@@ -75,14 +75,14 @@ extend UserServiceBuilder
         { self with config: cfg }
 
     fn build(self: UserServiceBuilder) -> Result[UserService, str] =
-        Ok(UserService {
+        UserService {
             repo: self.repo ?? return Err("UserRepository is required"),
             cache: self.cache ?? return Err("CacheService is required"),
             notifier: self.notifier ?? return Err("NotificationService is required"),
             audit: self.audit ?? return Err("AuditLog is required"),
             config: self.config,
             metrics: RwLock.new(ServiceMetrics {}),
-        })
+        }
 
 // --- Service Methods ---
 
@@ -123,22 +123,22 @@ extend UserService
 
             let posts = posts_task.await?
             let followers = followers_task.await?
-            let last_login = login_task.await.unwrap_or(Ok(None))
+            let last_login = login_task.await.unwrap_or(None)
 
             (posts, followers, last_login)
 
         let profile = UserProfile { user, post_count: posts, followers, last_login }
 
-        // Write through to cache (fire and forget — don't fail on cache error)
+        // Best-effort write-through cache update (await, ignore error)
         let _ = cache_set(&*self.cache, &cache_key, &profile, self.config.cache_ttl).await
 
-        Ok(profile)
+        profile
 
     // --- Create User ---
     //
     // Validates, inserts, invalidates cache, sends notification,
     // records audit log. Demonstrates with-block builders, pattern
-    // matching on roles, and concurrent fire-and-forget.
+    // matching on roles, and concurrent scope-managed side effects.
 
     async fn create_user(
         self: &UserService,
@@ -168,7 +168,7 @@ extend UserService
         let id = self.repo.insert(&user).await?
         let user = { user with id: id }
 
-        // Post-creation side effects (concurrent, non-blocking)
+        // Post-creation side effects (concurrent, scope-managed)
         async scope |s|:
             // Audit log
             s.track(self.audit.record(
@@ -182,7 +182,7 @@ extend UserService
             // Invalidate any cached user lists
             s.track(self.cache.delete("users:active:*"))
 
-        Ok(user)
+        user
 
     // --- Update User ---
     //
@@ -219,7 +219,7 @@ extend UserService
         with describe_changes(&current, &updated) as changes:
             self.audit.record(actor, "update_user", &changes).await?
 
-        Ok(updated)
+        updated
 
     // --- Delete User ---
 
@@ -250,8 +250,6 @@ extend UserService
                     body: "Your account has been removed.",
                     priority: .Normal,
                 }))
-
-        Ok()
 
     // --- List Active Users (paginated) ---
 
@@ -284,7 +282,7 @@ extend UserService
                 self.config.cache_ttl,
             ).await
 
-        Ok(users)
+        users
 
     // --- Batch Profile Fetch ---
     //

@@ -25,22 +25,22 @@ extend MockUserRepo
 impl UserRepository for MockUserRepo {
     async fn find_by_id(self: &MockUserRepo, id: UserId) -> Result[Option[User], DbError] =
         with self.users.read() as users:
-            Ok(users.get(&id).cloned())
+            users.get(&id).cloned()
 
     async fn find_by_email(self: &MockUserRepo, email: &str) -> Result[Option[User], DbError] =
         with self.users.read() as users:
-            Ok(users.values()
+            users.values()
                 |> find(|u| u.email == email)
-                |> map(|u| u.clone()))
+                |> map(|u| u.clone())
 
     async fn list_active(self: &MockUserRepo, limit: i32, offset: i32) -> Result[Vec[User], DbError] =
         with self.users.read() as users:
-            Ok(users.values()
+            users.values()
                 |> filter(|u| u.active)
                 |> skip(offset as usize)
                 |> take(limit as usize)
                 |> cloned()
-                |> collect())
+                |> collect()
 
     async fn insert(self: &MockUserRepo, user: &User) -> Result[UserId, DbError] =
         let id = with self.next_id.lock() as mut next:
@@ -50,7 +50,7 @@ impl UserRepository for MockUserRepo {
         let user = { user.clone() with id: id }
         with self.users.write() as mut users:
             users.insert(id, user)
-        Ok(id)
+        id
 
     async fn update(self: &MockUserRepo, id: UserId, fields: &UserUpdate) -> Result[Unit, DbError] =
         with self.users.write() as mut users:
@@ -70,10 +70,10 @@ impl UserRepository for MockUserRepo {
                 .ok_or(.NotFound("users", "{id}"))
 
     async fn count_posts(self: &MockUserRepo, _id: UserId) -> Result[i32, DbError] =
-        Ok(0)
+        0
 
     async fn count_followers(self: &MockUserRepo, _id: UserId) -> Result[i32, DbError] =
-        Ok(0)
+        0
 }
 
 // --- In-Memory Mock Cache ---
@@ -89,21 +89,19 @@ extend MockCache
 impl CacheService for MockCache {
     async fn get_bytes(self: &MockCache, key: &str) -> Result[Option[Vec[u8]], CacheError] =
         with self.store.read() as store:
-            Ok(store.get(key).cloned())
+            store.get(key).cloned()
 
     async fn set_bytes(self: &MockCache, key: &str, val: &[u8], _ttl: Duration) -> Result[Unit, CacheError] =
         with self.store.write() as mut store:
             store.insert(key.to_string(), val.to_vec())
-        Ok()
 
     async fn delete(self: &MockCache, key: &str) -> Result[Unit, CacheError] =
         with self.store.write() as mut store:
             store.remove(key)
-        Ok()
 
     async fn exists(self: &MockCache, key: &str) -> Result[bool, CacheError] =
         with self.store.read() as store:
-            Ok(store.contains_key(key))
+            store.contains_key(key)
 }
 
 // --- Recording Mock Notifier ---
@@ -132,14 +130,13 @@ impl NotificationService for MockNotifier {
     async fn send(self: &MockNotifier, notif: &Notification) -> Result[Unit, NotifyError] =
         with self.sent.lock() as mut sent:
             sent.push(notif.clone())
-        Ok()
 
     async fn send_batch(self: &MockNotifier, notifs: &[Notification]) -> Result[i32, NotifyError] =
         with self.sent.lock() as mut sent:
             let count = notifs.len32()
             for n in notifs:
                 sent.push(n.clone())
-            Ok(count)
+            count
 }
 
 // --- No-Op Audit Log ---
@@ -148,7 +145,7 @@ type MockAudit = {}
 
 impl AuditLog for MockAudit {
     async fn record(self: &MockAudit, _actor: UserId, _action: &str, _detail: &str) -> Result[Unit, DbError] =
-        Ok()
+        ()
 }
 
 // --- Test Helper: Build service with mocks ---

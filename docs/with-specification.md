@@ -1,8 +1,8 @@
-# The With Programming Language — Specification v5.2
+# The With Programming Language — Specification v6.2
 
 **Status:** Reference specification for prototype implementation
-**Positioning:** Pragmatic Rust. Safe Zig. Data-oriented by default.
-**Principle:** Own it, handle it, or scope it.
+**Positioning:** The Kotlin of systems programming.
+**Principle:** Make the common case delightful. Be safe where it matters. Trust the programmer at the edges.
 
 ---
 
@@ -12,72 +12,86 @@
 
 ## 1. Design Goals
 
-With is a systems programming language that compiles to native machine
-code. No garbage collector. No implicit reference counting. No lifetime
-annotations. No hidden runtime costs. Performance is predictable from
-reading the source.
+With is a systems programming language that wants you to have a good
+time. No garbage collector. No lifetime annotations. No fighting the
+compiler for an hour to do something obvious.
+
+You get memory safety, native performance, and code that reads like
+you'd explain it to a colleague. The compiler is smart, catches real
+bugs, and stays out of your way for everything else.
 
 ### 1.1 Identity
 
-With is a **handle-first, data-oriented, scoped-ownership systems
-language.**
+With is the **Kotlin of systems programming.**
 
-The core idea: data lives in pools. Entities reference each other
-by handle (typed index), not by pointer. You access data through
-scoped borrows. The compiler enforces memory safety at compile time,
-not through lifetime annotations but through an architectural
-constraint: **references are ephemeral** — they exist only in local
-scope and cannot be stored.
+Kotlin looked at Java and asked: what if we kept the good parts and
+made everything else *nice*? With asks the same question about Rust.
 
-This produces code that is naturally cache-friendly, naturally
-concurrent, and naturally safe — without the cognitive cost of
-lifetime algebra.
+The core idea: most lifetime complexity comes from storing references
+in structs. Ban that, and 90% of the borrow checker pain disappears.
+The remaining 10%? The compiler is smart about it, the stdlib handles
+the tricky parts internally, and if you hit a genuine edge case,
+`unsafe` is right there — no shame, no ceremony.
+
+**The philosophy:**
+
+- **Common case first.** If 95% of code does the obvious thing, make
+  the obvious thing work. Don't penalize everyone for edge cases.
+- **Safe where it matters.** Use-after-free, double-free, data races —
+  these are caught at compile time. Always.
+- **Pragmatic at the edges.** HashMap::get just works. Iterators just
+  work. The compiler is smart about common patterns even when it can't
+  formally prove safety. If it's wrong, the stdlib uses `unsafe`
+  internally. You never see it.
+- **Trust the programmer.** If you write something weird, the compiler
+  warns you. It doesn't block you. You're an adult.
 
 **With thrives in:**
 
-- Service architecture (async, trait-object-heavy DI, error handling)
-- Game engines and ECS (dense storage, handle-based entities, comptime codegen)
-- Database wrappers and infrastructure (FFI layering, resource guards)
-- Structured async services (fiber concurrency, structured scopes)
-- Compile-time-generated frameworks (comptime type introspection)
+- Service architecture (async, DI, error handling)
+- Game engines and ECS (dense storage, handle-based entities)
+- Database wrappers and infrastructure (FFI, resource guards)
+- Anything where you'd use Rust but don't want to fight the compiler
 
-**With is not optimized for:**
+**What With looks like in practice:**
 
-- Pointer-heavy graph algorithms (use arenas with handles instead)
-- Self-referential or intrusive data structures (the ephemeral rule
-  prevents these by design — use handle indirection)
-- Hyper-generic typeclass-heavy functional programming libraries
-  (With is pragmatic, not purist)
+```
+async fn handle_signup(req: HttpRequest, db: &Database) -> Result[HttpResponse, ApiError] =
+    let body = req.json[SignupRequest]() ?? return Err(.InvalidJson)
 
-This is deliberate. The language holds the opinion that **indexed
-storage with generational handles is superior to complex graph-based
-pointer ownership** for the domains it targets.
+    if not body.email.is_valid() then
+        return Err(.ValidationError("Invalid email format"))
+
+    if db.find_user(body.email).await?.is_some() then
+        return Err(.ValidationError("Email already exists"))
+
+    let email = body.email
+    let user = User { email, role: .Member, created: Instant.now() }
+
+    db.insert(user).await?
+    HttpResponse.json(201, "User created successfully")
+```
+
+No garbage collector. No lifetime annotations. No `Ok(())`. No
+`.to_owned()`. No `unsafe`. Zero explicit memory management,
+fully statically typed, native-compiled, memory-safe. It reads
+like Python, runs like C.
 
 ### 1.2 Positioning
 
-With occupies a specific point in the design space relative to
-existing systems languages:
+- **Kotlin to Rust's Java.** Rust proved that compile-time memory safety
+  works. With takes that proof and asks: "what if it was fun?"
+  No lifetime annotations, no `Pin`, no `PhantomData`, no `where`
+  clauses that scroll off the screen.
 
-- **Pragmatic Rust.** With takes Rust's ownership model and removes its
-  most complex feature — lifetime annotations — by enforcing an
-  architectural constraint: references cannot be stored. This eliminates
-  `struct Foo<'a>`, `Pin<&mut Self>`, and the entire lifetime algebra
-  while preserving compile-time memory safety.
+- **Zig's control, Rust's safety.** Explicit allocation, C interop
+  on day one, no hidden runtime costs — with compile-time safety
+  that Zig deliberately omits.
 
-- **Safe Zig.** With provides Zig's level of control (explicit
-  allocation, no hidden costs, C interop) with Rust-grade compile-time
-  safety guarantees that Zig deliberately omits.
-
-- **Data-oriented by default.** The language's restrictions naturally
-  push code toward Data-Oriented Design: data lives in pools, entities
-  reference each other by handle, ownership is always clear. This is
-  not a side effect — it is the core architectural thesis.
-
-With is not "Rust but simpler." It is a different language with a
-different architectural opinion. Rust allows you to express any
-ownership topology and annotates it. With forbids complex ownership
-topologies and gives you handles instead. Both are valid — they serve
-different priorities.
+- **Data-oriented by default.** The language naturally pushes you
+  toward good architecture: data in pools, handles over pointers,
+  clear ownership. Not because of restrictions, but because the
+  ergonomics make it the path of least resistance.
 
 ### 1.3 Target Domains
 
@@ -92,7 +106,7 @@ where:
 
 The name reflects the core abstraction: working *with* data through
 scoped access. The `with` keyword is the language's signature
-construct — it appears in guarded resource access (`with guard lock.read()
+construct — it appears in guarded resource access (`with lock.read()
 as data:`), object initialization (`with Config.default() as mut c:`),
 intermediate computation (`with expr as name:`), and record update
 (`{ entity with position: new_pos }`). Most With files contain `with`.
@@ -141,141 +155,91 @@ features listed above. This is the core design invariant.
 
 ### 1.6 Comparison
 
-| | Rust | With | Zig | Go |
+| | Rust | With | Kotlin | Go |
 |---|---|---|---|---|
-| **Memory safety** | Compile-time | Compile-time | Manual | GC |
+| **Memory safety** | Compile-time | Compile-time | GC | GC |
 | **Lifetime annotations** | Yes (`'a`) | None | None | None |
-| **Stored references** | Yes | No (handles) | Yes (raw ptrs) | Yes (GC) |
+| **Stored references** | Yes | No (handles) | Yes (GC) | Yes (GC) |
 | **Borrow checker** | Full | Simplified | None | None |
-| **Async model** | State machines | Fibers | Manual | Goroutines |
-| **Runtime** | Optional | Optional | None | Mandatory GC |
-| **Generics** | Yes | Yes | Yes (comptime) | Yes |
-| **C interop** | Via FFI | Native | Native | Via cgo |
-| **Learning curve** | Steep | Moderate | Moderate | Gentle |
+| **Async model** | State machines | Fibers | Coroutines | Goroutines |
+| **Runtime** | Optional | Optional | JVM/Native | Mandatory GC |
+| **Generics** | Yes | Yes | Yes | Yes |
+| **C interop** | Via FFI | Native | Via JNI/cinterop | Via cgo |
+| **Learning curve** | Steep | Gentle | Gentle | Gentle |
+| **Coding feel** | Explicit | Kotlin-like | Kotlin | Go |
 
 ---
 
 ### 1.7 Ergonomics
 
-With prioritizes day-to-day ergonomics without compromising safety:
+With prioritizes joy. The common case should be effortless:
 
+- **Implicit `Ok` wrapping** — functions returning `Result` don't
+  need `Ok(value)` at the end. Just return the value. (§4.9)
+- **No `Ok(())`** — functions returning `Result[Unit, E]` don't
+  need a trailing `Ok()`. Just end the function. (§4.9)
+- **String literals just work** — `"hello"` auto-promotes to owned
+  `str` when the type expects it. No `.to_owned()` on every struct
+  initialization. (§15.3)
+- **Auto-ref** — pass `alice` where `&User` is expected. The
+  compiler borrows for you. (§3.8)
+- **Auto-deref** — `box_user.name` works through any number of
+  pointers. No `(*x).field`. (§3.7)
+- **Implicit trait coercion** — pass `&my_log` where `&dyn Logger`
+  is expected. If it implements the trait, just pass it. (§3.9)
+- **Comprehensions** — `[x * x for x in 0..10]` builds a list.
+  Obviously it allocates. That's fine. (§13.6)
+- **Iterators just work** — hold two items, zip, peek. The compiler
+  is smart about stdlib iterators. (§13.2)
+- **`with` infers guards** — `with lock.read() as data:` — the
+  compiler knows it's a guard from the type. No keyword. (§7.1)
+- **C functions just call** — `c_import` functions are callable
+  directly. No `unsafe {}` wrapper on every FFI call. (§16.1)
 - **Postfix `.await`** — chains naturally with `?` and `|>` (§14.5)
+- **Pipeline operator** — `data |> filter(_.active) |> map(_.name)` (§12)
 - **Field shorthand** — `User { name, email }` when variable names
   match field names (§4.3)
 - **Default field values** — `ServerConfig { port: 9090 }` omits
   fields that have defaults (§4.3)
 - **Enum variant shorthand** — `.Member` when the type is known from
   context (§4.4)
-- **Ephemeral structs** — `type Token = ephemeral { text: StrView }`
-  for parsers, iterators, and borrowed contexts (§5.5)
-- **Tuples** — `(i32, str)` for quick groupings, destructuring with
-  `let (x, y) = ...` (§4.8)
 - **Optional chaining** — `user.address?.city` for nested Option
   access (§10.3)
-- **Default operator** — `x ?? default` for unwrap-or, with early
-  exit form `x ?? return Err(...)` (§10.4)
+- **Default operator** — `x ?? default` for unwrap-or (§10.4)
 - **Error context** — `fs.open(path).context("loading config")?`
   wraps errors with human-readable messages (§10.6)
-- **Destructuring `let`** — struct, tuple, and slice patterns in
-  bindings (§9.7)
-- **`@[derive(all)]`** — derives every structural trait a type
-  qualifies for (§11.8)
-- **Unit elision** — `Ok()` instead of `Ok(())` when `T = Unit`
-  (§4.8)
-- **Implicit iteration** — `for x in collection:` auto-inserts
-  `.iter()` when needed (§13.5)
-- **`.unwrap()` / `.expect()`** — extract values with panic on
-  failure, for tests and prototyping (§10.6)
-- **`unreachable()` / `todo()` / `assert_matches`** — testing and
-  control flow utilities in the prelude (§18.6)
-- **Implicit builder return** — `with x as mut c:` blocks
-  auto-return `c` when the last statement is Unit (§7.2)
-- **`select await`** — race multiple async expressions with
-  per-branch pattern matching (§14.10)
-- **Enum accessor methods** — `.is_variant()` and `.as_variant()`
-  auto-generated for all enums (§4.4)
-- **By-value `self` method chaining** — builder patterns use
-  `.method()` dot-notation, not pipeline placeholders (§9.5)
-- **Disjoint closure captures** — closures capture individual
-  fields, enabling parallel access to disjoint struct fields (§3.6)
-- **`.await` inside iterators** — fibers allow `.await` in `map`,
-  `filter`, `fold` — no `Stream` or `AsyncIterator` needed (§14.12)
-- **`async:` blocks** — inline async expressions that return
-  `Task[T]`, essential for structured concurrency (§14.6)
-- **Reference pattern ergonomics** — patterns matching `&T`
-  auto-bind as references, no explicit `&` needed (§9.7)
-- **By-value `drop`** — `Drop::drop` takes `self: Self`, no
-  defensive null-outs needed (§2.4)
-- **`ScopedSend`** — ephemeral types can be sent to scoped
-  threads/fibers that are guaranteed to join (§14.15)
-- **Synchronous ephemeral cancellation** — dropping an ephemeral
-  `Task` blocks until the fiber stops, preventing use-after-free
-  (§14.7)
+- **Builder blocks** — `with Config.default() as mut c:` with
+  flexible return values (§7.2)
+- **Cancellation just works** — no `From[TaskCancelled]` on every
+  error type. Cancellation unwinds cleanly. (§14.7)
 
 ### 1.8 Known Tradeoffs
 
-Eliminating lifetime annotations has real costs. These are
-deliberate design choices, not oversights:
+Eliminating lifetime annotations has real costs. With handles them
+pragmatically:
 
-**Conservative ephemeral returns.** When a function returns an
-ephemeral value and accepts multiple reference parameters, the
-returned reference is treated as borrowing from **all** inputs
-(§3.4). `fn pick(a: &mut X, b: &mut X) -> &mut X` locks both
-`a` and `b` while the return value is live. In Rust, lifetimes
-express "borrows only from `a`". In With, the compiler
-over-approximates. The workaround is to return an index/handle and
-let the caller access the winner directly, or restructure to avoid
-returning references from multi-reference functions.
+**No stored references.** References can't live in structs. Service
+architectures use `Arc` for shared ownership, handles for entity
+relationships. This is more verbose than Rust's `&'a T` but
+eliminates lifetime annotations on every struct.
 
-**Stateful zero-copy parsing.** The conservative return rule also
-impacts parsers: `fn next_token(p: &mut Parser) -> Token` where
-`Token` contains a `StrView` is treated as borrowing the parser
-exclusively, preventing the next call. Workarounds:
-
-- Return `Token` with `(start: u32, end: u32)` indices instead of
-  `StrView`, letting the caller slice the source string.
-- Take `&Parser` (shared) with internal mutability for the cursor.
-- Use the ephemeral tokenizer pattern from §5.5, which iterates
-  all tokens in a single scope.
-
-**No stored references.** References cannot be stored in structs
-(§3.3). Service architectures must own dependencies via `Box` or
-`Arc`. Testing with mock injection requires `Arc[Mutex[Mock]]` to
-inspect mocks after use. This is more verbose than Rust's borrowed
-references but eliminates lifetime annotations on every struct.
-
-**Fiber overhead per async trait call.** Each `async fn` call
-through a trait object spawns a fiber. The runtime mitigates this
-via stack pooling (§14.18), making the cost comparable to a free-list
-grab + context switch rather than a heap allocation. But it is still
-more expensive than Rust's stackless state machines for micro-tasks.
+**Conservative borrow analysis.** When a function returns a reference
+and takes multiple reference parameters, the compiler conservatively
+assumes the return borrows from all inputs. For common patterns
+(HashMap::get, split_at_mut, iterators), the **compiler has built-in
+knowledge** of stdlib types and does the right thing. For user code,
+returning references from multi-parameter functions may over-borrow.
+Workaround: return an index/handle, or restructure.
 
 **Generator yield restriction.** Generators cannot yield references
-to their own locals (§13.4). Zero-copy iteration that yields
-references requires fiber-backed async iteration or ephemeral
-iterator structs — not `gen fn`.
-
-**Collecting ephemeral items from iterators.** When `Iter[T]::next`
-returns an ephemeral value, the returned item borrows the iterator
-(Rule 6, §21.1). This means you cannot hold multiple ephemeral
-items from the same iterator simultaneously — calling `next()` a
-second time requires exclusive access to the iterator, which is
-blocked by the first item's borrow. `for` loops work fine (each
-item drops at iteration end), but collecting into a `Vec` requires
-owned items: `iter() |> map(|x| x.to_owned()) |> collect()`.
-Lookahead patterns use `peekable()` (which stores the peeked item
-internally). This is a fundamental cost of no-lifetimes — Rust
-distinguishes "borrows the source data" from "borrows the iterator
-state" via lifetimes; With cannot.
+to their own locals. Use ephemeral iterator structs (§5.5) or the
+callback/visitor pattern for zero-copy iteration.
 
 **FFI stack switching.** Fibers calling C code pay ~10–50 ns for
-stack switching at the FFI boundary (§14.18). Pure-With code pays
-nothing.
+stack switching. Use `@[ffi_stack]` to batch FFI-heavy functions.
 
-These tradeoffs are the price of eliminating lifetime annotations,
-`Pin`, and async coloring. For the target domain (data-oriented
-systems, game engines, async services with moderate concurrency),
-we believe they are the right trade.
+These are the real costs. For the target domain — services, games,
+infrastructure — they're the right trade.
 
 ---
 
@@ -356,22 +320,29 @@ value** — the value is consumed:
 ```
 impl Drop for Database
     fn drop(self: Self) =
-        unsafe { sqlite3_close(self.handle) }
+        sqlite3_close(self.handle)
 ```
 
 Because `drop` consumes `self`, there is no need to defensively
 null out fields to prevent double-free — the value ceases to exist
-after `drop` returns. The compiler guarantees `drop` is called
-exactly once. After the user's `drop` body executes, the compiler
-runs destructors for each field in reverse declaration order.
+after `drop` returns. The compiler handles the details: fields you
+use in your drop body are consumed, remaining fields are dropped
+automatically. No recursion, no leaks, no ceremony:
+
+```
+impl Drop for Database
+    fn drop(self: Self) =
+        sqlite3_close(self.handle)
+        // self.handle was consumed by the close call
+        // compiler drops remaining fields automatically
+```
 
 Drop order within a scope is reverse declaration order.
 
-**Partial moves from Drop types are forbidden.** If a type
-implements `Drop`, you cannot move individual fields out of it
-(including via record update syntax). Moving a field would leave
-the value in a partially-initialized state, and the compiler would
-not know which fields to destroy when running `Drop`:
+**Partial moves from Drop types are forbidden** in normal code.
+Inside `drop` itself, you can access and consume fields freely.
+Outside of `drop`, moving a field out of a Drop type is a compile
+error:
 
 ```
 type FileWrapper = { fd: File, name: String }
@@ -399,7 +370,7 @@ fn process(path: str) -> Result[Unit, IoError] =
     defer f.close()
     // ... use f ...
     // f.close() runs here, regardless of early returns
-    Ok()
+    // implicit Ok(()) — no trailing expression needed
 ```
 
 `defer` statements execute in LIFO order.
@@ -551,6 +522,86 @@ both closures would capture `world` as a whole, creating conflicting
 borrows. With disjoint capture, the compiler sees that the two
 closures access non-overlapping field paths and permits the code.
 
+### 3.7 Auto-Dereferencing
+
+The compiler automatically follows references, boxes, and smart
+pointers to find fields and methods. You never write `(*x).field`:
+
+```
+let u: Box[User] = Box.new(User { name: "Alice" })
+let name = u.name           // auto-derefs Box → User → .name
+
+let r: &User = &alice
+let name = r.name           // auto-derefs &User → .name
+
+let rr: &&User = &&alice
+let name = rr.name          // follows multiple layers automatically
+```
+
+Auto-deref applies to `&T`, `&mut T`, `Box[T]`, `Arc[T]`, `Rc[T]`,
+and any type implementing the `Deref` trait. The compiler inserts as
+many dereferences as needed to reach the target field or method.
+
+**The vibe:** "I don't care how many layers of indirection there
+are, just give me the `.name` field."
+
+### 3.8 Auto-Referencing
+
+When a function takes `&T` and you pass an owned `T`, the compiler
+automatically borrows it:
+
+```
+fn print_user(u: &User) = println(u.name)
+
+let alice = User { name: "Alice" }
+print_user(alice)           // compiler inserts &alice automatically
+```
+
+This also works for method calls: `alice.greet()` works whether
+`greet` takes `self: &Self` or `self: Self`.
+
+**Restriction:** Auto-referencing only applies to shared borrows
+(`&T`). Mutable borrows (`&mut T`) must be explicit — when data
+might be modified, the call site should show it:
+
+```
+fn update(u: &mut User) = u.name = "Bob"
+
+var alice = User { name: "Alice" }
+update(&mut alice)          // explicit: mutation is visible
+update(alice)               // ERROR: won't auto-ref to &mut
+```
+
+**The vibe:** "The function just wants to look at the data. I
+shouldn't have to manually type `&`."
+
+### 3.9 Implicit Trait Object Coercion
+
+When a function takes `&dyn Trait` and you pass `&T` where `T`
+implements the trait, the compiler coerces automatically. No cast
+needed — if it implements the trait, just pass it:
+
+```
+trait Logger { fn log(self: &Self, msg: &str) }
+type ConsoleLog = {}
+impl Logger for ConsoleLog
+    fn log(self: &Self, msg: &str) = println(msg)
+
+fn process(logger: &dyn Logger) = logger.log("processing")
+
+let my_log = ConsoleLog {}
+process(&my_log)            // auto-coerces &ConsoleLog → &dyn Logger
+```
+
+This is the Go interface feel — structural satisfaction, implicit
+coercion. The same applies to `Box[T]` → `Box[dyn Trait]`:
+
+```
+let logger: Box[dyn Logger] = Box.new(ConsoleLog {})  // auto-coerced
+```
+
+**The vibe:** "It implements the trait. Just take it."
+
 ---
 
 ## 4. Types
@@ -622,7 +673,10 @@ let p2 = { p1 with x: 3.0 }        // p2 = Point { x: 3.0, y: 2.0 }
 
 `{ base with field: value }` copies (or moves) all fields from `base`,
 then overwrites the named fields. If the type is `Copy`, the base is
-copied and remains valid. If not, the base is moved.
+copied and remains valid. If not, the base is moved — non-overwritten
+fields are moved into the new record, and **overwritten fields are
+dropped** (the compiler emits `drop` calls for them). The base is
+fully consumed.
 
 Multiple fields may be updated:
 
@@ -950,14 +1004,12 @@ expects a single argument of type `Unit`, the argument may be
 omitted. The compiler inserts `()` automatically:
 
 ```
-fn process() -> Result[Unit, IoError] = ...
-    Ok()                    // desugars to Ok(())
-
-cache.delete(key).await.unwrap_or()   // desugars to .unwrap_or(())
+unwrap_or()   // desugars to .unwrap_or(())
+Some()        // desugars to Some(())
 ```
 
-This avoids the double-parenthesis pattern `Ok(())` that arises
-whenever `Result[Unit, E]` is used.
+In practice, `Ok()` is rarely needed because of implicit `Ok`
+wrapping (§4.9). But Unit elision still helps with other types.
 
 **Applicability:** Unit elision applies **only when the expected
 parameter type is statically known to be `Unit`** at the call site
@@ -965,7 +1017,6 @@ via bidirectional type inference. It does NOT apply to unconstrained
 generics:
 
 ```
-Ok()                 // OK: return type Result[Unit, E] → T = Unit
 unwrap_or()          // OK: Option[Unit].unwrap_or → expected Unit
 
 fn id[T](val: T) -> T = val
@@ -973,26 +1024,68 @@ id()                 // ERROR: expected 1 argument, got 0
                      // T is unconstrained — elision does not apply
 ```
 
-This prevents ambiguity in the type checker: the compiler never
-needs to guess whether a missing argument is "zero args" or "Unit
-elision."
-
 More examples:
 
 ```
-// Common patterns that benefit from Unit elision:
+// These patterns used to need Ok() — now just let the function end:
 async fn send_email(to: &str, body: &str) -> Result[Unit, SmtpError] =
     transport.send(to, body).await?
-    Ok()                              // instead of Ok(())
+    // implicit Ok(()) — just end the function
 
 fn run_migrations() -> Result[Unit, DbError] =
     for m in migrations:
         m.execute(&conn)?
-    Ok()                              // instead of Ok(())
+    // implicit Ok(()) — no ceremony needed
 
-// unwrap_or with Unit
+// unwrap_or with Unit still uses elision
 let _ = cache.set(key, value).await.unwrap_or()   // instead of .unwrap_or(())
 ```
+
+### 4.9 Implicit `Ok` Wrapping
+
+When a function's return type is `Result[T, E]`, the compiler
+automatically wraps the final expression:
+
+- If the last expression has type `T` (not `Result`), it's wrapped
+  in `Ok(...)`.
+- If the function returns `Result[Unit, E]` and the block ends with
+  a statement (no trailing expression), `Ok(())` is returned.
+- `?` still early-returns `Err` as normal.
+
+```
+// Before: manual Ok wrapping
+fn get_user(id: i32) -> Result[User, DbError] =
+    let row = db.query("SELECT ...", id)?
+    let user = User.from_row(row)
+    Ok(user)
+
+// After: implicit Ok wrapping
+fn get_user(id: i32) -> Result[User, DbError] =
+    let row = db.query("SELECT ...", id)?
+    User.from_row(row)                   // auto-wrapped in Ok(...)
+
+// Result[Unit, E] — no trailing expression needed
+fn save_all(items: &Vec[Item]) -> Result[Unit, DbError] =
+    for item in items:
+        db.insert(item)?
+    // implicitly returns Ok(())
+
+// Explicit Err still works normally
+fn validate(age: i32) -> Result[Unit, ValidationError] =
+    if age < 0 then return Err(.InvalidAge)
+    if age > 150 then return Err(.InvalidAge)
+    // implicitly returns Ok(())
+```
+
+**The rule is simple:** `?` handles the sad path. The happy path
+just returns the value. No wrapping needed.
+
+**When implicit wrapping does NOT apply:**
+
+- If the last expression already has type `Result[T, E]`, no
+  wrapping occurs (would produce `Result[Result[T, E], E]`).
+- If the return type is not `Result`, this feature doesn't apply.
+- Explicit `Ok(...)` and `Err(...)` still work everywhere.
 
 **Guideline:** Tuples above 3 elements should usually be replaced
 with a named struct for readability. The compiler does not enforce
@@ -1195,35 +1288,34 @@ the same idea — bounded, explicit interaction with data.
 
 | Form | Meaning | Appears in |
 |------|---------|------------|
-| `with guard as name:` | Guarded access (lock, arena, file) | Concurrent/resource code |
+| `with as name:` | Guarded access (lock, arena, file) | Concurrent/resource code |
 | `with value as mut name:` | Scoped mutation (builder pattern) | Initialization, configuration |
 | `with expr as name:` | Scoped binding (named temporary) | Pipelines, intermediate values |
 | `{ expr with field: val }` | Record update (functional copy) | Data transformation |
 
 ### 7.1 Form 1: Guarded Access
 
-When data lives behind a lock, arena, or resource guard, `with guard`
-provides scoped access. The `guard` keyword is required — it tells
-the compiler to dispatch via the `Scoped`/`ScopedMut` trait. The
-guard manages acquisition and release; the user works with the data
-inside the block.
+When data lives behind a lock, arena, or resource guard, `with`
+provides scoped access. If the expression's type implements
+`Scoped` or `ScopedMut`, the compiler **automatically** dispatches
+through the guard. No keyword needed — the type tells the compiler
+everything.
 
 ```
-with guard lock.read() as data:
+with lock.read() as data:
     data.iter() |> filter(|x| x.active) |> count()
 
-with guard db.connection() as conn:
+with db.connection() as conn:
     conn.query("SELECT * FROM users WHERE id = ?", user_id)
 
-with guard world.entities[player_id] as mut player:
+with world.entities[player_id] as mut player:
     player.health -= damage
     player.last_hit = now()
 ```
 
-This form is dispatched when the `guard` keyword is present and the
-expression's type implements `Scoped` or `ScopedMut`. The block body
-receives a reference. The reference is ephemeral — it cannot escape
-the block.
+This form activates when the expression's type implements `Scoped`
+or `ScopedMut`. The block body receives a reference. The reference
+is ephemeral — it cannot escape the block.
 
 **Traits:**
 
@@ -1239,18 +1331,18 @@ trait ScopedMut[T] {
 
 **Desugaring:**
 ```
-with guard lock.read() as data: body
+with lock.read() as data: body
 // → lock.read().enter(|data| body)
 
-with guard store.write() as mut data: body
+with store.write() as mut data: body
 // → store.write().enter_mut(|data| body)
 ```
 
 Multiple guarded bindings are flat, nesting left-to-right:
 ```
-with guard a.read() as textures,
-           b.read() as meshes,
-           c.write() as mut materials:
+with a.read() as textures,
+     b.read() as meshes,
+     c.write() as mut materials:
     body
 // → a.read().enter(|textures|
 //     b.read().enter(|meshes|
@@ -1282,40 +1374,31 @@ let sprite = with Sprite.new() as mut s:
 ```
 
 **Implicit return rule:** In `with expr as mut x:`, if the block's
-last statement evaluates to `Unit` (i.e., it's an assignment,
-method call returning Unit, or other statement), the block
-implicitly evaluates to `x`. If the last statement is an explicit
-expression of non-Unit type, that expression is the block's value
-as normal.
+last statement evaluates to `Unit` (assignment, void method call),
+the block returns `x` (the builder). If the last expression is
+non-Unit, the block returns that expression's value.
 
 ```
-// Implicit return — last statement is an assignment (Unit)
+// Builder: last statement is assignment → returns config
 let config = with Config.default() as mut c:
-    c.timeout = 30          // Unit → block evaluates to `c`
+    c.timeout = 30
+    c.retries = 3            // Unit → block returns c
 
-// Explicit return — last expression is non-Unit
+// Extract: last expression is non-Unit → returns length
 let len = with Vec.new() as mut v:
     v.push(1)
     v.push(2)
-    v.len()                 // usize → block evaluates to v.len()
+    v.len()                  // usize → block returns 2
+
+// Builder with method that returns a value? Just add a trailing
+// statement or use let _ = :
+let config = with Config.default() as mut c:
+    c.headers.insert("Auth", tok)   // returns Option[V]...
+    c.timeout = 30                   // ...but this is Unit → returns c
 ```
 
-**Escape hatch:** To use a builder block purely for side effects
-(returning `Unit` instead of the built value), end the block with
-an explicit `Unit` literal or assign to `let _`:
-
-```
-// Side-effect-only builder: explicit Unit suppresses implicit return
-fn setup() =
-    with Config.default() as mut c:
-        c.timeout = 30
-        apply_config(&c)
-        ()                  // explicit Unit → block evaluates to Unit
-
-// Or simply discard:
-let _ = with Config.default() as mut c:
-    c.timeout = 30
-```
+This gives you both builder and extraction patterns from the same
+construct. The type system tells you what you're getting.
 
 This form is used when the expression's type does **not** implement
 `Scoped`/`ScopedMut`. The value is bound as a mutable local inside
@@ -1381,36 +1464,38 @@ consumed).
 
 ### 7.5 Dispatch Rule
 
-The `with` block form is determined by syntax, **not by trait
-implementation alone**:
+The `with` block form is determined by the **type** of the
+expression:
 
 ```
-with guard expr as name:       →  requires Scoped   → expr.enter(|name| body)
-with guard expr as mut name:   →  requires ScopedMut → expr.enter_mut(|name| body)
-with expr as mut name:         →  always             → { var name = expr; body }
-with expr as name:             →  always             → { let name = expr; body }
+// If expr implements Scoped → guarded access
+with lock.read() as data:          →  expr.enter(|data| body)
+with store.write() as mut data:    →  expr.enter_mut(|data| body)
+
+// Otherwise → simple binding
+with expr as mut name:             →  { var name = expr; body }
+with expr as name:                 →  { let name = expr; body }
 ```
 
-The `guard` keyword explicitly selects Form 1 (guarded access).
-Without `guard`, the `with` block is always a simple binding
-(Form 2/3). This prevents semver hazards: adding `ScopedMut` to a
-library type never changes how downstream `with` blocks desugar.
+The compiler checks: does the expression's type implement `Scoped`
+or `ScopedMut`? If yes, it's guarded access. If no, it's a simple
+binding. No keyword needed — the type system does the work.
 
 ```
-// Guarded access — explicit 'guard' keyword
-with guard lock.write() as data:
+// Guarded access — lock.read() returns a Scoped type
+with lock.write() as data:
     data.x = 1                         // guard released at block exit
 
-// Builder — no 'guard', always a simple binding
+// Builder — Config.default() doesn't implement Scoped
 let config = with Config.default() as mut c:
-    c.retries = 3                      // implicit builder return
-
-// If Config later implements ScopedMut, this code is unchanged —
-// it's still Form 2 because there's no 'guard' keyword.
+    c.retries = 3
 ```
 
-Using `guard` on a type that does not implement `Scoped`/`ScopedMut`
-is a compile error.
+**Semver note:** If a library type adds `Scoped` or `ScopedMut`
+in a new version, existing `with` blocks using that type will
+change dispatch. This is intentional — implementing `Scoped` is a
+deliberate API decision that says "this type is a guard." Types
+don't implement `Scoped` by accident.
 
 ### 7.6 `with` as Expression
 
@@ -1419,7 +1504,7 @@ the body.
 
 ```
 // Guarded access — result must be non-ephemeral
-let count = with guard store.read() as textures:
+let count = with store.read() as textures:
     textures.iter() |> count()
 
 // Builder — result is the configured value (implicit return)
@@ -1448,19 +1533,19 @@ Kotlin's `inline` lambdas or Swift's `@noescape` closures):
 
 ```
 fn find_value(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32] =
-    with guard lock.lock() as map:
+    with lock.lock() as map:
         match map.get(key)
             Some(v) -> return Some(v)   // returns from find_value
             None    -> ()
     None
 
 fn process_all(lock: &Mutex[Vec[Item]]) -> Result[Unit, AppError] =
-    with guard lock.lock() as items:
+    with lock.lock() as items:
         for item in items:
             if item.is_invalid():
                 continue                 // continues enclosing for loop
             validate(item)?              // propagates to process_all
-    Ok()
+    // implicit Ok(())
 ```
 
 This is possible because `with` blocks are always non-escaping and
@@ -1503,12 +1588,12 @@ with db.transaction() as tx:
 
 ### 7.9 `with` Idioms and Rules
 
-**`.await` inside `@[no_await_guard]` types is a compile error:**
+**`@[no_await_guard]` enforcement is NLL-based, not syntax-based:**
 
-Some `Scoped`/`ScopedMut` types represent synchronization guards
-that must not be held across suspension points — holding a mutex
-lock while a fiber suspends blocks all other fibers waiting for that
-lock. These types are annotated `@[no_await_guard]`:
+Some synchronization guard types must not be held across suspension
+points — holding a mutex lock while a fiber suspends blocks all
+other fibers waiting for that lock. These types are annotated
+`@[no_await_guard]`:
 
 ```
 @[no_await_guard]
@@ -1522,27 +1607,32 @@ type WriteGuard[T] = { ... }
 ```
 
 The compiler rejects `.await` **or any `may_suspend` function call**
-inside a `with` block when the guard type carries this annotation
-(see Invariant 5, §14.3):
+while a `@[no_await_guard]` value is **live in the NLL sense** —
+regardless of whether it was created via `with` or a plain
+`let` binding (see Invariant 5, §14.3):
 
 ```
-// ERROR: MutexGuard is @[no_await_guard]
-with guard lock.read() as data:
+// ERROR: guard is live across .await (via with block)
+with lock.read() as data:
     let result = fetch(data.url).await   // compile error E0701
 
-// ERROR: helper() is may_suspend (it contains .await internally)
-fn helper(url: &str) -> String =
-    http.get(url).await?.body
+// ERROR: guard is live across .await (via plain let binding)
+let guard = lock.lock()
+let data = guard.deref()
+fetch(data.url).await                    // compile error E0701!
+//              ^^^^^^ @[no_await_guard] MutexGuard is live
 
-with guard lock.read() as data:
+// ERROR: helper() is may_suspend (it contains .await internally)
+with lock.read() as data:
     let result = helper(data.url)        // compile error E0701
     //           ^^^^^^ may_suspend function called while
     //                  @[no_await_guard] ReadGuard is live
 
-// FIX: clone out, release guard, then await
-let snapshot = with guard lock.read() as data:
+// FIX: drop guard before awaiting
+let snapshot = with lock.read() as data:
     data.clone()
-let result = fetch(snapshot.url).await
+// guard dropped here
+let result = fetch(snapshot.url).await   // OK: no guard live
 ```
 
 Other `Scoped` types — connection pools, transactions, file handles
@@ -1550,12 +1640,12 @@ Other `Scoped` types — connection pools, transactions, file handles
 
 ```
 // OK: ConnectionPool's guard is NOT @[no_await_guard]
-with guard self.pool.acquire() as conn:
+with self.pool.acquire() as conn:
     let row = conn.query("SELECT ...").await?   // fine
     Ok(row_to_user(row))
 
 // OK: Transaction guard is NOT @[no_await_guard]
-with guard conn.begin() as tx:
+with conn.begin() as tx:
     tx.execute("INSERT ...").await?
     tx.execute("UPDATE ...").await?
     tx.commit()
@@ -1597,7 +1687,7 @@ let name = with db.read() as users:
         .map(|u| u.name.clone())   // clone to escape the guard
 
 // If the value is Copy, no explicit clone needed:
-let count = with guard store.read() as data:
+let count = with store.read() as data:
     data.len()                      // usize is Copy, escapes freely
 ```
 
@@ -2052,11 +2142,11 @@ No exceptions. Errors are values.
 
 **`@[must_use]`:** Both `Result` and `Option` are annotated
 `@[must_use]`. Ignoring a `Result` silently swallows an error.
-Ignoring an `Option` silently discards a value. Both are compile
-errors:
+Ignoring an `Option` silently discards a value. Both produce
+**warnings**:
 
 ```
-// ERROR: unused Result — error silently swallowed
+// WARNING: unused Result — error may be silently swallowed
 db.execute("DROP TABLE users")
 
 // Fix: propagate, handle, or explicitly discard
@@ -2067,7 +2157,14 @@ let _ = db.execute("DROP TABLE users")             // intentional discard
 
 This catches the single most common class of "why isn't this
 working?" bugs in systems code. `let _ = expr` makes intentional
-discard visible and grep-able.
+discard visible and grep-able. Projects that want stricter
+enforcement can promote `@[must_use]` warnings to errors via
+`with.toml`:
+
+```toml
+[lint]
+must_use = "error"    # promote to compile error
+```
 
 ### 10.2 The `?` Operator
 
@@ -2102,9 +2199,21 @@ let city = user.address?.city
 let zip = user.address?.city?.zip_code
 ```
 
-**Desugaring:** `expr?.field` desugars to `expr.map(|v| v.field)`.
-`expr?.method(args)` desugars to `expr.and_then(|v| v.method(args))`
-when the method itself returns `Option`/`Result`.
+**Desugaring:** The desugaring is **type-aware** to avoid producing
+`Option[Option[T]]`:
+
+- If `field` has type `U` (non-Optional): `expr?.field` → `expr.map(|v| v.field)` — result is `Option[U]`.
+- If `field` has type `Option[U]`: `expr?.field` → `expr.and_then(|v| v.field)` — result is `Option[U]` (flattened).
+- `expr?.method(args)` → `expr.and_then(|v| v.method(args))` when the method returns `Option`/`Result`.
+
+```
+type Address = { city: Option[str], zip: str }
+type Profile = { address: Option[Address] }
+
+let zip = profile.address?.zip     // map: Option[str]
+let city = profile.address?.city   // and_then: Option[str] (not Option[Option[str]])
+let len = profile.address?.city?.len()  // chains correctly
+```
 
 Optional chaining works on both `Option[T]` and `Result[T, E]`:
 
@@ -2374,6 +2483,48 @@ fn debug[T: Show + Hash](x: &T) =
 ### 11.3 Static Dispatch by Default
 
 Trait calls are monomorphized. Dynamic dispatch via explicit `dyn Trait`.
+
+**Object safety:** A trait can be used as `dyn Trait` only if all
+its methods are **object-safe**. A method is object-safe if:
+
+1. It takes `self` by **reference** (`&Self` or `&mut Self`), OR
+2. It takes `self` by value (`Self`) and the trait specifies
+   `Self: Sized` — but `dyn Trait` is unsized, so by-value self
+   methods are excluded from the vtable.
+
+```
+trait Drawable {
+    fn draw(self: &Self)        // OK: &Self, object-safe
+    fn name(self: &Self) -> str // OK: &Self, object-safe
+}
+
+trait Consumable {
+    fn consume(self: Self)      // by-value self: NOT object-safe
+}
+
+let d: &dyn Drawable = &circle    // OK: all methods are object-safe
+let c: &dyn Consumable = &item    // ERROR: consume() takes self by value
+```
+
+**By-value `self` behind `Box`:** To call a by-value method through
+a trait object, wrap it in `Box[dyn Trait]`. The compiler generates
+a shim that moves the value out of the box (which has a known
+pointer size):
+
+```
+trait Builder {
+    fn build(self: Self) -> Config     // by-value self
+    fn preview(self: &Self) -> str     // by-reference
+}
+
+// Box[dyn Builder] can call build() via a generated shim:
+let b: Box[dyn Builder] = Box.new(MyBuilder { ... })
+let cfg = b.build()    // moves value out of box, calls build
+```
+
+Traits with generic methods (where the generic is not `Self`) are
+not object-safe, because the vtable cannot contain entries for all
+possible monomorphizations.
 
 ### 11.4 Coherence (Orphan Rules)
 
@@ -2675,7 +2826,7 @@ The following are **non-escaping**:
 ```
 items.for_each(|x| println(x))      // direct argument: non-escaping
 items |> filter(|x| x > 0)          // direct argument: non-escaping
-with guard lock.read() as data:           // with block body: non-escaping
+with lock.read() as data:           // with block body: non-escaping
     data.iter() |> map(|x| x + 1)   // direct argument: non-escaping
 ```
 
@@ -2694,16 +2845,30 @@ Iterators holding references to collections are ephemeral. They can be
 used in pipelines within scope but not stored, returned, or captured by
 escaping closures.
 
-**What this means in practice:** You cannot return a lazy iterator that
-borrows from its inputs. This is the cost of eliminating lifetime
-annotations.
+**What this means in practice:** You cannot return an *opaque* lazy
+iterator that borrows from its inputs (e.g., `-> impl Iter[StrView]`
+or `-> dyn Iter[StrView]`). However, you CAN return a *concrete
+ephemeral struct* that implements `Iter`:
 
 ```
-// IMPOSSIBLE: returns an ephemeral iterator
-fn find_matches(text: &String, pat: &str) -> Iter[StrView]
+// IMPOSSIBLE: opaque return type hides the ephemerality
+fn find_matches(text: &str, pat: &str) -> dyn Iter[StrView]
+
+// POSSIBLE: concrete ephemeral struct — caller inherits restriction
+type MatchIter = ephemeral { text: StrView, pat: StrView, pos: usize }
+impl Iter[StrView] for MatchIter { ... }
+
+fn find_matches(text: &str, pat: &str) -> MatchIter =
+    MatchIter { text: text.as_view(), pat: pat.as_view(), pos: 0 }
+// Caller's binding is ephemeral — cannot store, must use in this scope
 ```
 
-**Workarounds (in order of preference):**
+The concrete ephemeral struct approach works because the caller can
+see the type is ephemeral and inherits the restriction (Rule 8,
+§22.1). The opaque approach fails because trait objects erase the
+ephemerality, preventing the caller from knowing the restriction.
+
+**Additional workarounds (when concrete ephemeral structs are too verbose):**
 
 ```
 // 1. Collect into owned container (small allocation cost)
@@ -2761,6 +2926,24 @@ This restriction replaces the need for associated types on `Iter`
 in v1.0. A type that genuinely needs to yield different element
 types should provide named methods returning different iterator
 types (e.g., `.bytes() -> ByteIter`, `.lines() -> LineIter`).
+
+**Iterators just work.** The compiler has built-in knowledge of
+stdlib collection iterators (Vec, HashMap, Slice, etc.). When
+`next()` returns a reference, the compiler knows the reference
+borrows the *underlying collection*, not the iterator struct itself.
+This means normal iteration patterns work naturally:
+
+```
+let iter = names.iter()
+let a = iter.next()   // borrows from names, not iter
+let b = iter.next()   // OK — iter is not locked by a
+process(a, b)         // both references live simultaneously
+```
+
+`for` loops, `.zip()`, `.peekable()`, `.windows()` — all work as
+you'd expect. The compiler is smart. If you hit an edge case with a
+custom iterator, the worst that happens is a conservative borrow
+error with a clear message.
 
 ### 13.3 Collection Operations (Standard Library)
 
@@ -2922,12 +3105,19 @@ movable structs.
 their own locals, which means `gen fn tokenize(src: &str) -> &str`
 that yields slices of `src` is impossible (src is stored in the
 state machine, yielding a slice creates a self-referential struct).
-For zero-copy iteration that yields references, use **fiber-based
-async iteration** instead — fibers have real stacks, so references
-across suspension points are safe. Generators are best for
-owned-value sequences (Fibonacci, generated data, transformations).
-For zero-copy parsing, use ephemeral iterator structs (§5.5) or
-fiber-backed iteration.
+For zero-copy iteration that yields references, use **concrete
+ephemeral iterator structs** (§5.5, §13.1) or the **callback/visitor
+pattern**. Generators are best for owned-value sequences (Fibonacci,
+generated data, transformations).
+
+```
+// Zero-copy: ephemeral iterator struct
+type TokenIter = ephemeral { source: StrView, pos: usize }
+impl Iter[StrView] for TokenIter { ... }
+
+// Zero-copy: callback pattern
+fn each_token(src: &str, f: fn(StrView)) = ...
+```
 
 **Generators are not coroutines.** They are pull-based (the caller
 drives iteration by calling `next()`), not push-based (no scheduler
@@ -2997,28 +3187,17 @@ let coords = [(x, y) for x in 0..3 for y in 0..3 if x != y]
 
 ```
 [expr for x in iter if cond]
-```
-
-desugars to:
-
-```
+// →
 iter |> filter(|x| cond) |> map(|x| expr) |> collect[Vec]()
 ```
 
-Multiple `for` clauses desugar to nested `flat_map`:
+Yes, this allocates a `Vec`. It's obvious from the syntax — you're
+building a list. This is the same philosophy as string interpolation:
+the allocation is inherent to what you're asking for, and the syntax
+makes it clear.
 
-```
-[expr for x in xs for y in ys]
-// →
-xs |> flat_map(|x| ys |> map(|y| expr)) |> collect[Vec]()
-```
-
-Comprehensions always produce a `Vec`. For lazy evaluation, use
-pipeline syntax with iterators directly.
-
-Comprehensions are pure sugar — they introduce no new semantics,
-no new iterator protocol, and no hidden allocation beyond the
-`Vec` they build.
+Comprehensions are pure sugar. For lazy evaluation, use pipeline
+syntax with iterators directly.
 
 ---
 
@@ -3031,6 +3210,15 @@ Three hard constraints govern the concurrency model:
 1. **Suspension must be visible.** A systems programmer must see where
    a function can yield. Hidden suspension violates "predictable from
    source." This rules out Go-style implicit yielding.
+
+   **Controlled exception:** Dropping an ephemeral `Task` without
+   explicit `.await` or `cancel` may yield the current fiber (§14.7)
+   to ensure memory safety. This is the only implicit suspension
+   point in the language. The compiler emits a **warning** at any
+   scope exit where an ephemeral Task is implicitly dropped without
+   being awaited or cancelled, recommending explicit handling.
+   Ephemeral Tasks cannot be created on OS threads or in FFI
+   callbacks, because these contexts cannot suspend.
 
 2. **No colored functions.** A function's callability must not depend on
    whether the caller is "async." This rules out Rust-style async.
@@ -3138,7 +3326,7 @@ non-suspendable guards, or C callbacks).
 fn helper() =
     some_io().await        // makes helper() may_suspend
 
-with guard lock.write() as data:
+with lock.write() as data:
     helper()               // ERROR E0701: may_suspend function called
                            // while @[no_await_guard] WriteGuard is live
     data.x = 1             // OK: no suspension
@@ -3315,14 +3503,37 @@ tasks. When `cancel()` is called or a non-ephemeral `Task` is dropped:
    declaration order, just as with normal scope exit.
 5. Cancellation **propagates to child tasks**: if a fiber is cancelled,
    any tasks it spawned via `async scope` are also cancelled.
-6. **Awaiting a cancelled task:** If the task's return type is
-   `Result[T, E]` where `E: From[TaskCancelled]`, `await` returns
-   `Err(TaskCancelled.into())`. Otherwise, `await` panics. This
-   means tasks returning `Result` can handle cancellation as an
-   error case; tasks returning bare `T` treat cancellation as
-   unrecoverable. Library authors writing cancellation-safe code
-   should prefer `Result`-returning async functions.
-   `TaskCancelled` is a standard library error type.
+6. **Awaiting a cancelled task:** Awaiting a cancelled task triggers
+   **cancellation unwinding** — similar to a panic, but structured
+   and catchable at `async scope` boundaries.
+
+   ```
+   async scope |s|:
+       let t1 = s.spawn(fetch_user(id))
+       let t2 = s.spawn(fetch_posts(id))
+       let user = t1.await?           // if this fails...
+       // t2 is cancelled, unwinds, destructors run
+       let posts = t2.await?          // returns CancelledError
+   ```
+
+   `async scope` automatically catches cancellation unwinding from
+   its child tasks. No error types need to change. No `From` impls
+   needed. `IoError`, `DbError`, `ApiError` — they all work
+   unchanged.
+
+   If you need to distinguish cancellation from real errors, match
+   on the scope's result:
+
+   ```
+   match task.await
+       Ok(value) -> use(value)
+       Err(e) if e.is_cancelled() -> log("task was cancelled")
+       Err(e) -> return Err(e)
+   ```
+
+   `TaskCancelled` is a standard library error type that all error
+   types can be checked against via `.is_cancelled()`. But you
+   never need to add a `Cancelled` variant to your own types.
 
 **Cancellation of ephemeral tasks:** If a `Task` is ephemeral
 (captures references), dropping or cancelling it must ensure the
@@ -3334,10 +3545,11 @@ memory safety: the fiber holds references to the caller's stack.
 1. The cancellation flag is set on the child fiber.
 2. If the child fiber is idle (suspended at an `.await`), it is
    immediately unwound. The parent continues.
-3. If the child fiber is actively running on the same OS thread,
-   the runtime runs it inline (on the current stack) until it
-   reaches an `.await` point, then unwinds it. No scheduler
-   involvement.
+3. If the child fiber is scheduled on the **same** OS thread (i.e.,
+   it is in the thread's run queue, not currently executing — the
+   parent is currently running), the runtime immediately switches
+   to the child fiber and runs it until its next `.await` point,
+   then unwinds it and resumes the parent. No scheduler involvement.
 4. If the child fiber is actively running on a **different** OS
    thread, the parent fiber **yields** (not blocks the OS thread)
    and the scheduler prioritizes the child for cancellation. When
@@ -3365,6 +3577,13 @@ ephemeral tasks, this means the parent fiber waits (yielding to the
 scheduler) for the duration of that computation. If both fibers are
 on the same OS thread, the computation runs inline. This is the
 trade-off of memory safety without `Pin`.
+
+**Restriction:** Ephemeral tasks can only be created inside fibers
+(async contexts). Creating an ephemeral task on a bare OS thread
+(e.g., inside `thread.spawn_os`) or in an FFI callback is a
+**compile error**, because these contexts cannot yield to the
+scheduler and dropping the task would deadlock. Non-ephemeral tasks
+(capturing only owned values) can be created anywhere.
 
 ### 14.8 Parallel Execution
 
@@ -3656,19 +3875,49 @@ match rx.try_recv()
     None      -> ()
 ```
 
-Channels transfer ownership: sending moves the value.
+Channels transfer ownership: sending moves the value. **Channel
+element types must be `Send`, not merely `ScopedSend`.** This is
+critical: a channel decouples the lifetime of data from the sender's
+stack frame. Even inside an `async scope`, Fiber 1 can send a
+reference to its own local and then drop that local before Fiber 2
+reads the message. `ScopedSend` guarantees the *scope* outlives the
+fibers, but not that Fiber 1's locals outlive Fiber 2's reads.
+
+```
+// ERROR: ephemeral values cannot be sent over channels
+async scope |s|:
+    let (tx, rx) = chan[&str](10)
+    s.track(async:
+        let local = "hello".to_owned()
+        tx.send(local.as_view()).await  // ERROR: &str is not Send
+    )
+    s.track(async:
+        let msg = rx.recv().await       // would be use-after-free
+    )
+
+// OK: send owned values over channels
+let (tx, rx) = chan[String](10)
+tx.send("hello").await                  // auto-promoted, String is Send
+```
 
 ### 14.15 Send, Sync, and ScopedSend
 
 - `Send`: safe to transfer across thread boundaries (value may
   outlive the sender). Ephemeral types are **not** `Send`.
 - `Sync`: safe to share via `&T` across threads
-- `ScopedSend`: safe to transfer to a **scoped** thread or fiber
-  that is guaranteed to join before the current scope exits.
+- `ScopedSend`: safe to **capture in a closure** sent to a scoped
+  thread or fiber that is guaranteed to join before the current
+  scope exits.
   All `Send` types implement `ScopedSend`. **Ephemeral types also
-  implement `ScopedSend`** — they can be sent to scoped threads
-  because the scope guarantees the thread joins before the borrowed
+  implement `ScopedSend`** — they can be captured by scoped fibers
+  because the scope guarantees the fiber joins before the borrowed
   data goes out of scope.
+
+  **Important:** `ScopedSend` does NOT mean "safe to send over a
+  channel." Channels decouple sender and receiver lifetimes.
+  `ScopedSend` only covers direct capture in the spawned closure —
+  the reference's lifetime is guaranteed by the scope's join.
+  Channel element types require full `Send` (see §14.14).
 
 ```
 // thread.spawn_os requires Send — no ephemerals
@@ -3767,7 +4016,7 @@ async fn compute(x: i32) -> i32 = x * x + 1
 
 // Calls C — auto-switches to OS stack at the boundary
 async fn query(db: &Database, sql: &str) -> Result[Row, DbError] =
-    unsafe { sqlite3_step(db.handle) }  // runs on OS-thread stack
+    sqlite3_step(db.handle)  // runs on OS-thread stack
 ```
 
 For performance-critical paths that call C frequently, the `@[ffi_stack]`
@@ -3936,27 +4185,43 @@ any argument is a reference or ephemeral value, the resulting Task
 binding is marked ephemeral. This marking propagates through
 assignments and function calls.
 
-**Passing ephemeral values to functions:** An ephemeral value can
-be passed to a function parameter, but the ephemeral restriction
-propagates into the callee. If the callee's parameter is used in a
-non-ephemeral position (stored in a struct, returned, sent to
-another thread), the compiler rejects it. This is enforced
-intraprocedurally at each function boundary:
+**Passing ephemeral values to functions:** Ephemeral values can be
+passed to functions — by reference or by value. The compiler tracks
+ephemerality and warns if a value might escape its safe scope:
 
 ```
+fn process_task(t: Task[i32]) =
+    t.await                          // OK: consumes the task
+
 fn store_globally(t: Task[i32]) =
-    GLOBAL_TASKS.push(t)            // stores in a non-ephemeral container
+    GLOBAL_TASKS.push(t)            // WARNING: storing a value that
+                                     // may be ephemeral at some call sites
 
 var v = vec![1, 2, 3]
 let task = process(&mut v)          // ephemeral task
-store_globally(task)                // ERROR: ephemeral value cannot be
-                                    // moved into storable position
+process_task(task)                   // OK: compiler sees task is consumed
+store_globally(task)                 // ERROR: compiler detects storage of
+                                     // ephemeral value in a global
 ```
 
-**Consequence:** Borrowing tasks must complete before their referent
-goes out of scope. The compiler enforces this through normal
-ephemeral rules — an ephemeral task cannot be stored, returned, or
-outlive its scope.
+The compiler catches the clear bugs (storing ephemeral refs in
+globals, sending them across threads). For ambiguous cases, it
+warns rather than blocks. You're a systems programmer — you can
+read a warning.
+
+**Ephemeral tasks CAN be returned from functions** — the caller's
+binding inherits the ephemerality (Rule 8, §22.1). This is
+essential: `async fn get_profile(self: &UserService)` returns a
+`Task` that captures `&self`. The returned task is ephemeral at
+the call site, preventing the caller from outliving `&self`:
+the call site, preventing the caller from storing it or outliving
+the referenced data:
+
+```
+let task = svc.get_profile(id)   // ephemeral: borrows &svc
+task.await?                       // OK: used immediately
+// task cannot be stored in a struct or global
+```
 
 **`async scope` is the ergonomic solution** for borrowing tasks:
 
@@ -3994,85 +4259,110 @@ avoids reintroducing lifetime annotations while preserving safety.
 
 ### 15.1 String Types
 
-| Type | Ownership | Storable? | UTF-8? | Description |
-|------|-----------|-----------|--------|-------------|
-| `str` | Owned | Yes | Yes | Alias for `String`. The default string type. |
-| `String` | Owned | Yes | Yes | Heap-allocated, growable UTF-8 string. |
-| `&str` | Ephemeral | No | Yes | Alias for `StrView`. Borrowed view into a `String` or literal. |
-| `StrView` | Ephemeral | No | Yes | Pointer + length view. Cannot be stored in structs or containers. |
-| `CStr` | Ephemeral | No | No | NUL-terminated C string view. |
-| `CString` | Owned | Yes | No | Owned NUL-terminated C string. |
+**There are two string types you need to know:**
 
-**`str` is `String`.** In With, `str` is syntactic sugar for `String`
-(owned, heap-allocated, UTF-8). It can be stored in structs, placed
-in containers, and returned from functions:
+| Type | What it is | When to use |
+|------|-----------|-------------|
+| `str` | Owned, heap-allocated, UTF-8 string | Storing strings, struct fields, return values |
+| `&str` | Borrowed view into a string | Function parameters, read-only access |
+
+That's it. `str` for owning, `&str` for borrowing. Everything else
+is an implementation detail or FFI-specific.
 
 ```
-type User = { name: str, email: str }    // owned Strings
-let map: HashMap[str, i32] = ...         // String keys
-fn get_name() -> str = "Alice".to_owned() // explicit allocation
+type User = { name: str, email: str }    // owned strings in structs
+fn greet(name: &str) = println("Hello, {name}")  // borrowed for reading
+fn get_name() -> str = "Alice"            // return owned string
 ```
 
-**`&str` is `StrView`.** A reference to a string (`&str`) is an
-ephemeral view — a pointer + length into an existing `String` or a
-string literal. It cannot be stored:
+**String literals** (`"hello"`) are `&str` by default (zero-cost
+reference into static memory). When the compiler knows you need an
+owned `str`, it auto-promotes:
 
 ```
-fn greet(name: &str) =              // ephemeral view parameter
-    println("Hello, {name}")
-
-let s: str = "hello"
-let view: &str = s.as_view()        // ephemeral, cannot escape scope
+let view = "hello"           // &str — no allocation
+let owned: str = "hello"     // str — auto-promoted
+let user = User { name: "Alice", email: "a@b.com" }  // auto-promoted
 ```
 
-**String literals** (`"hello"`) have type `&str` (ephemeral view into
-static data). When a literal appears in a context that expects `str`,
-the compiler treats it as a static `&str` reference:
+**Advanced types** (you rarely need these directly):
 
-```
-let view: &str = "hello"                  // ephemeral view into static
-let owned: str = "hello".to_owned()       // explicit allocation
-```
+| Type | What it is |
+|------|-----------|
+| `String` | Same as `str` — `str` is an alias for `String` |
+| `StrView` | Same as `&str` — `&str` is an alias for `StrView` |
+| `CStr` | NUL-terminated C string view (FFI only) |
+| `CString` | Owned NUL-terminated C string (FFI only) |
 
 ### 15.2 Conversions
 
-All conversions are explicit:
-
-| From | To | Method |
-|------|----|--------|
-| `String` / `str` | `&str` / `StrView` | `.as_view()` or auto-borrow |
-| `&str` / `StrView` | `String` / `str` | `.to_owned()` or `.to_string()` (allocates) |
-| String literal `"..."` | `&str` | Direct (no allocation) |
-| String literal `"..."` | `str` | `.to_owned()` (allocates) |
-| `String` / `str` | `CString` | `.to_cstring()` (appends NUL) |
+| From | To | How |
+|------|----|-----|
+| `str` | `&str` | auto-borrow or `.as_view()` |
+| `&str` | `str` | `.to_owned()` (allocates) |
+| `"literal"` | `&str` | direct (no allocation) |
+| `"literal"` | `str` | auto-promoted when type is known |
+| `str` | `CString` | `.to_cstring()` (appends NUL) |
 | `CString` | `CStr` | `.as_cstr()` |
-| `&str` | `CStr` | Not direct (must go through `CString`) |
 
 ### 15.3 String Literals
 
 String literals like `"hello"` are compile-time `&str` references
-into static memory. They do **not** auto-promote to owned `str`.
+into static memory. When the expected type is owned `str`, the
+compiler **automatically promotes** the literal:
 
 ```
-// These require explicit .to_owned():
-let name: str = "Alice".to_owned()
-let config = ServerConfig { host: "localhost".to_owned(), port: 8080 }
+// Auto-promotion: compiler sees str is expected, inserts allocation
+let name: str = "Alice"                                    // just works
+let config = ServerConfig { host: "localhost", port: 8080 } // just works
+fn get_name() -> str = "Alice"                              // just works
 
-// But &str works directly for most read-only use:
+// Passing to fn(str) also promotes:
+fn register(name: str) = ...
+register("Alice")                                          // just works
+
+// &str works directly for read-only use (no allocation):
 fn greet(name: &str) = println("hello {name}")
-greet("world")                               // OK: literal is &str
+greet("world")                               // OK: literal is &str, no alloc
+
+// Explicit .to_owned() still works if you prefer it:
+let name = "Alice".to_owned()                // same effect, just verbose
 ```
 
-**Rationale:** Auto-promoting string literals to owned `str` would
-violate the "no hidden heap allocations" guarantee (§20). Every
-`"hello"` in the language would silently `malloc` when assigned to
-an owned string. Instead, functions that only read strings should
-accept `&str`, and owned strings are allocated explicitly. This
-keeps allocation visible in the source code.
+**How it works:** When the compiler knows from context that an owned
+`str` is expected (struct field, function parameter, variable with
+type annotation, return type), it inserts `.to_owned()` on the
+literal automatically. This is the same as Kotlin's implicit
+conversions or Swift's string literals — the allocation is obvious
+from context (you're putting a string in an owned field), so the
+language doesn't make you type it.
 
-**Interpolated literals** (`"user {id}"`) produce `str` (owned)
-because they must allocate to build the result. This allocation is
-inherent to the operation and not hidden.
+When there's **no type context**, a bare `"hello"` is still `&str`:
+
+```
+let s = "hello"        // s: &str (static reference, no allocation)
+let s: str = "hello"   // s: str (owned, auto-promoted)
+```
+
+**Interpolated literals** (`"user {id}"`) always produce `str`
+(owned) because they must allocate to build the result.
+
+**C-string literals:** `c"hello"` produces a `&CStr` — a compile-
+time reference to a NUL-terminated string in static memory. The NUL
+byte is appended automatically by the compiler; the user does not
+write `\0`:
+
+```
+// c"hello" is &CStr pointing to static "hello\0"
+puts(c"hello".ptr)     // .ptr gives *const u8
+
+// For dynamic C strings, use CString:
+let name = CString.new("Alice")   // heap-allocates with NUL
+puts(name.as_cstr().ptr)
+```
+
+`c"..."` does not support string interpolation. For dynamic C
+strings, construct a `CString` from an owned `str`.
 
 ---
 
@@ -4096,7 +4386,7 @@ use c_import("openssl/ssl.h", link: "ssl", "crypto")
 `c_import` reads a C header file at compile time, parses it, and
 makes all declarations available as With symbols. This includes:
 
-- **Functions** → `extern "C"` functions (callable via `unsafe`)
+- **Functions** → callable directly (the `c_import` is the opt-in)
 - **Structs** → `@[repr(C)]` struct types
 - **Enums** → integer constants or With enums
 - **Typedefs** → type aliases
@@ -4108,11 +4398,34 @@ use c_import("sqlite3.h", link: "sqlite3")
 
 fn main() =
     var db: *mut sqlite3 = null
-    let rc = unsafe { sqlite3_open(":memory:", &mut db) }
+    let rc = sqlite3_open(":memory:", &mut db)   // direct call
     if rc != SQLITE_OK:
         panic("Failed to open database")
-    defer unsafe { sqlite3_close(db) }
+    defer sqlite3_close(db)
     // ... use sqlite3 API directly
+```
+
+**Why no `unsafe` on every call?** The `c_import` itself is the
+opt-in. You imported a C library — you know you're calling C code.
+Wrapping every call in `unsafe {}` is ceremony without safety. The
+real safety boundary is the **With wrapper** that the stdlib
+provides (e.g., `Database.open()` wraps `sqlite3_open` with proper
+error handling and resource management).
+
+`unsafe` is still required for raw pointer operations (dereferencing
+`*mut T`, pointer arithmetic, transmutes). But calling an imported
+C function that takes normal arguments is just a function call.
+
+**Raw pointer operations still need `unsafe`:**
+
+```
+use c_import("my_lib.h")
+
+// Direct call — no unsafe needed
+let handle = my_lib_init()
+
+// Pointer dereference — unsafe required
+let value = unsafe { *handle }
 ```
 
 **The C toolchain is a dependency.** `c_import` invokes the system
@@ -4436,6 +4749,30 @@ const SHADER_PARAM_ID = comptime hash_str("world_matrix")
    comptime with type introspection replaces the need for them. This
    is a deliberate choice to keep the compilation model simple — one
    phase, not two.
+
+**Comptime in generic functions:** When a generic function contains
+`comptime if` branches that depend on the type parameter `T`, the
+type checker uses **deferred branch checking**: the initial generic
+check verifies syntax and validates code *outside* comptime branches
+normally, but code *inside* `comptime if` branches that depend on
+`T` is deferred until monomorphization. When `T` is known, the
+`comptime if` condition is evaluated, the taken branch is type-
+checked against the concrete `T`, and the erased branch is discarded
+without checking.
+
+This is narrower than C++ templates (the non-comptime body is still
+fully checked against the declared bounds on `T`) and broader than
+Rust generics (comptime branches can use capabilities not declared
+in bounds). The trade-off: a comptime branch error only appears
+when that branch is instantiated with a specific `T`, similar to
+Zig's compile-time generics.
+
+```
+fn process[T](val: &T) =
+    val.len()   // ERROR at generic check: T has no .len() method
+    comptime if TypeInfo.implements[T, Serialize]():
+        val.serialize()   // Deferred: checked only when T: Serialize
+```
 
 ---
 
@@ -4847,7 +5184,7 @@ lowers `c_errno()` to the platform-appropriate thread-local access:
 
 ```
 // Inside std.fs (user never sees this):
-let fd = unsafe { open(path_cstr.ptr, O_RDONLY) }
+let fd = open(path_cstr.ptr, O_RDONLY)
 if fd == -1:
     let code = std.os.c_errno()    // compiler intrinsic
     return Err(IoError.from_errno(code, path))
@@ -4939,7 +5276,11 @@ the compiler rejects it.
 
 ## 20. Performance Guarantees
 
-1. **No hidden heap allocations.** All allocation is explicit.
+1. **Allocations are obvious.** You can see where allocation
+   happens — `Vec.new()`, `.to_owned()`, `[x for x in ...]`,
+   `"hello {name}"`. No allocation hides behind innocent syntax.
+   But the language doesn't force you to type `collect[Vec]()` when
+   the intent is already clear.
 2. **No hidden copies.** Values move unless `Copy`.
 3. **No hidden reference counting.** Only via explicit `Rc`/`Arc`.
 4. **No hidden synchronization.** Locks, atomics always explicit.
@@ -4966,11 +5307,11 @@ all other fibers waiting for that lock.
 
 ```
 // ERROR: RwLock guard is @[no_await_guard]
-with guard lock.read() as data:
+with lock.read() as data:
     fetch(data.url).await
 
 // FIX: clone out, release guard, then await
-let url = with guard lock.read() as data:
+let url = with lock.read() as data:
     data.url.clone()
 fetch(url).await
 ```
@@ -5129,7 +5470,12 @@ At every program point, the following must hold:
 
 6. **Ephemeral return conservation.** When a function returns an
    ephemeral value and accepts multiple reference parameters, the
-   return value is treated as borrowing from all reference inputs.
+   compiler **by default** treats the return as borrowing from all
+   reference inputs. However, the compiler has built-in knowledge
+   of stdlib types (HashMap, Vec, slice iterators, etc.) and
+   correctly narrows the borrow to the relevant parameter. For user
+   code, the conservative default applies. The stdlib achieves
+   correct narrowing via `unsafe` internally — users never see it.
 
 7. **Implicit drop is a use.** When a variable implementing `Drop`
    goes out of scope, its implicit destructor call is treated as a
@@ -5438,7 +5784,7 @@ fn test() =
 ```
 // PASS: basic
 fn test(lock: &Mutex[HashMap[str, i32]]) =
-    with guard lock.lock() as mut map:
+    with lock.lock() as mut map:
         map.insert("key", 42)
 
 // PASS: multi
@@ -5448,32 +5794,32 @@ fn test(a: &RwLock[Vec[i32]], b: &RwLock[Vec[i32]]) =
 
 // PASS: expression returning owned
 fn test(lock: &Mutex[HashMap[str, i32]]) -> Option[i32] =
-    with guard lock.lock() as map:
+    with lock.lock() as map:
         map.get("key").cloned()
 
 // FAIL: expression returning ephemeral
 fn test(lock: &Mutex[Vec[i32]]) =
-    let r = with guard lock.lock() as data:
+    let r = with lock.lock() as data:
         &data[0]                  // ERROR
 
 // PASS: collect pipeline escapes
 fn test(store: &Shared[SlotMap[Texture]]) -> Vec[Handle[Texture]] =
-    with guard store.read() as textures:
+    with store.read() as textures:
         textures.iter()
         |> filter(|(_h, t)| t.width > 1024)
         |> map(|(h, _)| h)
         |> collect()
 
-// PASS: error propagation
+// PASS: error propagation with implicit Ok wrapping
 fn test(lock: &Mutex[File]) -> Result[Unit, IoError] =
-    with guard lock.lock() as mut f:
+    with lock.lock() as mut f:
         f.write_all(b"hello")?
         f.flush()?
-        Ok()
+    // implicit Ok(())
 
 // PASS: non-local return from with block
 fn find_val(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32] =
-    with guard lock.lock() as map:
+    with lock.lock() as map:
         match map.get(key)
             Some(v) -> return Some(v)    // returns from find_val
             None    -> ()
@@ -5482,7 +5828,7 @@ fn find_val(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32] =
 // PASS: break/continue inside with block inside loop
 fn process(lock: &Mutex[Vec[Item]]) =
     for i in 0..10:
-        with guard lock.lock() as items:
+        with lock.lock() as items:
             if items[i].is_done():
                 continue                  // continues enclosing for loop
             items[i].process()
@@ -5602,28 +5948,28 @@ impl Show for MyType {
 ### 25.11 FFI and `c_import` (Section 16)
 
 ```
-// PASS: c_import makes C functions callable
+// PASS: c_import makes C functions callable directly
 use c_import("stdio.h")
 fn test() =
-    unsafe { printf(c"hello %d\n\0".ptr, 42) }
+    printf(c"hello %d\n".ptr, 42)             // no unsafe needed
 
 // PASS: c_import with link directive
 use c_import("sqlite3.h", link: "sqlite3")
 fn test() =
     var db: *mut sqlite3 = null
-    let rc = unsafe { sqlite3_open(c":memory:\0".ptr, &mut db) }
+    let rc = sqlite3_open(c":memory:".ptr, &mut db)  // direct call
     assert(rc == SQLITE_OK)
-    unsafe { sqlite3_close(db) }
+    sqlite3_close(db)
 
 // PASS: c_import structs are usable
 use c_import("time.h")
 fn test() =
     var t: time_t = 0
-    unsafe { time(&mut t) }
+    time(&mut t)                               // direct call
 
 // PASS: extern C manual declaration
 extern "C" { fn puts(s: *const u8) -> i32 }
-fn test() = unsafe { puts(c"hello\0".ptr) }
+fn test() = puts(c"hello".ptr)
 
 // PASS: non-capturing closure to fn ptr
 fn test() =
@@ -6094,12 +6440,33 @@ fn test() =
 fn test() =
     let pairs = [(x, y) for x in 0..3 for y in 0..3 if x != y]
     assert(pairs.len() == 6)
+```
 
-// PASS: comprehension with transform and filter
-fn test() =
-    let names = [user.name.to_upper()
-                 for user in users
-                 if user.age >= 18]
+### 25.27b Implicit Ok Wrapping (Section 4.9)
+
+```
+// PASS: value auto-wrapped in Ok
+fn get_number() -> Result[i32, str] =
+    42                       // auto-wrapped to Ok(42)
+
+// PASS: Result[Unit, E] with no trailing expression
+fn do_stuff() -> Result[Unit, IoError] =
+    let f = fs.open("test.txt")?
+    f.write_all(b"hello")?
+    // implicit Ok(())
+
+// PASS: explicit Ok still works
+fn explicit() -> Result[i32, str] =
+    Ok(42)
+
+// PASS: explicit Err still works
+fn fail() -> Result[i32, str] =
+    Err("nope")
+
+// PASS: ? still propagates errors
+fn chain() -> Result[User, DbError] =
+    let row = db.query("SELECT ...", id)?
+    User.from_row(row)       // auto-wrapped in Ok(...)
 ```
 
 ### 25.28 sequence / traverse / transpose (Section 10.5)
@@ -6165,7 +6532,7 @@ fn test() =
 // FAIL: await inside @[no_await_guard] with
 fn test() =
     let lock = RwLock.new(42)
-    with guard lock.read() as data:
+    with lock.read() as data:
         sleep(Duration.millis(1)).await    // ERROR: ReadGuard is @[no_await_guard]
 
 // PASS: await inside non-@[no_await_guard] with
@@ -6664,25 +7031,25 @@ fn test() =
     let view: &str = "hello"           // OK: literal is &str
     assert(view.len() == 5)
 
-// PASS: explicit .to_owned() for owned strings
+// PASS: explicit .to_owned() still works
 fn test() =
-    let name: str = "Alice".to_owned()
+    let name: str = "Alice"
     assert(name == "Alice")
 
-// PASS: interpolated literals produce owned str
+// PASS: auto-promotion in struct fields
 fn test() =
-    let id = 42
-    let msg: str = "user {id}"         // OK: interpolation allocates
-    assert(msg.contains("42"))
+    type Config = { host: str, port: i32 }
+    let c = Config { host: "localhost", port: 8080 }  // auto-promoted
+    assert(c.host == "localhost")
 
-// PASS: &str param accepts string literal
-fn greet(name: &str) = println("hi {name}")
-fn test() = greet("world")            // OK: literal is &str
+// PASS: auto-promotion in function args
+fn register(name: str) = assert(name.len() > 0)
+fn test() = register("Alice")               // auto-promoted
 
-// FAIL: cannot assign literal to owned str without .to_owned()
-fn test_fail() =
-    let name: str = "Alice"            // ERROR: expected str, found &str
-                                       //   help: call .to_owned()
+// PASS: no type context → stays &str
+fn test() =
+    let s = "hello"                          // s: &str (no allocation)
+    let owned: str = "hello"                 // owned: str (auto-promoted)
 ```
 
 ### 25.45 Unit Elision (Section 4.8)
@@ -6843,10 +7210,10 @@ fn test() =
     assert_ne(2 + 2, 5)
 ```
 
-### 25.50 Implicit Builder Return (Section 7.2)
+### 25.50 Builder Block Return (Section 7.2)
 
 ```
-// PASS: last statement is assignment (Unit) → implicit return
+// PASS: last statement is assignment (Unit) → returns builder
 fn test() =
     let c = with Config { timeout: 0, retries: 0 } as mut c:
         c.timeout = 30
@@ -6854,7 +7221,7 @@ fn test() =
     assert(c.timeout == 30)
     assert(c.retries == 3)
 
-// PASS: last statement is method call returning Unit → implicit return
+// PASS: push returns Unit → returns builder
 fn test() =
     let v = with Vec.new() as mut v:
         v.push(1)
@@ -6862,12 +7229,22 @@ fn test() =
         v.push(3)
     assert(v.len() == 3)
 
-// PASS: explicit non-Unit expression overrides implicit return
+// PASS: last statement is Unit (assignment) → builder returned
+// even though insert() returns Option[i32]
+fn test() =
+    let m = with HashMap.new() as mut m:
+        m.insert("a", 1)    // returns Option[i32]
+        m.insert("b", 2)    // returns Option[i32]... but:
+        m.len()              // this is non-Unit — block returns 2!
+    // m is now i32, not HashMap
+    assert(m == 2)
+
+// PASS: extract value from builder
 fn test() =
     let len = with Vec.new() as mut v:
         v.push(1)
         v.push(2)
-        v.len()             // usize, not Unit → block evaluates to 2
+        v.len()              // non-Unit → block returns 2
     assert(len == 2)
 
 // PASS: works as function return value
@@ -7236,13 +7613,13 @@ impl Drop for Wrapper
 
 // FAIL: partial move from Drop type
 fn test_fail() =
-    let w = Wrapper { fd: open(), name: "A".to_owned() }
-    let w2 = { w with name: "B".to_owned() }  // ERROR: partial move from Drop type
+    let w = Wrapper { fd: open(), name: "A" }
+    let w2 = { w with name: "B" }  // ERROR: partial move from Drop type
 
 // PASS: clone field instead
 fn test() =
-    let w = Wrapper { fd: open(), name: "A".to_owned() }
-    let w2 = Wrapper { fd: w.fd.clone(), name: "B".to_owned() }
+    let w = Wrapper { fd: open(), name: "A" }
+    let w2 = Wrapper { fd: w.fd.clone(), name: "B" }
 ```
 
 ### 25.65 No References Across Yield (Section 13.4)
@@ -7286,7 +7663,7 @@ fn helper() =
 
 fn test_fail() =
     let lock = Mutex.new(42)
-    with guard lock.lock() as data:
+    with lock.lock() as data:
         helper()                     // ERROR E0701: may_suspend function
                                      // called while @[no_await_guard] is live
 
@@ -7295,7 +7672,7 @@ fn safe_helper(x: i32) -> i32 = x * 2
 
 fn test() =
     let lock = Mutex.new(42)
-    with guard lock.lock() as data:
+    with lock.lock() as data:
         safe_helper(*data)           // OK: safe_helper is not may_suspend
 ```
 
@@ -7316,25 +7693,20 @@ fn test() =
     ) }
 ```
 
-### 25.69 With Guard Keyword (Section 7.5)
+### 25.69 With Type-Based Dispatch (Section 7.5)
 
 ```
-// PASS: guard keyword for scoped access
+// PASS: Scoped type → automatic guarded access
 fn test() =
     let lock = Mutex.new(vec![1, 2, 3])
-    with guard lock.lock() as data:
+    with lock.lock() as data:          // Mutex implements Scoped → guard
         assert(data.len() == 3)
 
-// PASS: no guard keyword for builder
+// PASS: non-Scoped type → simple builder binding
 fn test() =
     let config = with Config.default() as mut c:
-        c.retries = 3
+        c.retries = 3                  // Config is not Scoped → builder
     assert(config.retries == 3)
-
-// FAIL: guard on non-Scoped type
-fn test_fail() =
-    with guard Config.default() as mut c:  // ERROR: Config does not implement ScopedMut
-        c.retries = 3
 ```
 
 ### 25.70 Iter One-Implementation Rule (Section 13.2)
@@ -7412,24 +7784,329 @@ fn test_bad() =
     let _ = send_analytics("page_view") // WARNING: immediately cancelled!
 ```
 
-### 25.75 Ephemeral Iterator Limitation (Section 21.1, Rule 6)
+### 25.75 Iterator Borrowing (Section 13.2)
 
 ```
-// PASS: for loop works — tok drops each iteration
+// PASS: stdlib slice iterators work naturally
+fn test() =
+    let names = vec!["alice", "bob", "charlie"]
+    let iter = names.iter()
+    let a = iter.next().unwrap()    // borrows names, not iter
+    let b = iter.next().unwrap()    // OK — no conflict
+    assert(a == "alice")
+    assert(b == "bob")
+
+// PASS: for loop works with custom iterators too
 fn test() =
     while let Some(tok) = next_token(&mut parser):
         process(tok)                   // tok drops here, releases &mut parser
 
-// FAIL: cannot hold two ephemeral items from same iterator
-fn test_fail() =
-    let a = next_token(&mut parser)?   // a borrows &mut parser
-    let b = next_token(&mut parser)?   // ERROR: parser still borrowed by a
-
-// PASS: use owned tokens for collection
-fn test() =
+// NOTE: custom iterators returning ephemerals may still hit
+// conservative borrowing on user-defined types
+fn test_custom() =
     let tokens = with Vec.new() as mut toks:
         while let Some(tok) = next_owned_token(&mut parser):
             toks.push(tok)             // OwnedToken has no borrows
+```
+
+### 25.76 Channel Send Requires Send (Section 14.14)
+
+```
+// FAIL: ephemeral values cannot be sent over channels
+fn test_fail() =
+    async scope |s|:
+        let (tx, rx) = chan[&str](10)
+        s.track(async:
+            let local = "hello".to_owned()
+            tx.send(local.as_view()).await  // ERROR: &str is not Send
+        )
+
+// PASS: owned values over channels
+fn test() =
+    let (tx, rx) = chan[String](10)
+    tx.send("hello").await                  // auto-promoted, String is Send
+```
+
+### 25.77 Ephemeral Owned Passing Restriction (Section 14.21)
+
+```
+// FAIL: ephemeral by-value to external function
+fn store_globally(t: Task[i32]) = ...  // separately compiled
+
+fn test_fail() =
+    var x = 42
+    let task = my_fn(&mut x)
+    store_globally(task)                // ERROR: ephemeral value cannot be
+                                        // passed as owned to external fn
+
+// PASS: ephemeral by reference
+fn inspect(t: &Task[i32]) = ...
+
+fn test() =
+    var x = 42
+    let task = my_fn(&mut x)
+    inspect(&task)                      // OK: passed by reference
+```
+
+### 25.78 Disjoint Slice Operations (Section 3.4)
+
+```
+// PASS: split_at_mut returns disjoint slices — compiler knows
+fn test() =
+    var data = vec![1, 2, 3, 4, 5]
+    let (left, right) = data.split_at_mut(3)
+    left[0] = 10                        // OK: disjoint
+    right[0] = 40                       // OK: no aliasing
+```
+
+### 25.79 Optional Chaining Type-Aware Desugaring (Section 10.3)
+
+```
+type Address = { city: Option[str], zip: str }
+type Profile = { address: Option[Address] }
+
+// PASS: field is non-Option → map
+fn test() =
+    let p = Profile { address: Some(Address { city: Some("NYC"), zip: "10001" }) }
+    let zip: Option[str] = p.address?.zip    // map → Option[str]
+
+// PASS: field is Option → and_then (flattened)
+fn test() =
+    let p = Profile { address: Some(Address { city: Some("NYC"), zip: "10001" }) }
+    let city: Option[str] = p.address?.city  // and_then → Option[str], NOT Option[Option[str]]
+
+// PASS: chaining works correctly
+fn test() =
+    let p = Profile { address: Some(Address { city: Some("NYC"), zip: "10001" }) }
+    let len: Option[usize] = p.address?.city?.len()  // chains naturally
+```
+
+### 25.80 Drop Field Moves (Section 2.4)
+
+```
+// PASS: field moves allowed INSIDE drop
+type FileWrapper = { fd: File, name: String }
+impl Drop for FileWrapper
+    fn drop(self: Self) =
+        close_file(self.fd)   // OK: field move inside drop
+        // self.name NOT moved → compiler drops it automatically
+
+// FAIL: field moves forbidden OUTSIDE drop
+fn test_fail() =
+    let w = FileWrapper { fd: open_file(), name: "A" }
+    let fd = w.fd             // ERROR: partial move from Drop type
+```
+
+### 25.81 HashMap Lookup Borrowing (Section 13.2)
+
+```
+// PASS: HashMap::get borrows from the map, not the key
+fn test() =
+    var map = HashMap.new()
+    map.insert("admin", User { name: "Alice" })
+    let user = {
+        let key: str = "admin"
+        map.get(key.as_view())    // compiler knows: borrows map, not key
+    }                              // key drops here, user still valid
+    assert(user.is_some())
+```
+
+---
+
+### 25.82 NLL-Based @[no_await_guard] (Section 7.9)
+
+```
+// FAIL: guard live across .await via plain let binding
+fn test_fail() =
+    let guard = lock.lock()        // @[no_await_guard] type
+    fetch(url).await               // ERROR E0701: guard is live
+
+// PASS: guard dropped before .await
+fn test() =
+    let data = with lock.read() as d:
+        d.clone()
+    fetch(data.url).await          // OK: guard already dropped
+```
+
+### 25.83 Object Safety (Section 11.3)
+
+```
+// PASS: trait with &Self methods is object-safe
+trait Drawable { fn draw(self: &Self) }
+fn render(d: &dyn Drawable) = d.draw()
+
+// FAIL: trait with by-value self is not object-safe (without Box)
+trait Consumable { fn consume(self: Self) }
+fn bad(c: &dyn Consumable) = ...   // ERROR: Consumable is not object-safe
+
+// PASS: by-value self through Box
+fn good(c: Box[dyn Consumable]) = c.consume()  // OK via generated shim
+```
+
+### 25.84 C-String Literals (Section 15.3)
+
+```
+// PASS: c"..." produces &CStr
+fn test() =
+    let s: &CStr = c"hello"
+    assert(s.len() == 5)           // "hello" without NUL
+    puts(s.ptr)         // NUL is present in memory
+```
+
+### 25.85 Record Update Drops Overwritten Fields (Section 4.3)
+
+```
+// PASS: overwritten fields are dropped, non-overwritten are moved
+fn test() =
+    let p1 = NamedPoint { x: "first", y: "second" }
+    let p2 = { p1 with x: "third" }
+    // p1.x ("first") was dropped, p1.y ("second") was moved to p2.y
+    assert(p2.x == "third")
+    assert(p2.y == "second")
+```
+
+### 25.86 Ephemeral Task OS Thread Restriction (Section 14.7)
+
+```
+// FAIL: ephemeral task on bare OS thread
+fn test_fail() =
+    thread.spawn_os(||
+        var data = vec![1, 2, 3]
+        let task = process(&mut data)  // ERROR: ephemeral task in OS thread
+    )
+
+// PASS: ephemeral task inside fiber (async context)
+async fn test() =
+    var data = vec![1, 2, 3]
+    let task = process(&mut data)      // OK: inside async context
+    task.await
+```
+
+### 25.87 String Literal Auto-Promotion (Section 15.3)
+
+```
+// PASS: auto-promotion in struct field
+fn test() =
+    type Config = { host: str, port: i32 }
+    let c = Config { host: "localhost", port: 8080 }
+    assert(c.host == "localhost")
+
+// PASS: auto-promotion in function parameter
+fn greet(name: str) = assert(name.len() > 0)
+fn test() = greet("Alice")
+
+// PASS: auto-promotion in return type
+fn name() -> str = "Alice"
+fn test() = assert(name() == "Alice")
+
+// PASS: no promotion without type context
+fn test() =
+    let s = "hello"         // s: &str (no allocation)
+    let o: str = "hello"    // o: str (auto-promoted)
+```
+
+### 25.88 FFI Direct Call (Section 16.1)
+
+```
+// PASS: c_import functions callable directly
+use c_import("stdio.h")
+fn test() = puts(c"hello".ptr)      // no unsafe needed
+
+// PASS: unsafe still required for pointer deref
+fn test() =
+    let p: *mut i32 = alloc(4)
+    unsafe { *p = 42 }               // pointer deref needs unsafe
+    free(p)                           // C function call: no unsafe
+```
+
+### 25.89 With Type-Based Guard Inference (Section 7.1)
+
+```
+// PASS: Scoped type auto-detected
+fn test() =
+    let lock = Mutex.new(42)
+    let val = with lock.read() as data:    // auto-detected as guard
+        *data
+    assert(val == 42)
+
+// PASS: non-Scoped type → builder
+fn test() =
+    let v = with Vec.new() as mut v:
+        v.push(1)
+        v.push(2)
+    assert(v.len() == 2)
+```
+
+### 25.90 Auto-Dereferencing (Section 3.7)
+
+```
+// PASS: auto-deref through Box
+fn test() =
+    type User = { name: str }
+    let u: Box[User] = Box.new(User { name: "Alice" })
+    assert(u.name == "Alice")             // auto-deref Box → User → .name
+
+// PASS: auto-deref through multiple references
+fn test() =
+    let x = 42
+    let r = &x
+    let rr = &r
+    assert(rr == 42)                      // auto-deref through &&i32
+
+// PASS: auto-deref for method calls
+fn test() =
+    let v: Box[Vec[i32]] = Box.new(vec![1, 2, 3])
+    assert(v.len() == 3)                  // auto-deref Box → Vec → .len()
+```
+
+### 25.91 Auto-Referencing (Section 3.8)
+
+```
+// PASS: auto-ref for shared borrow parameter
+fn len(s: &str) -> usize = s.len()
+fn test() =
+    let name: str = "Alice"
+    assert(len(name) == 5)               // compiler inserts &name
+
+// PASS: auto-ref for method receiver
+fn test() =
+    type Point = { x: f64, y: f64 }
+    impl Point
+        fn magnitude(self: &Self) -> f64 = (self.x * self.x + self.y * self.y).sqrt()
+    let p = Point { x: 3.0, y: 4.0 }
+    assert(p.magnitude() == 5.0)          // auto-ref: p → &p
+
+// FAIL: no auto-ref for &mut
+fn mutate(s: &mut str) = s.push_str("!")
+fn test_fail() =
+    var name: str = "Alice"
+    mutate(name)                          // ERROR: won't auto-ref to &mut
+    mutate(&mut name)                     // OK: explicit &mut
+```
+
+### 25.92 Implicit Trait Object Coercion (Section 3.9)
+
+```
+// PASS: &T → &dyn Trait
+trait Greet { fn hello(self: &Self) -> str }
+type English = {}
+impl Greet for English
+    fn hello(self: &Self) -> str = "Hello"
+
+fn say_hi(g: &dyn Greet) -> str = g.hello()
+fn test() =
+    let eng = English {}
+    assert(say_hi(&eng) == "Hello")       // auto-coerce &English → &dyn Greet
+
+// PASS: Box[T] → Box[dyn Trait]
+fn test() =
+    let g: Box[dyn Greet] = Box.new(English {})  // auto-coerced
+    assert(g.hello() == "Hello")
+
+// PASS: combined auto-ref + trait coercion
+fn test() =
+    let eng = English {}
+    assert(say_hi(eng) == "Hello")        // auto-ref + auto-coerce
 ```
 
 ---

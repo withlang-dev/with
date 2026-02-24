@@ -9,8 +9,7 @@ module json
 //   - Error declarations with positional context
 //   - Generators for lazy tree traversal
 //   - Pipeline operators for composition
-//   - StrView (ephemeral string slices)
-//   - Collection comprehensions
+//   - Borrowed tree access via helper methods
 //   - with blocks (scoped mutation)
 // ===================================================================
 
@@ -27,11 +26,11 @@ type JsonValue =
 // --- Errors ---
 
 error JsonError =
-    | UnexpectedChar(pos: usize, expected: str, got: u8)
-    | UnexpectedEof(pos: usize, context: str)
-    | InvalidNumber(pos: usize, text: str)
-    | InvalidEscape(pos: usize, ch: u8)
-    | TrailingContent(pos: usize)
+    UnexpectedChar(pos: usize, expected: str, got: u8)
+    UnexpectedEof(pos: usize, context: str)
+    InvalidNumber(pos: usize, text: str)
+    InvalidEscape(pos: usize, ch: u8)
+    TrailingContent(pos: usize)
 
 // --- Token Types ---
 
@@ -359,9 +358,24 @@ fn JsonValue.index(self: &Self, i: usize) -> Option[&JsonValue] =
         .Array(items) if i < items.len() -> Some(&items[i])
         _ -> None
 
-// Accessor methods — .as_str(), .as_number(), .as_bool(), .as_array(),
-// .as_object() and .is_null(), .is_str(), etc. — are auto-generated
-// for every enum variant (§4.4). No manual definitions needed.
+// Auto-generated enum accessors (.as_variant()) consume self (§4.4).
+// For tree navigation we usually have &JsonValue, so add borrowed
+// helpers that preserve ownership of the parsed tree.
+
+fn JsonValue.as_str_ref(self: &Self) -> Option[&str] =
+    match self
+        .Str(s) -> Some(s.as_view())
+        _ -> None
+
+fn JsonValue.as_number_ref(self: &Self) -> Option[f64] =
+    match self
+        .Number(n) -> Some(*n)
+        _ -> None
+
+fn JsonValue.as_array_ref(self: &Self) -> Option[&Vec[JsonValue]] =
+    match self
+        .Array(items) -> Some(items)
+        _ -> None
 
 // --- Main Demo ---
 
@@ -386,14 +400,14 @@ fn main() =
             println("Pretty: {value}\n")
 
             // Access nested values via optional chaining + ??
-            let name = value.get("name")?.as_str() ?? "unknown"
+            let name = value.get("name")?.as_str_ref() ?? "unknown"
             println("Name: {name}")
 
-            let version = value.get("version")?.as_number() ?? 0.0
+            let version = value.get("version")?.as_number_ref() ?? 0.0
             println("Version: {version}")
 
             // Access array elements
-            let first_feature = value.get("features")?.index(0)?.as_str() ?? "none"
+            let first_feature = value.get("features")?.index(0)?.as_str_ref() ?? "none"
             println("First feature: {first_feature}")
 
             // Walk all leaves using generator
@@ -402,7 +416,7 @@ fn main() =
                 println("  {path} = {leaf}")
 
             // Count features using optional chaining
-            let feature_count = value.get("features")?.as_array()?.len() ?? 0
+            let feature_count = value.get("features")?.as_array_ref()?.len() ?? 0
             println("\nFeature count: {feature_count}")
 
         Err(e) ->

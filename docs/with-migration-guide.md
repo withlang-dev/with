@@ -23,9 +23,9 @@ borrow checker, and trait system are the same. What changes is syntax
 and a handful of design decisions that remove Rust's roughest edges.
 
 **The short version:** Strip lifetimes. Replace `{ }` with `:` and
-indentation. Replace `impl` with `extend`. Replace prefix `await`
-with postfix `.await`. Enjoy the fact that async just works without
-`Pin`, `Unpin`, or colored functions.
+indentation. `impl Type` → `extend Type`. `impl Trait for Type`
+stays the same. Postfix `.await`. No `Pin`, `Unpin`, or colored
+functions.
 
 ## Types
 
@@ -159,6 +159,10 @@ Variant shorthand: `.Circle` instead of `Shape::Circle` when the
 type is known from context. `=>` becomes `->`. Braces become `:` +
 indentation.
 
+Enum variants auto-generate accessor methods (§4.4):
+`shape.is_circle()` → `bool`, `shape.as_circle()` → `Option[f64]`.
+No `matches!()` macro needed.
+
 ## Error Handling
 
 ```rust
@@ -176,18 +180,20 @@ fn get_name(id: u64) -> Option<String> {
 ```
 
 ```with
-// With
+// With — implicit Ok wrapping: just return the value
 fn load(path: &str) -> Result[Config, IoError] =
     let text = fs.read_to_string(path)?
     let config = toml.parse(&text)?
-    Ok(config)
+    config                       // auto-wrapped in Ok(config)
 
 fn get_name(id: u64) -> Option[str] =
     let user = find_user(id)?
     Some(user.name)
 ```
 
-`?` works identically. Additional ergonomics:
+`?` works identically. The happy path just returns the value —
+the compiler wraps it in `Ok(...)` automatically. Additional
+ergonomics:
 
 ```with
 // Optional chaining (no Rust equivalent)
@@ -200,11 +206,35 @@ let name = find_name(id) ?? "anonymous"
 let text = fs.read_to_string(path)
     .context("failed to read config")?
 
-// Unit elision
+// Implicit Ok for Unit results — just end the function
 fn save(data: &Data) -> Result[Unit, IoError] =
     fs.write_file("out.txt", data.to_bytes())?
-    Ok()       // not Ok(())
+    // implicit Ok(()) — no trailing expression needed
+
+// Error composition (replaces thiserror #[from])
+error AppError from IoError, DbError =
+    Validation(msg: str)
+// Generates From impls — ? auto-converts IoError/DbError to AppError
 ```
+
+In Rust, error composition typically requires `thiserror`:
+
+```rust
+// Rust — thiserror
+#[derive(thiserror::Error, Debug)]
+enum AppError {
+    #[error("io error")]
+    Io(#[from] std::io::Error),
+    #[error("db error")]
+    Db(#[from] DbError),
+    #[error("validation: {0}")]
+    Validation(String),
+}
+```
+
+In With, `error ... from` generates the wrapper variants and `From`
+implementations automatically. `?` uses `From` for conversion, so
+errors propagate across subsystem boundaries without boilerplate.
 
 ## Structs and Methods
 
@@ -239,8 +269,8 @@ extend Counter
     fn value(self: &Counter) -> u32 = self.count
 ```
 
-`impl` → `extend`. `Self` → explicit type name. `&self` →
-`self: &Counter`. `&mut self` → `self: &mut Counter`.
+`impl Type` → `extend Type`. `Self` → explicit type name.
+`&self` → `self: &Counter`. `&mut self` → `self: &mut Counter`.
 
 By-value `self` enables consuming method chains (builders):
 
@@ -256,6 +286,43 @@ let server = Builder.new()
     .port(8080)
     .build()?
 ```
+
+## Default Values and Construction
+
+```rust
+// Rust — requires Default trait impl + struct update syntax
+#[derive(Default)]
+struct Config {
+    timeout: u32,
+    retries: u32,
+    verbose: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config { timeout: 30, retries: 3, verbose: false }
+    }
+}
+
+let config = Config::default();
+let custom = Config { retries: 5, ..Config::default() };
+```
+
+```with
+// With — default field values (§4.3): declare defaults inline
+type Config = {
+    timeout: u32 = 30,
+    retries: u32 = 3,
+    verbose: bool = false,
+}
+
+let config = Config {}               // all defaults
+let custom = Config { retries: 5 }   // only override what differs
+```
+
+No `impl Default`. No `..Default::default()` spread. Callers just
+omit fields that have defaults. Defaults are evaluated at the
+construction site (each construction gets fresh values).
 
 ## Traits
 
@@ -283,12 +350,14 @@ trait Summary
     fn preview(self: &Self) -> str =
         "{self.summarize().slice(0, 50)}..."
 
-extend Article: Summary
+impl Summary for Article {
     fn summarize(self: &Article) -> str =
         "{self.title}: {self.author}"
+}
 ```
 
-`impl Trait for Type` → `extend Type: Trait`.
+`impl` blocks → `extend` for inherent methods. `impl Trait for Type`
+stays the same syntax as Rust.
 
 Trait objects: `Box<dyn Trait>` → `Box[dyn Trait]`.
 `&dyn Trait` → `&dyn Trait`.
@@ -337,11 +406,11 @@ let (a, b) = join!(fetch("a"), fetch("b"));
 ```
 
 ```with
-// With — no colored functions, no Pin, no Send bounds
+// With — no colored functions, no Pin
 async fn fetch(url: &str) -> Result[str, Error] =
     let resp = client.get(url).await?
     let body = resp.text().await?
-    Ok(body)
+    body                             // implicit Ok wrapping
 
 // Structured concurrency
 let (a, b) = async scope |s|:
@@ -356,7 +425,7 @@ Key differences from Rust async:
 |------|------|
 | Stackless (state machines) | Stackful (fibers) |
 | `Pin<&mut Self>` needed | References just work across `.await` |
-| `Send` bounds infect everything | Not needed |
+| `Send` bounds infect everything | Mostly implicit; required only at explicit cross-thread/channel boundaries |
 | `async fn` in traits requires workarounds | Just works |
 | `.await` inside `map`/`filter` impossible | Works everywhere |
 | Multiple runtimes (tokio, async-std) | One blessed runtime |
@@ -438,9 +507,9 @@ This has no Rust equivalent. It replaces several patterns:
 
 ```with
 // Builder pattern (replaces Rust builder + method chaining)
-let config = with Config.default() as mut c:
-    c.timeout = 30
-    c.retries = 3
+let config = with Config {} as mut c:
+    c.timeout = compute_timeout()
+    c.retries = if production then 3 else 1
 
 // Scoped resource access (replaces Rust MutexGuard juggling)
 with mutex.lock() as data:
@@ -459,15 +528,15 @@ let updated = { user with name: "new_name", active: false }
 | `let mut x` | `var x` |
 | `Vec<T>` | `Vec[T]` |
 | `impl Foo` | `extend Foo` |
-| `impl Trait for Foo` | `extend Foo: Trait` |
+| `impl Trait for Foo` | `impl Trait for Foo` (same) |
 | `&self` | `self: &Foo` |
 | `match x { A => ..., }` | `match x` ⟨newline⟩ `A -> ...` |
 | `#[attr]` | `@[attr]` |
 | `String::from("x")` / `"x".to_string()` | `"x"` (auto-promoted) |
-| `Ok(())` | `Ok()` |
+| `Ok(value)` | `value` (implicit wrapping) or `Ok()` for early returns |
 | `println!("{}", x)` | `println("{x}")` |
 | `x.await` | `x.await` (same) |
-| `async move { }` | `async fn() = ...` |
+| `async move { }` | `async: expr` (inline block) |
 | `;` (semicolons) | (none) |
 | `pub(crate)` | `pub` |
 | `use crate::module` | `use module` |
@@ -476,6 +545,9 @@ let updated = { user with name: "new_name", active: false }
 | `::` (path separator) | `.` |
 | `'a` (lifetimes) | (deleted — ephemeral system) |
 | `where T: Trait` | `[T: Trait]` in signature |
+| `impl Default for Foo` + `..Default::default()` | Default field values: `type Foo = { x: i32 = 0 }`, `Foo {}` |
+| `thiserror` `#[from]` | `error AppError from IoError, DbError` |
+| `.unwrap_or(())` | `.unwrap_or()` (unit elision) |
 
 ---
 
@@ -636,7 +708,7 @@ fn process_items(items: &[Item]) -> Result[Unit, AppError] =
     var list = Vec[Item].new()
     for item in items:
         list.push(item)
-    Ok()
+    // implicit Ok(())
 
 // For custom allocators, use with blocks:
 with Arena.new(1024 * 1024) as arena:
@@ -896,6 +968,39 @@ Go interfaces → With traits. Go structs → With types. Fields are
 lowercase in With (no exported/unexported distinction by case —
 With uses `pub`).
 
+## Zero Values vs Default Field Values
+
+Go automatically zero-initializes all fields. With requires explicit
+initialization — but default field values (§4.3) provide the same
+convenience:
+
+```go
+// Go — all fields zero-initialized
+type Config struct {
+    Host    string   // ""
+    Port    int      // 0
+    Retries int      // 0
+    Verbose bool     // false
+}
+config := Config{Port: 8080}  // other fields are zero
+```
+
+```with
+// With — default field values declare what "default" means
+type Config = {
+    host: str = "localhost",
+    port: i32 = 8080,
+    retries: i32 = 3,
+    verbose: bool = false,
+}
+let config = Config {}                  // all defaults
+let custom = Config { port: 9090 }     // override one field
+```
+
+Unlike Go's zero values (always the zero of the type), With defaults
+can be any expression: `Duration.seconds(30)`, `Vec.new()`, etc.
+Fields without defaults must always be provided.
+
 ## Variables
 
 ```go
@@ -938,7 +1043,7 @@ fn add(a: i32, b: i32) -> i32 = a + b
 
 fn divide(a: f64, b: f64) -> Result[f64, MathError] =
     if b == 0.0 then return Err(.DivisionByZero)
-    Ok(a / b)
+    a / b
 ```
 
 Go's `(value, error)` return pattern → `Result[T, E]`. Always.
@@ -971,7 +1076,7 @@ fn load_config(path: &str) -> Result[Config, AppError] =
         .context("reading config")?
     let config = json.parse[Config](&data)
         .context("parsing config")?
-    Ok(config)
+    config                           // implicit Ok wrapping
 ```
 
 The `?` operator replaces every `if err != nil { return ..., err }`
@@ -1025,15 +1130,16 @@ trait Stringer
 
 type User = { name: str }
 
-extend User: Stringer
+impl Stringer for User {
     fn to_string(self: &User) -> str = self.name
+}
 
 fn print_anything(s: &dyn Stringer) =
     println(s.to_string())
 ```
 
 Go interfaces are implicit (structural typing). With traits are
-explicit (`extend Type: Trait`). You must declare which traits a
+explicit (`impl Trait for Type`). You must declare which traits a
 type implements. This catches mistakes at compile time instead
 of runtime.
 
@@ -1070,7 +1176,7 @@ spawn handle_request(conn)
 
 // With channels
 let (tx, rx) = chan[i32](10)
-spawn async fn() =
+spawn async:
     tx.send(42).await
 let val = rx.recv().await
 
@@ -1081,7 +1187,7 @@ select await
     _ = timeout(5.secs()) -> return Err(.Timeout)
 ```
 
-`go func()` → `spawn async fn()`. `chan T` → `chan[T]`. `select`
+`go func()` → `spawn async:`. `chan T` → `chan[T]`. `select`
 → `select await`. `ch <- val` → `tx.send(val).await`. `<-ch` →
 `rx.recv().await`.
 
@@ -1262,7 +1368,7 @@ let clone = shared.clone()   // both point to same data
 | `err != nil { return err }` | `?` |
 | `fmt.Errorf("msg: %w", err)` | `.context("msg")?` |
 | `interface { Method() }` | `trait Foo: fn method()` |
-| `go func() { }()` | `spawn async fn() = ...` |
+| `go func() { }()` | `spawn async: ...` |
 | `chan T` | `chan[T]` |
 | `select { case ... }` | `select await ... ->` |
 | `context.Context` | (deleted — structured concurrency) |
@@ -1276,6 +1382,9 @@ let clone = shared.clone()   // both point to same data
 | `struct{ }` | `type Foo = { }` |
 | `*T` (pointer) | `&T` (reference) or owned `T` |
 | `new(T)` | `Box.new(T { ... })` |
+| Zero-initialized fields | Default field values: `type Foo = { x: i32 = 0 }` |
+| `(value, error)` returns | `Result[T, E]` |
+| `errors.New("msg")` | `error AppError from ...` + `?` propagation |
 
 ---
 
@@ -1375,10 +1484,11 @@ sqlite3_open(":memory:", &db);
 use c_import("sqlite3.h", link: "sqlite3")
 
 var db: *mut sqlite3 = null
-unsafe { sqlite3_open(c":memory:".ptr, &mut db) }
+sqlite3_open(c":memory:".ptr, &mut db)
 ```
 
 `c_import` parses C headers at compile time and makes all `struct`s, `enum`s, `#define` macros, and functions instantly available as With symbols. 
+Imported C functions are directly callable; `unsafe` is still required for raw pointer dereference and pointer arithmetic.
 
 ## Classes and Methods
 
@@ -1484,7 +1594,8 @@ optionals, protocol-oriented design, structured concurrency, and
 explicit error handling. The main difference is that With has no
 ARC — ownership is compile-time, not runtime.
 
-**The short version:** `protocol` → `trait`. `extension` → `extend`.
+**The short version:** `protocol` → `trait`. `extension Foo: Bar` →
+`impl Bar for Foo`.
 `guard let` → `let ... else`. Optional chaining and `??` work
 identically. `class` → owned `type` (or `Arc[T]` for shared state).
 Delete `weak`/`unowned`/`strong` — the compiler figures it out.
@@ -1522,9 +1633,11 @@ type Shape =
     | Rectangle(width: f64, height: f64)
 
 // class → owned type (no ARC)
+// Default field values (§4.3) match Swift's property defaults:
 type ViewModel = {
-    items: Vec[Item],
+    items: Vec[Item] = Vec.new(),
 }
+let vm = ViewModel {}    // items defaults to empty Vec
 ```
 
 Swift `struct` → With `type` (both are value types).
@@ -1601,7 +1714,7 @@ let upper = name?.to_upper()
 if let Some(name) = name:
     println(name)
 
-let user = find_user(id) else return None
+let Some(user) = find_user(id) else return None
 ```
 
 `T?` → `Option[T]`. `nil` → `None`. Optional chaining (`?.`) is
@@ -1639,7 +1752,7 @@ fn load_config(path: &str) -> Result[Config, AppError] =
         .context("reading config")?
     let config = json.parse[Config](&data)
         .context("parsing config")?
-    Ok(config)
+    config                           // implicit Ok wrapping
 
 match load_config("config.json")
     Ok(config) -> use_config(config)
@@ -1682,7 +1795,7 @@ trait Drawable
     fn draw(self: &Self, canvas: &Canvas)
     fn bounding_box(self: &Self) -> Rect
 
-extend Circle: Drawable
+impl Drawable for Circle {
     fn draw(self: &Circle, canvas: &Canvas) =
         canvas.draw_circle(self.center, self.radius)
     fn bounding_box(self: &Circle) -> Rect =
@@ -1692,6 +1805,7 @@ extend Circle: Drawable
             width: self.radius * 2.0,
             height: self.radius * 2.0,
         }
+}
 
 extend Vec[T: Add]
     fn sum(self: &Vec[T]) -> T =
@@ -1699,8 +1813,8 @@ extend Vec[T: Add]
 ```
 
 `protocol` → `trait`. `extension Type: Protocol` →
-`extend Type: Trait`. Protocol extensions with `where` →
-`extend Vec[T: Trait]`.
+`impl Trait for Type`. Protocol extensions with `where` →
+`extend Vec[T: Trait]` (for inherent methods).
 
 Swift's protocol-oriented programming maps directly to With's
 trait-oriented design.
@@ -1912,11 +2026,11 @@ let set = HashSet[i32].from([1, 2, 3])
 | `nil` | `None` |
 | `x?.property` | `x?.property` |
 | `x ?? default` | `x ?? default` |
-| `guard let x = opt else { return }` | `let x = opt else return` |
+| `guard let x = opt else { return }` | `let Some(x) = opt else return` |
 | `throws` / `try` | `-> Result[T, E]` / `?` |
 | `do { } catch { }` | `match result` |
 | `protocol Foo` | `trait Foo` |
-| `extension Foo: Bar` | `extend Foo: Bar` |
+| `extension Foo: Bar` | `impl Bar for Foo` |
 | `class` | `type` (or `Arc[T]` if shared) |
 | `struct` | `type` |
 | `enum { case a(T) }` | `type Foo = A(T) \| B(U)` |
@@ -1968,10 +2082,12 @@ with mutex.lock() as data:
 // lock released automatically
 
 // Form 2: Builder (mutable init, then freeze)
-let config = with Config.default() as mut c:
-    c.timeout = 30
-    c.retries = 3
+let config = with Config {} as mut c:
+    c.timeout = compute_timeout(env)
+    c.retries = if production then 3 else 1
 // c is frozen and returned
+// (For simple cases, default field values let you write
+// Config { timeout: 30, retries: 3 } directly — see §4.3)
 
 // Form 3: Scoped binding (temporary name)
 let area = with shape.bounding_box() as bb:
@@ -2024,6 +2140,9 @@ automatically discovered.
 ```with
 // Discard a must-use value intentionally
 let _ = cache.delete(key).await
+
+// Fire-and-forget task (do not use `let _ = task_expr`)
+spawn send_analytics(event)
 
 // Early return on None/Err
 let user = find_user(id) ?? return Err(.NotFound)

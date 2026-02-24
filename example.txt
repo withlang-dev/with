@@ -9,8 +9,7 @@ module json
 //   - Error declarations with positional context
 //   - Generators for lazy tree traversal
 //   - Pipeline operators for composition
-//   - StrView (ephemeral string slices)
-//   - Collection comprehensions
+//   - Borrowed tree access via helper methods
 //   - with blocks (scoped mutation)
 // ===================================================================
 
@@ -27,11 +26,11 @@ type JsonValue =
 // --- Errors ---
 
 error JsonError =
-    | UnexpectedChar(pos: usize, expected: str, got: u8)
-    | UnexpectedEof(pos: usize, context: str)
-    | InvalidNumber(pos: usize, text: str)
-    | InvalidEscape(pos: usize, ch: u8)
-    | TrailingContent(pos: usize)
+    UnexpectedChar(pos: usize, expected: str, got: u8)
+    UnexpectedEof(pos: usize, context: str)
+    InvalidNumber(pos: usize, text: str)
+    InvalidEscape(pos: usize, ch: u8)
+    TrailingContent(pos: usize)
 
 // --- Token Types ---
 
@@ -359,9 +358,24 @@ fn JsonValue.index(self: &Self, i: usize) -> Option[&JsonValue] =
         .Array(items) if i < items.len() -> Some(&items[i])
         _ -> None
 
-// Accessor methods — .as_str(), .as_number(), .as_bool(), .as_array(),
-// .as_object() and .is_null(), .is_str(), etc. — are auto-generated
-// for every enum variant (§4.4). No manual definitions needed.
+// Auto-generated enum accessors (.as_variant()) consume self (§4.4).
+// For tree navigation we usually have &JsonValue, so add borrowed
+// helpers that preserve ownership of the parsed tree.
+
+fn JsonValue.as_str_ref(self: &Self) -> Option[&str] =
+    match self
+        .Str(s) -> Some(s.as_view())
+        _ -> None
+
+fn JsonValue.as_number_ref(self: &Self) -> Option[f64] =
+    match self
+        .Number(n) -> Some(*n)
+        _ -> None
+
+fn JsonValue.as_array_ref(self: &Self) -> Option[&Vec[JsonValue]] =
+    match self
+        .Array(items) -> Some(items)
+        _ -> None
 
 // --- Main Demo ---
 
@@ -386,14 +400,14 @@ fn main() =
             println("Pretty: {value}\n")
 
             // Access nested values via optional chaining + ??
-            let name = value.get("name")?.as_str() ?? "unknown"
+            let name = value.get("name")?.as_str_ref() ?? "unknown"
             println("Name: {name}")
 
-            let version = value.get("version")?.as_number() ?? 0.0
+            let version = value.get("version")?.as_number_ref() ?? 0.0
             println("Version: {version}")
 
             // Access array elements
-            let first_feature = value.get("features")?.index(0)?.as_str() ?? "none"
+            let first_feature = value.get("features")?.index(0)?.as_str_ref() ?? "none"
             println("First feature: {first_feature}")
 
             // Walk all leaves using generator
@@ -402,7 +416,7 @@ fn main() =
                 println("  {path} = {leaf}")
 
             // Count features using optional chaining
-            let feature_count = value.get("features")?.as_array()?.len() ?? 0
+            let feature_count = value.get("features")?.as_array_ref()?.len() ?? 0
             println("\nFeature count: {feature_count}")
 
         Err(e) ->
@@ -428,13 +442,13 @@ module c_interop
 //
 // Demonstrates:
 //   - c_import for automatic C header binding
-//   - unsafe blocks for FFI calls
+//   - unsafe only at raw-pointer boundaries
 //   - Safe wrapper types with Drop for RAII cleanup
-//   - @[repr(C)] layout control
-//   - defer for resource cleanup
-//   - Error types with from
+//   - extend blocks for inherent methods
+//   - Error types with contextual variants
 //   - Prepared statements and query iteration
 //   - Pipeline operators for result processing
+//   - Implicit Ok wrapping (§4.9)
 // ===================================================================
 
 use c_import("sqlite3.h", link: "sqlite3")
@@ -442,13 +456,13 @@ use c_import("sqlite3.h", link: "sqlite3")
 // --- Error Types ---
 
 error SqliteError =
-    | OpenFailed(path: str, code: i32, msg: str)
-    | ExecFailed(sql: str, code: i32, msg: str)
-    | PrepareFailed(sql: str, code: i32, msg: str)
-    | BindFailed(param: i32, code: i32)
-    | StepFailed(code: i32)
-    | ColumnOutOfRange(index: i32, count: i32)
-    | NullPointer(context: str)
+    OpenFailed(path: str, code: i32, msg: str)
+    ExecFailed(sql: str, code: i32, msg: str)
+    PrepareFailed(sql: str, code: i32, msg: str)
+    BindFailed(param: i32, code: i32)
+    StepFailed(code: i32)
+    ColumnOutOfRange(index: i32, count: i32)
+    NullPointer(context: str)
 
 // --- Safe Database Wrapper ---
 //
@@ -460,68 +474,78 @@ type Database = {
 }
 
 impl Drop for Database {
-    fn drop(self: &mut Self) =
+    fn drop(self: Self) =
         if self.handle != null:
-            unsafe { sqlite3_close(self.handle) }
-            self.handle = null
+            sqlite3_close(self.handle)
+        // self is consumed — no defensive nulling needed
 }
 
-fn Database.open(path: str) -> Result[Database, SqliteError] =
-    var handle: *mut sqlite3 = null
-    let rc = unsafe { sqlite3_open(path.as_ptr(), &mut handle) }
-    if rc != SQLITE_OK:
-        let msg = if handle != null:
-            unsafe { sqlite3_errmsg(handle) } |> ptr_to_string
-        else:
-            "unknown error"
-        // Close even on error — sqlite3_open may allocate
-        if handle != null:
-            unsafe { sqlite3_close(handle) }
-        return Err(.OpenFailed(
-            path,
-            code: rc,
-            msg,
-        ))
-    Ok(Database { handle, path })
+extend Database
+    fn open(path: str) -> Result[Database, SqliteError] =
+        var handle: *mut sqlite3 = null
+        let rc = sqlite3_open(path.as_ptr(), &mut handle)
+        if rc != SQLITE_OK:
+            let msg = if handle != null:
+                sqlite3_errmsg(handle) |> ptr_to_string
+            else:
+                "unknown error"
+            // Close even on error — sqlite3_open may allocate
+            if handle != null:
+                sqlite3_close(handle)
+            return Err(.OpenFailed(
+                path,
+                code: rc,
+                msg,
+            ))
+        Database { handle, path }
 
-fn Database.execute(self: &Self, sql: &str) -> Result[Unit, SqliteError] =
-    var err_msg: *mut u8 = null
-    let rc = unsafe {
-        sqlite3_exec(self.handle, sql.as_ptr(), null, null, &mut err_msg)
-    }
-    if rc != SQLITE_OK:
-        let msg = if err_msg != null:
-            let s = unsafe { ptr_to_string(err_msg) }
-            unsafe { sqlite3_free(err_msg as *mut void) }
-            s
-        else:
-            "unknown error"
-        return Err(.ExecFailed(
-            sql: sql.to_string(),
-            code: rc,
-            msg,
-        ))
-    Ok()
+    fn execute(self: &Self, sql: &str) -> Result[Unit, SqliteError] =
+        var err_msg: *mut u8 = null
+        let rc = sqlite3_exec(self.handle, sql.as_ptr(), null, null, &mut err_msg)
+        if rc != SQLITE_OK:
+            let msg = if err_msg != null:
+                let s = ptr_to_string(err_msg)
+                sqlite3_free(err_msg as *mut c_void)
+                s
+            else:
+                "unknown error"
+            return Err(.ExecFailed(
+                sql: sql.to_string(),
+                code: rc,
+                msg,
+            ))
 
-fn Database.prepare(self: &Self, sql: &str) -> Result[Statement, SqliteError] =
-    var stmt: *mut sqlite3_stmt = null
-    let rc = unsafe {
-        sqlite3_prepare_v2(self.handle, sql.as_ptr(), -1, &mut stmt, null)
-    }
-    if rc != SQLITE_OK:
-        let msg = unsafe { sqlite3_errmsg(self.handle) } |> ptr_to_string
-        return Err(.PrepareFailed(
-            sql: sql.to_string(),
-            code: rc,
-            msg,
-        ))
-    Ok(Statement { handle: stmt })
+    fn prepare(self: &Self, sql: &str) -> Result[Statement, SqliteError] =
+        var stmt: *mut sqlite3_stmt = null
+        let rc = sqlite3_prepare_v2(self.handle, sql.as_ptr(), -1, &mut stmt, null)
+        if rc != SQLITE_OK:
+            let msg = sqlite3_errmsg(self.handle) |> ptr_to_string
+            return Err(.PrepareFailed(
+                sql: sql.to_string(),
+                code: rc,
+                msg,
+            ))
+        Statement { handle: stmt }
 
-fn Database.last_insert_rowid(self: &Self) -> i64 =
-    unsafe { sqlite3_last_insert_rowid(self.handle) }
+    fn last_insert_rowid(self: &Self) -> i64 =
+        sqlite3_last_insert_rowid(self.handle)
 
-fn Database.changes(self: &Self) -> i32 =
-    unsafe { sqlite3_changes(self.handle) }
+    fn changes(self: &Self) -> i32 =
+        sqlite3_changes(self.handle)
+
+    fn transaction[T](
+        self: &Self,
+        body: fn(&Self) -> Result[T, SqliteError],
+    ) -> Result[T, SqliteError] =
+        self.execute("BEGIN")?
+        match body(self)
+            Ok(value) ->
+                self.execute("COMMIT")?
+                Ok(value)
+            Err(e) ->
+                // Rollback, but don't mask the original error
+                let _ = self.execute("ROLLBACK")
+                Err(e)
 
 // --- Safe Statement Wrapper ---
 //
@@ -532,60 +556,55 @@ type Statement = {
 }
 
 impl Drop for Statement {
-    fn drop(self: &mut Self) =
+    fn drop(self: Self) =
         if self.handle != null:
-            unsafe { sqlite3_finalize(self.handle) }
-            self.handle = null
+            sqlite3_finalize(self.handle)
+        // self is consumed — no defensive nulling needed
 }
 
-fn Statement.bind_int(self: &Self, param: i32, value: i32) -> Result[Unit, SqliteError] =
-    let rc = unsafe { sqlite3_bind_int(self.handle, param, value) }
-    if rc != SQLITE_OK:
-        return Err(.BindFailed(param, code: rc))
-    Ok()
+extend Statement
+    fn bind_int(self: &Self, param: i32, value: i32) -> Result[Unit, SqliteError] =
+        let rc = sqlite3_bind_int(self.handle, param, value)
+        if rc != SQLITE_OK:
+            return Err(.BindFailed(param, code: rc))
 
-fn Statement.bind_text(self: &Self, param: i32, value: &str) -> Result[Unit, SqliteError] =
-    let rc = unsafe {
-        sqlite3_bind_text(self.handle, param, value.as_ptr(), value.len32(), SQLITE_TRANSIENT)
-    }
-    if rc != SQLITE_OK:
-        return Err(.BindFailed(param, code: rc))
-    Ok()
+    fn bind_text(self: &Self, param: i32, value: &str) -> Result[Unit, SqliteError] =
+        let rc = sqlite3_bind_text(self.handle, param, value.as_ptr(), value.len32(), SQLITE_TRANSIENT)
+        if rc != SQLITE_OK:
+            return Err(.BindFailed(param, code: rc))
 
-fn Statement.bind_f64(self: &Self, param: i32, value: f64) -> Result[Unit, SqliteError] =
-    let rc = unsafe { sqlite3_bind_double(self.handle, param, value) }
-    if rc != SQLITE_OK:
-        return Err(.BindFailed(param, code: rc))
-    Ok()
+    fn bind_f64(self: &Self, param: i32, value: f64) -> Result[Unit, SqliteError] =
+        let rc = sqlite3_bind_double(self.handle, param, value)
+        if rc != SQLITE_OK:
+            return Err(.BindFailed(param, code: rc))
 
-fn Statement.step(self: &Self) -> Result[bool, SqliteError] =
-    let rc = unsafe { sqlite3_step(self.handle) }
-    match rc
-        SQLITE_ROW  -> Ok(true)
-        SQLITE_DONE -> Ok(false)
-        _           -> Err(.StepFailed(code: rc))
+    fn step(self: &Self) -> Result[bool, SqliteError] =
+        let rc = sqlite3_step(self.handle)
+        match rc
+            SQLITE_ROW  -> Ok(true)
+            SQLITE_DONE -> Ok(false)
+            _           -> Err(.StepFailed(code: rc))
 
-fn Statement.reset(self: &Self) -> Result[Unit, SqliteError] =
-    let rc = unsafe { sqlite3_reset(self.handle) }
-    if rc != SQLITE_OK:
-        return Err(.StepFailed(code: rc))
-    Ok()
+    fn reset(self: &Self) -> Result[Unit, SqliteError] =
+        let rc = sqlite3_reset(self.handle)
+        if rc != SQLITE_OK:
+            return Err(.StepFailed(code: rc))
 
-fn Statement.column_count(self: &Self) -> i32 =
-    unsafe { sqlite3_column_count(self.handle) }
+    fn column_count(self: &Self) -> i32 =
+        sqlite3_column_count(self.handle)
 
-fn Statement.column_int(self: &Self, col: i32) -> i32 =
-    unsafe { sqlite3_column_int(self.handle, col) }
+    fn column_int(self: &Self, col: i32) -> i32 =
+        sqlite3_column_int(self.handle, col)
 
-fn Statement.column_text(self: &Self, col: i32) -> str =
-    let ptr = unsafe { sqlite3_column_text(self.handle, col) }
-    if ptr == null:
-        str.new()
-    else:
-        unsafe { ptr_to_string(ptr) }
+    fn column_text(self: &Self, col: i32) -> str =
+        let ptr = sqlite3_column_text(self.handle, col)
+        if ptr == null:
+            str.new()
+        else:
+            ptr_to_string(ptr)
 
-fn Statement.column_f64(self: &Self, col: i32) -> f64 =
-    unsafe { sqlite3_column_double(self.handle, col) }
+    fn column_f64(self: &Self, col: i32) -> f64 =
+        sqlite3_column_double(self.handle, col)
 
 // --- Row Iterator ---
 //
@@ -606,22 +625,6 @@ fn ptr_to_string(ptr: *const u8) -> str =
         str.new()
     else:
         unsafe { str.from_c_str(ptr) }
-
-// --- Transaction Helper ---
-
-fn Database.transaction[T](
-    self: &Self,
-    body: fn(&Self) -> Result[T, SqliteError],
-) -> Result[T, SqliteError] =
-    self.execute("BEGIN")?
-    match body(self)
-        Ok(value) ->
-            self.execute("COMMIT")?
-            Ok(value)
-        Err(e) ->
-            // Rollback, but don't mask the original error
-            let _ = self.execute("ROLLBACK")
-            Err(e)
 
 // --- Main Demo ---
 
@@ -665,7 +668,7 @@ fn main() -> Result[Unit, SqliteError] =
             count = count + 1
 
         println("Inserted {count} users")
-        Ok(count)
+        count
     )?
     println("Transaction committed ({inserted} rows)\n")
 
@@ -708,7 +711,6 @@ fn main() -> Result[Unit, SqliteError] =
         Err(e) -> println("  expected error: {e}")
 
     println("\n=== Demo complete ===")
-    Ok()
 module ecs.components
 
 use ecs.math.Vec2
@@ -1639,7 +1641,6 @@ impl NotificationService for EmailNotifier {
 
         let transport = SmtpTransport.connect(&self.smtp_host, self.smtp_port).await?
         transport.send(&email).await?
-        Ok()
         // transport dropped here -> connection closed via Drop
 
     async fn send_batch(self: &EmailNotifier, notifs: &[Notification]) -> Result[i32, NotifyError] =
@@ -1649,7 +1650,7 @@ impl NotificationService for EmailNotifier {
                 Ok() -> sent += 1
                 Err(.RateLimited(d)) -> return Err(.RateLimited(d))
                 Err(_) -> ()  // skip individual failures
-        Ok(sent)
+        sent
 }
 module app.cache.redis
 
@@ -1680,12 +1681,10 @@ impl CacheService for RedisCache {
     async fn set_bytes(self: &RedisCache, key: &str, val: &[u8], ttl: Duration) -> Result[Unit, CacheError] =
         let full_key = self.prefixed_key(key)
         self.client.set_ex(&full_key, val, ttl.as_secs()).await?
-        Ok()
 
     async fn delete(self: &RedisCache, key: &str) -> Result[Unit, CacheError] =
         let full_key = self.prefixed_key(key)
         self.client.del(&full_key).await?
-        Ok()
 
     async fn exists(self: &RedisCache, key: &str) -> Result[bool, CacheError] =
         let full_key = self.prefixed_key(key)
@@ -1753,7 +1752,6 @@ async fn main() -> Result[Unit, ServiceError] =
 
     // Scope guarantees: all spawned fibers have completed or been cancelled.
     println("Service shut down cleanly.")
-    Ok()
 
 
 async fn listen_for_shutdown() =
@@ -1962,22 +1960,22 @@ extend MockUserRepo
 impl UserRepository for MockUserRepo {
     async fn find_by_id(self: &MockUserRepo, id: UserId) -> Result[Option[User], DbError] =
         with self.users.read() as users:
-            Ok(users.get(&id).cloned())
+            users.get(&id).cloned()
 
     async fn find_by_email(self: &MockUserRepo, email: &str) -> Result[Option[User], DbError] =
         with self.users.read() as users:
-            Ok(users.values()
+            users.values()
                 |> find(|u| u.email == email)
-                |> map(|u| u.clone()))
+                |> map(|u| u.clone())
 
     async fn list_active(self: &MockUserRepo, limit: i32, offset: i32) -> Result[Vec[User], DbError] =
         with self.users.read() as users:
-            Ok(users.values()
+            users.values()
                 |> filter(|u| u.active)
                 |> skip(offset as usize)
                 |> take(limit as usize)
                 |> cloned()
-                |> collect())
+                |> collect()
 
     async fn insert(self: &MockUserRepo, user: &User) -> Result[UserId, DbError] =
         let id = with self.next_id.lock() as mut next:
@@ -1987,7 +1985,7 @@ impl UserRepository for MockUserRepo {
         let user = { user.clone() with id: id }
         with self.users.write() as mut users:
             users.insert(id, user)
-        Ok(id)
+        id
 
     async fn update(self: &MockUserRepo, id: UserId, fields: &UserUpdate) -> Result[Unit, DbError] =
         with self.users.write() as mut users:
@@ -2007,10 +2005,10 @@ impl UserRepository for MockUserRepo {
                 .ok_or(.NotFound("users", "{id}"))
 
     async fn count_posts(self: &MockUserRepo, _id: UserId) -> Result[i32, DbError] =
-        Ok(0)
+        0
 
     async fn count_followers(self: &MockUserRepo, _id: UserId) -> Result[i32, DbError] =
-        Ok(0)
+        0
 }
 
 // --- In-Memory Mock Cache ---
@@ -2026,21 +2024,19 @@ extend MockCache
 impl CacheService for MockCache {
     async fn get_bytes(self: &MockCache, key: &str) -> Result[Option[Vec[u8]], CacheError] =
         with self.store.read() as store:
-            Ok(store.get(key).cloned())
+            store.get(key).cloned()
 
     async fn set_bytes(self: &MockCache, key: &str, val: &[u8], _ttl: Duration) -> Result[Unit, CacheError] =
         with self.store.write() as mut store:
             store.insert(key.to_string(), val.to_vec())
-        Ok()
 
     async fn delete(self: &MockCache, key: &str) -> Result[Unit, CacheError] =
         with self.store.write() as mut store:
             store.remove(key)
-        Ok()
 
     async fn exists(self: &MockCache, key: &str) -> Result[bool, CacheError] =
         with self.store.read() as store:
-            Ok(store.contains_key(key))
+            store.contains_key(key)
 }
 
 // --- Recording Mock Notifier ---
@@ -2069,14 +2065,13 @@ impl NotificationService for MockNotifier {
     async fn send(self: &MockNotifier, notif: &Notification) -> Result[Unit, NotifyError] =
         with self.sent.lock() as mut sent:
             sent.push(notif.clone())
-        Ok()
 
     async fn send_batch(self: &MockNotifier, notifs: &[Notification]) -> Result[i32, NotifyError] =
         with self.sent.lock() as mut sent:
             let count = notifs.len32()
             for n in notifs:
                 sent.push(n.clone())
-            Ok(count)
+            count
 }
 
 // --- No-Op Audit Log ---
@@ -2085,7 +2080,7 @@ type MockAudit = {}
 
 impl AuditLog for MockAudit {
     async fn record(self: &MockAudit, _actor: UserId, _action: &str, _detail: &str) -> Result[Unit, DbError] =
-        Ok()
+        ()
 }
 
 // --- Test Helper: Build service with mocks ---
@@ -2303,14 +2298,14 @@ extend UserServiceBuilder
         { self with config: cfg }
 
     fn build(self: UserServiceBuilder) -> Result[UserService, str] =
-        Ok(UserService {
+        UserService {
             repo: self.repo ?? return Err("UserRepository is required"),
             cache: self.cache ?? return Err("CacheService is required"),
             notifier: self.notifier ?? return Err("NotificationService is required"),
             audit: self.audit ?? return Err("AuditLog is required"),
             config: self.config,
             metrics: RwLock.new(ServiceMetrics {}),
-        })
+        }
 
 // --- Service Methods ---
 
@@ -2351,22 +2346,22 @@ extend UserService
 
             let posts = posts_task.await?
             let followers = followers_task.await?
-            let last_login = login_task.await.unwrap_or(Ok(None))
+            let last_login = login_task.await.unwrap_or(None)
 
             (posts, followers, last_login)
 
         let profile = UserProfile { user, post_count: posts, followers, last_login }
 
-        // Write through to cache (fire and forget — don't fail on cache error)
+        // Best-effort write-through cache update (await, ignore error)
         let _ = cache_set(&*self.cache, &cache_key, &profile, self.config.cache_ttl).await
 
-        Ok(profile)
+        profile
 
     // --- Create User ---
     //
     // Validates, inserts, invalidates cache, sends notification,
     // records audit log. Demonstrates with-block builders, pattern
-    // matching on roles, and concurrent fire-and-forget.
+    // matching on roles, and concurrent scope-managed side effects.
 
     async fn create_user(
         self: &UserService,
@@ -2396,7 +2391,7 @@ extend UserService
         let id = self.repo.insert(&user).await?
         let user = { user with id: id }
 
-        // Post-creation side effects (concurrent, non-blocking)
+        // Post-creation side effects (concurrent, scope-managed)
         async scope |s|:
             // Audit log
             s.track(self.audit.record(
@@ -2410,7 +2405,7 @@ extend UserService
             // Invalidate any cached user lists
             s.track(self.cache.delete("users:active:*"))
 
-        Ok(user)
+        user
 
     // --- Update User ---
     //
@@ -2447,7 +2442,7 @@ extend UserService
         with describe_changes(&current, &updated) as changes:
             self.audit.record(actor, "update_user", &changes).await?
 
-        Ok(updated)
+        updated
 
     // --- Delete User ---
 
@@ -2478,8 +2473,6 @@ extend UserService
                     body: "Your account has been removed.",
                     priority: .Normal,
                 }))
-
-        Ok()
 
     // --- List Active Users (paginated) ---
 
@@ -2512,7 +2505,7 @@ extend UserService
                 self.config.cache_ttl,
             ).await
 
-        Ok(users)
+        users
 
     // --- Batch Profile Fetch ---
     //
@@ -2576,46 +2569,27 @@ module app.errors
 use std.time.Duration
 
 error DbError =
-    | ConnectionFailed(host: str, port: u16)
-    | QueryFailed(query: str, reason: str)
-    | NotFound(table: str, id: str)
-    | Timeout
+    ConnectionFailed(host: str, port: u16)
+    QueryFailed(query: str, reason: str)
+    NotFound(table: str, id: str)
+    Timeout
 
 error CacheError =
-    | ConnectionLost
-    | KeyTooLarge(size: usize, max: usize)
-    | Timeout
+    ConnectionLost
+    KeyTooLarge(size: usize, max: usize)
+    Timeout
 
 error NotifyError =
-    | ProviderDown(provider: str)
-    | RateLimited(retry_after: Duration)
-    | InvalidRecipient(addr: str)
+    ProviderDown(provider: str)
+    RateLimited(retry_after: Duration)
+    InvalidRecipient(addr: str)
 
-// Unified service error — all subsystem errors convert into this
-// via From impls, so ? propagation works across boundaries.
-error ServiceError =
-    | Db(DbError)
-    | Cache(CacheError)
-    | Notify(NotifyError)
-    | Validation(msg: str)
-    | Timeout(operation: str, limit: Duration)
-    | Cancelled
-
-impl From[DbError] for ServiceError {
-    fn from(e: DbError) -> ServiceError = .Db(e)
-}
-
-impl From[CacheError] for ServiceError {
-    fn from(e: CacheError) -> ServiceError = .Cache(e)
-}
-
-impl From[NotifyError] for ServiceError {
-    fn from(e: NotifyError) -> ServiceError = .Notify(e)
-}
-
-impl From[TaskCancelled] for ServiceError {
-    fn from(_: TaskCancelled) -> ServiceError = .Cancelled
-}
+// Unified service error — `from` shorthand auto-generates wrapper
+// variants (Db, Cache, Notify) and From impls for ? propagation.
+// Cancellation just works — no Cancelled variant needed (§14.7).
+error ServiceError from DbError, CacheError, NotifyError =
+    Validation(msg: str)
+    Timeout(operation: str, limit: Duration)
 module app.domain
 
 type UserId = distinct i64
@@ -2681,7 +2655,7 @@ impl UserRepository for PgUserRepo {
             "SELECT id, name, email, role, active FROM users WHERE id = $1",
             &[&id],
         ).await?
-        Ok(row.map(|r| row_to_user(r)))
+        row.map(|r| row_to_user(r))
 
     async fn find_by_email(self: &PgUserRepo, email: &str) -> Result[Option[User], DbError] =
         let conn = self.pool.acquire().await?
@@ -2689,7 +2663,7 @@ impl UserRepository for PgUserRepo {
             "SELECT id, name, email, role, active FROM users WHERE email = $1",
             &[&email],
         ).await?
-        Ok(row.map(|r| row_to_user(r)))
+        row.map(|r| row_to_user(r))
 
     async fn list_active(self: &PgUserRepo, limit: i32, offset: i32) -> Result[Vec[User], DbError] =
         let conn = self.pool.acquire().await?
@@ -2697,7 +2671,7 @@ impl UserRepository for PgUserRepo {
             "SELECT id, name, email, role, active FROM users WHERE active = true LIMIT $1 OFFSET $2",
             &[&limit, &offset],
         ).await?
-        Ok(rows |> map(|r| row_to_user(r)) |> collect())
+        rows |> map(|r| row_to_user(r)) |> collect()
 
     async fn insert(self: &PgUserRepo, user: &User) -> Result[UserId, DbError] =
         let conn = self.pool.acquire().await?
@@ -2705,7 +2679,7 @@ impl UserRepository for PgUserRepo {
             "INSERT INTO users (name, email, role, active) VALUES ($1, $2, $3, $4) RETURNING id",
             &[&user.name, &user.email, &role_to_str(user.role), &user.active],
         ).await?
-        Ok(UserId(row.get(0)))
+        UserId(row.get(0))
 
     async fn update(self: &PgUserRepo, id: UserId, fields: &UserUpdate) -> Result[Unit, DbError] =
         let conn = self.pool.acquire().await?
@@ -2719,7 +2693,6 @@ impl UserRepository for PgUserRepo {
 
         let query = "UPDATE users SET {sets.join(", ")} WHERE id = $1"
         conn.execute(&query, &[&id]).await?
-        Ok()
 
     async fn delete(self: &PgUserRepo, id: UserId) -> Result[Unit, DbError] =
         let conn = self.pool.acquire().await?
@@ -2727,7 +2700,6 @@ impl UserRepository for PgUserRepo {
             "DELETE FROM users WHERE id = $1",
             &[&id],
         ).await?
-        Ok()
 
     async fn count_posts(self: &PgUserRepo, id: UserId) -> Result[i32, DbError] =
         let conn = self.pool.acquire().await?
@@ -2735,7 +2707,7 @@ impl UserRepository for PgUserRepo {
             "SELECT COUNT(*) FROM posts WHERE author_id = $1",
             &[&id],
         ).await?
-        Ok(row.get(0))
+        row.get(0)
 
     async fn count_followers(self: &PgUserRepo, id: UserId) -> Result[i32, DbError] =
         let conn = self.pool.acquire().await?
@@ -2743,7 +2715,7 @@ impl UserRepository for PgUserRepo {
             "SELECT COUNT(*) FROM follows WHERE followed_id = $1",
             &[&id],
         ).await?
-        Ok(row.get(0))
+        row.get(0)
 }
 
 fn row_to_user(row: &Row) -> User =
@@ -2819,7 +2791,7 @@ async fn produce(tx: Sender[WorkItem], count: u64) =
 // --- Stage 2: Workers (Fan-out) ---
 //
 // Multiple workers read from a shared channel and process items.
-// Demonstrates: async scope, spawn, shared receiver.
+// Demonstrates: async scope task tracking, shared receiver.
 
 async fn worker(
     id: u32,
@@ -2842,7 +2814,7 @@ async fn worker(
 // --- Stage 3: Collector (Fan-in) ---
 //
 // Collects processed results with a timeout.
-// Demonstrates: select with refutable patterns, timeout.
+// Demonstrates: select with let-else inside branches, timeout.
 
 async fn collect_results(
     rx: Receiver[ProcessedItem],
@@ -2854,10 +2826,10 @@ async fn collect_results(
             if remaining == 0:
                 break
             select await
-                Some(item) = rx.recv() else ->
-                    println("  channel closed with {remaining} items remaining")
-                    break
-                ->
+                opt = rx.recv() ->
+                    let Some(item) = opt else
+                        println("  channel closed with {remaining} items remaining")
+                        break
                     println("  collected #{item.id} from worker {item.worker_id}: {item.result}")
                     results.push(item)
                     remaining = remaining - 1
@@ -2933,7 +2905,7 @@ async fn demo_fan_out() =
         println("\nStats: {stats.total} total, {stats.successes} ok, {stats.failures} failed")
 
         // Show which worker handled what
-            with HashMap[u32, u64].new() as mut worker_counts:
+        with HashMap[u32, u64].new() as mut worker_counts:
             for r in results:
                 let entry = worker_counts.entry(r.worker_id).or_insert(0)
                 *entry = *entry + 1
@@ -2947,6 +2919,7 @@ async fn demo_select() =
 
     let (fast_tx, fast_rx) = chan[str](buffer: 4)
     let (slow_tx, slow_rx) = chan[str](buffer: 4)
+    var total = 0
 
     async scope |s|:
         // fast producer — sends every 50ms
@@ -2964,15 +2937,16 @@ async fn demo_select() =
         )
 
         // multiplexed consumer
-        var total = 0
         loop:
             if total >= 8:
                 break
             select await
-                Some(msg) = fast_rx.recv() else -> break ->
+                opt = fast_rx.recv() ->
+                    let Some(msg) = opt else break
                     println("  fast: {msg}")
                     total = total + 1
-                Some(msg) = slow_rx.recv() else -> break ->
+                opt = slow_rx.recv() ->
+                    let Some(msg) = opt else break
                     println("  slow: {msg}")
                     total = total + 1
                 _ = timeout(Duration.from_secs(1)) ->

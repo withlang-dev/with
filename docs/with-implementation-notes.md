@@ -1,6 +1,6 @@
 # The With Programming Language — Implementation Notes
 
-**Companion to:** Specification v5.2
+**Companion to:** Specification v6.2
 **Status:** Non-normative. Guidance for compiler and runtime engineers.
 **Scope:** Implementation strategies, trade-offs, and architectural
 decisions that do not affect language semantics.
@@ -18,10 +18,22 @@ The spec defines *what* the language guarantees. This document explains
 Source → Lexer → Parser → AST
     → c_import Resolution (invoke cc -E, parse C headers, inject symbols)
     → Name Resolution
+    → comptime Evaluation (compile-time functions, comptime if/for, TypeInfo)
+    → cfg Conditional Compilation (comptime if cfg.target_os, etc.)
+    → Default Field Value Insertion (insert missing defaults at construction sites)
     → Type Checker (bidirectional, local inference)
+    → Implicit Ok Wrapping (insert Ok(...) on Result-returning functions)
+    → String Auto-Promotion (insert .to_owned() on literals in owned contexts)
+    → Enum Accessor Generation (emit .is_variant()/.as_variant() methods)
     → Ephemeral Checker (post-type-check AST walk)
     → Borrow Checker (intra-procedural, NLL)
-    → MIR Lowering (desugaring: with-blocks, generators, pattern matching)
+    → Object Safety Check (validate dyn Trait usage)
+    → May-Suspend Analysis (whole-program boolean propagation)
+    → Suspend-Safety Check (@[no_await_guard] NLL liveness, extern callback)
+    → Denied-Pattern Check (unused Result/Task, unnecessary unsafe,
+          unreachable code, implicit narrowing)
+    → MIR Lowering (desugaring: with-blocks, generators, pattern matching,
+          defer, select await, closures, distinct types, tuples)
     → Optimization
     → Code Generation (C backend or Cranelift for v1.0)
     → Linker (with c_import link directives)
@@ -125,13 +137,28 @@ Array index disjointness is never assumed (use `get2_mut` or
 When a function returns an ephemeral value, the caller sees only:
 "this return value borrows from some or all reference parameters."
 
-The caller does not need to know *which* parameter is actually
-borrowed — it treats all of them conservatively. This is less
-precise than Rust but eliminates the need for lifetime annotations.
+**Default behavior (user code):** The caller does not know *which*
+parameter is actually borrowed — it treats all of them conservatively.
+This is less precise than Rust but eliminates lifetime annotations.
 
-The precision loss is small in practice. It occasionally forces a
-programmer to restructure code (e.g., take one reference parameter
-instead of two), but this is rare and the error messages are clear.
+**Stdlib narrowing (spec §21.1 Rule 6):** The compiler has built-in
+knowledge of standard library types (HashMap, Vec, slice iterators,
+etc.) and correctly narrows the borrow to the relevant parameter. For
+example, `HashMap.get(&self, key: &K) -> Option[&V]` borrows only
+from `&self`, not from `key`. The stdlib achieves this via `unsafe`
+internally — users never see it. The compiler encodes this knowledge
+as a whitelist of stdlib function signatures with explicit borrow
+provenance annotations.
+
+**Implementation:** The borrow checker maintains a mapping from known
+stdlib function signatures to their precise borrow outputs. When a
+call to a known function is encountered, the borrow checker uses the
+precise provenance instead of the conservative all-inputs default.
+
+For user code, the conservative default applies. The precision loss
+is small in practice. It occasionally forces a programmer to
+restructure code (e.g., take one reference parameter instead of two),
+but this is rare and the error messages are clear.
 
 ---
 
@@ -143,16 +170,21 @@ Post-type-check AST walk. No dataflow analysis required.
 
 | # | Rule | Action |
 |---|------|--------|
-| 1 | `&T`, `&mut T`, `StrView`, `Span[T]`, `SpanMut[T]` | Mark ephemeral |
+| 1 | `&T`, `&mut T`, `StrView`, `&[T]`, `&mut [T]` | Mark ephemeral |
 | 2 | Type declared `ephemeral` | Mark ephemeral |
 | 3 | Generic `F[T]` where `T` is ephemeral | Mark ephemeral |
 | 4 | Struct with ephemeral field, not marked `ephemeral` | Reject definition |
 | 5 | `let x = expr` where expr is ephemeral | Mark `x` ephemeral |
 | 6 | Struct field of ephemeral type | Reject |
-| 7 | Container insertion of ephemeral value | Reject |
+| 7 | Container insertion of ephemeral value | Mark container binding ephemeral |
 | 8 | Function returning ephemeral | Callers inherit restriction |
 | 9 | Escaping closure capturing ephemeral | Reject |
-| 10 | `with` block result is ephemeral | Reject |
+| 10 | Guarded `with` block (Form 1) result is ephemeral | Reject |
+| 11 | `Task[T]` created from ephemeral captures/arguments | Mark task binding ephemeral |
+
+Note: Rule 11 was removed from the normative rules (spec §22.1) since
+Task ephemerality is now covered by Rule 5 + creation-site analysis
+(see §3.3 below). The implementation-level guidance remains the same.
 
 ### 3.2 Implementation Notes
 
@@ -160,10 +192,51 @@ The checker walks the AST once, maintaining a set of "ephemeral"
 bindings per scope. It does not need fixpoint iteration because
 ephemerality is structural (determined by types, not by data flow).
 
+Rule 7 is permissive in local scope: containers that receive ephemeral
+elements (for example `Vec[TokenView]`) become ephemeral themselves,
+but are still usable as locals. Reject only when they escape via
+storage, return, or thread transfer.
+
 For Rule 8: when analyzing a function call, check if the callee's
 return type is ephemeral. If so, the binding receiving the result is
 marked ephemeral. If the current function returns this binding, the
 current function's return type must also be ephemeral (or it's an error).
+
+Rule 10 applies only to guarded `with` form (`Scoped`/`ScopedMut`).
+Binding forms (plain `let`/`var` desugaring) follow the normal rules.
+
+For Rule 11 (`Task` ephemerality), classify at creation sites. If any
+captured value is ephemeral, mark the produced task binding ephemeral.
+Propagate this binding-level marker through assignment and parameter
+passing exactly like other ephemeral bindings.
+
+### 3.3 Task Ephemerality (spec §14.21)
+
+Ephemerality for `Task[T]` is a **per-binding** property, not a
+per-type property. The type `Task[i32]` is the same whether ephemeral
+or storable. The compiler determines ephemerality at the creation site:
+
+```
+fn classify_task_ephemerality(call_expr):
+    let args = call_expr.arguments()
+    for arg in args:
+        if is_ephemeral(arg):
+            return EPHEMERAL    // task borrows caller's stack
+    return STORABLE             // task owns all captures
+```
+
+**Ephemeral tasks require synchronous cancellation on drop:**
+
+When an ephemeral task is dropped (goes out of scope without `.await`
+or explicit `cancel`), the runtime must ensure the fiber has stopped
+before the caller proceeds. This is mandatory for memory safety —
+the fiber holds references to the caller's stack. See spec §14.7 for
+the cancellation protocol.
+
+**Restriction:** Ephemeral tasks can only be created inside fibers
+(async contexts). Creating an ephemeral task on a bare OS thread or
+in an FFI callback is a compile error — these contexts cannot yield
+to the scheduler and dropping the task would deadlock.
 
 ---
 
@@ -208,8 +281,11 @@ a.read().enter(|x| b.write().enter_mut(|y| compute(x, y)))
 with expr as name: body
 // → { let name = expr; body }
 
-// Mutable binding (builder pattern)
+// Mutable binding (builder pattern / extraction pattern)
 with expr as mut name: body
+// If body tail type is Unit:
+// → { var name = expr; body; name }
+// Else:
 // → { var name = expr; body }
 ```
 
@@ -352,21 +428,102 @@ let result = runtime::fiber_block_on(expr)
 3. Yields to the scheduler
 4. (When task X completes, scheduler resumes this fiber)
 
-### 6.3 `no_runtime` Gate
+### 6.3 `async:` Block Lowering
 
-The compiler maintains a `runtime_available` flag from the build
-configuration. In `no_runtime` builds:
+```
+let t = async: body
+```
+
+Compiles to:
+
+```
+let t = runtime::spawn_fiber(move || { body })
+```
+
+`async:` is expression-oriented sugar over the same fiber spawn path
+used by `async fn`.
+
+### 6.4 Structured Concurrency Lowering (`async scope`)
+
+```
+async scope |s|:
+    body
+```
+
+Compiles to:
+
+```
+runtime::structured_scope(|s| { body })
+```
+
+`s.track(task_expr)` registers existing tasks for scope-managed
+cleanup and returns a `ScopedTask[T]` — a handle that behaves like
+`Task[T]` (supports `.await`, `cancel`, `is_done`) but is exempt
+from `@[must_use]`. The scope guarantees cleanup: when it exits
+(normally or via `?`), all tracked tasks are cancelled and joined.
+
+### 6.5 `spawn` Lowering (Detached Fire-and-Forget)
+
+```
+spawn send_analytics("page_view")
+```
+
+Compiles to:
+
+```
+let __task = send_analytics("page_view")
+runtime::detach(__task)   // returns Unit
+```
+
+`spawn` is the only fire-and-forget path that keeps the fiber alive
+independently from local ownership.
+
+### 6.6 `may_suspend` Analysis
+
+The compiler computes a boolean `may_suspend` for every function:
+
+1. Seed: any function containing `.await` is `may_suspend = true`.
+2. Propagate through the call graph to a fixpoint (SCC-aware).
+3. Mark closures and inline blocks similarly based on contained calls.
+
+**Closure propagation:** Closures inherit `may_suspend` from their
+body. A closure that calls a `may_suspend` function is itself
+`may_suspend`. When a closure is passed to a higher-order function,
+the higher-order function becomes `may_suspend` if it invokes the
+closure. For indirect calls through `dyn Trait` or function pointers,
+the compiler conservatively marks the call as `may_suspend = true`
+unless the function pointer type is annotated or constrained.
+
+**Implementation detail:** The call graph includes edges from higher-
+order functions to the closures they receive. Closures passed as
+direct arguments are analyzed inline. Closures stored in variables or
+passed through generic type parameters require the fixpoint analysis
+to converge. SCC (strongly connected component) decomposition ensures
+mutual recursion between closures and functions is handled correctly.
+
+This property feeds two mandatory checks:
+
+- Reject calls to `may_suspend` functions while a live
+  `@[no_await_guard]` value exists (NLL liveness).
+- Reject `may_suspend` functions or closures in `extern "C"` callback
+  positions (spec §14.18 — no suspension while C frames are on stack).
+
+### 6.7 `no_runtime` Gate
+
+The compiler maintains a `runtime_available` flag from build config.
+In `no_runtime` builds:
 
 - Any `async fn` declaration → compile error
+- Any `async:` block → compile error
 - Any `.await` expression → compile error
-- `spawn` → compile error
 - `async scope` → compile error
+- `spawn` → compile error
 
 Error message:
 
 ```
 ERROR: `async` requires the fiber runtime.
-       Add `runtime = true` to with.toml or remove `#[no_runtime]`.
+       Set `runtime = true` in with.toml.
        For OS-thread concurrency, use `thread.spawn_os` and `scope`.
 ```
 
@@ -422,8 +579,16 @@ to use any strategy that preserves observable semantics.
 
 ### 8.1 The Problem
 
-A naive implementation allocates a fixed stack per fiber. At scale
-(using the spec's 8KB initial allocation as baseline):
+A naive implementation allocates a fixed stack per fiber. The spec
+defines 64 KB as the default maximum stack and 8 KB as the initial
+allocation (growable). At scale using the max:
+
+```
+100K fibers × 64KB = 6.4GB
+  1M fibers × 64KB = 64GB
+```
+
+In practice most fibers stay near the 8 KB initial allocation:
 
 ```
 100K fibers × 8KB  = 800MB
@@ -448,17 +613,19 @@ Allocate a fixed-size stack per fiber. Simple and correct.
 **Use for:** v1.0 prototype. Get the language working first.
 
 ```
-Stack size:     8KB default (spec: 8KB initial, 64KB max growable)
+Stack size:     8KB default (spec §14.18: 8KB initial, 64KB max growable)
 Allocation:     mmap per fiber (or pool)
 100K fibers:    ~800MB (worst case; suspended fibers often < 2KB)
 Overhead:       None (no prologue checks)
 Complexity:     Minimal
 ```
 
-Note: the spec defines 64KB as the default maximum stack and 8KB as
-the initial allocation. For a fixed-stack prototype, 8KB is a
+Note: the spec (§14.18) defines 64 KB as the default maximum stack and
+8 KB as the initial allocation. The `with.toml` runtime section
+(`fiber_stack_size`, `fiber_initial_stack`, `fiber_pool_size`)
+configures these values. For a fixed-stack prototype, 8 KB is a
 reasonable starting point. The v1.0 phasing table targets segmented
-stacks with 8KB initial (see §8.3).
+stacks with 8 KB initial (see §8.3).
 
 ### 8.3 Strategy 2: Segmented / Growable Stacks
 
@@ -601,6 +768,10 @@ points in the NLL analysis — no different from borrows spanning
 any other function call. This is one of the key simplicity
 advantages of the fiber model over state-machine futures.
 
+Guard suspension safety is a separate pass: combine NLL liveness
+(`@[no_await_guard]` values live at point P) with `may_suspend`
+call metadata to reject illegal suspension edges.
+
 ---
 
 ## 9. Pattern Match Compilation
@@ -641,11 +812,43 @@ p2.x = 3.0            // overwrite
 For non-Copy types:
 ```
 let p2_y = move p1.y  // move each non-overwritten field
+drop(p1.x)            // drop each overwritten field!
 let p2 = Point { x: 3.0, y: p2_y }
-// p1 is now partially moved → invalid
+// p1 is now fully consumed — no leak, no double-free
 ```
 
+**Critical:** The compiler must emit `drop` calls for overwritten
+fields. Without this, `p1.x` (if it were heap-allocated) would
+leak — it was never moved to `p2` and never explicitly dropped.
+
 The compiler must track partial moves through record update syntax.
+
+### 10.1 Drop Types and Record Update
+
+**Partial moves from Drop types are forbidden** (spec §2.4). If the
+base expression's type implements `Drop`, record update syntax is a
+compile error:
+
+```
+type FileWrapper = { fd: File, name: String }
+impl Drop for FileWrapper
+    fn drop(self: Self) = close_file(self.fd)
+
+let w1 = FileWrapper { fd: open_file(), name: "A" }
+let w2 = { w1 with name: "B" }   // ERROR: partial move from Drop type
+```
+
+**Rationale:** A partial move would leave the base in a partially-
+valid state. If its destructor were then called, it would access
+moved-out fields. By-value `drop(self: Self)` prevents defensive
+null checks — the value is consumed whole.
+
+**Implementation:** At record update sites, check `typeof(base)` for
+`Drop` implementation. If found, emit error E0XXX pointing at the
+base expression and suggesting `.clone()` or restructuring.
+
+For non-Drop types, the partial-move + drop-overwritten-fields
+lowering described above applies.
 
 ---
 
@@ -743,13 +946,26 @@ re-analyzing each specialization.
 |---|---|
 | Struct | C struct |
 | Enum | Tagged union (tag + union of payloads) |
+| Tuple | Anonymous C struct (field0, field1, ...) |
+| Distinct type | Wrapper struct around base type |
 | Function | C function |
-| Closure | Struct (captured vars) + function pointer |
+| Closure (non-escaping) | Inlined at call site (no allocation) |
+| Closure (escaping) | Struct (captured vars) + function pointer |
 | Generic | Separate C function per monomorphization |
+| `dyn Trait` | Fat pointer (data ptr + vtable ptr) |
 | Move | memcpy + null source (debug) |
 | Drop | Call destructor function before scope exit |
+| `defer` | Emitted as cleanup code before every scope exit path |
 | Borrow check | Erased (compile-time only) |
 | Ephemeral check | Erased (compile-time only) |
+| `@[no_await_guard]` | Erased (compile-time only) |
+| `comptime` | Evaluated during compilation; result embedded as constant |
+| String literal | Static `const char[]` + length |
+| `async fn` | Function returning Task handle; fiber spawned via runtime |
+| `gen fn` | State struct + `next()` function |
+| `select await` | Dispatch table + cancellation of losers |
+| Channel | Ring buffer + fiber wait queues |
+| `@[repr(C)]` | C struct with platform ABI layout |
 
 ### 14.2 Fiber Runtime in C
 
@@ -835,6 +1051,19 @@ error[E0701]: `.await` inside `@[no_await_guard]` with block
            and file handles are not affected.
 ```
 
+**`may_suspend` call while `@[no_await_guard]` is live:**
+```
+error[E0701]: may_suspend call while `@[no_await_guard]` guard is live
+  --> src/service.w:15:9
+   |
+14 |     with self.cache.lock() as data:
+   |          ------------------- MutexGuard is @[no_await_guard]
+15 |         helper(data.url)
+   |         ^^^^^^^^^^^^^^^^ helper may suspend (directly or transitively)
+   |
+   = help: call helper after guard drop, or refactor helper to be non-suspending
+```
+
 **Unused Result:**
 ```
 error[E0802]: unused `Result` — error may be silently swallowed
@@ -856,7 +1085,10 @@ error[E0801]: unused `Task` will be cancelled on drop
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Task created but not used
    |
    = note: dropping a Task cancels the fiber cooperatively
-   = help: use `let _ = ...` to discard, or `spawn` for fire-and-forget
+   = help: use `.await` to wait for completion
+   = help: use `cancel(task)` for explicit cancellation
+   = help: use `spawn ...` for fire-and-forget
+   = note: `let _ = ...` on a Task cancels immediately and should emit a warning
 ```
 
 **Unnecessary unsafe block:**
@@ -919,6 +1151,32 @@ error[E0401]: closure captures ephemeral value but may escape
            this error will not occur — check what the closure captures
 ```
 
+### 15.3 Denied Patterns Diagnostics (spec §20b)
+
+These are compile errors, not warnings. The compiler must enforce
+all of the following unconditionally:
+
+| Pattern | Error code | Spec ref |
+|---------|-----------|----------|
+| `.await` while `@[no_await_guard]` is live | E0701 | §20b.1 |
+| `may_suspend` call while guard is live | E0701 | §20b.1 |
+| Unused `Result` value | E0802 | §20b.2 |
+| Unused `Task` value | E0801 | §20b.3 |
+| Unnecessary `unsafe` block | E0901 | §20b.4 |
+| Implicit numeric narrowing | E0201 | §20b.5 |
+| Unreachable code | E0601 | §20b.6 |
+
+**Implementation order:** The denied-pattern checks run as a
+late pass after borrow checking and may-suspend analysis, since
+some checks (like E0701) depend on NLL liveness and may-suspend
+data. The unreachable code check (E0601) runs after comptime
+evaluation — branches eliminated by `comptime if` are erased
+before the check.
+
+**`let _ = task` warning:** Per spec §20b.3, `let _ = ...` on a
+Task cancels immediately and should emit a warning (not error)
+suggesting `spawn` for fire-and-forget or `.await` for completion.
+
 ---
 
 ## 16. `c_import` Implementation (Phase 0 Priority)
@@ -957,25 +1215,39 @@ c_import("sqlite3.h", link: "sqlite3")
 └────────┬────────────┘
          │
          ▼
-  Available as normal With symbols (under `unsafe`)
+  Available as normal With symbols (direct call; no per-call `unsafe`)
 ```
+
+`c_import` is the explicit safety opt-in. Imported C functions are
+callable directly. `unsafe` remains required for raw pointer
+operations (`*p`, pointer arithmetic, transmutes). For manually
+declared `extern "C"` symbols (outside `c_import`), keep the
+call-site `unsafe` requirement.
 
 ### 16.2 C Preprocessor Invocation
 
 The compiler invokes the system C compiler in preprocessing mode:
 
 ```
-cc -E -dM \
+cc -E \
    -I /usr/include \
    -I /usr/local/include \
    ${user_include_paths} \
    ${user_defines} \
    input_header.h \
    > preprocessed.c
+
+cc -E -dM \
+   -I /usr/include \
+   -I /usr/local/include \
+   ${user_include_paths} \
+   ${user_defines} \
+   input_header.h \
+   > macros.txt
 ```
 
-`-E` produces preprocessed source (declarations without macros).
-`-dM` dumps all `#define` macros separately.
+`-E` produces preprocessed declarations. `-dM` is run as a second
+pass to dump `#define` constants.
 
 The C compiler to use and additional flags come from `with.toml`
 or can be auto-detected from the environment.
@@ -1040,7 +1312,7 @@ the dependency cost. Zig proved this approach works at scale.
 | `float` | `f32` |
 | `double` | `f64` |
 | `size_t` | `usize` |
-| `void*` | `*mut void` |
+| `void*` | `*mut c_void` |
 | `const char*` | `*const u8` |
 | `T*` | `*mut T` |
 | `const T*` | `*const T` |
@@ -1068,12 +1340,14 @@ definitions. Classification:
 | `#define NAME "string"` | `const NAME: *const u8 = "string"` |
 | `#define NAME (cast)0` | Recognized as null / zero |
 | `#define NAME other_name` | `const NAME = other_name` (alias) |
-| `#define F(a,b) expr` | Best-effort: `fn F(a: auto, b: auto) = expr` |
+| `#define F(a,b) expr` | Phase 0: warning + skip (manual wrapper/shim) |
 | Complex macros | Warning + skip |
 
-The compiler should track which macros are actually used in practice
-(e.g., `SQLITE_OK`, `O_RDONLY`, `MAP_SHARED`) and prioritize
-translating common patterns correctly.
+Phase 0 translates constant-like macros only. Function-like macro
+translation is intentionally deferred because token-level C macro
+semantics are not represented in the declaration AST. The compiler
+should emit a warning list of untranslated macros so users can add
+manual wrappers where needed.
 
 ### 16.6 Caching
 
@@ -1118,9 +1392,9 @@ Zig's `@cImport` is the gold standard. Key lessons:
    its LLVM dependency) and this handles the long tail of weird
    C idioms in real headers.
 
-3. **Translate macros aggressively.** Zig translates far more macros
-   than most people expect is possible. The payoff is huge — users
-   rarely need to write manual bindings.
+3. **Translate constant macros aggressively in Phase 0.** This
+   captures most practical constants (`SQLITE_OK`, `O_RDONLY`,
+   `PATH_MAX`). Function-like macros can be phased in later.
 
 4. **Cache aggressively.** Re-parsing system headers on every build
    is too slow. Zig caches parsed results.
@@ -1274,6 +1548,13 @@ touching `c_import`.
 | `std.sync` | Mutex, RwLock, Atomic, Condvar | `pthread.h`, `stdatomic.h` |
 | `std.alloc` | Arena, Pool | `stdlib.h` (malloc, free) |
 
+**Phase 3d — Utilities:**
+
+| Module | Key types | C headers wrapped |
+|--------|-----------|-------------------|
+| `std.signal` | Signal enum, on_signal handler | `signal.h` |
+| `std.random` | Rng, seedable | `stdlib.h` or platform-specific |
+
 Phase 4 (fiber runtime, async/await, std.net) builds on top of 3c.
 
 ### 17.5 Pure-With vs. Wrapper Modules
@@ -1313,7 +1594,51 @@ This ensures `with` blocks appear naturally whenever users interact
 with resources — files, locks, arenas — reinforcing the language's
 identity.
 
-### 17.7 Testing Strategy
+### 17.7 Additional Standard Library Requirements
+
+**`Shared[T]` convenience type (spec §8.4):**
+
+```
+type Shared[T] = Arc[RwLock[T]]
+```
+
+Must implement `Scoped[T]` and `ScopedMut[T]` for `with` blocks.
+This is the recommended type for shared mutable state across threads
+and fibers when full ownership semantics are not needed.
+
+**Prelude `drop` function (spec §18.2):**
+
+```
+fn drop[T](val: T) = ()
+```
+
+A built-in identity function that takes any value by move and does
+nothing — the value is destroyed when the argument goes out of scope.
+Must be in the prelude. Primary use: explicitly trigger resource
+cleanup (e.g., `drop(tx)` to close a channel sender).
+
+**Collection `.len32()` / `.len64()` methods (spec §18.6):**
+
+All collection types provide convenience narrowing methods:
+
+| Method | Return | Behavior |
+|--------|--------|----------|
+| `.len()` | `usize` | Length (always available) |
+| `.len32()` | `i32` | Panics if len > `i32.max` |
+| `.len64()` | `i64` | Panics if len > `i64.max` |
+| `.ulen32()` | `u32` | Panics if len > `u32.max` |
+
+These avoid the ubiquitous `.len() as i32` cast pattern.
+
+**`c_errno` compiler intrinsic (spec §18.6 "The errno Principle"):**
+
+The standard library reads C `errno` via `std.os.c_errno()`, which
+the compiler lowers to the platform-appropriate thread-local access
+(e.g., `(*__errno_location())` on glibc). This is NOT a `c_import`
+translation — `errno` on glibc is a complex macro. The compiler
+provides this as a built-in intrinsic.
+
+### 17.8 Testing Strategy
 
 Every public function in the standard library must have:
 
@@ -1328,7 +1653,7 @@ The test runner from Phase 2 is used. Tests are in companion
 Cross-platform CI is essential from Phase 3a onward. Every PR must
 pass on all three platforms.
 
-### 17.8 Documentation
+### 17.9 Documentation
 
 Every public type and function in the stdlib must have doc comments.
 The `with doc` tool (§18.5) generates browsable HTML documentation.
@@ -1343,6 +1668,777 @@ Documentation must include:
 
 The standard library documentation is the language's primary
 teaching material. Its quality matters more than any tutorial.
+
+---
+
+## 18. Default Field Values Compilation (spec §4.3)
+
+Default field values are a **comptime transformation**. The compiler
+inserts the default expressions for missing fields at each
+construction site.
+
+### 18.1 Algorithm
+
+```
+fn lower_struct_construction(site, type_def):
+    let provided_fields = site.explicit_fields()
+    for field in type_def.fields:
+        if field.name not in provided_fields:
+            if field.has_default:
+                // Insert default expression at construction site
+                site.add_field(field.name, field.default_expr.clone())
+            else:
+                EMIT ERROR "missing field `{field.name}` with no default"
+```
+
+### 18.2 Key Properties
+
+- Default expressions are **evaluated at the construction site**, not
+  at type definition time. Each construction gets a fresh evaluation.
+- Default expressions must be valid at any construction site (no
+  capturing locals from the definition scope).
+- Defaults compose with field shorthand and record update syntax.
+- The compiler clones the AST of the default expression into each
+  missing-field site, then type-checks as normal.
+
+### 18.3 Interaction with Record Update
+
+Record update `{ base with field: val }` only overrides explicitly
+named fields. Fields not mentioned in the override are taken from
+`base`, not from defaults. Default values apply only to fresh
+construction sites (no base expression).
+
+---
+
+## 19. Enum Accessor Method Generation (spec §4.4)
+
+Every enum variant with data automatically generates `.is_variant()`
+and `.as_variant()` methods. This is unconditional — no
+`@[derive]` needed.
+
+### 19.1 Generation Rules
+
+```
+fn generate_accessors(enum_def):
+    for variant in enum_def.variants:
+        let snake_name = to_snake_case(variant.name)
+
+        // .is_variant() → bool (always generated)
+        emit fn is_{snake_name}(self: &EnumType) -> bool =
+            match self
+                EnumType.{variant.name}(..) -> true
+                _ -> false
+
+        // .as_variant() → Option[T] (only for data variants)
+        if variant.has_data:
+            if variant.fields.len() == 1:
+                let T = variant.fields[0].type
+                emit fn as_{snake_name}(self: EnumType) -> Option[T] =
+                    match self
+                        EnumType.{variant.name}(val) -> Some(val)
+                        _ -> None
+            else:
+                let TupleType = tuple(variant.fields.types)
+                emit fn as_{snake_name}(self: EnumType) -> Option[TupleType] =
+                    match self
+                        EnumType.{variant.name}(fields..) -> Some((fields..))
+                        _ -> None
+```
+
+### 19.2 Key Properties
+
+- Method names use `snake_case` conversion of variant names.
+- `.as_variant()` takes `self` by value (consumes the enum).
+- Multi-field variants return `Option[(A, B)]` (tuple).
+- Unit variants (no data) only generate `.is_variant()`.
+- These methods are emitted early in the pipeline and go through
+  normal type checking.
+
+---
+
+## 20. Tuple Compilation (spec §4.8)
+
+### 20.1 Representation
+
+Tuples compile to anonymous C structs:
+
+```
+// (i32, str, bool) →
+struct __tuple_i32_String_bool {
+    i32 field0;
+    String field1;
+    bool field2;
+};
+```
+
+### 20.2 Key Properties
+
+- Index access (`pair.0`, `pair.1`) compiles to struct field access.
+- Destructuring compiles to multiple field reads.
+- A tuple is `Copy` if all elements are `Copy`.
+- A tuple is ephemeral if any element is ephemeral.
+- Tuples participate in monomorphization — each distinct element type
+  combination produces a separate struct.
+- The unit type `Unit` is equivalent to the empty tuple `()`.
+
+### 20.3 Unit Elision (spec §4.8)
+
+When a function expects a single `Unit` argument and the call site
+omits it, the compiler inserts `()`:
+
+```
+unwrap_or()  →  unwrap_or(())
+Some()       →  Some(())
+Ok()         →  Ok(())
+```
+
+Unit elision applies **only when the expected parameter type is
+statically known to be `Unit`** via bidirectional type inference.
+It does NOT apply to unconstrained generics.
+
+---
+
+## 21. Implicit `Ok` Wrapping (spec §4.9)
+
+### 21.1 Algorithm
+
+When a function's declared return type is `Result[T, E]`:
+
+1. If the last expression in the body has type `T` (not `Result`),
+   wrap it in `Ok(...)`.
+2. If the return type is `Result[Unit, E]` and the block ends with
+   a statement (no trailing expression), insert `Ok(())`.
+3. If the last expression already has type `Result[T, E]`, no
+   wrapping occurs.
+
+### 21.2 Implementation
+
+This is a post-type-check desugaring. After inferring the body's
+type and comparing it to the declared return type:
+
+```
+fn check_implicit_ok(func):
+    let ret_type = func.declared_return_type
+    if not is_result_type(ret_type):
+        return  // not applicable
+
+    let Result(T, E) = ret_type
+    let body_type = typeof(func.body)
+
+    if body_type == T:
+        // Wrap in Ok
+        func.body = Ok(func.body)
+    else if T == Unit and func.body.is_statement_terminated():
+        // Insert Ok(()) at end
+        func.body.append(Ok(()))
+    else if body_type == ret_type:
+        // Already Result — no wrapping
+        pass
+    else:
+        EMIT TYPE ERROR
+```
+
+---
+
+## 22. `defer` Compilation (spec §2.4)
+
+### 22.1 Lowering
+
+`defer` statements are lowered by duplicating the deferred code at
+every scope-exit point:
+
+```
+fn process(path: str) -> Result[Unit, IoError] =
+    let f = fs.open(path)?
+    defer f.close()
+    f.write_all(b"data")?
+    // f.close() runs here
+```
+
+Compiles to:
+
+```
+fn process(path: str) -> Result[Unit, IoError] =
+    let f = match fs.open(path) {
+        Ok(v) -> v
+        Err(e) -> return Err(e.into())  // no defer yet
+    }
+    match f.write_all(b"data") {
+        Ok(v) -> v
+        Err(e) -> { f.close(); return Err(e.into()) }
+    }
+    f.close()
+    Ok(())
+```
+
+### 22.2 Key Rules
+
+- `defer` statements execute in LIFO (reverse declaration) order.
+- `return`, `break`, `continue`, and `?` are **compile errors**
+  inside `defer` blocks.
+- Multiple `defer` in the same scope: each scope-exit path runs
+  all active defers in reverse order.
+- Tail call optimization: a call in `defer` scope breaks tail
+  position (the defer must run after the call).
+
+### 22.3 Implementation Strategy
+
+Option A (code duplication): Clone the defer body at every exit
+point. Simple but increases code size with many defers.
+
+Option B (cleanup labels): Emit a cleanup block at the end of the
+scope; each exit path jumps to the cleanup label. This is what LLVM
+and GCC do for C++ destructors. Recommended for v1.0.
+
+---
+
+## 23. `select await` Compilation (spec §14.10)
+
+### 23.1 Desugaring
+
+```
+select await
+    msg = rx.recv() -> handle(msg)
+    _ = timeout(1.secs()) -> println("timeout")
+```
+
+Compiles to:
+
+```
+// 1. Start all expressions as concurrent tasks
+let __branch0 = rx.recv()         // returns Task
+let __branch1 = timeout(1.secs()) // returns Task
+
+// 2. Race: suspend until any completes
+let (winner, result) = runtime::select([__branch0, __branch1])
+
+// 3. Cancel losers
+for task in [__branch0, __branch1] if task != winner:
+    cancel(task)
+
+// 4. Dispatch to winner's body
+match winner
+    0 -> { let msg = result as T0; handle(msg) }
+    1 -> { let _ = result as T1; println("timeout") }
+```
+
+### 23.2 Fair vs Biased Selection
+
+**Fair (default):** When multiple branches are simultaneously ready,
+select a ready branch at pseudo-random (prevent starvation).
+
+**Biased (`select await biased`):** Select the first textual branch
+that is ready (top-to-bottom priority). Used when deterministic
+priority ordering is needed.
+
+### 23.3 Implementation
+
+The runtime `select` primitive:
+
+1. Registers interest in all provided tasks.
+2. If any are already complete, returns immediately (fair: random
+   pick among completed; biased: first completed in order).
+3. Otherwise, suspends the calling fiber with a multi-wait entry
+   that is woken by any of the registered tasks.
+4. On wake, cancels all non-completed tasks and returns the winner.
+
+### 23.4 Composing with Loops
+
+`select await` inside a `loop:` is the idiomatic event loop pattern.
+The compiler must ensure cancelled tasks from previous iterations are
+properly cleaned up before starting new ones.
+
+---
+
+## 24. Channel Implementation (spec §14.14)
+
+### 24.1 Architecture
+
+```
+type Channel[T] = {
+    buffer:    RingBuffer[T],   // bounded buffer
+    senders:   WaitQueue,       // fibers blocked on send
+    receivers: WaitQueue,       // fibers blocked on recv
+    closed:    AtomicBool,
+}
+```
+
+### 24.2 Key Properties
+
+- Channels transfer ownership: sending moves the value.
+- Channel element types must be `Send` (not merely `ScopedSend`).
+  This is critical — channels decouple sender and receiver lifetimes.
+- `tx.send(msg).await` suspends the fiber if the buffer is full.
+- `rx.recv().await` suspends the fiber if the buffer is empty.
+- `try_recv()` is non-blocking (returns `Option`).
+- Dropping all senders closes the channel; receivers see `None`.
+
+### 24.3 Fiber-Aware Blocking
+
+Channel operations yield to the fiber scheduler, not the OS thread:
+
+```
+fn send(self: &Channel[T], val: T) -> Task[Unit]:
+    if self.buffer.try_push(val):
+        wake_one(self.receivers)
+        return // immediate completion
+    // Buffer full — suspend fiber
+    self.senders.enqueue(current_fiber, val)
+    yield_to_scheduler()
+```
+
+---
+
+## 25. `ScopedSend` Trait Implementation (spec §14.15)
+
+### 25.1 Trait Hierarchy
+
+```
+Send       ⊂ ScopedSend     (all Send types are ScopedSend)
+Ephemeral  ⊂ ScopedSend     (ephemeral types are ScopedSend)
+Rc[T]      ∉ ScopedSend     (not thread-safe at all)
+```
+
+### 25.2 Auto-Implementation
+
+`ScopedSend` is automatically derived:
+
+- All `Send` types implement `ScopedSend`.
+- Ephemeral types (`&T`, `&mut T`, ephemeral structs) implement
+  `ScopedSend` but NOT `Send`.
+- `Rc[T]` implements neither `Send` nor `ScopedSend`.
+
+### 25.3 Where Each Trait Is Required
+
+| Context | Required trait |
+|---------|---------------|
+| `thread.spawn_os(closure)` | All captures must be `Send` |
+| `scope \|s\|: s.spawn(closure)` | All captures must be `ScopedSend` |
+| `async scope \|s\|: s.track(task)` | All task captures must be `ScopedSend` |
+| Channel `tx.send(val)` | Value must be `Send` |
+
+### 25.4 Implementation
+
+The compiler auto-derives `Send` and `ScopedSend` based on field
+types, similar to how `Copy` is derived. No explicit `impl Send`
+is needed for most types. `unsafe impl Send` is available for types
+that contain raw pointers but are known to be thread-safe.
+
+---
+
+## 26. `comptime` Metaprogramming Implementation (spec §17)
+
+### 26.1 Architecture
+
+The compiler includes a comptime evaluator — an interpreter that
+executes With code at compile time. It runs after name resolution
+and before type checking (for `comptime if cfg.*`) or during
+monomorphization (for `comptime if TypeInfo.*`).
+
+### 26.2 Evaluator Capabilities
+
+The comptime evaluator can:
+
+- Execute pure functions (no I/O, no heap persistence to runtime)
+- Access `TypeInfo` API (fields, variants, size, align, name, traits)
+- Iterate over types with `comptime for`
+- Branch on types with `comptime if`
+- Generate trait implementations via `@[derive]`
+- Produce compile errors via `comptime_error("message")`
+
+### 26.3 `TypeInfo` Implementation
+
+The `TypeInfo` API is a compiler intrinsic, not a library:
+
+```
+TypeInfo.fields[T]()           // → [FieldInfo]
+TypeInfo.variants[T]()         // → [VariantInfo]
+TypeInfo.size[T]()             // → usize
+TypeInfo.align[T]()            // → usize
+TypeInfo.name[T]()             // → str
+TypeInfo.implements[T, Trait]() // → bool
+TypeInfo.is_copy[T]()          // → bool
+```
+
+Each call is lowered by the compiler to a constant lookup into the
+type metadata tables built during type checking.
+
+### 26.4 `comptime for` Unrolling
+
+`comptime for` unrolls at compile time:
+
+```
+comptime for field in TypeInfo.fields[T]():
+    out.key(field.name)
+    self.{field.name}.serialize(out)
+```
+
+The loop body is stamped out once per iteration with compile-time
+constants substituted. `self.{field.name}` is a comptime field
+access — the compiler resolves the field name from the constant
+string and emits a direct field access.
+
+### 26.5 Deferred Branch Checking
+
+For `comptime if` inside generic functions that depend on type
+parameter `T`:
+
+1. Non-comptime code is type-checked against declared bounds on `T`.
+2. Code inside `comptime if` branches depending on `T` is deferred.
+3. At monomorphization, the branch condition is evaluated.
+4. The taken branch is type-checked against concrete `T`.
+5. The eliminated branch is discarded without checking.
+
+This is narrower than C++ templates (non-comptime body is still
+checked) and broader than Rust generics (comptime branches can use
+capabilities not in bounds).
+
+### 26.6 `@[derive]` Integration
+
+`@[derive(TraitName)]` is sugar for invoking a comptime function:
+
+```
+@[derive(Serialize)]
+type User = { name: String, age: i32 }
+
+// Equivalent to:
+comptime derive_serialize[User]()
+```
+
+The compiler looks up `derive_serialize` (or the built-in handler
+for structural traits like `Eq`, `Hash`, `Clone`, `Copy`, `Debug`)
+and invokes it at compile time. The generated `impl` block goes
+through normal type checking.
+
+---
+
+## 27. Closure Compilation (spec §12)
+
+### 27.1 Classification
+
+The compiler classifies closures at definition sites:
+
+| Context | Classification |
+|---------|---------------|
+| Direct argument to function call | Non-escaping |
+| Bound to named variable | Escaping |
+| Stored in container | Escaping |
+| Returned from function | Escaping |
+| Stored in struct field | Escaping |
+| `with` block body (guarded form) | Non-escaping |
+
+### 27.2 Non-Escaping Closure Lowering
+
+Non-escaping closures are inlined at the call site. No heap
+allocation. The captured variables are accessed directly from the
+enclosing scope's stack frame.
+
+```
+items.for_each(|x| println(x))
+// → for x in items: println(x)  (effectively)
+```
+
+Non-escaping closures may capture ephemeral values.
+
+### 27.3 Escaping Closure Lowering
+
+Escaping closures compile to a struct (captured variables) plus
+a function pointer:
+
+```
+let offset = 5
+let f = |x| x + offset
+
+// →
+struct __closure_1 { offset: i32 }
+fn __closure_1_call(self: &__closure_1, x: i32) -> i32 =
+    x + self.offset
+let f = __closure_1 { offset: 5 }
+```
+
+Escaping closures may NOT capture ephemeral values. The compiler
+enforces this as part of the ephemeral checker (Rule 9).
+
+### 27.4 Disjoint Capture
+
+Closures capture only the specific fields they access, not the
+enclosing struct as a whole (spec §3.6). This is critical for
+parallel code:
+
+```
+scope |s|:
+    s.spawn(|| use(&world.positions))    // captures world.positions
+    s.spawn(|| use(&mut world.velocities)) // captures world.velocities
+// No conflict — disjoint captures
+```
+
+Implementation: walk the closure body, collect all accessed field
+paths, and capture at the finest granularity possible.
+
+---
+
+## 28. Distinct Type Compilation (spec §4.5)
+
+### 28.1 Representation
+
+```
+type UserId = distinct i64
+type Meters = distinct f64
+```
+
+Distinct types are zero-cost wrappers. They compile to the same
+representation as their base type — no runtime overhead.
+
+### 28.2 Lowering
+
+```
+type UserId = distinct i64
+// →
+struct UserId { __value: i64 };
+```
+
+The compiler prevents implicit conversion between `UserId` and `i64`.
+Explicit conversion requires `as`:
+
+```
+let id = UserId(42)     // construction
+let raw = id as i64     // explicit unwrap
+```
+
+Distinct types do NOT inherit traits from their base type. The
+programmer must explicitly implement or derive traits.
+
+---
+
+## 29. String Auto-Promotion (spec §15.3)
+
+### 29.1 Algorithm
+
+When the compiler encounters a string literal `"hello"` and the
+expected type from context is owned `str` (not `&str`), it inserts
+`.to_owned()`:
+
+```
+fn promote_string_literal(literal, expected_type):
+    if expected_type == str and typeof(literal) == &str:
+        return literal.to_owned()    // insert allocation
+    return literal                    // no change
+```
+
+### 29.2 Contexts That Trigger Promotion
+
+- Struct field initialization where the field type is `str`
+- Function argument where the parameter type is `str`
+- Variable binding with explicit type annotation `let x: str = "..."`
+- Return expression where the function return type is `str`
+
+### 29.3 Contexts That Do NOT Trigger Promotion
+
+- Bare `let s = "hello"` with no type annotation → stays `&str`
+- Function argument where the parameter type is `&str` → no promotion
+- Any context where `&str` satisfies the expected type
+
+### 29.4 Interpolated Strings
+
+`"hello {name}"` always produces owned `str` because it must
+allocate to build the result. No auto-promotion logic is needed —
+the interpolation itself produces an owned string.
+
+### 29.5 C-String Literals
+
+`c"hello"` produces `&CStr` — a compile-time reference to a
+NUL-terminated string in static memory. The compiler appends the
+NUL byte automatically. `c"..."` does not support interpolation.
+
+---
+
+## 30. Object Safety Checking (spec §11.3)
+
+### 30.1 Rules
+
+A trait can be used as `dyn Trait` only if all methods are
+object-safe:
+
+| Method form | Object-safe? |
+|-------------|-------------|
+| `self: &Self` | Yes |
+| `self: &mut Self` | Yes |
+| `self: Self` (by value) | No (excluded from vtable) |
+| Generic method (non-Self) | No |
+
+### 30.2 `Box[dyn Trait]` Exception
+
+By-value `self` methods can be called through `Box[dyn Trait]`.
+The compiler generates a shim that moves the value out of the box:
+
+```
+// For trait Builder with fn build(self: Self) -> Config:
+fn __box_dyn_build_shim(box_ptr: *mut u8) -> Config =
+    let builder = move_from_box(box_ptr)
+    builder.build()
+```
+
+### 30.3 Implementation
+
+At trait-object creation sites (`&dyn Trait`, `Box[dyn Trait]`):
+
+1. Check all methods of the trait for object safety.
+2. If any non-object-safe method exists, emit error.
+3. Build vtable with function pointers to monomorphized methods.
+4. For `Box[dyn Trait]`, generate shims for by-value self methods.
+
+---
+
+## 31. FFI Stack Switching (spec §14.18)
+
+### 31.1 The Problem
+
+C code called via `c_import` has no knowledge of With's segmented/
+small fiber stacks. It may use more stack space than available on the
+fiber's stack.
+
+### 31.2 Solution: Automatic Stack Switching
+
+1. The compiler marks functions as `ffi_reachable` if they (directly
+   or transitively) call any `c_import` function.
+2. At the FFI call boundary, the runtime:
+   a. Saves the fiber stack pointer
+   b. Switches to a pre-allocated OS-thread stack (2–8 MB)
+   c. Executes the C function on the full-size stack
+   d. Restores the fiber stack pointer on return
+
+Cost: ~10–50 ns per switch (save/restore a few registers).
+
+### 31.3 `@[ffi_stack]` Attribute
+
+For functions that call C frequently, `@[ffi_stack]` forces the
+entire function to run on an OS-thread stack, avoiding per-call
+switching:
+
+```
+@[ffi_stack]
+fn process_image(data: &[u8]) -> Image =
+    // All C calls run on OS stack without per-call switching
+    ...
+```
+
+### 31.4 No Suspension During C Frames
+
+The compiler enforces that any function used as an `extern "C"`
+callback, or transitively called while C frames are on the stack,
+must not be `may_suspend`. This prevents corrupting the OS-thread
+stack that may be shared with paused C frames.
+
+---
+
+## 32. Attribute System
+
+### 32.1 Built-In Attributes
+
+| Attribute | Applies to | Effect |
+|-----------|-----------|--------|
+| `@[tailrec]` | Functions | Verify tail recursion; compile to loop |
+| `@[no_await_guard]` | Types | Reject `.await`/`may_suspend` while live |
+| `@[must_use]` | Types | Warn/error on unused values |
+| `@[derive(...)]` | Types | Generate trait implementations |
+| `@[repr(C)]` | Types | C-compatible memory layout |
+| `@[c_export("name")]` | Functions | Export with C linkage |
+| `@[ffi_stack]` | Functions | Run on OS-thread stack |
+| `@[inline]` | Functions | Hint: inline this function |
+| `@[cold]` | Functions | Hint: unlikely to be called |
+
+### 32.2 `@[no_await_guard]` Algorithm (spec §7.9, §14.3)
+
+This is the most complex attribute. The check combines NLL liveness
+with `may_suspend` analysis:
+
+```
+fn check_no_await_guard(func):
+    let guard_bindings = find_bindings_of_no_await_guard_types(func)
+    let may_suspend_calls = find_may_suspend_call_sites(func)
+
+    for call in may_suspend_calls:
+        for guard in guard_bindings:
+            if nll_is_live(guard, call.program_point):
+                EMIT ERROR E0701
+                    "may_suspend call while @[no_await_guard] guard is live"
+                    point_at(guard.creation_site)
+                    point_at(call.site)
+                    suggest("drop guard before calling, or clone data out")
+```
+
+**Key insight:** The check is NLL-based, not syntax-based. It rejects
+suspension regardless of whether the guard was created via `with` or
+via a plain `let` binding. Any `may_suspend` function call (not just
+direct `.await`) while a guard is live is an error.
+
+### 32.3 `cfg` Conditional Compilation
+
+`comptime if cfg.target_os == "linux"` is the conditional compilation
+mechanism. Available `cfg` fields:
+
+| Field | Type | Example |
+|-------|------|---------|
+| `cfg.target_os` | `str` | `"linux"`, `"darwin"`, `"windows"` |
+| `cfg.target_arch` | `str` | `"x86_64"`, `"aarch64"` |
+| `cfg.is_debug` | `bool` | `true` in debug builds |
+| `cfg.is_release` | `bool` | `true` in release builds |
+
+The `cfg` object is a comptime constant populated from the build
+target and `with.toml` configuration.
+
+---
+
+## 33. Extension Block Coherence (spec §11.4)
+
+### 33.1 Rules
+
+- You may `extend` any type with new methods.
+- If two packages extend the same type with the same method name,
+  calling that method is a compile error (ambiguous).
+- Extension methods **never shadow** inherent methods.
+- Extension methods are resolved by import scope.
+
+### 33.2 Implementation
+
+At method resolution, the compiler:
+
+1. Check inherent methods (same module as type). If found, use it.
+2. Collect extension methods from all `use`d packages.
+3. If exactly one match, use it.
+4. If multiple matches, emit ambiguity error with fully-qualified
+   suggestion.
+5. If no match, emit "method not found" error.
+
+---
+
+## 34. Normative Rule §21.7: Implicit Drop as Use
+
+### 34.1 Rule
+
+When a variable implementing `Drop` goes out of scope, its implicit
+destructor call is treated as a **use** of that variable for borrow-
+checking purposes (spec §21.1 Rule 7).
+
+### 34.2 Implementation
+
+The compiler inserts implicit drop points at scope exit in reverse
+declaration order. Each drop point extends the NLL liveness of the
+variable being dropped:
+
+```
+fn example():
+    var v: Vec[&i32] = Vec.new()
+    var x = 5
+    v.push(&x)
+    // End of scope: x drops first (no Drop impl), then v drops.
+    // v.drop() would access &x, but x no longer exists.
+    // Rejected: v's implicit drop is a use of &x.
+```
+
+For the borrow checker, insert a virtual "use" of `v` at the point
+where `v.drop()` would execute. This extends the borrow `&x` through
+the destructor, causing a conflict with `x`'s destruction.
 
 ---
 

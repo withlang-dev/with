@@ -60,7 +60,6 @@ async fn main() -> Result[Unit, ServiceError] =
 
     // Scope guarantees: all spawned fibers have completed or been cancelled.
     println("Service shut down cleanly.")
-    Ok()
 
 
 async fn listen_for_shutdown() =

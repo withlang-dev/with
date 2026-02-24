@@ -28,9 +28,10 @@ and a dense array for cache-friendly iteration. Components are stored contiguous
 in memory regardless of entity creation order.
 
 **Parallel systems via disjoint borrowing** — `run_frame()` uses `scope` to run
-`run_movement` (borrows `transforms`, `velocities`) in parallel with `run_render`
-(borrows `transforms`, `sprites`). The borrow checker guarantees no data races
-at compile time because the fields are disjoint.
+`run_collision` (reads `transforms`, `colliders`, writes `collision_events`) in
+parallel with `run_render` (reads `transforms`, `sprites`). The borrow checker
+guarantees no data races at compile time because mutable/shared accesses are
+disjoint or shared-compatible.
 
 **Comptime component registration** — `@[component]` annotations and `comptime`
 blocks generate component IDs at compile time, avoiding runtime reflection or

@@ -19,9 +19,9 @@ trait objects with `Task[T]` return types need no boxing.
 module app.errors
 
 error DbError =
-    ConnectionFailed(host: String, port: u16)
-    QueryFailed(query: String, reason: String)
-    NotFound(table: String, id: String)
+    ConnectionFailed(host: str, port: u16)
+    QueryFailed(query: str, reason: str)
+    NotFound(table: str, id: str)
     Timeout
 
 error CacheError =
@@ -30,34 +30,14 @@ error CacheError =
     Timeout
 
 error NotifyError =
-    ProviderDown(provider: String)
+    ProviderDown(provider: str)
     RateLimited(retry_after: Duration)
-    InvalidRecipient(addr: String)
+    InvalidRecipient(addr: str)
 
-// Unified service error — all subsystem errors convert into this
-// via From impls, so ? propagation works across boundaries.
-error ServiceError =
-    Db(DbError)
-    Cache(CacheError)
-    Notify(NotifyError)
-    Validation(msg: String)
-    Cancelled
-
-impl From[DbError] for ServiceError {
-    fn from(e: DbError) -> ServiceError = ServiceError.Db(e)
-}
-
-impl From[CacheError] for ServiceError {
-    fn from(e: CacheError) -> ServiceError = ServiceError.Cache(e)
-}
-
-impl From[NotifyError] for ServiceError {
-    fn from(e: NotifyError) -> ServiceError = ServiceError.Notify(e)
-}
-
-impl From[TaskCancelled] for ServiceError {
-    fn from(_: TaskCancelled) -> ServiceError = ServiceError.Cancelled
-}
+// Unified service error — subsystem errors convert automatically
+// via `from` shorthand, so ? propagation works across boundaries.
+error ServiceError from DbError, CacheError, NotifyError =
+    Validation(msg: str)
 ```
 
 ---
@@ -72,12 +52,13 @@ type UserId = distinct i64
 @[derive(Clone)]
 type User = {
     id: UserId,
-    name: String,
-    email: String,
+    name: str,
+    email: str,
     role: Role,
     active: bool,
 }
 
+@[derive(all)]
 type Role = Admin | Moderator | Member | Guest
 
 type UserProfile = {
@@ -89,25 +70,28 @@ type UserProfile = {
 
 @[derive(Clone)]
 type CreateUserRequest = {
-    name: String,
-    email: String,
+    name: str,
+    email: str,
     role: Role,
 }
 
+// Default field values: all fields default to None, so callers
+// only specify the fields they want to change (§4.3).
 type UserUpdate = {
-    name: Option[String],
-    email: Option[String],
-    role: Option[Role],
-    active: Option[bool],
+    name: Option[str] = None,
+    email: Option[str] = None,
+    role: Option[Role] = None,
+    active: Option[bool] = None,
 }
 
 type Notification = {
-    recipient: String,
-    subject: String,
-    body: String,
+    recipient: str,
+    subject: str,
+    body: str,
     priority: Priority,
 }
 
+@[derive(all)]
 type Priority = Urgent | Normal | Low
 ```
 
@@ -187,39 +171,39 @@ extend PgUserRepo
 
 impl UserRepository for PgUserRepo {
     async fn find_by_id(self: &PgUserRepo, id: UserId) -> Result[Option[User], DbError] =
-        with guard self.pool.acquire() as conn:
+        with self.pool.acquire() as conn:
             let row = conn.query_opt(
                 "SELECT id, name, email, role, active FROM users WHERE id = $1",
                 &[&id],
             ).await?
-            Ok(row.map(|r| row_to_user(r)))
+            row.map(|r| row_to_user(r))
 
     async fn find_by_email(self: &PgUserRepo, email: &str) -> Result[Option[User], DbError] =
-        with guard self.pool.acquire() as conn:
+        with self.pool.acquire() as conn:
             let row = conn.query_opt(
                 "SELECT id, name, email, role, active FROM users WHERE email = $1",
                 &[&email],
             ).await?
-            Ok(row.map(|r| row_to_user(r)))
+            row.map(|r| row_to_user(r))
 
     async fn list_active(self: &PgUserRepo, limit: i32, offset: i32) -> Result[Vec[User], DbError] =
-        with guard self.pool.acquire() as conn:
+        with self.pool.acquire() as conn:
             let rows = conn.query(
                 "SELECT id, name, email, role, active FROM users WHERE active = true LIMIT $1 OFFSET $2",
                 &[&limit, &offset],
             ).await?
-            Ok(rows |> map(|r| row_to_user(r)) |> collect())
+            rows |> map(|r| row_to_user(r)) |> collect()
 
     async fn insert(self: &PgUserRepo, user: &User) -> Result[UserId, DbError] =
-        with guard self.pool.acquire() as conn:
+        with self.pool.acquire() as conn:
             let row = conn.query_one(
                 "INSERT INTO users (name, email, role, active) VALUES ($1, $2, $3, $4) RETURNING id",
                 &[&user.name, &user.email, &role_to_str(user.role), &user.active],
             ).await?
-            Ok(UserId(row.get(0)))
+            UserId(row.get(0))
 
     async fn update(self: &PgUserRepo, id: UserId, fields: &UserUpdate) -> Result[Unit, DbError] =
-        with guard self.pool.acquire() as conn:
+        with self.pool.acquire() as conn:
             // Build SET clause and params from non-None fields
             var sets = Vec.new()
             var params: Vec[&dyn ToSql] = vec![&id]
@@ -245,31 +229,29 @@ impl UserRepository for PgUserRepo {
 
             let query = "UPDATE users SET {sets.join(", ")} WHERE id = $1"
             conn.execute(&query, params.as_slice()).await?
-            Ok()
 
     async fn delete(self: &PgUserRepo, id: UserId) -> Result[Unit, DbError] =
-        with guard self.pool.acquire() as conn:
+        with self.pool.acquire() as conn:
             conn.execute(
                 "DELETE FROM users WHERE id = $1",
                 &[&id],
             ).await?
-            Ok()
 
     async fn count_posts(self: &PgUserRepo, id: UserId) -> Result[i32, DbError] =
-        with guard self.pool.acquire() as conn:
+        with self.pool.acquire() as conn:
             let row = conn.query_one(
                 "SELECT COUNT(*) FROM posts WHERE author_id = $1",
                 &[&id],
             ).await?
-            Ok(row.get(0))
+            row.get(0)
 
     async fn count_followers(self: &PgUserRepo, id: UserId) -> Result[i32, DbError] =
-        with guard self.pool.acquire() as conn:
+        with self.pool.acquire() as conn:
             let row = conn.query_one(
                 "SELECT COUNT(*) FROM follows WHERE followed_id = $1",
                 &[&id],
             ).await?
-            Ok(row.get(0))
+            row.get(0)
 }
 
 fn row_to_user(row: &Row) -> User =
@@ -307,14 +289,14 @@ use std.time.Duration
 
 type RedisCache = {
     client: RedisClient,
-    prefix: String,
+    prefix: str,
 }
 
 extend RedisCache
     fn new(client: RedisClient, prefix: &str) -> RedisCache =
         RedisCache { client, prefix: prefix.to_string() }
 
-    fn prefixed_key(self: &RedisCache, key: &str) -> String =
+    fn prefixed_key(self: &RedisCache, key: &str) -> str =
         "{self.prefix}:{key}"
 
 impl CacheService for RedisCache {
@@ -329,12 +311,10 @@ impl CacheService for RedisCache {
         let full_key = self.prefixed_key(key)
         let bytes = serialize(val)
         self.client.set_ex(&full_key, &bytes, ttl.as_secs()).await?
-        Ok()
 
     async fn delete(self: &RedisCache, key: &str) -> Result[Unit, CacheError] =
         let full_key = self.prefixed_key(key)
         self.client.del(&full_key).await?
-        Ok()
 
     async fn exists(self: &RedisCache, key: &str) -> Result[bool, CacheError] =
         let full_key = self.prefixed_key(key)
@@ -352,9 +332,9 @@ use app.domain.{Notification, Priority}
 use app.errors.NotifyError
 
 type EmailNotifier = {
-    smtp_host: String,
+    smtp_host: str,
     smtp_port: u16,
-    from_addr: String,
+    from_addr: str,
     rate_limit: RateLimiter,
 }
 
@@ -369,13 +349,12 @@ impl NotificationService for EmailNotifier {
             msg.subject = notif.subject.clone()
             msg.body = notif.body.clone()
             msg.priority = match notif.priority
-                Urgent -> 1
-                Normal -> 3
-                Low    -> 5
+                .Urgent -> 1
+                .Normal -> 3
+                .Low    -> 5
 
         with SmtpTransport.connect(&self.smtp_host, self.smtp_port) as transport:
             transport.send(&email).await?
-        Ok()
 
     async fn send_batch(self: &EmailNotifier, notifs: &[Notification]) -> Result[i32, NotifyError] =
         var sent = 0
@@ -384,7 +363,7 @@ impl NotificationService for EmailNotifier {
                 Ok() -> sent += 1
                 Err(NotifyError.RateLimited(d)) -> return Err(NotifyError.RateLimited(d))
                 Err(_) -> ()  // skip individual failures
-        Ok(sent)
+        sent
 }
 ```
 
@@ -407,22 +386,17 @@ use std.time.{Duration, Instant}
 use std.sync.RwLock
 
 // --- Service Configuration ---
+//
+// Default field values (§4.3): fields declare their defaults
+// inline. Callers only specify what they want to override.
+// No fn default() needed — just use ServiceConfig { ... }.
 
 type ServiceConfig = {
-    cache_ttl: Duration,
-    max_batch_size: i32,
-    notify_on_create: bool,
-    notify_on_delete: bool,
+    cache_ttl: Duration = Duration.minutes(5),
+    max_batch_size: i32 = 100,
+    notify_on_create: bool = true,
+    notify_on_delete: bool = false,
 }
-
-extend ServiceConfig
-    fn default() -> ServiceConfig =
-        ServiceConfig {
-            cache_ttl: Duration.minutes(5),
-            max_batch_size: 100,
-            notify_on_create: true,
-            notify_on_delete: false,
-        }
 
 // --- The Service ---
 //
@@ -441,17 +415,13 @@ type UserService = {
 }
 
 type ServiceMetrics = {
-    requests: i64,
-    cache_hits: i64,
-    cache_misses: i64,
-    errors: i64,
+    requests: i64 = 0,
+    cache_hits: i64 = 0,
+    cache_misses: i64 = 0,
+    errors: i64 = 0,
 }
 
-extend ServiceMetrics
-    fn new() -> ServiceMetrics =
-        ServiceMetrics { requests: 0, cache_hits: 0, cache_misses: 0, errors: 0 }
-
-// --- Builder (with block Form 2) ---
+// --- Builder (by-value self chaining) ---
 
 extend UserService
     fn builder() -> UserServiceBuilder =
@@ -460,7 +430,7 @@ extend UserService
             cache: None,
             notifier: None,
             audit: None,
-            config: ServiceConfig.default(),
+            config: ServiceConfig {},
         }
 
 type UserServiceBuilder = {
@@ -487,15 +457,15 @@ extend UserServiceBuilder
     fn config(self: UserServiceBuilder, cfg: ServiceConfig) -> UserServiceBuilder =
         { self with config: cfg }
 
-    fn build(self: UserServiceBuilder) -> Result[UserService, String] =
-        Ok(UserService {
+    fn build(self: UserServiceBuilder) -> Result[UserService, str] =
+        UserService {
             repo: self.repo.ok_or("UserRepository is required")?,
             cache: self.cache.ok_or("CacheService is required")?,
             notifier: self.notifier.ok_or("NotificationService is required")?,
             audit: self.audit.ok_or("AuditLog is required")?,
             config: self.config,
-            metrics: RwLock.new(ServiceMetrics.new()),
-        })
+            metrics: RwLock.new(ServiceMetrics {}),
+        }
 
 // --- Service Methods ---
 
@@ -547,16 +517,16 @@ extend UserService
             last_login,
         }
 
-        // Write through to cache (fire and forget — don't fail on cache error)
+        // Best-effort write-through cache update (await, ignore error)
         let _ = self.cache.set(&cache_key, &profile, self.config.cache_ttl).await
 
-        Ok(profile)
+        profile
 
     // --- Create User ---
     //
     // Validates, inserts, invalidates cache, sends notification,
     // records audit log. Demonstrates with-block builders, pattern
-    // matching on roles, and concurrent fire-and-forget.
+    // matching on roles, and concurrent scope-managed side effects.
 
     async fn create_user(
         self: &UserService,
@@ -587,7 +557,7 @@ extend UserService
         let id = self.repo.insert(&user).await?
         let user = { user with id }
 
-        // Post-creation side effects (concurrent, non-blocking)
+        // Post-creation side effects (concurrent, scope-managed)
         async scope |s|:
             // Audit log
             s.track(self.audit.record(
@@ -603,7 +573,7 @@ extend UserService
             // Invalidate any cached user lists
             s.track(self.cache.delete("users:active:*"))
 
-        Ok(user)
+        user
 
     // --- Update User ---
     //
@@ -618,9 +588,9 @@ extend UserService
     ) -> Result[User, ServiceError] =
         self.bump_requests()
 
-        // Fetch current state
-        let current = self.repo.find_by_id(id).await?
-            .ok_or(ServiceError.Db(DbError.NotFound("users", "{id}")))?
+        // let...else (§9.7): refutable pattern with early return on mismatch
+        let Some(current) = self.repo.find_by_id(id).await? else
+            return Err(ServiceError.Db(DbError.NotFound("users", "{id}")))
 
         // Apply partial update (clone current first — fields will be moved)
         let original = current.clone()
@@ -635,13 +605,13 @@ extend UserService
         self.repo.update(id, &update).await?
 
         // Invalidate caches
-        self.cache.delete("profile:{id}").await.unwrap_or(())
+        self.cache.delete("profile:{id}").await.unwrap_or()
 
         // Audit
         with describe_changes(&original, &updated) as changes:
             self.audit.record(actor, "update_user", &changes).await?
 
-        Ok(updated)
+        updated
 
     // --- Delete User ---
 
@@ -656,7 +626,7 @@ extend UserService
             .ok_or(ServiceError.Db(DbError.NotFound("users", "{id}")))?
 
         self.repo.delete(id).await?
-        self.cache.delete("profile:{id}").await.unwrap_or(())
+        self.cache.delete("profile:{id}").await.unwrap_or()
 
         async scope |s|:
             s.track(self.audit.record(
@@ -670,10 +640,8 @@ extend UserService
                     recipient: user.email.clone(),
                     subject: "Account deleted",
                     body: "Your account has been removed.",
-                    priority: Normal,
+                    priority: .Normal,
                 }))
-
-        Ok()
 
     // --- List Active Users (paginated) ---
 
@@ -705,7 +673,7 @@ extend UserService
                 self.config.cache_ttl,
             ).await
 
-        Ok(users)
+        users
 
     // --- Batch Profile Fetch ---
     //
@@ -730,33 +698,34 @@ extend UserService
     // --- Internal Helpers ---
 
     async fn send_welcome(self: &UserService, user: &User) -> Result[Unit, NotifyError] =
+        // Enum variant shorthand (§4.4): .Variant when type is known
         let body: str = match user.role
-            Admin     -> "Welcome, administrator. Full access granted."
-            Moderator -> "Welcome, moderator. You can manage content."
-            Member    -> "Welcome to the platform, {user.name}!"
-            Guest     -> "You've been added as a guest."
+            .Admin     -> "Welcome, administrator. Full access granted."
+            .Moderator -> "Welcome, moderator. You can manage content."
+            .Member    -> "Welcome to the platform, {user.name}!"
+            .Guest     -> "You've been added as a guest."
 
         self.notifier.send(&Notification {
             recipient: user.email.clone(),
             subject: "Welcome to the platform",
             body,
-            priority: Normal,
+            priority: .Normal,
         })
         .await
 
     fn bump_requests(self: &UserService) =
-        with guard self.metrics.write() as mut m:
+        with self.metrics.write() as mut m:
             m.requests += 1
 
     fn bump_cache_hit(self: &UserService) =
-        with guard self.metrics.write() as mut m:
+        with self.metrics.write() as mut m:
             m.cache_hits += 1
 
     fn bump_cache_miss(self: &UserService) =
-        with guard self.metrics.write() as mut m:
+        with self.metrics.write() as mut m:
             m.cache_misses += 1
 
-fn describe_changes(old: &User, new: &User) -> String =
+fn describe_changes(old: &User, new: &User) -> str =
     with Vec.new() as mut changes:
         if old.name != new.name then
             changes.push("name: '{old.name}' → '{new.name}'")
@@ -790,18 +759,28 @@ type AppState = {
 }
 
 async fn handle_request(state: &AppState, req: HttpRequest) -> HttpResponse =
-    match (req.method(), req.path_str())
-        ("GET",    "/users")     -> handle_list(state, &req) .await
-        ("GET",    "/users/{id}") -> handle_get_profile(state, req.param("id")) .await
-        ("POST",   "/users")     -> handle_create(state, &req) .await
-        ("PUT",    "/users/{id}") -> handle_update(state, &req, req.param("id")) .await
-        ("DELETE", "/users/{id}") -> handle_delete(state, &req, req.param("id")) .await
-        _ -> HttpResponse.not_found()
+    let method = req.method()
+    let path = req.path_str()
+
+    if method == "GET" && path == "/users" then
+        handle_list(state, &req).await
+    else if method == "POST" && path == "/users" then
+        handle_create(state, &req).await
+    else if method == "GET" && path.starts_with("/users/") then
+        let id_str = path.strip_prefix("/users/").unwrap_or("")
+        handle_get_profile(state, id_str).await
+    else if method == "PUT" && path.starts_with("/users/") then
+        let id_str = path.strip_prefix("/users/").unwrap_or("")
+        handle_update(state, &req, id_str).await
+    else if method == "DELETE" && path.starts_with("/users/") then
+        let id_str = path.strip_prefix("/users/").unwrap_or("")
+        handle_delete(state, &req, id_str).await
+    else
+        HttpResponse.not_found()
 
 async fn handle_get_profile(state: &AppState, id_str: &str) -> HttpResponse =
-    let id = match id_str.parse_int()
-        Ok(n)  -> UserId(n)
-        Err(_) -> return HttpResponse.bad_request("invalid user id")
+    // ?? with early return (§10.4): bail on None
+    let id = UserId(id_str.parse_int().ok() ?? return HttpResponse.bad_request("invalid user id"))
 
     match state.service.get_profile(id).await
         Ok(profile)                               -> HttpResponse.json(200, &profile)
@@ -810,12 +789,11 @@ async fn handle_get_profile(state: &AppState, id_str: &str) -> HttpResponse =
         Err(e)                                     -> HttpResponse.internal_error(&e.to_string())
 
 async fn handle_list(state: &AppState, req: &HttpRequest) -> HttpResponse =
+    // ?? default operator (§10.4): unwrap_or with cleaner syntax
     let page = req.query_param("page")
-        .and_then(|s| s.parse_int().ok())
-        .unwrap_or(1)
+        .and_then(|s| s.parse_int().ok()) ?? 1
     let per_page = req.query_param("per_page")
-        .and_then(|s| s.parse_int().ok())
-        .unwrap_or(20)
+        .and_then(|s| s.parse_int().ok()) ?? 20
 
     match state.service.list_active(page, per_page).await
         Ok(users) -> HttpResponse.json(200, &users)
@@ -879,17 +857,29 @@ use app.http.{AppState, handle_request}
 use std.sync.Arc
 use std.time.Duration
 
+// Demonstrates .context() / .with_context() (§10.6) for error wrapping.
+// .context() wraps an error with a human-readable message, producing
+// ContextError[E] that preserves the original error as .source.
+async fn load_config_from_file(path: &str) -> Result[ServiceConfig, ContextError[IoError]] =
+    let text = std.fs.read_to_string(path)
+        .context("reading config from {path}")?
+    toml.parse[ServiceConfig](&text)
+        .with_context(|| "parsing config file {path}")?
+
 async fn main() -> Result[Unit, ServiceError] =
-    // Configuration (with block Form 2: builder)
-    let config = with ServiceConfig.default() as mut c:
-        c.cache_ttl = Duration.minutes(10)
-        c.notify_on_create = true
-        c.notify_on_delete = true
-        c.max_batch_size = 50
+    // Default field values (§4.3): only specify overrides.
+    // ServiceConfig has defaults for all fields — just set what differs.
+    let config = ServiceConfig {
+        cache_ttl: Duration.minutes(10),
+        notify_on_delete: true,
+        max_batch_size: 50,
+    }
 
     // Initialize infrastructure
     let db_pool = ConnectionPool.connect("postgres://localhost/myapp", 20).await?
+    defer db_pool.close().await.unwrap_or()   // defer (§2.4): cleanup on exit
     let redis = RedisClient.connect("redis://localhost:6379").await?
+    defer redis.close().await.unwrap_or()
 
     // Compose the service from trait objects
     let service = UserService.builder()
@@ -907,15 +897,34 @@ async fn main() -> Result[Unit, ServiceError] =
 
     let state = Arc.new(AppState { service: Arc.new(service) })
 
-    // Start server
+    // Start server with graceful shutdown via select await (§14.10)
     let listener = std.net.TcpListener.bind("0.0.0.0:8080").await?
+    let (shutdown_tx, shutdown_rx) = chan[Unit](1)
+
+    // Register shutdown signal handler
+    std.signal.on_signal(.SIGTERM, || spawn shutdown_tx.send(()))
+
     println("Listening on :8080")
 
+    // async: block (§14.6): create an inline fiber for background work.
+    // spawn detaches it so it runs independently alongside the server.
+    spawn async:
+        loop:
+            sleep(Duration.seconds(30)).await
+            if db_pool.ping().await.is_err() then
+                eprintln("WARNING: database health check failed")
+
+    // select await: race accept vs shutdown — first to complete wins,
+    // siblings are cancelled (structured cancellation)
     loop:
-        let conn = listener.accept().await?
-        let state = state.clone()
-        // state is moved into the spawned fiber — no dangling reference
-        spawn handle_connection(state, conn)
+        select await
+            conn = listener.accept() ->
+                let state = state.clone()
+                spawn handle_connection(state, conn)
+            _ = shutdown_rx.recv() ->
+                println("Shutting down gracefully...")
+                break
+    // defer'd cleanup runs: db_pool.close(), redis.close()
 ```
 
 ---
@@ -932,7 +941,7 @@ use app.domain.*
 use app.errors.*
 use app.traits.*
 use app.service.{UserService, ServiceConfig}
-use std.sync.{RwLock, Mutex}
+use std.sync.{Arc, RwLock, Mutex}
 use std.collections.HashMap
 use std.time.Duration
 
@@ -952,36 +961,36 @@ extend MockUserRepo
 
 impl UserRepository for MockUserRepo {
     async fn find_by_id(self: &MockUserRepo, id: UserId) -> Result[Option[User], DbError] =
-        with guard self.users.read() as users:
-            Ok(users.get(&id).cloned())
+        with self.users.read() as users:
+            users.get(&id).cloned()
 
     async fn find_by_email(self: &MockUserRepo, email: &str) -> Result[Option[User], DbError] =
-        with guard self.users.read() as users:
-            Ok(users.values()
+        with self.users.read() as users:
+            users.values()
                 |> find(|u| u.email == email)
-                |> map(|u| u.clone()))
+                |> map(|u| u.clone())
 
     async fn list_active(self: &MockUserRepo, limit: i32, offset: i32) -> Result[Vec[User], DbError] =
-        with guard self.users.read() as users:
-            Ok(users.values()
+        with self.users.read() as users:
+            users.values()
                 |> filter(|u| u.active)
                 |> skip(offset as usize)
                 |> take(limit as usize)
                 |> cloned()
-                |> collect())
+                |> collect()
 
     async fn insert(self: &MockUserRepo, user: &User) -> Result[UserId, DbError] =
-        let id = with guard self.next_id.lock() as mut next:
+        let id = with self.next_id.lock() as mut next:
             let id = UserId(*next)
             *next += 1
             id
         let user = { user.clone() with id }
-        with guard self.users.write() as mut users:
+        with self.users.write() as mut users:
             users.insert(id, user)
-        Ok(id)
+        id
 
     async fn update(self: &MockUserRepo, id: UserId, fields: &UserUpdate) -> Result[Unit, DbError] =
-        with guard self.users.write() as mut users:
+        with self.users.write() as mut users:
             match users.get_mut(&id)
                 Some(user) ->
                     if let Some(name) = &fields.name then user.name = name.clone()
@@ -992,22 +1001,22 @@ impl UserRepository for MockUserRepo {
                 None -> Err(DbError.NotFound("users", "{id}"))
 
     async fn delete(self: &MockUserRepo, id: UserId) -> Result[Unit, DbError] =
-        with guard self.users.write() as mut users:
+        with self.users.write() as mut users:
             users.remove(&id)
                 .map(|_| ())
                 .ok_or(DbError.NotFound("users", "{id}"))
 
     async fn count_posts(self: &MockUserRepo, _id: UserId) -> Result[i32, DbError] =
-        Ok(0)
+        0
 
     async fn count_followers(self: &MockUserRepo, _id: UserId) -> Result[i32, DbError] =
-        Ok(0)
+        0
 }
 
 // --- In-Memory Mock Cache ---
 
 type MockCache = {
-    store: RwLock[HashMap[String, Vec[u8]]],
+    store: RwLock[HashMap[str, Vec[u8]]],
 }
 
 extend MockCache
@@ -1016,52 +1025,53 @@ extend MockCache
 
 impl CacheService for MockCache {
     async fn get[T: Deserialize](self: &MockCache, key: &str) -> Result[Option[T], CacheError] =
-        with guard self.store.read() as store:
+        with self.store.read() as store:
             match store.get(key)
                 Some(bytes) -> Ok(Some(deserialize(bytes)?))
                 None        -> Ok(None)
 
     async fn set[T: Serialize](self: &MockCache, key: &str, val: &T, _ttl: Duration) -> Result[Unit, CacheError] =
-        with guard self.store.write() as mut store:
+        with self.store.write() as mut store:
             store.insert(key.to_string(), serialize(val))
-        Ok()
 
     async fn delete(self: &MockCache, key: &str) -> Result[Unit, CacheError] =
-        with guard self.store.write() as mut store:
+        with self.store.write() as mut store:
             store.remove(key)
-        Ok()
 
     async fn exists(self: &MockCache, key: &str) -> Result[bool, CacheError] =
-        with guard self.store.read() as store:
-            Ok(store.contains_key(key))
+        with self.store.read() as store:
+            store.contains_key(key)
 }
 
 // --- Recording Mock Notifier ---
 
 type MockNotifier = {
-    sent: Mutex[Vec[Notification]],
+    sent: Arc[Mutex[Vec[Notification]]],
 }
 
 extend MockNotifier
     fn new() -> MockNotifier =
-        MockNotifier { sent: Mutex.new(Vec.new()) }
+        MockNotifier { sent: Arc.new(Mutex.new(Vec.new())) }
 
+    fn clone_handle(self: &MockNotifier) -> MockNotifier =
+        MockNotifier { sent: self.sent.clone() }
+
+    // .len32() (§18.6): bounds-checked narrowing, no manual cast
     fn sent_count(self: &MockNotifier) -> i32 =
-        with guard self.sent.lock() as sent:
-            sent.len() as i32
+        with self.sent.lock() as sent:
+            sent.len32()
 
 impl NotificationService for MockNotifier {
     async fn send(self: &MockNotifier, notif: &Notification) -> Result[Unit, NotifyError] =
-        with guard self.sent.lock() as mut sent:
+        with self.sent.lock() as mut sent:
             sent.push(notif.clone())
-        Ok()
 
     async fn send_batch(self: &MockNotifier, notifs: &[Notification]) -> Result[i32, NotifyError] =
-        with guard self.sent.lock() as mut sent:
-            let count = notifs.len() as i32
+        with self.sent.lock() as mut sent:
+            let count = notifs.len32()
             for n in notifs:
                 sent.push(n.clone())
-            Ok(count)
+            count
 }
 
 // --- No-Op Audit Log ---
@@ -1070,32 +1080,29 @@ type MockAudit = {}
 
 impl AuditLog for MockAudit {
     async fn record(self: &MockAudit, _actor: UserId, _action: &str, _detail: &str) -> Result[Unit, DbError] =
-        Ok()
+        ()
 }
 
 // --- Test Helper: Build service with mocks ---
 
-fn test_service() -> (UserService, &MockUserRepo, &MockNotifier) =
+fn test_service() -> (UserService, MockNotifier) =
     let repo = Box.new(MockUserRepo.new())
-    let notifier = Box.new(MockNotifier.new())
-
-    // Keep references to mocks for assertions
-    let repo_ref = &*repo as &MockUserRepo
-    let notifier_ref = &*notifier as &MockNotifier
+    let notifier = MockNotifier.new()
+    let notifier_handle = notifier.clone_handle()
 
     let service = UserService.builder()
         .repo(repo)
         .cache(Box.new(MockCache.new()))
-        .notifier(notifier)
+        .notifier(Box.new(notifier))
         .audit(Box.new(MockAudit {}))
         .build().unwrap()
 
-    (service, repo_ref, notifier_ref)
+    (service, notifier_handle)
 
 // --- Tests ---
 
 async fn test_create_and_fetch_user() =
-    let (svc, _, notifier) = test_service()
+    let (svc, notifier) = test_service()
 
     let req = CreateUserRequest {
         name: "Alice",
@@ -1119,7 +1126,7 @@ async fn test_create_and_fetch_user() =
     assert(profile.followers == 0)
 
 async fn test_duplicate_email_rejected() =
-    let (svc, _, _) = test_service()
+    let (svc, _) = test_service()
 
     let req = CreateUserRequest {
         name: "Alice",
@@ -1137,7 +1144,7 @@ async fn test_duplicate_email_rejected() =
         other -> unreachable("expected Validation error, got {other}")
 
 async fn test_update_partial_fields() =
-    let (svc, _, _) = test_service()
+    let (svc, _) = test_service()
 
     let user = svc.create_user(CreateUserRequest {
         name: "Bob",
@@ -1145,12 +1152,10 @@ async fn test_update_partial_fields() =
         role: Member,
     }, UserId(0)).await.unwrap()
 
-    // Update only the name
+    // Update only the name — default field values (§4.3) mean
+    // unspecified fields default to None, so partial updates are concise.
     let updated = svc.update_user(user.id, UserUpdate {
         name: Some("Robert"),
-        email: None,
-        role: None,
-        active: None,
     }, UserId(0)).await.unwrap()
 
     assert(updated.name == "Robert")
@@ -1158,7 +1163,7 @@ async fn test_update_partial_fields() =
     assert(updated.role == Member)              // unchanged
 
 async fn test_delete_user() =
-    let (svc, _, _) = test_service()
+    let (svc, _) = test_service()
 
     let user = svc.create_user(CreateUserRequest {
         name: "Charlie",
@@ -1172,7 +1177,7 @@ async fn test_delete_user() =
     assert_matches(svc.get_profile(user.id).await, Err(ServiceError.Db(DbError.NotFound(..))))
 
 async fn test_cache_hit_on_second_fetch() =
-    let (svc, _, _) = test_service()
+    let (svc, _) = test_service()
 
     let user = svc.create_user(CreateUserRequest {
         name: "Diana",
@@ -1194,7 +1199,7 @@ async fn test_cache_hit_on_second_fetch() =
         assert(m.cache_hits >= 1)
 
 async fn test_batch_profiles() =
-    let (svc, _, _) = test_service()
+    let (svc, _) = test_service()
 
     // Create 5 users
     let ids = with Vec.new() as mut ids:
@@ -1210,6 +1215,31 @@ async fn test_batch_profiles() =
     // Batch fetch all profiles
     let profiles = svc.get_profiles_batch(ids).await.unwrap()
     assert(profiles.len() == 5)
+
+async fn test_optional_chaining_and_accessors() =
+    let (svc, _) = test_service()
+
+    let user = svc.create_user(CreateUserRequest {
+        name: "Eve",
+        email: "eve@example.com",
+        role: Admin,
+    }, UserId(0)).await.unwrap()
+
+    let profile = svc.get_profile(user.id).await.unwrap()
+
+    // ?. optional chaining (§10.3): access method through Option.
+    // last_login is None for new users, so the chain short-circuits to None.
+    let elapsed = profile.last_login?.elapsed()
+    assert(elapsed == None)
+
+    // Combine ?. with ?? for a default value
+    let last_seen_secs = profile.last_login?.elapsed().as_secs() ?? 0
+    assert(last_seen_secs == 0)
+
+    // Enum accessor methods (§4.4): auto-generated for every enum variant.
+    // .is_X() returns bool, .as_X() returns Option[T] for data variants.
+    assert(profile.user.role.is_admin())
+    assert(!profile.user.role.is_guest())
 ```
 
 ---
@@ -1222,29 +1252,46 @@ This example exercises the following spec features:
 |---------|-------------|------------|
 | Trait definitions with async methods | §11.5 | All four service traits |
 | Trait objects (`dyn Trait`) | §11.3 | `Box[dyn UserRepository]`, etc. |
-| `with` Form 1: guarded access | §7.1 | `with guard self.pool.acquire() as conn:`, `with guard self.users.read() as users:` |
-| `with` Form 2: builder pattern | §7.2 | `with Vec.new() as mut parts:` |
-| `with` Form 3: scoped binding | §7.3 | `with describe_changes(...) as changes:` |
-| `with` Form 4: record update | §7.4 | `{ user with id }`, `{ self with repo: ... }` |
+| `with` type-inferred guards | §7.1 | `with self.pool.acquire() as conn:`, `with self.users.read() as users:` |
+| `with` builder pattern | §7.2 | `with SmtpMessage.new() as mut msg:`, `with Vec.new() as mut changes:` |
+| `with` scoped binding | §7.3 | `with describe_changes(...) as changes:` |
+| `with` record update | §7.4 | `{ user with id }`, `{ self with repo: ... }` |
 | `@[no_await_guard]` rule | §7.9 | Locks use `with` without `.await`; pools use `with` with `.await` |
+| Default field values | §4.3 | `ServiceConfig`, `ServiceMetrics`, `UserUpdate` — callers only specify overrides |
+| `@[derive(all)]` | §11.8 | `Role`, `Priority` enums — derives all eligible structural traits |
 | `?` error propagation | §10.2 | Throughout all service methods |
-| Structured concurrency (`s.track`) | §14.8 | `async scope` in get_profile, create_user |
+| `?.` optional chaining | §10.3 | `profile.last_login?.elapsed()` — access through `Option` |
+| `??` default operator | §10.4 | `req.query_param(...) ?? 1`, `profile.last_login?.elapsed().as_secs() ?? 0` |
+| `.context()` / `.with_context()` | §10.6 | `load_config_from_file` — wraps errors with human-readable messages |
+| Implicit Ok wrapping | §4.9 | Happy-path returns unwrapped; `Ok()` elided from Unit results |
+| `error ... from` shorthand | §10.9 | `error ServiceError from DbError, CacheError, NotifyError` |
+| `error` declarations | §10.8 | All error types |
+| `let ... else` | §9.7 | `update_user` — refutable pattern with early return on mismatch |
+| Enum variant shorthand `.Variant` | §4.4 | `.Admin`, `.Normal`, `.SIGTERM` — when type is known from context |
+| Enum accessor methods | §4.4 | `.is_admin()`, `.is_guest()` — auto-generated for every enum variant |
+| Cancellation just works | §14.7 | No `Cancelled` variant or `From[TaskCancelled]` needed |
+| Structured concurrency (`s.track`) | §14.9 | `async scope` in get_profile, create_user |
+| `async:` blocks | §14.6 | Background health check — inline fiber creation |
+| `select await` | §14.10 | Main server loop — race accept vs shutdown signal |
+| Channels `chan[T]` | §14.14 | `chan[Unit]` for shutdown signaling |
+| `spawn` for detached work | §14.7 | `spawn handle_connection(...)`, `spawn async:` for health check |
+| `defer` | §2.4 | `defer db_pool.close()...`, `defer redis.close()...` — cleanup on scope exit |
 | Pipeline operator `\|>` | §9.6 | Collection operations |
 | By-value `self` method chaining | §9.5 | Builder construction in main and tests |
 | Pattern matching | §9.7 | Error routing in HTTP handlers |
 | Distinct types | §4.5 | `type UserId = distinct i64` |
 | Enum variants | §4.4 | `Role`, `Priority`, all error types |
-| `error` declarations | §10.6 | All error types with `From` impls |
+| `str` as owned string type | §15.1 | All struct fields, return types |
+| `.len32()` bounds-checked narrowing | §18.6 | `sent.len32()` — no manual `as i32` cast |
 | `RwLock` as `Scoped`/`ScopedMut` | §18.6 | Metrics, mock collections |
 | Immutable by default | §2 | `let` everywhere, `var` only where needed |
 | `async fn` returns `Task[T]` | §14.4 | All service methods |
-| Cancellation via `TaskCancelled` | §14.6 | `From[TaskCancelled]` impl |
-| `@[must_use]` on Result/Task | §10.1, §14.6 | All fallible calls use `?` or `let _` |
-| `sequence` / `traverse` | §10.5 | Batch profile fetch |
+| `@[must_use]` on Result/Task | §20b.2, §14.7 | Results are handled via `?`/`match`; detached work uses `spawn` |
+| `sequence` / `traverse` | §10.7 | Batch profile fetch |
 | `.unwrap()` / `.expect()` | §10.6 | Test assertions |
 | `unreachable()` | §18.6 | Test match arms for unexpected cases |
 | `assert_matches` | §18.6 | Test pattern matching on results |
-| `.to_owned()` on string literals | §15.3 | Explicit string allocation |
-| Unit elision | §4.8 | `Ok()` instead of `Ok(())` throughout |
+| Unit elision | §4.8 | `Ok()` instead of `Ok(())`, `.unwrap_or()` instead of `.unwrap_or(())` |
 | Postfix `.await` | §14.5 | All async calls |
 | Implicit builder return | §7.2 | `with ... as mut` blocks auto-return |
+| Signal handling | §18.6 | `std.signal.on_signal(.SIGTERM, ...)` for graceful shutdown |
