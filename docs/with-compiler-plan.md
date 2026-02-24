@@ -1,6 +1,6 @@
 # The With Compiler — Development Plan
 
-Companion to: Specification v4.1, Implementation Notes v9
+Companion to: Specification v6.2, Implementation Notes v26
 Implementation language: **Zig** (bootstrap), then **With** (self-hosting)
 
 ---
@@ -423,11 +423,14 @@ Implementation:
    detection, and all C language extensions automatically.
 2. **Walk the AST:** Use `clang_visitChildren` to traverse
    declarations. Extract function signatures, struct/union/enum
-   definitions, typedefs, and `#define` integer/string constants.
+   definitions, typedefs, and constant-like `#define` values.
+   Function-like macros are reported as untranslated in Phase 0.
 3. **Map types:** `int` → `i32`, `long` → `i64`, `char*` → `*const u8`,
-   `void*` → `*mut u8`, `size_t` → `usize`, etc. (see impl notes §16.4)
+   `void*` → `*mut c_void`, `size_t` → `usize`, etc. (see impl notes §16.4)
 4. **Inject as module:** Make the parsed declarations available as
-   a With module. All functions are `unsafe`.
+   a With module. Imported C functions are callable directly; `unsafe`
+   remains required for raw pointer operations and manual `extern "C"`
+   declarations.
 5. **Link directives:** `c_import("sqlite3.h", link: "sqlite3")`
    passes `-lsqlite3` to the linker.
 6. **Caching:** Cache parsed headers by content hash. Don't re-parse
@@ -442,7 +445,7 @@ Test: compile and run:
 ```
 use c_import("stdio.h", link: "c")
 fn main() -> i32 =
-    unsafe { c.printf("Hello from With!\n") }
+    puts(c"Hello from With!".ptr)
     0
 ```
 
@@ -577,7 +580,7 @@ With — and critically, the stdlib can be written with real types.
 #### 2.1 Minimal Generics (Monomorphization Only)
 
 Generics must land before the stdlib (Phase 3). Without them,
-`Vec`, `HashMap`, `Option`, `Result`, `Iter`, `Scoped`, and `Try`
+`Vec`, `HashMap`, `Option`, `Result`, and generic helper APIs
 cannot be written — and the stdlib is unwritable. Writing concrete
 `Vec_i32`, `Vec_String` etc. and "retrofitting later" means writing
 the entire stdlib twice. Instead, ship minimal generics early:
@@ -618,10 +621,12 @@ Implement all four forms (impl notes §4):
 **Form 1 (Guarded):** Desugar to: call `.enter()`/`.enter_mut()`,
 bind result, execute body, drop guard on exit (or unwind). Check
 `@[no_await_guard]` annotation (§7.9). In Phase 2, resolve
-structurally (method lookup), not via Scoped trait.
+structurally (method lookup), not via Scoped trait. Full
+NLL-liveness + `may_suspend` enforcement lands with async in Phase 4.
 
 **Form 2 (Builder):** Desugar to: let-binding with mutable local,
-execute body, result is block value.
+execute body; if the body tail is `Unit`, return the builder binding,
+otherwise return the tail expression value.
 
 **Form 3 (Binding):** Desugar to: let-binding, execute body.
 
@@ -640,7 +645,9 @@ or loop, not the desugared closure (§7.7).
 
 - Parse closure syntax: `|params| expr` and `|params| { block }`
 - Capture analysis: determine which variables the closure captures
-- Capture mode: by reference (default) or by move (`move |...|`)
+- Capture mode inferred from usage (borrow vs move of captures)
+- Non-escaping rule: only closures passed directly as function-call
+  arguments are non-escaping; all other closures are escaping
 - Escaping detection (spec §12.3): closures bound to named
   variables are conservatively treated as escaping
 - LLVM codegen: closure → struct of captured values + function pointer
@@ -706,6 +713,13 @@ Without a known type, `.Variant` is a compile error (§25.35).
 This is type-checker sugar — the AST stores the shorthand, the
 type checker resolves it to the full qualified name.
 
+**Auto-generated accessor methods (§4.4):** Every enum variant
+unconditionally generates `.is_variant()` → `bool` and (for data
+variants) `.as_variant()` → `Option[T]`. For multi-field variants,
+`.as_variant()` returns `Option[(A, B)]`. Unit variants only get
+`.is_variant()`. These are compiler-generated during type checking
+— no `@[derive]` needed. Emit as regular methods in the codegen.
+
 #### 2.8 Tuples (§4.8)
 
 Tuples are first-class types: `(i32, str)`, `(A, B, C)`.
@@ -752,18 +766,37 @@ Desugars to a match on the parameter at function entry.
 
 **`match` in pipelines:** `input |> parse |> match { Ok(v) -> ..., Err(e) -> ... }`
 
-#### 2.12 Error Types
+#### 2.12 Error Types and Result Ergonomics
 
 `error` declarations desugar to enum types with auto-generated
 `Display` and `Debug` impls.
 
+**`error ... from` (§10.9):** `error AppError from IoError, DbError`
+generates wrapper variants (`AppError.Io(IoError)`, etc.) and `From`
+implementations. `?` uses `From` for automatic conversion, so errors
+propagate across subsystem boundaries without manual mapping.
+
 `?` operator desugars to match + early return on `Result`/`Option`
 directly. Generalized `Try` trait comes in Phase 5.
+
+**Implicit Ok wrapping (§4.9):** Functions returning `Result[T, E]`
+auto-wrap the tail expression in `Ok(...)`. The type checker detects
+when the expected return type is `Result[T, E]` and the expression
+type is `T`, then inserts the wrapping. Similarly, functions
+returning `Result[Unit, E]` that end without an expression get
+implicit `Ok(())`. This eliminates trailing `Ok(value)` everywhere.
+
+**Unit elision (§4.8):** `Ok()` is accepted as `Ok(())`, and
+`.unwrap_or()` as `.unwrap_or(())`. The parser or type checker
+recognizes Unit-typed positions and inserts `()` when the argument
+list is empty. This is minor sugar but appears constantly in
+Result-returning code.
 
 #### 2.13 Denied Patterns Checker
 
 Implement the six §20b rules as a post-type-check pass:
-- E0701: `await` inside `@[no_await_guard]` guard
+- E0701: `may_suspend` call (including direct `.await`) while a
+  `@[no_await_guard]` value is live (full check enabled in Phase 4)
 - E0802: unused `Result` or `Option`
 - E0801: unused `Task`
 - E0901: unnecessary `unsafe`
@@ -785,11 +818,12 @@ optional. `@[tailrec]` annotation on a non-tail-recursive function
 is a compile error (§9.2).
 
 **Phase 2 Milestone:** Tests 25.7, 25.9, 25.12–25.14,
-25.19–25.31, 25.34–25.39, 25.41–25.42 pass. Generic `Vec[T]`
-and `HashMap[K, V]` work. Field shorthand, default field values,
-enum variant shorthand, tuples, optional chaining, `??`, and
-comprehensions all work. The language is usable for real programs
-(without traits or async).
+25.19–25.31, 25.34–25.39, 25.41–25.42, 25.43, 25.52 pass.
+Generic `Vec[T]` and `HashMap[K, V]` work. Field shorthand,
+default field values, enum variant shorthand, enum accessor methods,
+tuples, optional chaining, `??`, `error ... from`, implicit Ok
+wrapping, unit elision, and comprehensions all work. The language
+is usable for real programs (without traits or async).
 
 ---
 
@@ -887,21 +921,33 @@ Key difference from Rust: no state machine transformation. The fiber
 has a real stack. Local variables across `await` are just stack
 variables. The borrow checker doesn't need special async handling.
 
+**`async:` blocks (§14.6):** `async: body` allocates a fiber,
+begins execution of `body`, and returns `Task[T]`. Desugar to an
+anonymous `async fn` call. Capture rules follow closures (§12.3) —
+captured references make the resulting `Task` ephemeral.
+
+**`spawn` (§14.7):** `spawn expr` evaluates `expr` as a detached
+fire-and-forget fiber. Returns `Unit` (not `Task`). Used for
+side-effect work where the caller doesn't need the result.
+In MIR: emit a fiber allocation + schedule call with no join handle.
+Combines with `async:` blocks: `spawn async: body`.
+
 #### 4.3 Task[T], Structured Concurrency, Channels
 
 - `Task[T]` — opaque handle wrapping a fiber ID
 - `@[must_use]` enforcement on `Task`
 - **Task ephemerality (§14.20):** If the spawned fiber's environment
   captures ephemeral values (references, StrView, etc.), the `Task`
-  itself is ephemeral and cannot be stored or returned. The compiler
+  itself is ephemeral and cannot be stored or sent across threads. The compiler
   must track whether a Task's closure captures ephemerals and
   propagate the ephemeral flag to the Task value. This ensures
-  tasks that borrow local data cannot outlive their scope.
+  tasks that borrow local data cannot outlive their scope. Returning
+  ephemeral tasks is allowed; the caller inherits the restriction.
 - `cancel()` — set cancellation flag, unwind at next await
-- `async scope` — spawn tasks that must complete before scope exits
-- `select()` — wait on first of N tasks
+- `async scope` — track tasks that must complete before scope exits
+- `select await` — wait on first of N async expressions
 - `Channel[T]` — MPMC channel, bounded and unbounded variants
-- `Send`/`Sync` trait enforcement
+- `Send`/`Sync`/`ScopedSend` enforcement at thread/channel/scope boundaries
 
 #### 4.4 std.net
 
@@ -966,7 +1012,7 @@ Add trait implementations to the existing generic stdlib:
 - `Vec[T]` implements `Iter[T]`, `Index[usize, T]`
 - `HashMap[K, V]` implements `Index[K, V]`
 - `Result[T, E]` implements `Try[T, E]`
-- `Mutex[T]` implements `ScopedMut[T]`
+- `MutexGuard[T]` and `RwLock` guards implement `Scoped`/`ScopedMut`
 - `String` implements `Display`, `Debug`, `Add`
 
 **Phase 5 Milestone:** Tests 25.10, 25.11 pass. Trait-bounded
@@ -1056,10 +1102,10 @@ require language-level knowledge LLVM doesn't have:
 
 #### 6.7 `c_import` Improvements
 
-- Translate more C macros (function-like macros, common patterns)
-- Handle C++ headers (via `extern "C"` blocks)
+- Expand constant-macro coverage and add best-effort translation for
+  simple function-like macros
+- Better diagnostics for unsupported declarations (including C++ headers)
 - Improved caching and invalidation
-- Better error messages for untranslatable declarations
 
 #### 6.8 Source Translation Tools
 
@@ -1085,14 +1131,15 @@ Mechanical transforms:
 - `{ }` blocks → `:` + indentation (reindent entire file)
 - `let mut x` → `var x`; strip semicolons
 - `<T>` → `[T]` in all generic positions
-- `impl Foo` → `extend Foo`; `impl Trait for Foo` → `extend Foo: Trait`
+- `impl Foo` → `extend Foo`; `impl Trait for Foo` → `impl Trait for Foo` (same)
 - `&self` → `self: &Foo`; `&mut self` → `self: &mut Foo`
 - `String` → `str`; `String::from("x")` / `"x".to_string()` → `"x"`
 - `Ok(())` → `Ok()`; `#[attr]` → `@[attr]`; `::` → `.`
 - `println!("{}", x)` → `println("{x}")` (rewrite format macros)
 - `match x { A => ..., }` → `match x` + newline + `A -> ...`
 - Strip all lifetime annotations (`'a`, `'static`, `'_`)
-- `async fn` / `.await` → same (but strip `Send` bounds)
+- `async fn` / `.await` → same (review `Send` bounds; keep where
+  crossing OS-thread/channel boundaries)
 - `Box::new(x)` → `Box.new(x)`
 
 Requires manual fixup:
@@ -1150,10 +1197,10 @@ Mechanical transforms:
 - `let` / `var` → `let` / `var` (identical)
 - `func foo(_ x: Int) -> Int` → `fn foo(x: i32) -> i32`
 - `T?` → `Option[T]`; `nil` → `None`
-- `guard let x = opt else { return }` → `let x = opt else return`
+- `guard let x = opt else { return }` → `let Some(x) = opt else return`
 - `throws` / `try` → `-> Result[T, E]` / `?`
 - `protocol Foo` → `trait Foo`; `extension Foo: Bar` →
-  `extend Foo: Bar`
+  `impl Bar for Foo`
 - `switch x { case .a: ... }` → `match x` + `.A -> ...`
 - `\(expr)` → `{expr}` (string interpolation)
 - `async throws` → `async fn ... -> Result[T, E]`

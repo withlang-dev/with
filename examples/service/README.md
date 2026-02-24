@@ -56,9 +56,9 @@ fetches the user and fires off three parallel enrichment queries (`count_posts`,
 | Feature | Spec | Location |
 |---------|------|----------|
 | `async fn` returns `Task[T]` | §14.4 | Throughout |
-| `async scope` + `s.track()` | §14.8 | main.w, service.w |
-| `select await` branched racing | §14.9 | main.w — shutdown, with_timeout |
-| `task.cancel()` cooperative cancellation | §14.6 | main.w — with_timeout |
+| `async scope` + `s.track()` | §14.9 | main.w, service.w |
+| `select await` branched racing | §14.10 | main.w — shutdown, with_timeout |
+| `task.cancel()` cooperative cancellation | §14.7 | main.w — with_timeout |
 | Trait objects (`Box[dyn T]`) | §11.4 | service.w — all dependencies |
 | `with` blocks (guarded) | §7.1 | service.w, tests.w — lock access |
 | `with` blocks (binding) | §7.3 | service.w — describe_changes; repo/postgres.w |

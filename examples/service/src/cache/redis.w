@@ -27,12 +27,10 @@ impl CacheService for RedisCache {
     async fn set_bytes(self: &RedisCache, key: &str, val: &[u8], ttl: Duration) -> Result[Unit, CacheError] =
         let full_key = self.prefixed_key(key)
         self.client.set_ex(&full_key, val, ttl.as_secs()).await?
-        Ok()
 
     async fn delete(self: &RedisCache, key: &str) -> Result[Unit, CacheError] =
         let full_key = self.prefixed_key(key)
         self.client.del(&full_key).await?
-        Ok()
 
     async fn exists(self: &RedisCache, key: &str) -> Result[bool, CacheError] =
         let full_key = self.prefixed_key(key)

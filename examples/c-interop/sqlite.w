@@ -5,13 +5,13 @@ module c_interop
 //
 // Demonstrates:
 //   - c_import for automatic C header binding
-//   - unsafe blocks for FFI calls
+//   - unsafe only at raw-pointer boundaries
 //   - Safe wrapper types with Drop for RAII cleanup
-//   - @[repr(C)] layout control
-//   - defer for resource cleanup
-//   - Error types with from
+//   - extend blocks for inherent methods
+//   - Error types with contextual variants
 //   - Prepared statements and query iteration
 //   - Pipeline operators for result processing
+//   - Implicit Ok wrapping (§4.9)
 // ===================================================================
 
 use c_import("sqlite3.h", link: "sqlite3")
@@ -19,13 +19,13 @@ use c_import("sqlite3.h", link: "sqlite3")
 // --- Error Types ---
 
 error SqliteError =
-    | OpenFailed(path: str, code: i32, msg: str)
-    | ExecFailed(sql: str, code: i32, msg: str)
-    | PrepareFailed(sql: str, code: i32, msg: str)
-    | BindFailed(param: i32, code: i32)
-    | StepFailed(code: i32)
-    | ColumnOutOfRange(index: i32, count: i32)
-    | NullPointer(context: str)
+    OpenFailed(path: str, code: i32, msg: str)
+    ExecFailed(sql: str, code: i32, msg: str)
+    PrepareFailed(sql: str, code: i32, msg: str)
+    BindFailed(param: i32, code: i32)
+    StepFailed(code: i32)
+    ColumnOutOfRange(index: i32, count: i32)
+    NullPointer(context: str)
 
 // --- Safe Database Wrapper ---
 //
@@ -39,66 +39,76 @@ type Database = {
 impl Drop for Database {
     fn drop(self: Self) =
         if self.handle != null:
-            unsafe { sqlite3_close(self.handle) }
+            sqlite3_close(self.handle)
         // self is consumed — no defensive nulling needed
 }
 
-fn Database.open(path: str) -> Result[Database, SqliteError] =
-    var handle: *mut sqlite3 = null
-    let rc = unsafe { sqlite3_open(path.as_ptr(), &mut handle) }
-    if rc != SQLITE_OK:
-        let msg = if handle != null:
-            unsafe { sqlite3_errmsg(handle) } |> ptr_to_string
-        else:
-            "unknown error"
-        // Close even on error — sqlite3_open may allocate
-        if handle != null:
-            unsafe { sqlite3_close(handle) }
-        return Err(.OpenFailed(
-            path,
-            code: rc,
-            msg,
-        ))
-    Ok(Database { handle, path })
+extend Database
+    fn open(path: str) -> Result[Database, SqliteError] =
+        var handle: *mut sqlite3 = null
+        let rc = sqlite3_open(path.as_ptr(), &mut handle)
+        if rc != SQLITE_OK:
+            let msg = if handle != null:
+                sqlite3_errmsg(handle) |> ptr_to_string
+            else:
+                "unknown error"
+            // Close even on error — sqlite3_open may allocate
+            if handle != null:
+                sqlite3_close(handle)
+            return Err(.OpenFailed(
+                path,
+                code: rc,
+                msg,
+            ))
+        Database { handle, path }
 
-fn Database.execute(self: &Self, sql: &str) -> Result[Unit, SqliteError] =
-    var err_msg: *mut u8 = null
-    let rc = unsafe {
-        sqlite3_exec(self.handle, sql.as_ptr(), null, null, &mut err_msg)
-    }
-    if rc != SQLITE_OK:
-        let msg = if err_msg != null:
-            let s = unsafe { ptr_to_string(err_msg) }
-            unsafe { sqlite3_free(err_msg as *mut void) }
-            s
-        else:
-            "unknown error"
-        return Err(.ExecFailed(
-            sql: sql.to_string(),
-            code: rc,
-            msg,
-        ))
-    Ok()
+    fn execute(self: &Self, sql: &str) -> Result[Unit, SqliteError] =
+        var err_msg: *mut u8 = null
+        let rc = sqlite3_exec(self.handle, sql.as_ptr(), null, null, &mut err_msg)
+        if rc != SQLITE_OK:
+            let msg = if err_msg != null:
+                let s = ptr_to_string(err_msg)
+                sqlite3_free(err_msg as *mut c_void)
+                s
+            else:
+                "unknown error"
+            return Err(.ExecFailed(
+                sql: sql.to_string(),
+                code: rc,
+                msg,
+            ))
 
-fn Database.prepare(self: &Self, sql: &str) -> Result[Statement, SqliteError] =
-    var stmt: *mut sqlite3_stmt = null
-    let rc = unsafe {
-        sqlite3_prepare_v2(self.handle, sql.as_ptr(), -1, &mut stmt, null)
-    }
-    if rc != SQLITE_OK:
-        let msg = unsafe { sqlite3_errmsg(self.handle) } |> ptr_to_string
-        return Err(.PrepareFailed(
-            sql: sql.to_string(),
-            code: rc,
-            msg,
-        ))
-    Ok(Statement { handle: stmt })
+    fn prepare(self: &Self, sql: &str) -> Result[Statement, SqliteError] =
+        var stmt: *mut sqlite3_stmt = null
+        let rc = sqlite3_prepare_v2(self.handle, sql.as_ptr(), -1, &mut stmt, null)
+        if rc != SQLITE_OK:
+            let msg = sqlite3_errmsg(self.handle) |> ptr_to_string
+            return Err(.PrepareFailed(
+                sql: sql.to_string(),
+                code: rc,
+                msg,
+            ))
+        Statement { handle: stmt }
 
-fn Database.last_insert_rowid(self: &Self) -> i64 =
-    unsafe { sqlite3_last_insert_rowid(self.handle) }
+    fn last_insert_rowid(self: &Self) -> i64 =
+        sqlite3_last_insert_rowid(self.handle)
 
-fn Database.changes(self: &Self) -> i32 =
-    unsafe { sqlite3_changes(self.handle) }
+    fn changes(self: &Self) -> i32 =
+        sqlite3_changes(self.handle)
+
+    fn transaction[T](
+        self: &Self,
+        body: fn(&Self) -> Result[T, SqliteError],
+    ) -> Result[T, SqliteError] =
+        self.execute("BEGIN")?
+        match body(self)
+            Ok(value) ->
+                self.execute("COMMIT")?
+                Ok(value)
+            Err(e) ->
+                // Rollback, but don't mask the original error
+                let _ = self.execute("ROLLBACK")
+                Err(e)
 
 // --- Safe Statement Wrapper ---
 //
@@ -111,58 +121,53 @@ type Statement = {
 impl Drop for Statement {
     fn drop(self: Self) =
         if self.handle != null:
-            unsafe { sqlite3_finalize(self.handle) }
+            sqlite3_finalize(self.handle)
         // self is consumed — no defensive nulling needed
 }
 
-fn Statement.bind_int(self: &Self, param: i32, value: i32) -> Result[Unit, SqliteError] =
-    let rc = unsafe { sqlite3_bind_int(self.handle, param, value) }
-    if rc != SQLITE_OK:
-        return Err(.BindFailed(param, code: rc))
-    Ok()
+extend Statement
+    fn bind_int(self: &Self, param: i32, value: i32) -> Result[Unit, SqliteError] =
+        let rc = sqlite3_bind_int(self.handle, param, value)
+        if rc != SQLITE_OK:
+            return Err(.BindFailed(param, code: rc))
 
-fn Statement.bind_text(self: &Self, param: i32, value: &str) -> Result[Unit, SqliteError] =
-    let rc = unsafe {
-        sqlite3_bind_text(self.handle, param, value.as_ptr(), value.len32(), SQLITE_TRANSIENT)
-    }
-    if rc != SQLITE_OK:
-        return Err(.BindFailed(param, code: rc))
-    Ok()
+    fn bind_text(self: &Self, param: i32, value: &str) -> Result[Unit, SqliteError] =
+        let rc = sqlite3_bind_text(self.handle, param, value.as_ptr(), value.len32(), SQLITE_TRANSIENT)
+        if rc != SQLITE_OK:
+            return Err(.BindFailed(param, code: rc))
 
-fn Statement.bind_f64(self: &Self, param: i32, value: f64) -> Result[Unit, SqliteError] =
-    let rc = unsafe { sqlite3_bind_double(self.handle, param, value) }
-    if rc != SQLITE_OK:
-        return Err(.BindFailed(param, code: rc))
-    Ok()
+    fn bind_f64(self: &Self, param: i32, value: f64) -> Result[Unit, SqliteError] =
+        let rc = sqlite3_bind_double(self.handle, param, value)
+        if rc != SQLITE_OK:
+            return Err(.BindFailed(param, code: rc))
 
-fn Statement.step(self: &Self) -> Result[bool, SqliteError] =
-    let rc = unsafe { sqlite3_step(self.handle) }
-    match rc
-        SQLITE_ROW  -> Ok(true)
-        SQLITE_DONE -> Ok(false)
-        _           -> Err(.StepFailed(code: rc))
+    fn step(self: &Self) -> Result[bool, SqliteError] =
+        let rc = sqlite3_step(self.handle)
+        match rc
+            SQLITE_ROW  -> Ok(true)
+            SQLITE_DONE -> Ok(false)
+            _           -> Err(.StepFailed(code: rc))
 
-fn Statement.reset(self: &Self) -> Result[Unit, SqliteError] =
-    let rc = unsafe { sqlite3_reset(self.handle) }
-    if rc != SQLITE_OK:
-        return Err(.StepFailed(code: rc))
-    Ok()
+    fn reset(self: &Self) -> Result[Unit, SqliteError] =
+        let rc = sqlite3_reset(self.handle)
+        if rc != SQLITE_OK:
+            return Err(.StepFailed(code: rc))
 
-fn Statement.column_count(self: &Self) -> i32 =
-    unsafe { sqlite3_column_count(self.handle) }
+    fn column_count(self: &Self) -> i32 =
+        sqlite3_column_count(self.handle)
 
-fn Statement.column_int(self: &Self, col: i32) -> i32 =
-    unsafe { sqlite3_column_int(self.handle, col) }
+    fn column_int(self: &Self, col: i32) -> i32 =
+        sqlite3_column_int(self.handle, col)
 
-fn Statement.column_text(self: &Self, col: i32) -> str =
-    let ptr = unsafe { sqlite3_column_text(self.handle, col) }
-    if ptr == null:
-        str.new()
-    else:
-        unsafe { ptr_to_string(ptr) }
+    fn column_text(self: &Self, col: i32) -> str =
+        let ptr = sqlite3_column_text(self.handle, col)
+        if ptr == null:
+            str.new()
+        else:
+            ptr_to_string(ptr)
 
-fn Statement.column_f64(self: &Self, col: i32) -> f64 =
-    unsafe { sqlite3_column_double(self.handle, col) }
+    fn column_f64(self: &Self, col: i32) -> f64 =
+        sqlite3_column_double(self.handle, col)
 
 // --- Row Iterator ---
 //
@@ -183,22 +188,6 @@ fn ptr_to_string(ptr: *const u8) -> str =
         str.new()
     else:
         unsafe { str.from_c_str(ptr) }
-
-// --- Transaction Helper ---
-
-fn Database.transaction[T](
-    self: &Self,
-    body: fn(&Self) -> Result[T, SqliteError],
-) -> Result[T, SqliteError] =
-    self.execute("BEGIN")?
-    match body(self)
-        Ok(value) ->
-            self.execute("COMMIT")?
-            Ok(value)
-        Err(e) ->
-            // Rollback, but don't mask the original error
-            let _ = self.execute("ROLLBACK")
-            Err(e)
 
 // --- Main Demo ---
 
@@ -242,7 +231,7 @@ fn main() -> Result[Unit, SqliteError] =
             count = count + 1
 
         println("Inserted {count} users")
-        Ok(count)
+        count
     )?
     println("Transaction committed ({inserted} rows)\n")
 
@@ -285,4 +274,3 @@ fn main() -> Result[Unit, SqliteError] =
         Err(e) -> println("  expected error: {e}")
 
     println("\n=== Demo complete ===")
-    Ok()

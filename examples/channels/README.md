@@ -25,8 +25,8 @@ firing the first branch that completes. The two-source demo races a recv
 against a deadline; the three-source demo multiplexes fast and slow
 producers with a 1-second timeout.
 
-**Structured concurrency** — All producers and workers are spawned inside
-an `async scope`. The scope guarantees every fiber completes before
+**Structured concurrency** — All producers and workers are started and
+tracked inside an `async scope`. The scope guarantees every fiber completes before
 `main()` continues.
 
 ## Language Features
@@ -41,7 +41,7 @@ an `async scope`. The scope guarantees every fiber completes before
 | `async:` blocks | `demo_select` — inline producer fibers |
 | `with` blocks (mutation) | `collect_results`, `demo_fan_out` — building Vec, HashMap |
 | Pipeline operators `\|>` | `compute_stats` — filter/count chains |
-| Default field values | `Stats { total: u64 = 0, ... }` |
+| Default field values | `Stats { total: i64 = 0, ... }` |
 | String interpolation | `"task-{i}"`, `"fast-{i}"`, worker output |
-| `.len64()` | `compute_stats` — result count as u64 |
+| `.len64()` | `compute_stats` — result count as i64 |
 | Implicit `for` iteration | `for r in results:`, `for (wid, count) in worker_counts:` |

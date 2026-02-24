@@ -1,5 +1,7 @@
 module channels
 
+use std.collections.HashMap
+
 // ===================================================================
 // Producer-Consumer Pipeline
 //
@@ -27,9 +29,9 @@ type ProcessedItem = {
 }
 
 type Stats = {
-    total: u64 = 0,
-    successes: u64 = 0,
-    failures: u64 = 0,
+    total: i64 = 0,
+    successes: i64 = 0,
+    failures: i64 = 0,
 }
 
 // --- Stage 1: Producer ---
@@ -49,7 +51,7 @@ async fn produce(tx: Sender[WorkItem], count: u64) =
 // --- Stage 2: Workers (Fan-out) ---
 //
 // Multiple workers read from a shared channel and process items.
-// Demonstrates: async scope, spawn, shared receiver.
+// Demonstrates: async scope task tracking, shared receiver.
 
 async fn worker(
     id: u32,
@@ -60,7 +62,7 @@ async fn worker(
         match rx.recv().await
             Some(item) ->
                 // Simulate async processing
-                sleep(Duration.from_millis(10)).await
+                sleep(10.millis()).await
                 let result = ProcessedItem {
                     id: item.id,
                     result: item.payload |> str.to_uppercase,
@@ -91,7 +93,7 @@ async fn collect_results(
                     println("  collected #{item.id} from worker {item.worker_id}: {item.result}")
                     results.push(item)
                     remaining = remaining - 1
-                _ = timeout(Duration.from_secs(5)) ->
+                _ = timeout(5.secs()) ->
                     println("  timeout waiting for results!")
                     break
 
@@ -104,10 +106,10 @@ fn compute_stats(results: &[ProcessedItem]) -> Stats =
         total: results.len64(),
         successes: results.iter()
             |> filter(|r| not r.result.is_empty())
-            |> count() as u64,
+            |> count() as i64,
         failures: results.iter()
             |> filter(|r| r.result.is_empty())
-            |> count() as u64,
+            |> count() as i64,
     }
 
 // --- Demo 1: Simple Pipeline ---
@@ -163,7 +165,7 @@ async fn demo_fan_out() =
         println("\nStats: {stats.total} total, {stats.successes} ok, {stats.failures} failed")
 
         // Show which worker handled what
-            with HashMap[u32, u64].new() as mut worker_counts:
+        with HashMap[u32, u64].new() as mut worker_counts:
             for r in results:
                 let entry = worker_counts.entry(r.worker_id).or_insert(0)
                 *entry = *entry + 1
@@ -177,24 +179,24 @@ async fn demo_select() =
 
     let (fast_tx, fast_rx) = chan[str](buffer: 4)
     let (slow_tx, slow_rx) = chan[str](buffer: 4)
+    var total = 0
 
     async scope |s|:
         // fast producer — sends every 50ms
         s.track(async:
             for i in 0..5:
-                sleep(Duration.from_millis(50)).await
+                sleep(50.millis()).await
                 fast_tx.send("fast-{i}").await
         )
 
         // slow producer — sends every 200ms
         s.track(async:
             for i in 0..3:
-                sleep(Duration.from_millis(200)).await
+                sleep(200.millis()).await
                 slow_tx.send("slow-{i}").await
         )
 
         // multiplexed consumer
-        var total = 0
         loop:
             if total >= 8:
                 break
@@ -207,7 +209,7 @@ async fn demo_select() =
                     let Some(msg) = opt else break
                     println("  slow: {msg}")
                     total = total + 1
-                _ = timeout(Duration.from_secs(1)) ->
+                _ = timeout(1.secs()) ->
                     println("  timeout — done waiting")
                     break
 

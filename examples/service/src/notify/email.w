@@ -28,7 +28,6 @@ impl NotificationService for EmailNotifier {
 
         let transport = SmtpTransport.connect(&self.smtp_host, self.smtp_port).await?
         transport.send(&email).await?
-        Ok()
         // transport dropped here -> connection closed via Drop
 
     async fn send_batch(self: &EmailNotifier, notifs: &[Notification]) -> Result[i32, NotifyError] =
@@ -38,5 +37,5 @@ impl NotificationService for EmailNotifier {
                 Ok() -> sent += 1
                 Err(.RateLimited(d)) -> return Err(.RateLimited(d))
                 Err(_) -> ()  // skip individual failures
-        Ok(sent)
+        sent
 }

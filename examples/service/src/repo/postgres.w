@@ -21,7 +21,7 @@ impl UserRepository for PgUserRepo {
             "SELECT id, name, email, role, active FROM users WHERE id = $1",
             &[&id],
         ).await?
-        Ok(row.map(|r| row_to_user(r)))
+        row.map(|r| row_to_user(r))
 
     async fn find_by_email(self: &PgUserRepo, email: &str) -> Result[Option[User], DbError] =
         let conn = self.pool.acquire().await?
@@ -29,7 +29,7 @@ impl UserRepository for PgUserRepo {
             "SELECT id, name, email, role, active FROM users WHERE email = $1",
             &[&email],
         ).await?
-        Ok(row.map(|r| row_to_user(r)))
+        row.map(|r| row_to_user(r))
 
     async fn list_active(self: &PgUserRepo, limit: i32, offset: i32) -> Result[Vec[User], DbError] =
         let conn = self.pool.acquire().await?
@@ -37,7 +37,7 @@ impl UserRepository for PgUserRepo {
             "SELECT id, name, email, role, active FROM users WHERE active = true LIMIT $1 OFFSET $2",
             &[&limit, &offset],
         ).await?
-        Ok(rows |> map(|r| row_to_user(r)) |> collect())
+        rows |> map(|r| row_to_user(r)) |> collect()
 
     async fn insert(self: &PgUserRepo, user: &User) -> Result[UserId, DbError] =
         let conn = self.pool.acquire().await?
@@ -45,7 +45,7 @@ impl UserRepository for PgUserRepo {
             "INSERT INTO users (name, email, role, active) VALUES ($1, $2, $3, $4) RETURNING id",
             &[&user.name, &user.email, &role_to_str(user.role), &user.active],
         ).await?
-        Ok(UserId(row.get(0)))
+        UserId(row.get(0))
 
     async fn update(self: &PgUserRepo, id: UserId, fields: &UserUpdate) -> Result[Unit, DbError] =
         let conn = self.pool.acquire().await?
@@ -59,7 +59,6 @@ impl UserRepository for PgUserRepo {
 
         let query = "UPDATE users SET {sets.join(", ")} WHERE id = $1"
         conn.execute(&query, &[&id]).await?
-        Ok()
 
     async fn delete(self: &PgUserRepo, id: UserId) -> Result[Unit, DbError] =
         let conn = self.pool.acquire().await?
@@ -67,7 +66,6 @@ impl UserRepository for PgUserRepo {
             "DELETE FROM users WHERE id = $1",
             &[&id],
         ).await?
-        Ok()
 
     async fn count_posts(self: &PgUserRepo, id: UserId) -> Result[i32, DbError] =
         let conn = self.pool.acquire().await?
@@ -75,7 +73,7 @@ impl UserRepository for PgUserRepo {
             "SELECT COUNT(*) FROM posts WHERE author_id = $1",
             &[&id],
         ).await?
-        Ok(row.get(0))
+        row.get(0)
 
     async fn count_followers(self: &PgUserRepo, id: UserId) -> Result[i32, DbError] =
         let conn = self.pool.acquire().await?
@@ -83,7 +81,7 @@ impl UserRepository for PgUserRepo {
             "SELECT COUNT(*) FROM follows WHERE followed_id = $1",
             &[&id],
         ).await?
-        Ok(row.get(0))
+        row.get(0)
 }
 
 fn row_to_user(row: &Row) -> User =

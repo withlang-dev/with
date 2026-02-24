@@ -28,9 +28,11 @@ and *what went wrong*.
 walks the JSON tree, yielding `(path_string, leaf_value)` pairs. The generator
 recurses through arrays and objects, building dotted paths like `meta.stats.stars`.
 
-**Optional chaining with auto-generated accessors** — Every `JsonValue` variant
-gets `.as_str()`, `.as_number()`, `.is_null()`, etc. for free (§4.4). Combined
-with `?.` and `??`, this enables `value.get("name")?.as_str() ?? "unknown"`.
+**Optional chaining with borrowed helper accessors** — `get()` / `index()`
+return `Option[&JsonValue]`. Since auto-generated enum `.as_variant()` accessors
+consume by value (§4.4), this example adds `as_str_ref()`, `as_number_ref()`,
+and `as_array_ref()` for borrowed tree traversal. Combined with `?.` and `??`,
+this enables `value.get("name")?.as_str_ref() ?? "unknown"`.
 
 ## Language Features
 
@@ -43,11 +45,11 @@ with `?.` and `??`, this enables `value.get("name")?.as_str() ?? "unknown"`.
 | Error enums | `JsonError` — 5 variants with position info |
 | `?` propagation | Throughout — `tokenizer.next_token()?`, `parser.parse_value()?` |
 | `.Variant` shorthand | Throughout — `.Null`, `.TString(s)`, `.UnexpectedEof(...)` |
-| Auto-generated enum accessors | `JsonValue` — `.as_str()`, `.as_number()`, `.is_null()`, etc. (§4.4) |
+| Borrowed helper accessors | `JsonValue` — `.as_str_ref()`, `.as_number_ref()`, `.as_array_ref()` |
 | Generators (`gen fn`) | `walk_leaves` — lazy recursive tree traversal |
 | Pipeline operators `\|>` | `to_string` — `iter \|> map \|> collect \|> join` |
 | `with` blocks (mutation) | `read_string`, `parse_array`, `parse_object` — buffer building |
-| Optional chaining (`?.`) | Main demo — `value.get("name")?.as_str()` |
+| Optional chaining (`?.`) | Main demo — `value.get("name")?.as_str_ref()` |
 | `??` coalescing | Main demo — `?? "unknown"`, `?? 0.0` |
 | String interpolation | `walk_leaves` — `"{path}[{i}]"`, `"{path}.{key}"` |
 | Default field values | `Tokenizer { pos: usize = 0 }` |
