@@ -119,6 +119,8 @@ pub const TypeDeclKind = union(enum) {
     enum_def: []const VariantDef,
     /// `type Alias = OtherType`
     alias: *const TypeExpr,
+    /// `type UserId = distinct i64` — nominal wrapper type
+    distinct: *const TypeExpr,
 };
 
 pub const FieldDef = struct {
@@ -360,6 +362,7 @@ pub const WhileExpr = struct {
 
 pub const ForExpr = struct {
     binding: Symbol,
+    index_binding: ?Symbol,
     iterable: *const Expr,
     body: *const Expr,
 };

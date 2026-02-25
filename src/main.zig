@@ -29,6 +29,15 @@ pub fn main() !void {
 
     const command = args[1];
 
+    // Parse -O flag from remaining args.
+    var opt_level: u8 = 0;
+    for (args) |arg| {
+        if (arg.len == 3 and arg[0] == '-' and arg[1] == 'O') {
+            opt_level = arg[2] - '0';
+            if (opt_level > 3) opt_level = 2;
+        }
+    }
+
     if (std.mem.eql(u8, command, "build")) {
         if (args.len < 3) {
             stderrPrint("error: 'build' requires a source file argument\n");
@@ -37,6 +46,7 @@ pub fn main() !void {
         }
         var driver = Driver.init(allocator);
         defer driver.deinit();
+        driver.opt_level = opt_level;
 
         const bin_path = try driver.buildBinary(args[2]);
         if (bin_path) |p| {
@@ -56,6 +66,7 @@ pub fn main() !void {
         }
         var driver = Driver.init(allocator);
         defer driver.deinit();
+        driver.opt_level = opt_level;
 
         const bin_path = try driver.buildBinary(args[2]);
         if (bin_path) |p| {
@@ -498,6 +509,11 @@ fn generateDoc(path: []const u8, allocator: std.mem.Allocator) !void {
                     .alias => |al| {
                         try w.print("### type `{s}` = `", .{name});
                         try render.renderTypeExpr(al, pool, w);
+                        try w.writeAll("`\n\n");
+                    },
+                    .distinct => |dt| {
+                        try w.print("### type `{s}` = distinct `", .{name});
+                        try render.renderTypeExpr(dt, pool, w);
                         try w.writeAll("`\n\n");
                     },
                 }

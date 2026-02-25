@@ -1,52 +1,51 @@
-// Test: match on enum inside if/else
-type Color = Red | Green | Blue
+// Test: nested enum matching and multi-payload enums
+type Expr = Num(i32) | Add(i32) | Mul(i32)
 
-fn color_value(c: Color) -> i32 =
-    match c
-        Red -> 1
-        Green -> 2
-        Blue -> 3
+fn eval(base: i32, e: Expr) -> i32 =
+    match e
+        Num(n) -> n
+        Add(n) -> base + n
+        Mul(n) -> base * n
 
-type Shape = Circle(i32) | Square(i32)
+type Priority = Low | Medium | High
 
-fn area(s: Shape) -> i32 =
-    match s
-        Circle(r) -> r * r
-        Square(w) -> w * w
+fn priority_value(p: Priority) -> i32 =
+    match p
+        Low -> 1
+        Medium -> 5
+        High -> 10
+
+fn classify_score(score: i32) -> Priority =
+    if score < 30 then Low
+    else if score < 70 then Medium
+    else High
 
 fn main() -> i32 =
-    let c = Green
-    let val = color_value(c)
+    // Basic multi-payload matching
+    let e1 = Num(42)
+    let e2 = Add(10)
+    let e3 = Mul(3)
+    assert(eval(5, e1) == 42)
+    assert(eval(5, e2) == 15)
+    assert(eval(5, e3) == 15)
 
-    // match inside if/else
-    let result = if val == 2:
-        let s = Circle(5)
-        area(s)
-    else
-        0
+    // Chained evaluation
+    var result: i32 = 0
+    result = eval(result, Num(10))
+    result = eval(result, Add(5))
+    result = eval(result, Mul(3))
+    assert(result == 45)
 
-    assert(result == 25)
+    // Priority classification
+    assert(priority_value(classify_score(10)) == 1)
+    assert(priority_value(classify_score(50)) == 5)
+    assert(priority_value(classify_score(90)) == 10)
 
-    // nested: use match result in another condition
-    let s1 = Square(4)
-    let s2 = Circle(3)
-    let a1 = area(s1)
-    let a2 = area(s2)
+    // Enum accessor methods
+    let x: Expr = Add(7)
+    assert(x.is_Add())
+    assert(not x.is_Num())
+    assert(not x.is_Mul())
 
-    if a1 > a2:
-        assert(a1 == 16)
-        assert(a2 == 9)
-    else
-        assert(false)
-
-    // match on enum, then use result
-    let picked = Blue
-    let multiplier = match picked
-        Red -> 10
-        Green -> 20
-        Blue -> 30
-
-    assert(multiplier == 30)
-
-    println("all enum nested match tests passed")
+    println("all enum_nested_match tests passed")
     0

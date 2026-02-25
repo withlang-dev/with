@@ -12,6 +12,7 @@ const c = @cImport({
     @cInclude("llvm-c/Target.h");
     @cInclude("llvm-c/TargetMachine.h");
     @cInclude("llvm-c/Analysis.h");
+    @cInclude("llvm-c/Transforms/PassBuilder.h");
 });
 
 const Codegen = @This();
@@ -344,6 +345,27 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
                     self.type_aliases.put(self.allocator, td.name, resolved) catch
                         return error.CodegenAlloc;
                 },
+                .distinct => |type_expr| {
+                    // Distinct type: create a single-field struct wrapper.
+                    const inner = try self.resolveType(type_expr);
+                    const name_str = self.pool.resolve(td.name);
+                    var field_types = [_]c.LLVMTypeRef{inner};
+                    const wrapper = c.LLVMStructCreateNamed(self.context, @ptrCast(name_str));
+                    c.LLVMStructSetBody(wrapper, &field_types, 1, 0);
+                    const field_names = self.allocator.alloc(u32, 1) catch return error.CodegenAlloc;
+                    const val_sym = self.pool.intern("value") catch return error.CodegenAlloc;
+                    field_names[0] = val_sym;
+                    const ft = self.allocator.alloc(c.LLVMTypeRef, 1) catch return error.CodegenAlloc;
+                    ft[0] = inner;
+                    const defaults = self.allocator.alloc(?*const Ast.Expr, 1) catch return error.CodegenAlloc;
+                    defaults[0] = null;
+                    self.struct_types.put(self.allocator, td.name, .{
+                        .llvm_type = wrapper,
+                        .field_names = field_names,
+                        .field_types = ft,
+                        .field_defaults = defaults,
+                    }) catch return error.CodegenAlloc;
+                },
             },
             else => {},
         }
@@ -450,6 +472,26 @@ fn verify(self: *const Codegen) Error!void {
         return error.VerifyFailed;
     }
     if (err_msg) |msg| c.LLVMDisposeMessage(msg);
+}
+
+/// Run optimization passes on the module.
+pub fn optimize(self: *Codegen, level: u8) void {
+    // Use the new pass manager API (LLVM 18+).
+    const passes: [*:0]const u8 = switch (level) {
+        0 => "default<O0>",
+        1 => "default<O1>",
+        3 => "default<O3>",
+        else => "default<O2>",
+    };
+    const opts = c.LLVMCreatePassBuilderOptions();
+    defer c.LLVMDisposePassBuilderOptions(opts);
+    const err = c.LLVMRunPasses(self.module, passes, self.target_machine, opts);
+    if (err != null) {
+        const msg = c.LLVMGetErrorMessage(err);
+        if (msg != null) {
+            c.LLVMDisposeErrorMessage(msg);
+        }
+    }
 }
 
 /// Emit an object file to the given path.
@@ -6535,6 +6577,22 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             if (args.len < 1) return error.UnsupportedExpr;
             const sep = try self.genExpr(args[0]);
             return self.genVecJoin(obj_val, sep);
+        } else if (std.mem.eql(u8, method_name, "fold")) {
+            // Vec[T].fold(init, fn(acc, elem) -> acc) -> acc
+            if (args.len < 2) return error.UnsupportedExpr;
+            const init_val = try self.genExpr(args[0]);
+            const fn_val = try self.genExpr(args[1]);
+            return self.genVecFold(obj_val, obj_type, init_val, fn_val);
+        } else if (std.mem.eql(u8, method_name, "map")) {
+            // Vec[T].map(fn(elem) -> U) -> Vec[U]
+            if (args.len < 1) return error.UnsupportedExpr;
+            const fn_val = try self.genExpr(args[0]);
+            return self.genVecMap(obj_val, obj_type, fn_val);
+        } else if (std.mem.eql(u8, method_name, "filter")) {
+            // Vec[T].filter(fn(elem) -> bool) -> Vec[T]
+            if (args.len < 1) return error.UnsupportedExpr;
+            const fn_val = try self.genExpr(args[0]);
+            return self.genVecFilter(obj_val, obj_type, fn_val);
         }
     }
 
@@ -7290,6 +7348,15 @@ fn genForArray(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
         .is_mut = false,
     }) catch return error.CodegenAlloc;
 
+    // If there's an index binding (for x, i in arr), expose the index as a local.
+    if (for_e.index_binding) |idx_sym| {
+        self.locals.put(self.allocator, idx_sym, .{
+            .alloca = idx_alloca,
+            .ty = i64_type,
+            .is_mut = false,
+        }) catch return error.CodegenAlloc;
+    }
+
     const function = self.current_function;
     const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.cond");
     const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.body");
@@ -7360,6 +7427,15 @@ fn genForVec(self: *Codegen, for_e: Ast.ForExpr, vec_val: c.LLVMValueRef) Error!
         .ty = elem_type,
         .is_mut = false,
     }) catch return error.CodegenAlloc;
+
+    // If there's an index binding (for x, i in vec), expose the index as a local.
+    if (for_e.index_binding) |idx_sym| {
+        self.locals.put(self.allocator, idx_sym, .{
+            .alloca = idx_alloca,
+            .ty = i64_type,
+            .is_mut = false,
+        }) catch return error.CodegenAlloc;
+    }
 
     const function = self.current_function;
     const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "forvec.cond");
@@ -10403,6 +10479,206 @@ fn ensureJoinHelperDeclared(self: *Codegen) FnInfo {
     const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
     self.functions.put(self.allocator, sym, fi) catch {};
     return fi;
+}
+
+/// Vec[T].fold(init, fn(acc, elem) -> acc) -> acc
+fn genVecFold(self: *Codegen, vec_val: c.LLVMValueRef, vec_type: c.LLVMTypeRef, init_val: c.LLVMValueRef, fn_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const elem_type = self.getVecElemType(vec_type) orelse return error.UnsupportedExpr;
+    const acc_type = c.LLVMTypeOf(init_val);
+
+    // Extract Vec data_ptr and len.
+    const vec_alloca = c.LLVMBuildAlloca(self.builder, vec_type, "fold.vec");
+    _ = c.LLVMBuildStore(self.builder, vec_val, vec_alloca);
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 0, "");
+    const data_ptr = c.LLVMBuildLoad2(self.builder, c.LLVMPointerTypeInContext(self.context, 0), ptr_gep, "data");
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 1, "");
+    const vec_len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "len");
+
+    // Create loop: idx alloca, acc alloca.
+    const idx_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "fold.idx");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), idx_alloca);
+    const acc_alloca = c.LLVMBuildAlloca(self.builder, acc_type, "fold.acc");
+    _ = c.LLVMBuildStore(self.builder, init_val, acc_alloca);
+
+    const function = self.current_function;
+    const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "fold.cond");
+    const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "fold.body");
+    const end_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "fold.end");
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    // Condition: idx < len.
+    c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+    const idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+    const cond = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, idx, vec_len, "fold.cmp");
+    _ = c.LLVMBuildCondBr(self.builder, cond, body_bb, end_bb);
+
+    // Body: load elem, call fn(acc, elem), store result, inc idx.
+    c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    var gep_idx = [_]c.LLVMValueRef{idx};
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, data_ptr, &gep_idx, 1, "elem.ptr");
+    const elem = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "elem");
+    const acc = c.LLVMBuildLoad2(self.builder, acc_type, acc_alloca, "acc");
+
+    // Call fn_val(acc, elem).
+    const fn_val_type = c.LLVMTypeOf(fn_val);
+    const fn_kind = c.LLVMGetTypeKind(fn_val_type);
+    const call_result = if (fn_kind == c.LLVMStructTypeKind) blk: {
+        // Fat pointer closure: {fn_ptr, cap_ptr}
+        const fn_ptr = c.LLVMBuildExtractValue(self.builder, fn_val, 0, "fn_ptr");
+        const cap_ptr = c.LLVMBuildExtractValue(self.builder, fn_val, 1, "cap_ptr");
+        const val_kind = c.LLVMGetValueKind(fn_ptr);
+        if (val_kind == c.LLVMFunctionValueKind) {
+            const ft = c.LLVMGlobalGetValueType(fn_ptr);
+            var call_args = [_]c.LLVMValueRef{ cap_ptr, acc, elem };
+            break :blk c.LLVMBuildCall2(self.builder, ft, fn_ptr, &call_args, 3, "fold.r");
+        }
+        const ptr_t = c.LLVMPointerTypeInContext(self.context, 0);
+        var pt = [_]c.LLVMTypeRef{ ptr_t, acc_type, elem_type };
+        const ft = c.LLVMFunctionType(acc_type, &pt, 3, 0);
+        var call_args = [_]c.LLVMValueRef{ cap_ptr, acc, elem };
+        break :blk c.LLVMBuildCall2(self.builder, ft, fn_ptr, &call_args, 3, "fold.r");
+    } else blk: {
+        // Regular function pointer.
+        const val_kind = c.LLVMGetValueKind(fn_val);
+        if (val_kind == c.LLVMFunctionValueKind) {
+            const ft = c.LLVMGlobalGetValueType(fn_val);
+            var call_args = [_]c.LLVMValueRef{ acc, elem };
+            break :blk c.LLVMBuildCall2(self.builder, ft, fn_val, &call_args, 2, "fold.r");
+        }
+        var pt = [_]c.LLVMTypeRef{ acc_type, elem_type };
+        const ft = c.LLVMFunctionType(acc_type, &pt, 2, 0);
+        var call_args = [_]c.LLVMValueRef{ acc, elem };
+        break :blk c.LLVMBuildCall2(self.builder, ft, fn_val, &call_args, 2, "fold.r");
+    };
+    _ = c.LLVMBuildStore(self.builder, call_result, acc_alloca);
+    const next_idx = c.LLVMBuildAdd(self.builder, idx, c.LLVMConstInt(i64_type, 1, 0), "inc");
+    _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+    return c.LLVMBuildLoad2(self.builder, acc_type, acc_alloca, "fold.result");
+}
+
+/// Vec[T].map(fn(elem) -> U) -> Vec[U]
+fn genVecMap(self: *Codegen, vec_val: c.LLVMValueRef, vec_type: c.LLVMTypeRef, fn_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const elem_type = self.getVecElemType(vec_type) orelse return error.UnsupportedExpr;
+
+    // Extract Vec data_ptr and len.
+    const vec_alloca = c.LLVMBuildAlloca(self.builder, vec_type, "map.vec");
+    _ = c.LLVMBuildStore(self.builder, vec_val, vec_alloca);
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 0, "");
+    const data_ptr = c.LLVMBuildLoad2(self.builder, c.LLVMPointerTypeInContext(self.context, 0), ptr_gep, "data");
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 1, "");
+    const vec_len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "len");
+
+    // Determine result element type by calling fn on a dummy (use elem_type as default).
+    // For now, assume result type is same as input type (T -> T map).
+    const result_elem_type = elem_type;
+    const result_vec_info = try self.getOrCreateVecType(result_elem_type);
+
+    // Create result Vec.
+    const result_alloca = c.LLVMBuildAlloca(self.builder, result_vec_info.llvm_type, "map.result");
+    const new_vec = try self.genVecNew(result_elem_type);
+    _ = c.LLVMBuildStore(self.builder, new_vec, result_alloca);
+
+    // Loop over input vec.
+    const idx_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "map.idx");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), idx_alloca);
+
+    const function = self.current_function;
+    const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "map.cond");
+    const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "map.body");
+    const end_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "map.end");
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+    const idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+    const cond = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, idx, vec_len, "map.cmp");
+    _ = c.LLVMBuildCondBr(self.builder, cond, body_bb, end_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    var gep_idx = [_]c.LLVMValueRef{idx};
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, data_ptr, &gep_idx, 1, "elem.ptr");
+    const elem = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "elem");
+
+    // Call fn_val(elem).
+    const mapped = try self.callFnValueWithArg(fn_val, elem);
+    _ = try self.genVecPush(result_alloca, result_vec_info.llvm_type, mapped);
+
+    const next_idx = c.LLVMBuildAdd(self.builder, idx, c.LLVMConstInt(i64_type, 1, 0), "inc");
+    _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+    return c.LLVMBuildLoad2(self.builder, result_vec_info.llvm_type, result_alloca, "map.result");
+}
+
+/// Vec[T].filter(fn(elem) -> bool) -> Vec[T]
+fn genVecFilter(self: *Codegen, vec_val: c.LLVMValueRef, vec_type: c.LLVMTypeRef, fn_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const elem_type = self.getVecElemType(vec_type) orelse return error.UnsupportedExpr;
+    const vec_info = try self.getOrCreateVecType(elem_type);
+
+    // Extract Vec data_ptr and len.
+    const vec_alloca = c.LLVMBuildAlloca(self.builder, vec_type, "filt.vec");
+    _ = c.LLVMBuildStore(self.builder, vec_val, vec_alloca);
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 0, "");
+    const data_ptr = c.LLVMBuildLoad2(self.builder, c.LLVMPointerTypeInContext(self.context, 0), ptr_gep, "data");
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 1, "");
+    const vec_len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "len");
+
+    // Create result Vec.
+    const result_alloca = c.LLVMBuildAlloca(self.builder, vec_info.llvm_type, "filt.result");
+    const new_vec = try self.genVecNew(elem_type);
+    _ = c.LLVMBuildStore(self.builder, new_vec, result_alloca);
+
+    // Loop.
+    const idx_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "filt.idx");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), idx_alloca);
+
+    const function = self.current_function;
+    const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "filt.cond");
+    const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "filt.body");
+    const push_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "filt.push");
+    const skip_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "filt.skip");
+    const end_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "filt.end");
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+    const idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+    const cond = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, idx, vec_len, "filt.cmp");
+    _ = c.LLVMBuildCondBr(self.builder, cond, body_bb, end_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    var gep_idx = [_]c.LLVMValueRef{idx};
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, data_ptr, &gep_idx, 1, "elem.ptr");
+    const elem = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "elem");
+
+    // Call fn_val(elem) -> bool.
+    const pred_result = try self.callFnValueWithArg(fn_val, elem);
+    // Truncate to i1 if needed.
+    const i1_type = c.LLVMInt1TypeInContext(self.context);
+    const pred_bool = if (c.LLVMTypeOf(pred_result) != i1_type)
+        c.LLVMBuildTrunc(self.builder, pred_result, i1_type, "pred")
+    else
+        pred_result;
+    _ = c.LLVMBuildCondBr(self.builder, pred_bool, push_bb, skip_bb);
+
+    // Push element if predicate is true.
+    c.LLVMPositionBuilderAtEnd(self.builder, push_bb);
+    _ = try self.genVecPush(result_alloca, vec_info.llvm_type, elem);
+    _ = c.LLVMBuildBr(self.builder, skip_bb);
+
+    // Increment and loop.
+    c.LLVMPositionBuilderAtEnd(self.builder, skip_bb);
+    const next_idx = c.LLVMBuildAdd(self.builder, idx, c.LLVMConstInt(i64_type, 1, 0), "inc");
+    _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+    return c.LLVMBuildLoad2(self.builder, vec_info.llvm_type, result_alloca, "filt.result");
 }
 
 /// array.contains(needle) → bool — linear scan
