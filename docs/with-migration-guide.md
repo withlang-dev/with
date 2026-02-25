@@ -151,6 +151,10 @@ match shape
 if let Some(user) = find_user(id):
     println("{user.name}")
 
+// chained if let (v6.3)
+if let Some(user) = find_user(id), let Some(email) = user.email:
+    send_welcome(email)
+
 // let ... else
 let Some(user) = find_user(id) else return Err(.NotFound)
 ```
@@ -160,7 +164,8 @@ type is known from context. `=>` becomes `->`. Braces become `:` +
 indentation.
 
 Enum variants auto-generate accessor methods (§4.4):
-`shape.is_circle()` → `bool`, `shape.as_circle()` → `Option[f64]`.
+`shape.is_circle()` → `bool`, `shape.as_circle()` → `Option[f64]` (moves),
+`shape.as_circle_ref()` → `Option[&f64]` (borrowed).
 No `matches!()` macro needed.
 
 ## Error Handling
@@ -286,6 +291,9 @@ let server = Builder.new()
     .port(8080)
     .build()?
 ```
+
+v6.3 note: `@[derive(Builder)]` can generate this boilerplate when
+you want a standard field-by-field builder.
 
 ## Default Values and Construction
 
@@ -778,11 +786,13 @@ fn dump(comptime T: type, value: T) void {
 ```with
 // With — comptime type info
 comptime fn dump[T: type](value: &T) =
-    comptime for field in TypeInfo.fields[T]():
+    for field in T.fields():
         println("{field.name}: {value.{field.name}}")
 ```
 
-`@typeInfo` → `TypeInfo`. `inline for` → `comptime for`.
+`@typeInfo` → `T.fields()` (or `TypeInfo.fields[T]()` in non-generic
+contexts). `inline for` → `for` inside `comptime fn` (comptime
+cascade).
 `@field(value, name)` → `value.{field.name}` (comptime field
 access).
 
@@ -913,8 +923,8 @@ runtime cost.
 | `defer` | `defer` |
 | `errdefer` | (no equivalent — use RAII + `?`) |
 | `comptime` | `comptime` |
-| `@typeInfo(T)` | `TypeInfo.fields[T]()` |
-| `inline for` | `comptime for` |
+| `@typeInfo(T)` | `T.fields()` (or `TypeInfo.fields[T]()` in non-generic contexts) |
+| `inline for` | `for` inside `comptime fn` (or `comptime for` at top-level) |
 | `test "name" { }` | `fn test_name() =` |
 | `std.debug.print` | `println` |
 | `null` | `None` |
@@ -1273,6 +1283,9 @@ m.remove("b")
 Go slices → `Vec[T]`. Go maps → `HashMap[K, V]`. Append →
 `.push()`. `delete` → `.remove()`.
 
+v6.3 also adds common map-mutation helpers:
+`m.update("a", 0, |n| n + 1)` and `m.increment("a")`.
+
 ## Defer
 
 ```go
@@ -1421,6 +1434,18 @@ let ptr: &mut i32 = &mut val    // Safe exclusive borrow
 In C/C++, a pointer can be null, uninitialized, or dangling. In With, a reference (`&T` or `&mut T`) is guaranteed to point to valid memory and **cannot be null**. If a value is optional, use `Option[&T]`. 
 
 Raw pointers (`*mut T`, `*const T`) exist in With, but they are strictly for C-interop and require `unsafe` blocks to dereference.
+
+v6.3 adds null-safe pointer conversion:
+
+```with
+let name_ptr: *const c_char = c_get_name(id)
+let name = name_ptr.as_option()
+    .map(|p| CStr.from_ptr(p).to_str())
+    .unwrap_or("unknown")
+```
+
+`.as_option()` is safe (null check only). Dereferencing still
+requires `unsafe`.
 
 ## Memory Management
 
@@ -1985,7 +2010,8 @@ match result
 
 Nearly identical. `.success` → `.Success`. `case` keyword dropped.
 `switch` → `match`. Enum accessor methods are auto-generated:
-`result.is_success()`, `result.as_success() -> Option[Vec[u8]]`.
+`result.is_success()`, `result.as_success() -> Option[Vec[u8]]`,
+`result.as_success_ref() -> Option[&Vec[u8]]`.
 
 ## Collections
 

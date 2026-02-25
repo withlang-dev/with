@@ -1,7 +1,8 @@
 module app.main
 
 use app.service.{UserService, ServiceConfig}
-use app.errors.ServiceError
+use app.errors.{ServiceError, ContextError}
+use std.io.IoError
 use app.repo.postgres.PgUserRepo
 use app.cache.redis.RedisCache
 use app.notify.email.EmailNotifier
@@ -9,6 +10,15 @@ use app.http.{AppState, HttpResponse, handle_request}
 use std.sync.Arc
 use std.net.TcpStream
 use std.time.Duration
+
+// Demonstrates .context() / .with_context() (§10.6) for error wrapping.
+// .context() wraps an error with a human-readable message, producing
+// ContextError[E] that preserves the original error as .source.
+async fn load_config_from_file(path: &str) -> Result[ServiceConfig, ContextError[IoError]] =
+    let text = std.fs.read_to_string(path)
+        .context("reading config from {path}")?
+    toml.parse[ServiceConfig](&text)
+        .with_context(|| "parsing config file {path}")?
 
 async fn main() -> Result[Unit, ServiceError] =
     // Configuration — only override fields that differ from defaults

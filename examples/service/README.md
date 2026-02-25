@@ -72,6 +72,13 @@ fetches the user and fires off three parallel enrichment queries (`count_posts`,
 | `.Variant` shorthand + auto accessors | §4.4 | Throughout |
 | Distinct types | §4.5 | domain.w — `type UserId = distinct i64` |
 | String interpolation | §15 | Throughout |
+| `@[derive(Clone)]` | §11.8 | domain.w — User, CreateUserRequest |
+| `@[derive(all)]` | §11.8 | domain.w — Role, Priority |
+| Default field values (`= None`) | §4.3 | domain.w — UserUpdate partial-update fields |
+| `?.` optional chaining | §10.3 | tests.w — `profile.last_login?.elapsed()` |
+| `.context()` / `.with_context()` | §10.6 | main.w — `load_config_from_file` error wrapping |
+| Enum accessor methods (`.is_X()`, `.as_X_ref()`) | §4.4 | tests.w — `role.is_admin()`, `err.as_validation_ref()` |
+| `let...else` | §9.7 | service.w — `update_user` refutable pattern |
 | `assert_matches` | §10 | tests.w — pattern-based assertions |
 
 ## `with` Usage Census

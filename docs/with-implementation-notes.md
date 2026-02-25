@@ -1,6 +1,6 @@
 # The With Programming Language — Implementation Notes
 
-**Companion to:** Specification v6.2
+**Companion to:** Specification v6.3
 **Status:** Non-normative. Guidance for compiler and runtime engineers.
 **Scope:** Implementation strategies, trade-offs, and architectural
 decisions that do not affect language semantics.
@@ -24,14 +24,19 @@ Source → Lexer → Parser → AST
     → Type Checker (bidirectional, local inference)
     → Implicit Ok Wrapping (insert Ok(...) on Result-returning functions)
     → String Auto-Promotion (insert .to_owned() on literals in owned contexts)
-    → Enum Accessor Generation (emit .is_variant()/.as_variant() methods)
+    → Auto-Referencing (insert & on owned values passed to &T params)
+    → Auto-Dereferencing (insert * chains for field/method access through ptrs)
+    → Implicit Trait Object Coercion (insert vtable construction for &T → &dyn Trait)
+    → Enum Accessor Generation (emit .is_*()/.as_*()/.as_*_ref()/.as_*_mut())
+    → Chained if-let Desugaring (flatten comma-separated let bindings)
     → Ephemeral Checker (post-type-check AST walk)
     → Borrow Checker (intra-procedural, NLL)
     → Object Safety Check (validate dyn Trait usage)
     → May-Suspend Analysis (whole-program boolean propagation)
     → Suspend-Safety Check (@[no_await_guard] NLL liveness, extern callback)
-    → Denied-Pattern Check (unused Result/Task, unnecessary unsafe,
+    → Denied-Pattern Check (unused Task, unnecessary unsafe,
           unreachable code, implicit narrowing)
+    → Lint Warnings (unused Result/@[must_use], configurable severity)
     → MIR Lowering (desugaring: with-blocks, generators, pattern matching,
           defer, select await, closures, distinct types, tuples)
     → Optimization
@@ -1066,7 +1071,7 @@ error[E0701]: may_suspend call while `@[no_await_guard]` guard is live
 
 **Unused Result:**
 ```
-error[E0802]: unused `Result` — error may be silently swallowed
+warning[W0802]: unused `Result` — error may be silently swallowed
   --> src/main.w:8:5
    |
  8 |     db.execute("DROP TABLE users")
@@ -1074,6 +1079,7 @@ error[E0802]: unused `Result` — error may be silently swallowed
    |
    = help: propagate with `?`, handle with match, or discard with
            `let _ = ...`
+   = note: promote to error with `must_use = "error"` in with.toml
 ```
 
 **Unused Task:**
@@ -1156,15 +1162,23 @@ error[E0401]: closure captures ephemeral value but may escape
 These are compile errors, not warnings. The compiler must enforce
 all of the following unconditionally:
 
-| Pattern | Error code | Spec ref |
-|---------|-----------|----------|
-| `.await` while `@[no_await_guard]` is live | E0701 | §20b.1 |
-| `may_suspend` call while guard is live | E0701 | §20b.1 |
-| Unused `Result` value | E0802 | §20b.2 |
-| Unused `Task` value | E0801 | §20b.3 |
-| Unnecessary `unsafe` block | E0901 | §20b.4 |
-| Implicit numeric narrowing | E0201 | §20b.5 |
-| Unreachable code | E0601 | §20b.6 |
+| Pattern | Code | Spec ref | Severity |
+|---------|------|----------|----------|
+| `.await` while `@[no_await_guard]` is live | E0701 | §20b.1 | Error |
+| `may_suspend` call while guard is live | E0701 | §20b.1 | Error |
+| Unused `Result` value | W0802 | §20b.2 | Warning (configurable) |
+| Unused `Task` value | E0801 | §20b.3 | Error |
+| Unnecessary `unsafe` block | E0901 | §20b.4 | Error |
+| Implicit numeric narrowing | E0201 | §20b.5 | Error |
+| Unreachable code | E0601 | §20b.6 | Error |
+
+Unused `Result` is a warning by default. Projects can promote it to
+an error via `with.toml`:
+
+```toml
+[lint]
+must_use = "error"
+```
 
 **Implementation order:** The denied-pattern checks run as a
 late pass after borrow checking and may-suspend analysis, since
@@ -1712,9 +1726,9 @@ construction sites (no base expression).
 
 ## 19. Enum Accessor Method Generation (spec §4.4)
 
-Every enum variant with data automatically generates `.is_variant()`
-and `.as_variant()` methods. This is unconditional — no
-`@[derive]` needed.
+Every enum variant with data automatically generates `.is_variant()`,
+`.as_variant()`, `.as_variant_ref()`, and `.as_variant_mut()` methods.
+This is unconditional — no `@[derive]` needed.
 
 ### 19.1 Generation Rules
 
@@ -1731,26 +1745,40 @@ fn generate_accessors(enum_def):
 
         // .as_variant() → Option[T] (only for data variants)
         if variant.has_data:
-            if variant.fields.len() == 1:
-                let T = variant.fields[0].type
-                emit fn as_{snake_name}(self: EnumType) -> Option[T] =
-                    match self
-                        EnumType.{variant.name}(val) -> Some(val)
-                        _ -> None
+            let T = if variant.fields.len() == 1:
+                variant.fields[0].type
             else:
-                let TupleType = tuple(variant.fields.types)
-                emit fn as_{snake_name}(self: EnumType) -> Option[TupleType] =
-                    match self
-                        EnumType.{variant.name}(fields..) -> Some((fields..))
-                        _ -> None
+                tuple(variant.fields.types)
+
+            // By value (moves)
+            emit fn as_{snake_name}(self: EnumType) -> Option[T] =
+                match self
+                    EnumType.{variant.name}(val) -> Some(val)
+                    _ -> None
+
+            // By shared reference
+            emit fn as_{snake_name}_ref(self: &EnumType) -> Option[&T] =
+                match self
+                    EnumType.{variant.name}(ref val) -> Some(val)
+                    _ -> None
+
+            // By mutable reference
+            emit fn as_{snake_name}_mut(self: &mut EnumType) -> Option[&mut T] =
+                match self
+                    EnumType.{variant.name}(ref mut val) -> Some(val)
+                    _ -> None
 ```
 
 ### 19.2 Key Properties
 
 - Method names use `snake_case` conversion of variant names.
 - `.as_variant()` takes `self` by value (consumes the enum).
-- Multi-field variants return `Option[(A, B)]` (tuple).
+- `.as_variant_ref()` takes `self: &Self` (shared borrow).
+- `.as_variant_mut()` takes `self: &mut Self` (mutable borrow).
+- Multi-field variants: all three forms return tuple types.
 - Unit variants (no data) only generate `.is_variant()`.
+- The `_ref` variants are essential for navigating tree structures
+  (ASTs, JSON, nested enums) without cloning.
 - These methods are emitted early in the pipeline and go through
   normal type checking.
 
@@ -2046,37 +2074,49 @@ The comptime evaluator can:
 - Generate trait implementations via `@[derive]`
 - Produce compile errors via `comptime_error("message")`
 
-### 26.3 `TypeInfo` Implementation
+### 26.3 `TypeInfo` / Type Method Implementation
 
-The `TypeInfo` API is a compiler intrinsic, not a library:
+Type introspection is available via two syntaxes:
 
-```
-TypeInfo.fields[T]()           // → [FieldInfo]
-TypeInfo.variants[T]()         // → [VariantInfo]
-TypeInfo.size[T]()             // → usize
-TypeInfo.align[T]()            // → usize
-TypeInfo.name[T]()             // → str
-TypeInfo.implements[T, Trait]() // → bool
-TypeInfo.is_copy[T]()          // → bool
-```
+- `T.fields()`, `T.name()`, `T.size()`, etc. — method syntax on type
+  parameters inside comptime context (preferred)
+- `TypeInfo.fields[SomeType]()` — module syntax for concrete types
 
-Each call is lowered by the compiler to a constant lookup into the
+Both are compiler intrinsics lowered to constant lookups into the
 type metadata tables built during type checking.
 
-### 26.4 `comptime for` Unrolling
+```
+T.fields()              // → [FieldInfo]
+T.variants()            // → [VariantInfo]
+T.size()                // → usize
+T.align()               // → usize
+T.name()                // → str
+T.implements(Trait)      // → bool
+T.is_copy()             // → bool
+```
 
-`comptime for` unrolls at compile time:
+### 26.4 `comptime for` Unrolling and Cascade
+
+**Comptime cascade:** Inside a `comptime fn` or `comptime for`, all
+code is already executing at compile time. Inner `for`, `if`, and
+other statements do NOT need the `comptime` prefix — it cascades
+automatically. The `comptime` prefix is only needed at the entry
+point.
 
 ```
-comptime for field in TypeInfo.fields[T]():
-    out.key(field.name)
-    self.{field.name}.serialize(out)
+comptime fn derive_serialize[T: type]() =
+    for field in T.fields():           // cascade: no prefix needed
+        if field.type_name == "str":   // cascade: no prefix needed
+            emit_string_serialize(field)
+        else:
+            emit_generic_serialize(field)
 ```
 
-The loop body is stamped out once per iteration with compile-time
-constants substituted. `self.{field.name}` is a comptime field
-access — the compiler resolves the field name from the constant
-string and emits a direct field access.
+`comptime for` unrolls at compile time. The loop body is stamped out
+once per iteration with compile-time constants substituted.
+`self.{field.name}` is a comptime field access — the compiler
+resolves the field name from the constant string and emits a direct
+field access.
 
 ### 26.5 Deferred Branch Checking
 
@@ -2340,7 +2380,7 @@ stack that may be shared with paused C frames.
 | `@[tailrec]` | Functions | Verify tail recursion; compile to loop |
 | `@[no_await_guard]` | Types | Reject `.await`/`may_suspend` while live |
 | `@[must_use]` | Types | Warn/error on unused values |
-| `@[derive(...)]` | Types | Generate trait implementations |
+| `@[derive(...)]` | Types | Generate trait implementations (incl. Builder) |
 | `@[repr(C)]` | Types | C-compatible memory layout |
 | `@[c_export("name")]` | Functions | Export with C linkage |
 | `@[ffi_stack]` | Functions | Run on OS-thread stack |
@@ -2439,6 +2479,240 @@ fn example():
 For the borrow checker, insert a virtual "use" of `v` at the point
 where `v.drop()` would execute. This extends the borrow `&x` through
 the destructor, causing a conflict with `x`'s destruction.
+
+---
+
+## 35. Auto-Dereferencing (spec §3.7)
+
+### 35.1 Algorithm
+
+At every field access `expr.field` and method call `expr.method()`,
+the compiler tries to resolve the field/method. If it fails, it
+inserts a dereference and retries:
+
+```
+fn resolve_field_access(expr, field_name):
+    let ty = typeof(expr)
+    loop:
+        if ty has field field_name:
+            return deref_chain + field_access
+        if ty implements Deref:
+            deref_chain.push(Deref)
+            ty = ty.Deref.Target
+            continue
+        EMIT ERROR "no field {field_name} on {ty}"
+```
+
+Works through `&T`, `&mut T`, `Box[T]`, `Arc[T]`, `Rc[T]`, and
+any user type implementing `Deref`. The compiler inserts as many
+dereferences as needed.
+
+---
+
+## 36. Auto-Referencing (spec §3.8)
+
+### 36.1 Rules
+
+When a function expects `&T` and receives an owned `T`:
+
+1. Insert `&` automatically for shared borrows.
+2. Do NOT auto-ref for `&mut T` — mutation must be explicit.
+
+```
+fn check_auto_ref(arg_expr, param_type):
+    let arg_type = typeof(arg_expr)
+    if param_type == &T and arg_type == T:
+        return &arg_expr     // insert shared borrow
+    if param_type == &mut T and arg_type == T:
+        EMIT ERROR           // no auto-ref for &mut
+```
+
+### 36.2 Method Calls
+
+For method calls, auto-ref applies to the receiver. If `greet`
+takes `self: &Self`, calling `alice.greet()` inserts `(&alice).greet()`.
+This already happens for method receivers in most languages (Rust does
+this too).
+
+---
+
+## 37. Implicit Trait Object Coercion (spec §3.9)
+
+### 37.1 Algorithm
+
+When a function expects `&dyn Trait` and receives `&T` where `T`
+implements the trait:
+
+1. Check that `T` implements `Trait` (and trait is object-safe).
+2. Construct the fat pointer: `(data_ptr, vtable_ptr)`.
+
+```
+fn check_trait_coercion(arg_expr, param_type):
+    if param_type == &dyn Trait:
+        let arg_type = typeof(arg_expr)
+        if arg_type == &T and T implements Trait:
+            return make_fat_ptr(arg_expr, vtable_for(T, Trait))
+```
+
+Same logic applies for `Box[T]` → `Box[dyn Trait]`.
+
+---
+
+## 38. Chained `if let` Compilation (spec §9.7)
+
+### 38.1 Desugaring
+
+Chained `if let` with commas desugars to nested `if let`:
+
+```
+if let Some(a) = x, let Some(b) = y, a > 0:
+    body
+else:
+    fallback
+
+// → desugars to:
+if let Some(a) = x:
+    if let Some(b) = y:
+        if a > 0:
+            body
+        else:
+            fallback
+    else:
+        fallback
+else:
+    fallback
+```
+
+The `else` branch (if present) is shared across all failure paths.
+Boolean conditions in the chain desugar to normal `if` checks.
+
+### 38.2 Key Properties
+
+- Each binding in the chain is in scope for subsequent bindings
+  and the body.
+- If any binding fails, the `else` branch runs (or the `if` is
+  skipped if there's no `else`).
+- Mixes of `let` bindings and boolean conditions are supported.
+
+---
+
+## 39. `@[derive(Builder)]` Implementation (spec §11.8)
+
+### 39.1 Generated Code
+
+For a type with `@[derive(Builder)]`:
+
+```
+@[derive(Builder)]
+type Config = { host: str, port: i32 = 8080 }
+```
+
+The comptime function generates:
+
+1. A builder struct with `Option` wrappers for each field:
+   ```
+   type ConfigBuilder = { host: Option[str], port: Option[i32] }
+   ```
+
+2. Chaining setter methods (by-value self):
+   ```
+   impl ConfigBuilder
+       fn host(self: Self, val: str) -> Self =
+           Self { host: Some(val), ..self }
+       fn port(self: Self, val: i32) -> Self =
+           Self { port: Some(val), ..self }
+   ```
+
+3. A `.build()` method that checks required fields:
+   ```
+   fn build(self: Self) -> Result[Config, BuilderError] =
+       Config {
+           host: self.host ?? return Err(.MissingField("host")),
+           port: self.port ?? 8080,   // use default
+       }
+   ```
+
+4. A static `.builder()` constructor on the original type.
+
+### 39.2 Required vs Optional Fields
+
+Fields with default values in the type definition are optional in the
+builder. Fields without defaults are required — `.build()` returns
+`Err(.MissingField(name))` if they aren't set.
+
+---
+
+## 40. HashMap Convenience Methods (spec §13.3)
+
+### 40.1 Implementation
+
+These are stdlib methods, not compiler features:
+
+```
+impl HashMap[K, V]
+    fn update(self: &mut Self, key: K, default: V, f: fn(V) -> V) =
+        let entry = self.entry(key).or_insert(default)
+        *entry = f(*entry)
+
+    fn increment(self: &mut Self, key: K) where V: Add[V, Output=V] + From[i32] =
+        self.update(key, V.from(0), |n| n + V.from(1))
+
+    fn decrement(self: &mut Self, key: K) where V: Sub[V, Output=V] + From[i32] =
+        self.update(key, V.from(0), |n| n - V.from(1))
+
+    fn append[Item](self: &mut Self, key: K, val: Item) where V: Push[Item] + Default =
+        self.entry(key).or_insert(V.default()).push(val)
+```
+
+---
+
+## 41. Raw Pointer `.as_option()` (spec §16.1)
+
+### 41.1 Implementation
+
+Built-in methods on raw pointer types:
+
+```
+impl *const T
+    fn as_option(self: Self) -> Option[*const T] =
+        if self == null then None else Some(self)
+
+impl *mut T
+    fn as_option(self: Self) -> Option[*mut T] =
+        if self == null then None else Some(self)
+```
+
+These are safe — they check for null without dereferencing. The
+resulting `Option[*T]` still requires `unsafe` to dereference.
+
+---
+
+## 42. Task Cancellation as Unwinding (spec §14.7)
+
+### 42.1 Mechanism
+
+Task cancellation uses structured unwinding, similar to panics but
+catchable at `async scope` boundaries:
+
+1. Cancellation flag is set on the fiber.
+2. At next `await`, instead of suspending, begin unwinding.
+3. Destructors run during unwinding (guaranteed).
+4. Unwinding propagates to child tasks in `async scope`.
+5. `async scope` catches cancellation from its children.
+
+### 42.2 No Error Type Infection
+
+Cancellation does NOT require `From[TaskCancelled]` on user error
+types. The unwinding mechanism is separate from the `Result` type
+system. User error types (`IoError`, `DbError`, etc.) are unchanged.
+
+`.await` on a cancelled task:
+- If the task's return type is `Result[T, E]`: returns a special
+  `CancelledError` that can be matched with `.is_cancelled()`.
+- If the task returns bare `T`: triggers unwinding in the caller.
+
+The runtime provides `TaskCancelled` as a standard error type that
+any `Result` can be checked against, but no `From` impls are needed.
 
 ---
 

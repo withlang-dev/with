@@ -2,6 +2,7 @@ module app.domain
 
 type UserId = distinct i64
 
+@[derive(Clone)]
 type User = {
     id: UserId,
     name: str,
@@ -10,6 +11,7 @@ type User = {
     active: bool = true,
 }
 
+@[derive(all)]
 type Role = | Admin | Moderator | Member | Guest
 
 type UserProfile = {
@@ -19,6 +21,7 @@ type UserProfile = {
     last_login: Option[Instant] = None,
 }
 
+@[derive(Clone)]
 type CreateUserRequest = {
     name: str,
     email: str,
@@ -26,10 +29,10 @@ type CreateUserRequest = {
 }
 
 type UserUpdate = {
-    name: Option[str],
-    email: Option[str],
-    role: Option[Role],
-    active: Option[bool],
+    name: Option[str] = None,
+    email: Option[str] = None,
+    role: Option[Role] = None,
+    active: Option[bool] = None,
 }
 
 type Notification = {
@@ -39,4 +42,5 @@ type Notification = {
     priority: Priority,
 }
 
+@[derive(all)]
 type Priority = | Urgent | Normal | Low
