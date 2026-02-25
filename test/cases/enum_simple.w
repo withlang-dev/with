@@ -10,4 +10,5 @@ fn main() -> i32 =
     let r = Red
     let g = Green
     let b = Blue
-    color_value(r) + color_value(g) + color_value(b) + 36
+    assert(color_value(r) + color_value(g) + color_value(b) + 36 == 42)
+    0

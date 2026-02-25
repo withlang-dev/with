@@ -11,4 +11,5 @@ fn early() -> i32 =
     return 42
 
 fn main() -> i32 =
-    early()
+    assert(early() == 42)
+    0

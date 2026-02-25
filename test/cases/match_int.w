@@ -6,4 +6,5 @@ fn classify(x: i32) -> i32 =
         _ -> 0
 
 fn main() -> i32 =
-    classify(1) + classify(2) + classify(99) + 12
+    assert(classify(1) + classify(2) + classify(99) + 12 == 42)
+    0

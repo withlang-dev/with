@@ -4,4 +4,5 @@ fn main() -> i32 =
     let c = a & b
     let d = c | 0x20
     let e = d ^ 0x0F
-    e
+    assert(e == 32)
+    0

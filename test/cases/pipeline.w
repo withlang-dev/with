@@ -5,4 +5,5 @@ fn add(a: i32, b: i32) -> i32 = a + b
 fn main() -> i32 =
     let x = 10 |> double
     let y = x |> add(1)
-    y
+    assert(y == 21)
+    0

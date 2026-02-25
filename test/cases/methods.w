@@ -8,4 +8,5 @@ fn Counter.add(self: Counter, n: i32) -> i32 = self.value + n
 
 fn main() -> i32 =
     let c = Counter { value: 10 }
-    c.get() + c.add(12) + 10
+    assert(c.get() + c.add(12) + 10 == 42)
+    0

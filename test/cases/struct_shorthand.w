@@ -4,4 +4,5 @@ fn main() -> i32 =
     let x: i32 = 20
     let y: i32 = 22
     let v: Vec2 = Vec2 { x, y }
-    v.x + v.y + v.z
+    assert(v.x + v.y + v.z == 42)
+    0

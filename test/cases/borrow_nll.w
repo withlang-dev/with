@@ -5,4 +5,5 @@ fn main() -> i32 =
     var x: i32 = 10
     let result = use_ref(&x)
     x = 42
-    x
+    assert(x == 42)
+    0

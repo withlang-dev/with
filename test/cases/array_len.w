@@ -1,3 +1,4 @@
 fn main() -> i32 =
     let xs: [5]i32 = [1, 2, 3, 4, 5]
-    xs.len
+    assert(xs.len == 5)
+    0

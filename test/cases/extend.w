@@ -15,4 +15,5 @@ extend Counter =
 fn main() -> i32 =
     let c = Counter.new(10)
     let c2 = c.add(32)
-    c2.get()
+    assert(c2.get() == 42)
+    0

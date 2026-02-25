@@ -21,4 +21,5 @@ fn main() -> i32 =
     let sum = p.sum()
     let product = p.apply_op(Mul)
     let diff = p.apply_op(Sub)
-    sum - product - diff + 222
+    assert(sum - product - diff + 222 == 42)
+    0

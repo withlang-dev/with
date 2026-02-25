@@ -20,4 +20,5 @@ impl Animal for Cat =
 fn main() -> i32 =
     let d = Dog { age: 7 }
     let c = Cat { age: 24 }
-    d.speak() + c.speak()
+    assert(d.speak() + c.speak() == 42)
+    0

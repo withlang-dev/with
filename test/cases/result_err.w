@@ -8,4 +8,5 @@ fn caller() -> Result[i32, i32] =
 
 fn main() -> i32 =
     let result = caller()
-    result ?? 42
+    assert(result ?? 42 == 42)
+    0

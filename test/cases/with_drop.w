@@ -11,4 +11,5 @@ fn make_handle() -> Handle = Handle { id: 42 }
 fn main() -> i32 =
     let result = with make_handle() as h:
         h.id
-    result
+    assert(result == 42)
+    0
