@@ -463,6 +463,8 @@ pub const TypeExprKind = union(enum) {
     array_type: ArrayTypeExpr,
     /// Slice type: `[]T`
     slice_type: *const TypeExpr,
+    /// Trait object: `dyn Trait`
+    trait_object: Symbol,
     /// Inferred (no annotation, placeholder for type checker)
     inferred,
 };

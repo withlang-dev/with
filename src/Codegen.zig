@@ -63,6 +63,15 @@ slice_elem_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
 enum_local_types: std.AutoHashMapUnmanaged(u32, u32) = .{},
 /// Drop functions: struct type Symbol → FnInfo for Type.drop.
 drop_fns: std.AutoHashMapUnmanaged(u32, FnInfo) = .{},
+/// Trait declarations: trait name Symbol → TraitInfo.
+trait_infos: std.AutoHashMapUnmanaged(u32, TraitInfo) = .{},
+/// VTable globals: hash(type_sym, trait_sym) → LLVM global vtable constant.
+vtable_globals: std.AutoHashMapUnmanaged(u64, c.LLVMValueRef) = .{},
+/// Trait-typed locals: local Symbol → trait Symbol (tracks which trait a dyn param holds).
+trait_locals: std.AutoHashMapUnmanaged(u32, u32) = .{},
+/// For functions with dyn Trait params: fn_sym → array of ?trait_sym per param.
+/// null means non-trait param.
+fn_dyn_params: std.AutoHashMapUnmanaged(u32, []const ?u32) = .{},
 /// Stack of scoped local variable lists for Drop emission.
 /// Each entry is the count of locals at block entry; on block exit we
 /// drop everything above that watermark in reverse order.
@@ -116,6 +125,13 @@ const OptionResultInfo = struct {
     payload_type: c.LLVMTypeRef, // T for Option, ok_type for Result
     err_type: ?c.LLVMTypeRef, // E for Result, null for Option
     enum_sym: u32, // Symbol for the enum type name
+};
+
+const TraitInfo = struct {
+    method_names: []const u32, // ordered method Symbols
+    method_return_types: []const c.LLVMTypeRef, // return type for each method
+    method_param_counts: []const u32, // param count (excluding self) for each method
+    vtable_type: c.LLVMTypeRef, // struct of function pointers
 };
 
 pub const Error = error{
@@ -210,6 +226,24 @@ pub fn deinit(self: *Codegen) void {
     self.drop_fns.deinit(self.allocator);
     self.slice_elem_types.deinit(self.allocator);
     self.enum_local_types.deinit(self.allocator);
+    {
+        var ti_it = self.trait_infos.iterator();
+        while (ti_it.next()) |entry| {
+            self.allocator.free(entry.value_ptr.method_names);
+            self.allocator.free(entry.value_ptr.method_return_types);
+            self.allocator.free(entry.value_ptr.method_param_counts);
+        }
+    }
+    self.trait_infos.deinit(self.allocator);
+    self.vtable_globals.deinit(self.allocator);
+    self.trait_locals.deinit(self.allocator);
+    {
+        var dp_it = self.fn_dyn_params.iterator();
+        while (dp_it.next()) |entry| {
+            self.allocator.free(entry.value_ptr.*);
+        }
+    }
+    self.fn_dyn_params.deinit(self.allocator);
     c.LLVMDisposeBuilder(self.builder);
     c.LLVMDisposeModule(self.module);
     c.LLVMContextDispose(self.context);
@@ -239,6 +273,14 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
         }
     }
 
+    // Pass 0.5: collect trait declarations.
+    for (module.decls) |decl| {
+        switch (decl.kind) {
+            .trait_decl => |td| try self.collectTraitInfo(td),
+            else => {},
+        }
+    }
+
     // Pass 1: declare all functions and externs (forward declarations).
     // Generic functions are stored for later monomorphization.
     for (module.decls) |decl| {
@@ -258,6 +300,14 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
 
     // Pass 1.5: detect Drop functions (Type.drop patterns).
     try self.detectDropFunctions();
+
+    // Pass 1.6: generate vtable globals for impl declarations.
+    for (module.decls) |decl| {
+        switch (decl.kind) {
+            .impl_decl => |id| try self.generateVtable(id),
+            else => {},
+        }
+    }
 
     // Pass 2: generate function bodies (skip generic functions).
     for (module.decls) |decl| {
@@ -334,13 +384,21 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         c.LLVMVoidTypeInContext(self.context);
 
     var param_types_buf: [64]c.LLVMTypeRef = undefined;
+    var has_dyn_param = false;
+    var dyn_params_buf: [64]?u32 = undefined;
     for (func.params, 0..) |param, i| {
+        dyn_params_buf[i] = null;
         if (param.type_expr) |te| {
             if (te.kind == .fn_type) {
                 // fn-type params use fat pointer {ptr, ptr} to support closures.
                 const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
                 var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
                 param_types_buf[i] = c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+            } else if (te.kind == .trait_object) {
+                // dyn Trait params use fat pointer {data_ptr, vtable_ptr}.
+                param_types_buf[i] = try self.resolveType(te);
+                dyn_params_buf[i] = te.kind.trait_object;
+                has_dyn_param = true;
             } else {
                 param_types_buf[i] = try self.resolveType(te);
             }
@@ -368,6 +426,13 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         .value = function,
         .fn_type = fn_type,
     }) catch return error.CodegenAlloc;
+
+    // Record dyn Trait param info if any.
+    if (has_dyn_param) {
+        const dyn_info = self.allocator.alloc(?u32, func.params.len) catch return error.CodegenAlloc;
+        @memcpy(dyn_info, dyn_params_buf[0..func.params.len]);
+        self.fn_dyn_params.put(self.allocator, func.name, dyn_info) catch return error.CodegenAlloc;
+    }
 }
 
 fn declareExternFn(self: *Codegen, ext: Ast.ExternFnDecl) Error!void {
@@ -449,6 +514,292 @@ fn findDropFn(self: *Codegen, ty: c.LLVMTypeRef) ?FnInfo {
     return null;
 }
 
+// ── Trait / Dynamic dispatch ──────────────────────────────────────
+
+/// Collect a trait declaration into trait_infos.
+fn collectTraitInfo(self: *Codegen, td: Ast.TraitDecl) Error!void {
+    const method_count = td.methods.len;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+
+    // Build arrays of method info.
+    const method_names = self.allocator.alloc(u32, method_count) catch return error.CodegenAlloc;
+    const method_ret_types = self.allocator.alloc(c.LLVMTypeRef, method_count) catch return error.CodegenAlloc;
+    const method_param_counts = self.allocator.alloc(u32, method_count) catch return error.CodegenAlloc;
+
+    // Build vtable struct type: one ptr per method.
+    var vtable_fields: [64]c.LLVMTypeRef = undefined;
+    for (td.methods, 0..) |m, i| {
+        method_names[i] = m.name;
+        method_ret_types[i] = if (m.return_type) |rt|
+            self.resolveType(rt) catch c.LLVMInt32TypeInContext(self.context)
+        else
+            c.LLVMVoidTypeInContext(self.context);
+        // params count excludes self (first param).
+        method_param_counts[i] = if (m.params.len > 0) @intCast(m.params.len - 1) else 0;
+        vtable_fields[i] = ptr_type; // function pointer
+    }
+
+    const vtable_type = c.LLVMStructTypeInContext(
+        self.context,
+        &vtable_fields,
+        @intCast(method_count),
+        0,
+    );
+
+    self.trait_infos.put(self.allocator, td.name, .{
+        .method_names = method_names,
+        .method_return_types = method_ret_types,
+        .method_param_counts = method_param_counts,
+        .vtable_type = vtable_type,
+    }) catch return error.CodegenAlloc;
+}
+
+/// Generate a vtable global constant for an impl declaration.
+fn generateVtable(self: *Codegen, id: Ast.ImplDecl) Error!void {
+    const trait_sym = id.trait_name orelse return; // plain `impl Type` — no vtable
+    const trait_info = self.trait_infos.get(trait_sym) orelse return;
+
+    // For each trait method, find the corresponding Type.method function.
+    const method_count = trait_info.method_names.len;
+    var vtable_values: [64]c.LLVMValueRef = undefined;
+
+    for (trait_info.method_names, 0..) |method_sym, i| {
+        const method_name = self.pool.resolve(method_sym);
+        const type_name = self.pool.resolve(id.type_name);
+
+        // Build mangled name "Type.method".
+        var name_buf: [512]u8 = undefined;
+        @memcpy(name_buf[0..type_name.len], type_name);
+        name_buf[type_name.len] = '.';
+        @memcpy(name_buf[type_name.len + 1 ..][0..method_name.len], method_name);
+        const mangled = name_buf[0 .. type_name.len + 1 + method_name.len];
+        const fn_sym = self.pool.intern(mangled) catch return error.CodegenAlloc;
+
+        if (self.functions.get(fn_sym)) |fn_info| {
+            // Create a dynwrap function: fn(ptr, params...) -> ret
+            // that loads the concrete type from the data pointer and calls the real method.
+            vtable_values[i] = try self.createDynWrapper(fn_info, id.type_name, trait_info, i);
+        } else {
+            // Method not found — use null placeholder.
+            vtable_values[i] = c.LLVMConstNull(c.LLVMPointerTypeInContext(self.context, 0));
+        }
+    }
+
+    // Build the vtable global constant.
+    const vtable_const = c.LLVMConstStructInContext(
+        self.context,
+        &vtable_values,
+        @intCast(method_count),
+        0,
+    );
+
+    // Create a global variable for the vtable.
+    const type_name = self.pool.resolve(id.type_name);
+    const trait_name = self.pool.resolve(trait_sym);
+    var global_name_buf: [512]u8 = undefined;
+    const prefix = "__vtable_";
+    @memcpy(global_name_buf[0..prefix.len], prefix);
+    @memcpy(global_name_buf[prefix.len..][0..type_name.len], type_name);
+    global_name_buf[prefix.len + type_name.len] = '_';
+    @memcpy(global_name_buf[prefix.len + type_name.len + 1 ..][0..trait_name.len], trait_name);
+    const global_name_len = prefix.len + type_name.len + 1 + trait_name.len;
+    global_name_buf[global_name_len] = 0;
+
+    const vtable_global = c.LLVMAddGlobal(self.module, trait_info.vtable_type, &global_name_buf);
+    c.LLVMSetInitializer(vtable_global, vtable_const);
+    c.LLVMSetGlobalConstant(vtable_global, 1);
+    c.LLVMSetLinkage(vtable_global, c.LLVMInternalLinkage);
+
+    // Cache it: hash(type_sym, trait_sym) → global.
+    const hash_key = @as(u64, id.type_name) << 32 | @as(u64, trait_sym);
+    self.vtable_globals.put(self.allocator, hash_key, vtable_global) catch
+        return error.CodegenAlloc;
+}
+
+/// Create a dynamic dispatch wrapper: fn(ptr, params...) -> ret
+/// that loads the concrete struct from the data pointer and calls the real method.
+fn createDynWrapper(self: *Codegen, fn_info: FnInfo, type_sym: u32, trait_info: TraitInfo, method_idx: usize) Error!c.LLVMValueRef {
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+
+    // Get the concrete struct type.
+    const struct_info = self.struct_types.get(type_sym);
+    const concrete_type = if (struct_info) |si| si.llvm_type else return fn_info.value;
+
+    // Build wrapper fn type: fn(ptr, params...) -> ret
+    const orig_param_count = c.LLVMCountParams(fn_info.value);
+    const ret_type = c.LLVMGetReturnType(fn_info.fn_type);
+
+    // The wrapper takes ptr (data) + same non-self params as the original.
+    // Original: fn(ConcreteType, param1, param2, ...) -> ret
+    // Wrapper:  fn(ptr, param1, param2, ...) -> ret
+    var wrapper_param_types: [64]c.LLVMTypeRef = undefined;
+    wrapper_param_types[0] = ptr_type; // data pointer (self)
+
+    // Copy non-self param types from original.
+    if (orig_param_count > 1) {
+        var orig_param_types: [64]c.LLVMTypeRef = undefined;
+        c.LLVMGetParamTypes(fn_info.fn_type, &orig_param_types);
+        for (1..orig_param_count) |i| {
+            wrapper_param_types[i] = orig_param_types[i];
+        }
+    }
+
+    const wrapper_fn_type = c.LLVMFunctionType(ret_type, &wrapper_param_types, orig_param_count, 0);
+
+    // Generate unique wrapper name.
+    const type_name = self.pool.resolve(type_sym);
+    const method_name = self.pool.resolve(trait_info.method_names[method_idx]);
+    var name_buf: [512]u8 = undefined;
+    const dynwrap = "__dynwrap_";
+    @memcpy(name_buf[0..dynwrap.len], dynwrap);
+    @memcpy(name_buf[dynwrap.len..][0..type_name.len], type_name);
+    name_buf[dynwrap.len + type_name.len] = '_';
+    @memcpy(name_buf[dynwrap.len + type_name.len + 1 ..][0..method_name.len], method_name);
+    const wrapper_name_len = dynwrap.len + type_name.len + 1 + method_name.len;
+    name_buf[wrapper_name_len] = 0;
+
+    const wrapper_fn = c.LLVMAddFunction(self.module, &name_buf, wrapper_fn_type);
+    c.LLVMSetLinkage(wrapper_fn, c.LLVMInternalLinkage);
+
+    // Save/restore builder state.
+    const saved_bb = c.LLVMGetInsertBlock(self.builder);
+    const saved_fn = self.current_function;
+
+    const bb = c.LLVMAppendBasicBlockInContext(self.context, wrapper_fn, "entry");
+    c.LLVMPositionBuilderAtEnd(self.builder, bb);
+
+    // Load concrete type from data pointer: %self = load %ConcreteType, ptr %0
+    const data_ptr = c.LLVMGetParam(wrapper_fn, 0);
+    const concrete_val = c.LLVMBuildLoad2(self.builder, concrete_type, data_ptr, "self");
+
+    // Build args: [concrete_val, param1, param2, ...]
+    var call_args: [64]c.LLVMValueRef = undefined;
+    call_args[0] = concrete_val;
+    for (1..orig_param_count) |i| {
+        call_args[i] = c.LLVMGetParam(wrapper_fn, @intCast(i));
+    }
+
+    const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+    const result = c.LLVMBuildCall2(
+        self.builder,
+        fn_info.fn_type,
+        fn_info.value,
+        &call_args,
+        orig_param_count,
+        if (is_void) "" else "res",
+    );
+
+    if (is_void) {
+        _ = c.LLVMBuildRetVoid(self.builder);
+    } else {
+        _ = c.LLVMBuildRet(self.builder, result);
+    }
+
+    // Restore builder state.
+    if (saved_bb) |bb_ref| {
+        c.LLVMPositionBuilderAtEnd(self.builder, bb_ref);
+    }
+    self.current_function = saved_fn;
+
+    return wrapper_fn;
+}
+
+/// Build a dyn Trait fat pointer from a concrete value.
+/// Returns {data_ptr, vtable_ptr} struct.
+fn buildDynTraitValue(self: *Codegen, concrete_val: c.LLVMValueRef, type_sym: u32, trait_sym: u32) Error!c.LLVMValueRef {
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const concrete_type = c.LLVMTypeOf(concrete_val);
+
+    // Alloca the concrete value and get a pointer to it.
+    const alloca = c.LLVMBuildAlloca(self.builder, concrete_type, "dyn.data");
+    _ = c.LLVMBuildStore(self.builder, concrete_val, alloca);
+
+    // Look up vtable global.
+    const hash_key = @as(u64, type_sym) << 32 | @as(u64, trait_sym);
+    const vtable_global = self.vtable_globals.get(hash_key) orelse return error.UnsupportedExpr;
+
+    // Build fat pointer: {data_ptr, vtable_ptr}.
+    var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+    const fat_type = c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+
+    var fat_val = c.LLVMGetUndef(fat_type);
+    fat_val = c.LLVMBuildInsertValue(self.builder, fat_val, alloca, 0, "dyn.withdata");
+    fat_val = c.LLVMBuildInsertValue(self.builder, fat_val, vtable_global, 1, "dyn.withvtable");
+
+    return fat_val;
+}
+
+/// Dispatch a method call on a dyn Trait object through its vtable.
+fn genDynDispatch(self: *Codegen, fat_ptr: c.LLVMValueRef, trait_sym: u32, method_sym: u32, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
+    const trait_info = self.trait_infos.get(trait_sym) orelse return error.UnsupportedExpr;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+
+    // Find method index in the trait's method list.
+    var method_idx: ?usize = null;
+    for (trait_info.method_names, 0..) |mn, i| {
+        if (mn == method_sym) {
+            method_idx = i;
+            break;
+        }
+    }
+    const idx = method_idx orelse return error.UnsupportedExpr;
+
+    // Extract data_ptr (field 0) and vtable_ptr (field 1) from fat pointer.
+    const data_ptr = c.LLVMBuildExtractValue(self.builder, fat_ptr, 0, "dyn.data");
+    const vtable_ptr = c.LLVMBuildExtractValue(self.builder, fat_ptr, 1, "dyn.vtable");
+
+    // GEP into vtable struct to get the method function pointer.
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    var indices = [_]c.LLVMValueRef{
+        c.LLVMConstInt(i32_type, 0, 0),
+        c.LLVMConstInt(i32_type, @intCast(idx), 0),
+    };
+    const method_gep = c.LLVMBuildGEP2(self.builder, trait_info.vtable_type, vtable_ptr, &indices, 2, "vtable.gep");
+    const method_fn_ptr = c.LLVMBuildLoad2(self.builder, ptr_type, method_gep, "vtable.fn");
+
+    // Build call args: [data_ptr, arg1, arg2, ...]
+    var call_args: [64]c.LLVMValueRef = undefined;
+    call_args[0] = data_ptr; // self (as opaque pointer)
+    for (args, 0..) |arg, i| {
+        call_args[1 + i] = try self.genExpr(arg);
+    }
+    const total_args: u32 = @intCast(1 + args.len);
+
+    // Build the call function type: fn(ptr, params...) -> ret
+    const ret_type = trait_info.method_return_types[idx];
+    var fn_param_types: [64]c.LLVMTypeRef = undefined;
+    fn_param_types[0] = ptr_type; // data pointer (self)
+    // For now, use the types of the actual arguments for non-self params.
+    for (args, 0..) |_, i| {
+        fn_param_types[1 + i] = c.LLVMTypeOf(call_args[1 + i]);
+    }
+
+    const call_fn_type = c.LLVMFunctionType(ret_type, &fn_param_types, total_args, 0);
+
+    const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+    return c.LLVMBuildCall2(
+        self.builder,
+        call_fn_type,
+        method_fn_ptr,
+        &call_args,
+        total_args,
+        if (is_void) "" else "dyncall",
+    );
+}
+
+/// Find the type symbol for a concrete LLVM type.
+fn findTypeSymbol(self: *Codegen, llvm_type: c.LLVMTypeRef) ?u32 {
+    var it = self.struct_types.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == llvm_type) return entry.key_ptr.*;
+    }
+    var eit = self.enum_types.iterator();
+    while (eit.next()) |entry| {
+        if (entry.value_ptr.llvm_type == llvm_type) return entry.key_ptr.*;
+    }
+    return null;
+}
+
 /// Emit drop calls for scoped locals from index `from` to `scope_local_count`
 /// in reverse order.
 fn emitDrops(self: *Codegen, from: u32) Error!void {
@@ -493,6 +844,9 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     const entry = c.LLVMAppendBasicBlockInContext(self.context, function, "entry");
     c.LLVMPositionBuilderAtEnd(self.builder, entry);
 
+    // Clear trait_locals for this function scope.
+    self.trait_locals.clearRetainingCapacity();
+
     // Add function parameters as locals (alloca + store).
     for (func.params, 0..) |param, i| {
         const param_val = c.LLVMGetParam(function, @intCast(i));
@@ -505,6 +859,9 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         if (param.type_expr) |te| {
             if (te.kind == .fn_type) {
                 fn_sig = self.buildFnTypeFromAst(te.kind.fn_type) catch null;
+            } else if (te.kind == .trait_object) {
+                // Track dyn Trait parameters for dynamic dispatch.
+                self.trait_locals.put(self.allocator, param.name, te.kind.trait_object) catch {};
             }
         }
 
@@ -1991,9 +2348,23 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
 
         // Coerce arguments to match parameter types.
         const param_count: u32 = c.LLVMCountParams(fn_info.value);
+        const dyn_params = self.fn_dyn_params.get(fn_sym);
         for (0..@min(call_e.args.len, param_count)) |i| {
             const param_type = c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, @intCast(i)));
             const arg_type = c.LLVMTypeOf(args_buf[i]);
+
+            // Convert concrete value → dyn Trait fat pointer.
+            if (dyn_params) |dp| {
+                if (i < dp.len) {
+                    if (dp[i]) |trait_sym| {
+                        // This param expects dyn Trait — wrap concrete value.
+                        if (self.findTypeSymbol(arg_type)) |type_sym| {
+                            args_buf[i] = try self.buildDynTraitValue(args_buf[i], type_sym, trait_sym);
+                            continue;
+                        }
+                    }
+                }
+            }
 
             // Wrap named function references as fat pointers for fn-type params.
             if (c.LLVMGetTypeKind(param_type) == c.LLVMStructTypeKind and
@@ -2573,6 +2944,15 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
                     if (is_void) "" else "mcall",
                 );
             }
+        }
+    }
+
+    // Dynamic dispatch: check if the object is a dyn Trait fat pointer.
+    // Identify via trait_locals map (set when param has dyn Trait type).
+    if (fa.expr.kind == .ident) {
+        const ident_sym = fa.expr.kind.ident;
+        if (self.trait_locals.get(ident_sym)) |trait_sym| {
+            return self.genDynDispatch(obj_val, trait_sym, fa.field, args);
         }
     }
 
@@ -4648,6 +5028,12 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
                 return res_info.llvm_type;
             }
             return error.UnsupportedType;
+        },
+        .trait_object => {
+            // dyn Trait → fat pointer {data_ptr, vtable_ptr}
+            const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+            var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+            return c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
         },
         .inferred => error.UnsupportedType,
     };

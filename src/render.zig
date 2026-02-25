@@ -439,6 +439,7 @@ fn renderTypeExpr(te: *const Ast.TypeExpr, pool: *const InternPool, writer: anyt
             try writer.writeAll("[]");
             try renderTypeExpr(elem, pool, writer);
         },
+        .trait_object => |sym| try writer.print("dyn {s}", .{pool.resolve(sym)}),
         .inferred => try writer.writeAll("_"),
     }
 }
