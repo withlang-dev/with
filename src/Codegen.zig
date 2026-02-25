@@ -902,6 +902,14 @@ fn genBinary(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
     const lhs = try self.genExpr(bin.lhs);
     const rhs = try self.genExpr(bin.rhs);
 
+    // Check for operator overloading via syntax traits.
+    const lhs_type = c.LLVMTypeOf(lhs);
+    if (c.LLVMGetTypeKind(lhs_type) == c.LLVMStructTypeKind) {
+        if (self.tryOperatorOverload(bin.op, lhs, lhs_type, rhs)) |result| {
+            return result;
+        }
+    }
+
     // Ensure operands have the same integer width for comparisons/arithmetic.
     const lhs_c, const rhs_c = self.coerceBinaryOperands(lhs, rhs);
 
@@ -1005,6 +1013,68 @@ fn genShortCircuitOr(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
     c.LLVMAddIncoming(phi, &incoming_vals, &incoming_bbs, 2);
 
     return phi;
+}
+
+/// Try to resolve a binary op via operator overloading (syntax traits).
+/// Returns null if no matching method found.
+fn tryOperatorOverload(
+    self: *Codegen,
+    op: Ast.BinOp,
+    lhs: c.LLVMValueRef,
+    lhs_type: c.LLVMTypeRef,
+    rhs: c.LLVMValueRef,
+) ?c.LLVMValueRef {
+    const method_name = switch (op) {
+        .add => "add",
+        .sub => "sub",
+        .mul => "mul",
+        .div => "div",
+        .mod => "mod",
+        .eq => "eq",
+        .neq => "neq",
+        .lt => "lt",
+        .gt => "gt",
+        .lte => "lte",
+        .gte => "gte",
+        else => return null,
+    };
+
+    // Find the type name for this struct.
+    var type_name_str: ?[]const u8 = null;
+    {
+        var it = self.struct_types.iterator();
+        while (it.next()) |entry| {
+            if (entry.value_ptr.llvm_type == lhs_type) {
+                type_name_str = self.pool.resolve(entry.key_ptr.*);
+                break;
+            }
+        }
+    }
+    const tn = type_name_str orelse return null;
+
+    // Build mangled name "Type.method".
+    var name_buf: [512]u8 = undefined;
+    if (tn.len + 1 + method_name.len >= name_buf.len) return null;
+    @memcpy(name_buf[0..tn.len], tn);
+    name_buf[tn.len] = '.';
+    @memcpy(name_buf[tn.len + 1 ..][0..method_name.len], method_name);
+    const mangled = name_buf[0 .. tn.len + 1 + method_name.len];
+    const fn_sym = self.pool.intern(mangled) catch return null;
+
+    const fn_info = self.functions.get(fn_sym) orelse return null;
+
+    // Call Type.method(self, rhs).
+    var args_buf = [_]c.LLVMValueRef{ lhs, rhs };
+    const ret_type = c.LLVMGetReturnType(fn_info.fn_type);
+    const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+    return c.LLVMBuildCall2(
+        self.builder,
+        fn_info.fn_type,
+        fn_info.value,
+        &args_buf,
+        2,
+        if (is_void) "" else "op",
+    );
 }
 
 /// Implement `??` (default operator): unwrap Option/Result or use default value.
