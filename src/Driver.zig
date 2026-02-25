@@ -167,7 +167,13 @@ pub fn compileToObject(self: *Driver, module: *const Ast.Module, output_path: [*
     defer cg.deinit();
 
     cg.genModule(module, &self.pool) catch {
-        self.writeStderr("error: code generation failed\n");
+        if (cg.comptime_error_msg) |msg| {
+            self.writeStderr("error: comptime_error: ");
+            self.writeStderr(msg);
+            self.writeStderr("\n");
+        } else {
+            self.writeStderr("error: code generation failed\n");
+        }
         return null;
     };
 
@@ -188,7 +194,13 @@ pub fn emitIR(self: *Driver, module: *const Ast.Module) !bool {
     defer cg.deinit();
 
     cg.genModule(module, &self.pool) catch {
-        self.writeStderr("error: code generation failed\n");
+        if (cg.comptime_error_msg) |msg| {
+            self.writeStderr("error: comptime_error: ");
+            self.writeStderr(msg);
+            self.writeStderr("\n");
+        } else {
+            self.writeStderr("error: code generation failed\n");
+        }
         return false;
     };
 

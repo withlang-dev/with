@@ -83,6 +83,8 @@ task_locals: std.AutoHashMapUnmanaged(u32, void) = .{},
 /// drop everything above that watermark in reverse order.
 scope_locals: [64]ScopedLocal = undefined,
 scope_local_count: u32 = 0,
+/// Comptime error message (set by comptime_error call, read by Driver).
+comptime_error_msg: ?[]const u8 = null,
 /// Generator state: pointer to the state struct (self param) during next() codegen.
 gen_state_ptr: ?c.LLVMValueRef = null,
 /// Generator state: the LLVM struct type of the state.
@@ -5285,6 +5287,18 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
     const assert_sym = self.pool.intern("assert") catch return error.CodegenAlloc;
     if (fn_sym == assert_sym) {
         return self.genAssertBuiltin(call_e.args);
+    }
+
+    // Built-in: comptime_error("msg") — emit compile-time error
+    const comptime_error_sym = self.pool.intern("comptime_error") catch return error.CodegenAlloc;
+    if (fn_sym == comptime_error_sym) {
+        if (call_e.args.len > 0) {
+            if (call_e.args[0].kind == .string_literal) {
+                const msg_sym = call_e.args[0].kind.string_literal;
+                self.emitComptimeError(msg_sym);
+            }
+        }
+        return error.UnsupportedExpr;
     }
 
     // Built-in: Some(val) — wraps a value in Option.
@@ -10543,6 +10557,11 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
         },
         .inferred => error.UnsupportedType,
     };
+}
+
+/// Store a comptime_error message for reporting by the Driver.
+fn emitComptimeError(self: *Codegen, msg_sym: u32) void {
+    self.comptime_error_msg = self.pool.resolve(msg_sym);
 }
 
 /// Create an alloca in the function's entry block (ensures it dominates all uses).
