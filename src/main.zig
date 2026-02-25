@@ -158,6 +158,13 @@ pub fn main() !void {
         printUsage();
     } else if (std.mem.eql(u8, command, "repl")) {
         try runRepl(allocator);
+    } else if (std.mem.eql(u8, command, "doc")) {
+        if (args.len < 3) {
+            stderrPrint("error: 'doc' requires a source file argument\n");
+            printUsage();
+            std.process.exit(1);
+        }
+        try generateDoc(args[2], allocator);
     } else if (std.mem.eql(u8, command, "version") or std.mem.eql(u8, command, "--version")) {
         var buf: [256]u8 = undefined;
         var w = std.fs.File.stdout().writer(&buf);
@@ -192,6 +199,7 @@ fn printUsage() void {
         \\  check <file.w>    Parse and type-check a source file
         \\  fmt <file.w>      Format a source file (to stdout)
         \\  repl              Interactive REPL
+        \\  doc <file.w>      Generate documentation (markdown)
         \\  ir <file.w>       Dump LLVM IR (debug)
         \\  ast <file.w>      Parse and dump the AST (debug)
         \\  tokens <file.w>   Lex and dump tokens (debug)
@@ -356,6 +364,191 @@ fn runRepl(allocator: std.mem.Allocator) !void {
 
     try writer_iface.writeAll("\nGoodbye!\n");
     try out.interface.flush();
+}
+
+const Ast = @import("Ast.zig");
+const render = @import("render.zig");
+const InternPool = @import("InternPool.zig");
+
+fn generateDoc(path: []const u8, allocator: std.mem.Allocator) !void {
+    var driver = Driver.init(allocator);
+    defer driver.deinit();
+
+    // Read source for doc comment extraction
+    const source_text = std.fs.cwd().readFileAlloc(allocator, path, 1024 * 1024) catch "";
+    defer if (source_text.len > 0) allocator.free(source_text);
+
+    const module = try driver.compileFile(path) orelse {
+        stderrPrint("error: failed to parse file\n");
+        std.process.exit(1);
+    };
+
+    const pool = &driver.pool;
+
+    var out_buf: [16384]u8 = undefined;
+    var out = std.fs.File.stdout().writer(&out_buf);
+    const w = &out.interface;
+
+    // Header
+    const basename = std.fs.path.basename(path);
+    try w.print("# {s}\n\n", .{basename});
+
+    // Walk declarations
+    for (module.decls) |decl| {
+        switch (decl.kind) {
+            .function => |f| {
+                // Skip private functions and main
+                const name = pool.resolve(f.name);
+                if (std.mem.eql(u8, name, "main")) continue;
+
+                // Extract doc comment
+                const doc = extractDocComment(source_text, decl.span.start);
+                if (doc.len > 0 and std.mem.indexOf(u8, doc, "//") != null) {
+                    try w.print("{s}\n", .{doc});
+                }
+
+                // Function signature
+                try w.writeAll("```\n");
+                if (f.is_pub == .public) try w.writeAll("pub ");
+                if (f.is_async) try w.writeAll("async ");
+                if (f.is_gen) try w.writeAll("gen ");
+                try w.print("fn {s}", .{name});
+                if (f.type_params.len > 0) {
+                    try w.writeAll("[");
+                    for (f.type_params, 0..) |tp, tpi| {
+                        if (tpi > 0) try w.writeAll(", ");
+                        try w.print("{s}", .{pool.resolve(tp.name)});
+                        if (tp.bounds.len > 0) {
+                            try w.writeAll(": ");
+                            for (tp.bounds, 0..) |b, bi| {
+                                if (bi > 0) try w.writeAll(" + ");
+                                try w.print("{s}", .{pool.resolve(b)});
+                            }
+                        }
+                    }
+                    try w.writeAll("]");
+                }
+                try w.writeAll("(");
+                for (f.params, 0..) |p, i| {
+                    if (i > 0) try w.writeAll(", ");
+                    if (p.is_mut) try w.writeAll("mut ");
+                    try w.print("{s}", .{pool.resolve(p.name)});
+                    if (p.type_expr) |te| {
+                        try w.writeAll(": ");
+                        try render.renderTypeExpr(te, pool, w);
+                    }
+                }
+                try w.writeAll(")");
+                if (f.return_type) |rt| {
+                    try w.writeAll(" -> ");
+                    try render.renderTypeExpr(rt, pool, w);
+                }
+                try w.writeAll("\n```\n\n");
+            },
+            .type_decl => |td| {
+                const name = pool.resolve(td.name);
+                const doc = extractDocComment(source_text, decl.span.start);
+                if (doc.len > 0 and std.mem.indexOf(u8, doc, "//") != null) {
+                    try w.print("{s}\n", .{doc});
+                }
+
+                switch (td.kind) {
+                    .struct_def => |fields| {
+                        try w.print("### struct `{s}`\n\n", .{name});
+                        if (fields.len > 0) {
+                            try w.writeAll("| Field | Type |\n|-------|------|\n");
+                            for (fields) |fld| {
+                                try w.print("| `{s}` | `", .{pool.resolve(fld.name)});
+                                try render.renderTypeExpr(fld.type_expr, pool, w);
+                                try w.writeAll("` |\n");
+                            }
+                            try w.writeAll("\n");
+                        }
+                    },
+                    .enum_def => |variants| {
+                        try w.print("### enum `{s}`\n\n", .{name});
+                        for (variants) |v| {
+                            try w.print("- `{s}`", .{pool.resolve(v.name)});
+                            if (v.payload) |payload| {
+                                try w.writeAll("(");
+                                for (payload, 0..) |pt, pi| {
+                                    if (pi > 0) try w.writeAll(", ");
+                                    try render.renderTypeExpr(pt, pool, w);
+                                }
+                                try w.writeAll(")");
+                            }
+                            try w.writeAll("\n");
+                        }
+                        try w.writeAll("\n");
+                    },
+                    .alias => |al| {
+                        try w.print("### type `{s}` = `", .{name});
+                        try render.renderTypeExpr(al, pool, w);
+                        try w.writeAll("`\n\n");
+                    },
+                }
+            },
+            .trait_decl => |td| {
+                const name = pool.resolve(td.name);
+                const doc = extractDocComment(source_text, decl.span.start);
+                if (doc.len > 0 and std.mem.indexOf(u8, doc, "//") != null) {
+                    try w.print("{s}\n", .{doc});
+                }
+                try w.print("### trait `{s}`\n\n", .{name});
+                for (td.methods) |m| {
+                    try w.print("- `fn {s}(", .{pool.resolve(m.name)});
+                    for (m.params, 0..) |p, i| {
+                        if (i > 0) try w.writeAll(", ");
+                        try w.print("{s}", .{pool.resolve(p.name)});
+                        if (p.type_expr) |te| {
+                            try w.writeAll(": ");
+                            try render.renderTypeExpr(te, pool, w);
+                        }
+                    }
+                    try w.writeAll(")");
+                    if (m.return_type) |rt| {
+                        try w.writeAll(" -> ");
+                        try render.renderTypeExpr(rt, pool, w);
+                    }
+                    try w.writeAll("`\n");
+                }
+                try w.writeAll("\n");
+            },
+            else => {},
+        }
+    }
+
+    try out.interface.flush();
+}
+
+/// Extract doc comments (// lines) immediately preceding a declaration.
+fn extractDocComment(source: []const u8, decl_start: usize) []const u8 {
+    if (decl_start == 0 or source.len == 0) return "";
+    // Walk backwards from decl_start to find consecutive // comment lines
+    var pos = decl_start;
+    // Skip backwards past whitespace before the declaration
+    while (pos > 0 and (source[pos - 1] == ' ' or source[pos - 1] == '\t')) pos -= 1;
+    if (pos > 0 and source[pos - 1] == '\n') pos -= 1;
+
+    // Now find the start of comment block
+    const comment_end = pos;
+    while (pos > 0) {
+        // Find start of this line
+        var line_start = pos;
+        while (line_start > 0 and source[line_start - 1] != '\n') line_start -= 1;
+        // Check if this line is a // comment
+        const line = std.mem.trimLeft(u8, source[line_start .. pos + 1], " \t");
+        if (line.len >= 2 and line[0] == '/' and line[1] == '/') {
+            // Continue searching
+            if (line_start == 0) return source[0 .. comment_end + 1];
+            pos = line_start - 1;
+        } else {
+            // Not a comment — return what we found
+            if (line_start >= comment_end) return "";
+            return source[line_start + 1 .. comment_end + 1];
+        }
+    }
+    return "";
 }
 
 fn dumpTokens(path: []const u8, allocator: std.mem.Allocator) !void {

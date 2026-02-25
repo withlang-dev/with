@@ -430,7 +430,7 @@ fn renderPattern(pat: *const Ast.Pattern, pool: *const InternPool, writer: anyty
     }
 }
 
-fn renderTypeExpr(te: *const Ast.TypeExpr, pool: *const InternPool, writer: anytype) !void {
+pub fn renderTypeExpr(te: *const Ast.TypeExpr, pool: *const InternPool, writer: anytype) !void {
     switch (te.kind) {
         .named => |n| try writer.print("{s}", .{pool.resolve(n)}),
         .generic => |g| {
