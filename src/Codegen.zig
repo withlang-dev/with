@@ -58,6 +58,9 @@ result_type_cache: std.AutoHashMapUnmanaged(u64, OptionResultInfo) = .{},
 /// Slice element types: local symbol → element LLVM type.
 /// Tracks which locals are slice types so we can index into them.
 slice_elem_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
+/// Enum-typed locals: local symbol → enum type symbol.
+/// Tracks which locals hold enum values for println.
+enum_local_types: std.AutoHashMapUnmanaged(u32, u32) = .{},
 /// Drop functions: struct type Symbol → FnInfo for Type.drop.
 drop_fns: std.AutoHashMapUnmanaged(u32, FnInfo) = .{},
 /// Stack of scoped local variable lists for Drop emission.
@@ -206,6 +209,7 @@ pub fn deinit(self: *Codegen) void {
     self.result_type_cache.deinit(self.allocator);
     self.drop_fns.deinit(self.allocator);
     self.slice_elem_types.deinit(self.allocator);
+    self.enum_local_types.deinit(self.allocator);
     c.LLVMDisposeBuilder(self.builder);
     c.LLVMDisposeModule(self.module);
     c.LLVMContextDispose(self.context);
@@ -1594,6 +1598,23 @@ fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
             .ty = ty,
         };
         self.scope_local_count += 1;
+    }
+
+    // Track enum type for the local (for println support).
+    if (let_b.value.kind == .ident) {
+        const val_sym = let_b.value.kind.ident;
+        // Check if the ident is an enum variant.
+        var eit = self.enum_types.iterator();
+        while (eit.next()) |entry| {
+            for (entry.value_ptr.variant_names) |vn| {
+                if (vn == val_sym) {
+                    self.enum_local_types.put(self.allocator, let_b.name, entry.key_ptr.*) catch {};
+                    break;
+                }
+            }
+        }
+    } else if (let_b.value.kind == .enum_variant) {
+        self.enum_local_types.put(self.allocator, let_b.name, let_b.value.kind.enum_variant.type_name) catch {};
     }
 
     // Track slice element type if the binding is a slice type.
@@ -3835,11 +3856,130 @@ fn genPrintStruct(self: *Codegen, val: c.LLVMValueRef, ty: c.LLVMTypeRef, printf
         var close_args = [_]c.LLVMValueRef{close_str};
         _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &close_args, 1, "");
     } else {
-        // Unknown struct, just print "<struct>"
-        const unknown_str = c.LLVMBuildGlobalStringPtr(self.builder, "<struct>", "");
-        var unknown_args = [_]c.LLVMValueRef{unknown_str};
-        _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &unknown_args, 1, "");
+        // Check if it's an enum type.
+        var enum_info: ?EnumTypeInfo = null;
+        var enum_sym: u32 = 0;
+        {
+            var eit = self.enum_types.iterator();
+            while (eit.next()) |entry| {
+                if (entry.value_ptr.llvm_type == ty) {
+                    enum_info = entry.value_ptr.*;
+                    enum_sym = entry.key_ptr.*;
+                    break;
+                }
+            }
+        }
+        if (enum_info) |ei| {
+            try self.genPrintEnum(val, ty, alloca, ei, enum_sym, printf_info);
+        } else {
+            // Unknown struct, just print "<struct>"
+            const unknown_str = c.LLVMBuildGlobalStringPtr(self.builder, "<struct>", "");
+            var unknown_args = [_]c.LLVMValueRef{unknown_str};
+            _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &unknown_args, 1, "");
+        }
     }
+}
+
+fn genPrintSimpleEnum(self: *Codegen, tag_val: c.LLVMValueRef, ei: EnumTypeInfo, printf_info: FnInfo) Error!void {
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const function = self.current_function;
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "print.merge");
+
+    const num_variants = ei.variant_names.len;
+    const switch_inst = c.LLVMBuildSwitch(self.builder, tag_val, merge_bb, @intCast(num_variants));
+
+    for (ei.variant_names, 0..) |variant_sym, i| {
+        const variant_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "print.v");
+        c.LLVMAddCase(switch_inst, c.LLVMConstInt(i32_type, @intCast(i), 0), variant_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, variant_bb);
+
+        const variant_name = self.pool.resolve(variant_sym);
+        var name_buf: [256]u8 = undefined;
+        const nl = @min(variant_name.len, 254);
+        @memcpy(name_buf[0..nl], variant_name[0..nl]);
+        name_buf[nl] = 0;
+        const name_z: [*:0]const u8 = @ptrCast(name_buf[0..nl :0]);
+        const fmt_str = c.LLVMBuildGlobalStringPtr(self.builder, "%s", "");
+        const name_global = c.LLVMBuildGlobalStringPtr(self.builder, name_z, "");
+        var print_args = [_]c.LLVMValueRef{ fmt_str, name_global };
+        _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &print_args, 2, "");
+
+        _ = c.LLVMBuildBr(self.builder, merge_bb);
+    }
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+}
+
+fn genPrintEnum(
+    self: *Codegen,
+    val: c.LLVMValueRef,
+    ty: c.LLVMTypeRef,
+    alloca: c.LLVMValueRef,
+    ei: EnumTypeInfo,
+    enum_sym: u32,
+    printf_info: FnInfo,
+) Error!void {
+    _ = enum_sym;
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+
+    // Extract tag from the enum struct.
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, ty, alloca, 0, "");
+    const tag_val = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag");
+
+    // Build a switch that prints the appropriate variant name.
+    const function = self.current_function;
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "print.merge");
+
+    // Create BBs for each variant.
+    const num_variants = ei.variant_names.len;
+    const switch_inst = c.LLVMBuildSwitch(self.builder, tag_val, merge_bb, @intCast(num_variants));
+
+    for (ei.variant_names, 0..) |variant_sym, i| {
+        const variant_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "print.variant");
+        c.LLVMAddCase(switch_inst, c.LLVMConstInt(i32_type, @intCast(i), 0), variant_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, variant_bb);
+
+        const variant_name = self.pool.resolve(variant_sym);
+
+        if (ei.variant_payload_types[i]) |payload_type| {
+            // Variant with payload: print "VariantName(payload)"
+            var name_buf: [256]u8 = undefined;
+            const nl = @min(variant_name.len, 250);
+            @memcpy(name_buf[0..nl], variant_name[0..nl]);
+            name_buf[nl] = '(';
+            name_buf[nl + 1] = 0;
+            const name_z: [*:0]const u8 = @ptrCast(name_buf[0 .. nl + 1 :0]);
+            const name_global = c.LLVMBuildGlobalStringPtr(self.builder, name_z, "");
+            var name_args = [_]c.LLVMValueRef{name_global};
+            _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &name_args, 1, "");
+
+            // Extract payload: GEP into field 1 (payload bytes), bitcast to payload type.
+            const payload_gep = c.LLVMBuildStructGEP2(self.builder, ty, alloca, 1, "");
+            const payload_val = c.LLVMBuildLoad2(self.builder, payload_type, payload_gep, "payload");
+            try self.genPrintValue(payload_val, printf_info);
+
+            const close_str = c.LLVMBuildGlobalStringPtr(self.builder, ")", "");
+            var close_args = [_]c.LLVMValueRef{close_str};
+            _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &close_args, 1, "");
+        } else {
+            // Unit variant: just print "VariantName"
+            var name_buf: [256]u8 = undefined;
+            const nl = @min(variant_name.len, 254);
+            @memcpy(name_buf[0..nl], variant_name[0..nl]);
+            name_buf[nl] = 0;
+            const name_z: [*:0]const u8 = @ptrCast(name_buf[0..nl :0]);
+            const name_global = c.LLVMBuildGlobalStringPtr(self.builder, name_z, "");
+            var name_args = [_]c.LLVMValueRef{name_global};
+            _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &name_args, 1, "");
+        }
+
+        _ = c.LLVMBuildBr(self.builder, merge_bb);
+    }
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    _ = val; // val was already stored to alloca
 }
 
 /// Generate a print/println call with string interpolation support.
@@ -3868,7 +4008,27 @@ fn genPrintlnOrPrint(self: *Codegen, args: []const *const Ast.Expr, add_newline:
     // Non-interpolated: print each arg.
     for (args) |arg| {
         const val = try self.genExpr(arg);
-        try self.genPrintValue(val, printf_info);
+        // Check if arg is an enum-typed local.
+        const printed_enum = blk: {
+            if (arg.kind == .ident) {
+                if (self.enum_local_types.get(arg.kind.ident)) |enum_sym| {
+                    if (self.enum_types.get(enum_sym)) |ei| {
+                        if (c.LLVMGetTypeKind(ei.llvm_type) == c.LLVMStructTypeKind) {
+                            // Payload enum — use genPrintStruct path (already handles it).
+                            break :blk false;
+                        } else {
+                            // Simple enum (i32) — print variant name.
+                            try self.genPrintSimpleEnum(val, ei, printf_info);
+                            break :blk true;
+                        }
+                    }
+                }
+            }
+            break :blk false;
+        };
+        if (!printed_enum) {
+            try self.genPrintValue(val, printf_info);
+        }
     }
     if (add_newline) {
         const nl = c.LLVMBuildGlobalStringPtr(self.builder, "\n", "nl");
