@@ -195,6 +195,8 @@ pub const ExprKind = union(enum) {
     variant_shorthand: Symbol,
     /// Await: `expr.await`
     await_expr: *const Expr,
+    /// Spawn: `spawn expr` (fire-and-forget async)
+    spawn_expr: *const Expr,
     /// Pipeline: `a |> f`
     pipeline: PipelineExpr,
     /// Grouped expression (parenthesized)

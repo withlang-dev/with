@@ -845,6 +845,10 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
         },
         .poisoned => error_type,
         .await_expr => |inner| self.checkExpr(inner),
+        .spawn_expr => |inner| {
+            _ = self.checkExpr(inner);
+            return self.ty_void;
+        },
         .yield_expr => |inner| self.checkExpr(inner),
     };
 }
@@ -1700,7 +1704,11 @@ fn isBuiltinFn(self: *Sema, sym: Symbol) bool {
         std.mem.eql(u8, name, "assert") or
         std.mem.eql(u8, name, "Some") or
         std.mem.eql(u8, name, "Ok") or
-        std.mem.eql(u8, name, "Err");
+        std.mem.eql(u8, name, "Err") or
+        std.mem.eql(u8, name, "Channel") or
+        std.mem.eql(u8, name, "send") or
+        std.mem.eql(u8, name, "recv") or
+        std.mem.eql(u8, name, "close");
 }
 
 fn isBuiltinValue(self: *Sema, sym: Symbol) bool {
