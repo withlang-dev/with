@@ -237,13 +237,35 @@ fn lexDotIdentifier(self: *Lexer, start: u32) Token {
 
 fn lexString(self: *Lexer, start: u32) Token {
     self.pos += 1; // skip opening "
+
+    // Check for triple-quoted multi-line string: """..."""
+    if (self.pos + 1 < self.source.len and self.source[self.pos] == '"' and self.source[self.pos + 1] == '"') {
+        self.pos += 2; // skip the two additional quotes
+        // Skip optional leading newline after opening """
+        if (self.pos < self.source.len and self.source[self.pos] == '\n') {
+            self.pos += 1;
+        }
+        while (self.pos + 2 < self.source.len) {
+            if (self.source[self.pos] == '"' and self.source[self.pos + 1] == '"' and self.source[self.pos + 2] == '"') {
+                self.pos += 3;
+                return self.makeToken(.string_literal, start, self.pos);
+            }
+            if (self.source[self.pos] == '\\') {
+                self.pos += 1; // skip escape char
+            }
+            self.pos += 1;
+        }
+        self.diagnostics.emit(Diagnostic.err("unterminated multi-line string", self.spanFrom(start, self.pos)));
+        return self.makeToken(.string_literal, start, self.pos);
+    }
+
     while (self.pos < self.source.len) {
-        const c = self.source[self.pos];
-        if (c == '"') {
+        const ch = self.source[self.pos];
+        if (ch == '"') {
             self.pos += 1;
             return self.makeToken(.string_literal, start, self.pos);
         }
-        if (c == '\\') {
+        if (ch == '\\') {
             self.pos += 1; // skip escape char
         }
         self.pos += 1;
