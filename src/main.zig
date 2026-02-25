@@ -113,6 +113,37 @@ pub fn main() !void {
         } else {
             std.process.exit(1);
         }
+    } else if (std.mem.eql(u8, command, "check")) {
+        if (args.len < 3) {
+            stderrPrint("error: 'check' requires a source file argument\n");
+            printUsage();
+            std.process.exit(1);
+        }
+        var driver = Driver.init(allocator);
+        defer driver.deinit();
+
+        const module = try driver.compileFile(args[2]);
+        if (module) |_| {
+            stderrPrint("ok\n");
+        } else {
+            std.process.exit(1);
+        }
+    } else if (std.mem.eql(u8, command, "fmt")) {
+        if (args.len < 3) {
+            stderrPrint("error: 'fmt' requires a source file argument\n");
+            printUsage();
+            std.process.exit(1);
+        }
+        var driver = Driver.init(allocator);
+        defer driver.deinit();
+
+        const module = try driver.compileFile(args[2]);
+        if (module) |m| {
+            // Render the AST back to formatted source.
+            try driver.dumpAst(&m);
+        } else {
+            std.process.exit(1);
+        }
     } else if (std.mem.eql(u8, command, "tokens")) {
         if (args.len < 3) {
             var buf: [4096]u8 = undefined;
@@ -155,6 +186,8 @@ fn printUsage() void {
         \\Commands:
         \\  build <file.w>    Compile a With source file to a binary
         \\  run <file.w>      Compile and run a With source file
+        \\  check <file.w>    Parse and type-check a source file
+        \\  fmt <file.w>      Format a source file (to stdout)
         \\  ir <file.w>       Dump LLVM IR (debug)
         \\  ast <file.w>      Parse and dump the AST (debug)
         \\  tokens <file.w>   Lex and dump tokens (debug)
