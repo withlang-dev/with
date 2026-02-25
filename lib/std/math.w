@@ -49,3 +49,60 @@ pub fn floor_f64(x: f64) -> f64 =
 // Ceil (f64 -> f64)
 pub fn ceil_f64(x: f64) -> f64 =
     ceil(x)
+
+// Round (f64 -> f64)
+pub fn round_f64(x: f64) -> f64 =
+    round(x)
+
+// Sine (radians)
+pub fn sin_f64(x: f64) -> f64 =
+    sin(x)
+
+// Cosine (radians)
+pub fn cos_f64(x: f64) -> f64 =
+    cos(x)
+
+// Tangent (radians)
+pub fn tan_f64(x: f64) -> f64 =
+    tan(x)
+
+// Natural logarithm
+pub fn log_f64(x: f64) -> f64 =
+    log(x)
+
+// Base-10 logarithm
+pub fn log10_f64(x: f64) -> f64 =
+    log10(x)
+
+// Exponential (e^x)
+pub fn exp_f64(x: f64) -> f64 =
+    exp(x)
+
+// Absolute value (f64)
+pub fn fabs_f64(x: f64) -> f64 =
+    fabs(x)
+
+// Float modulo
+pub fn fmod_f64(x: f64, y: f64) -> f64 =
+    fmod(x, y)
+
+// Arc sine
+pub fn asin_f64(x: f64) -> f64 =
+    asin(x)
+
+// Arc cosine
+pub fn acos_f64(x: f64) -> f64 =
+    acos(x)
+
+// Arc tangent
+pub fn atan_f64(x: f64) -> f64 =
+    atan(x)
+
+// Two-argument arc tangent
+pub fn atan2_f64(y: f64, x: f64) -> f64 =
+    atan2(y, x)
+
+// Constants
+pub let PI: f64 = 3.14159265358979323846
+pub let E: f64 = 2.71828182845904523536
+pub let TAU: f64 = 6.28318530717958647692
