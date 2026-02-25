@@ -70,7 +70,23 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
                     try writer.writeAll(" }");
                 },
                 .alias => |a| try renderTypeExpr(a, pool, writer),
-                .enum_def => try writer.writeAll("enum { ... }"),
+                .enum_def => |variants| {
+                    try writer.writeAll("\n");
+                    for (variants, 0..) |v, vi| {
+                        try writeIndent(writer, indent + 2);
+                        if (vi > 0) try writer.writeAll("| ");
+                        try writer.print("{s}", .{pool.resolve(v.name)});
+                        if (v.payload) |payloads| {
+                            try writer.writeAll("(");
+                            for (payloads, 0..) |p, pi| {
+                                if (pi > 0) try writer.writeAll(", ");
+                                try renderTypeExpr(p, pool, writer);
+                            }
+                            try writer.writeAll(")");
+                        }
+                        try writer.writeAll("\n");
+                    }
+                },
             }
         },
         .use_decl => |u| {
@@ -147,7 +163,10 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
 }
 
 fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, indent: u32) !void {
-    try writeIndent(writer, indent);
+    // Blocks don't emit their own indent — they delegate to children.
+    if (expr.kind != .block) {
+        try writeIndent(writer, indent);
+    }
     switch (expr.kind) {
         .int_literal => |v| try writer.print("{d}", .{v}),
         .float_literal => |v| try writer.print("{d}", .{v}),
@@ -195,11 +214,11 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
         },
         .block => |b| {
             for (b.stmts) |s| {
-                try renderExpr(s, pool, writer, indent + 2);
+                try renderExpr(s, pool, writer, indent);
                 try writer.writeAll("\n");
             }
             if (b.tail) |t| {
-                try renderExpr(t, pool, writer, indent + 2);
+                try renderExpr(t, pool, writer, indent);
             }
         },
         .if_expr => |ie| {
