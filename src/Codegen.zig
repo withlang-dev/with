@@ -3521,11 +3521,86 @@ fn genPrintValue(self: *Codegen, val: c.LLVMValueRef, printf_info: FnInfo) Error
             print_val = c.LLVMBuildFPExt(self.builder, val, c.LLVMDoubleTypeInContext(self.context), "");
         }
         fmt = "%g";
+    } else if (kind == c.LLVMStructTypeKind) {
+        // Print struct: TypeName { field1: val1, field2: val2 }
+        try self.genPrintStruct(val, ty, printf_info);
+        return;
     }
 
     const fmt_str = c.LLVMBuildGlobalStringPtr(self.builder, @ptrCast(fmt.ptr), "fmt");
     var args = [_]c.LLVMValueRef{ fmt_str, print_val };
     _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &args, 2, "");
+}
+
+fn genPrintStruct(self: *Codegen, val: c.LLVMValueRef, ty: c.LLVMTypeRef, printf_info: FnInfo) Error!void {
+    // Find the struct type info and its name.
+    var struct_info: ?StructTypeInfo = null;
+    var type_name_sym: u32 = 0;
+    {
+        var it = self.struct_types.iterator();
+        while (it.next()) |entry| {
+            if (entry.value_ptr.llvm_type == ty) {
+                struct_info = entry.value_ptr.*;
+                type_name_sym = entry.key_ptr.*;
+                break;
+            }
+        }
+    }
+
+    // Store val to temp alloca for GEP access.
+    const alloca = c.LLVMBuildAlloca(self.builder, ty, "print.tmp");
+    _ = c.LLVMBuildStore(self.builder, val, alloca);
+
+    if (struct_info) |si| {
+        // Print "TypeName { "
+        const name_str = self.pool.resolve(type_name_sym);
+        var open_buf: [256]u8 = undefined;
+        const open_len = @min(name_str.len, 240);
+        @memcpy(open_buf[0..open_len], name_str[0..open_len]);
+        @memcpy(open_buf[open_len..][0..3], " { ");
+        open_buf[open_len + 3] = 0;
+        const open_z: [*:0]const u8 = @ptrCast(open_buf[0 .. open_len + 3 :0]);
+        const open_global = c.LLVMBuildGlobalStringPtr(self.builder, open_z, "");
+        var open_args = [_]c.LLVMValueRef{open_global};
+        _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &open_args, 1, "");
+
+        // Print each field.
+        for (si.field_names, 0..) |field_sym, i| {
+            if (i > 0) {
+                const comma_str = c.LLVMBuildGlobalStringPtr(self.builder, ", ", "");
+                var comma_args = [_]c.LLVMValueRef{comma_str};
+                _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &comma_args, 1, "");
+            }
+
+            // Print "field_name: "
+            const field_name = self.pool.resolve(field_sym);
+            var label_buf: [256]u8 = undefined;
+            const fl = @min(field_name.len, 250);
+            @memcpy(label_buf[0..fl], field_name[0..fl]);
+            @memcpy(label_buf[fl..][0..2], ": ");
+            label_buf[fl + 2] = 0;
+            const label_z: [*:0]const u8 = @ptrCast(label_buf[0 .. fl + 2 :0]);
+            const label_global = c.LLVMBuildGlobalStringPtr(self.builder, label_z, "");
+            var label_args = [_]c.LLVMValueRef{label_global};
+            _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &label_args, 1, "");
+
+            // Get field value and print it.
+            const idx: u32 = @intCast(i);
+            const gep = c.LLVMBuildStructGEP2(self.builder, ty, alloca, idx, "");
+            const field_val = c.LLVMBuildLoad2(self.builder, si.field_types[i], gep, "");
+            try self.genPrintValue(field_val, printf_info);
+        }
+
+        // Print " }"
+        const close_str = c.LLVMBuildGlobalStringPtr(self.builder, " }", "");
+        var close_args = [_]c.LLVMValueRef{close_str};
+        _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &close_args, 1, "");
+    } else {
+        // Unknown struct, just print "<struct>"
+        const unknown_str = c.LLVMBuildGlobalStringPtr(self.builder, "<struct>", "");
+        var unknown_args = [_]c.LLVMValueRef{unknown_str};
+        _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &unknown_args, 1, "");
+    }
 }
 
 /// Generate a print/println call with string interpolation support.
