@@ -1689,7 +1689,7 @@ fn parseMatchExpr(self: *Parser) !*const Ast.Expr {
         const tag = self.peek();
         if (tag != .identifier and tag != .int_literal and
             tag != .dot_identifier and tag != .true_literal and tag != .false_literal and
-            tag != .string_literal)
+            tag != .string_literal and tag != .minus)
         {
             break;
         }
@@ -1750,7 +1750,7 @@ fn parseMatchExpr(self: *Parser) !*const Ast.Expr {
         const next_tag = self.peek();
         const is_arm_token = (next_tag == .identifier or next_tag == .int_literal or
             next_tag == .dot_identifier or next_tag == .true_literal or next_tag == .false_literal or
-            next_tag == .string_literal);
+            next_tag == .string_literal or next_tag == .minus);
         if (!is_arm_token) {
             self.pos = save;
             break;
@@ -1814,6 +1814,18 @@ fn parsePattern(self: *Parser) !Ast.Pattern {
             const sym = try self.pool.intern(raw);
             self.advance();
             return .{ .kind = .{ .string_literal = sym }, .span = span };
+        },
+        .minus => {
+            // Negative integer pattern: `-42`
+            self.advance(); // consume '-'
+            const num_span = self.currentSpan();
+            const text = self.source[num_span.start..num_span.end];
+            try self.expect(.int_literal);
+            const val = std.fmt.parseInt(i64, text, 0) catch 0;
+            return .{
+                .kind = .{ .int_literal = -val },
+                .span = span.merge(self.prevSpan()),
+            };
         },
         .identifier => {
             const name = try self.expectIdentifier();
