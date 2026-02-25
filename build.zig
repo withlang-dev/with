@@ -105,9 +105,36 @@ pub fn build(b: *std.Build) void {
     link_cmd.addArgs(&.{"-o"});
     const output = link_cmd.addOutputFileArg("with");
 
+    // --- Build fiber runtime ---
+    const fiber_c = b.addSystemCommand(&.{
+        "cc",
+        "-isysroot",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-c",
+        "runtime/fiber.c",
+        "-o",
+    });
+    const fiber_c_out = fiber_c.addOutputFileArg("fiber.o");
+
+    const fiber_asm = b.addSystemCommand(&.{
+        "cc",
+        "-isysroot",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-c",
+        "runtime/fiber_asm_aarch64.s",
+        "-o",
+    });
+    const fiber_asm_out = fiber_asm.addOutputFileArg("fiber_asm.o");
+
     // --- Install ---
     const install = b.addInstallBinFile(output, "with");
     b.getInstallStep().dependOn(&install.step);
+
+    // Install runtime objects alongside the compiler.
+    const install_fiber_c = b.addInstallBinFile(fiber_c_out, "runtime/fiber.o");
+    const install_fiber_asm = b.addInstallBinFile(fiber_asm_out, "runtime/fiber_asm.o");
+    b.getInstallStep().dependOn(&install_fiber_c.step);
+    b.getInstallStep().dependOn(&install_fiber_asm.step);
 
     // --- Run step (`zig build run -- <args>`) ---
     const run_step = b.step("run", "Run the With compiler");

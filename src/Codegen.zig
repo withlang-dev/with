@@ -95,6 +95,8 @@ gen_payload_type: ?c.LLVMTypeRef = null,
 gen_yield_count: u32 = 0,
 /// Generator state: current yield index during codegen.
 gen_current_yield: u32 = 0,
+/// Whether the program uses async/await (requires fiber runtime linking).
+uses_async: bool = false,
 
 const ScopedLocal = struct {
     sym: u32,
@@ -320,7 +322,9 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
         switch (decl.kind) {
             .function => |fn_decl| {
                 if (fn_decl.is_gen) continue; // already declared in pass 0.7
-                if (fn_decl.type_params.len > 0) {
+                if (fn_decl.is_async) {
+                    try self.declareAsyncFunction(fn_decl);
+                } else if (fn_decl.type_params.len > 0) {
                     self.generic_fns.put(self.allocator, fn_decl.name, fn_decl) catch
                         return error.CodegenAlloc;
                 } else {
@@ -349,12 +353,19 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
             .function => |fn_decl| {
                 if (fn_decl.is_gen) {
                     try self.genGeneratorBody(fn_decl);
+                } else if (fn_decl.is_async) {
+                    try self.genAsyncFunction(fn_decl);
                 } else if (fn_decl.type_params.len == 0) {
                     try self.genFunction(fn_decl);
                 }
             },
             else => {},
         }
+    }
+
+    // If async is used, wrap main to init/run/shutdown the runtime.
+    if (self.uses_async) {
+        try self.wrapMainForAsync();
     }
 
     try self.verify();
@@ -1812,6 +1823,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .index => |idx| try self.genIndex(idx),
         .slice => |sl| try self.genSlice(sl),
         .array_literal => |elems| try self.genArrayLiteral(elems),
+        .array_comprehension => |comp| try self.genArrayComprehension(comp),
         .struct_literal => |sl| try self.genStructLiteral(sl),
         .match_expr => |m| try self.genMatchExpr(m),
         .enum_variant => |ev| try self.genEnumVariant(ev),
@@ -1832,6 +1844,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .record_update => |ru| try self.genRecordUpdate(ru),
         .tuple_destructure => |td| try self.genTupleDestructure(td),
         .yield_expr => |val| try self.genYield(val),
+        .await_expr => |inner| try self.genAwait(inner),
         else => error.UnsupportedExpr,
     };
 }
@@ -1891,6 +1904,383 @@ fn genYield(self: *Codegen, val_expr: *const Ast.Expr) Error!c.LLVMValueRef {
     // The yield expression itself evaluates to void (in the state machine, control
     // continues after yield with reloaded locals).
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+// ── Async/Await codegen ─────────────────────────────────────────────
+
+/// Declare the fiber runtime extern functions (lazy, called once).
+fn declareAsyncRuntime(self: *Codegen) void {
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const void_type = c.LLVMVoidTypeInContext(self.context);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+
+    // void with_runtime_init(void)
+    if (c.LLVMGetNamedFunction(self.module, "with_runtime_init") == null) {
+        var no_params: [0]c.LLVMTypeRef = undefined;
+        const init_ft = c.LLVMFunctionType(void_type, &no_params, 0, 0);
+        _ = c.LLVMAddFunction(self.module, "with_runtime_init", init_ft);
+    }
+
+    // void with_runtime_run(void)
+    if (c.LLVMGetNamedFunction(self.module, "with_runtime_run") == null) {
+        var no_params: [0]c.LLVMTypeRef = undefined;
+        const run_ft = c.LLVMFunctionType(void_type, &no_params, 0, 0);
+        _ = c.LLVMAddFunction(self.module, "with_runtime_run", run_ft);
+    }
+
+    // void with_runtime_shutdown(void)
+    if (c.LLVMGetNamedFunction(self.module, "with_runtime_shutdown") == null) {
+        var no_params: [0]c.LLVMTypeRef = undefined;
+        const shutdown_ft = c.LLVMFunctionType(void_type, &no_params, 0, 0);
+        _ = c.LLVMAddFunction(self.module, "with_runtime_shutdown", shutdown_ft);
+    }
+
+    // i32 with_fiber_spawn(fn_ptr, void_ptr)
+    if (c.LLVMGetNamedFunction(self.module, "with_fiber_spawn") == null) {
+        var spawn_params = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+        const spawn_ft = c.LLVMFunctionType(i32_type, &spawn_params, 2, 0);
+        _ = c.LLVMAddFunction(self.module, "with_fiber_spawn", spawn_ft);
+    }
+
+    // i64 with_fiber_await(i32)
+    if (c.LLVMGetNamedFunction(self.module, "with_fiber_await") == null) {
+        var await_params = [_]c.LLVMTypeRef{i32_type};
+        const await_ft = c.LLVMFunctionType(i64_type, &await_params, 1, 0);
+        _ = c.LLVMAddFunction(self.module, "with_fiber_await", await_ft);
+    }
+
+    // void with_fiber_set_result(i64)
+    if (c.LLVMGetNamedFunction(self.module, "with_fiber_set_result") == null) {
+        var set_params = [_]c.LLVMTypeRef{i64_type};
+        const set_ft = c.LLVMFunctionType(void_type, &set_params, 1, 0);
+        _ = c.LLVMAddFunction(self.module, "with_fiber_set_result", set_ft);
+    }
+
+    // void with_fiber_yield(void)
+    if (c.LLVMGetNamedFunction(self.module, "with_fiber_yield") == null) {
+        var no_params: [0]c.LLVMTypeRef = undefined;
+        const yield_ft = c.LLVMFunctionType(void_type, &no_params, 0, 0);
+        _ = c.LLVMAddFunction(self.module, "with_fiber_yield", yield_ft);
+    }
+
+    self.uses_async = true;
+}
+
+/// Declare an async function. Creates:
+/// 1. The actual implementation: `fn_name_async(params) -> ret_type`
+/// 2. An args struct type for the parameters
+/// 3. A fiber entry trampoline: `fn_name_fiber(arg: *void) -> void`
+/// 4. The public function: `fn_name(params) -> i32` (returns Task ID)
+fn declareAsyncFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
+    self.declareAsyncRuntime();
+
+    const name = self.pool.resolve(func.name);
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const void_type = c.LLVMVoidTypeInContext(self.context);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+
+    // 1. Declare the implementation function: fn_name_async(params) -> ret_type
+    var param_types_buf: [32]c.LLVMTypeRef = undefined;
+    for (func.params, 0..) |param, i| {
+        param_types_buf[i] = if (param.type_expr) |te| self.resolveType(te) catch i32_type else i32_type;
+    }
+    const ret_type = if (func.return_type) |rt| self.resolveType(rt) catch i32_type else void_type;
+    const param_count: u32 = @intCast(func.params.len);
+    const impl_fn_type = c.LLVMFunctionType(ret_type, &param_types_buf, param_count, 0);
+
+    var impl_name_buf: [256]u8 = undefined;
+    const impl_name = std.fmt.bufPrint(&impl_name_buf, "{s}_async", .{name}) catch return error.CodegenAlloc;
+    impl_name_buf[impl_name.len] = 0;
+    const impl_fn = c.LLVMAddFunction(self.module, impl_name_buf[0..impl_name.len :0], impl_fn_type);
+
+    // Store the impl function so genAsyncFunction can find it.
+    // Use a mangled symbol.
+    const impl_sym = self.pool.intern(impl_name) catch return error.CodegenAlloc;
+    self.functions.put(self.allocator, impl_sym, .{
+        .value = impl_fn,
+        .fn_type = impl_fn_type,
+    }) catch return error.CodegenAlloc;
+
+    // 2. Create args struct if params exist.
+    var args_struct_type: c.LLVMTypeRef = undefined;
+    if (param_count > 0) {
+        args_struct_type = c.LLVMStructTypeInContext(self.context, &param_types_buf, param_count, 0);
+    } else {
+        args_struct_type = c.LLVMStructTypeInContext(self.context, null, 0, 0);
+    }
+
+    // 3. Declare fiber trampoline: fn_name_fiber(arg: *void) -> void
+    var tramp_params = [_]c.LLVMTypeRef{ptr_type};
+    const tramp_fn_type = c.LLVMFunctionType(void_type, &tramp_params, 1, 0);
+    var tramp_name_buf: [256]u8 = undefined;
+    const tramp_name = std.fmt.bufPrint(&tramp_name_buf, "{s}_fiber", .{name}) catch return error.CodegenAlloc;
+    tramp_name_buf[tramp_name.len] = 0;
+    _ = c.LLVMAddFunction(self.module, tramp_name_buf[0..tramp_name.len :0], tramp_fn_type);
+
+    // 4. Declare the public spawn function: fn_name(params) -> i32 (Task ID)
+    const spawn_fn_type = c.LLVMFunctionType(i32_type, &param_types_buf, param_count, 0);
+    var spawn_name_buf: [256]u8 = undefined;
+    const spawn_name = std.fmt.bufPrint(&spawn_name_buf, "{s}", .{name}) catch return error.CodegenAlloc;
+    spawn_name_buf[spawn_name.len] = 0;
+    const spawn_fn = c.LLVMAddFunction(self.module, spawn_name_buf[0..spawn_name.len :0], spawn_fn_type);
+
+    // Store the public function under the original name.
+    self.functions.put(self.allocator, func.name, .{
+        .value = spawn_fn,
+        .fn_type = spawn_fn_type,
+    }) catch return error.CodegenAlloc;
+
+    // tramp_fn and args_struct_type will be reconstructed in genAsyncFunction.
+}
+
+/// Generate the body of an async function (impl, trampoline, spawn wrapper).
+fn genAsyncFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
+    const name = self.pool.resolve(func.name);
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const void_type = c.LLVMVoidTypeInContext(self.context);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+
+    // Find the implementation function.
+    var impl_name_buf: [256]u8 = undefined;
+    const impl_name = std.fmt.bufPrint(&impl_name_buf, "{s}_async", .{name}) catch return error.CodegenAlloc;
+    const impl_sym = self.pool.intern(impl_name) catch return error.CodegenAlloc;
+    const impl_info = self.functions.get(impl_sym) orelse return error.UnsupportedExpr;
+    const impl_fn = impl_info.value;
+
+    // Get param types.
+    const param_count: u32 = @intCast(func.params.len);
+    var param_types_buf: [32]c.LLVMTypeRef = undefined;
+    for (func.params, 0..) |param, i| {
+        param_types_buf[i] = if (param.type_expr) |te| self.resolveType(te) catch i32_type else i32_type;
+    }
+    const ret_type = if (func.return_type) |rt| self.resolveType(rt) catch i32_type else void_type;
+
+    // Args struct type.
+    var args_struct_type: c.LLVMTypeRef = undefined;
+    if (param_count > 0) {
+        args_struct_type = c.LLVMStructTypeInContext(self.context, &param_types_buf, param_count, 0);
+    } else {
+        args_struct_type = c.LLVMStructTypeInContext(self.context, null, 0, 0);
+    }
+
+    // ── 1. Generate the implementation function body ─────────────────
+    {
+        self.current_function = impl_fn;
+        self.current_ret_type = ret_type;
+        self.locals.clearRetainingCapacity();
+        self.defer_depth = 0;
+        self.scope_local_count = 0;
+        self.trait_locals.clearRetainingCapacity();
+
+        const saved_expected = self.expected_type;
+        self.expected_type = ret_type;
+
+        const entry = c.LLVMAppendBasicBlockInContext(self.context, impl_fn, "entry");
+        c.LLVMPositionBuilderAtEnd(self.builder, entry);
+
+        // Add params as locals.
+        for (func.params, 0..) |param, i| {
+            const param_val = c.LLVMGetParam(impl_fn, @intCast(i));
+            const param_type = c.LLVMTypeOf(param_val);
+            const alloca = c.LLVMBuildAlloca(self.builder, param_type, "");
+            _ = c.LLVMBuildStore(self.builder, param_val, alloca);
+            self.locals.put(self.allocator, param.name, .{
+                .alloca = alloca,
+                .ty = param_type,
+                .is_mut = param.is_mut,
+            }) catch return error.CodegenAlloc;
+        }
+
+        const body_val = try self.genExpr(func.body);
+
+        self.expected_type = saved_expected;
+
+        const current_bb = c.LLVMGetInsertBlock(self.builder);
+        if (c.LLVMGetBasicBlockTerminator(current_bb) == null) {
+            const is_void = ret_type == void_type;
+            try self.emitDrops(0);
+            try self.emitDefers();
+            if (!is_void) {
+                const body_type = c.LLVMTypeOf(body_val);
+                if (body_type == void_type) {
+                    _ = c.LLVMBuildRet(self.builder, c.LLVMConstInt(ret_type, 0, 0));
+                } else {
+                    const coerced = self.coerceInt(body_val, ret_type);
+                    _ = c.LLVMBuildRet(self.builder, coerced);
+                }
+            } else {
+                _ = c.LLVMBuildRetVoid(self.builder);
+            }
+        }
+    }
+
+    // ── 2. Generate the fiber trampoline ─────────────────────────────
+    {
+        var tramp_name_buf: [256]u8 = undefined;
+        const tramp_name = std.fmt.bufPrint(&tramp_name_buf, "{s}_fiber", .{name}) catch return error.CodegenAlloc;
+        tramp_name_buf[tramp_name.len] = 0;
+        const tramp_fn = c.LLVMGetNamedFunction(self.module, tramp_name_buf[0..tramp_name.len :0]) orelse return error.UnsupportedExpr;
+
+        self.current_function = tramp_fn;
+        const entry = c.LLVMAppendBasicBlockInContext(self.context, tramp_fn, "entry");
+        c.LLVMPositionBuilderAtEnd(self.builder, entry);
+
+        // Load args from the void* parameter.
+        const arg_ptr = c.LLVMGetParam(tramp_fn, 0);
+
+        // Call the implementation function.
+        var call_args: [32]c.LLVMValueRef = undefined;
+        for (0..param_count) |i| {
+            const idx: u32 = @intCast(i);
+            var indices = [_]c.LLVMValueRef{
+                c.LLVMConstInt(i32_type, 0, 0),
+                c.LLVMConstInt(i32_type, idx, 0),
+            };
+            const gep = c.LLVMBuildGEP2(self.builder, args_struct_type, arg_ptr, &indices, 2, "");
+            call_args[i] = c.LLVMBuildLoad2(self.builder, param_types_buf[i], gep, "");
+        }
+
+        const result = c.LLVMBuildCall2(self.builder, impl_info.fn_type, impl_fn, &call_args, param_count, "");
+
+        // Store result via with_fiber_set_result.
+        if (ret_type != void_type) {
+            const set_result_fn = c.LLVMGetNamedFunction(self.module, "with_fiber_set_result") orelse return error.UnsupportedExpr;
+            var set_params = [_]c.LLVMTypeRef{i64_type};
+            const set_ft = c.LLVMFunctionType(void_type, &set_params, 1, 0);
+            // Extend result to i64 if needed.
+            const result_i64 = if (ret_type == i64_type)
+                result
+            else
+                c.LLVMBuildSExt(self.builder, result, i64_type, "");
+            var set_args = [_]c.LLVMValueRef{result_i64};
+            _ = c.LLVMBuildCall2(self.builder, set_ft, set_result_fn, &set_args, 1, "");
+        }
+        _ = c.LLVMBuildRetVoid(self.builder);
+    }
+
+    // ── 3. Generate the spawn wrapper ────────────────────────────────
+    {
+        const spawn_info = self.functions.get(func.name) orelse return error.UnsupportedExpr;
+        const spawn_fn = spawn_info.value;
+
+        self.current_function = spawn_fn;
+        const entry = c.LLVMAppendBasicBlockInContext(self.context, spawn_fn, "entry");
+        c.LLVMPositionBuilderAtEnd(self.builder, entry);
+
+        // Allocate args struct on heap (malloc).
+        const args_size = c.LLVMSizeOf(args_struct_type);
+        const malloc_fn = self.getOrDeclareMalloc();
+        var malloc_args = [_]c.LLVMValueRef{args_size};
+        const i64_type_local = c.LLVMInt64TypeInContext(self.context);
+        var malloc_param_types = [_]c.LLVMTypeRef{i64_type_local};
+        const malloc_ft = c.LLVMFunctionType(ptr_type, &malloc_param_types, 1, 0);
+        const args_ptr = c.LLVMBuildCall2(self.builder, malloc_ft, malloc_fn, &malloc_args, 1, "args");
+
+        // Store each parameter into the args struct.
+        for (0..param_count) |i| {
+            const idx: u32 = @intCast(i);
+            const param_val = c.LLVMGetParam(spawn_fn, idx);
+            var indices = [_]c.LLVMValueRef{
+                c.LLVMConstInt(i32_type, 0, 0),
+                c.LLVMConstInt(i32_type, idx, 0),
+            };
+            const gep = c.LLVMBuildGEP2(self.builder, args_struct_type, args_ptr, &indices, 2, "");
+            _ = c.LLVMBuildStore(self.builder, param_val, gep);
+        }
+
+        // Call with_fiber_spawn(trampoline_fn, args_ptr).
+        var tramp_name_buf2: [256]u8 = undefined;
+        const tramp_name2 = std.fmt.bufPrint(&tramp_name_buf2, "{s}_fiber", .{name}) catch return error.CodegenAlloc;
+        tramp_name_buf2[tramp_name2.len] = 0;
+        const tramp_fn = c.LLVMGetNamedFunction(self.module, tramp_name_buf2[0..tramp_name2.len :0]) orelse return error.UnsupportedExpr;
+
+        const spawn_rt_fn = c.LLVMGetNamedFunction(self.module, "with_fiber_spawn") orelse return error.UnsupportedExpr;
+        var spawn_params = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+        const spawn_ft = c.LLVMFunctionType(i32_type, &spawn_params, 2, 0);
+        var spawn_args = [_]c.LLVMValueRef{ tramp_fn, args_ptr };
+        const task_id = c.LLVMBuildCall2(self.builder, spawn_ft, spawn_rt_fn, &spawn_args, 2, "task");
+
+        _ = c.LLVMBuildRet(self.builder, task_id);
+    }
+}
+
+/// Generate an await expression: calls with_fiber_await(task_id).
+fn genAwait(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef {
+    self.declareAsyncRuntime();
+
+    // Evaluate the inner expression (should be a Task ID, i.e., i32).
+    const task_id = try self.genExpr(inner);
+
+    // Call with_fiber_await(task_id) -> i64.
+    const await_fn = c.LLVMGetNamedFunction(self.module, "with_fiber_await") orelse return error.UnsupportedExpr;
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var await_params = [_]c.LLVMTypeRef{i32_type};
+    const await_ft = c.LLVMFunctionType(i64_type, &await_params, 1, 0);
+
+    var args = [_]c.LLVMValueRef{task_id};
+    const result_i64 = c.LLVMBuildCall2(self.builder, await_ft, await_fn, &args, 1, "await.result");
+
+    // Truncate i64 result to i32 (common case). If expected_type is set, use that.
+    if (self.expected_type) |expected| {
+        if (expected == i32_type) {
+            return c.LLVMBuildTrunc(self.builder, result_i64, i32_type, "await.trunc");
+        }
+        if (expected == i64_type) {
+            return result_i64;
+        }
+    }
+    // Default: truncate to i32.
+    return c.LLVMBuildTrunc(self.builder, result_i64, i32_type, "await.trunc");
+}
+
+/// Wrap the user's main function to init/run/shutdown the fiber runtime.
+/// Renames `main` → `main_user`, creates new `main` that calls runtime lifecycle.
+fn wrapMainForAsync(self: *Codegen) Error!void {
+    const original_main = c.LLVMGetNamedFunction(self.module, "main") orelse return;
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const void_type = c.LLVMVoidTypeInContext(self.context);
+
+    // Rename original main.
+    c.LLVMSetValueName2(original_main, "main_user", 9);
+
+    // Create new main.
+    var no_params: [0]c.LLVMTypeRef = undefined;
+    const main_ft = c.LLVMFunctionType(i32_type, &no_params, 0, 0);
+    const new_main = c.LLVMAddFunction(self.module, "main", main_ft);
+    const entry = c.LLVMAppendBasicBlockInContext(self.context, new_main, "entry");
+    c.LLVMPositionBuilderAtEnd(self.builder, entry);
+
+    // Call with_runtime_init().
+    const init_fn = c.LLVMGetNamedFunction(self.module, "with_runtime_init") orelse return error.UnsupportedExpr;
+    const void_ft = c.LLVMFunctionType(void_type, &no_params, 0, 0);
+    _ = c.LLVMBuildCall2(self.builder, void_ft, init_fn, null, 0, "");
+
+    // Call main_user().
+    const user_main_ft = c.LLVMFunctionType(i32_type, &no_params, 0, 0);
+    const user_result = c.LLVMBuildCall2(self.builder, user_main_ft, original_main, null, 0, "user.result");
+
+    // Call with_runtime_run() — runs remaining fibers.
+    const run_fn = c.LLVMGetNamedFunction(self.module, "with_runtime_run") orelse return error.UnsupportedExpr;
+    _ = c.LLVMBuildCall2(self.builder, void_ft, run_fn, null, 0, "");
+
+    // Call with_runtime_shutdown().
+    const shutdown_fn = c.LLVMGetNamedFunction(self.module, "with_runtime_shutdown") orelse return error.UnsupportedExpr;
+    _ = c.LLVMBuildCall2(self.builder, void_ft, shutdown_fn, null, 0, "");
+
+    _ = c.LLVMBuildRet(self.builder, user_result);
+}
+
+/// Get or declare malloc for heap allocation.
+fn getOrDeclareMalloc(self: *Codegen) c.LLVMValueRef {
+    if (c.LLVMGetNamedFunction(self.module, "malloc")) |f| return f;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var params = [_]c.LLVMTypeRef{i64_type};
+    const ft = c.LLVMFunctionType(ptr_type, &params, 1, 0);
+    return c.LLVMAddFunction(self.module, "malloc", ft);
 }
 
 fn genTuple(self: *Codegen, elems: []const *const Ast.Expr) Error!c.LLVMValueRef {
@@ -4812,6 +5202,150 @@ fn genArrayLiteral(self: *Codegen, elems: []const *const Ast.Expr) Error!c.LLVMV
     }
 
     return c.LLVMBuildLoad2(self.builder, array_type, alloca, "arr.val");
+}
+
+fn genArrayComprehension(self: *Codegen, comp: Ast.ArrayComprehension) Error!c.LLVMValueRef {
+    // Currently only supports range-based comprehensions: [expr for x in start..end]
+    if (comp.iterable.kind != .range) return error.UnsupportedExpr;
+    const range = comp.iterable.kind.range;
+
+    // Evaluate range bounds.
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const start_val = if (range.start) |s| try self.genExpr(s) else c.LLVMConstInt(i32_type, 0, 0);
+    const end_val = if (range.end) |e| try self.genExpr(e) else return error.UnsupportedExpr;
+
+    // Compute array size = end - start (or end - start + 1 for inclusive).
+    const iter_type = c.LLVMTypeOf(end_val);
+    const coerced_start = self.coerceInt(start_val, iter_type);
+    var size_val = c.LLVMBuildSub(self.builder, end_val, coerced_start, "comp.size");
+    if (range.inclusive) {
+        size_val = c.LLVMBuildAdd(self.builder, size_val, c.LLVMConstInt(iter_type, 1, 0), "comp.size.inc");
+    }
+
+    // For fixed-size arrays, we need constant bounds. Try to evaluate.
+    // If bounds are constants, create a fixed-size array.
+    const start_const = c.LLVMIsConstant(coerced_start);
+    const end_const = c.LLVMIsConstant(end_val);
+
+    if (start_const != 0 and end_const != 0) {
+        // Constants: we can determine size at compile time.
+        const start_int: i64 = c.LLVMConstIntGetSExtValue(coerced_start);
+        const end_int: i64 = c.LLVMConstIntGetSExtValue(end_val);
+        const array_size: u64 = @intCast(if (range.inclusive) end_int - start_int + 1 else end_int - start_int);
+
+        // Evaluate first element to determine element type.
+        // We need to set up the binding variable first.
+        const binding_alloca = c.LLVMBuildAlloca(self.builder, iter_type, "comp.var");
+        _ = c.LLVMBuildStore(self.builder, coerced_start, binding_alloca);
+
+        // Save and set up binding.
+        const old_local = self.locals.get(comp.binding);
+        self.locals.put(self.allocator, comp.binding, .{
+            .alloca = binding_alloca,
+            .ty = iter_type,
+            .is_mut = false,
+        }) catch return error.CodegenAlloc;
+
+        // Generate first element to get the element type.
+        const first_val = try self.genExpr(comp.expr);
+        const elem_type = c.LLVMTypeOf(first_val);
+        const arr_type = c.LLVMArrayType2(elem_type, array_size);
+
+        // Allocate the result array.
+        const arr_alloca = c.LLVMBuildAlloca(self.builder, arr_type, "comp.arr");
+
+        // Store first element.
+        const zero = c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+        if (comp.filter == null) {
+            // No filter: simple indexed store.
+            var idx0 = [_]c.LLVMValueRef{ zero, c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0) };
+            const gep0 = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &idx0, 2, "");
+            _ = c.LLVMBuildStore(self.builder, first_val, gep0);
+        }
+
+        // Generate the loop for remaining elements.
+        const function = self.current_function;
+        const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.cond");
+        const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.body");
+        const inc_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.inc");
+        const end_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.end");
+
+        // Index counter.
+        const idx_alloca = c.LLVMBuildAlloca(self.builder, iter_type, "comp.idx");
+
+        if (comp.filter == null) {
+            // Start loop from second element (first already stored above).
+            const second = c.LLVMBuildAdd(self.builder, coerced_start, c.LLVMConstInt(iter_type, 1, 0), "");
+            _ = c.LLVMBuildStore(self.builder, second, binding_alloca);
+            _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(iter_type, 1, 0), idx_alloca);
+        } else {
+            // With filter, start from beginning (no pre-store).
+            _ = c.LLVMBuildStore(self.builder, coerced_start, binding_alloca);
+            _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(iter_type, 0, 0), idx_alloca);
+        }
+
+        _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+        // Condition: binding < end.
+        c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+        const cur = c.LLVMBuildLoad2(self.builder, iter_type, binding_alloca, "");
+        const cmp_op: c_uint = if (range.inclusive) c.LLVMIntSLE else c.LLVMIntSLT;
+        const cond = c.LLVMBuildICmp(self.builder, cmp_op, cur, end_val, "comp.cmp");
+        _ = c.LLVMBuildCondBr(self.builder, cond, body_bb, end_bb);
+
+        // Body: evaluate expr, store in array.
+        c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+        const val = try self.genExpr(comp.expr);
+        const cur_idx = c.LLVMBuildLoad2(self.builder, iter_type, idx_alloca, "");
+
+        if (comp.filter) |filter| {
+            // With filter: conditionally store.
+            const filter_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.filter");
+            const store_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.store");
+
+            const filter_val = try self.genExpr(filter);
+            _ = c.LLVMBuildCondBr(self.builder, filter_val, store_bb, filter_bb);
+
+            // Store path.
+            c.LLVMPositionBuilderAtEnd(self.builder, store_bb);
+            var store_indices = [_]c.LLVMValueRef{ zero, cur_idx };
+            const gep = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &store_indices, 2, "");
+            _ = c.LLVMBuildStore(self.builder, val, gep);
+            // Increment idx.
+            const next_idx = c.LLVMBuildAdd(self.builder, cur_idx, c.LLVMConstInt(iter_type, 1, 0), "");
+            _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+            _ = c.LLVMBuildBr(self.builder, inc_bb);
+
+            // Skip path (filter_bb): just go to inc.
+            c.LLVMPositionBuilderAtEnd(self.builder, filter_bb);
+            _ = c.LLVMBuildBr(self.builder, inc_bb);
+        } else {
+            // No filter: always store.
+            var store_indices = [_]c.LLVMValueRef{ zero, cur_idx };
+            const gep = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &store_indices, 2, "");
+            _ = c.LLVMBuildStore(self.builder, val, gep);
+            // Increment idx.
+            const next_idx = c.LLVMBuildAdd(self.builder, cur_idx, c.LLVMConstInt(iter_type, 1, 0), "");
+            _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+            _ = c.LLVMBuildBr(self.builder, inc_bb);
+        }
+
+        // Increment: binding += 1.
+        c.LLVMPositionBuilderAtEnd(self.builder, inc_bb);
+        const loaded = c.LLVMBuildLoad2(self.builder, iter_type, binding_alloca, "");
+        const next = c.LLVMBuildAdd(self.builder, loaded, c.LLVMConstInt(iter_type, 1, 0), "");
+        _ = c.LLVMBuildStore(self.builder, next, binding_alloca);
+        _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+        // End: restore old binding and load result.
+        c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+        if (old_local) |ol| {
+            self.locals.put(self.allocator, comp.binding, ol) catch return error.CodegenAlloc;
+        }
+        return c.LLVMBuildLoad2(self.builder, arr_type, arr_alloca, "comp.result");
+    }
+
+    return error.UnsupportedExpr;
 }
 
 fn genIndex(self: *Codegen, idx: Ast.IndexExpr) Error!c.LLVMValueRef {
