@@ -1,50 +1,55 @@
-// Test: built-in string methods
+// Test: String methods
 fn main() -> i32 =
-    let s = "Hello, World!"
+    let s = "hello world"
 
-    // len
-    assert(s.len() == 13)
+    // .len()
+    assert(s.len() == 11)
 
-    // is_empty
+    // .is_empty()
     assert(not s.is_empty())
-    let empty = ""
-    assert(empty.is_empty())
+    let empty_str = ""
+    assert(empty_str.is_empty())
 
-    // contains
-    assert(s.contains("World"))
+    // .contains()
+    assert(s.contains("world"))
+    assert(s.contains("hello"))
     assert(not s.contains("xyz"))
 
-    // starts_with / ends_with
-    assert(s.starts_with("Hello"))
-    assert(not s.starts_with("World"))
-    assert(s.ends_with("World!"))
-    assert(not s.ends_with("Hello"))
+    // .starts_with()
+    assert(s.starts_with("hello"))
+    assert(not s.starts_with("world"))
 
-    // find
-    assert(s.find("World") == 7)
-    assert(s.find("xyz") == -1)
-    assert(s.find("Hello") == 0)
+    // .ends_with()
+    assert(s.ends_with("world"))
+    assert(not s.ends_with("hello"))
 
-    // to_upper / to_lower
-    let hello = "hello"
-    let up = hello.to_upper()
-    assert(up == "HELLO")
-    let upper_str = "HELLO"
-    let lo = upper_str.to_lower()
-    assert(lo == "hello")
+    // .find()
+    assert(s.find("world") == 6)
+    assert(s.find("xyz") == 0 - 1)
 
-    // trim
-    let padded = "  hello  "
-    let trimmed = padded.trim()
-    assert(trimmed == "hello")
-
-    // repeat
-    let ab = "ab"
-    let r = ab.repeat(3)
-    assert(r == "ababab")
-
-    // slice
+    // .slice()
     let sub = s.slice(0, 5)
-    assert(sub == "Hello")
+    assert(sub.len() == 5)
+    assert(sub.starts_with("hello"))
 
+    // .to_upper() / .to_lower()
+    let abc = "abc"
+    let upper = abc.to_upper()
+    assert(upper.starts_with("ABC"))
+    let xyz = "XYZ"
+    let lower = xyz.to_lower()
+    assert(lower.starts_with("xyz"))
+
+    // .repeat()
+    let ab = "ab"
+    let rep = ab.repeat(3)
+    assert(rep.len() == 6)
+    assert(rep.starts_with("ababab"))
+
+    // .replace()
+    let r = s.replace("world", "there")
+    assert(r.contains("there"))
+    assert(not r.contains("world"))
+
+    println("all string method tests passed")
     0

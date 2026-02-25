@@ -1856,12 +1856,30 @@ fn isBuiltinFn(self: *Sema, sym: Symbol) bool {
         std.mem.eql(u8, name, "close") or
         std.mem.eql(u8, name, "Vec") or
         std.mem.eql(u8, name, "HashMap") or
-        std.mem.eql(u8, name, "HashSet");
+        std.mem.eql(u8, name, "HashSet") or
+        // Math builtins
+        std.mem.eql(u8, name, "abs") or
+        std.mem.eql(u8, name, "min") or
+        std.mem.eql(u8, name, "max") or
+        std.mem.eql(u8, name, "clamp") or
+        std.mem.eql(u8, name, "sqrt_f64") or
+        std.mem.eql(u8, name, "pow_f64") or
+        std.mem.eql(u8, name, "floor_f64") or
+        std.mem.eql(u8, name, "ceil_f64") or
+        std.mem.eql(u8, name, "sin_f64") or
+        std.mem.eql(u8, name, "cos_f64") or
+        std.mem.eql(u8, name, "log_f64") or
+        std.mem.eql(u8, name, "exp_f64") or
+        std.mem.eql(u8, name, "fabs_f64");
 }
 
 fn isBuiltinValue(self: *Sema, sym: Symbol) bool {
     const name = self.pool.resolve(sym);
-    return std.mem.eql(u8, name, "None");
+    return std.mem.eql(u8, name, "None") or
+        std.mem.eql(u8, name, "PI") or
+        std.mem.eql(u8, name, "E") or
+        std.mem.eql(u8, name, "INFINITY") or
+        std.mem.eql(u8, name, "NAN");
 }
 
 // ── Helper: method key lookup ────────────────────────────────────
