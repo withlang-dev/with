@@ -3271,22 +3271,77 @@ fn genArrayLiteral(self: *Codegen, elems: []const *const Ast.Expr) Error!c.LLVMV
 }
 
 fn genIndex(self: *Codegen, idx: Ast.IndexExpr) Error!c.LLVMValueRef {
-    const arr_sym = switch (idx.expr.kind) {
-        .ident => |s| s,
-        else => return error.UnsupportedExpr,
-    };
+    // Fast path: direct local variable indexing.
+    if (idx.expr.kind == .ident) {
+        const arr_sym = idx.expr.kind.ident;
+        if (self.locals.get(arr_sym)) |local| {
+            // Array indexing.
+            if (c.LLVMGetTypeKind(local.ty) == c.LLVMArrayTypeKind) {
+                const index_val = try self.genExpr(idx.index);
+                const i32_type = c.LLVMInt32TypeInContext(self.context);
+                const index_i32 = self.coerceInt(index_val, i32_type);
+                const zero = c.LLVMConstInt(i32_type, 0, 0);
+                var indices = [_]c.LLVMValueRef{ zero, index_i32 };
+                const gep = c.LLVMBuildGEP2(self.builder, local.ty, local.alloca, &indices, 2, "");
+                const elem_type = c.LLVMGetElementType(local.ty);
+                return c.LLVMBuildLoad2(self.builder, elem_type, gep, "elem");
+            }
+            // Struct with `get` method → operator overload.
+            if (c.LLVMGetTypeKind(local.ty) == c.LLVMStructTypeKind) {
+                const obj_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
+                return self.tryIndexOverload(obj_val, local.ty, idx.index);
+            }
+        }
+    }
 
-    const local = self.locals.get(arr_sym) orelse return error.UnsupportedExpr;
+    // General path: evaluate the expression, check its type.
+    const obj_val = try self.genExpr(idx.expr);
+    const obj_type = c.LLVMTypeOf(obj_val);
 
-    const index_val = try self.genExpr(idx.index);
-    const i32_type = c.LLVMInt32TypeInContext(self.context);
-    const index_i32 = self.coerceInt(index_val, i32_type);
-    const zero = c.LLVMConstInt(i32_type, 0, 0);
-    var indices = [_]c.LLVMValueRef{ zero, index_i32 };
-    const gep = c.LLVMBuildGEP2(self.builder, local.ty, local.alloca, &indices, 2, "");
+    if (c.LLVMGetTypeKind(obj_type) == c.LLVMStructTypeKind) {
+        return self.tryIndexOverload(obj_val, obj_type, idx.index);
+    }
 
-    const elem_type = c.LLVMGetElementType(local.ty);
-    return c.LLVMBuildLoad2(self.builder, elem_type, gep, "elem");
+    return error.UnsupportedExpr;
+}
+
+fn tryIndexOverload(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef, index_expr: *const Ast.Expr) Error!c.LLVMValueRef {
+    // Look for Type.get(self, index) method.
+    var type_name_str: ?[]const u8 = null;
+    {
+        var it = self.struct_types.iterator();
+        while (it.next()) |entry| {
+            if (entry.value_ptr.llvm_type == obj_type) {
+                type_name_str = self.pool.resolve(entry.key_ptr.*);
+                break;
+            }
+        }
+    }
+    const tn = type_name_str orelse return error.UnsupportedExpr;
+
+    var name_buf: [512]u8 = undefined;
+    const method_name = "get";
+    if (tn.len + 1 + method_name.len >= name_buf.len) return error.UnsupportedExpr;
+    @memcpy(name_buf[0..tn.len], tn);
+    name_buf[tn.len] = '.';
+    @memcpy(name_buf[tn.len + 1 ..][0..method_name.len], method_name);
+    const mangled = name_buf[0 .. tn.len + 1 + method_name.len];
+    const fn_sym = self.pool.intern(mangled) catch return error.CodegenAlloc;
+
+    const fn_info = self.functions.get(fn_sym) orelse return error.UnsupportedExpr;
+
+    const index_val = try self.genExpr(index_expr);
+    var args_buf = [_]c.LLVMValueRef{ obj_val, index_val };
+    const ret_type = c.LLVMGetReturnType(fn_info.fn_type);
+    const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+    return c.LLVMBuildCall2(
+        self.builder,
+        fn_info.fn_type,
+        fn_info.value,
+        &args_buf,
+        2,
+        if (is_void) "" else "idx",
+    );
 }
 
 fn genFieldAccess(self: *Codegen, fa: Ast.FieldAccessExpr) Error!c.LLVMValueRef {
