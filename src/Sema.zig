@@ -1710,7 +1710,8 @@ fn isBuiltinFn(self: *Sema, sym: Symbol) bool {
         std.mem.eql(u8, name, "send") or
         std.mem.eql(u8, name, "recv") or
         std.mem.eql(u8, name, "close") or
-        std.mem.eql(u8, name, "Vec");
+        std.mem.eql(u8, name, "Vec") or
+        std.mem.eql(u8, name, "HashMap");
 }
 
 fn isBuiltinValue(self: *Sema, sym: Symbol) bool {

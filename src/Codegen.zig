@@ -99,12 +99,23 @@ gen_current_yield: u32 = 0,
 vec_type_cache: std.AutoHashMapUnmanaged(usize, VecTypeInfo) = .{},
 /// Vec-typed locals: local symbol → element LLVM type.
 vec_local_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
+/// Cache of HashMap types keyed by combined key+val type pointer hash.
+hashmap_type_cache: std.AutoHashMapUnmanaged(u64, HashMapTypeInfo) = .{},
+/// HashMap-typed locals: local symbol → HashMapTypeInfo.
+hashmap_local_types: std.AutoHashMapUnmanaged(u32, HashMapTypeInfo) = .{},
 /// Whether the program uses async/await (requires fiber runtime linking).
 uses_async: bool = false,
 
 const VecTypeInfo = struct {
     llvm_type: c.LLVMTypeRef, // struct { ptr, i64, i64 }
     elem_type: c.LLVMTypeRef,
+};
+
+const HashMapTypeInfo = struct {
+    llvm_type: c.LLVMTypeRef, // named struct { ptr }
+    key_type: c.LLVMTypeRef,
+    val_type: c.LLVMTypeRef,
+    is_str_key: bool,
 };
 
 const ScopedLocal = struct {
@@ -256,6 +267,8 @@ pub fn deinit(self: *Codegen) void {
     self.result_type_cache.deinit(self.allocator);
     self.vec_type_cache.deinit(self.allocator);
     self.vec_local_types.deinit(self.allocator);
+    self.hashmap_type_cache.deinit(self.allocator);
+    self.hashmap_local_types.deinit(self.allocator);
     self.drop_fns.deinit(self.allocator);
     self.slice_elem_types.deinit(self.allocator);
     self.enum_local_types.deinit(self.allocator);
@@ -3400,6 +3413,272 @@ fn genVecPop(self: *Codegen, vec_alloca: c.LLVMValueRef, vec_type: c.LLVMTypeRef
     return phi;
 }
 
+// ---- HashMap[K,V] ----
+
+/// Get or create a HashMap[K,V] type.
+/// HashMap layout: named struct { ptr } — the ptr points to a C-allocated WithHashMap.
+fn getOrCreateHashMapType(self: *Codegen, key_type: c.LLVMTypeRef, val_type: c.LLVMTypeRef) Error!HashMapTypeInfo {
+    const cache_key: u64 = @intFromPtr(key_type) ^ (@as(u64, @intFromPtr(val_type)) << 1);
+    if (self.hashmap_type_cache.get(cache_key)) |info| return info;
+
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    var body = [_]c.LLVMTypeRef{ptr_type};
+    const llvm_type = c.LLVMStructCreateNamed(self.context, "HashMap");
+    c.LLVMStructSetBody(llvm_type, &body, 1, 0);
+
+    const is_str_key = self.isStrType(key_type);
+    const info = HashMapTypeInfo{
+        .llvm_type = llvm_type,
+        .key_type = key_type,
+        .val_type = val_type,
+        .is_str_key = is_str_key,
+    };
+    self.hashmap_type_cache.put(self.allocator, cache_key, info) catch return error.CodegenAlloc;
+    return info;
+}
+
+/// Check if an LLVM type is a HashMap type.
+fn isHashMapType(self: *Codegen, ty: c.LLVMTypeRef) bool {
+    if (c.LLVMGetTypeKind(ty) != c.LLVMStructTypeKind) return false;
+    var it = self.hashmap_type_cache.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == ty) return true;
+    }
+    return false;
+}
+
+/// Get HashMapTypeInfo for a HashMap LLVM type.
+fn getHashMapTypeInfo(self: *Codegen, ty: c.LLVMTypeRef) ?HashMapTypeInfo {
+    var it = self.hashmap_type_cache.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == ty) return entry.value_ptr.*;
+    }
+    return null;
+}
+
+/// Ensure with_hashmap_new is declared.
+fn ensureHashMapNewDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("with_hashmap_new") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{ i64_type, i64_type };
+    const fn_type = c.LLVMFunctionType(ptr_type, &param_types, 2, 0);
+    const func = c.LLVMAddFunction(self.module, "with_hashmap_new", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// Ensure with_hashmap_insert is declared.
+fn ensureHashMapInsertDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("with_hashmap_insert") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type, ptr_type, i64_type };
+    const fn_type = c.LLVMFunctionType(c.LLVMVoidTypeInContext(self.context), &param_types, 4, 0);
+    const func = c.LLVMAddFunction(self.module, "with_hashmap_insert", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// Ensure with_hashmap_get is declared.
+fn ensureHashMapGetDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("with_hashmap_get") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type, ptr_type, i64_type };
+    const fn_type = c.LLVMFunctionType(i64_type, &param_types, 4, 0);
+    const func = c.LLVMAddFunction(self.module, "with_hashmap_get", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// Ensure with_hashmap_contains is declared.
+fn ensureHashMapContainsDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("with_hashmap_contains") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type, i64_type };
+    const fn_type = c.LLVMFunctionType(i64_type, &param_types, 3, 0);
+    const func = c.LLVMAddFunction(self.module, "with_hashmap_contains", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// Ensure with_hashmap_remove is declared.
+fn ensureHashMapRemoveDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("with_hashmap_remove") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type, i64_type };
+    const fn_type = c.LLVMFunctionType(i64_type, &param_types, 3, 0);
+    const func = c.LLVMAddFunction(self.module, "with_hashmap_remove", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// Ensure with_hashmap_len is declared.
+fn ensureHashMapLenDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("with_hashmap_len") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{ptr_type};
+    const fn_type = c.LLVMFunctionType(i64_type, &param_types, 1, 0);
+    const func = c.LLVMAddFunction(self.module, "with_hashmap_len", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// Generate HashMap.new() — creates a new empty HashMap.
+fn genHashMapNew(self: *Codegen, key_type: c.LLVMTypeRef, val_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const hm_info = try self.getOrCreateHashMapType(key_type, val_type);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const new_info = self.ensureHashMapNewDeclared();
+
+    // Call with_hashmap_new(key_size, val_size)
+    const data_layout = c.LLVMGetModuleDataLayout(self.module);
+    const key_size = c.LLVMABISizeOfType(data_layout, key_type);
+    const val_size = c.LLVMABISizeOfType(data_layout, val_type);
+    var call_args = [_]c.LLVMValueRef{
+        c.LLVMConstInt(i64_type, key_size, 0),
+        c.LLVMConstInt(i64_type, val_size, 0),
+    };
+    const map_ptr = c.LLVMBuildCall2(self.builder, new_info.fn_type, new_info.value, &call_args, 2, "hashmap.ptr");
+
+    // Wrap in HashMap struct { ptr }
+    const alloca = c.LLVMBuildAlloca(self.builder, hm_info.llvm_type, "hashmap");
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, hm_info.llvm_type, alloca, 0, "");
+    _ = c.LLVMBuildStore(self.builder, map_ptr, ptr_gep);
+    return c.LLVMBuildLoad2(self.builder, hm_info.llvm_type, alloca, "hashmap.val");
+}
+
+/// Generate map.insert(key, val) — inserts or updates a key-value pair.
+fn genHashMapInsert(self: *Codegen, map_alloca: c.LLVMValueRef, map_type: c.LLVMTypeRef, key_val: c.LLVMValueRef, val_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const hm_info = self.getHashMapTypeInfo(map_type) orelse return error.UnsupportedExpr;
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const insert_info = self.ensureHashMapInsertDeclared();
+
+    // Extract the C map pointer from the struct
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, map_type, map_alloca, 0, "");
+    const map_ptr = c.LLVMBuildLoad2(self.builder, c.LLVMPointerTypeInContext(self.context, 0), ptr_gep, "map.ptr");
+
+    // Store key to alloca so we can pass pointer
+    const key_alloca = c.LLVMBuildAlloca(self.builder, hm_info.key_type, "key.tmp");
+    _ = c.LLVMBuildStore(self.builder, key_val, key_alloca);
+    // Store val to alloca
+    const val_alloca = c.LLVMBuildAlloca(self.builder, hm_info.val_type, "val.tmp");
+    _ = c.LLVMBuildStore(self.builder, val_val, val_alloca);
+
+    const is_str = c.LLVMConstInt(i64_type, if (hm_info.is_str_key) 1 else 0, 0);
+    var call_args = [_]c.LLVMValueRef{ map_ptr, key_alloca, val_alloca, is_str };
+    _ = c.LLVMBuildCall2(self.builder, insert_info.fn_type, insert_info.value, &call_args, 4, "");
+    return c.LLVMConstInt(c.LLVMVoidTypeInContext(self.context), 0, 0);
+}
+
+/// Generate map.get(key) → Option[V].
+fn genHashMapGet(self: *Codegen, map_val: c.LLVMValueRef, map_type: c.LLVMTypeRef, key_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const hm_info = self.getHashMapTypeInfo(map_type) orelse return error.UnsupportedExpr;
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const get_info = self.ensureHashMapGetDeclared();
+
+    // Extract the C map pointer
+    const map_ptr = c.LLVMBuildExtractValue(self.builder, map_val, 0, "map.ptr");
+
+    // Store key to alloca
+    const key_alloca = c.LLVMBuildAlloca(self.builder, hm_info.key_type, "key.tmp");
+    _ = c.LLVMBuildStore(self.builder, key_val, key_alloca);
+    // Alloca for output value
+    const out_alloca = c.LLVMBuildAlloca(self.builder, hm_info.val_type, "out.tmp");
+
+    const is_str = c.LLVMConstInt(i64_type, if (hm_info.is_str_key) 1 else 0, 0);
+    var call_args = [_]c.LLVMValueRef{ map_ptr, key_alloca, out_alloca, is_str };
+    const found = c.LLVMBuildCall2(self.builder, get_info.fn_type, get_info.value, &call_args, 4, "found");
+
+    // Branch: if found==1 → Some(val), else None
+    const cond = c.LLVMBuildICmp(self.builder, c.LLVMIntNE, found, c.LLVMConstInt(i64_type, 0, 0), "");
+    const some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "get.some");
+    const none_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "get.none");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "get.merge");
+    _ = c.LLVMBuildCondBr(self.builder, cond, some_bb, none_bb);
+
+    // Some
+    c.LLVMPositionBuilderAtEnd(self.builder, some_bb);
+    const val = c.LLVMBuildLoad2(self.builder, hm_info.val_type, out_alloca, "val");
+    const some_val = try self.buildOptionSome(val);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const some_exit = c.LLVMGetInsertBlock(self.builder);
+
+    // None
+    c.LLVMPositionBuilderAtEnd(self.builder, none_bb);
+    const opt_info = try self.getOrCreateOptionType(hm_info.val_type);
+    const none_val = self.buildOptionNone(opt_info.llvm_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const none_exit = c.LLVMGetInsertBlock(self.builder);
+
+    // Merge
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, opt_info.llvm_type, "get.result");
+    var vals = [_]c.LLVMValueRef{ some_val, none_val };
+    var bbs = [_]c.LLVMBasicBlockRef{ some_exit, none_exit };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
+/// Generate map.contains(key) → bool.
+fn genHashMapContains(self: *Codegen, map_val: c.LLVMValueRef, map_type: c.LLVMTypeRef, key_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const hm_info = self.getHashMapTypeInfo(map_type) orelse return error.UnsupportedExpr;
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const contains_info = self.ensureHashMapContainsDeclared();
+
+    const map_ptr = c.LLVMBuildExtractValue(self.builder, map_val, 0, "map.ptr");
+    const key_alloca = c.LLVMBuildAlloca(self.builder, hm_info.key_type, "key.tmp");
+    _ = c.LLVMBuildStore(self.builder, key_val, key_alloca);
+
+    const is_str = c.LLVMConstInt(i64_type, if (hm_info.is_str_key) 1 else 0, 0);
+    var call_args = [_]c.LLVMValueRef{ map_ptr, key_alloca, is_str };
+    const result = c.LLVMBuildCall2(self.builder, contains_info.fn_type, contains_info.value, &call_args, 3, "contains");
+    return c.LLVMBuildICmp(self.builder, c.LLVMIntNE, result, c.LLVMConstInt(i64_type, 0, 0), "contains.bool");
+}
+
+/// Generate map.remove(key) → bool.
+fn genHashMapRemove(self: *Codegen, map_alloca: c.LLVMValueRef, map_type: c.LLVMTypeRef, key_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const hm_info = self.getHashMapTypeInfo(map_type) orelse return error.UnsupportedExpr;
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const remove_info = self.ensureHashMapRemoveDeclared();
+
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, map_type, map_alloca, 0, "");
+    const map_ptr = c.LLVMBuildLoad2(self.builder, c.LLVMPointerTypeInContext(self.context, 0), ptr_gep, "map.ptr");
+
+    const key_alloca = c.LLVMBuildAlloca(self.builder, hm_info.key_type, "key.tmp");
+    _ = c.LLVMBuildStore(self.builder, key_val, key_alloca);
+
+    const is_str = c.LLVMConstInt(i64_type, if (hm_info.is_str_key) 1 else 0, 0);
+    var call_args = [_]c.LLVMValueRef{ map_ptr, key_alloca, is_str };
+    const result = c.LLVMBuildCall2(self.builder, remove_info.fn_type, remove_info.value, &call_args, 3, "removed");
+    return c.LLVMBuildICmp(self.builder, c.LLVMIntNE, result, c.LLVMConstInt(i64_type, 0, 0), "removed.bool");
+}
+
+/// Generate map.len() → i64.
+fn genHashMapLen(self: *Codegen, map_val: c.LLVMValueRef, map_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    _ = map_type;
+    const len_info = self.ensureHashMapLenDeclared();
+    const map_ptr = c.LLVMBuildExtractValue(self.builder, map_val, 0, "map.ptr");
+    var call_args = [_]c.LLVMValueRef{map_ptr};
+    return c.LLVMBuildCall2(self.builder, len_info.fn_type, len_info.value, &call_args, 1, "map.len");
+}
+
 /// Build an Option Some value: { tag: 0, payload: val }.
 fn buildOptionSome(self: *Codegen, val: c.LLVMValueRef) Error!c.LLVMValueRef {
     const payload_type = c.LLVMTypeOf(val);
@@ -4496,6 +4775,22 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             }
         }
 
+        // HashMap static methods: HashMap.new()
+        if (std.mem.eql(u8, ident_name, "HashMap")) {
+            if (std.mem.eql(u8, method_name, "new")) {
+                // HashMap.new() — requires expected_type context (from type annotation)
+                if (self.expected_type) |exp| {
+                    if (self.isHashMapType(exp)) {
+                        const hm_info = self.getHashMapTypeInfo(exp).?;
+                        return self.genHashMapNew(hm_info.key_type, hm_info.val_type);
+                    }
+                }
+                // Default to HashMap[str, i32] if no type context
+                const str_type = self.getStrType();
+                return self.genHashMapNew(str_type, c.LLVMInt32TypeInContext(self.context));
+            }
+        }
+
         const is_type = self.struct_types.get(ident_sym) != null or
             self.enum_types.get(ident_sym) != null;
         if (is_type) {
@@ -4598,6 +4893,43 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             if (args.len < 1) return error.UnsupportedExpr;
             const sep = try self.genExpr(args[0]);
             return self.genVecJoin(obj_val, sep);
+        }
+    }
+
+    // Built-in HashMap methods: len(), get(key), contains(key), insert(key, val), remove(key).
+    if (self.isHashMapType(obj_type)) {
+        if (std.mem.eql(u8, method_name, "len")) {
+            return self.genHashMapLen(obj_val, obj_type);
+        } else if (std.mem.eql(u8, method_name, "get")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const key = try self.genExpr(args[0]);
+            return self.genHashMapGet(obj_val, obj_type, key);
+        } else if (std.mem.eql(u8, method_name, "contains")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const key = try self.genExpr(args[0]);
+            return self.genHashMapContains(obj_val, obj_type, key);
+        } else if (std.mem.eql(u8, method_name, "insert")) {
+            if (args.len < 2) return error.UnsupportedExpr;
+            const key = try self.genExpr(args[0]);
+            const val = try self.genExpr(args[1]);
+            // Need alloca for mutation
+            if (fa.expr.kind == .ident) {
+                const sym = fa.expr.kind.ident;
+                if (self.locals.get(sym)) |local| {
+                    return self.genHashMapInsert(local.alloca, obj_type, key, val);
+                }
+            }
+            return error.UnsupportedExpr;
+        } else if (std.mem.eql(u8, method_name, "remove")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const key = try self.genExpr(args[0]);
+            if (fa.expr.kind == .ident) {
+                const sym = fa.expr.kind.ident;
+                if (self.locals.get(sym)) |local| {
+                    return self.genHashMapRemove(local.alloca, obj_type, key);
+                }
+            }
+            return error.UnsupportedExpr;
         }
     }
 
@@ -7206,6 +7538,13 @@ fn isStrType(self: *Codegen, ty: c.LLVMTypeRef) bool {
     return ty == str_info.llvm_type;
 }
 
+/// Get the LLVM type for str.
+fn getStrType(self: *Codegen) c.LLVMTypeRef {
+    const str_sym = self.pool.intern("str") catch unreachable;
+    const str_info = self.struct_types.get(str_sym).?;
+    return str_info.llvm_type;
+}
+
 /// Generate string concatenation: str + str → new str.
 fn genStrConcat(self: *Codegen, lhs: c.LLVMValueRef, rhs: c.LLVMValueRef) Error!c.LLVMValueRef {
     const str_sym = self.pool.intern("str") catch return error.CodegenAlloc;
@@ -8055,6 +8394,13 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
                 const elem_type = try self.resolveType(g.args[0]);
                 const vec_info = try self.getOrCreateVecType(elem_type);
                 return vec_info.llvm_type;
+            }
+            if (std.mem.eql(u8, name, "HashMap")) {
+                if (g.args.len != 2) return error.UnsupportedType;
+                const key_type = try self.resolveType(g.args[0]);
+                const val_type = try self.resolveType(g.args[1]);
+                const hm_info = try self.getOrCreateHashMapType(key_type, val_type);
+                return hm_info.llvm_type;
             }
             return error.UnsupportedType;
         },
