@@ -4968,8 +4968,8 @@ fn genLetElse(self: *Codegen, le: Ast.LetElse) Error!c.LLVMValueRef {
     const subject = try self.genExpr(le.value);
     const subject_type = c.LLVMTypeOf(subject);
 
-    // Store subject to memory so we can GEP into it.
-    const tmp = c.LLVMBuildAlloca(self.builder, subject_type, "letelse.subj");
+    // Store subject to memory so we can GEP into it (entry block for dominance).
+    const tmp = self.createEntryAlloca(subject_type, "letelse.subj");
     _ = c.LLVMBuildStore(self.builder, subject, tmp);
 
     // Extract tag (field 0).
@@ -5022,7 +5022,8 @@ fn genLetElse(self: *Codegen, le: Ast.LetElse) Error!c.LLVMValueRef {
         const payload_val = c.LLVMBuildLoad2(self.builder, pt, payload_ptr, "payload");
 
         const bind_sym = le.pattern.bindings[0];
-        const bind_alloca = c.LLVMBuildAlloca(self.builder, pt, "");
+        // Place alloca in entry block so it dominates all uses (including cont_bb).
+        const bind_alloca = self.createEntryAlloca(pt, "");
         _ = c.LLVMBuildStore(self.builder, payload_val, bind_alloca);
         self.locals.put(self.allocator, bind_sym, .{
             .alloca = bind_alloca,
@@ -9453,6 +9454,14 @@ fn genAssertBuiltin(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMV
 fn genMathAbs(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
     if (args.len != 1) return error.UnsupportedExpr;
     const val = try self.genExpr(args[0]);
+    const val_kind = c.LLVMGetTypeKind(c.LLVMTypeOf(val));
+    const is_float = (val_kind == c.LLVMFloatTypeKind or val_kind == c.LLVMDoubleTypeKind);
+    if (is_float) {
+        const zero = c.LLVMConstReal(c.LLVMTypeOf(val), 0.0);
+        const neg = c.LLVMBuildFNeg(self.builder, val, "fneg");
+        const is_neg = c.LLVMBuildFCmp(self.builder, c.LLVMRealOLT, val, zero, "isneg");
+        return c.LLVMBuildSelect(self.builder, is_neg, neg, val, "abs");
+    }
     // abs(x) = select(x < 0, -x, x)
     const zero = c.LLVMConstInt(c.LLVMTypeOf(val), 0, 0);
     const neg = c.LLVMBuildNeg(self.builder, val, "neg");
@@ -9464,7 +9473,12 @@ fn genMathMin(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRe
     if (args.len != 2) return error.UnsupportedExpr;
     const a = try self.genExpr(args[0]);
     const b = try self.genExpr(args[1]);
-    const cmp = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, a, b, "lt");
+    const a_kind = c.LLVMGetTypeKind(c.LLVMTypeOf(a));
+    const is_float = (a_kind == c.LLVMFloatTypeKind or a_kind == c.LLVMDoubleTypeKind);
+    const cmp = if (is_float)
+        c.LLVMBuildFCmp(self.builder, c.LLVMRealOLT, a, b, "flt")
+    else
+        c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, a, b, "lt");
     return c.LLVMBuildSelect(self.builder, cmp, a, b, "min");
 }
 
@@ -9472,7 +9486,12 @@ fn genMathMax(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRe
     if (args.len != 2) return error.UnsupportedExpr;
     const a = try self.genExpr(args[0]);
     const b = try self.genExpr(args[1]);
-    const cmp = c.LLVMBuildICmp(self.builder, c.LLVMIntSGT, a, b, "gt");
+    const a_kind = c.LLVMGetTypeKind(c.LLVMTypeOf(a));
+    const is_float = (a_kind == c.LLVMFloatTypeKind or a_kind == c.LLVMDoubleTypeKind);
+    const cmp = if (is_float)
+        c.LLVMBuildFCmp(self.builder, c.LLVMRealOGT, a, b, "fgt")
+    else
+        c.LLVMBuildICmp(self.builder, c.LLVMIntSGT, a, b, "gt");
     return c.LLVMBuildSelect(self.builder, cmp, a, b, "max");
 }
 
@@ -9481,10 +9500,18 @@ fn genMathClamp(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValue
     const val = try self.genExpr(args[0]);
     const lo = try self.genExpr(args[1]);
     const hi = try self.genExpr(args[2]);
+    const val_kind = c.LLVMGetTypeKind(c.LLVMTypeOf(val));
+    const is_float = (val_kind == c.LLVMFloatTypeKind or val_kind == c.LLVMDoubleTypeKind);
     // clamp(x, lo, hi) = min(max(x, lo), hi)
-    const cmp_lo = c.LLVMBuildICmp(self.builder, c.LLVMIntSGT, val, lo, "gt.lo");
+    const cmp_lo = if (is_float)
+        c.LLVMBuildFCmp(self.builder, c.LLVMRealOGT, val, lo, "gt.lo")
+    else
+        c.LLVMBuildICmp(self.builder, c.LLVMIntSGT, val, lo, "gt.lo");
     const max_val = c.LLVMBuildSelect(self.builder, cmp_lo, val, lo, "max.lo");
-    const cmp_hi = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, max_val, hi, "lt.hi");
+    const cmp_hi = if (is_float)
+        c.LLVMBuildFCmp(self.builder, c.LLVMRealOLT, max_val, hi, "lt.hi")
+    else
+        c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, max_val, hi, "lt.hi");
     return c.LLVMBuildSelect(self.builder, cmp_hi, max_val, hi, "clamp");
 }
 
@@ -10516,6 +10543,21 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
         },
         .inferred => error.UnsupportedType,
     };
+}
+
+/// Create an alloca in the function's entry block (ensures it dominates all uses).
+fn createEntryAlloca(self: *Codegen, ty: c.LLVMTypeRef, name: [*:0]const u8) c.LLVMValueRef {
+    const entry_bb = c.LLVMGetEntryBasicBlock(self.current_function);
+    const first_instr = c.LLVMGetFirstInstruction(entry_bb);
+    const saved_bb = c.LLVMGetInsertBlock(self.builder);
+    if (first_instr != null) {
+        c.LLVMPositionBuilderBefore(self.builder, first_instr);
+    } else {
+        c.LLVMPositionBuilderAtEnd(self.builder, entry_bb);
+    }
+    const alloca = c.LLVMBuildAlloca(self.builder, ty, name);
+    c.LLVMPositionBuilderAtEnd(self.builder, saved_bb);
+    return alloca;
 }
 
 /// Build an LLVM function type from an AST FnTypeExpr.
