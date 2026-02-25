@@ -1233,6 +1233,9 @@ fn checkMatchExpr(self: *Sema, m: Ast.MatchExpr) TypeId {
         self.current_scope = &arm_scope;
 
         self.checkPattern(&arm.pattern, subject_type);
+        if (arm.guard) |guard| {
+            _ = self.checkExpr(guard);
+        }
         const arm_type = self.checkExpr(arm.body);
 
         arm_scope.deinit(self.allocator);
@@ -1292,6 +1295,11 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                         .span = pattern.span,
                     });
                 }
+            }
+        },
+        .or_pattern => |alternatives| {
+            for (alternatives) |*alt| {
+                self.checkPattern(alt, subject_type);
             }
         },
     }

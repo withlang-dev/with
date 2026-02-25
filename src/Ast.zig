@@ -366,6 +366,7 @@ pub const MatchExpr = struct {
 
 pub const MatchArm = struct {
     pattern: Pattern,
+    guard: ?*const Expr = null,
     body: *const Expr,
     span: Span,
 };
@@ -388,6 +389,8 @@ pub const PatternKind = union(enum) {
     string_literal: Symbol,
     /// Enum variant pattern: `Circle(r)` or `None`
     variant: VariantPattern,
+    /// Or-pattern: `A | B`
+    or_pattern: []const Pattern,
 };
 
 pub const VariantPattern = struct {

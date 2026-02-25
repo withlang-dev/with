@@ -3854,29 +3854,7 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
 
     // Add cases.
     for (m.arms, 0..) |arm, i| {
-        switch (arm.pattern.kind) {
-            .int_literal => |val| {
-                const case_val = c.LLVMConstInt(c.LLVMTypeOf(tag_val), @bitCast(val), 1);
-                c.LLVMAddCase(sw, case_val, arm_bbs_buf[i]);
-            },
-            .bool_literal => |val| {
-                const case_val = c.LLVMConstInt(c.LLVMInt1TypeInContext(self.context), @intFromBool(val), 0);
-                c.LLVMAddCase(sw, case_val, arm_bbs_buf[i]);
-            },
-            .variant => |vp| {
-                if (enum_info) |ei| {
-                    for (ei.variant_names, 0..) |vn, vi| {
-                        if (vn == vp.name) {
-                            const case_val = c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), @intCast(vi), 0);
-                            c.LLVMAddCase(sw, case_val, arm_bbs_buf[i]);
-                            break;
-                        }
-                    }
-                }
-            },
-            .wildcard, .binding => {},
-            else => {},
-        }
+        self.addMatchCase(sw, arm.pattern, tag_val, arm_bbs_buf[i], enum_info);
     }
 
     // Generate code for each arm.
@@ -3933,6 +3911,20 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
             else => {},
         }
 
+        // Handle guard clause: if guard is false, jump to next arm or default.
+        if (arm.guard) |guard| {
+            const guard_val = try self.genExpr(guard);
+            const guard_cond = if (c.LLVMTypeOf(guard_val) == c.LLVMInt1TypeInContext(self.context))
+                guard_val
+            else
+                c.LLVMBuildICmp(self.builder, c.LLVMIntNE, guard_val, c.LLVMConstNull(c.LLVMTypeOf(guard_val)), "guard");
+            const body_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "guard.pass");
+            // On guard failure, fall through to default (or next arm's BB).
+            const fallthrough_bb = if (i + 1 < m.arms.len) arm_bbs_buf[i + 1] else default_bb;
+            _ = c.LLVMBuildCondBr(self.builder, guard_cond, body_bb, fallthrough_bb);
+            c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+        }
+
         const arm_val = try self.genExpr(arm.body);
         arm_vals_buf[arm_count] = arm_val;
         arm_from_bbs_buf[arm_count] = c.LLVMGetInsertBlock(self.builder);
@@ -3961,6 +3953,37 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
     }
 
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+fn addMatchCase(self: *Codegen, sw: c.LLVMValueRef, pattern: Ast.Pattern, tag_val: c.LLVMValueRef, target_bb: c.LLVMBasicBlockRef, enum_info: ?EnumTypeInfo) void {
+    switch (pattern.kind) {
+        .int_literal => |val| {
+            const case_val = c.LLVMConstInt(c.LLVMTypeOf(tag_val), @bitCast(val), 1);
+            c.LLVMAddCase(sw, case_val, target_bb);
+        },
+        .bool_literal => |val| {
+            const case_val = c.LLVMConstInt(c.LLVMInt1TypeInContext(self.context), @intFromBool(val), 0);
+            c.LLVMAddCase(sw, case_val, target_bb);
+        },
+        .variant => |vp| {
+            if (enum_info) |ei| {
+                for (ei.variant_names, 0..) |vn, vi| {
+                    if (vn == vp.name) {
+                        const case_val = c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), @intCast(vi), 0);
+                        c.LLVMAddCase(sw, case_val, target_bb);
+                        break;
+                    }
+                }
+            }
+        },
+        .or_pattern => |alternatives| {
+            for (alternatives) |alt| {
+                self.addMatchCase(sw, alt, tag_val, target_bb, enum_info);
+            }
+        },
+        .wildcard, .binding => {},
+        .string_literal => {},
+    }
 }
 
 fn genArrayLiteral(self: *Codegen, elems: []const *const Ast.Expr) Error!c.LLVMValueRef {
