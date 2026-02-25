@@ -3248,6 +3248,141 @@ fn buildResultErr(self: *Codegen, val: c.LLVMValueRef, result_type: c.LLVMTypeRe
     return c.LLVMBuildLoad2(self.builder, result_type, alloca, "err.val");
 }
 
+/// Check if an LLVM struct type is an Option or Result type.
+/// These have the layout { i32 tag, [N x i8] payload }.
+fn isOptionOrResultType(self: *Codegen, ty: c.LLVMTypeRef) bool {
+    if (c.LLVMGetTypeKind(ty) != c.LLVMStructTypeKind) return false;
+    const num_elements = c.LLVMCountStructElementTypes(ty);
+    if (num_elements != 2) return false;
+    // First element should be i32 (tag).
+    const first = c.LLVMStructGetTypeAtIndex(ty, 0);
+    if (first != c.LLVMInt32TypeInContext(self.context)) return false;
+    // Second element should be an array type (payload storage).
+    const second = c.LLVMStructGetTypeAtIndex(ty, 1);
+    return c.LLVMGetTypeKind(second) == c.LLVMArrayTypeKind;
+}
+
+/// Get the payload type from an Option/Result type.
+/// Searches the option_type_cache for the type.
+fn getOptionPayloadType(self: *Codegen, opt_type: c.LLVMTypeRef) ?c.LLVMTypeRef {
+    var it = self.option_type_cache.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == opt_type) {
+            return entry.value_ptr.payload_type;
+        }
+    }
+    // Check result cache too.
+    var it2 = self.result_type_cache.iterator();
+    while (it2.next()) |entry| {
+        if (entry.value_ptr.llvm_type == opt_type) {
+            return entry.value_ptr.payload_type;
+        }
+    }
+    return null;
+}
+
+/// Generate Option.unwrap() — returns payload or aborts.
+fn genOptionUnwrap(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef, _: ?c.LLVMValueRef) Error!c.LLVMValueRef {
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+
+    // Store the value to memory so we can GEP it.
+    const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "opt");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+
+    // Load tag.
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+
+    // Check tag == 0 (Some/Ok).
+    const is_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is_some");
+
+    // Branch: if not Some, abort.
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "unwrap.some");
+    const abort_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "unwrap.abort");
+    _ = c.LLVMBuildCondBr(self.builder, is_some, some_bb, abort_bb);
+
+    // Abort block: call abort().
+    c.LLVMPositionBuilderAtEnd(self.builder, abort_bb);
+    const abort_info = self.ensureAbortDeclared() catch return error.CodegenAlloc;
+    _ = c.LLVMBuildCall2(self.builder, abort_info.fn_type, abort_info.value, null, 0, "");
+    _ = c.LLVMBuildUnreachable(self.builder);
+
+    // Some block: extract payload.
+    c.LLVMPositionBuilderAtEnd(self.builder, some_bb);
+    const payload_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "payload");
+
+    // Get payload type.
+    const payload_type = self.getOptionPayloadType(obj_type) orelse i32_type;
+    const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    return c.LLVMBuildLoad2(self.builder, payload_type, payload_ptr, "unwrap.val");
+}
+
+/// Generate Option.unwrap_or(default) — returns payload or default value.
+fn genOptionUnwrapOr(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef, default_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+
+    const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "opt");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+    const is_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is_some");
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "unwrap_or.some");
+    const none_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "unwrap_or.none");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "unwrap_or.merge");
+    _ = c.LLVMBuildCondBr(self.builder, is_some, some_bb, none_bb);
+
+    // Some: extract payload.
+    c.LLVMPositionBuilderAtEnd(self.builder, some_bb);
+    const payload_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "payload");
+    const payload_type = self.getOptionPayloadType(obj_type) orelse i32_type;
+    const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const some_val = c.LLVMBuildLoad2(self.builder, payload_type, payload_ptr, "some.val");
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+
+    // None: use default.
+    c.LLVMPositionBuilderAtEnd(self.builder, none_bb);
+    const coerced_default = self.coerceInt(default_val, payload_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+
+    // Merge with phi.
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, payload_type, "unwrap_or.result");
+    var vals = [_]c.LLVMValueRef{ some_val, coerced_default };
+    var bbs = [_]c.LLVMBasicBlockRef{ some_bb, none_bb };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
+/// Generate Option.is_some() — returns true if tag == 0.
+fn genOptionIsSome(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "opt");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+    return c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is_some");
+}
+
+/// Generate Option.is_none() — returns true if tag != 0.
+fn genOptionIsNone(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "opt");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+    return c.LLVMBuildICmp(self.builder, c.LLVMIntNE, tag, c.LLVMConstInt(i32_type, 0, 0), "is_none");
+}
+
+/// Get or declare the abort() function.
+fn getOrDeclareAbort(self: *Codegen) ?c.LLVMValueRef {
+    const info = self.ensureAbortDeclared() catch return null;
+    return info.value;
+}
+
 fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
     // Set expected_type from annotation for type context (helps None, Err).
     const saved_expected = self.expected_type;
@@ -4169,6 +4304,30 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
     // Evaluate the object.
     const obj_val = try self.genExpr(fa.expr);
     const obj_type = c.LLVMTypeOf(obj_val);
+
+    // Built-in Option/Result methods: unwrap(), unwrap_or(default), is_some(), is_none(), expect(msg).
+    if (c.LLVMGetTypeKind(obj_type) == c.LLVMStructTypeKind) {
+        if (self.isOptionOrResultType(obj_type)) {
+            if (std.mem.eql(u8, method_name, "unwrap")) {
+                return self.genOptionUnwrap(obj_val, obj_type, null);
+            } else if (std.mem.eql(u8, method_name, "expect")) {
+                const msg = if (args.len > 0) try self.genExpr(args[0]) else null;
+                return self.genOptionUnwrap(obj_val, obj_type, msg);
+            } else if (std.mem.eql(u8, method_name, "unwrap_or")) {
+                if (args.len < 1) return error.UnsupportedExpr;
+                const default_val = try self.genExpr(args[0]);
+                return self.genOptionUnwrapOr(obj_val, obj_type, default_val);
+            } else if (std.mem.eql(u8, method_name, "is_some")) {
+                return self.genOptionIsSome(obj_val, obj_type);
+            } else if (std.mem.eql(u8, method_name, "is_none")) {
+                return self.genOptionIsNone(obj_val, obj_type);
+            } else if (std.mem.eql(u8, method_name, "is_ok")) {
+                return self.genOptionIsSome(obj_val, obj_type);
+            } else if (std.mem.eql(u8, method_name, "is_err")) {
+                return self.genOptionIsNone(obj_val, obj_type);
+            }
+        }
+    }
 
     // Search struct_types for matching type.
     var type_name_str: ?[]const u8 = null;
