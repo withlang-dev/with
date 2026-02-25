@@ -95,8 +95,17 @@ gen_payload_type: ?c.LLVMTypeRef = null,
 gen_yield_count: u32 = 0,
 /// Generator state: current yield index during codegen.
 gen_current_yield: u32 = 0,
+/// Cache of Vec types keyed by element LLVM type pointer.
+vec_type_cache: std.AutoHashMapUnmanaged(usize, VecTypeInfo) = .{},
+/// Vec-typed locals: local symbol → element LLVM type.
+vec_local_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
 /// Whether the program uses async/await (requires fiber runtime linking).
 uses_async: bool = false,
+
+const VecTypeInfo = struct {
+    llvm_type: c.LLVMTypeRef, // struct { ptr, i64, i64 }
+    elem_type: c.LLVMTypeRef,
+};
 
 const ScopedLocal = struct {
     sym: u32,
@@ -245,6 +254,8 @@ pub fn deinit(self: *Codegen) void {
     self.ref_pointee_types.deinit(self.allocator);
     self.option_type_cache.deinit(self.allocator);
     self.result_type_cache.deinit(self.allocator);
+    self.vec_type_cache.deinit(self.allocator);
+    self.vec_local_types.deinit(self.allocator);
     self.drop_fns.deinit(self.allocator);
     self.slice_elem_types.deinit(self.allocator);
     self.enum_local_types.deinit(self.allocator);
@@ -3199,6 +3210,196 @@ fn getOrCreateResultType(self: *Codegen, ok_type: c.LLVMTypeRef, err_type: c.LLV
     return info;
 }
 
+/// Get or create a Vec[T] type for given element type.
+/// Vec layout: struct { ptr: *T, len: i64, cap: i64 }
+fn getOrCreateVecType(self: *Codegen, elem_type: c.LLVMTypeRef) Error!VecTypeInfo {
+    const key: usize = @intFromPtr(elem_type);
+    if (self.vec_type_cache.get(key)) |info| return info;
+
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+
+    var body_types = [_]c.LLVMTypeRef{ ptr_type, i64_type, i64_type };
+    const llvm_type = c.LLVMStructCreateNamed(self.context, "Vec");
+    c.LLVMStructSetBody(llvm_type, &body_types, 3, 0);
+
+    const info = VecTypeInfo{ .llvm_type = llvm_type, .elem_type = elem_type };
+    self.vec_type_cache.put(self.allocator, key, info) catch return error.CodegenAlloc;
+    return info;
+}
+
+/// Check if an LLVM type is a Vec type.
+fn isVecType(self: *Codegen, ty: c.LLVMTypeRef) bool {
+    if (c.LLVMGetTypeKind(ty) != c.LLVMStructTypeKind) return false;
+    var it = self.vec_type_cache.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == ty) return true;
+    }
+    return false;
+}
+
+/// Get element type for a Vec type.
+fn getVecElemType(self: *Codegen, vec_type: c.LLVMTypeRef) ?c.LLVMTypeRef {
+    var it = self.vec_type_cache.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == vec_type) return entry.value_ptr.elem_type;
+    }
+    return null;
+}
+
+/// Ensure realloc is declared.
+fn ensureReallocDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("realloc") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{ ptr_type, i64_type };
+    const fn_type = c.LLVMFunctionType(ptr_type, &param_types, 2, 0);
+    const func = c.LLVMAddFunction(self.module, "realloc", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// Generate Vec.new() — creates an empty Vec.
+fn genVecNew(self: *Codegen, elem_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const vec_info = try self.getOrCreateVecType(elem_type);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, vec_info.llvm_type, "vec");
+    // ptr = null, len = 0, cap = 0
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_info.llvm_type, alloca, 0, "");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstNull(ptr_type), ptr_gep);
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_info.llvm_type, alloca, 1, "");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), len_gep);
+    const cap_gep = c.LLVMBuildStructGEP2(self.builder, vec_info.llvm_type, alloca, 2, "");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), cap_gep);
+    return c.LLVMBuildLoad2(self.builder, vec_info.llvm_type, alloca, "vec.val");
+}
+
+/// Generate Vec.push(val) — mutates the vec in-place (requires the local's alloca).
+/// This needs the alloca pointer, not the loaded value.
+fn genVecPush(self: *Codegen, vec_alloca: c.LLVMValueRef, vec_type: c.LLVMTypeRef, elem_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const elem_type = self.getVecElemType(vec_type) orelse return error.UnsupportedExpr;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+
+    // Load len and cap
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 1, "");
+    const len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "len");
+    const cap_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 2, "");
+    const cap = c.LLVMBuildLoad2(self.builder, i64_type, cap_gep, "cap");
+
+    // Check if need to grow
+    const needs_grow = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, len, cap, "needs_grow");
+    const grow_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "vec.grow");
+    const push_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "vec.push");
+    _ = c.LLVMBuildCondBr(self.builder, needs_grow, grow_bb, push_bb);
+
+    // Grow: new_cap = max(cap * 2, 4)
+    c.LLVMPositionBuilderAtEnd(self.builder, grow_bb);
+    const double_cap = c.LLVMBuildMul(self.builder, cap, c.LLVMConstInt(i64_type, 2, 0), "");
+    const four = c.LLVMConstInt(i64_type, 4, 0);
+    const is_small = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, double_cap, four, "");
+    const new_cap = c.LLVMBuildSelect(self.builder, is_small, four, double_cap, "new_cap");
+    // Compute element size
+    const data_layout = c.LLVMGetModuleDataLayout(self.module);
+    const elem_size_val = c.LLVMConstInt(i64_type, c.LLVMABISizeOfType(data_layout, elem_type), 0);
+    const new_size = c.LLVMBuildMul(self.builder, new_cap, elem_size_val, "new_size");
+    // Realloc
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 0, "");
+    const old_ptr = c.LLVMBuildLoad2(self.builder, ptr_type, ptr_gep, "old_ptr");
+    const realloc_fn = self.ensureReallocDeclared();
+    var realloc_args = [_]c.LLVMValueRef{ old_ptr, new_size };
+    const new_ptr = c.LLVMBuildCall2(self.builder, realloc_fn.fn_type, realloc_fn.value, &realloc_args, 2, "new_ptr");
+    _ = c.LLVMBuildStore(self.builder, new_ptr, ptr_gep);
+    _ = c.LLVMBuildStore(self.builder, new_cap, cap_gep);
+    _ = c.LLVMBuildBr(self.builder, push_bb);
+
+    // Push: store elem at ptr[len], len++
+    c.LLVMPositionBuilderAtEnd(self.builder, push_bb);
+    const ptr_gep2 = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 0, "");
+    const cur_ptr = c.LLVMBuildLoad2(self.builder, ptr_type, ptr_gep2, "ptr");
+    const cur_len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "cur_len");
+    var gep_idx = [_]c.LLVMValueRef{cur_len};
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, cur_ptr, &gep_idx, 1, "elem_ptr");
+    _ = c.LLVMBuildStore(self.builder, elem_val, elem_ptr);
+    const new_len = c.LLVMBuildAdd(self.builder, cur_len, c.LLVMConstInt(i64_type, 1, 0), "");
+    _ = c.LLVMBuildStore(self.builder, new_len, len_gep);
+
+    return c.LLVMConstInt(c.LLVMVoidTypeInContext(self.context), 0, 0);
+}
+
+/// Generate Vec.len() → i64
+fn genVecLen(self: *Codegen, obj_val: c.LLVMValueRef, vec_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, vec_type, "v");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, alloca, 1, "");
+    return c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "vec.len");
+}
+
+/// Generate Vec.get(idx) → T
+fn genVecGet(self: *Codegen, obj_val: c.LLVMValueRef, vec_type: c.LLVMTypeRef, idx: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const elem_type = self.getVecElemType(vec_type) orelse return error.UnsupportedExpr;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, vec_type, "v");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, alloca, 0, "");
+    const ptr = c.LLVMBuildLoad2(self.builder, ptr_type, ptr_gep, "ptr");
+    const idx_i64 = self.coerceInt(idx, i64_type);
+    var gep_idx = [_]c.LLVMValueRef{idx_i64};
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, ptr, &gep_idx, 1, "");
+    return c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "vec.get");
+}
+
+/// Generate Vec.pop() → ?T
+fn genVecPop(self: *Codegen, vec_alloca: c.LLVMValueRef, vec_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const elem_type = self.getVecElemType(vec_type) orelse return error.UnsupportedExpr;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 1, "");
+    const len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "len");
+    const is_empty = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, len, c.LLVMConstInt(i64_type, 0, 0), "");
+
+    const some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "pop.some");
+    const none_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "pop.none");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "pop.merge");
+    _ = c.LLVMBuildCondBr(self.builder, is_empty, none_bb, some_bb);
+
+    // Some: decrement len, load element
+    c.LLVMPositionBuilderAtEnd(self.builder, some_bb);
+    const new_len = c.LLVMBuildSub(self.builder, len, c.LLVMConstInt(i64_type, 1, 0), "");
+    _ = c.LLVMBuildStore(self.builder, new_len, len_gep);
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 0, "");
+    const ptr = c.LLVMBuildLoad2(self.builder, ptr_type, ptr_gep, "ptr");
+    var gep_idx = [_]c.LLVMValueRef{new_len};
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, ptr, &gep_idx, 1, "");
+    const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "elem");
+    const some_val = try self.buildOptionSome(elem_val);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const some_exit = c.LLVMGetInsertBlock(self.builder);
+
+    // None
+    c.LLVMPositionBuilderAtEnd(self.builder, none_bb);
+    const opt_info = try self.getOrCreateOptionType(elem_type);
+    const none_val = self.buildOptionNone(opt_info.llvm_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const none_exit = c.LLVMGetInsertBlock(self.builder);
+
+    // Merge
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, opt_info.llvm_type, "pop.result");
+    var vals = [_]c.LLVMValueRef{ some_val, none_val };
+    var bbs = [_]c.LLVMBasicBlockRef{ some_exit, none_exit };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
 /// Build an Option Some value: { tag: 0, payload: val }.
 fn buildOptionSome(self: *Codegen, val: c.LLVMValueRef) Error!c.LLVMValueRef {
     const payload_type = c.LLVMTypeOf(val);
@@ -4263,6 +4464,38 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
     if (fa.expr.kind == .ident) {
         const ident_sym = fa.expr.kind.ident;
         const ident_name = self.pool.resolve(ident_sym);
+
+        // Vec static methods: Vec.new(), Vec.of(...)
+        if (std.mem.eql(u8, ident_name, "Vec")) {
+            if (std.mem.eql(u8, method_name, "new")) {
+                // Vec.new() — requires expected_type context (from type annotation)
+                if (self.expected_type) |exp| {
+                    if (self.isVecType(exp)) {
+                        const elem_type = self.getVecElemType(exp).?;
+                        return self.genVecNew(elem_type);
+                    }
+                }
+                // Default to Vec[i32] if no type context
+                return self.genVecNew(c.LLVMInt32TypeInContext(self.context));
+            } else if (std.mem.eql(u8, method_name, "of")) {
+                // Vec.of(a, b, c) — infer type from first arg
+                if (args.len == 0) return self.genVecNew(c.LLVMInt32TypeInContext(self.context));
+                const first = try self.genExpr(args[0]);
+                const elem_type = c.LLVMTypeOf(first);
+                const vec_info = try self.getOrCreateVecType(elem_type);
+                // Create Vec, then push all elements
+                const result = try self.genVecNew(elem_type);
+                const alloca = c.LLVMBuildAlloca(self.builder, vec_info.llvm_type, "vec.of");
+                _ = c.LLVMBuildStore(self.builder, result, alloca);
+                _ = try self.genVecPush(alloca, vec_info.llvm_type, first);
+                for (args[1..]) |arg| {
+                    const val = try self.genExpr(arg);
+                    _ = try self.genVecPush(alloca, vec_info.llvm_type, val);
+                }
+                return c.LLVMBuildLoad2(self.builder, vec_info.llvm_type, alloca, "vec.of");
+            }
+        }
+
         const is_type = self.struct_types.get(ident_sym) != null or
             self.enum_types.get(ident_sym) != null;
         if (is_type) {
@@ -4326,6 +4559,40 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             } else if (std.mem.eql(u8, method_name, "is_err")) {
                 return self.genOptionIsNone(obj_val, obj_type);
             }
+        }
+    }
+
+    // Built-in Vec methods: len(), get(i), is_empty(), push(val), pop().
+    if (self.isVecType(obj_type)) {
+        if (std.mem.eql(u8, method_name, "len")) {
+            return self.genVecLen(obj_val, obj_type);
+        } else if (std.mem.eql(u8, method_name, "get")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const idx = try self.genExpr(args[0]);
+            return self.genVecGet(obj_val, obj_type, idx);
+        } else if (std.mem.eql(u8, method_name, "is_empty")) {
+            const i64_type = c.LLVMInt64TypeInContext(self.context);
+            const len = try self.genVecLen(obj_val, obj_type);
+            return c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, len, c.LLVMConstInt(i64_type, 0, 0), "is_empty");
+        } else if (std.mem.eql(u8, method_name, "push")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const val = try self.genExpr(args[0]);
+            // Need alloca of the vec local — look it up from the expression
+            if (fa.expr.kind == .ident) {
+                const sym = fa.expr.kind.ident;
+                if (self.locals.get(sym)) |local| {
+                    return self.genVecPush(local.alloca, obj_type, val);
+                }
+            }
+            return error.UnsupportedExpr;
+        } else if (std.mem.eql(u8, method_name, "pop")) {
+            if (fa.expr.kind == .ident) {
+                const sym = fa.expr.kind.ident;
+                if (self.locals.get(sym)) |local| {
+                    return self.genVecPop(local.alloca, obj_type);
+                }
+            }
+            return error.UnsupportedExpr;
         }
     }
 
@@ -7504,6 +7771,12 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
                 const err_type = try self.resolveType(g.args[1]);
                 const res_info = try self.getOrCreateResultType(ok_type, err_type);
                 return res_info.llvm_type;
+            }
+            if (std.mem.eql(u8, name, "Vec")) {
+                if (g.args.len != 1) return error.UnsupportedType;
+                const elem_type = try self.resolveType(g.args[0]);
+                const vec_info = try self.getOrCreateVecType(elem_type);
+                return vec_info.llvm_type;
             }
             return error.UnsupportedType;
         },
