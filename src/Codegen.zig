@@ -4656,6 +4656,17 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             return self.genArrayContains(obj_val, obj_type, needle);
         } else if (std.mem.eql(u8, method_name, "reverse")) {
             return self.genArrayReverse(obj_val, obj_type);
+        } else if (std.mem.eql(u8, method_name, "map")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const fn_val = try self.genExpr(args[0]);
+            return self.genArrayMap(obj_val, obj_type, fn_val);
+        } else if (std.mem.eql(u8, method_name, "reduce")) {
+            if (args.len < 2) return error.UnsupportedExpr;
+            const fn_val = try self.genExpr(args[0]);
+            const initial = try self.genExpr(args[1]);
+            return self.genArrayReduce(obj_val, obj_type, fn_val, initial);
+        } else if (std.mem.eql(u8, method_name, "sum")) {
+            return self.genArraySum(obj_val, obj_type);
         }
     }
 
@@ -7662,6 +7673,69 @@ fn genArrayReverse(self: *Codegen, arr_val: c.LLVMValueRef, arr_type: c.LLVMType
         result = c.LLVMBuildInsertValue(self.builder, result, elem, @intCast(i), "");
     }
     return result;
+}
+
+/// array.map(fn) → new array — applies fn to each element.
+fn genArrayMap(self: *Codegen, arr_val: c.LLVMValueRef, arr_type: c.LLVMTypeRef, fn_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const len = c.LLVMGetArrayLength2(arr_type);
+    if (len == 0) return arr_val;
+    // Get the fn type to determine result element type.
+    // fn_val is a function pointer — we need to call it with each element.
+    const elem_type = c.LLVMGetElementType(arr_type);
+    // Call fn_val(elem) for first element to determine return type.
+    const first = c.LLVMBuildExtractValue(self.builder, arr_val, 0, "elem");
+    var call_args = [_]c.LLVMValueRef{first};
+    // Build fn type: (elem_type) -> result_type; assume same type for now
+    var map_param_types = [_]c.LLVMTypeRef{elem_type};
+    const fn_type = c.LLVMFunctionType(elem_type, &map_param_types, 1, 0);
+    const first_result = c.LLVMBuildCall2(self.builder, fn_type, fn_val, &call_args, 1, "map.r");
+    const result_elem_type = c.LLVMTypeOf(first_result);
+    const result_arr_type = c.LLVMArrayType2(result_elem_type, len);
+    var result = c.LLVMGetUndef(result_arr_type);
+    result = c.LLVMBuildInsertValue(self.builder, result, first_result, 0, "");
+    for (1..len) |i| {
+        const elem = c.LLVMBuildExtractValue(self.builder, arr_val, @intCast(i), "elem");
+        var args = [_]c.LLVMValueRef{elem};
+        const r = c.LLVMBuildCall2(self.builder, fn_type, fn_val, &args, 1, "map.r");
+        result = c.LLVMBuildInsertValue(self.builder, result, r, @intCast(i), "");
+    }
+    return result;
+}
+
+/// array.reduce(fn, init) → T — fold array with binary function.
+fn genArrayReduce(self: *Codegen, arr_val: c.LLVMValueRef, arr_type: c.LLVMTypeRef, fn_val: c.LLVMValueRef, initial: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const len = c.LLVMGetArrayLength2(arr_type);
+    if (len == 0) return initial;
+    const elem_type = c.LLVMGetElementType(arr_type);
+    const acc_type = c.LLVMTypeOf(initial);
+    // Build fn type: (acc, elem) -> acc
+    var param_types = [_]c.LLVMTypeRef{ acc_type, elem_type };
+    const fn_type = c.LLVMFunctionType(acc_type, &param_types, 2, 0);
+    var acc = initial;
+    for (0..len) |i| {
+        const elem = c.LLVMBuildExtractValue(self.builder, arr_val, @intCast(i), "elem");
+        var call_args = [_]c.LLVMValueRef{ acc, elem };
+        acc = c.LLVMBuildCall2(self.builder, fn_type, fn_val, &call_args, 2, "acc");
+    }
+    return acc;
+}
+
+/// array.sum() → T — sum all elements.
+fn genArraySum(self: *Codegen, arr_val: c.LLVMValueRef, arr_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const len = c.LLVMGetArrayLength2(arr_type);
+    const elem_type = c.LLVMGetElementType(arr_type);
+    if (len == 0) return c.LLVMConstInt(elem_type, 0, 0);
+    var acc = c.LLVMBuildExtractValue(self.builder, arr_val, 0, "sum");
+    for (1..len) |i| {
+        const elem = c.LLVMBuildExtractValue(self.builder, arr_val, @intCast(i), "elem");
+        const kind = c.LLVMGetTypeKind(elem_type);
+        if (kind == c.LLVMFloatTypeKind or kind == c.LLVMDoubleTypeKind) {
+            acc = c.LLVMBuildFAdd(self.builder, acc, elem, "sum");
+        } else {
+            acc = c.LLVMBuildAdd(self.builder, acc, elem, "sum");
+        }
+    }
+    return acc;
 }
 
 /// Ensure malloc is declared.
