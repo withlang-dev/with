@@ -83,6 +83,8 @@ const LocalInfo = struct {
     alloca: c.LLVMValueRef,
     ty: c.LLVMTypeRef,
     is_mut: bool,
+    /// For function pointer locals: the underlying fn type for LLVMBuildCall2.
+    fn_sig: ?c.LLVMTypeRef = null,
 };
 
 const FnInfo = struct {
@@ -479,10 +481,20 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         const param_type = c.LLVMTypeOf(param_val);
         const alloca = c.LLVMBuildAlloca(self.builder, param_type, "");
         _ = c.LLVMBuildStore(self.builder, param_val, alloca);
+
+        // If this parameter has a fn_type annotation, build the LLVM fn type.
+        var fn_sig: ?c.LLVMTypeRef = null;
+        if (param.type_expr) |te| {
+            if (te.kind == .fn_type) {
+                fn_sig = self.buildFnTypeFromAst(te.kind.fn_type) catch null;
+            }
+        }
+
         self.locals.put(self.allocator, param.name, .{
             .alloca = alloca,
             .ty = param_type,
             .is_mut = param.is_mut,
+            .fn_sig = fn_sig,
         }) catch return error.CodegenAlloc;
     }
 
@@ -1654,6 +1666,11 @@ fn genIdent(self: *Codegen, sym: u32) Error!c.LLVMValueRef {
         }
     }
 
+    // Check if this is a function name — return function pointer value.
+    if (self.functions.get(sym)) |fn_info| {
+        return fn_info.value;
+    }
+
     // Built-in: None — creates Option None value using expected type context.
     // (Only reached if no user-defined enum variant matched.)
     const none_sym = self.pool.intern("None") catch return error.CodegenAlloc;
@@ -1867,27 +1884,43 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
         const loaded_kind = c.LLVMGetTypeKind(loaded_type);
 
         if (loaded_kind == c.LLVMPointerTypeKind) {
-            // It's a bare function pointer (non-capturing closure).
-            const i32_type = c.LLVMInt32TypeInContext(self.context);
+            // It's a bare function pointer (non-capturing closure or fn param).
             const arg_count: u32 = @intCast(call_e.args.len);
-            var param_types_buf: [16]c.LLVMTypeRef = undefined;
-            for (0..arg_count) |i| {
-                param_types_buf[i] = i32_type;
-            }
-            const fn_type = c.LLVMFunctionType(i32_type, &param_types_buf, arg_count, 0);
+
+            // Use the stored fn_sig if available, otherwise assume all i32.
+            const fn_type = if (local_info.fn_sig) |sig| sig else blk: {
+                const i32_type = c.LLVMInt32TypeInContext(self.context);
+                var param_types_buf: [16]c.LLVMTypeRef = undefined;
+                for (0..arg_count) |i| {
+                    param_types_buf[i] = i32_type;
+                }
+                break :blk c.LLVMFunctionType(i32_type, &param_types_buf, arg_count, 0);
+            };
 
             var args_buf: [64]c.LLVMValueRef = undefined;
             for (call_e.args, 0..) |arg, i| {
                 args_buf[i] = try self.genExpr(arg);
             }
 
+            // Coerce args to match fn type params.
+            const param_count = c.LLVMCountParamTypes(fn_type);
+            if (param_count > 0) {
+                var fn_param_types: [16]c.LLVMTypeRef = undefined;
+                c.LLVMGetParamTypes(fn_type, &fn_param_types);
+                for (0..@min(call_e.args.len, param_count)) |i| {
+                    args_buf[i] = self.coerceInt(args_buf[i], fn_param_types[i]);
+                }
+            }
+
+            const ret = c.LLVMGetReturnType(fn_type);
+            const void_ret = ret == c.LLVMVoidTypeInContext(self.context);
             return c.LLVMBuildCall2(
                 self.builder,
                 fn_type,
                 loaded,
                 if (arg_count > 0) &args_buf else null,
                 arg_count,
-                "call",
+                if (void_ret) "" else "call",
             );
         } else if (loaded_kind == c.LLVMStructTypeKind) {
             // It's a capturing closure (fat pointer: {fn_ptr, capture_ptr}).
@@ -4109,4 +4142,14 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
         },
         .inferred => error.UnsupportedType,
     };
+}
+
+/// Build an LLVM function type from an AST FnTypeExpr.
+fn buildFnTypeFromAst(self: *Codegen, ft: Ast.FnTypeExpr) Error!c.LLVMTypeRef {
+    var param_types: [16]c.LLVMTypeRef = undefined;
+    for (ft.params, 0..) |p, i| {
+        param_types[i] = try self.resolveType(p);
+    }
+    const ret_type = try self.resolveType(ft.return_type);
+    return c.LLVMFunctionType(ret_type, &param_types, @intCast(ft.params.len), 0);
 }
