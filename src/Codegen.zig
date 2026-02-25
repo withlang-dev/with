@@ -55,6 +55,9 @@ expected_type: ?c.LLVMTypeRef = null,
 option_type_cache: std.AutoHashMapUnmanaged(usize, OptionResultInfo) = .{},
 /// Cache of Result enum types keyed by hash of (ok_type, err_type).
 result_type_cache: std.AutoHashMapUnmanaged(u64, OptionResultInfo) = .{},
+/// Slice element types: local symbol → element LLVM type.
+/// Tracks which locals are slice types so we can index into them.
+slice_elem_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
 /// Drop functions: struct type Symbol → FnInfo for Type.drop.
 drop_fns: std.AutoHashMapUnmanaged(u32, FnInfo) = .{},
 /// Stack of scoped local variable lists for Drop emission.
@@ -202,6 +205,7 @@ pub fn deinit(self: *Codegen) void {
     self.option_type_cache.deinit(self.allocator);
     self.result_type_cache.deinit(self.allocator);
     self.drop_fns.deinit(self.allocator);
+    self.slice_elem_types.deinit(self.allocator);
     c.LLVMDisposeBuilder(self.builder);
     c.LLVMDisposeModule(self.module);
     c.LLVMContextDispose(self.context);
@@ -856,6 +860,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .continue_expr => try self.genContinue(),
         .field_access => |fa| try self.genFieldAccess(fa),
         .index => |idx| try self.genIndex(idx),
+        .slice => |sl| try self.genSlice(sl),
         .array_literal => |elems| try self.genArrayLiteral(elems),
         .struct_literal => |sl| try self.genStructLiteral(sl),
         .match_expr => |m| try self.genMatchExpr(m),
@@ -1589,6 +1594,30 @@ fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
             .ty = ty,
         };
         self.scope_local_count += 1;
+    }
+
+    // Track slice element type if the binding is a slice type.
+    if (let_b.type_expr) |te| {
+        if (te.kind == .slice_type) {
+            const elem_ty = self.resolveType(te.kind.slice_type) catch null;
+            if (elem_ty) |et| {
+                self.slice_elem_types.put(self.allocator, let_b.name, et) catch {};
+            }
+        }
+    }
+    // Also track slice element type from slice expressions (inferred).
+    if (let_b.value.kind == .slice) {
+        // Infer element type from the source array/slice.
+        if (let_b.value.kind.slice.expr.kind == .ident) {
+            const src_sym = let_b.value.kind.slice.expr.kind.ident;
+            if (self.slice_elem_types.get(src_sym)) |et| {
+                self.slice_elem_types.put(self.allocator, let_b.name, et) catch {};
+            } else if (self.locals.get(src_sym)) |src_local| {
+                if (c.LLVMGetTypeKind(src_local.ty) == c.LLVMArrayTypeKind) {
+                    self.slice_elem_types.put(self.allocator, let_b.name, c.LLVMGetElementType(src_local.ty)) catch {};
+                }
+            }
+        }
     }
 
     // Track pointee type if value is a reference (&expr or &mut expr).
@@ -2637,6 +2666,12 @@ fn genFor(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
     if (for_e.iterable.kind == .range) {
         return self.genForRange(for_e);
     }
+    // Check if iterable is a slice variable.
+    if (for_e.iterable.kind == .ident) {
+        if (self.slice_elem_types.get(for_e.iterable.kind.ident)) |_| {
+            return self.genForSlice(for_e);
+        }
+    }
     // Otherwise, try to generate as an array iteration.
     return self.genForArray(for_e);
 }
@@ -2757,6 +2792,73 @@ fn genForArray(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
     c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
     var indices = [_]c.LLVMValueRef{ c.LLVMConstInt(i64_type, 0, 0), current_idx };
     const elem_ptr = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &indices, 2, "elem.ptr");
+    const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "elem");
+    _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
+
+    _ = try self.genExpr(for_e.body);
+    const body_end_bb = c.LLVMGetInsertBlock(self.builder);
+    if (c.LLVMGetBasicBlockTerminator(body_end_bb) == null) {
+        _ = c.LLVMBuildBr(self.builder, inc_bb);
+    }
+
+    // Increment index.
+    c.LLVMPositionBuilderAtEnd(self.builder, inc_bb);
+    const loaded_idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+    const next_idx = c.LLVMBuildAdd(self.builder, loaded_idx, c.LLVMConstInt(i64_type, 1, 0), "inc");
+    _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    self.loop_depth -= 1;
+
+    c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+fn genForSlice(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
+    const slice_sym = for_e.iterable.kind.ident;
+    const local = self.locals.get(slice_sym) orelse return error.UnsupportedExpr;
+    const elem_type = self.slice_elem_types.get(slice_sym) orelse return error.UnsupportedExpr;
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+
+    // Load the slice struct.
+    const slice_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
+    const slice_ptr = c.LLVMBuildExtractValue(self.builder, slice_val, 0, "slice.ptr");
+    const slice_len = c.LLVMBuildExtractValue(self.builder, slice_val, 1, "slice.len");
+
+    // Create index variable.
+    const idx_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "for.idx");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), idx_alloca);
+
+    // Create element variable for the binding.
+    const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
+    self.locals.put(self.allocator, for_e.binding, .{
+        .alloca = elem_alloca,
+        .ty = elem_type,
+        .is_mut = false,
+    }) catch return error.CodegenAlloc;
+
+    const function = self.current_function;
+    const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.cond");
+    const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.body");
+    const inc_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.inc");
+    const end_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.end");
+
+    if (self.loop_depth >= self.loop_stack.len) return error.UnsupportedExpr;
+    self.loop_stack[self.loop_depth] = .{ .break_bb = end_bb, .continue_bb = inc_bb };
+    self.loop_depth += 1;
+
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    // Condition: idx < len.
+    c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+    const current_idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+    const cond = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, current_idx, slice_len, "for.cmp");
+    _ = c.LLVMBuildCondBr(self.builder, cond, body_bb, end_bb);
+
+    // Body: load element from ptr + idx.
+    c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    var gep_indices = [_]c.LLVMValueRef{current_idx};
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, slice_ptr, &gep_indices, 1, "elem.ptr");
     const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "elem");
     _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
 
@@ -3319,6 +3421,16 @@ fn genIndex(self: *Codegen, idx: Ast.IndexExpr) Error!c.LLVMValueRef {
                 const elem_type = c.LLVMGetElementType(local.ty);
                 return c.LLVMBuildLoad2(self.builder, elem_type, gep, "elem");
             }
+            // Slice indexing: extract ptr, GEP, load.
+            if (self.slice_elem_types.get(arr_sym)) |elem_type| {
+                const slice_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
+                const ptr = c.LLVMBuildExtractValue(self.builder, slice_val, 0, "slice.ptr");
+                const index_val = try self.genExpr(idx.index);
+                const index_i64 = self.coerceInt(index_val, c.LLVMInt64TypeInContext(self.context));
+                var slice_gep_idx = [_]c.LLVMValueRef{index_i64};
+                const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, ptr, &slice_gep_idx, 1, "");
+                return c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "slice.elem");
+            }
             // Struct with `get` method → operator overload.
             if (c.LLVMGetTypeKind(local.ty) == c.LLVMStructTypeKind) {
                 const obj_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
@@ -3333,6 +3445,86 @@ fn genIndex(self: *Codegen, idx: Ast.IndexExpr) Error!c.LLVMValueRef {
 
     if (c.LLVMGetTypeKind(obj_type) == c.LLVMStructTypeKind) {
         return self.tryIndexOverload(obj_val, obj_type, idx.index);
+    }
+
+    return error.UnsupportedExpr;
+}
+
+fn genSlice(self: *Codegen, sl: Ast.SliceExpr) Error!c.LLVMValueRef {
+    // Slicing an array: arr[start..end] → { ptr_to_element, len }
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+
+    if (sl.expr.kind == .ident) {
+        const arr_sym = sl.expr.kind.ident;
+        if (self.locals.get(arr_sym)) |local| {
+            // Slicing a fixed array.
+            if (c.LLVMGetTypeKind(local.ty) == c.LLVMArrayTypeKind) {
+                const elem_type = c.LLVMGetElementType(local.ty);
+                const arr_len = c.LLVMGetArrayLength2(local.ty);
+
+                const start_val = if (sl.start) |s|
+                    self.coerceInt(try self.genExpr(s), i64_type)
+                else
+                    c.LLVMConstInt(i64_type, 0, 0);
+
+                const end_val = if (sl.end) |e|
+                    self.coerceInt(try self.genExpr(e), i64_type)
+                else
+                    c.LLVMConstInt(i64_type, arr_len, 0);
+
+                // GEP to get pointer to start element.
+                const start_i32 = c.LLVMBuildTrunc(self.builder, start_val, i32_type, "");
+                const zero = c.LLVMConstInt(i32_type, 0, 0);
+                var indices = [_]c.LLVMValueRef{ zero, start_i32 };
+                const elem_ptr = c.LLVMBuildGEP2(self.builder, local.ty, local.alloca, &indices, 2, "");
+
+                // Length = end - start.
+                const len = c.LLVMBuildSub(self.builder, end_val, start_val, "slice.len");
+
+                // Build slice struct { ptr, len }.
+                var body_types = [_]c.LLVMTypeRef{
+                    c.LLVMPointerTypeInContext(self.context, 0),
+                    i64_type,
+                };
+                const slice_type = c.LLVMStructTypeInContext(self.context, &body_types, 2, 0);
+
+                var result = c.LLVMGetUndef(slice_type);
+                result = c.LLVMBuildInsertValue(self.builder, result, elem_ptr, 0, "");
+                result = c.LLVMBuildInsertValue(self.builder, result, len, 1, "");
+
+                // Track element type for later indexing.
+                _ = elem_type;
+                return result;
+            }
+
+            // Slicing a slice.
+            if (self.slice_elem_types.get(arr_sym)) |_| {
+                const slice_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
+                const src_ptr = c.LLVMBuildExtractValue(self.builder, slice_val, 0, "src.ptr");
+                const src_len = c.LLVMBuildExtractValue(self.builder, slice_val, 1, "src.len");
+
+                const start_val = if (sl.start) |s|
+                    self.coerceInt(try self.genExpr(s), i64_type)
+                else
+                    c.LLVMConstInt(i64_type, 0, 0);
+
+                const end_val = if (sl.end) |e|
+                    self.coerceInt(try self.genExpr(e), i64_type)
+                else
+                    src_len;
+
+                const elem_type = self.slice_elem_types.get(arr_sym).?;
+                var reslice_idx = [_]c.LLVMValueRef{start_val};
+                const new_ptr = c.LLVMBuildGEP2(self.builder, elem_type, src_ptr, &reslice_idx, 1, "");
+                const new_len = c.LLVMBuildSub(self.builder, end_val, start_val, "slice.len");
+
+                var result = c.LLVMGetUndef(local.ty);
+                result = c.LLVMBuildInsertValue(self.builder, result, new_ptr, 0, "");
+                result = c.LLVMBuildInsertValue(self.builder, result, new_len, 1, "");
+                return result;
+            }
+        }
     }
 
     return error.UnsupportedExpr;
@@ -3389,6 +3581,20 @@ fn genFieldAccess(self: *Codegen, fa: Ast.FieldAccessExpr) Error!c.LLVMValueRef 
             if (std.mem.eql(u8, field_name, "len")) {
                 const len = c.LLVMGetArrayLength2(local.ty);
                 return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), len, 0);
+            }
+            return error.UnsupportedExpr;
+        }
+
+        // Check for slice .len (slice is { ptr, i64 } struct).
+        if (self.slice_elem_types.get(sym)) |_| {
+            const field_name = self.pool.resolve(fa.field);
+            if (std.mem.eql(u8, field_name, "len")) {
+                const slice_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
+                return c.LLVMBuildExtractValue(self.builder, slice_val, 1, "slice.len");
+            }
+            if (std.mem.eql(u8, field_name, "ptr")) {
+                const slice_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
+                return c.LLVMBuildExtractValue(self.builder, slice_val, 0, "slice.ptr");
             }
             return error.UnsupportedExpr;
         }
@@ -4109,6 +4315,15 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
         .array_type => |arr| {
             const elem = try self.resolveType(arr.element);
             return c.LLVMArrayType2(elem, arr.size);
+        },
+        .slice_type => |elem_te| {
+            _ = try self.resolveType(elem_te);
+            // Slice is { ptr, i64 } — same layout as str.
+            var body_types = [_]c.LLVMTypeRef{
+                c.LLVMPointerTypeInContext(self.context, 0),
+                c.LLVMInt64TypeInContext(self.context),
+            };
+            return c.LLVMStructTypeInContext(self.context, &body_types, 2, 0);
         },
         .optional => |inner| {
             // ?T is sugar for Option[T].

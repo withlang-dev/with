@@ -41,6 +41,8 @@ pub const Type = union(enum) {
     enum_type: EnumType,
     /// Array type: [N]T.
     array_type: ArrayType,
+    /// Slice type: []T (ptr + len pair).
+    slice_type: SliceType,
     /// Tuple type: (T1, T2, ...).
     tuple_type: TupleType,
     /// Function type: fn(params) -> ret.
@@ -80,6 +82,10 @@ pub const EnumType = struct {
 pub const ArrayType = struct {
     element: TypeId,
     size: u64,
+};
+
+pub const SliceType = struct {
+    element: TypeId,
 };
 
 pub const TupleType = struct {
@@ -647,6 +653,12 @@ fn resolveTypeExpr(self: *Sema, te: *const Ast.TypeExpr) TypeId {
                 .size = at.size,
             } });
         },
+        .slice_type => |elem_te| {
+            const elem = self.resolveTypeExpr(elem_te);
+            return self.addType(.{ .slice_type = .{
+                .element = elem,
+            } });
+        },
         .tuple_type => |types| {
             const elems = self.allocator.alloc(TypeId, types.len) catch return error_type;
             for (types, 0..) |t, i| {
@@ -750,6 +762,7 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
         .continue_expr => self.ty_void,
         .field_access => |fa| self.checkFieldAccess(fa, expr.span),
         .index => |idx| self.checkIndex(idx, expr.span),
+        .slice => |sl| self.checkSlice(sl),
         .array_literal => |elems| self.checkArrayLiteral(elems),
         .struct_literal => |sl| self.checkStructLiteral(sl, expr.span),
         .match_expr => |m| self.checkMatchExpr(m),
@@ -1102,6 +1115,14 @@ fn checkFieldAccess(self: *Sema, fa: Ast.FieldAccessExpr, span: Span) TypeId {
             }
             return error_type;
         },
+        .slice_type => {
+            // .len and .ptr on slices.
+            const field_name = self.pool.resolve(fa.field);
+            if (std.mem.eql(u8, field_name, "len")) {
+                return self.ty_i64;
+            }
+            return error_type;
+        },
         .str_type => {
             // .len on str returns i64.
             const field_name = self.pool.resolve(fa.field);
@@ -1127,6 +1148,22 @@ fn checkIndex(self: *Sema, idx: Ast.IndexExpr, _: Span) TypeId {
     const resolved = self.resolveAlias(arr_type);
     switch (self.getType(resolved)) {
         .array_type => |at| return at.element,
+        .slice_type => |st| return st.element,
+        else => return error_type,
+    }
+}
+
+fn checkSlice(self: *Sema, sl: Ast.SliceExpr) TypeId {
+    const arr_type = self.checkExpr(sl.expr);
+    if (sl.start) |s| _ = self.checkExpr(s);
+    if (sl.end) |e| _ = self.checkExpr(e);
+
+    if (arr_type == error_type) return error_type;
+
+    const resolved = self.resolveAlias(arr_type);
+    switch (self.getType(resolved)) {
+        .array_type => |at| return self.addType(.{ .slice_type = .{ .element = at.element } }),
+        .slice_type => return resolved, // slicing a slice returns same slice type
         else => return error_type,
     }
 }
@@ -1691,6 +1728,11 @@ fn typesCompatible(self: *const Sema, expected: TypeId, actual: TypeId) bool {
             self.typesCompatible(exp_type.array_type.element, act_type.array_type.element);
     }
 
+    // Slice compatibility: same element type.
+    if (exp_type == .slice_type and act_type == .slice_type) {
+        return self.typesCompatible(exp_type.slice_type.element, act_type.slice_type.element);
+    }
+
     // Tuple compatibility: same number of elements, each compatible.
     if (exp_type == .tuple_type and act_type == .tuple_type) {
         const exp_elems = exp_type.tuple_type.elements;
@@ -1768,6 +1810,7 @@ pub fn isCopy(self: *const Sema, tid: TypeId) bool {
             return true;
         },
         .array_type => |at| return self.isCopy(at.element),
+        .slice_type => return true, // slices are {ptr, len} - Copy by default
         .tuple_type => |tt| {
             for (tt.elements) |elem| {
                 if (!self.isCopy(elem)) return false;

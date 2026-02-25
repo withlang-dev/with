@@ -724,6 +724,12 @@ fn compoundAssignOp(self: *const Parser) ?Ast.BinOp {
     };
 }
 
+/// Parse an expression for use inside `[...]` brackets.
+/// Uses higher min precedence (6) so that `..` (prec 5) is NOT consumed as a range.
+fn parseIndexExpr(self: *Parser) error{ ParseError, OutOfMemory }!*const Ast.Expr {
+    return self.parsePrecedence(6);
+}
+
 fn parsePrecedence(self: *Parser, min_prec: u8) !*const Ast.Expr {
     var lhs = try self.parsePrimary();
 
@@ -991,18 +997,42 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
             },
             .l_bracket => {
                 self.advance();
-                const index = try self.parseExpr();
-                const end = self.currentSpan();
-                try self.expect(.r_bracket);
-                const node = try self.arena.create(Ast.Expr);
-                node.* = .{
-                    .kind = .{ .index = .{
-                        .expr = lhs,
-                        .index = index,
-                    } },
-                    .span = lhs.span.merge(end),
-                };
-                lhs = node;
+                // Parse with precedence above range (..) so that 0..2 doesn't
+                // get consumed as a range expression. Precedence 6 stops
+                // before dot_dot (prec 5).
+                const index = try self.parseIndexExpr();
+                if (self.peek() == .dot_dot) {
+                    // Slice expression: arr[start..end]
+                    self.advance(); // consume '..'
+                    var end_expr: ?*const Ast.Expr = null;
+                    if (self.peek() != .r_bracket) {
+                        end_expr = try self.parseExpr();
+                    }
+                    const end = self.currentSpan();
+                    try self.expect(.r_bracket);
+                    const node = try self.arena.create(Ast.Expr);
+                    node.* = .{
+                        .kind = .{ .slice = .{
+                            .expr = lhs,
+                            .start = index,
+                            .end = end_expr,
+                        } },
+                        .span = lhs.span.merge(end),
+                    };
+                    lhs = node;
+                } else {
+                    const end = self.currentSpan();
+                    try self.expect(.r_bracket);
+                    const node = try self.arena.create(Ast.Expr);
+                    node.* = .{
+                        .kind = .{ .index = .{
+                            .expr = lhs,
+                            .index = index,
+                        } },
+                        .span = lhs.span.merge(end),
+                    };
+                    lhs = node;
+                }
             },
             .kw_as => {
                 if (self.suppress_as) return lhs;
@@ -1811,7 +1841,18 @@ fn parseTypeExpr(self: *Parser) !*const Ast.TypeExpr {
         .l_bracket => {
             const start = self.currentSpan();
             self.advance(); // consume '['
-            // Parse size as int literal.
+            // Slice type: []T (no size)
+            if (self.peek() == .r_bracket) {
+                self.advance(); // consume ']'
+                const element = try self.parseTypeExpr();
+                const node = try self.arena.create(Ast.TypeExpr);
+                node.* = .{
+                    .kind = .{ .slice_type = element },
+                    .span = start.merge(element.span),
+                };
+                return node;
+            }
+            // Array type: [N]T
             if (self.peek() != .int_literal) {
                 self.emitError("expected array size");
                 return error.ParseError;
