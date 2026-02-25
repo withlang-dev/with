@@ -31,6 +31,8 @@ imported_paths: std.StringHashMapUnmanaged(void),
 source_dir: []const u8,
 /// Next file ID for imported sources.
 next_file_id: Span.FileId,
+/// Rendered warning messages to print after compilation.
+pending_warnings: std.ArrayList([]const u8),
 
 pub fn init(allocator: std.mem.Allocator) Driver {
     return .{
@@ -41,6 +43,7 @@ pub fn init(allocator: std.mem.Allocator) Driver {
         .imported_paths = .empty,
         .source_dir = ".",
         .next_file_id = 1,
+        .pending_warnings = .empty,
     };
 }
 
@@ -54,6 +57,7 @@ pub fn deinit(self: *Driver) void {
         self.allocator.free(@constCast(entry.key_ptr.*));
     }
     self.imported_paths.deinit(self.allocator);
+    self.pending_warnings.deinit(self.allocator);
 }
 
 /// Compile a single source file through the current pipeline.
@@ -72,7 +76,23 @@ pub fn compileFile(self: *Driver, path: []const u8) !?Ast.Module {
     };
     defer source.deinit();
 
-    return self.compileSource(&source);
+    const module = try self.compileSource(&source);
+
+    // Render warnings before source is deinitialized.
+    if (module != null) {
+        for (self.diagnostics.items.items) |diag| {
+            if (diag.severity == .warning) {
+                const loc = source.offsetToLocation(diag.primary.start);
+                var msg_buf: [1024]u8 = undefined;
+                const msg = std.fmt.bufPrint(&msg_buf, "warning: {s}\n --> {s}:{d}:{d}\n", .{
+                    diag.message, source.name, loc.line + 1, loc.col + 1,
+                }) catch continue;
+                self.pending_warnings.append(self.allocator, self.arena.allocator().dupe(u8, msg) catch continue) catch {};
+            }
+        }
+    }
+
+    return module;
 }
 
 /// Compile from an already-loaded Source.
@@ -534,4 +554,12 @@ fn reportErrors(self: *const Driver, source: *Source) !void {
     var w = std.fs.File.stderr().writer(&buf);
     try self.diagnostics.renderAll(source, &w.interface);
     try w.interface.flush();
+}
+
+/// Print any pending warnings to stderr.
+pub fn printWarnings(self: *const Driver) void {
+    const stderr = std.fs.File.stderr();
+    for (self.pending_warnings.items) |msg| {
+        stderr.writeAll(msg) catch {};
+    }
 }
