@@ -1241,21 +1241,27 @@ fn parseIfExpr(self: *Parser) !*const Ast.Expr {
 
     const cond = try self.parseExpr();
 
+    var use_block = false;
     if (self.peek() == .kw_then) {
         self.advance();
+        self.skipNewlines();
     } else if (self.peek() == .colon) {
         self.advance();
+        use_block = true;
+        // Don't skip newlines — parseBlockOrExpr needs to see the newline
+        // to enter multi-line block mode.
+    } else {
+        self.skipNewlines();
     }
-    self.skipNewlines();
 
-    const then_body = try self.parseExpr();
+    const then_body = if (use_block) try self.parseBlockOrExpr() else try self.parseExpr();
     var else_body: ?*const Ast.Expr = null;
     const save = self.pos;
     self.skipNewlines();
     if (self.peek() == .kw_else) {
         self.advance();
-        self.skipNewlines();
-        else_body = try self.parseExpr();
+        // Don't skip newlines for else block — let parseBlockOrExpr handle it
+        else_body = try self.parseBlockOrExpr();
     } else {
         self.pos = save; // Don't consume newlines if no else clause.
     }
