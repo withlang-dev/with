@@ -913,6 +913,11 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
             const body_type = c.LLVMTypeOf(body_val);
             if (body_type == c.LLVMVoidTypeInContext(self.context)) {
                 _ = c.LLVMBuildRet(self.builder, c.LLVMConstInt(ret_type, 0, 0));
+            } else if (body_type != ret_type and self.isResultType(ret_type)) {
+                // Implicit Ok wrapping: if return type is Result and body is not,
+                // wrap the body value in Ok(...).
+                const wrapped = try self.buildResultOk(body_val, ret_type);
+                _ = c.LLVMBuildRet(self.builder, wrapped);
             } else {
                 const coerced = self.coerceInt(body_val, ret_type);
                 _ = c.LLVMBuildRet(self.builder, coerced);
@@ -2290,8 +2295,32 @@ fn genIfExpr(self: *Codegen, if_e: Ast.IfExpr) Error!c.LLVMValueRef {
 
     // Only add incoming edges from non-terminated branches.
     if (!then_terminated and !else_terminated) {
-        const coerced_else = self.coerceInt(else_val, phi_type);
-        var incoming_vals = [_]c.LLVMValueRef{ then_val, coerced_else };
+        // Implicit Ok wrapping: if types mismatch and phi_type is Result, wrap the other.
+        var final_then = then_val;
+        var final_else = else_val;
+        const then_type = c.LLVMTypeOf(then_val);
+        const else_type = c.LLVMTypeOf(else_val);
+        if (then_type != else_type) {
+            if (self.isResultType(then_type) and !self.isResultType(else_type)) {
+                // Wrap else in Ok.
+                c.LLVMPositionBuilderAtEnd(self.builder, else_end_bb);
+                // Remove the existing branch to merge_bb (we'll re-add it).
+                c.LLVMInstructionEraseFromParent(c.LLVMGetBasicBlockTerminator(else_end_bb));
+                final_else = self.buildResultOk(else_val, then_type) catch return error.UnsupportedExpr;
+                _ = c.LLVMBuildBr(self.builder, merge_bb);
+                c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+            } else if (self.isResultType(else_type) and !self.isResultType(then_type)) {
+                // Wrap then in Ok.
+                c.LLVMPositionBuilderAtEnd(self.builder, then_end_bb);
+                c.LLVMInstructionEraseFromParent(c.LLVMGetBasicBlockTerminator(then_end_bb));
+                final_then = self.buildResultOk(then_val, else_type) catch return error.UnsupportedExpr;
+                _ = c.LLVMBuildBr(self.builder, merge_bb);
+                c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+            } else {
+                final_else = self.coerceInt(else_val, phi_type);
+            }
+        }
+        var incoming_vals = [_]c.LLVMValueRef{ final_then, final_else };
         var incoming_bbs = [_]c.LLVMBasicBlockRef{ then_end_bb, else_end_bb };
         c.LLVMAddIncoming(phi, &incoming_vals, &incoming_bbs, 2);
     } else if (!then_terminated) {
@@ -3953,6 +3982,14 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
     }
 
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+fn isResultType(self: *Codegen, ty: c.LLVMTypeRef) bool {
+    var it = self.result_type_cache.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == ty) return true;
+    }
+    return false;
 }
 
 fn addMatchCase(self: *Codegen, sw: c.LLVMValueRef, pattern: Ast.Pattern, tag_val: c.LLVMValueRef, target_bb: c.LLVMBasicBlockRef, enum_info: ?EnumTypeInfo) void {
