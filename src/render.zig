@@ -392,6 +392,17 @@ fn renderPattern(pat: *const Ast.Pattern, pool: *const InternPool, writer: anyty
                 try renderPattern(alt, pool, writer);
             }
         },
+        .at_binding => |ab| {
+            try writer.print("{s} @ ", .{pool.resolve(ab.name)});
+            try renderPattern(ab.pattern, pool, writer);
+        },
+        .range_pattern => |rp| {
+            if (rp.inclusive) {
+                try writer.print("{}..={}", .{ rp.start, rp.end });
+            } else {
+                try writer.print("{}..{}", .{ rp.start, rp.end });
+            }
+        },
     }
 }
 

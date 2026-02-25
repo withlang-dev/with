@@ -1486,6 +1486,13 @@ fn parseWhile(self: *Parser) !*const Ast.Expr {
     const start = self.currentSpan();
     self.advance(); // consume 'while'
     self.skipNewlines();
+
+    // Check for while-let: `while let Pattern = expr: body`
+    // Desugars to: `loop: match expr { Pattern -> body, _ -> break }`
+    if (self.peek() == .kw_let) {
+        return self.parseWhileLet(start);
+    }
+
     const condition = try self.parseExpr();
 
     if (self.peek() == .colon) {
@@ -1500,6 +1507,57 @@ fn parseWhile(self: *Parser) !*const Ast.Expr {
             .condition = condition,
             .body = body,
         } },
+        .span = start.merge(body.span),
+    };
+    return node;
+}
+
+fn parseWhileLet(self: *Parser, start: Span) !*const Ast.Expr {
+    self.advance(); // consume 'let'
+    const pattern = try self.parsePattern();
+    try self.expect(.eq);
+    const subject = try self.parseExpr();
+
+    if (self.peek() == .colon) {
+        self.advance();
+    }
+    self.skipNewlines();
+
+    const body = try self.parseBlockOrExpr();
+
+    // Build break expression for the wildcard arm.
+    const break_node = try self.arena.create(Ast.Expr);
+    break_node.* = .{
+        .kind = .break_expr,
+        .span = start,
+    };
+
+    // Build match expression: match subject { Pattern -> body, _ -> break }
+    var arms: std.ArrayList(Ast.MatchArm) = .empty;
+    try arms.append(self.arena, .{
+        .pattern = pattern,
+        .body = body,
+        .span = start.merge(body.span),
+    });
+    try arms.append(self.arena, .{
+        .pattern = .{ .kind = .wildcard, .span = start },
+        .body = break_node,
+        .span = start,
+    });
+
+    const match_node = try self.arena.create(Ast.Expr);
+    match_node.* = .{
+        .kind = .{ .match_expr = .{
+            .subject = subject,
+            .arms = arms.items,
+        } },
+        .span = start.merge(body.span),
+    };
+
+    // Wrap in loop: loop: match_expr
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .loop_expr = match_node },
         .span = start.merge(body.span),
     };
     return node;
@@ -1659,8 +1717,22 @@ fn parsePattern(self: *Parser) !Ast.Pattern {
         .int_literal => {
             const text = self.source[span.start..span.end];
             self.advance();
+            const start_val = std.fmt.parseInt(i64, text, 0) catch 0;
+            // Check for range pattern: 1..5 or 1..=5
+            if (self.peek() == .dot_dot or self.peek() == .dot_dot_eq) {
+                const inclusive = self.peek() == .dot_dot_eq;
+                self.advance(); // consume .. or ..=
+                const end_span = self.currentSpan();
+                const end_text = self.source[end_span.start..end_span.end];
+                try self.expect(.int_literal);
+                const end_val = std.fmt.parseInt(i64, end_text, 0) catch 0;
+                return .{
+                    .kind = .{ .range_pattern = .{ .start = start_val, .end = end_val, .inclusive = inclusive } },
+                    .span = span.merge(self.prevSpan()),
+                };
+            }
             return .{
-                .kind = .{ .int_literal = std.fmt.parseInt(i64, text, 0) catch 0 },
+                .kind = .{ .int_literal = start_val },
                 .span = span,
             };
         },
@@ -1713,6 +1785,16 @@ fn parsePattern(self: *Parser) !Ast.Pattern {
                         .bindings = &.{},
                     } },
                     .span = span,
+                };
+            }
+            // Check for at-binding: `name @ Pattern`
+            if (self.peek() == .at) {
+                self.advance(); // consume '@'
+                const inner = try self.arena.create(Ast.Pattern);
+                inner.* = try self.parsePattern();
+                return .{
+                    .kind = .{ .at_binding = .{ .name = name, .pattern = inner } },
+                    .span = span.merge(inner.span),
                 };
             }
             // Otherwise it's a variable binding
