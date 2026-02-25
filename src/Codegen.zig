@@ -4329,6 +4329,47 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
         }
     }
 
+    // Built-in string methods: len(), is_empty(), contains(), starts_with(), ends_with(),
+    // find(), to_upper(), to_lower(), trim(), repeat(), slice().
+    if (self.isStrType(obj_type)) {
+        if (std.mem.eql(u8, method_name, "len")) {
+            return self.genStrLen(obj_val);
+        } else if (std.mem.eql(u8, method_name, "is_empty")) {
+            return self.genStrIsEmpty(obj_val);
+        } else if (std.mem.eql(u8, method_name, "contains")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const needle = try self.genExpr(args[0]);
+            return self.genStrContains(obj_val, needle);
+        } else if (std.mem.eql(u8, method_name, "starts_with")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const prefix = try self.genExpr(args[0]);
+            return self.genStrStartsWith(obj_val, prefix);
+        } else if (std.mem.eql(u8, method_name, "ends_with")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const suffix = try self.genExpr(args[0]);
+            return self.genStrEndsWith(obj_val, suffix);
+        } else if (std.mem.eql(u8, method_name, "find")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const needle = try self.genExpr(args[0]);
+            return self.genStrFind(obj_val, needle);
+        } else if (std.mem.eql(u8, method_name, "to_upper")) {
+            return self.genStrToCase(obj_val, true);
+        } else if (std.mem.eql(u8, method_name, "to_lower")) {
+            return self.genStrToCase(obj_val, false);
+        } else if (std.mem.eql(u8, method_name, "trim")) {
+            return self.genStrTrim(obj_val);
+        } else if (std.mem.eql(u8, method_name, "repeat")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const count = try self.genExpr(args[0]);
+            return self.genStrRepeat(obj_val, count);
+        } else if (std.mem.eql(u8, method_name, "slice")) {
+            if (args.len < 2) return error.UnsupportedExpr;
+            const start = try self.genExpr(args[0]);
+            const end = try self.genExpr(args[1]);
+            return self.genStrSlice(obj_val, start, end);
+        }
+    }
+
     // Search struct_types for matching type.
     var type_name_str: ?[]const u8 = null;
     {
@@ -6914,32 +6955,398 @@ fn genStrConcat(self: *Codegen, lhs: c.LLVMValueRef, rhs: c.LLVMValueRef) Error!
 }
 
 /// Generate string comparison: str == str or str != str.
-/// Uses strcmp(lhs.ptr, rhs.ptr) == 0.
+/// Uses length check + memcmp for correct comparison of non-null-terminated strings.
 fn genStrCompare(self: *Codegen, lhs: c.LLVMValueRef, rhs: c.LLVMValueRef, op: Ast.BinOp) Error!c.LLVMValueRef {
-    const lhs_ptr = self.extractStrPtr(lhs);
-    const rhs_ptr = self.extractStrPtr(rhs);
+    const l = self.extractStrPtrAndLen(lhs);
+    const r = self.extractStrPtrAndLen(rhs);
 
-    // Ensure strcmp is declared.
-    const strcmp_sym = self.pool.intern("strcmp") catch return error.CodegenAlloc;
-    const strcmp_fn = if (self.functions.get(strcmp_sym)) |fi| fi else blk: {
-        const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
-        const i32_type = c.LLVMInt32TypeInContext(self.context);
-        var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
-        const fn_type = c.LLVMFunctionType(i32_type, &param_types, 2, 0);
-        const func = c.LLVMAddFunction(self.module, "strcmp", fn_type);
-        const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
-        self.functions.put(self.allocator, strcmp_sym, fi) catch {};
-        break :blk fi;
-    };
+    // First: check lengths are equal.
+    const len_eq = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, l.len, r.len, "len_eq");
 
-    var call_args = [_]c.LLVMValueRef{ lhs_ptr, rhs_ptr };
-    const cmp_result = c.LLVMBuildCall2(self.builder, strcmp_fn.fn_type, strcmp_fn.value, &call_args, 2, "strcmp");
+    // Then: memcmp(lhs.ptr, rhs.ptr, lhs.len) == 0
+    const memcmp_fn = self.ensureMemcmpDeclared();
+    var call_args = [_]c.LLVMValueRef{ l.ptr, r.ptr, l.len };
+    const cmp_result = c.LLVMBuildCall2(self.builder, memcmp_fn.fn_type, memcmp_fn.value, &call_args, 3, "memcmp");
     const zero = c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+    const mem_eq = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, cmp_result, zero, "mem_eq");
 
-    return if (op == .eq)
-        c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, cmp_result, zero, "streq")
+    // Both conditions must hold: len_eq AND mem_eq
+    const both = c.LLVMBuildAnd(self.builder, len_eq, mem_eq, "streq");
+
+    return if (op == .eq) both else c.LLVMBuildNot(self.builder, both, "strne");
+}
+
+/// Ensure memcmp is declared.
+fn ensureMemcmpDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("memcmp") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type, i64_type };
+    const fn_type = c.LLVMFunctionType(i32_type, &param_types, 3, 0);
+    const func = c.LLVMAddFunction(self.module, "memcmp", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// Helper: extract (ptr, len) from a str value.
+fn extractStrPtrAndLen(self: *Codegen, val: c.LLVMValueRef) struct { ptr: c.LLVMValueRef, len: c.LLVMValueRef } {
+    const str_sym = self.pool.intern("str") catch unreachable;
+    const str_info = self.struct_types.get(str_sym).?;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, str_info.llvm_type, "s");
+    _ = c.LLVMBuildStore(self.builder, val, alloca);
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, alloca, 0, "");
+    const ptr = c.LLVMBuildLoad2(self.builder, ptr_type, ptr_gep, "s.ptr");
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, alloca, 1, "");
+    const len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "s.len");
+    return .{ .ptr = ptr, .len = len };
+}
+
+/// Helper: build a str value from ptr and len.
+fn buildStrValue(self: *Codegen, ptr: c.LLVMValueRef, len: c.LLVMValueRef) c.LLVMValueRef {
+    const str_sym = self.pool.intern("str") catch unreachable;
+    const str_info = self.struct_types.get(str_sym).?;
+    const alloca = c.LLVMBuildAlloca(self.builder, str_info.llvm_type, "str.result");
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, alloca, 0, "");
+    _ = c.LLVMBuildStore(self.builder, ptr, ptr_gep);
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, alloca, 1, "");
+    _ = c.LLVMBuildStore(self.builder, len, len_gep);
+    return c.LLVMBuildLoad2(self.builder, str_info.llvm_type, alloca, "str.val");
+}
+
+/// Ensure strstr is declared.
+fn ensureStrstrDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("strstr") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+    const fn_type = c.LLVMFunctionType(ptr_type, &param_types, 2, 0);
+    const func = c.LLVMAddFunction(self.module, "strstr", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// Ensure strncmp is declared.
+fn ensureStrncmpDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("strncmp") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type, i64_type };
+    const fn_type = c.LLVMFunctionType(i32_type, &param_types, 3, 0);
+    const func = c.LLVMAddFunction(self.module, "strncmp", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// Ensure free is declared.
+fn ensureFreeDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("free") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const void_type = c.LLVMVoidTypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{ptr_type};
+    const fn_type = c.LLVMFunctionType(void_type, &param_types, 1, 0);
+    const func = c.LLVMAddFunction(self.module, "free", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// str.len() → i64
+fn genStrLen(self: *Codegen, obj_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const s = self.extractStrPtrAndLen(obj_val);
+    return s.len;
+}
+
+/// str.is_empty() → bool
+fn genStrIsEmpty(self: *Codegen, obj_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const s = self.extractStrPtrAndLen(obj_val);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    return c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, s.len, c.LLVMConstInt(i64_type, 0, 0), "is_empty");
+}
+
+/// str.contains(needle) → bool — uses strstr(ptr, needle.ptr) != null
+fn genStrContains(self: *Codegen, obj_val: c.LLVMValueRef, needle: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const s = self.extractStrPtrAndLen(obj_val);
+    const n = self.extractStrPtrAndLen(needle);
+    const strstr_fn = self.ensureStrstrDeclared();
+    var call_args = [_]c.LLVMValueRef{ s.ptr, n.ptr };
+    const result = c.LLVMBuildCall2(self.builder, strstr_fn.fn_type, strstr_fn.value, &call_args, 2, "strstr");
+    const null_ptr = c.LLVMConstNull(c.LLVMPointerTypeInContext(self.context, 0));
+    return c.LLVMBuildICmp(self.builder, c.LLVMIntNE, result, null_ptr, "contains");
+}
+
+/// str.starts_with(prefix) → bool — strncmp(ptr, prefix.ptr, prefix.len) == 0
+fn genStrStartsWith(self: *Codegen, obj_val: c.LLVMValueRef, prefix: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const s = self.extractStrPtrAndLen(obj_val);
+    const p = self.extractStrPtrAndLen(prefix);
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    // First check: s.len >= p.len
+    const len_ok = c.LLVMBuildICmp(self.builder, c.LLVMIntSGE, s.len, p.len, "len_ok");
+    const strncmp_fn = self.ensureStrncmpDeclared();
+    var cmp_args = [_]c.LLVMValueRef{ s.ptr, p.ptr, p.len };
+    const cmp_result = c.LLVMBuildCall2(self.builder, strncmp_fn.fn_type, strncmp_fn.value, &cmp_args, 3, "cmp");
+    const is_eq = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, cmp_result, c.LLVMConstInt(i32_type, 0, 0), "eq");
+    return c.LLVMBuildAnd(self.builder, len_ok, is_eq, "starts_with");
+}
+
+/// str.ends_with(suffix) → bool
+fn genStrEndsWith(self: *Codegen, obj_val: c.LLVMValueRef, suffix: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const s = self.extractStrPtrAndLen(obj_val);
+    const sfx = self.extractStrPtrAndLen(suffix);
+    const i8_type = c.LLVMInt8TypeInContext(self.context);
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    // Check s.len >= sfx.len
+    const len_ok = c.LLVMBuildICmp(self.builder, c.LLVMIntSGE, s.len, sfx.len, "len_ok");
+    // offset = s.len - sfx.len
+    const offset = c.LLVMBuildSub(self.builder, s.len, sfx.len, "offset");
+    var gep_idx = [_]c.LLVMValueRef{offset};
+    const tail_ptr = c.LLVMBuildGEP2(self.builder, i8_type, s.ptr, &gep_idx, 1, "tail");
+    const strncmp_fn = self.ensureStrncmpDeclared();
+    var cmp_args = [_]c.LLVMValueRef{ tail_ptr, sfx.ptr, sfx.len };
+    const cmp_result = c.LLVMBuildCall2(self.builder, strncmp_fn.fn_type, strncmp_fn.value, &cmp_args, 3, "cmp");
+    const is_eq = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, cmp_result, c.LLVMConstInt(i32_type, 0, 0), "eq");
+    return c.LLVMBuildAnd(self.builder, len_ok, is_eq, "ends_with");
+}
+
+/// str.find(needle) → i64 (-1 if not found)
+fn genStrFind(self: *Codegen, obj_val: c.LLVMValueRef, needle: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const s = self.extractStrPtrAndLen(obj_val);
+    const n = self.extractStrPtrAndLen(needle);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const strstr_fn = self.ensureStrstrDeclared();
+    var call_args = [_]c.LLVMValueRef{ s.ptr, n.ptr };
+    const result = c.LLVMBuildCall2(self.builder, strstr_fn.fn_type, strstr_fn.value, &call_args, 2, "strstr");
+    const null_ptr = c.LLVMConstNull(c.LLVMPointerTypeInContext(self.context, 0));
+    const is_found = c.LLVMBuildICmp(self.builder, c.LLVMIntNE, result, null_ptr, "found");
+    // If found: result_ptr - s.ptr, else -1
+    const result_int = c.LLVMBuildPtrToInt(self.builder, result, i64_type, "res_int");
+    const base_int = c.LLVMBuildPtrToInt(self.builder, s.ptr, i64_type, "base_int");
+    const idx = c.LLVMBuildSub(self.builder, result_int, base_int, "idx");
+    const neg_one = c.LLVMConstInt(i64_type, @bitCast(@as(i64, -1)), 0);
+    return c.LLVMBuildSelect(self.builder, is_found, idx, neg_one, "find");
+}
+
+/// str.to_upper() / str.to_lower() → new str
+fn genStrToCase(self: *Codegen, obj_val: c.LLVMValueRef, upper: bool) Error!c.LLVMValueRef {
+    const s = self.extractStrPtrAndLen(obj_val);
+    const i8_type = c.LLVMInt8TypeInContext(self.context);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const one = c.LLVMConstInt(i64_type, 1, 0);
+    // Allocate new buffer: malloc(len + 1)
+    const alloc_size = c.LLVMBuildAdd(self.builder, s.len, one, "alloc");
+    const malloc_fn = self.ensureMallocDeclared();
+    var malloc_args = [_]c.LLVMValueRef{alloc_size};
+    const new_buf = c.LLVMBuildCall2(self.builder, malloc_fn.fn_type, malloc_fn.value, &malloc_args, 1, "buf");
+    // Loop: for each byte, convert case
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const loop_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "case.loop");
+    const done_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "case.done");
+    const entry_bb = c.LLVMGetInsertBlock(self.builder);
+    _ = c.LLVMBuildBr(self.builder, loop_bb);
+    c.LLVMPositionBuilderAtEnd(self.builder, loop_bb);
+    const phi_i = c.LLVMBuildPhi(self.builder, i64_type, "i");
+    // Load byte
+    var gep_src = [_]c.LLVMValueRef{phi_i};
+    const src_byte_ptr = c.LLVMBuildGEP2(self.builder, i8_type, s.ptr, &gep_src, 1, "");
+    const byte_val = c.LLVMBuildLoad2(self.builder, i8_type, src_byte_ptr, "ch");
+    // Convert: check if in range and flip case
+    const byte_i32 = c.LLVMBuildZExt(self.builder, byte_val, c.LLVMInt32TypeInContext(self.context), "");
+    const from_lo: u64 = if (upper) 'a' else 'A';
+    const from_hi: u64 = if (upper) 'z' else 'Z';
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const lo = c.LLVMConstInt(i32_type, from_lo, 0);
+    const hi = c.LLVMConstInt(i32_type, from_hi, 0);
+    const ge = c.LLVMBuildICmp(self.builder, c.LLVMIntUGE, byte_i32, lo, "ge");
+    const le = c.LLVMBuildICmp(self.builder, c.LLVMIntULE, byte_i32, hi, "le");
+    const in_range = c.LLVMBuildAnd(self.builder, ge, le, "in_range");
+    const case_diff: u64 = 'a' - 'A';
+    const diff = c.LLVMConstInt(i32_type, case_diff, 0);
+    const converted = if (upper)
+        c.LLVMBuildSub(self.builder, byte_i32, diff, "conv")
     else
-        c.LLVMBuildICmp(self.builder, c.LLVMIntNE, cmp_result, zero, "strne");
+        c.LLVMBuildAdd(self.builder, byte_i32, diff, "conv");
+    const result_i32 = c.LLVMBuildSelect(self.builder, in_range, converted, byte_i32, "");
+    const result_byte = c.LLVMBuildTrunc(self.builder, result_i32, i8_type, "");
+    // Store to new buffer
+    var gep_dst = [_]c.LLVMValueRef{phi_i};
+    const dst_byte_ptr = c.LLVMBuildGEP2(self.builder, i8_type, new_buf, &gep_dst, 1, "");
+    _ = c.LLVMBuildStore(self.builder, result_byte, dst_byte_ptr);
+    // i++
+    const next_i = c.LLVMBuildAdd(self.builder, phi_i, one, "next_i");
+    const at_end = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, next_i, s.len, "at_end");
+    _ = c.LLVMBuildCondBr(self.builder, at_end, done_bb, loop_bb);
+    // Phi incoming
+    var phi_vals = [_]c.LLVMValueRef{ c.LLVMConstInt(i64_type, 0, 0), next_i };
+    var phi_bbs = [_]c.LLVMBasicBlockRef{ entry_bb, loop_bb };
+    c.LLVMAddIncoming(phi_i, &phi_vals, &phi_bbs, 2);
+    // Done: null-terminate and build str
+    c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+    var gep_end = [_]c.LLVMValueRef{s.len};
+    const end_ptr = c.LLVMBuildGEP2(self.builder, i8_type, new_buf, &gep_end, 1, "");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i8_type, 0, 0), end_ptr);
+    return self.buildStrValue(new_buf, s.len);
+}
+
+/// str.trim() → new str (trim leading/trailing whitespace, returns a slice — no allocation)
+/// Uses alloca-based approach to avoid SSA dominance issues across blocks.
+fn genStrTrim(self: *Codegen, obj_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const s = self.extractStrPtrAndLen(obj_val);
+    const i8_type = c.LLVMInt8TypeInContext(self.context);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const one = c.LLVMConstInt(i64_type, 1, 0);
+    const zero = c.LLVMConstInt(i64_type, 0, 0);
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const i32_ty = c.LLVMInt32TypeInContext(self.context);
+
+    // Use allocas to store start/end results across blocks.
+    const start_slot = c.LLVMBuildAlloca(self.builder, i64_type, "trim.start_slot");
+    const end_slot = c.LLVMBuildAlloca(self.builder, i64_type, "trim.end_slot");
+    _ = c.LLVMBuildStore(self.builder, zero, start_slot);
+    _ = c.LLVMBuildStore(self.builder, s.len, end_slot);
+
+    // Phase 1: Find start (skip leading whitespace)
+    const find_start_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trim.fwd");
+    const find_end_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trim.rev");
+    const done_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trim.done");
+    const entry_bb = c.LLVMGetInsertBlock(self.builder);
+    _ = c.LLVMBuildBr(self.builder, find_start_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, find_start_bb);
+    const start_phi = c.LLVMBuildPhi(self.builder, i64_type, "i");
+    const at_end = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, start_phi, s.len, "");
+    const check_fwd_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trim.check_fwd");
+    _ = c.LLVMBuildCondBr(self.builder, at_end, done_bb, check_fwd_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, check_fwd_bb);
+    var gep_s = [_]c.LLVMValueRef{start_phi};
+    const ch_ptr = c.LLVMBuildGEP2(self.builder, i8_type, s.ptr, &gep_s, 1, "");
+    const ch = c.LLVMBuildLoad2(self.builder, i8_type, ch_ptr, "ch");
+    const ch32 = c.LLVMBuildZExt(self.builder, ch, i32_ty, "");
+    const is_ws_fwd = self.buildIsWhitespace(ch32);
+    const next_start = c.LLVMBuildAdd(self.builder, start_phi, one, "");
+    _ = c.LLVMBuildCondBr(self.builder, is_ws_fwd, find_start_bb, find_end_bb);
+    // Store start when we find non-whitespace
+    var start_phi_vals = [_]c.LLVMValueRef{ zero, next_start };
+    var start_phi_bbs = [_]c.LLVMBasicBlockRef{ entry_bb, check_fwd_bb };
+    c.LLVMAddIncoming(start_phi, &start_phi_vals, &start_phi_bbs, 2);
+
+    // Phase 2: Find end (skip trailing whitespace from len backwards)
+    c.LLVMPositionBuilderAtEnd(self.builder, find_end_bb);
+    _ = c.LLVMBuildStore(self.builder, start_phi, start_slot);
+    const rev_loop_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trim.rev_loop");
+    _ = c.LLVMBuildBr(self.builder, rev_loop_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, rev_loop_bb);
+    const end_phi = c.LLVMBuildPhi(self.builder, i64_type, "j");
+    const end_gt_start = c.LLVMBuildICmp(self.builder, c.LLVMIntSGT, end_phi, start_phi, "");
+    const check_rev_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trim.check_rev");
+    _ = c.LLVMBuildCondBr(self.builder, end_gt_start, check_rev_bb, done_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, check_rev_bb);
+    const end_minus = c.LLVMBuildSub(self.builder, end_phi, one, "");
+    var gep_e = [_]c.LLVMValueRef{end_minus};
+    const ch_ptr_e = c.LLVMBuildGEP2(self.builder, i8_type, s.ptr, &gep_e, 1, "");
+    const ch_e = c.LLVMBuildLoad2(self.builder, i8_type, ch_ptr_e, "ch_e");
+    const ch_e32 = c.LLVMBuildZExt(self.builder, ch_e, i32_ty, "");
+    const is_ws_rev = self.buildIsWhitespace(ch_e32);
+    // If whitespace, store decremented end and loop; otherwise store current end and exit
+    const store_end_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trim.store_end");
+    _ = c.LLVMBuildCondBr(self.builder, is_ws_rev, rev_loop_bb, store_end_bb);
+    var end_phi_vals = [_]c.LLVMValueRef{ s.len, end_minus };
+    var end_phi_bbs = [_]c.LLVMBasicBlockRef{ find_end_bb, check_rev_bb };
+    c.LLVMAddIncoming(end_phi, &end_phi_vals, &end_phi_bbs, 2);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, store_end_bb);
+    _ = c.LLVMBuildStore(self.builder, end_phi, end_slot);
+    _ = c.LLVMBuildBr(self.builder, done_bb);
+
+    // Done: read start/end from allocas and build result str
+    c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+    const final_start = c.LLVMBuildLoad2(self.builder, i64_type, start_slot, "trim.s");
+    const final_end = c.LLVMBuildLoad2(self.builder, i64_type, end_slot, "trim.e");
+    const new_len = c.LLVMBuildSub(self.builder, final_end, final_start, "trim.len");
+    var gep_start = [_]c.LLVMValueRef{final_start};
+    const new_ptr = c.LLVMBuildGEP2(self.builder, i8_type, s.ptr, &gep_start, 1, "trim.ptr");
+    return self.buildStrValue(new_ptr, new_len);
+}
+
+/// Helper: build is-whitespace check for a char (i32).
+fn buildIsWhitespace(self: *Codegen, ch32: c.LLVMValueRef) c.LLVMValueRef {
+    const i32_ty = c.LLVMInt32TypeInContext(self.context);
+    const is_space = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, ch32, c.LLVMConstInt(i32_ty, ' ', 0), "");
+    const is_tab = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, ch32, c.LLVMConstInt(i32_ty, '\t', 0), "");
+    const is_nl = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, ch32, c.LLVMConstInt(i32_ty, '\n', 0), "");
+    const is_cr = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, ch32, c.LLVMConstInt(i32_ty, '\r', 0), "");
+    const ws1 = c.LLVMBuildOr(self.builder, is_space, is_tab, "");
+    const ws2 = c.LLVMBuildOr(self.builder, is_nl, is_cr, "");
+    return c.LLVMBuildOr(self.builder, ws1, ws2, "is_ws");
+}
+
+/// str.repeat(n) → new str
+fn genStrRepeat(self: *Codegen, obj_val: c.LLVMValueRef, count: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const s = self.extractStrPtrAndLen(obj_val);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const i8_type = c.LLVMInt8TypeInContext(self.context);
+    const one = c.LLVMConstInt(i64_type, 1, 0);
+    // Coerce count to i64
+    const count_i64 = self.coerceInt(count, i64_type);
+    // total_len = len * count
+    const total_len = c.LLVMBuildMul(self.builder, s.len, count_i64, "total");
+    const alloc_size = c.LLVMBuildAdd(self.builder, total_len, one, "alloc");
+    const malloc_fn = self.ensureMallocDeclared();
+    var malloc_args = [_]c.LLVMValueRef{alloc_size};
+    const new_buf = c.LLVMBuildCall2(self.builder, malloc_fn.fn_type, malloc_fn.value, &malloc_args, 1, "buf");
+    // Loop: memcpy(buf + i*len, ptr, len) for i in 0..count
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const loop_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "repeat.loop");
+    const done_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "repeat.done");
+    const entry_bb = c.LLVMGetInsertBlock(self.builder);
+    _ = c.LLVMBuildBr(self.builder, loop_bb);
+    c.LLVMPositionBuilderAtEnd(self.builder, loop_bb);
+    const phi_i = c.LLVMBuildPhi(self.builder, i64_type, "i");
+    const at_end = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, phi_i, count_i64, "");
+    const body_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "repeat.body");
+    _ = c.LLVMBuildCondBr(self.builder, at_end, done_bb, body_bb);
+    c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    const offset = c.LLVMBuildMul(self.builder, phi_i, s.len, "off");
+    var gep_idx = [_]c.LLVMValueRef{offset};
+    const dst = c.LLVMBuildGEP2(self.builder, i8_type, new_buf, &gep_idx, 1, "dst");
+    const memcpy_fn = self.ensureMemcpyDeclared();
+    var cpy_args = [_]c.LLVMValueRef{ dst, s.ptr, s.len };
+    _ = c.LLVMBuildCall2(self.builder, memcpy_fn.fn_type, memcpy_fn.value, &cpy_args, 3, "");
+    const next_i = c.LLVMBuildAdd(self.builder, phi_i, one, "");
+    _ = c.LLVMBuildBr(self.builder, loop_bb);
+    var phi_vals = [_]c.LLVMValueRef{ c.LLVMConstInt(i64_type, 0, 0), next_i };
+    var phi_bbs = [_]c.LLVMBasicBlockRef{ entry_bb, body_bb };
+    c.LLVMAddIncoming(phi_i, &phi_vals, &phi_bbs, 2);
+    // Done: null-terminate
+    c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+    var gep_end = [_]c.LLVMValueRef{total_len};
+    const end_ptr = c.LLVMBuildGEP2(self.builder, i8_type, new_buf, &gep_end, 1, "");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i8_type, 0, 0), end_ptr);
+    return self.buildStrValue(new_buf, total_len);
+}
+
+/// str.slice(start, end) → new str (returns a view, no allocation)
+fn genStrSlice(self: *Codegen, obj_val: c.LLVMValueRef, start: c.LLVMValueRef, end: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const s = self.extractStrPtrAndLen(obj_val);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const i8_type = c.LLVMInt8TypeInContext(self.context);
+    const start_i64 = self.coerceInt(start, i64_type);
+    const end_i64 = self.coerceInt(end, i64_type);
+    var gep_idx = [_]c.LLVMValueRef{start_i64};
+    const new_ptr = c.LLVMBuildGEP2(self.builder, i8_type, s.ptr, &gep_idx, 1, "slice.ptr");
+    const new_len = c.LLVMBuildSub(self.builder, end_i64, start_i64, "slice.len");
+    return self.buildStrValue(new_ptr, new_len);
 }
 
 /// Ensure malloc is declared.
