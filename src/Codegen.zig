@@ -65,6 +65,8 @@ enum_local_types: std.AutoHashMapUnmanaged(u32, u32) = .{},
 drop_fns: std.AutoHashMapUnmanaged(u32, FnInfo) = .{},
 /// Trait declarations: trait name Symbol → TraitInfo.
 trait_infos: std.AutoHashMapUnmanaged(u32, TraitInfo) = .{},
+/// Trait AST declarations: trait name Symbol → TraitDecl (for default method bodies).
+trait_decl_map: std.AutoHashMapUnmanaged(u32, Ast.TraitDecl) = .{},
 /// VTable globals: hash(type_sym, trait_sym) → LLVM global vtable constant.
 vtable_globals: std.AutoHashMapUnmanaged(u64, c.LLVMValueRef) = .{},
 /// Trait-typed locals: local Symbol → trait Symbol (tracks which trait a dyn param holds).
@@ -369,6 +371,15 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
         }
     }
 
+    // Pass 1.3: generate default trait method implementations.
+    // For each impl Trait for Type, check for missing methods with defaults.
+    for (module.decls) |decl| {
+        switch (decl.kind) {
+            .impl_decl => |id| try self.generateDefaultMethods(id),
+            else => {},
+        }
+    }
+
     // Pass 1.5: detect Drop functions (Type.drop patterns).
     try self.detectDropFunctions();
 
@@ -632,6 +643,141 @@ fn collectTraitInfo(self: *Codegen, td: Ast.TraitDecl) Error!void {
         .method_param_counts = method_param_counts,
         .vtable_type = vtable_type,
     }) catch return error.CodegenAlloc;
+
+    // Store the full trait decl for default method body generation.
+    self.trait_decl_map.put(self.allocator, td.name, td) catch return error.CodegenAlloc;
+}
+
+/// Generate default method implementations for missing trait methods.
+/// For each method in the trait that has a default body and isn't overridden
+/// in the impl block, create a mangled Type.method function.
+fn generateDefaultMethods(self: *Codegen, id: Ast.ImplDecl) Error!void {
+    const trait_sym = id.trait_name orelse return;
+    const td = self.trait_decl_map.get(trait_sym) orelse return;
+    const type_name = self.pool.resolve(id.type_name);
+
+    for (td.methods) |method| {
+        if (!method.has_default) continue;
+        const default_body = method.default_body orelse continue;
+
+        // Build mangled name "Type.method"
+        const method_name = self.pool.resolve(method.name);
+        var name_buf: [512]u8 = undefined;
+        @memcpy(name_buf[0..type_name.len], type_name);
+        name_buf[type_name.len] = '.';
+        @memcpy(name_buf[type_name.len + 1 ..][0..method_name.len], method_name);
+        const mangled_len = type_name.len + 1 + method_name.len;
+        const mangled = name_buf[0..mangled_len];
+        const fn_sym = self.pool.intern(mangled) catch return error.CodegenAlloc;
+
+        // Skip if already implemented (override exists).
+        if (self.functions.get(fn_sym) != null) continue;
+
+        // Resolve parameter types (self param uses the struct type).
+        var param_types_buf: [64]c.LLVMTypeRef = undefined;
+        for (method.params, 0..) |param, i| {
+            if (param.type_expr) |te| {
+                // Check for Self type — resolve to the concrete struct type.
+                if (te.kind == .named) {
+                    const named_str = self.pool.resolve(te.kind.named);
+                    if (std.mem.eql(u8, named_str, "Self")) {
+                        if (self.struct_types.get(id.type_name)) |sti| {
+                            param_types_buf[i] = sti.llvm_type;
+                            continue;
+                        }
+                    }
+                }
+                param_types_buf[i] = self.resolveType(te) catch
+                    c.LLVMInt32TypeInContext(self.context);
+            } else {
+                param_types_buf[i] = c.LLVMInt32TypeInContext(self.context);
+            }
+        }
+
+        const ret_type = if (method.return_type) |rt|
+            self.resolveType(rt) catch c.LLVMInt32TypeInContext(self.context)
+        else
+            c.LLVMVoidTypeInContext(self.context);
+
+        const fn_type = c.LLVMFunctionType(
+            ret_type,
+            if (method.params.len > 0) &param_types_buf else null,
+            @intCast(method.params.len),
+            0,
+        );
+
+        // Null-terminate the mangled name.
+        name_buf[mangled_len] = 0;
+        const function = c.LLVMAddFunction(self.module, @ptrCast(name_buf[0..mangled_len :0]), fn_type);
+
+        self.functions.put(self.allocator, fn_sym, .{
+            .value = function,
+            .fn_type = fn_type,
+        }) catch return error.CodegenAlloc;
+
+        // Generate the function body.
+        const saved_fn = self.current_function;
+        const saved_ret = self.current_ret_type;
+        const saved_expected = self.expected_type;
+
+        self.current_function = function;
+        self.current_ret_type = ret_type;
+        self.expected_type = ret_type;
+        self.locals.clearRetainingCapacity();
+
+        const entry = c.LLVMAppendBasicBlockInContext(self.context, function, "entry");
+        c.LLVMPositionBuilderAtEnd(self.builder, entry);
+
+        // Add parameters as locals.
+        for (method.params, 0..) |param, i| {
+            const param_val = c.LLVMGetParam(function, @intCast(i));
+            const param_type = c.LLVMTypeOf(param_val);
+            const alloca = c.LLVMBuildAlloca(self.builder, param_type, "");
+            _ = c.LLVMBuildStore(self.builder, param_val, alloca);
+
+            // Map "self" to the concrete type's struct.
+            var pointee_struct: ?u32 = null;
+            if (param.type_expr) |te| {
+                if (te.kind == .named) {
+                    const pn = self.pool.resolve(te.kind.named);
+                    if (std.mem.eql(u8, pn, "Self")) {
+                        pointee_struct = id.type_name;
+                    }
+                }
+            }
+
+            self.locals.put(self.allocator, param.name, .{
+                .alloca = alloca,
+                .ty = param_type,
+                .is_mut = param.is_mut,
+                .fn_sig = null,
+                .pointee_struct = pointee_struct,
+            }) catch return error.CodegenAlloc;
+        }
+
+        const body_val = self.genExpr(default_body) catch {
+            // If codegen fails, add unreachable terminator.
+            _ = c.LLVMBuildUnreachable(self.builder);
+            self.current_function = saved_fn;
+            self.current_ret_type = saved_ret;
+            self.expected_type = saved_expected;
+            continue;
+        };
+
+        // Emit return if block isn't already terminated.
+        const current_bb = c.LLVMGetInsertBlock(self.builder);
+        if (c.LLVMGetBasicBlockTerminator(current_bb) == null) {
+            if (ret_type == c.LLVMVoidTypeInContext(self.context)) {
+                _ = c.LLVMBuildRetVoid(self.builder);
+            } else {
+                _ = c.LLVMBuildRet(self.builder, body_val);
+            }
+        }
+
+        self.current_function = saved_fn;
+        self.current_ret_type = saved_ret;
+        self.expected_type = saved_expected;
+    }
 }
 
 /// Generate a vtable global constant for an impl declaration.

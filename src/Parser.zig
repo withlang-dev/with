@@ -235,17 +235,14 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
             return_type = try self.parseTypeExpr();
         }
 
-        // Check for default body (= ...)
+        // Check for default body (= expr)
         var has_default = false;
+        var default_body: ?*const Ast.Expr = null;
         if (self.peek() == .eq) {
             has_default = true;
-            // Skip the default body
-            self.advance();
+            self.advance(); // consume =
             self.skipNewlines();
-            // Skip indented body tokens
-            while (self.peek() != .eof and self.peek() != .newline) {
-                self.advance();
-            }
+            default_body = try self.parseExpr();
         }
 
         try methods.append(self.arena, .{
@@ -253,6 +250,7 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
             .params = params,
             .return_type = return_type,
             .has_default = has_default,
+            .default_body = default_body,
             .span = method_start.merge(self.prevSpan()),
         });
 
