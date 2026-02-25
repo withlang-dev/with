@@ -371,6 +371,9 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
 }
 
 fn declareExternFn(self: *Codegen, ext: Ast.ExternFnDecl) Error!void {
+    // Skip duplicate extern fn declarations (from overlapping c_imports).
+    if (self.functions.get(ext.name) != null) return;
+
     const ret_type = if (ext.return_type) |rt|
         try self.resolveType(rt)
     else
@@ -1015,6 +1018,21 @@ fn genBinary(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
         if (self.tryOperatorOverload(bin.op, lhs, lhs_type, rhs)) |result| {
             return result;
         }
+    }
+
+    // Handle pointer comparisons (e.g., ptr != 0, ptr == 0).
+    const lhs_kind_raw = c.LLVMGetTypeKind(lhs_type);
+    const rhs_type = c.LLVMTypeOf(rhs);
+    const rhs_kind_raw = c.LLVMGetTypeKind(rhs_type);
+    if (lhs_kind_raw == c.LLVMPointerTypeKind or rhs_kind_raw == c.LLVMPointerTypeKind) {
+        const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+        const lhs_p = if (lhs_kind_raw == c.LLVMPointerTypeKind) lhs else c.LLVMConstNull(ptr_type);
+        const rhs_p = if (rhs_kind_raw == c.LLVMPointerTypeKind) rhs else c.LLVMConstNull(ptr_type);
+        return switch (bin.op) {
+            .eq => c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, lhs_p, rhs_p, "eq"),
+            .neq => c.LLVMBuildICmp(self.builder, c.LLVMIntNE, lhs_p, rhs_p, "ne"),
+            else => error.UnsupportedExpr,
+        };
     }
 
     // Ensure operands have the same integer width for comparisons/arithmetic.
