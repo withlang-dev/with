@@ -184,6 +184,14 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try renderExpr(idx.index, pool, writer, 0);
             try writer.writeAll("]");
         },
+        .slice => |sl| {
+            try renderExpr(sl.expr, pool, writer, 0);
+            try writer.writeAll("[");
+            if (sl.start) |s| try renderExpr(s, pool, writer, 0);
+            try writer.writeAll("..");
+            if (sl.end) |e| try renderExpr(e, pool, writer, 0);
+            try writer.writeAll("]");
+        },
         .block => |b| {
             for (b.stmts) |s| {
                 try renderExpr(s, pool, writer, indent + 2);
@@ -426,6 +434,10 @@ fn renderTypeExpr(te: *const Ast.TypeExpr, pool: *const InternPool, writer: anyt
         .array_type => |a| {
             try writer.print("[{d}]", .{a.size});
             try renderTypeExpr(a.element, pool, writer);
+        },
+        .slice_type => |elem| {
+            try writer.writeAll("[]");
+            try renderTypeExpr(elem, pool, writer);
         },
         .inferred => try writer.writeAll("_"),
     }

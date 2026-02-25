@@ -172,6 +172,8 @@ pub const ExprKind = union(enum) {
     field_access: FieldAccessExpr,
     /// Index: `arr[i]`
     index: IndexExpr,
+    /// Slice: `arr[a..b]`
+    slice: SliceExpr,
     /// Block: indented sequence of statements, final expr is the value
     block: BlockExpr,
     /// If expression: `if cond then a else b`
@@ -286,6 +288,12 @@ pub const FieldAccessExpr = struct {
 pub const IndexExpr = struct {
     expr: *const Expr,
     index: *const Expr,
+};
+
+pub const SliceExpr = struct {
+    expr: *const Expr,
+    start: ?*const Expr,
+    end: ?*const Expr,
 };
 
 pub const BlockExpr = struct {
@@ -453,6 +461,8 @@ pub const TypeExprKind = union(enum) {
     optional: *const TypeExpr,
     /// Array type: `[N]T`
     array_type: ArrayTypeExpr,
+    /// Slice type: `[]T`
+    slice_type: *const TypeExpr,
     /// Inferred (no annotation, placeholder for type checker)
     inferred,
 };
