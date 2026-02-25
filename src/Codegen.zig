@@ -4015,6 +4015,16 @@ fn genIndex(self: *Codegen, idx: Ast.IndexExpr) Error!c.LLVMValueRef {
                 const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, ptr, &slice_gep_idx, 1, "");
                 return c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "slice.elem");
             }
+            // String indexing: s[i] → byte at index i (as i8).
+            if (self.isStrType(local.ty)) {
+                const str_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
+                const str_ptr = self.extractStrPtr(str_val);
+                const index_val = try self.genExpr(idx.index);
+                const index_i64 = self.coerceInt(index_val, c.LLVMInt64TypeInContext(self.context));
+                var gep_idx = [_]c.LLVMValueRef{index_i64};
+                const byte_ptr = c.LLVMBuildGEP2(self.builder, c.LLVMInt8TypeInContext(self.context), str_ptr, &gep_idx, 1, "str.byte.ptr");
+                return c.LLVMBuildLoad2(self.builder, c.LLVMInt8TypeInContext(self.context), byte_ptr, "str.byte");
+            }
             // Struct with `get` method → operator overload.
             if (c.LLVMGetTypeKind(local.ty) == c.LLVMStructTypeKind) {
                 const obj_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
