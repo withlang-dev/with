@@ -594,6 +594,10 @@ fn parseTypeDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span) !Ast.D
         kind = .{ .enum_def = try self.parseEnumVariants() };
     } else if (self.peek() == .identifier and self.isEnumDef()) {
         kind = .{ .enum_def = try self.parseEnumVariants() };
+    } else if (self.peek() == .identifier and self.isIdentifierNamed("distinct")) {
+        // `type Name = distinct UnderlyingType`
+        self.advance(); // consume 'distinct'
+        kind = .{ .distinct = try self.parseTypeExpr() };
     } else if (self.peek() == .kw_fn or self.peek() == .identifier or self.peek() == .ampersand or self.peek() == .l_paren) {
         kind = .{ .alias = try self.parseTypeExpr() };
     } else {
@@ -1199,15 +1203,57 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
                 }
                 const end = self.currentSpan();
                 try self.expect(.r_paren);
-                const node = try self.arena.create(Ast.Expr);
-                node.* = .{
-                    .kind = .{ .call = .{
-                        .callee = lhs,
-                        .args = args.items,
-                    } },
-                    .span = lhs.span.merge(end),
-                };
-                lhs = node;
+
+                // Check for partial application: if any arg is `_`, desugar to closure.
+                var has_placeholder = false;
+                for (args.items) |arg| {
+                    if (arg.kind == .ident and std.mem.eql(u8, self.pool.resolve(arg.kind.ident), "_")) {
+                        has_placeholder = true;
+                        break;
+                    }
+                }
+
+                if (has_placeholder) {
+                    // Desugar f(a, _, b) → |__pa_0| f(a, __pa_0, b)
+                    var closure_params: std.ArrayList(Ast.Symbol) = .empty;
+                    var new_args: std.ArrayList(*const Ast.Expr) = .empty;
+                    var param_counter: u32 = 0;
+                    for (args.items) |arg| {
+                        if (arg.kind == .ident and std.mem.eql(u8, self.pool.resolve(arg.kind.ident), "_")) {
+                            var name_buf: [16]u8 = undefined;
+                            const name_len = std.fmt.bufPrint(&name_buf, "__pa_{d}", .{param_counter}) catch unreachable;
+                            const psym = self.pool.intern(name_len) catch return error.ParseError;
+                            param_counter += 1;
+                            try closure_params.append(self.arena, psym);
+                            const param_ident = try self.arena.create(Ast.Expr);
+                            param_ident.* = .{ .kind = .{ .ident = psym }, .span = arg.span };
+                            try new_args.append(self.arena, param_ident);
+                        } else {
+                            try new_args.append(self.arena, arg);
+                        }
+                    }
+                    const call_node = try self.arena.create(Ast.Expr);
+                    call_node.* = .{
+                        .kind = .{ .call = .{ .callee = lhs, .args = new_args.items } },
+                        .span = lhs.span.merge(end),
+                    };
+                    const closure_node = try self.arena.create(Ast.Expr);
+                    closure_node.* = .{
+                        .kind = .{ .closure = .{ .params = closure_params.items, .body = call_node } },
+                        .span = lhs.span.merge(end),
+                    };
+                    lhs = closure_node;
+                } else {
+                    const node = try self.arena.create(Ast.Expr);
+                    node.* = .{
+                        .kind = .{ .call = .{
+                            .callee = lhs,
+                            .args = args.items,
+                        } },
+                        .span = lhs.span.merge(end),
+                    };
+                    lhs = node;
+                }
             },
             .dot => {
                 self.advance();
@@ -2078,6 +2124,14 @@ fn parseFor(self: *Parser) !*const Ast.Expr {
     self.advance(); // consume 'for'
     self.skipNewlines();
     const binding = try self.expectIdentifier();
+
+    // Optional index binding: `for x, i in arr`
+    var index_binding: ?Ast.Symbol = null;
+    if (self.peek() == .comma) {
+        self.advance(); // consume ','
+        index_binding = try self.expectIdentifier();
+    }
+
     try self.expect(.kw_in);
     self.skipNewlines();
     const iterable = try self.parseExpr();
@@ -2092,6 +2146,7 @@ fn parseFor(self: *Parser) !*const Ast.Expr {
     node.* = .{
         .kind = .{ .for_expr = .{
             .binding = binding,
+            .index_binding = index_binding,
             .iterable = iterable,
             .body = body,
         } },

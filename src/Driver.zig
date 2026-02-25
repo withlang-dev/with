@@ -33,6 +33,8 @@ source_dir: []const u8,
 next_file_id: Span.FileId,
 /// Rendered warning messages to print after compilation.
 pending_warnings: std.ArrayList([]const u8),
+/// Optimization level: 0=none, 1=basic, 2=standard, 3=aggressive.
+opt_level: u8,
 
 pub fn init(allocator: std.mem.Allocator) Driver {
     return .{
@@ -44,6 +46,7 @@ pub fn init(allocator: std.mem.Allocator) Driver {
         .source_dir = ".",
         .next_file_id = 1,
         .pending_warnings = .empty,
+        .opt_level = 0,
     };
 }
 
@@ -176,6 +179,11 @@ pub fn compileToObject(self: *Driver, module: *const Ast.Module, output_path: [*
         }
         return null;
     };
+
+    // Run optimization passes if requested.
+    if (self.opt_level > 0) {
+        cg.optimize(self.opt_level);
+    }
 
     cg.emitObjectFile(output_path) catch {
         self.writeStderr("error: failed to emit object file\n");

@@ -469,6 +469,23 @@ fn collectTypeDecl(self: *Sema, td: Ast.TypeDecl, _: Span) void {
             const tid = self.addType(.{ .alias = target });
             self.named_types.put(self.allocator, td.name, tid) catch {};
         },
+        .distinct => |type_expr| {
+            // Distinct type: nominal wrapper. Treated as a single-field struct in Sema.
+            const inner = self.resolveTypeExpr(type_expr);
+            const field_names = self.allocator.alloc(Symbol, 1) catch return;
+            const field_types = self.allocator.alloc(TypeId, 1) catch return;
+            const field_defaults = self.allocator.alloc(bool, 1) catch return;
+            field_names[0] = self.pool.intern("value") catch return;
+            field_types[0] = inner;
+            field_defaults[0] = false;
+            const tid = self.addType(.{ .struct_type = .{
+                .name = td.name,
+                .field_names = field_names,
+                .field_types = field_types,
+                .field_defaults = field_defaults,
+            } });
+            self.named_types.put(self.allocator, td.name, tid) catch {};
+        },
     }
 }
 
@@ -1154,6 +1171,16 @@ fn checkFor(self: *Sema, for_e: Ast.ForExpr) TypeId {
         .state = .live,
         .span = Span.zero,
     });
+
+    // If there's an index binding, add it to scope too.
+    if (for_e.index_binding) |idx_sym| {
+        for_scope.put(self.allocator, idx_sym, .{
+            .type_id = self.ty_i64,
+            .is_mut = false,
+            .state = .live,
+            .span = Span.zero,
+        });
+    }
 
     _ = self.checkExpr(for_e.body);
     return self.ty_void;

@@ -70,6 +70,10 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
                     try writer.writeAll(" }");
                 },
                 .alias => |a| try renderTypeExpr(a, pool, writer),
+                .distinct => |d| {
+                    try writer.writeAll("distinct ");
+                    try renderTypeExpr(d, pool, writer);
+                },
                 .enum_def => |variants| {
                     try writer.writeAll("\n");
                     for (variants, 0..) |v, vi| {
@@ -326,7 +330,11 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try renderExpr(body, pool, writer, indent + 2);
         },
         .for_expr => |f| {
-            try writer.print("for {s} in ", .{pool.resolve(f.binding)});
+            try writer.print("for {s}", .{pool.resolve(f.binding)});
+            if (f.index_binding) |idx| {
+                try writer.print(", {s}", .{pool.resolve(idx)});
+            }
+            try writer.writeAll(" in ");
             try renderExpr(f.iterable, pool, writer, 0);
             try writer.writeAll(":\n");
             try renderExpr(f.body, pool, writer, indent + 2);
