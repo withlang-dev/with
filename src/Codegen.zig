@@ -2503,9 +2503,9 @@ fn evalComptimeInt(self: *Codegen, expr: *const Ast.Expr) ?i64 {
             const lhs = self.evalComptimeInt(b.lhs) orelse return null;
             const rhs = self.evalComptimeInt(b.rhs) orelse return null;
             return switch (b.op) {
-                .add => lhs + rhs,
-                .sub => lhs - rhs,
-                .mul => lhs * rhs,
+                .add, .add_wrap => lhs +% rhs,
+                .sub, .sub_wrap => lhs -% rhs,
+                .mul, .mul_wrap => lhs *% rhs,
                 .div => if (rhs != 0) @divTrunc(lhs, rhs) else null,
                 .mod => if (rhs != 0) @rem(lhs, rhs) else null,
                 .bit_and => lhs & rhs,
@@ -2809,9 +2809,9 @@ fn genBinary(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
     }
 
     return switch (bin.op) {
-        .add => c.LLVMBuildAdd(self.builder, lhs_c, rhs_c, "add"),
-        .sub => c.LLVMBuildSub(self.builder, lhs_c, rhs_c, "sub"),
-        .mul => c.LLVMBuildMul(self.builder, lhs_c, rhs_c, "mul"),
+        .add, .add_wrap => c.LLVMBuildAdd(self.builder, lhs_c, rhs_c, "add"),
+        .sub, .sub_wrap => c.LLVMBuildSub(self.builder, lhs_c, rhs_c, "sub"),
+        .mul, .mul_wrap => c.LLVMBuildMul(self.builder, lhs_c, rhs_c, "mul"),
         .div => c.LLVMBuildSDiv(self.builder, lhs_c, rhs_c, "div"),
         .mod => c.LLVMBuildSRem(self.builder, lhs_c, rhs_c, "mod"),
         .eq => c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, lhs_c, rhs_c, "eq"),
@@ -4819,6 +4819,24 @@ fn genIdent(self: *Codegen, sym: u32) Error!c.LLVMValueRef {
         return fn_info.value;
     }
 
+    // Built-in math constants
+    const pi_sym = self.pool.intern("PI") catch return error.CodegenAlloc;
+    if (sym == pi_sym) {
+        return c.LLVMConstReal(c.LLVMDoubleTypeInContext(self.context), 3.14159265358979323846);
+    }
+    const e_sym = self.pool.intern("E") catch return error.CodegenAlloc;
+    if (sym == e_sym) {
+        return c.LLVMConstReal(c.LLVMDoubleTypeInContext(self.context), 2.71828182845904523536);
+    }
+    const inf_sym = self.pool.intern("INFINITY") catch return error.CodegenAlloc;
+    if (sym == inf_sym) {
+        return c.LLVMConstReal(c.LLVMDoubleTypeInContext(self.context), std.math.inf(f64));
+    }
+    const nan_sym = self.pool.intern("NAN") catch return error.CodegenAlloc;
+    if (sym == nan_sym) {
+        return c.LLVMConstReal(c.LLVMDoubleTypeInContext(self.context), std.math.nan(f64));
+    }
+
     // Built-in: None — creates Option None value using expected type context.
     // (Only reached if no user-defined enum variant matched.)
     const none_sym = self.pool.intern("None") catch return error.CodegenAlloc;
@@ -5023,6 +5041,60 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
     const close_sym = self.pool.intern("close") catch return error.CodegenAlloc;
     if (fn_sym == close_sym) {
         return self.genChannelClose(call_e.args);
+    }
+
+    // Built-in math functions (std.math)
+    const abs_sym = self.pool.intern("abs") catch return error.CodegenAlloc;
+    if (fn_sym == abs_sym) {
+        return self.genMathAbs(call_e.args);
+    }
+    const min_sym = self.pool.intern("min") catch return error.CodegenAlloc;
+    if (fn_sym == min_sym) {
+        return self.genMathMin(call_e.args);
+    }
+    const max_sym = self.pool.intern("max") catch return error.CodegenAlloc;
+    if (fn_sym == max_sym) {
+        return self.genMathMax(call_e.args);
+    }
+    const clamp_sym = self.pool.intern("clamp") catch return error.CodegenAlloc;
+    if (fn_sym == clamp_sym) {
+        return self.genMathClamp(call_e.args);
+    }
+    const sqrt_f64_sym = self.pool.intern("sqrt_f64") catch return error.CodegenAlloc;
+    if (fn_sym == sqrt_f64_sym) {
+        return self.genMathUnaryF64(call_e.args, "llvm.sqrt.f64");
+    }
+    const pow_f64_sym = self.pool.intern("pow_f64") catch return error.CodegenAlloc;
+    if (fn_sym == pow_f64_sym) {
+        return self.genMathBinaryF64(call_e.args, "llvm.pow.f64");
+    }
+    const floor_f64_sym = self.pool.intern("floor_f64") catch return error.CodegenAlloc;
+    if (fn_sym == floor_f64_sym) {
+        return self.genMathUnaryF64(call_e.args, "llvm.floor.f64");
+    }
+    const ceil_f64_sym = self.pool.intern("ceil_f64") catch return error.CodegenAlloc;
+    if (fn_sym == ceil_f64_sym) {
+        return self.genMathUnaryF64(call_e.args, "llvm.ceil.f64");
+    }
+    const sin_f64_sym = self.pool.intern("sin_f64") catch return error.CodegenAlloc;
+    if (fn_sym == sin_f64_sym) {
+        return self.genMathUnaryF64(call_e.args, "llvm.sin.f64");
+    }
+    const cos_f64_sym = self.pool.intern("cos_f64") catch return error.CodegenAlloc;
+    if (fn_sym == cos_f64_sym) {
+        return self.genMathUnaryF64(call_e.args, "llvm.cos.f64");
+    }
+    const log_f64_sym = self.pool.intern("log_f64") catch return error.CodegenAlloc;
+    if (fn_sym == log_f64_sym) {
+        return self.genMathUnaryF64(call_e.args, "llvm.log.f64");
+    }
+    const exp_f64_sym = self.pool.intern("exp_f64") catch return error.CodegenAlloc;
+    if (fn_sym == exp_f64_sym) {
+        return self.genMathUnaryF64(call_e.args, "llvm.exp.f64");
+    }
+    const fabs_f64_sym = self.pool.intern("fabs_f64") catch return error.CodegenAlloc;
+    if (fn_sym == fabs_f64_sym) {
+        return self.genMathUnaryF64(call_e.args, "llvm.fabs.f64");
     }
 
     // Check if this is a known function.
@@ -8377,6 +8449,89 @@ fn genAssertBuiltin(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMV
     c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
 
     return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+}
+
+// ── Math builtins ──────────────────────────────────────────────
+
+fn genMathAbs(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
+    if (args.len != 1) return error.UnsupportedExpr;
+    const val = try self.genExpr(args[0]);
+    // abs(x) = select(x < 0, -x, x)
+    const zero = c.LLVMConstInt(c.LLVMTypeOf(val), 0, 0);
+    const neg = c.LLVMBuildNeg(self.builder, val, "neg");
+    const is_neg = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, val, zero, "isneg");
+    return c.LLVMBuildSelect(self.builder, is_neg, neg, val, "abs");
+}
+
+fn genMathMin(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
+    if (args.len != 2) return error.UnsupportedExpr;
+    const a = try self.genExpr(args[0]);
+    const b = try self.genExpr(args[1]);
+    const cmp = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, a, b, "lt");
+    return c.LLVMBuildSelect(self.builder, cmp, a, b, "min");
+}
+
+fn genMathMax(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
+    if (args.len != 2) return error.UnsupportedExpr;
+    const a = try self.genExpr(args[0]);
+    const b = try self.genExpr(args[1]);
+    const cmp = c.LLVMBuildICmp(self.builder, c.LLVMIntSGT, a, b, "gt");
+    return c.LLVMBuildSelect(self.builder, cmp, a, b, "max");
+}
+
+fn genMathClamp(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
+    if (args.len != 3) return error.UnsupportedExpr;
+    const val = try self.genExpr(args[0]);
+    const lo = try self.genExpr(args[1]);
+    const hi = try self.genExpr(args[2]);
+    // clamp(x, lo, hi) = min(max(x, lo), hi)
+    const cmp_lo = c.LLVMBuildICmp(self.builder, c.LLVMIntSGT, val, lo, "gt.lo");
+    const max_val = c.LLVMBuildSelect(self.builder, cmp_lo, val, lo, "max.lo");
+    const cmp_hi = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, max_val, hi, "lt.hi");
+    return c.LLVMBuildSelect(self.builder, cmp_hi, max_val, hi, "clamp");
+}
+
+fn genMathUnaryF64(self: *Codegen, args: []const *const Ast.Expr, intrinsic_name: [*:0]const u8) Error!c.LLVMValueRef {
+    if (args.len != 1) return error.UnsupportedExpr;
+    const arg = try self.genExpr(args[0]);
+    // Ensure arg is f64
+    const f64_type = c.LLVMDoubleTypeInContext(self.context);
+    const val = if (c.LLVMGetTypeKind(c.LLVMTypeOf(arg)) == c.LLVMFloatTypeKind)
+        c.LLVMBuildFPExt(self.builder, arg, f64_type, "ext")
+    else
+        arg;
+    // Get or declare the LLVM intrinsic
+    var param_types = [_]c.LLVMTypeRef{f64_type};
+    const fn_type = c.LLVMFunctionType(f64_type, &param_types, 1, 0);
+    var func = c.LLVMGetNamedFunction(self.module, intrinsic_name);
+    if (func == null) {
+        func = c.LLVMAddFunction(self.module, intrinsic_name, fn_type);
+    }
+    var call_args = [_]c.LLVMValueRef{val};
+    return c.LLVMBuildCall2(self.builder, fn_type, func, &call_args, 1, "math");
+}
+
+fn genMathBinaryF64(self: *Codegen, args: []const *const Ast.Expr, intrinsic_name: [*:0]const u8) Error!c.LLVMValueRef {
+    if (args.len != 2) return error.UnsupportedExpr;
+    const arg0 = try self.genExpr(args[0]);
+    const arg1 = try self.genExpr(args[1]);
+    const f64_type = c.LLVMDoubleTypeInContext(self.context);
+    const val0 = if (c.LLVMGetTypeKind(c.LLVMTypeOf(arg0)) == c.LLVMFloatTypeKind)
+        c.LLVMBuildFPExt(self.builder, arg0, f64_type, "ext")
+    else
+        arg0;
+    const val1 = if (c.LLVMGetTypeKind(c.LLVMTypeOf(arg1)) == c.LLVMFloatTypeKind)
+        c.LLVMBuildFPExt(self.builder, arg1, f64_type, "ext")
+    else
+        arg1;
+    var param_types = [_]c.LLVMTypeRef{ f64_type, f64_type };
+    const fn_type = c.LLVMFunctionType(f64_type, &param_types, 2, 0);
+    var func = c.LLVMGetNamedFunction(self.module, intrinsic_name);
+    if (func == null) {
+        func = c.LLVMAddFunction(self.module, intrinsic_name, fn_type);
+    }
+    var call_args = [_]c.LLVMValueRef{ val0, val1 };
+    return c.LLVMBuildCall2(self.builder, fn_type, func, &call_args, 2, "math");
 }
 
 fn genStringLiteral(self: *Codegen, sym: u32) Error!c.LLVMValueRef {
