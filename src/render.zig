@@ -265,6 +265,10 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try writer.writeAll("spawn ");
             try renderExpr(e, pool, writer, 0);
         },
+        .comptime_expr => |e| {
+            try writer.writeAll("comptime ");
+            try renderExpr(e, pool, writer, 0);
+        },
         .pipeline => |p| {
             try renderExpr(p.lhs, pool, writer, 0);
             try writer.writeAll(" |> ");
