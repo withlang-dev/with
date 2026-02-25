@@ -391,6 +391,21 @@ pub const PatternKind = union(enum) {
     variant: VariantPattern,
     /// Or-pattern: `A | B`
     or_pattern: []const Pattern,
+    /// At-binding: `name @ Pattern` — binds whole value and destructures
+    at_binding: AtBinding,
+    /// Range pattern: `1..=5` or `1..5`
+    range_pattern: RangePattern,
+};
+
+pub const RangePattern = struct {
+    start: i64,
+    end: i64,
+    inclusive: bool,
+};
+
+pub const AtBinding = struct {
+    name: Symbol,
+    pattern: *const Pattern,
 };
 
 pub const VariantPattern = struct {

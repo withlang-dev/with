@@ -4006,13 +4006,16 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
     // Create basic blocks for each arm and merge.
     const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "match.end");
 
-    // First pass: identify the wildcard/binding arm.
+    // First pass: identify the wildcard/binding arm and check for range patterns.
     var wildcard_arm_idx: ?usize = null;
+    var has_range_patterns = false;
     for (m.arms, 0..) |arm, i| {
         switch (arm.pattern.kind) {
             .wildcard, .binding => {
-                wildcard_arm_idx = i;
-                break;
+                if (wildcard_arm_idx == null) wildcard_arm_idx = i;
+            },
+            .range_pattern => {
+                has_range_patterns = true;
             },
             else => {},
         }
@@ -4020,11 +4023,11 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
 
     const default_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "match.default");
 
-    // Create BBs for non-default arms only.
+    // Create BBs for each arm.
     var arm_bbs_buf: [64]c.LLVMBasicBlockRef = undefined;
     for (0..m.arms.len) |i| {
-        if (wildcard_arm_idx != null and wildcard_arm_idx.? == i) {
-            arm_bbs_buf[i] = default_bb; // default arm uses default_bb
+        if (!has_range_patterns and wildcard_arm_idx != null and wildcard_arm_idx.? == i) {
+            arm_bbs_buf[i] = default_bb; // default arm uses default_bb (only when no ranges)
         } else {
             arm_bbs_buf[i] = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "match.arm");
         }
@@ -4036,6 +4039,42 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
     // Add cases.
     for (m.arms, 0..) |arm, i| {
         self.addMatchCase(sw, arm.pattern, tag_val, arm_bbs_buf[i], enum_info);
+    }
+
+    // Handle range patterns: chain comparisons from default_bb.
+    if (has_range_patterns) {
+        c.LLVMPositionBuilderAtEnd(self.builder, default_bb);
+        // Build chain of range checks. Final fallthrough goes to wildcard arm or unreachable.
+        const final_dest = if (wildcard_arm_idx) |wci| arm_bbs_buf[wci] else blk: {
+            const unr = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "range.unreachable");
+            c.LLVMPositionBuilderAtEnd(self.builder, unr);
+            _ = c.LLVMBuildUnreachable(self.builder);
+            break :blk unr;
+        };
+        // Build range checks in reverse order so first range is checked first.
+        var next_check = final_dest;
+        var ri: usize = m.arms.len;
+        while (ri > 0) {
+            ri -= 1;
+            const arm_pat = m.arms[ri].pattern;
+            if (arm_pat.kind == .range_pattern) {
+                const rp = arm_pat.kind.range_pattern;
+                const val_type = c.LLVMTypeOf(tag_val);
+                const start_val = c.LLVMConstInt(val_type, @bitCast(rp.start), 1);
+                const end_val = c.LLVMConstInt(val_type, @bitCast(rp.end), 1);
+                const check_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "range.check");
+                c.LLVMPositionBuilderAtEnd(self.builder, check_bb);
+                const ge = c.LLVMBuildICmp(self.builder, c.LLVMIntSGE, tag_val, start_val, "range.ge");
+                const le_op: c_uint = if (rp.inclusive) c.LLVMIntSLE else c.LLVMIntSLT;
+                const le = c.LLVMBuildICmp(self.builder, le_op, tag_val, end_val, "range.le");
+                const in_range = c.LLVMBuildAnd(self.builder, ge, le, "range.in");
+                _ = c.LLVMBuildCondBr(self.builder, in_range, arm_bbs_buf[ri], next_check);
+                next_check = check_bb;
+            }
+        }
+        // Wire default_bb to first range check.
+        c.LLVMPositionBuilderAtEnd(self.builder, default_bb);
+        _ = c.LLVMBuildBr(self.builder, next_check);
     }
 
     // Generate code for each arm.
@@ -4089,6 +4128,44 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
                     .is_mut = false,
                 }) catch return error.CodegenAlloc;
             },
+            .at_binding => |ab| {
+                // Bind the whole subject to the @ name.
+                const whole_alloca = c.LLVMBuildAlloca(self.builder, subject_type, "at.bind");
+                _ = c.LLVMBuildStore(self.builder, subject, whole_alloca);
+                self.locals.put(self.allocator, ab.name, .{
+                    .alloca = whole_alloca,
+                    .ty = subject_type,
+                    .is_mut = false,
+                }) catch return error.CodegenAlloc;
+                // Also bind inner pattern variables (e.g. variant payload).
+                if (ab.pattern.kind == .variant) {
+                    const vp = ab.pattern.kind.variant;
+                    if (vp.bindings.len > 0 and enum_info != null) {
+                        const ei = enum_info.?;
+                        for (ei.variant_names, 0..) |vn, vi| {
+                            if (vn == vp.name) {
+                                if (ei.variant_payload_types[vi]) |payload_type| {
+                                    if (is_enum_struct) {
+                                        const tmp2 = c.LLVMBuildAlloca(self.builder, subject_type, "at.subj");
+                                        _ = c.LLVMBuildStore(self.builder, subject, tmp2);
+                                        const pgep = c.LLVMBuildStructGEP2(self.builder, subject_type, tmp2, 1, "");
+                                        const pptr = c.LLVMBuildBitCast(self.builder, pgep, c.LLVMPointerTypeInContext(self.context, 0), "");
+                                        const pval = c.LLVMBuildLoad2(self.builder, payload_type, pptr, "at.payload");
+                                        const ba2 = c.LLVMBuildAlloca(self.builder, payload_type, "");
+                                        _ = c.LLVMBuildStore(self.builder, pval, ba2);
+                                        self.locals.put(self.allocator, vp.bindings[0], .{
+                                            .alloca = ba2,
+                                            .ty = payload_type,
+                                            .is_mut = false,
+                                        }) catch return error.CodegenAlloc;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            },
             else => {},
         }
 
@@ -4113,8 +4190,8 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
         _ = c.LLVMBuildBr(self.builder, merge_bb);
     }
 
-    // If no wildcard, make default_bb unreachable.
-    if (wildcard_arm_idx == null) {
+    // If no wildcard and no range patterns, make default_bb unreachable.
+    if (wildcard_arm_idx == null and !has_range_patterns) {
         c.LLVMPositionBuilderAtEnd(self.builder, default_bb);
         _ = c.LLVMBuildUnreachable(self.builder);
     }
@@ -4169,6 +4246,13 @@ fn addMatchCase(self: *Codegen, sw: c.LLVMValueRef, pattern: Ast.Pattern, tag_va
             for (alternatives) |alt| {
                 self.addMatchCase(sw, alt, tag_val, target_bb, enum_info);
             }
+        },
+        .at_binding => |ab| {
+            // Dispatch to inner pattern for case matching.
+            self.addMatchCase(sw, ab.pattern.*, tag_val, target_bb, enum_info);
+        },
+        .range_pattern => {
+            // Range patterns handled separately with comparison chains, not switch cases.
         },
         .wildcard, .binding => {},
         .string_literal => {},

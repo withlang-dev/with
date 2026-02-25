@@ -1302,6 +1302,10 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                 self.checkPattern(alt, subject_type);
             }
         },
+        .at_binding => |ab| {
+            self.checkPattern(ab.pattern, subject_type);
+        },
+        .range_pattern => {},
     }
 }
 
