@@ -235,3 +235,81 @@ void with_runtime_shutdown(void) {
 int32_t with_runtime_has_fibers(void) {
     return ready_head != NULL;
 }
+
+// ── Channels ────────────────────────────────────────────────────────
+
+#define CHAN_BUFFER_SIZE 256
+
+typedef struct {
+    int64_t  buffer[CHAN_BUFFER_SIZE];
+    int32_t  head;
+    int32_t  tail;
+    int32_t  count;
+    int32_t  capacity;
+    int32_t  closed;
+} Channel;
+
+// Create a new channel with given capacity (0 = unbounded up to CHAN_BUFFER_SIZE).
+void *with_channel_create(int32_t capacity) {
+    Channel *ch = (Channel *)malloc(sizeof(Channel));
+    if (!ch) return NULL;
+    memset(ch, 0, sizeof(Channel));
+    ch->capacity = (capacity > 0 && capacity < CHAN_BUFFER_SIZE) ? capacity : CHAN_BUFFER_SIZE;
+    return ch;
+}
+
+// Send a value to a channel. Blocks (yields) if channel is full.
+void with_channel_send(void *ch_ptr, int64_t value) {
+    Channel *ch = (Channel *)ch_ptr;
+    while (ch->count >= ch->capacity) {
+        if (current_fiber) {
+            with_fiber_yield();
+        } else {
+            if (ready_head) run_one_fiber();
+            else return; // deadlock prevention
+        }
+    }
+    ch->buffer[ch->tail] = value;
+    ch->tail = (ch->tail + 1) % CHAN_BUFFER_SIZE;
+    ch->count++;
+}
+
+// Receive a value from a channel. Returns the value.
+// Blocks (yields) if channel is empty. Returns -1 if channel closed and empty.
+int64_t with_channel_recv(void *ch_ptr) {
+    Channel *ch = (Channel *)ch_ptr;
+    while (ch->count == 0) {
+        if (ch->closed) return -1;
+        if (current_fiber) {
+            with_fiber_yield();
+        } else {
+            if (ready_head) run_one_fiber();
+            else return -1; // deadlock prevention
+        }
+    }
+    int64_t value = ch->buffer[ch->head];
+    ch->head = (ch->head + 1) % CHAN_BUFFER_SIZE;
+    ch->count--;
+    return value;
+}
+
+// Try to receive without blocking. Returns 1 if got value (stored in *out), 0 if empty.
+int32_t with_channel_try_recv(void *ch_ptr, int64_t *out) {
+    Channel *ch = (Channel *)ch_ptr;
+    if (ch->count == 0) return 0;
+    *out = ch->buffer[ch->head];
+    ch->head = (ch->head + 1) % CHAN_BUFFER_SIZE;
+    ch->count--;
+    return 1;
+}
+
+// Close the channel.
+void with_channel_close(void *ch_ptr) {
+    Channel *ch = (Channel *)ch_ptr;
+    ch->closed = 1;
+}
+
+// Free channel memory.
+void with_channel_destroy(void *ch_ptr) {
+    free(ch_ptr);
+}

@@ -860,6 +860,7 @@ fn parsePrimary(self: *Parser) !*const Ast.Expr {
         .kw_break => return self.parseBreak(),
         .kw_continue => return self.parseContinue(),
         .kw_defer => return self.parseDefer(),
+        .kw_spawn => return self.parseSpawn(),
         .kw_yield => return self.parseYield(),
         .l_bracket => return self.parseArrayLiteral(),
         .kw_let, .kw_var => return self.parseLetBinding(),
@@ -1463,6 +1464,18 @@ fn parseYield(self: *Parser) !*const Ast.Expr {
     const node = try self.arena.create(Ast.Expr);
     node.* = .{
         .kind = .{ .yield_expr = value },
+        .span = start.merge(value.span),
+    };
+    return node;
+}
+
+fn parseSpawn(self: *Parser) !*const Ast.Expr {
+    const start = self.currentSpan();
+    self.advance(); // consume 'spawn'
+    const value = try self.parseExpr();
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .spawn_expr = value },
         .span = start.merge(value.span),
     };
     return node;

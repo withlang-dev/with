@@ -1845,6 +1845,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .tuple_destructure => |td| try self.genTupleDestructure(td),
         .yield_expr => |val| try self.genYield(val),
         .await_expr => |inner| try self.genAwait(inner),
+        .spawn_expr => |inner| try self.genSpawn(inner),
         else => error.UnsupportedExpr,
     };
 }
@@ -2036,7 +2037,13 @@ fn declareAsyncFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
 
 /// Generate the body of an async function (impl, trampoline, spawn wrapper).
 fn genAsyncFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
-    const name = self.pool.resolve(func.name);
+    // Copy function name to stack buffer since pool.intern() during body
+    // generation can invalidate slices returned by pool.resolve().
+    var name_buf: [256]u8 = undefined;
+    const name_src = self.pool.resolve(func.name);
+    const name_len = @min(name_src.len, name_buf.len);
+    @memcpy(name_buf[0..name_len], name_src[0..name_len]);
+    const name: []const u8 = name_buf[0..name_len];
     const i32_type = c.LLVMInt32TypeInContext(self.context);
     const i64_type = c.LLVMInt64TypeInContext(self.context);
     const void_type = c.LLVMVoidTypeInContext(self.context);
@@ -2234,6 +2241,164 @@ fn genAwait(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef {
     }
     // Default: truncate to i32.
     return c.LLVMBuildTrunc(self.builder, result_i64, i32_type, "await.trunc");
+}
+
+/// Generate a spawn expression: fire-and-forget async task.
+/// Evaluates the inner expression (which should be an async function call that
+/// returns a task ID), and discards the result.
+fn genSpawn(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef {
+    self.declareAsyncRuntime();
+
+    // Evaluate the inner expression — this is a call to an async function
+    // which returns a task ID (i32). We simply discard it.
+    _ = try self.genExpr(inner);
+
+    // Return void/zero since spawn is fire-and-forget.
+    return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+}
+
+/// Declare channel runtime functions if not already declared.
+fn declareChannelRuntime(self: *Codegen) void {
+    self.declareAsyncRuntime(); // Channels depend on the fiber runtime
+
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const void_type = c.LLVMVoidTypeInContext(self.context);
+
+    // void* with_channel_create(i32 capacity)
+    if (c.LLVMGetNamedFunction(self.module, "with_channel_create") == null) {
+        var params = [_]c.LLVMTypeRef{i32_type};
+        const ft = c.LLVMFunctionType(ptr_type, &params, 1, 0);
+        _ = c.LLVMAddFunction(self.module, "with_channel_create", ft);
+    }
+
+    // void with_channel_send(void*, i64)
+    if (c.LLVMGetNamedFunction(self.module, "with_channel_send") == null) {
+        var params = [_]c.LLVMTypeRef{ ptr_type, i64_type };
+        const ft = c.LLVMFunctionType(void_type, &params, 2, 0);
+        _ = c.LLVMAddFunction(self.module, "with_channel_send", ft);
+    }
+
+    // i64 with_channel_recv(void*)
+    if (c.LLVMGetNamedFunction(self.module, "with_channel_recv") == null) {
+        var params = [_]c.LLVMTypeRef{ptr_type};
+        const ft = c.LLVMFunctionType(i64_type, &params, 1, 0);
+        _ = c.LLVMAddFunction(self.module, "with_channel_recv", ft);
+    }
+
+    // void with_channel_close(void*)
+    if (c.LLVMGetNamedFunction(self.module, "with_channel_close") == null) {
+        var params = [_]c.LLVMTypeRef{ptr_type};
+        const ft = c.LLVMFunctionType(void_type, &params, 1, 0);
+        _ = c.LLVMAddFunction(self.module, "with_channel_close", ft);
+    }
+
+    // void with_channel_destroy(void*)
+    if (c.LLVMGetNamedFunction(self.module, "with_channel_destroy") == null) {
+        var params = [_]c.LLVMTypeRef{ptr_type};
+        const ft = c.LLVMFunctionType(void_type, &params, 1, 0);
+        _ = c.LLVMAddFunction(self.module, "with_channel_destroy", ft);
+    }
+}
+
+/// Generate Channel(capacity) — returns an opaque pointer (as i64).
+fn genChannelCreate(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
+    self.declareChannelRuntime();
+    self.uses_async = true;
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+
+    var capacity: c.LLVMValueRef = c.LLVMConstInt(i32_type, 256, 0);
+    if (args.len >= 1) {
+        capacity = try self.genExpr(args[0]);
+    }
+
+    const create_fn = c.LLVMGetNamedFunction(self.module, "with_channel_create") orelse return error.UnsupportedExpr;
+    var create_params = [_]c.LLVMTypeRef{i32_type};
+    const create_ft = c.LLVMFunctionType(ptr_type, &create_params, 1, 0);
+    var create_args = [_]c.LLVMValueRef{capacity};
+    const ch_ptr = c.LLVMBuildCall2(self.builder, create_ft, create_fn, &create_args, 1, "ch.ptr");
+
+    // Cast pointer to i64 so it can be stored in a regular i64 variable.
+    return c.LLVMBuildPtrToInt(self.builder, ch_ptr, i64_type, "ch.handle");
+}
+
+/// Generate send(ch, value) — sends an i64 value to the channel.
+fn genChannelSend(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
+    if (args.len != 2) return error.UnsupportedExpr;
+    self.declareChannelRuntime();
+
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const void_type = c.LLVMVoidTypeInContext(self.context);
+
+    const ch_handle = try self.genExpr(args[0]);
+    var value = try self.genExpr(args[1]);
+
+    // Extend i32 to i64 if needed.
+    const val_type = c.LLVMTypeOf(value);
+    if (val_type == c.LLVMInt32TypeInContext(self.context)) {
+        value = c.LLVMBuildSExt(self.builder, value, i64_type, "send.ext");
+    }
+
+    // Convert handle (i64) back to pointer.
+    const ch_ptr = c.LLVMBuildIntToPtr(self.builder, ch_handle, ptr_type, "ch.ptr");
+
+    const send_fn = c.LLVMGetNamedFunction(self.module, "with_channel_send") orelse return error.UnsupportedExpr;
+    var send_params = [_]c.LLVMTypeRef{ ptr_type, i64_type };
+    const send_ft = c.LLVMFunctionType(void_type, &send_params, 2, 0);
+    var send_args = [_]c.LLVMValueRef{ ch_ptr, value };
+    _ = c.LLVMBuildCall2(self.builder, send_ft, send_fn, &send_args, 2, "");
+
+    return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+}
+
+/// Generate recv(ch) — receives an i64 value from the channel.
+fn genChannelRecv(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
+    if (args.len != 1) return error.UnsupportedExpr;
+    self.declareChannelRuntime();
+
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+
+    const ch_handle = try self.genExpr(args[0]);
+    const ch_ptr = c.LLVMBuildIntToPtr(self.builder, ch_handle, ptr_type, "ch.ptr");
+
+    const recv_fn = c.LLVMGetNamedFunction(self.module, "with_channel_recv") orelse return error.UnsupportedExpr;
+    var recv_params = [_]c.LLVMTypeRef{ptr_type};
+    const recv_ft = c.LLVMFunctionType(i64_type, &recv_params, 1, 0);
+    var recv_args = [_]c.LLVMValueRef{ch_ptr};
+    const result_i64 = c.LLVMBuildCall2(self.builder, recv_ft, recv_fn, &recv_args, 1, "recv.result");
+
+    // Truncate to i32 by default.
+    if (self.expected_type) |expected| {
+        if (expected == i64_type) return result_i64;
+    }
+    return c.LLVMBuildTrunc(self.builder, result_i64, i32_type, "recv.trunc");
+}
+
+/// Generate close(ch) — closes a channel.
+fn genChannelClose(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
+    if (args.len != 1) return error.UnsupportedExpr;
+    self.declareChannelRuntime();
+
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const void_type = c.LLVMVoidTypeInContext(self.context);
+
+    const ch_handle = try self.genExpr(args[0]);
+    const ch_ptr = c.LLVMBuildIntToPtr(self.builder, ch_handle, ptr_type, "ch.ptr");
+
+    const close_fn = c.LLVMGetNamedFunction(self.module, "with_channel_close") orelse return error.UnsupportedExpr;
+    var close_params = [_]c.LLVMTypeRef{ptr_type};
+    const close_ft = c.LLVMFunctionType(void_type, &close_params, 1, 0);
+    var close_args = [_]c.LLVMValueRef{ch_ptr};
+    _ = c.LLVMBuildCall2(self.builder, close_ft, close_fn, &close_args, 1, "");
+
+    return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
 }
 
 /// Wrap the user's main function to init/run/shutdown the fiber runtime.
@@ -3337,6 +3502,30 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
         const ok_type = c.LLVMInt32TypeInContext(self.context);
         const result_info = try self.getOrCreateResultType(ok_type, c.LLVMTypeOf(arg_val));
         return self.buildResultErr(arg_val, result_info.llvm_type);
+    }
+
+    // Built-in: Channel(capacity) — create a new channel
+    const channel_sym = self.pool.intern("Channel") catch return error.CodegenAlloc;
+    if (fn_sym == channel_sym) {
+        return self.genChannelCreate(call_e.args);
+    }
+
+    // Built-in: send(ch, value) — send to channel
+    const send_sym = self.pool.intern("send") catch return error.CodegenAlloc;
+    if (fn_sym == send_sym) {
+        return self.genChannelSend(call_e.args);
+    }
+
+    // Built-in: recv(ch) — receive from channel
+    const recv_sym = self.pool.intern("recv") catch return error.CodegenAlloc;
+    if (fn_sym == recv_sym) {
+        return self.genChannelRecv(call_e.args);
+    }
+
+    // Built-in: close(ch) — close a channel
+    const close_sym = self.pool.intern("close") catch return error.CodegenAlloc;
+    if (fn_sym == close_sym) {
+        return self.genChannelClose(call_e.args);
     }
 
     // Check if this is a known function.
