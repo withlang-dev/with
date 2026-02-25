@@ -77,6 +77,24 @@ fn_dyn_params: std.AutoHashMapUnmanaged(u32, []const ?u32) = .{},
 /// drop everything above that watermark in reverse order.
 scope_locals: [64]ScopedLocal = undefined,
 scope_local_count: u32 = 0,
+/// Generator state: pointer to the state struct (self param) during next() codegen.
+gen_state_ptr: ?c.LLVMValueRef = null,
+/// Generator state: the LLVM struct type of the state.
+gen_state_type: ?c.LLVMTypeRef = null,
+/// Generator state: mapping from local symbol → field index in state struct.
+gen_field_indices: std.AutoHashMapUnmanaged(u32, u32) = .{},
+/// Generator state: array of resume basic blocks (one per yield point).
+gen_resume_bbs: [32]c.LLVMBasicBlockRef = undefined,
+/// Generator state: the "done" basic block (returns None).
+gen_done_bb: ?c.LLVMBasicBlockRef = null,
+/// Generator state: the Option type for yield values.
+gen_option_type: ?c.LLVMTypeRef = null,
+/// Generator state: the payload type for yield values.
+gen_payload_type: ?c.LLVMTypeRef = null,
+/// Generator state: number of yield points found.
+gen_yield_count: u32 = 0,
+/// Generator state: current yield index during codegen.
+gen_current_yield: u32 = 0,
 
 const ScopedLocal = struct {
     sym: u32,
@@ -283,11 +301,24 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
         }
     }
 
+    // Pass 0.7: declare generator state structs and functions.
+    for (module.decls) |decl| {
+        switch (decl.kind) {
+            .function => |fn_decl| {
+                if (fn_decl.is_gen and fn_decl.type_params.len == 0) {
+                    try self.declareGenerator(fn_decl);
+                }
+            },
+            else => {},
+        }
+    }
+
     // Pass 1: declare all functions and externs (forward declarations).
     // Generic functions are stored for later monomorphization.
     for (module.decls) |decl| {
         switch (decl.kind) {
             .function => |fn_decl| {
+                if (fn_decl.is_gen) continue; // already declared in pass 0.7
                 if (fn_decl.type_params.len > 0) {
                     self.generic_fns.put(self.allocator, fn_decl.name, fn_decl) catch
                         return error.CodegenAlloc;
@@ -315,7 +346,9 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
     for (module.decls) |decl| {
         switch (decl.kind) {
             .function => |fn_decl| {
-                if (fn_decl.type_params.len == 0) {
+                if (fn_decl.is_gen) {
+                    try self.genGeneratorBody(fn_decl);
+                } else if (fn_decl.type_params.len == 0) {
                     try self.genFunction(fn_decl);
                 }
             },
@@ -941,6 +974,435 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     }
 }
 
+// ── Generator support ────────────────────────────────────────────
+
+/// Count yield expressions in an AST node (recursive).
+fn countYields(expr: *const Ast.Expr) u32 {
+    return switch (expr.kind) {
+        .yield_expr => 1,
+        .block => |b| {
+            var n: u32 = 0;
+            for (b.stmts) |s| n += countYields(s);
+            if (b.tail) |t| n += countYields(t);
+            return n;
+        },
+        .while_expr => |w| {
+            var n: u32 = 0;
+            n += countYields(w.condition);
+            n += countYields(w.body);
+            return n;
+        },
+        .loop_expr => |body| countYields(body),
+        .for_expr => |f| countYields(f.body),
+        .if_expr => |ie| {
+            var n: u32 = countYields(ie.then_body);
+            if (ie.else_body) |eb| n += countYields(eb);
+            return n;
+        },
+        .let_binding => |lb| countYields(lb.value),
+        .assign => |a| countYields(a.value),
+        .defer_expr => |d| countYields(d),
+        else => 0,
+    };
+}
+
+/// Collect local variable declarations from an AST (name + type).
+/// Appends to the provided buffers.
+fn collectGenLocals(
+    expr: *const Ast.Expr,
+    names: *[32]u32,
+    types: *[32]?*const Ast.TypeExpr,
+    count: *u32,
+) void {
+    switch (expr.kind) {
+        .block => |b| {
+            for (b.stmts) |s| collectGenLocals(s, names, types, count);
+            if (b.tail) |t| collectGenLocals(t, names, types, count);
+        },
+        .let_binding => |lb| {
+            if (count.* < 32) {
+                names[count.*] = lb.name;
+                types[count.*] = lb.type_expr;
+                count.* += 1;
+            }
+        },
+        .while_expr => |w| {
+            collectGenLocals(w.body, names, types, count);
+        },
+        .loop_expr => |body| collectGenLocals(body, names, types, count),
+        .for_expr => |f| collectGenLocals(f.body, names, types, count),
+        .if_expr => |ie| {
+            collectGenLocals(ie.then_body, names, types, count);
+            if (ie.else_body) |eb| collectGenLocals(eb, names, types, count);
+        },
+        else => {},
+    }
+}
+
+/// Declare a generator: create state struct, constructor function, and next() method.
+fn declareGenerator(self: *Codegen, func: Ast.FnDecl) Error!void {
+    // Resolve the yield element type from the return type annotation.
+    const yield_type = if (func.return_type) |rt|
+        try self.resolveType(rt)
+    else
+        c.LLVMInt32TypeInContext(self.context);
+
+    // Get or create the Option[YieldType] type.
+    const opt_info = try self.getOrCreateOptionType(yield_type);
+    const option_type = opt_info.llvm_type;
+
+    // Build the state struct type: { i32 state, param1_T, ..., local1_T, ... }
+    // For now, all locals default to i32 if type annotation is missing.
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    var field_types_buf: [64]c.LLVMTypeRef = undefined;
+    var field_names_buf: [64]u32 = undefined;
+    var field_count: u32 = 0;
+
+    // Field 0: state tag (i32).
+    const state_sym = self.pool.intern("__state") catch return error.CodegenAlloc;
+    field_types_buf[field_count] = i32_type;
+    field_names_buf[field_count] = state_sym;
+    field_count += 1;
+
+    // Fields for parameters.
+    for (func.params) |param| {
+        const pt = if (param.type_expr) |te| try self.resolveType(te) else i32_type;
+        field_types_buf[field_count] = pt;
+        field_names_buf[field_count] = param.name;
+        field_count += 1;
+    }
+
+    // Collect local variable declarations from the body.
+    var local_names: [32]u32 = undefined;
+    var local_types: [32]?*const Ast.TypeExpr = undefined;
+    var local_count: u32 = 0;
+    collectGenLocals(func.body, &local_names, &local_types, &local_count);
+
+    for (0..local_count) |i| {
+        const lt = if (local_types[i]) |te| self.resolveType(te) catch i32_type else i32_type;
+        // Avoid duplicate field names (let bindings may shadow).
+        var dup = false;
+        for (field_names_buf[0..field_count]) |fn_sym| {
+            if (fn_sym == local_names[i]) {
+                dup = true;
+                break;
+            }
+        }
+        if (!dup) {
+            field_types_buf[field_count] = lt;
+            field_names_buf[field_count] = local_names[i];
+            field_count += 1;
+        }
+    }
+
+    // Create the LLVM struct type.
+    const gen_name = self.pool.resolve(func.name);
+    var struct_name_buf: [256]u8 = undefined;
+    const sn_len = @min(gen_name.len, struct_name_buf.len - 7);
+    @memcpy(struct_name_buf[0..sn_len], gen_name[0..sn_len]);
+    @memcpy(struct_name_buf[sn_len .. sn_len + 6], "_State");
+    struct_name_buf[sn_len + 6] = 0;
+
+    const state_struct = c.LLVMStructCreateNamed(self.context, &struct_name_buf);
+    c.LLVMStructSetBody(state_struct, &field_types_buf, @intCast(field_count), 0);
+
+    // Register the state struct type.
+    const state_sym_name = self.pool.intern(struct_name_buf[0 .. sn_len + 6]) catch return error.CodegenAlloc;
+
+    // Allocate persistent field info.
+    const field_names_alloc = self.allocator.alloc(u32, field_count) catch return error.CodegenAlloc;
+    @memcpy(field_names_alloc, field_names_buf[0..field_count]);
+    const field_types_alloc = self.allocator.alloc(c.LLVMTypeRef, field_count) catch return error.CodegenAlloc;
+    @memcpy(field_types_alloc, field_types_buf[0..field_count]);
+    const field_defaults = self.allocator.alloc(?*const Ast.Expr, field_count) catch return error.CodegenAlloc;
+    @memset(field_defaults, null);
+
+    self.struct_types.put(self.allocator, state_sym_name, .{
+        .llvm_type = state_struct,
+        .field_names = field_names_alloc,
+        .field_types = field_types_alloc,
+        .field_defaults = field_defaults,
+    }) catch return error.CodegenAlloc;
+
+    // Create the constructor function: fn gen_name(params...) -> StateStruct
+    var ctor_param_types: [64]c.LLVMTypeRef = undefined;
+    for (func.params, 0..) |param, i| {
+        ctor_param_types[i] = if (param.type_expr) |te| try self.resolveType(te) else i32_type;
+    }
+
+    const ctor_fn_type = c.LLVMFunctionType(
+        state_struct,
+        if (func.params.len > 0) &ctor_param_types else null,
+        @intCast(func.params.len),
+        0,
+    );
+
+    var ctor_name_buf: [256]u8 = undefined;
+    if (gen_name.len >= ctor_name_buf.len) return error.UnsupportedExpr;
+    @memcpy(ctor_name_buf[0..gen_name.len], gen_name);
+    ctor_name_buf[gen_name.len] = 0;
+
+    const ctor_fn = c.LLVMAddFunction(self.module, &ctor_name_buf, ctor_fn_type);
+    self.functions.put(self.allocator, func.name, .{
+        .value = ctor_fn,
+        .fn_type = ctor_fn_type,
+    }) catch return error.CodegenAlloc;
+
+    // Create the next() method: fn StateType.next(*StateStruct) -> Option[T]
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    var next_param_types = [_]c.LLVMTypeRef{ptr_type};
+    const next_fn_type = c.LLVMFunctionType(option_type, &next_param_types, 1, 0);
+
+    // Mangle name as "StateName.next"
+    var next_name_buf: [256]u8 = undefined;
+    const next_prefix = struct_name_buf[0 .. sn_len + 6];
+    if (next_prefix.len + 5 >= next_name_buf.len) return error.UnsupportedExpr;
+    @memcpy(next_name_buf[0..next_prefix.len], next_prefix);
+    @memcpy(next_name_buf[next_prefix.len .. next_prefix.len + 5], ".next");
+    next_name_buf[next_prefix.len + 5] = 0;
+
+    const next_fn = c.LLVMAddFunction(self.module, &next_name_buf, next_fn_type);
+    const next_sym = self.pool.intern(next_name_buf[0 .. next_prefix.len + 5]) catch return error.CodegenAlloc;
+    self.functions.put(self.allocator, next_sym, .{
+        .value = next_fn,
+        .fn_type = next_fn_type,
+    }) catch return error.CodegenAlloc;
+}
+
+/// Generate the constructor body and next() state machine for a generator.
+fn genGeneratorBody(self: *Codegen, func: Ast.FnDecl) Error!void {
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+
+    // Resolve yield type.
+    const yield_type = if (func.return_type) |rt|
+        try self.resolveType(rt)
+    else
+        i32_type;
+
+    const opt_info = try self.getOrCreateOptionType(yield_type);
+    const option_type = opt_info.llvm_type;
+
+    // Look up the generator's state struct.
+    const gen_name = self.pool.resolve(func.name);
+    var struct_name_buf: [256]u8 = undefined;
+    const sn_len = @min(gen_name.len, struct_name_buf.len - 7);
+    @memcpy(struct_name_buf[0..sn_len], gen_name[0..sn_len]);
+    @memcpy(struct_name_buf[sn_len .. sn_len + 6], "_State");
+
+    const state_sym_name = self.pool.intern(struct_name_buf[0 .. sn_len + 6]) catch return error.CodegenAlloc;
+    const sti = self.struct_types.get(state_sym_name) orelse return error.UnsupportedExpr;
+    const state_struct = sti.llvm_type;
+
+    // ── Generate constructor body ──
+    const ctor_info = self.functions.get(func.name) orelse return error.UnsupportedExpr;
+    const ctor_fn = ctor_info.value;
+    {
+        const saved_fn = self.current_function;
+        const saved_ret = self.current_ret_type;
+        const saved_bb = c.LLVMGetInsertBlock(self.builder);
+        const saved_locals = self.locals;
+
+        self.current_function = ctor_fn;
+        self.current_ret_type = state_struct;
+        self.locals = .{};
+
+        const entry = c.LLVMAppendBasicBlockInContext(self.context, ctor_fn, "entry");
+        c.LLVMPositionBuilderAtEnd(self.builder, entry);
+
+        // Allocate the state struct.
+        const alloca = c.LLVMBuildAlloca(self.builder, state_struct, "state");
+
+        // Set state tag = 0.
+        const state_gep = c.LLVMBuildStructGEP2(self.builder, state_struct, alloca, 0, "state.tag");
+        _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i32_type, 0, 0), state_gep);
+
+        // Copy parameters into state struct fields (starting at index 1).
+        for (func.params, 0..) |_, i| {
+            const param_val = c.LLVMGetParam(ctor_fn, @intCast(i));
+            const field_gep = c.LLVMBuildStructGEP2(self.builder, state_struct, alloca, @intCast(i + 1), "");
+            _ = c.LLVMBuildStore(self.builder, param_val, field_gep);
+        }
+
+        // Zero-initialize local fields.
+        for (func.params.len + 1..sti.field_names.len) |i| {
+            const field_gep = c.LLVMBuildStructGEP2(self.builder, state_struct, alloca, @intCast(i), "");
+            _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(sti.field_types[i], 0, 0), field_gep);
+        }
+
+        const result = c.LLVMBuildLoad2(self.builder, state_struct, alloca, "state.val");
+        _ = c.LLVMBuildRet(self.builder, result);
+
+        self.current_function = saved_fn;
+        self.current_ret_type = saved_ret;
+        self.locals = saved_locals;
+        if (saved_bb != null) c.LLVMPositionBuilderAtEnd(self.builder, saved_bb);
+    }
+
+    // ── Generate next() body ──
+    var next_name_buf: [256]u8 = undefined;
+    const next_prefix = struct_name_buf[0 .. sn_len + 6];
+    @memcpy(next_name_buf[0..next_prefix.len], next_prefix);
+    @memcpy(next_name_buf[next_prefix.len .. next_prefix.len + 5], ".next");
+    const next_sym = self.pool.intern(next_name_buf[0 .. next_prefix.len + 5]) catch return error.CodegenAlloc;
+    const next_info = self.functions.get(next_sym) orelse return error.UnsupportedExpr;
+    const next_fn = next_info.value;
+
+    {
+        const saved_fn = self.current_function;
+        const saved_ret = self.current_ret_type;
+        const saved_bb = c.LLVMGetInsertBlock(self.builder);
+        const saved_locals = self.locals;
+        const saved_expected = self.expected_type;
+
+        self.current_function = next_fn;
+        self.current_ret_type = option_type;
+        self.locals = .{};
+        self.defer_depth = 0;
+        self.scope_local_count = 0;
+
+        // Set generator state for genExpr to use.
+        self.gen_state_ptr = c.LLVMGetParam(next_fn, 0);
+        self.gen_state_type = state_struct;
+        self.gen_option_type = option_type;
+        self.gen_payload_type = yield_type;
+        self.gen_yield_count = countYields(func.body);
+        self.gen_current_yield = 0;
+        self.gen_field_indices.clearRetainingCapacity();
+
+        // Build field index mapping.
+        for (sti.field_names, 0..) |fn_sym, i| {
+            self.gen_field_indices.put(self.allocator, fn_sym, @intCast(i)) catch {};
+        }
+
+        const entry_bb = c.LLVMAppendBasicBlockInContext(self.context, next_fn, "entry");
+        const start_bb = c.LLVMAppendBasicBlockInContext(self.context, next_fn, "state.0");
+        const done_bb = c.LLVMAppendBasicBlockInContext(self.context, next_fn, "done");
+        self.gen_done_bb = done_bb;
+
+        // Create resume basic blocks for each yield point.
+        for (0..self.gen_yield_count) |i| {
+            var resume_name: [32]u8 = undefined;
+            const rn = std.fmt.bufPrint(&resume_name, "resume.{d}", .{i}) catch "resume";
+            var rn_buf: [32]u8 = undefined;
+            @memcpy(rn_buf[0..rn.len], rn);
+            rn_buf[rn.len] = 0;
+            self.gen_resume_bbs[i] = c.LLVMAppendBasicBlockInContext(self.context, next_fn, &rn_buf);
+        }
+
+        // Entry block: create all local allocas here so they dominate all uses.
+        c.LLVMPositionBuilderAtEnd(self.builder, entry_bb);
+        const self_ptr = c.LLVMGetParam(next_fn, 0);
+
+        // Create local allocas in the entry block (dominates everything).
+        for (1..sti.field_names.len) |i| {
+            const field_sym = sti.field_names[i];
+            const field_ty = sti.field_types[i];
+            const local_alloca = c.LLVMBuildAlloca(self.builder, field_ty, "");
+            self.locals.put(self.allocator, field_sym, .{
+                .alloca = local_alloca,
+                .ty = field_ty,
+                .is_mut = true,
+            }) catch {};
+        }
+
+        // Load state tag and switch.
+        const state_tag_gep = c.LLVMBuildStructGEP2(self.builder, state_struct, self_ptr, 0, "state.tag.ptr");
+        const state_tag = c.LLVMBuildLoad2(self.builder, i32_type, state_tag_gep, "state.tag");
+        const switch_inst = c.LLVMBuildSwitch(self.builder, state_tag, done_bb, @intCast(self.gen_yield_count + 1));
+        c.LLVMAddCase(switch_inst, c.LLVMConstInt(i32_type, 0, 0), start_bb);
+        for (0..self.gen_yield_count) |i| {
+            c.LLVMAddCase(switch_inst, c.LLVMConstInt(i32_type, @intCast(i + 1), 0), self.gen_resume_bbs[i]);
+        }
+
+        // Start block: load all state struct fields into local allocas.
+        c.LLVMPositionBuilderAtEnd(self.builder, start_bb);
+        for (1..sti.field_names.len) |i| {
+            const field_sym = sti.field_names[i];
+            const field_ty = sti.field_types[i];
+            const field_gep = c.LLVMBuildStructGEP2(self.builder, state_struct, self_ptr, @intCast(i), "");
+            const field_val = c.LLVMBuildLoad2(self.builder, field_ty, field_gep, "");
+            if (self.locals.get(field_sym)) |local| {
+                _ = c.LLVMBuildStore(self.builder, field_val, local.alloca);
+            }
+        }
+
+        self.expected_type = option_type;
+
+        // Generate the body.  yield_expr handling in genExpr will:
+        // 1. Save all locals back to the state struct.
+        // 2. Set state tag = yield_index + 1.
+        // 3. Return Some(yield_value).
+        // 4. Position builder at the resume block.
+        _ = self.genExpr(func.body) catch {
+            // If body gen fails, ensure done_bb is terminated.
+            c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+            _ = c.LLVMBuildRet(self.builder, self.buildOptionNone(option_type));
+            // Terminate any unterminated resume blocks.
+            for (0..self.gen_yield_count) |i| {
+                if (c.LLVMGetBasicBlockTerminator(self.gen_resume_bbs[i]) == null) {
+                    c.LLVMPositionBuilderAtEnd(self.builder, self.gen_resume_bbs[i]);
+                    _ = c.LLVMBuildBr(self.builder, done_bb);
+                }
+            }
+            self.gen_state_ptr = null;
+            self.gen_state_type = null;
+            self.gen_done_bb = null;
+            self.gen_option_type = null;
+            self.gen_payload_type = null;
+
+            self.current_function = saved_fn;
+            self.current_ret_type = saved_ret;
+            self.locals = saved_locals;
+            self.expected_type = saved_expected;
+            if (saved_bb != null) c.LLVMPositionBuilderAtEnd(self.builder, saved_bb);
+            return;
+        };
+
+        // After the body, if current block has no terminator, fall through to done.
+        const final_bb = c.LLVMGetInsertBlock(self.builder);
+        if (c.LLVMGetBasicBlockTerminator(final_bb) == null) {
+            _ = c.LLVMBuildBr(self.builder, done_bb);
+        }
+
+        // Done block: return None.
+        c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+        const done_state_gep = c.LLVMBuildStructGEP2(self.builder, state_struct, self_ptr, 0, "");
+        _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i32_type, @as(c_ulonglong, @intCast(self.gen_yield_count + 100)), 0), done_state_gep);
+        _ = c.LLVMBuildRet(self.builder, self.buildOptionNone(option_type));
+
+        // Ensure all resume blocks are terminated.
+        for (0..self.gen_yield_count) |i| {
+            if (c.LLVMGetBasicBlockTerminator(self.gen_resume_bbs[i]) == null) {
+                c.LLVMPositionBuilderAtEnd(self.builder, self.gen_resume_bbs[i]);
+                // Load locals from state, same as start_bb.
+                for (1..sti.field_names.len) |fi| {
+                    const field_sym = sti.field_names[fi];
+                    const field_ty = sti.field_types[fi];
+                    const field_gep = c.LLVMBuildStructGEP2(self.builder, state_struct, self_ptr, @intCast(fi), "");
+                    const field_val = c.LLVMBuildLoad2(self.builder, field_ty, field_gep, "");
+                    if (self.locals.get(field_sym)) |local| {
+                        _ = c.LLVMBuildStore(self.builder, field_val, local.alloca);
+                    }
+                }
+                _ = c.LLVMBuildBr(self.builder, done_bb);
+            }
+        }
+
+        // Cleanup generator state.
+        self.gen_state_ptr = null;
+        self.gen_state_type = null;
+        self.gen_done_bb = null;
+        self.gen_option_type = null;
+        self.gen_payload_type = null;
+
+        self.current_function = saved_fn;
+        self.current_ret_type = saved_ret;
+        self.locals = saved_locals;
+        self.expected_type = saved_expected;
+        if (saved_bb != null) c.LLVMPositionBuilderAtEnd(self.builder, saved_bb);
+    }
+}
+
 const CapturedVar = struct {
     sym: u32,
     value: c.LLVMValueRef,
@@ -1368,8 +1830,66 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .with_expr => |w| try self.genWithExpr(w),
         .record_update => |ru| try self.genRecordUpdate(ru),
         .tuple_destructure => |td| try self.genTupleDestructure(td),
+        .yield_expr => |val| try self.genYield(val),
         else => error.UnsupportedExpr,
     };
+}
+
+/// Generate a yield expression inside a generator's next() method.
+/// Saves locals to state struct, sets state tag, returns Some(value).
+fn genYield(self: *Codegen, val_expr: *const Ast.Expr) Error!c.LLVMValueRef {
+    const state_ptr = self.gen_state_ptr orelse return error.UnsupportedExpr;
+    const state_type = self.gen_state_type orelse return error.UnsupportedExpr;
+    _ = self.gen_option_type orelse return error.UnsupportedExpr;
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const yield_idx = self.gen_current_yield;
+    self.gen_current_yield += 1;
+
+    // Evaluate the yield value.
+    const yield_val = try self.genExpr(val_expr);
+
+    // Save all locals back to the state struct.
+    var it = self.locals.iterator();
+    while (it.next()) |entry| {
+        const sym = entry.key_ptr.*;
+        const local = entry.value_ptr.*;
+        if (self.gen_field_indices.get(sym)) |field_idx| {
+            const val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
+            const gep = c.LLVMBuildStructGEP2(self.builder, state_type, state_ptr, field_idx, "");
+            _ = c.LLVMBuildStore(self.builder, val, gep);
+        }
+    }
+
+    // Set state tag to yield_idx + 1 (the resume state).
+    const state_tag_gep = c.LLVMBuildStructGEP2(self.builder, state_type, state_ptr, 0, "");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i32_type, @intCast(yield_idx + 1), 0), state_tag_gep);
+
+    // Build Some(yield_val) and return it.
+    const some_val = try self.buildOptionSome(yield_val);
+    _ = c.LLVMBuildRet(self.builder, some_val);
+
+    // Position at the resume block for code that follows this yield.
+    if (yield_idx < self.gen_yield_count) {
+        const resume_bb = self.gen_resume_bbs[yield_idx];
+        c.LLVMPositionBuilderAtEnd(self.builder, resume_bb);
+
+        // Reload all locals from state struct.
+        var it2 = self.locals.iterator();
+        while (it2.next()) |entry2| {
+            const sym2 = entry2.key_ptr.*;
+            const local2 = entry2.value_ptr.*;
+            if (self.gen_field_indices.get(sym2)) |field_idx| {
+                const gep = c.LLVMBuildStructGEP2(self.builder, state_type, state_ptr, field_idx, "");
+                const reloaded = c.LLVMBuildLoad2(self.builder, local2.ty, gep, "");
+                _ = c.LLVMBuildStore(self.builder, reloaded, local2.alloca);
+            }
+        }
+    }
+
+    // The yield expression itself evaluates to void (in the state machine, control
+    // continues after yield with reloaded locals).
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
 fn genTuple(self: *Codegen, elems: []const *const Ast.Expr) Error!c.LLVMValueRef {
@@ -2086,7 +2606,14 @@ fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
     else
         c.LLVMTypeOf(val);
 
-    const alloca = c.LLVMBuildAlloca(self.builder, ty, "");
+    // In generator mode, reuse the pre-created alloca from the entry block
+    // to avoid SSA dominance violations.
+    const alloca = if (self.gen_state_ptr != null) blk: {
+        if (self.locals.get(let_b.name)) |existing| {
+            break :blk existing.alloca;
+        }
+        break :blk c.LLVMBuildAlloca(self.builder, ty, "");
+    } else c.LLVMBuildAlloca(self.builder, ty, "");
     const coerced = self.coerceInt(val, ty);
     _ = c.LLVMBuildStore(self.builder, coerced, alloca);
 

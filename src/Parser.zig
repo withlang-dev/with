@@ -130,10 +130,14 @@ fn parseDecl(self: *Parser) !Ast.Decl {
     }
 
     return switch (self.peek()) {
-        .kw_fn => self.parseFnDecl(is_pub, start_span, false),
+        .kw_fn => self.parseFnDecl(is_pub, start_span, false, false),
         .kw_async => blk: {
             self.advance();
-            break :blk self.parseFnDecl(is_pub, start_span, true);
+            break :blk self.parseFnDecl(is_pub, start_span, true, false);
+        },
+        .kw_gen => blk: {
+            self.advance();
+            break :blk self.parseFnDecl(is_pub, start_span, false, true);
         },
         .kw_type => self.parseTypeDecl(is_pub, start_span),
         .kw_use => self.parseUseDecl(start_span),
@@ -352,6 +356,7 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
                 .return_type = return_type,
                 .body = body,
                 .is_async = is_async,
+                .is_gen = false,
                 .is_pub = method_vis,
             } },
             .span = method_start.merge(body.span),
@@ -373,7 +378,7 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
     return methods.items;
 }
 
-fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async: bool) !Ast.Decl {
+fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async: bool, is_gen: bool) !Ast.Decl {
     try self.expect(.kw_fn);
     var name = try self.expectIdentifier();
     // Support method syntax: `fn Type.method(...)` → mangled name `Type.method`
@@ -415,6 +420,7 @@ fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async
             .return_type = return_type,
             .body = body,
             .is_async = is_async,
+            .is_gen = is_gen,
             .is_pub = is_pub,
         } },
         .span = start_span.merge(body.span),
@@ -854,6 +860,7 @@ fn parsePrimary(self: *Parser) !*const Ast.Expr {
         .kw_break => return self.parseBreak(),
         .kw_continue => return self.parseContinue(),
         .kw_defer => return self.parseDefer(),
+        .kw_yield => return self.parseYield(),
         .l_bracket => return self.parseArrayLiteral(),
         .kw_let, .kw_var => return self.parseLetBinding(),
         .kw_match => return self.parseMatchExpr(),
@@ -1438,7 +1445,19 @@ fn parseDefer(self: *Parser) !*const Ast.Expr {
     return node;
 }
 
-/// Parse `with expr as [mut] name: body` or `with expr as [mut] name,... : body`
+fn parseYield(self: *Parser) !*const Ast.Expr {
+    const start = self.currentSpan();
+    self.advance(); // consume 'yield'
+    const value = try self.parseExpr();
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .yield_expr = value },
+        .span = start.merge(value.span),
+    };
+    return node;
+}
+
+// Parse `with expr as [mut] name: body` or `with expr as [mut] name,... : body`
 fn parseWithExpr(self: *Parser) !*const Ast.Expr {
     const start = self.currentSpan();
     self.advance(); // consume 'with'

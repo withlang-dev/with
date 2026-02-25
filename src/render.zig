@@ -21,6 +21,7 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
         .function => |f| {
             if (f.is_pub == .public) try writer.writeAll("pub ");
             if (f.is_async) try writer.writeAll("async ");
+            if (f.is_gen) try writer.writeAll("gen ");
             try writer.print("fn {s}", .{pool.resolve(f.name)});
             if (f.type_params.len > 0) {
                 try writer.writeAll("[");
@@ -363,6 +364,10 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
                 try renderExpr(f.value, pool, writer, 0);
             }
             try writer.writeAll(" }");
+        },
+        .yield_expr => |y| {
+            try writer.writeAll("yield ");
+            try renderExpr(y, pool, writer, 0);
         },
         .poisoned => try writer.writeAll("<poisoned>"),
     }
