@@ -20,18 +20,18 @@ pub fn print_int(n: i64) -> i32 =
 pub fn print_float(x: f64) -> i32 =
     printf("%f\n", x)
 
-// Open a file for reading, returns file pointer (0 on failure)
-pub fn file_open(path: str, mode: str) -> i64 =
+// Open a file for reading, returns file pointer (null on failure)
+pub fn file_open(path: str, mode: str) -> *i8 =
     fopen(path, mode)
 
 // Close a file
-pub fn file_close(fp: i64) -> i32 =
+pub fn file_close(fp: *i8) -> i32 =
     fclose(fp)
 
 // Write a string to a file
-pub fn file_write(fp: i64, s: str) -> i32 =
+pub fn file_write(fp: *i8, s: str) -> i32 =
     fputs(s, fp)
 
 // Read bytes from a file
-pub fn file_read(fp: i64, buf: *i8, size: i64) -> i64 =
+pub fn file_read(fp: *i8, buf: *i8, size: i64) -> i64 =
     fread(buf, 1, size, fp)
