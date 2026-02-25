@@ -829,6 +829,20 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
             }
             return source_ty;
         },
+        .let_else => |le| {
+            const val_type = self.checkExpr(le.value);
+            // Each binding gets the value's type (payload type not yet resolved in sema).
+            for (le.pattern.bindings) |bind_sym| {
+                self.current_scope.put(self.allocator, bind_sym, .{
+                    .type_id = val_type,
+                    .is_mut = le.is_mut,
+                    .span = expr.span,
+                    .state = .live,
+                });
+            }
+            _ = self.checkExpr(le.else_body);
+            return self.ty_void;
+        },
         .tuple_destructure => |td| {
             const val_type = self.checkExpr(td.value);
             // Each binding gets error_type for now (tuple element types).
@@ -850,6 +864,26 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
             return self.ty_void;
         },
         .comptime_expr => |inner| self.checkExpr(inner),
+        .select_await => |sel| {
+            var result_ty = self.ty_void;
+            for (sel.arms) |arm| {
+                _ = self.checkExpr(arm.task);
+                var arm_scope = Scope.init();
+                arm_scope.parent = self.current_scope;
+                const saved_scope = self.current_scope;
+                self.current_scope = &arm_scope;
+                self.current_scope.put(self.allocator, arm.name, .{
+                    .type_id = self.ty_i32,
+                    .is_mut = false,
+                    .span = arm.span,
+                    .state = .live,
+                });
+                result_ty = self.checkExpr(arm.body);
+                arm_scope.deinit(self.allocator);
+                self.current_scope = saved_scope;
+            }
+            return result_ty;
+        },
         .yield_expr => |inner| self.checkExpr(inner),
     };
 }

@@ -863,6 +863,7 @@ fn parsePrimary(self: *Parser) !*const Ast.Expr {
         .kw_spawn => return self.parseSpawn(),
         .kw_yield => return self.parseYield(),
         .kw_comptime => return self.parseComptime(),
+        .kw_select => return self.parseSelectAwait(),
         .l_bracket => return self.parseArrayLiteral(),
         .kw_let, .kw_var => return self.parseLetBinding(),
         .kw_match => return self.parseMatchExpr(),
@@ -1482,6 +1483,71 @@ fn parseComptime(self: *Parser) !*const Ast.Expr {
     return node;
 }
 
+fn parseSelectAwait(self: *Parser) !*const Ast.Expr {
+    const start = self.currentSpan();
+    self.advance(); // consume 'select'
+    try self.expect(.kw_await);
+    if (self.peek() == .colon) {
+        self.advance();
+    }
+    self.skipNewlines();
+
+    // Parse arms: `name = task_expr -> body_expr`
+    var arms: std.ArrayList(Ast.SelectAwaitArm) = .empty;
+    var arm_col: ?u32 = null;
+
+    while (self.peek() != .eof) {
+        if (self.peek() != .identifier) break;
+
+        // Column check: all arms must be at the same column
+        const cur_col = Lexer.columnOf(self.source, self.currentSpan().start);
+        if (arm_col) |ac| {
+            if (cur_col != ac) break;
+        } else {
+            arm_col = cur_col;
+        }
+
+        // Lookahead: must be `name =`
+        if (self.pos + 1 < self.tokens.tags.items.len and self.tokens.tags.items[self.pos + 1] != .eq) break;
+
+        const arm_span = self.currentSpan();
+        const name_sym = self.expectIdentifier() catch break;
+        if (self.peek() != .eq) break;
+        self.advance(); // consume '='
+        self.skipNewlines();
+        const task_expr = try self.parseExpr();
+        try self.expect(.arrow); // ->
+        self.skipNewlines();
+        const body_expr = try self.parseExpr();
+
+        try arms.append(self.arena, .{
+            .name = name_sym,
+            .task = task_expr,
+            .body = body_expr,
+            .span = arm_span.merge(body_expr.span),
+        });
+
+        // Skip newlines, save position to restore if not an arm
+        const save = self.pos;
+        self.skipNewlines();
+        if (self.peek() == .eof) break;
+        const next_col = Lexer.columnOf(self.source, self.currentSpan().start);
+        if (arm_col) |ac| {
+            if (next_col != ac or self.peek() != .identifier) {
+                self.pos = save;
+                break;
+            }
+        }
+    }
+
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .select_await = .{ .arms = arms.items } },
+        .span = start.merge(if (arms.items.len > 0) arms.items[arms.items.len - 1].span else start),
+    };
+    return node;
+}
+
 fn parseSpawn(self: *Parser) !*const Ast.Expr {
     const start = self.currentSpan();
     self.advance(); // consume 'spawn'
@@ -2029,6 +2095,84 @@ fn parseLetBinding(self: *Parser) !*const Ast.Expr {
     }
 
     const name_sym = try self.expectIdentifier();
+
+    // Check for let...else variant pattern: `let Some(x) = expr else { body }`
+    // Detect: identifier followed by '(' means variant with payload
+    // Or: uppercase identifier followed by '=' could be unit variant (e.g., let None = expr else ...)
+    const name_str = self.pool.resolve(name_sym);
+    const is_uppercase = name_str.len > 0 and std.ascii.isUpper(name_str[0]);
+
+    if (is_uppercase and self.peek() == .l_paren) {
+        // Variant pattern with payload: `let Some(x) = expr else ...`
+        self.advance(); // consume '('
+        var bindings: std.ArrayList(Ast.Symbol) = .empty;
+        while (self.peek() != .r_paren and self.peek() != .eof) {
+            try bindings.append(self.arena, try self.expectIdentifier());
+            if (self.peek() == .comma) {
+                self.advance();
+                self.skipNewlines();
+            }
+        }
+        try self.expect(.r_paren);
+        try self.expect(.eq);
+        self.skipNewlines();
+        const value = try self.parseExpr();
+        try self.expect(.kw_else);
+        self.skipNewlines();
+        const else_body = try self.parseExpr();
+        const node = try self.arena.create(Ast.Expr);
+        node.* = .{
+            .kind = .{ .let_else = .{
+                .pattern = .{ .name = name_sym, .bindings = bindings.items },
+                .value = value,
+                .else_body = else_body,
+                .is_mut = is_mut,
+            } },
+            .span = start.merge(else_body.span),
+        };
+        return node;
+    }
+
+    if (is_uppercase and self.peek() == .eq) {
+        // Unit variant pattern: `let None = expr else ...`
+        // Check if 'else' follows the value — disambiguate from normal let binding
+        const saved_pos = self.pos;
+        self.advance(); // consume '='
+        self.skipNewlines();
+        const value = try self.parseExpr();
+        if (self.peek() == .kw_else) {
+            self.skipNewlines();
+            self.advance(); // consume 'else'
+            self.skipNewlines();
+            const else_body = try self.parseExpr();
+            const empty_bindings = try self.arena.alloc(Ast.Symbol, 0);
+            const node = try self.arena.create(Ast.Expr);
+            node.* = .{
+                .kind = .{ .let_else = .{
+                    .pattern = .{ .name = name_sym, .bindings = empty_bindings },
+                    .value = value,
+                    .else_body = else_body,
+                    .is_mut = is_mut,
+                } },
+                .span = start.merge(else_body.span),
+            };
+            return node;
+        }
+        // Not a let...else, it's a regular let binding with uppercase name
+        // Value already parsed, just create normal let binding
+        _ = saved_pos;
+        const node = try self.arena.create(Ast.Expr);
+        node.* = .{
+            .kind = .{ .let_binding = .{
+                .name = name_sym,
+                .type_expr = null,
+                .value = value,
+                .is_mut = is_mut,
+            } },
+            .span = start.merge(value.span),
+        };
+        return node;
+    }
 
     var type_expr: ?*const Ast.TypeExpr = null;
     if (self.peek() == .colon) {

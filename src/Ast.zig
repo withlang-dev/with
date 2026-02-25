@@ -183,6 +183,8 @@ pub const ExprKind = union(enum) {
     return_expr: ?*const Expr,
     /// Let binding (as statement-expression in a block)
     let_binding: LetBinding,
+    /// Let-else: `let Some(x) = expr else { diverging }`
+    let_else: LetElse,
     /// Tuple destructuring: `let (a, b) = expr`
     tuple_destructure: TupleDestructure,
     /// Assignment: `x = expr`
@@ -235,6 +237,8 @@ pub const ExprKind = union(enum) {
     yield_expr: *const Expr,
     /// Comptime expression: `comptime expr` — evaluated at compile time
     comptime_expr: *const Expr,
+    /// Select await: `select await: arm1, arm2, ...`
+    select_await: SelectAwaitExpr,
     /// Poisoned — parse error placeholder
     poisoned,
 };
@@ -321,6 +325,13 @@ pub const LetBinding = struct {
     name: Symbol,
     type_expr: ?*const TypeExpr,
     value: *const Expr,
+    is_mut: bool,
+};
+
+pub const LetElse = struct {
+    pattern: VariantPattern,
+    value: *const Expr,
+    else_body: *const Expr,
     is_mut: bool,
 };
 
@@ -459,6 +470,20 @@ pub const WithExpr = struct {
     is_mut: bool,
     /// The body expression
     body: *const Expr,
+};
+
+pub const SelectAwaitArm = struct {
+    /// Binding name for the result
+    name: Symbol,
+    /// The task expression to await
+    task: *const Expr,
+    /// The body to execute when this arm wins
+    body: *const Expr,
+    span: Span,
+};
+
+pub const SelectAwaitExpr = struct {
+    arms: []const SelectAwaitArm,
 };
 
 pub const RecordUpdateExpr = struct {
