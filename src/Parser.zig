@@ -1502,7 +1502,30 @@ fn parseMatchExpr(self: *Parser) !*const Ast.Expr {
         }
 
         const arm_start = self.currentSpan();
-        const pattern = try self.parsePattern();
+        var pattern = try self.parsePattern();
+
+        // Check for or-pattern: `A | B | C`
+        if (self.peek() == .pipe) {
+            var alternatives: std.ArrayList(Ast.Pattern) = .empty;
+            try alternatives.append(self.arena, pattern);
+            while (self.peek() == .pipe) {
+                self.advance(); // consume '|'
+                self.skipNewlines();
+                try alternatives.append(self.arena, try self.parsePattern());
+            }
+            pattern = .{
+                .kind = .{ .or_pattern = alternatives.items },
+                .span = arm_start.merge(self.prevSpan()),
+            };
+        }
+
+        // Check for guard clause: `if expr`
+        var guard: ?*const Ast.Expr = null;
+        if (self.peek() == .kw_if) {
+            self.advance(); // consume 'if'
+            const guard_expr = try self.parseExpr();
+            guard = guard_expr;
+        }
 
         try self.expect(.arrow);
         self.skipNewlines();
@@ -1511,6 +1534,7 @@ fn parseMatchExpr(self: *Parser) !*const Ast.Expr {
 
         try arms.append(self.arena, .{
             .pattern = pattern,
+            .guard = guard,
             .body = body,
             .span = arm_start.merge(body.span),
         });

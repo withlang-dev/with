@@ -386,6 +386,12 @@ fn renderPattern(pat: *const Ast.Pattern, pool: *const InternPool, writer: anyty
                 try writer.writeAll(")");
             }
         },
+        .or_pattern => |alternatives| {
+            for (alternatives, 0..) |*alt, j| {
+                if (j > 0) try writer.writeAll(" | ");
+                try renderPattern(alt, pool, writer);
+            }
+        },
     }
 }
 
