@@ -187,7 +187,7 @@ pub const Scope = struct {
 
 // ── Function signature info ──────────────────────────────────────
 
-const FnSigInfo = struct {
+pub const FnSigInfo = struct {
     type_id: TypeId, // TypeId of the fn_type
     return_type: TypeId,
     param_types: []const TypeId,
@@ -355,13 +355,13 @@ fn addType(self: *Sema, ty: Type) TypeId {
     return id;
 }
 
-fn getType(self: *const Sema, tid: TypeId) Type {
+pub fn getType(self: *const Sema, tid: TypeId) Type {
     if (tid >= self.types.items.len) return .err;
     return self.types.items[tid];
 }
 
 /// Resolve a TypeId through aliases.
-fn resolveAlias(self: *const Sema, tid: TypeId) TypeId {
+pub fn resolveAlias(self: *const Sema, tid: TypeId) TypeId {
     var current = tid;
     var depth: u32 = 0;
     while (depth < 32) : (depth += 1) {
@@ -626,7 +626,7 @@ fn checkTraitConformance(self: *Sema, module: *const Ast.Module) void {
 
 // ── Type expression resolution ───────────────────────────────────
 
-fn resolveTypeExpr(self: *Sema, te: *const Ast.TypeExpr) TypeId {
+pub fn resolveTypeExpr(self: *Sema, te: *const Ast.TypeExpr) TypeId {
     return switch (te.kind) {
         .named => |sym| {
             if (self.named_types.get(sym)) |tid| return tid;
@@ -2200,6 +2200,7 @@ pub fn typeName(self: *const Sema, tid: TypeId) []const u8 {
         .struct_type => |st| return self.pool.resolve(st.name),
         .enum_type => |et| return self.pool.resolve(et.name),
         .array_type => return "[_]T",
+        .slice_type => return "[]T",
         .tuple_type => return "(_, _)",
         .fn_type => return "fn",
         .ptr_type => return "*T",
