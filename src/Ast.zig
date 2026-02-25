@@ -37,8 +37,38 @@ pub const DeclKind = union(enum) {
     let_decl: LetDecl,
     /// `extern fn name(params) -> RetType`
     extern_fn: ExternFnDecl,
+    /// `use c_import("...")` — C header import via libclang
+    c_import: CImportDecl,
+    /// `trait Name = ...` — trait declaration
+    trait_decl: TraitDecl,
+    /// `impl Trait for Type = ...` — trait implementation record
+    impl_decl: ImplDecl,
     /// Represents a parse error — this node is skipped by later passes.
     poisoned,
+};
+
+pub const CImportDecl = struct {
+    header_code: []const u8,
+};
+
+pub const TraitDecl = struct {
+    name: Symbol,
+    methods: []const TraitMethodSig,
+    is_pub: Visibility,
+};
+
+pub const ImplDecl = struct {
+    trait_name: ?Symbol, // null for plain `impl Type` or `extend Type`
+    type_name: Symbol,
+    method_names: []const Symbol, // mangled names like "Type.method"
+};
+
+pub const TraitMethodSig = struct {
+    name: Symbol,
+    params: []const Param,
+    return_type: ?*const TypeExpr,
+    has_default: bool,
+    span: Span,
 };
 
 pub const Visibility = enum { private, public };

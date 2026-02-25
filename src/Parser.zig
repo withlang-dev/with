@@ -74,10 +74,11 @@ pub fn parseModule(self: *Parser) !Ast.Module {
                 continue;
             }
             if (self.peek() == .kw_trait) {
-                self.parseTraitDecl() catch {
+                const trait_decl = self.parseTraitDecl(.public) catch {
                     self.recoverToTopLevel();
                     continue;
                 };
+                try decls.append(self.arena, trait_decl);
                 self.skipNewlines();
                 continue;
             }
@@ -91,10 +92,11 @@ pub fn parseModule(self: *Parser) !Ast.Module {
             self.skipNewlines();
             continue;
         } else if (self.peek() == .kw_trait) {
-            self.parseTraitDecl() catch {
+            const trait_decl = self.parseTraitDecl(.private) catch {
                 self.recoverToTopLevel();
                 continue;
             };
+            try decls.append(self.arena, trait_decl);
             self.skipNewlines();
             continue;
         }
@@ -162,26 +164,72 @@ fn parseDecl(self: *Parser) !Ast.Decl {
     };
 }
 
-fn parseTraitDecl(self: *Parser) !void {
+fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
+    const start_span = self.currentSpan();
     if (self.peek() == .kw_pub) self.advance();
     try self.expect(.kw_trait);
-    _ = try self.expectIdentifier(); // trait name
+    const name = try self.expectIdentifier();
     try self.expect(.eq);
     self.skipNewlines();
 
-    // Skip trait body — just consume indented fn signatures.
+    var methods: std.ArrayList(Ast.TraitMethodSig) = .empty;
+
+    // Parse trait body — indented fn signatures.
     while (self.peek() == .kw_fn or self.peek() == .kw_pub) {
         const fn_col = Lexer.columnOf(self.source, self.currentSpan().start);
         if (fn_col == 0) break;
-        // Skip tokens until next newline at top level.
-        while (self.peek() != .newline and self.peek() != .eof) {
+
+        const method_start = self.currentSpan();
+        if (self.peek() == .kw_pub) self.advance();
+        try self.expect(.kw_fn);
+        const method_name = try self.expectIdentifier();
+
+        try self.expect(.l_paren);
+        const params = try self.parseParamList();
+        try self.expect(.r_paren);
+
+        var return_type: ?*const Ast.TypeExpr = null;
+        if (self.peek() == .arrow) {
             self.advance();
+            return_type = try self.parseTypeExpr();
         }
+
+        // Check for default body (= ...)
+        var has_default = false;
+        if (self.peek() == .eq) {
+            has_default = true;
+            // Skip the default body
+            self.advance();
+            self.skipNewlines();
+            // Skip indented body tokens
+            while (self.peek() != .eof and self.peek() != .newline) {
+                self.advance();
+            }
+        }
+
+        try methods.append(self.arena, .{
+            .name = method_name,
+            .params = params,
+            .return_type = return_type,
+            .has_default = has_default,
+            .span = method_start.merge(self.prevSpan()),
+        });
+
         self.skipNewlines();
     }
+
+    return .{
+        .kind = .{ .trait_decl = .{
+            .name = name,
+            .methods = methods.items,
+            .is_pub = vis,
+        } },
+        .span = start_span.merge(self.prevSpan()),
+    };
 }
 
 fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
+    const start_span = self.currentSpan();
     if (self.peek() == .kw_pub) self.advance(); // skip pub (already consumed in caller)
     // Accept both `impl` and `extend`.
     if (self.peek() == .kw_impl) {
@@ -194,9 +242,11 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
     const first_name = try self.expectIdentifier();
 
     // Check for `impl Trait for Type` syntax.
+    var trait_name: ?Ast.Symbol = null;
     var type_name = first_name;
     if (self.peek() == .kw_for) {
         self.advance(); // consume 'for'
+        trait_name = first_name;
         type_name = try self.expectIdentifier();
     }
 
@@ -207,10 +257,7 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
     self.skipNewlines();
 
     var methods: std.ArrayList(Ast.Decl) = .empty;
-
-    // Determine the column of the first method — methods must be indented.
-    const impl_col: u32 = 0; // impl is at top level
-    _ = impl_col;
+    var method_names: std.ArrayList(Ast.Symbol) = .empty;
 
     // Parse indented method definitions.
     // Methods start with `fn` at a deeper indentation.
@@ -268,6 +315,7 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
         try self.expect(.eq);
         const body = try self.parseBlockOrExpr();
 
+        try method_names.append(self.arena, mangled_name);
         try methods.append(self.arena, .{
             .kind = .{ .function = .{
                 .name = mangled_name,
@@ -283,6 +331,16 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
 
         self.skipNewlines();
     }
+
+    // Emit an impl_decl to record the trait-type relationship.
+    try methods.append(self.arena, .{
+        .kind = .{ .impl_decl = .{
+            .trait_name = trait_name,
+            .type_name = type_name,
+            .method_names = method_names.items,
+        } },
+        .span = start_span.merge(self.prevSpan()),
+    });
 
     return methods.items;
 }
@@ -517,6 +575,32 @@ fn parseEnumVariants(self: *Parser) ![]const Ast.VariantDef {
 
 fn parseUseDecl(self: *Parser, start_span: Span) !Ast.Decl {
     try self.expect(.kw_use);
+
+    // use c_import("...") — C header import
+    if (self.peek() == .kw_c_import) {
+        self.advance(); // consume c_import
+        try self.expect(.l_paren);
+        if (self.peek() != .string_literal) {
+            self.emitError("expected string literal after c_import(");
+            return error.ParseError;
+        }
+        const str_span = self.currentSpan();
+        // Extract string content without quotes
+        const raw = self.source[str_span.start .. str_span.end];
+        const unquoted = if (raw.len >= 2 and raw[0] == '"' and raw[raw.len - 1] == '"')
+            raw[1 .. raw.len - 1]
+        else
+            raw;
+        // Process escape sequences (especially \n for multi-include strings)
+        const header_code = self.processEscapes(unquoted) catch unquoted;
+        self.advance(); // consume string literal
+        try self.expect(.r_paren);
+        return .{
+            .kind = .{ .c_import = .{ .header_code = header_code } },
+            .span = start_span.merge(self.prevSpan()),
+        };
+    }
+
     var path: std.ArrayList(Ast.Symbol) = .empty;
 
     // Consume an identifier (could be regular .identifier or .dot_identifier stripped of dot)
@@ -560,7 +644,7 @@ fn parseUseDecl(self: *Parser, start_span: Span) !Ast.Decl {
         }
     }
 
-    // Skip any remaining tokens on this line (handles c_import(...) etc.)
+    // Skip any remaining tokens on this line (handles unknown function-call-like syntax)
     if (self.peek() == .l_paren) {
         var depth: u32 = 1;
         self.advance();
@@ -1858,6 +1942,45 @@ fn skipNewlines(self: *Parser) void {
     while (self.peek() == .newline or self.peek() == .comment) {
         self.advance();
     }
+}
+
+/// Process escape sequences in a string (for c_import header code).
+fn processEscapes(self: *Parser, input: []const u8) ![]const u8 {
+    // Quick check: if no backslashes, return as-is
+    if (std.mem.indexOf(u8, input, "\\") == null) return input;
+
+    var result: std.ArrayList(u8) = .empty;
+    var i: usize = 0;
+    while (i < input.len) {
+        if (input[i] == '\\' and i + 1 < input.len) {
+            switch (input[i + 1]) {
+                'n' => {
+                    try result.append(self.arena, '\n');
+                    i += 2;
+                },
+                't' => {
+                    try result.append(self.arena, '\t');
+                    i += 2;
+                },
+                '\\' => {
+                    try result.append(self.arena, '\\');
+                    i += 2;
+                },
+                '"' => {
+                    try result.append(self.arena, '"');
+                    i += 2;
+                },
+                else => {
+                    try result.append(self.arena, input[i]);
+                    i += 1;
+                },
+            }
+        } else {
+            try result.append(self.arena, input[i]);
+            i += 1;
+        }
+    }
+    return result.items;
 }
 
 fn emitError(self: *Parser, expected: []const u8) void {
