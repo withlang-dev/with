@@ -4370,6 +4370,28 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
         }
     }
 
+    // Built-in array methods: len(), is_empty(), first(), last(), contains(val).
+    if (c.LLVMGetTypeKind(obj_type) == c.LLVMArrayTypeKind) {
+        if (std.mem.eql(u8, method_name, "len")) {
+            const len = c.LLVMGetArrayLength2(obj_type);
+            return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), len, 0);
+        } else if (std.mem.eql(u8, method_name, "is_empty")) {
+            const len = c.LLVMGetArrayLength2(obj_type);
+            return c.LLVMConstInt(c.LLVMInt1TypeInContext(self.context), if (len == 0) 1 else 0, 0);
+        } else if (std.mem.eql(u8, method_name, "first")) {
+            return c.LLVMBuildExtractValue(self.builder, obj_val, 0, "first");
+        } else if (std.mem.eql(u8, method_name, "last")) {
+            const len = c.LLVMGetArrayLength2(obj_type);
+            return c.LLVMBuildExtractValue(self.builder, obj_val, @intCast(len - 1), "last");
+        } else if (std.mem.eql(u8, method_name, "contains")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const needle = try self.genExpr(args[0]);
+            return self.genArrayContains(obj_val, obj_type, needle);
+        } else if (std.mem.eql(u8, method_name, "reverse")) {
+            return self.genArrayReverse(obj_val, obj_type);
+        }
+    }
+
     // Search struct_types for matching type.
     var type_name_str: ?[]const u8 = null;
     {
@@ -7347,6 +7369,32 @@ fn genStrSlice(self: *Codegen, obj_val: c.LLVMValueRef, start: c.LLVMValueRef, e
     const new_ptr = c.LLVMBuildGEP2(self.builder, i8_type, s.ptr, &gep_idx, 1, "slice.ptr");
     const new_len = c.LLVMBuildSub(self.builder, end_i64, start_i64, "slice.len");
     return self.buildStrValue(new_ptr, new_len);
+}
+
+/// array.contains(needle) → bool — linear scan
+fn genArrayContains(self: *Codegen, arr_val: c.LLVMValueRef, arr_type: c.LLVMTypeRef, needle: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const len = c.LLVMGetArrayLength2(arr_type);
+    if (len == 0) return c.LLVMConstInt(c.LLVMInt1TypeInContext(self.context), 0, 0);
+    // Unrolled: OR together (arr[i] == needle) for each i
+    var result = c.LLVMConstInt(c.LLVMInt1TypeInContext(self.context), 0, 0);
+    for (0..len) |i| {
+        const elem = c.LLVMBuildExtractValue(self.builder, arr_val, @intCast(i), "elem");
+        const eq = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, elem, needle, "eq");
+        result = c.LLVMBuildOr(self.builder, result, eq, "");
+    }
+    return result;
+}
+
+/// array.reverse() → new array with elements in reverse order
+fn genArrayReverse(self: *Codegen, arr_val: c.LLVMValueRef, arr_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const len = c.LLVMGetArrayLength2(arr_type);
+    if (len == 0) return arr_val;
+    var result = c.LLVMGetUndef(arr_type);
+    for (0..len) |i| {
+        const elem = c.LLVMBuildExtractValue(self.builder, arr_val, @intCast(len - 1 - i), "rev");
+        result = c.LLVMBuildInsertValue(self.builder, result, elem, @intCast(i), "");
+    }
+    return result;
 }
 
 /// Ensure malloc is declared.
