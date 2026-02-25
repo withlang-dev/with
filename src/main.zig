@@ -7,6 +7,7 @@
 //!   with tokens <file.w>  Lex and dump tokens (debug)
 
 const std = @import("std");
+const c = @cImport(@cInclude("stdlib.h"));
 const Driver = @import("Driver.zig");
 const Source = @import("Source.zig");
 const Lexer = @import("Lexer.zig");
@@ -155,6 +156,8 @@ pub fn main() !void {
         try dumpTokens(args[2], allocator);
     } else if (std.mem.eql(u8, command, "help") or std.mem.eql(u8, command, "--help") or std.mem.eql(u8, command, "-h")) {
         printUsage();
+    } else if (std.mem.eql(u8, command, "repl")) {
+        try runRepl(allocator);
     } else if (std.mem.eql(u8, command, "version") or std.mem.eql(u8, command, "--version")) {
         var buf: [256]u8 = undefined;
         var w = std.fs.File.stdout().writer(&buf);
@@ -188,6 +191,7 @@ fn printUsage() void {
         \\  run <file.w>      Compile and run a With source file
         \\  check <file.w>    Parse and type-check a source file
         \\  fmt <file.w>      Format a source file (to stdout)
+        \\  repl              Interactive REPL
         \\  ir <file.w>       Dump LLVM IR (debug)
         \\  ast <file.w>      Parse and dump the AST (debug)
         \\  tokens <file.w>   Lex and dump tokens (debug)
@@ -196,6 +200,162 @@ fn printUsage() void {
         \\
     ) catch {};
     w.interface.flush() catch {};
+}
+
+fn runRepl(allocator: std.mem.Allocator) !void {
+    const stdin_file = std.fs.File.stdin();
+    var out_buf: [8192]u8 = undefined;
+    var out = std.fs.File.stdout().writer(&out_buf);
+    const writer_iface = &out.interface;
+
+    try writer_iface.writeAll("With REPL v0.0.1 - type expressions or :quit to exit\n");
+    try out.interface.flush();
+
+    var lines: std.ArrayList([]const u8) = .empty;
+    defer {
+        for (lines.items) |line| allocator.free(line);
+        lines.deinit(allocator);
+    }
+
+    var line_buf: [4096]u8 = undefined;
+
+    while (true) {
+        // Print prompt
+        try writer_iface.writeAll("with> ");
+        try out.interface.flush();
+
+        // Read line using raw file read (byte by byte until newline)
+        var pos: usize = 0;
+        const got_line = while (pos < line_buf.len - 1) {
+            const n = stdin_file.read(line_buf[pos .. pos + 1]) catch break false;
+            if (n == 0) break false; // EOF
+            if (line_buf[pos] == '\n') break true;
+            pos += 1;
+        } else false;
+        if (!got_line and pos == 0) break; // EOF with no data
+        const line_or_null = line_buf[0..pos];
+        const line = std.mem.trimRight(u8, line_or_null, &.{ '\r', '\n' });
+
+        if (line.len == 0) continue;
+        if (std.mem.eql(u8, line, ":quit") or std.mem.eql(u8, line, ":q")) break;
+        if (std.mem.eql(u8, line, ":clear")) {
+            for (lines.items) |l| allocator.free(l);
+            lines.clearRetainingCapacity();
+            try writer_iface.writeAll("(cleared)\n");
+            try out.interface.flush();
+            continue;
+        }
+        if (std.mem.eql(u8, line, ":help")) {
+            try writer_iface.writeAll(
+                \\Commands:
+                \\  :quit, :q    Exit the REPL
+                \\  :clear       Clear accumulated bindings
+                \\  :help        Show this help
+                \\
+                \\Enter let/var bindings (persisted across lines) or expressions.
+                \\Expressions are automatically printed with println.
+                \\
+            );
+            try out.interface.flush();
+            continue;
+        }
+
+        // Determine if this is a binding (let/var/fn) or an expression
+        const trimmed = std.mem.trimLeft(u8, line, " \t");
+        const is_binding = std.mem.startsWith(u8, trimmed, "let ") or
+            std.mem.startsWith(u8, trimmed, "var ") or
+            std.mem.startsWith(u8, trimmed, "fn ");
+
+        // Build the source
+        var src: std.ArrayList(u8) = .empty;
+        defer src.deinit(allocator);
+        try src.appendSlice(allocator, "fn main() -> i32 =\n");
+        for (lines.items) |prev| {
+            try src.appendSlice(allocator, "    ");
+            try src.appendSlice(allocator, prev);
+            try src.appendSlice(allocator, "\n");
+        }
+        if (is_binding) {
+            try src.appendSlice(allocator, "    ");
+            try src.appendSlice(allocator, line);
+            try src.appendSlice(allocator, "\n    0\n");
+        } else {
+            // Wrap expression in println
+            try src.appendSlice(allocator, "    println(");
+            try src.appendSlice(allocator, line);
+            try src.appendSlice(allocator, ")\n    0\n");
+        }
+
+        // Write temp file
+        const tmp_path = "/tmp/_with_repl.w";
+        {
+            const f = std.fs.createFileAbsolute(tmp_path, .{}) catch {
+                try writer_iface.writeAll("error: could not create temp file\n");
+                try out.interface.flush();
+                continue;
+            };
+            defer f.close();
+            f.writeAll(src.items) catch {};
+        }
+
+        // Compile
+        var driver = Driver.init(allocator);
+        defer driver.deinit();
+
+        const bin_path = try driver.buildBinary(tmp_path);
+        if (bin_path == null) {
+            // Compilation failed — try without println wrapper if it was an expression
+            if (!is_binding) {
+                src.clearRetainingCapacity();
+                try src.appendSlice(allocator, "fn main() -> i32 =\n");
+                for (lines.items) |prev| {
+                    try src.appendSlice(allocator, "    ");
+                    try src.appendSlice(allocator, prev);
+                    try src.appendSlice(allocator, "\n");
+                }
+                try src.appendSlice(allocator, "    ");
+                try src.appendSlice(allocator, line);
+                try src.appendSlice(allocator, "\n    0\n");
+                {
+                    const f = std.fs.createFileAbsolute(tmp_path, .{}) catch continue;
+                    defer f.close();
+                    f.writeAll(src.items) catch {};
+                }
+                var driver2 = Driver.init(allocator);
+                defer driver2.deinit();
+                if (try driver2.buildBinary(tmp_path)) |bp| {
+                    var path_buf2: [4096]u8 = undefined;
+                    if (bp.len < path_buf2.len) {
+                        @memcpy(path_buf2[0..bp.len], bp);
+                        path_buf2[bp.len] = 0;
+                        _ = c.system(&path_buf2);
+                    }
+                }
+            }
+            continue;
+        }
+
+        // Execute the compiled binary via system()
+        {
+            const bp = bin_path.?;
+            // Build a null-terminated path for system()
+            var path_buf: [4096]u8 = undefined;
+            if (bp.len < path_buf.len) {
+                @memcpy(path_buf[0..bp.len], bp);
+                path_buf[bp.len] = 0;
+                _ = c.system(&path_buf);
+            }
+        }
+
+        // If it was a binding, save it for future lines
+        if (is_binding) {
+            const saved = try allocator.dupe(u8, line);
+            try lines.append(allocator, saved);
+        }
+    }
+
+    try writer_iface.writeAll("\nGoodbye!\n");
+    try out.interface.flush();
 }
 
 fn dumpTokens(path: []const u8, allocator: std.mem.Allocator) !void {
