@@ -1571,6 +1571,12 @@ fn parseLetBinding(self: *Parser) !*const Ast.Expr {
     const start = self.currentSpan();
     const is_mut = self.peek() == .kw_var;
     self.advance();
+
+    // Check for tuple destructuring: `let (a, b) = expr`
+    if (self.peek() == .l_paren) {
+        return self.parseTupleDestructure(start, is_mut);
+    }
+
     const name_sym = try self.expectIdentifier();
 
     var type_expr: ?*const Ast.TypeExpr = null;
@@ -1588,6 +1594,31 @@ fn parseLetBinding(self: *Parser) !*const Ast.Expr {
         .kind = .{ .let_binding = .{
             .name = name_sym,
             .type_expr = type_expr,
+            .value = value,
+            .is_mut = is_mut,
+        } },
+        .span = start.merge(value.span),
+    };
+    return node;
+}
+
+fn parseTupleDestructure(self: *Parser, start: Span, is_mut: bool) !*const Ast.Expr {
+    self.advance(); // consume '('
+    var names: std.ArrayList(Ast.Symbol) = .empty;
+    try names.append(self.arena, try self.expectIdentifier());
+    while (self.peek() == .comma) {
+        self.advance();
+        try names.append(self.arena, try self.expectIdentifier());
+    }
+    try self.expect(.r_paren);
+    try self.expect(.eq);
+    self.skipNewlines();
+    const value = try self.parseExpr();
+
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .tuple_destructure = .{
+            .names = names.items,
             .value = value,
             .is_mut = is_mut,
         } },

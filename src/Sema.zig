@@ -790,6 +790,20 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
             }
             return source_ty;
         },
+        .tuple_destructure => |td| {
+            const val_type = self.checkExpr(td.value);
+            // Each binding gets error_type for now (tuple element types).
+            for (td.names) |name| {
+                self.current_scope.put(self.allocator, name, .{
+                    .type_id = error_type,
+                    .is_mut = td.is_mut,
+                    .span = expr.span,
+                    .state = .live,
+                });
+            }
+            _ = val_type;
+            return self.ty_void;
+        },
         .poisoned => error_type,
         .await_expr => |inner| self.checkExpr(inner),
     };

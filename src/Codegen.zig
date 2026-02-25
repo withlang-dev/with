@@ -862,6 +862,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .tuple => |elems| try self.genTuple(elems),
         .with_expr => |w| try self.genWithExpr(w),
         .record_update => |ru| try self.genRecordUpdate(ru),
+        .tuple_destructure => |td| try self.genTupleDestructure(td),
         else => error.UnsupportedExpr,
     };
 }
@@ -1586,6 +1587,42 @@ fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
                 self.ref_pointee_types.put(self.allocator, let_b.name, pointee_info.ty) catch {};
             }
         }
+    }
+
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+fn genTupleDestructure(self: *Codegen, td: Ast.TupleDestructure) Error!c.LLVMValueRef {
+    const tuple_val = try self.genExpr(td.value);
+    const tuple_type = c.LLVMTypeOf(tuple_val);
+
+    // Store the tuple value to memory so we can GEP into it.
+    const tuple_alloca = c.LLVMBuildAlloca(self.builder, tuple_type, "tuple.tmp");
+    _ = c.LLVMBuildStore(self.builder, tuple_val, tuple_alloca);
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const num_fields = c.LLVMCountStructElementTypes(tuple_type);
+
+    for (td.names, 0..) |name, i| {
+        if (i >= num_fields) break; // more names than tuple elements
+        const idx: u32 = @intCast(i);
+        const elem_type = c.LLVMStructGetTypeAtIndex(tuple_type, idx);
+
+        var indices = [_]c.LLVMValueRef{
+            c.LLVMConstInt(i32_type, 0, 0),
+            c.LLVMConstInt(i32_type, idx, 0),
+        };
+        const elem_ptr = c.LLVMBuildGEP2(self.builder, tuple_type, tuple_alloca, &indices, 2, "");
+        const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "");
+
+        const alloca = c.LLVMBuildAlloca(self.builder, elem_type, "");
+        _ = c.LLVMBuildStore(self.builder, elem_val, alloca);
+
+        self.locals.put(self.allocator, name, .{
+            .alloca = alloca,
+            .ty = elem_type,
+            .is_mut = td.is_mut,
+        }) catch return error.CodegenAlloc;
     }
 
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));

@@ -220,6 +220,15 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try writer.writeAll(" = ");
             try renderExpr(l.value, pool, writer, 0);
         },
+        .tuple_destructure => |td| {
+            try writer.writeAll(if (td.is_mut) "var (" else "let (");
+            for (td.names, 0..) |name, i| {
+                if (i > 0) try writer.writeAll(", ");
+                try writer.print("{s}", .{pool.resolve(name)});
+            }
+            try writer.writeAll(") = ");
+            try renderExpr(td.value, pool, writer, 0);
+        },
         .assign => |a| {
             try renderExpr(a.target, pool, writer, 0);
             try writer.writeAll(" = ");
