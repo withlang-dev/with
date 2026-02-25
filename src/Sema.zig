@@ -1711,7 +1711,8 @@ fn isBuiltinFn(self: *Sema, sym: Symbol) bool {
         std.mem.eql(u8, name, "recv") or
         std.mem.eql(u8, name, "close") or
         std.mem.eql(u8, name, "Vec") or
-        std.mem.eql(u8, name, "HashMap");
+        std.mem.eql(u8, name, "HashMap") or
+        std.mem.eql(u8, name, "HashSet");
 }
 
 fn isBuiltinValue(self: *Sema, sym: Symbol) bool {
