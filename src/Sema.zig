@@ -1308,7 +1308,117 @@ fn checkMatchExpr(self: *Sema, m: Ast.MatchExpr) TypeId {
         }
     }
 
+    // Exhaustiveness check.
+    self.checkExhaustiveness(m, subject_type);
+
     return result_type;
+}
+
+/// Check whether a match expression covers all possible values.
+/// Emits a warning for non-exhaustive matches on enum and bool types.
+fn checkExhaustiveness(self: *Sema, m: Ast.MatchExpr, subject_type: TypeId) void {
+    const resolved = self.resolveAlias(subject_type);
+    const type_info = self.getType(resolved);
+
+    switch (type_info) {
+        .enum_type => |et| {
+            // Check that all enum variants are covered.
+            // A wildcard/binding arm (without guard) covers all remaining variants.
+            var has_catchall = false;
+            for (m.arms) |arm| {
+                if (arm.guard != null) continue; // Guarded arms don't guarantee coverage.
+                if (self.patternIsCatchAll(&arm.pattern)) {
+                    has_catchall = true;
+                    break;
+                }
+            }
+            if (has_catchall) return;
+
+            // Collect covered variant names.
+            for (et.variant_names) |vn| {
+                var covered = false;
+                for (m.arms) |arm| {
+                    if (arm.guard != null) continue;
+                    if (self.patternCoversVariant(&arm.pattern, vn)) {
+                        covered = true;
+                        break;
+                    }
+                }
+                if (!covered) {
+                    const name_str = self.pool.resolve(vn);
+                    const msg = std.fmt.allocPrint(self.allocator, "non-exhaustive match: missing variant '{s}'", .{name_str}) catch return;
+                    self.diagnostics.emit(Diagnostic.warn(msg, m.subject.span));
+                    return; // One warning is enough.
+                }
+            }
+        },
+        .bool_type => {
+            var has_true = false;
+            var has_false = false;
+            var has_catchall = false;
+            for (m.arms) |arm| {
+                if (arm.guard != null) continue;
+                if (self.patternIsCatchAll(&arm.pattern)) {
+                    has_catchall = true;
+                    break;
+                }
+                self.patternCoversBool(&arm.pattern, &has_true, &has_false);
+            }
+            if (!has_catchall and (!has_true or !has_false)) {
+                self.diagnostics.emit(Diagnostic.warn("non-exhaustive match on bool", m.subject.span));
+            }
+        },
+        else => {
+            // For int/string/other types, don't warn — too noisy for int matches.
+        },
+    }
+}
+
+/// Returns true if the pattern is a catch-all (wildcard, binding, or at-binding with catch-all).
+fn patternIsCatchAll(self: *Sema, pattern: *const Ast.Pattern) bool {
+    switch (pattern.kind) {
+        .wildcard, .binding => return true,
+        .at_binding => |ab| return self.patternIsCatchAll(ab.pattern),
+        .or_pattern => |pats| {
+            for (pats) |*p| {
+                if (self.patternIsCatchAll(p)) return true;
+            }
+            return false;
+        },
+        else => return false,
+    }
+}
+
+/// Returns true if the pattern covers a specific enum variant (by symbol).
+fn patternCoversVariant(self: *Sema, pattern: *const Ast.Pattern, variant: Symbol) bool {
+    switch (pattern.kind) {
+        .wildcard, .binding => return true,
+        .variant => |vp| return vp.name == variant,
+        .or_pattern => |pats| {
+            for (pats) |*p| {
+                if (self.patternCoversVariant(p, variant)) return true;
+            }
+            return false;
+        },
+        .at_binding => |ab| return self.patternCoversVariant(ab.pattern, variant),
+        else => return false,
+    }
+}
+
+/// Updates has_true/has_false based on bool patterns.
+fn patternCoversBool(self: *Sema, pattern: *const Ast.Pattern, has_true: *bool, has_false: *bool) void {
+    switch (pattern.kind) {
+        .bool_literal => |val| {
+            if (val) has_true.* = true else has_false.* = true;
+        },
+        .or_pattern => |pats| {
+            for (pats) |*p| {
+                self.patternCoversBool(p, has_true, has_false);
+            }
+        },
+        .at_binding => |ab| self.patternCoversBool(ab.pattern, has_true, has_false),
+        else => {},
+    }
 }
 
 fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) void {

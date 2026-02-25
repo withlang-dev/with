@@ -44,6 +44,7 @@ pub fn main() !void {
             var w = std.fs.File.stderr().writer(&buf);
             w.interface.print("compiled: {s}\n", .{p}) catch {};
             w.interface.flush() catch {};
+            driver.printWarnings();
         } else {
             std.process.exit(1);
         }
@@ -165,6 +166,10 @@ pub fn main() !void {
             std.process.exit(1);
         }
         try generateDoc(args[2], allocator);
+    } else if (std.mem.eql(u8, command, "lsp")) {
+        const Lsp = @import("Lsp.zig");
+        var lsp = Lsp.init(allocator);
+        try lsp.run();
     } else if (std.mem.eql(u8, command, "version") or std.mem.eql(u8, command, "--version")) {
         var buf: [256]u8 = undefined;
         var w = std.fs.File.stdout().writer(&buf);
@@ -199,6 +204,7 @@ fn printUsage() void {
         \\  check <file.w>    Parse and type-check a source file
         \\  fmt <file.w>      Format a source file (to stdout)
         \\  repl              Interactive REPL
+        \\  lsp               Start language server (LSP over stdio)
         \\  doc <file.w>      Generate documentation (markdown)
         \\  ir <file.w>       Dump LLVM IR (debug)
         \\  ast <file.w>      Parse and dump the AST (debug)
