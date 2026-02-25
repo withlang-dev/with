@@ -2080,21 +2080,33 @@ fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
         self.scope_local_count += 1;
     }
 
-    // Track enum type for the local (for println support).
-    if (let_b.value.kind == .ident) {
-        const val_sym = let_b.value.kind.ident;
-        // Check if the ident is an enum variant.
-        var eit = self.enum_types.iterator();
-        while (eit.next()) |entry| {
-            for (entry.value_ptr.variant_names) |vn| {
-                if (vn == val_sym) {
-                    self.enum_local_types.put(self.allocator, let_b.name, entry.key_ptr.*) catch {};
-                    break;
-                }
+    // Track enum type for the local (for println/match support).
+    // First: use explicit type annotation if available.
+    var enum_tracked = false;
+    if (let_b.type_expr) |te| {
+        if (te.kind == .named) {
+            if (self.enum_types.get(te.kind.named) != null) {
+                self.enum_local_types.put(self.allocator, let_b.name, te.kind.named) catch {};
+                enum_tracked = true;
             }
         }
-    } else if (let_b.value.kind == .enum_variant) {
-        self.enum_local_types.put(self.allocator, let_b.name, let_b.value.kind.enum_variant.type_name) catch {};
+    }
+    if (!enum_tracked) {
+        if (let_b.value.kind == .ident) {
+            const val_sym = let_b.value.kind.ident;
+            // Check if the ident is an enum variant.
+            var eit = self.enum_types.iterator();
+            while (eit.next()) |entry| {
+                for (entry.value_ptr.variant_names) |vn| {
+                    if (vn == val_sym) {
+                        self.enum_local_types.put(self.allocator, let_b.name, entry.key_ptr.*) catch {};
+                        break;
+                    }
+                }
+            }
+        } else if (let_b.value.kind == .enum_variant) {
+            self.enum_local_types.put(self.allocator, let_b.name, let_b.value.kind.enum_variant.type_name) catch {};
+        }
     }
 
     // Track slice element type if the binding is a slice type.
@@ -3780,12 +3792,22 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
             }
         }
     } else {
-        // Try to find by i32 tag type — scan enum_types for non-payload enums.
-        var it = self.enum_types.iterator();
-        while (it.next()) |entry| {
-            if (entry.value_ptr.llvm_type == subject_type and c.LLVMGetTypeKind(subject_type) == c.LLVMIntegerTypeKind) {
-                enum_info = entry.value_ptr.*;
-                break;
+        // Try to find by tracked enum type (from enum_local_types).
+        if (m.subject.kind == .ident) {
+            if (self.enum_local_types.get(m.subject.kind.ident)) |enum_sym| {
+                if (self.enum_types.get(enum_sym)) |ei| {
+                    enum_info = ei;
+                }
+            }
+        }
+        // Fallback: scan enum_types for non-payload enums with matching type.
+        if (enum_info == null) {
+            var it = self.enum_types.iterator();
+            while (it.next()) |entry| {
+                if (entry.value_ptr.llvm_type == subject_type and c.LLVMGetTypeKind(subject_type) == c.LLVMIntegerTypeKind) {
+                    enum_info = entry.value_ptr.*;
+                    break;
+                }
             }
         }
     }
