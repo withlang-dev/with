@@ -5675,6 +5675,98 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
         }
     }
 
+    // Auto-generated enum accessors: .is_X() -> bool, .as_X() -> ?T
+    if (c.LLVMGetTypeKind(obj_type) == c.LLVMStructTypeKind or
+        c.LLVMGetTypeKind(obj_type) == c.LLVMIntegerTypeKind)
+    {
+        // Find which enum type this is.
+        var found_ei: ?EnumTypeInfo = null;
+        var ei_it = self.enum_types.iterator();
+        while (ei_it.next()) |entry| {
+            if (entry.value_ptr.llvm_type == obj_type) {
+                found_ei = entry.value_ptr.*;
+                break;
+            }
+        }
+        if (found_ei) |ei| {
+            // .is_X() → check tag == variant index
+            if (method_name.len > 3 and std.mem.startsWith(u8, method_name, "is_")) {
+                const variant_name = method_name[3..];
+                const variant_sym = self.pool.intern(variant_name) catch return error.CodegenAlloc;
+                for (ei.variant_names, 0..) |vn, idx| {
+                    if (vn == variant_sym) {
+                        const i32_type = c.LLVMInt32TypeInContext(self.context);
+                        const has_payload = c.LLVMGetTypeKind(obj_type) == c.LLVMStructTypeKind;
+                        const tag = if (has_payload) blk: {
+                            const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "enum");
+                            _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+                            const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+                            break :blk c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+                        } else obj_val;
+                        return c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, @intCast(idx), 0), "is_variant");
+                    }
+                }
+            }
+
+            // .as_X() → if tag matches, return Some(payload); else None
+            if (method_name.len > 3 and std.mem.startsWith(u8, method_name, "as_")) {
+                const variant_name = method_name[3..];
+                const variant_sym = self.pool.intern(variant_name) catch return error.CodegenAlloc;
+                for (ei.variant_names, 0..) |vn, idx| {
+                    if (vn == variant_sym) {
+                        const i32_type = c.LLVMInt32TypeInContext(self.context);
+                        const has_payload = c.LLVMGetTypeKind(obj_type) == c.LLVMStructTypeKind;
+
+                        // Get payload type for this variant.
+                        const payload_type: ?c.LLVMTypeRef = if (idx < ei.variant_payload_types.len)
+                            ei.variant_payload_types[idx]
+                        else
+                            null;
+
+                        if (payload_type) |pt| {
+                            if (!has_payload) return error.UnsupportedExpr;
+
+                            const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "enum");
+                            _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+                            const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+                            const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+                            const is_match = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, @intCast(idx), 0), "is_variant");
+
+                            const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+                            const match_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "as.match");
+                            const nomatch_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "as.nomatch");
+                            const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "as.merge");
+                            _ = c.LLVMBuildCondBr(self.builder, is_match, match_bb, nomatch_bb);
+
+                            // Match: extract payload, wrap in Some.
+                            c.LLVMPositionBuilderAtEnd(self.builder, match_bb);
+                            const payload_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "payload");
+                            const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+                            const payload_val = c.LLVMBuildLoad2(self.builder, pt, payload_ptr, "as.payload");
+                            const some_val = try self.buildOptionSome(payload_val);
+                            const opt_type = c.LLVMTypeOf(some_val);
+                            _ = c.LLVMBuildBr(self.builder, merge_bb);
+
+                            // No match: return None.
+                            c.LLVMPositionBuilderAtEnd(self.builder, nomatch_bb);
+                            const none_val = self.buildOptionNone(opt_type);
+                            _ = c.LLVMBuildBr(self.builder, merge_bb);
+
+                            // Merge.
+                            c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+                            const phi = c.LLVMBuildPhi(self.builder, opt_type, "as.result");
+                            var vals = [_]c.LLVMValueRef{ some_val, none_val };
+                            var bbs = [_]c.LLVMBasicBlockRef{ match_bb, nomatch_bb };
+                            c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+                            return phi;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     // Built-in Vec methods: len(), get(i), is_empty(), push(val), pop().
     if (self.isVecType(obj_type)) {
         if (std.mem.eql(u8, method_name, "len")) {
