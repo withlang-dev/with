@@ -97,6 +97,7 @@ pub const Tag = enum(u8) {
     fat_arrow, // =>
     dot_dot, // ..
     dot_dot_eq, // ..=
+    dot_dot_dot, // ...
     pipe_gt, // |>
     lt_pipe, // <|
     gt_gt, // >>
@@ -255,6 +256,7 @@ pub const Tag = enum(u8) {
             .fat_arrow => "'=>'",
             .dot_dot => "'..'",
             .dot_dot_eq => "'..='",
+            .dot_dot_dot => "'...'",
             .pipe_gt => "'|>'",
             .lt_pipe => "'<|'",
             .gt_gt => "'>>'",

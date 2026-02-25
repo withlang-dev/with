@@ -1,11 +1,78 @@
 const std = @import("std");
 
+const llvm_prefix = "/usr/local/llvm";
+
+/// LLVM static libraries (from: llvm-config --libs core analysis native).
+/// Using inline for so the names stay comptime for string concatenation.
+const llvm_lib_flags = [_][]const u8{
+    "-lLLVMAArch64Disassembler",
+    "-lLLVMMCDisassembler",
+    "-lLLVMAArch64AsmParser",
+    "-lLLVMAArch64CodeGen",
+    "-lLLVMPasses",
+    "-lLLVMIRPrinter",
+    "-lLLVMHipStdPar",
+    "-lLLVMCoroutines",
+    "-lLLVMipo",
+    "-lLLVMInstrumentation",
+    "-lLLVMVectorize",
+    "-lLLVMSandboxIR",
+    "-lLLVMLinker",
+    "-lLLVMFrontendOpenMP",
+    "-lLLVMFrontendDirective",
+    "-lLLVMFrontendAtomic",
+    "-lLLVMFrontendOffloading",
+    "-lLLVMObjectYAML",
+    "-lLLVMGlobalISel",
+    "-lLLVMSelectionDAG",
+    "-lLLVMCFGuard",
+    "-lLLVMAsmPrinter",
+    "-lLLVMCodeGen",
+    "-lLLVMTarget",
+    "-lLLVMScalarOpts",
+    "-lLLVMInstCombine",
+    "-lLLVMAggressiveInstCombine",
+    "-lLLVMObjCARCOpts",
+    "-lLLVMTransformUtils",
+    "-lLLVMCGData",
+    "-lLLVMBitWriter",
+    "-lLLVMAArch64Desc",
+    "-lLLVMCodeGenTypes",
+    "-lLLVMAArch64Utils",
+    "-lLLVMAArch64Info",
+    "-lLLVMAnalysis",
+    "-lLLVMProfileData",
+    "-lLLVMSymbolize",
+    "-lLLVMDebugInfoBTF",
+    "-lLLVMDebugInfoPDB",
+    "-lLLVMDebugInfoMSF",
+    "-lLLVMDebugInfoCodeView",
+    "-lLLVMDebugInfoGSYM",
+    "-lLLVMDebugInfoDWARF",
+    "-lLLVMObject",
+    "-lLLVMTextAPI",
+    "-lLLVMMCParser",
+    "-lLLVMIRReader",
+    "-lLLVMAsmParser",
+    "-lLLVMMC",
+    "-lLLVMDebugInfoDWARFLowLevel",
+    "-lLLVMBitReader",
+    "-lLLVMFrontendHLSL",
+    "-lLLVMCore",
+    "-lLLVMRemarks",
+    "-lLLVMBitstreamReader",
+    "-lLLVMBinaryFormat",
+    "-lLLVMTargetParser",
+    "-lLLVMSupport",
+    "-lLLVMDemangle",
+};
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // --- Compiler executable ---
-    const exe = b.addExecutable(.{
+    // --- Compile Zig source to object file ---
+    const obj = b.addObject(.{
         .name = "with",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
@@ -13,16 +80,42 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    b.installArtifact(exe);
+    obj.root_module.addSystemIncludePath(.{ .cwd_relative = llvm_prefix ++ "/include" });
+    obj.linkLibC();
+
+    // --- Link with LLVM's clang (archives contain LTO bitcode) ---
+    const link_cmd = b.addSystemCommand(&.{llvm_prefix ++ "/bin/clang++"});
+    link_cmd.addArtifactArg(obj);
+    link_cmd.addArgs(&.{
+        "-L" ++ llvm_prefix ++ "/lib",
+        "-isysroot",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+    });
+    link_cmd.addArgs(&llvm_lib_flags);
+    link_cmd.addArgs(&.{
+        "-Wl,-rpath," ++ llvm_prefix ++ "/lib",
+        "-L/opt/homebrew/lib",
+        "-lc++",
+        "-lc++abi",
+        "-lz",
+        "-lzstd",
+        "-lxml2",
+    });
+    link_cmd.addArgs(&.{"-o"});
+    const output = link_cmd.addOutputFileArg("with");
+
+    // --- Install ---
+    const install = b.addInstallBinFile(output, "with");
+    b.getInstallStep().dependOn(&install.step);
 
     // --- Run step (`zig build run -- <args>`) ---
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
     const run_step = b.step("run", "Run the With compiler");
-    run_step.dependOn(&run_cmd.step);
+    const run_installed = b.addSystemCommand(&.{"./zig-out/bin/with"});
+    if (b.args) |args| {
+        run_installed.addArgs(args);
+    }
+    run_installed.step.dependOn(&install.step);
+    run_step.dependOn(&run_installed.step);
 
     // --- Unit tests ---
     const unit_tests = b.addTest(.{
@@ -32,6 +125,8 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+    unit_tests.root_module.addSystemIncludePath(.{ .cwd_relative = llvm_prefix ++ "/include" });
+    unit_tests.linkLibC();
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
     const test_step = b.step("test", "Run unit tests");

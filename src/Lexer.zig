@@ -168,6 +168,10 @@ pub fn next(self: *Lexer) Token {
                             self.pos += 1;
                             return self.makeToken(.dot_dot_eq, start, self.pos);
                         }
+                        if (self.pos < self.source.len and self.source[self.pos] == '.') {
+                            self.pos += 1;
+                            return self.makeToken(.dot_dot_dot, start, self.pos);
+                        }
                         return self.makeToken(.dot_dot, start, self.pos);
                     },
                     'A'...'Z' => return self.lexDotIdentifier(start),
@@ -250,6 +254,31 @@ fn lexString(self: *Lexer, start: u32) Token {
 
 fn lexNumber(self: *Lexer, start: u32) Token {
     var is_float = false;
+    // Check for 0x, 0b, 0o prefixes
+    if (self.source[self.pos] == '0' and self.pos + 1 < self.source.len) {
+        const prefix = self.source[self.pos + 1];
+        if (prefix == 'x' or prefix == 'X') {
+            self.pos += 2; // skip '0x'
+            while (self.pos < self.source.len and (std.ascii.isHex(self.source[self.pos]) or self.source[self.pos] == '_')) {
+                self.pos += 1;
+            }
+            return self.makeToken(.int_literal, start, self.pos);
+        }
+        if (prefix == 'b' or prefix == 'B') {
+            self.pos += 2; // skip '0b'
+            while (self.pos < self.source.len and (self.source[self.pos] == '0' or self.source[self.pos] == '1' or self.source[self.pos] == '_')) {
+                self.pos += 1;
+            }
+            return self.makeToken(.int_literal, start, self.pos);
+        }
+        if (prefix == 'o' or prefix == 'O') {
+            self.pos += 2; // skip '0o'
+            while (self.pos < self.source.len and (self.source[self.pos] >= '0' and self.source[self.pos] <= '7' or self.source[self.pos] == '_')) {
+                self.pos += 1;
+            }
+            return self.makeToken(.int_literal, start, self.pos);
+        }
+    }
     while (self.pos < self.source.len and (std.ascii.isDigit(self.source[self.pos]) or self.source[self.pos] == '_')) {
         self.pos += 1;
     }
@@ -286,8 +315,20 @@ fn skipWhitespace(self: *Lexer) void {
     }
 }
 
-fn isIdentContinue(c: u8) bool {
-    return std.ascii.isAlphanumeric(c) or c == '_';
+fn isIdentContinue(ch: u8) bool {
+    return std.ascii.isAlphanumeric(ch) or ch == '_';
+}
+
+/// Compute the 0-based column of a byte offset by scanning backward for a newline.
+pub fn columnOf(source: []const u8, pos: u32) u32 {
+    var p = pos;
+    while (p > 0) {
+        p -= 1;
+        if (source[p] == '\n') {
+            return pos - p - 1;
+        }
+    }
+    return pos;
 }
 
 fn makeToken(self: *const Lexer, tag: Token.Tag, start: u32, end: u32) Token {

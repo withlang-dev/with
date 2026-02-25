@@ -21,7 +21,16 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
         .function => |f| {
             if (f.is_pub == .public) try writer.writeAll("pub ");
             if (f.is_async) try writer.writeAll("async ");
-            try writer.print("fn {s}(", .{pool.resolve(f.name)});
+            try writer.print("fn {s}", .{pool.resolve(f.name)});
+            if (f.type_params.len > 0) {
+                try writer.writeAll("[");
+                for (f.type_params, 0..) |tp, tpi| {
+                    if (tpi > 0) try writer.writeAll(", ");
+                    try writer.print("{s}", .{pool.resolve(tp)});
+                }
+                try writer.writeAll("]");
+            }
+            try writer.writeAll("(");
             for (f.params, 0..) |p, i| {
                 if (i > 0) try writer.writeAll(", ");
                 if (p.is_mut) try writer.writeAll("mut ");
@@ -41,7 +50,20 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
         },
         .type_decl => |t| {
             if (t.is_pub == .public) try writer.writeAll("pub ");
-            try writer.print("type {s} = ...", .{pool.resolve(t.name)});
+            try writer.print("type {s} = ", .{pool.resolve(t.name)});
+            switch (t.kind) {
+                .struct_def => |fields| {
+                    try writer.writeAll("{ ");
+                    for (fields, 0..) |f, i| {
+                        if (i > 0) try writer.writeAll(", ");
+                        try writer.print("{s}: ", .{pool.resolve(f.name)});
+                        try renderTypeExpr(f.type_expr, pool, writer);
+                    }
+                    try writer.writeAll(" }");
+                },
+                .alias => |a| try renderTypeExpr(a, pool, writer),
+                .enum_def => try writer.writeAll("enum { ... }"),
+            }
         },
         .use_decl => |u| {
             try writer.writeAll("use ");
@@ -70,6 +92,10 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
                     try writer.writeAll(": ");
                     try renderTypeExpr(te, pool, writer);
                 }
+            }
+            if (ef.is_variadic) {
+                if (ef.params.len > 0) try writer.writeAll(", ");
+                try writer.writeAll("...");
             }
             try writer.writeAll(")");
             if (ef.return_type) |rt| {
@@ -184,12 +210,127 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try writer.writeAll(" |> ");
             try renderExpr(p.rhs, pool, writer, 0);
         },
+        .break_expr => try writer.writeAll("break"),
+        .continue_expr => try writer.writeAll("continue"),
+        .loop_expr => |body| {
+            try writer.writeAll("loop:\n");
+            try renderExpr(body, pool, writer, indent + 2);
+        },
+        .for_expr => |f| {
+            try writer.print("for {s} in ", .{pool.resolve(f.binding)});
+            try renderExpr(f.iterable, pool, writer, 0);
+            try writer.writeAll(":\n");
+            try renderExpr(f.body, pool, writer, indent + 2);
+        },
+        .while_expr => |w| {
+            try writer.writeAll("while ");
+            try renderExpr(w.condition, pool, writer, 0);
+            try writer.writeAll(":\n");
+            try renderExpr(w.body, pool, writer, indent + 2);
+        },
+        .array_literal => |elems| {
+            try writer.writeAll("[");
+            for (elems, 0..) |e, i| {
+                if (i > 0) try writer.writeAll(", ");
+                try renderExpr(e, pool, writer, 0);
+            }
+            try writer.writeAll("]");
+        },
+        .struct_literal => |sl| {
+            try writer.print("{s} {{ ", .{pool.resolve(sl.name)});
+            for (sl.fields, 0..) |f, i| {
+                if (i > 0) try writer.writeAll(", ");
+                try writer.print("{s}: ", .{pool.resolve(f.name)});
+                try renderExpr(f.value, pool, writer, 0);
+            }
+            try writer.writeAll(" }");
+        },
         .grouped => |g| {
             try writer.writeAll("(");
             try renderExpr(g, pool, writer, 0);
             try writer.writeAll(")");
         },
+        .match_expr => |m| {
+            try writer.writeAll("match ");
+            try renderExpr(m.subject, pool, writer, 0);
+            try writer.writeAll("\n");
+            for (m.arms) |arm| {
+                try writeIndent(writer, indent + 2);
+                try renderPattern(&arm.pattern, pool, writer);
+                try writer.writeAll(" -> ");
+                try renderExpr(arm.body, pool, writer, 0);
+                try writer.writeAll("\n");
+            }
+        },
+        .cast => |ca| {
+            try renderExpr(ca.expr, pool, writer, 0);
+            try writer.writeAll(" as ");
+            try renderTypeExpr(ca.target_type, pool, writer);
+        },
+        .defer_expr => |d| {
+            try writer.writeAll("defer ");
+            try renderExpr(d, pool, writer, 0);
+        },
+        .closure => |cl| {
+            try writer.writeAll("|");
+            for (cl.params, 0..) |p, i| {
+                if (i > 0) try writer.writeAll(", ");
+                try writer.print("{s}", .{pool.resolve(p)});
+            }
+            try writer.writeAll("| ");
+            try renderExpr(cl.body, pool, writer, 0);
+        },
+        .enum_variant => |ev| {
+            try writer.print("{s}.{s}", .{ pool.resolve(ev.type_name), pool.resolve(ev.variant_name) });
+            if (ev.args.len > 0) {
+                try writer.writeAll("(");
+                for (ev.args, 0..) |a, i| {
+                    if (i > 0) try writer.writeAll(", ");
+                    try renderExpr(a, pool, writer, 0);
+                }
+                try writer.writeAll(")");
+            }
+        },
+        .with_expr => |w| {
+            try writer.writeAll("with ");
+            try renderExpr(w.source, pool, writer, 0);
+            try writer.writeAll(if (w.is_mut) " as mut " else " as ");
+            try writer.print("{s}:\n", .{pool.resolve(w.name)});
+            try renderExpr(w.body, pool, writer, indent + 2);
+        },
+        .record_update => |ru| {
+            try writer.writeAll("{ ");
+            try renderExpr(ru.source, pool, writer, 0);
+            try writer.writeAll(" with ");
+            for (ru.fields, 0..) |f, i| {
+                if (i > 0) try writer.writeAll(", ");
+                try writer.print("{s}: ", .{pool.resolve(f.name)});
+                try renderExpr(f.value, pool, writer, 0);
+            }
+            try writer.writeAll(" }");
+        },
         .poisoned => try writer.writeAll("<poisoned>"),
+    }
+}
+
+fn renderPattern(pat: *const Ast.Pattern, pool: *const InternPool, writer: anytype) !void {
+    switch (pat.kind) {
+        .wildcard => try writer.writeAll("_"),
+        .binding => |s| try writer.print("{s}", .{pool.resolve(s)}),
+        .int_literal => |v| try writer.print("{d}", .{v}),
+        .bool_literal => |v| try writer.writeAll(if (v) "true" else "false"),
+        .string_literal => |s| try writer.print("\"{s}\"", .{pool.resolve(s)}),
+        .variant => |vp| {
+            try writer.print("{s}", .{pool.resolve(vp.name)});
+            if (vp.bindings.len > 0) {
+                try writer.writeAll("(");
+                for (vp.bindings, 0..) |b, i| {
+                    if (i > 0) try writer.writeAll(", ");
+                    try writer.print("{s}", .{pool.resolve(b)});
+                }
+                try writer.writeAll(")");
+            }
+        },
     }
 }
 
@@ -235,6 +376,10 @@ fn renderTypeExpr(te: *const Ast.TypeExpr, pool: *const InternPool, writer: anyt
             try writer.writeAll("?");
             try renderTypeExpr(o, pool, writer);
         },
+        .array_type => |a| {
+            try writer.print("[{d}]", .{a.size});
+            try renderTypeExpr(a.element, pool, writer);
+        },
         .inferred => try writer.writeAll("_"),
     }
 }
@@ -271,6 +416,7 @@ fn unaryOpStr(op: Ast.UnaryOp) []const u8 {
         .negate => "-",
         .not => "not ",
         .ref_of => "&",
+        .mut_ref_of => "&mut ",
         .deref => "*",
         .try_op => "?",
     };

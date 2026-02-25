@@ -45,6 +45,7 @@ pub const Visibility = enum { private, public };
 
 pub const FnDecl = struct {
     name: Symbol,
+    type_params: []const Symbol,
     params: []const Param,
     return_type: ?*const TypeExpr,
     body: *const Expr,
@@ -56,6 +57,7 @@ pub const ExternFnDecl = struct {
     name: Symbol,
     params: []const Param,
     return_type: ?*const TypeExpr,
+    is_variadic: bool,
 };
 
 pub const Param = struct {
@@ -155,6 +157,34 @@ pub const ExprKind = union(enum) {
     pipeline: PipelineExpr,
     /// Grouped expression (parenthesized)
     grouped: *const Expr,
+    /// While loop: `while cond: body`
+    while_expr: WhileExpr,
+    /// Infinite loop: `loop: body`
+    loop_expr: *const Expr,
+    /// For loop: `for x in range: body`
+    for_expr: ForExpr,
+    /// Break out of a loop
+    break_expr,
+    /// Continue to next loop iteration
+    continue_expr,
+    /// Array literal: `[1, 2, 3]`
+    array_literal: []const *const Expr,
+    /// Struct literal: `Point { x: 1, y: 2 }`
+    struct_literal: StructLiteral,
+    /// Match expression: `match expr { pattern -> body, ... }`
+    match_expr: MatchExpr,
+    /// Enum variant constructor: `Color.Red` or `Shape.Circle(5.0)`
+    enum_variant: EnumVariantExpr,
+    /// Closure: `|a, b| a + b`
+    closure: ClosureExpr,
+    /// Type cast: `x as i64`
+    cast: CastExpr,
+    /// Defer: `defer expr`
+    defer_expr: *const Expr,
+    /// With expression: `with expr as [mut] name: body`
+    with_expr: WithExpr,
+    /// Record update: `{ expr with field: val, ... }`
+    record_update: RecordUpdateExpr,
     /// Poisoned — parse error placeholder
     poisoned,
 };
@@ -199,6 +229,7 @@ pub const UnaryOp = enum {
     negate,
     not,
     ref_of, // &expr
+    mut_ref_of, // &mut expr
     deref, // *expr
     try_op, // expr?
 };
@@ -248,9 +279,108 @@ pub const RangeExpr = struct {
     inclusive: bool,
 };
 
+pub const WhileExpr = struct {
+    condition: *const Expr,
+    body: *const Expr,
+};
+
+pub const ForExpr = struct {
+    binding: Symbol,
+    iterable: *const Expr,
+    body: *const Expr,
+};
+
+pub const StructLiteral = struct {
+    name: Symbol,
+    fields: []const FieldInit,
+};
+
+pub const FieldInit = struct {
+    name: Symbol,
+    value: *const Expr,
+    span: Span,
+};
+
 pub const PipelineExpr = struct {
     lhs: *const Expr,
     rhs: *const Expr,
+};
+
+pub const MatchExpr = struct {
+    subject: *const Expr,
+    arms: []const MatchArm,
+};
+
+pub const MatchArm = struct {
+    pattern: Pattern,
+    body: *const Expr,
+    span: Span,
+};
+
+pub const Pattern = struct {
+    kind: PatternKind,
+    span: Span,
+};
+
+pub const PatternKind = union(enum) {
+    /// Wildcard: `_`
+    wildcard,
+    /// Variable binding: `x`
+    binding: Symbol,
+    /// Integer literal: `42`
+    int_literal: i64,
+    /// Bool literal: `true`, `false`
+    bool_literal: bool,
+    /// String literal: `"hello"`
+    string_literal: Symbol,
+    /// Enum variant pattern: `Circle(r)` or `None`
+    variant: VariantPattern,
+};
+
+pub const VariantPattern = struct {
+    /// The variant name (e.g. `Circle`, `None`)
+    name: Symbol,
+    /// Payload bindings (e.g. the `r` in `Circle(r)`)
+    bindings: []const Symbol,
+};
+
+pub const EnumVariantExpr = struct {
+    /// The enum type name (e.g. `Color`)
+    type_name: Symbol,
+    /// The variant name (e.g. `Red`)
+    variant_name: Symbol,
+    /// Arguments (e.g. `5.0` in `Circle(5.0)`)
+    args: []const *const Expr,
+};
+
+pub const ClosureExpr = struct {
+    params: []const Symbol,
+    body: *const Expr,
+};
+
+pub const CastExpr = struct {
+    expr: *const Expr,
+    target_type: *const TypeExpr,
+};
+
+pub const WithExpr = struct {
+    /// The expression being bound: `with THIS as name: body`
+    source: *const Expr,
+    /// The binding name
+    name: Symbol,
+    /// Whether the binding is mutable (Form 2: builder pattern)
+    is_mut: bool,
+    /// The body expression
+    body: *const Expr,
+};
+
+pub const RecordUpdateExpr = struct {
+    /// The source expression: `{ THIS with field: val }`
+    source: *const Expr,
+    /// The struct type name (inferred from source)
+    type_name: Symbol,
+    /// Field overrides
+    fields: []const FieldInit,
 };
 
 // ── Type Expressions ─────────────────────────────────────────────
@@ -276,6 +406,8 @@ pub const TypeExprKind = union(enum) {
     tuple_type: []const *const TypeExpr,
     /// Optional: `?T`
     optional: *const TypeExpr,
+    /// Array type: `[N]T`
+    array_type: ArrayTypeExpr,
     /// Inferred (no annotation, placeholder for type checker)
     inferred,
 };
@@ -298,4 +430,9 @@ pub const PtrTypeExpr = struct {
 pub const FnTypeExpr = struct {
     params: []const *const TypeExpr,
     return_type: *const TypeExpr,
+};
+
+pub const ArrayTypeExpr = struct {
+    size: u64,
+    element: *const TypeExpr,
 };
