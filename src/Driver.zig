@@ -240,18 +240,38 @@ pub fn buildBinary(self: *Driver, source_path: []const u8) !?[]const u8 {
     const uses_async = try self.compileToObject(&module, obj_buf[0..obj_path.len :0]);
     if (uses_async == null) return null;
 
-    // If async is used, find and link the fiber runtime objects.
+    // Find runtime objects relative to the compiler binary.
+    const exe_dir = self.findExeDir();
+
+    // Always link helpers.o (stdlib C wrappers).
+    var helpers_buf: [4096]u8 = undefined;
+    const helpers_path = if (exe_dir) |ed|
+        std.fmt.bufPrint(&helpers_buf, "{s}/runtime/helpers.o", .{ed}) catch null
+    else
+        null;
+
+    // If async is used, also link the fiber runtime objects.
     const link_ok = if (uses_async.?) blk: {
-        // Find runtime objects relative to the compiler binary.
-        const exe_dir = self.findExeDir() orelse {
-            break :blk try linkWithExtra(obj_path, bin_path, &.{});
+        const ed = exe_dir orelse {
+            if (helpers_path) |hp| {
+                break :blk try linkWithExtra(obj_path, bin_path, &.{hp});
+            }
+            break :blk try link(obj_path, bin_path);
         };
         var rt1_buf: [4096]u8 = undefined;
         var rt2_buf: [4096]u8 = undefined;
-        const rt1 = std.fmt.bufPrint(&rt1_buf, "{s}/runtime/fiber.o", .{exe_dir}) catch break :blk try linkWithExtra(obj_path, bin_path, &.{});
-        const rt2 = std.fmt.bufPrint(&rt2_buf, "{s}/runtime/fiber_asm.o", .{exe_dir}) catch break :blk try linkWithExtra(obj_path, bin_path, &.{});
+        const rt1 = std.fmt.bufPrint(&rt1_buf, "{s}/runtime/fiber.o", .{ed}) catch break :blk try link(obj_path, bin_path);
+        const rt2 = std.fmt.bufPrint(&rt2_buf, "{s}/runtime/fiber_asm.o", .{ed}) catch break :blk try link(obj_path, bin_path);
+        if (helpers_path) |hp| {
+            break :blk try linkWithExtra(obj_path, bin_path, &.{ rt1, rt2, hp });
+        }
         break :blk try linkWithExtra(obj_path, bin_path, &.{ rt1, rt2 });
-    } else try link(obj_path, bin_path);
+    } else blk: {
+        if (helpers_path) |hp| {
+            break :blk try linkWithExtra(obj_path, bin_path, &.{hp});
+        }
+        break :blk try link(obj_path, bin_path);
+    };
 
     if (!link_ok) {
         self.writeStderr("error: linking failed\n");

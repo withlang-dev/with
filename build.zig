@@ -126,6 +126,17 @@ pub fn build(b: *std.Build) void {
     });
     const fiber_asm_out = fiber_asm.addOutputFileArg("fiber_asm.o");
 
+    // Compile runtime helpers.
+    const helpers_c = b.addSystemCommand(&.{
+        "cc",
+        "-isysroot",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-c",
+        "runtime/helpers.c",
+        "-o",
+    });
+    const helpers_c_out = helpers_c.addOutputFileArg("helpers.o");
+
     // --- Install ---
     const install = b.addInstallBinFile(output, "with");
     b.getInstallStep().dependOn(&install.step);
@@ -133,8 +144,10 @@ pub fn build(b: *std.Build) void {
     // Install runtime objects alongside the compiler.
     const install_fiber_c = b.addInstallBinFile(fiber_c_out, "runtime/fiber.o");
     const install_fiber_asm = b.addInstallBinFile(fiber_asm_out, "runtime/fiber_asm.o");
+    const install_helpers = b.addInstallBinFile(helpers_c_out, "runtime/helpers.o");
     b.getInstallStep().dependOn(&install_fiber_c.step);
     b.getInstallStep().dependOn(&install_fiber_asm.step);
+    b.getInstallStep().dependOn(&install_helpers.step);
 
     // --- Run step (`zig build run -- <args>`) ---
     const run_step = b.step("run", "Run the With compiler");
