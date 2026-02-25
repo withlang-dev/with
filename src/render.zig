@@ -453,6 +453,33 @@ fn renderPattern(pat: *const Ast.Pattern, pool: *const InternPool, writer: anyty
                 try writer.print("{}..{}", .{ rp.start, rp.end });
             }
         },
+        .slice_pattern => |sp| {
+            try writer.writeAll("[");
+            for (sp.head, 0..) |sym, j| {
+                if (j > 0) try writer.writeAll(", ");
+                if (sym == 0) {
+                    try writer.writeAll("_");
+                } else {
+                    try writer.print("{s}", .{pool.resolve(sym)});
+                }
+            }
+            if (sp.has_rest) {
+                if (sp.head.len > 0) try writer.writeAll(", ");
+                try writer.writeAll("..");
+                if (sp.rest != 0) {
+                    try writer.print("{s}", .{pool.resolve(sp.rest)});
+                }
+            }
+            for (sp.tail, 0..) |sym, j| {
+                if (j > 0 or sp.has_rest or sp.head.len > 0) try writer.writeAll(", ");
+                if (sym == 0) {
+                    try writer.writeAll("_");
+                } else {
+                    try writer.print("{s}", .{pool.resolve(sym)});
+                }
+            }
+            try writer.writeAll("]");
+        },
     }
 }
 

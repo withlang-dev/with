@@ -7172,6 +7172,18 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
     const subject = try self.genExpr(m.subject);
     const subject_type = c.LLVMTypeOf(subject);
 
+    // Check if any arm uses slice patterns — use array/vec match path.
+    var has_slice = false;
+    for (m.arms) |arm| {
+        if (arm.pattern.kind == .slice_pattern) {
+            has_slice = true;
+            break;
+        }
+    }
+    if (has_slice) {
+        return self.genSliceMatch(m, subject, subject_type);
+    }
+
     // Determine if this is an enum match or an integer/value match.
     const is_enum_struct = c.LLVMGetTypeKind(subject_type) == c.LLVMStructTypeKind and !self.isStrType(subject_type);
 
@@ -7431,6 +7443,149 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
+/// Generate a match on arrays/vecs with slice patterns.
+/// Uses if-else chain comparing lengths rather than switch on tags.
+fn genSliceMatch(self: *Codegen, m: Ast.MatchExpr, subject: c.LLVMValueRef, subject_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    // Get the array length and element pointer.
+    var arr_len: c.LLVMValueRef = undefined;
+    var arr_ptr: c.LLVMValueRef = undefined;
+    var elem_type: c.LLVMTypeRef = undefined;
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+
+    if (c.LLVMGetTypeKind(subject_type) == c.LLVMArrayTypeKind) {
+        // Fixed-size array: [T; N]
+        const arr_len_const: u64 = c.LLVMGetArrayLength2(subject_type);
+        arr_len = c.LLVMConstInt(i64_type, arr_len_const, 0);
+        elem_type = c.LLVMGetElementType(subject_type);
+        // Store array to get a pointer for GEP.
+        const tmp = c.LLVMBuildAlloca(self.builder, subject_type, "arr.tmp");
+        _ = c.LLVMBuildStore(self.builder, subject, tmp);
+        arr_ptr = tmp;
+    } else if (self.isVecType(subject_type)) {
+        // Vec: { ptr, len, cap }
+        const tmp = c.LLVMBuildAlloca(self.builder, subject_type, "vec.tmp");
+        _ = c.LLVMBuildStore(self.builder, subject, tmp);
+        const len_gep = c.LLVMBuildStructGEP2(self.builder, subject_type, tmp, 1, "len.ptr");
+        arr_len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "vec.len");
+        const ptr_gep = c.LLVMBuildStructGEP2(self.builder, subject_type, tmp, 0, "ptr.ptr");
+        arr_ptr = c.LLVMBuildLoad2(self.builder, c.LLVMPointerTypeInContext(self.context, 0), ptr_gep, "vec.ptr");
+        elem_type = c.LLVMInt32TypeInContext(self.context); // default; could detect
+    } else {
+        return error.UnsupportedExpr;
+    }
+
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "slice.end");
+    var arm_vals_buf: [64]c.LLVMValueRef = undefined;
+    var arm_from_bbs_buf: [64]c.LLVMBasicBlockRef = undefined;
+    var arm_count: u32 = 0;
+    const is_fixed_arr = c.LLVMGetTypeKind(subject_type) == c.LLVMArrayTypeKind;
+
+    for (m.arms) |arm| {
+        const arm_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "slice.arm");
+        const next_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "slice.next");
+
+        switch (arm.pattern.kind) {
+            .slice_pattern => |sp| {
+                const min_required: u64 = @intCast(sp.head.len + sp.tail.len);
+                const min_val = c.LLVMConstInt(i64_type, min_required, 0);
+                const cond = if (sp.has_rest)
+                    // [a, ..rest] matches len >= head.len + tail.len
+                    c.LLVMBuildICmp(self.builder, c.LLVMIntSGE, arr_len, min_val, "len.ge")
+                else
+                    // [a, b] matches len == head.len
+                    c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, arr_len, min_val, "len.eq");
+                _ = c.LLVMBuildCondBr(self.builder, cond, arm_bb, next_bb);
+
+                c.LLVMPositionBuilderAtEnd(self.builder, arm_bb);
+
+                // Bind head elements.
+                for (sp.head, 0..) |bind_sym, idx| {
+                    if (bind_sym == 0) continue; // wildcard _
+                    const idx_val = c.LLVMConstInt(i64_type, @intCast(idx), 0);
+                    const elem_val = if (is_fixed_arr) blk: {
+                        var indices = [_]c.LLVMValueRef{
+                            c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0),
+                            c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), @intCast(idx), 0),
+                        };
+                        const gep = c.LLVMBuildGEP2(self.builder, subject_type, arr_ptr, &indices, 2, "elem.ptr");
+                        break :blk c.LLVMBuildLoad2(self.builder, elem_type, gep, "elem");
+                    } else blk: {
+                        var vec_idx = [_]c.LLVMValueRef{idx_val};
+                        const gep = c.LLVMBuildGEP2(self.builder, elem_type, arr_ptr, &vec_idx, 1, "elem.ptr");
+                        break :blk c.LLVMBuildLoad2(self.builder, elem_type, gep, "elem");
+                    };
+                    const ea = c.LLVMBuildAlloca(self.builder, elem_type, "");
+                    _ = c.LLVMBuildStore(self.builder, elem_val, ea);
+                    self.locals.put(self.allocator, bind_sym, .{
+                        .alloca = ea,
+                        .ty = elem_type,
+                        .is_mut = false,
+                    }) catch return error.CodegenAlloc;
+                }
+
+                // Bind rest as array length.
+                if (sp.has_rest and sp.rest != 0) {
+                    // rest = arr_len - head.len - tail.len
+                    const head_count = c.LLVMConstInt(i64_type, @intCast(sp.head.len), 0);
+                    const tail_count = c.LLVMConstInt(i64_type, @intCast(sp.tail.len), 0);
+                    const rest_len = c.LLVMBuildSub(self.builder, arr_len, c.LLVMBuildAdd(self.builder, head_count, tail_count, ""), "rest.len");
+                    const ra = c.LLVMBuildAlloca(self.builder, i64_type, "rest");
+                    _ = c.LLVMBuildStore(self.builder, rest_len, ra);
+                    self.locals.put(self.allocator, sp.rest, .{
+                        .alloca = ra,
+                        .ty = i64_type,
+                        .is_mut = false,
+                    }) catch return error.CodegenAlloc;
+                }
+            },
+            .wildcard => {
+                // Wildcard matches anything.
+                _ = c.LLVMBuildBr(self.builder, arm_bb);
+                c.LLVMPositionBuilderAtEnd(self.builder, arm_bb);
+            },
+            .binding => |sym| {
+                _ = c.LLVMBuildBr(self.builder, arm_bb);
+                c.LLVMPositionBuilderAtEnd(self.builder, arm_bb);
+                const ba = c.LLVMBuildAlloca(self.builder, subject_type, "");
+                _ = c.LLVMBuildStore(self.builder, subject, ba);
+                self.locals.put(self.allocator, sym, .{
+                    .alloca = ba,
+                    .ty = subject_type,
+                    .is_mut = false,
+                }) catch return error.CodegenAlloc;
+            },
+            else => {
+                _ = c.LLVMBuildBr(self.builder, arm_bb);
+                c.LLVMPositionBuilderAtEnd(self.builder, arm_bb);
+            },
+        }
+
+        const arm_val = try self.genExpr(arm.body);
+        arm_vals_buf[arm_count] = arm_val;
+        arm_from_bbs_buf[arm_count] = c.LLVMGetInsertBlock(self.builder);
+        arm_count += 1;
+        _ = c.LLVMBuildBr(self.builder, merge_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, next_bb);
+    }
+
+    // After all arms, unreachable.
+    _ = c.LLVMBuildUnreachable(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+
+    if (arm_count > 0) {
+        const result_type = c.LLVMTypeOf(arm_vals_buf[0]);
+        if (result_type == c.LLVMVoidTypeInContext(self.context)) {
+            return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+        }
+        const phi = c.LLVMBuildPhi(self.builder, result_type, "slice.result");
+        c.LLVMAddIncoming(phi, &arm_vals_buf, &arm_from_bbs_buf, arm_count);
+        return phi;
+    }
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
 fn isResultType(self: *Codegen, ty: c.LLVMTypeRef) bool {
     var it = self.result_type_cache.iterator();
     while (it.next()) |entry| {
@@ -7474,6 +7629,7 @@ fn addMatchCase(self: *Codegen, sw: c.LLVMValueRef, pattern: Ast.Pattern, tag_va
         },
         .wildcard, .binding => {},
         .string_literal => {},
+        .slice_pattern => {}, // handled in genSliceMatch
     }
 }
 

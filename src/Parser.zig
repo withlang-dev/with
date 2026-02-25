@@ -1805,11 +1805,11 @@ fn parseMatchExpr(self: *Parser) !*const Ast.Expr {
 
     // Parse arms: `pattern -> body` separated by newlines
     while (self.peek() != .eof) {
-        // Check if we are still at a match arm (identifier, int literal, underscore, dot_identifier, true/false)
+        // Check if we are still at a match arm (identifier, int literal, underscore, dot_identifier, true/false, [ for slice patterns)
         const tag = self.peek();
         if (tag != .identifier and tag != .int_literal and
             tag != .dot_identifier and tag != .true_literal and tag != .false_literal and
-            tag != .string_literal and tag != .minus)
+            tag != .string_literal and tag != .minus and tag != .l_bracket)
         {
             break;
         }
@@ -1870,7 +1870,7 @@ fn parseMatchExpr(self: *Parser) !*const Ast.Expr {
         const next_tag = self.peek();
         const is_arm_token = (next_tag == .identifier or next_tag == .int_literal or
             next_tag == .dot_identifier or next_tag == .true_literal or next_tag == .false_literal or
-            next_tag == .string_literal or next_tag == .minus);
+            next_tag == .string_literal or next_tag == .minus or next_tag == .l_bracket);
         if (!is_arm_token) {
             self.pos = save;
             break;
@@ -2028,6 +2028,65 @@ fn parsePattern(self: *Parser) !Ast.Pattern {
                     .bindings = &.{},
                 } },
                 .span = span,
+            };
+        },
+        .l_bracket => {
+            // Slice pattern: [a, b, ..rest]
+            self.advance(); // consume '['
+            var head: std.ArrayList(Ast.Symbol) = .empty;
+            var tail: std.ArrayList(Ast.Symbol) = .empty;
+            var rest: Ast.Symbol = 0;
+            var has_rest = false;
+            var in_tail = false;
+
+            while (self.peek() != .r_bracket and self.peek() != .eof) {
+                // Check for `..` or `..name` (rest pattern)
+                if (self.peek() == .dot_dot or self.peek() == .dot_dot_eq) {
+                    has_rest = true;
+                    self.advance(); // consume ..
+                    // Optional rest binding name
+                    if (self.peek() == .identifier) {
+                        rest = try self.expectIdentifier();
+                    }
+                    in_tail = true;
+                    if (self.peek() == .comma) self.advance();
+                    self.skipNewlines();
+                    continue;
+                }
+                if (self.peek() == .identifier) {
+                    const name = try self.expectIdentifier();
+                    const name_str = self.pool.resolve(name);
+                    // Check for `_` wildcard — use 0 symbol
+                    if (std.mem.eql(u8, name_str, "_")) {
+                        if (in_tail) {
+                            try tail.append(self.arena, 0);
+                        } else {
+                            try head.append(self.arena, 0);
+                        }
+                    } else {
+                        if (in_tail) {
+                            try tail.append(self.arena, name);
+                        } else {
+                            try head.append(self.arena, name);
+                        }
+                    }
+                } else {
+                    break;
+                }
+                if (self.peek() == .comma) {
+                    self.advance();
+                    self.skipNewlines();
+                }
+            }
+            try self.expect(.r_bracket);
+            return .{
+                .kind = .{ .slice_pattern = .{
+                    .head = head.items,
+                    .rest = rest,
+                    .has_rest = has_rest,
+                    .tail = tail.items,
+                } },
+                .span = span.merge(self.prevSpan()),
             };
         },
         else => {
