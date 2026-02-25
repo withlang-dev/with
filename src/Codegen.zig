@@ -787,6 +787,26 @@ fn genDynDispatch(self: *Codegen, fat_ptr: c.LLVMValueRef, trait_sym: u32, metho
     );
 }
 
+/// Look up a Display method (Type.display or Type.to_string) for a type.
+fn findDisplayMethod(self: *Codegen, type_sym: u32) ?FnInfo {
+    const type_name = self.pool.resolve(type_sym);
+    // Try "Type.display" first, then "Type.to_string".
+    const suffixes = [_][]const u8{ ".display", ".to_string" };
+    for (suffixes) |suffix| {
+        var name_buf: [512]u8 = undefined;
+        if (type_name.len + suffix.len < name_buf.len) {
+            @memcpy(name_buf[0..type_name.len], type_name);
+            @memcpy(name_buf[type_name.len..][0..suffix.len], suffix);
+            const mangled = name_buf[0 .. type_name.len + suffix.len];
+            const fn_sym = self.pool.intern(mangled) catch return null;
+            if (self.functions.get(fn_sym)) |fn_info| {
+                return fn_info;
+            }
+        }
+    }
+    return null;
+}
+
 /// Find the type symbol for a concrete LLVM type.
 fn findTypeSymbol(self: *Codegen, llvm_type: c.LLVMTypeRef) ?u32 {
     var it = self.struct_types.iterator();
@@ -4296,7 +4316,33 @@ fn genPrintValue(self: *Codegen, val: c.LLVMValueRef, printf_info: FnInfo) Error
         }
         fmt = "%g";
     } else if (kind == c.LLVMStructTypeKind) {
-        // Print struct: TypeName { field1: val1, field2: val2 }
+        // Check for Display trait: Type.display(self) -> str or Type.to_string(self) -> str
+        if (self.findTypeSymbol(ty)) |type_sym| {
+            if (self.findDisplayMethod(type_sym)) |display_fn| {
+                // Call Type.display(val) → get str result, print it.
+                var call_args = [_]c.LLVMValueRef{val};
+                const result = c.LLVMBuildCall2(
+                    self.builder,
+                    display_fn.fn_type,
+                    display_fn.value,
+                    &call_args,
+                    1,
+                    "display",
+                );
+                const result_type = c.LLVMTypeOf(result);
+                if (self.isStrType(result_type)) {
+                    const str_ptr = self.extractStrPtr(result);
+                    const s_fmt = c.LLVMBuildGlobalStringPtr(self.builder, "%s", "fmt");
+                    var s_args = [_]c.LLVMValueRef{ s_fmt, str_ptr };
+                    _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &s_args, 2, "");
+                } else {
+                    // Non-str return — print the result value.
+                    try self.genPrintValue(result, printf_info);
+                }
+                return;
+            }
+        }
+        // Default: print struct fields.
         try self.genPrintStruct(val, ty, printf_info);
         return;
     }
