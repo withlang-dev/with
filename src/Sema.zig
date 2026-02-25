@@ -1492,6 +1492,37 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
             self.checkPattern(ab.pattern, subject_type);
         },
         .range_pattern => {},
+        .slice_pattern => |sp| {
+            // Bind head element names.
+            for (sp.head) |sym| {
+                if (sym == 0) continue; // wildcard
+                self.current_scope.put(self.allocator, sym, .{
+                    .type_id = self.ty_i32, // element type (simplified)
+                    .is_mut = false,
+                    .state = .live,
+                    .span = pattern.span,
+                });
+            }
+            // Bind rest as i64 (length of remaining elements).
+            if (sp.has_rest and sp.rest != 0) {
+                self.current_scope.put(self.allocator, sp.rest, .{
+                    .type_id = self.ty_i64,
+                    .is_mut = false,
+                    .state = .live,
+                    .span = pattern.span,
+                });
+            }
+            // Bind tail element names.
+            for (sp.tail) |sym| {
+                if (sym == 0) continue;
+                self.current_scope.put(self.allocator, sym, .{
+                    .type_id = self.ty_i32,
+                    .is_mut = false,
+                    .state = .live,
+                    .span = pattern.span,
+                });
+            }
+        },
     }
 }
 

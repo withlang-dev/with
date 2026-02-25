@@ -423,12 +423,25 @@ pub const PatternKind = union(enum) {
     at_binding: AtBinding,
     /// Range pattern: `1..=5` or `1..5`
     range_pattern: RangePattern,
+    /// Slice pattern: `[a, b, ..rest]`, `[]`, `[only]`
+    slice_pattern: SlicePattern,
 };
 
 pub const RangePattern = struct {
     start: i64,
     end: i64,
     inclusive: bool,
+};
+
+pub const SlicePattern = struct {
+    /// Fixed element bindings at the start of the slice
+    head: []const Symbol,
+    /// Optional rest/spread binding: `..rest` (0 = no rest binding)
+    rest: Symbol = 0,
+    /// Whether there's a `..` (with or without a binding name)
+    has_rest: bool = false,
+    /// Fixed element bindings after the `..rest` (tail elements)
+    tail: []const Symbol = &.{},
 };
 
 pub const AtBinding = struct {
