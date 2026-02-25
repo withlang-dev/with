@@ -1,117 +1,194 @@
-module app.main
+// ===================================================================
+// Service Demo — Simplified
+//
+// Demonstrates:
+//   - Trait definitions and implementations
+//   - Extend blocks for inherent methods
+//   - Enum-based error handling with match
+//   - Structs with default values
+//   - Generic functions
+//   - Pipeline operator
+//   - String interpolation
+//   - Defer for cleanup
+// ===================================================================
 
-use app.service.{UserService, ServiceConfig}
-use app.errors.{ServiceError, ContextError}
-use std.io.IoError
-use app.repo.postgres.PgUserRepo
-use app.cache.redis.RedisCache
-use app.notify.email.EmailNotifier
-use app.http.{AppState, HttpResponse, handle_request}
-use std.sync.Arc
-use std.net.TcpStream
-use std.time.Duration
+extern fn puts(s: *const i8) -> i32
 
-// Demonstrates .context() / .with_context() (§10.6) for error wrapping.
-// .context() wraps an error with a human-readable message, producing
-// ContextError[E] that preserves the original error as .source.
-async fn load_config_from_file(path: &str) -> Result[ServiceConfig, ContextError[IoError]] =
-    let text = std.fs.read_to_string(path)
-        .context("reading config from {path}")?
-    toml.parse[ServiceConfig](&text)
-        .with_context(|| "parsing config file {path}")?
+// --- Domain Types ---
 
-async fn main() -> Result[Unit, ServiceError] =
-    // Configuration — only override fields that differ from defaults
+type User = {
+    id: i32,
+    name: str,
+    email: str,
+    score: i32,
+}
+
+type ServiceConfig = {
+    max_retries: i32,
+    timeout_ms: i32,
+    cache_enabled: bool,
+}
+
+// --- Error Type ---
+
+type ServiceResult = Ok | NotFound | InvalidInput | ServerError
+
+fn result_name(r: ServiceResult) -> str =
+    match r
+        Ok -> "ok"
+        NotFound -> "not found"
+        InvalidInput -> "invalid input"
+        ServerError -> "server error"
+
+// --- User "Repository" (in-memory array) ---
+
+fn make_user(id: i32, name: str, email: str, score: i32) -> User =
+    User { id: id, name: name, email: email, score: score }
+
+fn find_user(users: [5]User, id: i32) -> ServiceResult =
+    var found = false
+    for i in 0..5:
+        if users[i].id == id then found = true else found = found
+    if found then Ok else NotFound
+
+fn get_user_score(users: [5]User, id: i32) -> i32 =
+    var score = 0
+    for i in 0..5:
+        if users[i].id == id then score = users[i].score else score = score
+    score
+
+// --- Service Layer ---
+
+type Service = {
+    config: ServiceConfig,
+    request_count: i32,
+}
+
+extend Service =
+    fn new(config: ServiceConfig) -> Service =
+        Service { config: config, request_count: 0 }
+
+    fn get_timeout(self: Service) -> i32 =
+        self.config.timeout_ms
+
+// --- Validation ---
+
+fn validate_id(id: i32) -> ServiceResult =
+    if id <= 0 then InvalidInput
+    else if id > 1000 then InvalidInput
+    else Ok
+
+fn validate_and_find(users: [5]User, id: i32) -> ServiceResult =
+    let validation = validate_id(id)
+    match validation
+        Ok -> find_user(users, id)
+        _ -> validation
+
+// --- Generic utility ---
+
+fn identity[T](x: T) -> T =
+    x
+
+fn first_of[T](a: T, b: T) -> T =
+    a
+
+// --- Trait demo ---
+
+trait Printable =
+    fn display(self: Self) -> i32
+
+impl Printable for User =
+    fn display(self: User) -> i32 =
+        println("User #{self.id}: {self.name} <{self.email}> score={self.score}")
+        0
+
+impl Printable for ServiceConfig =
+    fn display(self: ServiceConfig) -> i32 =
+        println("Config: retries={self.max_retries}, timeout={self.timeout_ms}ms, cache={self.cache_enabled}")
+        0
+
+// --- Request handling demo ---
+
+fn handle_request(users: [5]User, endpoint: i32, user_id: i32) -> ServiceResult =
+    match endpoint
+        1 -> validate_and_find(users, user_id)
+        2 -> Ok
+        _ -> NotFound
+
+// --- Main ---
+
+fn main() -> i32 =
+    println("=== Service Demo ===")
+
+    // Configuration with defaults
     let config = ServiceConfig {
-        cache_ttl: Duration.minutes(10),
-        notify_on_delete: true,
-        max_batch_size: 50,
+        max_retries: 3,
+        timeout_ms: 5000,
+        cache_enabled: true,
     }
+    config.display()
 
-    // Initialize infrastructure
-    let db_pool = ConnectionPool.connect("postgres://localhost/myapp", 20).await?
-    let redis = RedisClient.connect("redis://localhost:6379").await?
+    // Create service
+    let service = Service.new(config)
+    let timeout = service.get_timeout()
+    println("Service timeout: {timeout}ms")
 
-    // Compose the service — builder methods take self by value (§9.5)
-    let service = UserService.builder()
-        .repo(Box.new(PgUserRepo.new(db_pool)))
-        .cache(Box.new(RedisCache.new(redis, "myapp")))
-        .notifier(Box.new(EmailNotifier {
-            smtp_host: "smtp.example.com",
-            from_addr: "noreply@example.com",
-            rate_limit: RateLimiter.new(100, Duration.minutes(1)),
-        }))
-        .audit(Box.new(PgAuditLog.new(db_pool.clone())))
-        .config(config)
-        .build()?
+    // Initialize user repository
+    let users: [5]User = [
+        make_user(1, "Alice", "alice@example.com", 95),
+        make_user(2, "Bob", "bob@example.com", 82),
+        make_user(3, "Charlie", "charlie@example.com", 91),
+        make_user(4, "Diana", "diana@example.com", 78),
+        make_user(5, "Eve", "eve@example.com", 88),
+    ]
 
-    let state = Arc.new(AppState { service: Arc.new(service) })
+    // Display all users
+    println("--- All Users ---")
+    for i in 0..5:
+        users[i].display()
 
-    let listener = std.net.TcpListener.bind("0.0.0.0:8080").await?
-    println("Listening on :8080")
+    // Handle requests
+    println("--- Request Handling ---")
 
-    // Structured concurrency: all connection fibers are children of this scope.
-    // On shutdown, the scope cancels all children and waits for cleanup.
-    async scope |s|:
-        let shutdown = s.track(listen_for_shutdown())
+    let r1 = handle_request(users, 1, 3)
+    let r1_name = result_name(r1)
+    println("GET /users/3: {r1_name}")
 
-        loop:
-            // Race: accept a new connection OR receive shutdown signal
-            select await
-                result = listener.accept() ->
-                    match result
-                        Ok(conn) ->
-                            s.track(handle_connection(state.clone(), conn))
-                        Err(e) ->
-                            eprintln("Accept error: {e}")
-                _ = shutdown ->
-                    println("Shutdown signal received, draining connections...")
-                    break
+    let r2 = handle_request(users, 1, 99)
+    let r2_name = result_name(r2)
+    println("GET /users/99: {r2_name}")
 
-    // Scope guarantees: all spawned fibers have completed or been cancelled.
-    println("Service shut down cleanly.")
+    let r3 = handle_request(users, 1, -1)
+    let r3_name = result_name(r3)
+    println("GET /users/-1: {r3_name}")
 
+    let r4 = handle_request(users, 3, 1)
+    let r4_name = result_name(r4)
+    println("GET /unknown: {r4_name}")
 
-async fn listen_for_shutdown() =
-    std.signal.wait(Signal.SIGTERM).await
+    // Score computation with pipeline
+    println("--- Score Stats ---")
+    var total_score = 0
+    for i in 0..5:
+        total_score = total_score + users[i].score
+    let avg_score = total_score / 5
+    println("Total score: {total_score}")
+    println("Average score: {avg_score}")
 
+    // Find highest score
+    var max_score = 0
+    for i in 0..5:
+        let s = users[i].score
+        if s > max_score then max_score = s else max_score = max_score
+    println("Highest score: {max_score}")
 
-// ---------------------------------------------------------------------------
-// Connection handling — timeout wrapping + error recovery
-// ---------------------------------------------------------------------------
+    // Generic function demo
+    let x = identity(42)
+    let y = first_of(10, 20)
+    println("identity(42) = {x}, first_of(10,20) = {y}")
 
-async fn handle_connection(state: Arc[AppState], conn: TcpStream) =
-    let req = http.parse_request(&conn).await
+    // Defer demo
+    defer puts("--- Cleanup: connections closed ---")
 
-    let result = with_timeout(
-        Duration.seconds(5),
-        handle_request(&state, req),
-    ).await
-
-    let resp = match result
-        Ok(r)              -> r
-        Err(.Timeout(..))  -> HttpResponse.json(408, "\"request timeout\"")
-        Err(e)             -> HttpResponse.internal_error(&e.to_string())
-
-    conn.write_all(resp.as_bytes()).await
-
-
-// ---------------------------------------------------------------------------
-// Timeout utility — select + task cancellation
-// ---------------------------------------------------------------------------
-
-// Runs `task` with a deadline. If the timer fires first, the task is
-// cancelled. Cancellation triggers unwinding — all destructors run,
-// all `with`-block guards are released, all resources are cleaned up.
-async fn with_timeout[T](
-    limit: Duration,
-    task: Task[T],
-) -> Result[T, ServiceError] =
-    let timer = async_sleep(limit)
-
-    select await
-        result = task ->
-            Ok(result)
-        _ = timer ->
-            task.cancel()
-            Err(.Timeout("request", limit))
+    println("=== Demo complete ===")
+    0

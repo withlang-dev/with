@@ -25,9 +25,36 @@ async fn handle_signup(req: HttpRequest, db: &Database) -> Result[HttpResponse, 
 
 Early development. The bootstrap compiler (written in Zig) can lex, parse, and dump ASTs for basic With programs.
 
-## Building
+## Prerequisites
 
-Requires [Zig](https://ziglang.org/) 0.15+.
+- [Zig](https://ziglang.org/) 0.15+
+- [LLVM](https://github.com/llvm/llvm-project/releases) 18+ (C API headers and static libraries)
+
+### LLVM setup
+
+Download a prebuilt release for your platform from the [LLVM releases page](https://github.com/llvm/llvm-project/releases) and install it:
+
+```
+# macOS ARM64 example (adjust version as needed)
+tar xf LLVM-22.1.0-macOS-ARM64.tar.xz
+sudo mv LLVM-22.1.0-macOS-ARM64 /usr/local/llvm
+```
+
+Add to your shell config:
+
+```sh
+# bash/zsh
+export LLVM_HOME=/usr/local/llvm
+export PATH="$LLVM_HOME/bin:$PATH"
+
+# fish
+set -gx LLVM_HOME /usr/local/llvm
+fish_add_path $LLVM_HOME/bin
+```
+
+Verify: `llvm-config --version`
+
+## Building
 
 ```
 zig build

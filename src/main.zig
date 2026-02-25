@@ -28,23 +28,71 @@ pub fn main() !void {
 
     const command = args[1];
 
-    if (std.mem.eql(u8, command, "run") or std.mem.eql(u8, command, "build")) {
+    if (std.mem.eql(u8, command, "build")) {
         if (args.len < 3) {
-            var buf: [4096]u8 = undefined;
-            var w = std.fs.File.stderr().writer(&buf);
-            w.interface.print("error: '{s}' requires a source file argument\n", .{command}) catch {};
-            w.interface.flush() catch {};
+            stderrPrint("error: 'build' requires a source file argument\n");
             printUsage();
             std.process.exit(1);
         }
-        const file = args[2];
         var driver = Driver.init(allocator);
         defer driver.deinit();
 
-        const module = try driver.compileFile(file);
+        const bin_path = try driver.buildBinary(args[2]);
+        if (bin_path) |p| {
+            var buf: [4096]u8 = undefined;
+            var w = std.fs.File.stderr().writer(&buf);
+            w.interface.print("compiled: {s}\n", .{p}) catch {};
+            w.interface.flush() catch {};
+        } else {
+            std.process.exit(1);
+        }
+    } else if (std.mem.eql(u8, command, "run")) {
+        if (args.len < 3) {
+            stderrPrint("error: 'run' requires a source file argument\n");
+            printUsage();
+            std.process.exit(1);
+        }
+        var driver = Driver.init(allocator);
+        defer driver.deinit();
+
+        const bin_path = try driver.buildBinary(args[2]);
+        if (bin_path) |p| {
+            // Execute the binary.
+            var child = std.process.Child.init(&.{p}, allocator);
+            _ = child.spawn() catch |e| {
+                var buf: [4096]u8 = undefined;
+                var w = std.fs.File.stderr().writer(&buf);
+                w.interface.print("error: failed to spawn binary: {}\n", .{e}) catch {};
+                w.interface.flush() catch {};
+                std.process.exit(1);
+            };
+            const term = child.wait() catch |e| {
+                var buf: [4096]u8 = undefined;
+                var w = std.fs.File.stderr().writer(&buf);
+                w.interface.print("error: failed to execute binary: {}\n", .{e}) catch {};
+                w.interface.flush() catch {};
+                std.process.exit(1);
+            };
+            if (term == .Exited) {
+                std.process.exit(term.Exited);
+            }
+            std.process.exit(1);
+        } else {
+            std.process.exit(1);
+        }
+    } else if (std.mem.eql(u8, command, "ir")) {
+        if (args.len < 3) {
+            stderrPrint("error: 'ir' requires a source file argument\n");
+            printUsage();
+            std.process.exit(1);
+        }
+        var driver = Driver.init(allocator);
+        defer driver.deinit();
+
+        const module = try driver.compileFile(args[2]);
         if (module) |m| {
-            try driver.dumpAst(&m);
-            // TODO: type check, codegen, link, (run)
+            const ok = try driver.emitIR(&m);
+            if (!ok) std.process.exit(1);
         } else {
             std.process.exit(1);
         }
@@ -91,6 +139,13 @@ pub fn main() !void {
     }
 }
 
+fn stderrPrint(msg: []const u8) void {
+    var buf: [4096]u8 = undefined;
+    var w = std.fs.File.stderr().writer(&buf);
+    w.interface.writeAll(msg) catch {};
+    w.interface.flush() catch {};
+}
+
 fn printUsage() void {
     var buf: [4096]u8 = undefined;
     var w = std.fs.File.stdout().writer(&buf);
@@ -98,8 +153,9 @@ fn printUsage() void {
         \\Usage: with <command> [options]
         \\
         \\Commands:
-        \\  run <file.w>      Compile and run a With source file
         \\  build <file.w>    Compile a With source file to a binary
+        \\  run <file.w>      Compile and run a With source file
+        \\  ir <file.w>       Dump LLVM IR (debug)
         \\  ast <file.w>      Parse and dump the AST (debug)
         \\  tokens <file.w>   Lex and dump tokens (debug)
         \\  version           Print compiler version
@@ -143,4 +199,6 @@ comptime {
     _ = @import("render.zig");
     _ = @import("Diagnostic.zig");
     _ = @import("Driver.zig");
+    _ = @import("Codegen.zig");
+    _ = @import("Sema.zig");
 }

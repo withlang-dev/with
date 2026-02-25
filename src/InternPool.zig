@@ -32,6 +32,11 @@ pub fn init(allocator: std.mem.Allocator) InternPool {
 }
 
 pub fn deinit(self: *InternPool) void {
+    // Free duplicated map keys.
+    var it = self.map.iterator();
+    while (it.next()) |entry| {
+        self.allocator.free(@constCast(entry.key_ptr.*));
+    }
     self.bytes.deinit(self.allocator);
     self.map.deinit(self.allocator);
     self.offsets.deinit(self.allocator);
@@ -46,8 +51,10 @@ pub fn intern(self: *InternPool, str: []const u8) !Symbol {
     try self.bytes.appendSlice(self.allocator, str);
     try self.offsets.append(self.allocator, @intCast(self.bytes.items.len));
 
-    // The key slice points into our own `bytes` buffer.
-    try self.map.put(self.allocator, str, id);
+    // Duplicate the string for the map key so it doesn't depend on
+    // the caller's memory or our bytes buffer (which can reallocate).
+    const key = try self.allocator.dupe(u8, str);
+    try self.map.put(self.allocator, key, id);
     return id;
 }
 
