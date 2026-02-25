@@ -217,6 +217,8 @@ variant_lookup: std.AutoHashMapUnmanaged(Symbol, VariantInfo),
 
 /// Trait declarations: trait name → list of required method name symbols.
 trait_methods: std.AutoHashMapUnmanaged(Symbol, []const Symbol),
+/// Trait declarations: trait name → full TraitDecl (for default method bodies).
+trait_decls: std.AutoHashMapUnmanaged(Symbol, Ast.TraitDecl),
 /// Trait implementations: type name → list of trait names implemented.
 type_impls: std.AutoHashMapUnmanaged(Symbol, std.ArrayList(Symbol)),
 
@@ -270,6 +272,7 @@ pub fn init(allocator: std.mem.Allocator, pool: *InternPool, diagnostics: *Diagn
         .methods = .{},
         .variant_lookup = .{},
         .trait_methods = .{},
+        .trait_decls = .{},
         .type_impls = .{},
         .active_borrows = .empty,
         .closure_analyses = .{},
@@ -556,6 +559,8 @@ fn collectTraitDecl(self: *Sema, td: Ast.TraitDecl) void {
         method_names[i] = m.name;
     }
     self.trait_methods.put(self.allocator, td.name, method_names) catch {};
+    // Store trait decl for default method lookup.
+    self.trait_decls.put(self.allocator, td.name, td) catch {};
 }
 
 fn collectImplDecl(self: *Sema, id: Ast.ImplDecl) void {
@@ -580,7 +585,10 @@ fn checkTraitConformance(self: *Sema, module: *const Ast.Module) void {
 
                 // Build set of short method names from mangled method_names.
                 // method_names are like "Type.method", we need just "method".
-                for (required) |req_name| {
+                // Get the trait decl to check for default methods.
+                const trait_decl = self.trait_decls.get(trait_sym);
+
+                for (required, 0..) |req_name, req_idx| {
                     const req_str = self.pool.resolve(req_name);
                     var found = false;
                     for (id.method_names) |mangled| {
@@ -596,6 +604,12 @@ fn checkTraitConformance(self: *Sema, module: *const Ast.Module) void {
                         }
                     }
                     if (!found) {
+                        // Check if the trait provides a default implementation.
+                        if (trait_decl) |td| {
+                            if (req_idx < td.methods.len and td.methods[req_idx].has_default) {
+                                continue; // Default method exists — no error.
+                            }
+                        }
                         var buf: [256]u8 = undefined;
                         const type_str = self.pool.resolve(id.type_name);
                         const trait_str = self.pool.resolve(trait_sym);

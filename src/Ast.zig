@@ -68,6 +68,7 @@ pub const TraitMethodSig = struct {
     params: []const Param,
     return_type: ?*const TypeExpr,
     has_default: bool,
+    default_body: ?*const Expr = null,
     span: Span,
 };
 
