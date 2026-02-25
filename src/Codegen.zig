@@ -1389,8 +1389,15 @@ fn genBinary(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
     const lhs = try self.genExpr(bin.lhs);
     const rhs = try self.genExpr(bin.rhs);
 
-    // Check for operator overloading via syntax traits.
+    // String operations: str + str (concat), str == str, str != str.
     const lhs_type = c.LLVMTypeOf(lhs);
+    const rhs_type_check = c.LLVMTypeOf(rhs);
+    if (self.isStrType(lhs_type) and self.isStrType(rhs_type_check)) {
+        if (bin.op == .add) return self.genStrConcat(lhs, rhs);
+        if (bin.op == .eq or bin.op == .neq) return self.genStrCompare(lhs, rhs, bin.op);
+    }
+
+    // Check for operator overloading via syntax traits.
     if (c.LLVMGetTypeKind(lhs_type) == c.LLVMStructTypeKind) {
         if (self.tryOperatorOverload(bin.op, lhs, lhs_type, rhs)) |result| {
             return result;
@@ -5013,6 +5020,125 @@ fn isStrType(self: *Codegen, ty: c.LLVMTypeRef) bool {
     const str_sym = self.pool.intern("str") catch return false;
     const str_info = self.struct_types.get(str_sym) orelse return false;
     return ty == str_info.llvm_type;
+}
+
+/// Generate string concatenation: str + str → new str.
+fn genStrConcat(self: *Codegen, lhs: c.LLVMValueRef, rhs: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const str_sym = self.pool.intern("str") catch return error.CodegenAlloc;
+    const str_info = self.struct_types.get(str_sym) orelse return error.UnsupportedExpr;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+
+    // Extract ptr and len from both strings.
+    const lhs_alloca = c.LLVMBuildAlloca(self.builder, str_info.llvm_type, "lhs.str");
+    _ = c.LLVMBuildStore(self.builder, lhs, lhs_alloca);
+    const lhs_ptr_gep = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, lhs_alloca, 0, "");
+    const lhs_ptr = c.LLVMBuildLoad2(self.builder, ptr_type, lhs_ptr_gep, "lhs.ptr");
+    const lhs_len_gep = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, lhs_alloca, 1, "");
+    const lhs_len = c.LLVMBuildLoad2(self.builder, i64_type, lhs_len_gep, "lhs.len");
+
+    const rhs_alloca = c.LLVMBuildAlloca(self.builder, str_info.llvm_type, "rhs.str");
+    _ = c.LLVMBuildStore(self.builder, rhs, rhs_alloca);
+    const rhs_ptr_gep = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, rhs_alloca, 0, "");
+    const rhs_ptr = c.LLVMBuildLoad2(self.builder, ptr_type, rhs_ptr_gep, "rhs.ptr");
+    const rhs_len_gep = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, rhs_alloca, 1, "");
+    const rhs_len = c.LLVMBuildLoad2(self.builder, i64_type, rhs_len_gep, "rhs.len");
+
+    // total_len = lhs.len + rhs.len
+    const total_len = c.LLVMBuildAdd(self.builder, lhs_len, rhs_len, "total.len");
+
+    // Allocate buffer: malloc(total_len + 1) for null terminator.
+    const one = c.LLVMConstInt(i64_type, 1, 0);
+    const alloc_size = c.LLVMBuildAdd(self.builder, total_len, one, "alloc.size");
+
+    // Ensure malloc is declared.
+    const malloc_fn = self.ensureMallocDeclared();
+    var malloc_args = [_]c.LLVMValueRef{alloc_size};
+    const new_buf = c.LLVMBuildCall2(self.builder, malloc_fn.fn_type, malloc_fn.value, &malloc_args, 1, "concat.buf");
+
+    // Ensure memcpy is declared.
+    const memcpy_fn = self.ensureMemcpyDeclared();
+
+    // memcpy(new_buf, lhs.ptr, lhs.len)
+    var copy1_args = [_]c.LLVMValueRef{ new_buf, lhs_ptr, lhs_len };
+    _ = c.LLVMBuildCall2(self.builder, memcpy_fn.fn_type, memcpy_fn.value, &copy1_args, 3, "");
+
+    // memcpy(new_buf + lhs.len, rhs.ptr, rhs.len)
+    var gep_idx1 = [_]c.LLVMValueRef{lhs_len};
+    const dest2 = c.LLVMBuildGEP2(self.builder, c.LLVMInt8TypeInContext(self.context), new_buf, &gep_idx1, 1, "dest2");
+    var copy2_args = [_]c.LLVMValueRef{ dest2, rhs_ptr, rhs_len };
+    _ = c.LLVMBuildCall2(self.builder, memcpy_fn.fn_type, memcpy_fn.value, &copy2_args, 3, "");
+
+    // Null-terminate: new_buf[total_len] = 0
+    var gep_idx2 = [_]c.LLVMValueRef{total_len};
+    const end_ptr = c.LLVMBuildGEP2(self.builder, c.LLVMInt8TypeInContext(self.context), new_buf, &gep_idx2, 1, "end");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(c.LLVMInt8TypeInContext(self.context), 0, 0), end_ptr);
+
+    // Build result: str { ptr: new_buf, len: total_len }
+    const result_alloca = c.LLVMBuildAlloca(self.builder, str_info.llvm_type, "concat.result");
+    const result_ptr_gep = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, result_alloca, 0, "");
+    _ = c.LLVMBuildStore(self.builder, new_buf, result_ptr_gep);
+    const result_len_gep = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, result_alloca, 1, "");
+    _ = c.LLVMBuildStore(self.builder, total_len, result_len_gep);
+
+    return c.LLVMBuildLoad2(self.builder, str_info.llvm_type, result_alloca, "concat");
+}
+
+/// Generate string comparison: str == str or str != str.
+/// Uses strcmp(lhs.ptr, rhs.ptr) == 0.
+fn genStrCompare(self: *Codegen, lhs: c.LLVMValueRef, rhs: c.LLVMValueRef, op: Ast.BinOp) Error!c.LLVMValueRef {
+    const lhs_ptr = self.extractStrPtr(lhs);
+    const rhs_ptr = self.extractStrPtr(rhs);
+
+    // Ensure strcmp is declared.
+    const strcmp_sym = self.pool.intern("strcmp") catch return error.CodegenAlloc;
+    const strcmp_fn = if (self.functions.get(strcmp_sym)) |fi| fi else blk: {
+        const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+        const i32_type = c.LLVMInt32TypeInContext(self.context);
+        var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+        const fn_type = c.LLVMFunctionType(i32_type, &param_types, 2, 0);
+        const func = c.LLVMAddFunction(self.module, "strcmp", fn_type);
+        const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+        self.functions.put(self.allocator, strcmp_sym, fi) catch {};
+        break :blk fi;
+    };
+
+    var call_args = [_]c.LLVMValueRef{ lhs_ptr, rhs_ptr };
+    const cmp_result = c.LLVMBuildCall2(self.builder, strcmp_fn.fn_type, strcmp_fn.value, &call_args, 2, "strcmp");
+    const zero = c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+
+    return if (op == .eq)
+        c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, cmp_result, zero, "streq")
+    else
+        c.LLVMBuildICmp(self.builder, c.LLVMIntNE, cmp_result, zero, "strne");
+}
+
+/// Ensure malloc is declared.
+fn ensureMallocDeclared(self: *Codegen) FnInfo {
+    const malloc_sym = self.pool.intern("malloc") catch unreachable;
+    if (self.functions.get(malloc_sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{i64_type};
+    const fn_type = c.LLVMFunctionType(ptr_type, &param_types, 1, 0);
+    const func = c.LLVMAddFunction(self.module, "malloc", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, malloc_sym, fi) catch {};
+    return fi;
+}
+
+/// Ensure memcpy is declared.
+fn ensureMemcpyDeclared(self: *Codegen) FnInfo {
+    const memcpy_sym = self.pool.intern("memcpy") catch unreachable;
+    if (self.functions.get(memcpy_sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type, i64_type };
+    const fn_type = c.LLVMFunctionType(ptr_type, &param_types, 3, 0);
+    const func = c.LLVMAddFunction(self.module, "memcpy", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, memcpy_sym, fi) catch {};
+    return fi;
 }
 
 fn extractStrPtr(self: *Codegen, val: c.LLVMValueRef) c.LLVMValueRef {
