@@ -4593,6 +4593,11 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
                 }
             }
             return error.UnsupportedExpr;
+        } else if (std.mem.eql(u8, method_name, "join")) {
+            // Vec[str].join(sep) → str
+            if (args.len < 1) return error.UnsupportedExpr;
+            const sep = try self.genExpr(args[0]);
+            return self.genVecJoin(obj_val, sep);
         }
     }
 
@@ -4634,6 +4639,15 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             const start = try self.genExpr(args[0]);
             const end = try self.genExpr(args[1]);
             return self.genStrSlice(obj_val, start, end);
+        } else if (std.mem.eql(u8, method_name, "split")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const delim = try self.genExpr(args[0]);
+            return self.genStrSplit(obj_val, delim);
+        } else if (std.mem.eql(u8, method_name, "replace")) {
+            if (args.len < 2) return error.UnsupportedExpr;
+            const old_s = try self.genExpr(args[0]);
+            const new_s = try self.genExpr(args[1]);
+            return self.genStrReplace(obj_val, old_s, new_s);
         }
     }
 
@@ -7647,6 +7661,196 @@ fn genStrSlice(self: *Codegen, obj_val: c.LLVMValueRef, start: c.LLVMValueRef, e
     const new_ptr = c.LLVMBuildGEP2(self.builder, i8_type, s.ptr, &gep_idx, 1, "slice.ptr");
     const new_len = c.LLVMBuildSub(self.builder, end_i64, start_i64, "slice.len");
     return self.buildStrValue(new_ptr, new_len);
+}
+
+/// str.split(delim) → Vec[str] — calls with_str_split C helper.
+fn genStrSplit(self: *Codegen, obj_val: c.LLVMValueRef, delim: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const s = self.extractStrPtrAndLen(obj_val);
+    const d = self.extractStrPtrAndLen(delim);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+
+    // Declare with_str_split if needed
+    const split_fn = self.ensureSplitHelperDeclared();
+
+    // Allocate stack buffers for up to 256 parts
+    const max_parts: u64 = 256;
+    const ptrs_arr_type = c.LLVMArrayType2(ptr_type, max_parts);
+    const lens_arr_type = c.LLVMArrayType2(i64_type, max_parts);
+    const ptrs_buf = c.LLVMBuildAlloca(self.builder, ptrs_arr_type, "ptrs_buf");
+    const lens_buf = c.LLVMBuildAlloca(self.builder, lens_arr_type, "lens_buf");
+
+    // Call with_str_split(src, src_len, delim, delim_len, ptrs_buf, lens_buf, max_parts)
+    var call_args = [_]c.LLVMValueRef{
+        s.ptr,                                         d.len,
+        d.ptr,                                         d.len,
+        ptrs_buf,
+        lens_buf,
+        c.LLVMConstInt(i64_type, max_parts, 0),
+    };
+    // Fix: first arg is src, second is src_len
+    call_args[0] = s.ptr;
+    call_args[1] = s.len;
+    call_args[2] = d.ptr;
+    call_args[3] = d.len;
+    const count = c.LLVMBuildCall2(self.builder, split_fn.fn_type, split_fn.value, &call_args, 7, "count");
+
+    // Build a Vec[str] from the results
+    const str_sym = self.pool.intern("str") catch return error.CodegenAlloc;
+    const str_info = self.struct_types.get(str_sym) orelse return error.UnsupportedExpr;
+    const vec_info = try self.getOrCreateVecType(str_info.llvm_type);
+
+    // Create empty Vec and push each part
+    const vec_alloca = c.LLVMBuildAlloca(self.builder, vec_info.llvm_type, "split_vec");
+    const initial = try self.genVecNew(str_info.llvm_type);
+    _ = c.LLVMBuildStore(self.builder, initial, vec_alloca);
+
+    // Loop: for i in 0..count, push str { ptrs[i], lens[i] }
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const loop_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "split.loop");
+    const body_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "split.body");
+    const done_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "split.done");
+    const entry_bb = c.LLVMGetInsertBlock(self.builder);
+    _ = c.LLVMBuildBr(self.builder, loop_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, loop_bb);
+    const phi_i = c.LLVMBuildPhi(self.builder, i64_type, "i");
+    const at_end = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, phi_i, count, "");
+    _ = c.LLVMBuildCondBr(self.builder, at_end, done_bb, body_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    // Load ptr and len for part i
+    const zero_idx = c.LLVMConstInt(c.LLVMInt64TypeInContext(self.context), 0, 0);
+    var ptr_gep_idx = [_]c.LLVMValueRef{ zero_idx, phi_i };
+    const part_ptr_ptr = c.LLVMBuildGEP2(self.builder, ptrs_arr_type, ptrs_buf, &ptr_gep_idx, 2, "");
+    const part_ptr = c.LLVMBuildLoad2(self.builder, ptr_type, part_ptr_ptr, "part.ptr");
+    var len_gep_idx = [_]c.LLVMValueRef{ zero_idx, phi_i };
+    const part_len_ptr = c.LLVMBuildGEP2(self.builder, lens_arr_type, lens_buf, &len_gep_idx, 2, "");
+    const part_len = c.LLVMBuildLoad2(self.builder, i64_type, part_len_ptr, "part.len");
+
+    // Build str value and push to Vec
+    const str_val = self.buildStrValue(part_ptr, part_len);
+    _ = try self.genVecPush(vec_alloca, vec_info.llvm_type, str_val);
+
+    // After push, the builder may be in a different BB (due to grow/push blocks)
+    const after_push_bb = c.LLVMGetInsertBlock(self.builder);
+    const next_i = c.LLVMBuildAdd(self.builder, phi_i, c.LLVMConstInt(i64_type, 1, 0), "");
+    _ = c.LLVMBuildBr(self.builder, loop_bb);
+    var phi_vals = [_]c.LLVMValueRef{ c.LLVMConstInt(i64_type, 0, 0), next_i };
+    var phi_bbs = [_]c.LLVMBasicBlockRef{ entry_bb, after_push_bb };
+    c.LLVMAddIncoming(phi_i, &phi_vals, &phi_bbs, 2);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+    return c.LLVMBuildLoad2(self.builder, vec_info.llvm_type, vec_alloca, "split.result");
+}
+
+/// Ensure with_str_split helper is declared.
+fn ensureSplitHelperDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("with_str_split") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    // int64_t with_str_split(const char*, int64_t, const char*, int64_t, void**, int64_t*, int64_t)
+    var param_types = [_]c.LLVMTypeRef{ ptr_type, i64_type, ptr_type, i64_type, ptr_type, ptr_type, i64_type };
+    const fn_type = c.LLVMFunctionType(i64_type, &param_types, 7, 0);
+    const func = c.LLVMAddFunction(self.module, "with_str_split", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
+}
+
+/// str.replace(old, new) → new str — simple search and replace.
+fn genStrReplace(self: *Codegen, obj_val: c.LLVMValueRef, old_s: c.LLVMValueRef, new_s: c.LLVMValueRef) Error!c.LLVMValueRef {
+    // Split by old, then join with new
+    const parts_vec = try self.genStrSplit(obj_val, old_s);
+    return self.genVecJoin(parts_vec, new_s);
+}
+
+/// Vec[str].join(sep) → str — calls with_str_join C helper.
+fn genVecJoin(self: *Codegen, vec_val: c.LLVMValueRef, sep: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const str_sym = self.pool.intern("str") catch return error.CodegenAlloc;
+    const str_info = self.struct_types.get(str_sym) orelse return error.UnsupportedExpr;
+    const vec_info = try self.getOrCreateVecType(str_info.llvm_type);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+
+    // Extract Vec fields: ptr, len
+    const vec_alloca = c.LLVMBuildAlloca(self.builder, vec_info.llvm_type, "jv");
+    _ = c.LLVMBuildStore(self.builder, vec_val, vec_alloca);
+    const vec_ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_info.llvm_type, vec_alloca, 0, "");
+    const vec_ptr = c.LLVMBuildLoad2(self.builder, ptr_type, vec_ptr_gep, "v.ptr");
+    const vec_len_gep = c.LLVMBuildStructGEP2(self.builder, vec_info.llvm_type, vec_alloca, 1, "");
+    const vec_len = c.LLVMBuildLoad2(self.builder, i64_type, vec_len_gep, "v.len");
+
+    // Extract sep ptr and len
+    const sep_info = self.extractStrPtrAndLen(sep);
+
+    // Build arrays of ptrs and lens from Vec[str] elements.
+    // Each str element is { ptr, i64 }, so we need to extract those.
+    // Allocate temp arrays for ptrs and lens
+    const max_parts: u64 = 256;
+    const ptrs_arr_type = c.LLVMArrayType2(ptr_type, max_parts);
+    const lens_arr_type = c.LLVMArrayType2(i64_type, max_parts);
+    const ptrs_buf = c.LLVMBuildAlloca(self.builder, ptrs_arr_type, "j_ptrs");
+    const lens_buf = c.LLVMBuildAlloca(self.builder, lens_arr_type, "j_lens");
+
+    // Loop: extract ptr+len from each str in the Vec
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const loop_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "join.loop");
+    const body_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "join.body");
+    const done_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "join.done");
+    const entry_bb = c.LLVMGetInsertBlock(self.builder);
+    _ = c.LLVMBuildBr(self.builder, loop_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, loop_bb);
+    const phi_i = c.LLVMBuildPhi(self.builder, i64_type, "i");
+    const at_end = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, phi_i, vec_len, "");
+    _ = c.LLVMBuildCondBr(self.builder, at_end, done_bb, body_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    // Load str element from Vec
+    var elem_gep_idx = [_]c.LLVMValueRef{phi_i};
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, str_info.llvm_type, vec_ptr, &elem_gep_idx, 1, "");
+    const str_val = c.LLVMBuildLoad2(self.builder, str_info.llvm_type, elem_ptr, "str_elem");
+    const str_parts = self.extractStrPtrAndLen(str_val);
+    // Store ptr and len into temp arrays
+    const zero_idx = c.LLVMConstInt(i64_type, 0, 0);
+    var ptr_gep = [_]c.LLVMValueRef{ zero_idx, phi_i };
+    const ptr_slot = c.LLVMBuildGEP2(self.builder, ptrs_arr_type, ptrs_buf, &ptr_gep, 2, "");
+    _ = c.LLVMBuildStore(self.builder, str_parts.ptr, ptr_slot);
+    var len_gep = [_]c.LLVMValueRef{ zero_idx, phi_i };
+    const len_slot = c.LLVMBuildGEP2(self.builder, lens_arr_type, lens_buf, &len_gep, 2, "");
+    _ = c.LLVMBuildStore(self.builder, str_parts.len, len_slot);
+
+    const next_i = c.LLVMBuildAdd(self.builder, phi_i, c.LLVMConstInt(i64_type, 1, 0), "");
+    _ = c.LLVMBuildBr(self.builder, loop_bb);
+    var phi_vals = [_]c.LLVMValueRef{ c.LLVMConstInt(i64_type, 0, 0), next_i };
+    var phi_bbs = [_]c.LLVMBasicBlockRef{ entry_bb, body_bb };
+    c.LLVMAddIncoming(phi_i, &phi_vals, &phi_bbs, 2);
+
+    // Call with_str_join
+    c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+    const join_fn = self.ensureJoinHelperDeclared();
+    const out_len_slot = c.LLVMBuildAlloca(self.builder, i64_type, "out_len");
+    var join_args = [_]c.LLVMValueRef{ ptrs_buf, lens_buf, vec_len, sep_info.ptr, sep_info.len, out_len_slot };
+    const result_ptr = c.LLVMBuildCall2(self.builder, join_fn.fn_type, join_fn.value, &join_args, 6, "joined");
+    const result_len = c.LLVMBuildLoad2(self.builder, i64_type, out_len_slot, "joined.len");
+    return self.buildStrValue(result_ptr, result_len);
+}
+
+/// Ensure with_str_join helper is declared.
+fn ensureJoinHelperDeclared(self: *Codegen) FnInfo {
+    const sym = self.pool.intern("with_str_join") catch unreachable;
+    if (self.functions.get(sym)) |fi| return fi;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    // char* with_str_join(void**, int64_t*, int64_t, const char*, int64_t, int64_t*)
+    var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type, i64_type, ptr_type, i64_type, ptr_type };
+    const fn_type = c.LLVMFunctionType(ptr_type, &param_types, 6, 0);
+    const func = c.LLVMAddFunction(self.module, "with_str_join", fn_type);
+    const fi: FnInfo = .{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, sym, fi) catch {};
+    return fi;
 }
 
 /// array.contains(needle) → bool — linear scan
