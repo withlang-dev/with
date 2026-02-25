@@ -87,6 +87,7 @@ pub const FnDecl = struct {
     return_type: ?*const TypeExpr,
     body: *const Expr,
     is_async: bool,
+    is_gen: bool,
     is_pub: Visibility,
 };
 
@@ -226,6 +227,8 @@ pub const ExprKind = union(enum) {
     with_expr: WithExpr,
     /// Record update: `{ expr with field: val, ... }`
     record_update: RecordUpdateExpr,
+    /// Yield: `yield expr` (inside gen fn)
+    yield_expr: *const Expr,
     /// Poisoned — parse error placeholder
     poisoned,
 };

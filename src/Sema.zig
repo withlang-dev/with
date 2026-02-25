@@ -823,6 +823,7 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
         },
         .poisoned => error_type,
         .await_expr => |inner| self.checkExpr(inner),
+        .yield_expr => |inner| self.checkExpr(inner),
     };
 }
 
