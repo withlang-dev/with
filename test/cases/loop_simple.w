@@ -3,4 +3,5 @@ fn main() -> i32 =
     loop:
         i += 1
         if i == 42 then break
-    i
+    assert(i == 42)
+    0

@@ -5,4 +5,5 @@ fn make_point(x: i32, y: i32) -> Point =
 
 fn main() -> i32 =
     let p: Point = make_point(20, 22)
-    p.x + p.y
+    assert(p.x + p.y == 42)
+    0

@@ -17,4 +17,5 @@ fn Direction.value(self: Direction) -> i32 =
 fn main() -> i32 =
     let d = North
     let opp = d.opposite()
-    d.value() + opp.value() + 39
+    assert(d.value() + opp.value() + 39 == 42)
+    0

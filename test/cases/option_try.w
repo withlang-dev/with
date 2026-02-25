@@ -8,4 +8,5 @@ fn process() -> Option[i32] =
 
 fn main() -> i32 =
     let result = process()
-    result ?? 0
+    assert(result ?? 0 == 42)
+    0

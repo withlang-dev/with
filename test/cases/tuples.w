@@ -5,4 +5,5 @@ fn main() -> i32 =
     let pair = (10, 32)
     let x = pair.0
     let y = pair.1
-    x + y
+    assert(x + y == 42)
+    0

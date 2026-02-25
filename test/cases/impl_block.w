@@ -14,4 +14,5 @@ fn main() -> i32 =
     let p = Point { x: 10, y: 11 }
     let s = p.sum()
     let t = p.scale(2)
-    t
+    assert(t == 42)
+    0

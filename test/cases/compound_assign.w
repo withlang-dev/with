@@ -5,4 +5,5 @@ fn main() -> i32 =
     x *= 2
     x /= 3
     x %= 10
-    x
+    assert(x == 8)
+    0

@@ -1,4 +1,5 @@
 fn main() -> i32 =
     let a = 100
     let b = a % 58
-    b
+    assert(b == 42)
+    0

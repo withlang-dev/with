@@ -3,4 +3,5 @@ fn apply(f: fn(i32) -> i32, x: i32) -> i32 =
 
 fn main() -> i32 =
     let inc = |x| x + 1
-    apply(inc, 41)
+    assert(apply(inc, 41) == 42)
+    0

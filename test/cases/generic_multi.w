@@ -7,4 +7,5 @@ fn second[T](a: T, b: T) -> T =
 fn main() -> i32 =
     let a = first(42, 99)
     let b = second(10, 0)
-    a + b
+    assert(a + b == 42)
+    0

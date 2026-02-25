@@ -1,3 +1,4 @@
 fn main() -> i32 =
     let s: str = "hello"
-    s.len
+    assert(s.len == 5)
+    0

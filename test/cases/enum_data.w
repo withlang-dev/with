@@ -8,4 +8,5 @@ fn area(s: Shape) -> i32 =
 fn main() -> i32 =
     let c = Circle(5)
     let r = Rect(6)
-    area(c) + area(r) + 5
+    assert(area(c) + area(r) + 5 == 42)
+    0

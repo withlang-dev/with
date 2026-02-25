@@ -3,4 +3,5 @@ fn factorial(n: i32) -> i32 =
     else n * factorial(n - 1)
 
 fn main() -> i32 =
-    factorial(5)
+    assert(factorial(5) == 120)
+    0

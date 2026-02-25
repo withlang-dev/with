@@ -8,4 +8,5 @@ impl Resource
 
 fn main() -> i32 =
     let r = Resource { value: 42 }
-    r.value
+    assert(r.value == 42)
+    0

@@ -7,4 +7,5 @@ fn add_one[T](x: T) -> T =
 fn main() -> i32 =
     let a = id(40)
     let b = add_one(1)
-    a + b
+    assert(a + b == 42)
+    0

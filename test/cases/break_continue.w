@@ -8,4 +8,5 @@ fn main() -> i32 =
         if i == 3 then continue
         if i == 6 then break
         sum += i
-    sum
+    assert(sum == 12)
+    0

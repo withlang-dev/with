@@ -15,4 +15,5 @@ impl B
 fn main() -> i32 =
     let a = A { id: 1 }
     let b = B { id: 2 }
-    a.id + b.id - 3 + 42
+    assert(a.id + b.id - 3 + 42 == 42)
+    0
