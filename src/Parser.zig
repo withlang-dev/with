@@ -1480,6 +1480,7 @@ fn parseMatchExpr(self: *Parser) !*const Ast.Expr {
     self.skipNewlines();
 
     var arms: std.ArrayList(Ast.MatchArm) = .empty;
+    var arm_col: ?u32 = null; // Column of first arm — used to detect end of match block
 
     // Parse arms: `pattern -> body` separated by newlines
     while (self.peek() != .eof) {
@@ -1490,6 +1491,14 @@ fn parseMatchExpr(self: *Parser) !*const Ast.Expr {
             tag != .string_literal)
         {
             break;
+        }
+
+        // Column check: all arms must be at the same column as the first arm
+        const cur_col = Lexer.columnOf(self.source, self.currentSpan().start);
+        if (arm_col) |ac| {
+            if (cur_col != ac) break;
+        } else {
+            arm_col = cur_col;
         }
 
         const arm_start = self.currentSpan();
@@ -1506,19 +1515,28 @@ fn parseMatchExpr(self: *Parser) !*const Ast.Expr {
             .span = arm_start.merge(body.span),
         });
 
-        // Skip newlines but restore position if we went past the match block
+        // Skip newlines but save position BEFORE skipping so we can restore
+        // if the next thing is not actually a match arm.
         const save = self.pos;
         self.skipNewlines();
         if (self.peek() == .eof) break;
-        // Check if the next token could be a match arm
+
+        // Check if the next token could be a match arm at the right column
         const next_tag = self.peek();
-        if (next_tag != .identifier and next_tag != .int_literal and
-            next_tag != .dot_identifier and next_tag != .true_literal and next_tag != .false_literal and
-            next_tag != .string_literal)
-        {
-            // Not an arm — restore position so outer block parser sees the newlines
+        const is_arm_token = (next_tag == .identifier or next_tag == .int_literal or
+            next_tag == .dot_identifier or next_tag == .true_literal or next_tag == .false_literal or
+            next_tag == .string_literal);
+        if (!is_arm_token) {
             self.pos = save;
             break;
+        }
+        // Also check column — if not at the same column, it's not a match arm
+        const next_col = Lexer.columnOf(self.source, self.currentSpan().start);
+        if (arm_col) |ac| {
+            if (next_col != ac) {
+                self.pos = save;
+                break;
+            }
         }
     }
 
@@ -1597,6 +1615,39 @@ fn parsePattern(self: *Parser) !Ast.Pattern {
             }
             // Otherwise it's a variable binding
             return .{ .kind = .{ .binding = name }, .span = span };
+        },
+        .dot_identifier => {
+            // .Member variant shorthand pattern
+            const text = self.source[span.start + 1 .. span.end];
+            const name = try self.pool.intern(text);
+            self.advance();
+            // Check for payload bindings: .Member(x, y)
+            if (self.peek() == .l_paren) {
+                self.advance(); // skip '('
+                var bindings: std.ArrayList(Ast.Symbol) = .empty;
+                while (self.peek() != .r_paren and self.peek() != .eof) {
+                    try bindings.append(self.arena, try self.expectIdentifier());
+                    if (self.peek() == .comma) {
+                        self.advance();
+                        self.skipNewlines();
+                    }
+                }
+                try self.expect(.r_paren);
+                return .{
+                    .kind = .{ .variant = .{
+                        .name = name,
+                        .bindings = bindings.items,
+                    } },
+                    .span = span.merge(self.prevSpan()),
+                };
+            }
+            return .{
+                .kind = .{ .variant = .{
+                    .name = name,
+                    .bindings = &.{},
+                } },
+                .span = span,
+            };
         },
         else => {
             self.emitError("expected pattern");

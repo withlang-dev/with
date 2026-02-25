@@ -1334,6 +1334,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .struct_literal => |sl| try self.genStructLiteral(sl),
         .match_expr => |m| try self.genMatchExpr(m),
         .enum_variant => |ev| try self.genEnumVariant(ev),
+        .variant_shorthand => |sym| self.genIdent(sym),
         .closure => |cl| try self.genClosure(cl),
         .cast => |ca| try self.genCast(ca),
         .pipeline => |p| try self.genPipeline(p),
