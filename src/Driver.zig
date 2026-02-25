@@ -16,6 +16,7 @@ const Diagnostic = @import("Diagnostic.zig");
 const render = @import("render.zig");
 const Codegen = @import("Codegen.zig");
 const Sema = @import("Sema.zig");
+const CImport = @import("CImport.zig");
 
 const Driver = @This();
 
@@ -24,6 +25,12 @@ pool: InternPool,
 diagnostics: Diagnostic.DiagnosticList,
 /// Arena for AST nodes and other compilation artifacts.
 arena: std.heap.ArenaAllocator,
+/// Set of already-imported file paths (to avoid duplicates and cycles).
+imported_paths: std.StringHashMapUnmanaged(void),
+/// Directory of the main source file being compiled (for relative imports).
+source_dir: []const u8,
+/// Next file ID for imported sources.
+next_file_id: Span.FileId,
 
 pub fn init(allocator: std.mem.Allocator) Driver {
     return .{
@@ -31,6 +38,9 @@ pub fn init(allocator: std.mem.Allocator) Driver {
         .pool = InternPool.init(allocator),
         .diagnostics = Diagnostic.DiagnosticList.init(allocator),
         .arena = std.heap.ArenaAllocator.init(allocator),
+        .imported_paths = .empty,
+        .source_dir = ".",
+        .next_file_id = 1,
     };
 }
 
@@ -38,11 +48,20 @@ pub fn deinit(self: *Driver) void {
     self.arena.deinit();
     self.pool.deinit();
     self.diagnostics.deinit();
+    // Free duplicated keys from imported_paths
+    var it = self.imported_paths.iterator();
+    while (it.next()) |entry| {
+        self.allocator.free(@constCast(entry.key_ptr.*));
+    }
+    self.imported_paths.deinit(self.allocator);
 }
 
 /// Compile a single source file through the current pipeline.
 /// Returns the parsed module on success.
 pub fn compileFile(self: *Driver, path: []const u8) !?Ast.Module {
+    // Store source directory for import resolution.
+    self.source_dir = std.fs.path.dirname(path) orelse ".";
+
     // Load source.
     var source = Source.fromFile(path, 0, self.allocator) catch |e| {
         var buf: [4096]u8 = undefined;
@@ -76,7 +95,7 @@ pub fn compileSource(self: *Driver, source: *Source) !?Ast.Module {
         &self.pool,
         &self.diagnostics,
     );
-    const module = parser.parseModule() catch {
+    var module = parser.parseModule() catch {
         try self.reportErrors(source);
         return null;
     };
@@ -85,6 +104,18 @@ pub fn compileSource(self: *Driver, source: *Source) !?Ast.Module {
         try self.reportErrors(source);
         return null;
     }
+
+    // Phase 2.5a: Process c_import declarations (expand to extern fn decls).
+    module = self.processCImports(module) catch {
+        self.writeStderr("error: c_import processing failed\n");
+        return null;
+    };
+
+    // Phase 2.5b: Process use imports (expand to imported declarations).
+    module = self.processImports(module) catch {
+        self.writeStderr("error: import processing failed\n");
+        return null;
+    };
 
     // Phase 3: Semantic analysis.
     var sema = Sema.init(self.arena.allocator(), &self.pool, &self.diagnostics);
@@ -199,6 +230,235 @@ pub fn buildBinary(self: *Driver, source_path: []const u8) !?[]const u8 {
     std.fs.cwd().deleteFile(obj_path) catch {};
 
     return bin_path;
+}
+
+// ── Import resolution ───────────────────────────────────────────
+
+const ImportError = error{ OutOfMemory, ParseFailed, PathTooLong, NotFound };
+
+/// Resolve `use` declarations by loading and parsing imported files,
+/// then replacing use_decl nodes with the imported declarations.
+fn processImports(self: *Driver, module: Ast.Module) ImportError!Ast.Module {
+    var has_imports = false;
+    for (module.decls) |decl| {
+        if (decl.kind == .use_decl) {
+            const path = decl.kind.use_decl.path;
+            if (path.len > 0) {
+                has_imports = true;
+                break;
+            }
+        }
+    }
+    if (!has_imports) return module;
+
+    const arena_alloc = self.arena.allocator();
+    var new_decls: std.ArrayList(Ast.Decl) = .empty;
+
+    for (module.decls) |decl| {
+        if (decl.kind == .use_decl) {
+            const use = decl.kind.use_decl;
+            if (use.path.len == 0) {
+                try new_decls.append(arena_alloc, decl);
+                continue;
+            }
+
+            // Try to resolve the use path to a file.
+            const file_path = self.resolveModulePath(use.path) catch {
+                // Unresolvable import — keep the use_decl (Sema ignores it)
+                try new_decls.append(arena_alloc, decl);
+                continue;
+            };
+
+            if (file_path) |path| {
+                // Check for duplicate imports.
+                if (self.imported_paths.get(path) != null) {
+                    // Already imported — skip.
+                    continue;
+                }
+
+                // Mark as imported.
+                const key = self.allocator.dupe(u8, path) catch {
+                    try new_decls.append(arena_alloc, decl);
+                    continue;
+                };
+                self.imported_paths.put(self.allocator, key, {}) catch {
+                    self.allocator.free(key);
+                    try new_decls.append(arena_alloc, decl);
+                    continue;
+                };
+
+                // Parse the imported file.
+                const imported_decls = self.parseImportedFile(path) catch {
+                    // Failed to parse — keep original use_decl
+                    try new_decls.append(arena_alloc, decl);
+                    continue;
+                };
+
+                // Add all declarations from the imported file.
+                try new_decls.appendSlice(arena_alloc, imported_decls);
+            } else {
+                // No file found — keep the use_decl
+                try new_decls.append(arena_alloc, decl);
+            }
+        } else {
+            try new_decls.append(arena_alloc, decl);
+        }
+    }
+
+    return .{
+        .decls = new_decls.items,
+        .span = module.span,
+    };
+}
+
+/// Resolve a module path (e.g., ["std", "string"]) to a file path.
+/// Search order:
+///   1. Relative to source directory: <source_dir>/<path>.w
+///   2. In lib/ relative to the compiler binary: lib/<path>.w
+///   3. In lib/ relative to working directory: lib/<path>.w
+fn resolveModulePath(self: *Driver, path: []const Ast.Symbol) ImportError!?[]const u8 {
+    const arena_alloc = self.arena.allocator();
+
+    // Build the relative path: join segments with '/' and append '.w'
+    var path_buf: [4096]u8 = undefined;
+    var pos: usize = 0;
+    for (path, 0..) |seg, i| {
+        if (i > 0) {
+            path_buf[pos] = '/';
+            pos += 1;
+        }
+        const name = self.pool.resolve(seg);
+        if (pos + name.len >= path_buf.len) return null;
+        @memcpy(path_buf[pos .. pos + name.len], name);
+        pos += name.len;
+    }
+    @memcpy(path_buf[pos .. pos + 2], ".w");
+    pos += 2;
+    const rel_path = path_buf[0..pos];
+
+    // Strategy 1: relative to source directory
+    {
+        const full = std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ self.source_dir, rel_path }) catch return null;
+        if (fileExists(full)) return full;
+    }
+
+    // Strategy 2: lib/ relative to project root (find by looking for build.zig)
+    const project_root = findProjectRoot() catch null;
+    if (project_root) |root| {
+        const full = std.fmt.allocPrint(arena_alloc, "{s}/lib/{s}", .{ root, rel_path }) catch return null;
+        if (fileExists(full)) return full;
+    }
+
+    // Strategy 3: lib/ relative to working directory
+    {
+        const full = std.fmt.allocPrint(arena_alloc, "lib/{s}", .{rel_path}) catch return null;
+        if (fileExists(full)) return full;
+    }
+
+    return null;
+}
+
+/// Parse an imported file and return its declarations.
+/// Recursively processes c_import and use declarations in the imported file.
+fn parseImportedFile(self: *Driver, path: []const u8) ImportError![]const Ast.Decl {
+    const arena_alloc = self.arena.allocator();
+    const file_id = self.next_file_id;
+    self.next_file_id += 1;
+
+    // Load and lex the file.
+    var source = Source.fromFile(path, file_id, self.allocator) catch return error.ParseFailed;
+    defer source.deinit();
+
+    var lexer = Lexer.init(source.text, source.file_id, &self.diagnostics);
+    var tokens = lexer.tokenize(self.allocator) catch return error.ParseFailed;
+    defer tokens.deinit();
+
+    if (self.diagnostics.hasErrors()) return error.ParseFailed;
+
+    // Parse.
+    var parser = Parser.init(
+        &tokens,
+        source.text,
+        arena_alloc,
+        &self.pool,
+        &self.diagnostics,
+    );
+    var module = parser.parseModule() catch return error.ParseFailed;
+
+    if (self.diagnostics.hasErrors()) return error.ParseFailed;
+
+    // Process c_imports in the imported file.
+    module = self.processCImports(module) catch return error.ParseFailed;
+
+    // Recursively process use imports in the imported file.
+    // Save and restore source_dir for relative import resolution.
+    const saved_dir = self.source_dir;
+    self.source_dir = std.fs.path.dirname(path) orelse ".";
+    module = try self.processImports(module);
+    self.source_dir = saved_dir;
+
+    return module.decls;
+}
+
+/// Replace c_import declarations with synthetic extern fn declarations.
+fn processCImports(self: *Driver, module: Ast.Module) !Ast.Module {
+    var has_c_import = false;
+    for (module.decls) |decl| {
+        if (decl.kind == .c_import) {
+            has_c_import = true;
+            break;
+        }
+    }
+    if (!has_c_import) return module;
+
+    const arena_alloc = self.arena.allocator();
+    var new_decls: std.ArrayList(Ast.Decl) = .empty;
+
+    for (module.decls) |decl| {
+        if (decl.kind == .c_import) {
+            const synthetic = try CImport.processCImport(
+                decl.kind.c_import.header_code,
+                arena_alloc,
+                &self.pool,
+            );
+            try new_decls.appendSlice(arena_alloc, synthetic);
+        } else {
+            try new_decls.append(arena_alloc, decl);
+        }
+    }
+
+    return .{
+        .decls = new_decls.items,
+        .span = module.span,
+    };
+}
+
+// ── Helpers ─────────────────────────────────────────────────────
+
+fn fileExists(path: []const u8) bool {
+    const file = std.fs.cwd().openFile(path, .{}) catch return false;
+    file.close();
+    return true;
+}
+
+/// Walk up from CWD to find the project root (directory containing build.zig).
+fn findProjectRoot() error{ PathTooLong, NotFound }![]const u8 {
+    var path_buf: [4096]u8 = undefined;
+    const cwd = std.process.getCwd(&path_buf) catch return error.NotFound;
+    // We need to iterate up parent directories; use a separate buffer to track current dir
+    var dir: []const u8 = cwd;
+    var check_buf: [4096]u8 = undefined;
+    while (true) {
+        const check_path = std.fmt.bufPrint(&check_buf, "{s}/build.zig", .{dir}) catch return error.PathTooLong;
+        const file = std.fs.cwd().openFile(check_path, .{}) catch {
+            const parent = std.fs.path.dirname(dir) orelse return error.NotFound;
+            if (std.mem.eql(u8, parent, dir)) return error.NotFound;
+            dir = parent;
+            continue;
+        };
+        file.close();
+        return dir;
+    }
 }
 
 fn writeStderr(self: *const Driver, msg: []const u8) void {

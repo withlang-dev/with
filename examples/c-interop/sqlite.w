@@ -12,13 +12,7 @@
 //   - String interpolation
 // ===================================================================
 
-extern fn printf(fmt: *const i8, ...) -> i32
-extern fn puts(s: *const i8) -> i32
-extern fn strlen(s: *const i8) -> i64
-extern fn strcmp(a: *const i8, b: *const i8) -> i32
-extern fn malloc(size: i64) -> *const i8
-extern fn free(ptr: *const i8) -> i32
-extern fn memcpy(dst: *const i8, src: *const i8, n: i64) -> *const i8
+use c_import("#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>")
 
 // --- Safe string wrapper ---
 

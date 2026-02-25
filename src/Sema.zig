@@ -381,6 +381,9 @@ fn collectDeclarations(self: *Sema, module: *const Ast.Module) void {
             .extern_fn => |ext| self.collectExternFn(ext),
             .let_decl => |ld| self.collectLetDecl(ld),
             .use_decl => {}, // use decls are no-ops for now
+            .c_import => {}, // already expanded by Driver
+            .trait_decl => {}, // trait declarations collected but not enforced yet
+            .impl_decl => {}, // impl blocks recorded for future trait checking
             .poisoned => {},
         }
     }

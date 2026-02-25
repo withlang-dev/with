@@ -95,6 +95,7 @@ pub fn build(b: *std.Build) void {
     link_cmd.addArgs(&.{
         "-Wl,-rpath," ++ llvm_prefix ++ "/lib",
         "-L/opt/homebrew/lib",
+        "-lclang",
         "-lc++",
         "-lc++abi",
         "-lz",

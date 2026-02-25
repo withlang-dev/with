@@ -103,6 +103,37 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
                 try renderTypeExpr(rt, pool, writer);
             }
         },
+        .c_import => |ci| {
+            try writer.print("use c_import(\"{s}\")", .{ci.header_code});
+        },
+        .trait_decl => |td| {
+            if (td.is_pub == .public) try writer.writeAll("pub ");
+            try writer.print("trait {s} =\n", .{pool.resolve(td.name)});
+            for (td.methods) |m| {
+                try writer.print("    fn {s}(", .{pool.resolve(m.name)});
+                for (m.params, 0..) |p, pi| {
+                    if (pi > 0) try writer.writeAll(", ");
+                    try writer.print("{s}", .{pool.resolve(p.name)});
+                    if (p.type_expr) |te| {
+                        try writer.writeAll(": ");
+                        try renderTypeExpr(te, pool, writer);
+                    }
+                }
+                try writer.writeAll(")");
+                if (m.return_type) |rt| {
+                    try writer.writeAll(" -> ");
+                    try renderTypeExpr(rt, pool, writer);
+                }
+                try writer.writeAll("\n");
+            }
+        },
+        .impl_decl => |id| {
+            if (id.trait_name) |tn| {
+                try writer.print("impl {s} for {s}", .{ pool.resolve(tn), pool.resolve(id.type_name) });
+            } else {
+                try writer.print("extend {s}", .{pool.resolve(id.type_name)});
+            }
+        },
         .poisoned => try writer.writeAll("<poisoned>"),
     }
 }
