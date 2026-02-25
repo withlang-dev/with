@@ -7728,6 +7728,30 @@ fn declareEnumType(self: *Codegen, name_sym: u32, variants: []const Ast.VariantD
                 has_payload = true;
                 const size = c.LLVMABISizeOfType(c.LLVMGetModuleDataLayout(self.module), pt);
                 if (size > max_payload_size) max_payload_size = size;
+            } else if (payload_types.len > 1) {
+                // Multi-payload variant: create an anonymous struct for the payload.
+                var field_types_buf: [16]c.LLVMTypeRef = undefined;
+                var ok = true;
+                for (payload_types, 0..) |pt_expr, pi| {
+                    field_types_buf[pi] = self.resolveType(pt_expr) catch {
+                        ok = false;
+                        break;
+                    };
+                }
+                if (ok) {
+                    const payload_struct = c.LLVMStructTypeInContext(
+                        self.context,
+                        &field_types_buf,
+                        @intCast(payload_types.len),
+                        0,
+                    );
+                    variant_payload_types[i] = payload_struct;
+                    has_payload = true;
+                    const size = c.LLVMABISizeOfType(c.LLVMGetModuleDataLayout(self.module), payload_struct);
+                    if (size > max_payload_size) max_payload_size = size;
+                } else {
+                    variant_payload_types[i] = null;
+                }
             } else {
                 variant_payload_types[i] = null;
             }
@@ -7866,12 +7890,26 @@ fn genEnumVariant(self: *Codegen, ev: Ast.EnumVariantExpr) Error!c.LLVMValueRef 
     // Store payload if this variant has one.
     if (enum_info.variant_payload_types[idx]) |payload_type| {
         if (ev.args.len > 0) {
-            const payload_val = try self.genExpr(ev.args[0]);
             const payload_gep = c.LLVMBuildStructGEP2(self.builder, enum_info.llvm_type, alloca, 1, "payload");
             // Bitcast the payload storage (which is [N x i8]) to the payload type ptr.
             const payload_store = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
-            const coerced = self.coerceInt(payload_val, payload_type);
-            _ = c.LLVMBuildStore(self.builder, coerced, payload_store);
+
+            if (ev.args.len == 1) {
+                // Single-payload variant.
+                const payload_val = try self.genExpr(ev.args[0]);
+                const coerced = self.coerceInt(payload_val, payload_type);
+                _ = c.LLVMBuildStore(self.builder, coerced, payload_store);
+            } else {
+                // Multi-payload variant: payload_type is a struct, store each field.
+                const struct_alloca = c.LLVMBuildAlloca(self.builder, payload_type, "mp.tmp");
+                for (ev.args, 0..) |arg, fi| {
+                    const field_val = try self.genExpr(arg);
+                    const field_gep = c.LLVMBuildStructGEP2(self.builder, payload_type, struct_alloca, @intCast(fi), "mp.field");
+                    _ = c.LLVMBuildStore(self.builder, field_val, field_gep);
+                }
+                const struct_val = c.LLVMBuildLoad2(self.builder, payload_type, struct_alloca, "mp.val");
+                _ = c.LLVMBuildStore(self.builder, struct_val, payload_store);
+            }
         }
     }
 
@@ -8042,15 +8080,33 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
                                     const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
                                     const payload_val = c.LLVMBuildLoad2(self.builder, payload_type, payload_ptr, "payload");
 
-                                    // Bind the first payload name.
-                                    const bind_sym = vp.bindings[0];
-                                    const bind_alloca = c.LLVMBuildAlloca(self.builder, payload_type, "");
-                                    _ = c.LLVMBuildStore(self.builder, payload_val, bind_alloca);
-                                    self.locals.put(self.allocator, bind_sym, .{
-                                        .alloca = bind_alloca,
-                                        .ty = payload_type,
-                                        .is_mut = false,
-                                    }) catch return error.CodegenAlloc;
+                                    if (vp.bindings.len == 1) {
+                                        // Single binding: bind the whole payload.
+                                        const bind_sym = vp.bindings[0];
+                                        const bind_alloca = c.LLVMBuildAlloca(self.builder, payload_type, "");
+                                        _ = c.LLVMBuildStore(self.builder, payload_val, bind_alloca);
+                                        self.locals.put(self.allocator, bind_sym, .{
+                                            .alloca = bind_alloca,
+                                            .ty = payload_type,
+                                            .is_mut = false,
+                                        }) catch return error.CodegenAlloc;
+                                    } else {
+                                        // Multi-binding: payload_type is a struct, extract each field.
+                                        const pval_alloca = c.LLVMBuildAlloca(self.builder, payload_type, "mp.ext");
+                                        _ = c.LLVMBuildStore(self.builder, payload_val, pval_alloca);
+                                        for (vp.bindings, 0..) |bind_sym, bi| {
+                                            const field_ty = c.LLVMStructGetTypeAtIndex(payload_type, @intCast(bi));
+                                            const field_gep = c.LLVMBuildStructGEP2(self.builder, payload_type, pval_alloca, @intCast(bi), "mp.f");
+                                            const field_val = c.LLVMBuildLoad2(self.builder, field_ty, field_gep, "mp.v");
+                                            const bind_alloca = c.LLVMBuildAlloca(self.builder, field_ty, "");
+                                            _ = c.LLVMBuildStore(self.builder, field_val, bind_alloca);
+                                            self.locals.put(self.allocator, bind_sym, .{
+                                                .alloca = bind_alloca,
+                                                .ty = field_ty,
+                                                .is_mut = false,
+                                            }) catch return error.CodegenAlloc;
+                                        }
+                                    }
                                 }
                             }
                             break;
@@ -8091,13 +8147,32 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
                                         const pgep = c.LLVMBuildStructGEP2(self.builder, subject_type, tmp2, 1, "");
                                         const pptr = c.LLVMBuildBitCast(self.builder, pgep, c.LLVMPointerTypeInContext(self.context, 0), "");
                                         const pval = c.LLVMBuildLoad2(self.builder, payload_type, pptr, "at.payload");
-                                        const ba2 = c.LLVMBuildAlloca(self.builder, payload_type, "");
-                                        _ = c.LLVMBuildStore(self.builder, pval, ba2);
-                                        self.locals.put(self.allocator, vp.bindings[0], .{
-                                            .alloca = ba2,
-                                            .ty = payload_type,
-                                            .is_mut = false,
-                                        }) catch return error.CodegenAlloc;
+
+                                        if (vp.bindings.len == 1) {
+                                            const ba2 = c.LLVMBuildAlloca(self.builder, payload_type, "");
+                                            _ = c.LLVMBuildStore(self.builder, pval, ba2);
+                                            self.locals.put(self.allocator, vp.bindings[0], .{
+                                                .alloca = ba2,
+                                                .ty = payload_type,
+                                                .is_mut = false,
+                                            }) catch return error.CodegenAlloc;
+                                        } else {
+                                            // Multi-binding at_binding extraction.
+                                            const pval_alloca = c.LLVMBuildAlloca(self.builder, payload_type, "at.mp");
+                                            _ = c.LLVMBuildStore(self.builder, pval, pval_alloca);
+                                            for (vp.bindings, 0..) |bind_sym, bi| {
+                                                const field_ty = c.LLVMStructGetTypeAtIndex(payload_type, @intCast(bi));
+                                                const field_gep = c.LLVMBuildStructGEP2(self.builder, payload_type, pval_alloca, @intCast(bi), "at.mp.f");
+                                                const field_val = c.LLVMBuildLoad2(self.builder, field_ty, field_gep, "at.mp.v");
+                                                const ba2 = c.LLVMBuildAlloca(self.builder, field_ty, "");
+                                                _ = c.LLVMBuildStore(self.builder, field_val, ba2);
+                                                self.locals.put(self.allocator, bind_sym, .{
+                                                    .alloca = ba2,
+                                                    .ty = field_ty,
+                                                    .is_mut = false,
+                                                }) catch return error.CodegenAlloc;
+                                            }
+                                        }
                                     }
                                 }
                                 break;
