@@ -100,6 +100,8 @@ const LocalInfo = struct {
     is_mut: bool,
     /// For function pointer locals: the underlying fn type for LLVMBuildCall2.
     fn_sig: ?c.LLVMTypeRef = null,
+    /// For pointer-to-struct locals: the pointee struct type (for field access through pointers).
+    pointee_struct: ?u32 = null,
 };
 
 const FnInfo = struct {
@@ -876,12 +878,22 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
 
         // If this parameter has a fn_type annotation, build the LLVM fn type.
         var fn_sig: ?c.LLVMTypeRef = null;
+        var pointee_struct: ?u32 = null;
         if (param.type_expr) |te| {
             if (te.kind == .fn_type) {
                 fn_sig = self.buildFnTypeFromAst(te.kind.fn_type) catch null;
             } else if (te.kind == .trait_object) {
                 // Track dyn Trait parameters for dynamic dispatch.
                 self.trait_locals.put(self.allocator, param.name, te.kind.trait_object) catch {};
+            } else if (te.kind == .ptr_type or te.kind == .ref_type) {
+                // Track pointer-to-struct for field access through pointers.
+                const pointee_te = if (te.kind == .ptr_type) te.kind.ptr_type.pointee else te.kind.ref_type.pointee;
+                if (pointee_te.kind == .named) {
+                    const ps = pointee_te.kind.named;
+                    if (self.struct_types.get(ps) != null) {
+                        pointee_struct = ps;
+                    }
+                }
             }
         }
 
@@ -890,6 +902,7 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
             .ty = param_type,
             .is_mut = param.is_mut,
             .fn_sig = fn_sig,
+            .pointee_struct = pointee_struct,
         }) catch return error.CodegenAlloc;
     }
 
@@ -2983,7 +2996,31 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             if (self.functions.get(fn_sym)) |fn_info| {
                 // Call with obj as first arg.
                 var args_buf: [64]c.LLVMValueRef = undefined;
-                args_buf[0] = obj_val;
+                // Check if first param expects a pointer (e.g. self: *mut T).
+                const first_param_type = if (c.LLVMCountParams(fn_info.value) > 0)
+                    c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, 0))
+                else
+                    null;
+                if (first_param_type != null and c.LLVMGetTypeKind(first_param_type.?) == c.LLVMPointerTypeKind and
+                    c.LLVMGetTypeKind(obj_type) != c.LLVMPointerTypeKind)
+                {
+                    // Method expects pointer but we have a value — pass the alloca address.
+                    if (fa.expr.kind == .ident) {
+                        const sym = fa.expr.kind.ident;
+                        if (self.locals.get(sym)) |local| {
+                            args_buf[0] = local.alloca;
+                        } else {
+                            args_buf[0] = obj_val;
+                        }
+                    } else {
+                        // For non-ident expressions, alloca a temp and pass its address.
+                        const tmp = c.LLVMBuildAlloca(self.builder, obj_type, "tmp.self");
+                        _ = c.LLVMBuildStore(self.builder, obj_val, tmp);
+                        args_buf[0] = tmp;
+                    }
+                } else {
+                    args_buf[0] = obj_val;
+                }
                 for (args, 0..) |arg, i| {
                     args_buf[i + 1] = try self.genExpr(arg);
                 }
@@ -2996,7 +3033,7 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
                     const arg_type = c.LLVMTypeOf(args_buf[i]);
                     if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
                         args_buf[i] = self.extractStrPtr(args_buf[i]);
-                    } else {
+                    } else if (c.LLVMGetTypeKind(param_type) != c.LLVMPointerTypeKind or c.LLVMGetTypeKind(arg_type) != c.LLVMPointerTypeKind) {
                         args_buf[i] = self.coerceInt(args_buf[i], param_type);
                     }
                 }
@@ -3155,13 +3192,24 @@ fn genAssign(self: *Codegen, assign: Ast.AssignExpr) Error!c.LLVMValueRef {
             };
             const local = self.locals.get(obj_sym) orelse return error.UnsupportedExpr;
             if (!local.is_mut) return error.ImmutableAssign;
-            const struct_info = self.findStructTypeByLlvm(local.ty) orelse return error.UnsupportedType;
-            const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
 
-            const gep = c.LLVMBuildStructGEP2(self.builder, local.ty, local.alloca, @intCast(idx), "");
-            const val = try self.genExpr(assign.value);
-            const coerced = self.coerceInt(val, struct_info.field_types[idx]);
-            _ = c.LLVMBuildStore(self.builder, coerced, gep);
+            // Pointer-to-struct field assignment (e.g. self.field = val where self: *mut T).
+            if (local.pointee_struct) |ps| {
+                const struct_info = self.struct_types.get(ps) orelse return error.UnsupportedType;
+                const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
+                const ptr_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "ptr");
+                const gep = c.LLVMBuildStructGEP2(self.builder, struct_info.llvm_type, ptr_val, @intCast(idx), "");
+                const val = try self.genExpr(assign.value);
+                const coerced = self.coerceInt(val, struct_info.field_types[idx]);
+                _ = c.LLVMBuildStore(self.builder, coerced, gep);
+            } else {
+                const struct_info = self.findStructTypeByLlvm(local.ty) orelse return error.UnsupportedType;
+                const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
+                const gep = c.LLVMBuildStructGEP2(self.builder, local.ty, local.alloca, @intCast(idx), "");
+                const val = try self.genExpr(assign.value);
+                const coerced = self.coerceInt(val, struct_info.field_types[idx]);
+                _ = c.LLVMBuildStore(self.builder, coerced, gep);
+            }
         },
         .index => |idx| {
             // arr[i] = expr
@@ -3274,6 +3322,16 @@ fn genFor(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
     if (for_e.iterable.kind == .ident) {
         if (self.slice_elem_types.get(for_e.iterable.kind.ident)) |_| {
             return self.genForSlice(for_e);
+        }
+    }
+    // Check if iterable is a struct with a next() method (custom iterator).
+    if (for_e.iterable.kind == .ident) {
+        if (self.locals.get(for_e.iterable.kind.ident)) |local| {
+            if (c.LLVMGetTypeKind(local.ty) == c.LLVMStructTypeKind) {
+                if (self.findNextMethod(local.ty)) |_| {
+                    return self.genForIterator(for_e);
+                }
+            }
         }
     }
     // Otherwise, try to generate as an array iteration.
@@ -3481,6 +3539,100 @@ fn genForSlice(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
 
     self.loop_depth -= 1;
 
+    c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+/// Find the `Type.next` method for a struct type. Returns the FnInfo if found.
+fn findNextMethod(self: *Codegen, struct_type: c.LLVMTypeRef) ?FnInfo {
+    // Look up the struct type name.
+    var type_sym: ?u32 = null;
+    var it = self.struct_types.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == struct_type) {
+            type_sym = entry.key_ptr.*;
+            break;
+        }
+    }
+    const ts = type_sym orelse return null;
+    const type_name = self.pool.resolve(ts);
+    // Build "Type.next" method name.
+    var name_buf: [256]u8 = undefined;
+    if (type_name.len + 5 >= name_buf.len) return null;
+    @memcpy(name_buf[0..type_name.len], type_name);
+    @memcpy(name_buf[type_name.len .. type_name.len + 5], ".next");
+    const method_name = name_buf[0 .. type_name.len + 5];
+    const method_sym = self.pool.intern(method_name) catch return null;
+    return self.functions.get(method_sym);
+}
+
+/// Generate a for-in loop over a custom iterator with a next() method.
+/// Desugars to: loop { match iter.next() { Some(x) -> body, None -> break } }
+fn genForIterator(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
+    const iter_sym = for_e.iterable.kind.ident;
+    const local = self.locals.get(iter_sym) orelse return error.UnsupportedExpr;
+    const fn_info = self.findNextMethod(local.ty) orelse return error.UnsupportedExpr;
+
+    const function = self.current_function;
+    const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "iter.cond");
+    const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "iter.body");
+    const end_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "iter.end");
+
+    if (self.loop_depth >= self.loop_stack.len) return error.UnsupportedExpr;
+    self.loop_stack[self.loop_depth] = .{ .break_bb = end_bb, .continue_bb = cond_bb };
+    self.loop_depth += 1;
+
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    // Condition block: call next(), check tag.
+    c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+
+    // Pass pointer to iterator (self param) if the method takes a pointer, otherwise pass by value.
+    // Most iterator next() methods take *mut self, so pass pointer.
+    var args_buf = [_]c.LLVMValueRef{local.alloca};
+    const result = c.LLVMBuildCall2(self.builder, fn_info.fn_type, fn_info.value, &args_buf, 1, "next.result");
+    const result_type = c.LLVMTypeOf(result);
+
+    // Extract tag (field 0).
+    const tag = c.LLVMBuildExtractValue(self.builder, result, 0, "tag");
+    const is_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0), "is.some");
+    _ = c.LLVMBuildCondBr(self.builder, is_some, body_bb, end_bb);
+
+    // Body block: extract payload and bind to loop variable.
+    c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    const result_alloca = c.LLVMBuildAlloca(self.builder, result_type, "next.tmp");
+    _ = c.LLVMBuildStore(self.builder, result, result_alloca);
+    const payload_gep = c.LLVMBuildStructGEP2(self.builder, result_type, result_alloca, 1, "payload.ptr");
+    // Determine the payload type from the Option type's payload.
+    const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+
+    // Try to find the payload type from option_type_cache.
+    var elem_type: c.LLVMTypeRef = c.LLVMInt32TypeInContext(self.context); // default
+    var opt_it = self.option_type_cache.iterator();
+    while (opt_it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == result_type) {
+            elem_type = entry.value_ptr.payload_type;
+            break;
+        }
+    }
+
+    const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, payload_ptr, "iter.elem");
+    const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
+    _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
+
+    self.locals.put(self.allocator, for_e.binding, .{
+        .alloca = elem_alloca,
+        .ty = elem_type,
+        .is_mut = false,
+    }) catch return error.CodegenAlloc;
+
+    _ = try self.genExpr(for_e.body);
+    const body_end_bb = c.LLVMGetInsertBlock(self.builder);
+    if (c.LLVMGetBasicBlockTerminator(body_end_bb) == null) {
+        _ = c.LLVMBuildBr(self.builder, cond_bb);
+    }
+
+    self.loop_depth -= 1;
     c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
@@ -4262,6 +4414,16 @@ fn genFieldAccess(self: *Codegen, fa: Ast.FieldAccessExpr) Error!c.LLVMValueRef 
                 const gep = c.LLVMBuildStructGEP2(self.builder, local.ty, local.alloca, idx, "");
                 return c.LLVMBuildLoad2(self.builder, elem_type, gep, "tuple.elem");
             } else |_| {}
+        }
+
+        // Check for pointer-to-struct field access (e.g. c.current where c: *mut Counter).
+        if (local.pointee_struct) |ps| {
+            const struct_info = self.struct_types.get(ps) orelse return error.UnsupportedType;
+            const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
+            // Load the pointer value, then GEP into the struct.
+            const ptr_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "ptr");
+            const gep = c.LLVMBuildStructGEP2(self.builder, struct_info.llvm_type, ptr_val, @intCast(idx), "");
+            return c.LLVMBuildLoad2(self.builder, struct_info.field_types[idx], gep, "ptr.field");
         }
 
         // Find which struct type this local is.
