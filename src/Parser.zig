@@ -1233,6 +1233,12 @@ fn parseIfExpr(self: *Parser) !*const Ast.Expr {
     const start = self.currentSpan();
     self.advance(); // consume 'if'
     self.skipNewlines();
+
+    // Check for `if let Pattern = expr` (desugars to match).
+    if (self.peek() == .kw_let) {
+        return self.parseIfLet(start);
+    }
+
     const cond = try self.parseExpr();
 
     if (self.peek() == .kw_then) {
@@ -1261,6 +1267,72 @@ fn parseIfExpr(self: *Parser) !*const Ast.Expr {
             .condition = cond,
             .then_body = then_body,
             .else_body = else_body,
+        } },
+        .span = start.merge(end_span),
+    };
+    return node;
+}
+
+fn parseIfLet(self: *Parser, start: Span) !*const Ast.Expr {
+    self.advance(); // consume 'let'
+    const pattern = try self.parsePattern();
+    try self.expect(.eq);
+    const subject = try self.parseExpr();
+
+    // Expect then/colon delimiter.
+    if (self.peek() == .kw_then) {
+        self.advance();
+    } else if (self.peek() == .colon) {
+        self.advance();
+    }
+    self.skipNewlines();
+
+    const then_body = try self.parseBlockOrExpr();
+
+    // Parse optional else branch.
+    var else_body: ?*const Ast.Expr = null;
+    const save = self.pos;
+    self.skipNewlines();
+    if (self.peek() == .kw_else) {
+        self.advance();
+        self.skipNewlines();
+        else_body = try self.parseBlockOrExpr();
+    } else {
+        self.pos = save;
+    }
+
+    // Desugar to match:
+    //   match subject
+    //       Pattern -> then_body
+    //       _ -> else_body (or void)
+    var arms: std.ArrayList(Ast.MatchArm) = .empty;
+    try arms.append(self.arena, .{
+        .pattern = pattern,
+        .body = then_body,
+        .span = start.merge(then_body.span),
+    });
+
+    // Always add a wildcard/else arm.
+    const else_expr = if (else_body) |eb| eb else blk: {
+        const void_node = try self.arena.create(Ast.Expr);
+        void_node.* = .{
+            .kind = .{ .int_literal = 0 },
+            .span = start,
+        };
+        break :blk void_node;
+    };
+    try arms.append(self.arena, .{
+        .pattern = .{ .kind = .wildcard, .span = start },
+        .body = else_expr,
+        .span = start.merge(else_expr.span),
+    });
+
+    const end_span = if (else_body) |eb| eb.span else then_body.span;
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .match_expr = .{
+            .subject = subject,
+            .arms = arms.items,
         } },
         .span = start.merge(end_span),
     };
