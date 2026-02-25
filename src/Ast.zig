@@ -180,6 +180,8 @@ pub const ExprKind = union(enum) {
     return_expr: ?*const Expr,
     /// Let binding (as statement-expression in a block)
     let_binding: LetBinding,
+    /// Tuple destructuring: `let (a, b) = expr`
+    tuple_destructure: TupleDestructure,
     /// Assignment: `x = expr`
     assign: AssignExpr,
     /// Tuple: `(a, b, c)`
@@ -301,6 +303,12 @@ pub const IfExpr = struct {
 pub const LetBinding = struct {
     name: Symbol,
     type_expr: ?*const TypeExpr,
+    value: *const Expr,
+    is_mut: bool,
+};
+
+pub const TupleDestructure = struct {
+    names: []const Symbol,
     value: *const Expr,
     is_mut: bool,
 };
