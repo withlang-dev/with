@@ -291,16 +291,7 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
         } else return error.ParseError;
 
         // Parse optional type parameters
-        var type_params: std.ArrayList(u32) = .empty;
-        if (self.peek() == .l_bracket) {
-            self.advance();
-            try type_params.append(self.arena, try self.expectIdentifier());
-            while (self.peek() == .comma) {
-                self.advance();
-                try type_params.append(self.arena, try self.expectIdentifier());
-            }
-            try self.expect(.r_bracket);
-        }
+        const type_params = try self.parseTypeParams();
 
         try self.expect(.l_paren);
         const params = try self.parseParamList();
@@ -319,7 +310,7 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
         try methods.append(self.arena, .{
             .kind = .{ .function = .{
                 .name = mangled_name,
-                .type_params = type_params.items,
+                .type_params = type_params,
                 .params = params,
                 .return_type = return_type,
                 .body = body,
@@ -363,17 +354,8 @@ fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async
             name = self.pool.intern(buf[0 .. type_str.len + 1 + method_str.len]) catch return error.ParseError;
         }
     }
-    // Parse optional type parameters: fn foo[T, U](...)
-    var type_params: std.ArrayList(u32) = .empty;
-    if (self.peek() == .l_bracket) {
-        self.advance();
-        try type_params.append(self.arena, try self.expectIdentifier());
-        while (self.peek() == .comma) {
-            self.advance();
-            try type_params.append(self.arena, try self.expectIdentifier());
-        }
-        try self.expect(.r_bracket);
-    }
+    // Parse optional type parameters: fn foo[T, U](...)  or  fn foo[T: Trait1 + Trait2](...)
+    const type_params = try self.parseTypeParams();
 
     try self.expect(.l_paren);
     const params = try self.parseParamList();
@@ -391,7 +373,7 @@ fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async
     return .{
         .kind = .{ .function = .{
             .name = name,
-            .type_params = type_params.items,
+            .type_params = type_params,
             .params = params,
             .return_type = return_type,
             .body = body,
@@ -1888,6 +1870,45 @@ fn parseParam(self: *Parser) !Ast.Param {
         .type_expr = type_expr,
         .is_mut = is_mut,
         .span = start.merge(self.prevSpan()),
+    };
+}
+
+// ── Type parameter parsing ───────────────────────────────────────
+
+/// Parse optional type parameters: `[T]`, `[T, U]`, `[T: Trait]`, `[T: Trait1 + Trait2]`
+fn parseTypeParams(self: *Parser) ![]const Ast.TypeParam {
+    if (self.peek() != .l_bracket) return &.{};
+    self.advance(); // consume '['
+
+    var params: std.ArrayList(Ast.TypeParam) = .empty;
+    try params.append(self.arena, try self.parseOneTypeParam());
+    while (self.peek() == .comma) {
+        self.advance();
+        try params.append(self.arena, try self.parseOneTypeParam());
+    }
+    try self.expect(.r_bracket);
+    return params.items;
+}
+
+/// Parse a single type parameter: `T` or `T: Trait1 + Trait2`
+fn parseOneTypeParam(self: *Parser) !Ast.TypeParam {
+    const name = try self.expectIdentifier();
+    var bounds: std.ArrayList(Ast.Symbol) = .empty;
+
+    if (self.peek() == .colon) {
+        self.advance(); // consume ':'
+        // Parse first bound
+        try bounds.append(self.arena, try self.expectIdentifier());
+        // Parse additional bounds separated by '+'
+        while (self.peek() == .plus) {
+            self.advance();
+            try bounds.append(self.arena, try self.expectIdentifier());
+        }
+    }
+
+    return .{
+        .name = name,
+        .bounds = bounds.items,
     };
 }
 

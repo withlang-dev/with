@@ -73,9 +73,16 @@ pub const TraitMethodSig = struct {
 
 pub const Visibility = enum { private, public };
 
+/// A generic type parameter with optional trait bounds.
+/// `T` or `T: Show` or `T: Show + Hash`
+pub const TypeParam = struct {
+    name: Symbol,
+    bounds: []const Symbol, // trait names (empty if no bounds)
+};
+
 pub const FnDecl = struct {
     name: Symbol,
-    type_params: []const Symbol,
+    type_params: []const TypeParam,
     params: []const Param,
     return_type: ?*const TypeExpr,
     body: *const Expr,

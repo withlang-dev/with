@@ -1879,7 +1879,7 @@ fn monomorphizeCall(self: *Codegen, gen_fn: Ast.FnDecl, args: []const *const Ast
         pos += 1;
         mangled_buf[pos] = '_';
         pos += 1;
-        const type_name = self.llvmTypeName(self.lookupTypeParam(tp, &type_map, type_map_len));
+        const type_name = self.llvmTypeName(self.lookupTypeParam(tp.name, &type_map, type_map_len));
         @memcpy(mangled_buf[pos..][0..type_name.len], type_name);
         pos += type_name.len;
     }
@@ -2000,7 +2000,7 @@ fn inferTypeParams(
     self: *const Codegen,
     type_expr: *const Ast.TypeExpr,
     arg_type: c.LLVMTypeRef,
-    type_params: []const u32,
+    type_params: []const Ast.TypeParam,
     type_map: *[16]TypeBinding,
     type_map_len: *u32,
 ) void {
@@ -2008,7 +2008,7 @@ fn inferTypeParams(
         .named => |sym| {
             // Check if this is a type parameter.
             for (type_params) |tp| {
-                if (tp == sym) {
+                if (tp.name == sym) {
                     // Check if already bound.
                     for (type_map[0..type_map_len.*]) |entry| {
                         if (entry.sym == sym) return; // already bound
@@ -2059,7 +2059,13 @@ fn llvmTypeName(_: *const Codegen, ty: c.LLVMTypeRef) []const u8 {
     if (kind == c.LLVMDoubleTypeKind) return "f64";
     if (kind == c.LLVMFloatTypeKind) return "f32";
     if (kind == c.LLVMPointerTypeKind) return "ptr";
-    if (kind == c.LLVMStructTypeKind) return "struct";
+    if (kind == c.LLVMStructTypeKind) {
+        const name_ptr = c.LLVMGetStructName(ty);
+        if (name_ptr != null) {
+            return std.mem.span(name_ptr);
+        }
+        return "struct";
+    }
     if (kind == c.LLVMArrayTypeKind) return "array";
     return "unknown";
 }
@@ -2067,7 +2073,7 @@ fn llvmTypeName(_: *const Codegen, ty: c.LLVMTypeRef) []const u8 {
 fn resolveTypeWithParams(
     self: *Codegen,
     type_expr: *const Ast.TypeExpr,
-    type_params: []const u32,
+    type_params: []const Ast.TypeParam,
     type_map: *const [16]TypeBinding,
     type_map_len: u32,
 ) Error!c.LLVMTypeRef {
@@ -2075,7 +2081,7 @@ fn resolveTypeWithParams(
         .named => |sym| {
             // Check if it's a type parameter — substitute.
             for (type_params) |tp| {
-                if (tp == sym) {
+                if (tp.name == sym) {
                     for (type_map[0..type_map_len]) |entry| {
                         if (entry.sym == sym) return entry.ty;
                     }
@@ -2487,11 +2493,16 @@ fn genLoop(self: *Codegen, body: *const Ast.Expr) Error!c.LLVMValueRef {
 }
 
 fn genFor(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
-    // The iterable must be a range expression.
-    const range = switch (for_e.iterable.kind) {
-        .range => |r| r,
-        else => return error.UnsupportedExpr,
-    };
+    // Check if the iterable is a range expression or an array.
+    if (for_e.iterable.kind == .range) {
+        return self.genForRange(for_e);
+    }
+    // Otherwise, try to generate as an array iteration.
+    return self.genForArray(for_e);
+}
+
+fn genForRange(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
+    const range = for_e.iterable.kind.range;
 
     const start_val = if (range.start) |s| try self.genExpr(s) else c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
     const end_val = if (range.end) |e| try self.genExpr(e) else return error.UnsupportedExpr;
@@ -2548,6 +2559,80 @@ fn genFor(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
     _ = c.LLVMBuildBr(self.builder, cond_bb);
 
     // Pop loop context.
+    self.loop_depth -= 1;
+
+    c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+fn genForArray(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
+    // Generate the iterable expression (should be an array).
+    const arr_val = try self.genExpr(for_e.iterable);
+    const arr_type = c.LLVMTypeOf(arr_val);
+
+    // Check if it's an array type.
+    if (c.LLVMGetTypeKind(arr_type) != c.LLVMArrayTypeKind) return error.UnsupportedExpr;
+
+    const arr_len = c.LLVMGetArrayLength2(arr_type);
+    const elem_type = c.LLVMGetElementType(arr_type);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+
+    // Store array to memory so we can GEP into it.
+    const arr_alloca = c.LLVMBuildAlloca(self.builder, arr_type, "for.arr");
+    _ = c.LLVMBuildStore(self.builder, arr_val, arr_alloca);
+
+    // Create index variable (i64).
+    const idx_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "for.idx");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), idx_alloca);
+
+    // Create element variable for the binding.
+    const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
+
+    self.locals.put(self.allocator, for_e.binding, .{
+        .alloca = elem_alloca,
+        .ty = elem_type,
+        .is_mut = false,
+    }) catch return error.CodegenAlloc;
+
+    const function = self.current_function;
+    const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.cond");
+    const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.body");
+    const inc_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.inc");
+    const end_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.end");
+
+    if (self.loop_depth >= self.loop_stack.len) return error.UnsupportedExpr;
+    self.loop_stack[self.loop_depth] = .{ .break_bb = end_bb, .continue_bb = inc_bb };
+    self.loop_depth += 1;
+
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    // Condition: idx < arr_len.
+    c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+    const current_idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+    const len_val = c.LLVMConstInt(i64_type, arr_len, 0);
+    const cond = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, current_idx, len_val, "for.cmp");
+    _ = c.LLVMBuildCondBr(self.builder, cond, body_bb, end_bb);
+
+    // Body: load element, then execute body.
+    c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    var indices = [_]c.LLVMValueRef{ c.LLVMConstInt(i64_type, 0, 0), current_idx };
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &indices, 2, "elem.ptr");
+    const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "elem");
+    _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
+
+    _ = try self.genExpr(for_e.body);
+    const body_end_bb = c.LLVMGetInsertBlock(self.builder);
+    if (c.LLVMGetBasicBlockTerminator(body_end_bb) == null) {
+        _ = c.LLVMBuildBr(self.builder, inc_bb);
+    }
+
+    // Increment index.
+    c.LLVMPositionBuilderAtEnd(self.builder, inc_bb);
+    const loaded_idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+    const next_idx = c.LLVMBuildAdd(self.builder, loaded_idx, c.LLVMConstInt(i64_type, 1, 0), "inc");
+    _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
     self.loop_depth -= 1;
 
     c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
