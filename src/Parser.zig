@@ -1889,6 +1889,23 @@ fn parseTypeExpr(self: *Parser) !*const Ast.TypeExpr {
             };
             return node;
         },
+        .kw_dyn => {
+            const start = self.currentSpan();
+            self.advance(); // consume 'dyn'
+            if (self.peek() != .identifier) {
+                self.emitError("expected trait name after 'dyn'");
+                return error.ParseError;
+            }
+            const trait_sym = try self.internCurrent();
+            const end = self.currentSpan();
+            self.advance();
+            const node = try self.arena.create(Ast.TypeExpr);
+            node.* = .{
+                .kind = .{ .trait_object = trait_sym },
+                .span = start.merge(end),
+            };
+            return node;
+        },
         .identifier => {
             const span = self.currentSpan();
             const name_sym = try self.internCurrent();

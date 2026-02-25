@@ -673,6 +673,10 @@ fn resolveTypeExpr(self: *Sema, te: *const Ast.TypeExpr) TypeId {
             _ = self.resolveTypeExpr(inner);
             return error_type;
         },
+        .trait_object => {
+            // dyn Trait — trait object type. Treated as opaque for now.
+            return error_type;
+        },
         .generic => {
             // Generic type applications (e.g., Vec[T]) not yet resolved in Sema.
             return error_type;
