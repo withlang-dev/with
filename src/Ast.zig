@@ -211,6 +211,8 @@ pub const ExprKind = union(enum) {
     continue_expr,
     /// Array literal: `[1, 2, 3]`
     array_literal: []const *const Expr,
+    /// Array comprehension: `[expr for x in iter]` or `[expr for x in iter if cond]`
+    array_comprehension: ArrayComprehension,
     /// Struct literal: `Point { x: 1, y: 2 }`
     struct_literal: StructLiteral,
     /// Match expression: `match expr { pattern -> body, ... }`
@@ -344,6 +346,13 @@ pub const ForExpr = struct {
     binding: Symbol,
     iterable: *const Expr,
     body: *const Expr,
+};
+
+pub const ArrayComprehension = struct {
+    expr: *const Expr, // the expression to compute per element
+    binding: Symbol, // loop variable name
+    iterable: *const Expr, // what to iterate over
+    filter: ?*const Expr, // optional if-condition
 };
 
 pub const StructLiteral = struct {

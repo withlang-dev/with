@@ -983,6 +983,17 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
             },
             .dot => {
                 self.advance();
+                // Handle .await as postfix await expression.
+                if (self.peek() == .kw_await) {
+                    self.advance();
+                    const node = try self.arena.create(Ast.Expr);
+                    node.* = .{
+                        .kind = .{ .await_expr = lhs },
+                        .span = lhs.span.merge(self.prevSpan()),
+                    };
+                    lhs = node;
+                    continue;
+                }
                 // Handle tuple field access: `.0`, `.1`, etc.
                 const field = if (self.peek() == .int_literal) blk: {
                     const sym = try self.internCurrent();
@@ -2049,6 +2060,35 @@ fn parseArrayLiteral(self: *Parser) !*const Ast.Expr {
     var elems: std.ArrayList(*const Ast.Expr) = .empty;
     if (self.peek() != .r_bracket) {
         try elems.append(self.arena, try self.parseExpr());
+
+        // Check for comprehension: [expr for x in iter] or [expr for x in iter if cond]
+        if (self.peek() == .kw_for) {
+            const map_expr = elems.items[0];
+            self.advance(); // consume 'for'
+            const binding = try self.expectIdentifier();
+            try self.expect(.kw_in);
+            const iterable = try self.parseExpr();
+            // Optional filter: if cond
+            var filter: ?*const Ast.Expr = null;
+            if (self.peek() == .kw_if) {
+                self.advance(); // consume 'if'
+                filter = try self.parseExpr();
+            }
+            const end = self.currentSpan();
+            try self.expect(.r_bracket);
+            const node = try self.arena.create(Ast.Expr);
+            node.* = .{
+                .kind = .{ .array_comprehension = .{
+                    .expr = map_expr,
+                    .binding = binding,
+                    .iterable = iterable,
+                    .filter = filter,
+                } },
+                .span = start.merge(end),
+            };
+            return node;
+        }
+
         while (self.peek() == .comma) {
             self.advance();
             self.skipNewlines();

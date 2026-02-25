@@ -768,6 +768,28 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
         .index => |idx| self.checkIndex(idx, expr.span),
         .slice => |sl| self.checkSlice(sl),
         .array_literal => |elems| self.checkArrayLiteral(elems),
+        .array_comprehension => |comp| {
+            _ = self.checkExpr(comp.iterable);
+            // Create scope with binding variable.
+            var comp_scope = Scope.init();
+            comp_scope.parent = self.current_scope;
+            const saved_scope = self.current_scope;
+            self.current_scope = &comp_scope;
+            comp_scope.put(self.allocator, comp.binding, .{
+                .type_id = self.ty_i32,
+                .is_mut = false,
+                .state = .live,
+                .span = Span.zero,
+            });
+            const elem_type = self.checkExpr(comp.expr);
+            if (comp.filter) |f| _ = self.checkExpr(f);
+            comp_scope.deinit(self.allocator);
+            self.current_scope = saved_scope;
+            return self.addType(.{ .array_type = .{
+                .element = elem_type,
+                .size = 0,
+            } });
+        },
         .struct_literal => |sl| self.checkStructLiteral(sl, expr.span),
         .match_expr => |m| self.checkMatchExpr(m),
         .enum_variant => |ev| self.checkEnumVariant(ev, expr.span),

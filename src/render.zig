@@ -292,6 +292,17 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             }
             try writer.writeAll("]");
         },
+        .array_comprehension => |comp| {
+            try writer.writeAll("[");
+            try renderExpr(comp.expr, pool, writer, 0);
+            try writer.print(" for {s} in ", .{pool.resolve(comp.binding)});
+            try renderExpr(comp.iterable, pool, writer, 0);
+            if (comp.filter) |f| {
+                try writer.writeAll(" if ");
+                try renderExpr(f, pool, writer, 0);
+            }
+            try writer.writeAll("]");
+        },
         .struct_literal => |sl| {
             try writer.print("{s} {{ ", .{pool.resolve(sl.name)});
             for (sl.fields, 0..) |f, i| {

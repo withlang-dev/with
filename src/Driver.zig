@@ -138,25 +138,25 @@ pub fn dumpAst(self: *const Driver, module: *const Ast.Module) !void {
     try w.interface.flush();
 }
 
-/// Compile a module to an object file.
-pub fn compileToObject(self: *Driver, module: *const Ast.Module, output_path: [*:0]const u8) !bool {
+/// Compile a module to an object file. Returns whether async is used.
+pub fn compileToObject(self: *Driver, module: *const Ast.Module, output_path: [*:0]const u8) !?bool {
     var cg = Codegen.init("with_module", self.allocator) catch {
         self.writeStderr("error: failed to initialize LLVM\n");
-        return false;
+        return null;
     };
     defer cg.deinit();
 
     cg.genModule(module, &self.pool) catch {
         self.writeStderr("error: code generation failed\n");
-        return false;
+        return null;
     };
 
     cg.emitObjectFile(output_path) catch {
         self.writeStderr("error: failed to emit object file\n");
-        return false;
+        return null;
     };
 
-    return true;
+    return cg.uses_async;
 }
 
 /// Dump LLVM IR for a module to stdout.
@@ -178,7 +178,27 @@ pub fn emitIR(self: *Driver, module: *const Ast.Module) !bool {
 
 /// Link an object file into a binary using the system linker.
 pub fn link(obj_path: []const u8, bin_path: []const u8) !bool {
-    var child = std.process.Child.init(&.{ "cc", obj_path, "-o", bin_path }, std.heap.page_allocator);
+    return linkWithExtra(obj_path, bin_path, &.{});
+}
+
+/// Link with extra object files (e.g., fiber runtime for async programs).
+pub fn linkWithExtra(obj_path: []const u8, bin_path: []const u8, extra_objs: []const []const u8) !bool {
+    var args_buf: [32][]const u8 = undefined;
+    var argc: usize = 0;
+    args_buf[argc] = "cc";
+    argc += 1;
+    args_buf[argc] = obj_path;
+    argc += 1;
+    for (extra_objs) |extra| {
+        args_buf[argc] = extra;
+        argc += 1;
+    }
+    args_buf[argc] = "-o";
+    argc += 1;
+    args_buf[argc] = bin_path;
+    argc += 1;
+
+    var child = std.process.Child.init(args_buf[0..argc], std.heap.page_allocator);
     _ = child.spawn() catch |e| {
         var buf: [4096]u8 = undefined;
         var w = std.fs.File.stderr().writer(&buf);
@@ -217,10 +237,22 @@ pub fn buildBinary(self: *Driver, source_path: []const u8) !?[]const u8 {
 
     const bin_path = std.fmt.allocPrint(self.arena.allocator(), "{s}/{s}", .{ dir, stem }) catch return null;
 
-    const ok = try self.compileToObject(&module, obj_buf[0..obj_path.len :0]);
-    if (!ok) return null;
+    const uses_async = try self.compileToObject(&module, obj_buf[0..obj_path.len :0]);
+    if (uses_async == null) return null;
 
-    const link_ok = try link(obj_path, bin_path);
+    // If async is used, find and link the fiber runtime objects.
+    const link_ok = if (uses_async.?) blk: {
+        // Find runtime objects relative to the compiler binary.
+        const exe_dir = self.findExeDir() orelse {
+            break :blk try linkWithExtra(obj_path, bin_path, &.{});
+        };
+        var rt1_buf: [4096]u8 = undefined;
+        var rt2_buf: [4096]u8 = undefined;
+        const rt1 = std.fmt.bufPrint(&rt1_buf, "{s}/runtime/fiber.o", .{exe_dir}) catch break :blk try linkWithExtra(obj_path, bin_path, &.{});
+        const rt2 = std.fmt.bufPrint(&rt2_buf, "{s}/runtime/fiber_asm.o", .{exe_dir}) catch break :blk try linkWithExtra(obj_path, bin_path, &.{});
+        break :blk try linkWithExtra(obj_path, bin_path, &.{ rt1, rt2 });
+    } else try link(obj_path, bin_path);
+
     if (!link_ok) {
         self.writeStderr("error: linking failed\n");
         return null;
@@ -230,6 +262,14 @@ pub fn buildBinary(self: *Driver, source_path: []const u8) !?[]const u8 {
     std.fs.cwd().deleteFile(obj_path) catch {};
 
     return bin_path;
+}
+
+/// Find the directory containing the compiler executable (for runtime objects).
+fn findExeDir(self: *Driver) ?[]const u8 {
+    var buf: [4096]u8 = undefined;
+    const exe_path = std.fs.selfExePath(&buf) catch return null;
+    const dir = std.fs.path.dirname(exe_path) orelse return null;
+    return std.fmt.allocPrint(self.arena.allocator(), "{s}", .{dir}) catch null;
 }
 
 // ── Import resolution ───────────────────────────────────────────
