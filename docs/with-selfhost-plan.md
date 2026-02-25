@@ -741,3 +741,5 @@ for the compiler is a line of With that proves the language works.
 Every bug you fix makes the language better. Every feature you add
 is immediately available to the compiler itself. The flywheel starts
 spinning.*
+
+Triple-Test: when you compile the sources with the bootstrap compiler to create stage0, then compile the sources with the stage0 compiler to create stage1, then compile again with stage1 to create stage2 and verify it is at a fixpoint (stage1 output == stage2 output). There's a lot of stuff that can get past stage0 -> stage1, but trips up on stage1 -> stage2.
