@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdio.h>
 
 // time(NULL) wrapper — Zig/LLVM has trouble with NULL pointer args
 int64_t with_time_now(void) {
@@ -245,4 +246,203 @@ static void hashmap_grow(WithHashMap *m, int64_t is_str_key) {
     free(old_keys);
     free(old_values);
     free(old_states);
+}
+
+// ---- std.fs ----
+
+typedef struct {
+    const char *ptr;
+    int64_t len;
+} with_str;
+
+static char *with_str_to_cstring(with_str s) {
+    char *buf = (char *)malloc((size_t)s.len + 1);
+    if (!buf) return NULL;
+    if (s.len > 0 && s.ptr) {
+        memcpy(buf, s.ptr, (size_t)s.len);
+    }
+    buf[s.len] = '\0';
+    return buf;
+}
+
+// Write text to a file. Returns 0 on success, non-zero on failure.
+int32_t with_fs_write_file(with_str path, with_str data) {
+    char *cpath = with_str_to_cstring(path);
+    if (!cpath) return -1;
+
+    FILE *f = fopen(cpath, "wb");
+    free(cpath);
+    if (!f) return -1;
+
+    size_t written = 0;
+    if (data.len > 0) {
+        written = fwrite(data.ptr, 1, (size_t)data.len, f);
+    }
+    int close_rc = fclose(f);
+    if ((int64_t)written != data.len) return -1;
+    return close_rc == 0 ? 0 : -1;
+}
+
+// Read full file contents into a heap-allocated buffer.
+// Returns empty string on failure.
+with_str with_fs_read_file(with_str path) {
+    with_str out = { "", 0 };
+    char *cpath = with_str_to_cstring(path);
+    if (!cpath) return out;
+
+    FILE *f = fopen(cpath, "rb");
+    free(cpath);
+    if (!f) return out;
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return out;
+    }
+    long size = ftell(f);
+    if (size < 0) {
+        fclose(f);
+        return out;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return out;
+    }
+
+    char *buf = (char *)malloc((size_t)size + 1);
+    if (!buf) {
+        fclose(f);
+        return out;
+    }
+
+    size_t read_n = fread(buf, 1, (size_t)size, f);
+    fclose(f);
+    if (read_n != (size_t)size) {
+        free(buf);
+        return out;
+    }
+
+    buf[size] = '\0';
+    out.ptr = buf;
+    out.len = (int64_t)size;
+    return out;
+}
+
+// ---- std.net ----
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <fcntl.h>
+#include <errno.h>
+
+// Create a TCP socket and bind+listen on given port. Returns fd or -1.
+int32_t with_net_tcp_listen(int32_t port, int32_t backlog) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) return -1;
+
+    int opt = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons((uint16_t)port);
+
+    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(fd);
+        return -1;
+    }
+    if (listen(fd, backlog) < 0) {
+        close(fd);
+        return -1;
+    }
+    return (int32_t)fd;
+}
+
+// Accept a connection on a listening socket. Returns client fd or -1.
+int32_t with_net_tcp_accept(int32_t listen_fd) {
+    struct sockaddr_in client_addr;
+    socklen_t client_len = sizeof(client_addr);
+    int fd = accept(listen_fd, (struct sockaddr *)&client_addr, &client_len);
+    return (int32_t)fd;
+}
+
+// Connect to host:port via TCP. Returns fd or -1.
+int32_t with_net_tcp_connect(with_str host, int32_t port) {
+    char *chost = with_str_to_cstring(host);
+    if (!chost) return -1;
+
+    struct addrinfo hints, *res;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    char port_buf[16];
+    snprintf(port_buf, sizeof(port_buf), "%d", port);
+
+    if (getaddrinfo(chost, port_buf, &hints, &res) != 0) {
+        free(chost);
+        return -1;
+    }
+    free(chost);
+
+    int fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (fd < 0) {
+        freeaddrinfo(res);
+        return -1;
+    }
+    if (connect(fd, res->ai_addr, res->ai_addrlen) < 0) {
+        close(fd);
+        freeaddrinfo(res);
+        return -1;
+    }
+    freeaddrinfo(res);
+    return (int32_t)fd;
+}
+
+// Send data on a socket. Returns bytes sent or -1.
+int64_t with_net_send(int32_t fd, with_str data) {
+    ssize_t n = send(fd, data.ptr, (size_t)data.len, 0);
+    return (int64_t)n;
+}
+
+// Receive data from a socket into a heap buffer. Returns {ptr, len}.
+with_str with_net_recv(int32_t fd, int64_t max_len) {
+    with_str out = { "", 0 };
+    char *buf = (char *)malloc((size_t)max_len);
+    if (!buf) return out;
+    ssize_t n = recv(fd, buf, (size_t)max_len, 0);
+    if (n <= 0) {
+        free(buf);
+        return out;
+    }
+    buf[n] = '\0';
+    out.ptr = buf;
+    out.len = (int64_t)n;
+    return out;
+}
+
+// Close a socket.
+int32_t with_net_close(int32_t fd) {
+    return close(fd);
+}
+
+// Create a UDP socket bound to a port. Returns fd or -1.
+int32_t with_net_udp_bind(int32_t port) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return -1;
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons((uint16_t)port);
+
+    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(fd);
+        return -1;
+    }
+    return (int32_t)fd;
 }

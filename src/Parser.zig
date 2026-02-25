@@ -23,6 +23,9 @@ pool: *InternPool,
 suppress_as: bool = false,
 diagnostics: *Diagnostic.DiagnosticList,
 source: []const u8,
+/// Pending `@[derive(...)]` trait names parsed from attributes that
+/// apply to the next top-level type declaration.
+pending_derive_traits: []const Ast.Symbol = &.{},
 
 pub fn init(
     tokens: *const Token.List,
@@ -60,6 +63,11 @@ pub fn parseModule(self: *Parser) !Ast.Module {
     }
 
     while (self.peek() != .eof) {
+        self.skipNewlines();
+        self.skipAttributes();
+        self.skipNewlines();
+        if (self.peek() == .eof) break;
+
         if (self.peek() == .kw_pub) {
             // Check for `pub impl` or `pub trait`
             const saved_pos = self.pos;
@@ -129,8 +137,21 @@ fn parseDecl(self: *Parser) !Ast.Decl {
         self.advance();
     }
 
+    // Derive attributes only apply to type declarations.
+    if (self.peek() != .kw_type) {
+        self.pending_derive_traits = &.{};
+    }
+
     return switch (self.peek()) {
         .kw_fn => self.parseFnDecl(is_pub, start_span, false, false),
+        .kw_comptime => blk: {
+            self.advance(); // consume 'comptime'
+            if (self.peek() != .kw_fn) {
+                self.emitError("expected 'fn' after 'comptime'");
+                return error.ParseError;
+            }
+            break :blk self.parseFnDecl(is_pub, start_span, false, false);
+        },
         .kw_async => blk: {
             self.advance();
             break :blk self.parseFnDecl(is_pub, start_span, true, false);
@@ -148,6 +169,24 @@ fn parseDecl(self: *Parser) !Ast.Decl {
             // Desugars to `type Name = enum { ... }`
             self.advance(); // consume 'error'
             const err_name = try self.expectIdentifier();
+            if (self.isIdentifierNamed("from")) {
+                // `error AppError from IoError` — alias for conversion-compatible error families.
+                self.advance(); // consume 'from'
+                const base_sym = try self.expectIdentifier();
+                const base_ty = try self.arena.create(Ast.TypeExpr);
+                base_ty.* = .{
+                    .kind = .{ .named = base_sym },
+                    .span = self.prevSpan(),
+                };
+                break :blk .{
+                    .kind = .{ .type_decl = .{
+                        .name = err_name,
+                        .kind = .{ .alias = base_ty },
+                        .is_pub = is_pub,
+                    } },
+                    .span = start_span.merge(self.prevSpan()),
+                };
+            }
             try self.expect(.eq);
             self.skipNewlines();
 
@@ -224,9 +263,10 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
         if (self.peek() == .kw_pub) self.advance();
         try self.expect(.kw_fn);
         const method_name = try self.expectIdentifier();
+        _ = try self.parseTypeParams(); // generic trait methods parse here (object-safety checks are later)
 
         try self.expect(.l_paren);
-        const params = try self.parseParamList();
+        const params = try self.parseParamList(null);
         try self.expect(.r_paren);
 
         var return_type: ?*const Ast.TypeExpr = null;
@@ -234,6 +274,7 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
             self.advance();
             return_type = try self.parseTypeExpr();
         }
+        try self.parseOptionalWhereClause();
 
         // Check for default body (= expr)
         var has_default = false;
@@ -333,7 +374,7 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
         const type_params = try self.parseTypeParams();
 
         try self.expect(.l_paren);
-        const params = try self.parseParamList();
+        const params = try self.parseParamList(null);
         try self.expect(.r_paren);
 
         var return_type: ?*const Ast.TypeExpr = null;
@@ -341,6 +382,7 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
             self.advance();
             return_type = try self.parseTypeExpr();
         }
+        try self.parseOptionalWhereClause();
 
         try self.expect(.eq);
         const body = try self.parseBlockOrExpr();
@@ -398,7 +440,8 @@ fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async
     const type_params = try self.parseTypeParams();
 
     try self.expect(.l_paren);
-    const params = try self.parseParamList();
+    var param_destructures: std.ArrayList(ParamDestructure) = .empty;
+    const params = try self.parseParamList(&param_destructures);
     try self.expect(.r_paren);
 
     var return_type: ?*const Ast.TypeExpr = null;
@@ -406,9 +449,11 @@ fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async
         self.advance();
         return_type = try self.parseTypeExpr();
     }
+    try self.parseOptionalWhereClause();
 
     try self.expect(.eq);
-    const body = try self.parseBlockOrExpr();
+    const raw_body = try self.parseBlockOrExpr();
+    const body = try self.injectParamDestructures(raw_body, param_destructures.items);
 
     return .{
         .kind = .{ .function = .{
@@ -425,12 +470,81 @@ fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async
     };
 }
 
+/// For parameter destructuring (`fn f({x, y}: Point) = ...`), inject
+/// leading let-bindings that project fields from the synthetic param.
+fn injectParamDestructures(
+    self: *Parser,
+    body: *const Ast.Expr,
+    destructures: []const ParamDestructure,
+) !*const Ast.Expr {
+    if (destructures.len == 0) return body;
+
+    var prefix_stmts: std.ArrayList(*const Ast.Expr) = .empty;
+    for (destructures) |d| {
+        for (d.field_names) |field_sym| {
+            const param_ident = try self.arena.create(Ast.Expr);
+            param_ident.* = .{
+                .kind = .{ .ident = d.param_name },
+                .span = d.span,
+            };
+
+            const field_access = try self.arena.create(Ast.Expr);
+            field_access.* = .{
+                .kind = .{ .field_access = .{
+                    .expr = param_ident,
+                    .field = field_sym,
+                } },
+                .span = d.span,
+            };
+
+            const let_node = try self.arena.create(Ast.Expr);
+            let_node.* = .{
+                .kind = .{ .let_binding = .{
+                    .name = field_sym,
+                    .type_expr = null,
+                    .value = field_access,
+                    .is_mut = false,
+                } },
+                .span = d.span,
+            };
+            try prefix_stmts.append(self.arena, let_node);
+        }
+    }
+
+    if (body.kind == .block) {
+        const blk = body.kind.block;
+        const merged = try self.arena.alloc(*const Ast.Expr, prefix_stmts.items.len + blk.stmts.len);
+        @memcpy(merged[0..prefix_stmts.items.len], prefix_stmts.items);
+        @memcpy(merged[prefix_stmts.items.len..], blk.stmts);
+
+        const node = try self.arena.create(Ast.Expr);
+        node.* = .{
+            .kind = .{ .block = .{
+                .stmts = merged,
+                .tail = blk.tail,
+            } },
+            .span = if (merged.len > 0) merged[0].span.merge(body.span) else body.span,
+        };
+        return node;
+    }
+
+    const wrapped = try self.arena.create(Ast.Expr);
+    wrapped.* = .{
+        .kind = .{ .block = .{
+            .stmts = prefix_stmts.items,
+            .tail = body,
+        } },
+        .span = if (prefix_stmts.items.len > 0) prefix_stmts.items[0].span.merge(body.span) else body.span,
+    };
+    return wrapped;
+}
+
 fn parseExternDecl(self: *Parser, start_span: Span) !Ast.Decl {
     try self.expect(.kw_extern);
     try self.expect(.kw_fn);
     const name = try self.expectIdentifier();
     try self.expect(.l_paren);
-    const params = try self.parseParamList();
+    const params = try self.parseParamList(null);
     // Check for variadic `...`
     var is_variadic = false;
     if (self.peek() == .dot_dot_dot) {
@@ -458,6 +572,9 @@ fn parseExternDecl(self: *Parser, start_span: Span) !Ast.Decl {
 }
 
 fn parseTypeDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span) !Ast.Decl {
+    const derive_traits = self.pending_derive_traits;
+    self.pending_derive_traits = &.{};
+
     try self.expect(.kw_type);
     const name = try self.expectIdentifier();
     try self.expect(.eq);
@@ -467,16 +584,30 @@ fn parseTypeDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span) !Ast.D
     // Enum syntax: `type Color = Red | Green | Blue`
     //          or: `type Shape = | Circle(f64) | Rect(f64, f64)`
     //          or: `type Shape =\n    | Circle(f64)\n    | Rect(f64, f64)`
-    const kind: Ast.TypeDeclKind = if (self.peek() == .l_brace)
-        .{ .struct_def = try self.parseStructBody() }
-    else if (self.peek() == .pipe)
-        .{ .enum_def = try self.parseEnumVariants() }
-    else if (self.peek() == .identifier and self.isEnumDef())
-        .{ .enum_def = try self.parseEnumVariants() }
-    else if (self.peek() == .kw_fn or self.peek() == .identifier or self.peek() == .ampersand or self.peek() == .l_paren)
-        .{ .alias = try self.parseTypeExpr() }
-    else
+    var kind: Ast.TypeDeclKind = undefined;
+    var struct_fields: ?[]const Ast.FieldDef = null;
+    if (self.peek() == .l_brace) {
+        const fields = try self.parseStructBody();
+        kind = .{ .struct_def = fields };
+        struct_fields = fields;
+    } else if (self.peek() == .pipe) {
+        kind = .{ .enum_def = try self.parseEnumVariants() };
+    } else if (self.peek() == .identifier and self.isEnumDef()) {
+        kind = .{ .enum_def = try self.parseEnumVariants() };
+    } else if (self.peek() == .kw_fn or self.peek() == .identifier or self.peek() == .ampersand or self.peek() == .l_paren) {
+        kind = .{ .alias = try self.parseTypeExpr() };
+    } else {
         return error.ParseError;
+    }
+
+    if (struct_fields) |fields| {
+        // Explicit derive(Copy) must reject obviously non-Copy fields.
+        // derive(all) is intentionally not rejected here.
+        if (self.hasDeriveTraitNamed(derive_traits, "Copy") and self.structHasObviouslyNonCopyField(fields)) {
+            self.emitError("cannot derive Copy for a type with non-Copy fields");
+            return error.ParseError;
+        }
+    }
 
     return .{
         .kind = .{ .type_decl = .{
@@ -685,8 +816,15 @@ fn parseUseDecl(self: *Parser, start_span: Span) !Ast.Decl {
 }
 
 fn parseTopLevelLet(self: *Parser, is_pub: Ast.Visibility, start_span: Span) !Ast.Decl {
-    const is_mut = self.peek() == .kw_var;
+    const is_var = self.peek() == .kw_var;
     self.advance(); // consume let/var
+    const is_mut = if (is_var) true else blk: {
+        if (self.peek() == .kw_mut) {
+            self.advance();
+            break :blk true;
+        }
+        break :blk false;
+    };
     const name = try self.expectIdentifier();
 
     var type_expr: ?*const Ast.TypeExpr = null;
@@ -779,14 +917,40 @@ fn parsePrecedence(self: *Parser, min_prec: u8) !*const Ast.Expr {
         if (op_info.prec < min_prec) break;
         self.advance();
         self.skipNewlines();
+
+        // Special pipeline form: `value |> match ...`
+        if (op_info.is_pipeline and !op_info.reverse_pipeline and self.peek() == .kw_match) {
+            self.advance(); // consume `match`
+            self.skipNewlines();
+            const arms = try self.parseMatchArms();
+            const node = try self.arena.create(Ast.Expr);
+            node.* = .{
+                .kind = .{ .match_expr = .{
+                    .subject = lhs,
+                    .arms = arms,
+                } },
+                .span = lhs.span.merge(if (arms.len > 0) arms[arms.len - 1].span else lhs.span),
+            };
+            lhs = node;
+            continue;
+        }
+
         const rhs = try self.parsePrecedence(op_info.prec + 1);
+
+        if (op_info.compose != .none) {
+            lhs = try self.buildComposedClosure(lhs, rhs, op_info.compose);
+            continue;
+        }
 
         const node = try self.arena.create(Ast.Expr);
         node.* = .{
             .kind = if (op_info.is_range)
                 .{ .range = .{ .start = lhs, .end = rhs, .inclusive = op_info.inclusive } }
             else if (op_info.is_pipeline)
-                .{ .pipeline = .{ .lhs = lhs, .rhs = rhs } }
+                .{ .pipeline = .{
+                    .lhs = if (op_info.reverse_pipeline) rhs else lhs,
+                    .rhs = if (op_info.reverse_pipeline) lhs else rhs,
+                } }
             else
                 .{ .binary = .{ .op = op_info.op, .lhs = lhs, .rhs = rhs } },
             .span = lhs.span.merge(rhs.span),
@@ -797,10 +961,18 @@ fn parsePrecedence(self: *Parser, min_prec: u8) !*const Ast.Expr {
     return lhs;
 }
 
+const ComposeKind = enum {
+    none,
+    forward, // f >> g  => |x| g(f(x))
+    backward, // f << g => |x| f(g(x))
+};
+
 const InfixInfo = struct {
     op: Ast.BinOp,
     prec: u8,
     is_pipeline: bool = false,
+    reverse_pipeline: bool = false,
+    compose: ComposeKind = .none,
     is_range: bool = false,
     inclusive: bool = false,
 };
@@ -818,8 +990,9 @@ fn infixOp(self: *const Parser) ?InfixInfo {
         .dot_dot => .{ .op = .add, .prec = 5, .is_range = true }, // op unused for range
         .dot_dot_eq => .{ .op = .add, .prec = 5, .is_range = true, .inclusive = true },
         .pipe_gt => .{ .op = .add, .prec = 6, .is_pipeline = true }, // op unused for pipeline
-        .lt_lt => .{ .op = .shl, .prec = 6 },
-        .gt_gt => .{ .op = .shr, .prec = 6 },
+        .lt_pipe => .{ .op = .add, .prec = 6, .is_pipeline = true, .reverse_pipeline = true },
+        .lt_lt => .{ .op = .add, .prec = 6, .compose = .backward },
+        .gt_gt => .{ .op = .add, .prec = 6, .compose = .forward },
         .ampersand => .{ .op = .bit_and, .prec = 7 },
         .caret => .{ .op = .bit_xor, .prec = 8 },
         .pipe => .{ .op = .bit_or, .prec = 9 },
@@ -834,6 +1007,59 @@ fn infixOp(self: *const Parser) ?InfixInfo {
         .star_wrap => .{ .op = .mul_wrap, .prec = 12 },
         else => null,
     };
+}
+
+fn buildComposedClosure(
+    self: *Parser,
+    lhs_fn: *const Ast.Expr,
+    rhs_fn: *const Ast.Expr,
+    compose: ComposeKind,
+) !*const Ast.Expr {
+    var sym_buf: [48]u8 = undefined;
+    const sym_name = std.fmt.bufPrint(&sym_buf, "__pipe_arg_{d}", .{self.pos}) catch return error.ParseError;
+    const param_sym = try self.pool.intern(sym_name);
+    const param_expr = try self.arena.create(Ast.Expr);
+    param_expr.* = .{
+        .kind = .{ .ident = param_sym },
+        .span = lhs_fn.span,
+    };
+
+    const first_callee = if (compose == .forward) lhs_fn else rhs_fn;
+    const second_callee = if (compose == .forward) rhs_fn else lhs_fn;
+
+    const first_args = try self.arena.alloc(*const Ast.Expr, 1);
+    first_args[0] = param_expr;
+    const first_call = try self.arena.create(Ast.Expr);
+    first_call.* = .{
+        .kind = .{ .call = .{
+            .callee = first_callee,
+            .args = first_args,
+        } },
+        .span = lhs_fn.span.merge(rhs_fn.span),
+    };
+
+    const second_args = try self.arena.alloc(*const Ast.Expr, 1);
+    second_args[0] = first_call;
+    const second_call = try self.arena.create(Ast.Expr);
+    second_call.* = .{
+        .kind = .{ .call = .{
+            .callee = second_callee,
+            .args = second_args,
+        } },
+        .span = lhs_fn.span.merge(rhs_fn.span),
+    };
+
+    const params = try self.arena.alloc(Ast.Symbol, 1);
+    params[0] = param_sym;
+    const closure = try self.arena.create(Ast.Expr);
+    closure.* = .{
+        .kind = .{ .closure = .{
+            .params = params,
+            .body = second_call,
+        } },
+        .span = lhs_fn.span.merge(rhs_fn.span),
+    };
+    return closure;
 }
 
 fn parsePrimary(self: *Parser) !*const Ast.Expr {
@@ -859,6 +1085,7 @@ fn parsePrimary(self: *Parser) !*const Ast.Expr {
         .kw_continue => return self.parseContinue(),
         .kw_defer => return self.parseDefer(),
         .kw_spawn => return self.parseSpawn(),
+        .kw_async => return self.parseAsyncExpr(),
         .kw_yield => return self.parseYield(),
         .kw_comptime => return self.parseComptime(),
         .kw_select => return self.parseSelectAwait(),
@@ -1364,10 +1591,33 @@ fn parseIfExpr(self: *Parser) !*const Ast.Expr {
 }
 
 fn parseIfLet(self: *Parser, start: Span) !*const Ast.Expr {
+    const IfLetClause = struct {
+        pattern: Ast.Pattern,
+        subject: *const Ast.Expr,
+    };
+
     self.advance(); // consume 'let'
-    const pattern = try self.parsePattern();
+    var clauses: std.ArrayList(IfLetClause) = .empty;
+
+    const first_pattern = try self.parsePattern();
     try self.expect(.eq);
-    const subject = try self.parseExpr();
+    const first_subject = try self.parseExpr();
+    try clauses.append(self.arena, .{ .pattern = first_pattern, .subject = first_subject });
+
+    // Chained form: `if let A = x, let B = y, ...`
+    while (self.peek() == .comma) {
+        self.advance();
+        self.skipNewlines();
+        if (self.peek() != .kw_let) {
+            self.emitError("expected 'let' after ',' in if-let chain");
+            return error.ParseError;
+        }
+        self.advance(); // consume 'let'
+        const p = try self.parsePattern();
+        try self.expect(.eq);
+        const s = try self.parseExpr();
+        try clauses.append(self.arena, .{ .pattern = p, .subject = s });
+    }
 
     // Expect then/colon delimiter.
     if (self.peek() == .kw_then) {
@@ -1391,17 +1641,6 @@ fn parseIfLet(self: *Parser, start: Span) !*const Ast.Expr {
         self.pos = save;
     }
 
-    // Desugar to match:
-    //   match subject
-    //       Pattern -> then_body
-    //       _ -> else_body (or void)
-    var arms: std.ArrayList(Ast.MatchArm) = .empty;
-    try arms.append(self.arena, .{
-        .pattern = pattern,
-        .body = then_body,
-        .span = start.merge(then_body.span),
-    });
-
     // Always add a wildcard/else arm.
     const else_expr = if (else_body) |eb| eb else blk: {
         const void_node = try self.arena.create(Ast.Expr);
@@ -1411,22 +1650,35 @@ fn parseIfLet(self: *Parser, start: Span) !*const Ast.Expr {
         };
         break :blk void_node;
     };
-    try arms.append(self.arena, .{
-        .pattern = .{ .kind = .wildcard, .span = start },
-        .body = else_expr,
-        .span = start.merge(else_expr.span),
-    });
+    // Desugar chained if-let into nested match expressions from right to left.
+    var acc = then_body;
+    var i: usize = clauses.items.len;
+    while (i > 0) {
+        i -= 1;
+        const clause = clauses.items[i];
+        var arms: std.ArrayList(Ast.MatchArm) = .empty;
+        try arms.append(self.arena, .{
+            .pattern = clause.pattern,
+            .body = acc,
+            .span = start.merge(acc.span),
+        });
+        try arms.append(self.arena, .{
+            .pattern = .{ .kind = .wildcard, .span = start },
+            .body = else_expr,
+            .span = start.merge(else_expr.span),
+        });
+        const node = try self.arena.create(Ast.Expr);
+        node.* = .{
+            .kind = .{ .match_expr = .{
+                .subject = clause.subject,
+                .arms = arms.items,
+            } },
+            .span = start.merge(acc.span),
+        };
+        acc = node;
+    }
 
-    const end_span = if (else_body) |eb| eb.span else then_body.span;
-    const node = try self.arena.create(Ast.Expr);
-    node.* = .{
-        .kind = .{ .match_expr = .{
-            .subject = subject,
-            .arms = arms.items,
-        } },
-        .span = start.merge(end_span),
-    };
-    return node;
+    return acc;
 }
 
 fn parseReturn(self: *Parser) !*const Ast.Expr {
@@ -1490,7 +1742,7 @@ fn parseSelectAwait(self: *Parser) !*const Ast.Expr {
     }
     self.skipNewlines();
 
-    // Parse arms: `name = task_expr -> body_expr`
+    // Parse arms: `name = task_expr -> body_expr|block`
     var arms: std.ArrayList(Ast.SelectAwaitArm) = .empty;
     var arm_col: ?u32 = null;
 
@@ -1515,8 +1767,7 @@ fn parseSelectAwait(self: *Parser) !*const Ast.Expr {
         self.skipNewlines();
         const task_expr = try self.parseExpr();
         try self.expect(.arrow); // ->
-        self.skipNewlines();
-        const body_expr = try self.parseExpr();
+        const body_expr = try self.parseBlockOrExpr();
 
         try arms.append(self.arena, .{
             .name = name_sym,
@@ -1525,17 +1776,18 @@ fn parseSelectAwait(self: *Parser) !*const Ast.Expr {
             .span = arm_span.merge(body_expr.span),
         });
 
-        // Skip newlines, save position to restore if not an arm
+        // Only consume trailing newlines if another arm follows.
+        // Otherwise, restore so enclosing block parsing can see the boundary.
         const save = self.pos;
         self.skipNewlines();
-        if (self.peek() == .eof) break;
-        const next_col = Lexer.columnOf(self.source, self.currentSpan().start);
-        if (arm_col) |ac| {
-            if (next_col != ac or self.peek() != .identifier) {
-                self.pos = save;
-                break;
+        if (self.peek() == .identifier and self.pos + 1 < self.tokens.tags.items.len and self.tokens.tags.items[self.pos + 1] == .eq) {
+            const next_col = Lexer.columnOf(self.source, self.currentSpan().start);
+            if (arm_col != null and next_col == arm_col.?) {
+                continue;
             }
         }
+        self.pos = save;
+        break;
     }
 
     const node = try self.arena.create(Ast.Expr);
@@ -1556,6 +1808,51 @@ fn parseSpawn(self: *Parser) !*const Ast.Expr {
         .span = start.merge(value.span),
     };
     return node;
+}
+
+/// Parse async expression forms used in expression position.
+/// - `async: expr_or_block`
+/// - `async scope |s|: ...` (currently parsed-and-ignored scope marker)
+fn parseAsyncExpr(self: *Parser) !*const Ast.Expr {
+    const start = self.currentSpan();
+    self.advance(); // consume 'async'
+
+    if (self.isIdentifierNamed("scope")) {
+        return self.parseAsyncScopeExpr(start);
+    }
+
+    if (self.peek() == .colon) self.advance();
+    self.skipNewlines();
+    const body = try self.parseBlockOrExpr();
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .grouped = body },
+        .span = start.merge(body.span),
+    };
+    return node;
+}
+
+/// Parse `async scope |name|: body`.
+/// For now, scope tracking is a no-op in the AST; the block is consumed for syntax coverage.
+fn parseAsyncScopeExpr(self: *Parser, start: Span) !*const Ast.Expr {
+    self.advance(); // consume 'scope'
+
+    if (self.peek() == .pipe) {
+        self.advance();
+        if (self.peek() == .identifier) _ = try self.expectIdentifier();
+        try self.expect(.pipe);
+    }
+
+    if (self.peek() == .colon) self.advance();
+    self.skipNewlines();
+    _ = try self.parseBlockOrExpr();
+
+    const zero = try self.arena.create(Ast.Expr);
+    zero.* = .{
+        .kind = .{ .int_literal = 0 },
+        .span = start,
+    };
+    return zero;
 }
 
 // Parse `with expr as [mut] name: body` or `with expr as [mut] name,... : body`
@@ -1638,9 +1935,19 @@ fn parseRecordUpdate(self: *Parser) !*const Ast.Expr {
     while (self.peek() != .r_brace and self.peek() != .eof) {
         const field_start = self.currentSpan();
         const field_name = try self.expectIdentifier();
-        try self.expect(.colon);
-        self.skipNewlines();
-        const value = try self.parseExpr();
+        const value = if (self.peek() == .colon) blk: {
+            self.advance();
+            self.skipNewlines();
+            break :blk try self.parseExpr();
+        } else blk: {
+            // Shorthand override: `{ base with field }` → `{ base with field: field }`
+            const ident_node = try self.arena.create(Ast.Expr);
+            ident_node.* = .{
+                .kind = .{ .ident = field_name },
+                .span = field_start,
+            };
+            break :blk ident_node;
+        };
         try fields.append(self.arena, .{
             .name = field_name,
             .value = value,
@@ -1799,7 +2106,20 @@ fn parseMatchExpr(self: *Parser) !*const Ast.Expr {
     self.skipNewlines();
     const subject = try self.parseExpr();
     self.skipNewlines();
+    const arms = try self.parseMatchArms();
 
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .match_expr = .{
+            .subject = subject,
+            .arms = arms,
+        } },
+        .span = start.merge(if (arms.len > 0) arms[arms.len - 1].span else subject.span),
+    };
+    return node;
+}
+
+fn parseMatchArms(self: *Parser) ![]const Ast.MatchArm {
     var arms: std.ArrayList(Ast.MatchArm) = .empty;
     var arm_col: ?u32 = null; // Column of first arm — used to detect end of match block
 
@@ -1885,15 +2205,7 @@ fn parseMatchExpr(self: *Parser) !*const Ast.Expr {
         }
     }
 
-    const node = try self.arena.create(Ast.Expr);
-    node.* = .{
-        .kind = .{ .match_expr = .{
-            .subject = subject,
-            .arms = arms.items,
-        } },
-        .span = start.merge(self.prevSpan()),
-    };
-    return node;
+    return arms.items;
 }
 
 fn parsePattern(self: *Parser) !Ast.Pattern {
@@ -2143,8 +2455,15 @@ fn parseContinue(self: *Parser) !*const Ast.Expr {
 
 fn parseLetBinding(self: *Parser) !*const Ast.Expr {
     const start = self.currentSpan();
-    const is_mut = self.peek() == .kw_var;
+    const is_var = self.peek() == .kw_var;
     self.advance();
+    const is_mut = if (is_var) true else blk: {
+        if (self.peek() == .kw_mut) {
+            self.advance();
+            break :blk true;
+        }
+        break :blk false;
+    };
 
     // Check for tuple destructuring: `let (a, b) = expr`
     if (self.peek() == .l_paren) {
@@ -2580,24 +2899,67 @@ fn parseTypeExpr(self: *Parser) !*const Ast.TypeExpr {
 
 // ── Parameter list ───────────────────────────────────────────────
 
-fn parseParamList(self: *Parser) ![]const Ast.Param {
+const ParamDestructure = struct {
+    param_name: Ast.Symbol,
+    field_names: []const Ast.Symbol,
+    span: Span,
+};
+
+fn parseParamList(self: *Parser, destructures_out: ?*std.ArrayList(ParamDestructure)) ![]const Ast.Param {
     var params: std.ArrayList(Ast.Param) = .empty;
     if (self.peek() == .r_paren or self.peek() == .dot_dot_dot) return params.items;
 
-    try params.append(self.arena, try self.parseParam());
+    try params.append(self.arena, try self.parseParam(destructures_out));
     while (self.peek() == .comma) {
         self.advance();
         self.skipNewlines();
         if (self.peek() == .r_paren or self.peek() == .dot_dot_dot) break;
-        try params.append(self.arena, try self.parseParam());
+        try params.append(self.arena, try self.parseParam(destructures_out));
     }
     return params.items;
 }
 
-fn parseParam(self: *Parser) !Ast.Param {
+fn parseParam(self: *Parser, destructures_out: ?*std.ArrayList(ParamDestructure)) !Ast.Param {
     const start = self.currentSpan();
     const is_mut = self.peek() == .kw_mut;
     if (is_mut) self.advance();
+
+    // Destructuring parameter pattern: `{ x, y }: Type`
+    if (self.peek() == .l_brace) {
+        self.advance(); // consume '{'
+        var field_names: std.ArrayList(Ast.Symbol) = .empty;
+        if (self.peek() != .r_brace) {
+            try field_names.append(self.arena, try self.expectIdentifier());
+            while (self.peek() == .comma) {
+                self.advance();
+                self.skipNewlines();
+                if (self.peek() == .r_brace) break;
+                try field_names.append(self.arena, try self.expectIdentifier());
+            }
+        }
+        try self.expect(.r_brace);
+        try self.expect(.colon);
+        const type_expr = try self.parseTypeExpr();
+
+        var synth_buf: [64]u8 = undefined;
+        const synth_name = std.fmt.bufPrint(&synth_buf, "__arg_{d}", .{start.start}) catch return error.ParseError;
+        const param_name = self.pool.intern(synth_name) catch return error.ParseError;
+
+        if (destructures_out) |out| {
+            try out.append(self.arena, .{
+                .param_name = param_name,
+                .field_names = field_names.items,
+                .span = start.merge(self.prevSpan()),
+            });
+        }
+
+        return .{
+            .name = param_name,
+            .type_expr = type_expr,
+            .is_mut = is_mut,
+            .span = start.merge(self.prevSpan()),
+        };
+    }
 
     const name = try self.expectIdentifier();
     var type_expr: ?*const Ast.TypeExpr = null;
@@ -2638,11 +3000,11 @@ fn parseOneTypeParam(self: *Parser) !Ast.TypeParam {
     if (self.peek() == .colon) {
         self.advance(); // consume ':'
         // Parse first bound
-        try bounds.append(self.arena, try self.expectIdentifier());
+        try bounds.append(self.arena, try self.parseTypeBoundSymbol());
         // Parse additional bounds separated by '+'
         while (self.peek() == .plus) {
             self.advance();
-            try bounds.append(self.arena, try self.expectIdentifier());
+            try bounds.append(self.arena, try self.parseTypeBoundSymbol());
         }
     }
 
@@ -2650,6 +3012,43 @@ fn parseOneTypeParam(self: *Parser) !Ast.TypeParam {
         .name = name,
         .bounds = bounds.items,
     };
+}
+
+fn parseTypeBoundSymbol(self: *Parser) !Ast.Symbol {
+    if (self.peek() == .identifier) return self.expectIdentifier();
+    if (self.peek() == .kw_type) {
+        self.advance();
+        return self.pool.intern("type") catch return error.ParseError;
+    }
+    self.emitError("expected type bound name");
+    return error.ParseError;
+}
+
+/// Consume an optional `where ...` clause on function/method signatures.
+/// The current parser ignores constraints semantically and only accepts syntax.
+fn parseOptionalWhereClause(self: *Parser) !void {
+    if (!self.isIdentifierNamed("where")) return;
+    self.advance(); // consume `where`
+
+    var depth: u32 = 0;
+    while (self.peek() != .eof) {
+        switch (self.peek()) {
+            .l_paren, .l_bracket, .l_brace => {
+                depth += 1;
+                self.advance();
+            },
+            .r_paren, .r_bracket, .r_brace => {
+                if (depth == 0) return;
+                depth -= 1;
+                self.advance();
+            },
+            .eq => {
+                if (depth == 0) return;
+                self.advance();
+            },
+            else => self.advance(),
+        }
+    }
 }
 
 // ── Token helpers ────────────────────────────────────────────────
@@ -2699,9 +3098,118 @@ fn internCurrent(self: *Parser) !Ast.Symbol {
     return self.pool.intern(text);
 }
 
+fn isIdentifierNamed(self: *const Parser, name: []const u8) bool {
+    if (self.peek() != .identifier) return false;
+    const span = self.currentSpan();
+    return std.mem.eql(u8, self.source[span.start..span.end], name);
+}
+
 fn skipNewlines(self: *Parser) void {
     while (self.peek() == .newline or self.peek() == .comment) {
         self.advance();
+    }
+}
+
+fn skipAttributes(self: *Parser) void {
+    self.pending_derive_traits = &.{};
+    var derives: std.ArrayList(Ast.Symbol) = .empty;
+
+    while (self.peek() == .at) {
+        const saved = self.pos;
+        self.advance(); // consume '@'
+        if (self.peek() != .l_bracket) {
+            // Not an attribute; restore so normal parsing can diagnose.
+            self.pos = saved;
+            return;
+        }
+        self.advance(); // consume '['
+
+        // Parse derive names from `@[derive(...)]`.
+        if (self.isIdentifierNamed("derive")) {
+            self.advance(); // consume 'derive'
+            if (self.peek() == .l_paren) {
+                self.advance();
+                while (self.peek() != .r_paren and self.peek() != .eof) {
+                    if (self.peek() == .identifier) {
+                        const sym = self.internCurrent() catch break;
+                        self.advance();
+                        derives.append(self.arena, sym) catch {};
+                    } else {
+                        self.advance();
+                    }
+                    if (self.peek() == .comma) {
+                        self.advance();
+                        self.skipNewlines();
+                    }
+                }
+                if (self.peek() == .r_paren) self.advance();
+            }
+        }
+
+        // Consume until matching `]`.
+        var depth: u32 = 1;
+        while (depth > 0 and self.peek() != .eof) {
+            switch (self.peek()) {
+                .l_bracket => depth += 1,
+                .r_bracket => depth -= 1,
+                else => {},
+            }
+            self.advance();
+        }
+        self.skipNewlines();
+    }
+
+    self.pending_derive_traits = derives.items;
+}
+
+fn hasDeriveTraitNamed(self: *const Parser, derives: []const Ast.Symbol, name: []const u8) bool {
+    for (derives) |d| {
+        if (std.mem.eql(u8, self.pool.resolve(d), name)) return true;
+    }
+    return false;
+}
+
+fn structHasObviouslyNonCopyField(self: *const Parser, fields: []const Ast.FieldDef) bool {
+    for (fields) |f| {
+        if (self.typeExprObviouslyNonCopy(f.type_expr)) return true;
+    }
+    return false;
+}
+
+fn typeExprObviouslyNonCopy(self: *const Parser, te: *const Ast.TypeExpr) bool {
+    switch (te.kind) {
+        .named => |sym| {
+            const name = self.pool.resolve(sym);
+            return std.mem.eql(u8, name, "Vec") or
+                std.mem.eql(u8, name, "HashMap") or
+                std.mem.eql(u8, name, "HashSet") or
+                std.mem.eql(u8, name, "Box") or
+                std.mem.eql(u8, name, "String");
+        },
+        .generic => |g| {
+            const name = self.pool.resolve(g.name);
+            if (std.mem.eql(u8, name, "Vec") or
+                std.mem.eql(u8, name, "HashMap") or
+                std.mem.eql(u8, name, "HashSet") or
+                std.mem.eql(u8, name, "Box") or
+                std.mem.eql(u8, name, "String"))
+            {
+                return true;
+            }
+            for (g.args) |arg| {
+                if (self.typeExprObviouslyNonCopy(arg)) return true;
+            }
+            return false;
+        },
+        .array_type => |a| return self.typeExprObviouslyNonCopy(a.element),
+        .tuple_type => |elems| {
+            for (elems) |elem| {
+                if (self.typeExprObviouslyNonCopy(elem)) return true;
+            }
+            return false;
+        },
+        .optional => |inner| return self.typeExprObviouslyNonCopy(inner),
+        else => return false,
     }
 }
 
@@ -2745,9 +3253,8 @@ fn processEscapes(self: *Parser, input: []const u8) ![]const u8 {
 }
 
 fn emitError(self: *Parser, expected: []const u8) void {
-    _ = expected;
     self.diagnostics.emit(Diagnostic.err(
-        "unexpected token",
+        expected,
         self.currentSpan(),
     ));
 }

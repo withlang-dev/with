@@ -1845,6 +1845,10 @@ fn checkGenericCall(self: *Sema, gen_fn: Ast.FnDecl, args: []const *const Ast.Ex
 
         // Check each required trait.
         for (tp.bounds) |trait_sym| {
+            const trait_name = self.pool.resolve(trait_sym);
+            // Special bound: `T: type` is a compile-time kind constraint, not a trait impl.
+            if (std.mem.eql(u8, trait_name, "type")) continue;
+
             const impl_list = self.type_impls.get(concrete_name.?);
             var found = false;
             if (impl_list) |list| {
