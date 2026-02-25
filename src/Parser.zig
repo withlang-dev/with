@@ -140,22 +140,59 @@ fn parseDecl(self: *Parser) !Ast.Decl {
         .kw_let, .kw_var => self.parseTopLevelLet(is_pub, start_span),
         .kw_extern => self.parseExternDecl(start_span),
         .kw_error => blk: {
-            // Skip `error Name = ...` declaration block
+            // `error Name = Variant1, Variant2(payload), ...`
+            // Desugars to `type Name = enum { ... }`
             self.advance(); // consume 'error'
-            _ = try self.expectIdentifier(); // error name
+            const err_name = try self.expectIdentifier();
             try self.expect(.eq);
             self.skipNewlines();
-            // Skip indented variant lines
+
+            // Parse variants (indented block or comma-separated).
+            var variants: std.ArrayList(Ast.VariantDef) = .empty;
             while (self.peek() != .eof) {
                 const col = Lexer.columnOf(self.source, self.currentSpan().start);
-                if (col == 0) break;
-                // Skip tokens until newline
-                while (self.peek() != .newline and self.peek() != .eof) {
+                if (col == 0) break; // back to top level
+
+                if (self.peek() != .identifier) break;
+                const v_start = self.currentSpan();
+                const v_name = try self.expectIdentifier();
+
+                // Optional payload: `Variant(Type1, Type2)`
+                var payload: ?[]const *const Ast.TypeExpr = null;
+                if (self.peek() == .l_paren) {
                     self.advance();
+                    var payload_types: std.ArrayList(*const Ast.TypeExpr) = .empty;
+                    while (self.peek() != .r_paren and self.peek() != .eof) {
+                        if (payload_types.items.len > 0) {
+                            try self.expect(.comma);
+                        }
+                        const ty = try self.parseTypeExpr();
+                        try payload_types.append(self.arena, ty);
+                    }
+                    try self.expect(.r_paren);
+                    payload = try payload_types.toOwnedSlice(self.arena);
                 }
+
+                try variants.append(self.arena, .{
+                    .name = v_name,
+                    .payload = payload,
+                    .span = v_start.merge(self.prevSpan()),
+                });
+
+                // Skip comma or newline between variants.
+                if (self.peek() == .comma) self.advance();
                 self.skipNewlines();
             }
-            break :blk .{ .kind = .poisoned, .span = start_span.merge(self.prevSpan()) };
+
+            const variant_slice = try variants.toOwnedSlice(self.arena);
+            break :blk .{
+                .kind = .{ .type_decl = .{
+                    .name = err_name,
+                    .kind = .{ .enum_def = variant_slice },
+                    .is_pub = is_pub,
+                } },
+                .span = start_span.merge(self.prevSpan()),
+            };
         },
         else => {
             self.emitError("expected declaration (fn, type, let, use, extern)");
