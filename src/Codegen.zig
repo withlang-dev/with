@@ -264,6 +264,7 @@ pub fn deinit(self: *Codegen) void {
         }
     }
     self.fn_dyn_params.deinit(self.allocator);
+    self.gen_field_indices.deinit(self.allocator);
     c.LLVMDisposeBuilder(self.builder);
     c.LLVMDisposeModule(self.module);
     c.LLVMContextDispose(self.context);
