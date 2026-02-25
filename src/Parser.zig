@@ -857,7 +857,23 @@ fn parseFloatLiteral(self: *Parser) !*const Ast.Expr {
 fn parseStringLiteral(self: *Parser) !*const Ast.Expr {
     const span = self.currentSpan();
     // Strip quotes from the source text for the interned symbol.
-    const raw = self.source[span.start + 1 .. span.end -| 1];
+    // Handle triple-quoted strings: """..."""
+    const text = self.source[span.start..span.end];
+    const raw = if (text.len >= 6 and std.mem.startsWith(u8, text, "\"\"\""))
+        // Strip """ delimiters and optional leading/trailing newlines.
+        blk: {
+            var content = text[3 .. text.len - 3];
+            if (content.len > 0 and content[0] == '\n') {
+                content = content[1..];
+            }
+            if (content.len > 0 and content[content.len - 1] == '\n') {
+                content = content[0 .. content.len - 1];
+            }
+            break :blk content;
+        }
+    else
+        // Strip single-quote delimiters.
+        self.source[span.start + 1 .. span.end -| 1];
     const sym = try self.pool.intern(raw);
     self.advance();
     const node = try self.arena.create(Ast.Expr);
