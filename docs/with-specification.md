@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v6.2
+# The With Programming Language — Specification v6.3
 
 **Status:** Reference specification for prototype implementation
 **Positioning:** The Kotlin of systems programming.
@@ -212,6 +212,16 @@ With prioritizes joy. The common case should be effortless:
   flexible return values (§7.2)
 - **Cancellation just works** — no `From[TaskCancelled]` on every
   error type. Cancellation unwinds cleanly. (§14.7)
+- **Chained `if let`** — `if let Some(a) = x, let Some(b) = y:`
+  kills the pyramid of doom (§9.7)
+- **Enum `_ref` accessors** — `.as_str_ref()`, `.as_num_mut()`
+  auto-generated. Navigate ASTs and JSON without cloning. (§4.4)
+- **`@[derive(Builder)]`** — one annotation generates the entire
+  builder pattern (§11.8)
+- **Comptime cascade** — inside `comptime fn`, everything is
+  comptime. No redundant prefixes. (§17.4)
+- **`T.fields()`** — types are objects at compile time. Natural
+  reflection-style metaprogramming. (§17.2)
 
 ### 1.8 Known Tradeoffs
 
@@ -855,13 +865,14 @@ let x = .Member
 
 **Auto-generated accessor methods:**
 
-Every enum variant with data automatically generates `.is_variant()`
-and `.as_variant()` methods. For a variant `Foo(T)`, the compiler
-generates:
+Every enum variant with data automatically generates accessor methods.
+For a variant `Foo(T)`, the compiler generates:
 
 ```
 fn is_foo(self: &MyEnum) -> bool
-fn as_foo(self: MyEnum) -> Option[T]
+fn as_foo(self: MyEnum) -> Option[T]         // by value (moves)
+fn as_foo_ref(self: &MyEnum) -> Option[&T]   // by shared ref
+fn as_foo_mut(self: &mut MyEnum) -> Option[&mut T]  // by mutable ref
 ```
 
 Method names are the variant name converted to `snake_case`.
@@ -874,10 +885,29 @@ type Token =
     | TNull
 
 // Auto-generated:
-// .is_tint() -> bool        .as_tint() -> Option[i64]
-// .is_tstr() -> bool        .as_tstr() -> Option[str]
-// .is_tbool() -> bool       .as_tbool() -> Option[bool]
-// .is_tnull() -> bool       (no .as_tnull — no data)
+// .is_tint() -> bool
+// .as_tint() -> Option[i64]           .as_tint_ref() -> Option[&i64]
+// .as_tstr() -> Option[str]           .as_tstr_ref() -> Option[&str]
+// .as_tbool() -> Option[bool]         .as_tbool_ref() -> Option[&bool>
+// (no .as_tnull — no data)
+```
+
+The `_ref` variants are essential for navigating tree structures
+without cloning:
+
+```
+type JsonValue =
+    | Null | Bool(bool) | Number(f64) | Str(str)
+    | Array(Vec[JsonValue]) | Object(HashMap[str, JsonValue])
+
+// Navigate a JSON tree without cloning anything:
+let stars = config
+    .as_object_ref()?
+    .get("meta")?
+    .as_object_ref()?
+    .get("stars")?
+    .as_number_ref()
+    ?? &0.0
 ```
 
 These compose with optional chaining and `??`:
@@ -886,14 +916,14 @@ These compose with optional chaining and `??`:
 // Extract a value you know is there (test/prototype code)
 let b = self.expect_token("bool")?.as_tbool() ?? unreachable()
 
-// Safely check and extract
-let name = token.as_tstr()?.to_upper()
+// Safely check and extract by reference
+let name = token.as_tstr_ref()?.to_upper()
 
 // Filter a collection
 let strings = tokens.iter()
-    .filter(|t| t.is_tstr())
-    .map(|t| t.as_tstr().unwrap())
-    .collect()
+    |> filter(|t| t.is_tstr())
+    |> map(|t| t.as_tstr_ref().unwrap())
+    |> collect()
 ```
 
 For variants with multiple fields, `.as_variant()` returns
@@ -2017,6 +2047,50 @@ if let Some(user) = find_user(id):
     println("found: {user.name}")
 ```
 
+**Chained `if let`:** Multiple conditional bindings in a single `if`,
+separated by commas. All bindings must succeed for the body to
+execute. This eliminates the pyramid of doom:
+
+```
+// Before: nested if let
+if let Some(b) = b_store.get(entity):
+    if let Some(c) = c_store.get(entity):
+        yield (entity, a, b, c)
+
+// After: chained if let
+if let Some(b) = b_store.get(entity),
+   let Some(c) = c_store.get(entity):
+    yield (entity, a, b, c)
+```
+
+Chains can mix `let` bindings with boolean conditions:
+
+```
+if let Some(user) = find_user(id),
+   user.is_active(),
+   let Some(email) = user.email:
+    send_welcome(email)
+```
+
+Each binding in the chain is in scope for subsequent bindings and
+the body. If any binding fails, the entire `if` is skipped (or the
+`else` branch runs).
+
+**`let ... else` with enum shorthand:**
+
+`let ... else` works especially well with enum variant shorthand
+for asserting expectations:
+
+```
+let .TString(key) = self.expect_token("object key")? else
+    return Err(.UnexpectedChar(self.pos))
+
+let .Colon = self.expect_token("':'")? else
+    return Err(.UnexpectedChar(self.pos))
+
+// Cleaner than the match equivalent
+```
+
 **Pattern matching in function parameters:**
 ```
 fn distance({ x: x1, y: y1 }: Point, { x: x2, y: y2 }: Point) -> f64 =
@@ -2792,6 +2866,46 @@ will produce a compile error if a field doesn't implement `Eq` or
 derive targets (e.g., `@[derive(Serialize)]`) are supported through
 comptime functions.
 
+**`@[derive(Builder)]`** generates a builder struct with chaining
+methods for every field. This eliminates the most common source of
+builder boilerplate:
+
+```
+@[derive(Builder)]
+type DatabaseConfig = {
+    host: str,
+    port: i32 = 5432,
+    max_connections: i32 = 10,
+    timeout: Duration = Duration.secs(30),
+    ssl: bool = false,
+}
+
+// Generates:
+// type DatabaseConfigBuilder = {
+//     host: Option[str], port: Option[i32], ...
+// }
+// impl DatabaseConfigBuilder {
+//     fn host(self: Self, val: str) -> Self = ...
+//     fn port(self: Self, val: i32) -> Self = ...
+//     fn build(self: Self) -> Result[DatabaseConfig, BuilderError] = ...
+// }
+// impl DatabaseConfig {
+//     fn builder() -> DatabaseConfigBuilder = ...
+// }
+
+// Usage:
+let config = DatabaseConfig.builder()
+    .host("localhost")
+    .port(5433)
+    .ssl(true)
+    .build()?
+```
+
+Fields with default values are optional in the builder. Fields
+without defaults are required — `.build()` returns an error if they
+aren't set. This is checked at compile time when all `.field()`
+calls are visible.
+
 ---
 
 ## 12. Closures and Escaping
@@ -3032,6 +3146,30 @@ let report = transactions.iter()
     |> map(|t| "{t.date}: ${t.amount}")
     |> join("\n")
 ```
+
+**HashMap convenience methods:**
+
+Beyond the standard iterator operations, `HashMap` provides
+ergonomic mutation methods:
+
+```
+// Entry API (Rust-style)
+worker_counts.entry(id).or_insert(0)
+
+// Convenience: update with default and transform
+worker_counts.update(id, 0, |n| n + 1)
+// equivalent to: entry(id).or_insert(0); *entry += 1
+
+// Convenience: increment/decrement
+worker_counts.increment(id)       // .update(id, 0, |n| n + 1)
+worker_counts.decrement(id)       // .update(id, 0, |n| n - 1)
+
+// Convenience: append to collection values
+event_log.append(user_id, event)  // .entry(id).or_insert(Vec.new()).push(event)
+```
+
+These methods cover the most common HashMap mutation patterns
+without requiring the entry API's verbose ceremony.
 
 ### 13.4 Generators (`yield`)
 
@@ -4428,6 +4566,27 @@ let handle = my_lib_init()
 let value = unsafe { *handle }
 ```
 
+**Null-safe pointer conversion:** Raw pointers from C are
+inherently nullable. The `.as_option()` method on raw pointers
+converts them to `Option`, making null handling ergonomic:
+
+```
+// C function returns nullable pointer
+let name_ptr: *const c_char = get_user_name(id)
+
+// Convert to Option — null becomes None
+let name = name_ptr.as_option()
+    .map(|p| CStr.from_ptr(p).to_str())
+    .unwrap_or("unknown")
+
+// Also works with ?? 
+let name = ptr_to_string(name_ptr.as_option() ?? return default_name())
+```
+
+`.as_option()` is safe — it only checks for null, it doesn't
+dereference the pointer. The resulting `Option[*const T]` or
+`Option[*mut T]` still requires `unsafe` to dereference.
+
 **The C toolchain is a dependency.** `c_import` invokes the system
 C compiler's preprocessor (configurable, default: `cc -E`) to expand
 includes, resolve `#ifdef`s, and handle platform-specific headers.
@@ -4594,20 +4753,31 @@ binary as a constant.
 
 ### 17.2 Compile-Time Type Introspection
 
-Comptime code can inspect type metadata through a built-in `TypeInfo`
-API. This is the mechanism that replaces derive macros.
+Comptime code can inspect type metadata by calling methods on type
+parameters directly. Inside comptime context, types are objects:
 
-**Available at compile time:**
+**Type methods (available at compile time):**
 
-| Function | Returns | Description |
-|----------|---------|-------------|
-| `TypeInfo.fields[T]()` | `[FieldInfo]` | Struct field names, types, offsets |
-| `TypeInfo.variants[T]()` | `[VariantInfo]` | Enum variant names and payloads |
-| `TypeInfo.size[T]()` | `usize` | Size in bytes |
-| `TypeInfo.align[T]()` | `usize` | Alignment in bytes |
-| `TypeInfo.name[T]()` | `str` | Type name as string |
-| `TypeInfo.implements[T, Trait]()` | `bool` | Whether T implements Trait |
-| `TypeInfo.is_copy[T]()` | `bool` | Whether T is Copy |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `T.fields()` | `[FieldInfo]` | Struct field names, types, offsets |
+| `T.variants()` | `[VariantInfo]` | Enum variant names and payloads |
+| `T.size()` | `usize` | Size in bytes |
+| `T.align()` | `usize` | Alignment in bytes |
+| `T.name()` | `str` | Type name as string |
+| `T.implements(Trait)` | `bool` | Whether T implements Trait |
+| `T.is_copy()` | `bool` | Whether T is Copy |
+
+```
+comptime fn print_fields[T: type]() =
+    for field in T.fields():           // T is a type object
+        println("field: {field.name}, size: {field.size}")
+```
+
+The `TypeInfo` module provides the same API for non-generic contexts:
+`TypeInfo.fields[SomeType]()`, `TypeInfo.size[SomeType]()`, etc.
+Inside comptime generic functions, `T.fields()` is preferred — it
+reads like natural reflection.
 
 `FieldInfo` contains:
 
@@ -4629,11 +4799,11 @@ structure.
 ```
 // Generate a JSON serializer for any struct at compile time
 comptime fn derive_serialize[T: type]() -> impl Serialize for T =
-    let fields = TypeInfo.fields[T]()
+    let fields = T.fields()
     impl Serialize for T {
         fn serialize(self: &T, out: &mut JsonWriter) =
             out.begin_object()
-            comptime for field in fields:
+            for field in fields:       // cascade: inside comptime fn
                 out.key(field.name)
                 self.{field.name}.serialize(out)
             out.end_object()
@@ -4666,15 +4836,34 @@ once per iteration with compile-time constants substituted:
 
 ```
 comptime fn register_components[Ts: [type]]() =
-    comptime for T in Ts:
+    for T in Ts:                       // already in comptime context
         world.register_storage[T](
-            TypeInfo.name[T](),
-            TypeInfo.size[T](),
+            T.name(),
+            T.size(),
         )
 
 // Usage:
 register_components[Position, Velocity, Health, Transform]()
 ```
+
+**Comptime cascade:** Inside a `comptime fn` or `comptime for`, all
+code is already executing at compile time. You don't need to prefix
+inner `for`, `if`, or other statements with `comptime` — it
+cascades automatically:
+
+```
+comptime fn generate_storage[T: type]() =
+    // These are all comptime — no prefix needed inside comptime fn:
+    for field in T.fields():
+        if field.type_name.starts_with("Vec["):
+            emit_vec_storage(field)
+        else:
+            emit_scalar_storage(field)
+```
+
+The `comptime` prefix is only needed at the **entry point** — the
+outermost `comptime fn`, `comptime for`, or `comptime if`. Everything
+inside is already compile-time by context.
 
 ### 17.5 Compile-Time Branching
 
@@ -4683,13 +4872,13 @@ not compiled:
 
 ```
 fn serialize_value[T](val: &T, out: &mut Writer) =
-    comptime if TypeInfo.is_copy[T]():
+    comptime if T.is_copy():
         // Fast path for small Copy types
-        out.write_bytes(val as *const u8, TypeInfo.size[T]())
-    comptime else if TypeInfo.implements[T, Serialize]():
+        out.write_bytes(val as *const u8, T.size())
+    else if T.implements(Serialize):         // cascade: already comptime
         val.serialize(out)
-    comptime else:
-        comptime_error("Type {TypeInfo.name[T]()} is not serializable")
+    else:
+        comptime_error("Type {T.name()} is not serializable")
 ```
 
 `comptime_error` produces a compile error with a custom message.
@@ -4716,7 +4905,7 @@ type Transform = { position: Vec3, rotation: Quat, scale: f32 }
 ```
 // Automatically generate SoA layout from AoS definition
 comptime fn make_soa[T: type](capacity: usize) -> SoaStorage[T] =
-    let fields = TypeInfo.fields[T]()
+    let fields = T.fields()
     // Generates a struct with one Vec per field:
     // { positions: Vec[Vec3], rotations: Vec[Quat], scales: Vec[f32] }
     // Plus accessors that reconstruct T from the parallel arrays
@@ -4770,7 +4959,7 @@ Zig's compile-time generics.
 ```
 fn process[T](val: &T) =
     val.len()   // ERROR at generic check: T has no .len() method
-    comptime if TypeInfo.implements[T, Serialize]():
+    comptime if T.implements(Serialize):
         val.serialize()   // Deferred: checked only when T: Serialize
 ```
 
@@ -8107,6 +8296,152 @@ fn test() =
 fn test() =
     let eng = English {}
     assert(say_hi(eng) == "Hello")        // auto-ref + auto-coerce
+```
+
+### 25.93 Enum Auto-Generated _ref and _mut (Section 4.4)
+
+```
+// PASS: as_variant_ref returns Option[&T]
+type Value = Str(str) | Num(f64) | Null
+
+fn test() =
+    let v = Value.Str("hello")
+    assert(v.as_str_ref() == Some(&"hello"))
+    assert(v.as_num_ref() == None)
+
+// PASS: as_variant_mut returns Option[&mut T]
+fn test() =
+    var v = Value.Num(42.0)
+    if let Some(n) = v.as_num_mut():
+        *n = 99.0
+    assert(v.as_num_ref() == Some(&99.0))
+
+// PASS: navigating tree structures by reference
+type Json = Null | Bool(bool) | Num(f64) | Str(str)
+         | Array(Vec[Json]) | Object(HashMap[str, Json])
+
+fn test() =
+    let data = Json.Object(/* ... */)
+    let name = data.as_object_ref()?.get("name")?.as_str_ref()
+    assert(name.is_some())
+```
+
+### 25.94 Chained if let (Section 9.7)
+
+```
+// PASS: chained if let bindings
+fn test() =
+    let a: Option[i32] = Some(1)
+    let b: Option[i32] = Some(2)
+    var result = 0
+    if let Some(x) = a, let Some(y) = b:
+        result = x + y
+    assert(result == 3)
+
+// PASS: chain fails if any binding fails
+fn test() =
+    let a: Option[i32] = Some(1)
+    let b: Option[i32] = None
+    var result = 0
+    if let Some(x) = a, let Some(y) = b:
+        result = x + y
+    assert(result == 0)
+
+// PASS: mixed boolean and let bindings
+fn test() =
+    let users = vec![User { name: "Alice", active: true }]
+    if let Some(user) = users.first(), user.active:
+        assert(user.name == "Alice")
+```
+
+### 25.95 Comptime Cascade (Section 17.4)
+
+```
+// PASS: no comptime prefix needed inside comptime fn
+comptime fn count_fields[T: type]() -> usize =
+    let mut n = 0
+    for field in T.fields():       // cascade: no comptime prefix
+        n += 1
+    n
+
+@[test]
+fn test() =
+    assert(count_fields[Point]() == 2)
+
+// PASS: type method syntax
+comptime fn type_name[T: type]() -> str = T.name()
+
+@[test]
+fn test() =
+    assert(type_name[i32]() == "i32")
+```
+
+### 25.96 derive(Builder) (Section 11.8)
+
+```
+// PASS: generated builder with required and optional fields
+@[derive(Builder)]
+type Config = {
+    host: str,
+    port: i32 = 8080,
+}
+
+fn test() =
+    let c = Config.builder()
+        .host("localhost")
+        .build()
+        .unwrap()
+    assert(c.host == "localhost")
+    assert(c.port == 8080)
+
+// PASS: override defaults
+fn test() =
+    let c = Config.builder()
+        .host("prod.example.com")
+        .port(443)
+        .build()
+        .unwrap()
+    assert(c.port == 443)
+```
+
+### 25.97 Raw Pointer .as_option() (Section 16.1)
+
+```
+// PASS: non-null pointer → Some
+fn test() =
+    var x: i32 = 42
+    let p: *mut i32 = &mut x
+    assert(p.as_option().is_some())
+
+// PASS: null pointer → None
+fn test() =
+    let p: *mut i32 = null
+    assert(p.as_option().is_none())
+
+// PASS: as_option composes with ?? 
+fn test() =
+    let p: *const i32 = null
+    let val = p.as_option().map(|p| unsafe { *p }).unwrap_or(0)
+    assert(val == 0)
+```
+
+### 25.98 HashMap Convenience Methods (Section 13.3)
+
+```
+// PASS: update with default and transform
+fn test() =
+    var counts: HashMap[str, i32] = HashMap.new()
+    counts.update("alice", 0, |n| n + 1)
+    counts.update("alice", 0, |n| n + 1)
+    assert(counts.get("alice") == Some(&2))
+
+// PASS: increment shorthand
+fn test() =
+    var counts: HashMap[str, i32] = HashMap.new()
+    counts.increment("bob")
+    counts.increment("bob")
+    counts.increment("bob")
+    assert(counts.get("bob") == Some(&3))
 ```
 
 ---

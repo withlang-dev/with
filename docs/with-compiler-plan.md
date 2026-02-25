@@ -1,6 +1,6 @@
 # The With Compiler — Development Plan
 
-Companion to: Specification v6.2, Implementation Notes v26
+Companion to: Specification v6.3, Implementation Notes v26
 Implementation language: **Zig** (bootstrap), then **With** (self-hosting)
 
 ---
@@ -396,6 +396,8 @@ Bidirectional type inference for the Phase 0 subset:
   tuple destructuring in `let` bindings (§4.8)
 - Range types: `Range[T]` for `..`, `RangeInclusive[T]` for `..=`
 - Pointer types for FFI (`*const T`, `*mut T`)
+- Raw pointer `.as_option()` (§16.1): null → `None`, non-null →
+  `Some(*T)`. Safe (no deref), ergonomic null handling for C interop
 - **Type aliases (§15.1):** `str` = `String`, `&str` = `StrView`.
   These must exist from Phase 0 — they appear in nearly every
   function signature. Implement as built-in aliases in the prelude.
@@ -665,6 +667,11 @@ Full pattern matching (impl notes §9):
 - Exhaustiveness checking (required)
 - Usefulness checking (warn on unreachable arms)
 - `if let` as sugar for single-arm match with fallthrough
+- **Chained `if let` (§9.7):** Multiple conditional bindings in a
+  single `if`, separated by commas: `if let Some(a) = x, let Some(b) = y:`.
+  Can mix `let` bindings with boolean conditions. All bindings must
+  succeed for the body to execute. Eliminates the pyramid of doom.
+  Desugar to nested single-arm matches.
 
 Compile to decision trees (impl notes §9 recommends Maranget's
 algorithm).
@@ -715,10 +722,19 @@ type checker resolves it to the full qualified name.
 
 **Auto-generated accessor methods (§4.4):** Every enum variant
 unconditionally generates `.is_variant()` → `bool` and (for data
-variants) `.as_variant()` → `Option[T]`. For multi-field variants,
-`.as_variant()` returns `Option[(A, B)]`. Unit variants only get
-`.is_variant()`. These are compiler-generated during type checking
-— no `@[derive]` needed. Emit as regular methods in the codegen.
+variants) three accessor forms:
+- `.as_variant()` → `Option[T]` (by value, moves)
+- `.as_variant_ref()` → `Option[&T]` (by shared ref)
+- `.as_variant_mut()` → `Option[&mut T]` (by mutable ref)
+
+For multi-field variants, `.as_variant()` returns `Option[(A, B)]`
+(and `_ref`/`_mut` return `Option[&(A, B)]`). Unit variants only
+get `.is_variant()`. These are compiler-generated during type
+checking — no `@[derive]` needed. Emit as regular methods in codegen.
+
+The `_ref` variants are essential for navigating tree structures
+(JSON, ASTs) without cloning — they compose with optional chaining:
+`config.as_object_ref()?.get("key")?.as_str_ref()`.
 
 #### 2.8 Tuples (§4.8)
 
@@ -818,12 +834,13 @@ optional. `@[tailrec]` annotation on a non-tail-recursive function
 is a compile error (§9.2).
 
 **Phase 2 Milestone:** Tests 25.7, 25.9, 25.12–25.14,
-25.19–25.31, 25.34–25.39, 25.41–25.42, 25.43, 25.52 pass.
-Generic `Vec[T]` and `HashMap[K, V]` work. Field shorthand,
-default field values, enum variant shorthand, enum accessor methods,
-tuples, optional chaining, `??`, `error ... from`, implicit Ok
-wrapping, unit elision, and comprehensions all work. The language
-is usable for real programs (without traits or async).
+25.19–25.31, 25.34–25.39, 25.41–25.42, 25.43, 25.52, 25.93, 25.94
+pass. Generic `Vec[T]` and `HashMap[K, V]` work. Field shorthand,
+default field values, enum variant shorthand, enum accessor methods
+(including `_ref`/`_mut` variants), chained `if let`, tuples,
+optional chaining, `??`, `error ... from`, implicit Ok wrapping,
+unit elision, and comprehensions all work. The language is usable
+for real programs (without traits or async).
 
 ---
 
@@ -848,6 +865,9 @@ Written in With using `c_import` (via libclang) for platform access:
 - `std.fs` (File, read_file, write_file, directory ops)
 - `std.string` (String methods, StrView methods)
 - `std.collections` (`Vec[T]`, `HashMap[K, V]`, `HashSet[T]`) — pure With
+  - HashMap convenience methods (§13.3): `.update(key, default, fn)`,
+    `.increment(key)`, `.decrement(key)`, `.append(key, value)` —
+    cover the most common mutation patterns without entry API ceremony
 - `Option[T]` combinator methods: `map`, `and_then`, `or_else`,
   `unwrap_or`, `filter`, `zip`, `flatten`, `cloned`, `transpose`
 - `Result[T, E]` combinator methods: `map`, `map_err`, `and_then`,
@@ -875,9 +895,10 @@ conditional compilation (`comptime if cfg.target_os`).
 - `std.alloc` (Arena, Pool)
 - Generator lowering (impl notes §5)
 
-**Phase 3 Milestone:** Tests 25.8, 25.15, 25.16, 25.19, 25.22 pass.
-A user can write file I/O, collections, string processing, timing
-code without ever seeing `c_import`.
+**Phase 3 Milestone:** Tests 25.8, 25.15, 25.16, 25.19, 25.22,
+25.97 (pointer as_option), 25.98 (HashMap convenience) pass. A user
+can write file I/O, collections, string processing, timing code
+without ever seeing `c_import`.
 
 ---
 
@@ -1030,10 +1051,17 @@ generics work. `dyn Trait` works. Syntax traits power `for`, `with`,
 Compile-time evaluation (§17):
 - `comptime if` / `comptime for` — conditional compilation and
   unrolling
-- `TypeInfo` API — type introspection at compile time:
-  `TypeInfo.fields[T]()`, `TypeInfo.variants[T]()`,
-  `TypeInfo.size[T]()`, `TypeInfo.implements[T, Trait]()`,
-  `TypeInfo.is_copy[T]()` (§17.2)
+- **Type-as-object API (§17.2):** Inside comptime context, type
+  parameters are objects with methods: `T.fields()`, `T.variants()`,
+  `T.size()`, `T.align()`, `T.name()`, `T.implements(Trait)`,
+  `T.is_copy()`. The `TypeInfo` module provides the same API for
+  non-generic contexts: `TypeInfo.fields[SomeType]()`. Inside
+  comptime generic functions, `T.fields()` is preferred.
+- **Comptime cascade (§17.4):** Inside a `comptime fn`, all code
+  is already executing at compile time — no `comptime` prefix
+  needed for inner `for`, `if`, or other statements. The prefix
+  is only required at the entry point (`comptime fn`, `comptime for`,
+  `comptime if`). This simplifies comptime code significantly.
 - `comptime fn` — functions that run at compile time,
   deterministic, no I/O (§17.7)
 - `comptime_error` — custom compile errors from comptime code
@@ -1044,6 +1072,11 @@ Compile-time evaluation (§17):
   Copy, Clone, Eq, Hash, Ord, Debug. Conservative — only derives
   traits where all fields qualify. Silently drops traits when a
   field is added that doesn't satisfy requirements (§11.8)
+- `@[derive(Builder)]` (§11.8) — generates a builder struct with
+  chaining methods for every field. Fields with default values are
+  optional; fields without are required. `.build()` returns
+  `Result[T, BuilderError]` with compile-time checking when all
+  calls are visible
 
 This is a significant feature but well-isolated — it's an
 additional compiler pass between type checking and MIR lowering.
@@ -1169,8 +1202,8 @@ Mechanical transforms:
 - `std.ArrayList(T)` → `Vec[T]`; `std.AutoHashMap(K,V)` →
   `HashMap[K, V]`
 - `@as(T, val)` → `val as T`; `@intCast(val)` → `val as T`
-- `@typeInfo(T)` → `TypeInfo.fields[T]()`; `inline for` →
-  `comptime for`
+- `@typeInfo(T)` → `T.fields()` (inside comptime context) or
+  `TypeInfo.fields[T]()` (outside); `inline for` → `comptime for`
 - `test "name" { ... }` → `fn test_name() = ...`
 - `{ }` blocks → `:` + indentation
 - Strip allocator parameters and `.deinit()` calls (RAII handles it)
@@ -1235,10 +1268,12 @@ The `--check` mode is particularly valuable: it scans source files
 and reports a summary of mechanical transforms vs. manual fixups
 needed, giving developers a realistic estimate before starting.
 
-**Phase 6 Milestone:** Tests 25.40 (derive) pass. `with fmt`,
-`with doc`, `with repl`, and `with migrate` work. Comptime enables
-`@[derive(all)]` and `@[derive(Serialize)]`. LSP provides basic IDE
-support.
+**Phase 6 Milestone:** Tests 25.40 (derive), 25.95 (comptime
+cascade), 25.96 (derive Builder) pass. `with fmt`, `with doc`,
+`with repl`, and `with migrate` work. Comptime enables
+`@[derive(all)]`, `@[derive(Builder)]`, and `@[derive(Serialize)]`.
+Type-as-object API (`T.fields()`) and comptime cascade simplify
+metaprogramming. LSP provides basic IDE support.
 
 ---
 

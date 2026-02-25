@@ -211,7 +211,7 @@ async fn test_duplicate_email_rejected() =
     match svc.create_user(req, UserId(0)).await
         Err(.Validation(msg)) ->
             assert(msg.contains("already registered"))
-        _ -> unreachable()
+        other -> unreachable("expected Validation error, got {other}")
 
 async fn test_update_partial_fields() =
     let (svc, _) = test_service()
@@ -222,12 +222,10 @@ async fn test_update_partial_fields() =
         role: .Member,
     }, UserId(0)).await.unwrap()
 
-    // Update only the name
+    // Update only the name — default field values (§4.3) mean
+    // unspecified fields default to None, so partial updates are concise.
     let updated = svc.update_user(user.id, UserUpdate {
         name: Some("Robert"),
-        email: None,
-        role: None,
-        active: None,
     }, UserId(0)).await.unwrap()
 
     assert(updated.name == "Robert")
@@ -286,3 +284,31 @@ async fn test_batch_profiles() =
     // Batch fetch all profiles
     let profiles = svc.get_profiles_batch(ids).await.unwrap()
     assert(profiles.len() == 5)
+
+async fn test_optional_chaining_and_accessors() =
+    let (svc, _) = test_service()
+
+    let user = svc.create_user(CreateUserRequest {
+        name: "Eve",
+        email: "eve@example.com",
+        role: .Admin,
+    }, UserId(0)).await.unwrap()
+
+    let profile = svc.get_profile(user.id).await.unwrap()
+
+    // ?. optional chaining (§10.3): access method through Option.
+    // last_login is None for new users, so the chain short-circuits to None.
+    let elapsed = profile.last_login?.elapsed()
+    assert(elapsed == None)
+
+    // Combine ?. with ?? for a default value
+    let last_seen_secs = profile.last_login?.elapsed().as_secs() ?? 0
+    assert(last_seen_secs == 0)
+
+    // Enum accessor methods (§4.4): auto-generated for every enum variant.
+    // Data variants expose .as_X(), .as_X_ref(), and .as_X_mut().
+    assert(profile.user.role.is_admin())
+    assert(!profile.user.role.is_guest())
+
+    let err = ServiceError.Validation("bad request")
+    assert(err.as_validation_ref() == Some(&"bad request"))
