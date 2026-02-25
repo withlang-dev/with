@@ -26,7 +26,14 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
                 try writer.writeAll("[");
                 for (f.type_params, 0..) |tp, tpi| {
                     if (tpi > 0) try writer.writeAll(", ");
-                    try writer.print("{s}", .{pool.resolve(tp)});
+                    try writer.print("{s}", .{pool.resolve(tp.name)});
+                    if (tp.bounds.len > 0) {
+                        try writer.writeAll(": ");
+                        for (tp.bounds, 0..) |b, bi| {
+                            if (bi > 0) try writer.writeAll(" + ");
+                            try writer.print("{s}", .{pool.resolve(b)});
+                        }
+                    }
                 }
                 try writer.writeAll("]");
             }

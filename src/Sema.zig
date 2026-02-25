@@ -209,6 +209,11 @@ methods: std.AutoHashMapUnmanaged(u64, FnSigInfo),
 /// Enum variant lookup: variant_name → (enum TypeId, variant index).
 variant_lookup: std.AutoHashMapUnmanaged(Symbol, VariantInfo),
 
+/// Trait declarations: trait name → list of required method name symbols.
+trait_methods: std.AutoHashMapUnmanaged(Symbol, []const Symbol),
+/// Trait implementations: type name → list of trait names implemented.
+type_impls: std.AutoHashMapUnmanaged(Symbol, std.ArrayList(Symbol)),
+
 /// Active borrows in current function (Phase 3).
 active_borrows: std.ArrayList(Borrow),
 
@@ -258,6 +263,8 @@ pub fn init(allocator: std.mem.Allocator, pool: *InternPool, diagnostics: *Diagn
         .mono_cache = .{},
         .methods = .{},
         .variant_lookup = .{},
+        .trait_methods = .{},
+        .type_impls = .{},
         .active_borrows = .empty,
         .closure_analyses = .{},
         .current_return_type = 0,
@@ -367,6 +374,9 @@ pub fn checkModule(self: *Sema, module: *const Ast.Module) void {
     // Pass 1: Collect all type declarations, function signatures, extern decls.
     self.collectDeclarations(module);
 
+    // Pass 1.5: Verify trait conformance (impl blocks satisfy trait requirements).
+    self.checkTraitConformance(module);
+
     // Pass 2: Check all function bodies.
     self.checkBodies(module);
 }
@@ -382,8 +392,8 @@ fn collectDeclarations(self: *Sema, module: *const Ast.Module) void {
             .let_decl => |ld| self.collectLetDecl(ld),
             .use_decl => {}, // use decls are no-ops for now
             .c_import => {}, // already expanded by Driver
-            .trait_decl => {}, // trait declarations collected but not enforced yet
-            .impl_decl => {}, // impl blocks recorded for future trait checking
+            .trait_decl => |td| self.collectTraitDecl(td),
+            .impl_decl => |id| self.collectImplDecl(id),
             .poisoned => {},
         }
     }
@@ -533,13 +543,65 @@ fn collectLetDecl(self: *Sema, ld: Ast.LetDecl) void {
     });
 }
 
-// ── Pass 1.5: Collect impl/extend/trait methods ──────────────────
+fn collectTraitDecl(self: *Sema, td: Ast.TraitDecl) void {
+    // Collect the method names required by this trait.
+    const method_names = self.allocator.alloc(Symbol, td.methods.len) catch return;
+    for (td.methods, 0..) |m, i| {
+        method_names[i] = m.name;
+    }
+    self.trait_methods.put(self.allocator, td.name, method_names) catch {};
+}
 
-fn collectImplMethods(_: *Sema, _: *const Ast.Module) void {
-    // impl/extend/trait blocks are lowered to top-level functions by the parser.
-    // Their methods appear as regular FnDecls with names like "Type.method".
-    // No-op: methods are already registered as regular functions by collectFnDecl.
-    // Method dispatch in checkExpr handles the Type.method lookup.
+fn collectImplDecl(self: *Sema, id: Ast.ImplDecl) void {
+    // Record which traits a type implements.
+    const trait_sym = id.trait_name orelse return; // plain `impl Type` has no trait
+    const gop = self.type_impls.getOrPut(self.allocator, id.type_name) catch return;
+    if (!gop.found_existing) {
+        gop.value_ptr.* = .empty;
+    }
+    gop.value_ptr.append(self.allocator, trait_sym) catch {};
+}
+
+// ── Pass 1.5: Trait conformance checking ─────────────────────────
+
+fn checkTraitConformance(self: *Sema, module: *const Ast.Module) void {
+    // For each impl_decl with a trait_name, verify all required methods exist.
+    for (module.decls) |decl| {
+        switch (decl.kind) {
+            .impl_decl => |id| {
+                const trait_sym = id.trait_name orelse continue;
+                const required = self.trait_methods.get(trait_sym) orelse continue;
+
+                // Build set of short method names from mangled method_names.
+                // method_names are like "Type.method", we need just "method".
+                for (required) |req_name| {
+                    const req_str = self.pool.resolve(req_name);
+                    var found = false;
+                    for (id.method_names) |mangled| {
+                        const mangled_str = self.pool.resolve(mangled);
+                        // Extract method name after the dot: "Type.method" → "method"
+                        const short = if (std.mem.indexOfScalar(u8, mangled_str, '.')) |dot_idx|
+                            mangled_str[dot_idx + 1 ..]
+                        else
+                            mangled_str;
+                        if (std.mem.eql(u8, short, req_str)) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        var buf: [256]u8 = undefined;
+                        const type_str = self.pool.resolve(id.type_name);
+                        const trait_str = self.pool.resolve(trait_sym);
+                        const msg = std.fmt.bufPrint(&buf, "type '{s}' is missing method '{s}' required by trait '{s}'", .{ type_str, req_str, trait_str }) catch "missing trait method";
+                        const alloc_msg = self.allocator.dupe(u8, msg) catch "missing trait method";
+                        self.emitError(alloc_msg, decl.span);
+                    }
+                }
+            },
+            else => {},
+        }
+    }
 }
 
 // ── Type expression resolution ───────────────────────────────────
@@ -610,9 +672,6 @@ fn resolveTypeExpr(self: *Sema, te: *const Ast.TypeExpr) TypeId {
 // ── Pass 2: Check function bodies ────────────────────────────────
 
 fn checkBodies(self: *Sema, module: *const Ast.Module) void {
-    // First, collect impl/extend method registrations.
-    self.collectImplMethods(module);
-
     for (module.decls) |decl| {
         switch (decl.kind) {
             .function => |fn_decl| {
@@ -1443,12 +1502,89 @@ fn checkMethodCall(self: *Sema, fa: Ast.FieldAccessExpr, args: []const *const As
     return error_type;
 }
 
-fn checkGenericCall(self: *Sema, gen_fn: Ast.FnDecl, _: []const *const Ast.Expr, _: Span) TypeId {
-    // For generic functions, we can't know the exact return type without
-    // monomorphization. Return the return type annotation if available.
+fn checkGenericCall(self: *Sema, gen_fn: Ast.FnDecl, args: []const *const Ast.Expr, span: Span) TypeId {
+    // Infer type parameter → concrete type bindings from call arguments.
+    var type_bindings: [16]struct { param: Ast.Symbol, concrete: TypeId } = undefined;
+    var binding_count: u32 = 0;
+
+    for (gen_fn.params, 0..) |param, i| {
+        if (i >= args.len) break;
+        if (param.type_expr) |te| {
+            if (te.kind == .named) {
+                const sym = te.kind.named;
+                // Check if this is a type parameter.
+                for (gen_fn.type_params) |tp| {
+                    if (tp.name == sym) {
+                        const arg_type = self.checkExpr(args[i]);
+                        if (arg_type != error_type and binding_count < 16) {
+                            // Check if already bound.
+                            var already = false;
+                            for (type_bindings[0..binding_count]) |b| {
+                                if (b.param == sym) {
+                                    already = true;
+                                    break;
+                                }
+                            }
+                            if (!already) {
+                                type_bindings[binding_count] = .{ .param = sym, .concrete = arg_type };
+                                binding_count += 1;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Check trait bounds for each type parameter.
+    for (gen_fn.type_params) |tp| {
+        if (tp.bounds.len == 0) continue;
+        // Find the concrete type for this type param.
+        var concrete: TypeId = error_type;
+        for (type_bindings[0..binding_count]) |b| {
+            if (b.param == tp.name) {
+                concrete = b.concrete;
+                break;
+            }
+        }
+        if (concrete == error_type) continue; // couldn't infer, skip check
+
+        // Get the concrete type's name (must be a struct or enum).
+        const resolved = self.resolveAlias(concrete);
+        const concrete_name: ?Ast.Symbol = switch (self.getType(resolved)) {
+            .struct_type => |st| st.name,
+            .enum_type => |et| et.name,
+            else => null,
+        };
+        if (concrete_name == null) continue; // can't check bounds on primitives yet
+
+        // Check each required trait.
+        for (tp.bounds) |trait_sym| {
+            const impl_list = self.type_impls.get(concrete_name.?);
+            var found = false;
+            if (impl_list) |list| {
+                for (list.items) |impl_trait| {
+                    if (impl_trait == trait_sym) {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found) {
+                var buf: [256]u8 = undefined;
+                const type_str = if (concrete_name) |cn| self.pool.resolve(cn) else "<unknown>";
+                const trait_str = self.pool.resolve(trait_sym);
+                const tp_str = self.pool.resolve(tp.name);
+                const msg = std.fmt.bufPrint(&buf, "type '{s}' does not implement trait '{s}' required by bound '{s}: {s}'", .{ type_str, trait_str, tp_str, trait_str }) catch "trait bound not satisfied";
+                const alloc_msg = self.allocator.dupe(u8, msg) catch "trait bound not satisfied";
+                self.emitError(alloc_msg, span);
+            }
+        }
+    }
+
+    // Return the return type annotation if available.
     if (gen_fn.return_type) |rt| {
-        // If the return type is a type parameter, we can't resolve it here.
-        // Just return error_type and let codegen handle it.
         const resolved = self.resolveTypeExpr(rt);
         if (resolved != error_type) return resolved;
     }
