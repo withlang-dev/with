@@ -1109,6 +1109,71 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
                 };
                 lhs = node;
             },
+            .question_dot => {
+                // Optional chaining: `opt?.field`
+                // Desugars to: match opt { Some(v) -> Some(v.field), None -> None }
+                self.advance(); // consume '?.'
+                const field = if (self.peek() == .int_literal) blk: {
+                    const sym = try self.internCurrent();
+                    self.advance();
+                    break :blk sym;
+                } else try self.expectIdentifier();
+                const end = self.prevSpan();
+
+                // Build: `v` ident for payload
+                const v_sym = try self.pool.intern("__opt_v");
+                const v_ident = try self.arena.create(Ast.Expr);
+                v_ident.* = .{ .kind = .{ .ident = v_sym }, .span = lhs.span };
+
+                // Build: `v.field`
+                const field_node = try self.arena.create(Ast.Expr);
+                field_node.* = .{
+                    .kind = .{ .field_access = .{ .expr = v_ident, .field = field } },
+                    .span = lhs.span.merge(end),
+                };
+
+                // Build: `Some(v.field)`
+                const some_sym = try self.pool.intern("Some");
+                const some_callee = try self.arena.create(Ast.Expr);
+                some_callee.* = .{ .kind = .{ .ident = some_sym }, .span = lhs.span };
+                const some_args = try self.arena.alloc(*const Ast.Expr, 1);
+                some_args[0] = field_node;
+                const some_call = try self.arena.create(Ast.Expr);
+                some_call.* = .{
+                    .kind = .{ .call = .{ .callee = some_callee, .args = some_args } },
+                    .span = lhs.span.merge(end),
+                };
+
+                // Build: `None`
+                const none_sym = try self.pool.intern("None");
+                const none_node = try self.arena.create(Ast.Expr);
+                none_node.* = .{ .kind = .{ .ident = none_sym }, .span = lhs.span };
+
+                // Build match arms.
+                var arms: std.ArrayList(Ast.MatchArm) = .empty;
+                const some_bindings = try self.arena.alloc(Ast.Symbol, 1);
+                some_bindings[0] = v_sym;
+                try arms.append(self.arena, .{
+                    .pattern = .{
+                        .kind = .{ .variant = .{ .name = some_sym, .bindings = some_bindings } },
+                        .span = lhs.span,
+                    },
+                    .body = some_call,
+                    .span = lhs.span.merge(end),
+                });
+                try arms.append(self.arena, .{
+                    .pattern = .{ .kind = .wildcard, .span = lhs.span },
+                    .body = none_node,
+                    .span = lhs.span,
+                });
+
+                const node = try self.arena.create(Ast.Expr);
+                node.* = .{
+                    .kind = .{ .match_expr = .{ .subject = lhs, .arms = arms.items } },
+                    .span = lhs.span.merge(end),
+                };
+                lhs = node;
+            },
             else => return lhs,
         }
     }
