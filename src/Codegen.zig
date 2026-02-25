@@ -3191,7 +3191,7 @@ fn genAssign(self: *Codegen, assign: Ast.AssignExpr) Error!c.LLVMValueRef {
                 else => return error.UnsupportedExpr,
             };
             const local = self.locals.get(obj_sym) orelse return error.UnsupportedExpr;
-            if (!local.is_mut) return error.ImmutableAssign;
+            if (!local.is_mut and local.pointee_struct == null) return error.ImmutableAssign;
 
             // Pointer-to-struct field assignment (e.g. self.field = val where self: *mut T).
             if (local.pointee_struct) |ps| {
