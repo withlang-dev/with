@@ -204,6 +204,53 @@ int64_t with_fiber_await(int32_t fiber_id) {
     }
 }
 
+// Cancel a fiber by ID.
+// Returns 1 if canceled/found, 0 if the fiber ID is unknown.
+int32_t with_fiber_cancel(int32_t fiber_id) {
+    // If already completed, clean it up now.
+    for (int i = 0; i < completed_count; i++) {
+        if (completed[i] && completed[i]->id == fiber_id) {
+            free(completed[i]->stack);
+            free(completed[i]);
+            completed[i] = completed[completed_count - 1];
+            completed_count--;
+            return 1;
+        }
+    }
+
+    // Remove from ready queue if present.
+    Fiber *prev = NULL;
+    Fiber *cur = ready_head;
+    while (cur) {
+        if (cur->id == fiber_id) {
+            if (prev) {
+                prev->next = cur->next;
+            } else {
+                ready_head = cur->next;
+            }
+            if (cur == ready_tail) {
+                ready_tail = prev;
+            }
+            free(cur->stack);
+            free(cur);
+            return 1;
+        }
+        prev = cur;
+        cur = cur->next;
+    }
+
+    // Best-effort handling if current fiber cancels itself.
+    if (current_fiber && current_fiber->id == fiber_id) {
+        current_fiber->state = FIBER_DONE;
+        if (completed_count < MAX_FIBERS) {
+            completed[completed_count++] = current_fiber;
+        }
+        return 1;
+    }
+
+    return 0;
+}
+
 // Set the result of the current fiber (called before returning).
 void with_fiber_set_result(int64_t value) {
     if (current_fiber) {

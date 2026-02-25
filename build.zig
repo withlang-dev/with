@@ -111,9 +111,9 @@ pub fn build(b: *std.Build) void {
         "-isysroot",
         "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
         "-c",
-        "runtime/fiber.c",
-        "-o",
     });
+    fiber_c.addFileArg(b.path("runtime/fiber.c"));
+    fiber_c.addArg("-o");
     const fiber_c_out = fiber_c.addOutputFileArg("fiber.o");
 
     const fiber_asm = b.addSystemCommand(&.{
@@ -121,9 +121,9 @@ pub fn build(b: *std.Build) void {
         "-isysroot",
         "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
         "-c",
-        "runtime/fiber_asm_aarch64.s",
-        "-o",
     });
+    fiber_asm.addFileArg(b.path("runtime/fiber_asm_aarch64.s"));
+    fiber_asm.addArg("-o");
     const fiber_asm_out = fiber_asm.addOutputFileArg("fiber_asm.o");
 
     // Compile runtime helpers.
@@ -132,9 +132,9 @@ pub fn build(b: *std.Build) void {
         "-isysroot",
         "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
         "-c",
-        "runtime/helpers.c",
-        "-o",
     });
+    helpers_c.addFileArg(b.path("runtime/helpers.c"));
+    helpers_c.addArg("-o");
     const helpers_c_out = helpers_c.addOutputFileArg("helpers.o");
 
     // --- Install ---

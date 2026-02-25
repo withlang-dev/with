@@ -1,9 +1,9 @@
 ---
 active: true
-iteration: 17
+iteration: 1
 max_iterations: 500
 completion_promise: "COMPLETE"
-started_at: "2026-02-25T18:57:55Z"
+started_at: "2026-02-25T21:56:09Z"
 ---
 
 Continue implementing the zig-based With compiler and tests for all features, as specified in docs/with-compiler-plan.md, docs/with-specification.md, docs/with-implementation-notes.md until all phases are complete.  the remaining phases: Near-term: Phase 3 — Standard Library

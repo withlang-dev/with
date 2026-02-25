@@ -181,6 +181,13 @@ navigate while enemies tumble. The 0.3x factor means the player
 slides slightly when gravity shifts (which feels good) but
 isn't helplessly thrown around.
 
+**Playtest note:** The sweet spot between "heavy but not helpless"
+is razor-thin. Test 0.25× and 0.35× aggressively. Additionally,
+add a small **inertia dampener** to the player — when the gravity
+direction changes, apply a brief counter-force (decaying over
+~0.2s) so direction reversals don't feel sticky. The dampener
+shouldn't eliminate the slide, just soften the jerk on reversal.
+
 ### 5.2 Damage Model
 
 The player takes damage from:
@@ -265,7 +272,7 @@ on top of each other with gravity, bottom ones get crushed.
 | Type | Mass | HP | Behavior | Visual |
 |------|------|----|----------|--------|
 | Titan | 100 kg | 800 | Slow, creates gravity well on death | Enormous, other enemies orbit it |
-| Anchor | 50 kg | 400 | Immune to gravity changes | Walks steadily regardless of tilt |
+| Anchor | 50 kg | 400 | Immune to gravity changes | Walks steadily regardless of tilt. Glowing runes on its body that stay upright no matter the tilt angle — visible from across the arena so players immediately understand this enemy plays by different rules |
 | Swarm Queen | 10 kg | 150 | Spawns Slimes continuously | Must be killed to stop spawn |
 
 **Bosses (every 5 minutes):**
@@ -274,6 +281,10 @@ Mini-boss waves. Single large enemy with unique physics mechanics:
 
 - **The Boulder** (min 5): Giant sphere, extremely heavy, rolls
   with gravity. Player must trap it in a pit.
+  **Hard design rule:** The Boulder MUST be beatable with only
+  starter traps (Spike Strip + Bumper + Wall) and basic tilt.
+  No unlocks required. If a new player who understands the core
+  mechanic can't kill this boss, the game's retention dies here.
 - **The Chain Gang** (min 10): Group of enemies connected by
   Box2D distance joints. Must break the chain by pulling them
   apart with alternating gravity.
@@ -455,22 +466,93 @@ On level up, the player chooses one of three random upgrades.
 
 ### 8.3 Meta-Progression (Between Runs)
 
-Completed runs earn currency based on:
+**Currency: Grav-Shards** — glowing blue-white crystals that tumble
+with gravity on the shop screen. Earned continuously during a run,
+paid out at death (or run completion).
 
-- Enemies killed
-- Time survived
-- Peak concurrent enemy count
-- Traps placed
+```
+shards_per_minute = 40 + (minutes_elapsed × 12)
+  + (peak_enemy_count / 10)           // bonus for surviving swarms
+  + (gravity_kills × 0.25)            // fall/crush/pit kills reward
+```
 
-Currency unlocks:
+A strong 18-minute run earns roughly 1,200–1,800 shards. A quick
+4-minute death earns ~300. Even the worst run gives at least 150.
+Never punish the player for learning.
+
+**The Bank:** Unspent shards roll over between runs. No wasted
+currency, no "I have 47 shards and nothing to buy" frustration.
+Players can save up for big-ticket items across multiple runs.
+
+**Post-Death Flow:**
+
+1. Slow-mo replay of the run's best kill (highest velocity impact
+   or biggest pile-up)
+2. Fade to **Grav-Shard Forge** (the shop)
+3. Player buys what they want (or banks shards)
+4. One button: **"Drop Again"** → next run starts
+
+The entire death-to-next-run loop must take under 30 seconds if
+the player doesn't want to browse.
+
+**Permanent Unlocks (one-time purchases):**
+
+All Tier 1 unlocks cost the same (500 shards) so the player's
+first decision is *which* upgrade, not *which can I barely afford.*
+Price differentiation starts at Tier 2.
+
+**Tier 1 — First Deaths (500 shards each):**
+
+| Unlock | Effect |
+|--------|--------|
+| Extra Trap Slot | +1 max trap of every type |
+| Heavier Tilt | Base max gravity +15% |
+| Iron Soles | Player gravity response reduced to 0.20× |
+| Gem Greed | XP gems have 30% stronger gravity pull toward player |
+
+**Tier 2 — Getting Comfortable (800–1,200 shards):**
 
 | Unlock | Cost | Effect |
 |--------|------|--------|
-| New trap types | Scaling | Adds trap to the in-run pool |
-| Arena templates | Scaling | New starting layouts |
-| Starting traps | High | Begin run with traps pre-placed |
-| Player characters | High | Cosmetic + minor stat variation |
-| Achievement badges | Milestone | "Killed 1000 with fall damage" etc. |
+| Unlock Ramp | 800 | New trap type: Ramp |
+| Unlock Funnel | 850 | New trap type: Funnel |
+| Unlock Grinder | 1,200 | New trap type: Grinder |
+| Starter Trap Bundle | 1,000 | Begin every run with 1 Spike Strip + 1 Bumper pre-placed |
+
+**Tier 3 — Invested (1,500–2,500 shards):**
+
+| Unlock | Cost | Effect | Prereq |
+|--------|------|--------|--------|
+| Unlock Magnet | 1,800 | New trap type: Magnet | Unlock Funnel |
+| Unlock Explosive Barrel | 2,000 | New trap type: Explosive Barrel | — |
+| Unlock Conveyor | 1,950 | New trap type: Conveyor | — |
+| Arena Pack 1 | 1,600 | +3 new arena templates | Survive 10 min once |
+| Titan Slayer | 2,500 | All elite enemies take +25% physics damage | — |
+
+**Tier 4 — Mastery (2,800–3,500 shards):**
+
+| Unlock | Cost | Effect | Prereq |
+|--------|------|--------|--------|
+| Unlock Pendulum | 3,200 | New trap type: Pendulum | Unlock Grinder |
+| Unlock Black Hole | 3,500 | New trap type: Black Hole | Unlock Magnet |
+| Arena Pack 2 | 3,000 | +4 complex multi-level arenas | Survive 15 min once |
+
+**Tier 5 — Endgame (4,800–7,000 shards):**
+
+| Unlock | Cost | Effect | Prereq |
+|--------|------|--------|--------|
+| Zero-G Mastery | 5,500 | Adds Zero-G Zone to the rare upgrade pool | — |
+| Physics God | 6,000 | Global physics damage multiplier +20% | Survive 20 min once |
+| The Anchor (character) | 7,000 | Playable character with 0.0× gravity response (completely stable, different playstyle) | — |
+
+**Design principles for the shop:**
+
+- Prioritize unlocks that change what you *do* (new trap types,
+  new arenas, new characters) over unlocks that change numbers.
+- The first 3–4 purchases should be obvious power spikes so new
+  players feel the system working immediately.
+- No temporary boosters. Every shard spent is a permanent
+  investment. Every death moves you forward. No way to waste a run.
 
 ---
 
@@ -836,7 +918,8 @@ This is the "is it fun?" checkpoint.
 - First boss (The Boulder)
 - 15 upgrades
 - Placeholder audio
-- Meta-progression (trap unlocks only)
+- Grav-Shard Forge with Tier 1 + Tier 2 permanent unlocks
+- Post-death flow (slow-mo best kill → shop → drop again)
 
 ### 12.3 Beta
 
@@ -846,7 +929,7 @@ This is the "is it fun?" checkpoint.
 - 4 bosses
 - 30 upgrades
 - Full audio + music
-- Full meta-progression
+- Full Grav-Shard Forge (all tiers, all unlocks)
 - Steam achievements
 - PC keyboard+mouse support
 
@@ -885,4 +968,4 @@ never seen before. Read it. You already understand it."
 
 ---
 
-*GRAVFALL — Game Design Specification v0.1*
+*GRAVFALL — Game Design Specification v0.2*

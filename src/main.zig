@@ -130,6 +130,13 @@ pub fn main() !void {
         } else {
             std.process.exit(1);
         }
+    } else if (std.mem.eql(u8, command, "test")) {
+        const target = if (args.len >= 3) args[2] else "test/cases";
+        // The test runner may compile many modules in one process.
+        // Use page allocator here to avoid noisy leak diagnostics from
+        // long-lived compiler caches that are intentionally process-scoped.
+        const ok = try runTests(target, std.heap.page_allocator);
+        if (!ok) std.process.exit(1);
     } else if (std.mem.eql(u8, command, "fmt")) {
         if (args.len < 3) {
             stderrPrint("error: 'fmt' requires a source file argument\n");
@@ -202,6 +209,7 @@ fn printUsage() void {
         \\  build <file.w>    Compile a With source file to a binary
         \\  run <file.w>      Compile and run a With source file
         \\  check <file.w>    Parse and type-check a source file
+        \\  test [path]       Run .w test cases (default: test/cases)
         \\  fmt <file.w>      Format a source file (to stdout)
         \\  repl              Interactive REPL
         \\  lsp               Start language server (LSP over stdio)
@@ -555,6 +563,131 @@ fn extractDocComment(source: []const u8, decl_start: usize) []const u8 {
         }
     }
     return "";
+}
+
+const TestSummary = struct {
+    passed: usize = 0,
+    failed: usize = 0,
+    skipped: usize = 0,
+};
+
+fn runTests(target: []const u8, allocator: std.mem.Allocator) !bool {
+    var summary: TestSummary = .{};
+    const cwd = std.fs.cwd();
+
+    if (std.mem.endsWith(u8, target, ".w")) {
+        try runOneTest(target, allocator, &summary);
+        printTestSummary(&summary);
+        return summary.failed == 0;
+    }
+
+    var dir = cwd.openDir(target, .{ .iterate = true }) catch |e| {
+        stderrPrint("error: cannot open test path\n");
+        var buf: [4096]u8 = undefined;
+        var w = std.fs.File.stderr().writer(&buf);
+        w.interface.print("detail: {s}: {}\n", .{ target, e }) catch {};
+        w.interface.flush() catch {};
+        return false;
+    };
+    defer dir.close();
+
+    var it = dir.iterate();
+    while (try it.next()) |entry| {
+        if (entry.kind != .file) continue;
+        if (!std.mem.endsWith(u8, entry.name, ".w")) continue;
+        const path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ target, entry.name });
+        defer allocator.free(path);
+        try runOneTest(path, allocator, &summary);
+    }
+
+    printTestSummary(&summary);
+    return summary.failed == 0;
+}
+
+fn runOneTest(path: []const u8, allocator: std.mem.Allocator, summary: *TestSummary) !void {
+    const source = std.fs.cwd().readFileAlloc(allocator, path, 2 * 1024 * 1024) catch |e| {
+        summary.failed += 1;
+        testStatus("FAIL", path, e);
+        return;
+    };
+    defer allocator.free(source);
+
+    if (!sourceHasMainFn(source)) {
+        summary.skipped += 1;
+        testStatusMsg("SKIP", path, "no main");
+        return;
+    }
+
+    var driver = Driver.init(allocator);
+    defer driver.deinit();
+
+    const bin_path_opt = try driver.buildBinary(path);
+    if (bin_path_opt == null) {
+        summary.failed += 1;
+        testStatusMsg("FAIL", path, "compile/link");
+        return;
+    }
+    const bin_path = bin_path_opt.?;
+
+    var child = std.process.Child.init(&.{bin_path}, allocator);
+    _ = child.spawn() catch |e| {
+        summary.failed += 1;
+        testStatus("FAIL", path, e);
+        return;
+    };
+
+    const term = child.wait() catch |e| {
+        summary.failed += 1;
+        testStatus("FAIL", path, e);
+        return;
+    };
+
+    if (term == .Exited and term.Exited == 0) {
+        summary.passed += 1;
+        testStatusMsg("PASS", path, "");
+    } else {
+        summary.failed += 1;
+        var msg_buf: [64]u8 = undefined;
+        const msg = if (term == .Exited)
+            std.fmt.bufPrint(&msg_buf, "exit {d}", .{term.Exited}) catch "nonzero exit"
+        else if (term == .Signal)
+            std.fmt.bufPrint(&msg_buf, "signal {d}", .{term.Signal}) catch "signal"
+        else
+            "abnormal termination";
+        testStatusMsg("FAIL", path, msg);
+    }
+}
+
+fn sourceHasMainFn(source: []const u8) bool {
+    return std.mem.indexOf(u8, source, "fn main(") != null;
+}
+
+fn testStatus(label: []const u8, path: []const u8, err: anytype) void {
+    var buf: [4096]u8 = undefined;
+    var w = std.fs.File.stdout().writer(&buf);
+    w.interface.print("{s} {s} ({})\n", .{ label, path, err }) catch {};
+    w.interface.flush() catch {};
+}
+
+fn testStatusMsg(label: []const u8, path: []const u8, msg: []const u8) void {
+    var buf: [4096]u8 = undefined;
+    var w = std.fs.File.stdout().writer(&buf);
+    if (msg.len == 0) {
+        w.interface.print("{s} {s}\n", .{ label, path }) catch {};
+    } else {
+        w.interface.print("{s} {s} ({s})\n", .{ label, path, msg }) catch {};
+    }
+    w.interface.flush() catch {};
+}
+
+fn printTestSummary(summary: *const TestSummary) void {
+    var buf: [4096]u8 = undefined;
+    var w = std.fs.File.stdout().writer(&buf);
+    w.interface.print(
+        "\nSummary: {d} passed, {d} failed, {d} skipped\n",
+        .{ summary.passed, summary.failed, summary.skipped },
+    ) catch {};
+    w.interface.flush() catch {};
 }
 
 fn dumpTokens(path: []const u8, allocator: std.mem.Allocator) !void {
