@@ -6552,6 +6552,15 @@ fn genFor(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
             }
         }
     }
+    // Check if iterable evaluates to a Vec type.
+    {
+        const iter_val = self.genExpr(for_e.iterable) catch null;
+        if (iter_val) |iv| {
+            if (self.isVecType(c.LLVMTypeOf(iv))) {
+                return self.genForVec(for_e, iv);
+            }
+        }
+    }
     // Otherwise, try to generate as an array iteration.
     return self.genForArray(for_e);
 }
@@ -6690,6 +6699,75 @@ fn genForArray(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
 
     self.loop_depth -= 1;
 
+    c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+fn genForVec(self: *Codegen, for_e: Ast.ForExpr, vec_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const vec_type = c.LLVMTypeOf(vec_val);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const elem_type = self.getVecElemType(vec_type) orelse c.LLVMInt32TypeInContext(self.context);
+
+    // Store vec to memory.
+    const vec_alloca = c.LLVMBuildAlloca(self.builder, vec_type, "for.vec");
+    _ = c.LLVMBuildStore(self.builder, vec_val, vec_alloca);
+
+    // Get data pointer and length.
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 0, "vec.ptr.ptr");
+    const data_ptr = c.LLVMBuildLoad2(self.builder, c.LLVMPointerTypeInContext(self.context, 0), ptr_gep, "vec.ptr");
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 1, "vec.len.ptr");
+    const vec_len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "vec.len");
+
+    // Create index and element variables.
+    const idx_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "for.idx");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), idx_alloca);
+    const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
+
+    self.locals.put(self.allocator, for_e.binding, .{
+        .alloca = elem_alloca,
+        .ty = elem_type,
+        .is_mut = false,
+    }) catch return error.CodegenAlloc;
+
+    const function = self.current_function;
+    const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "forvec.cond");
+    const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "forvec.body");
+    const inc_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "forvec.inc");
+    const end_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "forvec.end");
+
+    if (self.loop_depth >= self.loop_stack.len) return error.UnsupportedExpr;
+    self.loop_stack[self.loop_depth] = .{ .break_bb = end_bb, .continue_bb = inc_bb };
+    self.loop_depth += 1;
+
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    // Condition: idx < len.
+    c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+    const current_idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+    const cond = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, current_idx, vec_len, "for.cmp");
+    _ = c.LLVMBuildCondBr(self.builder, cond, body_bb, end_bb);
+
+    // Body: load element from data_ptr[idx].
+    c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    var gep_idx = [_]c.LLVMValueRef{current_idx};
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, data_ptr, &gep_idx, 1, "elem.ptr");
+    const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "elem");
+    _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
+
+    _ = try self.genExpr(for_e.body);
+    const body_end = c.LLVMGetInsertBlock(self.builder);
+    if (c.LLVMGetBasicBlockTerminator(body_end) == null) {
+        _ = c.LLVMBuildBr(self.builder, inc_bb);
+    }
+
+    // Increment.
+    c.LLVMPositionBuilderAtEnd(self.builder, inc_bb);
+    const loaded_idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+    const next_idx = c.LLVMBuildAdd(self.builder, loaded_idx, c.LLVMConstInt(i64_type, 1, 0), "inc");
+    _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+    _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+    self.loop_depth -= 1;
     c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
