@@ -849,6 +849,7 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
             _ = self.checkExpr(inner);
             return self.ty_void;
         },
+        .comptime_expr => |inner| self.checkExpr(inner),
         .yield_expr => |inner| self.checkExpr(inner),
     };
 }

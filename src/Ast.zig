@@ -233,6 +233,8 @@ pub const ExprKind = union(enum) {
     record_update: RecordUpdateExpr,
     /// Yield: `yield expr` (inside gen fn)
     yield_expr: *const Expr,
+    /// Comptime expression: `comptime expr` — evaluated at compile time
+    comptime_expr: *const Expr,
     /// Poisoned — parse error placeholder
     poisoned,
 };

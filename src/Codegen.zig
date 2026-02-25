@@ -1846,6 +1846,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .yield_expr => |val| try self.genYield(val),
         .await_expr => |inner| try self.genAwait(inner),
         .spawn_expr => |inner| try self.genSpawn(inner),
+        .comptime_expr => |inner| try self.genComptimeExpr(inner),
         else => error.UnsupportedExpr,
     };
 }
@@ -2255,6 +2256,107 @@ fn genSpawn(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef {
 
     // Return void/zero since spawn is fire-and-forget.
     return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+}
+
+/// Generate a comptime expression. Evaluates the inner expression at compile time.
+/// For `comptime if cond then a else b`, only emits code for the taken branch.
+/// For `comptime <arithmetic>`, evaluates to a constant.
+fn genComptimeExpr(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef {
+    switch (inner.kind) {
+        .if_expr => |ie| {
+            // Evaluate condition at compile time.
+            if (self.evalComptimeCondition(ie.condition)) |cond_val| {
+                if (cond_val) {
+                    return self.genExpr(ie.then_body);
+                } else if (ie.else_body) |eb| {
+                    return self.genExpr(eb);
+                } else {
+                    return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+                }
+            }
+            // Fallback: generate as regular if.
+            return self.genIfExpr(ie);
+        },
+        .int_literal => |v| {
+            return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), @bitCast(@as(i64, v)), 0);
+        },
+        .bool_literal => |v| {
+            return c.LLVMConstInt(c.LLVMInt1TypeInContext(self.context), if (v) 1 else 0, 0);
+        },
+        .binary => |b| {
+            // Try to evaluate binary expression at compile time.
+            if (self.evalComptimeInt(inner)) |v| {
+                return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), @bitCast(@as(i64, v)), 0);
+            }
+            // Fallback: generate as regular expression.
+            return self.genBinary(b);
+        },
+        else => {
+            // For anything else, just generate it normally.
+            return self.genExpr(inner);
+        },
+    }
+}
+
+/// Try to evaluate a condition expression at compile time (returns null if not constant).
+fn evalComptimeCondition(self: *Codegen, expr: *const Ast.Expr) ?bool {
+    switch (expr.kind) {
+        .bool_literal => |v| return v,
+        .binary => |b| {
+            const lhs = self.evalComptimeInt(b.lhs) orelse return null;
+            const rhs = self.evalComptimeInt(b.rhs) orelse return null;
+            return switch (b.op) {
+                .eq => lhs == rhs,
+                .neq => lhs != rhs,
+                .lt => lhs < rhs,
+                .gt => lhs > rhs,
+                .lte => lhs <= rhs,
+                .gte => lhs >= rhs,
+                else => null,
+            };
+        },
+        .unary => |u| {
+            if (u.op == .not) {
+                const inner = self.evalComptimeCondition(u.operand) orelse return null;
+                return !inner;
+            }
+            return null;
+        },
+        else => return null,
+    }
+}
+
+/// Try to evaluate an integer expression at compile time (returns null if not constant).
+fn evalComptimeInt(self: *Codegen, expr: *const Ast.Expr) ?i64 {
+    switch (expr.kind) {
+        .int_literal => |v| return v,
+        .bool_literal => |v| return if (v) 1 else 0,
+        .binary => |b| {
+            const lhs = self.evalComptimeInt(b.lhs) orelse return null;
+            const rhs = self.evalComptimeInt(b.rhs) orelse return null;
+            return switch (b.op) {
+                .add => lhs + rhs,
+                .sub => lhs - rhs,
+                .mul => lhs * rhs,
+                .div => if (rhs != 0) @divTrunc(lhs, rhs) else null,
+                .mod => if (rhs != 0) @rem(lhs, rhs) else null,
+                .bit_and => lhs & rhs,
+                .bit_or => lhs | rhs,
+                .bit_xor => lhs ^ rhs,
+                .shl => lhs << @intCast(@min(rhs, 63)),
+                .shr => lhs >> @intCast(@min(rhs, 63)),
+                else => null,
+            };
+        },
+        .unary => |u| {
+            if (u.op == .negate) {
+                const v = self.evalComptimeInt(u.operand) orelse return null;
+                return -v;
+            }
+            return null;
+        },
+        else => return null,
+    }
 }
 
 /// Declare channel runtime functions if not already declared.
