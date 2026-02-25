@@ -229,6 +229,32 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try writer.writeAll(" = ");
             try renderExpr(l.value, pool, writer, 0);
         },
+        .select_await => |sel| {
+            try writer.writeAll("select await:\n");
+            for (sel.arms) |arm| {
+                try writer.print("    {s} = ", .{pool.resolve(arm.name)});
+                try renderExpr(arm.task, pool, writer, 0);
+                try writer.writeAll(" -> ");
+                try renderExpr(arm.body, pool, writer, 0);
+                try writer.writeAll("\n");
+            }
+        },
+        .let_else => |le| {
+            try writer.writeAll(if (le.is_mut) "var " else "let ");
+            try writer.print("{s}", .{pool.resolve(le.pattern.name)});
+            if (le.pattern.bindings.len > 0) {
+                try writer.writeAll("(");
+                for (le.pattern.bindings, 0..) |b, i| {
+                    if (i > 0) try writer.writeAll(", ");
+                    try writer.print("{s}", .{pool.resolve(b)});
+                }
+                try writer.writeAll(")");
+            }
+            try writer.writeAll(" = ");
+            try renderExpr(le.value, pool, writer, 0);
+            try writer.writeAll(" else ");
+            try renderExpr(le.else_body, pool, writer, 0);
+        },
         .tuple_destructure => |td| {
             try writer.writeAll(if (td.is_mut) "var (" else "let (");
             for (td.names, 0..) |name, i| {

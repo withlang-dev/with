@@ -303,6 +303,41 @@ int32_t with_channel_try_recv(void *ch_ptr, int64_t *out) {
     return 1;
 }
 
+// ── Select Await ────────────────────────────────────────────────────
+
+// Select await: wait for the first of N fibers to complete.
+// Takes an array of fiber IDs and count.
+// Returns the index (0-based) of the first completed fiber.
+// The result of the completed fiber is stored in *result_out.
+int32_t with_fiber_select(int32_t *fiber_ids, int32_t count, int64_t *result_out) {
+    while (1) {
+        // Check if any of the target fibers are completed.
+        for (int i = 0; i < count; i++) {
+            for (int j = 0; j < completed_count; j++) {
+                if (completed[j] && completed[j]->id == fiber_ids[i]) {
+                    *result_out = completed[j]->result;
+                    // Clean up the completed fiber.
+                    free(completed[j]->stack);
+                    free(completed[j]);
+                    completed[j] = completed[completed_count - 1];
+                    completed_count--;
+                    return i;
+                }
+            }
+        }
+        // None done yet — yield or run a fiber.
+        if (current_fiber) {
+            with_fiber_yield();
+        } else {
+            if (ready_head) {
+                run_one_fiber();
+            } else {
+                return -1; // deadlock
+            }
+        }
+    }
+}
+
 // Close the channel.
 void with_channel_close(void *ch_ptr) {
     Channel *ch = (Channel *)ch_ptr;

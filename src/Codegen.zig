@@ -1045,6 +1045,7 @@ fn countYields(expr: *const Ast.Expr) u32 {
             return n;
         },
         .let_binding => |lb| countYields(lb.value),
+        .let_else => |le| countYields(le.value) + countYields(le.else_body),
         .assign => |a| countYields(a.value),
         .defer_expr => |d| countYields(d),
         else => 0,
@@ -1069,6 +1070,16 @@ fn collectGenLocals(
                 names[count.*] = lb.name;
                 types[count.*] = lb.type_expr;
                 count.* += 1;
+            }
+        },
+        .let_else => |le| {
+            // Each binding in the pattern becomes a local variable.
+            for (le.pattern.bindings) |bind_sym| {
+                if (count.* < 32) {
+                    names[count.*] = bind_sym;
+                    types[count.*] = null;
+                    count.* += 1;
+                }
             }
         },
         .while_expr => |w| {
@@ -1843,6 +1854,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .grouped => |inner| try self.genExpr(inner),
         .block => |blk| try self.genBlock(blk),
         .let_binding => |let_b| try self.genLetBinding(let_b),
+        .let_else => |le| try self.genLetElse(le),
         .if_expr => |if_e| try self.genIfExpr(if_e),
         .call => |call_e| try self.genCall(call_e),
         .return_expr => |ret_val| try self.genReturn(ret_val),
@@ -1880,6 +1892,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .await_expr => |inner| try self.genAwait(inner),
         .spawn_expr => |inner| try self.genSpawn(inner),
         .comptime_expr => |inner| try self.genComptimeExpr(inner),
+        .select_await => |sel| try self.genSelectAwait(sel),
         else => error.UnsupportedExpr,
     };
 }
@@ -2289,6 +2302,128 @@ fn genSpawn(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef {
 
     // Return void/zero since spawn is fire-and-forget.
     return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+}
+
+/// Generate a select await expression.
+/// Spawns all tasks, calls with_fiber_select to race them,
+/// then branches based on which completed first.
+fn genSelectAwait(self: *Codegen, sel: Ast.SelectAwaitExpr) Error!c.LLVMValueRef {
+    self.declareAsyncRuntime();
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const arm_count: u32 = @intCast(sel.arms.len);
+
+    // Declare with_fiber_select if not already declared.
+    if (c.LLVMGetNamedFunction(self.module, "with_fiber_select") == null) {
+        var select_params = [_]c.LLVMTypeRef{ ptr_type, i32_type, ptr_type };
+        const select_ft = c.LLVMFunctionType(i32_type, &select_params, 3, 0);
+        _ = c.LLVMAddFunction(self.module, "with_fiber_select", select_ft);
+    }
+
+    // Evaluate all task expressions (each returns a task ID: i32).
+    var task_ids_buf: [16]c.LLVMValueRef = undefined;
+    for (sel.arms, 0..) |arm, i| {
+        task_ids_buf[i] = try self.genExpr(arm.task);
+    }
+
+    // Build an array of task IDs on the stack.
+    const arr_type = c.LLVMArrayType2(i32_type, arm_count);
+    const ids_alloca = c.LLVMBuildAlloca(self.builder, arr_type, "select.ids");
+    const zero = c.LLVMConstInt(i32_type, 0, 0);
+    for (0..arm_count) |i| {
+        const idx: u32 = @intCast(i);
+        var indices = [_]c.LLVMValueRef{ zero, c.LLVMConstInt(i32_type, idx, 0) };
+        const gep = c.LLVMBuildGEP2(self.builder, arr_type, ids_alloca, &indices, 2, "");
+        _ = c.LLVMBuildStore(self.builder, task_ids_buf[i], gep);
+    }
+
+    // Allocate result_out on stack.
+    const result_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "select.result");
+
+    // Call with_fiber_select(ids_ptr, count, &result_out) -> i32 (winning index).
+    const select_fn = c.LLVMGetNamedFunction(self.module, "with_fiber_select") orelse return error.UnsupportedExpr;
+    var select_params_types = [_]c.LLVMTypeRef{ ptr_type, i32_type, ptr_type };
+    const select_ft = c.LLVMFunctionType(i32_type, &select_params_types, 3, 0);
+
+    const ids_ptr = c.LLVMBuildBitCast(self.builder, ids_alloca, ptr_type, "");
+    var call_args = [_]c.LLVMValueRef{
+        ids_ptr,
+        c.LLVMConstInt(i32_type, arm_count, 0),
+        result_alloca,
+    };
+    const winner_idx = c.LLVMBuildCall2(self.builder, select_ft, select_fn, &call_args, 3, "select.winner");
+
+    // Load the result value.
+    const result_val = c.LLVMBuildLoad2(self.builder, i64_type, result_alloca, "select.val");
+
+    // Build switch on winner_idx to dispatch to the right arm.
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "select.end");
+    const default_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "select.default");
+
+    const sw = c.LLVMBuildSwitch(self.builder, winner_idx, default_bb, arm_count);
+
+    var arm_vals: [16]c.LLVMValueRef = undefined;
+    var arm_bbs: [16]c.LLVMBasicBlockRef = undefined;
+    var val_count: u32 = 0;
+
+    for (sel.arms, 0..) |arm, i| {
+        const idx: u32 = @intCast(i);
+        const arm_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "select.arm");
+        c.LLVMAddCase(sw, c.LLVMConstInt(i32_type, idx, 0), arm_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, arm_bb);
+
+        // Bind the result to the arm's name (truncate i64 -> i32).
+        const truncated = c.LLVMBuildTrunc(self.builder, result_val, i32_type, "select.trunc");
+        const bind_alloca = c.LLVMBuildAlloca(self.builder, i32_type, "");
+        _ = c.LLVMBuildStore(self.builder, truncated, bind_alloca);
+        self.locals.put(self.allocator, arm.name, .{
+            .alloca = bind_alloca,
+            .ty = i32_type,
+            .is_mut = false,
+        }) catch return error.CodegenAlloc;
+
+        // Generate body.
+        const body_val = try self.genExpr(arm.body);
+        const from_bb = c.LLVMGetInsertBlock(self.builder);
+        if (c.LLVMGetBasicBlockTerminator(from_bb) == null) {
+            _ = c.LLVMBuildBr(self.builder, merge_bb);
+        }
+
+        arm_vals[val_count] = body_val;
+        arm_bbs[val_count] = from_bb;
+        val_count += 1;
+    }
+
+    // Default block (shouldn't be reached).
+    c.LLVMPositionBuilderAtEnd(self.builder, default_bb);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+
+    // Merge block.
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+
+    // If arms produce values, create a phi node.
+    if (val_count > 0 and arm_vals[0] != null) {
+        const result_type = c.LLVMTypeOf(arm_vals[0]);
+        if (result_type != c.LLVMVoidTypeInContext(self.context)) {
+            const phi = c.LLVMBuildPhi(self.builder, result_type, "select.phi");
+            // Add incoming from each arm.
+            for (0..val_count) |i| {
+                var vals = [_]c.LLVMValueRef{arm_vals[i]};
+                var bbs = [_]c.LLVMBasicBlockRef{arm_bbs[i]};
+                c.LLVMAddIncoming(phi, &vals, &bbs, 1);
+            }
+            // Add default incoming.
+            var def_vals = [_]c.LLVMValueRef{c.LLVMGetUndef(result_type)};
+            var def_bbs = [_]c.LLVMBasicBlockRef{default_bb};
+            c.LLVMAddIncoming(phi, &def_vals, &def_bbs, 1);
+            return phi;
+        }
+    }
+
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
 /// Generate a comptime expression. Evaluates the inner expression at compile time.
@@ -4100,6 +4235,103 @@ fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
             }
         }
     }
+
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+fn genLetElse(self: *Codegen, le: Ast.LetElse) Error!c.LLVMValueRef {
+    // Evaluate the value expression (should be an Option/Result enum).
+    const subject = try self.genExpr(le.value);
+    const subject_type = c.LLVMTypeOf(subject);
+
+    // Store subject to memory so we can GEP into it.
+    const tmp = c.LLVMBuildAlloca(self.builder, subject_type, "letelse.subj");
+    _ = c.LLVMBuildStore(self.builder, subject, tmp);
+
+    // Extract tag (field 0).
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, subject_type, tmp, 0, "tag.ptr");
+    const tag_val = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag");
+
+    // Find enum info by matching the LLVM type.
+    var enum_info: ?EnumTypeInfo = null;
+    {
+        var it = self.enum_types.iterator();
+        while (it.next()) |entry| {
+            if (entry.value_ptr.llvm_type == subject_type) {
+                enum_info = entry.value_ptr.*;
+                break;
+            }
+        }
+    }
+
+    // Find the variant index for the pattern name.
+    var variant_idx: ?u32 = null;
+    var payload_type: ?c.LLVMTypeRef = null;
+    if (enum_info) |ei| {
+        for (ei.variant_names, 0..) |vn, vi| {
+            if (vn == le.pattern.name) {
+                variant_idx = @intCast(vi);
+                payload_type = ei.variant_payload_types[vi];
+                break;
+            }
+        }
+    }
+
+    const expected_tag = c.LLVMConstInt(i32_type, variant_idx orelse 0, 0);
+    const cmp = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag_val, expected_tag, "letelse.match");
+
+    // Create basic blocks.
+    const match_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "letelse.match");
+    const else_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "letelse.else");
+    const cont_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "letelse.cont");
+
+    _ = c.LLVMBuildCondBr(self.builder, cmp, match_bb, else_bb);
+
+    // -- Match block: extract payload and bind variables --
+    c.LLVMPositionBuilderAtEnd(self.builder, match_bb);
+
+    if (le.pattern.bindings.len > 0 and payload_type != null) {
+        const pt = payload_type.?;
+        const payload_gep = c.LLVMBuildStructGEP2(self.builder, subject_type, tmp, 1, "payload.ptr");
+        const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+        const payload_val = c.LLVMBuildLoad2(self.builder, pt, payload_ptr, "payload");
+
+        const bind_sym = le.pattern.bindings[0];
+        const bind_alloca = c.LLVMBuildAlloca(self.builder, pt, "");
+        _ = c.LLVMBuildStore(self.builder, payload_val, bind_alloca);
+        self.locals.put(self.allocator, bind_sym, .{
+            .alloca = bind_alloca,
+            .ty = pt,
+            .is_mut = le.is_mut,
+        }) catch return error.CodegenAlloc;
+
+        // Track for Drop emission.
+        if (self.scope_local_count < self.scope_locals.len) {
+            self.scope_locals[self.scope_local_count] = .{
+                .sym = bind_sym,
+                .alloca = bind_alloca,
+                .ty = pt,
+            };
+            self.scope_local_count += 1;
+        }
+    }
+
+    _ = c.LLVMBuildBr(self.builder, cont_bb);
+
+    // -- Else block: execute diverging body (return/break/continue) --
+    c.LLVMPositionBuilderAtEnd(self.builder, else_bb);
+    _ = try self.genExpr(le.else_body);
+
+    // After genExpr, the builder may be on a different block (e.g. ret.dead).
+    // Ensure whatever block the builder is on has a terminator.
+    const current_bb = c.LLVMGetInsertBlock(self.builder);
+    if (c.LLVMGetBasicBlockTerminator(current_bb) == null) {
+        _ = c.LLVMBuildBr(self.builder, cont_bb);
+    }
+
+    // -- Continue block --
+    c.LLVMPositionBuilderAtEnd(self.builder, cont_bb);
 
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
