@@ -336,7 +336,14 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     var param_types_buf: [64]c.LLVMTypeRef = undefined;
     for (func.params, 0..) |param, i| {
         if (param.type_expr) |te| {
-            param_types_buf[i] = try self.resolveType(te);
+            if (te.kind == .fn_type) {
+                // fn-type params use fat pointer {ptr, ptr} to support closures.
+                const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+                var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+                param_types_buf[i] = c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+            } else {
+                param_types_buf[i] = try self.resolveType(te);
+            }
         } else {
             return error.UnsupportedType;
         }
@@ -570,14 +577,17 @@ fn genNonCapturingClosure(self: *Codegen, cl: Ast.ClosureExpr) Error!c.LLVMValue
     const name_z: [*:0]const u8 = @ptrCast(name_len.ptr);
 
     const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
     const param_count: u32 = @intCast(cl.params.len);
 
-    var param_types_buf: [16]c.LLVMTypeRef = undefined;
+    // All closures take a context pointer as first parameter (uniform convention).
+    var param_types_buf: [17]c.LLVMTypeRef = undefined;
+    param_types_buf[0] = ptr_type; // context/captures pointer
     for (0..param_count) |i| {
-        param_types_buf[i] = i32_type;
+        param_types_buf[1 + i] = i32_type;
     }
 
-    const fn_type = c.LLVMFunctionType(i32_type, &param_types_buf, param_count, 0);
+    const fn_type = c.LLVMFunctionType(i32_type, &param_types_buf, 1 + param_count, 0);
     const function = c.LLVMAddFunction(self.module, name_z, fn_type);
 
     // Reset locals for the closure scope.
@@ -588,9 +598,10 @@ fn genNonCapturingClosure(self: *Codegen, cl: Ast.ClosureExpr) Error!c.LLVMValue
     const entry = c.LLVMAppendBasicBlockInContext(self.context, function, "entry");
     c.LLVMPositionBuilderAtEnd(self.builder, entry);
 
-    // Add closure params as locals.
+    // Skip param 0 (context pointer — unused for non-capturing).
+    // Add closure params as locals starting at param index 1.
     for (cl.params, 0..) |param_sym, i| {
-        const param_val = c.LLVMGetParam(function, @intCast(i));
+        const param_val = c.LLVMGetParam(function, @intCast(1 + i));
         const param_type = c.LLVMTypeOf(param_val);
         const alloca = c.LLVMBuildAlloca(self.builder, param_type, "");
         _ = c.LLVMBuildStore(self.builder, param_val, alloca);
@@ -618,8 +629,14 @@ fn genNonCapturingClosure(self: *Codegen, cl: Ast.ClosureExpr) Error!c.LLVMValue
     self.locals = saved_locals;
     c.LLVMPositionBuilderAtEnd(self.builder, saved_bb);
 
-    // Return the function pointer.
-    return function;
+    // Build fat pointer: { fn_ptr, null } — uniform closure representation.
+    var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+    const fat_type = c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+    const null_ptr = c.LLVMConstNull(ptr_type);
+    var result = c.LLVMGetUndef(fat_type);
+    result = c.LLVMBuildInsertValue(self.builder, result, function, 0, "");
+    result = c.LLVMBuildInsertValue(self.builder, result, null_ptr, 1, "");
+    return result;
 }
 
 fn genCapturingClosure(
@@ -750,6 +767,74 @@ fn genCapturingClosure(
     _ = c.LLVMBuildStore(self.builder, cap_alloca, cap_gep);
 
     return c.LLVMBuildLoad2(self.builder, fat_type, fat_alloca, "closure.val");
+}
+
+/// Wrap a named function as a fat pointer {wrapper_fn, null} for passing to fn-type params.
+/// Creates a thin wrapper that adds a context pointer as first param and forwards the rest.
+fn wrapFunctionAsFatPointer(self: *Codegen, func: c.LLVMValueRef, orig_fn_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+
+    // Get the original function's param types and return type.
+    const orig_param_count = c.LLVMCountParamTypes(orig_fn_type);
+    const ret_type = c.LLVMGetReturnType(orig_fn_type);
+
+    // Build wrapper function type: fn(ctx: ptr, orig_params...) -> ret_type
+    var wrapper_param_types: [17]c.LLVMTypeRef = undefined;
+    wrapper_param_types[0] = ptr_type; // ctx pointer (ignored)
+    var orig_param_types: [16]c.LLVMTypeRef = undefined;
+    c.LLVMGetParamTypes(orig_fn_type, &orig_param_types);
+    for (0..orig_param_count) |i| {
+        wrapper_param_types[1 + i] = orig_param_types[i];
+    }
+    const total_params = 1 + orig_param_count;
+    const wrapper_fn_type = c.LLVMFunctionType(ret_type, &wrapper_param_types, total_params, 0);
+
+    // Create wrapper function.
+    var name_buf: [32]u8 = undefined;
+    const name_len = std.fmt.bufPrint(&name_buf, "__wrap_{d}\x00", .{self.closure_counter}) catch
+        return error.CodegenAlloc;
+    self.closure_counter += 1;
+    const name_z: [*:0]const u8 = @ptrCast(name_len.ptr);
+
+    const wrapper = c.LLVMAddFunction(self.module, name_z, wrapper_fn_type);
+
+    // Build wrapper body: call original function with params 1..N (skip ctx).
+    const saved_bb = c.LLVMGetInsertBlock(self.builder);
+    const entry = c.LLVMAppendBasicBlockInContext(self.context, wrapper, "entry");
+    c.LLVMPositionBuilderAtEnd(self.builder, entry);
+
+    var call_args: [16]c.LLVMValueRef = undefined;
+    for (0..orig_param_count) |i| {
+        call_args[i] = c.LLVMGetParam(wrapper, @intCast(1 + i));
+    }
+
+    const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+    const call_result = c.LLVMBuildCall2(
+        self.builder,
+        orig_fn_type,
+        func,
+        if (orig_param_count > 0) &call_args else null,
+        orig_param_count,
+        if (is_void) "" else "call",
+    );
+
+    if (is_void) {
+        _ = c.LLVMBuildRetVoid(self.builder);
+    } else {
+        _ = c.LLVMBuildRet(self.builder, call_result);
+    }
+
+    // Restore builder position.
+    c.LLVMPositionBuilderAtEnd(self.builder, saved_bb);
+
+    // Build fat pointer: {wrapper, null}
+    var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+    const fat_type = c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+    const null_ptr = c.LLVMConstNull(ptr_type);
+    var result = c.LLVMGetUndef(fat_type);
+    result = c.LLVMBuildInsertValue(self.builder, result, wrapper, 0, "");
+    result = c.LLVMBuildInsertValue(self.builder, result, null_ptr, 1, "");
+    return result;
 }
 
 /// Scan a closure body for identifiers that reference parent locals.
@@ -1891,6 +1976,20 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
         for (0..@min(call_e.args.len, param_count)) |i| {
             const param_type = c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, @intCast(i)));
             const arg_type = c.LLVMTypeOf(args_buf[i]);
+
+            // Wrap named function references as fat pointers for fn-type params.
+            if (c.LLVMGetTypeKind(param_type) == c.LLVMStructTypeKind and
+                c.LLVMGetTypeKind(arg_type) == c.LLVMPointerTypeKind)
+            {
+                if (call_e.args[i].kind == .ident) {
+                    const arg_sym = call_e.args[i].kind.ident;
+                    if (self.functions.get(arg_sym)) |arg_fn_info| {
+                        args_buf[i] = try self.wrapFunctionAsFatPointer(arg_fn_info.value, arg_fn_info.fn_type);
+                        continue;
+                    }
+                }
+            }
+
             // Auto-coerce str → ptr when param expects a pointer.
             if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
                 args_buf[i] = self.extractStrPtr(args_buf[i]);
@@ -1973,24 +2072,26 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
                 if (void_ret) "" else "call",
             );
         } else if (loaded_kind == c.LLVMStructTypeKind) {
-            // It's a capturing closure (fat pointer: {fn_ptr, capture_ptr}).
-            const i32_type = c.LLVMInt32TypeInContext(self.context);
+            // It's a closure fat pointer: {fn_ptr, capture_ptr}.
             const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
 
             // Extract fn_ptr (field 0) and capture_ptr (field 1).
             const fn_ptr = c.LLVMBuildExtractValue(self.builder, loaded, 0, "fn_ptr");
             const cap_ptr = c.LLVMBuildExtractValue(self.builder, loaded, 1, "cap_ptr");
 
-            // Build function type: fn(capture_ptr, user_params...) -> i32
             const arg_count: u32 = @intCast(call_e.args.len);
             const total_params = 1 + arg_count;
 
-            var fn_param_types_buf: [17]c.LLVMTypeRef = undefined;
-            fn_param_types_buf[0] = ptr_type; // capture struct pointer
-            for (0..arg_count) |i| {
-                fn_param_types_buf[1 + i] = i32_type;
-            }
-            const fn_type = c.LLVMFunctionType(i32_type, &fn_param_types_buf, total_params, 0);
+            // Use stored fn_sig (includes ctx param) if available, otherwise build default.
+            const call_fn_type = if (local_info.fn_sig) |sig| sig else blk: {
+                const i32_type = c.LLVMInt32TypeInContext(self.context);
+                var fn_param_types_buf: [17]c.LLVMTypeRef = undefined;
+                fn_param_types_buf[0] = ptr_type;
+                for (0..arg_count) |i| {
+                    fn_param_types_buf[1 + i] = i32_type;
+                }
+                break :blk c.LLVMFunctionType(i32_type, &fn_param_types_buf, total_params, 0);
+            };
 
             // Build args: [capture_ptr, user_args...]
             var args_buf: [65]c.LLVMValueRef = undefined;
@@ -1999,13 +2100,28 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
                 args_buf[1 + i] = try self.genExpr(arg);
             }
 
+            // Coerce user args to match fn_sig params (skip ctx param at index 0).
+            if (local_info.fn_sig != null) {
+                const sig_param_count = c.LLVMCountParamTypes(call_fn_type);
+                if (sig_param_count > 1) {
+                    var fn_param_types_arr: [17]c.LLVMTypeRef = undefined;
+                    c.LLVMGetParamTypes(call_fn_type, &fn_param_types_arr);
+                    for (1..@min(1 + call_e.args.len, sig_param_count)) |pi| {
+                        args_buf[pi] = self.coerceInt(args_buf[pi], fn_param_types_arr[pi]);
+                    }
+                }
+            }
+
+            const ret_type = c.LLVMGetReturnType(call_fn_type);
+            const void_ret = ret_type == c.LLVMVoidTypeInContext(self.context);
+
             return c.LLVMBuildCall2(
                 self.builder,
-                fn_type,
+                call_fn_type,
                 fn_ptr,
                 &args_buf,
                 total_params,
-                "call",
+                if (void_ret) "" else "call",
             );
         }
     }
@@ -4521,10 +4637,13 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
 
 /// Build an LLVM function type from an AST FnTypeExpr.
 fn buildFnTypeFromAst(self: *Codegen, ft: Ast.FnTypeExpr) Error!c.LLVMTypeRef {
-    var param_types: [16]c.LLVMTypeRef = undefined;
+    // Build fn type with ctx pointer as first param (uniform closure convention).
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    var param_types: [17]c.LLVMTypeRef = undefined;
+    param_types[0] = ptr_type; // context/captures pointer
     for (ft.params, 0..) |p, i| {
-        param_types[i] = try self.resolveType(p);
+        param_types[1 + i] = try self.resolveType(p);
     }
     const ret_type = try self.resolveType(ft.return_type);
-    return c.LLVMFunctionType(ret_type, &param_types, @intCast(ft.params.len), 0);
+    return c.LLVMFunctionType(ret_type, &param_types, @intCast(1 + ft.params.len), 0);
 }
