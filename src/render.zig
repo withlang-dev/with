@@ -137,6 +137,21 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
         .trait_decl => |td| {
             if (td.is_pub == .public) try writer.writeAll("pub ");
             try writer.print("trait {s} =\n", .{pool.resolve(td.name)});
+            for (td.associated_types) |at| {
+                try writer.print("    type {s}", .{pool.resolve(at.name)});
+                if (at.bounds.len > 0) {
+                    try writer.writeAll(": ");
+                    for (at.bounds, 0..) |b, bi| {
+                        if (bi > 0) try writer.writeAll(" + ");
+                        try writer.print("{s}", .{pool.resolve(b)});
+                    }
+                }
+                if (at.default) |d| {
+                    try writer.writeAll(" = ");
+                    try renderTypeExpr(d, pool, writer);
+                }
+                try writer.writeAll("\n");
+            }
             for (td.methods) |m| {
                 try writer.print("    fn {s}(", .{pool.resolve(m.name)});
                 for (m.params, 0..) |p, pi| {

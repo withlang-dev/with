@@ -258,11 +258,41 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
     self.skipNewlines();
 
     var methods: std.ArrayList(Ast.TraitMethodSig) = .empty;
+    var assoc_types: std.ArrayList(Ast.AssociatedType) = .empty;
 
-    // Parse trait body — indented fn signatures.
-    while (self.peek() == .kw_fn or self.peek() == .kw_pub) {
+    // Parse trait body — indented fn signatures and associated types.
+    while (self.peek() == .kw_fn or self.peek() == .kw_pub or self.peek() == .kw_type) {
         const fn_col = Lexer.columnOf(self.source, self.currentSpan().start);
         if (fn_col == 0) break;
+
+        // Parse associated type: `type Name` or `type Name: Bound` or `type Name = Default`
+        if (self.peek() == .kw_type) {
+            self.advance(); // consume 'type'
+            const at_name = try self.expectIdentifier();
+            var bounds: std.ArrayList(Ast.Symbol) = .empty;
+            var default_type: ?*const Ast.TypeExpr = null;
+
+            if (self.peek() == .colon) {
+                self.advance(); // consume ':'
+                try bounds.append(self.arena, try self.parseTypeBoundSymbol());
+                while (self.peek() == .plus) {
+                    self.advance();
+                    try bounds.append(self.arena, try self.parseTypeBoundSymbol());
+                }
+            }
+            if (self.peek() == .eq) {
+                self.advance(); // consume '='
+                default_type = try self.parseTypeExpr();
+            }
+
+            try assoc_types.append(self.arena, .{
+                .name = at_name,
+                .default = default_type,
+                .bounds = bounds.items,
+            });
+            self.skipNewlines();
+            continue;
+        }
 
         const method_start = self.currentSpan();
         if (self.peek() == .kw_pub) self.advance();
@@ -307,6 +337,7 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
         .kind = .{ .trait_decl = .{
             .name = name,
             .methods = methods.items,
+            .associated_types = assoc_types.items,
             .is_pub = vis,
         } },
         .span = start_span.merge(self.prevSpan()),

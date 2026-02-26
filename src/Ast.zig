@@ -54,7 +54,14 @@ pub const CImportDecl = struct {
 pub const TraitDecl = struct {
     name: Symbol,
     methods: []const TraitMethodSig,
+    associated_types: []const AssociatedType,
     is_pub: Visibility,
+};
+
+pub const AssociatedType = struct {
+    name: Symbol,
+    default: ?*const TypeExpr = null,
+    bounds: []const Symbol = &.{},
 };
 
 pub const ImplDecl = struct {
