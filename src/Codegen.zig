@@ -2749,6 +2749,20 @@ fn genComptimeExpr(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef 
             // Fallback: generate as regular expression.
             return self.genBinary(b);
         },
+        .block => |blk| {
+            // Comptime block: evaluate each statement, return tail value.
+            for (blk.stmts) |stmt| {
+                _ = try self.genComptimeExpr(stmt);
+            }
+            if (blk.tail) |tail| {
+                return self.genComptimeExpr(tail);
+            }
+            return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+        },
+        .string_literal => {
+            // Comptime string literal — just generate normally.
+            return self.genExpr(inner);
+        },
         else => {
             // For anything else, just generate it normally.
             return self.genExpr(inner);
