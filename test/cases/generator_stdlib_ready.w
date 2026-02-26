@@ -2,13 +2,13 @@
 use std.collections
 use std.math
 
-gen fn squares(n: i32) -> i32 =
+gen fn squares(n: i32) -> i32:
     var i: i32 = 0
     while i < n:
         yield i * i
         i += 1
 
-fn main() -> i32 =
+fn main -> i32:
     var iter = squares(5)
     var vals: Vec[i32] = Vec.new()
     for x in iter:
@@ -27,4 +27,3 @@ fn main() -> i32 =
     assert(got.get(0) == 1)
     assert(got.get(1) == 4)
 
-    0

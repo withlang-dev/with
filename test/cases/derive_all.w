@@ -6,7 +6,7 @@ type Vec2 = {
     y: i32,
 }
 
-fn main() -> i32 =
+fn main -> i32:
     let a = Vec2 { x: 1, y: 2 }
     let b = Vec2 { x: 1, y: 2 }
     let c = Vec2 { x: 3, y: 4 }
@@ -19,4 +19,3 @@ fn main() -> i32 =
     let d = a.clone()
     assert(d.x == 1)
     assert(d.y == 2)
-    0

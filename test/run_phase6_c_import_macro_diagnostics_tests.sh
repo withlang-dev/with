@@ -48,10 +48,9 @@ expect_check_fail_msg() {
 cat >"$tmpdir/c_import_macro_constants_ok.w" <<'EOF1'
 use c_import("#define ANSWER 42\n#define GREETING \"with\"")
 
-fn main() -> i32 =
+fn main -> i32:
     assert(ANSWER == 42)
     assert(GREETING == "with")
-    0
 EOF1
 expect_check_pass "$tmpdir/c_import_macro_constants_ok.w"
 
@@ -59,9 +58,8 @@ expect_check_pass "$tmpdir/c_import_macro_constants_ok.w"
 cat >"$tmpdir/c_import_macro_function_like_ok.w" <<'EOF2'
 use c_import("#define ADD(a,b) ((a)+(b))\n#define BASE 7")
 
-fn main() -> i32 =
+fn main -> i32:
     assert(BASE == 7)
-    0
 EOF2
 expect_check_pass "$tmpdir/c_import_macro_function_like_ok.w"
 
@@ -69,7 +67,7 @@ expect_check_pass "$tmpdir/c_import_macro_function_like_ok.w"
 cat >"$tmpdir/c_import_macro_bad_header_fail.w" <<'EOF3'
 use c_import("int broken( ;")
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF3
 expect_check_fail_msg "$tmpdir/c_import_macro_bad_header_fail.w" "for header snippet"
 

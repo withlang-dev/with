@@ -1,5 +1,5 @@
 // Test for loop with range
-fn main() -> i32 =
+fn main -> i32:
     var sum = 0
     for i in 0..5
         sum = sum + i
@@ -9,4 +9,3 @@ fn main() -> i32 =
     for i in 1..=5
         prod = prod * i
     println(prod)
-    0

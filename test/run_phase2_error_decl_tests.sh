@@ -38,12 +38,12 @@ error FileError =
     NotFound
     PermissionDenied
 
-fn code(e: FileError) -> i32 =
+fn code(e: FileError) -> i32:
     match e
         NotFound -> 1
         PermissionDenied -> 2
 
-fn main() -> i32 =
+fn main -> i32:
     let e: FileError = NotFound
     if code(e) == 1 then 0 else 1
 EOF1
@@ -54,12 +54,12 @@ error IoError =
     Disk(str)
     Permission(i32)
 
-fn code(e: IoError) -> i32 =
+fn code(e: IoError) -> i32:
     match e
         Disk(msg) -> msg.len() as i32
         Permission(v) -> v
 
-fn main() -> i32 =
+fn main -> i32:
     let a: IoError = Disk("oops")
     let b: IoError = Permission(7)
     if code(a) == 4 and code(b) == 7 then 0 else 1
@@ -69,7 +69,7 @@ expect_run_pass "$tmpdir/error_decl_payload_ok.w"
 cat >"$tmpdir/error_decl_comma_ok.w" <<'EOF3'
 error NetError = Timeout, Closed
 
-fn main() -> i32 =
+fn main -> i32:
     let e: NetError = Closed
     let v = match e
         Timeout -> 1
@@ -82,14 +82,14 @@ cat >"$tmpdir/error_decl_bad_payload_syntax_fail.w" <<'EOF4'
 error BadError =
     Disk(str
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF4
 expect_check_fail "$tmpdir/error_decl_bad_payload_syntax_fail.w"
 
 cat >"$tmpdir/error_decl_unknown_variant_fail.w" <<'EOF5'
 error MyError = A, B
 
-fn main() -> i32 =
+fn main -> i32:
     let e: MyError = C
     match e
         A -> 0

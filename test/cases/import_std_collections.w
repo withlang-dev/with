@@ -1,10 +1,10 @@
 // Test: std.collections import and wrappers
 use std.collections
 
-fn plus_one(x: i32) -> i32 =
+fn plus_one(x: i32) -> i32:
     x + 1
 
-fn main() -> i32 =
+fn main -> i32:
     var counts: HashMap[str, i32] = HashMap.new()
     increment(counts, "a")
     increment(counts, "a")
@@ -24,4 +24,3 @@ fn main() -> i32 =
     decrement(counts, "a")
     assert(counts.get("a").unwrap() == 2)
 
-    0

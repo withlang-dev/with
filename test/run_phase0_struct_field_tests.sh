@@ -36,7 +36,7 @@ expect_check_fail() {
 cat >"$tmpdir/struct_ok.w" <<'EOF'
 type Point = { x: i32, y: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let p = Point { x: 1, y: 2 }
     p.x + p.y
 EOF
@@ -45,7 +45,7 @@ expect_check_pass "$tmpdir/struct_ok.w"
 cat >"$tmpdir/struct_field_type_mismatch.w" <<'EOF'
 type Point = { x: i32, y: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let p = Point { x: true, y: 2 }
     p.x
 EOF
@@ -54,7 +54,7 @@ expect_check_fail "$tmpdir/struct_field_type_mismatch.w"
 cat >"$tmpdir/struct_unknown_field_access.w" <<'EOF'
 type Point = { x: i32, y: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let p = Point { x: 1, y: 2 }
     p.z
 EOF

@@ -1,7 +1,7 @@
 // Test: std.math import with extended functions
 use std.math
 
-fn main() -> i32 =
+fn main -> i32:
     // Test basic integer functions
     assert(abs(-5) == 5)
     assert(abs(3) == 3)
@@ -28,4 +28,3 @@ fn main() -> i32 =
     assert(ce > 3.99)
     assert(ce < 4.01)
 
-    0

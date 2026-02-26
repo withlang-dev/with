@@ -1,7 +1,7 @@
 // Test: std.mem import
 use std.mem
 
-fn main() -> i32 =
+fn main -> i32:
     // Allocate some memory
     let ptr = alloc(100)
     assert(ptr != 0)
@@ -18,4 +18,3 @@ fn main() -> i32 =
     free_mem(zptr)
 
     println("all stdlib mem tests passed")
-    0

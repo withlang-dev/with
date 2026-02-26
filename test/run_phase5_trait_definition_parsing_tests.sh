@@ -63,16 +63,16 @@ expect_run_pass "test/cases/trait_conform.w"
 cat >"$tmpdir/trait_required_and_default_parse_ok.w" <<'EOF1'
 trait Compute =
     fn base(self: Self) -> i32
-    fn bump(self: Self) -> i32 =
+    fn bump(self: Self) -> i32:
         self.base() + 1
 
 type Counter = { value: i32 }
 
 impl Compute for Counter =
-    fn base(self: Counter) -> i32 =
+    fn base(self: Counter) -> i32:
         self.value
 
-fn main() -> i32 =
+fn main -> i32:
     let c = Counter { value: 41 }
     if c.bump() == 42 then 0 else 1
 EOF1
@@ -81,16 +81,16 @@ expect_run_pass "$tmpdir/trait_required_and_default_parse_ok.w"
 cat >"$tmpdir/trait_missing_required_method_fail.w" <<'EOF2'
 trait NeedsBoth =
     fn required(self: Self) -> i32
-    fn optional(self: Self) -> i32 =
+    fn optional(self: Self) -> i32:
         10
 
 type Box = { v: i32 }
 
 impl NeedsBoth for Box =
-    fn optional(self: Box) -> i32 =
+    fn optional(self: Box) -> i32:
         self.v
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF2
 expect_check_fail_msg "$tmpdir/trait_missing_required_method_fail.w" "missing method 'required' required by trait 'NeedsBoth'"
 
@@ -99,7 +99,7 @@ trait Broken =
     fn value(self: Self) -> i32
         1
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF3
 expect_check_fail "$tmpdir/trait_malformed_default_syntax_fail.w"
 

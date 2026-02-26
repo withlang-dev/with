@@ -14,22 +14,22 @@ type Square = {
 }
 
 impl Displayable for Circle =
-    fn display(self: Circle) -> i32 =
+    fn display(self: Circle) -> i32:
         self.radius
 
 impl Sizeable for Circle =
-    fn size(self: Circle) -> i32 =
+    fn size(self: Circle) -> i32:
         self.radius * self.radius * 3
 
 impl Displayable for Square =
-    fn display(self: Square) -> i32 =
+    fn display(self: Square) -> i32:
         self.side
 
 impl Sizeable for Square =
-    fn size(self: Square) -> i32 =
+    fn size(self: Square) -> i32:
         self.side * self.side
 
-fn main() -> i32 =
+fn main -> i32:
     let c = Circle { radius: 5 }
     let s = Square { side: 4 }
     let cd = c.display()
@@ -40,4 +40,3 @@ fn main() -> i32 =
     assert(cs == 75)
     assert(sd == 4)
     assert(ss == 16)
-    0

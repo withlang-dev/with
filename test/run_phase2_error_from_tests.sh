@@ -37,13 +37,13 @@ cat >"$tmpdir/error_from_single_ok.w" <<'EOF1'
 error IoError = Disk
 error AppError from IoError
 
-fn f() -> Result[i32, IoError] = Err(Disk)
+fn f -> Result[i32, IoError]: Err(Disk)
 
-fn g() -> Result[i32, AppError] =
+fn g -> Result[i32, AppError]:
     let x = f()?
     x
 
-fn main() -> i32 =
+fn main -> i32:
     let app = g().err().unwrap()
     let io = app.as_Io()
     if io.is_some() and io.unwrap().is_Disk() then 0 else 1
@@ -55,18 +55,18 @@ error IoError = Disk
 error ParseError = Bad
 error AppError from IoError, ParseError
 
-fn io_fail() -> Result[i32, IoError] = Err(Disk)
-fn parse_fail() -> Result[i32, ParseError] = Err(Bad)
+fn io_fail -> Result[i32, IoError]: Err(Disk)
+fn parse_fail -> Result[i32, ParseError]: Err(Bad)
 
-fn g_io() -> Result[i32, AppError] =
+fn g_io -> Result[i32, AppError]:
     let _x = io_fail()?
     1
 
-fn g_parse() -> Result[i32, AppError] =
+fn g_parse -> Result[i32, AppError]:
     let _x = parse_fail()?
     2
 
-fn main() -> i32 =
+fn main -> i32:
     let e1 = g_io().err().unwrap()
     let e2 = g_parse().err().unwrap()
     let a = e1.as_Io()
@@ -78,7 +78,7 @@ expect_run_pass "$tmpdir/error_from_multi_ok.w"
 cat >"$tmpdir/error_from_unknown_source_fail.w" <<'EOF3'
 error AppError from MissingError
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF3
 expect_check_fail "$tmpdir/error_from_unknown_source_fail.w"
 
@@ -86,7 +86,7 @@ cat >"$tmpdir/error_from_trailing_comma_fail.w" <<'EOF4'
 error IoError = Disk
 error AppError from IoError,
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF4
 expect_check_fail "$tmpdir/error_from_trailing_comma_fail.w"
 

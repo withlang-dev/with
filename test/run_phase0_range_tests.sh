@@ -34,28 +34,25 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/range_ok.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     let ex = 0..10
     let inc = 0..=10
     for x in ex:
         let _ = x
     for y in inc:
         let _ = y
-    0
 EOF
 expect_check_pass "$tmpdir/range_ok.w"
 
 cat >"$tmpdir/range_bad_start.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     let r = "a"..10
-    0
 EOF
 expect_check_fail "$tmpdir/range_bad_start.w"
 
 cat >"$tmpdir/range_bad_end.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     let r = 0..false
-    0
 EOF
 expect_check_fail "$tmpdir/range_bad_end.w"
 

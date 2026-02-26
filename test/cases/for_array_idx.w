@@ -1,5 +1,5 @@
 // Test: for loop over array elements
-fn main() -> i32 =
+fn main -> i32:
     // basic for-in over array
     let arr = [10, 20, 30, 40, 50]
     var sum: i32 = 0
@@ -37,4 +37,3 @@ fn main() -> i32 =
     assert(squared_sum == 30)
 
     println("all for array idx tests passed")
-    0

@@ -50,7 +50,7 @@ cat >"$tmpdir/c_import_cache_same.w" <<'EOF1'
 use c_import("int same_fn(int);")
 use c_import("int same_fn(int);")
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF1
 check_trace_counts "$tmpdir/c_import_cache_same.w" 1 1
@@ -59,7 +59,7 @@ cat >"$tmpdir/c_import_cache_invalidate.w" <<'EOF2'
 use c_import("int one_fn(int);")
 use c_import("int two_fn(int);")
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF2
 check_trace_counts "$tmpdir/c_import_cache_invalidate.w" 0 2 0
@@ -67,14 +67,14 @@ check_trace_counts "$tmpdir/c_import_cache_invalidate.w" 0 2 0
 cat >"$tmpdir/mod_a.w" <<'EOF3'
 use c_import("int shared_fn(int);")
 
-fn a() -> i32 =
+fn a -> i32:
     1
 EOF3
 
 cat >"$tmpdir/mod_b.w" <<'EOF4'
 use c_import("int shared_fn(int);")
 
-fn b() -> i32 =
+fn b -> i32:
     2
 EOF4
 
@@ -82,7 +82,7 @@ cat >"$tmpdir/c_import_cache_imports.w" <<'EOF5'
 use mod_a
 use mod_b
 
-fn main() -> i32 =
+fn main -> i32:
     if a() + b() == 3 then 0 else 1
 EOF5
 check_trace_counts "$tmpdir/c_import_cache_imports.w" 1 1

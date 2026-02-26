@@ -50,7 +50,7 @@ expect_build_fail() {
 }
 
 cat >"$tmpdir/object_link_simple.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     if 2 + 2 == 4 then 0 else 1
 EOF1
 expect_build_and_run_pass "$tmpdir/object_link_simple.w"
@@ -64,7 +64,7 @@ ar rcs "$tmpdir/libextadd.a" "$tmpdir/extadd.o"
 cat >"$tmpdir/object_link_cimport_ok.w" <<'EOF2'
 use c_import("int ext_add(int, int);", link: "extadd")
 
-fn main() -> i32 =
+fn main -> i32:
     if ext_add(1, 2) == 8 then 0 else 1
 EOF2
 if LIBRARY_PATH="$tmpdir${LIBRARY_PATH:+:$LIBRARY_PATH}" "$WITH_BIN" build "$tmpdir/object_link_cimport_ok.w" >/dev/null 2>/dev/null && "$tmpdir/object_link_cimport_ok" >/dev/null 2>/dev/null; then
@@ -77,7 +77,7 @@ fi
 cat >"$tmpdir/object_link_cimport_missing_link.w" <<'EOF3'
 use c_import("int ext_add(int, int);")
 
-fn main() -> i32 =
+fn main -> i32:
     if ext_add(1, 2) == 8 then 0 else 1
 EOF3
 expect_build_fail "$tmpdir/object_link_cimport_missing_link.w"

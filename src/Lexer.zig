@@ -31,6 +31,9 @@ pub fn tokenize(self: *Lexer, allocator: std.mem.Allocator) !Token.List {
     var tokens = Token.List.init(allocator);
     while (true) {
         const tok = self.next();
+        // Skip comment tokens — they carry no semantic information and
+        // would otherwise confuse the indentation-sensitive parser.
+        if (tok.tag == .comment) continue;
         try tokens.append(tok);
         if (tok.tag == .eof) break;
     }
@@ -68,6 +71,7 @@ pub fn next(self: *Lexer) Token {
         '&' => return self.single(.ampersand),
 
         '+' => return self.operatorOrCompound(start, &.{
+            .{ '+', .plus_plus },
             .{ '%', .plus_wrap },
             .{ '=', .plus_eq },
         }, .plus),
@@ -186,6 +190,20 @@ pub fn next(self: *Lexer) Token {
         '0'...'9' => return self.lexNumber(start),
 
         'a'...'z', 'A'...'Z', '_' => return self.lexIdentifierOrKeyword(start),
+
+        '\'' => {
+            // Label: 'name
+            self.pos += 1;
+            if (self.pos < self.source.len and (std.ascii.isAlphabetic(self.source[self.pos]) or self.source[self.pos] == '_')) {
+                while (self.pos < self.source.len and isIdentContinue(self.source[self.pos])) {
+                    self.pos += 1;
+                }
+                return self.makeToken(.label, start, self.pos);
+            }
+            // Not followed by identifier — char literal or error.
+            self.diagnostics.emit(Diagnostic.err("unexpected character", self.spanFrom(start, self.pos)));
+            return self.makeToken(.invalid, start, self.pos);
+        },
 
         else => {
             self.pos += 1;
@@ -314,6 +332,26 @@ fn lexNumber(self: *Lexer, start: u32) Token {
             }
         }
     }
+    // Check for type suffix: 100_i64, 3.14_f32, etc.
+    // The digit loop above consumed trailing '_', so check if prev char was '_'
+    // and current char starts a type suffix (i/u/f).
+    if (self.pos > start and self.pos < self.source.len and self.source[self.pos - 1] == '_') {
+        const ch = self.source[self.pos];
+        if (ch == 'i' or ch == 'u' or ch == 'f') {
+            const remain = self.source[self.pos..];
+            const suffixes = [_][]const u8{ "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64" };
+            for (suffixes) |suf| {
+                if (remain.len >= suf.len and std.mem.eql(u8, remain[0..suf.len], suf)) {
+                    const end_pos = self.pos + suf.len;
+                    if (end_pos >= self.source.len or !isIdentContinue(self.source[end_pos])) {
+                        self.pos = @intCast(end_pos);
+                        if (suf[0] == 'f') is_float = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
     return self.makeToken(if (is_float) .float_literal else .int_literal, start, self.pos);
 }
 
@@ -377,23 +415,21 @@ fn spanFrom(self: *const Lexer, start: u32, end: u32) Span {
 // --- Tests ---
 
 test "lex simple function" {
-    const source = "fn main() -> i32 = 42";
+    const source = "fn main -> i32: 42";
     var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
     defer diags.deinit();
     var lexer = Lexer.init(source, 0, &diags);
     var tokens = try lexer.tokenize(std.testing.allocator);
     defer tokens.deinit();
 
-    // fn main ( ) -> i32 = 42 eof
+    // fn main -> i32 : 42 eof
     try std.testing.expectEqual(Token.Tag.kw_fn, tokens.tags.items[0]);
     try std.testing.expectEqual(Token.Tag.identifier, tokens.tags.items[1]);
-    try std.testing.expectEqual(Token.Tag.l_paren, tokens.tags.items[2]);
-    try std.testing.expectEqual(Token.Tag.r_paren, tokens.tags.items[3]);
-    try std.testing.expectEqual(Token.Tag.arrow, tokens.tags.items[4]);
-    try std.testing.expectEqual(Token.Tag.identifier, tokens.tags.items[5]); // i32
-    try std.testing.expectEqual(Token.Tag.eq, tokens.tags.items[6]);
-    try std.testing.expectEqual(Token.Tag.int_literal, tokens.tags.items[7]);
-    try std.testing.expectEqual(Token.Tag.eof, tokens.tags.items[8]);
+    try std.testing.expectEqual(Token.Tag.arrow, tokens.tags.items[2]);
+    try std.testing.expectEqual(Token.Tag.identifier, tokens.tags.items[3]); // i32
+    try std.testing.expectEqual(Token.Tag.colon, tokens.tags.items[4]);
+    try std.testing.expectEqual(Token.Tag.int_literal, tokens.tags.items[5]);
+    try std.testing.expectEqual(Token.Tag.eof, tokens.tags.items[6]);
     try std.testing.expect(!diags.hasErrors());
 }
 
@@ -651,12 +687,13 @@ test "lex line comments with and without trailing newline" {
     var tokens = try lexer.tokenize(std.testing.allocator);
     defer tokens.deinit();
 
-    // let x = 1 comment newline let y = 2 comment eof
+    // Comments are filtered out by tokenize().
+    // Tokens: let x = 1 newline let y = 2 eof
     try std.testing.expectEqual(Token.Tag.kw_let, tokens.tags.items[0]);
-    try std.testing.expectEqual(Token.Tag.comment, tokens.tags.items[4]);
-    try std.testing.expectEqual(Token.Tag.newline, tokens.tags.items[5]);
-    try std.testing.expectEqual(Token.Tag.kw_let, tokens.tags.items[6]);
-    try std.testing.expectEqual(Token.Tag.comment, tokens.tags.items[10]);
-    try std.testing.expectEqual(Token.Tag.eof, tokens.tags.items[11]);
+    try std.testing.expectEqual(Token.Tag.int_literal, tokens.tags.items[3]);
+    try std.testing.expectEqual(Token.Tag.newline, tokens.tags.items[4]);
+    try std.testing.expectEqual(Token.Tag.kw_let, tokens.tags.items[5]);
+    try std.testing.expectEqual(Token.Tag.int_literal, tokens.tags.items[8]);
+    try std.testing.expectEqual(Token.Tag.eof, tokens.tags.items[9]);
     try std.testing.expect(!diags.hasErrors());
 }

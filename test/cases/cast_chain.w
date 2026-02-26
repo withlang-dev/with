@@ -1,5 +1,5 @@
 // Test: chained type casts (i32 as f64 comparisons)
-fn main() -> i32 =
+fn main -> i32:
     // i32 -> i64 -> i32
     let a: i32 = 42
     let b = a as i64
@@ -24,4 +24,3 @@ fn main() -> i32 =
     let k = j as i64
     assert(k as i32 == 200)
 
-    0

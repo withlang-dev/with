@@ -56,8 +56,8 @@ proc = subprocess.Popen(
 )
 
 try:
-    source_ok = """fn make_point() -> i32 = 1
-fn use_point() -> i32 =
+    source_ok = """fn make_point -> i32: 1
+fn use_point -> i32:
     make_point()
 """
     uri = "file:///tmp/with_lsp_phase6.w"

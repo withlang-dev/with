@@ -54,7 +54,7 @@ expect_run_pass "test/cases/import_std_random.w"
 cat >"$tmpdir/std_random_extended_ok.w" <<'EOF1'
 use std.random
 
-fn main() -> i32 =
+fn main -> i32:
     seed(1234)
     let a1 = next_i32()
     let b1 = next_i32()
@@ -83,14 +83,13 @@ fn main() -> i32 =
     seed_now()
     let n = next_i32()
     assert(n >= 0)
-    0
 EOF1
 expect_run_pass "$tmpdir/std_random_extended_ok.w"
 
 cat >"$tmpdir/std_random_seed_arity_fail.w" <<'EOF2'
 use std.random
 
-fn main() -> i32 =
+fn main -> i32:
     seed()
     0
 EOF2
@@ -99,18 +98,16 @@ expect_run_fail "$tmpdir/std_random_seed_arity_fail.w"
 cat >"$tmpdir/std_random_range_type_fail.w" <<'EOF3'
 use std.random
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = range_i32("a", "b")
-    0
 EOF3
 expect_run_fail "$tmpdir/std_random_range_type_fail.w"
 
 cat >"$tmpdir/std_random_chance_type_fail.w" <<'EOF4'
 use std.random
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = chance("no")
-    0
 EOF4
 expect_run_fail "$tmpdir/std_random_chance_type_fail.w"
 

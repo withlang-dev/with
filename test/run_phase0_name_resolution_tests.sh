@@ -45,14 +45,14 @@ trap 'rm -rf "$tmpdir"' EXIT
 cat >"$tmpdir/module_scope.w" <<'EOF'
 let base: i32 = 41
 
-fn main() -> i32 =
+fn main -> i32:
     base + 1
 EOF
 expect_check_pass "$tmpdir/module_scope.w"
 
 # Negative: unresolved local name.
 cat >"$tmpdir/unresolved_name.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     missing_name
 EOF
 expect_check_fail "$tmpdir/unresolved_name.w"
@@ -61,7 +61,7 @@ expect_check_fail "$tmpdir/unresolved_name.w"
 cat >"$tmpdir/unresolved_import.w" <<'EOF'
 use missing_module
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF
 expect_check_fail "$tmpdir/unresolved_import.w"

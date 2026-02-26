@@ -1,4 +1,4 @@
-fn main() -> i32 =
+fn main -> i32:
     var x = 10
     x += 5
     println(x)
@@ -10,4 +10,3 @@ fn main() -> i32 =
     println(x)
     x %= 3
     println(x)
-    0

@@ -8,14 +8,14 @@ trait Measurable =
 type Item = { name: i32, weight: i32 }
 
 impl Printable for Item =
-    fn label(self: Item) -> i32 = self.name
+    fn label(self: Item) -> i32: self.name
 
 impl Measurable for Item =
-    fn size(self: Item) -> i32 = self.weight
+    fn size(self: Item) -> i32: self.weight
 
-fn describe[T: Printable + Measurable](x: T) -> i32 =
+fn describe[T: Printable + Measurable](x: T) -> i32:
     x.label() + x.size()
 
-fn main() -> i32 =
+fn main -> i32:
     let item = Item { name: 10, weight: 32 }
     if describe(item) == 42 then 0 else 1

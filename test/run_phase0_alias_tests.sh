@@ -34,13 +34,13 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/alias_ok.w" <<'EOF'
-fn takes_view(v: StrView) -> bool =
+fn takes_view(v: StrView) -> bool:
     true
 
-fn takes_str(v: &str) -> bool =
+fn takes_str(v: &str) -> bool:
     true
 
-fn main() -> bool =
+fn main -> bool:
     let s: String = "abc"
     let v: StrView = &s
     let w: &str = &s
@@ -49,9 +49,8 @@ EOF
 expect_check_pass "$tmpdir/alias_ok.w"
 
 cat >"$tmpdir/alias_unknown.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     let s: StrVeiw = "abc"
-    0
 EOF
 expect_check_fail "$tmpdir/alias_unknown.w"
 

@@ -1,8 +1,8 @@
 // Test: Result combinator methods (map, map_err, and_then, ok, err)
-fn double(x: i32) -> i32 = x * 2
-fn negate(x: i32) -> i32 = 0 - x
+fn double(x: i32) -> i32: x * 2
+fn negate(x: i32) -> i32: 0 - x
 
-fn main() -> i32 =
+fn main -> i32:
     // Result.map: Ok(5).map(double) == Ok(10)
     let a: Result[i32, i32] = Ok(5)
     let b = a.map(double)
@@ -48,4 +48,3 @@ fn main() -> i32 =
     assert(p.is_none())
 
     println("all result combinator tests passed")
-    0

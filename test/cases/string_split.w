@@ -1,5 +1,5 @@
 // Test: string split and join
-fn main() -> i32 =
+fn main -> i32:
     // Split
     let csv = "a,b,c,d"
     let parts = csv.split(",")
@@ -25,4 +25,3 @@ fn main() -> i32 =
     assert(segs.get(0) == "usr")
     assert(segs.get(2) == "bin")
 
-    0

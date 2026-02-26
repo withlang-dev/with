@@ -50,12 +50,12 @@ expect_run_pass "test/cases/dyn_trait.w"
 # Non-object-safe: no self parameter.
 cat >"$tmpdir/object_safety_no_self_fail.w" <<'EOF1'
 trait Bad =
-    fn make() -> i32
+    fn make -> i32
 
-fn use_dyn(x: dyn Bad) -> i32 =
+fn use_dyn(x: dyn Bad) -> i32:
     0
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF1
 expect_check_fail_msg "$tmpdir/object_safety_no_self_fail.w" "is not object-safe: method 'make' has no self parameter"
 
@@ -64,10 +64,10 @@ cat >"$tmpdir/object_safety_generic_method_fail.w" <<'EOF2'
 trait Factory =
     fn make[T](self: Self) -> T
 
-fn use_dyn(x: dyn Factory) -> i32 =
+fn use_dyn(x: dyn Factory) -> i32:
     0
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF2
 expect_check_fail_msg "$tmpdir/object_safety_generic_method_fail.w" "is not object-safe: method 'make' is generic"
 
@@ -76,10 +76,10 @@ cat >"$tmpdir/object_safety_returns_self_fail.w" <<'EOF3'
 trait CloneLike =
     fn clone(self: Self) -> Self
 
-fn use_dyn(x: dyn CloneLike) -> i32 =
+fn use_dyn(x: dyn CloneLike) -> i32:
     0
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF3
 expect_check_fail_msg "$tmpdir/object_safety_returns_self_fail.w" "is not object-safe: method 'clone' returns Self"
 

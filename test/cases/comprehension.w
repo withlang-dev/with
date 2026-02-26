@@ -1,5 +1,5 @@
 // Test: array comprehensions
-fn main() -> i32 =
+fn main -> i32:
     // Basic comprehension: [x * x for x in 0..5]
     let squares = [x * x for x in 0..5]
     assert(squares[0] == 0)
@@ -23,4 +23,3 @@ fn main() -> i32 =
         i += 1
     assert(sum == 15)
 
-    0

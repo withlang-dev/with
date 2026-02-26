@@ -1,5 +1,5 @@
 // Test: Defer LIFO execution order
-fn main() -> i32 =
+fn main -> i32:
     var x = 0
     defer x = x + 1
     defer x = x * 10

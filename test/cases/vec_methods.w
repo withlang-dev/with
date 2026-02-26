@@ -1,5 +1,5 @@
 // Test: Vec methods
-fn main() -> i32 =
+fn main -> i32:
     // Create vec and push elements
     var v = Vec.new()
     v.push(10)
@@ -36,4 +36,3 @@ fn main() -> i32 =
     assert(p.is_none())
 
     println("all vec method tests passed")
-    0

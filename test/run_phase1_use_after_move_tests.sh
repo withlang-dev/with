@@ -33,10 +33,10 @@ expect_fail_with_msg() {
 cat >"$tmpdir/use_after_move_let.w" <<'EOF1'
 type Res = { v: i32 }
 
-fn Res.drop(self: Res) -> void =
+fn Res.drop(self: Res) -> void:
     let _cleanup = self.v
 
-fn main() -> i32 =
+fn main -> i32:
     let r1 = Res { v: 1 }
     let _r2 = r1
     let x = r1.v
@@ -47,10 +47,10 @@ expect_fail_with_msg "$tmpdir/use_after_move_let.w" "use of moved value"
 cat >"$tmpdir/use_after_move_assign.w" <<'EOF2'
 type Res = { v: i32 }
 
-fn Res.drop(self: Res) -> void =
+fn Res.drop(self: Res) -> void:
     let _cleanup = self.v
 
-fn main() -> i32 =
+fn main -> i32:
     var a = Res { v: 2 }
     var b = Res { v: 3 }
     b = a

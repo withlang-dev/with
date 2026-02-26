@@ -80,7 +80,7 @@ expect_run_pass "test/cases/p3_std_fs_io.w"
 cat >"$tmpdir/std_fs_roundtrip_and_dirs_ok.w" <<'EOF1'
 use std.fs
 
-fn main() -> i32 =
+fn main -> i32:
     let dir = "/tmp/with_std_fs_phase3_dir"
     let file_a = "/tmp/with_std_fs_phase3_dir/a.txt"
     let file_b = "/tmp/with_std_fs_phase3_dir/b.txt"
@@ -110,24 +110,22 @@ fn main() -> i32 =
     assert(not file_exists(dir))
 
     println("fs-ok")
-    0
 EOF1
 expect_run_output "$tmpdir/std_fs_roundtrip_and_dirs_ok.w" $'fs-ok'
 
 cat >"$tmpdir/std_fs_missing_read_ok.w" <<'EOF2'
 use std.fs
 
-fn main() -> i32 =
+fn main -> i32:
     let missing = read_file("/tmp/with_std_fs_missing_938475938475.txt")
     println(missing.len())
-    0
 EOF2
 expect_run_output "$tmpdir/std_fs_missing_read_ok.w" $'0'
 
 cat >"$tmpdir/std_fs_create_dir_twice_ok.w" <<'EOF3'
 use std.fs
 
-fn main() -> i32 =
+fn main -> i32:
     let dir = "/tmp/with_std_fs_phase3_dir_twice"
     remove_dir(dir)
     assert(create_dir(dir) == 0)
@@ -135,34 +133,30 @@ fn main() -> i32 =
     assert(second != 0)
     assert(remove_dir(dir) == 0)
     println("dir-fail-ok")
-    0
 EOF3
 expect_run_output "$tmpdir/std_fs_create_dir_twice_ok.w" $'dir-fail-ok'
 
 cat >"$tmpdir/std_fs_bad_write_arg_fail.w" <<'EOF4'
 use std.fs
 
-fn main() -> i32 =
+fn main -> i32:
     let _rc = write_file(1, "abc")
-    0
 EOF4
 expect_check_fail "$tmpdir/std_fs_bad_write_arg_fail.w"
 
 cat >"$tmpdir/std_fs_bad_rename_arity_fail.w" <<'EOF5'
 use std.fs
 
-fn main() -> i32 =
+fn main -> i32:
     let _rc = rename_file("/tmp/a")
-    0
 EOF5
 expect_check_fail "$tmpdir/std_fs_bad_rename_arity_fail.w"
 
 cat >"$tmpdir/std_fs_bad_create_arg_fail.w" <<'EOF6'
 use std.fs
 
-fn main() -> i32 =
+fn main -> i32:
     let _rc = create_dir(true)
-    0
 EOF6
 expect_check_fail "$tmpdir/std_fs_bad_create_arg_fail.w"
 

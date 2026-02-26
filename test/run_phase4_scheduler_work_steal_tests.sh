@@ -42,9 +42,8 @@ expect_run_pass "test/cases/async_multi.w"
 cat >"$tmpdir/work_steal_events_arity_fail.w" <<'EOF1'
 extern fn with_fiber_steal_events() -> i64
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = with_fiber_steal_events(1)
-    0
 EOF1
 expect_run_fail "$tmpdir/work_steal_events_arity_fail.w"
 

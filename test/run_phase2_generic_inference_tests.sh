@@ -41,13 +41,13 @@ expect_check_fail_msg() {
 }
 
 cat >"$tmpdir/generic_infer_ok.w" <<'EOF1'
-fn id[T](x: T) -> T =
+fn id[T](x: T) -> T:
     x
 
-fn same[T](a: T, b: T) -> T =
+fn same[T](a: T, b: T) -> T:
     a
 
-fn main() -> i32 =
+fn main -> i32:
     let a = id(41)
     let b = id(true)
     let c = same(1, 2)
@@ -56,22 +56,20 @@ EOF1
 expect_run_pass "$tmpdir/generic_infer_ok.w"
 
 cat >"$tmpdir/generic_infer_conflict_fail.w" <<'EOF2'
-fn same[T](a: T, b: T) -> T =
+fn same[T](a: T, b: T) -> T:
     a
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = same(1, true)
-    0
 EOF2
 expect_check_fail_msg "$tmpdir/generic_infer_conflict_fail.w" "cannot infer a single type"
 
 cat >"$tmpdir/generic_infer_uninferred_fail.w" <<'EOF3'
-fn make[T]() -> T =
+fn make[T] -> T:
     0
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = make()
-    0
 EOF3
 expect_check_fail_msg "$tmpdir/generic_infer_uninferred_fail.w" "unknown type"
 

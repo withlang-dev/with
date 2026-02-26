@@ -54,16 +54,16 @@ expect_run_pass "test/cases/import_std_thread.w"
 cat >"$tmpdir/std_thread_extended_ok.w" <<'EOF1'
 use std.thread
 
-fn worker_a() -> i32 =
+fn worker_a -> i32:
     7
 
-fn worker_b() -> i32 =
+fn worker_b -> i32:
     19
 
-fn worker_c() -> i32 =
+fn worker_c -> i32:
     -4
 
-fn main() -> i32 =
+fn main -> i32:
     let a = join(spawn_os(worker_a))
     let b = join(spawn_os(worker_b))
     let c = join(spawn_os(worker_c))
@@ -71,37 +71,33 @@ fn main() -> i32 =
     assert(b == 19)
     assert(c == -4)
     assert(a + b + c == 22)
-    0
 EOF1
 expect_run_pass "$tmpdir/std_thread_extended_ok.w"
 
 cat >"$tmpdir/std_thread_spawn_arity_fail.w" <<'EOF2'
 use std.thread
 
-fn worker() -> i32 =
+fn worker -> i32:
     1
 
-fn main() -> i32 =
+fn main -> i32:
     let _h = spawn_os(worker, worker)
-    0
 EOF2
 expect_run_fail "$tmpdir/std_thread_spawn_arity_fail.w"
 
 cat >"$tmpdir/std_thread_spawn_sig_fail.w" <<'EOF3'
 use std.thread
 
-fn main() -> i32 =
+fn main -> i32:
     let _h = spawn_os(123)
-    0
 EOF3
 expect_run_fail "$tmpdir/std_thread_spawn_sig_fail.w"
 
 cat >"$tmpdir/std_thread_join_type_fail.w" <<'EOF4'
 use std.thread
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = join(123)
-    0
 EOF4
 expect_run_fail "$tmpdir/std_thread_join_type_fail.w"
 

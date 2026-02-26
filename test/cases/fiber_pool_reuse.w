@@ -2,10 +2,10 @@
 extern fn with_fiber_pool_reuses() -> i64
 extern fn with_fiber_pool_allocs() -> i64
 
-async fn bump(x: i32) -> i32 =
+async fn bump(x: i32) -> i32:
     x + 1
 
-fn main() -> i32 =
+fn main -> i32:
     let t1 = bump(1)
     assert(t1.await == 2)
     let allocs_after_first = with_fiber_pool_allocs()
@@ -17,4 +17,3 @@ fn main() -> i32 =
     let allocs_after_second = with_fiber_pool_allocs()
     assert(reuses >= 1)
     assert(allocs_after_second == allocs_after_first)
-    0

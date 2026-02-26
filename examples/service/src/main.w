@@ -33,7 +33,7 @@ type ServiceConfig = {
 
 type ServiceResult = Ok | NotFound | InvalidInput | ServerError
 
-fn result_name(r: ServiceResult) -> str =
+fn result_name(r: ServiceResult) -> str:
     match r
         Ok -> "ok"
         NotFound -> "not found"
@@ -42,16 +42,16 @@ fn result_name(r: ServiceResult) -> str =
 
 // --- User "Repository" (in-memory array) ---
 
-fn make_user(id: i32, name: str, email: str, score: i32) -> User =
+fn make_user(id: i32, name: str, email: str, score: i32) -> User:
     User { id: id, name: name, email: email, score: score }
 
-fn find_user(users: [5]User, id: i32) -> ServiceResult =
+fn find_user(users: [5]User, id: i32) -> ServiceResult:
     var found = false
     for i in 0..5:
         if users[i].id == id then found = true else found = found
     if found then Ok else NotFound
 
-fn get_user_score(users: [5]User, id: i32) -> i32 =
+fn get_user_score(users: [5]User, id: i32) -> i32:
     var score = 0
     for i in 0..5:
         if users[i].id == id then score = users[i].score else score = score
@@ -65,20 +65,20 @@ type Service = {
 }
 
 extend Service =
-    fn new(config: ServiceConfig) -> Service =
+    fn new(config: ServiceConfig) -> Service:
         Service { config: config, request_count: 0 }
 
-    fn get_timeout(self: Service) -> i32 =
+    fn get_timeout(self: Service) -> i32:
         self.config.timeout_ms
 
 // --- Validation ---
 
-fn validate_id(id: i32) -> ServiceResult =
+fn validate_id(id: i32) -> ServiceResult:
     if id <= 0 then InvalidInput
     else if id > 1000 then InvalidInput
     else Ok
 
-fn validate_and_find(users: [5]User, id: i32) -> ServiceResult =
+fn validate_and_find(users: [5]User, id: i32) -> ServiceResult:
     let validation = validate_id(id)
     match validation
         Ok -> find_user(users, id)
@@ -86,10 +86,10 @@ fn validate_and_find(users: [5]User, id: i32) -> ServiceResult =
 
 // --- Generic utility ---
 
-fn identity[T](x: T) -> T =
+fn identity[T](x: T) -> T:
     x
 
-fn first_of[T](a: T, b: T) -> T =
+fn first_of[T](a: T, b: T) -> T:
     a
 
 // --- Trait demo ---
@@ -98,18 +98,16 @@ trait Printable =
     fn display(self: Self) -> i32
 
 impl Printable for User =
-    fn display(self: User) -> i32 =
+    fn display(self: User) -> i32:
         println("User #{self.id}: {self.name} <{self.email}> score={self.score}")
-        0
 
 impl Printable for ServiceConfig =
-    fn display(self: ServiceConfig) -> i32 =
+    fn display(self: ServiceConfig) -> i32:
         println("Config: retries={self.max_retries}, timeout={self.timeout_ms}ms, cache={self.cache_enabled}")
-        0
 
 // --- Request handling demo ---
 
-fn handle_request(users: [5]User, endpoint: i32, user_id: i32) -> ServiceResult =
+fn handle_request(users: [5]User, endpoint: i32, user_id: i32) -> ServiceResult:
     match endpoint
         1 -> validate_and_find(users, user_id)
         2 -> Ok
@@ -117,7 +115,7 @@ fn handle_request(users: [5]User, endpoint: i32, user_id: i32) -> ServiceResult 
 
 // --- Main ---
 
-fn main() -> i32 =
+fn main -> i32:
     println("=== Service Demo ===")
 
     // Configuration with defaults
@@ -191,4 +189,3 @@ fn main() -> i32 =
     defer puts("--- Cleanup: connections closed ---")
 
     println("=== Demo complete ===")
-    0

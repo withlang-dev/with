@@ -3,10 +3,10 @@ extern fn with_fiber_stack_size_bytes() -> i64
 extern fn with_fiber_max_fibers() -> i32
 extern fn with_fiber_live_fibers() -> i32
 
-async fn unit(x: i32) -> i32 =
+async fn unit(x: i32) -> i32:
     x
 
-fn main() -> i32 =
+fn main -> i32:
     let stack_bytes = with_fiber_stack_size_bytes()
     let max_fibers = with_fiber_max_fibers()
     assert(stack_bytes >= 4096)
@@ -25,4 +25,3 @@ fn main() -> i32 =
 
     assert(hit_limit)
     assert(with_fiber_live_fibers() <= max_fibers)
-    0

@@ -1,23 +1,23 @@
 // Test: Default trait method implementations
 trait Describable =
     fn name(self: Self) -> str
-    fn describe(self: Self) -> str =
+    fn describe(self: Self) -> str:
         self.name()
 
 type Dog = { breed: str }
 type Cat = { color: str }
 
 impl Describable for Dog
-    fn name(self: Dog) -> str =
+    fn name(self: Dog) -> str:
         self.breed
 
 impl Describable for Cat
-    fn name(self: Cat) -> str =
+    fn name(self: Cat) -> str:
         self.color
-    fn describe(self: Cat) -> str =
+    fn describe(self: Cat) -> str:
         "a cat"
 
-fn main() -> i32 =
+fn main -> i32:
     let d = Dog { breed: "labrador" }
     let c = Cat { color: "orange" }
 
@@ -36,4 +36,3 @@ fn main() -> i32 =
     assert(c_name.starts_with("orange"))
 
     println("all trait default tests passed")
-    0

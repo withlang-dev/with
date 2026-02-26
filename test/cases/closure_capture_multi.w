@@ -1,8 +1,8 @@
 // Test: closures capturing multiple variables from outer scope
-fn apply(f: fn(i32) -> i32, x: i32) -> i32 = f(x)
-fn apply2(f: fn(i32, i32) -> i32, a: i32, b: i32) -> i32 = f(a, b)
+fn apply(f: fn(i32) -> i32, x: i32) -> i32: f(x)
+fn apply2(f: fn(i32, i32) -> i32, a: i32, b: i32) -> i32: f(a, b)
 
-fn main() -> i32 =
+fn main -> i32:
     // Capture single variable
     let offset = 100
     let add_offset = |x| x + offset
@@ -52,4 +52,3 @@ fn main() -> i32 =
     assert(biased_add(3, 7) == 110)
 
     println("all closure_capture_multi tests passed")
-    0

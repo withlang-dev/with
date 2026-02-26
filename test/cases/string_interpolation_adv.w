@@ -1,5 +1,5 @@
 // Test advanced string interpolation
-fn main() -> i32 =
+fn main -> i32:
     let name = "Alice"
     let age = 30
     let score = 95
@@ -10,4 +10,3 @@ fn main() -> i32 =
     let x = 42
     let y = 58
     println("x={x}, y={y}")
-    0

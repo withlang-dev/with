@@ -1,0 +1,7 @@
+exit: 0
+stdout:
+drop B
+drop A
+
+stderr:
+

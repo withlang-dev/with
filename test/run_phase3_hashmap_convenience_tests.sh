@@ -51,10 +51,10 @@ expect_run_pass "test/cases/hashmap_convenience.w"
 expect_run_pass "test/cases/import_std_collections.w"
 
 cat >"$tmpdir/hashmap_convenience_semantics_ok.w" <<'EOF1'
-fn plus_ten(x: i32) -> i32 =
+fn plus_ten(x: i32) -> i32:
     x + 10
 
-fn main() -> i32 =
+fn main -> i32:
     var counts: HashMap[str, i32] = HashMap.new()
 
     // increment/decrement on missing keys use 0 baseline.
@@ -81,12 +81,11 @@ fn main() -> i32 =
     assert(nums.len() == 3)
     assert(nums.get(0) == 3)
     assert(nums.get(2) == 5)
-    0
 EOF1
 expect_run_pass "$tmpdir/hashmap_convenience_semantics_ok.w"
 
 cat >"$tmpdir/hashmap_convenience_bad_increment_fail.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     var m: HashMap[str, str] = HashMap.new()
     m.insert("a", "b")
     m.increment("a")
@@ -95,17 +94,16 @@ EOF2
 expect_run_fail "$tmpdir/hashmap_convenience_bad_increment_fail.w"
 
 cat >"$tmpdir/hashmap_convenience_bad_append_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     var m: HashMap[str, i32] = HashMap.new()
     m.append("a", 1)
-    0
 EOF3
 expect_run_fail "$tmpdir/hashmap_convenience_bad_append_fail.w"
 
 cat >"$tmpdir/hashmap_convenience_bad_wrapper_key_fail.w" <<'EOF4'
 use std.collections
 
-fn main() -> i32 =
+fn main -> i32:
     var counts: HashMap[str, i32] = HashMap.new()
     increment(counts, 1)
     0

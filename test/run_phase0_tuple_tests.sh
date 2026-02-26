@@ -34,7 +34,7 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/tuple_ok.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     let t = (1, 2)
     let a = t.0
     let b = t.1
@@ -44,7 +44,7 @@ EOF
 expect_check_pass "$tmpdir/tuple_ok.w"
 
 cat >"$tmpdir/tuple_oob_index.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     let t = (1, 2)
     t.2
 EOF

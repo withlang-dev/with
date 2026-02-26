@@ -4,7 +4,7 @@ type Config = {
     debug: bool,
 }
 
-fn main() -> i32 =
+fn main -> i32:
     let base = Config { port: 8080, debug: false }
     let port = 9090
     let updated = { base with port }

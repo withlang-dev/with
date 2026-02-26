@@ -41,7 +41,7 @@ expect_check_fail_msg() {
 }
 
 cat >"$tmpdir/nll_shared_then_mut_ok.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     var x: i32 = 1
     let r = &x
     let _v = *r
@@ -52,7 +52,7 @@ EOF1
 expect_check_pass "$tmpdir/nll_shared_then_mut_ok.w"
 
 cat >"$tmpdir/nll_mut_then_shared_ok.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     var x: i32 = 1
     let m = &mut x
     *m = 3
@@ -62,7 +62,7 @@ EOF2
 expect_check_pass "$tmpdir/nll_mut_then_shared_ok.w"
 
 cat >"$tmpdir/nll_conflict_live_borrow_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     var x: i32 = 1
     let r = &x
     let m = &mut x

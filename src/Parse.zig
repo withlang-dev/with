@@ -38,7 +38,7 @@ test "parse facade parses valid source" {
     defer diags.deinit();
 
     try parseSource(
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    0
         \\
     , allocator, &diags);
@@ -52,7 +52,7 @@ test "parse facade reports syntax errors" {
     defer diags.deinit();
 
     try parseSource(
-        \\fn main( -> i32 =
+        \\fn main( -> i32:
         \\    0
         \\
     , allocator, &diags);
@@ -73,7 +73,7 @@ test "parse module declarations and use imports" {
         \\module demo.app
         \\use std.io
         \\use std.collections
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    0
         \\
     , allocator, arena.allocator(), &pool, &diags);
@@ -99,7 +99,7 @@ test "parse reports malformed use import" {
     _ = try parseModule(
         \\module broken
         \\use
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    0
         \\
     , allocator, arena.allocator(), &pool, &diags);
@@ -117,7 +117,7 @@ test "parse function definitions with parameters and return type" {
     defer diags.deinit();
 
     const module = try parseModule(
-        \\fn add(a: i32, b: i32) -> i32 =
+        \\fn add(a: i32, b: i32) -> i32:
         \\    a + b
         \\
     , allocator, arena.allocator(), &pool, &diags);
@@ -140,7 +140,7 @@ test "parse reports malformed function declaration" {
     defer diags.deinit();
 
     _ = try parseModule(
-        \\fn (a: i32) -> i32 =
+        \\fn (a: i32) -> i32:
         \\    a
         \\
     , allocator, arena.allocator(), &pool, &diags);
@@ -158,7 +158,7 @@ test "parse let/var/defer in function body" {
     defer diags.deinit();
 
     const module = try parseModule(
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    let x = 1
         \\    var y = 2
         \\    defer y = y + 1
@@ -190,7 +190,7 @@ test "parse reports malformed defer statement" {
     defer diags.deinit();
 
     _ = try parseModule(
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    defer
         \\    0
         \\
@@ -209,10 +209,10 @@ test "parse core expressions in function blocks" {
     defer diags.deinit();
 
     const module = try parseModule(
-        \\fn foo(x: i32) -> i32 =
+        \\fn foo(x: i32) -> i32:
         \\    x
         \\
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    let callv = foo(1)
         \\    let fieldv = obj.field
         \\    let indexv = arr[0]
@@ -250,7 +250,7 @@ test "parse reports malformed core expression syntax" {
     defer diags.deinit();
 
     _ = try parseModule(
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    let x = foo(1
         \\    x
         \\
@@ -269,7 +269,7 @@ test "parse type syntax forms in function signatures" {
     defer diags.deinit();
 
     const module = try parseModule(
-        \\fn typed(a: i32, b: MyType, c: Vec[i32], d: &i32, e: &mut i32, f: fn(i32) -> i32, g: (i32, bool)) -> i32 =
+        \\fn typed(a: i32, b: MyType, c: Vec[i32], d: &i32, e: &mut i32, f: fn(i32) -> i32, g: (i32, bool)) -> i32:
         \\    0
         \\
     , allocator, arena.allocator(), &pool, &diags);
@@ -298,7 +298,7 @@ test "parse reports malformed type syntax" {
     defer diags.deinit();
 
     _ = try parseModule(
-        \\fn bad(x: Vec[i32) -> i32 =
+        \\fn bad(x: Vec[i32) -> i32:
         \\    0
         \\
     , allocator, arena.allocator(), &pool, &diags);
@@ -316,7 +316,7 @@ test "parse unsafe expressions and unsafe blocks" {
     defer diags.deinit();
 
     const module = try parseModule(
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    unsafe:
         \\        let x = 1
         \\        x
@@ -339,7 +339,7 @@ test "parse reports malformed unsafe block" {
     defer diags.deinit();
 
     _ = try parseModule(
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    unsafe:
         \\
     , allocator, arena.allocator(), &pool, &diags);
@@ -357,10 +357,10 @@ test "parser recovers to next top-level declaration after error" {
     defer diags.deinit();
 
     const module = try parseModule(
-        \\fn broken( -> i32 =
+        \\fn broken( -> i32:
         \\    0
         \\
-        \\fn recovered() -> i32 =
+        \\fn recovered -> i32:
         \\    1
         \\
     , allocator, arena.allocator(), &pool, &diags);

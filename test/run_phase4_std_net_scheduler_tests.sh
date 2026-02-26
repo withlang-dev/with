@@ -54,19 +54,18 @@ expect_async_connect_pass() {
     cat >"$file" <<EOF1
 use std.net
 
-async fn server(port: i32) -> i32 =
+async fn server(port: i32) -> i32:
     let listen_fd = tcp_listen(port)
     let conn = tcp_accept(listen_fd)
     let _ = socket_close(conn)
     let _ = socket_close(listen_fd)
-    0
 
-async fn client(port: i32) -> i32 =
+async fn client(port: i32) -> i32:
     let conn = tcp_connect("localhost", port)
     let _ = socket_close(conn)
     if conn >= 0 then 0 else 1
 
-fn main() -> i32 =
+fn main -> i32:
     let s = server($port)
     let c = client($port)
     let cr = c.await
@@ -95,38 +94,34 @@ expect_async_connect_pass
 cat >"$tmpdir/std_net_udp_bind_ok.w" <<'EOF2'
 use std.net
 
-fn main() -> i32 =
+fn main -> i32:
     let fd = udp_bind(0)
     if fd < 0 then 1 else
         let _ = socket_close(fd)
-        0
 EOF2
 expect_run_pass "$tmpdir/std_net_udp_bind_ok.w"
 
 cat >"$tmpdir/std_net_listen_type_fail.w" <<'EOF3'
 use std.net
 
-fn main() -> i32 =
+fn main -> i32:
     let _ = tcp_listen("8080")
-    0
 EOF3
 expect_check_fail_msg "$tmpdir/std_net_listen_type_fail.w" "wrong type"
 
 cat >"$tmpdir/std_net_connect_arity_fail.w" <<'EOF4'
 use std.net
 
-fn main() -> i32 =
+fn main -> i32:
     let _ = tcp_connect("localhost")
-    0
 EOF4
 expect_check_fail_msg "$tmpdir/std_net_connect_arity_fail.w" "expects 2 argument(s)"
 
 cat >"$tmpdir/std_net_accept_type_fail.w" <<'EOF5'
 use std.net
 
-fn main() -> i32 =
+fn main -> i32:
     let _ = tcp_accept("bad")
-    0
 EOF5
 expect_check_fail_msg "$tmpdir/std_net_accept_type_fail.w" "wrong type"
 

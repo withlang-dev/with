@@ -54,7 +54,7 @@ expect_run_pass "test/cases/import_std_time.w"
 cat >"$tmpdir/std_time_extended_ok.w" <<'EOF1'
 use std.time
 
-fn main() -> i32 =
+fn main -> i32:
     let t1 = now()
     let t2 = now()
     assert(t1 > 1000000000)
@@ -66,34 +66,30 @@ fn main() -> i32 =
     assert(c2 >= c1)
 
     assert(sleep_secs(0) == 0)
-    0
 EOF1
 expect_run_pass "$tmpdir/std_time_extended_ok.w"
 
 cat >"$tmpdir/std_time_now_arity_fail.w" <<'EOF2'
 use std.time
 
-fn main() -> i32 =
+fn main -> i32:
     let _t = now(1)
-    0
 EOF2
 expect_run_fail "$tmpdir/std_time_now_arity_fail.w"
 
 cat >"$tmpdir/std_time_sleep_type_fail.w" <<'EOF3'
 use std.time
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = sleep_secs("bad")
-    0
 EOF3
 expect_run_fail "$tmpdir/std_time_sleep_type_fail.w"
 
 cat >"$tmpdir/std_time_clock_arity_fail.w" <<'EOF4'
 use std.time
 
-fn main() -> i32 =
+fn main -> i32:
     let _c = clock_ticks(1)
-    0
 EOF4
 expect_run_fail "$tmpdir/std_time_clock_arity_fail.w"
 

@@ -61,10 +61,10 @@ expect_run_pass "test/cases/string_escape.w"
 cat >"$tmpdir/std_string_wrappers_and_strview_ok.w" <<'EOF1'
 use std.string
 
-fn take_view(v: &str) -> i64 =
+fn take_view(v: &str) -> i64:
     view_len(v)
 
-fn main() -> i32 =
+fn main -> i32:
     let a = "abc"
     let b = "abd"
     assert(string_cmp(a, b) < 0)
@@ -83,40 +83,36 @@ fn main() -> i32 =
     assert(is_space(10))
     assert(not is_space(65))
 
-    let owned: str = "hello"
+    let owned = "hello"
     let view: &str = &owned
     assert(take_view(view) == 5)
     assert(view_len(view) == owned.len())
     assert(not view_is_empty(view))
     assert(view_eq(view, view))
-    0
 EOF1
 expect_run_pass "$tmpdir/std_string_wrappers_and_strview_ok.w"
 
 cat >"$tmpdir/std_string_bad_len_arg_fail.w" <<'EOF2'
 use std.string
 
-fn main() -> i32 =
+fn main -> i32:
     let _n = string_len(123)
-    0
 EOF2
 expect_check_fail "$tmpdir/std_string_bad_len_arg_fail.w"
 
 cat >"$tmpdir/std_string_bad_alpha_arg_fail.w" <<'EOF3'
 use std.string
 
-fn main() -> i32 =
+fn main -> i32:
     let _ok = is_alpha("A")
-    0
 EOF3
 expect_check_fail "$tmpdir/std_string_bad_alpha_arg_fail.w"
 
 cat >"$tmpdir/std_string_bad_cmp_arity_fail.w" <<'EOF4'
 use std.string
 
-fn main() -> i32 =
+fn main -> i32:
     let _c = string_cmp("a")
-    0
 EOF4
 expect_check_fail "$tmpdir/std_string_bad_cmp_arity_fail.w"
 

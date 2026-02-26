@@ -44,7 +44,7 @@ cat >"$tmpdir/copy_only_ok.w" <<'EOF1'
 @[derive(Copy)]
 type Point = { x: i32, y: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let p1 = Point { x: 1, y: 2 }
     let p2 = p1
     if p1.x + p2.x == 2 then 0 else 1
@@ -55,10 +55,10 @@ cat >"$tmpdir/copy_drop_conflict.w" <<'EOF2'
 @[derive(Copy)]
 type Res = { v: i32 }
 
-fn Res.drop(self: Res) -> void =
+fn Res.drop(self: Res) -> void:
     let _cleanup = self.v
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF2
 expect_check_fail_msg "$tmpdir/copy_drop_conflict.w" "type cannot be both Copy and Drop"
@@ -67,7 +67,7 @@ cat >"$tmpdir/derive_copy_obvious_noncopy.w" <<'EOF3'
 @[derive(Copy)]
 type Buffer = { data: Vec[u8] }
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF3
 expect_check_fail_msg "$tmpdir/derive_copy_obvious_noncopy.w" "cannot derive Copy"

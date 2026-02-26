@@ -34,20 +34,20 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/closure_inline_ok.w" <<'EOF1'
-fn apply(f: fn(i32) -> i32, x: i32) -> i32 =
+fn apply(f: fn(i32) -> i32, x: i32) -> i32:
     f(x)
 
-fn main() -> i32 =
+fn main -> i32:
     let inc = |x| x + 1
     if apply(inc, 4) == 5 then 0 else 1
 EOF1
 expect_run_pass "$tmpdir/closure_inline_ok.w"
 
 cat >"$tmpdir/closure_block_ok.w" <<'EOF2'
-fn apply(f: fn(i32) -> i32, x: i32) -> i32 =
+fn apply(f: fn(i32) -> i32, x: i32) -> i32:
     f(x)
 
-fn main() -> i32 =
+fn main -> i32:
     let dbl = |x|:
         let y = x + x
         y
@@ -56,14 +56,14 @@ EOF2
 expect_run_pass "$tmpdir/closure_block_ok.w"
 
 cat >"$tmpdir/closure_missing_pipe_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let bad = |x x + 1
     bad(1)
 EOF3
 expect_check_fail "$tmpdir/closure_missing_pipe_fail.w"
 
 cat >"$tmpdir/closure_bad_param_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let bad = |1| 1
     bad()
 EOF4

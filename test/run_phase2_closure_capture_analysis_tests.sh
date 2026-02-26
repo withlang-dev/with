@@ -41,10 +41,10 @@ expect_check_fail_msg() {
 }
 
 cat >"$tmpdir/closure_capture_single_ok.w" <<'EOF1'
-fn apply(f: fn(i32) -> i32, x: i32) -> i32 =
+fn apply(f: fn(i32) -> i32, x: i32) -> i32:
     f(x)
 
-fn main() -> i32 =
+fn main -> i32:
     let offset = 3
     let add = |x| x + offset
     if apply(add, 7) == 10 then 0 else 1
@@ -52,10 +52,10 @@ EOF1
 expect_run_pass "$tmpdir/closure_capture_single_ok.w"
 
 cat >"$tmpdir/closure_capture_multi_ok.w" <<'EOF2'
-fn apply(f: fn(i32) -> i32, x: i32) -> i32 =
+fn apply(f: fn(i32) -> i32, x: i32) -> i32:
     f(x)
 
-fn main() -> i32 =
+fn main -> i32:
     let a = 2
     let b = 5
     let mix = |x| x * a + b
@@ -64,7 +64,7 @@ EOF2
 expect_run_pass "$tmpdir/closure_capture_multi_ok.w"
 
 cat >"$tmpdir/closure_capture_ephemeral_ref_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let value = 10
     let r = &value
     let f = |x| x + *r

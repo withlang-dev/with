@@ -46,16 +46,15 @@ expect_check_fail_msg() {
 
 # Positive: deterministic/pure comptime fn remains valid.
 cat >"$tmpdir/comptime_fn_pure_ok.w" <<'EOF1'
-comptime fn eval(x: i32) -> i32 =
+comptime fn eval(x: i32) -> i32:
     let mut s = 0
     for i in [1, 2, 3, 4]:
         if i <= x:
             s = s + i
     s
 
-fn main() -> i32 =
+fn main -> i32:
     assert(eval(3) == 6)
-    0
 EOF1
 expect_run_pass "$tmpdir/comptime_fn_pure_ok.w"
 
@@ -64,11 +63,10 @@ expect_run_pass "test/cases/comptime.w"
 
 # Non-happy-path: I/O in comptime fn is denied.
 cat >"$tmpdir/comptime_fn_io_fail.w" <<'EOF2'
-comptime fn noisy() -> i32 =
+comptime fn noisy -> i32:
     println(1)
-    0
 
-fn main() -> i32 =
+fn main -> i32:
     noisy()
 EOF2
 expect_check_fail_msg "$tmpdir/comptime_fn_io_fail.w" "comptime fn cannot perform I/O"
@@ -77,10 +75,10 @@ expect_check_fail_msg "$tmpdir/comptime_fn_io_fail.w" "comptime fn cannot perfor
 cat >"$tmpdir/comptime_fn_extern_fail.w" <<'EOF3'
 use c_import("#include <stdio.h>")
 
-comptime fn bad() -> i32 =
+comptime fn bad -> i32:
     puts(c"x")
 
-fn main() -> i32 =
+fn main -> i32:
     bad()
 EOF3
 expect_check_fail_msg "$tmpdir/comptime_fn_extern_fail.w" "comptime fn cannot call extern functions"

@@ -39,7 +39,7 @@ type Pair[T, U] = {
     right: U,
 }
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF1
 expect_check_pass "$tmpdir/generic_type_struct_ok.w"
@@ -47,7 +47,7 @@ expect_check_pass "$tmpdir/generic_type_struct_ok.w"
 cat >"$tmpdir/generic_type_alias_ok.w" <<'EOF2'
 type Wrapper[T] = T
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF2
 expect_check_pass "$tmpdir/generic_type_alias_ok.w"
@@ -57,7 +57,7 @@ type Bad[T] = {
     value: U,
 }
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF3
 expect_check_fail "$tmpdir/generic_type_unknown_param_fail.w"

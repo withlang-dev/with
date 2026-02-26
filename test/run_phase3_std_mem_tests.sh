@@ -55,7 +55,7 @@ expect_run_pass "test/cases/import_std_mem.w"
 cat >"$tmpdir/std_mem_copy_compare_ok.w" <<'EOF1'
 use std.mem
 
-fn main() -> i32 =
+fn main -> i32:
     let a = alloc(16)
     let b = alloc_zeroed(16, 1)
     assert(a != 0)
@@ -77,7 +77,7 @@ expect_run_pass "$tmpdir/std_mem_copy_compare_ok.w"
 cat >"$tmpdir/std_mem_move_ok.w" <<'EOF2'
 use std.mem
 
-fn main() -> i32 =
+fn main -> i32:
     let a = alloc(8)
     assert(a != 0)
     mem_set(a, 90, 8)
@@ -91,16 +91,15 @@ expect_run_pass "$tmpdir/std_mem_move_ok.w"
 cat >"$tmpdir/std_mem_alloc_bad_arg_fail.w" <<'EOF3'
 use std.mem
 
-fn main() -> i32 =
+fn main -> i32:
     let _bad = alloc(true)
-    0
 EOF3
 expect_check_fail "$tmpdir/std_mem_alloc_bad_arg_fail.w"
 
 cat >"$tmpdir/std_mem_set_bad_len_fail.w" <<'EOF4'
 use std.mem
 
-fn main() -> i32 =
+fn main -> i32:
     let p = alloc(4)
     mem_set(p, 0, false)
     free_mem(p)
@@ -111,7 +110,7 @@ expect_check_fail "$tmpdir/std_mem_set_bad_len_fail.w"
 cat >"$tmpdir/std_mem_free_bad_ptr_fail.w" <<'EOF5'
 use std.mem
 
-fn main() -> i32 =
+fn main -> i32:
     free_mem(1)
     0
 EOF5

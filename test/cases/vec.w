@@ -1,5 +1,5 @@
 // Test: Vec[T] dynamic array
-fn main() -> i32 =
+fn main -> i32:
     // Create from Vec.of()
     var v = Vec.of(10, 20, 30)
     assert(v.len() == 3)
@@ -29,4 +29,3 @@ fn main() -> i32 =
     assert(v.len() == 8)
     assert(v.get(7) == 90)
 
-    0

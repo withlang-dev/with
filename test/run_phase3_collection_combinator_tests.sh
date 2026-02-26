@@ -53,39 +53,35 @@ expect_run_pass "test/cases/sequence_traverse.w"
 expect_run_pass "test/cases/import_std_collections.w"
 
 cat >"$tmpdir/sequence_non_wrapper_fail.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     var xs: Vec[i32] = Vec.new()
     xs.push(1)
     let _r = xs.sequence()
-    0
 EOF1
 expect_run_fail "$tmpdir/sequence_non_wrapper_fail.w"
 
 cat >"$tmpdir/traverse_non_wrapper_fail.w" <<'EOF2'
-fn plus_one(x: i32) -> i32 =
+fn plus_one(x: i32) -> i32:
     x + 1
 
-fn main() -> i32 =
+fn main -> i32:
     var xs: Vec[i32] = Vec.new()
     xs.push(1)
     let _r = xs.traverse(plus_one)
-    0
 EOF2
 expect_run_fail "$tmpdir/traverse_non_wrapper_fail.w"
 
 cat >"$tmpdir/traverse_missing_arg_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     var xs: Vec[i32] = Vec.new()
     let _r = xs.traverse()
-    0
 EOF3
 expect_run_fail "$tmpdir/traverse_missing_arg_fail.w"
 
 cat >"$tmpdir/sequence_unexpected_arg_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     var xs: Vec[?i32] = Vec.new()
     let _r = xs.sequence(1)
-    0
 EOF4
 expect_run_fail "$tmpdir/sequence_unexpected_arg_fail.w"
 

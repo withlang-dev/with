@@ -4,10 +4,9 @@ type Config = {
     port: i32 = 8080,
 }
 
-fn main() -> i32 =
+fn main -> i32:
     let c = with Config { host: "localhost", port: 3000 } as config:
         println(config.host)
         println(config.port)
         config
     println(c.port)
-    0

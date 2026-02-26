@@ -1,5 +1,5 @@
 // Test: multi-line strings with triple quotes
-fn main() -> i32 =
+fn main -> i32:
     let s = """
 hello
 world

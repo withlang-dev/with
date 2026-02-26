@@ -6,7 +6,7 @@ type StepRange = {
 }
 
 impl StepRange =
-    fn next(self: *mut StepRange) -> ?i32 =
+    fn next(self: *mut StepRange) -> ?i32:
         if self.current < self.end_val:
             let v = self.current
             self.current = self.current + self.step
@@ -20,7 +20,7 @@ type Repeat = {
 }
 
 impl Repeat =
-    fn next(self: *mut Repeat) -> ?i32 =
+    fn next(self: *mut Repeat) -> ?i32:
         if self.remaining > 0:
             self.remaining = self.remaining - 1
             Some(self.value)
@@ -33,7 +33,7 @@ type Collatz = {
 }
 
 impl Collatz =
-    fn next(self: *mut Collatz) -> ?i32 =
+    fn next(self: *mut Collatz) -> ?i32:
         if self.done:
             None
         else
@@ -46,7 +46,7 @@ impl Collatz =
                 self.n = self.n * 3 + 1
             Some(val)
 
-fn main() -> i32 =
+fn main -> i32:
     // StepRange: 0, 2, 4, 6, 8
     var sr = StepRange { current: 0, end_val: 10, step: 2 }
     var sum1: i32 = 0
@@ -85,4 +85,3 @@ fn main() -> i32 =
     assert(last_val == 1)
 
     println("all iter_custom_struct tests passed")
-    0

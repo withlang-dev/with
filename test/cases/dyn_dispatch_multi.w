@@ -7,18 +7,18 @@ type Circle = { radius: i32 }
 type Square = { side: i32 }
 
 impl Shape for Circle =
-    fn area(self: Circle) -> i32 = self.radius * self.radius * 3
-    fn name(self: Circle) -> str = "circle"
+    fn area(self: Circle) -> i32: self.radius * self.radius * 3
+    fn name(self: Circle) -> str: "circle"
 
 impl Shape for Square =
-    fn area(self: Square) -> i32 = self.side * self.side
-    fn name(self: Square) -> str = "square"
+    fn area(self: Square) -> i32: self.side * self.side
+    fn name(self: Square) -> str: "square"
 
-fn print_shape(s: dyn Shape) -> void =
+fn print_shape(s: dyn Shape) -> void:
     println(s.name())
     println(s.area())
 
-fn main() -> i32 =
+fn main -> i32:
     let c = Circle { radius: 5 }
     let s = Square { side: 4 }
     print_shape(c)

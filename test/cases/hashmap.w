@@ -1,5 +1,5 @@
 // Test: HashMap[K,V] built-in collection
-fn main() -> i32 =
+fn main -> i32:
     var m: HashMap[str, i32] = HashMap.new()
 
     // Empty check
@@ -32,4 +32,3 @@ fn main() -> i32 =
     let missing = m.get("one")
     assert(missing.is_none())
 
-    0

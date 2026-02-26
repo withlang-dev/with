@@ -54,7 +54,7 @@ expect_run_pass "test/cases/import_std_sync.w"
 cat >"$tmpdir/std_sync_extended_ok.w" <<'EOF1'
 use std.sync
 
-fn main() -> i32 =
+fn main -> i32:
     var m = mutex_new(3)
     assert(mutex_get(m) == 3)
     mutex_set(&mut m, 8)
@@ -73,46 +73,41 @@ fn main() -> i32 =
     var b = atomic_new(0)
     atomic_store(&mut b, -7)
     assert(atomic_load(b) == -7)
-    0
 EOF1
 expect_run_pass "$tmpdir/std_sync_extended_ok.w"
 
 cat >"$tmpdir/std_sync_mutex_set_borrow_fail.w" <<'EOF2'
 use std.sync
 
-fn main() -> i32 =
+fn main -> i32:
     let m = mutex_new(1)
     mutex_set(m, 2)
-    0
 EOF2
 expect_run_fail "$tmpdir/std_sync_mutex_set_borrow_fail.w"
 
 cat >"$tmpdir/std_sync_atomic_add_arity_fail.w" <<'EOF3'
 use std.sync
 
-fn main() -> i32 =
+fn main -> i32:
     var a = atomic_new(1)
     let _x = atomic_add(&mut a)
-    0
 EOF3
 expect_run_fail "$tmpdir/std_sync_atomic_add_arity_fail.w"
 
 cat >"$tmpdir/std_sync_rwlock_write_type_fail.w" <<'EOF4'
 use std.sync
 
-fn main() -> i32 =
+fn main -> i32:
     var rw = rwlock_new(1)
     rwlock_write(&mut rw, "x")
-    0
 EOF4
 expect_run_fail "$tmpdir/std_sync_rwlock_write_type_fail.w"
 
 cat >"$tmpdir/std_sync_atomic_load_type_fail.w" <<'EOF5'
 use std.sync
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = atomic_load(123)
-    0
 EOF5
 expect_run_fail "$tmpdir/std_sync_atomic_load_type_fail.w"
 

@@ -1,7 +1,7 @@
 // Test: nested enum matching and multi-payload enums
 type Expr = Num(i32) | Add(i32) | Mul(i32)
 
-fn eval(base: i32, e: Expr) -> i32 =
+fn eval(base: i32, e: Expr) -> i32:
     match e
         Num(n) -> n
         Add(n) -> base + n
@@ -9,18 +9,18 @@ fn eval(base: i32, e: Expr) -> i32 =
 
 type Priority = Low | Medium | High
 
-fn priority_value(p: Priority) -> i32 =
+fn priority_value(p: Priority) -> i32:
     match p
         Low -> 1
         Medium -> 5
         High -> 10
 
-fn classify_score(score: i32) -> Priority =
+fn classify_score(score: i32) -> Priority:
     if score < 30 then Low
     else if score < 70 then Medium
     else High
 
-fn main() -> i32 =
+fn main -> i32:
     // Basic multi-payload matching
     let e1 = Num(42)
     let e2 = Add(10)
@@ -48,4 +48,3 @@ fn main() -> i32 =
     assert(not x.is_Mul())
 
     println("all enum_nested_match tests passed")
-    0

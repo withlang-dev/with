@@ -34,11 +34,11 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/let_else_return_ok.w" <<'EOF1'
-fn unwrap_or(opt: ?i32, fallback: i32) -> i32 =
+fn unwrap_or(opt: ?i32, fallback: i32) -> i32:
     let Some(v) = opt else return fallback
     v
 
-fn main() -> i32 =
+fn main -> i32:
     let a = unwrap_or(Some(7), 0)
     let b = unwrap_or(None, 11)
     if a == 7 and b == 11 then 0 else 1
@@ -46,12 +46,12 @@ EOF1
 expect_run_pass "$tmpdir/let_else_return_ok.w"
 
 cat >"$tmpdir/let_else_if_diverge_ok.w" <<'EOF2'
-fn pick(opt: ?i32, flag: bool) -> i32 =
+fn pick(opt: ?i32, flag: bool) -> i32:
     let Some(v) = opt else
         if flag then return 10 else return 20
     v
 
-fn main() -> i32 =
+fn main -> i32:
     let a = pick(Some(3), true)
     let b = pick(None, true)
     let c = pick(None, false)
@@ -60,7 +60,7 @@ EOF2
 expect_run_pass "$tmpdir/let_else_if_diverge_ok.w"
 
 cat >"$tmpdir/let_else_continue_ok.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let xs = [Some(1), None, Some(3)]
     var sum = 0
     for opt in xs:
@@ -71,14 +71,14 @@ EOF3
 expect_run_pass "$tmpdir/let_else_continue_ok.w"
 
 cat >"$tmpdir/let_else_literal_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let Some(v) = Some(1) else 0
     v
 EOF4
 expect_check_fail "$tmpdir/let_else_literal_fail.w"
 
 cat >"$tmpdir/let_else_block_nondiverge_fail.w" <<'EOF5'
-fn main() -> i32 =
+fn main -> i32:
     let Some(v) = None else
         let x = 1
         x
@@ -87,7 +87,7 @@ EOF5
 expect_check_fail "$tmpdir/let_else_block_nondiverge_fail.w"
 
 cat >"$tmpdir/let_else_partial_if_fail.w" <<'EOF6'
-fn main() -> i32 =
+fn main -> i32:
     let Some(v) = None else
         if true then return 0 else 1
     v

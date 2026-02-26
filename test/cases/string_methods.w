@@ -1,5 +1,5 @@
 // Test: String methods
-fn main() -> i32 =
+fn main -> i32:
     let s = "hello world"
 
     // .len()
@@ -52,4 +52,3 @@ fn main() -> i32 =
     assert(not r.contains("world"))
 
     println("all string method tests passed")
-    0

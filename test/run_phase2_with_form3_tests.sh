@@ -34,10 +34,10 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/with_form3_binding_ok.w" <<'EOF1'
-fn compute(n: i32) -> i32 =
+fn compute(n: i32) -> i32:
     n * 2
 
-fn main() -> i32 =
+fn main -> i32:
     let v = with compute(21) as result:
         result + 1
     if v == 43 then 0 else 1
@@ -45,10 +45,10 @@ EOF1
 expect_run_pass "$tmpdir/with_form3_binding_ok.w"
 
 cat >"$tmpdir/with_form3_binding_fail.w" <<'EOF2'
-fn compute(n: i32) -> i32 =
+fn compute(n: i32) -> i32:
     n * 2
 
-fn main() -> i32 =
+fn main -> i32:
     let _v = with compute(21) as result:
         result + true
     0
@@ -56,7 +56,7 @@ EOF2
 expect_check_fail "$tmpdir/with_form3_binding_fail.w"
 
 cat >"$tmpdir/with_form3_immutable_binding_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let _v = with 10 as result:
         result = 11
         result

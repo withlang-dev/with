@@ -1,8 +1,8 @@
 // Phase 4 gap: select await branches with let-else blocks not implemented
-async fn fast() -> i32 = 1
-async fn slow() -> i32 = 2
+async fn fast -> i32: 1
+async fn slow -> i32: 2
 
-fn main() -> i32 =
+fn main -> i32:
     let r = select await:
         a = fast() ->
             let Some(x) = Some(a) else return 0

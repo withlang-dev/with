@@ -1,5 +1,5 @@
 // Test: HashSet[T] built-in collection
-fn main() -> i32 =
+fn main -> i32:
     var s: HashSet[str] = HashSet.new()
 
     // Empty check
@@ -37,4 +37,3 @@ fn main() -> i32 =
     nums.remove(20)
     assert(nums.len() == 2)
 
-    0

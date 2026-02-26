@@ -1,5 +1,5 @@
 // Test: HashMap[i32, str] with integer keys
-fn main() -> i32 =
+fn main -> i32:
     var m: HashMap[i32, str] = HashMap.new()
 
     m.insert(1, "one")
@@ -25,4 +25,3 @@ fn main() -> i32 =
     assert(m.len() == 2)
     assert(m.get(1).is_none())
 
-    0

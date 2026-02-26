@@ -34,19 +34,19 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/with_nonlocal_return_ok.w" <<'EOF1'
-fn f(x: i32) -> i32 =
+fn f(x: i32) -> i32:
     with x as y:
         if y == 5 then return 42
         y
     0
 
-fn main() -> i32 =
+fn main -> i32:
     if f(5) == 42 and f(1) == 0 then 0 else 1
 EOF1
 expect_run_pass "$tmpdir/with_nonlocal_return_ok.w"
 
 cat >"$tmpdir/with_nonlocal_loop_control_ok.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     var i: i32 = 0
     var sum: i32 = 0
     while i < 5:
@@ -60,20 +60,20 @@ EOF2
 expect_run_pass "$tmpdir/with_nonlocal_loop_control_ok.w"
 
 cat >"$tmpdir/with_nonlocal_mut_return_ok.w" <<'EOF3'
-fn f() -> i32 =
+fn f -> i32:
     with 1 as mut x:
         if x == 1 then return 9
         x = 2
         x
     0
 
-fn main() -> i32 =
+fn main -> i32:
     if f() == 9 then 0 else 1
 EOF3
 expect_run_pass "$tmpdir/with_nonlocal_mut_return_ok.w"
 
 cat >"$tmpdir/with_nonlocal_break_outside_loop_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     with 1 as x:
         break
     x
@@ -81,7 +81,7 @@ EOF4
 expect_check_fail "$tmpdir/with_nonlocal_break_outside_loop_fail.w"
 
 cat >"$tmpdir/with_nonlocal_continue_outside_loop_fail.w" <<'EOF5'
-fn main() -> i32 =
+fn main -> i32:
     with 1 as x:
         continue
     x

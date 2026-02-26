@@ -1,12 +1,12 @@
 // Integration test: closures with vector iteration
-fn for_each(v: Vec[i32], f: fn(i32) -> void) -> void =
+fn for_each(v: Vec[i32], f: fn(i32) -> void) -> void:
     for x in v
         f(x)
 
-fn print_val(x: i32) -> void =
+fn print_val(x: i32) -> void:
     println(x)
 
-fn main() -> i32 =
+fn main -> i32:
     var v: Vec[i32] = Vec.new()
     v.push(10)
     v.push(20)

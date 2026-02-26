@@ -1,0 +1,6 @@
+exit: 0
+stdout:
+Vec2 { x: 4, y: 6 }
+
+stderr:
+

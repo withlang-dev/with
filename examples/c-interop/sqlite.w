@@ -22,10 +22,10 @@ type SafeStr = {
 }
 
 extend SafeStr =
-    fn new(s: str) -> SafeStr =
+    fn new(s: str) -> SafeStr:
         SafeStr { data: s, len: s.len as i32 }
 
-    fn get_len(self: SafeStr) -> i32 =
+    fn get_len(self: SafeStr) -> i32:
         self.len
 
 // --- Simple key-value store (array-based) ---
@@ -40,21 +40,21 @@ type Store = {
     count: i32,
 }
 
-fn store_new() -> Store =
+fn store_new -> Store:
     Store { count: 0 }
 
-fn make_entry(key: i32, value: i32) -> Entry =
+fn make_entry(key: i32, value: i32) -> Entry:
     Entry { key: key, value: value, active: true }
 
-fn entry_display(e: Entry) -> i32 =
+fn entry_display(e: Entry) -> i32:
     if e.active then println("  [{e.key}] = {e.value}") else println("  [{e.key}] = (deleted)")
     0
 
 // --- Demo: C string functions ---
 
-fn demo_strings() -> i32 =
+fn demo_strings -> i32:
     println("--- String Operations ---")
-    let hello: str = "Hello, C interop!"
+    let hello = "Hello, C interop!"
     puts(hello)
 
     let len = strlen(hello)
@@ -65,11 +65,10 @@ fn demo_strings() -> i32 =
 
     let cmp2 = strcmp("abc", "def")
     println("strcmp(abc, def) = {cmp2}")
-    0
 
 // --- Demo: Struct wrapper ---
 
-fn demo_wrapper() -> i32 =
+fn demo_wrapper -> i32:
     println("--- Safe Wrapper ---")
     let s = SafeStr.new("Hello World")
     println("SafeStr len = {s.len}")
@@ -77,11 +76,10 @@ fn demo_wrapper() -> i32 =
     let s2 = SafeStr.new("With Language")
     let total = s.get_len() + s2.get_len()
     println("Total length = {total}")
-    0
 
 // --- Demo: Key-value operations ---
 
-fn demo_store() -> i32 =
+fn demo_store -> i32:
     println("--- Key-Value Store ---")
     let entries: [5]Entry = [
         make_entry(1, 100),
@@ -99,11 +97,10 @@ fn demo_store() -> i32 =
     for i in 0..5:
         sum = sum + entries[i].value
     println("Sum of values: {sum}")
-    0
 
 // --- Demo: Printf formatting ---
 
-fn demo_printf() -> i32 =
+fn demo_printf -> i32:
     println("--- Printf Formatting ---")
     printf("Decimal: %d\n", 42)
     printf("Hex: 0x%x\n", 255)
@@ -114,11 +111,10 @@ fn demo_printf() -> i32 =
 
 // --- Main ---
 
-fn main() -> i32 =
+fn main -> i32:
     println("=== C Interop Demo ===")
     demo_strings()
     demo_wrapper()
     demo_store()
     demo_printf()
     println("=== Demo complete ===")
-    0

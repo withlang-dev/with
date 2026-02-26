@@ -2,13 +2,13 @@
 type UserId = distinct i32
 type GroupId = distinct i32
 
-fn get_user_id() -> UserId =
+fn get_user_id -> UserId:
     UserId { value: 42 }
 
-fn get_group_id() -> GroupId =
+fn get_group_id -> GroupId:
     GroupId { value: 99 }
 
-fn main() -> i32 =
+fn main -> i32:
     let uid = get_user_id()
     let gid = get_group_id()
 
@@ -20,4 +20,3 @@ fn main() -> i32 =
     assert(sum == 141)
 
     println("all distinct type tests passed")
-    0

@@ -54,7 +54,7 @@ expect_run_pass "test/cases/import_std_collections_additional.w"
 cat >"$tmpdir/additional_collections_extended_ok.w" <<'EOF1'
 use std.collections
 
-fn main() -> i32 =
+fn main -> i32:
     var sm = slotmap_new()
     let ins = slotmap_insert(sm, 99)
     sm = ins.0
@@ -72,47 +72,42 @@ fn main() -> i32 =
     bt = btree_insert(bt, "k", 8)
     assert(btree_len(bt) == 1)
     assert(btree_get(bt, "k").unwrap() == 8)
-    0
 EOF1
 expect_run_pass "$tmpdir/additional_collections_extended_ok.w"
 
 cat >"$tmpdir/additional_collections_slotmap_insert_type_fail.w" <<'EOF2'
 use std.collections
 
-fn main() -> i32 =
+fn main -> i32:
     var sm = slotmap_new()
     let _h = slotmap_insert(sm, "bad")
-    0
 EOF2
 expect_run_fail "$tmpdir/additional_collections_slotmap_insert_type_fail.w"
 
 cat >"$tmpdir/additional_collections_slotmap_get_handle_fail.w" <<'EOF3'
 use std.collections
 
-fn main() -> i32 =
+fn main -> i32:
     let sm = slotmap_new()
     let _v = slotmap_get(sm, 123)
-    0
 EOF3
 expect_run_fail "$tmpdir/additional_collections_slotmap_get_handle_fail.w"
 
 cat >"$tmpdir/additional_collections_btree_insert_arity_fail.w" <<'EOF4'
 use std.collections
 
-fn main() -> i32 =
+fn main -> i32:
     var bt = btree_new()
     btree_insert(bt, "x")
-    0
 EOF4
 expect_run_fail "$tmpdir/additional_collections_btree_insert_arity_fail.w"
 
 cat >"$tmpdir/additional_collections_btree_remove_type_fail.w" <<'EOF5'
 use std.collections
 
-fn main() -> i32 =
+fn main -> i32:
     var bt = btree_new()
     let _ok = btree_remove(bt, 12)
-    0
 EOF5
 expect_run_fail "$tmpdir/additional_collections_btree_remove_type_fail.w"
 

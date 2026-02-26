@@ -1,5 +1,5 @@
 // Test float casting
-fn main() -> i32 =
+fn main -> i32:
     let x: f64 = 3.14
     let y = x as i32
     println(y)
@@ -16,4 +16,3 @@ fn main() -> i32 =
     let f = e as f64
     let g = f as i32
     println(g)
-    0

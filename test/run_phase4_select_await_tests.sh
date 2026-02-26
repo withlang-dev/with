@@ -48,13 +48,13 @@ expect_run_pass "test/cases/select_await.w"
 expect_run_pass "test/cases/select_await_three.w"
 
 cat >"$tmpdir/select_await_first_ready_second_arm.w" <<'EOF1'
-async fn slow() -> i32 =
+async fn slow -> i32:
     let _ = (async: 0).await
     10
 
-async fn fast() -> i32 = 20
+async fn fast -> i32: 20
 
-fn main() -> i32 =
+fn main -> i32:
     let r = select await:
         a = slow() -> a
         b = fast() -> b
@@ -63,9 +63,9 @@ EOF1
 expect_run_pass "$tmpdir/select_await_first_ready_second_arm.w"
 
 cat >"$tmpdir/select_await_arm_binding_scope_fail.w" <<'EOF2'
-async fn work() -> i32 = 1
+async fn work -> i32: 1
 
-fn main() -> i32 =
+fn main -> i32:
     let v = select await:
         x = work() -> x
     x + v
@@ -73,7 +73,7 @@ EOF2
 expect_check_fail_msg "$tmpdir/select_await_arm_binding_scope_fail.w" "undefined variable"
 
 cat >"$tmpdir/select_await_non_task_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let r = select await:
         x = 123 -> x
     r
@@ -81,7 +81,7 @@ EOF3
 expect_check_fail_msg "$tmpdir/select_await_non_task_fail.w" "select await arm requires a Task value"
 
 cat >"$tmpdir/select_await_empty_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     select await:
 EOF4
 expect_check_fail_msg "$tmpdir/select_await_empty_fail.w" "select await requires at least one arm"

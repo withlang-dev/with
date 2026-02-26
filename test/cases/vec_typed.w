@@ -1,5 +1,5 @@
 // Test: Vec[T] with type annotation
-fn main() -> i32 =
+fn main -> i32:
     var v: Vec[i32] = Vec.new()
     assert(v.is_empty())
     assert(v.len() == 0)
@@ -21,4 +21,3 @@ fn main() -> i32 =
     let empty = v.pop()
     assert(empty.is_none())
 
-    0

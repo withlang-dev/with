@@ -46,12 +46,12 @@ cat >"$tmpdir/impl_extend_form_ok.w" <<'EOF1'
 type Counter = { value: i32 }
 
 extend Counter =
-    fn new(v: i32) -> Counter =
+    fn new(v: i32) -> Counter:
         Counter { value: v }
-    fn get(self: Counter) -> i32 =
+    fn get(self: Counter) -> i32:
         self.value
 
-fn main() -> i32 =
+fn main -> i32:
     let c = Counter.new(42)
     if c.get() == 42 then 0 else 1
 EOF1
@@ -64,10 +64,10 @@ trait Value =
 type Box = { v: i32 }
 
 impl Value for Box =
-    fn value(self: Box) -> i32 =
+    fn value(self: Box) -> i32:
         self.v
 
-fn main() -> i32 =
+fn main -> i32:
     let b = Box { v: 42 }
     if b.value() == 42 then 0 else 1
 EOF2
@@ -80,7 +80,7 @@ impl Broken =
     fn value(self: Broken) -> i32
         self.v
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF3
 expect_check_fail "$tmpdir/impl_missing_method_eq_fail.w"
 
@@ -89,10 +89,10 @@ trait Value =
     fn value(self: Self) -> i32
 
 impl Value for =
-    fn value(self: i32) -> i32 =
+    fn value(self: i32) -> i32:
         self
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF4
 expect_check_fail "$tmpdir/impl_trait_for_missing_type_fail.w"
 

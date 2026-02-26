@@ -8,17 +8,16 @@ trait Showable =
 type Item = { v: i32, label: str }
 
 impl Addable for Item =
-    fn add_val(self: Item) -> i32 = self.v
+    fn add_val(self: Item) -> i32: self.v
 
 impl Showable for Item =
-    fn show_val(self: Item) -> str = self.label
+    fn show_val(self: Item) -> str: self.label
 
-fn process[T](x: T) -> i32 where T: Addable + Showable =
+fn process[T](x: T) -> i32 where T: Addable + Showable:
     println(x.show_val())
     x.add_val()
 
-fn main() -> i32 =
+fn main -> i32:
     let item = Item { v: 42, label: "answer" }
     let result = process(item)
     println(result)
-    0

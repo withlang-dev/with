@@ -11,7 +11,7 @@ type Point = {
     y: i32 = 0
 }
 
-fn main() -> i32 =
+fn main -> i32:
     // All defaults
     let c1 = Config {}
     assert(c1.width == 800)
@@ -39,4 +39,3 @@ fn main() -> i32 =
     assert(p2.x == 10)
     assert(p2.y == 0)
 
-    0

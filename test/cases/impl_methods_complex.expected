@@ -1,0 +1,6 @@
+exit: 0
+stdout:
+all impl_methods_complex tests passed
+
+stderr:
+

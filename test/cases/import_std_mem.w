@@ -2,7 +2,7 @@
 use std.mem
 use std.fmt
 
-fn main() -> i32 =
+fn main -> i32:
     // Test memory allocation
     let buf = alloc(256)
     assert(buf != 0)

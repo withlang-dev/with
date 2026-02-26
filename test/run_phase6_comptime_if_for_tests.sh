@@ -45,31 +45,29 @@ expect_run_pass "test/cases/comptime_block.w"
 
 # Positive: compositional comptime-if + comptime-for.
 cat >"$tmpdir/comptime_if_for_combo_ok.w" <<'EOF1'
-fn sum_scaled() -> i32 =
+fn sum_scaled -> i32:
     var total = 0
     let scale = comptime if 3 > 1 then 2 else 5
     comptime for i in [1, 2, 3]:
         total = total + i * scale
     total
 
-fn main() -> i32 =
+fn main -> i32:
     assert(sum_scaled() == 12)
-    0
 EOF1
 expect_run_pass "$tmpdir/comptime_if_for_combo_ok.w"
 
 # Non-happy-path: comptime-for iterable must still be valid iterable expression.
 cat >"$tmpdir/comptime_for_non_iterable_fail.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     comptime for i in 1:
         let _ = i
-    0
 EOF2
 expect_run_fail "$tmpdir/comptime_for_non_iterable_fail.w"
 
 # Non-happy-path: malformed comptime-if expression should fail.
 cat >"$tmpdir/comptime_if_missing_else_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let x = comptime if true then 1
     x
 EOF3

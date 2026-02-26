@@ -1,0 +1,10 @@
+exit: 0
+stdout:
+100
+200
+3.14
+hello
+true
+
+stderr:
+

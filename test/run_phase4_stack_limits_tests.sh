@@ -41,9 +41,8 @@ expect_run_pass "test/cases/fiber_stack_limits.w"
 cat >"$tmpdir/fiber_stack_size_arity_fail.w" <<'EOF1'
 extern fn with_fiber_stack_size_bytes() -> i64
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = with_fiber_stack_size_bytes(1)
-    0
 EOF1
 expect_run_fail "$tmpdir/fiber_stack_size_arity_fail.w"
 

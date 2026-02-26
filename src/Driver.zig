@@ -5,6 +5,7 @@
 //! pool, diagnostics).
 
 const std = @import("std");
+const builtin = @import("builtin");
 const Source = @import("Source.zig");
 const Span = @import("Span.zig");
 const InternPool = @import("InternPool.zig");
@@ -260,7 +261,36 @@ fn linkWithExtraAndLibs(
     extra_objs: []const []const u8,
     link_libs: []const []const u8,
 ) !bool {
-    var args_buf: [64][]const u8 = undefined;
+    return linkArtifactWithExtraAndLibs(obj_path, bin_path, extra_objs, link_libs, .executable);
+}
+
+/// Link an object file into a shared library.
+pub fn linkShared(obj_path: []const u8, so_path: []const u8) !bool {
+    return linkSharedWithExtraAndLibs(obj_path, so_path, &.{}, &.{});
+}
+
+fn linkSharedWithExtraAndLibs(
+    obj_path: []const u8,
+    so_path: []const u8,
+    extra_objs: []const []const u8,
+    link_libs: []const []const u8,
+) !bool {
+    return linkArtifactWithExtraAndLibs(obj_path, so_path, extra_objs, link_libs, .shared);
+}
+
+const LinkArtifactMode = enum {
+    executable,
+    shared,
+};
+
+fn linkArtifactWithExtraAndLibs(
+    obj_path: []const u8,
+    out_path: []const u8,
+    extra_objs: []const []const u8,
+    link_libs: []const []const u8,
+    mode: LinkArtifactMode,
+) !bool {
+    var args_buf: [96][]const u8 = undefined;
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const arena_alloc = arena.allocator();
@@ -268,6 +298,18 @@ fn linkWithExtraAndLibs(
     var argc: usize = 0;
     args_buf[argc] = "cc";
     argc += 1;
+    if (mode == .shared) {
+        switch (builtin.os.tag) {
+            .macos, .ios, .tvos, .watchos, .visionos => {
+                args_buf[argc] = "-dynamiclib";
+                argc += 1;
+            },
+            else => {
+                args_buf[argc] = "-shared";
+                argc += 1;
+            },
+        }
+    }
     args_buf[argc] = obj_path;
     argc += 1;
     for (extra_objs) |extra| {
@@ -276,7 +318,7 @@ fn linkWithExtraAndLibs(
     }
     args_buf[argc] = "-o";
     argc += 1;
-    args_buf[argc] = bin_path;
+    args_buf[argc] = out_path;
     argc += 1;
     for (link_libs) |lib| {
         if (argc >= args_buf.len) return false;
@@ -374,6 +416,75 @@ pub fn buildBinary(self: *Driver, source_path: []const u8) !?[]const u8 {
     std.fs.cwd().deleteFile(obj_path) catch {};
 
     return bin_path;
+}
+
+/// Full pipeline: parse → codegen → link → shared library.
+/// output_stem should be a basename without extension (e.g., "cell_1").
+pub fn buildSharedLibrary(self: *Driver, source_path: []const u8, output_stem: []const u8) !?[]const u8 {
+    const module = try self.compileFile(source_path) orelse return null;
+    const dir = std.fs.path.dirname(source_path) orelse ".";
+
+    var obj_buf: [4096]u8 = undefined;
+    const obj_path = std.fmt.bufPrint(&obj_buf, "{s}/{s}.o", .{ dir, output_stem }) catch return null;
+    obj_buf[obj_path.len] = 0;
+
+    const lib_ext = sharedLibraryExt();
+    const so_path = std.fmt.allocPrint(self.arena.allocator(), "{s}/{s}.{s}", .{ dir, output_stem, lib_ext }) catch return null;
+
+    const uses_async = try self.compileToObject(&module, obj_buf[0..obj_path.len :0]);
+    if (uses_async == null) return null;
+
+    var link_libs: std.ArrayList([]const u8) = .empty;
+    var link_libs_it = self.c_import_link_libs.iterator();
+    while (link_libs_it.next()) |entry| {
+        link_libs.append(self.arena.allocator(), self.pool.resolve(entry.key_ptr.*)) catch return null;
+    }
+
+    const exe_dir = self.findExeDir();
+
+    var helpers_buf: [4096]u8 = undefined;
+    const helpers_path = if (exe_dir) |ed|
+        std.fmt.bufPrint(&helpers_buf, "{s}/runtime/helpers.o", .{ed}) catch null
+    else
+        null;
+
+    const link_ok = if (uses_async.?) blk: {
+        const ed = exe_dir orelse {
+            if (helpers_path) |hp| {
+                break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{hp}, link_libs.items);
+            }
+            break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{}, link_libs.items);
+        };
+        var rt1_buf: [4096]u8 = undefined;
+        var rt2_buf: [4096]u8 = undefined;
+        const rt1 = std.fmt.bufPrint(&rt1_buf, "{s}/runtime/fiber.o", .{ed}) catch break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{}, link_libs.items);
+        const rt2 = std.fmt.bufPrint(&rt2_buf, "{s}/runtime/fiber_asm.o", .{ed}) catch break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{}, link_libs.items);
+        if (helpers_path) |hp| {
+            break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{ rt1, rt2, hp }, link_libs.items);
+        }
+        break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{ rt1, rt2 }, link_libs.items);
+    } else blk: {
+        if (helpers_path) |hp| {
+            break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{hp}, link_libs.items);
+        }
+        break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{}, link_libs.items);
+    };
+
+    if (!link_ok) {
+        self.writeStderr("error: shared library linking failed\n");
+        return null;
+    }
+
+    std.fs.cwd().deleteFile(obj_path) catch {};
+    return so_path;
+}
+
+fn sharedLibraryExt() []const u8 {
+    return switch (builtin.os.tag) {
+        .windows => "dll",
+        .macos, .ios, .tvos, .watchos, .visionos => "dylib",
+        else => "so",
+    };
 }
 
 /// Find the directory containing the compiler executable (for runtime objects).

@@ -1,4 +1,4 @@
-fn main() -> i32 =
+fn main -> i32:
     var x: i32 = 10
     x += 20
     x -= 3
@@ -6,4 +6,3 @@ fn main() -> i32 =
     x /= 3
     x %= 10
     assert(x == 8)
-    0

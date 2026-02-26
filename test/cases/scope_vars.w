@@ -1,4 +1,4 @@
-fn main() -> i32 =
+fn main -> i32:
     let x = 10
     let result = if x > 5:
         let y = x * 2
@@ -6,4 +6,3 @@ fn main() -> i32 =
     else
         0
     println(result)
-    0

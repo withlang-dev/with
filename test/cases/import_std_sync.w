@@ -1,7 +1,7 @@
 // Test: std.sync import
 use std.sync
 
-fn main() -> i32 =
+fn main -> i32:
     var m = mutex_new(10)
     assert(mutex_get(m) == 10)
     mutex_set(&mut m, 42)
@@ -18,4 +18,3 @@ fn main() -> i32 =
     var b = atomic_new(1)
     atomic_store(&mut b, 7)
     assert(atomic_load(b) == 7)
-    0

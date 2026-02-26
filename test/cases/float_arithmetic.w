@@ -1,5 +1,5 @@
 // Test: comprehensive float operations (f32/f64, arithmetic, casting)
-fn main() -> i32 =
+fn main -> i32:
     // basic f64 arithmetic
     let a = 3.14
     let b = 2.0
@@ -41,4 +41,3 @@ fn main() -> i32 =
     assert(big as i32 == 1234)
 
     println("all float arithmetic tests passed")
-    0

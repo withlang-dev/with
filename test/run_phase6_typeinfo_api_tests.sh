@@ -41,7 +41,7 @@ cat >"$tmpdir/typeinfo_non_generic_ok.w" <<'EOF1'
 type Point = { x: i32, y: i32 }
 type Color = Red | Green | Blue
 
-fn main() -> i32 =
+fn main -> i32:
     assert(TypeInfo.fields(Point).len() == 2)
     assert(TypeInfo.variants(Color).len() == 3)
     assert(TypeInfo.name(i32) == "i32")
@@ -49,7 +49,6 @@ fn main() -> i32 =
     assert(TypeInfo.align(Point) > 0)
     assert(TypeInfo.is_copy(i32))
     assert(not TypeInfo.implements(Point, Point))
-    0
 EOF1
 expect_run_pass "$tmpdir/typeinfo_non_generic_ok.w"
 
@@ -57,11 +56,10 @@ expect_run_pass "$tmpdir/typeinfo_non_generic_ok.w"
 cat >"$tmpdir/typeinfo_parity_ok.w" <<'EOF2'
 type Pair = { a: i32, b: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     assert(TypeInfo.fields(Pair).len() == Pair.fields().len())
     assert(TypeInfo.size(Pair) == Pair.size())
     assert(TypeInfo.align(Pair) == Pair.align())
-    0
 EOF2
 expect_run_pass "$tmpdir/typeinfo_parity_ok.w"
 
@@ -69,10 +67,9 @@ expect_run_pass "$tmpdir/typeinfo_parity_ok.w"
 cat >"$tmpdir/typeinfo_value_receiver_fail.w" <<'EOF3'
 type Point = { x: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let p = Point { x: 1 }
     let _ = TypeInfo.fields(p)
-    0
 EOF3
 expect_run_fail "$tmpdir/typeinfo_value_receiver_fail.w"
 
@@ -80,9 +77,8 @@ expect_run_fail "$tmpdir/typeinfo_value_receiver_fail.w"
 cat >"$tmpdir/typeinfo_arity_fail.w" <<'EOF4'
 type Point = { x: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let _ = TypeInfo.size()
-    0
 EOF4
 expect_run_fail "$tmpdir/typeinfo_arity_fail.w"
 

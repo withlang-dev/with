@@ -37,14 +37,14 @@ trait Score =
 type Box = { v: i32 }
 
 impl Score for Box =
-    fn value(self: Box) -> bool =
+    fn value(self: Box) -> bool:
         true
 
 impl Box =
-    fn value(self: Box) -> i32 =
+    fn value(self: Box) -> i32:
         self.v + 2
 
-fn main() -> i32 =
+fn main -> i32:
     let b = Box { v: 0 }
     let a = b.value()
     let c = Box.value(b)
@@ -60,14 +60,14 @@ trait Measure =
 type Item = { v: i32 }
 
 impl Item =
-    fn score(self: Item) -> i32 =
+    fn score(self: Item) -> i32:
         self.v + 7
 
 impl Measure for Item =
-    fn score(self: Item) -> bool =
+    fn score(self: Item) -> bool:
         false
 
-fn main() -> i32 =
+fn main -> i32:
     let it = Item { v: 1 }
     let a = it.score()
     let b = Item.score(it)
@@ -83,10 +83,10 @@ trait Eval =
 type Node = { v: i32 }
 
 impl Eval for Node =
-    fn score(self: Node) -> i32 =
+    fn score(self: Node) -> i32:
         self.v + 1
 
-fn main() -> i32 =
+fn main -> i32:
     let n = Node { v: 4 }
     if n.score() == 5 then 0 else 1
 EOF3

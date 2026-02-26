@@ -1,4 +1,4 @@
-fn main() -> i32 =
+fn main -> i32:
     var total = 0
     var i = 0
     while i < 3
@@ -8,4 +8,3 @@ fn main() -> i32 =
             j = j + 1
         i = i + 1
     println(total)
-    0

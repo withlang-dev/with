@@ -1,0 +1,11 @@
+exit: 0
+stdout:
+13
+true
+true
+true
+HELLO, WORLD!
+hello, world!
+
+stderr:
+

@@ -1,5 +1,5 @@
 // Test: slice type and array slicing
-fn main() -> i32 =
+fn main -> i32:
     let arr = [10, 20, 30, 40, 50]
     let s: []i32 = arr[1..4]
     assert(s.len == 3)
@@ -19,4 +19,3 @@ fn main() -> i32 =
         sum += v
     assert(sum == 90)
 
-    0

@@ -1,4 +1,4 @@
-fn main() -> i32 =
+fn main -> i32:
     let mut sum = 0
     for i in 0..10:
         sum = sum + i
@@ -8,4 +8,3 @@ fn main() -> i32 =
     for i in 0..5:
         count = count + 1
     println(count)
-    0

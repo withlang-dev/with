@@ -47,19 +47,18 @@ expect_check_fail_msg() {
 expect_run_pass "test/cases/channels.w"
 
 cat >"$tmpdir/channel_bounded_capacity_one.w" <<'EOF1'
-async fn producer(ch: i64) -> i32 =
+async fn producer(ch: i64) -> i32:
     send(ch, 1)
     send(ch, 2)
     send(ch, 3)
-    0
 
-async fn consumer(ch: i64) -> i32 =
+async fn consumer(ch: i64) -> i32:
     let a = recv(ch)
     let b = recv(ch)
     let c = recv(ch)
     a + b + c
 
-fn main() -> i32 =
+fn main -> i32:
     let ch = Channel(1)
     let p = producer(ch)
     let c = consumer(ch)
@@ -70,14 +69,13 @@ EOF1
 expect_run_pass "$tmpdir/channel_bounded_capacity_one.w"
 
 cat >"$tmpdir/channel_unbounded_growth.w" <<'EOF2'
-async fn produce(ch: i64, n: i32) -> i32 =
+async fn produce(ch: i64, n: i32) -> i32:
     var i: i32 = 1
     while i <= n:
         send(ch, i)
         i = i + 1
-    0
 
-fn main() -> i32 =
+fn main -> i32:
     let n = 600
     let ch = Channel(0)
     let p = produce(ch, n)
@@ -94,7 +92,7 @@ EOF2
 expect_run_pass "$tmpdir/channel_unbounded_growth.w"
 
 cat >"$tmpdir/channel_close_empty_recv.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let ch = Channel(2)
     close(ch)
     let v = recv(ch)
@@ -103,7 +101,7 @@ EOF3
 expect_run_pass "$tmpdir/channel_close_empty_recv.w"
 
 cat >"$tmpdir/channel_close_drains_then_sentinel.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let ch = Channel(2)
     send(ch, 7)
     close(ch)
@@ -114,22 +112,20 @@ EOF4
 expect_run_pass "$tmpdir/channel_close_drains_then_sentinel.w"
 
 cat >"$tmpdir/channel_mpmc_two_by_two.w" <<'EOF5'
-async fn p1(ch: i64) -> i32 =
+async fn p1(ch: i64) -> i32:
     send(ch, 1)
     send(ch, 2)
-    0
 
-async fn p2(ch: i64) -> i32 =
+async fn p2(ch: i64) -> i32:
     send(ch, 3)
     send(ch, 4)
-    0
 
-async fn csum2(ch: i64) -> i32 =
+async fn csum2(ch: i64) -> i32:
     let a = recv(ch)
     let b = recv(ch)
     a + b
 
-fn main() -> i32 =
+fn main -> i32:
     let ch = Channel(2)
     let a = p1(ch)
     let b = p2(ch)
@@ -146,41 +142,36 @@ EOF5
 expect_run_pass "$tmpdir/channel_mpmc_two_by_two.w"
 
 cat >"$tmpdir/channel_capacity_type_fail.w" <<'EOF6'
-fn main() -> i32 =
+fn main -> i32:
     let _ = Channel("oops")
-    0
 EOF6
 expect_check_fail_msg "$tmpdir/channel_capacity_type_fail.w" "Channel() capacity must be an integer"
 
 cat >"$tmpdir/channel_send_arity_fail.w" <<'EOF7'
-fn main() -> i32 =
+fn main -> i32:
     let ch = Channel(2)
     send(ch)
-    0
 EOF7
 expect_check_fail_msg "$tmpdir/channel_send_arity_fail.w" "send() expects exactly two arguments"
 
 cat >"$tmpdir/channel_recv_arity_fail.w" <<'EOF8'
-fn main() -> i32 =
+fn main -> i32:
     let ch = Channel(2)
     recv(ch, 1)
-    0
 EOF8
 expect_check_fail_msg "$tmpdir/channel_recv_arity_fail.w" "recv() expects exactly one argument"
 
 cat >"$tmpdir/channel_close_arity_fail.w" <<'EOF9'
-fn main() -> i32 =
+fn main -> i32:
     let ch = Channel(2)
     close(ch, 1)
-    0
 EOF9
 expect_check_fail_msg "$tmpdir/channel_close_arity_fail.w" "close() expects exactly one argument"
 
 cat >"$tmpdir/channel_send_payload_type_fail.w" <<'EOF10'
-fn main() -> i32 =
+fn main -> i32:
     let ch = Channel(2)
     send(ch, "text")
-    0
 EOF10
 expect_check_fail_msg "$tmpdir/channel_send_payload_type_fail.w" "send() currently supports integer payloads"
 

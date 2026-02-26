@@ -36,7 +36,7 @@ expect_check_fail() {
 cat >"$tmpdir/if_let_basic_ok.w" <<'EOF1'
 type Shape = Circle(i32) | Square(i32) | Point
 
-fn area(s: Shape) -> i32 =
+fn area(s: Shape) -> i32:
     if let Circle(r) = s:
         r * r
     else
@@ -45,7 +45,7 @@ fn area(s: Shape) -> i32 =
         else
             0
 
-fn main() -> i32 =
+fn main -> i32:
     if area(Circle(3)) == 9 and area(Square(4)) == 16 and area(Point) == 0 then 0 else 1
 EOF1
 expect_run_pass "$tmpdir/if_let_basic_ok.w"
@@ -53,7 +53,7 @@ expect_run_pass "$tmpdir/if_let_basic_ok.w"
 cat >"$tmpdir/if_let_no_else_ok.w" <<'EOF2'
 type Flag = On | Off
 
-fn main() -> i32 =
+fn main -> i32:
     let v = if let On = On:
         7
     v - 7
@@ -63,7 +63,7 @@ expect_run_pass "$tmpdir/if_let_no_else_ok.w"
 cat >"$tmpdir/if_let_bad_pattern_fail.w" <<'EOF3'
 type Shape = Circle(i32) | Point
 
-fn main() -> i32 =
+fn main -> i32:
     let _v = if let Circle(a, b) = Circle(1):
         a + b
     else
@@ -75,7 +75,7 @@ expect_check_fail "$tmpdir/if_let_bad_pattern_fail.w"
 cat >"$tmpdir/if_let_syntax_fail.w" <<'EOF4'
 type Shape = Circle(i32) | Point
 
-fn main() -> i32 =
+fn main -> i32:
     let _v = if let Circle(x) Circle(1):
         x
     else

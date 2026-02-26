@@ -49,11 +49,10 @@ cat >"$tmpdir/generated_pipeline_positive.w" <<'EOF1'
 @[derive(Eq, Clone)]
 type Pair = { a: i32, b: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let p = Pair { a: 1, b: 2 }
     let q = p.clone()
     assert(p == q)
-    0
 EOF1
 expect_run_pass "$tmpdir/generated_pipeline_positive.w"
 
@@ -62,7 +61,7 @@ cat >"$tmpdir/generated_pipeline_eq_fail.w" <<'EOF2'
 @[derive(Eq)]
 type Bad = { items: Vec[i32] }
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF2
 expect_check_fail_msg "$tmpdir/generated_pipeline_eq_fail.w" "cannot derive Eq"
 
@@ -71,10 +70,9 @@ cat >"$tmpdir/generated_pipeline_clone_fail.w" <<'EOF3'
 @[derive(Clone)]
 type BadFn = { f: fn(i32) -> i32 }
 
-fn id(x: i32) -> i32 = x
-fn main() -> i32 =
+fn id(x: i32) -> i32: x
+fn main -> i32:
     let _ = BadFn { f: id }
-    0
 EOF3
 expect_check_fail_msg "$tmpdir/generated_pipeline_clone_fail.w" "cannot derive Clone"
 

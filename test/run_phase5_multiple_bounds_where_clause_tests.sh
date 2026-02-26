@@ -62,17 +62,17 @@ trait B =
 type X = { v: i32 }
 
 impl A for X =
-    fn a(self: X) -> i32 =
+    fn a(self: X) -> i32:
         self.v
 
 impl B for X =
-    fn b(self: X) -> i32 =
+    fn b(self: X) -> i32:
         self.v + 1
 
-fn sum_ab[T: A](x: T) -> i32 where T: B =
+fn sum_ab[T: A](x: T) -> i32 where T: B:
     x.a() + x.b()
 
-fn main() -> i32 =
+fn main -> i32:
     let x = X { v: 5 }
     if sum_ab(x) == 11 then 0 else 1
 EOF1
@@ -89,13 +89,13 @@ trait B =
 type OnlyA = { v: i32 }
 
 impl A for OnlyA =
-    fn a(self: OnlyA) -> i32 =
+    fn a(self: OnlyA) -> i32:
         self.v
 
-fn use_ab[T: A + B](x: T) -> i32 =
+fn use_ab[T: A + B](x: T) -> i32:
     x.a()
 
-fn main() -> i32 =
+fn main -> i32:
     let x = OnlyA { v: 1 }
     use_ab(x)
 EOF2
@@ -103,10 +103,10 @@ expect_check_fail_msg "$tmpdir/multi_bound_missing_trait_fail.w" "does not imple
 
 # Malformed where-clause bound syntax must fail.
 cat >"$tmpdir/where_malformed_bound_fail.w" <<'EOF3'
-fn bad[T](x: T) -> i32 where T: =
+fn bad[T](x: T) -> i32 where T::
     0
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF3
 expect_check_fail_msg "$tmpdir/where_malformed_bound_fail.w" "expected type bound name"
 
@@ -115,10 +115,10 @@ cat >"$tmpdir/where_unknown_type_param_fail.w" <<'EOF4'
 trait A =
     fn a(self: Self) -> i32
 
-fn bad[T](x: T) -> i32 where U: A =
+fn bad[T](x: T) -> i32 where U: A:
     0
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF4
 expect_check_fail_msg "$tmpdir/where_unknown_type_param_fail.w" "where clause references unknown type parameter"
 

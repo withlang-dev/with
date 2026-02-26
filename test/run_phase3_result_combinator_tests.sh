@@ -56,16 +56,16 @@ expect_run_pass "test/cases/result_combinators.w"
 expect_run_pass "test/cases/import_std_result.w"
 
 cat >"$tmpdir/result_combinator_extended_ok.w" <<'EOF1'
-fn plus_one(x: i32) -> Result[i32, i32] =
+fn plus_one(x: i32) -> Result[i32, i32]:
     Ok(x + 1)
 
-fn fail_if_odd(x: i32) -> Result[i32, i32] =
+fn fail_if_odd(x: i32) -> Result[i32, i32]:
     if x % 2 == 1 then Err(77) else Ok(x)
 
-fn widen_err(e: i32) -> Result[i32, i64] =
+fn widen_err(e: i32) -> Result[i32, i64]:
     Err(1000 + e)
 
-fn main() -> i32 =
+fn main -> i32:
     let a: Result[i32, i32] = Ok(10)
     let b = a.and_then(plus_one)
     assert(b.unwrap_or(0) == 11)
@@ -93,49 +93,44 @@ fn main() -> i32 =
     let i: Result[?i32, str] = Err("bad")
     let it = i.transpose()
     assert(it.is_some())
-    0
 EOF1
 expect_run_pass "$tmpdir/result_combinator_extended_ok.w"
 
 cat >"$tmpdir/result_or_else_bad_ok_type_fail.w" <<'EOF2'
-fn bad(e: i32) -> Result[str, i32] =
+fn bad(e: i32) -> Result[str, i32]:
     let _x = e
     Ok("x")
 
-fn main() -> i32 =
+fn main -> i32:
     let a: Result[i32, i32] = Err(1)
     let _b = a.or_else(bad)
-    0
 EOF2
 expect_run_fail "$tmpdir/result_or_else_bad_ok_type_fail.w"
 
 cat >"$tmpdir/result_and_then_bad_return_fail.w" <<'EOF3'
-fn bad(x: i32) -> ?i32 =
+fn bad(x: i32) -> ?i32:
     Some(x)
 
-fn main() -> i32 =
+fn main -> i32:
     let a: Result[i32, i32] = Ok(1)
     let _b = a.and_then(bad)
-    0
 EOF3
 expect_run_fail "$tmpdir/result_and_then_bad_return_fail.w"
 
 cat >"$tmpdir/result_transpose_bad_receiver_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let a: Result[i32, i32] = Ok(1)
     let _b = a.transpose()
-    0
 EOF4
 expect_run_fail "$tmpdir/result_transpose_bad_receiver_fail.w"
 
 cat >"$tmpdir/result_map_err_on_option_fail.w" <<'EOF5'
-fn id(x: i32) -> i32 =
+fn id(x: i32) -> i32:
     x
 
-fn main() -> i32 =
+fn main -> i32:
     let a: ?i32 = Some(1)
     let _b = a.map_err(id)
-    0
 EOF5
 expect_run_fail "$tmpdir/result_map_err_on_option_fail.w"
 

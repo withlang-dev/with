@@ -4,26 +4,26 @@
 type Point = { x: i32, y: i32 }
 
 impl Point =
-    fn new(x: i32, y: i32) -> Point = Point { x, y }
-    fn distance_sq(self: Point) -> i32 = self.x * self.x + self.y * self.y
+    fn new(x: i32, y: i32) -> Point: Point { x, y }
+    fn distance_sq(self: Point) -> i32: self.x * self.x + self.y * self.y
 
 trait HasArea =
     fn area(self: Self) -> i32
 
 type Shape = Circle(i32) | Square(i32)
 
-fn shape_area(s: Shape) -> i32 =
+fn shape_area(s: Shape) -> i32:
     match s
         Circle(r) -> r * r * 3
         Square(side) -> side * side
 
-fn double(x: i32) -> i32 = x * 2
-fn add10(x: i32) -> i32 = x + 10
+fn double(x: i32) -> i32: x * 2
+fn add10(x: i32) -> i32: x + 10
 
-fn safe_div(a: i32, b: i32) -> Result[i32, str] =
+fn safe_div(a: i32, b: i32) -> Result[i32, str]:
     if b == 0 then Err("div by zero") else Ok(a / b)
 
-fn main() -> i32 =
+fn main -> i32:
     // Structs with methods
     let p = Point.new(3, 4)
     assert(p.distance_sq() == 25)
@@ -61,6 +61,5 @@ fn main() -> i32 =
     assert(sum == 45)
 
     println("all showcase2 tests passed")
-    0
 
-fn id[T](x: T) -> T = x
+fn id[T](x: T) -> T: x

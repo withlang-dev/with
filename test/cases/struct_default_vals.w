@@ -4,7 +4,7 @@ type Config = {
     title: str = "untitled"
 }
 
-fn main() -> i32 =
+fn main -> i32:
     let c = Config {}
     println(c.width)
     println(c.height)
@@ -12,4 +12,3 @@ fn main() -> i32 =
     let c2 = Config { width: 100 }
     println(c2.width)
     println(c2.height)
-    0

@@ -34,23 +34,23 @@ expect_run_fail() {
 }
 
 cat >"$tmpdir/default_early_return_ok.w" <<'EOF1'
-fn get(flag: bool) -> ?i32 =
+fn get(flag: bool) -> ?i32:
     if flag then Some(5) else None
 
-fn value(flag: bool) -> i32 =
+fn value(flag: bool) -> i32:
     let x = get(flag) ?? return 9
     x
 
-fn main() -> i32 =
+fn main -> i32:
     if value(true) == 5 and value(false) == 9 then 0 else 1
 EOF1
 expect_run_pass "$tmpdir/default_early_return_ok.w"
 
 cat >"$tmpdir/default_early_continue_break_ok.w" <<'EOF2'
-fn pick(i: i32) -> ?i32 =
+fn pick(i: i32) -> ?i32:
     if i % 2 == 0 then Some(i) else None
 
-fn main() -> i32 =
+fn main -> i32:
     var sum = 0
     for i in 0..6:
         let v = pick(i) ?? continue
@@ -61,29 +61,27 @@ EOF2
 expect_run_pass "$tmpdir/default_early_continue_break_ok.w"
 
 cat >"$tmpdir/default_early_result_return_ok.w" <<'EOF3'
-fn parse(flag: bool) -> Result[i32, i32] =
+fn parse(flag: bool) -> Result[i32, i32]:
     if flag then Ok(7) else Err(1)
 
-fn unwrap_or_return(flag: bool) -> i32 =
+fn unwrap_or_return(flag: bool) -> i32:
     let v = parse(flag) ?? return 11
     v
 
-fn main() -> i32 =
+fn main -> i32:
     if unwrap_or_return(true) == 7 and unwrap_or_return(false) == 11 then 0 else 1
 EOF3
 expect_run_pass "$tmpdir/default_early_result_return_ok.w"
 
 cat >"$tmpdir/default_early_continue_outside_loop_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let _x = None ?? continue
-    0
 EOF4
 expect_run_fail "$tmpdir/default_early_continue_outside_loop_fail.w"
 
 cat >"$tmpdir/default_early_break_outside_loop_fail.w" <<'EOF5'
-fn main() -> i32 =
+fn main -> i32:
     let _x = None ?? break
-    0
 EOF5
 expect_run_fail "$tmpdir/default_early_break_outside_loop_fail.w"
 

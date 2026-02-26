@@ -19,19 +19,19 @@ type Vec2 = {
 }
 
 extend Vec2 =
-    fn new(x: f64, y: f64) -> Vec2 =
+    fn new(x: f64, y: f64) -> Vec2:
         Vec2 { x: x, y: y }
 
-    fn zero() -> Vec2 =
+    fn zero -> Vec2:
         Vec2 { x: 0.0, y: 0.0 }
 
-    fn add(self: Vec2, other: Vec2) -> Vec2 =
+    fn add(self: Vec2, other: Vec2) -> Vec2:
         Vec2 { x: self.x + other.x, y: self.y + other.y }
 
-    fn scale(self: Vec2, s: f64) -> Vec2 =
+    fn scale(self: Vec2, s: f64) -> Vec2:
         Vec2 { x: self.x * s, y: self.y * s }
 
-    fn length_sq(self: Vec2) -> f64 =
+    fn length_sq(self: Vec2) -> f64:
         self.x * self.x + self.y * self.y
 
 // --- Components ---
@@ -72,18 +72,18 @@ type Entity = {
 
 // --- World (simplified: fixed-size arrays) ---
 
-fn make_entity(id: i32) -> Entity =
+fn make_entity(id: i32) -> Entity:
     Entity { id: id, generation: 1 }
 
-fn make_transform(x: f64, y: f64) -> Transform =
+fn make_transform(x: f64, y: f64) -> Transform:
     Transform { x: x, y: y, rotation: 0.0, scale_val: 1.0 }
 
-fn make_velocity(vx: f64, vy: f64) -> Velocity =
+fn make_velocity(vx: f64, vy: f64) -> Velocity:
     Velocity { vx: vx, vy: vy, angular: 0.0 }
 
 // --- Systems ---
 
-fn apply_velocity(t: Transform, v: Velocity, dt: f64) -> Transform =
+fn apply_velocity(t: Transform, v: Velocity, dt: f64) -> Transform:
     Transform {
         x: t.x + v.vx * dt,
         y: t.y + v.vy * dt,
@@ -91,7 +91,7 @@ fn apply_velocity(t: Transform, v: Velocity, dt: f64) -> Transform =
         scale_val: t.scale_val,
     }
 
-fn check_collision(t1: Transform, c1: Collider, t2: Transform, c2: Collider) -> bool =
+fn check_collision(t1: Transform, c1: Collider, t2: Transform, c2: Collider) -> bool:
     let dx = t1.x - t2.x
     let dy = t1.y - t2.y
     let dist_sq = dx * dx + dy * dy
@@ -100,20 +100,20 @@ fn check_collision(t1: Transform, c1: Collider, t2: Transform, c2: Collider) -> 
 
 // --- Generic utility ---
 
-fn max[T](a: T, b: T) -> T =
+fn max[T](a: T, b: T) -> T:
     if a > b then a else b
 
-fn min[T](a: T, b: T) -> T =
+fn min[T](a: T, b: T) -> T:
     if a < b then a else b
 
-fn clamp[T](val: T, lo: T, hi: T) -> T =
+fn clamp[T](val: T, lo: T, hi: T) -> T:
     min(max(val, lo), hi)
 
 // --- Input ---
 
 type InputDir = None | Up | Down | Left | Right
 
-fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity =
+fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity:
     match dir
         None -> make_velocity(0.0, 0.0)
         Up -> make_velocity(0.0, 0.0 - speed)
@@ -123,7 +123,7 @@ fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity =
 
 // --- Main ---
 
-fn main() -> i32 =
+fn main -> i32:
     println("=== ECS Demo ===")
 
     // Create entities
@@ -191,4 +191,3 @@ fn main() -> i32 =
     println("Vec2 length_sq: {len_sq:.1}")
 
     println("=== Demo complete ===")
-    0

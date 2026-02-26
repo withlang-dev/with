@@ -38,10 +38,10 @@ test "check facade validates well-typed module" {
     defer arena.deinit();
 
     var module = try parseModule(
-        \\fn add(a: i32, b: i32) -> i32 =
+        \\fn add(a: i32, b: i32) -> i32:
         \\    a + b
         \\
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    add(1, 2)
         \\
     , arena.allocator(), &diags, &pool);
@@ -60,7 +60,7 @@ test "check facade reports type mismatch" {
     defer arena.deinit();
 
     var module = try parseModule(
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    missing_name
         \\
     , arena.allocator(), &diags, &pool);

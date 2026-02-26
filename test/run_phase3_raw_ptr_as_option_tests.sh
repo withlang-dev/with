@@ -42,7 +42,7 @@ expect_run_pass "test/cases/p3_raw_ptr_as_option.w"
 cat >"$tmpdir/raw_ptr_as_option_extra_ok.w" <<'EOF1'
 use c_import("#include <stdlib.h>")
 
-fn main() -> i32 =
+fn main -> i32:
     let p1 = malloc(8)
     let o1 = p1.as_option()
     assert(o1.is_some())
@@ -57,17 +57,16 @@ EOF1
 expect_run_pass "$tmpdir/raw_ptr_as_option_extra_ok.w"
 
 cat >"$tmpdir/raw_ptr_as_option_non_ptr_fail.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     let x = 123
     let _o = x.as_option()
-    0
 EOF2
 expect_run_fail "$tmpdir/raw_ptr_as_option_non_ptr_fail.w"
 
 cat >"$tmpdir/raw_ptr_as_option_arity_fail.w" <<'EOF3'
 use c_import("#include <stdlib.h>")
 
-fn main() -> i32 =
+fn main -> i32:
     let p = malloc(8)
     let _o = p.as_option(1)
     free(p)

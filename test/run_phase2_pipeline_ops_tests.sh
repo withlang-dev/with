@@ -34,11 +34,11 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/pipeline_forward_ok.w" <<'EOF1'
-fn inc(x: i32) -> i32 = x + 1
-fn add(a: i32, b: i32) -> i32 = a + b
-fn mul(a: i32, b: i32) -> i32 = a * b
+fn inc(x: i32) -> i32: x + 1
+fn add(a: i32, b: i32) -> i32: a + b
+fn mul(a: i32, b: i32) -> i32: a * b
 
-fn main() -> i32 =
+fn main -> i32:
     let a = 5 |> inc
     let b = 4 |> add(3)
     let c = 3 |> add(2) |> mul(4)
@@ -47,19 +47,19 @@ EOF1
 expect_run_pass "$tmpdir/pipeline_forward_ok.w"
 
 cat >"$tmpdir/pipeline_backward_apply_ok.w" <<'EOF2'
-fn inc(x: i32) -> i32 = x + 1
+fn inc(x: i32) -> i32: x + 1
 
-fn main() -> i32 =
+fn main -> i32:
     let out = inc <| 41
     if out == 42 then 0 else 1
 EOF2
 expect_run_pass "$tmpdir/pipeline_backward_apply_ok.w"
 
 cat >"$tmpdir/pipeline_compose_ok.w" <<'EOF3'
-fn double(x: i32) -> i32 = x * 2
-fn add1(x: i32) -> i32 = x + 1
+fn double(x: i32) -> i32: x * 2
+fn add1(x: i32) -> i32: x + 1
 
-fn main() -> i32 =
+fn main -> i32:
     let f = double >> add1
     let g = add1 << double
     if f(5) == 11 and g(5) == 11 then 0 else 1
@@ -67,9 +67,8 @@ EOF3
 expect_run_pass "$tmpdir/pipeline_compose_ok.w"
 
 cat >"$tmpdir/pipeline_bad_rhs_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let _bad = 1 |> 2
-    0
 EOF4
 expect_check_fail "$tmpdir/pipeline_bad_rhs_fail.w"
 

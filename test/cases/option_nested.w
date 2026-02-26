@@ -1,15 +1,15 @@
 // Test nested option operations
-fn find_positive(x: i32) -> ?i32 =
+fn find_positive(x: i32) -> ?i32:
     if x > 0 then Some(x)
     else None
 
-fn double_positive(x: i32) -> ?i32 =
+fn double_positive(x: i32) -> ?i32:
     let opt = find_positive(x)
     match opt
         Some(v) -> Some(v * 2)
         None -> None
 
-fn main() -> i32 =
+fn main -> i32:
     match double_positive(5)
         Some(v) -> println(v)
         None -> println(0)
@@ -24,4 +24,3 @@ fn main() -> i32 =
 
     let b = find_positive(-5) ?? 99
     println(b)
-    0

@@ -322,11 +322,8 @@ fn runRepl(allocator: std.mem.Allocator) !void {
     try writer_iface.writeAll("With REPL v0.0.1 - type expressions or :quit to exit\n");
     try out.interface.flush();
 
-    var lines: std.ArrayList([]const u8) = .empty;
-    defer {
-        for (lines.items) |line| allocator.free(line);
-        lines.deinit(allocator);
-    }
+    var repl_state = ReplState.init();
+    defer repl_state.deinit(allocator);
 
     var line_buf: [4096]u8 = undefined;
 
@@ -350,8 +347,7 @@ fn runRepl(allocator: std.mem.Allocator) !void {
         if (line.len == 0) continue;
         if (std.mem.eql(u8, line, ":quit") or std.mem.eql(u8, line, ":q")) break;
         if (std.mem.eql(u8, line, ":clear")) {
-            for (lines.items) |l| allocator.free(l);
-            lines.clearRetainingCapacity();
+            repl_state.clear(allocator);
             try writer_iface.writeAll("(cleared)\n");
             try out.interface.flush();
             continue;
@@ -374,9 +370,8 @@ fn runRepl(allocator: std.mem.Allocator) !void {
 
         // Determine whether this line should be persisted as REPL state.
         const trimmed = std.mem.trimLeft(u8, line, " \t");
-        const is_binding = std.mem.startsWith(u8, trimmed, "let ") or
-            std.mem.startsWith(u8, trimmed, "var ") or
-            std.mem.startsWith(u8, trimmed, "fn ") or
+        const is_binding = std.mem.startsWith(u8, trimmed, "let ") or std.mem.startsWith(u8, trimmed, "var ");
+        const is_module_decl = std.mem.startsWith(u8, trimmed, "fn ") or
             std.mem.startsWith(u8, trimmed, "type ") or
             std.mem.startsWith(u8, trimmed, "use ") or
             std.mem.startsWith(u8, trimmed, "c_import(");
@@ -384,26 +379,27 @@ fn runRepl(allocator: std.mem.Allocator) !void {
 
         // For declarations and likely stateful statements, execute as a statement
         // first so side effects are persisted consistently.
-        if (is_binding or is_stateful_stmt) {
-            if (try executeReplLine(allocator, lines.items, line, .statement)) {
-                const saved = try allocator.dupe(u8, line);
-                try lines.append(allocator, saved);
+        if (is_module_decl or is_binding or is_stateful_stmt) {
+            const persist_kind: ReplPersistKind = if (is_module_decl) .module_decl else .body_stmt;
+            if (try executeReplLine(allocator, &repl_state, line, .statement, persist_kind)) {
+                const cell_id = repl_state.lastLoadedCellId() orelse 0;
+                try repl_state.persistLine(allocator, line, persist_kind, cell_id);
                 continue;
             }
             // Bindings are never treated as printable expressions.
-            if (is_binding) continue;
+            if (is_binding or is_module_decl) continue;
         }
 
         // Try expression mode (println wrapper) for query-like lines.
-        if (try executeReplLine(allocator, lines.items, line, .expression)) {
+        if (try executeReplLine(allocator, &repl_state, line, .expression, .body_stmt)) {
             continue;
         }
 
         // Fallback to statement mode for non-printable expressions.
-        if (try executeReplLine(allocator, lines.items, line, .statement)) {
+        if (try executeReplLine(allocator, &repl_state, line, .statement, .body_stmt)) {
             if (isLikelyStatefulStatement(trimmed)) {
-                const saved = try allocator.dupe(u8, line);
-                try lines.append(allocator, saved);
+                const cell_id = repl_state.lastLoadedCellId() orelse 0;
+                try repl_state.persistLine(allocator, line, .body_stmt, cell_id);
             }
         }
     }
@@ -417,17 +413,239 @@ const ReplExecMode = enum {
     statement,
 };
 
+const ReplPersistKind = enum {
+    module_decl,
+    body_stmt,
+};
+
+const ReplSymbolKind = enum {
+    let_binding,
+    var_binding,
+    fn_decl,
+    type_decl,
+};
+
+const ReplSymbol = struct {
+    kind: ReplSymbolKind,
+    persist_kind: ReplPersistKind,
+    line_index: usize,
+    cell_id: usize,
+    address: ?usize = null,
+};
+
+const ReplLoadedCell = struct {
+    id: usize,
+    source_path: []const u8,
+    dylib_path: []const u8,
+    dylib: std.DynLib,
+};
+
+const ReplState = struct {
+    module_lines: std.ArrayList([]const u8) = .empty,
+    body_lines: std.ArrayList([]const u8) = .empty,
+    loaded_cells: std.ArrayList(ReplLoadedCell) = .empty,
+    symbols: std.StringHashMapUnmanaged(ReplSymbol) = .empty,
+    next_cell_id: usize = 1,
+
+    fn init() ReplState {
+        return .{};
+    }
+
+    fn deinit(self: *ReplState, allocator: std.mem.Allocator) void {
+        self.clear(allocator);
+        self.module_lines.deinit(allocator);
+        self.body_lines.deinit(allocator);
+        self.loaded_cells.deinit(allocator);
+        self.symbols.deinit(allocator);
+    }
+
+    fn clear(self: *ReplState, allocator: std.mem.Allocator) void {
+        for (self.module_lines.items) |line| allocator.free(line);
+        self.module_lines.clearRetainingCapacity();
+
+        for (self.body_lines.items) |line| allocator.free(line);
+        self.body_lines.clearRetainingCapacity();
+
+        for (self.loaded_cells.items) |*cell| {
+            cell.dylib.close();
+            std.fs.deleteFileAbsolute(cell.source_path) catch {};
+            std.fs.deleteFileAbsolute(cell.dylib_path) catch {};
+            allocator.free(cell.source_path);
+            allocator.free(cell.dylib_path);
+        }
+        self.loaded_cells.clearRetainingCapacity();
+
+        var sym_it = self.symbols.iterator();
+        while (sym_it.next()) |entry| {
+            allocator.free(@constCast(entry.key_ptr.*));
+        }
+        self.symbols.clearRetainingCapacity();
+        self.next_cell_id = 1;
+    }
+
+    fn persistLine(
+        self: *ReplState,
+        allocator: std.mem.Allocator,
+        line: []const u8,
+        persist_kind: ReplPersistKind,
+        cell_id: usize,
+    ) !void {
+        const line_copy = try allocator.dupe(u8, line);
+        const target = switch (persist_kind) {
+            .module_decl => &self.module_lines,
+            .body_stmt => &self.body_lines,
+        };
+
+        const maybe_symbol = parseReplSymbol(line);
+        if (maybe_symbol) |sym| {
+            if (self.symbols.getPtr(sym.name)) |entry| {
+                if (entry.persist_kind == persist_kind and entry.line_index < target.items.len) {
+                    allocator.free(target.items[entry.line_index]);
+                    target.items[entry.line_index] = line_copy;
+                    entry.kind = sym.kind;
+                    entry.cell_id = cell_id;
+                    entry.address = self.lookupSymbolAddress(sym.kind, sym.name);
+                    return;
+                }
+            }
+
+            const idx = target.items.len;
+            try target.append(allocator, line_copy);
+
+            if (self.symbols.getPtr(sym.name)) |entry| {
+                entry.* = .{
+                    .kind = sym.kind,
+                    .persist_kind = persist_kind,
+                    .line_index = idx,
+                    .cell_id = cell_id,
+                    .address = self.lookupSymbolAddress(sym.kind, sym.name),
+                };
+            } else {
+                const key = try allocator.dupe(u8, sym.name);
+                try self.symbols.put(allocator, key, .{
+                    .kind = sym.kind,
+                    .persist_kind = persist_kind,
+                    .line_index = idx,
+                    .cell_id = cell_id,
+                    .address = self.lookupSymbolAddress(sym.kind, sym.name),
+                });
+            }
+            return;
+        }
+
+        try target.append(allocator, line_copy);
+    }
+
+    fn lastLoadedCellId(self: *const ReplState) ?usize {
+        if (self.loaded_cells.items.len == 0) return null;
+        return self.loaded_cells.items[self.loaded_cells.items.len - 1].id;
+    }
+
+    fn lookupSymbolAddress(self: *ReplState, kind: ReplSymbolKind, symbol_name: []const u8) ?usize {
+        if (self.loaded_cells.items.len == 0) return null;
+        if (kind != .fn_decl) return null;
+        const cell = &self.loaded_cells.items[self.loaded_cells.items.len - 1];
+
+        var name_buf: [256]u8 = undefined;
+        if (symbol_name.len + 1 > name_buf.len) return null;
+        @memcpy(name_buf[0..symbol_name.len], symbol_name);
+        name_buf[symbol_name.len] = 0;
+        const name_z: [:0]const u8 = name_buf[0..symbol_name.len :0];
+
+        const ptr = cell.dylib.lookup(*const anyopaque, name_z) orelse return null;
+        return @intFromPtr(ptr);
+    }
+};
+
+const ParsedReplSymbol = struct {
+    kind: ReplSymbolKind,
+    name: []const u8,
+};
+
+fn parseReplSymbol(line: []const u8) ?ParsedReplSymbol {
+    const trimmed = std.mem.trimLeft(u8, line, " \t");
+    if (std.mem.startsWith(u8, trimmed, "let ")) {
+        var rest = std.mem.trimLeft(u8, trimmed["let ".len..], " \t");
+        if (std.mem.startsWith(u8, rest, "mut ")) {
+            rest = std.mem.trimLeft(u8, rest["mut ".len..], " \t");
+        }
+        if (identifierPrefix(rest)) |name| {
+            return .{ .kind = .let_binding, .name = name };
+        }
+        return null;
+    }
+    if (std.mem.startsWith(u8, trimmed, "var ")) {
+        const rest = std.mem.trimLeft(u8, trimmed["var ".len..], " \t");
+        if (identifierPrefix(rest)) |name| {
+            return .{ .kind = .var_binding, .name = name };
+        }
+        return null;
+    }
+    if (std.mem.startsWith(u8, trimmed, "fn ")) {
+        const rest = std.mem.trimLeft(u8, trimmed["fn ".len..], " \t");
+        if (identifierPrefix(rest)) |name| {
+            return .{ .kind = .fn_decl, .name = name };
+        }
+        return null;
+    }
+    if (std.mem.startsWith(u8, trimmed, "type ")) {
+        const rest = std.mem.trimLeft(u8, trimmed["type ".len..], " \t");
+        if (identifierPrefix(rest)) |name| {
+            return .{ .kind = .type_decl, .name = name };
+        }
+        return null;
+    }
+    return null;
+}
+
+fn identifierPrefix(s: []const u8) ?[]const u8 {
+    if (s.len == 0) return null;
+    if (!isIdentStart(s[0])) return null;
+    var i: usize = 1;
+    while (i < s.len and isIdentContinue(s[i])) : (i += 1) {}
+    return s[0..i];
+}
+
+fn isIdentStart(ch: u8) bool {
+    return (ch >= 'a' and ch <= 'z') or (ch >= 'A' and ch <= 'Z') or ch == '_';
+}
+
+fn isIdentContinue(ch: u8) bool {
+    return isIdentStart(ch) or (ch >= '0' and ch <= '9');
+}
+
 fn executeReplLine(
     allocator: std.mem.Allocator,
-    prior_lines: []const []const u8,
+    repl_state: *ReplState,
     line: []const u8,
     mode: ReplExecMode,
+    persist_kind: ReplPersistKind,
 ) !bool {
+    const cell_id = repl_state.next_cell_id;
+    repl_state.next_cell_id += 1;
+
+    var src_path_buf: [4096]u8 = undefined;
+    const src_path = std.fmt.bufPrint(&src_path_buf, "/tmp/_with_repl_cell_{d}.w", .{cell_id}) catch return false;
+
     var src: std.ArrayList(u8) = .empty;
     defer src.deinit(allocator);
 
-    try src.appendSlice(allocator, "fn main() -> i32 =\n");
-    for (prior_lines) |prev| {
+    for (repl_state.module_lines.items) |prev| {
+        try src.appendSlice(allocator, prev);
+        try src.appendSlice(allocator, "\n");
+    }
+    if (mode == .statement and persist_kind == .module_decl) {
+        try src.appendSlice(allocator, line);
+        try src.appendSlice(allocator, "\n");
+    }
+
+    var entry_name_buf: [128]u8 = undefined;
+    const entry_name = std.fmt.bufPrint(&entry_name_buf, "__repl_cell_{d}_entry", .{cell_id}) catch return false;
+    try src.appendSlice(allocator, "fn ");
+    try src.appendSlice(allocator, entry_name);
+    try src.appendSlice(allocator, "() -> i32 =\n");
+
+    for (repl_state.body_lines.items) |prev| {
         try src.appendSlice(allocator, "    ");
         try src.appendSlice(allocator, prev);
         try src.appendSlice(allocator, "\n");
@@ -438,14 +656,16 @@ fn executeReplLine(
         try src.appendSlice(allocator, line);
         try src.appendSlice(allocator, ")\n    0\n");
     } else {
-        try src.appendSlice(allocator, "    ");
-        try src.appendSlice(allocator, line);
-        try src.appendSlice(allocator, "\n    0\n");
+        if (persist_kind == .body_stmt) {
+            try src.appendSlice(allocator, "    ");
+            try src.appendSlice(allocator, line);
+            try src.appendSlice(allocator, "\n");
+        }
+        try src.appendSlice(allocator, "    0\n");
     }
 
-    const tmp_path = "/tmp/_with_repl.w";
     {
-        const f = std.fs.createFileAbsolute(tmp_path, .{}) catch return false;
+        const f = std.fs.createFileAbsolute(src_path, .{}) catch return false;
         defer f.close();
         f.writeAll(src.items) catch return false;
     }
@@ -453,15 +673,35 @@ fn executeReplLine(
     var driver = Driver.init(allocator);
     defer driver.deinit();
 
-    const bin_path = try driver.buildBinary(tmp_path);
-    if (bin_path == null) return false;
+    var stem_buf: [128]u8 = undefined;
+    const stem = std.fmt.bufPrint(&stem_buf, "_with_repl_cell_{d}", .{cell_id}) catch return false;
+    const dylib_path_tmp = try driver.buildSharedLibrary(src_path, stem);
+    if (dylib_path_tmp == null) return false;
 
-    const bp = bin_path.?;
-    var path_buf: [4096]u8 = undefined;
-    if (bp.len >= path_buf.len) return false;
-    @memcpy(path_buf[0..bp.len], bp);
-    path_buf[bp.len] = 0;
-    _ = c.system(&path_buf);
+    const dylib_path = try allocator.dupe(u8, dylib_path_tmp.?);
+    errdefer allocator.free(dylib_path);
+    const src_path_copy = try allocator.dupe(u8, src_path);
+    errdefer allocator.free(src_path_copy);
+
+    var dylib = std.DynLib.open(dylib_path) catch return false;
+    errdefer dylib.close();
+
+    var entry_name_z_buf: [160]u8 = undefined;
+    if (entry_name.len + 1 > entry_name_z_buf.len) return false;
+    @memcpy(entry_name_z_buf[0..entry_name.len], entry_name);
+    entry_name_z_buf[entry_name.len] = 0;
+    const entry_name_z: [:0]const u8 = entry_name_z_buf[0..entry_name.len :0];
+
+    const EntryFn = *const fn () callconv(.c) i32;
+    const entry_fn = dylib.lookup(EntryFn, entry_name_z) orelse return false;
+    _ = entry_fn();
+
+    try repl_state.loaded_cells.append(allocator, .{
+        .id = cell_id,
+        .source_path = src_path_copy,
+        .dylib_path = dylib_path,
+        .dylib = dylib,
+    });
     return true;
 }
 

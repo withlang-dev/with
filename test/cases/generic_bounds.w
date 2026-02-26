@@ -5,12 +5,12 @@ trait Summable =
 type Wrapper = { n: i32 }
 
 impl Summable for Wrapper =
-    fn value(self: Wrapper) -> i32 = self.n
+    fn value(self: Wrapper) -> i32: self.n
 
-fn add_values[T: Summable](a: T, b: T) -> i32 =
+fn add_values[T: Summable](a: T, b: T) -> i32:
     a.value() + b.value()
 
-fn main() -> i32 =
+fn main -> i32:
     let a = Wrapper { n: 20 }
     let b = Wrapper { n: 22 }
     let result = add_values(a, b)

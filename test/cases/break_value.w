@@ -1,4 +1,4 @@
-fn main() -> i32 =
+fn main -> i32:
     let x = loop:
         break 42
 
@@ -10,4 +10,3 @@ fn main() -> i32 =
         i = i + 1
 
     println(y)
-    0

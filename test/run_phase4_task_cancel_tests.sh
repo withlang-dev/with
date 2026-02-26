@@ -48,17 +48,17 @@ expect_run_pass "test/cases/task_cancel.w"
 expect_run_pass "test/cases/p4_task_cancel.w"
 
 cat >"$tmpdir/task_cancel_next_await.w" <<'EOF1'
-async fn tick() -> i32 =
+async fn tick -> i32:
     0
 
-async fn worker() -> i32 =
+async fn worker -> i32:
     let t1 = tick()
     let _ = t1.await
     let t2 = tick()
     let _ = t2.await
     99
 
-fn main() -> i32 =
+fn main -> i32:
     let t = worker()
     t.cancel()
     let r = t.await
@@ -67,7 +67,7 @@ EOF1
 expect_run_pass "$tmpdir/task_cancel_next_await.w"
 
 cat >"$tmpdir/task_cancel_non_task_fail.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     let x = 7
     x.cancel()
     0

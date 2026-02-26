@@ -1,5 +1,5 @@
 // Test array initialization and operations
-fn main() -> i32 =
+fn main -> i32:
     let a = [1, 2, 3, 4, 5]
     println(a[0])
     println(a[4])
@@ -10,4 +10,3 @@ fn main() -> i32 =
     for x in a:
         sum = sum + x
     println(sum)
-    0

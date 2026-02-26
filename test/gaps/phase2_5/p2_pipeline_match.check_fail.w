@@ -1,6 +1,6 @@
-fn id(x: i32) -> i32 = x
+fn id(x: i32) -> i32: x
 
-fn main() -> i32 =
+fn main -> i32:
     let v = 2 |> id |> match
         1 -> 10
         2 -> 20

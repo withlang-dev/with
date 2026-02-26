@@ -59,10 +59,10 @@ trait Speak =
 
 type Rock = { n: i32 }
 
-fn call(x: &dyn Speak) -> i32 =
+fn call(x: &dyn Speak) -> i32:
     x.speak()
 
-fn main() -> i32 =
+fn main -> i32:
     let r = Rock { n: 1 }
     call(&r)
 EOF1

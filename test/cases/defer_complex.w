@@ -1,5 +1,5 @@
 // Test: Complex defer patterns
-fn test_order() -> i32 =
+fn test_order -> i32:
     var x = 0
     defer x = x + 100
     defer x = x * 10
@@ -7,7 +7,7 @@ fn test_order() -> i32 =
     // Return value is 5 (captured before defers)
     x
 
-fn main() -> i32 =
+fn main -> i32:
     // The return value is captured before defers execute
     let v1 = test_order()
     assert(v1 == 5)

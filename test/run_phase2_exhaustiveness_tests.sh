@@ -51,48 +51,48 @@ expect_build_no_warn() {
 cat >"$tmpdir/exhaustive_enum_ok.w" <<'EOF1'
 type Dir = Up | Down | Left | Right
 
-fn score(d: Dir) -> i32 =
+fn score(d: Dir) -> i32:
     match d
         Up -> 1
         Down -> 2
         Left -> 3
         Right -> 4
 
-fn main() -> i32 = score(Up)
+fn main -> i32: score(Up)
 EOF1
 expect_build_no_warn "$tmpdir/exhaustive_enum_ok.w"
 
 cat >"$tmpdir/non_exhaustive_enum_warn.w" <<'EOF2'
 type Dir = Up | Down | Left | Right
 
-fn score(d: Dir) -> i32 =
+fn score(d: Dir) -> i32:
     match d
         Up -> 1
         Down -> 2
         _ -> 9
 
-fn main() -> i32 = score(Up)
+fn main -> i32: score(Up)
 EOF2
 expect_build_no_warn "$tmpdir/non_exhaustive_enum_warn.w"
 
 cat >"$tmpdir/non_exhaustive_enum_missing_warn.w" <<'EOF3'
 type Dir = Up | Down | Left | Right
 
-fn score(d: Dir) -> i32 =
+fn score(d: Dir) -> i32:
     match d
         Up -> 1
         Down -> 2
 
-fn main() -> i32 = score(Up)
+fn main -> i32: score(Up)
 EOF3
 expect_build_warn_msg "$tmpdir/non_exhaustive_enum_missing_warn.w" "non-exhaustive match: missing variant"
 
 cat >"$tmpdir/non_exhaustive_bool_warn.w" <<'EOF4'
-fn score(v: bool) -> i32 =
+fn score(v: bool) -> i32:
     match v
         true -> 1
 
-fn main() -> i32 = score(true)
+fn main -> i32: score(true)
 EOF4
 expect_build_warn_msg "$tmpdir/non_exhaustive_bool_warn.w" "non-exhaustive match on bool"
 

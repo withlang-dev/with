@@ -37,24 +37,24 @@ cat >"$tmpdir/pattern_variants_ok.w" <<'EOF1'
 type Shape = Circle(i32) | Rect(i32, i32) | Point
 type Wrapped = Wrap(Shape) | Empty
 
-fn literal_or_wildcard(n: i32) -> i32 =
+fn literal_or_wildcard(n: i32) -> i32:
     match n
         0 -> 0
         1 | 2 -> 10
         _ -> -1
 
-fn binding_value(n: i32) -> i32 =
+fn binding_value(n: i32) -> i32:
     match n
         value -> value + 1
 
-fn score_shape(s: Shape) -> i32 =
+fn score_shape(s: Shape) -> i32:
     match s
         whole @ Rect(w, h) if w == h -> if whole.is_Rect() then w * 10 else 0
         Circle(r) -> r + 1
         Point -> 0
         _ -> 1
 
-fn nested_eval(w: Wrapped) -> i32 =
+fn nested_eval(w: Wrapped) -> i32:
     match w
         Wrap(inner) ->
             match inner
@@ -63,7 +63,7 @@ fn nested_eval(w: Wrapped) -> i32 =
                 Point -> 0
         Empty -> -1
 
-fn main() -> i32 =
+fn main -> i32:
     let ok =
         literal_or_wildcard(0) == 0 and
         literal_or_wildcard(2) == 10 and
@@ -81,7 +81,7 @@ expect_run_pass "$tmpdir/pattern_variants_ok.w"
 cat >"$tmpdir/pattern_variant_arity_fail.w" <<'EOF2'
 type Shape = Circle(i32) | Point
 
-fn main() -> i32 =
+fn main -> i32:
     let s = Circle(1)
     let _v = match s
         Circle(a, b) -> a + b
@@ -94,7 +94,7 @@ cat >"$tmpdir/pattern_variant_wrong_enum_fail.w" <<'EOF3'
 type A = One | Two
 type B = Bee
 
-fn main() -> i32 =
+fn main -> i32:
     let x = Bee
     let _v = match x
         One -> 1

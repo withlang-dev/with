@@ -1,11 +1,11 @@
 // Test: multiple async tasks running concurrently
-async fn add(a: i32, b: i32) -> i32 =
+async fn add(a: i32, b: i32) -> i32:
     a + b
 
-async fn multiply(a: i32, b: i32) -> i32 =
+async fn multiply(a: i32, b: i32) -> i32:
     a * b
 
-fn main() -> i32 =
+fn main -> i32:
     // Spawn multiple tasks
     let t1 = add(10, 20)
     let t2 = multiply(5, 6)
@@ -19,4 +19,3 @@ fn main() -> i32 =
     assert(r1 == 30)
     assert(r2 == 30)
     assert(r3 == 300)
-    0

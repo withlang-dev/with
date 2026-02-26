@@ -5,8 +5,8 @@ type Point = {
 }
 
 impl Point =
-    fn display(self: Point) -> str = "Point(custom)"
-    fn sum(self: Point) -> i32 = self.x + self.y
+    fn display(self: Point) -> str: "Point(custom)"
+    fn sum(self: Point) -> i32: self.x + self.y
 
 type Color = {
     r: i32,
@@ -15,9 +15,9 @@ type Color = {
 }
 
 impl Color =
-    fn to_string(self: Color) -> str = "Color(rgb)"
+    fn to_string(self: Color) -> str: "Color(rgb)"
 
-fn main() -> i32 =
+fn main -> i32:
     let p = Point { x: 3, y: 4 }
     // display method works directly
     let s = Point.display(p)
@@ -34,4 +34,3 @@ fn main() -> i32 =
     println(c)
 
     println("all display trait tests passed")
-    0

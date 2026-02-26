@@ -1,5 +1,5 @@
 // Test Vec with manual map/filter pattern
-fn main() -> i32 =
+fn main -> i32:
     var nums: Vec[i32] = Vec.new()
     nums.push(1)
     nums.push(2)
@@ -20,4 +20,3 @@ fn main() -> i32 =
     for x in evens
         sum = sum + x
     println(sum)
-    0

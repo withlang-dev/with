@@ -56,13 +56,13 @@ trait Addable =
 type Num = { v: i32 }
 
 impl Addable for Num =
-    fn add(self: Num, other: Num) -> i32 =
+    fn add(self: Num, other: Num) -> i32:
         self.v + other.v
 
-fn sum_pair[T: Addable](a: T, b: T) -> i32 =
+fn sum_pair[T: Addable](a: T, b: T) -> i32:
     a.add(b)
 
-fn main() -> i32 =
+fn main -> i32:
     let x = Num { v: 3 }
     let y = Num { v: 9 }
     if sum_pair(x, y) == 12 then 0 else 1
@@ -78,13 +78,13 @@ type A = { v: i32 }
 type B = { v: i32 }
 
 impl Show for A =
-    fn show(self: A) -> i32 =
+    fn show(self: A) -> i32:
         self.v
 
-fn use_show[T: Show](x: T) -> i32 =
+fn use_show[T: Show](x: T) -> i32:
     x.show()
 
-fn main() -> i32 =
+fn main -> i32:
     let b = B { v: 1 }
     use_show(b)
 EOF2
@@ -92,10 +92,10 @@ expect_check_fail_msg "$tmpdir/single_bound_not_satisfied_fail.w" "does not impl
 
 # Malformed bound syntax must be rejected.
 cat >"$tmpdir/single_bound_malformed_syntax_fail.w" <<'EOF3'
-fn bad[T:](x: T) -> i32 =
+fn bad[T:](x: T) -> i32:
     0
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF3
 expect_check_fail_msg "$tmpdir/single_bound_malformed_syntax_fail.w" "expected type bound name"
 

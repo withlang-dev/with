@@ -1,0 +1,6 @@
+exit: 0
+stdout:
+Point { x: 10, y: 20 }
+
+stderr:
+

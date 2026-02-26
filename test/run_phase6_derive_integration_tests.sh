@@ -55,7 +55,7 @@ cat >"$tmpdir/derive_unknown_trait_fail.w" <<'EOF1'
 @[derive(Serialize)]
 type User = { id: i32 }
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF1
 expect_check_fail_msg "$tmpdir/derive_unknown_trait_fail.w" "unknown derive trait"
 
@@ -64,7 +64,7 @@ cat >"$tmpdir/derive_builder_enum_fail.w" <<'EOF2'
 @[derive(Builder)]
 type Kind = A | B
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF2
 expect_check_fail_msg "$tmpdir/derive_builder_enum_fail.w" "requires a struct"
 

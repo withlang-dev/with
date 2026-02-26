@@ -1,9 +1,9 @@
 // Test: HashMap convenience methods (increment/decrement/update/append)
 
-fn plus_ten(x: i32) -> i32 =
+fn plus_ten(x: i32) -> i32:
     x + 10
 
-fn main() -> i32 =
+fn main -> i32:
     var counts: HashMap[str, i32] = HashMap.new()
 
     counts.increment("apple")
@@ -24,4 +24,3 @@ fn main() -> i32 =
     assert(nums.get(0) == 10)
     assert(nums.get(1) == 20)
 
-    0

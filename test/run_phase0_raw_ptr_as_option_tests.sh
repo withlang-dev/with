@@ -37,7 +37,7 @@ expect_check_fail() {
 cat >"$tmpdir/as_option_non_null.w" <<'EOF'
 use c_import("#include <stdlib.h>")
 
-fn main() -> i32 =
+fn main -> i32:
     let p = malloc(8)
     let o = p.as_option()
     if o.is_none() then return 1
@@ -50,7 +50,7 @@ expect_run_pass "$tmpdir/as_option_non_null.w"
 cat >"$tmpdir/as_option_null.w" <<'EOF'
 use c_import("#include <string.h>")
 
-fn main() -> i32 =
+fn main -> i32:
     let p = strchr(c"abc", 122)
     let o = p.as_option()
     if o.is_none() then 0 else 1
@@ -59,10 +59,9 @@ expect_run_pass "$tmpdir/as_option_null.w"
 
 # Negative: as_option on non-pointer must fail.
 cat >"$tmpdir/as_option_non_pointer.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     let x = 1
     let _ = x.as_option()
-    0
 EOF
 expect_check_fail "$tmpdir/as_option_non_pointer.w"
 

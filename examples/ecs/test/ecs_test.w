@@ -6,19 +6,19 @@ type Vec2 = {
 }
 
 extend Vec2 =
-    fn new(x: f64, y: f64) -> Vec2 =
+    fn new(x: f64, y: f64) -> Vec2:
         Vec2 { x: x, y: y }
 
-    fn zero() -> Vec2 =
+    fn zero -> Vec2:
         Vec2 { x: 0.0, y: 0.0 }
 
-    fn add(self: Vec2, other: Vec2) -> Vec2 =
+    fn add(self: Vec2, other: Vec2) -> Vec2:
         Vec2 { x: self.x + other.x, y: self.y + other.y }
 
-    fn scale(self: Vec2, s: f64) -> Vec2 =
+    fn scale(self: Vec2, s: f64) -> Vec2:
         Vec2 { x: self.x * s, y: self.y * s }
 
-    fn length_sq(self: Vec2) -> f64 =
+    fn length_sq(self: Vec2) -> f64:
         self.x * self.x + self.y * self.y
 
 type Transform = {
@@ -45,16 +45,16 @@ type Entity = {
     generation: i32,
 }
 
-fn make_entity(id: i32) -> Entity =
+fn make_entity(id: i32) -> Entity:
     Entity { id: id, generation: 1 }
 
-fn make_transform(x: f64, y: f64) -> Transform =
+fn make_transform(x: f64, y: f64) -> Transform:
     Transform { x: x, y: y, rotation: 0.0, scale_val: 1.0 }
 
-fn make_velocity(vx: f64, vy: f64) -> Velocity =
+fn make_velocity(vx: f64, vy: f64) -> Velocity:
     Velocity { vx: vx, vy: vy, angular: 0.0 }
 
-fn apply_velocity(t: Transform, v: Velocity, dt: f64) -> Transform =
+fn apply_velocity(t: Transform, v: Velocity, dt: f64) -> Transform:
     Transform {
         x: t.x + v.vx * dt,
         y: t.y + v.vy * dt,
@@ -62,25 +62,25 @@ fn apply_velocity(t: Transform, v: Velocity, dt: f64) -> Transform =
         scale_val: t.scale_val,
     }
 
-fn check_collision(t1: Transform, c1: Collider, t2: Transform, c2: Collider) -> bool =
+fn check_collision(t1: Transform, c1: Collider, t2: Transform, c2: Collider) -> bool:
     let dx = t1.x - t2.x
     let dy = t1.y - t2.y
     let dist_sq = dx * dx + dy * dy
     let r_sum = c1.radius + c2.radius
     dist_sq < r_sum * r_sum
 
-fn max[T](a: T, b: T) -> T =
+fn max[T](a: T, b: T) -> T:
     if a > b then a else b
 
-fn min[T](a: T, b: T) -> T =
+fn min[T](a: T, b: T) -> T:
     if a < b then a else b
 
-fn clamp[T](val: T, lo: T, hi: T) -> T =
+fn clamp[T](val: T, lo: T, hi: T) -> T:
     min(max(val, lo), hi)
 
 type InputDir = None | Up | Down | Left | Right
 
-fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity =
+fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity:
     match dir
         None -> make_velocity(0.0, 0.0)
         Up -> make_velocity(0.0, 0.0 - speed)
@@ -88,7 +88,7 @@ fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity =
         Left -> make_velocity(0.0 - speed, 0.0)
         Right -> make_velocity(speed, 0.0)
 
-fn main() -> i32 =
+fn main -> i32:
     // Test Vec2 creation
     let v1 = Vec2.new(3.0, 4.0)
     assert(v1.x == 3.0)
@@ -187,4 +187,3 @@ fn main() -> i32 =
     assert(dv_left.vy == 0.0)
 
     println("ecs: all tests passed")
-    0

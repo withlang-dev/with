@@ -8,7 +8,7 @@ type Range = {
 }
 
 impl Range =
-    fn next(self: *mut Range) -> ?i32 =
+    fn next(self: *mut Range) -> ?i32:
         if self.current < self.end_val:
             let v = self.current
             self.current = self.current + 1
@@ -17,7 +17,7 @@ impl Range =
             None
 
 // Manual fold: sum elements of an iterator
-fn fold_sum(start: i32, end_val: i32) -> i32 =
+fn fold_sum(start: i32, end_val: i32) -> i32:
     var r = Range { current: start, end_val: end_val }
     var acc = 0
     for x in r:
@@ -25,7 +25,7 @@ fn fold_sum(start: i32, end_val: i32) -> i32 =
     acc
 
 // Manual count: count elements
-fn count_range(start: i32, end_val: i32) -> i32 =
+fn count_range(start: i32, end_val: i32) -> i32:
     var r = Range { current: start, end_val: end_val }
     var n = 0
     for x in r:
@@ -33,7 +33,7 @@ fn count_range(start: i32, end_val: i32) -> i32 =
     n
 
 // Manual filter+count: count even numbers
-fn count_even(start: i32, end_val: i32) -> i32 =
+fn count_even(start: i32, end_val: i32) -> i32:
     var r = Range { current: start, end_val: end_val }
     var n = 0
     for x in r:
@@ -42,7 +42,7 @@ fn count_even(start: i32, end_val: i32) -> i32 =
     n
 
 // Manual map+sum: sum of squares
-fn sum_squares(start: i32, end_val: i32) -> i32 =
+fn sum_squares(start: i32, end_val: i32) -> i32:
     var r = Range { current: start, end_val: end_val }
     var acc = 0
     for x in r:
@@ -55,7 +55,7 @@ type Countdown = {
 }
 
 impl Countdown =
-    fn next(self: *mut Countdown) -> ?i32 =
+    fn next(self: *mut Countdown) -> ?i32:
         if self.value > 0:
             self.value = self.value - 1
             Some(self.value + 1)
@@ -70,7 +70,7 @@ type Fib = {
 }
 
 impl Fib =
-    fn next(self: *mut Fib) -> ?i32 =
+    fn next(self: *mut Fib) -> ?i32:
         if self.remaining > 0:
             let val = self.a
             let temp = self.a + self.b
@@ -81,7 +81,7 @@ impl Fib =
         else
             None
 
-fn main() -> i32 =
+fn main -> i32:
     // fold: sum 0..5 = 0+1+2+3+4 = 10
     assert(fold_sum(0, 5) == 10)
 
@@ -123,4 +123,3 @@ fn main() -> i32 =
     assert(outer_sum == 36)
 
     println("all iterator combinator tests passed")
-    0

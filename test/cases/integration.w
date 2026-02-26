@@ -1,6 +1,6 @@
 type Op = Add | Sub | Mul
 
-fn apply(op: Op, a: i32, b: i32) -> i32 =
+fn apply(op: Op, a: i32, b: i32) -> i32:
     match op
         Add -> a + b
         Sub -> a - b
@@ -11,15 +11,14 @@ type Pair = {
     second: i32,
 }
 
-fn Pair.sum(self: Pair) -> i32 = self.first + self.second
+fn Pair.sum(self: Pair) -> i32: self.first + self.second
 
-fn Pair.apply_op(self: Pair, op: Op) -> i32 =
+fn Pair.apply_op(self: Pair, op: Op) -> i32:
     apply(op, self.first, self.second)
 
-fn main() -> i32 =
+fn main -> i32:
     let p = Pair { first: 20, second: 10 }
     let sum = p.sum()
     let product = p.apply_op(Mul)
     let diff = p.apply_op(Sub)
     assert(sum - product - diff + 222 == 42)
-    0
