@@ -268,7 +268,7 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
         if (self.peek() == .kw_pub) self.advance();
         try self.expect(.kw_fn);
         const method_name = try self.expectIdentifier();
-        _ = try self.parseTypeParams(); // generic trait methods parse here (object-safety checks are later)
+        var trait_method_tps = try self.parseTypeParams(); // generic trait methods parse here (object-safety checks are later)
 
         try self.expect(.l_paren);
         const params = try self.parseParamList(null);
@@ -279,7 +279,7 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
             self.advance();
             return_type = try self.parseTypeExpr();
         }
-        try self.parseOptionalWhereClause();
+        try self.parseOptionalWhereClause(&trait_method_tps);
 
         // Check for default body (= expr)
         var has_default = false;
@@ -376,7 +376,7 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
         } else return error.ParseError;
 
         // Parse optional type parameters
-        const type_params = try self.parseTypeParams();
+        var type_params = try self.parseTypeParams();
 
         try self.expect(.l_paren);
         const params = try self.parseParamList(null);
@@ -387,7 +387,7 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
             self.advance();
             return_type = try self.parseTypeExpr();
         }
-        try self.parseOptionalWhereClause();
+        try self.parseOptionalWhereClause(&type_params);
 
         try self.expect(.eq);
         const body = try self.parseBlockOrExpr();
@@ -442,7 +442,7 @@ fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async
         }
     }
     // Parse optional type parameters: fn foo[T, U](...)  or  fn foo[T: Trait1 + Trait2](...)
-    const type_params = try self.parseTypeParams();
+    var type_params = try self.parseTypeParams();
 
     try self.expect(.l_paren);
     var param_destructures: std.ArrayList(ParamDestructure) = .empty;
@@ -454,7 +454,7 @@ fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async
         self.advance();
         return_type = try self.parseTypeExpr();
     }
-    try self.parseOptionalWhereClause();
+    try self.parseOptionalWhereClause(&type_params);
 
     try self.expect(.eq);
     const raw_body = try self.parseBlockOrExpr();
@@ -3099,30 +3099,48 @@ fn parseTypeBoundSymbol(self: *Parser) !Ast.Symbol {
     return error.ParseError;
 }
 
-/// Consume an optional `where ...` clause on function/method signatures.
-/// The current parser ignores constraints semantically and only accepts syntax.
-fn parseOptionalWhereClause(self: *Parser) !void {
+/// Parse an optional `where T: Trait1 + Trait2, U: Trait3` clause.
+/// Merges parsed bounds into the type_params slice (creates new entries on arena).
+fn parseOptionalWhereClause(self: *Parser, type_params: *[]const Ast.TypeParam) !void {
     if (!self.isIdentifierNamed("where")) return;
     self.advance(); // consume `where`
 
-    var depth: u32 = 0;
-    while (self.peek() != .eof) {
-        switch (self.peek()) {
-            .l_paren, .l_bracket, .l_brace => {
-                depth += 1;
-                self.advance();
-            },
-            .r_paren, .r_bracket, .r_brace => {
-                if (depth == 0) return;
-                depth -= 1;
-                self.advance();
-            },
-            .eq => {
-                if (depth == 0) return;
-                self.advance();
-            },
-            else => self.advance(),
+    // Parse comma-separated constraints: `T: Trait1 + Trait2, U: Trait3`
+    while (self.peek() == .identifier) {
+        const param_name = try self.expectIdentifier();
+        try self.expect(.colon);
+
+        // Parse bounds: Trait1 + Trait2
+        var new_bounds: std.ArrayList(Ast.Symbol) = .empty;
+        try new_bounds.append(self.arena, try self.parseTypeBoundSymbol());
+        while (self.peek() == .plus) {
+            self.advance();
+            try new_bounds.append(self.arena, try self.parseTypeBoundSymbol());
         }
+
+        // Merge into existing type_params.
+        const params = type_params.*;
+        for (params, 0..) |tp, idx| {
+            if (tp.name == param_name) {
+                // Combine existing bounds with new ones.
+                var combined: std.ArrayList(Ast.Symbol) = .empty;
+                for (tp.bounds) |b| {
+                    try combined.append(self.arena, b);
+                }
+                for (new_bounds.items) |b| {
+                    try combined.append(self.arena, b);
+                }
+                // Create mutable copy of type_params to update.
+                const new_params = try self.arena.alloc(Ast.TypeParam, params.len);
+                @memcpy(new_params, params);
+                new_params[idx].bounds = combined.items;
+                type_params.* = new_params;
+                break;
+            }
+        }
+
+        if (self.peek() != .comma) break;
+        self.advance(); // consume ','
     }
 }
 

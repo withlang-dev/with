@@ -1,15 +1,23 @@
-// Phase 5: where clauses on generic functions
-trait Describable =
-    fn describe(self: Self) -> i32
+// Test where clause syntax for trait bounds
+trait Numeric =
+    fn value(self: Self) -> i32
 
-type Point = { x: i32, y: i32 }
+type Meters = { v: i32 }
+type Seconds = { v: i32 }
 
-impl Describable for Point =
-    fn describe(self: Point) -> i32 = self.x + self.y
+impl Numeric for Meters =
+    fn value(self: Meters) -> i32 =
+        self.v
 
-fn summarize[T](item: T) -> i32 where T: Describable =
-    item.describe()
+impl Numeric for Seconds =
+    fn value(self: Seconds) -> i32 =
+        self.v
+
+fn add_values[A, B](a: A, b: B) -> i32 where A: Numeric, B: Numeric =
+    a.value() + b.value()
 
 fn main() -> i32 =
-    let p = Point { x: 19, y: 23 }
-    if summarize(p) == 42 then 0 else 1
+    let m = Meters { v: 10 }
+    let s = Seconds { v: 5 }
+    println(add_values(m, s))
+    0
