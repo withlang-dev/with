@@ -1059,7 +1059,7 @@ fn checkIdent(self: *Sema, sym: Symbol, span: Span) TypeId {
     return error_type;
 }
 
-fn checkBinary(self: *Sema, bin: Ast.BinaryExpr, _: Span) TypeId {
+fn checkBinary(self: *Sema, bin: Ast.BinaryExpr, span: Span) TypeId {
     const lhs = self.checkExpr(bin.lhs);
     const rhs = self.checkExpr(bin.rhs);
 
@@ -1069,8 +1069,16 @@ fn checkBinary(self: *Sema, bin: Ast.BinaryExpr, _: Span) TypeId {
     return switch (bin.op) {
         // Comparison operators return bool.
         .eq, .neq, .lt, .gt, .lte, .gte => self.ty_bool,
-        // Logical operators return bool.
-        .@"and", .@"or" => self.ty_bool,
+        // Logical operators require bool operands and return bool.
+        .@"and", .@"or" => blk: {
+            if (lhs != self.ty_bool) {
+                self.emitWarning("left operand of logical operator should be bool", span);
+            }
+            if (rhs != self.ty_bool) {
+                self.emitWarning("right operand of logical operator should be bool", span);
+            }
+            break :blk self.ty_bool;
+        },
         // Arithmetic: result type is the wider/left type.
         .add, .sub, .mul, .div, .mod => self.arithmeticResultType(lhs, rhs),
         // Bitwise operations.
