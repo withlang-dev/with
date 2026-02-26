@@ -1175,7 +1175,16 @@ fn checkLetBinding(self: *Sema, let_b: Ast.LetBinding, span: Span) TypeId {
         // Check compatibility between annotated and inferred types.
         if (annotated != error_type and val_type != error_type) {
             if (!self.typesCompatible(annotated, val_type)) {
-                self.emitError("type mismatch in let binding", span);
+                // Allow numeric coercion.
+                if (self.arithmeticResultType(annotated, val_type) == error_type) {
+                    var buf: [256]u8 = undefined;
+                    const expected = self.typeName(annotated);
+                    const actual = self.typeName(val_type);
+                    const name_str = self.pool.resolve(let_b.name);
+                    const msg = std.fmt.bufPrint(&buf, "type mismatch in binding '{s}': expected '{s}', found '{s}'", .{ name_str, expected, actual }) catch "type mismatch in let binding";
+                    const alloc_msg = self.allocator.dupe(u8, msg) catch "type mismatch in let binding";
+                    self.emitError(alloc_msg, span);
+                }
             }
         }
         break :blk annotated;
@@ -1899,6 +1908,14 @@ fn checkCall(self: *Sema, call_e: Ast.CallExpr, span: Span) TypeId {
 
     // Known function.
     if (self.fn_sigs.get(fn_sym)) |sig| {
+        // Check argument count (skip variadic functions).
+        if (!sig.is_variadic and sig.param_types.len != call_e.args.len) {
+            var buf: [256]u8 = undefined;
+            const fn_name = self.pool.resolve(fn_sym);
+            const msg = std.fmt.bufPrint(&buf, "function '{s}' expects {d} argument(s), found {d}", .{ fn_name, sig.param_types.len, call_e.args.len }) catch "wrong argument count";
+            const alloc_msg = self.allocator.dupe(u8, msg) catch "wrong argument count";
+            self.emitError(alloc_msg, span);
+        }
         return sig.return_type;
     }
 
