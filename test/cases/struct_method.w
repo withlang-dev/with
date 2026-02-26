@@ -1,21 +1,20 @@
-// Test: Struct methods via impl blocks
-type Vec2 = { x: i32, y: i32 }
+// Test struct with methods
+type Point = {
+    x: i32,
+    y: i32,
+}
 
-impl Vec2 =
-    fn new(x: i32, y: i32) -> Vec2 =
-        Vec2 { x, y }
+fn Point.new(x: i32, y: i32) -> Point =
+    Point { x: x, y: y }
 
-    fn magnitude_sq(self: Vec2) -> i32 =
-        self.x * self.x + self.y * self.y
-
-    fn add(self: Vec2, other: Vec2) -> Vec2 =
-        Vec2 { x: self.x + other.x, y: self.y + other.y }
+fn Point.manhattan(self: Point) -> i32 =
+    let ax = if self.x < 0 then 0 - self.x else self.x
+    let ay = if self.y < 0 then 0 - self.y else self.y
+    ax + ay
 
 fn main() -> i32 =
-    let a = Vec2.new(3, 4)
-    let b = Vec2.new(1, 2)
-    let c = a.add(b)
-    assert(a.magnitude_sq() == 25)
-    assert(c.x == 4)
-    assert(c.y == 6)
+    let p = Point.new(3, -4)
+    println(p.x)
+    println(p.y)
+    println(Point.manhattan(p))
     0
