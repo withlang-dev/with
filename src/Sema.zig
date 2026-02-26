@@ -233,6 +233,8 @@ closure_analyses: std.AutoHashMapUnmanaged(usize, ClosureAnalysis),
 
 /// Current function return type (for checking return statements).
 current_return_type: TypeId,
+/// Whether we're inside the RHS of a pipeline (call gets +1 implicit arg).
+in_pipeline_rhs: bool = false,
 /// Current scope.
 current_scope: *Scope,
 /// Root scope (module-level).
@@ -1860,7 +1862,10 @@ fn checkCast(self: *Sema, ca: Ast.CastExpr) TypeId {
 fn checkPipeline(self: *Sema, p: Ast.PipelineExpr, _: Span) TypeId {
     const lhs = self.checkExpr(p.lhs);
     _ = lhs;
-    // Pipeline RHS should be a function — check it.
+    // Pipeline RHS gets one extra implicit argument from the pipe.
+    const saved = self.in_pipeline_rhs;
+    self.in_pipeline_rhs = true;
+    defer self.in_pipeline_rhs = saved;
     return self.checkExpr(p.rhs);
 }
 
@@ -1917,10 +1922,13 @@ fn checkCall(self: *Sema, call_e: Ast.CallExpr, span: Span) TypeId {
     // Known function.
     if (self.fn_sigs.get(fn_sym)) |sig| {
         // Check argument count (skip variadic functions).
-        if (!sig.is_variadic and sig.param_types.len != call_e.args.len) {
+        // In pipeline context, there's one implicit argument from the pipe.
+        const expected = sig.param_types.len;
+        const actual = call_e.args.len + (if (self.in_pipeline_rhs) @as(usize, 1) else 0);
+        if (!sig.is_variadic and expected != actual) {
             var buf: [256]u8 = undefined;
             const fn_name = self.pool.resolve(fn_sym);
-            const msg = std.fmt.bufPrint(&buf, "function '{s}' expects {d} argument(s), found {d}", .{ fn_name, sig.param_types.len, call_e.args.len }) catch "wrong argument count";
+            const msg = std.fmt.bufPrint(&buf, "function '{s}' expects {d} argument(s), found {d}", .{ fn_name, expected, actual }) catch "wrong argument count";
             const alloc_msg = self.allocator.dupe(u8, msg) catch "wrong argument count";
             self.emitError(alloc_msg, span);
         }
