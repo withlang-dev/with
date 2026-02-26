@@ -1,12 +1,15 @@
 // Test match on string values
-fn greet(name: str) -> str =
-    match name
-        "Alice" -> "Hello, Alice!"
-        "Bob" -> "Hi, Bob!"
-        _ -> "Hey there!"
+fn classify(s: str) -> i32 =
+    match s
+        "hello" -> 1
+        "world" -> 2
+        "foo" -> 3
+        _ -> 0
 
 fn main() -> i32 =
-    println(greet("Alice"))
-    println(greet("Bob"))
-    println(greet("Charlie"))
+    println(classify("hello"))
+    println(classify("world"))
+    println(classify("foo"))
+    println(classify("bar"))
+    println(classify(""))
     0
