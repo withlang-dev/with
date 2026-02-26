@@ -525,6 +525,9 @@ fn generateDoc(path: []const u8, allocator: std.mem.Allocator) !void {
                     try w.print("{s}\n", .{doc});
                 }
                 try w.print("### trait `{s}`\n\n", .{name});
+                for (td.associated_types) |at| {
+                    try w.print("- `type {s}`\n", .{pool.resolve(at.name)});
+                }
                 for (td.methods) |m| {
                     try w.print("- `fn {s}(", .{pool.resolve(m.name)});
                     for (m.params, 0..) |p, i| {
