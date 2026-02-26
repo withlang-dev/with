@@ -1,12 +1,12 @@
 // Test: collection combinators sequence/traverse on Vec
 
-fn half_if_even(x: i32) -> ?i32 =
+fn half_if_even(x: i32) -> ?i32:
     if x % 2 == 0 then Some(x / 2) else None
 
-fn nonneg(x: i32) -> Result[i32, i32] =
+fn nonneg(x: i32) -> Result[i32, i32]:
     if x < 0 then Err(99) else Ok(x)
 
-fn main() -> i32 =
+fn main -> i32:
     var xo: Vec[?i32] = Vec.new()
     xo.push(Some(1))
     xo.push(Some(2))
@@ -72,4 +72,3 @@ fn main() -> i32 =
     var empty_i: Vec[i32] = Vec.new()
     assert(empty_i.traverse(half_if_even).is_some())
 
-    0

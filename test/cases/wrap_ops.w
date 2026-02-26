@@ -1,5 +1,5 @@
 // Test: Wrapping arithmetic operators (+%, -%, *%)
-fn main() -> i32 =
+fn main -> i32:
     // Basic wrapping addition
     let a: i32 = 100
     let b: i32 = 200
@@ -20,4 +20,3 @@ fn main() -> i32 =
     assert(wrapped == 0 - 2147483648)
 
     println("all wrapping ops tests passed")
-    0

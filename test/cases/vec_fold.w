@@ -1,9 +1,9 @@
 // Test: Vec fold, map, filter methods
-fn add(a: i32, b: i32) -> i32 = a + b
-fn double(x: i32) -> i32 = x * 2
-fn is_even(x: i32) -> bool = x % 2 == 0
+fn add(a: i32, b: i32) -> i32: a + b
+fn double(x: i32) -> i32: x * 2
+fn is_even(x: i32) -> bool: x % 2 == 0
 
-fn main() -> i32 =
+fn main -> i32:
     var v: Vec[i32] = Vec.new()
     v.push(1)
     v.push(2)
@@ -29,4 +29,3 @@ fn main() -> i32 =
     assert(evens.get(1) == 4)
 
     println("all vec fold tests passed")
-    0

@@ -78,7 +78,7 @@ cat >"$tmpdir/std_fmt_wrappers_ok.w" <<'EOF1'
 use std.mem
 use std.fmt
 
-fn main() -> i32 =
+fn main -> i32:
     let int_buf = alloc_zeroed(64, 1)
     let hex_buf = alloc_zeroed(64, 1)
     let float_buf = alloc_zeroed(64, 1)
@@ -108,7 +108,7 @@ cat >"$tmpdir/std_fmt_truncate_ok.w" <<'EOF2'
 use std.mem
 use std.fmt
 
-fn main() -> i32 =
+fn main -> i32:
     let buf = alloc_zeroed(2, 1)
     assert(buf != 0)
     let written = fmt_int(buf, 2, 1234)
@@ -122,7 +122,7 @@ expect_run_output "$tmpdir/std_fmt_truncate_ok.w" $'1'
 cat >"$tmpdir/std_fmt_interpolation_backend_ok.w" <<'EOF3'
 type Point = { x: i32, y: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let name = "with"
     let x = 41
     let p = Point { x: 7, y: 9 }
@@ -133,7 +133,6 @@ fn main() -> i32 =
     println("coords=({p.x},{p.y})")
     println("scaled={(x + 1) * 2}")
     println("pi={pi:.2}")
-    0
 EOF3
 expect_run_output "$tmpdir/std_fmt_interpolation_backend_ok.w" $'hello with\nsum=42\ncoords=(7,9)\nscaled=84\npi=3.14'
 
@@ -144,9 +143,8 @@ expect_run_pass "test/cases/string_interp_multi.w"
 cat >"$tmpdir/std_fmt_bad_ptr_arg_fail.w" <<'EOF4'
 use std.fmt
 
-fn main() -> i32 =
+fn main -> i32:
     let _n = fmt_int(true, 64, 1)
-    0
 EOF4
 expect_check_fail "$tmpdir/std_fmt_bad_ptr_arg_fail.w"
 
@@ -154,7 +152,7 @@ cat >"$tmpdir/std_fmt_bad_size_arg_fail.w" <<'EOF5'
 use std.mem
 use std.fmt
 
-fn main() -> i32 =
+fn main -> i32:
     let buf = alloc_zeroed(8, 1)
     let _n = fmt_hex(buf, false, 255)
     free_mem(buf)
@@ -166,7 +164,7 @@ cat >"$tmpdir/std_fmt_bad_value_arg_fail.w" <<'EOF6'
 use std.mem
 use std.fmt
 
-fn main() -> i32 =
+fn main -> i32:
     let buf = alloc_zeroed(8, 1)
     let _n = fmt_float(buf, 8)
     free_mem(buf)

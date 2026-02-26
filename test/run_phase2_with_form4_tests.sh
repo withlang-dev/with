@@ -36,7 +36,7 @@ expect_build_fail() {
 cat >"$tmpdir/with_form4_update_ok.w" <<'EOF1'
 type Vec3 = { x: i32, y: i32, z: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let base = Vec3 { x: 1, y: 2, z: 3 }
     let moved = { base with x: base.x + 10, y: base.y + 20 }
     if moved.x == 11 and moved.y == 22 and moved.z == 3 then 0 else 1
@@ -46,20 +46,18 @@ expect_run_pass "$tmpdir/with_form4_update_ok.w"
 cat >"$tmpdir/with_form4_unknown_field_fail.w" <<'EOF2'
 type Vec3 = { x: i32, y: i32, z: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let base = Vec3 { x: 1, y: 2, z: 3 }
     let _bad = { base with w: 99 }
-    0
 EOF2
 expect_build_fail "$tmpdir/with_form4_unknown_field_fail.w"
 
 cat >"$tmpdir/with_form4_type_mismatch_fail.w" <<'EOF3'
 type Vec3 = { x: i32, y: i32, z: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let base = Vec3 { x: 1, y: 2, z: 3 }
     let _bad = { base with x: true }
-    0
 EOF3
 expect_build_fail "$tmpdir/with_form4_type_mismatch_fail.w"
 

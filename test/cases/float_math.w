@@ -1,7 +1,7 @@
 // Test: Float math builtins (abs, min, max, clamp) with f64
 use std.math
 
-fn main() -> i32 =
+fn main -> i32:
     // abs with float
     let a = abs(-3.5)
     assert(a > 3.4)
@@ -30,4 +30,3 @@ fn main() -> i32 =
     assert(g > 4.9)
     assert(g < 5.1)
 
-    0

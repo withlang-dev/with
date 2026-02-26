@@ -1,4 +1,4 @@
-gen fn fibonacci() -> i32 =
+gen fn fibonacci -> i32:
     var a: i32 = 0
     var b: i32 = 1
     loop:
@@ -7,7 +7,7 @@ gen fn fibonacci() -> i32 =
         a = b
         b = next
 
-fn main() -> i32 =
+fn main -> i32:
     var iter = fibonacci()
     var sum: i32 = 0
     var count: i32 = 0
@@ -16,4 +16,3 @@ fn main() -> i32 =
         count += 1
         if count == 7 then break
     assert(sum == 20)
-    0

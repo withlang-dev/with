@@ -36,10 +36,10 @@ expect_check_fail() {
 cat >"$tmpdir/move_let_ok.w" <<'EOF1'
 type Res = { v: i32 }
 
-fn Res.drop(self: Res) -> void =
+fn Res.drop(self: Res) -> void:
     let _cleanup = self.v
 
-fn main() -> i32 =
+fn main -> i32:
     let r1 = Res { v: 1 }
     let r2 = r1
     let r3 = r2
@@ -50,10 +50,10 @@ expect_check_pass "$tmpdir/move_let_ok.w"
 cat >"$tmpdir/move_let_use_after_move.w" <<'EOF2'
 type Res = { v: i32 }
 
-fn Res.drop(self: Res) -> void =
+fn Res.drop(self: Res) -> void:
     let _cleanup = self.v
 
-fn main() -> i32 =
+fn main -> i32:
     let r1 = Res { v: 1 }
     let _r2 = r1
     let bad = r1.v
@@ -64,10 +64,10 @@ expect_check_fail "$tmpdir/move_let_use_after_move.w"
 cat >"$tmpdir/move_assign_ok.w" <<'EOF3'
 type Res = { v: i32 }
 
-fn Res.drop(self: Res) -> void =
+fn Res.drop(self: Res) -> void:
     let _cleanup = self.v
 
-fn main() -> i32 =
+fn main -> i32:
     var a = Res { v: 3 }
     var b = Res { v: 4 }
     b = a
@@ -78,10 +78,10 @@ expect_check_pass "$tmpdir/move_assign_ok.w"
 cat >"$tmpdir/move_assign_use_after_move.w" <<'EOF4'
 type Res = { v: i32 }
 
-fn Res.drop(self: Res) -> void =
+fn Res.drop(self: Res) -> void:
     let _cleanup = self.v
 
-fn main() -> i32 =
+fn main -> i32:
     var a = Res { v: 3 }
     var b = Res { v: 4 }
     b = a

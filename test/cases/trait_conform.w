@@ -7,11 +7,10 @@ type Box = {
 }
 
 impl Printable for Box =
-    fn show(self: Box) -> i32 =
+    fn show(self: Box) -> i32:
         self.value
 
-fn main() -> i32 =
+fn main -> i32:
     let b = Box { value: 42 }
     let v = b.show()
     assert(v == 42)
-    0

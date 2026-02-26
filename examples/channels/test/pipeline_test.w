@@ -1,9 +1,9 @@
 // Tests for the pipeline example
 
-fn double(x: i32) -> i32 =
+fn double(x: i32) -> i32:
     x * 2
 
-fn add_ten(x: i32) -> i32 =
+fn add_ten(x: i32) -> i32:
     x + 10
 
 type WorkItem = {
@@ -17,14 +17,14 @@ type ProcessedItem = {
     worker_id: i32,
 }
 
-fn process_item(item: WorkItem, worker_id: i32) -> ProcessedItem =
+fn process_item(item: WorkItem, worker_id: i32) -> ProcessedItem:
     ProcessedItem {
         id: item.id,
         result: item.payload * 2 + worker_id,
         worker_id: worker_id,
     }
 
-fn count_positive(a: i32, b: i32, c: i32, d: i32, e: i32) -> i32 =
+fn count_positive(a: i32, b: i32, c: i32, d: i32, e: i32) -> i32:
     var n = 0
     if a > 0 then n = n + 1 else n = n
     if b > 0 then n = n + 1 else n = n
@@ -33,7 +33,7 @@ fn count_positive(a: i32, b: i32, c: i32, d: i32, e: i32) -> i32 =
     if e > 0 then n = n + 1 else n = n
     n
 
-fn main() -> i32 =
+fn main -> i32:
     // Test double
     assert(double(0) == 0)
     assert(double(5) == 10)
@@ -73,4 +73,3 @@ fn main() -> i32 =
     assert(sum == 60)
 
     println("pipeline: all tests passed")
-    0

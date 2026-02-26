@@ -1,5 +1,5 @@
 // Test: Variable scoping in if/else blocks
-fn main() -> i32 =
+fn main -> i32:
     var x = 10
     if true:
         x = 20

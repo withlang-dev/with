@@ -34,20 +34,20 @@ expect_run_fail() {
 }
 
 cat >"$tmpdir/unit_elision_ok_ctor_ok.w" <<'EOF1'
-fn noop() -> Result[Unit, i32] =
+fn noop -> Result[Unit, i32]:
     Ok()
 
-fn main() -> i32 =
+fn main -> i32:
     let r = noop()
     if r.is_ok() then 0 else 1
 EOF1
 expect_run_pass "$tmpdir/unit_elision_ok_ctor_ok.w"
 
 cat >"$tmpdir/unit_elision_ctor_branching_ok.w" <<'EOF2'
-fn make(ok: bool) -> Result[Unit, i32] =
+fn make(ok: bool) -> Result[Unit, i32]:
     if ok then Ok() else Err(1)
 
-fn main() -> i32 =
+fn main -> i32:
     let r1 = make(true)
     let r2 = make(false)
     if r1.is_ok() and r2.is_err() then 0 else 1
@@ -55,34 +55,31 @@ EOF2
 expect_run_pass "$tmpdir/unit_elision_ctor_branching_ok.w"
 
 cat >"$tmpdir/unit_elision_unwrap_or_result_ok.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let r: Result[Unit, i32] = Err(7)
     let _u = r.unwrap_or()
-    0
 EOF3
 expect_run_pass "$tmpdir/unit_elision_unwrap_or_result_ok.w"
 
 cat >"$tmpdir/unit_elision_unwrap_or_option_ok.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let o: Option[Unit] = None
     let _u = o.unwrap_or()
-    0
 EOF4
 expect_run_pass "$tmpdir/unit_elision_unwrap_or_option_ok.w"
 
 cat >"$tmpdir/unit_elision_ok_no_args_non_unit_fail.w" <<'EOF5'
-fn bad() -> Result[str, i32] =
+fn bad -> Result[str, i32]:
     Ok()
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF5
 expect_run_fail "$tmpdir/unit_elision_ok_no_args_non_unit_fail.w"
 
 cat >"$tmpdir/unit_elision_unwrap_or_non_unit_fail.w" <<'EOF6'
-fn main() -> i32 =
+fn main -> i32:
     let r: Result[str, i32] = Err(1)
     let _x = r.unwrap_or()
-    0
 EOF6
 expect_run_fail "$tmpdir/unit_elision_unwrap_or_non_unit_fail.w"
 

@@ -1,7 +1,7 @@
 // Test: Auto-generated enum accessors (.is_X, .as_X)
 type Shape = Circle(i32) | Rectangle(i32, i32) | Point
 
-fn main() -> i32 =
+fn main -> i32:
     // .is_X() tests
     let c = Circle(5)
     assert(c.is_Circle())
@@ -28,4 +28,3 @@ fn main() -> i32 =
     assert(not_circle.is_none())
 
     println("all enum accessor tests passed")
-    0

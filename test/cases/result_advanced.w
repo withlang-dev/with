@@ -1,10 +1,10 @@
 // Test: Advanced Result patterns
-fn parse_positive(x: i32) -> Result[i32, i32] =
+fn parse_positive(x: i32) -> Result[i32, i32]:
     if x > 0 then Ok(x) else Err(-1)
 
-fn double(x: i32) -> i32 = x * 2
+fn double(x: i32) -> i32: x * 2
 
-fn main() -> i32 =
+fn main -> i32:
     // Basic Ok/Err
     let a = parse_positive(21)
     assert(a.is_ok())
@@ -33,4 +33,3 @@ fn main() -> i32 =
     let j = i ?? 99
     assert(j == 7)
 
-    0

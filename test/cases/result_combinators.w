@@ -1,8 +1,8 @@
 // Test Result combinators: map, map_err, and_then, unwrap_or, is_ok, is_err
 
-fn double(x: i32) -> i32 = x * 2
+fn double(x: i32) -> i32: x * 2
 
-fn main() -> i32 =
+fn main -> i32:
     let ok_val: Result[i32, i32] = Ok(21)
     let err_val: Result[i32, i32] = Err(42)
 
@@ -20,4 +20,3 @@ fn main() -> i32 =
 
     let err_mapped = err_val.map(double)
     assert(err_mapped.is_err())
-    0

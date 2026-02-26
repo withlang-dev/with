@@ -1,8 +1,8 @@
 // Test Option combinators: map, unwrap, unwrap_or, is_some, is_none
 
-fn double(x: i32) -> i32 = x * 2
+fn double(x: i32) -> i32: x * 2
 
-fn main() -> i32 =
+fn main -> i32:
     let some_val: ?i32 = Some(21)
     let none_val: ?i32 = None
 
@@ -23,4 +23,3 @@ fn main() -> i32 =
 
     let none_doubled = none_val.map(double)
     assert(none_doubled.is_none())
-    0

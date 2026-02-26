@@ -1,4 +1,4 @@
-fn main() -> i32 =
+fn main -> i32:
     // Nested loops with break
     let mut result = 0
     let mut i = 0
@@ -16,4 +16,3 @@ fn main() -> i32 =
     while n > 0:
         n = n - 1
     println(n)
-    0

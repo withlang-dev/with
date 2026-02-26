@@ -45,15 +45,15 @@ type A = Same | OnlyA
 type B = Same | OnlyB
 type Holder = { a: A, b: B }
 
-fn default_a() -> A = .Same
-fn default_b() -> B = .Same
+fn default_a -> A: .Same
+fn default_b -> B: .Same
 
-fn score_a(v: A) -> i32 =
+fn score_a(v: A) -> i32:
     match v
         .Same -> 1
         .OnlyA -> 2
 
-fn main() -> i32 =
+fn main -> i32:
     let a: A = .Same
     let b: B = .Same
     let h = Holder { a: .Same, b: .Same }
@@ -69,15 +69,14 @@ cat >"$tmpdir/enum_shorthand_wrong_expected_fail.w" <<'EOF2'
 type A = Same | OnlyA
 type B = Same | OnlyB
 
-fn score_a(v: A) -> i32 =
+fn score_a(v: A) -> i32:
     match v
         Same -> 1
         _ -> 0
 
-fn main() -> i32 =
+fn main -> i32:
     let _bad_a: A = .OnlyB
     let _bad_call = score_a(.OnlyB)
-    0
 EOF2
 expect_check_fail_msg "$tmpdir/enum_shorthand_wrong_expected_fail.w" "enum variant shorthand does not match expected enum type"
 

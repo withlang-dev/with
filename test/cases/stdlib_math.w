@@ -1,7 +1,7 @@
 // Test: stdlib math functions
 use std.math
 
-fn main() -> i32 =
+fn main -> i32:
     // Integer math
     assert(abs(0 - 42) == 42)
     assert(abs(42) == 42)
@@ -42,4 +42,3 @@ fn main() -> i32 =
     assert(E < 2.72)
 
     println("all stdlib math tests passed")
-    0

@@ -1,5 +1,5 @@
 // Phase 4 gap: async block syntax not implemented
-fn main() -> i32 =
+fn main -> i32:
     let t = async:
         21 * 2
     let v = t.await

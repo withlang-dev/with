@@ -446,9 +446,8 @@ exit), `string.h` (strlen, memcpy). These are enough to bootstrap.
 Test: compile and run:
 ```
 use c_import("stdio.h", link: "c")
-fn main() -> i32 =
+fn main -> i32:
     puts(c"Hello from With!".ptr)
-    0
 ```
 
 #### 0.7 LLVM Backend — Minimal
@@ -562,7 +561,7 @@ A function can return a reference, but only if it borrows from a
 parameter. The return value is ephemeral.
 
 ```
-fn first(items: &[T]) -> &T = &items[0]
+fn first(items: &[T]) -> &T: &items[0]
 ```
 
 In the borrow checker: the return value's borrow is considered to
@@ -711,7 +710,7 @@ written with a dot prefix instead of the full type name:
 `.Member` instead of `Role.Member`.
 
 The compiler infers the type from:
-- Return type annotations: `fn default() -> Color = .Blue`
+- Return type annotations: `fn default -> Color: .Blue`
 - Match subjects: `match c { .Red -> ..., .Blue -> ... }`
 - Function arguments: `paint(.Red)`
 - Struct field types: `Config { theme: .Green }`
@@ -1195,7 +1194,7 @@ With enforces it.
 
 Mechanical transforms:
 - `const x: T = val` → `let x: T = val`; `var` → `var`
-- `fn foo(x: T) T { return expr; }` → `fn foo(x: T) -> T = expr`
+- `fn foo(x: T) T { return expr; }` → `fn foo(x: T) -> T: expr`
 - `try expr` → `expr?`; `orelse` → `??`
 - `!T` (error union) → `Result[T, E]`; `?T` → `Option[T]`
 - `[]const u8` → `&[u8]`; string literals → `&str`
@@ -1204,7 +1203,7 @@ Mechanical transforms:
 - `@as(T, val)` → `val as T`; `@intCast(val)` → `val as T`
 - `@typeInfo(T)` → `T.fields()` (inside comptime context) or
   `TypeInfo.fields[T]()` (outside); `inline for` → `comptime for`
-- `test "name" { ... }` → `fn test_name() = ...`
+- `test "name" { ... }` → `fn test_name: ...`
 - `{ }` blocks → `:` + indentation
 - Strip allocator parameters and `.deinit()` calls (RAII handles it)
 - `null` → `None`; `undefined` → (flag as error, must initialize)
@@ -1360,11 +1359,11 @@ Day-one checklist:
 4. Write lexer for: `fn`, `let`, `=`, `(`, `)`, `{`, `}`, `:`,
    `->`, identifiers, integer literals, string literals, `+`, `-`,
    `*`, `/`, `,`, `;`, newlines
-5. Test: `zig build test` — lex `fn main() -> i32 = 42`
+5. Test: `zig build test` — lex `fn main -> i32: 42`
 6. Write parser for: function definition, let binding, return,
    integer literal, function call, binary expression (`src/parser.zig`)
 7. Write AST pretty-printer (use `std.io.Writer`)
-8. Test: parse and pretty-print `fn main() -> i32 = 42`
+8. Test: parse and pretty-print `fn main -> i32: 42`
 9. Write LLVM backend (`src/codegen_llvm.zig`):
    - `LLVMModuleCreateWithName("main")`
    - `LLVMAddFunction` for `main` returning `i32`

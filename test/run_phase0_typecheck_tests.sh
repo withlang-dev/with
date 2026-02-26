@@ -34,10 +34,10 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/typecheck_ok.w" <<'EOF'
-fn add(a: i32, b: i32) -> i32 =
+fn add(a: i32, b: i32) -> i32:
     a + b
 
-fn main() -> i32 =
+fn main -> i32:
     let i = 1
     let f = 2.5
     let b = true
@@ -51,31 +51,31 @@ EOF
 expect_check_pass "$tmpdir/typecheck_ok.w"
 
 cat >"$tmpdir/return_mismatch.w" <<'EOF'
-fn bad() -> i32 =
+fn bad -> i32:
     true
 EOF
 expect_check_fail "$tmpdir/return_mismatch.w"
 
 cat >"$tmpdir/call_arity_mismatch.w" <<'EOF'
-fn add(a: i32, b: i32) -> i32 =
+fn add(a: i32, b: i32) -> i32:
     a + b
 
-fn main() -> i32 =
+fn main -> i32:
     add(1)
 EOF
 expect_check_fail "$tmpdir/call_arity_mismatch.w"
 
 cat >"$tmpdir/call_type_mismatch.w" <<'EOF'
-fn add(a: i32, b: i32) -> i32 =
+fn add(a: i32, b: i32) -> i32:
     a + b
 
-fn main() -> i32 =
+fn main -> i32:
     add(1, true)
 EOF
 expect_check_fail "$tmpdir/call_type_mismatch.w"
 
 cat >"$tmpdir/operator_type_mismatch.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     1 + true
 EOF
 expect_check_fail "$tmpdir/operator_type_mismatch.w"

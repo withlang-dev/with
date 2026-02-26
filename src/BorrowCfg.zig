@@ -103,8 +103,13 @@ const Builder = struct {
             .block => |blk| return try self.buildBlock(blk, expr.span),
             .if_expr => |if_e| return try self.buildIf(if_e, expr.span),
             .while_expr => |w| return try self.buildWhile(w, expr.span),
-            .loop_expr => |body| return try self.buildLoop(body, expr.span),
-            .return_expr, .break_expr, .continue_expr => {
+            .loop_expr => |le| return try self.buildLoop(le.body, expr.span),
+            .return_expr, .break_expr => {
+                const node = try self.graph.addNode(.expr, expr.span);
+                try self.graph.addEdge(node, self.graph.exit);
+                return .{ .entry = node, .exits = try self.makeExits(&.{}) };
+            },
+            .continue_expr => |_| {
                 const node = try self.graph.addNode(.expr, expr.span);
                 try self.graph.addEdge(node, self.graph.exit);
                 return .{ .entry = node, .exits = try self.makeExits(&.{}) };
@@ -244,7 +249,7 @@ fn buildCfgFromSource(source_text: []const u8, allocator: std.mem.Allocator) !Gr
 
 test "cfg linear sequence" {
     const src =
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    let a = 1
         \\    let b = 2
         \\    a + b
@@ -259,7 +264,7 @@ test "cfg linear sequence" {
 
 test "cfg if has two outgoing branch edges" {
     const src =
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    if true then 1 else 2
     ;
 
@@ -279,7 +284,7 @@ test "cfg if has two outgoing branch edges" {
 
 test "cfg while has back edge to loop condition" {
     const src =
-        \\fn main() -> i32 =
+        \\fn main -> i32:
         \\    var i = 0
         \\    while i < 3 do
         \\        i = i + 1

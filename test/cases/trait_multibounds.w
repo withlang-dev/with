@@ -10,15 +10,14 @@ type X = {
 }
 
 impl A for X =
-    fn a(self: X) -> i32 = self.v
+    fn a(self: X) -> i32: self.v
 
 impl B for X =
-    fn b(self: X) -> i32 = self.v + 1
+    fn b(self: X) -> i32: self.v + 1
 
-fn sum[T: A + B](x: T) -> i32 =
+fn sum[T: A + B](x: T) -> i32:
     x.a() + x.b()
 
-fn main() -> i32 =
+fn main -> i32:
     let x = X { v: 20 }
     assert(sum(x) == 41)
-    0

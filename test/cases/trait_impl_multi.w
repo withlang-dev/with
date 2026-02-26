@@ -14,21 +14,20 @@ type Box = {
 }
 
 impl Describable for Box =
-    fn describe(self: Box) -> i32 =
+    fn describe(self: Box) -> i32:
         self.width + self.height
 
 impl Measurable for Box =
-    fn measure(self: Box) -> i32 =
+    fn measure(self: Box) -> i32:
         self.width * self.height
 
 impl Comparable for Box =
-    fn compare(self: Box, other: i32) -> bool =
+    fn compare(self: Box, other: i32) -> bool:
         self.width * self.height > other
 
-fn main() -> i32 =
+fn main -> i32:
     let b = Box { width: 6, height: 7 }
     assert(b.describe() == 13)
     assert(b.measure() == 42)
     assert(b.compare(41))
     assert(not b.compare(42))
-    0

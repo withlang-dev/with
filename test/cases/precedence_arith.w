@@ -1,4 +1,4 @@
-fn main() -> i32 =
+fn main -> i32:
     // Operator precedence tests
     let a = 2 + 3 * 4
     println(a)
@@ -10,4 +10,3 @@ fn main() -> i32 =
     println(d)
     let e = 1 + 2 * 3 - 4
     println(e)
-    0

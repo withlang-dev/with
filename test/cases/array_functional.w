@@ -1,9 +1,9 @@
 // Test: functional array methods (map, reduce, sum)
-fn double(x: i32) -> i32 = x * 2
+fn double(x: i32) -> i32: x * 2
 
-fn add(a: i32, b: i32) -> i32 = a + b
+fn add(a: i32, b: i32) -> i32: a + b
 
-fn main() -> i32 =
+fn main -> i32:
     let arr = [1, 2, 3, 4, 5]
 
     // sum
@@ -24,4 +24,3 @@ fn main() -> i32 =
     let total2 = arr.reduce(add, 100)
     assert(total2 == 115)
 
-    0

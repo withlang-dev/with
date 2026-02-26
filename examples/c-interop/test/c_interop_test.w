@@ -9,10 +9,10 @@ type SafeStr = {
 }
 
 extend SafeStr =
-    fn new(s: str) -> SafeStr =
+    fn new(s: str) -> SafeStr:
         SafeStr { data: s, len: s.len as i32 }
 
-    fn get_len(self: SafeStr) -> i32 =
+    fn get_len(self: SafeStr) -> i32:
         self.len
 
 type Entry = {
@@ -21,28 +21,28 @@ type Entry = {
     active: bool,
 }
 
-fn make_entry(key: i32, value: i32) -> Entry =
+fn make_entry(key: i32, value: i32) -> Entry:
     Entry { key: key, value: value, active: true }
 
-fn sum_entries(entries: [5]Entry) -> i32 =
+fn sum_entries(entries: [5]Entry) -> i32:
     var sum = 0
     for i in 0..5:
         sum = sum + entries[i].value
     sum
 
-fn count_active(entries: [5]Entry) -> i32 =
+fn count_active(entries: [5]Entry) -> i32:
     var n = 0
     for i in 0..5:
         if entries[i].active then n = n + 1 else n = n
     n
 
-fn find_value(entries: [5]Entry, key: i32) -> i32 =
+fn find_value(entries: [5]Entry, key: i32) -> i32:
     var result = 0
     for i in 0..5:
         if entries[i].key == key then result = entries[i].value else result = result
     result
 
-fn main() -> i32 =
+fn main -> i32:
     // Test strlen via C interop
     assert(strlen("hello") == 5)
     assert(strlen("") == 0)
@@ -97,4 +97,3 @@ fn main() -> i32 =
     assert(s4.len == 12)
 
     println("c-interop: all tests passed")
-    0

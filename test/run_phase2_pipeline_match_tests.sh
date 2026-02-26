@@ -34,9 +34,9 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/pipeline_match_basic_ok.w" <<'EOF1'
-fn id(x: i32) -> i32 = x
+fn id(x: i32) -> i32: x
 
-fn main() -> i32 =
+fn main -> i32:
     let v = 2 |> id |> match
         1 -> 10
         2 -> 20
@@ -46,9 +46,9 @@ EOF1
 expect_run_pass "$tmpdir/pipeline_match_basic_ok.w"
 
 cat >"$tmpdir/pipeline_match_chain_ok.w" <<'EOF2'
-fn inc(x: i32) -> i32 = x + 1
+fn inc(x: i32) -> i32: x + 1
 
-fn main() -> i32 =
+fn main -> i32:
     let out = 1 |> inc |> inc |> match
         3 -> 99
         _ -> 0
@@ -57,7 +57,7 @@ EOF2
 expect_run_pass "$tmpdir/pipeline_match_chain_ok.w"
 
 cat >"$tmpdir/pipeline_match_guard_ok.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let v = 5 |> match
         n if n > 3 -> 77
         _ -> 0
@@ -66,14 +66,14 @@ EOF3
 expect_run_pass "$tmpdir/pipeline_match_guard_ok.w"
 
 cat >"$tmpdir/pipeline_match_missing_arms_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let v = 1 |> match
     v
 EOF4
 expect_check_fail "$tmpdir/pipeline_match_missing_arms_fail.w"
 
 cat >"$tmpdir/pipeline_match_bad_arm_fail.w" <<'EOF5'
-fn main() -> i32 =
+fn main -> i32:
     let v = 1 |> match
         1 => 10
         _ -> 0

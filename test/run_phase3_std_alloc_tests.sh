@@ -54,7 +54,7 @@ expect_run_pass "test/cases/import_std_alloc.w"
 cat >"$tmpdir/std_alloc_extended_ok.w" <<'EOF1'
 use std.alloc
 
-fn main() -> i32 =
+fn main -> i32:
     let arena = arena_new(64)
     let p1 = arena_alloc(arena, 0)
     assert(p1 != 0)
@@ -85,35 +85,32 @@ expect_run_pass "$tmpdir/std_alloc_extended_ok.w"
 cat >"$tmpdir/std_alloc_arena_new_type_fail.w" <<'EOF2'
 use std.alloc
 
-fn main() -> i32 =
+fn main -> i32:
     let _a = arena_new("x")
-    0
 EOF2
 expect_run_fail "$tmpdir/std_alloc_arena_new_type_fail.w"
 
 cat >"$tmpdir/std_alloc_arena_alloc_arity_fail.w" <<'EOF3'
 use std.alloc
 
-fn main() -> i32 =
+fn main -> i32:
     let a = arena_new(8)
     let _p = arena_alloc(a)
-    0
 EOF3
 expect_run_fail "$tmpdir/std_alloc_arena_alloc_arity_fail.w"
 
 cat >"$tmpdir/std_alloc_pool_new_arity_fail.w" <<'EOF4'
 use std.alloc
 
-fn main() -> i32 =
+fn main -> i32:
     let _p = pool_new(8)
-    0
 EOF4
 expect_run_fail "$tmpdir/std_alloc_pool_new_arity_fail.w"
 
 cat >"$tmpdir/std_alloc_pool_free_type_fail.w" <<'EOF5'
 use std.alloc
 
-fn main() -> i32 =
+fn main -> i32:
     let p = pool_new(8, 2)
     pool_free(p, 123)
     0

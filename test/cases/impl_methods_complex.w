@@ -7,25 +7,25 @@ type Rect = {
 }
 
 impl Rect =
-    fn new(x: i32, y: i32, w: i32, h: i32) -> Rect =
+    fn new(x: i32, y: i32, w: i32, h: i32) -> Rect:
         Rect { x: x, y: y, w: w, h: h }
 
-    fn area(self: Rect) -> i32 =
+    fn area(self: Rect) -> i32:
         self.w * self.h
 
-    fn perimeter(self: Rect) -> i32 =
+    fn perimeter(self: Rect) -> i32:
         2 * (self.w + self.h)
 
-    fn contains_point(self: Rect, px: i32, py: i32) -> bool =
+    fn contains_point(self: Rect, px: i32, py: i32) -> bool:
         px >= self.x and px < self.x + self.w and py >= self.y and py < self.y + self.h
 
-    fn right(self: Rect) -> i32 =
+    fn right(self: Rect) -> i32:
         self.x + self.w
 
-    fn bottom(self: Rect) -> i32 =
+    fn bottom(self: Rect) -> i32:
         self.y + self.h
 
-    fn is_square(self: Rect) -> bool =
+    fn is_square(self: Rect) -> bool:
         self.w == self.h
 
 type Counter = {
@@ -35,16 +35,16 @@ type Counter = {
 }
 
 impl Counter =
-    fn new(step: i32, max_val: i32) -> Counter =
+    fn new(step: i32, max_val: i32) -> Counter:
         Counter { value: 0, step: step, max_val: max_val }
 
-    fn current(self: Counter) -> i32 =
+    fn current(self: Counter) -> i32:
         self.value
 
-    fn is_done(self: Counter) -> bool =
+    fn is_done(self: Counter) -> bool:
         self.value >= self.max_val
 
-fn main() -> i32 =
+fn main -> i32:
     // Rect tests
     let r = Rect.new(10, 20, 30, 40)
     assert(r.area() == 1200)
@@ -78,4 +78,3 @@ fn main() -> i32 =
     assert(c3.is_done())
 
     println("all impl_methods_complex tests passed")
-    0

@@ -67,7 +67,7 @@ expect_run_pass "test/cases/hashmap_convenience.w"
 cat >"$tmpdir/std_collections_bad_increment_key_fail.w" <<'EOF1'
 use std.collections
 
-fn main() -> i32 =
+fn main -> i32:
     var counts: HashMap[str, i32] = HashMap.new()
     increment(counts, 123)
     0
@@ -77,20 +77,19 @@ expect_check_fail "$tmpdir/std_collections_bad_increment_key_fail.w"
 cat >"$tmpdir/std_collections_bad_append_arity_fail.w" <<'EOF2'
 use std.collections
 
-fn main() -> i32 =
+fn main -> i32:
     var grouped: HashMap[str, Vec[i32]] = HashMap.new()
     append(grouped, "vals")
-    0
 EOF2
 expect_check_fail "$tmpdir/std_collections_bad_append_arity_fail.w"
 
 cat >"$tmpdir/std_collections_bad_update_arity_fail.w" <<'EOF3'
 use std.collections
 
-fn plus_one(x: i32) -> i32 =
+fn plus_one(x: i32) -> i32:
     x + 1
 
-fn main() -> i32 =
+fn main -> i32:
     var counts: HashMap[str, i32] = HashMap.new()
     update(counts, "a", plus_one)
     0

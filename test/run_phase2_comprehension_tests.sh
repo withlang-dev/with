@@ -44,14 +44,14 @@ expect_run_fail() {
 }
 
 cat >"$tmpdir/comprehension_basic_ok.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     let squares = [x * x for x in 0..5]
     if squares[0] == 0 and squares[1] == 1 and squares[4] == 16 then 0 else 1
 EOF1
 expect_run_pass "$tmpdir/comprehension_basic_ok.w"
 
 cat >"$tmpdir/comprehension_filter_ok.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     let evens = [x for x in 0..10 if x % 2 == 0]
     let ok =
         evens[0] == 0 and
@@ -64,7 +64,7 @@ EOF2
 expect_run_pass "$tmpdir/comprehension_filter_ok.w"
 
 cat >"$tmpdir/comprehension_nested_ok.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let pairs = [x * 10 + y for x in 0..3 for y in 0..3 if x != y]
     let ok =
         pairs[0] == 1 and
@@ -78,7 +78,7 @@ EOF3
 expect_run_pass "$tmpdir/comprehension_nested_ok.w"
 
 cat >"$tmpdir/comprehension_three_for_ok.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let vals = [x * 100 + y * 10 + z for x in 0..2 for y in 0..2 for z in 0..2]
     let ok =
         vals[0] == 0 and
@@ -94,7 +94,7 @@ EOF4
 expect_run_pass "$tmpdir/comprehension_three_for_ok.w"
 
 cat >"$tmpdir/comprehension_non_range_iter_fail.w" <<'EOF5'
-fn main() -> i32 =
+fn main -> i32:
     let xs = [1, 2, 3]
     let ys = [x for x in xs]
     ys[0]
@@ -102,7 +102,7 @@ EOF5
 expect_run_fail "$tmpdir/comprehension_non_range_iter_fail.w"
 
 cat >"$tmpdir/comprehension_parse_fail.w" <<'EOF6'
-fn main() -> i32 =
+fn main -> i32:
     let xs = [x for x 0..3]
     xs[0]
 EOF6

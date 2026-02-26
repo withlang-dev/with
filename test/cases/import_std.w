@@ -2,7 +2,7 @@
 use std.string
 use std.math
 
-fn main() -> i32 =
+fn main -> i32:
     // Test string functions
     let len = string_len("hello")
     assert(len == 5)
@@ -29,4 +29,3 @@ fn main() -> i32 =
     let c2 = clamp(0 - 5, 0, 100)
     assert(c2 == 0)
 
-    0

@@ -68,7 +68,7 @@ cat >"$tmpdir/std_io_file_roundtrip_ok.w" <<'EOF1'
 use std.io
 use std.mem
 
-fn main() -> i32 =
+fn main -> i32:
     let path = "/tmp/with_std_io_roundtrip.txt"
 
     let out = file_open(path, "w")
@@ -93,31 +93,28 @@ expect_run_output "$tmpdir/std_io_file_roundtrip_ok.w" $'abc'
 cat >"$tmpdir/std_io_file_missing_ok.w" <<'EOF2'
 use std.io
 
-fn main() -> i32 =
+fn main -> i32:
     let inp = file_open("/tmp/with_std_io_missing_938475938475.txt", "r")
     if inp == 0 then
         println("missing")
     else
         file_close(inp)
-    0
 EOF2
 expect_run_output "$tmpdir/std_io_file_missing_ok.w" $'missing'
 
 cat >"$tmpdir/std_io_bad_open_arg_fail.w" <<'EOF3'
 use std.io
 
-fn main() -> i32 =
+fn main -> i32:
     let _f = file_open(123, "r")
-    0
 EOF3
 expect_check_fail "$tmpdir/std_io_bad_open_arg_fail.w"
 
 cat >"$tmpdir/std_io_bad_close_arg_fail.w" <<'EOF4'
 use std.io
 
-fn main() -> i32 =
+fn main -> i32:
     let _rc = file_close(1)
-    0
 EOF4
 expect_check_fail "$tmpdir/std_io_bad_close_arg_fail.w"
 
@@ -125,11 +122,10 @@ cat >"$tmpdir/std_io_bad_read_arity_fail.w" <<'EOF5'
 use std.io
 use std.mem
 
-fn main() -> i32 =
+fn main -> i32:
     let inp = file_open("/tmp/with_std_io_missing_938475938475.txt", "r")
     let buf = alloc_zeroed(8, 1)
     let _n = file_read(inp, buf)
-    0
 EOF5
 expect_check_fail "$tmpdir/std_io_bad_read_arity_fail.w"
 

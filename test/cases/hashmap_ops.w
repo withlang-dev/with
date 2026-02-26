@@ -1,5 +1,5 @@
 // Test HashMap operations
-fn main() -> i32 =
+fn main -> i32:
     var m: HashMap[str, i32] = HashMap.new()
     m.insert("a", 1)
     m.insert("b", 2)
@@ -13,4 +13,3 @@ fn main() -> i32 =
     println(m.len())
     let v2 = m.get("b")
     println(v2.is_none())
-    0

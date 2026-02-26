@@ -6,7 +6,7 @@ type Config = {
     workers: i32,
 }
 
-fn main() -> i32 =
+fn main -> i32:
     let base = Config {
         host: "localhost",
         port: 8080,
@@ -17,4 +17,3 @@ fn main() -> i32 =
     println(prod.port)
     println(prod.workers)
     println(prod.debug)
-    0

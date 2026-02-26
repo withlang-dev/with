@@ -34,9 +34,8 @@ expect_fail() {
 }
 
 cat >"$tmpdir/snap_case.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     println("v1")
-    0
 EOF
 
 # 1) Create snapshot.
@@ -47,9 +46,8 @@ expect_pass "$WITH_BIN" test "$tmpdir/snap_case.w"
 
 # 3) Change output and ensure mismatch fails without update.
 cat >"$tmpdir/snap_case.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     println("v2")
-    0
 EOF
 expect_fail "$WITH_BIN" test "$tmpdir/snap_case.w"
 

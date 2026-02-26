@@ -55,13 +55,12 @@ trait Speak =
 type Dog = { n: i32 }
 
 impl Speak for Dog =
-    fn speak(self: Dog) -> i32 = self.n
+    fn speak(self: Dog) -> i32: self.n
 
-fn main() -> i32 =
+fn main -> i32:
     let d = Dog { n: 5 }
     let x: Box[dyn Speak] = d
     assert(x.speak() == 5)
-    0
 EOF1
 expect_run_pass "$tmpdir/devirt_known_local.w"
 "$WITH_BIN" ir "$tmpdir/devirt_known_local.w" >"$tmpdir/devirt_known_local.ir" 2>"$tmpdir/ir.stderr.$$" || true
@@ -78,15 +77,14 @@ trait Speak =
 type Dog = { n: i32 }
 
 impl Speak for Dog =
-    fn speak(self: Dog) -> i32 = self.n
+    fn speak(self: Dog) -> i32: self.n
 
-fn call(x: Box[dyn Speak]) -> i32 =
+fn call(x: Box[dyn Speak]) -> i32:
     x.speak()
 
-fn main() -> i32 =
+fn main -> i32:
     let d = Dog { n: 5 }
     assert(call(d) == 5)
-    0
 EOF2
 expect_run_pass "$tmpdir/devirt_unknown_param.w"
 "$WITH_BIN" ir "$tmpdir/devirt_unknown_param.w" >"$tmpdir/devirt_unknown_param.ir" 2>"$tmpdir/ir.stderr.$$" || true

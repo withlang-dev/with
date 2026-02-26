@@ -1,4 +1,4 @@
-fn main() -> i32 =
+fn main -> i32:
     var v: Vec[i32] = Vec.new()
     var i = 0
     while i < 5
@@ -9,4 +9,3 @@ fn main() -> i32 =
         sum = sum + x
     println(sum)
     println(v.len())
-    0

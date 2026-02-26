@@ -1,0 +1,6 @@
+exit: 0
+stdout:
+all with_record_methods tests passed
+
+stderr:
+

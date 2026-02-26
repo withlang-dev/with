@@ -1,0 +1,9 @@
+exit: 0
+stdout:
+big
+medium
+small
+non-positive
+
+stderr:
+

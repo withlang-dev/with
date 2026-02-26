@@ -45,7 +45,7 @@ expect_check_fail_msg() {
 }
 
 cat >"$tmpdir/channel_send_owned_ok.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     let ch = Channel(2)
     send(ch, 123)
     let v = recv(ch)
@@ -54,18 +54,17 @@ EOF1
 expect_run_pass "$tmpdir/channel_send_owned_ok.w"
 
 cat >"$tmpdir/channel_send_ephemeral_fail.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     let ch = Channel(2)
     let x = 7
     send(ch, &x)
-    0
 EOF2
 expect_check_fail_msg "$tmpdir/channel_send_ephemeral_fail.w" "channel send requires Send value"
 
 cat >"$tmpdir/spawn_os_owned_capture_ok.w" <<'EOF3'
 use std.thread
 
-fn main() -> i32 =
+fn main -> i32:
     let base = 5
     let h = spawn_os(|| base + 1)
     let v = join(h)
@@ -76,17 +75,16 @@ expect_run_pass "$tmpdir/spawn_os_owned_capture_ok.w"
 cat >"$tmpdir/spawn_os_ephemeral_capture_fail.w" <<'EOF4'
 use std.thread
 
-fn main() -> i32 =
+fn main -> i32:
     let x = 41
     let r = &x
     let h = spawn_os(|| *r)
     let _ = join(h)
-    0
 EOF4
 expect_check_fail_msg "$tmpdir/spawn_os_ephemeral_capture_fail.w" "spawn_os requires Send captures"
 
 cat >"$tmpdir/async_scope_scopedsend_ephemeral_ok.w" <<'EOF5'
-fn main() -> i32 =
+fn main -> i32:
     let n = 9
     let r = &n
     let out = async scope |s|:

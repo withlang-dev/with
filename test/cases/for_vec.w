@@ -1,5 +1,5 @@
 // Test: for-in loop over Vec
-fn main() -> i32 =
+fn main -> i32:
     let v = Vec.of(10, 20, 30, 40, 50)
     var sum = 0
     for x in v
@@ -14,4 +14,3 @@ fn main() -> i32 =
     assert(total == 42)
 
     println("all for-vec tests passed")
-    0

@@ -8,18 +8,18 @@ trait Clickable =
 type Button = { label: str, id: i32 }
 
 impl Drawable for Button =
-    fn draw(self: Button) -> str = self.label
+    fn draw(self: Button) -> str: self.label
 
 impl Clickable for Button =
-    fn click(self: Button) -> i32 = self.id
+    fn click(self: Button) -> i32: self.id
 
-fn render(d: dyn Drawable) -> void =
+fn render(d: dyn Drawable) -> void:
     println(d.draw())
 
-fn handle(c: dyn Clickable) -> void =
+fn handle(c: dyn Clickable) -> void:
     println(c.click())
 
-fn main() -> i32 =
+fn main -> i32:
     let btn = Button { label: "Submit", id: 42 }
     render(btn)
     handle(btn)

@@ -1,5 +1,5 @@
 // Test: Vec iteration with index tracking and complex logic
-fn main() -> i32 =
+fn main -> i32:
     let v = Vec.of(10, 20, 30, 40, 50)
 
     // Sum using for-in
@@ -41,4 +41,3 @@ fn main() -> i32 =
     assert(v2.len() == 1)
 
     println("all vec_for_indexed tests passed")
-    0

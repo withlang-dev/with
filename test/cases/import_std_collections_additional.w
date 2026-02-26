@@ -1,7 +1,7 @@
 // Test: std.collections additional SlotMap/Handle/BTreeMap APIs
 use std.collections
 
-fn main() -> i32 =
+fn main -> i32:
     var sm = slotmap_new()
     assert(slotmap_len(sm) == 0)
 
@@ -62,4 +62,3 @@ fn main() -> i32 =
     assert(not btree_contains(bt, "a"))
     assert(btree_len(bt) == 1)
 
-    0

@@ -1,5 +1,5 @@
 // Test hex, binary, and octal literals
-fn main() -> i32 =
+fn main -> i32:
     let hex = 0xFF
     println(hex)
 
@@ -11,4 +11,3 @@ fn main() -> i32 =
 
     let hex2 = 0xDEAD
     println(hex2)
-    0

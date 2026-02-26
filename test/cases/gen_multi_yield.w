@@ -1,5 +1,5 @@
 // Test: generator function with multiple yield points and parameters
-gen fn alternating(a: i32, b: i32, count: i32) -> i32 =
+gen fn alternating(a: i32, b: i32, count: i32) -> i32:
     var i: i32 = 0
     while i < count:
         if i % 2 == 0:
@@ -8,13 +8,13 @@ gen fn alternating(a: i32, b: i32, count: i32) -> i32 =
             yield b
         i += 1
 
-gen fn countdown_by(start: i32, step: i32) -> i32 =
+gen fn countdown_by(start: i32, step: i32) -> i32:
     var val: i32 = start
     while val > 0:
         yield val
         val -= step
 
-fn main() -> i32 =
+fn main -> i32:
     // Test alternating generator
     var iter1 = alternating(10, 20, 6)
     var sum1: i32 = 0
@@ -35,4 +35,3 @@ fn main() -> i32 =
     assert(count == 4)
 
     println("all gen_multi_yield tests passed")
-    0

@@ -48,7 +48,7 @@ type Config = {
     tls: bool = false,
 }
 
-fn main() -> i32 =
+fn main -> i32:
     let a = Config.builder().host("localhost").build().unwrap()
     assert(a.host == "localhost")
     assert(a.port == 8080)
@@ -57,7 +57,6 @@ fn main() -> i32 =
     let b = Config.builder().host("prod").port(443).tls(true).build().unwrap()
     assert(b.port == 443)
     assert(b.tls)
-    0
 EOF1
 expect_run_pass "$tmpdir/derive_builder_required_optional_ok.w"
 
@@ -69,9 +68,8 @@ type Config = {
     port: i32 = 8080,
 }
 
-fn main() -> i32 =
+fn main -> i32:
     let _ = Config.builder().build().unwrap()
-    0
 EOF2
 expect_run_fail "$tmpdir/derive_builder_missing_required_fail.w"
 
@@ -79,9 +77,8 @@ expect_run_fail "$tmpdir/derive_builder_missing_required_fail.w"
 cat >"$tmpdir/derive_builder_without_derive_fail.w" <<'EOF3'
 type Plain = { x: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let _ = Plain.builder()
-    0
 EOF3
 expect_run_fail "$tmpdir/derive_builder_without_derive_fail.w"
 

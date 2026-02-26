@@ -79,53 +79,51 @@ expect_ir_lacks() {
 
 cat >"$tmpdir/tailrec_valid_ok.w" <<'EOF1'
 @[tailrec]
-fn factorial(n: i32, acc: i32) -> i32 =
+fn factorial(n: i32, acc: i32) -> i32:
     if n <= 1: acc
     else factorial(n - 1, acc * n)
 
-fn main() -> i32 =
+fn main -> i32:
     assert(factorial(10, 1) == 3628800)
-    0
 EOF1
 expect_run_pass "$tmpdir/tailrec_valid_ok.w"
 
 cat >"$tmpdir/tailrec_non_tail_fail.w" <<'EOF2'
 @[tailrec]
-fn bad(n: i32) -> i32 =
+fn bad(n: i32) -> i32:
     if n == 0: 1
     else n * bad(n - 1)
 
-fn main() -> i32 = bad(5)
+fn main -> i32: bad(5)
 EOF2
 expect_check_fail_msg "$tmpdir/tailrec_non_tail_fail.w" "@[tailrec] recursive call is not in tail position"
 
 cat >"$tmpdir/tailrec_no_recursion_fail.w" <<'EOF3'
 @[tailrec]
-fn not_recursive(n: i32) -> i32 =
+fn not_recursive(n: i32) -> i32:
     n + 1
 
-fn main() -> i32 = not_recursive(1)
+fn main -> i32: not_recursive(1)
 EOF3
 expect_check_fail_msg "$tmpdir/tailrec_no_recursion_fail.w" "@[tailrec] function has no recursive tail call"
 
 cat >"$tmpdir/tailrec_plain_recursive_ok.w" <<'EOF4'
-fn fact(n: i32) -> i32 =
+fn fact(n: i32) -> i32:
     if n <= 1: 1
     else n * fact(n - 1)
 
-fn main() -> i32 =
+fn main -> i32:
     assert(fact(6) == 720)
-    0
 EOF4
 expect_run_pass "$tmpdir/tailrec_plain_recursive_ok.w"
 
 cat >"$tmpdir/tailrec_ir_ok.w" <<'EOF5'
 @[tailrec]
-fn factorial(n: i32, acc: i32) -> i32 =
+fn factorial(n: i32, acc: i32) -> i32:
     if n <= 1: acc
     else factorial(n - 1, acc * n)
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF5
 expect_ir_has "$tmpdir/tailrec_ir_ok.w" "tailrec.body"
 expect_ir_lacks "$tmpdir/tailrec_ir_ok.w" "call i32 @factorial"

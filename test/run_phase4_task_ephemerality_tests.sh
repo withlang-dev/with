@@ -54,13 +54,13 @@ expect_build_pass_no_msg() {
 }
 
 cat >"$tmpdir/task_ephemeral_borrow_warn.w" <<'EOF1'
-async fn borrow(x: &mut i32) -> i32 =
+async fn borrow(x: &mut i32) -> i32:
     *x
 
-fn sink(t: i32) -> i32 =
+fn sink(t: i32) -> i32:
     t
 
-fn main() -> i32 =
+fn main -> i32:
     let mut x = 7
     let t = borrow(&mut x)
     sink(t)
@@ -69,13 +69,13 @@ EOF1
 expect_build_warn_msg "$tmpdir/task_ephemeral_borrow_warn.w" "ephemeral Task passed by value may escape"
 
 cat >"$tmpdir/task_ephemeral_assign_warn.w" <<'EOF2'
-async fn borrow(x: &mut i32) -> i32 =
+async fn borrow(x: &mut i32) -> i32:
     *x
 
-fn sink(t: i32) -> i32 =
+fn sink(t: i32) -> i32:
     t
 
-fn main() -> i32 =
+fn main -> i32:
     let mut x = 9
     let t1 = borrow(&mut x)
     let t2 = t1
@@ -85,10 +85,10 @@ EOF2
 expect_build_warn_msg "$tmpdir/task_ephemeral_assign_warn.w" "ephemeral Task passed by value may escape"
 
 cat >"$tmpdir/task_ephemeral_async_block_warn.w" <<'EOF3'
-fn sink(t: i32) -> i32 =
+fn sink(t: i32) -> i32:
     t
 
-fn main() -> i32 =
+fn main -> i32:
     let mut x = 3
     let r = &mut x
     let t = async: *r
@@ -98,13 +98,13 @@ EOF3
 expect_build_warn_msg "$tmpdir/task_ephemeral_async_block_warn.w" "ephemeral Task passed by value may escape"
 
 cat >"$tmpdir/task_ephemeral_owned_ok.w" <<'EOF4'
-async fn owned(x: i32) -> i32 =
+async fn owned(x: i32) -> i32:
     x + 1
 
-fn sink(t: i32) -> i32 =
+fn sink(t: i32) -> i32:
     t
 
-fn main() -> i32 =
+fn main -> i32:
     let t = owned(1)
     sink(t)
     0
@@ -112,13 +112,13 @@ EOF4
 expect_build_pass_no_msg "$tmpdir/task_ephemeral_owned_ok.w" "ephemeral Task passed by value may escape"
 
 cat >"$tmpdir/task_ephemeral_byref_ok.w" <<'EOF5'
-async fn borrow(x: &mut i32) -> i32 =
+async fn borrow(x: &mut i32) -> i32:
     *x
 
-fn inspect(t: &i32) -> i32 =
+fn inspect(t: &i32) -> i32:
     *t
 
-fn main() -> i32 =
+fn main -> i32:
     let mut x = 11
     let t = borrow(&mut x)
     inspect(&t)

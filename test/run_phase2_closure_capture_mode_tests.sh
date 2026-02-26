@@ -41,7 +41,7 @@ expect_check_fail_msg() {
 }
 
 cat >"$tmpdir/closure_capture_copy_ok.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     let x = 5
     let f = |n| n + x
     let y = x + 1
@@ -51,9 +51,9 @@ expect_run_pass "$tmpdir/closure_capture_copy_ok.w"
 
 cat >"$tmpdir/closure_capture_move_fail.w" <<'EOF2'
 type Box = { v: i32 }
-fn Box.drop(self: Box) -> void = assert(true)
+fn Box.drop(self: Box) -> void: assert(true)
 
-fn main() -> i32 =
+fn main -> i32:
     let b = Box { v: 2 }
     let f = |n| n + b.v
     let z = b.v
@@ -63,12 +63,12 @@ expect_check_fail_msg "$tmpdir/closure_capture_move_fail.w" "use of moved value"
 
 cat >"$tmpdir/closure_capture_nonescaping_borrow_ok.w" <<'EOF3'
 type Box = { v: i32 }
-fn Box.drop(self: Box) -> void = assert(true)
+fn Box.drop(self: Box) -> void: assert(true)
 
-fn apply(f: fn(i32) -> i32, x: i32) -> i32 =
+fn apply(f: fn(i32) -> i32, x: i32) -> i32:
     f(x)
 
-fn main() -> i32 =
+fn main -> i32:
     let b = Box { v: 3 }
     let r = apply(|n| n + b.v, 1)
     let still = b.v

@@ -5,19 +5,19 @@ type Rect = {
 }
 
 impl Rect =
-    fn area(self: Rect) -> i32 =
+    fn area(self: Rect) -> i32:
         self.width * self.height
 
-    fn perimeter(self: Rect) -> i32 =
+    fn perimeter(self: Rect) -> i32:
         2 * (self.width + self.height)
 
-    fn is_square(self: Rect) -> bool =
+    fn is_square(self: Rect) -> bool:
         self.width == self.height
 
-    fn scale(self: Rect, factor: i32) -> Rect =
+    fn scale(self: Rect, factor: i32) -> Rect:
         Rect { width: self.width * factor, height: self.height * factor }
 
-fn main() -> i32 =
+fn main -> i32:
     let r = Rect { width: 3, height: 4 }
     assert(r.area() == 12)
     assert(r.perimeter() == 14)
@@ -34,4 +34,3 @@ fn main() -> i32 =
     assert(big.area() == 48)
 
     println("all struct methods tests passed")
-    0

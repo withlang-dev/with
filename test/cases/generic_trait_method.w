@@ -5,8 +5,8 @@ trait Maker =
 type Id = {}
 
 impl Maker for Id =
-    fn make[T](self: Id, x: T) -> T = x
+    fn make[T](self: Id, x: T) -> T: x
 
-fn main() -> i32 =
+fn main -> i32:
     let id = Id {}
     if id.make(42) == 42 then 0 else 1

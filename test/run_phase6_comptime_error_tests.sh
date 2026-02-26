@@ -49,14 +49,14 @@ expect_run_pass "test/cases/comptime_error.w"
 
 # Negative: direct comptime_error call fails compilation/run.
 cat >"$tmpdir/comptime_error_direct_fail.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     comptime_error("boom")
 EOF1
 expect_run_fail_msg "$tmpdir/comptime_error_direct_fail.w" "comptime_error"
 
 # Negative: taken comptime-if branch triggers comptime_error.
 cat >"$tmpdir/comptime_error_taken_branch_fail.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     comptime if 2 > 1:
         comptime_error("taken")
     0

@@ -21,7 +21,7 @@ else
 fi
 
 cat >"$tmpdir/cfg_semantics_ok.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     var i = 0
     if i == 0 then
         i = i + 1
@@ -37,7 +37,7 @@ else
 fi
 
 cat >"$tmpdir/cfg_parse_fail.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     if true then
 EOF2
 if "$WITH_BIN" check "$tmpdir/cfg_parse_fail.w" >/dev/null 2>/dev/null; then

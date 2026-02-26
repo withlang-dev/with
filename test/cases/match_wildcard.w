@@ -2,17 +2,17 @@
 
 type Day = Mon | Tue | Wed | Thu | Fri | Sat | Sun
 
-fn is_weekend(d: Day) -> bool =
+fn is_weekend(d: Day) -> bool:
     match d
         Sat | Sun -> true
         _ -> false
 
-fn day_type(d: Day) -> i32 =
+fn day_type(d: Day) -> i32:
     match d
         Mon | Tue | Wed | Thu | Fri -> 1
         Sat | Sun -> 2
 
-fn main() -> i32 =
+fn main -> i32:
     assert(not is_weekend(Mon))
     assert(not is_weekend(Wed))
     assert(is_weekend(Sat))
@@ -24,4 +24,3 @@ fn main() -> i32 =
     assert(day_type(Sun) == 2)
 
     println("ok")
-    0

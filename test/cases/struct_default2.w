@@ -5,7 +5,7 @@ type Config = {
     debug: bool = false,
 }
 
-fn main() -> i32 =
+fn main -> i32:
     // Only specify required fields, rest use defaults
     let c = Config { host: "localhost" }
     println(c.host)
@@ -17,4 +17,3 @@ fn main() -> i32 =
     println(c2.host)
     println(c2.port)
     println(c2.debug)
-    0

@@ -36,7 +36,7 @@ expect_cmd_fail() {
 }
 
 cat >"$tmpdir/driver_main.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     if 10 - 3 == 7 then 0 else 1
 EOF1
 
@@ -51,7 +51,7 @@ expect_cmd_pass "driver-run" "$WITH_BIN" run "$tmpdir/driver_main.w"
 
 mkdir -p "$tmpdir/cases"
 cat >"$tmpdir/cases/cmd_test_pass.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF2
 expect_cmd_pass "driver-test-dir" "$WITH_BIN" test "$tmpdir/cases"

@@ -49,39 +49,35 @@ expect_run_pass "test/cases/import_std_signal.w"
 cat >"$tmpdir/std_signal_constants_and_raise0_ok.w" <<'EOF1'
 use std.signal
 
-fn main() -> i32 =
+fn main -> i32:
     assert(sigint() == 2)
     assert(sigterm() == 15)
     assert(sigkill() == 9)
     assert(raise_signal(0) == 0)
-    0
 EOF1
 expect_run_pass "$tmpdir/std_signal_constants_and_raise0_ok.w"
 
 cat >"$tmpdir/std_signal_raise_arity_fail.w" <<'EOF2'
 use std.signal
 
-fn main() -> i32 =
+fn main -> i32:
     let _ = raise_signal()
-    0
 EOF2
 expect_check_fail_msg "$tmpdir/std_signal_raise_arity_fail.w" "expects 1 argument(s)"
 
 cat >"$tmpdir/std_signal_sigint_arity_fail.w" <<'EOF3'
 use std.signal
 
-fn main() -> i32 =
+fn main -> i32:
     let _ = sigint(1)
-    0
 EOF3
 expect_check_fail_msg "$tmpdir/std_signal_sigint_arity_fail.w" "expects 0 argument(s)"
 
 cat >"$tmpdir/std_signal_raise_type_fail.w" <<'EOF4'
 use std.signal
 
-fn main() -> i32 =
+fn main -> i32:
     let _ = raise_signal("bad")
-    0
 EOF4
 expect_check_fail_msg "$tmpdir/std_signal_raise_type_fail.w" "wrong type"
 

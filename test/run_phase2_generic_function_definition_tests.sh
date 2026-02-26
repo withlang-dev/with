@@ -34,13 +34,13 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/generic_fn_ok.w" <<'EOF1'
-fn id[T](x: T) -> T =
+fn id[T](x: T) -> T:
     x
 
-fn pair_first[T, U](x: T, y: U) -> T =
+fn pair_first[T, U](x: T, y: U) -> T:
     x
 
-fn main() -> i32 =
+fn main -> i32:
     let a = id(40)
     let b = id(true)
     let c = pair_first(2, 99)
@@ -49,10 +49,10 @@ EOF1
 expect_run_pass "$tmpdir/generic_fn_ok.w"
 
 cat >"$tmpdir/generic_fn_unknown_type_fail.w" <<'EOF2'
-fn bad[T](x: U) -> T =
+fn bad[T](x: U) -> T:
     x
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF2
 expect_check_fail "$tmpdir/generic_fn_unknown_type_fail.w"
@@ -61,7 +61,7 @@ cat >"$tmpdir/generic_fn_syntax_fail.w" <<'EOF3'
 fn bad[T(x: T) -> T =
     x
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF3
 expect_check_fail "$tmpdir/generic_fn_syntax_fail.w"

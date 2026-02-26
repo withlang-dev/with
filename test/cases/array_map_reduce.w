@@ -1,12 +1,12 @@
 // Test: array map and reduce chains
-fn square(x: i32) -> i32 = x * x
-fn triple(x: i32) -> i32 = x * 3
-fn add(a: i32, b: i32) -> i32 = a + b
-fn mul(a: i32, b: i32) -> i32 = a * b
-fn max_fn(a: i32, b: i32) -> i32 =
+fn square(x: i32) -> i32: x * x
+fn triple(x: i32) -> i32: x * 3
+fn add(a: i32, b: i32) -> i32: a + b
+fn mul(a: i32, b: i32) -> i32: a * b
+fn max_fn(a: i32, b: i32) -> i32:
     if a > b then a else b
 
-fn main() -> i32 =
+fn main -> i32:
     let arr = [1, 2, 3, 4, 5]
 
     // map then sum
@@ -49,4 +49,3 @@ fn main() -> i32 =
     assert(with_init == 106)
 
     println("all array_map_reduce tests passed")
-    0

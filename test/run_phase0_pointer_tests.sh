@@ -34,25 +34,24 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/pointer_ok.w" <<'EOF'
-fn id_const(p: *const i32) -> *const i32 =
+fn id_const(p: *const i32) -> *const i32:
     p
 
-fn id_mut(p: *mut i32) -> *mut i32 =
+fn id_mut(p: *mut i32) -> *mut i32:
     p
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF
 expect_check_pass "$tmpdir/pointer_ok.w"
 
 cat >"$tmpdir/pointer_mutability_mismatch.w" <<'EOF'
-fn takes_const(p: *const i32) -> *const i32 =
+fn takes_const(p: *const i32) -> *const i32:
     p
 
-fn main() -> i32 =
+fn main -> i32:
     let p: *mut i32 = 0 as *mut i32
     let _x = takes_const(p)
-    0
 EOF
 expect_check_fail "$tmpdir/pointer_mutability_mismatch.w"
 

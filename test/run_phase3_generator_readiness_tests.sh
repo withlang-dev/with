@@ -43,10 +43,10 @@ expect_run_pass "test/cases/gen_fib.w"
 expect_run_pass "test/cases/generator_stdlib_ready.w"
 
 cat >"$tmpdir/generator_type_mismatch_fail.w" <<'EOF1'
-gen fn bad_yield_type() -> i32 =
+gen fn bad_yield_type -> i32:
     yield "oops"
 
-fn main() -> i32 =
+fn main -> i32:
     var it = bad_yield_type()
     for _x in it:
         ()
@@ -55,11 +55,11 @@ EOF1
 expect_check_fail "$tmpdir/generator_type_mismatch_fail.w"
 
 cat >"$tmpdir/generator_ref_across_yield_fail.w" <<'EOF2'
-gen fn bad_ref_gen() -> &str =
+gen fn bad_ref_gen -> &str:
     let s = "hello"
     yield &s
 
-fn main() -> i32 =
+fn main -> i32:
     var it = bad_ref_gen()
     for _x in it:
         ()

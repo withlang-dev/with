@@ -1,5 +1,5 @@
 // Phase 2 gap: chained if let not implemented
-fn main() -> i32 =
+fn main -> i32:
     let a: ?i32 = Some(1)
     let b: ?i32 = Some(2)
     if let Some(x) = a, let Some(y) = b:

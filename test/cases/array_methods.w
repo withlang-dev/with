@@ -1,5 +1,5 @@
 // Test: Array methods
-fn main() -> i32 =
+fn main -> i32:
     let arr = [10, 20, 30, 40, 50]
 
     // .len
@@ -24,4 +24,3 @@ fn main() -> i32 =
     assert(arr.sum() == 150)
 
     println("all array method tests passed")
-    0

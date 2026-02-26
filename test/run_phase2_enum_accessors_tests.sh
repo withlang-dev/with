@@ -36,7 +36,7 @@ expect_build_fail() {
 cat >"$tmpdir/enum_accessors_all_ok.w" <<'EOF1'
 type Value = Num(i32) | Text(str) | Nil
 
-fn main() -> i32 =
+fn main -> i32:
     let n = Num(10)
     assert(n.is_Num())
     assert(not n.is_Text())
@@ -58,17 +58,15 @@ fn main() -> i32 =
 
     let u: Value = Nil
     assert(u.is_Nil())
-    0
 EOF1
 expect_run_pass "$tmpdir/enum_accessors_all_ok.w"
 
 cat >"$tmpdir/enum_accessors_unit_as_fail.w" <<'EOF2'
 type Value = Num(i32) | Text(str) | Nil
 
-fn main() -> i32 =
+fn main -> i32:
     let v: Value = Nil
     let _bad = v.as_Nil()
-    0
 EOF2
 expect_build_fail "$tmpdir/enum_accessors_unit_as_fail.w"
 

@@ -1,8 +1,8 @@
 // Test: closures capturing variables in different scopes
-fn apply(f: fn(i32) -> i32, x: i32) -> i32 =
+fn apply(f: fn(i32) -> i32, x: i32) -> i32:
     f(x)
 
-fn main() -> i32 =
+fn main -> i32:
     // capture a let binding
     let base = 100
     let add_base = |x| x + base
@@ -33,4 +33,3 @@ fn main() -> i32 =
     assert(plain(9) == 10)
 
     println("all closure capture mut tests passed")
-    0

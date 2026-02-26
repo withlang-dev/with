@@ -1,0 +1,9 @@
+exit: 0
+stdout:
+inner defer 2
+inner defer 1
+42
+main defer
+
+stderr:
+

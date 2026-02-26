@@ -1,6 +1,6 @@
 // Test string indexing
 
-fn main() -> i32 =
+fn main -> i32:
     let s = "hello"
     let first = s[0]
     let last = s[4]
@@ -10,4 +10,3 @@ fn main() -> i32 =
     // 'e' = 101, 'l' = 108
     assert(s[1] == 101)
     assert(s[2] == 108)
-    0

@@ -438,7 +438,7 @@ fn findBindingInExpr(expr: *const Ast.Expr, sym: InternPool.Symbol) ?*const Ast.
         },
         .while_expr => |we| return findBindingInExpr(we.body, sym),
         .for_expr => |fe| return findBindingInExpr(fe.body, sym),
-        .loop_expr => |le| return findBindingInExpr(le, sym),
+        .loop_expr => |le| return findBindingInExpr(le.body, sym),
         else => {},
     }
     return null;
@@ -718,7 +718,7 @@ fn findBindingSpanInExpr(expr: *const Ast.Expr, sym: InternPool.Symbol) ?@import
             }
             return findBindingSpanInExpr(fe.body, sym);
         },
-        .loop_expr => |le| return findBindingSpanInExpr(le, sym),
+        .loop_expr => |le| return findBindingSpanInExpr(le.body, sym),
         .with_expr => |we| {
             if (we.name == sym) return expr.span;
             return findBindingSpanInExpr(we.body, sym);
@@ -1000,7 +1000,7 @@ fn collectBindingsFromExpr(self: *Self, expr: *const Ast.Expr, pool: *InternPool
             }
             self.collectBindingsFromExpr(fe.body, pool, prefix, buf, pos, item_count, seen);
         },
-        .loop_expr => |le| self.collectBindingsFromExpr(le, pool, prefix, buf, pos, item_count, seen),
+        .loop_expr => |le| self.collectBindingsFromExpr(le.body, pool, prefix, buf, pos, item_count, seen),
         .with_expr => |we| {
             const name = pool.resolve(we.name);
             self.addCompletionItem(name, 6, prefix, buf, pos, item_count, seen);

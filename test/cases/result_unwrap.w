@@ -1,8 +1,8 @@
 // Test: result unwrap_or, map_err chain
-fn negate(x: i32) -> i32 = 0 - x
-fn double(x: i32) -> i32 = x * 2
+fn negate(x: i32) -> i32: 0 - x
+fn double(x: i32) -> i32: x * 2
 
-fn main() -> i32 =
+fn main -> i32:
     // unwrap_or on Ok
     let a: Result[i32, i32] = Ok(42)
     assert(a.unwrap_or(0) == 42)
@@ -27,4 +27,3 @@ fn main() -> i32 =
     let h = g.map_err(negate)
     assert(h.unwrap() == 42)
 
-    0

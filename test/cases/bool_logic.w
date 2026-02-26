@@ -1,5 +1,5 @@
 // Test boolean logic operations
-fn main() -> i32 =
+fn main -> i32:
     // Short-circuit and
     println(true and true)
     println(true and false)
@@ -13,4 +13,3 @@ fn main() -> i32 =
     // Not
     println(not true)
     println(not false)
-    0

@@ -42,9 +42,8 @@ expect_run_pass "test/cases/async_basic.w"
 cat >"$tmpdir/fiber_pool_reuses_arity_fail.w" <<'EOF1'
 extern fn with_fiber_pool_reuses() -> i64
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = with_fiber_pool_reuses(1)
-    0
 EOF1
 expect_run_fail "$tmpdir/fiber_pool_reuses_arity_fail.w"
 

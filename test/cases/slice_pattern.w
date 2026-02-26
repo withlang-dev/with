@@ -1,5 +1,5 @@
 // Test: Slice patterns in match
-fn main() -> i32 =
+fn main -> i32:
     let arr = [10, 20, 30]
 
     // Match on fixed array with exact length
@@ -25,4 +25,3 @@ fn main() -> i32 =
     assert(val == 42)
 
     println("all slice pattern tests passed")
-    0

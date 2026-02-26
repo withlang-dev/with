@@ -1,5 +1,5 @@
 // Test: for loop with break and continue
-fn main() -> i32 =
+fn main -> i32:
     // Sum numbers 1..20, skip multiples of 3, break at 15
     var sum: i32 = 0
     for i in 1..20:
@@ -19,4 +19,3 @@ fn main() -> i32 =
     // 0+1+2+3+4+5+6+7+8+9 = 45 >= 42
     assert(total >= 42)
 
-    0

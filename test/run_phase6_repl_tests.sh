@@ -63,6 +63,8 @@ expect_repl_contains $'let x = 5\nx + 1\n:quit\n' '6'
 expect_repl_contains $'let v = Vec.of(1, 2, 3)\nv.push(5)\nv.len()\n:quit\n' '4'
 expect_repl_contains $'var count = 0\ncount += 1\ncount += 1\ncount\n:quit\n' '2'
 expect_repl_contains $'let m: HashMap[str, i32] = HashMap.new()\nm.insert("a", 1)\nm.insert("b", 2)\nm.len()\n:quit\n' '2'
+expect_repl_contains $'let x = 10\nlet x = 20\nx\n:quit\n' '20'
+expect_repl_contains $'fn double(n: i32) -> i32 = n * 2\ndouble(21)\nfn double(n: i32) -> i32 = n * 3\ndouble(21)\n:quit\n' '63'
 
 # Positive: help and clear commands.
 expect_repl_contains $':help\n:quit\n' 'Commands:'

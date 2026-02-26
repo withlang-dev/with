@@ -84,19 +84,19 @@ expect_fmt_parse_fail() {
 
 # Positive: canonical formatting for comment-free source.
 cat >"$tmpdir/fmt_canonical_ok.w" <<'EOF1'
-fn   main()->i32=1+2
+fn   main ->i32: 1+2
 EOF1
-expect_fmt_contains "$tmpdir/fmt_canonical_ok.w" "fn main() -> i32 ="
+expect_fmt_contains "$tmpdir/fmt_canonical_ok.w" "fn main -> i32:"
 expect_fmt_contains "$tmpdir/fmt_canonical_ok.w" "(1 + 2)"
 
 # Positive: comment preservation path keeps comment-bearing input intact.
 cat >"$tmpdir/fmt_comment_preserve_ok.w" <<'EOF2'
 // top comment
-fn main() -> i32 =
+fn main -> i32:
     // inner comment
     0
 EOF2
-expected_comment_preserved=$'// top comment\nfn main() -> i32 =\n    // inner comment\n    0\n'
+expected_comment_preserved=$'// top comment\nfn main -> i32:\n    // inner comment\n    0\n'
 expect_fmt_equal "$tmpdir/fmt_comment_preserve_ok.w" "$expected_comment_preserved"
 
 # Non-happy-path: missing file argument.

@@ -34,7 +34,7 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/copy_i32.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     let a: i32 = 10
     let b = a
     if a + b == 20 then 0 else 1
@@ -44,7 +44,7 @@ expect_check_pass "$tmpdir/copy_i32.w"
 cat >"$tmpdir/copy_struct.w" <<'EOF2'
 type Point = { x: i32, y: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let p1 = Point { x: 1, y: 2 }
     let p2 = p1
     if p1.x + p2.x == 2 then 0 else 1
@@ -54,10 +54,10 @@ expect_check_pass "$tmpdir/copy_struct.w"
 cat >"$tmpdir/noncopy_drop.w" <<'EOF3'
 type Res = { v: i32 }
 
-fn Res.drop(self: Res) -> void =
+fn Res.drop(self: Res) -> void:
     let _cleanup = self.v
 
-fn main() -> i32 =
+fn main -> i32:
     let r1 = Res { v: 5 }
     let _r2 = r1
     if r1.v == 5 then 0 else 1

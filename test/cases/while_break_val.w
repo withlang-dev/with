@@ -1,5 +1,5 @@
 // Test: while loop with break and continue
-fn main() -> i32 =
+fn main -> i32:
     // basic while with break
     var i: i32 = 0
     while true:
@@ -46,4 +46,3 @@ fn main() -> i32 =
     assert(total == 37)
 
     println("all while break val tests passed")
-    0

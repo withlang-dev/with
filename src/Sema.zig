@@ -247,6 +247,8 @@ type_impls: std.AutoHashMapUnmanaged(Symbol, std.ArrayList(Symbol)),
 local_trait_names: std.AutoHashMapUnmanaged(Symbol, void),
 /// Locally-declared types (used for orphan rule checks).
 local_type_names: std.AutoHashMapUnmanaged(Symbol, void),
+/// Types marked as ephemeral.
+ephemeral_types: std.AutoHashMapUnmanaged(Symbol, void),
 /// File id for the primary module being checked (used to distinguish local declarations from imports).
 local_file_id: Span.FileId,
 /// Method declaration origin by top-level declaration index.
@@ -337,6 +339,7 @@ pub fn init(allocator: std.mem.Allocator, pool: *InternPool, diagnostics: *Diagn
         .type_impls = .{},
         .local_trait_names = .{},
         .local_type_names = .{},
+        .ephemeral_types = .{},
         .local_file_id = 0,
         .method_decl_origins = .{},
         .method_has_inherent = .{},
@@ -423,6 +426,7 @@ pub fn deinit(self: *Sema) void {
     self.type_impls.deinit(self.allocator);
     self.local_trait_names.deinit(self.allocator);
     self.local_type_names.deinit(self.allocator);
+    self.ephemeral_types.deinit(self.allocator);
     self.method_decl_origins.deinit(self.allocator);
     self.method_has_inherent.deinit(self.allocator);
     self.must_use_fns.deinit(self.allocator);
@@ -851,6 +855,9 @@ fn collectTypeDecl(self: *Sema, td: Ast.TypeDecl, span: Span) void {
             self.named_types.put(self.allocator, td.name, tid) catch {};
         },
     }
+    if (td.is_ephemeral) {
+        self.ephemeral_types.put(self.allocator, td.name, {}) catch {};
+    }
     if (span.file == self.local_file_id) {
         self.local_type_names.put(self.allocator, td.name, {}) catch {};
     }
@@ -878,6 +885,12 @@ fn collectFnDecl(self: *Sema, fn_decl: Ast.FnDecl) void {
     const ret_type = if (fn_decl.return_type) |rt| blk: {
         if (typeExprContainsRef(rt)) {
             self.emitError("ephemeral references cannot be returned from functions", rt.span);
+        }
+        // Check if the return type is a named ephemeral type.
+        if (rt.kind == .named) {
+            if (self.ephemeral_types.get(rt.kind.named) != null) {
+                self.emitError("ephemeral types cannot be returned from functions", rt.span);
+            }
         }
         break :blk self.resolveTypeExpr(rt);
     } else self.ty_void;
@@ -1038,7 +1051,10 @@ fn collectImplDecl(self: *Sema, id: Ast.ImplDecl, span: Span) void {
     // Record which traits a type implements.
     const trait_sym = id.trait_name orelse return; // plain `impl Type` has no trait
 
-    if (self.trait_methods.get(trait_sym) == null and self.trait_decls.get(trait_sym) == null) {
+    // Drop is a built-in trait (no explicit declaration needed).
+    const trait_name = self.pool.resolve(trait_sym);
+    const is_builtin_trait = std.mem.eql(u8, trait_name, "Drop");
+    if (!is_builtin_trait and self.trait_methods.get(trait_sym) == null and self.trait_decls.get(trait_sym) == null) {
         self.emitError("unknown trait", span);
         return;
     }
@@ -1047,7 +1063,7 @@ fn collectImplDecl(self: *Sema, id: Ast.ImplDecl, span: Span) void {
         return;
     }
 
-    const trait_is_local = self.local_trait_names.get(trait_sym) != null;
+    const trait_is_local = self.local_trait_names.get(trait_sym) != null or is_builtin_trait;
     const type_is_local = self.local_type_names.get(id.type_name) != null;
     if (!trait_is_local and !type_is_local) {
         self.emitError("orphan rule violation: impl requires a local trait or local type", span);
@@ -1116,6 +1132,30 @@ fn checkTraitConformance(self: *Sema, module: *const Ast.Module) void {
                         const msg = std.fmt.bufPrint(&buf, "type '{s}' is missing method '{s}' required by trait '{s}'", .{ type_str, req_str, trait_str }) catch "missing trait method";
                         const alloc_msg = self.allocator.dupe(u8, msg) catch "missing trait method";
                         self.emitError(alloc_msg, decl.span);
+                    }
+                }
+
+                // Check that all required associated types are provided.
+                if (trait_decl) |td| {
+                    for (td.associated_types) |at| {
+                        // Skip associated types with defaults.
+                        if (at.default != null) continue;
+                        var at_found = false;
+                        for (id.associated_types) |binding| {
+                            if (binding.name == at.name) {
+                                at_found = true;
+                                break;
+                            }
+                        }
+                        if (!at_found) {
+                            var buf2: [256]u8 = undefined;
+                            const type_str2 = self.pool.resolve(id.type_name);
+                            const trait_str2 = self.pool.resolve(trait_sym);
+                            const at_str = self.pool.resolve(at.name);
+                            const msg2 = std.fmt.bufPrint(&buf2, "type '{s}' is missing associated type '{s}' required by trait '{s}'", .{ type_str2, at_str, trait_str2 }) catch "missing associated type";
+                            const alloc_msg2 = self.allocator.dupe(u8, msg2) catch "missing associated type";
+                            self.emitError(alloc_msg2, decl.span);
+                        }
                     }
                 }
             },
@@ -1278,7 +1318,7 @@ fn checkGenericExprBounds(self: *Sema, expr: *const Ast.Expr, param_infos: []con
             self.checkGenericExprBounds(w.condition, param_infos);
             self.checkGenericExprBounds(w.body, param_infos);
         },
-        .loop_expr => |body| self.checkGenericExprBounds(body, param_infos),
+        .loop_expr => |le| self.checkGenericExprBounds(le.body, param_infos),
         .yield_expr => |y| self.checkGenericExprBounds(y, param_infos),
         .await_expr => |a| self.checkGenericExprBounds(a, param_infos),
         .async_block => |ab| self.checkGenericExprBounds(ab, param_infos),
@@ -1648,12 +1688,15 @@ fn checkFnBody(self: *Sema, fn_decl: Ast.FnDecl) void {
         if (self.isImplicitNarrowing(sig.return_type, body_type)) {
             self.emitError("E0201: implicit narrowing conversion", fn_decl.body.span);
         } else if (!self.typesCompatible(sig.return_type, body_type) and self.arithmeticResultType(sig.return_type, body_type) == error_type) {
-            var buf: [256]u8 = undefined;
-            const expected = self.typeName(sig.return_type);
-            const actual = self.typeName(body_type);
-            const msg = std.fmt.bufPrint(&buf, "return type mismatch: expected '{s}', found '{s}'", .{ expected, actual }) catch "return type mismatch";
-            const alloc_msg = self.allocator.dupe(u8, msg) catch "return type mismatch";
-            self.emitError(alloc_msg, fn_decl.body.span);
+            // Implicit default return: allow void body when return type has Default.
+            if (body_type != self.ty_void or !self.typeHasDefault(sig.return_type)) {
+                var buf: [256]u8 = undefined;
+                const expected = self.typeName(sig.return_type);
+                const actual = self.typeName(body_type);
+                const msg = std.fmt.bufPrint(&buf, "return type mismatch: expected '{s}', found '{s}'", .{ expected, actual }) catch "return type mismatch";
+                const alloc_msg = self.allocator.dupe(u8, msg) catch "return type mismatch";
+                self.emitError(alloc_msg, fn_decl.body.span);
+            }
         }
     }
 
@@ -1783,10 +1826,10 @@ fn validateTailRecUsage(
             self.validateTailRecUsage(p.rhs, fn_name, false, saw_tail, bad_span),
         .while_expr => |w| self.validateTailRecUsage(w.condition, fn_name, false, saw_tail, bad_span) and
             self.validateTailRecUsage(w.body, fn_name, false, saw_tail, bad_span),
-        .loop_expr => |body| self.validateTailRecUsage(body, fn_name, false, saw_tail, bad_span),
+        .loop_expr => |le| self.validateTailRecUsage(le.body, fn_name, false, saw_tail, bad_span),
         .for_expr => |f| self.validateTailRecUsage(f.iterable, fn_name, false, saw_tail, bad_span) and
             self.validateTailRecUsage(f.body, fn_name, false, saw_tail, bad_span),
-        .break_expr => |v| if (v) |inner|
+        .break_expr => |be| if (be.value) |inner|
             self.validateTailRecUsage(inner, fn_name, false, saw_tail, bad_span)
         else
             true,
@@ -1904,22 +1947,22 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
         },
         .assign => |assign_e| self.checkAssign(assign_e, expr.span),
         .while_expr => |while_e| self.checkWhile(while_e),
-        .loop_expr => |body| self.checkLoop(body),
+        .loop_expr => |le| self.checkLoop(le.body),
         .for_expr => |for_e| self.checkFor(for_e),
-        .break_expr => |brk_val| {
+        .break_expr => |be| {
             if (self.in_defer) {
                 self.emitError("non-local control flow in defer: break is not allowed inside defer blocks", expr.span);
             }
             if (self.loop_depth == 0) {
                 self.emitError("break outside of loop", expr.span);
             }
-            if (brk_val) |v| {
+            if (be.value) |v| {
                 const vt = self.checkExpr(v);
                 if (vt != error_type) self.break_value_type = vt;
             }
             return self.ty_void;
         },
-        .continue_expr => {
+        .continue_expr => |_| {
             if (self.in_defer) {
                 self.emitError("non-local control flow in defer: continue is not allowed inside defer blocks", expr.span);
             }
@@ -1988,7 +2031,10 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
         },
         .tuple => |elems| self.checkTuple(elems),
         .range => |r| self.checkRange(r),
-        .variant_shorthand => |sym| self.checkVariantShorthand(sym, expr.span, self.expected_expr_type),
+        .variant_shorthand => |vs| {
+            for (vs.args) |arg| _ = self.checkExpr(arg);
+            return self.checkVariantShorthand(vs.name, expr.span, self.expected_expr_type);
+        },
         .with_expr => |w| {
             const source_ty = self.checkExpr(w.source);
             var bind_ty = source_ty;
@@ -2336,6 +2382,8 @@ fn checkBinary(self: *Sema, bin: Ast.BinaryExpr, span: Span) TypeId {
         },
         // Default operator (??).
         .default_op => lhs,
+        // String concatenation (++).
+        .concat => self.ty_str,
     };
 }
 
@@ -2737,6 +2785,7 @@ fn typeIsEphemeralValue(self: *Sema, ty: TypeId) bool {
     return switch (self.getType(resolved)) {
         .ref_type => true,
         .slice_type => true,
+        .struct_type => |st| self.ephemeral_types.get(st.name) != null,
         .tuple_type => |tt| blk: {
             for (tt.elements) |elem| {
                 if (self.typeIsEphemeralValue(elem)) break :blk true;
@@ -2904,7 +2953,8 @@ fn checkLoop(self: *Sema, body: *const Ast.Expr) TypeId {
 
 fn exprDefinitelyDiverges(self: *Sema, expr: *const Ast.Expr) bool {
     return switch (expr.kind) {
-        .return_expr, .break_expr, .continue_expr => true,
+        .return_expr, .break_expr => true,
+        .continue_expr => |_| true,
         .block => |blk| blk: {
             for (blk.stmts) |stmt| {
                 if (self.exprDefinitelyDiverges(stmt)) break :blk true;
@@ -3565,28 +3615,37 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
 
                 const payload_opt = et.variant_payloads[variant_index.?];
                 const expected_count: usize = if (payload_opt) |payloads| payloads.len else 0;
-                if (vp.bindings.len != expected_count) {
+                // Only check arity for simple bindings, not nested patterns.
+                if (vp.nested_patterns.len == 0 and vp.bindings.len != expected_count) {
                     self.emitError("variant pattern payload arity mismatch", pattern.span);
                 }
 
                 if (payload_opt) |payloads| {
-                    const bind_count = @min(vp.bindings.len, payloads.len);
-                    for (vp.bindings[0..bind_count], 0..) |binding_sym, i| {
-                        const payload_type = payloads[i];
-                        self.current_scope.put(self.allocator, binding_sym, .{
-                            .type_id = payload_type,
-                            .is_mut = false,
-                            .state = .live,
-                            .span = pattern.span,
-                        });
-                    }
-                    for (vp.bindings[bind_count..]) |binding_sym| {
-                        self.current_scope.put(self.allocator, binding_sym, .{
-                            .type_id = error_type,
-                            .is_mut = false,
-                            .state = .live,
-                            .span = pattern.span,
-                        });
+                    // Handle nested patterns: recursively check each against its payload type.
+                    if (vp.nested_patterns.len > 0) {
+                        const np_count = @min(vp.nested_patterns.len, payloads.len);
+                        for (vp.nested_patterns[0..np_count], 0..) |*np, i| {
+                            self.checkPattern(np, payloads[i]);
+                        }
+                    } else {
+                        const bind_count = @min(vp.bindings.len, payloads.len);
+                        for (vp.bindings[0..bind_count], 0..) |binding_sym, i| {
+                            const payload_type = payloads[i];
+                            self.current_scope.put(self.allocator, binding_sym, .{
+                                .type_id = payload_type,
+                                .is_mut = false,
+                                .state = .live,
+                                .span = pattern.span,
+                            });
+                        }
+                        for (vp.bindings[bind_count..]) |binding_sym| {
+                            self.current_scope.put(self.allocator, binding_sym, .{
+                                .type_id = error_type,
+                                .is_mut = false,
+                                .state = .live,
+                                .span = pattern.span,
+                            });
+                        }
                     }
                 } else {
                     for (vp.bindings) |binding_sym| {
@@ -3596,6 +3655,10 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                             .state = .live,
                             .span = pattern.span,
                         });
+                    }
+                    // For nested patterns on unit variants, still recurse.
+                    for (vp.nested_patterns) |*np| {
+                        self.checkPattern(np, error_type);
                     }
                 }
                 return;
@@ -3613,6 +3676,10 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                         .span = pattern.span,
                     });
                 }
+                // Recursively check nested patterns (e.g. Some(Some(v))).
+                for (vp.nested_patterns) |*np| {
+                    self.checkPattern(np, error_type);
+                }
                 return;
             }
 
@@ -3628,6 +3695,9 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                     .state = .live,
                     .span = pattern.span,
                 });
+            }
+            for (vp.nested_patterns) |*np| {
+                self.checkPattern(np, error_type);
             }
         },
         .or_pattern => |alternatives| {
@@ -3709,6 +3779,24 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                     .state = .live,
                     .span = pattern.span,
                 });
+            }
+        },
+        .struct_pattern => |sp| {
+            // For struct patterns, bind field shorthand names.
+            // Full type-checking of field types would require struct type resolution.
+            for (sp.fields) |field| {
+                if (field.pattern) |p| {
+                    // Field with explicit pattern: `x: 0` — check inner pattern
+                    self.checkPattern(p, error_type);
+                } else {
+                    // Shorthand binding: `x` — bind as field type (use error_type as approx)
+                    self.current_scope.put(self.allocator, field.name, .{
+                        .type_id = error_type,
+                        .is_mut = false,
+                        .state = .live,
+                        .span = pattern.span,
+                    });
+                }
             }
         },
     }
@@ -4584,6 +4672,14 @@ fn dynArgConcreteTypeSymbol(self: *Sema, tid: TypeId) ?Symbol {
 
 // ── Type compatibility checking ──────────────────────────────────
 
+/// Check whether a type implements Default (can be implicitly returned).
+fn typeHasDefault(self: *const Sema, ty: TypeId) bool {
+    return ty == self.ty_i8 or ty == self.ty_i16 or ty == self.ty_i32 or ty == self.ty_i64 or
+        ty == self.ty_u8 or ty == self.ty_u16 or ty == self.ty_u32 or ty == self.ty_u64 or
+        ty == self.ty_f32 or ty == self.ty_f64 or
+        ty == self.ty_bool or ty == self.ty_str;
+}
+
 fn typesCompatible(self: *const Sema, expected: TypeId, actual: TypeId) bool {
     if (expected == actual) return true;
     if (expected == error_type or actual == error_type) return true;
@@ -5005,8 +5101,8 @@ fn exprUsesSymbol(expr: *const Ast.Expr, sym: Symbol) bool {
         },
         .for_expr => |f| exprUsesSymbol(f.iterable, sym) or exprUsesSymbol(f.body, sym),
         .while_expr => |w| exprUsesSymbol(w.condition, sym) or exprUsesSymbol(w.body, sym),
-        .loop_expr => |b| exprUsesSymbol(b, sym),
-        .break_expr => |v| if (v) |val| exprUsesSymbol(val, sym) else false,
+        .loop_expr => |le| exprUsesSymbol(le.body, sym),
+        .break_expr => |be| if (be.value) |val| exprUsesSymbol(val, sym) else false,
         .comptime_expr => |inner| exprUsesSymbol(inner, sym),
         .pipeline => |p| exprUsesSymbol(p.lhs, sym) or exprUsesSymbol(p.rhs, sym),
         .with_expr => |w| exprUsesSymbol(w.source, sym) or exprUsesSymbol(w.body, sym),

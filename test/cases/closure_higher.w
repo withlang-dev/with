@@ -1,9 +1,9 @@
 // Test: higher-order functions with closures
 
-fn apply_twice(f: fn(i32) -> i32, x: i32) -> i32 =
+fn apply_twice(f: fn(i32) -> i32, x: i32) -> i32:
     f(f(x))
 
-fn main() -> i32 =
+fn main -> i32:
     // Non-capturing closures work as function pointers
     let doubled = apply_twice(|x| x * 2, 3)
     println(doubled)
@@ -14,4 +14,3 @@ fn main() -> i32 =
     let squared = apply_twice(|x| x * x, 2)
     println(squared)
 
-    0

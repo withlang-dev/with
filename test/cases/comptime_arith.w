@@ -1,5 +1,5 @@
 // Test comptime arithmetic evaluation
-fn main() -> i32 =
+fn main -> i32:
     let a = comptime 3 + 4 * 2
     println(a)
 
@@ -8,4 +8,3 @@ fn main() -> i32 =
 
     let c = comptime if 5 > 3 then 100 else 200
     println(c)
-    0

@@ -52,13 +52,13 @@ cat >"$tmpdir/scoped_enter_methods_ok.w" <<'EOF1'
 type Box = { v: i32 }
 
 impl Box =
-    fn enter(self: Box) -> i32 =
+    fn enter(self: Box) -> i32:
         self.v
 
-    fn enter_mut(self: Box) -> i32 =
+    fn enter_mut(self: Box) -> i32:
         self.v + 1
 
-fn main() -> i32 =
+fn main -> i32:
     let b = Box { v: 4 }
     let a = with b as x:
         x
@@ -76,10 +76,10 @@ trait IndexLike =
 type IntPair = { a: i32, b: i32 }
 
 impl IndexLike for IntPair =
-    fn get(self: IntPair, idx: i32) -> i32 =
+    fn get(self: IntPair, idx: i32) -> i32:
         if idx == 0 then self.a else self.b
 
-fn main() -> i32 =
+fn main -> i32:
     let p = IntPair { a: 7, b: 9 }
     if p[0] == 7 and p[1] == 9 then 0 else 1
 EOF2
@@ -97,10 +97,10 @@ trait AddOps =
 type Vec2 = { x: i32, y: i32 }
 
 impl AddOps for Vec2 =
-    fn add(self: Vec2, other: Vec2) -> Vec2 =
+    fn add(self: Vec2, other: Vec2) -> Vec2:
         Vec2 { x: self.x + other.x, y: self.y + other.y }
 
-fn main() -> i32 =
+fn main -> i32:
     let a = Vec2 { x: 1, y: 2 }
     let b = Vec2 { x: 3, y: 4 }
     let c = a + b
@@ -116,12 +116,11 @@ trait DropLike =
 type R = { v: i32 }
 
 impl DropLike for R =
-    fn drop(self: R) =
+    fn drop(self: R):
         print("")
 
-fn main() -> i32 =
+fn main -> i32:
     let r = R { v: 1 }
-    0
 EOF4
 expect_run_pass "$tmpdir/drop_trait_method_ok.w"
 
@@ -132,22 +131,21 @@ cat >"$tmpdir/debug_print_fallback_ok.w" <<'EOF5'
 type D = { v: i32 }
 
 impl D =
-    fn debug(self: D) -> str =
+    fn debug(self: D) -> str:
         "D"
 
-fn main() -> i32 =
+fn main -> i32:
     println(D { v: 1 })
-    0
 EOF5
 expect_run_pass "$tmpdir/debug_print_fallback_ok.w"
 
 # Non-happy-path: `?` on non-Option/Result must fail.
 cat >"$tmpdir/try_non_option_fail.w" <<'EOF6'
-fn bad() -> i32 =
+fn bad -> i32:
     let x = 1
     x?
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF6
 expect_check_fail_msg "$tmpdir/try_non_option_fail.w" "? operator requires Option or Result"
 
@@ -156,14 +154,13 @@ cat >"$tmpdir/op_rhs_mismatch_fail.w" <<'EOF7'
 type Vec2 = { x: i32, y: i32 }
 
 impl Vec2 =
-    fn add(self: Vec2, other: Vec2) -> Vec2 =
+    fn add(self: Vec2, other: Vec2) -> Vec2:
         Vec2 { x: self.x + other.x, y: self.y + other.y }
 
-fn main() -> i32 =
+fn main -> i32:
     let v = Vec2 { x: 1, y: 2 }
     let n = 5
     let _ = v + n
-    0
 EOF7
 expect_check_fail_msg "$tmpdir/op_rhs_mismatch_fail.w" "operator overload rhs type mismatch"
 

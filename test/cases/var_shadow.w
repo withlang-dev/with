@@ -1,10 +1,10 @@
 // Test: variable shadowing in nested scopes
-fn shadow_test(x: i32) -> i32 =
+fn shadow_test(x: i32) -> i32:
     let a = x + 1
     let b = a + 1
     b
 
-fn main() -> i32 =
+fn main -> i32:
     let x: i32 = 10
     assert(x == 10)
     let y: i32 = 20
@@ -26,4 +26,3 @@ fn main() -> i32 =
     let b2: i32 = 2
     assert(a2 + b2 == 42)
 
-    0

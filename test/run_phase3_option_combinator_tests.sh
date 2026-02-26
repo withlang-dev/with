@@ -56,12 +56,12 @@ expect_run_pass "test/cases/option_chain_adv.w"
 expect_run_pass "test/cases/option_unwrap.w"
 
 cat >"$tmpdir/option_combinator_extended_ok.w" <<'EOF1'
-fn plus_one(x: i32) -> i32 = x + 1
-fn half_if_even(x: i32) -> ?i32 = if x % 2 == 0 then Some(x / 2) else None
-fn fallback() -> ?i32 = Some(9)
-fn is_even(x: i32) -> bool = x % 2 == 0
+fn plus_one(x: i32) -> i32: x + 1
+fn half_if_even(x: i32) -> ?i32: if x % 2 =: 0 then Some(x / 2) else None
+fn fallback -> ?i32: Some(9)
+fn is_even(x: i32) -> bool: x % 2 =: 0
 
-fn main() -> i32 =
+fn main -> i32:
     let a: ?i32 = Some(1)
     let mapped = a.map(plus_one)
     assert(mapped.unwrap_or(0) == 2)
@@ -88,31 +88,27 @@ fn main() -> i32 =
     let tr_src: ?Result[i32, str] = Some(Ok(1))
     let tr = tr_src.transpose()
     assert(tr.is_ok())
-    0
 EOF1
 expect_run_pass "$tmpdir/option_combinator_extended_ok.w"
 
 cat >"$tmpdir/option_or_else_bad_arg_fail.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     let a: ?i32 = None
     let _b = a.or_else(1)
-    0
 EOF2
 expect_run_fail "$tmpdir/option_or_else_bad_arg_fail.w"
 
 cat >"$tmpdir/option_zip_bad_arity_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let a: ?i32 = Some(1)
     let _z = a.zip()
-    0
 EOF3
 expect_run_fail "$tmpdir/option_zip_bad_arity_fail.w"
 
 cat >"$tmpdir/option_flatten_bad_type_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let a: ?i32 = Some(1)
     let _f = a.flatten()
-    0
 EOF4
 expect_run_fail "$tmpdir/option_flatten_bad_type_fail.w"
 

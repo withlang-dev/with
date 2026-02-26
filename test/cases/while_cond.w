@@ -1,5 +1,5 @@
 // Test: while loop with complex conditions
-fn main() -> i32 =
+fn main -> i32:
     // Count up while multiple conditions hold
     var x: i32 = 0
     var y: i32 = 100
@@ -30,4 +30,3 @@ fn main() -> i32 =
         k -= 1
     assert(k == 4)
 
-    0

@@ -1,10 +1,10 @@
 // Test: Advanced Option patterns
-fn safe_div(a: i32, b: i32) -> ?i32 =
+fn safe_div(a: i32, b: i32) -> ?i32:
     if b == 0 then None else Some(a / b)
 
-fn double(x: i32) -> i32 = x * 2
+fn double(x: i32) -> i32: x * 2
 
-fn main() -> i32 =
+fn main -> i32:
     // Basic Some/None
     let a = safe_div(10, 2)
     assert(a.is_some())
@@ -33,4 +33,3 @@ fn main() -> i32 =
     let j = i ?? 99
     assert(j == 7)
 
-    0

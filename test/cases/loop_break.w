@@ -1,5 +1,5 @@
 // Test loop with break
-fn main() -> i32 =
+fn main -> i32:
     let mut count = 0
     loop:
         count = count + 1
@@ -19,4 +19,3 @@ fn main() -> i32 =
             j = j + 1
         i = i + 1
     println(total)
-    0

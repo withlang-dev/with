@@ -1,5 +1,5 @@
 // Test: Iterator patterns - for loops over various ranges
-fn main() -> i32 =
+fn main -> i32:
     // Exclusive range
     var sum = 0
     for i in 0..5:
@@ -19,4 +19,3 @@ fn main() -> i32 =
         total = total + x
     assert(total == 60)
 
-    0

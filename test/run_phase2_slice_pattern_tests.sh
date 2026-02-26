@@ -34,7 +34,7 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/slice_exact_and_fallback_ok.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     let arr = [1, 2, 3]
     let v = match arr
         [a, b, c] -> a + b + c
@@ -48,7 +48,7 @@ EOF1
 expect_run_pass "$tmpdir/slice_exact_and_fallback_ok.w"
 
 cat >"$tmpdir/slice_rest_and_tail_ok.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     let arr = [10, 20, 30, 40, 50]
     let v = match arr
         [first, ..middle, last] ->
@@ -59,7 +59,7 @@ EOF2
 expect_run_pass "$tmpdir/slice_rest_and_tail_ok.w"
 
 cat >"$tmpdir/slice_rest_no_binding_ok.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let arr = [4, 5, 6]
     let v = match arr
         [_, .., tail] -> tail
@@ -69,7 +69,7 @@ EOF3
 expect_run_pass "$tmpdir/slice_rest_no_binding_ok.w"
 
 cat >"$tmpdir/slice_non_array_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let v = match 42
         [x, ..rest] -> x + rest as i32
         _ -> 0
@@ -78,7 +78,7 @@ EOF4
 expect_check_fail "$tmpdir/slice_non_array_fail.w"
 
 cat >"$tmpdir/slice_multiple_rest_fail.w" <<'EOF5'
-fn main() -> i32 =
+fn main -> i32:
     let arr = [1, 2, 3]
     let _v = match arr
         [a, ..r1, ..r2] -> a
@@ -88,7 +88,7 @@ EOF5
 expect_check_fail "$tmpdir/slice_multiple_rest_fail.w"
 
 cat >"$tmpdir/slice_rest_dotdot_eq_fail.w" <<'EOF6'
-fn main() -> i32 =
+fn main -> i32:
     let arr = [1, 2, 3]
     let _v = match arr
         [a, ..=rest] -> a

@@ -50,52 +50,51 @@ expect_check_fail_msg() {
 }
 
 cat >"$tmpdir/denied_e0802_unused_result_option_warn.w" <<'EOF1'
-fn fallible() -> Result[i32, i32] = Err(1)
+fn fallible -> Result[i32, i32]: Err(1)
 
-fn main() -> i32 =
+fn main -> i32:
     fallible()
     0
 EOF1
 expect_build_warn_msg "$tmpdir/denied_e0802_unused_result_option_warn.w" "E0802: unused Result/Option value"
 
 cat >"$tmpdir/denied_e0801_unused_task_warn.w" <<'EOF2'
-async fn work() -> i32 =
+async fn work -> i32:
     1
 
-fn main() -> i32 =
+fn main -> i32:
     work()
     0
 EOF2
 expect_build_warn_msg "$tmpdir/denied_e0801_unused_task_warn.w" "E0801: unused Task value"
 
 cat >"$tmpdir/denied_e0901_unnecessary_unsafe_warn.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     unsafe:
         0
 EOF3
 expect_build_warn_msg "$tmpdir/denied_e0901_unnecessary_unsafe_warn.w" "E0901: unnecessary unsafe block"
 
 cat >"$tmpdir/denied_e0601_unreachable_warn.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     return 0
     1
 EOF4
 expect_build_warn_msg "$tmpdir/denied_e0601_unreachable_warn.w" "E0601: unreachable code after return/break/continue"
 
 cat >"$tmpdir/denied_e0201_implicit_narrowing_fail.w" <<'EOF5'
-fn main() -> i32 =
+fn main -> i32:
     let x: i8 = 300
     x
 EOF5
 expect_check_fail_msg "$tmpdir/denied_e0201_implicit_narrowing_fail.w" "E0201: implicit narrowing conversion"
 
 cat >"$tmpdir/denied_e0701_may_suspend_guard_fail.w" <<'EOF6'
-fn task() -> i32 = 1
+fn task -> i32: 1
 
-fn main() -> i32 =
+fn main -> i32:
     let lock_guard = 1
     let _x = task().await
-    0
 EOF6
 expect_check_fail_msg "$tmpdir/denied_e0701_may_suspend_guard_fail.w" "E0701: may_suspend call while no_await_guard value is live"
 

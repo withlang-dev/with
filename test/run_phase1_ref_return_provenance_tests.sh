@@ -41,19 +41,19 @@ expect_check_fail_msg() {
 }
 
 cat >"$tmpdir/ref_return_fail.w" <<'EOF1'
-fn id_ref(x: &i32) -> &i32 =
+fn id_ref(x: &i32) -> &i32:
     x
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF1
 expect_check_fail_msg "$tmpdir/ref_return_fail.w" "ephemeral references cannot be returned from functions"
 
 cat >"$tmpdir/ref_return_ok_value.w" <<'EOF2'
-fn id_val(x: i32) -> i32 =
+fn id_val(x: i32) -> i32:
     x
 
-fn main() -> i32 =
+fn main -> i32:
     id_val(7)
 EOF2
 expect_check_pass "$tmpdir/ref_return_ok_value.w"

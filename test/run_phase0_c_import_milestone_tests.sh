@@ -36,7 +36,7 @@ expect_build_fail() {
 cat >"$tmpdir/c_import_stdio_milestone.w" <<'EOF1'
 use c_import("#include <stdio.h>")
 
-fn main() -> i32 =
+fn main -> i32:
     puts(c"milestone puts")
     printf(c"milestone printf %d\n", 42)
     0
@@ -46,7 +46,7 @@ expect_run_pass "$tmpdir/c_import_stdio_milestone.w"
 cat >"$tmpdir/c_import_stdio_negative.w" <<'EOF2'
 use c_import("#include <stdio.h>")
 
-fn main() -> i32 =
+fn main -> i32:
     if no_such_stdio_symbol() == 0 then 0 else 1
 EOF2
 expect_build_fail "$tmpdir/c_import_stdio_negative.w"

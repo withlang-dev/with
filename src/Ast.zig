@@ -65,10 +65,16 @@ pub const AssociatedType = struct {
     bounds: []const Symbol = &.{},
 };
 
+pub const AssociatedTypeBinding = struct {
+    name: Symbol,
+    type_expr: *const TypeExpr,
+};
+
 pub const ImplDecl = struct {
     trait_name: ?Symbol, // null for plain `impl Type` or `extend Type`
     type_name: Symbol,
     method_names: []const Symbol, // mangled names like "Type.method"
+    associated_types: []const AssociatedTypeBinding = &.{},
 };
 
 pub const TraitMethodSig = struct {
@@ -76,6 +82,7 @@ pub const TraitMethodSig = struct {
     params: []const Param,
     return_type: ?*const TypeExpr,
     has_type_params: bool = false,
+    is_async: bool = false,
     has_default: bool,
     default_body: ?*const Expr = null,
     span: Span,
@@ -126,6 +133,7 @@ pub const TypeDecl = struct {
     kind: TypeDeclKind,
     is_pub: Visibility,
     derive_traits: []const Symbol = &.{},
+    is_ephemeral: bool = false,
 };
 
 pub const TypeDeclKind = union(enum) {
@@ -216,8 +224,8 @@ pub const ExprKind = union(enum) {
     tuple: []const *const Expr,
     /// Range: `a..b` or `a..=b`
     range: RangeExpr,
-    /// Enum variant shorthand: `.Member`
-    variant_shorthand: Symbol,
+    /// Enum variant shorthand: `.Member` or `.Member(args)`
+    variant_shorthand: VariantShorthandExpr,
     /// Await: `expr.await`
     await_expr: *const Expr,
     /// Async block: `async: expr_or_block`
@@ -231,13 +239,13 @@ pub const ExprKind = union(enum) {
     /// While loop: `while cond: body`
     while_expr: WhileExpr,
     /// Infinite loop: `loop: body`
-    loop_expr: *const Expr,
+    loop_expr: LoopExpr,
     /// For loop: `for x in range: body`
     for_expr: ForExpr,
     /// Break out of a loop, optionally with a value: `break` or `break expr`
-    break_expr: ?*const Expr,
-    /// Continue to next loop iteration
-    continue_expr,
+    break_expr: BreakExpr,
+    /// Continue to next loop iteration, optionally with a label: `continue` or `continue 'label`
+    continue_expr: ContinueExpr,
     /// Array literal: `[1, 2, 3]`
     array_literal: []const *const Expr,
     /// Array comprehension: `[expr for x in iter]` or `[expr for x in iter if cond]`
@@ -299,6 +307,7 @@ pub const BinOp = enum {
     sub_wrap,
     mul_wrap,
     default_op, // ??
+    concat, // ++
 };
 
 pub const UnaryExpr = struct {
@@ -389,6 +398,12 @@ pub const RangeExpr = struct {
 pub const WhileExpr = struct {
     condition: *const Expr,
     body: *const Expr,
+    label: ?Symbol = null,
+};
+
+pub const LoopExpr = struct {
+    body: *const Expr,
+    label: ?Symbol = null,
 };
 
 pub const ForExpr = struct {
@@ -397,6 +412,16 @@ pub const ForExpr = struct {
     index_binding: ?Symbol,
     iterable: *const Expr,
     body: *const Expr,
+    label: ?Symbol = null,
+};
+
+pub const BreakExpr = struct {
+    value: ?*const Expr = null,
+    label: ?Symbol = null,
+};
+
+pub const ContinueExpr = struct {
+    label: ?Symbol = null,
 };
 
 pub const ArrayComprehension = struct {
@@ -468,6 +493,8 @@ pub const PatternKind = union(enum) {
     range_pattern: RangePattern,
     /// Slice pattern: `[a, b, ..rest]`, `[]`, `[only]`
     slice_pattern: SlicePattern,
+    /// Struct pattern: `{ x: 0, y, .. }` — destructure/match struct fields
+    struct_pattern: StructPattern,
 };
 
 pub const RangePattern = struct {
@@ -492,11 +519,30 @@ pub const AtBinding = struct {
     pattern: *const Pattern,
 };
 
+pub const StructPattern = struct {
+    /// Named type (optional): `Point { x, y }` — 0 if no type name (`{ x, y }`)
+    type_name: Symbol = 0,
+    /// Fields to match/bind
+    fields: []const StructPatternField,
+    /// Whether `..` rest was present (ignore remaining fields)
+    has_rest: bool = false,
+};
+
+pub const StructPatternField = struct {
+    /// Field name in the struct
+    name: Symbol,
+    /// Pattern to match against this field; null = bind shorthand (bind name = field name)
+    pattern: ?*const Pattern = null,
+};
+
 pub const VariantPattern = struct {
     /// The variant name (e.g. `Circle`, `None`)
     name: Symbol,
     /// Payload bindings (e.g. the `r` in `Circle(r)`)
     bindings: []const Symbol,
+    /// Nested payload patterns (e.g. the `Some(v)` in `Some(Some(v))`)
+    /// When non-empty, these override bindings for matching.
+    nested_patterns: []const Pattern = &.{},
 };
 
 pub const EnumVariantExpr = struct {
@@ -510,7 +556,14 @@ pub const EnumVariantExpr = struct {
 
 pub const ClosureExpr = struct {
     params: []const Symbol,
+    param_types: []const ?*const TypeExpr = &.{},
+    return_type: ?*const TypeExpr = null,
     body: *const Expr,
+};
+
+pub const VariantShorthandExpr = struct {
+    name: Symbol,
+    args: []const *const Expr = &.{},
 };
 
 pub const CastExpr = struct {

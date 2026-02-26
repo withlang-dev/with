@@ -1,17 +1,17 @@
 // Test: generic functions over container types (Vec[T], HashMap[K, V])
 
-fn push_item[T](v: Vec[T], x: T) -> Vec[T] =
+fn push_item[T](v: Vec[T], x: T) -> Vec[T]:
     var out = v
     out.push(x)
     out
 
-fn vec_len[T](v: Vec[T]) -> i64 =
+fn vec_len[T](v: Vec[T]) -> i64:
     v.len()
 
-fn map_len[K, V](m: HashMap[K, V]) -> i64 =
+fn map_len[K, V](m: HashMap[K, V]) -> i64:
     m.len()
 
-fn main() -> i32 =
+fn main -> i32:
     var nums: Vec[i32] = Vec.new()
     nums = push_item(nums, 10)
     nums = push_item(nums, 20)
@@ -24,4 +24,3 @@ fn main() -> i32 =
     m.insert("b", 2)
     assert(map_len(m) == 2)
 
-    0

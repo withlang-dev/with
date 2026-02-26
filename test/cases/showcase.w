@@ -7,16 +7,16 @@ type Vec2 = {
 }
 
 impl Vec2 =
-    fn new(x: i32, y: i32) -> Vec2 =
+    fn new(x: i32, y: i32) -> Vec2:
         Vec2 { x: x, y: y }
 
-    fn add(self: Vec2, other: Vec2) -> Vec2 =
+    fn add(self: Vec2, other: Vec2) -> Vec2:
         Vec2 { x: self.x + other.x, y: self.y + other.y }
 
-    fn dot(self: Vec2, other: Vec2) -> i32 =
+    fn dot(self: Vec2, other: Vec2) -> i32:
         self.x * other.x + self.y * other.y
 
-    fn scale(self: Vec2, s: i32) -> Vec2 =
+    fn scale(self: Vec2, s: i32) -> Vec2:
         Vec2 { x: self.x * s, y: self.y * s }
 
 // --- Traits ---
@@ -24,29 +24,29 @@ trait Measurable =
     fn measure(self: Self) -> i32
 
 impl Measurable for Vec2 =
-    fn measure(self: Vec2) -> i32 =
+    fn measure(self: Vec2) -> i32:
         self.x * self.x + self.y * self.y
 
 // --- Generic function with trait bounds ---
-fn get_measure[T: Measurable](x: T) -> i32 =
+fn get_measure[T: Measurable](x: T) -> i32:
     x.measure()
 
 // --- Enum with match ---
 type Shape = Circle(i32) | Rectangle(i32)
 
-fn area(s: Shape) -> i32 =
+fn area(s: Shape) -> i32:
     match s
         Circle(r) -> r * r * 3
         Rectangle(side) -> side * side
 
 // --- Higher-order functions ---
-fn apply(x: i32, f: fn(i32) -> i32) -> i32 =
+fn apply(x: i32, f: fn(i32) -> i32) -> i32:
     f(x)
 
-fn triple(x: i32) -> i32 = x * 3
+fn triple(x: i32) -> i32: x * 3
 
 // --- Main ---
-fn main() -> i32 =
+fn main -> i32:
     let a = Vec2.new(3, 4)
     let b = Vec2.new(1, 2)
     let c = a + b
@@ -73,4 +73,3 @@ fn main() -> i32 =
     assert(scaled.x == 10)
     assert(scaled.y == 4)
     println(c)
-    0

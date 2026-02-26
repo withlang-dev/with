@@ -1,0 +1,6 @@
+exit: 0
+stdout:
+all stdlib string tests passed
+
+stderr:
+

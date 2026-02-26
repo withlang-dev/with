@@ -1,4 +1,4 @@
-fn main() -> i32 =
+fn main -> i32:
     let double = |x| x * 2
     let add = |a, b| a + b
     println(double(5))
@@ -6,4 +6,3 @@ fn main() -> i32 =
 
     let square = |n| n * n
     println(square(6))
-    0

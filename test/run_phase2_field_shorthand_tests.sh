@@ -36,7 +36,7 @@ expect_check_fail() {
 cat >"$tmpdir/field_shorthand_struct_ok.w" <<'EOF1'
 type User = { id: i32, active: bool, score: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let id = 7
     let score = 42
     let u = User { id, active: true, score }
@@ -47,7 +47,7 @@ expect_run_pass "$tmpdir/field_shorthand_struct_ok.w"
 cat >"$tmpdir/field_shorthand_update_ok.w" <<'EOF2'
 type Pair = { a: i32, b: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let a = 9
     let p = Pair { a: 1, b: 2 }
     let out = { p with a }
@@ -58,20 +58,18 @@ expect_run_pass "$tmpdir/field_shorthand_update_ok.w"
 cat >"$tmpdir/field_shorthand_missing_binding_fail.w" <<'EOF3'
 type User = { id: i32, active: bool }
 
-fn main() -> i32 =
+fn main -> i32:
     let _u = User { id, active: true }
-    0
 EOF3
 expect_check_fail "$tmpdir/field_shorthand_missing_binding_fail.w"
 
 cat >"$tmpdir/field_shorthand_unknown_field_fail.w" <<'EOF4'
 type Pair = { a: i32, b: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let c = 10
     let p = Pair { a: 1, b: 2 }
     let _bad = { p with c }
-    0
 EOF4
 expect_check_fail "$tmpdir/field_shorthand_unknown_field_fail.w"
 

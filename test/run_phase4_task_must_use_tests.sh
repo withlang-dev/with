@@ -66,27 +66,27 @@ expect_run_pass() {
 }
 
 cat >"$tmpdir/task_must_use_call_warn.w" <<'EOF1'
-async fn work() -> i32 =
+async fn work -> i32:
     1
 
-fn main() -> i32 =
+fn main -> i32:
     work()
     0
 EOF1
 expect_build_warn_msg "$tmpdir/task_must_use_call_warn.w" "E0801: unused Task value"
 
 cat >"$tmpdir/task_must_use_async_block_warn.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     async: 1 + 2
     0
 EOF2
 expect_build_warn_msg "$tmpdir/task_must_use_async_block_warn.w" "E0801: unused Task value"
 
 cat >"$tmpdir/task_must_use_await_ok.w" <<'EOF3'
-async fn work() -> i32 =
+async fn work -> i32:
     41 + 1
 
-fn main() -> i32 =
+fn main -> i32:
     let t = work()
     let r = t.await
     if r == 42 then 0 else 1
@@ -95,10 +95,10 @@ expect_run_pass "$tmpdir/task_must_use_await_ok.w"
 expect_build_pass_no_msg "$tmpdir/task_must_use_await_ok.w" "E0801: unused Task value"
 
 cat >"$tmpdir/task_must_use_spawn_ok.w" <<'EOF4'
-async fn work() -> i32 =
+async fn work -> i32:
     1
 
-fn main() -> i32 =
+fn main -> i32:
     spawn work()
     0
 EOF4

@@ -51,10 +51,10 @@ trait ShowInt =
     fn show(self: Self) -> i32
 
 impl ShowInt for i32 =
-    fn show(self: i32) -> i32 =
+    fn show(self: i32) -> i32:
         self
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF1
 expect_run_pass "$tmpdir/coherence_local_trait_for_primitive_ok.w"
 
@@ -69,10 +69,10 @@ use external_trait
 type LocalBox = { v: i32 }
 
 impl ExternalTrait for LocalBox =
-    fn value(self: LocalBox) -> i32 =
+    fn value(self: LocalBox) -> i32:
         self.v
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF3
 expect_run_pass "$tmpdir/orphan_local_type_with_external_trait_ok.w"
 
@@ -87,10 +87,10 @@ cat >"$tmpdir/orphan_foreign_trait_foreign_type_fail.w" <<'EOF5'
 use external_defs
 
 impl ExternalValue for ExternalBox =
-    fn value(self: ExternalBox) -> i32 =
+    fn value(self: ExternalBox) -> i32:
         self.v
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF5
 expect_check_fail_msg "$tmpdir/orphan_foreign_trait_foreign_type_fail.w" "orphan rule violation: impl requires a local trait or local type"
 
@@ -101,14 +101,14 @@ trait Value =
 type Box = { v: i32 }
 
 impl Value for Box =
-    fn value(self: Box) -> i32 =
+    fn value(self: Box) -> i32:
         self.v
 
 impl Value for Box =
-    fn value(self: Box) -> i32 =
+    fn value(self: Box) -> i32:
         self.v + 1
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF2
 expect_check_fail_msg "$tmpdir/coherence_duplicate_impl_fail.w" "duplicate implementation of trait 'Value' for type 'Box'"
 
@@ -116,10 +116,10 @@ cat >"$tmpdir/orphan_unknown_trait_fail.w" <<'EOF6'
 type Box = { v: i32 }
 
 impl UnknownTrait for Box =
-    fn value(self: Box) -> i32 =
+    fn value(self: Box) -> i32:
         self.v
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF6
 expect_check_fail_msg "$tmpdir/orphan_unknown_trait_fail.w" "unknown trait"
 
@@ -128,10 +128,10 @@ trait KnownTrait =
     fn value(self: Self) -> i32
 
 impl KnownTrait for MissingType =
-    fn value(self: MissingType) -> i32 =
+    fn value(self: MissingType) -> i32:
         0
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF7
 expect_check_fail_msg "$tmpdir/orphan_unknown_type_fail.w" "unknown type"
 

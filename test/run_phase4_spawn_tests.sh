@@ -65,10 +65,10 @@ expect_build_pass_no_msg() {
 }
 
 cat >"$tmpdir/spawn_async_fn_ok.w" <<'EOF1'
-async fn work(x: i32) -> i32 =
+async fn work(x: i32) -> i32:
     x + 1
 
-fn main() -> i32 =
+fn main -> i32:
     spawn work(1)
     spawn work(2)
     0
@@ -77,24 +77,24 @@ expect_run_pass "$tmpdir/spawn_async_fn_ok.w"
 expect_build_pass_no_msg "$tmpdir/spawn_async_fn_ok.w" "E0801: unused Task value"
 
 cat >"$tmpdir/spawn_async_block_ok.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     spawn async: 40 + 2
     0
 EOF2
 expect_run_pass "$tmpdir/spawn_async_block_ok.w"
 
 cat >"$tmpdir/spawn_non_task_literal_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     spawn 123
     0
 EOF3
 expect_check_fail_msg "$tmpdir/spawn_non_task_literal_fail.w" "spawn requires a Task value"
 
 cat >"$tmpdir/spawn_non_task_call_fail.w" <<'EOF4'
-fn sync_work() -> i32 =
+fn sync_work -> i32:
     7
 
-fn main() -> i32 =
+fn main -> i32:
     spawn sync_work()
     0
 EOF4

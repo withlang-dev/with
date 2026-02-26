@@ -1,5 +1,5 @@
 // Test: advanced string method chains (trim, find, replace, slice, etc.)
-fn main() -> i32 =
+fn main -> i32:
     // trim
     let padded = "  hello  "
     let trimmed = padded.trim()
@@ -50,4 +50,3 @@ fn main() -> i32 =
     assert(not path.contains("etc"))
 
     println("all advanced string method tests passed")
-    0

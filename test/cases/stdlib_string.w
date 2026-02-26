@@ -1,7 +1,7 @@
 // Test: std.string import
 use std.string
 
-fn main() -> i32 =
+fn main -> i32:
     let s = "hello world"
 
     // string_len
@@ -22,4 +22,3 @@ fn main() -> i32 =
     assert(not is_digit(65))
 
     println("all stdlib string tests passed")
-    0

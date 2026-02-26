@@ -54,7 +54,7 @@ expect_run_pass "test/cases/import_std_process.w"
 cat >"$tmpdir/std_process_extended_ok.w" <<'EOF1'
 use std.process
 
-fn main() -> i32 =
+fn main -> i32:
     assert(pid() > 0)
 
     let argv = args()
@@ -75,52 +75,46 @@ fn main() -> i32 =
 
     let bad_cmd = command("false")
     assert(bad_cmd.status() != 0)
-    0
 EOF1
 expect_run_pass "$tmpdir/std_process_extended_ok.w"
 
 cat >"$tmpdir/std_process_pid_arity_fail.w" <<'EOF2'
 use std.process
 
-fn main() -> i32 =
+fn main -> i32:
     let _p = pid(1)
-    0
 EOF2
 expect_run_fail "$tmpdir/std_process_pid_arity_fail.w"
 
 cat >"$tmpdir/std_process_args_arity_fail.w" <<'EOF3'
 use std.process
 
-fn main() -> i32 =
+fn main -> i32:
     let _a = args(1)
-    0
 EOF3
 expect_run_fail "$tmpdir/std_process_args_arity_fail.w"
 
 cat >"$tmpdir/std_process_env_type_fail.w" <<'EOF4'
 use std.process
 
-fn main() -> i32 =
+fn main -> i32:
     let _e = env(1)
-    0
 EOF4
 expect_run_fail "$tmpdir/std_process_env_type_fail.w"
 
 cat >"$tmpdir/std_process_set_env_arity_fail.w" <<'EOF5'
 use std.process
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = set_env("ONLY_ONE_ARG")
-    0
 EOF5
 expect_run_fail "$tmpdir/std_process_set_env_arity_fail.w"
 
 cat >"$tmpdir/std_process_command_arity_fail.w" <<'EOF6'
 use std.process
 
-fn main() -> i32 =
+fn main -> i32:
     let _c = command()
-    0
 EOF6
 expect_run_fail "$tmpdir/std_process_command_arity_fail.w"
 

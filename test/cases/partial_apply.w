@@ -1,10 +1,10 @@
 // Test: partial application with _ placeholder
-fn add(a: i32, b: i32) -> i32 = a + b
-fn mul(a: i32, b: i32) -> i32 = a * b
+fn add(a: i32, b: i32) -> i32: a + b
+fn mul(a: i32, b: i32) -> i32: a * b
 
-fn apply(f: fn(i32) -> i32, x: i32) -> i32 = f(x)
+fn apply(f: fn(i32) -> i32, x: i32) -> i32: f(x)
 
-fn main() -> i32 =
+fn main -> i32:
     // Partial application: add(5, _) creates a closure |x| add(5, x)
     let add5 = add(5, _)
     assert(add5(10) == 15)
@@ -19,4 +19,3 @@ fn main() -> i32 =
     assert(result == 142)
 
     println("all partial apply tests passed")
-    0

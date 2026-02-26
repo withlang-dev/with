@@ -1,6 +1,6 @@
 // Test string concatenation and comparison
 
-fn main() -> i32 =
+fn main -> i32:
     let a = "hello"
     let b = " world"
     let c = a + b
@@ -19,4 +19,3 @@ fn main() -> i32 =
     assert(z == "abcd")
     assert(z != "abc")
     assert(z.len == 4)
-    0

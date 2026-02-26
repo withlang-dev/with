@@ -1,7 +1,7 @@
 // Test: std.hash import
 use std.hash
 
-fn main() -> i32 =
+fn main -> i32:
     let a = hash_i64(42)
     let b = hash_i64(42)
     let c = hash_i64(43)
@@ -34,4 +34,3 @@ fn main() -> i32 =
     h3.update_i64(10)
     let hv3 = h3.finish()
     assert(hv1 != hv3)
-    0

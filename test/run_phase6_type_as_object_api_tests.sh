@@ -44,14 +44,13 @@ cat >"$tmpdir/type_object_enum_primitive_ok.w" <<'EOF1'
 type Color = Red | Green | Blue
 type Point = { x: i32, y: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     assert(Color.variants().len() == 3)
     assert(Point.fields().len() == 2)
     assert(i32.name() == "i32")
     assert(i32.size() > 0)
     assert(i32.align() > 0)
     assert(i32.is_copy())
-    0
 EOF1
 expect_run_pass "$tmpdir/type_object_enum_primitive_ok.w"
 
@@ -59,14 +58,13 @@ expect_run_pass "$tmpdir/type_object_enum_primitive_ok.w"
 cat >"$tmpdir/type_object_generic_ok.w" <<'EOF2'
 type Pair = { a: i32, b: i32 }
 
-comptime fn field_count[T: type](x: T) -> i32 =
+comptime fn field_count[T: type](x: T) -> i32:
     let fs = T.fields()
     fs.len() as i32
 
-fn main() -> i32 =
+fn main -> i32:
     let p = Pair { a: 1, b: 2 }
     assert(field_count(p) == 2)
-    0
 EOF2
 expect_run_pass "$tmpdir/type_object_generic_ok.w"
 
@@ -74,9 +72,8 @@ expect_run_pass "$tmpdir/type_object_generic_ok.w"
 cat >"$tmpdir/type_object_bad_arity_fail.w" <<'EOF3'
 type Point = { x: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let _ = Point.fields(1)
-    0
 EOF3
 expect_run_fail "$tmpdir/type_object_bad_arity_fail.w"
 
@@ -84,10 +81,9 @@ expect_run_fail "$tmpdir/type_object_bad_arity_fail.w"
 cat >"$tmpdir/type_object_value_receiver_fail.w" <<'EOF4'
 type Point = { x: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let p = Point { x: 1 }
     let _ = p.fields()
-    0
 EOF4
 expect_run_fail "$tmpdir/type_object_value_receiver_fail.w"
 

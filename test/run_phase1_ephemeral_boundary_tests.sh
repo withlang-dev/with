@@ -41,7 +41,7 @@ expect_check_fail_msg() {
 }
 
 cat >"$tmpdir/ephemeral_local_ok.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     var x: i32 = 10
     let r = &x
     *r
@@ -51,7 +51,7 @@ expect_check_pass "$tmpdir/ephemeral_local_ok.w"
 cat >"$tmpdir/ephemeral_struct_fail.w" <<'EOF2'
 type Bad = { r: &i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF2
 expect_check_fail_msg "$tmpdir/ephemeral_struct_fail.w" "ephemeral references cannot be stored in structs"
@@ -59,22 +59,22 @@ expect_check_fail_msg "$tmpdir/ephemeral_struct_fail.w" "ephemeral references ca
 cat >"$tmpdir/ephemeral_collection_fail.w" <<'EOF3'
 let bad: Vec[&i32] = 0
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF3
 expect_check_fail_msg "$tmpdir/ephemeral_collection_fail.w" "ephemeral references cannot be stored in collections"
 
 cat >"$tmpdir/ephemeral_return_fail.w" <<'EOF4'
-fn id_ref(x: &i32) -> &i32 =
+fn id_ref(x: &i32) -> &i32:
     x
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF4
 expect_check_fail_msg "$tmpdir/ephemeral_return_fail.w" "ephemeral references cannot be returned from functions"
 
 cat >"$tmpdir/ephemeral_closure_capture_fail.w" <<'EOF5'
-fn main() -> i32 =
+fn main -> i32:
     var x: i32 = 1
     let r = &x
     let f = || *r

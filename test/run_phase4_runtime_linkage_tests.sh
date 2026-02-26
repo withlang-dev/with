@@ -27,15 +27,15 @@ expect_cmd_pass() {
 }
 
 cat >"$tmpdir/sync_main.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF1
 
 cat >"$tmpdir/async_main.w" <<'EOF2'
-async fn one() -> i32 =
+async fn one -> i32:
     1
 
-fn main() -> i32 =
+fn main -> i32:
     let t = one()
     let r = t.await
     if r == 1 then 0 else 1

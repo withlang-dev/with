@@ -41,10 +41,10 @@ expect_check_fail_msg() {
 }
 
 cat >"$tmpdir/closure_nonescaping_ref_capture_ok.w" <<'EOF1'
-fn apply(f: fn(i32) -> i32, x: i32) -> i32 =
+fn apply(f: fn(i32) -> i32, x: i32) -> i32:
     f(x)
 
-fn main() -> i32 =
+fn main -> i32:
     let x = 10
     let r = &x
     let out = apply(|n| n + *r, 5)
@@ -53,7 +53,7 @@ EOF1
 expect_run_pass "$tmpdir/closure_nonescaping_ref_capture_ok.w"
 
 cat >"$tmpdir/closure_escaping_ref_capture_fail.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     let x = 10
     let r = &x
     let f = |n| n + *r
@@ -62,7 +62,7 @@ EOF2
 expect_check_fail_msg "$tmpdir/closure_escaping_ref_capture_fail.w" "closures cannot capture ephemeral references"
 
 cat >"$tmpdir/closure_escaping_no_ref_ok.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let offset = 3
     let f = |n| n + offset
     if f(2) == 5 then 0 else 1

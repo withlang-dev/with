@@ -54,7 +54,7 @@ expect_run_pass "test/cases/import_std_hash.w"
 cat >"$tmpdir/std_hash_extended_ok.w" <<'EOF1'
 use std.hash
 
-fn main() -> i32 =
+fn main -> i32:
     let e1 = hash_str("")
     let e2 = hash_str("")
     assert(e1 == e2)
@@ -88,14 +88,13 @@ fn main() -> i32 =
     d.update_i64(2)
     d.update_str("x")
     assert(d.finish() == av)
-    0
 EOF1
 expect_run_pass "$tmpdir/std_hash_extended_ok.w"
 
 cat >"$tmpdir/std_hash_update_arity_fail.w" <<'EOF2'
 use std.hash
 
-fn main() -> i32 =
+fn main -> i32:
     var h = hasher()
     h.update_i64()
     0
@@ -105,18 +104,16 @@ expect_run_fail "$tmpdir/std_hash_update_arity_fail.w"
 cat >"$tmpdir/std_hash_pair_type_fail.w" <<'EOF3'
 use std.hash
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = hash_pair("a", "b")
-    0
 EOF3
 expect_run_fail "$tmpdir/std_hash_pair_type_fail.w"
 
 cat >"$tmpdir/std_hash_default_arity_fail.w" <<'EOF4'
 use std.hash
 
-fn main() -> i32 =
+fn main -> i32:
     let _h = default_hasher(1)
-    0
 EOF4
 expect_run_fail "$tmpdir/std_hash_default_arity_fail.w"
 

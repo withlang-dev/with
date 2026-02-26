@@ -45,10 +45,9 @@ cat >"$tmpdir/derive_all_drop_traits_ok.w" <<'EOF1'
 @[derive(all)]
 type Bag = { items: Vec[i32] }
 
-fn main() -> i32 =
+fn main -> i32:
     let b = Bag { items: Vec.new() }
     assert(b.items.len() == 0)
-    0
 EOF1
 expect_run_pass "$tmpdir/derive_all_drop_traits_ok.w"
 
@@ -57,10 +56,9 @@ cat >"$tmpdir/derive_all_clone_dropped_fail.w" <<'EOF2'
 @[derive(all)]
 type Bag = { items: Vec[i32] }
 
-fn main() -> i32 =
+fn main -> i32:
     let b = Bag { items: Vec.new() }
     let _ = b.clone()
-    0
 EOF2
 expect_run_fail "$tmpdir/derive_all_clone_dropped_fail.w"
 
@@ -69,11 +67,10 @@ cat >"$tmpdir/derive_all_eq_dropped_fail.w" <<'EOF3'
 @[derive(all)]
 type Bag = { items: Vec[i32] }
 
-fn main() -> i32 =
+fn main -> i32:
     let a = Bag { items: Vec.new() }
     let b = Bag { items: Vec.new() }
     assert(a == b)
-    0
 EOF3
 expect_run_fail "$tmpdir/derive_all_eq_dropped_fail.w"
 

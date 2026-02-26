@@ -74,78 +74,72 @@ expect_run_pass "test/cases/result_try.w"
 expect_run_pass "test/cases/result_combinators.w"
 
 cat >"$tmpdir/result_context_ok.w" <<'EOF1'
-fn read_ok() -> Result[i32, i32] =
+fn read_ok -> Result[i32, i32]:
     Ok(7)
 
-fn read_err() -> Result[i32, i32] =
+fn read_err -> Result[i32, i32]:
     Err(9)
 
-fn load_ok() -> Result[i32, ContextError[i32]] =
+fn load_ok -> Result[i32, ContextError[i32]]:
     let x = read_ok().context("read ok")?
     Ok(x + 1)
 
-fn load_err() -> Result[i32, ContextError[i32]] =
+fn load_err -> Result[i32, ContextError[i32]]:
     let x = read_err().context("read failed")?
     Ok(x)
 
-fn main() -> i32 =
+fn main -> i32:
     assert(load_ok().unwrap_or(0) == 8)
     assert(load_err().is_err())
 
     let direct: Result[i32, i32] = Err(2)
     let with_msg = direct.context("boom")
     assert(with_msg.is_err())
-    0
 EOF1
 expect_run_pass "$tmpdir/result_context_ok.w"
 
 cat >"$tmpdir/result_with_context_lazy_ok.w" <<'EOF2'
-fn make_msg() -> str =
+fn make_msg -> str:
     println("ctx-built")
     "ctx"
 
-fn main() -> i32 =
+fn main -> i32:
     let okv: Result[i32, i32] = Ok(1)
     let _a = okv.with_context(make_msg)
 
     let errv: Result[i32, i32] = Err(2)
     let _b = errv.with_context(make_msg)
-    0
 EOF2
 expect_run_stdout "$tmpdir/result_with_context_lazy_ok.w" "ctx-built"
 
 cat >"$tmpdir/context_on_option_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     let x: ?i32 = Some(1)
     let _y = x.context("bad")
-    0
 EOF3
 expect_run_fail "$tmpdir/context_on_option_fail.w"
 
 cat >"$tmpdir/context_bad_message_type_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let x: Result[i32, i32] = Err(1)
     let _y = x.context(42)
-    0
 EOF4
 expect_run_fail "$tmpdir/context_bad_message_type_fail.w"
 
 cat >"$tmpdir/with_context_bad_arg_fail.w" <<'EOF5'
-fn main() -> i32 =
+fn main -> i32:
     let x: Result[i32, i32] = Err(1)
     let _y = x.with_context("oops")
-    0
 EOF5
 expect_run_fail "$tmpdir/with_context_bad_arg_fail.w"
 
 cat >"$tmpdir/with_context_bad_return_type_fail.w" <<'EOF6'
-fn build() -> i32 =
+fn build -> i32:
     1
 
-fn main() -> i32 =
+fn main -> i32:
     let x: Result[i32, i32] = Err(1)
     let _y = x.with_context(build)
-    0
 EOF6
 expect_run_fail "$tmpdir/with_context_bad_return_type_fail.w"
 

@@ -1,8 +1,8 @@
 // Test: Tuple destructuring in let bindings
-fn swap(a: i32, b: i32) -> (i32, i32) =
+fn swap(a: i32, b: i32) -> (i32, i32):
     (b, a)
 
-fn main() -> i32 =
+fn main -> i32:
     // Basic tuple destructure
     let (x, y) = (10, 20)
     assert(x == 10)
@@ -20,4 +20,3 @@ fn main() -> i32 =
     assert(r == 300)
 
     println("all tuple destructure tests passed")
-    0

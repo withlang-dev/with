@@ -1,0 +1,12 @@
+exit: 0
+stdout:
+language: With
+answer: 42
+point x: 10
+point y: 20
+a=3 b=7
+flag: true
+all str_interp_complex tests passed
+
+stderr:
+

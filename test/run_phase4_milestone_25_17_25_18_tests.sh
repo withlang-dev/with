@@ -66,22 +66,22 @@ expect_build_no_warn_msg() {
 }
 
 cat >"$tmpdir/milestone_async_call_unrestricted_ok.w" <<'EOF1'
-async fn inc(x: i32) -> i32 = x + 1
+async fn inc(x: i32) -> i32: x + 1
 
-fn call_async(x: i32) -> i32 =
+fn call_async(x: i32) -> i32:
     let t = inc(x)
     t.await
 
-fn main() -> i32 =
+fn main -> i32:
     if call_async(41) == 42 then 0 else 1
 EOF1
 expect_run_pass "$tmpdir/milestone_async_call_unrestricted_ok.w"
 
 cat >"$tmpdir/milestone_parallel_await_ok.w" <<'EOF2'
-async fn one() -> i32 = 1
-async fn two() -> i32 = 2
+async fn one -> i32: 1
+async fn two -> i32: 2
 
-fn main() -> i32 =
+fn main -> i32:
     let t1 = one()
     let t2 = two()
     if t1.await + t2.await == 3 then 0 else 1
@@ -89,9 +89,9 @@ EOF2
 expect_run_pass "$tmpdir/milestone_parallel_await_ok.w"
 
 cat >"$tmpdir/milestone_structured_scope_spawn_ok.w" <<'EOF3'
-async fn work(v: i32) -> i32 = v * 2
+async fn work(v: i32) -> i32: v * 2
 
-fn main() -> i32 =
+fn main -> i32:
     let scoped = async scope |s|:
         let a = s.track(work(10))
         let b = s.track(work(11))
@@ -102,9 +102,9 @@ EOF3
 expect_run_pass "$tmpdir/milestone_structured_scope_spawn_ok.w"
 
 cat >"$tmpdir/milestone_task_value_composition_ok.w" <<'EOF4'
-async fn value(x: i32) -> i32 = x
+async fn value(x: i32) -> i32: x
 
-fn main() -> i32 =
+fn main -> i32:
     let t = value(7)
     let keep = t
     if keep.await == 7 then 0 else 1
@@ -112,18 +112,18 @@ EOF4
 expect_run_pass "$tmpdir/milestone_task_value_composition_ok.w"
 
 cat >"$tmpdir/milestone_discarded_task_warn.w" <<'EOF5'
-async fn send_analytics() -> i32 = 1
+async fn send_analytics -> i32: 1
 
-fn main() -> i32 =
+fn main -> i32:
     send_analytics()
     0
 EOF5
 expect_build_warn_msg "$tmpdir/milestone_discarded_task_warn.w" "E0801: unused Task value"
 
 cat >"$tmpdir/milestone_spawn_detach_no_warn.w" <<'EOF6'
-async fn send_analytics() -> i32 = 1
+async fn send_analytics -> i32: 1
 
-fn main() -> i32 =
+fn main -> i32:
     spawn send_analytics()
     0
 EOF6

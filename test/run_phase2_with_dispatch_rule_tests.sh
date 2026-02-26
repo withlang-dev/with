@@ -25,12 +25,12 @@ expect_run_pass() {
 
 cat >"$tmpdir/with_dispatch_rule_ok.w" <<'EOF1'
 type Guard = { v: i32 }
-fn Guard.enter(self: Guard) -> i32 = self.v + 10
-fn Guard.enter_mut(self: Guard) -> i32 = self.v + 20
+fn Guard.enter(self: Guard) -> i32: self.v + 10
+fn Guard.enter_mut(self: Guard) -> i32: self.v + 20
 
 type BuilderOnly = { v: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     let a = with Guard { v: 1 } as x:
         x
 
@@ -49,9 +49,9 @@ expect_run_pass "$tmpdir/with_dispatch_rule_ok.w"
 
 cat >"$tmpdir/with_dispatch_mut_prefers_builder_when_no_enter_mut.w" <<'EOF2'
 type HasEnterOnly = { v: i32 }
-fn HasEnterOnly.enter(self: HasEnterOnly) -> i32 = self.v
+fn HasEnterOnly.enter(self: HasEnterOnly) -> i32: self.v
 
-fn main() -> i32 =
+fn main -> i32:
     let out = with HasEnterOnly { v: 5 } as mut x:
         x.v = 8
     if out.v == 8 then 0 else 1
@@ -60,9 +60,9 @@ expect_run_pass "$tmpdir/with_dispatch_mut_prefers_builder_when_no_enter_mut.w"
 
 cat >"$tmpdir/with_dispatch_nonmut_prefers_binding_when_no_enter.w" <<'EOF3'
 type HasEnterMutOnly = { v: i32 }
-fn HasEnterMutOnly.enter_mut(self: HasEnterMutOnly) -> i32 = self.v
+fn HasEnterMutOnly.enter_mut(self: HasEnterMutOnly) -> i32: self.v
 
-fn main() -> i32 =
+fn main -> i32:
     let out = with HasEnterMutOnly { v: 4 } as x:
         x.v + 1
     if out == 5 then 0 else 1

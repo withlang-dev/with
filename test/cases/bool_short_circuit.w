@@ -1,5 +1,5 @@
 // Test boolean short-circuit evaluation
-fn main() -> i32 =
+fn main -> i32:
     // 'and' short-circuits: false and X => false
     let a = false and true
     assert(not a)
@@ -16,4 +16,3 @@ fn main() -> i32 =
     let f = false or true
     assert(f)
     println("all short circuit tests passed")
-    0

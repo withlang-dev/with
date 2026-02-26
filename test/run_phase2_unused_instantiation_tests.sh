@@ -48,19 +48,19 @@ expect_ir_not_contains() {
 }
 
 cat >"$tmpdir/unused_generic.w" <<'EOF1'
-fn id[T](x: T) -> T =
+fn id[T](x: T) -> T:
     x
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF1
 expect_ir_not_contains "$tmpdir/unused_generic.w" "@id__"
 
 cat >"$tmpdir/single_instantiation.w" <<'EOF2'
-fn id[T](x: T) -> T =
+fn id[T](x: T) -> T:
     x
 
-fn main() -> i32 =
+fn main -> i32:
     id(7)
 EOF2
 expect_ir_contains "$tmpdir/single_instantiation.w" "@id__i32"

@@ -68,10 +68,10 @@ expect_run_pass "test/cases/async_scope.w"
 expect_run_pass "test/cases/p4_async_scope.w"
 
 cat >"$tmpdir/async_scope_track_and_await.w" <<'EOF1'
-async fn one() -> i32 = 1
-async fn two() -> i32 = 2
+async fn one -> i32: 1
+async fn two -> i32: 2
 
-fn main() -> i32 =
+fn main -> i32:
     let sum = async scope |s|:
         let a = s.track(one())
         let b = s.track(two())
@@ -81,9 +81,9 @@ EOF1
 expect_run_pass "$tmpdir/async_scope_track_and_await.w"
 
 cat >"$tmpdir/async_scope_drop_scoped_task_ok.w" <<'EOF2'
-async fn work() -> i32 = 1
+async fn work -> i32: 1
 
-fn main() -> i32 =
+fn main -> i32:
     async scope |s|:
         s.track(work())
     0
@@ -92,7 +92,7 @@ expect_run_pass "$tmpdir/async_scope_drop_scoped_task_ok.w"
 expect_build_pass_no_msg "$tmpdir/async_scope_drop_scoped_task_ok.w" "E0801: unused Task value"
 
 cat >"$tmpdir/async_scope_track_non_task_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     async scope |s|:
         s.track(123)
     0
@@ -100,7 +100,7 @@ EOF3
 expect_check_fail_msg "$tmpdir/async_scope_track_non_task_fail.w" "track() requires a Task value"
 
 cat >"$tmpdir/async_scope_track_outside_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     let s = 1
     s.track(async: 1)
     0

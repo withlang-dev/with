@@ -1,5 +1,5 @@
 // Test: Result combinator methods
-fn main() -> i32 =
+fn main -> i32:
     // unwrap on Ok
     let a: Result[i32, i32] = Ok(42)
     let v = a.unwrap()
@@ -25,4 +25,3 @@ fn main() -> i32 =
     assert(e.is_err())
     assert(not e.is_ok())
 
-    0

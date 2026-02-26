@@ -58,7 +58,7 @@ type Shape =
 
 `String` → `str` (both are owned, heap-allocated, UTF-8).
 `&str` → `&str` (both are borrowed views). String literals
-auto-promote: `let s: str = "hello"` works without `.to_string()`.
+auto-promote: `let s = "hello"` works without `.to_string()`.
 
 Generics use `[]` not `<>`:
 
@@ -111,13 +111,13 @@ fn greet(name: &str) {
 
 ```with
 // With
-fn add(a: i32, b: i32) -> i32 = a + b
+fn add(a: i32, b: i32) -> i32: a + b
 
-fn greet(name: &str) =
+fn greet(name: &str):
     println("Hello, {name}")
 ```
 
-`= expr` for single-expression bodies. No `!` on `println` — it's a
+`: expr` for single-expression bodies. No `!` on `println` — it's a
 function, not a macro. String interpolation is built-in: `"{name}"`
 calls `Display` on `name`.
 
@@ -186,12 +186,12 @@ fn get_name(id: u64) -> Option<String> {
 
 ```with
 // With — implicit Ok wrapping: just return the value
-fn load(path: &str) -> Result[Config, IoError] =
+fn load(path: &str) -> Result[Config, IoError]:
     let text = fs.read_to_string(path)?
     let config = toml.parse(&text)?
     config                       // auto-wrapped in Ok(config)
 
-fn get_name(id: u64) -> Option[str] =
+fn get_name(id: u64) -> Option[str]:
     let user = find_user(id)?
     Some(user.name)
 ```
@@ -212,7 +212,7 @@ let text = fs.read_to_string(path)
     .context("failed to read config")?
 
 // Implicit Ok for Unit results — just end the function
-fn save(data: &Data) -> Result[Unit, IoError] =
+fn save(data: &Data) -> Result[Unit, IoError]:
     fs.write_file("out.txt", data.to_bytes())?
     // implicit Ok(()) — no trailing expression needed
 
@@ -269,9 +269,9 @@ impl Counter {
 type Counter = { count: u32 }
 
 extend Counter
-    fn new() -> Counter = Counter { count: 0 }
-    fn increment(self: &mut Counter) = self.count += 1
-    fn value(self: &Counter) -> u32 = self.count
+    fn new -> Counter: Counter { count: 0 }
+    fn increment(self: &mut Counter): self.count += 1
+    fn value(self: &Counter) -> u32: self.count
 ```
 
 `impl Type` → `extend Type`. `Self` → explicit type name.
@@ -282,9 +282,9 @@ By-value `self` enables consuming method chains (builders):
 ```with
 // With — builder pattern with by-value self
 extend Builder
-    fn host(self: Builder, h: str) -> Builder = { self with host: h }
-    fn port(self: Builder, p: u16) -> Builder = { self with port: p }
-    fn build(self: Builder) -> Result[Server, ConfigError] = ...
+    fn host(self: Builder, h: str) -> Builder: { self with host: h }
+    fn port(self: Builder, p: u16) -> Builder: { self with port: p }
+    fn build(self: Builder) -> Result[Server, ConfigError]: ...
 
 let server = Builder.new()
     .host("localhost")
@@ -355,11 +355,11 @@ impl Summary for Article {
 // With
 trait Summary
     fn summarize(self: &Self) -> str
-    fn preview(self: &Self) -> str =
+    fn preview(self: &Self) -> str:
         "{self.summarize().slice(0, 50)}..."
 
 impl Summary for Article {
-    fn summarize(self: &Article) -> str =
+    fn summarize(self: &Article) -> str:
         "{self.title}: {self.author}"
 }
 ```
@@ -384,7 +384,7 @@ fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
 
 ```with
 // With — no lifetime annotations needed
-fn longest(x: &str, y: &str) -> &str =
+fn longest(x: &str, y: &str) -> &str:
     if x.len() > y.len() then x else y
 ```
 
@@ -415,7 +415,7 @@ let (a, b) = join!(fetch("a"), fetch("b"));
 
 ```with
 // With — no colored functions, no Pin
-async fn fetch(url: &str) -> Result[str, Error] =
+async fn fetch(url: &str) -> Result[str, Error]:
     let resp = client.get(url).await?
     let body = resp.text().await?
     body                             // implicit Ok wrapping
@@ -635,9 +635,9 @@ pub fn greet(name: []const u8) void {
 
 ```with
 // With
-fn add(a: i32, b: i32) -> i32 = a + b
+fn add(a: i32, b: i32) -> i32: a + b
 
-pub fn greet(name: &str) =
+pub fn greet(name: &str):
     println("Hello, {name}")
 ```
 
@@ -670,12 +670,12 @@ const data = readFile("config.txt") catch |err| {
 
 ```with
 // With
-fn read_file(path: &str) -> Result[Vec[u8], IoError] =
+fn read_file(path: &str) -> Result[Vec[u8], IoError]:
     let file = fs.open(path)?
     defer file.close()
     file.read_to_end()
 
-fn find_user(id: u64) -> Option[User] =
+fn find_user(id: u64) -> Option[User]:
     // ...
 
 // ?? (replaces orelse)
@@ -712,7 +712,7 @@ fn processItems(allocator: std.mem.Allocator, items: []const Item) !void {
 
 ```with
 // With — no allocator parameter needed
-fn process_items(items: &[Item]) -> Result[Unit, AppError] =
+fn process_items(items: &[Item]) -> Result[Unit, AppError]:
     var list = Vec[Item].new()
     for item in items:
         list.push(item)
@@ -763,7 +763,7 @@ const fib_10 = fibonacci(10); // computed at compile time
 
 ```with
 // With
-comptime fn fibonacci(n: u32) -> u32 =
+comptime fn fibonacci(n: u32) -> u32:
     if n <= 1 then n
     else fibonacci(n - 1) + fibonacci(n - 2)
 
@@ -785,7 +785,7 @@ fn dump(comptime T: type, value: T) void {
 
 ```with
 // With — comptime type info
-comptime fn dump[T: type](value: &T) =
+comptime fn dump[T: type](value: &T):
     for field in T.fields():
         println("{field.name}: {value.{field.name}}")
 ```
@@ -811,14 +811,14 @@ test "string equality" {
 
 ```with
 // With
-fn test_addition() =
+fn test_addition:
     assert_eq(add(2, 2), 4)
 
-fn test_string_equality() =
+fn test_string_equality:
     assert_eq(greeting, "hello")
 ```
 
-Zig's `test "name" { }` → `fn test_name() =`. Run with
+Zig's `test "name" { }` → `fn test_name:`. Run with
 `with test`.
 
 ## For Loops and Iteration
@@ -891,7 +891,7 @@ let b = a.clone()      // separate copy
 References prevent moves:
 
 ```with
-fn sum(data: &[i32]) -> i32 =   // borrows, doesn't take ownership
+fn sum(data: &[i32]) -> i32:   // borrows, doesn't take ownership
     data.iter() |> fold(0, |a, x| a + x)
 
 let nums = vec![1, 2, 3]
@@ -925,7 +925,7 @@ runtime cost.
 | `comptime` | `comptime` |
 | `@typeInfo(T)` | `T.fields()` (or `TypeInfo.fields[T]()` in non-generic contexts) |
 | `inline for` | `for` inside `comptime fn` (or `comptime for` at top-level) |
-| `test "name" { }` | `fn test_name() =` |
+| `test "name" { }` | `fn test_name:` |
 | `std.debug.print` | `println` |
 | `null` | `None` |
 | `undefined` | (no equivalent — all values initialized) |
@@ -1049,9 +1049,9 @@ func divide(a, b float64) (float64, error) {
 
 ```with
 // With
-fn add(a: i32, b: i32) -> i32 = a + b
+fn add(a: i32, b: i32) -> i32: a + b
 
-fn divide(a: f64, b: f64) -> Result[f64, MathError] =
+fn divide(a: f64, b: f64) -> Result[f64, MathError]:
     if b == 0.0 then return Err(.DivisionByZero)
     a / b
 ```
@@ -1081,7 +1081,7 @@ func loadConfig(path string) (*Config, error) {
 
 ```with
 // With
-fn load_config(path: &str) -> Result[Config, AppError] =
+fn load_config(path: &str) -> Result[Config, AppError]:
     let data = fs.read_file(path)
         .context("reading config")?
     let config = json.parse[Config](&data)
@@ -1141,10 +1141,10 @@ trait Stringer
 type User = { name: str }
 
 impl Stringer for User {
-    fn to_string(self: &User) -> str = self.name
+    fn to_string(self: &User) -> str: self.name
 }
 
-fn print_anything(s: &dyn Stringer) =
+fn print_anything(s: &dyn Stringer):
     println(s.to_string())
 ```
 
@@ -1217,7 +1217,7 @@ func GetUser(ctx context.Context, id int64) (*User, error) {
 
 ```with
 // With — structured concurrency handles it all
-async fn get_user(id: i64) -> Result[User, DbError] =
+async fn get_user(id: i64) -> Result[User, DbError]:
     // Cancellation propagates automatically through async scope
     // Timeouts are handled at the caller level
     let row = db.query_one("SELECT ...", &[&id]).await?
@@ -1323,7 +1323,7 @@ if user := findUser(42); user != nil {
 
 ```with
 // With
-fn find_user(id: i64) -> Option[User] =
+fn find_user(id: i64) -> Option[User]:
     // returns None if not found
 
 if let Some(user) = find_user(42):
@@ -1349,7 +1349,7 @@ let b = a                 // ownership MOVES to b
 // a is invalid here — compile error to use it
 
 // Borrowing: temporary access without ownership transfer
-fn print_sum(data: &[i32]) =     // borrows immutably
+fn print_sum(data: &[i32]):     // borrows immutably
     let sum = data.iter() |> fold(0, |a, x| a + x)
     println("sum: {sum}")
 
@@ -1423,7 +1423,7 @@ int& ref = val;
 
 ```with
 // With
-fn process(user: Option[&mut User]) =
+fn process(user: Option[&mut User]):
     if let Some(u) = user:
         u.active = true
 
@@ -1534,12 +1534,12 @@ public:
 type Entity = { id: i32 }
 
 extend Entity
-    fn new(id: i32) -> Entity = Entity { id }
-    
+    fn new(id: i32) -> Entity: Entity { id }
+
     // Note the explicit 'self' parameter
-    fn get_id(self: &Entity) -> i32 = self.id
-    
-    fn set_id(self: &mut Entity, new_id: i32) = 
+    fn get_id(self: &Entity) -> i32: self.id
+
+    fn set_id(self: &mut Entity, new_id: i32):
         self.id = new_id
 ```
 
@@ -1557,7 +1557,7 @@ T max(T a, T b) {
 
 ```with
 // With
-fn max[T: Ord](a: T, b: T) -> T =
+fn max[T: Ord](a: T, b: T) -> T:
     if a > b then a else b
 ```
 
@@ -1579,7 +1579,7 @@ int arr[compute_size(10)];
 // With
 const MAX_PLAYERS: i32 = 100
 
-comptime fn compute_size(base: i32) -> i32 =
+comptime fn compute_size(base: i32) -> i32:
     base * 2
 
 let arr: [i32; comptime compute_size(10)]
@@ -1594,7 +1594,7 @@ With has no token-level macros. Instead, `comptime` allows you to execute normal
 | `int`, `long long`, `float` | `i32`, `i64`, `f32` |
 | `size_t` | `usize` |
 | `struct` / `class` | `type` |
-| `void foo()` | `fn foo()` (or `fn foo() -> Unit`) |
+| `void foo()` | `fn foo:` (or `fn foo -> Unit:`) |
 | `T* ptr` (optional) | `Option[&mut T]` |
 | `T& ref` | `&mut T` or `&T` |
 | `auto x = 5;` | `let x = 5` |
@@ -1704,9 +1704,9 @@ func greet(name: String) {
 
 ```with
 // With
-fn add(a: i32, b: i32) -> i32 = a + b
+fn add(a: i32, b: i32) -> i32: a + b
 
-fn greet(name: &str) =
+fn greet(name: &str):
     println("Hello, {name}")
 ```
 
@@ -1772,7 +1772,7 @@ do {
 // With
 error AppError = NotFound | InvalidInput(str)
 
-fn load_config(path: &str) -> Result[Config, AppError] =
+fn load_config(path: &str) -> Result[Config, AppError]:
     let data = fs.read_file(path)
         .context("reading config")?
     let config = json.parse[Config](&data)
@@ -1821,9 +1821,9 @@ trait Drawable
     fn bounding_box(self: &Self) -> Rect
 
 impl Drawable for Circle {
-    fn draw(self: &Circle, canvas: &Canvas) =
+    fn draw(self: &Circle, canvas: &Canvas):
         canvas.draw_circle(self.center, self.radius)
-    fn bounding_box(self: &Circle) -> Rect =
+    fn bounding_box(self: &Circle) -> Rect:
         Rect {
             x: self.center.x - self.radius,
             y: self.center.y - self.radius,
@@ -1833,7 +1833,7 @@ impl Drawable for Circle {
 }
 
 extend Vec[T: Add]
-    fn sum(self: &Vec[T]) -> T =
+    fn sum(self: &Vec[T]) -> T:
         self.iter() |> fold(T.zero(), |a, x| a + x)
 ```
 
@@ -1905,7 +1905,7 @@ try await withThrowingTaskGroup(of: User.self) { group in
 
 ```with
 // With
-async fn fetch_user(id: i32) -> Result[User, ApiError] =
+async fn fetch_user(id: i32) -> Result[User, ApiError]:
     let data = api.get("/users/{id}").await?
     json.parse[User](&data)
 
@@ -2128,7 +2128,7 @@ let updated = { user with name: "Alice", active: true }
 
 ```with
 // Owned string (heap-allocated, growable)
-let name: str = "Alice"              // literal auto-promoted
+let name = "Alice"                   // str is the default type
 
 // Borrowed view (ephemeral, zero-copy)
 let view: &str = name.as_view()
@@ -2137,23 +2137,23 @@ let view: &str = name.as_view()
 let msg = "Hello, {name}! You have {count} items."
 
 // Runtime &str → str requires explicit .to_string()
-fn take_owned(view: &str) -> str =
+fn take_owned(view: &str) -> str:
     view.to_string()                 // explicit allocation
 ```
 
 ## Testing
 
 ```with
-fn test_basic_math() =
+fn test_basic_math:
     assert_eq(2 + 2, 4)
     assert_ne(2 + 2, 5)
     assert(is_positive(1))
 
-fn test_error_case() =
+fn test_error_case:
     let result = parse("invalid")
     assert_matches(result, Err(ParseError.InvalidSyntax(..)))
 
-fn test_async_operation() =
+fn test_async_operation:
     let user = fetch_user(42).await.unwrap()
     assert_eq(user.name, "Alice")
 ```

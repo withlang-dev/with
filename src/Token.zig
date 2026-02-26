@@ -30,6 +30,7 @@ pub const Tag = enum(u8) {
     // -- Identifiers --
     identifier,
     dot_identifier, // .Variant (enum shorthand)
+    label, // 'name (loop label)
 
     // -- Keywords --
     kw_fn,
@@ -107,6 +108,7 @@ pub const Tag = enum(u8) {
     lt_pipe, // <|
     gt_gt, // >>
     lt_lt, // <<
+    plus_plus, // ++
     plus_eq, // +=
     minus_eq, // -=
     star_eq, // *=
@@ -202,6 +204,7 @@ pub const Tag = enum(u8) {
             .false_literal => "'false'",
             .identifier => "identifier",
             .dot_identifier => "dot-identifier",
+            .label => "label",
             .kw_fn => "'fn'",
             .kw_let => "'let'",
             .kw_var => "'var'",
@@ -275,6 +278,7 @@ pub const Tag = enum(u8) {
             .lt_pipe => "'<|'",
             .gt_gt => "'>>'",
             .lt_lt => "'<<'",
+            .plus_plus => "'++'",
             .plus_eq => "'+='",
             .minus_eq => "'-='",
             .star_eq => "'*='",

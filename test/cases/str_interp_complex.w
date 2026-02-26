@@ -2,11 +2,11 @@
 type Point = { x: i32, y: i32 }
 
 impl Point =
-    fn sum(self: Point) -> i32 = self.x + self.y
+    fn sum(self: Point) -> i32: self.x + self.y
 
-fn double(x: i32) -> i32 = x * 2
+fn double(x: i32) -> i32: x * 2
 
-fn main() -> i32 =
+fn main -> i32:
     // Basic variable interpolation
     let name = "With"
     println("language: {name}")
@@ -30,4 +30,3 @@ fn main() -> i32 =
     println("flag: {flag}")
 
     println("all str_interp_complex tests passed")
-    0

@@ -50,10 +50,10 @@ expect_build_fail() {
 }
 
 cat >"$tmpdir/llvm_minimal.w" <<'EOF1'
-fn add(a: i32, b: i32) -> i32 =
+fn add(a: i32, b: i32) -> i32:
     a + b
 
-fn main() -> i32 =
+fn main -> i32:
     if add(2, 3) == 5 then 0 else 1
 EOF1
 expect_ir_pass "$tmpdir/llvm_minimal.w"
@@ -62,7 +62,7 @@ expect_run_pass "$tmpdir/llvm_minimal.w"
 cat >"$tmpdir/llvm_extern.w" <<'EOF2'
 use c_import("#include <stdio.h>")
 
-fn main() -> i32 =
+fn main -> i32:
     printf(c"%s %d\n", c"llvm", 1)
     0
 EOF2
@@ -70,7 +70,7 @@ expect_ir_pass "$tmpdir/llvm_extern.w"
 expect_run_pass "$tmpdir/llvm_extern.w"
 
 cat >"$tmpdir/llvm_negative.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     unknown_symbol(1)
 EOF3
 expect_build_fail "$tmpdir/llvm_negative.w"

@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v6.3
+# The With Programming Language — Specification v6.4
 
 **Status:** Reference specification for prototype implementation
 **Positioning:** The Kotlin of systems programming.
@@ -56,7 +56,7 @@ the tricky parts internally, and if you hit a genuine edge case,
 **What With looks like in practice:**
 
 ```
-async fn handle_signup(req: HttpRequest, db: &Database) -> Result[HttpResponse, ApiError] =
+async fn handle_signup(req: HttpRequest, db: &Database) -> Result[HttpResponse, ApiError]:
     let body = req.json[SignupRequest]() ?? return Err(.InvalidJson)
 
     if not body.email.is_valid() then
@@ -174,13 +174,15 @@ features listed above. This is the core design invariant.
 
 With prioritizes joy. The common case should be effortless:
 
+- **Clean function syntax** — `fn greet:` for no-arg void functions.
+  Parentheses optional when you have no parameters. `:` introduces
+  the body. Return type only when you return something. (§9.1)
 - **Implicit `Ok` wrapping** — functions returning `Result` don't
   need `Ok(value)` at the end. Just return the value. (§4.9)
 - **No `Ok(())`** — functions returning `Result[Unit, E]` don't
   need a trailing `Ok()`. Just end the function. (§4.9)
-- **String literals just work** — `"hello"` auto-promotes to owned
-  `str` when the type expects it. No `.to_owned()` on every struct
-  initialization. (§15.3)
+- **String literals just work** — `"hello"` is `str` by default.
+  No type annotations, no `.to_owned()`. (§15.3)
 - **Auto-ref** — pass `alice` where `&User` is expected. The
   compiler borrows for you. (§3.8)
 - **Auto-deref** — `box_user.name` works through any number of
@@ -308,7 +310,7 @@ type Buffer = { data: Vec[u8] }          // Vec is NOT Copy (has Drop)
 impl Copy for Buffer {}                   // ERROR: field `data` is not Copy
 
 type File = { fd: i32 }
-impl Drop for File { fn drop(self) = ... }
+impl Drop for File { fn drop(self): ... }
 impl Copy for File {}                     // ERROR: Copy + Drop is forbidden
 ```
 
@@ -329,7 +331,7 @@ value** — the value is consumed:
 
 ```
 impl Drop for Database
-    fn drop(self: Self) =
+    fn drop(self: Self):
         sqlite3_close(self.handle)
 ```
 
@@ -341,7 +343,7 @@ automatically. No recursion, no leaks, no ceremony:
 
 ```
 impl Drop for Database
-    fn drop(self: Self) =
+    fn drop(self: Self):
         sqlite3_close(self.handle)
         // self.handle was consumed by the close call
         // compiler drops remaining fields automatically
@@ -357,7 +359,7 @@ error:
 ```
 type FileWrapper = { fd: File, name: String }
 impl Drop for FileWrapper
-    fn drop(self: Self) = close_file(self.fd)
+    fn drop(self: Self): close_file(self.fd)
 
 let w1 = FileWrapper { fd: open_file(), name: "A" }
 let w2 = { w1 with name: "B" }   // ERROR: partial move from Drop type
@@ -375,7 +377,7 @@ For explicit cleanup of resources not tied to a value's lifetime, `defer`
 executes a statement when the enclosing scope exits:
 
 ```
-fn process(path: str) -> Result[Unit, IoError] =
+fn process(path: str) -> Result[Unit, IoError]:
     let f = fs.open(path)?
     defer f.close()
     // ... use f ...
@@ -452,7 +454,7 @@ it in a container, capture it in an escaping closure, or return it from
 a function whose return type is not itself ephemeral.
 
 A function whose declared return type is or contains an ephemeral type
-is permitted. Both `fn foo() -> StrView` and `fn bar() -> Option[StrView]`
+is permitted. Both `fn foo -> StrView` and `fn bar -> Option[StrView]`
 are legal. Any function that calls such a function and returns its
 result must also have an ephemeral return type. This forms a chain:
 ephemerality propagates upward through callers until a function
@@ -460,24 +462,24 @@ consumes the ephemeral value (by copying data out, converting to
 owned, etc.) rather than returning it.
 
 ```
-fn first(xs: &Vec[i32]) -> Option[&i32] =
+fn first(xs: &Vec[i32]) -> Option[&i32]:
     if xs.is_empty() then None else Some(&xs[0])
 
-fn caller(xs: &Vec[i32]) =
+fn caller(xs: &Vec[i32]):
     let r = first(xs)        // OK: ephemeral local binding
     match r
         Some(v) -> println(v) // OK: local use
         None    -> ()
 
 // OK: wraps ephemeral return in another ephemeral return
-fn get_name(user: &User) -> StrView = user.name.as_view()
+fn get_name(user: &User) -> StrView: user.name.as_view()
 
 // OK: chains ephemeral through caller
-fn get_name_upper(user: &User) -> StrView =
+fn get_name_upper(user: &User) -> StrView:
     get_name(user).to_upper_view()
 
 // OK: consumes ephemeral, returns owned (chain ends here)
-fn get_name_owned(user: &User) -> String =
+fn get_name_owned(user: &User) -> String:
     get_name(user).to_string()
 ```
 
@@ -561,7 +563,7 @@ When a function takes `&T` and you pass an owned `T`, the compiler
 automatically borrows it:
 
 ```
-fn print_user(u: &User) = println(u.name)
+fn print_user(u: &User): println(u.name)
 
 let alice = User { name: "Alice" }
 print_user(alice)           // compiler inserts &alice automatically
@@ -575,7 +577,7 @@ This also works for method calls: `alice.greet()` works whether
 might be modified, the call site should show it:
 
 ```
-fn update(u: &mut User) = u.name = "Bob"
+fn update(u: &mut User): u.name = "Bob"
 
 var alice = User { name: "Alice" }
 update(&mut alice)          // explicit: mutation is visible
@@ -595,9 +597,9 @@ needed — if it implements the trait, just pass it:
 trait Logger { fn log(self: &Self, msg: &str) }
 type ConsoleLog = {}
 impl Logger for ConsoleLog
-    fn log(self: &Self, msg: &str) = println(msg)
+    fn log(self: &Self, msg: &str): println(msg)
 
-fn process(logger: &dyn Logger) = logger.log("processing")
+fn process(logger: &dyn Logger): logger.log("processing")
 
 let my_log = ConsoleLog {}
 process(&my_log)            // auto-coerces &ConsoleLog → &dyn Logger
@@ -835,17 +837,17 @@ names may be prefixed with `.` instead of the full type path:
 type Role = Admin | Member | Guest
 
 // Return type is known → .Member is unambiguous
-fn default_role() -> Role = .Member
+fn default_role -> Role: .Member
 
 // Match subject type is known → .Admin, .Member, .Guest work
-fn describe(role: Role) -> str =
+fn describe(role: Role) -> str:
     match role
         .Admin   -> "Administrator"
         .Member  -> "Member"
         .Guest   -> "Guest"
 
 // Parameter type is known → .Urgent works
-fn send(msg: str, priority: Priority) = ...
+fn send(msg: str, priority: Priority): ...
 send("hello", .Urgent)
 
 // Struct field type is known → .Member works
@@ -1011,7 +1013,7 @@ let s = pair.1                       // "hello"
 **Use in generics and containers:**
 
 ```
-fn swap[A, B](pair: (A, B)) -> (B, A) =
+fn swap[A, B](pair: (A, B)) -> (B, A):
     (pair.1, pair.0)
 
 // HashMap iteration yields (K, V) tuples
@@ -1019,7 +1021,7 @@ for (key, value) in map:
     println("{key}: {value}")
 
 // Functions can return multiple values naturally
-fn divmod(a: i32, b: i32) -> (i32, i32) =
+fn divmod(a: i32, b: i32) -> (i32, i32):
     (a / b, a % b)
 ```
 
@@ -1049,7 +1051,7 @@ generics:
 ```
 unwrap_or()          // OK: Option[Unit].unwrap_or → expected Unit
 
-fn id[T](val: T) -> T = val
+fn id[T](val: T) -> T: val
 id()                 // ERROR: expected 1 argument, got 0
                      // T is unconstrained — elision does not apply
 ```
@@ -1058,11 +1060,11 @@ More examples:
 
 ```
 // These patterns used to need Ok() — now just let the function end:
-async fn send_email(to: &str, body: &str) -> Result[Unit, SmtpError] =
+async fn send_email(to: &str, body: &str) -> Result[Unit, SmtpError]:
     transport.send(to, body).await?
     // implicit Ok(()) — just end the function
 
-fn run_migrations() -> Result[Unit, DbError] =
+fn run_migrations -> Result[Unit, DbError]:
     for m in migrations:
         m.execute(&conn)?
     // implicit Ok(()) — no ceremony needed
@@ -1084,24 +1086,24 @@ automatically wraps the final expression:
 
 ```
 // Before: manual Ok wrapping
-fn get_user(id: i32) -> Result[User, DbError] =
+fn get_user(id: i32) -> Result[User, DbError]:
     let row = db.query("SELECT ...", id)?
     let user = User.from_row(row)
     Ok(user)
 
 // After: implicit Ok wrapping
-fn get_user(id: i32) -> Result[User, DbError] =
+fn get_user(id: i32) -> Result[User, DbError]:
     let row = db.query("SELECT ...", id)?
     User.from_row(row)                   // auto-wrapped in Ok(...)
 
 // Result[Unit, E] — no trailing expression needed
-fn save_all(items: &Vec[Item]) -> Result[Unit, DbError] =
+fn save_all(items: &Vec[Item]) -> Result[Unit, DbError]:
     for item in items:
         db.insert(item)?
     // implicitly returns Ok(())
 
 // Explicit Err still works normally
-fn validate(age: i32) -> Result[Unit, ValidationError] =
+fn validate(age: i32) -> Result[Unit, ValidationError]:
     if age < 0 then return Err(.InvalidAge)
     if age > 150 then return Err(.InvalidAge)
     // implicitly returns Ok(())
@@ -1114,12 +1116,91 @@ just returns the value. No wrapping needed.
 
 - If the last expression already has type `Result[T, E]`, no
   wrapping occurs (would produce `Result[Result[T, E], E]`).
-- If the return type is not `Result`, this feature doesn't apply.
+- If the return type is not `Result`, implicit Ok wrapping doesn't
+  apply (but see §4.10 for implicit default return).
 - Explicit `Ok(...)` and `Err(...)` still work everywhere.
 
 **Guideline:** Tuples above 3 elements should usually be replaced
 with a named struct for readability. The compiler does not enforce
 this, but `with fmt` may suggest it.
+
+### 4.10 Implicit Default Return
+
+When a function's return type implements the `Default` trait and the
+body's last expression is `Unit` (a statement like `println`), the
+compiler implicitly returns `T.default()`.
+
+```
+// Before: manual trailing 0
+fn demo_strings -> i32:
+    let hello = "Hello, C interop!"
+    puts(hello)
+    println("strlen = {strlen(hello)}")
+    0                                      // annoying boilerplate
+
+// After: implicit default return
+fn demo_strings -> i32:
+    let hello = "Hello, C interop!"
+    puts(hello)
+    println("strlen = {strlen(hello)}")
+    // implicitly returns 0 (i32.default())
+```
+
+**The `Default` trait:**
+
+```
+trait Default {
+    fn default -> Self
+}
+```
+
+Built-in implementations:
+
+| Type | `default()` |
+|------|-------------|
+| `i8`, `i16`, `i32`, `i64` | `0` |
+| `u8`, `u16`, `u32`, `u64` | `0` |
+| `usize` | `0` |
+| `f32`, `f64` | `0.0` |
+| `bool` | `false` |
+| `str` | `""` |
+| `Option[T]` | `None` |
+| `Vec[T]` | empty vec |
+| `HashMap[K, V]` | empty map |
+| `HashSet[T]` | empty set |
+
+User types can implement `Default` manually or via `@[derive(Default)]`
+(requires all fields to implement `Default`):
+
+```
+@[derive(Default)]
+type Config = {
+    port: i32,          // defaults to 0
+    debug: bool,        // defaults to false
+    name: str,          // defaults to ""
+}
+
+fn make_config -> Config:
+    println("Creating default config...")
+    // implicitly returns Config.default()
+```
+
+**Interaction with implicit Ok wrapping:**
+
+Both features compose. If the return type is `Result[T, E]` and the
+body ends with a `Unit` statement, implicit Ok wrapping takes
+priority (returns `Ok(T.default())` if `T` implements `Default`, or
+`Ok(())` if `T` is `Unit`).
+
+**When implicit default return does NOT apply:**
+
+- If the last expression has a non-Unit type, no default insertion
+  occurs (the expression is the return value as usual).
+- If the return type does not implement `Default`, the compiler
+  reports a type mismatch as usual.
+- If the return type is `Unit`, no return value is needed (already
+  handled).
+- Explicit return values always work and are never overridden.
 
 ---
 
@@ -1179,7 +1260,7 @@ type Request = {
 }
 
 extend Request
-    fn path_str(self: &Request) -> StrView =
+    fn path_str(self: &Request) -> StrView:
         self.buf.view(self.path.offset, self.path.len)
 ```
 
@@ -1203,7 +1284,7 @@ type Parser = ephemeral {
     pos: usize,
 }
 
-fn next_token(parser: &mut Parser) -> Option[Token] =
+fn next_token(parser: &mut Parser) -> Option[Token]:
     // ... returns Token borrowing from parser.source
 ```
 
@@ -1231,7 +1312,7 @@ while let Some(tok) = next_token(&mut parser):
 // To collect, use owned tokens with offset indices:
 type OwnedToken = { start: u32, end: u32, kind: TokenKind, span: Span }
 
-fn next_owned_token(parser: &mut Parser) -> Option[OwnedToken] =
+fn next_owned_token(parser: &mut Parser) -> Option[OwnedToken]:
     let tok = next_raw_token(parser)?
     Some(OwnedToken { start: tok.start, end: tok.end, kind: tok.kind, span: tok.span })
 
@@ -1562,14 +1643,14 @@ Kotlin's `inline` lambdas or Swift's `@noescape` closures):
 - **`?`** propagates errors to the **enclosing function**.
 
 ```
-fn find_value(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32] =
+fn find_value(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32]:
     with lock.lock() as map:
         match map.get(key)
             Some(v) -> return Some(v)   // returns from find_value
             None    -> ()
     None
 
-fn process_all(lock: &Mutex[Vec[Item]]) -> Result[Unit, AppError] =
+fn process_all(lock: &Mutex[Vec[Item]]) -> Result[Unit, AppError]:
     with lock.lock() as items:
         for item in items:
             if item.is_invalid():
@@ -1758,7 +1839,7 @@ it can only be used as a local variable — it cannot be stored in
 structs or returned from functions:
 
 ```
-fn example(arena: &FrameArena) =
+fn example(arena: &FrameArena):
     // Vec borrows the arena → ephemeral
     var candidates = Vec.new_in(arena)
     candidates.push(1)           // OK: used as local
@@ -1788,12 +1869,36 @@ Implements `Scoped[T]` and `ScopedMut[T]` for `with` blocks.
 ### 9.1 Functions
 
 ```
-fn add(a: i32, b: i32) -> i32 = a + b
+fn add(a: i32, b: i32) -> i32: a + b
 
-fn clamp(x: i32, lo: i32, hi: i32) -> i32 =
+fn clamp(x: i32, lo: i32, hi: i32) -> i32:
     if x < lo then lo
     else if x > hi then hi
     else x
+```
+
+**Syntax:**
+
+```
+fn NAME(PARAMS) -> TYPE: BODY    // parameters + return type
+fn NAME(PARAMS): BODY            // parameters, returns Unit
+fn NAME -> TYPE: BODY            // no parameters, has return type
+fn NAME: BODY                    // no parameters, returns Unit
+```
+
+Parentheses are required when a function takes parameters. When a
+function takes no parameters, parentheses may be included or
+omitted — `fn greet:` and `fn greet():` are both legal. The
+idiomatic style omits them. The return type `-> TYPE` is omitted
+when the function returns `Unit` (void). The colon `:` introduces
+the body — either inline on the same line or indented on the next.
+
+```
+fn greet: println("hello")               // no args, no return type
+fn greet(): println("hello")             // also legal, parens optional
+fn get_pi -> f64: 3.14159                // no args, returns f64
+fn double(x: i32) -> i32: x * 2         // args + return type
+fn log(msg: str): println(msg)           // args, returns Unit
 ```
 
 ### 9.2 Tail Call Optimization
@@ -1803,7 +1908,7 @@ If the function is not tail-recursive, the compiler rejects it.
 
 ```
 @[tailrec]
-fn factorial(n: Int, acc: Int) -> Int =
+fn factorial(n: Int, acc: Int) -> Int:
     match n
         0 -> acc
         _ -> factorial(n - 1, n * acc)
@@ -1831,7 +1936,7 @@ items |> filter(_.age > 21) |> map(_.name)
 Functions can be partially applied with `_` as placeholder:
 
 ```
-fn add(a: i32, b: i32) -> i32 = a + b
+fn add(a: i32, b: i32) -> i32: a + b
 let add5 = add(5, _)        // fn(i32) -> i32
 add5(3)                      // 8
 
@@ -1845,7 +1950,7 @@ controlled equivalent.
 
 ```
 extend Vec[T]
-    fn is_empty(self: &Vec[T]) -> bool = self.len() == 0
+    fn is_empty(self: &Vec[T]) -> bool: self.len() == 0
 ```
 
 **Method call syntax** applies to all `self` parameter forms:
@@ -1862,9 +1967,9 @@ extend Vec[T]
 type Builder = { host: str, port: u16 }
 
 extend Builder
-    fn host(self: Builder, h: str) -> Builder = { self with host: h }
-    fn port(self: Builder, p: u16) -> Builder = { self with port: p }
-    fn build(self: Builder) -> Result[Server, ConfigError] = ...
+    fn host(self: Builder, h: str) -> Builder: { self with host: h }
+    fn port(self: Builder, p: u16) -> Builder: { self with port: p }
+    fn build(self: Builder) -> Result[Server, ConfigError]: ...
 
 // Dot-notation chains naturally — each call moves the builder
 let server = Builder.new()
@@ -2093,15 +2198,15 @@ let .Colon = self.expect_token("':'")? else
 
 **Pattern matching in function parameters:**
 ```
-fn distance({ x: x1, y: y1 }: Point, { x: x2, y: y2 }: Point) -> f64 =
+fn distance({ x: x1, y: y1 }: Point, { x: x2, y: y2 }: Point) -> f64:
     let dx = x2 - x1
     let dy = y2 - y1
     (dx * dx + dy * dy).sqrt()
 
-fn origin() = Point { x: 0.0, y: 0.0 }
+fn origin: Point { x: 0.0, y: 0.0 }
 
-fn head([first, ..]: &[T]) -> Option[&T] = Some(first)
-fn head([]: &[T]) -> Option[&T] = None
+fn head([first, ..]: &[T]) -> Option[&T]: Some(first)
+fn head([]: &[T]) -> Option[&T]: None
 ```
 
 Parameter patterns desugar to a match on the parameter at the
@@ -2147,7 +2252,7 @@ for &(key, val) in items:
     println("{key}: {val}")
 
 // Works with match on borrowed enums:
-fn describe(opt: &Option[String]) -> &str =
+fn describe(opt: &Option[String]) -> &str:
     match opt
         Some(s) -> s       // s: &String, not String
         None    -> "none"
@@ -2246,7 +2351,7 @@ must_use = "error"    # promote to compile error
 propagates `None`.
 
 ```
-fn load_config(path: &str) -> Result[Config, AppError] =
+fn load_config(path: &str) -> Result[Config, AppError]:
     let text = read_file(path)?           // propagates IoError
     let config = parse_toml(text)?        // propagates ParseError
     Ok(config)
@@ -2423,7 +2528,7 @@ producing a `ContextError[E]` that preserves the original error as
 a `source` field. This chains naturally with `?`:
 
 ```
-fn load_config(path: &str) -> Result[Config, AppError] =
+fn load_config(path: &str) -> Result[Config, AppError]:
     let text = fs.read_to_string(path)
         .context("failed to read config file")?
     let config = toml.parse(text)
@@ -2453,8 +2558,8 @@ type ContextError[E] = {
 }
 
 impl Error for ContextError[E] where E: Error {
-    fn display(self: &Self) -> str = self.message
-    fn source(self: &Self) -> Option[&dyn Error] = Some(&self.source)
+    fn display(self: &Self) -> str: self.message
+    fn source(self: &Self) -> Option[&dyn Error]: Some(&self.source)
 }
 ```
 
@@ -2543,14 +2648,14 @@ trait Show {
 }
 
 impl Show for Point {
-    fn show(self: &Point) -> String = "({self.x}, {self.y})"
+    fn show(self: &Point) -> String: "({self.x}, {self.y})"
 }
 ```
 
 ### 11.2 Generic Bounds
 
 ```
-fn debug[T: Show + Hash](x: &T) =
+fn debug[T: Show + Hash](x: &T):
     println("{x.show()} (hash: {x.hash()})")
 ```
 
@@ -2621,11 +2726,11 @@ rules to prevent method conflicts across packages:
 ```
 // In package `slug`:
 extend String
-    fn to_slug(self: &Self) -> String = ...
+    fn to_slug(self: &Self) -> String: ...
 
 // In package `url`:
 extend String
-    fn to_slug(self: &Self) -> String = ...
+    fn to_slug(self: &Self) -> String: ...
 
 // In user code:
 use slug
@@ -2735,7 +2840,7 @@ traits is **fixed and closed** — users cannot define new syntax hooks.
 type Matrix = { data: Vec[f64], rows: usize, cols: usize }
 
 impl Index[(usize, usize), f64] for Matrix {
-    fn index(self: &Self, (r, c): (usize, usize)) -> &f64 =
+    fn index(self: &Self, (r, c): (usize, usize)) -> &f64:
         &self.data[r * self.cols + c]
 }
 
@@ -2749,14 +2854,14 @@ type ParseResult[T] = ParseOk(T, remaining: str)
                     | ParseErr(msg: str, pos: usize)
 
 impl Try[T, ParseError] for ParseResult[T] {
-    fn branch(self: Self) -> ControlFlow[ParseError, T] =
+    fn branch(self: Self) -> ControlFlow[ParseError, T]:
         match self
             ParseOk(v, _) -> ControlFlow.Continue(v)
             ParseErr(m, p) -> ControlFlow.Break(ParseError { msg: m, pos: p })
 }
 
 // Now ? works naturally in parser combinators:
-fn parse_pair(input: &str) -> ParseResult[(Expr, Expr)] =
+fn parse_pair(input: &str) -> ParseResult[(Expr, Expr)]:
     let left = parse_expr(input)?
     let right = parse_expr(left.remaining)?
     ParseOk((left.value, right.value), right.remaining)
@@ -2822,6 +2927,7 @@ structure. The following **structural traits** may be derived:
 |-------|-----------|----------|
 | `Copy` | All fields are `Copy`, no `Drop` | Bitwise copy |
 | `Clone` | All fields are `Clone` | Field-by-field clone |
+| `Default` | All fields are `Default` | Field-by-field default |
 | `Eq` | All fields are `Eq` | Field-by-field equality |
 | `Hash` | All fields are `Hash` | Hash all fields in order |
 | `Ord` | All fields are `Ord` | Lexicographic comparison |
@@ -2842,12 +2948,12 @@ qualifies for:
 ```
 @[derive(all)]
 type Color = { r: u8, g: u8, b: u8, a: u8 }
-// Derives: Copy, Clone, Eq, Hash, Ord, Debug
+// Derives: Copy, Clone, Default, Eq, Hash, Ord, Debug
 // (all fields are u8, which implements all of these)
 
 @[derive(all)]
 type User = { name: str, email: str, age: i32 }
-// Derives: Clone, Eq, Hash, Debug
+// Derives: Clone, Default, Eq, Hash, Debug
 // (NOT Copy — String is not Copy)
 // (NOT Ord — not all fields implement Ord by default)
 ```
@@ -2885,12 +2991,12 @@ type DatabaseConfig = {
 //     host: Option[str], port: Option[i32], ...
 // }
 // impl DatabaseConfigBuilder {
-//     fn host(self: Self, val: str) -> Self = ...
-//     fn port(self: Self, val: i32) -> Self = ...
-//     fn build(self: Self) -> Result[DatabaseConfig, BuilderError] = ...
+//     fn host(self: Self, val: str) -> Self: ...
+//     fn port(self: Self, val: i32) -> Self: ...
+//     fn build(self: Self) -> Result[DatabaseConfig, BuilderError]: ...
 // }
 // impl DatabaseConfig {
-//     fn builder() -> DatabaseConfigBuilder = ...
+//     fn builder -> DatabaseConfigBuilder: ...
 // }
 
 // Usage:
@@ -2972,7 +3078,7 @@ fn find_matches(text: &str, pat: &str) -> dyn Iter[StrView]
 type MatchIter = ephemeral { text: StrView, pat: StrView, pos: usize }
 impl Iter[StrView] for MatchIter { ... }
 
-fn find_matches(text: &str, pat: &str) -> MatchIter =
+fn find_matches(text: &str, pat: &str) -> MatchIter:
     MatchIter { text: text.as_view(), pat: pat.as_view(), pos: 0 }
 // Caller's binding is ephemeral — cannot store, must use in this scope
 ```
@@ -2986,16 +3092,16 @@ ephemerality, preventing the caller from knowing the restriction.
 
 ```
 // 1. Collect into owned container (small allocation cost)
-fn find_matches(text: &String, pat: &str) -> Vec[String] =
+fn find_matches(text: &String, pat: &str) -> Vec[String]:
     text.split(pat) |> map(|s| s.to_string()) |> collect()
 
 // 2. Generator that owns its data (lazy, no allocation)
-gen fn find_matches(text: String, pat: String) -> String =
+gen fn find_matches(text: String, pat: String) -> String:
     for segment in text.split(&pat):
         yield segment.to_string()
 
 // 3. Callback / visitor pattern (zero allocation, inversion of control)
-fn find_matches(text: &String, pat: &str, f: fn(StrView)) =
+fn find_matches(text: &String, pat: &str, f: fn(StrView)):
     for segment in text.split(pat):
         f(segment)
 
@@ -3176,7 +3282,7 @@ without requiring the entry API's verbose ceremony.
 Generators produce sequences lazily, suspending between each `yield`.
 
 ```
-gen fn fibonacci() -> Int =
+gen fn fibonacci -> Int:
     var a = 0
     var b = 1
     loop:
@@ -3191,19 +3297,19 @@ let first_10 = fibonacci() |> take(10) |> collect[Vec]()
 Generators are declared with `gen fn`, use `yield`, and return
 iterators implementing `Iter[T]`.
 
-**Return type convention:** In `gen fn f() -> T`, the `-> T`
+**Return type convention:** In `gen fn f -> T`, the `-> T`
 specifies the **yielded element type**, not the function's actual
 return type. The function actually returns an opaque iterator
-(`impl Iter[T]`). This is analogous to `async fn f() -> T`
+(`impl Iter[T]`). This is analogous to `async fn f -> T`
 meaning "returns `Task[T]`" — the keyword modifies the return
 type's meaning:
 
 ```
-gen fn fibonacci() -> Int = ...
+gen fn fibonacci -> Int: ...
 // Actual type of fibonacci(): impl Iter[Int]
 // Each yield produces an Int
 
-async fn fetch(url: str) -> String = ...
+async fn fetch(url: str) -> String: ...
 // Actual type of fetch(url): Task[String]
 ```
 
@@ -3222,12 +3328,12 @@ struct (the struct contains both the field and a pointer to it).
 Since With has no `Pin`, this is forbidden:
 
 ```
-gen fn bad_generator() -> &str =
+gen fn bad_generator -> &str:
     let s = "hello".to_owned()
     let r = &s           // r borrows s
     yield r              // ERROR: reference `r` to local `s` is live across yield
 
-gen fn ok_generator() -> str =
+gen fn ok_generator -> str:
     let s = "hello".to_owned()
     yield s.clone()      // OK: yields an owned value
     let r = &s           // OK: r does not cross a yield
@@ -3254,7 +3360,7 @@ type TokenIter = ephemeral { source: StrView, pos: usize }
 impl Iter[StrView] for TokenIter { ... }
 
 // Zero-copy: callback pattern
-fn each_token(src: &str, f: fn(StrView)) = ...
+fn each_token(src: &str, f: fn(StrView)): ...
 ```
 
 **Generators are not coroutines.** They are pull-based (the caller
@@ -3375,7 +3481,7 @@ lightweight thread and returns a `Task[T]` handle immediately. `.await`
 suspends the current fiber until a task completes.
 
 ```
-async fn fetch_user(id: UserId) -> Result[User, ApiError] =
+async fn fetch_user(id: UserId) -> Result[User, ApiError]:
     let resp = http.get("/users/{id}").await
     let body = resp.read_body().await
     json.decode(body)?
@@ -3461,7 +3567,7 @@ only manifests as compile errors in unsafe contexts (holding
 non-suspendable guards, or C callbacks).
 
 ```
-fn helper() =
+fn helper:
     some_io().await        // makes helper() may_suspend
 
 with lock.write() as data:
@@ -3473,7 +3579,7 @@ with lock.write() as data:
 ### 14.4 `async fn` Semantics
 
 ```
-async fn fetch(url: str) -> Result[String, IoError] = ...
+async fn fetch(url: str) -> Result[String, IoError]: ...
 ```
 
 Calling `fetch(url)` does the following:
@@ -3726,7 +3832,7 @@ scheduler and dropping the task would deadlock. Non-ephemeral tasks
 ### 14.8 Parallel Execution
 
 ```
-async fn fetch_profile(id: UserId) -> Result[Profile, ApiError] =
+async fn fetch_profile(id: UserId) -> Result[Profile, ApiError]:
     let user_task = fetch_user(id)       // fiber starts
     let posts_task = fetch_posts(id)     // fiber starts
     // both running concurrently
@@ -3805,7 +3911,7 @@ async scope |s|:
 4. `s` cannot escape the scope. It is ephemeral.
 
 ```
-async fn handle_batch(ids: Vec[UserId]) -> Vec[Result[User, ApiError]] =
+async fn handle_batch(ids: Vec[UserId]) -> Vec[Result[User, ApiError]]:
     async scope |s|:
         let tasks = ids.iter()
             |> map(|id| s.track(fetch_user(id)))
@@ -3937,7 +4043,7 @@ stack survive suspension. No lifetime gymnastics required.
 Because fibers have real stacks, references across `await` are safe:
 
 ```
-async fn process(data: &mut Vec[i32]) =
+async fn process(data: &mut Vec[i32]):
     let first = &data[0]
     some_io().await              // fiber suspends; reference still valid
     println(first)               // safe to use
@@ -4035,7 +4141,7 @@ async scope |s|:
 
 // OK: send owned values over channels
 let (tx, rx) = chan[String](10)
-tx.send("hello").await                  // auto-promoted, String is Send
+tx.send("hello").await                  // str literal, String is Send
 ```
 
 ### 14.15 Send, Sync, and ScopedSend
@@ -4150,10 +4256,10 @@ nothing.
 
 ```
 // Pure With — stays on 8KB fiber stack, no switch
-async fn compute(x: i32) -> i32 = x * x + 1
+async fn compute(x: i32) -> i32: x * x + 1
 
 // Calls C — auto-switches to OS stack at the boundary
-async fn query(db: &Database, sql: &str) -> Result[Row, DbError] =
+async fn query(db: &Database, sql: &str) -> Result[Row, DbError]:
     sqlite3_step(db.handle)  // runs on OS-thread stack
 ```
 
@@ -4163,7 +4269,7 @@ avoiding per-call switching:
 
 ```
 @[ffi_stack]
-fn process_image(data: &[u8]) -> Image =
+fn process_image(data: &[u8]) -> Image:
     // All C calls in this function run on the OS stack
     // without per-call switching overhead
     ...
@@ -4266,7 +4372,7 @@ tools, not alternatives.
 ### 14.20 Real-World Example
 
 ```
-async fn main() =
+async fn main:
     let listener = net.listen("0.0.0.0:8080").await
     println("Listening on :8080")
 
@@ -4274,7 +4380,7 @@ async fn main() =
         let conn = listener.accept().await
         spawn handle_connection(conn)
 
-async fn handle_connection(conn: TcpStream) =
+async fn handle_connection(conn: TcpStream):
     let req = http.parse_request(&conn).await
 
     let response = match req.path_str()
@@ -4309,7 +4415,7 @@ let task = fetch_user(id)              // id: UserId is owned
 // task is Task[Result[User, DbError]], storable, Send
 
 // Borrowing task: ephemeral — cannot be stored or sent
-async fn process(data: &mut Vec[i32]) -> Unit = ...
+async fn process(data: &mut Vec[i32]) -> Unit: ...
 let task = process(&mut my_vec)        // captures &mut my_vec
 // task is ephemeral — it borrows my_vec
 // Cannot store in a struct, cannot send to another thread
@@ -4328,10 +4434,10 @@ passed to functions — by reference or by value. The compiler tracks
 ephemerality and warns if a value might escape its safe scope:
 
 ```
-fn process_task(t: Task[i32]) =
+fn process_task(t: Task[i32]):
     t.await                          // OK: consumes the task
 
-fn store_globally(t: Task[i32]) =
+fn store_globally(t: Task[i32]):
     GLOBAL_TASKS.push(t)            // WARNING: storing a value that
                                      // may be ephemeral at some call sites
 
@@ -4364,7 +4470,7 @@ task.await?                       // OK: used immediately
 **`async scope` is the ergonomic solution** for borrowing tasks:
 
 ```
-async fn process_all(data: &mut Vec[i32]) =
+async fn process_all(data: &mut Vec[i32]):
     async scope |s|:
         // These tasks borrow data — ephemeral
         let t1 = s.track(transform(&data[0..100]))
@@ -4409,18 +4515,28 @@ is an implementation detail or FFI-specific.
 
 ```
 type User = { name: str, email: str }    // owned strings in structs
-fn greet(name: &str) = println("Hello, {name}")  // borrowed for reading
-fn get_name() -> str = "Alice"            // return owned string
+fn greet(name: &str): println("Hello, {name}")  // borrowed for reading
+fn get_name -> str: "Alice"            // return owned string
 ```
 
-**String literals** (`"hello"`) are `&str` by default (zero-cost
-reference into static memory). When the compiler knows you need an
-owned `str`, it auto-promotes:
+**String literals** (`"hello"`) are `str` by default (owned). The
+compiler is smart about this — when it can prove the string is only
+read (never stored, never returned, never mutated), it silently
+optimizes away the allocation and uses a static reference internally.
+You don't think about this. You write strings, the compiler does the
+right thing:
 
 ```
-let view = "hello"           // &str — no allocation
-let owned: str = "hello"     // str — auto-promoted
-let user = User { name: "Alice", email: "a@b.com" }  // auto-promoted
+let greeting = "hello"       // str — just a string
+let user = User { name: "Alice", email: "a@b.com" }  // str fields
+```
+
+**When you explicitly want a borrowed view** (e.g., for performance
+in a tight loop over slices), annotate it:
+
+```
+let view: &str = "hello"     // &str — static reference, no allocation
+fn greet(name: &str): ...   // parameter context: callers can pass &str
 ```
 
 **Advanced types** (you rarely need these directly):
@@ -4438,48 +4554,48 @@ let user = User { name: "Alice", email: "a@b.com" }  // auto-promoted
 |------|----|-----|
 | `str` | `&str` | auto-borrow or `.as_view()` |
 | `&str` | `str` | `.to_owned()` (allocates) |
-| `"literal"` | `&str` | direct (no allocation) |
-| `"literal"` | `str` | auto-promoted when type is known |
+| `"literal"` | `str` | direct (default) |
+| `"literal"` | `&str` | when type context is `&str`, zero-cost static ref |
 | `str` | `CString` | `.to_cstring()` (appends NUL) |
 | `CString` | `CStr` | `.as_cstr()` |
 
 ### 15.3 String Literals
 
-String literals like `"hello"` are compile-time `&str` references
-into static memory. When the expected type is owned `str`, the
-compiler **automatically promotes** the literal:
+String literals like `"hello"` default to owned `str`. You never
+need a type annotation to use a string:
 
 ```
-// Auto-promotion: compiler sees str is expected, inserts allocation
-let name: str = "Alice"                                    // just works
-let config = ServerConfig { host: "localhost", port: 8080 } // just works
-fn get_name() -> str = "Alice"                              // just works
+// These all just work — no annotations needed
+let name = "Alice"
+let config = ServerConfig { host: "localhost", port: 8080 }
+fn get_name -> str: "Alice"
 
-// Passing to fn(str) also promotes:
-fn register(name: str) = ...
+fn register(name: str): ...
 register("Alice")                                          // just works
 
-// &str works directly for read-only use (no allocation):
-fn greet(name: &str) = println("hello {name}")
-greet("world")                               // OK: literal is &str, no alloc
+// Passing to fn(&str) auto-borrows (no allocation):
+fn greet(name: &str): println("hello {name}")
+greet("world")                               // OK: str auto-borrows to &str
 
-// Explicit .to_owned() still works if you prefer it:
-let name = "Alice".to_owned()                // same effect, just verbose
+// Explicit &str for zero-cost static reference:
+let view: &str = "hello"                     // no allocation, static memory
 ```
 
-**How it works:** When the compiler knows from context that an owned
-`str` is expected (struct field, function parameter, variable with
-type annotation, return type), it inserts `.to_owned()` on the
-literal automatically. This is the same as Kotlin's implicit
-conversions or Swift's string literals — the allocation is obvious
-from context (you're putting a string in an owned field), so the
-language doesn't make you type it.
+**How it works:** A bare string literal produces an owned `str`.
+The compiler is free to optimize this — when it can prove the
+string is never mutated, never stored in a heap structure, and
+never escapes the current scope, it may use a static reference
+internally. But the *type* is always `str` unless you annotate
+`&str`.
 
-When there's **no type context**, a bare `"hello"` is still `&str`:
+When the type context is `&str` (function parameter, explicit
+annotation), the literal is a zero-cost static reference with no
+allocation. This is an optimization the compiler applies
+automatically.
 
 ```
-let s = "hello"        // s: &str (static reference, no allocation)
-let s: str = "hello"   // s: str (owned, auto-promoted)
+let s = "hello"        // s: str (owned — the default)
+let s: &str = "hello"  // s: &str (static reference, no allocation)
 ```
 
 **Interpolated literals** (`"user {id}"`) always produce `str`
@@ -4534,7 +4650,7 @@ makes all declarations available as With symbols. This includes:
 ```
 use c_import("sqlite3.h", link: "sqlite3")
 
-fn main() =
+fn main:
     var db: *mut sqlite3 = null
     let rc = sqlite3_open(":memory:", &mut db)   // direct call
     if rc != SQLITE_OK:
@@ -4628,7 +4744,7 @@ perfecting). Phase 0 translates only `#define` constants:
 ```c
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 // → NOT translated. Compiler warning: untranslated macro MAX
-// User must write: fn max[T: Ord](a: T, b: T) -> T = if a > b then a else b
+// User must write: fn max[T: Ord](a: T, b: T) -> T: if a > b then a else b
 ```
 
 Complex macros (token pasting, stringification, variadic macros,
@@ -4675,7 +4791,7 @@ annotated.
 
 ```
 @[c_export("my_lib_init")]
-fn init(config: *const Config) -> i32 = ...
+fn init(config: *const Config) -> i32: ...
 ```
 
 The toolchain generates C header files for all `@[c_export]` symbols.
@@ -4734,7 +4850,7 @@ checker. Nothing is hidden from the safety machinery.
 `comptime` executes code at compile time. Deterministic, side-effect-free.
 
 ```
-comptime fn build_table(keys: [str]) -> HashMap[str, usize] =
+comptime fn build_table(keys: [str]) -> HashMap[str, usize]:
     var table = HashMap.new()
     var i = 0
     for key in keys:
@@ -4769,7 +4885,7 @@ parameters directly. Inside comptime context, types are objects:
 | `T.is_copy()` | `bool` | Whether T is Copy |
 
 ```
-comptime fn print_fields[T: type]() =
+comptime fn print_fields[T: type]:
     for field in T.fields():           // T is a type object
         println("field: {field.name}, size: {field.size}")
 ```
@@ -4798,10 +4914,10 @@ structure.
 
 ```
 // Generate a JSON serializer for any struct at compile time
-comptime fn derive_serialize[T: type]() -> impl Serialize for T =
+comptime fn derive_serialize[T: type] -> impl Serialize for T:
     let fields = T.fields()
     impl Serialize for T {
-        fn serialize(self: &T, out: &mut JsonWriter) =
+        fn serialize(self: &T, out: &mut JsonWriter):
             out.begin_object()
             for field in fields:       // cascade: inside comptime fn
                 out.key(field.name)
@@ -4815,7 +4931,7 @@ type User = { name: String, age: i32, email: String }
 
 // The compiler generates (conceptually):
 // impl Serialize for User {
-//     fn serialize(self: &User, out: &mut JsonWriter) =
+//     fn serialize(self: &User, out: &mut JsonWriter):
 //         out.begin_object()
 //         out.key("name"); self.name.serialize(out)
 //         out.key("age"); self.age.serialize(out)
@@ -4835,7 +4951,7 @@ implementation.
 once per iteration with compile-time constants substituted:
 
 ```
-comptime fn register_components[Ts: [type]]() =
+comptime fn register_components[Ts: [type]]():
     for T in Ts:                       // already in comptime context
         world.register_storage[T](
             T.name(),
@@ -4852,7 +4968,7 @@ inner `for`, `if`, or other statements with `comptime` — it
 cascades automatically:
 
 ```
-comptime fn generate_storage[T: type]() =
+comptime fn generate_storage[T: type]:
     // These are all comptime — no prefix needed inside comptime fn:
     for field in T.fields():
         if field.type_name.starts_with("Vec["):
@@ -4871,7 +4987,7 @@ inside is already compile-time by context.
 not compiled:
 
 ```
-fn serialize_value[T](val: &T, out: &mut Writer) =
+fn serialize_value[T](val: &T, out: &mut Writer):
     comptime if T.is_copy():
         // Fast path for small Copy types
         out.write_bytes(val as *const u8, T.size())
@@ -4904,7 +5020,7 @@ type Transform = { position: Vec3, rotation: Quat, scale: f32 }
 
 ```
 // Automatically generate SoA layout from AoS definition
-comptime fn make_soa[T: type](capacity: usize) -> SoaStorage[T] =
+comptime fn make_soa[T: type](capacity: usize) -> SoaStorage[T]:
     let fields = T.fields()
     // Generates a struct with one Vec per field:
     // { positions: Vec[Vec3], rotations: Vec[Quat], scales: Vec[f32] }
@@ -4914,7 +5030,7 @@ comptime fn make_soa[T: type](capacity: usize) -> SoaStorage[T] =
 **Compile-time string hashing:**
 
 ```
-comptime fn hash_str(s: str) -> u64 =
+comptime fn hash_str(s: str) -> u64:
     var h: u64 = 5381
     for c in s.bytes():
         h = h * 33 + c as u64
@@ -4957,7 +5073,7 @@ when that branch is instantiated with a specific `T`, similar to
 Zig's compile-time generics.
 
 ```
-fn process[T](val: &T) =
+fn process[T](val: &T):
     val.len()   // ERROR at generic check: T has no .len() method
     comptime if T.implements(Serialize):
         val.serialize()   // Deferred: checked only when T: Serialize
@@ -5002,7 +5118,7 @@ move and does nothing — the value is destroyed when the argument
 goes out of scope:
 
 ```
-fn drop[T](val: T) = ()
+fn drop[T](val: T): ()
 ```
 
 This is used to trigger resource cleanup at a specific point:
@@ -5338,7 +5454,7 @@ match direction
     .West  -> go_west()
     _      -> unreachable()     // enum is exhaustive
 
-fn get_config() -> Config =
+fn get_config -> Config:
     // This function always succeeds in our deployment
     load_config() ?? unreachable("config must exist")
 ```
@@ -5347,7 +5463,7 @@ fn get_config() -> Config =
 panics at runtime:
 
 ```
-fn complex_algorithm(data: &[i32]) -> i32 =
+fn complex_algorithm(data: &[i32]) -> i32:
     todo("implement after benchmarking")
 ```
 
@@ -5426,14 +5542,14 @@ same fiber.
 
 ```
 // UNDEFINED BEHAVIOR:
-async fn bad() =
+async fn bad:
     let x = 42
     let p: *const i32 = &raw x
     some_io().await          // stack may be relocated
     unsafe { *p }            // UB: p may be dangling
 
 // OK: pointer used before await
-async fn ok() =
+async fn ok:
     let x = 42
     let p: *const i32 = &raw x
     unsafe { use(p) }        // fine: no intervening await
@@ -5590,7 +5706,7 @@ leftover from refactoring.
 
 ```
 // ERROR:
-fn example() -> i32 =
+fn example -> i32:
     return 42
     println("hello")    // unreachable
 
@@ -5783,7 +5899,7 @@ Possible approaches include tagged-union returns, inlining the
 
 ### 24.1 `async fn` Equivalence
 
-`async fn foo(x: T) -> U = body` is equivalent to a function that
+`async fn foo(x: T) -> U: body` is equivalent to a function that
 spawns a fiber executing `body` and returns a `Task[U]`:
 
 ```
@@ -5818,26 +5934,26 @@ runtime fallback.
 
 ```
 // PASS: basic move
-fn test() =
+fn test:
     let a = Vec.new()
     let b = a
     b.push(1)
 
 // FAIL: use after move
-fn test() =
+fn test:
     let a = Vec.new()
     let b = a
     a.push(1)            // ERROR: use of moved value
 
 // PASS: copy type
-fn test() =
+fn test:
     let a: i32 = 5
     let b = a
     let c = a            // OK: Copy
 
 // FAIL: use after move to function
-fn takes(v: Vec[i32]) = ()
-fn test() =
+fn takes(v: Vec[i32]): ()
+fn test:
     let a = Vec.new()
     takes(a)
     a.len()              // ERROR: moved
@@ -5847,7 +5963,7 @@ fn test() =
 
 ```
 // PASS: reference as local
-fn test() =
+fn test:
     let x = 42
     let r = &x
     println(r)
@@ -5856,19 +5972,19 @@ fn test() =
 type Bad = { data: &i32 }        // ERROR
 
 // FAIL: reference in container
-fn test() =
+fn test:
     let x = 42
     var v = Vec.new()
     v.push(&x)                   // ERROR
 
 // PASS: non-escaping closure captures ref
-fn test() =
+fn test:
     let x = 42
     let r = &x
     vec![1, 2, 3].for_each(|item| println("{item} {r}"))
 
 // FAIL: escaping closure captures ref
-fn test() =
+fn test:
     let x = 42
     let r = &x
     thread.spawn_os(|| println(r))   // ERROR
@@ -5878,39 +5994,39 @@ fn test() =
 
 ```
 // PASS: return ref, use locally
-fn first(xs: &Vec[i32]) -> Option[&i32] =
+fn first(xs: &Vec[i32]) -> Option[&i32]:
     if xs.is_empty() then None else Some(&xs[0])
 
-fn test() =
+fn test:
     let v = vec![1, 2, 3]
     match first(&v)
         Some(x) -> println(x)
         None    -> ()
 
 // PASS: ephemeral to owned conversion
-fn get_name(user: &User) -> StrView = user.name.as_view()
-fn owned(user: &User) -> String = get_name(user).to_string()
+fn get_name(user: &User) -> StrView: user.name.as_view()
+fn owned(user: &User) -> String: get_name(user).to_string()
 ```
 
 ### 25.4 NLL Borrow Scoping (Section 3.5)
 
 ```
 // PASS: borrow ends at last use
-fn test() =
+fn test:
     var x = 5
     let r = &x
     println(r)
     x = 10           // OK
 
 // FAIL: mutation while borrow active
-fn test() =
+fn test:
     var x = 5
     let r = &x
     x = 10           // ERROR
     println(r)
 
 // PASS: mutable then shared
-fn test() =
+fn test:
     var x = 5
     let r = &mut x
     *r = 10          // last use
@@ -5924,25 +6040,25 @@ fn test() =
 type Pair = { a: Vec[i32], b: Vec[i32] }
 
 // PASS: distinct fields
-fn test(p: &mut Pair) =
+fn test(p: &mut Pair):
     let a = &mut p.a
     let b = &mut p.b
     a.push(1); b.push(2)
 
 // FAIL: same field twice
-fn test(p: &mut Pair) =
+fn test(p: &mut Pair):
     let a1 = &mut p.a
     let a2 = &mut p.a     // ERROR
 
 // PASS: nested disjoint
 type Deep = { inner: Pair }
-fn test(d: &mut Deep) =
+fn test(d: &mut Deep):
     let a = &mut d.inner.a
     let b = &mut d.inner.b
     a.push(1); b.push(2)
 
 // FAIL: field then whole struct
-fn test(p: &mut Pair) =
+fn test(p: &mut Pair):
     let a = &mut p.a
     let whole = &p         // ERROR: overlaps p.a
 ```
@@ -5951,7 +6067,7 @@ fn test(p: &mut Pair) =
 
 ```
 // PASS: ephemeral local
-fn test() =
+fn test:
     let v = "hello".as_view()
     println(v)
 
@@ -5962,7 +6078,7 @@ type Bad = { view: StrView }      // ERROR
 type Ok = ephemeral { view: StrView }
 
 // FAIL: ephemeral in container
-fn test() =
+fn test:
     let v = "hello".as_view()
     var vec = Vec.new()
     vec.push(Some(v))             // ERROR: Option[StrView] is ephemeral
@@ -5972,27 +6088,27 @@ fn test() =
 
 ```
 // PASS: basic
-fn test(lock: &Mutex[HashMap[str, i32]]) =
+fn test(lock: &Mutex[HashMap[str, i32]]):
     with lock.lock() as mut map:
         map.insert("key", 42)
 
 // PASS: multi
-fn test(a: &RwLock[Vec[i32]], b: &RwLock[Vec[i32]]) =
+fn test(a: &RwLock[Vec[i32]], b: &RwLock[Vec[i32]]):
     with a.read() as xs, b.read() as ys:
         println(xs.len() + ys.len())
 
 // PASS: expression returning owned
-fn test(lock: &Mutex[HashMap[str, i32]]) -> Option[i32] =
+fn test(lock: &Mutex[HashMap[str, i32]]) -> Option[i32]:
     with lock.lock() as map:
         map.get("key").cloned()
 
 // FAIL: expression returning ephemeral
-fn test(lock: &Mutex[Vec[i32]]) =
+fn test(lock: &Mutex[Vec[i32]]):
     let r = with lock.lock() as data:
         &data[0]                  // ERROR
 
 // PASS: collect pipeline escapes
-fn test(store: &Shared[SlotMap[Texture]]) -> Vec[Handle[Texture]] =
+fn test(store: &Shared[SlotMap[Texture]]) -> Vec[Handle[Texture]]:
     with store.read() as textures:
         textures.iter()
         |> filter(|(_h, t)| t.width > 1024)
@@ -6000,14 +6116,14 @@ fn test(store: &Shared[SlotMap[Texture]]) -> Vec[Handle[Texture]] =
         |> collect()
 
 // PASS: error propagation with implicit Ok wrapping
-fn test(lock: &Mutex[File]) -> Result[Unit, IoError] =
+fn test(lock: &Mutex[File]) -> Result[Unit, IoError]:
     with lock.lock() as mut f:
         f.write_all(b"hello")?
         f.flush()?
     // implicit Ok(())
 
 // PASS: non-local return from with block
-fn find_val(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32] =
+fn find_val(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32]:
     with lock.lock() as map:
         match map.get(key)
             Some(v) -> return Some(v)    // returns from find_val
@@ -6015,7 +6131,7 @@ fn find_val(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32] =
     None
 
 // PASS: break/continue inside with block inside loop
-fn process(lock: &Mutex[Vec[Item]]) =
+fn process(lock: &Mutex[Vec[Item]]):
     for i in 0..10:
         with lock.lock() as items:
             if items[i].is_done():
@@ -6026,7 +6142,7 @@ fn process(lock: &Mutex[Vec[Item]]) =
 
 // PASS: basic builder
 type Config = { timeout: i32, retries: i32, verbose: bool }
-fn test() =
+fn test:
     let c = with Config { timeout: 0, retries: 0, verbose: false } as mut c:
         c.timeout = 30
         c.retries = 3
@@ -6035,12 +6151,12 @@ fn test() =
     assert(c.retries == 3)
 
 // PASS: builder is an expression
-fn make_config() -> Config =
+fn make_config -> Config:
     with Config { timeout: 0, retries: 0, verbose: false } as mut c:
         c.timeout = 30
 
 // PASS: nested with in builder
-fn test() =
+fn test:
     let sprite = with Sprite.new() as mut s:
         s.position = Vec2.new(100.0, 200.0)
         s.health = with difficulty_mult() as mult:
@@ -6049,19 +6165,19 @@ fn test() =
 // --- Form 3: Scoped binding ---
 
 // PASS: basic scoped binding
-fn test() =
+fn test:
     let area = with shape.bounding_box() as bb:
         bb.width * bb.height
     assert(area > 0.0)
 
 // PASS: scoped binding avoids name leakage
-fn test() =
+fn test:
     let x = with expensive_compute() as result:
         result + 1
     // `result` is not visible here
 
 // PASS: scoped binding in pipeline context
-fn test() =
+fn test:
     let label = with user.display_name.unwrap_or(user.username) as name:
         "{name} ({user.role})"
 ```
@@ -6070,14 +6186,14 @@ fn test() =
 
 ```
 // FAIL: handle type mismatch
-fn test() =
+fn test:
     var textures = SlotMap[Texture].new()
     var meshes = SlotMap[Mesh].new()
     let h = textures.insert(Texture.default())
     meshes.get(h)                 // ERROR: Handle[Texture] vs Handle[Mesh]
 
 // PASS: get2_mut
-fn test() =
+fn test:
     var map = SlotMap[i32].new()
     let a = map.insert(10)
     let b = map.insert(20)
@@ -6086,7 +6202,7 @@ fn test() =
         None -> ()
 
 // PASS: handles in containers
-fn test() =
+fn test:
     var map = SlotMap[String].new()
     let h1 = map.insert("hello")
     let h2 = map.insert("world")
@@ -6101,18 +6217,18 @@ error IoError = NotFound(path: String)
 error AppError from IoError, ParseError
 
 // PASS: propagation with conversion
-fn load(path: &str) -> Result[Ast, AppError] =
+fn load(path: &str) -> Result[Ast, AppError]:
     let text = read_file(path)?        // IoError -> AppError
     parse(&text)?                      // ParseError -> AppError
 
 // PASS: match converted error
-fn handle(e: AppError) =
+fn handle(e: AppError):
     match e
         AppError.Io(io)    -> println("io: {io}")
         AppError.Parse(pe) -> println("parse: {pe}")
 
 // FAIL: non-exhaustive
-fn bad(e: AppError) =
+fn bad(e: AppError):
     match e
         AppError.Io(_) -> ()          // ERROR: missing Parse
 ```
@@ -6124,13 +6240,13 @@ trait Show { fn show(self: &Self) -> String }
 
 // FAIL: orphan rule
 impl Show for Vec[i32] {             // ERROR
-    fn show(self: &Vec[i32]) -> String = "vec"
+    fn show(self: &Vec[i32]) -> String: "vec"
 }
 
 // PASS: own type
 type MyType = { x: i32 }
 impl Show for MyType {
-    fn show(self: &MyType) -> String = "MyType"
+    fn show(self: &MyType) -> String: "MyType"
 }
 ```
 
@@ -6139,12 +6255,12 @@ impl Show for MyType {
 ```
 // PASS: c_import makes C functions callable directly
 use c_import("stdio.h")
-fn test() =
+fn test:
     printf(c"hello %d\n".ptr, 42)             // no unsafe needed
 
 // PASS: c_import with link directive
 use c_import("sqlite3.h", link: "sqlite3")
-fn test() =
+fn test:
     var db: *mut sqlite3 = null
     let rc = sqlite3_open(c":memory:".ptr, &mut db)  // direct call
     assert(rc == SQLITE_OK)
@@ -6152,26 +6268,26 @@ fn test() =
 
 // PASS: c_import structs are usable
 use c_import("time.h")
-fn test() =
+fn test:
     var t: time_t = 0
     time(&mut t)                               // direct call
 
 // PASS: extern C manual declaration
 extern "C" { fn puts(s: *const u8) -> i32 }
-fn test() = puts(c"hello".ptr)
+fn test: puts(c"hello".ptr)
 
 // PASS: non-capturing closure to fn ptr
-fn test() =
+fn test:
     let f: extern "C" fn(i32) -> i32 = |x| x + 1
 
 // FAIL: capturing closure to fn ptr
-fn test() =
+fn test:
     let offset = 5
     let f: extern "C" fn(i32) -> i32 = |x| x + offset  // ERROR
 
 // PASS: c_import constants available
 use c_import("limits.h")
-fn test() =
+fn test:
     assert(PATH_MAX > 0)
     assert(INT_MAX == 2147483647)
 ```
@@ -6181,12 +6297,12 @@ fn test() =
 ```
 // PASS: valid
 @[tailrec]
-fn factorial(n: Int, acc: Int) -> Int =
+fn factorial(n: Int, acc: Int) -> Int:
     match n { 0 -> acc; _ -> factorial(n - 1, n * acc) }
 
 // FAIL: not in tail position
 @[tailrec]
-fn bad(n: Int) -> Int =
+fn bad(n: Int) -> Int:
     match n { 0 -> 1; _ -> n * bad(n - 1) }  // ERROR
 ```
 
@@ -6194,13 +6310,13 @@ fn bad(n: Int) -> Int =
 
 ```
 // PASS
-fn add(a: i32, b: i32) -> i32 = a + b
-fn test() =
+fn add(a: i32, b: i32) -> i32: a + b
+fn test:
     let add5 = add(5, _)
     assert(add5(3) == 8)
 
 // PASS: in pipeline
-fn test() =
+fn test:
     let result = vec![1, 2, 3] |> map(add(10, _)) |> collect[Vec]()
     assert(result == vec![11, 12, 13])
 ```
@@ -6210,36 +6326,36 @@ fn test() =
 ```
 // PASS: nested
 type Expr = Lit(i32) | Add(Expr, Expr) | Mul(Expr, Expr)
-fn simplify(e: Expr) -> Expr =
+fn simplify(e: Expr) -> Expr:
     match e
         Add(Lit(0), rhs) -> rhs
         Mul(Lit(0), _) | Mul(_, Lit(0)) -> Lit(0)
         other -> other
 
 // PASS: or-patterns
-fn classify(day: Day) -> str =
+fn classify(day: Day) -> str:
     match day
         Monday | Tuesday | Wednesday | Thursday | Friday -> "weekday"
         Saturday | Sunday -> "weekend"
 
 // PASS: if-let
-fn test(opt: Option[i32]) =
+fn test(opt: Option[i32]):
     if let Some(x) = opt: println(x)
 
 // PASS: range
-fn category(code: i32) -> str =
+fn category(code: i32) -> str:
     match code
         200 -> "ok"; 400..=499 -> "client error"; _ -> "unknown"
 
 // PASS: slice
-fn describe(items: &[i32]) -> str =
+fn describe(items: &[i32]) -> str:
     match items
         [] -> "empty"
         [x] -> "one"
         [first, ..rest] -> "{rest.len()} more"
 
 // FAIL: non-exhaustive nested
-fn bad(e: Expr) =
+fn bad(e: Expr):
     match e
         Lit(_) -> "lit"
         Add(_, _) -> "add"       // ERROR: missing Mul
@@ -6249,37 +6365,37 @@ fn bad(e: Expr) =
 
 ```
 // PASS: reduce
-fn test() =
+fn test:
     let sum = vec![1, 2, 3, 4].iter() |> reduce(|a, b| a + b)
     assert(sum == Some(10))
 
 // PASS: fold
-fn test() =
+fn test:
     let sum = vec![1, 2, 3].iter() |> fold(0, |acc, x| acc + x)
     assert(sum == 6)
 
 // PASS: flat_map
-fn test() =
+fn test:
     let words = vec!["hello world", "foo bar"].iter()
         |> flat_map(|s| s.split(' '))
         |> collect[Vec]()
     assert(words.len() == 4)
 
 // PASS: zip
-fn test() =
+fn test:
     let pairs = vec![1, 2].iter()
         |> zip(vec!["a", "b"].iter())
         |> collect[Vec]()
     assert(pairs == vec![(1, "a"), (2, "b")])
 
 // PASS: partition
-fn test() =
+fn test:
     let (evens, odds) = vec![1, 2, 3, 4].iter()
         |> partition(|x| x % 2 == 0)
     assert(evens == vec![2, 4])
 
 // PASS: complex pipeline
-fn test() =
+fn test:
     let result = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].iter()
         |> filter(|x| x % 2 == 0)
         |> map(|x| x * x)
@@ -6292,29 +6408,29 @@ fn test() =
 
 ```
 // PASS: basic
-gen fn countdown(from: i32) -> i32 =
+gen fn countdown(from: i32) -> i32:
     var i = from
     while i >= 0: yield i; i -= 1
 
-fn test() =
+fn test:
     let result = countdown(3) |> collect[Vec]()
     assert(result == vec![3, 2, 1, 0])
 
 // PASS: infinite with take
-gen fn naturals() -> Int =
+gen fn naturals -> Int:
     var n = 0
     loop: yield n; n += 1
 
-fn test() =
+fn test:
     let first_5 = naturals() |> take(5) |> collect[Vec]()
     assert(first_5 == vec![0, 1, 2, 3, 4])
 
 // PASS: compose with pipeline
-gen fn fibonacci() -> Int =
+gen fn fibonacci -> Int:
     var a = 0; var b = 1
     loop: yield a; let n = a + b; a = b; b = n
 
-fn test() =
+fn test:
     let even_fibs = fibonacci()
         |> take_while(|x| x < 100)
         |> filter(|x| x % 2 == 0)
@@ -6326,53 +6442,53 @@ fn test() =
 
 ```
 // PASS: basic async function
-async fn fetch_data(url: str) -> Result[String, IoError] =
+async fn fetch_data(url: str) -> Result[String, IoError]:
     let resp = http.get(url).await
     resp.read_body().await
 
 // PASS: await from any function
-fn test() =
+fn test:
     let data = fetch_data("http://example.com").await
 
 // PASS: parallel tasks
-fn test() =
+fn test:
     let t1 = fetch_data("http://a.com")
     let t2 = fetch_data("http://b.com")
     let (a, b) = (t1.await, t2.await)
 
 // PASS: references across await
-async fn process(data: &mut Vec[i32]) =
+async fn process(data: &mut Vec[i32]):
     let len = data.len()
     some_io().await
     data.push(len as i32)          // OK: stack preserved
 
 // PASS: structured concurrency
-async fn test_scope() =
+async fn test_scope:
     async scope |s|:
         s.track(fetch_data("http://a.com"))
         s.track(fetch_data("http://b.com"))
 
 // PASS: task is storable
-fn test() =
+fn test:
     let task = fetch_data("http://example.com")
     var tasks = Vec.new()
     tasks.push(task)               // OK: Task[T] is storable
 
 // PASS: error propagation with await
-async fn load(url: str) -> Result[Config, AppError] =
+async fn load(url: str) -> Result[Config, AppError]:
     let text = fetch_data(url).await?
     json.decode(text)?
 
 // FAIL: async in no_runtime build
 // (when with.toml has runtime = false)
-async fn bad() -> i32 = 42        // ERROR: async requires fiber runtime
+async fn bad -> i32: 42        // ERROR: async requires fiber runtime
 ```
 
 ### 25.18 Async Calling Is Unrestricted (Section 14.3)
 
 ```
 // PASS: any function can call an async fn (gets Task[T] back)
-fn regular_function() =
+fn regular_function:
     let task = fetch_data("http://example.com")
     // task is Task[Result[String, IoError]]
     // can store it, pass it around
@@ -6380,18 +6496,18 @@ fn regular_function() =
     println(result)
 
 // WARNING: let _ = ... immediately CANCELS the task
-fn bad_fire_and_forget() =
+fn bad_fire_and_forget:
     let _ = send_analytics("page_view")
     // WARNING: task is dropped — fiber is cancelled immediately!
     // Use `spawn` for true fire-and-forget
 
 // PASS: fire-and-forget (spawn, runs to completion)
-fn fire_and_forget() =
+fn fire_and_forget:
     spawn send_analytics("page_view")
     // task runs in background, detached, not tied to caller
 
 // PASS: store tasks, compose them as values
-fn test() =
+fn test:
     let tasks = urls
         |> map(|u| fetch_data(u))  // no .await here — just Task values
         |> collect[Vec]()
@@ -6405,7 +6521,7 @@ trait DataSource {
 }
 
 impl DataSource for RemoteDb {
-    async fn fetch(self: &RemoteDb, id: i32) -> Result[Data, Error] =
+    async fn fetch(self: &RemoteDb, id: i32) -> Result[Data, Error]:
         let row = self.conn.query(id).await
         Ok(row.into_data())
 }
@@ -6418,22 +6534,22 @@ impl DataSource for RemoteDb {
 
 ```
 // RUNTIME PANIC (debug): overflow
-fn test() =
+fn test:
     let x: u8 = 255
     let y = x + 1                  // panic
 
 // PASS: wrapping
-fn test() =
+fn test:
     let x: u8 = 255
     assert(x +% 1 == 0)
 
 // PASS: implicit widening
-fn test() =
+fn test:
     let x: i32 = 42
     let y: i64 = x                 // OK
 
 // FAIL: implicit narrowing
-fn test() =
+fn test:
     let x: i64 = 42
     let y: i32 = x                 // ERROR
 ```
@@ -6444,17 +6560,17 @@ fn test() =
 type Color = Red | Green | Blue
 
 // PASS
-fn name(c: Color) -> str =
+fn name(c: Color) -> str:
     match c
         Red -> "red"; Green -> "green"; Blue -> "blue"
 
 // FAIL
-fn name(c: Color) -> str =
+fn name(c: Color) -> str:
     match c
         Red -> "red"; Green -> "green"   // ERROR: missing Blue
 
 // PASS: wildcard
-fn name(c: Color) -> str =
+fn name(c: Color) -> str:
     match c
         Red -> "red"; _ -> "other"
 ```
@@ -6465,7 +6581,7 @@ fn name(c: Color) -> str =
 type Point = { x: f64, y: f64 } with Copy
 
 // PASS: basic update
-fn test() =
+fn test:
     let p1 = Point { x: 1.0, y: 2.0 }
     let p2 = { p1 with x: 3.0 }
     assert(p2.x == 3.0)
@@ -6474,7 +6590,7 @@ fn test() =
 
 // PASS: update non-Copy (moves base)
 type Entity = { name: String, hp: i32, pos: Point }
-fn test() =
+fn test:
     let e = Entity { name: "hero", hp: 100, pos: Point { x: 0.0, y: 0.0 } }
     let e2 = { e with hp: 90 }
     // e is moved; e2 owns the String
@@ -6482,7 +6598,7 @@ fn test() =
     assert(e2.name == "hero")
 
 // PASS: multiple field update
-fn test() =
+fn test:
     let p = Point { x: 1.0, y: 2.0 }
     let p2 = { p with x: 10.0, y: 20.0 }
     assert(p2.x == 10.0 && p2.y == 20.0)
@@ -6492,13 +6608,13 @@ fn test() =
 
 ```
 // PASS: option chaining
-fn test() =
+fn test:
     let x: Option[i32] = Some(5)
     let y = x.map(|n| n * 2).unwrap_or(0)
     assert(y == 10)
 
 // PASS: and_then chains
-fn test() =
+fn test:
     let result = Some(10)
         .filter(|x| x > 5)
         .and_then(|x| if x < 20 then Some(x) else None)
@@ -6506,13 +6622,13 @@ fn test() =
     assert(result == 10)
 
 // PASS: result map_err
-fn test() =
+fn test:
     let r: Result[i32, String] = Err("bad")
     let r2 = r.map_err(|s| s.len())
     assert(r2 == Err(3))
 
 // PASS: option on None
-fn test() =
+fn test:
     let x: Option[i32] = None
     let y = x.map(|n| n * 2).unwrap_or(42)
     assert(y == 42)
@@ -6522,24 +6638,24 @@ fn test() =
 
 ```
 // PASS: range in for loop
-fn test() =
+fn test:
     var sum = 0
     for i in 0..5: sum += i
     assert(sum == 10)
 
 // PASS: inclusive range
-fn test() =
+fn test:
     var sum = 0
     for i in 0..=5: sum += i
     assert(sum == 15)
 
 // PASS: range as iterator
-fn test() =
+fn test:
     let squares = (0..5) |> map(|x| x * x) |> collect[Vec]()
     assert(squares == vec![0, 1, 4, 9, 16])
 
 // PASS: range in pattern
-fn test(code: i32) -> str =
+fn test(code: i32) -> str:
     match code
         200..=299 -> "ok"
         _ -> "other"
@@ -6549,19 +6665,19 @@ fn test(code: i32) -> str =
 
 ```
 // PASS: forward composition
-fn double(x: i32) -> i32 = x * 2
-fn add1(x: i32) -> i32 = x + 1
-fn test() =
+fn double(x: i32) -> i32: x * 2
+fn add1(x: i32) -> i32: x + 1
+fn test:
     let f = double >> add1
     assert(f(5) == 11)       // add1(double(5)) = 11
 
 // PASS: backward composition
-fn test() =
+fn test:
     let f = add1 << double
     assert(f(5) == 11)       // add1(double(5)) = 11
 
 // PASS: composition with map
-fn test() =
+fn test:
     let process = trim >> lowercase
     let result = names |> map(process) |> collect[Vec]()
 ```
@@ -6570,23 +6686,23 @@ fn test() =
 
 ```
 // PASS: struct destructuring in parameters
-fn distance({ x: x1, y: y1 }: Point, { x: x2, y: y2 }: Point) -> f64 =
+fn distance({ x: x1, y: y1 }: Point, { x: x2, y: y2 }: Point) -> f64:
     let dx = x2 - x1
     let dy = y2 - y1
     (dx * dx + dy * dy).sqrt()
 
-fn test() =
+fn test:
     let d = distance(Point { x: 0.0, y: 0.0 }, Point { x: 3.0, y: 4.0 })
     assert(d == 5.0)
 
 // PASS: tuple destructuring in parameters
-fn swap((a, b): (i32, i32)) -> (i32, i32) = (b, a)
+fn swap((a, b): (i32, i32)) -> (i32, i32): (b, a)
 
-fn test() =
+fn test:
     assert(swap((1, 2)) == (2, 1))
 
 // PASS: destructuring in for loop
-fn test() =
+fn test:
     let pairs = vec![(1, "a"), (2, "b")]
     for (num, letter) in pairs:
         println("{num}: {letter}")
@@ -6599,7 +6715,7 @@ type Color = Red | Green | Blue
 
 // PASS: unqualified after import
 use Color.{Red, Green, Blue}
-fn test() =
+fn test:
     let c = Red                // no prefix needed
     match c
         Red   -> "red"
@@ -6607,7 +6723,7 @@ fn test() =
         Blue  -> "blue"
 
 // PASS: Option/Result always unqualified (prelude)
-fn test() =
+fn test:
     let x: Option[i32] = Some(5)    // not Option.Some
     let y: Result[i32, str] = Ok(5)  // not Result.Ok
 ```
@@ -6616,17 +6732,17 @@ fn test() =
 
 ```
 // PASS: basic comprehension
-fn test() =
+fn test:
     let squares = [x * x for x in 0..5]
     assert(squares == vec![0, 1, 4, 9, 16])
 
 // PASS: comprehension with filter
-fn test() =
+fn test:
     let evens = [x for x in 0..10 if x % 2 == 0]
     assert(evens == vec![0, 2, 4, 6, 8])
 
 // PASS: nested comprehension
-fn test() =
+fn test:
     let pairs = [(x, y) for x in 0..3 for y in 0..3 if x != y]
     assert(pairs.len() == 6)
 ```
@@ -6635,60 +6751,108 @@ fn test() =
 
 ```
 // PASS: value auto-wrapped in Ok
-fn get_number() -> Result[i32, str] =
+fn get_number -> Result[i32, str]:
     42                       // auto-wrapped to Ok(42)
 
 // PASS: Result[Unit, E] with no trailing expression
-fn do_stuff() -> Result[Unit, IoError] =
+fn do_stuff -> Result[Unit, IoError]:
     let f = fs.open("test.txt")?
     f.write_all(b"hello")?
     // implicit Ok(())
 
 // PASS: explicit Ok still works
-fn explicit() -> Result[i32, str] =
+fn explicit -> Result[i32, str]:
     Ok(42)
 
 // PASS: explicit Err still works
-fn fail() -> Result[i32, str] =
+fn fail -> Result[i32, str]:
     Err("nope")
 
 // PASS: ? still propagates errors
-fn chain() -> Result[User, DbError] =
+fn chain -> Result[User, DbError]:
     let row = db.query("SELECT ...", id)?
     User.from_row(row)       // auto-wrapped in Ok(...)
+```
+
+### 25.27c Implicit Default Return (Section 4.10)
+
+```
+// PASS: i32 function ending with println — returns 0
+fn demo -> i32:
+    println("hello")
+    // implicit 0
+
+// PASS: bool function ending with statement — returns false
+fn setup -> bool:
+    println("initializing...")
+    // implicit false
+
+// PASS: f64 function ending with statement — returns 0.0
+fn measure -> f64:
+    println("measuring...")
+    // implicit 0.0
+
+// PASS: Option[T] function ending with statement — returns None
+fn maybe_find -> Option[i32]:
+    println("searching...")
+    // implicit None
+
+// PASS: explicit return still works
+fn explicit_return -> i32:
+    println("hello")
+    42                       // not Unit — returned as-is
+
+// FAIL: return type without Default — type mismatch
+fn bad -> SomeTypeWithoutDefault:
+    println("oops")
+    // error: last expression is Unit but return type
+    // SomeTypeWithoutDefault does not implement Default
+
+// PASS: derive Default on user type
+@[derive(Default)]
+type Config = { port: i32, debug: bool }
+
+fn make_config -> Config:
+    println("creating config...")
+    // implicit Config { port: 0, debug: false }
+
+// PASS: composes with implicit Ok wrapping
+fn init -> Result[i32, IoError]:
+    fs.create_dir("data")?
+    // implicit Ok(0) — Ok wrapping + default return
 ```
 
 ### 25.28 sequence / traverse / transpose (Section 10.5)
 
 ```
 // PASS: sequence on Vec[Option]
-fn test() =
+fn test:
     let xs: Vec[Option[i32]] = vec![Some(1), Some(2), Some(3)]
     assert(xs.sequence() == Some(vec![1, 2, 3]))
 
 // PASS: sequence short-circuits on None
-fn test() =
+fn test:
     let xs: Vec[Option[i32]] = vec![Some(1), None, Some(3)]
     assert(xs.sequence() == None)
 
 // PASS: sequence on Vec[Result]
-fn test() =
+fn test:
     let rs: Vec[Result[i32, str]] = vec![Ok(1), Ok(2)]
     assert(rs.sequence() == Ok(vec![1, 2]))
 
 // PASS: traverse applies function then sequences
-fn test() =
+fn test:
     let strs = vec!["1", "2", "3"]
     let parsed = strs.traverse(|s| s.parse_int())
     assert(parsed == Ok(vec![1, 2, 3]))
 
 // PASS: traverse fails on first error
-fn test() =
+fn test:
     let strs = vec!["1", "bad", "3"]
     assert(strs.traverse(|s| s.parse_int()).is_err())
 
 // PASS: transpose Option[Result] → Result[Option]
-fn test() =
+fn test:
     let x: Option[Result[i32, str]] = Some(Ok(5))
     assert(x.transpose() == Ok(Some(5)))
 
@@ -6703,14 +6867,14 @@ fn test() =
 
 ```
 // PASS: basic backward application
-fn double(x: i32) -> i32 = x * 2
-fn test() =
+fn double(x: i32) -> i32: x * 2
+fn test:
     let result = double <| 5
     assert(result == 10)
 
 // PASS: chained backward application (right-associative)
-fn add1(x: i32) -> i32 = x + 1
-fn test() =
+fn add1(x: i32) -> i32: x + 1
+fn test:
     let result = add1 <| double <| 3
     assert(result == 7)      // add1(double(3)) = add1(6) = 7
 ```
@@ -6719,80 +6883,80 @@ fn test() =
 
 ```
 // FAIL: await inside @[no_await_guard] with
-fn test() =
+fn test:
     let lock = RwLock.new(42)
     with lock.read() as data:
         sleep(Duration.millis(1)).await    // ERROR: ReadGuard is @[no_await_guard]
 
 // PASS: await inside non-@[no_await_guard] with
-async fn test(pool: &ConnectionPool) =
+async fn test(pool: &ConnectionPool):
     with pool.acquire() as conn:
         let row = conn.query("SELECT 1").await?  // OK: Connection not @[no_await_guard]
         Ok(row)
 
 // FAIL: unused Result
-fn fallible() -> Result[i32, String] = Ok(1)
-fn test() =
+fn fallible -> Result[i32, String]: Ok(1)
+fn test:
     fallible()              // ERROR: unused Result
 
 // PASS: explicitly discarded Result
-fn fallible() -> Result[i32, String] = Ok(1)
-fn test() =
+fn fallible -> Result[i32, String]: Ok(1)
+fn test:
     let _ = fallible()      // OK: intentional discard
 
 // FAIL: unused Task
-async fn background() -> Unit = ()
-fn test() =
+async fn background -> Unit: ()
+fn test:
     background()             // ERROR: unused Task
 
 // PASS: explicitly discarded Task
-async fn background() -> Unit = ()
-fn test() =
+async fn background -> Unit: ()
+fn test:
     let _ = background()     // OK: intentional discard
 
 // FAIL: unnecessary unsafe
-fn test() =
+fn test:
     unsafe { let x = 1 + 2 }   // ERROR: no unsafe operations
 
 // FAIL: implicit narrowing
-fn test() =
+fn test:
     let big: i64 = 42
     let small: i32 = big        // ERROR: implicit narrowing
 
 // PASS: explicit narrowing
-fn test() =
+fn test:
     let big: i64 = 42
     let small: i32 = big as i32  // OK: explicit cast
 
 // PASS: implicit widening
-fn test() =
+fn test:
     let small: i32 = 42
     let big: i64 = small         // OK: widening is lossless
 
 // FAIL: signed/unsigned at same width
-fn test() =
+fn test:
     let x: i32 = 42
     let y: u32 = x               // ERROR: sign conversion requires as
 
 // FAIL: unreachable code after return
-fn test() -> i32 =
+fn test -> i32:
     return 42
     println("hello")             // ERROR: unreachable
 
 // FAIL: unreachable code after break
-fn test() =
+fn test:
     for x in 0..10:
         break
         println("hello")        // ERROR: unreachable
 
 // FAIL: unreachable code after continue
-fn test() =
+fn test:
     for x in 0..10:
         continue
         println("hello")        // ERROR: unreachable
 
 // PASS: conditionally reachable code
-fn test(flag: bool) -> i32 =
+fn test(flag: bool) -> i32:
     if flag then return 42
     println("still reachable")   // OK: return is conditional
     0
@@ -6811,7 +6975,7 @@ impl Copy for Buffer {}              // ERROR: field `data` is not Copy
 
 // FAIL: Copy + Drop on same type
 type Handle = { fd: i32 }
-impl Drop for Handle { fn drop(self) = close(self.fd) }
+impl Drop for Handle { fn drop(self): close(self.fd) }
 impl Copy for Handle {}              // ERROR: Copy + Drop is forbidden
 
 // PASS: Copy on struct with only primitives
@@ -6823,20 +6987,20 @@ impl Copy for Color {}               // OK: all fields are Copy
 
 ```
 // PASS: owned-argument task is storable
-async fn fetch(id: i32) -> String = ...
-fn test() =
+async fn fetch(id: i32) -> String: ...
+fn test:
     let task = fetch(42)                // Task[String], storable
     let tasks: Vec[Task[String]] = vec![task]  // OK: can store
 
 // FAIL: borrowing task is ephemeral, cannot store
-async fn process(data: &mut Vec[i32]) -> Unit = ...
-fn test() =
+async fn process(data: &mut Vec[i32]) -> Unit: ...
+fn test:
     var v = vec![1, 2, 3]
     let task = process(&mut v)
     let stored: Vec[Task[Unit]] = vec![task]  // ERROR: ephemeral Task
 
 // PASS: borrowing task in async scope
-async fn test() =
+async fn test:
     var v = vec![1, 2, 3]
     async scope |s|:
         let t = s.track(process(&mut v))
@@ -6847,23 +7011,23 @@ async fn test() =
 
 ```
 // PASS: basic postfix .await
-async fn fetch(url: str) -> Result[String, IoError] = ...
-async fn test() =
+async fn fetch(url: str) -> Result[String, IoError]: ...
+async fn test:
     let data = fetch("http://example.com").await
     assert(data.is_ok())
 
 // PASS: chaining .await with ?
-async fn test() =
+async fn test:
     let text = fetch("http://example.com").await?
     assert(text.len() > 0)
 
 // PASS: chaining .await through method calls
-async fn test(pool: &Pool) =
+async fn test(pool: &Pool):
     let row = pool.acquire().await?.query("SELECT 1").await?
     assert(row.is_some())
 
 // PASS: .await on stored task
-async fn test() =
+async fn test:
     let task = fetch("http://example.com")   // Task, not awaited yet
     let result = task.await                   // await later
     assert(result.is_ok())
@@ -6874,7 +7038,7 @@ async fn test() =
 ```
 // PASS: field shorthand in construction
 type Point = { x: f64, y: f64 }
-fn test() =
+fn test:
     let x = 1.0
     let y = 2.0
     let p = Point { x, y }
@@ -6883,14 +7047,14 @@ fn test() =
 
 // PASS: mixed shorthand and explicit
 type User = { name: str, email: str, active: bool }
-fn test() =
+fn test:
     let name = "Alice"
     let email = "alice@example.com"
     let u = User { name, email, active: true }
     assert(u.active)
 
 // PASS: shorthand in record update
-fn test() =
+fn test:
     let u = User { name: "Alice", email: "a@b.com", active: true }
     let email = "new@b.com"
     let u2 = { u with email }
@@ -6903,28 +7067,28 @@ fn test() =
 type Color = Red | Green | Blue
 
 // PASS: shorthand in return position
-fn default_color() -> Color = .Blue
+fn default_color -> Color: .Blue
 
 // PASS: shorthand in match arms
-fn describe(c: Color) -> str =
+fn describe(c: Color) -> str:
     match c
         .Red   -> "red"
         .Green -> "green"
         .Blue  -> "blue"
 
 // PASS: shorthand in function arguments
-fn paint(c: Color) = ...
-fn test() =
+fn paint(c: Color): ...
+fn test:
     paint(.Red)
 
 // PASS: shorthand in struct field
 type Config = { theme: Color }
-fn test() =
+fn test:
     let cfg = Config { theme: .Green }
     assert(describe(cfg.theme) == "green")
 
 // FAIL: ambiguous shorthand
-fn test() =
+fn test:
     let x = .Red    // ERROR: cannot infer type for `.Red`
 ```
 
@@ -6932,38 +7096,38 @@ fn test() =
 
 ```
 // PASS: tuple construction and destructuring
-fn test() =
+fn test:
     let pair = (42, "hello")
     let (n, s) = pair
     assert(n == 42)
 
 // PASS: tuple access by index
-fn test() =
+fn test:
     let t = (1, 2, 3)
     assert(t.0 == 1)
     assert(t.2 == 3)
 
 // PASS: tuple return from function
-fn divmod(a: i32, b: i32) -> (i32, i32) = (a / b, a % b)
-fn test() =
+fn divmod(a: i32, b: i32) -> (i32, i32): (a / b, a % b)
+fn test:
     let (q, r) = divmod(17, 5)
     assert(q == 3)
     assert(r == 2)
 
 // PASS: nested destructuring
-fn test() =
+fn test:
     let ((a, b), c) = ((1, 2), 3)
     assert(a == 1)
     assert(c == 3)
 
 // PASS: tuples in for loops
-fn test() =
+fn test:
     let pairs = vec![(1, "a"), (2, "b")]
     for (n, s) in pairs:
         assert(n > 0)
 
 // PASS: tuple is Copy when all elements are Copy
-fn test() =
+fn test:
     let t: (i32, bool) = (1, true)
     let t2 = t                    // copy
     assert(t.0 == 1)              // original still valid
@@ -6976,19 +7140,19 @@ type Address = { city: Option[str], zip: Option[str] }
 type Profile = { address: Option[Address] }
 
 // PASS: optional chaining on Option
-fn test() =
+fn test:
     let profile = Profile { address: Some(Address { city: Some("NYC"), zip: None }) }
     let city = profile.address?.city
     assert(city == Some("NYC"))
 
 // PASS: chained optional access
-fn test() =
+fn test:
     let profile = Profile { address: None }
     let city = profile.address?.city
     assert(city == None)
 
 // PASS: optional chaining with ?? default
-fn test() =
+fn test:
     let profile = Profile { address: None }
     let city = profile.address?.city ?? "unknown"
     assert(city == "unknown")
@@ -6998,13 +7162,13 @@ fn test() =
 
 ```
 // PASS: basic default
-fn test() =
+fn test:
     let x: Option[i32] = None
     let y = x ?? 42
     assert(y == 42)
 
 // PASS: chained defaults
-fn test() =
+fn test:
     let a: Option[i32] = None
     let b: Option[i32] = None
     let c: Option[i32] = Some(3)
@@ -7012,12 +7176,12 @@ fn test() =
     assert(result == 3)
 
 // PASS: default with early return
-fn find(id: i32) -> Option[str] = None
-fn get_or_fail(id: i32) -> Result[str, str] =
+fn find(id: i32) -> Option[str]: None
+fn get_or_fail(id: i32) -> Result[str, str]:
     let name = find(id) ?? return Err("not found")
     Ok(name)
 
-fn test() =
+fn test:
     assert(get_or_fail(1).is_err())
 ```
 
@@ -7025,32 +7189,32 @@ fn test() =
 
 ```
 // PASS: tuple destructuring
-fn test() =
+fn test:
     let (a, b, c) = (1, 2, 3)
     assert(a + b + c == 6)
 
 // PASS: struct destructuring
 type Point = { x: f64, y: f64 }
-fn test() =
+fn test:
     let p = Point { x: 3.0, y: 4.0 }
     let { x, y } = p
     assert(x == 3.0)
 
 // PASS: rest pattern in struct
 type User = { name: str, email: str, age: i32 }
-fn test() =
+fn test:
     let u = User { name: "A", email: "a@b", age: 30 }
     let { name, .. } = u
     assert(name == "A")
 
 // PASS: let-else with Option
-fn test() =
+fn test:
     let opt: Option[i32] = Some(42)
     let Some(val) = opt else return
     assert(val == 42)
 
 // PASS: nested destructuring
-fn test() =
+fn test:
     let (a, { x, y }) = (1, Point { x: 2.0, y: 3.0 })
     assert(a == 1)
     assert(x == 2.0)
@@ -7062,7 +7226,7 @@ fn test() =
 // PASS: explicit derive
 @[derive(Eq, Hash, Debug, Clone)]
 type Color = { r: u8, g: u8, b: u8 }
-fn test() =
+fn test:
     let a = Color { r: 255, g: 0, b: 0 }
     let b = Color { r: 255, g: 0, b: 0 }
     assert(a == b)
@@ -7070,7 +7234,7 @@ fn test() =
 // PASS: derive(all) on Copy-eligible type
 @[derive(all)]
 type Vec2 = { x: f64, y: f64 }
-fn test() =
+fn test:
     let a = Vec2 { x: 1.0, y: 2.0 }
     let b = a              // Copy (derived)
     assert(a.x == b.x)    // both valid
@@ -7078,7 +7242,7 @@ fn test() =
 // PASS: derive(all) on non-Copy type
 @[derive(all)]
 type Name = { first: str, last: str }
-fn test() =
+fn test:
     let a = Name { first: "A", last: "B" }
     let b = a.clone()     // Clone (derived), not Copy
     assert(b.first == "A")
@@ -7100,24 +7264,24 @@ type Token = ephemeral {
     line: usize,
 }
 
-fn first_token(src: StrView) -> Option[Token] =
+fn first_token(src: StrView) -> Option[Token]:
     if src.len() == 0 then return None
     Some(Token { text: src.slice(0, 1), kind: .Ident, line: 1 })
 
-fn test() =
+fn test:
     let src = "hello world"
     let tok = first_token(src.as_view())?
     assert(tok.kind == .Ident)
 
 // PASS: ephemeral struct in pattern matching
-fn describe(tok: Token) -> str =
+fn describe(tok: Token) -> str:
     match tok.kind
         .Ident  -> "identifier: {tok.text}"
         .Number -> "number: {tok.text}"
         _       -> "other"
 
 // PASS: Vec of ephemeral struct (Vec itself becomes ephemeral)
-fn tokenize(src: StrView) -> Vec[Token] =
+fn tokenize(src: StrView) -> Vec[Token]:
     // Vec[Token] is ephemeral — cannot escape scope of src
     Vec.new()
 
@@ -7143,24 +7307,24 @@ type Config = {
 }
 
 // PASS: omit fields with defaults
-fn test() =
+fn test:
     let c = Config { port: 9090 }
     assert(c.host == "localhost")
     assert(c.port == 9090)
     assert(c.debug == false)
 
 // PASS: all defaults
-fn test_all_defaults() =
+fn test_all_defaults:
     let c = Config {}
     assert(c.port == 8080)
 
 // PASS: override all fields
-fn test_all_explicit() =
+fn test_all_explicit:
     let c = Config { host: "0.0.0.0", port: 443, debug: true }
     assert(c.debug == true)
 
 // PASS: defaults with field shorthand
-fn test_shorthand() =
+fn test_shorthand:
     let host = "example.com"
     let c = Config { host, debug: true }
     assert(c.host == "example.com")
@@ -7168,7 +7332,7 @@ fn test_shorthand() =
 
 // PASS: fresh evaluation per construction
 type Counter = { id: usize = next_id() }
-fn test_fresh() =
+fn test_fresh:
     let a = Counter {}
     let b = Counter {}
     assert(a.id != b.id)
@@ -7178,7 +7342,7 @@ type Required = {
     name: str,              // no default
     age: i32 = 0,
 }
-fn test_fail() =
+fn test_fail:
     let r = Required { age: 25 }   // ERROR: missing field `name`
 ```
 
@@ -7186,12 +7350,12 @@ fn test_fail() =
 
 ```
 // PASS: basic .context()
-fn load(path: &str) -> Result[str, ContextError[IoError]] =
+fn load(path: &str) -> Result[str, ContextError[IoError]]:
     let text = fs.read_to_string(path)
         .context("failed to read config")?
     Ok(text)
 
-fn test() =
+fn test:
     match load("/nonexistent")
         Err(e) ->
             assert(e.message == "failed to read config")
@@ -7199,7 +7363,7 @@ fn test() =
         Ok(_) -> panic("expected error")
 
 // PASS: chained context
-fn load_and_parse(path: &str) -> Result[Config, AppError] =
+fn load_and_parse(path: &str) -> Result[Config, AppError]:
     let text = fs.read_to_string(path)
         .context("reading config file")?
     let config = toml.parse(text)
@@ -7207,7 +7371,7 @@ fn load_and_parse(path: &str) -> Result[Config, AppError] =
     Ok(config)
 
 // PASS: lazy context with .with_context()
-fn find_user(id: UserId) -> Result[User, ContextError[DbError]] =
+fn find_user(id: UserId) -> Result[User, ContextError[DbError]]:
     db.query_one("SELECT * FROM users WHERE id = $1", &[&id])
         .with_context(|| "failed to find user {id}")?
 ```
@@ -7215,59 +7379,62 @@ fn find_user(id: UserId) -> Result[User, ContextError[DbError]] =
 ### 25.44 String Literals (Section 15.3)
 
 ```
-// PASS: string literal is &str, not owned
-fn test() =
-    let view: &str = "hello"           // OK: literal is &str
+// PASS: string literal is str by default (owned)
+fn test:
+    let s = "hello"                          // s: str — no annotation needed
+    assert(s.len() == 5)
+
+// PASS: explicit &str annotation gives static reference
+fn test:
+    let view: &str = "hello"                 // &str — zero-cost static ref
     assert(view.len() == 5)
 
-// PASS: explicit .to_owned() still works
-fn test() =
-    let name: str = "Alice"
-    assert(name == "Alice")
-
-// PASS: auto-promotion in struct fields
-fn test() =
+// PASS: str in struct fields — no annotation on the literal
+fn test:
     type Config = { host: str, port: i32 }
-    let c = Config { host: "localhost", port: 8080 }  // auto-promoted
+    let c = Config { host: "localhost", port: 8080 }
     assert(c.host == "localhost")
 
-// PASS: auto-promotion in function args
-fn register(name: str) = assert(name.len() > 0)
-fn test() = register("Alice")               // auto-promoted
+// PASS: str in function args
+fn register(name: str): assert(name.len() > 0)
+fn test: register("Alice")
 
-// PASS: no type context → stays &str
-fn test() =
-    let s = "hello"                          // s: &str (no allocation)
-    let owned: str = "hello"                 // owned: str (auto-promoted)
+// PASS: &str parameter context — auto-borrows, no allocation
+fn greet(name: &str): assert(name.len() > 0)
+fn test: greet("Alice")
+
+// PASS: return type str — literal just works
+fn get_name -> str: "Alice"
+fn test: assert(get_name() == "Alice")
 ```
 
 ### 25.45 Unit Elision (Section 4.8)
 
 ```
 // PASS: Ok() with Unit elision
-fn do_work() -> Result[Unit, str] = Ok()
-fn test() =
+fn do_work -> Result[Unit, str]: Ok()
+fn test:
     assert(do_work().is_ok())
 
 // PASS: Ok(()) still works
-fn do_work2() -> Result[Unit, str] = Ok(())
-fn test() =
+fn do_work2 -> Result[Unit, str]: Ok(())
+fn test:
     assert(do_work2().is_ok())
 
 // PASS: unwrap_or with Unit elision
-fn test() =
+fn test:
     let r: Result[Unit, str] = Err("fail")
     r.unwrap_or()                   // desugars to .unwrap_or(())
 
 // PASS: Unit elision in match
-fn test() =
+fn test:
     let r: Result[Unit, str] = Ok()
     match r
         Ok() -> assert(true)
         Err(_) -> assert(false)
 
 // PASS: no elision when T != Unit (Ok still requires argument)
-fn test() =
+fn test:
     let r: Result[i32, str] = Ok(42)   // 42 required, not Unit
     assert(r.unwrap_or(0) == 42)
 ```
@@ -7276,7 +7443,7 @@ fn test() =
 
 ```
 // PASS: for-in auto-inserts .iter()
-fn test() =
+fn test:
     let items = vec![1, 2, 3]
     var sum = 0
     for x in items:              // compiler inserts .iter()
@@ -7285,7 +7452,7 @@ fn test() =
     assert(items.len() == 3)     // items not consumed
 
 // PASS: explicit .iter() still works
-fn test() =
+fn test:
     let items = vec![1, 2, 3]
     var sum = 0
     for x in items.iter():
@@ -7293,20 +7460,20 @@ fn test() =
     assert(sum == 6)
 
 // PASS: ranges don't need .iter() (implement Iter directly)
-fn test() =
+fn test:
     var sum = 0
     for i in 0..4:
         sum += i
     assert(sum == 6)
 
 // PASS: destructuring in for loop
-fn test() =
+fn test:
     let pairs = vec![(1, "a"), (2, "b")]
     for (n, s) in pairs:         // .iter() auto-inserted
         assert(n > 0)
 
 // PASS: mutable iteration requires explicit .iter_mut()
-fn test() =
+fn test:
     var items = vec![1, 2, 3]
     for x in items.iter_mut():
         *x *= 2
@@ -7317,19 +7484,19 @@ fn test() =
 
 ```
 // PASS: .len32() returns i32
-fn test() =
+fn test:
     let items = vec![1, 2, 3, 4, 5]
     let count: i32 = items.len32()
     assert(count == 5)
 
 // PASS: .len64() returns i64
-fn test() =
+fn test:
     let items = vec![1, 2, 3]
     let count: i64 = items.len64()
     assert(count == 3)
 
 // PASS: .len() still returns usize
-fn test() =
+fn test:
     let items = vec![1, 2, 3]
     let count: usize = items.len()
     assert(count == 3)
@@ -7339,27 +7506,27 @@ fn test() =
 
 ```
 // PASS: .unwrap() on Some
-fn test() =
+fn test:
     let x: Option[i32] = Some(42)
     assert(x.unwrap() == 42)
 
 // PASS: .unwrap() on Ok
-fn test() =
+fn test:
     let r: Result[i32, str] = Ok(10)
     assert(r.unwrap() == 10)
 
 // PASS: .expect() on Some
-fn test() =
+fn test:
     let x = Some("hello")
     assert(x.expect("must have value") == "hello")
 
 // PASS (panics): .unwrap() on None
-fn test_panics() =
+fn test_panics:
     let x: Option[i32] = None
     x.unwrap()    // PANICS: "called unwrap() on None"
 
 // PASS (panics): .expect() on Err
-fn test_panics() =
+fn test_panics:
     let r: Result[i32, str] = Err("bad")
     r.expect("operation failed")    // PANICS: "operation failed: bad"
 ```
@@ -7369,7 +7536,7 @@ fn test_panics() =
 ```
 // PASS: unreachable() has type Never
 type Direction = North | South | East | West
-fn go(d: Direction) -> i32 =
+fn go(d: Direction) -> i32:
     match d
         .North -> 1
         .South -> 2
@@ -7378,23 +7545,23 @@ fn go(d: Direction) -> i32 =
         _      -> unreachable()
 
 // PASS: todo() compiles but panics at runtime
-fn future_feature(x: i32) -> str =
+fn future_feature(x: i32) -> str:
     todo("implement after v2")
 
 // PASS: assert_matches with enum pattern
-fn test() =
+fn test:
     let r: Result[i32, str] = Err("not found")
     assert_matches(r, Err(_))
 
 // PASS: assert_matches with nested pattern
 type AppError = Db(DbError) | Auth(str)
 type DbError = NotFound(str, str) | Timeout
-fn test() =
+fn test:
     let e = AppError.Db(DbError.NotFound("users", "42"))
     assert_matches(e, .Db(.NotFound(..)))
 
 // PASS: assert_eq shows both values on failure
-fn test() =
+fn test:
     assert_eq(2 + 2, 4)
     assert_ne(2 + 2, 5)
 ```
@@ -7403,7 +7570,7 @@ fn test() =
 
 ```
 // PASS: last statement is assignment (Unit) → returns builder
-fn test() =
+fn test:
     let c = with Config { timeout: 0, retries: 0 } as mut c:
         c.timeout = 30
         c.retries = 3
@@ -7411,7 +7578,7 @@ fn test() =
     assert(c.retries == 3)
 
 // PASS: push returns Unit → returns builder
-fn test() =
+fn test:
     let v = with Vec.new() as mut v:
         v.push(1)
         v.push(2)
@@ -7420,7 +7587,7 @@ fn test() =
 
 // PASS: last statement is Unit (assignment) → builder returned
 // even though insert() returns Option[i32]
-fn test() =
+fn test:
     let m = with HashMap.new() as mut m:
         m.insert("a", 1)    // returns Option[i32]
         m.insert("b", 2)    // returns Option[i32]... but:
@@ -7429,7 +7596,7 @@ fn test() =
     assert(m == 2)
 
 // PASS: extract value from builder
-fn test() =
+fn test:
     let len = with Vec.new() as mut v:
         v.push(1)
         v.push(2)
@@ -7437,7 +7604,7 @@ fn test() =
     assert(len == 2)
 
 // PASS: works as function return value
-fn make_config() -> Config =
+fn make_config -> Config:
     with Config.default() as mut c:
         c.timeout = 30
 ```
@@ -7446,7 +7613,7 @@ fn make_config() -> Config =
 
 ```
 // PASS: basic select with timeout
-async fn test() =
+async fn test:
     let (tx, rx) = channel[str]()
     tx.send("hello").await
     select await
@@ -7454,7 +7621,7 @@ async fn test() =
         _ = timeout(1.secs()) -> unreachable()
 
 // PASS: select in a loop with break
-async fn test() =
+async fn test:
     let (tx, rx) = channel[i32]()
     var sum = 0
     tx.send(1).await
@@ -7467,7 +7634,7 @@ async fn test() =
     assert(sum == 3)
 
 // PASS: select with error propagation
-async fn do_work(rx: Receiver[str], cancel: CancelToken) -> Result[str, AppError] =
+async fn do_work(rx: Receiver[str], cancel: CancelToken) -> Result[str, AppError]:
     select await
         msg = rx.recv() -> Ok(msg)
         _ = cancel.cancelled() -> Err(.Cancelled)
@@ -7478,27 +7645,27 @@ async fn do_work(rx: Receiver[str], cancel: CancelToken) -> Result[str, AppError
 ```
 // PASS: .is_variant() on data variants
 type Token = TInt(i64) | TStr(str) | TBool(bool) | TNull
-fn test() =
+fn test:
     let t = Token.TInt(42)
     assert(t.is_tint())
     assert(!t.is_tstr())
     assert(!t.is_tnull())
 
 // PASS: .as_variant() returns Option
-fn test() =
+fn test:
     let t = Token.TStr("hello")
     assert(t.as_tstr() == Some("hello"))
     assert(t.as_tint() == None)
 
 // PASS: chaining with ?? and optional chaining
-fn test() =
+fn test:
     let t = Token.TInt(42)
     let n = t.as_tint() ?? 0
     assert(n == 42)
 
 // PASS: multi-field variant returns tuple
 type Shape = Circle(f64) | Rect(f64, f64)
-fn test() =
+fn test:
     let s = Shape.Rect(3.0, 4.0)
     let (w, h) = s.as_rect() ?? unreachable()
     assert(w == 3.0)
@@ -7506,14 +7673,14 @@ fn test() =
 
 // PASS: unit variants only get .is_variant()
 type Color = Red | Green | Blue
-fn test() =
+fn test:
     let c = Color.Red
     assert(c.is_red())
     assert(!c.is_green())
 
 // PASS: works with enum variant shorthand
 type Result2 = Success(i32) | Failure(str)
-fn test() =
+fn test:
     let r: Result2 = .Success(10)
     assert(r.as_success() == Some(10))
     assert(r.as_failure() == None)
@@ -7523,21 +7690,21 @@ fn test() =
 
 ```
 // PASS: s.track registers task with scope
-async fn test() =
+async fn test:
     async scope |s|:
         let t = s.track(fetch_data("http://example.com"))
         let result = t.await
         assert(result.is_ok())
 
 // PASS: ScopedTask is exempt from @[must_use] — scope handles cleanup
-async fn test() =
+async fn test:
     async scope |s|:
         s.track(fire_and_forget_in_scope())
         // ScopedTask dropped — no compile error
         // scope will cancel+join it on exit
 
 // PASS: early ? return with ScopedTask — no E0801
-async fn test() -> Result[i32, AppError] =
+async fn test -> Result[i32, AppError]:
     async scope |s|:
         let task_a = s.track(compute_a())
         let task_b = s.track(compute_b())
@@ -7547,7 +7714,7 @@ async fn test() -> Result[i32, AppError] =
         Ok(a + b)
 
 // PASS: scatter-gather pattern
-async fn test() =
+async fn test:
     let results = async scope |s|:
         let tasks = vec![1, 2, 3].iter()
             |> map(|id| s.track(fetch_user(id)))
@@ -7556,7 +7723,7 @@ async fn test() =
     assert(results.len() == 3)
 
 // FAIL: bare Task (not ScopedTask) is still @[must_use]
-async fn test_fail() =
+async fn test_fail:
     fetch_data("http://example.com")    // ERROR E0801: unused Task
 ```
 
@@ -7566,11 +7733,11 @@ async fn test_fail() =
 // PASS: consuming self with dot-notation
 type Builder = { host: str, port: u16 }
 extend Builder
-    fn new() -> Builder = Builder { host: "", port: 0 }
-    fn host(self: Builder, h: str) -> Builder = { self with host: h }
-    fn port(self: Builder, p: u16) -> Builder = { self with port: p }
+    fn new -> Builder: Builder { host: "", port: 0 }
+    fn host(self: Builder, h: str) -> Builder: { self with host: h }
+    fn port(self: Builder, p: u16) -> Builder: { self with port: p }
 
-fn test() =
+fn test:
     let b = Builder.new()
         .host("localhost")
         .port(8080)
@@ -7579,18 +7746,18 @@ fn test() =
 
 // PASS: consuming self in final method
 extend Builder
-    fn build(self: Builder) -> Result[Server, str] =
+    fn build(self: Builder) -> Result[Server, str]:
         if self.host.is_empty() then Err("missing host")
         else Ok(Server { host: self.host, port: self.port })
 
-fn test() =
+fn test:
     let server = Builder.new()
         .host("localhost")
         .port(8080)
         .build().unwrap()
 
 // FAIL: use after consuming move
-fn test_fail() =
+fn test_fail:
     let b = Builder.new()
     let b2 = b.host("x")     // b is moved
     b.port(80)                // ERROR: use of moved value `b`
@@ -7602,7 +7769,7 @@ fn test_fail() =
 type World = { positions: Vec[Vec2], velocities: Vec[Vec2], sprites: Vec[Sprite] }
 
 // PASS: closures capture disjoint fields
-fn test() =
+fn test:
     var world = World { ... }
     scope |s|:
         s.spawn(|| update_physics(&mut world.velocities, &world.positions))
@@ -7612,7 +7779,7 @@ fn test() =
     //     no conflict — disjoint mutable access
 
 // FAIL: overlapping mutable capture
-fn test_fail() =
+fn test_fail:
     var world = World { ... }
     scope |s|:
         s.spawn(|| modify(&mut world.positions))
@@ -7623,7 +7790,7 @@ fn test_fail() =
 
 ```
 // PASS: let...else inside branch body
-async fn test(rx: Receiver[i32]) =
+async fn test(rx: Receiver[i32]):
     var items = Vec.new()
     loop:
         select await
@@ -7633,7 +7800,7 @@ async fn test(rx: Receiver[i32]) =
             _ = timeout(1.secs()) -> break
 
 // PASS: multiple branches with let...else
-async fn serve(listener: TcpListener, ctrl: Receiver[str]) =
+async fn serve(listener: TcpListener, ctrl: Receiver[str]):
     loop:
         select await
             result = listener.accept() ->
@@ -7648,7 +7815,7 @@ async fn serve(listener: TcpListener, ctrl: Receiver[str]) =
 
 ```
 // PASS: drop closes channel sender
-fn test() =
+fn test:
     let (tx, rx) = chan[i32](10)
     tx.send(1)
     tx.send(2)
@@ -7661,7 +7828,7 @@ fn test() =
 
 ```
 // PASS: .await inside map closure
-async fn test() =
+async fn test:
     let urls = vec!["http://a.com", "http://b.com"]
     let results = urls.iter()
         |> map(|url| fetch(url).await)
@@ -7669,7 +7836,7 @@ async fn test() =
     assert(results.len() == 2)
 
 // PASS: .await inside fold
-async fn test() =
+async fn test:
     let ids = vec![1, 2, 3]
     let total = ids.iter()
         |> fold(0, |sum, id| sum + get_count(id).await)
@@ -7680,7 +7847,7 @@ async fn test() =
 
 ```
 // PASS: async: block returns Task[T]
-async fn test() =
+async fn test:
     let task = async:
         sleep(10.millis()).await
         42
@@ -7688,7 +7855,7 @@ async fn test() =
     assert(result == 42)
 
 // PASS: async: block in structured concurrency
-async fn test() =
+async fn test:
     async scope |s|:
         s.track(async:
             println("hello from fiber 1")
@@ -7698,7 +7865,7 @@ async fn test() =
         )
 
 // PASS: async: block captures variables
-async fn test() =
+async fn test:
     let url = "http://example.com"
     let task = async:
         fetch(url).await    // captures url by reference
@@ -7709,24 +7876,24 @@ async fn test() =
 
 ```
 // PASS: for loop destructuring auto-borrows
-fn test() =
+fn test:
     let items = vec![("alice", 1), ("bob", 2)]
     for (name, val) in items:        // yields &(str, i32)
         assert(name.len() > 0)       // name: &str
         assert(*val > 0)              // val: &i32
 
 // PASS: match on borrowed Option
-fn describe(opt: &Option[String]) -> &str =
+fn describe(opt: &Option[String]) -> &str:
     match opt
         Some(s) -> s.as_str()         // s: &String
         None    -> "none"
 
-fn test() =
+fn test:
     let x = Some("hello".to_string())
     assert(describe(&x) == "hello")
 
 // PASS: nested tuple destructuring through reference
-fn test() =
+fn test:
     let pairs: Vec[(i32, i32)] = vec![(1, 2), (3, 4)]
     for (a, b) in pairs:
         assert(*a + *b > 0)           // a: &i32, b: &i32
@@ -7738,34 +7905,34 @@ fn test() =
 // PASS: drop takes self by value — no double-free risk
 type Handle = { fd: i32 }
 impl Drop for Handle
-    fn drop(self: Self) =
+    fn drop(self: Self):
         close(self.fd)
         // self is consumed — no need to null out fd
 
 // PASS: field destructors run after user drop body
 type Wrapper = { name: String, handle: Handle }
 impl Drop for Wrapper
-    fn drop(self: Self) =
+    fn drop(self: Self):
         println("dropping {self.name}")
         // after this returns, Handle::drop runs for self.handle
         // then String::drop runs for self.name
 
 // FAIL: Copy + Drop is still forbidden
 type Bad = { x: i32 } with Copy
-impl Drop for Bad { fn drop(self: Self) = () }  // ERROR: Copy + Drop conflict
+impl Drop for Bad { fn drop(self: Self): () }  // ERROR: Copy + Drop conflict
 ```
 
 ### 25.62 Ephemeral Task Cancellation (Section 14.7)
 
 ```
 // Ephemeral task drop blocks until fiber stops
-async fn test() =
+async fn test:
     var data = vec![1, 2, 3]
     let _ = process(&mut data)       // ephemeral task: drop blocks
     // data is safe here — fiber guaranteed stopped
 
 // Non-ephemeral task drop is cooperative (non-blocking)
-async fn test() =
+async fn test:
     let _ = fetch("http://example.com")  // owned task: cooperative cancel
     // fetch fiber may still be running briefly
 ```
@@ -7774,21 +7941,21 @@ async fn test() =
 
 ```
 // PASS: scoped thread can use &mut local
-fn test() =
+fn test:
     var data = vec![1, 2, 3]
     scope |s|:
         s.spawn(|| data.push(4))     // OK: &mut data is ScopedSend
     assert(data.len() == 4)
 
 // PASS: async scope can track ephemeral tasks
-async fn test() =
+async fn test:
     var data = vec![1, 2, 3]
     async scope |s|:
         s.track(process(&mut data))  // OK: ScopedSend
     assert(data.len() > 0)
 
 // FAIL: unscoped thread.spawn_os rejects ephemeral
-fn test_fail() =
+fn test_fail:
     var data = vec![1, 2, 3]
     thread.spawn_os(|| data.push(4)) // ERROR: &mut Vec is not Send
 ```
@@ -7798,15 +7965,15 @@ fn test_fail() =
 ```
 type Wrapper = { fd: File, name: String }
 impl Drop for Wrapper
-    fn drop(self: Self) = close(self.fd)
+    fn drop(self: Self): close(self.fd)
 
 // FAIL: partial move from Drop type
-fn test_fail() =
+fn test_fail:
     let w = Wrapper { fd: open(), name: "A" }
     let w2 = { w with name: "B" }  // ERROR: partial move from Drop type
 
 // PASS: clone field instead
-fn test() =
+fn test:
     let w = Wrapper { fd: open(), name: "A" }
     let w2 = Wrapper { fd: w.fd.clone(), name: "B" }
 ```
@@ -7815,13 +7982,13 @@ fn test() =
 
 ```
 // FAIL: reference to local crosses yield
-gen fn bad() -> &str =
+gen fn bad -> &str:
     let s = "hello".to_owned()
     let r = &s
     yield r                          // ERROR: borrow of `s` live across yield
 
 // PASS: owned value across yield
-gen fn ok() -> str =
+gen fn ok -> str:
     let s = "hello".to_owned()
     yield s.clone()
     yield s
@@ -7831,14 +7998,14 @@ gen fn ok() -> str =
 
 ```
 // PASS: code after comptime if return is not flagged unreachable
-fn compute(x: i32) -> i32 =
+fn compute(x: i32) -> i32:
     comptime if cfg.is_debug:
         return 0
     // In release: reachable. In debug: erased by comptime.
     x * x + 1
 
 // FAIL: code after unconditional return is still unreachable
-fn test_fail() -> i32 =
+fn test_fail -> i32:
     return 0
     1 + 1                            // ERROR: unreachable code
 ```
@@ -7847,19 +8014,19 @@ fn test_fail() -> i32 =
 
 ```
 // FAIL: may_suspend function called while guard is live
-fn helper() =
+fn helper:
     some_io().await
 
-fn test_fail() =
+fn test_fail:
     let lock = Mutex.new(42)
     with lock.lock() as data:
         helper()                     // ERROR E0701: may_suspend function
                                      // called while @[no_await_guard] is live
 
 // PASS: no suspension in guarded block
-fn safe_helper(x: i32) -> i32 = x * 2
+fn safe_helper(x: i32) -> i32: x * 2
 
-fn test() =
+fn test:
     let lock = Mutex.new(42)
     with lock.lock() as data:
         safe_helper(*data)           // OK: safe_helper is not may_suspend
@@ -7869,14 +8036,14 @@ fn test() =
 
 ```
 // FAIL: may_suspend in extern "C" callback
-fn test_fail() =
+fn test_fail:
     unsafe { c_sort(items.ptr, items.len, |a, b|
         fetch_weight(a).await <=> fetch_weight(b).await
         //              ^^^^^^ ERROR: may_suspend in C callback
     ) }
 
 // PASS: no suspension in callback
-fn test() =
+fn test:
     unsafe { c_sort(items.ptr, items.len, |a, b|
         a.weight <=> b.weight        // OK: no suspension
     ) }
@@ -7886,13 +8053,13 @@ fn test() =
 
 ```
 // PASS: Scoped type → automatic guarded access
-fn test() =
+fn test:
     let lock = Mutex.new(vec![1, 2, 3])
     with lock.lock() as data:          // Mutex implements Scoped → guard
         assert(data.len() == 3)
 
 // PASS: non-Scoped type → simple builder binding
-fn test() =
+fn test:
     let config = with Config.default() as mut c:
         c.retries = 3                  // Config is not Scoped → builder
     assert(config.retries == 3)
@@ -7910,7 +8077,7 @@ impl Iter[String] for MyBuffer { ... }  // ERROR: MyBuffer already implements It
 type MyBuffer = { data: Vec[u8] }
 impl Iter[u8] for MyBuffer { ... }
 impl MyBuffer
-    fn lines(self: &Self) -> LineIter = ...   // separate iterator type
+    fn lines(self: &Self) -> LineIter: ...   // separate iterator type
 ```
 
 ### 25.71 Operator One-Impl Rule (Section 11.7)
@@ -7918,10 +8085,10 @@ impl MyBuffer
 ```
 // PASS: unique Output per (Self, Rhs) pair
 impl Add[Vector, Vector] for Vector {
-    fn add(self: Vector, rhs: Vector) -> Vector = ...
+    fn add(self: Vector, rhs: Vector) -> Vector: ...
 }
 impl Add[f32, Vector] for Vector {   // different Rhs = OK
-    fn add(self: Vector, rhs: f32) -> Vector = ...
+    fn add(self: Vector, rhs: f32) -> Vector: ...
 }
 let v = vec1 + vec2   // Output uniquely determined: Vector
 
@@ -7949,15 +8116,15 @@ select await biased
 
 ```
 // FAIL: return inside defer
-fn test_fail() =
+fn test_fail:
     defer return 42                    // ERROR E0901: non-local control flow in defer
 
 // FAIL: ? inside defer
-fn test_fail() =
+fn test_fail:
     defer conn.close()?                // ERROR E0901: ? in defer
 
 // PASS: handle errors locally
-fn test() =
+fn test:
     defer conn.close().unwrap_or(())   // OK: error handled locally
 ```
 
@@ -7965,11 +8132,11 @@ fn test() =
 
 ```
 // PASS: spawn for fire-and-forget
-fn test() =
+fn test:
     spawn send_analytics("page_view")  // runs to completion, detached
 
 // WARNING: let _ = task cancels immediately
-fn test_bad() =
+fn test_bad:
     let _ = send_analytics("page_view") // WARNING: immediately cancelled!
 ```
 
@@ -7977,7 +8144,7 @@ fn test_bad() =
 
 ```
 // PASS: stdlib slice iterators work naturally
-fn test() =
+fn test:
     let names = vec!["alice", "bob", "charlie"]
     let iter = names.iter()
     let a = iter.next().unwrap()    // borrows names, not iter
@@ -7986,13 +8153,13 @@ fn test() =
     assert(b == "bob")
 
 // PASS: for loop works with custom iterators too
-fn test() =
+fn test:
     while let Some(tok) = next_token(&mut parser):
         process(tok)                   // tok drops here, releases &mut parser
 
 // NOTE: custom iterators returning ephemerals may still hit
 // conservative borrowing on user-defined types
-fn test_custom() =
+fn test_custom:
     let tokens = with Vec.new() as mut toks:
         while let Some(tok) = next_owned_token(&mut parser):
             toks.push(tok)             // OwnedToken has no borrows
@@ -8002,7 +8169,7 @@ fn test_custom() =
 
 ```
 // FAIL: ephemeral values cannot be sent over channels
-fn test_fail() =
+fn test_fail:
     async scope |s|:
         let (tx, rx) = chan[&str](10)
         s.track(async:
@@ -8011,27 +8178,27 @@ fn test_fail() =
         )
 
 // PASS: owned values over channels
-fn test() =
+fn test:
     let (tx, rx) = chan[String](10)
-    tx.send("hello").await                  // auto-promoted, String is Send
+    tx.send("hello").await                  // str literal, String is Send
 ```
 
 ### 25.77 Ephemeral Owned Passing Restriction (Section 14.21)
 
 ```
 // FAIL: ephemeral by-value to external function
-fn store_globally(t: Task[i32]) = ...  // separately compiled
+fn store_globally(t: Task[i32]): ...  // separately compiled
 
-fn test_fail() =
+fn test_fail:
     var x = 42
     let task = my_fn(&mut x)
     store_globally(task)                // ERROR: ephemeral value cannot be
                                         // passed as owned to external fn
 
 // PASS: ephemeral by reference
-fn inspect(t: &Task[i32]) = ...
+fn inspect(t: &Task[i32]): ...
 
-fn test() =
+fn test:
     var x = 42
     let task = my_fn(&mut x)
     inspect(&task)                      // OK: passed by reference
@@ -8041,7 +8208,7 @@ fn test() =
 
 ```
 // PASS: split_at_mut returns disjoint slices — compiler knows
-fn test() =
+fn test:
     var data = vec![1, 2, 3, 4, 5]
     let (left, right) = data.split_at_mut(3)
     left[0] = 10                        // OK: disjoint
@@ -8055,17 +8222,17 @@ type Address = { city: Option[str], zip: str }
 type Profile = { address: Option[Address] }
 
 // PASS: field is non-Option → map
-fn test() =
+fn test:
     let p = Profile { address: Some(Address { city: Some("NYC"), zip: "10001" }) }
     let zip: Option[str] = p.address?.zip    // map → Option[str]
 
 // PASS: field is Option → and_then (flattened)
-fn test() =
+fn test:
     let p = Profile { address: Some(Address { city: Some("NYC"), zip: "10001" }) }
     let city: Option[str] = p.address?.city  // and_then → Option[str], NOT Option[Option[str]]
 
 // PASS: chaining works correctly
-fn test() =
+fn test:
     let p = Profile { address: Some(Address { city: Some("NYC"), zip: "10001" }) }
     let len: Option[usize] = p.address?.city?.len()  // chains naturally
 ```
@@ -8076,12 +8243,12 @@ fn test() =
 // PASS: field moves allowed INSIDE drop
 type FileWrapper = { fd: File, name: String }
 impl Drop for FileWrapper
-    fn drop(self: Self) =
+    fn drop(self: Self):
         close_file(self.fd)   // OK: field move inside drop
         // self.name NOT moved → compiler drops it automatically
 
 // FAIL: field moves forbidden OUTSIDE drop
-fn test_fail() =
+fn test_fail:
     let w = FileWrapper { fd: open_file(), name: "A" }
     let fd = w.fd             // ERROR: partial move from Drop type
 ```
@@ -8090,11 +8257,11 @@ fn test_fail() =
 
 ```
 // PASS: HashMap::get borrows from the map, not the key
-fn test() =
+fn test:
     var map = HashMap.new()
     map.insert("admin", User { name: "Alice" })
     let user = {
-        let key: str = "admin"
+        let key = "admin"
         map.get(key.as_view())    // compiler knows: borrows map, not key
     }                              // key drops here, user still valid
     assert(user.is_some())
@@ -8106,12 +8273,12 @@ fn test() =
 
 ```
 // FAIL: guard live across .await via plain let binding
-fn test_fail() =
+fn test_fail:
     let guard = lock.lock()        // @[no_await_guard] type
     fetch(url).await               // ERROR E0701: guard is live
 
 // PASS: guard dropped before .await
-fn test() =
+fn test:
     let data = with lock.read() as d:
         d.clone()
     fetch(data.url).await          // OK: guard already dropped
@@ -8122,21 +8289,21 @@ fn test() =
 ```
 // PASS: trait with &Self methods is object-safe
 trait Drawable { fn draw(self: &Self) }
-fn render(d: &dyn Drawable) = d.draw()
+fn render(d: &dyn Drawable): d.draw()
 
 // FAIL: trait with by-value self is not object-safe (without Box)
 trait Consumable { fn consume(self: Self) }
-fn bad(c: &dyn Consumable) = ...   // ERROR: Consumable is not object-safe
+fn bad(c: &dyn Consumable): ...   // ERROR: Consumable is not object-safe
 
 // PASS: by-value self through Box
-fn good(c: Box[dyn Consumable]) = c.consume()  // OK via generated shim
+fn good(c: Box[dyn Consumable]): c.consume()  // OK via generated shim
 ```
 
 ### 25.84 C-String Literals (Section 15.3)
 
 ```
 // PASS: c"..." produces &CStr
-fn test() =
+fn test:
     let s: &CStr = c"hello"
     assert(s.len() == 5)           // "hello" without NUL
     puts(s.ptr)         // NUL is present in memory
@@ -8146,7 +8313,7 @@ fn test() =
 
 ```
 // PASS: overwritten fields are dropped, non-overwritten are moved
-fn test() =
+fn test:
     let p1 = NamedPoint { x: "first", y: "second" }
     let p2 = { p1 with x: "third" }
     // p1.x ("first") was dropped, p1.y ("second") was moved to p2.y
@@ -8158,40 +8325,45 @@ fn test() =
 
 ```
 // FAIL: ephemeral task on bare OS thread
-fn test_fail() =
+fn test_fail:
     thread.spawn_os(||
         var data = vec![1, 2, 3]
         let task = process(&mut data)  // ERROR: ephemeral task in OS thread
     )
 
 // PASS: ephemeral task inside fiber (async context)
-async fn test() =
+async fn test:
     var data = vec![1, 2, 3]
     let task = process(&mut data)      // OK: inside async context
     task.await
 ```
 
-### 25.87 String Literal Auto-Promotion (Section 15.3)
+### 25.87 String Literal Default Type (Section 15.3)
 
 ```
-// PASS: auto-promotion in struct field
-fn test() =
+// PASS: literal is str by default — no annotation
+fn test:
+    let s = "hello"
+    assert(s.len() == 5)
+
+// PASS: str in struct field — no annotation on literal
+fn test:
     type Config = { host: str, port: i32 }
     let c = Config { host: "localhost", port: 8080 }
     assert(c.host == "localhost")
 
-// PASS: auto-promotion in function parameter
-fn greet(name: str) = assert(name.len() > 0)
-fn test() = greet("Alice")
+// PASS: str in function parameter
+fn greet(name: str): assert(name.len() > 0)
+fn test: greet("Alice")
 
-// PASS: auto-promotion in return type
-fn name() -> str = "Alice"
-fn test() = assert(name() == "Alice")
+// PASS: str in return type
+fn name -> str: "Alice"
+fn test: assert(name() == "Alice")
 
-// PASS: no promotion without type context
-fn test() =
-    let s = "hello"         // s: &str (no allocation)
-    let o: str = "hello"    // o: str (auto-promoted)
+// PASS: explicit &str annotation gives static reference
+fn test:
+    let view: &str = "hello"  // &str — zero-cost, no allocation
+    assert(view.len() == 5)
 ```
 
 ### 25.88 FFI Direct Call (Section 16.1)
@@ -8199,10 +8371,10 @@ fn test() =
 ```
 // PASS: c_import functions callable directly
 use c_import("stdio.h")
-fn test() = puts(c"hello".ptr)      // no unsafe needed
+fn test: puts(c"hello".ptr)      // no unsafe needed
 
 // PASS: unsafe still required for pointer deref
-fn test() =
+fn test:
     let p: *mut i32 = alloc(4)
     unsafe { *p = 42 }               // pointer deref needs unsafe
     free(p)                           // C function call: no unsafe
@@ -8212,14 +8384,14 @@ fn test() =
 
 ```
 // PASS: Scoped type auto-detected
-fn test() =
+fn test:
     let lock = Mutex.new(42)
     let val = with lock.read() as data:    // auto-detected as guard
         *data
     assert(val == 42)
 
 // PASS: non-Scoped type → builder
-fn test() =
+fn test:
     let v = with Vec.new() as mut v:
         v.push(1)
         v.push(2)
@@ -8230,20 +8402,20 @@ fn test() =
 
 ```
 // PASS: auto-deref through Box
-fn test() =
+fn test:
     type User = { name: str }
     let u: Box[User] = Box.new(User { name: "Alice" })
     assert(u.name == "Alice")             // auto-deref Box → User → .name
 
 // PASS: auto-deref through multiple references
-fn test() =
+fn test:
     let x = 42
     let r = &x
     let rr = &r
     assert(rr == 42)                      // auto-deref through &&i32
 
 // PASS: auto-deref for method calls
-fn test() =
+fn test:
     let v: Box[Vec[i32]] = Box.new(vec![1, 2, 3])
     assert(v.len() == 3)                  // auto-deref Box → Vec → .len()
 ```
@@ -8252,23 +8424,23 @@ fn test() =
 
 ```
 // PASS: auto-ref for shared borrow parameter
-fn len(s: &str) -> usize = s.len()
-fn test() =
-    let name: str = "Alice"
+fn len(s: &str) -> usize: s.len()
+fn test:
+    let name = "Alice"
     assert(len(name) == 5)               // compiler inserts &name
 
 // PASS: auto-ref for method receiver
-fn test() =
+fn test:
     type Point = { x: f64, y: f64 }
     impl Point
-        fn magnitude(self: &Self) -> f64 = (self.x * self.x + self.y * self.y).sqrt()
+        fn magnitude(self: &Self) -> f64: (self.x * self.x + self.y * self.y).sqrt()
     let p = Point { x: 3.0, y: 4.0 }
     assert(p.magnitude() == 5.0)          // auto-ref: p → &p
 
 // FAIL: no auto-ref for &mut
-fn mutate(s: &mut str) = s.push_str("!")
-fn test_fail() =
-    var name: str = "Alice"
+fn mutate(s: &mut str): s.push_str("!")
+fn test_fail:
+    var name = "Alice"
     mutate(name)                          // ERROR: won't auto-ref to &mut
     mutate(&mut name)                     // OK: explicit &mut
 ```
@@ -8280,20 +8452,20 @@ fn test_fail() =
 trait Greet { fn hello(self: &Self) -> str }
 type English = {}
 impl Greet for English
-    fn hello(self: &Self) -> str = "Hello"
+    fn hello(self: &Self) -> str: "Hello"
 
-fn say_hi(g: &dyn Greet) -> str = g.hello()
-fn test() =
+fn say_hi(g: &dyn Greet) -> str: g.hello()
+fn test:
     let eng = English {}
     assert(say_hi(&eng) == "Hello")       // auto-coerce &English → &dyn Greet
 
 // PASS: Box[T] → Box[dyn Trait]
-fn test() =
+fn test:
     let g: Box[dyn Greet] = Box.new(English {})  // auto-coerced
     assert(g.hello() == "Hello")
 
 // PASS: combined auto-ref + trait coercion
-fn test() =
+fn test:
     let eng = English {}
     assert(say_hi(eng) == "Hello")        // auto-ref + auto-coerce
 ```
@@ -8304,13 +8476,13 @@ fn test() =
 // PASS: as_variant_ref returns Option[&T]
 type Value = Str(str) | Num(f64) | Null
 
-fn test() =
+fn test:
     let v = Value.Str("hello")
     assert(v.as_str_ref() == Some(&"hello"))
     assert(v.as_num_ref() == None)
 
 // PASS: as_variant_mut returns Option[&mut T]
-fn test() =
+fn test:
     var v = Value.Num(42.0)
     if let Some(n) = v.as_num_mut():
         *n = 99.0
@@ -8320,7 +8492,7 @@ fn test() =
 type Json = Null | Bool(bool) | Num(f64) | Str(str)
          | Array(Vec[Json]) | Object(HashMap[str, Json])
 
-fn test() =
+fn test:
     let data = Json.Object(/* ... */)
     let name = data.as_object_ref()?.get("name")?.as_str_ref()
     assert(name.is_some())
@@ -8330,7 +8502,7 @@ fn test() =
 
 ```
 // PASS: chained if let bindings
-fn test() =
+fn test:
     let a: Option[i32] = Some(1)
     let b: Option[i32] = Some(2)
     var result = 0
@@ -8339,7 +8511,7 @@ fn test() =
     assert(result == 3)
 
 // PASS: chain fails if any binding fails
-fn test() =
+fn test:
     let a: Option[i32] = Some(1)
     let b: Option[i32] = None
     var result = 0
@@ -8348,7 +8520,7 @@ fn test() =
     assert(result == 0)
 
 // PASS: mixed boolean and let bindings
-fn test() =
+fn test:
     let users = vec![User { name: "Alice", active: true }]
     if let Some(user) = users.first(), user.active:
         assert(user.name == "Alice")
@@ -8358,21 +8530,21 @@ fn test() =
 
 ```
 // PASS: no comptime prefix needed inside comptime fn
-comptime fn count_fields[T: type]() -> usize =
+comptime fn count_fields[T: type] -> usize:
     let mut n = 0
     for field in T.fields():       // cascade: no comptime prefix
         n += 1
     n
 
 @[test]
-fn test() =
+fn test:
     assert(count_fields[Point]() == 2)
 
 // PASS: type method syntax
-comptime fn type_name[T: type]() -> str = T.name()
+comptime fn type_name[T: type] -> str: T.name()
 
 @[test]
-fn test() =
+fn test:
     assert(type_name[i32]() == "i32")
 ```
 
@@ -8386,7 +8558,7 @@ type Config = {
     port: i32 = 8080,
 }
 
-fn test() =
+fn test:
     let c = Config.builder()
         .host("localhost")
         .build()
@@ -8395,7 +8567,7 @@ fn test() =
     assert(c.port == 8080)
 
 // PASS: override defaults
-fn test() =
+fn test:
     let c = Config.builder()
         .host("prod.example.com")
         .port(443)
@@ -8408,18 +8580,18 @@ fn test() =
 
 ```
 // PASS: non-null pointer → Some
-fn test() =
+fn test:
     var x: i32 = 42
     let p: *mut i32 = &mut x
     assert(p.as_option().is_some())
 
 // PASS: null pointer → None
-fn test() =
+fn test:
     let p: *mut i32 = null
     assert(p.as_option().is_none())
 
 // PASS: as_option composes with ?? 
-fn test() =
+fn test:
     let p: *const i32 = null
     let val = p.as_option().map(|p| unsafe { *p }).unwrap_or(0)
     assert(val == 0)
@@ -8429,14 +8601,14 @@ fn test() =
 
 ```
 // PASS: update with default and transform
-fn test() =
+fn test:
     var counts: HashMap[str, i32] = HashMap.new()
     counts.update("alice", 0, |n| n + 1)
     counts.update("alice", 0, |n| n + 1)
     assert(counts.get("alice") == Some(&2))
 
 // PASS: increment shorthand
-fn test() =
+fn test:
     var counts: HashMap[str, i32] = HashMap.new()
     counts.increment("bob")
     counts.increment("bob")

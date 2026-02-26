@@ -59,7 +59,7 @@ expect_check_fail() {
 cat >"$tmpdir/c_import_link_ok.w" <<'EOF1'
 use c_import("int ext_add(int, int);", link: "extadd")
 
-fn main() -> i32 =
+fn main -> i32:
     if ext_add(2, 3) == 105 then 0 else 1
 EOF1
 expect_run_pass "$tmpdir/c_import_link_ok.w"
@@ -67,7 +67,7 @@ expect_run_pass "$tmpdir/c_import_link_ok.w"
 cat >"$tmpdir/c_import_link_missing.w" <<'EOF2'
 use c_import("int ext_add(int, int);")
 
-fn main() -> i32 =
+fn main -> i32:
     if ext_add(2, 3) == 105 then 0 else 1
 EOF2
 expect_run_fail "$tmpdir/c_import_link_missing.w"
@@ -75,7 +75,7 @@ expect_run_fail "$tmpdir/c_import_link_missing.w"
 cat >"$tmpdir/c_import_link_multi.w" <<'EOF3'
 use c_import("int ext_add(int, int); int ext_mul(int, int);", link: "extadd", "extmul")
 
-fn main() -> i32 =
+fn main -> i32:
     let a = ext_add(1, 2)
     let b = ext_mul(3, 4)
     if a == 103 and b == 12 then 0 else 1
@@ -85,7 +85,7 @@ expect_run_pass "$tmpdir/c_import_link_multi.w"
 cat >"$tmpdir/c_import_link_bad_arg.w" <<'EOF4'
 use c_import("int ext_add(int, int);", libs: "extadd")
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF4
 expect_check_fail "$tmpdir/c_import_link_bad_arg.w"

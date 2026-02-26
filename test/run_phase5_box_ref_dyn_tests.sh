@@ -52,17 +52,16 @@ trait Speak =
 type Dog = { n: i32 }
 
 impl Speak for Dog =
-    fn speak(self: Dog) -> i32 = self.n
+    fn speak(self: Dog) -> i32: self.n
 
-fn call_ref(x: &dyn Speak) -> i32 =
+fn call_ref(x: &dyn Speak) -> i32:
     x.speak()
 
-fn main() -> i32 =
+fn main -> i32:
     let d = Dog { n: 7 }
     assert(call_ref(&d) == 7)
     let r = &d
     assert(call_ref(r) == 7)
-    0
 EOF1
 expect_run_pass "$tmpdir/ref_dyn_dispatch_ok.w"
 
@@ -75,20 +74,19 @@ type Dog = { n: i32 }
 type Cat = { n: i32 }
 
 impl Speak for Dog =
-    fn speak(self: Dog) -> i32 = self.n
+    fn speak(self: Dog) -> i32: self.n
 
 impl Speak for Cat =
-    fn speak(self: Cat) -> i32 = self.n * 2
+    fn speak(self: Cat) -> i32: self.n * 2
 
-fn call_box(x: Box[dyn Speak]) -> i32 =
+fn call_box(x: Box[dyn Speak]) -> i32:
     x.speak()
 
-fn main() -> i32 =
+fn main -> i32:
     let d = Dog { n: 9 }
     let c = Cat { n: 5 }
     assert(call_box(d) == 9)
     assert(call_box(c) == 10)
-    0
 EOF2
 expect_run_pass "$tmpdir/box_dyn_dispatch_ok.w"
 
@@ -99,10 +97,10 @@ trait Speak =
 
 type Rock = { n: i32 }
 
-fn call_ref(x: &dyn Speak) -> i32 =
+fn call_ref(x: &dyn Speak) -> i32:
     x.speak()
 
-fn main() -> i32 =
+fn main -> i32:
     let r = Rock { n: 1 }
     call_ref(&r)
 EOF3
@@ -115,10 +113,10 @@ trait Speak =
 
 type Rock = { n: i32 }
 
-fn call_box(x: Box[dyn Speak]) -> i32 =
+fn call_box(x: Box[dyn Speak]) -> i32:
     x.speak()
 
-fn main() -> i32 =
+fn main -> i32:
     let r = Rock { n: 1 }
     call_box(r)
 EOF4

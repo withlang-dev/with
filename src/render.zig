@@ -38,22 +38,24 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
                 }
                 try writer.writeAll("]");
             }
-            try writer.writeAll("(");
-            for (f.params, 0..) |p, i| {
-                if (i > 0) try writer.writeAll(", ");
-                if (p.is_mut) try writer.writeAll("mut ");
-                try writer.print("{s}", .{pool.resolve(p.name)});
-                if (p.type_expr) |te| {
-                    try writer.writeAll(": ");
-                    try renderTypeExpr(te, pool, writer);
+            if (f.params.len > 0) {
+                try writer.writeAll("(");
+                for (f.params, 0..) |p, i| {
+                    if (i > 0) try writer.writeAll(", ");
+                    if (p.is_mut) try writer.writeAll("mut ");
+                    try writer.print("{s}", .{pool.resolve(p.name)});
+                    if (p.type_expr) |te| {
+                        try writer.writeAll(": ");
+                        try renderTypeExpr(te, pool, writer);
+                    }
                 }
+                try writer.writeAll(")");
             }
-            try writer.writeAll(")");
             if (f.return_type) |rt| {
                 try writer.writeAll(" -> ");
                 try renderTypeExpr(rt, pool, writer);
             }
-            try writer.writeAll(" =\n");
+            try writer.writeAll(":\n");
             try renderExpr(f.body, pool, writer, indent + 2);
         },
         .type_decl => |t| {
@@ -356,7 +358,17 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try writer.writeAll(if (r.inclusive) "..=" else "..");
             if (r.end) |e| try renderExpr(e, pool, writer, 0);
         },
-        .variant_shorthand => |s| try writer.print(".{s}", .{pool.resolve(s)}),
+        .variant_shorthand => |vs| {
+            try writer.print(".{s}", .{pool.resolve(vs.name)});
+            if (vs.args.len > 0) {
+                try writer.writeAll("(");
+                for (vs.args, 0..) |a, i| {
+                    if (i > 0) try writer.writeAll(", ");
+                    try renderExpr(a, pool, writer, 0);
+                }
+                try writer.writeAll(")");
+            }
+        },
         .await_expr => |e| {
             try renderExpr(e, pool, writer, 0);
             try writer.writeAll(".await");
@@ -382,17 +394,25 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try writer.writeAll(" |> ");
             try renderExpr(p.rhs, pool, writer, 0);
         },
-        .break_expr => |brk_val| {
+        .break_expr => |be| {
             try writer.writeAll("break");
-            if (brk_val) |val| {
+            if (be.label) |lbl| {
+                try writer.print(" '{s}", .{pool.resolve(lbl)});
+            }
+            if (be.value) |val| {
                 try writer.writeAll(" ");
                 try renderExpr(val, pool, writer, 0);
             }
         },
-        .continue_expr => try writer.writeAll("continue"),
-        .loop_expr => |body| {
+        .continue_expr => |ce| {
+            try writer.writeAll("continue");
+            if (ce.label) |lbl| {
+                try writer.print(" '{s}", .{pool.resolve(lbl)});
+            }
+        },
+        .loop_expr => |le| {
             try writer.writeAll("loop:\n");
-            try renderExpr(body, pool, writer, indent + 2);
+            try renderExpr(le.body, pool, writer, indent + 2);
         },
         .for_expr => |f| {
             try writer.writeAll("for ");
@@ -592,6 +612,25 @@ fn renderPattern(pat: *const Ast.Pattern, pool: *const InternPool, writer: anyty
             }
             try writer.writeAll("]");
         },
+        .struct_pattern => |sp| {
+            if (sp.type_name != 0) {
+                try writer.print("{s} ", .{pool.resolve(sp.type_name)});
+            }
+            try writer.writeAll("{ ");
+            for (sp.fields, 0..) |field, j| {
+                if (j > 0) try writer.writeAll(", ");
+                try writer.print("{s}", .{pool.resolve(field.name)});
+                if (field.pattern) |p| {
+                    try writer.writeAll(": ");
+                    try renderPattern(p, pool, writer);
+                }
+            }
+            if (sp.has_rest) {
+                if (sp.fields.len > 0) try writer.writeAll(", ");
+                try writer.writeAll("..");
+            }
+            try writer.writeAll(" }");
+        },
     }
 }
 
@@ -674,6 +713,7 @@ fn binOpStr(op: Ast.BinOp) []const u8 {
         .sub_wrap => "-%",
         .mul_wrap => "*%",
         .default_op => "??",
+        .concat => "++",
     };
 }
 

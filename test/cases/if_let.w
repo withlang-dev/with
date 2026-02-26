@@ -2,7 +2,7 @@
 
 type Shape = Circle(f64) | Square(f64) | Point
 
-fn area(s: Shape) -> f64 =
+fn area(s: Shape) -> f64:
     if let Circle(r) = s:
         3.14159 * r * r
     else
@@ -11,7 +11,7 @@ fn area(s: Shape) -> f64 =
         else
             0.0
 
-fn main() -> i32 =
+fn main -> i32:
     let c = Circle(2.0)
     let s = Square(3.0)
     let p = Point
@@ -31,4 +31,3 @@ fn main() -> i32 =
     // Point area = 0.0
     assert(pa > -0.1)
     assert(pa < 0.1)
-    0

@@ -2,7 +2,7 @@
 use std.string
 use std.math
 
-fn main() -> i32 =
+fn main -> i32:
     // Test char functions from std.string
     assert(is_alpha(65))
     assert(not is_alpha(48))
@@ -27,4 +27,3 @@ fn main() -> i32 =
     assert(string_eq("hello", "hello"))
     assert(not string_eq("hello", "world"))
 
-    0

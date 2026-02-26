@@ -58,17 +58,17 @@ trait B =
 type X = { v: i32 }
 
 impl A for X =
-    fn a(self: X) -> i32 =
+    fn a(self: X) -> i32:
         self.v
 
 impl B for X =
-    fn b(self: X) -> i32 =
+    fn b(self: X) -> i32:
         self.v + 10
 
-fn sum[T: A + B](x: T) -> i32 =
+fn sum[T: A + B](x: T) -> i32:
     x.a() + x.b()
 
-fn main() -> i32 =
+fn main -> i32:
     let x = X { v: 2 }
     if sum(x) == 14 then 0 else 1
 EOF1
@@ -85,13 +85,13 @@ trait B =
 type OnlyA = { v: i32 }
 
 impl A for OnlyA =
-    fn a(self: OnlyA) -> i32 =
+    fn a(self: OnlyA) -> i32:
         self.v
 
-fn use_ab[T: A + B](x: T) -> i32 =
+fn use_ab[T: A + B](x: T) -> i32:
     x.a()
 
-fn main() -> i32 =
+fn main -> i32:
     let x = OnlyA { v: 1 }
     use_ab(x)
 EOF2
@@ -102,10 +102,10 @@ cat >"$tmpdir/bounds_callsite_primitive_fail.w" <<'EOF3'
 trait Show =
     fn show(self: Self) -> i32
 
-fn use_show[T: Show](x: T) -> i32 =
+fn use_show[T: Show](x: T) -> i32:
     0
 
-fn main() -> i32 =
+fn main -> i32:
     use_show(1)
 EOF3
 expect_check_fail_msg "$tmpdir/bounds_callsite_primitive_fail.w" "type 'i32' does not implement trait 'Show' required by bound 'T: Show'"
@@ -121,13 +121,13 @@ trait B =
 type X = { v: i32 }
 
 impl A for X =
-    fn a(self: X) -> i32 =
+    fn a(self: X) -> i32:
         self.v
 
-fn bad[T: A](x: T) -> i32 =
+fn bad[T: A](x: T) -> i32:
     x.b()
 
-fn main() -> i32 =
+fn main -> i32:
     let x = X { v: 1 }
     bad(x)
 EOF4

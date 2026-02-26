@@ -41,7 +41,7 @@ expect_check_fail_msg() {
 }
 
 cat >"$tmpdir/borrow_shared_shared_ok.w" <<'EOF1'
-fn main() -> i32 =
+fn main -> i32:
     var x: i32 = 1
     let a = &x
     let b = &x
@@ -50,7 +50,7 @@ EOF1
 expect_check_pass "$tmpdir/borrow_shared_shared_ok.w"
 
 cat >"$tmpdir/borrow_shared_mut_fail.w" <<'EOF2'
-fn main() -> i32 =
+fn main -> i32:
     var x: i32 = 1
     let a = &x
     let b = &mut x
@@ -59,7 +59,7 @@ EOF2
 expect_check_fail_msg "$tmpdir/borrow_shared_mut_fail.w" "cannot borrow mutably: already borrowed"
 
 cat >"$tmpdir/borrow_mut_mut_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     var x: i32 = 1
     let a = &mut x
     let b = &mut x
@@ -68,7 +68,7 @@ EOF3
 expect_check_fail_msg "$tmpdir/borrow_mut_mut_fail.w" "cannot borrow mutably: already mutably borrowed"
 
 cat >"$tmpdir/borrow_mut_shared_fail.w" <<'EOF4'
-fn main() -> i32 =
+fn main -> i32:
     var x: i32 = 1
     let a = &mut x
     let b = &x

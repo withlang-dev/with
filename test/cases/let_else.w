@@ -1,10 +1,10 @@
-fn get_some() -> ?i32 =
+fn get_some -> ?i32:
     Some(42)
 
-fn get_none() -> ?i32 =
+fn get_none -> ?i32:
     None
 
-fn main() -> i32 =
+fn main -> i32:
     // Test 1: let Some(x) = expr else return
     let Some(val) = get_some() else return 1
     assert(val == 42)

@@ -1,7 +1,7 @@
 // Test: std.alloc import
 use std.alloc
 
-fn main() -> i32 =
+fn main -> i32:
     let arena = arena_new(128)
     let p = arena_alloc(arena, 64)
     assert(p != 0)

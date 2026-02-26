@@ -1,5 +1,5 @@
 // Test vector push, len, and iteration
-fn main() -> i32 =
+fn main -> i32:
     var v = Vec.new()
     v.push(10)
     v.push(20)
@@ -10,4 +10,3 @@ fn main() -> i32 =
     for x in v
         sum = sum + x
     println(sum)
-    0

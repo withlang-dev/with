@@ -1,9 +1,9 @@
 // Test option chaining and combinators
-fn safe_div(a: i32, b: i32) -> ?i32 =
+fn safe_div(a: i32, b: i32) -> ?i32:
     if b == 0: None
     else Some(a / b)
 
-fn main() -> i32 =
+fn main -> i32:
     let r1 = safe_div(10, 2)
     let r2 = safe_div(10, 0)
     println(r1 ?? -1)

@@ -71,7 +71,7 @@ type User = {
 }
 
 // Returns a deterministic answer.
-fn answer() -> i32 = 42
+fn answer -> i32: 42
 EOF1
 expect_doc_contains "$tmpdir/doc_index_examples_ok.w" "## Index"
 expect_doc_contains "$tmpdir/doc_index_examples_ok.w" '[type `User`](#type-User)'

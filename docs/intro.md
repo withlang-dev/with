@@ -17,7 +17,7 @@ With is a systems programming language — no garbage collector, no runtime over
 It does not have lifetime annotations.
 
 ```
-async fn handle_signup(req: HttpRequest, db: &Database) -> Result[HttpResponse, ApiError] =
+async fn handle_signup(req: HttpRequest, db: &Database) -> Result[HttpResponse, ApiError]:
     let body = req.json[SignupRequest]() ?? return Err(.InvalidJson)
 
     if not body.email.is_valid() then
@@ -103,7 +103,7 @@ With's async model is fibers — lightweight threads with real stacks. When you 
 Because fibers have real stacks, references across `await` points just work. No `Pin`. No `Unpin`. No `Future`. No `Poll`. These concepts don't exist in With.
 
 ```
-async fn process(data: &mut Vec[i32]) =
+async fn process(data: &mut Vec[i32]):
     let first = &data[0]
     some_io().await           // fiber suspends; reference is fine
     println(first)            // safe to use
@@ -130,7 +130,7 @@ A systems language that can't call C libraries isn't a systems language. With tr
 use c_import("SDL2/SDL.h", link: "SDL2")
 use c_import("sqlite3.h", link: "sqlite3")
 
-fn main() =
+fn main:
     var db: *mut sqlite3 = null
     sqlite3_open(c":memory:".ptr, &mut db)
     defer sqlite3_close(db)
@@ -147,7 +147,7 @@ Language design lives in the details. Here are some that matter:
 **Implicit Ok wrapping.** Functions returning `Result` don't need `Ok(value)` at the end. Just return the value. The `?` operator handles the sad path; the happy path just flows.
 
 ```
-fn load_config(path: &str) -> Result[Config, AppError] =
+fn load_config(path: &str) -> Result[Config, AppError]:
     let text = fs.read_to_string(path)?
     let config = toml.parse(text)?
     config    // auto-wrapped in Ok(...)
@@ -162,7 +162,7 @@ let user = User { name: "Alice", email: "alice@example.com", role: .Member }
 **Enum variant shorthand.** When the type is known, `.Variant` works without the full path.
 
 ```
-fn default_role() -> Role = .Member
+fn default_role -> Role: .Member
 ```
 
 **Pipeline operator.** Data flows left to right, naturally.
@@ -179,10 +179,10 @@ let report = transactions.iter()
 **Comptime instead of macros.** No token-level metaprogramming. Compile-time execution of regular With code with access to type information. Generated code goes through the full type checker.
 
 ```
-comptime fn derive_serialize[T: type]() -> impl Serialize for T =
+comptime fn derive_serialize[T: type] -> impl Serialize for T:
     let fields = T.fields()
     impl Serialize for T {
-        fn serialize(self: &T, out: &mut JsonWriter) =
+        fn serialize(self: &T, out: &mut JsonWriter):
             out.begin_object()
             for field in fields:
                 out.key(field.name)

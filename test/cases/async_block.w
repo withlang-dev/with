@@ -1,5 +1,5 @@
 // Test: async block lowering and await
-fn main() -> i32 =
+fn main -> i32:
     let t = async:
         21 * 2
     let v = t.await

@@ -34,13 +34,13 @@ expect_fail() {
 }
 
 cat >"$tmpdir/default_exit.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF
 expect_pass "$tmpdir/default_exit.w"
 
 cat >"$tmpdir/exit_42.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     42
 EOF
 cat >"$tmpdir/exit_42.exit" <<'EOF'
@@ -49,9 +49,8 @@ EOF
 expect_pass "$tmpdir/exit_42.w"
 
 cat >"$tmpdir/stdout_ok.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     println("phase0-harness")
-    0
 EOF
 cat >"$tmpdir/stdout_ok.stdout" <<'EOF'
 phase0-harness
@@ -59,9 +58,8 @@ EOF
 expect_pass "$tmpdir/stdout_ok.w"
 
 cat >"$tmpdir/stdout_mismatch.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     println("actual")
-    0
 EOF
 cat >"$tmpdir/stdout_mismatch.stdout" <<'EOF'
 expected
@@ -69,7 +67,7 @@ EOF
 expect_fail "$tmpdir/stdout_mismatch.w"
 
 cat >"$tmpdir/exit_mismatch.w" <<'EOF'
-fn main() -> i32 =
+fn main -> i32:
     7
 EOF
 cat >"$tmpdir/exit_mismatch.exit" <<'EOF'

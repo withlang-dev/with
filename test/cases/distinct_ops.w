@@ -2,10 +2,10 @@
 type Celsius = distinct i32
 type Fahrenheit = distinct i32
 
-fn to_fahrenheit(c: i32) -> i32 =
+fn to_fahrenheit(c: i32) -> i32:
     c * 9 / 5 + 32
 
-fn main() -> i32 =
+fn main -> i32:
     let temp = 100
     let f = to_fahrenheit(temp)
     println(f)
@@ -15,4 +15,3 @@ fn main() -> i32 =
     println(freezing)
     assert(freezing == 32)
 
-    0

@@ -1,10 +1,10 @@
 // Test chained if-let syntax
 
-fn get_a() -> ?i32 = Some(10)
-fn get_b() -> ?i32 = Some(20)
-fn get_none() -> ?i32 = None
+fn get_a -> ?i32: Some(10)
+fn get_b -> ?i32: Some(20)
+fn get_none -> ?i32: None
 
-fn main() -> i32 =
+fn main -> i32:
     // Single if-let
     if let Some(a) = get_a():
         assert(a == 10)
@@ -19,4 +19,3 @@ fn main() -> i32 =
     else
         99
     assert(x == 99)
-    0

@@ -1,8 +1,8 @@
 // Test: tuples with more than 2 elements
-fn make_triple(a: i32, b: i32, c: i32) -> (i32, i32, i32) =
+fn make_triple(a: i32, b: i32, c: i32) -> (i32, i32, i32):
     (a, b, c)
 
-fn main() -> i32 =
+fn main -> i32:
     // 3-element tuple
     let t = (10, 20, 30)
     assert(t.0 == 10)
@@ -29,4 +29,3 @@ fn main() -> i32 =
     assert(sum == 60)
 
     println("all tuple multi tests passed")
-    0

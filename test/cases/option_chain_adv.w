@@ -1,13 +1,13 @@
 // Test: advanced chained Option operations (map, and_then, filter, unwrap_or)
-fn double(x: i32) -> i32 = x * 2
+fn double(x: i32) -> i32: x * 2
 
-fn safe_half(x: i32) -> ?i32 =
+fn safe_half(x: i32) -> ?i32:
     if x > 1 then Some(x / 2)
     else None
 
-fn is_even(x: i32) -> bool = x % 2 == 0
+fn is_even(x: i32) -> bool: x % 2 == 0
 
-fn main() -> i32 =
+fn main -> i32:
     // map then unwrap
     let a: ?i32 = Some(5)
     let b = a.map(double)
@@ -56,4 +56,3 @@ fn main() -> i32 =
     assert(not o.is_some())
 
     println("all option chain adv tests passed")
-    0

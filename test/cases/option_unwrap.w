@@ -1,10 +1,10 @@
 // Test: option unwrap_or, map, and_then chaining
-fn double(x: i32) -> i32 = x * 2
+fn double(x: i32) -> i32: x * 2
 
-fn safe_half(x: i32) -> ?i32 =
+fn safe_half(x: i32) -> ?i32:
     if x % 2 == 0 then Some(x / 2) else None
 
-fn main() -> i32 =
+fn main -> i32:
     // map then unwrap_or
     let a: ?i32 = Some(21)
     let b = a.map(double)
@@ -27,4 +27,3 @@ fn main() -> i32 =
     assert(h.is_none())
     assert(h.unwrap_or(0) == 0)
 
-    0

@@ -1,5 +1,5 @@
 // Test: comptime expressions and comptime if
-fn main() -> i32 =
+fn main -> i32:
     // comptime arithmetic
     let x = comptime 2 + 3 * 4
     assert(x == 14)
@@ -24,4 +24,3 @@ fn main() -> i32 =
     let e = comptime (10 - 3) * 2
     assert(e == 14)
 
-    0

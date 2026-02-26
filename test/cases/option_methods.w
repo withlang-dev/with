@@ -1,5 +1,5 @@
 // Test: Option/Result combinator methods
-fn main() -> i32 =
+fn main -> i32:
     // unwrap on Some
     let a: ?i32 = Some(42)
     let v = a.unwrap()
@@ -25,4 +25,3 @@ fn main() -> i32 =
     assert(e.is_none())
     assert(not e.is_some())
 
-    0

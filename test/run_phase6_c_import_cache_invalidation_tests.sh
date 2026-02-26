@@ -44,7 +44,7 @@ cat >"$tmpdir/c_import_cache_same_links.w" <<'EOF1'
 use c_import("int shared_fn(int);", link: "c")
 use c_import("int shared_fn(int);", link: "c")
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF1
 check_trace_counts "$tmpdir/c_import_cache_same_links.w" 1 1
 
@@ -53,7 +53,7 @@ cat >"$tmpdir/c_import_cache_diff_links.w" <<'EOF2'
 use c_import("int shared_fn(int);", link: "c")
 use c_import("int shared_fn(int);", link: "m")
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF2
 check_trace_counts "$tmpdir/c_import_cache_diff_links.w" 0 2
 
@@ -62,7 +62,7 @@ cat >"$tmpdir/c_import_cache_epoch_override.w" <<'EOF3'
 use c_import("int epoch_fn(int);")
 use c_import("int epoch_fn(int);")
 
-fn main() -> i32 = 0
+fn main -> i32: 0
 EOF3
 epoch_trace=""
 if ! epoch_trace=$(WITH_TRACE_CIMPORT_CACHE=1 WITH_CIMPORT_CACHE_EPOCH=phase6 "$WITH_BIN" check "$tmpdir/c_import_cache_epoch_override.w" 2>&1 >/dev/null); then

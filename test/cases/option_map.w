@@ -1,12 +1,12 @@
 // Test: Option/Result combinator methods (map, and_then, filter, ok, err)
-fn double(x: i32) -> i32 = x * 2
+fn double(x: i32) -> i32: x * 2
 
-fn safe_div(x: i32) -> ?i32 =
+fn safe_div(x: i32) -> ?i32:
     if x == 0 then None else Some(x / 2)
 
-fn is_positive(x: i32) -> bool = x > 0
+fn is_positive(x: i32) -> bool: x > 0
 
-fn main() -> i32 =
+fn main -> i32:
     // Option.map: Some(5).map(double) == Some(10)
     let a: ?i32 = Some(5)
     let b = a.map(double)
@@ -51,4 +51,3 @@ fn main() -> i32 =
     assert(p.is_none())
 
     println("all option combinator tests passed")
-    0

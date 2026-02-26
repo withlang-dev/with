@@ -2,7 +2,7 @@
 
 type JsonTag = Null | Bool | Number | Str
 
-fn classify_char(ch: i32) -> i32 =
+fn classify_char(ch: i32) -> i32:
     if ch == 123 then 1
     else if ch == 125 then 2
     else if ch == 91 then 3
@@ -11,15 +11,15 @@ fn classify_char(ch: i32) -> i32 =
     else if ch == 44 then 6
     else 0
 
-fn update_depth(depth: i32, cls: i32) -> i32 =
+fn update_depth(depth: i32, cls: i32) -> i32:
     if cls == 1 or cls == 3 then depth + 1
     else if cls == 2 or cls == 4 then depth - 1
     else depth
 
-fn max(a: i32, b: i32) -> i32 =
+fn max(a: i32, b: i32) -> i32:
     if a > b then a else b
 
-fn count_depth(input: [10]i32, len: i32) -> i32 =
+fn count_depth(input: [10]i32, len: i32) -> i32:
     var max_depth = 0
     var depth = 0
     for i in 0..len:
@@ -28,10 +28,10 @@ fn count_depth(input: [10]i32, len: i32) -> i32 =
         max_depth = max(max_depth, depth)
     max_depth
 
-fn is_digit(ch: i32) -> bool =
+fn is_digit(ch: i32) -> bool:
     ch >= 48 and ch <= 57
 
-fn classify_value(first_char: i32) -> i32 =
+fn classify_value(first_char: i32) -> i32:
     if first_char == 110 then 0
     else if first_char == 116 then 1
     else if first_char == 102 then 2
@@ -39,22 +39,22 @@ fn classify_value(first_char: i32) -> i32 =
     else if first_char == 34 then 4
     else 5
 
-fn is_json_char(ch: i32) -> bool =
+fn is_json_char(ch: i32) -> bool:
     let cls = classify_char(ch)
     cls > 0 or is_digit(ch) or ch == 34 or ch == 32
 
-fn fib(n: i32) -> i32 =
+fn fib(n: i32) -> i32:
     if n <= 1 then n
     else fib(n - 1) + fib(n - 2)
 
-fn tag_to_int(t: JsonTag) -> i32 =
+fn tag_to_int(t: JsonTag) -> i32:
     match t
         Null -> 0
         Bool -> 1
         Number -> 2
         Str -> 3
 
-fn main() -> i32 =
+fn main -> i32:
     // Test classify_char
     assert(classify_char(123) == 1)
     assert(classify_char(125) == 2)
@@ -112,4 +112,3 @@ fn main() -> i32 =
     assert(tag_to_int(Str) == 3)
 
     println("json: all tests passed")
-    0

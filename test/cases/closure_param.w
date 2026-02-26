@@ -1,10 +1,10 @@
 // Test: closures (capturing and non-capturing) passed as function parameters
-fn apply(f: fn(i32) -> i32, x: i32) -> i32 =
+fn apply(f: fn(i32) -> i32, x: i32) -> i32:
     f(x)
 
-fn double(x: i32) -> i32 = x * 2
+fn double(x: i32) -> i32: x * 2
 
-fn main() -> i32 =
+fn main -> i32:
     // Non-capturing closure as param
     let inc = |x| x + 1
     let r1 = apply(inc, 10)
@@ -24,4 +24,3 @@ fn main() -> i32 =
     let r4 = apply(|x| x * x, 7)
     assert(r4 == 49)
 
-    0

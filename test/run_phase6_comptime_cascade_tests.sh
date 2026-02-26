@@ -42,27 +42,26 @@ expect_run_pass "test/cases/comptime_error.w"
 
 # Positive: inside comptime fn, plain for/if cascade without extra comptime prefixes.
 cat >"$tmpdir/comptime_cascade_if_for_ok.w" <<'EOF1'
-comptime fn score(limit: i32) -> i32 =
+comptime fn score(limit: i32) -> i32:
     var out = 0
     for i in [1, 2, 3, 4]:
         if i <= limit:
             out = out + i
     out
 
-fn main() -> i32 =
+fn main -> i32:
     assert(score(3) == 6)
-    0
 EOF1
 expect_run_pass "$tmpdir/comptime_cascade_if_for_ok.w"
 
 # Non-happy-path: taken branch inside comptime fn triggers comptime_error.
 cat >"$tmpdir/comptime_cascade_taken_error_fail.w" <<'EOF2'
-comptime fn bad() -> i32 =
+comptime fn bad -> i32:
     if true:
         comptime_error("boom")
     0
 
-fn main() -> i32 =
+fn main -> i32:
     bad()
 EOF2
 expect_run_fail "$tmpdir/comptime_cascade_taken_error_fail.w"

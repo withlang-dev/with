@@ -56,7 +56,7 @@ expect_run_pass "test/cases/float_math.w"
 cat >"$tmpdir/std_math_extended_ok.w" <<'EOF1'
 use std.math
 
-fn main() -> i32 =
+fn main -> i32:
     assert(abs64(0 - 9) == 9)
     assert(min64(4, 9) == 4)
     assert(max64(4, 9) == 9)
@@ -105,43 +105,38 @@ fn main() -> i32 =
     assert(at2 > -0.01)
     assert(at2 < 0.01)
 
-    0
 EOF1
 expect_run_pass "$tmpdir/std_math_extended_ok.w"
 
 cat >"$tmpdir/std_math_sqrt_arity_fail.w" <<'EOF2'
 use std.math
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = sqrt_f64()
-    0
 EOF2
 expect_run_fail "$tmpdir/std_math_sqrt_arity_fail.w"
 
 cat >"$tmpdir/std_math_pow_arity_fail.w" <<'EOF3'
 use std.math
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = pow_f64(2.0)
-    0
 EOF3
 expect_run_fail "$tmpdir/std_math_pow_arity_fail.w"
 
 cat >"$tmpdir/std_math_abs64_type_fail.w" <<'EOF4'
 use std.math
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = abs64("bad")
-    0
 EOF4
 expect_run_fail "$tmpdir/std_math_abs64_type_fail.w"
 
 cat >"$tmpdir/std_math_atan2_arity_fail.w" <<'EOF5'
 use std.math
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = atan2_f64(1.0)
-    0
 EOF5
 expect_run_fail "$tmpdir/std_math_atan2_arity_fail.w"
 

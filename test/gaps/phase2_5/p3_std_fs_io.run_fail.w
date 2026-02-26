@@ -1,7 +1,7 @@
 // Phase 3 gap: std.fs runtime coverage incomplete
 use std.fs
 
-fn main() -> i32 =
+fn main -> i32:
     let path = "/tmp/with_fs_gap.txt"
     let w = write_file(path, "abc")
     if w != 0 then return 1

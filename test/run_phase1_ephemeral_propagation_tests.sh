@@ -33,7 +33,7 @@ expect_check_fail_msg() {
 cat >"$tmpdir/ephemeral_nested_struct_fail.w" <<'EOF1'
 type Bad = { payload: (i32, &i32) }
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF1
 expect_check_fail_msg "$tmpdir/ephemeral_nested_struct_fail.w" "ephemeral references cannot be stored in structs"
@@ -41,13 +41,13 @@ expect_check_fail_msg "$tmpdir/ephemeral_nested_struct_fail.w" "ephemeral refere
 cat >"$tmpdir/ephemeral_nested_collection_fail.w" <<'EOF2'
 let bad: Vec[(i32, &i32)] = 0
 
-fn main() -> i32 =
+fn main -> i32:
     0
 EOF2
 expect_check_fail_msg "$tmpdir/ephemeral_nested_collection_fail.w" "ephemeral references cannot be stored in collections"
 
 cat >"$tmpdir/ephemeral_alias_capture_fail.w" <<'EOF3'
-fn main() -> i32 =
+fn main -> i32:
     var x: i32 = 1
     let r = &x
     let rr = r

@@ -51,47 +51,47 @@ expect_build_no_warn() {
 cat >"$tmpdir/usefulness_reachable_ok.w" <<'EOF1'
 type E = A | B | C
 
-fn f(e: E) -> i32 =
+fn f(e: E) -> i32:
     match e
         A -> 1
         B -> 2
         _ -> 3
 
-fn main() -> i32 = f(A)
+fn main -> i32: f(A)
 EOF1
 expect_build_no_warn "$tmpdir/usefulness_reachable_ok.w"
 
 cat >"$tmpdir/usefulness_after_wildcard_warn.w" <<'EOF2'
-fn f(x: i32) -> i32 =
+fn f(x: i32) -> i32:
     match x
         _ -> 0
         1 -> 1
 
-fn main() -> i32 = f(1)
+fn main -> i32: f(1)
 EOF2
 expect_build_warn_msg "$tmpdir/usefulness_after_wildcard_warn.w" "unreachable match arm: previous arm covers all remaining values"
 
 cat >"$tmpdir/usefulness_duplicate_literal_warn.w" <<'EOF3'
-fn f(x: i32) -> i32 =
+fn f(x: i32) -> i32:
     match x
         1 -> 10
         1 -> 20
         _ -> 30
 
-fn main() -> i32 = f(1)
+fn main -> i32: f(1)
 EOF3
 expect_build_warn_msg "$tmpdir/usefulness_duplicate_literal_warn.w" "unreachable match arm"
 
 cat >"$tmpdir/usefulness_duplicate_variant_warn.w" <<'EOF4'
 type E = A | B
 
-fn f(e: E) -> i32 =
+fn f(e: E) -> i32:
     match e
         A -> 1
         A -> 2
         B -> 3
 
-fn main() -> i32 = f(A)
+fn main -> i32: f(A)
 EOF4
 expect_build_warn_msg "$tmpdir/usefulness_duplicate_variant_warn.w" "unreachable match arm"
 

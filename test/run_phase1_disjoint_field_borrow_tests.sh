@@ -43,7 +43,7 @@ expect_check_fail_msg() {
 cat >"$tmpdir/disjoint_fields_ok.w" <<'EOF1'
 type Pair = { x: i32, y: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     var p = Pair { x: 1, y: 2 }
     let rx = &p.x
     let ry = &mut p.y
@@ -55,7 +55,7 @@ expect_check_pass "$tmpdir/disjoint_fields_ok.w"
 cat >"$tmpdir/same_field_conflict_fail.w" <<'EOF2'
 type Pair = { x: i32, y: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     var p = Pair { x: 1, y: 2 }
     let rx = &p.x
     let mx = &mut p.x
@@ -66,7 +66,7 @@ expect_check_fail_msg "$tmpdir/same_field_conflict_fail.w" "cannot borrow mutabl
 cat >"$tmpdir/whole_place_conflict_fail.w" <<'EOF3'
 type Pair = { x: i32, y: i32 }
 
-fn main() -> i32 =
+fn main -> i32:
     var p = Pair { x: 1, y: 2 }
     let all = &mut p
     let fx = &p.x

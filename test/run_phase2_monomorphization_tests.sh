@@ -51,10 +51,10 @@ expect_check_fail() {
 }
 
 cat >"$tmpdir/mono_multi_types.w" <<'EOF1'
-fn id[T](x: T) -> T =
+fn id[T](x: T) -> T:
     x
 
-fn main() -> i32 =
+fn main -> i32:
     let a = id(41)
     let b = id(true)
     if a == 41 and b then 0 else 1
@@ -64,12 +64,11 @@ expect_ir_has "$tmpdir/mono_multi_types.w" "@id__i32"
 expect_ir_has "$tmpdir/mono_multi_types.w" "@id__bool"
 
 cat >"$tmpdir/mono_uninferred_fail.w" <<'EOF2'
-fn make[T]() -> T =
+fn make[T] -> T:
     0
 
-fn main() -> i32 =
+fn main -> i32:
     let _x = make()
-    0
 EOF2
 expect_check_fail "$tmpdir/mono_uninferred_fail.w"
 

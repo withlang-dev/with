@@ -352,7 +352,7 @@ call closure, unlock), this is always possible.
 A generator:
 
 ```
-gen fn countdown(from: i32) -> i32 =
+gen fn countdown(from: i32) -> i32:
     var i = from
     while i >= 0:
         yield i
@@ -367,11 +367,11 @@ type CountdownState = {
     i: i32           // captured local
 }
 
-fn countdown(from: i32) -> CountdownState =
+fn countdown(from: i32) -> CountdownState:
     CountdownState { state: 0, i: from }
 
 impl Iter[i32] for CountdownState {
-    fn next(self: &mut Self) -> Option[i32] =
+    fn next(self: &mut Self) -> Option[i32]:
         loop:
             match self.state
                 0 ->
@@ -402,13 +402,13 @@ impl Iter[i32] for CountdownState {
 ### 6.1 `async fn` Lowering
 
 ```
-async fn fetch(url: str) -> Result[String, IoError] = body
+async fn fetch(url: str) -> Result[String, IoError]: body
 ```
 
 Compiles to:
 
 ```
-fn fetch(url: str) -> Task[Result[String, IoError]] =
+fn fetch(url: str) -> Task[Result[String, IoError]]:
     runtime::spawn_fiber(move || { body })
 ```
 
@@ -837,7 +837,7 @@ compile error:
 ```
 type FileWrapper = { fd: File, name: String }
 impl Drop for FileWrapper
-    fn drop(self: Self) = close_file(self.fd)
+    fn drop(self: Self): close_file(self.fd)
 
 let w1 = FileWrapper { fd: open_file(), name: "A" }
 let w2 = { w1 with name: "B" }   // ERROR: partial move from Drop type
@@ -897,11 +897,11 @@ type AppError =
     | Parse(ParseError)
 
 impl From[IoError] for AppError {
-    fn from(e: IoError) -> AppError = AppError.Io(e)
+    fn from(e: IoError) -> AppError: AppError.Io(e)
 }
 
 impl From[ParseError] for AppError {
-    fn from(e: ParseError) -> AppError = AppError.Parse(e)
+    fn from(e: ParseError) -> AppError: AppError.Parse(e)
 }
 ```
 
@@ -1029,7 +1029,7 @@ error[E0101]: conflicting borrows of `data`
 error[E0501]: `async` requires the fiber runtime
   --> src/main.w:3:1
    |
- 3 | async fn fetch(url: str) -> String =
+ 3 | async fn fetch(url: str) -> String:
    | ^^^^^^^^ not available in no_runtime builds
    |
    = help: add `runtime = true` to with.toml
@@ -1462,7 +1462,7 @@ comptime else if cfg.target_os == "windows":
 
 pub type File = { handle: platform.FileHandle }
 
-pub fn open(path: &str, mode: OpenMode) -> Result[File, IoError] =
+pub fn open(path: &str, mode: OpenMode) -> Result[File, IoError]:
     let raw = platform.open(path.as_cstr(), mode.to_flags())?
     Ok(File { handle: raw })
 ```
@@ -1478,7 +1478,7 @@ use c_import("unistd.h", link: "c")
 
 pub(crate) type FileHandle = { fd: i32 }
 
-pub(crate) fn open(path: &CStr, flags: i32) -> Result[FileHandle, IoError] =
+pub(crate) fn open(path: &CStr, flags: i32) -> Result[FileHandle, IoError]:
     let fd = unsafe { c.open(path.as_ptr(), flags) }
     if fd < 0 then
         Err(IoError.from_errno())
@@ -1517,7 +1517,7 @@ error AppError =
     Parse(ParseError)
 
 impl From[IoError] for AppError {
-    fn from(e: IoError) -> AppError = AppError.Io(e)
+    fn from(e: IoError) -> AppError: AppError.Io(e)
 }
 ```
 
@@ -1623,7 +1623,7 @@ and fibers when full ownership semantics are not needed.
 **Prelude `drop` function (spec §18.2):**
 
 ```
-fn drop[T](val: T) = ()
+fn drop[T](val: T): ()
 ```
 
 A built-in identity function that takes any value by move and does
@@ -1738,7 +1738,7 @@ fn generate_accessors(enum_def):
         let snake_name = to_snake_case(variant.name)
 
         // .is_variant() → bool (always generated)
-        emit fn is_{snake_name}(self: &EnumType) -> bool =
+        emit fn is_{snake_name}(self: &EnumType) -> bool:
             match self
                 EnumType.{variant.name}(..) -> true
                 _ -> false
@@ -1751,19 +1751,19 @@ fn generate_accessors(enum_def):
                 tuple(variant.fields.types)
 
             // By value (moves)
-            emit fn as_{snake_name}(self: EnumType) -> Option[T] =
+            emit fn as_{snake_name}(self: EnumType) -> Option[T]:
                 match self
                     EnumType.{variant.name}(val) -> Some(val)
                     _ -> None
 
             // By shared reference
-            emit fn as_{snake_name}_ref(self: &EnumType) -> Option[&T] =
+            emit fn as_{snake_name}_ref(self: &EnumType) -> Option[&T]:
                 match self
                     EnumType.{variant.name}(ref val) -> Some(val)
                     _ -> None
 
             // By mutable reference
-            emit fn as_{snake_name}_mut(self: &mut EnumType) -> Option[&mut T] =
+            emit fn as_{snake_name}_mut(self: &mut EnumType) -> Option[&mut T]:
                 match self
                     EnumType.{variant.name}(ref mut val) -> Some(val)
                     _ -> None
@@ -1876,7 +1876,7 @@ fn check_implicit_ok(func):
 every scope-exit point:
 
 ```
-fn process(path: str) -> Result[Unit, IoError] =
+fn process(path: str) -> Result[Unit, IoError]:
     let f = fs.open(path)?
     defer f.close()
     f.write_all(b"data")?
@@ -1886,7 +1886,7 @@ fn process(path: str) -> Result[Unit, IoError] =
 Compiles to:
 
 ```
-fn process(path: str) -> Result[Unit, IoError] =
+fn process(path: str) -> Result[Unit, IoError]:
     let f = match fs.open(path) {
         Ok(v) -> v
         Err(e) -> return Err(e.into())  // no defer yet
@@ -2104,7 +2104,7 @@ automatically. The `comptime` prefix is only needed at the entry
 point.
 
 ```
-comptime fn derive_serialize[T: type]() =
+comptime fn derive_serialize[T: type]:
     for field in T.fields():           // cascade: no prefix needed
         if field.type_name == "str":   // cascade: no prefix needed
             emit_string_serialize(field)
@@ -2191,7 +2191,7 @@ let f = |x| x + offset
 
 // →
 struct __closure_1 { offset: i32 }
-fn __closure_1_call(self: &__closure_1, x: i32) -> i32 =
+fn __closure_1_call(self: &__closure_1, x: i32) -> i32:
     x + self.offset
 let f = __closure_1 { offset: 5 }
 ```
@@ -2269,12 +2269,12 @@ fn promote_string_literal(literal, expected_type):
 
 - Struct field initialization where the field type is `str`
 - Function argument where the parameter type is `str`
-- Variable binding with explicit type annotation `let x: str = "..."`
+- Variable binding: `let x = "..."` (str is the default type for string literals)
 - Return expression where the function return type is `str`
 
 ### 29.3 Contexts That Do NOT Trigger Promotion
 
-- Bare `let s = "hello"` with no type annotation → stays `&str`
+- Explicit `let s: &str = "hello"` with `&str` annotation → stays `&str`
 - Function argument where the parameter type is `&str` → no promotion
 - Any context where `&str` satisfies the expected type
 
@@ -2313,7 +2313,7 @@ The compiler generates a shim that moves the value out of the box:
 
 ```
 // For trait Builder with fn build(self: Self) -> Config:
-fn __box_dyn_build_shim(box_ptr: *mut u8) -> Config =
+fn __box_dyn_build_shim(box_ptr: *mut u8) -> Config:
     let builder = move_from_box(box_ptr)
     builder.build()
 ```
@@ -2357,7 +2357,7 @@ switching:
 
 ```
 @[ffi_stack]
-fn process_image(data: &[u8]) -> Image =
+fn process_image(data: &[u8]) -> Image:
     // All C calls run on OS stack without per-call switching
     ...
 ```
@@ -2617,15 +2617,15 @@ The comptime function generates:
 2. Chaining setter methods (by-value self):
    ```
    impl ConfigBuilder
-       fn host(self: Self, val: str) -> Self =
+       fn host(self: Self, val: str) -> Self:
            Self { host: Some(val), ..self }
-       fn port(self: Self, val: i32) -> Self =
+       fn port(self: Self, val: i32) -> Self:
            Self { port: Some(val), ..self }
    ```
 
 3. A `.build()` method that checks required fields:
    ```
-   fn build(self: Self) -> Result[Config, BuilderError] =
+   fn build(self: Self) -> Result[Config, BuilderError]:
        Config {
            host: self.host ?? return Err(.MissingField("host")),
            port: self.port ?? 8080,   // use default
@@ -2650,17 +2650,17 @@ These are stdlib methods, not compiler features:
 
 ```
 impl HashMap[K, V]
-    fn update(self: &mut Self, key: K, default: V, f: fn(V) -> V) =
+    fn update(self: &mut Self, key: K, default: V, f: fn(V) -> V):
         let entry = self.entry(key).or_insert(default)
         *entry = f(*entry)
 
-    fn increment(self: &mut Self, key: K) where V: Add[V, Output=V] + From[i32] =
+    fn increment(self: &mut Self, key: K) where V: Add[V, Output=V] + From[i32]:
         self.update(key, V.from(0), |n| n + V.from(1))
 
-    fn decrement(self: &mut Self, key: K) where V: Sub[V, Output=V] + From[i32] =
+    fn decrement(self: &mut Self, key: K) where V: Sub[V, Output=V] + From[i32]:
         self.update(key, V.from(0), |n| n - V.from(1))
 
-    fn append[Item](self: &mut Self, key: K, val: Item) where V: Push[Item] + Default =
+    fn append[Item](self: &mut Self, key: K, val: Item) where V: Push[Item] + Default:
         self.entry(key).or_insert(V.default()).push(val)
 ```
 
@@ -2674,11 +2674,11 @@ Built-in methods on raw pointer types:
 
 ```
 impl *const T
-    fn as_option(self: Self) -> Option[*const T] =
+    fn as_option(self: Self) -> Option[*const T]:
         if self == null then None else Some(self)
 
 impl *mut T
-    fn as_option(self: Self) -> Option[*mut T] =
+    fn as_option(self: Self) -> Option[*mut T]:
         if self == null then None else Some(self)
 ```
 

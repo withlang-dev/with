@@ -7,10 +7,10 @@ type Config = {
 }
 
 impl Config =
-    fn pixel_count(self: Config) -> i32 =
+    fn pixel_count(self: Config) -> i32:
         self.width * self.height
 
-    fn is_hd(self: Config) -> bool =
+    fn is_hd(self: Config) -> bool:
         self.width >= 1920 and self.height >= 1080
 
 type Vec3 = {
@@ -20,13 +20,13 @@ type Vec3 = {
 }
 
 impl Vec3 =
-    fn length_sq(self: Vec3) -> i32 =
+    fn length_sq(self: Vec3) -> i32:
         self.x * self.x + self.y * self.y + self.z * self.z
 
-    fn add(self: Vec3, other: Vec3) -> Vec3 =
+    fn add(self: Vec3, other: Vec3) -> Vec3:
         Vec3 { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
 
-fn main() -> i32 =
+fn main -> i32:
     // With-builder form: build Config with mutations
     let cfg = with Config {} as mut c:
         c.width = 1920
@@ -72,4 +72,3 @@ fn main() -> i32 =
     assert(val == 60)
 
     println("all with_record_methods tests passed")
-    0

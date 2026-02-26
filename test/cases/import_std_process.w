@@ -1,7 +1,7 @@
 // Test: std.process import
 use std.process
 
-fn main() -> i32 =
+fn main -> i32:
     let p = pid()
     // PID should be positive
     assert(p > 0)
@@ -21,4 +21,3 @@ fn main() -> i32 =
     let cmd = command("true")
     assert(cmd.run() == 0)
     assert(cmd.status() == 0)
-    0
