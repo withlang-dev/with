@@ -8179,12 +8179,37 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
         }
     }
 
+    // Pre-pass: detect duplicate variant/int tags and build guard fallthrough chain.
+    // For arms with the same tag, only the first gets a switch case; subsequent ones
+    // are reached via guard fallthrough from prior same-tag arms.
+    var guard_fallthrough: [64]?usize = .{null} ** 64;
+    var skip_case: [64]bool = .{false} ** 64;
+    {
+        var ia: usize = 0;
+        while (ia < m.arms.len) : (ia += 1) {
+            if (skip_case[ia]) continue;
+            const tag_a = getPatternTag(m.arms[ia].pattern, enum_info) orelse continue;
+            var prev_in_group: usize = ia;
+            var ib: usize = ia + 1;
+            while (ib < m.arms.len) : (ib += 1) {
+                const tag_b = getPatternTag(m.arms[ib].pattern, enum_info) orelse continue;
+                if (tag_a == tag_b) {
+                    guard_fallthrough[prev_in_group] = ib;
+                    skip_case[ib] = true;
+                    prev_in_group = ib;
+                }
+            }
+        }
+    }
+
     // Build switch.
     const sw = c.LLVMBuildSwitch(self.builder, tag_val, default_bb, @intCast(m.arms.len));
 
-    // Add cases.
+    // Add cases (skip duplicates — they're reached via guard fallthrough).
     for (m.arms, 0..) |arm, i| {
-        self.addMatchCase(sw, arm.pattern, tag_val, arm_bbs_buf[i], enum_info);
+        if (!skip_case[i]) {
+            self.addMatchCase(sw, arm.pattern, tag_val, arm_bbs_buf[i], enum_info);
+        }
     }
 
     // Handle range patterns: chain comparisons from default_bb.
@@ -8352,7 +8377,7 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
             else => {},
         }
 
-        // Handle guard clause: if guard is false, jump to next arm or default.
+        // Handle guard clause: if guard is false, jump to next same-tag arm or default.
         if (arm.guard) |guard| {
             const guard_val = try self.genExpr(guard);
             const guard_cond = if (c.LLVMTypeOf(guard_val) == c.LLVMInt1TypeInContext(self.context))
@@ -8360,8 +8385,13 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
             else
                 c.LLVMBuildICmp(self.builder, c.LLVMIntNE, guard_val, c.LLVMConstNull(c.LLVMTypeOf(guard_val)), "guard");
             const body_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "guard.pass");
-            // On guard failure, fall through to default (or next arm's BB).
-            const fallthrough_bb = if (i + 1 < m.arms.len) arm_bbs_buf[i + 1] else default_bb;
+            // On guard failure: prefer next arm with same tag, else next arm, else default.
+            const fallthrough_bb = if (guard_fallthrough[i]) |next_same|
+                arm_bbs_buf[next_same]
+            else if (i + 1 < m.arms.len)
+                arm_bbs_buf[i + 1]
+            else
+                default_bb;
             _ = c.LLVMBuildCondBr(self.builder, guard_cond, body_bb, fallthrough_bb);
             c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
         }
@@ -8584,6 +8614,25 @@ fn addMatchCase(self: *Codegen, sw: c.LLVMValueRef, pattern: Ast.Pattern, tag_va
         .string_literal => {},
         .slice_pattern => {}, // handled in genSliceMatch
     }
+}
+
+/// Extract the effective tag value for a pattern (for duplicate detection).
+/// Returns null for patterns that don't map to a single switch case value.
+fn getPatternTag(pattern: Ast.Pattern, enum_info: ?EnumTypeInfo) ?i64 {
+    return switch (pattern.kind) {
+        .variant => |vp| {
+            if (enum_info) |ei| {
+                for (ei.variant_names, 0..) |vn, vi| {
+                    if (vn == vp.name) return @intCast(vi);
+                }
+            }
+            return null;
+        },
+        .int_literal => |val| val,
+        .bool_literal => |val| @intFromBool(val),
+        .at_binding => |ab| getPatternTag(ab.pattern.*, enum_info),
+        else => null,
+    };
 }
 
 fn genArrayLiteral(self: *Codegen, elems: []const *const Ast.Expr) Error!c.LLVMValueRef {
