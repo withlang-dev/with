@@ -8100,6 +8100,18 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
         return self.genSliceMatch(m, subject, subject_type);
     }
 
+    // Check if any arm uses string literal patterns — use strcmp chain.
+    var has_string_patterns = false;
+    for (m.arms) |arm| {
+        if (arm.pattern.kind == .string_literal) {
+            has_string_patterns = true;
+            break;
+        }
+    }
+    if (has_string_patterns) {
+        return self.genStringMatch(m, subject, subject_type);
+    }
+
     // Determine if this is an enum match or an integer/value match.
     const is_enum_struct = c.LLVMGetTypeKind(subject_type) == c.LLVMStructTypeKind and !self.isStrType(subject_type);
 
@@ -8563,6 +8575,117 @@ fn genSliceMatch(self: *Codegen, m: Ast.MatchExpr, subject: c.LLVMValueRef, subj
             return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
         }
         const phi = c.LLVMBuildPhi(self.builder, result_type, "slice.result");
+        c.LLVMAddIncoming(phi, &arm_vals_buf, &arm_from_bbs_buf, arm_count);
+        return phi;
+    }
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+/// Generate match expression for string patterns using strcmp chains.
+fn genStringMatch(self: *Codegen, m: Ast.MatchExpr, subject: c.LLVMValueRef, subject_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    _ = subject_type;
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "strmatch.end");
+
+    // Extract ptr and len from subject str struct.
+    const subj_alloca = c.LLVMBuildAlloca(self.builder, c.LLVMTypeOf(subject), "strmatch.subj");
+    _ = c.LLVMBuildStore(self.builder, subject, subj_alloca);
+    const str_type = c.LLVMTypeOf(subject);
+    const subj_ptr_gep = c.LLVMBuildStructGEP2(self.builder, str_type, subj_alloca, 0, "subj.ptr.gep");
+    const subj_ptr = c.LLVMBuildLoad2(self.builder, c.LLVMPointerTypeInContext(self.context, 0), subj_ptr_gep, "subj.ptr");
+    const subj_len_gep = c.LLVMBuildStructGEP2(self.builder, str_type, subj_alloca, 1, "subj.len.gep");
+    const subj_len = c.LLVMBuildLoad2(self.builder, c.LLVMInt64TypeInContext(self.context), subj_len_gep, "subj.len");
+
+    const strncmp_fn = self.ensureStrncmpDeclared();
+
+    var arm_vals_buf: [64]c.LLVMValueRef = undefined;
+    var arm_from_bbs_buf: [64]c.LLVMBasicBlockRef = undefined;
+    var arm_count: u32 = 0;
+    var had_wildcard = false;
+
+    // Build chain of comparisons: for each string pattern, compare length + content.
+    var i: usize = 0;
+    while (i < m.arms.len) : (i += 1) {
+        const arm = m.arms[i];
+        switch (arm.pattern.kind) {
+            .string_literal => |pat_sym| {
+                const pat_str = self.pool.resolve(pat_sym);
+                const pat_len = pat_str.len;
+
+                // Check length first.
+                const pat_len_val = c.LLVMConstInt(c.LLVMInt64TypeInContext(self.context), @intCast(pat_len), 0);
+                const len_eq = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, subj_len, pat_len_val, "len.eq");
+
+                const len_ok_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "strmatch.lenok");
+                const next_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "strmatch.next");
+                _ = c.LLVMBuildCondBr(self.builder, len_eq, len_ok_bb, next_bb);
+
+                // Length matches — compare content with strncmp.
+                c.LLVMPositionBuilderAtEnd(self.builder, len_ok_bb);
+                const pat_global = c.LLVMBuildGlobalStringPtr(self.builder, @ptrCast(pat_str.ptr), "pat.str");
+                var cmp_args = [3]c.LLVMValueRef{ subj_ptr, pat_global, pat_len_val };
+                const cmp_result = c.LLVMBuildCall2(self.builder, strncmp_fn.fn_type, strncmp_fn.value, &cmp_args, 3, "strcmp");
+                const str_eq = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, cmp_result, c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0), "str.eq");
+
+                const body_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "strmatch.body");
+                _ = c.LLVMBuildCondBr(self.builder, str_eq, body_bb, next_bb);
+
+                // Generate arm body.
+                c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+                if (arm.guard) |guard| {
+                    const guard_val = try self.genExpr(guard);
+                    const guard_cond = if (c.LLVMTypeOf(guard_val) == c.LLVMInt1TypeInContext(self.context))
+                        guard_val
+                    else
+                        c.LLVMBuildICmp(self.builder, c.LLVMIntNE, guard_val, c.LLVMConstNull(c.LLVMTypeOf(guard_val)), "guard");
+                    const guard_pass_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "strmatch.guard");
+                    _ = c.LLVMBuildCondBr(self.builder, guard_cond, guard_pass_bb, next_bb);
+                    c.LLVMPositionBuilderAtEnd(self.builder, guard_pass_bb);
+                }
+                const arm_val = try self.genExpr(arm.body);
+                arm_vals_buf[arm_count] = arm_val;
+                arm_from_bbs_buf[arm_count] = c.LLVMGetInsertBlock(self.builder);
+                arm_count += 1;
+                _ = c.LLVMBuildBr(self.builder, merge_bb);
+
+                // Position for next comparison.
+                c.LLVMPositionBuilderAtEnd(self.builder, next_bb);
+            },
+            .wildcard, .binding => {
+                // Default arm — generate body directly in the current fallthrough block.
+                had_wildcard = true;
+                if (arm.pattern.kind == .binding) {
+                    const sym = arm.pattern.kind.binding;
+                    const bind_alloca = c.LLVMBuildAlloca(self.builder, c.LLVMTypeOf(subject), "");
+                    _ = c.LLVMBuildStore(self.builder, subject, bind_alloca);
+                    self.locals.put(self.allocator, sym, .{
+                        .alloca = bind_alloca,
+                        .ty = c.LLVMTypeOf(subject),
+                        .is_mut = false,
+                    }) catch return error.CodegenAlloc;
+                }
+                const arm_val = try self.genExpr(arm.body);
+                arm_vals_buf[arm_count] = arm_val;
+                arm_from_bbs_buf[arm_count] = c.LLVMGetInsertBlock(self.builder);
+                arm_count += 1;
+                _ = c.LLVMBuildBr(self.builder, merge_bb);
+                break; // wildcard is terminal — stop processing arms
+            },
+            else => {},
+        }
+    }
+
+    // If no wildcard arm, the fallthrough path needs to terminate.
+    if (!had_wildcard) {
+        _ = c.LLVMBuildUnreachable(self.builder);
+    }
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    if (arm_count > 0) {
+        const result_type = c.LLVMTypeOf(arm_vals_buf[0]);
+        if (result_type == c.LLVMVoidTypeInContext(self.context)) {
+            return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+        }
+        const phi = c.LLVMBuildPhi(self.builder, result_type, "strmatch.result");
         c.LLVMAddIncoming(phi, &arm_vals_buf, &arm_from_bbs_buf, arm_count);
         return phi;
     }
