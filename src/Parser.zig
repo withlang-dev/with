@@ -26,10 +26,11 @@ source: []const u8,
 /// Pending `@[derive(...)]` trait names parsed from attributes that
 /// apply to the next top-level type declaration.
 pending_derive_traits: []const Ast.Symbol = &.{},
-/// Pending function attributes from `@[tailrec]`, `@[inline]`, `@[noinline]`.
+/// Pending function attributes from `@[tailrec]`, `@[inline]`, `@[noinline]`, `@[must_use]`.
 pending_tailrec: bool = false,
 pending_inline: bool = false,
 pending_noinline: bool = false,
+pending_must_use: bool = false,
 
 pub fn init(
     tokens: *const Token.List,
@@ -472,6 +473,7 @@ fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async
             .is_tailrec = self.pending_tailrec,
             .is_inline = self.pending_inline,
             .is_noinline = self.pending_noinline,
+            .is_must_use = self.pending_must_use,
         } },
         .span = start_span.merge(body.span),
     };
@@ -3188,6 +3190,7 @@ fn skipAttributes(self: *Parser) void {
     self.pending_tailrec = false;
     self.pending_inline = false;
     self.pending_noinline = false;
+    self.pending_must_use = false;
     var derives: std.ArrayList(Ast.Symbol) = .empty;
 
     while (self.peek() == .at) {
@@ -3228,6 +3231,9 @@ fn skipAttributes(self: *Parser) void {
             self.advance();
         } else if (self.isIdentifierNamed("noinline")) {
             self.pending_noinline = true;
+            self.advance();
+        } else if (self.isIdentifierNamed("must_use")) {
+            self.pending_must_use = true;
             self.advance();
         }
 

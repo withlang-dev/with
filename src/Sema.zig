@@ -222,6 +222,9 @@ trait_decls: std.AutoHashMapUnmanaged(Symbol, Ast.TraitDecl),
 /// Trait implementations: type name → list of trait names implemented.
 type_impls: std.AutoHashMapUnmanaged(Symbol, std.ArrayList(Symbol)),
 
+/// Functions marked @[must_use] — emit warning if return value is discarded.
+must_use_fns: std.AutoHashMapUnmanaged(Symbol, void) = .{},
+
 /// Active borrows in current function (Phase 3).
 active_borrows: std.ArrayList(Borrow),
 
@@ -522,6 +525,11 @@ fn collectFnDecl(self: *Sema, fn_decl: Ast.FnDecl) void {
         .param_types = param_types,
         .is_variadic = false,
     }) catch {};
+
+    // Track @[must_use] functions.
+    if (fn_decl.is_must_use) {
+        self.must_use_fns.put(self.allocator, fn_decl.name, {}) catch {};
+    }
 }
 
 fn collectExternFn(self: *Sema, ext: Ast.ExternFnDecl) void {
@@ -586,6 +594,19 @@ fn collectImplDecl(self: *Sema, id: Ast.ImplDecl) void {
     const gop = self.type_impls.getOrPut(self.allocator, id.type_name) catch return;
     if (!gop.found_existing) {
         gop.value_ptr.* = .empty;
+    } else {
+        // Coherence check: detect duplicate impl of the same trait for the same type.
+        for (gop.value_ptr.items) |existing_trait| {
+            if (existing_trait == trait_sym) {
+                var buf: [256]u8 = undefined;
+                const type_str = self.pool.resolve(id.type_name);
+                const trait_str = self.pool.resolve(trait_sym);
+                const msg = std.fmt.bufPrint(&buf, "duplicate implementation of trait '{s}' for type '{s}'", .{ trait_str, type_str }) catch "duplicate trait impl";
+                const alloc_msg = self.allocator.dupe(u8, msg) catch "duplicate trait impl";
+                self.emitWarning(alloc_msg, Span.zero);
+                break;
+            }
+        }
     }
     gop.value_ptr.append(self.allocator, trait_sym) catch {};
 }
@@ -704,8 +725,21 @@ pub fn resolveTypeExpr(self: *Sema, te: *const Ast.TypeExpr) TypeId {
             _ = self.resolveTypeExpr(inner);
             return error_type;
         },
-        .trait_object => {
-            // dyn Trait — trait object type. Treated as opaque for now.
+        .trait_object => |trait_sym| {
+            // dyn Trait — validate object safety.
+            if (self.trait_decls.get(trait_sym)) |td| {
+                for (td.methods) |method| {
+                    // Check that each method has at least one parameter (self).
+                    if (method.params.len == 0) {
+                        var buf: [256]u8 = undefined;
+                        const trait_str = self.pool.resolve(trait_sym);
+                        const method_str = self.pool.resolve(method.name);
+                        const msg = std.fmt.bufPrint(&buf, "trait '{s}' is not object-safe: method '{s}' has no self parameter", .{ trait_str, method_str }) catch "non-object-safe trait";
+                        const alloc_msg = self.allocator.dupe(u8, msg) catch "non-object-safe trait";
+                        self.emitWarning(alloc_msg, te.span);
+                    }
+                }
+            }
             return error_type;
         },
         .generic => {
@@ -766,6 +800,50 @@ fn checkFnBody(self: *Sema, fn_decl: Ast.FnDecl) void {
 
     // Check body.
     _ = self.checkExpr(fn_decl.body);
+
+    // Validate @[tailrec]: ensure there is at least one self-recursive call in tail position.
+    if (fn_decl.is_tailrec) {
+        if (!hasTailCall(fn_decl.body, fn_decl.name)) {
+            self.emitWarning("@[tailrec] function has no tail-recursive call to itself", fn_decl.body.span);
+        }
+    }
+}
+
+/// Check whether an expression contains a tail call to `fn_name`.
+/// A "tail position" is: the expression itself, the last expr of a block,
+/// the then/else branches of an if, or match arm bodies.
+fn hasTailCall(expr: *const Ast.Expr, fn_name: Symbol) bool {
+    return switch (expr.kind) {
+        .call => |call_e| {
+            // Direct call to fn_name is a tail call.
+            if (call_e.callee.kind == .ident) {
+                if (call_e.callee.kind.ident == fn_name) return true;
+            }
+            return false;
+        },
+        .block => |blk| {
+            // Tail position is the tail expression of the block.
+            if (blk.tail) |tail| return hasTailCall(tail, fn_name);
+            // Or the last statement if no tail.
+            if (blk.stmts.len > 0) return hasTailCall(blk.stmts[blk.stmts.len - 1], fn_name);
+            return false;
+        },
+        .if_expr => |if_e| {
+            // Tail position in both branches.
+            const then_ok = hasTailCall(if_e.then_body, fn_name);
+            const else_ok = if (if_e.else_body) |eb| hasTailCall(eb, fn_name) else false;
+            return then_ok or else_ok;
+        },
+        .match_expr => |match_e| {
+            // Any match arm body can be a tail call.
+            for (match_e.arms) |arm| {
+                if (hasTailCall(arm.body, fn_name)) return true;
+            }
+            return false;
+        },
+        .grouped => |inner| hasTailCall(inner, fn_name),
+        else => false,
+    };
 }
 
 // ── Expression type checking ─────────────────────────────────────
@@ -1055,6 +1133,16 @@ fn checkBlock(self: *Sema, blk: Ast.BlockExpr) TypeId {
 
     for (blk.stmts) |stmt| {
         _ = self.checkExpr(stmt);
+        // @[must_use]: warn if a @[must_use] function's return value is discarded.
+        if (stmt.kind == .call) {
+            const call_e = stmt.kind.call;
+            if (call_e.callee.kind == .ident) {
+                const fn_sym = call_e.callee.kind.ident;
+                if (self.must_use_fns.get(fn_sym) != null) {
+                    self.emitWarning("return value of @[must_use] function is discarded", stmt.span);
+                }
+            }
+        }
     }
 
     if (blk.tail) |tail| {
@@ -2208,6 +2296,10 @@ fn expireBorrowsInScope(self: *Sema, scope: *const Scope) void {
 
 fn emitError(self: *Sema, message: []const u8, span: Span) void {
     self.diagnostics.emit(Diagnostic.err(message, span));
+}
+
+fn emitWarning(self: *Sema, message: []const u8, span: Span) void {
+    self.diagnostics.emit(Diagnostic.warn(message, span));
 }
 
 // ── Type formatting (for error messages) ─────────────────────────

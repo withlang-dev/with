@@ -93,6 +93,7 @@ pub const FnDecl = struct {
     is_tailrec: bool = false,
     is_inline: bool = false,
     is_noinline: bool = false,
+    is_must_use: bool = false,
 };
 
 pub const ExternFnDecl = struct {
