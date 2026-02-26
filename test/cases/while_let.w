@@ -5,8 +5,7 @@ fn maybe(n: i32) -> Option[i32] =
 
 fn main() -> i32 =
     var i = 0
-    var x = 0
     while let Some(v) = maybe(i):
-        x = 1
+        let _v = v
         i = i + 1
-    i
+    if i == 3 then 0 else 1

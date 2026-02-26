@@ -1100,7 +1100,7 @@ fn parsePrecedence(self: *Parser, min_prec: u8) !*const Ast.Expr {
             continue;
         }
 
-        const rhs_min_prec = if (op_info.op == .default_op) op_info.prec else op_info.prec + 1;
+        const rhs_min_prec = if (op_info.op == .default_op or op_info.right_assoc) op_info.prec else op_info.prec + 1;
         const rhs = try self.parsePrecedence(rhs_min_prec);
 
         if (op_info.compose != .none) {
@@ -1141,6 +1141,7 @@ const InfixInfo = struct {
     compose: ComposeKind = .none,
     is_range: bool = false,
     inclusive: bool = false,
+    right_assoc: bool = false,
 };
 
 fn infixOp(self: *const Parser) ?InfixInfo {
@@ -1156,7 +1157,7 @@ fn infixOp(self: *const Parser) ?InfixInfo {
         .dot_dot => .{ .op = .add, .prec = 5, .is_range = true }, // op unused for range
         .dot_dot_eq => .{ .op = .add, .prec = 5, .is_range = true, .inclusive = true },
         .pipe_gt => .{ .op = .add, .prec = 6, .is_pipeline = true }, // op unused for pipeline
-        .lt_pipe => .{ .op = .add, .prec = 6, .is_pipeline = true, .reverse_pipeline = true },
+        .lt_pipe => .{ .op = .add, .prec = 6, .is_pipeline = true, .reverse_pipeline = true, .right_assoc = true },
         .lt_lt => .{ .op = .add, .prec = 6, .compose = .backward },
         .gt_gt => .{ .op = .add, .prec = 6, .compose = .forward },
         .ampersand => .{ .op = .bit_and, .prec = 7 },
@@ -2253,7 +2254,6 @@ fn parseWhileLet(self: *Parser, start: Span) !*const Ast.Expr {
     if (self.peek() == .colon) {
         self.advance();
     }
-    self.skipNewlines();
 
     const body = try self.parseBlockOrExpr();
 

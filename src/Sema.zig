@@ -281,6 +281,10 @@ in_pipeline_rhs: bool = false,
 in_comptime_fn: bool = false,
 /// Whether we're inside a defer expression (control flow is restricted).
 in_defer: bool = false,
+/// Type of the most recent break-with-value (for loop expression typing).
+break_value_type: ?TypeId = null,
+/// Nesting depth inside loops (for break/continue validation).
+loop_depth: u32 = 0,
 /// Active async scope binding symbols (`async scope |s|:`).
 active_async_scope_symbols: [16]Symbol = undefined,
 active_async_scope_depth: u32 = 0,
@@ -752,6 +756,16 @@ fn collectTypeDecl(self: *Sema, td: Ast.TypeDecl, span: Span) void {
 
             for (fields, 0..) |field, i| {
                 field_names[i] = field.name;
+                // Check for duplicate field names.
+                for (field_names[0..i]) |prev| {
+                    if (prev == field.name) {
+                        var buf: [256]u8 = undefined;
+                        const name_str = self.pool.resolve(field.name);
+                        const msg = std.fmt.bufPrint(&buf, "duplicate field '{s}' in struct", .{name_str}) catch "duplicate field in struct";
+                        self.emitError(self.allocator.dupe(u8, msg) catch "duplicate field in struct", field.span);
+                        break;
+                    }
+                }
                 if (typeExprContainsRef(field.type_expr)) {
                     self.emitError("ephemeral references cannot be stored in structs", field.span);
                 }
@@ -927,7 +941,11 @@ fn validateGenericTypeExpr(self: *Sema, te: *const Ast.TypeExpr, type_params: []
             self.emitError("unknown type", te.span);
         },
         .generic => |g| {
-            if (!typeParamExists(type_params, g.name) and self.named_types.get(g.name) == null) {
+            const base_name = self.pool.resolve(g.name);
+            if (!typeParamExists(type_params, g.name) and
+                self.named_types.get(g.name) == null and
+                !isBuiltinGenericTypeName(base_name))
+            {
                 self.emitError("unknown type", te.span);
             }
             for (g.args) |arg| {
@@ -1411,6 +1429,15 @@ fn isCollectionTypeName(name: []const u8) bool {
         std.mem.eql(u8, name, "SlotMap");
 }
 
+fn isBuiltinGenericTypeName(name: []const u8) bool {
+    return isCollectionTypeName(name) or
+        std.mem.eql(u8, name, "Option") or
+        std.mem.eql(u8, name, "Result") or
+        std.mem.eql(u8, name, "Task") or
+        std.mem.eql(u8, name, "Channel") or
+        std.mem.eql(u8, name, "Box");
+}
+
 fn typeExprIsCollectionWithRef(self: *Sema, te: *const Ast.TypeExpr) bool {
     return switch (te.kind) {
         .generic => |g| blk: {
@@ -1616,7 +1643,8 @@ fn checkFnBody(self: *Sema, fn_decl: Ast.FnDecl) void {
         null;
     const body_type = self.checkExprWithExpected(fn_decl.body, expected_body_ty);
     // If there is no explicit `return`, the body's value is the implicit return.
-    if (!fn_decl.is_gen and !hasExplicitReturn(fn_decl.body) and sig.return_type != error_type and body_type != error_type) {
+    // Void functions may have non-void body expressions (value is discarded).
+    if (!fn_decl.is_gen and !hasExplicitReturn(fn_decl.body) and sig.return_type != error_type and sig.return_type != self.ty_void and body_type != error_type) {
         if (self.isImplicitNarrowing(sig.return_type, body_type)) {
             self.emitError("E0201: implicit narrowing conversion", fn_decl.body.span);
         } else if (!self.typesCompatible(sig.return_type, body_type) and self.arithmeticResultType(sig.return_type, body_type) == error_type) {
@@ -1854,7 +1882,9 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
             const fits_i32 = val >= std.math.minInt(i32) and val <= std.math.maxInt(i32);
             return if (fits_i32) self.ty_i32 else self.ty_i64;
         },
-        .float_literal => self.ty_f64,
+        .float_literal => if (self.expected_expr_type) |exp| blk: {
+            break :blk if (self.getType(self.resolveAlias(exp)) == .float) exp else self.ty_f64;
+        } else self.ty_f64,
         .bool_literal => self.ty_bool,
         .string_literal => self.ty_str,
         .c_string_literal => self.addType(.{ .ptr_type = .{ .pointee = self.ty_i8, .is_mut = false } }),
@@ -1880,14 +1910,21 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
             if (self.in_defer) {
                 self.emitError("non-local control flow in defer: break is not allowed inside defer blocks", expr.span);
             }
+            if (self.loop_depth == 0) {
+                self.emitError("break outside of loop", expr.span);
+            }
             if (brk_val) |v| {
-                _ = self.checkExpr(v);
+                const vt = self.checkExpr(v);
+                if (vt != error_type) self.break_value_type = vt;
             }
             return self.ty_void;
         },
         .continue_expr => {
             if (self.in_defer) {
                 self.emitError("non-local control flow in defer: continue is not allowed inside defer blocks", expr.span);
+            }
+            if (self.loop_depth == 0) {
+                self.emitError("continue outside of loop", expr.span);
             }
             return self.ty_void;
         },
@@ -2335,6 +2372,12 @@ fn operatorOverloadReturnType(self: *Sema, op: Ast.BinOp, lhs: TypeId, rhs: Type
 }
 
 fn checkUnary(self: *Sema, un: Ast.UnaryExpr, span: Span) TypeId {
+    // Check non-local control flow in defer BEFORE operand type bail-out,
+    // because Option[T] resolves to error_type in sema and would mask this.
+    if (un.op == .try_op and self.in_defer) {
+        self.emitError("non-local control flow in defer: ? operator is not allowed inside defer blocks", un.operand.span);
+    }
+
     const operand = self.checkExpr(un.operand);
     if (operand == error_type) return error_type;
 
@@ -2842,13 +2885,21 @@ fn checkTupleDestructurePattern(self: *Sema, pattern: *const Ast.Pattern, subjec
 
 fn checkWhile(self: *Sema, while_e: Ast.WhileExpr) TypeId {
     _ = self.checkExpr(while_e.condition);
+    self.loop_depth += 1;
     _ = self.checkExpr(while_e.body);
+    self.loop_depth -= 1;
     return self.ty_void;
 }
 
 fn checkLoop(self: *Sema, body: *const Ast.Expr) TypeId {
+    const saved_break_type = self.break_value_type;
+    self.break_value_type = null;
+    self.loop_depth += 1;
     _ = self.checkExpr(body);
-    return self.ty_void;
+    self.loop_depth -= 1;
+    const result = self.break_value_type orelse self.ty_void;
+    self.break_value_type = saved_break_type;
+    return result;
 }
 
 fn exprDefinitelyDiverges(self: *Sema, expr: *const Ast.Expr) bool {
@@ -2915,7 +2966,9 @@ fn checkFor(self: *Sema, for_e: Ast.ForExpr) TypeId {
         });
     }
 
+    self.loop_depth += 1;
     _ = self.checkExpr(for_e.body);
+    self.loop_depth -= 1;
     return self.ty_void;
 }
 
@@ -3221,7 +3274,7 @@ fn checkMatchExpr(self: *Sema, m: Ast.MatchExpr) TypeId {
 }
 
 /// Check whether a match expression covers all possible values.
-/// Emits a warning for non-exhaustive matches on enum and bool types.
+/// Emits an error for non-exhaustive matches on enum and bool types.
 fn checkExhaustiveness(self: *Sema, m: Ast.MatchExpr, subject_type: TypeId) void {
     const resolved = self.resolveAlias(subject_type);
     const type_info = self.getType(resolved);
@@ -3253,8 +3306,8 @@ fn checkExhaustiveness(self: *Sema, m: Ast.MatchExpr, subject_type: TypeId) void
                 if (!covered) {
                     const name_str = self.pool.resolve(vn);
                     const msg = std.fmt.allocPrint(self.allocator, "non-exhaustive match: missing variant '{s}'", .{name_str}) catch return;
-                    self.diagnostics.emit(Diagnostic.warn(msg, m.subject.span));
-                    return; // One warning is enough.
+                    self.diagnostics.emit(Diagnostic.err(msg, m.subject.span));
+                    return; // One error is enough.
                 }
             }
         },
@@ -3271,7 +3324,7 @@ fn checkExhaustiveness(self: *Sema, m: Ast.MatchExpr, subject_type: TypeId) void
                 self.patternCoversBool(&arm.pattern, &has_true, &has_false);
             }
             if (!has_catchall and (!has_true or !has_false)) {
-                self.diagnostics.emit(Diagnostic.warn("non-exhaustive match on bool", m.subject.span));
+                self.diagnostics.emit(Diagnostic.err("non-exhaustive match on bool", m.subject.span));
             }
         },
         else => {
@@ -3544,6 +3597,21 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                             .span = pattern.span,
                         });
                     }
+                }
+                return;
+            }
+
+            // When subject type is unresolved (error_type), accept variant
+            // patterns permissively — this covers built-in Option[T]/Result[T,E]
+            // whose generic type expressions are not yet resolved in sema.
+            if (subject_resolved == error_type) {
+                for (vp.bindings) |binding_sym| {
+                    self.current_scope.put(self.allocator, binding_sym, .{
+                        .type_id = error_type,
+                        .is_mut = false,
+                        .state = .live,
+                        .span = pattern.span,
+                    });
                 }
                 return;
             }
@@ -3826,6 +3894,13 @@ fn checkPipeline(self: *Sema, p: Ast.PipelineExpr, _: Span) TypeId {
     if (!rhs_supported) {
         self.emitError("pipeline rhs must be a function name or direct function call", p.rhs.span);
         return error_type;
+    }
+    // For bare function names, the rhs_ty is a fn_type; extract the return type.
+    if (rhs_ty != error_type) {
+        const resolved = self.resolveAlias(rhs_ty);
+        if (self.getType(resolved) == .fn_type) {
+            return self.getType(resolved).fn_type.return_type;
+        }
     }
     return rhs_ty;
 }
@@ -4179,9 +4254,11 @@ fn checkMethodCall(self: *Sema, fa: Ast.FieldAccessExpr, args: []const *const As
     return error_type;
 }
 
+const TypeBinding = struct { param: Ast.Symbol, concrete: TypeId };
+
 fn checkGenericCall(self: *Sema, gen_fn: Ast.FnDecl, args: []const *const Ast.Expr, span: Span) TypeId {
     // Infer type parameter → concrete type bindings from call arguments.
-    var type_bindings: [16]struct { param: Ast.Symbol, concrete: TypeId } = undefined;
+    var type_bindings: [16]TypeBinding = undefined;
     var binding_count: u32 = 0;
 
     for (gen_fn.params, 0..) |param, i| {
@@ -4268,16 +4345,46 @@ fn checkGenericCall(self: *Sema, gen_fn: Ast.FnDecl, args: []const *const Ast.Ex
 
     // Return the return type annotation if available.
     if (gen_fn.return_type) |rt| {
-        if (rt.kind == .named) {
-            const ret_sym = rt.kind.named;
-            for (type_bindings[0..binding_count]) |b| {
-                if (b.param == ret_sym) return b.concrete;
-            }
-        }
-        const resolved = self.resolveTypeExpr(rt);
+        const resolved = self.resolveGenericReturnType(rt, type_bindings[0..binding_count]);
         if (resolved != error_type) return resolved;
     }
     return error_type;
+}
+
+fn resolveGenericReturnType(self: *Sema, te: *const Ast.TypeExpr, bindings: []const TypeBinding) TypeId {
+    switch (te.kind) {
+        .named => |sym| {
+            // Check if this is a bound type parameter.
+            for (bindings) |b| {
+                if (b.param == sym) return b.concrete;
+            }
+            // Otherwise resolve as a normal type.
+            return self.resolveTypeExpr(te);
+        },
+        .tuple_type => |elems| {
+            const elem_types = self.allocator.alloc(TypeId, elems.len) catch return error_type;
+            for (elems, 0..) |e, i| {
+                elem_types[i] = self.resolveGenericReturnType(e, bindings);
+            }
+            return self.addType(.{ .tuple_type = .{ .elements = elem_types } });
+        },
+        .optional => |inner| {
+            _ = self.resolveGenericReturnType(inner, bindings);
+            return error_type; // Option types resolved in codegen
+        },
+        .ref_type => |rt| {
+            const pointee = self.resolveGenericReturnType(rt.pointee, bindings);
+            return self.addType(.{ .ref_type = .{ .pointee = pointee, .is_mut = rt.is_mut } });
+        },
+        .ptr_type => |pt| {
+            const pointee = self.resolveGenericReturnType(pt.pointee, bindings);
+            return self.addType(.{ .ptr_type = .{ .pointee = pointee, .is_mut = pt.is_mut } });
+        },
+        .generic => {
+            return error_type; // Generic type apps resolved in codegen
+        },
+        else => return self.resolveTypeExpr(te),
+    }
 }
 
 fn checkBuiltinCall(self: *Sema, fn_sym: Symbol, args: []const *const Ast.Expr, arg_types: []const TypeId, span: Span) TypeId {
@@ -4554,6 +4661,16 @@ fn typesCompatible(self: *const Sema, expected: TypeId, actual: TypeId) bool {
     }
     if (exp_type == .enum_type and act_type == .enum_type) {
         return exp_type.enum_type.name == act_type.enum_type.name;
+    }
+
+    // Auto-referencing: T → &T (spec §3.8).
+    if (exp_type == .ref_type) {
+        if (self.typesCompatible(exp_type.ref_type.pointee, act_resolved)) return true;
+    }
+
+    // Reference-to-pointer coercion: &T → *const T, &mut T → *mut T.
+    if (exp_type == .ptr_type and act_type == .ref_type) {
+        return self.typesCompatible(exp_type.ptr_type.pointee, act_type.ref_type.pointee);
     }
 
     return false;

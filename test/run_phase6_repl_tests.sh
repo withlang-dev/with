@@ -59,6 +59,11 @@ expect_repl_contains $'1 + 2\n:quit\n' '3'
 # Positive: persistent binding across inputs.
 expect_repl_contains $'let x = 5\nx + 1\n:quit\n' '6'
 
+# Positive: mutation statements persist across inputs.
+expect_repl_contains $'let v = Vec.of(1, 2, 3)\nv.push(5)\nv.len()\n:quit\n' '4'
+expect_repl_contains $'var count = 0\ncount += 1\ncount += 1\ncount\n:quit\n' '2'
+expect_repl_contains $'let m: HashMap[str, i32] = HashMap.new()\nm.insert("a", 1)\nm.insert("b", 2)\nm.len()\n:quit\n' '2'
+
 # Positive: help and clear commands.
 expect_repl_contains $':help\n:quit\n' 'Commands:'
 expect_repl_contains $'let x = 9\n:clear\n:quit\n' '(cleared)'
