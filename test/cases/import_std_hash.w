@@ -17,4 +17,21 @@ fn main() -> i32 =
     let s3 = hash_str("abd")
     assert(s1 == s2)
     assert(s1 != s3)
+
+    var h1 = hasher()
+    h1.update_i64(10)
+    h1.update_str("abc")
+    let hv1 = h1.finish()
+
+    var h2 = default_hasher()
+    h2.update_i64(10)
+    h2.update_str("abc")
+    let hv2 = h2.finish()
+    assert(hv1 == hv2)
+
+    var h3 = hasher()
+    h3.update_str("abc")
+    h3.update_i64(10)
+    let hv3 = h3.finish()
+    assert(hv1 != hv3)
     0

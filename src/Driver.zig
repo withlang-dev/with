@@ -35,6 +35,12 @@ next_file_id: Span.FileId,
 pending_warnings: std.ArrayList([]const u8),
 /// Optimization level: 0=none, 1=basic, 2=standard, 3=aggressive.
 opt_level: u8,
+/// Link libraries requested by `use c_import(..., link: "...")`.
+c_import_link_libs: std.AutoHashMapUnmanaged(Ast.Symbol, void),
+/// In-memory cache for c_import expansions, keyed by header code text.
+c_import_cache: std.StringHashMapUnmanaged([]const Ast.Decl),
+/// Emit c_import cache hit/miss diagnostics to stderr when enabled.
+trace_c_import_cache: bool,
 
 pub fn init(allocator: std.mem.Allocator) Driver {
     return .{
@@ -47,6 +53,9 @@ pub fn init(allocator: std.mem.Allocator) Driver {
         .next_file_id = 1,
         .pending_warnings = .empty,
         .opt_level = 0,
+        .c_import_link_libs = .empty,
+        .c_import_cache = .empty,
+        .trace_c_import_cache = false,
     };
 }
 
@@ -61,6 +70,12 @@ pub fn deinit(self: *Driver) void {
     }
     self.imported_paths.deinit(self.allocator);
     self.pending_warnings.deinit(self.allocator);
+    self.c_import_link_libs.deinit(self.allocator);
+    var c_import_it = self.c_import_cache.iterator();
+    while (c_import_it.next()) |entry| {
+        self.allocator.free(@constCast(entry.key_ptr.*));
+    }
+    self.c_import_cache.deinit(self.allocator);
 }
 
 /// Compile a single source file through the current pipeline.
@@ -100,6 +115,15 @@ pub fn compileFile(self: *Driver, path: []const u8) !?Ast.Module {
 
 /// Compile from an already-loaded Source.
 pub fn compileSource(self: *Driver, source: *Source) !?Ast.Module {
+    // Reset per-compilation-unit c_import link directives.
+    self.c_import_link_libs.clearRetainingCapacity();
+    self.trace_c_import_cache = blk: {
+        const value = std.process.getEnvVarOwned(self.allocator, "WITH_TRACE_CIMPORT_CACHE") catch
+            break :blk false;
+        defer self.allocator.free(value);
+        break :blk value.len > 0 and !std.mem.eql(u8, value, "0");
+    };
+
     // Phase 1: Lex.
     var lexer = Lexer.init(source.text, source.file_id, &self.diagnostics);
     var tokens = try lexer.tokenize(self.allocator);
@@ -169,13 +193,15 @@ pub fn compileToObject(self: *Driver, module: *const Ast.Module, output_path: [*
     };
     defer cg.deinit();
 
-    cg.genModule(module, &self.pool) catch {
+    cg.genModule(module, &self.pool) catch |err| {
         if (cg.comptime_error_msg) |msg| {
             self.writeStderr("error: comptime_error: ");
             self.writeStderr(msg);
             self.writeStderr("\n");
         } else {
-            self.writeStderr("error: code generation failed\n");
+            self.writeStderr("error: code generation failed (");
+            self.writeStderr(@errorName(err));
+            self.writeStderr(")\n");
         }
         return null;
     };
@@ -201,13 +227,15 @@ pub fn emitIR(self: *Driver, module: *const Ast.Module) !bool {
     };
     defer cg.deinit();
 
-    cg.genModule(module, &self.pool) catch {
+    cg.genModule(module, &self.pool) catch |err| {
         if (cg.comptime_error_msg) |msg| {
             self.writeStderr("error: comptime_error: ");
             self.writeStderr(msg);
             self.writeStderr("\n");
         } else {
-            self.writeStderr("error: code generation failed\n");
+            self.writeStderr("error: code generation failed (");
+            self.writeStderr(@errorName(err));
+            self.writeStderr(")\n");
         }
         return false;
     };
@@ -218,12 +246,25 @@ pub fn emitIR(self: *Driver, module: *const Ast.Module) !bool {
 
 /// Link an object file into a binary using the system linker.
 pub fn link(obj_path: []const u8, bin_path: []const u8) !bool {
-    return linkWithExtra(obj_path, bin_path, &.{});
+    return linkWithExtraAndLibs(obj_path, bin_path, &.{}, &.{});
 }
 
 /// Link with extra object files (e.g., fiber runtime for async programs).
 pub fn linkWithExtra(obj_path: []const u8, bin_path: []const u8, extra_objs: []const []const u8) !bool {
-    var args_buf: [32][]const u8 = undefined;
+    return linkWithExtraAndLibs(obj_path, bin_path, extra_objs, &.{});
+}
+
+fn linkWithExtraAndLibs(
+    obj_path: []const u8,
+    bin_path: []const u8,
+    extra_objs: []const []const u8,
+    link_libs: []const []const u8,
+) !bool {
+    var args_buf: [64][]const u8 = undefined;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const arena_alloc = arena.allocator();
+
     var argc: usize = 0;
     args_buf[argc] = "cc";
     argc += 1;
@@ -237,6 +278,11 @@ pub fn linkWithExtra(obj_path: []const u8, bin_path: []const u8, extra_objs: []c
     argc += 1;
     args_buf[argc] = bin_path;
     argc += 1;
+    for (link_libs) |lib| {
+        if (argc >= args_buf.len) return false;
+        args_buf[argc] = std.fmt.allocPrint(arena_alloc, "-l{s}", .{lib}) catch return false;
+        argc += 1;
+    }
 
     var child = std.process.Child.init(args_buf[0..argc], std.heap.page_allocator);
     _ = child.spawn() catch |e| {
@@ -280,6 +326,12 @@ pub fn buildBinary(self: *Driver, source_path: []const u8) !?[]const u8 {
     const uses_async = try self.compileToObject(&module, obj_buf[0..obj_path.len :0]);
     if (uses_async == null) return null;
 
+    var link_libs: std.ArrayList([]const u8) = .empty;
+    var link_libs_it = self.c_import_link_libs.iterator();
+    while (link_libs_it.next()) |entry| {
+        link_libs.append(self.arena.allocator(), self.pool.resolve(entry.key_ptr.*)) catch return null;
+    }
+
     // Find runtime objects relative to the compiler binary.
     const exe_dir = self.findExeDir();
 
@@ -294,23 +346,23 @@ pub fn buildBinary(self: *Driver, source_path: []const u8) !?[]const u8 {
     const link_ok = if (uses_async.?) blk: {
         const ed = exe_dir orelse {
             if (helpers_path) |hp| {
-                break :blk try linkWithExtra(obj_path, bin_path, &.{hp});
+                break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{hp}, link_libs.items);
             }
-            break :blk try link(obj_path, bin_path);
+            break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{}, link_libs.items);
         };
         var rt1_buf: [4096]u8 = undefined;
         var rt2_buf: [4096]u8 = undefined;
-        const rt1 = std.fmt.bufPrint(&rt1_buf, "{s}/runtime/fiber.o", .{ed}) catch break :blk try link(obj_path, bin_path);
-        const rt2 = std.fmt.bufPrint(&rt2_buf, "{s}/runtime/fiber_asm.o", .{ed}) catch break :blk try link(obj_path, bin_path);
+        const rt1 = std.fmt.bufPrint(&rt1_buf, "{s}/runtime/fiber.o", .{ed}) catch break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{}, link_libs.items);
+        const rt2 = std.fmt.bufPrint(&rt2_buf, "{s}/runtime/fiber_asm.o", .{ed}) catch break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{}, link_libs.items);
         if (helpers_path) |hp| {
-            break :blk try linkWithExtra(obj_path, bin_path, &.{ rt1, rt2, hp });
+            break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{ rt1, rt2, hp }, link_libs.items);
         }
-        break :blk try linkWithExtra(obj_path, bin_path, &.{ rt1, rt2 });
+        break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{ rt1, rt2 }, link_libs.items);
     } else blk: {
         if (helpers_path) |hp| {
-            break :blk try linkWithExtra(obj_path, bin_path, &.{hp});
+            break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{hp}, link_libs.items);
         }
-        break :blk try link(obj_path, bin_path);
+        break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{}, link_libs.items);
     };
 
     if (!link_ok) {
@@ -364,7 +416,7 @@ fn processImports(self: *Driver, module: Ast.Module) ImportError!Ast.Module {
 
             // Try to resolve the use path to a file.
             const file_path = self.resolveModulePath(use.path) catch {
-                // Unresolvable import — keep the use_decl (Sema ignores it)
+                self.diagnostics.emit(Diagnostic.err("failed to resolve import path", decl.span));
                 try new_decls.append(arena_alloc, decl);
                 continue;
             };
@@ -389,7 +441,7 @@ fn processImports(self: *Driver, module: Ast.Module) ImportError!Ast.Module {
 
                 // Parse the imported file.
                 const imported_decls = self.parseImportedFile(path) catch {
-                    // Failed to parse — keep original use_decl
+                    self.diagnostics.emit(Diagnostic.err("failed to parse imported module", decl.span));
                     try new_decls.append(arena_alloc, decl);
                     continue;
                 };
@@ -397,7 +449,7 @@ fn processImports(self: *Driver, module: Ast.Module) ImportError!Ast.Module {
                 // Add all declarations from the imported file.
                 try new_decls.appendSlice(arena_alloc, imported_decls);
             } else {
-                // No file found — keep the use_decl
+                self.diagnostics.emit(Diagnostic.err("import module not found", decl.span));
                 try new_decls.append(arena_alloc, decl);
             }
         } else {
@@ -516,12 +568,36 @@ fn processCImports(self: *Driver, module: Ast.Module) !Ast.Module {
 
     for (module.decls) |decl| {
         if (decl.kind == .c_import) {
-            const synthetic = try CImport.processCImport(
+            for (decl.kind.c_import.link_libs) |lib| {
+                try self.c_import_link_libs.put(self.allocator, lib, {});
+            }
+            const cache_key = try self.makeCImportCacheKey(
                 decl.kind.c_import.header_code,
-                arena_alloc,
-                &self.pool,
+                decl.kind.c_import.link_libs,
             );
-            try new_decls.appendSlice(arena_alloc, synthetic);
+            var cache_key_owned = true;
+            defer if (cache_key_owned) self.allocator.free(cache_key);
+
+            if (self.c_import_cache.get(cache_key)) |cached| {
+                if (self.trace_c_import_cache) self.writeStderr("c_import cache hit\n");
+                try new_decls.appendSlice(arena_alloc, cached);
+            } else {
+                if (self.trace_c_import_cache) self.writeStderr("c_import cache miss\n");
+                const synthetic = CImport.processCImport(
+                    decl.kind.c_import.header_code,
+                    arena_alloc,
+                    &self.pool,
+                ) catch |err| {
+                    self.writeStderr("error: c_import processing failed for header snippet: ");
+                    const preview_len = @min(decl.kind.c_import.header_code.len, 80);
+                    self.writeStderr(decl.kind.c_import.header_code[0..preview_len]);
+                    self.writeStderr("\n");
+                    return err;
+                };
+                try self.c_import_cache.put(self.allocator, cache_key, synthetic);
+                cache_key_owned = false;
+                try new_decls.appendSlice(arena_alloc, synthetic);
+            }
         } else {
             try new_decls.append(arena_alloc, decl);
         }
@@ -534,6 +610,32 @@ fn processCImports(self: *Driver, module: Ast.Module) !Ast.Module {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
+
+fn makeCImportCacheKey(
+    self: *Driver,
+    header_code: []const u8,
+    link_libs: []const Ast.Symbol,
+) ![]u8 {
+    var key: std.ArrayList(u8) = .empty;
+    errdefer key.deinit(self.allocator);
+
+    try key.appendSlice(self.allocator, header_code);
+    try key.appendSlice(self.allocator, "\n#links:");
+    for (link_libs) |lib_sym| {
+        try key.append(self.allocator, '|');
+        try key.appendSlice(self.allocator, self.pool.resolve(lib_sym));
+    }
+
+    // Optional global cache-epoch override for explicit invalidation.
+    const epoch = std.process.getEnvVarOwned(self.allocator, "WITH_CIMPORT_CACHE_EPOCH") catch "";
+    defer if (epoch.len > 0) self.allocator.free(epoch);
+    if (epoch.len > 0) {
+        try key.appendSlice(self.allocator, "\n#epoch:");
+        try key.appendSlice(self.allocator, epoch);
+    }
+
+    return key.toOwnedSlice(self.allocator);
+}
 
 fn fileExists(path: []const u8) bool {
     const file = std.fs.cwd().openFile(path, .{}) catch return false;

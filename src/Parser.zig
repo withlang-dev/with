@@ -148,22 +148,22 @@ fn parseDecl(self: *Parser) !Ast.Decl {
     }
 
     return switch (self.peek()) {
-        .kw_fn => self.parseFnDecl(is_pub, start_span, false, false),
+        .kw_fn => self.parseFnDecl(is_pub, start_span, false, false, false),
         .kw_comptime => blk: {
             self.advance(); // consume 'comptime'
             if (self.peek() != .kw_fn) {
                 self.emitError("expected 'fn' after 'comptime'");
                 return error.ParseError;
             }
-            break :blk self.parseFnDecl(is_pub, start_span, false, false);
+            break :blk self.parseFnDecl(is_pub, start_span, false, false, true);
         },
         .kw_async => blk: {
             self.advance();
-            break :blk self.parseFnDecl(is_pub, start_span, true, false);
+            break :blk self.parseFnDecl(is_pub, start_span, true, false, false);
         },
         .kw_gen => blk: {
             self.advance();
-            break :blk self.parseFnDecl(is_pub, start_span, false, true);
+            break :blk self.parseFnDecl(is_pub, start_span, false, true, false);
         },
         .kw_type => self.parseTypeDecl(is_pub, start_span),
         .kw_use => self.parseUseDecl(start_span),
@@ -175,18 +175,47 @@ fn parseDecl(self: *Parser) !Ast.Decl {
             self.advance(); // consume 'error'
             const err_name = try self.expectIdentifier();
             if (self.isIdentifierNamed("from")) {
-                // `error AppError from IoError` — alias for conversion-compatible error families.
+                // `error AppError from IoError, ParseError` — desugar to wrapper enum.
                 self.advance(); // consume 'from'
-                const base_sym = try self.expectIdentifier();
-                const base_ty = try self.arena.create(Ast.TypeExpr);
-                base_ty.* = .{
-                    .kind = .{ .named = base_sym },
-                    .span = self.prevSpan(),
-                };
+
+                var variants: std.ArrayList(Ast.VariantDef) = .empty;
+                while (true) {
+                    const src_start = self.currentSpan();
+                    const src_sym = try self.expectIdentifier();
+                    const src_span = self.prevSpan();
+
+                    const src_ty = try self.arena.create(Ast.TypeExpr);
+                    src_ty.* = .{
+                        .kind = .{ .named = src_sym },
+                        .span = src_span,
+                    };
+
+                    const src_name = self.pool.resolve(src_sym);
+                    const suffix = "Error";
+                    const variant_text = if (src_name.len > suffix.len and std.mem.endsWith(u8, src_name, suffix))
+                        src_name[0 .. src_name.len - suffix.len]
+                    else
+                        src_name;
+                    const variant_name = self.pool.intern(variant_text) catch return error.ParseError;
+
+                    const payload = try self.arena.alloc(*const Ast.TypeExpr, 1);
+                    payload[0] = src_ty;
+                    try variants.append(self.arena, .{
+                        .name = variant_name,
+                        .payload = payload,
+                        .span = src_start.merge(src_span),
+                    });
+
+                    if (self.peek() != .comma) break;
+                    self.advance();
+                    self.skipNewlines();
+                }
+
+                const variant_slice = try variants.toOwnedSlice(self.arena);
                 break :blk .{
                     .kind = .{ .type_decl = .{
                         .name = err_name,
-                        .kind = .{ .alias = base_ty },
+                        .kind = .{ .enum_def = variant_slice },
                         .is_pub = is_pub,
                     } },
                     .span = start_span.merge(self.prevSpan()),
@@ -325,6 +354,7 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
             .name = method_name,
             .params = params,
             .return_type = return_type,
+            .has_type_params = trait_method_tps.len > 0,
             .has_default = has_default,
             .default_body = default_body,
             .span = method_start.merge(self.prevSpan()),
@@ -454,7 +484,14 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
     return methods.items;
 }
 
-fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async: bool, is_gen: bool) !Ast.Decl {
+fn parseFnDecl(
+    self: *Parser,
+    is_pub: Ast.Visibility,
+    start_span: Span,
+    is_async: bool,
+    is_gen: bool,
+    is_comptime: bool,
+) !Ast.Decl {
     try self.expect(.kw_fn);
     var name = try self.expectIdentifier();
     // Support method syntax: `fn Type.method(...)` → mangled name `Type.method`
@@ -500,6 +537,7 @@ fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async
             .body = body,
             .is_async = is_async,
             .is_gen = is_gen,
+            .is_comptime = is_comptime,
             .is_pub = is_pub,
             .is_tailrec = self.pending_tailrec,
             .is_inline = self.pending_inline,
@@ -521,33 +559,58 @@ fn injectParamDestructures(
 
     var prefix_stmts: std.ArrayList(*const Ast.Expr) = .empty;
     for (destructures) |d| {
-        for (d.field_names) |field_sym| {
-            const param_ident = try self.arena.create(Ast.Expr);
-            param_ident.* = .{
-                .kind = .{ .ident = d.param_name },
-                .span = d.span,
-            };
+        switch (d.kind) {
+            .struct_fields => |fields| {
+                for (fields) |field| {
+                    if (field.binding_name == 0) continue; // wildcard
 
-            const field_access = try self.arena.create(Ast.Expr);
-            field_access.* = .{
-                .kind = .{ .field_access = .{
-                    .expr = param_ident,
-                    .field = field_sym,
-                } },
-                .span = d.span,
-            };
+                    const param_ident = try self.arena.create(Ast.Expr);
+                    param_ident.* = .{
+                        .kind = .{ .ident = d.param_name },
+                        .span = d.span,
+                    };
 
-            const let_node = try self.arena.create(Ast.Expr);
-            let_node.* = .{
-                .kind = .{ .let_binding = .{
-                    .name = field_sym,
-                    .type_expr = null,
-                    .value = field_access,
-                    .is_mut = false,
-                } },
-                .span = d.span,
-            };
-            try prefix_stmts.append(self.arena, let_node);
+                    const field_access = try self.arena.create(Ast.Expr);
+                    field_access.* = .{
+                        .kind = .{ .field_access = .{
+                            .expr = param_ident,
+                            .field = field.field_name,
+                        } },
+                        .span = d.span,
+                    };
+
+                    const let_node = try self.arena.create(Ast.Expr);
+                    let_node.* = .{
+                        .kind = .{ .let_binding = .{
+                            .name = field.binding_name,
+                            .type_expr = null,
+                            .value = field_access,
+                            .is_mut = false,
+                        } },
+                        .span = d.span,
+                    };
+                    try prefix_stmts.append(self.arena, let_node);
+                }
+            },
+            .tuple_pattern => |pat| {
+                const param_ident = try self.arena.create(Ast.Expr);
+                param_ident.* = .{
+                    .kind = .{ .ident = d.param_name },
+                    .span = d.span,
+                };
+
+                const tuple_node = try self.arena.create(Ast.Expr);
+                tuple_node.* = .{
+                    .kind = .{ .tuple_destructure = .{
+                        .names = &.{},
+                        .pattern = pat,
+                        .value = param_ident,
+                        .is_mut = false,
+                    } },
+                    .span = d.span,
+                };
+                try prefix_stmts.append(self.arena, tuple_node);
+            },
         }
     }
 
@@ -617,6 +680,8 @@ fn parseTypeDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span) !Ast.D
 
     try self.expect(.kw_type);
     const name = try self.expectIdentifier();
+    var type_params = try self.parseTypeParams();
+    try self.parseOptionalWhereClause(&type_params);
     try self.expect(.eq);
     self.skipNewlines();
 
@@ -656,8 +721,10 @@ fn parseTypeDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span) !Ast.D
     return .{
         .kind = .{ .type_decl = .{
             .name = name,
+            .type_params = type_params,
             .kind = kind,
             .is_pub = is_pub,
+            .derive_traits = derive_traits,
         } },
         .span = start_span.merge(self.prevSpan()),
     };
@@ -792,9 +859,58 @@ fn parseUseDecl(self: *Parser, start_span: Span) !Ast.Decl {
         // Process escape sequences (especially \n for multi-include strings)
         const header_code = self.processEscapes(unquoted) catch unquoted;
         self.advance(); // consume string literal
+
+        var link_libs: std.ArrayList(Ast.Symbol) = .empty;
+        if (self.peek() == .comma) {
+            self.advance(); // consume ','
+            self.skipNewlines();
+
+            if (self.peek() != .identifier) {
+                self.emitError("expected 'link: \"lib\"' after c_import header string");
+                return error.ParseError;
+            }
+            const arg_name = try self.expectIdentifier();
+            if (!std.mem.eql(u8, self.pool.resolve(arg_name), "link")) {
+                self.emitError("expected 'link:' named argument");
+                return error.ParseError;
+            }
+            try self.expect(.colon);
+            self.skipNewlines();
+
+            if (self.peek() != .string_literal) {
+                self.emitError("expected library string after 'link:'");
+                return error.ParseError;
+            }
+            while (self.peek() == .string_literal) {
+                const lib_span = self.currentSpan();
+                const lib_raw = self.source[lib_span.start .. lib_span.end];
+                const lib_unquoted = if (lib_raw.len >= 2 and lib_raw[0] == '"' and lib_raw[lib_raw.len - 1] == '"')
+                    lib_raw[1 .. lib_raw.len - 1]
+                else
+                    lib_raw;
+                const lib_name = self.processEscapes(lib_unquoted) catch lib_unquoted;
+                try link_libs.append(self.arena, try self.pool.intern(lib_name));
+                self.advance(); // consume string literal
+                self.skipNewlines();
+                if (self.peek() == .comma) {
+                    const comma_pos = self.pos;
+                    self.advance();
+                    self.skipNewlines();
+                    if (self.peek() == .string_literal) {
+                        continue;
+                    }
+                    self.pos = comma_pos;
+                }
+                break;
+            }
+        }
+
         try self.expect(.r_paren);
         return .{
-            .kind = .{ .c_import = .{ .header_code = header_code } },
+            .kind = .{ .c_import = .{
+                .header_code = header_code,
+                .link_libs = link_libs.items,
+            } },
             .span = start_span.merge(self.prevSpan()),
         };
     }
@@ -840,6 +956,11 @@ fn parseUseDecl(self: *Parser, start_span: Span) !Ast.Decl {
         } else {
             break;
         }
+    }
+
+    if (path.items.len == 0) {
+        self.emitError("expected import path after 'use'");
+        return error.ParseError;
     }
 
     // Skip any remaining tokens on this line (handles unknown function-call-like syntax)
@@ -979,7 +1100,8 @@ fn parsePrecedence(self: *Parser, min_prec: u8) !*const Ast.Expr {
             continue;
         }
 
-        const rhs = try self.parsePrecedence(op_info.prec + 1);
+        const rhs_min_prec = if (op_info.op == .default_op) op_info.prec else op_info.prec + 1;
+        const rhs = try self.parsePrecedence(rhs_min_prec);
 
         if (op_info.compose != .none) {
             lhs = try self.buildComposedClosure(lhs, rhs, op_info.compose);
@@ -1112,6 +1234,7 @@ fn parsePrimary(self: *Parser) !*const Ast.Expr {
         .int_literal => return self.parseIntLiteral(),
         .float_literal => return self.parseFloatLiteral(),
         .string_literal => return self.parseStringLiteral(),
+        .c_string_literal => return self.parseCStringLiteral(),
         .true_literal, .false_literal => return self.parseBoolLiteral(),
         .identifier => return self.parseIdentOrCall(),
         .dot_identifier => return self.parseVariantShorthand(),
@@ -1127,6 +1250,7 @@ fn parsePrimary(self: *Parser) !*const Ast.Expr {
         .kw_return => return self.parseReturn(),
         .kw_break => return self.parseBreak(),
         .kw_continue => return self.parseContinue(),
+        .kw_unsafe => return self.parseUnsafe(),
         .kw_defer => return self.parseDefer(),
         .kw_spawn => return self.parseSpawn(),
         .kw_async => return self.parseAsyncExpr(),
@@ -1195,6 +1319,21 @@ fn parseStringLiteral(self: *Parser) !*const Ast.Expr {
     const node = try self.arena.create(Ast.Expr);
     node.* = .{
         .kind = .{ .string_literal = sym },
+        .span = span,
+    };
+    return node;
+}
+
+fn parseCStringLiteral(self: *Parser) !*const Ast.Expr {
+    const span = self.currentSpan();
+    // Strip c"..." delimiters: skip leading c" and trailing "
+    const text = self.source[span.start..span.end];
+    const raw = if (text.len >= 3) text[2 .. text.len - 1] else "";
+    const sym = try self.pool.intern(raw);
+    self.advance();
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .c_string_literal = sym },
         .span = span,
     };
     return node;
@@ -1442,66 +1581,41 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
                 lhs = node;
             },
             .question_dot => {
-                // Optional chaining: `opt?.field`
-                // Desugars to: match opt { Some(v) -> Some(v.field), None -> None }
+                // Optional chaining: `opt?.field` / `opt?.method(args)`
                 self.advance(); // consume '?.'
-                const field = if (self.peek() == .int_literal) blk: {
+                const member = if (self.peek() == .int_literal) blk: {
                     const sym = try self.internCurrent();
                     self.advance();
                     break :blk sym;
                 } else try self.expectIdentifier();
-                const end = self.prevSpan();
+                var end = self.prevSpan();
 
-                // Build: `v` ident for payload
-                const v_sym = try self.pool.intern("__opt_v");
-                const v_ident = try self.arena.create(Ast.Expr);
-                v_ident.* = .{ .kind = .{ .ident = v_sym }, .span = lhs.span };
-
-                // Build: `v.field`
-                const field_node = try self.arena.create(Ast.Expr);
-                field_node.* = .{
-                    .kind = .{ .field_access = .{ .expr = v_ident, .field = field } },
-                    .span = lhs.span.merge(end),
-                };
-
-                // Build: `Some(v.field)`
-                const some_sym = try self.pool.intern("Some");
-                const some_callee = try self.arena.create(Ast.Expr);
-                some_callee.* = .{ .kind = .{ .ident = some_sym }, .span = lhs.span };
-                const some_args = try self.arena.alloc(*const Ast.Expr, 1);
-                some_args[0] = field_node;
-                const some_call = try self.arena.create(Ast.Expr);
-                some_call.* = .{
-                    .kind = .{ .call = .{ .callee = some_callee, .args = some_args } },
-                    .span = lhs.span.merge(end),
-                };
-
-                // Build: `None`
-                const none_sym = try self.pool.intern("None");
-                const none_node = try self.arena.create(Ast.Expr);
-                none_node.* = .{ .kind = .{ .ident = none_sym }, .span = lhs.span };
-
-                // Build match arms.
-                var arms: std.ArrayList(Ast.MatchArm) = .empty;
-                const some_bindings = try self.arena.alloc(Ast.Symbol, 1);
-                some_bindings[0] = v_sym;
-                try arms.append(self.arena, .{
-                    .pattern = .{
-                        .kind = .{ .variant = .{ .name = some_sym, .bindings = some_bindings } },
-                        .span = lhs.span,
-                    },
-                    .body = some_call,
-                    .span = lhs.span.merge(end),
-                });
-                try arms.append(self.arena, .{
-                    .pattern = .{ .kind = .wildcard, .span = lhs.span },
-                    .body = none_node,
-                    .span = lhs.span,
-                });
+                var args: ?[]const *const Ast.Expr = null;
+                if (self.peek() == .l_paren) {
+                    self.advance(); // consume '('
+                    var parsed_args: std.ArrayList(*const Ast.Expr) = .empty;
+                    self.skipNewlines();
+                    if (self.peek() != .r_paren) {
+                        while (true) {
+                            try parsed_args.append(self.arena, try self.parseExpr());
+                            self.skipNewlines();
+                            if (self.peek() != .comma) break;
+                            self.advance();
+                            self.skipNewlines();
+                        }
+                    }
+                    end = self.currentSpan();
+                    try self.expect(.r_paren);
+                    args = parsed_args.items;
+                }
 
                 const node = try self.arena.create(Ast.Expr);
                 node.* = .{
-                    .kind = .{ .match_expr = .{ .subject = lhs, .arms = arms.items } },
+                    .kind = .{ .optional_chain = .{
+                        .expr = lhs,
+                        .member = member,
+                        .args = args,
+                    } },
                     .span = lhs.span.merge(end),
                 };
                 lhs = node;
@@ -1677,32 +1791,43 @@ fn parseIfExpr(self: *Parser) !*const Ast.Expr {
 }
 
 fn parseIfLet(self: *Parser, start: Span) !*const Ast.Expr {
-    const IfLetClause = struct {
-        pattern: Ast.Pattern,
-        subject: *const Ast.Expr,
+    const IfClause = union(enum) {
+        let_clause: struct {
+            pattern: Ast.Pattern,
+            subject: *const Ast.Expr,
+        },
+        cond_expr: *const Ast.Expr,
     };
 
     self.advance(); // consume 'let'
-    var clauses: std.ArrayList(IfLetClause) = .empty;
+    var clauses: std.ArrayList(IfClause) = .empty;
 
     const first_pattern = try self.parsePattern();
     try self.expect(.eq);
     const first_subject = try self.parseExpr();
-    try clauses.append(self.arena, .{ .pattern = first_pattern, .subject = first_subject });
+    try clauses.append(self.arena, .{ .let_clause = .{
+        .pattern = first_pattern,
+        .subject = first_subject,
+    } });
 
-    // Chained form: `if let A = x, let B = y, ...`
+    // Chained form: `if let A = x, let B = y, cond, ...`
     while (self.peek() == .comma) {
         self.advance();
         self.skipNewlines();
-        if (self.peek() != .kw_let) {
-            self.emitError("expected 'let' after ',' in if-let chain");
-            return error.ParseError;
+        if (self.peek() == .kw_let) {
+            self.advance(); // consume 'let'
+            const p = try self.parsePattern();
+            try self.expect(.eq);
+            const s = try self.parseExpr();
+            try clauses.append(self.arena, .{ .let_clause = .{
+                .pattern = p,
+                .subject = s,
+            } });
+        } else {
+            // Boolean clause in mixed if-let chain.
+            const cond = try self.parseExpr();
+            try clauses.append(self.arena, .{ .cond_expr = cond });
         }
-        self.advance(); // consume 'let'
-        const p = try self.parsePattern();
-        try self.expect(.eq);
-        const s = try self.parseExpr();
-        try clauses.append(self.arena, .{ .pattern = p, .subject = s });
     }
 
     // Expect then/colon delimiter.
@@ -1741,27 +1866,42 @@ fn parseIfLet(self: *Parser, start: Span) !*const Ast.Expr {
     var i: usize = clauses.items.len;
     while (i > 0) {
         i -= 1;
-        const clause = clauses.items[i];
-        var arms: std.ArrayList(Ast.MatchArm) = .empty;
-        try arms.append(self.arena, .{
-            .pattern = clause.pattern,
-            .body = acc,
-            .span = start.merge(acc.span),
-        });
-        try arms.append(self.arena, .{
-            .pattern = .{ .kind = .wildcard, .span = start },
-            .body = else_expr,
-            .span = start.merge(else_expr.span),
-        });
-        const node = try self.arena.create(Ast.Expr);
-        node.* = .{
-            .kind = .{ .match_expr = .{
-                .subject = clause.subject,
-                .arms = arms.items,
-            } },
-            .span = start.merge(acc.span),
-        };
-        acc = node;
+        switch (clauses.items[i]) {
+            .let_clause => |clause| {
+                var arms: std.ArrayList(Ast.MatchArm) = .empty;
+                try arms.append(self.arena, .{
+                    .pattern = clause.pattern,
+                    .body = acc,
+                    .span = start.merge(acc.span),
+                });
+                try arms.append(self.arena, .{
+                    .pattern = .{ .kind = .wildcard, .span = start },
+                    .body = else_expr,
+                    .span = start.merge(else_expr.span),
+                });
+                const node = try self.arena.create(Ast.Expr);
+                node.* = .{
+                    .kind = .{ .match_expr = .{
+                        .subject = clause.subject,
+                        .arms = arms.items,
+                    } },
+                    .span = start.merge(acc.span),
+                };
+                acc = node;
+            },
+            .cond_expr => |cond| {
+                const node = try self.arena.create(Ast.Expr);
+                node.* = .{
+                    .kind = .{ .if_expr = .{
+                        .condition = cond,
+                        .then_body = acc,
+                        .else_body = else_expr,
+                    } },
+                    .span = start.merge(acc.span),
+                };
+                acc = node;
+            },
+        }
     }
 
     return acc;
@@ -1793,6 +1933,17 @@ fn parseDefer(self: *Parser) !*const Ast.Expr {
         .span = start.merge(body.span),
     };
     return node;
+}
+
+fn parseUnsafe(self: *Parser) !*const Ast.Expr {
+    const start = self.currentSpan();
+    self.advance(); // consume 'unsafe'
+    self.diagnostics.emit(Diagnostic.warn(
+        "E0901: unnecessary unsafe block",
+        start,
+    ));
+    if (self.peek() == .colon) self.advance();
+    return self.parseBlockOrExpr();
 }
 
 fn parseYield(self: *Parser) !*const Ast.Expr {
@@ -1908,37 +2059,40 @@ fn parseAsyncExpr(self: *Parser) !*const Ast.Expr {
     }
 
     if (self.peek() == .colon) self.advance();
-    self.skipNewlines();
+    // Let parseBlockOrExpr see the newline so it can parse an indented block.
     const body = try self.parseBlockOrExpr();
     const node = try self.arena.create(Ast.Expr);
     node.* = .{
-        .kind = .{ .grouped = body },
+        .kind = .{ .async_block = body },
         .span = start.merge(body.span),
     };
     return node;
 }
 
 /// Parse `async scope |name|: body`.
-/// For now, scope tracking is a no-op in the AST; the block is consumed for syntax coverage.
 fn parseAsyncScopeExpr(self: *Parser, start: Span) !*const Ast.Expr {
     self.advance(); // consume 'scope'
 
+    var scope_name: Ast.Symbol = self.pool.intern("s") catch return error.OutOfMemory;
     if (self.peek() == .pipe) {
         self.advance();
-        if (self.peek() == .identifier) _ = try self.expectIdentifier();
+        if (self.peek() == .identifier) scope_name = try self.expectIdentifier();
         try self.expect(.pipe);
     }
 
     if (self.peek() == .colon) self.advance();
-    self.skipNewlines();
-    _ = try self.parseBlockOrExpr();
+    // Let parseBlockOrExpr see the newline so it can parse an indented block.
+    const body = try self.parseBlockOrExpr();
 
-    const zero = try self.arena.create(Ast.Expr);
-    zero.* = .{
-        .kind = .{ .int_literal = 0 },
-        .span = start,
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .async_scope = .{
+            .name = scope_name,
+            .body = body,
+        } },
+        .span = start.merge(body.span),
     };
-    return zero;
+    return node;
 }
 
 // Parse `with expr as [mut] name: body` or `with expr as [mut] name,... : body`
@@ -2163,13 +2317,26 @@ fn parseFor(self: *Parser) !*const Ast.Expr {
     const start = self.currentSpan();
     self.advance(); // consume 'for'
     self.skipNewlines();
-    const binding = try self.expectIdentifier();
-
-    // Optional index binding: `for x, i in arr`
+    var binding: Ast.Symbol = 0;
+    var binding_pattern: ?Ast.Pattern = null;
     var index_binding: ?Ast.Symbol = null;
-    if (self.peek() == .comma) {
-        self.advance(); // consume ','
-        index_binding = try self.expectIdentifier();
+
+    if (self.peek() == .l_paren) {
+        // Tuple destructuring in for loop: `for (a, b) in items:`
+        const pat = try self.parsePattern();
+        if (pat.kind != .tuple_pattern) {
+            self.emitError("expected tuple pattern in for loop");
+            return error.ParseError;
+        }
+        binding_pattern = pat;
+    } else {
+        binding = try self.expectIdentifier();
+
+        // Optional index binding: `for x, i in arr`
+        if (self.peek() == .comma) {
+            self.advance(); // consume ','
+            index_binding = try self.expectIdentifier();
+        }
     }
 
     try self.expect(.kw_in);
@@ -2186,6 +2353,7 @@ fn parseFor(self: *Parser) !*const Ast.Expr {
     node.* = .{
         .kind = .{ .for_expr = .{
             .binding = binding,
+            .binding_pattern = binding_pattern,
             .index_binding = index_binding,
             .iterable = iterable,
             .body = body,
@@ -2220,11 +2388,12 @@ fn parseMatchArms(self: *Parser) ![]const Ast.MatchArm {
 
     // Parse arms: `pattern -> body` separated by newlines
     while (self.peek() != .eof) {
-        // Check if we are still at a match arm (identifier, int literal, underscore, dot_identifier, true/false, [ for slice patterns)
+        // Check if we are still at a match arm (identifier/int/dot_identifier/true/false/string/minus/[/( for patterns)
         const tag = self.peek();
         if (tag != .identifier and tag != .int_literal and
             tag != .dot_identifier and tag != .true_literal and tag != .false_literal and
-            tag != .string_literal and tag != .minus and tag != .l_bracket)
+            tag != .string_literal and tag != .minus and tag != .l_bracket and
+            tag != .l_paren)
         {
             break;
         }
@@ -2285,7 +2454,8 @@ fn parseMatchArms(self: *Parser) ![]const Ast.MatchArm {
         const next_tag = self.peek();
         const is_arm_token = (next_tag == .identifier or next_tag == .int_literal or
             next_tag == .dot_identifier or next_tag == .true_literal or next_tag == .false_literal or
-            next_tag == .string_literal or next_tag == .minus or next_tag == .l_bracket);
+            next_tag == .string_literal or next_tag == .minus or next_tag == .l_bracket or
+            next_tag == .l_paren);
         if (!is_arm_token) {
             self.pos = save;
             break;
@@ -2437,6 +2607,27 @@ fn parsePattern(self: *Parser) !Ast.Pattern {
                 .span = span,
             };
         },
+        .l_paren => {
+            // Tuple pattern: `(a, b)` or nested `(x, (y, z))`
+            self.advance(); // consume '('
+            var elems: std.ArrayList(Ast.Pattern) = .empty;
+
+            if (self.peek() != .r_paren) {
+                try elems.append(self.arena, try self.parsePattern());
+                while (self.peek() == .comma) {
+                    self.advance();
+                    self.skipNewlines();
+                    // Allow trailing comma.
+                    if (self.peek() == .r_paren) break;
+                    try elems.append(self.arena, try self.parsePattern());
+                }
+            }
+            try self.expect(.r_paren);
+            return .{
+                .kind = .{ .tuple_pattern = elems.items },
+                .span = span.merge(self.prevSpan()),
+            };
+        },
         .l_bracket => {
             // Slice pattern: [a, b, ..rest]
             self.advance(); // consume '['
@@ -2449,6 +2640,14 @@ fn parsePattern(self: *Parser) !Ast.Pattern {
             while (self.peek() != .r_bracket and self.peek() != .eof) {
                 // Check for `..` or `..name` (rest pattern)
                 if (self.peek() == .dot_dot or self.peek() == .dot_dot_eq) {
+                    if (self.peek() == .dot_dot_eq) {
+                        self.emitError("slice rest pattern uses '..', not '..='");
+                        return error.ParseError;
+                    }
+                    if (has_rest) {
+                        self.emitError("slice pattern can contain only one '..' rest");
+                        return error.ParseError;
+                    }
                     has_rest = true;
                     self.advance(); // consume ..
                     // Optional rest binding name
@@ -2519,7 +2718,10 @@ fn parseClosure(self: *Parser) !*const Ast.Expr {
     try self.expect(.pipe);
     self.skipNewlines();
 
-    const body = try self.parseExpr();
+    const body = if (self.peek() == .colon) blk: {
+        self.advance(); // consume ':'
+        break :blk try self.parseBlockOrExpr();
+    } else try self.parseExpr();
 
     const node = try self.arena.create(Ast.Expr);
     node.* = .{
@@ -2680,14 +2882,15 @@ fn parseLetBinding(self: *Parser) !*const Ast.Expr {
 }
 
 fn parseTupleDestructure(self: *Parser, start: Span, is_mut: bool) !*const Ast.Expr {
-    self.advance(); // consume '('
-    var names: std.ArrayList(Ast.Symbol) = .empty;
-    try names.append(self.arena, try self.expectIdentifier());
-    while (self.peek() == .comma) {
-        self.advance();
-        try names.append(self.arena, try self.expectIdentifier());
+    const pattern = try self.parsePattern();
+    if (pattern.kind != .tuple_pattern) {
+        self.emitError("expected tuple destructuring pattern");
+        return error.ParseError;
     }
-    try self.expect(.r_paren);
+
+    var names: std.ArrayList(Ast.Symbol) = .empty;
+    try self.collectPatternBindings(&pattern, &names);
+
     try self.expect(.eq);
     self.skipNewlines();
     const value = try self.parseExpr();
@@ -2696,12 +2899,53 @@ fn parseTupleDestructure(self: *Parser, start: Span, is_mut: bool) !*const Ast.E
     node.* = .{
         .kind = .{ .tuple_destructure = .{
             .names = names.items,
+            .pattern = pattern,
             .value = value,
             .is_mut = is_mut,
         } },
         .span = start.merge(value.span),
     };
     return node;
+}
+
+fn collectPatternBindings(self: *Parser, pattern: *const Ast.Pattern, out: *std.ArrayList(Ast.Symbol)) !void {
+    switch (pattern.kind) {
+        .binding => |sym| {
+            const name = self.pool.resolve(sym);
+            if (!std.mem.eql(u8, name, "_")) {
+                try out.append(self.arena, sym);
+            }
+        },
+        .tuple_pattern => |elems| {
+            for (elems) |*elem| {
+                try self.collectPatternBindings(elem, out);
+            }
+        },
+        .at_binding => |ab| {
+            try out.append(self.arena, ab.name);
+            try self.collectPatternBindings(ab.pattern, out);
+        },
+        .variant => |vp| {
+            for (vp.bindings) |b| {
+                try out.append(self.arena, b);
+            }
+        },
+        .slice_pattern => |sp| {
+            for (sp.head) |s| {
+                if (s != 0) try out.append(self.arena, s);
+            }
+            if (sp.has_rest and sp.rest != 0) try out.append(self.arena, sp.rest);
+            for (sp.tail) |s| {
+                if (s != 0) try out.append(self.arena, s);
+            }
+        },
+        .or_pattern => |alts| {
+            for (alts) |*alt| {
+                try self.collectPatternBindings(alt, out);
+            }
+        },
+        else => {},
+    }
 }
 
 fn parseArrayLiteral(self: *Parser) !*const Ast.Expr {
@@ -2716,10 +2960,19 @@ fn parseArrayLiteral(self: *Parser) !*const Ast.Expr {
         // Check for comprehension: [expr for x in iter] or [expr for x in iter if cond]
         if (self.peek() == .kw_for) {
             const map_expr = elems.items[0];
-            self.advance(); // consume 'for'
-            const binding = try self.expectIdentifier();
-            try self.expect(.kw_in);
-            const iterable = try self.parseExpr();
+            var clauses: std.ArrayList(Ast.ComprehensionClause) = .empty;
+            self.advance(); // consume first 'for'
+            while (true) {
+                const binding = try self.expectIdentifier();
+                try self.expect(.kw_in);
+                const iterable = try self.parseExpr();
+                try clauses.append(self.arena, .{
+                    .binding = binding,
+                    .iterable = iterable,
+                });
+                if (self.peek() != .kw_for) break;
+                self.advance(); // consume next 'for'
+            }
             // Optional filter: if cond
             var filter: ?*const Ast.Expr = null;
             if (self.peek() == .kw_if) {
@@ -2732,9 +2985,10 @@ fn parseArrayLiteral(self: *Parser) !*const Ast.Expr {
             node.* = .{
                 .kind = .{ .array_comprehension = .{
                     .expr = map_expr,
-                    .binding = binding,
-                    .iterable = iterable,
+                    .binding = clauses.items[0].binding,
+                    .iterable = clauses.items[0].iterable,
                     .filter = filter,
+                    .clauses = clauses.items,
                 } },
                 .span = start.merge(end),
             };
@@ -3007,8 +3261,18 @@ fn parseTypeExpr(self: *Parser) !*const Ast.TypeExpr {
 
 const ParamDestructure = struct {
     param_name: Ast.Symbol,
-    field_names: []const Ast.Symbol,
+    kind: Kind,
     span: Span,
+
+    const StructField = struct {
+        field_name: Ast.Symbol,
+        binding_name: Ast.Symbol, // 0 for wildcard `_`
+    };
+
+    const Kind = union(enum) {
+        struct_fields: []const StructField,
+        tuple_pattern: Ast.Pattern,
+    };
 };
 
 fn parseParamList(self: *Parser, destructures_out: ?*std.ArrayList(ParamDestructure)) ![]const Ast.Param {
@@ -3030,17 +3294,32 @@ fn parseParam(self: *Parser, destructures_out: ?*std.ArrayList(ParamDestructure)
     const is_mut = self.peek() == .kw_mut;
     if (is_mut) self.advance();
 
-    // Destructuring parameter pattern: `{ x, y }: Type`
+    // Destructuring parameter pattern: `{ x, y }: Type` or `{ x: x1, y: y1 }: Type`
     if (self.peek() == .l_brace) {
         self.advance(); // consume '{'
-        var field_names: std.ArrayList(Ast.Symbol) = .empty;
+        var fields: std.ArrayList(ParamDestructure.StructField) = .empty;
         if (self.peek() != .r_brace) {
-            try field_names.append(self.arena, try self.expectIdentifier());
-            while (self.peek() == .comma) {
+            while (true) {
+                const field_name = try self.expectIdentifier();
+                var binding_name = field_name;
+                if (self.peek() == .colon) {
+                    self.advance();
+                    const bind = try self.expectIdentifier();
+                    const bind_text = self.pool.resolve(bind);
+                    if (std.mem.eql(u8, bind_text, "_")) {
+                        binding_name = 0;
+                    } else {
+                        binding_name = bind;
+                    }
+                }
+                try fields.append(self.arena, .{
+                    .field_name = field_name,
+                    .binding_name = binding_name,
+                });
+                if (self.peek() != .comma) break;
                 self.advance();
                 self.skipNewlines();
                 if (self.peek() == .r_brace) break;
-                try field_names.append(self.arena, try self.expectIdentifier());
             }
         }
         try self.expect(.r_brace);
@@ -3054,7 +3333,37 @@ fn parseParam(self: *Parser, destructures_out: ?*std.ArrayList(ParamDestructure)
         if (destructures_out) |out| {
             try out.append(self.arena, .{
                 .param_name = param_name,
-                .field_names = field_names.items,
+                .kind = .{ .struct_fields = fields.items },
+                .span = start.merge(self.prevSpan()),
+            });
+        }
+
+        return .{
+            .name = param_name,
+            .type_expr = type_expr,
+            .is_mut = is_mut,
+            .span = start.merge(self.prevSpan()),
+        };
+    }
+
+    // Tuple parameter destructuring: `(a, b): (i32, i32)`
+    if (self.peek() == .l_paren) {
+        const pattern = try self.parsePattern();
+        if (pattern.kind != .tuple_pattern) {
+            self.emitError("parameter tuple destructuring requires tuple pattern");
+            return error.ParseError;
+        }
+        try self.expect(.colon);
+        const type_expr = try self.parseTypeExpr();
+
+        var synth_buf: [64]u8 = undefined;
+        const synth_name = std.fmt.bufPrint(&synth_buf, "__arg_{d}", .{start.start}) catch return error.ParseError;
+        const param_name = self.pool.intern(synth_name) catch return error.ParseError;
+
+        if (destructures_out) |out| {
+            try out.append(self.arena, .{
+                .param_name = param_name,
+                .kind = .{ .tuple_pattern = pattern },
                 .span = start.merge(self.prevSpan()),
             });
         }
@@ -3151,8 +3460,10 @@ fn parseOptionalWhereClause(self: *Parser, type_params: *[]const Ast.TypeParam) 
 
         // Merge into existing type_params.
         const params = type_params.*;
+        var matched_param = false;
         for (params, 0..) |tp, idx| {
             if (tp.name == param_name) {
+                matched_param = true;
                 // Combine existing bounds with new ones.
                 var combined: std.ArrayList(Ast.Symbol) = .empty;
                 for (tp.bounds) |b| {
@@ -3168,6 +3479,10 @@ fn parseOptionalWhereClause(self: *Parser, type_params: *[]const Ast.TypeParam) 
                 type_params.* = new_params;
                 break;
             }
+        }
+        if (!matched_param) {
+            self.emitError("where clause references unknown type parameter");
+            return error.ParseError;
         }
 
         if (self.peek() != .comma) break;

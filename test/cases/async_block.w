@@ -1,4 +1,4 @@
-// Phase 4 gap: async block syntax not implemented
+// Test: async block lowering and await
 fn main() -> i32 =
     let t = async:
         21 * 2

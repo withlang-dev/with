@@ -1,4 +1,4 @@
-// Phase 4 gap: Task.cancel() runtime API not implemented
+// Test: phase4 Task.cancel() basic behavior
 async fn work() -> i32 = 1
 
 fn main() -> i32 =

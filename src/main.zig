@@ -13,6 +13,7 @@ const Source = @import("Source.zig");
 const Lexer = @import("Lexer.zig");
 const Token = @import("Token.zig");
 const Diagnostic = @import("Diagnostic.zig");
+const Migrate = @import("Migrate.zig");
 
 pub fn main() !void {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
@@ -142,11 +143,21 @@ pub fn main() !void {
             std.process.exit(1);
         }
     } else if (std.mem.eql(u8, command, "test")) {
-        const target = if (args.len >= 3) args[2] else "test/cases";
+        var target: []const u8 = "test/cases";
+        var update_snapshots = false;
+        if (args.len >= 3) {
+            for (args[2..]) |arg| {
+                if (std.mem.eql(u8, arg, "--update")) {
+                    update_snapshots = true;
+                } else {
+                    target = arg;
+                }
+            }
+        }
         // The test runner may compile many modules in one process.
         // Use page allocator here to avoid noisy leak diagnostics from
         // long-lived compiler caches that are intentionally process-scoped.
-        const ok = try runTests(target, std.heap.page_allocator);
+        const ok = try runTests(target, update_snapshots, std.heap.page_allocator);
         if (!ok) std.process.exit(1);
     } else if (std.mem.eql(u8, command, "fmt")) {
         if (args.len < 3) {
@@ -154,6 +165,26 @@ pub fn main() !void {
             printUsage();
             std.process.exit(1);
         }
+        const source_text = std.fs.cwd().readFileAlloc(allocator, args[2], 2 * 1024 * 1024) catch {
+            stderrPrint("error: failed to read source file for formatting\n");
+            std.process.exit(1);
+        };
+        defer allocator.free(source_text);
+
+        // Temporary comment-preserving strategy:
+        // render-based formatting currently drops comments, so if comments are
+        // present we keep source text verbatim until comment-aware CST fmt lands.
+        if (std.mem.indexOf(u8, source_text, "//") != null) {
+            var out_buf: [16384]u8 = undefined;
+            var out = std.fs.File.stdout().writer(&out_buf);
+            out.interface.writeAll(source_text) catch {};
+            if (source_text.len == 0 or source_text[source_text.len - 1] != '\n') {
+                out.interface.writeAll("\n") catch {};
+            }
+            out.interface.flush() catch {};
+            return;
+        }
+
         var driver = Driver.init(allocator);
         defer driver.deinit();
 
@@ -184,6 +215,49 @@ pub fn main() !void {
             std.process.exit(1);
         }
         try generateDoc(args[2], allocator);
+    } else if (std.mem.eql(u8, command, "migrate")) {
+        if (args.len < 4) {
+            stderrPrint("error: 'migrate' requires <lang> and <path>\n");
+            printUsage();
+            std.process.exit(1);
+        }
+
+        var mode: Migrate.Mode = .write;
+        for (args[4..]) |arg| {
+            if (std.mem.eql(u8, arg, "--check")) {
+                if (mode != .write) {
+                    stderrPrint("error: choose only one of --check or --diff\n");
+                    std.process.exit(1);
+                }
+                mode = .check;
+            } else if (std.mem.eql(u8, arg, "--diff")) {
+                if (mode != .write) {
+                    stderrPrint("error: choose only one of --check or --diff\n");
+                    std.process.exit(1);
+                }
+                mode = .diff;
+            } else {
+                var err_buf: [512]u8 = undefined;
+                const msg = std.fmt.bufPrint(&err_buf, "error: unknown migrate flag '{s}'\n", .{arg}) catch "error: unknown migrate flag\n";
+                stderrPrint(msg);
+                std.process.exit(1);
+            }
+        }
+
+        const code = Migrate.run(allocator, args[2], args[3], mode) catch |err| {
+            switch (err) {
+                error.UnsupportedLanguage => stderrPrint("error: unsupported migrate language (use rust|zig|swift)\n"),
+                error.InvalidPath => stderrPrint("error: migrate path not found or unsupported\n"),
+                error.NoInputFiles => stderrPrint("error: no source files found for selected language\n"),
+                else => {
+                    var err_buf: [512]u8 = undefined;
+                    const msg = std.fmt.bufPrint(&err_buf, "error: migrate failed ({s})\n", .{@errorName(err)}) catch "error: migrate failed\n";
+                    stderrPrint(msg);
+                },
+            }
+            std.process.exit(1);
+        };
+        if (code != 0) std.process.exit(@intCast(code));
     } else if (std.mem.eql(u8, command, "lsp")) {
         const Lsp = @import("Lsp.zig");
         var lsp = Lsp.init(allocator);
@@ -225,6 +299,8 @@ fn printUsage() void {
         \\  repl              Interactive REPL
         \\  lsp               Start language server (LSP over stdio)
         \\  doc <file.w>      Generate documentation (markdown)
+        \\  migrate <lang> <path> [--check|--diff]
+        \\                    Translate rust/zig/swift sources to .w
         \\  ir <file.w>       Dump LLVM IR (debug)
         \\  ast <file.w>      Parse and dump the AST (debug)
         \\  tokens <file.w>   Lex and dump tokens (debug)
@@ -418,6 +494,28 @@ fn generateDoc(path: []const u8, allocator: std.mem.Allocator) !void {
     const basename = std.fs.path.basename(path);
     try w.print("# {s}\n\n", .{basename});
 
+    // Index with cross-links.
+    try w.writeAll("## Index\n\n");
+    for (module.decls) |decl| {
+        switch (decl.kind) {
+            .function => |f| {
+                const name = pool.resolve(f.name);
+                if (std.mem.eql(u8, name, "main")) continue;
+                try w.print("- [fn `{s}`](#fn-{s})\n", .{ name, name });
+            },
+            .type_decl => |td| {
+                const name = pool.resolve(td.name);
+                try w.print("- [type `{s}`](#type-{s})\n", .{ name, name });
+            },
+            .trait_decl => |td| {
+                const name = pool.resolve(td.name);
+                try w.print("- [trait `{s}`](#trait-{s})\n", .{ name, name });
+            },
+            else => {},
+        }
+    }
+    try w.writeAll("\n");
+
     // Walk declarations
     for (module.decls) |decl| {
         switch (decl.kind) {
@@ -428,9 +526,9 @@ fn generateDoc(path: []const u8, allocator: std.mem.Allocator) !void {
 
                 // Extract doc comment
                 const doc = extractDocComment(source_text, decl.span.start);
-                if (doc.len > 0 and std.mem.indexOf(u8, doc, "//") != null) {
-                    try w.print("{s}\n", .{doc});
-                }
+                try w.print("<a id=\"fn-{s}\"></a>\n", .{name});
+                try w.print("### fn `{s}`\n\n", .{name});
+                try emitDocCommentAndExamples(w, doc);
 
                 // Function signature
                 try w.writeAll("```\n");
@@ -473,9 +571,8 @@ fn generateDoc(path: []const u8, allocator: std.mem.Allocator) !void {
             .type_decl => |td| {
                 const name = pool.resolve(td.name);
                 const doc = extractDocComment(source_text, decl.span.start);
-                if (doc.len > 0 and std.mem.indexOf(u8, doc, "//") != null) {
-                    try w.print("{s}\n", .{doc});
-                }
+                try w.print("<a id=\"type-{s}\"></a>\n", .{name});
+                try emitDocCommentAndExamples(w, doc);
 
                 switch (td.kind) {
                     .struct_def => |fields| {
@@ -521,9 +618,8 @@ fn generateDoc(path: []const u8, allocator: std.mem.Allocator) !void {
             .trait_decl => |td| {
                 const name = pool.resolve(td.name);
                 const doc = extractDocComment(source_text, decl.span.start);
-                if (doc.len > 0 and std.mem.indexOf(u8, doc, "//") != null) {
-                    try w.print("{s}\n", .{doc});
-                }
+                try w.print("<a id=\"trait-{s}\"></a>\n", .{name});
+                try emitDocCommentAndExamples(w, doc);
                 try w.print("### trait `{s}`\n\n", .{name});
                 for (td.associated_types) |at| {
                     try w.print("- `type {s}`\n", .{pool.resolve(at.name)});
@@ -584,18 +680,52 @@ fn extractDocComment(source: []const u8, decl_start: usize) []const u8 {
     return "";
 }
 
+fn emitDocCommentAndExamples(w: anytype, doc: []const u8) !void {
+    if (doc.len == 0) return;
+
+    var found_text = false;
+    var example_line: ?[]const u8 = null;
+
+    var it = std.mem.splitScalar(u8, doc, '\n');
+    while (it.next()) |raw_line| {
+        var line = std.mem.trim(u8, raw_line, " \t\r");
+        if (line.len >= 2 and line[0] == '/' and line[1] == '/') {
+            line = std.mem.trimLeft(u8, line[2..], " \t");
+        }
+        if (line.len == 0) continue;
+
+        if (std.mem.startsWith(u8, line, "example:")) {
+            if (example_line == null) {
+                example_line = std.mem.trimLeft(u8, line["example:".len..], " \t");
+            }
+            continue;
+        }
+
+        try w.print("{s}\n", .{line});
+        found_text = true;
+    }
+
+    if (found_text) try w.writeAll("\n");
+
+    if (example_line) |ex| {
+        try w.writeAll("**Example**\n\n```with\n");
+        try w.print("{s}\n", .{ex});
+        try w.writeAll("```\n\n");
+    }
+}
+
 const TestSummary = struct {
     passed: usize = 0,
     failed: usize = 0,
     skipped: usize = 0,
 };
 
-fn runTests(target: []const u8, allocator: std.mem.Allocator) !bool {
+fn runTests(target: []const u8, update_snapshots: bool, allocator: std.mem.Allocator) !bool {
     var summary: TestSummary = .{};
     const cwd = std.fs.cwd();
 
     if (std.mem.endsWith(u8, target, ".w")) {
-        try runOneTest(target, allocator, &summary);
+        try runOneTest(target, update_snapshots, allocator, &summary);
         printTestSummary(&summary);
         return summary.failed == 0;
     }
@@ -616,14 +746,14 @@ fn runTests(target: []const u8, allocator: std.mem.Allocator) !bool {
         if (!std.mem.endsWith(u8, entry.name, ".w")) continue;
         const path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ target, entry.name });
         defer allocator.free(path);
-        try runOneTest(path, allocator, &summary);
+        try runOneTest(path, update_snapshots, allocator, &summary);
     }
 
     printTestSummary(&summary);
     return summary.failed == 0;
 }
 
-fn runOneTest(path: []const u8, allocator: std.mem.Allocator, summary: *TestSummary) !void {
+fn runOneTest(path: []const u8, update_snapshots: bool, allocator: std.mem.Allocator, summary: *TestSummary) !void {
     const source = std.fs.cwd().readFileAlloc(allocator, path, 2 * 1024 * 1024) catch |e| {
         summary.failed += 1;
         testStatus("FAIL", path, e);
@@ -647,6 +777,24 @@ fn runOneTest(path: []const u8, allocator: std.mem.Allocator, summary: *TestSumm
         return;
     }
     const bin_path = bin_path_opt.?;
+    const expected_exit = loadExpectedExit(path, allocator) catch |e| {
+        summary.failed += 1;
+        testStatus("FAIL", path, e);
+        return;
+    };
+    const expected_stdout = loadExpectedOutput(path, allocator, "stdout") catch |e| {
+        summary.failed += 1;
+        testStatus("FAIL", path, e);
+        return;
+    };
+    defer if (expected_stdout) |buf| allocator.free(buf);
+    const expected_stderr = loadExpectedOutput(path, allocator, "stderr") catch |e| {
+        summary.failed += 1;
+        testStatus("FAIL", path, e);
+        return;
+    };
+    defer if (expected_stderr) |buf| allocator.free(buf);
+
     // Clean up binary and object file after test completes.
     defer std.fs.cwd().deleteFile(bin_path) catch {};
     defer {
@@ -663,11 +811,27 @@ fn runOneTest(path: []const u8, allocator: std.mem.Allocator, summary: *TestSumm
     }
 
     var child = std.process.Child.init(&.{bin_path}, allocator);
+    child.stdout_behavior = .Pipe;
+    child.stderr_behavior = .Pipe;
     _ = child.spawn() catch |e| {
         summary.failed += 1;
         testStatus("FAIL", path, e);
         return;
     };
+
+    const actual_stdout = child.stdout.?.readToEndAlloc(allocator, 64 * 1024) catch |e| {
+        summary.failed += 1;
+        testStatus("FAIL", path, e);
+        return;
+    };
+    defer allocator.free(actual_stdout);
+
+    const actual_stderr = child.stderr.?.readToEndAlloc(allocator, 64 * 1024) catch |e| {
+        summary.failed += 1;
+        testStatus("FAIL", path, e);
+        return;
+    };
+    defer allocator.free(actual_stderr);
 
     const term = child.wait() catch |e| {
         summary.failed += 1;
@@ -675,20 +839,124 @@ fn runOneTest(path: []const u8, allocator: std.mem.Allocator, summary: *TestSumm
         return;
     };
 
-    if (term == .Exited and term.Exited == 0) {
+    const snapshot_text = formatSnapshot(term, actual_stdout, actual_stderr, allocator) catch |e| {
+        summary.failed += 1;
+        testStatus("FAIL", path, e);
+        return;
+    };
+    defer allocator.free(snapshot_text);
+    const snapshot_path = expectationPath(path, "expected", allocator) catch |e| {
+        summary.failed += 1;
+        testStatus("FAIL", path, e);
+        return;
+    };
+    defer allocator.free(snapshot_path);
+    const existing_snapshot = std.fs.cwd().readFileAlloc(allocator, snapshot_path, 128 * 1024) catch |e| switch (e) {
+        error.FileNotFound => null,
+        else => {
+            summary.failed += 1;
+            testStatus("FAIL", path, e);
+            return;
+        },
+    };
+    defer if (existing_snapshot) |buf| allocator.free(buf);
+
+    if (existing_snapshot) |expected_snapshot| {
+        if (!std.mem.eql(u8, expected_snapshot, snapshot_text)) {
+            if (update_snapshots) {
+                std.fs.cwd().writeFile(.{ .sub_path = snapshot_path, .data = snapshot_text }) catch |e| {
+                    summary.failed += 1;
+                    testStatus("FAIL", path, e);
+                    return;
+                };
+            } else {
+                summary.failed += 1;
+                testStatusMsg("FAIL", path, "snapshot mismatch");
+                return;
+            }
+        }
         summary.passed += 1;
         testStatusMsg("PASS", path, "");
-    } else {
-        summary.failed += 1;
-        var msg_buf: [64]u8 = undefined;
-        const msg = if (term == .Exited)
-            std.fmt.bufPrint(&msg_buf, "exit {d}", .{term.Exited}) catch "nonzero exit"
-        else if (term == .Signal)
-            std.fmt.bufPrint(&msg_buf, "signal {d}", .{term.Signal}) catch "signal"
-        else
-            "abnormal termination";
-        testStatusMsg("FAIL", path, msg);
+        return;
+    } else if (update_snapshots) {
+        std.fs.cwd().writeFile(.{ .sub_path = snapshot_path, .data = snapshot_text }) catch |e| {
+            summary.failed += 1;
+            testStatus("FAIL", path, e);
+            return;
+        };
+        summary.passed += 1;
+        testStatusMsg("PASS", path, "");
+        return;
     }
+
+    if (term != .Exited) {
+        summary.failed += 1;
+        testStatusMsg("FAIL", path, "abnormal termination");
+        return;
+    }
+
+    if (@as(i32, term.Exited) != expected_exit) {
+        summary.failed += 1;
+        var msg_buf: [96]u8 = undefined;
+        const msg = std.fmt.bufPrint(&msg_buf, "exit {d} (expected {d})", .{ term.Exited, expected_exit }) catch "exit code mismatch";
+        testStatusMsg("FAIL", path, msg);
+        return;
+    }
+
+    if (expected_stdout) |exp| {
+        if (!std.mem.eql(u8, exp, actual_stdout)) {
+            summary.failed += 1;
+            testStatusMsg("FAIL", path, "stdout mismatch");
+            return;
+        }
+    }
+
+    if (expected_stderr) |exp| {
+        if (!std.mem.eql(u8, exp, actual_stderr)) {
+            summary.failed += 1;
+            testStatusMsg("FAIL", path, "stderr mismatch");
+            return;
+        }
+    }
+
+    summary.passed += 1;
+    testStatusMsg("PASS", path, "");
+}
+
+fn expectationPath(path: []const u8, suffix: []const u8, allocator: std.mem.Allocator) ![]const u8 {
+    const stem = if (std.mem.endsWith(u8, path, ".w")) path[0 .. path.len - 2] else path;
+    return std.fmt.allocPrint(allocator, "{s}.{s}", .{ stem, suffix });
+}
+
+fn loadExpectedOutput(path: []const u8, allocator: std.mem.Allocator, suffix: []const u8) !?[]u8 {
+    const exp_path = try expectationPath(path, suffix, allocator);
+    defer allocator.free(exp_path);
+
+    return std.fs.cwd().readFileAlloc(allocator, exp_path, 64 * 1024) catch |e| switch (e) {
+        error.FileNotFound => null,
+        else => return e,
+    };
+}
+
+fn loadExpectedExit(path: []const u8, allocator: std.mem.Allocator) !i32 {
+    const maybe_buf = try loadExpectedOutput(path, allocator, "exit");
+    defer if (maybe_buf) |buf| allocator.free(buf);
+
+    if (maybe_buf == null) return 0;
+    const raw = maybe_buf.?;
+    const trimmed = std.mem.trim(u8, raw, " \t\r\n");
+    if (trimmed.len == 0) return 0;
+    return std.fmt.parseInt(i32, trimmed, 10) catch error.InvalidExpectedExit;
+}
+
+fn formatSnapshot(term: std.process.Child.Term, stdout_data: []const u8, stderr_data: []const u8, allocator: std.mem.Allocator) ![]u8 {
+    var exit_code: i32 = -1;
+    if (term == .Exited) exit_code = term.Exited;
+    return std.fmt.allocPrint(
+        allocator,
+        "exit: {d}\nstdout:\n{s}\nstderr:\n{s}\n",
+        .{ exit_code, stdout_data, stderr_data },
+    );
 }
 
 fn sourceHasMainFn(source: []const u8) bool {
@@ -753,9 +1021,15 @@ comptime {
     _ = @import("Token.zig");
     _ = @import("Lexer.zig");
     _ = @import("Ast.zig");
+    _ = @import("Types.zig");
+    _ = @import("Parse.zig");
+    _ = @import("Check.zig");
+    _ = @import("Mir.zig");
     _ = @import("Parser.zig");
     _ = @import("render.zig");
     _ = @import("Diagnostic.zig");
+    _ = @import("Diag.zig");
+    _ = @import("Scaffold.zig");
     _ = @import("Driver.zig");
     _ = @import("Codegen.zig");
     _ = @import("Sema.zig");

@@ -19,6 +19,7 @@ pub const Tag = enum(u8) {
     int_literal,
     float_literal,
     string_literal,
+    c_string_literal, // c"..." null-terminated C string
     string_start, // opening `"` of an interpolated string
     string_end, // closing `"` of an interpolated string
     string_fragment, // literal text between interpolation holes
@@ -192,6 +193,7 @@ pub const Tag = enum(u8) {
             .int_literal => "integer literal",
             .float_literal => "float literal",
             .string_literal => "string literal",
+            .c_string_literal => "c-string literal",
             .string_start => "string start",
             .string_end => "string end",
             .string_fragment => "string fragment",

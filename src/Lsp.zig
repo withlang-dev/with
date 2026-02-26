@@ -3,7 +3,7 @@
 //! Communicates over stdin/stdout using JSON-RPC 2.0 with Content-Length headers.
 //! Supports: initialize, shutdown, textDocument/didOpen, textDocument/didChange,
 //! textDocument/publishDiagnostics, textDocument/hover, textDocument/definition,
-//! textDocument/completion.
+//! textDocument/completion, textDocument/references, textDocument/rename.
 
 const std = @import("std");
 const Driver = @import("Driver.zig");
@@ -89,7 +89,7 @@ fn handleMessage(self: *Self, body: []const u8, stdout: std.fs.File) !void {
 
     if (std.mem.eql(u8, method, "initialize")) {
         const result =
-            \\{"capabilities":{"textDocumentSync":{"openClose":true,"change":1},"hoverProvider":true,"definitionProvider":true,"completionProvider":{"triggerCharacters":[".",":"]}},"serverInfo":{"name":"with-lsp","version":"0.2.0"}}
+            \\{"capabilities":{"textDocumentSync":{"openClose":true,"change":1},"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"triggerCharacters":[".",":"]}},"serverInfo":{"name":"with-lsp","version":"0.2.0"}}
         ;
         sendResponse(id, result, stdout);
     } else if (std.mem.eql(u8, method, "initialized")) {
@@ -112,6 +112,10 @@ fn handleMessage(self: *Self, body: []const u8, stdout: std.fs.File) !void {
         self.handleHover(body, id, stdout);
     } else if (std.mem.eql(u8, method, "textDocument/definition")) {
         self.handleDefinition(body, id, stdout);
+    } else if (std.mem.eql(u8, method, "textDocument/references")) {
+        self.handleReferences(body, id, stdout);
+    } else if (std.mem.eql(u8, method, "textDocument/rename")) {
+        self.handleRename(body, id, stdout);
     } else if (std.mem.eql(u8, method, "textDocument/completion")) {
         self.handleCompletion(body, id, stdout);
     } else if (id != null) {
@@ -507,6 +511,138 @@ fn handleDefinition(self: *Self, body: []const u8, id: ?i64, stdout: std.fs.File
     sendResponse(id, result, stdout);
 }
 
+fn isWordMatchAt(text: []const u8, idx: usize, word: []const u8) bool {
+    if (word.len == 0) return false;
+    if (idx + word.len > text.len) return false;
+    if (!std.mem.eql(u8, text[idx .. idx + word.len], word)) return false;
+    if (idx > 0 and isIdentChar(text[idx - 1])) return false;
+    if (idx + word.len < text.len and isIdentChar(text[idx + word.len])) return false;
+    return true;
+}
+
+fn handleReferences(self: *Self, body: []const u8, id: ?i64, stdout: std.fs.File) void {
+    const uri = extractString(body, "\"uri\"") orelse {
+        sendResponse(id, "[]", stdout);
+        return;
+    };
+    const source_text = self.getDocument(uri) orelse {
+        sendResponse(id, "[]", stdout);
+        return;
+    };
+    const line = extractPosition(body, "\"line\"") orelse {
+        sendResponse(id, "[]", stdout);
+        return;
+    };
+    const character = extractPosition(body, "\"character\"") orelse {
+        sendResponse(id, "[]", stdout);
+        return;
+    };
+
+    var source = Source.fromString("lsp-input", source_text, 0, self.allocator);
+    defer source.deinit();
+    const offset = locationToOffset(&source, @intCast(line), @intCast(character));
+    const word = wordAtOffset(source_text, offset) orelse {
+        sendResponse(id, "[]", stdout);
+        return;
+    };
+
+    var buf: [65536]u8 = undefined;
+    var pos: usize = 0;
+    pos += (std.fmt.bufPrint(buf[pos..], "[", .{}) catch {
+        sendResponse(id, "[]", stdout);
+        return;
+    }).len;
+
+    var found: usize = 0;
+    var i: usize = 0;
+    while (i + word.len <= source_text.len) : (i += 1) {
+        if (!isWordMatchAt(source_text, i, word)) continue;
+        const start_loc = source.offsetToLocation(@intCast(i));
+        const end_loc = source.offsetToLocation(@intCast(i + word.len));
+        if (found > 0) {
+            buf[pos] = ',';
+            pos += 1;
+        }
+        const loc = std.fmt.bufPrint(
+            buf[pos..],
+            \\{{"uri":"{s}","range":{{"start":{{"line":{d},"character":{d}}},"end":{{"line":{d},"character":{d}}}}}}}
+        , .{ uri, start_loc.line, start_loc.col, end_loc.line, end_loc.col }) catch break;
+        pos += loc.len;
+        found += 1;
+        i += word.len - 1;
+    }
+
+    pos += (std.fmt.bufPrint(buf[pos..], "]", .{}) catch {
+        sendResponse(id, "[]", stdout);
+        return;
+    }).len;
+
+    sendResponse(id, buf[0..pos], stdout);
+}
+
+fn handleRename(self: *Self, body: []const u8, id: ?i64, stdout: std.fs.File) void {
+    const uri = extractString(body, "\"uri\"") orelse {
+        sendResponse(id, "null", stdout);
+        return;
+    };
+    const source_text = self.getDocument(uri) orelse {
+        sendResponse(id, "null", stdout);
+        return;
+    };
+    const new_name = extractString(body, "\"newName\"") orelse {
+        sendResponse(id, "null", stdout);
+        return;
+    };
+    const line = extractPosition(body, "\"line\"") orelse {
+        sendResponse(id, "null", stdout);
+        return;
+    };
+    const character = extractPosition(body, "\"character\"") orelse {
+        sendResponse(id, "null", stdout);
+        return;
+    };
+
+    var source = Source.fromString("lsp-input", source_text, 0, self.allocator);
+    defer source.deinit();
+    const offset = locationToOffset(&source, @intCast(line), @intCast(character));
+    const word = wordAtOffset(source_text, offset) orelse {
+        sendResponse(id, "null", stdout);
+        return;
+    };
+
+    var buf: [65536]u8 = undefined;
+    var pos: usize = 0;
+    pos += (std.fmt.bufPrint(buf[pos..], "{{\"changes\":{{\"{s}\":[", .{uri}) catch {
+        sendResponse(id, "null", stdout);
+        return;
+    }).len;
+
+    var found: usize = 0;
+    var i: usize = 0;
+    while (i + word.len <= source_text.len) : (i += 1) {
+        if (!isWordMatchAt(source_text, i, word)) continue;
+        const start_loc = source.offsetToLocation(@intCast(i));
+        const end_loc = source.offsetToLocation(@intCast(i + word.len));
+        if (found > 0) {
+            buf[pos] = ',';
+            pos += 1;
+        }
+        const edit = std.fmt.bufPrint(
+            buf[pos..],
+            \\{{"range":{{"start":{{"line":{d},"character":{d}}},"end":{{"line":{d},"character":{d}}}}},"newText":"{s}"}}
+        , .{ start_loc.line, start_loc.col, end_loc.line, end_loc.col, new_name }) catch break;
+        pos += edit.len;
+        found += 1;
+        i += word.len - 1;
+    }
+
+    pos += (std.fmt.bufPrint(buf[pos..], "]}}}}", .{}) catch {
+        sendResponse(id, "null", stdout);
+        return;
+    }).len;
+    sendResponse(id, buf[0..pos], stdout);
+}
+
 fn findDefinitionSpan(self: *Self, source_text: []const u8, word: []const u8) ?@import("Span.zig") {
     var pool = InternPool.init(self.allocator);
     defer pool.deinit();
@@ -575,7 +711,11 @@ fn findBindingSpanInExpr(expr: *const Ast.Expr, sym: InternPool.Symbol) ?@import
         },
         .while_expr => |we| return findBindingSpanInExpr(we.body, sym),
         .for_expr => |fe| {
-            if (fe.binding == sym) return expr.span;
+            if (fe.binding_pattern) |bp| {
+                if (patternContainsBinding(&bp, sym)) return expr.span;
+            } else if (fe.binding == sym) {
+                return expr.span;
+            }
             return findBindingSpanInExpr(fe.body, sym);
         },
         .loop_expr => |le| return findBindingSpanInExpr(le, sym),
@@ -607,6 +747,51 @@ fn findBindingSpanInExpr(expr: *const Ast.Expr, sym: InternPool.Symbol) ?@import
         else => {},
     }
     return null;
+}
+
+fn patternContainsBinding(pattern: *const Ast.Pattern, sym: InternPool.Symbol) bool {
+    switch (pattern.kind) {
+        .binding => |s| return s == sym,
+        .at_binding => |ab| return ab.name == sym or patternContainsBinding(ab.pattern, sym),
+        .tuple_pattern => |elems| {
+            for (elems) |*elem| {
+                if (patternContainsBinding(elem, sym)) return true;
+            }
+            return false;
+        },
+        .or_pattern => |alts| {
+            for (alts) |*alt| {
+                if (patternContainsBinding(alt, sym)) return true;
+            }
+            return false;
+        },
+        else => return false,
+    }
+}
+
+fn addPatternBindingsToCompletion(self: *Self, pattern: *const Ast.Pattern, pool: *InternPool, prefix: []const u8, buf: *[65536]u8, pos: *usize, item_count: *usize, seen: *std.StringHashMapUnmanaged(void)) void {
+    switch (pattern.kind) {
+        .binding => |sym| {
+            const name = pool.resolve(sym);
+            self.addCompletionItem(name, 6, prefix, buf, pos, item_count, seen);
+        },
+        .at_binding => |ab| {
+            const name = pool.resolve(ab.name);
+            self.addCompletionItem(name, 6, prefix, buf, pos, item_count, seen);
+            self.addPatternBindingsToCompletion(ab.pattern, pool, prefix, buf, pos, item_count, seen);
+        },
+        .tuple_pattern => |elems| {
+            for (elems) |*elem| {
+                self.addPatternBindingsToCompletion(elem, pool, prefix, buf, pos, item_count, seen);
+            }
+        },
+        .or_pattern => |alts| {
+            for (alts) |*alt| {
+                self.addPatternBindingsToCompletion(alt, pool, prefix, buf, pos, item_count, seen);
+            }
+        },
+        else => {},
+    }
 }
 
 // ── Completion ──────────────────────────────────────────────────
@@ -807,8 +992,12 @@ fn collectBindingsFromExpr(self: *Self, expr: *const Ast.Expr, pool: *InternPool
         },
         .while_expr => |we| self.collectBindingsFromExpr(we.body, pool, prefix, buf, pos, item_count, seen),
         .for_expr => |fe| {
-            const name = pool.resolve(fe.binding);
-            self.addCompletionItem(name, 6, prefix, buf, pos, item_count, seen);
+            if (fe.binding_pattern) |bp| {
+                self.addPatternBindingsToCompletion(&bp, pool, prefix, buf, pos, item_count, seen);
+            } else {
+                const name = pool.resolve(fe.binding);
+                self.addCompletionItem(name, 6, prefix, buf, pos, item_count, seen);
+            }
             self.collectBindingsFromExpr(fe.body, pool, prefix, buf, pos, item_count, seen);
         },
         .loop_expr => |le| self.collectBindingsFromExpr(le, pool, prefix, buf, pos, item_count, seen),
@@ -947,7 +1136,13 @@ fn unescapeJson(allocator: Allocator, s: []const u8) ![]const u8 {
         }
         out += 1;
     }
-    return result[0..out];
+    if (out == s.len) return result;
+    const shrunk = allocator.dupe(u8, result[0..out]) catch |err| {
+        allocator.free(result);
+        return err;
+    };
+    allocator.free(result);
+    return shrunk;
 }
 
 /// Convert LSP line/character (both 0-indexed) to a byte offset.
@@ -1025,4 +1220,3 @@ fn dupeStr(self: *Self, s: []const u8) ?[]const u8 {
     @memcpy(Static.buf[0..s.len], s);
     return Static.buf[0..s.len];
 }
-

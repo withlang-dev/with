@@ -322,6 +322,16 @@ fn lexIdentifierOrKeyword(self: *Lexer, start: u32) Token {
         self.pos += 1;
     }
     const text = self.source[start..self.pos];
+    // c"..." → C-string literal (null-terminated).
+    if (std.mem.eql(u8, text, "c") and self.pos < self.source.len and self.source[self.pos] == '"') {
+        self.pos += 1; // skip opening "
+        while (self.pos < self.source.len and self.source[self.pos] != '"') {
+            if (self.source[self.pos] == '\\') self.pos += 1; // skip escape
+            self.pos += 1;
+        }
+        if (self.pos < self.source.len) self.pos += 1; // skip closing "
+        return self.makeToken(.c_string_literal, start, self.pos);
+    }
     if (Token.Tag.fromKeyword(text)) |kw| {
         return self.makeToken(kw, start, self.pos);
     }
@@ -384,5 +394,269 @@ test "lex simple function" {
     try std.testing.expectEqual(Token.Tag.eq, tokens.tags.items[6]);
     try std.testing.expectEqual(Token.Tag.int_literal, tokens.tags.items[7]);
     try std.testing.expectEqual(Token.Tag.eof, tokens.tags.items[8]);
+    try std.testing.expect(!diags.hasErrors());
+}
+
+test "lex phase0 keyword set" {
+    const source =
+        \\fn let with match for if else return break continue async await unsafe type trait impl use module pub extend var comptime gen in as mut then loop while ephemeral spawn defer error extern
+    ;
+    var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
+    defer diags.deinit();
+    var lexer = Lexer.init(source, 0, &diags);
+    var tokens = try lexer.tokenize(std.testing.allocator);
+    defer tokens.deinit();
+
+    const expected = [_]Token.Tag{
+        .kw_fn,
+        .kw_let,
+        .kw_with,
+        .kw_match,
+        .kw_for,
+        .kw_if,
+        .kw_else,
+        .kw_return,
+        .kw_break,
+        .kw_continue,
+        .kw_async,
+        .kw_await,
+        .kw_unsafe,
+        .kw_type,
+        .kw_trait,
+        .kw_impl,
+        .kw_use,
+        .kw_module,
+        .kw_pub,
+        .kw_extend,
+        .kw_var,
+        .kw_comptime,
+        .kw_gen,
+        .kw_in,
+        .kw_as,
+        .kw_mut,
+        .kw_then,
+        .kw_loop,
+        .kw_while,
+        .kw_ephemeral,
+        .kw_spawn,
+        .kw_defer,
+        .kw_error,
+        .kw_extern,
+    };
+
+    for (expected, 0..) |tag, idx| {
+        try std.testing.expectEqual(tag, tokens.tags.items[idx]);
+    }
+    try std.testing.expectEqual(Token.Tag.eof, tokens.tags.items[expected.len]);
+    try std.testing.expect(!diags.hasErrors());
+}
+
+test "lexer keeps keyword-like identifiers as identifiers" {
+    const source =
+        \\fnx lett withhold matcher forget iff elsey returned breaker continuez asyncc awaitable unsafely typer traitor imply useful module_name pubish extender variant comptimes generated inn assert mutable thenly looper whiley ephemerally spawner deference errory external
+    ;
+    var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
+    defer diags.deinit();
+    var lexer = Lexer.init(source, 0, &diags);
+    var tokens = try lexer.tokenize(std.testing.allocator);
+    defer tokens.deinit();
+
+    // Every token before EOF should remain an identifier.
+    for (0..tokens.tags.items.len - 1) |idx| {
+        try std.testing.expectEqual(Token.Tag.identifier, tokens.tags.items[idx]);
+    }
+    try std.testing.expectEqual(Token.Tag.eof, tokens.tags.items[tokens.tags.items.len - 1]);
+    try std.testing.expect(!diags.hasErrors());
+}
+
+test "lex phase0 operator set" {
+    const source = "|> <| >> << ? ?. ?? -> => .. ..= +% -% *%";
+    var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
+    defer diags.deinit();
+    var lexer = Lexer.init(source, 0, &diags);
+    var tokens = try lexer.tokenize(std.testing.allocator);
+    defer tokens.deinit();
+
+    const expected = [_]Token.Tag{
+        .pipe_gt,
+        .lt_pipe,
+        .gt_gt,
+        .lt_lt,
+        .question,
+        .question_dot,
+        .question_question,
+        .arrow,
+        .fat_arrow,
+        .dot_dot,
+        .dot_dot_eq,
+        .plus_wrap,
+        .minus_wrap,
+        .star_wrap,
+    };
+    for (expected, 0..) |tag, idx| {
+        try std.testing.expectEqual(tag, tokens.tags.items[idx]);
+    }
+    try std.testing.expectEqual(Token.Tag.eof, tokens.tags.items[expected.len]);
+    try std.testing.expect(!diags.hasErrors());
+}
+
+test "lexer operator edge cases and invalid operator diagnostics" {
+    const source = "< | - > ? . !";
+    var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
+    defer diags.deinit();
+    var lexer = Lexer.init(source, 0, &diags);
+    var tokens = try lexer.tokenize(std.testing.allocator);
+    defer tokens.deinit();
+
+    const expected = [_]Token.Tag{
+        .lt,
+        .pipe,
+        .minus,
+        .gt,
+        .question,
+        .dot,
+        .invalid,
+        .eof,
+    };
+    for (expected, 0..) |tag, idx| {
+        try std.testing.expectEqual(tag, tokens.tags.items[idx]);
+    }
+    try std.testing.expect(diags.hasErrors());
+}
+
+test "lex brackets and punctuation" {
+    const source = "()[]{}:,.;\n";
+    var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
+    defer diags.deinit();
+    var lexer = Lexer.init(source, 0, &diags);
+    var tokens = try lexer.tokenize(std.testing.allocator);
+    defer tokens.deinit();
+
+    const expected = [_]Token.Tag{
+        .l_paren,
+        .r_paren,
+        .l_bracket,
+        .r_bracket,
+        .l_brace,
+        .r_brace,
+        .colon,
+        .comma,
+        .dot,
+        .semicolon,
+        .newline,
+        .eof,
+    };
+    for (expected, 0..) |tag, idx| {
+        try std.testing.expectEqual(tag, tokens.tags.items[idx]);
+    }
+    try std.testing.expect(!diags.hasErrors());
+}
+
+test "lexer keeps newline significant while skipping horizontal whitespace" {
+    const source =
+        \\let x = 1
+        \\    let y = 2
+        \\
+    ;
+    var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
+    defer diags.deinit();
+    var lexer = Lexer.init(source, 0, &diags);
+    var tokens = try lexer.tokenize(std.testing.allocator);
+    defer tokens.deinit();
+
+    // Ensure the first newline is preserved as a token between statements.
+    try std.testing.expectEqual(Token.Tag.kw_let, tokens.tags.items[0]);
+    try std.testing.expectEqual(Token.Tag.identifier, tokens.tags.items[1]);
+    try std.testing.expectEqual(Token.Tag.eq, tokens.tags.items[2]);
+    try std.testing.expectEqual(Token.Tag.int_literal, tokens.tags.items[3]);
+    try std.testing.expectEqual(Token.Tag.newline, tokens.tags.items[4]);
+    try std.testing.expectEqual(Token.Tag.kw_let, tokens.tags.items[5]);
+    try std.testing.expectEqual(Token.Tag.eof, tokens.tags.items[tokens.tags.items.len - 1]);
+    try std.testing.expect(!diags.hasErrors());
+}
+
+test "lex literal forms including interpolation text" {
+    const source = "42 1_000 3.14 0xFF 0b1010 0o77 true false \"abc\" \"hello {name}\" c\"ffi\"";
+    var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
+    defer diags.deinit();
+    var lexer = Lexer.init(source, 0, &diags);
+    var tokens = try lexer.tokenize(std.testing.allocator);
+    defer tokens.deinit();
+
+    const expected = [_]Token.Tag{
+        .int_literal,
+        .int_literal,
+        .float_literal,
+        .int_literal,
+        .int_literal,
+        .int_literal,
+        .true_literal,
+        .false_literal,
+        .string_literal,
+        .string_literal,
+        .c_string_literal,
+        .eof,
+    };
+    for (expected, 0..) |tag, idx| {
+        try std.testing.expectEqual(tag, tokens.tags.items[idx]);
+    }
+    try std.testing.expect(!diags.hasErrors());
+}
+
+test "lexer reports unterminated string literal" {
+    const source = "\"unterminated";
+    var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
+    defer diags.deinit();
+    var lexer = Lexer.init(source, 0, &diags);
+    var tokens = try lexer.tokenize(std.testing.allocator);
+    defer tokens.deinit();
+
+    try std.testing.expectEqual(Token.Tag.string_literal, tokens.tags.items[0]);
+    try std.testing.expectEqual(Token.Tag.eof, tokens.tags.items[1]);
+    try std.testing.expect(diags.hasErrors());
+}
+
+test "lex identifiers and dot-variant shorthand" {
+    const source = "name _tmp value2 .Red .Http500 .x";
+    var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
+    defer diags.deinit();
+    var lexer = Lexer.init(source, 0, &diags);
+    var tokens = try lexer.tokenize(std.testing.allocator);
+    defer tokens.deinit();
+
+    const expected = [_]Token.Tag{
+        .identifier,
+        .identifier,
+        .identifier,
+        .dot_identifier,
+        .dot_identifier,
+        .dot,
+        .identifier,
+        .eof,
+    };
+    for (expected, 0..) |tag, idx| {
+        try std.testing.expectEqual(tag, tokens.tags.items[idx]);
+    }
+    try std.testing.expect(!diags.hasErrors());
+}
+
+test "lex line comments with and without trailing newline" {
+    const source =
+        \\let x = 1 // keep
+        \\let y = 2 // eof
+    ;
+    var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
+    defer diags.deinit();
+    var lexer = Lexer.init(source, 0, &diags);
+    var tokens = try lexer.tokenize(std.testing.allocator);
+    defer tokens.deinit();
+
+    // let x = 1 comment newline let y = 2 comment eof
+    try std.testing.expectEqual(Token.Tag.kw_let, tokens.tags.items[0]);
+    try std.testing.expectEqual(Token.Tag.comment, tokens.tags.items[4]);
+    try std.testing.expectEqual(Token.Tag.newline, tokens.tags.items[5]);
+    try std.testing.expectEqual(Token.Tag.kw_let, tokens.tags.items[6]);
+    try std.testing.expectEqual(Token.Tag.comment, tokens.tags.items[10]);
+    try std.testing.expectEqual(Token.Tag.eof, tokens.tags.items[11]);
     try std.testing.expect(!diags.hasErrors());
 }

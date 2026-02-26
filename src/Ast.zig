@@ -49,6 +49,7 @@ pub const DeclKind = union(enum) {
 
 pub const CImportDecl = struct {
     header_code: []const u8,
+    link_libs: []const Symbol = &.{},
 };
 
 pub const TraitDecl = struct {
@@ -74,6 +75,7 @@ pub const TraitMethodSig = struct {
     name: Symbol,
     params: []const Param,
     return_type: ?*const TypeExpr,
+    has_type_params: bool = false,
     has_default: bool,
     default_body: ?*const Expr = null,
     span: Span,
@@ -96,6 +98,7 @@ pub const FnDecl = struct {
     body: *const Expr,
     is_async: bool,
     is_gen: bool,
+    is_comptime: bool = false,
     is_pub: Visibility,
     is_tailrec: bool = false,
     is_inline: bool = false,
@@ -119,8 +122,10 @@ pub const Param = struct {
 
 pub const TypeDecl = struct {
     name: Symbol,
+    type_params: []const TypeParam = &.{},
     kind: TypeDeclKind,
     is_pub: Visibility,
+    derive_traits: []const Symbol = &.{},
 };
 
 pub const TypeDeclKind = union(enum) {
@@ -173,6 +178,8 @@ pub const ExprKind = union(enum) {
     float_literal: f64,
     /// String literal: `"hello"`
     string_literal: Symbol,
+    /// C-string literal: `c"hello"` (null-terminated)
+    c_string_literal: Symbol,
     /// Bool literal: `true`, `false`
     bool_literal: bool,
     /// Identifier reference: `x`, `foo`
@@ -185,6 +192,8 @@ pub const ExprKind = union(enum) {
     call: CallExpr,
     /// Field access: `obj.field`
     field_access: FieldAccessExpr,
+    /// Optional chaining: `opt?.field` or `opt?.method(args)`
+    optional_chain: OptionalChainExpr,
     /// Index: `arr[i]`
     index: IndexExpr,
     /// Slice: `arr[a..b]`
@@ -211,6 +220,8 @@ pub const ExprKind = union(enum) {
     variant_shorthand: Symbol,
     /// Await: `expr.await`
     await_expr: *const Expr,
+    /// Async block: `async: expr_or_block`
+    async_block: *const Expr,
     /// Spawn: `spawn expr` (fire-and-forget async)
     spawn_expr: *const Expr,
     /// Pipeline: `a |> f`
@@ -251,6 +262,8 @@ pub const ExprKind = union(enum) {
     yield_expr: *const Expr,
     /// Comptime expression: `comptime expr` — evaluated at compile time
     comptime_expr: *const Expr,
+    /// Async scope: `async scope |s|: body`
+    async_scope: AsyncScopeExpr,
     /// Select await: `select await: arm1, arm2, ...`
     select_await: SelectAwaitExpr,
     /// Poisoned — parse error placeholder
@@ -312,6 +325,12 @@ pub const FieldAccessExpr = struct {
     field: Symbol,
 };
 
+pub const OptionalChainExpr = struct {
+    expr: *const Expr,
+    member: Symbol,
+    args: ?[]const *const Expr,
+};
+
 pub const IndexExpr = struct {
     expr: *const Expr,
     index: *const Expr,
@@ -351,6 +370,7 @@ pub const LetElse = struct {
 
 pub const TupleDestructure = struct {
     names: []const Symbol,
+    pattern: ?Pattern = null,
     value: *const Expr,
     is_mut: bool,
 };
@@ -373,6 +393,7 @@ pub const WhileExpr = struct {
 
 pub const ForExpr = struct {
     binding: Symbol,
+    binding_pattern: ?Pattern = null,
     index_binding: ?Symbol,
     iterable: *const Expr,
     body: *const Expr,
@@ -383,6 +404,12 @@ pub const ArrayComprehension = struct {
     binding: Symbol, // loop variable name
     iterable: *const Expr, // what to iterate over
     filter: ?*const Expr, // optional if-condition
+    clauses: ?[]const ComprehensionClause = null, // optional multi-for clauses
+};
+
+pub const ComprehensionClause = struct {
+    binding: Symbol,
+    iterable: *const Expr,
 };
 
 pub const StructLiteral = struct {
@@ -435,6 +462,8 @@ pub const PatternKind = union(enum) {
     or_pattern: []const Pattern,
     /// At-binding: `name @ Pattern` — binds whole value and destructures
     at_binding: AtBinding,
+    /// Tuple pattern: `(a, b)` or nested tuples `(x, (y, z))`
+    tuple_pattern: []const Pattern,
     /// Range pattern: `1..=5` or `1..5`
     range_pattern: RangePattern,
     /// Slice pattern: `[a, b, ..rest]`, `[]`, `[only]`
@@ -512,6 +541,11 @@ pub const SelectAwaitArm = struct {
 
 pub const SelectAwaitExpr = struct {
     arms: []const SelectAwaitArm,
+};
+
+pub const AsyncScopeExpr = struct {
+    name: Symbol,
+    body: *const Expr,
 };
 
 pub const RecordUpdateExpr = struct {

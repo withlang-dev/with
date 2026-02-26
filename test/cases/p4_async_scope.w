@@ -1,4 +1,4 @@
-// Phase 4 gap: async scope task tracking syntax not implemented
+// Test: phase4 async scope tracked task behavior
 async fn work() -> i32 = 1
 
 fn main() -> i32 =
