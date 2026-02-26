@@ -1,14 +1,16 @@
-// Test: generic functions with multiple type params
+// Test generic struct with multiple type params
+type Pair = { first: i32, second: i32 }
 
-fn first[T](a: T, b: T) -> T = a
-fn second[T](a: T, b: T) -> T = b
+fn swap(p: Pair) -> Pair =
+    Pair { first: p.second, second: p.first }
 
-fn max_val[T](a: T, b: T) -> T =
-    if a > b then a else b
+fn sum(p: Pair) -> i32 =
+    p.first + p.second
 
 fn main() -> i32 =
-    println(first(10, 20))
-    println(second(10, 20))
-    println(max_val(42, 17))
-    println(max_val(3, 99))
+    let p = Pair { first: 10, second: 20 }
+    let s = swap(p)
+    println(s.first)
+    println(s.second)
+    println(sum(p))
     0
