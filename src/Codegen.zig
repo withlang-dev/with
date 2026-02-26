@@ -37,6 +37,8 @@ struct_types: std.AutoHashMapUnmanaged(u32, StructTypeInfo),
 enum_types: std.AutoHashMapUnmanaged(u32, EnumTypeInfo),
 /// Generic function ASTs: Symbol → FnDecl (for monomorphization).
 generic_fns: std.AutoHashMapUnmanaged(u32, Ast.FnDecl),
+/// Generic struct type declarations: Symbol → TypeDecl (for monomorphization).
+generic_structs: std.AutoHashMapUnmanaged(u32, Ast.TypeDecl),
 /// Already-monomorphized specializations: mangled name → FnInfo.
 mono_cache: std.AutoHashMapUnmanaged(u64, FnInfo),
 /// Type aliases: Symbol → LLVM type.
@@ -319,6 +321,7 @@ pub fn init(module_name: [*:0]const u8, allocator: std.mem.Allocator) Error!Code
         .struct_types = .{},
         .enum_types = .{},
         .generic_fns = .{},
+        .generic_structs = .{},
         .mono_cache = .{},
         .type_aliases = .{},
     };
@@ -341,6 +344,7 @@ pub fn deinit(self: *Codegen) void {
     self.functions.deinit(self.allocator);
     self.locals.deinit(self.allocator);
     self.generic_fns.deinit(self.allocator);
+    self.generic_structs.deinit(self.allocator);
     self.mono_cache.deinit(self.allocator);
     self.type_aliases.deinit(self.allocator);
     self.ref_pointee_types.deinit(self.allocator);
@@ -469,7 +473,12 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
     for (module.decls) |decl| {
         switch (decl.kind) {
             .type_decl => |td| switch (td.kind) {
-                .struct_def => |fields| try self.declareStructType(td.name, fields),
+                .struct_def => |fields| if (td.type_params.len == 0) {
+                    try self.declareStructType(td.name, fields);
+                } else {
+                    self.generic_structs.put(self.allocator, td.name, td) catch
+                        return error.CodegenAlloc;
+                },
                 .enum_def => |variants| try self.declareEnumType(td.name, variants),
                 .alias => |type_expr| {
                     const resolved = try self.resolveType(type_expr);
@@ -5612,6 +5621,10 @@ fn genOptionIsNone(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMType
 /// Helper: call a function value (either raw fn pointer or closure fat pointer) with one argument.
 /// Returns the call result.
 fn callFnValueWithArg(self: *Codegen, fn_val: c.LLVMValueRef, arg: c.LLVMValueRef) Error!c.LLVMValueRef {
+    return self.callFnValueWithArgHinted(fn_val, arg, null);
+}
+
+fn callFnValueWithArgHinted(self: *Codegen, fn_val: c.LLVMValueRef, arg: c.LLVMValueRef, ret_type_hint: ?c.LLVMTypeRef) Error!c.LLVMValueRef {
     const fn_val_type = c.LLVMTypeOf(fn_val);
     const kind = c.LLVMGetTypeKind(fn_val_type);
 
@@ -5643,12 +5656,14 @@ fn callFnValueWithArg(self: *Codegen, fn_val: c.LLVMValueRef, arg: c.LLVMValueRe
             const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
             return c.LLVMBuildCall2(self.builder, pointee_type, fn_val, &args_buf, 1, if (is_void) "" else "map.call");
         }
-        // Fallback: infer signature as fn(arg_type) -> arg_type.
+        // Fallback: use hint or infer signature as fn(arg_type) -> arg_type.
         const arg_type = c.LLVMTypeOf(arg);
+        const fallback_ret = ret_type_hint orelse arg_type;
         var param_types = [_]c.LLVMTypeRef{arg_type};
-        const fn_type = c.LLVMFunctionType(arg_type, &param_types, 1, 0);
+        const fn_type = c.LLVMFunctionType(fallback_ret, &param_types, 1, 0);
         var args_buf = [_]c.LLVMValueRef{arg};
-        return c.LLVMBuildCall2(self.builder, fn_type, fn_val, &args_buf, 1, "map.call");
+        const is_void = fallback_ret == c.LLVMVoidTypeInContext(self.context);
+        return c.LLVMBuildCall2(self.builder, fn_type, fn_val, &args_buf, 1, if (is_void) "" else "map.call");
     } else if (kind == c.LLVMStructTypeKind) {
         // Fat pointer: { fn_ptr, capture_ptr }.
         const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
@@ -5672,12 +5687,14 @@ fn callFnValueWithArg(self: *Codegen, fn_val: c.LLVMValueRef, arg: c.LLVMValueRe
             return c.LLVMBuildCall2(self.builder, fn_type, fn_ptr, &args_buf, 2, if (is_void) "" else "map.call");
         }
 
-        // Fallback: infer signature as fn(ptr, arg_type) -> arg_type.
+        // Fallback: use hint or infer signature as fn(ptr, arg_type) -> arg_type.
         const arg_type = c.LLVMTypeOf(arg);
+        const fallback_ret = ret_type_hint orelse arg_type;
         var param_types = [_]c.LLVMTypeRef{ ptr_type, arg_type };
-        const fn_type = c.LLVMFunctionType(arg_type, &param_types, 2, 0);
+        const fn_type = c.LLVMFunctionType(fallback_ret, &param_types, 2, 0);
         var args_buf = [_]c.LLVMValueRef{ cap_ptr, arg };
-        return c.LLVMBuildCall2(self.builder, fn_type, fn_ptr, &args_buf, 2, "map.call");
+        const is_void = fallback_ret == c.LLVMVoidTypeInContext(self.context);
+        return c.LLVMBuildCall2(self.builder, fn_type, fn_ptr, &args_buf, 2, if (is_void) "" else "map.call");
     }
 
     return error.UnsupportedExpr;
@@ -5685,6 +5702,10 @@ fn callFnValueWithArg(self: *Codegen, fn_val: c.LLVMValueRef, arg: c.LLVMValueRe
 
 /// Helper: call a function value (raw fn pointer or closure fat pointer) with no arguments.
 fn callFnValueNoArgs(self: *Codegen, fn_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    return self.callFnValueNoArgsHinted(fn_val, null);
+}
+
+fn callFnValueNoArgsHinted(self: *Codegen, fn_val: c.LLVMValueRef, ret_type_hint: ?c.LLVMTypeRef) Error!c.LLVMValueRef {
     const fn_val_type = c.LLVMTypeOf(fn_val);
     const kind = c.LLVMGetTypeKind(fn_val_type);
 
@@ -5696,9 +5717,16 @@ fn callFnValueNoArgs(self: *Codegen, fn_val: c.LLVMValueRef) Error!c.LLVMValueRe
             const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
             return c.LLVMBuildCall2(self.builder, fn_type, fn_val, null, 0, if (is_void) "" else "call0");
         }
+        // Fallback with hint: construct fn() -> ret_type.
+        if (ret_type_hint) |hint| {
+            const fn_type = c.LLVMFunctionType(hint, null, 0, 0);
+            const is_void = hint == c.LLVMVoidTypeInContext(self.context);
+            return c.LLVMBuildCall2(self.builder, fn_type, fn_val, null, 0, if (is_void) "" else "call0");
+        }
         return error.UnsupportedExpr;
     } else if (kind == c.LLVMStructTypeKind) {
         // Closure fat pointer: { fn_ptr, capture_ptr }.
+        const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
         const fn_ptr = c.LLVMBuildExtractValue(self.builder, fn_val, 0, "fn_ptr");
         const cap_ptr = c.LLVMBuildExtractValue(self.builder, fn_val, 1, "cap_ptr");
 
@@ -5709,6 +5737,14 @@ fn callFnValueNoArgs(self: *Codegen, fn_val: c.LLVMValueRef) Error!c.LLVMValueRe
             if (c.LLVMCountParamTypes(fn_type) < 1) return error.UnsupportedExpr;
             var args_buf = [_]c.LLVMValueRef{cap_ptr};
             const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+            return c.LLVMBuildCall2(self.builder, fn_type, fn_ptr, &args_buf, 1, if (is_void) "" else "call0");
+        }
+        // Fallback with hint: construct fn(ptr) -> ret_type.
+        if (ret_type_hint) |hint| {
+            var param_types = [_]c.LLVMTypeRef{ptr_type};
+            const fn_type = c.LLVMFunctionType(hint, &param_types, 1, 0);
+            var args_buf = [_]c.LLVMValueRef{cap_ptr};
+            const is_void = hint == c.LLVMVoidTypeInContext(self.context);
             return c.LLVMBuildCall2(self.builder, fn_type, fn_ptr, &args_buf, 1, if (is_void) "" else "call0");
         }
         return error.UnsupportedExpr;
@@ -5820,7 +5856,8 @@ fn genOptionAndThen(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTyp
     const payload_val = c.LLVMBuildLoad2(self.builder, payload_type, payload_ptr, "payload.val");
 
     const fn_val = try self.genExpr(fn_arg);
-    const some_result = try self.callFnValueWithArg(fn_val, payload_val);
+    // f returns Option[U] directly; use obj_type as hint (same Option layout).
+    const some_result = try self.callFnValueWithArgHinted(fn_val, payload_val, obj_type);
     const result_type = c.LLVMTypeOf(some_result);
     _ = c.LLVMBuildBr(self.builder, merge_bb);
     const some_end_bb = c.LLVMGetInsertBlock(self.builder);
@@ -5917,8 +5954,8 @@ fn genOptionOrElse(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMType
 
     c.LLVMPositionBuilderAtEnd(self.builder, none_bb);
     const fn_val = try self.genExpr(fn_arg);
-    const fallback = try self.callFnValueNoArgs(fn_val);
-    if (c.LLVMTypeOf(fallback) != obj_type) return error.UnsupportedExpr;
+    // f() returns Option[T] (same as obj_type); pass hint.
+    const fallback = try self.callFnValueNoArgsHinted(fn_val, obj_type);
     _ = c.LLVMBuildBr(self.builder, merge_bb);
     const none_end_bb = c.LLVMGetInsertBlock(self.builder);
 
@@ -10155,6 +10192,115 @@ fn declareStructType(self: *Codegen, name_sym: u32, fields: []const Ast.FieldDef
     }) catch return error.CodegenAlloc;
 }
 
+/// Monomorphize a generic struct by inferring type params from literal field values.
+fn monomorphizeGenericStruct(self: *Codegen, td: Ast.TypeDecl, sl: Ast.StructLiteral) Error!void {
+    const fields = td.kind.struct_def;
+
+    // Build type param → LLVM type mapping from literal field values.
+    // We generate each field value to get its LLVM type, then map type params.
+    var type_map: [8]struct { param: u32, llvm_type: c.LLVMTypeRef } = undefined;
+    var type_map_len: usize = 0;
+
+    for (sl.fields) |lit_field| {
+        // Find corresponding def field.
+        for (fields) |def_field| {
+            if (def_field.name == lit_field.name) {
+                // If this field's type is a type param, infer it.
+                if (def_field.type_expr.kind == .named) {
+                    const sym = def_field.type_expr.kind.named;
+                    for (td.type_params) |tp| {
+                        if (tp.name == sym) {
+                            // Infer the LLVM type from the literal expression.
+                            const llvm_ty = self.inferExprType(lit_field.value) orelse continue;
+                            // Store mapping if not already present.
+                            var found = false;
+                            for (type_map[0..type_map_len]) |entry| {
+                                if (entry.param == sym) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found and type_map_len < 8) {
+                                type_map[type_map_len] = .{ .param = sym, .llvm_type = llvm_ty };
+                                type_map_len += 1;
+                            }
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    // Now create the monomorphized struct type.
+    const name = self.pool.resolve(td.name);
+    var name_buf: [256]u8 = undefined;
+    if (name.len >= name_buf.len) return error.UnsupportedExpr;
+    @memcpy(name_buf[0..name.len], name);
+    name_buf[name.len] = 0;
+
+    const struct_type = c.LLVMStructCreateNamed(self.context, &name_buf);
+
+    const field_names = self.allocator.alloc(u32, fields.len) catch return error.CodegenAlloc;
+    const field_types = self.allocator.alloc(c.LLVMTypeRef, fields.len) catch return error.CodegenAlloc;
+    const field_defaults = self.allocator.alloc(?*const Ast.Expr, fields.len) catch return error.CodegenAlloc;
+
+    var llvm_field_types_buf: [64]c.LLVMTypeRef = undefined;
+    for (fields, 0..) |f, i| {
+        field_names[i] = f.name;
+        field_defaults[i] = f.default;
+
+        // Resolve the field type, substituting type params.
+        if (f.type_expr.kind == .named) {
+            const sym = f.type_expr.kind.named;
+            var resolved = false;
+            for (type_map[0..type_map_len]) |entry| {
+                if (entry.param == sym) {
+                    field_types[i] = entry.llvm_type;
+                    resolved = true;
+                    break;
+                }
+            }
+            if (!resolved) {
+                field_types[i] = try self.resolveType(f.type_expr);
+            }
+        } else {
+            field_types[i] = try self.resolveType(f.type_expr);
+        }
+        llvm_field_types_buf[i] = field_types[i];
+    }
+
+    c.LLVMStructSetBody(
+        struct_type,
+        if (fields.len > 0) &llvm_field_types_buf else null,
+        @intCast(fields.len),
+        0,
+    );
+
+    self.struct_types.put(self.allocator, td.name, .{
+        .llvm_type = struct_type,
+        .field_names = field_names,
+        .field_types = field_types,
+        .field_defaults = field_defaults,
+    }) catch return error.CodegenAlloc;
+}
+
+/// Infer the LLVM type of an expression without generating code.
+fn inferExprType(self: *Codegen, expr: *const Ast.Expr) ?c.LLVMTypeRef {
+    return switch (expr.kind) {
+        .int_literal => c.LLVMInt32TypeInContext(self.context),
+        .float_literal => c.LLVMDoubleTypeInContext(self.context),
+        .bool_literal => c.LLVMInt1TypeInContext(self.context),
+        .string_literal => self.getStrType(),
+        .ident => |sym| {
+            if (self.locals.get(sym)) |local| return local.ty;
+            return null;
+        },
+        else => null,
+    };
+}
+
 fn llvmTypeSupportsDeriveEq(self: *Codegen, ty: c.LLVMTypeRef) bool {
     const kind = c.LLVMGetTypeKind(ty);
     return switch (kind) {
@@ -10499,7 +10645,12 @@ fn declareBuiltinStrType(self: *Codegen) Error!void {
 }
 
 fn genStructLiteral(self: *Codegen, sl: Ast.StructLiteral) Error!c.LLVMValueRef {
-    const info = self.struct_types.get(sl.name) orelse return error.UnsupportedType;
+    const info = self.struct_types.get(sl.name) orelse blk: {
+        // Try monomorphizing a generic struct.
+        const gs = self.generic_structs.get(sl.name) orelse return error.UnsupportedType;
+        try self.monomorphizeGenericStruct(gs, sl);
+        break :blk self.struct_types.get(sl.name) orelse return error.UnsupportedType;
+    };
 
     // Alloca for the struct.
     const alloca = c.LLVMBuildAlloca(self.builder, info.llvm_type, "struct");

@@ -71,6 +71,7 @@ pub fn main() !void {
 
         const bin_path = try driver.buildBinary(args[2]);
         if (bin_path) |p| {
+            driver.printWarnings();
             // Execute the binary.
             var child = std.process.Child.init(&.{p}, allocator);
             _ = child.spawn() catch |e| {
@@ -139,6 +140,7 @@ pub fn main() !void {
         const module = try driver.compileFile(args[2]);
         if (module) |_| {
             stderrPrint("ok\n");
+            driver.printWarnings();
         } else {
             std.process.exit(1);
         }
@@ -358,10 +360,11 @@ fn runRepl(allocator: std.mem.Allocator) !void {
             try writer_iface.writeAll(
                 \\Commands:
                 \\  :quit, :q    Exit the REPL
-                \\  :clear       Clear accumulated bindings
+                \\  :clear       Clear accumulated state
                 \\  :help        Show this help
                 \\
-                \\Enter let/var bindings (persisted across lines) or expressions.
+                \\Enter declarations, mutation statements, or expressions.
+                \\Declarations and mutation statements persist across lines.
                 \\Expressions are automatically printed with println.
                 \\
             );
@@ -369,102 +372,138 @@ fn runRepl(allocator: std.mem.Allocator) !void {
             continue;
         }
 
-        // Determine if this is a binding (let/var/fn) or an expression
+        // Determine whether this line should be persisted as REPL state.
         const trimmed = std.mem.trimLeft(u8, line, " \t");
         const is_binding = std.mem.startsWith(u8, trimmed, "let ") or
             std.mem.startsWith(u8, trimmed, "var ") or
-            std.mem.startsWith(u8, trimmed, "fn ");
+            std.mem.startsWith(u8, trimmed, "fn ") or
+            std.mem.startsWith(u8, trimmed, "type ") or
+            std.mem.startsWith(u8, trimmed, "use ") or
+            std.mem.startsWith(u8, trimmed, "c_import(");
+        const is_stateful_stmt = isLikelyStatefulStatement(trimmed);
 
-        // Build the source
-        var src: std.ArrayList(u8) = .empty;
-        defer src.deinit(allocator);
-        try src.appendSlice(allocator, "fn main() -> i32 =\n");
-        for (lines.items) |prev| {
-            try src.appendSlice(allocator, "    ");
-            try src.appendSlice(allocator, prev);
-            try src.appendSlice(allocator, "\n");
-        }
-        if (is_binding) {
-            try src.appendSlice(allocator, "    ");
-            try src.appendSlice(allocator, line);
-            try src.appendSlice(allocator, "\n    0\n");
-        } else {
-            // Wrap expression in println
-            try src.appendSlice(allocator, "    println(");
-            try src.appendSlice(allocator, line);
-            try src.appendSlice(allocator, ")\n    0\n");
-        }
-
-        // Write temp file
-        const tmp_path = "/tmp/_with_repl.w";
-        {
-            const f = std.fs.createFileAbsolute(tmp_path, .{}) catch {
-                try writer_iface.writeAll("error: could not create temp file\n");
-                try out.interface.flush();
+        // For declarations and likely stateful statements, execute as a statement
+        // first so side effects are persisted consistently.
+        if (is_binding or is_stateful_stmt) {
+            if (try executeReplLine(allocator, lines.items, line, .statement)) {
+                const saved = try allocator.dupe(u8, line);
+                try lines.append(allocator, saved);
                 continue;
-            };
-            defer f.close();
-            f.writeAll(src.items) catch {};
+            }
+            // Bindings are never treated as printable expressions.
+            if (is_binding) continue;
         }
 
-        // Compile
-        var driver = Driver.init(allocator);
-        defer driver.deinit();
-
-        const bin_path = try driver.buildBinary(tmp_path);
-        if (bin_path == null) {
-            // Compilation failed — try without println wrapper if it was an expression
-            if (!is_binding) {
-                src.clearRetainingCapacity();
-                try src.appendSlice(allocator, "fn main() -> i32 =\n");
-                for (lines.items) |prev| {
-                    try src.appendSlice(allocator, "    ");
-                    try src.appendSlice(allocator, prev);
-                    try src.appendSlice(allocator, "\n");
-                }
-                try src.appendSlice(allocator, "    ");
-                try src.appendSlice(allocator, line);
-                try src.appendSlice(allocator, "\n    0\n");
-                {
-                    const f = std.fs.createFileAbsolute(tmp_path, .{}) catch continue;
-                    defer f.close();
-                    f.writeAll(src.items) catch {};
-                }
-                var driver2 = Driver.init(allocator);
-                defer driver2.deinit();
-                if (try driver2.buildBinary(tmp_path)) |bp| {
-                    var path_buf2: [4096]u8 = undefined;
-                    if (bp.len < path_buf2.len) {
-                        @memcpy(path_buf2[0..bp.len], bp);
-                        path_buf2[bp.len] = 0;
-                        _ = c.system(&path_buf2);
-                    }
-                }
-            }
+        // Try expression mode (println wrapper) for query-like lines.
+        if (try executeReplLine(allocator, lines.items, line, .expression)) {
             continue;
         }
 
-        // Execute the compiled binary via system()
-        {
-            const bp = bin_path.?;
-            // Build a null-terminated path for system()
-            var path_buf: [4096]u8 = undefined;
-            if (bp.len < path_buf.len) {
-                @memcpy(path_buf[0..bp.len], bp);
-                path_buf[bp.len] = 0;
-                _ = c.system(&path_buf);
+        // Fallback to statement mode for non-printable expressions.
+        if (try executeReplLine(allocator, lines.items, line, .statement)) {
+            if (isLikelyStatefulStatement(trimmed)) {
+                const saved = try allocator.dupe(u8, line);
+                try lines.append(allocator, saved);
             }
-        }
-
-        // If it was a binding, save it for future lines
-        if (is_binding) {
-            const saved = try allocator.dupe(u8, line);
-            try lines.append(allocator, saved);
         }
     }
 
     try writer_iface.writeAll("\nGoodbye!\n");
     try out.interface.flush();
+}
+
+const ReplExecMode = enum {
+    expression,
+    statement,
+};
+
+fn executeReplLine(
+    allocator: std.mem.Allocator,
+    prior_lines: []const []const u8,
+    line: []const u8,
+    mode: ReplExecMode,
+) !bool {
+    var src: std.ArrayList(u8) = .empty;
+    defer src.deinit(allocator);
+
+    try src.appendSlice(allocator, "fn main() -> i32 =\n");
+    for (prior_lines) |prev| {
+        try src.appendSlice(allocator, "    ");
+        try src.appendSlice(allocator, prev);
+        try src.appendSlice(allocator, "\n");
+    }
+
+    if (mode == .expression) {
+        try src.appendSlice(allocator, "    println(");
+        try src.appendSlice(allocator, line);
+        try src.appendSlice(allocator, ")\n    0\n");
+    } else {
+        try src.appendSlice(allocator, "    ");
+        try src.appendSlice(allocator, line);
+        try src.appendSlice(allocator, "\n    0\n");
+    }
+
+    const tmp_path = "/tmp/_with_repl.w";
+    {
+        const f = std.fs.createFileAbsolute(tmp_path, .{}) catch return false;
+        defer f.close();
+        f.writeAll(src.items) catch return false;
+    }
+
+    var driver = Driver.init(allocator);
+    defer driver.deinit();
+
+    const bin_path = try driver.buildBinary(tmp_path);
+    if (bin_path == null) return false;
+
+    const bp = bin_path.?;
+    var path_buf: [4096]u8 = undefined;
+    if (bp.len >= path_buf.len) return false;
+    @memcpy(path_buf[0..bp.len], bp);
+    path_buf[bp.len] = 0;
+    _ = c.system(&path_buf);
+    return true;
+}
+
+fn isLikelyStatefulStatement(line: []const u8) bool {
+    if (hasAssignmentOperator(line)) return true;
+
+    const mutating_patterns = [_][]const u8{
+        ".push(",
+        ".pop(",
+        ".insert(",
+        ".remove(",
+        ".clear(",
+        ".append(",
+        ".extend(",
+        ".set(",
+        ".swap(",
+        ".truncate(",
+        ".retain(",
+        ".sort(",
+        ".reverse(",
+    };
+    for (mutating_patterns) |pat| {
+        if (std.mem.indexOf(u8, line, pat) != null) return true;
+    }
+    return false;
+}
+
+fn hasAssignmentOperator(line: []const u8) bool {
+    var i: usize = 0;
+    while (i < line.len) : (i += 1) {
+        if (line[i] != '=') continue;
+
+        const prev: u8 = if (i == 0) 0 else line[i - 1];
+        const next: u8 = if (i + 1 < line.len) line[i + 1] else 0;
+
+        // Exclude comparison/arrow tokens.
+        if (prev == '=' or prev == '!' or prev == '<' or prev == '>') continue;
+        if (next == '=' or next == '>') continue;
+
+        return true;
+    }
+    return false;
 }
 
 const Ast = @import("Ast.zig");
