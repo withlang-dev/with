@@ -1,4 +1,4 @@
-# GRAVFALL — Game Design Specification
+# Falling With Style — Game Design Specification
 
 **Genre:** Physics Survivors / Horde Defense
 **Platform:** Steam Deck (primary), PC (secondary)
@@ -6,21 +6,23 @@
 **Physics:** Box2D v3 (C API via `c_import`)
 **Renderer:** SDL3 + SDL3_image + SDL3_gpu (2D sprite-based)
 **Audio:** SDL3_mixer
-**Input:** Steam Input API (gyro/accelerometer), gamepad, keyboard
+**Input:** Steam Input API (gyro, trackpads, touchscreen, grip buttons), gamepad, keyboard
 **Target:** 60fps with 2,000+ active rigid bodies on Steam Deck
 
 ---
 
 ## 1. Elevator Pitch
 
-You control gravity. Enemies don't.
+You control gravity. They don't.
 
-Tilt your Steam Deck to change the direction of gravity across the
-entire arena. Enemies tumble, slide, pile up, and ragdoll. Place
-physics obstacles — ramps, walls, bumpers, pits — to build kill
-zones, then tilt the world to pour enemies into them.
+You're a little maintenance robot in a space station that's been
+overrun by malfunctioning drones. Tilt your Steam Deck to change
+the direction of gravity across the entire arena. Enemies tumble,
+slide, pile up, and ragdoll. Place physics hazards — ramps, walls,
+bumpers, pits — to build kill zones, then tilt the world to pour
+enemies into them.
 
-It's Vampire Survivors meets a marble maze.
+It's Vampire Survivors meets a marble maze, in space.
 
 ---
 
@@ -32,7 +34,7 @@ Every 0.016s (60fps):
     2. Spawn enemy wave (escalating)
     3. Step physics (Box2D)
     4. Check damage (enemy-trap collisions, crush damage, fall damage)
-    5. Collect XP gems from kills
+    5. Collect XP cores from kills
     6. Level up → choose upgrade
     7. Render
 ```
@@ -48,17 +50,53 @@ between runs.
 
 ### 3.1 Steam Deck (Primary)
 
+**Movement and gravity:**
+
 | Input | Action |
 |-------|--------|
 | Gyro (accelerometer) | Control gravity direction and magnitude |
 | Left stick | Move player character |
-| Right stick | Aim manual abilities (optional) |
-| A button | Place selected trap |
-| B button | Cycle trap selection |
-| X button | Activate special ability |
-| L1 / R1 | Rotate trap before placing |
-| L2 (hold) | Lock gravity (stop responding to tilt) |
-| R2 (hold) | Amplify gravity (2x force) |
+| R2 (analog trigger) | Amplify gravity — light pull = 1.5×, full pull = 2.5×, past click = 3× burst |
+
+**Trap placement:**
+
+| Input | Action |
+|-------|--------|
+| Touchscreen tap | Place selected trap at tap location |
+| Left trackpad (radial) | Select trap type — slide thumb in a direction, each segment = one trap type (up to 8). Haptic click on segment boundaries for eyes-free selection |
+| R4 (back grip) | Quick-place last trap type at player position (panic button) |
+
+**Gravity abilities:**
+
+| Input | Action |
+|-------|--------|
+| L4 (back grip) | Gravity slam — instant max gravity in current tilt direction (10s cooldown) |
+| L5 (back grip) | Gravity flip — instant 180° reversal of gravity direction (separate cooldown) |
+| R5 (back grip) | Gravity lock — hold to freeze gravity direction while repositioning the Deck |
+| X button | Activate special ability (unlocked abilities) |
+
+**Haptic feedback (right trackpad motor):**
+
+The right trackpad is used as a haptic feedback channel, not an
+input. It encodes gravity state as vibration:
+
+- Idle: silent
+- Light tilt: gentle purr (low frequency, low amplitude)
+- Strong tilt: aggressive rumble (high frequency, high amplitude)
+- Gravity amplify (R2): motor revs up proportional to trigger pull
+- Gravity slam (L4): sharp heavy pulse on activation
+- Enemy fall-damage kill: quick directional tick (you feel the
+  impact through your thumb)
+
+This gives a tactile sense of gravity force even when the screen
+is too chaotic to read the visual indicators.
+
+**Gyro dampening on touch:**
+
+When the touchscreen registers a tap, gyro input is dampened for
+~100ms to prevent the physical act of touching the screen from
+jerking the gravity direction. Without this, every trap placement
+will feel bad and players won't know why.
 
 **Gravity control details:**
 
@@ -93,21 +131,34 @@ gravity = normalize(tilt_direction) * effective * MAX_GRAVITY
 `MAX_GRAVITY` default: 30 m/s². Normal earth gravity (9.81) is the
 baseline. Fully tilting gives ~3x earth gravity.
 
+**Why back grip buttons work here:** All four grip buttons (L4, L5,
+R4, R5) are operated by fingers already resting on the back of the
+Deck. They require zero hand repositioning. You can tilt, move with
+the left stick, amplify with R2, and hit a grip button simultaneously.
+These are the most underused inputs on the Deck because most games
+don't know they exist.
+
 ### 3.2 PC Fallback
 
 | Input | Action |
 |-------|--------|
 | Mouse position (relative to player) | Gravity direction + magnitude |
 | WASD | Move player |
-| Left click | Place trap |
-| Right click | Cycle trap |
+| Left click | Place trap at cursor position |
+| Right click | Cycle trap type |
 | Space | Special ability |
 | Shift (hold) | Lock gravity |
 | Ctrl (hold) | Amplify gravity |
+| Q / E | Gravity slam / gravity flip |
+| 1–8 keys | Direct trap type selection |
 
 Mouse-controlled gravity: direction from player to cursor sets
 gravity direction. Distance from player to cursor sets magnitude
 (close = weak, far = strong).
+
+PC players get cursor-based trap placement for free since they
+already have a mouse cursor on screen. This makes PC feel natural
+even without the touchscreen and trackpad.
 
 ### 3.3 Accessibility
 
@@ -116,6 +167,8 @@ gravity direction. Distance from player to cursor sets magnitude
 - Option to use right stick instead of gyro
 - Option to lock gravity to 8 cardinal directions (digital mode)
 - Colorblind-safe palette for all gameplay-critical elements
+- Option to disable touchscreen placement (use cursor/stick instead)
+- Haptic intensity slider (including off)
 
 ---
 
@@ -123,9 +176,9 @@ gravity direction. Distance from player to cursor sets magnitude
 
 ### 4.1 Structure
 
-The arena is a bounded 2D space with walls on all four sides. The
-player and all enemies exist within this box. The walls are
-indestructible rigid bodies.
+The arena is a sealed section of the space station — a bounded 2D
+space with bulkhead walls on all four sides. GV-7 and all drones
+exist within this section. The walls are indestructible hull plating.
 
 **Arena size:** ~40x30 meters (Box2D units). Camera shows the
 full arena at all times (no scrolling). This keeps the cognitive
@@ -135,11 +188,11 @@ load on "manage the whole space" rather than "explore."
 
 The arena contains static geometry that interacts with physics:
 
-- **Platforms** — horizontal surfaces enemies can stand/slide on
-- **Ramps** — angled surfaces that redirect falling enemies
-- **Pits** — gaps with kill zones at the bottom (lava, spikes)
-- **Pillars** — vertical obstacles that split enemy flow
-- **Funnels** — V-shaped geometry that concentrates enemies
+- **Platforms** — metal grating surfaces enemies can stand/slide on
+- **Ramps** — angled hull plating that redirects falling enemies
+- **Pits** — gaps with kill zones at the bottom (plasma vents, crushers)
+- **Pillars** — structural columns that split enemy flow
+- **Funnels** — V-shaped bulkhead geometry that concentrates enemies
 
 The terrain layout varies per run (procedurally selected from
 hand-designed chunks). Terrain is destructible at higher
@@ -166,20 +219,40 @@ structures with ramps, funnels, and floating platforms.
 
 ### 5.1 Properties
 
+**GV-7 ("Gee")** — a chunky little maintenance robot. Spherical
+body, stubby magnetized legs, single large eye, expressive antenna.
+Built for station repair, accidentally became the only thing
+standing between the station and total drone malfunction.
+
 | Property | Value |
 |----------|-------|
 | Shape | Circle, radius 0.5m |
-| Mass | 10 kg (heavy — resists gravity changes) |
+| Mass | 10 kg (heavy — mag-boots resist gravity changes) |
 | Movement | Direct velocity control (not force-based) |
 | Speed | 8 m/s base |
-| Health | 100 base |
+| Health | 100 base (shield charge) |
 | Gravity response | Reduced (0.3x world gravity) |
 
 The player is a physics body but is only partially affected by
 gravity changes. This is critical — the player must be able to
-navigate while enemies tumble. The 0.3x factor means the player
-slides slightly when gravity shifts (which feels good) but
-isn't helplessly thrown around.
+navigate while enemies tumble. The 0.3x factor means GV-7 slides
+slightly when gravity shifts (which feels good) but isn't
+helplessly thrown around. The lore justification: mag-boots and
+internal stabilizers.
+
+**Visual expressiveness (no facial animation needed):**
+
+- Antenna points in current gravity direction (doubles as a
+  gameplay indicator)
+- Eye widens when enemies are close, narrows when safe
+- Legs scramble comically when sliding on a surface
+- Body tilts opposite to movement direction (leans into the walk)
+- Small thruster puffs when changing direction
+- Eye blinks occasionally during calm moments
+
+This is important: the character communicates state through body
+language alone. Works at 32×32 pixel scale because the silhouette
+reads clearly — round body, pointy antenna, two stubby legs.
 
 **Playtest note:** The sweet spot between "heavy but not helpless"
 is razor-thin. Test 0.25× and 0.35× aggressively. Additionally,
@@ -194,15 +267,16 @@ The player takes damage from:
 
 - Enemy contact (per-enemy damage, with brief invincibility frames)
 - Crushing (pinned between enemies and a wall at high gravity)
-- Environmental hazards (lava pits, if player falls in)
+- Environmental hazards (plasma pits, if player falls in)
 
-The player does NOT take fall damage (enemies do).
+The player does NOT take fall damage (enemies do). GV-7 is built
+to survive impacts. The drones are not.
 
 ### 5.3 Health and Recovery
 
-- Health regenerates slowly (1 hp/s base)
-- XP gems restore small amounts of health (2 hp each)
-- Upgrade options can increase regen, max health, or add shields
+- Shield charge regenerates slowly (1 hp/s base)
+- XP cores restore small amounts of charge (2 hp each)
+- Upgrade options can increase regen, max charge, or add barriers
 
 ---
 
@@ -210,9 +284,11 @@ The player does NOT take fall damage (enemies do).
 
 ### 6.1 Core Enemy Properties
 
-All enemies are Box2D rigid bodies with full physics simulation.
-They have mass, friction, restitution (bounciness), and respond
-to gravity.
+All enemies are malfunctioning drones — Box2D rigid bodies with
+full physics simulation. They have mass, friction, restitution
+(bounciness), and respond to gravity. They want to reach GV-7
+and discharge into it. They don't know gravity is about to ruin
+their day.
 
 | Property | Meaning |
 |----------|---------|
@@ -222,7 +298,7 @@ to gravity.
 | Shape | Circle or convex polygon |
 | HP | How much damage before death |
 | Contact damage | Damage dealt to player on touch |
-| XP value | Gems dropped on death |
+| XP value | Cores dropped on death |
 
 ### 6.2 Damage From Physics
 
@@ -248,50 +324,52 @@ on top of each other with gravity, bottom ones get crushed.
 
 | Type | Mass | HP | Behavior | Visual |
 |------|------|----|----------|--------|
-| Slime | 2 kg | 20 | Walk toward player | Blob, high restitution (bouncy) |
-| Skeleton | 5 kg | 40 | Walk toward player | Humanoid, low friction (slides easily) |
+| Blobber | 2 kg | 20 | Roll toward player | Spherical gel-drone, high restitution (bouncy), wobbles and deforms on impact |
+| Junkbot | 5 kg | 40 | Walk toward player | Cobbled-together scrap drone, low friction (slides easily), limbs flail when tumbling |
 
 **Tier 2 — Sturdy (minutes 3–10):**
 
 | Type | Mass | HP | Behavior | Visual |
 |------|------|----|----------|--------|
-| Golem | 20 kg | 120 | Slow walk | Heavy, low restitution (thud) |
-| Bat | 1 kg | 15 | Fly (reduced gravity response) | Airborne, high friction on contact |
-| Spider | 3 kg | 30 | Wall-cling (high friction) | Grips surfaces, resists sliding |
+| Loader | 20 kg | 120 | Slow walk | Heavy industrial drone, cubic, low restitution (thud), dents on impact |
+| Hover Drone | 1 kg | 15 | Fly (reduced gravity response) | Small quad-rotor, buzzes, high friction on contact |
+| Clinger | 3 kg | 30 | Wall-cling (high friction) | Spider-like repair drone, grips surfaces with mag-legs, resists sliding |
 
 **Tier 3 — Threats (minutes 8–20):**
 
 | Type | Mass | HP | Behavior | Visual |
 |------|------|----|----------|--------|
-| Knight | 15 kg | 200 | Charge toward player | Armored, destroys traps on contact |
-| Wraith | 0.5 kg | 60 | Phase through platforms | Semi-transparent, only solid near player |
-| Bomber | 8 kg | 50 | Walk toward player, explode on death | Explosion applies radial impulse to nearby enemies |
+| Breacher | 15 kg | 200 | Charge toward player | Armored security drone, battering ram head, destroys traps on contact |
+| Phase Drone | 0.5 kg | 60 | Phase through platforms | Translucent holographic shell, only solid near player, flickers |
+| Detonator | 8 kg | 50 | Walk toward player, explode on death | Blinking red warning light, explosion applies radial impulse to nearby enemies |
 
 **Tier 4 — Elites (minutes 15+):**
 
 | Type | Mass | HP | Behavior | Visual |
 |------|------|----|----------|--------|
-| Titan | 100 kg | 800 | Slow, creates gravity well on death | Enormous, other enemies orbit it |
-| Anchor | 50 kg | 400 | Immune to gravity changes | Walks steadily regardless of tilt. Glowing runes on its body that stay upright no matter the tilt angle — visible from across the arena so players immediately understand this enemy plays by different rules |
-| Swarm Queen | 10 kg | 150 | Spawns Slimes continuously | Must be killed to stop spawn |
+| Colossus | 100 kg | 800 | Slow, creates gravity well on death | Enormous cargo drone, other enemies orbit it, screen shakes when it lands |
+| Anchor | 50 kg | 400 | Immune to gravity changes | Walks steadily regardless of tilt. Gyroscopic stabilizer rings on its body that stay level no matter the tilt angle — visible from across the arena so players immediately understand this drone plays by different rules |
+| Hive Core | 10 kg | 150 | Spawns Blobbers continuously | Pulsing factory drone, must be killed to stop spawn, glows brighter as it produces |
 
 **Bosses (every 5 minutes):**
 
 Mini-boss waves. Single large enemy with unique physics mechanics:
 
-- **The Boulder** (min 5): Giant sphere, extremely heavy, rolls
-  with gravity. Player must trap it in a pit.
-  **Hard design rule:** The Boulder MUST be beatable with only
-  starter traps (Spike Strip + Bumper + Wall) and basic tilt.
+- **The Wrecking Ball** (min 5): Giant sphere drone, extremely
+  heavy, rolls with gravity. Player must trap it in a pit.
+  **Hard design rule:** The Wrecking Ball MUST be beatable with
+  only starter traps (Spike Strip + Bumper + Wall) and basic tilt.
   No unlocks required. If a new player who understands the core
   mechanic can't kill this boss, the game's retention dies here.
-- **The Chain Gang** (min 10): Group of enemies connected by
-  Box2D distance joints. Must break the chain by pulling them
-  apart with alternating gravity.
-- **The Wrecking Ball** (min 15): Enemy on a revolute joint,
-  swings with gravity. Destroys terrain it hits.
-- **The Inverse** (min 20): Reverses gravity for itself.
-  Falls upward. Completely disorienting.
+- **The Chain Gang** (min 10): Group of drones connected by
+  energy tethers (Box2D distance joints). Must break the chain
+  by pulling them apart with alternating gravity.
+- **The Pendulum** (min 15): Drone on a revolute joint,
+  swings with gravity. Destroys terrain it hits. Wrecking ball
+  on a cosmic string.
+- **The Inverter** (min 20): Reverses gravity for itself.
+  Falls upward. Completely disorienting. Its own gravity field
+  is visible as a shimmering bubble.
 
 ### 6.4 Spawning
 
@@ -344,9 +422,10 @@ damage. The player places them in the arena and they persist.
 
 ### 7.1 Trap Placement
 
-- Player selects a trap type (cycle with B or scroll)
-- Aim with right stick or player-facing direction
-- Place with A button
+- Player selects a trap type (radial selector on left trackpad,
+  or d-pad cycle)
+- Tap touchscreen at desired location to place the trap
+- Alternatively: R4 back grip to quick-place at player position
 - Trap appears as a static or kinematic Box2D body
 - Each trap has a cooldown before another can be placed
 - Maximum active traps per type (typically 3–5)
@@ -410,7 +489,7 @@ CATEGORY_KILL_ZONE  = 0x0020
 
 ### 8.1 In-Run Progression (XP and Levels)
 
-Killed enemies drop XP gems. Gems are small physics bodies that
+Killed enemies drop XP cores. Cores are small physics bodies that
 roll with gravity (this is important — they slide toward the
 player when gravity favors it, creating a satisfying cascade of
 pickups after a big kill).
@@ -448,21 +527,21 @@ On level up, the player chooses one of three random upgrades.
 
 | Upgrade | Effect |
 |---------|--------|
-| Iron Boots | Player gravity response 0.15x (more stable) |
-| Speed Boost | +20% movement speed |
-| Regeneration | +2 hp/s |
-| Shield | Absorb one hit every 10 seconds |
-| XP Magnet | Gems attracted from further away |
-| Heavyweight | Player mass +50% (push through enemies) |
+| Mag-Boot Override | Player gravity response 0.15x (more stable) |
+| Thruster Boost | +20% movement speed |
+| Shield Regen | +2 hp/s |
+| Deflector | Absorb one hit every 10 seconds |
+| Core Magnet | XP cores attracted from further away |
+| Ballast Module | Player mass +50% (push through enemies) |
 
 **Special upgrades (rare, game-changing):**
 
 | Upgrade | Effect |
 |---------|--------|
-| Earthquake | Gravity changes crack terrain, creating new pits |
+| Hull Breach | Gravity changes crack terrain, creating new pits |
 | Zero-G Zone | Area around player has zero gravity (enemies float helplessly) |
 | Gravity Bomb | On cooldown: slam gravity to max in random direction |
-| Ricochet | Enemies that hit walls bounce back at 2x speed |
+| Ricochet Plating | Enemies that hit walls bounce back at 2x speed |
 
 ### 8.3 Meta-Progression (Between Runs)
 
@@ -507,8 +586,8 @@ Price differentiation starts at Tier 2.
 |--------|--------|
 | Extra Trap Slot | +1 max trap of every type |
 | Heavier Tilt | Base max gravity +15% |
-| Iron Soles | Player gravity response reduced to 0.20× |
-| Gem Greed | XP gems have 30% stronger gravity pull toward player |
+| Iron Soles | Player gravity response reduced to 0.20× (mag-boot upgrade) |
+| Core Magnet | XP cores have 30% stronger gravity pull toward player |
 
 **Tier 2 — Getting Comfortable (800–1,200 shards):**
 
@@ -527,7 +606,7 @@ Price differentiation starts at Tier 2.
 | Unlock Explosive Barrel | 2,000 | New trap type: Explosive Barrel | — |
 | Unlock Conveyor | 1,950 | New trap type: Conveyor | — |
 | Arena Pack 1 | 1,600 | +3 new arena templates | Survive 10 min once |
-| Titan Slayer | 2,500 | All elite enemies take +25% physics damage | — |
+| Colossus Slayer | 2,500 | All elite enemies take +25% physics damage | — |
 
 **Tier 4 — Mastery (2,800–3,500 shards):**
 
@@ -560,19 +639,54 @@ Price differentiation starts at Tier 2.
 
 ### 9.1 Art Direction
 
-**Chunky pixel art, 32x32 base sprites, bright saturated palette.**
+**Chunky pixel art, 32×32 base sprites. Sci-fi space station
+aesthetic with a bright, saturated palette.**
 
-The visual priority is readability at high entity counts. When 500
-enemies are on screen, the player must instantly distinguish:
+Think: abandoned space station meets toy box. Clean metal surfaces,
+glowing plasma vents, exposed wiring, warning stripes — but all
+rendered in chunky, friendly pixel art. Nothing grimdark. The
+station is dangerous but the robots are cute.
 
-- Enemies (by type/tier — color coded)
-- Traps (distinct silhouettes)
-- Terrain (muted background colors)
-- XP gems (bright, high contrast)
-- Player (always visible, never lost in the crowd)
+**Color language:**
 
-Think: Vampire Survivors meets Noita's physics. Sprites for
-characters, particles for juice, physics for everything else.
+- **Player (GV-7):** Bright cyan body, warm orange eye. Always
+  pops against any background. The antenna tip glows white.
+- **Tier 1 enemies:** Green spectrum (lime Blobbers, olive Junkbots)
+- **Tier 2 enemies:** Yellow-orange spectrum (amber Loaders, yellow
+  Hover Drones, orange Clingers)
+- **Tier 3 enemies:** Red spectrum (crimson Breachers, magenta Phase
+  Drones, scarlet Detonators with blinking warning light)
+- **Tier 4 enemies:** Purple/white (Colossus glows purple, Anchor
+  has white stabilizer rings, Hive Core pulses violet)
+- **Bosses:** Unique palette per boss, larger sprites (64×64 or 96×96)
+- **Traps:** Metallic grey with colored accents matching their
+  function (red for damage, blue for physics, yellow for area)
+- **XP cores:** Bright electric blue, high contrast against
+  everything. Small glowing hexagons.
+- **Terrain:** Muted steel grey and dark blue. Never competes with
+  gameplay elements for attention.
+
+**The visual priority is readability at high entity counts.** When
+500 drones are on screen, the player must instantly distinguish:
+
+- Enemies (by type/tier — color coded by temperature)
+- Traps (distinct silhouettes, metallic)
+- Terrain (muted background)
+- XP cores (bright blue, always visible)
+- GV-7 (cyan + orange, never lost in the crowd)
+
+**Character animation principles:**
+
+All robots communicate through body language, not faces:
+
+- GV-7's antenna points toward gravity direction
+- Enemy drones lean into their movement, flail when tumbling
+- Destroyed drones burst into component parts (screws, bolts,
+  plating) that are themselves physics bodies for a brief moment
+  before fading — this creates satisfying debris cascades
+- Blobbers deform on every surface contact (squash and stretch)
+- Junkbots lose limb-pieces as they take damage
+- Loaders leave dent sprites on walls they impact
 
 ### 9.2 Camera
 
@@ -591,35 +705,38 @@ Subtle camera effects:
 
 Critical: the player must always know the gravity direction.
 
-- **Arrow indicator** — large, semi-transparent arrow showing gravity
-  direction and magnitude, always visible at screen center
-- **Particle dust** — ambient particles drift in gravity direction
-- **Enemy lean** — enemies tilt toward gravity (visual only)
-- **Background parallax** — subtle background layer shifts opposite
-  to gravity, reinforcing the tilt feeling
-- **XP gem behavior** — gems sliding and rolling in gravity direction
-  provides constant ambient feedback
+- **Arrow indicator** — large, semi-transparent holographic arrow
+  showing gravity direction and magnitude, always visible at screen
+  center
+- **Particle dust** — ambient debris particles drift in gravity
+  direction
+- **Drone lean** — enemies tilt toward gravity (visual only)
+- **Background parallax** — subtle starfield/station exterior layer
+  shifts opposite to gravity, reinforcing the tilt feeling
+- **XP core behavior** — cores sliding and rolling in gravity
+  direction provides constant ambient feedback
 
 ### 9.4 Juice
 
 | Event | Effect |
 |-------|--------|
-| Enemy death | Sprite pops, 3-5 particles in death color, XP gems fly out |
+| Enemy death | Drone pops into component debris, 3–5 sparks, XP cores fly out |
 | High-speed impact | Flash white, screen shake (proportional to velocity) |
-| Crush kill | Squish animation, particles spray from crush point |
-| Pit kill | Brief flame/splash from pit type |
+| Crush kill | Crumple animation, sparks spray from crush point |
+| Pit kill | Plasma flare / electrical discharge from pit type |
 | Level up | Flash, brief slowdown (100ms), upgrade UI |
-| Boss spawn | Screen darkens briefly, rumble, warning text |
-| Gravity slam (R2) | Radial pulse wave, everything accelerates |
+| Boss spawn | Screen darkens briefly, klaxon warning, alert text |
+| Gravity slam (L4) | Radial pulse wave, everything accelerates, heavy haptic pulse |
+| Gravity flip (L5) | Brief inversion flash, all particles reverse, sharp haptic tick |
 
 ### 9.5 UI
 
 **HUD (always visible):**
 
-- Health bar (top left)
+- Shield charge bar (top left)
 - XP bar (bottom, full width, thin)
 - Current trap + count (bottom right)
-- Gravity direction indicator (center, subtle)
+- Gravity direction indicator (center, subtle holographic)
 - Timer (top right)
 - Kill counter (top right, below timer)
 - Active trap count (bottom right, per type)
@@ -638,13 +755,14 @@ Critical: the player must always know the gravity direction.
 
 ### 10.1 Music
 
-Escalating electronic/chiptune soundtrack.
+Escalating electronic/synthwave soundtrack. Space station ambience
+underneath.
 
-- Minutes 0–5: Calm, ambient, building anticipation
-- Minutes 5–10: Driving beat kicks in
-- Minutes 10–15: Intensity increases, layers added
+- Minutes 0–5: Calm, ambient, low hum of the station, building anticipation
+- Minutes 5–10: Driving beat kicks in, synth layers
+- Minutes 10–15: Intensity increases, distorted bass, alarm tones woven in
 - Minutes 15+: Full chaos mode, aggressive track
-- Boss: Unique stinger + boss theme
+- Boss: Klaxon stinger + boss theme
 
 Music tempo can subtly sync with enemy spawn rate.
 
@@ -652,30 +770,54 @@ Music tempo can subtly sync with enemy spawn rate.
 
 | Sound | Trigger |
 |-------|---------|
-| Thud (pitch varies with mass) | Enemy hits surface |
-| Splat | Enemy dies |
+| Metallic thud (pitch varies with mass) | Drone hits surface |
+| Crackle/pop | Drone destroyed |
 | Crunch | Crush kill |
-| Sizzle/splash | Pit kill |
+| Electrical zap | Plasma pit kill |
 | Boing | Bumper hit |
 | Whoosh | Gravity direction change (proportional to delta) |
-| Rumble (low freq) | Gravity amplify (R2 hold) |
-| Chime | XP gem pickup |
+| Rumble (low freq) | Gravity amplify (R2 analog pull) |
+| Slam (percussive) | Gravity slam (L4) |
+| Ping | XP core pickup |
 | Fanfare (short) | Level up |
-| Warning horn | Boss incoming |
+| Klaxon | Boss incoming |
 
 Physics-driven audio: impact sounds pitch-shift based on collision
 velocity. Heavy impacts are deep, light bounces are high. This
-creates an organic soundscape as hundreds of enemies tumble.
+creates an organic soundscape as hundreds of drones tumble.
 
 ### 10.3 Haptics
 
-Steam Deck has HD haptics. Use them:
+Steam Deck has two HD haptic motors (one in each trackpad). Use
+the **right trackpad motor** as a continuous gravity feedback
+channel (see §3.1 for details). The left trackpad motor provides
+haptic clicks for the radial trap selector.
 
-- Gravity changes: gentle continuous vibration proportional to tilt
-- Heavy impacts: sharp pulse
-- Amplify mode: sustained rumble
-- Level up: unique pattern
-- Damage taken: sharp double pulse
+**Right trackpad (gravity feedback):**
+
+| State | Haptic |
+|-------|--------|
+| No tilt | Silent |
+| Light tilt | Low-frequency gentle purr |
+| Strong tilt | High-frequency aggressive rumble |
+| R2 amplify | Motor intensity scales with trigger pull |
+| L4 gravity slam | Sharp heavy thud |
+| L5 gravity flip | Quick double-tick |
+| Enemy fall-kill | Brief directional pulse |
+| Damage taken | Sharp triple-pulse |
+| Level up | Rising sweep pattern |
+
+**Left trackpad (trap selector):**
+
+| State | Haptic |
+|-------|--------|
+| Thumb crosses segment boundary | Crisp click |
+| Trap placed successfully | Soft confirm tick |
+| Trap placement failed (cooldown) | Harsh buzz |
+
+The haptic feedback should be noticeable but never fatiguing.
+Players will be holding the Deck for 15–30 minute sessions.
+Provide an intensity slider in settings (including fully off).
 
 ---
 
@@ -731,7 +873,7 @@ type World = {
     // Singleton state
     player:       Player,
     traps:        Vec[Trap],
-    gems:         Vec[Gem],
+    cores:         Vec[Core],
     gravity:      Vec2,
     elapsed:      f32,
 
@@ -833,7 +975,7 @@ fn render(world: &World, renderer: &mut Renderer) =
     // Layer 1: Terrain (static, cached)
     renderer.draw_terrain(world.terrain)
 
-    // Layer 2: Kill zones (pits, lava)
+    // Layer 2: Kill zones (pits, plasma vents)
     renderer.draw_kill_zones(world.terrain)
 
     // Layer 3: Traps
@@ -850,9 +992,9 @@ fn render(world: &World, renderer: &mut Renderer) =
                 b2Rot_GetAngle(rot),
             )
 
-    // Layer 5: XP gems
-    for gem in &world.gems:
-        renderer.queue_sprite(GEM_SPRITE, gem.position, 0.0)
+    // Layer 5: XP cores
+    for core in &world.cores:
+        renderer.queue_sprite(CORE_SPRITE, core.position, 0.0)
 
     // Layer 6: Player (always on top)
     renderer.queue_sprite(world.player.sprite, world.player.position, 0.0)
@@ -900,8 +1042,8 @@ fn read_gyro() -> Vec2 =
 
 ### 12.1 Playable Demo (Minimum Viable Game)
 
-- 1 arena template (simple: flat floor, 2 pits, some platforms)
-- 3 enemy types (Slime, Skeleton, Golem)
+- 1 arena template (simple: flat floor, 2 plasma pits, some platforms)
+- 3 enemy types (Blobber, Junkbot, Loader)
 - 3 starter traps (Spike Strip, Bumper, Wall)
 - Gravity control via gyro
 - XP + leveling with 6 basic upgrades
@@ -915,7 +1057,7 @@ This is the "is it fun?" checkpoint.
 - 3 arena templates
 - 6 enemy types (Tier 1 + Tier 2)
 - 6 trap types
-- First boss (The Boulder)
+- First boss (The Wrecking Ball)
 - 15 upgrades
 - Placeholder audio
 - Grav-Shard Forge with Tier 1 + Tier 2 permanent unlocks
@@ -964,8 +1106,9 @@ When someone opens the repo and reads the source code:
 
 The story: "This game runs at 60fps on Steam Deck with 2000 physics
 bodies, and the source code is 5,000 lines of a language you've
-never seen before. Read it. You already understand it."
+never seen before. A little robot, a broken space station, and a
+gravity gun. Read the code. You already understand it."
 
 ---
 
-*GRAVFALL — Game Design Specification v0.2*
+*Falling With Style — Game Design Specification v0.4*

@@ -26,6 +26,10 @@ source: []const u8,
 /// Pending `@[derive(...)]` trait names parsed from attributes that
 /// apply to the next top-level type declaration.
 pending_derive_traits: []const Ast.Symbol = &.{},
+/// Pending function attributes from `@[tailrec]`, `@[inline]`, `@[noinline]`.
+pending_tailrec: bool = false,
+pending_inline: bool = false,
+pending_noinline: bool = false,
 
 pub fn init(
     tokens: *const Token.List,
@@ -465,6 +469,9 @@ fn parseFnDecl(self: *Parser, is_pub: Ast.Visibility, start_span: Span, is_async
             .is_async = is_async,
             .is_gen = is_gen,
             .is_pub = is_pub,
+            .is_tailrec = self.pending_tailrec,
+            .is_inline = self.pending_inline,
+            .is_noinline = self.pending_noinline,
         } },
         .span = start_span.merge(body.span),
     };
@@ -2066,7 +2073,7 @@ fn parseWhileLet(self: *Parser, start: Span) !*const Ast.Expr {
     // Build break expression for the wildcard arm.
     const break_node = try self.arena.create(Ast.Expr);
     break_node.* = .{
-        .kind = .break_expr,
+        .kind = .{ .break_expr = null },
         .span = start,
     };
 
@@ -2494,9 +2501,20 @@ fn parseClosure(self: *Parser) !*const Ast.Expr {
 
 fn parseBreak(self: *Parser) !*const Ast.Expr {
     const span = self.currentSpan();
-    self.advance();
+    self.advance(); // consume 'break'
+    // Optionally parse a value expression: `break expr`
+    var value: ?*const Ast.Expr = null;
+    const next = self.peek();
+    if (next != .newline and next != .eof and next != .r_brace and
+        next != .r_paren and next != .r_bracket)
+    {
+        value = try self.parseExpr();
+    }
     const node = try self.arena.create(Ast.Expr);
-    node.* = .{ .kind = .break_expr, .span = span };
+    node.* = .{
+        .kind = .{ .break_expr = value },
+        .span = if (value) |v| span.merge(v.span) else span,
+    };
     return node;
 }
 
@@ -3167,6 +3185,9 @@ fn skipNewlines(self: *Parser) void {
 
 fn skipAttributes(self: *Parser) void {
     self.pending_derive_traits = &.{};
+    self.pending_tailrec = false;
+    self.pending_inline = false;
+    self.pending_noinline = false;
     var derives: std.ArrayList(Ast.Symbol) = .empty;
 
     while (self.peek() == .at) {
@@ -3199,6 +3220,15 @@ fn skipAttributes(self: *Parser) void {
                 }
                 if (self.peek() == .r_paren) self.advance();
             }
+        } else if (self.isIdentifierNamed("tailrec")) {
+            self.pending_tailrec = true;
+            self.advance();
+        } else if (self.isIdentifierNamed("inline")) {
+            self.pending_inline = true;
+            self.advance();
+        } else if (self.isIdentifierNamed("noinline")) {
+            self.pending_noinline = true;
+            self.advance();
         }
 
         // Consume until matching `]`.
