@@ -1,7 +1,12 @@
-// Test: For loop with range
+// Test for loop with range
 fn main() -> i32 =
     var sum = 0
-    for i in 1..11:
+    for i in 0..5
         sum = sum + i
-    // 1+2+3+4+5+6+7+8+9+10 = 55
-    if sum == 55 then 0 else 1
+    println(sum)
+
+    var prod = 1
+    for i in 1..=5
+        prod = prod * i
+    println(prod)
+    0
