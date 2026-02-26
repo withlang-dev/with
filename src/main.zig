@@ -644,6 +644,20 @@ fn runOneTest(path: []const u8, allocator: std.mem.Allocator, summary: *TestSumm
         return;
     }
     const bin_path = bin_path_opt.?;
+    // Clean up binary and object file after test completes.
+    defer std.fs.cwd().deleteFile(bin_path) catch {};
+    defer {
+        const stem = blk: {
+            const base = std.fs.path.basename(path);
+            if (std.mem.endsWith(u8, base, ".w")) break :blk base[0 .. base.len - 2];
+            break :blk base;
+        };
+        const dir = std.fs.path.dirname(path) orelse ".";
+        var obj_buf: [4096]u8 = undefined;
+        if (std.fmt.bufPrint(&obj_buf, "{s}/{s}.o", .{ dir, stem })) |obj_path| {
+            std.fs.cwd().deleteFile(obj_path) catch {};
+        } else |_| {}
+    }
 
     var child = std.process.Child.init(&.{bin_path}, allocator);
     _ = child.spawn() catch |e| {

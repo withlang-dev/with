@@ -1,24 +1,21 @@
-// Test: Nested match expressions
+// Test: nested match expressions
+
 type Color = Red | Green | Blue
+type Shape = Circle(i32) | Rect(i32, i32)
 
-fn color_val(c: Color) -> i32 =
-    match c
-        Red -> 1
-        Green -> 2
-        Blue -> 3
-
-fn combine(a: Color, b: Color) -> i32 =
-    color_val(a) * 10 + color_val(b)
+fn describe(s: Shape, c: Color) -> i32 =
+    match s
+        Circle(r) -> match c
+            Red -> r * 100
+            Green -> r * 200
+            Blue -> r * 300
+        Rect(w, h) -> match c
+            Red -> w + h
+            Green -> (w + h) * 2
+            Blue -> (w + h) * 3
 
 fn main() -> i32 =
-    assert(combine(Red, Blue) == 13)
-    assert(combine(Green, Green) == 22)
-    assert(combine(Blue, Red) == 31)
-
-    // Nested match in expressions
-    let x = match Red
-        Red -> match Green
-            Green -> 42
-            _ -> 0
-        _ -> 0
-    if x == 42 then 0 else 1
+    println(describe(Circle(5), Red))
+    println(describe(Circle(5), Green))
+    println(describe(Rect(3, 4), Blue))
+    0

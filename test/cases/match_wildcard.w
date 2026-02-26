@@ -1,13 +1,27 @@
-// Test: Match with wildcard patterns
-fn classify(x: i32) -> i32 =
-    match x
-        0 -> 0
-        1 -> 1
-        _ -> 42
+// Test: match with wildcard and or-patterns
+
+type Day = Mon | Tue | Wed | Thu | Fri | Sat | Sun
+
+fn is_weekend(d: Day) -> bool =
+    match d
+        Sat | Sun -> true
+        _ -> false
+
+fn day_type(d: Day) -> i32 =
+    match d
+        Mon | Tue | Wed | Thu | Fri -> 1
+        Sat | Sun -> 2
 
 fn main() -> i32 =
-    assert(classify(0) == 0)
-    assert(classify(1) == 1)
-    assert(classify(99) == 42)
-    assert(classify(-5) == 42)
+    assert(not is_weekend(Mon))
+    assert(not is_weekend(Wed))
+    assert(is_weekend(Sat))
+    assert(is_weekend(Sun))
+
+    assert(day_type(Mon) == 1)
+    assert(day_type(Fri) == 1)
+    assert(day_type(Sat) == 2)
+    assert(day_type(Sun) == 2)
+
+    println("ok")
     0
