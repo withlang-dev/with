@@ -959,16 +959,21 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
         },
         .tuple_destructure => |td| {
             const val_type = self.checkExpr(td.value);
-            // Each binding gets error_type for now (tuple element types).
-            for (td.names) |name| {
+            const resolved = self.resolveAlias(val_type);
+            const type_info = self.getType(resolved);
+            // Extract element types from tuple if available.
+            for (td.names, 0..) |name, i| {
+                const elem_type = if (type_info == .tuple_type and i < type_info.tuple_type.elements.len)
+                    type_info.tuple_type.elements[i]
+                else
+                    error_type;
                 self.current_scope.put(self.allocator, name, .{
-                    .type_id = error_type,
+                    .type_id = elem_type,
                     .is_mut = td.is_mut,
                     .span = expr.span,
                     .state = .live,
                 });
             }
-            _ = val_type;
             return self.ty_void;
         },
         .poisoned => error_type,
