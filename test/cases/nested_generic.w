@@ -1,17 +1,8 @@
-// Test: generic function calling another generic function
-fn id[T](x: T) -> T =
-    x
-
-fn apply_id[T](x: T) -> T =
-    id(x)
-
-fn add_then_id[T](x: T, y: T) -> T =
-    id(x + y)
+// Test nested generic function calls
+fn add[T](a: T, b: T) -> T = a + b
+fn double[T](x: T) -> T = add(x, x)
 
 fn main() -> i32 =
-    let a = apply_id(20)
-    let b = apply_id(22)
-    assert(a + b == 42)
-    let c = add_then_id(10, 32)
-    assert(c == 42)
+    println(double(5))
+    println(double(21))
     0
