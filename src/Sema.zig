@@ -1136,8 +1136,17 @@ fn checkBlock(self: *Sema, blk: Ast.BlockExpr) TypeId {
         self.current_scope = saved;
     }
 
+    var saw_diverging = false;
     for (blk.stmts) |stmt| {
+        if (saw_diverging) {
+            self.emitWarning("unreachable code after return/break/continue", stmt.span);
+            break;
+        }
         _ = self.checkExpr(stmt);
+        // Detect diverging statements.
+        if (stmt.kind == .return_expr or stmt.kind == .break_expr or stmt.kind == .continue_expr) {
+            saw_diverging = true;
+        }
         // @[must_use]: warn if a @[must_use] function's return value is discarded.
         if (stmt.kind == .call) {
             const call_e = stmt.kind.call;
@@ -1215,16 +1224,58 @@ fn checkIfExpr(self: *Sema, if_e: Ast.IfExpr) TypeId {
     return then_type;
 }
 
-fn checkReturn(self: *Sema, ret_val: ?*const Ast.Expr, _: Span) TypeId {
+fn checkReturn(self: *Sema, ret_val: ?*const Ast.Expr, span: Span) TypeId {
     if (ret_val) |val| {
-        _ = self.checkExpr(val);
+        const val_type = self.checkExpr(val);
+        // Check return type compatibility.
+        if (self.current_return_type != error_type and val_type != error_type) {
+            if (!self.typesCompatible(self.current_return_type, val_type)) {
+                if (self.arithmeticResultType(self.current_return_type, val_type) == error_type) {
+                    var buf: [256]u8 = undefined;
+                    const expected = self.typeName(self.current_return_type);
+                    const actual = self.typeName(val_type);
+                    const msg = std.fmt.bufPrint(&buf, "return type mismatch: expected '{s}', found '{s}'", .{ expected, actual }) catch "return type mismatch";
+                    const alloc_msg = self.allocator.dupe(u8, msg) catch "return type mismatch";
+                    self.emitError(alloc_msg, span);
+                }
+            }
+        }
     }
     return self.ty_void;
 }
 
-fn checkAssign(self: *Sema, assign_e: Ast.AssignExpr, _: Span) TypeId {
-    _ = self.checkExpr(assign_e.target);
-    _ = self.checkExpr(assign_e.value);
+fn checkAssign(self: *Sema, assign_e: Ast.AssignExpr, span: Span) TypeId {
+    const target_type = self.checkExpr(assign_e.target);
+    const value_type = self.checkExpr(assign_e.value);
+
+    // Check mutability: target must be mutable.
+    if (assign_e.target.kind == .ident) {
+        const target_sym = assign_e.target.kind.ident;
+        if (self.current_scope.lookup(target_sym)) |info| {
+            if (!info.is_mut) {
+                var buf: [256]u8 = undefined;
+                const name_str = self.pool.resolve(target_sym);
+                const msg = std.fmt.bufPrint(&buf, "cannot assign to immutable variable '{s}'", .{name_str}) catch "immutable assignment";
+                const alloc_msg = self.allocator.dupe(u8, msg) catch "immutable assignment";
+                self.emitError(alloc_msg, span);
+            }
+        }
+    }
+
+    // Check type compatibility.
+    if (target_type != error_type and value_type != error_type) {
+        if (!self.typesCompatible(target_type, value_type)) {
+            // Allow numeric coercion.
+            if (self.arithmeticResultType(target_type, value_type) == error_type) {
+                var buf: [256]u8 = undefined;
+                const expected = self.typeName(target_type);
+                const actual = self.typeName(value_type);
+                const msg = std.fmt.bufPrint(&buf, "type mismatch in assignment: expected '{s}', found '{s}'", .{ expected, actual }) catch "type mismatch";
+                const alloc_msg = self.allocator.dupe(u8, msg) catch "type mismatch";
+                self.emitError(alloc_msg, span);
+            }
+        }
+    }
 
     // Assignment reinitializes the target (state → live).
     if (assign_e.target.kind == .ident) {
