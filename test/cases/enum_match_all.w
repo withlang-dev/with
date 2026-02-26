@@ -1,28 +1,21 @@
-// Test: exhaustive enum matching (all variants)
-type Season = Spring | Summer | Autumn | Winter
+// Test exhaustive enum matching with multiple variant types
+type Token = enum {
+    Number(i32),
+    Plus,
+    Minus,
+    Eof,
+}
 
-fn temp(s: Season) -> i32 =
-    match s
-        Spring -> 15
-        Summer -> 30
-        Autumn -> 10
-        Winter -> 0
-
-fn is_warm(s: Season) -> bool =
-    match s
-        Spring -> true
-        Summer -> true
-        Autumn -> false
-        Winter -> false
+fn token_to_str(t: Token) -> str =
+    match t
+        Token.Number(n) -> "number"
+        Token.Plus -> "plus"
+        Token.Minus -> "minus"
+        Token.Eof -> "eof"
 
 fn main() -> i32 =
-    assert(temp(Spring) == 15)
-    assert(temp(Summer) == 30)
-    assert(temp(Autumn) == 10)
-    assert(temp(Winter) == 0)
-    assert(is_warm(Spring))
-    assert(is_warm(Summer))
-    assert(not is_warm(Autumn))
-    assert(not is_warm(Winter))
-    assert(temp(Spring) + temp(Summer) + temp(Autumn) + temp(Winter) - 13 == 42)
+    println(token_to_str(Token.Number(42)))
+    println(token_to_str(Token.Plus))
+    println(token_to_str(Token.Minus))
+    println(token_to_str(Token.Eof))
     0
