@@ -323,7 +323,13 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try writer.writeAll(" |> ");
             try renderExpr(p.rhs, pool, writer, 0);
         },
-        .break_expr => try writer.writeAll("break"),
+        .break_expr => |brk_val| {
+            try writer.writeAll("break");
+            if (brk_val) |val| {
+                try writer.writeAll(" ");
+                try renderExpr(val, pool, writer, 0);
+            }
+        },
         .continue_expr => try writer.writeAll("continue"),
         .loop_expr => |body| {
             try writer.writeAll("loop:\n");

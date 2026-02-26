@@ -793,7 +793,12 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
         .while_expr => |while_e| self.checkWhile(while_e),
         .loop_expr => |body| self.checkLoop(body),
         .for_expr => |for_e| self.checkFor(for_e),
-        .break_expr => self.ty_void,
+        .break_expr => |brk_val| {
+            if (brk_val) |v| {
+                _ = self.checkExpr(v);
+            }
+            return self.ty_void;
+        },
         .continue_expr => self.ty_void,
         .field_access => |fa| self.checkFieldAccess(fa, expr.span),
         .index => |idx| self.checkIndex(idx, expr.span),

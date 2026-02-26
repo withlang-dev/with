@@ -90,6 +90,9 @@ pub const FnDecl = struct {
     is_async: bool,
     is_gen: bool,
     is_pub: Visibility,
+    is_tailrec: bool = false,
+    is_inline: bool = false,
+    is_noinline: bool = false,
 };
 
 pub const ExternFnDecl = struct {
@@ -212,8 +215,8 @@ pub const ExprKind = union(enum) {
     loop_expr: *const Expr,
     /// For loop: `for x in range: body`
     for_expr: ForExpr,
-    /// Break out of a loop
-    break_expr,
+    /// Break out of a loop, optionally with a value: `break` or `break expr`
+    break_expr: ?*const Expr,
     /// Continue to next loop iteration
     continue_expr,
     /// Array literal: `[1, 2, 3]`

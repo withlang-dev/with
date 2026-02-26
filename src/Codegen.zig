@@ -44,6 +44,10 @@ type_aliases: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef),
 /// Stack of loop contexts for break/continue.
 loop_stack: [16]LoopContext = undefined,
 loop_depth: u32 = 0,
+/// Tail-call optimization state: when non-null, recursive calls branch back.
+tailrec_body_bb: ?c.LLVMBasicBlockRef = null,
+tailrec_param_allocas: ?[]c.LLVMValueRef = null,
+tailrec_fn_sym: ?u32 = null,
 closure_counter: u32 = 0,
 /// Defer stack for current function.
 defer_stack: [32]*const Ast.Expr = undefined,
@@ -147,6 +151,7 @@ const ScopedLocal = struct {
 const LoopContext = struct {
     break_bb: c.LLVMBasicBlockRef,
     continue_bb: c.LLVMBasicBlockRef,
+    result_alloca: ?c.LLVMValueRef = null,
 };
 
 const TypeBinding = struct {
@@ -574,6 +579,21 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     name_buf[name.len] = 0;
 
     const function = c.LLVMAddFunction(self.module, &name_buf, fn_type);
+
+    // Apply @[inline] / @[noinline] LLVM function attributes.
+    if (func.is_inline) {
+        c.LLVMAddAttributeAtIndex(function, @bitCast(@as(i32, -1)), c.LLVMCreateEnumAttribute(
+            self.context,
+            c.LLVMGetEnumAttributeKindForName("alwaysinline", 12),
+            0,
+        ));
+    } else if (func.is_noinline) {
+        c.LLVMAddAttributeAtIndex(function, @bitCast(@as(i32, -1)), c.LLVMCreateEnumAttribute(
+            self.context,
+            c.LLVMGetEnumAttributeKindForName("noinline", 8),
+            0,
+        ));
+    }
 
     self.functions.put(self.allocator, func.name, .{
         .value = function,
@@ -1157,6 +1177,14 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     // Clear trait_locals for this function scope.
     self.trait_locals.clearRetainingCapacity();
 
+    // Save/setup tailrec state.
+    const saved_tailrec_bb = self.tailrec_body_bb;
+    const saved_tailrec_params = self.tailrec_param_allocas;
+    const saved_tailrec_sym = self.tailrec_fn_sym;
+    self.tailrec_body_bb = null;
+    self.tailrec_param_allocas = null;
+    self.tailrec_fn_sym = null;
+
     // Add function parameters as locals (alloca + store).
     for (func.params, 0..) |param, i| {
         const param_val = c.LLVMGetParam(function, @intCast(i));
@@ -1194,6 +1222,27 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         }) catch return error.CodegenAlloc;
     }
 
+    // @[tailrec]: create body BB that recursive calls branch back to.
+    if (func.is_tailrec and func.params.len > 0) {
+        const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "tailrec.body");
+        _ = c.LLVMBuildBr(self.builder, body_bb);
+        c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+        self.tailrec_body_bb = body_bb;
+        self.tailrec_fn_sym = func.name;
+
+        // Collect param allocas for updating on tail call.
+        const allocas = self.allocator.alloc(c.LLVMValueRef, func.params.len) catch
+            return error.CodegenAlloc;
+        for (func.params, 0..) |param, i| {
+            if (self.locals.get(param.name)) |local| {
+                allocas[i] = local.alloca;
+            } else {
+                allocas[i] = null;
+            }
+        }
+        self.tailrec_param_allocas = allocas;
+    }
+
     const body_val = try self.genExpr(func.body);
 
     // Restore expected_type.
@@ -1227,6 +1276,11 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
             _ = c.LLVMBuildRetVoid(self.builder);
         }
     }
+
+    // Restore tailrec state.
+    self.tailrec_body_bb = saved_tailrec_bb;
+    self.tailrec_param_allocas = saved_tailrec_params;
+    self.tailrec_fn_sym = saved_tailrec_sym;
 }
 
 // ── Generator support ────────────────────────────────────────────
@@ -2072,7 +2126,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .while_expr => |while_e| try self.genWhile(while_e),
         .loop_expr => |body| try self.genLoop(body),
         .for_expr => |for_e| try self.genFor(for_e),
-        .break_expr => try self.genBreak(),
+        .break_expr => |brk_val| try self.genBreak(brk_val),
         .continue_expr => try self.genContinue(),
         .field_access => |fa| try self.genFieldAccess(fa),
         .index => |idx| try self.genIndex(idx),
@@ -5528,6 +5582,25 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
             }
         }
 
+        // @[tailrec]: convert self-recursive call to a jump back.
+        if (self.tailrec_fn_sym != null and fn_sym == self.tailrec_fn_sym.?) {
+            if (self.tailrec_body_bb != null and self.tailrec_param_allocas != null) {
+                const allocas = self.tailrec_param_allocas.?;
+                // Store new arg values into param allocas.
+                for (0..@min(call_e.args.len, allocas.len)) |i| {
+                    _ = c.LLVMBuildStore(self.builder, args_buf[i], allocas[i]);
+                }
+                // Branch back to the start of the function body.
+                _ = c.LLVMBuildBr(self.builder, self.tailrec_body_bb.?);
+
+                // Dead block for any code after the tail call.
+                const dead_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "tailrec.dead");
+                c.LLVMPositionBuilderAtEnd(self.builder, dead_bb);
+
+                return c.LLVMGetUndef(c.LLVMGetReturnType(fn_info.fn_type));
+            }
+        }
+
         const ret_type = c.LLVMGetReturnType(fn_info.fn_type);
         const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
 
@@ -7214,10 +7287,17 @@ fn genLoop(self: *Codegen, body: *const Ast.Expr) Error!c.LLVMValueRef {
         _ = c.LLVMBuildBr(self.builder, body_bb);
     }
 
-    // Pop loop context.
+    // Pop loop context — capture result_alloca before popping.
+    const result_alloca = self.loop_stack[self.loop_depth - 1].result_alloca;
     self.loop_depth -= 1;
 
     c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+
+    // If a break-with-value was used, load and return the result.
+    if (result_alloca) |alloca| {
+        const alloca_ty = c.LLVMGetAllocatedType(alloca);
+        return c.LLVMBuildLoad2(self.builder, alloca_ty, alloca, "loop.val");
+    }
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
@@ -7722,9 +7802,21 @@ fn genRecordUpdate(self: *Codegen, ru: Ast.RecordUpdateExpr) Error!c.LLVMValueRe
     return c.LLVMBuildLoad2(self.builder, source_type, alloca, "updated");
 }
 
-fn genBreak(self: *Codegen) Error!c.LLVMValueRef {
+fn genBreak(self: *Codegen, brk_val: ?*const Ast.Expr) Error!c.LLVMValueRef {
     if (self.loop_depth == 0) return error.UnsupportedExpr;
-    const ctx = self.loop_stack[self.loop_depth - 1];
+    var ctx = &self.loop_stack[self.loop_depth - 1];
+
+    // If there's a break value, generate it and store to the loop result alloca.
+    if (brk_val) |val_expr| {
+        const val = try self.genExpr(val_expr);
+        // Lazily create the result alloca on first break-with-value.
+        if (ctx.result_alloca == null) {
+            const val_type = c.LLVMTypeOf(val);
+            ctx.result_alloca = c.LLVMBuildAlloca(self.builder, val_type, "loop.result");
+        }
+        _ = c.LLVMBuildStore(self.builder, val, ctx.result_alloca.?);
+    }
+
     _ = c.LLVMBuildBr(self.builder, ctx.break_bb);
 
     // Dead block for any code after break.

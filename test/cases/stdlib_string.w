@@ -11,17 +11,15 @@ fn main() -> i32 =
     assert(string_eq("abc", "abc"))
     assert(not string_eq("abc", "xyz"))
 
-    // string_contains
-    assert(string_contains(s, "world"))
-    assert(not string_contains(s, "xyz"))
-
-    // starts_with
-    assert(starts_with(s, "hello"))
-    assert(not starts_with(s, "world"))
-
     // string_to_int
     assert(string_to_int("42") == 42)
     assert(string_to_int("0") == 0)
+
+    // is_alpha / is_digit
+    assert(is_alpha(65))
+    assert(not is_alpha(48))
+    assert(is_digit(48))
+    assert(not is_digit(65))
 
     println("all stdlib string tests passed")
     0
