@@ -1,123 +1,119 @@
 # With
 
-A systems programming language that wants you to have a good time.
+With is a systems language focused on memory safety, ownership, and low-level control without a GC.
 
-No garbage collector. No lifetime annotations. No fighting the compiler for an hour to do something obvious. Memory safety, native performance, and code that reads like you'd explain it to a colleague.
-
-```
-async fn handle_signup(req: HttpRequest, db: &Database) -> Result[HttpResponse, ApiError] =
-    let body = req.json[SignupRequest]() ?? return Err(.InvalidJson)
-
-    if not body.email.is_valid() then
-        return Err(.ValidationError("Invalid email format"))
-
-    if db.find_user(body.email).await?.is_some() then
-        return Err(.ValidationError("Email already exists"))
-
-    let email = body.email
-    let user = User { email, role: .Member, created: Instant.now() }
-
-    db.insert(user).await?
-    HttpResponse.json(201, "User created successfully")
-```
+This repository contains the Zig bootstrap compiler, runtime, standard library modules, tooling commands, and phase-based test suites.
 
 ## Status
 
-Early development. The bootstrap compiler (written in Zig) can lex, parse, and dump ASTs for basic With programs.
+- The bootstrap compiler is actively developed and implements broad Phase 0-6 functionality.
+- The command-line tool supports compile/run/check/test plus tooling (`fmt`, `doc`, `lsp`, `repl`, `migrate`).
+- The detailed feature checklist lives in `docs/test_checklist.md`.
 
-## Prerequisites
+## Requirements
 
-- [Zig](https://ziglang.org/) 0.15+
-- [LLVM](https://github.com/llvm/llvm-project/releases) 18+ (C API headers and static libraries)
+- Zig `0.15.2` (or compatible `0.15.x`)
+- LLVM with C API + clang toolchain available
 
-### LLVM setup
+The build expects `LLVM_PREFIX` (defaults to `/usr/local/llvm`) and uses:
 
-Download a prebuilt release for your platform from the [LLVM releases page](https://github.com/llvm/llvm-project/releases) and install it:
+- `${LLVM_PREFIX}/bin/clang++`
+- `${LLVM_PREFIX}/include`
+- `${LLVM_PREFIX}/lib`
 
-```
-# macOS ARM64 example (adjust version as needed)
-tar xf LLVM-22.1.0-macOS-ARM64.tar.xz
-sudo mv LLVM-22.1.0-macOS-ARM64 /usr/local/llvm
-```
-
-Add to your shell config:
+Example:
 
 ```sh
-# bash/zsh
-export LLVM_HOME=/usr/local/llvm
-export PATH="$LLVM_HOME/bin:$PATH"
-
-# fish
-set -gx LLVM_HOME /usr/local/llvm
-fish_add_path $LLVM_HOME/bin
-```
-
-Verify: `llvm-config --version`
-
-## Building
-
-```
+export LLVM_PREFIX=/usr/local/llvm
 zig build
 ```
 
-## Usage
+## Build
 
-```
-# Parse and dump the AST
-zig build run -- ast test/cases/hello.w
-
-# Dump token stream
-zig build run -- tokens test/cases/hello.w
-
-# Show help
-zig build run -- help
+```sh
+zig build
 ```
 
-Or use the binary directly after building:
+Compiler binary:
 
-```
-./zig-out/bin/with ast test/cases/hello.w
+```sh
+./zig-out/bin/with
 ```
 
-## Running tests
+## CLI Quick Reference
 
+```sh
+with build <file.w>                     # Compile to native binary
+with run <file.w>                       # Compile + run
+with check <file.w>                     # Parse + type-check
+with test [path] [--update]             # Built-in harness runner
+with fmt <file.w>                       # Format to stdout
+with doc <file.w>                       # Generate docs (markdown to stdout)
+with repl                               # Interactive REPL
+with lsp                                # LSP server over stdio
+with migrate <lang> <path> [--check|--diff]  # rust|zig|swift to .w
+with ir <file.w>                        # Dump LLVM IR
+with ast <file.w>                       # Dump AST
+with tokens <file.w>                    # Dump lexer tokens
+with version
+with help
 ```
+
+## Testing
+
+Unit tests:
+
+```sh
 zig build test
 ```
 
-## Project structure
+Phase suites (script-based):
 
+```sh
+bash test/run_phase6_tests.sh
 ```
+
+Run every phase script:
+
+```sh
+for s in test/run_phase*.sh; do bash "$s"; done
+```
+
+## Repository Layout
+
+```text
 src/
-  main.zig          CLI entry point
-  Driver.zig        Pipeline orchestration (lex -> parse -> ...)
-  Lexer.zig         Tokenizer
-  Token.zig         Token definitions
-  Parser.zig        Recursive descent parser
-  Ast.zig           AST node types
-  render.zig        AST pretty-printer
-  Diagnostic.zig    Structured error reporting
-  Source.zig         Source file management
-  Span.zig          Source location tracking
-  InternPool.zig    String interning
+  main.zig              CLI entrypoint
+  Driver.zig            Compiler pipeline orchestration
+  Lexer.zig             Tokenizer
+  Parser.zig            Parser
+  Sema.zig              Semantic analysis
+  Codegen.zig           LLVM IR codegen
+  Lsp.zig               Language server
+  Migrate.zig           Source migration tooling
+  Mir.zig               MIR scaffolding
+  MirOpt.zig            MIR optimization passes
+runtime/
+  fiber.c
+  fiber_asm_aarch64.s
+  helpers.c
+lib/std/
+  *.w                   Standard library modules
 test/
-  cases/            .w source files for testing
-  expected/         Snapshot expected outputs
+  cases/                Runtime/behavior examples
+  run_phase*_tests.sh   Phase and feature suites
 docs/
   with-specification.md
   with-compiler-plan.md
   with-implementation-notes.md
-examples/
-  c-interop/        C FFI via c_import
-  channels/         Channel-based concurrency
-  ecs/              Entity component system
-  json-parser/      JSON parser
-  service/          Async HTTP service
+  with-migration-guide.md
+  test_checklist.md
 ```
 
 ## Documentation
 
-- [Language Specification](docs/with-specification.md)
-- [Compiler Plan](docs/with-compiler-plan.md)
-- [Implementation Notes](docs/with-implementation-notes.md)
-- [Migration Guide](docs/with-migration-guide.md)
+- Language spec: `docs/with-specification.md`
+- Compiler plan: `docs/with-compiler-plan.md`
+- Implementation notes: `docs/with-implementation-notes.md`
+- Migration guide: `docs/with-migration-guide.md`
+- Test checklist: `docs/test_checklist.md`

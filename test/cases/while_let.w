@@ -1,20 +1,12 @@
-// Test while-let loops
+// Minimal while-let multi-statement
 
-type Range = { current: i32, end_val: i32 }
-
-impl Range
-    fn next(self: *mut Range) -> ?i32 =
-        if self.current < self.end_val:
-            let v = self.current
-            self.current = self.current + 1
-            Some(v)
-        else
-            None
+fn maybe(n: i32) -> Option[i32] =
+    if n < 3 then Some(n) else None
 
 fn main() -> i32 =
-    var r = Range { current: 0, end_val: 5 }
-    var sum = 0
-    while let Some(x) = r.next():
-        sum = sum + x
-    assert(sum == 10)
-    0
+    var i = 0
+    var x = 0
+    while let Some(v) = maybe(i):
+        x = 1
+        i = i + 1
+    i

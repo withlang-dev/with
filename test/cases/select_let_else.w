@@ -5,7 +5,7 @@ async fn slow() -> i32 = 2
 fn main() -> i32 =
     let r = select await:
         a = fast() ->
-            let Some(x) = Some(a) else 0
+            let Some(x) = Some(a) else return 0
             x
         b = slow() ->
             b

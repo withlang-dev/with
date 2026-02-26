@@ -23,6 +23,18 @@ use c_import("#include <string.h>\n#include <stdlib.h>\n#include <stdio.h>\n#inc
 pub fn string_len(s: str) -> i64 =
     strlen(s)
 
+// StrView length helper (same as v.len)
+pub fn view_len(v: &str) -> i64 =
+    v.len
+
+// StrView emptiness helper
+pub fn view_is_empty(v: &str) -> bool =
+    v.len == 0
+
+// StrView equality helper
+pub fn view_eq(a: &str, b: &str) -> bool =
+    a == b
+
 // String comparison (returns true if equal)
 pub fn string_eq(a: str, b: str) -> bool =
     strcmp(a, b) == 0

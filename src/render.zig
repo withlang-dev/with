@@ -58,7 +58,16 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
         },
         .type_decl => |t| {
             if (t.is_pub == .public) try writer.writeAll("pub ");
-            try writer.print("type {s} = ", .{pool.resolve(t.name)});
+            try writer.print("type {s}", .{pool.resolve(t.name)});
+            if (t.type_params.len > 0) {
+                try writer.writeAll("[");
+                for (t.type_params, 0..) |tp, i| {
+                    if (i > 0) try writer.writeAll(", ");
+                    try writer.print("{s}", .{pool.resolve(tp.name)});
+                }
+                try writer.writeAll("]");
+            }
+            try writer.writeAll(" = ");
             switch (t.kind) {
                 .struct_def => |fields| {
                     try writer.writeAll("{ ");
@@ -132,7 +141,15 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
             }
         },
         .c_import => |ci| {
-            try writer.print("use c_import(\"{s}\")", .{ci.header_code});
+            try writer.print("use c_import(\"{s}\"", .{ci.header_code});
+            if (ci.link_libs.len > 0) {
+                try writer.writeAll(", link: ");
+                for (ci.link_libs, 0..) |lib, i| {
+                    if (i > 0) try writer.writeAll(", ");
+                    try writer.print("\"{s}\"", .{pool.resolve(lib)});
+                }
+            }
+            try writer.writeAll(")");
         },
         .trait_decl => |td| {
             if (td.is_pub == .public) try writer.writeAll("pub ");
@@ -190,6 +207,7 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
         .int_literal => |v| try writer.print("{d}", .{v}),
         .float_literal => |v| try writer.print("{d}", .{v}),
         .string_literal => |s| try writer.print("\"{s}\"", .{pool.resolve(s)}),
+        .c_string_literal => |s| try writer.print("c\"{s}\"", .{pool.resolve(s)}),
         .bool_literal => |v| try writer.writeAll(if (v) "true" else "false"),
         .ident => |s| try writer.print("{s}", .{pool.resolve(s)}),
         .binary => |b| {
@@ -216,6 +234,18 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
         .field_access => |f| {
             try renderExpr(f.expr, pool, writer, 0);
             try writer.print(".{s}", .{pool.resolve(f.field)});
+        },
+        .optional_chain => |oc| {
+            try renderExpr(oc.expr, pool, writer, 0);
+            try writer.print("?.{s}", .{pool.resolve(oc.member)});
+            if (oc.args) |args| {
+                try writer.writeAll("(");
+                for (args, 0..) |arg, i| {
+                    if (i > 0) try writer.writeAll(", ");
+                    try renderExpr(arg, pool, writer, 0);
+                }
+                try writer.writeAll(")");
+            }
         },
         .index => |idx| {
             try renderExpr(idx.expr, pool, writer, 0);
@@ -294,12 +324,18 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try renderExpr(le.else_body, pool, writer, 0);
         },
         .tuple_destructure => |td| {
-            try writer.writeAll(if (td.is_mut) "var (" else "let (");
-            for (td.names, 0..) |name, i| {
-                if (i > 0) try writer.writeAll(", ");
-                try writer.print("{s}", .{pool.resolve(name)});
+            try writer.writeAll(if (td.is_mut) "var " else "let ");
+            if (td.pattern) |pat| {
+                try renderPattern(&pat, pool, writer);
+            } else {
+                try writer.writeAll("(");
+                for (td.names, 0..) |name, i| {
+                    if (i > 0) try writer.writeAll(", ");
+                    try writer.print("{s}", .{pool.resolve(name)});
+                }
+                try writer.writeAll(")");
             }
-            try writer.writeAll(") = ");
+            try writer.writeAll(" = ");
             try renderExpr(td.value, pool, writer, 0);
         },
         .assign => |a| {
@@ -325,6 +361,10 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try renderExpr(e, pool, writer, 0);
             try writer.writeAll(".await");
         },
+        .async_block => |e| {
+            try writer.writeAll("async:\n");
+            try renderExpr(e, pool, writer, indent + 2);
+        },
         .spawn_expr => |e| {
             try writer.writeAll("spawn ");
             try renderExpr(e, pool, writer, 0);
@@ -332,6 +372,10 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
         .comptime_expr => |e| {
             try writer.writeAll("comptime ");
             try renderExpr(e, pool, writer, 0);
+        },
+        .async_scope => |as| {
+            try writer.print("async scope |{s}|:\n", .{pool.resolve(as.name)});
+            try renderExpr(as.body, pool, writer, indent + 2);
         },
         .pipeline => |p| {
             try renderExpr(p.lhs, pool, writer, 0);
@@ -351,7 +395,12 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try renderExpr(body, pool, writer, indent + 2);
         },
         .for_expr => |f| {
-            try writer.print("for {s}", .{pool.resolve(f.binding)});
+            try writer.writeAll("for ");
+            if (f.binding_pattern) |bp| {
+                try renderPattern(&bp, pool, writer);
+            } else {
+                try writer.print("{s}", .{pool.resolve(f.binding)});
+            }
             if (f.index_binding) |idx| {
                 try writer.print(", {s}", .{pool.resolve(idx)});
             }
@@ -377,8 +426,15 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
         .array_comprehension => |comp| {
             try writer.writeAll("[");
             try renderExpr(comp.expr, pool, writer, 0);
-            try writer.print(" for {s} in ", .{pool.resolve(comp.binding)});
-            try renderExpr(comp.iterable, pool, writer, 0);
+            if (comp.clauses) |clauses| {
+                for (clauses) |cl| {
+                    try writer.print(" for {s} in ", .{pool.resolve(cl.binding)});
+                    try renderExpr(cl.iterable, pool, writer, 0);
+                }
+            } else {
+                try writer.print(" for {s} in ", .{pool.resolve(comp.binding)});
+                try renderExpr(comp.iterable, pool, writer, 0);
+            }
             if (comp.filter) |f| {
                 try writer.writeAll(" if ");
                 try renderExpr(f, pool, writer, 0);
@@ -493,6 +549,14 @@ fn renderPattern(pat: *const Ast.Pattern, pool: *const InternPool, writer: anyty
         .at_binding => |ab| {
             try writer.print("{s} @ ", .{pool.resolve(ab.name)});
             try renderPattern(ab.pattern, pool, writer);
+        },
+        .tuple_pattern => |elems| {
+            try writer.writeAll("(");
+            for (elems, 0..) |*elem, j| {
+                if (j > 0) try writer.writeAll(", ");
+                try renderPattern(elem, pool, writer);
+            }
+            try writer.writeAll(")");
         },
         .range_pattern => |rp| {
             if (rp.inclusive) {

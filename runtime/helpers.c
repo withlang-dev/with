@@ -7,6 +7,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#ifdef __APPLE__
+#include <crt_externs.h>
+#endif
 
 // Common string type used across runtime helpers
 typedef struct {
@@ -14,9 +17,91 @@ typedef struct {
     int64_t len;
 } with_str;
 
+// Convert i32 to owned string.
+with_str with_i32_to_str(int32_t n) {
+    char tmp[32];
+    int wrote = snprintf(tmp, sizeof(tmp), "%d", n);
+    if (wrote <= 0) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    char *buf = (char *)malloc((size_t)wrote + 1);
+    if (!buf) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    memcpy(buf, tmp, (size_t)wrote + 1);
+    with_str out = { buf, (int64_t)wrote };
+    return out;
+}
+
 // time(NULL) wrapper — Zig/LLVM has trouble with NULL pointer args
 int64_t with_time_now(void) {
     return (int64_t)time(NULL);
+}
+
+// ---- Process helpers ----
+
+// Command-line argument count.
+int32_t with_arg_count(void) {
+#ifdef __APPLE__
+    int *argc_ptr = _NSGetArgc();
+    return argc_ptr ? (int32_t)(*argc_ptr) : 0;
+#else
+    return 0;
+#endif
+}
+
+// Command-line argument at index. Returns "" when out of range.
+with_str with_arg_at(int32_t idx) {
+#ifdef __APPLE__
+    int *argc_ptr = _NSGetArgc();
+    char ***argv_ptr = _NSGetArgv();
+    if (!argc_ptr || !argv_ptr || idx < 0 || idx >= *argc_ptr) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    const char *s = (*argv_ptr)[idx];
+    if (!s) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    with_str out = { s, (int64_t)strlen(s) };
+    return out;
+#else
+    (void)idx;
+    with_str out = { "", 0 };
+    return out;
+#endif
+}
+
+// getenv wrapper returning with_str.
+with_str with_getenv_str(with_str name) {
+    char *name_buf = (char *)malloc((size_t)name.len + 1);
+    memcpy(name_buf, name.ptr, (size_t)name.len);
+    name_buf[name.len] = '\0';
+    const char *val = getenv(name_buf);
+    free(name_buf);
+    if (!val) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    with_str out = { val, (int64_t)strlen(val) };
+    return out;
+}
+
+// setenv wrapper from with_str names/values.
+int32_t with_setenv_str(with_str name, with_str value) {
+    char *name_buf = (char *)malloc((size_t)name.len + 1);
+    char *value_buf = (char *)malloc((size_t)value.len + 1);
+    memcpy(name_buf, name.ptr, (size_t)name.len);
+    memcpy(value_buf, value.ptr, (size_t)value.len);
+    name_buf[name.len] = '\0';
+    value_buf[value.len] = '\0';
+    int rc = setenv(name_buf, value_buf, 1);
+    free(name_buf);
+    free(value_buf);
+    return (int32_t)rc;
 }
 
 // getenv wrapper that returns "" instead of NULL for missing vars
@@ -480,6 +565,29 @@ with_str with_fs_read_file(with_str path) {
 #include <netdb.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/select.h>
+
+__attribute__((weak)) void with_fiber_yield(void) {
+}
+
+__attribute__((weak)) int32_t with_fiber_in_fiber(void) {
+    return 0;
+}
+
+static int with_net_set_nonblocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) return -1;
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) return -1;
+    return 0;
+}
+
+static void with_net_wait_step(void) {
+    if (with_fiber_in_fiber()) {
+        with_fiber_yield();
+    } else {
+        usleep(1000);
+    }
+}
 
 // Create a TCP socket and bind+listen on given port. Returns fd or -1.
 int32_t with_net_tcp_listen(int32_t port, int32_t backlog) {
@@ -503,15 +611,33 @@ int32_t with_net_tcp_listen(int32_t port, int32_t backlog) {
         close(fd);
         return -1;
     }
+    if (with_net_set_nonblocking(fd) < 0) {
+        close(fd);
+        return -1;
+    }
     return (int32_t)fd;
 }
 
 // Accept a connection on a listening socket. Returns client fd or -1.
 int32_t with_net_tcp_accept(int32_t listen_fd) {
-    struct sockaddr_in client_addr;
-    socklen_t client_len = sizeof(client_addr);
-    int fd = accept(listen_fd, (struct sockaddr *)&client_addr, &client_len);
-    return (int32_t)fd;
+    while (1) {
+        struct sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
+        int fd = accept(listen_fd, (struct sockaddr *)&client_addr, &client_len);
+        if (fd >= 0) {
+            if (with_net_set_nonblocking(fd) < 0) {
+                close(fd);
+                return -1;
+            }
+            return (int32_t)fd;
+        }
+
+        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+            with_net_wait_step();
+            continue;
+        }
+        return -1;
+    }
 }
 
 // Connect to host:port via TCP. Returns fd or -1.
@@ -519,7 +645,7 @@ int32_t with_net_tcp_connect(with_str host, int32_t port) {
     char *chost = with_str_to_cstring(host);
     if (!chost) return -1;
 
-    struct addrinfo hints, *res;
+    struct addrinfo hints, *res = NULL;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
@@ -533,40 +659,104 @@ int32_t with_net_tcp_connect(with_str host, int32_t port) {
     }
     free(chost);
 
-    int fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (fd < 0) {
-        freeaddrinfo(res);
-        return -1;
-    }
-    if (connect(fd, res->ai_addr, res->ai_addrlen) < 0) {
+    int32_t out_fd = -1;
+    for (struct addrinfo *ai = res; ai != NULL; ai = ai->ai_next) {
+        int fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        if (fd < 0) continue;
+
+        if (with_net_set_nonblocking(fd) < 0) {
+            close(fd);
+            continue;
+        }
+
+        int rc = connect(fd, ai->ai_addr, ai->ai_addrlen);
+        if (rc == 0) {
+            out_fd = (int32_t)fd;
+            break;
+        }
+
+        if (errno == EINPROGRESS || errno == EALREADY || errno == EWOULDBLOCK) {
+            while (1) {
+                fd_set wfds;
+                FD_ZERO(&wfds);
+                FD_SET(fd, &wfds);
+                struct timeval tv;
+                tv.tv_sec = 0;
+                tv.tv_usec = 0;
+                int sel = select(fd + 1, NULL, &wfds, NULL, &tv);
+                if (sel > 0 && FD_ISSET(fd, &wfds)) {
+                    int so_err = 0;
+                    socklen_t so_len = sizeof(so_err);
+                    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &so_err, &so_len) == 0 && so_err == 0) {
+                        out_fd = (int32_t)fd;
+                    } else {
+                        close(fd);
+                    }
+                    break;
+                }
+                if (sel < 0 && errno != EINTR) {
+                    close(fd);
+                    break;
+                }
+                with_net_wait_step();
+            }
+            if (out_fd >= 0) break;
+            continue;
+        }
+
         close(fd);
-        freeaddrinfo(res);
-        return -1;
     }
+
     freeaddrinfo(res);
-    return (int32_t)fd;
+    return out_fd;
 }
 
 // Send data on a socket. Returns bytes sent or -1.
 int64_t with_net_send(int32_t fd, with_str data) {
-    ssize_t n = send(fd, data.ptr, (size_t)data.len, 0);
-    return (int64_t)n;
+    int64_t sent = 0;
+    while (sent < data.len) {
+        ssize_t n = send(fd, data.ptr + sent, (size_t)(data.len - sent), 0);
+        if (n > 0) {
+            sent += (int64_t)n;
+            continue;
+        }
+        if (n == 0) return sent;
+        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+            with_net_wait_step();
+            continue;
+        }
+        return -1;
+    }
+    return sent;
 }
 
 // Receive data from a socket into a heap buffer. Returns {ptr, len}.
 with_str with_net_recv(int32_t fd, int64_t max_len) {
     with_str out = { "", 0 };
-    char *buf = (char *)malloc((size_t)max_len);
+    if (max_len <= 0) return out;
+
+    char *buf = (char *)malloc((size_t)max_len + 1);
     if (!buf) return out;
-    ssize_t n = recv(fd, buf, (size_t)max_len, 0);
-    if (n <= 0) {
+
+    while (1) {
+        ssize_t n = recv(fd, buf, (size_t)max_len, 0);
+        if (n > 0) {
+            buf[n] = '\0';
+            out.ptr = buf;
+            out.len = (int64_t)n;
+            return out;
+        }
+        if (n == 0) {
+            free(buf);
+            return out;
+        }
+        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+            with_net_wait_step();
+            continue;
+        }
         free(buf);
         return out;
     }
-    buf[n] = '\0';
-    out.ptr = buf;
-    out.len = (int64_t)n;
-    return out;
 }
 
 // Close a socket.
@@ -586,6 +776,10 @@ int32_t with_net_udp_bind(int32_t port) {
     addr.sin_port = htons((uint16_t)port);
 
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(fd);
+        return -1;
+    }
+    if (with_net_set_nonblocking(fd) < 0) {
         close(fd);
         return -1;
     }

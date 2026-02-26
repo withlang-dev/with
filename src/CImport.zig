@@ -54,9 +54,13 @@ pub fn processCImport(
         c.CXTranslationUnit_SkipFunctionBodies,
     );
     if (tu == null) {
-        return &.{};
+        return error.CImportFailed;
     }
     defer c.clang_disposeTranslationUnit(tu);
+
+    if (hasErrorDiagnostics(tu)) {
+        return error.CImportFailed;
+    }
 
     // Walk top-level declarations
     var ctx = VisitorContext{
@@ -68,7 +72,27 @@ pub fn processCImport(
     const cursor = c.clang_getTranslationUnitCursor(tu);
     _ = c.clang_visitChildren(cursor, visitCallback, @ptrCast(&ctx));
 
+    // Best-effort translation for simple object-like macros:
+    //   #define NAME 123
+    //   #define NAME "text"
+    // Function-like macros are intentionally skipped here.
+    try processSimpleDefineMacros(&ctx, header_code);
+
     return ctx.decls.items;
+}
+
+fn hasErrorDiagnostics(tu: c.CXTranslationUnit) bool {
+    const count = c.clang_getNumDiagnostics(tu);
+    var i: u32 = 0;
+    while (i < count) : (i += 1) {
+        const diag = c.clang_getDiagnostic(tu, i);
+        defer c.clang_disposeDiagnostic(diag);
+        const sev = c.clang_getDiagnosticSeverity(diag);
+        if (sev == c.CXDiagnostic_Error or sev == c.CXDiagnostic_Fatal) {
+            return true;
+        }
+    }
+    return false;
 }
 
 const VisitorContext = struct {
@@ -76,6 +100,94 @@ const VisitorContext = struct {
     arena: std.mem.Allocator,
     pool: *InternPool,
 };
+
+fn processSimpleDefineMacros(ctx: *VisitorContext, header_code: []const u8) !void {
+    var lines = std.mem.splitScalar(u8, header_code, '\n');
+    while (lines.next()) |raw_line| {
+        var line = std.mem.trim(u8, raw_line, " \t\r");
+        if (!std.mem.startsWith(u8, line, "#define ")) continue;
+        line = line["#define ".len..];
+        line = std.mem.trimLeft(u8, line, " \t");
+        if (line.len == 0) continue;
+
+        // Parse macro name.
+        var name_end: usize = 0;
+        while (name_end < line.len and isMacroNameChar(line[name_end])) : (name_end += 1) {}
+        if (name_end == 0) continue;
+        const name = line[0..name_end];
+        // Skip function-like macros: NAME(...)
+        if (name_end < line.len and line[name_end] == '(') continue;
+
+        var value = std.mem.trimLeft(u8, line[name_end..], " \t");
+        if (value.len == 0) continue;
+        value = trimOuterParens(value);
+
+        if (parseMacroInt(value)) |int_val| {
+            const expr = try ctx.arena.create(Ast.Expr);
+            expr.* = .{
+                .kind = .{ .int_literal = int_val },
+                .span = Span.zero,
+            };
+            const name_sym = try ctx.pool.intern(name);
+            try ctx.decls.append(ctx.arena, .{
+                .kind = .{ .let_decl = .{
+                    .name = name_sym,
+                    .type_expr = null,
+                    .value = expr,
+                    .is_mut = false,
+                    .is_pub = .private,
+                } },
+                .span = Span.zero,
+            });
+            continue;
+        }
+
+        if (value.len >= 2 and value[0] == '"' and value[value.len - 1] == '"') {
+            const inner = value[1 .. value.len - 1];
+            const str_sym = try ctx.pool.intern(inner);
+            const expr = try ctx.arena.create(Ast.Expr);
+            expr.* = .{
+                .kind = .{ .string_literal = str_sym },
+                .span = Span.zero,
+            };
+            const name_sym = try ctx.pool.intern(name);
+            try ctx.decls.append(ctx.arena, .{
+                .kind = .{ .let_decl = .{
+                    .name = name_sym,
+                    .type_expr = null,
+                    .value = expr,
+                    .is_mut = false,
+                    .is_pub = .private,
+                } },
+                .span = Span.zero,
+            });
+            continue;
+        }
+    }
+}
+
+fn isMacroNameChar(ch: u8) bool {
+    return (ch >= 'A' and ch <= 'Z') or
+        (ch >= 'a' and ch <= 'z') or
+        (ch >= '0' and ch <= '9') or
+        ch == '_';
+}
+
+fn trimOuterParens(value: []const u8) []const u8 {
+    var v = std.mem.trim(u8, value, " \t");
+    while (v.len >= 2 and v[0] == '(' and v[v.len - 1] == ')') {
+        v = std.mem.trim(u8, v[1 .. v.len - 1], " \t");
+    }
+    return v;
+}
+
+fn parseMacroInt(value: []const u8) ?i64 {
+    if (value.len == 0) return null;
+    if (std.mem.startsWith(u8, value, "0x") or std.mem.startsWith(u8, value, "0X")) {
+        return std.fmt.parseInt(i64, value, 0) catch null;
+    }
+    return std.fmt.parseInt(i64, value, 10) catch null;
+}
 
 fn visitCallback(
     cursor: c.CXCursor,

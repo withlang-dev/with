@@ -60,6 +60,8 @@ expected_type: ?c.LLVMTypeRef = null,
 option_type_cache: std.AutoHashMapUnmanaged(usize, OptionResultInfo) = .{},
 /// Cache of Result enum types keyed by hash of (ok_type, err_type).
 result_type_cache: std.AutoHashMapUnmanaged(u64, OptionResultInfo) = .{},
+/// Cache of ContextError structs keyed by source error LLVM type pointer.
+context_error_type_cache: std.AutoHashMapUnmanaged(usize, ContextErrorInfo) = .{},
 /// Slice element types: local symbol → element LLVM type.
 /// Tracks which locals are slice types so we can index into them.
 slice_elem_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
@@ -76,13 +78,34 @@ trait_decl_map: std.AutoHashMapUnmanaged(u32, Ast.TraitDecl) = .{},
 vtable_globals: std.AutoHashMapUnmanaged(u64, c.LLVMValueRef) = .{},
 /// Trait-typed locals: local Symbol → trait Symbol (tracks which trait a dyn param holds).
 trait_locals: std.AutoHashMapUnmanaged(u32, u32) = .{},
+/// Dyn-typed locals with known concrete implementor: local Symbol → concrete type Symbol.
+/// Used for direct-call devirtualization when concrete type is known at compile time.
+trait_local_concrete_types: std.AutoHashMapUnmanaged(u32, u32) = .{},
 /// For functions with dyn Trait params: fn_sym → array of ?trait_sym per param.
 /// null means non-trait param.
 fn_dyn_params: std.AutoHashMapUnmanaged(u32, []const ?u32) = .{},
-/// Async function symbols (spawn wrappers) for await/task tracking.
-async_fn_symbols: std.AutoHashMapUnmanaged(u32, void) = .{},
+    /// For functions with &T ref params: fn_sym → array of bools per param.
+    /// true means the param is a reference type (&T or &mut T).
+    fn_ref_params: std.AutoHashMapUnmanaged(u32, []const bool) = .{},
+    /// For functions returning Result[_, E]: fn_sym → E symbol (when named).
+    fn_result_err_symbols: std.AutoHashMapUnmanaged(u32, u32) = .{},
+    /// Functions declared with a Result return type.
+    fn_returns_result: std.AutoHashMapUnmanaged(u32, void) = .{},
+    /// Functions returning Result[Unit, E] (implicit Ok(()) on empty tail).
+    fn_result_unit_returns: std.AutoHashMapUnmanaged(u32, void) = .{},
+    /// Current function's Result error symbol (if return type is Result[_, E]).
+    current_result_err_symbol: ?u32 = null,
+    /// Current function has declared return type Result[_, _].
+    current_fn_returns_result: bool = false,
+    /// Whether an explicit `return` was emitted in the current function.
+    current_fn_saw_explicit_return: bool = false,
+    /// Async function symbols (spawn wrappers) for await/task tracking.
+    async_fn_symbols: std.AutoHashMapUnmanaged(u32, void) = .{},
 /// Locals known to hold task IDs.
 task_locals: std.AutoHashMapUnmanaged(u32, void) = .{},
+/// Active async-scope tracking frames (`async scope |s|:`).
+async_scope_frames: [16]AsyncScopeFrame = undefined,
+async_scope_depth: u32 = 0,
 /// Stack of scoped local variable lists for Drop emission.
 /// Each entry is the count of locals at block entry; on block exit we
 /// drop everything above that watermark in reverse order.
@@ -118,6 +141,10 @@ hashmap_type_cache: std.AutoHashMapUnmanaged(u64, HashMapTypeInfo) = .{},
 hashmap_local_types: std.AutoHashMapUnmanaged(u32, HashMapTypeInfo) = .{},
 /// Cache of HashSet types keyed by element type pointer.
 hashset_type_cache: std.AutoHashMapUnmanaged(usize, HashSetTypeInfo) = .{},
+/// `@[derive(Builder)]` metadata keyed by owner type symbol.
+derive_builder_types: std.AutoHashMapUnmanaged(u32, BuilderMeta) = .{},
+/// Reverse lookup: builder LLVM type pointer -> owner type symbol.
+builder_owner_by_type: std.AutoHashMapUnmanaged(usize, u32) = .{},
 /// Whether the program uses async/await (requires fiber runtime linking).
 uses_async: bool = false,
 /// Active generic type-parameter substitutions while emitting a monomorphized body.
@@ -142,6 +169,12 @@ const HashSetTypeInfo = struct {
     hm_info: HashMapTypeInfo, // underlying HashMap[T, i8]
 };
 
+const BuilderMeta = struct {
+    llvm_type: c.LLVMTypeRef, // struct { T, i64 mask }
+    required_mask: u64,
+    default_mask: u64,
+};
+
 const ScopedLocal = struct {
     sym: u32,
     alloca: c.LLVMValueRef,
@@ -157,6 +190,12 @@ const LoopContext = struct {
 const TypeBinding = struct {
     sym: u32,
     ty: c.LLVMTypeRef,
+};
+
+const AsyncScopeFrame = struct {
+    symbol: u32,
+    tasks: [64]c.LLVMValueRef = undefined,
+    task_count: u32 = 0,
 };
 
 const TypeObjectInfo = struct {
@@ -201,11 +240,21 @@ const OptionResultInfo = struct {
     enum_sym: u32, // Symbol for the enum type name
 };
 
+const ContextErrorInfo = struct {
+    llvm_type: c.LLVMTypeRef, // struct { str, E }
+    source_type: c.LLVMTypeRef, // E
+};
+
 const TraitInfo = struct {
     method_names: []const u32, // ordered method Symbols
     method_return_types: []const c.LLVMTypeRef, // return type for each method
     method_param_counts: []const u32, // param count (excluding self) for each method
     vtable_type: c.LLVMTypeRef, // struct of function pointers
+};
+
+const MethodOrigin = enum {
+    trait,
+    inherent,
 };
 
 pub const Error = error{
@@ -297,11 +346,14 @@ pub fn deinit(self: *Codegen) void {
     self.ref_pointee_types.deinit(self.allocator);
     self.option_type_cache.deinit(self.allocator);
     self.result_type_cache.deinit(self.allocator);
+    self.context_error_type_cache.deinit(self.allocator);
     self.vec_type_cache.deinit(self.allocator);
     self.vec_local_types.deinit(self.allocator);
     self.hashmap_type_cache.deinit(self.allocator);
     self.hashmap_local_types.deinit(self.allocator);
     self.hashset_type_cache.deinit(self.allocator);
+    self.derive_builder_types.deinit(self.allocator);
+    self.builder_owner_by_type.deinit(self.allocator);
     self.drop_fns.deinit(self.allocator);
     self.slice_elem_types.deinit(self.allocator);
     self.enum_local_types.deinit(self.allocator);
@@ -316,6 +368,7 @@ pub fn deinit(self: *Codegen) void {
     self.trait_infos.deinit(self.allocator);
     self.vtable_globals.deinit(self.allocator);
     self.trait_locals.deinit(self.allocator);
+    self.trait_local_concrete_types.deinit(self.allocator);
     {
         var dp_it = self.fn_dyn_params.iterator();
         while (dp_it.next()) |entry| {
@@ -323,6 +376,16 @@ pub fn deinit(self: *Codegen) void {
         }
     }
     self.fn_dyn_params.deinit(self.allocator);
+    {
+        var rp_it = self.fn_ref_params.iterator();
+        while (rp_it.next()) |entry| {
+            self.allocator.free(entry.value_ptr.*);
+        }
+    }
+    self.fn_ref_params.deinit(self.allocator);
+    self.fn_result_err_symbols.deinit(self.allocator);
+    self.fn_returns_result.deinit(self.allocator);
+    self.fn_result_unit_returns.deinit(self.allocator);
     self.async_fn_symbols.deinit(self.allocator);
     self.task_locals.deinit(self.allocator);
     self.gen_field_indices.deinit(self.allocator);
@@ -332,9 +395,72 @@ pub fn deinit(self: *Codegen) void {
     c.LLVMDisposeTargetMachine(self.target_machine);
 }
 
+fn computeMethodOrigins(
+    self: *Codegen,
+    module: *const Ast.Module,
+    method_decl_origins: *std.AutoHashMapUnmanaged(usize, MethodOrigin),
+    method_has_inherent: *std.AutoHashMapUnmanaged(u32, void),
+) void {
+    method_decl_origins.clearRetainingCapacity();
+    method_has_inherent.clearRetainingCapacity();
+
+    // impl blocks are parsed as: method function decls, then one impl_decl.
+    for (module.decls, 0..) |decl, decl_idx| {
+        if (decl.kind != .impl_decl) continue;
+        const id = decl.kind.impl_decl;
+        const origin: MethodOrigin = if (id.trait_name == null) .inherent else .trait;
+
+        var remaining = id.method_names.len;
+        var j = decl_idx;
+        while (remaining > 0 and j > 0) {
+            j -= 1;
+            if (module.decls[j].kind != .function) continue;
+            const fn_decl = module.decls[j].kind.function;
+            method_decl_origins.put(self.allocator, j, origin) catch {};
+            if (origin == .inherent and self.isMethodSymbol(fn_decl.name)) {
+                method_has_inherent.put(self.allocator, fn_decl.name, {}) catch {};
+            }
+            remaining -= 1;
+        }
+    }
+
+    // Top-level method syntax (`fn Type.method(...)`) is inherent.
+    for (module.decls, 0..) |decl, decl_idx| {
+        if (decl.kind != .function) continue;
+        const fn_decl = decl.kind.function;
+        if (!self.isMethodSymbol(fn_decl.name)) continue;
+        if (method_decl_origins.get(decl_idx) == null) {
+            method_has_inherent.put(self.allocator, fn_decl.name, {}) catch {};
+        }
+    }
+}
+
+fn isMethodSymbol(self: *const Codegen, sym: u32) bool {
+    const name = self.pool.resolve(sym);
+    return std.mem.indexOfScalar(u8, name, '.') != null;
+}
+
+fn shouldSkipTraitMethodDecl(
+    self: *const Codegen,
+    decl_index: usize,
+    fn_sym: u32,
+    method_decl_origins: *const std.AutoHashMapUnmanaged(usize, MethodOrigin),
+    method_has_inherent: *const std.AutoHashMapUnmanaged(u32, void),
+) bool {
+    if (!self.isMethodSymbol(fn_sym)) return false;
+    const origin = method_decl_origins.get(decl_index) orelse .inherent;
+    return origin == .trait and method_has_inherent.get(fn_sym) != null;
+}
+
 /// Generate LLVM IR for an entire module (two-pass).
 pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) Error!void {
     self.pool = pool;
+
+    var method_decl_origins: std.AutoHashMapUnmanaged(usize, MethodOrigin) = .{};
+    defer method_decl_origins.deinit(self.allocator);
+    var method_has_inherent: std.AutoHashMapUnmanaged(u32, void) = .{};
+    defer method_has_inherent.deinit(self.allocator);
+    self.computeMethodOrigins(module, &method_decl_origins, &method_has_inherent);
 
     // Declare built-in str type before user types.
     try self.declareBuiltinStrType();
@@ -385,9 +511,15 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
     }
 
     // Pass 0.7: declare generator state structs and functions.
-    for (module.decls) |decl| {
+    for (module.decls, 0..) |decl, decl_idx| {
         switch (decl.kind) {
             .function => |fn_decl| {
+                if (self.shouldSkipTraitMethodDecl(
+                    decl_idx,
+                    fn_decl.name,
+                    &method_decl_origins,
+                    &method_has_inherent,
+                )) continue;
                 if (fn_decl.is_gen and fn_decl.type_params.len == 0) {
                     try self.declareGenerator(fn_decl);
                 }
@@ -396,11 +528,29 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
         }
     }
 
-    // Pass 1: declare all functions and externs (forward declarations).
-    // Generic functions are stored for later monomorphization.
+    // Pass 0.8: generate derived trait methods (@[derive(...)]).
     for (module.decls) |decl| {
         switch (decl.kind) {
+            .type_decl => |td| {
+                if (td.derive_traits.len > 0) {
+                    try self.generateDerivedMethods(td);
+                }
+            },
+            else => {},
+        }
+    }
+
+    // Pass 1: declare all functions and externs (forward declarations).
+    // Generic functions are stored for later monomorphization.
+    for (module.decls, 0..) |decl, decl_idx| {
+        switch (decl.kind) {
             .function => |fn_decl| {
+                if (self.shouldSkipTraitMethodDecl(
+                    decl_idx,
+                    fn_decl.name,
+                    &method_decl_origins,
+                    &method_has_inherent,
+                )) continue;
                 if (fn_decl.is_gen) continue; // already declared in pass 0.7
                 if (fn_decl.is_async) {
                     self.async_fn_symbols.put(self.allocator, fn_decl.name, {}) catch
@@ -439,9 +589,15 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
     }
 
     // Pass 2: generate function bodies (skip generic functions).
-    for (module.decls) |decl| {
+    for (module.decls, 0..) |decl, decl_idx| {
         switch (decl.kind) {
             .function => |fn_decl| {
+                if (self.shouldSkipTraitMethodDecl(
+                    decl_idx,
+                    fn_decl.name,
+                    &method_decl_origins,
+                    &method_has_inherent,
+                )) continue;
                 if (fn_decl.is_gen) {
                     try self.genGeneratorBody(fn_decl);
                 } else if (fn_decl.is_async) {
@@ -535,6 +691,50 @@ pub fn printIR(self: *const Codegen) void {
 
 // ── Function declaration (pass 1) ────────────────────────────────
 
+fn isResultReturnType(self: *Codegen, ret: ?*const Ast.TypeExpr) bool {
+    const rt = ret orelse return false;
+    if (rt.kind != .generic) return false;
+    const g = rt.kind.generic;
+    if (g.args.len != 2) return false;
+    const g_name = self.pool.resolve(g.name);
+    return std.mem.eql(u8, g_name, "Result");
+}
+
+fn resultErrSymbolFromReturnType(self: *Codegen, ret: ?*const Ast.TypeExpr) ?u32 {
+    const rt = ret orelse return null;
+    if (!self.isResultReturnType(ret)) return null;
+    const g = rt.kind.generic;
+    if (g.args[1].kind != .named) return null;
+    return g.args[1].kind.named;
+}
+
+fn isResultUnitReturnType(self: *Codegen, ret: ?*const Ast.TypeExpr) bool {
+    const rt = ret orelse return false;
+    if (rt.kind != .generic) return false;
+    const g = rt.kind.generic;
+    if (!self.isResultReturnType(ret)) return false;
+    if (g.args[0].kind != .named) return false;
+    const ok_name = self.pool.resolve(g.args[0].kind.named);
+    return std.mem.eql(u8, ok_name, "Unit");
+}
+
+/// Extract a trait symbol when a parameter type syntactically denotes a dyn trait object.
+/// Supports plain `dyn Trait`, wrapped refs/ptrs (`&dyn Trait`, `*dyn Trait`), and
+/// `Box[dyn Trait]`.
+fn dynTraitFromTypeExpr(self: *Codegen, te: *const Ast.TypeExpr) ?u32 {
+    return switch (te.kind) {
+        .trait_object => |sym| sym,
+        .ref_type => |rt| dynTraitFromTypeExpr(self, rt.pointee),
+        .ptr_type => |pt| dynTraitFromTypeExpr(self, pt.pointee),
+        .generic => |g| blk: {
+            const name = self.pool.resolve(g.name);
+            if (!std.mem.eql(u8, name, "Box") or g.args.len != 1) break :blk null;
+            break :blk dynTraitFromTypeExpr(self, g.args[0]);
+        },
+        else => null,
+    };
+}
+
 fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     const ret_type = if (func.return_type) |rt|
         try self.resolveType(rt)
@@ -543,20 +743,29 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
 
     var param_types_buf: [64]c.LLVMTypeRef = undefined;
     var has_dyn_param = false;
+    var has_ref_param = false;
     var dyn_params_buf: [64]?u32 = undefined;
+    var ref_params_buf: [64]bool = undefined;
     for (func.params, 0..) |param, i| {
         dyn_params_buf[i] = null;
+        ref_params_buf[i] = false;
         if (param.type_expr) |te| {
             if (te.kind == .fn_type) {
                 // fn-type params use fat pointer {ptr, ptr} to support closures.
                 const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
                 var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
                 param_types_buf[i] = c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
-            } else if (te.kind == .trait_object) {
-                // dyn Trait params use fat pointer {data_ptr, vtable_ptr}.
+            } else if (dynTraitFromTypeExpr(self, te)) |trait_sym| {
+                // Any dyn-typed parameter form uses the same runtime fat pointer
+                // representation {data_ptr, vtable_ptr}.
                 param_types_buf[i] = try self.resolveType(te);
-                dyn_params_buf[i] = te.kind.trait_object;
+                dyn_params_buf[i] = trait_sym;
                 has_dyn_param = true;
+            } else if (te.kind == .ref_type) {
+                // Track reference params for auto-referencing.
+                param_types_buf[i] = try self.resolveType(te);
+                ref_params_buf[i] = true;
+                has_ref_param = true;
             } else {
                 param_types_buf[i] = try self.resolveType(te);
             }
@@ -605,6 +814,23 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         const dyn_info = self.allocator.alloc(?u32, func.params.len) catch return error.CodegenAlloc;
         @memcpy(dyn_info, dyn_params_buf[0..func.params.len]);
         self.fn_dyn_params.put(self.allocator, func.name, dyn_info) catch return error.CodegenAlloc;
+    }
+
+    // Record ref param info for auto-referencing.
+    if (has_ref_param) {
+        const ref_info = self.allocator.alloc(bool, func.params.len) catch return error.CodegenAlloc;
+        @memcpy(ref_info, ref_params_buf[0..func.params.len]);
+        self.fn_ref_params.put(self.allocator, func.name, ref_info) catch return error.CodegenAlloc;
+    }
+
+    if (self.resultErrSymbolFromReturnType(func.return_type)) |err_sym| {
+        self.fn_result_err_symbols.put(self.allocator, func.name, err_sym) catch return error.CodegenAlloc;
+    }
+    if (self.isResultReturnType(func.return_type)) {
+        self.fn_returns_result.put(self.allocator, func.name, {}) catch return error.CodegenAlloc;
+    }
+    if (self.isResultUnitReturnType(func.return_type)) {
+        self.fn_result_unit_returns.put(self.allocator, func.name, {}) catch return error.CodegenAlloc;
     }
 }
 
@@ -1013,6 +1239,54 @@ fn createDynWrapper(self: *Codegen, fn_info: FnInfo, type_sym: u32, trait_info: 
     return wrapper_fn;
 }
 
+const DynConcreteArgInfo = struct {
+    type_sym: u32,
+    use_ptr: bool,
+};
+
+/// Determine whether an expression flowing into a dyn-typed position has a
+/// known concrete implementor type, and whether to wrap it by value or pointer.
+fn dynConcreteArgInfo(
+    self: *Codegen,
+    arg_expr: *const Ast.Expr,
+    arg_type: c.LLVMTypeRef,
+) ?DynConcreteArgInfo {
+    if (self.findTypeSymbol(arg_type)) |type_sym| {
+        return .{ .type_sym = type_sym, .use_ptr = false };
+    }
+    if (c.LLVMGetTypeKind(arg_type) != c.LLVMPointerTypeKind) return null;
+
+    if (arg_expr.kind == .unary) {
+        const un = arg_expr.kind.unary;
+        if (un.op == .ref_of or un.op == .mut_ref_of) {
+            if (un.operand.kind == .ident) {
+                const base_sym = un.operand.kind.ident;
+                if (self.locals.get(base_sym)) |base_local| {
+                    if (self.findTypeSymbol(base_local.ty)) |type_sym| {
+                        return .{ .type_sym = type_sym, .use_ptr = true };
+                    }
+                }
+            }
+        }
+    }
+
+    if (arg_expr.kind == .ident) {
+        const arg_sym = arg_expr.kind.ident;
+        if (self.ref_pointee_types.get(arg_sym)) |pointee_ty| {
+            if (self.findTypeSymbol(pointee_ty)) |type_sym| {
+                return .{ .type_sym = type_sym, .use_ptr = true };
+            }
+        }
+        if (self.locals.get(arg_sym)) |arg_local| {
+            if (arg_local.pointee_struct) |ps| {
+                return .{ .type_sym = ps, .use_ptr = true };
+            }
+        }
+    }
+
+    return null;
+}
+
 /// Build a dyn Trait fat pointer from a concrete value.
 /// Returns {data_ptr, vtable_ptr} struct.
 fn buildDynTraitValue(self: *Codegen, concrete_val: c.LLVMValueRef, type_sym: u32, trait_sym: u32) Error!c.LLVMValueRef {
@@ -1035,6 +1309,23 @@ fn buildDynTraitValue(self: *Codegen, concrete_val: c.LLVMValueRef, type_sym: u3
     fat_val = c.LLVMBuildInsertValue(self.builder, fat_val, alloca, 0, "dyn.withdata");
     fat_val = c.LLVMBuildInsertValue(self.builder, fat_val, vtable_global, 1, "dyn.withvtable");
 
+    return fat_val;
+}
+
+/// Build a dyn Trait fat pointer from an existing pointer to concrete data.
+fn buildDynTraitValueFromPtr(self: *Codegen, data_ptr: c.LLVMValueRef, type_sym: u32, trait_sym: u32) Error!c.LLVMValueRef {
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+
+    const hash_key = @as(u64, type_sym) << 32 | @as(u64, trait_sym);
+    const vtable_global = self.vtable_globals.get(hash_key) orelse return error.UnsupportedExpr;
+
+    var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+    const fat_type = c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+
+    const erased_ptr = c.LLVMBuildBitCast(self.builder, data_ptr, ptr_type, "dyn.data.cast");
+    var fat_val = c.LLVMGetUndef(fat_type);
+    fat_val = c.LLVMBuildInsertValue(self.builder, fat_val, erased_ptr, 0, "dyn.withdata");
+    fat_val = c.LLVMBuildInsertValue(self.builder, fat_val, vtable_global, 1, "dyn.withvtable");
     return fat_val;
 }
 
@@ -1096,11 +1387,70 @@ fn genDynDispatch(self: *Codegen, fat_ptr: c.LLVMValueRef, trait_sym: u32, metho
     );
 }
 
-/// Look up a Display method (Type.display or Type.to_string) for a type.
+/// Attempt to devirtualize a dyn dispatch call when the concrete implementor
+/// is known at compile time.
+fn genKnownConcreteDispatch(
+    self: *Codegen,
+    fat_ptr: c.LLVMValueRef,
+    concrete_sym: u32,
+    method_sym: u32,
+    args: []const *const Ast.Expr,
+) Error!?c.LLVMValueRef {
+    const type_name = self.pool.resolve(concrete_sym);
+    const method_name = self.pool.resolve(method_sym);
+    var name_buf: [512]u8 = undefined;
+    if (type_name.len + 1 + method_name.len >= name_buf.len) return null;
+    @memcpy(name_buf[0..type_name.len], type_name);
+    name_buf[type_name.len] = '.';
+    @memcpy(name_buf[type_name.len + 1 ..][0..method_name.len], method_name);
+    const mangled = name_buf[0 .. type_name.len + 1 + method_name.len];
+    const fn_sym = self.pool.intern(mangled) catch return error.CodegenAlloc;
+    const fn_info = self.functions.get(fn_sym) orelse return null;
+
+    var call_args: [64]c.LLVMValueRef = undefined;
+    const total_args: u32 = @intCast(1 + args.len);
+    if (c.LLVMCountParams(fn_info.value) < 1) return null;
+
+    const self_param_type = c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, 0));
+    const data_ptr = c.LLVMBuildExtractValue(self.builder, fat_ptr, 0, "devirt.data");
+    if (c.LLVMGetTypeKind(self_param_type) == c.LLVMPointerTypeKind) {
+        call_args[0] = c.LLVMBuildBitCast(self.builder, data_ptr, self_param_type, "devirt.self.ptr");
+    } else {
+        call_args[0] = c.LLVMBuildLoad2(self.builder, self_param_type, data_ptr, "devirt.self");
+    }
+
+    for (args, 0..) |arg, i| {
+        call_args[1 + i] = try self.genExpr(arg);
+    }
+
+    const param_count: u32 = c.LLVMCountParams(fn_info.value);
+    for (0..@min(total_args, param_count)) |i| {
+        const param_type = c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, @intCast(i)));
+        const arg_type = c.LLVMTypeOf(call_args[i]);
+        if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
+            call_args[i] = self.extractStrPtr(call_args[i]);
+        } else if (c.LLVMGetTypeKind(param_type) != c.LLVMPointerTypeKind or c.LLVMGetTypeKind(arg_type) != c.LLVMPointerTypeKind) {
+            call_args[i] = self.coerceInt(call_args[i], param_type);
+        }
+    }
+
+    const ret_type = c.LLVMGetReturnType(fn_info.fn_type);
+    const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+    return c.LLVMBuildCall2(
+        self.builder,
+        fn_info.fn_type,
+        fn_info.value,
+        &call_args,
+        total_args,
+        if (is_void) "" else "devirt.call",
+    );
+}
+
+/// Look up a display-style method for a type.
 fn findDisplayMethod(self: *Codegen, type_sym: u32) ?FnInfo {
     const type_name = self.pool.resolve(type_sym);
-    // Try "Type.display" first, then "Type.to_string".
-    const suffixes = [_][]const u8{ ".display", ".to_string" };
+    // Try "Type.display" first, then "Type.to_string", then "Type.debug".
+    const suffixes = [_][]const u8{ ".display", ".to_string", ".debug" };
     for (suffixes) |suffix| {
         var name_buf: [512]u8 = undefined;
         if (type_name.len + suffix.len < name_buf.len) {
@@ -1170,12 +1520,19 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     // Set expected_type for function body (helps Ok/Err/None type inference).
     const saved_expected = self.expected_type;
     self.expected_type = self.current_ret_type;
+    const saved_result_err_sym = self.current_result_err_symbol;
+    const saved_fn_returns_result = self.current_fn_returns_result;
+    const saved_fn_saw_return = self.current_fn_saw_explicit_return;
+    self.current_result_err_symbol = self.fn_result_err_symbols.get(func.name);
+    self.current_fn_returns_result = self.fn_returns_result.get(func.name) != null;
+    self.current_fn_saw_explicit_return = false;
 
     const entry = c.LLVMAppendBasicBlockInContext(self.context, function, "entry");
     c.LLVMPositionBuilderAtEnd(self.builder, entry);
 
     // Clear trait_locals for this function scope.
     self.trait_locals.clearRetainingCapacity();
+    self.trait_local_concrete_types.clearRetainingCapacity();
 
     // Save/setup tailrec state.
     const saved_tailrec_bb = self.tailrec_body_bb;
@@ -1198,9 +1555,10 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         if (param.type_expr) |te| {
             if (te.kind == .fn_type) {
                 fn_sig = self.buildFnTypeFromAst(te.kind.fn_type) catch null;
-            } else if (te.kind == .trait_object) {
-                // Track dyn Trait parameters for dynamic dispatch.
-                self.trait_locals.put(self.allocator, param.name, te.kind.trait_object) catch {};
+            } else if (dynTraitFromTypeExpr(self, te)) |trait_sym| {
+                // Track dyn-typed parameters (`dyn`, `&dyn`, `Box[dyn]`) for
+                // dynamic method dispatch in `x.method(...)`.
+                self.trait_locals.put(self.allocator, param.name, trait_sym) catch {};
             } else if (te.kind == .ptr_type or te.kind == .ref_type) {
                 // Track pointer-to-struct for field access through pointers.
                 const pointee_te = if (te.kind == .ptr_type) te.kind.ptr_type.pointee else te.kind.ref_type.pointee;
@@ -1245,9 +1603,6 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
 
     const body_val = try self.genExpr(func.body);
 
-    // Restore expected_type.
-    self.expected_type = saved_expected;
-
     // Only emit implicit return if the current block has no terminator
     // (i.e. body didn't end with an explicit return).
     const current_bb = c.LLVMGetInsertBlock(self.builder);
@@ -1262,8 +1617,23 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
             // use a zero default rather than the void undef.
             const body_type = c.LLVMTypeOf(body_val);
             if (body_type == c.LLVMVoidTypeInContext(self.context)) {
-                _ = c.LLVMBuildRet(self.builder, c.LLVMConstInt(ret_type, 0, 0));
-            } else if (body_type != ret_type and self.isResultType(ret_type)) {
+                if (self.current_fn_returns_result) {
+                    if (self.fn_result_unit_returns.get(func.name) != null) {
+                        const unit_val = c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+                        const wrapped = try self.buildResultOk(unit_val, ret_type);
+                        _ = c.LLVMBuildRet(self.builder, wrapped);
+                    } else if (self.current_fn_saw_explicit_return) {
+                        // We are in dead continuation code after one or more
+                        // explicit returns; keep this block unreachable rather
+                        // than forcing a synthetic Result return.
+                        _ = c.LLVMBuildUnreachable(self.builder);
+                    } else {
+                        return error.UnsupportedExpr;
+                    }
+                } else {
+                    _ = c.LLVMBuildRet(self.builder, c.LLVMConstInt(ret_type, 0, 0));
+                }
+            } else if (body_type != ret_type and self.current_fn_returns_result) {
                 // Implicit Ok wrapping: if return type is Result and body is not,
                 // wrap the body value in Ok(...).
                 const wrapped = try self.buildResultOk(body_val, ret_type);
@@ -1275,6 +1645,16 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         } else {
             _ = c.LLVMBuildRetVoid(self.builder);
         }
+    }
+
+    // Restore expected/result context.
+    self.expected_type = saved_expected;
+    self.current_result_err_symbol = saved_result_err_sym;
+    self.current_fn_returns_result = saved_fn_returns_result;
+    self.current_fn_saw_explicit_return = saved_fn_saw_return;
+
+    if (self.tailrec_param_allocas) |allocas| {
+        self.allocator.free(allocas);
     }
 
     // Restore tailrec state.
@@ -2080,8 +2460,119 @@ fn findCaptures(
             self.findCaptures(if_e.then_body, closure_params, captured, count);
             if (if_e.else_body) |eb| self.findCaptures(eb, closure_params, captured, count);
         },
+        .let_binding => |lb| {
+            self.findCaptures(lb.value, closure_params, captured, count);
+        },
+        .let_else => |le| {
+            self.findCaptures(le.value, closure_params, captured, count);
+            self.findCaptures(le.else_body, closure_params, captured, count);
+        },
+        .tuple_destructure => |td| {
+            self.findCaptures(td.value, closure_params, captured, count);
+        },
+        .assign => |a| {
+            self.findCaptures(a.target, closure_params, captured, count);
+            self.findCaptures(a.value, closure_params, captured, count);
+        },
+        .tuple => |elems| {
+            for (elems) |elem| {
+                self.findCaptures(elem, closure_params, captured, count);
+            }
+        },
+        .range => |r| {
+            if (r.start) |s| self.findCaptures(s, closure_params, captured, count);
+            if (r.end) |e| self.findCaptures(e, closure_params, captured, count);
+        },
         .field_access => |fa| {
             self.findCaptures(fa.expr, closure_params, captured, count);
+        },
+        .optional_chain => |oc| {
+            self.findCaptures(oc.expr, closure_params, captured, count);
+            if (oc.args) |args| {
+                for (args) |arg| {
+                    self.findCaptures(arg, closure_params, captured, count);
+                }
+            }
+        },
+        .index => |idx| {
+            self.findCaptures(idx.expr, closure_params, captured, count);
+            self.findCaptures(idx.index, closure_params, captured, count);
+        },
+        .slice => |sl| {
+            self.findCaptures(sl.expr, closure_params, captured, count);
+            if (sl.start) |s| self.findCaptures(s, closure_params, captured, count);
+            if (sl.end) |e| self.findCaptures(e, closure_params, captured, count);
+        },
+        .pipeline => |p| {
+            self.findCaptures(p.lhs, closure_params, captured, count);
+            self.findCaptures(p.rhs, closure_params, captured, count);
+        },
+        .while_expr => |w| {
+            self.findCaptures(w.condition, closure_params, captured, count);
+            self.findCaptures(w.body, closure_params, captured, count);
+        },
+        .loop_expr => |inner| self.findCaptures(inner, closure_params, captured, count),
+        .for_expr => |f| {
+            self.findCaptures(f.iterable, closure_params, captured, count);
+            self.findCaptures(f.body, closure_params, captured, count);
+        },
+        .break_expr => |v| if (v) |inner| self.findCaptures(inner, closure_params, captured, count),
+        .array_literal => |elems| {
+            for (elems) |elem| {
+                self.findCaptures(elem, closure_params, captured, count);
+            }
+        },
+        .array_comprehension => |ac| {
+            self.findCaptures(ac.expr, closure_params, captured, count);
+            self.findCaptures(ac.iterable, closure_params, captured, count);
+            if (ac.filter) |f| self.findCaptures(f, closure_params, captured, count);
+            if (ac.clauses) |clauses| {
+                for (clauses) |clause| {
+                    self.findCaptures(clause.iterable, closure_params, captured, count);
+                }
+            }
+        },
+        .struct_literal => |sl| {
+            for (sl.fields) |field| {
+                self.findCaptures(field.value, closure_params, captured, count);
+            }
+        },
+        .match_expr => |m| {
+            self.findCaptures(m.subject, closure_params, captured, count);
+            for (m.arms) |arm| {
+                if (arm.guard) |g| self.findCaptures(g, closure_params, captured, count);
+                self.findCaptures(arm.body, closure_params, captured, count);
+            }
+        },
+        .enum_variant => |ev| {
+            for (ev.args) |arg| {
+                self.findCaptures(arg, closure_params, captured, count);
+            }
+        },
+        .closure => |cl| self.findCaptures(cl.body, closure_params, captured, count),
+        .cast => |ca| self.findCaptures(ca.expr, closure_params, captured, count),
+        .defer_expr => |inner| self.findCaptures(inner, closure_params, captured, count),
+        .with_expr => |w| {
+            self.findCaptures(w.source, closure_params, captured, count);
+            self.findCaptures(w.body, closure_params, captured, count);
+        },
+        .record_update => |ru| {
+            self.findCaptures(ru.source, closure_params, captured, count);
+            for (ru.fields) |field| {
+                self.findCaptures(field.value, closure_params, captured, count);
+            }
+        },
+        .yield_expr => |inner| self.findCaptures(inner, closure_params, captured, count),
+        .await_expr => |inner| self.findCaptures(inner, closure_params, captured, count),
+        .async_block => |inner| self.findCaptures(inner, closure_params, captured, count),
+        .async_scope => |as| self.findCaptures(as.body, closure_params, captured, count),
+        .spawn_expr => |inner| self.findCaptures(inner, closure_params, captured, count),
+        .comptime_expr => |inner| self.findCaptures(inner, closure_params, captured, count),
+        .select_await => |sa| {
+            for (sa.arms) |arm| {
+                self.findCaptures(arm.task, closure_params, captured, count);
+                self.findCaptures(arm.body, closure_params, captured, count);
+            }
         },
         .grouped => |inner| {
             self.findCaptures(inner, closure_params, captured, count);
@@ -2112,6 +2603,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
             0,
         ),
         .string_literal => |sym| try self.genStringLiteral(sym),
+        .c_string_literal => |sym| try self.genCStringLiteral(sym),
         .ident => |sym| self.genIdent(sym),
         .binary => |bin| try self.genBinary(bin),
         .unary => |un| try self.genUnary(un),
@@ -2129,6 +2621,7 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .break_expr => |brk_val| try self.genBreak(brk_val),
         .continue_expr => try self.genContinue(),
         .field_access => |fa| try self.genFieldAccess(fa),
+        .optional_chain => |oc| try self.genOptionalChain(oc),
         .index => |idx| try self.genIndex(idx),
         .slice => |sl| try self.genSlice(sl),
         .array_literal => |elems| try self.genArrayLiteral(elems),
@@ -2154,7 +2647,9 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .tuple_destructure => |td| try self.genTupleDestructure(td),
         .yield_expr => |val| try self.genYield(val),
         .await_expr => |inner| try self.genAwait(inner),
+        .async_block => |inner| try self.genAsyncBlock(inner),
         .spawn_expr => |inner| try self.genSpawn(inner),
+        .async_scope => |as| try self.genAsyncScope(as),
         .comptime_expr => |inner| try self.genComptimeExpr(inner),
         .select_await => |sel| try self.genSelectAwait(sel),
         else => error.UnsupportedExpr,
@@ -2294,7 +2789,14 @@ fn declareAsyncRuntime(self: *Codegen) void {
 fn declareAsyncFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     self.declareAsyncRuntime();
 
-    const name = self.pool.resolve(func.name);
+    // Interning during async declaration can reallocate the string pool and
+    // invalidate slices from pool.resolve(). Keep a stable local copy.
+    var name_buf: [256]u8 = undefined;
+    const name_src = self.pool.resolve(func.name);
+    if (name_src.len >= name_buf.len) return error.UnsupportedExpr;
+    @memcpy(name_buf[0..name_src.len], name_src);
+    const name = name_buf[0..name_src.len];
+
     const i32_type = c.LLVMInt32TypeInContext(self.context);
     const void_type = c.LLVMVoidTypeInContext(self.context);
     const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
@@ -2532,22 +3034,191 @@ fn genAsyncFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     }
 }
 
-/// Generate an await expression: calls with_fiber_await(task_id).
-fn genAwait(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef {
-    var should_await_task = false;
-    switch (inner.kind) {
-        .ident => |sym| {
-            should_await_task = self.task_locals.get(sym) != null;
-        },
-        .call => |call_e| {
-            if (call_e.callee.kind == .ident) {
-                should_await_task = self.async_fn_symbols.get(call_e.callee.kind.ident) != null;
+fn findActiveAsyncScopeFrame(self: *Codegen, sym: u32) ?*AsyncScopeFrame {
+    var i: usize = self.async_scope_depth;
+    while (i > 0) {
+        i -= 1;
+        if (self.async_scope_frames[i].symbol == sym) {
+            return &self.async_scope_frames[i];
+        }
+    }
+    return null;
+}
+
+fn exprProducesTask(self: *Codegen, expr: *const Ast.Expr) bool {
+    return switch (expr.kind) {
+        .ident => |sym| self.task_locals.get(sym) != null,
+        .call => |call_e| blk: {
+            if (call_e.callee.kind == .field_access) {
+                const fa = call_e.callee.kind.field_access;
+                if (fa.expr.kind == .ident and self.findActiveAsyncScopeFrame(fa.expr.kind.ident) != null) {
+                    if (std.mem.eql(u8, self.pool.resolve(fa.field), "track")) break :blk true;
+                }
             }
+            if (call_e.callee.kind == .ident) {
+                break :blk self.async_fn_symbols.get(call_e.callee.kind.ident) != null;
+            }
+            break :blk false;
         },
-        else => {},
+        .async_block => true,
+        .grouped => |inner| self.exprProducesTask(inner),
+        else => false,
+    };
+}
+
+/// Generate `async: body` by lowering to a spawned fiber with capture payload.
+fn genAsyncBlock(self: *Codegen, body: *const Ast.Expr) Error!c.LLVMValueRef {
+    self.declareAsyncRuntime();
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const void_type = c.LLVMVoidTypeInContext(self.context);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+
+    // Capture locals referenced by the async block body.
+    var captured: [16]CapturedVar = undefined;
+    var capture_count: u32 = 0;
+    self.findCaptures(body, &.{}, &captured, &capture_count);
+
+    var cap_field_types: [16]c.LLVMTypeRef = undefined;
+    for (captured[0..capture_count], 0..) |cap, i| {
+        cap_field_types[i] = cap.ty;
+    }
+    const cap_struct_type = if (capture_count > 0)
+        c.LLVMStructTypeInContext(self.context, &cap_field_types, capture_count, 0)
+    else
+        c.LLVMStructTypeInContext(self.context, null, 0, 0);
+    const cap_ptr_type = c.LLVMPointerType(cap_struct_type, 0);
+
+    const block_id = self.closure_counter;
+    self.closure_counter += 1;
+
+    // 1) Build implementation fn: __async_block_impl_N(*capture) -> i32
+    var impl_name_buf: [64]u8 = undefined;
+    const impl_name = std.fmt.bufPrint(&impl_name_buf, "__async_block_impl_{d}\x00", .{block_id}) catch return error.CodegenAlloc;
+    const impl_name_z: [*:0]const u8 = @ptrCast(impl_name.ptr);
+
+    var impl_param_types = [_]c.LLVMTypeRef{cap_ptr_type};
+    const impl_ft = c.LLVMFunctionType(i32_type, &impl_param_types, 1, 0);
+    const impl_fn = c.LLVMAddFunction(self.module, impl_name_z, impl_ft);
+
+    const saved_function = self.current_function;
+    const saved_ret_type = self.current_ret_type;
+    const saved_bb = c.LLVMGetInsertBlock(self.builder);
+    const saved_locals = self.locals;
+    const saved_task_locals = self.task_locals;
+    const saved_scope_local_count = self.scope_local_count;
+    const saved_defer_depth = self.defer_depth;
+    const saved_expected = self.expected_type;
+    const saved_trait_locals = self.trait_locals;
+
+    self.current_function = impl_fn;
+    self.current_ret_type = i32_type;
+    self.locals = .empty;
+    self.task_locals = .{};
+    self.scope_local_count = 0;
+    self.defer_depth = 0;
+    self.expected_type = i32_type;
+    self.trait_locals = .{};
+
+    const impl_entry = c.LLVMAppendBasicBlockInContext(self.context, impl_fn, "entry");
+    c.LLVMPositionBuilderAtEnd(self.builder, impl_entry);
+
+    const cap_ptr_arg = c.LLVMGetParam(impl_fn, 0);
+    for (captured[0..capture_count], 0..) |cap, i| {
+        const field_gep = c.LLVMBuildStructGEP2(self.builder, cap_struct_type, cap_ptr_arg, @intCast(i), "");
+        const loaded = c.LLVMBuildLoad2(self.builder, cap.ty, field_gep, "");
+        const alloca = c.LLVMBuildAlloca(self.builder, cap.ty, "");
+        _ = c.LLVMBuildStore(self.builder, loaded, alloca);
+        self.locals.put(self.allocator, cap.sym, .{
+            .alloca = alloca,
+            .ty = cap.ty,
+            .is_mut = false,
+        }) catch return error.CodegenAlloc;
     }
 
-    if (!should_await_task) {
+    const body_val = try self.genExpr(body);
+    const impl_bb = c.LLVMGetInsertBlock(self.builder);
+    if (c.LLVMGetBasicBlockTerminator(impl_bb) == null) {
+        const coerced = self.coerceInt(body_val, i32_type);
+        _ = c.LLVMBuildRet(self.builder, coerced);
+    }
+
+    self.locals.deinit(self.allocator);
+    self.task_locals.deinit(self.allocator);
+    self.trait_locals.deinit(self.allocator);
+    self.current_function = saved_function;
+    self.current_ret_type = saved_ret_type;
+    self.locals = saved_locals;
+    self.task_locals = saved_task_locals;
+    self.scope_local_count = saved_scope_local_count;
+    self.defer_depth = saved_defer_depth;
+    self.expected_type = saved_expected;
+    self.trait_locals = saved_trait_locals;
+    c.LLVMPositionBuilderAtEnd(self.builder, saved_bb);
+
+    // 2) Build fiber trampoline: __async_block_fiber_N(void*) -> void
+    var tramp_name_buf: [64]u8 = undefined;
+    const tramp_name = std.fmt.bufPrint(&tramp_name_buf, "__async_block_fiber_{d}\x00", .{block_id}) catch return error.CodegenAlloc;
+    const tramp_name_z: [*:0]const u8 = @ptrCast(tramp_name.ptr);
+
+    var tramp_param_types = [_]c.LLVMTypeRef{ptr_type};
+    const tramp_ft = c.LLVMFunctionType(void_type, &tramp_param_types, 1, 0);
+    const tramp_fn = c.LLVMAddFunction(self.module, tramp_name_z, tramp_ft);
+
+    const saved_fn_for_tramp = self.current_function;
+    const saved_ret_for_tramp = self.current_ret_type;
+    const saved_bb_for_tramp = c.LLVMGetInsertBlock(self.builder);
+
+    self.current_function = tramp_fn;
+    self.current_ret_type = void_type;
+    const tramp_entry = c.LLVMAppendBasicBlockInContext(self.context, tramp_fn, "entry");
+    c.LLVMPositionBuilderAtEnd(self.builder, tramp_entry);
+
+    const raw_arg_ptr = c.LLVMGetParam(tramp_fn, 0);
+    const typed_cap_ptr = c.LLVMBuildBitCast(self.builder, raw_arg_ptr, cap_ptr_type, "cap.ptr");
+    var impl_call_args = [_]c.LLVMValueRef{typed_cap_ptr};
+    const impl_result = c.LLVMBuildCall2(self.builder, impl_ft, impl_fn, &impl_call_args, 1, "async.block.res");
+    const result_i64 = c.LLVMBuildSExt(self.builder, impl_result, i64_type, "async.block.res.i64");
+
+    const set_result_fn = c.LLVMGetNamedFunction(self.module, "with_fiber_set_result") orelse return error.UnsupportedExpr;
+    var set_params = [_]c.LLVMTypeRef{i64_type};
+    const set_ft = c.LLVMFunctionType(void_type, &set_params, 1, 0);
+    var set_args = [_]c.LLVMValueRef{result_i64};
+    _ = c.LLVMBuildCall2(self.builder, set_ft, set_result_fn, &set_args, 1, "");
+    _ = c.LLVMBuildRetVoid(self.builder);
+
+    self.current_function = saved_fn_for_tramp;
+    self.current_ret_type = saved_ret_for_tramp;
+    c.LLVMPositionBuilderAtEnd(self.builder, saved_bb_for_tramp);
+
+    // 3) Allocate capture payload and spawn.
+    var cap_payload_ptr: c.LLVMValueRef = c.LLVMConstNull(ptr_type);
+    if (capture_count > 0) {
+        const cap_size = c.LLVMSizeOf(cap_struct_type);
+        const malloc_fn = self.getOrDeclareMalloc();
+        var malloc_args = [_]c.LLVMValueRef{cap_size};
+        var malloc_param_types = [_]c.LLVMTypeRef{i64_type};
+        const malloc_ft = c.LLVMFunctionType(ptr_type, &malloc_param_types, 1, 0);
+        const cap_raw = c.LLVMBuildCall2(self.builder, malloc_ft, malloc_fn, &malloc_args, 1, "async.block.cap");
+        const cap_heap_ptr = c.LLVMBuildBitCast(self.builder, cap_raw, cap_ptr_type, "async.block.cap.ptr");
+        for (captured[0..capture_count], 0..) |cap, i| {
+            const field_gep = c.LLVMBuildStructGEP2(self.builder, cap_struct_type, cap_heap_ptr, @intCast(i), "");
+            _ = c.LLVMBuildStore(self.builder, cap.value, field_gep);
+        }
+        cap_payload_ptr = cap_raw;
+    }
+
+    const spawn_rt_fn = c.LLVMGetNamedFunction(self.module, "with_fiber_spawn") orelse return error.UnsupportedExpr;
+    var spawn_params = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+    const spawn_ft = c.LLVMFunctionType(i32_type, &spawn_params, 2, 0);
+    var spawn_args = [_]c.LLVMValueRef{ tramp_fn, cap_payload_ptr };
+    return c.LLVMBuildCall2(self.builder, spawn_ft, spawn_rt_fn, &spawn_args, 2, "task");
+}
+
+/// Generate an await expression: calls with_fiber_await(task_id).
+fn genAwait(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef {
+    if (!self.exprProducesTask(inner)) {
         // Non-task await is treated as identity for async-block expression ergonomics.
         return self.genExpr(inner);
     }
@@ -2590,8 +3261,50 @@ fn genSpawn(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef {
     // which returns a task ID (i32). We simply discard it.
     _ = try self.genExpr(inner);
 
-    // Return void/zero since spawn is fire-and-forget.
-    return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+    // spawn returns Unit/void and detaches ownership of the task handle.
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+/// Generate `async scope |s|: body`.
+/// Tracked tasks registered via `s.track(task)` are canceled and awaited
+/// at scope exit to enforce bounded lifetime.
+fn genAsyncScope(self: *Codegen, as: Ast.AsyncScopeExpr) Error!c.LLVMValueRef {
+    self.declareAsyncRuntime();
+
+    if (self.async_scope_depth >= self.async_scope_frames.len) return error.UnsupportedExpr;
+
+    const frame_idx = self.async_scope_depth;
+    self.async_scope_frames[frame_idx].symbol = as.name;
+    self.async_scope_frames[frame_idx].task_count = 0;
+    self.async_scope_depth += 1;
+    defer self.async_scope_depth -= 1;
+
+    const body_val = try self.genExpr(as.body);
+
+    const current_bb = c.LLVMGetInsertBlock(self.builder);
+    if (c.LLVMGetBasicBlockTerminator(current_bb) == null) {
+        const i32_type = c.LLVMInt32TypeInContext(self.context);
+        const i64_type = c.LLVMInt64TypeInContext(self.context);
+
+        const cancel_fn = c.LLVMGetNamedFunction(self.module, "with_fiber_cancel") orelse return error.UnsupportedExpr;
+        var cancel_params = [_]c.LLVMTypeRef{i32_type};
+        const cancel_ft = c.LLVMFunctionType(i32_type, &cancel_params, 1, 0);
+
+        const await_fn = c.LLVMGetNamedFunction(self.module, "with_fiber_await") orelse return error.UnsupportedExpr;
+        var await_params = [_]c.LLVMTypeRef{i32_type};
+        const await_ft = c.LLVMFunctionType(i64_type, &await_params, 1, 0);
+
+        const frame = &self.async_scope_frames[frame_idx];
+        for (0..frame.task_count) |i| {
+            const task_id = frame.tasks[i];
+            var cancel_args = [_]c.LLVMValueRef{task_id};
+            _ = c.LLVMBuildCall2(self.builder, cancel_ft, cancel_fn, &cancel_args, 1, "");
+            var await_args = [_]c.LLVMValueRef{task_id};
+            _ = c.LLVMBuildCall2(self.builder, await_ft, await_fn, &await_args, 1, "");
+        }
+    }
+
+    return body_val;
 }
 
 /// Generate a select await expression.
@@ -2604,6 +3317,8 @@ fn genSelectAwait(self: *Codegen, sel: Ast.SelectAwaitExpr) Error!c.LLVMValueRef
     const i64_type = c.LLVMInt64TypeInContext(self.context);
     const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
     const arm_count: u32 = @intCast(sel.arms.len);
+
+    if (sel.arms.len == 0 or sel.arms.len > 16) return error.UnsupportedExpr;
 
     // Declare with_fiber_select if not already declared.
     if (c.LLVMGetNamedFunction(self.module, "with_fiber_select") == null) {
@@ -2668,6 +3383,7 @@ fn genSelectAwait(self: *Codegen, sel: Ast.SelectAwaitExpr) Error!c.LLVMValueRef
         // Bind the result to the arm's name (truncate i64 -> i32).
         const truncated = c.LLVMBuildTrunc(self.builder, result_val, i32_type, "select.trunc");
         const bind_alloca = c.LLVMBuildAlloca(self.builder, i32_type, "");
+        const saved_local = self.locals.get(arm.name);
         _ = c.LLVMBuildStore(self.builder, truncated, bind_alloca);
         self.locals.put(self.allocator, arm.name, .{
             .alloca = bind_alloca,
@@ -2677,6 +3393,11 @@ fn genSelectAwait(self: *Codegen, sel: Ast.SelectAwaitExpr) Error!c.LLVMValueRef
 
         // Generate body.
         const body_val = try self.genExpr(arm.body);
+        if (saved_local) |old| {
+            self.locals.put(self.allocator, arm.name, old) catch return error.CodegenAlloc;
+        } else {
+            _ = self.locals.remove(arm.name);
+        }
         const from_bb = c.LLVMGetInsertBlock(self.builder);
         if (c.LLVMGetBasicBlockTerminator(from_bb) == null) {
             _ = c.LLVMBuildBr(self.builder, merge_bb);
@@ -3286,25 +4007,174 @@ fn genDefaultOp(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
     c.LLVMPositionBuilderAtEnd(self.builder, then_bb);
     const payload_gep = c.LLVMBuildStructGEP2(self.builder, lhs_type, tmp, 1, "");
     const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
-    const payload_type = self.findEnumPayloadType(lhs_type, 0) orelse i32_type;
+    const payload_type = self.getOptionPayloadType(lhs_type) orelse self.findEnumPayloadType(lhs_type, 0) orelse i32_type;
     const payload = c.LLVMBuildLoad2(self.builder, payload_type, payload_ptr, "default.payload");
     const then_end_bb = c.LLVMGetInsertBlock(self.builder);
     _ = c.LLVMBuildBr(self.builder, merge_bb);
 
-    // None/Err path: evaluate default (RHS).
+    // None/Err path: evaluate default (RHS). This may diverge (return/break/continue).
     c.LLVMPositionBuilderAtEnd(self.builder, else_bb);
     const rhs = try self.genExpr(bin.rhs);
-    const rhs_coerced = self.coerceInt(rhs, payload_type);
     const else_end_bb = c.LLVMGetInsertBlock(self.builder);
-    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const else_bb_terminated = c.LLVMGetBasicBlockTerminator(else_bb) != null;
+    const else_end_terminated = c.LLVMGetBasicBlockTerminator(else_end_bb) != null;
+    const rhs_is_void = c.LLVMTypeOf(rhs) == c.LLVMVoidTypeInContext(self.context);
+    const else_cur_dead = else_end_bb != else_bb and !else_end_terminated;
+    const rhs_diverged = rhs_is_void and else_bb_terminated and else_cur_dead;
+    const else_terminated = else_end_terminated or rhs_diverged;
+    var rhs_coerced: c.LLVMValueRef = undefined;
+    if (rhs_diverged) {
+        _ = c.LLVMBuildUnreachable(self.builder);
+    } else if (!else_terminated) {
+        rhs_coerced = self.coerceInt(rhs, payload_type);
+        _ = c.LLVMBuildBr(self.builder, merge_bb);
+    }
 
     // Merge with phi.
     c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
     const phi = c.LLVMBuildPhi(self.builder, payload_type, "default.val");
-    var incoming_vals = [_]c.LLVMValueRef{ payload, rhs_coerced };
-    var incoming_bbs = [_]c.LLVMBasicBlockRef{ then_end_bb, else_end_bb };
-    c.LLVMAddIncoming(phi, &incoming_vals, &incoming_bbs, 2);
+    if (else_terminated) {
+        var incoming_vals = [_]c.LLVMValueRef{payload};
+        var incoming_bbs = [_]c.LLVMBasicBlockRef{then_end_bb};
+        c.LLVMAddIncoming(phi, &incoming_vals, &incoming_bbs, 1);
+    } else {
+        var incoming_vals = [_]c.LLVMValueRef{ payload, rhs_coerced };
+        var incoming_bbs = [_]c.LLVMBasicBlockRef{ then_end_bb, else_end_bb };
+        c.LLVMAddIncoming(phi, &incoming_vals, &incoming_bbs, 2);
+    }
 
+    return phi;
+}
+
+fn getResultErrType(self: *Codegen, result_type: c.LLVMTypeRef) ?c.LLVMTypeRef {
+    var it = self.result_type_cache.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == result_type) {
+            return entry.value_ptr.err_type;
+        }
+    }
+    return null;
+}
+
+fn genOptionalChainMember(self: *Codegen, oc: Ast.OptionalChainExpr, payload: c.LLVMValueRef, payload_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    var name_buf: [32]u8 = undefined;
+    const name = std.fmt.bufPrint(&name_buf, "__opt_payload_{d}", .{self.closure_counter}) catch return error.CodegenAlloc;
+    self.closure_counter += 1;
+    const payload_sym = self.pool.intern(name) catch return error.CodegenAlloc;
+
+    const payload_alloca = c.LLVMBuildAlloca(self.builder, payload_type, "opt.payload");
+    _ = c.LLVMBuildStore(self.builder, payload, payload_alloca);
+
+    const old_local = self.locals.get(payload_sym);
+    self.locals.put(self.allocator, payload_sym, .{
+        .alloca = payload_alloca,
+        .ty = payload_type,
+        .is_mut = false,
+    }) catch return error.CodegenAlloc;
+    defer {
+        if (old_local) |ol| {
+            self.locals.put(self.allocator, payload_sym, ol) catch {};
+        } else {
+            _ = self.locals.remove(payload_sym);
+        }
+    }
+
+    var payload_expr = Ast.Expr{
+        .kind = .{ .ident = payload_sym },
+        .span = oc.expr.span,
+    };
+    const member = Ast.FieldAccessExpr{
+        .expr = &payload_expr,
+        .field = oc.member,
+    };
+
+    if (oc.args) |args| {
+        return self.genMethodCall(member, args);
+    }
+    return self.genFieldAccess(member);
+}
+
+fn genOptionalChain(self: *Codegen, oc: Ast.OptionalChainExpr) Error!c.LLVMValueRef {
+    const base = try self.genExpr(oc.expr);
+    const base_type = c.LLVMTypeOf(base);
+    if (!self.isOptionOrResultType(base_type)) return error.UnsupportedExpr;
+
+    const payload_type = self.getOptionPayloadType(base_type) orelse return error.UnsupportedExpr;
+    const is_result = self.isResultType(base_type);
+    const base_err_type = if (is_result)
+        (self.getResultErrType(base_type) orelse c.LLVMInt32TypeInContext(self.context))
+    else
+        null;
+
+    const cur_fn = self.current_function;
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const base_tmp = c.LLVMBuildAlloca(self.builder, base_type, "opt.base");
+    _ = c.LLVMBuildStore(self.builder, base, base_tmp);
+
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, base_type, base_tmp, 0, "opt.tag.ptr");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "opt.tag");
+    const is_ok = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "opt.is_ok");
+
+    const then_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "opt.then");
+    const else_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "opt.else");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "opt.merge");
+    _ = c.LLVMBuildCondBr(self.builder, is_ok, then_bb, else_bb);
+
+    // Success branch: evaluate the chained member on payload.
+    c.LLVMPositionBuilderAtEnd(self.builder, then_bb);
+    const payload_gep = c.LLVMBuildStructGEP2(self.builder, base_type, base_tmp, 1, "opt.payload.ptr");
+    const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const payload_val = c.LLVMBuildLoad2(self.builder, payload_type, payload_ptr, "opt.payload");
+    const member_val = try self.genOptionalChainMember(oc, payload_val, payload_type);
+    const member_type = c.LLVMTypeOf(member_val);
+
+    var then_result: c.LLVMValueRef = undefined;
+    var out_type: c.LLVMTypeRef = undefined;
+
+    if (!is_result) {
+        const flatten = self.isOptionOrResultType(member_type) and !self.isResultType(member_type);
+        if (flatten) {
+            out_type = member_type;
+            then_result = member_val;
+        } else {
+            const out_info = try self.getOrCreateOptionType(member_type);
+            out_type = out_info.llvm_type;
+            then_result = try self.buildOptionSome(member_val);
+        }
+    } else {
+        const member_err_type = if (self.isResultType(member_type)) self.getResultErrType(member_type) else null;
+        const flatten = self.isResultType(member_type) and member_err_type != null and member_err_type.? == base_err_type.?;
+        if (flatten) {
+            out_type = member_type;
+            then_result = member_val;
+        } else {
+            const out_info = try self.getOrCreateResultType(member_type, base_err_type.?);
+            out_type = out_info.llvm_type;
+            then_result = try self.buildResultOk(member_val, out_type);
+        }
+    }
+    const then_end = c.LLVMGetInsertBlock(self.builder);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+
+    // Failure branch: propagate None/Err.
+    c.LLVMPositionBuilderAtEnd(self.builder, else_bb);
+    const else_result = if (!is_result)
+        self.buildOptionNone(out_type)
+    else blk: {
+        const err_payload_type = self.findEnumPayloadType(base_type, 1) orelse base_err_type.?;
+        const err_gep = c.LLVMBuildStructGEP2(self.builder, base_type, base_tmp, 1, "opt.err.ptr");
+        const err_ptr = c.LLVMBuildBitCast(self.builder, err_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+        const err_val = c.LLVMBuildLoad2(self.builder, err_payload_type, err_ptr, "opt.err");
+        break :blk try self.buildResultErr(err_val, out_type);
+    };
+    const else_end = c.LLVMGetInsertBlock(self.builder);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, out_type, "opt.chain");
+    var vals = [_]c.LLVMValueRef{ then_result, else_result };
+    var bbs = [_]c.LLVMBasicBlockRef{ then_end, else_end };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
     return phi;
 }
 
@@ -3363,9 +4233,23 @@ fn genUnary(self: *Codegen, un: Ast.UnaryExpr) Error!c.LLVMValueRef {
 fn genTryOp(self: *Codegen, operand: *const Ast.Expr) Error!c.LLVMValueRef {
     const val = try self.genExpr(operand);
     const val_type = c.LLVMTypeOf(val);
+    const src_err_sym = self.trySourceErrSymbol(operand);
+    const dst_err_sym = self.current_result_err_symbol;
 
     // Must be a struct type (enum with payload: { i32 tag, [N x i8] payload }).
     if (c.LLVMGetTypeKind(val_type) != c.LLVMStructTypeKind) return error.UnsupportedExpr;
+
+    const src_is_result = self.isResultType(val_type);
+    const src_is_option = self.isOptionType(val_type);
+    if (!src_is_result and !src_is_option) return error.UnsupportedExpr;
+
+    const dst_is_result = self.isResultType(self.current_ret_type);
+    const dst_is_option = self.isOptionType(self.current_ret_type);
+    if (!dst_is_result and !dst_is_option) return error.UnsupportedExpr;
+    if ((src_is_result and !dst_is_result) or (src_is_option and !dst_is_option)) {
+        // Phase 2 lowering supports Result->Result and Option->Option only.
+        return error.UnsupportedExpr;
+    }
 
     const i32_type = c.LLVMInt32TypeInContext(self.context);
     const function = self.current_function;
@@ -3419,12 +4303,28 @@ fn genTryOp(self: *Codegen, operand: *const Ast.Expr) Error!c.LLVMValueRef {
         // Copy the error payload if it exists (for Result propagation).
         const src_payload_gep = c.LLVMBuildStructGEP2(self.builder, val_type, tmp, 1, "");
         const dst_payload_gep = c.LLVMBuildStructGEP2(self.builder, self.current_ret_type, ret_alloca, 1, "");
-        const err_payload_type = self.findEnumPayloadType(val_type, 1);
-        if (err_payload_type) |ept| {
-            const src_ptr = c.LLVMBuildBitCast(self.builder, src_payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
-            const err_val = c.LLVMBuildLoad2(self.builder, ept, src_ptr, "");
-            const dst_ptr = c.LLVMBuildBitCast(self.builder, dst_payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
-            _ = c.LLVMBuildStore(self.builder, err_val, dst_ptr);
+        const src_err_type = self.findEnumPayloadType(val_type, 1);
+        const dst_err_type = self.findEnumPayloadType(self.current_ret_type, 1);
+        if (src_err_type) |set| {
+            if (dst_err_type) |det| {
+                const src_ptr = c.LLVMBuildBitCast(self.builder, src_payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+                const src_err_val = c.LLVMBuildLoad2(self.builder, set, src_ptr, "");
+                const conv_err_val = blk: {
+                    if (set == det) break :blk src_err_val;
+                    if (src_err_sym != null and dst_err_sym != null and src_err_sym.? != dst_err_sym.?) {
+                        if (self.convertErrorValueBySymbols(src_err_val, set, dst_err_sym.?, src_err_sym.?)) |wrapped| {
+                            break :blk wrapped;
+                        }
+                    }
+                    if (self.convertErrorValue(src_err_val, set, det)) |converted| {
+                        break :blk converted;
+                    }
+                    break :blk self.coerceInt(src_err_val, det);
+                };
+
+                const dst_ptr = c.LLVMBuildBitCast(self.builder, dst_payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+                _ = c.LLVMBuildStore(self.builder, conv_err_val, dst_ptr);
+            }
         }
 
         const ret_val = c.LLVMBuildLoad2(self.builder, self.current_ret_type, ret_alloca, "try.err");
@@ -3446,6 +4346,32 @@ fn genTryOp(self: *Codegen, operand: *const Ast.Expr) Error!c.LLVMValueRef {
 
 /// Find the payload LLVM type for variant at index `variant_idx` of an enum.
 fn findEnumPayloadType(self: *Codegen, llvm_type: c.LLVMTypeRef, variant_idx: u32) ?c.LLVMTypeRef {
+    // First consult specialized Option/Result caches because enum_types is keyed
+    // by symbol name and generic instantiations (Result/Option) share names.
+    var opt_it = self.option_type_cache.iterator();
+    while (opt_it.next()) |entry| {
+        const info = entry.value_ptr.*;
+        if (info.llvm_type == llvm_type) {
+            return switch (variant_idx) {
+                0 => info.payload_type, // Some
+                1 => null, // None
+                else => null,
+            };
+        }
+    }
+
+    var res_it = self.result_type_cache.iterator();
+    while (res_it.next()) |entry| {
+        const info = entry.value_ptr.*;
+        if (info.llvm_type == llvm_type) {
+            return switch (variant_idx) {
+                0 => info.payload_type, // Ok
+                1 => info.err_type, // Err
+                else => null,
+            };
+        }
+    }
+
     var it = self.enum_types.iterator();
     while (it.next()) |entry| {
         if (entry.value_ptr.llvm_type == llvm_type) {
@@ -3453,6 +4379,100 @@ fn findEnumPayloadType(self: *Codegen, llvm_type: c.LLVMTypeRef, variant_idx: u3
                 return entry.value_ptr.variant_payload_types[variant_idx];
             }
         }
+    }
+    return null;
+}
+
+fn trySourceErrSymbol(self: *Codegen, operand: *const Ast.Expr) ?u32 {
+    switch (operand.kind) {
+        .call => |call_e| {
+            if (call_e.callee.kind == .ident) {
+                return self.fn_result_err_symbols.get(call_e.callee.kind.ident);
+            }
+        },
+        .grouped => |inner| return self.trySourceErrSymbol(inner),
+        else => {},
+    }
+    return null;
+}
+
+fn sourceToWrapperVariant(self: *Codegen, source_err_sym: u32) ?u32 {
+    const src_name = self.pool.resolve(source_err_sym);
+    const suffix = "Error";
+    const variant_text = if (src_name.len > suffix.len and std.mem.endsWith(u8, src_name, suffix))
+        src_name[0 .. src_name.len - suffix.len]
+    else
+        src_name;
+    return self.pool.intern(variant_text) catch null;
+}
+
+fn convertErrorValueBySymbols(
+    self: *Codegen,
+    src_err_val: c.LLVMValueRef,
+    src_err_type: c.LLVMTypeRef,
+    dst_err_sym: u32,
+    source_err_sym: u32,
+) ?c.LLVMValueRef {
+    const dst_enum = self.enum_types.get(dst_err_sym) orelse return null;
+    const variant_sym = self.sourceToWrapperVariant(source_err_sym) orelse return null;
+
+    for (dst_enum.variant_names, 0..) |vn, i| {
+        if (vn != variant_sym) continue;
+        const payload_opt = if (i < dst_enum.variant_payload_types.len)
+            dst_enum.variant_payload_types[i]
+        else
+            null;
+        if (payload_opt == null) return null;
+        const payload_ty = payload_opt.?;
+        if (payload_ty != src_err_type) return null;
+
+        const dst_err_type = dst_enum.llvm_type;
+        const i32_type = c.LLVMInt32TypeInContext(self.context);
+        const alloca = c.LLVMBuildAlloca(self.builder, dst_err_type, "err.conv.sym");
+        const tag_gep = c.LLVMBuildStructGEP2(self.builder, dst_err_type, alloca, 0, "");
+        _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i32_type, @intCast(i), 0), tag_gep);
+        const payload_gep = c.LLVMBuildStructGEP2(self.builder, dst_err_type, alloca, 1, "");
+        const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+        _ = c.LLVMBuildStore(self.builder, src_err_val, payload_ptr);
+        return c.LLVMBuildLoad2(self.builder, dst_err_type, alloca, "err.conv.sym.val");
+    }
+
+    return null;
+}
+
+/// Convert an error payload value `src_err_val: src_err_type` into `dst_err_type`
+/// when `dst_err_type` is an enum that has a variant carrying `src_err_type`.
+fn convertErrorValue(
+    self: *Codegen,
+    src_err_val: c.LLVMValueRef,
+    src_err_type: c.LLVMTypeRef,
+    dst_err_type: c.LLVMTypeRef,
+) ?c.LLVMValueRef {
+    if (src_err_type == dst_err_type) return src_err_val;
+    if (c.LLVMGetTypeKind(dst_err_type) != c.LLVMStructTypeKind) return null;
+
+    var it = self.enum_types.iterator();
+    while (it.next()) |entry| {
+        const enum_info = entry.value_ptr.*;
+        if (enum_info.llvm_type != dst_err_type) continue;
+
+        for (enum_info.variant_payload_types, 0..) |payload_opt, i| {
+            if (payload_opt) |payload_ty| {
+                if (payload_ty == src_err_type) {
+                    const i32_type = c.LLVMInt32TypeInContext(self.context);
+                    const alloca = c.LLVMBuildAlloca(self.builder, dst_err_type, "err.conv");
+                    const tag_gep = c.LLVMBuildStructGEP2(self.builder, dst_err_type, alloca, 0, "err.conv.tag");
+                    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i32_type, @intCast(i), 0), tag_gep);
+
+                    const payload_gep = c.LLVMBuildStructGEP2(self.builder, dst_err_type, alloca, 1, "err.conv.payload");
+                    const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+                    _ = c.LLVMBuildStore(self.builder, src_err_val, payload_ptr);
+
+                    return c.LLVMBuildLoad2(self.builder, dst_err_type, alloca, "err.conv.val");
+                }
+            }
+        }
+        return null;
     }
     return null;
 }
@@ -3571,12 +4591,19 @@ fn inferPointeeType(self: *Codegen, operand: *const Ast.Expr) c.LLVMTypeRef {
 }
 
 fn genBlock(self: *Codegen, blk: Ast.BlockExpr) Error!c.LLVMValueRef {
+    const scope_start = self.scope_local_count;
+
     for (blk.stmts) |stmt| {
         _ = try self.genExpr(stmt);
     }
     if (blk.tail) |tail| {
-        return try self.genExpr(tail);
+        const v = try self.genExpr(tail);
+        try self.emitDrops(scope_start);
+        self.scope_local_count = scope_start;
+        return v;
     }
+    try self.emitDrops(scope_start);
+    self.scope_local_count = scope_start;
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
@@ -3589,13 +4616,18 @@ fn getOrCreateOptionType(self: *Codegen, payload_type: c.LLVMTypeRef) Error!Opti
     // Compute payload size.
     const data_layout = c.LLVMGetModuleDataLayout(self.module);
     const payload_size = c.LLVMABISizeOfType(data_layout, payload_type);
+    const slot_size: u64 = 8;
+    const slot_count = if (payload_size == 0) 1 else (payload_size + slot_size - 1) / slot_size;
 
     // Create the LLVM struct type: { i32, [payload_size x i8] }.
     const i32_type = c.LLVMInt32TypeInContext(self.context);
-    const i8_type = c.LLVMInt8TypeInContext(self.context);
-    const payload_arr = c.LLVMArrayType2(i8_type, payload_size);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const payload_arr = c.LLVMArrayType2(i64_type, slot_count);
     var body_types = [_]c.LLVMTypeRef{ i32_type, payload_arr };
-    const llvm_type = c.LLVMStructTypeInContext(self.context, &body_types, 2, 0);
+    var name_buf: [64]u8 = undefined;
+    const name_z = std.fmt.bufPrintZ(&name_buf, "__with.Option.{x}", .{key}) catch return error.CodegenAlloc;
+    const llvm_type = c.LLVMStructCreateNamed(self.context, name_z);
+    c.LLVMStructSetBody(llvm_type, &body_types, 2, 0);
 
     // Register in enum_types with variant names Some (0) and None (1).
     const some_sym = self.pool.intern("Some") catch return error.CodegenAlloc;
@@ -3636,12 +4668,17 @@ fn getOrCreateResultType(self: *Codegen, ok_type: c.LLVMTypeRef, err_type: c.LLV
     const ok_size = c.LLVMABISizeOfType(data_layout, ok_type);
     const err_size = c.LLVMABISizeOfType(data_layout, err_type);
     const max_size = @max(ok_size, err_size);
+    const slot_size: u64 = 8;
+    const slot_count = if (max_size == 0) 1 else (max_size + slot_size - 1) / slot_size;
 
     const i32_type = c.LLVMInt32TypeInContext(self.context);
-    const i8_type = c.LLVMInt8TypeInContext(self.context);
-    const payload_arr = c.LLVMArrayType2(i8_type, max_size);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const payload_arr = c.LLVMArrayType2(i64_type, slot_count);
     var body_types = [_]c.LLVMTypeRef{ i32_type, payload_arr };
-    const llvm_type = c.LLVMStructTypeInContext(self.context, &body_types, 2, 0);
+    var name_buf: [72]u8 = undefined;
+    const name_z = std.fmt.bufPrintZ(&name_buf, "__with.Result.{x}", .{key}) catch return error.CodegenAlloc;
+    const llvm_type = c.LLVMStructCreateNamed(self.context, name_z);
+    c.LLVMStructSetBody(llvm_type, &body_types, 2, 0);
 
     const ok_sym = self.pool.intern("Ok") catch return error.CodegenAlloc;
     const err_sym = self.pool.intern("Err") catch return error.CodegenAlloc;
@@ -3671,6 +4708,37 @@ fn getOrCreateResultType(self: *Codegen, ok_type: c.LLVMTypeRef, err_type: c.LLV
     return info;
 }
 
+/// Find or create ContextError[E] as a struct { str, E }.
+fn getOrCreateContextErrorType(self: *Codegen, source_type: c.LLVMTypeRef) Error!ContextErrorInfo {
+    const key: usize = @intFromPtr(source_type);
+    if (self.context_error_type_cache.get(key)) |info| return info;
+
+    const str_sym = self.pool.intern("str") catch return error.CodegenAlloc;
+    const str_type = if (self.struct_types.get(str_sym)) |info|
+        info.llvm_type
+    else blk: {
+        // Fallback to the canonical str layout { ptr, i64 }.
+        var fields = [_]c.LLVMTypeRef{
+            c.LLVMPointerTypeInContext(self.context, 0),
+            c.LLVMInt64TypeInContext(self.context),
+        };
+        break :blk c.LLVMStructTypeInContext(self.context, &fields, 2, 0);
+    };
+
+    var name_buf: [80]u8 = undefined;
+    const name_z = std.fmt.bufPrintZ(&name_buf, "__with.ContextError.{x}", .{key}) catch return error.CodegenAlloc;
+    const llvm_type = c.LLVMStructCreateNamed(self.context, name_z);
+    var body_types = [_]c.LLVMTypeRef{ str_type, source_type };
+    c.LLVMStructSetBody(llvm_type, &body_types, 2, 0);
+
+    const info: ContextErrorInfo = .{
+        .llvm_type = llvm_type,
+        .source_type = source_type,
+    };
+    self.context_error_type_cache.put(self.allocator, key, info) catch return error.CodegenAlloc;
+    return info;
+}
+
 /// Get or create a Vec[T] type for given element type.
 /// Vec layout: struct { ptr: *T, len: i64, cap: i64 }
 fn getOrCreateVecType(self: *Codegen, elem_type: c.LLVMTypeRef) Error!VecTypeInfo {
@@ -3681,7 +4749,9 @@ fn getOrCreateVecType(self: *Codegen, elem_type: c.LLVMTypeRef) Error!VecTypeInf
     const i64_type = c.LLVMInt64TypeInContext(self.context);
 
     var body_types = [_]c.LLVMTypeRef{ ptr_type, i64_type, i64_type };
-    const llvm_type = c.LLVMStructCreateNamed(self.context, "Vec");
+    var name_buf: [64]u8 = undefined;
+    const name_z = std.fmt.bufPrintZ(&name_buf, "__with.Vec.{x}", .{key}) catch return error.CodegenAlloc;
+    const llvm_type = c.LLVMStructCreateNamed(self.context, name_z);
     c.LLVMStructSetBody(llvm_type, &body_types, 3, 0);
 
     const info = VecTypeInfo{ .llvm_type = llvm_type, .elem_type = elem_type };
@@ -3871,7 +4941,9 @@ fn getOrCreateHashMapType(self: *Codegen, key_type: c.LLVMTypeRef, val_type: c.L
 
     const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
     var body = [_]c.LLVMTypeRef{ptr_type};
-    const llvm_type = c.LLVMStructCreateNamed(self.context, "HashMap");
+    var name_buf: [80]u8 = undefined;
+    const name_z = std.fmt.bufPrintZ(&name_buf, "__with.HashMap.{x}", .{cache_key}) catch return error.CodegenAlloc;
+    const llvm_type = c.LLVMStructCreateNamed(self.context, name_z);
     c.LLVMStructSetBody(llvm_type, &body, 1, 0);
 
     const is_str_key = self.isStrType(key_type);
@@ -4233,7 +5305,9 @@ fn getOrCreateHashSetType(self: *Codegen, elem_type: c.LLVMTypeRef) Error!HashSe
     // HashSet uses a distinct named struct so isHashSetType can distinguish it
     const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
     var body = [_]c.LLVMTypeRef{ptr_type};
-    const llvm_type = c.LLVMStructCreateNamed(self.context, "HashSet");
+    var name_buf: [80]u8 = undefined;
+    const name_z = std.fmt.bufPrintZ(&name_buf, "__with.HashSet.{x}", .{key}) catch return error.CodegenAlloc;
+    const llvm_type = c.LLVMStructCreateNamed(self.context, name_z);
     c.LLVMStructSetBody(llvm_type, &body, 1, 0);
 
     const info = HashSetTypeInfo{
@@ -4349,6 +5423,8 @@ fn buildOptionSome(self: *Codegen, val: c.LLVMValueRef) Error!c.LLVMValueRef {
     const i32_type = c.LLVMInt32TypeInContext(self.context);
 
     const alloca = c.LLVMBuildAlloca(self.builder, opt_info.llvm_type, "some");
+    // Zero-init to avoid poison in padding bytes.
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstNull(opt_info.llvm_type), alloca);
     const tag_gep = c.LLVMBuildStructGEP2(self.builder, opt_info.llvm_type, alloca, 0, "");
     _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i32_type, 0, 0), tag_gep);
     const payload_gep = c.LLVMBuildStructGEP2(self.builder, opt_info.llvm_type, alloca, 1, "");
@@ -4362,6 +5438,8 @@ fn buildOptionSome(self: *Codegen, val: c.LLVMValueRef) Error!c.LLVMValueRef {
 fn buildOptionNone(self: *Codegen, opt_llvm_type: c.LLVMTypeRef) c.LLVMValueRef {
     const i32_type = c.LLVMInt32TypeInContext(self.context);
     const alloca = c.LLVMBuildAlloca(self.builder, opt_llvm_type, "none");
+    // Zero-init so payload bytes are defined.
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstNull(opt_llvm_type), alloca);
     const tag_gep = c.LLVMBuildStructGEP2(self.builder, opt_llvm_type, alloca, 0, "");
     _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i32_type, 1, 0), tag_gep);
     return c.LLVMBuildLoad2(self.builder, opt_llvm_type, alloca, "none.val");
@@ -4371,6 +5449,8 @@ fn buildOptionNone(self: *Codegen, opt_llvm_type: c.LLVMTypeRef) c.LLVMValueRef 
 fn buildResultOk(self: *Codegen, val: c.LLVMValueRef, result_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
     const i32_type = c.LLVMInt32TypeInContext(self.context);
     const alloca = c.LLVMBuildAlloca(self.builder, result_type, "ok");
+    // Zero-init to avoid poison in unused payload bytes.
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstNull(result_type), alloca);
     const tag_gep = c.LLVMBuildStructGEP2(self.builder, result_type, alloca, 0, "");
     _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i32_type, 0, 0), tag_gep);
     const payload_gep = c.LLVMBuildStructGEP2(self.builder, result_type, alloca, 1, "");
@@ -4383,6 +5463,8 @@ fn buildResultOk(self: *Codegen, val: c.LLVMValueRef, result_type: c.LLVMTypeRef
 fn buildResultErr(self: *Codegen, val: c.LLVMValueRef, result_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
     const i32_type = c.LLVMInt32TypeInContext(self.context);
     const alloca = c.LLVMBuildAlloca(self.builder, result_type, "err");
+    // Zero-init to avoid poison in unused payload bytes.
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstNull(result_type), alloca);
     const tag_gep = c.LLVMBuildStructGEP2(self.builder, result_type, alloca, 0, "");
     _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i32_type, 1, 0), tag_gep);
     const payload_gep = c.LLVMBuildStructGEP2(self.builder, result_type, alloca, 1, "");
@@ -4410,15 +5492,22 @@ fn isOptionOrResultType(self: *Codegen, ty: c.LLVMTypeRef) bool {
 fn getOptionPayloadType(self: *Codegen, opt_type: c.LLVMTypeRef) ?c.LLVMTypeRef {
     var it = self.option_type_cache.iterator();
     while (it.next()) |entry| {
-        if (entry.value_ptr.llvm_type == opt_type) {
+        if (entry.value_ptr.llvm_type == opt_type or self.sameStructTypeName(entry.value_ptr.llvm_type, opt_type)) {
             return entry.value_ptr.payload_type;
         }
     }
     // Check result cache too.
     var it2 = self.result_type_cache.iterator();
     while (it2.next()) |entry| {
-        if (entry.value_ptr.llvm_type == opt_type) {
+        if (entry.value_ptr.llvm_type == opt_type or self.sameStructTypeName(entry.value_ptr.llvm_type, opt_type)) {
             return entry.value_ptr.payload_type;
+        }
+    }
+    // Fallback: scan enum type registry (needed for some nested Option shapes).
+    var it3 = self.enum_types.iterator();
+    while (it3.next()) |entry| {
+        if (entry.value_ptr.llvm_type == opt_type and entry.value_ptr.variant_payload_types.len > 0) {
+            return entry.value_ptr.variant_payload_types[0];
         }
     }
     return null;
@@ -4544,7 +5633,17 @@ fn callFnValueWithArg(self: *Codegen, fn_val: c.LLVMValueRef, arg: c.LLVMValueRe
             const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
             return c.LLVMBuildCall2(self.builder, fn_type, fn_val, &args_buf, 1, if (is_void) "" else "map.call");
         }
-        // Pointer to function — build a generic fn type.
+        // Pointer to function type (e.g. fn parameter/local): use declared signature.
+        const pointee_type = c.LLVMGetElementType(fn_val_type);
+        if (c.LLVMGetTypeKind(pointee_type) == c.LLVMFunctionTypeKind and c.LLVMCountParamTypes(pointee_type) == 1) {
+            var param_types: [1]c.LLVMTypeRef = undefined;
+            c.LLVMGetParamTypes(pointee_type, &param_types);
+            var args_buf = [_]c.LLVMValueRef{self.coerceInt(arg, param_types[0])};
+            const ret_type = c.LLVMGetReturnType(pointee_type);
+            const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+            return c.LLVMBuildCall2(self.builder, pointee_type, fn_val, &args_buf, 1, if (is_void) "" else "map.call");
+        }
+        // Fallback: infer signature as fn(arg_type) -> arg_type.
         const arg_type = c.LLVMTypeOf(arg);
         var param_types = [_]c.LLVMTypeRef{arg_type};
         const fn_type = c.LLVMFunctionType(arg_type, &param_types, 1, 0);
@@ -4582,6 +5681,74 @@ fn callFnValueWithArg(self: *Codegen, fn_val: c.LLVMValueRef, arg: c.LLVMValueRe
     }
 
     return error.UnsupportedExpr;
+}
+
+/// Helper: call a function value (raw fn pointer or closure fat pointer) with no arguments.
+fn callFnValueNoArgs(self: *Codegen, fn_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const fn_val_type = c.LLVMTypeOf(fn_val);
+    const kind = c.LLVMGetTypeKind(fn_val_type);
+
+    if (kind == c.LLVMPointerTypeKind) {
+        const val_kind = c.LLVMGetValueKind(fn_val);
+        if (val_kind == c.LLVMFunctionValueKind) {
+            const fn_type = c.LLVMGlobalGetValueType(fn_val);
+            const ret_type = c.LLVMGetReturnType(fn_type);
+            const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+            return c.LLVMBuildCall2(self.builder, fn_type, fn_val, null, 0, if (is_void) "" else "call0");
+        }
+        return error.UnsupportedExpr;
+    } else if (kind == c.LLVMStructTypeKind) {
+        // Closure fat pointer: { fn_ptr, capture_ptr }.
+        const fn_ptr = c.LLVMBuildExtractValue(self.builder, fn_val, 0, "fn_ptr");
+        const cap_ptr = c.LLVMBuildExtractValue(self.builder, fn_val, 1, "cap_ptr");
+
+        const val_kind = c.LLVMGetValueKind(fn_ptr);
+        if (val_kind == c.LLVMFunctionValueKind) {
+            const fn_type = c.LLVMGlobalGetValueType(fn_ptr);
+            const ret_type = c.LLVMGetReturnType(fn_type);
+            if (c.LLVMCountParamTypes(fn_type) < 1) return error.UnsupportedExpr;
+            var args_buf = [_]c.LLVMValueRef{cap_ptr};
+            const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+            return c.LLVMBuildCall2(self.builder, fn_type, fn_ptr, &args_buf, 1, if (is_void) "" else "call0");
+        }
+        return error.UnsupportedExpr;
+    }
+
+    return error.UnsupportedExpr;
+}
+
+/// Infer return type of a unary callable (fn(T)->U or closure form).
+fn inferUnaryFnReturnType(self: *Codegen, fn_val: c.LLVMValueRef) ?c.LLVMTypeRef {
+    const fn_val_type = c.LLVMTypeOf(fn_val);
+    const kind = c.LLVMGetTypeKind(fn_val_type);
+
+    if (kind == c.LLVMPointerTypeKind) {
+        const val_kind = c.LLVMGetValueKind(fn_val);
+        if (val_kind == c.LLVMFunctionValueKind) {
+            const fn_type = c.LLVMGlobalGetValueType(fn_val);
+            if (c.LLVMCountParamTypes(fn_type) != 1) return null;
+            return c.LLVMGetReturnType(fn_type);
+        }
+        const elem_type = c.LLVMGetElementType(fn_val_type);
+        if (c.LLVMGetTypeKind(elem_type) == c.LLVMFunctionTypeKind) {
+            if (c.LLVMCountParamTypes(elem_type) != 1) return null;
+            return c.LLVMGetReturnType(elem_type);
+        }
+        return null;
+    }
+
+    if (kind == c.LLVMStructTypeKind) {
+        const fn_ptr = c.LLVMBuildExtractValue(self.builder, fn_val, 0, "fn_ptr.type");
+        const fn_ptr_type = c.LLVMTypeOf(fn_ptr);
+        if (c.LLVMGetTypeKind(fn_ptr_type) != c.LLVMPointerTypeKind) return null;
+        const elem_type = c.LLVMGetElementType(fn_ptr_type);
+        if (c.LLVMGetTypeKind(elem_type) != c.LLVMFunctionTypeKind) return null;
+        // Closure ABI is fn(ctx_ptr, arg) -> ret.
+        if (c.LLVMCountParamTypes(elem_type) < 2) return null;
+        return c.LLVMGetReturnType(elem_type);
+    }
+
+    return null;
 }
 
 /// Generate Option.map(f) — if Some(x), return Some(f(x)); if None, return None.
@@ -4727,6 +5894,246 @@ fn genOptionFilter(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMType
     return phi;
 }
 
+/// Generate Option.or_else(f) — if Some(x), return Some(x); else return f().
+fn genOptionOrElse(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef, fn_arg: *const Ast.Expr) Error!c.LLVMValueRef {
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "opt");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+    const is_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is_some");
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "orelse.some");
+    const none_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "orelse.none");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "orelse.merge");
+    _ = c.LLVMBuildCondBr(self.builder, is_some, some_bb, none_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, some_bb);
+    const some_result = obj_val;
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const some_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, none_bb);
+    const fn_val = try self.genExpr(fn_arg);
+    const fallback = try self.callFnValueNoArgs(fn_val);
+    if (c.LLVMTypeOf(fallback) != obj_type) return error.UnsupportedExpr;
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const none_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, obj_type, "orelse.result");
+    var vals = [_]c.LLVMValueRef{ some_result, fallback };
+    var bbs = [_]c.LLVMBasicBlockRef{ some_end_bb, none_end_bb };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
+/// Generate Option.zip(other) — Some((a,b)) when both are Some, else None.
+fn genOptionZip(
+    self: *Codegen,
+    lhs_val: c.LLVMValueRef,
+    lhs_type: c.LLVMTypeRef,
+    rhs_val: c.LLVMValueRef,
+    rhs_type: c.LLVMTypeRef,
+) Error!c.LLVMValueRef {
+    if (!self.isOptionType(lhs_type) or !self.isOptionType(rhs_type)) return error.UnsupportedExpr;
+    const lhs_payload_type = self.getOptionPayloadType(lhs_type) orelse return error.UnsupportedExpr;
+    const rhs_payload_type = self.getOptionPayloadType(rhs_type) orelse return error.UnsupportedExpr;
+
+    var tuple_fields = [_]c.LLVMTypeRef{ lhs_payload_type, rhs_payload_type };
+    const tuple_type = c.LLVMStructTypeInContext(self.context, &tuple_fields, 2, 0);
+    const tuple_opt_info = try self.getOrCreateOptionType(tuple_type);
+    const out_type = tuple_opt_info.llvm_type;
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+
+    const lhs_alloca = c.LLVMBuildAlloca(self.builder, lhs_type, "zip.lhs");
+    const rhs_alloca = c.LLVMBuildAlloca(self.builder, rhs_type, "zip.rhs");
+    _ = c.LLVMBuildStore(self.builder, lhs_val, lhs_alloca);
+    _ = c.LLVMBuildStore(self.builder, rhs_val, rhs_alloca);
+
+    const lhs_tag_gep = c.LLVMBuildStructGEP2(self.builder, lhs_type, lhs_alloca, 0, "tag");
+    const rhs_tag_gep = c.LLVMBuildStructGEP2(self.builder, rhs_type, rhs_alloca, 0, "tag");
+    const lhs_tag = c.LLVMBuildLoad2(self.builder, i32_type, lhs_tag_gep, "tag.val");
+    const rhs_tag = c.LLVMBuildLoad2(self.builder, i32_type, rhs_tag_gep, "tag.val");
+    const lhs_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, lhs_tag, c.LLVMConstInt(i32_type, 0, 0), "lhs.some");
+    const rhs_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, rhs_tag, c.LLVMConstInt(i32_type, 0, 0), "rhs.some");
+    const both_some = c.LLVMBuildAnd(self.builder, lhs_some, rhs_some, "both.some");
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "zip.some");
+    const none_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "zip.none");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "zip.merge");
+    _ = c.LLVMBuildCondBr(self.builder, both_some, some_bb, none_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, some_bb);
+    const lhs_payload_gep = c.LLVMBuildStructGEP2(self.builder, lhs_type, lhs_alloca, 1, "payload");
+    const rhs_payload_gep = c.LLVMBuildStructGEP2(self.builder, rhs_type, rhs_alloca, 1, "payload");
+    const lhs_payload_ptr = c.LLVMBuildBitCast(self.builder, lhs_payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const rhs_payload_ptr = c.LLVMBuildBitCast(self.builder, rhs_payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const lhs_payload = c.LLVMBuildLoad2(self.builder, lhs_payload_type, lhs_payload_ptr, "lhs.payload");
+    const rhs_payload = c.LLVMBuildLoad2(self.builder, rhs_payload_type, rhs_payload_ptr, "rhs.payload");
+
+    const tuple_alloca = c.LLVMBuildAlloca(self.builder, tuple_type, "zip.tuple");
+    const t0 = c.LLVMBuildStructGEP2(self.builder, tuple_type, tuple_alloca, 0, "");
+    const t1 = c.LLVMBuildStructGEP2(self.builder, tuple_type, tuple_alloca, 1, "");
+    _ = c.LLVMBuildStore(self.builder, lhs_payload, t0);
+    _ = c.LLVMBuildStore(self.builder, rhs_payload, t1);
+    const tuple_val = c.LLVMBuildLoad2(self.builder, tuple_type, tuple_alloca, "zip.tuple.val");
+    const some_result = try self.buildOptionSome(tuple_val);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const some_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, none_bb);
+    const none_result = self.buildOptionNone(out_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const none_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, out_type, "zip.result");
+    var vals = [_]c.LLVMValueRef{ some_result, none_result };
+    var bbs = [_]c.LLVMBasicBlockRef{ some_end_bb, none_end_bb };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
+/// Generate Option.flatten() for Option[Option[T]].
+fn genOptionFlatten(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const inner_opt_type = self.getOptionPayloadType(obj_type) orelse blk: {
+        if (self.expected_type) |et| {
+            if (et != obj_type and self.isOptionType(et)) break :blk et;
+        }
+        if (self.current_ret_type != null and self.current_ret_type != obj_type and self.isOptionType(self.current_ret_type)) {
+            break :blk self.current_ret_type;
+        }
+        return error.UnsupportedExpr;
+    };
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "opt");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+    const is_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is_some");
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "flatten.some");
+    const none_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "flatten.none");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "flatten.merge");
+    _ = c.LLVMBuildCondBr(self.builder, is_some, some_bb, none_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, some_bb);
+    const payload_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "payload");
+    const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const inner_val = c.LLVMBuildLoad2(self.builder, inner_opt_type, payload_ptr, "inner.opt");
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const some_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, none_bb);
+    const none_val = self.buildOptionNone(inner_opt_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const none_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, inner_opt_type, "flatten.result");
+    var vals = [_]c.LLVMValueRef{ inner_val, none_val };
+    var bbs = [_]c.LLVMBasicBlockRef{ some_end_bb, none_end_bb };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
+/// Generate Option.cloned() — currently a by-value identity copy.
+fn genOptionCloned(_: *Codegen, obj_val: c.LLVMValueRef, _: c.LLVMTypeRef) c.LLVMValueRef {
+    return obj_val;
+}
+
+/// Generate Option.transpose() for Option[Result[T, E]].
+/// Some(Ok(v))  -> Ok(Some(v))
+/// Some(Err(e)) -> Err(e)
+/// None         -> Ok(None)
+fn genOptionTranspose(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const inner_result_type = self.getOptionPayloadType(obj_type) orelse return error.UnsupportedExpr;
+    if (!self.isResultType(inner_result_type)) return error.UnsupportedExpr;
+
+    const ok_type = self.getOptionPayloadType(inner_result_type) orelse return error.UnsupportedExpr;
+    const err_type = self.getResultErrType(inner_result_type) orelse return error.UnsupportedExpr;
+    const opt_ok_info = try self.getOrCreateOptionType(ok_type);
+    const out_result_info = try self.getOrCreateResultType(opt_ok_info.llvm_type, err_type);
+    const out_type = out_result_info.llvm_type;
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const outer_alloca = c.LLVMBuildAlloca(self.builder, obj_type, "opt");
+    _ = c.LLVMBuildStore(self.builder, obj_val, outer_alloca);
+
+    const outer_tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, outer_alloca, 0, "tag");
+    const outer_tag = c.LLVMBuildLoad2(self.builder, i32_type, outer_tag_gep, "tag.val");
+    const outer_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, outer_tag, c.LLVMConstInt(i32_type, 0, 0), "is_some");
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "transpose.some");
+    const none_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "transpose.none");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "transpose.merge");
+    _ = c.LLVMBuildCondBr(self.builder, outer_some, some_bb, none_bb);
+
+    // None -> Ok(None)
+    c.LLVMPositionBuilderAtEnd(self.builder, none_bb);
+    const none_opt = self.buildOptionNone(opt_ok_info.llvm_type);
+    const none_result = try self.buildResultOk(none_opt, out_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const none_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    // Some(inner_result) -> branch on inner tag.
+    c.LLVMPositionBuilderAtEnd(self.builder, some_bb);
+    const outer_payload_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, outer_alloca, 1, "payload");
+    const outer_payload_ptr = c.LLVMBuildBitCast(self.builder, outer_payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const inner_result_val = c.LLVMBuildLoad2(self.builder, inner_result_type, outer_payload_ptr, "inner.result");
+
+    const inner_alloca = c.LLVMBuildAlloca(self.builder, inner_result_type, "inner.res");
+    _ = c.LLVMBuildStore(self.builder, inner_result_val, inner_alloca);
+    const inner_tag_gep = c.LLVMBuildStructGEP2(self.builder, inner_result_type, inner_alloca, 0, "tag");
+    const inner_tag = c.LLVMBuildLoad2(self.builder, i32_type, inner_tag_gep, "tag.val");
+    const inner_ok = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, inner_tag, c.LLVMConstInt(i32_type, 0, 0), "is_ok");
+
+    const inner_ok_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "transpose.inner.ok");
+    const inner_err_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "transpose.inner.err");
+    const inner_merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "transpose.inner.merge");
+    _ = c.LLVMBuildCondBr(self.builder, inner_ok, inner_ok_bb, inner_err_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, inner_ok_bb);
+    const inner_payload_gep_ok = c.LLVMBuildStructGEP2(self.builder, inner_result_type, inner_alloca, 1, "payload");
+    const inner_payload_ptr_ok = c.LLVMBuildBitCast(self.builder, inner_payload_gep_ok, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const ok_val = c.LLVMBuildLoad2(self.builder, ok_type, inner_payload_ptr_ok, "ok.val");
+    const some_opt = try self.buildOptionSome(ok_val);
+    const ok_result = try self.buildResultOk(some_opt, out_type);
+    _ = c.LLVMBuildBr(self.builder, inner_merge_bb);
+    const inner_ok_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, inner_err_bb);
+    const inner_payload_gep_err = c.LLVMBuildStructGEP2(self.builder, inner_result_type, inner_alloca, 1, "payload");
+    const inner_payload_ptr_err = c.LLVMBuildBitCast(self.builder, inner_payload_gep_err, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const err_val = c.LLVMBuildLoad2(self.builder, err_type, inner_payload_ptr_err, "err.val");
+    const err_result = try self.buildResultErr(err_val, out_type);
+    _ = c.LLVMBuildBr(self.builder, inner_merge_bb);
+    const inner_err_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, inner_merge_bb);
+    const some_result = c.LLVMBuildPhi(self.builder, out_type, "transpose.some.result");
+    var some_vals = [_]c.LLVMValueRef{ ok_result, err_result };
+    var some_bbs = [_]c.LLVMBasicBlockRef{ inner_ok_end_bb, inner_err_end_bb };
+    c.LLVMAddIncoming(some_result, &some_vals, &some_bbs, 2);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const some_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, out_type, "transpose.result");
+    var vals = [_]c.LLVMValueRef{ some_result, none_result };
+    var bbs = [_]c.LLVMBasicBlockRef{ some_end_bb, none_end_bb };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
 /// Generate Result.map(f) — if Ok(x), return Ok(f(x)); if Err(e), return Err(e).
 fn genResultMap(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef, fn_arg: *const Ast.Expr) Error!c.LLVMValueRef {
     const i32_type = c.LLVMInt32TypeInContext(self.context);
@@ -4789,6 +6196,65 @@ fn genResultMap(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef
     return phi;
 }
 
+/// Generate Result.and_then(f) — if Ok(x), return f(x); if Err(e), return Err(e).
+/// f must return Result[U, E] and preserves the original error payload.
+fn genResultAndThen(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef, fn_arg: *const Ast.Expr) Error!c.LLVMValueRef {
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "res");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+    const is_ok = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is_ok");
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const ok_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "randthen.ok");
+    const err_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "randthen.err");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "randthen.merge");
+    _ = c.LLVMBuildCondBr(self.builder, is_ok, ok_bb, err_bb);
+
+    const orig_ok_type = self.getOptionPayloadType(obj_type) orelse i32_type;
+    const orig_err_type = self.getResultErrType(obj_type) orelse i32_type;
+
+    // Ok: call f(ok_val) -> Result[U, E].
+    c.LLVMPositionBuilderAtEnd(self.builder, ok_bb);
+    const ok_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "ok.payload");
+    const ok_payload_ptr = c.LLVMBuildBitCast(self.builder, ok_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const ok_val = c.LLVMBuildLoad2(self.builder, orig_ok_type, ok_payload_ptr, "ok.val");
+
+    const fn_val = try self.genExpr(fn_arg);
+    const ok_result = try self.callFnValueWithArg(fn_val, ok_val);
+    const out_result_type = c.LLVMTypeOf(ok_result);
+    if (!self.isResultType(out_result_type)) return error.UnsupportedExpr;
+    const out_ok_type = self.getOptionPayloadType(out_result_type) orelse return error.UnsupportedExpr;
+    const out_err_type = self.getResultErrType(out_result_type) orelse return error.UnsupportedExpr;
+    if (out_err_type != orig_err_type and !self.sameStructTypeName(out_err_type, orig_err_type)) {
+        return error.UnsupportedExpr;
+    }
+    const out_result_info = try self.getOrCreateResultType(out_ok_type, orig_err_type);
+    if (out_result_info.llvm_type != out_result_type and !self.sameStructTypeName(out_result_info.llvm_type, out_result_type)) {
+        return error.UnsupportedExpr;
+    }
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const ok_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    // Err: preserve and rewrap the original error payload.
+    c.LLVMPositionBuilderAtEnd(self.builder, err_bb);
+    const err_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "err.payload");
+    const err_payload_ptr = c.LLVMBuildBitCast(self.builder, err_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const err_val = c.LLVMBuildLoad2(self.builder, orig_err_type, err_payload_ptr, "err.val");
+    const err_result = try self.buildResultErr(err_val, out_result_info.llvm_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const err_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, out_result_info.llvm_type, "randthen.result");
+    var vals = [_]c.LLVMValueRef{ ok_result, err_result };
+    var bbs = [_]c.LLVMBasicBlockRef{ ok_end_bb, err_end_bb };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
 /// Generate Result.map_err(f) — if Ok(x), return Ok(x); if Err(e), return Err(f(e)).
 fn genResultMapErr(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef, fn_arg: *const Ast.Expr) Error!c.LLVMValueRef {
     const i32_type = c.LLVMInt32TypeInContext(self.context);
@@ -4844,6 +6310,270 @@ fn genResultMapErr(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMType
     const phi = c.LLVMBuildPhi(self.builder, new_result_info.llvm_type, "rmaperr.result");
     var vals = [_]c.LLVMValueRef{ ok_result, err_result };
     var bbs = [_]c.LLVMBasicBlockRef{ ok_end_bb, err_bb };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
+/// Generate Result.or_else(f) — if Err(e), return f(e); if Ok(x), return Ok(x).
+fn genResultOrElse(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef, fn_arg: *const Ast.Expr) Error!c.LLVMValueRef {
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "res");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+    const is_ok = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is_ok");
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const ok_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "ror.ok");
+    const err_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "ror.err");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "ror.merge");
+    _ = c.LLVMBuildCondBr(self.builder, is_ok, ok_bb, err_bb);
+
+    // Find original Result payload/error types.
+    const orig_ok_type = self.getOptionPayloadType(obj_type) orelse i32_type;
+    const orig_err_type = self.getResultErrType(obj_type) orelse i32_type;
+
+    // Err: extract error payload, call f(err) -> Result[Ok, E2].
+    c.LLVMPositionBuilderAtEnd(self.builder, err_bb);
+    const err_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "err.payload");
+    const err_payload_ptr = c.LLVMBuildBitCast(self.builder, err_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const err_val = c.LLVMBuildLoad2(self.builder, orig_err_type, err_payload_ptr, "err.val");
+
+    const fn_val = try self.genExpr(fn_arg);
+    const mapped_result = try self.callFnValueWithArg(fn_val, err_val);
+    const mapped_type = c.LLVMTypeOf(mapped_result);
+    if (!self.isResultType(mapped_type)) return error.UnsupportedExpr;
+    const mapped_ok_type = self.getOptionPayloadType(mapped_type) orelse return error.UnsupportedExpr;
+    if (mapped_ok_type != orig_ok_type and !self.sameStructTypeName(mapped_ok_type, orig_ok_type)) {
+        return error.UnsupportedExpr;
+    }
+    const mapped_err_type = self.getResultErrType(mapped_type) orelse return error.UnsupportedExpr;
+    const new_result_info = try self.getOrCreateResultType(orig_ok_type, mapped_err_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const err_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    // Ok: re-wrap ok payload in Result[Ok, E2].
+    c.LLVMPositionBuilderAtEnd(self.builder, ok_bb);
+    const ok_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "ok.payload");
+    const ok_payload_ptr = c.LLVMBuildBitCast(self.builder, ok_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const ok_val = c.LLVMBuildLoad2(self.builder, orig_ok_type, ok_payload_ptr, "ok.val");
+    const ok_result = try self.buildResultOk(ok_val, new_result_info.llvm_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const ok_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, new_result_info.llvm_type, "ror.result");
+    var vals = [_]c.LLVMValueRef{ ok_result, mapped_result };
+    var bbs = [_]c.LLVMBasicBlockRef{ ok_end_bb, err_end_bb };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
+/// Generate Result.transpose() for Result[Option[T], E] -> Option[Result[T, E]].
+fn genResultTranspose(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    if (!self.isResultType(obj_type)) return error.UnsupportedExpr;
+
+    const opt_ok_type = self.getOptionPayloadType(obj_type) orelse return error.UnsupportedExpr;
+    if (!self.isOptionType(opt_ok_type)) return error.UnsupportedExpr;
+    const inner_ok_type = self.getOptionPayloadType(opt_ok_type) orelse return error.UnsupportedExpr;
+    const err_type = self.getResultErrType(obj_type) orelse return error.UnsupportedExpr;
+
+    const inner_result_info = try self.getOrCreateResultType(inner_ok_type, err_type);
+    const out_option_info = try self.getOrCreateOptionType(inner_result_info.llvm_type);
+    const out_type = out_option_info.llvm_type;
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const res_alloca = c.LLVMBuildAlloca(self.builder, obj_type, "res");
+    _ = c.LLVMBuildStore(self.builder, obj_val, res_alloca);
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, res_alloca, 0, "tag");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+    const is_ok = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is_ok");
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const ok_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rtr.ok");
+    const err_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rtr.err");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rtr.merge");
+    _ = c.LLVMBuildCondBr(self.builder, is_ok, ok_bb, err_bb);
+
+    // Err(e) -> Some(Err(e))
+    c.LLVMPositionBuilderAtEnd(self.builder, err_bb);
+    const err_payload_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, res_alloca, 1, "payload");
+    const err_payload_ptr = c.LLVMBuildBitCast(self.builder, err_payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const err_val = c.LLVMBuildLoad2(self.builder, err_type, err_payload_ptr, "err.val");
+    const inner_err = try self.buildResultErr(err_val, inner_result_info.llvm_type);
+    const some_err = try self.buildOptionSome(inner_err);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const err_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    // Ok(opt) -> if Some(v) => Some(Ok(v)); if None => None.
+    c.LLVMPositionBuilderAtEnd(self.builder, ok_bb);
+    const ok_payload_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, res_alloca, 1, "payload");
+    const ok_payload_ptr = c.LLVMBuildBitCast(self.builder, ok_payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const ok_opt_val = c.LLVMBuildLoad2(self.builder, opt_ok_type, ok_payload_ptr, "ok.opt");
+
+    const opt_alloca = c.LLVMBuildAlloca(self.builder, opt_ok_type, "opt");
+    _ = c.LLVMBuildStore(self.builder, ok_opt_val, opt_alloca);
+    const opt_tag_gep = c.LLVMBuildStructGEP2(self.builder, opt_ok_type, opt_alloca, 0, "tag");
+    const opt_tag = c.LLVMBuildLoad2(self.builder, i32_type, opt_tag_gep, "tag.val");
+    const opt_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, opt_tag, c.LLVMConstInt(i32_type, 0, 0), "is_some");
+
+    const opt_some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rtr.opt.some");
+    const opt_none_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rtr.opt.none");
+    const opt_merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rtr.opt.merge");
+    _ = c.LLVMBuildCondBr(self.builder, opt_some, opt_some_bb, opt_none_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, opt_some_bb);
+    const opt_inner_gep = c.LLVMBuildStructGEP2(self.builder, opt_ok_type, opt_alloca, 1, "payload");
+    const opt_inner_ptr = c.LLVMBuildBitCast(self.builder, opt_inner_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const ok_val = c.LLVMBuildLoad2(self.builder, inner_ok_type, opt_inner_ptr, "ok.val");
+    const inner_ok = try self.buildResultOk(ok_val, inner_result_info.llvm_type);
+    const some_ok = try self.buildOptionSome(inner_ok);
+    _ = c.LLVMBuildBr(self.builder, opt_merge_bb);
+    const opt_some_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, opt_none_bb);
+    const none_out = self.buildOptionNone(out_type);
+    _ = c.LLVMBuildBr(self.builder, opt_merge_bb);
+    const opt_none_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, opt_merge_bb);
+    const ok_branch_result = c.LLVMBuildPhi(self.builder, out_type, "rtr.ok.branch");
+    var ok_vals = [_]c.LLVMValueRef{ some_ok, none_out };
+    var ok_bbs = [_]c.LLVMBasicBlockRef{ opt_some_end_bb, opt_none_end_bb };
+    c.LLVMAddIncoming(ok_branch_result, &ok_vals, &ok_bbs, 2);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const ok_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, out_type, "rtr.result");
+    var vals = [_]c.LLVMValueRef{ ok_branch_result, some_err };
+    var bbs = [_]c.LLVMBasicBlockRef{ ok_end_bb, err_end_bb };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
+/// Generate Result.context(msg) — wraps Err(e) into Err(ContextError[E]{msg, e}).
+fn genResultContext(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef, msg_arg: *const Ast.Expr) Error!c.LLVMValueRef {
+    if (!self.isResultType(obj_type)) return error.UnsupportedExpr;
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "res");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+    const is_ok = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is_ok");
+
+    // context(msg) is eager: evaluate msg before branching.
+    const msg_val = try self.genExpr(msg_arg);
+    const msg_type = c.LLVMTypeOf(msg_val);
+
+    const ok_type = self.getOptionPayloadType(obj_type) orelse i32_type;
+    const err_type = self.getResultErrType(obj_type) orelse i32_type;
+    const ctx_info = try self.getOrCreateContextErrorType(err_type);
+    const out_info = try self.getOrCreateResultType(ok_type, ctx_info.llvm_type);
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const ok_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rctx.ok");
+    const err_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rctx.err");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rctx.merge");
+    _ = c.LLVMBuildCondBr(self.builder, is_ok, ok_bb, err_bb);
+
+    // Ok: passthrough payload into new Result type.
+    c.LLVMPositionBuilderAtEnd(self.builder, ok_bb);
+    const ok_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "ok.payload");
+    const ok_ptr = c.LLVMBuildBitCast(self.builder, ok_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const ok_val = c.LLVMBuildLoad2(self.builder, ok_type, ok_ptr, "ok.val");
+    const ok_result = try self.buildResultOk(ok_val, out_info.llvm_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const ok_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    // Err: build ContextError { message, source } and wrap as Err.
+    c.LLVMPositionBuilderAtEnd(self.builder, err_bb);
+    const err_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "err.payload");
+    const err_ptr = c.LLVMBuildBitCast(self.builder, err_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const err_val = c.LLVMBuildLoad2(self.builder, err_type, err_ptr, "err.val");
+
+    const ctx_msg_type = c.LLVMStructGetTypeAtIndex(ctx_info.llvm_type, 0);
+    if (msg_type != ctx_msg_type and !self.sameStructTypeName(msg_type, ctx_msg_type)) return error.UnsupportedExpr;
+
+    const ctx_alloca = c.LLVMBuildAlloca(self.builder, ctx_info.llvm_type, "ctx.err");
+    const msg_gep = c.LLVMBuildStructGEP2(self.builder, ctx_info.llvm_type, ctx_alloca, 0, "ctx.msg");
+    _ = c.LLVMBuildStore(self.builder, msg_val, msg_gep);
+    const src_gep = c.LLVMBuildStructGEP2(self.builder, ctx_info.llvm_type, ctx_alloca, 1, "ctx.src");
+    _ = c.LLVMBuildStore(self.builder, err_val, src_gep);
+    const ctx_val = c.LLVMBuildLoad2(self.builder, ctx_info.llvm_type, ctx_alloca, "ctx.val");
+    const err_result = try self.buildResultErr(ctx_val, out_info.llvm_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const err_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, out_info.llvm_type, "rctx.result");
+    var vals = [_]c.LLVMValueRef{ ok_result, err_result };
+    var bbs = [_]c.LLVMBasicBlockRef{ ok_end_bb, err_end_bb };
+    c.LLVMAddIncoming(phi, &vals, &bbs, 2);
+    return phi;
+}
+
+/// Generate Result.with_context(f) — lazily computes message only on Err.
+fn genResultWithContext(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMTypeRef, fn_arg: *const Ast.Expr) Error!c.LLVMValueRef {
+    if (!self.isResultType(obj_type)) return error.UnsupportedExpr;
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "res");
+    _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+
+    const tag_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 0, "tag");
+    const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "tag.val");
+    const is_ok = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is_ok");
+
+    const ok_type = self.getOptionPayloadType(obj_type) orelse i32_type;
+    const err_type = self.getResultErrType(obj_type) orelse i32_type;
+    const ctx_info = try self.getOrCreateContextErrorType(err_type);
+    const out_info = try self.getOrCreateResultType(ok_type, ctx_info.llvm_type);
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const ok_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rwctx.ok");
+    const err_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rwctx.err");
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "rwctx.merge");
+    _ = c.LLVMBuildCondBr(self.builder, is_ok, ok_bb, err_bb);
+
+    // Ok: passthrough payload into new Result type.
+    c.LLVMPositionBuilderAtEnd(self.builder, ok_bb);
+    const ok_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "ok.payload");
+    const ok_ptr = c.LLVMBuildBitCast(self.builder, ok_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const ok_val = c.LLVMBuildLoad2(self.builder, ok_type, ok_ptr, "ok.val");
+    const ok_result = try self.buildResultOk(ok_val, out_info.llvm_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const ok_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    // Err: evaluate message thunk and wrap { message, source }.
+    c.LLVMPositionBuilderAtEnd(self.builder, err_bb);
+    const err_gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, 1, "err.payload");
+    const err_ptr = c.LLVMBuildBitCast(self.builder, err_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+    const err_val = c.LLVMBuildLoad2(self.builder, err_type, err_ptr, "err.val");
+
+    const fn_val = try self.genExpr(fn_arg);
+    const msg_val = try self.callFnValueNoArgs(fn_val);
+    const msg_type = c.LLVMTypeOf(msg_val);
+    const ctx_msg_type = c.LLVMStructGetTypeAtIndex(ctx_info.llvm_type, 0);
+    if (msg_type != ctx_msg_type and !self.sameStructTypeName(msg_type, ctx_msg_type)) return error.UnsupportedExpr;
+
+    const ctx_alloca = c.LLVMBuildAlloca(self.builder, ctx_info.llvm_type, "ctx.err");
+    const msg_gep = c.LLVMBuildStructGEP2(self.builder, ctx_info.llvm_type, ctx_alloca, 0, "ctx.msg");
+    _ = c.LLVMBuildStore(self.builder, msg_val, msg_gep);
+    const src_gep = c.LLVMBuildStructGEP2(self.builder, ctx_info.llvm_type, ctx_alloca, 1, "ctx.src");
+    _ = c.LLVMBuildStore(self.builder, err_val, src_gep);
+    const ctx_val = c.LLVMBuildLoad2(self.builder, ctx_info.llvm_type, ctx_alloca, "ctx.val");
+    const err_result = try self.buildResultErr(ctx_val, out_info.llvm_type);
+    _ = c.LLVMBuildBr(self.builder, merge_bb);
+    const err_end_bb = c.LLVMGetInsertBlock(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    const phi = c.LLVMBuildPhi(self.builder, out_info.llvm_type, "rwctx.result");
+    var vals = [_]c.LLVMValueRef{ ok_result, err_result };
+    var bbs = [_]c.LLVMBasicBlockRef{ ok_end_bb, err_end_bb };
     c.LLVMAddIncoming(phi, &vals, &bbs, 2);
     return phi;
 }
@@ -4950,7 +6680,23 @@ fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
         self.expected_type = self.resolveType(te) catch null;
     }
 
-    const val = try self.genExpr(let_b.value);
+    var val = try self.genExpr(let_b.value);
+    var dyn_trait_sym: ?u32 = null;
+    var dyn_concrete_sym: ?u32 = null;
+    if (let_b.type_expr) |te| {
+        dyn_trait_sym = dynTraitFromTypeExpr(self, te);
+        if (dyn_trait_sym) |trait_sym| {
+            const arg_type = c.LLVMTypeOf(val);
+            if (self.dynConcreteArgInfo(let_b.value, arg_type)) |info| {
+                if (info.use_ptr) {
+                    val = try self.buildDynTraitValueFromPtr(val, info.type_sym, trait_sym);
+                } else {
+                    val = try self.buildDynTraitValue(val, info.type_sym, trait_sym);
+                }
+                dyn_concrete_sym = info.type_sym;
+            }
+        }
+    }
 
     // Type from annotation, or inferred from value.
     const ty = if (let_b.type_expr) |te|
@@ -4975,25 +6721,21 @@ fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
         .is_mut = let_b.is_mut,
     }) catch return error.CodegenAlloc;
 
+    if (dyn_trait_sym) |trait_sym| {
+        self.trait_locals.put(self.allocator, let_b.name, trait_sym) catch {};
+        if (dyn_concrete_sym) |concrete_sym| {
+            self.trait_local_concrete_types.put(self.allocator, let_b.name, concrete_sym) catch {};
+        } else {
+            _ = self.trait_local_concrete_types.remove(let_b.name);
+        }
+    } else {
+        _ = self.trait_locals.remove(let_b.name);
+        _ = self.trait_local_concrete_types.remove(let_b.name);
+    }
+
     // Track locals that hold async task IDs so `.await` can distinguish
     // real task handles from plain integers.
-    var is_task_local = false;
-    switch (let_b.value.kind) {
-        .call => |call_e| {
-            if (call_e.callee.kind == .ident) {
-                if (self.async_fn_symbols.get(call_e.callee.kind.ident) != null) {
-                    is_task_local = true;
-                }
-            }
-        },
-        .ident => |src_sym| {
-            if (self.task_locals.get(src_sym) != null) {
-                is_task_local = true;
-            }
-        },
-        else => {},
-    }
-    if (is_task_local) {
+    if (self.exprProducesTask(let_b.value)) {
         self.task_locals.put(self.allocator, let_b.name, {}) catch return error.CodegenAlloc;
     } else {
         _ = self.task_locals.remove(let_b.name);
@@ -5173,37 +6915,87 @@ fn genLetElse(self: *Codegen, le: Ast.LetElse) Error!c.LLVMValueRef {
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
+fn bindPatternFromPtr(self: *Codegen, pattern: Ast.Pattern, value_type: c.LLVMTypeRef, value_ptr: c.LLVMValueRef, is_mut: bool) Error!void {
+    switch (pattern.kind) {
+        .wildcard => {},
+        .binding => |sym| {
+            const value = c.LLVMBuildLoad2(self.builder, value_type, value_ptr, "pat.bind");
+            const alloca = c.LLVMBuildAlloca(self.builder, value_type, "pat.local");
+            _ = c.LLVMBuildStore(self.builder, value, alloca);
+            self.locals.put(self.allocator, sym, .{
+                .alloca = alloca,
+                .ty = value_type,
+                .is_mut = is_mut,
+            }) catch return error.CodegenAlloc;
+        },
+        .at_binding => |ab| {
+            const whole = c.LLVMBuildLoad2(self.builder, value_type, value_ptr, "pat.at");
+            const alloca = c.LLVMBuildAlloca(self.builder, value_type, "pat.at.local");
+            _ = c.LLVMBuildStore(self.builder, whole, alloca);
+            self.locals.put(self.allocator, ab.name, .{
+                .alloca = alloca,
+                .ty = value_type,
+                .is_mut = is_mut,
+            }) catch return error.CodegenAlloc;
+            try self.bindPatternFromPtr(ab.pattern.*, value_type, value_ptr, is_mut);
+        },
+        .tuple_pattern => |elems| {
+            if (c.LLVMGetTypeKind(value_type) != c.LLVMStructTypeKind) return error.UnsupportedExpr;
+            const field_count: usize = @intCast(c.LLVMCountStructElementTypes(value_type));
+            const bind_count: usize = @min(elems.len, field_count);
+            const i32_type = c.LLVMInt32TypeInContext(self.context);
+            for (elems[0..bind_count], 0..) |elem, i| {
+                const idx: u32 = @intCast(i);
+                const elem_type = c.LLVMStructGetTypeAtIndex(value_type, idx);
+                var indices = [_]c.LLVMValueRef{
+                    c.LLVMConstInt(i32_type, 0, 0),
+                    c.LLVMConstInt(i32_type, idx, 0),
+                };
+                const elem_ptr = c.LLVMBuildGEP2(self.builder, value_type, value_ptr, &indices, 2, "pat.tup.gep");
+                try self.bindPatternFromPtr(elem, elem_type, elem_ptr, is_mut);
+            }
+        },
+        else => {},
+    }
+}
+
+fn bindPatternFromValue(self: *Codegen, pattern: Ast.Pattern, value: c.LLVMValueRef, value_type: c.LLVMTypeRef, is_mut: bool) Error!void {
+    const tmp = c.LLVMBuildAlloca(self.builder, value_type, "pat.tmp");
+    _ = c.LLVMBuildStore(self.builder, value, tmp);
+    try self.bindPatternFromPtr(pattern, value_type, tmp, is_mut);
+}
+
 fn genTupleDestructure(self: *Codegen, td: Ast.TupleDestructure) Error!c.LLVMValueRef {
     const tuple_val = try self.genExpr(td.value);
     const tuple_type = c.LLVMTypeOf(tuple_val);
 
-    // Store the tuple value to memory so we can GEP into it.
-    const tuple_alloca = c.LLVMBuildAlloca(self.builder, tuple_type, "tuple.tmp");
-    _ = c.LLVMBuildStore(self.builder, tuple_val, tuple_alloca);
+    if (td.pattern) |pat| {
+        try self.bindPatternFromValue(pat, tuple_val, tuple_type, td.is_mut);
+    } else {
+        // Legacy flat tuple destructure path.
+        const tuple_alloca = c.LLVMBuildAlloca(self.builder, tuple_type, "tuple.tmp");
+        _ = c.LLVMBuildStore(self.builder, tuple_val, tuple_alloca);
 
-    const i32_type = c.LLVMInt32TypeInContext(self.context);
-    const num_fields = c.LLVMCountStructElementTypes(tuple_type);
-
-    for (td.names, 0..) |name, i| {
-        if (i >= num_fields) break; // more names than tuple elements
-        const idx: u32 = @intCast(i);
-        const elem_type = c.LLVMStructGetTypeAtIndex(tuple_type, idx);
-
-        var indices = [_]c.LLVMValueRef{
-            c.LLVMConstInt(i32_type, 0, 0),
-            c.LLVMConstInt(i32_type, idx, 0),
-        };
-        const elem_ptr = c.LLVMBuildGEP2(self.builder, tuple_type, tuple_alloca, &indices, 2, "");
-        const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "");
-
-        const alloca = c.LLVMBuildAlloca(self.builder, elem_type, "");
-        _ = c.LLVMBuildStore(self.builder, elem_val, alloca);
-
-        self.locals.put(self.allocator, name, .{
-            .alloca = alloca,
-            .ty = elem_type,
-            .is_mut = td.is_mut,
-        }) catch return error.CodegenAlloc;
+        const i32_type = c.LLVMInt32TypeInContext(self.context);
+        const num_fields = c.LLVMCountStructElementTypes(tuple_type);
+        for (td.names, 0..) |name, i| {
+            if (i >= num_fields) break;
+            const idx: u32 = @intCast(i);
+            const elem_type = c.LLVMStructGetTypeAtIndex(tuple_type, idx);
+            var indices = [_]c.LLVMValueRef{
+                c.LLVMConstInt(i32_type, 0, 0),
+                c.LLVMConstInt(i32_type, idx, 0),
+            };
+            const elem_ptr = c.LLVMBuildGEP2(self.builder, tuple_type, tuple_alloca, &indices, 2, "");
+            const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "");
+            const alloca = c.LLVMBuildAlloca(self.builder, elem_type, "");
+            _ = c.LLVMBuildStore(self.builder, elem_val, alloca);
+            self.locals.put(self.allocator, name, .{
+                .alloca = alloca,
+                .ty = elem_type,
+                .is_mut = td.is_mut,
+            }) catch return error.CodegenAlloc;
+        }
     }
 
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
@@ -5423,10 +7215,20 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
     const ok_sym = self.pool.intern("Ok") catch return error.CodegenAlloc;
     if (fn_sym == ok_sym) {
         if (call_e.args.len > 1) return error.UnsupportedExpr;
+        const i32_type = c.LLVMInt32TypeInContext(self.context);
+        if (call_e.args.len == 0) {
+            // Unit elision: Ok() is accepted only in Unit-like (i32-backed) payload positions.
+            if (self.expected_type) |et| {
+                if (self.isResultType(et)) {
+                    const payload_ty = self.findEnumPayloadType(et, 0) orelse i32_type;
+                    if (payload_ty != i32_type) return error.UnsupportedExpr;
+                }
+            }
+        }
         const arg_val = if (call_e.args.len == 1)
             try self.genExpr(call_e.args[0])
         else
-            c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
+            c.LLVMConstInt(i32_type, 0, 0);
         // Use expected_type if available (from let binding annotation or return type).
         if (self.expected_type) |et| {
             if (c.LLVMGetTypeKind(et) == c.LLVMStructTypeKind) {
@@ -5457,25 +7259,25 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
 
     // Built-in: Channel(capacity) — create a new channel
     const channel_sym = self.pool.intern("Channel") catch return error.CodegenAlloc;
-    if (fn_sym == channel_sym) {
+    if (fn_sym == channel_sym and self.functions.get(fn_sym) == null and self.generic_fns.get(fn_sym) == null) {
         return self.genChannelCreate(call_e.args);
     }
 
     // Built-in: send(ch, value) — send to channel
     const send_sym = self.pool.intern("send") catch return error.CodegenAlloc;
-    if (fn_sym == send_sym) {
+    if (fn_sym == send_sym and self.functions.get(fn_sym) == null and self.generic_fns.get(fn_sym) == null) {
         return self.genChannelSend(call_e.args);
     }
 
     // Built-in: recv(ch) — receive from channel
     const recv_sym = self.pool.intern("recv") catch return error.CodegenAlloc;
-    if (fn_sym == recv_sym) {
+    if (fn_sym == recv_sym and self.functions.get(fn_sym) == null and self.generic_fns.get(fn_sym) == null) {
         return self.genChannelRecv(call_e.args);
     }
 
     // Built-in: close(ch) — close a channel
     const close_sym = self.pool.intern("close") catch return error.CodegenAlloc;
-    if (fn_sym == close_sym) {
+    if (fn_sym == close_sym and self.functions.get(fn_sym) == null and self.generic_fns.get(fn_sym) == null) {
         return self.genChannelClose(call_e.args);
     }
 
@@ -5551,9 +7353,13 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
             if (dyn_params) |dp| {
                 if (i < dp.len) {
                     if (dp[i]) |trait_sym| {
-                        // This param expects dyn Trait — wrap concrete value.
-                        if (self.findTypeSymbol(arg_type)) |type_sym| {
-                            args_buf[i] = try self.buildDynTraitValue(args_buf[i], type_sym, trait_sym);
+                        // This param expects dyn Trait — wrap concrete arg when known.
+                        if (self.dynConcreteArgInfo(call_e.args[i], arg_type)) |info| {
+                            if (info.use_ptr) {
+                                args_buf[i] = try self.buildDynTraitValueFromPtr(args_buf[i], info.type_sym, trait_sym);
+                            } else {
+                                args_buf[i] = try self.buildDynTraitValue(args_buf[i], info.type_sym, trait_sym);
+                            }
                             continue;
                         }
                     }
@@ -5568,6 +7374,23 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
                     const arg_sym = call_e.args[i].kind.ident;
                     if (self.functions.get(arg_sym)) |arg_fn_info| {
                         args_buf[i] = try self.wrapFunctionAsFatPointer(arg_fn_info.value, arg_fn_info.fn_type);
+                        continue;
+                    }
+                }
+            }
+
+            // Auto-referencing: if param is &T (pointer) and arg is T (struct value),
+            // auto-insert alloca to create a reference. Only for shared borrows.
+            const ref_params = self.fn_ref_params.get(fn_sym);
+            if (ref_params) |rp| {
+                if (i < rp.len and rp[i]) {
+                    if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and
+                        c.LLVMGetTypeKind(arg_type) == c.LLVMStructTypeKind)
+                    {
+                        // Auto-alloca the value and pass the pointer.
+                        const tmp = c.LLVMBuildAlloca(self.builder, arg_type, "autoref");
+                        _ = c.LLVMBuildStore(self.builder, args_buf[i], tmp);
+                        args_buf[i] = tmp;
                         continue;
                     }
                 }
@@ -6129,8 +7952,22 @@ fn resolveTypeWithParams(
             // Not a type param — resolve normally.
             return self.resolveType(type_expr);
         },
-        .ptr_type => return c.LLVMPointerTypeInContext(self.context, 0),
-        .ref_type => return c.LLVMPointerTypeInContext(self.context, 0),
+        .ptr_type => |pt| {
+            if (dynTraitFromTypeExpr(self, pt.pointee) != null) {
+                const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+                var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+                return c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+            }
+            return c.LLVMPointerTypeInContext(self.context, 0);
+        },
+        .ref_type => |rt| {
+            if (dynTraitFromTypeExpr(self, rt.pointee) != null) {
+                const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+                var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+                return c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+            }
+            return c.LLVMPointerTypeInContext(self.context, 0);
+        },
         .fn_type => return c.LLVMPointerTypeInContext(self.context, 0),
         .array_type => |arr| {
             const elem = try self.resolveTypeWithParams(arr.element, type_params, type_map, type_map_len);
@@ -6171,6 +8008,12 @@ fn resolveTypeWithParams(
                 const res_info = try self.getOrCreateResultType(ok_type, err_type);
                 return res_info.llvm_type;
             }
+            if (std.mem.eql(u8, name, "ContextError")) {
+                if (g.args.len != 1) return error.UnsupportedType;
+                const source_type = try self.resolveTypeWithParams(g.args[0], type_params, type_map, type_map_len);
+                const ctx_info = try self.getOrCreateContextErrorType(source_type);
+                return ctx_info.llvm_type;
+            }
             if (std.mem.eql(u8, name, "Vec")) {
                 if (g.args.len != 1) return error.UnsupportedType;
                 const elem_type = try self.resolveTypeWithParams(g.args[0], type_params, type_map, type_map_len);
@@ -6189,6 +8032,15 @@ fn resolveTypeWithParams(
                 const elem_type = try self.resolveTypeWithParams(g.args[0], type_params, type_map, type_map_len);
                 const hs_info = try self.getOrCreateHashSetType(elem_type);
                 return hs_info.llvm_type;
+            }
+            if (std.mem.eql(u8, name, "Box")) {
+                if (g.args.len != 1) return error.UnsupportedType;
+                if (dynTraitFromTypeExpr(self, g.args[0]) != null) {
+                    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+                    var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+                    return c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+                }
+                return c.LLVMPointerTypeInContext(self.context, 0);
             }
             return error.UnsupportedType;
         },
@@ -6241,8 +8093,57 @@ fn genCast(self: *Codegen, ca: Ast.CastExpr) Error!c.LLVMValueRef {
     return error.UnsupportedExpr;
 }
 
+fn getMutableReceiverPtr(self: *Codegen, recv_expr: *const Ast.Expr) Error!c.LLVMValueRef {
+    switch (recv_expr.kind) {
+        .ident => |sym| {
+            const local = self.locals.get(sym) orelse return error.UnsupportedExpr;
+            return local.alloca;
+        },
+        .field_access => |fa| {
+            const base_sym = switch (fa.expr.kind) {
+                .ident => |s| s,
+                else => return error.UnsupportedExpr,
+            };
+            const base_local = self.locals.get(base_sym) orelse return error.UnsupportedExpr;
+
+            if (base_local.pointee_struct) |ps| {
+                const struct_info = self.struct_types.get(ps) orelse return error.UnsupportedType;
+                const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
+                const ptr_val = c.LLVMBuildLoad2(self.builder, base_local.ty, base_local.alloca, "recv.ptr.base");
+                return c.LLVMBuildStructGEP2(
+                    self.builder,
+                    struct_info.llvm_type,
+                    ptr_val,
+                    @intCast(idx),
+                    "recv.ptr.field",
+                );
+            }
+
+            const struct_info = self.findStructTypeByLlvm(base_local.ty) orelse return error.UnsupportedType;
+            const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
+            return c.LLVMBuildStructGEP2(self.builder, base_local.ty, base_local.alloca, @intCast(idx), "recv.ptr.field");
+        },
+        else => return error.UnsupportedExpr,
+    }
+}
+
 fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
     const method_name = self.pool.resolve(fa.field);
+
+    // Async-scope API: s.track(task_expr)
+    // Handle this before evaluating the receiver as a normal value; `s` is
+    // a scope marker symbol, not a runtime object local.
+    if (std.mem.eql(u8, method_name, "track") and fa.expr.kind == .ident) {
+        if (self.findActiveAsyncScopeFrame(fa.expr.kind.ident)) |frame| {
+            if (args.len != 1) return error.UnsupportedExpr;
+            const task_val = try self.genExpr(args[0]);
+            if (frame.task_count < frame.tasks.len) {
+                frame.tasks[frame.task_count] = task_val;
+                frame.task_count += 1;
+            }
+            return task_val;
+        }
+    }
 
     // Check for static method call: `Type.method(args)` where Type is a type name.
     if (fa.expr.kind == .ident) {
@@ -6307,6 +8208,59 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             }
         }
 
+        // TypeInfo equivalent API in non-generic contexts:
+        //   TypeInfo.fields(Point), TypeInfo.size(Point), ...
+        if (std.mem.eql(u8, ident_name, "TypeInfo")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            if (args[0].kind != .ident) return error.UnsupportedExpr;
+            const target_sym = args[0].kind.ident;
+            const target_name = self.pool.resolve(target_sym);
+            const target_obj = self.resolveTypeObjectInfo(target_sym, target_name) orelse return error.UnsupportedExpr;
+
+            if (std.mem.eql(u8, method_name, "fields") and args.len == 1) {
+                if (target_obj.struct_sym) |ss| {
+                    if (self.struct_types.get(ss)) |st| {
+                        return self.buildIntArrayCount(st.field_names.len);
+                    }
+                }
+                return self.buildIntArrayCount(0);
+            }
+            if (std.mem.eql(u8, method_name, "variants") and args.len == 1) {
+                if (target_obj.enum_sym) |es| {
+                    if (self.enum_types.get(es)) |et| {
+                        return self.buildIntArrayCount(et.variant_names.len);
+                    }
+                }
+                return self.buildIntArrayCount(0);
+            }
+            if (std.mem.eql(u8, method_name, "name") and args.len == 1) {
+                const name_sym = self.pool.intern(target_obj.name) catch return error.CodegenAlloc;
+                return self.genStringLiteral(name_sym);
+            }
+            if (std.mem.eql(u8, method_name, "size") and args.len == 1) {
+                const dl = c.LLVMGetModuleDataLayout(self.module);
+                const size = c.LLVMABISizeOfType(dl, target_obj.llvm_type);
+                return c.LLVMConstInt(c.LLVMInt64TypeInContext(self.context), size, 0);
+            }
+            if (std.mem.eql(u8, method_name, "align") and args.len == 1) {
+                const dl = c.LLVMGetModuleDataLayout(self.module);
+                const abi_align = c.LLVMABIAlignmentOfType(dl, target_obj.llvm_type);
+                return c.LLVMConstInt(c.LLVMInt64TypeInContext(self.context), abi_align, 0);
+            }
+            if (std.mem.eql(u8, method_name, "is_copy") and args.len == 1) {
+                return c.LLVMConstInt(
+                    c.LLVMInt1TypeInContext(self.context),
+                    if (self.isCopyLlvmType(target_obj.llvm_type)) 1 else 0,
+                    0,
+                );
+            }
+            if (std.mem.eql(u8, method_name, "implements") and args.len == 2) {
+                // Placeholder for non-generic TypeInfo.implements API.
+                return c.LLVMConstInt(c.LLVMInt1TypeInContext(self.context), 0, 0);
+            }
+            return error.UnsupportedExpr;
+        }
+
         if (self.resolveTypeObjectInfo(ident_sym, ident_name)) |type_obj| {
             // Type-as-object API: T.fields(), T.variants(), T.name(), ...
             if (std.mem.eql(u8, method_name, "fields") and args.len == 0) {
@@ -6354,17 +8308,31 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             // Derive(Builder)-style API: Type.builder()
             if (std.mem.eql(u8, method_name, "builder") and args.len == 0) {
                 if (type_obj.struct_sym) |ss| {
-                    const st = self.struct_types.get(ss) orelse return error.UnsupportedExpr;
-                    const alloca = c.LLVMBuildAlloca(self.builder, st.llvm_type, "builder.init");
-                    for (st.field_types, 0..) |ft, i| {
-                        const gep = c.LLVMBuildStructGEP2(self.builder, st.llvm_type, alloca, @intCast(i), "");
-                        const value = if (st.field_defaults[i]) |def_expr| blk: {
-                            const v = try self.genExpr(def_expr);
-                            break :blk self.coerceInt(v, ft);
-                        } else c.LLVMConstNull(ft);
-                        _ = c.LLVMBuildStore(self.builder, value, gep);
+                    if (self.derive_builder_types.get(ss)) |bm| {
+                        const st = self.struct_types.get(ss) orelse return error.UnsupportedExpr;
+                        const alloca = c.LLVMBuildAlloca(self.builder, bm.llvm_type, "builder.init");
+
+                        // Initialize builder.value
+                        const value_gep = c.LLVMBuildStructGEP2(self.builder, bm.llvm_type, alloca, 0, "");
+                        const value_alloca = c.LLVMBuildAlloca(self.builder, st.llvm_type, "builder.value");
+                        for (st.field_types, 0..) |ft, i| {
+                            const gep = c.LLVMBuildStructGEP2(self.builder, st.llvm_type, value_alloca, @intCast(i), "");
+                            const value = if (st.field_defaults[i]) |def_expr| blk: {
+                                const v = try self.genExpr(def_expr);
+                                break :blk self.coerceInt(v, ft);
+                            } else c.LLVMConstNull(ft);
+                            _ = c.LLVMBuildStore(self.builder, value, gep);
+                        }
+                        const init_value = c.LLVMBuildLoad2(self.builder, st.llvm_type, value_alloca, "builder.value.init");
+                        _ = c.LLVMBuildStore(self.builder, init_value, value_gep);
+
+                        // Initialize builder.mask with fields that already have defaults.
+                        const mask_gep = c.LLVMBuildStructGEP2(self.builder, bm.llvm_type, alloca, 1, "");
+                        const i64_type = c.LLVMInt64TypeInContext(self.context);
+                        _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, bm.default_mask, 0), mask_gep);
+
+                        return c.LLVMBuildLoad2(self.builder, bm.llvm_type, alloca, "builder.val");
                     }
-                    return c.LLVMBuildLoad2(self.builder, st.llvm_type, alloca, "builder.val");
                 }
             }
         }
@@ -6414,27 +8382,75 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
     const obj_val = try self.genExpr(fa.expr);
     const obj_type = c.LLVMTypeOf(obj_val);
 
-    // Derive-like convenience: x.clone() copies the value.
-    if (std.mem.eql(u8, method_name, "clone") and args.len == 0) {
-        return obj_val;
-    }
+    // Derive(Builder)-style chaining on builder values:
+    //   T.builder().field(v).build()
+    if (self.builder_owner_by_type.get(@intFromPtr(obj_type))) |owner_sym| {
+        const bm = self.derive_builder_types.get(owner_sym) orelse return error.UnsupportedExpr;
+        const st = self.struct_types.get(owner_sym) orelse return error.UnsupportedExpr;
 
-    // Derive(Builder)-style chaining on struct values:
-    //   cfg.host("x") -> { cfg with host: "x" }
-    //   cfg.build()   -> Some(cfg)
-    if (self.findStructTypeByLlvm(obj_type)) |st| {
         if (std.mem.eql(u8, method_name, "build") and args.len == 0) {
-            return self.buildOptionSome(obj_val);
+            const i64_type = c.LLVMInt64TypeInContext(self.context);
+            const alloca = c.LLVMBuildAlloca(self.builder, bm.llvm_type, "builder.tmp");
+            _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
+
+            const mask_gep = c.LLVMBuildStructGEP2(self.builder, bm.llvm_type, alloca, 1, "");
+            const mask_val = c.LLVMBuildLoad2(self.builder, i64_type, mask_gep, "builder.mask");
+            const req_mask = c.LLVMConstInt(i64_type, bm.required_mask, 0);
+            const set_bits = c.LLVMBuildAnd(self.builder, mask_val, req_mask, "builder.setbits");
+            const has_all = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, set_bits, req_mask, "builder.ready");
+
+            const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+            const then_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "builder.ready");
+            const else_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "builder.missing");
+            const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "builder.merge");
+            _ = c.LLVMBuildCondBr(self.builder, has_all, then_bb, else_bb);
+
+            c.LLVMPositionBuilderAtEnd(self.builder, then_bb);
+            const value_gep_ok = c.LLVMBuildStructGEP2(self.builder, bm.llvm_type, alloca, 0, "");
+            const ready_val = c.LLVMBuildLoad2(self.builder, st.llvm_type, value_gep_ok, "builder.value");
+            const some_val = try self.buildOptionSome(ready_val);
+            _ = c.LLVMBuildBr(self.builder, merge_bb);
+            const then_end = c.LLVMGetInsertBlock(self.builder);
+
+            c.LLVMPositionBuilderAtEnd(self.builder, else_bb);
+            const opt_ty = try self.getOrCreateOptionType(st.llvm_type);
+            const none_val = self.buildOptionNone(opt_ty.llvm_type);
+            _ = c.LLVMBuildBr(self.builder, merge_bb);
+            const else_end = c.LLVMGetInsertBlock(self.builder);
+
+            c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+            var incoming_vals = [_]c.LLVMValueRef{ some_val, none_val };
+            var incoming_bbs = [_]c.LLVMBasicBlockRef{ then_end, else_end };
+            const phi = c.LLVMBuildPhi(self.builder, c.LLVMTypeOf(some_val), "builder.out");
+            c.LLVMAddIncoming(phi, &incoming_vals, &incoming_bbs, 2);
+            return phi;
         }
+
         if (args.len == 1) {
             if (self.findFieldIndex(st, fa.field)) |idx| {
-                const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "builder.set");
+                const alloca = c.LLVMBuildAlloca(self.builder, bm.llvm_type, "builder.set");
                 _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
-                const gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, @intCast(idx), "");
+
+                const value_gep = c.LLVMBuildStructGEP2(self.builder, bm.llvm_type, alloca, 0, "");
+                const value_ptr = c.LLVMBuildAlloca(self.builder, st.llvm_type, "builder.value.ptr");
+                const current_value = c.LLVMBuildLoad2(self.builder, st.llvm_type, value_gep, "builder.value.cur");
+                _ = c.LLVMBuildStore(self.builder, current_value, value_ptr);
+
+                const field_gep = c.LLVMBuildStructGEP2(self.builder, st.llvm_type, value_ptr, @intCast(idx), "");
                 const field_val = try self.genExpr(args[0]);
                 const coerced = self.coerceInt(field_val, st.field_types[idx]);
-                _ = c.LLVMBuildStore(self.builder, coerced, gep);
-                return c.LLVMBuildLoad2(self.builder, obj_type, alloca, "builder.updated");
+                _ = c.LLVMBuildStore(self.builder, coerced, field_gep);
+                const updated_value = c.LLVMBuildLoad2(self.builder, st.llvm_type, value_ptr, "builder.value.updated");
+                _ = c.LLVMBuildStore(self.builder, updated_value, value_gep);
+
+                const mask_gep = c.LLVMBuildStructGEP2(self.builder, bm.llvm_type, alloca, 1, "");
+                const i64_type = c.LLVMInt64TypeInContext(self.context);
+                const old_mask = c.LLVMBuildLoad2(self.builder, i64_type, mask_gep, "builder.mask.old");
+                const bit = c.LLVMConstInt(i64_type, if (idx < 64) (@as(u64, 1) << @intCast(idx)) else 0, 0);
+                const new_mask = c.LLVMBuildOr(self.builder, old_mask, bit, "builder.mask.new");
+                _ = c.LLVMBuildStore(self.builder, new_mask, mask_gep);
+
+                return c.LLVMBuildLoad2(self.builder, bm.llvm_type, alloca, "builder.updated");
             }
         }
     }
@@ -6448,12 +8464,14 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             var cancel_params = [_]c.LLVMTypeRef{i32_type};
             const cancel_ft = c.LLVMFunctionType(i32_type, &cancel_params, 1, 0);
             var cancel_args = [_]c.LLVMValueRef{obj_val};
-            return c.LLVMBuildCall2(self.builder, cancel_ft, cancel_fn, &cancel_args, 1, "task.cancel");
+            _ = c.LLVMBuildCall2(self.builder, cancel_ft, cancel_fn, &cancel_args, 1, "task.cancel");
+            return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
         }
     }
 
     // Raw-pointer convenience: ptr.as_option()
     if (std.mem.eql(u8, method_name, "as_option") and c.LLVMGetTypeKind(obj_type) == c.LLVMPointerTypeKind) {
+        if (args.len != 0) return error.UnsupportedExpr;
         const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
         const is_nonnull = c.LLVMBuildICmp(self.builder, c.LLVMIntNE, obj_val, c.LLVMConstNull(ptr_type), "ptr.nonnull");
 
@@ -6489,8 +8507,15 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
                 const msg = if (args.len > 0) try self.genExpr(args[0]) else null;
                 return self.genOptionUnwrap(obj_val, obj_type, msg);
             } else if (std.mem.eql(u8, method_name, "unwrap_or")) {
-                if (args.len < 1) return error.UnsupportedExpr;
-                const default_val = try self.genExpr(args[0]);
+                const i32_type = c.LLVMInt32TypeInContext(self.context);
+                const default_val = if (args.len >= 1)
+                    try self.genExpr(args[0])
+                else blk: {
+                    // Unit elision: unwrap_or() -> unwrap_or(()) in Unit-like (i32-backed) contexts.
+                    const payload_ty = self.getOptionPayloadType(obj_type) orelse i32_type;
+                    if (payload_ty != i32_type) return error.UnsupportedExpr;
+                    break :blk c.LLVMConstInt(i32_type, 0, 0);
+                };
                 return self.genOptionUnwrapOr(obj_val, obj_type, default_val);
             } else if (std.mem.eql(u8, method_name, "is_some")) {
                 return self.genOptionIsSome(obj_val, obj_type);
@@ -6509,15 +8534,46 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             } else if (std.mem.eql(u8, method_name, "and_then")) {
                 if (args.len < 1) return error.UnsupportedExpr;
                 if (self.isResultType(obj_type)) {
-                    // Result.and_then: same as Option.and_then (f returns Result)
-                    return self.genOptionAndThen(obj_val, obj_type, args[0]);
+                    return self.genResultAndThen(obj_val, obj_type, args[0]);
                 }
                 return self.genOptionAndThen(obj_val, obj_type, args[0]);
             } else if (std.mem.eql(u8, method_name, "filter")) {
                 if (args.len < 1) return error.UnsupportedExpr;
                 return self.genOptionFilter(obj_val, obj_type, args[0]);
+            } else if (std.mem.eql(u8, method_name, "or_else")) {
+                if (args.len < 1) return error.UnsupportedExpr;
+                if (self.isResultType(obj_type)) {
+                    return self.genResultOrElse(obj_val, obj_type, args[0]);
+                }
+                return self.genOptionOrElse(obj_val, obj_type, args[0]);
+            } else if (std.mem.eql(u8, method_name, "zip")) {
+                if (args.len < 1) return error.UnsupportedExpr;
+                if (self.isResultType(obj_type)) return error.UnsupportedExpr;
+                const rhs_val = try self.genExpr(args[0]);
+                const rhs_type = c.LLVMTypeOf(rhs_val);
+                return self.genOptionZip(obj_val, obj_type, rhs_val, rhs_type);
+            } else if (std.mem.eql(u8, method_name, "flatten")) {
+                if (self.isResultType(obj_type)) return error.UnsupportedExpr;
+                return self.genOptionFlatten(obj_val, obj_type);
+            } else if (std.mem.eql(u8, method_name, "cloned")) {
+                if (self.isResultType(obj_type)) return error.UnsupportedExpr;
+                return self.genOptionCloned(obj_val, obj_type);
+            } else if (std.mem.eql(u8, method_name, "transpose")) {
+                if (self.isResultType(obj_type)) {
+                    return self.genResultTranspose(obj_val, obj_type);
+                }
+                return self.genOptionTranspose(obj_val, obj_type);
+            } else if (std.mem.eql(u8, method_name, "context")) {
+                if (args.len < 1) return error.UnsupportedExpr;
+                if (!self.isResultType(obj_type)) return error.UnsupportedExpr;
+                return self.genResultContext(obj_val, obj_type, args[0]);
+            } else if (std.mem.eql(u8, method_name, "with_context")) {
+                if (args.len < 1) return error.UnsupportedExpr;
+                if (!self.isResultType(obj_type)) return error.UnsupportedExpr;
+                return self.genResultWithContext(obj_val, obj_type, args[0]);
             } else if (std.mem.eql(u8, method_name, "map_err")) {
                 if (args.len < 1) return error.UnsupportedExpr;
+                if (!self.isResultType(obj_type)) return error.UnsupportedExpr;
                 return self.genResultMapErr(obj_val, obj_type, args[0]);
             } else if (std.mem.eql(u8, method_name, "ok")) {
                 if (self.isResultType(obj_type)) {
@@ -6535,14 +8591,54 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
     if (c.LLVMGetTypeKind(obj_type) == c.LLVMStructTypeKind or
         c.LLVMGetTypeKind(obj_type) == c.LLVMIntegerTypeKind)
     {
-        // Find which enum type this is.
-        var found_ei: ?EnumTypeInfo = null;
-        var ei_it = self.enum_types.iterator();
-        while (ei_it.next()) |entry| {
-            if (entry.value_ptr.llvm_type == obj_type) {
-                found_ei = entry.value_ptr.*;
-                break;
+        // Determine requested variant (for disambiguation across enums that
+        // share the same lowered LLVM type layout).
+        var requested_variant_sym: ?u32 = null;
+        if (method_name.len > 3 and std.mem.startsWith(u8, method_name, "is_")) {
+            requested_variant_sym = self.pool.intern(method_name[3..]) catch return error.CodegenAlloc;
+        } else if (method_name.len > 3 and std.mem.startsWith(u8, method_name, "as_")) {
+            var variant_name = method_name[3..];
+            if (std.mem.endsWith(u8, variant_name, "_ref")) {
+                variant_name = variant_name[0 .. variant_name.len - 4];
+            } else if (std.mem.endsWith(u8, variant_name, "_mut")) {
+                variant_name = variant_name[0 .. variant_name.len - 4];
             }
+            requested_variant_sym = self.pool.intern(variant_name) catch return error.CodegenAlloc;
+        }
+
+        // Find which enum type this is.
+        // Prefer symbol-tracked enum types for locals, then resolve by variant
+        // name when available, and finally fall back to first by type.
+        var found_ei: ?EnumTypeInfo = null;
+        if (fa.expr.kind == .ident) {
+            if (self.enum_local_types.get(fa.expr.kind.ident)) |enum_sym| {
+                if (self.enum_types.get(enum_sym)) |ei| {
+                    if (ei.llvm_type == obj_type) {
+                        found_ei = ei;
+                    }
+                }
+            }
+        }
+        if (found_ei == null) {
+            var fallback_ei: ?EnumTypeInfo = null;
+            var ei_it = self.enum_types.iterator();
+            while (ei_it.next()) |entry| {
+                if (entry.value_ptr.llvm_type != obj_type) continue;
+                if (fallback_ei == null) fallback_ei = entry.value_ptr.*;
+                if (requested_variant_sym) |variant_sym| {
+                    for (entry.value_ptr.variant_names) |vn| {
+                        if (vn == variant_sym) {
+                            found_ei = entry.value_ptr.*;
+                            break;
+                        }
+                    }
+                    if (found_ei != null) break;
+                } else {
+                    found_ei = entry.value_ptr.*;
+                    break;
+                }
+            }
+            if (found_ei == null) found_ei = fallback_ei;
         }
         if (found_ei) |ei| {
             // .is_X() → check tag == variant index
@@ -6643,22 +8739,11 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
         } else if (std.mem.eql(u8, method_name, "push")) {
             if (args.len < 1) return error.UnsupportedExpr;
             const val = try self.genExpr(args[0]);
-            // Need alloca of the vec local — look it up from the expression
-            if (fa.expr.kind == .ident) {
-                const sym = fa.expr.kind.ident;
-                if (self.locals.get(sym)) |local| {
-                    return self.genVecPush(local.alloca, obj_type, val);
-                }
-            }
-            return error.UnsupportedExpr;
+            const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
+            return self.genVecPush(recv_ptr, obj_type, val);
         } else if (std.mem.eql(u8, method_name, "pop")) {
-            if (fa.expr.kind == .ident) {
-                const sym = fa.expr.kind.ident;
-                if (self.locals.get(sym)) |local| {
-                    return self.genVecPop(local.alloca, obj_type);
-                }
-            }
-            return error.UnsupportedExpr;
+            const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
+            return self.genVecPop(recv_ptr, obj_type);
         } else if (std.mem.eql(u8, method_name, "join")) {
             // Vec[str].join(sep) → str
             if (args.len < 1) return error.UnsupportedExpr;
@@ -6680,6 +8765,13 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             if (args.len < 1) return error.UnsupportedExpr;
             const fn_val = try self.genExpr(args[0]);
             return self.genVecFilter(obj_val, obj_type, fn_val);
+        } else if (std.mem.eql(u8, method_name, "sequence")) {
+            if (args.len != 0) return error.UnsupportedExpr;
+            return self.genVecSequence(obj_val, obj_type);
+        } else if (std.mem.eql(u8, method_name, "traverse")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const fn_val = try self.genExpr(args[0]);
+            return self.genVecTraverse(obj_val, obj_type, fn_val);
         }
     }
 
@@ -6701,67 +8793,36 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             if (args.len < 2) return error.UnsupportedExpr;
             const key = try self.genExpr(args[0]);
             const val = try self.genExpr(args[1]);
-            // Need alloca for mutation
-            if (fa.expr.kind == .ident) {
-                const sym = fa.expr.kind.ident;
-                if (self.locals.get(sym)) |local| {
-                    return self.genHashMapInsert(local.alloca, obj_type, key, val);
-                }
-            }
-            return error.UnsupportedExpr;
+            const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
+            return self.genHashMapInsert(recv_ptr, obj_type, key, val);
         } else if (std.mem.eql(u8, method_name, "remove")) {
             if (args.len < 1) return error.UnsupportedExpr;
             const key = try self.genExpr(args[0]);
-            if (fa.expr.kind == .ident) {
-                const sym = fa.expr.kind.ident;
-                if (self.locals.get(sym)) |local| {
-                    return self.genHashMapRemove(local.alloca, obj_type, key);
-                }
-            }
-            return error.UnsupportedExpr;
+            const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
+            return self.genHashMapRemove(recv_ptr, obj_type, key);
         } else if (std.mem.eql(u8, method_name, "increment")) {
             if (args.len < 1) return error.UnsupportedExpr;
             const key = try self.genExpr(args[0]);
-            if (fa.expr.kind == .ident) {
-                const sym = fa.expr.kind.ident;
-                if (self.locals.get(sym)) |local| {
-                    return self.genHashMapBump(local.alloca, obj_val, obj_type, key, 1);
-                }
-            }
-            return error.UnsupportedExpr;
+            const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
+            return self.genHashMapBump(recv_ptr, obj_val, obj_type, key, 1);
         } else if (std.mem.eql(u8, method_name, "decrement")) {
             if (args.len < 1) return error.UnsupportedExpr;
             const key = try self.genExpr(args[0]);
-            if (fa.expr.kind == .ident) {
-                const sym = fa.expr.kind.ident;
-                if (self.locals.get(sym)) |local| {
-                    return self.genHashMapBump(local.alloca, obj_val, obj_type, key, -1);
-                }
-            }
-            return error.UnsupportedExpr;
+            const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
+            return self.genHashMapBump(recv_ptr, obj_val, obj_type, key, -1);
         } else if (std.mem.eql(u8, method_name, "update")) {
             if (args.len < 3) return error.UnsupportedExpr;
             const key = try self.genExpr(args[0]);
             const default_val = try self.genExpr(args[1]);
             const fn_val = try self.genExpr(args[2]);
-            if (fa.expr.kind == .ident) {
-                const sym = fa.expr.kind.ident;
-                if (self.locals.get(sym)) |local| {
-                    return self.genHashMapUpdate(local.alloca, obj_val, obj_type, key, default_val, fn_val);
-                }
-            }
-            return error.UnsupportedExpr;
+            const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
+            return self.genHashMapUpdate(recv_ptr, obj_val, obj_type, key, default_val, fn_val);
         } else if (std.mem.eql(u8, method_name, "append")) {
             if (args.len < 2) return error.UnsupportedExpr;
             const key = try self.genExpr(args[0]);
             const elem = try self.genExpr(args[1]);
-            if (fa.expr.kind == .ident) {
-                const sym = fa.expr.kind.ident;
-                if (self.locals.get(sym)) |local| {
-                    return self.genHashMapAppend(local.alloca, obj_val, obj_type, key, elem);
-                }
-            }
-            return error.UnsupportedExpr;
+            const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
+            return self.genHashMapAppend(recv_ptr, obj_val, obj_type, key, elem);
         }
     }
 
@@ -6780,23 +8841,13 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
         } else if (std.mem.eql(u8, method_name, "insert")) {
             if (args.len < 1) return error.UnsupportedExpr;
             const val = try self.genExpr(args[0]);
-            if (fa.expr.kind == .ident) {
-                const sym = fa.expr.kind.ident;
-                if (self.locals.get(sym)) |local| {
-                    return self.genHashSetInsert(local.alloca, obj_type, val);
-                }
-            }
-            return error.UnsupportedExpr;
+            const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
+            return self.genHashSetInsert(recv_ptr, obj_type, val);
         } else if (std.mem.eql(u8, method_name, "remove")) {
             if (args.len < 1) return error.UnsupportedExpr;
             const val = try self.genExpr(args[0]);
-            if (fa.expr.kind == .ident) {
-                const sym = fa.expr.kind.ident;
-                if (self.locals.get(sym)) |local| {
-                    return self.genHashSetRemove(local.alloca, obj_type, val);
-                }
-            }
-            return error.UnsupportedExpr;
+            const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
+            return self.genHashSetRemove(recv_ptr, obj_type, val);
         }
     }
 
@@ -6954,9 +9005,23 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
 
                 // Coerce arguments.
                 const param_count: u32 = c.LLVMCountParams(fn_info.value);
+                const m_ref_params = self.fn_ref_params.get(fn_sym);
                 for (0..@min(total_args, param_count)) |i| {
                     const param_type = c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, @intCast(i)));
                     const arg_type = c.LLVMTypeOf(args_buf[i]);
+                    // Auto-referencing for non-self args in method calls.
+                    if (m_ref_params) |rp| {
+                        if (i < rp.len and rp[i]) {
+                            if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and
+                                c.LLVMGetTypeKind(arg_type) == c.LLVMStructTypeKind)
+                            {
+                                const tmp = c.LLVMBuildAlloca(self.builder, arg_type, "autoref");
+                                _ = c.LLVMBuildStore(self.builder, args_buf[i], tmp);
+                                args_buf[i] = tmp;
+                                continue;
+                            }
+                        }
+                    }
                     if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
                         args_buf[i] = self.extractStrPtr(args_buf[i]);
                     } else if (c.LLVMGetTypeKind(param_type) != c.LLVMPointerTypeKind or c.LLVMGetTypeKind(arg_type) != c.LLVMPointerTypeKind) {
@@ -6985,27 +9050,7 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
                 return self.monomorphizeCall(gen_fn, all_args[0 .. args.len + 1]);
             }
 
-            // Builder-style sugar for structs:
-            //   value.field(new_val)  -> { value with field: new_val }
-            //   value.build()         -> Some(value)
-            if (tn_sym != 0) {
-                if (self.struct_types.get(tn_sym)) |st| {
-                    if (std.mem.eql(u8, method_name, "build") and args.len == 0) {
-                        return self.buildOptionSome(obj_val);
-                    }
-                    if (args.len == 1) {
-                        if (self.findFieldIndex(st, fa.field)) |idx| {
-                            const alloca = c.LLVMBuildAlloca(self.builder, obj_type, "builder.set");
-                            _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
-                            const gep = c.LLVMBuildStructGEP2(self.builder, obj_type, alloca, @intCast(idx), "");
-                            const field_val = try self.genExpr(args[0]);
-                            const coerced = self.coerceInt(field_val, st.field_types[idx]);
-                            _ = c.LLVMBuildStore(self.builder, coerced, gep);
-                            return c.LLVMBuildLoad2(self.builder, obj_type, alloca, "builder.updated");
-                        }
-                    }
-                }
-            }
+            _ = tn_sym;
         }
     }
 
@@ -7014,6 +9059,11 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
     if (fa.expr.kind == .ident) {
         const ident_sym = fa.expr.kind.ident;
         if (self.trait_locals.get(ident_sym)) |trait_sym| {
+            if (self.trait_local_concrete_types.get(ident_sym)) |concrete_sym| {
+                if (try self.genKnownConcreteDispatch(obj_val, concrete_sym, fa.field, args)) |direct| {
+                    return direct;
+                }
+            }
             return self.genDynDispatch(obj_val, trait_sym, fa.field, args);
         }
     }
@@ -7144,14 +9194,23 @@ fn genPipeline(self: *Codegen, p: Ast.PipelineExpr) Error!c.LLVMValueRef {
 fn genReturn(self: *Codegen, ret_val: ?*const Ast.Expr) Error!c.LLVMValueRef {
     const ret_type = self.current_ret_type;
     const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+    self.current_fn_saw_explicit_return = true;
 
     if (ret_val) |val| {
         const v = try self.genExpr(val);
-        const coerced = self.coerceInt(v, ret_type);
+        const out_val = blk: {
+            if (self.current_fn_returns_result) {
+                const v_type = c.LLVMTypeOf(v);
+                if (v_type == ret_type) break :blk v;
+                if (self.isResultType(v_type)) return error.UnsupportedExpr;
+                break :blk try self.buildResultOk(v, ret_type);
+            }
+            break :blk self.coerceInt(v, ret_type);
+        };
         // Emit drops and deferred expressions before return.
         try self.emitDrops(0);
         try self.emitDefers();
-        _ = c.LLVMBuildRet(self.builder, coerced);
+        _ = c.LLVMBuildRet(self.builder, out_val);
     } else if (is_void) {
         try self.emitDrops(0);
         try self.emitDefers();
@@ -7163,7 +9222,9 @@ fn genReturn(self: *Codegen, ret_val: ?*const Ast.Expr) Error!c.LLVMValueRef {
     }
 
     // Create a dead basic block so LLVM has a valid insertion point for any
-    // code that follows the return in the same block.
+    // code that follows the return in the same source block. Intentionally do
+    // not terminate this block here; later codegen may emit additional
+    // instructions/terminators into it for other syntactic paths.
     const dead_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "ret.dead");
     c.LLVMPositionBuilderAtEnd(self.builder, dead_bb);
 
@@ -7178,6 +9239,7 @@ fn genAssign(self: *Codegen, assign: Ast.AssignExpr) Error!c.LLVMValueRef {
             const val = try self.genExpr(assign.value);
             const coerced = self.coerceInt(val, info.ty);
             _ = c.LLVMBuildStore(self.builder, coerced, info.alloca);
+            _ = self.trait_local_concrete_types.remove(sym);
         },
         .field_access => |fa| {
             // p.x = expr → GEP into the local's alloca + store
@@ -7316,36 +9378,49 @@ fn genLoop(self: *Codegen, body: *const Ast.Expr) Error!c.LLVMValueRef {
 }
 
 fn genFor(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
-    // Check if the iterable is a range expression or an array.
+    // Ranges iterate directly.
     if (for_e.iterable.kind == .range) {
         return self.genForRange(for_e);
     }
-    // Check if iterable is a slice variable.
+
+    // Slices iterate directly.
     if (for_e.iterable.kind == .ident) {
         if (self.slice_elem_types.get(for_e.iterable.kind.ident)) |_| {
             return self.genForSlice(for_e);
         }
     }
-    // Check if iterable is a struct with a next() method (custom iterator).
+
+    // Existing local iterator variable with next().
     if (for_e.iterable.kind == .ident) {
         if (self.locals.get(for_e.iterable.kind.ident)) |local| {
-            if (c.LLVMGetTypeKind(local.ty) == c.LLVMStructTypeKind) {
-                if (self.findNextMethod(local.ty)) |_| {
-                    return self.genForIterator(for_e);
-                }
+            if (self.findNextMethod(local.ty) != null) {
+                return self.genForIterator(for_e);
             }
         }
     }
-    // Check if iterable evaluates to a Vec type.
-    {
-        const iter_val = self.genExpr(for_e.iterable) catch null;
-        if (iter_val) |iv| {
-            if (self.isVecType(c.LLVMTypeOf(iv))) {
-                return self.genForVec(for_e, iv);
-            }
+
+    // Evaluate once for protocol lowering.
+    const iterable_val = try self.genExpr(for_e.iterable);
+    const iterable_ty = c.LLVMTypeOf(iterable_val);
+
+    // Built-in Vec fast path.
+    if (self.isVecType(iterable_ty)) {
+        return self.genForVec(for_e, iterable_val);
+    }
+
+    // Iterator protocol: if expression already has next(), use as-is.
+    if (self.findNextMethod(iterable_ty) != null) {
+        return self.genForIteratorValue(for_e, iterable_val);
+    }
+
+    // Iterator protocol: otherwise, auto-insert .iter() when available.
+    if (self.callMethodNoArgs(iterable_val, iterable_ty, "iter")) |iter_obj| {
+        if (self.findNextMethod(c.LLVMTypeOf(iter_obj)) != null) {
+            return self.genForIteratorValue(for_e, iter_obj);
         }
     }
-    // Otherwise, try to generate as an array iteration.
+
+    // Fall back to array iteration.
     return self.genForArray(for_e);
 }
 
@@ -7363,11 +9438,13 @@ fn genForRange(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
     const alloca = c.LLVMBuildAlloca(self.builder, iter_type, "");
     _ = c.LLVMBuildStore(self.builder, coerced_start, alloca);
 
-    self.locals.put(self.allocator, for_e.binding, .{
-        .alloca = alloca,
-        .ty = iter_type,
-        .is_mut = false,
-    }) catch return error.CodegenAlloc;
+    if (for_e.binding_pattern == null) {
+        self.locals.put(self.allocator, for_e.binding, .{
+            .alloca = alloca,
+            .ty = iter_type,
+            .is_mut = false,
+        }) catch return error.CodegenAlloc;
+    }
 
     const function = self.current_function;
     const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.cond");
@@ -7392,6 +9469,10 @@ fn genForRange(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
 
     // Body.
     c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    if (for_e.binding_pattern) |bp| {
+        const cur_val = c.LLVMBuildLoad2(self.builder, iter_type, alloca, "for.cur");
+        try self.bindPatternFromValue(bp, cur_val, iter_type, false);
+    }
     _ = try self.genExpr(for_e.body);
     const body_end_bb = c.LLVMGetInsertBlock(self.builder);
     if (c.LLVMGetBasicBlockTerminator(body_end_bb) == null) {
@@ -7436,11 +9517,13 @@ fn genForArray(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
     // Create element variable for the binding.
     const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
 
-    self.locals.put(self.allocator, for_e.binding, .{
-        .alloca = elem_alloca,
-        .ty = elem_type,
-        .is_mut = false,
-    }) catch return error.CodegenAlloc;
+    if (for_e.binding_pattern == null) {
+        self.locals.put(self.allocator, for_e.binding, .{
+            .alloca = elem_alloca,
+            .ty = elem_type,
+            .is_mut = false,
+        }) catch return error.CodegenAlloc;
+    }
 
     // If there's an index binding (for x, i in arr), expose the index as a local.
     if (for_e.index_binding) |idx_sym| {
@@ -7476,6 +9559,9 @@ fn genForArray(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
     const elem_ptr = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &indices, 2, "elem.ptr");
     const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "elem");
     _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
+    if (for_e.binding_pattern) |bp| {
+        try self.bindPatternFromValue(bp, elem_val, elem_type, false);
+    }
 
     _ = try self.genExpr(for_e.body);
     const body_end_bb = c.LLVMGetInsertBlock(self.builder);
@@ -7516,11 +9602,13 @@ fn genForVec(self: *Codegen, for_e: Ast.ForExpr, vec_val: c.LLVMValueRef) Error!
     _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), idx_alloca);
     const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
 
-    self.locals.put(self.allocator, for_e.binding, .{
-        .alloca = elem_alloca,
-        .ty = elem_type,
-        .is_mut = false,
-    }) catch return error.CodegenAlloc;
+    if (for_e.binding_pattern == null) {
+        self.locals.put(self.allocator, for_e.binding, .{
+            .alloca = elem_alloca,
+            .ty = elem_type,
+            .is_mut = false,
+        }) catch return error.CodegenAlloc;
+    }
 
     // If there's an index binding (for x, i in vec), expose the index as a local.
     if (for_e.index_binding) |idx_sym| {
@@ -7555,6 +9643,9 @@ fn genForVec(self: *Codegen, for_e: Ast.ForExpr, vec_val: c.LLVMValueRef) Error!
     const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, data_ptr, &gep_idx, 1, "elem.ptr");
     const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "elem");
     _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
+    if (for_e.binding_pattern) |bp| {
+        try self.bindPatternFromValue(bp, elem_val, elem_type, false);
+    }
 
     _ = try self.genExpr(for_e.body);
     const body_end = c.LLVMGetInsertBlock(self.builder);
@@ -7591,11 +9682,13 @@ fn genForSlice(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
 
     // Create element variable for the binding.
     const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
-    self.locals.put(self.allocator, for_e.binding, .{
-        .alloca = elem_alloca,
-        .ty = elem_type,
-        .is_mut = false,
-    }) catch return error.CodegenAlloc;
+    if (for_e.binding_pattern == null) {
+        self.locals.put(self.allocator, for_e.binding, .{
+            .alloca = elem_alloca,
+            .ty = elem_type,
+            .is_mut = false,
+        }) catch return error.CodegenAlloc;
+    }
 
     const function = self.current_function;
     const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "for.cond");
@@ -7621,6 +9714,9 @@ fn genForSlice(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
     const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, slice_ptr, &gep_indices, 1, "elem.ptr");
     const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "elem");
     _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
+    if (for_e.binding_pattern) |bp| {
+        try self.bindPatternFromValue(bp, elem_val, elem_type, false);
+    }
 
     _ = try self.genExpr(for_e.body);
     const body_end_bb = c.LLVMGetInsertBlock(self.builder);
@@ -7641,9 +9737,19 @@ fn genForSlice(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
-/// Find the `Type.next` method for a struct type. Returns the FnInfo if found.
-fn findNextMethod(self: *Codegen, struct_type: c.LLVMTypeRef) ?FnInfo {
-    // Look up the struct type name.
+fn normalizeReceiverStructType(self: *Codegen, receiver_type: c.LLVMTypeRef) ?c.LLVMTypeRef {
+    _ = self;
+    if (c.LLVMGetTypeKind(receiver_type) == c.LLVMStructTypeKind) return receiver_type;
+    if (c.LLVMGetTypeKind(receiver_type) == c.LLVMPointerTypeKind) {
+        const elem = c.LLVMGetElementType(receiver_type);
+        if (c.LLVMGetTypeKind(elem) == c.LLVMStructTypeKind) return elem;
+    }
+    return null;
+}
+
+fn findMethod(self: *Codegen, receiver_type: c.LLVMTypeRef, method_name: []const u8) ?FnInfo {
+    const struct_type = self.normalizeReceiverStructType(receiver_type) orelse return null;
+
     var type_sym: ?u32 = null;
     var it = self.struct_types.iterator();
     while (it.next()) |entry| {
@@ -7654,22 +9760,88 @@ fn findNextMethod(self: *Codegen, struct_type: c.LLVMTypeRef) ?FnInfo {
     }
     const ts = type_sym orelse return null;
     const type_name = self.pool.resolve(ts);
-    // Build "Type.next" method name.
+
     var name_buf: [256]u8 = undefined;
-    if (type_name.len + 5 >= name_buf.len) return null;
+    if (type_name.len + 1 + method_name.len >= name_buf.len) return null;
     @memcpy(name_buf[0..type_name.len], type_name);
-    @memcpy(name_buf[type_name.len .. type_name.len + 5], ".next");
-    const method_name = name_buf[0 .. type_name.len + 5];
-    const method_sym = self.pool.intern(method_name) catch return null;
+    name_buf[type_name.len] = '.';
+    @memcpy(name_buf[type_name.len + 1 .. type_name.len + 1 + method_name.len], method_name);
+    const mangled = name_buf[0 .. type_name.len + 1 + method_name.len];
+    const method_sym = self.pool.intern(mangled) catch return null;
     return self.functions.get(method_sym);
 }
 
-/// Generate a for-in loop over a custom iterator with a next() method.
-/// Desugars to: loop { match iter.next() { Some(x) -> body, None -> break } }
-fn genForIterator(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
-    const iter_sym = for_e.iterable.kind.ident;
-    const local = self.locals.get(iter_sym) orelse return error.UnsupportedExpr;
-    const fn_info = self.findNextMethod(local.ty) orelse return error.UnsupportedExpr;
+/// Find the `Type.next` method for a struct receiver.
+fn findNextMethod(self: *Codegen, receiver_type: c.LLVMTypeRef) ?FnInfo {
+    return self.findMethod(receiver_type, "next");
+}
+
+/// Invoke an instance method with no explicit arguments (`obj.method()`).
+/// Returns `null` when no matching method exists.
+fn callMethodNoArgs(
+    self: *Codegen,
+    obj_val: c.LLVMValueRef,
+    obj_type: c.LLVMTypeRef,
+    method_name: []const u8,
+) ?c.LLVMValueRef {
+    const fn_info = self.findMethod(obj_type, method_name) orelse return null;
+    const param_count: u32 = c.LLVMCountParams(fn_info.value);
+
+    var call_args: [1]c.LLVMValueRef = undefined;
+    var arg_count: u32 = 0;
+
+    if (param_count > 0) {
+        const self_param_type = c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, 0));
+        const self_param_kind = c.LLVMGetTypeKind(self_param_type);
+        const obj_kind = c.LLVMGetTypeKind(obj_type);
+
+        var self_arg = obj_val;
+        if (self_param_kind == c.LLVMPointerTypeKind) {
+            if (obj_kind == c.LLVMPointerTypeKind) {
+                if (self_param_type != obj_type) {
+                    self_arg = c.LLVMBuildBitCast(self.builder, obj_val, self_param_type, "for.self.cast");
+                }
+            } else {
+                const tmp = c.LLVMBuildAlloca(self.builder, obj_type, "for.self.addr");
+                _ = c.LLVMBuildStore(self.builder, obj_val, tmp);
+                self_arg = if (self_param_type == c.LLVMTypeOf(tmp))
+                    tmp
+                else
+                    c.LLVMBuildBitCast(self.builder, tmp, self_param_type, "for.self.cast");
+            }
+        } else {
+            if (obj_kind == c.LLVMPointerTypeKind and c.LLVMGetTypeKind(c.LLVMGetElementType(obj_type)) == c.LLVMStructTypeKind) {
+                const pointee = c.LLVMGetElementType(obj_type);
+                self_arg = c.LLVMBuildLoad2(self.builder, pointee, obj_val, "for.self.load");
+            }
+            self_arg = self.coerceInt(self_arg, self_param_type);
+        }
+
+        call_args[0] = self_arg;
+        arg_count = 1;
+    }
+
+    const ret_type = c.LLVMGetReturnType(fn_info.fn_type);
+    const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+    return c.LLVMBuildCall2(
+        self.builder,
+        fn_info.fn_type,
+        fn_info.value,
+        if (arg_count == 0) null else &call_args,
+        arg_count,
+        if (is_void) "" else "for.mcall",
+    );
+}
+
+/// Generate a for-in loop over iterator storage (`iter_ptr` points to iterator state).
+fn genForIteratorFromPtr(
+    self: *Codegen,
+    for_e: Ast.ForExpr,
+    iter_ptr: c.LLVMValueRef,
+    iter_type: c.LLVMTypeRef,
+) Error!c.LLVMValueRef {
+    const fn_info = self.findNextMethod(iter_type) orelse return error.UnsupportedExpr;
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
 
     const function = self.current_function;
     const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "iter.cond");
@@ -7681,48 +9853,69 @@ fn genForIterator(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
     self.loop_depth += 1;
 
     _ = c.LLVMBuildBr(self.builder, cond_bb);
-
-    // Condition block: call next(), check tag.
     c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
 
-    // Pass pointer to iterator (self param) if the method takes a pointer, otherwise pass by value.
-    // Most iterator next() methods take *mut self, so pass pointer.
-    var args_buf = [_]c.LLVMValueRef{local.alloca};
-    const result = c.LLVMBuildCall2(self.builder, fn_info.fn_type, fn_info.value, &args_buf, 1, "next.result");
+    var call_args: [1]c.LLVMValueRef = undefined;
+    var arg_count: u32 = 0;
+    if (c.LLVMCountParams(fn_info.value) > 0) {
+        const self_param_type = c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, 0));
+        var self_arg = iter_ptr;
+        if (c.LLVMGetTypeKind(self_param_type) == c.LLVMPointerTypeKind) {
+            if (c.LLVMTypeOf(iter_ptr) != self_param_type) {
+                self_arg = c.LLVMBuildBitCast(self.builder, iter_ptr, self_param_type, "iter.self.cast");
+            }
+        } else {
+            self_arg = c.LLVMBuildLoad2(self.builder, iter_type, iter_ptr, "iter.self");
+            self_arg = self.coerceInt(self_arg, self_param_type);
+        }
+        call_args[0] = self_arg;
+        arg_count = 1;
+    }
+
+    const result = c.LLVMBuildCall2(
+        self.builder,
+        fn_info.fn_type,
+        fn_info.value,
+        if (arg_count == 0) null else &call_args,
+        arg_count,
+        "next.result",
+    );
     const result_type = c.LLVMTypeOf(result);
 
-    // Extract tag (field 0).
+    var elem_type_opt: ?c.LLVMTypeRef = null;
+    var opt_it = self.option_type_cache.iterator();
+    while (opt_it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == result_type) {
+            elem_type_opt = entry.value_ptr.payload_type;
+            break;
+        }
+    }
+    const elem_type = elem_type_opt orelse return error.UnsupportedExpr;
+
+    // Option layout: tag == 0 -> Some(payload), tag == 1 -> None.
     const tag = c.LLVMBuildExtractValue(self.builder, result, 0, "tag");
-    const is_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0), "is.some");
+    const is_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is.some");
     _ = c.LLVMBuildCondBr(self.builder, is_some, body_bb, end_bb);
 
-    // Body block: extract payload and bind to loop variable.
     c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
     const result_alloca = c.LLVMBuildAlloca(self.builder, result_type, "next.tmp");
     _ = c.LLVMBuildStore(self.builder, result, result_alloca);
     const payload_gep = c.LLVMBuildStructGEP2(self.builder, result_type, result_alloca, 1, "payload.ptr");
-    // Determine the payload type from the Option type's payload.
     const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
-
-    // Try to find the payload type from option_type_cache.
-    var elem_type: c.LLVMTypeRef = c.LLVMInt32TypeInContext(self.context); // default
-    var opt_it = self.option_type_cache.iterator();
-    while (opt_it.next()) |entry| {
-        if (entry.value_ptr.llvm_type == result_type) {
-            elem_type = entry.value_ptr.payload_type;
-            break;
-        }
-    }
-
     const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, payload_ptr, "iter.elem");
+
     const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
     _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
-
-    self.locals.put(self.allocator, for_e.binding, .{
-        .alloca = elem_alloca,
-        .ty = elem_type,
-        .is_mut = false,
-    }) catch return error.CodegenAlloc;
+    if (for_e.binding_pattern == null) {
+        self.locals.put(self.allocator, for_e.binding, .{
+            .alloca = elem_alloca,
+            .ty = elem_type,
+            .is_mut = false,
+        }) catch return error.CodegenAlloc;
+    }
+    if (for_e.binding_pattern) |bp| {
+        try self.bindPatternFromValue(bp, elem_val, elem_type, false);
+    }
 
     _ = try self.genExpr(for_e.body);
     const body_end_bb = c.LLVMGetInsertBlock(self.builder);
@@ -7733,6 +9926,27 @@ fn genForIterator(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
     self.loop_depth -= 1;
     c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+/// Generate a for-in loop over an iterator value expression.
+fn genForIteratorValue(self: *Codegen, for_e: Ast.ForExpr, iter_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const iter_val_type = c.LLVMTypeOf(iter_val);
+    const iter_struct_type = self.normalizeReceiverStructType(iter_val_type) orelse return error.UnsupportedExpr;
+
+    if (c.LLVMGetTypeKind(iter_val_type) == c.LLVMPointerTypeKind) {
+        return self.genForIteratorFromPtr(for_e, iter_val, iter_struct_type);
+    }
+
+    const iter_alloca = c.LLVMBuildAlloca(self.builder, iter_val_type, "for.iter");
+    _ = c.LLVMBuildStore(self.builder, iter_val, iter_alloca);
+    return self.genForIteratorFromPtr(for_e, iter_alloca, iter_val_type);
+}
+
+/// Generate a for-in loop over a named local iterator.
+fn genForIterator(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
+    const iter_sym = for_e.iterable.kind.ident;
+    const local = self.locals.get(iter_sym) orelse return error.UnsupportedExpr;
+    return self.genForIteratorFromPtr(for_e, local.alloca, local.ty);
 }
 
 fn emitDefers(self: *Codegen) Error!void {
@@ -7752,34 +9966,87 @@ fn genWithExpr(self: *Codegen, w: Ast.WithExpr) Error!c.LLVMValueRef {
     const source_val = try self.genExpr(w.source);
     const source_type = c.LLVMTypeOf(source_val);
 
-    // Create a local binding.
-    const alloca = c.LLVMBuildAlloca(self.builder, source_type, "with");
-    _ = c.LLVMBuildStore(self.builder, source_val, alloca);
-    self.locals.put(self.allocator, w.name, .{
-        .alloca = alloca,
-        .ty = source_type,
-        .is_mut = w.is_mut,
-    }) catch return error.CodegenAlloc;
+    // Always materialize the source value so guards live for the full with-scope.
+    const guard_alloca = c.LLVMBuildAlloca(self.builder, source_type, "with.guard");
+    _ = c.LLVMBuildStore(self.builder, source_val, guard_alloca);
 
-    // Track for Drop.
+    // Track guard for Drop.
     if (self.scope_local_count < self.scope_locals.len) {
         self.scope_locals[self.scope_local_count] = .{
             .sym = w.name,
-            .alloca = alloca,
+            .alloca = guard_alloca,
             .ty = source_type,
         };
         self.scope_local_count += 1;
     }
 
+    // Form 1 guarded lowering:
+    // if Type.enter/enter_mut exists, bind `name` to that method's result.
+    var bind_alloca = guard_alloca;
+    var bind_type = source_type;
+    var used_guard_enter = false;
+    if (self.findTypeSymbol(source_type)) |type_sym| {
+        const type_name = self.pool.resolve(type_sym);
+        const method_name = if (w.is_mut) "enter_mut" else "enter";
+        var name_buf: [512]u8 = undefined;
+        if (type_name.len + 1 + method_name.len < name_buf.len) {
+            @memcpy(name_buf[0..type_name.len], type_name);
+            name_buf[type_name.len] = '.';
+            @memcpy(name_buf[type_name.len + 1 ..][0..method_name.len], method_name);
+            const mangled = name_buf[0 .. type_name.len + 1 + method_name.len];
+            const method_sym = self.pool.intern(mangled) catch 0;
+            if (method_sym != 0) {
+                if (self.functions.get(method_sym)) |fn_info| {
+                    const self_arg = c.LLVMBuildLoad2(self.builder, source_type, guard_alloca, "with.guard.val");
+                    var args_buf = [_]c.LLVMValueRef{self_arg};
+                    const ret_type = c.LLVMGetReturnType(fn_info.fn_type);
+                    const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
+                    const entered = c.LLVMBuildCall2(
+                        self.builder,
+                        fn_info.fn_type,
+                        fn_info.value,
+                        &args_buf,
+                        1,
+                        if (is_void) "" else "with.enter",
+                    );
+                    if (!is_void) {
+                        bind_alloca = c.LLVMBuildAlloca(self.builder, ret_type, "with.bind");
+                        _ = c.LLVMBuildStore(self.builder, entered, bind_alloca);
+                        bind_type = ret_type;
+                        used_guard_enter = true;
+
+                        // Track bound entered value for Drop independently.
+                        if (self.scope_local_count < self.scope_locals.len) {
+                            self.scope_locals[self.scope_local_count] = .{
+                                .sym = w.name,
+                                .alloca = bind_alloca,
+                                .ty = bind_type,
+                            };
+                            self.scope_local_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Create the visible local binding.
+    self.locals.put(self.allocator, w.name, .{
+        .alloca = bind_alloca,
+        .ty = bind_type,
+        .is_mut = w.is_mut,
+    }) catch return error.CodegenAlloc;
+
     // Generate the body.
     const body_val = try self.genExpr(w.body);
 
-    // Form 2 (builder): if mut and body returns void, return the binding value.
-    if (w.is_mut) {
+    // Form 2 (builder fallback): if mut and body returns void, return binding value.
+    // Guarded Form 1 (`enter_mut`) always returns the body value directly.
+    if (w.is_mut and !used_guard_enter) {
         const body_type = c.LLVMTypeOf(body_val);
         if (body_type == c.LLVMVoidTypeInContext(self.context)) {
             // Body was void (assignments, etc.) → return the builder value.
-            return c.LLVMBuildLoad2(self.builder, source_type, alloca, "with.val");
+            return c.LLVMBuildLoad2(self.builder, bind_type, bind_alloca, "with.val");
         }
     }
 
@@ -7886,6 +10153,234 @@ fn declareStructType(self: *Codegen, name_sym: u32, fields: []const Ast.FieldDef
         .field_types = field_types,
         .field_defaults = field_defaults,
     }) catch return error.CodegenAlloc;
+}
+
+fn llvmTypeSupportsDeriveEq(self: *Codegen, ty: c.LLVMTypeRef) bool {
+    const kind = c.LLVMGetTypeKind(ty);
+    return switch (kind) {
+        c.LLVMIntegerTypeKind, c.LLVMFloatTypeKind, c.LLVMDoubleTypeKind, c.LLVMPointerTypeKind => true,
+        c.LLVMStructTypeKind => blk: {
+            if (self.isStrType(ty)) break :blk true;
+            if (self.findTypeSymbol(ty)) |nested_sym| {
+                const nested_name = self.pool.resolve(nested_sym);
+                var buf: [512]u8 = undefined;
+                if (nested_name.len + 3 >= buf.len) break :blk false;
+                @memcpy(buf[0..nested_name.len], nested_name);
+                buf[nested_name.len] = '.';
+                @memcpy(buf[nested_name.len + 1 ..][0..2], "eq");
+                const sym = self.pool.intern(buf[0 .. nested_name.len + 3]) catch break :blk false;
+                break :blk self.functions.get(sym) != null;
+            }
+            break :blk false;
+        },
+        else => false,
+    };
+}
+
+fn llvmTypeSupportsDeriveClone(self: *Codegen, ty: c.LLVMTypeRef) bool {
+    const kind = c.LLVMGetTypeKind(ty);
+    return switch (kind) {
+        c.LLVMIntegerTypeKind, c.LLVMFloatTypeKind, c.LLVMDoubleTypeKind, c.LLVMPointerTypeKind => true,
+        c.LLVMStructTypeKind => self.isStrType(ty),
+        else => false,
+    };
+}
+
+fn registerBuilderDerive(self: *Codegen, td: Ast.TypeDecl, st: StructTypeInfo) Error!void {
+    if (self.derive_builder_types.get(td.name) != null) return;
+
+    const type_name = self.pool.resolve(td.name);
+    var name_buf: [512]u8 = undefined;
+    const builder_name = std.fmt.bufPrintZ(&name_buf, "__with.Builder.{s}", .{type_name}) catch return error.CodegenAlloc;
+    const builder_ty = c.LLVMStructCreateNamed(self.context, builder_name);
+
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var body = [_]c.LLVMTypeRef{ st.llvm_type, i64_type };
+    c.LLVMStructSetBody(builder_ty, &body, 2, 0);
+
+    var required_mask: u64 = 0;
+    var default_mask: u64 = 0;
+    for (st.field_names, 0..) |_, i| {
+        if (i >= 64) continue;
+        const bit: u64 = (@as(u64, 1) << @intCast(i));
+        if (st.field_defaults[i] != null) {
+            default_mask |= bit;
+        } else {
+            required_mask |= bit;
+        }
+    }
+
+    self.derive_builder_types.put(self.allocator, td.name, .{
+        .llvm_type = builder_ty,
+        .required_mask = required_mask,
+        .default_mask = default_mask,
+    }) catch return error.CodegenAlloc;
+    self.builder_owner_by_type.put(self.allocator, @intFromPtr(builder_ty), td.name) catch
+        return error.CodegenAlloc;
+}
+
+/// Generate derived trait methods for a struct with @[derive(...)].
+fn generateDerivedMethods(self: *Codegen, td: Ast.TypeDecl) Error!void {
+    const st = self.struct_types.get(td.name) orelse return;
+    const type_name = self.pool.resolve(td.name);
+
+    // Check what traits to derive.
+    var derive_eq = false;
+    var derive_clone = false;
+    var derive_builder = false;
+    for (td.derive_traits) |trait_sym| {
+        const trait_name = self.pool.resolve(trait_sym);
+        if (std.mem.eql(u8, trait_name, "Eq") or std.mem.eql(u8, trait_name, "PartialEq")) {
+            derive_eq = true;
+        } else if (std.mem.eql(u8, trait_name, "Clone")) {
+            derive_clone = true;
+        } else if (std.mem.eql(u8, trait_name, "Builder")) {
+            derive_builder = true;
+        } else if (std.mem.eql(u8, trait_name, "all")) {
+            var can_eq = true;
+            var can_clone = true;
+            for (st.field_types) |ft| {
+                if (!self.llvmTypeSupportsDeriveEq(ft)) can_eq = false;
+                if (!self.llvmTypeSupportsDeriveClone(ft)) can_clone = false;
+            }
+            derive_eq = derive_eq or can_eq;
+            derive_clone = derive_clone or can_clone;
+        }
+    }
+
+    // Generate Type.eq(self, other) -> bool
+    if (derive_eq) {
+        try self.generateDeriveEq(td.name, type_name, st);
+    }
+
+    // Generate Type.clone(self) -> Type
+    if (derive_clone) {
+        try self.generateDeriveClone(td.name, type_name, st);
+    }
+
+    // Register derived builder metadata for Type.builder()/builder chaining.
+    if (derive_builder) {
+        try self.registerBuilderDerive(td, st);
+    }
+}
+
+fn generateDeriveEq(self: *Codegen, type_sym: u32, type_name: []const u8, st: StructTypeInfo) Error!void {
+    // Build mangled name "Type.eq"
+    var name_buf: [512]u8 = undefined;
+    @memcpy(name_buf[0..type_name.len], type_name);
+    name_buf[type_name.len] = '.';
+    @memcpy(name_buf[type_name.len + 1 ..][0..2], "eq");
+    const mangled_len = type_name.len + 3;
+    const fn_sym = self.pool.intern(name_buf[0..mangled_len]) catch return error.CodegenAlloc;
+
+    // Skip if already implemented.
+    if (self.functions.get(fn_sym) != null) return;
+
+    // fn eq(self: Type, other: Type) -> bool
+    var param_types = [_]c.LLVMTypeRef{ st.llvm_type, st.llvm_type };
+    const bool_type = c.LLVMInt1TypeInContext(self.context);
+    const fn_type = c.LLVMFunctionType(bool_type, &param_types, 2, 0);
+
+    name_buf[mangled_len] = 0;
+    const function = c.LLVMAddFunction(self.module, @ptrCast(name_buf[0..mangled_len :0]), fn_type);
+
+    self.functions.put(self.allocator, fn_sym, .{
+        .value = function,
+        .fn_type = fn_type,
+    }) catch return error.CodegenAlloc;
+
+    // Generate body: compare all fields.
+    const saved_fn = self.current_function;
+    const saved_ret = self.current_ret_type;
+    self.current_function = function;
+    self.current_ret_type = bool_type;
+
+    const entry_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "entry");
+    c.LLVMPositionBuilderAtEnd(self.builder, entry_bb);
+
+    const self_val = c.LLVMGetParam(function, 0);
+    const other_val = c.LLVMGetParam(function, 1);
+
+    if (st.field_names.len == 0) {
+        // No fields — always equal.
+        _ = c.LLVMBuildRet(self.builder, c.LLVMConstInt(bool_type, 1, 0));
+    } else {
+        // Compare all fields with AND.
+        var result = c.LLVMConstInt(bool_type, 1, 0);
+        for (st.field_types, 0..) |ft, i| {
+            const field_a = c.LLVMBuildExtractValue(self.builder, self_val, @intCast(i), "a");
+            const field_b = c.LLVMBuildExtractValue(self.builder, other_val, @intCast(i), "b");
+            const field_eq = switch (c.LLVMGetTypeKind(ft)) {
+                c.LLVMIntegerTypeKind => c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, field_a, field_b, "eq"),
+                c.LLVMFloatTypeKind, c.LLVMDoubleTypeKind => c.LLVMBuildFCmp(self.builder, c.LLVMRealOEQ, field_a, field_b, "eq"),
+                c.LLVMStructTypeKind => blk: {
+                    // Nested struct — call its .eq method if available.
+                    if (self.findTypeSymbol(ft)) |nested_sym| {
+                        var nested_name_buf: [512]u8 = undefined;
+                        const nested_name = self.pool.resolve(nested_sym);
+                        @memcpy(nested_name_buf[0..nested_name.len], nested_name);
+                        nested_name_buf[nested_name.len] = '.';
+                        @memcpy(nested_name_buf[nested_name.len + 1 ..][0..2], "eq");
+                        const nested_fn_sym = self.pool.intern(nested_name_buf[0 .. nested_name.len + 3]) catch break :blk c.LLVMConstInt(bool_type, 1, 0);
+                        if (self.functions.get(nested_fn_sym)) |nested_fn| {
+                            var nested_args = [_]c.LLVMValueRef{ field_a, field_b };
+                            break :blk c.LLVMBuildCall2(self.builder, nested_fn.fn_type, nested_fn.value, &nested_args, 2, "nesteq");
+                        }
+                    }
+                    break :blk c.LLVMConstInt(bool_type, 1, 0);
+                },
+                else => c.LLVMConstInt(bool_type, 1, 0),
+            };
+            result = c.LLVMBuildAnd(self.builder, result, field_eq, "and");
+        }
+        _ = c.LLVMBuildRet(self.builder, result);
+    }
+
+    self.current_function = saved_fn;
+    self.current_ret_type = saved_ret;
+
+    // Register impl for this trait.
+    _ = type_sym;
+}
+
+fn generateDeriveClone(self: *Codegen, type_sym: u32, type_name: []const u8, st: StructTypeInfo) Error!void {
+    _ = type_sym;
+    // Build mangled name "Type.clone"
+    var name_buf: [512]u8 = undefined;
+    @memcpy(name_buf[0..type_name.len], type_name);
+    name_buf[type_name.len] = '.';
+    @memcpy(name_buf[type_name.len + 1 ..][0..5], "clone");
+    const mangled_len = type_name.len + 6;
+    const fn_sym = self.pool.intern(name_buf[0..mangled_len]) catch return error.CodegenAlloc;
+
+    // Skip if already implemented.
+    if (self.functions.get(fn_sym) != null) return;
+
+    // fn clone(self: Type) -> Type
+    var param_types = [_]c.LLVMTypeRef{st.llvm_type};
+    const fn_type = c.LLVMFunctionType(st.llvm_type, &param_types, 1, 0);
+
+    name_buf[mangled_len] = 0;
+    const function = c.LLVMAddFunction(self.module, @ptrCast(name_buf[0..mangled_len :0]), fn_type);
+
+    self.functions.put(self.allocator, fn_sym, .{
+        .value = function,
+        .fn_type = fn_type,
+    }) catch return error.CodegenAlloc;
+
+    // Generate body: just return self (bitwise copy).
+    const saved_fn = self.current_function;
+    const saved_ret = self.current_ret_type;
+    self.current_function = function;
+    self.current_ret_type = st.llvm_type;
+
+    const entry_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "entry");
+    c.LLVMPositionBuilderAtEnd(self.builder, entry_bb);
+
+    _ = c.LLVMBuildRet(self.builder, c.LLVMGetParam(function, 0));
+
+    self.current_function = saved_fn;
+    self.current_ret_type = saved_ret;
 }
 
 fn declareEnumType(self: *Codegen, name_sym: u32, variants: []const Ast.VariantDef) Error!void {
@@ -8101,6 +10596,18 @@ fn genEnumVariant(self: *Codegen, ev: Ast.EnumVariantExpr) Error!c.LLVMValueRef 
 fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
     const subject = try self.genExpr(m.subject);
     const subject_type = c.LLVMTypeOf(subject);
+
+    // Tuple-pattern match path.
+    var has_tuple_patterns = false;
+    for (m.arms) |arm| {
+        if (arm.pattern.kind == .tuple_pattern) {
+            has_tuple_patterns = true;
+            break;
+        }
+    }
+    if (has_tuple_patterns) {
+        return self.genTupleMatch(m, subject, subject_type);
+    }
 
     // Check if any arm uses slice patterns — use array/vec match path.
     var has_slice = false;
@@ -8423,10 +10930,29 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
         }
 
         const arm_val = try self.genExpr(arm.body);
-        arm_vals_buf[arm_count] = arm_val;
-        arm_from_bbs_buf[arm_count] = c.LLVMGetInsertBlock(self.builder);
-        arm_count += 1;
-        _ = c.LLVMBuildBr(self.builder, merge_bb);
+
+        // If the arm body diverges (break, continue, return), the builder is
+        // positioned in a dead block. Detect this by checking if the arm body
+        // produced a void undef (diverging expression marker) and the current
+        // block differs from the arm's entry block — indicating a branch was
+        // already emitted. We also check if the original arm BB is already
+        // terminated (has a br to break_bb/continue_bb/ret).
+        const cur_bb = c.LLVMGetInsertBlock(self.builder);
+        const arm_bb_terminated = c.LLVMGetBasicBlockTerminator(arm_bbs_buf[i]) != null;
+        const cur_bb_is_dead = cur_bb != arm_bbs_buf[i] and c.LLVMGetBasicBlockTerminator(cur_bb) == null;
+        const arm_val_is_void = c.LLVMTypeOf(arm_val) == c.LLVMVoidTypeInContext(self.context);
+        const arm_body_diverged = arm_val_is_void and arm_bb_terminated and cur_bb_is_dead;
+
+        if (arm_body_diverged) {
+            // Arm already branched away (break/return/continue). Add unreachable
+            // to the dead block and skip the phi contribution.
+            _ = c.LLVMBuildUnreachable(self.builder);
+        } else if (c.LLVMGetBasicBlockTerminator(cur_bb) == null) {
+            arm_vals_buf[arm_count] = arm_val;
+            arm_from_bbs_buf[arm_count] = cur_bb;
+            arm_count += 1;
+            _ = c.LLVMBuildBr(self.builder, merge_bb);
+        }
     }
 
     // If no wildcard and no range patterns, make default_bb unreachable.
@@ -8449,6 +10975,123 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
         return phi;
     }
 
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+}
+
+fn buildTuplePatternCond(self: *Codegen, pattern: Ast.Pattern, value_type: c.LLVMTypeRef, value_ptr: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const i1_type = c.LLVMInt1TypeInContext(self.context);
+    switch (pattern.kind) {
+        .wildcard, .binding => return c.LLVMConstInt(i1_type, 1, 0),
+        .at_binding => |ab| return self.buildTuplePatternCond(ab.pattern.*, value_type, value_ptr),
+        .or_pattern => |alts| {
+            if (alts.len == 0) return c.LLVMConstInt(i1_type, 0, 0);
+            var cond = c.LLVMConstInt(i1_type, 0, 0);
+            for (alts) |alt| {
+                const alt_cond = try self.buildTuplePatternCond(alt, value_type, value_ptr);
+                cond = c.LLVMBuildOr(self.builder, cond, alt_cond, "pat.or");
+            }
+            return cond;
+        },
+        .int_literal => |lit| {
+            if (c.LLVMGetTypeKind(value_type) != c.LLVMIntegerTypeKind) return c.LLVMConstInt(i1_type, 0, 0);
+            const value = c.LLVMBuildLoad2(self.builder, value_type, value_ptr, "pat.int");
+            const lit_val = c.LLVMConstInt(value_type, @bitCast(lit), 1);
+            return c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, value, lit_val, "pat.int.eq");
+        },
+        .bool_literal => |lit| {
+            if (c.LLVMGetTypeKind(value_type) != c.LLVMIntegerTypeKind) return c.LLVMConstInt(i1_type, 0, 0);
+            const value = c.LLVMBuildLoad2(self.builder, value_type, value_ptr, "pat.bool");
+            const lit_val = c.LLVMConstInt(value_type, @intFromBool(lit), 0);
+            return c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, value, lit_val, "pat.bool.eq");
+        },
+        .tuple_pattern => |elems| {
+            if (c.LLVMGetTypeKind(value_type) != c.LLVMStructTypeKind) return c.LLVMConstInt(i1_type, 0, 0);
+            const field_count: usize = @intCast(c.LLVMCountStructElementTypes(value_type));
+            if (elems.len != field_count) return c.LLVMConstInt(i1_type, 0, 0);
+
+            var cond = c.LLVMConstInt(i1_type, 1, 0);
+            const i32_type = c.LLVMInt32TypeInContext(self.context);
+            for (elems, 0..) |elem, i| {
+                const idx: u32 = @intCast(i);
+                const elem_type = c.LLVMStructGetTypeAtIndex(value_type, idx);
+                var indices = [_]c.LLVMValueRef{
+                    c.LLVMConstInt(i32_type, 0, 0),
+                    c.LLVMConstInt(i32_type, idx, 0),
+                };
+                const elem_ptr = c.LLVMBuildGEP2(self.builder, value_type, value_ptr, &indices, 2, "pat.tuple.gep");
+                const sub = try self.buildTuplePatternCond(elem, elem_type, elem_ptr);
+                cond = c.LLVMBuildAnd(self.builder, cond, sub, "pat.tuple.and");
+            }
+            return cond;
+        },
+        else => return c.LLVMConstInt(i1_type, 0, 0),
+    }
+}
+
+fn genTupleMatch(self: *Codegen, m: Ast.MatchExpr, subject: c.LLVMValueRef, subject_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "tuplematch.end");
+    const subj_alloca = c.LLVMBuildAlloca(self.builder, subject_type, "tuplematch.subj");
+    _ = c.LLVMBuildStore(self.builder, subject, subj_alloca);
+
+    var arm_vals_buf: [64]c.LLVMValueRef = undefined;
+    var arm_from_bbs_buf: [64]c.LLVMBasicBlockRef = undefined;
+    var arm_count: u32 = 0;
+
+    for (m.arms) |arm| {
+        const arm_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "tuplematch.arm");
+        const next_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "tuplematch.next");
+
+        switch (arm.pattern.kind) {
+            .wildcard, .binding => {
+                _ = c.LLVMBuildBr(self.builder, arm_bb);
+            },
+            else => {
+                const cond = try self.buildTuplePatternCond(arm.pattern, subject_type, subj_alloca);
+                _ = c.LLVMBuildCondBr(self.builder, cond, arm_bb, next_bb);
+            },
+        }
+
+        c.LLVMPositionBuilderAtEnd(self.builder, arm_bb);
+        try self.bindPatternFromPtr(arm.pattern, subject_type, subj_alloca, false);
+
+        if (arm.guard) |guard| {
+            const guard_val = try self.genExpr(guard);
+            const guard_cond = if (c.LLVMTypeOf(guard_val) == c.LLVMInt1TypeInContext(self.context))
+                guard_val
+            else
+                c.LLVMBuildICmp(self.builder, c.LLVMIntNE, guard_val, c.LLVMConstNull(c.LLVMTypeOf(guard_val)), "guard");
+            const guard_pass_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "tuplematch.guard");
+            _ = c.LLVMBuildCondBr(self.builder, guard_cond, guard_pass_bb, next_bb);
+            c.LLVMPositionBuilderAtEnd(self.builder, guard_pass_bb);
+        }
+
+        const arm_val = try self.genExpr(arm.body);
+        const arm_end = c.LLVMGetInsertBlock(self.builder);
+        if (c.LLVMGetBasicBlockTerminator(arm_end) == null) {
+            arm_vals_buf[arm_count] = arm_val;
+            arm_from_bbs_buf[arm_count] = arm_end;
+            arm_count += 1;
+            _ = c.LLVMBuildBr(self.builder, merge_bb);
+        }
+
+        c.LLVMPositionBuilderAtEnd(self.builder, next_bb);
+    }
+
+    const fallthrough = c.LLVMGetInsertBlock(self.builder);
+    if (c.LLVMGetBasicBlockTerminator(fallthrough) == null) {
+        _ = c.LLVMBuildUnreachable(self.builder);
+    }
+
+    c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
+    if (arm_count > 0) {
+        const result_type = c.LLVMTypeOf(arm_vals_buf[0]);
+        if (result_type == c.LLVMVoidTypeInContext(self.context)) {
+            return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
+        }
+        const phi = c.LLVMBuildPhi(self.builder, result_type, "tuplematch.result");
+        c.LLVMAddIncoming(phi, &arm_vals_buf, &arm_from_bbs_buf, arm_count);
+        return phi;
+    }
     return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
@@ -8545,6 +11188,37 @@ fn genSliceMatch(self: *Codegen, m: Ast.MatchExpr, subject: c.LLVMValueRef, subj
                         .ty = i64_type,
                         .is_mut = false,
                     }) catch return error.CodegenAlloc;
+                }
+
+                // Bind tail elements from the end: [.., a, b]
+                if (sp.tail.len > 0) {
+                    const tail_len_val = c.LLVMConstInt(i64_type, @intCast(sp.tail.len), 0);
+                    const tail_start = c.LLVMBuildSub(self.builder, arr_len, tail_len_val, "tail.start");
+                    for (sp.tail, 0..) |bind_sym, tail_i| {
+                        if (bind_sym == 0) continue; // wildcard _
+                        const off = c.LLVMConstInt(i64_type, @intCast(tail_i), 0);
+                        const elem_idx = c.LLVMBuildAdd(self.builder, tail_start, off, "tail.idx");
+                        const elem_val = if (is_fixed_arr) blk: {
+                            var indices = [_]c.LLVMValueRef{
+                                c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0),
+                                self.coerceInt(elem_idx, c.LLVMInt32TypeInContext(self.context)),
+                            };
+                            const gep = c.LLVMBuildGEP2(self.builder, subject_type, arr_ptr, &indices, 2, "tail.ptr");
+                            break :blk c.LLVMBuildLoad2(self.builder, elem_type, gep, "tail.elem");
+                        } else blk: {
+                            var vec_idx = [_]c.LLVMValueRef{elem_idx};
+                            const gep = c.LLVMBuildGEP2(self.builder, elem_type, arr_ptr, &vec_idx, 1, "tail.ptr");
+                            break :blk c.LLVMBuildLoad2(self.builder, elem_type, gep, "tail.elem");
+                        };
+
+                        const ba = c.LLVMBuildAlloca(self.builder, elem_type, "tail.bind");
+                        _ = c.LLVMBuildStore(self.builder, elem_val, ba);
+                        self.locals.put(self.allocator, bind_sym, .{
+                            .alloca = ba,
+                            .ty = elem_type,
+                            .is_mut = false,
+                        }) catch return error.CodegenAlloc;
+                    }
                 }
             },
             .wildcard => {
@@ -8709,9 +11383,25 @@ fn genStringMatch(self: *Codegen, m: Ast.MatchExpr, subject: c.LLVMValueRef, sub
 fn isResultType(self: *Codegen, ty: c.LLVMTypeRef) bool {
     var it = self.result_type_cache.iterator();
     while (it.next()) |entry| {
-        if (entry.value_ptr.llvm_type == ty) return true;
+        if (entry.value_ptr.llvm_type == ty or self.sameStructTypeName(entry.value_ptr.llvm_type, ty)) return true;
     }
     return false;
+}
+
+fn isOptionType(self: *Codegen, ty: c.LLVMTypeRef) bool {
+    var it = self.option_type_cache.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.llvm_type == ty or self.sameStructTypeName(entry.value_ptr.llvm_type, ty)) return true;
+    }
+    return false;
+}
+
+fn sameStructTypeName(_: *Codegen, lhs: c.LLVMTypeRef, rhs: c.LLVMTypeRef) bool {
+    if (c.LLVMGetTypeKind(lhs) != c.LLVMStructTypeKind or c.LLVMGetTypeKind(rhs) != c.LLVMStructTypeKind) return false;
+    const lhs_name = c.LLVMGetStructName(lhs);
+    const rhs_name = c.LLVMGetStructName(rhs);
+    if (lhs_name == null or rhs_name == null) return false;
+    return std.mem.eql(u8, std.mem.span(lhs_name), std.mem.span(rhs_name));
 }
 
 fn addMatchCase(self: *Codegen, sw: c.LLVMValueRef, pattern: Ast.Pattern, tag_val: c.LLVMValueRef, target_bb: c.LLVMBasicBlockRef, enum_info: ?EnumTypeInfo) void {
@@ -8744,6 +11434,7 @@ fn addMatchCase(self: *Codegen, sw: c.LLVMValueRef, pattern: Ast.Pattern, tag_va
             // Dispatch to inner pattern for case matching.
             self.addMatchCase(sw, ab.pattern.*, tag_val, target_bb, enum_info);
         },
+        .tuple_pattern => {},
         .range_pattern => {
             // Range patterns handled separately with comparison chains, not switch cases.
         },
@@ -8768,6 +11459,7 @@ fn getPatternTag(pattern: Ast.Pattern, enum_info: ?EnumTypeInfo) ?i64 {
         .int_literal => |val| val,
         .bool_literal => |val| @intFromBool(val),
         .at_binding => |ab| getPatternTag(ab.pattern.*, enum_info),
+        .tuple_pattern => null,
         else => null,
     };
 }
@@ -8800,147 +11492,217 @@ fn genArrayLiteral(self: *Codegen, elems: []const *const Ast.Expr) Error!c.LLVMV
 }
 
 fn genArrayComprehension(self: *Codegen, comp: Ast.ArrayComprehension) Error!c.LLVMValueRef {
-    // Currently only supports range-based comprehensions: [expr for x in start..end]
-    if (comp.iterable.kind != .range) return error.UnsupportedExpr;
-    const range = comp.iterable.kind.range;
+    const ClauseInfo = struct {
+        binding: u32,
+        iter_type: c.LLVMTypeRef,
+        start_val: c.LLVMValueRef, // constant of iter_type
+        len: u64,
+        stride: u64,
+        alloca: c.LLVMValueRef,
+        old_local: ?LocalInfo,
+    };
 
-    // Evaluate range bounds.
-    const i32_type = c.LLVMInt32TypeInContext(self.context);
-    const start_val = if (range.start) |s| try self.genExpr(s) else c.LLVMConstInt(i32_type, 0, 0);
-    const end_val = if (range.end) |e| try self.genExpr(e) else return error.UnsupportedExpr;
+    var one_clause = [_]Ast.ComprehensionClause{.{
+        .binding = comp.binding,
+        .iterable = comp.iterable,
+    }};
+    const clauses = if (comp.clauses) |cs| cs else one_clause[0..];
+    if (clauses.len == 0) return error.UnsupportedExpr;
 
-    // Compute array size = end - start (or end - start + 1 for inclusive).
-    const iter_type = c.LLVMTypeOf(end_val);
-    const coerced_start = self.coerceInt(start_val, iter_type);
-    var size_val = c.LLVMBuildSub(self.builder, end_val, coerced_start, "comp.size");
-    if (range.inclusive) {
-        size_val = c.LLVMBuildAdd(self.builder, size_val, c.LLVMConstInt(iter_type, 1, 0), "comp.size.inc");
-    }
+    var infos: std.ArrayList(ClauseInfo) = .empty;
+    defer infos.deinit(self.allocator);
+    infos.ensureTotalCapacity(self.allocator, clauses.len) catch return error.CodegenAlloc;
 
-    // For fixed-size arrays, we need constant bounds. Try to evaluate.
-    // If bounds are constants, create a fixed-size array.
-    const start_const = c.LLVMIsConstant(coerced_start);
-    const end_const = c.LLVMIsConstant(end_val);
+    // Parse all clauses as constant ranges so we can materialize a fixed-size array.
+    for (clauses) |cl| {
+        if (cl.iterable.kind != .range) return error.UnsupportedExpr;
+        const range = cl.iterable.kind.range;
 
-    if (start_const != 0 and end_const != 0) {
-        // Constants: we can determine size at compile time.
-        const start_int: i64 = c.LLVMConstIntGetSExtValue(coerced_start);
-        const end_int: i64 = c.LLVMConstIntGetSExtValue(end_val);
-        const array_size: u64 = @intCast(if (range.inclusive) end_int - start_int + 1 else end_int - start_int);
+        const i32_type = c.LLVMInt32TypeInContext(self.context);
+        const start_raw = if (range.start) |s| try self.genExpr(s) else c.LLVMConstInt(i32_type, 0, 0);
+        const end_raw = if (range.end) |e| try self.genExpr(e) else return error.UnsupportedExpr;
+        const iter_type = c.LLVMTypeOf(end_raw);
+        const start_val = self.coerceInt(start_raw, iter_type);
+        const end_val = self.coerceInt(end_raw, iter_type);
 
-        // Evaluate first element to determine element type.
-        // We need to set up the binding variable first.
-        const binding_alloca = c.LLVMBuildAlloca(self.builder, iter_type, "comp.var");
-        _ = c.LLVMBuildStore(self.builder, coerced_start, binding_alloca);
-
-        // Save and set up binding.
-        const old_local = self.locals.get(comp.binding);
-        self.locals.put(self.allocator, comp.binding, .{
-            .alloca = binding_alloca,
-            .ty = iter_type,
-            .is_mut = false,
-        }) catch return error.CodegenAlloc;
-
-        // Generate first element to get the element type.
-        const first_val = try self.genExpr(comp.expr);
-        const elem_type = c.LLVMTypeOf(first_val);
-        const arr_type = c.LLVMArrayType2(elem_type, array_size);
-
-        // Allocate the result array.
-        const arr_alloca = c.LLVMBuildAlloca(self.builder, arr_type, "comp.arr");
-
-        // Store first element.
-        const zero = c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
-        if (comp.filter == null) {
-            // No filter: simple indexed store.
-            var idx0 = [_]c.LLVMValueRef{ zero, c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0) };
-            const gep0 = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &idx0, 2, "");
-            _ = c.LLVMBuildStore(self.builder, first_val, gep0);
+        if (c.LLVMIsConstant(start_val) == 0 or c.LLVMIsConstant(end_val) == 0) {
+            return error.UnsupportedExpr;
         }
 
-        // Generate the loop for remaining elements.
+        const start_i: i64 = c.LLVMConstIntGetSExtValue(start_val);
+        const end_i: i64 = c.LLVMConstIntGetSExtValue(end_val);
+        const len: u64 = if (range.inclusive)
+            (if (end_i >= start_i) @as(u64, @intCast(end_i - start_i + 1)) else 0)
+        else
+            (if (end_i > start_i) @as(u64, @intCast(end_i - start_i)) else 0);
+
+        infos.appendAssumeCapacity(.{
+            .binding = cl.binding,
+            .iter_type = iter_type,
+            .start_val = start_val,
+            .len = len,
+            .stride = 1,
+            .alloca = undefined,
+            .old_local = null,
+        });
+    }
+
+    // Precompute clause strides and total Cartesian product size.
+    var total_size: u64 = 1;
+    var i: usize = infos.items.len;
+    while (i > 0) {
+        i -= 1;
+        infos.items[i].stride = total_size;
+        const mul = @mulWithOverflow(total_size, infos.items[i].len);
+        if (mul[1] != 0) return error.UnsupportedExpr;
+        total_size = mul[0];
+    }
+
+    // Bind clause variables in local scope for element/filter generation.
+    for (infos.items) |*info| {
+        const binding_alloca = c.LLVMBuildAlloca(self.builder, info.iter_type, "comp.var");
+        _ = c.LLVMBuildStore(self.builder, info.start_val, binding_alloca);
+        info.alloca = binding_alloca;
+        info.old_local = self.locals.get(info.binding);
+        self.locals.put(self.allocator, info.binding, .{
+            .alloca = binding_alloca,
+            .ty = info.iter_type,
+            .is_mut = false,
+        }) catch return error.CodegenAlloc;
+    }
+    defer {
+        for (infos.items) |info| {
+            if (info.old_local) |old| {
+                self.locals.put(self.allocator, info.binding, old) catch {};
+            } else {
+                _ = self.locals.remove(info.binding);
+            }
+        }
+    }
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const zero_i32 = c.LLVMConstInt(i32_type, 0, 0);
+    const zero_i64 = c.LLVMConstInt(i64_type, 0, 0);
+    const one_i64 = c.LLVMConstInt(i64_type, 1, 0);
+    const total_i64 = c.LLVMConstInt(i64_type, total_size, 0);
+
+    // Evaluate first element once to get result element type and avoid duplicate
+    // evaluation for iteration 0.
+    const first_val = try self.genExpr(comp.expr);
+    const elem_type = c.LLVMTypeOf(first_val);
+    const arr_type = c.LLVMArrayType2(elem_type, total_size);
+    const arr_alloca = c.LLVMBuildAlloca(self.builder, arr_type, "comp.arr");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstNull(arr_type), arr_alloca);
+
+    // Dense output index used when filter excludes some combinations.
+    const out_idx_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "comp.out_idx");
+    _ = c.LLVMBuildStore(self.builder, zero_i64, out_idx_alloca);
+
+    if (total_size > 0) {
+        if (comp.filter) |filter_expr| {
+            const function = self.current_function;
+            const first_store_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.first.store");
+            const first_after_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.first.after");
+            const filter_val = try self.genExpr(filter_expr);
+            _ = c.LLVMBuildCondBr(self.builder, filter_val, first_store_bb, first_after_bb);
+
+            c.LLVMPositionBuilderAtEnd(self.builder, first_store_bb);
+            const out_idx = c.LLVMBuildLoad2(self.builder, i64_type, out_idx_alloca, "");
+            var idxs = [_]c.LLVMValueRef{ zero_i32, out_idx };
+            const gep = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &idxs, 2, "");
+            _ = c.LLVMBuildStore(self.builder, self.coerceInt(first_val, elem_type), gep);
+            const out_next = c.LLVMBuildAdd(self.builder, out_idx, one_i64, "");
+            _ = c.LLVMBuildStore(self.builder, out_next, out_idx_alloca);
+            _ = c.LLVMBuildBr(self.builder, first_after_bb);
+
+            c.LLVMPositionBuilderAtEnd(self.builder, first_after_bb);
+        } else {
+            var idx0 = [_]c.LLVMValueRef{ zero_i32, zero_i64 };
+            const gep0 = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &idx0, 2, "");
+            _ = c.LLVMBuildStore(self.builder, self.coerceInt(first_val, elem_type), gep0);
+            _ = c.LLVMBuildStore(self.builder, one_i64, out_idx_alloca);
+        }
+    }
+
+    // Remaining Cartesian iterations (start at flat index 1).
+    if (total_size > 1) {
         const function = self.current_function;
         const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.cond");
         const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.body");
         const inc_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.inc");
         const end_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.end");
 
-        // Index counter.
-        const idx_alloca = c.LLVMBuildAlloca(self.builder, iter_type, "comp.idx");
-
-        if (comp.filter == null) {
-            // Start loop from second element (first already stored above).
-            const second = c.LLVMBuildAdd(self.builder, coerced_start, c.LLVMConstInt(iter_type, 1, 0), "");
-            _ = c.LLVMBuildStore(self.builder, second, binding_alloca);
-            _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(iter_type, 1, 0), idx_alloca);
-        } else {
-            // With filter, start from beginning (no pre-store).
-            _ = c.LLVMBuildStore(self.builder, coerced_start, binding_alloca);
-            _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(iter_type, 0, 0), idx_alloca);
-        }
-
+        const flat_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "comp.flat");
+        _ = c.LLVMBuildStore(self.builder, one_i64, flat_alloca);
         _ = c.LLVMBuildBr(self.builder, cond_bb);
 
-        // Condition: binding < end.
         c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
-        const cur = c.LLVMBuildLoad2(self.builder, iter_type, binding_alloca, "");
-        const cmp_op: c_uint = if (range.inclusive) c.LLVMIntSLE else c.LLVMIntSLT;
-        const cond = c.LLVMBuildICmp(self.builder, cmp_op, cur, end_val, "comp.cmp");
+        const flat_cur = c.LLVMBuildLoad2(self.builder, i64_type, flat_alloca, "");
+        const cond = c.LLVMBuildICmp(self.builder, c.LLVMIntULT, flat_cur, total_i64, "comp.cmp");
         _ = c.LLVMBuildCondBr(self.builder, cond, body_bb, end_bb);
 
-        // Body: evaluate expr, store in array.
         c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
-        const val = try self.genExpr(comp.expr);
-        const cur_idx = c.LLVMBuildLoad2(self.builder, iter_type, idx_alloca, "");
-
-        if (comp.filter) |filter| {
-            // With filter: conditionally store.
-            const filter_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.filter");
-            const store_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.store");
-
-            const filter_val = try self.genExpr(filter);
-            _ = c.LLVMBuildCondBr(self.builder, filter_val, store_bb, filter_bb);
-
-            // Store path.
-            c.LLVMPositionBuilderAtEnd(self.builder, store_bb);
-            var store_indices = [_]c.LLVMValueRef{ zero, cur_idx };
-            const gep = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &store_indices, 2, "");
-            _ = c.LLVMBuildStore(self.builder, val, gep);
-            // Increment idx.
-            const next_idx = c.LLVMBuildAdd(self.builder, cur_idx, c.LLVMConstInt(iter_type, 1, 0), "");
-            _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
-            _ = c.LLVMBuildBr(self.builder, inc_bb);
-
-            // Skip path (filter_bb): just go to inc.
-            c.LLVMPositionBuilderAtEnd(self.builder, filter_bb);
-            _ = c.LLVMBuildBr(self.builder, inc_bb);
-        } else {
-            // No filter: always store.
-            var store_indices = [_]c.LLVMValueRef{ zero, cur_idx };
-            const gep = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &store_indices, 2, "");
-            _ = c.LLVMBuildStore(self.builder, val, gep);
-            // Increment idx.
-            const next_idx = c.LLVMBuildAdd(self.builder, cur_idx, c.LLVMConstInt(iter_type, 1, 0), "");
-            _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
-            _ = c.LLVMBuildBr(self.builder, inc_bb);
+        var rem = c.LLVMBuildLoad2(self.builder, i64_type, flat_alloca, "");
+        for (infos.items, 0..) |info, idx| {
+            const stride_const = c.LLVMConstInt(i64_type, info.stride, 0);
+            const q = if (info.stride == 1)
+                rem
+            else
+                c.LLVMBuildUDiv(self.builder, rem, stride_const, "comp.q");
+            if (idx + 1 < infos.items.len and info.stride != 1) {
+                rem = c.LLVMBuildURem(self.builder, rem, stride_const, "comp.r");
+            }
+            const q_cast = self.coerceInt(q, info.iter_type);
+            const bind_val = c.LLVMBuildAdd(self.builder, info.start_val, q_cast, "comp.bind");
+            _ = c.LLVMBuildStore(self.builder, bind_val, info.alloca);
         }
 
-        // Increment: binding += 1.
+        if (comp.filter) |filter_expr| {
+            const filter_val = try self.genExpr(filter_expr);
+            const store_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.store");
+            const skip_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "comp.skip");
+            _ = c.LLVMBuildCondBr(self.builder, filter_val, store_bb, skip_bb);
+
+            c.LLVMPositionBuilderAtEnd(self.builder, store_bb);
+            const val = try self.genExpr(comp.expr);
+            const out_idx = c.LLVMBuildLoad2(self.builder, i64_type, out_idx_alloca, "");
+            var store_idxs = [_]c.LLVMValueRef{ zero_i32, out_idx };
+            const store_gep = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &store_idxs, 2, "");
+            _ = c.LLVMBuildStore(self.builder, self.coerceInt(val, elem_type), store_gep);
+            const out_next = c.LLVMBuildAdd(self.builder, out_idx, one_i64, "");
+            _ = c.LLVMBuildStore(self.builder, out_next, out_idx_alloca);
+            if (c.LLVMGetBasicBlockTerminator(c.LLVMGetInsertBlock(self.builder)) == null) {
+                _ = c.LLVMBuildBr(self.builder, inc_bb);
+            }
+
+            c.LLVMPositionBuilderAtEnd(self.builder, skip_bb);
+            if (c.LLVMGetBasicBlockTerminator(c.LLVMGetInsertBlock(self.builder)) == null) {
+                _ = c.LLVMBuildBr(self.builder, inc_bb);
+            }
+        } else {
+            const val = try self.genExpr(comp.expr);
+            const out_idx = c.LLVMBuildLoad2(self.builder, i64_type, out_idx_alloca, "");
+            var store_idxs = [_]c.LLVMValueRef{ zero_i32, out_idx };
+            const store_gep = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &store_idxs, 2, "");
+            _ = c.LLVMBuildStore(self.builder, self.coerceInt(val, elem_type), store_gep);
+            const out_next = c.LLVMBuildAdd(self.builder, out_idx, one_i64, "");
+            _ = c.LLVMBuildStore(self.builder, out_next, out_idx_alloca);
+            if (c.LLVMGetBasicBlockTerminator(c.LLVMGetInsertBlock(self.builder)) == null) {
+                _ = c.LLVMBuildBr(self.builder, inc_bb);
+            }
+        }
+
         c.LLVMPositionBuilderAtEnd(self.builder, inc_bb);
-        const loaded = c.LLVMBuildLoad2(self.builder, iter_type, binding_alloca, "");
-        const next = c.LLVMBuildAdd(self.builder, loaded, c.LLVMConstInt(iter_type, 1, 0), "");
-        _ = c.LLVMBuildStore(self.builder, next, binding_alloca);
+        const flat_loaded = c.LLVMBuildLoad2(self.builder, i64_type, flat_alloca, "");
+        const flat_next = c.LLVMBuildAdd(self.builder, flat_loaded, one_i64, "");
+        _ = c.LLVMBuildStore(self.builder, flat_next, flat_alloca);
         _ = c.LLVMBuildBr(self.builder, cond_bb);
 
-        // End: restore old binding and load result.
         c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
-        if (old_local) |ol| {
-            self.locals.put(self.allocator, comp.binding, ol) catch return error.CodegenAlloc;
-        }
-        return c.LLVMBuildLoad2(self.builder, arr_type, arr_alloca, "comp.result");
     }
 
-    return error.UnsupportedExpr;
+    return c.LLVMBuildLoad2(self.builder, arr_type, arr_alloca, "comp.result");
 }
 
 fn genIndex(self: *Codegen, idx: Ast.IndexExpr) Error!c.LLVMValueRef {
@@ -8979,6 +11741,20 @@ fn genIndex(self: *Codegen, idx: Ast.IndexExpr) Error!c.LLVMValueRef {
                 const byte_ptr = c.LLVMBuildGEP2(self.builder, c.LLVMInt8TypeInContext(self.context), str_ptr, &gep_idx, 1, "str.byte.ptr");
                 return c.LLVMBuildLoad2(self.builder, c.LLVMInt8TypeInContext(self.context), byte_ptr, "str.byte");
             }
+            // Vec indexing: v[i] -> v.get(i)
+            if (self.isVecType(local.ty)) {
+                const vec_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
+                const index_val = try self.genExpr(idx.index);
+                return self.genVecGet(vec_val, local.ty, index_val);
+            }
+            // HashMap indexing: map[key] -> map.get(key).unwrap()
+            if (self.isHashMapType(local.ty)) {
+                const map_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
+                const key_val = try self.genExpr(idx.index);
+                const opt_val = try self.genHashMapGet(map_val, local.ty, key_val);
+                const opt_type = c.LLVMTypeOf(opt_val);
+                return self.genOptionUnwrap(opt_val, opt_type, null);
+            }
             // Struct with `get` method → operator overload.
             if (c.LLVMGetTypeKind(local.ty) == c.LLVMStructTypeKind) {
                 const obj_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "");
@@ -8992,6 +11768,16 @@ fn genIndex(self: *Codegen, idx: Ast.IndexExpr) Error!c.LLVMValueRef {
     const obj_type = c.LLVMTypeOf(obj_val);
 
     if (c.LLVMGetTypeKind(obj_type) == c.LLVMStructTypeKind) {
+        if (self.isVecType(obj_type)) {
+            const index_val = try self.genExpr(idx.index);
+            return self.genVecGet(obj_val, obj_type, index_val);
+        }
+        if (self.isHashMapType(obj_type)) {
+            const key_val = try self.genExpr(idx.index);
+            const opt_val = try self.genHashMapGet(obj_val, obj_type, key_val);
+            const opt_type = c.LLVMTypeOf(opt_val);
+            return self.genOptionUnwrap(opt_val, opt_type, null);
+        }
         return self.tryIndexOverload(obj_val, obj_type, idx.index);
     }
 
@@ -9167,6 +11953,18 @@ fn genFieldAccess(self: *Codegen, fa: Ast.FieldAccessExpr) Error!c.LLVMValueRef 
             return c.LLVMBuildLoad2(self.builder, struct_info.field_types[idx], gep, "ptr.field");
         }
 
+        // Auto-dereference: if local is a pointer (from let r = &p), check ref_pointee_types.
+        if (c.LLVMGetTypeKind(local.ty) == c.LLVMPointerTypeKind) {
+            if (self.ref_pointee_types.get(sym)) |pointee_ty| {
+                if (self.findStructTypeByLlvm(pointee_ty)) |struct_info| {
+                    const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
+                    const ptr_val = c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "ptr");
+                    const gep = c.LLVMBuildStructGEP2(self.builder, pointee_ty, ptr_val, @intCast(idx), "");
+                    return c.LLVMBuildLoad2(self.builder, struct_info.field_types[idx], gep, "deref.field");
+                }
+            }
+        }
+
         // Find which struct type this local is.
         const struct_info = self.findStructTypeByLlvm(local.ty) orelse return error.UnsupportedType;
         const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
@@ -9199,6 +11997,22 @@ fn genFieldAccess(self: *Codegen, fa: Ast.FieldAccessExpr) Error!c.LLVMValueRef 
             const gep = c.LLVMBuildStructGEP2(self.builder, val_type, tmp, idx, "");
             return c.LLVMBuildLoad2(self.builder, elem_type, gep, "tuple.elem");
         } else |_| {}
+    }
+
+    // Auto-dereference: if val is a pointer, try to find the struct it points to
+    // and GEP through the pointer directly.
+    if (c.LLVMGetTypeKind(val_type) == c.LLVMPointerTypeKind) {
+        // Try to infer the pointee struct type from the expression.
+        if (fa.expr.kind == .ident) {
+            const sym = fa.expr.kind.ident;
+            if (self.ref_pointee_types.get(sym)) |pointee_ty| {
+                if (self.findStructTypeByLlvm(pointee_ty)) |struct_info| {
+                    const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
+                    const gep = c.LLVMBuildStructGEP2(self.builder, pointee_ty, val, @intCast(idx), "");
+                    return c.LLVMBuildLoad2(self.builder, struct_info.field_types[idx], gep, "deref.field");
+                }
+            }
+        }
     }
 
     // Must be a struct type.
@@ -9798,65 +12612,234 @@ fn genInterpolatedPrint(
     return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
 }
 
-/// Resolve a simple interpolation expression (identifier, field access, method call).
+/// Resolve an interpolation expression used in print/println strings.
+/// Supports identifiers, field paths, literals, grouping, and numeric +/-/*//%.
 fn resolveInterpExpr(self: *Codegen, expr_text: []const u8) Error!?c.LLVMValueRef {
-    // Simple identifier: "name"
-    const trimmed = std.mem.trim(u8, expr_text, " \t");
+    const trimmed = std.mem.trim(u8, expr_text, " \t\r\n");
     if (trimmed.len == 0) return null;
 
-    // Check for field access: "obj.field"
-    if (std.mem.indexOfScalar(u8, trimmed, '.')) |dot_pos| {
-        const obj_name = trimmed[0..dot_pos];
-        const field_name = trimmed[dot_pos + 1 ..];
+    var pos: usize = 0;
+    const val = try self.parseInterpAddSub(trimmed, &pos);
+    if (val == null) return null;
+    self.skipInterpWs(trimmed, &pos);
+    if (pos != trimmed.len) return null;
+    return val;
+}
 
-        const obj_sym = self.pool.intern(obj_name) catch return error.CodegenAlloc;
-        const field_sym = self.pool.intern(field_name) catch return error.CodegenAlloc;
+fn skipInterpWs(_: *Codegen, text: []const u8, pos: *usize) void {
+    while (pos.* < text.len) : (pos.* += 1) {
+        const ch = text[pos.*];
+        if (ch != ' ' and ch != '\t' and ch != '\r' and ch != '\n') break;
+    }
+}
 
-        if (self.locals.get(obj_sym)) |local_info| {
-            const val = c.LLVMBuildLoad2(self.builder, local_info.ty, local_info.alloca, "");
-            const val_type = c.LLVMTypeOf(val);
+fn isInterpIdentStart(ch: u8) bool {
+    return std.ascii.isAlphabetic(ch) or ch == '_';
+}
 
-            // Check for array .len
-            if (c.LLVMGetTypeKind(val_type) == c.LLVMArrayTypeKind) {
-                const len_sym = self.pool.intern("len") catch return error.CodegenAlloc;
-                if (field_sym == len_sym) {
-                    const len = c.LLVMGetArrayLength2(val_type);
-                    return c.LLVMConstInt(c.LLVMInt64TypeInContext(self.context), len, 0);
-                }
-            }
+fn isInterpIdentContinue(ch: u8) bool {
+    return std.ascii.isAlphanumeric(ch) or ch == '_';
+}
 
-            // Check for str .len
-            if (self.isStrType(val_type)) {
-                const len_sym = self.pool.intern("len") catch return error.CodegenAlloc;
-                if (field_sym == len_sym) {
-                    const str_info = self.findStructTypeByLlvm(val_type) orelse return null;
-                    const idx = self.findFieldIndex(str_info, field_sym) orelse return null;
-                    const tmp = c.LLVMBuildAlloca(self.builder, val_type, "");
-                    _ = c.LLVMBuildStore(self.builder, val, tmp);
-                    const gep = c.LLVMBuildStructGEP2(self.builder, val_type, tmp, @intCast(idx), "");
-                    return c.LLVMBuildLoad2(self.builder, str_info.field_types[idx], gep, "");
-                }
-            }
+fn parseInterpAddSub(self: *Codegen, text: []const u8, pos: *usize) Error!?c.LLVMValueRef {
+    var lhs = try self.parseInterpMulDiv(text, pos);
+    if (lhs == null) return null;
 
-            // Struct field access
-            if (self.findStructTypeByLlvm(val_type)) |struct_info| {
-                const idx = self.findFieldIndex(struct_info, field_sym) orelse return null;
-                const tmp = c.LLVMBuildAlloca(self.builder, val_type, "");
-                _ = c.LLVMBuildStore(self.builder, val, tmp);
-                const gep = c.LLVMBuildStructGEP2(self.builder, val_type, tmp, @intCast(idx), "");
-                return c.LLVMBuildLoad2(self.builder, struct_info.field_types[idx], gep, "");
-            }
-        }
-        return null;
+    while (true) {
+        self.skipInterpWs(text, pos);
+        if (pos.* >= text.len) break;
+        const op = text[pos.*];
+        if (op != '+' and op != '-') break;
+        pos.* += 1;
+
+        const rhs = try self.parseInterpMulDiv(text, pos);
+        if (rhs == null) return null;
+        lhs = try self.buildInterpBinary(lhs.?, rhs.?, op);
     }
 
-    // Simple identifier lookup
-    const sym = self.pool.intern(trimmed) catch return error.CodegenAlloc;
-    if (self.locals.get(sym)) |local_info| {
-        return c.LLVMBuildLoad2(self.builder, local_info.ty, local_info.alloca, "");
+    return lhs;
+}
+
+fn parseInterpMulDiv(self: *Codegen, text: []const u8, pos: *usize) Error!?c.LLVMValueRef {
+    var lhs = try self.parseInterpUnary(text, pos);
+    if (lhs == null) return null;
+
+    while (true) {
+        self.skipInterpWs(text, pos);
+        if (pos.* >= text.len) break;
+        const op = text[pos.*];
+        if (op != '*' and op != '/' and op != '%') break;
+        pos.* += 1;
+
+        const rhs = try self.parseInterpUnary(text, pos);
+        if (rhs == null) return null;
+        lhs = try self.buildInterpBinary(lhs.?, rhs.?, op);
+    }
+
+    return lhs;
+}
+
+fn parseInterpUnary(self: *Codegen, text: []const u8, pos: *usize) Error!?c.LLVMValueRef {
+    self.skipInterpWs(text, pos);
+    if (pos.* >= text.len) return null;
+
+    const op = text[pos.*];
+    if (op == '+' or op == '-') {
+        pos.* += 1;
+        const inner = try self.parseInterpUnary(text, pos);
+        if (inner == null) return null;
+        if (op == '+') return inner;
+
+        const ty = c.LLVMTypeOf(inner.?);
+        return switch (c.LLVMGetTypeKind(ty)) {
+            c.LLVMIntegerTypeKind => c.LLVMBuildNeg(self.builder, inner.?, "interp.neg"),
+            c.LLVMFloatTypeKind, c.LLVMDoubleTypeKind => c.LLVMBuildFNeg(self.builder, inner.?, "interp.fneg"),
+            else => null,
+        };
+    }
+
+    return self.parseInterpPrimary(text, pos);
+}
+
+fn parseInterpPrimary(self: *Codegen, text: []const u8, pos: *usize) Error!?c.LLVMValueRef {
+    self.skipInterpWs(text, pos);
+    if (pos.* >= text.len) return null;
+
+    const ch = text[pos.*];
+
+    if (ch == '(') {
+        pos.* += 1;
+        const inner = try self.parseInterpAddSub(text, pos);
+        if (inner == null) return null;
+        self.skipInterpWs(text, pos);
+        if (pos.* >= text.len or text[pos.*] != ')') return null;
+        pos.* += 1;
+        return inner;
+    }
+
+    if (std.ascii.isDigit(ch)) {
+        const start = pos.*;
+        while (pos.* < text.len and std.ascii.isDigit(text[pos.*])) : (pos.* += 1) {}
+
+        var is_float = false;
+        if (pos.* < text.len and text[pos.*] == '.') {
+            if (pos.* + 1 < text.len and std.ascii.isDigit(text[pos.* + 1])) {
+                is_float = true;
+                pos.* += 1;
+                while (pos.* < text.len and std.ascii.isDigit(text[pos.*])) : (pos.* += 1) {}
+            }
+        }
+
+        const lit = text[start..pos.*];
+        if (is_float) {
+            const val = std.fmt.parseFloat(f64, lit) catch return null;
+            return c.LLVMConstReal(c.LLVMDoubleTypeInContext(self.context), val);
+        }
+        const val = std.fmt.parseInt(i64, lit, 0) catch return null;
+        return c.LLVMConstInt(c.LLVMInt64TypeInContext(self.context), @bitCast(val), 1);
+    }
+
+    if (isInterpIdentStart(ch)) {
+        const start = pos.*;
+        pos.* += 1;
+        while (pos.* < text.len and isInterpIdentContinue(text[pos.*])) : (pos.* += 1) {}
+        while (pos.* < text.len and text[pos.*] == '.') {
+            const dot = pos.*;
+            pos.* += 1;
+            if (pos.* >= text.len or !isInterpIdentStart(text[pos.*])) {
+                pos.* = dot;
+                break;
+            }
+            pos.* += 1;
+            while (pos.* < text.len and isInterpIdentContinue(text[pos.*])) : (pos.* += 1) {}
+        }
+        return self.resolveInterpPath(text[start..pos.*]);
     }
 
     return null;
+}
+
+fn buildInterpBinary(self: *Codegen, lhs: c.LLVMValueRef, rhs: c.LLVMValueRef, op: u8) Error!?c.LLVMValueRef {
+    const lhs_kind = c.LLVMGetTypeKind(c.LLVMTypeOf(lhs));
+    const rhs_kind = c.LLVMGetTypeKind(c.LLVMTypeOf(rhs));
+    const lhs_numeric = lhs_kind == c.LLVMIntegerTypeKind or lhs_kind == c.LLVMFloatTypeKind or lhs_kind == c.LLVMDoubleTypeKind;
+    const rhs_numeric = rhs_kind == c.LLVMIntegerTypeKind or rhs_kind == c.LLVMFloatTypeKind or rhs_kind == c.LLVMDoubleTypeKind;
+    if (!lhs_numeric or !rhs_numeric) return null;
+
+    const lhs_c, const rhs_c = self.coerceBinaryOperands(lhs, rhs);
+    const kind = c.LLVMGetTypeKind(c.LLVMTypeOf(lhs_c));
+    const is_float = kind == c.LLVMFloatTypeKind or kind == c.LLVMDoubleTypeKind;
+
+    if (is_float) {
+        return switch (op) {
+            '+' => c.LLVMBuildFAdd(self.builder, lhs_c, rhs_c, "interp.fadd"),
+            '-' => c.LLVMBuildFSub(self.builder, lhs_c, rhs_c, "interp.fsub"),
+            '*' => c.LLVMBuildFMul(self.builder, lhs_c, rhs_c, "interp.fmul"),
+            '/' => c.LLVMBuildFDiv(self.builder, lhs_c, rhs_c, "interp.fdiv"),
+            '%' => c.LLVMBuildFRem(self.builder, lhs_c, rhs_c, "interp.fmod"),
+            else => null,
+        };
+    }
+
+    return switch (op) {
+        '+' => c.LLVMBuildAdd(self.builder, lhs_c, rhs_c, "interp.add"),
+        '-' => c.LLVMBuildSub(self.builder, lhs_c, rhs_c, "interp.sub"),
+        '*' => c.LLVMBuildMul(self.builder, lhs_c, rhs_c, "interp.mul"),
+        '/' => c.LLVMBuildSDiv(self.builder, lhs_c, rhs_c, "interp.div"),
+        '%' => c.LLVMBuildSRem(self.builder, lhs_c, rhs_c, "interp.mod"),
+        else => null,
+    };
+}
+
+fn resolveInterpPath(self: *Codegen, path_text: []const u8) Error!?c.LLVMValueRef {
+    const path = std.mem.trim(u8, path_text, " \t\r\n");
+    if (path.len == 0) return null;
+
+    const first_dot = std.mem.indexOfScalar(u8, path, '.') orelse path.len;
+    const base_name = path[0..first_dot];
+    const base_sym = self.pool.intern(base_name) catch return error.CodegenAlloc;
+    const local_info = self.locals.get(base_sym) orelse return null;
+    var val = c.LLVMBuildLoad2(self.builder, local_info.ty, local_info.alloca, "");
+
+    var cursor = first_dot;
+    while (cursor < path.len) {
+        if (path[cursor] != '.') return null;
+        cursor += 1;
+        if (cursor >= path.len) return null;
+
+        const seg_start = cursor;
+        while (cursor < path.len and path[cursor] != '.') : (cursor += 1) {}
+        const segment = path[seg_start..cursor];
+        if (segment.len == 0) return null;
+        const seg_sym = self.pool.intern(segment) catch return error.CodegenAlloc;
+
+        const val_type = c.LLVMTypeOf(val);
+        if (segment.len == 3 and std.mem.eql(u8, segment, "len")) {
+            if (c.LLVMGetTypeKind(val_type) == c.LLVMArrayTypeKind) {
+                const len = c.LLVMGetArrayLength2(val_type);
+                val = c.LLVMConstInt(c.LLVMInt64TypeInContext(self.context), len, 0);
+                continue;
+            }
+            if (self.isStrType(val_type)) {
+                const str_info = self.findStructTypeByLlvm(val_type) orelse return null;
+                const idx = self.findFieldIndex(str_info, seg_sym) orelse return null;
+                const tmp = c.LLVMBuildAlloca(self.builder, val_type, "");
+                _ = c.LLVMBuildStore(self.builder, val, tmp);
+                const gep = c.LLVMBuildStructGEP2(self.builder, val_type, tmp, @intCast(idx), "");
+                val = c.LLVMBuildLoad2(self.builder, str_info.field_types[idx], gep, "");
+                continue;
+            }
+        }
+
+        const struct_info = self.findStructTypeByLlvm(val_type) orelse return null;
+        const field_idx = self.findFieldIndex(struct_info, seg_sym) orelse return null;
+        const tmp = c.LLVMBuildAlloca(self.builder, val_type, "");
+        _ = c.LLVMBuildStore(self.builder, val, tmp);
+        const gep = c.LLVMBuildStructGEP2(self.builder, val_type, tmp, @intCast(field_idx), "");
+        val = c.LLVMBuildLoad2(self.builder, struct_info.field_types[field_idx], gep, "");
+    }
+
+    return val;
 }
 
 /// Built-in: assert(condition) — abort if false.
@@ -10044,6 +13027,37 @@ fn genStringLiteral(self: *Codegen, sym: u32) Error!c.LLVMValueRef {
     _ = c.LLVMBuildStore(self.builder, len_val, gep_len);
 
     return c.LLVMBuildLoad2(self.builder, str_info.llvm_type, alloca, "str.val");
+}
+
+fn genCStringLiteral(self: *Codegen, sym: u32) Error!c.LLVMValueRef {
+    const text = self.pool.resolve(sym);
+    var buf: [4096]u8 = undefined;
+    if (text.len >= buf.len) return error.UnsupportedExpr;
+
+    // Process escape sequences.
+    var out_len: usize = 0;
+    var i: usize = 0;
+    while (i < text.len) : (i += 1) {
+        if (text[i] == '\\' and i + 1 < text.len) {
+            i += 1;
+            buf[out_len] = switch (text[i]) {
+                'n' => '\n',
+                't' => '\t',
+                'r' => '\r',
+                '0' => 0,
+                '\\' => '\\',
+                '"' => '"',
+                else => text[i],
+            };
+        } else {
+            buf[out_len] = text[i];
+        }
+        out_len += 1;
+    }
+    buf[out_len] = 0;
+
+    // Return a *const i8 pointing to a null-terminated global string constant.
+    return c.LLVMBuildGlobalStringPtr(self.builder, @ptrCast(buf[0..out_len :0]), "cstr");
 }
 
 // ── Type coercion ────────────────────────────────────────────────
@@ -10959,6 +13973,307 @@ fn genVecFilter(self: *Codegen, vec_val: c.LLVMValueRef, vec_type: c.LLVMTypeRef
     return c.LLVMBuildLoad2(self.builder, vec_info.llvm_type, result_alloca, "filt.result");
 }
 
+/// Vec[Option[T]].sequence() -> Option[Vec[T]]
+/// Vec[Result[T, E]].sequence() -> Result[Vec[T], E]
+fn genVecSequence(self: *Codegen, vec_val: c.LLVMValueRef, vec_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const elem_type = self.getVecElemType(vec_type) orelse return error.UnsupportedExpr;
+
+    // Extract Vec data_ptr and len.
+    const vec_alloca = c.LLVMBuildAlloca(self.builder, vec_type, "seq.vec");
+    _ = c.LLVMBuildStore(self.builder, vec_val, vec_alloca);
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 0, "");
+    const data_ptr = c.LLVMBuildLoad2(self.builder, c.LLVMPointerTypeInContext(self.context, 0), ptr_gep, "data");
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 1, "");
+    const vec_len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "len");
+    const idx_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "seq.idx");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), idx_alloca);
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+
+    if (self.isOptionType(elem_type)) {
+        const payload_type = self.getOptionPayloadType(elem_type) orelse return error.UnsupportedExpr;
+        const out_vec_info = try self.getOrCreateVecType(payload_type);
+        const out_opt_info = try self.getOrCreateOptionType(out_vec_info.llvm_type);
+
+        const out_vec_alloca = c.LLVMBuildAlloca(self.builder, out_vec_info.llvm_type, "seq.out.vec");
+        const empty_vec = try self.genVecNew(payload_type);
+        _ = c.LLVMBuildStore(self.builder, empty_vec, out_vec_alloca);
+        const ret_alloca = c.LLVMBuildAlloca(self.builder, out_opt_info.llvm_type, "seq.ret");
+
+        const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.opt.cond");
+        const body_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.opt.body");
+        const some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.opt.some");
+        const none_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.opt.none");
+        const done_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.opt.done");
+        const end_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.opt.end");
+        _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+        const idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+        const has_more = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, idx, vec_len, "seq.opt.has_more");
+        _ = c.LLVMBuildCondBr(self.builder, has_more, body_bb, done_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+        var elem_idx = [_]c.LLVMValueRef{idx};
+        const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, data_ptr, &elem_idx, 1, "seq.elem.ptr");
+        const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "seq.elem");
+        const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "seq.elem.alloca");
+        _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
+        const tag_gep = c.LLVMBuildStructGEP2(self.builder, elem_type, elem_alloca, 0, "seq.tag");
+        const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "seq.tag.val");
+        const is_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "seq.is_some");
+        _ = c.LLVMBuildCondBr(self.builder, is_some, some_bb, none_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, some_bb);
+        const payload_gep = c.LLVMBuildStructGEP2(self.builder, elem_type, elem_alloca, 1, "seq.payload");
+        const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+        const payload_val = c.LLVMBuildLoad2(self.builder, payload_type, payload_ptr, "seq.payload.val");
+        _ = try self.genVecPush(out_vec_alloca, out_vec_info.llvm_type, payload_val);
+        const next_idx = c.LLVMBuildAdd(self.builder, idx, c.LLVMConstInt(i64_type, 1, 0), "seq.next");
+        _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+        _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, none_bb);
+        const none_val = self.buildOptionNone(out_opt_info.llvm_type);
+        _ = c.LLVMBuildStore(self.builder, none_val, ret_alloca);
+        _ = c.LLVMBuildBr(self.builder, end_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+        const out_vec = c.LLVMBuildLoad2(self.builder, out_vec_info.llvm_type, out_vec_alloca, "seq.out.vec.val");
+        const some_val = try self.buildOptionSome(out_vec);
+        _ = c.LLVMBuildStore(self.builder, some_val, ret_alloca);
+        _ = c.LLVMBuildBr(self.builder, end_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+        return c.LLVMBuildLoad2(self.builder, out_opt_info.llvm_type, ret_alloca, "seq.opt.result");
+    }
+
+    if (self.isResultType(elem_type)) {
+        const ok_type = self.getOptionPayloadType(elem_type) orelse return error.UnsupportedExpr;
+        const err_type = self.getResultErrType(elem_type) orelse return error.UnsupportedExpr;
+        const out_vec_info = try self.getOrCreateVecType(ok_type);
+        const out_res_info = try self.getOrCreateResultType(out_vec_info.llvm_type, err_type);
+
+        const out_vec_alloca = c.LLVMBuildAlloca(self.builder, out_vec_info.llvm_type, "seq.out.vec");
+        const empty_vec = try self.genVecNew(ok_type);
+        _ = c.LLVMBuildStore(self.builder, empty_vec, out_vec_alloca);
+        const ret_alloca = c.LLVMBuildAlloca(self.builder, out_res_info.llvm_type, "seq.ret");
+
+        const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.res.cond");
+        const body_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.res.body");
+        const ok_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.res.ok");
+        const err_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.res.err");
+        const done_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.res.done");
+        const end_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "seq.res.end");
+        _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+        const idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+        const has_more = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, idx, vec_len, "seq.res.has_more");
+        _ = c.LLVMBuildCondBr(self.builder, has_more, body_bb, done_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+        var elem_idx = [_]c.LLVMValueRef{idx};
+        const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, data_ptr, &elem_idx, 1, "seq.elem.ptr");
+        const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "seq.elem");
+        const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "seq.elem.alloca");
+        _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
+        const tag_gep = c.LLVMBuildStructGEP2(self.builder, elem_type, elem_alloca, 0, "seq.tag");
+        const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "seq.tag.val");
+        const is_ok = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "seq.is_ok");
+        _ = c.LLVMBuildCondBr(self.builder, is_ok, ok_bb, err_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, ok_bb);
+        const payload_gep = c.LLVMBuildStructGEP2(self.builder, elem_type, elem_alloca, 1, "seq.payload");
+        const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+        const payload_val = c.LLVMBuildLoad2(self.builder, ok_type, payload_ptr, "seq.payload.val");
+        _ = try self.genVecPush(out_vec_alloca, out_vec_info.llvm_type, payload_val);
+        const next_idx = c.LLVMBuildAdd(self.builder, idx, c.LLVMConstInt(i64_type, 1, 0), "seq.next");
+        _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+        _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, err_bb);
+        const err_gep = c.LLVMBuildStructGEP2(self.builder, elem_type, elem_alloca, 1, "seq.err");
+        const err_ptr = c.LLVMBuildBitCast(self.builder, err_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+        const err_val = c.LLVMBuildLoad2(self.builder, err_type, err_ptr, "seq.err.val");
+        const err_result = try self.buildResultErr(err_val, out_res_info.llvm_type);
+        _ = c.LLVMBuildStore(self.builder, err_result, ret_alloca);
+        _ = c.LLVMBuildBr(self.builder, end_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+        const out_vec = c.LLVMBuildLoad2(self.builder, out_vec_info.llvm_type, out_vec_alloca, "seq.out.vec.val");
+        const ok_result = try self.buildResultOk(out_vec, out_res_info.llvm_type);
+        _ = c.LLVMBuildStore(self.builder, ok_result, ret_alloca);
+        _ = c.LLVMBuildBr(self.builder, end_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+        return c.LLVMBuildLoad2(self.builder, out_res_info.llvm_type, ret_alloca, "seq.res.result");
+    }
+
+    return error.UnsupportedExpr;
+}
+
+/// Vec[T].traverse(f) — map each element with f then sequence.
+fn genVecTraverse(self: *Codegen, vec_val: c.LLVMValueRef, vec_type: c.LLVMTypeRef, fn_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const elem_type = self.getVecElemType(vec_type) orelse return error.UnsupportedExpr;
+    const mapped_type = self.inferUnaryFnReturnType(fn_val) orelse return error.UnsupportedExpr;
+
+    // Extract Vec data_ptr and len.
+    const vec_alloca = c.LLVMBuildAlloca(self.builder, vec_type, "trav.vec");
+    _ = c.LLVMBuildStore(self.builder, vec_val, vec_alloca);
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 0, "");
+    const data_ptr = c.LLVMBuildLoad2(self.builder, c.LLVMPointerTypeInContext(self.context, 0), ptr_gep, "data");
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 1, "");
+    const vec_len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "len");
+    const idx_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "trav.idx");
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), idx_alloca);
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+
+    if (self.isOptionType(mapped_type)) {
+        const payload_type = self.getOptionPayloadType(mapped_type) orelse return error.UnsupportedExpr;
+        const out_vec_info = try self.getOrCreateVecType(payload_type);
+        const out_opt_info = try self.getOrCreateOptionType(out_vec_info.llvm_type);
+
+        const out_vec_alloca = c.LLVMBuildAlloca(self.builder, out_vec_info.llvm_type, "trav.out.vec");
+        const empty_vec = try self.genVecNew(payload_type);
+        _ = c.LLVMBuildStore(self.builder, empty_vec, out_vec_alloca);
+        const ret_alloca = c.LLVMBuildAlloca(self.builder, out_opt_info.llvm_type, "trav.ret");
+
+        const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.opt.cond");
+        const body_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.opt.body");
+        const some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.opt.some");
+        const none_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.opt.none");
+        const done_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.opt.done");
+        const end_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.opt.end");
+        _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+        const idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+        const has_more = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, idx, vec_len, "trav.opt.has_more");
+        _ = c.LLVMBuildCondBr(self.builder, has_more, body_bb, done_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+        var elem_idx = [_]c.LLVMValueRef{idx};
+        const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, data_ptr, &elem_idx, 1, "trav.elem.ptr");
+        const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "trav.elem");
+        const mapped_val = try self.callFnValueWithArg(fn_val, elem_val);
+        const mapped_val_type = c.LLVMTypeOf(mapped_val);
+        if (!self.isOptionType(mapped_val_type)) return error.UnsupportedExpr;
+        const mapped_alloca = c.LLVMBuildAlloca(self.builder, mapped_val_type, "trav.mapped");
+        _ = c.LLVMBuildStore(self.builder, mapped_val, mapped_alloca);
+        const tag_gep = c.LLVMBuildStructGEP2(self.builder, mapped_val_type, mapped_alloca, 0, "trav.tag");
+        const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "trav.tag.val");
+        const is_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "trav.is_some");
+        _ = c.LLVMBuildCondBr(self.builder, is_some, some_bb, none_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, some_bb);
+        const mapped_payload_type = self.getOptionPayloadType(mapped_val_type) orelse return error.UnsupportedExpr;
+        if (mapped_payload_type != payload_type and !self.sameStructTypeName(mapped_payload_type, payload_type)) {
+            return error.UnsupportedExpr;
+        }
+        const payload_gep = c.LLVMBuildStructGEP2(self.builder, mapped_val_type, mapped_alloca, 1, "trav.payload");
+        const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+        const payload_val = c.LLVMBuildLoad2(self.builder, payload_type, payload_ptr, "trav.payload.val");
+        _ = try self.genVecPush(out_vec_alloca, out_vec_info.llvm_type, payload_val);
+        const next_idx = c.LLVMBuildAdd(self.builder, idx, c.LLVMConstInt(i64_type, 1, 0), "trav.next");
+        _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+        _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, none_bb);
+        const none_val = self.buildOptionNone(out_opt_info.llvm_type);
+        _ = c.LLVMBuildStore(self.builder, none_val, ret_alloca);
+        _ = c.LLVMBuildBr(self.builder, end_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+        const out_vec = c.LLVMBuildLoad2(self.builder, out_vec_info.llvm_type, out_vec_alloca, "trav.out.vec.val");
+        const some_val = try self.buildOptionSome(out_vec);
+        _ = c.LLVMBuildStore(self.builder, some_val, ret_alloca);
+        _ = c.LLVMBuildBr(self.builder, end_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+        return c.LLVMBuildLoad2(self.builder, out_opt_info.llvm_type, ret_alloca, "trav.opt.result");
+    }
+
+    if (self.isResultType(mapped_type)) {
+        const ok_type = self.getOptionPayloadType(mapped_type) orelse return error.UnsupportedExpr;
+        const err_type = self.getResultErrType(mapped_type) orelse return error.UnsupportedExpr;
+        const out_vec_info = try self.getOrCreateVecType(ok_type);
+        const out_res_info = try self.getOrCreateResultType(out_vec_info.llvm_type, err_type);
+
+        const out_vec_alloca = c.LLVMBuildAlloca(self.builder, out_vec_info.llvm_type, "trav.out.vec");
+        const empty_vec = try self.genVecNew(ok_type);
+        _ = c.LLVMBuildStore(self.builder, empty_vec, out_vec_alloca);
+        const ret_alloca = c.LLVMBuildAlloca(self.builder, out_res_info.llvm_type, "trav.ret");
+
+        const cond_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.res.cond");
+        const body_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.res.body");
+        const ok_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.res.ok");
+        const err_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.res.err");
+        const done_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.res.done");
+        const end_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "trav.res.end");
+        _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, cond_bb);
+        const idx = c.LLVMBuildLoad2(self.builder, i64_type, idx_alloca, "idx");
+        const has_more = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, idx, vec_len, "trav.res.has_more");
+        _ = c.LLVMBuildCondBr(self.builder, has_more, body_bb, done_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+        var elem_idx = [_]c.LLVMValueRef{idx};
+        const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, data_ptr, &elem_idx, 1, "trav.elem.ptr");
+        const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "trav.elem");
+        const mapped_val = try self.callFnValueWithArg(fn_val, elem_val);
+        const mapped_val_type = c.LLVMTypeOf(mapped_val);
+        if (!self.isResultType(mapped_val_type)) return error.UnsupportedExpr;
+        const mapped_alloca = c.LLVMBuildAlloca(self.builder, mapped_val_type, "trav.mapped");
+        _ = c.LLVMBuildStore(self.builder, mapped_val, mapped_alloca);
+        const tag_gep = c.LLVMBuildStructGEP2(self.builder, mapped_val_type, mapped_alloca, 0, "trav.tag");
+        const tag = c.LLVMBuildLoad2(self.builder, i32_type, tag_gep, "trav.tag.val");
+        const is_ok = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "trav.is_ok");
+        _ = c.LLVMBuildCondBr(self.builder, is_ok, ok_bb, err_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, ok_bb);
+        const mapped_ok_type = self.getOptionPayloadType(mapped_val_type) orelse return error.UnsupportedExpr;
+        const mapped_err_type = self.getResultErrType(mapped_val_type) orelse return error.UnsupportedExpr;
+        if ((mapped_ok_type != ok_type and !self.sameStructTypeName(mapped_ok_type, ok_type)) or
+            (mapped_err_type != err_type and !self.sameStructTypeName(mapped_err_type, err_type)))
+        {
+            return error.UnsupportedExpr;
+        }
+        const payload_gep = c.LLVMBuildStructGEP2(self.builder, mapped_val_type, mapped_alloca, 1, "trav.payload");
+        const payload_ptr = c.LLVMBuildBitCast(self.builder, payload_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+        const payload_val = c.LLVMBuildLoad2(self.builder, ok_type, payload_ptr, "trav.payload.val");
+        _ = try self.genVecPush(out_vec_alloca, out_vec_info.llvm_type, payload_val);
+        const next_idx = c.LLVMBuildAdd(self.builder, idx, c.LLVMConstInt(i64_type, 1, 0), "trav.next");
+        _ = c.LLVMBuildStore(self.builder, next_idx, idx_alloca);
+        _ = c.LLVMBuildBr(self.builder, cond_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, err_bb);
+        const err_gep = c.LLVMBuildStructGEP2(self.builder, mapped_val_type, mapped_alloca, 1, "trav.err");
+        const err_ptr = c.LLVMBuildBitCast(self.builder, err_gep, c.LLVMPointerTypeInContext(self.context, 0), "");
+        const err_val = c.LLVMBuildLoad2(self.builder, err_type, err_ptr, "trav.err.val");
+        const err_result = try self.buildResultErr(err_val, out_res_info.llvm_type);
+        _ = c.LLVMBuildStore(self.builder, err_result, ret_alloca);
+        _ = c.LLVMBuildBr(self.builder, end_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+        const out_vec = c.LLVMBuildLoad2(self.builder, out_vec_info.llvm_type, out_vec_alloca, "trav.out.vec.val");
+        const ok_result = try self.buildResultOk(out_vec, out_res_info.llvm_type);
+        _ = c.LLVMBuildStore(self.builder, ok_result, ret_alloca);
+        _ = c.LLVMBuildBr(self.builder, end_bb);
+
+        c.LLVMPositionBuilderAtEnd(self.builder, end_bb);
+        return c.LLVMBuildLoad2(self.builder, out_res_info.llvm_type, ret_alloca, "trav.res.result");
+    }
+
+    return error.UnsupportedExpr;
+}
+
 /// array.contains(needle) → bool — linear scan
 fn genArrayContains(self: *Codegen, arr_val: c.LLVMValueRef, arr_type: c.LLVMTypeRef, needle: c.LLVMValueRef) Error!c.LLVMValueRef {
     const len = c.LLVMGetArrayLength2(arr_type);
@@ -11113,8 +14428,24 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
             if (self.type_aliases.get(sym)) |ty| return ty;
             return error.UnsupportedType;
         },
-        .ptr_type => c.LLVMPointerTypeInContext(self.context, 0),
-        .ref_type => c.LLVMPointerTypeInContext(self.context, 0),
+        .ptr_type => |pt| {
+            // Pointer-to-dyn is represented as a trait-object fat pointer.
+            if (dynTraitFromTypeExpr(self, pt.pointee) != null) {
+                const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+                var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+                return c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+            }
+            return c.LLVMPointerTypeInContext(self.context, 0);
+        },
+        .ref_type => |rt| {
+            // `&dyn Trait` lowers to the same fat pointer representation as `dyn Trait`.
+            if (dynTraitFromTypeExpr(self, rt.pointee) != null) {
+                const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+                var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+                return c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+            }
+            return c.LLVMPointerTypeInContext(self.context, 0);
+        },
         .fn_type => c.LLVMPointerTypeInContext(self.context, 0),
         .array_type => |arr| {
             const elem = try self.resolveType(arr.element);
@@ -11157,6 +14488,12 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
                 const res_info = try self.getOrCreateResultType(ok_type, err_type);
                 return res_info.llvm_type;
             }
+            if (std.mem.eql(u8, name, "ContextError")) {
+                if (g.args.len != 1) return error.UnsupportedType;
+                const source_type = try self.resolveType(g.args[0]);
+                const ctx_info = try self.getOrCreateContextErrorType(source_type);
+                return ctx_info.llvm_type;
+            }
             if (std.mem.eql(u8, name, "Vec")) {
                 if (g.args.len != 1) return error.UnsupportedType;
                 const elem_type = try self.resolveType(g.args[0]);
@@ -11175,6 +14512,15 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
                 const elem_type = try self.resolveType(g.args[0]);
                 const hs_info = try self.getOrCreateHashSetType(elem_type);
                 return hs_info.llvm_type;
+            }
+            if (std.mem.eql(u8, name, "Box")) {
+                if (g.args.len != 1) return error.UnsupportedType;
+                if (dynTraitFromTypeExpr(self, g.args[0]) != null) {
+                    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+                    var fat_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type };
+                    return c.LLVMStructTypeInContext(self.context, &fat_types, 2, 0);
+                }
+                return c.LLVMPointerTypeInContext(self.context, 0);
             }
             return error.UnsupportedType;
         },

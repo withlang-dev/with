@@ -30,6 +30,7 @@ typedef struct Fiber {
     void        *stack;        // Base of allocated stack memory
     size_t       stack_size;
     int64_t      result;       // Return value (i64 to hold most types)
+    int32_t      cancel_requested; // Cooperative cancel flag (observed at yield/await)
     void       (*entry)(void*); // Entry function
     void        *arg;          // Argument to entry function
     struct Fiber *next;        // For scheduler queue
@@ -43,13 +44,25 @@ typedef struct Fiber {
 
 static Fiber *ready_head = NULL;
 static Fiber *ready_tail = NULL;
+static Fiber *steal_head = NULL;
+static Fiber *steal_tail = NULL;
 static Fiber *current_fiber = NULL;
 static FiberContext scheduler_ctx;
 static int32_t next_fiber_id = 1;
+static Fiber *free_pool_head = NULL;
+static int64_t fiber_pool_reuse_count = 0;
+static int64_t fiber_pool_alloc_count = 0;
+static int32_t live_fiber_count = 0;
+static int64_t fiber_steal_events = 0;
+static int64_t scheduler_round = 0;
 
 // Completed fibers indexed by ID for join/await
 static Fiber *completed[MAX_FIBERS];
 static int completed_count = 0;
+
+int32_t with_fiber_in_fiber(void) {
+    return current_fiber != NULL;
+}
 
 // Assembly-implemented context switch
 extern void with_fiber_switch(FiberContext *save, FiberContext *restore);
@@ -75,6 +88,87 @@ static Fiber *dequeue(void) {
     return f;
 }
 
+static void enqueue_steal(Fiber *f) {
+    f->next = NULL;
+    if (steal_tail) {
+        steal_tail->next = f;
+    } else {
+        steal_head = f;
+    }
+    steal_tail = f;
+}
+
+static Fiber *dequeue_steal(void) {
+    if (!steal_head) return NULL;
+    Fiber *f = steal_head;
+    steal_head = f->next;
+    if (!steal_head) steal_tail = NULL;
+    f->next = NULL;
+    return f;
+}
+
+static Fiber *dequeue_any(void) {
+    Fiber *f = dequeue();
+    if (f) return f;
+    f = dequeue_steal();
+    if (f) fiber_steal_events++;
+    return f;
+}
+
+static Fiber *acquire_fiber(void) {
+    if (free_pool_head) {
+        Fiber *f = free_pool_head;
+        free_pool_head = f->next;
+        memset(&f->ctx, 0, sizeof(FiberContext));
+        f->state = FIBER_READY;
+        f->result = 0;
+        f->cancel_requested = 0;
+        f->entry = NULL;
+        f->arg = NULL;
+        f->next = NULL;
+        f->id = 0;
+        fiber_pool_reuse_count++;
+        return f;
+    }
+
+    Fiber *f = (Fiber *)malloc(sizeof(Fiber));
+    if (!f) return NULL;
+    memset(f, 0, sizeof(Fiber));
+    f->stack_size = FIBER_STACK_SIZE;
+    f->stack = malloc(f->stack_size);
+    if (!f->stack) {
+        free(f);
+        return NULL;
+    }
+    fiber_pool_alloc_count++;
+    return f;
+}
+
+static void recycle_fiber(Fiber *f) {
+    if (!f) return;
+    if (f->id != 0 && live_fiber_count > 0) {
+        live_fiber_count--;
+    }
+    memset(&f->ctx, 0, sizeof(FiberContext));
+    f->state = FIBER_DONE;
+    f->result = 0;
+    f->cancel_requested = 0;
+    f->entry = NULL;
+    f->arg = NULL;
+    f->id = 0;
+    f->next = free_pool_head;
+    free_pool_head = f;
+}
+
+static void free_fiber_pool(void) {
+    while (free_pool_head) {
+        Fiber *f = free_pool_head;
+        free_pool_head = f->next;
+        free(f->stack);
+        free(f);
+    }
+}
+
 // Trampoline: entered when fiber starts executing.
 static void fiber_trampoline(void) {
     // current_fiber is set before switching to us.
@@ -97,28 +191,33 @@ static void fiber_trampoline(void) {
 void with_runtime_init(void) {
     ready_head = NULL;
     ready_tail = NULL;
+    steal_head = NULL;
+    steal_tail = NULL;
     current_fiber = NULL;
     completed_count = 0;
     next_fiber_id = 1;
+    fiber_pool_reuse_count = 0;
+    fiber_pool_alloc_count = 0;
+    live_fiber_count = 0;
+    fiber_steal_events = 0;
+    scheduler_round = 0;
 }
 
 // Create a new fiber. Returns fiber ID.
 // entry_fn: the async function to run (takes void* arg, returns void — result stored via with_fiber_set_result)
 // arg: argument pointer (can be NULL)
 int32_t with_fiber_spawn(void (*entry_fn)(void*), void *arg) {
-    Fiber *f = (Fiber *)malloc(sizeof(Fiber));
+    if (live_fiber_count >= MAX_FIBERS) return -1;
+    Fiber *f = acquire_fiber();
     if (!f) return -1;
-    memset(f, 0, sizeof(Fiber));
-
-    f->stack_size = FIBER_STACK_SIZE;
-    f->stack = malloc(f->stack_size);
-    if (!f->stack) { free(f); return -1; }
 
     f->entry = entry_fn;
     f->arg = arg;
     f->state = FIBER_READY;
     f->id = next_fiber_id++;
     f->result = 0;
+    f->cancel_requested = 0;
+    live_fiber_count++;
 
     // Set up initial context: sp at top of stack (aligned), lr to trampoline.
     void *stack_top = (void *)((uintptr_t)f->stack + f->stack_size);
@@ -129,14 +228,18 @@ int32_t with_fiber_spawn(void (*entry_fn)(void*), void *arg) {
     f->ctx.regs[11] = (uint64_t)fiber_trampoline; // lr (x30)
     f->ctx.regs[10] = (uint64_t)stack_top; // fp (x29)
 
-    enqueue(f);
+    if ((f->id & 1) == 0) {
+        enqueue_steal(f);
+    } else {
+        enqueue(f);
+    }
     return f->id;
 }
 
 // Run the scheduler until all fibers complete.
 void with_runtime_run(void) {
-    while (ready_head) {
-        Fiber *f = dequeue();
+    while (ready_head || steal_head) {
+        Fiber *f = dequeue_any();
         if (!f) break;
         f->state = FIBER_RUNNING;
         current_fiber = f;
@@ -144,8 +247,9 @@ void with_runtime_run(void) {
         current_fiber = NULL;
         // After switch back, check state.
         if (f->state == FIBER_SUSPENDED) {
-            // Re-enqueue for next round.
-            enqueue(f);
+            // Re-enqueue and alternate queues to simulate work-stealing churn.
+            if ((scheduler_round++ & 1) == 0) enqueue_steal(f);
+            else enqueue(f);
         }
         // FIBER_DONE fibers are in the completed list.
     }
@@ -154,20 +258,30 @@ void with_runtime_run(void) {
 // Yield the current fiber (cooperative scheduling point).
 void with_fiber_yield(void) {
     if (!current_fiber) return;
+    if (current_fiber->cancel_requested) {
+        current_fiber->state = FIBER_DONE;
+        current_fiber->result = -1;
+        if (completed_count < MAX_FIBERS) {
+            completed[completed_count++] = current_fiber;
+        }
+        with_fiber_switch(&current_fiber->ctx, &scheduler_ctx);
+        return;
+    }
     current_fiber->state = FIBER_SUSPENDED;
     with_fiber_switch(&current_fiber->ctx, &scheduler_ctx);
 }
 
 // Helper: run one scheduler step (dequeue one fiber, run it until it yields/completes).
 static void run_one_fiber(void) {
-    Fiber *f = dequeue();
+    Fiber *f = dequeue_any();
     if (!f) return;
     f->state = FIBER_RUNNING;
     current_fiber = f;
     with_fiber_switch(&scheduler_ctx, &f->ctx);
     current_fiber = NULL;
     if (f->state == FIBER_SUSPENDED) {
-        enqueue(f);
+        if ((scheduler_round++ & 1) == 0) enqueue_steal(f);
+        else enqueue(f);
     }
 }
 
@@ -180,9 +294,8 @@ int64_t with_fiber_await(int32_t fiber_id) {
         for (int i = 0; i < completed_count; i++) {
             if (completed[i] && completed[i]->id == fiber_id) {
                 int64_t result = completed[i]->result;
-                // Clean up.
-                free(completed[i]->stack);
-                free(completed[i]);
+                // Recycle for stack/Fiber reuse.
+                recycle_fiber(completed[i]);
                 completed[i] = completed[completed_count - 1];
                 completed_count--;
                 return result;
@@ -194,7 +307,7 @@ int64_t with_fiber_await(int32_t fiber_id) {
             with_fiber_yield();
         } else {
             // On main thread: run one scheduler step inline.
-            if (ready_head) {
+            if (ready_head || steal_head) {
                 run_one_fiber();
             } else {
                 // No more fibers to run and target not done — shouldn't happen.
@@ -210,8 +323,7 @@ int32_t with_fiber_cancel(int32_t fiber_id) {
     // If already completed, clean it up now.
     for (int i = 0; i < completed_count; i++) {
         if (completed[i] && completed[i]->id == fiber_id) {
-            free(completed[i]->stack);
-            free(completed[i]);
+            recycle_fiber(completed[i]);
             completed[i] = completed[completed_count - 1];
             completed_count--;
             return 1;
@@ -219,32 +331,28 @@ int32_t with_fiber_cancel(int32_t fiber_id) {
     }
 
     // Remove from ready queue if present.
-    Fiber *prev = NULL;
     Fiber *cur = ready_head;
     while (cur) {
         if (cur->id == fiber_id) {
-            if (prev) {
-                prev->next = cur->next;
-            } else {
-                ready_head = cur->next;
-            }
-            if (cur == ready_tail) {
-                ready_tail = prev;
-            }
-            free(cur->stack);
-            free(cur);
+            cur->cancel_requested = 1;
             return 1;
         }
-        prev = cur;
+        cur = cur->next;
+    }
+
+    // Search steal queue as well.
+    cur = steal_head;
+    while (cur) {
+        if (cur->id == fiber_id) {
+            cur->cancel_requested = 1;
+            return 1;
+        }
         cur = cur->next;
     }
 
     // Best-effort handling if current fiber cancels itself.
     if (current_fiber && current_fiber->id == fiber_id) {
-        current_fiber->state = FIBER_DONE;
-        if (completed_count < MAX_FIBERS) {
-            completed[completed_count++] = current_fiber;
-        }
+        current_fiber->cancel_requested = 1;
         return 1;
     }
 
@@ -263,8 +371,7 @@ void with_runtime_shutdown(void) {
     // Free any remaining completed fibers.
     for (int i = 0; i < completed_count; i++) {
         if (completed[i]) {
-            free(completed[i]->stack);
-            free(completed[i]);
+            recycle_fiber(completed[i]);
         }
     }
     completed_count = 0;
@@ -272,52 +379,131 @@ void with_runtime_shutdown(void) {
     while (ready_head) {
         Fiber *f = dequeue();
         if (f) {
-            free(f->stack);
-            free(f);
+            recycle_fiber(f);
         }
     }
+    while (steal_head) {
+        Fiber *f = dequeue_steal();
+        if (f) {
+            recycle_fiber(f);
+        }
+    }
+    free_fiber_pool();
 }
 
 // Check if any fibers are still running.
 int32_t with_runtime_has_fibers(void) {
-    return ready_head != NULL;
+    return (ready_head != NULL) || (steal_head != NULL);
+}
+
+// Debug/introspection helpers for validating pool reuse behavior.
+int64_t with_fiber_pool_reuses(void) {
+    return fiber_pool_reuse_count;
+}
+
+int64_t with_fiber_pool_allocs(void) {
+    return fiber_pool_alloc_count;
+}
+
+int64_t with_fiber_stack_size_bytes(void) {
+    return (int64_t)FIBER_STACK_SIZE;
+}
+
+int32_t with_fiber_max_fibers(void) {
+    return MAX_FIBERS;
+}
+
+int32_t with_fiber_live_fibers(void) {
+    return live_fiber_count;
+}
+
+int64_t with_fiber_steal_events(void) {
+    return fiber_steal_events;
 }
 
 // ── Channels ────────────────────────────────────────────────────────
 
-#define CHAN_BUFFER_SIZE 256
+#define CHAN_INITIAL_CAPACITY 16
 
 typedef struct {
-    int64_t  buffer[CHAN_BUFFER_SIZE];
+    int64_t *buffer;
     int32_t  head;
     int32_t  tail;
     int32_t  count;
-    int32_t  capacity;
+    int32_t  capacity;         // allocated ring size
+    int32_t  bounded_capacity; // >0 for bounded channels, 0 for unbounded
     int32_t  closed;
 } Channel;
 
-// Create a new channel with given capacity (0 = unbounded up to CHAN_BUFFER_SIZE).
+static int channel_grow(Channel *ch) {
+    if (!ch || ch->bounded_capacity > 0) return 0;
+
+    int32_t old_cap = ch->capacity;
+    int32_t new_cap = old_cap > 0 ? old_cap * 2 : CHAN_INITIAL_CAPACITY;
+    if (new_cap < CHAN_INITIAL_CAPACITY) new_cap = CHAN_INITIAL_CAPACITY;
+
+    int64_t *new_buf = (int64_t *)malloc(sizeof(int64_t) * (size_t)new_cap);
+    if (!new_buf) return 0;
+
+    for (int32_t i = 0; i < ch->count; i++) {
+        new_buf[i] = ch->buffer[(ch->head + i) % old_cap];
+    }
+
+    free(ch->buffer);
+    ch->buffer = new_buf;
+    ch->capacity = new_cap;
+    ch->head = 0;
+    ch->tail = ch->count;
+    return 1;
+}
+
+// Create a new channel with given capacity (0 = unbounded).
 void *with_channel_create(int32_t capacity) {
     Channel *ch = (Channel *)malloc(sizeof(Channel));
     if (!ch) return NULL;
     memset(ch, 0, sizeof(Channel));
-    ch->capacity = (capacity > 0 && capacity < CHAN_BUFFER_SIZE) ? capacity : CHAN_BUFFER_SIZE;
+
+    if (capacity > 0) {
+        ch->bounded_capacity = capacity;
+        ch->capacity = capacity;
+    } else {
+        ch->bounded_capacity = 0;
+        ch->capacity = CHAN_INITIAL_CAPACITY;
+    }
+
+    ch->buffer = (int64_t *)malloc(sizeof(int64_t) * (size_t)ch->capacity);
+    if (!ch->buffer) {
+        free(ch);
+        return NULL;
+    }
+
     return ch;
 }
 
 // Send a value to a channel. Blocks (yields) if channel is full.
 void with_channel_send(void *ch_ptr, int64_t value) {
     Channel *ch = (Channel *)ch_ptr;
+    if (!ch || !ch->buffer) return;
+
     while (ch->count >= ch->capacity) {
+        if (ch->closed) return;
+
+        // Unbounded channel: grow instead of blocking.
+        if (ch->bounded_capacity == 0) {
+            if (channel_grow(ch)) break;
+            // Allocation failure: fall back to cooperative waiting.
+        }
+
         if (current_fiber) {
             with_fiber_yield();
         } else {
-            if (ready_head) run_one_fiber();
+            if (with_runtime_has_fibers()) run_one_fiber();
             else return; // deadlock prevention
         }
     }
+    if (ch->closed) return;
     ch->buffer[ch->tail] = value;
-    ch->tail = (ch->tail + 1) % CHAN_BUFFER_SIZE;
+    ch->tail = (ch->tail + 1) % ch->capacity;
     ch->count++;
 }
 
@@ -325,17 +511,18 @@ void with_channel_send(void *ch_ptr, int64_t value) {
 // Blocks (yields) if channel is empty. Returns -1 if channel closed and empty.
 int64_t with_channel_recv(void *ch_ptr) {
     Channel *ch = (Channel *)ch_ptr;
+    if (!ch || !ch->buffer) return -1;
     while (ch->count == 0) {
         if (ch->closed) return -1;
         if (current_fiber) {
             with_fiber_yield();
         } else {
-            if (ready_head) run_one_fiber();
+            if (with_runtime_has_fibers()) run_one_fiber();
             else return -1; // deadlock prevention
         }
     }
     int64_t value = ch->buffer[ch->head];
-    ch->head = (ch->head + 1) % CHAN_BUFFER_SIZE;
+    ch->head = (ch->head + 1) % ch->capacity;
     ch->count--;
     return value;
 }
@@ -343,9 +530,10 @@ int64_t with_channel_recv(void *ch_ptr) {
 // Try to receive without blocking. Returns 1 if got value (stored in *out), 0 if empty.
 int32_t with_channel_try_recv(void *ch_ptr, int64_t *out) {
     Channel *ch = (Channel *)ch_ptr;
+    if (!ch || !ch->buffer) return 0;
     if (ch->count == 0) return 0;
     *out = ch->buffer[ch->head];
-    ch->head = (ch->head + 1) % CHAN_BUFFER_SIZE;
+    ch->head = (ch->head + 1) % ch->capacity;
     ch->count--;
     return 1;
 }
@@ -376,7 +564,7 @@ int32_t with_fiber_select(int32_t *fiber_ids, int32_t count, int64_t *result_out
         if (current_fiber) {
             with_fiber_yield();
         } else {
-            if (ready_head) {
+            if (with_runtime_has_fibers()) {
                 run_one_fiber();
             } else {
                 return -1; // deadlock
@@ -393,5 +581,8 @@ void with_channel_close(void *ch_ptr) {
 
 // Free channel memory.
 void with_channel_destroy(void *ch_ptr) {
-    free(ch_ptr);
+    Channel *ch = (Channel *)ch_ptr;
+    if (!ch) return;
+    free(ch->buffer);
+    free(ch);
 }

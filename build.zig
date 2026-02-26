@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const llvm_prefix = "/usr/local/llvm";
-
 /// LLVM static libraries (from: llvm-config --libs core analysis native).
 /// Using inline for so the names stay comptime for string concatenation.
 const llvm_lib_flags = [_][]const u8{
@@ -70,6 +68,10 @@ const llvm_lib_flags = [_][]const u8{
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const llvm_prefix = b.graph.env_map.get("LLVM_PREFIX") orelse "/usr/local/llvm";
+    const llvm_include = b.pathJoin(&.{ llvm_prefix, "include" });
+    const llvm_lib = b.pathJoin(&.{ llvm_prefix, "lib" });
+    const clangxx = b.pathJoin(&.{ llvm_prefix, "bin", "clang++" });
 
     // --- Compile Zig source to object file ---
     const obj = b.addObject(.{
@@ -80,20 +82,20 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    obj.root_module.addSystemIncludePath(.{ .cwd_relative = llvm_prefix ++ "/include" });
+    obj.root_module.addSystemIncludePath(.{ .cwd_relative = llvm_include });
     obj.linkLibC();
 
     // --- Link with LLVM's clang (archives contain LTO bitcode) ---
-    const link_cmd = b.addSystemCommand(&.{llvm_prefix ++ "/bin/clang++"});
+    const link_cmd = b.addSystemCommand(&.{clangxx});
     link_cmd.addArtifactArg(obj);
     link_cmd.addArgs(&.{
-        "-L" ++ llvm_prefix ++ "/lib",
+        b.fmt("-L{s}", .{llvm_lib}),
         "-isysroot",
         "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
     });
     link_cmd.addArgs(&llvm_lib_flags);
     link_cmd.addArgs(&.{
-        "-Wl,-rpath," ++ llvm_prefix ++ "/lib",
+        b.fmt("-Wl,-rpath,{s}", .{llvm_lib}),
         "-L/opt/homebrew/lib",
         "-lclang",
         "-lc++",
@@ -166,7 +168,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    unit_tests.root_module.addSystemIncludePath(.{ .cwd_relative = llvm_prefix ++ "/include" });
+    unit_tests.root_module.addSystemIncludePath(.{ .cwd_relative = llvm_include });
     unit_tests.linkLibC();
     const run_unit_tests = b.addRunArtifact(unit_tests);
 

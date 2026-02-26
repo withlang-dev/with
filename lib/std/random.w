@@ -6,10 +6,13 @@ use c_import("#include <stdlib.h>")
 extern fn with_time_now() -> i64
 
 pub fn seed(seed_value: i32) -> void =
-    srand(seed_value)
+    let s = seed_value as u32
+    srand(s)
 
 pub fn seed_now() -> void =
-    srand(with_time_now())
+    let t = with_time_now()
+    let t32 = t as u32
+    srand(t32)
 
 pub fn next_i32() -> i32 =
     rand()

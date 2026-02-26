@@ -4,20 +4,20 @@
 
 use c_import("#include <math.h>")
 
-// Absolute value (integer)
-pub fn abs(x: i32) -> i32 =
+// Absolute value (numeric)
+pub fn abs[T](x: T) -> T =
     if x < 0 then 0 - x else x
 
 // Absolute value (i64)
 pub fn abs64(x: i64) -> i64 =
     if x < 0 then 0 - x else x
 
-// Min of two integers
-pub fn min(a: i32, b: i32) -> i32 =
+// Min of two values
+pub fn min[T](a: T, b: T) -> T =
     if a < b then a else b
 
-// Max of two integers
-pub fn max(a: i32, b: i32) -> i32 =
+// Max of two values
+pub fn max[T](a: T, b: T) -> T =
     if a > b then a else b
 
 // Min of two i64s
@@ -28,8 +28,8 @@ pub fn min64(a: i64, b: i64) -> i64 =
 pub fn max64(a: i64, b: i64) -> i64 =
     if a > b then a else b
 
-// Clamp a value between min and max
-pub fn clamp(x: i32, lo: i32, hi: i32) -> i32 =
+// Clamp a value between lo and hi
+pub fn clamp[T](x: T, lo: T, hi: T) -> T =
     if x < lo then lo
     else if x > hi then hi
     else x

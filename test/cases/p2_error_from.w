@@ -1,4 +1,3 @@
-// Phase 2 gap: error ... from conversion syntax not implemented
 error IoError = Disk
 error AppError from IoError
 
