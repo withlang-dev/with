@@ -1,7 +1,8 @@
-// Test: String interpolation with expressions
+// Test string interpolation
 fn main() -> i32 =
+    let name = "World"
     let x = 42
-    println("value is {x}")
-    let name = "world"
-    println("hello {name}")
+    println("Hello, {name}!")
+    println("x = {x}")
+    println("sum = {x + 1}")
     0
