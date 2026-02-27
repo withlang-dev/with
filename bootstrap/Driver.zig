@@ -364,26 +364,38 @@ fn linkArtifactWithExtraAndLibs(
     return term == .Exited and term.Exited == 0;
 }
 
+fn sourceStem(source_path: []const u8) []const u8 {
+    const base = std.fs.path.basename(source_path);
+    if (std.mem.endsWith(u8, base, ".w")) {
+        return base[0 .. base.len - 2];
+    }
+    return base;
+}
+
 /// Full pipeline: parse → codegen → link → binary.
 pub fn buildBinary(self: *Driver, source_path: []const u8) !?[]const u8 {
-    const module = try self.compileFile(source_path) orelse return null;
-
-    // Derive output paths from source path: foo.w → foo.o, foo
-    const stem = blk: {
-        const base = std.fs.path.basename(source_path);
-        if (std.mem.endsWith(u8, base, ".w")) {
-            break :blk base[0 .. base.len - 2];
-        }
-        break :blk base;
-    };
     const dir = std.fs.path.dirname(source_path) orelse ".";
+    return self.buildBinaryAt(source_path, dir, null);
+}
+
+/// Full pipeline: parse → codegen → link → binary.
+/// The output binary/object are placed in `output_dir`.
+/// If `output_stem` is null, the source filename stem is used.
+pub fn buildBinaryAt(
+    self: *Driver,
+    source_path: []const u8,
+    output_dir: []const u8,
+    output_stem: ?[]const u8,
+) !?[]const u8 {
+    const module = try self.compileFile(source_path) orelse return null;
+    const stem = output_stem orelse sourceStem(source_path);
 
     // Build null-terminated object path.
     var obj_buf: [4096]u8 = undefined;
-    const obj_path = std.fmt.bufPrint(&obj_buf, "{s}/{s}.o", .{ dir, stem }) catch return null;
+    const obj_path = std.fmt.bufPrint(&obj_buf, "{s}/{s}.o", .{ output_dir, stem }) catch return null;
     obj_buf[obj_path.len] = 0;
 
-    const bin_path = std.fmt.allocPrint(self.arena.allocator(), "{s}/{s}", .{ dir, stem }) catch return null;
+    const bin_path = std.fmt.allocPrint(self.arena.allocator(), "{s}/{s}", .{ output_dir, stem }) catch return null;
 
     const uses_async = try self.compileToObject(&module, obj_buf[0..obj_path.len :0]);
     if (uses_async == null) return null;
@@ -433,7 +445,11 @@ pub fn buildBinary(self: *Driver, source_path: []const u8) !?[]const u8 {
     }
 
     // Clean up the .o file.
-    std.fs.cwd().deleteFile(obj_path) catch {};
+    if (std.fs.path.isAbsolute(obj_path)) {
+        std.fs.deleteFileAbsolute(obj_path) catch {};
+    } else {
+        std.fs.cwd().deleteFile(obj_path) catch {};
+    }
 
     return bin_path;
 }

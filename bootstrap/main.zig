@@ -1,8 +1,9 @@
 //! CLI entry point for the With compiler.
 //!
 //! Usage:
-//!   with run <file.w>     Compile and run a With source file
-//!   with build <file.w>   Compile a With source file
+//!   with run [file.w]     Build + run package or source file
+//!   with build [file.w]   Build package or source file
+//!   with clean            Remove .with build/test artifacts
 //!   with ast <file.w>     Parse and dump the AST (debug)
 //!   with tokens <file.w>  Lex and dump tokens (debug)
 
@@ -35,10 +36,14 @@ pub fn main() !void {
     var opt_level: u8 = 0;
     var no_std = false;
     var alloc_mode = false;
+    var release_mode = false;
     for (args) |arg| {
         if (arg.len == 3 and arg[0] == '-' and arg[1] == 'O') {
             opt_level = arg[2] - '0';
             if (opt_level > 3) opt_level = 2;
+        } else if (std.mem.eql(u8, arg, "--release")) {
+            release_mode = true;
+            if (opt_level < 2) opt_level = 2;
         } else if (std.mem.eql(u8, arg, "--no-std")) {
             no_std = true;
         } else if (std.mem.eql(u8, arg, "--alloc")) {
@@ -55,65 +60,25 @@ pub fn main() !void {
     };
 
     if (std.mem.eql(u8, command, "build")) {
-        const file = source_file orelse {
-            stderrPrint("error: 'build' requires a source file argument\n");
-            printUsage();
-            std.process.exit(1);
-        };
-        var driver = Driver.init(allocator);
-        defer driver.deinit();
-        driver.opt_level = opt_level;
-        driver.no_std = no_std;
-        driver.alloc = alloc_mode;
-
-        const bin_path = try driver.buildBinary(file);
-        if (bin_path) |p| {
-            var buf: [4096]u8 = undefined;
-            var w = std.fs.File.stderr().writer(&buf);
-            w.interface.print("compiled: {s}\n", .{p}) catch {};
-            w.interface.flush() catch {};
-            driver.printWarnings();
-        } else {
-            std.process.exit(1);
-        }
+        const code = try runBuildCommand(
+            args[2..],
+            opt_level,
+            no_std,
+            alloc_mode,
+            release_mode,
+            std.heap.page_allocator,
+        );
+        if (code != 0) std.process.exit(code);
     } else if (std.mem.eql(u8, command, "run")) {
-        const file = source_file orelse {
-            stderrPrint("error: 'run' requires a source file argument\n");
-            printUsage();
-            std.process.exit(1);
-        };
-        var driver = Driver.init(allocator);
-        defer driver.deinit();
-        driver.opt_level = opt_level;
-        driver.no_std = no_std;
-        driver.alloc = alloc_mode;
-
-        const bin_path = try driver.buildBinary(file);
-        if (bin_path) |p| {
-            driver.printWarnings();
-            // Execute the binary.
-            var child = std.process.Child.init(&.{p}, allocator);
-            _ = child.spawn() catch |e| {
-                var buf: [4096]u8 = undefined;
-                var w = std.fs.File.stderr().writer(&buf);
-                w.interface.print("error: failed to spawn binary: {}\n", .{e}) catch {};
-                w.interface.flush() catch {};
-                std.process.exit(1);
-            };
-            const term = child.wait() catch |e| {
-                var buf: [4096]u8 = undefined;
-                var w = std.fs.File.stderr().writer(&buf);
-                w.interface.print("error: failed to execute binary: {}\n", .{e}) catch {};
-                w.interface.flush() catch {};
-                std.process.exit(1);
-            };
-            if (term == .Exited) {
-                std.process.exit(term.Exited);
-            }
-            std.process.exit(1);
-        } else {
-            std.process.exit(1);
-        }
+        const code = try runRunCommand(
+            args[2..],
+            opt_level,
+            no_std,
+            alloc_mode,
+            release_mode,
+            std.heap.page_allocator,
+        );
+        if (code != 0) std.process.exit(code);
     } else if (std.mem.eql(u8, command, "ir")) {
         const file = source_file orelse {
             stderrPrint("error: 'ir' requires a source file argument\n");
@@ -166,7 +131,10 @@ pub fn main() !void {
             std.process.exit(1);
         }
     } else if (std.mem.eql(u8, command, "test")) {
-        const code = try runPackageTests(args[2..], opt_level, no_std, alloc_mode, std.heap.page_allocator);
+        const code = try runTestCommand(args[2..], opt_level, no_std, alloc_mode, std.heap.page_allocator);
+        if (code != 0) std.process.exit(code);
+    } else if (std.mem.eql(u8, command, "clean")) {
+        const code = try runCleanCommand(args[2..], std.heap.page_allocator);
         if (code != 0) std.process.exit(code);
     } else if (std.mem.eql(u8, command, "test-harness")) {
         var target: []const u8 = "test/cases";
@@ -317,11 +285,13 @@ fn printUsage() void {
         \\Usage: with <command> [options]
         \\
         \\Commands:
-        \\  build <file.w>    Compile a With source file to a binary
-        \\  run <file.w>      Compile and run a With source file
+        \\  build [file.w]    Build package (default entrypoint) or a source file
+        \\  run [file.w]      Build + run package or a source file
         \\  check <file.w>    Parse and type-check a source file
         \\  test [flags] [filter]
         \\                    Run package tests (annotations: @[test], @[before], @[after])
+        \\                    Workspace root: add -p <member> to select one package
+        \\  clean [--all]     Delete .with/ artifacts (workspace: all members)
         \\  test-harness [path] [--update]
         \\                    Run built-in snapshot harness (default: test/cases)
         \\  fmt <file.w>      Format a source file (to stdout)
@@ -1085,7 +1055,942 @@ const ParseDurationError = error{
 
 const with_test_skip_marker = "__WITH_TEST_SKIP__";
 
-fn runPackageTests(
+const ParseCommandOptionsError = error{
+    InvalidArgs,
+    OutOfMemory,
+};
+
+const ProjectContextKind = enum {
+    package,
+    workspace,
+    none,
+};
+
+const ProjectContext = struct {
+    kind: ProjectContextKind,
+    root: []const u8,
+};
+
+const WorkspaceMember = struct {
+    name: []const u8,
+    root_path: []const u8,
+};
+
+const WorkspaceDiscovery = struct {
+    members: std.ArrayList(WorkspaceMember) = .empty,
+
+    fn deinit(self: *WorkspaceDiscovery, allocator: std.mem.Allocator) void {
+        for (self.members.items) |member| {
+            allocator.free(member.name);
+            allocator.free(member.root_path);
+        }
+        self.members.deinit(allocator);
+    }
+};
+
+const ArtifactLayout = struct {
+    with_dir: []const u8,
+    build_dir: []const u8,
+    test_dir: []const u8,
+
+    fn deinit(self: *const ArtifactLayout, allocator: std.mem.Allocator) void {
+        allocator.free(self.with_dir);
+        allocator.free(self.build_dir);
+        allocator.free(self.test_dir);
+    }
+};
+
+const PackageBuildInputs = struct {
+    source_path: []const u8,
+    output_stem: []const u8,
+
+    fn deinit(self: *const PackageBuildInputs, allocator: std.mem.Allocator) void {
+        allocator.free(self.source_path);
+        allocator.free(self.output_stem);
+    }
+};
+
+const BuildCommandOptions = struct {
+    source_file: ?[]const u8 = null,
+    package_filter: ?[]const u8 = null,
+};
+
+const RunCommandOptions = struct {
+    source_file: ?[]const u8 = null,
+    package_filter: ?[]const u8 = null,
+    program_args: []const []const u8 = &.{},
+};
+
+const TestCommandTopOptions = struct {
+    package_filter: ?[]const u8 = null,
+    forwarded_args: [][]const u8,
+};
+
+const CleanCommandOptions = struct {
+    package_filter: ?[]const u8 = null,
+    all: bool = false,
+};
+
+const DefaultEntryError = error{
+    MissingEntrypoint,
+    AmbiguousEntrypoint,
+};
+
+fn commandOptionError(msg: []const u8) ParseCommandOptionsError {
+    stderrPrint(msg);
+    return error.InvalidArgs;
+}
+
+fn isGlobalDriverFlag(arg: []const u8) bool {
+    if (arg.len == 3 and arg[0] == '-' and arg[1] == 'O') return true;
+    if (std.mem.eql(u8, arg, "--no-std")) return true;
+    if (std.mem.eql(u8, arg, "--alloc")) return true;
+    if (std.mem.eql(u8, arg, "--release")) return true;
+    return false;
+}
+
+fn sourceStem(path: []const u8) []const u8 {
+    const base = std.fs.path.basename(path);
+    if (std.mem.endsWith(u8, base, ".w")) return base[0 .. base.len - 2];
+    return base;
+}
+
+fn directoryHasWithToml(dir_path: []const u8, allocator: std.mem.Allocator) bool {
+    const with_toml = std.fmt.allocPrint(allocator, "{s}/with.toml", .{dir_path}) catch return false;
+    defer allocator.free(with_toml);
+    return pathExistsAbsolute(with_toml);
+}
+
+fn directoryHasWorkspaceToml(dir_path: []const u8, allocator: std.mem.Allocator) bool {
+    const workspace_toml = std.fmt.allocPrint(allocator, "{s}/with-workspace.toml", .{dir_path}) catch return false;
+    defer allocator.free(workspace_toml);
+    return pathExistsAbsolute(workspace_toml);
+}
+
+fn detectProjectContext(allocator: std.mem.Allocator) !ProjectContext {
+    const cwd = try std.process.getCwdAlloc(allocator);
+    const fallback = try allocator.dupe(u8, cwd);
+    var current = cwd;
+
+    while (true) {
+        const has_package = directoryHasWithToml(current, allocator);
+        const has_workspace = directoryHasWorkspaceToml(current, allocator);
+        if (has_package and has_workspace) {
+            stderrPrint("error: directory cannot contain both with.toml and with-workspace.toml\n");
+            allocator.free(fallback);
+            allocator.free(current);
+            return error.InvalidProjectLayout;
+        }
+        if (has_package) {
+            allocator.free(fallback);
+            return .{ .kind = .package, .root = current };
+        }
+        if (has_workspace) {
+            allocator.free(fallback);
+            return .{ .kind = .workspace, .root = current };
+        }
+
+        const parent = std.fs.path.dirname(current) orelse break;
+        if (std.mem.eql(u8, parent, current)) break;
+
+        const next = try allocator.dupe(u8, parent);
+        allocator.free(current);
+        current = next;
+    }
+
+    allocator.free(current);
+    return .{ .kind = .none, .root = fallback };
+}
+
+fn ensureDirAbsolute(path: []const u8) !void {
+    std.fs.makeDirAbsolute(path) catch |err| switch (err) {
+        error.PathAlreadyExists => {},
+        else => return err,
+    };
+}
+
+fn ensureArtifactLayout(package_root: []const u8, release_mode: bool, allocator: std.mem.Allocator) !ArtifactLayout {
+    const with_dir = try std.fmt.allocPrint(allocator, "{s}/.with", .{package_root});
+    errdefer allocator.free(with_dir);
+    try ensureDirAbsolute(with_dir);
+
+    const build_parent = try std.fmt.allocPrint(allocator, "{s}/build", .{with_dir});
+    errdefer allocator.free(build_parent);
+    try ensureDirAbsolute(build_parent);
+
+    const build_dir = if (release_mode)
+        try std.fmt.allocPrint(allocator, "{s}/release", .{build_parent})
+    else
+        try allocator.dupe(u8, build_parent);
+    errdefer allocator.free(build_dir);
+    if (release_mode) try ensureDirAbsolute(build_dir);
+
+    const test_dir = try std.fmt.allocPrint(allocator, "{s}/test", .{with_dir});
+    errdefer allocator.free(test_dir);
+    try ensureDirAbsolute(test_dir);
+
+    allocator.free(build_parent);
+    return .{
+        .with_dir = with_dir,
+        .build_dir = build_dir,
+        .test_dir = test_dir,
+    };
+}
+
+fn parsePackageNameFromWithToml(package_root: []const u8, allocator: std.mem.Allocator) !?[]const u8 {
+    const with_toml = try std.fmt.allocPrint(allocator, "{s}/with.toml", .{package_root});
+    defer allocator.free(with_toml);
+    if (!pathExistsAbsolute(with_toml)) return null;
+
+    var file = std.fs.openFileAbsolute(with_toml, .{}) catch |err| switch (err) {
+        error.FileNotFound => return null,
+        else => return err,
+    };
+    defer file.close();
+
+    const text = try file.readToEndAlloc(allocator, 512 * 1024);
+    defer allocator.free(text);
+
+    var in_package = false;
+    var line_it = std.mem.splitScalar(u8, text, '\n');
+    while (line_it.next()) |line_raw| {
+        const line = std.mem.trim(u8, line_raw, " \t\r");
+        if (line.len == 0) continue;
+        if (line[0] == '#') continue;
+        if (line[0] == '[' and line[line.len - 1] == ']') {
+            in_package = std.mem.eql(u8, line, "[package]");
+            continue;
+        }
+        if (!in_package) continue;
+        if (!std.mem.startsWith(u8, line, "name")) continue;
+
+        var rest = std.mem.trimLeft(u8, line["name".len..], " \t");
+        if (rest.len == 0 or rest[0] != '=') continue;
+        rest = std.mem.trimLeft(u8, rest[1..], " \t");
+        if (rest.len < 2 or rest[0] != '"') continue;
+        var end_idx: usize = 1;
+        while (end_idx < rest.len and rest[end_idx] != '"') : (end_idx += 1) {}
+        if (end_idx >= rest.len) continue;
+        return try allocator.dupe(u8, rest[1..end_idx]);
+    }
+
+    return null;
+}
+
+fn findDefaultPackageEntrypoint(package_root: []const u8, allocator: std.mem.Allocator) ![]const u8 {
+    const src_main = try std.fmt.allocPrint(allocator, "{s}/src/main.w", .{package_root});
+    if (pathExistsAbsolute(src_main)) return src_main;
+    allocator.free(src_main);
+
+    const root_main = try std.fmt.allocPrint(allocator, "{s}/main.w", .{package_root});
+    if (pathExistsAbsolute(root_main)) return root_main;
+    allocator.free(root_main);
+
+    var dir = try std.fs.openDirAbsolute(package_root, .{ .iterate = true });
+    defer dir.close();
+    var it = dir.iterate();
+
+    var candidate: ?[]const u8 = null;
+    var count: usize = 0;
+    while (try it.next()) |entry| {
+        if (entry.kind != .file) continue;
+        if (!std.mem.endsWith(u8, entry.name, ".w")) continue;
+        if (std.mem.startsWith(u8, entry.name, ".")) continue;
+        count += 1;
+        if (count == 1) {
+            candidate = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ package_root, entry.name });
+        } else if (candidate) |path| {
+            allocator.free(path);
+            candidate = null;
+        }
+    }
+
+    if (count == 1 and candidate != null) return candidate.?;
+    if (count > 1) return error.AmbiguousEntrypoint;
+    return error.MissingEntrypoint;
+}
+
+fn resolvePackageBuildInputs(
+    package_root: []const u8,
+    explicit_source: ?[]const u8,
+    allocator: std.mem.Allocator,
+) !PackageBuildInputs {
+    if (explicit_source) |src| {
+        return .{
+            .source_path = try allocator.dupe(u8, src),
+            .output_stem = try allocator.dupe(u8, sourceStem(src)),
+        };
+    }
+
+    const source_path = try findDefaultPackageEntrypoint(package_root, allocator);
+    errdefer allocator.free(source_path);
+
+    const package_name = try parsePackageNameFromWithToml(package_root, allocator);
+    if (package_name) |name| {
+        return .{
+            .source_path = source_path,
+            .output_stem = name,
+        };
+    }
+
+    return .{
+        .source_path = source_path,
+        .output_stem = try allocator.dupe(u8, sourceStem(source_path)),
+    };
+}
+
+fn parseWorkspaceMembersFromToml(text: []const u8, allocator: std.mem.Allocator) ![][]const u8 {
+    var members_buf: std.ArrayList(u8) = .empty;
+    defer members_buf.deinit(allocator);
+
+    var in_workspace = false;
+    var capturing = false;
+    var line_it = std.mem.splitScalar(u8, text, '\n');
+    while (line_it.next()) |line_raw| {
+        const line = std.mem.trim(u8, line_raw, " \t\r");
+        if (line.len == 0) continue;
+        if (line[0] == '#') continue;
+        if (line[0] == '[' and line[line.len - 1] == ']') {
+            in_workspace = std.mem.eql(u8, line, "[workspace]");
+            continue;
+        }
+        if (!in_workspace) continue;
+        if (!capturing and std.mem.startsWith(u8, line, "members")) {
+            capturing = true;
+        }
+        if (!capturing) continue;
+
+        try members_buf.appendSlice(allocator, line);
+        try members_buf.append(allocator, '\n');
+        if (std.mem.indexOfScalar(u8, line, ']') != null) break;
+    }
+
+    if (members_buf.items.len == 0) return error.InvalidWorkspaceConfig;
+
+    var members: std.ArrayList([]const u8) = .empty;
+    errdefer {
+        for (members.items) |item| allocator.free(item);
+        members.deinit(allocator);
+    }
+
+    var i: usize = 0;
+    while (i < members_buf.items.len) : (i += 1) {
+        if (members_buf.items[i] != '"') continue;
+        i += 1;
+        const start = i;
+        while (i < members_buf.items.len and members_buf.items[i] != '"') : (i += 1) {}
+        if (i >= members_buf.items.len) return error.InvalidWorkspaceConfig;
+        const value = std.mem.trim(u8, members_buf.items[start..i], " \t\r\n");
+        if (value.len == 0) continue;
+        try members.append(allocator, try allocator.dupe(u8, value));
+    }
+
+    if (members.items.len == 0) return error.InvalidWorkspaceConfig;
+    return try members.toOwnedSlice(allocator);
+}
+
+fn workspaceContainsRoot(members: []const WorkspaceMember, root_path: []const u8) bool {
+    for (members) |member| {
+        if (std.mem.eql(u8, member.root_path, root_path)) return true;
+    }
+    return false;
+}
+
+fn sortWorkspaceMembers(members: []WorkspaceMember) void {
+    var i: usize = 1;
+    while (i < members.len) : (i += 1) {
+        var j = i;
+        while (j > 0 and std.mem.order(u8, members[j].name, members[j - 1].name) == .lt) : (j -= 1) {
+            const tmp = members[j];
+            members[j] = members[j - 1];
+            members[j - 1] = tmp;
+        }
+    }
+}
+
+fn discoverWorkspaceMembers(workspace_root: []const u8, allocator: std.mem.Allocator) !WorkspaceDiscovery {
+    const workspace_toml = try std.fmt.allocPrint(allocator, "{s}/with-workspace.toml", .{workspace_root});
+    defer allocator.free(workspace_toml);
+
+    var file = try std.fs.openFileAbsolute(workspace_toml, .{});
+    defer file.close();
+    const text = try file.readToEndAlloc(allocator, 512 * 1024);
+    defer allocator.free(text);
+
+    const configured_members = try parseWorkspaceMembersFromToml(text, allocator);
+    defer {
+        for (configured_members) |member| allocator.free(member);
+        allocator.free(configured_members);
+    }
+
+    var out: WorkspaceDiscovery = .{};
+    errdefer out.deinit(allocator);
+
+    var all_members = false;
+    for (configured_members) |member| {
+        if (std.mem.eql(u8, member, "*")) {
+            all_members = true;
+            break;
+        }
+    }
+
+    if (all_members) {
+        var dir = try std.fs.openDirAbsolute(workspace_root, .{ .iterate = true });
+        defer dir.close();
+        var it = dir.iterate();
+        while (try it.next()) |entry| {
+            if (entry.kind != .directory) continue;
+            if (std.mem.startsWith(u8, entry.name, ".")) continue;
+            const member_root = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ workspace_root, entry.name });
+            errdefer allocator.free(member_root);
+            if (!directoryHasWithToml(member_root, allocator)) {
+                allocator.free(member_root);
+                continue;
+            }
+            if (workspaceContainsRoot(out.members.items, member_root)) {
+                allocator.free(member_root);
+                continue;
+            }
+            const member_name = try allocator.dupe(u8, entry.name);
+            errdefer allocator.free(member_name);
+            try out.members.append(allocator, .{
+                .name = member_name,
+                .root_path = member_root,
+            });
+        }
+    } else {
+        for (configured_members) |member_rel| {
+            const member_root = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ workspace_root, member_rel });
+            errdefer allocator.free(member_root);
+            if (!directoryHasWithToml(member_root, allocator)) {
+                var err_buf: [512]u8 = undefined;
+                const msg = std.fmt.bufPrint(
+                    &err_buf,
+                    "error: workspace member '{s}' does not contain with.toml\n",
+                    .{member_rel},
+                ) catch "error: invalid workspace member\n";
+                stderrPrint(msg);
+                return error.InvalidWorkspaceConfig;
+            }
+            if (workspaceContainsRoot(out.members.items, member_root)) {
+                allocator.free(member_root);
+                continue;
+            }
+            const member_name = try allocator.dupe(u8, std.fs.path.basename(member_rel));
+            errdefer allocator.free(member_name);
+            try out.members.append(allocator, .{
+                .name = member_name,
+                .root_path = member_root,
+            });
+        }
+    }
+
+    sortWorkspaceMembers(out.members.items);
+    return out;
+}
+
+fn workspaceMemberSelected(member: WorkspaceMember, filter: ?[]const u8) bool {
+    if (filter == null) return true;
+    return std.mem.eql(u8, member.name, filter.?);
+}
+
+fn parseBuildCommandOptions(raw_args: []const []const u8) ParseCommandOptionsError!BuildCommandOptions {
+    var options: BuildCommandOptions = .{};
+
+    var idx: usize = 0;
+    while (idx < raw_args.len) : (idx += 1) {
+        const arg = raw_args[idx];
+        if (isGlobalDriverFlag(arg)) continue;
+        if (std.mem.eql(u8, arg, "-p") or std.mem.eql(u8, arg, "--package")) {
+            if (idx + 1 >= raw_args.len) return commandOptionError("error: -p/--package requires a value\n");
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = raw_args[idx + 1];
+            idx += 1;
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-p=")) {
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = arg["-p=".len..];
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "--package=")) {
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = arg["--package=".len..];
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-")) {
+            var err_buf: [256]u8 = undefined;
+            const msg = std.fmt.bufPrint(&err_buf, "error: unknown build flag '{s}'\n", .{arg}) catch "error: unknown build flag\n";
+            return commandOptionError(msg);
+        }
+        if (options.source_file != null) {
+            return commandOptionError("error: build accepts at most one source file\n");
+        }
+        options.source_file = arg;
+    }
+
+    return options;
+}
+
+fn parseRunCommandOptions(raw_args: []const []const u8) ParseCommandOptionsError!RunCommandOptions {
+    var options: RunCommandOptions = .{};
+
+    var idx: usize = 0;
+    while (idx < raw_args.len) : (idx += 1) {
+        const arg = raw_args[idx];
+        if (std.mem.eql(u8, arg, "--")) {
+            options.program_args = raw_args[idx + 1 ..];
+            break;
+        }
+        if (isGlobalDriverFlag(arg)) continue;
+        if (std.mem.eql(u8, arg, "-p") or std.mem.eql(u8, arg, "--package")) {
+            if (idx + 1 >= raw_args.len) return commandOptionError("error: -p/--package requires a value\n");
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = raw_args[idx + 1];
+            idx += 1;
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-p=")) {
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = arg["-p=".len..];
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "--package=")) {
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = arg["--package=".len..];
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-")) {
+            var err_buf: [256]u8 = undefined;
+            const msg = std.fmt.bufPrint(&err_buf, "error: unknown run flag '{s}'\n", .{arg}) catch "error: unknown run flag\n";
+            return commandOptionError(msg);
+        }
+        if (options.source_file != null) {
+            return commandOptionError("error: run accepts at most one source file\n");
+        }
+        options.source_file = arg;
+    }
+
+    return options;
+}
+
+fn parseTestTopOptions(raw_args: []const []const u8, allocator: std.mem.Allocator) ParseCommandOptionsError!TestCommandTopOptions {
+    var options: TestCommandTopOptions = .{ .forwarded_args = &.{} };
+    var forwarded: std.ArrayList([]const u8) = .empty;
+    errdefer forwarded.deinit(allocator);
+
+    var idx: usize = 0;
+    while (idx < raw_args.len) : (idx += 1) {
+        const arg = raw_args[idx];
+        if (std.mem.eql(u8, arg, "-p") or std.mem.eql(u8, arg, "--package")) {
+            if (idx + 1 >= raw_args.len) return commandOptionError("error: -p/--package requires a value\n");
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = raw_args[idx + 1];
+            idx += 1;
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-p=")) {
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = arg["-p=".len..];
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "--package=")) {
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = arg["--package=".len..];
+            continue;
+        }
+        try forwarded.append(allocator, arg);
+    }
+
+    options.forwarded_args = try forwarded.toOwnedSlice(allocator);
+    return options;
+}
+
+fn parseCleanCommandOptions(raw_args: []const []const u8) ParseCommandOptionsError!CleanCommandOptions {
+    var options: CleanCommandOptions = .{};
+    var idx: usize = 0;
+    while (idx < raw_args.len) : (idx += 1) {
+        const arg = raw_args[idx];
+        if (std.mem.eql(u8, arg, "--all")) {
+            options.all = true;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "-p") or std.mem.eql(u8, arg, "--package")) {
+            if (idx + 1 >= raw_args.len) return commandOptionError("error: -p/--package requires a value\n");
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = raw_args[idx + 1];
+            idx += 1;
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-p=")) {
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = arg["-p=".len..];
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "--package=")) {
+            if (options.package_filter != null) return commandOptionError("error: -p/--package may only be provided once\n");
+            options.package_filter = arg["--package=".len..];
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-")) {
+            var err_buf: [256]u8 = undefined;
+            const msg = std.fmt.bufPrint(&err_buf, "error: unknown clean flag '{s}'\n", .{arg}) catch "error: unknown clean flag\n";
+            return commandOptionError(msg);
+        }
+        return commandOptionError("error: clean does not accept positional arguments\n");
+    }
+    return options;
+}
+
+fn buildPackageBinary(
+    package_root: []const u8,
+    source_file: ?[]const u8,
+    opt_level: u8,
+    no_std: bool,
+    alloc_mode: bool,
+    release_mode: bool,
+    allocator: std.mem.Allocator,
+    emit_compiled_line: bool,
+) !?[]const u8 {
+    var inputs = resolvePackageBuildInputs(package_root, source_file, allocator) catch |err| {
+        switch (err) {
+            error.MissingEntrypoint => {
+                stderrPrint("error: no package entrypoint found (expected src/main.w, main.w, or one top-level .w file)\n");
+            },
+            error.AmbiguousEntrypoint => {
+                stderrPrint("error: multiple top-level .w files found; pass an explicit source file\n");
+            },
+            else => {
+                var err_buf: [256]u8 = undefined;
+                const msg = std.fmt.bufPrint(&err_buf, "error: failed to resolve build inputs ({s})\n", .{@errorName(err)}) catch "error: failed to resolve build inputs\n";
+                stderrPrint(msg);
+            },
+        }
+        return null;
+    };
+    defer inputs.deinit(allocator);
+
+    var layout = ensureArtifactLayout(package_root, release_mode, allocator) catch |err| {
+        var err_buf: [256]u8 = undefined;
+        const msg = std.fmt.bufPrint(&err_buf, "error: failed to create .with directories ({s})\n", .{@errorName(err)}) catch "error: failed to create .with directories\n";
+        stderrPrint(msg);
+        return null;
+    };
+    defer layout.deinit(allocator);
+
+    var driver = Driver.init(allocator);
+    defer driver.deinit();
+    driver.opt_level = opt_level;
+    driver.no_std = no_std;
+    driver.alloc = alloc_mode;
+
+    const bin_path = try driver.buildBinaryAt(inputs.source_path, layout.build_dir, inputs.output_stem);
+    if (bin_path == null) return null;
+
+    if (emit_compiled_line) {
+        var buf: [4096]u8 = undefined;
+        var w = std.fs.File.stderr().writer(&buf);
+        w.interface.print("compiled: {s}\n", .{bin_path.?}) catch {};
+        w.interface.flush() catch {};
+    }
+    driver.printWarnings();
+
+    return try allocator.dupe(u8, bin_path.?);
+}
+
+fn runCompiledBinary(
+    binary_path: []const u8,
+    run_root: []const u8,
+    program_args: []const []const u8,
+    allocator: std.mem.Allocator,
+) !u8 {
+    var argv: std.ArrayList([]const u8) = .empty;
+    defer argv.deinit(allocator);
+    try argv.append(allocator, binary_path);
+    for (program_args) |arg| try argv.append(allocator, arg);
+
+    var child = std.process.Child.init(argv.items, allocator);
+    var cwd_dir = std.fs.openDirAbsolute(run_root, .{}) catch |err| {
+        var err_buf: [256]u8 = undefined;
+        const msg = std.fmt.bufPrint(&err_buf, "error: failed to open run directory '{s}' ({s})\n", .{ run_root, @errorName(err) }) catch "error: failed to open run directory\n";
+        stderrPrint(msg);
+        return 1;
+    };
+    defer cwd_dir.close();
+    child.cwd_dir = cwd_dir;
+
+    _ = child.spawn() catch |e| {
+        var buf: [4096]u8 = undefined;
+        var w = std.fs.File.stderr().writer(&buf);
+        w.interface.print("error: failed to spawn binary: {}\n", .{e}) catch {};
+        w.interface.flush() catch {};
+        return 1;
+    };
+    const term = child.wait() catch |e| {
+        var buf: [4096]u8 = undefined;
+        var w = std.fs.File.stderr().writer(&buf);
+        w.interface.print("error: failed to execute binary: {}\n", .{e}) catch {};
+        w.interface.flush() catch {};
+        return 1;
+    };
+    if (term == .Exited) return term.Exited;
+    return 1;
+}
+
+fn runBuildCommand(
+    raw_args: []const []const u8,
+    opt_level: u8,
+    no_std: bool,
+    alloc_mode: bool,
+    release_mode: bool,
+    allocator: std.mem.Allocator,
+) !u8 {
+    const options = parseBuildCommandOptions(raw_args) catch return 1;
+    const context = detectProjectContext(allocator) catch return 1;
+    defer allocator.free(context.root);
+
+    if (context.kind == .workspace) {
+        if (options.source_file != null) {
+            stderrPrint("error: workspace build does not accept a direct source file\n");
+            return 1;
+        }
+        var workspace = discoverWorkspaceMembers(context.root, allocator) catch return 1;
+        defer workspace.deinit(allocator);
+
+        var selected: usize = 0;
+        var failed: usize = 0;
+        for (workspace.members.items) |member| {
+            if (!workspaceMemberSelected(member, options.package_filter)) continue;
+            selected += 1;
+            var head_buf: [256]u8 = undefined;
+            var w = std.fs.File.stdout().writer(&head_buf);
+            w.interface.print("building {s}...\n", .{member.name}) catch {};
+            w.interface.flush() catch {};
+
+            const result = try buildPackageBinary(
+                member.root_path,
+                null,
+                opt_level,
+                no_std,
+                alloc_mode,
+                release_mode,
+                allocator,
+                true,
+            );
+            if (result) |bin_path| {
+                allocator.free(bin_path);
+                var ok_buf: [128]u8 = undefined;
+                var ok_w = std.fs.File.stdout().writer(&ok_buf);
+                ok_w.interface.writeAll("ok\n") catch {};
+                ok_w.interface.flush() catch {};
+            } else {
+                failed += 1;
+                var fail_buf: [128]u8 = undefined;
+                var fail_w = std.fs.File.stdout().writer(&fail_buf);
+                fail_w.interface.writeAll("FAIL\n") catch {};
+                fail_w.interface.flush() catch {};
+            }
+        }
+        if (selected == 0) {
+            stderrPrint("error: no workspace members matched selection\n");
+            return 1;
+        }
+        return if (failed == 0) 0 else 1;
+    }
+
+    if (options.package_filter != null) {
+        stderrPrint("error: -p/--package can only be used at a workspace root\n");
+        return 1;
+    }
+
+    const result = try buildPackageBinary(
+        context.root,
+        options.source_file,
+        opt_level,
+        no_std,
+        alloc_mode,
+        release_mode,
+        allocator,
+        true,
+    );
+    if (result) |bin_path| {
+        allocator.free(bin_path);
+        return 0;
+    }
+    return 1;
+}
+
+fn runRunCommand(
+    raw_args: []const []const u8,
+    opt_level: u8,
+    no_std: bool,
+    alloc_mode: bool,
+    release_mode: bool,
+    allocator: std.mem.Allocator,
+) !u8 {
+    const options = parseRunCommandOptions(raw_args) catch return 1;
+    const context = detectProjectContext(allocator) catch return 1;
+    defer allocator.free(context.root);
+
+    var target_root: []const u8 = context.root;
+    var target_source: ?[]const u8 = options.source_file;
+    var owned_target_root: ?[]const u8 = null;
+    defer if (owned_target_root) |path| allocator.free(path);
+
+    if (context.kind == .workspace) {
+        if (options.source_file != null) {
+            stderrPrint("error: workspace run does not accept a direct source file\n");
+            return 1;
+        }
+        if (options.package_filter == null) {
+            stderrPrint("error: workspace run requires -p <member>\n");
+            return 1;
+        }
+        var workspace = discoverWorkspaceMembers(context.root, allocator) catch return 1;
+        defer workspace.deinit(allocator);
+
+        var matched_root: ?[]const u8 = null;
+        for (workspace.members.items) |member| {
+            if (!workspaceMemberSelected(member, options.package_filter)) continue;
+            matched_root = member.root_path;
+            break;
+        }
+        if (matched_root == null) {
+            stderrPrint("error: workspace member not found\n");
+            return 1;
+        }
+        owned_target_root = try allocator.dupe(u8, matched_root.?);
+        target_root = owned_target_root.?;
+        target_source = null;
+    } else if (options.package_filter != null) {
+        stderrPrint("error: -p/--package can only be used at a workspace root\n");
+        return 1;
+    }
+
+    const built = try buildPackageBinary(
+        target_root,
+        target_source,
+        opt_level,
+        no_std,
+        alloc_mode,
+        release_mode,
+        allocator,
+        false,
+    );
+    if (built == null) return 1;
+    defer allocator.free(built.?);
+
+    return try runCompiledBinary(built.?, target_root, options.program_args, allocator);
+}
+
+fn runTestCommand(
+    raw_args: []const []const u8,
+    opt_level: u8,
+    no_std: bool,
+    alloc_mode: bool,
+    allocator: std.mem.Allocator,
+) !u8 {
+    const options = parseTestTopOptions(raw_args, allocator) catch return 1;
+    defer allocator.free(options.forwarded_args);
+
+    const context = detectProjectContext(allocator) catch return 1;
+    defer allocator.free(context.root);
+
+    if (context.kind == .workspace) {
+        var workspace = discoverWorkspaceMembers(context.root, allocator) catch return 1;
+        defer workspace.deinit(allocator);
+
+        var selected: usize = 0;
+        var failed: usize = 0;
+        for (workspace.members.items) |member| {
+            if (!workspaceMemberSelected(member, options.package_filter)) continue;
+            selected += 1;
+            var head_buf: [256]u8 = undefined;
+            var w = std.fs.File.stdout().writer(&head_buf);
+            w.interface.print("testing {s}...\n", .{member.name}) catch {};
+            w.interface.flush() catch {};
+
+            const code = try runPackageTestsAtRoot(
+                member.root_path,
+                options.forwarded_args,
+                opt_level,
+                no_std,
+                alloc_mode,
+                allocator,
+            );
+            if (code != 0) failed += 1;
+        }
+        if (selected == 0) {
+            stderrPrint("error: no workspace members matched selection\n");
+            return 1;
+        }
+        return if (failed == 0) 0 else 1;
+    }
+
+    if (options.package_filter != null) {
+        stderrPrint("error: -p/--package can only be used at a workspace root\n");
+        return 1;
+    }
+
+    return runPackageTestsAtRoot(context.root, options.forwarded_args, opt_level, no_std, alloc_mode, allocator);
+}
+
+fn cleanPackageArtifacts(package_root: []const u8, allocator: std.mem.Allocator) !void {
+    const with_dir = try std.fmt.allocPrint(allocator, "{s}/.with", .{package_root});
+    defer allocator.free(with_dir);
+    std.fs.deleteTreeAbsolute(with_dir) catch |err| switch (err) {
+        error.FileNotFound => {},
+        error.NotDir => {},
+        else => return err,
+    };
+}
+
+fn runCleanCommand(raw_args: []const []const u8, allocator: std.mem.Allocator) !u8 {
+    const options = parseCleanCommandOptions(raw_args) catch return 1;
+    const context = detectProjectContext(allocator) catch return 1;
+    defer allocator.free(context.root);
+
+    if (context.kind == .workspace) {
+        var workspace = discoverWorkspaceMembers(context.root, allocator) catch return 1;
+        defer workspace.deinit(allocator);
+
+        var selected: usize = 0;
+        for (workspace.members.items) |member| {
+            if (!workspaceMemberSelected(member, options.package_filter)) continue;
+            selected += 1;
+            cleanPackageArtifacts(member.root_path, allocator) catch |err| {
+                var err_buf: [256]u8 = undefined;
+                const msg = std.fmt.bufPrint(&err_buf, "error: failed to clean '{s}' ({s})\n", .{ member.name, @errorName(err) }) catch "error: clean failed\n";
+                stderrPrint(msg);
+                return 1;
+            };
+            var ok_buf: [256]u8 = undefined;
+            var w = std.fs.File.stdout().writer(&ok_buf);
+            w.interface.print("cleaned {s}\n", .{member.name}) catch {};
+            w.interface.flush() catch {};
+        }
+        if (selected == 0) {
+            stderrPrint("error: no workspace members matched selection\n");
+            return 1;
+        }
+        return 0;
+    }
+
+    if (options.package_filter != null or options.all) {
+        stderrPrint("error: --all and -p/--package are only valid at a workspace root\n");
+        return 1;
+    }
+    cleanPackageArtifacts(context.root, allocator) catch |err| {
+        var err_buf: [256]u8 = undefined;
+        const msg = std.fmt.bufPrint(&err_buf, "error: clean failed ({s})\n", .{@errorName(err)}) catch "error: clean failed\n";
+        stderrPrint(msg);
+        return 1;
+    };
+    return 0;
+}
+
+fn runPackageTestsAtRoot(
+    project_root: []const u8,
     raw_args: []const []const u8,
     opt_level: u8,
     no_std: bool,
@@ -1093,9 +1998,6 @@ fn runPackageTests(
     allocator: std.mem.Allocator,
 ) !u8 {
     const options = parsePackageTestOptions(raw_args) catch return 1;
-
-    const project_root = try findPackageRoot(allocator);
-    defer allocator.free(project_root);
     const package_name = std.fs.path.basename(project_root);
 
     var discovery = try discoverPackageTests(project_root, allocator);
@@ -1138,13 +2040,21 @@ fn runPackageTests(
         return 0;
     }
 
-    const runner_stem = try std.fmt.allocPrint(allocator, ".with_test_runner_{d}", .{@abs(std.time.nanoTimestamp())});
+    var layout = ensureArtifactLayout(project_root, false, allocator) catch |err| {
+        var err_buf: [256]u8 = undefined;
+        const msg = std.fmt.bufPrint(&err_buf, "error: failed to create .with directories ({s})\n", .{@errorName(err)}) catch "error: failed to create .with directories\n";
+        stderrPrint(msg);
+        return 1;
+    };
+    defer layout.deinit(allocator);
+
+    const runner_stem = try std.fmt.allocPrint(allocator, "test_runner_{d}", .{@abs(std.time.nanoTimestamp())});
     defer allocator.free(runner_stem);
-    const runner_source_path = try std.fmt.allocPrint(allocator, "{s}/{s}.w", .{ project_root, runner_stem });
+    const runner_source_path = try std.fmt.allocPrint(allocator, "{s}/.{s}.w", .{ project_root, runner_stem });
     defer allocator.free(runner_source_path);
-    const runner_bin_path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ project_root, runner_stem });
+    const runner_bin_path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ layout.test_dir, runner_stem });
     defer allocator.free(runner_bin_path);
-    const runner_obj_path = try std.fmt.allocPrint(allocator, "{s}/{s}.o", .{ project_root, runner_stem });
+    const runner_obj_path = try std.fmt.allocPrint(allocator, "{s}/{s}.o", .{ layout.test_dir, runner_stem });
     defer allocator.free(runner_obj_path);
 
     defer deleteAbsoluteFileQuiet(runner_source_path);
@@ -1169,7 +2079,7 @@ fn runPackageTests(
         driver.no_std = no_std;
         driver.alloc = alloc_mode;
 
-        const bin_path_opt = try driver.buildBinary(runner_source_path);
+        const bin_path_opt = try driver.buildBinaryAt(runner_source_path, layout.test_dir, runner_stem);
         if (bin_path_opt == null) {
             failed += 1;
             break;
@@ -1344,34 +2254,6 @@ fn parseDurationNs(raw: []const u8) ParseDurationError!u64 {
     return std.math.mul(u64, amount, multiplier) catch error.Overflow;
 }
 
-fn findPackageRoot(allocator: std.mem.Allocator) ![]const u8 {
-    const cwd = try std.process.getCwdAlloc(allocator);
-    const fallback = try allocator.dupe(u8, cwd);
-    var current = cwd;
-
-    while (true) {
-        if (directoryHasProjectMarker(current, allocator)) {
-            if (!std.mem.eql(u8, current, fallback)) allocator.free(fallback);
-            return current;
-        }
-        const parent = std.fs.path.dirname(current) orelse break;
-        if (std.mem.eql(u8, parent, current)) break;
-
-        const next = try allocator.dupe(u8, parent);
-        allocator.free(current);
-        current = next;
-    }
-
-    if (!std.mem.eql(u8, current, fallback)) allocator.free(current);
-    return fallback;
-}
-
-fn directoryHasProjectMarker(dir_path: []const u8, allocator: std.mem.Allocator) bool {
-    const with_toml = std.fmt.allocPrint(allocator, "{s}/with.toml", .{dir_path}) catch return false;
-    defer allocator.free(with_toml);
-    return pathExistsAbsolute(with_toml);
-}
-
 fn pathExistsAbsolute(path: []const u8) bool {
     std.fs.accessAbsolute(path, .{}) catch return false;
     return true;
@@ -1395,10 +2277,6 @@ fn discoverPackageTests(project_root: []const u8, allocator: std.mem.Allocator) 
 
         const module_path = try modulePathFromRelativeWFile(rel_path, allocator);
         defer allocator.free(module_path);
-        if (!containsString(discovery.module_paths.items, module_path)) {
-            try discovery.module_paths.append(allocator, try allocator.dupe(u8, module_path));
-        }
-
         const source_text = entry.dir.readFileAlloc(allocator, entry.basename, 8 * 1024 * 1024) catch |err| {
             var err_buf: [512]u8 = undefined;
             const msg = std.fmt.bufPrint(&err_buf, "error: failed to read '{s}' ({s})\n", .{ rel_path, @errorName(err) }) catch "error: failed to read test source\n";
@@ -1475,6 +2353,10 @@ fn discoverPackageTests(project_root: []const u8, allocator: std.mem.Allocator) 
                 .after_name = null,
             });
             try discovered_indices.append(allocator, test_idx);
+        }
+
+        if (discovered_indices.items.len > 0 and !containsString(discovery.module_paths.items, module_path)) {
+            try discovery.module_paths.append(allocator, try allocator.dupe(u8, module_path));
         }
 
         for (discovered_indices.items) |test_idx| {
