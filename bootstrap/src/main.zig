@@ -2686,10 +2686,18 @@ fn runOneTest(path: []const u8, update_snapshots: bool, allocator: std.mem.Alloc
     };
     defer allocator.free(source);
 
-    // Parse test flags from `// FLAGS: --no-std --alloc` comment.
+    // Parse test flags from `// FLAGS: --no-std --alloc` comment
+    // and inline `//!` directives for self-contained tests.
     var test_no_std = false;
     var test_alloc = false;
     var test_expect_error = false;
+    var inline_stdout_list: std.ArrayList(u8) = .empty;
+    var inline_stderr_list: std.ArrayList(u8) = .empty;
+    var has_inline_stdout = false;
+    var has_inline_stderr = false;
+    var inline_exit: ?i32 = null;
+    defer inline_stdout_list.deinit(allocator);
+    defer inline_stderr_list.deinit(allocator);
     {
         var line_iter = std.mem.splitScalar(u8, source, '\n');
         while (line_iter.next()) |line| {
@@ -2702,6 +2710,26 @@ fn runOneTest(path: []const u8, update_snapshots: bool, allocator: std.mem.Alloc
                     if (std.mem.eql(u8, f, "--no-std")) test_no_std = true;
                     if (std.mem.eql(u8, f, "--alloc")) test_alloc = true;
                     if (std.mem.eql(u8, f, "--expect-error")) test_expect_error = true;
+                }
+            } else if (std.mem.startsWith(u8, trimmed, "//!")) {
+                const directive = std.mem.trim(u8, trimmed["//!".len..], " \t");
+                if (std.mem.startsWith(u8, directive, "expect-stdout:")) {
+                    const val = std.mem.trim(u8, directive["expect-stdout:".len..], " \t");
+                    has_inline_stdout = true;
+                    inline_stdout_list.appendSlice(allocator, val) catch {};
+                    inline_stdout_list.append(allocator, '\n') catch {};
+                } else if (std.mem.startsWith(u8, directive, "expect-stderr:")) {
+                    const val = std.mem.trim(u8, directive["expect-stderr:".len..], " \t");
+                    has_inline_stderr = true;
+                    inline_stderr_list.appendSlice(allocator, val) catch {};
+                    inline_stderr_list.append(allocator, '\n') catch {};
+                } else if (std.mem.startsWith(u8, directive, "expect-exit:")) {
+                    const val = std.mem.trim(u8, directive["expect-exit:".len..], " \t");
+                    inline_exit = std.fmt.parseInt(i32, val, 10) catch null;
+                } else if (std.mem.eql(u8, directive, "expect-error")) {
+                    test_expect_error = true;
+                } else if (std.mem.eql(u8, directive, "no-std")) {
+                    test_no_std = true;
                 }
             }
             if (trimmed.len > 0 and !std.mem.startsWith(u8, trimmed, "//")) break;
@@ -2741,23 +2769,30 @@ fn runOneTest(path: []const u8, update_snapshots: bool, allocator: std.mem.Alloc
         return;
     }
     const bin_path = bin_path_opt.?;
-    const expected_exit = loadExpectedExit(path, allocator) catch |e| {
+    const has_inline_directives = has_inline_stdout or has_inline_stderr or inline_exit != null;
+
+    // When inline directives are present, use them instead of sidecar files.
+    const expected_exit = if (inline_exit) |ex| ex else loadExpectedExit(path, allocator) catch |e| {
         summary.failed += 1;
         testStatus("FAIL", path, e);
         return;
     };
-    const expected_stdout = loadExpectedOutput(path, allocator, "stdout") catch |e| {
+    const expected_stdout: ?[]const u8 = if (has_inline_stdout) inline_stdout_list.items else loadExpectedOutput(path, allocator, "stdout") catch |e| {
         summary.failed += 1;
         testStatus("FAIL", path, e);
         return;
     };
-    defer if (expected_stdout) |buf| allocator.free(buf);
-    const expected_stderr = loadExpectedOutput(path, allocator, "stderr") catch |e| {
+    defer if (!has_inline_stdout) {
+        if (expected_stdout) |buf| allocator.free(@constCast(buf));
+    };
+    const expected_stderr: ?[]const u8 = if (has_inline_stderr) inline_stderr_list.items else loadExpectedOutput(path, allocator, "stderr") catch |e| {
         summary.failed += 1;
         testStatus("FAIL", path, e);
         return;
     };
-    defer if (expected_stderr) |buf| allocator.free(buf);
+    defer if (!has_inline_stderr) {
+        if (expected_stderr) |buf| allocator.free(@constCast(buf));
+    };
 
     // Clean up binary and object file after test completes.
     defer std.fs.cwd().deleteFile(bin_path) catch {};
@@ -2803,54 +2838,57 @@ fn runOneTest(path: []const u8, update_snapshots: bool, allocator: std.mem.Alloc
         return;
     };
 
-    const snapshot_text = formatSnapshot(term, actual_stdout, actual_stderr, allocator) catch |e| {
-        summary.failed += 1;
-        testStatus("FAIL", path, e);
-        return;
-    };
-    defer allocator.free(snapshot_text);
-    const snapshot_path = expectationPath(path, "expected", allocator) catch |e| {
-        summary.failed += 1;
-        testStatus("FAIL", path, e);
-        return;
-    };
-    defer allocator.free(snapshot_path);
-    const existing_snapshot = std.fs.cwd().readFileAlloc(allocator, snapshot_path, 128 * 1024) catch |e| switch (e) {
-        error.FileNotFound => null,
-        else => {
-            summary.failed += 1;
-            testStatus("FAIL", path, e);
-            return;
-        },
-    };
-    defer if (existing_snapshot) |buf| allocator.free(buf);
-
-    if (existing_snapshot) |expected_snapshot| {
-        if (!std.mem.eql(u8, expected_snapshot, snapshot_text)) {
-            if (update_snapshots) {
-                std.fs.cwd().writeFile(.{ .sub_path = snapshot_path, .data = snapshot_text }) catch |e| {
-                    summary.failed += 1;
-                    testStatus("FAIL", path, e);
-                    return;
-                };
-            } else {
-                summary.failed += 1;
-                testStatusMsg("FAIL", path, "snapshot mismatch");
-                return;
-            }
-        }
-        summary.passed += 1;
-        testStatusMsg("PASS", path, "");
-        return;
-    } else if (update_snapshots) {
-        std.fs.cwd().writeFile(.{ .sub_path = snapshot_path, .data = snapshot_text }) catch |e| {
+    // Skip snapshot logic for inline-directive tests.
+    if (!has_inline_directives) {
+        const snapshot_text = formatSnapshot(term, actual_stdout, actual_stderr, allocator) catch |e| {
             summary.failed += 1;
             testStatus("FAIL", path, e);
             return;
         };
-        summary.passed += 1;
-        testStatusMsg("PASS", path, "");
-        return;
+        defer allocator.free(snapshot_text);
+        const snapshot_path = expectationPath(path, "expected", allocator) catch |e| {
+            summary.failed += 1;
+            testStatus("FAIL", path, e);
+            return;
+        };
+        defer allocator.free(snapshot_path);
+        const existing_snapshot = std.fs.cwd().readFileAlloc(allocator, snapshot_path, 128 * 1024) catch |e| switch (e) {
+            error.FileNotFound => null,
+            else => {
+                summary.failed += 1;
+                testStatus("FAIL", path, e);
+                return;
+            },
+        };
+        defer if (existing_snapshot) |buf| allocator.free(buf);
+
+        if (existing_snapshot) |expected_snapshot| {
+            if (!std.mem.eql(u8, expected_snapshot, snapshot_text)) {
+                if (update_snapshots) {
+                    std.fs.cwd().writeFile(.{ .sub_path = snapshot_path, .data = snapshot_text }) catch |e| {
+                        summary.failed += 1;
+                        testStatus("FAIL", path, e);
+                        return;
+                    };
+                } else {
+                    summary.failed += 1;
+                    testStatusMsg("FAIL", path, "snapshot mismatch");
+                    return;
+                }
+            }
+            summary.passed += 1;
+            testStatusMsg("PASS", path, "");
+            return;
+        } else if (update_snapshots) {
+            std.fs.cwd().writeFile(.{ .sub_path = snapshot_path, .data = snapshot_text }) catch |e| {
+                summary.failed += 1;
+                testStatus("FAIL", path, e);
+                return;
+            };
+            summary.passed += 1;
+            testStatusMsg("PASS", path, "");
+            return;
+        }
     }
 
     if (term != .Exited) {
