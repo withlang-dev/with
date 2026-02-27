@@ -1876,6 +1876,10 @@ fn parseIfExpr(self: *Parser) !*const Ast.Expr {
     self.skipNewlines();
     if (self.peek() == .kw_else) {
         self.advance();
+        // Handle optional ':' after else (e.g. `else:`)
+        if (self.peek() == .colon) {
+            self.advance();
+        }
         // Don't skip newlines for else block — let parseBlockOrExpr handle it
         else_body = try self.parseBlockOrExpr();
     } else {
@@ -1957,6 +1961,10 @@ fn parseIfLet(self: *Parser, start: Span) !*const Ast.Expr {
     self.skipNewlines();
     if (self.peek() == .kw_else) {
         self.advance();
+        // Handle optional ':' after else (e.g. `else:`)
+        if (self.peek() == .colon) {
+            self.advance();
+        }
         else_body = try self.parseBlockOrExpr();
     } else {
         self.pos = save;

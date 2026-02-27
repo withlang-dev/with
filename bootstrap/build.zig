@@ -77,7 +77,7 @@ pub fn build(b: *std.Build) void {
     const obj = b.addObject(.{
         .name = "with",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("bootstrap/src/main.zig"),
+            .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -114,7 +114,7 @@ pub fn build(b: *std.Build) void {
         "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
         "-c",
     });
-    fiber_c.addFileArg(b.path("runtime/fiber.c"));
+    fiber_c.addFileArg(b.path("../runtime/fiber.c"));
     fiber_c.addArg("-o");
     const fiber_c_out = fiber_c.addOutputFileArg("fiber.o");
 
@@ -124,7 +124,7 @@ pub fn build(b: *std.Build) void {
         "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
         "-c",
     });
-    fiber_asm.addFileArg(b.path("runtime/fiber_asm_aarch64.s"));
+    fiber_asm.addFileArg(b.path("../runtime/fiber_asm_aarch64.s"));
     fiber_asm.addArg("-o");
     const fiber_asm_out = fiber_asm.addOutputFileArg("fiber_asm.o");
 
@@ -135,7 +135,7 @@ pub fn build(b: *std.Build) void {
         "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
         "-c",
     });
-    helpers_c.addFileArg(b.path("runtime/helpers.c"));
+    helpers_c.addFileArg(b.path("../runtime/helpers.c"));
     helpers_c.addArg("-o");
     const helpers_c_out = helpers_c.addOutputFileArg("helpers.o");
 
@@ -163,7 +163,7 @@ pub fn build(b: *std.Build) void {
     // --- Unit tests ---
     const unit_tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("bootstrap/src/main.zig"),
+            .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
         }),

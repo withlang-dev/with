@@ -1,15 +1,25 @@
 # Reference repos (large external clones)
 .reference/
 
-# Build artifacts (future)
+# Build artifacts
 zig-out/
 zig-cache/
 .zig-cache/
+bootstrap/zig-out/
+bootstrap/.zig-cache/
+bootstrap/zig-out-root/
+bootstrap/.zig-cache-root/
 .with/
 *.o
 *.a
 *.so
 *.dylib
+
+# Self-hosted compiler outputs
+with
+with-stage1
+with-stage2
+with-stage3
 
 # Editor / OS
 .DS_Store

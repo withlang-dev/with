@@ -1,0 +1,5 @@
+#!/bin/sh
+if git diff --cached --name-only | grep -q '^bootstrap/'; then
+    echo "error: bootstrap/ is frozen — do not modify"
+    exit 1
+fi

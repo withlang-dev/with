@@ -17,6 +17,51 @@ typedef struct {
     int64_t len;
 } with_str;
 
+typedef struct {
+    char *buf;
+    int64_t len;
+    int64_t cap;
+} with_str_builder;
+
+static void with_sb_reserve(with_str_builder *sb, int64_t need) {
+    if (need <= sb->cap) return;
+    int64_t cap = sb->cap > 0 ? sb->cap : 256;
+    while (cap < need) {
+        cap *= 2;
+    }
+    char *next = (char *)realloc(sb->buf, (size_t)cap);
+    if (!next) return;
+    sb->buf = next;
+    sb->cap = cap;
+}
+
+int64_t with_sb_new(void) {
+    with_str_builder *sb = (with_str_builder *)calloc(1, sizeof(with_str_builder));
+    if (!sb) return 0;
+    return (int64_t)(intptr_t)sb;
+}
+
+void with_sb_append(int64_t handle, with_str s) {
+    with_str_builder *sb = (with_str_builder *)(intptr_t)handle;
+    if (!sb || s.len <= 0) return;
+    int64_t need = sb->len + s.len + 1;
+    with_sb_reserve(sb, need);
+    if (!sb->buf) return;
+    memcpy(sb->buf + sb->len, s.ptr, (size_t)s.len);
+    sb->len += s.len;
+    sb->buf[sb->len] = '\0';
+}
+
+with_str with_sb_build(int64_t handle) {
+    with_str_builder *sb = (with_str_builder *)(intptr_t)handle;
+    if (!sb || !sb->buf) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    with_str out = { sb->buf, sb->len };
+    return out;
+}
+
 // Convert i32 to owned string.
 with_str with_i32_to_str(int32_t n) {
     char tmp[32];
@@ -32,6 +77,24 @@ with_str with_i32_to_str(int32_t n) {
     }
     memcpy(buf, tmp, (size_t)wrote + 1);
     with_str out = { buf, (int64_t)wrote };
+    return out;
+}
+
+// Legacy alias used by self-hosted sources.
+with_str i32_to_str(int32_t n) {
+    return with_i32_to_str(n);
+}
+
+// Convert a single byte value to a one-char string.
+with_str str_from_byte(int32_t b) {
+    char *buf = (char *)malloc(2);
+    if (!buf) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    buf[0] = (char)(b & 0xFF);
+    buf[1] = '\0';
+    with_str out = { buf, 1 };
     return out;
 }
 
@@ -101,6 +164,17 @@ int32_t with_setenv_str(with_str name, with_str value) {
     int rc = setenv(name_buf, value_buf, 1);
     free(name_buf);
     free(value_buf);
+    return (int32_t)rc;
+}
+
+// system() wrapper for with_str command input.
+int32_t with_system(with_str cmd) {
+    char *buf = (char *)malloc((size_t)cmd.len + 1);
+    if (!buf) return -1;
+    memcpy(buf, cmd.ptr, (size_t)cmd.len);
+    buf[cmd.len] = '\0';
+    int rc = system(buf);
+    free(buf);
     return (int32_t)rc;
 }
 
