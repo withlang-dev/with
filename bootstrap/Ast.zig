@@ -114,6 +114,9 @@ pub const FnDecl = struct {
     is_panic_handler: bool = false,
     is_entry: bool = false,
     is_no_main: bool = false,
+    is_test: bool = false,
+    is_before: bool = false,
+    is_after: bool = false,
 };
 
 pub const ExternFnDecl = struct {
@@ -127,6 +130,7 @@ pub const Param = struct {
     name: Symbol,
     type_expr: ?*const TypeExpr,
     is_mut: bool,
+    default_value: ?*const Expr = null,
     span: Span,
 };
 

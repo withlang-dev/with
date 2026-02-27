@@ -1,0 +1,9 @@
+exit: 0
+stdout:
+--- Test Session ---
+  addition... ok
+  comparison... ok
+---
+2 passed, 0 failed, 2 total
+
+stderr:

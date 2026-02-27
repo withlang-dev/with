@@ -12,6 +12,7 @@ const Driver = @import("Driver.zig");
 const Source = @import("Source.zig");
 const Lexer = @import("Lexer.zig");
 const Token = @import("Token.zig");
+const Parser = @import("Parser.zig");
 const Diagnostic = @import("Diagnostic.zig");
 const Migrate = @import("Migrate.zig");
 
@@ -165,6 +166,9 @@ pub fn main() !void {
             std.process.exit(1);
         }
     } else if (std.mem.eql(u8, command, "test")) {
+        const code = try runPackageTests(args[2..], opt_level, no_std, alloc_mode, std.heap.page_allocator);
+        if (code != 0) std.process.exit(code);
+    } else if (std.mem.eql(u8, command, "test-harness")) {
         var target: []const u8 = "test/cases";
         var update_snapshots = false;
         if (args.len >= 3) {
@@ -316,7 +320,10 @@ fn printUsage() void {
         \\  build <file.w>    Compile a With source file to a binary
         \\  run <file.w>      Compile and run a With source file
         \\  check <file.w>    Parse and type-check a source file
-        \\  test [path]       Run .w test cases (default: test/cases)
+        \\  test [flags] [filter]
+        \\                    Run package tests (annotations: @[test], @[before], @[after])
+        \\  test-harness [path] [--update]
+        \\                    Run built-in snapshot harness (default: test/cases)
         \\  fmt <file.w>      Format a source file (to stdout)
         \\  repl              Interactive REPL
         \\  lsp               Start language server (LSP over stdio)
@@ -1010,6 +1017,739 @@ fn emitDocCommentAndExamples(w: anytype, doc: []const u8) !void {
         try w.writeAll("**Example**\n\n```with\n");
         try w.print("{s}\n", .{ex});
         try w.writeAll("```\n\n");
+    }
+}
+
+const PackageTestOptions = struct {
+    verbose: bool = false,
+    run_pattern: ?[]const u8 = null,
+    positional_filter: ?[]const u8 = null,
+    count: usize = 1,
+    timeout_ns: u64 = 10 * 60 * std.time.ns_per_s,
+    short: bool = false,
+    failfast: bool = false,
+    shuffle: bool = false,
+    shuffle_seed: ?u64 = null,
+    list: bool = false,
+};
+
+const PackageTest = struct {
+    name: []const u8,
+    file_path: []const u8,
+    module_path: []const u8,
+    line: u32,
+    returns_result: bool,
+    before_name: ?[]const u8 = null,
+    after_name: ?[]const u8 = null,
+};
+
+const PackageTestDiscovery = struct {
+    tests: std.ArrayList(PackageTest) = .empty,
+    module_paths: std.ArrayList([]const u8) = .empty,
+
+    fn deinit(self: *PackageTestDiscovery, allocator: std.mem.Allocator) void {
+        for (self.tests.items) |test_case| {
+            allocator.free(test_case.name);
+            allocator.free(test_case.file_path);
+            allocator.free(test_case.module_path);
+            if (test_case.before_name) |name| allocator.free(name);
+            if (test_case.after_name) |name| allocator.free(name);
+        }
+        self.tests.deinit(allocator);
+        for (self.module_paths.items) |module_path| allocator.free(module_path);
+        self.module_paths.deinit(allocator);
+    }
+};
+
+const PackageTestRunStatus = enum {
+    passed,
+    failed,
+    skipped,
+};
+
+const PackageTestRunResult = struct {
+    status: PackageTestRunStatus,
+    term: std.process.Child.Term,
+    stdout: []u8,
+    stderr: []u8,
+};
+
+const ParsePackageTestOptionsError = error{
+    InvalidArgs,
+};
+
+const ParseDurationError = error{
+    InvalidDuration,
+    Overflow,
+};
+
+const with_test_skip_marker = "__WITH_TEST_SKIP__";
+
+fn runPackageTests(
+    raw_args: []const []const u8,
+    opt_level: u8,
+    no_std: bool,
+    alloc_mode: bool,
+    allocator: std.mem.Allocator,
+) !u8 {
+    const options = parsePackageTestOptions(raw_args) catch return 1;
+
+    const project_root = try findPackageRoot(allocator);
+    defer allocator.free(project_root);
+    const package_name = std.fs.path.basename(project_root);
+
+    var discovery = try discoverPackageTests(project_root, allocator);
+    defer discovery.deinit(allocator);
+    sortPackageTestsByFileAndLine(discovery.tests.items);
+    sortStrings(discovery.module_paths.items);
+
+    if (reportDuplicateTestNames(discovery.tests.items)) return 1;
+
+    var selected_indices: std.ArrayList(usize) = .empty;
+    defer selected_indices.deinit(allocator);
+    for (discovery.tests.items, 0..) |test_case, idx| {
+        if (!packageTestMatchesFilters(test_case.name, options.run_pattern, options.positional_filter)) continue;
+        try selected_indices.append(allocator, idx);
+    }
+
+    if (options.list) {
+        for (selected_indices.items) |idx| {
+            var buf: [4096]u8 = undefined;
+            var w = std.fs.File.stdout().writer(&buf);
+            w.interface.print("{s}\n", .{discovery.tests.items[idx].name}) catch {};
+            w.interface.flush() catch {};
+        }
+        return 0;
+    }
+
+    if (options.shuffle and selected_indices.items.len > 1) {
+        const seed = options.shuffle_seed orelse @as(u64, @intCast(@abs(std.time.nanoTimestamp())));
+        var prng = std.Random.DefaultPrng.init(seed);
+        prng.random().shuffle(usize, selected_indices.items);
+    }
+
+    var run_started = try std.time.Timer.start();
+    var passed: usize = 0;
+    var failed: usize = 0;
+    var skipped: usize = 0;
+
+    if (selected_indices.items.len == 0) {
+        printPackageSummary(true, package_name, run_started.read(), skipped);
+        return 0;
+    }
+
+    const runner_stem = try std.fmt.allocPrint(allocator, ".with_test_runner_{d}", .{@abs(std.time.nanoTimestamp())});
+    defer allocator.free(runner_stem);
+    const runner_source_path = try std.fmt.allocPrint(allocator, "{s}/{s}.w", .{ project_root, runner_stem });
+    defer allocator.free(runner_source_path);
+    const runner_bin_path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ project_root, runner_stem });
+    defer allocator.free(runner_bin_path);
+    const runner_obj_path = try std.fmt.allocPrint(allocator, "{s}/{s}.o", .{ project_root, runner_stem });
+    defer allocator.free(runner_obj_path);
+
+    defer deleteAbsoluteFileQuiet(runner_source_path);
+    defer deleteAbsoluteFileQuiet(runner_bin_path);
+    defer deleteAbsoluteFileQuiet(runner_obj_path);
+
+    var timed_out = false;
+    outer: for (selected_indices.items) |selected_idx| {
+        if (run_started.read() > options.timeout_ns) {
+            timed_out = true;
+            failed += 1;
+            break;
+        }
+
+        const test_case = discovery.tests.items[selected_idx];
+
+        try writeGeneratedTestRunner(runner_source_path, discovery.module_paths.items, test_case);
+
+        var driver = Driver.init(allocator);
+        defer driver.deinit();
+        driver.opt_level = opt_level;
+        driver.no_std = no_std;
+        driver.alloc = alloc_mode;
+
+        const bin_path_opt = try driver.buildBinary(runner_source_path);
+        if (bin_path_opt == null) {
+            failed += 1;
+            break;
+        }
+
+        var count_idx: usize = 0;
+        while (count_idx < options.count) : (count_idx += 1) {
+            if (run_started.read() > options.timeout_ns) {
+                timed_out = true;
+                failed += 1;
+                break :outer;
+            }
+
+            var one_test_timer = try std.time.Timer.start();
+            if (options.verbose) printVerboseTestRun("RUN", test_case.name, 0);
+
+            const run_result = runGeneratedTestBinary(runner_bin_path, project_root, options.short, allocator) catch |err| {
+                failed += 1;
+                if (options.verbose) printVerboseTestRun("FAIL", test_case.name, one_test_timer.read());
+                var err_buf: [256]u8 = undefined;
+                const msg = std.fmt.bufPrint(&err_buf, "    failed to execute test binary: {s}\n", .{@errorName(err)}) catch "    failed to execute test binary\n";
+                stderrPrint(msg);
+                if (options.failfast) break :outer;
+                continue;
+            };
+            defer allocator.free(run_result.stdout);
+            defer allocator.free(run_result.stderr);
+
+            const elapsed_ns = one_test_timer.read();
+            switch (run_result.status) {
+                .passed => {
+                    passed += 1;
+                    if (options.verbose) printVerboseTestRun("PASS", test_case.name, elapsed_ns);
+                },
+                .skipped => {
+                    skipped += 1;
+                    if (options.verbose) printVerboseTestRun("SKIP", test_case.name, elapsed_ns);
+                },
+                .failed => {
+                    failed += 1;
+                    printFailureReport(test_case, elapsed_ns, run_result.stdout, run_result.stderr);
+                    if (options.verbose) printVerboseTestRun("FAIL", test_case.name, elapsed_ns);
+                    if (options.failfast) break :outer;
+                },
+            }
+        }
+
+        deleteAbsoluteFileQuiet(runner_bin_path);
+        deleteAbsoluteFileQuiet(runner_obj_path);
+    }
+
+    if (timed_out) {
+        stderrPrint("error: test run timed out\n");
+    }
+
+    const ok = failed == 0;
+    printPackageSummary(ok, package_name, run_started.read(), skipped);
+    return if (ok) 0 else 1;
+}
+
+fn parsePackageTestOptions(args: []const []const u8) ParsePackageTestOptionsError!PackageTestOptions {
+    var options: PackageTestOptions = .{};
+    var i: usize = 0;
+    while (i < args.len) : (i += 1) {
+        const arg = args[i];
+        if (std.mem.eql(u8, arg, "-v")) {
+            options.verbose = true;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "-short")) {
+            options.short = true;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "-failfast")) {
+            options.failfast = true;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "-list")) {
+            options.list = true;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "-shuffle")) {
+            options.shuffle = true;
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-shuffle=")) {
+            const raw_seed = arg["-shuffle=".len..];
+            if (raw_seed.len == 0) return packageTestOptionError("error: '-shuffle' seed must be an integer\n");
+            options.shuffle = true;
+            options.shuffle_seed = std.fmt.parseInt(u64, raw_seed, 10) catch {
+                return packageTestOptionError("error: '-shuffle' seed must be an integer\n");
+            };
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "-run")) {
+            if (i + 1 >= args.len) return packageTestOptionError("error: '-run' requires a pattern\n");
+            i += 1;
+            options.run_pattern = args[i];
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-run=")) {
+            options.run_pattern = arg["-run=".len..];
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "-count")) {
+            if (i + 1 >= args.len) return packageTestOptionError("error: '-count' requires a positive integer\n");
+            i += 1;
+            options.count = std.fmt.parseInt(usize, args[i], 10) catch {
+                return packageTestOptionError("error: '-count' requires a positive integer\n");
+            };
+            if (options.count == 0) return packageTestOptionError("error: '-count' must be >= 1\n");
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-count=")) {
+            const raw_count = arg["-count=".len..];
+            options.count = std.fmt.parseInt(usize, raw_count, 10) catch {
+                return packageTestOptionError("error: '-count' requires a positive integer\n");
+            };
+            if (options.count == 0) return packageTestOptionError("error: '-count' must be >= 1\n");
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "-timeout")) {
+            if (i + 1 >= args.len) return packageTestOptionError("error: '-timeout' requires a duration (e.g. 30s, 5m, 1h)\n");
+            i += 1;
+            options.timeout_ns = parseDurationNs(args[i]) catch {
+                return packageTestOptionError("error: '-timeout' requires a duration (e.g. 30s, 5m, 1h)\n");
+            };
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-timeout=")) {
+            const raw_timeout = arg["-timeout=".len..];
+            options.timeout_ns = parseDurationNs(raw_timeout) catch {
+                return packageTestOptionError("error: '-timeout' requires a duration (e.g. 30s, 5m, 1h)\n");
+            };
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-bench")) {
+            return packageTestOptionError("error: '-bench' is not implemented yet\n");
+        }
+        if (std.mem.eql(u8, arg, "-cover")) {
+            return packageTestOptionError("error: '-cover' is not implemented yet\n");
+        }
+        if (arg.len > 0 and arg[0] == '-') {
+            var err_buf: [256]u8 = undefined;
+            const msg = std.fmt.bufPrint(&err_buf, "error: unknown test flag '{s}'\n", .{arg}) catch "error: unknown test flag\n";
+            return packageTestOptionError(msg);
+        }
+        if (options.positional_filter != null) {
+            return packageTestOptionError("error: only one test filter positional argument is supported\n");
+        }
+        options.positional_filter = arg;
+    }
+
+    return options;
+}
+
+fn packageTestOptionError(msg: []const u8) ParsePackageTestOptionsError {
+    stderrPrint(msg);
+    return error.InvalidArgs;
+}
+
+fn parseDurationNs(raw: []const u8) ParseDurationError!u64 {
+    if (raw.len < 2) return error.InvalidDuration;
+    const unit = raw[raw.len - 1];
+    const amount = std.fmt.parseInt(u64, raw[0 .. raw.len - 1], 10) catch return error.InvalidDuration;
+    const multiplier: u64 = switch (unit) {
+        's' => std.time.ns_per_s,
+        'm' => 60 * std.time.ns_per_s,
+        'h' => 60 * 60 * std.time.ns_per_s,
+        else => return error.InvalidDuration,
+    };
+    return std.math.mul(u64, amount, multiplier) catch error.Overflow;
+}
+
+fn findPackageRoot(allocator: std.mem.Allocator) ![]const u8 {
+    const cwd = try std.process.getCwdAlloc(allocator);
+    const fallback = try allocator.dupe(u8, cwd);
+    var current = cwd;
+
+    while (true) {
+        if (directoryHasProjectMarker(current, allocator)) {
+            if (!std.mem.eql(u8, current, fallback)) allocator.free(fallback);
+            return current;
+        }
+        const parent = std.fs.path.dirname(current) orelse break;
+        if (std.mem.eql(u8, parent, current)) break;
+
+        const next = try allocator.dupe(u8, parent);
+        allocator.free(current);
+        current = next;
+    }
+
+    if (!std.mem.eql(u8, current, fallback)) allocator.free(current);
+    return fallback;
+}
+
+fn directoryHasProjectMarker(dir_path: []const u8, allocator: std.mem.Allocator) bool {
+    const with_toml = std.fmt.allocPrint(allocator, "{s}/with.toml", .{dir_path}) catch return false;
+    defer allocator.free(with_toml);
+    return pathExistsAbsolute(with_toml);
+}
+
+fn pathExistsAbsolute(path: []const u8) bool {
+    std.fs.accessAbsolute(path, .{}) catch return false;
+    return true;
+}
+
+fn discoverPackageTests(project_root: []const u8, allocator: std.mem.Allocator) !PackageTestDiscovery {
+    var discovery: PackageTestDiscovery = .{};
+    errdefer discovery.deinit(allocator);
+
+    var dir = try std.fs.openDirAbsolute(project_root, .{ .iterate = true });
+    defer dir.close();
+
+    var walker = try dir.walk(allocator);
+    defer walker.deinit();
+
+    while (try walker.next()) |entry| {
+        if (entry.kind != .file) continue;
+        const rel_path: []const u8 = entry.path;
+        if (!std.mem.endsWith(u8, rel_path, ".w")) continue;
+        if (shouldSkipTestDiscoveryPath(rel_path)) continue;
+
+        const module_path = try modulePathFromRelativeWFile(rel_path, allocator);
+        defer allocator.free(module_path);
+        if (!containsString(discovery.module_paths.items, module_path)) {
+            try discovery.module_paths.append(allocator, try allocator.dupe(u8, module_path));
+        }
+
+        const source_text = entry.dir.readFileAlloc(allocator, entry.basename, 8 * 1024 * 1024) catch |err| {
+            var err_buf: [512]u8 = undefined;
+            const msg = std.fmt.bufPrint(&err_buf, "error: failed to read '{s}' ({s})\n", .{ rel_path, @errorName(err) }) catch "error: failed to read test source\n";
+            stderrPrint(msg);
+            return err;
+        };
+        defer allocator.free(source_text);
+
+        var source = Source.fromString(rel_path, source_text, 0, allocator);
+        defer source.deinit();
+
+        var diags = Diagnostic.DiagnosticList.init(allocator);
+        defer diags.deinit();
+        var lexer = Lexer.init(source_text, 0, &diags);
+        var tokens = try lexer.tokenize(allocator);
+        defer tokens.deinit();
+
+        var pool = InternPool.init(allocator);
+        defer pool.deinit();
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        defer arena.deinit();
+        var parser = Parser.init(&tokens, source_text, arena.allocator(), &pool, &diags);
+
+        const module = parser.parseModule() catch {
+            var err_buf: [512]u8 = undefined;
+            const msg = std.fmt.bufPrint(&err_buf, "error: failed to parse '{s}' while discovering tests\n", .{rel_path}) catch "error: failed to parse test source\n";
+            stderrPrint(msg);
+            return error.ParseError;
+        };
+
+        var before_name: ?[]const u8 = null;
+        defer if (before_name) |name| allocator.free(name);
+        var after_name: ?[]const u8 = null;
+        defer if (after_name) |name| allocator.free(name);
+        var discovered_indices: std.ArrayList(usize) = .empty;
+        defer discovered_indices.deinit(allocator);
+
+        for (module.decls) |decl| {
+            if (decl.kind != .function) continue;
+            const fn_decl = decl.kind.function;
+            const fn_name = pool.resolve(fn_decl.name);
+
+            if (fn_decl.is_before) {
+                if (before_name != null) {
+                    var err_buf: [512]u8 = undefined;
+                    const msg = std.fmt.bufPrint(&err_buf, "error: multiple @[before] functions in '{s}'\n", .{rel_path}) catch "error: multiple @[before] functions\n";
+                    stderrPrint(msg);
+                    return error.InvalidTestHooks;
+                }
+                before_name = try allocator.dupe(u8, fn_name);
+            }
+
+            if (fn_decl.is_after) {
+                if (after_name != null) {
+                    var err_buf: [512]u8 = undefined;
+                    const msg = std.fmt.bufPrint(&err_buf, "error: multiple @[after] functions in '{s}'\n", .{rel_path}) catch "error: multiple @[after] functions\n";
+                    stderrPrint(msg);
+                    return error.InvalidTestHooks;
+                }
+                after_name = try allocator.dupe(u8, fn_name);
+            }
+
+            if (!fn_decl.is_test) continue;
+
+            const loc = source.offsetToLocation(decl.span.start);
+            const test_idx = discovery.tests.items.len;
+            try discovery.tests.append(allocator, .{
+                .name = try allocator.dupe(u8, fn_name),
+                .file_path = try allocator.dupe(u8, rel_path),
+                .module_path = try allocator.dupe(u8, module_path),
+                .line = loc.line + 1,
+                .returns_result = isResultReturnType(fn_decl.return_type, &pool),
+                .before_name = null,
+                .after_name = null,
+            });
+            try discovered_indices.append(allocator, test_idx);
+        }
+
+        for (discovered_indices.items) |test_idx| {
+            if (before_name) |name| {
+                discovery.tests.items[test_idx].before_name = try allocator.dupe(u8, name);
+            }
+            if (after_name) |name| {
+                discovery.tests.items[test_idx].after_name = try allocator.dupe(u8, name);
+            }
+        }
+    }
+
+    return discovery;
+}
+
+fn shouldSkipTestDiscoveryPath(path: []const u8) bool {
+    var it = std.mem.tokenizeAny(u8, path, "/\\");
+    while (it.next()) |segment| {
+        if (std.mem.eql(u8, segment, ".git")) return true;
+        if (std.mem.eql(u8, segment, ".zig-cache")) return true;
+        if (std.mem.eql(u8, segment, "zig-out")) return true;
+        if (std.mem.eql(u8, segment, ".with")) return true;
+        if (std.mem.eql(u8, segment, "testdata")) return true;
+        if (std.mem.startsWith(u8, segment, ".with_test_runner_")) return true;
+    }
+    return false;
+}
+
+fn modulePathFromRelativeWFile(path: []const u8, allocator: std.mem.Allocator) ![]const u8 {
+    if (!std.mem.endsWith(u8, path, ".w")) return error.InvalidModulePath;
+    const stem = path[0 .. path.len - 2];
+
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
+
+    for (stem) |ch| {
+        if (ch == '/' or ch == '\\') {
+            try out.append(allocator, '.');
+        } else {
+            try out.append(allocator, ch);
+        }
+    }
+
+    return out.toOwnedSlice(allocator);
+}
+
+fn isResultReturnType(return_type: ?*const Ast.TypeExpr, pool: *const InternPool) bool {
+    const rt = return_type orelse return false;
+    return switch (rt.kind) {
+        .named => |sym| std.mem.eql(u8, pool.resolve(sym), "Result"),
+        .generic => |g| std.mem.eql(u8, pool.resolve(g.name), "Result"),
+        else => false,
+    };
+}
+
+fn containsString(values: []const []const u8, needle: []const u8) bool {
+    for (values) |value| {
+        if (std.mem.eql(u8, value, needle)) return true;
+    }
+    return false;
+}
+
+fn reportDuplicateTestNames(tests: []const PackageTest) bool {
+    for (tests, 0..) |lhs, i| {
+        var j: usize = i + 1;
+        while (j < tests.len) : (j += 1) {
+            const rhs = tests[j];
+            if (!std.mem.eql(u8, lhs.name, rhs.name)) continue;
+            var err_buf: [1024]u8 = undefined;
+            const msg = std.fmt.bufPrint(
+                &err_buf,
+                "error: duplicate test name '{s}' in '{s}:{d}' and '{s}:{d}'\n",
+                .{ lhs.name, lhs.file_path, lhs.line, rhs.file_path, rhs.line },
+            ) catch "error: duplicate test name\n";
+            stderrPrint(msg);
+            return true;
+        }
+    }
+    return false;
+}
+
+fn packageTestMatchesFilters(name: []const u8, run_pattern: ?[]const u8, positional_filter: ?[]const u8) bool {
+    if (run_pattern) |pattern| {
+        if (std.mem.indexOf(u8, name, pattern) == null) return false;
+    }
+    if (positional_filter) |pattern| {
+        if (std.mem.indexOf(u8, name, pattern) == null) return false;
+    }
+    return true;
+}
+
+fn writeGeneratedTestRunner(
+    runner_source_path: []const u8,
+    module_paths: []const []const u8,
+    test_case: PackageTest,
+) !void {
+    var file = try std.fs.createFileAbsolute(runner_source_path, .{ .truncate = true });
+    defer file.close();
+
+    var out_buf: [32768]u8 = undefined;
+    var out = file.writer(&out_buf);
+    const writer = &out.interface;
+
+    try writer.writeAll("use test.testing\n");
+    for (module_paths) |module_path| {
+        try writer.print("use {s}\n", .{module_path});
+    }
+
+    try writer.writeAll("\nfn __with_test_entry -> void:\n");
+    if (test_case.returns_result) {
+        try writer.print("    match {s}()\n", .{test_case.name});
+        try writer.writeAll("        Ok(()) -> ()\n");
+        try writer.writeAll("        Err(_e) -> fail(\"returned Err\")\n");
+    } else {
+        try writer.print("    {s}()\n", .{test_case.name});
+    }
+
+    try writer.writeAll("\nfn main -> i32:\n");
+    if (test_case.before_name) |before_name| {
+        try writer.print("    {s}()\n", .{before_name});
+    }
+    try writer.writeAll("    __with_test_entry()\n");
+    if (test_case.after_name) |after_name| {
+        try writer.print("    {s}()\n", .{after_name});
+    }
+    try writer.writeAll("    0\n");
+    try out.interface.flush();
+}
+
+fn runGeneratedTestBinary(
+    binary_path: []const u8,
+    project_root: []const u8,
+    short_mode: bool,
+    allocator: std.mem.Allocator,
+) !PackageTestRunResult {
+    var env_map_storage: ?std.process.EnvMap = null;
+    defer if (env_map_storage) |*map| map.deinit();
+
+    var env_map_ptr: ?*const std.process.EnvMap = null;
+    if (short_mode) {
+        env_map_storage = try std.process.getEnvMap(allocator);
+        try env_map_storage.?.put("WITH_TEST_SHORT", "1");
+        if (env_map_storage) |*map| env_map_ptr = map;
+    }
+
+    const run_result = try std.process.Child.run(.{
+        .allocator = allocator,
+        .argv = &.{binary_path},
+        .cwd = project_root,
+        .env_map = env_map_ptr,
+        .max_output_bytes = 1024 * 1024,
+    });
+
+    const skipped = outputContainsSkipMarker(run_result.stdout) or outputContainsSkipMarker(run_result.stderr);
+    const status: PackageTestRunStatus = if (run_result.term == .Exited and run_result.term.Exited == 0)
+        (if (skipped) .skipped else .passed)
+    else
+        .failed;
+
+    return .{
+        .status = status,
+        .term = run_result.term,
+        .stdout = run_result.stdout,
+        .stderr = run_result.stderr,
+    };
+}
+
+fn outputContainsSkipMarker(output: []const u8) bool {
+    return std.mem.indexOf(u8, output, with_test_skip_marker) != null;
+}
+
+fn printVerboseTestRun(kind: []const u8, test_name: []const u8, duration_ns: u64) void {
+    var buf: [512]u8 = undefined;
+    var w = std.fs.File.stdout().writer(&buf);
+
+    if (std.mem.eql(u8, kind, "RUN")) {
+        w.interface.print("=== RUN   {s}\n", .{test_name}) catch {};
+        w.interface.flush() catch {};
+        return;
+    }
+
+    var duration_buf: [32]u8 = undefined;
+    const duration_text = formatDuration(duration_ns, &duration_buf);
+    w.interface.print("--- {s}: {s} ({s})\n", .{ kind, test_name, duration_text }) catch {};
+    w.interface.flush() catch {};
+}
+
+fn printFailureReport(test_case: PackageTest, duration_ns: u64, stdout_data: []const u8, stderr_data: []const u8) void {
+    var buf: [1024]u8 = undefined;
+    var w = std.fs.File.stdout().writer(&buf);
+    var duration_buf: [32]u8 = undefined;
+    const duration_text = formatDuration(duration_ns, &duration_buf);
+    w.interface.print("--- FAIL: {s} ({s})\n", .{ test_case.name, duration_text }) catch {};
+    w.interface.flush() catch {};
+
+    printIndentedOutput(stdout_data);
+    printIndentedOutput(stderr_data);
+}
+
+fn printIndentedOutput(data: []const u8) void {
+    var line_it = std.mem.splitScalar(u8, data, '\n');
+    while (line_it.next()) |line| {
+        if (line.len == 0) continue;
+        if (std.mem.startsWith(u8, line, with_test_skip_marker)) continue;
+        var buf: [4096]u8 = undefined;
+        var w = std.fs.File.stdout().writer(&buf);
+        w.interface.print("    {s}\n", .{line}) catch {};
+        w.interface.flush() catch {};
+    }
+}
+
+fn printPackageSummary(ok: bool, package_name: []const u8, total_ns: u64, skipped: usize) void {
+    var duration_buf: [32]u8 = undefined;
+    const duration_text = formatDuration(total_ns, &duration_buf);
+
+    var buf: [1024]u8 = undefined;
+    var w = std.fs.File.stdout().writer(&buf);
+    if (ok) {
+        w.interface.writeAll("PASS\n") catch {};
+        w.interface.print("ok\t{s}\t{s}\n", .{ package_name, duration_text }) catch {};
+    } else {
+        w.interface.writeAll("FAIL\n") catch {};
+        w.interface.print("FAIL\t{s}\t{s}\n", .{ package_name, duration_text }) catch {};
+    }
+    if (skipped > 0) {
+        w.interface.print("skipped\t{d}\n", .{skipped}) catch {};
+    }
+    w.interface.flush() catch {};
+}
+
+fn formatDuration(duration_ns: u64, buf: []u8) []const u8 {
+    const secs = duration_ns / std.time.ns_per_s;
+    const millis = (duration_ns % std.time.ns_per_s) / std.time.ns_per_ms;
+    return std.fmt.bufPrint(buf, "{d}.{d}{d}{d}s", .{
+        secs,
+        (millis / 100) % 10,
+        (millis / 10) % 10,
+        millis % 10,
+    }) catch "0.000s";
+}
+
+fn deleteAbsoluteFileQuiet(path: []const u8) void {
+    std.fs.deleteFileAbsolute(path) catch {};
+}
+
+fn sortPackageTestsByFileAndLine(items: []PackageTest) void {
+    var i: usize = 1;
+    while (i < items.len) : (i += 1) {
+        var j = i;
+        while (j > 0 and packageTestLess(items[j], items[j - 1])) : (j -= 1) {
+            const tmp = items[j];
+            items[j] = items[j - 1];
+            items[j - 1] = tmp;
+        }
+    }
+}
+
+fn packageTestLess(lhs: PackageTest, rhs: PackageTest) bool {
+    const path_order = std.mem.order(u8, lhs.file_path, rhs.file_path);
+    if (path_order == .lt) return true;
+    if (path_order == .gt) return false;
+    if (lhs.line < rhs.line) return true;
+    if (lhs.line > rhs.line) return false;
+    return std.mem.order(u8, lhs.name, rhs.name) == .lt;
+}
+
+fn sortStrings(items: [][]const u8) void {
+    var i: usize = 1;
+    while (i < items.len) : (i += 1) {
+        var j = i;
+        while (j > 0 and std.mem.order(u8, items[j], items[j - 1]) == .lt) : (j -= 1) {
+            const tmp = items[j];
+            items[j] = items[j - 1];
+            items[j - 1] = tmp;
+        }
     }
 }
 

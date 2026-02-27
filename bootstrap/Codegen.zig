@@ -156,6 +156,12 @@ uses_async: bool = false,
 /// Active generic type-parameter substitutions while emitting a monomorphized body.
 active_type_bindings: [16]TypeBinding = undefined,
 active_type_bindings_len: u32 = 0,
+/// Function param defaults: fn_sym → param list (for default arg insertion).
+fn_default_params: std.AutoHashMapUnmanaged(u32, []const Ast.Param) = .{},
+/// Source file path for __FILE__ built-in.
+source_file: []const u8 = "<unknown>",
+/// Source text for line number computation (__LINE__ built-in).
+source_text: []const u8 = "",
 
 const VecTypeInfo = struct {
     llvm_type: c.LLVMTypeRef, // struct { ptr, i64, i64 }
@@ -394,6 +400,7 @@ pub fn deinit(self: *Codegen) void {
         }
     }
     self.fn_ref_params.deinit(self.allocator);
+    self.fn_default_params.deinit(self.allocator);
     self.fn_result_err_symbols.deinit(self.allocator);
     self.fn_returns_result.deinit(self.allocator);
     self.fn_result_unit_returns.deinit(self.allocator);
@@ -834,6 +841,20 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         .value = function,
         .fn_type = fn_type,
     }) catch return error.CodegenAlloc;
+
+    // Record param defaults for default-arg insertion at call sites.
+    {
+        var has_defaults = false;
+        for (func.params) |p| {
+            if (p.default_value != null) {
+                has_defaults = true;
+                break;
+            }
+        }
+        if (has_defaults) {
+            self.fn_default_params.put(self.allocator, func.name, func.params) catch return error.CodegenAlloc;
+        }
+    }
 
     // Record dyn Trait param info if any.
     if (has_dyn_param) {
@@ -1494,6 +1515,23 @@ fn findDisplayMethod(self: *Codegen, type_sym: u32) ?FnInfo {
             if (self.functions.get(fn_sym)) |fn_info| {
                 return fn_info;
             }
+        }
+    }
+    return null;
+}
+
+/// Look up a debug-style method for a type (for :? format specifier).
+fn findDebugMethod(self: *Codegen, type_sym: u32) ?FnInfo {
+    const type_name = self.pool.resolve(type_sym);
+    var name_buf: [512]u8 = undefined;
+    const suffix = ".debug";
+    if (type_name.len + suffix.len < name_buf.len) {
+        @memcpy(name_buf[0..type_name.len], type_name);
+        @memcpy(name_buf[type_name.len..][0..suffix.len], suffix);
+        const mangled = name_buf[0 .. type_name.len + suffix.len];
+        const fn_sym = self.pool.intern(mangled) catch return null;
+        if (self.functions.get(fn_sym)) |fn_info| {
+            return fn_info;
         }
     }
     return null;
@@ -2714,7 +2752,20 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         ),
         .string_literal => |sym| try self.genStringLiteral(sym),
         .c_string_literal => |sym| try self.genCStringLiteral(sym),
-        .ident => |sym| self.genIdent(sym),
+        .ident => |sym| blk: {
+            // __FILE__ → str constant with source file path
+            const file_sym = self.pool.intern("__FILE__") catch return error.CodegenAlloc;
+            if (sym == file_sym) {
+                break :blk try self.genStringLiteralRaw(self.source_file);
+            }
+            // __LINE__ → u32 constant with source line number
+            const line_sym = self.pool.intern("__LINE__") catch return error.CodegenAlloc;
+            if (sym == line_sym) {
+                const line_no = self.spanToLine(expr.span);
+                break :blk c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), line_no, 0);
+            }
+            break :blk self.genIdent(sym);
+        },
         .binary => |bin| try self.genBinary(bin),
         .unary => |un| try self.genUnary(un),
         .grouped => |inner| try self.genExpr(inner),
@@ -7620,39 +7671,54 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
             args_buf[i] = try self.genExpr(arg);
         }
 
-        // Coerce arguments to match parameter types.
+        // Fill in default values for omitted arguments.
         const param_count: u32 = c.LLVMCountParams(fn_info.value);
+        var effective_arg_count = call_e.args.len;
+        if (effective_arg_count < param_count) {
+            if (self.fn_default_params.get(fn_sym)) |params| {
+                for (effective_arg_count..@min(params.len, param_count)) |i| {
+                    if (params[i].default_value) |default_expr| {
+                        args_buf[i] = try self.genExpr(default_expr);
+                        effective_arg_count = i + 1;
+                    }
+                }
+            }
+        }
+
+        // Coerce arguments to match parameter types.
         const dyn_params = self.fn_dyn_params.get(fn_sym);
-        for (0..@min(call_e.args.len, param_count)) |i| {
+        for (0..@min(effective_arg_count, param_count)) |i| {
             const param_type = c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, @intCast(i)));
             const arg_type = c.LLVMTypeOf(args_buf[i]);
 
             // Convert concrete value → dyn Trait fat pointer.
-            if (dyn_params) |dp| {
-                if (i < dp.len) {
-                    if (dp[i]) |trait_sym| {
-                        // This param expects dyn Trait — wrap concrete arg when known.
-                        if (self.dynConcreteArgInfo(call_e.args[i], arg_type)) |info| {
-                            if (info.use_ptr) {
-                                args_buf[i] = try self.buildDynTraitValueFromPtr(args_buf[i], info.type_sym, trait_sym);
-                            } else {
-                                args_buf[i] = try self.buildDynTraitValue(args_buf[i], info.type_sym, trait_sym);
+            if (i < call_e.args.len) {
+                if (dyn_params) |dp| {
+                    if (i < dp.len) {
+                        if (dp[i]) |trait_sym| {
+                            // This param expects dyn Trait — wrap concrete arg when known.
+                            if (self.dynConcreteArgInfo(call_e.args[i], arg_type)) |info| {
+                                if (info.use_ptr) {
+                                    args_buf[i] = try self.buildDynTraitValueFromPtr(args_buf[i], info.type_sym, trait_sym);
+                                } else {
+                                    args_buf[i] = try self.buildDynTraitValue(args_buf[i], info.type_sym, trait_sym);
+                                }
+                                continue;
                             }
-                            continue;
                         }
                     }
                 }
-            }
 
-            // Wrap named function references as fat pointers for fn-type params.
-            if (c.LLVMGetTypeKind(param_type) == c.LLVMStructTypeKind and
-                c.LLVMGetTypeKind(arg_type) == c.LLVMPointerTypeKind)
-            {
-                if (call_e.args[i].kind == .ident) {
-                    const arg_sym = call_e.args[i].kind.ident;
-                    if (self.functions.get(arg_sym)) |arg_fn_info| {
-                        args_buf[i] = try self.wrapFunctionAsFatPointer(arg_fn_info.value, arg_fn_info.fn_type);
-                        continue;
+                // Wrap named function references as fat pointers for fn-type params.
+                if (c.LLVMGetTypeKind(param_type) == c.LLVMStructTypeKind and
+                    c.LLVMGetTypeKind(arg_type) == c.LLVMPointerTypeKind)
+                {
+                    if (call_e.args[i].kind == .ident) {
+                        const arg_sym = call_e.args[i].kind.ident;
+                        if (self.functions.get(arg_sym)) |arg_fn_info| {
+                            args_buf[i] = try self.wrapFunctionAsFatPointer(arg_fn_info.value, arg_fn_info.fn_type);
+                            continue;
+                        }
                     }
                 }
             }
@@ -7685,7 +7751,7 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
         // For variadic functions, coerce remaining args (str → ptr, float → double).
         const is_variadic = c.LLVMIsFunctionVarArg(fn_info.fn_type) != 0;
         if (is_variadic) {
-            for (param_count..@intCast(call_e.args.len)) |i| {
+            for (param_count..@intCast(effective_arg_count)) |i| {
                 const arg_type = c.LLVMTypeOf(args_buf[i]);
                 if (self.isStrType(arg_type)) {
                     args_buf[i] = self.extractStrPtr(args_buf[i]);
@@ -7702,7 +7768,7 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
             if (self.tailrec_body_bb != null and self.tailrec_param_allocas != null) {
                 const allocas = self.tailrec_param_allocas.?;
                 // Store new arg values into param allocas.
-                for (0..@min(call_e.args.len, allocas.len)) |i| {
+                for (0..@min(effective_arg_count, allocas.len)) |i| {
                     _ = c.LLVMBuildStore(self.builder, args_buf[i], allocas[i]);
                 }
                 // Branch back to the start of the function body.
@@ -7723,8 +7789,8 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
             self.builder,
             fn_info.fn_type,
             fn_info.value,
-            if (call_e.args.len > 0) &args_buf else null,
-            @intCast(call_e.args.len),
+            if (effective_arg_count > 0) &args_buf else null,
+            @intCast(effective_arg_count),
             if (is_void) "" else "call",
         );
     }
@@ -13504,6 +13570,43 @@ fn genInterpolatedPrint(
                 const expr_text = text[expr_start..expr_end];
                 // Try to resolve the expression. For now: simple identifiers and field access.
                 if (try self.resolveInterpExpr(expr_text)) |val| {
+                    // Check for :? debug format specifier.
+                    if (format_spec_start) |fs| {
+                        const spec_text = text[fs + 1 .. i];
+                        if (std.mem.eql(u8, spec_text, "?")) {
+                            // Call .debug() method on the value.
+                            const ty2 = c.LLVMTypeOf(val);
+                            if (c.LLVMGetTypeKind(ty2) == c.LLVMStructTypeKind) {
+                                if (self.findTypeSymbol(ty2)) |type_sym| {
+                                    if (self.findDebugMethod(type_sym)) |debug_fn| {
+                                        var debug_args = [_]c.LLVMValueRef{val};
+                                        const debug_result = c.LLVMBuildCall2(
+                                            self.builder,
+                                            debug_fn.fn_type,
+                                            debug_fn.value,
+                                            &debug_args,
+                                            1,
+                                            "debug",
+                                        );
+                                        // debug() returns str — extract ptr.
+                                        if (self.isStrType(c.LLVMTypeOf(debug_result))) {
+                                            expr_vals[expr_count] = self.extractStrPtr(debug_result);
+                                        } else {
+                                            expr_vals[expr_count] = debug_result;
+                                        }
+                                        const spec = "%s";
+                                        @memcpy(fmt_buf[fmt_len..][0..spec.len], spec);
+                                        fmt_len += spec.len;
+                                        expr_count += 1;
+                                        i += 1;
+                                        continue;
+                                    }
+                                }
+                            }
+                            // Fallthrough: no debug method, use default formatting.
+                        }
+                    }
+
                     // Determine format specifier based on type
                     const ty = c.LLVMTypeOf(val);
                     const kind = c.LLVMGetTypeKind(ty);
@@ -14060,6 +14163,39 @@ fn genPlainStringLiteral(self: *Codegen, text: []const u8) Error!c.LLVMValueRef 
     _ = c.LLVMBuildStore(self.builder, len_val, gep_len);
 
     return c.LLVMBuildLoad2(self.builder, str_info.llvm_type, alloca, "str.val");
+}
+
+/// Generate a str value from a raw byte slice (no escape processing).
+/// Used for __FILE__ and other compiler-generated strings.
+fn genStringLiteralRaw(self: *Codegen, text: []const u8) Error!c.LLVMValueRef {
+    var buf: [4096]u8 = undefined;
+    if (text.len >= buf.len) return error.UnsupportedExpr;
+    @memcpy(buf[0..text.len], text);
+    buf[text.len] = 0;
+
+    const str_ptr = c.LLVMBuildGlobalStringPtr(self.builder, @ptrCast(buf[0..text.len :0]), "str.data");
+    const str_sym = self.pool.intern("str") catch return error.CodegenAlloc;
+    const str_info = self.struct_types.get(str_sym) orelse return error.UnsupportedType;
+
+    const alloca = c.LLVMBuildAlloca(self.builder, str_info.llvm_type, "str");
+    const gep_ptr = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, alloca, 0, "");
+    _ = c.LLVMBuildStore(self.builder, str_ptr, gep_ptr);
+    const gep_len = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, alloca, 1, "");
+    const len_val = c.LLVMConstInt(c.LLVMInt64TypeInContext(self.context), @intCast(text.len), 0);
+    _ = c.LLVMBuildStore(self.builder, len_val, gep_len);
+
+    return c.LLVMBuildLoad2(self.builder, str_info.llvm_type, alloca, "str.val");
+}
+
+/// Convert a span byte offset to a 1-indexed line number using source text.
+fn spanToLine(self: *const Codegen, span: @import("Span.zig")) u32 {
+    if (self.source_text.len == 0 or span.start == 0) return 1;
+    var line: u32 = 1;
+    const end = @min(span.start, @as(u32, @intCast(self.source_text.len)));
+    for (self.source_text[0..end]) |ch| {
+        if (ch == '\n') line += 1;
+    }
+    return line;
 }
 
 /// Generate an interpolated string as a str value using snprintf.

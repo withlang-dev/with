@@ -15,7 +15,7 @@ failures=0
 
 expect_pass() {
   local file="$1"
-  if "$WITH_BIN" test "$file" >/dev/null 2>/dev/null; then
+  if "$WITH_BIN" test-harness "$file" >/dev/null 2>/dev/null; then
     echo "PASS(harness-pass) $file"
   else
     echo "FAIL(harness-pass) $file"
@@ -25,7 +25,7 @@ expect_pass() {
 
 expect_fail() {
   local file="$1"
-  if "$WITH_BIN" test "$file" >/dev/null 2>/dev/null; then
+  if "$WITH_BIN" test-harness "$file" >/dev/null 2>/dev/null; then
     echo "FAIL(harness-fail) $file"
     failures=$((failures + 1))
   else

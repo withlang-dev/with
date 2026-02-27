@@ -1901,6 +1901,31 @@ fn double(x: i32) -> i32: x * 2         // args + return type
 fn log(msg: str): println(msg)           // args, returns Unit
 ```
 
+### 9.1a Default Function Parameters
+
+Parameters may have default values, specified with `= expr` after the type annotation:
+
+```
+fn greet(name: str, greeting: str = "Hello"):
+    println("{greeting}, {name}!")
+
+greet("Alice")              // greeting defaults to "Hello"
+greet("Bob", "Hey")         // explicit override
+```
+
+**Rules:**
+- Default parameters must appear after all non-default parameters.
+- Default expressions are evaluated at the call site, not at the definition site.
+- Only literal values and `__FILE__`/`__LINE__` are allowed as default expressions (phase 1).
+- The compiler fills in missing trailing arguments from defaults at code generation time.
+
+```
+fn assert_eq(left: i32, right: i32, file: str = __FILE__, line: u32 = __LINE__):
+    if left != right:
+        println("assertion failed at {file}:{line}")
+        abort()
+```
+
 ### 9.2 Tail Call Optimization
 
 Functions marked `@[tailrec]` are guaranteed to compile to loops.
@@ -3011,6 +3036,34 @@ Fields with default values are optional in the builder. Fields
 without defaults are required — `.build()` returns an error if they
 aren't set. This is checked at compile time when all `.field()`
 calls are visible.
+
+### 11.9 Debug Trait and `:?` Format Specifier
+
+The `Debug` trait provides a programmer-facing string representation of a value:
+
+```
+trait Debug:
+    fn debug(&self) -> str
+```
+
+Types can implement `Debug` manually or via `@[derive(Debug)]`. Derived
+implementations produce `"TypeName { field1: value1, field2: value2 }"` for
+structs and variant names for enums.
+
+The `:?` format specifier in string interpolation calls the `debug()` method:
+
+```
+@[derive(Debug)]
+type Point = { x: f64, y: f64 }
+
+let p = Point { x: 1.0, y: 2.0 }
+println("{p:?}")    // prints "Point { x: 1.0, y: 2.0 }"
+```
+
+If no `debug()` method is found, the value falls through to default formatting.
+
+The `Display` trait (§11.7) is used for user-facing output via `println("{value}")`.
+The `Debug` trait is used for programmer-facing output via `println("{value:?}")`.
 
 ---
 
@@ -4844,6 +4897,30 @@ derive macros, reflection-based codegen, and most uses of procedural
 macros from other languages. The key property: generated code is
 regular With code that goes through the full type checker and borrow
 checker. Nothing is hidden from the safety machinery.
+
+### 17.0 Magic Constants
+
+With provides two built-in magic constants, evaluated at the point of use:
+
+| Constant | Type | Value |
+|----------|------|-------|
+| `__FILE__` | `str` | Path of the current source file |
+| `__LINE__` | `u32` | Line number of the expression |
+
+```
+println(__FILE__)    // prints "src/main.w"
+println(__LINE__)    // prints the current line number
+```
+
+These are especially useful as default parameter values for assertion
+and logging functions:
+
+```
+fn log(msg: str, file: str = __FILE__, line: u32 = __LINE__):
+    println("[{file}:{line}] {msg}")
+
+log("hello")  // prints "[src/main.w:5] hello"
+```
 
 ### 17.1 Compile-Time Evaluation
 

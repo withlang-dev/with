@@ -1,5 +1,7 @@
 // Tests for the C interop example
 
+use test.testing
+
 extern fn strlen(s: *const i8) -> i64
 extern fn strcmp(a: *const i8, b: *const i8) -> i32
 
@@ -42,37 +44,38 @@ fn find_value(entries: [5]Entry, key: i32) -> i32:
         if entries[i].key == key then result = entries[i].value else result = result
     result
 
-fn main -> i32:
+@[test]
+fn test_c_interop_example:
     // Test strlen via C interop
-    assert(strlen("hello") == 5)
-    assert(strlen("") == 0)
-    assert(strlen("With Language") == 13)
+    assert_true(strlen("hello") == 5)
+    assert_true(strlen("") == 0)
+    assert_true(strlen("With Language") == 13)
 
     // Test strcmp via C interop
-    assert(strcmp("abc", "abc") == 0)
-    assert(strcmp("abc", "def") < 0)
-    assert(strcmp("def", "abc") > 0)
+    assert_true(strcmp("abc", "abc") == 0)
+    assert_true(strcmp("abc", "def") < 0)
+    assert_true(strcmp("def", "abc") > 0)
 
     // Test SafeStr wrapper
     let s1 = SafeStr.new("Hello World")
-    assert(s1.len == 11)
-    assert(s1.get_len() == 11)
+    assert_true(s1.len == 11)
+    assert_true(s1.get_len() == 11)
 
     let s2 = SafeStr.new("")
-    assert(s2.len == 0)
+    assert_true(s2.len == 0)
 
     let s3 = SafeStr.new("With")
-    assert(s3.get_len() == 4)
+    assert_true(s3.get_len() == 4)
 
     // Test combined lengths
     let total = s1.get_len() + s3.get_len()
-    assert(total == 15)
+    assert_true(total == 15)
 
     // Test Entry and make_entry
     let e = make_entry(42, 100)
-    assert(e.key == 42)
-    assert(e.value == 100)
-    assert(e.active == true)
+    assert_true(e.key == 42)
+    assert_true(e.value == 100)
+    assert_true(e.active == true)
 
     // Test sum_entries
     let entries: [5]Entry = [
@@ -82,18 +85,17 @@ fn main -> i32:
         make_entry(4, 400),
         make_entry(5, 500),
     ]
-    assert(sum_entries(entries) == 1500)
+    assert_true(sum_entries(entries) == 1500)
 
     // Test count_active
-    assert(count_active(entries) == 5)
+    assert_true(count_active(entries) == 5)
 
     // Test find_value
-    assert(find_value(entries, 1) == 100)
-    assert(find_value(entries, 3) == 300)
-    assert(find_value(entries, 5) == 500)
+    assert_true(find_value(entries, 1) == 100)
+    assert_true(find_value(entries, 3) == 300)
+    assert_true(find_value(entries, 5) == 500)
 
     // Test type casting in SafeStr
     let s4 = SafeStr.new("twelve chars")
-    assert(s4.len == 12)
+    assert_true(s4.len == 12)
 
-    println("c-interop: all tests passed")
