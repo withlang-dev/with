@@ -30,26 +30,42 @@ pub fn main() !void {
 
     const command = args[1];
 
-    // Parse -O flag from remaining args.
+    // Parse flags from remaining args.
     var opt_level: u8 = 0;
+    var no_std = false;
+    var alloc_mode = false;
     for (args) |arg| {
         if (arg.len == 3 and arg[0] == '-' and arg[1] == 'O') {
             opt_level = arg[2] - '0';
             if (opt_level > 3) opt_level = 2;
+        } else if (std.mem.eql(u8, arg, "--no-std")) {
+            no_std = true;
+        } else if (std.mem.eql(u8, arg, "--alloc")) {
+            alloc_mode = true;
         }
     }
 
+    // Find the first non-flag positional argument after the command.
+    const source_file: ?[]const u8 = blk: {
+        for (args[2..]) |arg| {
+            if (!std.mem.startsWith(u8, arg, "-")) break :blk arg;
+        }
+        break :blk null;
+    };
+
     if (std.mem.eql(u8, command, "build")) {
-        if (args.len < 3) {
+        const file = source_file orelse {
             stderrPrint("error: 'build' requires a source file argument\n");
             printUsage();
             std.process.exit(1);
-        }
+        };
         var driver = Driver.init(allocator);
         defer driver.deinit();
         driver.opt_level = opt_level;
+        driver.no_std = no_std;
+        driver.alloc = alloc_mode;
 
-        const bin_path = try driver.buildBinary(args[2]);
+        const bin_path = try driver.buildBinary(file);
         if (bin_path) |p| {
             var buf: [4096]u8 = undefined;
             var w = std.fs.File.stderr().writer(&buf);
@@ -60,16 +76,18 @@ pub fn main() !void {
             std.process.exit(1);
         }
     } else if (std.mem.eql(u8, command, "run")) {
-        if (args.len < 3) {
+        const file = source_file orelse {
             stderrPrint("error: 'run' requires a source file argument\n");
             printUsage();
             std.process.exit(1);
-        }
+        };
         var driver = Driver.init(allocator);
         defer driver.deinit();
         driver.opt_level = opt_level;
+        driver.no_std = no_std;
+        driver.alloc = alloc_mode;
 
-        const bin_path = try driver.buildBinary(args[2]);
+        const bin_path = try driver.buildBinary(file);
         if (bin_path) |p| {
             driver.printWarnings();
             // Execute the binary.
@@ -96,15 +114,15 @@ pub fn main() !void {
             std.process.exit(1);
         }
     } else if (std.mem.eql(u8, command, "ir")) {
-        if (args.len < 3) {
+        const file = source_file orelse {
             stderrPrint("error: 'ir' requires a source file argument\n");
             printUsage();
             std.process.exit(1);
-        }
+        };
         var driver = Driver.init(allocator);
         defer driver.deinit();
 
-        const module = try driver.compileFile(args[2]);
+        const module = try driver.compileFile(file);
         if (module) |m| {
             const ok = try driver.emitIR(&m);
             if (!ok) std.process.exit(1);
@@ -112,32 +130,34 @@ pub fn main() !void {
             std.process.exit(1);
         }
     } else if (std.mem.eql(u8, command, "ast")) {
-        if (args.len < 3) {
+        const file = source_file orelse {
             var buf: [4096]u8 = undefined;
             var w = std.fs.File.stderr().writer(&buf);
             w.interface.writeAll("error: 'ast' requires a source file argument\n") catch {};
             w.interface.flush() catch {};
             std.process.exit(1);
-        }
+        };
         var driver = Driver.init(allocator);
         defer driver.deinit();
 
-        const module = try driver.compileFile(args[2]);
+        const module = try driver.compileFile(file);
         if (module) |m| {
             try driver.dumpAst(&m);
         } else {
             std.process.exit(1);
         }
     } else if (std.mem.eql(u8, command, "check")) {
-        if (args.len < 3) {
+        const file = source_file orelse {
             stderrPrint("error: 'check' requires a source file argument\n");
             printUsage();
             std.process.exit(1);
-        }
+        };
         var driver = Driver.init(allocator);
         defer driver.deinit();
+        driver.no_std = no_std;
+        driver.alloc = alloc_mode;
 
-        const module = try driver.compileFile(args[2]);
+        const module = try driver.compileFile(file);
         if (module) |_| {
             stderrPrint("ok\n");
             driver.printWarnings();
@@ -162,12 +182,12 @@ pub fn main() !void {
         const ok = try runTests(target, update_snapshots, std.heap.page_allocator);
         if (!ok) std.process.exit(1);
     } else if (std.mem.eql(u8, command, "fmt")) {
-        if (args.len < 3) {
+        const file = source_file orelse {
             stderrPrint("error: 'fmt' requires a source file argument\n");
             printUsage();
             std.process.exit(1);
-        }
-        const source_text = std.fs.cwd().readFileAlloc(allocator, args[2], 2 * 1024 * 1024) catch {
+        };
+        const source_text = std.fs.cwd().readFileAlloc(allocator, file, 2 * 1024 * 1024) catch {
             stderrPrint("error: failed to read source file for formatting\n");
             std.process.exit(1);
         };
@@ -190,7 +210,7 @@ pub fn main() !void {
         var driver = Driver.init(allocator);
         defer driver.deinit();
 
-        const module = try driver.compileFile(args[2]);
+        const module = try driver.compileFile(file);
         if (module) |m| {
             // Render the AST back to formatted source.
             try driver.dumpAst(&m);
@@ -198,25 +218,25 @@ pub fn main() !void {
             std.process.exit(1);
         }
     } else if (std.mem.eql(u8, command, "tokens")) {
-        if (args.len < 3) {
+        const file = source_file orelse {
             var buf: [4096]u8 = undefined;
             var w = std.fs.File.stderr().writer(&buf);
             w.interface.writeAll("error: 'tokens' requires a source file argument\n") catch {};
             w.interface.flush() catch {};
             std.process.exit(1);
-        }
-        try dumpTokens(args[2], allocator);
+        };
+        try dumpTokens(file, allocator);
     } else if (std.mem.eql(u8, command, "help") or std.mem.eql(u8, command, "--help") or std.mem.eql(u8, command, "-h")) {
         printUsage();
     } else if (std.mem.eql(u8, command, "repl")) {
         try runRepl(allocator);
     } else if (std.mem.eql(u8, command, "doc")) {
-        if (args.len < 3) {
+        const file = source_file orelse {
             stderrPrint("error: 'doc' requires a source file argument\n");
             printUsage();
             std.process.exit(1);
-        }
-        try generateDoc(args[2], allocator);
+        };
+        try generateDoc(file, allocator);
     } else if (std.mem.eql(u8, command, "migrate")) {
         if (args.len < 4) {
             stderrPrint("error: 'migrate' requires <lang> and <path>\n");
@@ -1040,7 +1060,29 @@ fn runOneTest(path: []const u8, update_snapshots: bool, allocator: std.mem.Alloc
     };
     defer allocator.free(source);
 
-    if (!sourceHasMainFn(source)) {
+    // Parse test flags from `// FLAGS: --no-std --alloc` comment.
+    var test_no_std = false;
+    var test_alloc = false;
+    var test_expect_error = false;
+    {
+        var line_iter = std.mem.splitScalar(u8, source, '\n');
+        while (line_iter.next()) |line| {
+            const trimmed = std.mem.trimLeft(u8, line, " \t");
+            if (std.mem.startsWith(u8, trimmed, "// FLAGS:")) {
+                const flags_str = trimmed["// FLAGS:".len..];
+                var flag_iter = std.mem.splitScalar(u8, flags_str, ' ');
+                while (flag_iter.next()) |flag| {
+                    const f = std.mem.trim(u8, flag, " \t");
+                    if (std.mem.eql(u8, f, "--no-std")) test_no_std = true;
+                    if (std.mem.eql(u8, f, "--alloc")) test_alloc = true;
+                    if (std.mem.eql(u8, f, "--expect-error")) test_expect_error = true;
+                }
+            }
+            if (trimmed.len > 0 and !std.mem.startsWith(u8, trimmed, "//")) break;
+        }
+    }
+
+    if (!sourceHasMainFn(source) and !test_expect_error) {
         summary.skipped += 1;
         testStatusMsg("SKIP", path, "no main");
         return;
@@ -1048,8 +1090,25 @@ fn runOneTest(path: []const u8, update_snapshots: bool, allocator: std.mem.Alloc
 
     var driver = Driver.init(allocator);
     defer driver.deinit();
+    driver.no_std = test_no_std;
+    driver.alloc = test_alloc;
 
     const bin_path_opt = try driver.buildBinary(path);
+
+    // For tests that expect compilation failure, success is bin_path == null.
+    if (test_expect_error) {
+        if (bin_path_opt == null) {
+            summary.passed += 1;
+            testStatusMsg("PASS", path, "");
+        } else {
+            summary.failed += 1;
+            testStatusMsg("FAIL", path, "expected compile error but compiled OK");
+            // Clean up the binary.
+            std.fs.cwd().deleteFile(bin_path_opt.?) catch {};
+        }
+        return;
+    }
+
     if (bin_path_opt == null) {
         summary.failed += 1;
         testStatusMsg("FAIL", path, "compile/link");
@@ -1239,7 +1298,36 @@ fn formatSnapshot(term: std.process.Child.Term, stdout_data: []const u8, stderr_
 }
 
 fn sourceHasMainFn(source: []const u8) bool {
-    return std.mem.indexOf(u8, source, "fn main(") != null;
+    // Also accept @[entry] annotation as an alternative entry point.
+    if (std.mem.indexOf(u8, source, "@[entry]") != null) return true;
+
+    var search_from: usize = 0;
+    while (std.mem.indexOfPos(u8, source, search_from, "fn main")) |idx| {
+        // Reject embedded identifiers like `myfn main`.
+        if (idx > 0) {
+            const prev = source[idx - 1];
+            if (std.ascii.isAlphanumeric(prev) or prev == '_') {
+                search_from = idx + 1;
+                continue;
+            }
+        }
+
+        var i = idx + "fn main".len;
+        while (i < source.len and (source[i] == ' ' or source[i] == '\t')) : (i += 1) {}
+        if (i >= source.len) return true;
+
+        // Supports:
+        //   fn main(...)
+        //   fn main -> i32:
+        //   fn main:
+        //   fn main = ...
+        const next = source[i];
+        if (next == '(' or next == '-' or next == ':' or next == '=') return true;
+
+        search_from = idx + 1;
+    }
+
+    return false;
 }
 
 fn testStatus(label: []const u8, path: []const u8, err: anytype) void {

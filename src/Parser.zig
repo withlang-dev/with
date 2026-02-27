@@ -31,6 +31,10 @@ pending_tailrec: bool = false,
 pending_inline: bool = false,
 pending_noinline: bool = false,
 pending_must_use: bool = false,
+/// Pending no_std annotations (§18.7).
+pending_panic_handler: bool = false,
+pending_entry: bool = false,
+pending_no_main: bool = false,
 
 pub fn init(
     tokens: *const Token.List,
@@ -334,9 +338,14 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
         const method_name = try self.expectIdentifier();
         var trait_method_tps = try self.parseTypeParams(); // generic trait methods parse here (object-safety checks are later)
 
-        try self.expect(.l_paren);
-        const params = try self.parseParamList(null);
-        try self.expect(.r_paren);
+        // Parameter parens are optional for zero-parameter trait methods,
+        // matching top-level function syntax.
+        var params: []const Ast.Param = &.{};
+        if (self.peek() == .l_paren) {
+            self.advance();
+            params = try self.parseParamList(null);
+            try self.expect(.r_paren);
+        }
 
         var return_type: ?*const Ast.TypeExpr = null;
         if (self.peek() == .arrow) {
@@ -345,14 +354,13 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
         }
         try self.parseOptionalWhereClause(&trait_method_tps);
 
-        // Check for default body (= expr)
+        // Check for default body (= expr or : block)
         var has_default = false;
         var default_body: ?*const Ast.Expr = null;
-        if (self.peek() == .eq) {
+        if (self.peek() == .eq or self.peek() == .colon) {
             has_default = true;
-            self.advance(); // consume =
-            self.skipNewlines();
-            default_body = try self.parseExpr();
+            self.advance(); // consume = or :
+            default_body = try self.parseBlockOrExpr();
         }
 
         try methods.append(self.arena, .{
@@ -586,6 +594,9 @@ fn parseFnDecl(
             .is_inline = self.pending_inline,
             .is_noinline = self.pending_noinline,
             .is_must_use = self.pending_must_use,
+            .is_panic_handler = self.pending_panic_handler,
+            .is_entry = self.pending_entry,
+            .is_no_main = self.pending_no_main,
         } },
         .span = start_span.merge(body.span),
     };
@@ -3833,6 +3844,9 @@ fn skipAttributes(self: *Parser) void {
     self.pending_inline = false;
     self.pending_noinline = false;
     self.pending_must_use = false;
+    self.pending_panic_handler = false;
+    self.pending_entry = false;
+    self.pending_no_main = false;
     var derives: std.ArrayList(Ast.Symbol) = .empty;
 
     while (self.peek() == .at) {
@@ -3876,6 +3890,15 @@ fn skipAttributes(self: *Parser) void {
             self.advance();
         } else if (self.isIdentifierNamed("must_use")) {
             self.pending_must_use = true;
+            self.advance();
+        } else if (self.isIdentifierNamed("panic_handler")) {
+            self.pending_panic_handler = true;
+            self.advance();
+        } else if (self.isIdentifierNamed("entry")) {
+            self.pending_entry = true;
+            self.advance();
+        } else if (self.isIdentifierNamed("no_main")) {
+            self.pending_no_main = true;
             self.advance();
         }
 

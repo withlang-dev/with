@@ -13,20 +13,20 @@ trap 'rm -rf "$tmpdir"' EXIT
 
 failures=0
 
-expect_build_warn_msg() {
+expect_build_fail_msg() {
   local file="$1"
   local msg="$2"
-  local stderr_file="$tmpdir/stderr.warn.$$"
+  local stderr_file="$tmpdir/stderr.fail.$$"
   if "$WITH_BIN" build "$file" >/dev/null 2>"$stderr_file"; then
+    echo "FAIL(exhaustiveness-build-fail) $file"
+    failures=$((failures + 1))
+  else
     if grep -Fq "$msg" "$stderr_file"; then
-      echo "PASS(exhaustiveness-warn) $file"
+      echo "PASS(exhaustiveness-build-fail) $file"
     else
-      echo "FAIL(exhaustiveness-warn-msg) $file"
+      echo "FAIL(exhaustiveness-build-msg) $file"
       failures=$((failures + 1))
     fi
-  else
-    echo "FAIL(exhaustiveness-build) $file"
-    failures=$((failures + 1))
   fi
   rm -f "$stderr_file"
 }
@@ -85,7 +85,7 @@ fn score(d: Dir) -> i32:
 
 fn main -> i32: score(Up)
 EOF3
-expect_build_warn_msg "$tmpdir/non_exhaustive_enum_missing_warn.w" "non-exhaustive match: missing variant"
+expect_build_fail_msg "$tmpdir/non_exhaustive_enum_missing_warn.w" "non-exhaustive match: missing variant"
 
 cat >"$tmpdir/non_exhaustive_bool_warn.w" <<'EOF4'
 fn score(v: bool) -> i32:
@@ -94,7 +94,7 @@ fn score(v: bool) -> i32:
 
 fn main -> i32: score(true)
 EOF4
-expect_build_warn_msg "$tmpdir/non_exhaustive_bool_warn.w" "non-exhaustive match on bool"
+expect_build_fail_msg "$tmpdir/non_exhaustive_bool_warn.w" "non-exhaustive match on bool"
 
 if [[ "$failures" -ne 0 ]]; then
   echo "phase2 exhaustiveness tests: $failures failure(s)"

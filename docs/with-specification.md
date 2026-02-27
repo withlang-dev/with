@@ -5517,6 +5517,153 @@ Users writing portable code import `std.fs`, not `std.os.posix`.
 Users writing platform-specific code (system daemons, kernel
 modules) can reach through to `std.os` or use `c_import` directly.
 
+### 18.7 Freestanding Mode (`no_std`)
+
+For embedded, kernel, bootloader, and bare-metal targets, the
+standard library can be skipped entirely. Set `std = false` in
+`with.toml`:
+
+```toml
+[package]
+name = "my-firmware"
+std = false
+```
+
+Or pass `--no-std` to the compiler:
+
+```
+with build --no-std --target thumbv7em-none-eabi
+```
+
+**What you keep (`core`):**
+
+The `core` library is always available. It contains everything
+that doesn't need a heap allocator or OS:
+
+| Category | What's included |
+|----------|----------------|
+| Primitives | `i8`–`i64`, `u8`–`u64`, `f32`, `f64`, `bool`, `usize` |
+| Traits | `Copy`, `Clone`, `Drop`, `Default`, `Debug`, `Eq`, `Ord`, `Hash` |
+| Option/Result | `Option[T]`, `Result[T, E]` and all methods |
+| Slices | `&[T]`, `&mut [T]` — borrowed views into arrays |
+| Fixed arrays | `[T; N]` — stack-allocated |
+| Tuples | `(A, B, ...)` |
+| Ranges | `0..10`, `0..=10` |
+| Math | Integer and float arithmetic, `min`, `max`, `abs` |
+| Bitwise | All bit operations on integer types |
+| Pointers | `*T`, `*mut T`, raw pointer operations (unsafe) |
+| Comptime | All compile-time evaluation (§17) |
+| `c_import` | Full C interop — this is how you talk to hardware |
+| Ownership | Full borrow checker, move semantics, drop — all compile-time, zero cost |
+| `@[panic_handler]` | Custom panic behavior (see below) |
+| `Never` type | For diverging functions |
+| `unsafe` blocks | Full unsafe capabilities |
+| `comptime if` | Conditional compilation |
+
+**What you lose (`std` only):**
+
+| Category | Requires `std` | Why |
+|----------|---------------|-----|
+| `str`, `String` | Yes | Heap-allocated |
+| `Vec[T]` | Yes | Heap-allocated |
+| `HashMap`, `HashSet` | Yes | Heap-allocated |
+| `Box[T]` | Yes | Heap-allocated |
+| `println`, `print` | Yes | Needs stdout |
+| `std.io`, `std.fs` | Yes | Needs OS |
+| `std.net` | Yes | Needs OS |
+| `async fn`, `.await` | Yes | Needs fiber runtime |
+| `std.sync` (channels) | Yes | Needs OS threads |
+
+**String literals in `no_std`:** Bare `"hello"` is `&str` (static
+reference) in `no_std` mode — there is no allocator to create
+an owned `str`. This is the one context where the default type of
+a string literal changes. If you need owned strings in `no_std`,
+bring your own allocator and use `FixedString[N]` or a similar
+stack-allocated string type.
+
+**Panic handler:** In `no_std` mode, you must provide a panic
+handler. Without one, the compiler errors:
+
+```
+@[panic_handler]
+fn on_panic(info: &PanicInfo) -> Never:
+    // Option 1: spin forever
+    loop {}
+
+    // Option 2: reset the chip
+    // cortex_m.SCB.system_reset()
+```
+
+**Entry point:** There is no `fn main` in `no_std` unless you
+define it yourself. Use `@[entry]` to mark your entry point,
+or `@[no_main]` to handle startup entirely through C interop
+or linker scripts:
+
+```
+@[no_main]
+@[entry]
+fn start -> Never:
+    // Initialize hardware
+    let peripherals = c_import("stm32f4xx.h")
+    // ...
+    loop
+        // main loop
+```
+
+**Allocator opt-in:** You can get `Vec`, `str`, `Box`, and
+other heap types back without pulling in the full `std` by
+providing a global allocator:
+
+```toml
+[package]
+name = "my-firmware"
+std = false
+alloc = true       # enables core + alloc (heap types, no OS)
+```
+
+```
+@[global_allocator]
+static ALLOC: BumpAllocator = BumpAllocator.new(
+    start: 0x2000_0000,
+    size: 64 * 1024,    // 64KB SRAM
+)
+```
+
+With `alloc = true`, you get `Vec[T]`, `Box[T]`, `str`,
+`String`, `HashMap`, and `HashSet` — but still no I/O, no
+filesystem, no async runtime, no OS-dependent features.
+
+**Three tiers:**
+
+| Tier | `with.toml` | What you get |
+|------|-------------|--------------|
+| Full | `std = true` (default) | Everything |
+| Alloc | `std = false`, `alloc = true` | `core` + heap types |
+| Freestanding | `std = false` | `core` only — no heap |
+
+**Embedded hello world:**
+
+```
+// with.toml: std = false, target = "thumbv7em-none-eabi"
+
+use c_import("stm32f4xx_hal.h", link: "hal")
+
+@[panic_handler]
+fn on_panic(info: &PanicInfo) -> Never:
+    loop {}
+
+@[entry]
+fn start -> Never:
+    let led = gpio_init(GPIOA, PIN_5, .Output)
+    loop
+        gpio_toggle(led)
+        delay_ms(500)
+```
+
+Everything With gives you — ownership, borrow checking, `c_import`,
+`match`, `comptime`, type inference — works in freestanding mode.
+You're just writing With without a heap or an OS.
+
 ---
 
 ## 19. Safety Boundaries
@@ -8261,7 +8408,7 @@ fn test:
     var map = HashMap.new()
     map.insert("admin", User { name: "Alice" })
     let user = {
-        let key = "admin"
+        let key: str = "admin"
         map.get(key.as_view())    // compiler knows: borrows map, not key
     }                              // key drops here, user still valid
     assert(user.is_some())
@@ -8426,7 +8573,7 @@ fn test:
 // PASS: auto-ref for shared borrow parameter
 fn len(s: &str) -> usize: s.len()
 fn test:
-    let name = "Alice"
+    let name: str = "Alice"
     assert(len(name) == 5)               // compiler inserts &name
 
 // PASS: auto-ref for method receiver
@@ -8440,7 +8587,7 @@ fn test:
 // FAIL: no auto-ref for &mut
 fn mutate(s: &mut str): s.push_str("!")
 fn test_fail:
-    var name = "Alice"
+    var name: str = "Alice"
     mutate(name)                          // ERROR: won't auto-ref to &mut
     mutate(&mut name)                     // OK: explicit &mut
 ```
@@ -8614,6 +8761,67 @@ fn test:
     counts.increment("bob")
     counts.increment("bob")
     assert(counts.get("bob") == Some(&3))
+```
+
+### 25.99 Freestanding Mode (Section 18.7)
+
+```
+// PASS: core types available in no_std
+// @[cfg(no_std)]
+fn test:
+    let x: i32 = 42
+    let y: bool = true
+    let opt: Option[i32] = Some(10)
+    let arr: [u8; 4] = [1, 2, 3, 4]
+    assert(opt.unwrap() == 10)
+
+// PASS: c_import works in no_std
+// @[cfg(no_std)]
+fn test:
+    use c_import("stdint.h")
+    let x: u32 = 0xFF
+
+// PASS: match and ownership work in no_std
+// @[cfg(no_std)]
+fn test:
+    type Command = Reset | Set(u8) | Get
+    let cmd = Command.Set(42)
+    match cmd
+        .Set(val) -> assert(val == 42)
+        _ -> panic("wrong variant")
+
+// FAIL: Vec requires std or alloc
+// @[cfg(no_std)]
+fn test:
+    let v = Vec.new()     // ERROR: Vec requires alloc
+
+// FAIL: println requires std
+// @[cfg(no_std)]
+fn test:
+    println("hello")      // ERROR: println requires std (stdout)
+
+// FAIL: str literal is &str in no_std (no allocator for owned str)
+// @[cfg(no_std)]
+fn test:
+    let s = "hello"       // s: &str (not str) in no_std
+    let owned: str = "x"  // ERROR: str requires alloc
+
+// PASS: &str works in no_std
+// @[cfg(no_std)]
+fn test:
+    let s: &str = "hello"
+    assert(s.len() == 5)
+
+// PASS: alloc tier gives back Vec and str
+// @[cfg(no_std, alloc)]
+fn test:
+    let v = Vec.from([1, 2, 3])
+    let s = "hello"       // s: str (owned, allocator available)
+    assert(v.len() == 3)
+
+// FAIL: missing panic handler in no_std
+// @[cfg(no_std)]
+// ERROR: no_std requires @[panic_handler]
 ```
 
 ---

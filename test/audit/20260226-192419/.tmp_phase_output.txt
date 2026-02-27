@@ -1,0 +1,10 @@
+building compiler binary for driver command tests...
+PASS(driver-build)
+PASS(driver-build-output)
+PASS(driver-run)
+PASS(driver-test-dir)
+PASS(driver-test-file)
+PASS(driver-build-missing-arg)
+PASS(driver-run-missing-arg)
+PASS(driver-test-missing-path)
+phase0 driver command tests: PASS

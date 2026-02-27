@@ -806,10 +806,12 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     );
 
     const name = self.pool.resolve(func.name);
+    // @[entry] — use "main" as the LLVM function name (§18.7).
+    const effective_name = if (func.is_entry) "main" else name;
     var name_buf: [256]u8 = undefined;
-    if (name.len >= name_buf.len) return error.UnsupportedExpr;
-    @memcpy(name_buf[0..name.len], name);
-    name_buf[name.len] = 0;
+    if (effective_name.len >= name_buf.len) return error.UnsupportedExpr;
+    @memcpy(name_buf[0..effective_name.len], effective_name);
+    name_buf[effective_name.len] = 0;
 
     const function = c.LLVMAddFunction(self.module, &name_buf, fn_type);
 
@@ -3194,6 +3196,21 @@ fn genAsyncBlock(self: *Codegen, body: *const Ast.Expr) Error!c.LLVMValueRef {
     var capture_count: u32 = 0;
     self.findCaptures(body, &.{}, &captured, &capture_count);
 
+    // Async blocks capture by value. For mutable locals, findCaptures stores
+    // the source alloca pointer; load the current value now so the task gets
+    // a stable snapshot rather than a borrowed stack pointer.
+    var capture_i: usize = 0;
+    while (capture_i < capture_count) : (capture_i += 1) {
+        if (captured[capture_i].is_mut) {
+            captured[capture_i].value = c.LLVMBuildLoad2(
+                self.builder,
+                captured[capture_i].ty,
+                captured[capture_i].value,
+                "async.cap.load",
+            );
+        }
+    }
+
     var cap_field_types: [16]c.LLVMTypeRef = undefined;
     for (captured[0..capture_count], 0..) |cap, i| {
         cap_field_types[i] = cap.ty;
@@ -3247,7 +3264,7 @@ fn genAsyncBlock(self: *Codegen, body: *const Ast.Expr) Error!c.LLVMValueRef {
         self.locals.put(self.allocator, cap.sym, .{
             .alloca = alloca,
             .ty = cap.ty,
-            .is_mut = false,
+            .is_mut = cap.is_mut,
         }) catch return error.CodegenAlloc;
     }
 
@@ -3949,9 +3966,12 @@ fn genBinary(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
     }
 
     return switch (bin.op) {
-        .add, .add_wrap => c.LLVMBuildAdd(self.builder, lhs_c, rhs_c, "add"),
-        .sub, .sub_wrap => c.LLVMBuildSub(self.builder, lhs_c, rhs_c, "sub"),
-        .mul, .mul_wrap => c.LLVMBuildMul(self.builder, lhs_c, rhs_c, "mul"),
+        .add => self.genCheckedArith(lhs_c, rhs_c, "llvm.sadd.with.overflow", "add"),
+        .sub => self.genCheckedArith(lhs_c, rhs_c, "llvm.ssub.with.overflow", "sub"),
+        .mul => self.genCheckedArith(lhs_c, rhs_c, "llvm.smul.with.overflow", "mul"),
+        .add_wrap => c.LLVMBuildAdd(self.builder, lhs_c, rhs_c, "add"),
+        .sub_wrap => c.LLVMBuildSub(self.builder, lhs_c, rhs_c, "sub"),
+        .mul_wrap => c.LLVMBuildMul(self.builder, lhs_c, rhs_c, "mul"),
         .div => c.LLVMBuildSDiv(self.builder, lhs_c, rhs_c, "div"),
         .mod => c.LLVMBuildSRem(self.builder, lhs_c, rhs_c, "mod"),
         .eq => c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, lhs_c, rhs_c, "eq"),
@@ -3967,6 +3987,65 @@ fn genBinary(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
         .shr => c.LLVMBuildAShr(self.builder, lhs_c, rhs_c, "shr"),
         else => error.UnsupportedExpr,
     };
+}
+
+/// Checked integer arithmetic using LLVM overflow intrinsics (§4.2).
+/// Calls abort() on overflow. Used for +, -, * on signed integers.
+fn genCheckedArith(
+    self: *Codegen,
+    lhs: c.LLVMValueRef,
+    rhs: c.LLVMValueRef,
+    intrinsic_name: [*:0]const u8,
+    label: [*:0]const u8,
+) Error!c.LLVMValueRef {
+    const int_type = c.LLVMTypeOf(lhs);
+    // Look up the intrinsic (e.g., llvm.sadd.with.overflow.i32).
+    const intrinsic_id = c.LLVMLookupIntrinsicID(intrinsic_name, std.mem.len(intrinsic_name));
+    if (intrinsic_id == 0) {
+        // Fallback: if intrinsic not found, use plain wrapping arithmetic.
+        if (std.mem.eql(u8, std.mem.span(intrinsic_name), "llvm.sadd.with.overflow"))
+            return c.LLVMBuildAdd(self.builder, lhs, rhs, label);
+        if (std.mem.eql(u8, std.mem.span(intrinsic_name), "llvm.ssub.with.overflow"))
+            return c.LLVMBuildSub(self.builder, lhs, rhs, label);
+        return c.LLVMBuildMul(self.builder, lhs, rhs, label);
+    }
+
+    var overloaded_types = [_]c.LLVMTypeRef{int_type};
+    const intrinsic_fn = c.LLVMGetIntrinsicDeclaration(self.module, intrinsic_id, &overloaded_types, 1);
+    const intrinsic_fn_type = c.LLVMIntrinsicGetType(self.context, intrinsic_id, &overloaded_types, 1);
+
+    var call_args = [_]c.LLVMValueRef{ lhs, rhs };
+    const result_struct = c.LLVMBuildCall2(self.builder, intrinsic_fn_type, intrinsic_fn, &call_args, 2, "");
+
+    // Extract {result, overflow_bit}.
+    const value = c.LLVMBuildExtractValue(self.builder, result_struct, 0, label);
+    const overflow = c.LLVMBuildExtractValue(self.builder, result_struct, 1, "overflow");
+
+    // Branch: if overflow, abort.
+    const cur_fn = self.current_function;
+    const overflow_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "overflow.trap");
+    const ok_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "overflow.ok");
+
+    _ = c.LLVMBuildCondBr(self.builder, overflow, overflow_bb, ok_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, overflow_bb);
+    // Write error message to stderr (fd 2) via write(), then _exit(134).
+    const write_info = self.ensureWriteDeclared() catch return error.CodegenAlloc;
+    const panic_msg = c.LLVMBuildGlobalStringPtr(self.builder, "runtime panic: integer overflow\n", "overflow.msg");
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    var write_args = [_]c.LLVMValueRef{
+        c.LLVMConstInt(i32_type, 2, 0), // fd = stderr
+        panic_msg,
+        c.LLVMConstInt(i32_type, 33, 0), // len of message
+    };
+    _ = c.LLVMBuildCall2(self.builder, write_info.fn_type, write_info.value, &write_args, 3, "");
+    const exit_info = self.ensureExitDeclared() catch return error.CodegenAlloc;
+    var exit_args = [_]c.LLVMValueRef{c.LLVMConstInt(i32_type, 134, 0)};
+    _ = c.LLVMBuildCall2(self.builder, exit_info.fn_type, exit_info.value, &exit_args, 1, "");
+    _ = c.LLVMBuildUnreachable(self.builder);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, ok_bb);
+    return value;
 }
 
 fn genShortCircuitAnd(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
@@ -5658,16 +5737,17 @@ fn genOptionUnwrap(self: *Codegen, obj_val: c.LLVMValueRef, obj_type: c.LLVMType
     // Check tag == 0 (Some/Ok).
     const is_some = c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, tag, c.LLVMConstInt(i32_type, 0, 0), "is_some");
 
-    // Branch: if not Some, abort.
+    // Branch: if not Some, terminate with a non-zero code.
     const cur_fn = self.current_function orelse return error.UnsupportedExpr;
     const some_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "unwrap.some");
     const abort_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "unwrap.abort");
     _ = c.LLVMBuildCondBr(self.builder, is_some, some_bb, abort_bb);
 
-    // Abort block: call abort().
+    // Failure block: _exit(134).
     c.LLVMPositionBuilderAtEnd(self.builder, abort_bb);
-    const abort_info = self.ensureAbortDeclared() catch return error.CodegenAlloc;
-    _ = c.LLVMBuildCall2(self.builder, abort_info.fn_type, abort_info.value, null, 0, "");
+    const exit_info = try self.ensureExitDeclared();
+    var exit_args = [_]c.LLVMValueRef{c.LLVMConstInt(i32_type, 134, 0)};
+    _ = c.LLVMBuildCall2(self.builder, exit_info.fn_type, exit_info.value, &exit_args, 1, "");
     _ = c.LLVMBuildUnreachable(self.builder);
 
     // Some block: extract payload.
@@ -11632,16 +11712,20 @@ fn genMatchExpr(self: *Codegen, m: Ast.MatchExpr) Error!c.LLVMValueRef {
         const arm_val = try self.genExpr(arm.body);
 
         // If the arm body diverges (break, continue, return), the builder is
-        // positioned in a dead block. Detect this by checking if the arm body
-        // produced a void undef (diverging expression marker) and the current
-        // block differs from the arm's entry block — indicating a branch was
-        // already emitted. We also check if the original arm BB is already
-        // terminated (has a br to break_bb/continue_bb/ret).
+        // positioned in a dead block (no predecessors, no terminator) that was
+        // created after the diverging instruction. Detect this by checking:
+        //   1. arm value is void (diverging expressions return void undef)
+        //   2. current block differs from arm entry (new blocks were created)
+        //   3. current block has no terminator AND no predecessors (truly dead)
+        // Note: intermediate blocks created by overflow checks etc. ARE live
+        // (they have predecessors), so checking arm_bbs_buf[i] termination
+        // alone would incorrectly flag those.
         const cur_bb = c.LLVMGetInsertBlock(self.builder);
-        const arm_bb_terminated = c.LLVMGetBasicBlockTerminator(arm_bbs_buf[i]) != null;
-        const cur_bb_is_dead = cur_bb != arm_bbs_buf[i] and c.LLVMGetBasicBlockTerminator(cur_bb) == null;
         const arm_val_is_void = c.LLVMTypeOf(arm_val) == c.LLVMVoidTypeInContext(self.context);
-        const arm_body_diverged = arm_val_is_void and arm_bb_terminated and cur_bb_is_dead;
+        const cur_bb_is_dead = cur_bb != arm_bbs_buf[i] and
+            c.LLVMGetBasicBlockTerminator(cur_bb) == null and
+            c.LLVMGetFirstUse(c.LLVMBasicBlockAsValue(cur_bb)) == null;
+        const arm_body_diverged = arm_val_is_void and cur_bb_is_dead;
 
         if (arm_body_diverged) {
             // Arm already branched away (break/return/continue). Add unreachable
@@ -12947,6 +13031,34 @@ fn ensureAbortDeclared(self: *Codegen) Error!FnInfo {
     return info;
 }
 
+/// Ensure write() is declared as an extern (unbuffered I/O for panic messages).
+fn ensureWriteDeclared(self: *Codegen) Error!FnInfo {
+    const write_sym = self.pool.intern("write") catch return error.CodegenAlloc;
+    if (self.functions.get(write_sym)) |info| return info;
+
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    var param_types = [_]c.LLVMTypeRef{ i32_type, ptr_type, i32_type };
+    const fn_type = c.LLVMFunctionType(i32_type, &param_types, 3, 0);
+    const func = c.LLVMAddFunction(self.module, "write", fn_type);
+    const info = FnInfo{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, write_sym, info) catch return error.CodegenAlloc;
+    return info;
+}
+
+/// Ensure _exit() is declared as an extern (immediate process termination).
+fn ensureExitDeclared(self: *Codegen) Error!FnInfo {
+    const exit_sym = self.pool.intern("_exit") catch return error.CodegenAlloc;
+    if (self.functions.get(exit_sym)) |info| return info;
+
+    var param_types = [_]c.LLVMTypeRef{c.LLVMInt32TypeInContext(self.context)};
+    const fn_type = c.LLVMFunctionType(c.LLVMVoidTypeInContext(self.context), &param_types, 1, 0);
+    const func = c.LLVMAddFunction(self.module, "_exit", fn_type);
+    const info = FnInfo{ .value = func, .fn_type = fn_type };
+    self.functions.put(self.allocator, exit_sym, info) catch return error.CodegenAlloc;
+    return info;
+}
+
 /// Declare or look up a C library function by name.
 fn getOrDeclareCFn(
     self: *Codegen,
@@ -13745,9 +13857,7 @@ fn genAssertBuiltin(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMV
     const cond = try self.genExpr(args[0]);
     const cond_bool = self.coerceToBool(cond);
 
-    const abort_info = try self.ensureAbortDeclared();
-
-    // if (!cond) abort();
+    // if (!cond) _exit(134);
     const then_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "assert.fail");
     const merge_bb = c.LLVMAppendBasicBlockInContext(self.context, self.current_function, "assert.ok");
 
@@ -13763,7 +13873,10 @@ fn genAssertBuiltin(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMV
         var nl_args = [_]c.LLVMValueRef{nl};
         _ = c.LLVMBuildCall2(self.builder, printf_info.fn_type, printf_info.value, &nl_args, 1, "");
     }
-    _ = c.LLVMBuildCall2(self.builder, abort_info.fn_type, abort_info.value, null, 0, "");
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const exit_info = try self.ensureExitDeclared();
+    var exit_args = [_]c.LLVMValueRef{c.LLVMConstInt(i32_type, 134, 0)};
+    _ = c.LLVMBuildCall2(self.builder, exit_info.fn_type, exit_info.value, &exit_args, 1, "");
     _ = c.LLVMBuildUnreachable(self.builder);
 
     c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);

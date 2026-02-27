@@ -9,7 +9,7 @@ type Hasher = {
 type DefaultHasher = Hasher
 
 pub fn combine(seed: i64, value: i64) -> i64:
-    (seed * 1099511628211) ^ value
+    (seed *% 1099511628211) ^ value
 
 pub fn hash_i64(value: i64) -> i64:
     combine(1469598103934665603, value)

@@ -2194,3 +2194,39 @@ with state.lock() as data:
     data.counter += 1
     data.last_updated = Instant.now()
 ```
+
+## Freestanding Mode (`no_std`)
+
+For embedded, kernel, and bare-metal targets, With can run without
+the standard library. Pass `--no-std` to the compiler:
+
+```
+with build --no-std firmware.w
+```
+
+**What you keep:** All primitives (`i8`–`i64`, `u8`–`u64`, `f32`,
+`f64`, `bool`), `Option[T]`, `Result[T, E]`, fixed arrays, tuples,
+`c_import`, full ownership/borrowing, `comptime`, `unsafe`, and
+`match`. Everything that doesn't need a heap or an OS works.
+
+**What you lose:** `str` (heap-allocated), `Vec[T]`, `HashMap`,
+`HashSet`, `Box[T]`, `println`/`print` (needs stdout), `async fn`
+(needs fiber runtime), and all of `std.io`/`std.fs`/`std.net`.
+
+**Custom entry point:** Use `@[entry]` to name your entry point
+something other than `main`:
+
+```with
+@[entry]
+fn start -> i32:
+    // initialize hardware via c_import
+    0
+```
+
+**Three tiers:**
+
+| Tier | Flag | What you get |
+|------|------|--------------|
+| Full | (default) | Everything |
+| Alloc | `--no-std --alloc` | Core + heap types (Vec, str, HashMap) |
+| Freestanding | `--no-std` | Core only — no heap |

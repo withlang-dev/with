@@ -1,0 +1,45 @@
+===== PASS test/run_phase0_alias_tests.sh (0s) =====
+building compiler binary for alias tests...
+PASS(alias-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.EV9GhJ15Jy/alias_ok.w
+PASS(alias-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.EV9GhJ15Jy/alias_unknown.w
+phase0 alias tests: PASS
+
+===== PASS test/run_phase0_c_import_cache_tests.sh (0s) =====
+building compiler binary for c_import cache tests...
+PASS(c_import-cache) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.v0fkq87L5I/c_import_cache_same.w (hits=1 misses=1)
+PASS(c_import-cache) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.v0fkq87L5I/c_import_cache_invalidate.w (hits=0 misses=2)
+PASS(c_import-cache) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.v0fkq87L5I/c_import_cache_imports.w (hits=1 misses=1)
+phase0 c_import cache tests: PASS
+
+===== PASS test/run_phase0_c_import_link_tests.sh (1s) =====
+building compiler binary for c_import link tests...
+PASS(c_import-link-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.TsoCGShRK8/c_import_link_ok.w
+PASS(c_import-link-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.TsoCGShRK8/c_import_link_missing.w
+PASS(c_import-link-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.TsoCGShRK8/c_import_link_multi.w
+PASS(c_import-link-parse-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.TsoCGShRK8/c_import_link_bad_arg.w
+phase0 c_import link tests: PASS
+
+===== PASS test/run_phase0_c_import_milestone_tests.sh (0s) =====
+building compiler binary for c_import milestone tests...
+PASS(c_import-milestone-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qpXURZq5IF/c_import_stdio_milestone.w
+PASS(c_import-milestone-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qpXURZq5IF/c_import_stdio_negative.w
+phase0 c_import milestone tests: PASS
+
+===== PASS test/run_phase0_c_import_tests.sh (1s) =====
+building compiler binary for c_import tests...
+PASS(c_import-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fNzjflbMFp/c_import_stdio.w
+PASS(c_import-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fNzjflbMFp/c_import_printf.w
+PASS(c_import-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fNzjflbMFp/c_import_string.w
+PASS(c_import-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fNzjflbMFp/c_import_stdlib.w
+PASS(c_import-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fNzjflbMFp/c_import_injected_module.w
+PASS(c_import-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fNzjflbMFp/c_import_missing_header.w
+PASS(c_import-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fNzjflbMFp/c_import_bad_syntax.w
+phase0 c_import tests: PASS
+
+===== PASS test/run_phase0_ci_tests.sh (0s) =====
+PASS(ci-config) .github/workflows/ci.yml
+PASS(ci-positive) synthetic
+PASS(ci-negative) missing windows rejected
+PASS(ci-negative) missing test command rejected
+phase0 CI tests: PASS
+
