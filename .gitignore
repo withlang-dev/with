@@ -5,6 +5,7 @@
 zig-out/
 zig-cache/
 .zig-cache/
+.with/
 *.o
 *.a
 *.so

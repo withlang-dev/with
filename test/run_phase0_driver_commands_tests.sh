@@ -40,14 +40,14 @@ fn main -> i32:
     if 10 - 3 == 7 then 0 else 1
 EOF1
 
-expect_cmd_pass "driver-build" "$WITH_BIN" build "$tmpdir/driver_main.w"
-if [[ -x "$tmpdir/driver_main" ]]; then
+expect_cmd_pass "driver-build" bash -c "cd \"$tmpdir\" && \"$WITH_BIN\" build driver_main.w"
+if [[ -x "$tmpdir/.with/build/driver_main" ]]; then
   echo "PASS(driver-build-output)"
 else
   echo "FAIL(driver-build-output)"
   failures=$((failures + 1))
 fi
-expect_cmd_pass "driver-run" "$WITH_BIN" run "$tmpdir/driver_main.w"
+expect_cmd_pass "driver-run" bash -c "cd \"$tmpdir\" && \"$WITH_BIN\" run driver_main.w"
 
 mkdir -p "$tmpdir/pkg"
 cat >"$tmpdir/pkg/tests.w" <<'EOF2'

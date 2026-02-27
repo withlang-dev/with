@@ -43,10 +43,11 @@ Compiler binary:
 ## CLI Quick Reference
 
 ```sh
-with build <file.w>                     # Compile to native binary
-with run <file.w>                       # Compile + run
+with build [file.w]                     # Build package (or explicit source) to .with/build
+with run [file.w] [-- args...]          # Build + run package (or explicit source)
 with check <file.w>                     # Parse + type-check
-with test [flags] [filter]              # Package tests (@[test], @[before], @[after])
+with test [flags] [filter]              # Package tests; workspace supports -p <member>
+with clean [--all]                      # Remove .with artifacts (workspace: all members)
 with test-harness [path] [--update]     # Legacy snapshot harness runner
 with fmt <file.w>                       # Format to stdout
 with doc <file.w>                       # Generate docs (markdown to stdout)
