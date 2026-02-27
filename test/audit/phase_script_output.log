@@ -1,0 +1,429 @@
+===== PASS test/run_phase0_alias_tests.sh (1s) =====
+building compiler binary for alias tests...
+PASS(alias-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.QMWNrxzihq/alias_ok.w
+PASS(alias-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.QMWNrxzihq/alias_unknown.w
+phase0 alias tests: PASS
+
+===== PASS test/run_phase0_c_import_cache_tests.sh (0s) =====
+building compiler binary for c_import cache tests...
+PASS(c_import-cache) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.CRUqh9b0NC/c_import_cache_same.w (hits=1 misses=1)
+PASS(c_import-cache) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.CRUqh9b0NC/c_import_cache_invalidate.w (hits=0 misses=2)
+PASS(c_import-cache) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.CRUqh9b0NC/c_import_cache_imports.w (hits=1 misses=1)
+phase0 c_import cache tests: PASS
+
+===== PASS test/run_phase0_c_import_link_tests.sh (0s) =====
+building compiler binary for c_import link tests...
+PASS(c_import-link-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ySJwGJiXsY/c_import_link_ok.w
+PASS(c_import-link-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ySJwGJiXsY/c_import_link_missing.w
+PASS(c_import-link-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ySJwGJiXsY/c_import_link_multi.w
+PASS(c_import-link-parse-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ySJwGJiXsY/c_import_link_bad_arg.w
+phase0 c_import link tests: PASS
+
+===== PASS test/run_phase0_c_import_milestone_tests.sh (1s) =====
+building compiler binary for c_import milestone tests...
+PASS(c_import-milestone-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.nFfKwSbzGt/c_import_stdio_milestone.w
+PASS(c_import-milestone-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.nFfKwSbzGt/c_import_stdio_negative.w
+phase0 c_import milestone tests: PASS
+
+===== PASS test/run_phase0_c_import_tests.sh (1s) =====
+building compiler binary for c_import tests...
+PASS(c_import-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.JVqCS3qGCV/c_import_stdio.w
+PASS(c_import-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.JVqCS3qGCV/c_import_printf.w
+PASS(c_import-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.JVqCS3qGCV/c_import_string.w
+PASS(c_import-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.JVqCS3qGCV/c_import_stdlib.w
+PASS(c_import-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.JVqCS3qGCV/c_import_injected_module.w
+PASS(c_import-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.JVqCS3qGCV/c_import_missing_header.w
+PASS(c_import-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.JVqCS3qGCV/c_import_bad_syntax.w
+phase0 c_import tests: PASS
+
+===== PASS test/run_phase0_ci_tests.sh (0s) =====
+PASS(ci-config) .github/workflows/ci.yml
+PASS(ci-positive) synthetic
+PASS(ci-negative) missing windows rejected
+PASS(ci-negative) missing test command rejected
+phase0 CI tests: PASS
+
+===== PASS test/run_phase0_driver_commands_tests.sh (1s) =====
+building compiler binary for driver command tests...
+PASS(driver-build)
+PASS(driver-build-output)
+PASS(driver-run)
+PASS(driver-test-dir)
+PASS(driver-test-file)
+PASS(driver-build-missing-arg)
+PASS(driver-run-missing-arg)
+PASS(driver-test-missing-path)
+phase0 driver command tests: PASS
+
+===== FAIL test/run_phase0_harness_tests.sh (0s) =====
+building compiler binary for harness tests...
+PASS(harness-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.c1Z2Lf4Zow/default_exit.w
+PASS(harness-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.c1Z2Lf4Zow/exit_42.w
+PASS(harness-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.c1Z2Lf4Zow/stdout_ok.w
+FAIL(harness-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.c1Z2Lf4Zow/stdout_mismatch.w
+FAIL(harness-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.c1Z2Lf4Zow/exit_mismatch.w
+phase0 harness tests: 2 failure(s)
+
+===== PASS test/run_phase0_llvm_codegen_tests.sh (1s) =====
+building compiler binary for llvm codegen tests...
+PASS(llvm-ir) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.UjdnQvq3du/llvm_minimal.w
+PASS(llvm-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.UjdnQvq3du/llvm_minimal.w
+PASS(llvm-ir) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.UjdnQvq3du/llvm_extern.w
+PASS(llvm-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.UjdnQvq3du/llvm_extern.w
+PASS(llvm-negative-build) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.UjdnQvq3du/llvm_negative.w
+phase0 llvm codegen tests: PASS
+
+===== PASS test/run_phase0_llvm_verify_ir_tests.sh (0s) =====
+building compiler binary for llvm verify/ir tests...
+PASS(llvm-verify-ir) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ByxBVqXy0N/llvm_ir_simple.w
+PASS(llvm-verify-ir) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ByxBVqXy0N/llvm_ir_cimport.w
+PASS(llvm-ir-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ByxBVqXy0N/llvm_ir_parse_fail.w
+PASS(llvm-ir-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ByxBVqXy0N/llvm_ir_type_fail.w
+phase0 llvm verify/ir tests: PASS
+
+===== PASS test/run_phase0_name_resolution_tests.sh (0s) =====
+building compiler binary for name-resolution tests...
+PASS(name-check) test/cases/locals.w
+PASS(name-check) test/cases/import_local.w
+PASS(name-check) test/cases/option_basic.w
+PASS(name-check) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.yX8doA1At0/module_scope.w
+PASS(name-check-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.yX8doA1At0/unresolved_name.w
+PASS(name-check-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.yX8doA1At0/unresolved_import.w
+phase0 name-resolution tests: PASS
+
+===== PASS test/run_phase0_object_link_tests.sh (1s) =====
+building compiler binary for object/link tests...
+PASS(obj-link) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Bv4GXuU9Ea/object_link_simple.w
+PASS(obj-link-cimport) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Bv4GXuU9Ea/object_link_cimport_ok.w
+PASS(obj-link-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Bv4GXuU9Ea/object_link_cimport_missing_link.w
+phase0 object/link tests: PASS
+
+===== PASS test/run_phase0_pointer_tests.sh (0s) =====
+building compiler binary for pointer tests...
+PASS(pointer-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.2U5kelhE5I/pointer_ok.w
+PASS(pointer-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.2U5kelhE5I/pointer_mutability_mismatch.w
+phase0 pointer tests: PASS
+
+===== PASS test/run_phase0_range_tests.sh (0s) =====
+building compiler binary for range tests...
+PASS(range-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.3WNIkBMgGp/range_ok.w
+PASS(range-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.3WNIkBMgGp/range_bad_start.w
+PASS(range-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.3WNIkBMgGp/range_bad_end.w
+phase0 range tests: PASS
+
+===== PASS test/run_phase0_raw_ptr_as_option_tests.sh (1s) =====
+building compiler binary for raw-pointer as_option tests...
+PASS(as_option-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.iadfJ2NShg/as_option_non_null.w
+PASS(as_option-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.iadfJ2NShg/as_option_null.w
+PASS(as_option-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.iadfJ2NShg/as_option_non_pointer.w
+phase0 raw-pointer as_option tests: PASS
+
+===== FAIL test/run_phase0_snapshot_tests.sh (0s) =====
+building compiler binary for snapshot tests...
+PASS(snapshot-pass) ./zig-out/bin/with test /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.B3iUfqI2xZ/snap_case.w --update
+PASS(snapshot-pass) ./zig-out/bin/with test /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.B3iUfqI2xZ/snap_case.w
+FAIL(snapshot-fail) ./zig-out/bin/with test /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.B3iUfqI2xZ/snap_case.w
+PASS(snapshot-pass) ./zig-out/bin/with test /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.B3iUfqI2xZ/snap_case.w --update
+PASS(snapshot-pass) ./zig-out/bin/with test /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.B3iUfqI2xZ/snap_case.w
+phase0 snapshot tests: 1 failure(s)
+
+===== PASS test/run_phase0_struct_field_tests.sh (0s) =====
+building compiler binary for struct/field tests...
+PASS(struct-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.o6Ooewo4xS/struct_ok.w
+PASS(struct-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.o6Ooewo4xS/struct_field_type_mismatch.w
+PASS(struct-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.o6Ooewo4xS/struct_unknown_field_access.w
+phase0 struct/field tests: PASS
+
+===== PASS test/run_phase0_tuple_tests.sh (0s) =====
+building compiler binary for tuple tests...
+PASS(tuple-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.9oVQrWeAKL/tuple_ok.w
+PASS(tuple-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.9oVQrWeAKL/tuple_oob_index.w
+phase0 tuple tests: PASS
+
+===== PASS test/run_phase0_typecheck_tests.sh (1s) =====
+building compiler binary for typecheck tests...
+PASS(typecheck-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hINXiAvcCu/typecheck_ok.w
+PASS(typecheck-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hINXiAvcCu/return_mismatch.w
+PASS(typecheck-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hINXiAvcCu/call_arity_mismatch.w
+PASS(typecheck-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hINXiAvcCu/call_type_mismatch.w
+PASS(typecheck-negative) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hINXiAvcCu/operator_type_mismatch.w
+phase0 typecheck tests: PASS
+
+===== PASS test/run_phase1_borrow_overlap_tests.sh (0s) =====
+building compiler binary for phase1 borrow-overlap tests...
+PASS(overlap-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.q8gMquXahr/borrow_shared_shared_ok.w
+PASS(overlap-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.q8gMquXahr/borrow_shared_mut_fail.w
+PASS(overlap-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.q8gMquXahr/borrow_mut_mut_fail.w
+PASS(overlap-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.q8gMquXahr/borrow_mut_shared_fail.w
+phase1 borrow-overlap tests: PASS
+
+===== PASS test/run_phase1_cfg_tests.sh (1s) =====
+building compiler binary for phase1 cfg tests...
+1/14 BorrowCfg.test.cfg linear sequence...OK
+2/14 BorrowCfg.test.cfg if has two outgoing branch edges...OK
+3/14 BorrowCfg.test.cfg while has back edge to loop condition...OK
+4/14 Lexer.test.lex simple function...OK
+5/14 Lexer.test.lex phase0 keyword set...OK
+6/14 Lexer.test.lexer keeps keyword-like identifiers as identifiers...OK
+7/14 Lexer.test.lex phase0 operator set...OK
+8/14 Lexer.test.lexer operator edge cases and invalid operator diagnostics...OK
+9/14 Lexer.test.lex brackets and punctuation...OK
+10/14 Lexer.test.lexer keeps newline significant while skipping horizontal whitespace...OK
+11/14 Lexer.test.lex literal forms including interpolation text...OK
+12/14 Lexer.test.lexer reports unterminated string literal...OK
+13/14 Lexer.test.lex identifiers and dot-variant shorthand...OK
+14/14 Lexer.test.lex line comments with and without trailing newline...OK
+All 14 tests passed.
+PASS(cfg-unit-tests)
+PASS(cfg-integration-check)
+PASS(cfg-negative-parse)
+phase1 cfg tests: PASS
+
+===== PASS test/run_phase1_copy_drop_exclusive_tests.sh (0s) =====
+building compiler binary for phase1 copy/drop exclusivity tests...
+PASS(copy-drop-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.cLHAaOzed7/copy_only_ok.w
+PASS(copy-drop-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.cLHAaOzed7/copy_drop_conflict.w
+PASS(copy-drop-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.cLHAaOzed7/derive_copy_obvious_noncopy.w
+phase1 copy/drop exclusivity tests: PASS
+
+===== PASS test/run_phase1_copy_type_tests.sh (1s) =====
+building compiler binary for phase1 copy-type tests...
+PASS(copy-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.samYBJarwj/copy_i32.w
+PASS(copy-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.samYBJarwj/copy_struct.w
+PASS(copy-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.samYBJarwj/noncopy_drop.w
+phase1 copy-type tests: PASS
+
+===== PASS test/run_phase1_disjoint_field_borrow_tests.sh (0s) =====
+building compiler binary for phase1 disjoint-field borrow tests...
+PASS(disjoint-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ENBAU9gBA5/disjoint_fields_ok.w
+PASS(disjoint-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ENBAU9gBA5/same_field_conflict_fail.w
+PASS(disjoint-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ENBAU9gBA5/whole_place_conflict_fail.w
+phase1 disjoint-field borrow tests: PASS
+
+===== PASS test/run_phase1_drop_order_tests.sh (0s) =====
+building compiler binary for phase1 drop-order tests...
+PASS(drop-output) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.VjqnSFrUx3/drop_scope_order.w
+PASS(drop-output) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.VjqnSFrUx3/drop_early_return_order.w
+phase1 drop-order tests: PASS
+
+===== PASS test/run_phase1_ephemeral_boundary_tests.sh (1s) =====
+building compiler binary for phase1 ephemeral-boundary tests...
+PASS(ephemeral-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.1aeZnHDG8G/ephemeral_local_ok.w
+PASS(ephemeral-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.1aeZnHDG8G/ephemeral_struct_fail.w
+PASS(ephemeral-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.1aeZnHDG8G/ephemeral_collection_fail.w
+PASS(ephemeral-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.1aeZnHDG8G/ephemeral_return_fail.w
+PASS(ephemeral-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.1aeZnHDG8G/ephemeral_closure_capture_fail.w
+phase1 ephemeral-boundary tests: PASS
+
+===== PASS test/run_phase1_ephemeral_propagation_tests.sh (0s) =====
+building compiler binary for phase1 ephemeral-propagation tests...
+PASS(ephemeral-prop-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.WFQifmr44W/ephemeral_nested_struct_fail.w
+PASS(ephemeral-prop-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.WFQifmr44W/ephemeral_nested_collection_fail.w
+PASS(ephemeral-prop-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.WFQifmr44W/ephemeral_alias_capture_fail.w
+phase1 ephemeral-propagation tests: PASS
+
+===== PASS test/run_phase1_milestone_tests.sh (2s) =====
+building compiler binary for phase1 move-assignment tests...
+PASS(move-assign-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qxjHlyyLT8/move_let_ok.w
+PASS(move-assign-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qxjHlyyLT8/move_let_use_after_move.w
+PASS(move-assign-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qxjHlyyLT8/move_assign_ok.w
+PASS(move-assign-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qxjHlyyLT8/move_assign_use_after_move.w
+phase1 move-assignment tests: PASS
+building compiler binary for phase1 use-after-move tests...
+PASS(use-after-move) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.8ZSUC8GHW9/use_after_move_let.w
+PASS(use-after-move) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.8ZSUC8GHW9/use_after_move_assign.w
+phase1 use-after-move tests: PASS
+building compiler binary for phase1 copy-type tests...
+PASS(copy-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.592tiGWCXU/copy_i32.w
+PASS(copy-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.592tiGWCXU/copy_struct.w
+PASS(copy-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.592tiGWCXU/noncopy_drop.w
+phase1 copy-type tests: PASS
+building compiler binary for phase1 drop-order tests...
+PASS(drop-output) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.0f77YNSIvY/drop_scope_order.w
+PASS(drop-output) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.0f77YNSIvY/drop_early_return_order.w
+phase1 drop-order tests: PASS
+building compiler binary for phase1 copy/drop exclusivity tests...
+PASS(copy-drop-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qeYxl3d2Px/copy_only_ok.w
+PASS(copy-drop-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qeYxl3d2Px/copy_drop_conflict.w
+PASS(copy-drop-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qeYxl3d2Px/derive_copy_obvious_noncopy.w
+phase1 copy/drop exclusivity tests: PASS
+building compiler binary for phase1 cfg tests...
+1/14 BorrowCfg.test.cfg linear sequence...OK
+2/14 BorrowCfg.test.cfg if has two outgoing branch edges...OK
+3/14 BorrowCfg.test.cfg while has back edge to loop condition...OK
+4/14 Lexer.test.lex simple function...OK
+5/14 Lexer.test.lex phase0 keyword set...OK
+6/14 Lexer.test.lexer keeps keyword-like identifiers as identifiers...OK
+7/14 Lexer.test.lex phase0 operator set...OK
+8/14 Lexer.test.lexer operator edge cases and invalid operator diagnostics...OK
+9/14 Lexer.test.lex brackets and punctuation...OK
+10/14 Lexer.test.lexer keeps newline significant while skipping horizontal whitespace...OK
+11/14 Lexer.test.lex literal forms including interpolation text...OK
+12/14 Lexer.test.lexer reports unterminated string literal...OK
+13/14 Lexer.test.lex identifiers and dot-variant shorthand...OK
+14/14 Lexer.test.lex line comments with and without trailing newline...OK
+All 14 tests passed.
+PASS(cfg-unit-tests)
+PASS(cfg-integration-check)
+PASS(cfg-negative-parse)
+phase1 cfg tests: PASS
+building compiler binary for phase1 NLL tests...
+PASS(nll-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.DZRMYeirrK/nll_shared_then_mut_ok.w
+PASS(nll-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.DZRMYeirrK/nll_mut_then_shared_ok.w
+PASS(nll-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.DZRMYeirrK/nll_conflict_live_borrow_fail.w
+phase1 NLL tests: PASS
+building compiler binary for phase1 borrow-overlap tests...
+PASS(overlap-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.YxZNgMWOuE/borrow_shared_shared_ok.w
+PASS(overlap-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.YxZNgMWOuE/borrow_shared_mut_fail.w
+PASS(overlap-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.YxZNgMWOuE/borrow_mut_mut_fail.w
+PASS(overlap-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.YxZNgMWOuE/borrow_mut_shared_fail.w
+phase1 borrow-overlap tests: PASS
+building compiler binary for phase1 disjoint-field borrow tests...
+PASS(disjoint-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.gxKwu5o5d0/disjoint_fields_ok.w
+PASS(disjoint-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.gxKwu5o5d0/same_field_conflict_fail.w
+PASS(disjoint-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.gxKwu5o5d0/whole_place_conflict_fail.w
+phase1 disjoint-field borrow tests: PASS
+building compiler binary for phase1 ephemeral-boundary tests...
+PASS(ephemeral-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qDsLFi0wDJ/ephemeral_local_ok.w
+PASS(ephemeral-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qDsLFi0wDJ/ephemeral_struct_fail.w
+PASS(ephemeral-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qDsLFi0wDJ/ephemeral_collection_fail.w
+PASS(ephemeral-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qDsLFi0wDJ/ephemeral_return_fail.w
+PASS(ephemeral-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.qDsLFi0wDJ/ephemeral_closure_capture_fail.w
+phase1 ephemeral-boundary tests: PASS
+building compiler binary for phase1 ephemeral-propagation tests...
+PASS(ephemeral-prop-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.PITx5iEjXO/ephemeral_nested_struct_fail.w
+PASS(ephemeral-prop-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.PITx5iEjXO/ephemeral_nested_collection_fail.w
+PASS(ephemeral-prop-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.PITx5iEjXO/ephemeral_alias_capture_fail.w
+phase1 ephemeral-propagation tests: PASS
+building compiler binary for phase1 ref-return provenance tests...
+PASS(ref-return-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Qcq1nbsAc4/ref_return_fail.w
+PASS(ref-return-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Qcq1nbsAc4/ref_return_ok_value.w
+phase1 ref-return provenance tests: PASS
+phase1 milestone tests: PASS
+
+===== PASS test/run_phase1_move_assignment_tests.sh (1s) =====
+building compiler binary for phase1 move-assignment tests...
+PASS(move-assign-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.IeQ82gPq4q/move_let_ok.w
+PASS(move-assign-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.IeQ82gPq4q/move_let_use_after_move.w
+PASS(move-assign-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.IeQ82gPq4q/move_assign_ok.w
+PASS(move-assign-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.IeQ82gPq4q/move_assign_use_after_move.w
+phase1 move-assignment tests: PASS
+
+===== PASS test/run_phase1_nll_tests.sh (0s) =====
+building compiler binary for phase1 NLL tests...
+PASS(nll-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ewFehwu9Dd/nll_shared_then_mut_ok.w
+PASS(nll-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ewFehwu9Dd/nll_mut_then_shared_ok.w
+PASS(nll-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ewFehwu9Dd/nll_conflict_live_borrow_fail.w
+phase1 NLL tests: PASS
+
+===== PASS test/run_phase1_ref_return_provenance_tests.sh (0s) =====
+building compiler binary for phase1 ref-return provenance tests...
+PASS(ref-return-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.l2AyeOd6iD/ref_return_fail.w
+PASS(ref-return-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.l2AyeOd6iD/ref_return_ok_value.w
+phase1 ref-return provenance tests: PASS
+
+===== PASS test/run_phase1_use_after_move_tests.sh (0s) =====
+building compiler binary for phase1 use-after-move tests...
+PASS(use-after-move) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.0OCuJSMqeL/use_after_move_let.w
+PASS(use-after-move) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.0OCuJSMqeL/use_after_move_assign.w
+phase1 use-after-move tests: PASS
+
+===== FAIL test/run_phase2_5_gap_tests.sh (3s) =====
+PASS test/cases/pipeline_chain.w
+PASS test/cases/result_and_then.w
+PASS test/cases/expect_methods.w
+PASS test/cases/with_builder_expr.w
+PASS test/cases/with_nonlocal_return.w
+PASS test/cases/async_sync_bridge.w
+PASS test/cases/select_await_three.w
+PASS test/cases/trait_multibounds.w
+FAIL(pass) test/cases/dyn_default_dispatch.w
+PASS(check) test/gaps/phase2_5/p2_pipeline_advanced.check_fail.w
+PASS(check) test/gaps/phase2_5/p2_if_let_chained.check_fail.w
+PASS(check) test/gaps/phase2_5/p2_param_patterns.check_fail.w
+PASS(check) test/gaps/phase2_5/p2_pipeline_match.check_fail.w
+PASS(check) test/gaps/phase2_5/p2_error_from.check_fail.w
+PASS(check) test/gaps/phase2_5/p2_record_update_shorthand.check_fail.w
+PASS(check) test/gaps/phase2_5/p4_async_block.check_fail.w
+PASS(check) test/gaps/phase2_5/p4_select_let_else.check_fail.w
+PASS(check) test/gaps/phase2_5/p4_async_scope.check_fail.w
+PASS(check) test/gaps/phase2_5/p4_no_await_guard.check_fail.w
+PASS(check) test/gaps/phase2_5/p5_where_clause.check_fail.w
+PASS(check) test/gaps/phase2_5/p5_generic_trait_method.check_fail.w
+PASS(run) test/gaps/phase2_5/p2_enum_accessor_ref_mut.run_fail.w
+PASS(run) test/gaps/phase2_5/p2_unit_elision_result_unit.run_fail.w
+PASS(run) test/gaps/phase2_5/p3_raw_ptr_as_option.run_fail.w
+PASS(run) test/gaps/phase2_5/p3_std_fs_io.run_fail.w
+PASS(run) test/gaps/phase2_5/p4_task_cancel.run_fail.w
+phase2_5 gap tests: 1 failure(s)
+
+===== PASS test/run_phase2_chained_if_let_tests.sh (0s) =====
+building compiler binary for phase2 chained-if-let tests...
+PASS(chained-if-let-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.pJ0E65wjHA/chained_if_let_basic_ok.w
+PASS(chained-if-let-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.pJ0E65wjHA/chained_if_let_mixed_bool_ok.w
+PASS(chained-if-let-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.pJ0E65wjHA/chained_if_let_syntax_fail.w
+phase2 chained-if-let tests: PASS
+
+===== PASS test/run_phase2_closure_capture_analysis_tests.sh (1s) =====
+building compiler binary for phase2 closure-capture-analysis tests...
+PASS(closure-capture-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dddSa5fxiv/closure_capture_single_ok.w
+PASS(closure-capture-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dddSa5fxiv/closure_capture_multi_ok.w
+PASS(closure-capture-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dddSa5fxiv/closure_capture_ephemeral_ref_fail.w
+phase2 closure-capture-analysis tests: PASS
+
+===== PASS test/run_phase2_closure_capture_mode_tests.sh (0s) =====
+building compiler binary for phase2 closure-capture-mode tests...
+PASS(closure-capture-mode-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.SyZBMI2gvs/closure_capture_copy_ok.w
+PASS(closure-capture-mode-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.SyZBMI2gvs/closure_capture_move_fail.w
+PASS(closure-capture-mode-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.SyZBMI2gvs/closure_capture_nonescaping_borrow_ok.w
+phase2 closure-capture-mode tests: PASS
+
+===== PASS test/run_phase2_closure_codegen_tests.sh (1s) =====
+building compiler binary for phase2 closure-codegen tests...
+PASS(closure-codegen-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.NW0VkNmxL6/closure_codegen_noncapturing_ok.w
+PASS(closure-codegen-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.NW0VkNmxL6/closure_codegen_capturing_ok.w
+PASS(closure-codegen-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.NW0VkNmxL6/closure_codegen_higher_order_ok.w
+PASS(closure-codegen-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.NW0VkNmxL6/closure_codegen_wrong_arity_fail.w
+phase2 closure-codegen tests: PASS
+
+===== PASS test/run_phase2_closure_escaping_tests.sh (1s) =====
+building compiler binary for phase2 closure-escaping tests...
+PASS(closure-escaping-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fIGzZAi9wZ/closure_nonescaping_ref_capture_ok.w
+PASS(closure-escaping-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fIGzZAi9wZ/closure_escaping_ref_capture_fail.w
+PASS(closure-escaping-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fIGzZAi9wZ/closure_escaping_no_ref_ok.w
+phase2 closure-escaping tests: PASS
+
+===== PASS test/run_phase2_closure_parse_forms_tests.sh (0s) =====
+building compiler binary for phase2 closure-parse-forms tests...
+PASS(closure-parse-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Wrq8YwHULv/closure_inline_ok.w
+PASS(closure-parse-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Wrq8YwHULv/closure_block_ok.w
+PASS(closure-parse-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Wrq8YwHULv/closure_missing_pipe_fail.w
+PASS(closure-parse-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Wrq8YwHULv/closure_bad_param_fail.w
+phase2 closure-parse-forms tests: PASS
+
+===== PASS test/run_phase2_comprehension_tests.sh (1s) =====
+building compiler binary for phase2 comprehension tests...
+PASS(comprehension-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Bh2CEKN33F/comprehension_basic_ok.w
+PASS(comprehension-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Bh2CEKN33F/comprehension_filter_ok.w
+PASS(comprehension-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Bh2CEKN33F/comprehension_nested_ok.w
+PASS(comprehension-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Bh2CEKN33F/comprehension_three_for_ok.w
+PASS(comprehension-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Bh2CEKN33F/comprehension_non_range_iter_fail.w
+PASS(comprehension-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Bh2CEKN33F/comprehension_parse_fail.w
+phase2 comprehension tests: PASS
+
+===== PASS test/run_phase2_default_early_exit_tests.sh (1s) =====
+building compiler binary for phase2 default-early-exit tests...
+PASS(default-early-exit-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fdcqsC4aVS/default_early_return_ok.w
+PASS(default-early-exit-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fdcqsC4aVS/default_early_continue_break_ok.w
+PASS(default-early-exit-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fdcqsC4aVS/default_early_result_return_ok.w
+PASS(default-early-exit-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fdcqsC4aVS/default_early_continue_outside_loop_fail.w
+PASS(default-early-exit-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.fdcqsC4aVS/default_early_break_outside_loop_fail.w
+phase2 default-early-exit tests: PASS
+
+===== PASS test/run_phase2_default_field_values_tests.sh (1s) =====
+building compiler binary for phase2 default-field-values tests...
+PASS(default-fields-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.jttU0c00fH/default_fields_insert_ok.w
+PASS(default-fields-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.jttU0c00fH/default_fields_override_ok.w
+PASS(default-fields-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.jttU0c00fH/default_fields_missing_required_fail.w
+phase2 default-field-values tests: PASS
+

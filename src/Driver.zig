@@ -42,6 +42,10 @@ c_import_link_libs: std.AutoHashMapUnmanaged(Ast.Symbol, void),
 c_import_cache: std.StringHashMapUnmanaged([]const Ast.Decl),
 /// Emit c_import cache hit/miss diagnostics to stderr when enabled.
 trace_c_import_cache: bool,
+/// Freestanding mode: no std library (§18.7).
+no_std: bool,
+/// Alloc tier: core + heap types but no OS (§18.7).
+alloc: bool,
 
 pub fn init(allocator: std.mem.Allocator) Driver {
     return .{
@@ -57,6 +61,8 @@ pub fn init(allocator: std.mem.Allocator) Driver {
         .c_import_link_libs = .empty,
         .c_import_cache = .empty,
         .trace_c_import_cache = false,
+        .no_std = false,
+        .alloc = false,
     };
 }
 
@@ -168,6 +174,8 @@ pub fn compileSource(self: *Driver, source: *Source) !?Ast.Module {
     // Phase 3: Semantic analysis.
     var sema = Sema.init(self.arena.allocator(), &self.pool, &self.diagnostics);
     defer sema.deinit();
+    sema.no_std = self.no_std;
+    sema.alloc = self.alloc;
     sema.checkModule(&module);
 
     if (self.diagnostics.hasErrors()) {

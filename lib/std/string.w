@@ -21,7 +21,7 @@ use c_import("#include <string.h>\n#include <stdlib.h>\n#include <stdio.h>\n#inc
 
 // String length (same as s.len())
 pub fn string_len(s: str) -> i64:
-    strlen(s)
+    strlen(s) as i64
 
 // StrView length helper (same as v.len)
 pub fn view_len(v: &str) -> i64:

@@ -96,8 +96,9 @@ use std.net
 
 fn main -> i32:
     let fd = udp_bind(0)
-    if fd < 0 then 1 else
-        let _ = socket_close(fd)
+    if fd < 0 then return 1
+    let _ = socket_close(fd)
+    0
 EOF2
 expect_run_pass "$tmpdir/std_net_udp_bind_ok.w"
 

@@ -281,6 +281,10 @@ expected_expr_type: ?TypeId = null,
 in_pipeline_rhs: bool = false,
 /// Whether the current function being checked is declared `comptime fn`.
 in_comptime_fn: bool = false,
+/// Freestanding mode: no std library (§18.7).
+no_std: bool = false,
+/// Alloc tier: core + heap types but no OS (§18.7).
+alloc: bool = false,
 /// Whether we're inside a defer expression (control flow is restricted).
 in_defer: bool = false,
 /// Type of the most recent break-with-value (for loop expression typing).
@@ -921,6 +925,11 @@ fn collectFnDecl(self: *Sema, fn_decl: Ast.FnDecl) void {
     // Denied pattern E0801: async function calls produce Task handles.
     if (fn_decl.is_async) {
         self.task_fns.put(self.allocator, fn_decl.name, {}) catch {};
+    }
+
+    // §18.7 — async fn requires std (fiber runtime).
+    if (self.no_std and fn_decl.is_async) {
+        self.emitError("async fn requires std (fiber runtime not available in no_std mode)", fn_decl.body.span);
     }
 }
 
@@ -2095,6 +2104,13 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
             }
 
             const st = self.getType(resolved).struct_type;
+
+            // Drop types cannot be used in record update — partial move violates
+            // whole-value move semantics (§2.4).
+            if (self.hasDropMethod(st.name)) {
+                self.emitError("record update cannot be used on types with Drop", expr.span);
+            }
+
             for (ru.fields) |f| {
                 const value_ty = self.checkExpr(f.value);
 
@@ -4111,6 +4127,11 @@ fn checkCall(self: *Sema, call_e: Ast.CallExpr, span: Span) TypeId {
         if (i < arg_types.len) arg_types[i] = ty;
     }
 
+    // Mark non-Copy arguments as moved (consumed by the call).
+    for (call_e.args) |arg| {
+        self.markMovedIfConsumed(arg);
+    }
+
     if (self.in_comptime_fn) {
         const fn_name = self.pool.resolve(fn_sym);
         if (std.mem.eql(u8, fn_name, "print") or std.mem.eql(u8, fn_name, "println")) {
@@ -4281,6 +4302,15 @@ fn checkCall(self: *Sema, call_e: Ast.CallExpr, span: Span) TypeId {
 }
 
 fn checkMethodCall(self: *Sema, fa: Ast.FieldAccessExpr, args: []const *const Ast.Expr, span: Span) TypeId {
+    // §18.7 — reject heap-dependent type constructors in no_std mode.
+    if (self.no_std and fa.expr.kind == .ident) {
+        const type_name = self.pool.resolve(fa.expr.kind.ident);
+        if (self.isStdOnlyBuiltin(type_name)) {
+            self.emitError("not available in no_std mode", span);
+            return error_type;
+        }
+    }
+
     const obj_type = self.checkExpr(fa.expr);
 
     // Check all arguments.
@@ -4288,6 +4318,11 @@ fn checkMethodCall(self: *Sema, fa: Ast.FieldAccessExpr, args: []const *const As
         self.closure_direct_arg_depth += 1;
         _ = self.checkExpr(arg);
         self.closure_direct_arg_depth -= 1;
+    }
+
+    // Mark non-Copy arguments as moved (consumed by the call).
+    for (args) |arg| {
+        self.markMovedIfConsumed(arg);
     }
 
     if (obj_type == error_type) return error_type;
@@ -4477,6 +4512,15 @@ fn resolveGenericReturnType(self: *Sema, te: *const Ast.TypeExpr, bindings: []co
 
 fn checkBuiltinCall(self: *Sema, fn_sym: Symbol, args: []const *const Ast.Expr, arg_types: []const TypeId, span: Span) TypeId {
     const name = self.pool.resolve(fn_sym);
+
+    // §18.7 — reject std-dependent builtins in no_std mode.
+    if (self.no_std) {
+        if (self.isStdOnlyBuiltin(name)) {
+            self.emitError("not available in no_std mode", span);
+            return error_type;
+        }
+    }
+
     if (std.mem.eql(u8, name, "println") or std.mem.eql(u8, name, "print")) {
         return self.ty_void;
     }
@@ -4596,6 +4640,29 @@ fn isBuiltinValue(self: *Sema, sym: Symbol) bool {
         std.mem.eql(u8, name, "E") or
         std.mem.eql(u8, name, "INFINITY") or
         std.mem.eql(u8, name, "NAN");
+}
+
+/// §18.7 — Returns true if the given built-in name requires std (or alloc).
+fn isStdOnlyBuiltin(self: *const Sema, name: []const u8) bool {
+    // println/print require stdout → std only.
+    if (std.mem.eql(u8, name, "println") or std.mem.eql(u8, name, "print"))
+        return true;
+
+    // Heap-allocated collections require alloc tier.
+    if (!self.alloc) {
+        if (std.mem.eql(u8, name, "Vec") or
+            std.mem.eql(u8, name, "HashMap") or
+            std.mem.eql(u8, name, "HashSet") or
+            std.mem.eql(u8, name, "Box") or
+            std.mem.eql(u8, name, "Channel"))
+            return true;
+    }
+
+    // async/spawn require the fiber runtime → std only.
+    if (std.mem.eql(u8, name, "spawn"))
+        return true;
+
+    return false;
 }
 
 // ── Helper: method key lookup ────────────────────────────────────
@@ -4761,7 +4828,11 @@ fn typesCompatible(self: *const Sema, expected: TypeId, actual: TypeId) bool {
 
     // Auto-referencing: T → &T (spec §3.8).
     if (exp_type == .ref_type) {
-        if (self.typesCompatible(exp_type.ref_type.pointee, act_resolved)) return true;
+        // Auto-ref is only for shared borrows. Mutable borrows require
+        // an explicit `&mut` so we do not silently create mutable aliases.
+        if (!exp_type.ref_type.is_mut and self.typesCompatible(exp_type.ref_type.pointee, act_resolved)) {
+            return true;
+        }
     }
 
     // Reference-to-pointer coercion: &T → *const T, &mut T → *mut T.
@@ -4839,7 +4910,12 @@ fn isImplicitNarrowing(self: *Sema, expected: TypeId, actual: TypeId) bool {
 
     if (exp_ty == .int and act_ty == .int) {
         if (act_ty.int.bits > exp_ty.int.bits) return true;
+        // Signed → unsigned at same width: reject (negative values become huge).
         if (act_ty.int.bits == exp_ty.int.bits and act_ty.int.signed and !exp_ty.int.signed) {
+            return true;
+        }
+        // Unsigned → signed at same width: reject (values > MAX_SIGNED wrap negative).
+        if (act_ty.int.bits == exp_ty.int.bits and !act_ty.int.signed and exp_ty.int.signed) {
             return true;
         }
         return false;

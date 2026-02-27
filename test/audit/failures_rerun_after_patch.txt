@@ -1,0 +1,368 @@
+===== test/run_phase0_harness_tests.sh =====
+PASS test/run_phase0_harness_tests.sh
+building compiler binary for harness tests...
+PASS(harness-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.CneHJVW2I0/default_exit.w
+PASS(harness-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.CneHJVW2I0/exit_42.w
+PASS(harness-pass) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.CneHJVW2I0/stdout_ok.w
+PASS(harness-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.CneHJVW2I0/stdout_mismatch.w
+PASS(harness-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.CneHJVW2I0/exit_mismatch.w
+phase0 harness tests: PASS
+
+===== test/run_phase0_snapshot_tests.sh =====
+PASS test/run_phase0_snapshot_tests.sh
+building compiler binary for snapshot tests...
+PASS(snapshot-pass) ./zig-out/bin/with test /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dTmp2bgUau/snap_case.w --update
+PASS(snapshot-pass) ./zig-out/bin/with test /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dTmp2bgUau/snap_case.w
+PASS(snapshot-fail) ./zig-out/bin/with test /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dTmp2bgUau/snap_case.w
+PASS(snapshot-pass) ./zig-out/bin/with test /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dTmp2bgUau/snap_case.w --update
+PASS(snapshot-pass) ./zig-out/bin/with test /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dTmp2bgUau/snap_case.w
+phase0 snapshot tests: PASS
+
+===== test/run_phase2_5_gap_tests.sh =====
+PASS test/run_phase2_5_gap_tests.sh
+PASS test/cases/pipeline_chain.w
+PASS test/cases/result_and_then.w
+PASS test/cases/expect_methods.w
+PASS test/cases/with_builder_expr.w
+PASS test/cases/with_nonlocal_return.w
+PASS test/cases/async_sync_bridge.w
+PASS test/cases/select_await_three.w
+PASS test/cases/trait_multibounds.w
+PASS test/cases/dyn_default_dispatch.w
+PASS(check) test/gaps/phase2_5/p2_pipeline_advanced.check_fail.w
+PASS(check) test/gaps/phase2_5/p2_if_let_chained.check_fail.w
+PASS(check) test/gaps/phase2_5/p2_param_patterns.check_fail.w
+PASS(check) test/gaps/phase2_5/p2_pipeline_match.check_fail.w
+PASS(check) test/gaps/phase2_5/p2_error_from.check_fail.w
+PASS(check) test/gaps/phase2_5/p2_record_update_shorthand.check_fail.w
+PASS(check) test/gaps/phase2_5/p4_async_block.check_fail.w
+PASS(check) test/gaps/phase2_5/p4_select_let_else.check_fail.w
+PASS(check) test/gaps/phase2_5/p4_async_scope.check_fail.w
+PASS(check) test/gaps/phase2_5/p4_no_await_guard.check_fail.w
+PASS(check) test/gaps/phase2_5/p5_where_clause.check_fail.w
+PASS(check) test/gaps/phase2_5/p5_generic_trait_method.check_fail.w
+PASS(run) test/gaps/phase2_5/p2_enum_accessor_ref_mut.run_fail.w
+PASS(run) test/gaps/phase2_5/p2_unit_elision_result_unit.run_fail.w
+PASS(run) test/gaps/phase2_5/p3_raw_ptr_as_option.run_fail.w
+PASS(run) test/gaps/phase2_5/p3_std_fs_io.run_fail.w
+PASS(run) test/gaps/phase2_5/p4_task_cancel.run_fail.w
+phase2_5 gap tests: PASS
+
+===== test/run_phase2_default_operator_tests.sh =====
+PASS test/run_phase2_default_operator_tests.sh
+building compiler binary for phase2 default-operator tests...
+PASS(default-op-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.SHKLkhGHYM/default_option_basic_ok.w
+PASS(default-op-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.SHKLkhGHYM/default_chaining_ok.w
+PASS(default-op-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.SHKLkhGHYM/default_laziness_ok.w
+PASS(default-op-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.SHKLkhGHYM/default_laziness_trigger_fail.w
+PASS(default-op-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.SHKLkhGHYM/default_non_container_fail.w
+phase2 default-operator tests: PASS
+
+===== test/run_phase2_exhaustiveness_tests.sh =====
+PASS test/run_phase2_exhaustiveness_tests.sh
+building compiler binary for phase2 exhaustiveness tests...
+PASS(exhaustiveness-nowarn) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.IAmKRlfvYK/exhaustive_enum_ok.w
+PASS(exhaustiveness-nowarn) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.IAmKRlfvYK/non_exhaustive_enum_warn.w
+PASS(exhaustiveness-build-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.IAmKRlfvYK/non_exhaustive_enum_missing_warn.w
+PASS(exhaustiveness-build-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.IAmKRlfvYK/non_exhaustive_bool_warn.w
+phase2 exhaustiveness tests: PASS
+
+===== test/run_phase3_option_combinator_tests.sh =====
+PASS test/run_phase3_option_combinator_tests.sh
+building compiler binary for phase3 Option combinator tests...
+PASS(option-check) lib/std/option.w
+PASS(option-run) test/cases/option_map.w
+PASS(option-run) test/cases/option_combinators.w
+PASS(option-run) test/cases/option_chain_adv.w
+PASS(option-run) test/cases/option_unwrap.w
+PASS(option-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.KnfydhJvJC/option_combinator_extended_ok.w
+PASS(option-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.KnfydhJvJC/option_or_else_bad_arg_fail.w
+PASS(option-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.KnfydhJvJC/option_zip_bad_arity_fail.w
+PASS(option-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.KnfydhJvJC/option_flatten_bad_type_fail.w
+phase3 Option combinator tests: PASS
+
+===== test/run_phase3_std_sync_tests.sh =====
+PASS test/run_phase3_std_sync_tests.sh
+building compiler binary for phase3 std.sync tests...
+PASS(sync-check) lib/std/sync.w
+PASS(sync-run) test/cases/import_std_sync.w
+PASS(sync-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.eJzZLGUGf1/std_sync_extended_ok.w
+PASS(sync-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.eJzZLGUGf1/std_sync_mutex_set_borrow_fail.w
+PASS(sync-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.eJzZLGUGf1/std_sync_atomic_add_arity_fail.w
+PASS(sync-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.eJzZLGUGf1/std_sync_rwlock_write_type_fail.w
+PASS(sync-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.eJzZLGUGf1/std_sync_atomic_load_type_fail.w
+phase3 std.sync tests: PASS
+
+===== test/run_phase3_milestone_138_tests.sh =====
+PASS test/run_phase3_milestone_138_tests.sh
+running phase3 milestone 138 groups: 25.8, 25.15, 25.16, 25.22, 25.97, 25.98...
+building compiler binary for phase3 additional collections tests...
+PASS(additional-collections-check) lib/std/collections.w
+PASS(additional-collections-run) test/cases/import_std_collections_additional.w
+PASS(additional-collections-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Oxcl0V7GHk/additional_collections_extended_ok.w
+PASS(additional-collections-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Oxcl0V7GHk/additional_collections_slotmap_insert_type_fail.w
+PASS(additional-collections-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Oxcl0V7GHk/additional_collections_slotmap_get_handle_fail.w
+PASS(additional-collections-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Oxcl0V7GHk/additional_collections_btree_insert_arity_fail.w
+PASS(additional-collections-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Oxcl0V7GHk/additional_collections_btree_remove_type_fail.w
+phase3 additional collections tests: PASS
+building compiler binary for phase3 collection combinator tests...
+PASS(collection-check) lib/std/collections.w
+PASS(collection-run) test/cases/sequence_traverse.w
+PASS(collection-run) test/cases/import_std_collections.w
+PASS(collection-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.XmGu7nVBW1/sequence_non_wrapper_fail.w
+PASS(collection-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.XmGu7nVBW1/traverse_non_wrapper_fail.w
+PASS(collection-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.XmGu7nVBW1/traverse_missing_arg_fail.w
+PASS(collection-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.XmGu7nVBW1/sequence_unexpected_arg_fail.w
+phase3 collection combinator tests: PASS
+building compiler binary for phase3 generator-readiness tests...
+PASS(generator-run) test/cases/generator.w
+PASS(generator-run) test/cases/gen_params.w
+PASS(generator-run) test/cases/gen_multi_yield.w
+PASS(generator-run) test/cases/gen_fib.w
+PASS(generator-run) test/cases/generator_stdlib_ready.w
+PASS(generator-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Xn4zKY2pQm/generator_type_mismatch_fail.w
+PASS(generator-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.Xn4zKY2pQm/generator_ref_across_yield_fail.w
+phase3 generator readiness tests: PASS
+building compiler binary for phase3 Option combinator tests...
+PASS(option-check) lib/std/option.w
+PASS(option-run) test/cases/option_map.w
+PASS(option-run) test/cases/option_combinators.w
+PASS(option-run) test/cases/option_chain_adv.w
+PASS(option-run) test/cases/option_unwrap.w
+PASS(option-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ZnjLW68072/option_combinator_extended_ok.w
+PASS(option-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ZnjLW68072/option_or_else_bad_arg_fail.w
+PASS(option-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ZnjLW68072/option_zip_bad_arity_fail.w
+PASS(option-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ZnjLW68072/option_flatten_bad_type_fail.w
+phase3 Option combinator tests: PASS
+building compiler binary for phase3 Result combinator tests...
+PASS(result-check) lib/std/result.w
+PASS(result-run) test/cases/result_map.w
+PASS(result-run) test/cases/result_and_then.w
+PASS(result-run) test/cases/result_combinators.w
+PASS(result-run) test/cases/import_std_result.w
+PASS(result-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.KGau3G1rkN/result_combinator_extended_ok.w
+PASS(result-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.KGau3G1rkN/result_or_else_bad_ok_type_fail.w
+PASS(result-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.KGau3G1rkN/result_and_then_bad_return_fail.w
+PASS(result-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.KGau3G1rkN/result_transpose_bad_receiver_fail.w
+PASS(result-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.KGau3G1rkN/result_map_err_on_option_fail.w
+phase3 Result combinator tests: PASS
+building compiler binary for phase3 raw pointer as_option tests...
+PASS(raw-ptr-run) test/cases/raw_ptr_option.w
+PASS(raw-ptr-run) test/cases/p3_raw_ptr_as_option.w
+PASS(raw-ptr-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.U2AsOHDNPD/raw_ptr_as_option_extra_ok.w
+PASS(raw-ptr-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.U2AsOHDNPD/raw_ptr_as_option_non_ptr_fail.w
+PASS(raw-ptr-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.U2AsOHDNPD/raw_ptr_as_option_arity_fail.w
+phase3 raw pointer as_option tests: PASS
+building compiler binary for phase3 HashMap convenience tests...
+PASS(hashmap-conv-run) test/cases/hashmap_convenience.w
+PASS(hashmap-conv-run) test/cases/import_std_collections.w
+PASS(hashmap-conv-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.RiMNKKnlg6/hashmap_convenience_semantics_ok.w
+PASS(hashmap-conv-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.RiMNKKnlg6/hashmap_convenience_bad_increment_fail.w
+PASS(hashmap-conv-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.RiMNKKnlg6/hashmap_convenience_bad_append_fail.w
+PASS(hashmap-conv-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.RiMNKKnlg6/hashmap_convenience_bad_wrapper_key_fail.w
+phase3 HashMap convenience tests: PASS
+phase3 milestone 138 tests: PASS
+
+===== test/run_phase4_async_block_tests.sh =====
+PASS test/run_phase4_async_block_tests.sh
+building compiler/runtime for phase4 async-block tests...
+PASS(async-block-run) test/cases/async_block.w
+PASS(async-block-run) test/cases/p4_async_block.w
+PASS(async-block-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hmPeB3Foby/async_block_capture_copy.w
+PASS(async-block-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hmPeB3Foby/async_block_inline_await.w
+PASS(async-block-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hmPeB3Foby/async_block_multi_capture.w
+PASS(async-block-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hmPeB3Foby/async_block_unknown_capture_fail.w
+PASS(async-block-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hmPeB3Foby/async_block_missing_body_fail.w
+phase4 async-block tests: PASS
+
+===== test/run_phase4_std_net_scheduler_tests.sh =====
+FAIL test/run_phase4_std_net_scheduler_tests.sh (rc=1)
+building compiler/runtime for phase4 std.net scheduler tests...
+PASS(std-net-run) test/cases/import_std_net.w
+PASS(std-net-async-connect) port=38793
+FAIL(std-net-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.6L5NZU159T/std_net_udp_bind_ok.w
+error: expected expression
+ --> /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.6L5NZU159T/std_net_udp_bind_ok.w:5:26
+  |
+5 |     if fd < 0 then 1 else:
+  |                          ^
+
+error: expected declaration (fn, type, let, use, extern)
+ --> /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.6L5NZU159T/std_net_udp_bind_ok.w:7:9
+  |
+7 |         0
+  |         ^
+
+PASS(std-net-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.6L5NZU159T/std_net_listen_type_fail.w
+PASS(std-net-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.6L5NZU159T/std_net_connect_arity_fail.w
+PASS(std-net-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.6L5NZU159T/std_net_accept_type_fail.w
+phase4 std.net scheduler tests: 1 failure(s)
+
+===== test/run_phase5_dyn_trait_vtable_tests.sh =====
+PASS test/run_phase5_dyn_trait_vtable_tests.sh
+building compiler/runtime for phase5 dyn-trait/vtable tests...
+PASS(dyn-vtable-run) test/cases/dyn_trait.w
+PASS(dyn-vtable-run) test/cases/dyn_dispatch.w
+PASS(dyn-vtable-run) test/cases/dyn_dispatch_multi.w
+PASS(dyn-vtable-run) test/cases/trait_dyn_advanced.w
+PASS(dyn-vtable-run) test/cases/impl_trait_dyn.w
+PASS(dyn-vtable-run) test/cases/dyn_default_dispatch.w
+PASS(dyn-vtable-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.txGxoJecjS/dyn_missing_impl_fail.w
+phase5 dyn-trait/vtable tests: PASS
+
+===== test/run_phase5_object_safety_diagnostics_tests.sh =====
+PASS test/run_phase5_object_safety_diagnostics_tests.sh
+building compiler/runtime for phase5 object-safety diagnostics tests...
+PASS(object-safety-run) test/cases/dyn_trait.w
+PASS(object-safety-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.jKqthhth5g/object_safety_no_self_fail.w
+PASS(object-safety-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.jKqthhth5g/object_safety_generic_method_fail.w
+PASS(object-safety-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.jKqthhth5g/object_safety_returns_self_fail.w
+phase5 object-safety diagnostics tests: PASS
+
+===== test/run_phase5_trait_definition_parsing_tests.sh =====
+PASS test/run_phase5_trait_definition_parsing_tests.sh
+building compiler/runtime for phase5 trait-definition parsing tests...
+PASS(trait-def-run) test/cases/trait_default.w
+PASS(trait-def-run) test/cases/trait_default_method.w
+PASS(trait-def-run) test/cases/trait_conform.w
+PASS(trait-def-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.SjYOZj0YB1/trait_required_and_default_parse_ok.w
+PASS(trait-def-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.SjYOZj0YB1/trait_missing_required_method_fail.w
+PASS(trait-def-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.SjYOZj0YB1/trait_malformed_default_syntax_fail.w
+phase5 trait-definition parsing tests: PASS
+
+===== test/run_phase5_stdlib_trait_impl_coverage_tests.sh =====
+PASS test/run_phase5_stdlib_trait_impl_coverage_tests.sh
+building compiler/runtime for phase5 stdlib trait-impl coverage tests...
+PASS(stdlib-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.zREveAvmPK/vec_iter_index_ok.w
+PASS(stdlib-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.zREveAvmPK/hashmap_index_ok.w
+PASS(stdlib-trait-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.zREveAvmPK/hashmap_index_missing_fail.w
+PASS(stdlib-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.zREveAvmPK/result_try_ok.w
+PASS(stdlib-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.zREveAvmPK/sync_guard_scoped_ok.w
+PASS(stdlib-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.zREveAvmPK/string_add_display_ok.w
+PASS(stdlib-trait-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.zREveAvmPK/string_add_mismatch_fail.w
+PASS(stdlib-trait-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.zREveAvmPK/try_non_result_fail.w
+phase5 stdlib trait-impl coverage tests: PASS
+
+===== test/run_phase5_milestone_25_10_25_11_tests.sh =====
+PASS test/run_phase5_milestone_25_10_25_11_tests.sh
+running phase5 milestone 25.10/25.11 suites...
+building compiler/runtime for phase5 trait-definition parsing tests...
+PASS(trait-def-run) test/cases/trait_default.w
+PASS(trait-def-run) test/cases/trait_default_method.w
+PASS(trait-def-run) test/cases/trait_conform.w
+PASS(trait-def-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.53S69VNljC/trait_required_and_default_parse_ok.w
+PASS(trait-def-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.53S69VNljC/trait_missing_required_method_fail.w
+PASS(trait-def-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.53S69VNljC/trait_malformed_default_syntax_fail.w
+phase5 trait-definition parsing tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_trait_definition_parsing_tests.sh
+building compiler/runtime for phase5 impl-block parsing tests...
+PASS(impl-parse-run) test/cases/impl_block.w
+PASS(impl-parse-run) test/cases/impl_methods_complex.w
+PASS(impl-parse-run) test/cases/impl_static.w
+PASS(impl-parse-run) test/cases/trait_impl.w
+PASS(impl-parse-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dQPaaAlMCM/impl_extend_form_ok.w
+PASS(impl-parse-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dQPaaAlMCM/impl_trait_for_form_ok.w
+PASS(impl-parse-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dQPaaAlMCM/impl_missing_method_eq_fail.w
+PASS(impl-parse-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.dQPaaAlMCM/impl_trait_for_missing_type_fail.w
+phase5 impl-block parsing tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_impl_block_parsing_tests.sh
+building compiler/runtime for phase5 orphan/coherence tests...
+PASS(orphan-coherence-run) test/cases/trait_conform.w
+PASS(orphan-coherence-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ORIBZOZNi7/coherence_local_trait_for_primitive_ok.w
+PASS(orphan-coherence-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ORIBZOZNi7/orphan_local_type_with_external_trait_ok.w
+PASS(orphan-coherence-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ORIBZOZNi7/orphan_foreign_trait_foreign_type_fail.w
+PASS(orphan-coherence-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ORIBZOZNi7/coherence_duplicate_impl_fail.w
+PASS(orphan-coherence-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ORIBZOZNi7/orphan_unknown_trait_fail.w
+PASS(orphan-coherence-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.ORIBZOZNi7/orphan_unknown_type_fail.w
+phase5 orphan/coherence tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_orphan_coherence_tests.sh
+building compiler/runtime for phase5 method-resolution-order tests...
+PASS(method-resolution-run) test/cases/trait_impl.w
+PASS(method-resolution-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.few8fdDVzY/mro_trait_then_inherent_ok.w
+PASS(method-resolution-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.few8fdDVzY/mro_inherent_then_trait_ok.w
+PASS(method-resolution-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.few8fdDVzY/mro_trait_only_ok.w
+phase5 method-resolution-order tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_method_resolution_order_tests.sh
+building compiler/runtime for phase5 trait-bounds-signature tests...
+PASS(trait-bounds-signature-run) test/cases/trait_bounds.w
+PASS(trait-bounds-signature-run) test/cases/generic_bounds.w
+PASS(trait-bounds-signature-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.yzr7UrfQBD/single_bound_signature_ok.w
+PASS(trait-bounds-signature-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.yzr7UrfQBD/single_bound_not_satisfied_fail.w
+PASS(trait-bounds-signature-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.yzr7UrfQBD/single_bound_malformed_syntax_fail.w
+phase5 trait-bounds-signature tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_trait_bounds_signatures_tests.sh
+building compiler/runtime for phase5 multiple-bounds/where-clause tests...
+PASS(multi-bounds-where-run) test/cases/trait_multibounds.w
+PASS(multi-bounds-where-run) test/cases/multi_trait_bounds.w
+PASS(multi-bounds-where-run) test/cases/where_clause.w
+PASS(multi-bounds-where-run) test/cases/where_multi_bound.w
+PASS(multi-bounds-where-run) test/cases/p5_where_clause.w
+PASS(multi-bounds-where-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.p6PE9Ggdam/where_merges_with_signature_bounds_ok.w
+PASS(multi-bounds-where-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.p6PE9Ggdam/multi_bound_missing_trait_fail.w
+PASS(multi-bounds-where-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.p6PE9Ggdam/where_malformed_bound_fail.w
+PASS(multi-bounds-where-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.p6PE9Ggdam/where_unknown_type_param_fail.w
+phase5 multiple-bounds/where-clause tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_multiple_bounds_where_clause_tests.sh
+building compiler/runtime for phase5 bounds-enforcement tests...
+PASS(bounds-enforcement-run) test/cases/trait_bounds_check.w
+PASS(bounds-enforcement-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.wLo780GMO4/bounds_body_and_callsite_ok.w
+PASS(bounds-enforcement-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.wLo780GMO4/bounds_callsite_missing_trait_fail.w
+PASS(bounds-enforcement-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.wLo780GMO4/bounds_callsite_primitive_fail.w
+PASS(bounds-enforcement-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.wLo780GMO4/bounds_body_missing_bound_fail.w
+phase5 bounds-enforcement tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_bounds_enforcement_tests.sh
+building compiler/runtime for phase5 syntax-trait wiring tests...
+PASS(syntax-trait-run) test/cases/for_iter.w
+PASS(syntax-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.s9zDCMutO3/scoped_enter_methods_ok.w
+PASS(syntax-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.s9zDCMutO3/index_get_protocol_ok.w
+PASS(syntax-trait-run) test/cases/option_try.w
+PASS(syntax-trait-run) test/cases/result_try.w
+PASS(syntax-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.s9zDCMutO3/op_add_trait_protocol_ok.w
+PASS(syntax-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.s9zDCMutO3/drop_trait_method_ok.w
+PASS(syntax-trait-run) test/cases/display_trait.w
+PASS(syntax-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.s9zDCMutO3/debug_print_fallback_ok.w
+PASS(syntax-trait-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.s9zDCMutO3/try_non_option_fail.w
+PASS(syntax-trait-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.s9zDCMutO3/op_rhs_mismatch_fail.w
+phase5 syntax-trait wiring tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_syntax_trait_wiring_tests.sh
+building compiler/runtime for phase5 dyn-trait/vtable tests...
+PASS(dyn-vtable-run) test/cases/dyn_trait.w
+PASS(dyn-vtable-run) test/cases/dyn_dispatch.w
+PASS(dyn-vtable-run) test/cases/dyn_dispatch_multi.w
+PASS(dyn-vtable-run) test/cases/trait_dyn_advanced.w
+PASS(dyn-vtable-run) test/cases/impl_trait_dyn.w
+PASS(dyn-vtable-run) test/cases/dyn_default_dispatch.w
+PASS(dyn-vtable-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.EFImjvdRG5/dyn_missing_impl_fail.w
+phase5 dyn-trait/vtable tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_dyn_trait_vtable_tests.sh
+building compiler/runtime for phase5 object-safety diagnostics tests...
+PASS(object-safety-run) test/cases/dyn_trait.w
+PASS(object-safety-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.pBM9U5XrAw/object_safety_no_self_fail.w
+PASS(object-safety-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.pBM9U5XrAw/object_safety_generic_method_fail.w
+PASS(object-safety-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.pBM9U5XrAw/object_safety_returns_self_fail.w
+phase5 object-safety diagnostics tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_object_safety_diagnostics_tests.sh
+building compiler/runtime for phase5 Box[dyn]/&dyn tests...
+PASS(box-ref-dyn-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.UyIBwdVJit/ref_dyn_dispatch_ok.w
+PASS(box-ref-dyn-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.UyIBwdVJit/box_dyn_dispatch_ok.w
+PASS(box-ref-dyn-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.UyIBwdVJit/ref_dyn_missing_impl_fail.w
+PASS(box-ref-dyn-check-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.UyIBwdVJit/box_dyn_missing_impl_fail.w
+phase5 Box[dyn]/&dyn tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_box_ref_dyn_tests.sh
+building compiler/runtime for phase5 devirtualization tests...
+PASS(devirt-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hreuoExCGA/devirt_known_local.w
+PASS(devirt-ir-has) devirt.call
+PASS(devirt-ir-not) vtable.gep
+PASS(devirt-ir-not) dyncall
+PASS(devirt-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.hreuoExCGA/devirt_unknown_param.w
+PASS(devirt-ir-has) vtable.gep
+PASS(devirt-ir-has) dyncall
+phase5 devirtualization tests: PASS
+PASS(milestone-25.10-25.11) test/run_phase5_devirtualization_tests.sh
+building compiler/runtime for phase5 stdlib trait-impl coverage tests...
+PASS(stdlib-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.rZAAtFNPre/vec_iter_index_ok.w
+PASS(stdlib-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.rZAAtFNPre/hashmap_index_ok.w
+PASS(stdlib-trait-run-fail) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.rZAAtFNPre/hashmap_index_missing_fail.w
+PASS(stdlib-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.rZAAtFNPre/result_try_ok.w
+PASS(stdlib-trait-run) /var/folders/hm/4__yy2jn15q482j82gm6p3ph0000gn/T/tmp.rZAAtFNPre/sync_guard_scoped_ok.w
+

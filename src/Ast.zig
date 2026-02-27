@@ -111,6 +111,9 @@ pub const FnDecl = struct {
     is_inline: bool = false,
     is_noinline: bool = false,
     is_must_use: bool = false,
+    is_panic_handler: bool = false,
+    is_entry: bool = false,
+    is_no_main: bool = false,
 };
 
 pub const ExternFnDecl = struct {

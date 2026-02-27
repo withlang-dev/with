@@ -57,9 +57,9 @@ expect_run_pass "test/cases/option_unwrap.w"
 
 cat >"$tmpdir/option_combinator_extended_ok.w" <<'EOF1'
 fn plus_one(x: i32) -> i32: x + 1
-fn half_if_even(x: i32) -> ?i32: if x % 2 =: 0 then Some(x / 2) else None
+fn half_if_even(x: i32) -> ?i32: if x % 2 == 0 then Some(x / 2) else None
 fn fallback -> ?i32: Some(9)
-fn is_even(x: i32) -> bool: x % 2 =: 0
+fn is_even(x: i32) -> bool: x % 2 == 0
 
 fn main -> i32:
     let a: ?i32 = Some(1)
