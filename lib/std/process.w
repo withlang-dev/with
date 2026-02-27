@@ -9,6 +9,7 @@ extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
+extern fn with_popen_read(cmd: str) -> str
 
 // Exit the process with given code
 pub fn exit_code(code: i32) -> void:
@@ -40,6 +41,10 @@ pub fn env(name: str) -> ?str:
 // Set environment variable (0 on success).
 pub fn set_env(name: str, value: str) -> i32:
     with_setenv_str(name, value)
+
+// Run a command and capture its stdout via pipe.
+pub fn pipe_read(cmd: str) -> str:
+    with_popen_read(cmd)
 
 // Minimal command runner wrapper.
 type Command = {

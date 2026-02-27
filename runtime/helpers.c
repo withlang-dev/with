@@ -557,6 +557,40 @@ with_str with_fs_read_file(with_str path) {
     return out;
 }
 
+// Run a shell command via popen and return its stdout as a with_str.
+with_str with_popen_read(with_str cmd) {
+    with_str out = { "", 0 };
+    char *ccmd = with_str_to_cstring(cmd);
+    if (!ccmd) return out;
+
+    FILE *p = popen(ccmd, "r");
+    free(ccmd);
+    if (!p) return out;
+
+    size_t cap = 1024;
+    size_t len = 0;
+    char *buf = (char *)malloc(cap);
+    if (!buf) { pclose(p); return out; }
+
+    while (1) {
+        size_t n = fread(buf + len, 1, cap - len, p);
+        len += n;
+        if (n == 0) break;
+        if (len == cap) {
+            cap *= 2;
+            char *tmp = (char *)realloc(buf, cap);
+            if (!tmp) { free(buf); pclose(p); return out; }
+            buf = tmp;
+        }
+    }
+    pclose(p);
+
+    buf[len] = '\0';
+    out.ptr = buf;
+    out.len = (int64_t)len;
+    return out;
+}
+
 // ---- std.net ----
 
 #include <sys/socket.h>
