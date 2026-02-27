@@ -39,21 +39,21 @@ fn main -> i32:
 EOF
 
 # 1) Create snapshot.
-expect_pass "$WITH_BIN" test "$tmpdir/snap_case.w" --update
+expect_pass "$WITH_BIN" test-harness "$tmpdir/snap_case.w" --update
 
 # 2) Snapshot should now pass without update.
-expect_pass "$WITH_BIN" test "$tmpdir/snap_case.w"
+expect_pass "$WITH_BIN" test-harness "$tmpdir/snap_case.w"
 
 # 3) Change output and ensure mismatch fails without update.
 cat >"$tmpdir/snap_case.w" <<'EOF'
 fn main -> i32:
     println("v2")
 EOF
-expect_fail "$WITH_BIN" test "$tmpdir/snap_case.w"
+expect_fail "$WITH_BIN" test-harness "$tmpdir/snap_case.w"
 
 # 4) Update snapshot and verify it passes.
-expect_pass "$WITH_BIN" test "$tmpdir/snap_case.w" --update
-expect_pass "$WITH_BIN" test "$tmpdir/snap_case.w"
+expect_pass "$WITH_BIN" test-harness "$tmpdir/snap_case.w" --update
+expect_pass "$WITH_BIN" test-harness "$tmpdir/snap_case.w"
 
 if [[ "$failures" -ne 0 ]]; then
   echo "phase0 snapshot tests: $failures failure(s)"
@@ -61,4 +61,3 @@ if [[ "$failures" -ne 0 ]]; then
 fi
 
 echo "phase0 snapshot tests: PASS"
-

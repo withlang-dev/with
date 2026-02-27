@@ -1,5 +1,7 @@
 // Tests for the ECS example
 
+use test.testing
+
 type Vec2 = {
     x: f64,
     y: f64,
@@ -78,112 +80,111 @@ fn min[T](a: T, b: T) -> T:
 fn clamp[T](val: T, lo: T, hi: T) -> T:
     min(max(val, lo), hi)
 
-type InputDir = None | Up | Down | Left | Right
+type InputDir = Idle | Up | Down | Left | Right
 
 fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity:
     match dir
-        None -> make_velocity(0.0, 0.0)
+        Idle -> make_velocity(0.0, 0.0)
         Up -> make_velocity(0.0, 0.0 - speed)
         Down -> make_velocity(0.0, speed)
         Left -> make_velocity(0.0 - speed, 0.0)
         Right -> make_velocity(speed, 0.0)
 
-fn main -> i32:
+@[test]
+fn test_ecs_example:
     // Test Vec2 creation
     let v1 = Vec2.new(3.0, 4.0)
-    assert(v1.x == 3.0)
-    assert(v1.y == 4.0)
+    assert_true(v1.x == 3.0)
+    assert_true(v1.y == 4.0)
 
     let vz = Vec2.zero()
-    assert(vz.x == 0.0)
-    assert(vz.y == 0.0)
+    assert_true(vz.x == 0.0)
+    assert_true(vz.y == 0.0)
 
     // Test Vec2 add
     let v2 = Vec2.new(1.0, 2.0)
     let v3 = v1.add(v2)
-    assert(v3.x == 4.0)
-    assert(v3.y == 6.0)
+    assert_true(v3.x == 4.0)
+    assert_true(v3.y == 6.0)
 
     // Test Vec2 scale
     let v4 = v1.scale(2.0)
-    assert(v4.x == 6.0)
-    assert(v4.y == 8.0)
+    assert_true(v4.x == 6.0)
+    assert_true(v4.y == 8.0)
 
     // Test Vec2 length_sq
     let len_sq = v1.length_sq()
-    assert(len_sq == 25.0)
+    assert_true(len_sq == 25.0)
 
     // Test Entity creation
     let e = make_entity(42)
-    assert(e.id == 42)
-    assert(e.generation == 1)
+    assert_true(e.id == 42)
+    assert_true(e.generation == 1)
 
     // Test Transform and Velocity
     let t = make_transform(100.0, 200.0)
-    assert(t.x == 100.0)
-    assert(t.y == 200.0)
-    assert(t.rotation == 0.0)
-    assert(t.scale_val == 1.0)
+    assert_true(t.x == 100.0)
+    assert_true(t.y == 200.0)
+    assert_true(t.rotation == 0.0)
+    assert_true(t.scale_val == 1.0)
 
     let v = make_velocity(10.0, 20.0)
-    assert(v.vx == 10.0)
-    assert(v.vy == 20.0)
+    assert_true(v.vx == 10.0)
+    assert_true(v.vy == 20.0)
 
     // Test apply_velocity
     let t2 = apply_velocity(t, v, 1.0)
-    assert(t2.x == 110.0)
-    assert(t2.y == 220.0)
+    assert_true(t2.x == 110.0)
+    assert_true(t2.y == 220.0)
 
     let t3 = apply_velocity(t, v, 0.5)
-    assert(t3.x == 105.0)
-    assert(t3.y == 210.0)
+    assert_true(t3.x == 105.0)
+    assert_true(t3.y == 210.0)
 
     // Test check_collision — overlapping
     let ta = make_transform(0.0, 0.0)
     let tb = make_transform(10.0, 0.0)
     let ca = Collider { radius: 8.0, layer: 1, mask: 1 }
     let cb = Collider { radius: 8.0, layer: 1, mask: 1 }
-    assert(check_collision(ta, ca, tb, cb) == true)
+    assert_true(check_collision(ta, ca, tb, cb) == true)
 
     // Test check_collision — not overlapping
     let tc = make_transform(100.0, 0.0)
-    assert(check_collision(ta, ca, tc, cb) == false)
+    assert_true(check_collision(ta, ca, tc, cb) == false)
 
     // Test generic clamp
-    assert(clamp(5, 0, 10) == 5)
-    assert(clamp(-5, 0, 10) == 0)
-    assert(clamp(15, 0, 10) == 10)
+    assert_true(clamp(5, 0, 10) == 5)
+    assert_true(clamp(-5, 0, 10) == 0)
+    assert_true(clamp(15, 0, 10) == 10)
 
     // Test float clamp
-    assert(clamp(5.0, 0.0, 10.0) == 5.0)
-    assert(clamp(-1.0, 0.0, 10.0) == 0.0)
-    assert(clamp(99.0, 0.0, 10.0) == 10.0)
+    assert_true(clamp(5.0, 0.0, 10.0) == 5.0)
+    assert_true(clamp(-1.0, 0.0, 10.0) == 0.0)
+    assert_true(clamp(99.0, 0.0, 10.0) == 10.0)
 
     // Test generic max/min
-    assert(max(3, 7) == 7)
-    assert(min(3, 7) == 3)
-    assert(max(3.0, 7.0) == 7.0)
-    assert(min(3.0, 7.0) == 3.0)
+    assert_true(max(3, 7) == 7)
+    assert_true(min(3, 7) == 3)
+    assert_true(max(3.0, 7.0) == 7.0)
+    assert_true(min(3.0, 7.0) == 3.0)
 
     // Test dir_to_velocity
-    let dv_none = dir_to_velocity(None, 100.0)
-    assert(dv_none.vx == 0.0)
-    assert(dv_none.vy == 0.0)
+    let dv_none = dir_to_velocity(.Idle, 100.0)
+    assert_true(dv_none.vx == 0.0)
+    assert_true(dv_none.vy == 0.0)
 
-    let dv_right = dir_to_velocity(Right, 100.0)
-    assert(dv_right.vx == 100.0)
-    assert(dv_right.vy == 0.0)
+    let dv_right = dir_to_velocity(.Right, 100.0)
+    assert_true(dv_right.vx == 100.0)
+    assert_true(dv_right.vy == 0.0)
 
-    let dv_up = dir_to_velocity(Up, 50.0)
-    assert(dv_up.vx == 0.0)
-    assert(dv_up.vy == -50.0)
+    let dv_up = dir_to_velocity(.Up, 50.0)
+    assert_true(dv_up.vx == 0.0)
+    assert_true(dv_up.vy == -50.0)
 
-    let dv_down = dir_to_velocity(Down, 50.0)
-    assert(dv_down.vx == 0.0)
-    assert(dv_down.vy == 50.0)
+    let dv_down = dir_to_velocity(.Down, 50.0)
+    assert_true(dv_down.vx == 0.0)
+    assert_true(dv_down.vy == 50.0)
 
-    let dv_left = dir_to_velocity(Left, 75.0)
-    assert(dv_left.vx == -75.0)
-    assert(dv_left.vy == 0.0)
-
-    println("ecs: all tests passed")
+    let dv_left = dir_to_velocity(.Left, 75.0)
+    assert_true(dv_left.vx == -75.0)
+    assert_true(dv_left.vy == 0.0)

@@ -4,11 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-WITH_BIN="./zig-out/bin/with"
+WITH_BIN="$ROOT_DIR/zig-out/bin/with"
 echo "building compiler binary for driver command tests..."
 zig build -Doptimize=Debug >/dev/null
 
-tmpdir="$(mktemp -d)"
+tmpdir="$(mktemp -d "$ROOT_DIR/.tmp_driver_commands.XXXXXX")"
 trap 'rm -rf "$tmpdir"' EXIT
 
 failures=0
@@ -49,17 +49,33 @@ else
 fi
 expect_cmd_pass "driver-run" "$WITH_BIN" run "$tmpdir/driver_main.w"
 
-mkdir -p "$tmpdir/cases"
-cat >"$tmpdir/cases/cmd_test_pass.w" <<'EOF2'
-fn main -> i32:
-    0
+mkdir -p "$tmpdir/pkg"
+cat >"$tmpdir/pkg/tests.w" <<'EOF2'
+use test.testing
+
+fn add(a: i32, b: i32) -> i32:
+    a + b
+
+@[test]
+fn test_add:
+    assert_eq_i32(add(2, 3), 5)
 EOF2
-expect_cmd_pass "driver-test-dir" "$WITH_BIN" test "$tmpdir/cases"
-expect_cmd_pass "driver-test-file" "$WITH_BIN" test "$tmpdir/cases/cmd_test_pass.w"
+expect_cmd_pass "driver-test-package" bash -c "cd \"$tmpdir/pkg\" && \"$WITH_BIN\" test"
+expect_cmd_pass "driver-test-list" bash -c "cd \"$tmpdir/pkg\" && \"$WITH_BIN\" test -list"
+
+mkdir -p "$tmpdir/pkg_fail"
+cat >"$tmpdir/pkg_fail/tests.w" <<'EOF3'
+use test.testing
+
+@[test]
+fn test_fail:
+    assert_eq_i32(1, 2)
+EOF3
+expect_cmd_fail "driver-test-failing-test" bash -c "cd \"$tmpdir/pkg_fail\" && \"$WITH_BIN\" test"
 
 expect_cmd_fail "driver-build-missing-arg" "$WITH_BIN" build
 expect_cmd_fail "driver-run-missing-arg" "$WITH_BIN" run
-expect_cmd_fail "driver-test-missing-path" "$WITH_BIN" test "$tmpdir/does_not_exist"
+expect_cmd_fail "driver-test-unknown-flag" "$WITH_BIN" test "--unknown-flag"
 
 if [[ "$failures" -ne 0 ]]; then
   echo "phase0 driver command tests: $failures failure(s)"

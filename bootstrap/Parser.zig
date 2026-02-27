@@ -35,6 +35,10 @@ pending_must_use: bool = false,
 pending_panic_handler: bool = false,
 pending_entry: bool = false,
 pending_no_main: bool = false,
+/// Pending test attributes for `with test`.
+pending_test: bool = false,
+pending_before: bool = false,
+pending_after: bool = false,
 
 pub fn init(
     tokens: *const Token.List,
@@ -597,6 +601,9 @@ fn parseFnDecl(
             .is_panic_handler = self.pending_panic_handler,
             .is_entry = self.pending_entry,
             .is_no_main = self.pending_no_main,
+            .is_test = self.pending_test,
+            .is_before = self.pending_before,
+            .is_after = self.pending_after,
         } },
         .span = start_span.merge(body.span),
     };
@@ -3671,10 +3678,17 @@ fn parseParam(self: *Parser, destructures_out: ?*std.ArrayList(ParamDestructure)
         self.advance();
         type_expr = try self.parseTypeExpr();
     }
+    // Parse optional default value: `= expr`
+    var default_value: ?*const Ast.Expr = null;
+    if (self.peek() == .eq) {
+        self.advance();
+        default_value = try self.parseExpr();
+    }
     return .{
         .name = name,
         .type_expr = type_expr,
         .is_mut = is_mut,
+        .default_value = default_value,
         .span = start.merge(self.prevSpan()),
     };
 }
@@ -3847,6 +3861,9 @@ fn skipAttributes(self: *Parser) void {
     self.pending_panic_handler = false;
     self.pending_entry = false;
     self.pending_no_main = false;
+    self.pending_test = false;
+    self.pending_before = false;
+    self.pending_after = false;
     var derives: std.ArrayList(Ast.Symbol) = .empty;
 
     while (self.peek() == .at) {
@@ -3899,6 +3916,15 @@ fn skipAttributes(self: *Parser) void {
             self.advance();
         } else if (self.isIdentifierNamed("no_main")) {
             self.pending_no_main = true;
+            self.advance();
+        } else if (self.isIdentifierNamed("test")) {
+            self.pending_test = true;
+            self.advance();
+        } else if (self.isIdentifierNamed("before")) {
+            self.pending_before = true;
+            self.advance();
+        } else if (self.isIdentifierNamed("after")) {
+            self.pending_after = true;
             self.advance();
         }
 

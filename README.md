@@ -46,7 +46,8 @@ Compiler binary:
 with build <file.w>                     # Compile to native binary
 with run <file.w>                       # Compile + run
 with check <file.w>                     # Parse + type-check
-with test [path] [--update]             # Built-in harness runner
+with test [flags] [filter]              # Package tests (@[test], @[before], @[after])
+with test-harness [path] [--update]     # Legacy snapshot harness runner
 with fmt <file.w>                       # Format to stdout
 with doc <file.w>                       # Generate docs (markdown to stdout)
 with repl                               # Interactive REPL

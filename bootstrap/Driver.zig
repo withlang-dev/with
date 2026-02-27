@@ -46,6 +46,10 @@ trace_c_import_cache: bool,
 no_std: bool,
 /// Alloc tier: core + heap types but no OS (§18.7).
 alloc: bool,
+/// Path of the main source file being compiled (for __FILE__).
+current_source_path: []const u8 = "<unknown>",
+/// Source text of the main file (for __LINE__ span→line mapping).
+current_source_text: []const u8 = "",
 
 pub fn init(allocator: std.mem.Allocator) Driver {
     return .{
@@ -90,6 +94,7 @@ pub fn deinit(self: *Driver) void {
 pub fn compileFile(self: *Driver, path: []const u8) !?Ast.Module {
     // Store source directory for import resolution.
     self.source_dir = std.fs.path.dirname(path) orelse ".";
+    self.current_source_path = path;
 
     // Load source.
     var source = Source.fromFile(path, 0, self.allocator) catch |e| {
@@ -122,6 +127,9 @@ pub fn compileFile(self: *Driver, path: []const u8) !?Ast.Module {
 
 /// Compile from an already-loaded Source.
 pub fn compileSource(self: *Driver, source: *Source) !?Ast.Module {
+    // Store source text in arena for __LINE__ support.
+    self.current_source_text = self.arena.allocator().dupe(u8, source.text) catch "";
+
     // Reset per-compilation-unit c_import link directives.
     self.c_import_link_libs.clearRetainingCapacity();
     self.trace_c_import_cache = blk: {
@@ -202,6 +210,8 @@ pub fn compileToObject(self: *Driver, module: *const Ast.Module, output_path: [*
     };
     defer cg.deinit();
 
+    cg.source_file = self.current_source_path;
+    cg.source_text = self.current_source_text;
     cg.genModule(module, &self.pool) catch |err| {
         if (cg.comptime_error_msg) |msg| {
             self.writeStderr("error: comptime_error: ");
@@ -236,6 +246,8 @@ pub fn emitIR(self: *Driver, module: *const Ast.Module) !bool {
     };
     defer cg.deinit();
 
+    cg.source_file = self.current_source_path;
+    cg.source_text = self.current_source_text;
     cg.genModule(module, &self.pool) catch |err| {
         if (cg.comptime_error_msg) |msg| {
             self.writeStderr("error: comptime_error: ");

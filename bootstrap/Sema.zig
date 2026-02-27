@@ -4148,10 +4148,24 @@ fn checkCall(self: *Sema, call_e: Ast.CallExpr, span: Span) TypeId {
         // In pipeline context, there's one implicit argument from the pipe.
         const expected = sig.param_types.len;
         const actual = call_e.args.len + (if (self.in_pipeline_rhs) @as(usize, 1) else 0);
-        if (!sig.is_variadic and expected != actual) {
+
+        // Count required params (no default value).
+        var min_expected = expected;
+        if (self.fn_decls.get(fn_sym)) |fd| {
+            var required: usize = 0;
+            for (fd.params) |p| {
+                if (p.default_value == null) required += 1;
+            }
+            min_expected = required;
+        }
+
+        if (!sig.is_variadic and (actual < min_expected or actual > expected)) {
             var buf: [256]u8 = undefined;
             const fn_name = self.pool.resolve(fn_sym);
-            const msg = std.fmt.bufPrint(&buf, "function '{s}' expects {d} argument(s), found {d}", .{ fn_name, expected, actual }) catch "wrong argument count";
+            const msg = if (min_expected == expected)
+                std.fmt.bufPrint(&buf, "function '{s}' expects {d} argument(s), found {d}", .{ fn_name, expected, actual }) catch "wrong argument count"
+            else
+                std.fmt.bufPrint(&buf, "function '{s}' expects {d}-{d} argument(s), found {d}", .{ fn_name, min_expected, expected, actual }) catch "wrong argument count";
             const alloc_msg = self.allocator.dupe(u8, msg) catch "wrong argument count";
             self.emitError(alloc_msg, span);
         }
@@ -4639,7 +4653,9 @@ fn isBuiltinValue(self: *Sema, sym: Symbol) bool {
         std.mem.eql(u8, name, "PI") or
         std.mem.eql(u8, name, "E") or
         std.mem.eql(u8, name, "INFINITY") or
-        std.mem.eql(u8, name, "NAN");
+        std.mem.eql(u8, name, "NAN") or
+        std.mem.eql(u8, name, "__FILE__") or
+        std.mem.eql(u8, name, "__LINE__");
 }
 
 /// §18.7 — Returns true if the given built-in name requires std (or alloc).

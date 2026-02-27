@@ -9,7 +9,7 @@ zig build -Doptimize=Debug >/dev/null
 
 failures=0
 
-if zig test src/MirOpt.zig >/dev/null; then
+if zig test bootstrap/MirOpt.zig >/dev/null; then
   echo "PASS(phase6-miropt-unit-tests)"
 else
   echo "FAIL(phase6-miropt-unit-tests)"

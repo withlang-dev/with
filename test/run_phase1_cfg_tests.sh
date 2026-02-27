@@ -13,7 +13,7 @@ trap 'rm -rf "$tmpdir"' EXIT
 
 failures=0
 
-if zig test src/BorrowCfg.zig >/dev/null; then
+if zig test bootstrap/BorrowCfg.zig >/dev/null; then
   echo "PASS(cfg-unit-tests)"
 else
   echo "FAIL(cfg-unit-tests)"

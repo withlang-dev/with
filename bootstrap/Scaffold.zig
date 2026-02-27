@@ -19,14 +19,14 @@ pub const required_logical_modules = [_][]const u8{
 };
 
 pub const canonical_modules = [_]ModuleSpec{
-    .{ .logical_name = "ast", .file_path = "src/Ast.zig" },
-    .{ .logical_name = "types", .file_path = "src/Types.zig" },
-    .{ .logical_name = "parse", .file_path = "src/Parse.zig" },
-    .{ .logical_name = "check", .file_path = "src/Check.zig" },
-    .{ .logical_name = "mir", .file_path = "src/Mir.zig" },
-    .{ .logical_name = "codegen", .file_path = "src/Codegen.zig" },
-    .{ .logical_name = "driver", .file_path = "src/Driver.zig" },
-    .{ .logical_name = "diag", .file_path = "src/Diag.zig" },
+    .{ .logical_name = "ast", .file_path = "bootstrap/Ast.zig" },
+    .{ .logical_name = "types", .file_path = "bootstrap/Types.zig" },
+    .{ .logical_name = "parse", .file_path = "bootstrap/Parse.zig" },
+    .{ .logical_name = "check", .file_path = "bootstrap/Check.zig" },
+    .{ .logical_name = "mir", .file_path = "bootstrap/Mir.zig" },
+    .{ .logical_name = "codegen", .file_path = "bootstrap/Codegen.zig" },
+    .{ .logical_name = "driver", .file_path = "bootstrap/Driver.zig" },
+    .{ .logical_name = "diag", .file_path = "bootstrap/Diag.zig" },
 };
 
 pub const ValidateError = error{
@@ -77,7 +77,7 @@ test "scaffold validation rejects missing required module" {
 
 test "scaffold validation rejects duplicate logical module" {
     var specs = canonical_modules;
-    specs[7] = .{ .logical_name = "ast", .file_path = "src/Ast.zig" };
+    specs[7] = .{ .logical_name = "ast", .file_path = "bootstrap/Ast.zig" };
 
     try std.testing.expectError(
         error.DuplicateRequiredModule,
@@ -87,7 +87,7 @@ test "scaffold validation rejects duplicate logical module" {
 
 test "scaffold validation rejects missing module file" {
     var specs = canonical_modules;
-    specs[4] = .{ .logical_name = "mir", .file_path = "src/__missing_mir__.zig" };
+    specs[4] = .{ .logical_name = "mir", .file_path = "bootstrap/__missing_mir__.zig" };
 
     try std.testing.expectError(
         error.MissingFile,

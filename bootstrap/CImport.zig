@@ -201,6 +201,9 @@ fn visitCallback(
     if (kind == c.CXCursor_FunctionDecl) {
         processFunctionDecl(ctx, cursor) catch {};
     }
+    if (kind == c.CXCursor_EnumDecl) {
+        processEnumDecl(ctx, cursor) catch {};
+    }
 
     return c.CXChildVisit_Continue;
 }
@@ -297,6 +300,51 @@ fn processFunctionDecl(ctx: *VisitorContext, cursor: c.CXCursor) !void {
     });
 }
 
+fn processEnumDecl(ctx: *VisitorContext, cursor: c.CXCursor) !void {
+    // Visit each enum constant child and create a let_decl for it.
+    _ = c.clang_visitChildren(cursor, enumConstantVisitor, @ptrCast(ctx));
+}
+
+fn enumConstantVisitor(
+    cursor: c.CXCursor,
+    parent: c.CXCursor,
+    client_data: c.CXClientData,
+) callconv(.c) c.enum_CXChildVisitResult {
+    _ = parent;
+    const ctx: *VisitorContext = @ptrCast(@alignCast(client_data));
+
+    const kind = c.clang_getCursorKind(cursor);
+    if (kind != c.CXCursor_EnumConstantDecl) return c.CXChildVisit_Continue;
+
+    const name_cx = c.clang_getCursorSpelling(cursor);
+    defer c.clang_disposeString(name_cx);
+    const name_cstr = c.clang_getCString(name_cx);
+    if (name_cstr == null) return c.CXChildVisit_Continue;
+    const name_slice = std.mem.span(name_cstr);
+    if (name_slice.len == 0) return c.CXChildVisit_Continue;
+
+    const val = c.clang_getEnumConstantDeclValue(cursor);
+
+    const expr = ctx.arena.create(Ast.Expr) catch return c.CXChildVisit_Continue;
+    expr.* = .{
+        .kind = .{ .int_literal = @intCast(val) },
+        .span = Span.zero,
+    };
+    const name_sym = ctx.pool.intern(name_slice) catch return c.CXChildVisit_Continue;
+    ctx.decls.append(ctx.arena, .{
+        .kind = .{ .let_decl = .{
+            .name = name_sym,
+            .type_expr = null,
+            .value = expr,
+            .is_mut = false,
+            .is_pub = .private,
+        } },
+        .span = Span.zero,
+    }) catch return c.CXChildVisit_Continue;
+
+    return c.CXChildVisit_Continue;
+}
+
 const MapError = error{ UnsupportedType, OutOfMemory };
 
 /// Map a libclang CXType to a With TypeExpr.
@@ -319,6 +367,12 @@ fn mapCType(arena: std.mem.Allocator, pool: *InternPool, cx_type: c.CXType) MapE
         c.CXType_Float => makeNamedType(pool, "f32"),
         c.CXType_Double, c.CXType_LongDouble => makeNamedType(pool, "f64"),
         c.CXType_Pointer => mapPointerType(arena, pool, canonical),
+        c.CXType_Enum => {
+            // C enums are integers. Map to the underlying integer type.
+            const decl = c.clang_getTypeDeclaration(canonical);
+            const int_type = c.clang_getEnumDeclIntegerType(decl);
+            return mapCType(arena, pool, int_type);
+        },
         else => error.UnsupportedType,
     };
 }
@@ -351,6 +405,13 @@ fn mapPointerType(arena: std.mem.Allocator, pool: *InternPool, cx_type: c.CXType
         };
     }
 
+    // Function pointer: void(*)(int, float) → fn(i32, f32) -> void
+    if (pointee_canonical.kind == c.CXType_FunctionProto or
+        pointee_canonical.kind == c.CXType_FunctionNoProto)
+    {
+        return mapFunctionPointerType(arena, pool, pointee_canonical);
+    }
+
     // Try to map the pointee type recursively
     const pointee_type = mapCType(arena, pool, pointee) catch {
         // Fall back to *const i8 for unmappable pointee types (structs, etc.)
@@ -366,6 +427,37 @@ fn mapPointerType(arena: std.mem.Allocator, pool: *InternPool, cx_type: c.CXType
     inner.* = pointee_type;
     return .{
         .kind = .{ .ptr_type = .{ .is_mut = false, .pointee = inner } },
+        .span = Span.zero,
+    };
+}
+
+fn mapFunctionPointerType(arena: std.mem.Allocator, pool: *InternPool, cx_type: c.CXType) MapError!Ast.TypeExpr {
+    // Get return type.
+    const ret_cx = c.clang_getResultType(cx_type);
+    const ret_mapped = try mapCType(arena, pool, ret_cx);
+    const ret_heap = try arena.create(Ast.TypeExpr);
+    ret_heap.* = ret_mapped;
+
+    // Get parameter types.
+    const num_args = c.clang_getNumArgTypes(cx_type);
+    const n: u32 = if (num_args < 0) 0 else @intCast(num_args);
+
+    var params: std.ArrayList(*const Ast.TypeExpr) = .empty;
+    try params.ensureTotalCapacity(arena, n);
+
+    for (0..n) |i| {
+        const arg_cx = c.clang_getArgType(cx_type, @intCast(i));
+        const arg_mapped = try mapCType(arena, pool, arg_cx);
+        const arg_heap = try arena.create(Ast.TypeExpr);
+        arg_heap.* = arg_mapped;
+        try params.append(arena, arg_heap);
+    }
+
+    return .{
+        .kind = .{ .fn_type = .{
+            .params = params.items,
+            .return_type = ret_heap,
+        } },
         .span = Span.zero,
     };
 }
