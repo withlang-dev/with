@@ -1,6 +1,6 @@
 # Self-Hosting the With Compiler — Detailed Execution Plan
 
-**Status:** Pre-implementation planning
+**Status:** In progress — Wave 1 (foundational stubs)
 **Scope:** Translate the With compiler from Zig (bootstrap) to With, drawing architecture from the Zig and Rust reference compilers.
 
 ---
@@ -258,74 +258,70 @@ The bootstrap uses LLVM-C bindings directly (`Codegen.zig` calls `LLVMBuildAdd`,
 
 ## 4. Module Layout
 
+### Design Rationale
+
+Following the Zig reference compiler's layout (``.reference/zig/src/``): **flat ``src/`` with PascalCase for struct modules, snake_case for utilities.** Zig uses subdirectories only for architectural variants (multiple codegen backends, multiple linker formats) — not for conceptual grouping. Since With has one codegen backend (LLVM) and one linker strategy (delegate to system linker), all ~19 modules sit flat in ``src/``.
+
+Data structures (``HashMap``, ``Vec``, ``Arena``) come from ``lib/std/``, not a ``src/util/`` directory — same as Zig's compiler using ``std.ArrayList``, ``std.HashMap``, etc.
+
 ### Project Structure
 
 ```
 src/
-├── main.w                  — CLI entry point, command dispatch
-│
-├── compiler/
-│   ├── span.w              — Span (file, start, end), FileId, Location
-│   ├── source.w            — Source file loading, line offset table
-│   ├── diagnostic.w        — Diagnostic, Severity, Label, Suggestion
-│   ├── intern.w            — InternPool: strings, types, and values
-│   ├── token.w             — Token.Tag enum, Token struct
-│   ├── lexer.w             — Hand-written lexer → Token list
-│   ├── ast.w               — AST node types (Decl, Expr, TypeExpr, Pattern)
-│   ├── parser.w            — Recursive descent parser → Ast.Module
-│   ├── types.w             — TypeId, TypeKind, type representation
-│   ├── traits.w            — Trait solver, selection cache, coherence
-│   ├── sema.w              — Semantic analysis (two-pass)
-│   ├── mir.w               — MIR types: BasicBlock, Statement, Terminator, Place
-│   ├── mir_build.w         — Typed AST → MIR lowering + desugaring
-│   ├── borrow.w            — Borrow checker (NLL on MIR CFG)
-│   ├── codegen.w           — MIR → LLVM IR code generation
-│   ├── c_import.w          — libclang FFI for c_import
-│   ├── driver.w            — Pipeline orchestrator
-│   └── render.w            — AST/MIR pretty-printer (debug)
-│
-├── util/
-│   ├── arena.w             — Arena allocator
-│   ├── string_map.w        — String → Value hash map
-│   ├── array_list.w        — Dynamic array (growable)
-│   ├── hash_map.w          — Generic hash map
-│   └── sort.w              — Sorting utilities
-│
-└── test/
-    └── compiler/
-        ├── test_lexer.w
-        ├── test_parser.w
-        ├── test_sema.w
-        ├── test_mir.w
-        ├── test_borrow.w
-        └── test_codegen.w
+├── main.w              — CLI entry point, command dispatch
+├── Span.w              — Span (file, start, end), FileId
+├── Source.w            — Source file loading, line offset table
+├── Diag.w              — Diagnostic, Severity, Label, Suggestion
+├── InternPool.w        — InternPool: strings, types, and values
+├── Token.w             — Token.Tag enum, Token struct
+├── Lexer.w             — Hand-written lexer → Token list
+├── Ast.w               — AST node types (Decl, Expr, TypeExpr, Pattern)
+├── Parser.w            — Recursive descent parser → Ast.Module
+├── Type.w              — TypeId, TypeKind, type representation
+├── Traits.w            — Trait solver, selection cache, coherence
+├── Sema.w              — Semantic analysis (two-pass)
+├── Mir.w               — MIR types: BasicBlock, Statement, Terminator, Place
+├── MirBuild.w          — Typed AST → MIR lowering + desugaring
+├── Borrow.w            — Borrow checker (NLL on MIR CFG)
+├── Codegen.w           — MIR → LLVM IR code generation
+├── CImport.w           — libclang FFI for c_import
+├── Driver.w            — Pipeline orchestrator
+└── render.w            — AST/MIR pretty-printer (debug, snake_case = utility)
+```
+
+Unit tests live alongside integration tests in ``test/``:
+```
+test/
+├── cases/              — Compiler integration tests (.w with //! directives)
+├── behavior/           — (future) Runtime behavior tests
+└── golden/             — (future) Golden baseline snapshots
 ```
 
 ### Module Dependency Graph
 
 ```
 main.w
-  └─► driver.w
-        ├─► source.w ──► span.w
-        ├─► lexer.w ──► token.w ──► intern.w
-        │                            └──► span.w
-        ├─► parser.w ──► ast.w ──► intern.w
-        │                          └──► span.w
-        ├─► c_import.w ──► ast.w
-        ├─► sema.w ──► ast.w
-        │             ├─► types.w ──► intern.w
-        │             ├─► traits.w ──► types.w
-        │             └─► diagnostic.w
-        ├─► mir_build.w ──► mir.w
-        │                  ├─► ast.w
-        │                  └─► types.w
-        ├─► borrow.w ──► mir.w
-        │               └─► diagnostic.w
-        ├─► codegen.w ──► mir.w
-        │                ├─► types.w
-        │                └─► intern.w
-        └─► diagnostic.w ──► span.w
-                             └──► source.w
+  └─► Driver.w
+        ├─► Source.w ──► Span.w
+        ├─► Lexer.w ──► Token.w ──► InternPool.w
+        │                            └──► Span.w
+        ├─► Parser.w ──► Ast.w ──► InternPool.w
+        │                          └──► Span.w
+        ├─► CImport.w ──► Ast.w
+        ├─► Sema.w ──► Ast.w
+        │             ├─► Type.w ──► InternPool.w
+        │             ├─► Traits.w ──► Type.w
+        │             └─► Diag.w
+        ├─► MirBuild.w ──► Mir.w
+        │                  ├─► Ast.w
+        │                  └─► Type.w
+        ├─► Borrow.w ──► Mir.w
+        │               └─► Diag.w
+        ├─► Codegen.w ──► Mir.w
+        │                ├─► Type.w
+        │                └─► InternPool.w
+        └─► Diag.w ──► Span.w
+                        └──► Source.w
 ```
 
 ---
@@ -740,26 +736,15 @@ Implement the foundational types and utilities that every other module depends o
 
 ### Modules
 
-#### 7.1 `src/util/arena.w` — Arena Allocator
+#### 7.1 `src/Span.w` — Source Locations
 
-```
-// An arena allocator that grows in chunks and frees everything at once.
-// Ref: .reference/zig/src/Sema.zig (uses arena: Allocator throughout)
-// Ref: .reference/rust/compiler/rustc_arena/
-// Ref: bootstrap/Driver.zig (arena: std.heap.ArenaAllocator)
-```
+Direct port from `bootstrap/Span.zig`. FileId, Span (byte range), merge, len, zero sentinel.
 
-The bootstrap uses Zig's built-in `ArenaAllocator`. We need our own since With doesn't have a built-in arena. Implement as a linked list of malloc'd chunks.
-
-#### 7.2 `src/compiler/span.w` — Source Locations
-
-Direct port from `bootstrap/Span.zig`.
-
-#### 7.3 `src/compiler/source.w` — Source File Loading
+#### 7.2 `src/Source.w` — Source File Loading
 
 Port from `bootstrap/Source.zig`. Loads file content, builds line offset table.
 
-#### 7.4 `src/compiler/intern.w` — Unified Intern Pool
+#### 7.3 `src/InternPool.w` — Unified Intern Pool
 
 Not a port — the bootstrap's InternPool is string-only. This is a new module that interns strings, types, and values from the start. Pre-registers all builtin types at fixed indices.
 
@@ -768,7 +753,7 @@ Not a port — the bootstrap's InternPool is string-only. This is a new module t
 // Ref: bootstrap/InternPool.zig (string-only — we extend)
 ```
 
-#### 7.5 `src/compiler/diagnostic.w` — Error Reporting
+#### 7.4 `src/Diag.w` — Error Reporting
 
 New, not a port. Follows rustc's diagnostic model: primary span, secondary labels, error codes, machine-applicable suggestions.
 
@@ -779,13 +764,9 @@ New, not a port. Follows rustc's diagnostic model: primary span, secondary label
 
 The diagnostic renderer (terminal output with colors, span underlines, multi-line context) is built here, separate from diagnostic emission.
 
-#### 7.6 `src/util/array_list.w` — Dynamic Array
+#### 7.5 Data Structures — from `lib/std/`
 
-If not already in stdlib, implement a growable array.
-
-#### 7.7 `src/util/hash_map.w` — Hash Map
-
-A generic `HashMap[K, V]` where `K: Hash + Eq`, plus specialized `StringMap[V]`.
+Arena allocator, dynamic arrays, hash maps, and sorting come from the standard library (`lib/std/`). If the stdlib lacks a needed data structure, extend it there — not in a compiler-internal `src/util/`.
 
 ### Validation Gate
 - Unit tests for Arena (alloc, reset, bulk free)
@@ -803,13 +784,13 @@ Tokenize With source files identically to the bootstrap.
 
 ### Modules
 
-#### 8.1 `src/compiler/token.w` — Token Definitions
+#### 8.1 `src/Token.w` — Token Definitions
 
 Port all 141 token tag variants from `bootstrap/Token.zig`. Include keyword lookup table.
 
 **Keyword table** — The bootstrap uses Zig's `StaticStringMap` (compile-time perfect hash). In With, implement as a sorted array with binary search, or a hash map initialized at startup.
 
-#### 8.2 `src/compiler/lexer.w` — Lexer
+#### 8.2 `src/Lexer.w` — Lexer
 
 Port `bootstrap/Lexer.zig`. Hand-written scanner.
 
@@ -835,11 +816,11 @@ Parse With source into AST nodes identically to the bootstrap.
 
 ### Modules
 
-#### 9.1 `src/compiler/ast.w` — AST Node Types
+#### 9.1 `src/Ast.w` — AST Node Types
 
 Port `bootstrap/Ast.zig`. All types listed in §5.4. Data definition module — no logic, just type declarations. Every variant, every field must match the bootstrap exactly.
 
-#### 9.2 `src/compiler/parser.w` — Recursive Descent Parser
+#### 9.2 `src/Parser.w` — Recursive Descent Parser
 
 Port `bootstrap/Parser.zig`. This is the largest single translation task in the frontend.
 
@@ -902,7 +883,7 @@ Build the type system infrastructure that Sema will populate and Codegen will co
 
 ### Modules
 
-#### 10.1 `src/compiler/types.w` — Type System
+#### 10.1 `src/Type.w` — Type System
 
 Full type representation as described in §5.5. The TypeKind enum, struct/enum/fn type details, and the TypeTable that wraps the intern pool's type storage.
 
@@ -943,7 +924,7 @@ type Scope = {
 }
 ```
 
-#### 10.3 `src/compiler/traits.w` — Trait Solver
+#### 10.3 `src/Traits.w` — Trait Solver
 
 Not a port — new module. Built correctly from the start.
 
@@ -980,7 +961,7 @@ With has no HKTs, no GATs, no specialization, no lifetime parameters on traits. 
 ### Goal
 Type-check and validate all With programs identically to the bootstrap.
 
-### Module: `src/compiler/sema.w`
+### Module: `src/Sema.w`
 
 #### 11.1 Architecture
 
@@ -1142,11 +1123,11 @@ Lower typed AST into MIR — a CFG of basic blocks with all syntax sugar desugar
 
 ### Modules
 
-#### 12.1 `src/compiler/mir.w` — MIR Type Definitions
+#### 12.1 `src/Mir.w` — MIR Type Definitions
 
 All types defined in §5.6: MirBody, BasicBlock, Statement, Terminator, Place, Rvalue, Operand.
 
-#### 12.2 `src/compiler/mir_build.w` — AST → MIR Lowering
+#### 12.2 `src/MirBuild.w` — AST → MIR Lowering
 
 ```
 // Ref: .reference/rust/compiler/rustc_mir_build/src/build/
@@ -1229,7 +1210,7 @@ fn example:
 ### Goal
 Enforce the aliasing rule and borrow scoping on MIR, identically to the bootstrap's results but with a cleaner implementation.
 
-### Module: `src/compiler/borrow.w`
+### Module: `src/Borrow.w`
 
 ```
 // Ref: .reference/rust/compiler/rustc_borrowck/ (NLL on MIR)
@@ -1319,7 +1300,7 @@ The bootstrap handles this with special-case logic. MIR makes it fall out of the
 ### Goal
 Generate LLVM IR from MIR, producing identical binaries to the bootstrap.
 
-### Module: `src/compiler/codegen.w`
+### Module: `src/Codegen.w`
 
 The bootstrap goes AST → LLVM IR. We go MIR → LLVM IR. The generated LLVM IR must be semantically identical (same behavior), though the exact IR may differ structurally since MIR has already desugared things the bootstrap desugars during codegen.
 
@@ -1430,7 +1411,7 @@ fn genFunction(fn_info: &FnInfo, mir: &MirBody):
 ### Goal
 Wire everything together. The compiler accepts a `.w` file and produces a binary.
 
-### Module: `src/compiler/driver.w`
+### Module: `src/Driver.w`
 
 ```
 // Ref: bootstrap/Driver.zig
@@ -1491,7 +1472,7 @@ fn main -> i32:
         _        -> printUsage()
 ```
 
-### Module: `src/compiler/c_import.w`
+### Module: `src/CImport.w`
 
 ```
 // Ref: bootstrap/CImport.zig
@@ -1507,7 +1488,7 @@ fn processCImport(header: str, link_libs: Vec[str]) -> Vec[Decl]:
     // Return list of extern declarations
 ```
 
-### Module: `src/compiler/render.w`
+### Module: `src/render.w`
 
 AST and MIR pretty-printer for `--dump-ast`, `--dump-mir`, and debugging.
 
@@ -1623,19 +1604,19 @@ Each compiler module has corresponding tests:
 
 | Module | Test File | What's Tested |
 |--------|-----------|--------------|
-| span.w | test_span.w | merge, len, zero sentinel |
-| intern.w | test_intern.w | intern strings+types, resolve, dedup |
-| token.w | test_token.w | keyword lookup, tag display |
-| lexer.w | test_lexer.w | all token types, edge cases |
-| ast.w | test_ast.w | node construction, traversal |
-| parser.w | test_parser.w | all syntax forms, error recovery |
-| types.w | test_types.w | type equality, builtin types |
-| traits.w | test_traits.w | obligation resolution, cache, coherence |
-| sema.w | test_sema.w | type inference, move checking |
-| mir.w | test_mir.w | MIR construction, CFG integrity |
-| mir_build.w | test_mir_build.w | AST→MIR lowering, desugaring, drop insertion |
-| borrow.w | test_borrow.w | NLL on CFG, aliasing, second-class, disjoint fields |
-| codegen.w | test_codegen.w | MIR→LLVM IR generation |
+| Span.w | test/span.w | merge, len, zero sentinel |
+| InternPool.w | test/intern.w | intern strings+types, resolve, dedup |
+| Token.w | test/token.w | keyword lookup, tag display |
+| Lexer.w | test/lexer.w | all token types, edge cases |
+| Ast.w | test/ast.w | node construction, traversal |
+| Parser.w | test/parser.w | all syntax forms, error recovery |
+| Type.w | test/types.w | type equality, builtin types |
+| Traits.w | test/traits.w | obligation resolution, cache, coherence |
+| Sema.w | test/sema.w | type inference, move checking |
+| Mir.w | test/mir.w | MIR construction, CFG integrity |
+| MirBuild.w | test/mir_build.w | AST→MIR lowering, desugaring, drop insertion |
+| Borrow.w | test/borrow.w | NLL on CFG, aliasing, second-class, disjoint fields |
+| Codegen.w | test/codegen.w | MIR→LLVM IR generation |
 
 ### 18.2 Golden Diff Tests
 
@@ -1710,15 +1691,15 @@ Every bug found during self-hosting becomes a test case in `test/cases/`.
 
 ```
 Wave 0:  Determinism audit + Golden baseline capture
-Wave 1:  span.w, source.w, intern.w (full), diagnostic.w (full), arena.w, hash_map.w
-Wave 2:  token.w, lexer.w
-Wave 3:  ast.w, parser.w
-Wave 4:  types.w, traits.w (with selection cache + coherence)
-Wave 5:  sema.w (two-pass, move tracking, trait obligations)
-Wave 6:  mir.w, mir_build.w (all desugaring, explicit drops)
-Wave 7:  borrow.w (NLL on MIR CFG)
-Wave 8:  codegen.w (MIR → LLVM IR)
-Wave 9:  driver.w, main.w, c_import.w, render.w
+Wave 1:  Span.w, Source.w, InternPool.w (full), Diag.w (full) + lib/std/ data structures
+Wave 2:  Token.w, Lexer.w
+Wave 3:  Ast.w, Parser.w
+Wave 4:  Type.w, Traits.w (with selection cache + coherence)
+Wave 5:  Sema.w (two-pass, move tracking, trait obligations)
+Wave 6:  Mir.w, MirBuild.w (all desugaring, explicit drops)
+Wave 7:  Borrow.w (NLL on MIR CFG)
+Wave 8:  Codegen.w (MIR → LLVM IR)
+Wave 9:  Driver.w, main.w, CImport.w, render.w
 Wave 10: Stdlib validation, runtime linking
 Wave 11: Bootstrap chain, fixpoint verification
 ```

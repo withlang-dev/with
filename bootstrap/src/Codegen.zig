@@ -119,6 +119,8 @@ scope_locals: [64]ScopedLocal = undefined,
 scope_local_count: u32 = 0,
 /// Comptime error message (set by comptime_error call, read by Driver).
 comptime_error_msg: ?[]const u8 = null,
+/// Codegen error detail message (set before returning codegen errors, read by Driver).
+codegen_error_detail: ?[]const u8 = null,
 /// Generator state: pointer to the state struct (self param) during next() codegen.
 gen_state_ptr: ?c.LLVMValueRef = null,
 /// Generator state: the LLVM struct type of the state.
@@ -634,7 +636,14 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
                 } else if (fn_decl.is_async) {
                     try self.genAsyncFunction(fn_decl);
                 } else if (fn_decl.type_params.len == 0) {
-                    try self.genFunction(fn_decl);
+                    self.genFunction(fn_decl) catch |err| {
+                        const fn_name = self.pool.resolve(fn_decl.name);
+                        const detail = self.codegen_error_detail orelse @errorName(err);
+                        var buf: [384]u8 = undefined;
+                        const msg = std.fmt.bufPrint(&buf, "codegen failed in function '{s}': {s}", .{ fn_name, detail }) catch "codegen failed";
+                        self.codegen_error_detail = self.allocator.dupe(u8, msg) catch null;
+                        return err;
+                    };
                 }
             },
             else => {},
@@ -665,6 +674,21 @@ fn verify(self: *const Codegen) Error!void {
             w.interface.print("LLVM verify error: {s}\n", .{slice}) catch {};
             w.interface.flush() catch {};
             c.LLVMDisposeMessage(msg);
+        }
+        // Best-effort: identify which function fails verification.
+        var fn_val = c.LLVMGetFirstFunction(self.module);
+        while (fn_val != null) : (fn_val = c.LLVMGetNextFunction(fn_val)) {
+            if (c.LLVMIsDeclaration(fn_val) != 0) continue;
+            if (c.LLVMVerifyFunction(fn_val, c.LLVMReturnStatusAction) != 0) {
+                var name_len: usize = 0;
+                const name_ptr = c.LLVMGetValueName2(fn_val, &name_len);
+                const name_slice: []const u8 = if (name_ptr != null) name_ptr[0..name_len] else "<unknown>";
+                var buf2: [1024]u8 = undefined;
+                var w2 = std.fs.File.stderr().writer(&buf2);
+                w2.interface.print("LLVM verify function: {s}\n", .{name_slice}) catch {};
+                w2.interface.flush() catch {};
+                break;
+            }
         }
         return error.VerifyFailed;
     }
@@ -782,10 +806,29 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     var has_ref_param = false;
     var dyn_params_buf: [64]?u32 = undefined;
     var ref_params_buf: [64]bool = undefined;
+    var method_owner_sym: u32 = 0;
+    {
+        const fn_name = self.pool.resolve(func.name);
+        if (std.mem.indexOfScalar(u8, fn_name, '.')) |dot| {
+            if (dot > 0) {
+                method_owner_sym = self.pool.intern(fn_name[0..dot]) catch 0;
+            }
+        }
+    }
     for (func.params, 0..) |param, i| {
         dyn_params_buf[i] = null;
         ref_params_buf[i] = false;
         if (param.type_expr) |te| {
+            if (i == 0 and method_owner_sym != 0 and te.kind == .named) {
+                const n = self.pool.resolve(te.kind.named);
+                if (std.mem.eql(u8, n, "Self") or te.kind.named == method_owner_sym) {
+                    // Lower method `self: T` as pointer param so mutations persist.
+                    param_types_buf[i] = c.LLVMPointerTypeInContext(self.context, 0);
+                    ref_params_buf[i] = true;
+                    has_ref_param = true;
+                    continue;
+                }
+            }
             if (te.kind == .fn_type) {
                 // fn-type params use fat pointer {ptr, ptr} to support closures.
                 const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
@@ -912,17 +955,46 @@ fn declareExternFn(self: *Codegen, ext: Ast.ExternFnDecl) Error!void {
     );
 
     const name = self.pool.resolve(ext.name);
+    const link_name = canonicalExternName(name);
     var name_buf: [256]u8 = undefined;
-    if (name.len >= name_buf.len) return error.UnsupportedExpr;
-    @memcpy(name_buf[0..name.len], name);
-    name_buf[name.len] = 0;
+    if (link_name.len >= name_buf.len) return error.UnsupportedExpr;
+    @memcpy(name_buf[0..link_name.len], link_name);
+    name_buf[link_name.len] = 0;
 
-    const function = c.LLVMAddFunction(self.module, &name_buf, fn_type);
-
-    self.functions.put(self.allocator, ext.name, .{
+    const function = c.LLVMGetNamedFunction(self.module, &name_buf) orelse
+        c.LLVMAddFunction(self.module, &name_buf, fn_type);
+    const actual_fn_type = c.LLVMGlobalGetValueType(function);
+    const info = FnInfo{
         .value = function,
-        .fn_type = fn_type,
-    }) catch return error.CodegenAlloc;
+        .fn_type = actual_fn_type,
+    };
+
+    self.functions.put(self.allocator, ext.name, info) catch return error.CodegenAlloc;
+
+    // Also register the canonical symbol name so runtime helpers (e.g. malloc)
+    // reuse this declaration instead of redeclaring `name.<n>` variants.
+    if (!std.mem.eql(u8, link_name, name)) {
+        const canonical_sym = self.pool.intern(link_name) catch return error.CodegenAlloc;
+        if (self.functions.get(canonical_sym) == null) {
+            self.functions.put(self.allocator, canonical_sym, info) catch return error.CodegenAlloc;
+        }
+    }
+}
+
+/// c_import may suffix C symbols as `name.<n>` to avoid parser collisions.
+/// For linking, map those extern declarations back to the base C symbol name.
+fn canonicalExternName(name: []const u8) []const u8 {
+    if (std.mem.lastIndexOfScalar(u8, name, '.')) |dot| {
+        if (dot > 0 and dot + 1 < name.len) {
+            var i = dot + 1;
+            while (i < name.len) : (i += 1) {
+                const ch = name[i];
+                if (ch < '0' or ch > '9') return name;
+            }
+            return name[0..dot];
+        }
+    }
+    return name;
 }
 
 // ── Drop detection ──────────────────────────────────────────────
@@ -1631,6 +1703,16 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     self.tailrec_param_allocas = null;
     self.tailrec_fn_sym = null;
 
+    var method_owner_sym: u32 = 0;
+    {
+        const fn_name = self.pool.resolve(func.name);
+        if (std.mem.indexOfScalar(u8, fn_name, '.')) |dot| {
+            if (dot > 0) {
+                method_owner_sym = self.pool.intern(fn_name[0..dot]) catch 0;
+            }
+        }
+    }
+
     // Add function parameters as locals (alloca + store).
     for (func.params, 0..) |param, i| {
         const param_val = c.LLVMGetParam(function, @intCast(i));
@@ -1642,6 +1724,12 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         var fn_sig: ?c.LLVMTypeRef = null;
         var pointee_struct: ?u32 = null;
         if (param.type_expr) |te| {
+            if (i == 0 and method_owner_sym != 0 and te.kind == .named and c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind) {
+                const n = self.pool.resolve(te.kind.named);
+                if (std.mem.eql(u8, n, "Self") or te.kind.named == method_owner_sym) {
+                    pointee_struct = method_owner_sym;
+                }
+            }
             if (te.kind == .fn_type) {
                 fn_sig = self.buildFnTypeFromAst(te.kind.fn_type) catch null;
             } else if (dynTraitFromTypeExpr(self, te)) |trait_sym| {
@@ -2737,6 +2825,18 @@ fn findCaptures(
 // ── Expression codegen ───────────────────────────────────────────
 
 fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
+    return self.genExprInner(expr) catch |err| {
+        if (err == error.UnsupportedExpr and self.codegen_error_detail == null) {
+            const line = self.spanToLine(expr.span);
+            var buf: [256]u8 = undefined;
+            const msg = std.fmt.bufPrint(&buf, "unsupported expression while lowering '{s}' at {s}:{d}", .{ @tagName(expr.kind), self.source_file, line }) catch "unsupported expression";
+            self.codegen_error_detail = self.allocator.dupe(u8, msg) catch null;
+        }
+        return err;
+    };
+}
+
+fn genExprInner(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
     return switch (expr.kind) {
         .int_literal => |val| blk: {
             const fits_i32 = val >= std.math.minInt(i32) and val <= std.math.maxInt(i32);
@@ -2824,7 +2924,13 @@ fn genExpr(self: *Codegen, expr: *const Ast.Expr) Error!c.LLVMValueRef {
         .async_scope => |as| try self.genAsyncScope(as),
         .comptime_expr => |inner| try self.genComptimeExpr(inner),
         .select_await => |sel| try self.genSelectAwait(sel),
-        else => error.UnsupportedExpr,
+        else => {
+            const line = self.spanToLine(expr.span);
+            var buf: [256]u8 = undefined;
+            const msg = std.fmt.bufPrint(&buf, "unsupported expression kind '{s}' at {s}:{d}", .{ @tagName(expr.kind), self.source_file, line }) catch "unsupported expression";
+            self.codegen_error_detail = self.allocator.dupe(u8, msg) catch null;
+            return error.UnsupportedExpr;
+        },
     };
 }
 
@@ -5068,6 +5174,14 @@ fn getVecElemType(self: *Codegen, vec_type: c.LLVMTypeRef) ?c.LLVMTypeRef {
 fn ensureReallocDeclared(self: *Codegen) FnInfo {
     const sym = self.pool.intern("realloc") catch unreachable;
     if (self.functions.get(sym)) |fi| return fi;
+    if (c.LLVMGetNamedFunction(self.module, "realloc")) |func| {
+        const fi_existing: FnInfo = .{
+            .value = func,
+            .fn_type = c.LLVMGlobalGetValueType(func),
+        };
+        self.functions.put(self.allocator, sym, fi_existing) catch {};
+        return fi_existing;
+    }
     const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
     const i64_type = c.LLVMInt64TypeInContext(self.context);
     var param_types = [_]c.LLVMTypeRef{ ptr_type, i64_type };
@@ -7527,6 +7641,30 @@ fn genIfExpr(self: *Codegen, if_e: Ast.IfExpr) Error!c.LLVMValueRef {
 }
 
 fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
+    return self.genCallInner(call_e) catch |err| {
+        if (err == error.UnsupportedExpr and self.codegen_error_detail == null) {
+            var callee_buf: [160]u8 = undefined;
+            const callee_name: []const u8 = switch (call_e.callee.kind) {
+                .ident => |sym| self.pool.resolve(sym),
+                .field_access => |fa| blk: {
+                    if (fa.expr.kind == .ident) {
+                        const lhs = self.pool.resolve(fa.expr.kind.ident);
+                        const rhs = self.pool.resolve(fa.field);
+                        break :blk std.fmt.bufPrint(&callee_buf, "{s}.{s}", .{ lhs, rhs }) catch "<field-call>";
+                    }
+                    break :blk "<field-call>";
+                },
+                else => "<expr-call>",
+            };
+            var msg_buf: [256]u8 = undefined;
+            const msg = std.fmt.bufPrint(&msg_buf, "unsupported call to '{s}'", .{callee_name}) catch "unsupported call";
+            self.codegen_error_detail = self.allocator.dupe(u8, msg) catch null;
+        }
+        return err;
+    };
+}
+
+fn genCallInner(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
     // Handle method call syntax: `obj.method(args)` → look up `Type.method(obj, args)`
     if (call_e.callee.kind == .field_access) {
         const fa = call_e.callee.kind.field_access;
@@ -7777,8 +7915,15 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
                 }
             }
 
-            // Auto-coerce str → ptr when param expects a pointer.
-            if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
+            // Auto-coerce c"..." → str when the callee expects a struct-like string parameter.
+            if (i < call_e.args.len and call_e.args[i].kind == .c_string_literal and
+                c.LLVMGetTypeKind(arg_type) == c.LLVMPointerTypeKind and
+                c.LLVMGetTypeKind(param_type) == c.LLVMStructTypeKind)
+            {
+                args_buf[i] = try self.cStrPtrToStr(args_buf[i]);
+            } else if (self.isStrType(param_type) and c.LLVMGetTypeKind(arg_type) == c.LLVMPointerTypeKind) {
+                args_buf[i] = try self.cStrPtrToStr(args_buf[i]);
+            } else if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
                 args_buf[i] = self.extractStrPtr(args_buf[i]);
             } else {
                 args_buf[i] = self.coerceInt(args_buf[i], param_type);
@@ -8762,7 +8907,57 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
                     const param_count: u32 = c.LLVMCountParams(fn_info.value);
                     for (0..@min(args.len, param_count)) |i| {
                         const param_type = c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, @intCast(i)));
-                        args_buf[i] = self.coerceInt(args_buf[i], param_type);
+                        const arg_type = c.LLVMTypeOf(args_buf[i]);
+                        if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and
+                            c.LLVMGetTypeKind(arg_type) == c.LLVMStructTypeKind)
+                        {
+                            if (args[i].kind == .ident) {
+                                const sym = args[i].kind.ident;
+                                if (self.locals.get(sym)) |local| {
+                                    args_buf[i] = local.alloca;
+                                    continue;
+                                }
+                            } else if (args[i].kind == .field_access) {
+                                const fa_arg = args[i].kind.field_access;
+                                if (fa_arg.expr.kind == .ident) {
+                                    const base_sym = fa_arg.expr.kind.ident;
+                                    if (self.locals.get(base_sym)) |base_local| {
+                                        if (base_local.pointee_struct) |ps| {
+                                            if (self.struct_types.get(ps)) |si| {
+                                                if (self.findFieldIndex(si, fa_arg.field)) |idx| {
+                                                    const base_ptr = c.LLVMBuildLoad2(self.builder, base_local.ty, base_local.alloca, "base.ptr");
+                                                    const field_ptr = c.LLVMBuildStructGEP2(self.builder, si.llvm_type, base_ptr, @intCast(idx), "field.ptr");
+                                                    args_buf[i] = field_ptr;
+                                                    continue;
+                                                }
+                                            }
+                                        } else if (self.findStructTypeByLlvm(base_local.ty)) |si| {
+                                            if (self.findFieldIndex(si, fa_arg.field)) |idx| {
+                                                const field_ptr = c.LLVMBuildStructGEP2(self.builder, base_local.ty, base_local.alloca, @intCast(idx), "field.ptr");
+                                                args_buf[i] = field_ptr;
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            const tmp = c.LLVMBuildAlloca(self.builder, arg_type, "autoptr");
+                            _ = c.LLVMBuildStore(self.builder, args_buf[i], tmp);
+                            args_buf[i] = tmp;
+                            continue;
+                        }
+                        if (i < args.len and args[i].kind == .c_string_literal and
+                            c.LLVMGetTypeKind(arg_type) == c.LLVMPointerTypeKind and
+                            c.LLVMGetTypeKind(param_type) == c.LLVMStructTypeKind)
+                        {
+                            args_buf[i] = try self.cStrPtrToStr(args_buf[i]);
+                        } else if (self.isStrType(param_type) and c.LLVMGetTypeKind(arg_type) == c.LLVMPointerTypeKind) {
+                            args_buf[i] = try self.cStrPtrToStr(args_buf[i]);
+                        } else if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
+                            args_buf[i] = self.extractStrPtr(args_buf[i]);
+                        } else {
+                            args_buf[i] = self.coerceInt(args_buf[i], param_type);
+                        }
                     }
                     const ret_type = c.LLVMGetReturnType(fn_info.fn_type);
                     const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
@@ -9426,7 +9621,14 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
                             }
                         }
                     }
-                    if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
+                    if (i < args.len and args[i].kind == .c_string_literal and
+                        c.LLVMGetTypeKind(arg_type) == c.LLVMPointerTypeKind and
+                        c.LLVMGetTypeKind(param_type) == c.LLVMStructTypeKind)
+                    {
+                        args_buf[i] = try self.cStrPtrToStr(args_buf[i]);
+                    } else if (self.isStrType(param_type) and c.LLVMGetTypeKind(arg_type) == c.LLVMPointerTypeKind) {
+                        args_buf[i] = try self.cStrPtrToStr(args_buf[i]);
+                    } else if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
                         args_buf[i] = self.extractStrPtr(args_buf[i]);
                     } else if (c.LLVMGetTypeKind(param_type) != c.LLVMPointerTypeKind or c.LLVMGetTypeKind(arg_type) != c.LLVMPointerTypeKind) {
                         args_buf[i] = self.coerceInt(args_buf[i], param_type);
@@ -9639,7 +9841,10 @@ fn genAssign(self: *Codegen, assign: Ast.AssignExpr) Error!c.LLVMValueRef {
     switch (assign.target.kind) {
         .ident => |sym| {
             const info = self.locals.get(sym) orelse return error.UnsupportedExpr;
-            if (!info.is_mut) return error.ImmutableAssign;
+            if (!info.is_mut) {
+                self.setAssignError(assign.target.span, self.pool.resolve(sym));
+                return error.ImmutableAssign;
+            }
             const val = try self.genExpr(assign.value);
             const coerced = self.coerceInt(val, info.ty);
             _ = c.LLVMBuildStore(self.builder, coerced, info.alloca);
@@ -9652,7 +9857,15 @@ fn genAssign(self: *Codegen, assign: Ast.AssignExpr) Error!c.LLVMValueRef {
                 else => return error.UnsupportedExpr,
             };
             const local = self.locals.get(obj_sym) orelse return error.UnsupportedExpr;
-            if (!local.is_mut and local.pointee_struct == null) return error.ImmutableAssign;
+            if (!local.is_mut and local.pointee_struct == null) {
+                // Allow field mutation for by-value struct parameters
+                // (their alloca can be GEP'd directly for field access).
+                const is_struct = self.findStructTypeByLlvm(local.ty) != null;
+                if (!is_struct) {
+                    self.setAssignError(assign.target.span, self.pool.resolve(obj_sym));
+                    return error.ImmutableAssign;
+                }
+            }
 
             // Pointer-to-struct field assignment (e.g. self.field = val where self: *mut T).
             if (local.pointee_struct) |ps| {
@@ -9679,7 +9892,10 @@ fn genAssign(self: *Codegen, assign: Ast.AssignExpr) Error!c.LLVMValueRef {
                 else => return error.UnsupportedExpr,
             };
             const local = self.locals.get(arr_sym) orelse return error.UnsupportedExpr;
-            if (!local.is_mut) return error.ImmutableAssign;
+            if (!local.is_mut) {
+                self.setAssignError(assign.target.span, self.pool.resolve(arr_sym));
+                return error.ImmutableAssign;
+            }
 
             const index_val = try self.genExpr(idx.index);
             const i32_type = c.LLVMInt32TypeInContext(self.context);
@@ -12826,6 +13042,16 @@ fn genIndex(self: *Codegen, idx: Ast.IndexExpr) Error!c.LLVMValueRef {
     const obj_val = try self.genExpr(idx.expr);
     const obj_type = c.LLVMTypeOf(obj_val);
 
+    // String indexing from non-local expressions (e.g. self.text[i]).
+    if (self.isStrType(obj_type)) {
+        const str_ptr = self.extractStrPtr(obj_val);
+        const index_val = try self.genExpr(idx.index);
+        const index_i64 = self.coerceInt(index_val, c.LLVMInt64TypeInContext(self.context));
+        var gep_idx = [_]c.LLVMValueRef{index_i64};
+        const byte_ptr = c.LLVMBuildGEP2(self.builder, c.LLVMInt8TypeInContext(self.context), str_ptr, &gep_idx, 1, "str.byte.ptr");
+        return c.LLVMBuildLoad2(self.builder, c.LLVMInt8TypeInContext(self.context), byte_ptr, "str.byte");
+    }
+
     if (c.LLVMGetTypeKind(obj_type) == c.LLVMStructTypeKind) {
         if (self.isVecType(obj_type)) {
             const index_val = try self.genExpr(idx.index);
@@ -14224,6 +14450,14 @@ fn genStringLiteralRaw(self: *Codegen, text: []const u8) Error!c.LLVMValueRef {
     return c.LLVMBuildLoad2(self.builder, str_info.llvm_type, alloca, "str.val");
 }
 
+/// Record a detailed error message for assignment to immutable variable.
+fn setAssignError(self: *Codegen, span: @import("Span.zig"), name: []const u8) void {
+    const line = self.spanToLine(span);
+    var buf: [256]u8 = undefined;
+    const msg = std.fmt.bufPrint(&buf, "cannot assign to immutable variable '{s}' at {s}:{d}", .{ name, self.source_file, line }) catch "cannot assign to immutable variable";
+    self.codegen_error_detail = self.allocator.dupe(u8, msg) catch null;
+}
+
 /// Convert a span byte offset to a 1-indexed line number using source text.
 fn spanToLine(self: *const Codegen, span: @import("Span.zig")) u32 {
     if (self.source_text.len == 0 or span.start == 0) return 1;
@@ -14676,6 +14910,16 @@ fn buildStrValue(self: *Codegen, ptr: c.LLVMValueRef, len: c.LLVMValueRef) c.LLV
     const len_gep = c.LLVMBuildStructGEP2(self.builder, str_info.llvm_type, alloca, 1, "");
     _ = c.LLVMBuildStore(self.builder, len, len_gep);
     return c.LLVMBuildLoad2(self.builder, str_info.llvm_type, alloca, "str.val");
+}
+
+/// Convert a C string pointer (`*u8` / `char*`) into a `str` value by calling strlen.
+fn cStrPtrToStr(self: *Codegen, ptr_val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const strlen_info = self.getOrDeclareCFn("strlen", &.{ptr_type}, i64_type, false);
+    var call_args = [_]c.LLVMValueRef{ptr_val};
+    const len = c.LLVMBuildCall2(self.builder, strlen_info.fn_type, strlen_info.value, &call_args, 1, "cstr.len");
+    return self.buildStrValue(ptr_val, len);
 }
 
 /// Ensure strstr is declared.
@@ -15793,6 +16037,14 @@ fn genArraySum(self: *Codegen, arr_val: c.LLVMValueRef, arr_type: c.LLVMTypeRef)
 fn ensureMallocDeclared(self: *Codegen) FnInfo {
     const malloc_sym = self.pool.intern("malloc") catch unreachable;
     if (self.functions.get(malloc_sym)) |fi| return fi;
+    if (c.LLVMGetNamedFunction(self.module, "malloc")) |func| {
+        const fi_existing: FnInfo = .{
+            .value = func,
+            .fn_type = c.LLVMGlobalGetValueType(func),
+        };
+        self.functions.put(self.allocator, malloc_sym, fi_existing) catch {};
+        return fi_existing;
+    }
     const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
     const i64_type = c.LLVMInt64TypeInContext(self.context);
     var param_types = [_]c.LLVMTypeRef{i64_type};
@@ -15807,6 +16059,14 @@ fn ensureMallocDeclared(self: *Codegen) FnInfo {
 fn ensureMemcpyDeclared(self: *Codegen) FnInfo {
     const memcpy_sym = self.pool.intern("memcpy") catch unreachable;
     if (self.functions.get(memcpy_sym)) |fi| return fi;
+    if (c.LLVMGetNamedFunction(self.module, "memcpy")) |func| {
+        const fi_existing: FnInfo = .{
+            .value = func,
+            .fn_type = c.LLVMGlobalGetValueType(func),
+        };
+        self.functions.put(self.allocator, memcpy_sym, fi_existing) catch {};
+        return fi_existing;
+    }
     const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
     const i64_type = c.LLVMInt64TypeInContext(self.context);
     var param_types = [_]c.LLVMTypeRef{ ptr_type, ptr_type, i64_type };

@@ -1,121 +1,67 @@
 # With
 
-With is a systems language focused on memory safety, ownership, and low-level control without a GC.
+With is a systems language with a self-hosted compiler.
 
-This repository contains the Zig bootstrap compiler, runtime, standard library modules, tooling commands, and phase-based test suites.
-
-## Status
-
-- The bootstrap compiler is actively developed and implements broad Phase 0-6 functionality.
-- The command-line tool supports compile/run/check/test plus tooling (`fmt`, `doc`, `lsp`, `repl`, `migrate`).
-- The detailed feature checklist lives in `docs/test_checklist.md`.
+This repository has two compiler implementations:
+- `bootstrap/` (Zig): trusted bootstrap compiler
+- `src/` (With): self-hosted compiler and backend
 
 ## Requirements
 
-- Zig `0.15.2` (or compatible `0.15.x`)
-- LLVM with C API + clang toolchain available
+- Zig `0.15.x`
+- clang/LLVM toolchain available on PATH
 
-The build expects `LLVM_PREFIX` (defaults to `/usr/local/llvm`) and uses:
+## Build Flow
 
-- `${LLVM_PREFIX}/bin/clang++`
-- `${LLVM_PREFIX}/include`
-- `${LLVM_PREFIX}/lib`
-
-Example:
+1. Build bootstrap compiler:
 
 ```sh
-export LLVM_PREFIX=/usr/local/llvm
+cd bootstrap
 zig build
+cd ..
 ```
 
-## Build
+2. Stage 1 (bootstrap compiles self-hosted compiler):
 
 ```sh
-zig build
+./bootstrap/zig-out/bin/with build src/main.w
+cp .with/build/main ./with-stage1
 ```
 
-Compiler binary:
+3. Stage 2 (self-hosted compiler compiles itself):
 
 ```sh
-./zig-out/bin/with
+./with-stage1 build src/main.w -o .with/build/with-stage2
+cp .with/build/with-stage2 ./with-stage2
 ```
 
-## CLI Quick Reference
+## Test
+
+Run both suites with the bootstrap test harness:
 
 ```sh
-with build [file.w]                     # Build package (or explicit source) to .with/build
-with run [file.w] [-- args...]          # Build + run package (or explicit source)
-with check <file.w>                     # Parse + type-check
-with test [flags] [filter]              # Package tests; workspace supports -p <member>
-with clean [--all]                      # Remove .with artifacts (workspace: all members)
-with test-harness [path] [--update]     # Legacy snapshot harness runner
-with fmt <file.w>                       # Format to stdout
-with doc <file.w>                       # Generate docs (markdown to stdout)
-with repl                               # Interactive REPL
-with lsp                                # LSP server over stdio
-with migrate <lang> <path> [--check|--diff]  # rust|zig|swift to .w
-with ir <file.w>                        # Dump LLVM IR
-with ast <file.w>                       # Dump AST
-with tokens <file.w>                    # Dump lexer tokens
-with version
-with help
+./bootstrap/zig-out/bin/with test test/cases/
+./bootstrap/zig-out/bin/with test bootstrap/test/cases/
 ```
 
-## Testing
-
-Unit tests:
+Then sanity-check the stage2 compiler binary:
 
 ```sh
-zig build test
+./with-stage2 version
 ```
 
-Phase suites (script-based):
+Or use Make targets for the full flow:
 
 ```sh
-bash test/run_phase6_tests.sh
+make test
 ```
 
-Run every phase script:
-
-```sh
-for s in test/run_phase*.sh; do bash "$s"; done
-```
-
-## Repository Layout
+## Repo Layout
 
 ```text
-src/
-  main.zig              CLI entrypoint
-  Driver.zig            Compiler pipeline orchestration
-  Lexer.zig             Tokenizer
-  Parser.zig            Parser
-  Sema.zig              Semantic analysis
-  Codegen.zig           LLVM IR codegen
-  Lsp.zig               Language server
-  Migrate.zig           Source migration tooling
-  Mir.zig               MIR scaffolding
-  MirOpt.zig            MIR optimization passes
-runtime/
-  fiber.c
-  fiber_asm_aarch64.s
-  helpers.c
-lib/std/
-  *.w                   Standard library modules
-test/
-  cases/                Runtime/behavior examples
-  run_phase*_tests.sh   Phase and feature suites
-docs/
-  with-specification.md
-  with-compiler-plan.md
-  with-implementation-notes.md
-  with-migration-guide.md
-  test_checklist.md
+bootstrap/           Zig bootstrap compiler
+src/                 self-hosted compiler (.w)
+runtime/             C runtime support
+test/cases/          self-hosted behavior tests
+bootstrap/test/cases/bootstrap parser/codegen tests
 ```
-
-## Documentation
-
-- Language spec: `docs/with-specification.md`
-- Compiler plan: `docs/with-compiler-plan.md`
-- Implementation notes: `docs/with-implementation-notes.md`
-- Migration guide: `docs/with-migration-guide.md`
-- Test checklist: `docs/test_checklist.md`

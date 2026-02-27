@@ -1,0 +1,10 @@
+exit: 0
+stdout:
+big
+small
+one
+two
+other
+
+stderr:
+
