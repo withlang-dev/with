@@ -77,7 +77,7 @@ pub fn build(b: *std.Build) void {
     const obj = b.addObject(.{
         .name = "with",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("bootstrap/main.zig"),
+            .root_source_file = b.path("bootstrap/src/main.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -163,7 +163,7 @@ pub fn build(b: *std.Build) void {
     // --- Unit tests ---
     const unit_tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("bootstrap/main.zig"),
+            .root_source_file = b.path("bootstrap/src/main.zig"),
             .target = target,
             .optimize = optimize,
         }),
