@@ -66,11 +66,11 @@ fn main:
 
     // Print entity positions using query pipeline
     println("\nEntity positions:")
-    query2(&world.transforms, &world.sprites)
-        |> for_each(|(entity, tf, sprite)|
-            with world.entity_name(entity) as name:
-                println("  {name.unwrap_or("?")} -> ({tf.position.x:.1}, {tf.position.y:.1}) tex={texture_name(sprite.texture)}")
-        )
+    for item in query2(&world.transforms, &world.sprites):
+        let (entity, tf, sprite) = item
+        with world.entity_name(entity) as name:
+            let label = name.unwrap_or("?")
+            println("  {label} -> ({tf.position.x:.1}, {tf.position.y:.1}) tex={texture_name(sprite.texture)}")
 
     // --- Demonstrate despawning ---
 
