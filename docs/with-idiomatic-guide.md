@@ -601,6 +601,308 @@ trait Neg[Output]: fn neg(self: Self) -> Output
 
 ---
 
+## Use Handles, Not Pointers
+
+For data-oriented relationships, use `Handle[T]` with `SlotMap`
+instead of pointers or reference-counted objects. Handles are
+`Copy`, type-safe, and detect use-after-remove via generation
+mismatch.
+
+```
+// ✗ pointer-based — fragile, cache-unfriendly
+type Entity = {
+    parent: *Entity,
+    children: Vec[*Entity],
+}
+
+// ✓ idiomatic — handle-based, data-oriented
+type Entity = Handle[EntityRow]
+
+type World = {
+    entities: SlotMap[EntityRow],
+    transforms: DenseStorage[Transform],
+    sprites: DenseStorage[Sprite],
+}
+
+// Handles are Copy — store them freely
+let player = world.spawn("player")
+let enemies = vec![world.spawn("e1"), world.spawn("e2")]
+
+// Safe access — None if entity was despawned
+if let Some(tf) = world.transforms.get(player):
+    println("pos: {tf.position}")
+```
+
+Handles compose naturally with the ECS pattern:
+
+```
+// Query all entities with both Transform and Sprite
+for (entity, tf, sprite) in query2(&world.transforms, &world.sprites):
+    draw(tf.position, sprite.texture)
+```
+
+---
+
+## Use `traverse` for Bulk Fallible Operations
+
+When applying a fallible function to a collection, use
+`traverse` instead of a manual loop with error handling.
+Use `sequence` when you already have `Vec[Result[T, E]]`.
+
+```
+// ✗ manual loop with error handling
+var results = Vec.new[i32]()
+for s in strings:
+    match s.parse_int()
+        Ok(n)  -> results.push(n)
+        Err(e) -> return Err(e)
+
+// ✓ idiomatic — traverse = map + collect-or-fail
+let results = strings.traverse(|s| s.parse_int())?
+```
+
+`sequence` converts `Vec[Result[T, E]]` to `Result[Vec[T], E]`:
+
+```
+// ✗ manual unwrapping
+var users = Vec.new[User]()
+for result in fetch_results:
+    users.push(result?)
+
+// ✓ idiomatic — sequence
+let users = fetch_results.sequence()?
+```
+
+Both short-circuit on the first error.
+
+---
+
+## Use `async scope` for Concurrency
+
+Structured concurrency with `async scope` guarantees all
+spawned tasks complete before the scope exits. No lifetime
+annotations needed — the compiler knows borrows can't outlive
+the scope.
+
+```
+// ✗ manual task management — tasks can leak
+let t1 = spawn(fetch_user(1))
+let t2 = spawn(fetch_user(2))
+let r1 = t1.await
+let r2 = t2.await
+
+// ✓ idiomatic — structured concurrency
+async scope |s|:
+    let t1 = s.track(fetch_user(1))
+    let t2 = s.track(fetch_user(2))
+    let (r1, r2) = (t1.await, t2.await)
+// All tasks guaranteed complete here.
+```
+
+Scatter-gather pattern:
+
+```
+// Fire off N parallel fetches, collect results
+let profiles = async scope |s|:
+    ids |> map(|id| s.track(get_profile(id)))
+        |> collect[Vec]()
+        |> map(|task| task.await)
+        |> collect[Vec]()
+```
+
+Scoped borrows — tasks can borrow local data without lifetimes:
+
+```
+async fn process_all(data: &mut Vec[i32]):
+    async scope |s|:
+        s.track(transform(&data[0..100]))
+        s.track(transform(&data[100..200]))
+    // Borrows released, data is accessible again.
+```
+
+---
+
+## Use `in` for Membership Tests
+
+The `in` operator tests containment on any collection or
+literal array. Don't write chains of `==` or verbose `match`
+for set membership.
+
+```
+// ✗ verbose equality chain
+if kind == .Plus or kind == .Minus or kind == .Star or kind == .Slash:
+    handle_operator()
+
+// ✓ idiomatic
+if kind in [.Plus, .Minus, .Star, .Slash]:
+    handle_operator()
+```
+
+Works in match arms:
+
+```
+match token
+    in [.Red, .Green, .Blue] -> "color"
+    in [.Bold, .Italic]      -> "style"
+    _                         -> "other"
+```
+
+`not in` reads naturally:
+
+```
+if user.role not in [.Admin, .Moderator] then
+    return Err(.Forbidden)
+```
+
+---
+
+## Use Chained `if let` to Avoid Nesting
+
+Multiple `if let` bindings can be chained with commas.
+All patterns must match for the body to execute.
+
+```
+// ✗ pyramid of doom
+if let Some(a) = store_a.get(entity):
+    if let Some(b) = store_b.get(entity):
+        if let Some(c) = store_c.get(entity):
+            yield (entity, a, b, c)
+
+// ✓ idiomatic — flat
+if let Some(a) = store_a.get(entity),
+   let Some(b) = store_b.get(entity),
+   let Some(c) = store_c.get(entity):
+    yield (entity, a, b, c)
+```
+
+Especially useful for extracting nested optional data:
+
+```
+if let Some(user) = find_user(id),
+   let Some(addr) = user.address,
+   let Some(city) = addr.city:
+    println("User lives in {city}")
+else:
+    println("Address unknown")
+```
+
+---
+
+## Use `let ... else` to Test Expected Variants
+
+When you expect a specific variant and want to bail otherwise,
+`let ... else` is cleaner than a full `match`.
+
+```
+// ✗ verbose match for a single expected variant
+let value = match token
+    .TString(s) -> s
+    _ -> return Err(.UnexpectedToken)
+
+// ✓ idiomatic — assert the pattern, bail in else
+let .TString(value) = token else return Err(.UnexpectedToken)
+```
+
+Pairs well with `?` for multi-step unwrapping:
+
+```
+let Some(user) = find_user(id) else return Err(.NotFound)
+let Ok(config) = parse_config(path) else return Err(.ParseError)
+let [first, ..rest] = items else return Err(.Empty)
+```
+
+Inside `select` branches:
+
+```
+select await
+    opt = rx.recv() ->
+        let Some(item) = opt else break
+        items.push(item)
+    _ = timeout(Duration.from_secs(5)) ->
+        break
+```
+
+---
+
+## Use `comptime if` for Metaprogramming
+
+`comptime if` selects code at compile time. Dead branches
+are erased entirely — no runtime cost, no dead code warnings.
+
+```
+// ✓ specialize based on type capabilities
+fn serialize[T](val: &T, out: &mut Writer):
+    comptime if T.is_copy():
+        out.write_bytes(val as *const u8, T.size())
+    else if T.implements(Serialize):
+        val.serialize(out)
+```
+
+Platform-specific code:
+
+```
+comptime if cfg.target_os == "linux":
+    use c_import("fcntl.h", link: "c")
+comptime else if cfg.target_os == "windows":
+    use c_import("windows.h")
+```
+
+Debug-only instrumentation:
+
+```
+fn process(x: i32) -> i32:
+    comptime if cfg.is_debug:
+        println("debug: processing {x}")
+    x * x + 1
+```
+
+---
+
+## Use `c_import` for C Interop
+
+`c_import` reads a C header at compile time and makes all
+declarations available as With symbols. No manual `extern fn`
+declarations needed.
+
+```
+// ✗ manual FFI declarations
+extern "C":
+    fn sqlite3_open(filename: *const u8, db: *mut *mut sqlite3) -> i32
+    fn sqlite3_close(db: *mut sqlite3) -> i32
+    fn sqlite3_exec(db: *mut sqlite3, sql: *const u8, ...) -> i32
+
+// ✓ idiomatic — import the header, link the library
+use c_import("sqlite3.h", link: "sqlite3")
+```
+
+Use `c"..."` string literals for NUL-terminated C strings:
+
+```
+// c"hello" is a &CStr — static, NUL-terminated
+printf(c"hello %d\n".ptr, 42)
+```
+
+Wrap C resources with `impl Drop` for safe cleanup:
+
+```
+type Database = { handle: *mut sqlite3, path: str }
+
+impl Drop for Database:
+    fn drop(self: Self):
+        if self.handle != null:
+            unsafe { sqlite3_close(self.handle) }
+
+extend Database:
+    fn open(path: str) -> Result[Database, SqliteError]:
+        var handle: *mut sqlite3 = null
+        let rc = unsafe { sqlite3_open(path.as_ptr(), &mut handle) }
+        if rc != SQLITE_OK then
+            return Err(.OpenFailed(path, code: rc))
+        Database { handle, path }
+```
+
+---
+
 ## Naming
 
 With follows Rust's naming conventions:
@@ -639,3 +941,11 @@ Before submitting code, check:
 16. **No manual cleanup at every exit** — use `defer`
 17. **No `== true` or `== false`** — just `if active` or `if not active`
 18. **No artificial newlines** — if a trait/impl/fn fits on one line, keep it there
+19. **No pointer-based relationships** — use `Handle[T]` with `SlotMap`
+20. **No manual error-collecting loops** — use `traverse` / `sequence`
+21. **No unstructured task spawning** — use `async scope` with `s.track()`
+22. **No equality chains for membership** — use `in` / `not in`
+23. **No nested `if let` pyramids** — chain with commas
+24. **No full `match` for single variant tests** — use `let ... else`
+25. **No runtime checks for compile-time facts** — use `comptime if`
+26. **No manual `extern fn` declarations** — use `c_import` with `c"..."` strings

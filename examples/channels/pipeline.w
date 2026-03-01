@@ -163,12 +163,20 @@ async fn demo_fan_out:
         println("\nStats: {stats.total} total, {stats.successes} ok, {stats.failures} failed")
 
         // Show which worker handled what
-        with HashMap[u32, u64].new() as mut worker_counts:
+        with Vec.new() as mut worker_counts:
             for r in results:
-                let entry = worker_counts.entry(r.worker_id).or_insert(0)
-                *entry = *entry + 1
-            for (wid, count) in worker_counts:
-                println("  worker {wid}: {count} items")
+                // Scan for existing entry
+                var found = false
+                for i in 0..worker_counts.len():
+                    let pair = worker_counts[i]
+                    if pair.0 == r.worker_id:
+                        worker_counts[i] = (r.worker_id, pair.1 + 1)
+                        found = true
+                        break
+                if not found:
+                    worker_counts.push((r.worker_id, 1 as u64))
+            for pair in worker_counts:
+                println("  worker {pair.0}: {pair.1} items")
 
 // --- Demo 3: Select with Multiple Sources ---
 

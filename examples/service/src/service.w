@@ -82,7 +82,7 @@ extend UserServiceBuilder:
             audit: self.audit ?? return Err("AuditLog is required"),
             config: self.config,
             metrics: RwLock.new(ServiceMetrics {}),
-        })
+        }
 
 // --- Service Methods ---
 

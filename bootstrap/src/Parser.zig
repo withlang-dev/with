@@ -233,27 +233,44 @@ fn parseDecl(self: *Parser) !Ast.Decl {
             self.skipNewlines();
 
             // Parse variants (indented block or comma-separated).
+            // Supports both `Variant(Type)` and `| Variant(Type)` prefix syntax.
             var variants: std.ArrayList(Ast.VariantDef) = .empty;
             while (self.peek() != .eof) {
                 const col = Lexer.columnOf(self.source, self.currentSpan().start);
                 if (col == 0) break; // back to top level
 
+                // Skip optional `|` prefix on variants
+                if (self.peek() == .pipe) {
+                    self.advance();
+                    self.skipNewlines();
+                }
                 if (self.peek() != .identifier) break;
                 const v_start = self.currentSpan();
                 const v_name = try self.expectIdentifier();
 
-                // Optional payload: `Variant(Type1, Type2)`
+                // Optional payload: `Variant(Type1, Type2)` or `Variant(name: Type1, name: Type2)`
                 var payload: ?[]const *const Ast.TypeExpr = null;
                 if (self.peek() == .l_paren) {
                     self.advance();
+                    self.skipNewlines();
                     var payload_types: std.ArrayList(*const Ast.TypeExpr) = .empty;
                     while (self.peek() != .r_paren and self.peek() != .eof) {
                         if (payload_types.items.len > 0) {
                             try self.expect(.comma);
+                            self.skipNewlines();
+                        }
+                        // Skip optional `name:` prefix (named fields in error variants)
+                        if (self.peek() == .identifier and
+                            self.pos + 1 < self.tokens.tags.items.len and
+                            self.tokens.tags.items[self.pos + 1] == .colon)
+                        {
+                            self.advance(); // skip name
+                            self.advance(); // skip ':'
                         }
                         const ty = try self.parseTypeExpr();
                         try payload_types.append(self.arena, ty);
                     }
+                    self.skipNewlines();
                     try self.expect(.r_paren);
                     payload = try payload_types.toOwnedSlice(self.arena);
                 }
@@ -460,7 +477,7 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
             self.advance();
         }
         try self.expect(.kw_fn);
-        const method_name_sym = try self.expectIdentifier();
+        const method_name_sym = try self.expectIdentifierOrKeyword();
 
         // Mangle as "Type.method"
         const type_str = self.pool.resolve(type_name);
@@ -541,11 +558,11 @@ fn parseFnDecl(
     is_comptime: bool,
 ) !Ast.Decl {
     try self.expect(.kw_fn);
-    var name = try self.expectIdentifier();
+    var name = try self.expectIdentifierOrKeyword();
     // Support method syntax: `fn Type.method(...)` → mangled name `Type.method`
     if (self.peek() == .dot) {
         self.advance(); // consume '.'
-        const method_name = try self.expectIdentifier();
+        const method_name = try self.expectIdentifierOrKeyword();
         // Mangle as "Type.method" by interning the combined name.
         const type_str = self.pool.resolve(name);
         const method_str = self.pool.resolve(method_name);
@@ -1149,6 +1166,30 @@ fn parsePrecedence(self: *Parser, min_prec: u8) !*const Ast.Expr {
     var lhs = try self.parsePrimary();
 
     while (true) {
+        // Allow continuation operators at start of new line:
+        //   value
+        //       |> transform
+        //       ?? default
+        if (self.peek() == .newline) {
+            const next = self.peekPastNewlines();
+            if (next == .pipe_gt or next == .lt_pipe or next == .question_question) {
+                self.skipNewlines();
+            }
+        }
+        // Handle 'as' cast — some primary parsers (int/float/bool literals)
+        // don't call parsePostfix, so handle it here to cover all cases.
+        if (self.peek() == .kw_as and !self.suppress_as) {
+            self.advance();
+            const target_type = try self.parseTypeExpr();
+            const cast_node = try self.arena.create(Ast.Expr);
+            cast_node.* = .{
+                .kind = .{ .cast = .{ .expr = lhs, .target_type = target_type } },
+                .span = lhs.span.merge(target_type.span),
+            };
+            lhs = cast_node;
+            continue;
+        }
+
         const op_info = self.infixOp() orelse break;
         if (op_info.prec < min_prec) break;
         self.advance();
@@ -1468,15 +1509,20 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
         switch (self.peek()) {
             .l_paren => {
                 self.advance();
+                self.skipNewlines(); // allow newline after '('
                 var args: std.ArrayList(*const Ast.Expr) = .empty;
                 if (self.peek() != .r_paren) {
+                    self.skipNamedArgLabel(); // skip optional `name:` label
                     try args.append(self.arena, try self.parseExpr());
                     while (self.peek() == .comma) {
                         self.advance();
                         self.skipNewlines();
+                        if (self.peek() == .r_paren) break; // trailing comma
+                        self.skipNamedArgLabel(); // skip optional `name:` label
                         try args.append(self.arena, try self.parseExpr());
                     }
                 }
+                self.skipNewlines(); // allow newline before ')'
                 const end = self.currentSpan();
                 try self.expect(.r_paren);
 
@@ -1545,11 +1591,12 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
                     continue;
                 }
                 // Handle tuple field access: `.0`, `.1`, etc.
+                // After `.`, allow keywords as field/method names (e.g. `world.spawn()`).
                 const field = if (self.peek() == .int_literal) blk: {
                     const sym = try self.internCurrent();
                     self.advance();
                     break :blk sym;
-                } else try self.expectIdentifier();
+                } else try self.expectIdentifierOrKeyword();
                 const node = try self.arena.create(Ast.Expr);
                 node.* = .{
                     .kind = .{ .field_access = .{
@@ -1717,6 +1764,17 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
                 };
                 lhs = node;
             },
+            .newline => {
+                // Allow method chaining across newlines:
+                //   foo.bar()
+                //       .baz()
+                const next = self.peekPastNewlines();
+                if (next == .dot or next == .question_dot) {
+                    self.skipNewlines();
+                    continue;
+                }
+                return lhs;
+            },
             else => return lhs,
         }
     }
@@ -1732,13 +1790,16 @@ fn parseVariantShorthand(self: *Parser) !*const Ast.Expr {
     var args: std.ArrayList(*const Ast.Expr) = .empty;
     if (self.peek() == .l_paren) {
         self.advance(); // consume '('
+        self.skipNewlines(); // allow newline after '('
         while (self.peek() != .r_paren and self.peek() != .eof) {
+            self.skipNamedArgLabel(); // skip optional `name:` label
             try args.append(self.arena, try self.parseExpr());
             if (self.peek() == .comma) {
                 self.advance();
                 self.skipNewlines();
             }
         }
+        self.skipNewlines(); // allow newline before ')'
         try self.expect(.r_paren);
     }
 
@@ -2068,7 +2129,34 @@ fn parseUnsafe(self: *Parser) !*const Ast.Expr {
         start,
     ));
     if (self.peek() == .colon) self.advance();
+    // Support brace-delimited blocks: `unsafe { expr }`
+    if (self.peek() == .l_brace) {
+        return self.parseBraceBlock(start);
+    }
     return self.parseBlockOrExpr();
+}
+
+/// Parse a brace-delimited block `{ stmts... expr }` and return the last expression.
+fn parseBraceBlock(self: *Parser, start: Span) !*const Ast.Expr {
+    self.advance(); // consume '{'
+    self.skipNewlines();
+    var stmts: std.ArrayList(*const Ast.Expr) = .empty;
+    var last_expr = try self.parseExpr();
+    while (self.peek() != .r_brace and self.peek() != .eof) {
+        self.skipNewlines();
+        if (self.peek() == .r_brace) break;
+        try stmts.append(self.arena, last_expr);
+        last_expr = try self.parseExpr();
+    }
+    const end = self.currentSpan();
+    try self.expect(.r_brace);
+    if (stmts.items.len == 0) return last_expr;
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .block = .{ .stmts = stmts.items, .tail = last_expr } },
+        .span = start.merge(end),
+    };
+    return node;
 }
 
 fn parseYield(self: *Parser) !*const Ast.Expr {
@@ -2588,7 +2676,8 @@ fn parseMatchArms(self: *Parser) ![]const Ast.MatchArm {
         }
 
         try self.expect(.arrow);
-        self.skipNewlines();
+        // Don't skip newlines — parseBlockOrExpr needs to see the newline
+        // to distinguish inline `-> expr` from multi-line `-> \n block`.
 
         const body = try self.parseBlockOrExpr();
 
@@ -2995,20 +3084,19 @@ fn parseClosure(self: *Parser) !*const Ast.Expr {
         }
     }
     try self.expect(.pipe);
-    self.skipNewlines();
+    // Don't skip newlines — let parseBlockOrExpr detect multi-line bodies.
 
     // Check for optional return type: `-> Type`
     var return_type: ?*const Ast.TypeExpr = null;
     if (self.peek() == .arrow) {
         self.advance(); // consume '->'
         return_type = try self.parseTypeExpr();
-        self.skipNewlines();
     }
 
-    const body = if (self.peek() == .colon) blk: {
-        self.advance(); // consume ':'
-        break :blk try self.parseBlockOrExpr();
-    } else try self.parseExpr();
+    // Optional ':' before body (both `|x|: body` and `|x| body` are valid).
+    if (self.peek() == .colon) self.advance();
+    // parseBlockOrExpr handles both inline (same line) and multi-line (newline → block).
+    const body = try self.parseBlockOrExpr();
 
     const node = try self.arena.create(Ast.Expr);
     node.* = .{
@@ -3493,10 +3581,16 @@ fn parseTypeExpr(self: *Parser) !*const Ast.TypeExpr {
                 };
                 return node;
             }
-            // Array type: [N]T
+            // Slice type alternate syntax: [T] (element type inside brackets)
             if (self.peek() != .int_literal) {
-                self.emitError("expected array size");
-                return error.ParseError;
+                const element = try self.parseTypeExpr();
+                try self.expect(.r_bracket);
+                const node = try self.arena.create(Ast.TypeExpr);
+                node.* = .{
+                    .kind = .{ .slice_type = element },
+                    .span = start.merge(self.prevSpan()),
+                };
+                return node;
             }
             const size_span = self.currentSpan();
             const size_text = self.source[size_span.start..size_span.end];
@@ -3588,6 +3682,7 @@ const ParamDestructure = struct {
 
 fn parseParamList(self: *Parser, destructures_out: ?*std.ArrayList(ParamDestructure)) ![]const Ast.Param {
     var params: std.ArrayList(Ast.Param) = .empty;
+    self.skipNewlines(); // allow newline after '('
     if (self.peek() == .r_paren or self.peek() == .dot_dot_dot) return params.items;
 
     try params.append(self.arena, try self.parseParam(destructures_out));
@@ -3597,6 +3692,7 @@ fn parseParamList(self: *Parser, destructures_out: ?*std.ArrayList(ParamDestruct
         if (self.peek() == .r_paren or self.peek() == .dot_dot_dot) break;
         try params.append(self.arena, try self.parseParam(destructures_out));
     }
+    self.skipNewlines(); // allow newline before ')'
     return params.items;
 }
 
@@ -3839,6 +3935,26 @@ fn expect(self: *Parser, expected: Token.Tag) !void {
     self.advance();
 }
 
+/// Accept an identifier or keyword as a name (used after `.` for field/method access).
+/// Keywords like `spawn`, `type`, `match` are valid method/field names after `.`.
+fn expectIdentifierOrKeyword(self: *Parser) !Ast.Symbol {
+    if (self.peek() == .identifier) {
+        const sym = try self.internCurrent();
+        self.advance();
+        return sym;
+    }
+    // Accept any keyword token as a field/method name
+    const span = self.currentSpan();
+    const text = self.source[span.start..span.end];
+    if (text.len > 0 and (std.ascii.isAlphabetic(text[0]) or text[0] == '_')) {
+        const sym = self.pool.intern(text) catch return error.ParseError;
+        self.advance();
+        return sym;
+    }
+    self.emitError("expected identifier");
+    return error.ParseError;
+}
+
 fn expectIdentifier(self: *Parser) !Ast.Symbol {
     if (self.peek() != .identifier) {
         self.emitError("expected identifier");
@@ -3861,10 +3977,34 @@ fn isIdentifierNamed(self: *const Parser, name: []const u8) bool {
     return std.mem.eql(u8, self.source[span.start..span.end], name);
 }
 
+/// Skip optional `name:` label in call arguments (named argument syntax).
+/// Only skips if current token is identifier followed by colon.
+fn skipNamedArgLabel(self: *Parser) void {
+    if (self.peek() == .identifier and
+        self.pos + 1 < self.tokens.tags.items.len and
+        self.tokens.tags.items[self.pos + 1] == .colon)
+    {
+        self.advance(); // skip name
+        self.advance(); // skip ':'
+        self.skipNewlines();
+    }
+}
+
 fn skipNewlines(self: *Parser) void {
     while (self.peek() == .newline) {
         self.advance();
     }
+}
+
+/// Peek past any newline tokens without consuming them.
+/// Returns the first non-newline token ahead.
+fn peekPastNewlines(self: *const Parser) Token.Tag {
+    var pos = self.pos;
+    while (pos < self.tokens.tags.items.len and self.tokens.tags.items[pos] == .newline) {
+        pos += 1;
+    }
+    if (pos < self.tokens.tags.items.len) return self.tokens.tags.items[pos];
+    return .eof;
 }
 
 fn skipAttributes(self: *Parser) void {
