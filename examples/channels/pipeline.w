@@ -1,92 +1,225 @@
+module channels
+
 // ===================================================================
-// Pipeline Demo — Simplified
+// Producer-Consumer Pipeline
 //
 // Demonstrates:
-//   - Pipeline operator |>
-//   - Structs with defaults
-//   - Methods (UFCS)
-//   - String interpolation
-//   - For loops and ranges
+//   - Channels: chan[T] with buffered send/recv
+//   - Async functions and await
+//   - Structured concurrency with async scope
+//   - Select for multiplexing with timeout
+//   - Pipeline operator composition
+//   - Fan-out / fan-in patterns
+//   - Channel ownership transfer semantics
 // ===================================================================
 
+// --- Domain Types ---
+
 type WorkItem = {
-    id: i32,
-    payload: i32,
+    id: u64,
+    payload: str,
 }
 
 type ProcessedItem = {
-    id: i32,
-    result: i32,
-    worker_id: i32,
+    id: u64,
+    result: str,
+    worker_id: u32,
 }
 
 type Stats = {
-    total: i32,
-    successes: i32,
-    failures: i32,
+    total: u64 = 0,
+    successes: u64 = 0,
+    failures: u64 = 0,
 }
 
-// --- Processing Functions ---
+// --- Stage 1: Producer ---
+//
+// Generates work items and sends them into a channel.
+// Demonstrates: channel send, ownership transfer.
 
-fn process_item(item: WorkItem, worker_id: i32) -> ProcessedItem:
-    ProcessedItem {
-        id: item.id,
-        result: item.payload * 2 + worker_id,
-        worker_id,
+async fn produce(tx: Sender[WorkItem], count: u64):
+    for i in 0..count:
+        let item = WorkItem {
+            id: i,
+            payload: "task-{i}",
+        }
+        tx.send(item).await  // moves item into channel
+    // tx is dropped here — channel closes when all senders drop
+
+// --- Stage 2: Workers (Fan-out) ---
+//
+// Multiple workers read from a shared channel and process items.
+// Demonstrates: async scope, spawn, shared receiver.
+
+async fn worker(
+    id: u32,
+    rx: &Receiver[WorkItem],
+    tx: Sender[ProcessedItem],
+):
+    loop:
+        match rx.recv().await
+            Some(item) ->
+                // Simulate async processing
+                sleep(Duration.from_millis(10)).await
+                let result = ProcessedItem {
+                    id: item.id,
+                    result: item.payload |> str.to_uppercase,
+                    worker_id: id,
+                }
+                tx.send(result).await
+            None -> break  // channel closed, no more items
+
+// --- Stage 3: Collector (Fan-in) ---
+//
+// Collects processed results with a timeout.
+// Demonstrates: select with let-else inside branches, timeout.
+
+async fn collect_results(
+    rx: Receiver[ProcessedItem],
+    expected: u64,
+) -> Vec[ProcessedItem]:
+    with Vec.new() as mut results:
+        var remaining = expected
+        loop:
+            if remaining == 0:
+                break
+            select await
+                opt = rx.recv() ->
+                    let Some(item) = opt else
+                        println("  channel closed with {remaining} items remaining")
+                        break
+                    println("  collected #{item.id} from worker {item.worker_id}: {item.result}")
+                    results.push(item)
+                    remaining = remaining - 1
+                _ = timeout(Duration.from_secs(5)) ->
+                    println("  timeout waiting for results!")
+                    break
+
+// --- Stage 4: Stats Aggregator ---
+//
+// Simple pipeline stage that computes stats from results.
+
+fn compute_stats(results: &[ProcessedItem]):
+    Stats {
+        total: results.len64(),
+        successes: results.iter()
+            |> filter(|r| not r.result.is_empty())
+            |> count() as u64,
+        failures: results.iter()
+            |> filter(|r| r.result.is_empty())
+            |> count() as u64,
     }
 
-fn double(x: i32) -> i32: x * 2
+// --- Demo 1: Simple Pipeline ---
 
-fn add_ten(x: i32) -> i32: x + 10
+async fn demo_simple_pipeline:
+    println("=== Demo 1: Simple Pipeline ===\n")
 
-// --- Pipeline Stage Functions ---
+    let (work_tx, work_rx) = chan[WorkItem](buffer: 8)
+    let (result_tx, result_rx) = chan[ProcessedItem](buffer: 8)
+    let item_count: u64 = 10
 
-fn produce_items(count: i32) -> i32:
-    var total = 0
-    for i in 0..count:
-        let item = WorkItem { id: i, payload: i * 10 }
-        let processed = process_item(item, 0)
-        total = total + processed.result
-    total
+    async scope |s|:
+        // producer
+        s.track(produce(work_tx, item_count))
 
-// --- Stats computation ---
+        // single worker
+        s.track(worker(0, &work_rx, result_tx))
 
-fn count_positive(a: i32, b: i32, c: i32, d: i32, e: i32) -> i32:
-    var n = 0
-    if a > 0:
-        n = n + 1
-    if b > 0:
-        n = n + 1
-    if c > 0:
-        n = n + 1
-    if d > 0:
-        n = n + 1
-    if e > 0:
-        n = n + 1
-    n
+        // collector
+        let results = collect_results(result_rx, item_count).await
+        let stats = compute_stats(&results)
+
+        println("\nStats: {stats.total} total, {stats.successes} ok, {stats.failures} failed")
+
+// --- Demo 2: Fan-out / Fan-in ---
+
+async fn demo_fan_out:
+    println("\n=== Demo 2: Fan-out / Fan-in (3 workers) ===\n")
+
+    let (work_tx, work_rx) = chan[WorkItem](buffer: 16)
+    let (result_tx, result_rx) = chan[ProcessedItem](buffer: 16)
+    let item_count: u64 = 15
+    let worker_count: u32 = 3
+
+    async scope |s|:
+        // producer
+        s.track(produce(work_tx, item_count))
+
+        // fan-out: N workers sharing the same rx
+        // Each worker gets its own clone of result_tx.
+        for id in 0..worker_count:
+            let tx_clone = result_tx.clone()
+            s.track(worker(id, &work_rx, tx_clone))
+
+        // Drop the original result_tx so the channel closes
+        // when all worker clones are dropped.
+        drop(result_tx)
+
+        // fan-in: single collector
+        let results = collect_results(result_rx, item_count).await
+        let stats = compute_stats(&results)
+
+        println("\nStats: {stats.total} total, {stats.successes} ok, {stats.failures} failed")
+
+        // Show which worker handled what
+        with HashMap[u32, u64].new() as mut worker_counts:
+            for r in results:
+                let entry = worker_counts.entry(r.worker_id).or_insert(0)
+                *entry = *entry + 1
+            for (wid, count) in worker_counts:
+                println("  worker {wid}: {count} items")
+
+// --- Demo 3: Select with Multiple Sources ---
+
+async fn demo_select:
+    println("\n=== Demo 3: Select with Multiple Sources ===\n")
+
+    let (fast_tx, fast_rx) = chan[str](buffer: 4)
+    let (slow_tx, slow_rx) = chan[str](buffer: 4)
+
+    async scope |s|:
+        // fast producer — sends every 50ms
+        s.track(async:
+            for i in 0..5:
+                sleep(Duration.from_millis(50)).await
+                fast_tx.send("fast-{i}").await
+        )
+
+        // slow producer — sends every 200ms
+        s.track(async:
+            for i in 0..3:
+                sleep(Duration.from_millis(200)).await
+                slow_tx.send("slow-{i}").await
+        )
+
+        // multiplexed consumer
+        var total = 0
+        loop:
+            if total >= 8:
+                break
+            select await
+                opt = fast_rx.recv() ->
+                    let Some(msg) = opt else break
+                    println("  fast: {msg}")
+                    total = total + 1
+                opt = slow_rx.recv() ->
+                    let Some(msg) = opt else break
+                    println("  slow: {msg}")
+                    total = total + 1
+                _ = timeout(Duration.from_secs(1)) ->
+                    println("  timeout — done waiting")
+                    break
+
+    println("\nReceived {total} messages total")
 
 // --- Main ---
 
-fn main:
-    println("=== Pipeline Demo ===")
+async fn main:
+    println("=== Channel Pipeline Demo ===\n")
 
-    // Demo 1: Pipeline operator composition
-    let result = 5 |> double |> add_ten |> double
-    println("Pipeline: 5 |> double |> add_ten |> double = {result}")
+    demo_simple_pipeline().await
+    demo_fan_out().await
+    demo_select().await
 
-    // Demo 2: Produce and process items
-    let total = produce_items(5)
-    println("Processed 5 items, total = {total}")
-
-    // Demo 3: Stats
-    let successes = count_positive(10, 20, 0, 30, 0)
-    let failures = 5 - successes
-    println("Stats: 5 total, {successes} ok, {failures} failed")
-
-    // Demo 4: Chained transforms
-    var sum = 0
-    for i in 1..5:
-        sum = sum + (i |> double |> add_ten)
-    println("Sum of transformed [1..5]: {sum}")
-
-    println("=== Demo complete ===")
+    println("\n=== Demo complete ===")

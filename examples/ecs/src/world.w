@@ -43,7 +43,7 @@ type World = {
 }
 
 extend World:
-    fn new -> World:
+    fn new:
         World {
             entities: SlotMap.new(),
             transforms: DenseStorage.new(),
