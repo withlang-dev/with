@@ -1,185 +1,107 @@
-// ===================================================================
-// Service Demo — Simplified
-//
-// Demonstrates:
-//   - Trait definitions and implementations
-//   - Extend blocks for inherent methods
-//   - Enum-based error handling with match
-//   - Structs with default values
-//   - Generic functions
-//   - Pipeline operator
-//   - String interpolation
-//   - Defer for cleanup
-// ===================================================================
+module app.main
 
-extern fn puts(s: *const i8) -> i32
+use app.service.{UserService, ServiceConfig}
+use app.errors.ServiceError
+use app.repo.postgres.PgUserRepo
+use app.cache.redis.RedisCache
+use app.notify.email.EmailNotifier
+use app.http.{AppState, HttpResponse, handle_request}
+use std.sync.Arc
+use std.net.TcpStream
+use std.time.Duration
 
-// --- Domain Types ---
-
-type User = {
-    id: i32,
-    name: str,
-    email: str,
-    score: i32,
-}
-
-type ServiceConfig = {
-    max_retries: i32,
-    timeout_ms: i32,
-    cache_enabled: bool,
-}
-
-// --- Error Type ---
-
-type ServiceResult = Ok | NotFound | InvalidInput | ServerError
-
-fn result_name(r: ServiceResult) -> str:
-    match r
-        Ok -> "ok"
-        NotFound -> "not found"
-        InvalidInput -> "invalid input"
-        ServerError -> "server error"
-
-// --- User "Repository" (in-memory array) ---
-
-fn make_user(id: i32, name: str, email: str, score: i32) -> User: User { id, name, email, score }
-
-fn find_user(users: [5]User, id: i32) -> ServiceResult:
-    var found = false
-    for i in 0..5:
-        if users[i].id == id:
-            found = true
-    if found then Ok else NotFound
-
-fn get_user_score(users: [5]User, id: i32) -> i32:
-    var score = 0
-    for i in 0..5:
-        if users[i].id == id:
-            score = users[i].score
-    score
-
-// --- Service Layer ---
-
-type Service = {
-    config: ServiceConfig,
-    request_count: i32,
-}
-
-extend Service:
-    fn new(config: ServiceConfig) -> Service: Service { config, request_count: 0 }
-
-    fn get_timeout(self: Service) -> i32: self.config.timeout_ms
-
-// --- Validation ---
-
-fn validate_id(id: i32) -> ServiceResult: if id in 1..=1000 then Ok else InvalidInput
-
-fn validate_and_find(users: [5]User, id: i32) -> ServiceResult:
-    let validation = validate_id(id)
-    match validation
-        Ok -> find_user(users, id)
-        _ -> validation
-
-// --- Generic utility ---
-
-fn identity[T](x: T) -> T: x
-
-fn first_of[T](a: T, b: T) -> T: a
-
-// --- Trait demo ---
-
-trait Printable: fn display(self: Self)
-
-impl Printable for User:
-    fn display(self: User):
-        println("User #{self.id}: {self.name} <{self.email}> score={self.score}")
-
-impl Printable for ServiceConfig:
-    fn display(self: ServiceConfig):
-        println("Config: retries={self.max_retries}, timeout={self.timeout_ms}ms, cache={self.cache_enabled}")
-
-// --- Request handling demo ---
-
-fn handle_request(users: [5]User, endpoint: i32, user_id: i32) -> ServiceResult:
-    match endpoint
-        1 -> validate_and_find(users, user_id)
-        2 -> Ok
-        _ -> NotFound
-
-// --- Main ---
-
-fn main:
-    println("=== Service Demo ===")
-
-    // Configuration with defaults
+async fn main -> Result[Unit, ServiceError]:
+    // Configuration — only override fields that differ from defaults
     let config = ServiceConfig {
-        max_retries: 3,
-        timeout_ms: 5000,
-        cache_enabled: true,
+        cache_ttl: Duration.minutes(10),
+        notify_on_delete: true,
+        max_batch_size: 50,
     }
-    config.display()
 
-    // Create service
-    let service = Service.new(config)
-    let timeout = service.get_timeout()
-    println("Service timeout: {timeout}ms")
+    // Initialize infrastructure
+    let db_pool = ConnectionPool.connect("postgres://localhost/myapp", 20).await?
+    let redis = RedisClient.connect("redis://localhost:6379").await?
 
-    // Initialize user repository
-    let users: [5]User = [
-        make_user(1, "Alice", "alice@example.com", 95),
-        make_user(2, "Bob", "bob@example.com", 82),
-        make_user(3, "Charlie", "charlie@example.com", 91),
-        make_user(4, "Diana", "diana@example.com", 78),
-        make_user(5, "Eve", "eve@example.com", 88),
-    ]
+    // Compose the service — builder methods take self by value (S9.5)
+    let service = UserService.builder()
+        .repo(Box.new(PgUserRepo.new(db_pool)))
+        .cache(Box.new(RedisCache.new(redis, "myapp")))
+        .notifier(Box.new(EmailNotifier {
+            smtp_host: "smtp.example.com",
+            from_addr: "noreply@example.com",
+            rate_limit: RateLimiter.new(100, Duration.minutes(1)),
+        }))
+        .audit(Box.new(PgAuditLog.new(db_pool.clone())))
+        .config(config)
+        .build()?
 
-    // Display all users
-    println("--- All Users ---")
-    for i in 0..5:
-        users[i].display()
+    let state = Arc.new(AppState { service: Arc.new(service) })
 
-    // Handle requests
-    println("--- Request Handling ---")
+    let listener = std.net.TcpListener.bind("0.0.0.0:8080").await?
+    println("Listening on :8080")
 
-    let r1 = handle_request(users, 1, 3)
-    let r1_name = result_name(r1)
-    println("GET /users/3: {r1_name}")
+    // Structured concurrency: all connection fibers are children of this scope.
+    // On shutdown, the scope cancels all children and waits for cleanup.
+    async scope |s|:
+        let shutdown = s.track(listen_for_shutdown())
 
-    let r2 = handle_request(users, 1, 99)
-    let r2_name = result_name(r2)
-    println("GET /users/99: {r2_name}")
+        loop:
+            // Race: accept a new connection OR receive shutdown signal
+            select await
+                result = listener.accept() ->
+                    match result
+                        Ok(conn) ->
+                            s.track(handle_connection(state.clone(), conn))
+                        Err(e) ->
+                            eprintln("Accept error: {e}")
+                _ = shutdown ->
+                    println("Shutdown signal received, draining connections...")
+                    break
 
-    let r3 = handle_request(users, 1, -1)
-    let r3_name = result_name(r3)
-    println("GET /users/-1: {r3_name}")
+    // Scope guarantees: all spawned fibers have completed or been cancelled.
+    println("Service shut down cleanly.")
 
-    let r4 = handle_request(users, 3, 1)
-    let r4_name = result_name(r4)
-    println("GET /unknown: {r4_name}")
 
-    // Score computation with pipeline
-    println("--- Score Stats ---")
-    var total_score = 0
-    for i in 0..5:
-        total_score = total_score + users[i].score
-    let avg_score = total_score / 5
-    println("Total score: {total_score}")
-    println("Average score: {avg_score}")
+async fn listen_for_shutdown:
+    std.signal.wait(Signal.SIGTERM).await
 
-    // Find highest score
-    var max_score = 0
-    for i in 0..5:
-        let s = users[i].score
-        if s > max_score:
-            max_score = s
-    println("Highest score: {max_score}")
 
-    // Generic function demo
-    let x = identity(42)
-    let y = first_of(10, 20)
-    println("identity(42) = {x}, first_of(10,20) = {y}")
+// ---------------------------------------------------------------------------
+// Connection handling — timeout wrapping + error recovery
+// ---------------------------------------------------------------------------
 
-    // Defer demo
-    defer puts("--- Cleanup: connections closed ---")
+async fn handle_connection(state: Arc[AppState], conn: TcpStream):
+    let req = http.parse_request(&conn).await
 
-    println("=== Demo complete ===")
+    let result = with_timeout(
+        Duration.seconds(5),
+        handle_request(&state, req),
+    ).await
+
+    let resp = match result
+        Ok(r)              -> r
+        Err(.Timeout(..))  -> HttpResponse.json(408, "\"request timeout\"")
+        Err(e)             -> HttpResponse.internal_error(&e.to_string())
+
+    conn.write_all(resp.as_bytes()).await
+
+
+// ---------------------------------------------------------------------------
+// Timeout utility — select + task cancellation
+// ---------------------------------------------------------------------------
+
+// Runs `task` with a deadline. If the timer fires first, the task is
+// cancelled. Cancellation triggers unwinding — all destructors run,
+// all `with`-block guards are released, all resources are cleaned up.
+async fn with_timeout[T](
+    limit: Duration,
+    task: Task[T],
+) -> Result[T, ServiceError]:
+    let timer = async_sleep(limit)
+
+    select await
+        result = task ->
+            result
+        _ = timer ->
+            task.cancel()
+            Err(.Timeout("request", limit))

@@ -1,93 +1,424 @@
+module json
+
 // ===================================================================
-// JSON-like Parser — Simplified
+// JSON Parser — Recursive Descent
 //
 // Demonstrates:
-//   - Enum variants
-//   - Pattern matching
-//   - Recursive functions
-//   - String interpolation
-//   - For loops and ranges
+//   - Algebraic data types (enum variants with data)
+//   - Pattern matching (nested, guards, or-patterns)
+//   - Error declarations with positional context
+//   - Generators for lazy tree traversal
+//   - Pipeline operators for composition
+//   - StrView (ephemeral string slices)
+//   - Collection comprehensions
+//   - with blocks (scoped mutation)
 // ===================================================================
 
-type JsonTag = Null | Bool | Number | Str
+// --- JSON Value Type ---
 
-fn classify_char(ch: i32) -> i32:
-    if ch == 123 then 1
-    else if ch == 125 then 2
-    else if ch == 91 then 3
-    else if ch == 93 then 4
-    else if ch == 58 then 5
-    else if ch == 44 then 6
-    else 0
+type JsonValue =
+    | Null
+    | Bool(bool)
+    | Number(f64)
+    | Str(str)
+    | Array(Vec[JsonValue])
+    | Object(Vec[(str, JsonValue)])
 
-fn update_depth(depth: i32, cls: i32) -> i32:
-    if cls in [1, 3] then depth + 1
-    else if cls in [2, 4] then depth - 1
-    else depth
+// --- Errors ---
 
-fn max(a: i32, b: i32) -> i32: if a > b then a else b
+error JsonError =
+    | UnexpectedChar(pos: usize, expected: str, got: u8)
+    | UnexpectedEof(pos: usize, context: str)
+    | InvalidNumber(pos: usize, text: str)
+    | InvalidEscape(pos: usize, ch: u8)
+    | TrailingContent(pos: usize)
 
-fn count_depth(input: [10]i32, len: i32) -> i32:
-    var max_depth = 0
-    var depth = 0
-    for i in 0..len:
-        let cls = classify_char(input[i])
-        depth = update_depth(depth, cls)
-        max_depth = max(max_depth, depth)
-    max_depth
+// --- Token Types ---
 
-fn is_digit(ch: i32) -> bool: ch in 48..=57
+type Token =
+    | LBrace
+    | RBrace
+    | LBracket
+    | RBracket
+    | Colon
+    | Comma
+    | TNull
+    | TBool(bool)
+    | TNumber(f64)
+    | TString(str)
 
-fn classify_value(first_char: i32) -> i32:
-    if first_char == 110 then 0
-    else if first_char == 116 then 1
-    else if first_char == 102 then 2
-    else if is_digit(first_char) then 3
-    else if first_char == 34 then 4
-    else 5
+// --- Tokenizer ---
 
-fn is_json_char(ch: i32) -> bool:
-    let cls = classify_char(ch)
-    cls > 0 or is_digit(ch) or ch in [34, 32]
+type Tokenizer = {
+    input: Vec[u8],
+    pos: usize = 0,
+}
 
-fn fib(n: i32) -> i32:
-    if n <= 1 then n
-    else fib(n - 1) + fib(n - 2)
+extend Tokenizer:
+    fn new(input: str):
+        Tokenizer { input: input.into_bytes() }
+
+    fn peek(self: &Self) -> Option[u8]:
+        if self.pos < self.input.len():
+            Some(self.input[self.pos])
+        else:
+            None
+
+    fn advance(self: &mut Self) -> Option[u8]:
+        if self.pos < self.input.len():
+            let ch = self.input[self.pos]
+            self.pos = self.pos + 1
+            Some(ch)
+        else:
+            None
+
+    fn skip_whitespace(self: &mut Self):
+        loop:
+            match self.peek()
+                Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r') ->
+                    self.pos = self.pos + 1
+                _ -> break
+
+    fn next_token(self: &mut Self) -> Result[Option[Token], JsonError]:
+        self.skip_whitespace()
+        match self.advance()
+            None        -> Ok(None)
+            Some(b'{')  -> Ok(Some(.LBrace))
+            Some(b'}')  -> Ok(Some(.RBrace))
+            Some(b'[')  -> Ok(Some(.LBracket))
+            Some(b']')  -> Ok(Some(.RBracket))
+            Some(b':')  -> Ok(Some(.Colon))
+            Some(b',')  -> Ok(Some(.Comma))
+            Some(b'"')  -> self.read_string() |> Result.map(.TString) |> Result.map(Some)
+            Some(b't')  -> self.expect_literal("rue")  |> Result.map(|_| Some(.TBool(true)))
+            Some(b'f')  -> self.expect_literal("alse") |> Result.map(|_| Some(.TBool(false)))
+            Some(b'n')  -> self.expect_literal("ull")  |> Result.map(|_| Some(.TNull))
+            Some(ch) if ch == b'-' or (ch >= b'0' and ch <= b'9') ->
+                self.pos = self.pos - 1
+                self.read_number() |> Result.map(.TNumber) |> Result.map(Some)
+            Some(ch) ->
+                Err(.UnexpectedChar(
+                    pos: self.pos - 1,
+                    expected: "valid JSON token",
+                    got: ch,
+                ))
+
+    fn read_string(self: &mut Self) -> Result[str, JsonError]:
+        with str.new() as mut buf:
+            loop:
+                match self.advance()
+                    None ->
+                        return Err(.UnexpectedEof(
+                            pos: self.pos,
+                            context: "unterminated string",
+                        ))
+                    Some(b'"') -> break
+                    Some(b'\\') ->
+                        match self.advance()
+                            Some(b'"')  -> buf.push(b'"')
+                            Some(b'\\') -> buf.push(b'\\')
+                            Some(b'/')  -> buf.push(b'/')
+                            Some(b'n')  -> buf.push(b'\n')
+                            Some(b't')  -> buf.push(b'\t')
+                            Some(b'r')  -> buf.push(b'\r')
+                            Some(ch)    -> return Err(.InvalidEscape(pos: self.pos - 1, ch))
+                            None        -> return Err(.UnexpectedEof(
+                                pos: self.pos,
+                                context: "escape sequence",
+                            ))
+                    Some(ch) -> buf.push(ch)
+            buf
+
+    fn read_number(self: &mut Self) -> Result[f64, JsonError]:
+        let start = self.pos
+        // optional minus
+        if self.peek() == Some(b'-'):
+            self.pos = self.pos + 1
+        // integer part
+        self.read_digits()
+        // optional fractional part
+        if self.peek() == Some(b'.'):
+            self.pos = self.pos + 1
+            self.read_digits()
+        // optional exponent
+        match self.peek()
+            Some(b'e') | Some(b'E') ->
+                self.pos = self.pos + 1
+                match self.peek()
+                    Some(b'+') | Some(b'-') -> self.pos = self.pos + 1
+                    _ -> ()
+                self.read_digits()
+            _ -> ()
+
+        let text = str.from_utf8_lossy(&self.input[start..self.pos])
+        text.parse_f64()
+            .map_err(|_| .InvalidNumber(pos: start, text: text.to_string()))
+
+    fn read_digits(self: &mut Self):
+        loop:
+            match self.peek()
+                Some(ch) if ch >= b'0' and ch <= b'9' -> self.pos = self.pos + 1
+                _ -> break
+
+    fn expect_literal(self: &mut Self, expected: &str) -> Result[Unit, JsonError]:
+        for ch in expected.bytes():
+            match self.advance()
+                Some(got) if got == ch -> ()
+                Some(got) -> return Err(.UnexpectedChar(
+                    pos: self.pos - 1,
+                    expected: expected.to_string(),
+                    got,
+                ))
+                None -> return Err(.UnexpectedEof(
+                    pos: self.pos,
+                    context: "literal '{expected}'",
+                ))
+
+// --- Recursive Descent Parser ---
+
+type Parser = {
+    tokenizer: Tokenizer,
+    current: Option[Token],
+}
+
+extend Parser:
+    fn new(input: str) -> Result[Parser, JsonError]:
+        var tokenizer = Tokenizer.new(input)
+        let first = tokenizer.next_token()?
+        Parser { tokenizer, current: first }
+
+    fn bump(self: &mut Self) -> Result[Unit, JsonError]:
+        self.current = self.tokenizer.next_token()?
+
+    fn expect_token(self: &mut Self, description: str) -> Result[Token, JsonError]:
+        match self.current.take()
+            Some(tok) ->
+                self.bump()?
+                tok
+            None ->
+                Err(.UnexpectedEof(
+                    pos: self.tokenizer.pos,
+                    context: description,
+                ))
+
+    fn parse_value(self: &mut Self) -> Result[JsonValue, JsonError]:
+        match &self.current
+            Some(.LBrace)   -> self.parse_object()
+            Some(.LBracket) -> self.parse_array()
+            Some(.TNull)    ->
+                self.bump()?
+                .Null
+            Some(.TBool(_)) ->
+                let .TBool(b) = self.expect_token("bool")?
+                .Bool(b)
+            Some(.TNumber(_)) ->
+                let .TNumber(n) = self.expect_token("number")?
+                .Number(n)
+            Some(.TString(_)) ->
+                let .TString(s) = self.expect_token("string")?
+                .Str(s)
+            Some(_) ->
+                Err(.UnexpectedChar(
+                    pos: self.tokenizer.pos,
+                    expected: "JSON value",
+                    got: 0,
+                ))
+            None ->
+                Err(.UnexpectedEof(
+                    pos: self.tokenizer.pos,
+                    context: "JSON value",
+                ))
+
+    fn parse_array(self: &mut Self) -> Result[JsonValue, JsonError]:
+        self.bump()?  // consume '['
+        with Vec.new() as mut items:
+            // empty array
+            if let Some(.RBracket) = &self.current:
+                self.bump()?
+                return .Array(items)
+            // first element
+            items.push(self.parse_value()?)
+            // remaining elements
+            loop:
+                match &self.current
+                    Some(.Comma) ->
+                        self.bump()?
+                        items.push(self.parse_value()?)
+                    Some(.RBracket) ->
+                        self.bump()?
+                        break
+                    _ -> return Err(.UnexpectedEof(
+                        pos: self.tokenizer.pos,
+                        context: "array element or ']'",
+                    ))
+            .Array(items)
+
+    fn parse_object(self: &mut Self) -> Result[JsonValue, JsonError]:
+        self.bump()?  // consume '{'
+        with Vec.new() as mut entries:
+            // empty object
+            if let Some(.RBrace) = &self.current:
+                self.bump()?
+                return .Object(entries)
+            // first key-value pair
+            entries.push(self.parse_kv()?)
+            // remaining pairs
+            loop:
+                match &self.current
+                    Some(.Comma) ->
+                        self.bump()?
+                        entries.push(self.parse_kv()?)
+                    Some(.RBrace) ->
+                        self.bump()?
+                        break
+                    _ -> return Err(.UnexpectedEof(
+                        pos: self.tokenizer.pos,
+                        context: "object entry or '}'",
+                    ))
+            .Object(entries)
+
+    fn parse_kv(self: &mut Self) -> Result[(str, JsonValue), JsonError]:
+        let key = match self.expect_token("object key")?
+            .TString(s) -> s
+            _ -> return Err(.UnexpectedChar(
+                pos: self.tokenizer.pos,
+                expected: "string key",
+                got: 0,
+            ))
+        // expect colon
+        match self.expect_token("':'")?
+            .Colon -> ()
+            _ -> return Err(.UnexpectedChar(
+                pos: self.tokenizer.pos,
+                expected: "':'",
+                got: 0,
+            ))
+        let value = self.parse_value()?
+        (key, value)
+
+fn parse(input: str) -> Result[JsonValue, JsonError]:
+    var parser = Parser.new(input)?
+    let value = parser.parse_value()?
+    if parser.current.is_some():
+        return Err(.TrailingContent(pos: parser.tokenizer.pos))
+    value
+
+// --- Generator: Leaf Path Walker ---
+//
+// Lazily walks the JSON tree and yields (path, leaf_value) pairs.
+// Captures &JsonValue — generator is ephemeral (cannot be stored).
+
+gen fn walk_leaves(value: &JsonValue, path: str) -> (str, &JsonValue):
+    match value
+        .Null | .Bool(_) | .Number(_) | .Str(_) ->
+            yield (path, value)
+        .Array(items) ->
+            for (i, item) in items.iter().enumerate():
+                let child_path = "{path}[{i}]"
+                for leaf in walk_leaves(item, child_path):
+                    yield leaf
+        .Object(entries) ->
+            for (key, val) in entries:
+                let child_path = if path.is_empty() then key.clone() else "{path}.{key}"
+                for leaf in walk_leaves(val, child_path):
+                    yield leaf
+
+// --- Display ---
+
+extend JsonValue:
+    fn to_string(self: &Self) -> str:
+        match self
+            .Null       -> "null"
+            .Bool(b)    -> "{b}"
+            .Number(n)  -> "{n}"
+            .Str(s)     -> "\"{s}\""
+            .Array(items) ->
+                let inner = items.iter()
+                    |> map(|item| "{item}")
+                    |> collect[Vec]()
+                    |> join(", ")
+                "[{inner}]"
+            .Object(entries) ->
+                let inner = entries.iter()
+                    |> map(|(k, v)| "\"{k}\": {v}")
+                    |> collect[Vec]()
+                    |> join(", ")
+                "{ {inner} }"
+
+    // --- Accessors ---
+
+    fn get(self: &Self, key: &str) -> Option[&JsonValue]:
+        match self
+            .Object(entries) ->
+                entries.iter()
+                    |> find(|(k, _)| k == key)
+                    |> Option.map(|(_, v)| v)
+            _ -> None
+
+    fn index(self: &Self, i: usize) -> Option[&JsonValue]:
+        match self
+            .Array(items) if i < items.len() -> Some(&items[i])
+            _ -> None
+
+// Accessor methods — .as_str(), .as_number(), .as_bool(), .as_array(),
+// .as_object() and .is_null(), .is_str(), etc. — are auto-generated
+// for every enum variant (S4.4). No manual definitions needed.
+
+// --- Main Demo ---
 
 fn main:
-    println("=== JSON Parser Demo ===")
+    let input = r#"{
+        "name": "With Language",
+        "version": 3.2,
+        "features": ["handles", "fibers", "comptime"],
+        "meta": {
+            "stable": false,
+            "authors": ["core-team"],
+            "stats": { "stars": 0, "forks": null }
+        }
+    }"#
 
-    let input: [10]i32 = [123, 34, 107, 101, 121, 34, 58, 52, 50, 125]
+    println("=== JSON Parser Demo ===\n")
+    println("Input ({input.len()} bytes):\n{input}\n")
 
-    let depth = count_depth(input, 10)
-    println("Max nesting depth: {depth}")
+    match parse(input)
+        Ok(value) ->
+            println("Parsed successfully!\n")
+            println("Pretty: {value}\n")
 
-    var valid_count = 0
-    for i in 0..10:
-        if is_json_char(input[i]):
-            valid_count = valid_count + 1
-    println("Valid JSON chars: {valid_count}/10")
+            // Access nested values via optional chaining + ??
+            let name = value.get("name")?.as_str() ?? "unknown"
+            println("Name: {name}")
 
-    let null_type = classify_value(110)
-    let true_type = classify_value(116)
-    let num_type = classify_value(52)
-    let str_type = classify_value(34)
-    println("null=type{null_type}, true=type{true_type}, num=type{num_type}, str=type{str_type}")
+            let version = value.get("version")?.as_number() ?? 0.0
+            println("Version: {version}")
 
-    let tag = Null
-    match tag
-        Null -> println("Got null value")
-        Bool -> println("Got bool")
-        Number -> println("Got number")
-        Str -> println("Got string")
+            // Access array elements
+            let first_feature = value.get("features")?.index(0)?.as_str() ?? "none"
+            println("First feature: {first_feature}")
 
-    let tag2 = Number
-    match tag2
-        Null -> println("null")
-        Number -> println("Got a number value")
-        _ -> println("other")
+            // Walk all leaves using generator
+            println("\nAll leaf paths:")
+            for (path, leaf) in walk_leaves(&value, ""):
+                println("  {path} = {leaf}")
 
-    let f10 = fib(10)
-    println("fib(10) = {f10}")
+            // Count features using optional chaining
+            let feature_count = value.get("features")?.as_array()?.len() ?? 0
+            println("\nFeature count: {feature_count}")
 
-    println("=== Demo complete ===")
+        Err(e) ->
+            println("Parse error: {e}")
+
+    // Demonstrate error handling
+    println("\n--- Error cases ---")
+    let bad_inputs = [
+        (r#"{"key": }"#, "missing value"),
+        (r#"[1, 2,"#,    "unterminated array"),
+        (r#""hello"#,    "unterminated string"),
+    ]
+    for (input, description) in bad_inputs:
+        match parse(input.to_string())
+            Ok(_)  -> println("  {description}: unexpectedly succeeded")
+            Err(e) -> println("  {description}: {e}")
+
+    println("\n=== Demo complete ===")

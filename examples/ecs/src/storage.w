@@ -16,7 +16,7 @@ type DenseStorage[T] = {
 }
 
 extend DenseStorage[T]:
-    fn new -> DenseStorage[T]:
+    fn new:
         DenseStorage {
             dense_entities: Vec.new(),
             dense_data: Vec.new(),
