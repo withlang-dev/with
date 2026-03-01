@@ -315,6 +315,8 @@ pub const BinOp = enum {
     mul_wrap,
     default_op, // ??
     concat, // ++
+    in_op, // x in collection
+    not_in, // x not in collection
 };
 
 pub const UnaryExpr = struct {

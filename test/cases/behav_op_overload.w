@@ -24,15 +24,23 @@ fn test_operator_tokens:
 fn test_solver_add_trait:
     // Operator overloading works through traits: Add, Sub, Mul, Eq
     var solver = TraitSolver.new()
-    TraitSolver.add_trait(solver, "Add", 1)
-    TraitSolver.add_trait(solver, "Sub", 1)
-    TraitSolver.add_trait(solver, "Mul", 1)
-    TraitSolver.add_trait(solver, "Eq", 1)
-    assert(TraitSolver.trait_count(solver) == 4)
-    // Implement Add for a custom type (id=20)
-    TraitSolver.add_impl(solver, "Add", 20)
-    assert(TraitSolver.resolve(solver, "Add", 20) == 1)
-    assert(TraitSolver.resolve(solver, "Sub", 20) == 0)
+    // Register Add trait with 1 method
+    var mn = Vec.new()
+    mn.push(1)
+    var mp = Vec.new()
+    mp.push(1)  // 1 param (rhs)
+    var mr = Vec.new()
+    mr.push(0)
+    TraitSolver.add_trait(solver, 100, mn, mp, mr)  // "Add"
+    TraitSolver.add_trait(solver, 101, mn, mp, mr)  // "Sub"
+    TraitSolver.add_trait(solver, 102, mn, mp, mr)  // "Mul"
+    TraitSolver.add_trait(solver, 103, mn, mp, mr)  // "Eq"
+    // Implement Add for custom type (id=20)
+    var im = Vec.new()
+    im.push(1)
+    TraitSolver.add_impl(solver, 20, 100, im)
+    assert(TraitSolver.resolve(solver, 100, 20) >= 0)  // Add found
+    assert(TraitSolver.resolve(solver, 101, 20) < 0)    // Sub not found
 
 fn test_binop_constants:
     // Verify binary op constants are distinct

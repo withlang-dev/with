@@ -11,6 +11,7 @@ use Sema
 use InternPool
 use Mir
 use MirBuild
+use Parser
 
 fn lex(source: str) -> TokenList:
     var l = Lexer.new(source, 0)

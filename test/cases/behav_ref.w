@@ -11,6 +11,7 @@ use Sema
 use InternPool
 use Borrow
 use Mir
+use Parser
 
 fn lex(source: str) -> TokenList:
     var l = Lexer.new(source, 0)
@@ -68,9 +69,9 @@ fn test_type_ptr:
 fn test_borrow_checker_clean:
     var types = TypeTable.new()
     var body = MirBody.new()
-    MirBody.add_local(body, TYPE_I32(), 0)  // return place
-    MirBody.add_block(body)
-    MirBody.set_terminator(body, 0, TM_RETURN(), 0, 0, 0)
+    MirBody.add_local(body, 0, TYPE_I32(), 0)  // return place (name=0, type=i32, not mutable)
+    let bb0 = MirBody.add_block(body)
+    MirBody.set_return(body, bb0)
     var bc = BorrowChecker.new(body, types)
     BorrowChecker.check(bc)
     assert(BorrowChecker.error_count(bc) == 0)

@@ -141,9 +141,9 @@ fn test_defer_lifo_order:
     MirBuilder.add_defer(builder, d1)
     MirBuilder.add_defer(builder, d2)
     MirBuilder.add_defer(builder, d3)
-    // Verify defers stored
-    let sc = builder.scopes.get(builder.current_scope_idx as i64)
-    assert(sc.defers.len() == 3)
+    // Verify defers stored (using SoA arrays)
+    let defer_count = builder.scope_defer_counts.get(builder.current_scope_idx as i64)
+    assert(defer_count == 3)
     // Defers execute in LIFO: d3, d2, d1
 
 fn main:

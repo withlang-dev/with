@@ -31,9 +31,19 @@ cp .with/build/main ./with-stage1
 3. Stage 2 (self-hosted compiler compiles itself):
 
 ```sh
-./with-stage1 build src/main.w -o .with/build/with-stage2
-cp .with/build/with-stage2 ./with-stage2
+cp ./with-stage1 /tmp/with-stage1-local
+chmod +x /tmp/with-stage1-local
+/tmp/with-stage1-local build src/main.w
+cp .with/build/main ./with-stage2
 ```
+
+For a reliable end-to-end rebuild on macOS/external-volume setups, use:
+
+```sh
+./scripts/rebuild_selfhost.sh stage2
+```
+
+This runs compiler binaries from `/tmp` and writes logs to `.with/build/.stage*.log`.
 
 ## Test
 
@@ -47,7 +57,8 @@ Run both suites with the bootstrap test harness:
 Then sanity-check the stage2 compiler binary:
 
 ```sh
-./with-stage2 version
+cp ./with-stage2 /tmp/with-stage2-check
+/tmp/with-stage2-check version
 ```
 
 Or use Make targets for the full flow:

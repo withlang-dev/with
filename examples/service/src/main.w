@@ -74,9 +74,7 @@ extend Service =
 // --- Validation ---
 
 fn validate_id(id: i32) -> ServiceResult:
-    if id <= 0 then InvalidInput
-    else if id > 1000 then InvalidInput
-    else Ok
+    if id in 1..=1000 then Ok else InvalidInput
 
 fn validate_and_find(users: [5]User, id: i32) -> ServiceResult:
     let validation = validate_id(id)

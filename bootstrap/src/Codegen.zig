@@ -4097,6 +4097,7 @@ fn genBinary(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
     if (bin.op == .@"and") return self.genShortCircuitAnd(bin);
     if (bin.op == .@"or") return self.genShortCircuitOr(bin);
     if (bin.op == .default_op) return self.genDefaultOp(bin);
+    if (bin.op == .in_op or bin.op == .not_in) return self.genInExpr(bin);
 
     const lhs = try self.genExpr(bin.lhs);
     const rhs = try self.genExpr(bin.rhs);
@@ -4432,6 +4433,88 @@ fn genDefaultOp(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
     }
 
     return phi;
+}
+
+/// Generate `x in collection` or `x not in collection`.
+/// Dispatches based on RHS AST kind: array literal, range, or collection type.
+fn genInExpr(self: *Codegen, bin: Ast.BinaryExpr) Error!c.LLVMValueRef {
+    const negate = bin.op == .not_in;
+    const i1_type = c.LLVMInt1TypeInContext(self.context);
+
+    // Path A: RHS is array literal — unroll to comparison chain (zero allocation)
+    if (bin.rhs.kind == .array_literal) {
+        const elements = bin.rhs.kind.array_literal;
+        const lhs = try self.genExpr(bin.lhs);
+
+        if (elements.len == 0) {
+            return c.LLVMConstInt(i1_type, if (negate) 1 else 0, 0);
+        }
+
+        var result = c.LLVMConstInt(i1_type, 0, 0);
+        const lhs_type = c.LLVMTypeOf(lhs);
+        for (elements) |elem_expr| {
+            const elem = try self.genExpr(elem_expr);
+            const eq = if (self.isStrType(lhs_type))
+                try self.genStrCompare(lhs, elem, .eq)
+            else blk: {
+                const lhs_c, const elem_c = self.coerceBinaryOperands(lhs, elem);
+                break :blk c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, lhs_c, elem_c, "eq");
+            };
+            result = c.LLVMBuildOr(self.builder, result, eq, "");
+        }
+
+        return if (negate) c.LLVMBuildNot(self.builder, result, "not_in") else result;
+    }
+
+    // Path B: RHS is range — generate bounds check
+    if (bin.rhs.kind == .range) {
+        const range = bin.rhs.kind.range;
+        const lhs = try self.genExpr(bin.lhs);
+        const start = if (range.start) |s| try self.genExpr(s) else return error.UnsupportedExpr;
+        const end = if (range.end) |e| try self.genExpr(e) else return error.UnsupportedExpr;
+
+        const lhs_type = c.LLVMTypeOf(lhs);
+        const lhs_kind = c.LLVMGetTypeKind(lhs_type);
+        const is_float = (lhs_kind == c.LLVMFloatTypeKind or lhs_kind == c.LLVMDoubleTypeKind);
+
+        if (is_float) {
+            const ge = c.LLVMBuildFCmp(self.builder, c.LLVMRealOGE, lhs, start, "range.ge");
+            const le_op: c_uint = if (range.inclusive) c.LLVMRealOLE else c.LLVMRealOLT;
+            const le = c.LLVMBuildFCmp(self.builder, le_op, lhs, end, "range.le");
+            const in_range = c.LLVMBuildAnd(self.builder, ge, le, "range.in");
+            return if (negate) c.LLVMBuildNot(self.builder, in_range, "not_in") else in_range;
+        }
+
+        const lhs_c, const start_c = self.coerceBinaryOperands(lhs, start);
+        const lhs_c2, const end_c = self.coerceBinaryOperands(lhs_c, end);
+        _ = lhs_c2;
+        const ge = c.LLVMBuildICmp(self.builder, c.LLVMIntSGE, lhs_c, start_c, "range.ge");
+        const le_op: c_uint = if (range.inclusive) c.LLVMIntSLE else c.LLVMIntSLT;
+        const le = c.LLVMBuildICmp(self.builder, le_op, lhs_c, end_c, "range.le");
+        const in_range = c.LLVMBuildAnd(self.builder, ge, le, "range.in");
+
+        return if (negate) c.LLVMBuildNot(self.builder, in_range, "not_in") else in_range;
+    }
+
+    // Path C: Collection — dispatch to the appropriate contains method
+    const lhs = try self.genExpr(bin.lhs);
+    const rhs = try self.genExpr(bin.rhs);
+    const rhs_type = c.LLVMTypeOf(rhs);
+
+    const result = if (self.isStrType(rhs_type))
+        try self.genStrContains(rhs, lhs)
+    else if (self.isHashMapType(rhs_type))
+        try self.genHashMapContains(rhs, rhs_type, lhs)
+    else if (self.isHashSetType(rhs_type))
+        try self.genHashSetContains(rhs, rhs_type, lhs)
+    else if (self.isVecType(rhs_type))
+        try self.genVecContains(rhs, rhs_type, lhs)
+    else if (c.LLVMGetTypeKind(rhs_type) == c.LLVMArrayTypeKind)
+        try self.genArrayContains(rhs, rhs_type, lhs)
+    else
+        return error.UnsupportedExpr;
+
+    return if (negate) c.LLVMBuildNot(self.builder, result, "not_in") else result;
 }
 
 fn getResultErrType(self: *Codegen, result_type: c.LLVMTypeRef) ?c.LLVMTypeRef {
@@ -5269,6 +5352,71 @@ fn genVecLen(self: *Codegen, obj_val: c.LLVMValueRef, vec_type: c.LLVMTypeRef) E
     _ = c.LLVMBuildStore(self.builder, obj_val, alloca);
     const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, alloca, 1, "");
     return c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "vec.len");
+}
+
+/// Vec.contains(needle) → bool — linear scan
+fn genVecContains(self: *Codegen, vec_val: c.LLVMValueRef, vec_type: c.LLVMTypeRef, needle: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const elem_type = self.getVecElemType(vec_type) orelse return error.UnsupportedExpr;
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const i1_type = c.LLVMInt1TypeInContext(self.context);
+    const function = self.current_function;
+
+    // Store vec to access fields via GEP.
+    const alloca = c.LLVMBuildAlloca(self.builder, vec_type, "vc");
+    _ = c.LLVMBuildStore(self.builder, vec_val, alloca);
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, alloca, 0, "");
+    const data_ptr = c.LLVMBuildLoad2(self.builder, ptr_type, ptr_gep, "vc.ptr");
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, alloca, 1, "");
+    const len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "vc.len");
+
+    // Loop: for i in 0..len, check elem[i] == needle.
+    const entry_bb = c.LLVMGetInsertBlock(self.builder);
+    const loop_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "vc.loop");
+    const found_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "vc.found");
+    const done_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "vc.done");
+
+    _ = c.LLVMBuildBr(self.builder, loop_bb);
+
+    // Loop header: i = phi(0 from entry, i+1 from loop body)
+    c.LLVMPositionBuilderAtEnd(self.builder, loop_bb);
+    const i_phi = c.LLVMBuildPhi(self.builder, i64_type, "vc.i");
+    const cond = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, i_phi, len, "vc.cond");
+
+    const body_bb = c.LLVMAppendBasicBlockInContext(self.context, function, "vc.body");
+    _ = c.LLVMBuildCondBr(self.builder, cond, body_bb, done_bb);
+
+    // Loop body: load elem[i], compare
+    c.LLVMPositionBuilderAtEnd(self.builder, body_bb);
+    var gep_idx = [_]c.LLVMValueRef{i_phi};
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, data_ptr, &gep_idx, 1, "vc.ep");
+    const elem = c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "vc.el");
+
+    const eq = if (self.isStrType(elem_type))
+        try self.genStrCompare(elem, needle, .eq)
+    else
+        c.LLVMBuildICmp(self.builder, c.LLVMIntEQ, elem, needle, "vc.eq");
+
+    _ = c.LLVMBuildCondBr(self.builder, eq, found_bb, loop_bb);
+
+    // Increment i
+    const i_next = c.LLVMBuildAdd(self.builder, i_phi, c.LLVMConstInt(i64_type, 1, 0), "vc.inc");
+    var phi_vals = [_]c.LLVMValueRef{ c.LLVMConstInt(i64_type, 0, 0), i_next };
+    var phi_bbs = [_]c.LLVMBasicBlockRef{ entry_bb, body_bb };
+    c.LLVMAddIncoming(i_phi, &phi_vals, &phi_bbs, 2);
+
+    // Found path
+    c.LLVMPositionBuilderAtEnd(self.builder, found_bb);
+    _ = c.LLVMBuildBr(self.builder, done_bb);
+
+    // Done: phi(false from loop header, true from found)
+    c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+    const result_phi = c.LLVMBuildPhi(self.builder, i1_type, "vc.result");
+    var res_vals = [_]c.LLVMValueRef{ c.LLVMConstInt(i1_type, 0, 0), c.LLVMConstInt(i1_type, 1, 0) };
+    var res_bbs = [_]c.LLVMBasicBlockRef{ loop_bb, found_bb };
+    c.LLVMAddIncoming(result_phi, &res_vals, &res_bbs, 2);
+
+    return result_phi;
 }
 
 /// Generate Vec.get(idx) → T
@@ -9371,6 +9519,10 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             if (args.len < 1) return error.UnsupportedExpr;
             const fn_val = try self.genExpr(args[0]);
             return self.genVecTraverse(obj_val, obj_type, fn_val);
+        } else if (std.mem.eql(u8, method_name, "contains")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const needle = try self.genExpr(args[0]);
+            return self.genVecContains(obj_val, obj_type, needle);
         }
     }
 

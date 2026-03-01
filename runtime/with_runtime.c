@@ -96,6 +96,10 @@ int64_t with_vec_len(with_vec *v) {
     return v->len;
 }
 
+void with_vec_clear(with_vec *v) {
+    v->len = 0;
+}
+
 void with_vec_push_i32(with_vec *v, int32_t val) {
     with_vec_push(v, &val);
 }
@@ -126,6 +130,33 @@ void with_vec_push_bool(with_vec *v, bool val) {
 
 bool with_vec_get_bool(with_vec *v, int64_t index) {
     return *(bool *)with_vec_get_ptr(v, index);
+}
+
+void with_vec_set_i32(with_vec *v, int64_t index, int32_t val) {
+    if (index >= 0 && index < v->len) {
+        ((int32_t *)v->ptr)[index] = val;
+    }
+}
+
+void with_vec_remove(with_vec *v, int64_t index) {
+    if (index < 0 || index >= v->len) return;
+    char *base = (char *)v->ptr;
+    int64_t es = v->elem_size;
+    memmove(base + index * es, base + (index + 1) * es, (v->len - index - 1) * es);
+    v->len--;
+}
+
+with_option_i32 with_vec_pop_i32(with_vec *v) {
+    with_option_i32 r;
+    if (v->len <= 0) {
+        r.has_value = false;
+        r.value = 0;
+        return r;
+    }
+    v->len--;
+    r.has_value = true;
+    r.value = ((int32_t *)v->ptr)[v->len];
+    return r;
 }
 
 // ── I/O ────────────────────────────────────────────────────────────
