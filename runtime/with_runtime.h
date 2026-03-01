@@ -40,6 +40,7 @@ with_vec with_vec_new(int64_t elem_size);
 void with_vec_push(with_vec *v, const void *elem);
 void *with_vec_get_ptr(with_vec *v, int64_t index);
 int64_t with_vec_len(with_vec *v);
+void with_vec_clear(with_vec *v);
 
 // Type-specific push/get helpers (avoid pointer-to-temp issues)
 void with_vec_push_i32(with_vec *v, int32_t val);
@@ -50,6 +51,8 @@ void with_vec_push_str(with_vec *v, with_str val);
 with_str with_vec_get_str(with_vec *v, int64_t index);
 void with_vec_push_bool(with_vec *v, bool val);
 bool with_vec_get_bool(with_vec *v, int64_t index);
+void with_vec_set_i32(with_vec *v, int64_t index, int32_t val);
+void with_vec_remove(with_vec *v, int64_t index);
 
 // ── Option types ───────────────────────────────────────────────────
 
@@ -67,6 +70,8 @@ typedef struct {
     bool has_value;
     with_str value;
 } with_option_str;
+
+with_option_i32 with_vec_pop_i32(with_vec *v);
 
 // ── HashMap (from helpers.c — re-declared for convenience) ─────────
 

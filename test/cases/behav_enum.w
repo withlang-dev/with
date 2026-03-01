@@ -9,6 +9,7 @@ use Ast
 use Type
 use Sema
 use InternPool
+use Parser
 
 fn lex(source: str) -> TokenList:
     var l = Lexer.new(source, 0)
@@ -45,15 +46,15 @@ fn test_sema_variant_lookup:
     var pool = AstPool.new()
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
-    // Register Color enum
+    // Register Color enum — use s.pool (Sema's copy), not pool
     var vnames = Vec.new()
-    vnames.push(AstPool.add_string(pool, "Red"))
-    vnames.push(AstPool.add_string(pool, "Green"))
+    vnames.push(AstPool.add_string(s.pool, "Red"))
+    vnames.push(AstPool.add_string(s.pool, "Green"))
     var vpayloads = Vec.new()
     vpayloads.push(0)
     vpayloads.push(0)
     var vptypes = Vec.new()
-    let eid = TypeTable.add_enum(s.types, AstPool.add_string(pool, "Color"), vnames, vpayloads, vptypes)
+    let eid = TypeTable.add_enum(s.types, AstPool.add_string(s.pool, "Color"), vnames, vpayloads, vptypes)
     s.variant_names.push("Red")
     s.variant_enum_types.push(eid)
     s.variant_indices.push(0)
@@ -61,8 +62,8 @@ fn test_sema_variant_lookup:
     s.variant_enum_types.push(eid)
     s.variant_indices.push(1)
     // Check that "Red" resolves to Color type
-    let sym = AstPool.add_string(pool, "Red")
-    let n = AstPool.add_node(pool, NK_IDENT(), 0, 3, sym, 0, 0)
+    let sym = AstPool.add_string(s.pool, "Red")
+    let n = AstPool.add_node(s.pool, NK_IDENT(), 0, 3, sym, 0, 0)
     let t = Sema.check_expr(s, n)
     assert(t == eid)
 

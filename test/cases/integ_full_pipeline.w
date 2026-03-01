@@ -19,6 +19,7 @@ use Source
 use CImport
 use render
 use Driver
+use Parser
 
 fn test_lex_parse_sema:
     // Phase 1: Lex a simple function

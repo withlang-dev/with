@@ -1,84 +1,90 @@
-// Source — Source file loading and line offset table.
+// Source file storage and offset-to-location mapping.
 //
-// Provides source text management, line/column lookup for
-// diagnostics, and file identity tracking.
-//
-// Ref: bootstrap/Source.zig
+// Source owns the text content of a loaded file and provides
+// efficient offset -> line/column translation via a precomputed
+// line-start table.
 
 use Span
 
-// ── Source file ──────────────────────────────────────────────────────
+extern fn with_fs_read_file(path: str) -> str
 
-type SourceFile = {
+type Source = {
+    // Human-readable file path (for diagnostics).
     name: str,
+    // The full source text.
     text: str,
+    // Byte offsets where each line begins (0-indexed lines).
     line_offsets: Vec[i32],
-    file_id: i32,
+    // Identifier used in Span.file.
+    file_id: FileId,
+    // Whether we conceptually own the text buffer.
+    owns_text: bool,
 }
 
-fn SourceFile.new(name: str, text: str, file_id: i32) -> SourceFile:
-    var sf = SourceFile {
+type Location = {
+    line: i32, // 0-indexed
+    col: i32, // 0-indexed, byte offset within line
+}
+
+// Build the line-offset table from source text.
+fn Source.compute_line_offsets(text: str) -> Vec[i32]:
+    var offsets = Vec.new()
+    offsets.push(0) // line 0 starts at byte 0
+    var i = 0
+    while i < text.len():
+        if text[i] == 10:
+            offsets.push(i + 1)
+        i = i + 1
+    offsets
+
+// Create a Source from a file path.
+fn Source.from_file(path: str, file_id: FileId) -> Source:
+    let text = with_fs_read_file(path)
+    Source {
+        name: path,
+        text: text,
+        line_offsets: Source.compute_line_offsets(text),
+        file_id: file_id,
+        owns_text: true,
+    }
+
+// Create a Source from an in-memory string (useful for tests).
+fn Source.from_string(name: str, text: str, file_id: FileId) -> Source:
+    Source {
         name: name,
         text: text,
-        line_offsets: Vec.new(),
+        line_offsets: Source.compute_line_offsets(text),
         file_id: file_id,
+        owns_text: false,
     }
-    // Compute line offsets
-    SourceFile.compute_line_offsets(sf)
-    sf
 
-fn SourceFile.compute_line_offsets(self: SourceFile) -> void:
-    self.line_offsets.push(0)
-    let len = self.text.len()
-    var i = 0
-    while i < len:
-        if self.text[i] == 10:
-            self.line_offsets.push((i + 1) as i32)
-        i = i + 1
-
-fn SourceFile.line_count(self: SourceFile) -> i32:
-    self.line_offsets.len() as i32
-
-// Find the line number (0-based) for a byte offset.
-fn SourceFile.line_at(self: SourceFile, offset: i32) -> i32:
-    let count = self.line_offsets.len() as i32
+// Convert a byte offset to a line/column location.
+fn Source.offset_to_location(self: Source, offset: i32) -> Location:
+    // Binary search for the line containing offset.
     var lo = 0
-    var hi = count - 1
-    while lo <= hi:
-        let mid = (lo + hi) / 2
-        let mid_offset = self.line_offsets.get(mid as i64)
-        if mid_offset <= offset:
+    var hi = self.line_offsets.len() as i32
+    while lo < hi:
+        let mid = lo + ((hi - lo) / 2)
+        if self.line_offsets.get(mid as i64) <= offset:
             lo = mid + 1
-        if mid_offset > offset:
-            hi = mid - 1
-    lo - 1
+        else:
+            hi = mid
+    let line = lo - 1
+    let col = offset - self.line_offsets.get(line as i64)
+    Location { line: line, col: col }
 
-// Find the column (0-based) for a byte offset.
-fn SourceFile.col_at(self: SourceFile, offset: i32) -> i32:
-    let line = SourceFile.line_at(self, offset)
-    let line_start = self.line_offsets.get(line as i64)
-    offset - line_start
-
-// Get line and column as (line, col) for a span start.
-fn SourceFile.line_col(self: SourceFile, offset: i32) -> i32:
-    // Returns encoded: line * 10000 + col
-    let line = SourceFile.line_at(self, offset)
-    let col = SourceFile.col_at(self, offset)
-    line * 10000 + col
-
-// Extract a line of text by line number (0-based).
-fn SourceFile.get_line_text(self: SourceFile, line: i32) -> str:
-    let count = self.line_offsets.len() as i32
-    if line < 0:
-        return ""
-    if line >= count:
-        return ""
+// Extract the source line that contains the given line index.
+fn Source.line_text(self: Source, line: i32) -> str:
     let start = self.line_offsets.get(line as i64)
-    var end = self.text.len() as i32
-    if line + 1 < count:
+    var end = self.text.len()
+    if line + 1 < self.line_offsets.len() as i32:
         end = self.line_offsets.get((line + 1) as i64)
-    // Trim trailing newline
-    if end > start:
-        if self.text[end - 1] == 10:
-            end = end - 1
-    self.text.slice(start as i64, end as i64)
+
+    let slice = self.text.slice(start as i64, end as i64)
+    if slice.len() > 0 and slice[slice.len() - 1] == 10:
+        return slice.slice(0, (slice.len() - 1) as i64)
+    slice
+
+fn Source.deinit(self: Source) -> void:
+    // No-op in current runtime model.
+    return

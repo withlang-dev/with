@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v6.4
+# The With Programming Language — Specification v6.5
 
 **Status:** Reference specification for prototype implementation
 **Positioning:** The Kotlin of systems programming.
@@ -199,6 +199,9 @@ With prioritizes joy. The common case should be effortless:
   directly. No `unsafe {}` wrapper on every FFI call. (§16.1)
 - **Postfix `.await`** — chains naturally with `?` and `|>` (§14.5)
 - **Pipeline operator** — `data |> filter(_.active) |> map(_.name)` (§12)
+- **Membership test** — `if x in [1, 2, 3]:` and `if x not in banned:`
+  — reads like English, works on any collection, optimized for
+  literals (§9.9)
 - **Field shorthand** — `User { name, email }` when variable names
   match field names (§4.3)
 - **Default field values** — `ServerConfig { port: 9090 }` omits
@@ -969,14 +972,18 @@ not cross compilation unit boundaries.
 ```
 
 Ranges are values of type `Range[T]` or `RangeInclusive[T]`. They
-implement `Iter[T]` for integer types and are usable in `for` loops,
-slicing, and pattern matching.
+implement `Iter[T]` for integer types and `Contains[T]` for ordered
+types, making them usable in `for` loops, slicing, pattern matching,
+and membership tests.
 
 ```
 for i in 0..n:
     process(i)
 
 let slice = data[2..5]         // elements at index 2, 3, 4
+
+if x in 1..=100:               // membership test (§9.9)
+    handle_valid(x)
 
 match code
     200..=299 -> "success"
@@ -2115,6 +2122,52 @@ match status_code
     _           -> "unknown"
 ```
 
+**`in` patterns:**
+
+An `in` pattern matches when the scrutinee is contained in the given
+expression. It works with any `Contains` type — arrays, ranges, sets,
+or user types:
+
+```
+match method
+    in ["map", "filter", "take", "skip"] -> handle_lazy()
+    in ["collect", "fold", "sum", "count"] -> handle_eager()
+    _ -> handle_other()
+```
+
+This is syntactic sugar for a guard:
+
+```
+match method
+    m if m in ["map", "filter", "take", "skip"] -> handle_lazy()
+    m if m in ["collect", "fold", "sum", "count"] -> handle_eager()
+    _ -> handle_other()
+```
+
+The `in` pattern does not introduce a binding. Use `@` if you need
+one:
+
+```
+match status_code
+    code @ in 200..=299 -> log("success: {code}")
+    code @ in 400..=499 -> log("client error: {code}")
+    code @ in 500..=599 -> log("server error: {code}")
+    other               -> log("unexpected: {other}")
+```
+
+`in` patterns compose naturally with other match features:
+
+```
+fn categorize(token: TokenKind) -> Category:
+    match token
+        in [Plus, Minus, Star, Slash]  -> .Operator
+        in [LParen, RParen, LBrace, RBrace] -> .Delimiter
+        in [If, Else, While, For, Match]    -> .Keyword
+        Ident(_)                             -> .Identifier
+        IntLit(_) | FloatLit(_)              -> .Literal
+        _                                    -> .Other
+```
+
 **Struct patterns with `..` rest:**
 ```
 match user
@@ -2330,6 +2383,245 @@ These patterns require no language support beyond `|>`, extension
 blocks, and closures. The gap between "library code" and "language
 feature" is intentionally small in With — the pipeline operator makes
 well-designed libraries feel like built-in syntax.
+
+### 9.9 The `in` Operator
+
+`in` is a boolean operator that tests membership. It works on any
+type that implements the `Contains` trait. The compiler optimizes
+literal cases to zero-allocation comparisons.
+
+```
+if method in ["map", "and_then", "filter", "map_err", "ok", "err"]:
+    handle_combinator(method)
+```
+
+**Expression forms:**
+
+```
+expr in expr       → bool
+expr not in expr   → bool
+```
+
+`in` is a binary operator at the same precedence level as comparison
+operators (`==`, `!=`). Like comparisons, it is non-associative —
+`a in b in c` is a compile error.
+
+**Operator precedence** (low to high):
+
+| Level | Operators | Associativity |
+|-------|-----------|---------------|
+| 1 | `or` | Left |
+| 2 | `and` | Left |
+| 3 | `==`, `!=`, `in`, `not in` | Non-associative |
+| 4 | `<`, `>`, `<=`, `>=` | Non-associative |
+| 5 | `\|>` (pipeline) | Left |
+| 6 | `\|` | Left |
+| 7 | `^` | Left |
+| 8 | `&` | Left |
+| 9 | `<<`, `>>` | Left |
+| 10 | `+`, `-`, `++`, `??` | Left |
+| 11 | `*`, `/`, `%` | Left |
+| 12 | Unary prefix (`not`, `-`, `&`, `&mut`) | — |
+| 13 | Postfix (`.await`, `?`, `.field`, `[i]`, `()`) | Left |
+
+This means:
+
+```
+x in list and y in list       // (x in list) and (y in list)
+x + 1 in values               // (x + 1) in values
+not x in list                  // not (x in list) — but prefer `x not in list`
+```
+
+`not in` is a single two-keyword operator, not `not (x in y)`.
+This matches Python's `not in` and reads naturally:
+
+```
+if x in [1, 2, 3]:               // membership test
+if x not in [1, 2, 3]:           // negated membership
+if name in names:                 // variable collection
+if ch in 'a'..='z':              // range membership
+if key in map:                    // key existence
+if "hello" in text:               // substring search
+```
+
+**Desugaring:** `x in collection` desugars to
+`collection.contains(&x)`. `x not in collection` desugars to
+`not collection.contains(&x)`. The `Contains` trait is defined in
+§11.7.
+
+**`not in` vs `not` + `in`:**
+
+`not in` is parsed as a single operator, not as `not (expr in expr)`.
+Both `x not in list` and `not x in list` produce the same result.
+The `not in` form is idiomatic. The linter suggests `x not in y`
+when it sees `not (x in y)`.
+
+**Type checking:**
+
+1. Left operand type `T`
+2. Right operand type `C` where `C: Contains[T]`
+3. Result type is `bool`
+
+If `C` does not implement `Contains[T]`, the compiler emits:
+
+```
+error[E0277]: cannot test membership of `Foo` in `Bar`
+  --> src/main.w:12:15
+   |
+12 |     if x in bar:
+   |           ^^ `Bar` does not implement `Contains[Foo]`
+   |
+   = help: implement `Contains[Foo] for Bar`
+```
+
+**Type inference:** The right-hand side provides type context for the
+left-hand side, just as with `==`:
+
+```
+if 42 in values:    // 42 inferred as element type of values
+if .Red in colors:  // .Red inferred as enum variant matching element type
+```
+
+Literal arrays on the right infer element type from the left:
+
+```
+let x: u8 = 5
+if x in [1, 2, 3]:  // array inferred as [u8; 3], elements as u8
+```
+
+**Compiler optimizations:**
+
+*Literal array elimination.* When the right-hand side of `in` is an
+array literal where all elements are compile-time constants, the
+compiler eliminates the array entirely and emits a chain of
+comparisons:
+
+```
+// Source:
+if method in ["map", "and_then", "filter"]:
+
+// Compiles to (no allocation, no array):
+if method == "map" or method == "and_then" or method == "filter":
+```
+
+This applies to any array literal of constants: integers, floats,
+strings, enum variants, bool. For small arrays (≤8 elements), this
+is always done. For larger literal arrays, the compiler may emit a
+switch/jump table or sorted binary search. The threshold is
+implementation-defined.
+
+*Range optimization.* Ranges are always optimized to two comparisons:
+
+```
+// Source:
+if x in 1..=100:
+
+// Compiles to:
+if x >= 1 and x <= 100:
+```
+
+No `Contains` trait call, no range object allocation.
+
+*HashSet / HashMap.* These go through the actual `.contains()` method,
+which is O(1). No special compiler treatment needed.
+
+**Interaction with `for` loops:**
+
+`in` already appears in `for` loops (`for x in collection:`). The
+`for` loop uses the `Iter` trait. The `in` operator uses the
+`Contains` trait. The parser distinguishes them structurally:
+`for PATTERN in EXPR:` is a loop, `EXPR in EXPR` is a membership
+test. No ambiguity.
+
+**Interaction with comprehensions:**
+
+`in` in comprehensions is the `for` loop form, not the membership
+test. The membership test appears in filter expressions:
+
+```
+[x * x for x in 0..10]              // for-in loop
+[x for x in 0..100 if x in primes]  // for-in loop + membership test in filter
+```
+
+**Interaction with pipelines:**
+
+`in` works naturally inside pipeline closures:
+
+```
+let valid = tokens
+    |> filter(|t| t.kind in [Ident, Number, String])
+    |> collect[Vec]()
+```
+
+**Interaction with match patterns:**
+
+`in` patterns are described in §9.7. Range patterns (`400..=499`)
+remain valid in match. There is no ambiguity because `in` patterns
+always start with the `in` keyword.
+
+**Examples:**
+
+```
+// Basic membership
+let vowels = ['a', 'e', 'i', 'o', 'u']
+if ch in vowels:
+    println("vowel")
+
+// String search
+if "error" in log_line:
+    alert(log_line)
+
+if '@' in email:
+    validate_email(email)
+
+// Enum variant sets
+type Color = Red | Green | Blue | Yellow | Cyan | Magenta
+
+fn is_primary(c: Color) -> bool:
+    c in [.Red, .Green, .Blue]
+
+// Map key existence
+if key in cache:
+    cache[key]
+else:
+    let val = compute(key)
+    cache[key] = val
+    val
+
+// Range checks
+fn is_ascii_letter(c: char) -> bool:
+    c in 'a'..='z' or c in 'A'..='Z'
+
+fn is_valid_port(port: u16) -> bool:
+    port in 1..=65535
+
+// Filtering
+let dangerous_ops = ["rm", "format", "drop", "truncate"]
+let safe_commands = commands
+    |> filter(|cmd| cmd.op not in dangerous_ops)
+    |> collect[Vec]()
+
+// Compound conditions
+if user.role in ["admin", "moderator"] and action in allowed_actions:
+    execute(action)
+```
+
+**Grammar:**
+
+```
+// Expression
+in_expr     = expr "in" expr
+            | expr "not" "in" expr
+
+// Pattern (in match arms)
+in_pattern  = "in" expr
+
+// With @ binding
+in_pattern  = IDENT "@" "in" expr
+```
+
+The `in` keyword is already reserved (used by `for`). `not` is
+already a keyword. No new keywords needed.
 
 ---
 
@@ -2849,6 +3141,7 @@ traits is **fixed and closed** — users cannot define new syntax hooks.
 | Trait | Unlocks | Syntax |
 |-------|---------|--------|
 | `Iter[T]` | `for` loops | `for x in expr:` |
+| `Contains[T]` | Membership test | `x in collection`, `x not in collection` |
 | `Scoped[T]` | `with` blocks (guarded) | `with expr as name:` |
 | `ScopedMut[T]` | `with` blocks (guarded, mutable) | `with expr as mut name:` |
 | `Index[I, O]` | Subscript read | `expr[index]` |
@@ -2916,6 +3209,53 @@ trait Sub[Rhs, Output] { fn sub(self: Self, rhs: Rhs) -> Output }
 trait Mul[Rhs, Output] { fn mul(self: Self, rhs: Rhs) -> Output }
 trait Div[Rhs, Output] { fn div(self: Self, rhs: Rhs) -> Output }
 trait Neg[Output]      { fn neg(self: Self) -> Output }
+```
+
+**One-implementation rule for operator output:** A type may implement
+
+**The `Contains` trait:**
+
+```
+trait Contains[T] =
+    fn contains(self: &Self, value: &T) -> bool
+```
+
+`x in collection` desugars to `collection.contains(&x)`.
+`x not in collection` desugars to `not collection.contains(&x)`.
+
+Standard library implementations:
+
+| Type | `Contains[T]` for | Semantics |
+|------|-------------------|-----------|
+| `[T; N]` (array) | `T` where `T: Eq` | Linear scan |
+| `[]T` (slice) | `T` where `T: Eq` | Linear scan |
+| `Vec[T]` | `T` where `T: Eq` | Linear scan |
+| `HashSet[T]` | `T` where `T: Hash + Eq` | O(1) lookup |
+| `HashMap[K, V]` | `K` where `K: Hash + Eq` | Key existence |
+| `BTreeSet[T]` | `T` where `T: Ord` | O(log n) lookup |
+| `BTreeMap[K, V]` | `K` where `K: Ord` | Key existence |
+| `Range[T]` (`a..b`) | `T` where `T: Ord` | `a <= x and x < b` |
+| `RangeInclusive[T]` (`a..=b`) | `T` where `T: Ord` | `a <= x and x <= b` |
+| `str` | `str` | Substring search |
+| `str` | `char` | Character search |
+| `String` | `str` | Substring search |
+| `String` | `char` | Character search |
+
+Maps test **key** containment, not value. This is consistent with
+`for (k, v) in map` iterating keys. To test value containment:
+`value in map.values()`.
+
+User types can implement `Contains`:
+
+```
+type Whitelist = { allowed: HashSet[str] }
+
+impl Contains[str] for Whitelist =
+    fn contains(self: &Self, value: &str) -> bool:
+        value in self.allowed
+
+if user.name in whitelist:
+    grant_access()
 ```
 
 **One-implementation rule for operator output:** A type may implement
@@ -3495,6 +3835,17 @@ makes it clear.
 
 Comprehensions are pure sugar. For lazy evaluation, use pipeline
 syntax with iterators directly.
+
+**Disambiguation with `in` operator:** In comprehensions, `for x in`
+is always the iteration form (`Iter` trait). The `in` membership
+operator (§9.9) may appear in the `if` filter clause:
+
+```
+[x for x in 0..100 if x in primes]  // for-in loop + membership test in filter
+```
+
+The parser resolves this structurally — `for PATTERN in EXPR` is
+always iteration, `EXPR in EXPR` in the filter is always membership.
 
 ---
 
@@ -5336,6 +5687,11 @@ All collection types provide `.len()` returning `usize`, plus
 | `.len64()` | `i64` | Panics if len > `i64.max` |
 | `.ulen32()` | `u32` | Panics if len > `u32.max` |
 
+All collection types implement `Contains[T]` (§11.7), enabling the
+`in` operator for membership tests: `if key in map:`,
+`if x in my_vec:`, etc. See §9.9 for details and the full
+implementation table.
+
 ```
 // Before: manual casting
 let count: i32 = results.len() as i32
@@ -5361,6 +5717,9 @@ Rich methods on `String` and `StrView`: `split`, `trim`,
 `starts_with`, `ends_with`, `contains`, `replace`, `to_upper`,
 `to_lower`, `find`, `rfind`, `chars`, `bytes`, `len`,
 `is_empty`, `repeat`, `join`.
+
+`String` and `str` implement `Contains[str]` and `Contains[char]`,
+enabling `if "error" in log_line:` and `if '@' in email:`. See §9.9.
 
 Replaces: `string.h` (strlen, strcmp, strcpy, strstr, memcpy,
 memset), `ctype.h` (isalpha, isdigit, toupper, tolower)
@@ -8901,6 +9260,143 @@ fn test:
 // ERROR: no_std requires @[panic_handler]
 ```
 
+### 25.100 The `in` Operator (Section 9.9)
+
+```
+// PASS: basic array membership
+fn test:
+    let x = 3
+    assert(x in [1, 2, 3, 4, 5])
+    assert(not (x in [6, 7, 8]))
+
+// PASS: not in operator
+fn test:
+    let x = 10
+    assert(x not in [1, 2, 3])
+    assert(not (x not in [10, 20, 30]))
+
+// PASS: range membership
+fn test:
+    assert(5 in 1..10)
+    assert(not (10 in 1..10))     // exclusive upper bound
+    assert(10 in 1..=10)          // inclusive upper bound
+    assert(not (0 in 1..10))
+
+// PASS: string contains substring
+fn test:
+    let text = "hello world"
+    assert("hello" in text)
+    assert("xyz" not in text)
+
+// PASS: char in string
+fn test:
+    let email = "user@example.com"
+    assert('@' in email)
+    assert('!' not in email)
+
+// PASS: HashMap key membership
+fn test:
+    var map: HashMap[str, i32] = HashMap.new()
+    map.insert("alice", 1)
+    map.insert("bob", 2)
+    assert("alice" in map)
+    assert("charlie" not in map)
+
+// PASS: HashSet membership
+fn test:
+    var set: HashSet[i32] = HashSet.new()
+    set.insert(10)
+    set.insert(20)
+    assert(10 in set)
+    assert(30 not in set)
+
+// PASS: enum variant shorthand in array
+fn test:
+    type Color = Red | Green | Blue | Yellow
+    let c = Color.Red
+    assert(c in [.Red, .Green, .Blue])
+    assert(c not in [.Yellow])
+
+// PASS: in with pipeline filter
+fn test:
+    let nums = Vec.from([1, 2, 3, 4, 5, 6])
+    let evens = nums.iter()
+        |> filter(|x| *x in [2, 4, 6])
+        |> collect[Vec]()
+    assert(evens.len() == 3)
+
+// PASS: match with in patterns
+fn test:
+    let method = "map"
+    let result = match method
+        in ["map", "filter", "take"] -> "lazy"
+        in ["collect", "fold", "sum"] -> "eager"
+        _ -> "other"
+    assert(result == "lazy")
+
+// PASS: match with in pattern and @ binding
+fn test:
+    let code = 404
+    let msg = match code
+        c @ in 200..=299 -> "ok: {c}"
+        c @ in 400..=499 -> "client error: {c}"
+        _ -> "other"
+    assert(msg == "client error: 404")
+
+// PASS: user type implementing Contains
+fn test:
+    type Whitelist = { allowed: HashSet[i32] }
+    impl Contains[i32] for Whitelist =
+        fn contains(self: &Self, value: &i32) -> bool:
+            *value in self.allowed
+    var wl = Whitelist { allowed: HashSet.from([1, 2, 3]) }
+    assert(1 in wl)
+    assert(4 not in wl)
+
+// PASS: in with compound conditions
+fn test:
+    let role = "admin"
+    let action = "delete"
+    let allowed = ["read", "write", "delete"]
+    assert(role in ["admin", "moderator"] and action in allowed)
+
+// PASS: literal array optimization (semantic equivalence)
+fn test:
+    let x = "filter"
+    // These should produce identical results
+    let a = x in ["map", "filter", "reduce"]
+    let b = x == "map" or x == "filter" or x == "reduce"
+    assert(a == b)
+
+// FAIL: in requires Contains implementation
+fn test:
+    type Foo = { x: i32 }
+    type Bar = { y: i32 }
+    let f = Foo { x: 1 }
+    let b = Bar { y: 2 }
+    f in b              // ERROR: `Bar` does not implement `Contains[Foo]`
+
+// FAIL: in is non-associative
+fn test:
+    let x = 1
+    x in [1, 2] in [true, false]   // ERROR: `in` is non-associative
+
+// PASS: for-in loop is distinct from membership in
+fn test:
+    let items = [1, 2, 3, 4, 5]
+    var count = 0
+    for x in items:             // for-in loop (Iter trait)
+        if x in [2, 4]:        // membership test (Contains trait)
+            count += 1
+    assert(count == 2)
+
+// PASS: comprehension with membership filter
+fn test:
+    let primes = HashSet.from([2, 3, 5, 7, 11, 13])
+    let prime_squares = [x * x for x in 1..=15 if x in primes]
+    assert(prime_squares.len() == 6)
+```
+
 ---
 
 # Part IV — Implementation Roadmap
@@ -8934,11 +9430,13 @@ type qualifier. Reference return with propagation.
 ### Phase 2: Ergonomic Surface
 
 `with` blocks. Closures with escaping detection. Partial application.
-Pipelines and function composition (`>>`, `<<`). Pattern matching
-(full: nested, or-patterns, `@` binding, `if let`, slice, parameter
-patterns). Error types. Tail call optimization.
+Pipelines and function composition (`>>`, `<<`). `in` / `not in`
+operator with `Contains` trait and literal optimizations. Pattern
+matching (full: nested, or-patterns, `@` binding, `if let`, `in`
+patterns, slice, parameter patterns). Error types. Tail call
+optimization.
 
-**Milestone:** Tests 25.7, 25.9, 25.12–25.14, 25.20–25.26 pass.
+**Milestone:** Tests 25.7, 25.9, 25.12–25.14, 25.20–25.26, 25.100 pass.
 
 ### Phase 3: Standard Library
 

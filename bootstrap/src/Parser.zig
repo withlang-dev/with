@@ -1151,6 +1151,10 @@ fn parsePrecedence(self: *Parser, min_prec: u8) !*const Ast.Expr {
         const op_info = self.infixOp() orelse break;
         if (op_info.prec < min_prec) break;
         self.advance();
+        // For `not in`, consume the second token (`in`)
+        if (op_info.op == .not_in) {
+            self.advance();
+        }
         self.skipNewlines();
 
         // Special pipeline form: `value |> match ...`
@@ -1220,6 +1224,8 @@ fn infixOp(self: *const Parser) ?InfixInfo {
         .kw_and => .{ .op = .@"and", .prec = 2 },
         .eq_eq => .{ .op = .eq, .prec = 3 },
         .bang_eq => .{ .op = .neq, .prec = 3 },
+        .kw_in => .{ .op = .in_op, .prec = 3 },
+        .kw_not => if (self.pos + 1 < self.tokens.tags.items.len and self.tokens.tags.items[self.pos + 1] == .kw_in) .{ .op = .not_in, .prec = 3 } else null,
         .lt => .{ .op = .lt, .prec = 4 },
         .gt => .{ .op = .gt, .prec = 4 },
         .lt_eq => .{ .op = .lte, .prec = 4 },

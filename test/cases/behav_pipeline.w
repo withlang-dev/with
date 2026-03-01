@@ -6,6 +6,7 @@
 use Token
 use Lexer
 use Ast
+use Parser
 
 fn lex(source: str) -> TokenList:
     var l = Lexer.new(source, 0)

@@ -6,14 +6,11 @@ bootstrap:
 
 # Stage 1: bootstrap compiler builds self-hosted compiler
 stage1: bootstrap
-	./bootstrap/zig-out/bin/with build src/main.w
-	cp .with/build/main ./with-stage1
-	cp .with/build/main ./with
+	./scripts/rebuild_selfhost.sh stage1
 
 # Stage 2: stage1 compiler builds itself
-stage2: stage1
-	./with-stage1 build src/main.w -o .with/build/with-stage2
-	cp .with/build/with-stage2 ./with-stage2
+stage2: bootstrap
+	./scripts/rebuild_selfhost.sh stage2
 
 # Bootstrap compiler test run
 test-bootstrap: bootstrap
@@ -26,7 +23,10 @@ test-stage1: stage1
 
 # Stage2 compiler sanity check
 test-stage2: stage2
-	./.with/build/with-stage2 version
+	cp ./with-stage2 /tmp/with-stage2-check
+	chmod +x /tmp/with-stage2-check
+	/tmp/with-stage2-check version
+	rm -f /tmp/with-stage2-check
 
 # Full verification: bootstrap suites + stage2 self-host check
 test: test-bootstrap test-stage2

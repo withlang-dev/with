@@ -1,10 +1,24 @@
-// Span — Source location tracking.
+// Source location tracking.
 //
 // A Span identifies a contiguous byte range within a source file.
-// Every token and AST node carries a span so that diagnostics can
+// Every token and AST node carries a span so diagnostics can
 // point back to the original source text.
 
-type Span = { file: i32, start: i32, end: i32 }
+use Source
+
+// Opaque identifier for a loaded source file.
+type FileId = i32
+
+// A contiguous byte range within a source file.
+type Span = {
+    file: FileId,
+    start: i32,
+    end: i32,
+}
+
+// Sentinel span used for compiler-generated nodes with no source location.
+fn Span.zero() -> Span:
+    Span { file: 0, start: 0, end: 0 }
 
 // Returns the length of the span in bytes.
 fn Span.len(self: Span) -> i32:
@@ -12,10 +26,18 @@ fn Span.len(self: Span) -> i32:
 
 // Extends this span to cover other as well.
 fn Span.merge(self: Span, other: Span) -> Span:
-    let s = if self.start < other.start then self.start else other.start
-    let e = if self.end > other.end then self.end else other.end
-    Span { file: self.file, start: s, end: e }
+    Span {
+        file: self.file,
+        start: span_min(self.start, other.start),
+        end: span_max(self.end, other.end),
+    }
 
-// Sentinel span used for compiler-generated nodes with no source location.
-fn span_zero() -> Span:
-    Span { file: 0, start: 0, end: 0 }
+fn span_min(a: i32, b: i32) -> i32:
+    if a < b:
+        return a
+    b
+
+fn span_max(a: i32, b: i32) -> i32:
+    if a > b:
+        return a
+    b

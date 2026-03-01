@@ -9,6 +9,7 @@ use Ast
 use Type
 use Sema
 use InternPool
+use Parser
 
 fn lex(source: str) -> TokenList:
     var l = Lexer.new(source, 0)
@@ -77,6 +78,7 @@ fn test_type_struct_lookup:
     field_defaults.push(0)
     let name_sym = AstPool.add_string(pool, "Vec3")
     let sid = TypeTable.add_struct(types, name_sym, field_names, field_types, field_defaults)
+    TypeTable.register_name(types, "Vec3", sid)
     // Look up by name
     let found = TypeTable.lookup(types, "Vec3")
     assert(found == sid)

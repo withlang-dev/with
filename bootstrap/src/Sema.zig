@@ -2356,7 +2356,7 @@ fn checkBinary(self: *Sema, bin: Ast.BinaryExpr, span: Span) TypeId {
 
     return switch (bin.op) {
         // Comparison operators return bool.
-        .eq, .neq, .lt, .gt, .lte, .gte => self.ty_bool,
+        .eq, .neq, .lt, .gt, .lte, .gte, .in_op, .not_in => self.ty_bool,
         // Logical operators require bool operands and return bool.
         .@"and", .@"or" => blk: {
             if (lhs != self.ty_bool) {

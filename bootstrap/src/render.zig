@@ -714,6 +714,8 @@ fn binOpStr(op: Ast.BinOp) []const u8 {
         .mul_wrap => "*%",
         .default_op => "??",
         .concat => "++",
+        .in_op => "in",
+        .not_in => "not in",
     };
 }
 
