@@ -36,6 +36,36 @@ fn greet:
     println("hello")
 ```
 
+**Drop the return type when the body makes it obvious.** The
+compiler infers return types. If the body is a single expression
+whose type is clear, the annotation is redundant.
+
+```
+// ✗ redundant — the struct literal already says Vec2
+fn zero -> Vec2: Vec2 { x: 0.0, y: 0.0 }
+
+// ✓ idiomatic
+fn zero: Vec2 { x: 0.0, y: 0.0 }
+
+// ✗ redundant — .North is clearly a Direction
+fn default_dir -> Direction: .North
+
+// ✓ idiomatic
+fn default_dir: .North
+```
+
+**Do annotate when it helps the reader.** If the return type
+isn't obvious from the body, keep the annotation.
+
+```
+// ✓ annotation helps — what does this compute?
+fn solve(input: str) -> Solution:
+    input |> parse |> optimize |> evaluate
+
+// ✓ annotation helps — numeric expressions don't reveal the type
+fn area(r: f64) -> f64: 3.14159 * r * r
+```
+
 **`fn main:` not `fn main -> i32:`.** A program that succeeds
 shouldn't need to say so.
 
@@ -592,7 +622,7 @@ With follows Rust's naming conventions:
 Before submitting code, check:
 
 1. **No unnecessary parens** — `fn greet:` not `fn greet():`
-2. **No unnecessary return types** — `fn main:` not `fn main -> i32:`
+2. **No unnecessary return types** — `fn zero: Vec2 { x: 0.0, y: 0.0 }` not `fn zero -> Vec2: ...`
 3. **No unnecessary type annotations** — `let x = 42` not `let x: i32 = 42`
 4. **No `Ok(value)`** — just return the value
 5. **No `Ok(())`** — just end the function

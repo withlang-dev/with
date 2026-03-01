@@ -44,12 +44,12 @@ fn test_sema_float_type:
 
 fn test_type_float_properties:
     var types = TypeTable.new()
-    assert(TypeTable.is_float(types, TYPE_F32()) == true)
-    assert(TypeTable.is_float(types, TYPE_F64()) == true)
-    assert(TypeTable.is_float(types, TYPE_I32()) == false)
-    assert(TypeTable.is_numeric(types, TYPE_F32()) == true)
-    assert(TypeTable.is_copy(types, TYPE_F32()) == true)
-    assert(TypeTable.is_copy(types, TYPE_F64()) == true)
+    assert(TypeTable.is_float(types, TYPE_F32()))
+    assert(TypeTable.is_float(types, TYPE_F64()))
+    assert(not TypeTable.is_float(types, TYPE_I32()))
+    assert(TypeTable.is_numeric(types, TYPE_F32()))
+    assert(TypeTable.is_copy(types, TYPE_F32()))
+    assert(TypeTable.is_copy(types, TYPE_F64()))
 
 fn test_codegen_float_ops:
     var types = TypeTable.new()

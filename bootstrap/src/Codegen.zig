@@ -58,6 +58,8 @@ closure_counter: u32 = 0,
 /// Defer stack for current function.
 defer_stack: [32]*const Ast.Expr = undefined,
 defer_depth: u32 = 0,
+/// Inferred return types from Sema: fn name → synthetic TypeExpr.
+inferred_return_types: std.AutoHashMapUnmanaged(u32, *const Ast.TypeExpr) = .{},
 /// Tracks pointee types for references created by &expr.
 ref_pointee_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
 /// Type context for expressions (set by let bindings, return types, etc.).
@@ -798,6 +800,8 @@ fn dynTraitFromTypeExpr(self: *Codegen, te: *const Ast.TypeExpr) ?u32 {
 fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     const ret_type = if (func.return_type) |rt|
         try self.resolveType(rt)
+    else if (self.inferred_return_types.get(func.name)) |inferred_te|
+        try self.resolveType(inferred_te)
     else
         c.LLVMVoidTypeInContext(self.context);
 
@@ -3113,7 +3117,12 @@ fn declareAsyncFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     for (func.params, 0..) |param, i| {
         param_types_buf[i] = if (param.type_expr) |te| self.resolveType(te) catch i32_type else i32_type;
     }
-    const ret_type = if (func.return_type) |rt| self.resolveType(rt) catch i32_type else void_type;
+    const ret_type = if (func.return_type) |rt|
+        self.resolveType(rt) catch i32_type
+    else if (self.inferred_return_types.get(func.name)) |inferred_te|
+        self.resolveType(inferred_te) catch i32_type
+    else
+        void_type;
     const param_count: u32 = @intCast(func.params.len);
     const impl_fn_type = c.LLVMFunctionType(ret_type, &param_types_buf, param_count, 0);
 
@@ -3189,7 +3198,12 @@ fn genAsyncFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     for (func.params, 0..) |param, i| {
         param_types_buf[i] = if (param.type_expr) |te| self.resolveType(te) catch i32_type else i32_type;
     }
-    const ret_type = if (func.return_type) |rt| self.resolveType(rt) catch i32_type else void_type;
+    const ret_type = if (func.return_type) |rt|
+        self.resolveType(rt) catch i32_type
+    else if (self.inferred_return_types.get(func.name)) |inferred_te|
+        self.resolveType(inferred_te) catch i32_type
+    else
+        void_type;
 
     // Args struct type.
     var args_struct_type: c.LLVMTypeRef = undefined;

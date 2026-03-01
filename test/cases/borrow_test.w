@@ -15,14 +15,14 @@ fn test_borrow_info:
 
 fn test_nll_region:
     var r = NllRegion.new()
-    assert(NllRegion.contains(r, 0) == false)
+    assert(not NllRegion.contains(r, 0))
     NllRegion.add(r, 0)
     NllRegion.add(r, 1)
     NllRegion.add(r, 2)
-    assert(NllRegion.contains(r, 0) == true)
-    assert(NllRegion.contains(r, 1) == true)
-    assert(NllRegion.contains(r, 2) == true)
-    assert(NllRegion.contains(r, 3) == false)
+    assert(NllRegion.contains(r, 0))
+    assert(NllRegion.contains(r, 1))
+    assert(NllRegion.contains(r, 2))
+    assert(not NllRegion.contains(r, 3))
     // Adding duplicate should not increase size
     NllRegion.add(r, 1)
     assert(r.blocks.len() == 3)

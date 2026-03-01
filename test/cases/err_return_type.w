@@ -17,8 +17,8 @@ fn test_return_type_tracking:
     s.current_return_type = TYPE_I32()
     assert(s.current_return_type == TYPE_I32())
     // Return type compat check
-    assert(Sema.types_compatible(s, TYPE_I32(), s.current_return_type) == true)
-    assert(Sema.types_compatible(s, TYPE_STR(), s.current_return_type) == false)
+    assert(Sema.types_compatible(s, TYPE_I32(), s.current_return_type))
+    assert(not Sema.types_compatible(s, TYPE_STR(), s.current_return_type))
 
 fn test_fn_return_type_registration:
     var intern = InternPool.new()
@@ -41,7 +41,7 @@ fn test_void_return:
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
     s.current_return_type = TYPE_VOID()
-    assert(Sema.types_compatible(s, TYPE_VOID(), s.current_return_type) == true)
+    assert(Sema.types_compatible(s, TYPE_VOID(), s.current_return_type))
 
 fn main:
     test_return_type_tracking()

@@ -16,20 +16,20 @@ fn test_unsigned_types_exist:
 
 fn test_unsigned_not_signed:
     var types = TypeTable.new()
-    assert(TypeTable.is_unsigned_int(types, TYPE_U8()) == true)
-    assert(TypeTable.is_unsigned_int(types, TYPE_U16()) == true)
-    assert(TypeTable.is_unsigned_int(types, TYPE_U32()) == true)
-    assert(TypeTable.is_unsigned_int(types, TYPE_U64()) == true)
-    assert(TypeTable.is_signed_int(types, TYPE_U8()) == false)
-    assert(TypeTable.is_signed_int(types, TYPE_U32()) == false)
+    assert(TypeTable.is_unsigned_int(types, TYPE_U8()))
+    assert(TypeTable.is_unsigned_int(types, TYPE_U16()))
+    assert(TypeTable.is_unsigned_int(types, TYPE_U32()))
+    assert(TypeTable.is_unsigned_int(types, TYPE_U64()))
+    assert(not TypeTable.is_signed_int(types, TYPE_U8()))
+    assert(not TypeTable.is_signed_int(types, TYPE_U32()))
 
 fn test_signed_int_correct:
     var types = TypeTable.new()
-    assert(TypeTable.is_signed_int(types, TYPE_I8()) == true)
-    assert(TypeTable.is_signed_int(types, TYPE_I16()) == true)
-    assert(TypeTable.is_signed_int(types, TYPE_I32()) == true)
-    assert(TypeTable.is_signed_int(types, TYPE_I64()) == true)
-    assert(TypeTable.is_unsigned_int(types, TYPE_I32()) == false)
+    assert(TypeTable.is_signed_int(types, TYPE_I8()))
+    assert(TypeTable.is_signed_int(types, TYPE_I16()))
+    assert(TypeTable.is_signed_int(types, TYPE_I32()))
+    assert(TypeTable.is_signed_int(types, TYPE_I64()))
+    assert(not TypeTable.is_unsigned_int(types, TYPE_I32()))
 
 fn test_unsigned_bit_widths:
     var types = TypeTable.new()
@@ -40,16 +40,16 @@ fn test_unsigned_bit_widths:
 
 fn test_unsigned_is_numeric:
     var types = TypeTable.new()
-    assert(TypeTable.is_numeric(types, TYPE_U8()) == true)
-    assert(TypeTable.is_numeric(types, TYPE_U32()) == true)
-    assert(TypeTable.is_numeric(types, TYPE_U64()) == true)
+    assert(TypeTable.is_numeric(types, TYPE_U8()))
+    assert(TypeTable.is_numeric(types, TYPE_U32()))
+    assert(TypeTable.is_numeric(types, TYPE_U64()))
 
 fn test_unsigned_is_copy:
     var types = TypeTable.new()
-    assert(TypeTable.is_copy(types, TYPE_U8()) == true)
-    assert(TypeTable.is_copy(types, TYPE_U16()) == true)
-    assert(TypeTable.is_copy(types, TYPE_U32()) == true)
-    assert(TypeTable.is_copy(types, TYPE_U64()) == true)
+    assert(TypeTable.is_copy(types, TYPE_U8()))
+    assert(TypeTable.is_copy(types, TYPE_U16()))
+    assert(TypeTable.is_copy(types, TYPE_U32()))
+    assert(TypeTable.is_copy(types, TYPE_U64()))
 
 fn test_unsigned_cast_widening:
     // u8 → u32 should use ZEXT (zero extend, not sign extend)

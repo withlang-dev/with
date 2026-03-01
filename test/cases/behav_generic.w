@@ -86,7 +86,7 @@ fn test_trait_coherence:
     TraitSolver.add_impl(solver, 6, 300, im2)
     // No overlap - different types
     let ok = TraitSolver.check_coherence(solver)
-    assert(ok == true)
+    assert(ok)
 
 fn main:
     test_type_generic_param()

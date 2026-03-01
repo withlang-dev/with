@@ -42,9 +42,9 @@ fn test_impl_and_resolve:
     TraitSolver.add_impl(solver, 50, 100, impl_methods)
 
     // Should resolve
-    assert(TraitSolver.implements(solver, 100, 50) == true)
+    assert(TraitSolver.implements(solver, 100, 50))
     // Should not resolve for type 51
-    assert(TraitSolver.implements(solver, 100, 51) == false)
+    assert(not TraitSolver.implements(solver, 100, 51))
     // Should cache the result
     let r1 = TraitSolver.resolve(solver, 100, 50)
     let r2 = TraitSolver.resolve(solver, 100, 50)
@@ -70,19 +70,19 @@ fn test_coherence:
     var impl1 = Vec.new()
     impl1.push(10)
     TraitSolver.add_impl(solver, 50, 100, impl1)
-    assert(TraitSolver.check_coherence(solver) == true)
+    assert(TraitSolver.check_coherence(solver))
 
     // Different type — still coherent
     var impl2 = Vec.new()
     impl2.push(10)
     TraitSolver.add_impl(solver, 51, 100, impl2)
-    assert(TraitSolver.check_coherence(solver) == true)
+    assert(TraitSolver.check_coherence(solver))
 
     // Same type, same trait — incoherent!
     var impl3 = Vec.new()
     impl3.push(10)
     TraitSolver.add_impl(solver, 50, 100, impl3)
-    assert(TraitSolver.check_coherence(solver) == false)
+    assert(not TraitSolver.check_coherence(solver))
 
 fn test_obligation_list:
     var solver = TraitSolver.new()

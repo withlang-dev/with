@@ -223,10 +223,8 @@ fn Parser.skip_attributes(self: Parser):
     if derive_syms.len() > 0:
         self.pending_derive_start = self.pool.extra_len()
         self.pending_derive_count = derive_syms.len() as i32
-        var i = 0
-        while i < derive_syms.len() as i32:
+        for i in 0..derive_syms.len() as i32:
             self.pool.add_extra(derive_syms.get(i as i64))
-            i = i + 1
 
 // ── Module parsing ───────────────────────────────────────────────
 
@@ -545,10 +543,8 @@ fn Parser.parse_struct_body(self: Parser) -> i32:
     self.expect(TK_R_BRACE())
     let extra_start = self.pool.extra_len()
     self.pool.add_extra(field_count)
-    var fi = 0
-    while fi < fields.len() as i32:
+    for fi in 0..fields.len() as i32:
         self.pool.add_extra(fields.get(fi as i64))
-        fi = fi + 1
     extra_start
 
 fn Parser.is_enum_def(self: Parser) -> bool:
@@ -598,10 +594,8 @@ fn Parser.parse_enum_variants(self: Parser) -> i32:
 
         variants.push(vname)
         variants.push(payloads.len() as i32)
-        var pi = 0
-        while pi < payloads.len() as i32:
+        for pi in 0..payloads.len() as i32:
             variants.push(payloads.get(pi as i64))
-            pi = pi + 1
         variant_count = variant_count + 1
 
         self.skip_newlines()
@@ -613,10 +607,8 @@ fn Parser.parse_enum_variants(self: Parser) -> i32:
 
     let extra_start = self.pool.extra_len()
     self.pool.add_extra(variant_count)
-    var vi = 0
-    while vi < variants.len() as i32:
+    for vi in 0..variants.len() as i32:
         self.pool.add_extra(variants.get(vi as i64))
-        vi = vi + 1
     extra_start
 
 // ── use decl ─────────────────────────────────────────────────────
@@ -1243,10 +1235,8 @@ fn Parser.parse_call(self: Parser, callee: i32) -> i32:
     self.expect(TK_R_PAREN())
     let extra_start = self.pool.extra_len()
     let arg_count = args.len() as i32
-    var ai = 0
-    while ai < arg_count:
+    for ai in 0..arg_count:
         self.pool.add_extra(args.get(ai as i64))
-        ai = ai + 1
     self.pool.add_node(NK_CALL(), self.pool.get_start(callee), self.prev_end(), callee, extra_start, arg_count)
 
 fn Parser.parse_dot(self: Parser, lhs: i32) -> i32:
@@ -1289,10 +1279,8 @@ fn Parser.parse_struct_literal(self: Parser, lhs: i32) -> i32:
             self.skip_newlines()
     self.expect(TK_R_BRACE())
     let extra_start = self.pool.extra_len()
-    var fi = 0
-    while fi < fields.len() as i32:
+    for fi in 0..fields.len() as i32:
         self.pool.add_extra(fields.get(fi as i64))
-        fi = fi + 1
     self.pool.add_node(NK_STRUCT_LIT(), self.pool.get_start(lhs), self.prev_end(), struct_name, extra_start, field_count)
 
 fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> i32:
@@ -1333,10 +1321,8 @@ fn Parser.parse_optional_chain(self: Parser, lhs: i32) -> i32:
     let extra_start = self.pool.extra_len()
     let arg_count = args.len() as i32
     self.pool.add_extra(arg_count)
-    var ai = 0
-    while ai < arg_count:
+    for ai in 0..arg_count:
         self.pool.add_extra(args.get(ai as i64))
-        ai = ai + 1
     self.pool.add_node(NK_OPTIONAL_CHAIN(), self.pool.get_start(lhs), self.prev_end(), lhs, member, extra_start)
 
 // ── Variant shorthand ────────────────────────────────────────────
@@ -1358,10 +1344,8 @@ fn Parser.parse_variant_shorthand(self: Parser) -> i32:
         self.expect(TK_R_PAREN())
     let extra_start = self.pool.extra_len()
     let arg_count = args.len() as i32
-    var ai = 0
-    while ai < arg_count:
+    for ai in 0..arg_count:
         self.pool.add_extra(args.get(ai as i64))
-        ai = ai + 1
     self.pool.add_node(NK_VARIANT_SHORTHAND(), start, self.prev_end(), sym, extra_start, arg_count)
 
 // ── Grouped / tuple ──────────────────────────────────────────────
@@ -1389,10 +1373,8 @@ fn Parser.parse_grouped_or_tuple(self: Parser) -> i32:
             elems.push(elem)
         self.expect(TK_R_PAREN())
         let extra_start = self.pool.extra_len()
-        var ei = 0
-        while ei < elems.len() as i32:
+        for ei in 0..elems.len() as i32:
             self.pool.add_extra(elems.get(ei as i64))
-            ei = ei + 1
         let count = elems.len() as i32
         return self.pool.add_node(NK_TUPLE(), start, self.prev_end(), extra_start, count, 0)
 
@@ -2143,10 +2125,8 @@ fn Parser.parse_record_update(self: Parser) -> i32:
             self.skip_newlines()
     self.expect(TK_R_BRACE())
     let extra_start = self.pool.extra_len()
-    var fi = 0
-    while fi < fields.len() as i32:
+    for fi in 0..fields.len() as i32:
         self.pool.add_extra(fields.get(fi as i64))
-        fi = fi + 1
     self.pool.add_node(NK_RECORD_UPDATE(), start, self.prev_end(), source, extra_start, field_count)
 
 // ── Array literal / comprehension ────────────────────────────────
@@ -2185,10 +2165,8 @@ fn Parser.parse_array_literal(self: Parser) -> i32:
     self.expect(TK_R_BRACKET())
     let extra_start = self.pool.extra_len()
     let count = elems.len() as i32
-    var ei = 0
-    while ei < count:
+    for ei in 0..count:
         self.pool.add_extra(elems.get(ei as i64))
-        ei = ei + 1
     self.pool.add_node(NK_ARRAY_LIT(), start, self.prev_end(), extra_start, count, 0)
 
 // ── Closure ──────────────────────────────────────────────────────
@@ -2265,10 +2243,8 @@ fn Parser.parse_block_or_expr(self: Parser) -> i32:
         return last_expr
 
     let extra_start = self.pool.extra_len()
-    var i = 0
-    while i < stmts.len() as i32:
+    for i in 0..stmts.len() as i32:
         self.pool.add_extra(stmts.get(i as i64))
-        i = i + 1
 
     let stmt_count = stmts.len() as i32
     self.pool.add_node(NK_BLOCK(), self.pool.get_start(stmts.get(0)), self.prev_end(), extra_start, stmt_count, last_expr)
@@ -2305,10 +2281,8 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
                 elems.push(ty2)
         self.expect(TK_R_PAREN())
         let extra_start = self.pool.extra_len()
-        var ei = 0
-        while ei < elems.len() as i32:
+        for ei in 0..elems.len() as i32:
             self.pool.add_extra(elems.get(ei as i64))
-            ei = ei + 1
         let count = elems.len() as i32
         return self.pool.add_node(NK_TYPE_TUPLE(), start, self.prev_end(), extra_start, count, 0)
 
@@ -2327,10 +2301,8 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
         self.expect(TK_ARROW())
         let ret = self.parse_type_expr()
         let extra_start = self.pool.extra_len()
-        var pi = 0
-        while pi < params.len() as i32:
+        for pi in 0..params.len() as i32:
             self.pool.add_extra(params.get(pi as i64))
-            pi = pi + 1
         let count = params.len() as i32
         return self.pool.add_node(NK_TYPE_FN(), start, self.prev_end(), extra_start, count, ret)
 
@@ -2386,10 +2358,8 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
                 args.push(ty2)
             self.expect(TK_R_BRACKET())
             let extra_start = self.pool.extra_len()
-            var ai = 0
-            while ai < args.len() as i32:
+            for ai in 0..args.len() as i32:
                 self.pool.add_extra(args.get(ai as i64))
-                ai = ai + 1
             let count = args.len() as i32
             return self.pool.add_node(NK_TYPE_GENERIC(), start, self.prev_end(), sym, extra_start, count)
         return self.pool.add_node(NK_TYPE_NAMED(), start, self.prev_end(), sym, 0, 0)
@@ -2434,10 +2404,8 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             break
 
     let count = (params.len() / 2) as i32
-    var pi = 0
-    while pi < params.len() as i32:
+    for pi in 0..params.len() as i32:
         self.pool.add_extra(params.get(pi as i64))
-        pi = pi + 1
     count
 
 fn Parser.parse_one_param(self: Parser) -> i32:

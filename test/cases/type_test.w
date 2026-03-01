@@ -22,11 +22,11 @@ fn test_builtins:
 
     // Verify int details
     assert(TypeTable.int_bits(tt, TYPE_I8()) == 8)
-    assert(TypeTable.int_is_signed(tt, TYPE_I8()) == true)
+    assert(TypeTable.int_is_signed(tt, TYPE_I8()))
     assert(TypeTable.int_bits(tt, TYPE_I32()) == 32)
-    assert(TypeTable.int_is_signed(tt, TYPE_I32()) == true)
+    assert(TypeTable.int_is_signed(tt, TYPE_I32()))
     assert(TypeTable.int_bits(tt, TYPE_U64()) == 64)
-    assert(TypeTable.int_is_signed(tt, TYPE_U64()) == false)
+    assert(not TypeTable.int_is_signed(tt, TYPE_U64()))
 
     // Verify float details
     assert(TypeTable.float_bits(tt, TYPE_F32()) == 32)
@@ -44,20 +44,20 @@ fn test_named_lookup:
 
 fn test_predicates:
     var tt = TypeTable.new()
-    assert(TypeTable.is_int(tt, TYPE_I32()) == true)
-    assert(TypeTable.is_int(tt, TYPE_BOOL()) == false)
-    assert(TypeTable.is_signed_int(tt, TYPE_I32()) == true)
-    assert(TypeTable.is_unsigned_int(tt, TYPE_U32()) == true)
-    assert(TypeTable.is_float(tt, TYPE_F64()) == true)
-    assert(TypeTable.is_numeric(tt, TYPE_I32()) == true)
-    assert(TypeTable.is_numeric(tt, TYPE_F64()) == true)
-    assert(TypeTable.is_numeric(tt, TYPE_BOOL()) == false)
-    assert(TypeTable.is_bool(tt, TYPE_BOOL()) == true)
-    assert(TypeTable.is_str(tt, TYPE_STR()) == true)
-    assert(TypeTable.is_void(tt, TYPE_VOID()) == true)
-    assert(TypeTable.is_copy(tt, TYPE_I32()) == true)
-    assert(TypeTable.is_copy(tt, TYPE_BOOL()) == true)
-    assert(TypeTable.is_copy(tt, TYPE_STR()) == false)
+    assert(TypeTable.is_int(tt, TYPE_I32()))
+    assert(not TypeTable.is_int(tt, TYPE_BOOL()))
+    assert(TypeTable.is_signed_int(tt, TYPE_I32()))
+    assert(TypeTable.is_unsigned_int(tt, TYPE_U32()))
+    assert(TypeTable.is_float(tt, TYPE_F64()))
+    assert(TypeTable.is_numeric(tt, TYPE_I32()))
+    assert(TypeTable.is_numeric(tt, TYPE_F64()))
+    assert(not TypeTable.is_numeric(tt, TYPE_BOOL()))
+    assert(TypeTable.is_bool(tt, TYPE_BOOL()))
+    assert(TypeTable.is_str(tt, TYPE_STR()))
+    assert(TypeTable.is_void(tt, TYPE_VOID()))
+    assert(TypeTable.is_copy(tt, TYPE_I32()))
+    assert(TypeTable.is_copy(tt, TYPE_BOOL()))
+    assert(not TypeTable.is_copy(tt, TYPE_STR()))
 
 fn test_struct_type:
     var tt = TypeTable.new()
@@ -71,7 +71,7 @@ fn test_struct_type:
     defaults.push(0)
     defaults.push(1)
     let sid = TypeTable.add_struct(tt, 200, names, types, defaults)
-    assert(TypeTable.is_struct(tt, sid) == true)
+    assert(TypeTable.is_struct(tt, sid))
     assert(TypeTable.struct_field_count(tt, sid) == 2)
     assert(TypeTable.struct_name(tt, sid) == 200)
     assert(TypeTable.struct_field_name(tt, sid, 0) == 100)
@@ -80,7 +80,7 @@ fn test_struct_type:
     assert(TypeTable.struct_field_type(tt, sid, 1) == TYPE_F64())
     assert(TypeTable.struct_field_has_default(tt, sid, 0) == 0)
     assert(TypeTable.struct_field_has_default(tt, sid, 1) == 1)
-    assert(TypeTable.is_copy(tt, sid) == false)
+    assert(not TypeTable.is_copy(tt, sid))
 
 fn test_enum_type:
     var tt = TypeTable.new()
@@ -93,7 +93,7 @@ fn test_enum_type:
     var vptypes = Vec.new()
     vptypes.push(TYPE_I32())
     let eid = TypeTable.add_enum(tt, 400, vnames, vpayloads, vptypes)
-    assert(TypeTable.is_enum(tt, eid) == true)
+    assert(TypeTable.is_enum(tt, eid))
     assert(TypeTable.enum_variant_count(tt, eid) == 2)
     assert(TypeTable.enum_name(tt, eid) == 400)
     assert(TypeTable.enum_variant_name(tt, eid, 0) == 300)
@@ -105,14 +105,14 @@ fn test_enum_type:
 fn test_array_type:
     var tt = TypeTable.new()
     let aid = TypeTable.add_array(tt, TYPE_I32(), 10)
-    assert(TypeTable.is_array(tt, aid) == true)
+    assert(TypeTable.is_array(tt, aid))
     assert(TypeTable.array_elem_type(tt, aid) == TYPE_I32())
     assert(TypeTable.array_size(tt, aid) == 10)
 
 fn test_slice_type:
     var tt = TypeTable.new()
     let sid = TypeTable.add_slice(tt, TYPE_U8())
-    assert(TypeTable.is_slice(tt, sid) == true)
+    assert(TypeTable.is_slice(tt, sid))
     assert(TypeTable.slice_elem_type(tt, sid) == TYPE_U8())
 
 fn test_tuple_type:
@@ -122,7 +122,7 @@ fn test_tuple_type:
     elems.push(TYPE_BOOL())
     elems.push(TYPE_STR())
     let tid = TypeTable.add_tuple(tt, elems)
-    assert(TypeTable.is_tuple(tt, tid) == true)
+    assert(TypeTable.is_tuple(tt, tid))
     assert(TypeTable.tuple_elem_count(tt, tid) == 3)
     assert(TypeTable.tuple_elem_type(tt, tid, 0) == TYPE_I32())
     assert(TypeTable.tuple_elem_type(tt, tid, 1) == TYPE_BOOL())
@@ -134,7 +134,7 @@ fn test_fn_type:
     params.push(TYPE_I32())
     params.push(TYPE_I32())
     let fid = TypeTable.add_fn(tt, params, TYPE_BOOL(), 0)
-    assert(TypeTable.is_fn(tt, fid) == true)
+    assert(TypeTable.is_fn(tt, fid))
     assert(TypeTable.fn_param_count(tt, fid) == 2)
     assert(TypeTable.fn_return_type(tt, fid) == TYPE_BOOL())
     assert(TypeTable.fn_is_variadic(tt, fid) == 0)
@@ -144,23 +144,23 @@ fn test_fn_type:
 fn test_ptr_ref_types:
     var tt = TypeTable.new()
     let pid = TypeTable.add_ptr(tt, TYPE_I32(), 0)
-    assert(TypeTable.is_ptr(tt, pid) == true)
+    assert(TypeTable.is_ptr(tt, pid))
     assert(TypeTable.pointee_type(tt, pid) == TYPE_I32())
-    assert(TypeTable.is_mut_ptr(tt, pid) == false)
-    assert(TypeTable.is_copy(tt, pid) == true)
+    assert(not TypeTable.is_mut_ptr(tt, pid))
+    assert(TypeTable.is_copy(tt, pid))
 
     let mid = TypeTable.add_ptr(tt, TYPE_I32(), 1)
-    assert(TypeTable.is_mut_ptr(tt, mid) == true)
+    assert(TypeTable.is_mut_ptr(tt, mid))
 
     let rid = TypeTable.add_ref(tt, TYPE_STR(), 1)
-    assert(TypeTable.is_ref(tt, rid) == true)
+    assert(TypeTable.is_ref(tt, rid))
     assert(TypeTable.pointee_type(tt, rid) == TYPE_STR())
-    assert(TypeTable.is_mut_ref(tt, rid) == true)
+    assert(TypeTable.is_mut_ref(tt, rid))
 
 fn test_alias_type:
     var tt = TypeTable.new()
     let aid = TypeTable.add_alias(tt, 500, TYPE_I32())
-    assert(TypeTable.is_alias(tt, aid) == true)
+    assert(TypeTable.is_alias(tt, aid))
     assert(TypeTable.alias_target(tt, aid) == TYPE_I32())
     assert(TypeTable.resolve_alias(tt, aid) == TYPE_I32())
     // Chain of aliases
@@ -170,42 +170,42 @@ fn test_alias_type:
 fn test_option_result:
     var tt = TypeTable.new()
     let oid = TypeTable.add_option(tt, TYPE_I32())
-    assert(TypeTable.is_option(tt, oid) == true)
+    assert(TypeTable.is_option(tt, oid))
     assert(TypeTable.option_payload(tt, oid) == TYPE_I32())
 
     let rid = TypeTable.add_result(tt, TYPE_STR(), TYPE_I32())
-    assert(TypeTable.is_result(tt, rid) == true)
+    assert(TypeTable.is_result(tt, rid))
     assert(TypeTable.result_ok_type(tt, rid) == TYPE_STR())
     assert(TypeTable.result_err_type(tt, rid) == TYPE_I32())
 
 fn test_type_equality:
     var tt = TypeTable.new()
     // Same builtin type
-    assert(TypeTable.types_equal(tt, TYPE_I32(), TYPE_I32()) == true)
-    assert(TypeTable.types_equal(tt, TYPE_I32(), TYPE_I64()) == false)
+    assert(TypeTable.types_equal(tt, TYPE_I32(), TYPE_I32()))
+    assert(not TypeTable.types_equal(tt, TYPE_I32(), TYPE_I64()))
     // Array types
     let a1 = TypeTable.add_array(tt, TYPE_I32(), 10)
     let a2 = TypeTable.add_array(tt, TYPE_I32(), 10)
     let a3 = TypeTable.add_array(tt, TYPE_I32(), 20)
-    assert(TypeTable.types_equal(tt, a1, a2) == true)
-    assert(TypeTable.types_equal(tt, a1, a3) == false)
+    assert(TypeTable.types_equal(tt, a1, a2))
+    assert(not TypeTable.types_equal(tt, a1, a3))
     // Option types
     let o1 = TypeTable.add_option(tt, TYPE_I32())
     let o2 = TypeTable.add_option(tt, TYPE_I32())
     let o3 = TypeTable.add_option(tt, TYPE_STR())
-    assert(TypeTable.types_equal(tt, o1, o2) == true)
-    assert(TypeTable.types_equal(tt, o1, o3) == false)
+    assert(TypeTable.types_equal(tt, o1, o2))
+    assert(not TypeTable.types_equal(tt, o1, o3))
 
 fn test_generic_param:
     var tt = TypeTable.new()
     let gp = TypeTable.add_generic_param(tt, 600)
-    assert(TypeTable.is_generic_param(tt, gp) == true)
+    assert(TypeTable.is_generic_param(tt, gp))
     assert(TypeTable.generic_param_name(tt, gp) == 600)
 
 fn test_trait_obj:
     var tt = TypeTable.new()
     let to = TypeTable.add_trait_obj(tt, 700)
-    assert(TypeTable.is_trait_obj(tt, to) == true)
+    assert(TypeTable.is_trait_obj(tt, to))
     assert(TypeTable.trait_obj_name(tt, to) == 700)
 
 fn test_register_name:

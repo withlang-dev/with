@@ -89,11 +89,11 @@ fn test_type_struct_lookup:
 fn test_type_copy:
     var types = TypeTable.new()
     // Primitive types are copy
-    assert(TypeTable.is_copy(types, TYPE_I32()) == true)
-    assert(TypeTable.is_copy(types, TYPE_BOOL()) == true)
-    assert(TypeTable.is_copy(types, TYPE_F64()) == true)
+    assert(TypeTable.is_copy(types, TYPE_I32()))
+    assert(TypeTable.is_copy(types, TYPE_BOOL()))
+    assert(TypeTable.is_copy(types, TYPE_F64()))
     // Str is not copy (has heap allocation in general)
-    assert(TypeTable.is_copy(types, TYPE_STR()) == false)
+    assert(not TypeTable.is_copy(types, TYPE_STR()))
 
 fn main:
     test_type_keyword()

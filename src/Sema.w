@@ -309,13 +309,11 @@ fn Sema.get_type_d2(self: Sema, tid: i32) -> i32:
 
 fn Sema.resolve_alias(self: Sema, tid: i32) -> i32:
     var current = tid
-    var depth = 0
-    while depth < 32:
+    for depth in 0..32:
         if self.get_type_kind(current) == TY_ALIAS():
             current = self.get_type_d0(current)
         else:
             return current
-        depth = depth + 1
     current
 
 // ── Scope management ─────────────────────────────────────────────
@@ -426,8 +424,7 @@ fn Sema.check_module(self: Sema):
 // ── Pass 1: Declaration collection ───────────────────────────────
 
 fn Sema.compute_method_origins(self: Sema):
-    var di = 0
-    while di < self.ast.decl_count():
+    for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         let kind = self.ast.kind(decl)
         if kind == NK_IMPL_DECL():
@@ -449,26 +446,21 @@ fn Sema.compute_method_origins(self: Sema):
                 if origin == 0:
                     if self.is_method_symbol(fn_name):
                         self.method_has_inherent.insert(fn_name, 1)
-        di = di + 1
 
     // Top-level method syntax
-    di = 0
-    while di < self.ast.decl_count():
+    for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NK_FN_DECL():
             let fn_name = self.ast.get_data0(decl)
             if self.is_method_symbol(fn_name):
                 if not self.method_decl_origins.contains(di):
                     self.method_has_inherent.insert(fn_name, 1)
-        di = di + 1
 
 fn Sema.is_method_symbol(self: Sema, sym: i32) -> i32:
     let name = self.pool.resolve(sym)
-    var i = 0
-    while i < name.len() as i32:
+    for i in 0..name.len() as i32:
         if name[i] == 46:
             return 1
-        i = i + 1
     0
 
 fn Sema.should_skip_trait_method(self: Sema, decl_idx: i32, fn_sym: i32) -> i32:
@@ -485,29 +477,24 @@ fn Sema.collect_declarations(self: Sema):
     self.collecting_types = 1
     // Pass 1: collect named types and traits first so functions can refer
     // to imported or forward-declared types regardless of declaration order.
-    var di = 0
-    while di < self.ast.decl_count():
+    for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         let kind = self.ast.kind(decl)
         if kind == NK_TYPE_DECL():
             self.collect_type_decl(decl)
         if kind == NK_TRAIT_DECL():
             self.collect_trait_decl(decl)
-        di = di + 1
 
     // Pass 2: collect impl declarations once trait/type tables exist.
-    di = 0
-    while di < self.ast.decl_count():
+    for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NK_IMPL_DECL():
             self.collect_impl_decl(decl)
-        di = di + 1
 
     self.collecting_types = 0
 
     // Pass 3: collect function signatures and top-level let decls.
-    di = 0
-    while di < self.ast.decl_count():
+    for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         let kind = self.ast.kind(decl)
         if kind == NK_FN_DECL():
@@ -518,7 +505,6 @@ fn Sema.collect_declarations(self: Sema):
             self.collect_extern_fn(decl)
         if kind == NK_LET_DECL():
             self.collect_let_decl(decl)
-        di = di + 1
 
 fn Sema.collect_type_decl(self: Sema, node: i32):
     let name = self.ast.get_data0(node)
@@ -528,8 +514,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32):
     if sub_kind == TDK_STRUCT():
         let field_count = self.ast.get_extra(extra_start)
         let te_start = self.type_extra.len() as i32
-        var fi = 0
-        while fi < field_count:
+        for fi in 0..field_count:
             let base = extra_start + 1 + fi * 3
             let f_name = self.ast.get_extra(base)
             let f_type_node = self.ast.get_extra(base + 1)
@@ -538,43 +523,36 @@ fn Sema.collect_type_decl(self: Sema, node: i32):
             self.type_extra.push(f_name)
             self.type_extra.push(f_tid)
             self.type_extra.push(f_default)
-            fi = fi + 1
         let tid = self.add_type(TY_STRUCT(), name, te_start, field_count)
         self.named_types.insert(name, tid)
 
     if sub_kind == TDK_ENUM():
         let variant_count = self.ast.get_extra(extra_start)
         let te_start = self.type_extra.len() as i32
-        var vi = 0
         var epos = extra_start + 1
-        while vi < variant_count:
+        for vi in 0..variant_count:
             let v_name = self.ast.get_extra(epos)
             epos = epos + 1
             let payload_count = self.ast.get_extra(epos)
             epos = epos + 1
             self.type_extra.push(v_name)
             self.type_extra.push(payload_count)
-            var pi = 0
-            while pi < payload_count:
+            for pi in 0..payload_count:
                 let pt_node = self.ast.get_extra(epos)
                 epos = epos + 1
                 let pt_tid = self.resolve_type_expr(pt_node)
                 self.type_extra.push(pt_tid)
-                pi = pi + 1
             // Register variant lookup
             self.variant_lookup.insert(v_name, vi)
-            vi = vi + 1
         let tid = self.add_type(TY_ENUM(), name, te_start, variant_count)
         self.named_types.insert(name, tid)
         // Re-register variants with actual enum TypeId
-        vi = 0
         var vpos = te_start
-        while vi < variant_count:
+        for vi in 0..variant_count:
             let v_name = self.type_extra.get(vpos as i64)
             self.variant_lookup.insert(v_name, tid * 65536 + vi)
             let pc = self.type_extra.get((vpos + 1) as i64)
             vpos = vpos + 2 + pc
-            vi = vi + 1
 
     if sub_kind == TDK_ALIAS():
         let aliased_node = self.ast.get_extra(extra_start)
@@ -621,12 +599,10 @@ fn Sema.collect_fn_decl(self: Sema, node: i32):
 
     // Resolve param types
     let sig_param_start = self.sig_params.len() as i32
-    var pi = 0
-    while pi < param_count:
+    for pi in 0..param_count:
         let p_type_node = self.ast.get_extra(param_start + pi * 2 + 1)
         let p_tid = self.resolve_type_expr(p_type_node)
         self.sig_params.push(p_tid)
-        pi = pi + 1
 
     let ret_type = self.resolve_type_expr(ret_node)
     let actual_ret = ret_type
@@ -636,10 +612,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32):
 
     // Build fn type
     let fn_extra_start = self.type_extra.len() as i32
-    pi = 0
-    while pi < param_count:
+    for pi in 0..param_count:
         self.type_extra.push(self.sig_params.get((sig_param_start + pi) as i64))
-        pi = pi + 1
     let fn_tid = self.add_type(TY_FN(), fn_extra_start, param_count, ret_type)
 
     self.add_sig(fn_name, fn_tid, ret_type, sig_param_start, param_count, 0)
@@ -668,21 +642,17 @@ fn Sema.collect_extern_fn(self: Sema, node: i32):
     let param_count = self.ast.fn_meta_param_count(meta)
 
     let sig_param_start = self.sig_params.len() as i32
-    var pi = 0
-    while pi < param_count:
+    for pi in 0..param_count:
         // extern params use the same parser extra layout as regular fns: [name, type]*
         let p_type_node = self.ast.get_extra(param_start + pi * 2 + 1)
         let p_tid = self.resolve_type_expr(p_type_node)
         self.sig_params.push(p_tid)
-        pi = pi + 1
 
     let ret_type = self.resolve_type_expr(ret_node)
 
     let fn_extra_start = self.type_extra.len() as i32
-    pi = 0
-    while pi < param_count:
+    for pi in 0..param_count:
         self.type_extra.push(self.sig_params.get((sig_param_start + pi) as i64))
-        pi = pi + 1
     let fn_tid = self.add_type(TY_FN(), fn_extra_start, param_count, ret_type)
 
     self.add_sig(name, fn_tid, ret_type, sig_param_start, param_count, is_variadic)
@@ -760,11 +730,9 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
         let param_count = self.ast.get_data1(node)
         let ret_node = self.ast.get_data2(node)
         let te_start = self.type_extra.len() as i32
-        var pi = 0
-        while pi < param_count:
+        for pi in 0..param_count:
             let p_node = self.ast.get_extra(extra_start + pi)
             self.type_extra.push(self.resolve_type_expr(p_node))
-            pi = pi + 1
         let ret = self.resolve_type_expr(ret_node)
         return self.add_type(TY_FN(), te_start, param_count, ret)
 
@@ -781,11 +749,9 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         let te_start = self.type_extra.len() as i32
-        var ei = 0
-        while ei < elem_count:
+        for ei in 0..elem_count:
             let e_node = self.ast.get_extra(extra_start + ei)
             self.type_extra.push(self.resolve_type_expr(e_node))
-            ei = ei + 1
         return self.add_type(TY_TUPLE(), te_start, elem_count, 0)
 
     if kind == NK_TYPE_OPTIONAL():
@@ -806,8 +772,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
 // ── Pass 2: Check function bodies ────────────────────────────────
 
 fn Sema.check_bodies(self: Sema):
-    var di = 0
-    while di < self.ast.decl_count():
+    for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NK_FN_DECL():
             let fn_name = self.ast.get_data0(decl)
@@ -819,7 +784,6 @@ fn Sema.check_bodies(self: Sema):
                     tp_count = self.ast.fn_meta_tp_count(meta)
                 if tp_count == 0:
                     self.check_fn_body(decl)
-        di = di + 1
 
 fn Sema.check_fn_body(self: Sema, node: i32):
     let fn_name = self.ast.get_data0(node)
@@ -840,12 +804,10 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     if meta >= 0:
         let param_start = self.ast.fn_meta_param_start(meta)
         let param_count = self.ast.fn_meta_param_count(meta)
-        var pi = 0
-        while pi < param_count:
+        for pi in 0..param_count:
             let p_name = self.ast.get_extra(param_start + pi * 2)
             let p_tid = self.sig_param_type(sig_idx, pi)
             self.scope_put(p_name, p_tid, 0)
-            pi = pi + 1
 
     // Set current return type
     let saved_ret = self.current_return_type
@@ -1061,8 +1023,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
         let extra_start = self.ast.get_data0(node)
         let arm_count = self.ast.get_data1(node)
         var result = self.ty_void
-        var ai = 0
-        while ai < arm_count:
+        for ai in 0..arm_count:
             // Each select arm has: task_node, name_sym, body_node
             let task = self.ast.get_extra(extra_start + ai * 3)
             let arm_name = self.ast.get_extra(extra_start + ai * 3 + 1)
@@ -1072,7 +1033,6 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
             self.scope_put(arm_name, self.ty_i32, 0)
             result = self.check_expr(arm_body)
             self.pop_scope()
-            ai = ai + 1
         return result
 
     if kind == NK_ARRAY_COMPREHENSION():
@@ -1221,11 +1181,9 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
 
     self.push_scope()
 
-    var i = 0
-    while i < stmt_count:
+    for i in 0..stmt_count:
         let stmt = self.ast.get_extra(extra_start + i)
         self.check_expr(stmt)
-        i = i + 1
 
     var result = self.ty_void
     if tail != 0:
@@ -1348,12 +1306,10 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
         let st_name = self.get_type_d0(field_base)
         let te_start = self.get_type_d1(field_base)
         let field_count = self.get_type_d2(field_base)
-        var fi = 0
-        while fi < field_count:
+        for fi in 0..field_count:
             let f_name = self.type_extra.get((te_start + fi * 3) as i64)
             if f_name == field:
                 return self.type_extra.get((te_start + fi * 3 + 1) as i64)
-            fi = fi + 1
         return 0
 
     if ftk == TY_TUPLE():
@@ -1362,12 +1318,10 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
         let field_name = self.pool.resolve(field)
         // Parse field index
         var idx = 0
-        var vi = 0
-        while vi < field_name.len() as i32:
+        for vi in 0..field_name.len() as i32:
             let ch = field_name[vi]
             if ch >= 48 and ch <= 57:
                 idx = idx * 10 + ch - 48
-            vi = vi + 1
         if idx < elem_count:
             return self.type_extra.get((te_start + idx) as i64)
         return 0
@@ -1429,13 +1383,11 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
         return 0
 
     var elem_type = 0
-    var i = 0
-    while i < elem_count:
+    for i in 0..elem_count:
         let elem = self.ast.get_extra(extra_start + i)
         let et = self.check_expr(elem)
         if elem_type == 0:
             elem_type = et
-        i = i + 1
 
     self.add_type(TY_ARRAY(), elem_type, elem_count, 0)
 
@@ -1449,12 +1401,10 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) == TY_STRUCT():
             // Check field initializers
-            var fi = 0
-            while fi < field_count:
+            for fi in 0..field_count:
                 let f_name = self.ast.get_extra(extra_start + fi * 2)
                 let f_value = self.ast.get_extra(extra_start + fi * 2 + 1)
                 self.check_expr(f_value)
-                fi = fi + 1
             return resolved
     0
 
@@ -1466,8 +1416,7 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
     let subject_type = self.check_expr(subject)
     var result_type = 0
 
-    var ai = 0
-    while ai < arm_count:
+    for ai in 0..arm_count:
         let arm_node = self.ast.get_extra(extra_start + ai)
         let pat = self.ast.get_data0(arm_node)
         let arm_body = self.ast.get_data1(arm_node)
@@ -1482,7 +1431,6 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
 
         if result_type == 0:
             result_type = arm_type
-        ai = ai + 1
 
     result_type
 
@@ -1508,20 +1456,16 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         let v_extra = self.ast.get_data1(node)
         let bind_count = self.ast.get_data2(node)
         // Bind each payload variable
-        var bi = 0
-        while bi < bind_count:
+        for bi in 0..bind_count:
             let b_sym = self.ast.get_extra(v_extra + bi)
             self.scope_put(b_sym, 0, 0)
-            bi = bi + 1
         return
 
     if kind == NK_PAT_OR():
         let p_extra = self.ast.get_data0(node)
         let p_count = self.ast.get_data1(node)
-        var pi = 0
-        while pi < p_count:
+        for pi in 0..p_count:
             self.check_pattern(self.ast.get_extra(p_extra + pi), subject_type)
-            pi = pi + 1
         return
 
     if kind == NK_PAT_AT_BINDING():
@@ -1534,10 +1478,8 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
     if kind == NK_PAT_TUPLE():
         let t_extra = self.ast.get_data0(node)
         let t_count = self.ast.get_data1(node)
-        var ti = 0
-        while ti < t_count:
+        for ti in 0..t_count:
             self.check_pattern(self.ast.get_extra(t_extra + ti), 0)
-            ti = ti + 1
         return
 
     if kind == NK_PAT_SLICE():
@@ -1552,36 +1494,30 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         if stk == TY_SLICE():
             elem_type = self.get_type_d0(resolved)
         let has_rest = self.ast.get_extra(s_extra)
-        var hi = 0
-        while hi < head_count:
+        for hi in 0..head_count:
             let h_sym = self.ast.get_extra(s_extra + 1 + hi)
             if h_sym != 0:
                 self.scope_put(h_sym, elem_type, 0)
-            hi = hi + 1
         if has_rest != 0 and rest_sym != 0:
             self.scope_put(rest_sym, self.ty_i64, 0)
         let tail_count = self.ast.get_extra(s_extra + 1 + head_count)
-        var ti = 0
-        while ti < tail_count:
+        for ti in 0..tail_count:
             let t_sym = self.ast.get_extra(s_extra + 2 + head_count + ti)
             if t_sym != 0:
                 self.scope_put(t_sym, elem_type, 0)
-            ti = ti + 1
         return
 
     if kind == NK_PAT_STRUCT():
         let sp_extra = self.ast.get_data1(node)
         let sp_count = self.ast.get_data2(node)
         let has_rest = self.ast.get_extra(sp_extra)
-        var spi = 0
-        while spi < sp_count:
+        for spi in 0..sp_count:
             let f_name = self.ast.get_extra(sp_extra + 1 + spi * 2)
             let f_pat = self.ast.get_extra(sp_extra + 1 + spi * 2 + 1)
             if f_pat != 0:
                 self.check_pattern(f_pat, 0)
             else:
                 self.scope_put(f_name, 0, 0)
-            spi = spi + 1
         return
 
 fn Sema.check_enum_variant(self: Sema, node: i32) -> i32:
@@ -1589,10 +1525,8 @@ fn Sema.check_enum_variant(self: Sema, node: i32) -> i32:
     let variant_name = self.ast.get_data1(node)
     let extra_start = self.ast.get_data2(node)
     let arg_count = self.ast.get_extra(extra_start)
-    var ai = 0
-    while ai < arg_count:
+    for ai in 0..arg_count:
         self.check_expr(self.ast.get_extra(extra_start + 1 + ai))
-        ai = ai + 1
     if self.named_types.contains(type_name):
         return self.resolve_alias(self.named_types.get(type_name).unwrap())
     0
@@ -1604,12 +1538,10 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
 
     self.push_scope()
     let te_start = self.type_extra.len() as i32
-    var pi = 0
-    while pi < param_count:
+    for pi in 0..param_count:
         let p_sym = self.ast.get_extra(extra_start + pi)
         self.scope_put(p_sym, self.ty_i32, 0)
         self.type_extra.push(self.ty_i32)
-        pi = pi + 1
     self.check_expr(body)
     self.pop_scope()
 
@@ -1633,12 +1565,10 @@ fn Sema.check_tuple(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data0(node)
     let elem_count = self.ast.get_data1(node)
     let te_start = self.type_extra.len() as i32
-    var ei = 0
-    while ei < elem_count:
+    for ei in 0..elem_count:
         let elem = self.ast.get_extra(extra_start + ei)
         let et = self.check_expr(elem)
         self.type_extra.push(et)
-        ei = ei + 1
     self.add_type(TY_TUPLE(), te_start, elem_count, 0)
 
 fn Sema.check_range(self: Sema, node: i32) -> i32:
@@ -1670,12 +1600,10 @@ fn Sema.check_record_update(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data1(node)
     let field_count = self.ast.get_data2(node)
     let source_ty = self.check_expr(source)
-    var fi = 0
-    while fi < field_count:
+    for fi in 0..field_count:
         let f_name = self.ast.get_extra(extra_start + fi * 2)
         let f_value = self.ast.get_extra(extra_start + fi * 2 + 1)
         self.check_expr(f_value)
-        fi = fi + 1
     source_ty
 
 fn Sema.check_let_else(self: Sema, node: i32) -> i32:
@@ -1692,11 +1620,9 @@ fn Sema.check_tuple_destructure(self: Sema, node: i32) -> i32:
     let name_count = self.ast.get_data1(node)
     let value = self.ast.get_data2(node)
     let val_type = self.check_expr(value)
-    var ni = 0
-    while ni < name_count:
+    for ni in 0..name_count:
         let n_sym = self.ast.get_extra(extra_start + ni)
         self.scope_put(n_sym, 0, 0)
-        ni = ni + 1
     self.ty_void
 
 fn Sema.check_call(self: Sema, node: i32) -> i32:
@@ -1714,23 +1640,17 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         fn_sym = self.ast.get_data0(callee)
     else:
         self.check_expr(callee)
-        var ai = 0
-        while ai < arg_count:
+        for ai in 0..arg_count:
             self.check_expr(self.ast.get_extra(extra_start + ai))
-            ai = ai + 1
         return 0
 
     // Check all arguments
-    var ai = 0
-    while ai < arg_count:
+    for ai in 0..arg_count:
         self.check_expr(self.ast.get_extra(extra_start + ai))
-        ai = ai + 1
 
     // Mark non-Copy args as moved
-    ai = 0
-    while ai < arg_count:
+    for ai in 0..arg_count:
         self.mark_moved_if_consumed(self.ast.get_extra(extra_start + ai))
-        ai = ai + 1
 
     // Known function
     let sig_idx = self.get_sig(fn_sym)
@@ -1776,10 +1696,8 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     let obj_type = self.check_expr(expr)
 
     // Check all arguments
-    var ai = 0
-    while ai < arg_count:
+    for ai in 0..arg_count:
         self.check_expr(self.ast.get_extra(extra_start + ai))
-        ai = ai + 1
 
     if obj_type == 0:
         return 0
@@ -1953,12 +1871,10 @@ fn Sema.is_copy(self: Sema, tid: i32) -> i32:
             return 0
         let te_start = self.get_type_d1(resolved)
         let field_count = self.get_type_d2(resolved)
-        var fi = 0
-        while fi < field_count:
+        for fi in 0..field_count:
             let ft = self.type_extra.get((te_start + fi * 3 + 1) as i64)
             if self.is_copy(ft) == 0:
                 return 0
-            fi = fi + 1
         return 1
     if tk == TY_ENUM():
         return 1
@@ -1969,11 +1885,9 @@ fn Sema.is_copy(self: Sema, tid: i32) -> i32:
     if tk == TY_TUPLE():
         let te_start = self.get_type_d0(resolved)
         let elem_count = self.get_type_d1(resolved)
-        var ei = 0
-        while ei < elem_count:
+        for ei in 0..elem_count:
             if self.is_copy(self.type_extra.get((te_start + ei) as i64)) == 0:
                 return 0
-            ei = ei + 1
         return 1
     if tk == TY_RANGE():
         return self.is_copy(self.get_type_d0(resolved))

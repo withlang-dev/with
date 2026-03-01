@@ -53,18 +53,14 @@ fn VE_DUPLICATE_MODULE -> i32: 2
 
 // Validate project scaffold. Returns VE_OK on success.
 fn validate_scaffold(spec_names: Vec[str], spec_paths: Vec[str]) -> i32:
-    var ri = 0
-    while ri < required_module_count():
+    for ri in 0..required_module_count():
         let req = required_module(ri)
         var count = 0
-        var si = 0
-        while si < spec_names.len() as i32:
+        for si in 0..spec_names.len() as i32:
             if spec_names.get(si as i64) == req:
                 count = count + 1
-            si = si + 1
         if count == 0:
             return VE_MISSING_MODULE()
         if count > 1:
             return VE_DUPLICATE_MODULE()
-        ri = ri + 1
     VE_OK()

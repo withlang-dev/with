@@ -32,9 +32,7 @@ fn MirModule.add_function(self: MirModule, name: str, block_count: i32) -> i32:
     0
 
 fn MirModule.has_function(self: MirModule, name: str) -> bool:
-    var i = 0
-    while i < self.functions.len() as i32:
+    for i in 0..self.functions.len() as i32:
         if self.functions.get(i as i64).name == name:
             return true
-        i = i + 1
     false
