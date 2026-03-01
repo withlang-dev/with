@@ -806,12 +806,12 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     var has_ref_param = false;
     var dyn_params_buf: [64]?u32 = undefined;
     var ref_params_buf: [64]bool = undefined;
-    var method_owner_sym: u32 = 0;
+    var method_owner_name: ?[]const u8 = null;
     {
         const fn_name = self.pool.resolve(func.name);
         if (std.mem.indexOfScalar(u8, fn_name, '.')) |dot| {
             if (dot > 0) {
-                method_owner_sym = self.pool.intern(fn_name[0..dot]) catch 0;
+                method_owner_name = fn_name[0..dot];
             }
         }
     }
@@ -819,10 +819,15 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         dyn_params_buf[i] = null;
         ref_params_buf[i] = false;
         if (param.type_expr) |te| {
-            if (i == 0 and method_owner_sym != 0 and te.kind == .named) {
-                const n = self.pool.resolve(te.kind.named);
-                if (std.mem.eql(u8, n, "Self") or te.kind.named == method_owner_sym) {
-                    // Lower method `self: T` as pointer param so mutations persist.
+            if (i == 0 and method_owner_name != null) {
+                const param_name = self.pool.resolve(param.name);
+                var is_receiver = std.mem.eql(u8, param_name, "self");
+                if (!is_receiver and te.kind == .named) {
+                    const n = self.pool.resolve(te.kind.named);
+                    is_receiver = std.mem.eql(u8, n, "Self") or std.mem.eql(u8, n, method_owner_name.?);
+                }
+                if (is_receiver) {
+                    // Lower method receiver to pointer so mutations persist.
                     param_types_buf[i] = c.LLVMPointerTypeInContext(self.context, 0);
                     ref_params_buf[i] = true;
                     has_ref_param = true;
@@ -927,6 +932,15 @@ fn declareFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     if (self.isResultUnitReturnType(func.return_type)) {
         self.fn_result_unit_returns.put(self.allocator, func.name, {}) catch return error.CodegenAlloc;
     }
+}
+
+fn findStructTypeSymbolByName(self: *Codegen, name: []const u8) ?u32 {
+    var it = self.struct_types.iterator();
+    while (it.next()) |entry| {
+        const sym = entry.key_ptr.*;
+        if (std.mem.eql(u8, self.pool.resolve(sym), name)) return sym;
+    }
+    return null;
 }
 
 fn declareExternFn(self: *Codegen, ext: Ast.ExternFnDecl) Error!void {
@@ -1704,10 +1718,12 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     self.tailrec_fn_sym = null;
 
     var method_owner_sym: u32 = 0;
+    var method_owner_name: ?[]const u8 = null;
     {
         const fn_name = self.pool.resolve(func.name);
         if (std.mem.indexOfScalar(u8, fn_name, '.')) |dot| {
             if (dot > 0) {
+                method_owner_name = fn_name[0..dot];
                 method_owner_sym = self.pool.intern(fn_name[0..dot]) catch 0;
             }
         }
@@ -1724,10 +1740,23 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         var fn_sig: ?c.LLVMTypeRef = null;
         var pointee_struct: ?u32 = null;
         if (param.type_expr) |te| {
-            if (i == 0 and method_owner_sym != 0 and te.kind == .named and c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind) {
-                const n = self.pool.resolve(te.kind.named);
-                if (std.mem.eql(u8, n, "Self") or te.kind.named == method_owner_sym) {
-                    pointee_struct = method_owner_sym;
+            if (i == 0 and c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind) {
+                const param_name = self.pool.resolve(param.name);
+                if (std.mem.eql(u8, param_name, "self")) {
+                    if (te.kind == .named) {
+                        const n = self.pool.resolve(te.kind.named);
+                        if (std.mem.eql(u8, n, "Self")) {
+                            if (method_owner_sym != 0 and self.struct_types.get(method_owner_sym) != null) {
+                                pointee_struct = method_owner_sym;
+                            } else if (method_owner_name) |owner| {
+                                pointee_struct = self.findStructTypeSymbolByName(owner);
+                            }
+                        } else if (method_owner_name != null and std.mem.eql(u8, n, method_owner_name.?)) {
+                            pointee_struct = te.kind.named;
+                        } else {
+                            pointee_struct = te.kind.named;
+                        }
+                    }
                 }
             }
             if (te.kind == .fn_type) {
@@ -5342,7 +5371,7 @@ fn genVecPush(self: *Codegen, vec_alloca: c.LLVMValueRef, vec_type: c.LLVMTypeRe
     const new_len = c.LLVMBuildAdd(self.builder, cur_len, c.LLVMConstInt(i64_type, 1, 0), "");
     _ = c.LLVMBuildStore(self.builder, new_len, len_gep);
 
-    return c.LLVMConstInt(c.LLVMVoidTypeInContext(self.context), 0, 0);
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
 /// Generate Vec.len() → i64
@@ -5432,6 +5461,47 @@ fn genVecGet(self: *Codegen, obj_val: c.LLVMValueRef, vec_type: c.LLVMTypeRef, i
     var gep_idx = [_]c.LLVMValueRef{idx_i64};
     const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, ptr, &gep_idx, 1, "");
     return c.LLVMBuildLoad2(self.builder, elem_type, elem_ptr, "vec.get");
+}
+
+/// Generate Vec.set_i32(idx, val) -> Unit with bounds check.
+fn genVecSetI32(self: *Codegen, vec_alloca: c.LLVMValueRef, vec_type: c.LLVMTypeRef, idx: c.LLVMValueRef, val: c.LLVMValueRef) Error!c.LLVMValueRef {
+    const elem_type = self.getVecElemType(vec_type) orelse return error.UnsupportedExpr;
+    if (c.LLVMGetTypeKind(elem_type) != c.LLVMIntegerTypeKind or c.LLVMGetIntTypeWidth(elem_type) != 32) {
+        return error.UnsupportedExpr;
+    }
+
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const idx_i64 = self.coerceInt(idx, i64_type);
+
+    const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 1, "vec.set.len.gep");
+    const len = c.LLVMBuildLoad2(self.builder, i64_type, len_gep, "vec.set.len");
+
+    const ge_zero = c.LLVMBuildICmp(
+        self.builder,
+        c.LLVMIntSGE,
+        idx_i64,
+        c.LLVMConstInt(i64_type, 0, 0),
+        "vec.set.ge0",
+    );
+    const lt_len = c.LLVMBuildICmp(self.builder, c.LLVMIntSLT, idx_i64, len, "vec.set.ltlen");
+    const in_bounds = c.LLVMBuildAnd(self.builder, ge_zero, lt_len, "vec.set.in_bounds");
+
+    const cur_fn = self.current_function orelse return error.UnsupportedExpr;
+    const store_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "vec.set.store");
+    const done_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "vec.set.done");
+    _ = c.LLVMBuildCondBr(self.builder, in_bounds, store_bb, done_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, store_bb);
+    const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_type, vec_alloca, 0, "vec.set.ptr.gep");
+    const ptr = c.LLVMBuildLoad2(self.builder, ptr_type, ptr_gep, "vec.set.ptr");
+    var gep_idx = [_]c.LLVMValueRef{idx_i64};
+    const elem_ptr = c.LLVMBuildGEP2(self.builder, elem_type, ptr, &gep_idx, 1, "vec.set.elem.ptr");
+    _ = c.LLVMBuildStore(self.builder, self.coerceInt(val, elem_type), elem_ptr);
+    _ = c.LLVMBuildBr(self.builder, done_bb);
+
+    c.LLVMPositionBuilderAtEnd(self.builder, done_bb);
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
 /// Generate Vec.pop() → ?T
@@ -5651,7 +5721,7 @@ fn genHashMapInsert(self: *Codegen, map_alloca: c.LLVMValueRef, map_type: c.LLVM
     const is_str = c.LLVMConstInt(i64_type, if (hm_info.is_str_key) 1 else 0, 0);
     var call_args = [_]c.LLVMValueRef{ map_ptr, key_alloca, val_alloca, is_str };
     _ = c.LLVMBuildCall2(self.builder, insert_info.fn_type, insert_info.value, &call_args, 4, "");
-    return c.LLVMConstInt(c.LLVMVoidTypeInContext(self.context), 0, 0);
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
 /// Generate map.get(key) → Option[V].
@@ -5919,7 +5989,7 @@ fn genHashSetInsert(self: *Codegen, set_alloca: c.LLVMValueRef, set_type: c.LLVM
     const is_str = c.LLVMConstInt(i64_type, if (hs_info.hm_info.is_str_key) 1 else 0, 0);
     var call_args = [_]c.LLVMValueRef{ map_ptr, key_alloca, val_alloca, is_str };
     _ = c.LLVMBuildCall2(self.builder, insert_info.fn_type, insert_info.value, &call_args, 4, "");
-    return c.LLVMConstInt(c.LLVMVoidTypeInContext(self.context), 0, 0);
+    return c.LLVMGetUndef(c.LLVMVoidTypeInContext(self.context));
 }
 
 /// Generate set.contains(val) → bool.
@@ -8794,31 +8864,72 @@ fn getMutableReceiverPtr(self: *Codegen, recv_expr: *const Ast.Expr) Error!c.LLV
     switch (recv_expr.kind) {
         .ident => |sym| {
             const local = self.locals.get(sym) orelse return error.UnsupportedExpr;
+            if (c.LLVMGetTypeKind(local.ty) == c.LLVMPointerTypeKind) {
+                if (local.pointee_struct != null) {
+                    return c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "recv.ptr.self");
+                }
+                // Fallback for pointer locals where pointee_struct metadata is missing.
+                const pointee = c.LLVMGetElementType(local.ty);
+                if (c.LLVMGetTypeKind(pointee) == c.LLVMStructTypeKind) {
+                    return c.LLVMBuildLoad2(self.builder, local.ty, local.alloca, "recv.ptr.load");
+                }
+            }
             return local.alloca;
         },
         .field_access => |fa| {
-            const base_sym = switch (fa.expr.kind) {
-                .ident => |s| s,
-                else => return error.UnsupportedExpr,
-            };
-            const base_local = self.locals.get(base_sym) orelse return error.UnsupportedExpr;
+            if (fa.expr.kind == .ident) {
+                const base_sym = fa.expr.kind.ident;
+                const base_local = self.locals.get(base_sym) orelse return error.UnsupportedExpr;
 
-            if (base_local.pointee_struct) |ps| {
-                const struct_info = self.struct_types.get(ps) orelse return error.UnsupportedType;
+                if (base_local.pointee_struct) |ps| {
+                    const struct_info = self.struct_types.get(ps) orelse return error.UnsupportedType;
+                    const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
+                    const ptr_val = c.LLVMBuildLoad2(self.builder, base_local.ty, base_local.alloca, "recv.ptr.base");
+                    return c.LLVMBuildStructGEP2(
+                        self.builder,
+                        struct_info.llvm_type,
+                        ptr_val,
+                        @intCast(idx),
+                        "recv.ptr.field",
+                    );
+                }
+
+                // Fallback for pointer-typed locals where pointee_struct metadata is missing.
+                if (c.LLVMGetTypeKind(base_local.ty) == c.LLVMPointerTypeKind) {
+                    const pointee = c.LLVMGetElementType(base_local.ty);
+                    if (c.LLVMGetTypeKind(pointee) == c.LLVMStructTypeKind) {
+                        if (self.findStructTypeByLlvm(pointee)) |struct_info| {
+                            if (self.findFieldIndex(struct_info, fa.field)) |idx| {
+                                const ptr_val = c.LLVMBuildLoad2(self.builder, base_local.ty, base_local.alloca, "recv.ptr.base");
+                                return c.LLVMBuildStructGEP2(
+                                    self.builder,
+                                    pointee,
+                                    ptr_val,
+                                    @intCast(idx),
+                                    "recv.ptr.field",
+                                );
+                            }
+                        }
+                    }
+                }
+
+                const struct_info = self.findStructTypeByLlvm(base_local.ty) orelse return error.UnsupportedType;
                 const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
-                const ptr_val = c.LLVMBuildLoad2(self.builder, base_local.ty, base_local.alloca, "recv.ptr.base");
-                return c.LLVMBuildStructGEP2(
-                    self.builder,
-                    struct_info.llvm_type,
-                    ptr_val,
-                    @intCast(idx),
-                    "recv.ptr.field",
-                );
+                return c.LLVMBuildStructGEP2(self.builder, base_local.ty, base_local.alloca, @intCast(idx), "recv.ptr.field");
             }
 
-            const struct_info = self.findStructTypeByLlvm(base_local.ty) orelse return error.UnsupportedType;
+            // Nested field access: recursively compute pointer to the base field.
+            const base_ptr = try self.getMutableReceiverPtr(fa.expr);
+            const base_val = try self.genExpr(fa.expr);
+            var base_ty = c.LLVMTypeOf(base_val);
+            if (c.LLVMGetTypeKind(base_ty) == c.LLVMPointerTypeKind) {
+                const pointee = c.LLVMGetElementType(base_ty);
+                if (c.LLVMGetTypeKind(pointee) != c.LLVMStructTypeKind) return error.UnsupportedType;
+                base_ty = pointee;
+            }
+            const struct_info = self.findStructTypeByLlvm(base_ty) orelse return error.UnsupportedType;
             const idx = self.findFieldIndex(struct_info, fa.field) orelse return error.UnsupportedExpr;
-            return c.LLVMBuildStructGEP2(self.builder, base_local.ty, base_local.alloca, @intCast(idx), "recv.ptr.field");
+            return c.LLVMBuildStructGEP2(self.builder, base_ty, base_ptr, @intCast(idx), "recv.ptr.field");
         },
         else => return error.UnsupportedExpr,
     }
@@ -9128,6 +9239,16 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
     // Evaluate the object.
     const obj_val = try self.genExpr(fa.expr);
     const obj_type = c.LLVMTypeOf(obj_val);
+    var dispatch_obj_val = obj_val;
+    var dispatch_obj_type = obj_type;
+    if (c.LLVMGetTypeKind(obj_type) == c.LLVMPointerTypeKind) {
+        const pointee = c.LLVMGetElementType(obj_type);
+        const pointee_kind = c.LLVMGetTypeKind(pointee);
+        if (pointee_kind == c.LLVMStructTypeKind or pointee_kind == c.LLVMArrayTypeKind) {
+            dispatch_obj_type = pointee;
+            dispatch_obj_val = c.LLVMBuildLoad2(self.builder, pointee, obj_val, "mcall.recv");
+        }
+    }
 
     // Derive(Builder)-style chaining on builder values:
     //   T.builder().field(v).build()
@@ -9488,6 +9609,12 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             const val = try self.genExpr(args[0]);
             const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
             return self.genVecPush(recv_ptr, obj_type, val);
+        } else if (std.mem.eql(u8, method_name, "set_i32")) {
+            if (args.len < 2) return error.UnsupportedExpr;
+            const idx = try self.genExpr(args[0]);
+            const val = try self.genExpr(args[1]);
+            const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
+            return self.genVecSetI32(recv_ptr, obj_type, idx, val);
         } else if (std.mem.eql(u8, method_name, "pop")) {
             const recv_ptr = try self.getMutableReceiverPtr(fa.expr);
             return self.genVecPop(recv_ptr, obj_type);
@@ -9640,6 +9767,21 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             const start = try self.genExpr(args[0]);
             const end = try self.genExpr(args[1]);
             return self.genStrSlice(obj_val, start, end);
+        } else if (std.mem.eql(u8, method_name, "byte_at")) {
+            if (args.len < 1) return error.UnsupportedExpr;
+            const index_val = try self.genExpr(args[0]);
+            const index_i64 = self.coerceInt(index_val, c.LLVMInt64TypeInContext(self.context));
+            const str_ptr = self.extractStrPtr(obj_val);
+            var gep_idx = [_]c.LLVMValueRef{index_i64};
+            const byte_ptr = c.LLVMBuildGEP2(
+                self.builder,
+                c.LLVMInt8TypeInContext(self.context),
+                str_ptr,
+                &gep_idx,
+                1,
+                "str.byte.ptr",
+            );
+            return c.LLVMBuildLoad2(self.builder, c.LLVMInt8TypeInContext(self.context), byte_ptr, "str.byte");
         } else if (std.mem.eql(u8, method_name, "split")) {
             if (args.len < 1) return error.UnsupportedExpr;
             const delim = try self.genExpr(args[0]);
@@ -9688,13 +9830,24 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
     // Search struct_types for matching type.
     var type_name_str: ?[]const u8 = null;
     var type_name_sym: ?u32 = null;
+    if (fa.expr.kind == .ident) {
+        const recv_sym = fa.expr.kind.ident;
+        if (self.locals.get(recv_sym)) |local| {
+            if (local.pointee_struct) |ps| {
+                type_name_sym = ps;
+                type_name_str = self.pool.resolve(ps);
+            }
+        }
+    }
     {
-        var it = self.struct_types.iterator();
-        while (it.next()) |entry| {
-            if (entry.value_ptr.llvm_type == obj_type) {
-                type_name_str = self.pool.resolve(entry.key_ptr.*);
-                type_name_sym = entry.key_ptr.*;
-                break;
+        if (type_name_str == null) {
+            var it = self.struct_types.iterator();
+            while (it.next()) |entry| {
+                if (entry.value_ptr.llvm_type == dispatch_obj_type) {
+                    type_name_str = self.pool.resolve(entry.key_ptr.*);
+                    type_name_sym = entry.key_ptr.*;
+                    break;
+                }
             }
         }
     }
@@ -9702,7 +9855,7 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
     if (type_name_str == null) {
         var it = self.enum_types.iterator();
         while (it.next()) |entry| {
-            if (entry.value_ptr.llvm_type == obj_type) {
+            if (entry.value_ptr.llvm_type == dispatch_obj_type) {
                 type_name_str = self.pool.resolve(entry.key_ptr.*);
                 type_name_sym = entry.key_ptr.*;
                 break;
@@ -9721,34 +9874,28 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             const mangled = name_buf[0 .. tn.len + 1 + method_name.len];
             const fn_sym = self.pool.intern(mangled) catch return error.CodegenAlloc;
 
-            if (self.functions.get(fn_sym)) |fn_info| {
-                // Call with obj as first arg.
-                var args_buf: [64]c.LLVMValueRef = undefined;
-                // Check if first param expects a pointer (e.g. self: *mut T).
-                const first_param_type = if (c.LLVMCountParams(fn_info.value) > 0)
-                    c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, 0))
-                else
-                    null;
-                if (first_param_type != null and c.LLVMGetTypeKind(first_param_type.?) == c.LLVMPointerTypeKind and
-                    c.LLVMGetTypeKind(obj_type) != c.LLVMPointerTypeKind)
-                {
-                    // Method expects pointer but we have a value — pass the alloca address.
-                    if (fa.expr.kind == .ident) {
-                        const sym = fa.expr.kind.ident;
-                        if (self.locals.get(sym)) |local| {
-                            args_buf[0] = local.alloca;
-                        } else {
-                            args_buf[0] = obj_val;
-                        }
+                if (self.functions.get(fn_sym)) |fn_info| {
+                    // Call with obj as first arg.
+                    var args_buf: [64]c.LLVMValueRef = undefined;
+                    // Check if first param expects a pointer (e.g. self: *mut T).
+                    const first_param_type = if (c.LLVMCountParams(fn_info.value) > 0)
+                        c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, 0))
+                    else
+                        null;
+                    if (first_param_type != null and c.LLVMGetTypeKind(first_param_type.?) == c.LLVMPointerTypeKind and
+                        c.LLVMGetTypeKind(dispatch_obj_type) != c.LLVMPointerTypeKind)
+                    {
+                        // Method expects pointer but we have a value.
+                        // Prefer a real mutable receiver pointer (ident/field/deref lvalues);
+                        // only fall back to a temporary for unsupported expressions.
+                        args_buf[0] = self.getMutableReceiverPtr(fa.expr) catch blk: {
+                            const tmp = c.LLVMBuildAlloca(self.builder, dispatch_obj_type, "tmp.self");
+                            _ = c.LLVMBuildStore(self.builder, dispatch_obj_val, tmp);
+                            break :blk tmp;
+                        };
                     } else {
-                        // For non-ident expressions, alloca a temp and pass its address.
-                        const tmp = c.LLVMBuildAlloca(self.builder, obj_type, "tmp.self");
-                        _ = c.LLVMBuildStore(self.builder, obj_val, tmp);
-                        args_buf[0] = tmp;
+                        args_buf[0] = dispatch_obj_val;
                     }
-                } else {
-                    args_buf[0] = obj_val;
-                }
                 for (args, 0..) |arg, i| {
                     args_buf[i + 1] = try self.genExpr(arg);
                 }
@@ -10954,17 +11101,15 @@ fn declareStructType(self: *Codegen, name_sym: u32, fields: []const Ast.FieldDef
     const field_types = self.allocator.alloc(c.LLVMTypeRef, fields.len) catch return error.CodegenAlloc;
     const field_defaults = self.allocator.alloc(?*const Ast.Expr, fields.len) catch return error.CodegenAlloc;
 
-    var llvm_field_types_buf: [64]c.LLVMTypeRef = undefined;
     for (fields, 0..) |f, i| {
         field_names[i] = f.name;
         field_types[i] = try self.resolveType(f.type_expr);
         field_defaults[i] = f.default;
-        llvm_field_types_buf[i] = field_types[i];
     }
 
     c.LLVMStructSetBody(
         struct_type,
-        if (fields.len > 0) &llvm_field_types_buf else null,
+        if (fields.len > 0) field_types.ptr else null,
         @intCast(fields.len),
         0,
     );
@@ -11031,7 +11176,6 @@ fn monomorphizeGenericStruct(self: *Codegen, td: Ast.TypeDecl, sl: Ast.StructLit
     const field_types = self.allocator.alloc(c.LLVMTypeRef, fields.len) catch return error.CodegenAlloc;
     const field_defaults = self.allocator.alloc(?*const Ast.Expr, fields.len) catch return error.CodegenAlloc;
 
-    var llvm_field_types_buf: [64]c.LLVMTypeRef = undefined;
     for (fields, 0..) |f, i| {
         field_names[i] = f.name;
         field_defaults[i] = f.default;
@@ -11053,12 +11197,11 @@ fn monomorphizeGenericStruct(self: *Codegen, td: Ast.TypeDecl, sl: Ast.StructLit
         } else {
             field_types[i] = try self.resolveType(f.type_expr);
         }
-        llvm_field_types_buf[i] = field_types[i];
     }
 
     c.LLVMStructSetBody(
         struct_type,
-        if (fields.len > 0) &llvm_field_types_buf else null,
+        if (fields.len > 0) field_types.ptr else null,
         @intCast(fields.len),
         0,
     );
@@ -11099,7 +11242,6 @@ fn monomorphizeGenericStructFromTypes(self: *Codegen, td: Ast.TypeDecl, resolved
     const field_types = self.allocator.alloc(c.LLVMTypeRef, fields.len) catch return error.CodegenAlloc;
     const field_defaults = self.allocator.alloc(?*const Ast.Expr, fields.len) catch return error.CodegenAlloc;
 
-    var llvm_field_types_buf: [64]c.LLVMTypeRef = undefined;
     for (fields, 0..) |f, i| {
         field_names[i] = f.name;
         field_defaults[i] = f.default;
@@ -11120,12 +11262,11 @@ fn monomorphizeGenericStructFromTypes(self: *Codegen, td: Ast.TypeDecl, resolved
         } else {
             field_types[i] = try self.resolveType(f.type_expr);
         }
-        llvm_field_types_buf[i] = field_types[i];
     }
 
     c.LLVMStructSetBody(
         struct_type,
-        if (fields.len > 0) &llvm_field_types_buf else null,
+        if (fields.len > 0) field_types.ptr else null,
         @intCast(fields.len),
         0,
     );
@@ -11582,14 +11723,21 @@ fn genStructLiteral(self: *Codegen, sl: Ast.StructLiteral) Error!c.LLVMValueRef 
     // Alloca for the struct.
     const alloca = c.LLVMBuildAlloca(self.builder, info.llvm_type, "struct");
 
+    // Field initializers should inherit the declared field type as context
+    // (e.g. HashMap.new() inside struct literals).
+    const saved_expected = self.expected_type;
+    defer self.expected_type = saved_expected;
+
     // Track which fields are explicitly provided.
-    var provided: [64]bool = .{false} ** 64;
+    const provided = self.allocator.alloc(bool, info.field_names.len) catch return error.CodegenAlloc;
+    @memset(provided, false);
 
     // Store each explicitly provided field.
     for (sl.fields) |field| {
         const idx = self.findFieldIndex(info, field.name) orelse return error.UnsupportedExpr;
         provided[idx] = true;
         const gep = c.LLVMBuildStructGEP2(self.builder, info.llvm_type, alloca, @intCast(idx), "");
+        self.expected_type = info.field_types[idx];
         const val = try self.genExpr(field.value);
         const coerced = self.coerceInt(val, info.field_types[idx]);
         _ = c.LLVMBuildStore(self.builder, coerced, gep);
@@ -11600,6 +11748,7 @@ fn genStructLiteral(self: *Codegen, sl: Ast.StructLiteral) Error!c.LLVMValueRef 
         if (!provided[i]) {
             if (info.field_defaults[i]) |default_expr| {
                 const gep = c.LLVMBuildStructGEP2(self.builder, info.llvm_type, alloca, @intCast(i), "");
+                self.expected_type = info.field_types[i];
                 const val = try self.genExpr(default_expr);
                 const coerced = self.coerceInt(val, info.field_types[i]);
                 _ = c.LLVMBuildStore(self.builder, coerced, gep);

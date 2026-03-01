@@ -221,7 +221,7 @@ These are real costs. For services, games, databases, and infrastructure — the
 
 ## What's Next
 
-With is in active development. The compiler bootstraps through Zig, the spec is at v6.3, and the standard library design covers I/O, networking, collections, concurrency, and FFI. We're building toward a self-hosted compiler, a package manager (`with get`), and a VSCode extension backed by a language server.
+With is in active development. The compiler bootstraps through Zig, the spec is at v6.5, and the standard library design covers I/O, networking, collections, concurrency, and FFI. The self-hosted compiler is operational — it compiles itself via a C backend, reaching a fixpoint at stage 3. Next up: a package manager (`with get`) and a VSCode extension backed by a language server.
 
 If any of this resonates — if you've felt the gap between Rust's promise and Rust's daily experience — With might be worth watching.
 

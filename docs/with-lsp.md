@@ -303,11 +303,11 @@ is the TextMate grammar.
   ],
   "repository": {
     "keywords": {
-      "match": "\\b(fn|let|var|type|use|if|else|match|for|while|return|break|continue|and|or|not|in|as|mut|pub|impl|trait|extend|defer|with|comptime|const|true|false)\\b",
+      "match": "\\b(fn|let|var|type|use|if|else|match|for|while|return|break|continue|and|or|not|in|as|mut|pub|impl|trait|extend|defer|with|comptime|const|true|false|async|await|extern|unsafe|gen|yield|spawn|error|select|scope|move|where)\\b",
       "name": "keyword.control.with"
     },
     "types": {
-      "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|bool|str|void|usize|isize|Self|Option|Result|Vec|HashMap|Box)\\b",
+      "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|bool|str|Unit|usize|isize|Self|Option|Result|Vec|HashMap|Box)\\b",
       "name": "entity.name.type.with"
     },
     "functions": {

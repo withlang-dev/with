@@ -18,8 +18,7 @@ fn update_depth(depth: i32, cls: i32) -> i32:
     else if cls in [2, 4] then depth - 1
     else depth
 
-fn max(a: i32, b: i32) -> i32:
-    if a > b then a else b
+fn max(a: i32, b: i32) -> i32: if a > b then a else b
 
 fn count_depth(input: [10]i32, len: i32) -> i32:
     var max_depth = 0
@@ -30,8 +29,7 @@ fn count_depth(input: [10]i32, len: i32) -> i32:
         max_depth = max(max_depth, depth)
     max_depth
 
-fn is_digit(ch: i32) -> bool:
-    ch in 48..=57
+fn is_digit(ch: i32) -> bool: ch in 48..=57
 
 fn classify_value(first_char: i32) -> i32:
     if first_char == 110 then 0
@@ -83,10 +81,10 @@ fn test_json_parser_example:
     assert_true(count_depth(nested, 6) == 3)
 
     // Test is_digit
-    assert_true(is_digit(48) == true)
-    assert_true(is_digit(57) == true)
-    assert_true(is_digit(47) == false)
-    assert_true(is_digit(58) == false)
+    assert_true(is_digit(48))
+    assert_true(is_digit(57))
+    assert_true(not is_digit(47))
+    assert_true(not is_digit(58))
 
     // Test classify_value
     assert_true(classify_value(110) == 0)
@@ -97,10 +95,10 @@ fn test_json_parser_example:
     assert_true(classify_value(0) == 5)
 
     // Test is_json_char
-    assert_true(is_json_char(123) == true)
-    assert_true(is_json_char(32) == true)
-    assert_true(is_json_char(49) == true)
-    assert_true(is_json_char(1) == false)
+    assert_true(is_json_char(123))
+    assert_true(is_json_char(32))
+    assert_true(is_json_char(49))
+    assert_true(not is_json_char(1))
 
     // Test fib
     assert_true(fib(0) == 0)

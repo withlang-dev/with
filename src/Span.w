@@ -4,8 +4,6 @@
 // Every token and AST node carries a span so diagnostics can
 // point back to the original source text.
 
-use Source
-
 // Opaque identifier for a loaded source file.
 type FileId = i32
 
@@ -17,7 +15,7 @@ type Span = {
 }
 
 // Sentinel span used for compiler-generated nodes with no source location.
-fn Span.zero() -> Span:
+fn Span.zero -> Span:
     Span { file: 0, start: 0, end: 0 }
 
 // Returns the length of the span in bytes.

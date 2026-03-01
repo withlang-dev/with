@@ -1,0 +1,6 @@
+-isysroot
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+-Wl,-rpath,/opt/homebrew/opt/llvm/lib
+-L/opt/homebrew/lib
+-lz
+-lzstd

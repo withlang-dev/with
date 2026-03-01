@@ -10,12 +10,10 @@ type SafeStr = {
     len: i32,
 }
 
-extend SafeStr =
-    fn new(s: str) -> SafeStr:
-        SafeStr { data: s, len: s.len as i32 }
+extend SafeStr:
+    fn new(s: str) -> SafeStr: SafeStr { data: s, len: s.len as i32 }
 
-    fn get_len(self: SafeStr) -> i32:
-        self.len
+    fn get_len(self: SafeStr) -> i32: self.len
 
 type Entry = {
     key: i32,
@@ -23,8 +21,7 @@ type Entry = {
     active: bool,
 }
 
-fn make_entry(key: i32, value: i32) -> Entry:
-    Entry { key: key, value: value, active: true }
+fn make_entry(key: i32, value: i32) -> Entry: Entry { key, value, active: true }
 
 fn sum_entries(entries: [5]Entry) -> i32:
     var sum = 0
@@ -35,13 +32,15 @@ fn sum_entries(entries: [5]Entry) -> i32:
 fn count_active(entries: [5]Entry) -> i32:
     var n = 0
     for i in 0..5:
-        if entries[i].active then n = n + 1 else n = n
+        if entries[i].active:
+            n = n + 1
     n
 
 fn find_value(entries: [5]Entry, key: i32) -> i32:
     var result = 0
     for i in 0..5:
-        if entries[i].key == key then result = entries[i].value else result = result
+        if entries[i].key == key:
+            result = entries[i].value
     result
 
 @[test]
@@ -75,7 +74,7 @@ fn test_c_interop_example:
     let e = make_entry(42, 100)
     assert_true(e.key == 42)
     assert_true(e.value == 100)
-    assert_true(e.active == true)
+    assert_true(e.active)
 
     // Test sum_entries
     let entries: [5]Entry = [

@@ -18,21 +18,17 @@ type Vec2 = {
     y: f64,
 }
 
-extend Vec2 =
-    fn new(x: f64, y: f64) -> Vec2:
-        Vec2 { x: x, y: y }
+extend Vec2:
+    fn new(x: f64, y: f64) -> Vec2: Vec2 { x, y }
 
-    fn zero -> Vec2:
-        Vec2 { x: 0.0, y: 0.0 }
+    fn zero -> Vec2: Vec2 { x: 0.0, y: 0.0 }
 
     fn add(self: Vec2, other: Vec2) -> Vec2:
         Vec2 { x: self.x + other.x, y: self.y + other.y }
 
-    fn scale(self: Vec2, s: f64) -> Vec2:
-        Vec2 { x: self.x * s, y: self.y * s }
+    fn scale(self: Vec2, s: f64) -> Vec2: Vec2 { x: self.x * s, y: self.y * s }
 
-    fn length_sq(self: Vec2) -> f64:
-        self.x * self.x + self.y * self.y
+    fn length_sq(self: Vec2) -> f64: self.x * self.x + self.y * self.y
 
 // --- Components ---
 
@@ -72,14 +68,12 @@ type Entity = {
 
 // --- World (simplified: fixed-size arrays) ---
 
-fn make_entity(id: i32) -> Entity:
-    Entity { id: id, generation: 1 }
+fn make_entity(id: i32) -> Entity: Entity { id, generation: 1 }
 
 fn make_transform(x: f64, y: f64) -> Transform:
-    Transform { x: x, y: y, rotation: 0.0, scale_val: 1.0 }
+    Transform { x, y, rotation: 0.0, scale_val: 1.0 }
 
-fn make_velocity(vx: f64, vy: f64) -> Velocity:
-    Velocity { vx: vx, vy: vy, angular: 0.0 }
+fn make_velocity(vx: f64, vy: f64) -> Velocity: Velocity { vx, vy, angular: 0.0 }
 
 // --- Systems ---
 
@@ -100,22 +94,19 @@ fn check_collision(t1: Transform, c1: Collider, t2: Transform, c2: Collider) -> 
 
 // --- Generic utility ---
 
-fn max[T](a: T, b: T) -> T:
-    if a > b then a else b
+fn max[T](a: T, b: T) -> T: if a > b then a else b
 
-fn min[T](a: T, b: T) -> T:
-    if a < b then a else b
+fn min[T](a: T, b: T) -> T: if a < b then a else b
 
-fn clamp[T](val: T, lo: T, hi: T) -> T:
-    min(max(val, lo), hi)
+fn clamp[T](val: T, lo: T, hi: T) -> T: min(max(val, lo), hi)
 
 // --- Input ---
 
-type InputDir = None | Up | Down | Left | Right
+type InputDir = Idle | Up | Down | Left | Right
 
 fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity:
     match dir
-        None -> make_velocity(0.0, 0.0)
+        Idle -> make_velocity(0.0, 0.0)
         Up -> make_velocity(0.0, 0.0 - speed)
         Down -> make_velocity(0.0, speed)
         Left -> make_velocity(0.0 - speed, 0.0)
@@ -123,7 +114,7 @@ fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity:
 
 // --- Main ---
 
-fn main -> i32:
+fn main:
     println("=== ECS Demo ===")
 
     // Create entities

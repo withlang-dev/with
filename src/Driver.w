@@ -1,2 +1,400 @@
-// Direct bootstrap port scaffold from bootstrap/src/Driver.zig.
-// Line-for-line port in progress.
+// Driver — Pipeline orchestration: lex → parse → (sema) → codegen → link.
+//
+// The Driver is the central coordinator that runs each compilation
+// phase in sequence and manages shared state (intern pool, diagnostics).
+// Direct port of bootstrap/src/Driver.zig to With.
+
+use Ast
+use Token
+use Lexer
+use InternPool
+use Parser
+use Diagnostic
+use Source
+use Span
+use Sema
+use Codegen
+use CImport
+
+extern fn with_fs_read_file(path: str) -> str
+extern fn with_eprintln(s: str) -> void
+extern fn with_system(cmd: str) -> i32
+extern fn int_to_string(n: i32) -> str
+extern fn with_arg_count() -> i32
+extern fn with_arg_at(idx: i32) -> str
+
+type Driver = {
+    pool: InternPool,
+    diagnostics: DiagnosticList,
+    // Set of already-imported file paths (to avoid duplicates/cycles).
+    imported_paths: HashMap[str, i32],
+    // Directory of the main source file being compiled.
+    source_dir: str,
+    // Next file ID for imported sources.
+    next_file_id: i32,
+    // Optimization level: 0=none, 1=basic, 2=standard, 3=aggressive.
+    opt_level: i32,
+    // Freestanding mode flags.
+    no_std: bool,
+    alloc: bool,
+    // Path of the main source file.
+    current_source_path: str,
+    // Source text of the main file.
+    current_source_text: str,
+    // Pending warning messages.
+    pending_warnings: Vec[str],
+}
+
+fn Driver.init -> Driver:
+    Driver {
+        pool: InternPool.init(),
+        diagnostics: DiagnosticList.init(),
+        imported_paths: HashMap.new(),
+        source_dir: ".",
+        next_file_id: 1,
+        opt_level: 0,
+        no_std: false,
+        alloc: false,
+        current_source_path: "<unknown>",
+        current_source_text: "",
+        pending_warnings: Vec.new(),
+    }
+
+fn Driver.deinit(self: Driver):
+    return
+
+// ── Compile pipeline ─────────────────────────────────────────────
+
+// Compile a single source file through the full pipeline.
+// Returns the parsed AstPool on success, or a pool with 0 decls on failure.
+fn Driver.compile_file(self: Driver, path: str) -> AstPool:
+    self.source_dir = dirname(path)
+    self.current_source_path = path
+
+    // Load source text.
+    let text = with_fs_read_file(path)
+    if text.len() == 0:
+        with_eprintln("error: cannot open '" ++ path ++ "'")
+        return AstPool.new()
+
+    self.current_source_text = text
+    let pool = self.compile_source(text, path, 0)
+    if pool.decl_count() == 0 and not self.diagnostics.has_errors():
+        with_eprintln("error: compiler produced an empty module for '" ++ path ++ "'")
+    pool
+
+// Compile from already-loaded source text.
+fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> AstPool:
+    // Phase 1: Lex.
+    var lexer = Lexer.init(text, file_id)
+    let tokens = lexer.tokenize()
+
+    // Phase 2: Parse.
+    var parser = Parser.init(tokens, text, file_id, self.pool, self.diagnostics)
+    var pool = parser.parse_module()
+
+    // Propagate parser's intern pool and diagnostics back to the driver.
+    // (Struct params are passed by value, so the parser operated on copies.)
+    self.pool = parser.intern
+    self.diagnostics = parser.diags
+
+    if self.diagnostics.has_errors():
+        let source = Source.from_string(name, text, file_id)
+        self.diagnostics.render_all(source)
+        return AstPool.new()
+
+    // Phase 2.5: Process use imports.
+    // Iterate to a fixed point so nested imports are resolved.
+    var import_passes = 0
+    while import_passes < 64:
+        let before = pool.decl_count()
+        pool = self.process_imports(pool, text)
+        let after = pool.decl_count()
+        if after == before:
+            break
+        import_passes = import_passes + 1
+
+    // Phase 3: Semantic analysis.
+    var sema = Sema.init(self.pool, self.diagnostics, pool)
+    sema.check_module()
+
+    // Propagate sema's changes back.
+    self.pool = sema.pool
+    self.diagnostics = sema.diags
+
+    if self.diagnostics.has_errors():
+        let source = Source.from_string(name, text, file_id)
+        self.diagnostics.render_all(source)
+        return AstPool.new()
+
+    if pool.decl_count() == 0:
+        with_eprintln("error: parser returned an empty module without diagnostics for '" ++ name ++ "'")
+        return AstPool.new()
+
+    pool
+
+// ── Codegen + link ───────────────────────────────────────────────
+
+// Compile a module to an object file. Returns 0 on success, 1 on failure.
+fn Driver.compile_to_object(self: Driver, pool: AstPool, output_path: str) -> i32:
+    var cg = Codegen.init("with_module")
+    cg.source_file = self.current_source_path
+    cg.source_text = self.current_source_text
+    let result = cg.gen_module(pool, self.pool)
+    if result != 0:
+        with_eprintln("error: code generation failed")
+        return 1
+    if self.opt_level > 0:
+        cg.optimize(self.opt_level)
+    let emit_result = cg.emit_object_file(output_path)
+    if emit_result != 0:
+        with_eprintln("error: failed to emit object file")
+        return 1
+    0
+
+// Dump LLVM IR to stdout.
+fn Driver.emit_ir(self: Driver, pool: AstPool) -> bool:
+    var cg = Codegen.init("with_module")
+    cg.source_file = self.current_source_path
+    cg.source_text = self.current_source_text
+    let result = cg.gen_module(pool, self.pool)
+    if result != 0:
+        with_eprintln("error: code generation failed")
+        return false
+    cg.print_ir()
+    true
+
+// Link an object file into a binary using the system linker.
+fn link(obj_path: str, bin_path: str) -> bool:
+    let cmd = "cc " ++ obj_path ++ " -o " ++ bin_path
+    let result = with_system(cmd)
+    result == 0
+
+// Link with extra object files.
+fn link_with_extras(obj_path: str, bin_path: str, extras: Vec[str]) -> bool:
+    var cmd = "cc " ++ obj_path
+    var i = 0
+    while i < extras.len() as i32:
+        cmd = cmd ++ " " ++ extras.get(i as i64)
+        i = i + 1
+    cmd = cmd ++ " -o " ++ bin_path
+    let result = with_system(cmd)
+    result == 0
+
+fn compiler_runtime_dir() -> str:
+    let argv0 = with_arg_at(0)
+    if argv0.len() == 0:
+        return "runtime"
+    dirname(argv0) ++ "/runtime"
+
+fn find_llvm_bridge_path() -> str:
+    let p1 = compiler_runtime_dir() ++ "/libwith_llvm_bridge.dylib"
+    if with_fs_read_file(p1).len() > 0:
+        return p1
+
+    let p2 = "bootstrap/zig-out/bin/runtime/libwith_llvm_bridge.dylib"
+    if with_fs_read_file(p2).len() > 0:
+        return p2
+
+    let p3 = "runtime/libwith_llvm_bridge.dylib"
+    if with_fs_read_file(p3).len() > 0:
+        return p3
+
+    ""
+
+fn should_link_llvm_bridge(source_path: str) -> bool:
+    source_path == "src/main.w" or source_path.ends_with("/src/main.w") or source_path.ends_with("\\src\\main.w")
+
+// Full pipeline: parse → codegen → link → binary.
+// Returns the output binary path on success, "" on failure.
+fn Driver.build_binary(self: Driver, source_path: str) -> str:
+    let dir = dirname(source_path)
+    self.build_binary_at(source_path, dir)
+
+fn Driver.build_binary_at(self: Driver, source_path: str, output_dir: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+
+    let stem = source_stem(source_path)
+    let obj_path = output_dir ++ "/" ++ stem ++ ".o"
+    let bin_path = output_dir ++ "/" ++ stem
+
+    let result = self.compile_to_object(pool, obj_path)
+    if result != 0:
+        return ""
+
+    var link_ok = false
+    if should_link_llvm_bridge(source_path):
+        let bridge_path = find_llvm_bridge_path()
+        if bridge_path.len() == 0:
+            with_eprintln("error: missing runtime/libwith_llvm_bridge.dylib")
+            return ""
+        let extras: Vec[str] = Vec.new()
+        extras.push(bridge_path)
+        link_ok = link_with_extras(obj_path, bin_path, extras)
+    else:
+        link_ok = link(obj_path, bin_path)
+    if not link_ok:
+        with_eprintln("error: linking failed")
+        return ""
+
+    // Clean up .o file
+    with_system("rm -f " ++ obj_path)
+    bin_path
+
+// ── Import resolution ────────────────────────────────────────────
+
+fn Driver.process_imports(self: Driver, pool: AstPool, source_text: str) -> AstPool:
+    // Keep declaration order stable by replacing each `use` with imported decls.
+    var merged_pool = pool
+    let base_count = merged_pool.decl_count()
+
+    var base_decls: Vec[i32] = Vec.new()
+    var bi = 0
+    while bi < base_count:
+        base_decls.push(merged_pool.get_decl(bi))
+        bi = bi + 1
+
+    var ordered: Vec[i32] = Vec.new()
+    var i = 0
+    while i < base_count:
+        let decl = base_decls.get(i as i64)
+        let kind = merged_pool.kind(decl)
+        if kind != NK_USE_DECL():
+            ordered.push(decl)
+            i = i + 1
+            continue
+
+        let path_start = merged_pool.get_data0(decl)
+        let path_count = merged_pool.get_data1(decl)
+        if path_count <= 0:
+            i = i + 1
+            continue
+
+        let path_name = self.use_path_name(merged_pool, path_start, path_count)
+        let file_path = self.resolve_module_path(path_name)
+        if file_path.len() == 0:
+            i = i + 1
+            continue
+
+        if self.imported_paths.contains(file_path):
+            i = i + 1
+            continue
+
+        self.imported_paths.insert(file_path, 1)
+        let before = merged_pool.decl_count()
+        merged_pool = self.parse_imported_file(file_path, merged_pool)
+        let after = merged_pool.decl_count()
+        var di = before
+        while di < after:
+            ordered.push(merged_pool.get_decl(di))
+            di = di + 1
+
+        i = i + 1
+
+    // Rebuild decl list in-place to avoid replacing Vec ownership.
+    while merged_pool.decl_count() > 0:
+        merged_pool.decls.pop()
+    var oi = 0
+    while oi < ordered.len() as i32:
+        merged_pool.add_decl(ordered.get(oi as i64))
+        oi = oi + 1
+    merged_pool
+
+fn Driver.use_path_name(self: Driver, pool: AstPool, path_start: i32, path_count: i32) -> str:
+    var path = ""
+    var pi = 0
+    while pi < path_count:
+        if pi > 0:
+            path = path ++ "/"
+        let seg = pool.get_extra(path_start + pi)
+        path = path ++ self.pool.resolve(seg)
+        pi = pi + 1
+    path
+
+fn Driver.resolve_module_path(self: Driver, module_name: str) -> str:
+    let module_rel = normalize_module_path(module_name)
+
+    // Strategy 1: relative to source directory
+    let path1 = self.source_dir ++ "/" ++ module_rel ++ ".w"
+    let text1 = with_fs_read_file(path1)
+    if text1.len() > 0:
+        return path1
+
+    // Strategy 2: lib/ relative to working directory
+    let path2 = "lib/" ++ module_rel ++ ".w"
+    let text2 = with_fs_read_file(path2)
+    if text2.len() > 0:
+        return path2
+
+    // Strategy 3: src/ directory (for self-hosted imports)
+    let path3 = "src/" ++ module_rel ++ ".w"
+    let text3 = with_fs_read_file(path3)
+    if text3.len() > 0:
+        return path3
+
+    ""
+
+fn normalize_module_path(module_name: str) -> str:
+    var out = ""
+    var i = 0
+    while i < module_name.len():
+        if module_name[i] == 46: // '.'
+            out = out ++ "/"
+        else:
+            out = out ++ module_name.slice(i as i64, (i + 1) as i64)
+        i = i + 1
+    out
+
+fn Driver.parse_imported_file(self: Driver, path: str, target_pool: AstPool) -> AstPool:
+    let text = with_fs_read_file(path)
+    if text.len() == 0:
+        return target_pool
+
+    let file_id = self.next_file_id
+    self.next_file_id = self.next_file_id + 1
+
+    var lexer = Lexer.init(text, file_id)
+    let tokens = lexer.tokenize()
+
+    var parser = Parser.init_with_pool(tokens, text, file_id, self.pool, self.diagnostics, target_pool)
+    let merged_pool = parser.parse_module()
+    self.pool = parser.intern
+    self.diagnostics = parser.diags
+    merged_pool
+
+// ── Helpers ──────────────────────────────────────────────────────
+
+fn dirname(path: str) -> str:
+    var last_slash = -1
+    var i = 0
+    while i < path.len():
+        if path[i] == 47: // '/'
+            last_slash = i as i32
+        i = i + 1
+    if last_slash < 0:
+        return "."
+    path.slice(0, last_slash as i64)
+
+fn source_stem(source_path: str) -> str:
+    // Extract basename and remove .w extension
+    var last_slash = -1
+    var i = 0
+    while i < source_path.len():
+        if source_path[i] == 47: // '/'
+            last_slash = i as i32
+        i = i + 1
+    let base = if last_slash >= 0:
+        source_path.slice((last_slash + 1) as i64, source_path.len() as i64)
+    else:
+        source_path
+    if base.len() > 2 and base.ends_with(".w"):
+        return base.slice(0, (base.len() - 2) as i64)
+    base
+
+fn Driver.print_warnings(self: Driver):
+    var i = 0
+    while i < self.pending_warnings.len() as i32:
+        with_eprintln(self.pending_warnings.get(i as i64))
+        i = i + 1

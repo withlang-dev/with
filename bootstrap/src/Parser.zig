@@ -291,7 +291,10 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
     if (self.peek() == .kw_pub) self.advance();
     try self.expect(.kw_trait);
     const name = try self.expectIdentifier();
-    try self.expect(.eq);
+    // Accept `=` or `:` for trait blocks.
+    if (self.peek() == .eq or self.peek() == .colon) {
+        self.advance();
+    }
     self.skipNewlines();
 
     var methods: std.ArrayList(Ast.TraitMethodSig) = .empty;
@@ -414,8 +417,8 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
         type_name = try self.expectIdentifier();
     }
 
-    // Accept either `=` or newline for extend blocks.
-    if (self.peek() == .eq) {
+    // Accept `=`, `:`, or newline for extend/impl blocks.
+    if (self.peek() == .eq or self.peek() == .colon) {
         self.advance();
     }
     self.skipNewlines();

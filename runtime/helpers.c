@@ -85,6 +85,19 @@ with_str i32_to_str(int32_t n) {
     return with_i32_to_str(n);
 }
 
+// Alias used by self-hosted compiler (extern fn int_to_string).
+with_str int_to_string(int32_t n) {
+    return with_i32_to_str(n);
+}
+
+// Print a string to stderr with trailing newline.
+void with_eprintln(with_str s) {
+    if (s.ptr && s.len > 0) {
+        fwrite(s.ptr, 1, (size_t)s.len, stderr);
+    }
+    fputc('\n', stderr);
+}
+
 // Convert a single byte value to a one-char string.
 with_str str_from_byte(int32_t b) {
     char *buf = (char *)malloc(2);
