@@ -1,184 +1,188 @@
+module ecs.main
+
+use ecs.math.Vec2
+use ecs.storage.{DenseStorage, iter}
+use ecs.query.{query1, query2}
+use ecs.components.*
+use ecs.world.{Entity, World}
+use ecs.systems.run_frame
+
 // ===================================================================
-// ECS (Entity-Component-System) Demo — Simplified
+// ECS Demo — A small game engine core
 //
 // Demonstrates:
-//   - Structs as components
-//   - Extend blocks for methods
-//   - Generics (generic functions)
-//   - Enums with pattern matching
-//   - For loops, arrays, pipeline
-//   - String interpolation
-//   - Float arithmetic and casting
+//   - Handle-first entity design (SlotMap + generational handles)
+//   - Dense component storage with O(1) lookup
+//   - Disjoint field borrowing for parallel system execution
+//   - Comptime component registration and ID generation
+//   - Query generators with pipeline composition
+//   - Record update syntax for entity modification
+//   - Frame arena for per-frame temporary allocations
+//   - scope-based parallelism (OS threads, not fibers)
+//   - Data-oriented iteration patterns
 // ===================================================================
 
-// --- Math ---
+fn main:
+    var world = World.new()
+    let dt = 1.0 / 60.0
+    world.dt = dt
 
-type Vec2 = {
-    x: f64,
-    y: f64,
-}
+    // --- Spawn Entities ---
 
-extend Vec2:
-    fn new(x: f64, y: f64) -> Vec2: Vec2 { x, y }
+    let player = spawn_player(&mut world)
+    let enemies = spawn_enemies(&mut world, 5)
+    let walls = spawn_walls(&mut world)
 
-    fn zero -> Vec2: Vec2 { x: 0.0, y: 0.0 }
+    println("=== ECS Demo: {world.entity_count()} entities spawned ===\n")
+    world.print_stats()
+    println("")
 
-    fn add(self: Vec2, other: Vec2) -> Vec2:
-        Vec2 { x: self.x + other.x, y: self.y + other.y }
+    // --- Simulate 5 frames ---
 
-    fn scale(self: Vec2, s: f64) -> Vec2: Vec2 { x: self.x * s, y: self.y * s }
+    // Frame 0: player presses Right
+    println("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    run_frame(&mut world, &[.KeyDown(.Right)])
 
-    fn length_sq(self: Vec2) -> f64: self.x * self.x + self.y * self.y
+    // Frame 1: key held (no new events)
+    println("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    run_frame(&mut world, &[])
 
-// --- Components ---
+    // Frame 2: player also presses Up (diagonal movement)
+    println("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    run_frame(&mut world, &[.KeyDown(.Up)])
 
-type Transform = {
-    x: f64,
-    y: f64,
-    rotation: f64,
-    scale_val: f64,
-}
+    // Frame 3: release Right, keep Up
+    println("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    run_frame(&mut world, &[.KeyUp(.Right)])
 
-type Velocity = {
-    vx: f64,
-    vy: f64,
-    angular: f64,
-}
+    // Frame 4: release everything
+    println("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    run_frame(&mut world, &[.KeyUp(.Up)])
 
-type Sprite = {
-    texture_id: i32,
-    width: i32,
-    height: i32,
-    layer: i32,
-    visible: bool,
-}
+    // --- Final State ---
 
-type Collider = {
-    radius: f64,
-    layer: i32,
-    mask: i32,
-}
+    println("\n=== After 5 frames ===")
+    world.print_stats()
 
-// --- Entity Handle ---
+    // Print entity positions using query pipeline
+    println("\nEntity positions:")
+    query2(&world.transforms, &world.sprites)
+        |> for_each(|(entity, tf, sprite)|
+            with world.entity_name(entity) as name:
+                println("  {name.unwrap_or("?")} -> ({tf.position.x:.1}, {tf.position.y:.1}) tex={texture_name(sprite.texture)}")
+        )
 
-type Entity = {
-    id: i32,
-    generation: i32,
-}
+    // --- Demonstrate despawning ---
 
-// --- World (simplified: fixed-size arrays) ---
+    println("\nDespawning first enemy...")
+    if let Some(first_enemy) = enemies.first():
+        world.despawn(*first_enemy)
 
-fn make_entity(id: i32) -> Entity: Entity { id, generation: 1 }
+    println("Entities after despawn: {world.entity_count()}")
 
-fn make_transform(x: f64, y: f64) -> Transform:
-    Transform { x, y, rotation: 0.0, scale_val: 1.0 }
+    // Verify the handle is invalidated
+    if let Some(first_enemy) = enemies.first():
+        assert(not world.is_alive(*first_enemy))
+        assert(world.transforms.get(*first_enemy).is_none())
+        println("Handle correctly invalidated (generation mismatch)")
 
-fn make_velocity(vx: f64, vy: f64) -> Velocity: Velocity { vx, vy, angular: 0.0 }
+    println("\n=== Demo complete ===")
 
-// --- Systems ---
+// --- Entity Spawning Helpers ---
 
-fn apply_velocity(t: Transform, v: Velocity, dt: f64) -> Transform:
-    Transform {
-        x: t.x + v.vx * dt,
-        y: t.y + v.vy * dt,
-        rotation: t.rotation + v.angular * dt,
-        scale_val: t.scale_val,
+fn spawn_player(world: &mut World) -> Entity:
+    let player = world.spawn("player")
+    world.add(player, Transform {
+        position: Vec2.new(100.0, 300.0),
+        rotation: 0.0,
+        scale: 1.0,
+    })
+    world.add(player, Velocity {
+        linear: Vec2.zero(),
+        angular: 0.0,
+    })
+    world.add(player, InputState {})
+    world.add(player, Sprite {
+        texture: TEXTURE_PLAYER,
+        width: 32,
+        height: 32,
+        layer: 10,
+        visible: true,
+    })
+    world.add(player, Collider {
+        radius: 16.0,
+        layer: 1,    // player layer
+        mask: 0xFF,  // collides with everything
+    })
+    player
+
+fn spawn_enemies(world: &mut World, count: i32) -> Vec[Entity]:
+    with Vec.new() as mut enemies:
+        for i in 0..count:
+            let enemy = world.spawn("enemy_{i}")
+            world.add(enemy, Transform {
+                position: Vec2.new(200.0 + (i as f32) * 80.0, 300.0),
+                rotation: 0.0,
+                scale: 1.0,
+            })
+            world.add(enemy, Velocity {
+                linear: Vec2.new(0.0, 30.0 + (i as f32) * 5.0),
+                angular: 0.5,
+            })
+            world.add(enemy, Sprite {
+                texture: TEXTURE_ENEMY,
+                width: 32,
+                height: 32,
+                layer: 5,
+                visible: true,
+            })
+            world.add(enemy, Collider {
+                radius: 16.0,
+                layer: 2,    // enemy layer
+                mask: 0x01,  // collides with player layer only
+            })
+            enemies.push(enemy)
+
+fn spawn_walls(world: &mut World) -> Vec[Entity]:
+    // Spawn border walls using record update syntax
+    let base_wall = Transform {
+        position: Vec2.zero(),
+        rotation: 0.0,
+        scale: 1.0,
+    }
+    let wall_sprite = Sprite {
+        texture: TEXTURE_WALL,
+        width: 800,
+        height: 16,
+        layer: 0,
+        visible: true,
     }
 
-fn check_collision(t1: Transform, c1: Collider, t2: Transform, c2: Collider) -> bool:
-    let dx = t1.x - t2.x
-    let dy = t1.y - t2.y
-    let dist_sq = dx * dx + dy * dy
-    let r_sum = c1.radius + c2.radius
-    dist_sq < r_sum * r_sum
+    with Vec.new() as mut walls:
+        // Top wall
+        let top = world.spawn("wall_top")
+        world.add(top, { base_wall with position: Vec2.new(400.0, 0.0) })
+        world.add(top, wall_sprite)
+        world.add(top, Collider { radius: 400.0, layer: 4, mask: 0xFF })
+        walls.push(top)
 
-// --- Generic utility ---
+        // Bottom wall (record update — only position changes)
+        let bottom = world.spawn("wall_bottom")
+        world.add(bottom, { base_wall with position: Vec2.new(400.0, 600.0) })
+        world.add(bottom, wall_sprite)
+        world.add(bottom, Collider { radius: 400.0, layer: 4, mask: 0xFF })
+        walls.push(bottom)
 
-fn max[T](a: T, b: T) -> T: if a > b then a else b
+        // Left wall
+        let left = world.spawn("wall_left")
+        world.add(left, { base_wall with position: Vec2.new(0.0, 300.0) })
+        world.add(left, { wall_sprite with width: 16, height: 600 })
+        world.add(left, Collider { radius: 300.0, layer: 4, mask: 0xFF })
+        walls.push(left)
 
-fn min[T](a: T, b: T) -> T: if a < b then a else b
-
-fn clamp[T](val: T, lo: T, hi: T) -> T: min(max(val, lo), hi)
-
-// --- Input ---
-
-type InputDir = Idle | Up | Down | Left | Right
-
-fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity:
-    match dir
-        Idle -> make_velocity(0.0, 0.0)
-        Up -> make_velocity(0.0, 0.0 - speed)
-        Down -> make_velocity(0.0, speed)
-        Left -> make_velocity(0.0 - speed, 0.0)
-        Right -> make_velocity(speed, 0.0)
-
-// --- Main ---
-
-fn main:
-    println("=== ECS Demo ===")
-
-    // Create entities
-    let player = make_entity(0)
-    let enemy1 = make_entity(1)
-    let enemy2 = make_entity(2)
-    println("Spawned 3 entities (player + 2 enemies)")
-
-    // Initialize transforms
-    var player_t = make_transform(100.0, 300.0)
-    var enemy1_t = make_transform(200.0, 300.0)
-    var enemy2_t = make_transform(400.0, 300.0)
-
-    // Initialize velocities
-    var player_v = make_velocity(0.0, 0.0)
-    let enemy1_v = make_velocity(0.0, 30.0)
-    let enemy2_v = make_velocity(0.0, 50.0)
-
-    // Colliders
-    let player_c = Collider { radius: 16.0, layer: 1, mask: 0xFF }
-    let enemy_c = Collider { radius: 16.0, layer: 2, mask: 0x01 }
-
-    let dt = 1.0 / 60.0
-
-    // Simulate 5 frames
-    println("--- Simulating 5 frames ---")
-
-    // Frame 0: player moves right
-    player_v = dir_to_velocity(Right, 100.0)
-    player_t = apply_velocity(player_t, player_v, dt)
-    enemy1_t = apply_velocity(enemy1_t, enemy1_v, dt)
-    enemy2_t = apply_velocity(enemy2_t, enemy2_v, dt)
-    println("Frame 0: player=({player_t.x:.1}, {player_t.y:.1})")
-
-    // Frame 1: continue
-    player_t = apply_velocity(player_t, player_v, dt)
-    enemy1_t = apply_velocity(enemy1_t, enemy1_v, dt)
-    enemy2_t = apply_velocity(enemy2_t, enemy2_v, dt)
-    println("Frame 1: player=({player_t.x:.1}, {player_t.y:.1})")
-
-    // Frame 2: player moves up-right
-    player_v = make_velocity(100.0, -100.0)
-    player_t = apply_velocity(player_t, player_v, dt)
-    enemy1_t = apply_velocity(enemy1_t, enemy1_v, dt)
-    println("Frame 2: player=({player_t.x:.1}, {player_t.y:.1})")
-
-    // Check collision
-    let collision = check_collision(player_t, player_c, enemy1_t, enemy_c)
-    if collision then println("Collision detected!") else println("No collision")
-
-    // Generic clamp demo
-    let clamped = clamp(player_t.x, 0.0, 800.0)
-    println("Clamped x: {clamped:.1}")
-
-    // Vec2 operations
-    let v1 = Vec2.new(3.0, 4.0)
-    let v2 = Vec2.new(1.0, 2.0)
-    let v3 = v1.add(v2)
-    println("Vec2 add: ({v3.x:.1}, {v3.y:.1})")
-
-    let v4 = v1.scale(2.0)
-    println("Vec2 scale: ({v4.x:.1}, {v4.y:.1})")
-
-    let len_sq = v1.length_sq()
-    println("Vec2 length_sq: {len_sq:.1}")
-
-    println("=== Demo complete ===")
+        // Right wall
+        let right = world.spawn("wall_right")
+        world.add(right, { base_wall with position: Vec2.new(800.0, 300.0) })
+        world.add(right, { wall_sprite with width: 16, height: 600 })
+        world.add(right, Collider { radius: 300.0, layer: 4, mask: 0xFF })
+        walls.push(right)
