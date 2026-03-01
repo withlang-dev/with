@@ -3,9 +3,9 @@
 // Provides assertion functions for writing tests.
 // Uses __FILE__ and __LINE__ defaults for automatic location tracking.
 
-use c_import("#include <stdio.h>")
-use c_import("#include <stdlib.h>")
-use c_import("#include <string.h>")
+use c_import("stdio.h")
+use c_import("stdlib.h")
+use c_import("string.h")
 use std.process
 
 // ── Assertion Functions ─────────────────────────────────────────

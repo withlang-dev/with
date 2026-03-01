@@ -48,7 +48,7 @@ pub const DeclKind = union(enum) {
 };
 
 pub const CImportDecl = struct {
-    header_code: []const u8,
+    header_path: []const u8,
     link_libs: []const Symbol = &.{},
 };
 

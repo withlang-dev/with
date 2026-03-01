@@ -17,7 +17,10 @@
 //
 // This module provides additional utility functions.
 
-use c_import("#include <string.h>\n#include <stdlib.h>\n#include <stdio.h>\n#include <ctype.h>")
+use c_import("string.h")
+use c_import("stdlib.h")
+use c_import("stdio.h")
+use c_import("ctype.h")
 
 // String length (same as s.len())
 pub fn string_len(s: str) -> i64:

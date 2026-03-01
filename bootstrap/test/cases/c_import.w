@@ -1,4 +1,5 @@
-use c_import("#include <stdio.h>\n#include <string.h>")
+use c_import("stdio.h")
+use c_import("string.h")
 
 fn main -> i32:
     puts("hello from c_import")

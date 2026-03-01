@@ -12,7 +12,9 @@
 //   - String interpolation
 // ===================================================================
 
-use c_import("#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>")
+use c_import("stdio.h")
+use c_import("stdlib.h")
+use c_import("string.h")
 
 // --- Safe string wrapper ---
 

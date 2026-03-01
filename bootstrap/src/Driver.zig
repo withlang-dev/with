@@ -38,7 +38,7 @@ pending_warnings: std.ArrayList([]const u8),
 opt_level: u8,
 /// Link libraries requested by `use c_import(..., link: "...")`.
 c_import_link_libs: std.AutoHashMapUnmanaged(Ast.Symbol, void),
-/// In-memory cache for c_import expansions, keyed by header code text.
+/// In-memory cache for c_import expansions, keyed by header path.
 c_import_cache: std.StringHashMapUnmanaged([]const Ast.Decl),
 /// Emit c_import cache hit/miss diagnostics to stderr when enabled.
 trace_c_import_cache: bool,
@@ -781,7 +781,7 @@ fn processCImports(self: *Driver, module: Ast.Module) !Ast.Module {
                 try self.c_import_link_libs.put(self.allocator, lib, {});
             }
             const cache_key = try self.makeCImportCacheKey(
-                decl.kind.c_import.header_code,
+                decl.kind.c_import.header_path,
                 decl.kind.c_import.link_libs,
             );
             var cache_key_owned = true;
@@ -793,13 +793,13 @@ fn processCImports(self: *Driver, module: Ast.Module) !Ast.Module {
             } else {
                 if (self.trace_c_import_cache) self.writeStderr("c_import cache miss\n");
                 const synthetic = CImport.processCImport(
-                    decl.kind.c_import.header_code,
+                    decl.kind.c_import.header_path,
                     arena_alloc,
                     &self.pool,
                 ) catch |err| {
                     self.writeStderr("error: c_import processing failed for header snippet: ");
-                    const preview_len = @min(decl.kind.c_import.header_code.len, 80);
-                    self.writeStderr(decl.kind.c_import.header_code[0..preview_len]);
+                    const preview_len = @min(decl.kind.c_import.header_path.len, 80);
+                    self.writeStderr(decl.kind.c_import.header_path[0..preview_len]);
                     self.writeStderr("\n");
                     return err;
                 };
@@ -822,13 +822,13 @@ fn processCImports(self: *Driver, module: Ast.Module) !Ast.Module {
 
 fn makeCImportCacheKey(
     self: *Driver,
-    header_code: []const u8,
+    header_path: []const u8,
     link_libs: []const Ast.Symbol,
 ) ![]u8 {
     var key: std.ArrayList(u8) = .empty;
     errdefer key.deinit(self.allocator);
 
-    try key.appendSlice(self.allocator, header_code);
+    try key.appendSlice(self.allocator, header_path);
     try key.appendSlice(self.allocator, "\n#links:");
     for (link_libs) |lib_sym| {
         try key.append(self.allocator, '|');

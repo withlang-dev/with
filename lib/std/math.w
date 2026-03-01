@@ -2,7 +2,7 @@
 //
 // Provides common math operations wrapping C libm functions.
 
-use c_import("#include <math.h>")
+use c_import("math.h")
 
 // Absolute value (numeric)
 pub fn abs[T](x: T) -> T:

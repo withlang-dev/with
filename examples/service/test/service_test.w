@@ -142,7 +142,7 @@ fn test_service_example:
 
     // Test generic functions
     assert_true(identity(42) == 42)
-    assert_true(identity(true) == true)
+    assert_true(identity(true))
     assert_true(first_of(10, 20) == 10)
     assert_true(first_of(99, 1) == 99)
 
