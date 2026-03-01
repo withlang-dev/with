@@ -923,14 +923,12 @@ fn parseUseDecl(self: *Parser, start_span: Span) !Ast.Decl {
             return error.ParseError;
         }
         const str_span = self.currentSpan();
-        // Extract string content without quotes
+        // Extract header path without quotes
         const raw = self.source[str_span.start .. str_span.end];
-        const unquoted = if (raw.len >= 2 and raw[0] == '"' and raw[raw.len - 1] == '"')
+        const header_path = if (raw.len >= 2 and raw[0] == '"' and raw[raw.len - 1] == '"')
             raw[1 .. raw.len - 1]
         else
             raw;
-        // Process escape sequences (especially \n for multi-include strings)
-        const header_code = self.processEscapes(unquoted) catch unquoted;
         self.advance(); // consume string literal
 
         var link_libs: std.ArrayList(Ast.Symbol) = .empty;
@@ -981,7 +979,7 @@ fn parseUseDecl(self: *Parser, start_span: Span) !Ast.Decl {
         try self.expect(.r_paren);
         return .{
             .kind = .{ .c_import = .{
-                .header_code = header_code,
+                .header_path = header_path,
                 .link_libs = link_libs.items,
             } },
             .span = start_span.merge(self.prevSpan()),

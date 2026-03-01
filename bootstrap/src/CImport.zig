@@ -14,9 +14,11 @@ const c = @cImport({
 
 const CImport = @This();
 
-/// Process a c_import string and return synthetic extern fn declarations.
+/// Process a c_import header path and return synthetic extern fn declarations.
+/// The header_path is a bare header name (e.g. "stdio.h") which gets wrapped
+/// in `#include <...>` before being sent to libclang.
 pub fn processCImport(
-    header_code: []const u8,
+    header_path: []const u8,
     arena: std.mem.Allocator,
     pool: *InternPool,
 ) ![]Ast.Decl {
@@ -24,14 +26,21 @@ pub fn processCImport(
     const index = c.clang_createIndex(0, 0);
     defer c.clang_disposeIndex(index);
 
-    // Create null-terminated header code for libclang
-    const code_z = try arena.dupeZ(u8, header_code);
+    // Wrap the header path in #include <...> for libclang
+    const prefix = "#include <";
+    const suffix = ">\n";
+    const code_len = prefix.len + header_path.len + suffix.len;
+    const include_code = try arena.alloc(u8, code_len + 1); // +1 for null
+    @memcpy(include_code[0..prefix.len], prefix);
+    @memcpy(include_code[prefix.len..][0..header_path.len], header_path);
+    @memcpy(include_code[prefix.len + header_path.len ..][0..suffix.len], suffix);
+    include_code[code_len] = 0;
 
     // Set up unsaved file so we don't need to write to disk
     var unsaved = c.CXUnsavedFile{
         .Filename = "input.h",
-        .Contents = code_z.ptr,
-        .Length = @intCast(header_code.len),
+        .Contents = include_code.ptr,
+        .Length = @intCast(code_len),
     };
 
     // System include paths for macOS
@@ -72,11 +81,9 @@ pub fn processCImport(
     const cursor = c.clang_getTranslationUnitCursor(tu);
     _ = c.clang_visitChildren(cursor, visitCallback, @ptrCast(&ctx));
 
-    // Best-effort translation for simple object-like macros:
-    //   #define NAME 123
-    //   #define NAME "text"
-    // Function-like macros are intentionally skipped here.
-    try processSimpleDefineMacros(&ctx, header_code);
+    // Note: processSimpleDefineMacros is not called here because with the
+    // header-path approach, the unsaved file only contains `#include <...>`.
+    // Macros from headers are handled by libclang through preprocessing.
 
     return ctx.decls.items;
 }

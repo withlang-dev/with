@@ -1,6 +1,7 @@
 // CImport — C header import via libclang.
 //
-// Parses C header code and generates synthetic extern fn declarations.
+// Parses C header paths (e.g. "stdio.h") by wrapping them in #include <...>
+// and generating synthetic extern fn declarations via libclang.
 // In the self-hosted compiler, this calls into libclang via extern functions.
 
 use Ast
@@ -22,7 +23,8 @@ extern fn clang_getFunctionParamName(tu: i32, fn_idx: i32, param_idx: i32) -> st
 extern fn clang_getFunctionParamType(tu: i32, fn_idx: i32, param_idx: i32) -> str
 extern fn clang_isFunctionVariadic(tu: i32, index: i32) -> i32
 
-// Process a c_import header string and return synthetic extern fn nodes in pool.
+// Process a c_import header path (e.g. "stdio.h") and return synthetic extern fn nodes.
+// The header path is wrapped in #include <...> before being sent to libclang.
 // Returns the number of declarations added.
 // Note: In the bootstrap compiler this uses libclang directly. Here we provide
 // the same interface but the actual C interop happens via the runtime bridge.

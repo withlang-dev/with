@@ -625,7 +625,7 @@ fn Parser.parse_use_decl(self: Parser, start: i32) -> i32:
     if self.expect(TK_KW_USE()) == 0:
         return 0
 
-    // use c_import("...")
+    // use c_import("header.h")
     if self.peek() == TK_KW_C_IMPORT():
         return self.parse_c_import(start)
 

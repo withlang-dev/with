@@ -2,7 +2,9 @@
 //
 // Provides basic I/O operations wrapping C stdlib functions.
 
-use c_import("#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>")
+use c_import("stdio.h")
+use c_import("stdlib.h")
+use c_import("string.h")
 
 // Print a string to stdout (no newline)
 pub fn print_str(s: str) -> i32:

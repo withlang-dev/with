@@ -2,7 +2,8 @@
 //
 // Provides formatted output helpers wrapping C printf family.
 
-use c_import("#include <stdio.h>\n#include <stdlib.h>")
+use c_import("stdio.h")
+use c_import("stdlib.h")
 
 // Format an integer to a string buffer (returns chars written)
 pub fn fmt_int(buf: *i8, size: i32, n: i32) -> i32:

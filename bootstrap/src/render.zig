@@ -143,7 +143,7 @@ fn renderDecl(decl: *const Ast.Decl, pool: *const InternPool, writer: anytype, i
             }
         },
         .c_import => |ci| {
-            try writer.print("use c_import(\"{s}\"", .{ci.header_code});
+            try writer.print("use c_import(\"{s}\"", .{ci.header_path});
             if (ci.link_libs.len > 0) {
                 try writer.writeAll(", link: ");
                 for (ci.link_libs, 0..) |lib, i| {

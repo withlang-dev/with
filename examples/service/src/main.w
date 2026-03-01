@@ -88,8 +88,7 @@ fn first_of[T](a: T, b: T) -> T: a
 
 // --- Trait demo ---
 
-trait Printable:
-    fn display(self: Self)
+trait Printable: fn display(self: Self)
 
 impl Printable for User:
     fn display(self: User):

@@ -2,7 +2,10 @@
 //
 // Provides file and directory operations wrapping C stdlib functions.
 
-use c_import("#include <stdio.h>\n#include <stdlib.h>\n#include <unistd.h>\n#include <sys/stat.h>")
+use c_import("stdio.h")
+use c_import("stdlib.h")
+use c_import("unistd.h")
+use c_import("sys/stat.h")
 
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_read_file(path: str) -> str

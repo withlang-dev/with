@@ -4,7 +4,7 @@
 // Test functions should call abort() on failure (via assert_* from testing.w).
 // If a test function returns normally, it passed.
 
-use c_import("#include <stdio.h>")
+use c_import("stdio.h")
 
 // ── Test runner ─────────────────────────────────────────────────
 

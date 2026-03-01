@@ -2,7 +2,7 @@
 //
 // Wraps libc rand/srand for deterministic and ad-hoc randomness.
 
-use c_import("#include <stdlib.h>")
+use c_import("stdlib.h")
 extern fn with_time_now() -> i64
 
 pub fn seed(seed_value: i32) -> void:

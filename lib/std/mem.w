@@ -2,7 +2,8 @@
 //
 // Provides heap allocation and memory operations wrapping C stdlib.
 
-use c_import("#include <stdlib.h>\n#include <string.h>")
+use c_import("stdlib.h")
+use c_import("string.h")
 
 // Allocate size bytes on the heap. Returns pointer (0 on failure).
 pub fn alloc(size: i32) -> *i8:
