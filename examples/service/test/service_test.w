@@ -26,19 +26,20 @@ fn result_code(r: ServiceResult) -> i32:
         InvalidInput -> 2
         ServerError -> 3
 
-fn make_user(id: i32, name: str, email: str, score: i32) -> User:
-    User { id: id, name: name, email: email, score: score }
+fn make_user(id: i32, name: str, email: str, score: i32) -> User: User { id, name, email, score }
 
 fn find_user(users: [5]User, id: i32) -> ServiceResult:
     var found = false
     for i in 0..5:
-        if users[i].id == id then found = true else found = found
+        if users[i].id == id:
+            found = true
     if found then Ok else NotFound
 
 fn get_user_score(users: [5]User, id: i32) -> i32:
     var score = 0
     for i in 0..5:
-        if users[i].id == id then score = users[i].score else score = score
+        if users[i].id == id:
+            score = users[i].score
     score
 
 type Service = {
@@ -46,15 +47,12 @@ type Service = {
     request_count: i32,
 }
 
-extend Service =
-    fn new(config: ServiceConfig) -> Service:
-        Service { config: config, request_count: 0 }
+extend Service:
+    fn new(config: ServiceConfig) -> Service: Service { config, request_count: 0 }
 
-    fn get_timeout(self: Service) -> i32:
-        self.config.timeout_ms
+    fn get_timeout(self: Service) -> i32: self.config.timeout_ms
 
-fn validate_id(id: i32) -> ServiceResult:
-    if id in 1..=1000 then Ok else InvalidInput
+fn validate_id(id: i32) -> ServiceResult: if id in 1..=1000 then Ok else InvalidInput
 
 fn validate_and_find(users: [5]User, id: i32) -> ServiceResult:
     let validation = validate_id(id)
@@ -68,14 +66,11 @@ fn handle_request(users: [5]User, endpoint: i32, user_id: i32) -> ServiceResult:
         2 -> Ok
         _ -> NotFound
 
-fn identity[T](x: T) -> T:
-    x
+fn identity[T](x: T) -> T: x
 
-fn first_of[T](a: T, b: T) -> T:
-    a
+fn first_of[T](a: T, b: T) -> T: a
 
-fn display_user(user: User) -> i32:
-    println("User #{user.id}: {user.name}")
+fn display_user(user: User): println("User #{user.id}: {user.name}")
 
 @[test]
 fn test_service_example:
@@ -106,7 +101,7 @@ fn test_service_example:
     }
     assert_true(config.max_retries == 3)
     assert_true(config.timeout_ms == 5000)
-    assert_true(config.cache_enabled == true)
+    assert_true(config.cache_enabled)
 
     let service = Service.new(config)
     assert_true(service.get_timeout() == 5000)
@@ -160,5 +155,4 @@ fn test_service_example:
     assert_true(avg_score == 86)
 
     // Test display helper
-    let display_result = display_user(u)
-    assert_true(display_result == 0)
+    display_user(u)

@@ -7,21 +7,17 @@ type Vec2 = {
     y: f64,
 }
 
-extend Vec2 =
-    fn new(x: f64, y: f64) -> Vec2:
-        Vec2 { x: x, y: y }
+extend Vec2:
+    fn new(x: f64, y: f64) -> Vec2: Vec2 { x, y }
 
-    fn zero -> Vec2:
-        Vec2 { x: 0.0, y: 0.0 }
+    fn zero -> Vec2: Vec2 { x: 0.0, y: 0.0 }
 
     fn add(self: Vec2, other: Vec2) -> Vec2:
         Vec2 { x: self.x + other.x, y: self.y + other.y }
 
-    fn scale(self: Vec2, s: f64) -> Vec2:
-        Vec2 { x: self.x * s, y: self.y * s }
+    fn scale(self: Vec2, s: f64) -> Vec2: Vec2 { x: self.x * s, y: self.y * s }
 
-    fn length_sq(self: Vec2) -> f64:
-        self.x * self.x + self.y * self.y
+    fn length_sq(self: Vec2) -> f64: self.x * self.x + self.y * self.y
 
 type Transform = {
     x: f64,
@@ -47,14 +43,12 @@ type Entity = {
     generation: i32,
 }
 
-fn make_entity(id: i32) -> Entity:
-    Entity { id: id, generation: 1 }
+fn make_entity(id: i32) -> Entity: Entity { id, generation: 1 }
 
 fn make_transform(x: f64, y: f64) -> Transform:
-    Transform { x: x, y: y, rotation: 0.0, scale_val: 1.0 }
+    Transform { x, y, rotation: 0.0, scale_val: 1.0 }
 
-fn make_velocity(vx: f64, vy: f64) -> Velocity:
-    Velocity { vx: vx, vy: vy, angular: 0.0 }
+fn make_velocity(vx: f64, vy: f64) -> Velocity: Velocity { vx, vy, angular: 0.0 }
 
 fn apply_velocity(t: Transform, v: Velocity, dt: f64) -> Transform:
     Transform {
@@ -71,14 +65,11 @@ fn check_collision(t1: Transform, c1: Collider, t2: Transform, c2: Collider) -> 
     let r_sum = c1.radius + c2.radius
     dist_sq < r_sum * r_sum
 
-fn max[T](a: T, b: T) -> T:
-    if a > b then a else b
+fn max[T](a: T, b: T) -> T: if a > b then a else b
 
-fn min[T](a: T, b: T) -> T:
-    if a < b then a else b
+fn min[T](a: T, b: T) -> T: if a < b then a else b
 
-fn clamp[T](val: T, lo: T, hi: T) -> T:
-    min(max(val, lo), hi)
+fn clamp[T](val: T, lo: T, hi: T) -> T: min(max(val, lo), hi)
 
 type InputDir = Idle | Up | Down | Left | Right
 
@@ -146,11 +137,11 @@ fn test_ecs_example:
     let tb = make_transform(10.0, 0.0)
     let ca = Collider { radius: 8.0, layer: 1, mask: 1 }
     let cb = Collider { radius: 8.0, layer: 1, mask: 1 }
-    assert_true(check_collision(ta, ca, tb, cb) == true)
+    assert_true(check_collision(ta, ca, tb, cb))
 
     // Test check_collision — not overlapping
     let tc = make_transform(100.0, 0.0)
-    assert_true(check_collision(ta, ca, tc, cb) == false)
+    assert_true(not check_collision(ta, ca, tc, cb))
 
     // Test generic clamp
     assert_true(clamp(5, 0, 10) == 5)

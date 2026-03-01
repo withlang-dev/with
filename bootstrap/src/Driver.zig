@@ -380,6 +380,12 @@ fn sourceStem(source_path: []const u8) []const u8 {
     return base;
 }
 
+fn shouldLinkLlvmBridge(source_path: []const u8) bool {
+    if (std.mem.eql(u8, source_path, "src/main.w")) return true;
+    if (std.mem.endsWith(u8, source_path, "/src/main.w")) return true;
+    return std.mem.endsWith(u8, source_path, "\\src\\main.w");
+}
+
 /// Full pipeline: parse → codegen → link → binary.
 pub fn buildBinary(self: *Driver, source_path: []const u8) !?[]const u8 {
     const dir = std.fs.path.dirname(source_path) orelse ".";
@@ -414,38 +420,61 @@ pub fn buildBinaryAt(
         link_libs.append(self.arena.allocator(), self.pool.resolve(entry.key_ptr.*)) catch return null;
     }
 
-    // Find runtime objects relative to the compiler binary.
+    // Find runtime artifacts relative to the compiler binary.
     const exe_dir = self.findExeDir();
 
-    // Always link helpers.o (stdlib C wrappers).
     var helpers_buf: [4096]u8 = undefined;
     const helpers_path = if (exe_dir) |ed|
         std.fmt.bufPrint(&helpers_buf, "{s}/runtime/helpers.o", .{ed}) catch null
     else
         null;
 
-    // If async is used, also link the fiber runtime objects.
-    const link_ok = if (uses_async.?) blk: {
-        const ed = exe_dir orelse {
-            if (helpers_path) |hp| {
-                break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{hp}, link_libs.items);
-            }
-            break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{}, link_libs.items);
+    const needs_llvm_bridge = shouldLinkLlvmBridge(source_path);
+    var bridge_buf: [4096]u8 = undefined;
+    const bridge_path = if (needs_llvm_bridge and exe_dir != null)
+        std.fmt.bufPrint(&bridge_buf, "{s}/runtime/libwith_llvm_bridge.dylib", .{exe_dir.?}) catch null
+    else
+        null;
+    if (needs_llvm_bridge and bridge_path == null) {
+        self.writeStderr("error: failed to locate LLVM bridge runtime path\n");
+        return null;
+    }
+    if (bridge_path) |bp| {
+        std.fs.accessAbsolute(bp, .{}) catch {
+            self.writeStderr("error: missing runtime/libwith_llvm_bridge.dylib\n");
+            return null;
         };
-        var rt1_buf: [4096]u8 = undefined;
-        var rt2_buf: [4096]u8 = undefined;
-        const rt1 = std.fmt.bufPrint(&rt1_buf, "{s}/runtime/fiber.o", .{ed}) catch break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{}, link_libs.items);
-        const rt2 = std.fmt.bufPrint(&rt2_buf, "{s}/runtime/fiber_asm.o", .{ed}) catch break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{}, link_libs.items);
-        if (helpers_path) |hp| {
-            break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{ rt1, rt2, hp }, link_libs.items);
+    }
+
+    var extras: [4][]const u8 = undefined;
+    var extra_count: usize = 0;
+    if (uses_async.?) {
+        if (exe_dir) |ed| {
+            var rt1_buf: [4096]u8 = undefined;
+            var rt2_buf: [4096]u8 = undefined;
+            const rt1 = std.fmt.bufPrint(&rt1_buf, "{s}/runtime/fiber.o", .{ed}) catch {
+                self.writeStderr("error: failed to build fiber runtime path\n");
+                return null;
+            };
+            const rt2 = std.fmt.bufPrint(&rt2_buf, "{s}/runtime/fiber_asm.o", .{ed}) catch {
+                self.writeStderr("error: failed to build fiber asm runtime path\n");
+                return null;
+            };
+            extras[extra_count] = rt1;
+            extra_count += 1;
+            extras[extra_count] = rt2;
+            extra_count += 1;
         }
-        break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{ rt1, rt2 }, link_libs.items);
-    } else blk: {
-        if (helpers_path) |hp| {
-            break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{hp}, link_libs.items);
-        }
-        break :blk try linkWithExtraAndLibs(obj_path, bin_path, &.{}, link_libs.items);
-    };
+    }
+    if (helpers_path) |hp| {
+        extras[extra_count] = hp;
+        extra_count += 1;
+    }
+    if (bridge_path) |bp| {
+        extras[extra_count] = bp;
+        extra_count += 1;
+    }
+    const link_ok = try linkWithExtraAndLibs(obj_path, bin_path, extras[0..extra_count], link_libs.items);
 
     if (!link_ok) {
         self.writeStderr("error: linking failed\n");
@@ -492,27 +521,52 @@ pub fn buildSharedLibrary(self: *Driver, source_path: []const u8, output_stem: [
     else
         null;
 
-    const link_ok = if (uses_async.?) blk: {
-        const ed = exe_dir orelse {
-            if (helpers_path) |hp| {
-                break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{hp}, link_libs.items);
-            }
-            break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{}, link_libs.items);
+    const needs_llvm_bridge = shouldLinkLlvmBridge(source_path);
+    var bridge_buf: [4096]u8 = undefined;
+    const bridge_path = if (needs_llvm_bridge and exe_dir != null)
+        std.fmt.bufPrint(&bridge_buf, "{s}/runtime/libwith_llvm_bridge.dylib", .{exe_dir.?}) catch null
+    else
+        null;
+    if (needs_llvm_bridge and bridge_path == null) {
+        self.writeStderr("error: failed to locate LLVM bridge runtime path\n");
+        return null;
+    }
+    if (bridge_path) |bp| {
+        std.fs.accessAbsolute(bp, .{}) catch {
+            self.writeStderr("error: missing runtime/libwith_llvm_bridge.dylib\n");
+            return null;
         };
-        var rt1_buf: [4096]u8 = undefined;
-        var rt2_buf: [4096]u8 = undefined;
-        const rt1 = std.fmt.bufPrint(&rt1_buf, "{s}/runtime/fiber.o", .{ed}) catch break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{}, link_libs.items);
-        const rt2 = std.fmt.bufPrint(&rt2_buf, "{s}/runtime/fiber_asm.o", .{ed}) catch break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{}, link_libs.items);
-        if (helpers_path) |hp| {
-            break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{ rt1, rt2, hp }, link_libs.items);
+    }
+
+    var extras: [4][]const u8 = undefined;
+    var extra_count: usize = 0;
+    if (uses_async.?) {
+        if (exe_dir) |ed| {
+            var rt1_buf: [4096]u8 = undefined;
+            var rt2_buf: [4096]u8 = undefined;
+            const rt1 = std.fmt.bufPrint(&rt1_buf, "{s}/runtime/fiber.o", .{ed}) catch {
+                self.writeStderr("error: failed to build fiber runtime path\n");
+                return null;
+            };
+            const rt2 = std.fmt.bufPrint(&rt2_buf, "{s}/runtime/fiber_asm.o", .{ed}) catch {
+                self.writeStderr("error: failed to build fiber asm runtime path\n");
+                return null;
+            };
+            extras[extra_count] = rt1;
+            extra_count += 1;
+            extras[extra_count] = rt2;
+            extra_count += 1;
         }
-        break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{ rt1, rt2 }, link_libs.items);
-    } else blk: {
-        if (helpers_path) |hp| {
-            break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{hp}, link_libs.items);
-        }
-        break :blk try linkSharedWithExtraAndLibs(obj_path, so_path, &.{}, link_libs.items);
-    };
+    }
+    if (helpers_path) |hp| {
+        extras[extra_count] = hp;
+        extra_count += 1;
+    }
+    if (bridge_path) |bp| {
+        extras[extra_count] = bp;
+        extra_count += 1;
+    }
+    const link_ok = try linkSharedWithExtraAndLibs(obj_path, so_path, extras[0..extra_count], link_libs.items);
 
     if (!link_ok) {
         self.writeStderr("error: shared library linking failed\n");

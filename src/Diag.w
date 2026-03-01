@@ -1,2 +1,6 @@
-// Direct bootstrap port scaffold from bootstrap/src/Diag.zig.
-// Line-for-line port in progress.
+// Diag — Facade re-exporting Diagnostic types.
+//
+// Provides a stable module boundary matching the phase plan terminology.
+
+use Diagnostic
+use Span

@@ -290,16 +290,15 @@ match parse_config(path)
         return Err(e)
 
 // ✓ idiomatic — flat
-let config = parse_config(path) else |e|:
-    return Err(e)
+let Ok(config) = parse_config(path) else return Err(.ParseError)
 // rest of function at top level
 ```
 
 Works with enum patterns:
 
 ```
-let .Connected(socket) = state else:
-    return Err(.NotConnected)
+let .Connected(socket) = state else return Err(.NotConnected)
+let Some(user) = find_user(id) else return Err(.NotFound)
 ```
 
 ---
@@ -531,21 +530,44 @@ items.filter(|item| item.active)
 
 ---
 
-## Single-Expression Functions
+## The Colon Rule
 
-If a function body is one expression, it's one line.
+`:` introduces a block everywhere in With — `fn`, `if`, `for`,
+`while`, `match`, `trait`, `impl`, `extend`. One rule:
+
+- **One expression/statement after the colon = one line.**
+- **Multiple = indent block.**
+
+No special cases.
 
 ```
-// ✗ verbose
-fn double(x: i32) -> i32:
-    x * 2
-
-// ✓ idiomatic — both are fine, but the short form is preferred
+// ✓ one-line bodies
 fn double(x: i32) -> i32: x * 2
+if not valid then return Err(.Invalid)
+
+// ✓ one-line traits and impls
+trait Add[Rhs, Output]: fn add(self: Self, rhs: Rhs) -> Output
+trait Sub[Rhs, Output]: fn sub(self: Self, rhs: Rhs) -> Output
+impl Show for Point: fn show(self: &Point) -> String: "({self.x}, {self.y})"
+
+// ✓ multi-line when it doesn't fit
+trait DataSource:
+    async fn fetch(self: &Self, id: i32) -> Result[Data, Error]
+    async fn batch(self: &Self, ids: &Vec[i32]) -> Result[Vec[Data], Error]
+
+extend Vec[T]:
+    fn is_empty(self: &Vec[T]) -> bool: self.len() == 0
+    fn first(self: &Vec[T]) -> Option[&T]: if self.is_empty() then None else Some(&self[0])
 ```
 
-Same for match arms, if/else, closures — if it fits on one
-line, keep it on one line.
+```
+// ✗ artificially multi-line
+trait Neg[Output]:
+    fn neg(self: Self) -> Output
+
+// ✓ fits on one line — keep it there
+trait Neg[Output]: fn neg(self: Self) -> Output
+```
 
 ---
 
@@ -586,3 +608,4 @@ Before submitting code, check:
 15. **No `if/else if` chains on enums** — use `match`
 16. **No manual cleanup at every exit** — use `defer`
 17. **No `== true` or `== false`** — just `if active` or `if not active`
+18. **No artificial newlines** — if a trait/impl/fn fits on one line, keep it there

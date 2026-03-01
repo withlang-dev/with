@@ -85,6 +85,6 @@ fn Source.line_text(self: Source, line: i32) -> str:
         return slice.slice(0, (slice.len() - 1) as i64)
     slice
 
-fn Source.deinit(self: Source) -> void:
+fn Source.deinit(self: Source):
     // No-op in current runtime model.
     return

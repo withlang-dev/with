@@ -72,6 +72,7 @@ pub fn build(b: *std.Build) void {
     const llvm_include = b.pathJoin(&.{ llvm_prefix, "include" });
     const llvm_lib = b.pathJoin(&.{ llvm_prefix, "lib" });
     const clangxx = b.pathJoin(&.{ llvm_prefix, "bin", "clang++" });
+    const sdk_path = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk";
 
     // --- Compile Zig source to object file ---
     const obj = b.addObject(.{
@@ -91,7 +92,7 @@ pub fn build(b: *std.Build) void {
     link_cmd.addArgs(&.{
         b.fmt("-L{s}", .{llvm_lib}),
         "-isysroot",
-        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        sdk_path,
     });
     link_cmd.addArgs(&llvm_lib_flags);
     link_cmd.addArgs(&.{
@@ -111,7 +112,7 @@ pub fn build(b: *std.Build) void {
     const fiber_c = b.addSystemCommand(&.{
         "cc",
         "-isysroot",
-        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        sdk_path,
         "-c",
     });
     fiber_c.addFileArg(b.path("../runtime/fiber.c"));
@@ -121,7 +122,7 @@ pub fn build(b: *std.Build) void {
     const fiber_asm = b.addSystemCommand(&.{
         "cc",
         "-isysroot",
-        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        sdk_path,
         "-c",
     });
     fiber_asm.addFileArg(b.path("../runtime/fiber_asm_aarch64.s"));
@@ -132,12 +133,47 @@ pub fn build(b: *std.Build) void {
     const helpers_c = b.addSystemCommand(&.{
         "cc",
         "-isysroot",
-        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        sdk_path,
         "-c",
     });
     helpers_c.addFileArg(b.path("../runtime/helpers.c"));
     helpers_c.addArg("-o");
     const helpers_c_out = helpers_c.addOutputFileArg("helpers.o");
+
+    // Compile LLVM bridge object.
+    const bridge_c = b.addSystemCommand(&.{
+        "cc",
+        "-isysroot",
+        sdk_path,
+        b.fmt("-I{s}", .{llvm_include}),
+        "-c",
+    });
+    bridge_c.addFileArg(b.path("../runtime/llvm_bridge.c"));
+    bridge_c.addArg("-o");
+    const bridge_c_out = bridge_c.addOutputFileArg("llvm_bridge.o");
+
+    // Link LLVM bridge shared library used by self-hosted compiler binaries.
+    const bridge_link = b.addSystemCommand(&.{clangxx});
+    bridge_link.addFileArg(bridge_c_out);
+    bridge_link.addArgs(&.{
+        "-dynamiclib",
+        b.fmt("-L{s}", .{llvm_lib}),
+        "-isysroot",
+        sdk_path,
+        "-Wl,-install_name,@executable_path/runtime/libwith_llvm_bridge.dylib",
+        b.fmt("-Wl,-rpath,{s}", .{llvm_lib}),
+    });
+    bridge_link.addArgs(&llvm_lib_flags);
+    bridge_link.addArgs(&.{
+        "-L/opt/homebrew/lib",
+        "-lc++",
+        "-lc++abi",
+        "-lz",
+        "-lzstd",
+        "-lxml2",
+    });
+    bridge_link.addArgs(&.{"-o"});
+    const bridge_dylib_out = bridge_link.addOutputFileArg("libwith_llvm_bridge.dylib");
 
     // --- Install ---
     const install = b.addInstallBinFile(output, "with");
@@ -147,9 +183,13 @@ pub fn build(b: *std.Build) void {
     const install_fiber_c = b.addInstallBinFile(fiber_c_out, "runtime/fiber.o");
     const install_fiber_asm = b.addInstallBinFile(fiber_asm_out, "runtime/fiber_asm.o");
     const install_helpers = b.addInstallBinFile(helpers_c_out, "runtime/helpers.o");
+    const install_bridge_obj = b.addInstallBinFile(bridge_c_out, "runtime/llvm_bridge.o");
+    const install_bridge_dylib = b.addInstallBinFile(bridge_dylib_out, "runtime/libwith_llvm_bridge.dylib");
     b.getInstallStep().dependOn(&install_fiber_c.step);
     b.getInstallStep().dependOn(&install_fiber_asm.step);
     b.getInstallStep().dependOn(&install_helpers.step);
+    b.getInstallStep().dependOn(&install_bridge_obj.step);
+    b.getInstallStep().dependOn(&install_bridge_dylib.step);
 
     // --- Run step (`zig build run -- <args>`) ---
     const run_step = b.step("run", "Run the With compiler");

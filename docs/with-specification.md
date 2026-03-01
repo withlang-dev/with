@@ -304,17 +304,18 @@ let b = a            // copy; both a and b are valid
 
 ```
 type Point = { x: f64, y: f64 }         // OK: f64 is Copy
-impl Copy for Point {}                    // OK
+impl Copy for Point                       // OK
 
 type Handle = { id: u32, gen: u32 }      // OK: u32 is Copy
-impl Copy for Handle {}                   // OK
+impl Copy for Handle                      // OK
 
 type Buffer = { data: Vec[u8] }          // Vec is NOT Copy (has Drop)
-impl Copy for Buffer {}                   // ERROR: field `data` is not Copy
+impl Copy for Buffer                      // ERROR: field `data` is not Copy
 
 type File = { fd: i32 }
-impl Drop for File { fn drop(self): ... }
-impl Copy for File {}                     // ERROR: Copy + Drop is forbidden
+impl Drop for File:
+    fn drop(self): ...
+impl Copy for File                        // ERROR: Copy + Drop is forbidden
 ```
 
 These rules guarantee that `Copy` is always safe in safe code — it
@@ -333,7 +334,7 @@ the value goes out of scope. The `drop` method takes `self` **by
 value** — the value is consumed:
 
 ```
-impl Drop for Database
+impl Drop for Database:
     fn drop(self: Self):
         sqlite3_close(self.handle)
 ```
@@ -345,7 +346,7 @@ use in your drop body are consumed, remaining fields are dropped
 automatically. No recursion, no leaks, no ceremony:
 
 ```
-impl Drop for Database
+impl Drop for Database:
     fn drop(self: Self):
         sqlite3_close(self.handle)
         // self.handle was consumed by the close call
@@ -361,7 +362,7 @@ error:
 
 ```
 type FileWrapper = { fd: File, name: String }
-impl Drop for FileWrapper
+impl Drop for FileWrapper:
     fn drop(self: Self): close_file(self.fd)
 
 let w1 = FileWrapper { fd: open_file(), name: "A" }
@@ -597,9 +598,10 @@ implements the trait, the compiler coerces automatically. No cast
 needed — if it implements the trait, just pass it:
 
 ```
-trait Logger { fn log(self: &Self, msg: &str) }
+trait Logger:
+    fn log(self: &Self, msg: &str)
 type ConsoleLog = {}
-impl Logger for ConsoleLog
+impl Logger for ConsoleLog:
     fn log(self: &Self, msg: &str): println(msg)
 
 fn process(logger: &dyn Logger): logger.log("processing")
@@ -1156,9 +1158,8 @@ fn demo_strings -> i32:
 **The `Default` trait:**
 
 ```
-trait Default {
+trait Default:
     fn default -> Self
-}
 ```
 
 Built-in implementations:
@@ -1266,7 +1267,7 @@ type Request = {
     headers: Vec[Header],
 }
 
-extend Request
+extend Request:
     fn path_str(self: &Request) -> StrView:
         self.buf.view(self.path.offset, self.path.len)
 ```
@@ -1438,13 +1439,11 @@ is ephemeral — it cannot escape the block.
 **Traits:**
 
 ```
-trait Scoped[T] {
+trait Scoped[T]:
     fn enter[R](self: &Self, f: fn(&T) -> R) -> R
-}
 
-trait ScopedMut[T] {
+trait ScopedMut[T]:
     fn enter_mut[R](self: &Self, f: fn(&mut T) -> R) -> R
-}
 ```
 
 **Desugaring:**
@@ -1981,7 +1980,7 @@ controlled equivalent.
 ### 9.5 Extension Blocks
 
 ```
-extend Vec[T]
+extend Vec[T]:
     fn is_empty(self: &Vec[T]) -> bool: self.len() == 0
 ```
 
@@ -1998,7 +1997,7 @@ extend Vec[T]
 ```
 type Builder = { host: str, port: u16 }
 
-extend Builder
+extend Builder:
     fn host(self: Builder, h: str) -> Builder: { self with host: h }
     fn port(self: Builder, p: u16) -> Builder: { self with port: p }
     fn build(self: Builder) -> Result[Server, ConfigError]: ...
@@ -2874,10 +2873,9 @@ type ContextError[E] = {
     source: E,
 }
 
-impl Error for ContextError[E] where E: Error {
+impl Error for ContextError[E] where E: Error:
     fn display(self: &Self) -> str: self.message
     fn source(self: &Self) -> Option[&dyn Error]: Some(&self.source)
-}
 ```
 
 **Examples:**
@@ -2960,13 +2958,11 @@ conversion works via transitivity.
 ### 11.1 Definition and Implementation
 
 ```
-trait Show {
+trait Show:
     fn show(self: &Self) -> String
-}
 
-impl Show for Point {
+impl Show for Point:
     fn show(self: &Point) -> String: "({self.x}, {self.y})"
-}
 ```
 
 ### 11.2 Generic Bounds
@@ -2989,14 +2985,12 @@ its methods are **object-safe**. A method is object-safe if:
    methods are excluded from the vtable.
 
 ```
-trait Drawable {
+trait Drawable:
     fn draw(self: &Self)        // OK: &Self, object-safe
     fn name(self: &Self) -> str // OK: &Self, object-safe
-}
 
-trait Consumable {
+trait Consumable:
     fn consume(self: Self)      // by-value self: NOT object-safe
-}
 
 let d: &dyn Drawable = &circle    // OK: all methods are object-safe
 let c: &dyn Consumable = &item    // ERROR: consume() takes self by value
@@ -3008,10 +3002,9 @@ a shim that moves the value out of the box (which has a known
 pointer size):
 
 ```
-trait Builder {
+trait Builder:
     fn build(self: Self) -> Config     // by-value self
     fn preview(self: &Self) -> str     // by-reference
-}
 
 // Box[dyn Builder] can call build() via a generated shim:
 let b: Box[dyn Builder] = Box.new(MyBuilder { ... })
@@ -3042,11 +3035,11 @@ rules to prevent method conflicts across packages:
 
 ```
 // In package `slug`:
-extend String
+extend String:
     fn to_slug(self: &Self) -> String: ...
 
 // In package `url`:
-extend String
+extend String:
     fn to_slug(self: &Self) -> String: ...
 
 // In user code:
@@ -3062,9 +3055,8 @@ slug.to_slug(&s)          // OK: fully qualified
 Async methods in traits are permitted and require no special rules.
 
 ```
-trait DataSource {
+trait DataSource:
     async fn fetch(self: &Self, id: i32) -> Result[Data, Error]
-}
 ```
 
 Because `async fn fetch(...) -> T` is equivalent to
@@ -3120,7 +3112,7 @@ affects custom container types most:
 // Instead, parameterize the implementing type:
 type MyMap[K, V] = { ... }
 
-impl Iter[(K, V)] for MyMap[K, V] { ... }
+impl Iter[(K, V)] for MyMap[K, V]: ...
 ```
 
 Async methods in traits are **not affected** by this limitation —
@@ -3157,10 +3149,9 @@ traits is **fixed and closed** — users cannot define new syntax hooks.
 // A matrix type that supports m[row, col] syntax
 type Matrix = { data: Vec[f64], rows: usize, cols: usize }
 
-impl Index[(usize, usize), f64] for Matrix {
+impl Index[(usize, usize), f64] for Matrix:
     fn index(self: &Self, (r, c): (usize, usize)) -> &f64:
         &self.data[r * self.cols + c]
-}
 
 let m = Matrix.new(3, 3)
 let val = m[(1, 2)]    // calls Matrix::index
@@ -3171,12 +3162,11 @@ let val = m[(1, 2)]    // calls Matrix::index
 type ParseResult[T] = ParseOk(T, remaining: str)
                     | ParseErr(msg: str, pos: usize)
 
-impl Try[T, ParseError] for ParseResult[T] {
+impl Try[T, ParseError] for ParseResult[T]:
     fn branch(self: Self) -> ControlFlow[ParseError, T]:
         match self
             ParseOk(v, _) -> ControlFlow.Continue(v)
             ParseErr(m, p) -> ControlFlow.Break(ParseError { msg: m, pos: p })
-}
 
 // Now ? works naturally in parser combinators:
 fn parse_pair(input: &str) -> ParseResult[(Expr, Expr)]:
@@ -3202,13 +3192,17 @@ fn parse_pair(input: &str) -> ParseResult[(Expr, Expr)]:
 **Arithmetic operator traits:**
 
 ```
-trait Add[Rhs, Output] {
+trait Add[Rhs, Output]:
     fn add(self: Self, rhs: Rhs) -> Output
-}
-trait Sub[Rhs, Output] { fn sub(self: Self, rhs: Rhs) -> Output }
-trait Mul[Rhs, Output] { fn mul(self: Self, rhs: Rhs) -> Output }
-trait Div[Rhs, Output] { fn div(self: Self, rhs: Rhs) -> Output }
-trait Neg[Output]      { fn neg(self: Self) -> Output }
+
+trait Sub[Rhs, Output]:
+    fn sub(self: Self, rhs: Rhs) -> Output
+trait Mul[Rhs, Output]:
+    fn mul(self: Self, rhs: Rhs) -> Output
+trait Div[Rhs, Output]:
+    fn div(self: Self, rhs: Rhs) -> Output
+trait Neg[Output]:
+    fn neg(self: Self) -> Output
 ```
 
 **One-implementation rule for operator output:** A type may implement
@@ -3216,7 +3210,7 @@ trait Neg[Output]      { fn neg(self: Self) -> Output }
 **The `Contains` trait:**
 
 ```
-trait Contains[T] =
+trait Contains[T]:
     fn contains(self: &Self, value: &T) -> bool
 ```
 
@@ -3250,7 +3244,7 @@ User types can implement `Contains`:
 ```
 type Whitelist = { allowed: HashSet[str] }
 
-impl Contains[str] for Whitelist =
+impl Contains[str] for Whitelist:
     fn contains(self: &Self, value: &str) -> bool:
         value in self.allowed
 
@@ -3263,10 +3257,10 @@ if user.name in whitelist:
 The `Output` type is uniquely determined by `Self` and `Rhs`:
 
 ```
-impl Add[Vector, Vector] for Vector { ... }    // OK: Vector + Vector = Vector
-impl Add[f32, Vector] for Vector { ... }       // OK: Vector + f32 = Vector
+impl Add[Vector, Vector] for Vector: ...    // OK: Vector + Vector = Vector
+impl Add[f32, Vector] for Vector: ...       // OK: Vector + f32 = Vector
 
-impl Add[Vector, Matrix] for Vector { ... }    // ERROR: conflicting Output
+impl Add[Vector, Matrix] for Vector: ...    // ERROR: conflicting Output
     // Vector + Vector already defined with Output = Vector
     // Cannot also be Output = Matrix
 ```
@@ -3355,14 +3349,12 @@ type DatabaseConfig = {
 // type DatabaseConfigBuilder = {
 //     host: Option[str], port: Option[i32], ...
 // }
-// impl DatabaseConfigBuilder {
+// impl DatabaseConfigBuilder:
 //     fn host(self: Self, val: str) -> Self: ...
 //     fn port(self: Self, val: i32) -> Self: ...
 //     fn build(self: Self) -> Result[DatabaseConfig, BuilderError]: ...
-// }
-// impl DatabaseConfig {
+// impl DatabaseConfig:
 //     fn builder -> DatabaseConfigBuilder: ...
-// }
 
 // Usage:
 let config = DatabaseConfig.builder()
@@ -3469,7 +3461,7 @@ fn find_matches(text: &str, pat: &str) -> dyn Iter[StrView]
 
 // POSSIBLE: concrete ephemeral struct — caller inherits restriction
 type MatchIter = ephemeral { text: StrView, pat: StrView, pos: usize }
-impl Iter[StrView] for MatchIter { ... }
+impl Iter[StrView] for MatchIter: ...
 
 fn find_matches(text: &str, pat: &str) -> MatchIter:
     MatchIter { text: text.as_view(), pat: pat.as_view(), pos: 0 }
@@ -3515,9 +3507,8 @@ zero-copy parsing pipelines, it is real.
 ### 13.2 The Iterator Trait
 
 ```
-trait Iter[T] {
+trait Iter[T]:
     fn next(self: &mut Self) -> Option[T]
-}
 ```
 
 **One-implementation rule:** A type may implement `Iter[T]` for
@@ -3531,8 +3522,8 @@ for x in my_vec:
     println(x)           // x: &i32, unambiguous
 
 // ERROR: conflicting Iter implementations
-impl Iter[u8] for MyBuffer { ... }
-impl Iter[String] for MyBuffer { ... }   // REJECTED: MyBuffer already implements Iter[u8]
+impl Iter[u8] for MyBuffer: ...
+impl Iter[String] for MyBuffer: ...   // REJECTED: MyBuffer already implements Iter[u8]
 ```
 
 This restriction replaces the need for associated types on `Iter`
@@ -3750,7 +3741,7 @@ generated data, transformations).
 ```
 // Zero-copy: ephemeral iterator struct
 type TokenIter = ephemeral { source: StrView, pos: usize }
-impl Iter[StrView] for TokenIter { ... }
+impl Iter[StrView] for TokenIter: ...
 
 // Zero-copy: callback pattern
 fn each_token(src: &str, f: fn(StrView)): ...
@@ -5344,21 +5335,20 @@ structure.
 // Generate a JSON serializer for any struct at compile time
 comptime fn derive_serialize[T: type] -> impl Serialize for T:
     let fields = T.fields()
-    impl Serialize for T {
+    impl Serialize for T:
         fn serialize(self: &T, out: &mut JsonWriter):
             out.begin_object()
             for field in fields:       // cascade: inside comptime fn
                 out.key(field.name)
                 self.{field.name}.serialize(out)
             out.end_object()
-    }
 
 // Usage: just annotate the type
 @[derive(Serialize)]
 type User = { name: String, age: i32, email: String }
 
 // The compiler generates (conceptually):
-// impl Serialize for User {
+// impl Serialize for User:
 //     fn serialize(self: &User, out: &mut JsonWriter):
 //         out.begin_object()
 //         out.key("name"); self.name.serialize(out)
@@ -6819,18 +6809,17 @@ fn bad(e: AppError):
 ### 25.10 Traits and Coherence (Section 11)
 
 ```
-trait Show { fn show(self: &Self) -> String }
+trait Show:
+    fn show(self: &Self) -> String
 
 // FAIL: orphan rule
-impl Show for Vec[i32] {             // ERROR
+impl Show for Vec[i32]:             // ERROR
     fn show(self: &Vec[i32]) -> String: "vec"
-}
 
 // PASS: own type
 type MyType = { x: i32 }
-impl Show for MyType {
+impl Show for MyType:
     fn show(self: &MyType) -> String: "MyType"
-}
 ```
 
 ### 25.11 FFI and `c_import` (Section 16)
@@ -7099,15 +7088,13 @@ fn test:
         |> collect[Vec]()
 
 // PASS: async fn in trait (just works)
-trait DataSource {
+trait DataSource:
     async fn fetch(self: &Self, id: i32) -> Result[Data, Error]
-}
 
-impl DataSource for RemoteDb {
+impl DataSource for RemoteDb:
     async fn fetch(self: &RemoteDb, id: i32) -> Result[Data, Error]:
         let row = self.conn.query(id).await
         Ok(row.into_data())
-}
 
 // No boxing, no GATs, no special handling.
 // async fn in traits returns Task[T] like any other async fn.
@@ -7550,20 +7537,21 @@ fn test(flag: bool) -> i32:
 ```
 // PASS: Copy on all-Copy struct
 type Point = { x: f64, y: f64 }
-impl Copy for Point {}
+impl Copy for Point
 
 // FAIL: Copy on struct with non-Copy field
 type Buffer = { data: Vec[u8] }
-impl Copy for Buffer {}              // ERROR: field `data` is not Copy
+impl Copy for Buffer              // ERROR: field `data` is not Copy
 
 // FAIL: Copy + Drop on same type
 type Handle = { fd: i32 }
-impl Drop for Handle { fn drop(self): close(self.fd) }
-impl Copy for Handle {}              // ERROR: Copy + Drop is forbidden
+impl Drop for Handle:
+    fn drop(self): close(self.fd)
+impl Copy for Handle              // ERROR: Copy + Drop is forbidden
 
 // PASS: Copy on struct with only primitives
 type Color = { r: u8, g: u8, b: u8, a: u8 }
-impl Copy for Color {}               // OK: all fields are Copy
+impl Copy for Color               // OK: all fields are Copy
 ```
 
 ### 25.32 Task Ephemerality (Section 14.20)
@@ -8315,7 +8303,7 @@ async fn test_fail:
 ```
 // PASS: consuming self with dot-notation
 type Builder = { host: str, port: u16 }
-extend Builder
+extend Builder:
     fn new -> Builder: Builder { host: "", port: 0 }
     fn host(self: Builder, h: str) -> Builder: { self with host: h }
     fn port(self: Builder, p: u16) -> Builder: { self with port: p }
@@ -8328,7 +8316,7 @@ fn test:
     assert(b.port == 8080)
 
 // PASS: consuming self in final method
-extend Builder
+extend Builder:
     fn build(self: Builder) -> Result[Server, str]:
         if self.host.is_empty() then Err("missing host")
         else Ok(Server { host: self.host, port: self.port })
@@ -8487,14 +8475,14 @@ fn test:
 ```
 // PASS: drop takes self by value — no double-free risk
 type Handle = { fd: i32 }
-impl Drop for Handle
+impl Drop for Handle:
     fn drop(self: Self):
         close(self.fd)
         // self is consumed — no need to null out fd
 
 // PASS: field destructors run after user drop body
 type Wrapper = { name: String, handle: Handle }
-impl Drop for Wrapper
+impl Drop for Wrapper:
     fn drop(self: Self):
         println("dropping {self.name}")
         // after this returns, Handle::drop runs for self.handle
@@ -8502,7 +8490,8 @@ impl Drop for Wrapper
 
 // FAIL: Copy + Drop is still forbidden
 type Bad = { x: i32 } with Copy
-impl Drop for Bad { fn drop(self: Self): () }  // ERROR: Copy + Drop conflict
+impl Drop for Bad:
+    fn drop(self: Self): ()  // ERROR: Copy + Drop conflict
 ```
 
 ### 25.62 Ephemeral Task Cancellation (Section 14.7)
@@ -8547,7 +8536,7 @@ fn test_fail:
 
 ```
 type Wrapper = { fd: File, name: String }
-impl Drop for Wrapper
+impl Drop for Wrapper:
     fn drop(self: Self): close(self.fd)
 
 // FAIL: partial move from Drop type
@@ -8653,13 +8642,13 @@ fn test:
 ```
 // FAIL: conflicting Iter implementations
 type MyBuffer = { data: Vec[u8] }
-impl Iter[u8] for MyBuffer { ... }
-impl Iter[String] for MyBuffer { ... }  // ERROR: MyBuffer already implements Iter[u8]
+impl Iter[u8] for MyBuffer: ...
+impl Iter[String] for MyBuffer: ...  // ERROR: MyBuffer already implements Iter[u8]
 
 // PASS: named methods for alternate iteration
 type MyBuffer = { data: Vec[u8] }
-impl Iter[u8] for MyBuffer { ... }
-impl MyBuffer
+impl Iter[u8] for MyBuffer: ...
+extend MyBuffer:
     fn lines(self: &Self) -> LineIter: ...   // separate iterator type
 ```
 
@@ -8667,16 +8656,14 @@ impl MyBuffer
 
 ```
 // PASS: unique Output per (Self, Rhs) pair
-impl Add[Vector, Vector] for Vector {
+impl Add[Vector, Vector] for Vector:
     fn add(self: Vector, rhs: Vector) -> Vector: ...
-}
-impl Add[f32, Vector] for Vector {   // different Rhs = OK
+impl Add[f32, Vector] for Vector:   // different Rhs = OK
     fn add(self: Vector, rhs: f32) -> Vector: ...
-}
 let v = vec1 + vec2   // Output uniquely determined: Vector
 
 // FAIL: conflicting Output for same (Self, Rhs)
-impl Add[Vector, Matrix] for Vector { ... }   // ERROR: Vector + Vector
+impl Add[Vector, Matrix] for Vector: ...   // ERROR: Vector + Vector
                                                // already has Output = Vector
 ```
 
@@ -8825,7 +8812,7 @@ fn test:
 ```
 // PASS: field moves allowed INSIDE drop
 type FileWrapper = { fd: File, name: String }
-impl Drop for FileWrapper
+impl Drop for FileWrapper:
     fn drop(self: Self):
         close_file(self.fd)   // OK: field move inside drop
         // self.name NOT moved → compiler drops it automatically
@@ -8871,11 +8858,13 @@ fn test:
 
 ```
 // PASS: trait with &Self methods is object-safe
-trait Drawable { fn draw(self: &Self) }
+trait Drawable:
+    fn draw(self: &Self)
 fn render(d: &dyn Drawable): d.draw()
 
 // FAIL: trait with by-value self is not object-safe (without Box)
-trait Consumable { fn consume(self: Self) }
+trait Consumable:
+    fn consume(self: Self)
 fn bad(c: &dyn Consumable): ...   // ERROR: Consumable is not object-safe
 
 // PASS: by-value self through Box
@@ -9032,9 +9021,10 @@ fn test_fail:
 
 ```
 // PASS: &T → &dyn Trait
-trait Greet { fn hello(self: &Self) -> str }
+trait Greet:
+    fn hello(self: &Self) -> str
 type English = {}
-impl Greet for English
+impl Greet for English:
     fn hello(self: &Self) -> str: "Hello"
 
 fn say_hi(g: &dyn Greet) -> str: g.hello()

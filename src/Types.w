@@ -1,2 +1,6 @@
-// Direct bootstrap port scaffold from bootstrap/src/Types.zig.
-// Line-for-line port in progress.
+// Types — Facade re-exporting Sema type definitions.
+//
+// The implementation lives in Sema; this facade provides
+// a stable module boundary matching the phase plan terminology.
+
+use Sema

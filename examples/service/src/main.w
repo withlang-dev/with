@@ -42,19 +42,20 @@ fn result_name(r: ServiceResult) -> str:
 
 // --- User "Repository" (in-memory array) ---
 
-fn make_user(id: i32, name: str, email: str, score: i32) -> User:
-    User { id: id, name: name, email: email, score: score }
+fn make_user(id: i32, name: str, email: str, score: i32) -> User: User { id, name, email, score }
 
 fn find_user(users: [5]User, id: i32) -> ServiceResult:
     var found = false
     for i in 0..5:
-        if users[i].id == id then found = true else found = found
+        if users[i].id == id:
+            found = true
     if found then Ok else NotFound
 
 fn get_user_score(users: [5]User, id: i32) -> i32:
     var score = 0
     for i in 0..5:
-        if users[i].id == id then score = users[i].score else score = score
+        if users[i].id == id:
+            score = users[i].score
     score
 
 // --- Service Layer ---
@@ -64,17 +65,14 @@ type Service = {
     request_count: i32,
 }
 
-extend Service =
-    fn new(config: ServiceConfig) -> Service:
-        Service { config: config, request_count: 0 }
+extend Service:
+    fn new(config: ServiceConfig) -> Service: Service { config, request_count: 0 }
 
-    fn get_timeout(self: Service) -> i32:
-        self.config.timeout_ms
+    fn get_timeout(self: Service) -> i32: self.config.timeout_ms
 
 // --- Validation ---
 
-fn validate_id(id: i32) -> ServiceResult:
-    if id in 1..=1000 then Ok else InvalidInput
+fn validate_id(id: i32) -> ServiceResult: if id in 1..=1000 then Ok else InvalidInput
 
 fn validate_and_find(users: [5]User, id: i32) -> ServiceResult:
     let validation = validate_id(id)
@@ -84,23 +82,21 @@ fn validate_and_find(users: [5]User, id: i32) -> ServiceResult:
 
 // --- Generic utility ---
 
-fn identity[T](x: T) -> T:
-    x
+fn identity[T](x: T) -> T: x
 
-fn first_of[T](a: T, b: T) -> T:
-    a
+fn first_of[T](a: T, b: T) -> T: a
 
 // --- Trait demo ---
 
-trait Printable =
-    fn display(self: Self) -> i32
+trait Printable:
+    fn display(self: Self)
 
-impl Printable for User =
-    fn display(self: User) -> i32:
+impl Printable for User:
+    fn display(self: User):
         println("User #{self.id}: {self.name} <{self.email}> score={self.score}")
 
-impl Printable for ServiceConfig =
-    fn display(self: ServiceConfig) -> i32:
+impl Printable for ServiceConfig:
+    fn display(self: ServiceConfig):
         println("Config: retries={self.max_retries}, timeout={self.timeout_ms}ms, cache={self.cache_enabled}")
 
 // --- Request handling demo ---
@@ -113,7 +109,7 @@ fn handle_request(users: [5]User, endpoint: i32, user_id: i32) -> ServiceResult:
 
 // --- Main ---
 
-fn main -> i32:
+fn main:
     println("=== Service Demo ===")
 
     // Configuration with defaults
@@ -175,7 +171,8 @@ fn main -> i32:
     var max_score = 0
     for i in 0..5:
         let s = users[i].score
-        if s > max_score then max_score = s else max_score = max_score
+        if s > max_score:
+            max_score = s
     println("Highest score: {max_score}")
 
     // Generic function demo

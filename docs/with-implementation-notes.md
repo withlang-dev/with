@@ -1,6 +1,6 @@
 # The With Programming Language — Implementation Notes
 
-**Companion to:** Specification v6.3
+**Companion to:** Specification v6.5
 **Status:** Non-normative. Guidance for compiler and runtime engineers.
 **Scope:** Implementation strategies, trade-offs, and architectural
 decisions that do not affect language semantics.

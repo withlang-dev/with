@@ -2,11 +2,9 @@
 
 use test.testing
 
-fn double(x: i32) -> i32:
-    x * 2
+fn double(x: i32) -> i32: x * 2
 
-fn add_ten(x: i32) -> i32:
-    x + 10
+fn add_ten(x: i32) -> i32: x + 10
 
 type WorkItem = {
     id: i32,
@@ -23,16 +21,21 @@ fn process_item(item: WorkItem, worker_id: i32) -> ProcessedItem:
     ProcessedItem {
         id: item.id,
         result: item.payload * 2 + worker_id,
-        worker_id: worker_id,
+        worker_id,
     }
 
 fn count_positive(a: i32, b: i32, c: i32, d: i32, e: i32) -> i32:
     var n = 0
-    if a > 0 then n = n + 1 else n = n
-    if b > 0 then n = n + 1 else n = n
-    if c > 0 then n = n + 1 else n = n
-    if d > 0 then n = n + 1 else n = n
-    if e > 0 then n = n + 1 else n = n
+    if a > 0:
+        n = n + 1
+    if b > 0:
+        n = n + 1
+    if c > 0:
+        n = n + 1
+    if d > 0:
+        n = n + 1
+    if e > 0:
+        n = n + 1
     n
 
 @[test]
