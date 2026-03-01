@@ -17,24 +17,24 @@ fn lex(source: str) -> TokenList:
 fn test_copy_types:
     var types = TypeTable.new()
     // Primitive integers are copy
-    assert(TypeTable.is_copy(types, TYPE_I8()) == true)
-    assert(TypeTable.is_copy(types, TYPE_I16()) == true)
-    assert(TypeTable.is_copy(types, TYPE_I32()) == true)
-    assert(TypeTable.is_copy(types, TYPE_I64()) == true)
-    assert(TypeTable.is_copy(types, TYPE_U8()) == true)
-    assert(TypeTable.is_copy(types, TYPE_U16()) == true)
-    assert(TypeTable.is_copy(types, TYPE_U32()) == true)
-    assert(TypeTable.is_copy(types, TYPE_U64()) == true)
+    assert(TypeTable.is_copy(types, TYPE_I8()))
+    assert(TypeTable.is_copy(types, TYPE_I16()))
+    assert(TypeTable.is_copy(types, TYPE_I32()))
+    assert(TypeTable.is_copy(types, TYPE_I64()))
+    assert(TypeTable.is_copy(types, TYPE_U8()))
+    assert(TypeTable.is_copy(types, TYPE_U16()))
+    assert(TypeTable.is_copy(types, TYPE_U32()))
+    assert(TypeTable.is_copy(types, TYPE_U64()))
     // Floats are copy
-    assert(TypeTable.is_copy(types, TYPE_F32()) == true)
-    assert(TypeTable.is_copy(types, TYPE_F64()) == true)
+    assert(TypeTable.is_copy(types, TYPE_F32()))
+    assert(TypeTable.is_copy(types, TYPE_F64()))
     // Bool is copy
-    assert(TypeTable.is_copy(types, TYPE_BOOL()) == true)
+    assert(TypeTable.is_copy(types, TYPE_BOOL()))
 
 fn test_non_copy_types:
     var types = TypeTable.new()
     // str is not copy
-    assert(TypeTable.is_copy(types, TYPE_STR()) == false)
+    assert(not TypeTable.is_copy(types, TYPE_STR()))
 
 fn test_var_state_encoding:
     // Variable info encoding: type_id * 4 + is_mut * 2 + state

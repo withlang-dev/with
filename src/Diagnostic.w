@@ -74,12 +74,10 @@ fn Diagnostic.render(self: Diagnostic, source: Source):
     with_eprintln(int_to_string(line_num) ++ " | " ++ line_text)
 
     var underline = ""
-    var u_i = 0
     let raw_u_len = if self.primary.len() > 0: self.primary.len() else: 1
     let u_len = clamp_i32(raw_u_len, 1, 120)
-    while u_i < u_len:
+    for u_i in 0..u_len:
         underline = underline ++ "^"
-        u_i = u_i + 1
     let col_pad = clamp_i32(loc.col, 0, 200)
     var marker = spaces(gutter_w + 1) ++ "| " ++ spaces(col_pad) ++ underline
     if loc.col > 200 or raw_u_len > 120:
@@ -87,22 +85,16 @@ fn Diagnostic.render(self: Diagnostic, source: Source):
     with_eprintln(marker)
 
     // Notes and helps.
-    var n_i = 0
-    while n_i < self.notes.len() as i32:
+    for n_i in 0..self.notes.len() as i32:
         with_eprintln(spaces(gutter_w + 1) ++ "= note: " ++ self.notes.get(n_i as i64))
-        n_i = n_i + 1
-    var h_i = 0
-    while h_i < self.helps.len() as i32:
+    for h_i in 0..self.helps.len() as i32:
         with_eprintln(spaces(gutter_w + 1) ++ "= help: " ++ self.helps.get(h_i as i64))
-        h_i = h_i + 1
 
 fn spaces(count: i32) -> str:
     let n = clamp_i32(count, 0, 512)
     var result = ""
-    var i = 0
-    while i < n:
+    for i in 0..n:
         result = result ++ " "
-        i = i + 1
     result
 
 fn clamp_i32(v: i32, lo: i32, hi: i32) -> i32:
@@ -138,16 +130,12 @@ fn DiagnosticList.emit(self: DiagnosticList, diag: Diagnostic):
     self.items.push(diag)
 
 fn DiagnosticList.has_errors(self: DiagnosticList) -> bool:
-    var i = 0
-    while i < self.items.len() as i32:
+    for i in 0..self.items.len() as i32:
         if self.items.get(i as i64).severity == SEV_ERROR():
             return true
-        i = i + 1
     false
 
 fn DiagnosticList.render_all(self: DiagnosticList, source: Source):
-    var i = 0
-    while i < self.items.len() as i32:
+    for i in 0..self.items.len() as i32:
         self.items.get(i as i64).render(source)
         with_eprintln("")
-        i = i + 1

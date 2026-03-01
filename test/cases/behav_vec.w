@@ -19,10 +19,8 @@ fn test_vec_empty:
 
 fn test_vec_large:
     var v = Vec.new()
-    var i = 0
-    while i < 100:
+    for i in 0..100:
         v.push(i)
-        i = i + 1
     assert(v.len() == 100)
     assert(v.get(0) == 0)
     assert(v.get(50) == 50)

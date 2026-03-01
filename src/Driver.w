@@ -105,14 +105,12 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
 
     // Phase 2.5: Process use imports.
     // Iterate to a fixed point so nested imports are resolved.
-    var import_passes = 0
-    while import_passes < 64:
+    for import_passes in 0..64:
         let before = pool.decl_count()
         pool = self.process_imports(pool, text)
         let after = pool.decl_count()
         if after == before:
             break
-        import_passes = import_passes + 1
 
     // Phase 3: Semantic analysis.
     var sema = Sema.init(self.pool, self.diagnostics, pool)
@@ -173,10 +171,8 @@ fn link(obj_path: str, bin_path: str) -> bool:
 // Link with extra object files.
 fn link_with_extras(obj_path: str, bin_path: str, extras: Vec[str]) -> bool:
     var cmd = "cc " ++ obj_path
-    var i = 0
-    while i < extras.len() as i32:
+    for i in 0..extras.len() as i32:
         cmd = cmd ++ " " ++ extras.get(i as i64)
-        i = i + 1
     cmd = cmd ++ " -o " ++ bin_path
     let result = with_system(cmd)
     result == 0
@@ -251,35 +247,28 @@ fn Driver.process_imports(self: Driver, pool: AstPool, source_text: str) -> AstP
     let base_count = merged_pool.decl_count()
 
     var base_decls: Vec[i32] = Vec.new()
-    var bi = 0
-    while bi < base_count:
+    for bi in 0..base_count:
         base_decls.push(merged_pool.get_decl(bi))
-        bi = bi + 1
 
     var ordered: Vec[i32] = Vec.new()
-    var i = 0
-    while i < base_count:
+    for i in 0..base_count:
         let decl = base_decls.get(i as i64)
         let kind = merged_pool.kind(decl)
         if kind != NK_USE_DECL():
             ordered.push(decl)
-            i = i + 1
             continue
 
         let path_start = merged_pool.get_data0(decl)
         let path_count = merged_pool.get_data1(decl)
         if path_count <= 0:
-            i = i + 1
             continue
 
         let path_name = self.use_path_name(merged_pool, path_start, path_count)
         let file_path = self.resolve_module_path(path_name)
         if file_path.len() == 0:
-            i = i + 1
             continue
 
         if self.imported_paths.contains(file_path):
-            i = i + 1
             continue
 
         self.imported_paths.insert(file_path, 1)
@@ -291,26 +280,20 @@ fn Driver.process_imports(self: Driver, pool: AstPool, source_text: str) -> AstP
             ordered.push(merged_pool.get_decl(di))
             di = di + 1
 
-        i = i + 1
-
     // Rebuild decl list in-place to avoid replacing Vec ownership.
     while merged_pool.decl_count() > 0:
         merged_pool.decls.pop()
-    var oi = 0
-    while oi < ordered.len() as i32:
+    for oi in 0..ordered.len() as i32:
         merged_pool.add_decl(ordered.get(oi as i64))
-        oi = oi + 1
     merged_pool
 
 fn Driver.use_path_name(self: Driver, pool: AstPool, path_start: i32, path_count: i32) -> str:
     var path = ""
-    var pi = 0
-    while pi < path_count:
+    for pi in 0..path_count:
         if pi > 0:
             path = path ++ "/"
         let seg = pool.get_extra(path_start + pi)
         path = path ++ self.pool.resolve(seg)
-        pi = pi + 1
     path
 
 fn Driver.resolve_module_path(self: Driver, module_name: str) -> str:
@@ -338,13 +321,11 @@ fn Driver.resolve_module_path(self: Driver, module_name: str) -> str:
 
 fn normalize_module_path(module_name: str) -> str:
     var out = ""
-    var i = 0
-    while i < module_name.len():
+    for i in 0..module_name.len():
         if module_name[i] == 46: // '.'
             out = out ++ "/"
         else:
             out = out ++ module_name.slice(i as i64, (i + 1) as i64)
-        i = i + 1
     out
 
 fn Driver.parse_imported_file(self: Driver, path: str, target_pool: AstPool) -> AstPool:
@@ -368,11 +349,9 @@ fn Driver.parse_imported_file(self: Driver, path: str, target_pool: AstPool) -> 
 
 fn dirname(path: str) -> str:
     var last_slash = -1
-    var i = 0
-    while i < path.len():
+    for i in 0..path.len():
         if path[i] == 47: // '/'
             last_slash = i as i32
-        i = i + 1
     if last_slash < 0:
         return "."
     path.slice(0, last_slash as i64)
@@ -380,11 +359,9 @@ fn dirname(path: str) -> str:
 fn source_stem(source_path: str) -> str:
     // Extract basename and remove .w extension
     var last_slash = -1
-    var i = 0
-    while i < source_path.len():
+    for i in 0..source_path.len():
         if source_path[i] == 47: // '/'
             last_slash = i as i32
-        i = i + 1
     let base = if last_slash >= 0:
         source_path.slice((last_slash + 1) as i64, source_path.len() as i64)
     else:
@@ -394,7 +371,5 @@ fn source_stem(source_path: str) -> str:
     base
 
 fn Driver.print_warnings(self: Driver):
-    var i = 0
-    while i < self.pending_warnings.len() as i32:
+    for i in 0..self.pending_warnings.len() as i32:
         with_eprintln(self.pending_warnings.get(i as i64))
-        i = i + 1

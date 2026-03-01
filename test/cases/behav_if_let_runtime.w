@@ -25,5 +25,5 @@ fn main:
     var found = false
     if let .Some(v) = a:
         found = true
-    assert(found == true)
+    assert(found)
     println("ok")

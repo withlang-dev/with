@@ -34,31 +34,31 @@ fn test_parse_cast:
 fn test_type_int_widening:
     var types = TypeTable.new()
     // i32 can widen to i64
-    assert(TypeTable.is_int(types, TYPE_I32()) == true)
-    assert(TypeTable.is_int(types, TYPE_I64()) == true)
+    assert(TypeTable.is_int(types, TYPE_I32()))
+    assert(TypeTable.is_int(types, TYPE_I64()))
     // All int types are numeric
-    assert(TypeTable.is_numeric(types, TYPE_I8()) == true)
-    assert(TypeTable.is_numeric(types, TYPE_I16()) == true)
-    assert(TypeTable.is_numeric(types, TYPE_I32()) == true)
-    assert(TypeTable.is_numeric(types, TYPE_I64()) == true)
-    assert(TypeTable.is_numeric(types, TYPE_U8()) == true)
-    assert(TypeTable.is_numeric(types, TYPE_U16()) == true)
-    assert(TypeTable.is_numeric(types, TYPE_U32()) == true)
-    assert(TypeTable.is_numeric(types, TYPE_U64()) == true)
+    assert(TypeTable.is_numeric(types, TYPE_I8()))
+    assert(TypeTable.is_numeric(types, TYPE_I16()))
+    assert(TypeTable.is_numeric(types, TYPE_I32()))
+    assert(TypeTable.is_numeric(types, TYPE_I64()))
+    assert(TypeTable.is_numeric(types, TYPE_U8()))
+    assert(TypeTable.is_numeric(types, TYPE_U16()))
+    assert(TypeTable.is_numeric(types, TYPE_U32()))
+    assert(TypeTable.is_numeric(types, TYPE_U64()))
 
 fn test_type_float_checks:
     var types = TypeTable.new()
-    assert(TypeTable.is_float(types, TYPE_F32()) == true)
-    assert(TypeTable.is_float(types, TYPE_F64()) == true)
-    assert(TypeTable.is_float(types, TYPE_I32()) == false)
-    assert(TypeTable.is_numeric(types, TYPE_F32()) == true)
-    assert(TypeTable.is_numeric(types, TYPE_F64()) == true)
+    assert(TypeTable.is_float(types, TYPE_F32()))
+    assert(TypeTable.is_float(types, TYPE_F64()))
+    assert(not TypeTable.is_float(types, TYPE_I32()))
+    assert(TypeTable.is_numeric(types, TYPE_F32()))
+    assert(TypeTable.is_numeric(types, TYPE_F64()))
 
 fn test_type_non_numeric:
     var types = TypeTable.new()
-    assert(TypeTable.is_numeric(types, TYPE_BOOL()) == false)
-    assert(TypeTable.is_numeric(types, TYPE_STR()) == false)
-    assert(TypeTable.is_numeric(types, TYPE_VOID()) == false)
+    assert(not TypeTable.is_numeric(types, TYPE_BOOL()))
+    assert(not TypeTable.is_numeric(types, TYPE_STR()))
+    assert(not TypeTable.is_numeric(types, TYPE_VOID()))
 
 fn test_codegen_cast_instructions:
     // Test the cast_instruction helper in Codegen
@@ -94,11 +94,11 @@ fn test_sema_type_compat_widening:
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
     // i32 widens to i64
-    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_I64()) == true)
+    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_I64()))
     // f32 widens to f64
-    assert(Sema.types_compatible(s, TYPE_F32(), TYPE_F64()) == true)
+    assert(Sema.types_compatible(s, TYPE_F32(), TYPE_F64()))
     // But not str to i32
-    assert(Sema.types_compatible(s, TYPE_STR(), TYPE_I32()) == false)
+    assert(not Sema.types_compatible(s, TYPE_STR(), TYPE_I32()))
 
 fn main:
     test_as_keyword()

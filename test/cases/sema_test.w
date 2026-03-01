@@ -89,17 +89,17 @@ fn test_type_compatibility:
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
     // Same type
-    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_I32()) == true)
+    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_I32()))
     // Error type is compatible with anything
-    assert(Sema.types_compatible(s, TYPE_ERROR(), TYPE_I32()) == true)
-    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_ERROR()) == true)
+    assert(Sema.types_compatible(s, TYPE_ERROR(), TYPE_I32()))
+    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_ERROR()))
     // Never type is compatible with anything
-    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_NEVER()) == true)
+    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_NEVER()))
     // Int widening
-    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_I64()) == true)
+    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_I64()))
     // Different types
-    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_STR()) == false)
-    assert(Sema.types_compatible(s, TYPE_BOOL(), TYPE_I32()) == false)
+    assert(not Sema.types_compatible(s, TYPE_I32(), TYPE_STR()))
+    assert(not Sema.types_compatible(s, TYPE_BOOL(), TYPE_I32()))
 
 fn test_check_int_lit:
     var intern = InternPool.new()

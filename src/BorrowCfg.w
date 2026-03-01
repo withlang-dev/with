@@ -53,20 +53,16 @@ fn CfgGraph.add_edge(self: CfgGraph, from: i32, to: i32):
 
 fn CfgGraph.out_degree(self: CfgGraph, node_id: i32) -> i32:
     var n = 0
-    var i = 0
-    while i < self.edges.len() as i32:
+    for i in 0..self.edges.len() as i32:
         if self.edges.get(i as i64).from == node_id:
             n = n + 1
-        i = i + 1
     n
 
 fn CfgGraph.has_edge(self: CfgGraph, from: i32, to: i32) -> bool:
-    var i = 0
-    while i < self.edges.len() as i32:
+    for i in 0..self.edges.len() as i32:
         let e = self.edges.get(i as i64)
         if e.from == from and e.to == to:
             return true
-        i = i + 1
     false
 
 // Build a CFG from an AST expression subtree.
@@ -128,8 +124,7 @@ fn build_block(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
 
     var prev = -1
     var first = -1
-    var i = 0
-    while i < stmt_count:
+    for i in 0..stmt_count:
         let stmt_node = pool.get_extra(extra_start + i)
         let curr = build_expr(graph, pool, stmt_node)
         if i == 0:
@@ -137,7 +132,6 @@ fn build_block(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
         if prev != -1:
             graph.add_edge(prev, curr)
         prev = curr
-        i = i + 1
 
     if tail != 0:
         let tail_n = build_expr(graph, pool, tail)

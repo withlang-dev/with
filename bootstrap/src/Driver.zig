@@ -50,6 +50,8 @@ alloc: bool,
 current_source_path: []const u8 = "<unknown>",
 /// Source text of the main file (for __LINE__ span→line mapping).
 current_source_text: []const u8 = "",
+/// Inferred return types from Sema (passed to Codegen).
+inferred_return_types: std.AutoHashMapUnmanaged(Ast.Symbol, *const Ast.TypeExpr) = .{},
 
 pub fn init(allocator: std.mem.Allocator) Driver {
     return .{
@@ -186,6 +188,10 @@ pub fn compileSource(self: *Driver, source: *Source) !?Ast.Module {
     sema.alloc = self.alloc;
     sema.checkModule(&module);
 
+    // Transfer inferred return types to Driver (before sema deinit frees the map).
+    self.inferred_return_types = sema.inferred_return_types;
+    sema.inferred_return_types = .{};
+
     if (self.diagnostics.hasErrors()) {
         try self.reportErrors(source);
         return null;
@@ -212,6 +218,7 @@ pub fn compileToObject(self: *Driver, module: *const Ast.Module, output_path: [*
 
     cg.source_file = self.current_source_path;
     cg.source_text = self.current_source_text;
+    cg.inferred_return_types = self.inferred_return_types;
     cg.genModule(module, &self.pool) catch |err| {
         if (cg.comptime_error_msg) |msg| {
             self.writeStderr("error: comptime_error: ");
@@ -252,6 +259,7 @@ pub fn emitIR(self: *Driver, module: *const Ast.Module) !bool {
 
     cg.source_file = self.current_source_path;
     cg.source_text = self.current_source_text;
+    cg.inferred_return_types = self.inferred_return_types;
     cg.genModule(module, &self.pool) catch |err| {
         if (cg.comptime_error_msg) |msg| {
             self.writeStderr("error: comptime_error: ");

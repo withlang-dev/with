@@ -13,11 +13,9 @@ extern fn int_to_string(n: i32) -> str
 // Render an entire module (all top-level decls).
 fn render_module(pool: AstPool, intern: InternPool) -> str:
     var out = ""
-    var i = 0
-    while i < pool.decl_count():
+    for i in 0..pool.decl_count():
         let decl = pool.get_decl(i)
         out = out ++ render_decl(pool, intern, decl, 0) ++ "\n"
-        i = i + 1
     out
 
 // Render a single declaration.
@@ -51,12 +49,10 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         let extra_start = pool.get_data0(node)
         let path_count = pool.get_data1(node)
         var out = prefix ++ "use "
-        var pi = 0
-        while pi < path_count:
+        for pi in 0..path_count:
             if pi > 0:
                 out = out ++ "."
             out = out ++ intern.resolve(pool.get_extra(extra_start + pi))
-            pi = pi + 1
         return out
 
     if kind == NK_LET_DECL():
@@ -132,12 +128,10 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         let extra_start = pool.get_data1(node)
         let arg_count = pool.get_data2(node)
         var out = prefix ++ render_expr(pool, intern, callee, 0) ++ "("
-        var i = 0
-        while i < arg_count:
+        for i in 0..arg_count:
             if i > 0:
                 out = out ++ ", "
             out = out ++ render_expr(pool, intern, pool.get_extra(extra_start + i), 0)
-            i = i + 1
         return out ++ ")"
 
     if kind == NK_FIELD_ACCESS():
@@ -150,10 +144,8 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         let stmt_count = pool.get_data1(node)
         let tail = pool.get_data2(node)
         var out = ""
-        var i = 0
-        while i < stmt_count:
+        for i in 0..stmt_count:
             out = out ++ render_expr(pool, intern, pool.get_extra(extra_start + i), indent) ++ "\n"
-            i = i + 1
         if tail != 0:
             out = out ++ render_expr(pool, intern, tail, indent)
         return out
@@ -252,12 +244,10 @@ fn render_type_expr(pool: AstPool, intern: InternPool, node: i32) -> str:
         let extra_start = pool.get_data1(node)
         let arg_count = pool.get_data2(node)
         var out = name ++ "["
-        var i = 0
-        while i < arg_count:
+        for i in 0..arg_count:
             if i > 0:
                 out = out ++ ", "
             out = out ++ render_type_expr(pool, intern, pool.get_extra(extra_start + i))
-            i = i + 1
         return out ++ "]"
 
     if kind == NK_TYPE_REF():
@@ -317,8 +307,6 @@ fn unary_op_str(op: i32) -> str:
 
 fn make_indent(n: i32) -> str:
     var out = ""
-    var i = 0
-    while i < n:
+    for i in 0..n:
         out = out ++ " "
-        i = i + 1
     out

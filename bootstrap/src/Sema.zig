@@ -23,6 +23,9 @@ pub const TypeId = u32;
 /// Sentinel for unresolvable / error-recovery types.
 pub const error_type: TypeId = 0;
 
+/// Sentinel for return types that need inference from the function body.
+pub const inferred_type: TypeId = std.math.maxInt(TypeId) - 1;
+
 pub const Type = union(enum) {
     /// Poison type for error recovery.
     err,
@@ -256,6 +259,9 @@ method_decl_origins: std.AutoHashMapUnmanaged(usize, MethodOrigin),
 /// Method symbols that have at least one inherent implementation.
 method_has_inherent: std.AutoHashMapUnmanaged(Symbol, void),
 
+/// Inferred return types: fn name → synthetic TypeExpr for Codegen.
+inferred_return_types: std.AutoHashMapUnmanaged(Symbol, *const Ast.TypeExpr) = .{},
+
 /// Functions marked @[must_use] — emit warning if return value is discarded.
 must_use_fns: std.AutoHashMapUnmanaged(Symbol, void) = .{},
 /// Functions returning Result/Option (denied pattern E0802 when discarded).
@@ -433,6 +439,7 @@ pub fn deinit(self: *Sema) void {
     self.ephemeral_types.deinit(self.allocator);
     self.method_decl_origins.deinit(self.allocator);
     self.method_has_inherent.deinit(self.allocator);
+    self.inferred_return_types.deinit(self.allocator);
     self.must_use_fns.deinit(self.allocator);
     self.result_option_fns.deinit(self.allocator);
     self.task_fns.deinit(self.allocator);
@@ -897,7 +904,7 @@ fn collectFnDecl(self: *Sema, fn_decl: Ast.FnDecl) void {
             }
         }
         break :blk self.resolveTypeExpr(rt);
-    } else self.ty_void;
+    } else inferred_type;
 
     const fn_tid = self.addType(.{ .fn_type = .{
         .params = param_types,
@@ -1674,7 +1681,13 @@ fn checkFnBody(self: *Sema, fn_decl: Ast.FnDecl) void {
 
     // Set current return type.
     const saved_ret = self.current_return_type;
-    self.current_return_type = if (fn_decl.is_gen) self.ty_void else sig.return_type;
+    const needs_inference = sig.return_type == inferred_type;
+    self.current_return_type = if (fn_decl.is_gen)
+        self.ty_void
+    else if (needs_inference)
+        self.ty_void // temporary: allows bare `return` during inference
+    else
+        sig.return_type;
     defer self.current_return_type = saved_ret;
     const saved_gen_yield = self.current_gen_yield_type;
     self.current_gen_yield_type = if (fn_decl.is_gen) sig.return_type else null;
@@ -1686,25 +1699,48 @@ fn checkFnBody(self: *Sema, fn_decl: Ast.FnDecl) void {
     // Check body.
     const expected_body_ty: ?TypeId = if (fn_decl.is_gen)
         self.ty_void
+    else if (needs_inference)
+        null // no constraint — infer from body
     else if (sig.return_type != error_type)
         sig.return_type
     else
         null;
     const body_type = self.checkExprWithExpected(fn_decl.body, expected_body_ty);
-    // If there is no explicit `return`, the body's value is the implicit return.
-    // Void functions may have non-void body expressions (value is discarded).
-    if (!fn_decl.is_gen and !hasExplicitReturn(fn_decl.body) and sig.return_type != error_type and sig.return_type != self.ty_void and body_type != error_type) {
-        if (self.isImplicitNarrowing(sig.return_type, body_type)) {
-            self.emitError("E0201: implicit narrowing conversion", fn_decl.body.span);
-        } else if (!self.typesCompatible(sig.return_type, body_type) and self.arithmeticResultType(sig.return_type, body_type) == error_type) {
-            // Implicit default return: allow void body when return type has Default.
-            if (body_type != self.ty_void or !self.typeHasDefault(sig.return_type)) {
-                var buf: [256]u8 = undefined;
-                const expected = self.typeName(sig.return_type);
-                const actual = self.typeName(body_type);
-                const msg = std.fmt.bufPrint(&buf, "return type mismatch: expected '{s}', found '{s}'", .{ expected, actual }) catch "return type mismatch";
-                const alloc_msg = self.allocator.dupe(u8, msg) catch "return type mismatch";
-                self.emitError(alloc_msg, fn_decl.body.span);
+
+    // Return type inference: update sig and create synthetic TypeExpr for Codegen.
+    if (needs_inference) {
+        const real_ret = if (body_type != error_type and body_type != self.ty_void)
+            body_type
+        else
+            self.ty_void;
+        // Update the fn_sigs entry with the resolved return type.
+        if (self.fn_sigs.getPtr(fn_decl.name)) |sig_ptr| {
+            sig_ptr.return_type = real_ret;
+        }
+        // Create a synthetic TypeExpr so Codegen can resolve the return type.
+        if (real_ret != self.ty_void) {
+            if (self.typeIdToNameSymbol(real_ret)) |name_sym| {
+                const te = self.allocator.create(Ast.TypeExpr) catch unreachable;
+                te.* = .{ .kind = .{ .named = name_sym }, .span = fn_decl.body.span };
+                self.inferred_return_types.put(self.allocator, fn_decl.name, te) catch {};
+            }
+        }
+    } else {
+        // If there is no explicit `return`, the body's value is the implicit return.
+        // Void functions may have non-void body expressions (value is discarded).
+        if (!fn_decl.is_gen and !hasExplicitReturn(fn_decl.body) and sig.return_type != error_type and sig.return_type != self.ty_void and body_type != error_type) {
+            if (self.isImplicitNarrowing(sig.return_type, body_type)) {
+                self.emitError("E0201: implicit narrowing conversion", fn_decl.body.span);
+            } else if (!self.typesCompatible(sig.return_type, body_type) and self.arithmeticResultType(sig.return_type, body_type) == error_type) {
+                // Implicit default return: allow void body when return type has Default.
+                if (body_type != self.ty_void or !self.typeHasDefault(sig.return_type)) {
+                    var buf: [256]u8 = undefined;
+                    const expected = self.typeName(sig.return_type);
+                    const actual = self.typeName(body_type);
+                    const msg = std.fmt.bufPrint(&buf, "return type mismatch: expected '{s}', found '{s}'", .{ expected, actual }) catch "return type mismatch";
+                    const alloc_msg = self.allocator.dupe(u8, msg) catch "return type mismatch";
+                    self.emitError(alloc_msg, fn_decl.body.span);
+                }
             }
         }
     }
@@ -4243,6 +4279,8 @@ fn checkCall(self: *Sema, call_e: Ast.CallExpr, span: Span) TypeId {
                 self.emitError("spawn_os requires Send captures (no ephemeral references/tasks)", call_e.args[0].span);
             }
         }
+        // If the callee's return type hasn't been inferred yet, treat as error.
+        if (sig.return_type == inferred_type) return error_type;
         return sig.return_type;
     }
 
@@ -5294,5 +5332,31 @@ pub fn typeName(self: *const Sema, tid: TypeId) []const u8 {
         .ref_type => return "&T",
         .alias => return "<alias>",
         .generic_fn => return "<generic>",
+    }
+}
+
+/// Convert a TypeId to its interned name symbol (for creating synthetic TypeExprs).
+/// Returns null for void or unrepresentable types.
+fn typeIdToNameSymbol(self: *Sema, tid: TypeId) ?Symbol {
+    const resolved = self.resolveAlias(tid);
+    switch (self.getType(resolved)) {
+        .err => return null,
+        .int => |i| {
+            const name: []const u8 = switch (i.bits) {
+                8 => if (i.signed) "i8" else "u8",
+                16 => if (i.signed) "i16" else "u16",
+                32 => if (i.signed) "i32" else "u32",
+                64 => if (i.signed) "i64" else "u64",
+                else => return null,
+            };
+            return self.pool.intern(name) catch null;
+        },
+        .float => |f| return self.pool.intern(if (f.bits == 32) "f32" else "f64") catch null,
+        .bool_type => return self.pool.intern("bool") catch null,
+        .void_type => return null,
+        .str_type => return self.pool.intern("str") catch null,
+        .struct_type => |st| return st.name,
+        .enum_type => |et| return et.name,
+        else => return null,
     }
 }

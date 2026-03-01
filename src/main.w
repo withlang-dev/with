@@ -234,14 +234,12 @@ fn dump_tokens(source_file: str) -> i32:
     var lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
     // Print each token
-    var i = 0
-    while i < tokens.len():
+    for i in 0..tokens.len():
         let tk = tokens.get_tag(i)
         let start = tokens.get_start(i)
         let end = tokens.get_end(i)
         let text_slice = text.slice(start as i64, end as i64)
         print(int_to_string(tk) ++ " " ++ text_slice ++ "\n")
-        i = i + 1
     0
 
 fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool) -> i32:

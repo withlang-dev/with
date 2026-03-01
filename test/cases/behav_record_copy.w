@@ -105,22 +105,22 @@ fn test_struct_type_equality:
     let st2 = TypeTable.add_struct(types, 2, fn2, ft2, fd2)
     assert(st1 != st2)
     // types_equal returns false for different struct TypeIds
-    assert(TypeTable.types_equal(types, st1, st2) == false)
+    assert(not TypeTable.types_equal(types, st1, st2))
     // Same TypeId is always equal
-    assert(TypeTable.types_equal(types, st1, st1) == true)
+    assert(TypeTable.types_equal(types, st1, st1))
 
 fn test_copy_types_after_update:
     // Copy types (i32, bool, f64) remain valid after being "used"
     // This verifies the is_copy predicate covers all primitive types
     var types = TypeTable.new()
-    assert(TypeTable.is_copy(types, TYPE_I32()) == true)
-    assert(TypeTable.is_copy(types, TYPE_I64()) == true)
-    assert(TypeTable.is_copy(types, TYPE_F32()) == true)
-    assert(TypeTable.is_copy(types, TYPE_F64()) == true)
-    assert(TypeTable.is_copy(types, TYPE_BOOL()) == true)
-    assert(TypeTable.is_copy(types, TYPE_U8()) == true)
-    assert(TypeTable.is_copy(types, TYPE_UNIT()) == true)
-    assert(TypeTable.is_copy(types, TYPE_VOID()) == true)
+    assert(TypeTable.is_copy(types, TYPE_I32()))
+    assert(TypeTable.is_copy(types, TYPE_I64()))
+    assert(TypeTable.is_copy(types, TYPE_F32()))
+    assert(TypeTable.is_copy(types, TYPE_F64()))
+    assert(TypeTable.is_copy(types, TYPE_BOOL()))
+    assert(TypeTable.is_copy(types, TYPE_U8()))
+    assert(TypeTable.is_copy(types, TYPE_UNIT()))
+    assert(TypeTable.is_copy(types, TYPE_VOID()))
 
 fn main:
     test_struct_type_construction()

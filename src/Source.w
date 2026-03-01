@@ -30,11 +30,9 @@ type Location = {
 fn Source.compute_line_offsets(text: str) -> Vec[i32]:
     var offsets = Vec.new()
     offsets.push(0) // line 0 starts at byte 0
-    var i = 0
-    while i < text.len():
+    for i in 0..text.len():
         if text[i] == 10:
             offsets.push(i + 1)
-        i = i + 1
     offsets
 
 // Create a Source from a file path.

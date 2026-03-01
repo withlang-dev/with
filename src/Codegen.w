@@ -602,45 +602,36 @@ fn Codegen.verify(self: Codegen) -> i32:
 
 fn Codegen.is_method_symbol(self: Codegen, sym: i32) -> bool:
     let name = self.intern.resolve(sym)
-    var i = 0
-    while i < name.len() as i32:
+    for i in 0..name.len() as i32:
         if name.byte_at(i as i64) == 46:  // '.'
             return true
-        i = i + 1
     false
 
 // ── Helper: find struct/enum type symbol from LLVM type ───────────
 
 fn Codegen.find_type_symbol(self: Codegen, llvm_ty: i64) -> i32:
     // Search struct types
-    var i = 0
-    while i < self.struct_llvm_types.len() as i32:
+    for i in 0..self.struct_llvm_types.len() as i32:
         if self.struct_llvm_types.get(i as i64) == llvm_ty:
             // Find the symbol that maps to this index
             // We need to iterate the hashmap — just check all entries
-            var j = 0
-            while j < self.struct_field_counts.len() as i32:
+            for j in 0..self.struct_field_counts.len() as i32:
                 // struct_type_map maps sym → index, we want reverse
-                j = j + 1
+                0
             // Fallback: return 0
             return 0
-        i = i + 1
     0
 
 fn Codegen.find_struct_index_by_type(self: Codegen, llvm_ty: i64) -> i32:
-    var i = 0
-    while i < self.struct_llvm_types.len() as i32:
+    for i in 0..self.struct_llvm_types.len() as i32:
         if self.struct_llvm_types.get(i as i64) == llvm_ty:
             return i
-        i = i + 1
     0 - 1
 
 fn Codegen.vec_contains_i32(self: Codegen, values: Vec[i32], needle: i32) -> bool:
-    var i = 0
-    while i < values.len() as i32:
+    for i in 0..values.len() as i32:
         if values.get(i as i64) == needle:
             return true
-        i = i + 1
     false
 
 fn Codegen.struct_reaches_type(self: Codegen, start_idx: i32, target_ty: i64) -> bool:
@@ -656,8 +647,7 @@ fn Codegen.struct_reaches_type(self: Codegen, start_idx: i32, target_ty: i64) ->
 
         let f_start = self.struct_field_starts.get(cur as i64)
         let f_count = self.struct_field_counts.get(cur as i64)
-        var fi = 0
-        while fi < f_count:
+        for fi in 0..f_count:
             let f_ty = self.struct_field_types.get((f_start + fi) as i64)
             if f_ty == target_ty:
                 return true
@@ -665,7 +655,6 @@ fn Codegen.struct_reaches_type(self: Codegen, start_idx: i32, target_ty: i64) ->
             if next_idx >= 0 and not self.vec_contains_i32(visited, next_idx):
                 visited.push(next_idx)
                 queue.push(next_idx)
-            fi = fi + 1
     false
 
 // ── Helper: span to line number ───────────────────────────────────
@@ -675,12 +664,10 @@ fn Codegen.span_to_line(self: Codegen, node: i32) -> i32:
     if start <= 0: return 1
     let src = self.source_text
     var line = 1
-    var i = 0
-    while i < start:
+    for i in 0..start:
         if i < src.len() as i32:
             if src.byte_at(i as i64) == 10:
                 line = line + 1
-        i = i + 1
     line
 
 // ── Helper: coerce integer widths ─────────────────────────────────
@@ -797,11 +784,9 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         let extra_start = self.pool.get_data0(type_node)
         let elem_count = self.pool.get_data1(type_node)
         let elem_types: Vec[i64] = Vec.new()
-        var i = 0
-        while i < elem_count:
+        for i in 0..elem_count:
             let et_node = self.pool.get_extra(extra_start + i)
             elem_types.push(self.resolve_type(et_node))
-            i = i + 1
         return wl_struct_type(self.context, vec_data_i64(elem_types), elem_count, 0)
 
     if kind == NK_TYPE_GENERIC():
@@ -840,11 +825,9 @@ fn Codegen.resolve_named_type(self: Codegen, sym: i32) -> i64:
     if name == "void": return wl_void_type(self.context)
     if name == "Unit": return wl_i32_type(self.context)
     // Check active type bindings (monomorphization)
-    var i = 0
-    while i < self.type_bindings_len:
+    for i in 0..self.type_bindings_len:
         if self.type_binding_syms.get(i as i64) == sym:
             return self.type_binding_types.get(i as i64)
-        i = i + 1
     // User-defined struct types
     let st_opt = self.struct_type_map.get(sym)
     if st_opt.is_some():
@@ -972,8 +955,7 @@ fn Codegen.declare_struct_type(self: Codegen, name_sym: i32, type_node: i32):
     // Parse fields: [field_name, field_type, field_default]*
     let ft_vec: Vec[i64] = Vec.new()
     var invalid_layout = 0
-    var fi = 0
-    while fi < field_count:
+    for fi in 0..field_count:
         let offset = extra_start + 1 + fi * 3
         let f_name = self.pool.get_extra(offset)
         let f_type_node = self.pool.get_extra(offset + 1)
@@ -998,7 +980,6 @@ fn Codegen.declare_struct_type(self: Codegen, name_sym: i32, type_node: i32):
         self.struct_field_types.push(f_ty)
         self.struct_field_defaults.push(f_default)
         ft_vec.push(f_ty)
-        fi = fi + 1
 
     if invalid_layout != 0:
         return
@@ -1019,8 +1000,7 @@ fn Codegen.declare_enum_type(self: Codegen, name_sym: i32, type_node: i32):
 
     let v_starts = self.enum_variant_names.len() as i32
     var offset = extra_start + 1
-    var vi = 0
-    while vi < variant_count:
+    for vi in 0..variant_count:
         let v_name = self.pool.get_extra(offset)
         let v_payload_count = self.pool.get_extra(offset + 1)
         offset = offset + 2
@@ -1034,7 +1014,6 @@ fn Codegen.declare_enum_type(self: Codegen, name_sym: i32, type_node: i32):
             offset = offset + v_payload_count
         self.enum_variant_names.push(v_name)
         self.enum_variant_payloads.push(payload_ty)
-        vi = vi + 1
 
     // Build enum struct: { i32, [N x i8] }
     if not self.enum_type_map.get(name_sym).is_some():
@@ -1079,12 +1058,10 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
 
     // Check if method (has dot in name)
     var method_owner_sym = 0
-    var di = 0
-    while di < name_str.len() as i32:
+    for di in 0..name_str.len() as i32:
         if name_str.byte_at(di as i64) == 46:
             method_owner_sym = self.intern.intern(name_str.slice(0, di as i64))
             break
-        di = di + 1
 
     var has_ref_param = false
     var pi = 0
@@ -1161,10 +1138,8 @@ fn Codegen.record_ref_param(self: Codegen, fn_sym: i32, idx: i32, count: i32):
     if not self.fn_ref_param_starts.get(fn_sym).is_some():
         let start = self.fn_ref_param_data.len() as i32
         self.fn_ref_param_starts.insert(fn_sym, start)
-        var j = 0
-        while j < count:
+        for j in 0..count:
             self.fn_ref_param_data.push(0)
-            j = j + 1
     let base = self.fn_ref_param_starts.get(fn_sym).unwrap()
     self.fn_ref_param_data.set_i32((base + idx) as i64, 1)
 
@@ -1172,10 +1147,8 @@ fn Codegen.record_dyn_param(self: Codegen, fn_sym: i32, idx: i32, count: i32, tr
     if not self.fn_dyn_param_starts.get(fn_sym).is_some():
         let start = self.fn_dyn_param_data.len() as i32
         self.fn_dyn_param_starts.insert(fn_sym, start)
-        var j = 0
-        while j < count:
+        for j in 0..count:
             self.fn_dyn_param_data.push(0)
-            j = j + 1
     let base = self.fn_dyn_param_starts.get(fn_sym).unwrap()
     self.fn_dyn_param_data.set_i32((base + idx) as i64, trait_sym)
 
@@ -1199,11 +1172,9 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
     let ret_ty = self.resolve_type(ret_type_node)
 
     let param_types: Vec[i64] = Vec.new()
-    var pi = 0
-    while pi < param_count:
+    for pi in 0..param_count:
         let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
         param_types.push(self.resolve_type(p_type_node))
-        pi = pi + 1
 
     let fn_type = wl_function_type(ret_ty, vec_data_i64(param_types), param_count, is_variadic)
 
@@ -1230,11 +1201,9 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
 fn Codegen.canonical_extern_name(self: Codegen, name: str) -> str:
     // c_import may suffix C symbols as "name.<n>" — strip the suffix for linking.
     var dot_pos = 0 - 1
-    var i = 0
-    while i < name.len() as i32:
+    for i in 0..name.len() as i32:
         if name.byte_at(i as i64) == 46:
             dot_pos = i
-        i = i + 1
     if dot_pos > 0 and dot_pos + 1 < name.len() as i32:
         var all_digits = true
         var j = dot_pos + 1
@@ -1252,8 +1221,7 @@ fn Codegen.canonical_extern_name(self: Codegen, name: str) -> str:
 
 fn Codegen.detect_drop_functions(self: Codegen):
     // Scan declared functions for "Type.drop" patterns
-    var i = 0
-    while i < self.pool.decl_count():
+    for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
         if kind == NK_FN_DECL():
@@ -1271,7 +1239,6 @@ fn Codegen.detect_drop_functions(self: Codegen):
                             if fv.is_some() and ft.is_some():
                                 self.drop_fn_values.insert(type_sym, fv.unwrap() as i64)
                                 self.drop_fn_types.insert(type_sym, ft.unwrap() as i64)
-        i = i + 1
 
 // ── Result return type helpers ────────────────────────────────────
 
@@ -1517,11 +1484,9 @@ fn Codegen.build_fn_type_from_ast(self: Codegen, fn_type_node: i32) -> i64:
     let ptr_ty = wl_ptr_type(self.context)
     let param_types: Vec[i64] = Vec.new()
     param_types.push(ptr_ty)  // context pointer (closure convention)
-    var i = 0
-    while i < param_count:
+    for i in 0..param_count:
         let p_node = self.pool.get_extra(extra_start + i)
         param_types.push(self.resolve_type(p_node))
-        i = i + 1
     let ret_ty = self.resolve_type(ret_node)
     wl_function_type(ret_ty, vec_data_i64(param_types), param_count + 1, 0)
 
@@ -1535,8 +1500,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
     self.declare_builtin_str_type()
 
     // Pass 0a: predeclare all struct/enum names so forward references resolve.
-    var i = 0
-    while i < self.pool.decl_count():
+    for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
         if kind == NK_TYPE_DECL():
@@ -1546,11 +1510,9 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
                 self.predeclare_struct_type(name_sym)
             else if sub_kind == TDK_ENUM():
                 self.predeclare_enum_type(name_sym)
-        i = i + 1
 
     // Pass 0b: define struct/enum bodies and type aliases.
-    i = 0
-    while i < self.pool.decl_count():
+    for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
         if kind == NK_TYPE_DECL():
@@ -1565,30 +1527,24 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
                 let aliased_node = self.pool.get_extra(extra_start)
                 let resolved = self.resolve_type(aliased_node)
                 self.type_aliases.insert(name_sym, resolved)
-        i = i + 1
 
     if self.had_error != 0:
         return 1
 
     // Pass 0.5: collect trait declarations
-    i = 0
-    while i < self.pool.decl_count():
+    for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         if self.pool.kind(decl) == NK_TRAIT_DECL():
             self.collect_trait_info(decl)
-        i = i + 1
 
     // Pass 0.6: process top-level let declarations as module constants
-    i = 0
-    while i < self.pool.decl_count():
+    for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         if self.pool.kind(decl) == NK_LET_DECL():
             self.gen_module_constant(decl)
-        i = i + 1
 
     // Pass 1: declare all functions and externs (forward declarations)
-    i = 0
-    while i < self.pool.decl_count():
+    for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
         if kind == NK_FN_DECL():
@@ -1606,14 +1562,12 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
                     self.declare_function(decl)
         else if kind == NK_EXTERN_FN():
             self.declare_extern_fn(decl)
-        i = i + 1
 
     // Pass 1.5: detect drop functions
     self.detect_drop_functions()
 
     // Pass 2: generate function bodies
-    i = 0
-    while i < self.pool.decl_count():
+    for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
         if kind == NK_FN_DECL():
@@ -1623,7 +1577,6 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
                 let tp_count = self.pool.fn_meta_tp_count(meta)
                 if tp_count == 0 and (flags / FN_FLAG_ASYNC()) % 2 == 0:
                     self.gen_function(decl)
-        i = i + 1
 
     // Wrap main for exit
     self.wrap_main_for_exit()
@@ -1742,16 +1695,13 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
     // Detect method owner
     let name_str = self.intern.resolve(name_sym)
     var method_owner_sym = 0
-    var di = 0
-    while di < name_str.len() as i32:
+    for di in 0..name_str.len() as i32:
         if name_str.byte_at(di as i64) == 46:
             method_owner_sym = self.intern.intern(name_str.slice(0, di as i64))
             break
-        di = di + 1
     self.current_method_owner_sym = method_owner_sym
 
-    var pi = 0
-    while pi < param_count:
+    for pi in 0..param_count:
         let p_name = self.pool.get_extra(param_start + pi * 2)
         let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
         let param_val = wl_get_param(function, pi)
@@ -1790,7 +1740,6 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
             if pk == NK_TYPE_TRAIT_OBJ():
                 let trait_sym = self.pool.get_data0(p_type_node)
                 self.trait_locals.insert(p_name, trait_sym)
-        pi = pi + 1
 
     // @[tailrec]: create body BB
     if (flags / FN_FLAG_TAILREC()) % 2 == 1 and param_count > 0:
@@ -1801,15 +1750,13 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
         self.tailrec_fn_sym = name_sym
         // Collect param allocas
         self.tailrec_param_allocas = Vec.new()
-        var ti = 0
-        while ti < param_count:
+        for ti in 0..param_count:
             let tp_name = self.pool.get_extra(param_start + ti * 2)
             let ta = self.local_allocas.get(tp_name)
             if ta.is_some():
                 self.tailrec_param_allocas.push(ta.unwrap() as i64)
             else:
                 self.tailrec_param_allocas.push(0)
-            ti = ti + 1
 
     // Generate body
     let body_val = self.gen_expr(body_node)
@@ -2004,12 +1951,10 @@ fn Codegen.gen_ident(self: Codegen, sym: i32) -> i64:
     // Check enum variants (unit variants are constant ints)
     let name = self.intern.resolve(sym)
     // Look through all enum types for a matching variant name
-    var ei = 0
-    while ei < self.enum_llvm_types.len() as i32:
+    for ei in 0..self.enum_llvm_types.len() as i32:
         let v_start = self.enum_variant_starts.get(ei as i64)
         let v_count = self.enum_variant_counts.get(ei as i64)
-        var vi = 0
-        while vi < v_count:
+        for vi in 0..v_count:
             let v_name = self.enum_variant_names.get((v_start + vi) as i64)
             if v_name == sym:
                 let payload = self.enum_variant_payloads.get((v_start + vi) as i64)
@@ -2020,8 +1965,6 @@ fn Codegen.gen_ident(self: Codegen, sym: i32) -> i64:
                     let tag_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 0)
                     wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), vi as i64, 0), tag_ptr)
                     return wl_build_load(self.builder, enum_ty, alloca)
-            vi = vi + 1
-        ei = ei + 1
 
     // Not found
     wl_get_undef(wl_i32_type(self.context))
@@ -2281,8 +2224,7 @@ fn Codegen.gen_block(self: Codegen, node: i32) -> i64:
     let tail_node = self.pool.get_data2(node)
     let saved_scope = self.scope_local_count
     var result: i64 = wl_get_undef(wl_void_type(self.context))
-    var si = 0
-    while si < stmt_count:
+    for si in 0..stmt_count:
         let stmt = self.pool.get_extra(extra_start + si)
         self.gen_expr(stmt)
         // Check if current block is terminated
@@ -2290,7 +2232,6 @@ fn Codegen.gen_block(self: Codegen, node: i32) -> i64:
         if wl_get_bb_terminator(bb) != 0:
             self.scope_local_count = saved_scope
             return wl_get_undef(wl_void_type(self.context))
-        si = si + 1
     if tail_node != 0:
         result = self.gen_expr(tail_node)
     self.emit_drops(saved_scope)
@@ -2591,28 +2532,24 @@ fn Codegen.gen_field_access_ptr(self: Codegen, obj_node: i32, field_sym: i32) ->
     0
 
 fn Codegen.find_struct_type_by_llvm(self: Codegen, llvm_ty: i64) -> i32:
-    var i = 0
-    while i < self.struct_llvm_types.len() as i32:
+    for i in 0..self.struct_llvm_types.len() as i32:
         if self.struct_llvm_types.get(i as i64) == llvm_ty:
             // Walk struct_type_map to find the sym
             // Since we can't iterate HashMap[i32,i32], use a reverse lookup approach
             // For now, scan decls
             return self.reverse_struct_lookup(i)
-        i = i + 1
     0
 
 fn Codegen.reverse_struct_lookup(self: Codegen, idx: i32) -> i32:
     // Slow reverse lookup: scan all known type syms
     // This is O(n) but only called for field access
-    var i = 0
-    while i < self.pool.decl_count():
+    for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         if self.pool.kind(decl) == NK_TYPE_DECL():
             let sym = self.pool.get_data0(decl)
             let st = self.struct_type_map.get(sym)
             if st.is_some() and st.unwrap() == idx:
                 return sym
-        i = i + 1
     // Check built-in str
     let str_sym = self.intern.intern("str")
     let st = self.struct_type_map.get(str_sym)
@@ -2625,11 +2562,9 @@ fn Codegen.find_field_index(self: Codegen, type_sym: i32, field_sym: i32) -> i32
     let idx = st_opt.unwrap()
     let start = self.struct_field_starts.get(idx as i64)
     let count = self.struct_field_counts.get(idx as i64)
-    var i = 0
-    while i < count:
+    for i in 0..count:
         if self.struct_field_names.get((start + i) as i64) == field_sym:
             return i
-        i = i + 1
     0 - 1
 
 // ── Index expression ──────────────────────────────────────────────
@@ -2734,12 +2669,10 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
         let ft = self.fn_fn_types.get(fn_sym)
         if fv.is_some() and ft.is_some():
             let args: Vec[i64] = Vec.new()
-            var ai = 0
-            while ai < arg_count:
+            for ai in 0..arg_count:
                 let arg_node = self.pool.get_extra(args_start + ai)
                 let arg = self.gen_expr(arg_node)
                 args.push(arg)
-                ai = ai + 1
             return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(args), arg_count)
 
         // Check if it's a function pointer local
@@ -2755,21 +2688,17 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
                     let ctx_ptr = wl_build_extract_value(self.builder, fat_ptr, 1)
                     let args: Vec[i64] = Vec.new()
                     args.push(ctx_ptr)
-                    var ai = 0
-                    while ai < arg_count:
+                    for ai in 0..arg_count:
                         let arg_node = self.pool.get_extra(args_start + ai)
                         args.push(self.gen_expr(arg_node))
-                        ai = ai + 1
                     return wl_build_call(self.builder, fs.unwrap() as i64, fn_ptr, vec_data_i64(args), arg_count + 1)
 
     // Indirect call (expression as callee)
     let callee = self.gen_expr(callee_node)
     let args: Vec[i64] = Vec.new()
-    var ai = 0
-    while ai < arg_count:
+    for ai in 0..arg_count:
         let arg_node = self.pool.get_extra(args_start + ai)
         args.push(self.gen_expr(arg_node))
-        ai = ai + 1
     // Try to determine function type
     let callee_ty = wl_type_of(callee)
     if wl_get_type_kind(callee_ty) == wl_pointer_type_kind():
@@ -2846,11 +2775,9 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
                 args.push(self.get_mutable_receiver_ptr(obj_node, obj, obj_ty))
             else:
                 args.push(obj)
-            var ai = 0
-            while ai < arg_count:
+            for ai in 0..arg_count:
                 let arg_node = self.pool.get_extra(args_start + ai)
                 args.push(self.gen_expr(arg_node))
-                ai = ai + 1
             return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(args), arg_count + 1)
 
     // Check pointer-to-struct methods
@@ -2867,11 +2794,9 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
                 if fv.is_some() and ft.is_some():
                     let args: Vec[i64] = Vec.new()
                     args.push(obj)  // already a pointer
-                    var ai = 0
-                    while ai < arg_count:
+                    for ai in 0..arg_count:
                         let arg_node = self.pool.get_extra(args_start + ai)
                         args.push(self.gen_expr(arg_node))
-                        ai = ai + 1
                     return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(args), arg_count + 1)
 
     wl_get_undef(wl_i32_type(self.context))
@@ -3235,11 +3160,9 @@ fn Codegen.find_variant_index(self: Codegen, enum_ty: i64, variant_sym: i32) -> 
     let idx = et.unwrap()
     let v_start = self.enum_variant_starts.get(idx as i64)
     let v_count = self.enum_variant_counts.get(idx as i64)
-    var i = 0
-    while i < v_count:
+    for i in 0..v_count:
         if self.enum_variant_names.get((v_start + i) as i64) == variant_sym:
             return i
-        i = i + 1
     0 - 1
 
 // ── Struct literal ────────────────────────────────────────────────
@@ -3257,16 +3180,13 @@ fn Codegen.gen_struct_lit(self: Codegen, node: i32) -> i64:
     let alloca = wl_build_alloca(self.builder, st_ty)
     let saved_expected = self.expected_type
     // Initialize all fields to zero
-    var i = 0
-    while i < st_field_count:
+    for i in 0..st_field_count:
         let fty = self.struct_field_types.get((st_field_start + i) as i64)
         let gep = wl_build_struct_gep(self.builder, st_ty, alloca, i)
         wl_build_store(self.builder, self.build_default_value(fty), gep)
-        i = i + 1
     // Set provided fields
     // Struct lit extra: [field_name, field_value]* pairs
-    i = 0
-    while i < field_count:
+    for i in 0..field_count:
         let f_name = self.pool.get_extra(fields_start + i * 2)
         let f_val_node = self.pool.get_extra(fields_start + i * 2 + 1)
         let fi = self.find_field_index(type_sym, f_name)
@@ -3276,7 +3196,6 @@ fn Codegen.gen_struct_lit(self: Codegen, node: i32) -> i64:
             let val = self.gen_expr(f_val_node)
             let gep = wl_build_struct_gep(self.builder, st_ty, alloca, fi)
             wl_build_store(self.builder, self.coerce_int(val, fty), gep)
-        i = i + 1
     self.expected_type = saved_expected
     wl_build_load(self.builder, st_ty, alloca)
 
@@ -3297,12 +3216,10 @@ fn Codegen.gen_enum_variant(self: Codegen, node: i32) -> i64:
 
     // Find variant index
     var v_idx = 0
-    var vi = 0
-    while vi < v_count:
+    for vi in 0..v_count:
         if self.enum_variant_names.get((v_start + vi) as i64) == variant_sym:
             v_idx = vi
             break
-        vi = vi + 1
 
     let alloca = wl_build_alloca(self.builder, enum_ty)
     let tag_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 0)
@@ -3329,12 +3246,10 @@ fn Codegen.gen_variant_shorthand(self: Codegen, node: i32) -> i64:
         return self.gen_ident(name_sym)
     // .Variant(args) — try to find the variant and construct it
     // Search through enum types for matching variant
-    var ei = 0
-    while ei < self.enum_llvm_types.len() as i32:
+    for ei in 0..self.enum_llvm_types.len() as i32:
         let v_start = self.enum_variant_starts.get(ei as i64)
         let v_count = self.enum_variant_counts.get(ei as i64)
-        var vi = 0
-        while vi < v_count:
+        for vi in 0..v_count:
             if self.enum_variant_names.get((v_start + vi) as i64) == name_sym:
                 let enum_ty = self.enum_llvm_types.get(ei as i64)
                 let alloca = wl_build_alloca(self.builder, enum_ty)
@@ -3349,8 +3264,6 @@ fn Codegen.gen_variant_shorthand(self: Codegen, node: i32) -> i64:
                         let cast_ptr = wl_build_bitcast(self.builder, payload_ptr, wl_ptr_type(self.context))
                         wl_build_store(self.builder, payload, cast_ptr)
                 return wl_build_load(self.builder, enum_ty, alloca)
-            vi = vi + 1
-        ei = ei + 1
     wl_get_undef(wl_i32_type(self.context))
 
 // ── Array literal ─────────────────────────────────────────────────
@@ -3394,19 +3307,15 @@ fn Codegen.gen_tuple(self: Codegen, node: i32) -> i64:
     let elem_count = self.pool.get_data1(node)
     let elem_types: Vec[i64] = Vec.new()
     let elem_vals: Vec[i64] = Vec.new()
-    var i = 0
-    while i < elem_count:
+    for i in 0..elem_count:
         let e_node = self.pool.get_extra(extra_start + i)
         let val = self.gen_expr(e_node)
         elem_types.push(wl_type_of(val))
         elem_vals.push(val)
-        i = i + 1
     let tup_ty = wl_struct_type(self.context, vec_data_i64(elem_types), elem_count, 0)
     var result = wl_get_undef(tup_ty)
-    i = 0
-    while i < elem_count:
+    for i in 0..elem_count:
         result = wl_build_insert_value(self.builder, result, elem_vals.get(i as i64), i)
-        i = i + 1
     result
 
 // ── Cast ──────────────────────────────────────────────────────────
@@ -3500,15 +3409,13 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     let param_count = self.pool.get_data2(node)
     // Build parameter types
     let param_types: Vec[i64] = Vec.new()
-    var i = 0
-    while i < param_count:
+    for i in 0..param_count:
         let p_name = self.pool.get_extra(extra_start + i * 2)
         let p_type = self.pool.get_extra(extra_start + i * 2 + 1)
         if p_type != 0:
             param_types.push(self.resolve_type(p_type))
         else:
             param_types.push(wl_i32_type(self.context))
-        i = i + 1
     // Determine return type (infer from context or use i32)
     let ret_ty = wl_i32_type(self.context)
     let fn_ty = wl_function_type(ret_ty, vec_data_i64(param_types), param_count, 0)
@@ -3525,8 +3432,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     let entry = wl_append_bb(self.context, closure_fn, "entry")
     wl_position_at_end(self.builder, entry)
     // Add params as locals
-    i = 0
-    while i < param_count:
+    for i in 0..param_count:
         let p_name = self.pool.get_extra(extra_start + i * 2)
         let param_val = wl_get_param(closure_fn, i)
         let param_ty = wl_type_of(param_val)
@@ -3534,7 +3440,6 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         wl_build_store(self.builder, param_val, alloca)
         self.local_allocas.insert(p_name, alloca)
         self.local_types.insert(p_name, param_ty)
-        i = i + 1
     let body_val = self.gen_expr(body_node)
     if body_val != 0:
         let body_ty = wl_type_of(body_val)
@@ -3602,8 +3507,7 @@ fn Codegen.gen_record_update(self: Codegen, node: i32) -> i64:
     let alloca = self.create_entry_alloca(source_ty)
     wl_build_store(self.builder, source, alloca)
     // Override each field
-    var i = 0
-    while i < field_count:
+    for i in 0..field_count:
         let field_sym = self.pool.get_extra(extra_start + i * 2)
         let val_node = self.pool.get_extra(extra_start + i * 2 + 1)
         let val = self.gen_expr(val_node)
@@ -3613,7 +3517,6 @@ fn Codegen.gen_record_update(self: Codegen, node: i32) -> i64:
         if field_idx >= 0:
             let gep = wl_build_struct_gep(self.builder, source_ty, alloca, field_idx)
             wl_build_store(self.builder, val, gep)
-        i = i + 1
     wl_build_load(self.builder, source_ty, alloca)
 
 // ── Range ─────────────────────────────────────────────────────────
@@ -3694,8 +3597,7 @@ fn Codegen.gen_tuple_destructure(self: Codegen, node: i32) -> i64:
     let tuple_val = self.gen_expr(value_node)
     let tuple_ty = wl_type_of(tuple_val)
     // Extract each element and bind to name
-    var i = 0
-    while i < binding_count:
+    for i in 0..binding_count:
         let name_sym = self.pool.get_extra(extra_start + i)
         let elem_val = wl_build_extract_value(self.builder, tuple_val, i)
         let elem_ty = wl_type_of(elem_val)
@@ -3703,7 +3605,6 @@ fn Codegen.gen_tuple_destructure(self: Codegen, node: i32) -> i64:
         wl_build_store(self.builder, elem_val, alloca)
         self.local_allocas.insert(name_sym, alloca)
         self.local_types.insert(name_sym, elem_ty)
-        i = i + 1
     wl_get_undef(wl_void_type(self.context))
 
 // ── Array Comprehension ───────────────────────────────────────────
@@ -3866,8 +3767,7 @@ fn Codegen.gen_print_value(self: Codegen, val: i64, printf_fn: i64, printf_ty: i
         let open_args: Vec[i64] = Vec.new()
         open_args.push(open_fmt)
         wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(open_args), 1)
-        var fi = 0
-        while fi < field_count:
+        for fi in 0..field_count:
             if fi > 0:
                 let comma_fmt = wl_build_global_string_ptr(self.builder, ", ")
                 let comma_args: Vec[i64] = Vec.new()
@@ -3875,7 +3775,6 @@ fn Codegen.gen_print_value(self: Codegen, val: i64, printf_fn: i64, printf_ty: i
                 wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(comma_args), 1)
             let fv = wl_build_extract_value(self.builder, val, fi)
             self.gen_print_value(fv, printf_fn, printf_ty)
-            fi = fi + 1
         let close_fmt = wl_build_global_string_ptr(self.builder, "}")
         let close_args: Vec[i64] = Vec.new()
         close_args.push(close_fmt)
@@ -3910,12 +3809,10 @@ fn Codegen.gen_print_or_println(self: Codegen, args_start: i32, arg_count: i32, 
             wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(nl_args), 1)
         return wl_const_int(wl_i32_type(self.context), 0, 0)
     // Print each arg
-    var i = 0
-    while i < arg_count:
+    for i in 0..arg_count:
         let arg_node = self.pool.get_extra(args_start + i)
         let val = self.gen_expr(arg_node)
         self.gen_print_value(val, printf_fn, printf_ty)
-        i = i + 1
     if add_newline:
         let nl = wl_build_global_string_ptr(self.builder, "\n")
         let nl_args: Vec[i64] = Vec.new()
@@ -4020,10 +3917,8 @@ fn Codegen.get_runtime_fn_type(self: Codegen, ret_ty: i64, param_count: i32) -> 
     let st_opt = self.struct_type_map.get(str_sym)
     let str_type = if st_opt.is_some(): self.struct_llvm_types.get(st_opt.unwrap() as i64) else wl_i64_type(self.context)
     let params: Vec[i64] = Vec.new()
-    var i = 0
-    while i < param_count:
+    for i in 0..param_count:
         params.push(str_type)
-        i = i + 1
     wl_function_type(ret_ty, vec_data_i64(params), param_count, 0)
 
 // ── Vec method dispatch ───────────────────────────────────────────

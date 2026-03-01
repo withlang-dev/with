@@ -379,11 +379,9 @@ fn Lexer.lex_number(self: Lexer) -> i32:
 fn try_suffix(src: str, pos: i32, remain: i32, suffix: str, suf_len: i32) -> bool:
     if remain < suf_len:
         return false
-    var i = 0
-    while i < suf_len:
+    for i in 0..suf_len:
         if src[pos + i] != suffix[i]:
             return false
-        i = i + 1
     // Make sure it's not followed by more ident chars
     if pos + suf_len < src.len() as i32 and is_ident_continue(src[pos + suf_len]):
         return false

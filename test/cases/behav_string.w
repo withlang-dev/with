@@ -50,7 +50,7 @@ fn test_sema_string_type:
 
 fn test_type_str_is_not_copy:
     var types = TypeTable.new()
-    assert(TypeTable.is_copy(types, TYPE_STR()) == false)
+    assert(not TypeTable.is_copy(types, TYPE_STR()))
 
 fn test_empty_string:
     let src = "\"\""

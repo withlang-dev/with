@@ -37,9 +37,9 @@ fn test_impl_satisfies_bound:
     impl_methods.push(1)  // "display"
     TraitSolver.add_impl(solver, TYPE_I32(), 200, impl_methods)
     // Resolve: does i32 implement Display?
-    assert(TraitSolver.implements(solver, 200, TYPE_I32()) == true)
+    assert(TraitSolver.implements(solver, 200, TYPE_I32()))
     // f64 does NOT implement Display
-    assert(TraitSolver.implements(solver, 200, TYPE_F64()) == false)
+    assert(not TraitSolver.implements(solver, 200, TYPE_F64()))
 
 fn test_generic_bound_obligation:
     // Simulate: fn print_it[T: Display](x: T)
@@ -176,7 +176,7 @@ fn test_coherence_no_overlap:
     var im2 = Vec.new()
     im2.push(1)
     TraitSolver.add_impl(solver, TYPE_F64(), 800, im2)
-    assert(TraitSolver.check_coherence(solver) == true)
+    assert(TraitSolver.check_coherence(solver))
 
 fn test_coherence_overlap_detected:
     var solver = TraitSolver.new()
@@ -194,7 +194,7 @@ fn test_coherence_overlap_detected:
     var im2 = Vec.new()
     im2.push(1)
     TraitSolver.add_impl(solver, TYPE_I32(), 900, im2)
-    assert(TraitSolver.check_coherence(solver) == false)
+    assert(not TraitSolver.check_coherence(solver))
 
 fn main:
     test_trait_with_method()
