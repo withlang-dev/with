@@ -192,15 +192,31 @@ pub fn next(self: *Lexer) Token {
         'a'...'z', 'A'...'Z', '_' => return self.lexIdentifierOrKeyword(start),
 
         '\'' => {
-            // Label: 'name
             self.pos += 1;
+            // Try char literal first: 'x' or '\x'
+            if (self.pos < self.source.len) {
+                if (self.source[self.pos] == '\\') {
+                    // Escape sequence: '\n', '\\', '\'' etc.
+                    if (self.pos + 2 < self.source.len and self.source[self.pos + 2] == '\'') {
+                        self.pos += 3; // skip \X'
+                        return self.makeToken(.char_literal, start, self.pos);
+                    }
+                } else if (self.source[self.pos] != '\'') {
+                    // Single char: 'a' — check for closing quote
+                    if (self.pos + 1 < self.source.len and self.source[self.pos + 1] == '\'') {
+                        self.pos += 2; // skip X'
+                        return self.makeToken(.char_literal, start, self.pos);
+                    }
+                }
+            }
+            // Label: 'name
             if (self.pos < self.source.len and (std.ascii.isAlphabetic(self.source[self.pos]) or self.source[self.pos] == '_')) {
                 while (self.pos < self.source.len and isIdentContinue(self.source[self.pos])) {
                     self.pos += 1;
                 }
                 return self.makeToken(.label, start, self.pos);
             }
-            // Not followed by identifier — char literal or error.
+            // Not a char literal or label — error.
             self.diagnostics.emit(Diagnostic.err("unexpected character", self.spanFrom(start, self.pos)));
             return self.makeToken(.invalid, start, self.pos);
         },
@@ -277,11 +293,42 @@ fn lexString(self: *Lexer, start: u32) Token {
         return self.makeToken(.string_literal, start, self.pos);
     }
 
+    // Track brace depth so that `"` inside interpolation holes `{...}` is not
+    // treated as the end of the string. E.g. "hello {name.join(", ")}" works.
+    var brace_depth: u32 = 0;
     while (self.pos < self.source.len) {
         const ch = self.source[self.pos];
-        if (ch == '"') {
+        if (ch == '{' and brace_depth == 0) {
+            // Don't count escaped braces
+            if (self.pos > 0 and self.source[self.pos - 1] != '\\') {
+                brace_depth += 1;
+                self.pos += 1;
+                continue;
+            }
+        }
+        if (ch == '{' and brace_depth > 0) {
+            brace_depth += 1;
+            self.pos += 1;
+            continue;
+        }
+        if (ch == '}' and brace_depth > 0) {
+            brace_depth -= 1;
+            self.pos += 1;
+            continue;
+        }
+        if (ch == '"' and brace_depth == 0) {
             self.pos += 1;
             return self.makeToken(.string_literal, start, self.pos);
+        }
+        if (ch == '"' and brace_depth > 0) {
+            // Inside an interpolation hole: skip nested string literal
+            self.pos += 1;
+            while (self.pos < self.source.len and self.source[self.pos] != '"') {
+                if (self.source[self.pos] == '\\') self.pos += 1;
+                self.pos += 1;
+            }
+            if (self.pos < self.source.len) self.pos += 1; // skip closing "
+            continue;
         }
         if (ch == '\\') {
             self.pos += 1; // skip escape char

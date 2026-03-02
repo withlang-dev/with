@@ -2017,6 +2017,7 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
             return self.ty_void;
         },
         .field_access => |fa| self.checkFieldAccess(fa, expr.span),
+        .computed_field_access => error_type, // comptime: not yet implemented
         .optional_chain => |oc| self.checkOptionalChain(oc, expr.span),
         .index => |idx| self.checkIndex(idx, expr.span),
         .slice => |sl| self.checkSlice(sl),
