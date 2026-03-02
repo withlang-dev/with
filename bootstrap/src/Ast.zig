@@ -124,6 +124,7 @@ pub const ExternFnDecl = struct {
     params: []const Param,
     return_type: ?*const TypeExpr,
     is_variadic: bool,
+    abi: ?[]const u8 = null, // e.g. "C" from `extern "C" fn`
 };
 
 pub const Param = struct {
@@ -207,6 +208,8 @@ pub const ExprKind = union(enum) {
     call: CallExpr,
     /// Field access: `obj.field`
     field_access: FieldAccessExpr,
+    /// Computed field access: `obj.{expr}` (comptime)
+    computed_field_access: ComputedFieldAccessExpr,
     /// Optional chaining: `opt?.field` or `opt?.method(args)`
     optional_chain: OptionalChainExpr,
     /// Index: `arr[i]`
@@ -341,6 +344,11 @@ pub const CallExpr = struct {
 pub const FieldAccessExpr = struct {
     expr: *const Expr,
     field: Symbol,
+};
+
+pub const ComputedFieldAccessExpr = struct {
+    expr: *const Expr,
+    field_expr: *const Expr,
 };
 
 pub const OptionalChainExpr = struct {
@@ -603,6 +611,7 @@ pub const SelectAwaitArm = struct {
 
 pub const SelectAwaitExpr = struct {
     arms: []const SelectAwaitArm,
+    biased: bool = false,
 };
 
 pub const AsyncScopeExpr = struct {

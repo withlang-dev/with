@@ -159,11 +159,15 @@ fn parseDecl(self: *Parser) !Ast.Decl {
         .kw_fn => self.parseFnDecl(is_pub, start_span, false, false, false),
         .kw_comptime => blk: {
             self.advance(); // consume 'comptime'
-            if (self.peek() != .kw_fn) {
-                self.emitError("expected 'fn' after 'comptime'");
-                return error.ParseError;
+            if (self.peek() == .kw_fn) {
+                break :blk self.parseFnDecl(is_pub, start_span, false, false, true);
             }
-            break :blk self.parseFnDecl(is_pub, start_span, false, false, true);
+            if (self.peek() == .kw_let or self.peek() == .kw_var) {
+                // `comptime let _ = expr` — parse as a top-level let with comptime flag
+                break :blk self.parseTopLevelLet(is_pub, start_span);
+            }
+            self.emitError("expected 'fn' or 'let' after 'comptime'");
+            return error.ParseError;
         },
         .kw_async => blk: {
             self.advance();
@@ -184,26 +188,51 @@ fn parseDecl(self: *Parser) !Ast.Decl {
             const err_name = try self.expectIdentifier();
             if (self.isIdentifierNamed("from")) {
                 // `error AppError from IoError, ParseError` — desugar to wrapper enum.
+                // Also handles qualified paths: `error AppError from nebula.db.DbError`
                 self.advance(); // consume 'from'
 
                 var variants: std.ArrayList(Ast.VariantDef) = .empty;
                 while (true) {
                     const src_start = self.currentSpan();
-                    const src_sym = try self.expectIdentifier();
-                    const src_span = self.prevSpan();
+                    // Parse a possibly-qualified type name: `IoError` or `nebula.db.DbError`
+                    // Note: `.DbError` (dot + uppercase) is lexed as a single dot_identifier token.
+                    var last_seg_sym = try self.expectIdentifier();
+                    var src_span = self.prevSpan();
+                    while (true) {
+                        if (self.peek() == .dot and
+                            self.pos + 1 < self.tokens.tags.items.len and
+                            self.tokens.tags.items[self.pos + 1] == .identifier)
+                        {
+                            self.advance(); // consume '.'
+                            last_seg_sym = try self.expectIdentifier();
+                            src_span = self.prevSpan();
+                        } else if (self.peek() == .dot_identifier) {
+                            // .DbError — strip leading dot for the segment name
+                            const di_span = self.currentSpan();
+                            const di_text = self.source[di_span.start + 1 .. di_span.end]; // skip '.'
+                            last_seg_sym = self.pool.intern(di_text) catch return error.ParseError;
+                            src_span = di_span;
+                            self.advance();
+                        } else break;
+                    }
+                    // Intern the full qualified path as the type name symbol
+                    const full_span = src_start.merge(src_span);
+                    const full_name = self.source[full_span.start..full_span.end];
+                    const src_sym = self.pool.intern(full_name) catch return error.ParseError;
 
                     const src_ty = try self.arena.create(Ast.TypeExpr);
                     src_ty.* = .{
                         .kind = .{ .named = src_sym },
-                        .span = src_span,
+                        .span = full_span,
                     };
 
-                    const src_name = self.pool.resolve(src_sym);
+                    // Use the last segment for the variant name, stripping "Error" suffix
+                    const last_name = self.pool.resolve(last_seg_sym);
                     const suffix = "Error";
-                    const variant_text = if (src_name.len > suffix.len and std.mem.endsWith(u8, src_name, suffix))
-                        src_name[0 .. src_name.len - suffix.len]
+                    const variant_text = if (last_name.len > suffix.len and std.mem.endsWith(u8, last_name, suffix))
+                        last_name[0 .. last_name.len - suffix.len]
                     else
-                        src_name;
+                        last_name;
                     const variant_name = self.pool.intern(variant_text) catch return error.ParseError;
 
                     const payload = try self.arena.alloc(*const Ast.TypeExpr, 1);
@@ -211,7 +240,7 @@ fn parseDecl(self: *Parser) !Ast.Decl {
                     try variants.append(self.arena, .{
                         .name = variant_name,
                         .payload = payload,
-                        .span = src_start.merge(src_span),
+                        .span = full_span,
                     });
 
                     if (self.peek() != .comma) break;
@@ -725,6 +754,15 @@ fn injectParamDestructures(
 
 fn parseExternDecl(self: *Parser, start_span: Span) !Ast.Decl {
     try self.expect(.kw_extern);
+
+    // Optional ABI string: `extern "C" fn ...`
+    var abi: ?[]const u8 = null;
+    if (self.peek() == .string_literal) {
+        const span = self.currentSpan();
+        abi = self.source[span.start + 1 .. span.end - 1]; // strip quotes
+        self.advance();
+    }
+
     try self.expect(.kw_fn);
     const name = try self.expectIdentifier();
     try self.expect(.l_paren);
@@ -750,6 +788,7 @@ fn parseExternDecl(self: *Parser, start_span: Span) !Ast.Decl {
             .params = params,
             .return_type = return_type,
             .is_variadic = is_variadic,
+            .abi = abi,
         } },
         .span = start_span.merge(if (return_type) |rt| rt.span else end_span),
     };
@@ -900,11 +939,21 @@ fn parseEnumVariants(self: *Parser) ![]const Ast.VariantDef {
             self.advance(); // skip '('
             var types: std.ArrayList(*const Ast.TypeExpr) = .empty;
             while (self.peek() != .r_paren and self.peek() != .eof) {
-                try types.append(self.arena, try self.parseTypeExpr());
-                if (self.peek() == .comma) {
-                    self.advance();
-                    self.skipNewlines();
+                if (types.items.len > 0) {
+                    if (self.peek() == .comma) {
+                        self.advance();
+                        self.skipNewlines();
+                    }
                 }
+                // Skip optional `name:` prefix (named fields in type enum variants)
+                if (self.peek() == .identifier and
+                    self.pos + 1 < self.tokens.tags.items.len and
+                    self.tokens.tags.items[self.pos + 1] == .colon)
+                {
+                    self.advance(); // skip name
+                    self.advance(); // skip ':'
+                }
+                try types.append(self.arena, try self.parseTypeExpr());
             }
             try self.expect(.r_paren);
             payload = types.items;
@@ -1355,6 +1404,7 @@ fn parsePrimary(self: *Parser) !*const Ast.Expr {
         .float_literal => return self.parseFloatLiteral(),
         .string_literal => return self.parseStringLiteral(),
         .c_string_literal => return self.parseCStringLiteral(),
+        .char_literal => return self.parseCharLiteral(),
         .true_literal, .false_literal => return self.parseBoolLiteral(),
         .identifier => return self.parseIdentOrCall(),
         .dot_identifier => return self.parseVariantShorthand(),
@@ -1378,17 +1428,54 @@ fn parsePrimary(self: *Parser) !*const Ast.Expr {
         .kw_yield => return self.parseYield(),
         .kw_comptime => return self.parseComptime(),
         .kw_select => return self.parseSelectAwait(),
-        .l_bracket => return self.parseArrayLiteral(),
+        .l_bracket => return self.parsePostfix(try self.parseArrayLiteral()),
         .kw_let, .kw_var => return self.parseLetBinding(),
         .kw_match => return self.parseMatchExpr(),
         .kw_with => return self.parseWithExpr(),
         .l_brace => return self.parseRecordUpdate(),
         .pipe => return self.parseClosure(),
+        .kw_impl, .kw_extend => return self.parseImplExpr(),
         else => {
             self.emitError("expected expression");
             return error.ParseError;
         },
     }
+}
+
+fn parseImplExpr(self: *Parser) !*const Ast.Expr {
+    // `impl Trait for Type:` inside a function body (comptime).
+    // Parse the impl block header and skip the indented body.
+    const start = self.currentSpan();
+    self.advance(); // consume 'impl' or 'extend'
+    // Skip trait name
+    if (self.peek() == .identifier) self.advance();
+    // Skip 'for Type'
+    if (self.peek() == .kw_for) {
+        self.advance();
+        if (self.peek() == .identifier) self.advance();
+    }
+    // Skip ':' or '='
+    if (self.peek() == .colon or self.peek() == .eq) self.advance();
+    self.skipNewlines();
+    // Skip indented body: consume all tokens that are indented deeper than `impl`.
+    // We check only non-newline tokens for indentation.
+    const start_col = Lexer.columnOf(self.source, start.start);
+    while (self.peek() != .eof) {
+        if (self.peek() == .newline) {
+            self.advance();
+            continue;
+        }
+        const col = Lexer.columnOf(self.source, self.currentSpan().start);
+        if (col <= start_col) break;
+        self.advance();
+    }
+    // Produce a unit literal
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .int_literal = 0 },
+        .span = start.merge(self.prevSpan()),
+    };
+    return node;
 }
 
 fn parseIntLiteral(self: *Parser) !*const Ast.Expr {
@@ -1407,6 +1494,32 @@ fn parseIntLiteral(self: *Parser) !*const Ast.Expr {
     const node = try self.arena.create(Ast.Expr);
     node.* = .{
         .kind = .{ .int_literal = std.fmt.parseInt(i64, num_text, 0) catch 0 },
+        .span = span,
+    };
+    return node;
+}
+
+fn parseCharLiteral(self: *Parser) !*const Ast.Expr {
+    const span = self.currentSpan();
+    const text = self.source[span.start..span.end];
+    self.advance();
+    // Convert char literal to integer value.
+    // 'a' -> 97, '\n' -> 10, '\\' -> 92, '\'' -> 39
+    const value: i64 = if (text.len >= 4 and text[1] == '\\') blk: {
+        break :blk switch (text[2]) {
+            'n' => 10,
+            'r' => 13,
+            't' => 9,
+            '0' => 0,
+            '\\' => 92,
+            '\'' => 39,
+            '"' => 34,
+            else => text[2],
+        };
+    } else if (text.len >= 3) text[1] else 0;
+    const node = try self.arena.create(Ast.Expr);
+    node.* = .{
+        .kind = .{ .int_literal = value },
         .span = span,
     };
     return node;
@@ -1585,6 +1698,22 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
                     const node = try self.arena.create(Ast.Expr);
                     node.* = .{
                         .kind = .{ .await_expr = lhs },
+                        .span = lhs.span.merge(self.prevSpan()),
+                    };
+                    lhs = node;
+                    continue;
+                }
+                // Handle computed field access: `obj.{expr}`
+                if (self.peek() == .l_brace) {
+                    self.advance(); // consume '{'
+                    const field_expr = try self.parseExpr();
+                    try self.expect(.r_brace);
+                    const node = try self.arena.create(Ast.Expr);
+                    node.* = .{
+                        .kind = .{ .computed_field_access = .{
+                            .expr = lhs,
+                            .field_expr = field_expr,
+                        } },
                         .span = lhs.span.merge(self.prevSpan()),
                     };
                     lhs = node;
@@ -2187,6 +2316,13 @@ fn parseSelectAwait(self: *Parser) !*const Ast.Expr {
     const start = self.currentSpan();
     self.advance(); // consume 'select'
     try self.expect(.kw_await);
+
+    // Optional `biased` modifier: `select await biased`
+    const is_biased = if (self.isIdentifierNamed("biased")) blk: {
+        self.advance(); // consume 'biased'
+        break :blk true;
+    } else false;
+
     if (self.peek() == .colon) {
         self.advance();
     }
@@ -2242,7 +2378,7 @@ fn parseSelectAwait(self: *Parser) !*const Ast.Expr {
 
     const node = try self.arena.create(Ast.Expr);
     node.* = .{
-        .kind = .{ .select_await = .{ .arms = arms.items } },
+        .kind = .{ .select_await = .{ .arms = arms.items, .biased = is_biased } },
         .span = start.merge(if (arms.items.len > 0) arms.items[arms.items.len - 1].span else start),
     };
     return node;
@@ -3622,6 +3758,29 @@ fn parseTypeExpr(self: *Parser) !*const Ast.TypeExpr {
             node.* = .{
                 .kind = .{ .trait_object = trait_sym },
                 .span = start.merge(end),
+            };
+            return node;
+        },
+        .kw_impl => {
+            // `impl Trait for Type` as a type expression (used in comptime return types)
+            const start = self.currentSpan();
+            self.advance(); // consume 'impl'
+            if (self.peek() != .identifier) {
+                self.emitError("expected trait name after 'impl'");
+                return error.ParseError;
+            }
+            const trait_sym = try self.internCurrent();
+            self.advance(); // consume trait name
+            // Expect 'for' (keyword, not identifier)
+            if (self.peek() == .kw_for) {
+                self.advance(); // consume 'for'
+            }
+            // Parse the target type
+            const target = try self.parseTypeExpr();
+            const node = try self.arena.create(Ast.TypeExpr);
+            node.* = .{
+                .kind = .{ .trait_object = trait_sym },
+                .span = start.merge(target.span),
             };
             return node;
         },

@@ -237,6 +237,12 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try renderExpr(f.expr, pool, writer, 0);
             try writer.print(".{s}", .{pool.resolve(f.field)});
         },
+        .computed_field_access => |cf| {
+            try renderExpr(cf.expr, pool, writer, 0);
+            try writer.writeAll(".{");
+            try renderExpr(cf.field_expr, pool, writer, 0);
+            try writer.writeAll("}");
+        },
         .optional_chain => |oc| {
             try renderExpr(oc.expr, pool, writer, 0);
             try writer.print("?.{s}", .{pool.resolve(oc.member)});
@@ -300,7 +306,7 @@ fn renderExpr(expr: *const Ast.Expr, pool: *const InternPool, writer: anytype, i
             try renderExpr(l.value, pool, writer, 0);
         },
         .select_await => |sel| {
-            try writer.writeAll("select await:\n");
+            try writer.writeAll(if (sel.biased) "select await biased:\n" else "select await:\n");
             for (sel.arms) |arm| {
                 try writer.print("    {s} = ", .{pool.resolve(arm.name)});
                 try renderExpr(arm.task, pool, writer, 0);
