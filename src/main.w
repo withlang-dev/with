@@ -3,7 +3,7 @@
 // Usage:
 //   with run [file.w]     Build + run source file
 //   with build [file.w]   Build source file
-//   with check <file.w>   Parse and type-check
+//   with check <file.w>   Parse and type-check (supports --dump-tokens)
 //   with ir <file.w>      Dump LLVM IR
 //   with ast <file.w>     Parse and dump AST
 //   with tokens <file.w>  Lex and dump tokens
@@ -45,6 +45,8 @@ fn main -> void:
     var no_std = false
     var alloc_mode = false
     var release_mode = false
+    var dump_tokens_flag = false
+    var deterministic_mode = false
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -64,6 +66,10 @@ fn main -> void:
             no_std = true
         if arg == "--alloc":
             alloc_mode = true
+        if arg == "--dump-tokens":
+            dump_tokens_flag = true
+        if arg == "--deterministic":
+            deterministic_mode = true
         i = i + 1
 
     // Find the first non-flag positional argument after the command.
@@ -104,6 +110,9 @@ fn main -> void:
             with_eprintln("error: 'check' requires a source file argument")
             exit(1)
             return
+        if dump_tokens_flag:
+            exit(dump_tokens(source_file, true))
+            return
         var comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode)
         let pool = comp.compile_file(source_file)
@@ -119,7 +128,7 @@ fn main -> void:
             with_eprintln("error: 'tokens' requires a source file argument")
             exit(1)
             return
-        exit(dump_tokens(source_file))
+        exit(dump_tokens(source_file, deterministic_mode))
         return
     if command == "test":
         exit(run_test_command(argc, opt_level, no_std, alloc_mode))
@@ -221,21 +230,62 @@ fn run_ast_command(source_file: str) -> i32:
     print(rendered)
     0
 
-fn dump_tokens(source_file: str) -> i32:
+fn dump_tokens(source_file: str, deterministic: bool) -> i32:
     let text = with_fs_read_file(source_file)
     if text.len() == 0:
         with_eprintln("error: cannot read '{source_file}'")
         return 1
     var lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
-    // Print each token
+    if deterministic:
+        print("tokens file=" ++ source_file ++ " count=" ++ int_to_string(tokens.len()) ++ "\n")
+        for i in 0..tokens.len():
+            let tk = tokens.get_tag(i)
+            let start = tokens.get_start(i)
+            let end = tokens.get_end(i)
+            let text_slice = text.slice(start as i64, end as i64)
+            let escaped = escape_dump_lexeme(text_slice)
+            let tag_text = dump_tag_name(tk, text_slice)
+            print("tok[" ++ int_to_string(i) ++ "] tag=" ++ tag_text ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ " lex=\"" ++ escaped ++ "\"\n")
+        return 0
+
+    // Compatibility debug output, similar to stage0 `tokens` command.
     for i in 0..tokens.len():
         let tk = tokens.get_tag(i)
         let start = tokens.get_start(i)
         let end = tokens.get_end(i)
         let text_slice = text.slice(start as i64, end as i64)
-        print(int_to_string(tk) ++ " " ++ text_slice ++ "\n")
+        let tag_text = dump_tag_name(tk, text_slice)
+        print(tag_text ++ " |" ++ text_slice ++ "|\n")
     0
+
+fn escape_dump_lexeme(text: str) -> str:
+    var out = ""
+    for i in 0..text.len():
+        let ch = text[i]
+        if ch == 92:  // '\'
+            out = out ++ "\\\\"
+            continue
+        if ch == 34:  // '"'
+            out = out ++ "\\\""
+            continue
+        if ch == 10:  // '\n'
+            out = out ++ "\\n"
+            continue
+        if ch == 13:  // '\r'
+            out = out ++ "\\r"
+            continue
+        if ch == 9:  // '\t'
+            out = out ++ "\\t"
+            continue
+        out = out ++ text.slice(i as i64, (i + 1) as i64)
+    out
+
+fn dump_tag_name(tag: i32, lexeme: str) -> str:
+    // Keep deterministic dump names identical to Stage0 for brace delimiters.
+    if tag == TK_L_BRACE() or tag == TK_R_BRACE():
+        return "'" ++ lexeme ++ "'"
+    tag_name(tag)
 
 fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool) -> i32:
     // Find test file/dir argument
@@ -266,7 +316,7 @@ fn print_usage:
     print("Commands:\n")
     print("  build [file.w]    Build a source file\n")
     print("  run [file.w]      Build + run a source file\n")
-    print("  check <file.w>    Parse and type-check a source file\n")
+    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens)\n")
     print("  test [file.w]     Run tests\n")
     print("  clean             Delete .with/ artifacts\n")
     print("  ir <file.w>       Dump LLVM IR (debug)\n")

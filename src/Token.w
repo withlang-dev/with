@@ -80,58 +80,59 @@ fn TK_MINUS_WRAP -> i32: 60
 fn TK_STAR_WRAP -> i32: 61
 fn TK_EQ -> i32: 62
 fn TK_EQ_EQ -> i32: 63
-fn TK_BANG_EQ -> i32: 64
-fn TK_LT -> i32: 65
-fn TK_GT -> i32: 66
-fn TK_LT_EQ -> i32: 67
-fn TK_GT_EQ -> i32: 68
-fn TK_AMPERSAND -> i32: 69
-fn TK_PIPE -> i32: 70
-fn TK_CARET -> i32: 71
-fn TK_TILDE -> i32: 72
-fn TK_AT -> i32: 73
-fn TK_QUESTION -> i32: 74
-fn TK_QUESTION_DOT -> i32: 75
-fn TK_QUESTION_QUESTION -> i32: 76
-fn TK_ARROW -> i32: 77
-fn TK_FAT_ARROW -> i32: 78
-fn TK_DOT_DOT -> i32: 79
-fn TK_DOT_DOT_EQ -> i32: 80
-fn TK_DOT_DOT_DOT -> i32: 81
-fn TK_PIPE_GT -> i32: 82
-fn TK_LT_PIPE -> i32: 83
-fn TK_GT_GT -> i32: 84
-fn TK_LT_LT -> i32: 85
-fn TK_PLUS_PLUS -> i32: 86
-fn TK_PLUS_EQ -> i32: 87
-fn TK_MINUS_EQ -> i32: 88
-fn TK_STAR_EQ -> i32: 89
-fn TK_SLASH_EQ -> i32: 90
-fn TK_PERCENT_EQ -> i32: 91
+fn TK_BANG -> i32: 64
+fn TK_BANG_EQ -> i32: 65
+fn TK_LT -> i32: 66
+fn TK_GT -> i32: 67
+fn TK_LT_EQ -> i32: 68
+fn TK_GT_EQ -> i32: 69
+fn TK_AMPERSAND -> i32: 70
+fn TK_PIPE -> i32: 71
+fn TK_CARET -> i32: 72
+fn TK_TILDE -> i32: 73
+fn TK_AT -> i32: 74
+fn TK_QUESTION -> i32: 75
+fn TK_QUESTION_DOT -> i32: 76
+fn TK_QUESTION_QUESTION -> i32: 77
+fn TK_ARROW -> i32: 78
+fn TK_FAT_ARROW -> i32: 79
+fn TK_DOT_DOT -> i32: 80
+fn TK_DOT_DOT_EQ -> i32: 81
+fn TK_DOT_DOT_DOT -> i32: 82
+fn TK_PIPE_GT -> i32: 83
+fn TK_LT_PIPE -> i32: 84
+fn TK_GT_GT -> i32: 85
+fn TK_LT_LT -> i32: 86
+fn TK_PLUS_PLUS -> i32: 87
+fn TK_PLUS_EQ -> i32: 88
+fn TK_MINUS_EQ -> i32: 89
+fn TK_STAR_EQ -> i32: 90
+fn TK_SLASH_EQ -> i32: 91
+fn TK_PERCENT_EQ -> i32: 92
 
 // -- Delimiters --
-fn TK_L_PAREN -> i32: 92
-fn TK_R_PAREN -> i32: 93
-fn TK_L_BRACKET -> i32: 94
-fn TK_R_BRACKET -> i32: 95
-fn TK_L_BRACE -> i32: 96
-fn TK_R_BRACE -> i32: 97
+fn TK_L_PAREN -> i32: 93
+fn TK_R_PAREN -> i32: 94
+fn TK_L_BRACKET -> i32: 95
+fn TK_R_BRACKET -> i32: 96
+fn TK_L_BRACE -> i32: 97
+fn TK_R_BRACE -> i32: 98
 
 // -- Punctuation --
-fn TK_COLON -> i32: 98
-fn TK_COMMA -> i32: 99
-fn TK_DOT -> i32: 100
-fn TK_SEMICOLON -> i32: 101
+fn TK_COLON -> i32: 99
+fn TK_COMMA -> i32: 100
+fn TK_DOT -> i32: 101
+fn TK_SEMICOLON -> i32: 102
 
 // -- Structural --
-fn TK_NEWLINE -> i32: 102
-fn TK_INDENT -> i32: 103
-fn TK_DEDENT -> i32: 104
+fn TK_NEWLINE -> i32: 103
+fn TK_INDENT -> i32: 104
+fn TK_DEDENT -> i32: 105
 
 // -- Special --
-fn TK_COMMENT -> i32: 105
-fn TK_EOF -> i32: 106
-fn TK_INVALID -> i32: 107
+fn TK_COMMENT -> i32: 106
+fn TK_EOF -> i32: 107
+fn TK_INVALID -> i32: 108
 
 // Lookup table: keyword string -> tag. Returns -1 if not a keyword.
 fn tag_from_keyword(s: str) -> i32:
@@ -246,6 +247,7 @@ fn tag_name(tag: i32) -> str:
     if tag == TK_STAR_WRAP(): return "'*%'"
     if tag == TK_EQ(): return "'='"
     if tag == TK_EQ_EQ(): return "'=='"
+    if tag == TK_BANG(): return "'!'"
     if tag == TK_BANG_EQ(): return "'!='"
     if tag == TK_LT(): return "'<'"
     if tag == TK_GT(): return "'>'"
@@ -278,8 +280,8 @@ fn tag_name(tag: i32) -> str:
     if tag == TK_R_PAREN(): return "')'"
     if tag == TK_L_BRACKET(): return "'['"
     if tag == TK_R_BRACKET(): return "']'"
-    if tag == TK_L_BRACE(): return "'{'"
-    if tag == TK_R_BRACE(): return "'}'"
+    if tag == TK_L_BRACE(): return "left brace"
+    if tag == TK_R_BRACE(): return "right brace"
     if tag == TK_COLON(): return "':'"
     if tag == TK_COMMA(): return "','"
     if tag == TK_DOT(): return "'.'"
