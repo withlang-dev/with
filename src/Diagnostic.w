@@ -1,119 +1,97 @@
-// Diagnostic — Compiler diagnostics: structured errors, warnings, and rendering.
-//
-// Every compiler error is a structured Diagnostic value carrying a
-// primary span, optional labels, notes, and help text.
+// Wave 1 foundations: diagnostics model + deterministic rendering.
 
 use Span
 use Source
+use DiagnosticRender
 
 extern fn with_eprintln(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
-// Severity levels.
-fn SEV_ERROR -> i32: 0
-fn SEV_WARNING -> i32: 1
+fn DIAG_SEVERITY_ERROR -> i32: 1
+fn DIAG_SEVERITY_WARNING -> i32: 2
+fn DIAG_SEVERITY_NOTE -> i32: 3
 
-// A secondary label with span and message.
-type Label = {
+// Legacy aliases kept for existing callers.
+fn SEV_ERROR -> i32: DIAG_SEVERITY_ERROR()
+fn SEV_WARNING -> i32: DIAG_SEVERITY_WARNING()
+
+type DiagnosticLabel = {
     span: Span,
     message: str,
 }
 
+// Legacy alias kept for existing callers.
+type Label = DiagnosticLabel
+
 type Diagnostic = {
     severity: i32,
+    code: str,
     message: str,
     primary: Span,
-    labels: Vec[Label],
+    labels: Vec[DiagnosticLabel],
     notes: Vec[str],
     helps: Vec[str],
 }
 
-// Convenience constructor for a simple error with no extra labels.
+fn diagnostic_error(message: str, primary: Span) -> Diagnostic:
+    Diagnostic {
+        severity: DIAG_SEVERITY_ERROR(),
+        code: "",
+        message,
+        primary,
+        labels: Vec.new(),
+        notes: Vec.new(),
+        helps: Vec.new(),
+    }
+
+fn diagnostic_warning(message: str, primary: Span) -> Diagnostic:
+    Diagnostic {
+        severity: DIAG_SEVERITY_WARNING(),
+        code: "",
+        message,
+        primary,
+        labels: Vec.new(),
+        notes: Vec.new(),
+        helps: Vec.new(),
+    }
+
 fn Diagnostic.err(message: str, span: Span) -> Diagnostic:
-    Diagnostic {
-        severity: SEV_ERROR(),
-        message,
-        primary: span,
-        labels: Vec.new(),
-        notes: Vec.new(),
-        helps: Vec.new(),
-    }
+    diagnostic_error(message, span)
 
-// Convenience constructor for a simple warning.
 fn Diagnostic.warn(message: str, span: Span) -> Diagnostic:
-    Diagnostic {
-        severity: SEV_WARNING(),
-        message,
-        primary: span,
-        labels: Vec.new(),
-        notes: Vec.new(),
-        helps: Vec.new(),
-    }
+    diagnostic_warning(message, span)
 
-// Render this diagnostic to stderr.
+fn Diagnostic.set_code(self: Diagnostic, code: str):
+    self.code = code
+
+fn Diagnostic.add_label(self: Diagnostic, span: Span, message: str):
+    self.labels.push(DiagnosticLabel { span, message })
+
+fn Diagnostic.add_note(self: Diagnostic, message: str):
+    self.notes.push(message)
+
+fn Diagnostic.add_help(self: Diagnostic, message: str):
+    self.helps.push(message)
+
 fn Diagnostic.render(self: Diagnostic, source: Source):
-    // Severity prefix.
-    var out = ""
-    if self.severity == SEV_ERROR():
-        out = "error"
-    else:
-        out = "warning"
-    out = out ++ ": " ++ self.message
-    with_eprintln(out)
+    with_eprintln(render_diag_header(self.severity, self.code, self.message))
 
-    // Location.
     let loc = source.offset_to_location(self.primary.start)
-    let line_num = loc.line + 1
-    let col_num = loc.col + 1
-    with_eprintln(" --> " ++ source.name ++ ":" ++ int_to_string(line_num) ++ ":" ++ int_to_string(col_num))
+    with_eprintln(render_diag_location(source.path, loc.line, loc.col))
 
-    // Source snippet.
     let line_text = source.line_text(loc.line)
-    let gutter_w = digit_count(line_num)
-    with_eprintln(spaces(gutter_w + 1) ++ "|")
-    with_eprintln(int_to_string(line_num) ++ " | " ++ line_text)
+    with_eprintln(render_diag_source_line(loc.line, line_text))
+    with_eprintln(render_diag_marker_line(loc.col, span_underline_len(self.primary.start, self.primary.end)))
 
-    var underline = ""
-    let raw_u_len = if self.primary.len() > 0: self.primary.len() else: 1
-    let u_len = clamp_i32(raw_u_len, 1, 120)
-    for u_i in 0..u_len:
-        underline = underline ++ "^"
-    let col_pad = clamp_i32(loc.col, 0, 200)
-    var marker = spaces(gutter_w + 1) ++ "| " ++ spaces(col_pad) ++ underline
-    if loc.col > 200 or raw_u_len > 120:
-        marker = marker ++ " ..."
-    with_eprintln(marker)
+    for i in 0..self.labels.len() as i32:
+        let lab = self.labels.get(i as i64)
+        let lloc = source.offset_to_location(lab.span.start)
+        with_eprintln(render_diag_label_line(lloc.line, lloc.col, lab.message))
 
-    // Notes and helps.
-    for n_i in 0..self.notes.len() as i32:
-        with_eprintln(spaces(gutter_w + 1) ++ "= note: " ++ self.notes.get(n_i as i64))
-    for h_i in 0..self.helps.len() as i32:
-        with_eprintln(spaces(gutter_w + 1) ++ "= help: " ++ self.helps.get(h_i as i64))
+    for i in 0..self.notes.len() as i32:
+        with_eprintln(render_diag_note_line(self.notes.get(i as i64)))
+    for i in 0..self.helps.len() as i32:
+        with_eprintln(render_diag_help_line(self.helps.get(i as i64)))
 
-fn spaces(count: i32) -> str:
-    let n = clamp_i32(count, 0, 512)
-    var result = ""
-    for i in 0..n:
-        result = result ++ " "
-    result
-
-fn clamp_i32(v: i32, lo: i32, hi: i32) -> i32:
-    if v < lo:
-        return lo
-    if v > hi:
-        return hi
-    v
-
-fn digit_count(n: i32) -> i32:
-    if n == 0: return 1
-    var val = n
-    var count = 0
-    while val > 0:
-        val = val / 10
-        count = count + 1
-    count
-
-// Accumulator for diagnostics produced during compilation.
 type DiagnosticList = {
     items: Vec[Diagnostic],
 }
@@ -129,13 +107,21 @@ fn DiagnosticList.deinit(self: DiagnosticList):
 fn DiagnosticList.emit(self: DiagnosticList, diag: Diagnostic):
     self.items.push(diag)
 
-fn DiagnosticList.has_errors(self: DiagnosticList) -> bool:
+fn DiagnosticList.count(self: DiagnosticList) -> i32:
+    self.items.len() as i32
+
+fn DiagnosticList.count_by_severity(self: DiagnosticList, severity: i32) -> i32:
+    var n = 0
     for i in 0..self.items.len() as i32:
-        if self.items.get(i as i64).severity == SEV_ERROR():
-            return true
-    false
+        if self.items.get(i as i64).severity == severity:
+            n = n + 1
+    n
+
+fn DiagnosticList.has_errors(self: DiagnosticList) -> bool:
+    self.count_by_severity(DIAG_SEVERITY_ERROR()) > 0
 
 fn DiagnosticList.render_all(self: DiagnosticList, source: Source):
     for i in 0..self.items.len() as i32:
         self.items.get(i as i64).render(source)
-        with_eprintln("")
+        if i + 1 < self.items.len() as i32:
+            with_eprintln("")

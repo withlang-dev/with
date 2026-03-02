@@ -1,8 +1,6 @@
 // Wave 1 foundations: source locations.
-//
-// Root `Span` now follows the foundation implementation shape.
 
-type FileId = i32
+use compiler.foundation.Ids
 
 type Span = {
     file: FileId,
@@ -12,19 +10,16 @@ type Span = {
 
 fn span_zero -> Span:
     Span {
-        file: 0,
+        file: file_id_from_raw(0),
         start: 0,
         end: 0,
     }
-
-fn Span.zero -> Span:
-    span_zero()
 
 fn Span.len(self: Span) -> i32:
     self.end - self.start
 
 fn Span.is_valid(self: Span) -> bool:
-    self.file >= 0 and self.start >= 0 and self.end >= self.start
+    file_id_is_valid(self.file) and self.start >= 0 and self.end >= self.start
 
 fn Span.merge(self: Span, other: Span) -> Span:
     Span {

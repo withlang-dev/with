@@ -2,7 +2,7 @@
 
 ## Architecture-First Execution Plan
 
-**Status:** Wave 0 complete (determinism + stable dumps + golden baseline).
+**Status:** Wave 1 complete (foundations + unit-test-only validation gate).
 **Goal:** Build a clean-room, self-hosted With compiler in With.
 **Bootstrap:** Stage0 (Zig implementation) remains semantic oracle.
 
