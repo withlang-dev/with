@@ -45,11 +45,11 @@ fn CfgGraph.deinit(self: CfgGraph):
 
 fn CfgGraph.add_node(self: CfgGraph, kind: i32, span_start: i32, span_end: i32) -> i32:
     let id = self.nodes.len() as i32
-    self.nodes.push(CfgNode { kind: kind, span_start: span_start, span_end: span_end })
+    self.nodes.push(CfgNode { kind, span_start, span_end })
     id
 
 fn CfgGraph.add_edge(self: CfgGraph, from: i32, to: i32):
-    self.edges.push(CfgEdge { from: from, to: to })
+    self.edges.push(CfgEdge { from, to })
 
 fn CfgGraph.out_degree(self: CfgGraph, node_id: i32) -> i32:
     var n = 0

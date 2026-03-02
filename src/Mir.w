@@ -28,7 +28,7 @@ fn MirModule.add_function(self: MirModule, name: str, block_count: i32) -> i32:
         return -1
     if self.has_function(name):
         return -1
-    self.functions.push(MirFunction { name: name, block_count: block_count })
+    self.functions.push(MirFunction { name, block_count })
     0
 
 fn MirModule.has_function(self: MirModule, name: str) -> bool:
