@@ -14,9 +14,12 @@ const c = @cImport({
 
 const CImport = @This();
 
-/// Process a c_import header path and return synthetic extern fn declarations.
-/// The header_path is a bare header name (e.g. "stdio.h") which gets wrapped
-/// in `#include <...>` before being sent to libclang.
+/// Process a c_import header string and return synthetic extern fn declarations.
+///
+/// Accepted input forms:
+/// - Bare header: `"stdio.h"` (wrapped as `#include <stdio.h>`)
+/// - Include target: `"<stdio.h>"` or `"\"stdio.h\""` (wrapped as `#include ...`)
+/// - Raw snippet: `"#include <stdio.h>"` (forwarded as-is)
 pub fn processCImport(
     header_path: []const u8,
     arena: std.mem.Allocator,
@@ -26,21 +29,13 @@ pub fn processCImport(
     const index = c.clang_createIndex(0, 0);
     defer c.clang_disposeIndex(index);
 
-    // Wrap the header path in #include <...> for libclang
-    const prefix = "#include <";
-    const suffix = ">\n";
-    const code_len = prefix.len + header_path.len + suffix.len;
-    const include_code = try arena.alloc(u8, code_len + 1); // +1 for null
-    @memcpy(include_code[0..prefix.len], prefix);
-    @memcpy(include_code[prefix.len..][0..header_path.len], header_path);
-    @memcpy(include_code[prefix.len + header_path.len ..][0..suffix.len], suffix);
-    include_code[code_len] = 0;
+    const include_code = try makeIncludeCode(arena, header_path);
 
     // Set up unsaved file so we don't need to write to disk
     var unsaved = c.CXUnsavedFile{
         .Filename = "input.h",
         .Contents = include_code.ptr,
-        .Length = @intCast(code_len),
+        .Length = @intCast(include_code.len - 1), // exclude trailing NUL
     };
 
     // System include paths for macOS
@@ -86,6 +81,46 @@ pub fn processCImport(
     // Macros from headers are handled by libclang through preprocessing.
 
     return ctx.decls.items;
+}
+
+fn makeIncludeCode(arena: std.mem.Allocator, header_path: []const u8) ![]u8 {
+    const trimmed = std.mem.trim(u8, header_path, " \t\r\n");
+    if (trimmed.len == 0) return error.CImportFailed;
+
+    var rendered: std.ArrayList(u8) = .empty;
+    defer rendered.deinit(arena);
+
+    const has_newline = std.mem.indexOfScalar(u8, trimmed, '\n') != null;
+    const starts_with_hash = std.mem.startsWith(u8, trimmed, "#");
+    const has_statement_terminator = std.mem.indexOfScalar(u8, trimmed, ';') != null;
+    const looks_like_include_target = trimmed.len >= 2 and
+        ((trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') or
+            (trimmed[0] == '"' and trimmed[trimmed.len - 1] == '"'));
+
+    if (starts_with_hash or has_newline or has_statement_terminator) {
+        // Already raw C/preprocessor snippet, e.g.:
+        // - `#include <stdio.h>`
+        // - `int ext_add(int, int);`
+        try rendered.appendSlice(arena, trimmed);
+    } else if (looks_like_include_target) {
+        // Include target form like `<stdio.h>` or `"stdio.h"`.
+        try rendered.appendSlice(arena, "#include ");
+        try rendered.appendSlice(arena, trimmed);
+    } else {
+        // Bare header name like `stdio.h`.
+        try rendered.appendSlice(arena, "#include <");
+        try rendered.appendSlice(arena, trimmed);
+        try rendered.appendSlice(arena, ">");
+    }
+
+    if (rendered.items[rendered.items.len - 1] != '\n') {
+        try rendered.append(arena, '\n');
+    }
+
+    const include_code = try arena.alloc(u8, rendered.items.len + 1);
+    @memcpy(include_code[0..rendered.items.len], rendered.items);
+    include_code[rendered.items.len] = 0;
+    return include_code;
 }
 
 fn hasErrorDiagnostics(tu: c.CXTranslationUnit) bool {

@@ -938,8 +938,9 @@ fn processCImports(self: *Driver, module: Ast.Module) !Ast.Module {
             for (decl.kind.c_import.link_libs) |lib| {
                 try self.c_import_link_libs.put(self.allocator, lib, {});
             }
+            const header_spec = decl.kind.c_import.header_path;
             const cache_key = try self.makeCImportCacheKey(
-                decl.kind.c_import.header_path,
+                header_spec,
                 decl.kind.c_import.link_libs,
             );
             var cache_key_owned = true;
@@ -951,13 +952,13 @@ fn processCImports(self: *Driver, module: Ast.Module) !Ast.Module {
             } else {
                 if (self.trace_c_import_cache) self.writeStderr("c_import cache miss\n");
                 const synthetic = CImport.processCImport(
-                    decl.kind.c_import.header_path,
+                    header_spec,
                     arena_alloc,
                     &self.pool,
                 ) catch |err| {
                     self.writeStderr("error: c_import processing failed for header snippet: ");
-                    const preview_len = @min(decl.kind.c_import.header_path.len, 80);
-                    self.writeStderr(decl.kind.c_import.header_path[0..preview_len]);
+                    const preview_len = @min(header_spec.len, 80);
+                    self.writeStderr(header_spec[0..preview_len]);
                     self.writeStderr("\n");
                     return err;
                 };
