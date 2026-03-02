@@ -67,11 +67,18 @@ Or use Make targets for the full flow:
 make test
 ```
 
+Run the Stage-0 bootstrap gate (bootstrap -> stage2 rebuild) with:
+
+```sh
+make gate-stage0
+```
+
 ## Repo Layout
 
 ```text
 bootstrap/           Zig bootstrap compiler
 src/                 self-hosted compiler (.w)
+src/compiler/        Zig-style architecture port layer (Compilation-first)
 runtime/             C runtime support
 test/cases/          self-hosted behavior tests
 bootstrap/test/cases/bootstrap parser/codegen tests

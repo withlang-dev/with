@@ -1067,9 +1067,11 @@ fn collectImplDecl(self: *Sema, id: Ast.ImplDecl, span: Span) void {
     // Record which traits a type implements.
     const trait_sym = id.trait_name orelse return; // plain `impl Type` has no trait
 
-    // Drop is a built-in trait (no explicit declaration needed).
+    // Built-in traits (no explicit declaration needed).
     const trait_name = self.pool.resolve(trait_sym);
-    const is_builtin_trait = std.mem.eql(u8, trait_name, "Drop");
+    const is_builtin_trait = std.mem.eql(u8, trait_name, "Drop") or
+        std.mem.eql(u8, trait_name, "Scoped") or
+        std.mem.eql(u8, trait_name, "ScopedMut");
     if (!is_builtin_trait and self.trait_methods.get(trait_sym) == null and self.trait_decls.get(trait_sym) == null) {
         self.emitError("unknown trait", span);
         return;
@@ -1081,7 +1083,7 @@ fn collectImplDecl(self: *Sema, id: Ast.ImplDecl, span: Span) void {
 
     const trait_is_local = self.local_trait_names.get(trait_sym) != null or is_builtin_trait;
     const type_is_local = self.local_type_names.get(id.type_name) != null;
-    if (!trait_is_local and !type_is_local) {
+    if (span.file == self.local_file_id and !trait_is_local and !type_is_local) {
         self.emitError("orphan rule violation: impl requires a local trait or local type", span);
     }
 
@@ -2092,9 +2094,23 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
                     const enter_sym = self.pool.intern(enter_name) catch 0;
                     if (enter_sym != 0) {
                         const key = self.methodKey(tn_sym, enter_sym);
-                        if (self.fn_sigs.get(key)) |sig| {
-                            bind_ty = sig.return_type;
-                            used_guard_enter = true;
+                        if (self.fn_decls.get(key)) |enter_decl| {
+                            // Callback-style scoped entry:
+                            //   fn enter[R](self: &T, f: fn(&U) -> R) -> R
+                            if (enter_decl.params.len >= 2) {
+                                if (enter_decl.params[1].type_expr) |cb_ty| {
+                                    if (cb_ty.kind == .fn_type and cb_ty.kind.fn_type.params.len >= 1) {
+                                        bind_ty = self.resolveTypeExpr(cb_ty.kind.fn_type.params[0]);
+                                        used_guard_enter = true;
+                                    }
+                                }
+                            }
+                        }
+                        if (!used_guard_enter) {
+                            if (self.fn_sigs.get(key)) |sig| {
+                                bind_ty = sig.return_type;
+                                used_guard_enter = true;
+                            }
                         }
                     }
                 }
@@ -4244,6 +4260,17 @@ fn checkCall(self: *Sema, call_e: Ast.CallExpr, span: Span) TypeId {
                 const trait_sym = self.traitObjectFromTypeExpr(te) orelse continue;
 
                 const arg_ty = if (i < arg_types.len) arg_types[i] else error_type;
+                if (arg_ty == error_type) continue;
+                const resolved_arg = self.resolveAlias(arg_ty);
+                switch (self.getType(resolved_arg)) {
+                    .ref_type => |rt| {
+                        if (self.resolveAlias(rt.pointee) == error_type) continue;
+                    },
+                    .ptr_type => |pt| {
+                        if (self.resolveAlias(pt.pointee) == error_type) continue;
+                    },
+                    else => {},
+                }
                 const concrete_sym = self.dynArgConcreteTypeSymbol(arg_ty) orelse {
                     self.emitError("argument cannot be converted to dyn trait object", call_e.args[i].span);
                     continue;
@@ -4367,10 +4394,12 @@ fn checkMethodCall(self: *Sema, fa: Ast.FieldAccessExpr, args: []const *const As
     const obj_type = self.checkExpr(fa.expr);
 
     // Check all arguments.
-    for (args) |arg| {
+    var first_arg_type: TypeId = error_type;
+    for (args, 0..) |arg, i| {
         self.closure_direct_arg_depth += 1;
-        _ = self.checkExpr(arg);
+        const arg_ty = self.checkExpr(arg);
         self.closure_direct_arg_depth -= 1;
+        if (i == 0) first_arg_type = arg_ty;
     }
 
     // Mark non-Copy arguments as moved (consumed by the call).
@@ -4393,7 +4422,7 @@ fn checkMethodCall(self: *Sema, fa: Ast.FieldAccessExpr, args: []const *const As
                 self.emitError("track() requires a Task value", span);
                 return error_type;
             }
-            return self.ty_i32;
+            return first_arg_type;
         }
         self.emitError("track() is only available inside async scope", span);
         return error_type;
@@ -4659,6 +4688,8 @@ fn isBuiltinFn(self: *Sema, sym: Symbol) bool {
     return std.mem.eql(u8, name, "println") or
         std.mem.eql(u8, name, "print") or
         std.mem.eql(u8, name, "assert") or
+        std.mem.eql(u8, name, "map") or
+        std.mem.eql(u8, name, "collect") or
         std.mem.eql(u8, name, "Some") or
         std.mem.eql(u8, name, "Ok") or
         std.mem.eql(u8, name, "Err") or
@@ -4854,6 +4885,14 @@ fn typesCompatible(self: *const Sema, expected: TypeId, actual: TypeId) bool {
     // Reference compatibility: same mutability + compatible pointee.
     if (exp_type == .ref_type and act_type == .ref_type) {
         if (exp_type.ref_type.is_mut != act_type.ref_type.is_mut) return false;
+        const exp_pointee = self.resolveAlias(exp_type.ref_type.pointee);
+        const act_pointee = self.resolveAlias(act_type.ref_type.pointee);
+        if (self.getType(exp_pointee) == .slice_type and self.getType(act_pointee) == .array_type) {
+            return self.typesCompatible(
+                self.getType(exp_pointee).slice_type.element,
+                self.getType(act_pointee).array_type.element,
+            );
+        }
         return self.typesCompatible(exp_type.ref_type.pointee, act_type.ref_type.pointee);
     }
 

@@ -93,7 +93,7 @@ pub fn next(self: *Lexer) Token {
         }, .eq),
         '!' => return self.operatorOrCompound(start, &.{
             .{ '=', .bang_eq },
-        }, .invalid),
+        }, .bang),
         '?' => return self.operatorOrCompound(start, &.{
             .{ '.', .question_dot },
             .{ '?', .question_question },
@@ -584,7 +584,7 @@ test "lex phase0 operator set" {
 }
 
 test "lexer operator edge cases and invalid operator diagnostics" {
-    const source = "< | - > ? . !";
+    const source = "< | - > ? . ! $";
     var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
     defer diags.deinit();
     var lexer = Lexer.init(source, 0, &diags);
@@ -598,6 +598,7 @@ test "lexer operator edge cases and invalid operator diagnostics" {
         .gt,
         .question,
         .dot,
+        .bang,
         .invalid,
         .eof,
     };

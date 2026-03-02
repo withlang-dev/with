@@ -67,10 +67,21 @@ pub fn parseModule(self: *Parser) !Ast.Module {
     // Skip optional `module name.subname` declaration at file top
     if (self.peek() == .kw_module) {
         self.advance();
-        if (self.peek() == .identifier) self.advance();
-        while (self.peek() == .dot) {
-            self.advance();
-            if (self.peek() == .identifier) self.advance();
+        if (self.peek() == .identifier or self.peek() == .dot_identifier) self.advance();
+        while (true) {
+            if (self.peek() == .dot) {
+                self.advance();
+                if (self.peek() == .identifier) {
+                    self.advance();
+                } else {
+                    break;
+                }
+            } else if (self.peek() == .dot_identifier) {
+                // .Uppercase segments are lexed as dot_identifier.
+                self.advance();
+            } else {
+                break;
+            }
         }
         self.skipNewlines();
     }
@@ -457,7 +468,28 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
     // Check for `impl Trait for Type` syntax.
     var trait_name: ?Ast.Symbol = null;
     var type_name = first_name;
-    if (self.peek() == .kw_for) {
+    if (self.peek() == .l_bracket) {
+        // Generic trait impl header: `impl Trait[Args...] for Type`.
+        // The current AST stores only the trait symbol here, so parse and
+        // discard the generic argument list while preserving syntax support.
+        self.advance(); // consume '['
+        var depth: u32 = 1;
+        while (depth > 0 and self.peek() != .eof) {
+            switch (self.peek()) {
+                .l_bracket => depth += 1,
+                .r_bracket => depth -= 1,
+                else => {},
+            }
+            self.advance();
+        }
+        if (self.peek() != .kw_for) {
+            self.emitError("expected 'for' after trait generic arguments in impl");
+            return error.ParseError;
+        }
+        self.advance(); // consume 'for'
+        trait_name = first_name;
+        type_name = try self.expectIdentifier();
+    } else if (self.peek() == .kw_for) {
         self.advance(); // consume 'for'
         trait_name = first_name;
         type_name = try self.expectIdentifier();
@@ -1794,6 +1826,16 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
             },
             .l_bracket => {
                 self.advance();
+                // Generic call sugar: `foo[TypeArgs](...)`.
+                // The bootstrap AST does not model explicit call type args yet,
+                // so parse/discard them and continue with the following call.
+                if (self.bracketStartsGenericCallTypeArgs(lhs)) {
+                    if (!self.consumeBracketedTypeArgs()) {
+                        self.emitError("expected ']'");
+                        return error.ParseError;
+                    }
+                    continue;
+                }
                 // Parse with precedence above range (..) so that 0..2 doesn't
                 // get consumed as a range expression. Precedence 6 stops
                 // before dot_dot (prec 5).
@@ -1830,6 +1872,69 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
                     };
                     lhs = node;
                 }
+            },
+            .bang => {
+                // Macro-like invocation sugar (currently only `vec![...]`):
+                //   vec![a, b, c]  =>  Vec.of(a, b, c)
+                if (lhs.kind != .ident) {
+                    self.emitError("macro invocation requires an identifier before '!'");
+                    return error.ParseError;
+                }
+                const macro_name = self.pool.resolve(lhs.kind.ident);
+                self.advance(); // consume '!'
+
+                if (!std.mem.eql(u8, macro_name, "vec")) {
+                    self.emitError("unsupported macro invocation");
+                    return error.ParseError;
+                }
+                if (self.peek() != .l_bracket) {
+                    self.emitError("expected '[' after vec!");
+                    return error.ParseError;
+                }
+
+                self.advance(); // consume '['
+                self.skipNewlines();
+                var args: std.ArrayList(*const Ast.Expr) = .empty;
+                if (self.peek() != .r_bracket) {
+                    try args.append(self.arena, try self.parseExpr());
+                    while (self.peek() == .comma) {
+                        self.advance();
+                        self.skipNewlines();
+                        if (self.peek() == .r_bracket) break; // trailing comma
+                        try args.append(self.arena, try self.parseExpr());
+                    }
+                }
+                self.skipNewlines();
+                const end = self.currentSpan();
+                try self.expect(.r_bracket);
+
+                const vec_sym = try self.pool.intern("Vec");
+                const of_sym = try self.pool.intern("of");
+
+                const vec_ident = try self.arena.create(Ast.Expr);
+                vec_ident.* = .{
+                    .kind = .{ .ident = vec_sym },
+                    .span = lhs.span,
+                };
+
+                const callee = try self.arena.create(Ast.Expr);
+                callee.* = .{
+                    .kind = .{ .field_access = .{
+                        .expr = vec_ident,
+                        .field = of_sym,
+                    } },
+                    .span = lhs.span.merge(end),
+                };
+
+                const node = try self.arena.create(Ast.Expr);
+                node.* = .{
+                    .kind = .{ .call = .{
+                        .callee = callee,
+                        .args = args.items,
+                    } },
+                    .span = lhs.span.merge(end),
+                };
+                lhs = node;
             },
             .kw_as => {
                 if (self.suppress_as) return lhs;
@@ -1907,6 +2012,76 @@ fn parsePostfix(self: *Parser, lhs_in: *const Ast.Expr) !*const Ast.Expr {
             else => return lhs,
         }
     }
+}
+
+fn bracketStartsGenericCallTypeArgs(self: *Parser, lhs: *const Ast.Expr) bool {
+    switch (lhs.kind) {
+        .ident, .field_access => {},
+        else => return false,
+    }
+
+    // Require a type-like leading token to avoid ambiguity with indexing.
+    if (self.peek() != .identifier) return false;
+    const lead_span = self.currentSpan();
+    const lead_text = self.source[lead_span.start..lead_span.end];
+    if (!isLikelyTypeName(lead_text)) return false;
+
+    var depth: u32 = 1;
+    var i: usize = @intCast(self.pos);
+    while (i < self.tokens.len()) : (i += 1) {
+        const tag = self.tokens.tags.items[i];
+        switch (tag) {
+            .l_bracket => depth += 1,
+            .r_bracket => {
+                depth -= 1;
+                if (depth == 0) {
+                    const next_i = i + 1;
+                    if (next_i >= self.tokens.len()) return false;
+                    return self.tokens.tags.items[next_i] == .l_paren;
+                }
+            },
+            .identifier, .comma, .ampersand, .kw_mut, .star, .question, .kw_dyn, .kw_fn, .l_paren, .r_paren, .arrow, .dot, .int_literal => {},
+            else => return false,
+        }
+    }
+    return false;
+}
+
+fn consumeBracketedTypeArgs(self: *Parser) bool {
+    var depth: u32 = 1;
+    while (self.peek() != .eof) {
+        switch (self.peek()) {
+            .l_bracket => depth += 1,
+            .r_bracket => {
+                depth -= 1;
+                self.advance();
+                if (depth == 0) return true;
+                continue;
+            },
+            else => {},
+        }
+        self.advance();
+    }
+    return false;
+}
+
+fn isLikelyTypeName(name: []const u8) bool {
+    if (name.len == 0) return false;
+    const c0 = name[0];
+    if (c0 >= 'A' and c0 <= 'Z') return true;
+    return std.mem.eql(u8, name, "i8") or
+        std.mem.eql(u8, name, "i16") or
+        std.mem.eql(u8, name, "i32") or
+        std.mem.eql(u8, name, "i64") or
+        std.mem.eql(u8, name, "u8") or
+        std.mem.eql(u8, name, "u16") or
+        std.mem.eql(u8, name, "u32") or
+        std.mem.eql(u8, name, "u64") or
+        std.mem.eql(u8, name, "f32") or
+        std.mem.eql(u8, name, "f64") or
+        std.mem.eql(u8, name, "str") or
+        std.mem.eql(u8, name, "bool") or
+        std.mem.eql(u8, name, "Self");
 }
 
 fn parseVariantShorthand(self: *Parser) !*const Ast.Expr {
@@ -2450,46 +2625,75 @@ fn parseWithExpr(self: *Parser) !*const Ast.Expr {
     self.advance(); // consume 'with'
     self.skipNewlines();
 
-    // Parse the source expression, suppressing 'as' in postfix position
-    // so it's treated as the with-binding separator, not a type cast.
-    self.suppress_as = true;
-    const source = try self.parseExpr();
-    self.suppress_as = false;
+    const Clause = struct {
+        source: *const Ast.Expr,
+        name: Ast.Symbol,
+        is_mut: bool,
+    };
 
-    // Expect 'as'.
-    if (self.peek() != .kw_as) {
-        self.emitError("expected 'as' in with expression");
-        return error.ParseError;
+    var clauses: std.ArrayList(Clause) = .empty;
+
+    while (true) {
+        // Parse the source expression, suppressing 'as' in postfix position
+        // so it's treated as the with-binding separator, not a type cast.
+        self.suppress_as = true;
+        const source = try self.parseExpr();
+        self.suppress_as = false;
+
+        // Expect 'as'.
+        if (self.peek() != .kw_as) {
+            self.emitError("expected 'as' in with expression");
+            return error.ParseError;
+        }
+        self.advance(); // consume 'as'
+
+        // Check for 'mut'.
+        var is_mut = false;
+        if (self.peek() == .kw_mut) {
+            is_mut = true;
+            self.advance();
+        }
+
+        // Parse binding name.
+        const name = try self.expectIdentifier();
+
+        try clauses.append(self.arena, .{
+            .source = source,
+            .name = name,
+            .is_mut = is_mut,
+        });
+
+        if (self.peek() != .comma) break;
+        self.advance(); // consume ','
+        self.skipNewlines();
     }
-    self.advance(); // consume 'as'
-
-    // Check for 'mut'.
-    var is_mut = false;
-    if (self.peek() == .kw_mut) {
-        is_mut = true;
-        self.advance();
-    }
-
-    // Parse binding name.
-    const name = try self.expectIdentifier();
 
     // Expect ':' then body.
     if (self.peek() == .colon) {
         self.advance();
     }
-    const body = try self.parseBlockOrExpr();
+    var nested_body = try self.parseBlockOrExpr();
 
-    const node = try self.arena.create(Ast.Expr);
-    node.* = .{
-        .kind = .{ .with_expr = .{
-            .source = source,
-            .name = name,
-            .is_mut = is_mut,
-            .body = body,
-        } },
-        .span = start.merge(body.span),
-    };
-    return node;
+    // Lower multi-binding into nested with-expressions (right-associative):
+    // with a as x, b as y: body  =>  with a as x: with b as y: body
+    var i = clauses.items.len;
+    while (i > 0) {
+        i -= 1;
+        const c = clauses.items[i];
+        const node = try self.arena.create(Ast.Expr);
+        node.* = .{
+            .kind = .{ .with_expr = .{
+                .source = c.source,
+                .name = c.name,
+                .is_mut = c.is_mut,
+                .body = nested_body,
+            } },
+            .span = start.merge(nested_body.span),
+        };
+        nested_body = node;
+    }
+
+    return nested_body;
 }
 
 /// Parse `{ expr with field: val, ... }`

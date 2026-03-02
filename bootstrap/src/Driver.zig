@@ -683,45 +683,84 @@ fn processImports(self: *Driver, module: Ast.Module) ImportError!Ast.Module {
 /// Resolve a module path (e.g., ["std", "string"]) to a file path.
 /// Search order:
 ///   1. Relative to source directory: <source_dir>/<path>.w
-///   2. In lib/ relative to the compiler binary: lib/<path>.w
-///   3. In lib/ relative to working directory: lib/<path>.w
+///   2. In lib/ by walking parent directories from source_dir
+///   3. In lib/ relative to project root (directory containing build.zig)
+///   4. In lib/ relative to working directory: lib/<path>.w
 fn resolveModulePath(self: *Driver, path: []const Ast.Symbol) ImportError!?[]const u8 {
     const arena_alloc = self.arena.allocator();
 
-    // Build the relative path: join segments with '/' and append '.w'
-    var path_buf: [4096]u8 = undefined;
-    var pos: usize = 0;
+    var rel_buf_primary: [4096]u8 = undefined;
+    var rel_len_primary: usize = 0;
     for (path, 0..) |seg, i| {
         if (i > 0) {
-            path_buf[pos] = '/';
-            pos += 1;
+            rel_buf_primary[rel_len_primary] = '/';
+            rel_len_primary += 1;
         }
         const name = self.pool.resolve(seg);
-        if (pos + name.len >= path_buf.len) return null;
-        @memcpy(path_buf[pos .. pos + name.len], name);
-        pos += name.len;
+        if (rel_len_primary + name.len + 2 >= rel_buf_primary.len) return null;
+        @memcpy(rel_buf_primary[rel_len_primary .. rel_len_primary + name.len], name);
+        rel_len_primary += name.len;
     }
-    @memcpy(path_buf[pos .. pos + 2], ".w");
-    pos += 2;
-    const rel_path = path_buf[0..pos];
+    @memcpy(rel_buf_primary[rel_len_primary .. rel_len_primary + 2], ".w");
+    rel_len_primary += 2;
 
-    // Strategy 1: relative to source directory
-    {
-        const full = std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ self.source_dir, rel_path }) catch return null;
-        if (fileExists(full)) return full;
+    var rel_buf_fallback: [4096]u8 = undefined;
+    var rel_len_fallback: usize = 0;
+    var rel_candidates: [2][]const u8 = undefined;
+    var rel_count: usize = 0;
+    rel_candidates[rel_count] = rel_buf_primary[0..rel_len_primary];
+    rel_count += 1;
+
+    // Support item-import syntax like `use std.time.Duration` by falling back
+    // to module import path `std/time.w` when `std/time/Duration.w` is absent.
+    if (path.len > 1) {
+        for (path[0 .. path.len - 1], 0..) |seg, i| {
+            if (i > 0) {
+                rel_buf_fallback[rel_len_fallback] = '/';
+                rel_len_fallback += 1;
+            }
+            const name = self.pool.resolve(seg);
+            if (rel_len_fallback + name.len + 2 >= rel_buf_fallback.len) return null;
+            @memcpy(rel_buf_fallback[rel_len_fallback .. rel_len_fallback + name.len], name);
+            rel_len_fallback += name.len;
+        }
+        @memcpy(rel_buf_fallback[rel_len_fallback .. rel_len_fallback + 2], ".w");
+        rel_len_fallback += 2;
+        rel_candidates[rel_count] = rel_buf_fallback[0..rel_len_fallback];
+        rel_count += 1;
     }
 
-    // Strategy 2: lib/ relative to project root (find by looking for build.zig)
-    const project_root = findProjectRoot() catch null;
-    if (project_root) |root| {
-        const full = std.fmt.allocPrint(arena_alloc, "{s}/lib/{s}", .{ root, rel_path }) catch return null;
-        if (fileExists(full)) return full;
-    }
+    for (rel_candidates[0..rel_count]) |rel_path| {
+        // Strategy 1: relative to source directory
+        {
+            const full = std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ self.source_dir, rel_path }) catch return null;
+            if (fileExists(full)) return full;
+        }
 
-    // Strategy 3: lib/ relative to working directory
-    {
-        const full = std.fmt.allocPrint(arena_alloc, "lib/{s}", .{rel_path}) catch return null;
-        if (fileExists(full)) return full;
+        // Strategy 2: walk upward from source_dir and look for lib/<module>.w.
+        {
+            var cur = self.source_dir;
+            while (true) {
+                const full = std.fmt.allocPrint(arena_alloc, "{s}/lib/{s}", .{ cur, rel_path }) catch return null;
+                if (fileExists(full)) return full;
+                const parent = std.fs.path.dirname(cur) orelse break;
+                if (std.mem.eql(u8, parent, cur)) break;
+                cur = parent;
+            }
+        }
+
+        // Strategy 3: lib/ relative to project root (find by looking for build.zig)
+        const project_root = findProjectRoot() catch null;
+        if (project_root) |root| {
+            const full = std.fmt.allocPrint(arena_alloc, "{s}/lib/{s}", .{ root, rel_path }) catch return null;
+            if (fileExists(full)) return full;
+        }
+
+        // Strategy 4: lib/ relative to working directory
+        {
+            const full = std.fmt.allocPrint(arena_alloc, "lib/{s}", .{rel_path}) catch return null;
+            if (fileExists(full)) return full;
+        }
     }
 
     return null;
@@ -855,6 +894,11 @@ fn makeCImportCacheKey(
 }
 
 fn fileExists(path: []const u8) bool {
+    if (std.fs.path.isAbsolute(path)) {
+        const file = std.fs.openFileAbsolute(path, .{}) catch return false;
+        file.close();
+        return true;
+    }
     const file = std.fs.cwd().openFile(path, .{}) catch return false;
     file.close();
     return true;

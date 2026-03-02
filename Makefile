@@ -1,4 +1,4 @@
-.PHONY: bootstrap stage1 stage2 test-bootstrap test-stage1 test-stage2 test clean
+.PHONY: bootstrap stage1 stage2 gate-stage0 test-bootstrap test-stage1 test-stage2 test clean
 
 # Build bootstrap compiler (Zig -> bootstrap/zig-out/bin/with)
 bootstrap:
@@ -11,6 +11,10 @@ stage1: bootstrap
 # Stage 2: stage1 compiler builds itself
 stage2: bootstrap
 	./scripts/rebuild_selfhost.sh stage2
+
+# Stage 0 bootstrap contract gate (safe subset + expected fails)
+gate-stage0: bootstrap
+	./scripts/gate_stage0_subset.sh
 
 # Bootstrap compiler test run
 test-bootstrap: bootstrap

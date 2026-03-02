@@ -234,12 +234,20 @@ fn Parser.parse_module(self: Parser) -> AstPool:
     // Skip optional module declaration
     if self.peek() == TK_KW_MODULE():
         self.advance()
-        if self.peek() == TK_IDENT():
+        if self.peek() == TK_IDENT() or self.peek() == TK_DOT_IDENT():
             self.advance()
-        while self.peek() == TK_DOT():
-            self.advance()
-            if self.peek() == TK_IDENT():
+        while true:
+            if self.peek() == TK_DOT():
                 self.advance()
+                if self.peek() == TK_IDENT():
+                    self.advance()
+                else:
+                    break
+            else if self.peek() == TK_DOT_IDENT():
+                // .Uppercase segments are lexed as dot-identifiers.
+                self.advance()
+            else:
+                break
         self.skip_newlines()
 
     while self.peek() != TK_EOF():

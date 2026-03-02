@@ -49,6 +49,14 @@ else
 fi
 expect_cmd_pass "driver-run" bash -c "cd \"$tmpdir\" && \"$WITH_BIN\" run driver_main.w"
 
+cat >"$tmpdir/module_upper.w" <<'EOFU'
+module compiler.Compilation.Config
+
+fn main -> i32:
+    0
+EOFU
+expect_cmd_pass "driver-check-module-uppercase" bash -c "cd \"$tmpdir\" && \"$WITH_BIN\" check module_upper.w"
+
 mkdir -p "$tmpdir/pkg"
 cat >"$tmpdir/pkg/tests.w" <<'EOF2'
 use test.testing
@@ -62,6 +70,8 @@ fn test_add:
 EOF2
 expect_cmd_pass "driver-test-package" bash -c "cd \"$tmpdir/pkg\" && \"$WITH_BIN\" test"
 expect_cmd_pass "driver-test-list" bash -c "cd \"$tmpdir/pkg\" && \"$WITH_BIN\" test -list"
+expect_cmd_pass "driver-test-file-filter" bash -c "cd \"$tmpdir/pkg\" && \"$WITH_BIN\" test tests.w"
+expect_cmd_fail "driver-test-missing-file-filter" bash -c "cd \"$tmpdir/pkg\" && \"$WITH_BIN\" test does_not_exist.w"
 
 mkdir -p "$tmpdir/pkg_fail"
 cat >"$tmpdir/pkg_fail/tests.w" <<'EOF3'
