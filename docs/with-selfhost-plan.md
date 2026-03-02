@@ -1,6 +1,6 @@
 # Self-Hosting With — Architecture-First Plan
 
-**Status:** Wave 3 baseline implemented (AST/parser dump path + Wave 3 corpus parity gate).
+**Status:** Wave 4 baseline implemented (resolved/module-graph dump path + Wave 4 unit + parity gates).
 
 ---
 
