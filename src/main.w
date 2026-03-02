@@ -3,7 +3,7 @@
 // Usage:
 //   with run [file.w]     Build + run source file
 //   with build [file.w]   Build source file
-//   with check <file.w>   Parse and type-check (supports --dump-tokens)
+//   with check <file.w>   Parse and type-check (supports --dump-tokens/--dump-ast)
 //   with ir <file.w>      Dump LLVM IR
 //   with ast <file.w>     Parse and dump AST
 //   with tokens <file.w>  Lex and dump tokens
@@ -16,10 +16,6 @@
 use Compilation
 use Lexer
 use Token
-use InternPool
-use Parser
-use Diagnostic
-use Source
 use Ast
 use render
 
@@ -46,6 +42,7 @@ fn main -> void:
     var alloc_mode = false
     var release_mode = false
     var dump_tokens_flag = false
+    var dump_ast_flag = false
     var deterministic_mode = false
     var i = 2
     while i < argc:
@@ -68,6 +65,8 @@ fn main -> void:
             alloc_mode = true
         if arg == "--dump-tokens":
             dump_tokens_flag = true
+        if arg == "--dump-ast":
+            dump_ast_flag = true
         if arg == "--deterministic":
             deterministic_mode = true
         i = i + 1
@@ -103,7 +102,7 @@ fn main -> void:
             with_eprintln("error: 'ast' requires a source file argument")
             exit(1)
             return
-        exit(run_ast_command(source_file))
+        exit(dump_ast(source_file, no_std, alloc_mode, deterministic_mode))
         return
     if command == "check":
         if source_file == "":
@@ -111,7 +110,15 @@ fn main -> void:
             exit(1)
             return
         if dump_tokens_flag:
-            exit(dump_tokens(source_file, true))
+            let rc_tokens = dump_tokens(source_file, true)
+            if rc_tokens != 0:
+                exit(rc_tokens)
+                return
+            if not dump_ast_flag:
+                exit(0)
+                return
+        if dump_ast_flag:
+            exit(dump_ast(source_file, no_std, alloc_mode, true))
             return
         var comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode)
@@ -204,31 +211,47 @@ fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: b
     comp.print_warnings()
     with_system(bin_path)
 
-fn run_ast_command(source_file: str) -> i32:
-    let text = with_fs_read_file(source_file)
-    if text.len() == 0:
-        with_eprintln("error: cannot read '{source_file}'")
+fn dump_ast(source_file: str, no_std: bool, alloc_mode: bool, include_header: bool) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode)
+    let pool = comp.compile_file(source_file)
+    if pool.decl_count() == 0:
+        with_eprintln("error: check failed during compilation")
         return 1
-    var lexer = Lexer.init(text, 0)
-    let tokens = lexer.tokenize()
-    var intern = InternPool.init()
-    var diags = DiagnosticList.init()
-    var parser = Parser.init(tokens, text, 0, intern, diags)
-    let pool = parser.parse_module()
-    // Propagate parser changes back
-    intern = parser.intern
-    diags = parser.diags
-    if diags.has_errors():
-        let source = Source.from_string(source_file, text, 0)
-        diags.render_all(source)
-        return 1
-    // Render the AST
-    let rendered = render_module(pool, intern)
+
+    if include_header:
+        var module_start = 0
+        var module_end = 0
+        if pool.decl_count() > 0:
+            let first_decl = pool.get_decl(0)
+            let last_decl = pool.get_decl(pool.decl_count() - 1)
+            module_start = pool.get_start(first_decl)
+            module_end = pool.get_end(last_decl)
+        print("module span=" ++ int_to_string(module_start) ++ ".." ++ int_to_string(module_end) ++ " decls=" ++ int_to_string(pool.decl_count()) ++ "\n")
+        for i in 0..pool.decl_count():
+            let decl = pool.get_decl(i)
+            let kind_name = ast_decl_kind_name(pool.kind(decl))
+            print("decl[" ++ int_to_string(i) ++ "] kind=" ++ kind_name ++ " span=" ++ int_to_string(pool.get_start(decl)) ++ ".." ++ int_to_string(pool.get_end(decl)) ++ "\n")
+        print("---\n")
+
+    let rendered = render_module(pool, comp.driver.pool)
     if rendered.len() == 0:
         with_eprintln("error: parser produced an empty AST without diagnostics")
         return 1
     print(rendered)
     0
+
+fn ast_decl_kind_name(kind: i32) -> str:
+    if kind == NK_FN_DECL(): return "function"
+    if kind == NK_TYPE_DECL(): return "type_decl"
+    if kind == NK_USE_DECL(): return "use_decl"
+    if kind == NK_LET_DECL(): return "let_decl"
+    if kind == NK_EXTERN_FN(): return "extern_fn"
+    if kind == NK_C_IMPORT(): return "c_import"
+    if kind == NK_TRAIT_DECL(): return "trait_decl"
+    if kind == NK_IMPL_DECL(): return "impl_decl"
+    if kind == NK_POISONED_DECL(): return "poisoned"
+    "unknown"
 
 fn dump_tokens(source_file: str, deterministic: bool) -> i32:
     let text = with_fs_read_file(source_file)
@@ -316,7 +339,7 @@ fn print_usage:
     print("Commands:\n")
     print("  build [file.w]    Build a source file\n")
     print("  run [file.w]      Build + run a source file\n")
-    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens)\n")
+    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast)\n")
     print("  test [file.w]     Run tests\n")
     print("  clean             Delete .with/ artifacts\n")
     print("  ir <file.w>       Dump LLVM IR (debug)\n")

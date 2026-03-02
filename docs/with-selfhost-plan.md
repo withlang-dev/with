@@ -1,6 +1,6 @@
 # Self-Hosting With — Architecture-First Plan
 
-**Status:** Wave 2 implemented (foundation layer + lexer parity gate).
+**Status:** Wave 3 baseline implemented (AST/parser dump path + Wave 3 corpus parity gate).
 
 ---
 

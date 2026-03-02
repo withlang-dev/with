@@ -2,7 +2,7 @@
 
 ## Architecture-First Execution Plan
 
-**Status:** Wave 2 complete (foundations + Stage0 token-dump parity gate).
+**Status:** Wave 3 baseline complete (AST/parser dump path + Stage0 AST parity on Wave 3 corpus).
 **Goal:** Build a clean-room, self-hosted With compiler in With.
 **Bootstrap:** Stage0 (Zig implementation) remains semantic oracle.
 

@@ -416,7 +416,7 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
 
     // Store extra: type params then params already in extra from parsing.
     // We encode: d0=name, d1=body, d2=flags
-    let fn_node = self.pool.add_node(NK_FN_DECL(), start, self.prev_end(), name, body, flags)
+    let fn_node = self.pool.add_node(NK_FN_DECL(), start, self.pool.get_end(body), name, body, flags)
     self.pool.add_fn_meta(fn_node, flags, ret_type, params_start, param_count, tp_start, tp_count)
     fn_node
 
@@ -507,7 +507,14 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         return self.pool.add_node(NK_TYPE_DECL(), start, self.prev_end(), name, extra_start, TDK_DISTINCT())
 
     // Type alias
-    if self.peek() == TK_KW_FN() or self.peek() == TK_IDENT() or self.peek() == TK_AMPERSAND() or self.peek() == TK_L_PAREN():
+    if self.peek() == TK_KW_FN() or
+       self.peek() == TK_IDENT() or
+       self.peek() == TK_AMPERSAND() or
+       self.peek() == TK_L_PAREN() or
+       self.peek() == TK_QUESTION() or
+       self.peek() == TK_STAR() or
+       self.peek() == TK_L_BRACKET() or
+       self.peek() == TK_KW_DYN():
         let aliased = self.parse_type_expr()
         let extra_start = self.pool.extra_len()
         self.pool.add_extra(aliased)
@@ -759,6 +766,11 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> i32:
         flags = flags + 1
     if is_pub == VIS_PUBLIC():
         flags = flags + 2
+    if type_ann != 0:
+        let type_extra = self.pool.extra_len()
+        self.pool.add_extra(type_ann)
+        // Keep lower 2 bits for mut/pub; encode optional type at bit 2+.
+        flags = flags + (type_extra + 1) * 4
 
     self.pool.add_node(NK_LET_DECL(), start, self.prev_end(), name, value, flags)
 
@@ -1104,6 +1116,7 @@ fn Parser.parse_primary(self: Parser) -> i32:
     if t == TK_FLOAT_LIT(): return self.parse_float_literal()
     if t == TK_STRING_LIT(): return self.parse_string_literal()
     if t == TK_C_STRING_LIT(): return self.parse_c_string_literal()
+    if t == TK_CHAR_LIT(): return self.parse_char_literal()
     if t == TK_TRUE() or t == TK_FALSE(): return self.parse_bool_literal()
     if t == TK_IDENT(): return self.parse_ident_or_call()
     if t == TK_DOT_IDENT(): return self.parse_variant_shorthand()
@@ -1127,7 +1140,9 @@ fn Parser.parse_primary(self: Parser) -> i32:
     if t == TK_KW_YIELD(): return self.parse_yield()
     if t == TK_KW_COMPTIME(): return self.parse_comptime_expr()
     if t == TK_KW_SELECT(): return self.parse_select_await()
-    if t == TK_L_BRACKET(): return self.parse_array_literal()
+    if t == TK_L_BRACKET():
+        let arr = self.parse_array_literal()
+        return self.parse_postfix(arr)
     if t == TK_KW_LET() or t == TK_KW_VAR(): return self.parse_let_binding()
     if t == TK_KW_MATCH(): return self.parse_match_expr()
     if t == TK_KW_WITH(): return self.parse_with_expr()
@@ -1189,6 +1204,36 @@ fn Parser.parse_bool_literal(self: Parser) -> i32:
     let val = if self.peek() == TK_TRUE(): 1 else: 0
     self.advance()
     self.pool.add_node(NK_BOOL_LIT(), start, end, val, 0, 0)
+
+fn Parser.parse_char_literal(self: Parser) -> i32:
+    let start = self.current_start()
+    let end = self.current_end()
+    let text = self.source.slice(start as i64, end as i64)
+    self.advance()
+    // Stage0 parity: char literals lower to integer literals.
+    // Supported escapes mirror bootstrap parser behavior.
+    var value = 0
+    if text.len() >= 4 and text[1] == 92:  // '\'
+        let esc = text[2]
+        if esc == 110:  // n
+            value = 10
+        else if esc == 114:  // r
+            value = 13
+        else if esc == 116:  // t
+            value = 9
+        else if esc == 48:  // 0
+            value = 0
+        else if esc == 92:  // \
+            value = 92
+        else if esc == 39:  // '
+            value = 39
+        else if esc == 34:  // "
+            value = 34
+        else:
+            value = esc as i32
+    else if text.len() >= 3:
+        value = text[1] as i32
+    self.pool.add_node(NK_INT_LIT(), start, end, value, 0, 0)
 
 fn Parser.parse_ident_or_call(self: Parser) -> i32:
     let start = self.current_start()
@@ -2073,6 +2118,11 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
     var flags = 0
     if is_mut:
         flags = 1
+    if type_ann != 0:
+        let type_extra = self.pool.extra_len()
+        self.pool.add_extra(type_ann)
+        // Keep bit 0 for mut; encode optional type at bit 1+.
+        flags = flags + (type_extra + 1) * 2
     self.pool.add_node(NK_LET_BINDING(), start, self.prev_end(), name_sym, value, flags)
 
 // ── With expression ──────────────────────────────────────────────
@@ -2255,7 +2305,7 @@ fn Parser.parse_block_or_expr(self: Parser) -> i32:
         self.pool.add_extra(stmts.get(i as i64))
 
     let stmt_count = stmts.len() as i32
-    self.pool.add_node(NK_BLOCK(), self.pool.get_start(stmts.get(0)), self.prev_end(), extra_start, stmt_count, last_expr)
+    self.pool.add_node(NK_BLOCK(), self.pool.get_start(stmts.get(0)), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
 
 // ── Type expression parsing ──────────────────────────────────────
 
@@ -2453,6 +2503,7 @@ fn Parser.parse_type_params(self: Parser) -> i32:
 fn Parser.parse_one_type_param(self: Parser) -> i32:
     let name = self.expect_ident()
     self.pool.add_extra(name)
+    let count_idx = self.pool.add_extra(0)
     var bound_count = 0
     if self.peek() == TK_COLON():
         self.advance()
@@ -2464,7 +2515,7 @@ fn Parser.parse_one_type_param(self: Parser) -> i32:
             let b2 = self.parse_type_bound_symbol()
             self.pool.add_extra(b2)
             bound_count = bound_count + 1
-    self.pool.add_extra(bound_count)
+    self.pool.extra.set_i32(count_idx as i64, bound_count)
     1
 
 fn Parser.parse_type_bound_symbol(self: Parser) -> i32:

@@ -266,24 +266,28 @@ Corpus policy:
 
 ## Implementation Checklist
 
-- [ ] Freeze Wave 3 AST oracle contract against Stage0 current output.
-- [ ] Define Wave 3 AST parity corpus file.
-- [ ] Inventory Stage0 parser feature buckets from `bootstrap/src/Parser.zig` + `bootstrap/src/Parse.zig` tests.
+- [x] Freeze Wave 3 AST oracle contract against Stage0 current output.
+- [x] Define Wave 3 AST parity corpus file.
+- [x] Inventory Stage0 parser feature buckets from `bootstrap/src/Parser.zig` + `bootstrap/src/Parse.zig` tests.
 - [ ] Align `src/Ast.w` node coverage/flags/spans needed for Stage0 dump parity.
-- [ ] Align module span + decl span computation with Stage0 behavior.
+- [x] Align module span + decl span computation with Stage0 behavior.
 - [ ] Align top-level declaration parsing parity (`fn/type/use/let/extern/trait/impl/extend/c_import`).
 - [ ] Align attribute parsing parity (`@[...]` forms used in Stage0).
 - [ ] Align expression parser precedence/associativity with Stage0.
-- [ ] Add/align missing literal expression parsing (including `char` literal expressions).
+- [x] Add/align missing literal expression parsing (including `char` literal expressions).
 - [ ] Align type-expression parsing parity.
 - [ ] Align pattern parsing parity.
 - [ ] Align parser recovery behavior for deterministic outputs.
-- [ ] Align `src/render.w` with Stage0 AST render format.
-- [ ] Add self-host `check --dump-ast` support in `src/main.w`.
-- [ ] Route `ast` command through shared dump formatting path where practical.
-- [ ] Add `test/wave3/` parser and render unit tests.
-- [ ] Add deterministic AST dump format checks.
-- [ ] Add `scripts/run_wave3_parser_unit_tests.sh`.
-- [ ] Add `scripts/run_wave3_ast_parity.sh` (Stage0 vs self-host diff + determinism re-run).
-- [ ] Verify Wave 3 gates pass locally.
-- [ ] Mark Wave 3 progress in `docs/with-selfhost-plan.md` and `docs/with-selfhost-detailed-plan.md`.
+- [x] Align `src/render.w` with Stage0 AST render format.
+- [x] Add self-host `check --dump-ast` support in `src/main.w`.
+- [x] Route `ast` command through shared dump formatting path where practical.
+- [x] Add `test/wave3/` parser and render unit tests.
+- [x] Add deterministic AST dump format checks.
+- [x] Add `scripts/run_wave3_parser_unit_tests.sh`.
+- [x] Add `scripts/run_wave3_ast_parity.sh` (Stage0 vs self-host diff + determinism re-run).
+- [x] Verify Wave 3 gates pass locally.
+- [x] Mark Wave 3 progress in `docs/with-selfhost-plan.md` and `docs/with-selfhost-detailed-plan.md`.
+
+Current scope note:
+- Wave 3 parity gate is green for the explicit Wave 3 corpus in `test/wave3/ast_corpus.txt`.
+- Unchecked items above remain follow-up work to broaden parity coverage (notably full top-level declaration parity, attribute parity, and parser recovery parity).
