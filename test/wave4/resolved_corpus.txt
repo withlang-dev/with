@@ -1,0 +1,7 @@
+# Wave 4 resolved-dump corpus.
+# One source path per line; scripts sort this list before execution.
+
+test/wave4/cases/basic_root.w
+test/wave4/cases/cimport_root.w
+test/wave4/cases/cycle_root.w
+test/wave4/cases/fallback_root.w

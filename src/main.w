@@ -3,7 +3,7 @@
 // Usage:
 //   with run [file.w]     Build + run source file
 //   with build [file.w]   Build source file
-//   with check <file.w>   Parse and type-check (supports --dump-tokens/--dump-ast)
+//   with check <file.w>   Parse and type-check (supports --dump-tokens/--dump-ast/--dump-resolved)
 //   with ir <file.w>      Dump LLVM IR
 //   with ast <file.w>     Parse and dump AST
 //   with tokens <file.w>  Lex and dump tokens
@@ -18,6 +18,7 @@ use Lexer
 use Token
 use Ast
 use render
+use Resolve
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
@@ -43,6 +44,7 @@ fn main -> void:
     var release_mode = false
     var dump_tokens_flag = false
     var dump_ast_flag = false
+    var dump_resolved_flag = false
     var deterministic_mode = false
     var i = 2
     while i < argc:
@@ -67,6 +69,8 @@ fn main -> void:
             dump_tokens_flag = true
         if arg == "--dump-ast":
             dump_ast_flag = true
+        if arg == "--dump-resolved":
+            dump_resolved_flag = true
         if arg == "--deterministic":
             deterministic_mode = true
         i = i + 1
@@ -119,6 +123,9 @@ fn main -> void:
                 return
         if dump_ast_flag:
             exit(dump_ast(source_file, no_std, alloc_mode, true))
+            return
+        if dump_resolved_flag:
+            exit(dump_resolved_artifact(source_file, no_std, alloc_mode))
             return
         var comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode)
@@ -282,6 +289,16 @@ fn dump_tokens(source_file: str, deterministic: bool) -> i32:
         print(tag_text ++ " |" ++ text_slice ++ "|\n")
     0
 
+fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode)
+    let result = comp.driver.resolve_file(source_file, true)
+    if comp.driver.diagnostics.has_errors():
+        with_eprintln("error: resolved dump failed")
+        return 1
+    print(dump_resolved(result, comp.driver.pool, source_file))
+    0
+
 fn escape_dump_lexeme(text: str) -> str:
     var out = ""
     for i in 0..text.len():
@@ -339,7 +356,7 @@ fn print_usage:
     print("Commands:\n")
     print("  build [file.w]    Build a source file\n")
     print("  run [file.w]      Build + run a source file\n")
-    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast)\n")
+    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved)\n")
     print("  test [file.w]     Run tests\n")
     print("  clean             Delete .with/ artifacts\n")
     print("  ir <file.w>       Dump LLVM IR (debug)\n")

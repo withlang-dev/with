@@ -323,24 +323,29 @@ Corpus policy:
 
 ## Implementation Checklist
 
-- [ ] Define Wave 4 resolved dump contract and deterministic ordering rules.
-- [ ] Create `test/wave4/resolved_corpus.txt`.
-- [ ] Implement `ModuleGraph` tables keyed by `ModuleId`.
-- [ ] Port Stage0 module-path search/fallback behavior to self-host resolver path.
-- [ ] Implement duplicate/cycle import suppression semantics matching Stage0.
-- [ ] Model `use` edges explicitly in module graph.
-- [ ] Model minimal `c_import` edges and link-lib tracking in module graph.
-- [ ] Implement `DefTable` with stable `DefId` assignment.
-- [ ] Define `DefKind` coverage for Wave 4 (top-level + required scoped bindings).
-- [ ] Implement lexical scope graph and deterministic binding maps.
-- [ ] Implement AST -> resolved HIR mapping for identifier/path uses.
-- [ ] Wire resolve stage into frontend pipeline (`Zcu`/frontend orchestration).
-- [ ] Add compatibility bridge for existing AST consumers where required.
-- [ ] Add CLI support for `check --dump-resolved`.
-- [ ] Implement deterministic resolved dump emitter.
-- [ ] Add resolver/module-graph unit tests in `test/wave4/`.
-- [ ] Add deterministic rerun checks for resolved dumps.
-- [ ] Add `scripts/run_wave4_resolve_unit_tests.sh`.
-- [ ] Add `scripts/run_wave4_resolved_parity.sh`.
-- [ ] Verify Wave 4 gates pass locally.
-- [ ] Mark Wave 4 progress in `docs/with-selfhost-plan.md` and `docs/with-selfhost-detailed-plan.md`.
+- [x] Define Wave 4 resolved dump contract and deterministic ordering rules.
+- [x] Create `test/wave4/resolved_corpus.txt`.
+- [x] Implement `ModuleGraph` tables keyed by `ModuleId`.
+- [x] Port Stage0 module-path search/fallback behavior to self-host resolver path.
+- [x] Implement duplicate/cycle import suppression semantics matching Stage0.
+- [x] Model `use` edges explicitly in module graph.
+- [x] Model minimal `c_import` edges and link-lib tracking in module graph.
+- [x] Implement `DefTable` with stable `DefId` assignment.
+- [x] Define `DefKind` coverage for Wave 4 (top-level + required scoped bindings).
+- [x] Implement lexical scope graph and deterministic binding maps.
+- [x] Implement AST -> resolved HIR mapping for identifier/path uses.
+- [x] Wire resolve stage into frontend pipeline (`Zcu`/frontend orchestration).
+- [x] Add compatibility bridge for existing AST consumers where required.
+- [x] Add CLI support for `check --dump-resolved`.
+- [x] Implement deterministic resolved dump emitter.
+- [x] Add resolver/module-graph unit tests in `test/wave4/`.
+- [x] Add deterministic rerun checks for resolved dumps.
+- [x] Add `scripts/run_wave4_resolve_unit_tests.sh`.
+- [x] Add `scripts/run_wave4_resolved_parity.sh`.
+- [x] Verify Wave 4 gates pass locally.
+- [x] Mark Wave 4 progress in `docs/with-selfhost-plan.md` and `docs/with-selfhost-detailed-plan.md`.
+
+Current scope note:
+- `--dump-resolved` now includes identifier-use mapping from root-module function bodies and signatures; imported modules keep deterministic module/import/def/scope/binding coverage without deep body-use traversal (performance guard for Wave 4).
+- Cycle handling is covered in both unit tests and parity corpus (`test/wave4/cases/cycle_*`).
+- Bootstrap import resolution now supports both nested relative imports (`use b`) and nested package-qualified imports (`use cycle.b`) via root-source-dir fallback.

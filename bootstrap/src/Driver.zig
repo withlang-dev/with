@@ -30,6 +30,10 @@ arena: std.heap.ArenaAllocator,
 imported_paths: std.StringHashMapUnmanaged(void),
 /// Directory of the main source file being compiled (for relative imports).
 source_dir: []const u8,
+/// Root source directory for the current compilation unit.
+/// This stays anchored to the entry file and is used as a fallback
+/// when resolving package-qualified imports from nested modules.
+root_source_dir: []const u8,
 /// Next file ID for imported sources.
 next_file_id: Span.FileId,
 /// Rendered warning messages to print after compilation.
@@ -63,6 +67,7 @@ pub fn init(allocator: std.mem.Allocator) Driver {
         .arena = std.heap.ArenaAllocator.init(allocator),
         .imported_paths = .empty,
         .source_dir = ".",
+        .root_source_dir = ".",
         .next_file_id = 1,
         .pending_warnings = .empty,
         .opt_level = 0,
@@ -99,6 +104,7 @@ pub fn deinit(self: *Driver) void {
 pub fn compileFile(self: *Driver, path: []const u8) !?Ast.Module {
     // Store source directory for import resolution.
     self.source_dir = std.fs.path.dirname(path) orelse ".";
+    self.root_source_dir = self.source_dir;
     self.current_source_path = path;
 
     // Load source.
@@ -799,6 +805,7 @@ fn processImports(self: *Driver, module: Ast.Module) ImportError!Ast.Module {
 ///   4. In src/ relative to project root (self-host modules): <root>/src/<path>.w
 ///   5. In src/ relative to working directory: src/<path>.w
 ///   6. In lib/ relative to working directory: lib/<path>.w
+///   7. Relative to entry source directory: <root_source_dir>/<path>.w
 fn resolveModulePath(self: *Driver, path: []const Ast.Symbol) ImportError!?[]const u8 {
     const arena_alloc = self.arena.allocator();
 
@@ -882,6 +889,14 @@ fn resolveModulePath(self: *Driver, path: []const Ast.Symbol) ImportError!?[]con
         // Strategy 6: lib/ relative to working directory
         {
             const full = std.fmt.allocPrint(arena_alloc, "lib/{s}", .{rel_path}) catch return null;
+            if (fileExists(full)) return full;
+        }
+
+        // Strategy 7: relative to root source directory (entry file dir).
+        // This enables nested package-qualified imports in local module trees:
+        // root.w -> use cycle.a ; cycle/a.w -> use cycle.b
+        if (!std.mem.eql(u8, self.root_source_dir, self.source_dir)) {
+            const full = std.fmt.allocPrint(arena_alloc, "{s}/{s}", .{ self.root_source_dir, rel_path }) catch return null;
             if (fileExists(full)) return full;
         }
     }

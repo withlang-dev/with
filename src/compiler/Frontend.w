@@ -3,6 +3,7 @@ use Lexer
 use Parser
 use Source
 use Sema
+use Resolve
 use compiler.Zcu
 
 extern fn with_fs_read_file(path: str) -> str
@@ -18,6 +19,8 @@ fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
     let text = with_fs_read_file(path)
     if text.len() == 0:
         with_eprintln("error: cannot open '" ++ path ++ "'")
+        self.last_resolved = ResolveResult.init()
+        self.resolved_root_path = path
         return AstPool.new()
 
     self.current_source_text = text
@@ -42,7 +45,16 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
+        self.last_resolved = ResolveResult.init()
+        self.resolved_root_path = name
         return AstPool.new()
+
+    // Wave 4: sidecar resolved artifact.
+    let artifacts = resolve_from_root_pool(name, text, file_id, pool, self.pool, self.diagnostics, false)
+    self.pool = artifacts.pool
+    self.diagnostics = artifacts.diags
+    self.last_resolved = artifacts.result
+    self.resolved_root_path = name
 
     // Phase 2.5: Import expansion to a fixed point.
     for import_passes in 0..64:
@@ -61,6 +73,8 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
+        self.last_resolved = ResolveResult.init()
+        self.resolved_root_path = name
         return AstPool.new()
 
     if pool.decl_count() == 0:

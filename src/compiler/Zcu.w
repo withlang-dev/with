@@ -1,5 +1,6 @@
 use InternPool
 use Diagnostic
+use Resolve
 
 extern fn with_eprintln(s: str) -> void
 
@@ -16,6 +17,8 @@ type Zcu = {
     current_source_path: str,
     current_source_text: str,
     pending_warnings: Vec[str],
+    last_resolved: ResolveResult,
+    resolved_root_path: str,
 }
 
 fn Zcu.init -> Zcu:
@@ -28,6 +31,8 @@ fn Zcu.init -> Zcu:
         current_source_path: "<unknown>",
         current_source_text: "",
         pending_warnings: Vec.new(),
+        last_resolved: ResolveResult.init(),
+        resolved_root_path: "",
     }
 
 fn Zcu.reset_import_state(self: Zcu):

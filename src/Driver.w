@@ -15,6 +15,7 @@ use Span
 use Sema
 use Codegen
 use CImport
+use Resolve
 
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_eprintln(s: str) -> void
@@ -43,6 +44,10 @@ type Driver = {
     current_source_text: str,
     // Pending warning messages.
     pending_warnings: Vec[str],
+    // Wave 4 resolve artifact from the most recent compile/resolve run.
+    last_resolved: ResolveResult,
+    // Root path used when producing the last resolve artifact.
+    resolved_root_path: str,
 }
 
 fn Driver.init -> Driver:
@@ -58,6 +63,8 @@ fn Driver.init -> Driver:
         current_source_path: "<unknown>",
         current_source_text: "",
         pending_warnings: Vec.new(),
+        last_resolved: ResolveResult.init(),
+        resolved_root_path: "",
     }
 
 fn Driver.deinit(self: Driver):
@@ -80,6 +87,8 @@ fn Driver.compile_file(self: Driver, path: str) -> AstPool:
     let text = with_fs_read_file(path)
     if text.len() == 0:
         with_eprintln("error: cannot open '" ++ path ++ "'")
+        self.last_resolved = ResolveResult.init()
+        self.resolved_root_path = path
         return AstPool.new()
 
     self.current_source_text = text
@@ -87,6 +96,45 @@ fn Driver.compile_file(self: Driver, path: str) -> AstPool:
     if pool.decl_count() == 0 and not self.diagnostics.has_errors():
         with_eprintln("error: compiler produced an empty module for '" ++ path ++ "'")
     pool
+
+fn Driver.resolve_file(self: Driver, path: str, emit_resolve_diags: bool) -> ResolveResult:
+    self.source_dir = dirname(path)
+    self.current_source_path = path
+
+    let text = with_fs_read_file(path)
+    if text.len() == 0:
+        with_eprintln("error: cannot open '" ++ path ++ "'")
+        self.last_resolved = ResolveResult.init()
+        self.resolved_root_path = path
+        return self.last_resolved
+
+    self.current_source_text = text
+
+    var lexer = Lexer.init(text, 0)
+    let tokens = lexer.tokenize()
+    var parser = Parser.init(tokens, text, 0, self.pool, self.diagnostics)
+    let pool = parser.parse_module()
+    self.pool = parser.intern
+    self.diagnostics = parser.diags
+
+    if self.diagnostics.has_errors():
+        let source = Source.from_string(path, text, 0)
+        self.diagnostics.render_all(source)
+        self.last_resolved = ResolveResult.init()
+        self.resolved_root_path = path
+        return self.last_resolved
+
+    let artifacts = resolve_from_root_pool(path, text, 0, pool, self.pool, self.diagnostics, emit_resolve_diags)
+    self.pool = artifacts.pool
+    self.diagnostics = artifacts.diags
+    self.last_resolved = artifacts.result
+    self.resolved_root_path = path
+
+    if emit_resolve_diags and self.diagnostics.has_errors():
+        let source = Source.from_string(path, text, 0)
+        self.diagnostics.render_all(source)
+
+    self.last_resolved
 
 // Compile from already-loaded source text.
 fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> AstPool:
@@ -107,6 +155,13 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
         return AstPool.new()
+
+    // Wave 4: build a deterministic resolved module graph sidecar.
+    let artifacts = resolve_from_root_pool(name, text, file_id, pool, self.pool, self.diagnostics, false)
+    self.pool = artifacts.pool
+    self.diagnostics = artifacts.diags
+    self.last_resolved = artifacts.result
+    self.resolved_root_path = name
 
     // Phase 2.5: Process use imports.
     // Iterate to a fixed point so nested imports are resolved.
@@ -320,24 +375,18 @@ fn Driver.use_path_name(self: Driver, pool: AstPool, path_start: i32, path_count
 
 fn Driver.resolve_module_path(self: Driver, module_name: str) -> str:
     let module_rel = normalize_module_path(module_name)
-
-    // Strategy 1: relative to source directory
-    let path1 = self.source_dir ++ "/" ++ module_rel ++ ".w"
-    let text1 = with_fs_read_file(path1)
-    if text1.len() > 0:
+    let primary = module_rel ++ ".w"
+    let path1 = resolve_module_rel_from(self.source_dir, primary)
+    if path1.len() > 0:
         return path1
 
-    // Strategy 2: lib/ relative to working directory
-    let path2 = "lib/" ++ module_rel ++ ".w"
-    let text2 = with_fs_read_file(path2)
-    if text2.len() > 0:
-        return path2
-
-    // Strategy 3: src/ directory (for self-hosted imports)
-    let path3 = "src/" ++ module_rel ++ ".w"
-    let text3 = with_fs_read_file(path3)
-    if text3.len() > 0:
-        return path3
+    // Item-import fallback:
+    // use std.time.Duration -> try std/time.w if std/time/Duration.w is missing.
+    let fallback = module_item_fallback(module_rel)
+    if fallback.len() > 0:
+        let path2 = resolve_module_rel_from(self.source_dir, fallback ++ ".w")
+        if path2.len() > 0:
+            return path2
 
     ""
 
@@ -349,6 +398,80 @@ fn normalize_module_path(module_name: str) -> str:
         else:
             out = out ++ module_name.slice(i as i64, (i + 1) as i64)
     out
+
+fn module_item_fallback(module_rel: str) -> str:
+    var last_slash = -1
+    for i in 0..module_rel.len():
+        if module_rel[i] == 47:
+            last_slash = i as i32
+    if last_slash <= 0:
+        return ""
+    module_rel.slice(0, last_slash as i64)
+
+fn resolve_module_rel_from(source_dir: str, rel_path: str) -> str:
+    // Strategy 1: relative to current source directory.
+    let cand1 = resolve_join(source_dir, rel_path)
+    if resolve_file_exists(cand1):
+        return cand1
+
+    // Strategy 2: walk upward and probe lib/<rel_path>.
+    var cur = source_dir
+    while true:
+        let cand = resolve_join(resolve_join(cur, "lib"), rel_path)
+        if resolve_file_exists(cand):
+            return cand
+        let parent = dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+
+    // Strategy 3/4: project root by build.zig, then lib/ and src/.
+    let root = find_project_root(source_dir)
+    if root.len() > 0:
+        let cand3 = resolve_join(resolve_join(root, "lib"), rel_path)
+        if resolve_file_exists(cand3):
+            return cand3
+        let cand4 = resolve_join(resolve_join(root, "src"), rel_path)
+        if resolve_file_exists(cand4):
+            return cand4
+
+    // Strategy 5: src/<rel_path> from cwd.
+    let cand5 = resolve_join("src", rel_path)
+    if resolve_file_exists(cand5):
+        return cand5
+
+    // Strategy 6: lib/<rel_path> from cwd.
+    let cand6 = resolve_join("lib", rel_path)
+    if resolve_file_exists(cand6):
+        return cand6
+
+    ""
+
+fn find_project_root(start_dir: str) -> str:
+    var cur = start_dir
+    while true:
+        let build_file = resolve_join(cur, "build.zig")
+        if resolve_file_exists(build_file):
+            return cur
+        let parent = dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+    ""
+
+fn resolve_file_exists(path: str) -> bool:
+    with_fs_read_file(path).len() > 0
+
+fn resolve_join(a: str, b: str) -> str:
+    if a.len() == 0:
+        return b
+    if b.len() == 0:
+        return a
+    if a == ".":
+        return b
+    if a.ends_with("/"):
+        return a ++ b
+    a ++ "/" ++ b
 
 fn Driver.parse_imported_file(self: Driver, path: str, target_pool: AstPool) -> AstPool:
     let text = with_fs_read_file(path)
