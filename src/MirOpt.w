@@ -42,7 +42,7 @@ type MirOptFunction = {
 
 fn MirOptFunction.init(name: str) -> MirOptFunction:
     MirOptFunction {
-        name: name,
+        name,
         calls: Vec.new(),
         allocations: Vec.new(),
         moves: Vec.new(),
@@ -55,7 +55,7 @@ type MirOptTypeDecl = {
 
 fn MirOptTypeDecl.init(name: str) -> MirOptTypeDecl:
     MirOptTypeDecl {
-        name: name,
+        name,
         fields: Vec.new(),
     }
 

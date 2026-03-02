@@ -162,9 +162,9 @@ type Sema = {
 
 fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     var s = Sema {
-        pool: pool,
-        diags: diags,
-        ast: ast,
+        pool,
+        diags,
+        ast,
         type_kinds: Vec.new(),
         type_d0: Vec.new(),
         type_d1: Vec.new(),

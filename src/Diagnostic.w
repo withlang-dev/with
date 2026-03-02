@@ -32,7 +32,7 @@ type Diagnostic = {
 fn Diagnostic.err(message: str, span: Span) -> Diagnostic:
     Diagnostic {
         severity: SEV_ERROR(),
-        message: message,
+        message,
         primary: span,
         labels: Vec.new(),
         notes: Vec.new(),
@@ -43,7 +43,7 @@ fn Diagnostic.err(message: str, span: Span) -> Diagnostic:
 fn Diagnostic.warn(message: str, span: Span) -> Diagnostic:
     Diagnostic {
         severity: SEV_WARNING(),
-        message: message,
+        message,
         primary: span,
         labels: Vec.new(),
         notes: Vec.new(),

@@ -40,19 +40,19 @@ fn Source.from_file(path: str, file_id: FileId) -> Source:
     let text = with_fs_read_file(path)
     Source {
         name: path,
-        text: text,
+        text,
         line_offsets: Source.compute_line_offsets(text),
-        file_id: file_id,
+        file_id,
         owns_text: true,
     }
 
 // Create a Source from an in-memory string (useful for tests).
 fn Source.from_string(name: str, text: str, file_id: FileId) -> Source:
     Source {
-        name: name,
-        text: text,
+        name,
+        text,
         line_offsets: Source.compute_line_offsets(text),
-        file_id: file_id,
+        file_id,
         owns_text: false,
     }
 
@@ -69,7 +69,7 @@ fn Source.offset_to_location(self: Source, offset: i32) -> Location:
             hi = mid
     let line = lo - 1
     let col = offset - self.line_offsets.get(line as i64)
-    Location { line: line, col: col }
+    Location { line, col }
 
 // Extract the source line that contains the given line index.
 fn Source.line_text(self: Source, line: i32) -> str:
