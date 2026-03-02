@@ -21,7 +21,7 @@ impl UserRepository for PgUserRepo:
             "SELECT id, name, email, role, active FROM users WHERE id = $1",
             &[&id],
         ).await?
-        row.map(|r| row_to_user(r))
+        row.map(row_to_user)
 
     async fn find_by_email(self: &PgUserRepo, email: &str) -> Result[Option[User], DbError]:
         let conn = self.pool.acquire().await?
@@ -29,7 +29,7 @@ impl UserRepository for PgUserRepo:
             "SELECT id, name, email, role, active FROM users WHERE email = $1",
             &[&email],
         ).await?
-        row.map(|r| row_to_user(r))
+        row.map(row_to_user)
 
     async fn list_active(self: &PgUserRepo, limit: i32, offset: i32) -> Result[Vec[User], DbError]:
         let conn = self.pool.acquire().await?
@@ -37,7 +37,7 @@ impl UserRepository for PgUserRepo:
             "SELECT id, name, email, role, active FROM users WHERE active = true LIMIT $1 OFFSET $2",
             &[&limit, &offset],
         ).await?
-        rows |> map(|r| row_to_user(r)) |> collect()
+        rows |> map(row_to_user) |> collect()
 
     async fn insert(self: &PgUserRepo, user: &User) -> Result[UserId, DbError]:
         let conn = self.pool.acquire().await?

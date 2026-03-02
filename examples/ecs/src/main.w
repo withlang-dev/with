@@ -66,8 +66,7 @@ fn main:
 
     // Print entity positions using query pipeline
     println("\nEntity positions:")
-    for item in query2(&world.transforms, &world.sprites):
-        let (entity, tf, sprite) = item
+    for (entity, tf, sprite) in query2(&world.transforms, &world.sprites):
         with world.entity_name(entity) as name:
             let label = name.unwrap_or("?")
             println("  {label} -> ({tf.position.x:.1}, {tf.position.y:.1}) tex={texture_name(sprite.texture)}")

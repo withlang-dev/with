@@ -5,13 +5,14 @@ use test.testing
 type JsonTag = Null | Bool | Number | Str
 
 fn classify_char(ch: i32) -> i32:
-    if ch == 123 then 1
-    else if ch == 125 then 2
-    else if ch == 91 then 3
-    else if ch == 93 then 4
-    else if ch == 58 then 5
-    else if ch == 44 then 6
-    else 0
+    match ch
+        123 -> 1   // {
+        125 -> 2   // }
+        91  -> 3   // [
+        93  -> 4   // ]
+        58  -> 5   // :
+        44  -> 6   // ,
+        _   -> 0
 
 fn update_depth(depth: i32, cls: i32) -> i32:
     if cls in [1, 3] then depth + 1

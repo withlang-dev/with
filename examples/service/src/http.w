@@ -38,9 +38,8 @@ async fn handle_list(state: &AppState, req: &HttpRequest) -> HttpResponse:
         Err(e)    -> HttpResponse.internal_error(&e.to_string())
 
 async fn handle_create(state: &AppState, req: &HttpRequest) -> HttpResponse:
-    let body = match req.json[CreateUserRequest]()
-        Ok(b)  -> b
-        Err(_) -> return HttpResponse.bad_request("invalid request body")
+    let Ok(body) = req.json[CreateUserRequest]() else
+        return HttpResponse.bad_request("invalid request body")
 
     // Actor ID from auth middleware (stored in request extensions)
     let actor = req.extension[UserId]() ?? UserId(0)
@@ -55,9 +54,8 @@ async fn handle_update(state: &AppState, req: &HttpRequest, id_str: &str) -> Htt
         Ok(n)  -> UserId(n)
         Err(_) -> return HttpResponse.bad_request("invalid user id")
 
-    let update = match req.json[UserUpdate]()
-        Ok(u)  -> u
-        Err(_) -> return HttpResponse.bad_request("invalid request body")
+    let Ok(update) = req.json[UserUpdate]() else
+        return HttpResponse.bad_request("invalid request body")
 
     let actor = req.extension[UserId]() ?? UserId(0)
 
