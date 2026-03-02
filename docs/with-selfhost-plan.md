@@ -1,5 +1,7 @@
 # Self-Hosting With — Architecture-First Plan
 
+**Status:** Phase 0 implemented in Stage0 (stable dumps + golden baseline).
+
 ---
 
 # 0. Guiding Principles
@@ -525,4 +527,3 @@ This plan is:
 * Architecturally principled
 * Scalable
 * Far safer than the original “mutate Zig compiler” idea
-

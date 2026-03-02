@@ -1,0 +1,15 @@
+typed module decls=2
+decl[0] kind=function span=0..49
+  fn swap(a: i32, b: i32) -> (_, _)
+    expr tuple span=43..49 : (_, _)
+decl[1] kind=function span=51..152
+  fn main() -> i32
+    expr block span=71..152 : void
+      expr let_binding span=71..90 : void
+        bind pair: (_, _)
+      expr let_binding span=95..109 : void
+        bind x: i32
+      expr let_binding span=114..128 : void
+        bind y: i32
+      expr call span=133..152 : void
+        expr ident span=133..139 : void

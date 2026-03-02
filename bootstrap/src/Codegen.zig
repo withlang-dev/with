@@ -762,13 +762,26 @@ pub fn emitObjectFile(self: *Codegen, path: [*:0]const u8) Error!void {
 
 /// Print LLVM IR text to stdout.
 pub fn printIR(self: *const Codegen) void {
+    var buf: [8192]u8 = undefined;
+    var w = std.fs.File.stdout().writer(&buf);
+    self.writeIR(&w.interface) catch {};
+    w.interface.flush() catch {};
+}
+
+/// Write LLVM IR text to the provided writer.
+pub fn writeIR(self: *const Codegen, writer: anytype) !void {
     const ir = c.LLVMPrintModuleToString(self.module);
     defer c.LLVMDisposeMessage(ir);
     const slice = std.mem.span(ir);
-    var buf: [8192]u8 = undefined;
-    var w = std.fs.File.stdout().writer(&buf);
-    w.interface.writeAll(slice) catch {};
-    w.interface.flush() catch {};
+    try writer.writeAll(slice);
+}
+
+/// Return LLVM IR text as an owned slice.
+pub fn irStringAlloc(self: *const Codegen, allocator: std.mem.Allocator) ![]u8 {
+    const ir = c.LLVMPrintModuleToString(self.module);
+    defer c.LLVMDisposeMessage(ir);
+    const slice = std.mem.span(ir);
+    return try allocator.dupe(u8, slice);
 }
 
 // ── Function declaration (pass 1) ────────────────────────────────

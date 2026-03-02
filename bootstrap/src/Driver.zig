@@ -46,6 +46,8 @@ trace_c_import_cache: bool,
 no_std: bool,
 /// Alloc tier: core + heap types but no OS (§18.7).
 alloc: bool,
+/// Deterministic output mode for dump workflows.
+deterministic: bool,
 /// Path of the main source file being compiled (for __FILE__).
 current_source_path: []const u8 = "<unknown>",
 /// Source text of the main file (for __LINE__ span→line mapping).
@@ -69,6 +71,7 @@ pub fn init(allocator: std.mem.Allocator) Driver {
         .trace_c_import_cache = false,
         .no_std = false,
         .alloc = false,
+        .deterministic = false,
     };
 }
 
@@ -200,12 +203,50 @@ pub fn compileSource(self: *Driver, source: *Source) !?Ast.Module {
     return module;
 }
 
+/// Write AST dump text to any writer.
+pub fn writeAst(self: *const Driver, module: *const Ast.Module, writer: anytype, include_header: bool) !void {
+    if (include_header) {
+        try writer.print("module span={d}..{d} decls={d}\n", .{
+            module.span.start,
+            module.span.end,
+            module.decls.len,
+        });
+        for (module.decls, 0..) |decl, idx| {
+            try writer.print("decl[{d}] kind={s} span={d}..{d}\n", .{
+                idx,
+                @tagName(decl.kind),
+                decl.span.start,
+                decl.span.end,
+            });
+        }
+        try writer.writeAll("---\n");
+    }
+    try render.renderModule(module, &self.pool, writer);
+}
+
 /// Print the AST for debugging.
 pub fn dumpAst(self: *const Driver, module: *const Ast.Module) !void {
     var buf: [8192]u8 = undefined;
     var w = std.fs.File.stdout().writer(&buf);
-    try render.renderModule(module, &self.pool, &w.interface);
+    try self.writeAst(module, &w.interface, self.deterministic);
     try w.interface.flush();
+}
+
+/// Write typed dump text for a checked module.
+pub fn writeTyped(self: *Driver, module: *const Ast.Module, writer: anytype) !bool {
+    var typed_diags = Diagnostic.DiagnosticList.init(self.allocator);
+    defer typed_diags.deinit();
+    var sema = Sema.init(self.arena.allocator(), &self.pool, &typed_diags);
+    defer sema.deinit();
+    sema.no_std = self.no_std;
+    sema.alloc = self.alloc;
+    sema.checkModule(module);
+    if (typed_diags.hasErrors()) {
+        self.writeStderr("error: typed dump failed during semantic analysis\n");
+        return false;
+    }
+    try sema.dumpTypedModule(module, writer);
+    return true;
 }
 
 /// Compile a module to an object file. Returns whether async is used.
@@ -249,8 +290,8 @@ pub fn compileToObject(self: *Driver, module: *const Ast.Module, output_path: [*
     return cg.uses_async;
 }
 
-/// Dump LLVM IR for a module to stdout.
-pub fn emitIR(self: *Driver, module: *const Ast.Module) !bool {
+/// Write LLVM IR for a module to a writer.
+pub fn writeIR(self: *Driver, module: *const Ast.Module, writer: anytype) !bool {
     var cg = Codegen.init("with_module", self.allocator) catch {
         self.writeStderr("error: failed to initialize LLVM\n");
         return false;
@@ -277,8 +318,60 @@ pub fn emitIR(self: *Driver, module: *const Ast.Module) !bool {
         return false;
     };
 
-    cg.printIR();
+    if (self.deterministic) {
+        const raw_ir = cg.irStringAlloc(self.allocator) catch {
+            self.writeStderr("error: failed to collect LLVM IR\n");
+            return false;
+        };
+        defer self.allocator.free(raw_ir);
+        const normalized_ir = normalizeIrForStableDump(raw_ir, self.current_source_path, self.allocator) catch {
+            self.writeStderr("error: failed to normalize LLVM IR\n");
+            return false;
+        };
+        defer self.allocator.free(normalized_ir);
+        try writer.writeAll(normalized_ir);
+    } else {
+        try cg.writeIR(writer);
+    }
     return true;
+}
+
+/// Dump LLVM IR for a module to stdout.
+pub fn emitIR(self: *Driver, module: *const Ast.Module) !bool {
+    var buf: [8192]u8 = undefined;
+    var w = std.fs.File.stdout().writer(&buf);
+    const ok = try self.writeIR(module, &w.interface);
+    try w.interface.flush();
+    return ok;
+}
+
+fn normalizeIrForStableDump(
+    ir: []const u8,
+    source_path: []const u8,
+    allocator: std.mem.Allocator,
+) ![]u8 {
+    const replaced: []u8 = if (source_path.len > 0 and std.mem.indexOf(u8, ir, source_path) != null)
+        try std.mem.replaceOwned(u8, allocator, ir, source_path, "<source>")
+    else
+        try allocator.dupe(u8, ir);
+    defer allocator.free(replaced);
+
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
+
+    var line_it = std.mem.splitScalar(u8, replaced, '\n');
+    while (line_it.next()) |line| {
+        const normalized_line: []const u8 = if (std.mem.startsWith(u8, line, "; ModuleID ="))
+            "; ModuleID = '<with_module>'"
+        else if (std.mem.startsWith(u8, line, "source_filename = \""))
+            "source_filename = \"<source>\""
+        else
+            line;
+        try out.appendSlice(allocator, normalized_line);
+        try out.append(allocator, '\n');
+    }
+
+    return out.toOwnedSlice(allocator);
 }
 
 /// Link an object file into a binary using the system linker.
@@ -427,6 +520,9 @@ pub fn buildBinaryAt(
     while (link_libs_it.next()) |entry| {
         link_libs.append(self.arena.allocator(), self.pool.resolve(entry.key_ptr.*)) catch return null;
     }
+    if (self.deterministic and link_libs.items.len > 1) {
+        sortStringSlice(link_libs.items);
+    }
 
     // Find runtime artifacts relative to the compiler binary.
     const exe_dir = self.findExeDir();
@@ -520,6 +616,9 @@ pub fn buildSharedLibrary(self: *Driver, source_path: []const u8, output_stem: [
     while (link_libs_it.next()) |entry| {
         link_libs.append(self.arena.allocator(), self.pool.resolve(entry.key_ptr.*)) catch return null;
     }
+    if (self.deterministic and link_libs.items.len > 1) {
+        sortStringSlice(link_libs.items);
+    }
 
     const exe_dir = self.findExeDir();
 
@@ -591,6 +690,18 @@ fn sharedLibraryExt() []const u8 {
         .macos, .ios, .tvos, .watchos, .visionos => "dylib",
         else => "so",
     };
+}
+
+fn sortStringSlice(items: [][]const u8) void {
+    var i: usize = 1;
+    while (i < items.len) : (i += 1) {
+        var j = i;
+        while (j > 0 and std.mem.order(u8, items[j], items[j - 1]) == .lt) : (j -= 1) {
+            const tmp = items[j];
+            items[j] = items[j - 1];
+            items[j - 1] = tmp;
+        }
+    }
 }
 
 /// Find the directory containing the compiler executable (for runtime objects).

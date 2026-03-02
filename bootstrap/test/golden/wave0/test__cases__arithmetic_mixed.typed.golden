@@ -1,0 +1,12 @@
+typed module decls=1
+decl[0] kind=function span=0..110
+  fn main() -> i32
+    expr block span=20..110 : void
+      expr call span=20..38 : void
+        expr ident span=20..27 : void
+      expr call span=43..63 : void
+        expr ident span=43..50 : void
+      expr call span=68..89 : void
+        expr ident span=68..75 : void
+      expr call span=94..110 : void
+        expr ident span=94..101 : void

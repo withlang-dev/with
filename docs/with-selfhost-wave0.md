@@ -91,9 +91,9 @@ Wave 0 should fix determinism in dump/baseline workflows without changing langua
 
 ## 0. Baseline Inventory + Acceptance Spec
 
-- [ ] Create `docs/wave0-dump-spec.md` (or section here) defining exact line format for all 4 dumps.
-- [ ] Freeze a deterministic sample corpus list file (for golden generation).
-- [ ] Add explicit acceptance checks:
+- [x] Create `docs/wave0-dump-spec.md` (or section here) defining exact line format for all 4 dumps.
+- [x] Freeze a deterministic sample corpus list file (for golden generation).
+- [x] Add explicit acceptance checks:
   - same input, same commit, two runs => byte-identical dumps
   - golden diff command returns non-zero on mismatch
 
@@ -101,51 +101,51 @@ Wave 0 should fix determinism in dump/baseline workflows without changing langua
 
 Targets: `bootstrap/src/main.zig`, `bootstrap/src/Driver.zig`, related helpers.
 
-- [ ] Audit all dump-adjacent code paths for:
+- [x] Audit all dump-adjacent code paths for:
   - directory iteration without sort
   - hash-map iteration without sort before output
   - time/random seeds in output-affecting workflows
   - absolute path emission in dump output
-- [ ] Add deterministic utilities:
+- [x] Add deterministic utilities:
   - stable sort helpers for string/path lists
   - path canonicalization/remap helper (repo-relative in dumps)
-- [ ] Remove or gate nondeterministic defaults where dumps/goldens depend on them.
-- [ ] Add a deterministic test mode switch (`--deterministic` or equivalent) and enable it for dump/golden commands by default.
+- [x] Remove or gate nondeterministic defaults where dumps/goldens depend on them.
+- [x] Add a deterministic test mode switch (`--deterministic` or equivalent) and enable it for dump/golden commands by default.
 
 ## 2. Unified Stable Dump Flags
 
 Targets: `bootstrap/src/main.zig`, `bootstrap/src/Driver.zig`, `bootstrap/src/Sema.zig`, `bootstrap/src/render.zig`, optional new dump modules.
 
-- [ ] Add CLI flags:
+- [x] Add CLI flags:
   - `--dump-tokens`
   - `--dump-ast`
   - `--dump-typed`
   - `--dump-llvm-ir`
-- [ ] Support `check` pathway with dump flags so one entrypoint can produce all oracle artifacts.
-- [ ] Keep existing subcommands (`tokens`, `ast`, `ir`) as compatibility wrappers.
-- [ ] Implement canonical token dump formatter.
-- [ ] Implement canonical AST dump formatter (stable, span-aware; separate from doc/fmt pretty output).
-- [ ] Implement typed dump:
+- [x] Support `check` pathway with dump flags so one entrypoint can produce all oracle artifacts.
+- [x] Keep existing subcommands (`tokens`, `ast`, `ir`) as compatibility wrappers.
+- [x] Implement canonical token dump formatter.
+- [x] Implement canonical AST dump formatter (stable, span-aware; separate from doc/fmt pretty output).
+- [x] Implement typed dump:
   - record/check type information in Sema dump structures
   - print in deterministic AST/source traversal order
-- [ ] Implement LLVM IR normalized dump mode:
+- [x] Implement LLVM IR normalized dump mode:
   - deterministic pass selection (`-O0` for dump path unless explicitly requested)
   - strip/remap unstable headers/path-only variance
-- [ ] Add `--dump-out <path|->` and/or `--dump-dir <dir>` for machine workflows.
+- [x] Add `--dump-out <path|->` and/or `--dump-dir <dir>` for machine workflows.
 
 ## 3. Golden Baseline Capture
 
 Targets: `bootstrap/test`, new `bootstrap/test/golden/wave0/...` layout.
 
-- [ ] Define corpus file list (curated, representative, stable size).
-- [ ] Add capture script:
+- [x] Define corpus file list (curated, representative, stable size).
+- [x] Add capture script:
   - emits all four dumps per corpus file
   - writes to deterministic path layout
   - supports `--update` (bless) and verify mode
-- [ ] Add compare script:
+- [x] Add compare script:
   - diff current dumps vs golden
   - clear failure report grouped by dump kind/file
-- [ ] Ensure script ordering is deterministic (sorted corpus processing).
+- [x] Ensure script ordering is deterministic (sorted corpus processing).
 
 Suggested layout:
 
@@ -162,44 +162,54 @@ bootstrap/test/golden/wave0/
 
 Targets: `bootstrap/test/run_phase0_*.sh` + any CI runner scripts.
 
-- [ ] Add `run_phase0_golden_dumps_tests.sh`.
-- [ ] Wire into Phase 0 suite.
-- [ ] Document local flow:
+- [x] Add `run_phase0_golden_dumps_tests.sh`.
+- [x] Wire into Phase 0 suite.
+- [x] Document local flow:
   - generate/update goldens
   - verify goldens
   - inspect mismatch quickly
-- [ ] Enforce no implicit golden updates in CI (verify-only in CI).
+- [x] Enforce no implicit golden updates in CI (verify-only in CI).
+
+Local flow:
+
+```bash
+# bless/update baseline
+bash bootstrap/test/run_phase0_golden_dumps_tests.sh --update
+
+# verify against baseline
+bash bootstrap/test/run_phase0_golden_dumps_tests.sh
+```
 
 ## 5. Wave 0 Exit Criteria
 
-- [ ] Stable dump flags produce byte-identical output across repeated local runs.
-- [ ] Golden suite passes on clean tree.
-- [ ] Golden suite fails on intentional dump drift.
-- [ ] Stage0 dump outputs are documented as oracle inputs for Withc2 Wave 1+.
+- [x] Stable dump flags produce byte-identical output across repeated local runs.
+- [x] Golden suite passes on clean tree.
+- [x] Golden suite fails on intentional dump drift.
+- [x] Stage0 dump outputs are documented as oracle inputs for Withc2 Wave 1+.
 
 ---
 
 ## Risk Register + Mitigations
 
-- [ ] LLVM IR nondeterminism across LLVM versions/platforms.
+- [x] LLVM IR nondeterminism across LLVM versions/platforms.
   - Mitigation: normalize known unstable lines; pin toolchain in CI; compare normalized IR only.
-- [ ] Typed dump churn due current Sema gaps.
+- [x] Typed dump churn due current Sema gaps.
   - Mitigation: stable typed dump schema now; allow additive fields with explicit version bump.
-- [ ] Snapshot size/maintenance burden.
+- [x] Snapshot size/maintenance burden.
   - Mitigation: curated corpus + deterministic selection + fast diff reporting.
 
 ---
 
 ## Implementation Checklist (copy/paste tracker)
 
-- [ ] Finalize dump format spec.
-- [ ] Add deterministic-mode plumbing in Stage0 CLI/driver.
-- [ ] Land stable token dump output.
-- [ ] Land stable AST dump output.
-- [ ] Land stable typed dump output.
-- [ ] Land normalized LLVM IR dump output.
-- [ ] Add wave0 golden capture script + corpus.
-- [ ] Add wave0 golden verify script.
-- [ ] Integrate into phase0 test runner/CI.
-- [ ] Document developer usage in `docs/`.
-- [ ] Mark Wave 0 complete in self-host plan docs.
+- [x] Finalize dump format spec.
+- [x] Add deterministic-mode plumbing in Stage0 CLI/driver.
+- [x] Land stable token dump output.
+- [x] Land stable AST dump output.
+- [x] Land stable typed dump output.
+- [x] Land normalized LLVM IR dump output.
+- [x] Add wave0 golden capture script + corpus.
+- [x] Add wave0 golden verify script.
+- [x] Integrate into phase0 test runner/CI.
+- [x] Document developer usage in `docs/`.
+- [x] Mark Wave 0 complete in self-host plan docs.

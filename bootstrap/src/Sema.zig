@@ -261,6 +261,10 @@ method_has_inherent: std.AutoHashMapUnmanaged(Symbol, void),
 
 /// Inferred return types: fn name → synthetic TypeExpr for Codegen.
 inferred_return_types: std.AutoHashMapUnmanaged(Symbol, *const Ast.TypeExpr) = .{},
+/// Let binding types keyed by source start offset (stable dump support).
+typed_binding_types: std.AutoHashMapUnmanaged(u32, TypedBindingInfo) = .{},
+/// Statement/tail expression types keyed by source start offset.
+typed_expr_types: std.AutoHashMapUnmanaged(u32, TypeId) = .{},
 
 /// Functions marked @[must_use] — emit warning if return value is discarded.
 must_use_fns: std.AutoHashMapUnmanaged(Symbol, void) = .{},
@@ -324,6 +328,12 @@ ty_str_view: TypeId,
 const VariantInfo = struct {
     enum_type: TypeId,
     variant_index: u32,
+};
+
+const TypedBindingInfo = struct {
+    name: Symbol,
+    ty: TypeId,
+    is_mut: bool,
 };
 
 pub fn init(allocator: std.mem.Allocator, pool: *InternPool, diagnostics: *Diagnostic.DiagnosticList) Sema {
@@ -440,6 +450,8 @@ pub fn deinit(self: *Sema) void {
     self.method_decl_origins.deinit(self.allocator);
     self.method_has_inherent.deinit(self.allocator);
     self.inferred_return_types.deinit(self.allocator);
+    self.typed_binding_types.deinit(self.allocator);
+    self.typed_expr_types.deinit(self.allocator);
     self.must_use_fns.deinit(self.allocator);
     self.result_option_fns.deinit(self.allocator);
     self.task_fns.deinit(self.allocator);
@@ -752,7 +764,7 @@ fn collectDeclarations(self: *Sema, module: *const Ast.Module) void {
                 self.collectFnDecl(fn_decl);
             },
             .extern_fn => |ext| self.collectExternFn(ext),
-            .let_decl => |ld| self.collectLetDecl(ld),
+            .let_decl => |ld| self.collectLetDecl(ld, decl.span),
             .use_decl => {}, // use decls are no-ops for now
             .c_import => {}, // already expanded by Driver
             .trait_decl => |td| self.collectTraitDecl(td, decl.span),
@@ -1031,7 +1043,7 @@ fn collectExternFn(self: *Sema, ext: Ast.ExternFnDecl) void {
     self.extern_fn_names.put(self.allocator, ext.name, {}) catch {};
 }
 
-fn collectLetDecl(self: *Sema, ld: Ast.LetDecl) void {
+fn collectLetDecl(self: *Sema, ld: Ast.LetDecl, span: Span) void {
     // Module-level let: resolve type from annotation or infer as error_type
     // (will be checked in pass 2 when we check the value expression).
     const tid = if (ld.type_expr) |te| blk: {
@@ -1047,6 +1059,11 @@ fn collectLetDecl(self: *Sema, ld: Ast.LetDecl) void {
         .state = .live,
         .span = Span.zero,
     });
+    self.typed_binding_types.put(self.allocator, span.start, .{
+        .name = ld.name,
+        .ty = tid,
+        .is_mut = ld.is_mut,
+    }) catch {};
 }
 
 fn collectTraitDecl(self: *Sema, td: Ast.TraitDecl, span: Span) void {
@@ -1708,6 +1725,7 @@ fn checkFnBody(self: *Sema, fn_decl: Ast.FnDecl) void {
     else
         null;
     const body_type = self.checkExprWithExpected(fn_decl.body, expected_body_ty);
+    self.typed_expr_types.put(self.allocator, fn_decl.body.span.start, body_type) catch {};
 
     // Return type inference: update sig and create synthetic TypeExpr for Codegen.
     if (needs_inference) {
@@ -2583,6 +2601,7 @@ fn checkBlock(self: *Sema, blk: Ast.BlockExpr) TypeId {
             break;
         }
         const stmt_ty = self.checkExpr(stmt);
+        self.typed_expr_types.put(self.allocator, stmt.span.start, stmt_ty) catch {};
         // Detect diverging statements.
         if (self.exprDefinitelyDiverges(stmt)) {
             saw_diverging = true;
@@ -2618,6 +2637,7 @@ fn checkBlock(self: *Sema, blk: Ast.BlockExpr) TypeId {
             return error_type;
         }
         const tail_ty = self.checkExpr(tail);
+        self.typed_expr_types.put(self.allocator, tail.span.start, tail_ty) catch {};
         self.expireDeadBorrows(&.{}, null);
         return tail_ty;
     }
@@ -2673,6 +2693,11 @@ fn checkLetBinding(self: *Sema, let_b: Ast.LetBinding, span: Span) TypeId {
         .state = .live,
         .span = span,
     });
+    self.typed_binding_types.put(self.allocator, span.start, .{
+        .name = let_b.name,
+        .ty = bind_type,
+        .is_mut = let_b.is_mut,
+    }) catch {};
 
     // If the value is a &expr, tag the most recent borrow with this binding.
     if (let_b.value.kind == .unary) {
@@ -5340,6 +5365,226 @@ fn emitError(self: *Sema, message: []const u8, span: Span) void {
 
 fn emitWarning(self: *Sema, message: []const u8, span: Span) void {
     self.diagnostics.emit(Diagnostic.warn(message, span));
+}
+
+pub fn dumpTypedModule(self: *const Sema, module: *const Ast.Module, writer: anytype) !void {
+    try writer.print("typed module decls={d}\n", .{module.decls.len});
+    for (module.decls, 0..) |decl, decl_idx| {
+        try writer.print("decl[{d}] kind={s} span={d}..{d}\n", .{
+            decl_idx,
+            @tagName(decl.kind),
+            decl.span.start,
+            decl.span.end,
+        });
+        switch (decl.kind) {
+            .function => |fn_decl| {
+                const fn_name = self.pool.resolve(fn_decl.name);
+                if (self.fn_sigs.get(fn_decl.name)) |sig| {
+                    try writer.print("  fn {s}(", .{fn_name});
+                    for (sig.param_types, 0..) |pt, i| {
+                        if (i > 0) try writer.writeAll(", ");
+                        const param_name = if (i < fn_decl.params.len) self.pool.resolve(fn_decl.params[i].name) else "_";
+                        try writer.print("{s}: {s}", .{ param_name, self.typeName(pt) });
+                    }
+                    try writer.print(") -> {s}\n", .{self.typeName(sig.return_type)});
+                } else {
+                    try writer.print("  fn {s}(<unknown>)\n", .{fn_name});
+                }
+                if (self.inferred_return_types.get(fn_decl.name) != null) {
+                    if (self.fn_sigs.get(fn_decl.name)) |sig_inferred| {
+                        try writer.print("  inferred_return: {s}\n", .{self.typeName(sig_inferred.return_type)});
+                    }
+                }
+                try self.dumpTypedExprTree(fn_decl.body, writer, 2);
+            },
+            .extern_fn => |ext| {
+                const ext_name = self.pool.resolve(ext.name);
+                if (self.fn_sigs.get(ext.name)) |sig| {
+                    try writer.print("  extern fn {s}(", .{ext_name});
+                    for (sig.param_types, 0..) |pt, i| {
+                        if (i > 0) try writer.writeAll(", ");
+                        const param_name = if (i < ext.params.len) self.pool.resolve(ext.params[i].name) else "_";
+                        try writer.print("{s}: {s}", .{ param_name, self.typeName(pt) });
+                    }
+                    try writer.print(") -> {s}\n", .{self.typeName(sig.return_type)});
+                } else {
+                    try writer.print("  extern fn {s}(<unknown>)\n", .{ext_name});
+                }
+            },
+            .let_decl => |ld| {
+                const binding_name = self.pool.resolve(ld.name);
+                if (self.typed_binding_types.get(decl.span.start)) |info| {
+                    try writer.print("  let {s}{s}: {s}\n", .{
+                        binding_name,
+                        if (info.is_mut) " (mut)" else "",
+                        self.typeName(info.ty),
+                    });
+                } else {
+                    const ty_name = if (ld.type_expr != null) "<annotated>" else "<inferred>";
+                    try writer.print("  let {s}: {s}\n", .{ binding_name, ty_name });
+                }
+            },
+            .type_decl => |td| try writer.print("  type {s}\n", .{self.pool.resolve(td.name)}),
+            .trait_decl => |td| try writer.print("  trait {s}\n", .{self.pool.resolve(td.name)}),
+            .impl_decl => |id| {
+                if (id.trait_name) |trait_name| {
+                    try writer.print("  impl {s} for {s}\n", .{
+                        self.pool.resolve(trait_name),
+                        self.pool.resolve(id.type_name),
+                    });
+                } else {
+                    try writer.print("  impl {s}\n", .{self.pool.resolve(id.type_name)});
+                }
+            },
+            .use_decl => |ud| {
+                try writer.writeAll("  use ");
+                for (ud.path, 0..) |seg, i| {
+                    if (i > 0) try writer.writeAll(".");
+                    try writer.print("{s}", .{self.pool.resolve(seg)});
+                }
+                try writer.writeAll("\n");
+            },
+            .c_import => |ci| try writer.print("  c_import \"{s}\"\n", .{ci.header_path}),
+            .poisoned => try writer.writeAll("  <poisoned>\n"),
+        }
+    }
+}
+
+fn dumpTypedExprTree(self: *const Sema, expr: *const Ast.Expr, writer: anytype, indent: u32) !void {
+    if (self.typed_expr_types.get(expr.span.start)) |tid| {
+        try dumpIndent(writer, indent);
+        try writer.print("expr {s} span={d}..{d} : {s}\n", .{
+            @tagName(expr.kind),
+            expr.span.start,
+            expr.span.end,
+            self.typeName(tid),
+        });
+    }
+    if (expr.kind == .let_binding) {
+        if (self.typed_binding_types.get(expr.span.start)) |info| {
+            try dumpIndent(writer, indent + 1);
+            try writer.print("bind {s}{s}: {s}\n", .{
+                self.pool.resolve(info.name),
+                if (info.is_mut) " (mut)" else "",
+                self.typeName(info.ty),
+            });
+        }
+    }
+
+    switch (expr.kind) {
+        .binary => |b| {
+            try self.dumpTypedExprTree(b.lhs, writer, indent + 1);
+            try self.dumpTypedExprTree(b.rhs, writer, indent + 1);
+        },
+        .unary => |u| try self.dumpTypedExprTree(u.operand, writer, indent + 1),
+        .call => |c| {
+            try self.dumpTypedExprTree(c.callee, writer, indent + 1);
+            for (c.args) |arg| try self.dumpTypedExprTree(arg, writer, indent + 1);
+        },
+        .field_access => |fa| try self.dumpTypedExprTree(fa.expr, writer, indent + 1),
+        .computed_field_access => |cf| {
+            try self.dumpTypedExprTree(cf.expr, writer, indent + 1);
+            try self.dumpTypedExprTree(cf.field_expr, writer, indent + 1);
+        },
+        .optional_chain => |oc| {
+            try self.dumpTypedExprTree(oc.expr, writer, indent + 1);
+            if (oc.args) |args| for (args) |arg| try self.dumpTypedExprTree(arg, writer, indent + 1);
+        },
+        .index => |idx| {
+            try self.dumpTypedExprTree(idx.expr, writer, indent + 1);
+            try self.dumpTypedExprTree(idx.index, writer, indent + 1);
+        },
+        .slice => |sl| {
+            try self.dumpTypedExprTree(sl.expr, writer, indent + 1);
+            if (sl.start) |st| try self.dumpTypedExprTree(st, writer, indent + 1);
+            if (sl.end) |ed| try self.dumpTypedExprTree(ed, writer, indent + 1);
+        },
+        .block => |blk| {
+            for (blk.stmts) |stmt| try self.dumpTypedExprTree(stmt, writer, indent + 1);
+            if (blk.tail) |tail| try self.dumpTypedExprTree(tail, writer, indent + 1);
+        },
+        .if_expr => |if_e| {
+            try self.dumpTypedExprTree(if_e.condition, writer, indent + 1);
+            try self.dumpTypedExprTree(if_e.then_body, writer, indent + 1);
+            if (if_e.else_body) |else_body| try self.dumpTypedExprTree(else_body, writer, indent + 1);
+        },
+        .return_expr => |r| if (r) |ret| try self.dumpTypedExprTree(ret, writer, indent + 1),
+        .let_binding => |lb| try self.dumpTypedExprTree(lb.value, writer, indent + 1),
+        .let_else => |le| {
+            try self.dumpTypedExprTree(le.value, writer, indent + 1);
+            try self.dumpTypedExprTree(le.else_body, writer, indent + 1);
+        },
+        .tuple_destructure => |td| try self.dumpTypedExprTree(td.value, writer, indent + 1),
+        .assign => |a| {
+            try self.dumpTypedExprTree(a.target, writer, indent + 1);
+            try self.dumpTypedExprTree(a.value, writer, indent + 1);
+        },
+        .tuple => |elems| for (elems) |elem| try self.dumpTypedExprTree(elem, writer, indent + 1),
+        .range => |r| {
+            if (r.start) |st| try self.dumpTypedExprTree(st, writer, indent + 1);
+            if (r.end) |ed| try self.dumpTypedExprTree(ed, writer, indent + 1);
+        },
+        .variant_shorthand => |vs| for (vs.args) |arg| try self.dumpTypedExprTree(arg, writer, indent + 1),
+        .await_expr => |aw| try self.dumpTypedExprTree(aw, writer, indent + 1),
+        .async_block => |ab| try self.dumpTypedExprTree(ab, writer, indent + 1),
+        .spawn_expr => |sp| try self.dumpTypedExprTree(sp, writer, indent + 1),
+        .pipeline => |p| {
+            try self.dumpTypedExprTree(p.lhs, writer, indent + 1);
+            try self.dumpTypedExprTree(p.rhs, writer, indent + 1);
+        },
+        .grouped => |g| try self.dumpTypedExprTree(g, writer, indent + 1),
+        .while_expr => |w| {
+            try self.dumpTypedExprTree(w.condition, writer, indent + 1);
+            try self.dumpTypedExprTree(w.body, writer, indent + 1);
+        },
+        .loop_expr => |l| try self.dumpTypedExprTree(l.body, writer, indent + 1),
+        .for_expr => |f| {
+            try self.dumpTypedExprTree(f.iterable, writer, indent + 1);
+            try self.dumpTypedExprTree(f.body, writer, indent + 1);
+        },
+        .break_expr => |b| if (b.value) |val| try self.dumpTypedExprTree(val, writer, indent + 1),
+        .array_literal => |arr| for (arr) |elem| try self.dumpTypedExprTree(elem, writer, indent + 1),
+        .array_comprehension => |ac| {
+            try self.dumpTypedExprTree(ac.expr, writer, indent + 1);
+            try self.dumpTypedExprTree(ac.iterable, writer, indent + 1);
+            if (ac.filter) |filter| try self.dumpTypedExprTree(filter, writer, indent + 1);
+            if (ac.clauses) |clauses| for (clauses) |clause| try self.dumpTypedExprTree(clause.iterable, writer, indent + 1);
+        },
+        .struct_literal => |sl| for (sl.fields) |field| try self.dumpTypedExprTree(field.value, writer, indent + 1),
+        .match_expr => |m| {
+            try self.dumpTypedExprTree(m.subject, writer, indent + 1);
+            for (m.arms) |arm| {
+                if (arm.guard) |guard| try self.dumpTypedExprTree(guard, writer, indent + 1);
+                try self.dumpTypedExprTree(arm.body, writer, indent + 1);
+            }
+        },
+        .enum_variant => |ev| for (ev.args) |arg| try self.dumpTypedExprTree(arg, writer, indent + 1),
+        .closure => |cl| try self.dumpTypedExprTree(cl.body, writer, indent + 1),
+        .cast => |ca| try self.dumpTypedExprTree(ca.expr, writer, indent + 1),
+        .defer_expr => |d| try self.dumpTypedExprTree(d, writer, indent + 1),
+        .with_expr => |w| {
+            try self.dumpTypedExprTree(w.source, writer, indent + 1);
+            try self.dumpTypedExprTree(w.body, writer, indent + 1);
+        },
+        .record_update => |ru| {
+            try self.dumpTypedExprTree(ru.source, writer, indent + 1);
+            for (ru.fields) |field| try self.dumpTypedExprTree(field.value, writer, indent + 1);
+        },
+        .yield_expr => |y| try self.dumpTypedExprTree(y, writer, indent + 1),
+        .comptime_expr => |ce| try self.dumpTypedExprTree(ce, writer, indent + 1),
+        .async_scope => |ascope| try self.dumpTypedExprTree(ascope.body, writer, indent + 1),
+        .select_await => |sa| for (sa.arms) |arm| {
+            try self.dumpTypedExprTree(arm.task, writer, indent + 1);
+            try self.dumpTypedExprTree(arm.body, writer, indent + 1);
+        },
+        else => {},
+    }
+}
+
+fn dumpIndent(writer: anytype, indent: u32) !void {
+    for (0..indent) |_| {
+        try writer.writeAll("  ");
+    }
 }
 
 // ── Type formatting (for error messages) ─────────────────────────
