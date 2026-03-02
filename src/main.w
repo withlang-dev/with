@@ -3,7 +3,7 @@
 // Usage:
 //   with run [file.w]     Build + run source file
 //   with build [file.w]   Build source file
-//   with check <file.w>   Parse and type-check (supports --dump-tokens/--dump-ast/--dump-resolved)
+//   with check <file.w>   Parse and type-check (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed)
 //   with ir <file.w>      Dump LLVM IR
 //   with ast <file.w>     Parse and dump AST
 //   with tokens <file.w>  Lex and dump tokens
@@ -19,6 +19,10 @@ use Token
 use Ast
 use render
 use Resolve
+use Parser
+use InternPool
+use Diagnostic
+use Source
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
@@ -45,6 +49,7 @@ fn main -> void:
     var dump_tokens_flag = false
     var dump_ast_flag = false
     var dump_resolved_flag = false
+    var dump_typed_flag = false
     var deterministic_mode = false
     var i = 2
     while i < argc:
@@ -71,6 +76,8 @@ fn main -> void:
             dump_ast_flag = true
         if arg == "--dump-resolved":
             dump_resolved_flag = true
+        if arg == "--dump-typed":
+            dump_typed_flag = true
         if arg == "--deterministic":
             deterministic_mode = true
         i = i + 1
@@ -126,6 +133,9 @@ fn main -> void:
             return
         if dump_resolved_flag:
             exit(dump_resolved_artifact(source_file, no_std, alloc_mode))
+            return
+        if dump_typed_flag:
+            exit(dump_typed_artifact(source_file, no_std, alloc_mode))
             return
         var comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode)
@@ -219,11 +229,23 @@ fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: b
     with_system(bin_path)
 
 fn dump_ast(source_file: str, no_std: bool, alloc_mode: bool, include_header: bool) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode)
-    let pool = comp.compile_file(source_file)
-    if pool.decl_count() == 0:
-        with_eprintln("error: check failed during compilation")
+    let text = with_fs_read_file(source_file)
+    if text.len() == 0:
+        with_eprintln("error: cannot read '{source_file}'")
+        return 1
+
+    var lexer = Lexer.init(text, 0)
+    let tokens = lexer.tokenize()
+    var intern = InternPool.init()
+    var diags = DiagnosticList.init()
+    var parser = Parser.init(tokens, text, 0, intern, diags)
+    let pool = parser.parse_module()
+    intern = parser.intern
+    diags = parser.diags
+
+    if diags.has_errors():
+        let source = Source.from_string(source_file, text, 0)
+        diags.render_all(source)
         return 1
 
     if include_header:
@@ -241,7 +263,7 @@ fn dump_ast(source_file: str, no_std: bool, alloc_mode: bool, include_header: bo
             print("decl[" ++ int_to_string(i) ++ "] kind=" ++ kind_name ++ " span=" ++ int_to_string(pool.get_start(decl)) ++ ".." ++ int_to_string(pool.get_end(decl)) ++ "\n")
         print("---\n")
 
-    let rendered = render_module(pool, comp.driver.pool)
+    let rendered = render_module(pool, intern)
     if rendered.len() == 0:
         with_eprintln("error: parser produced an empty AST without diagnostics")
         return 1
@@ -297,6 +319,20 @@ fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i
         with_eprintln("error: resolved dump failed")
         return 1
     print(dump_resolved(result, comp.driver.pool, source_file))
+    0
+
+fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode)
+    let pool = comp.compile_file(source_file)
+    if pool.decl_count() == 0:
+        with_eprintln("error: typed dump failed during compilation")
+        return 1
+    let typed = comp.driver.dump_typed(pool)
+    if typed.len() == 0:
+        with_eprintln("error: typed dump failed during semantic analysis")
+        return 1
+    print(typed)
     0
 
 fn escape_dump_lexeme(text: str) -> str:
@@ -356,7 +392,7 @@ fn print_usage:
     print("Commands:\n")
     print("  build [file.w]    Build a source file\n")
     print("  run [file.w]      Build + run a source file\n")
-    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved)\n")
+    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed)\n")
     print("  test [file.w]     Run tests\n")
     print("  clean             Delete .with/ artifacts\n")
     print("  ir <file.w>       Dump LLVM IR (debug)\n")

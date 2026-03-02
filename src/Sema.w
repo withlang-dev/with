@@ -32,6 +32,7 @@ fn TY_PTR -> i32: 13
 fn TY_REF -> i32: 14
 fn TY_ALIAS -> i32: 15
 fn TY_GENERIC_FN -> i32: 16
+fn TY_TRAIT_OBJ -> i32: 17
 
 // Var state constants
 fn VS_LIVE -> i32: 0
@@ -96,6 +97,11 @@ type Sema = {
     impl_counts: Vec[i32],
     impl_type_syms: Vec[i32],
     impl_lookup: HashMap[i32, i32],
+    // Trait obligations + deterministic selection cache
+    obligation_trait_syms: Vec[i32],
+    obligation_type_syms: Vec[i32],
+    obligation_nodes: Vec[i32],
+    selection_cache: HashMap[str, i32],
 
     // Local trait/type names
     local_trait_names: HashMap[i32, i32],
@@ -124,6 +130,16 @@ type Sema = {
     borrow_places: Vec[i32],
     borrow_fields: Vec[i32],
     borrow_refs: Vec[i32],
+
+    // Typed dump sidecar maps (keyed by span start byte offset)
+    typed_expr_types: HashMap[i32, i32],
+    typed_binding_types: HashMap[i32, i32],
+    typed_binding_names: HashMap[i32, i32],
+    typed_binding_muts: HashMap[i32, i32],
+    // Generic substitution map + specialization cache
+    generic_subst_param_syms: Vec[i32],
+    generic_subst_type_ids: Vec[i32],
+    generic_specialization_cache: HashMap[str, i32],
 
     // Current state
     current_return_type: i32,
@@ -193,6 +209,10 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         impl_counts: Vec.new(),
         impl_type_syms: Vec.new(),
         impl_lookup: HashMap.new(),
+        obligation_trait_syms: Vec.new(),
+        obligation_type_syms: Vec.new(),
+        obligation_nodes: Vec.new(),
+        selection_cache: HashMap.new(),
         local_trait_names: HashMap.new(),
         local_type_names: HashMap.new(),
         ephemeral_types: HashMap.new(),
@@ -211,6 +231,13 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         borrow_places: Vec.new(),
         borrow_fields: Vec.new(),
         borrow_refs: Vec.new(),
+        typed_expr_types: HashMap.new(),
+        typed_binding_types: HashMap.new(),
+        typed_binding_names: HashMap.new(),
+        typed_binding_muts: HashMap.new(),
+        generic_subst_param_syms: Vec.new(),
+        generic_subst_type_ids: Vec.new(),
+        generic_specialization_cache: HashMap.new(),
         current_return_type: 0,
         current_gen_yield_type: 0,
         has_gen_yield_type: 0,
@@ -658,11 +685,31 @@ fn Sema.collect_extern_fn(self: Sema, node: i32):
     self.add_sig(name, fn_tid, ret_type, sig_param_start, param_count, is_variadic)
     self.extern_fn_names.insert(name, 1)
 
+fn Sema.top_level_let_type_ann_extra(self: Sema, flags: i32) -> i32:
+    let packed = flags / 4
+    if packed <= 0:
+        return -1
+    packed - 1
+
+fn Sema.local_let_type_ann_extra(self: Sema, flags: i32) -> i32:
+    let packed = flags / 2
+    if packed <= 0:
+        return -1
+    packed - 1
+
 fn Sema.collect_let_decl(self: Sema, node: i32):
     let name = self.ast.get_data0(node)
     let flags = self.ast.get_data2(node)
     let is_mut = flags % 2
-    self.scope_put(name, 0, is_mut)
+    var bind_ty = 0
+    let type_extra = self.top_level_let_type_ann_extra(flags)
+    if type_extra >= 0:
+        bind_ty = self.resolve_type_expr(self.ast.get_extra(type_extra))
+    self.scope_put(name, bind_ty, is_mut)
+    let span_start = self.ast.get_start(node)
+    self.typed_binding_types.insert(span_start, bind_ty)
+    self.typed_binding_names.insert(span_start, name)
+    self.typed_binding_muts.insert(span_start, is_mut)
 
 fn Sema.collect_trait_decl(self: Sema, node: i32):
     let name = self.ast.get_data0(node)
@@ -671,10 +718,24 @@ fn Sema.collect_trait_decl(self: Sema, node: i32):
     let trait_idx = self.trait_name_syms.len() as i32
     self.trait_name_syms.push(name)
     self.trait_method_starts.push(self.trait_method_names.len() as i32)
-    // Parse trait methods from extra
-    // extra layout: [method_count, [method_name, has_default, param_count, params...]*]
-    // Simplified: just record the trait name
-    self.trait_method_counts.push(0)
+    // Trait extra layout:
+    // [assoc_count,
+    //   [assoc_name, bound_count, bounds..., default_type]*,
+    //  method_count,
+    //   [method_name, method_flags, param_start, param_count, ret_type]*]
+    var pos = extra_start
+    let assoc_count = self.ast.get_extra(pos)
+    pos = pos + 1
+    for ai in 0..assoc_count:
+        let bound_count = self.ast.get_extra(pos + 1)
+        pos = pos + 2 + bound_count + 1
+
+    let method_count = self.ast.get_extra(pos)
+    pos = pos + 1
+    for i in 0..method_count:
+        self.trait_method_names.push(self.ast.get_extra(pos))
+        pos = pos + 5
+    self.trait_method_counts.push(method_count)
     self.trait_lookup.insert(name, trait_idx)
     self.local_trait_names.insert(name, 1)
 
@@ -684,10 +745,27 @@ fn Sema.collect_impl_decl(self: Sema, node: i32):
     if trait_sym == 0:
         return
 
+    let trait_name = self.pool.resolve(trait_sym)
+    let is_builtin_trait = trait_name == "Drop" or trait_name == "Scoped" or trait_name == "ScopedMut"
+    if not is_builtin_trait and not self.trait_lookup.contains(trait_sym):
+        self.emit_error("unknown trait", node)
+        return
+
+    let trait_is_local = self.local_trait_names.contains(trait_sym) or is_builtin_trait
+    let type_is_local = self.local_type_names.contains(type_name)
+    if not trait_is_local and not type_is_local:
+        self.emit_error("orphan rule violation: impl requires a local trait or local type", node)
+        return
+
     // Record impl
     if self.impl_lookup.contains(type_name):
         let idx = self.impl_lookup.get(type_name).unwrap()
+        let start = self.impl_starts.get(idx as i64)
         let count = self.impl_counts.get(idx as i64)
+        for i in 0..count:
+            if self.impl_extra.get((start + i) as i64) == trait_sym:
+                self.emit_error("duplicate implementation of trait for type", node)
+                return
         self.impl_extra.push(trait_sym)
         self.impl_counts.set_i32(idx as i64, count + 1)
     else:
@@ -756,12 +834,20 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
 
     if kind == NK_TYPE_OPTIONAL():
         let inner = self.resolve_type_expr(self.ast.get_data0(node))
+        // Optional lowering remains deferred in bootstrap sema path.
         return 0
 
     if kind == NK_TYPE_TRAIT_OBJ():
-        return 0
+        let trait_sym = self.ast.get_data0(node)
+        let trait_name = self.pool.resolve(trait_sym)
+        let is_builtin_trait = trait_name == "Drop" or trait_name == "Scoped" or trait_name == "ScopedMut"
+        if not is_builtin_trait and not self.trait_lookup.contains(trait_sym):
+            self.emit_error("unknown trait", node)
+            return 0
+        return self.add_type(TY_TRAIT_OBJ(), trait_sym, 0, 0)
 
     if kind == NK_TYPE_GENERIC():
+        // Generic type applications are resolved by codegen/later waves.
         return 0
 
     if kind == NK_TYPE_INFERRED():
@@ -821,7 +907,8 @@ fn Sema.check_fn_body(self: Sema, node: i32):
         self.in_comptime_fn = 1
 
     // Check body
-    self.check_expr(body)
+    let body_ty = self.check_expr(body)
+    self.typed_expr_types.insert(self.ast.get_start(body), body_ty)
 
     // Restore state
     self.current_return_type = saved_ret
@@ -1183,11 +1270,13 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
 
     for i in 0..stmt_count:
         let stmt = self.ast.get_extra(extra_start + i)
-        self.check_expr(stmt)
+        let stmt_ty = self.check_expr(stmt)
+        self.typed_expr_types.insert(self.ast.get_start(stmt), stmt_ty)
 
     var result = self.ty_void
     if tail != 0:
         result = self.check_expr(tail)
+        self.typed_expr_types.insert(self.ast.get_start(tail), result)
 
     self.pop_scope()
     result
@@ -1198,12 +1287,28 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     let flags = self.ast.get_data2(node)
     let is_mut = flags % 2
 
+    let ann_extra = self.local_let_type_ann_extra(flags)
+    var ann_type = 0
+    if ann_extra >= 0:
+        ann_type = self.resolve_type_expr(self.ast.get_extra(ann_extra))
+
     let val_type = self.check_expr(value)
+    var bind_type = val_type
+    if ann_type != 0:
+        bind_type = ann_type
+        if val_type != 0:
+            if not self.types_compatible(ann_type, val_type):
+                if self.arithmetic_result_type(ann_type, val_type) == 0:
+                    self.emit_error("type mismatch in binding", node)
 
     // Move semantics
     self.mark_moved_if_consumed(value)
 
-    self.scope_put(name, val_type, is_mut)
+    self.scope_put(name, bind_type, is_mut)
+    let span_start = self.ast.get_start(node)
+    self.typed_binding_types.insert(span_start, bind_type)
+    self.typed_binding_names.insert(span_start, name)
+    self.typed_binding_muts.insert(span_start, is_mut)
     self.ty_void
 
 fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
@@ -1645,12 +1750,16 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         return 0
 
     // Check all arguments
+    let arg_types: Vec[i32] = Vec.new()
     for ai in 0..arg_count:
-        self.check_expr(self.ast.get_extra(extra_start + ai))
+        let arg_ty = self.check_expr(self.ast.get_extra(extra_start + ai))
+        arg_types.push(arg_ty)
 
     // Mark non-Copy args as moved
     for ai in 0..arg_count:
         self.mark_moved_if_consumed(self.ast.get_extra(extra_start + ai))
+
+    let param_offset = if self.in_pipeline_rhs != 0: 1 else: 0
 
     // Known function
     let sig_idx = self.get_sig(fn_sym)
@@ -1658,13 +1767,25 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         let ret = self.sig_return_type(sig_idx)
         // Check arg count
         let expected = self.sig_get_param_count(sig_idx)
-        let actual = arg_count
-        if self.in_pipeline_rhs != 0:
-            // Pipeline adds one implicit arg
-            let _ = 0
+        let actual = arg_count + param_offset
         if self.sig_is_variadic(sig_idx) == 0:
-            if actual != expected and (self.in_pipeline_rhs == 0 or actual + 1 != expected):
+            if actual != expected:
                 self.emit_error("wrong argument count", node)
+
+        for ai in 0..arg_count:
+            let param_i = ai + param_offset
+            if param_i >= expected:
+                break
+            let expected_ty = self.sig_param_type(sig_idx, param_i)
+            let arg_ty = arg_types.get(ai as i64)
+            if expected_ty != 0 and arg_ty != 0:
+                let exp_resolved = self.resolve_alias(expected_ty)
+                if self.get_type_kind(exp_resolved) != TY_TRAIT_OBJ():
+                    if not self.types_compatible(expected_ty, arg_ty):
+                        if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
+                            self.emit_error("wrong argument type", self.ast.get_extra(extra_start + ai))
+
+        self.check_dyn_trait_call_compat(fn_sym, extra_start, arg_types, arg_count, param_offset)
         return ret
 
     // Local variable (function pointer)
@@ -1677,7 +1798,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // Generic function
     if self.generic_fn_nodes.contains(fn_sym):
-        return 0
+        let fn_node = self.generic_fn_nodes.get(fn_sym).unwrap()
+        return self.check_generic_call(fn_sym, fn_node, arg_types, arg_count, node)
 
     // Enum variant constructor
     if self.variant_lookup.contains(fn_sym):
@@ -1689,6 +1811,330 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         return self.check_builtin_call(fn_sym, node)
 
     0
+
+fn Sema.check_dyn_trait_call_compat(self: Sema, fn_sym: i32, call_extra_start: i32, arg_types: Vec[i32], arg_count: i32, param_offset: i32):
+    if not self.fn_decl_nodes.contains(fn_sym):
+        return
+    let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return
+
+    let param_start = self.ast.fn_meta_param_start(meta)
+    let param_count = self.ast.fn_meta_param_count(meta)
+    for ai in 0..arg_count:
+        let param_i = ai + param_offset
+        if param_i >= param_count:
+            break
+
+        let p_type_node = self.ast.get_extra(param_start + param_i * 2 + 1)
+        let trait_sym = self.trait_object_from_type_node(p_type_node)
+        if trait_sym == 0:
+            continue
+
+        let arg_ty = arg_types.get(ai as i64)
+        let concrete_sym = self.dyn_arg_concrete_type_symbol(arg_ty)
+        if concrete_sym == 0:
+            self.emit_error("argument cannot be converted to dyn trait object", self.ast.get_extra(call_extra_start + ai))
+            continue
+
+        if self.select_trait_impl(concrete_sym, trait_sym) == 0:
+            let type_str = self.pool.resolve(concrete_sym)
+            let trait_str = self.pool.resolve(trait_sym)
+            self.emit_error("type '" ++ type_str ++ "' does not implement trait '" ++ trait_str ++ "' required for dyn parameter", self.ast.get_extra(call_extra_start + ai))
+            continue
+
+        self.obligation_trait_syms.push(trait_sym)
+        self.obligation_type_syms.push(concrete_sym)
+        self.obligation_nodes.push(self.ast.get_extra(call_extra_start + ai))
+
+fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: Vec[i32], arg_count: i32, call_node: i32) -> i32:
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        if arg_count > 0:
+            return arg_types.get(0)
+        return 0
+
+    let param_start = self.ast.fn_meta_param_start(meta)
+    let param_count = self.ast.fn_meta_param_count(meta)
+    let tp_start = self.ast.fn_meta_tp_start(meta)
+    let tp_count = self.ast.fn_meta_tp_count(meta)
+    let ret_node = self.ast.fn_meta_ret(meta)
+
+    if arg_count != param_count:
+        self.emit_error("wrong argument count", call_node)
+
+    self.clear_generic_substitution()
+
+    // Infer type parameter substitutions from call argument types.
+    for pi in 0..param_count:
+        if pi >= arg_count:
+            break
+        let p_type_node = self.ast.get_extra(param_start + pi * 2 + 1)
+        let arg_ty = arg_types.get(pi as i64)
+        self.bind_type_params_from_type_expr(p_type_node, arg_ty, tp_start, tp_count, call_node)
+
+    // Obligation model: collect and solve trait bounds for each bound type parameter.
+    self.check_generic_trait_bounds(tp_start, tp_count, call_node)
+
+    let spec_key = self.generic_specialization_key(fn_sym, tp_start, tp_count)
+    if self.generic_specialization_cache.contains(spec_key):
+        return self.generic_specialization_cache.get(spec_key).unwrap()
+
+    let resolved_ret = self.resolve_generic_return_type_node(ret_node, tp_start, tp_count)
+    self.generic_specialization_cache.insert(spec_key, resolved_ret)
+    resolved_ret
+
+fn Sema.clear_generic_substitution(self: Sema):
+    while self.generic_subst_param_syms.len() > 0:
+        self.generic_subst_param_syms.pop()
+        self.generic_subst_type_ids.pop()
+
+fn Sema.lookup_generic_subst(self: Sema, param_sym: i32) -> i32:
+    var i = self.generic_subst_param_syms.len() as i32 - 1
+    while i >= 0:
+        if self.generic_subst_param_syms.get(i as i64) == param_sym:
+            return self.generic_subst_type_ids.get(i as i64)
+        i = i - 1
+    0
+
+fn Sema.put_generic_subst(self: Sema, param_sym: i32, tid: i32, node: i32):
+    if tid == 0:
+        return
+    let existing = self.lookup_generic_subst(param_sym)
+    if existing != 0:
+        if not self.types_compatible(existing, tid):
+            if self.arithmetic_result_type(existing, tid) == 0:
+                let tp_name = self.pool.resolve(param_sym)
+                let a = self.type_name(existing)
+                let b = self.type_name(tid)
+                self.emit_error("cannot infer a single type for '" ++ tp_name ++ "': saw '" ++ a ++ "' and '" ++ b ++ "'", node)
+        return
+
+    self.generic_subst_param_syms.push(param_sym)
+    self.generic_subst_type_ids.push(tid)
+
+fn Sema.type_param_exists(self: Sema, tp_start: i32, tp_count: i32, sym: i32) -> i32:
+    var pos = tp_start
+    for ti in 0..tp_count:
+        let tp_name = self.ast.get_extra(pos)
+        let bound_count = self.ast.get_extra(pos + 1)
+        if tp_name == sym:
+            return 1
+        pos = pos + 2 + bound_count
+    0
+
+fn Sema.bind_type_params_from_type_expr(self: Sema, type_node: i32, arg_tid: i32, tp_start: i32, tp_count: i32, err_node: i32):
+    if type_node == 0 or arg_tid == 0:
+        return
+
+    let kind = self.ast.kind(type_node)
+
+    if kind == NK_TYPE_NAMED():
+        let sym = self.ast.get_data0(type_node)
+        if self.type_param_exists(tp_start, tp_count, sym) != 0:
+            self.put_generic_subst(sym, arg_tid, err_node)
+        return
+
+    if kind == NK_TYPE_REF():
+        let inner_node = self.ast.get_data0(type_node)
+        let resolved = self.resolve_alias(arg_tid)
+        if self.get_type_kind(resolved) == TY_REF():
+            self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
+        return
+
+    if kind == NK_TYPE_PTR():
+        let inner_node = self.ast.get_data0(type_node)
+        let resolved = self.resolve_alias(arg_tid)
+        if self.get_type_kind(resolved) == TY_PTR():
+            self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
+        return
+
+    if kind == NK_TYPE_ARRAY():
+        let inner_node = self.ast.get_data0(type_node)
+        let resolved = self.resolve_alias(arg_tid)
+        if self.get_type_kind(resolved) == TY_ARRAY():
+            self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
+        return
+
+    if kind == NK_TYPE_SLICE():
+        let inner_node = self.ast.get_data0(type_node)
+        let resolved = self.resolve_alias(arg_tid)
+        if self.get_type_kind(resolved) == TY_SLICE():
+            self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
+        return
+
+    if kind == NK_TYPE_TUPLE():
+        let inner_start = self.ast.get_data0(type_node)
+        let inner_count = self.ast.get_data1(type_node)
+        let resolved = self.resolve_alias(arg_tid)
+        if self.get_type_kind(resolved) != TY_TUPLE():
+            return
+        let te_start = self.get_type_d0(resolved)
+        let elem_count = self.get_type_d1(resolved)
+        let pair_count = if inner_count < elem_count: inner_count else: elem_count
+        for ei in 0..pair_count:
+            let inner_node = self.ast.get_extra(inner_start + ei)
+            let arg_elem = self.type_extra.get((te_start + ei) as i64)
+            self.bind_type_params_from_type_expr(inner_node, arg_elem, tp_start, tp_count, err_node)
+        return
+
+fn Sema.generic_specialization_key(self: Sema, fn_sym: i32, tp_start: i32, tp_count: i32) -> str:
+    var key = int_to_string(fn_sym)
+    var pos = tp_start
+    for ti in 0..tp_count:
+        let tp_name = self.ast.get_extra(pos)
+        let bound_count = self.ast.get_extra(pos + 1)
+        key = key ++ ":" ++ int_to_string(tp_name) ++ "=" ++ int_to_string(self.lookup_generic_subst(tp_name))
+        pos = pos + 2 + bound_count
+    key
+
+fn Sema.check_generic_trait_bounds(self: Sema, tp_start: i32, tp_count: i32, call_node: i32):
+    var pos = tp_start
+    for ti in 0..tp_count:
+        let tp_name = self.ast.get_extra(pos)
+        let bound_count = self.ast.get_extra(pos + 1)
+        let concrete_tid = self.lookup_generic_subst(tp_name)
+        for bi in 0..bound_count:
+            let trait_sym = self.ast.get_extra(pos + 2 + bi)
+            let trait_name = self.pool.resolve(trait_sym)
+            if trait_name == "type":
+                continue
+            if concrete_tid == 0:
+                continue
+            let concrete_sym = self.type_symbol_for_bounds(concrete_tid)
+            if concrete_sym == 0:
+                continue
+            self.obligation_trait_syms.push(trait_sym)
+            self.obligation_type_syms.push(concrete_sym)
+            self.obligation_nodes.push(call_node)
+            if self.select_trait_impl(concrete_sym, trait_sym) == 0:
+                let type_str = self.pool.resolve(concrete_sym)
+                let tp_str = self.pool.resolve(tp_name)
+                self.emit_error("type '" ++ type_str ++ "' does not implement trait '" ++ trait_name ++ "' required by bound '" ++ tp_str ++ ": " ++ trait_name ++ "'", call_node)
+        pos = pos + 2 + bound_count
+
+fn Sema.resolve_generic_return_type_node(self: Sema, ret_node: i32, tp_start: i32, tp_count: i32) -> i32:
+    if ret_node == 0:
+        return self.ty_void
+
+    let kind = self.ast.kind(ret_node)
+
+    if kind == NK_TYPE_NAMED():
+        let sym = self.ast.get_data0(ret_node)
+        if self.type_param_exists(tp_start, tp_count, sym) != 0:
+            return self.lookup_generic_subst(sym)
+        return self.resolve_type_expr(ret_node)
+
+    if kind == NK_TYPE_REF():
+        let pointee = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
+        let is_mut = self.ast.get_data1(ret_node)
+        return self.add_type(TY_REF(), pointee, is_mut, 0)
+
+    if kind == NK_TYPE_PTR():
+        let pointee = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
+        let is_mut = self.ast.get_data1(ret_node)
+        return self.add_type(TY_PTR(), pointee, is_mut, 0)
+
+    if kind == NK_TYPE_ARRAY():
+        let elem = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
+        let size = self.ast.get_data1(ret_node)
+        return self.add_type(TY_ARRAY(), elem, size, 0)
+
+    if kind == NK_TYPE_SLICE():
+        let elem = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
+        return self.add_type(TY_SLICE(), elem, 0, 0)
+
+    if kind == NK_TYPE_TUPLE():
+        let extra_start = self.ast.get_data0(ret_node)
+        let elem_count = self.ast.get_data1(ret_node)
+        let te_start = self.type_extra.len() as i32
+        for ei in 0..elem_count:
+            let e_node = self.ast.get_extra(extra_start + ei)
+            self.type_extra.push(self.resolve_generic_return_type_node(e_node, tp_start, tp_count))
+        return self.add_type(TY_TUPLE(), te_start, elem_count, 0)
+
+    self.resolve_type_expr(ret_node)
+
+fn Sema.selection_cache_key(self: Sema, type_sym: i32, trait_sym: i32) -> str:
+    int_to_string(type_sym) ++ ":" ++ int_to_string(trait_sym)
+
+fn Sema.select_trait_impl(self: Sema, type_sym: i32, trait_sym: i32) -> i32:
+    let key = self.selection_cache_key(type_sym, trait_sym)
+    if self.selection_cache.contains(key):
+        return self.selection_cache.get(key).unwrap()
+
+    var found = 0
+    if self.impl_lookup.contains(type_sym):
+        let idx = self.impl_lookup.get(type_sym).unwrap()
+        let start = self.impl_starts.get(idx as i64)
+        let count = self.impl_counts.get(idx as i64)
+        for i in 0..count:
+            if self.impl_extra.get((start + i) as i64) == trait_sym:
+                found = 1
+    self.selection_cache.insert(key, found)
+    found
+
+fn Sema.type_symbol_for_bounds(self: Sema, tid: i32) -> i32:
+    let resolved = self.resolve_alias(tid)
+    let tk = self.get_type_kind(resolved)
+    if tk == TY_STRUCT() or tk == TY_ENUM():
+        return self.get_type_d0(resolved)
+    if tk == TY_INT():
+        let bits = self.get_type_d0(resolved)
+        let signed = self.get_type_d1(resolved)
+        if bits == 8:
+            if signed != 0:
+                return self.pool.intern("i8")
+            return self.pool.intern("u8")
+        if bits == 16:
+            if signed != 0:
+                return self.pool.intern("i16")
+            return self.pool.intern("u16")
+        if bits == 32:
+            if signed != 0:
+                return self.pool.intern("i32")
+            return self.pool.intern("u32")
+        if bits == 64:
+            if signed != 0:
+                return self.pool.intern("i64")
+            return self.pool.intern("u64")
+        return 0
+    if tk == TY_FLOAT():
+        if self.get_type_d0(resolved) == 32:
+            return self.pool.intern("f32")
+        return self.pool.intern("f64")
+    if tk == TY_BOOL():
+        return self.pool.intern("bool")
+    if tk == TY_STR():
+        return self.pool.intern("str")
+    0
+
+fn Sema.trait_object_from_type_node(self: Sema, type_node: i32) -> i32:
+    if type_node == 0:
+        return 0
+    let kind = self.ast.kind(type_node)
+    if kind == NK_TYPE_TRAIT_OBJ():
+        return self.ast.get_data0(type_node)
+    if kind == NK_TYPE_REF() or kind == NK_TYPE_PTR():
+        return self.trait_object_from_type_node(self.ast.get_data0(type_node))
+    if kind == NK_TYPE_GENERIC():
+        let base = self.ast.get_data0(type_node)
+        if self.pool.resolve(base) != "Box":
+            return 0
+        let extra_start = self.ast.get_data1(type_node)
+        let arg_count = self.ast.get_data2(type_node)
+        if arg_count != 1:
+            return 0
+        return self.trait_object_from_type_node(self.ast.get_extra(extra_start))
+    0
+
+fn Sema.dyn_arg_concrete_type_symbol(self: Sema, tid: i32) -> i32:
+    let resolved = self.resolve_alias(tid)
+    let tk = self.get_type_kind(resolved)
+    if tk == TY_REF() or tk == TY_PTR():
+        return self.type_symbol_for_bounds(self.get_type_d0(resolved))
+    self.type_symbol_for_bounds(resolved)
 
 fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
     let expr = self.ast.get_data0(callee)
@@ -1964,6 +2410,402 @@ fn Sema.emit_warning(self: Sema, msg: str, node: i32):
     let end = self.ast.get_end(node)
     self.diags.emit(Diagnostic.warn(msg, Span { file: self.local_file_id, start: start, end: end }))
 
+// ── Typed dump rendering ────────────────────────────────────────
+
+fn typed_decl_kind_name(kind: i32) -> str:
+    if kind == NK_FN_DECL(): return "function"
+    if kind == NK_TYPE_DECL(): return "type_decl"
+    if kind == NK_USE_DECL(): return "use_decl"
+    if kind == NK_LET_DECL(): return "let_decl"
+    if kind == NK_EXTERN_FN(): return "extern_fn"
+    if kind == NK_C_IMPORT(): return "c_import"
+    if kind == NK_TRAIT_DECL(): return "trait_decl"
+    if kind == NK_IMPL_DECL(): return "impl_decl"
+    if kind == NK_POISONED_DECL(): return "poisoned"
+    "unknown"
+
+fn typed_expr_kind_name(kind: i32) -> str:
+    if kind == NK_INT_LIT(): return "int_literal"
+    if kind == NK_FLOAT_LIT(): return "float_literal"
+    if kind == NK_STRING_LIT(): return "string_literal"
+    if kind == NK_C_STRING_LIT(): return "c_string_literal"
+    if kind == NK_BOOL_LIT(): return "bool_literal"
+    if kind == NK_IDENT(): return "ident"
+    if kind == NK_BINARY(): return "binary"
+    if kind == NK_UNARY(): return "unary"
+    if kind == NK_CALL(): return "call"
+    if kind == NK_FIELD_ACCESS(): return "field_access"
+    if kind == NK_INDEX(): return "index"
+    if kind == NK_SLICE(): return "slice"
+    if kind == NK_BLOCK(): return "block"
+    if kind == NK_IF_EXPR(): return "if_expr"
+    if kind == NK_RETURN(): return "return_expr"
+    if kind == NK_LET_BINDING(): return "let_binding"
+    if kind == NK_LET_ELSE(): return "let_else"
+    if kind == NK_TUPLE_DESTRUCTURE(): return "tuple_destructure"
+    if kind == NK_ASSIGN(): return "assign"
+    if kind == NK_TUPLE(): return "tuple"
+    if kind == NK_RANGE(): return "range"
+    if kind == NK_VARIANT_SHORTHAND(): return "variant_shorthand"
+    if kind == NK_AWAIT(): return "await_expr"
+    if kind == NK_ASYNC_BLOCK(): return "async_block"
+    if kind == NK_SPAWN(): return "spawn_expr"
+    if kind == NK_PIPELINE(): return "pipeline"
+    if kind == NK_GROUPED(): return "grouped"
+    if kind == NK_WHILE(): return "while_expr"
+    if kind == NK_LOOP(): return "loop_expr"
+    if kind == NK_FOR(): return "for_expr"
+    if kind == NK_BREAK(): return "break_expr"
+    if kind == NK_CONTINUE(): return "continue_expr"
+    if kind == NK_ARRAY_LIT(): return "array_literal"
+    if kind == NK_ARRAY_COMPREHENSION(): return "array_comprehension"
+    if kind == NK_STRUCT_LIT(): return "struct_literal"
+    if kind == NK_MATCH(): return "match_expr"
+    if kind == NK_ENUM_VARIANT(): return "enum_variant"
+    if kind == NK_CLOSURE(): return "closure"
+    if kind == NK_CAST(): return "cast"
+    if kind == NK_DEFER(): return "defer_expr"
+    if kind == NK_WITH_EXPR(): return "with_expr"
+    if kind == NK_RECORD_UPDATE(): return "record_update"
+    if kind == NK_YIELD(): return "yield_expr"
+    if kind == NK_COMPTIME(): return "comptime_expr"
+    if kind == NK_ASYNC_SCOPE(): return "async_scope"
+    if kind == NK_SELECT_AWAIT(): return "select_await"
+    if kind == NK_OPTIONAL_CHAIN(): return "optional_chain"
+    if kind == NK_POISONED_EXPR(): return "poisoned"
+    "unknown"
+
+fn typed_indent(indent: i32) -> str:
+    var out = ""
+    for i in 0..indent:
+        out = out ++ "  "
+    out
+
+fn Sema.dump_typed_module(self: Sema) -> str:
+    var out = ""
+    out = out ++ "typed module decls=" ++ int_to_string(self.ast.decl_count()) ++ "\n"
+
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        let kind = self.ast.kind(decl)
+        let start = self.ast.get_start(decl)
+        let end = self.ast.get_end(decl)
+
+        out = out ++ "decl[" ++ int_to_string(di) ++ "] kind=" ++ typed_decl_kind_name(kind) ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ "\n"
+
+        if kind == NK_FN_DECL():
+            let fn_name_sym = self.ast.get_data0(decl)
+            let fn_name = self.pool.resolve(fn_name_sym)
+            let sig_idx = self.get_sig(fn_name_sym)
+            if sig_idx >= 0:
+                out = out ++ "  fn " ++ fn_name ++ "("
+                let meta = self.ast.find_fn_meta(decl)
+                var param_start = 0
+                if meta >= 0:
+                    param_start = self.ast.fn_meta_param_start(meta)
+                let param_count = self.sig_get_param_count(sig_idx)
+                for pi in 0..param_count:
+                    if pi > 0:
+                        out = out ++ ", "
+                    let p_name_sym = if meta >= 0: self.ast.get_extra(param_start + pi * 2) else: 0
+                    let p_name = if p_name_sym != 0: self.pool.resolve(p_name_sym) else: "_"
+                    out = out ++ p_name ++ ": " ++ self.type_name(self.sig_param_type(sig_idx, pi))
+                out = out ++ ") -> " ++ self.type_name(self.sig_return_type(sig_idx)) ++ "\n"
+            else:
+                out = out ++ "  fn " ++ fn_name ++ "(<unknown>)\n"
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(decl), 2)
+            continue
+
+        if kind == NK_EXTERN_FN():
+            let ext_name_sym = self.ast.get_data0(decl)
+            let ext_name = self.pool.resolve(ext_name_sym)
+            let sig_idx = self.get_sig(ext_name_sym)
+            if sig_idx >= 0:
+                out = out ++ "  extern fn " ++ ext_name ++ "("
+                let meta = self.ast.find_fn_meta(decl)
+                var param_start = 0
+                if meta >= 0:
+                    param_start = self.ast.fn_meta_param_start(meta)
+                let param_count = self.sig_get_param_count(sig_idx)
+                for pi in 0..param_count:
+                    if pi > 0:
+                        out = out ++ ", "
+                    let p_name_sym = if meta >= 0: self.ast.get_extra(param_start + pi * 2) else: 0
+                    let p_name = if p_name_sym != 0: self.pool.resolve(p_name_sym) else: "_"
+                    out = out ++ p_name ++ ": " ++ self.type_name(self.sig_param_type(sig_idx, pi))
+                out = out ++ ") -> " ++ self.type_name(self.sig_return_type(sig_idx)) ++ "\n"
+            else:
+                out = out ++ "  extern fn " ++ ext_name ++ "(<unknown>)\n"
+            continue
+
+        if kind == NK_LET_DECL():
+            let name = self.pool.resolve(self.ast.get_data0(decl))
+            if self.typed_binding_types.contains(start):
+                let ty = self.typed_binding_types.get(start).unwrap()
+                let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: 0
+                out = out ++ "  let " ++ name
+                if is_mut != 0:
+                    out = out ++ " (mut)"
+                out = out ++ ": " ++ self.type_name(ty) ++ "\n"
+            else:
+                out = out ++ "  let " ++ name ++ ": <inferred>\n"
+            continue
+
+        if kind == NK_TYPE_DECL():
+            out = out ++ "  type " ++ self.pool.resolve(self.ast.get_data0(decl)) ++ "\n"
+            continue
+
+        if kind == NK_TRAIT_DECL():
+            out = out ++ "  trait " ++ self.pool.resolve(self.ast.get_data0(decl)) ++ "\n"
+            continue
+
+        if kind == NK_IMPL_DECL():
+            let type_name = self.pool.resolve(self.ast.get_data0(decl))
+            let trait_sym = self.ast.get_data2(decl)
+            if trait_sym != 0:
+                out = out ++ "  impl " ++ self.pool.resolve(trait_sym) ++ " for " ++ type_name ++ "\n"
+            else:
+                out = out ++ "  impl " ++ type_name ++ "\n"
+            continue
+
+        if kind == NK_USE_DECL():
+            let extra_start = self.ast.get_data0(decl)
+            let path_count = self.ast.get_data1(decl)
+            out = out ++ "  use "
+            for pi in 0..path_count:
+                if pi > 0:
+                    out = out ++ "."
+                out = out ++ self.pool.resolve(self.ast.get_extra(extra_start + pi))
+            out = out ++ "\n"
+            continue
+
+        if kind == NK_C_IMPORT():
+            out = out ++ "  c_import \"" ++ self.pool.resolve(self.ast.get_data0(decl)) ++ "\"\n"
+            continue
+
+        if kind == NK_POISONED_DECL():
+            out = out ++ "  <poisoned>\n"
+
+    out
+
+fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
+    if node == 0:
+        return ""
+
+    var out = ""
+    let kind = self.ast.kind(node)
+    let start = self.ast.get_start(node)
+    let end = self.ast.get_end(node)
+
+    if self.typed_expr_types.contains(start):
+        let tid = self.typed_expr_types.get(start).unwrap()
+        out = out ++ typed_indent(indent) ++ "expr " ++ typed_expr_kind_name(kind) ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ " : " ++ self.type_name(tid) ++ "\n"
+
+    if kind == NK_LET_BINDING():
+        if self.typed_binding_types.contains(start):
+            let name_sym = if self.typed_binding_names.contains(start): self.typed_binding_names.get(start).unwrap() else: self.ast.get_data0(node)
+            let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: (self.ast.get_data2(node) % 2)
+            out = out ++ typed_indent(indent + 1) ++ "bind " ++ self.pool.resolve(name_sym)
+            if is_mut != 0:
+                out = out ++ " (mut)"
+            out = out ++ ": " ++ self.type_name(self.typed_binding_types.get(start).unwrap()) ++ "\n"
+
+    if kind == NK_BINARY():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return out
+
+    if kind == NK_UNARY():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
+    if kind == NK_CALL():
+        let extra_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        for ai in 0..arg_count:
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + ai), indent + 1)
+        return out
+
+    if kind == NK_FIELD_ACCESS():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return out
+
+    if kind == NK_OPTIONAL_CHAIN():
+        let extra_start = self.ast.get_data2(node)
+        let arg_count = self.ast.get_extra(extra_start)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        for ai in 0..arg_count:
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + 1 + ai), indent + 1)
+        return out
+
+    if kind == NK_INDEX():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
+    if kind == NK_SLICE():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return out
+
+    if kind == NK_BLOCK():
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        let tail = self.ast.get_data2(node)
+        for si in 0..stmt_count:
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + si), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(tail, indent + 1)
+        return out
+
+    if kind == NK_IF_EXPR():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return out
+
+    if kind == NK_RETURN():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return out
+
+    if kind == NK_LET_BINDING():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
+    if kind == NK_LET_ELSE():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return out
+
+    if kind == NK_TUPLE_DESTRUCTURE():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return out
+
+    if kind == NK_ASSIGN():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
+    if kind == NK_TUPLE():
+        let extra_start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        for i in 0..count:
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
+        return out
+
+    if kind == NK_RANGE():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
+    if kind == NK_VARIANT_SHORTHAND():
+        let extra_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for i in 0..arg_count:
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
+        return out
+
+    if kind == NK_AWAIT() or kind == NK_ASYNC_BLOCK() or kind == NK_SPAWN() or kind == NK_GROUPED() or kind == NK_DEFER() or kind == NK_YIELD() or kind == NK_COMPTIME():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return out
+
+    if kind == NK_PIPELINE():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
+    if kind == NK_WHILE():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
+    if kind == NK_LOOP():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return out
+
+    if kind == NK_FOR():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return out
+
+    if kind == NK_BREAK():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return out
+
+    if kind == NK_ARRAY_LIT():
+        let extra_start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        for i in 0..count:
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
+        return out
+
+    if kind == NK_ARRAY_COMPREHENSION():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return out
+
+    if kind == NK_STRUCT_LIT():
+        let extra_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for i in 0..field_count:
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
+        return out
+
+    if kind == NK_MATCH():
+        let extra_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        for i in 0..arm_count:
+            let arm = self.ast.get_extra(extra_start + i)
+            let guard = self.ast.get_data2(arm)
+            if guard != 0:
+                out = out ++ self.dump_typed_expr_tree(guard, indent + 1)
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(arm), indent + 1)
+        return out
+
+    if kind == NK_ENUM_VARIANT():
+        let extra_start = self.ast.get_data2(node)
+        let arg_count = self.ast.get_extra(extra_start)
+        for i in 0..arg_count:
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + 1 + i), indent + 1)
+        return out
+
+    if kind == NK_CLOSURE():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return out
+
+    if kind == NK_CAST():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return out
+
+    if kind == NK_WITH_EXPR():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
+    if kind == NK_RECORD_UPDATE():
+        let extra_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        for i in 0..field_count:
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
+        return out
+
+    if kind == NK_ASYNC_SCOPE():
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
+    if kind == NK_SELECT_AWAIT():
+        let extra_start = self.ast.get_data0(node)
+        let arm_count = self.ast.get_data1(node)
+        for i in 0..arm_count:
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 3), indent + 1)
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 3 + 2), indent + 1)
+        return out
+
+    out
+
 // ── Type name formatting ─────────────────────────────────────────
 
 fn Sema.type_name(self: Sema, tid: i32) -> str:
@@ -2015,4 +2857,7 @@ fn Sema.type_name(self: Sema, tid: i32) -> str:
         return "<alias>"
     if tk == TY_GENERIC_FN():
         return "<generic>"
+    if tk == TY_TRAIT_OBJ():
+        // Stage0 parity: dyn trait-object type expressions currently print as <error>.
+        return "<error>"
     "<unknown>"

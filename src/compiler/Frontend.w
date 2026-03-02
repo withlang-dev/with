@@ -69,6 +69,11 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     sema.check_module()
     self.pool = sema.pool
     self.diagnostics = sema.diags
+    self.typed_expr_types = sema.typed_expr_types
+    self.typed_binding_types = sema.typed_binding_types
+    self.typed_binding_names = sema.typed_binding_names
+    self.typed_binding_muts = sema.typed_binding_muts
+    self.last_typed_dump = sema.dump_typed_module()
 
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)

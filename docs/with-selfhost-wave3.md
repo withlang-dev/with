@@ -269,15 +269,15 @@ Corpus policy:
 - [x] Freeze Wave 3 AST oracle contract against Stage0 current output.
 - [x] Define Wave 3 AST parity corpus file.
 - [x] Inventory Stage0 parser feature buckets from `bootstrap/src/Parser.zig` + `bootstrap/src/Parse.zig` tests.
-- [ ] Align `src/Ast.w` node coverage/flags/spans needed for Stage0 dump parity.
+- [x] Align `src/Ast.w` node coverage/flags/spans needed for Stage0 dump parity.
 - [x] Align module span + decl span computation with Stage0 behavior.
-- [ ] Align top-level declaration parsing parity (`fn/type/use/let/extern/trait/impl/extend/c_import`).
-- [ ] Align attribute parsing parity (`@[...]` forms used in Stage0).
-- [ ] Align expression parser precedence/associativity with Stage0.
+- [x] Align top-level declaration parsing parity (`fn/type/use/let/extern/trait/impl/extend/c_import`).
+- [x] Align attribute parsing parity (`@[...]` forms used in Stage0).
+- [x] Align expression parser precedence/associativity with Stage0.
 - [x] Add/align missing literal expression parsing (including `char` literal expressions).
-- [ ] Align type-expression parsing parity.
-- [ ] Align pattern parsing parity.
-- [ ] Align parser recovery behavior for deterministic outputs.
+- [x] Align type-expression parsing parity.
+- [x] Align pattern parsing parity.
+- [x] Align parser recovery behavior for deterministic outputs.
 - [x] Align `src/render.w` with Stage0 AST render format.
 - [x] Add self-host `check --dump-ast` support in `src/main.w`.
 - [x] Route `ast` command through shared dump formatting path where practical.
@@ -290,4 +290,4 @@ Corpus policy:
 
 Current scope note:
 - Wave 3 parity gate is green for the explicit Wave 3 corpus in `test/wave3/ast_corpus.txt`.
-- Unchecked items above remain follow-up work to broaden parity coverage (notably full top-level declaration parity, attribute parity, and parser recovery parity).
+- Remaining Stage0-vs-selfhost AST diffs seen in broad corpus sweeps are outside Wave 3 parser surface (import/c_import expansion, chained `if let`, and other later-wave frontend behaviors).
