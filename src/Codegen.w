@@ -1616,7 +1616,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
 
 // ── Wrap main for exit ────────────────────────────────────────────
 
-fn Codegen.wrap_main_for_exit(self: Codegen):
+fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
     // If user's main returns void, create an OS-facing wrapper that returns 0.
     let main_fn = wl_get_named_function(self.llmod, "main")
     if main_fn == 0: return
@@ -3725,7 +3725,7 @@ fn Codegen.is_str_type(self: Codegen, ty: i64) -> bool:
     let str_type = self.struct_llvm_types.get(st_opt.unwrap() as i64)
     ty == str_type
 
-fn Codegen.gen_print_value(self: Codegen, val: i64, printf_fn: i64, printf_ty: i64):
+fn Codegen.gen_print_value(self: Codegen, val: i64, printf_fn: i64, printf_ty: i64) -> void:
     let ty = wl_type_of(val)
     let kind = wl_get_type_kind(ty)
     var print_val = val
@@ -3763,10 +3763,12 @@ fn Codegen.gen_print_value(self: Codegen, val: i64, printf_fn: i64, printf_ty: i
     else if kind == wl_struct_type_kind():
         // Struct: try to print each field
         let field_count = wl_count_struct_elem_types(ty)
-        let open_fmt = wl_build_global_string_ptr(self.builder, "{")
+        let brace_fmt = wl_build_global_string_ptr(self.builder, "%c")
+        let open_brace = wl_const_int(wl_i32_type(self.context), 123, 0)
         let open_args: Vec[i64] = Vec.new()
-        open_args.push(open_fmt)
-        wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(open_args), 1)
+        open_args.push(brace_fmt)
+        open_args.push(open_brace)
+        wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(open_args), 2)
         for fi in 0..field_count:
             if fi > 0:
                 let comma_fmt = wl_build_global_string_ptr(self.builder, ", ")
@@ -3775,10 +3777,11 @@ fn Codegen.gen_print_value(self: Codegen, val: i64, printf_fn: i64, printf_ty: i
                 wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(comma_args), 1)
             let fv = wl_build_extract_value(self.builder, val, fi)
             self.gen_print_value(fv, printf_fn, printf_ty)
-        let close_fmt = wl_build_global_string_ptr(self.builder, "}")
+        let close_brace = wl_const_int(wl_i32_type(self.context), 125, 0)
         let close_args: Vec[i64] = Vec.new()
-        close_args.push(close_fmt)
-        wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(close_args), 1)
+        close_args.push(brace_fmt)
+        close_args.push(close_brace)
+        wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(close_args), 2)
         return
     else:
         fmt = "%d"

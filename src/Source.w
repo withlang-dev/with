@@ -4,8 +4,6 @@
 // efficient offset -> line/column translation via a precomputed
 // line-start table.
 
-use Span
-
 extern fn with_fs_read_file(path: str) -> str
 
 type Source = {
@@ -15,8 +13,8 @@ type Source = {
     text: str,
     // Byte offsets where each line begins (0-indexed lines).
     line_offsets: Vec[i32],
-    // Identifier used in Span.file.
-    file_id: FileId,
+    // Identifier used in diagnostics.
+    file_id: i32,
     // Whether we conceptually own the text buffer.
     owns_text: bool,
 }
@@ -36,7 +34,7 @@ fn Source.compute_line_offsets(text: str) -> Vec[i32]:
     offsets
 
 // Create a Source from a file path.
-fn Source.from_file(path: str, file_id: FileId) -> Source:
+fn Source.from_file(path: str, file_id: i32) -> Source:
     let text = with_fs_read_file(path)
     Source {
         name: path,
@@ -47,7 +45,7 @@ fn Source.from_file(path: str, file_id: FileId) -> Source:
     }
 
 // Create a Source from an in-memory string (useful for tests).
-fn Source.from_string(name: str, text: str, file_id: FileId) -> Source:
+fn Source.from_string(name: str, text: str, file_id: i32) -> Source:
     Source {
         name,
         text,
