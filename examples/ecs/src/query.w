@@ -40,9 +40,9 @@ gen fn query3[A, B, C](
 ) -> (Entity, &A, &B, &C):
     for i in 0..a.len():
         let entity = a.dense_entities[i]
-        if let Some(b_val) = b.get(entity):
-            if let Some(c_val) = c.get(entity):
-                yield (entity, &a.dense_data[i], b_val, c_val)
+        if let Some(b_val) = b.get(entity),
+           let Some(c_val) = c.get(entity):
+            yield (entity, &a.dense_data[i], b_val, c_val)
 
 // --- Query with exclusion (entities that have A but NOT B) ---
 

@@ -55,10 +55,10 @@ type Tokenizer = {
 }
 
 fn is_whitespace(ch: u8) -> bool:
-    ch == 32 or ch == 9 or ch == 10 or ch == 13
+    ch in [32, 9, 10, 13]
 
 fn is_digit(ch: u8) -> bool:
-    ch >= 48 and ch <= 57
+    ch in 48..=57
 
 extend Tokenizer:
     fn new(input: str):
