@@ -2010,7 +2010,7 @@ fn runPackageTestsAtRoot(
     var selected_indices: std.ArrayList(usize) = .empty;
     defer selected_indices.deinit(allocator);
     for (discovery.tests.items, 0..) |test_case, idx| {
-        if (!packageTestMatchesFilters(test_case.name, options.run_pattern, options.positional_filter)) continue;
+        if (!packageTestMatchesFilters(test_case, options.run_pattern, options.positional_filter)) continue;
         try selected_indices.append(allocator, idx);
     }
 
@@ -2036,6 +2036,10 @@ fn runPackageTestsAtRoot(
     var skipped: usize = 0;
 
     if (selected_indices.items.len == 0) {
+        if (options.run_pattern != null or options.positional_filter != null) {
+            stderrPrint("error: no tests matched filter\n");
+            return 1;
+        }
         printPackageSummary(true, package_name, run_started.read(), skipped);
         return 0;
     }
@@ -2442,12 +2446,16 @@ fn reportDuplicateTestNames(tests: []const PackageTest) bool {
     return false;
 }
 
-fn packageTestMatchesFilters(name: []const u8, run_pattern: ?[]const u8, positional_filter: ?[]const u8) bool {
+fn packageTestMatchesFilters(test_case: PackageTest, run_pattern: ?[]const u8, positional_filter: ?[]const u8) bool {
     if (run_pattern) |pattern| {
-        if (std.mem.indexOf(u8, name, pattern) == null) return false;
+        if (std.mem.indexOf(u8, test_case.name, pattern) == null) return false;
     }
     if (positional_filter) |pattern| {
-        if (std.mem.indexOf(u8, name, pattern) == null) return false;
+        if (std.mem.indexOf(u8, test_case.name, pattern) == null and
+            std.mem.indexOf(u8, test_case.file_path, pattern) == null)
+        {
+            return false;
+        }
     }
     return true;
 }

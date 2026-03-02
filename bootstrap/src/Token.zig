@@ -86,6 +86,7 @@ pub const Tag = enum(u8) {
     star_wrap, // *%
     eq, // =
     eq_eq, // ==
+    bang, // !
     bang_eq, // !=
     lt, // <
     gt, // >
@@ -256,6 +257,7 @@ pub const Tag = enum(u8) {
             .star_wrap => "'*%'",
             .eq => "'='",
             .eq_eq => "'=='",
+            .bang => "'!'",
             .bang_eq => "'!='",
             .lt => "'<'",
             .gt => "'>'",

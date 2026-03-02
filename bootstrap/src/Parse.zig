@@ -87,6 +87,27 @@ test "parse module declarations and use imports" {
     try std.testing.expectEqual(@as(usize, 2), module.decls[1].kind.use_decl.path.len);
 }
 
+test "parse module declaration with uppercase path segments" {
+    const allocator = std.testing.allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var pool = InternPool.init(allocator);
+    defer pool.deinit();
+    var diags = Diagnostic.DiagnosticList.init(allocator);
+    defer diags.deinit();
+
+    const module = try parseModule(
+        \\module compiler.Compilation.Config
+        \\fn main -> i32:
+        \\    0
+        \\
+    , allocator, arena.allocator(), &pool, &diags);
+
+    try std.testing.expect(!diags.hasErrors());
+    try std.testing.expectEqual(@as(usize, 1), module.decls.len);
+    try std.testing.expect(module.decls[0].kind == .function);
+}
+
 test "parse reports malformed use import" {
     const allocator = std.testing.allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -238,6 +259,93 @@ test "parse core expressions in function blocks" {
     try std.testing.expect(block.stmts[5].kind.let_binding.value.kind == .if_expr);
     try std.testing.expect(block.stmts[6].kind.let_binding.value.kind == .range);
     try std.testing.expect(block.tail != null);
+}
+
+test "parse vec macro literal sugar" {
+    const allocator = std.testing.allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var pool = InternPool.init(allocator);
+    defer pool.deinit();
+    var diags = Diagnostic.DiagnosticList.init(allocator);
+    defer diags.deinit();
+
+    const module = try parseModule(
+        \\fn main -> i32:
+        \\    let v = vec![1, 2, 3]
+        \\    v.len()
+        \\
+    , allocator, arena.allocator(), &pool, &diags);
+
+    try std.testing.expect(!diags.hasErrors());
+    try std.testing.expectEqual(@as(usize, 1), module.decls.len);
+    const fn_decl = module.decls[0].kind.function;
+    try std.testing.expect(fn_decl.body.kind == .block);
+    const block = fn_decl.body.kind.block;
+    try std.testing.expectEqual(@as(usize, 1), block.stmts.len);
+
+    const init_expr = block.stmts[0].kind.let_binding.value;
+    try std.testing.expect(init_expr.kind == .call);
+    const call_expr = init_expr.kind.call;
+    try std.testing.expect(call_expr.callee.kind == .field_access);
+    const fa = call_expr.callee.kind.field_access;
+    try std.testing.expect(fa.expr.kind == .ident);
+    try std.testing.expect(std.mem.eql(u8, pool.resolve(fa.expr.kind.ident), "Vec"));
+    try std.testing.expect(std.mem.eql(u8, pool.resolve(fa.field), "of"));
+    try std.testing.expectEqual(@as(usize, 3), call_expr.args.len);
+}
+
+test "parse generic trait impl header in impl block" {
+    const allocator = std.testing.allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var pool = InternPool.init(allocator);
+    defer pool.deinit();
+    var diags = Diagnostic.DiagnosticList.init(allocator);
+    defer diags.deinit();
+
+    const module = try parseModule(
+        \\type DbConnection = { id: i32 }
+        \\type ConnectionPool = { url: str }
+        \\
+        \\impl Scoped[DbConnection] for ConnectionPool:
+        \\    fn enter(self: ConnectionPool) -> i32:
+        \\        0
+        \\
+    , allocator, arena.allocator(), &pool, &diags);
+
+    try std.testing.expect(!diags.hasErrors());
+    try std.testing.expectEqual(@as(usize, 4), module.decls.len);
+    try std.testing.expect(module.decls[3].kind == .impl_decl);
+}
+
+test "parse multi-binding with expression" {
+    const allocator = std.testing.allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var pool = InternPool.init(allocator);
+    defer pool.deinit();
+    var diags = Diagnostic.DiagnosticList.init(allocator);
+    defer diags.deinit();
+
+    const module = try parseModule(
+        \\fn main -> i32:
+        \\    let a = 1
+        \\    let b = 2
+        \\    with a as x, b as y:
+        \\        x + y
+        \\
+    , allocator, arena.allocator(), &pool, &diags);
+
+    try std.testing.expect(!diags.hasErrors());
+    try std.testing.expectEqual(@as(usize, 1), module.decls.len);
+    const fn_decl = module.decls[0].kind.function;
+    try std.testing.expect(fn_decl.body.kind == .block);
+    const block = fn_decl.body.kind.block;
+    try std.testing.expect(block.tail != null);
+    try std.testing.expect(block.tail.?.kind == .with_expr);
+    const outer = block.tail.?.kind.with_expr;
+    try std.testing.expect(outer.body.kind == .with_expr);
 }
 
 test "parse reports malformed core expression syntax" {

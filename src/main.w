@@ -13,7 +13,7 @@
 //
 // Direct port of bootstrap/src/main.zig to With.
 
-use Driver
+use Compilation
 use Lexer
 use Token
 use InternPool
@@ -80,14 +80,14 @@ fn main:
             with_eprintln("error: 'ir' requires a source file argument")
             exit(1)
             return
-        var driver = Driver.init()
-        driver.opt_level = opt_level
-        let pool = driver.compile_file(source_file)
+        var comp = Compilation.init()
+        comp.configure(opt_level, no_std, alloc_mode)
+        let pool = comp.compile_file(source_file)
         if pool.decl_count() == 0:
             with_eprintln("error: IR generation failed during compilation")
             exit(1)
             return
-        let ok = driver.emit_ir(pool)
+        let ok = comp.emit_ir(pool)
         if not ok:
             exit(1)
             return
@@ -104,16 +104,15 @@ fn main:
             with_eprintln("error: 'check' requires a source file argument")
             exit(1)
             return
-        var driver = Driver.init()
-        driver.no_std = no_std
-        driver.alloc = alloc_mode
-        let pool = driver.compile_file(source_file)
+        var comp = Compilation.init()
+        comp.configure(0, no_std, alloc_mode)
+        let pool = comp.compile_file(source_file)
         if pool.decl_count() == 0:
             with_eprintln("error: check failed during compilation")
             exit(1)
             return
         print("ok\n")
-        driver.print_warnings()
+        comp.print_warnings()
         return
     if command == "tokens":
         if source_file == "":
@@ -174,30 +173,26 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
     if source_file == "":
         with_eprintln("error: 'build' requires a source file argument")
         return 1
-    var driver = Driver.init()
-    driver.opt_level = opt_level
-    driver.no_std = no_std
-    driver.alloc = alloc_mode
-    let bin_path = driver.build_binary(source_file)
+    var comp = Compilation.init()
+    comp.configure(opt_level, no_std, alloc_mode)
+    let bin_path = comp.build_binary(source_file)
     if bin_path == "":
         with_eprintln("error: build failed")
         return 1
-    driver.print_warnings()
+    comp.print_warnings()
     0
 
 fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool) -> i32:
     if source_file == "":
         with_eprintln("error: 'run' requires a source file argument")
         return 1
-    var driver = Driver.init()
-    driver.opt_level = opt_level
-    driver.no_std = no_std
-    driver.alloc = alloc_mode
-    let bin_path = driver.build_binary(source_file)
+    var comp = Compilation.init()
+    comp.configure(opt_level, no_std, alloc_mode)
+    let bin_path = comp.build_binary(source_file)
     if bin_path == "":
         with_eprintln("error: run command failed to build target")
         return 1
-    driver.print_warnings()
+    comp.print_warnings()
     with_system(bin_path)
 
 fn run_ast_command(source_file: str) -> i32:
@@ -249,11 +244,9 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool) -
         with_eprintln("error: 'test' requires a source file or directory argument")
         return 1
     // Compile and run as test
-    var driver = Driver.init()
-    driver.opt_level = opt_level
-    driver.no_std = no_std
-    driver.alloc = alloc_mode
-    let bin_path = driver.build_binary(target)
+    var comp = Compilation.init()
+    comp.configure(opt_level, no_std, alloc_mode)
+    let bin_path = comp.build_binary(target)
     if bin_path == "":
         with_eprintln("error: test build failed")
         return 1
