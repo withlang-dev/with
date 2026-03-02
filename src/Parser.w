@@ -109,6 +109,15 @@ fn Parser.expect_ident(self: Parser) -> i32:
     self.advance()
     sym
 
+fn Parser.expect_ident_or_keyword(self: Parser) -> i32:
+    let t = self.peek()
+    if t == TK_IDENT() or (t >= TK_KW_FN() and t <= TK_KW_OR()):
+        let sym = self.intern_current()
+        self.advance()
+        return sym
+    self.emit_error("expected identifier")
+    0
+
 fn Parser.intern_current(self: Parser) -> i32:
     let s = self.current_start()
     let e = self.current_end()
@@ -126,6 +135,14 @@ fn Parser.skip_newlines(self: Parser):
     while self.peek() == TK_NEWLINE():
         self.advance()
 
+fn Parser.peek_past_newlines(self: Parser) -> i32:
+    var p = self.pos
+    while p < self.tokens.len() and self.tokens.get_tag(p) == TK_NEWLINE():
+        p = p + 1
+    if p < self.tokens.len():
+        return self.tokens.get_tag(p)
+    TK_EOF()
+
 fn Parser.emit_error(self: Parser, msg: str):
     let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
     self.diags.emit(Diagnostic.err(msg, span))
@@ -133,7 +150,11 @@ fn Parser.emit_error(self: Parser, msg: str):
 fn Parser.recover_to_top_level(self: Parser):
     while self.peek() != TK_EOF():
         let t = self.peek()
-        if t == TK_KW_FN() or t == TK_KW_TYPE() or t == TK_KW_USE() or t == TK_KW_LET() or t == TK_KW_VAR() or t == TK_KW_PUB() or t == TK_KW_EXTERN():
+        if t == TK_AT() or
+           t == TK_KW_FN() or t == TK_KW_TYPE() or t == TK_KW_USE() or t == TK_KW_LET() or
+           t == TK_KW_VAR() or t == TK_KW_PUB() or t == TK_KW_EXTERN() or t == TK_KW_ERROR() or
+           t == TK_KW_TRAIT() or t == TK_KW_IMPL() or t == TK_KW_EXTEND() or t == TK_KW_ASYNC() or
+           t == TK_KW_GEN() or t == TK_KW_COMPTIME():
             return
         self.advance()
 
@@ -335,14 +356,14 @@ fn Parser.parse_decl(self: Parser) -> i32:
 fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is_gen: i32, is_comptime: i32) -> i32:
     if self.expect(TK_KW_FN()) == 0:
         return 0
-    var name = self.expect_ident()
+    var name = self.expect_ident_or_keyword()
     if name == 0:
         return 0
 
     // Method syntax: fn Type.method(...)
     if self.peek() == TK_DOT():
         self.advance()
-        let method_name = self.expect_ident()
+        let method_name = self.expect_ident_or_keyword()
         if method_name == 0:
             return 0
         let type_str = self.intern.resolve(name)
@@ -425,6 +446,9 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
 fn Parser.parse_extern_decl(self: Parser, start: i32) -> i32:
     if self.expect(TK_KW_EXTERN()) == 0:
         return 0
+    // Optional ABI string: extern "C" fn ...
+    if self.peek() == TK_STRING_LIT():
+        self.advance()
     if self.expect(TK_KW_FN()) == 0:
         return 0
     let name = self.expect_ident()
@@ -823,12 +847,24 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
     let name = self.expect_ident()
     if name == 0:
         return
-    if self.expect(TK_EQ()) == 0:
+    if self.peek() == TK_EQ() or self.peek() == TK_COLON():
+        self.advance()
+    else:
+        self.emit_error("expected '=' or ':'")
         return
     self.skip_newlines()
 
-    let extra_start = self.pool.extra_len()
-    var method_count = 0
+    var method_names: Vec[i32] = Vec.new()
+    var method_flags: Vec[i32] = Vec.new()
+    var method_param_starts: Vec[i32] = Vec.new()
+    var method_param_counts: Vec[i32] = Vec.new()
+    var method_ret_types: Vec[i32] = Vec.new()
+
+    var assoc_names: Vec[i32] = Vec.new()
+    var assoc_bound_starts: Vec[i32] = Vec.new()
+    var assoc_bound_counts: Vec[i32] = Vec.new()
+    var assoc_default_types: Vec[i32] = Vec.new()
+    var assoc_bounds_flat: Vec[i32] = Vec.new()
 
     while self.peek() == TK_KW_FN() or self.peek() == TK_KW_PUB() or self.peek() == TK_KW_TYPE() or self.peek() == TK_KW_ASYNC():
         let fn_col = column_of(self.source, self.current_start())
@@ -838,34 +874,57 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
         if self.peek() == TK_KW_TYPE():
             self.advance()
             let at_name = self.expect_ident()
-            // Skip bounds and defaults
+            let bound_start = assoc_bounds_flat.len() as i32
+            var bound_count = 0
             if self.peek() == TK_COLON():
                 self.advance()
-                while self.peek() == TK_IDENT() or self.peek() == TK_PLUS():
+                let b = self.parse_type_bound_symbol()
+                if b != 0:
+                    assoc_bounds_flat.push(b)
+                    bound_count = bound_count + 1
+                while self.peek() == TK_PLUS():
                     self.advance()
+                    let b2 = self.parse_type_bound_symbol()
+                    if b2 != 0:
+                        assoc_bounds_flat.push(b2)
+                        bound_count = bound_count + 1
+            var default_ty = 0
             if self.peek() == TK_EQ():
                 self.advance()
-                self.parse_type_expr()
+                default_ty = self.parse_type_expr()
+            assoc_names.push(at_name)
+            assoc_bound_starts.push(bound_start)
+            assoc_bound_counts.push(bound_count)
+            assoc_default_types.push(default_ty)
             self.skip_newlines()
             continue
 
+        var is_pub_method = 0
         if self.peek() == TK_KW_PUB():
+            is_pub_method = 1
             self.advance()
+        var is_async_method = 0
         if self.peek() == TK_KW_ASYNC():
+            is_async_method = 1
             self.advance()
         if self.expect(TK_KW_FN()) == 0:
             break
-        let mname = self.expect_ident()
+        let mname = self.expect_ident_or_keyword()
         self.parse_type_params()
 
+        var params_start = 0
+        var param_count = 0
         if self.peek() == TK_L_PAREN():
             self.advance()
-            self.parse_param_list()
+            param_count = self.parse_param_list()
+            if param_count > 0:
+                params_start = self.pool.extra_len() - param_count * 2
             self.expect(TK_R_PAREN())
 
+        var ret_type = 0
         if self.peek() == TK_ARROW():
             self.advance()
-            self.parse_type_expr()
+            ret_type = self.parse_type_expr()
 
         self.parse_optional_where_clause()
 
@@ -873,9 +932,38 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
             self.advance()
             self.parse_block_or_expr()
 
-        self.pool.add_extra(mname)
-        method_count = method_count + 1
+        method_names.push(mname)
+        method_param_starts.push(params_start)
+        method_param_counts.push(param_count)
+        method_ret_types.push(ret_type)
+        var mflags = 0
+        if is_async_method != 0:
+            mflags = mflags + 1
+        if is_pub_method != 0:
+            mflags = mflags + 2
+        method_flags.push(mflags)
         self.skip_newlines()
+
+    let extra_start = self.pool.extra_len()
+    let assoc_count = assoc_names.len() as i32
+    self.pool.add_extra(assoc_count)
+    for ai in 0..assoc_count:
+        self.pool.add_extra(assoc_names.get(ai as i64))
+        let bound_start = assoc_bound_starts.get(ai as i64)
+        let bound_count = assoc_bound_counts.get(ai as i64)
+        self.pool.add_extra(bound_count)
+        for bi in 0..bound_count:
+            self.pool.add_extra(assoc_bounds_flat.get((bound_start + bi) as i64))
+        self.pool.add_extra(assoc_default_types.get(ai as i64))
+
+    let method_count = method_names.len() as i32
+    self.pool.add_extra(method_count)
+    for mi in 0..method_count:
+        self.pool.add_extra(method_names.get(mi as i64))
+        self.pool.add_extra(method_flags.get(mi as i64))
+        self.pool.add_extra(method_param_starts.get(mi as i64))
+        self.pool.add_extra(method_param_counts.get(mi as i64))
+        self.pool.add_extra(method_ret_types.get(mi as i64))
 
     let node = self.pool.add_node(NK_TRAIT_DECL(), start, self.prev_end(), name, extra_start, vis)
     self.pool.add_decl(node)
@@ -899,14 +987,39 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
 
     var trait_name = 0
     var type_name = first_name
-    if self.peek() == TK_KW_FOR():
+    if self.peek() == TK_L_BRACKET():
+        self.advance()
+        var depth = 1
+        while depth > 0 and self.peek() != TK_EOF():
+            if self.peek() == TK_L_BRACKET():
+                depth = depth + 1
+            if self.peek() == TK_R_BRACKET():
+                depth = depth - 1
+            self.advance()
+        if self.peek() != TK_KW_FOR():
+            self.emit_error("expected 'for' after trait generic arguments in impl")
+            return
+        self.advance()
+        trait_name = first_name
+        type_name = self.expect_ident()
+        if type_name == 0:
+            return
+    else if self.peek() == TK_KW_FOR():
         self.advance()
         trait_name = first_name
         type_name = self.expect_ident()
         if type_name == 0:
             return
 
-    if self.peek() == TK_EQ():
+    // Defensive fallback: if `for` was not consumed above, consume it now.
+    if trait_name == 0 and (self.peek() == TK_KW_FOR() or self.is_ident_named("for")):
+        self.advance()
+        trait_name = first_name
+        type_name = self.expect_ident()
+        if type_name == 0:
+            return
+
+    if self.peek() == TK_EQ() or self.peek() == TK_COLON():
         self.advance()
     self.skip_newlines()
 
@@ -939,7 +1052,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
             self.advance()
         if self.expect(TK_KW_FN()) == 0:
             break
-        let method_name_sym = self.expect_ident()
+        let method_name_sym = self.expect_ident_or_keyword()
         if method_name_sym == 0:
             break
 
@@ -1034,6 +1147,11 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> i32:
         return 0
 
     while true:
+        if self.peek() == TK_NEWLINE():
+            let next = self.peek_past_newlines()
+            if next == TK_PIPE_GT() or next == TK_LT_PIPE() or next == TK_QUESTION_QUESTION():
+                self.skip_newlines()
+
         let info = self.infix_op()
         if info == 0:
             break
@@ -1052,8 +1170,8 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> i32:
         if op_code == 500 and self.peek() == TK_KW_MATCH():
             self.advance()
             self.skip_newlines()
-            let arms_start = self.pool.extra_len()
             let arm_count = self.parse_match_arms()
+            let arms_start = if arm_count > 0: self.pool.extra_len() - arm_count else: self.pool.extra_len()
             lhs = self.pool.add_node(NK_MATCH(), self.pool.get_start(lhs), self.prev_end(), lhs, arms_start, arm_count)
             continue
 
@@ -1064,6 +1182,10 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> i32:
             lhs = self.pool.add_node(NK_PIPELINE(), self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
         else if op_code == 501:  // reverse pipeline
             lhs = self.pool.add_node(NK_PIPELINE(), self.pool.get_start(lhs), self.prev_end(), rhs, lhs, 0)
+        else if op_code == 504:  // backward compose <<
+            lhs = self.build_composed_closure(lhs, rhs, 0)
+        else if op_code == 505:  // forward compose >>
+            lhs = self.build_composed_closure(lhs, rhs, 1)
         else if op_code == 502:  // range ..
             lhs = self.pool.add_node(NK_RANGE(), self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
         else if op_code == 503:  // range ..=
@@ -1093,6 +1215,8 @@ fn Parser.infix_op(self: Parser) -> i32:
     if t == TK_DOT_DOT_EQ(): return 5 * 1000 + 503
     if t == TK_PIPE_GT(): return 6 * 1000 + 500
     if t == TK_LT_PIPE(): return 6 * 1000 + 501
+    if t == TK_LT_LT(): return 6 * 1000 + 504
+    if t == TK_GT_GT(): return 6 * 1000 + 505
     if t == TK_AMPERSAND(): return 7 * 1000 + OP_BIT_AND()
     if t == TK_CARET(): return 8 * 1000 + OP_BIT_XOR()
     if t == TK_PIPE(): return 9 * 1000 + OP_BIT_OR()
@@ -1303,8 +1427,58 @@ fn Parser.parse_dot(self: Parser, lhs: i32) -> i32:
         let field = self.intern_current()
         self.advance()
         return self.pool.add_node(NK_FIELD_ACCESS(), self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
-    let field = self.expect_ident()
+    let field = self.expect_ident_or_keyword()
     self.pool.add_node(NK_FIELD_ACCESS(), self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
+
+fn Parser.build_composed_closure(self: Parser, lhs_fn: i32, rhs_fn: i32, is_forward: i32) -> i32:
+    let param_name = "__pipe_arg_" ++ int_to_string(self.pos)
+    let param_sym = self.intern.intern(param_name)
+    let param_expr = self.pool.add_node(
+        NK_IDENT(),
+        self.pool.get_start(lhs_fn),
+        self.pool.get_end(lhs_fn),
+        param_sym,
+        0,
+        0,
+    )
+
+    let first_callee = if is_forward != 0: lhs_fn else: rhs_fn
+    let second_callee = if is_forward != 0: rhs_fn else: lhs_fn
+
+    let first_args = self.pool.extra_len()
+    self.pool.add_extra(param_expr)
+    let first_call = self.pool.add_node(
+        NK_CALL(),
+        self.pool.get_start(lhs_fn),
+        self.pool.get_end(rhs_fn),
+        first_callee,
+        first_args,
+        1,
+    )
+
+    let second_args = self.pool.extra_len()
+    self.pool.add_extra(first_call)
+    let second_call = self.pool.add_node(
+        NK_CALL(),
+        self.pool.get_start(lhs_fn),
+        self.pool.get_end(rhs_fn),
+        second_callee,
+        second_args,
+        1,
+    )
+
+    // NK_CLOSURE expects [name, type] pairs.
+    let params_start = self.pool.extra_len()
+    self.pool.add_extra(param_sym)
+    self.pool.add_extra(0)
+    self.pool.add_node(
+        NK_CLOSURE(),
+        self.pool.get_start(lhs_fn),
+        self.pool.get_end(second_call),
+        second_call,
+        params_start,
+        1,
+    )
 
 fn Parser.parse_struct_literal(self: Parser, lhs: i32) -> i32:
     let struct_name = self.pool.get_data0(lhs)
@@ -1610,7 +1784,7 @@ fn Parser.parse_select_await(self: Parser) -> i32:
         self.advance()
     self.skip_newlines()
 
-    let extra_start = self.pool.extra_len()
+    var arm_entries: Vec[i32] = Vec.new()
     var arm_count = 0
     var arm_col = -1
 
@@ -1632,9 +1806,9 @@ fn Parser.parse_select_await(self: Parser) -> i32:
         let task_expr = self.parse_expr()
         self.expect(TK_ARROW())
         let body = self.parse_block_or_expr()
-        self.pool.add_extra(name_sym)
-        self.pool.add_extra(task_expr)
-        self.pool.add_extra(body)
+        arm_entries.push(name_sym)
+        arm_entries.push(task_expr)
+        arm_entries.push(body)
         arm_count = arm_count + 1
 
         let save = self.pos
@@ -1646,6 +1820,9 @@ fn Parser.parse_select_await(self: Parser) -> i32:
         self.pos = save
         break
 
+    let extra_start = self.pool.extra_len()
+    for ei in 0..arm_entries.len() as i32:
+        self.pool.add_extra(arm_entries.get(ei as i64))
     self.pool.add_node(NK_SELECT_AWAIT(), start, self.prev_end(), extra_start, arm_count, 0)
 
 // ── Loop expressions ─────────────────────────────────────────────
@@ -1778,12 +1955,12 @@ fn Parser.parse_match_expr(self: Parser) -> i32:
     self.skip_newlines()
     let subject = self.parse_expr()
     self.skip_newlines()
-    let extra_start = self.pool.extra_len()
     let arm_count = self.parse_match_arms()
+    let extra_start = if arm_count > 0: self.pool.extra_len() - arm_count else: self.pool.extra_len()
     self.pool.add_node(NK_MATCH(), start, self.prev_end(), subject, extra_start, arm_count)
 
 fn Parser.parse_match_arms(self: Parser) -> i32:
-    var arm_count = 0
+    var arms: Vec[i32] = Vec.new()
     var arm_col = -1
 
     while self.peek() != TK_EOF():
@@ -1825,8 +2002,7 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
         let body = self.parse_block_or_expr()
 
         let arm = self.pool.add_node(NK_MATCH_ARM(), arm_start, self.prev_end(), pattern, body, guard)
-        self.pool.add_extra(arm)
-        arm_count = arm_count + 1
+        arms.push(arm)
 
         let save = self.pos
         self.skip_newlines()
@@ -1840,6 +2016,9 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
             self.pos = save
             break
 
+    let arm_count = arms.len() as i32
+    for ai in 0..arm_count:
+        self.pool.add_extra(arms.get(ai as i64))
     arm_count
 
 fn Parser.is_arm_token(self: Parser, t: i32) -> bool:
@@ -2381,6 +2560,11 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             self.advance()
             let elem = self.parse_type_expr()
             return self.pool.add_node(NK_TYPE_SLICE(), start, self.prev_end(), elem, 0, 0)
+        // Alternate slice syntax: [T]
+        if self.peek() != TK_INT_LIT():
+            let elem = self.parse_type_expr()
+            self.expect(TK_R_BRACKET())
+            return self.pool.add_node(NK_TYPE_SLICE(), start, self.prev_end(), elem, 0, 0)
         if self.peek() == TK_INT_LIT():
             let ss = self.current_start()
             let se = self.current_end()
@@ -2400,6 +2584,20 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             return 0
         let sym = self.intern_current()
         self.advance()
+        return self.pool.add_node(NK_TYPE_TRAIT_OBJ(), start, self.prev_end(), sym, 0, 0)
+
+    if t == TK_KW_IMPL():
+        self.advance()
+        if self.peek() != TK_IDENT():
+            self.emit_error("expected trait name after 'impl'")
+            return 0
+        let sym = self.intern_current()
+        self.advance()
+        if self.peek() == TK_KW_FOR():
+            self.advance()
+        let target = self.parse_type_expr()
+        if target == 0:
+            return 0
         return self.pool.add_node(NK_TYPE_TRAIT_OBJ(), start, self.prev_end(), sym, 0, 0)
 
     if t == TK_IDENT():

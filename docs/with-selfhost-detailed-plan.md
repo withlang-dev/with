@@ -2,7 +2,7 @@
 
 ## Architecture-First Execution Plan
 
-**Status:** Wave 4 baseline complete (resolved/module-graph dump path + Wave 4 unit + parity gates).
+**Status:** Wave 5 complete (`--dump-typed` parity + obligation selection cache + generic bound checks + dyn trait-call compatibility + specialization cache + typed sidecar persistence).
 **Goal:** Build a clean-room, self-hosted With compiler in With.
 **Bootstrap:** Stage0 (Zig implementation) remains semantic oracle.
 

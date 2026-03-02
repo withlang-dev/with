@@ -19,6 +19,12 @@ type Zcu = {
     pending_warnings: Vec[str],
     last_resolved: ResolveResult,
     resolved_root_path: str,
+    // Wave 5 canonical typed sidecars from the latest semantic pass.
+    typed_expr_types: HashMap[i32, i32],
+    typed_binding_types: HashMap[i32, i32],
+    typed_binding_names: HashMap[i32, i32],
+    typed_binding_muts: HashMap[i32, i32],
+    last_typed_dump: str,
 }
 
 fn Zcu.init -> Zcu:
@@ -33,6 +39,11 @@ fn Zcu.init -> Zcu:
         pending_warnings: Vec.new(),
         last_resolved: ResolveResult.init(),
         resolved_root_path: "",
+        typed_expr_types: HashMap.new(),
+        typed_binding_types: HashMap.new(),
+        typed_binding_names: HashMap.new(),
+        typed_binding_muts: HashMap.new(),
+        last_typed_dump: "",
     }
 
 fn Zcu.reset_import_state(self: Zcu):

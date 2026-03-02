@@ -297,27 +297,27 @@ Corpus policy:
 
 ## Implementation Checklist
 
-- [ ] Freeze Wave 5 typed dump oracle contract against Stage0 current output.
-- [ ] Create `test/wave5/typed_corpus.txt`.
-- [ ] Inventory Stage0 type/trait/generic behaviors needed for Wave 5 corpus from `bootstrap/src/Sema.zig`.
-- [ ] Define canonical Wave 5 type representation and `TypeId` usage rules.
-- [ ] Expand `TypeKey`/interning coverage for Wave 5 type forms.
-- [ ] Add deterministic type-name rendering helpers for typed dump output.
-- [ ] Implement deterministic trait declaration collection tables.
-- [ ] Implement deterministic impl collection tables.
-- [ ] Implement coherence duplicate-impl checks with Stage0 parity.
-- [ ] Implement orphan-rule checks with Stage0 parity.
-- [ ] Implement trait obligation model and selection cache.
-- [ ] Implement trait-bound checking for generic instantiation.
-- [ ] Implement dyn-trait compatibility checks needed for typed parity corpus.
-- [ ] Implement generic substitution map and specialization cache.
-- [ ] Ensure canonical typed pass outputs are stored in `Zcu`.
-- [ ] Wire Wave 5 type/trait pass into frontend pipeline.
-- [ ] Add self-host `check --dump-typed` path if missing in current path.
-- [ ] Implement Stage0-compatible deterministic typed dump emitter.
-- [ ] Add `test/wave5/` unit tests for types/traits/coherence/generic instantiation.
-- [ ] Add typed-dump formatting and determinism unit checks.
-- [ ] Add `scripts/run_wave5_type_trait_unit_tests.sh`.
-- [ ] Add `scripts/run_wave5_typed_parity.sh` (Stage0 diff + determinism rerun + divergence reporting).
-- [ ] Verify Wave 5 unit and parity gates pass locally.
-- [ ] Mark Wave 5 progress in top-level self-host plan docs.
+- [x] Freeze Wave 5 typed dump oracle contract against Stage0 current output.
+- [x] Create `test/wave5/typed_corpus.txt`.
+- [x] Inventory Stage0 type/trait/generic behaviors needed for Wave 5 corpus from `bootstrap/src/Sema.zig`.
+- [x] Define canonical Wave 5 type representation and `TypeId` usage rules.
+- [x] Expand `TypeKey`/interning coverage for Wave 5 type forms.
+- [x] Add deterministic type-name rendering helpers for typed dump output.
+- [x] Implement deterministic trait declaration collection tables.
+- [x] Implement deterministic impl collection tables.
+- [x] Implement coherence duplicate-impl checks with Stage0 parity.
+- [x] Implement orphan-rule checks with Stage0 parity.
+- [x] Implement trait obligation model and selection cache.
+- [x] Implement trait-bound checking for generic instantiation.
+- [x] Implement dyn-trait compatibility checks needed for typed parity corpus.
+- [x] Implement generic substitution map and specialization cache.
+- [x] Ensure canonical typed pass outputs are stored in `Zcu`.
+- [x] Wire Wave 5 type/trait pass into frontend pipeline.
+- [x] Add self-host `check --dump-typed` path if missing in current path.
+- [x] Implement Stage0-compatible deterministic typed dump emitter.
+- [x] Add `test/wave5/` unit tests for types/traits/coherence/generic instantiation.
+- [x] Add typed-dump formatting and determinism unit checks.
+- [x] Add `scripts/run_wave5_type_trait_unit_tests.sh`.
+- [x] Add `scripts/run_wave5_typed_parity.sh` (Stage0 diff + determinism rerun + divergence reporting).
+- [x] Verify Wave 5 unit and parity gates pass locally.
+- [x] Mark Wave 5 progress in top-level self-host plan docs.

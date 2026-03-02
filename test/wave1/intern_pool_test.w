@@ -31,7 +31,44 @@ fn main:
     assert(k.tag == TYPE_KEY_PTR())
     assert(k.arg0 == type_id_raw(ty_i32))
     assert(k.flags == 0)
-    assert(p.type_count() == 3)
+
+    // Expanded Wave 5 forms: ref/fn/trait-object/generic/tupleN.
+    let ty_ref = p.intern_type(type_key_ref(ty_i32, false))
+    let ty_ref_mut = p.intern_type(type_key_ref(ty_i32, true))
+    assert(type_id_raw(ty_ref) != type_id_raw(ty_ref_mut))
+
+    let params2 = type_key_pack2(ty_i32, ty_i32)
+    let fn0 = p.intern_type(type_key_fn_sig(params2, ty_i32, 2, false))
+    let fn1 = p.intern_type(type_key_fn_sig(params2, ty_i32, 2, false))
+    let fn_var = p.intern_type(type_key_fn_sig(params2, ty_i32, 2, true))
+    assert(type_id_raw(fn0) == type_id_raw(fn1))
+    assert(type_id_raw(fn0) != type_id_raw(fn_var))
+
+    let dyn_show0 = p.intern_type(type_key_trait_object("Show"))
+    let dyn_show1 = p.intern_type(type_key_trait_object("Show"))
+    let dyn_clone = p.intern_type(type_key_trait_object("Clone"))
+    assert(type_id_raw(dyn_show0) == type_id_raw(dyn_show1))
+    assert(type_id_raw(dyn_show0) != type_id_raw(dyn_clone))
+
+    let gp_t0 = p.intern_type(type_key_generic_param("T", 0))
+    let gp_t0_2 = p.intern_type(type_key_generic_param("T", 0))
+    let gp_u0 = p.intern_type(type_key_generic_param("U", 0))
+    assert(type_id_raw(gp_t0) == type_id_raw(gp_t0_2))
+    assert(type_id_raw(gp_t0) != type_id_raw(gp_u0))
+
+    let vec_i32_0 = p.intern_type(type_key_generic_apply2("Vec", ty_i32, ty_i32, 1))
+    let vec_i32_1 = p.intern_type(type_key_generic_apply2("Vec", ty_i32, ty_i32, 1))
+    let map_i32_i32 = p.intern_type(type_key_generic_apply2("HashMap", ty_i32, ty_i32, 2))
+    assert(type_id_raw(vec_i32_0) == type_id_raw(vec_i32_1))
+    assert(type_id_raw(vec_i32_0) != type_id_raw(map_i32_i32))
+
+    let tupn0 = p.intern_type(type_key_tuplen(type_key_pack3(ty_i32, ty_i32, ty_i32), 3))
+    let tupn1 = p.intern_type(type_key_tuplen(type_key_pack3(ty_i32, ty_i32, ty_i32), 3))
+    let tupn2 = p.intern_type(type_key_tuplen(type_key_pack2(ty_i32, ty_i32), 2))
+    assert(type_id_raw(tupn0) == type_id_raw(tupn1))
+    assert(type_id_raw(tupn0) != type_id_raw(tupn2))
+
+    assert(p.type_count() >= 13)
 
     // Value interning.
     let v0 = p.intern_value(value_key_int(5))

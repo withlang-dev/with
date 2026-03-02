@@ -1,0 +1,8 @@
+# Wave 5 typed parity corpus (sorted by script).
+# Stage0 oracle: bootstrap/zig-out/bin/with check <file> --dump-typed
+
+bootstrap/test/cases/arithmetic_mixed.w
+bootstrap/test/cases/async_scope.w
+bootstrap/test/cases/dyn_dispatch.w
+bootstrap/test/cases/generic_multi.w
+bootstrap/test/cases/tuples.w

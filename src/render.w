@@ -7,6 +7,7 @@ use Token
 use InternPool
 
 extern fn int_to_string(n: i32) -> str
+extern fn str_from_byte(b: i32) -> str
 
 fn render_module(pool: AstPool, intern: InternPool) -> str:
     var out = ""
@@ -65,7 +66,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         if sub_kind == TDK_STRUCT():
             let field_count = pool.get_extra(extra_start)
             var ep = extra_start + 1
-            out = out ++ "{{ "
+            out = out ++ lbrace() ++ " "
             for fi in 0..field_count:
                 if fi > 0:
                     out = out ++ ", "
@@ -76,7 +77,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
                 out = out ++ field_name ++ ": " ++ render_type_expr(pool, intern, field_type)
                 if field_default != 0:
                     out = out ++ " = " ++ render_expr(pool, intern, field_default, 0)
-            out = out ++ " }}"
+            out = out ++ " " ++ rbrace()
             return out
 
         if sub_kind == TDK_ALIAS():
@@ -182,10 +183,57 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
     if kind == NK_TRAIT_DECL():
         let name = intern.resolve(pool.get_data0(node))
         let vis = pool.get_data2(node)
+        let extra_start = pool.get_data1(node)
         var out = prefix
         if vis == VIS_PUBLIC():
             out = out ++ "pub "
-        return out ++ "trait " ++ name
+        out = out ++ "trait " ++ name ++ " =\n"
+
+        // Layout:
+        // [assoc_count, (name, bound_count, bounds..., default_type)*, method_count, (name, flags, param_start, param_count, ret_type)*]
+        let assoc_count = pool.get_extra(extra_start)
+        var ep = extra_start + 1
+        for ai in 0..assoc_count:
+            out = out ++ make_indent(indent + 4)
+            out = out ++ "type " ++ intern.resolve(pool.get_extra(ep))
+            ep = ep + 1
+            let bound_count = pool.get_extra(ep)
+            ep = ep + 1
+            if bound_count > 0:
+                out = out ++ ": "
+                for bi in 0..bound_count:
+                    if bi > 0:
+                        out = out ++ " + "
+                    out = out ++ intern.resolve(pool.get_extra(ep + bi))
+                ep = ep + bound_count
+            let default_ty = pool.get_extra(ep)
+            ep = ep + 1
+            if default_ty != 0:
+                out = out ++ " = " ++ render_type_expr(pool, intern, default_ty)
+            out = out ++ "\n"
+
+        let method_count = pool.get_extra(ep)
+        ep = ep + 1
+        for mi in 0..method_count:
+            let mname = intern.resolve(pool.get_extra(ep))
+            ep = ep + 1
+            ep = ep + 1  // flags (currently not rendered)
+            let param_start = pool.get_extra(ep)
+            ep = ep + 1
+            let param_count = pool.get_extra(ep)
+            ep = ep + 1
+            let ret_ty = pool.get_extra(ep)
+            ep = ep + 1
+
+            out = out ++ make_indent(indent + 4)
+            out = out ++ "fn " ++ mname ++ "("
+            out = out ++ render_params(pool, intern, param_start, param_count)
+            out = out ++ ")"
+            if ret_ty != 0:
+                out = out ++ " -> " ++ render_type_expr(pool, intern, ret_ty)
+            out = out ++ "\n"
+
+        return out
 
     if kind == NK_IMPL_DECL():
         let type_name = intern.resolve(pool.get_data0(node))
@@ -493,14 +541,14 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
-        var out = prefix ++ name ++ " {{ "
+        var out = prefix ++ name ++ " " ++ lbrace() ++ " "
         for fi in 0..field_count:
             if fi > 0:
                 out = out ++ ", "
             let field_name = intern.resolve(pool.get_extra(extra_start + fi * 2))
             let field_val = pool.get_extra(extra_start + fi * 2 + 1)
             out = out ++ field_name ++ ": " ++ render_expr(pool, intern, field_val, 0)
-        return out ++ " }}"
+        return out ++ " " ++ rbrace()
 
     if kind == NK_GROUPED():
         let inner = pool.get_data0(node)
@@ -577,14 +625,14 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         let source = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
-        var out = prefix ++ "{{ " ++ render_expr(pool, intern, source, 0) ++ " with "
+        var out = prefix ++ lbrace() ++ " " ++ render_expr(pool, intern, source, 0) ++ " with "
         for fi in 0..field_count:
             if fi > 0:
                 out = out ++ ", "
             let fname = intern.resolve(pool.get_extra(extra_start + fi * 2))
             let fval = pool.get_extra(extra_start + fi * 2 + 1)
             out = out ++ fname ++ ": " ++ render_expr(pool, intern, fval, 0)
-        return out ++ " }}"
+        return out ++ " " ++ rbrace()
 
     if kind == NK_YIELD():
         let value = pool.get_data0(node)
@@ -707,7 +755,7 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
         var out = ""
         if type_name != 0:
             out = out ++ intern.resolve(type_name) ++ " "
-        out = out ++ "{{ "
+        out = out ++ lbrace() ++ " "
         for fi in 0..field_count:
             if fi > 0:
                 out = out ++ ", "
@@ -720,7 +768,7 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
             if field_count > 0:
                 out = out ++ ", "
             out = out ++ ".."
-        return out ++ " }}"
+        return out ++ " " ++ rbrace()
 
     "<pat:" ++ int_to_string(kind) ++ ">"
 
@@ -926,3 +974,9 @@ fn make_indent(n: i32) -> str:
     for i in 0..n:
         out = out ++ " "
     out
+
+fn lbrace -> str:
+    str_from_byte(123)
+
+fn rbrace -> str:
+    str_from_byte(125)

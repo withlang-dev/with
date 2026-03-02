@@ -48,6 +48,12 @@ type Driver = {
     last_resolved: ResolveResult,
     // Root path used when producing the last resolve artifact.
     resolved_root_path: str,
+    // Wave 5 canonical typed sidecars from the latest semantic pass.
+    typed_expr_types: HashMap[i32, i32],
+    typed_binding_types: HashMap[i32, i32],
+    typed_binding_names: HashMap[i32, i32],
+    typed_binding_muts: HashMap[i32, i32],
+    last_typed_dump: str,
 }
 
 fn Driver.init -> Driver:
@@ -65,6 +71,11 @@ fn Driver.init -> Driver:
         pending_warnings: Vec.new(),
         last_resolved: ResolveResult.init(),
         resolved_root_path: "",
+        typed_expr_types: HashMap.new(),
+        typed_binding_types: HashMap.new(),
+        typed_binding_names: HashMap.new(),
+        typed_binding_muts: HashMap.new(),
+        last_typed_dump: "",
     }
 
 fn Driver.deinit(self: Driver):
@@ -179,6 +190,11 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
     // Propagate sema's changes back.
     self.pool = sema.pool
     self.diagnostics = sema.diags
+    self.typed_expr_types = sema.typed_expr_types
+    self.typed_binding_types = sema.typed_binding_types
+    self.typed_binding_names = sema.typed_binding_names
+    self.typed_binding_muts = sema.typed_binding_muts
+    self.last_typed_dump = sema.dump_typed_module()
 
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
@@ -190,6 +206,29 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
         return AstPool.new()
 
     pool
+
+fn Driver.dump_typed(self: Driver, pool: AstPool) -> str:
+    var sema = Sema.init(self.pool, self.diagnostics, pool)
+    if self.no_std:
+        sema.no_std = 1
+    if self.alloc:
+        sema.alloc = 1
+    sema.check_module()
+
+    self.pool = sema.pool
+    self.diagnostics = sema.diags
+    self.typed_expr_types = sema.typed_expr_types
+    self.typed_binding_types = sema.typed_binding_types
+    self.typed_binding_names = sema.typed_binding_names
+    self.typed_binding_muts = sema.typed_binding_muts
+    self.last_typed_dump = sema.dump_typed_module()
+
+    if self.diagnostics.has_errors():
+        let source = Source.from_string(self.current_source_path, self.current_source_text, 0)
+        self.diagnostics.render_all(source)
+        return ""
+
+    self.last_typed_dump
 
 // ── Codegen + link ───────────────────────────────────────────────
 
