@@ -17,6 +17,33 @@ const Parser = @import("Parser.zig");
 const Diagnostic = @import("Diagnostic.zig");
 const Migrate = @import("Migrate.zig");
 
+const DumpArtifact = enum {
+    tokens,
+    ast,
+    typed,
+    llvm,
+};
+
+const CheckCommandOptions = struct {
+    source_file: ?[]const u8 = null,
+    dump_tokens: bool = false,
+    dump_ast: bool = false,
+    dump_typed: bool = false,
+    dump_llvm_ir: bool = false,
+    dump_out: ?[]const u8 = null,
+    dump_dir: ?[]const u8 = null,
+    deterministic: bool = false,
+
+    fn dumpCount(self: CheckCommandOptions) u32 {
+        var count: u32 = 0;
+        if (self.dump_tokens) count += 1;
+        if (self.dump_ast) count += 1;
+        if (self.dump_typed) count += 1;
+        if (self.dump_llvm_ir) count += 1;
+        return count;
+    }
+};
+
 pub fn main() !void {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
     defer _ = gpa.deinit();
@@ -37,6 +64,7 @@ pub fn main() !void {
     var no_std = false;
     var alloc_mode = false;
     var release_mode = false;
+    var deterministic_mode = false;
     for (args) |arg| {
         if (arg.len == 3 and arg[0] == '-' and arg[1] == 'O') {
             opt_level = arg[2] - '0';
@@ -48,6 +76,8 @@ pub fn main() !void {
             no_std = true;
         } else if (std.mem.eql(u8, arg, "--alloc")) {
             alloc_mode = true;
+        } else if (std.mem.eql(u8, arg, "--deterministic")) {
+            deterministic_mode = true;
         }
     }
 
@@ -87,6 +117,7 @@ pub fn main() !void {
         };
         var driver = Driver.init(allocator);
         defer driver.deinit();
+        driver.deterministic = deterministic_mode;
 
         const module = try driver.compileFile(file);
         if (module) |m| {
@@ -105,6 +136,7 @@ pub fn main() !void {
         };
         var driver = Driver.init(allocator);
         defer driver.deinit();
+        driver.deterministic = deterministic_mode;
 
         const module = try driver.compileFile(file);
         if (module) |m| {
@@ -113,7 +145,11 @@ pub fn main() !void {
             std.process.exit(1);
         }
     } else if (std.mem.eql(u8, command, "check")) {
-        const file = source_file orelse {
+        const check_opts = parseCheckCommandOptions(args[2..], deterministic_mode) catch {
+            printUsage();
+            std.process.exit(1);
+        };
+        const file = check_opts.source_file orelse {
             stderrPrint("error: 'check' requires a source file argument\n");
             printUsage();
             std.process.exit(1);
@@ -122,11 +158,16 @@ pub fn main() !void {
         defer driver.deinit();
         driver.no_std = no_std;
         driver.alloc = alloc_mode;
+        driver.deterministic = check_opts.deterministic or check_opts.dumpCount() > 0;
 
         const module = try driver.compileFile(file);
-        if (module) |_| {
-            stderrPrint("ok\n");
-            driver.printWarnings();
+        if (module) |m| {
+            if (check_opts.dumpCount() == 0) {
+                stderrPrint("ok\n");
+                driver.printWarnings();
+            } else {
+                try emitCheckDumps(&driver, &m, file, check_opts, allocator);
+            }
         } else {
             std.process.exit(1);
         }
@@ -197,7 +238,7 @@ pub fn main() !void {
             w.interface.flush() catch {};
             std.process.exit(1);
         };
-        try dumpTokens(file, allocator);
+        try dumpTokens(file, allocator, deterministic_mode);
     } else if (std.mem.eql(u8, command, "help") or std.mem.eql(u8, command, "--help") or std.mem.eql(u8, command, "-h")) {
         printUsage();
     } else if (std.mem.eql(u8, command, "repl")) {
@@ -287,7 +328,9 @@ fn printUsage() void {
         \\Commands:
         \\  build [file.w]    Build package (default entrypoint) or a source file
         \\  run [file.w]      Build + run package or a source file
-        \\  check <file.w>    Parse and type-check a source file
+        \\  check <file.w>    Parse/type-check; optional dump flags for oracle baselines
+        \\                    --dump-tokens --dump-ast --dump-typed --dump-llvm-ir
+        \\                    [--dump-out <path>] [--dump-dir <dir>] [--deterministic]
         \\  test [flags] [filter]
         \\                    Run package tests (annotations: @[test], @[before], @[after])
         \\                    Workspace root: add -p <member> to select one package
@@ -1146,6 +1189,7 @@ fn isGlobalDriverFlag(arg: []const u8) bool {
     if (std.mem.eql(u8, arg, "--no-std")) return true;
     if (std.mem.eql(u8, arg, "--alloc")) return true;
     if (std.mem.eql(u8, arg, "--release")) return true;
+    if (std.mem.eql(u8, arg, "--deterministic")) return true;
     return false;
 }
 
@@ -1492,6 +1536,81 @@ fn discoverWorkspaceMembers(workspace_root: []const u8, allocator: std.mem.Alloc
 fn workspaceMemberSelected(member: WorkspaceMember, filter: ?[]const u8) bool {
     if (filter == null) return true;
     return std.mem.eql(u8, member.name, filter.?);
+}
+
+fn parseCheckCommandOptions(raw_args: []const []const u8, default_deterministic: bool) ParseCommandOptionsError!CheckCommandOptions {
+    var options: CheckCommandOptions = .{ .deterministic = default_deterministic };
+
+    var idx: usize = 0;
+    while (idx < raw_args.len) : (idx += 1) {
+        const arg = raw_args[idx];
+        if (isGlobalDriverFlag(arg)) continue;
+
+        if (std.mem.eql(u8, arg, "--dump-tokens")) {
+            options.dump_tokens = true;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "--dump-ast")) {
+            options.dump_ast = true;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "--dump-typed")) {
+            options.dump_typed = true;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "--dump-llvm-ir")) {
+            options.dump_llvm_ir = true;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "--dump-all")) {
+            options.dump_tokens = true;
+            options.dump_ast = true;
+            options.dump_typed = true;
+            options.dump_llvm_ir = true;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "--dump-out")) {
+            if (idx + 1 >= raw_args.len) return commandOptionError("error: --dump-out requires a path\n");
+            options.dump_out = raw_args[idx + 1];
+            idx += 1;
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "--dump-out=")) {
+            options.dump_out = arg["--dump-out=".len..];
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "--dump-dir")) {
+            if (idx + 1 >= raw_args.len) return commandOptionError("error: --dump-dir requires a path\n");
+            options.dump_dir = raw_args[idx + 1];
+            idx += 1;
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "--dump-dir=")) {
+            options.dump_dir = arg["--dump-dir=".len..];
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "-")) {
+            var err_buf: [256]u8 = undefined;
+            const msg = std.fmt.bufPrint(&err_buf, "error: unknown check flag '{s}'\n", .{arg}) catch "error: unknown check flag\n";
+            return commandOptionError(msg);
+        }
+        if (options.source_file != null) {
+            return commandOptionError("error: check accepts at most one source file\n");
+        }
+        options.source_file = arg;
+    }
+
+    if (options.dump_out != null and options.dump_dir != null) {
+        return commandOptionError("error: use either --dump-out or --dump-dir (not both)\n");
+    }
+    if (options.dump_out != null and options.dumpCount() != 1) {
+        return commandOptionError("error: --dump-out requires exactly one dump flag\n");
+    }
+    if (options.dumpCount() > 0 and !options.deterministic) {
+        options.deterministic = true;
+    }
+
+    return options;
 }
 
 fn parseBuildCommandOptions(raw_args: []const []const u8) ParseCommandOptionsError!BuildCommandOptions {
@@ -2673,12 +2792,22 @@ fn runTests(target: []const u8, update_snapshots: bool, allocator: std.mem.Alloc
     };
     defer dir.close();
 
+    var files: std.ArrayList([]const u8) = .empty;
+    defer {
+        for (files.items) |path| allocator.free(path);
+        files.deinit(allocator);
+    }
+
     var it = dir.iterate();
     while (try it.next()) |entry| {
         if (entry.kind != .file) continue;
         if (!std.mem.endsWith(u8, entry.name, ".w")) continue;
         const path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ target, entry.name });
-        defer allocator.free(path);
+        try files.append(allocator, path);
+    }
+
+    sortStrings(files.items);
+    for (files.items) |path| {
         try runOneTest(path, update_snapshots, allocator, &summary);
     }
 
@@ -3030,7 +3159,151 @@ fn printTestSummary(summary: *const TestSummary) void {
     w.interface.flush() catch {};
 }
 
-fn dumpTokens(path: []const u8, allocator: std.mem.Allocator) !void {
+fn emitCheckDumps(
+    driver: *Driver,
+    module: *const Ast.Module,
+    source_path: []const u8,
+    options: CheckCommandOptions,
+    allocator: std.mem.Allocator,
+) !void {
+    var selected: [4]DumpArtifact = undefined;
+    var selected_count: usize = 0;
+    if (options.dump_tokens) {
+        selected[selected_count] = .tokens;
+        selected_count += 1;
+    }
+    if (options.dump_ast) {
+        selected[selected_count] = .ast;
+        selected_count += 1;
+    }
+    if (options.dump_typed) {
+        selected[selected_count] = .typed;
+        selected_count += 1;
+    }
+    if (options.dump_llvm_ir) {
+        selected[selected_count] = .llvm;
+        selected_count += 1;
+    }
+    if (selected_count == 0) return;
+
+    if (options.dump_dir) |dir| {
+        if (std.fs.path.isAbsolute(dir)) {
+            std.fs.makeDirAbsolute(dir) catch |err| switch (err) {
+                error.PathAlreadyExists => {},
+                else => return err,
+            };
+        } else {
+            try std.fs.cwd().makePath(dir);
+        }
+    }
+
+    var stdout_buf: [16384]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buf);
+    for (selected[0..selected_count], 0..) |artifact, idx| {
+        const dump_text = try collectDumpArtifact(driver, module, source_path, artifact, allocator, options.deterministic);
+        defer allocator.free(dump_text);
+
+        if (options.dump_out) |out_path| {
+            try writeTextFile(out_path, dump_text);
+            continue;
+        }
+        if (options.dump_dir) |dir_path| {
+            const file_name = try std.fmt.allocPrint(allocator, "{s}/{s}.{s}.dump", .{
+                dir_path,
+                sourceStem(source_path),
+                dumpArtifactSuffix(artifact),
+            });
+            defer allocator.free(file_name);
+            try writeTextFile(file_name, dump_text);
+            continue;
+        }
+
+        if (selected_count > 1) {
+            try stdout_writer.interface.print("== {s} ==\n", .{dumpArtifactHeader(artifact)});
+        }
+        try stdout_writer.interface.writeAll(dump_text);
+        if (selected_count > 1 and idx + 1 < selected_count) {
+            if (dump_text.len == 0 or dump_text[dump_text.len - 1] != '\n') {
+                try stdout_writer.interface.writeAll("\n");
+            }
+            try stdout_writer.interface.writeAll("\n");
+        }
+    }
+    try stdout_writer.interface.flush();
+}
+
+fn collectDumpArtifact(
+    driver: *Driver,
+    module: *const Ast.Module,
+    source_path: []const u8,
+    artifact: DumpArtifact,
+    allocator: std.mem.Allocator,
+    deterministic: bool,
+) ![]u8 {
+    switch (artifact) {
+        .tokens => return collectTokensDump(source_path, allocator, deterministic),
+        .ast => {
+            var out: std.ArrayList(u8) = .empty;
+            errdefer out.deinit(allocator);
+            try driver.writeAst(module, out.writer(allocator), true);
+            return out.toOwnedSlice(allocator);
+        },
+        .typed => {
+            var out: std.ArrayList(u8) = .empty;
+            errdefer out.deinit(allocator);
+            const ok = try driver.writeTyped(module, out.writer(allocator));
+            if (!ok) return error.DumpFailed;
+            return out.toOwnedSlice(allocator);
+        },
+        .llvm => {
+            var out: std.ArrayList(u8) = .empty;
+            errdefer out.deinit(allocator);
+            const ok = try driver.writeIR(module, out.writer(allocator));
+            if (!ok) return error.DumpFailed;
+            return out.toOwnedSlice(allocator);
+        },
+    }
+}
+
+fn dumpArtifactHeader(artifact: DumpArtifact) []const u8 {
+    return switch (artifact) {
+        .tokens => "TOKENS",
+        .ast => "AST",
+        .typed => "TYPED",
+        .llvm => "LLVM",
+    };
+}
+
+fn dumpArtifactSuffix(artifact: DumpArtifact) []const u8 {
+    return switch (artifact) {
+        .tokens => "tokens",
+        .ast => "ast",
+        .typed => "typed",
+        .llvm => "llvm",
+    };
+}
+
+fn writeTextFile(path: []const u8, data: []const u8) !void {
+    if (std.fs.path.isAbsolute(path)) {
+        var file = try std.fs.createFileAbsolute(path, .{ .truncate = true });
+        defer file.close();
+        try file.writeAll(data);
+        return;
+    }
+    try std.fs.cwd().writeFile(.{ .sub_path = path, .data = data });
+}
+
+fn dumpTokens(path: []const u8, allocator: std.mem.Allocator, deterministic: bool) !void {
+    const out = try collectTokensDump(path, allocator, deterministic);
+    defer allocator.free(out);
+
+    var buf: [8192]u8 = undefined;
+    var w = std.fs.File.stdout().writer(&buf);
+    try w.interface.writeAll(out);
+    try w.interface.flush();
+}
+
+fn collectTokensDump(path: []const u8, allocator: std.mem.Allocator, deterministic: bool) ![]u8 {
     var source = try Source.fromFile(path, 0, allocator);
     defer source.deinit();
 
@@ -3041,15 +3314,48 @@ fn dumpTokens(path: []const u8, allocator: std.mem.Allocator) !void {
     var tokens = try lexer.tokenize(allocator);
     defer tokens.deinit();
 
-    var buf: [8192]u8 = undefined;
-    var w = std.fs.File.stdout().writer(&buf);
-    const writer = &w.interface;
-    for (0..tokens.len()) |i| {
-        const tok = tokens.get(i);
-        const text = source.text[tok.span.start..tok.span.end];
-        try writer.print("{s:16} |{s}|\n", .{ tok.tag.name(), text });
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
+    const writer = out.writer(allocator);
+    if (deterministic) {
+        try writer.print("tokens file={s} count={d}\n", .{ path, tokens.len() });
+        for (0..tokens.len()) |i| {
+            const tok = tokens.get(i);
+            const text = source.text[tok.span.start..tok.span.end];
+            const escaped = try escapeDumpLexeme(text, allocator);
+            defer allocator.free(escaped);
+            try writer.print("tok[{d}] tag={s} span={d}..{d} lex=\"{s}\"\n", .{
+                i,
+                tok.tag.name(),
+                tok.span.start,
+                tok.span.end,
+                escaped,
+            });
+        }
+    } else {
+        for (0..tokens.len()) |i| {
+            const tok = tokens.get(i);
+            const text = source.text[tok.span.start..tok.span.end];
+            try writer.print("{s:16} |{s}|\n", .{ tok.tag.name(), text });
+        }
     }
-    try w.interface.flush();
+    return out.toOwnedSlice(allocator);
+}
+
+fn escapeDumpLexeme(text: []const u8, allocator: std.mem.Allocator) ![]u8 {
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
+    for (text) |ch| {
+        switch (ch) {
+            '\\' => try out.appendSlice(allocator, "\\\\"),
+            '"' => try out.appendSlice(allocator, "\\\""),
+            '\n' => try out.appendSlice(allocator, "\\n"),
+            '\r' => try out.appendSlice(allocator, "\\r"),
+            '\t' => try out.appendSlice(allocator, "\\t"),
+            else => try out.append(allocator, ch),
+        }
+    }
+    return out.toOwnedSlice(allocator);
 }
 
 // ── Tests ────────────────────────────────────────────────────────

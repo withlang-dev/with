@@ -1,0 +1,10 @@
+module span=43..134 decls=2
+decl[0] kind=function span=43..66
+decl[1] kind=function span=68..134
+---
+async fn work -> i32:
+  1
+fn main -> i32:
+  async scope |s|:
+    s.track(work())
+  0
