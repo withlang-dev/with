@@ -1,0 +1,17 @@
+# Wave 2 token dump parity corpus.
+# Paths are repository-root relative.
+
+bootstrap/test/cases/arithmetic_mixed.w
+bootstrap/test/cases/async_scope.w
+bootstrap/test/cases/dyn_dispatch.w
+bootstrap/test/cases/generic_multi.w
+bootstrap/test/cases/tuples.w
+bootstrap/test/cases/string_interp.w
+bootstrap/test/cases/hex_bin_oct.w
+bootstrap/test/cases/char_literal.w
+bootstrap/test/cases/with_form1.w
+bootstrap/test/cases/trait.w
+test/wave2/lexer_keywords_test.w
+test/wave2/lexer_operators_test.w
+test/wave2/lexer_literals_test.w
+test/wave2/lexer_structure_test.w

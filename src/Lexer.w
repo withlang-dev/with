@@ -160,7 +160,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
         if self.pos < slen and src[self.pos] == 61:  // !=
             self.pos = self.pos + 1
             return TK_BANG_EQ()
-        return TK_INVALID()
+        return TK_BANG()
 
     // ? compound
     if ch == 63:  // ?
@@ -259,9 +259,20 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if is_ident_start(ch):
         return self.lex_ident()
 
-    // Label: 'name
+    // Character literal or label: 'x' / 'name
     if ch == 39:  // '
         self.pos = self.pos + 1
+        // Try char literal first: 'x' or '\x'
+        if self.pos < slen and src[self.pos] == 92:  // backslash
+            // Escape sequence: '\n', '\\', '\'' etc.
+            if self.pos + 2 < slen and src[self.pos + 2] == 39:
+                self.pos = self.pos + 3
+                return TK_CHAR_LIT()
+        if self.pos + 1 < slen and src[self.pos + 1] == 39:
+            // Single char: 'a' or escaped quote handled above.
+            self.pos = self.pos + 2
+            return TK_CHAR_LIT()
+        // Label: 'name
         if self.pos < slen and is_ident_start(src[self.pos]):
             while self.pos < slen and is_ident_continue(src[self.pos]):
                 self.pos = self.pos + 1
@@ -305,11 +316,38 @@ fn Lexer.lex_string(self: Lexer) -> i32:
         // Unterminated multi-line string
         return TK_STRING_LIT()
 
+    // Track brace depth so that `"` inside interpolation holes `{...}` is not
+    // treated as the end of the string.
+    var brace_depth = 0
     while self.pos < slen:
         let ch = src[self.pos]
-        if ch == 34:  // closing "
+        if ch == 123 and brace_depth == 0:  // {
+            // Don't count escaped braces.
+            if self.pos > 0 and src[self.pos - 1] != 92:
+                brace_depth = brace_depth + 1
+                self.pos = self.pos + 1
+                continue
+        if ch == 123 and brace_depth > 0:  // {
+            brace_depth = brace_depth + 1
+            self.pos = self.pos + 1
+            continue
+        if ch == 125 and brace_depth > 0:  // }
+            brace_depth = brace_depth - 1
+            self.pos = self.pos + 1
+            continue
+        if ch == 34 and brace_depth == 0:  // closing "
             self.pos = self.pos + 1
             return TK_STRING_LIT()
+        if ch == 34 and brace_depth > 0:
+            // Inside an interpolation hole: skip nested string literal.
+            self.pos = self.pos + 1
+            while self.pos < slen and src[self.pos] != 34:
+                if src[self.pos] == 92:
+                    self.pos = self.pos + 1
+                self.pos = self.pos + 1
+            if self.pos < slen:
+                self.pos = self.pos + 1
+            continue
         if ch == 92:  // backslash escape
             self.pos = self.pos + 1
         self.pos = self.pos + 1
@@ -357,33 +395,50 @@ fn Lexer.lex_number(self: Lexer) -> i32:
     if self.pos > start and self.pos < slen and src[self.pos - 1] == 95:
         let ch2 = src[self.pos]
         if ch2 == 105 or ch2 == 117 or ch2 == 102:  // i, u, f
-            // Try to consume a known suffix
-            let remain_len = slen - self.pos
-            if try_suffix(src, self.pos, remain_len, "i8", 2) or try_suffix(src, self.pos, remain_len, "i16", 3) or try_suffix(src, self.pos, remain_len, "i32", 3) or try_suffix(src, self.pos, remain_len, "i64", 3):
-                while self.pos < slen and is_ident_continue(src[self.pos]):
-                    self.pos = self.pos + 1
+            if suffix_accept(src, self.pos, slen, "i8", 2):
+                self.pos = self.pos + 2
             else:
-                if try_suffix(src, self.pos, remain_len, "u8", 2) or try_suffix(src, self.pos, remain_len, "u16", 3) or try_suffix(src, self.pos, remain_len, "u32", 3) or try_suffix(src, self.pos, remain_len, "u64", 3):
-                    while self.pos < slen and is_ident_continue(src[self.pos]):
-                        self.pos = self.pos + 1
+                if suffix_accept(src, self.pos, slen, "i16", 3):
+                    self.pos = self.pos + 3
                 else:
-                    if try_suffix(src, self.pos, remain_len, "f32", 3) or try_suffix(src, self.pos, remain_len, "f64", 3):
-                        is_float = true
-                        while self.pos < slen and is_ident_continue(src[self.pos]):
-                            self.pos = self.pos + 1
+                    if suffix_accept(src, self.pos, slen, "i32", 3):
+                        self.pos = self.pos + 3
+                    else:
+                        if suffix_accept(src, self.pos, slen, "i64", 3):
+                            self.pos = self.pos + 3
+                        else:
+                            if suffix_accept(src, self.pos, slen, "u8", 2):
+                                self.pos = self.pos + 2
+                            else:
+                                if suffix_accept(src, self.pos, slen, "u16", 3):
+                                    self.pos = self.pos + 3
+                                else:
+                                    if suffix_accept(src, self.pos, slen, "u32", 3):
+                                        self.pos = self.pos + 3
+                                    else:
+                                        if suffix_accept(src, self.pos, slen, "u64", 3):
+                                            self.pos = self.pos + 3
+                                        else:
+                                            if suffix_accept(src, self.pos, slen, "f32", 3):
+                                                self.pos = self.pos + 3
+                                                is_float = true
+                                            else:
+                                                if suffix_accept(src, self.pos, slen, "f64", 3):
+                                                    self.pos = self.pos + 3
+                                                    is_float = true
 
     if is_float:
         return TK_FLOAT_LIT()
     TK_INT_LIT()
 
-fn try_suffix(src: str, pos: i32, remain: i32, suffix: str, suf_len: i32) -> bool:
-    if remain < suf_len:
+fn suffix_accept(src: str, pos: i32, slen: i32, suffix: str, suf_len: i32) -> bool:
+    if pos + suf_len > slen:
         return false
     for i in 0..suf_len:
         if src[pos + i] != suffix[i]:
             return false
-    // Make sure it's not followed by more ident chars
-    if pos + suf_len < src.len() as i32 and is_ident_continue(src[pos + suf_len]):
+    // Make sure it's not followed by more identifier chars.
+    if pos + suf_len < slen and is_ident_continue(src[pos + suf_len]):
         return false
     true
 

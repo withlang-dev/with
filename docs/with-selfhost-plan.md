@@ -1,6 +1,6 @@
 # Self-Hosting With — Architecture-First Plan
 
-**Status:** Wave 1 implemented (foundation layer + Wave 1 unit test gate).
+**Status:** Wave 2 implemented (foundation layer + lexer parity gate).
 
 ---
 
