@@ -1,6 +1,6 @@
 // Wave 1 foundations: source text + line mapping.
-//
-// Root `Source` now follows the foundation implementation shape.
+
+use compiler.foundation.Ids
 
 extern fn with_fs_read_file(path: str) -> str
 
@@ -8,7 +8,7 @@ type Source = {
     path: str,
     text: str,
     line_offsets: Vec[i32],
-    file_id: i32,
+    file_id: FileId,
 }
 
 type SourceLocation = {
@@ -16,10 +16,7 @@ type SourceLocation = {
     col: i32, // 0-based byte column
 }
 
-// Keep historical alias name for callers/tests.
-type Location = SourceLocation
-
-fn Source.from_string(path: str, text: str, file_id: i32) -> Source:
+fn Source.from_string(path: str, text: str, file_id: FileId) -> Source:
     Source {
         path,
         text,
@@ -27,7 +24,7 @@ fn Source.from_string(path: str, text: str, file_id: i32) -> Source:
         file_id,
     }
 
-fn Source.from_file(path: str, file_id: i32) -> Source:
+fn Source.from_file(path: str, file_id: FileId) -> Source:
     let text = with_fs_read_file(path)
     Source.from_string(path, text, file_id)
 
@@ -79,7 +76,3 @@ fn source_compute_line_offsets(text: str) -> Vec[i32]:
         if text[i] == 10:
             offsets.push((i as i32) + 1)
     offsets
-
-fn Source.deinit(self: Source):
-    // No-op in current runtime model.
-    return

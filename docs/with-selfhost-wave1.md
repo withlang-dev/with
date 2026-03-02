@@ -253,6 +253,12 @@ Validation command policy:
 - Unit tests only for Wave 1 gate.
 - No e2e/golden/full compiler parity requirement in this wave.
 
+Local command:
+
+```bash
+./scripts/run_wave1_unit_tests.sh
+```
+
 ---
 
 ## Acceptance Criteria (Wave 1 Exit)
@@ -282,25 +288,24 @@ Validation command policy:
 
 ## Implementation Checklist
 
-- [ ] Create `src/compiler/foundation/` module skeleton and `Mod.w` exports.
-- [ ] Define all Wave 1 ID types in `Ids.w` with explicit invalid sentinels.
-- [ ] Add ID helper APIs (construct/compare/format/raw conversion) and tests.
-- [ ] Implement `Arena.w` with deterministic handle allocation and reset semantics.
-- [ ] Add arena unit tests (allocation order, reset, invalid handle behavior).
-- [ ] Implement string interning in `InternPool.w`.
-- [ ] Implement type-key definitions in `Types.w`.
-- [ ] Implement value-key definitions in `Values.w`.
-- [ ] Implement type/value interning in `InternPool.w`.
-- [ ] Add intern tests for string/type/value canonicalization.
-- [ ] Implement `Span.w` and span utilities (`len`, `merge`, validation).
-- [ ] Implement `Source.w` (line starts + location mapping).
-- [ ] Implement `SourceMap.w` (`FileId` registry + lookup APIs).
-- [ ] Add span/source/source_map boundary and lookup tests.
-- [ ] Implement `Diagnostic.w` structured model and store.
-- [ ] Implement `DiagnosticRender.w` deterministic text renderer.
-- [ ] Add diagnostics model/render tests.
+- [x] Create `src/compiler/foundation/` module skeleton and `Mod.w` exports.
+- [x] Define all Wave 1 ID types in `Ids.w` with explicit invalid sentinels.
+- [x] Add ID helper APIs (construct/compare/format/raw conversion) and tests.
+- [x] Implement `Arena.w` with deterministic handle allocation and reset semantics.
+- [x] Add arena unit tests (allocation order, reset, invalid handle behavior).
+- [x] Implement string interning in `InternPool.w`.
+- [x] Implement type-key definitions in `Types.w`.
+- [x] Implement value-key definitions in `Values.w`.
+- [x] Implement type/value interning in `InternPool.w`.
+- [x] Add intern tests for string/type/value canonicalization.
+- [x] Implement `Span.w` and span utilities (`len`, `merge`, validation).
+- [x] Implement `Source.w` (line starts + location mapping).
+- [x] Implement `SourceMap.w` (`FileId` registry + lookup APIs).
+- [x] Add span/source/source_map boundary and lookup tests.
+- [x] Implement `Diagnostic.w` structured model and store.
+- [x] Implement `DiagnosticRender.w` deterministic text renderer.
+- [x] Add diagnostics model/render tests.
 - [ ] Add optional root-module adapters (`src/InternPool.w`, `src/Span.w`, `src/Source.w`, `src/Diagnostic.w`) to point at foundation modules.
-- [ ] Add Wave 1 test runner script and document commands.
-- [ ] Verify Wave 1 gate: unit tests only, all passing.
+- [x] Add Wave 1 test runner script and document commands.
+- [x] Verify Wave 1 gate: unit tests only, all passing.
 - [ ] Mark Wave 1 complete in `docs/with-selfhost-plan.md` and `docs/with-selfhost-detailed-plan.md`.
-

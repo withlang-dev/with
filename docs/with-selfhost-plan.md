@@ -1,6 +1,6 @@
 # Self-Hosting With — Architecture-First Plan
 
-**Status:** Phase 0 implemented in Stage0 (stable dumps + golden baseline).
+**Status:** Wave 1 implemented (foundation layer + Wave 1 unit test gate).
 
 ---
 

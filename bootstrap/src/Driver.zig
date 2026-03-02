@@ -796,7 +796,9 @@ fn processImports(self: *Driver, module: Ast.Module) ImportError!Ast.Module {
 ///   1. Relative to source directory: <source_dir>/<path>.w
 ///   2. In lib/ by walking parent directories from source_dir
 ///   3. In lib/ relative to project root (directory containing build.zig)
-///   4. In lib/ relative to working directory: lib/<path>.w
+///   4. In src/ relative to project root (self-host modules): <root>/src/<path>.w
+///   5. In src/ relative to working directory: src/<path>.w
+///   6. In lib/ relative to working directory: lib/<path>.w
 fn resolveModulePath(self: *Driver, path: []const Ast.Symbol) ImportError!?[]const u8 {
     const arena_alloc = self.arena.allocator();
 
@@ -865,9 +867,19 @@ fn resolveModulePath(self: *Driver, path: []const Ast.Symbol) ImportError!?[]con
         if (project_root) |root| {
             const full = std.fmt.allocPrint(arena_alloc, "{s}/lib/{s}", .{ root, rel_path }) catch return null;
             if (fileExists(full)) return full;
+
+            // Strategy 4: src/ relative to project root
+            const src_full = std.fmt.allocPrint(arena_alloc, "{s}/src/{s}", .{ root, rel_path }) catch return null;
+            if (fileExists(src_full)) return src_full;
         }
 
-        // Strategy 4: lib/ relative to working directory
+        // Strategy 5: src/ relative to working directory
+        {
+            const full = std.fmt.allocPrint(arena_alloc, "src/{s}", .{rel_path}) catch return null;
+            if (fileExists(full)) return full;
+        }
+
+        // Strategy 6: lib/ relative to working directory
         {
             const full = std.fmt.allocPrint(arena_alloc, "lib/{s}", .{rel_path}) catch return null;
             if (fileExists(full)) return full;
