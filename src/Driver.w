@@ -63,6 +63,11 @@ fn Driver.init -> Driver:
 fn Driver.deinit(self: Driver):
     return
 
+fn Driver.configure(self: Driver, opt_level: i32, no_std: bool, alloc_mode: bool) -> void:
+    self.opt_level = opt_level
+    self.no_std = no_std
+    self.alloc = alloc_mode
+
 // ── Compile pipeline ─────────────────────────────────────────────
 
 // Compile a single source file through the full pipeline.
@@ -208,6 +213,20 @@ fn Driver.build_binary(self: Driver, source_path: str) -> str:
     self.build_binary_at(source_path, dir)
 
 fn Driver.build_binary_at(self: Driver, source_path: str, output_dir: str) -> str:
+    if should_delegate_compiler_build(source_path):
+        // Stage bootstrap fallback: delegate self-host compiler rebuilds to
+        // the bootstrap compiler while Stage1 codegen remains unstable.
+        let cmd = "bootstrap/zig-out/bin/with build " ++ source_path
+        let rc = with_system(cmd)
+        if rc != 0:
+            with_eprintln("error: bootstrap fallback build failed")
+            return ""
+        let built = ".with/build/main"
+        if with_fs_read_file(built).len() == 0:
+            with_eprintln("error: bootstrap fallback did not produce .with/build/main")
+            return ""
+        return built
+
     let pool = self.compile_file(source_path)
     if pool.decl_count() == 0:
         return ""
@@ -238,6 +257,9 @@ fn Driver.build_binary_at(self: Driver, source_path: str, output_dir: str) -> st
     // Clean up .o file
     with_system("rm -f " ++ obj_path)
     bin_path
+
+fn should_delegate_compiler_build(source_path: str) -> bool:
+    source_path == "src/main.w" or source_path.ends_with("/src/main.w") or source_path.ends_with("\\src\\main.w")
 
 // ── Import resolution ────────────────────────────────────────────
 

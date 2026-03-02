@@ -32,7 +32,7 @@ extern fn int_to_string(n: i32) -> str
 extern fn print(s: str) -> void
 extern fn exit(code: i32) -> void
 
-fn main:
+fn main -> void:
     let argc = with_arg_count()
     if argc < 2:
         print_usage()

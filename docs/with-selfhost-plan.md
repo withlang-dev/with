@@ -1,376 +1,528 @@
-# Porting the With Compiler from Zig to With — Execution Plan
+# Self-Hosting With — Architecture-First Plan
 
 ---
 
-## 1. Definition of Success
+# 0. Guiding Principles
 
-Self-hosting is complete when:
-
-1. The With compiler (written in With) compiles its own source.
-2. The resulting compiler compiles itself again.
-3. The second self-compiled compiler produces identical semantic output.
-4. The full language test suite passes under the self-hosted compiler.
-5. All flagship demos (kernel module, Steam Deck game, withgrad) build with the self-hosted compiler.
-6. Fixpoint verification passes (see §6).
-
-Only then is the Zig compiler demoted to bootstrap-only.
+1. **Semantics are frozen during self-host.**
+2. **Stage0 (Zig bootstrap) is the oracle.**
+3. **Architecture is clean-room.**
+4. **Every IR boundary has a written contract.**
+5. **All sugar lowers in exactly one place.**
+6. **Determinism is enforced at every layer.**
+7. **No cleverness during bootstrap. Only clarity.**
 
 ---
 
-## 2. Bootstrap Chain
+# 1. Compiler Architecture Spine
+
+**Dominant style: Zig-like pipeline simplicity.**
+**Diagnostics discipline: Rust-grade.**
+
+Pipeline:
 
 ```
-STAGE 0 (Zig reference compiler):
-    Zig source → Zig → with-stage0
-
-STAGE 1:
-    With compiler source → with-stage0 → with-stage1
-
-STAGE 2:
-    With compiler source → with-stage1 → with-stage2
-
-STAGE 3 (fixpoint verification):
-    With compiler source → with-stage2 → with-stage3
+Source
+  ↓
+Lexer
+  ↓
+AST
+  ↓
+HIR (Resolved + Elaborated)
+  ↓
+Typed IR
+  ↓
+Borrow / Ephemeral Analysis
+  ↓
+MIR
+  ↓
+Async-MIR (if needed)
+  ↓
+LLVM IR
+  ↓
+Object/Binary
 ```
 
-Self-hosting requires:
+No query engine initially.
+No incremental compilation initially.
+No parallel passes initially.
 
-* Stage1 builds correctly.
-* Stage2 builds correctly.
-* Stage2 and Stage3 satisfy fixpoint constraints.
-
----
-
-## 3. Determinism Requirements (Mandatory Before Port Begins)
-
-Before porting any module:
-
-* File discovery order must be sorted.
-* Diagnostic output must be sorted by source position.
-* Symbol tables must not be iterated in nondeterministic order for emission.
-* Hash maps used in code generation must be sorted before output.
-* LLVM IR emission order must be stable.
-* Metadata emission must not depend on pointer identity.
-* Any debug info or timestamp embedding must be disabled or normalized for comparison mode.
-
-Add internal flags:
-
-```
---dump-tokens
---dump-ast
---dump-typed
---dump-mir
---dump-llvm
-```
-
-These dumps must be deterministic and diffable.
+Self-host first. Optimize later.
 
 ---
 
-## 4. Golden Baseline Capture
+# 2. IR Contract Document (Required Before Implementation)
 
-Before porting:
-
-1. Run Stage0 on the entire test suite.
-2. Capture for every test:
-
-   * Exit code
-   * Diagnostics
-   * AST dump
-   * Typed dump
-   * MIR dump
-   * LLVM IR dump (normalized)
-
-Store as golden reference.
-
-Every port step is validated against these.
+This is the core of your architectural discipline.
 
 ---
 
-## 5. Port Strategy
+## 2.1 AST — Syntax Tree
 
-### Absolute rule:
+**Purpose:** Lossless representation of parsed source.
 
-No redesign during port.
+### Input:
 
-No algorithm improvements.
-No feature tweaks.
-No semantic changes.
+* Token stream
 
-Only translation from Zig → With.
+### Output:
+
+* AST preserving:
+
+  * All syntax sugar
+  * Exact spans
+  * All surface constructs
+
+### Invariants:
+
+* No name resolution
+* No type information
+* No desugaring
+* No symbol linking
+* No control flow rewriting
+
+### Sugar allowed:
+
+* `with`
+* `?.`
+* `??`
+* record update
+* pattern matching
+* implicit returns
+* `async`, `await`
+* `select await`
+* `gen`
+* everything surface-level
+
+### What must NOT appear:
+
+* No lowered control flow
+* No temporary variables
+* No inserted implicit nodes
+
+AST is a faithful parse tree.
 
 ---
 
-### Module Port Order (Strict Dependency Order)
+## 2.2 HIR — Resolved & Elaborated
 
-### Wave 1 — Foundational Utilities
+**Purpose:** Name resolution + structural normalization.
 
-* Source locations
-* Span types
-* Diagnostics
-* String interning
-* Arena allocation
-* ID types (`distinct u32` handles)
+### Input:
 
-After port:
+* AST
 
-* Rebuild compiler with stage0
-* Run full golden diff
-* Zero divergence allowed
+### Output:
+
+* HIR with:
+
+  * All names resolved to symbols
+  * All `use` expanded
+  * All identifiers replaced by symbol IDs
+  * Fully qualified paths resolved
+
+### Invariants:
+
+* Symbol IDs stable
+* Type inference NOT yet complete
+* Sugar still present
+* Patterns still present
+* Control flow still high-level
+
+### Sugar allowed:
+
+* `with`
+* `?.`
+* `??`
+* record update
+* pattern matching
+* implicit Ok wrapping
+* implicit default return
+* async constructs
+
+### Eliminated:
+
+* No unresolved names
+* No unbound identifiers
+* No ambiguous references
+
+HIR is still high-level but semantically anchored.
 
 ---
 
-### Wave 2 — Token + Lexer
+## 2.3 Typed IR
 
-* Token enum
+**Purpose:** Attach types and resolve generics.
+
+### Input:
+
+* HIR
+
+### Output:
+
+* Typed nodes
+* All expressions have concrete types
+* Generic instantiations resolved
+* Trait resolution complete
+
+### Invariants:
+
+* All type inference complete
+* All trait method resolution complete
+* All type coercions explicit
+* Auto-ref/deref resolved
+* Implicit trait object coercion resolved
+
+### Sugar allowed:
+
+* `with`
+* `?.`
+* `??`
+* record update
+* pattern matching
+* implicit Ok wrapping
+* implicit default return
+* async constructs
+
+### Eliminated:
+
+* No generic type holes
+* No unresolved traits
+* No type inference variables
+
+Typed IR still preserves high-level control constructs.
+
+---
+
+## 2.4 Borrow / Ephemeral Analysis
+
+**Purpose:** Enforce aliasing and ephemeral rules.
+
+### Input:
+
+* Typed IR
+
+### Output:
+
+* Same IR annotated with:
+
+  * Borrow lifetimes
+  * Move tracking
+  * Ephemeral flags
+  * Guard constraints
+  * `may_suspend` flags
+
+### Invariants:
+
+* All borrow errors detected here
+* All ephemeral propagation resolved
+* All `@[no_await_guard]` enforcement validated
+
+### Sugar allowed:
+
+* `with`
+* pattern matching
+* record update
+* async constructs
+
+### Eliminated:
+
+* No borrow ambiguity
+* No move-after-use
+* No ephemeral violations
+
+After this stage, semantics are fixed.
+
+---
+
+## 2.5 MIR — Explicit Control Flow
+
+**Purpose:** Remove language sugar and make control flow explicit.
+
+### Input:
+
+* Typed + Borrow-checked IR
+
+### Output:
+
+* Basic blocks
+* Explicit temporaries
+* Explicit branches
+* Explicit drops
+
+### At this stage eliminate:
+
+| Feature                 | Lower Here                                  |
+| ----------------------- | ------------------------------------------- |
+| `?.`                    | Convert to explicit match / branch          |
+| `??`                    | Convert to match with early exit            |
+| `with` Form 1           | Lower to guard enter/exit calls             |
+| `with` Form 2/3         | Lower to block + temporary                  |
+| record update           | Expand to struct construction + moves/drops |
+| pattern matching        | Lower to decision tree                      |
+| implicit Ok             | Insert explicit Ok(...)                     |
+| implicit default return | Insert explicit default value               |
+| `let...else`            | Lower to match + early return               |
+| chained `if let`        | Lower to nested conditionals                |
+
+### Invariants:
+
+* No syntactic sugar remains
+* Only:
+
+  * assignments
+  * jumps
+  * calls
+  * temporaries
+  * drops
+  * returns
+  * explicit match lowering
+
+MIR is boring and explicit.
+
+---
+
+## 2.6 Async-MIR
+
+**Purpose:** Lower async constructs.
+
+### Input:
+
+* MIR with async nodes
+
+### Output:
+
+* Fiber-aware control flow
+* Suspension points explicit
+* State transitions explicit
+* `select await` expanded
+
+### Lower:
+
+* `.await`
+* `async fn`
+* `async scope`
+* `select await`
+* `spawn`
+
+After this:
+
+* Async is just runtime calls + control flow
+
+---
+
+## 2.7 LLVM IR
+
+**Purpose:** Machine-level lowering.
+
+### Input:
+
+* Async-MIR
+
+### Output:
+
+* LLVM IR only
+
+### Invariants:
+
+* No With concepts
+* No type system
+* No trait system
+* No borrow logic
+* No sugar
+
+Pure data layout + control flow.
+
+---
+
+# 3. Sugar Lowering Map (Single Source of Truth)
+
+| Feature                 | Lowering Stage         |
+| ----------------------- | ---------------------- |
+| `?.`                    | HIR→MIR                |
+| `??`                    | HIR→MIR                |
+| `with`                  | HIR→MIR                |
+| record update           | HIR→MIR                |
+| implicit Ok             | MIR return elaboration |
+| implicit default return | MIR return elaboration |
+| `let...else`            | HIR→MIR                |
+| chained `if let`        | HIR→MIR                |
+| pattern matching        | HIR→MIR                |
+| async constructs        | MIR→Async-MIR          |
+
+No sugar lowers in two places.
+
+This is how you prevent architecture drift.
+
+---
+
+# 4. Revised Self-Host Phases
+
+Now we adapt your Waves to this architecture.
+
+---
+
+## Phase 0 — Deterministic Stage0
+
+Before writing Withc2:
+
+* Add all dump flags to Stage0.
+* Enforce deterministic ordering.
+* Capture golden baseline.
+
+Stage0 becomes semantic oracle.
+
+---
+
+## Phase 1 — Lexer + AST (Withc2)
+
+Implement:
+
 * Lexer
-* Keyword recognition
-* Literal parsing
+* AST
+* Dump comparison vs Stage0 `--dump-tokens`
+* Dump comparison vs Stage0 `--dump-ast`
 
-Validation:
-
-* `--dump-tokens` identical to golden
-
----
-
-### Wave 3 — AST + Parser
-
-* AST enums and structs
-* Recursive descent parser
-* Pattern parsing
-* Expression parsing
-* Statement parsing
-* Module parsing
-
-Validation:
-
-* `--dump-ast` identical
-* Diagnostics identical
+Zero semantic deviation allowed.
 
 ---
 
-### Wave 4 — Symbol Resolution + Type Representation
+## Phase 2 — HIR + Name Resolution
 
-* Scope stack
+Implement:
+
 * Symbol tables
+* ID interning
+* Scope stack
+* Path resolution
+
+Validate HIR dumps vs Stage0 resolved output.
+
+---
+
+## Phase 3 — Type System
+
+Implement:
+
 * Type representation
-* Generic instantiation
-* Type equality
-* Type inference
-
-Validation:
-
-* `--dump-typed` identical
-* Diagnostics identical
-
----
-
-### Wave 5 — Type Checking + All Language Features
-
-This must include:
-
 * Trait resolution
-* Associated types (if implemented)
-* Monomorphization
-* Auto-ref
-* Auto-deref
-* Implicit Ok wrapping
-* Default field insertion
-* Enum accessor generation
-* Pattern exhaustiveness
-* Record update lowering
-* `let...else`
-* Chained `if let`
-* Pipeline desugaring
-* `with` lowering
-* `defer` lowering
-* Optional chaining lowering
-* `??` lowering
-* All syntax traits
-* All attribute handling
-* All derive logic
-* All comptime support
-* All macro-like expansions (if any)
+* Generic instantiation
+* Auto-ref/deref
 
-Validation:
-
-* Typed dump identical
-* MIR dump identical
+Validate typed dump vs Stage0.
 
 ---
 
-### Wave 6 — Borrow Checker + Ephemeral Enforcement
+## Phase 4 — Borrow + Ephemeral
 
-* NLL computation
-* Overlap detection
+Implement:
+
+* NLL
+* Disjoint field borrowing
 * Ephemeral propagation
 * Guard enforcement
-* Drop-as-use rule
+* `may_suspend`
 
-Validation:
-
-* Diagnostics identical
-* No new borrow divergences
+Diagnostics must match Stage0.
 
 ---
 
-### Wave 7 — MIR + Lowering
+## Phase 5 — MIR
 
-* Desugaring of:
+Implement full sugar lowering.
 
-  * `with`
-  * `match`
-  * `gen`
-  * `async`
-  * `select`
-  * closures
-  * tuple destructuring
-  * record updates
-  * builder returns
-* All implicit transformations
+Validate:
 
-Validation:
+* MIR dumps identical to Stage0.
 
-* `--dump-mir` identical
+This is the biggest structural checkpoint.
 
 ---
 
-### Wave 8 — LLVM Backend
+## Phase 6 — Async-MIR
 
-* Type lowering
-* Function lowering
-* Control flow
-* Data layout
-* Struct/enum layout
-* Vtable generation
-* Trait object layout
+Implement fiber lowering.
+
+Validate:
+
+* Async test suite passes.
+* Stage0 vs Withc2 behavior identical.
+
+---
+
+## Phase 7 — LLVM Backend
+
+Implement:
+
+* Type layout
+* Vtables
+* Trait objects
 * Task lowering
-* Channel lowering
-* Async lowering
-* All runtime calls
-
-Validation:
-
-* Normalized LLVM IR identical
-
----
-
-### Wave 9 — Driver + Build System
-
-* CLI parsing
-* with.toml parsing
-* Module graph resolution
-* Linking invocation
-* Build orchestration
-
-Validation:
-
-* Full compiler builds
-* Full golden diff passes
-
----
-
-## 6. Fixpoint Verification (Revised and Strict)
-
-Fixpoint is validated in layers:
-
-### Level 1 — Semantic Fixpoint (Required)
-
-Stage2 compiles itself → Stage3
-
-* Stage3 passes full test suite
-* Stage3 builds demos
-
-If this fails, self-hosting is incomplete.
-
----
-
-### Level 2 — IR Fixpoint (Required)
-
-Compare normalized LLVM IR:
-
-```
-stage2 IR == stage3 IR
-```
-
-Normalization removes:
-
-* Debug metadata
-* Non-semantic attributes
-* Ordering artifacts
-
-If IR differs, investigate nondeterminism or semantic drift.
-
----
-
-### Level 3 — Binary Fixpoint (Optional but Ideal)
-
-```
-stage2 binary == stage3 binary
-```
-
-If this fails:
-
-* Investigate linker nondeterminism
-* Investigate section ordering
-* Investigate embedded metadata
-
-Binary equality is desirable but not required for semantic correctness.
-
----
-
-## 7. No Feature Freeze During Port — All Features Required
-
-This plan assumes:
-
-* Async
-* Fibers
 * Channels
-* c_import
-* Unsafe
-* All traits
-* All derives
-* Comptime
-* All syntax sugar
 
-The self-hosted compiler must implement the full language.
-
-No partial subset.
+Validate normalized LLVM IR.
 
 ---
 
-## 8. Post Self-Host Policy
+## Phase 8 — Self-Host
 
-After fixpoint passes:
+```
+Stage1 = Withc2 compiled by Stage0
+Stage2 = Withc2 compiled by Stage1
+Stage3 = Withc2 compiled by Stage2
+```
 
-1. Stage2 becomes canonical.
-2. Zig compiler moves to `/bootstrap`.
-3. Zig compiler is frozen.
-4. No new language features are added to Zig.
-5. With compiler becomes the only evolving implementation.
-6. CI still builds Zig bootstrap for recovery purposes.
+Check:
 
----
-
-## 9. Strict Rules During Port
-
-* No architectural refactoring.
-* No performance tuning.
-* No stylistic cleanups.
-* No semantic reinterpretation.
-* Only literal translation.
-
-After Stage2 fixpoint, improvements begin.
+* Full test suite passes
+* Demos build
+* Stage2 IR structurally equals Stage3 IR
+* Optional: binary fixpoint
 
 ---
 
-## 10. What This Plan Guarantees
+# 5. Bootstrap Policy
 
-If executed precisely:
+Stage0 remains:
 
-* Self-hosted compiler is semantically identical to Zig compiler.
-* Determinism issues are controlled.
-* Stage1→Stage2 traps are caught.
-* No silent drift.
-* All features are implemented.
-* The language is validated at full scale.
+* Frozen
+* Used only as oracle
+* Never deleted
+
+After Stage2 fixpoint:
+
+* Stage2 becomes canonical
+* Stage0 moved to `/bootstrap`
+* CI builds both
+
+---
+
+# 6. Why This Plan Works
+
+You get:
+
+* Clean architecture
+* No inheritance of bootstrap mess
+* No semantic gamble
+* Deterministic validation
+* Clear sugar boundaries
+* Future extensibility
+
+And you avoid:
+
+* Porting Zig compiler semantics
+* Simultaneous multi-axis mutation
+* Loss of validation anchor
+
+---
+
+# Final Verdict
+
+This plan is:
+
+* Ambitious
+* Correct
+* Architecturally principled
+* Scalable
+* Far safer than the original “mutate Zig compiler” idea
+
