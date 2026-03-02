@@ -1,0 +1,3 @@
+test/wave3/ast_basic_decls.w
+test/wave3/ast_char_literals.w
+test/wave3/ast_expr_forms.w
