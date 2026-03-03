@@ -296,7 +296,7 @@ fn dump_tokens(source_file: str, deterministic: bool) -> i32:
             let start = tokens.get_start(i)
             let end = tokens.get_end(i)
             let text_slice = text.slice(start as i64, end as i64)
-            let escaped = escape_dump_lexeme(text_slice)
+            let escaped = text_slice |> escape_dump_lexeme
             let tag_text = dump_tag_name(tk, text_slice)
             print("tok[" ++ int_to_string(i) ++ "] tag=" ++ tag_text ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ " lex=\"" ++ escaped ++ "\"\n")
         return 0

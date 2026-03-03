@@ -919,6 +919,84 @@ With follows Rust's naming conventions:
 
 ---
 
+## Additional Language Rules
+
+### Use Numeric Separators for Readability
+
+Prefer grouped numeric literals:
+
+```
+let users = 1_000_000
+let color = 0xFF_AA_22
+let mask = 0b1111_0000
+let pi = 3.141_592_653
+```
+
+### Use Trailing Commas in Multi-line Lists
+
+Trailing commas are optional, but preferred in multi-line forms because they reduce diff noise:
+
+```
+let cfg = ServerConfig {
+    host: "localhost",
+    port: 8080,
+    max_connections: 200,
+}
+```
+
+### Choose the Right String Form
+
+- Use normal strings for escaped/interpolated text.
+- Use raw strings for regex/path/JSON fragments where escapes should stay literal.
+- Use triple-quoted strings for readable multi-line literals.
+
+```
+let path = r"C:\Users\eric\logs"
+let json = r#"{"name":"with","ok":true}"#
+let sql = """
+    SELECT id, name
+    FROM users
+    WHERE active = true
+    """
+```
+
+### Use `b'X'` for Byte-oriented Code
+
+Use byte literals when working with protocol/data bytes:
+
+```
+let esc = b'\x1B'
+let newline = b'\n'
+```
+
+### Discard Explicitly With `_`
+
+If a binding is intentionally unused, write `_`:
+
+```
+let _ = cache.delete(key)
+```
+
+### No Shadowing: Prefer Pipelines
+
+Do not rebind the same name for sequential transforms.
+
+```
+// ✗ shadowing style
+let input = read_file(path)?
+let input = input.trim()
+let input = parse_json(input)?
+
+// ✓ pipeline style
+let input = read_file(path)? |> trim |> parse_json?
+```
+
+### `todo` and `unreachable`
+
+Use `todo()` for intentional not-yet-implemented branches and `unreachable()` for logically impossible branches. Keep them short-lived and remove them before release code.
+
+---
+
 ## Summary: The Idiomatic Checklist
 
 Before submitting code, check:

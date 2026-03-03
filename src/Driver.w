@@ -263,8 +263,7 @@ fn Driver.emit_ir(self: Driver, pool: AstPool) -> bool:
 
 // Link an object file into a binary using the system linker.
 fn link(obj_path: str, bin_path: str) -> bool:
-    let cmd = "cc " ++ obj_path ++ " -o " ++ bin_path
-    let result = with_system(cmd)
+    let result = ("cc " ++ obj_path ++ " -o " ++ bin_path) |> with_system
     result == 0
 
 // Link with extra object files.
@@ -273,7 +272,7 @@ fn link_with_extras(obj_path: str, bin_path: str, extras: Vec[str]) -> bool:
     for i in 0..extras.len() as i32:
         cmd = cmd ++ " " ++ extras.get(i as i64)
     cmd = cmd ++ " -o " ++ bin_path
-    let result = with_system(cmd)
+    let result = cmd |> with_system
     result == 0
 
 fn compiler_runtime_dir() -> str:
@@ -310,8 +309,7 @@ fn Driver.build_binary_at(self: Driver, source_path: str, output_dir: str) -> st
     if should_delegate_compiler_build(source_path):
         // Stage bootstrap fallback: delegate self-host compiler rebuilds to
         // the bootstrap compiler while Stage1 codegen remains unstable.
-        let cmd = "bootstrap/zig-out/bin/with build " ++ source_path
-        let rc = with_system(cmd)
+        let rc = ("bootstrap/zig-out/bin/with build " ++ source_path) |> with_system
         if rc != 0:
             with_eprintln("error: bootstrap fallback build failed")
             return ""

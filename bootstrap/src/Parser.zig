@@ -1523,9 +1523,10 @@ fn parseIntLiteral(self: *Parser) !*const Ast.Expr {
         }
         break :blk text; // Not a type suffix, keep as-is (e.g. 1_000).
     } else text;
+    const parse_text = try normalizeNumberText(self, num_text);
     const node = try self.arena.create(Ast.Expr);
     node.* = .{
-        .kind = .{ .int_literal = std.fmt.parseInt(i64, num_text, 0) catch 0 },
+        .kind = .{ .int_literal = std.fmt.parseInt(i64, parse_text, 0) catch 0 },
         .span = span,
     };
     return node;
@@ -1536,9 +1537,17 @@ fn parseCharLiteral(self: *Parser) !*const Ast.Expr {
     const text = self.source[span.start..span.end];
     self.advance();
     // Convert char literal to integer value.
-    // 'a' -> 97, '\n' -> 10, '\\' -> 92, '\'' -> 39
-    const value: i64 = if (text.len >= 4 and text[1] == '\\') blk: {
-        break :blk switch (text[2]) {
+    // 'a' -> 97, '\n' -> 10, '\\' -> 92, '\'' -> 39, '\x41' -> 65.
+    // b'...' shares the same token kind, with a leading b prefix.
+    const base: usize = if (text.len > 0 and text[0] == 'b') 2 else 1;
+    const value: i64 = if (text.len >= base + 3 and text[base] == '\\') blk: {
+        const esc = text[base + 1];
+        if (esc == 'x' and text.len >= base + 5) {
+            const hi = hexDigitValue(text[base + 2]);
+            const lo = hexDigitValue(text[base + 3]);
+            if (hi >= 0 and lo >= 0) break :blk @as(i64, @intCast(hi * 16 + lo));
+        }
+        break :blk switch (esc) {
             'n' => 10,
             'r' => 13,
             't' => 9,
@@ -1546,9 +1555,9 @@ fn parseCharLiteral(self: *Parser) !*const Ast.Expr {
             '\\' => 92,
             '\'' => 39,
             '"' => 34,
-            else => text[2],
+            else => esc,
         };
-    } else if (text.len >= 3) text[1] else 0;
+    } else if (text.len >= base + 2) text[base] else 0;
     const node = try self.arena.create(Ast.Expr);
     node.* = .{
         .kind = .{ .int_literal = value },
@@ -1569,35 +1578,36 @@ fn parseFloatLiteral(self: *Parser) !*const Ast.Expr {
         }
         break :blk text;
     } else text;
+    const parse_text = try normalizeNumberText(self, num_text);
     const node = try self.arena.create(Ast.Expr);
     node.* = .{
-        .kind = .{ .float_literal = std.fmt.parseFloat(f64, num_text) catch 0.0 },
+        .kind = .{ .float_literal = std.fmt.parseFloat(f64, parse_text) catch 0.0 },
         .span = span,
     };
     return node;
 }
 
+fn normalizeNumberText(self: *Parser, text: []const u8) ![]const u8 {
+    if (std.mem.indexOfScalar(u8, text, '_') == null) return text;
+    var out = try self.arena.alloc(u8, text.len);
+    var len: usize = 0;
+    for (text) |ch| {
+        if (ch == '_') continue;
+        out[len] = ch;
+        len += 1;
+    }
+    return out[0..len];
+}
+
 fn parseStringLiteral(self: *Parser) !*const Ast.Expr {
     const span = self.currentSpan();
-    // Strip quotes from the source text for the interned symbol.
-    // Handle triple-quoted strings: """..."""
     const text = self.source[span.start..span.end];
-    const raw = if (text.len >= 6 and std.mem.startsWith(u8, text, "\"\"\""))
-        // Strip """ delimiters and optional leading/trailing newlines.
-        blk: {
-            var content = text[3 .. text.len - 3];
-            if (content.len > 0 and content[0] == '\n') {
-                content = content[1..];
-            }
-            if (content.len > 0 and content[content.len - 1] == '\n') {
-                content = content[0 .. content.len - 1];
-            }
-            break :blk content;
-        }
+    const raw = try stripStringTokenText(self, text);
+    const stored = if (isRawStringTokenText(text))
+        try tagRawStringContent(self, raw)
     else
-        // Strip single-quote delimiters.
-        self.source[span.start + 1 .. span.end -| 1];
-    const sym = try self.pool.intern(raw);
+        raw;
+    const sym = try self.pool.intern(stored);
     self.advance();
     const node = try self.arena.create(Ast.Expr);
     node.* = .{
@@ -1605,6 +1615,121 @@ fn parseStringLiteral(self: *Parser) !*const Ast.Expr {
         .span = span,
     };
     return self.parsePostfix(node);
+}
+
+fn stripStringTokenText(self: *Parser, text: []const u8) ![]const u8 {
+    // Raw strings: r"...", r#"..."#, r##"..."##, ...
+    if (text.len >= 3 and text[0] == 'r') {
+        var i: usize = 1;
+        while (i < text.len and text[i] == '#') : (i += 1) {}
+        if (i < text.len and text[i] == '"') {
+            const content_start = i + 1;
+            var end_q: usize = text.len - 1;
+            while (end_q >= content_start and text[end_q] == '#') {
+                if (end_q == 0) break;
+                end_q -= 1;
+            }
+            if (end_q >= content_start and text[end_q] == '"') {
+                return text[content_start..end_q];
+            }
+        }
+    }
+
+    // Triple-quoted multiline strings: """..."""
+    if (text.len >= 6 and std.mem.startsWith(u8, text, "\"\"\"")) {
+        var content = text[3 .. text.len - 3];
+        if (content.len > 0 and content[0] == '\n') {
+            content = content[1..];
+        }
+        if (content.len > 0 and content[content.len - 1] == '\n') {
+            content = content[0 .. content.len - 1];
+        }
+        return try dedentMultiline(self, content);
+    }
+
+    // Standard quoted string.
+    if (text.len >= 2) return text[1 .. text.len - 1];
+    return "";
+}
+
+fn isRawStringTokenText(text: []const u8) bool {
+    if (text.len < 3) return false;
+    if (text[0] != 'r') return false;
+    var i: usize = 1;
+    while (i < text.len and text[i] == '#') : (i += 1) {}
+    return i < text.len and text[i] == '"';
+}
+
+fn tagRawStringContent(self: *Parser, content: []const u8) ![]const u8 {
+    const prefix = "\x01raw\x01";
+    var out = try self.arena.alloc(u8, prefix.len + content.len);
+    @memcpy(out[0..prefix.len], prefix);
+    @memcpy(out[prefix.len .. prefix.len + content.len], content);
+    return out;
+}
+
+fn dedentMultiline(self: *Parser, text: []const u8) ![]const u8 {
+    var min_indent: ?usize = null;
+    var line_start: usize = 0;
+    var i: usize = 0;
+    while (i <= text.len) : (i += 1) {
+        if (i == text.len or text[i] == '\n') {
+            var j = line_start;
+            while (j < i and (text[j] == ' ' or text[j] == '\t')) : (j += 1) {}
+            if (j < i) {
+                const indent = j - line_start;
+                if (min_indent == null or indent < min_indent.?) min_indent = indent;
+            }
+            line_start = i + 1;
+        }
+    }
+
+    const cut = min_indent orelse return text;
+    if (cut == 0) return text;
+
+    // If any non-empty line has less than `cut` leading whitespace, keep as-is.
+    line_start = 0;
+    i = 0;
+    while (i <= text.len) : (i += 1) {
+        if (i == text.len or text[i] == '\n') {
+            var j = line_start;
+            while (j < i and (text[j] == ' ' or text[j] == '\t')) : (j += 1) {}
+            if (j < i and (j - line_start) < cut) return text;
+            line_start = i + 1;
+        }
+    }
+
+    // Build dedented content line-by-line.
+    var out = try self.arena.alloc(u8, text.len);
+    var out_len: usize = 0;
+    line_start = 0;
+    i = 0;
+    while (i <= text.len) : (i += 1) {
+        if (i == text.len or text[i] == '\n') {
+            var j = line_start;
+            var remaining = cut;
+            while (remaining > 0 and j < i and (text[j] == ' ' or text[j] == '\t')) : (remaining -= 1) {
+                j += 1;
+            }
+            if (j < i) {
+                @memcpy(out[out_len .. out_len + (i - j)], text[j..i]);
+                out_len += i - j;
+            }
+            if (i != text.len) {
+                out[out_len] = '\n';
+                out_len += 1;
+            }
+            line_start = i + 1;
+        }
+    }
+    return out[0..out_len];
+}
+
+fn hexDigitValue(ch: u8) i32 {
+    if (ch >= '0' and ch <= '9') return @as(i32, ch - '0');
+    if (ch >= 'a' and ch <= 'f') return @as(i32, ch - 'a') + 10;
+    if (ch >= 'A' and ch <= 'F') return @as(i32, ch - 'A') + 10;
+    return -1;
 }
 
 fn parseCStringLiteral(self: *Parser) !*const Ast.Expr {
@@ -3996,10 +4121,13 @@ fn parseTypeExpr(self: *Parser) !*const Ast.TypeExpr {
             if (self.peek() == .l_bracket) {
                 self.advance();
                 var args: std.ArrayList(*const Ast.TypeExpr) = .empty;
-                try args.append(self.arena, try self.parseTypeExpr());
-                while (self.peek() == .comma) {
-                    self.advance();
+                if (self.peek() != .r_bracket) {
                     try args.append(self.arena, try self.parseTypeExpr());
+                    while (self.peek() == .comma) {
+                        self.advance();
+                        if (self.peek() == .r_bracket) break; // trailing comma
+                        try args.append(self.arena, try self.parseTypeExpr());
+                    }
                 }
                 const end = self.currentSpan();
                 try self.expect(.r_bracket);
@@ -4175,10 +4303,13 @@ fn parseTypeParams(self: *Parser) ![]const Ast.TypeParam {
     self.advance(); // consume '['
 
     var params: std.ArrayList(Ast.TypeParam) = .empty;
-    try params.append(self.arena, try self.parseOneTypeParam());
-    while (self.peek() == .comma) {
-        self.advance();
+    if (self.peek() != .r_bracket) {
         try params.append(self.arena, try self.parseOneTypeParam());
+        while (self.peek() == .comma) {
+            self.advance();
+            if (self.peek() == .r_bracket) break; // trailing comma
+            try params.append(self.arena, try self.parseOneTypeParam());
+        }
     }
     try self.expect(.r_bracket);
     return params.items;

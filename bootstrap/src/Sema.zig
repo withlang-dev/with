@@ -37,6 +37,8 @@ pub const Type = union(enum) {
     bool_type,
     /// Void.
     void_type,
+    /// Never (diverging expressions, e.g. `todo()` / `unreachable()`).
+    never_type,
     /// String type (built-in str = {ptr, len}).
     str_type,
     /// User-defined struct.
@@ -201,6 +203,24 @@ pub const Scope = struct {
     }
 };
 
+fn isDiscardBindingSymbol(self: *const Sema, sym: Symbol) bool {
+    if (sym == 0) return true;
+    return std.mem.eql(u8, self.pool.resolve(sym), "_");
+}
+
+fn putBinding(self: *Sema, scope: *Scope, sym: Symbol, info: BindingInfo) void {
+    if (self.isDiscardBindingSymbol(sym)) return;
+    if (scope.lookup(sym) != null) {
+        var buf: [256]u8 = undefined;
+        const name = self.pool.resolve(sym);
+        const msg = std.fmt.bufPrint(&buf, "shadowing is not allowed for '{s}'", .{name}) catch "shadowing is not allowed";
+        const alloc_msg = self.allocator.dupe(u8, msg) catch "shadowing is not allowed";
+        self.emitError(alloc_msg, info.span);
+        return;
+    }
+    scope.put(self.allocator, sym, info);
+}
+
 // ── Function signature info ──────────────────────────────────────
 
 pub const FnSigInfo = struct {
@@ -322,6 +342,7 @@ ty_f32: TypeId,
 ty_f64: TypeId,
 ty_bool: TypeId,
 ty_void: TypeId,
+ty_never: TypeId,
 ty_str: TypeId,
 ty_str_view: TypeId,
 
@@ -384,6 +405,7 @@ pub fn init(allocator: std.mem.Allocator, pool: *InternPool, diagnostics: *Diagn
         .ty_f64 = 0,
         .ty_bool = 0,
         .ty_void = 0,
+        .ty_never = 0,
         .ty_str = 0,
         .ty_str_view = 0,
     };
@@ -401,6 +423,7 @@ pub fn init(allocator: std.mem.Allocator, pool: *InternPool, diagnostics: *Diagn
     self.ty_f64 = self.addType(.{ .float = .{ .bits = 64 } });
     self.ty_bool = self.addType(.bool_type);
     self.ty_void = self.addType(.void_type);
+    self.ty_never = self.addType(.never_type);
     self.ty_str = self.addType(.str_type);
     self.ty_str_view = self.addType(.{ .ref_type = .{
         .pointee = self.ty_str,
@@ -420,6 +443,7 @@ pub fn init(allocator: std.mem.Allocator, pool: *InternPool, diagnostics: *Diagn
     self.registerPrimName("f64", self.ty_f64);
     self.registerPrimName("bool", self.ty_bool);
     self.registerPrimName("void", self.ty_void);
+    self.registerPrimName("Never", self.ty_never);
     self.registerPrimName("str", self.ty_str);
     self.registerPrimName("String", self.ty_str);
     self.registerPrimName("StrView", self.ty_str_view);
@@ -684,7 +708,7 @@ fn namedTypeSupportsDerivedTrait(_: *const Sema, name: []const u8, req: DeriveRe
         std.mem.eql(u8, name, "i8") or std.mem.eql(u8, name, "i16") or std.mem.eql(u8, name, "i32") or std.mem.eql(u8, name, "i64") or
         std.mem.eql(u8, name, "u8") or std.mem.eql(u8, name, "u16") or std.mem.eql(u8, name, "u32") or std.mem.eql(u8, name, "u64") or
         std.mem.eql(u8, name, "f32") or std.mem.eql(u8, name, "f64");
-    if (is_numeric or std.mem.eql(u8, name, "bool") or std.mem.eql(u8, name, "str") or std.mem.eql(u8, name, "StrView")) {
+    if (is_numeric or std.mem.eql(u8, name, "bool") or std.mem.eql(u8, name, "str") or std.mem.eql(u8, name, "StrView") or std.mem.eql(u8, name, "Never")) {
         return true;
     }
 
@@ -1053,7 +1077,7 @@ fn collectLetDecl(self: *Sema, ld: Ast.LetDecl, span: Span) void {
         break :blk self.resolveTypeExpr(te);
     } else error_type;
 
-    self.root_scope.put(self.allocator, ld.name, .{
+    self.putBinding(&self.root_scope, ld.name, .{
         .type_id = tid,
         .is_mut = ld.is_mut,
         .state = .live,
@@ -1690,7 +1714,7 @@ fn checkFnBody(self: *Sema, fn_decl: Ast.FnDecl) void {
         else
             error_type;
 
-        fn_scope.put(self.allocator, param.name, .{
+        self.putBinding(&fn_scope, param.name, .{
             .type_id = param_type,
             .is_mut = param.is_mut,
             .state = .live,
@@ -2057,7 +2081,7 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
                 for (clauses) |cl| {
                     const iter_ty = self.checkExpr(cl.iterable);
                     const bind_ty = self.inferForElementType(iter_ty);
-                    comp_scope.put(self.allocator, cl.binding, .{
+                    self.putBinding(&comp_scope, cl.binding, .{
                         .type_id = bind_ty,
                         .is_mut = false,
                         .state = .live,
@@ -2067,7 +2091,7 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
             } else {
                 const iter_ty = self.checkExpr(comp.iterable);
                 const bind_ty = self.inferForElementType(iter_ty);
-                comp_scope.put(self.allocator, comp.binding, .{
+                self.putBinding(&comp_scope, comp.binding, .{
                     .type_id = bind_ty,
                     .is_mut = false,
                     .state = .live,
@@ -2142,7 +2166,7 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
                 with_scope.deinit(self.allocator);
                 self.current_scope = saved_scope;
             }
-            self.current_scope.put(self.allocator, w.name, .{
+            self.putBinding(self.current_scope, w.name, .{
                 .type_id = bind_ty,
                 .is_mut = w.is_mut,
                 .span = expr.span,
@@ -2222,7 +2246,7 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
             const val_type = self.checkExpr(le.value);
             // Each binding gets the value's type (payload type not yet resolved in sema).
             for (le.pattern.bindings) |bind_sym| {
-                self.current_scope.put(self.allocator, bind_sym, .{
+                self.putBinding(self.current_scope, bind_sym, .{
                     .type_id = val_type,
                     .is_mut = le.is_mut,
                     .span = expr.span,
@@ -2248,7 +2272,7 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
                         type_info.tuple_type.elements[i]
                     else
                         error_type;
-                    self.current_scope.put(self.allocator, name, .{
+                    self.putBinding(self.current_scope, name, .{
                         .type_id = elem_type,
                         .is_mut = td.is_mut,
                         .span = expr.span,
@@ -2287,7 +2311,7 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
                 self.current_scope = saved_scope;
             }
 
-            self.current_scope.put(self.allocator, as.name, .{
+            self.putBinding(self.current_scope, as.name, .{
                 .type_id = self.ty_void,
                 .is_mut = false,
                 .state = .live,
@@ -2325,7 +2349,7 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
                 arm_scope.parent = self.current_scope;
                 const saved_scope = self.current_scope;
                 self.current_scope = &arm_scope;
-                self.current_scope.put(self.allocator, arm.name, .{
+                self.putBinding(self.current_scope, arm.name, .{
                     .type_id = self.ty_i32,
                     .is_mut = false,
                     .span = arm.span,
@@ -2684,7 +2708,7 @@ fn checkLetBinding(self: *Sema, let_b: Ast.LetBinding, span: Span) TypeId {
 
     const is_task_binding = self.exprIsTask(let_b.value);
     const is_scoped_task_binding = self.exprIsScopedTask(let_b.value);
-    self.current_scope.put(self.allocator, let_b.name, .{
+    self.putBinding(self.current_scope, let_b.name, .{
         .type_id = bind_type,
         .is_mut = let_b.is_mut,
         .is_task = is_task_binding,
@@ -2991,7 +3015,7 @@ fn checkTupleDestructurePattern(self: *Sema, pattern: *const Ast.Pattern, subjec
     switch (pattern.kind) {
         .wildcard => {},
         .binding => |sym| {
-            self.current_scope.put(self.allocator, sym, .{
+            self.putBinding(self.current_scope, sym, .{
                 .type_id = subject_type,
                 .is_mut = is_mut,
                 .state = .live,
@@ -3070,6 +3094,11 @@ fn exprDefinitelyDiverges(self: *Sema, expr: *const Ast.Expr) bool {
             break :blk true;
         },
         .loop_expr => true,
+        .call => |call_e| blk: {
+            if (call_e.callee.kind != .ident) break :blk false;
+            const name = self.pool.resolve(call_e.callee.kind.ident);
+            break :blk std.mem.eql(u8, name, "todo") or std.mem.eql(u8, name, "unreachable");
+        },
         else => false,
     };
 }
@@ -3092,7 +3121,7 @@ fn checkFor(self: *Sema, for_e: Ast.ForExpr) TypeId {
         self.checkTupleDestructurePattern(&bp, loop_var_type, false);
     } else {
         // Infer loop variable from iterable when available.
-        for_scope.put(self.allocator, for_e.binding, .{
+        self.putBinding(&for_scope, for_e.binding, .{
             .type_id = loop_var_type,
             .is_mut = false,
             .state = .live,
@@ -3102,7 +3131,7 @@ fn checkFor(self: *Sema, for_e: Ast.ForExpr) TypeId {
 
     // If there's an index binding, add it to scope too.
     if (for_e.index_binding) |idx_sym| {
-        for_scope.put(self.allocator, idx_sym, .{
+        self.putBinding(&for_scope, idx_sym, .{
             .type_id = self.ty_i64,
             .is_mut = false,
             .state = .live,
@@ -3168,7 +3197,7 @@ fn checkOptionalChain(self: *Sema, oc: Ast.OptionalChainExpr, span: Span) TypeId
 
         const payload_sym = self.pool.intern("__opt_payload") catch 0;
         if (payload_sym != 0) {
-            self.current_scope.put(self.allocator, payload_sym, .{
+            self.putBinding(self.current_scope, payload_sym, .{
                 .type_id = payload_ty,
                 .is_mut = false,
                 .state = .live,
@@ -3405,6 +3434,10 @@ fn checkMatchExpr(self: *Sema, m: Ast.MatchExpr) TypeId {
         self.current_scope = saved;
 
         if (result_type == error_type) {
+            result_type = arm_type;
+        } else if (result_type == self.ty_never and arm_type != error_type) {
+            // Bottom-type merge: if the accumulated type is Never, let later
+            // concrete arm types determine the match expression type.
             result_type = arm_type;
         }
     }
@@ -3672,7 +3705,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
     switch (pattern.kind) {
         .wildcard => {},
         .binding => |sym| {
-            self.current_scope.put(self.allocator, sym, .{
+            self.putBinding(self.current_scope, sym, .{
                 .type_id = subject_type,
                 .is_mut = false,
                 .state = .live,
@@ -3697,7 +3730,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                 if (variant_index == null) {
                     self.emitError("unknown enum variant in pattern", pattern.span);
                     for (vp.bindings) |binding_sym| {
-                        self.current_scope.put(self.allocator, binding_sym, .{
+                        self.putBinding(self.current_scope, binding_sym, .{
                             .type_id = error_type,
                             .is_mut = false,
                             .state = .live,
@@ -3725,7 +3758,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                         const bind_count = @min(vp.bindings.len, payloads.len);
                         for (vp.bindings[0..bind_count], 0..) |binding_sym, i| {
                             const payload_type = payloads[i];
-                            self.current_scope.put(self.allocator, binding_sym, .{
+                            self.putBinding(self.current_scope, binding_sym, .{
                                 .type_id = payload_type,
                                 .is_mut = false,
                                 .state = .live,
@@ -3733,7 +3766,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                             });
                         }
                         for (vp.bindings[bind_count..]) |binding_sym| {
-                            self.current_scope.put(self.allocator, binding_sym, .{
+                            self.putBinding(self.current_scope, binding_sym, .{
                                 .type_id = error_type,
                                 .is_mut = false,
                                 .state = .live,
@@ -3743,7 +3776,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                     }
                 } else {
                     for (vp.bindings) |binding_sym| {
-                        self.current_scope.put(self.allocator, binding_sym, .{
+                        self.putBinding(self.current_scope, binding_sym, .{
                             .type_id = error_type,
                             .is_mut = false,
                             .state = .live,
@@ -3763,7 +3796,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
             // whose generic type expressions are not yet resolved in sema.
             if (subject_resolved == error_type) {
                 for (vp.bindings) |binding_sym| {
-                    self.current_scope.put(self.allocator, binding_sym, .{
+                    self.putBinding(self.current_scope, binding_sym, .{
                         .type_id = error_type,
                         .is_mut = false,
                         .state = .live,
@@ -3783,7 +3816,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                 self.emitError("unknown enum variant in pattern", pattern.span);
             }
             for (vp.bindings) |binding_sym| {
-                self.current_scope.put(self.allocator, binding_sym, .{
+                self.putBinding(self.current_scope, binding_sym, .{
                     .type_id = error_type,
                     .is_mut = false,
                     .state = .live,
@@ -3801,7 +3834,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
         },
         .at_binding => |ab| {
             // Bind the whole matched value, then bind inner pattern names.
-            self.current_scope.put(self.allocator, ab.name, .{
+            self.putBinding(self.current_scope, ab.name, .{
                 .type_id = subject_type,
                 .is_mut = false,
                 .state = .live,
@@ -3848,7 +3881,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
             // Bind head element names.
             for (sp.head) |sym| {
                 if (sym == 0) continue; // wildcard
-                self.current_scope.put(self.allocator, sym, .{
+                self.putBinding(self.current_scope, sym, .{
                     .type_id = elem_type,
                     .is_mut = false,
                     .state = .live,
@@ -3857,7 +3890,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
             }
             // Bind rest as i64 (length of remaining elements).
             if (sp.has_rest and sp.rest != 0) {
-                self.current_scope.put(self.allocator, sp.rest, .{
+                self.putBinding(self.current_scope, sp.rest, .{
                     .type_id = self.ty_i64,
                     .is_mut = false,
                     .state = .live,
@@ -3867,7 +3900,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
             // Bind tail element names.
             for (sp.tail) |sym| {
                 if (sym == 0) continue;
-                self.current_scope.put(self.allocator, sym, .{
+                self.putBinding(self.current_scope, sym, .{
                     .type_id = elem_type,
                     .is_mut = false,
                     .state = .live,
@@ -3884,7 +3917,7 @@ fn checkPattern(self: *Sema, pattern: *const Ast.Pattern, subject_type: TypeId) 
                     self.checkPattern(p, error_type);
                 } else {
                     // Shorthand binding: `x` — bind as field type (use error_type as approx)
-                    self.current_scope.put(self.allocator, field.name, .{
+                    self.putBinding(self.current_scope, field.name, .{
                         .type_id = error_type,
                         .is_mut = false,
                         .state = .live,
@@ -3928,7 +3961,7 @@ fn checkClosure(self: *Sema, cl: Ast.ClosureExpr, span: Span) TypeId {
     const param_types = self.allocator.alloc(TypeId, cl.params.len) catch return error_type;
     for (cl.params, 0..) |param_sym, i| {
         param_types[i] = self.ty_i32;
-        closure_scope.put(self.allocator, param_sym, .{
+        self.putBinding(&closure_scope, param_sym, .{
             .type_id = self.ty_i32,
             .is_mut = false,
             .state = .live,
@@ -4705,6 +4738,19 @@ fn checkBuiltinCall(self: *Sema, fn_sym: Symbol, args: []const *const Ast.Expr, 
         }
         return self.ty_void;
     }
+    if (std.mem.eql(u8, name, "todo") or std.mem.eql(u8, name, "unreachable")) {
+        if (args.len > 1) {
+            self.emitError("todo()/unreachable() expect zero or one message argument", span);
+            return error_type;
+        }
+        if (args.len == 1 and arg_types.len >= 1 and arg_types[0] != error_type) {
+            if (!self.typesCompatible(self.ty_str, arg_types[0])) {
+                self.emitError("todo()/unreachable() message must be str-compatible", args[0].span);
+                return error_type;
+            }
+        }
+        return self.ty_never;
+    }
     return error_type;
 }
 
@@ -4722,6 +4768,8 @@ fn isBuiltinFn(self: *Sema, sym: Symbol) bool {
         std.mem.eql(u8, name, "send") or
         std.mem.eql(u8, name, "recv") or
         std.mem.eql(u8, name, "close") or
+        std.mem.eql(u8, name, "todo") or
+        std.mem.eql(u8, name, "unreachable") or
         std.mem.eql(u8, name, "Vec") or
         std.mem.eql(u8, name, "HashMap") or
         std.mem.eql(u8, name, "HashSet") or
@@ -4869,6 +4917,9 @@ fn typesCompatible(self: *const Sema, expected: TypeId, actual: TypeId) bool {
     const exp_type = self.getType(exp_resolved);
     const act_type = self.getType(act_resolved);
 
+    // Never is the bottom type: it can flow into any expected type.
+    if (act_type == .never_type) return true;
+
     // Integer coercion: any int to any int is OK (codegen handles truncation).
     if (isIntType(exp_type) and isIntType(act_type)) return true;
 
@@ -4969,6 +5020,9 @@ fn arithmeticResultType(self: *const Sema, lhs: TypeId, rhs: TypeId) TypeId {
     const l = self.getType(self.resolveAlias(lhs));
     const r = self.getType(self.resolveAlias(rhs));
 
+    if (l == .never_type) return rhs;
+    if (r == .never_type) return lhs;
+
     // Float wins over int.
     if (isFloatType(l) and isFloatType(r)) {
         const lb = l.float.bits;
@@ -5056,7 +5110,7 @@ pub fn isCopy(self: *Sema, tid: TypeId) bool {
     const resolved = self.resolveAlias(tid);
     switch (self.getType(resolved)) {
         .err => return true,
-        .int, .float, .bool_type, .void_type, .str_type => return true,
+        .int, .float, .bool_type, .void_type, .never_type, .str_type => return true,
         .ptr_type, .ref_type, .fn_type, .generic_fn => return true,
         .struct_type => |st| {
             // User-defined drop handlers make the type move-only.
@@ -5605,6 +5659,7 @@ pub fn typeName(self: *const Sema, tid: TypeId) []const u8 {
         .float => |f| return if (f.bits == 32) "f32" else "f64",
         .bool_type => return "bool",
         .void_type => return "void",
+        .never_type => return "Never",
         .str_type => return "str",
         .struct_type => |st| return self.pool.resolve(st.name),
         .enum_type => |et| return self.pool.resolve(et.name),
@@ -5639,6 +5694,7 @@ fn typeIdToNameSymbol(self: *Sema, tid: TypeId) ?Symbol {
         .float => |f| return self.pool.intern(if (f.bits == 32) "f32" else "f64") catch null,
         .bool_type => return self.pool.intern("bool") catch null,
         .void_type => return null,
+        .never_type => return self.pool.intern("Never") catch null,
         .str_type => return self.pool.intern("str") catch null,
         .struct_type => |st| return st.name,
         .enum_type => |et| return et.name,

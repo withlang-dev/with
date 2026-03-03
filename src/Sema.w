@@ -33,6 +33,7 @@ fn TY_REF -> i32: 14
 fn TY_ALIAS -> i32: 15
 fn TY_GENERIC_FN -> i32: 16
 fn TY_TRAIT_OBJ -> i32: 17
+fn TY_NEVER -> i32: 18
 
 // Var state constants
 fn VS_LIVE -> i32: 0
@@ -172,6 +173,7 @@ type Sema = {
     ty_f64: i32,
     ty_bool: i32,
     ty_void: i32,
+    ty_never: i32,
     ty_str: i32,
     ty_str_view: i32,
 }
@@ -257,7 +259,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         ty_i8: 0, ty_i16: 0, ty_i32: 0, ty_i64: 0,
         ty_u8: 0, ty_u16: 0, ty_u32: 0, ty_u64: 0,
         ty_f32: 0, ty_f64: 0, ty_bool: 0, ty_void: 0,
-        ty_str: 0, ty_str_view: 0,
+        ty_never: 0, ty_str: 0, ty_str_view: 0,
     }
 
     // Index 0 = error type (sentinel).
@@ -276,6 +278,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.ty_f64 = s.add_type(TY_FLOAT(), 64, 0, 0)
     s.ty_bool = s.add_type(TY_BOOL(), 0, 0, 0)
     s.ty_void = s.add_type(TY_VOID(), 0, 0, 0)
+    s.ty_never = s.add_type(TY_NEVER(), 0, 0, 0)
     s.ty_str = s.add_type(TY_STR(), 0, 0, 0)
     s.ty_str_view = s.add_type(TY_REF(), s.ty_str, 0, 0)
 
@@ -292,6 +295,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.register_prim("f64", s.ty_f64)
     s.register_prim("bool", s.ty_bool)
     s.register_prim("void", s.ty_void)
+    s.register_prim("Never", s.ty_never)
     s.register_prim("str", s.ty_str)
     s.register_prim("String", s.ty_str)
     s.register_prim("StrView", s.ty_str_view)
@@ -364,7 +368,26 @@ fn Sema.pop_scope(self: Sema):
         self.bind_is_task.pop()
     self.scope_starts.pop()
 
+fn Sema.is_discard_binding_symbol(self: Sema, sym: i32) -> i32:
+    if sym == 0:
+        return 1
+    let name = self.pool.resolve(sym)
+    if name == "_":
+        return 1
+    0
+
 fn Sema.scope_put(self: Sema, sym: i32, tid: i32, is_mut: i32):
+    self.scope_put_at(sym, tid, is_mut, 0)
+
+fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
+    if self.is_discard_binding_symbol(sym) != 0:
+        return
+    if self.scope_has(sym) != 0:
+        if node != 0:
+            self.emit_error("shadowing is not allowed", node)
+        else:
+            self.diags.emit(Diagnostic.err("shadowing is not allowed", Span { file: self.local_file_id, start: 0, end: 0 }))
+        return
     self.bind_names.push(sym)
     self.bind_types.push(tid)
     self.bind_muts.push(is_mut)
@@ -1536,6 +1559,9 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
 
         if result_type == 0:
             result_type = arm_type
+        else if result_type == self.ty_never and arm_type != 0:
+            // Bottom-type merge: allow concrete arm types after Never arms.
+            result_type = arm_type
 
     result_type
 
@@ -1808,7 +1834,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // Built-in function
     if self.is_builtin_fn(fn_sym):
-        return self.check_builtin_call(fn_sym, node)
+        return self.check_builtin_call(fn_sym, node, arg_types, arg_count)
 
     0
 
@@ -2167,7 +2193,7 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
 
     0
 
-fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32) -> i32:
+fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i32], arg_count: i32) -> i32:
     let name = self.pool.resolve(fn_sym)
     if name == "println" or name == "print":
         return self.ty_void
@@ -2181,6 +2207,17 @@ fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32) -> i32:
         return self.ty_i32
     if name == "close":
         return self.ty_void
+    if name == "todo" or name == "unreachable":
+        if arg_count > 1:
+            self.emit_error("todo()/unreachable() expect zero or one message argument", node)
+            return 0
+        if arg_count == 1:
+            let msg_ty = arg_types.get(0)
+            if msg_ty != 0:
+                if not self.types_compatible(self.ty_str, msg_ty):
+                    self.emit_error("todo()/unreachable() message must be str-compatible", self.ast.get_extra(self.ast.get_data1(node)))
+                    return 0
+        return self.ty_never
     0
 
 // ── Helper functions ─────────────────────────────────────────────
@@ -2240,6 +2277,30 @@ fn Sema.types_compatible(self: Sema, expected: i32, actual: i32) -> i32:
     let exp_k = self.get_type_kind(exp_r)
     let act_k = self.get_type_kind(act_r)
 
+    // Never is the bottom type: actual Never is compatible with any expected type.
+    if act_k == TY_NEVER():
+        return 1
+
+    // Structural compatibility for non-interned compound types.
+    if exp_k == TY_PTR() and act_k == TY_PTR():
+        let exp_mut = self.get_type_d1(exp_r)
+        let act_mut = self.get_type_d1(act_r)
+        if exp_mut != 0 and act_mut == 0:
+            return 0
+        return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
+    if exp_k == TY_REF() and act_k == TY_REF():
+        let exp_mut = self.get_type_d1(exp_r)
+        let act_mut = self.get_type_d1(act_r)
+        if exp_mut != 0 and act_mut == 0:
+            return 0
+        return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
+    if exp_k == TY_SLICE() and act_k == TY_SLICE():
+        return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
+    if exp_k == TY_ARRAY() and act_k == TY_ARRAY():
+        if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
+            return 0
+        return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
+
     // Int coercion
     if exp_k == TY_INT() and act_k == TY_INT():
         return 1
@@ -2282,6 +2343,10 @@ fn Sema.arithmetic_result_type(self: Sema, lhs: i32, rhs: i32) -> i32:
         return lhs
     let lk = self.get_type_kind(self.resolve_alias(lhs))
     let rk = self.get_type_kind(self.resolve_alias(rhs))
+    if lk == TY_NEVER():
+        return rhs
+    if rk == TY_NEVER():
+        return lhs
     // Float wins over int
     if lk == TY_FLOAT() and rk == TY_FLOAT():
         let lb = self.get_type_d0(self.resolve_alias(lhs))
@@ -2307,7 +2372,7 @@ fn Sema.is_copy(self: Sema, tid: i32) -> i32:
         return 1
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_ERR() or tk == TY_INT() or tk == TY_FLOAT() or tk == TY_BOOL() or tk == TY_VOID() or tk == TY_STR():
+    if tk == TY_ERR() or tk == TY_INT() or tk == TY_FLOAT() or tk == TY_BOOL() or tk == TY_VOID() or tk == TY_NEVER() or tk == TY_STR():
         return 1
     if tk == TY_PTR() or tk == TY_REF() or tk == TY_FN() or tk == TY_GENERIC_FN():
         return 1
@@ -2353,6 +2418,8 @@ fn Sema.is_builtin_fn(self: Sema, sym: i32) -> i32:
     if name == "Some" or name == "Ok" or name == "Err":
         return 1
     if name == "Channel" or name == "send" or name == "recv" or name == "close":
+        return 1
+    if name == "todo" or name == "unreachable":
         return 1
     if name == "Vec" or name == "HashMap" or name == "HashSet":
         return 1
@@ -2833,6 +2900,8 @@ fn Sema.type_name(self: Sema, tid: i32) -> str:
         return "bool"
     if tk == TY_VOID():
         return "void"
+    if tk == TY_NEVER():
+        return "Never"
     if tk == TY_STR():
         return "str"
     if tk == TY_STRUCT():
