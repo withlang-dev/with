@@ -26,6 +26,7 @@ source: []const u8,
 /// Pending `@[derive(...)]` trait names parsed from attributes that
 /// apply to the next top-level type declaration.
 pending_derive_traits: []const Ast.Symbol = &.{},
+
 /// Pending function attributes from `@[tailrec]`, `@[inline]`, `@[noinline]`, `@[must_use]`.
 pending_tailrec: bool = false,
 pending_inline: bool = false,
@@ -39,6 +40,14 @@ pending_no_main: bool = false,
 pending_test: bool = false,
 pending_before: bool = false,
 pending_after: bool = false,
+
+const ImplicitSelfMode = enum {
+    none,
+    by_ref,
+    by_mut_ref,
+    by_value,
+    conflict,
+};
 
 pub fn init(
     tokens: *const Token.List,
@@ -410,7 +419,6 @@ fn parseTraitDecl(self: *Parser, vis: Ast.Visibility) !Ast.Decl {
             params = try self.parseParamList(null);
             try self.expect(.r_paren);
         }
-
         var return_type: ?*const Ast.TypeExpr = null;
         if (self.peek() == .arrow) {
             self.advance();
@@ -561,6 +569,8 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
             params = try self.parseParamList(null);
             try self.expect(.r_paren);
         }
+        const self_sym = self.pool.intern("self") catch return error.ParseError;
+        const has_explicit_self = params.len > 0 and params[0].name == self_sym;
 
         var return_type: ?*const Ast.TypeExpr = null;
         if (self.peek() == .arrow) {
@@ -577,6 +587,48 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
             return error.ParseError;
         }
         const body = try self.parseBlockOrExpr();
+        // Implicit `self` only for instance-style methods that actually use `self`.
+        // Keep static constructor/factory methods (`Type.new(...)`) unchanged.
+        if (!has_explicit_self) {
+            const mode = self.inferImplicitSelfMode(body, self_sym);
+            if (mode == .conflict) {
+                self.emitError("conflicting implicit self usage: body both mutates and consumes self; declare explicit receiver type");
+                return error.ParseError;
+            }
+            if (mode != .none) {
+                const named_self = try self.arena.create(Ast.TypeExpr);
+                named_self.* = .{
+                    .kind = .{ .named = type_name },
+                    .span = method_start,
+                };
+
+                const self_type = switch (mode) {
+                    .by_ref, .by_mut_ref => blk: {
+                        const ref_te = try self.arena.create(Ast.TypeExpr);
+                        ref_te.* = .{
+                            .kind = .{ .ref_type = .{
+                                .pointee = named_self,
+                                .is_mut = mode == .by_mut_ref,
+                            } },
+                            .span = method_start,
+                        };
+                        break :blk ref_te;
+                    },
+                    .by_value => named_self,
+                    .none, .conflict => unreachable,
+                };
+
+                const expanded = try self.arena.alloc(Ast.Param, params.len + 1);
+                expanded[0] = .{
+                    .name = self_sym,
+                    .type_expr = self_type,
+                    .is_mut = mode == .by_mut_ref,
+                    .span = method_start,
+                };
+                for (params, 0..) |p, i| expanded[i + 1] = p;
+                params = expanded;
+            }
+        }
 
         try method_names.append(self.arena, mangled_name);
         try methods.append(self.arena, .{
@@ -608,6 +660,379 @@ fn parseImplBlock(self: *Parser, vis: Ast.Visibility) ![]const Ast.Decl {
     });
 
     return methods.items;
+}
+
+fn spanUsesIdentifier(self: *const Parser, span: Span, ident: []const u8) bool {
+    for (self.tokens.tags.items, self.tokens.spans.items) |tag, tok_span| {
+        if (tok_span.start < span.start or tok_span.end > span.end) continue;
+        if (tag != .identifier) continue;
+        const text = self.source[tok_span.start..tok_span.end];
+        if (std.mem.eql(u8, text, ident)) return true;
+    }
+    return false;
+}
+
+fn inferImplicitSelfMode(self: *const Parser, body: *const Ast.Expr, self_sym: Ast.Symbol) ImplicitSelfMode {
+    if (!self.exprUsesSymbol(body, self_sym)) return .none;
+    const mutates = self.exprMutatesSelf(body, self_sym);
+    const consumes = self.exprConsumesSelf(body, self_sym);
+    if (mutates and consumes) return .conflict;
+    if (mutates) return .by_mut_ref;
+    if (consumes) return .by_value;
+    return .by_ref;
+}
+
+fn exprUsesSymbol(self: *const Parser, expr: *const Ast.Expr, sym: Ast.Symbol) bool {
+    return switch (expr.kind) {
+        .ident => |id| id == sym,
+        .binary => |b| exprUsesSymbol(self, b.lhs, sym) or exprUsesSymbol(self, b.rhs, sym),
+        .unary => |u| exprUsesSymbol(self, u.operand, sym),
+        .call => |c| blk: {
+            if (exprUsesSymbol(self, c.callee, sym)) break :blk true;
+            for (c.args) |arg| {
+                if (exprUsesSymbol(self, arg, sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .field_access => |fa| exprUsesSymbol(self, fa.expr, sym),
+        .computed_field_access => |fa| exprUsesSymbol(self, fa.expr, sym) or exprUsesSymbol(self, fa.field_expr, sym),
+        .optional_chain => |oc| blk: {
+            if (exprUsesSymbol(self, oc.expr, sym)) break :blk true;
+            if (oc.args) |args| {
+                for (args) |arg| {
+                    if (exprUsesSymbol(self, arg, sym)) break :blk true;
+                }
+            }
+            break :blk false;
+        },
+        .index => |idx| exprUsesSymbol(self, idx.expr, sym) or exprUsesSymbol(self, idx.index, sym),
+        .slice => |sl| blk: {
+            if (exprUsesSymbol(self, sl.expr, sym)) break :blk true;
+            if (sl.start) |s| if (exprUsesSymbol(self, s, sym)) break :blk true;
+            if (sl.end) |e| if (exprUsesSymbol(self, e, sym)) break :blk true;
+            break :blk false;
+        },
+        .block => |b| blk: {
+            for (b.stmts) |s| {
+                if (exprUsesSymbol(self, s, sym)) break :blk true;
+            }
+            if (b.tail) |t| if (exprUsesSymbol(self, t, sym)) break :blk true;
+            break :blk false;
+        },
+        .if_expr => |i| exprUsesSymbol(self, i.condition, sym) or
+            exprUsesSymbol(self, i.then_body, sym) or
+            (if (i.else_body) |e| exprUsesSymbol(self, e, sym) else false),
+        .return_expr => |v| if (v) |inner| exprUsesSymbol(self, inner, sym) else false,
+        .let_binding => |lb| exprUsesSymbol(self, lb.value, sym),
+        .let_else => |le| exprUsesSymbol(self, le.value, sym) or exprUsesSymbol(self, le.else_body, sym),
+        .tuple_destructure => |td| exprUsesSymbol(self, td.value, sym),
+        .assign => |a| exprUsesSymbol(self, a.target, sym) or exprUsesSymbol(self, a.value, sym),
+        .tuple => |elems| blk: {
+            for (elems) |e| {
+                if (exprUsesSymbol(self, e, sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .range => |r| (if (r.start) |s| exprUsesSymbol(self, s, sym) else false) or
+            (if (r.end) |e| exprUsesSymbol(self, e, sym) else false),
+        .await_expr => |inner| exprUsesSymbol(self, inner, sym),
+        .async_block => |inner| exprUsesSymbol(self, inner, sym),
+        .spawn_expr => |inner| exprUsesSymbol(self, inner, sym),
+        .pipeline => |p| exprUsesSymbol(self, p.lhs, sym) or exprUsesSymbol(self, p.rhs, sym),
+        .grouped => |inner| exprUsesSymbol(self, inner, sym),
+        .while_expr => |w| exprUsesSymbol(self, w.condition, sym) or exprUsesSymbol(self, w.body, sym),
+        .loop_expr => |l| exprUsesSymbol(self, l.body, sym),
+        .for_expr => |f| exprUsesSymbol(self, f.iterable, sym) or exprUsesSymbol(self, f.body, sym),
+        .break_expr => |b| if (b.value) |v| exprUsesSymbol(self, v, sym) else false,
+        .array_literal => |elems| blk: {
+            for (elems) |e| {
+                if (exprUsesSymbol(self, e, sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .array_comprehension => |ac| exprUsesSymbol(self, ac.expr, sym) or
+            exprUsesSymbol(self, ac.iterable, sym) or
+            (if (ac.filter) |f| exprUsesSymbol(self, f, sym) else false),
+        .struct_literal => |sl| blk: {
+            for (sl.fields) |f| {
+                if (exprUsesSymbol(self, f.value, sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .match_expr => |m| blk: {
+            if (exprUsesSymbol(self, m.subject, sym)) break :blk true;
+            for (m.arms) |arm| {
+                if (arm.guard) |g| if (exprUsesSymbol(self, g, sym)) break :blk true;
+                if (exprUsesSymbol(self, arm.body, sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .enum_variant => |ev| blk: {
+            for (ev.args) |a| {
+                if (exprUsesSymbol(self, a, sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .closure => |cl| exprUsesSymbol(self, cl.body, sym),
+        .cast => |ca| exprUsesSymbol(self, ca.expr, sym),
+        .defer_expr => |inner| exprUsesSymbol(self, inner, sym),
+        .with_expr => |w| exprUsesSymbol(self, w.body, sym),
+        .record_update => |ru| blk: {
+            if (exprUsesSymbol(self, ru.source, sym)) break :blk true;
+            for (ru.fields) |f| {
+                if (exprUsesSymbol(self, f.value, sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .yield_expr => |inner| exprUsesSymbol(self, inner, sym),
+        .comptime_expr => |inner| exprUsesSymbol(self, inner, sym),
+        .async_scope => |as| exprUsesSymbol(self, as.body, sym),
+        .select_await => |sa| blk: {
+            for (sa.arms) |arm| {
+                if (exprUsesSymbol(self, arm.task, sym) or exprUsesSymbol(self, arm.body, sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        else => false,
+    };
+}
+
+fn exprTargetRootIsSelf(self: *const Parser, expr: *const Ast.Expr, self_sym: Ast.Symbol) bool {
+    return switch (expr.kind) {
+        .ident => |id| id == self_sym,
+        .field_access => |fa| exprTargetRootIsSelf(self, fa.expr, self_sym),
+        .computed_field_access => |fa| exprTargetRootIsSelf(self, fa.expr, self_sym),
+        .index => |idx| exprTargetRootIsSelf(self, idx.expr, self_sym),
+        .slice => |sl| exprTargetRootIsSelf(self, sl.expr, self_sym),
+        .grouped => |inner| exprTargetRootIsSelf(self, inner, self_sym),
+        .unary => |u| if (u.op == .deref) exprTargetRootIsSelf(self, u.operand, self_sym) else false,
+        else => false,
+    };
+}
+
+fn exprMutatesSelf(self: *const Parser, expr: *const Ast.Expr, self_sym: Ast.Symbol) bool {
+    return switch (expr.kind) {
+        .assign => |a| exprTargetRootIsSelf(self, a.target, self_sym) or exprMutatesSelf(self, a.value, self_sym),
+        .block => |b| blk: {
+            for (b.stmts) |s| {
+                if (exprMutatesSelf(self, s, self_sym)) break :blk true;
+            }
+            if (b.tail) |t| if (exprMutatesSelf(self, t, self_sym)) break :blk true;
+            break :blk false;
+        },
+        .if_expr => |i| exprMutatesSelf(self, i.condition, self_sym) or
+            exprMutatesSelf(self, i.then_body, self_sym) or
+            (if (i.else_body) |e| exprMutatesSelf(self, e, self_sym) else false),
+        .let_binding => |lb| exprMutatesSelf(self, lb.value, self_sym),
+        .let_else => |le| exprMutatesSelf(self, le.value, self_sym) or exprMutatesSelf(self, le.else_body, self_sym),
+        .tuple_destructure => |td| exprMutatesSelf(self, td.value, self_sym),
+        .while_expr => |w| exprMutatesSelf(self, w.condition, self_sym) or exprMutatesSelf(self, w.body, self_sym),
+        .loop_expr => |l| exprMutatesSelf(self, l.body, self_sym),
+        .for_expr => |f| exprMutatesSelf(self, f.iterable, self_sym) or exprMutatesSelf(self, f.body, self_sym),
+        .match_expr => |m| blk: {
+            if (exprMutatesSelf(self, m.subject, self_sym)) break :blk true;
+            for (m.arms) |arm| {
+                if (arm.guard) |g| if (exprMutatesSelf(self, g, self_sym)) break :blk true;
+                if (exprMutatesSelf(self, arm.body, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .with_expr => |w| exprMutatesSelf(self, w.body, self_sym),
+        .async_scope => |as| exprMutatesSelf(self, as.body, self_sym),
+        .select_await => |sa| blk: {
+            for (sa.arms) |arm| {
+                if (exprMutatesSelf(self, arm.task, self_sym) or exprMutatesSelf(self, arm.body, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .binary => |b| exprMutatesSelf(self, b.lhs, self_sym) or exprMutatesSelf(self, b.rhs, self_sym),
+        .unary => |u| exprMutatesSelf(self, u.operand, self_sym),
+        .call => |c| blk: {
+            if (exprMutatesSelf(self, c.callee, self_sym)) break :blk true;
+            for (c.args) |a| {
+                if (exprMutatesSelf(self, a, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .field_access => |fa| exprMutatesSelf(self, fa.expr, self_sym),
+        .computed_field_access => |fa| exprMutatesSelf(self, fa.expr, self_sym) or exprMutatesSelf(self, fa.field_expr, self_sym),
+        .optional_chain => |oc| blk: {
+            if (exprMutatesSelf(self, oc.expr, self_sym)) break :blk true;
+            if (oc.args) |args| {
+                for (args) |a| if (exprMutatesSelf(self, a, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .index => |idx| exprMutatesSelf(self, idx.expr, self_sym) or exprMutatesSelf(self, idx.index, self_sym),
+        .slice => |sl| exprMutatesSelf(self, sl.expr, self_sym) or
+            (if (sl.start) |s| exprMutatesSelf(self, s, self_sym) else false) or
+            (if (sl.end) |e| exprMutatesSelf(self, e, self_sym) else false),
+        .return_expr => |rv| if (rv) |v| exprMutatesSelf(self, v, self_sym) else false,
+        .tuple => |elems| blk: {
+            for (elems) |e| {
+                if (exprMutatesSelf(self, e, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .range => |r| (if (r.start) |s| exprMutatesSelf(self, s, self_sym) else false) or
+            (if (r.end) |e| exprMutatesSelf(self, e, self_sym) else false),
+        .await_expr => |inner| exprMutatesSelf(self, inner, self_sym),
+        .async_block => |inner| exprMutatesSelf(self, inner, self_sym),
+        .spawn_expr => |inner| exprMutatesSelf(self, inner, self_sym),
+        .pipeline => |p| exprMutatesSelf(self, p.lhs, self_sym) or exprMutatesSelf(self, p.rhs, self_sym),
+        .grouped => |inner| exprMutatesSelf(self, inner, self_sym),
+        .break_expr => |b| if (b.value) |v| exprMutatesSelf(self, v, self_sym) else false,
+        .array_literal => |elems| blk: {
+            for (elems) |e| {
+                if (exprMutatesSelf(self, e, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .array_comprehension => |ac| exprMutatesSelf(self, ac.expr, self_sym) or
+            exprMutatesSelf(self, ac.iterable, self_sym) or
+            (if (ac.filter) |f| exprMutatesSelf(self, f, self_sym) else false),
+        .struct_literal => |sl| blk: {
+            for (sl.fields) |f| {
+                if (exprMutatesSelf(self, f.value, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .enum_variant => |ev| blk: {
+            for (ev.args) |a| {
+                if (exprMutatesSelf(self, a, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .closure => |cl| exprMutatesSelf(self, cl.body, self_sym),
+        .cast => |ca| exprMutatesSelf(self, ca.expr, self_sym),
+        .defer_expr => |inner| exprMutatesSelf(self, inner, self_sym),
+        .record_update => |ru| blk: {
+            if (exprMutatesSelf(self, ru.source, self_sym)) break :blk true;
+            for (ru.fields) |f| {
+                if (exprMutatesSelf(self, f.value, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .yield_expr => |inner| exprMutatesSelf(self, inner, self_sym),
+        .comptime_expr => |inner| exprMutatesSelf(self, inner, self_sym),
+        else => false,
+    };
+}
+
+fn exprConsumesSelf(self: *const Parser, expr: *const Ast.Expr, self_sym: Ast.Symbol) bool {
+    return switch (expr.kind) {
+        .ident => |id| id == self_sym,
+        .field_access => |fa| blk: {
+            if (fa.expr.kind == .ident and fa.expr.kind.ident == self_sym) break :blk false;
+            break :blk exprConsumesSelf(self, fa.expr, self_sym);
+        },
+        .computed_field_access => |fa| blk: {
+            if (exprConsumesSelf(self, fa.field_expr, self_sym)) break :blk true;
+            if (fa.expr.kind == .ident and fa.expr.kind.ident == self_sym) break :blk false;
+            break :blk exprConsumesSelf(self, fa.expr, self_sym);
+        },
+        .assign => |a| exprConsumesSelf(self, a.value, self_sym),
+        .block => |b| blk: {
+            for (b.stmts) |s| {
+                if (exprConsumesSelf(self, s, self_sym)) break :blk true;
+            }
+            if (b.tail) |t| if (exprConsumesSelf(self, t, self_sym)) break :blk true;
+            break :blk false;
+        },
+        .if_expr => |i| exprConsumesSelf(self, i.condition, self_sym) or
+            exprConsumesSelf(self, i.then_body, self_sym) or
+            (if (i.else_body) |e| exprConsumesSelf(self, e, self_sym) else false),
+        .return_expr => |rv| if (rv) |v| exprConsumesSelf(self, v, self_sym) else false,
+        .let_binding => |lb| exprConsumesSelf(self, lb.value, self_sym),
+        .let_else => |le| exprConsumesSelf(self, le.value, self_sym) or exprConsumesSelf(self, le.else_body, self_sym),
+        .tuple_destructure => |td| exprConsumesSelf(self, td.value, self_sym),
+        .binary => |b| exprConsumesSelf(self, b.lhs, self_sym) or exprConsumesSelf(self, b.rhs, self_sym),
+        .unary => |u| exprConsumesSelf(self, u.operand, self_sym),
+        .call => |c| blk: {
+            if (exprConsumesSelf(self, c.callee, self_sym)) break :blk true;
+            for (c.args) |a| {
+                if (exprConsumesSelf(self, a, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .optional_chain => |oc| blk: {
+            if (exprConsumesSelf(self, oc.expr, self_sym)) break :blk true;
+            if (oc.args) |args| {
+                for (args) |a| if (exprConsumesSelf(self, a, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .index => |idx| exprConsumesSelf(self, idx.expr, self_sym) or exprConsumesSelf(self, idx.index, self_sym),
+        .slice => |sl| exprConsumesSelf(self, sl.expr, self_sym) or
+            (if (sl.start) |s| exprConsumesSelf(self, s, self_sym) else false) or
+            (if (sl.end) |e| exprConsumesSelf(self, e, self_sym) else false),
+        .tuple => |elems| blk: {
+            for (elems) |e| {
+                if (exprConsumesSelf(self, e, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .range => |r| (if (r.start) |s| exprConsumesSelf(self, s, self_sym) else false) or
+            (if (r.end) |e| exprConsumesSelf(self, e, self_sym) else false),
+        .await_expr => |inner| exprConsumesSelf(self, inner, self_sym),
+        .async_block => |inner| exprConsumesSelf(self, inner, self_sym),
+        .spawn_expr => |inner| exprConsumesSelf(self, inner, self_sym),
+        .pipeline => |p| exprConsumesSelf(self, p.lhs, self_sym) or exprConsumesSelf(self, p.rhs, self_sym),
+        .grouped => |inner| exprConsumesSelf(self, inner, self_sym),
+        .while_expr => |w| exprConsumesSelf(self, w.condition, self_sym) or exprConsumesSelf(self, w.body, self_sym),
+        .loop_expr => |l| exprConsumesSelf(self, l.body, self_sym),
+        .for_expr => |f| exprConsumesSelf(self, f.iterable, self_sym) or exprConsumesSelf(self, f.body, self_sym),
+        .break_expr => |b| if (b.value) |v| exprConsumesSelf(self, v, self_sym) else false,
+        .array_literal => |elems| blk: {
+            for (elems) |e| {
+                if (exprConsumesSelf(self, e, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .array_comprehension => |ac| exprConsumesSelf(self, ac.expr, self_sym) or
+            exprConsumesSelf(self, ac.iterable, self_sym) or
+            (if (ac.filter) |f| exprConsumesSelf(self, f, self_sym) else false),
+        .struct_literal => |sl| blk: {
+            for (sl.fields) |f| {
+                if (exprConsumesSelf(self, f.value, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .match_expr => |m| blk: {
+            if (exprConsumesSelf(self, m.subject, self_sym)) break :blk true;
+            for (m.arms) |arm| {
+                if (arm.guard) |g| if (exprConsumesSelf(self, g, self_sym)) break :blk true;
+                if (exprConsumesSelf(self, arm.body, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .enum_variant => |ev| blk: {
+            for (ev.args) |a| {
+                if (exprConsumesSelf(self, a, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .closure => |cl| exprConsumesSelf(self, cl.body, self_sym),
+        .cast => |ca| exprConsumesSelf(self, ca.expr, self_sym),
+        .defer_expr => |inner| exprConsumesSelf(self, inner, self_sym),
+        .with_expr => |w| exprConsumesSelf(self, w.body, self_sym),
+        .record_update => |ru| exprConsumesSelf(self, ru.source, self_sym) or blk: {
+            for (ru.fields) |f| {
+                if (exprConsumesSelf(self, f.value, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        .yield_expr => |inner| exprConsumesSelf(self, inner, self_sym),
+        .comptime_expr => |inner| exprConsumesSelf(self, inner, self_sym),
+        .async_scope => |as| exprConsumesSelf(self, as.body, self_sym),
+        .select_await => |sa| blk: {
+            for (sa.arms) |arm| {
+                if (exprConsumesSelf(self, arm.task, self_sym) or exprConsumesSelf(self, arm.body, self_sym)) break :blk true;
+            }
+            break :blk false;
+        },
+        else => false,
+    };
 }
 
 fn parseFnDecl(
@@ -2253,7 +2678,7 @@ fn parseGroupedOrTuple(self: *Parser) !*const Ast.Expr {
             .kind = .{ .tuple = &.{} },
             .span = start.merge(end),
         };
-        return node;
+        return self.parsePostfix(node);
     }
 
     const first = try self.parseExpr();
@@ -2273,7 +2698,7 @@ fn parseGroupedOrTuple(self: *Parser) !*const Ast.Expr {
             .kind = .{ .tuple = elems.items },
             .span = start.merge(end),
         };
-        return node;
+        return self.parsePostfix(node);
     }
 
     const end = self.currentSpan();

@@ -27,6 +27,18 @@ indentation. `impl Type` → `extend Type`. `impl Trait for Type`
 stays the same. Postfix `.await`. No `Pin`, `Unpin`, or colored
 functions.
 
+## Prelude Names (No Import Needed)
+
+With keeps a practical prelude in scope for every module. You do not
+need to import:
+
+- `Vec`, `HashMap`, `HashSet`, `Option`, `Result`, `String`
+- `Debug`, `Display`, `Default`, `Iter`, `IntoIter`, `Eq`, `Hash`, `Ord`
+- `print`, `println`, `assert` and related assertion/panic helpers
+
+Write these names directly unless you want explicit qualification for
+style/readability reasons.
+
 ## Types
 
 ```rust
@@ -77,6 +89,17 @@ HashMap[K, V]
 Result[T, E]
 Option[T]
 ```
+
+Numeric widening is implicit for lossless cases:
+
+```with
+let n8: u8 = 10
+let n64: u64 = n8       // OK
+let s64: i64 = n8       // OK (unsigned -> wider signed)
+let f64v: f64 = 3.0 as f32   // f32 -> f64 is implicit once value is f32
+```
+
+Narrowing or sign-risky conversions still require `as`.
 
 ## Variables and Mutability
 
@@ -501,13 +524,15 @@ let callback = move |x| captured_value + x;
 ```with
 // With
 let add = |a, b| a + b
-let double = nums.iter() |> map(|x| x * 2) |> collect[Vec]()
+let double = nums |> map(|x| x * 2) |> collect[Vec]()
 // move closures: With infers capture mode from usage
 let callback = |x| captured_value + x
 ```
 
 With infers whether a closure captures by reference or by move
 based on how the captured variable is used. No `move` keyword.
+Iterator pipelines also accept collections directly (`Vec`, arrays,
+slices, map/set) via implicit `.iter()` insertion.
 
 ## The `with` Block (New)
 
@@ -1926,6 +1951,36 @@ actor/continuation model. No `@Sendable` annotations. No
 `MainActor` isolation. `.await` works everywhere, including
 inside `map` and `filter`.
 
+## Concurrent Await (Rust Mapping)
+
+Rust commonly uses `tokio::join!`, `join_all`, or
+`FuturesUnordered` for concurrent waits. With uses tuple `.await`
+for fixed-size heterogeneous sets and pipeline combinators for
+collections.
+
+```rust
+// Rust
+let (user, posts) = tokio::join!(
+    fetch_user(id),
+    fetch_posts(id),
+);
+
+let users: Vec<User> = futures::future::join_all(
+    ids.iter().map(|id| fetch_user(*id))
+).await;
+```
+
+```with
+// With
+let (user, posts) = (fetch_user(id), fetch_posts(id)).await
+let users = ids |> map(fetch_user) |> await_all
+let users_limited = ids |> map(fetch_user) |> with_concurrency(10) |> await_all
+```
+
+`tokio::join!` maps to tuple `.await`. `join_all` maps to
+`await_all`. `FuturesUnordered` + bounded parallelism maps to
+`with_concurrency(n) |> await_all`.
+
 ## ARC → Ownership
 
 This is the conceptual shift. Swift uses ARC (Automatic Reference
@@ -2012,6 +2067,10 @@ Nearly identical. `.success` → `.Success`. `case` keyword dropped.
 `switch` → `match`. Enum accessor methods are auto-generated:
 `result.is_success()`, `result.as_success() -> Option[Vec[u8]]`,
 `result.as_success_ref() -> Option[&Vec[u8]]`.
+
+Exhaustiveness rule differs by position:
+- expression-position `match` must be exhaustive;
+- statement-position `match` may be partial (unmatched variants no-op).
 
 ## Collections
 

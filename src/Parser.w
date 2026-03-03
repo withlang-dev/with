@@ -1688,7 +1688,8 @@ fn Parser.parse_grouped_or_tuple(self: Parser) -> i32:
     if self.peek() == TK_R_PAREN():
         let end = self.current_end()
         self.advance()
-        return self.pool.add_node(NK_TUPLE(), start, end, self.pool.extra_len(), 0, 0)
+        let node = self.pool.add_node(NK_TUPLE(), start, end, self.pool.extra_len(), 0, 0)
+        return self.parse_postfix(node)
 
     let first = self.parse_expr()
     if self.peek() == TK_COMMA():
@@ -1706,7 +1707,8 @@ fn Parser.parse_grouped_or_tuple(self: Parser) -> i32:
         for ei in 0..elems.len() as i32:
             self.pool.add_extra(elems.get(ei as i64))
         let count = elems.len() as i32
-        return self.pool.add_node(NK_TUPLE(), start, self.prev_end(), extra_start, count, 0)
+        let node = self.pool.add_node(NK_TUPLE(), start, self.prev_end(), extra_start, count, 0)
+        return self.parse_postfix(node)
 
     self.expect(TK_R_PAREN())
     let node = self.pool.add_node(NK_GROUPED(), start, self.prev_end(), first, 0, 0)

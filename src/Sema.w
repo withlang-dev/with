@@ -762,6 +762,19 @@ fn Sema.collect_trait_decl(self: Sema, node: i32):
     self.trait_lookup.insert(name, trait_idx)
     self.local_trait_names.insert(name, 1)
 
+fn sema_is_builtin_trait_name(name: str) -> bool:
+    name == "Drop" or
+    name == "Scoped" or
+    name == "ScopedMut" or
+    name == "Debug" or
+    name == "Display" or
+    name == "Default" or
+    name == "Iter" or
+    name == "IntoIter" or
+    name == "Eq" or
+    name == "Hash" or
+    name == "Ord"
+
 fn Sema.collect_impl_decl(self: Sema, node: i32):
     let type_name = self.ast.get_data0(node)
     let trait_sym = self.ast.get_data2(node)
@@ -769,7 +782,7 @@ fn Sema.collect_impl_decl(self: Sema, node: i32):
         return
 
     let trait_name = self.pool.resolve(trait_sym)
-    let is_builtin_trait = trait_name == "Drop" or trait_name == "Scoped" or trait_name == "ScopedMut"
+    let is_builtin_trait = sema_is_builtin_trait_name(trait_name)
     if not is_builtin_trait and not self.trait_lookup.contains(trait_sym):
         self.emit_error("unknown trait", node)
         return
@@ -863,7 +876,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
     if kind == NK_TYPE_TRAIT_OBJ():
         let trait_sym = self.ast.get_data0(node)
         let trait_name = self.pool.resolve(trait_sym)
-        let is_builtin_trait = trait_name == "Drop" or trait_name == "Scoped" or trait_name == "ScopedMut"
+        let is_builtin_trait = sema_is_builtin_trait_name(trait_name)
         if not is_builtin_trait and not self.trait_lookup.contains(trait_sym):
             self.emit_error("unknown trait", node)
             return 0

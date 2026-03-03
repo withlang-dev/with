@@ -92,32 +92,35 @@ trait_local_concrete_types: std.AutoHashMapUnmanaged(u32, u32) = .{},
 /// For functions with dyn Trait params: fn_sym → array of ?trait_sym per param.
 /// null means non-trait param.
 fn_dyn_params: std.AutoHashMapUnmanaged(u32, []const ?u32) = .{},
-    /// For functions with &T ref params: fn_sym → array of bools per param.
-    /// true means the param is a reference type (&T or &mut T).
-    fn_ref_params: std.AutoHashMapUnmanaged(u32, []const bool) = .{},
-    /// For functions returning Result[_, E]: fn_sym → E symbol (when named).
-    fn_result_err_symbols: std.AutoHashMapUnmanaged(u32, u32) = .{},
-    /// Functions declared with a Result return type.
-    fn_returns_result: std.AutoHashMapUnmanaged(u32, void) = .{},
-    /// Functions returning Result[Unit, E] (implicit Ok(()) on empty tail).
-    fn_result_unit_returns: std.AutoHashMapUnmanaged(u32, void) = .{},
-    /// Current function's Result error symbol (if return type is Result[_, E]).
-    current_result_err_symbol: ?u32 = null,
-    /// Current function has declared return type Result[_, _].
-    current_fn_returns_result: bool = false,
-    /// Whether an explicit `return` was emitted in the current function.
-    current_fn_saw_explicit_return: bool = false,
-    /// Async function symbols (spawn wrappers) for await/task tracking.
-    async_fn_symbols: std.AutoHashMapUnmanaged(u32, void) = .{},
-    /// Async function result types: async fn symbol -> implementation return type.
-    async_fn_ret_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
-    /// Locals known to hold task IDs.
-    task_locals: std.AutoHashMapUnmanaged(u32, void) = .{},
-    /// Task local result types: local symbol -> awaited result LLVM type.
-    task_local_result_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
-    /// Active async-scope tracking frames (`async scope |s|:`).
-    async_scope_frames: [16]AsyncScopeFrame = undefined,
-    async_scope_depth: u32 = 0,
+/// For functions with &T ref params: fn_sym → array of bools per param.
+/// true means the param is a reference type (&T or &mut T).
+fn_ref_params: std.AutoHashMapUnmanaged(u32, []const bool) = .{},
+/// For functions returning Result[_, E]: fn_sym → E symbol (when named).
+fn_result_err_symbols: std.AutoHashMapUnmanaged(u32, u32) = .{},
+/// Functions declared with a Result return type.
+fn_returns_result: std.AutoHashMapUnmanaged(u32, void) = .{},
+/// Functions returning Result[Unit, E] (implicit Ok(()) on empty tail).
+fn_result_unit_returns: std.AutoHashMapUnmanaged(u32, void) = .{},
+/// Current function's Result error symbol (if return type is Result[_, E]).
+current_result_err_symbol: ?u32 = null,
+/// Current function has declared return type Result[_, _].
+current_fn_returns_result: bool = false,
+/// Whether an explicit `return` was emitted in the current function.
+current_fn_saw_explicit_return: bool = false,
+/// Async function symbols (spawn wrappers) for await/task tracking.
+async_fn_symbols: std.AutoHashMapUnmanaged(u32, void) = .{},
+/// Async function result types: async fn symbol -> implementation return type.
+async_fn_ret_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
+/// Locals known to hold task IDs.
+task_locals: std.AutoHashMapUnmanaged(u32, void) = .{},
+/// Task local result types: local symbol -> awaited result LLVM type.
+task_local_result_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
+/// Locals known to hold containers of Task values:
+/// local symbol -> task payload LLVM type.
+task_container_local_elem_types: std.AutoHashMapUnmanaged(u32, c.LLVMTypeRef) = .{},
+/// Active async-scope tracking frames (`async scope |s|:`).
+async_scope_frames: [16]AsyncScopeFrame = undefined,
+async_scope_depth: u32 = 0,
 /// Stack of scoped local variable lists for Drop emission.
 /// Each entry is the count of locals at block entry; on block exit we
 /// drop everything above that watermark in reverse order.
@@ -416,6 +419,7 @@ pub fn deinit(self: *Codegen) void {
     self.async_fn_ret_types.deinit(self.allocator);
     self.task_locals.deinit(self.allocator);
     self.task_local_result_types.deinit(self.allocator);
+    self.task_container_local_elem_types.deinit(self.allocator);
     self.gen_field_indices.deinit(self.allocator);
     c.LLVMDisposeBuilder(self.builder);
     c.LLVMDisposeModule(self.module);
@@ -1221,6 +1225,7 @@ fn generateDefaultMethods(self: *Codegen, id: Ast.ImplDecl) Error!void {
         self.locals.clearRetainingCapacity();
         self.task_locals.clearRetainingCapacity();
         self.task_local_result_types.clearRetainingCapacity();
+        self.task_container_local_elem_types.clearRetainingCapacity();
         self.vec_local_types.clearRetainingCapacity();
 
         const entry = c.LLVMAppendBasicBlockInContext(self.context, function, "entry");
@@ -1742,6 +1747,7 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
     self.locals.clearRetainingCapacity();
     self.task_locals.clearRetainingCapacity();
     self.task_local_result_types.clearRetainingCapacity();
+    self.task_container_local_elem_types.clearRetainingCapacity();
     self.vec_local_types.clearRetainingCapacity();
     self.defer_depth = 0;
     self.scope_local_count = 0;
@@ -1813,35 +1819,35 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
                     }
                 }
             }
-                if (te.kind == .fn_type) {
-                    fn_sig = self.buildFnTypeFromAst(te.kind.fn_type) catch null;
-                } else if (dynTraitFromTypeExpr(self, te)) |trait_sym| {
-                    // Track dyn-typed parameters (`dyn`, `&dyn`, `Box[dyn]`) for
-                    // dynamic method dispatch in `x.method(...)`.
-                    self.trait_locals.put(self.allocator, param.name, trait_sym) catch {};
-                } else if (te.kind == .generic and std.mem.eql(u8, self.pool.resolve(te.kind.generic.name), "Vec")) {
-                    if (self.resolveType(te)) |vec_ty| {
-                        self.vec_local_types.put(self.allocator, param.name, vec_ty) catch {};
-                    } else |_| {}
-                } else if (te.kind == .ref_type and te.kind.ref_type.pointee.kind == .generic and
-                    std.mem.eql(u8, self.pool.resolve(te.kind.ref_type.pointee.kind.generic.name), "Vec"))
-                {
-                    if (self.resolveType(te.kind.ref_type.pointee)) |vec_ty| {
-                        self.vec_local_types.put(self.allocator, param.name, vec_ty) catch {};
-                    } else |_| {}
-                } else if (te.kind == .slice_type) {
-                    if (self.resolveType(te.kind.slice_type)) |elem_ty| {
-                        self.slice_elem_types.put(self.allocator, param.name, elem_ty) catch {};
-                    } else |_| {}
-                } else if (te.kind == .ref_type and te.kind.ref_type.pointee.kind == .slice_type) {
-                    if (self.resolveType(te.kind.ref_type.pointee.kind.slice_type)) |elem_ty| {
-                        self.slice_elem_types.put(self.allocator, param.name, elem_ty) catch {};
-                    } else |_| {}
-                } else if (te.kind == .ptr_type or te.kind == .ref_type) {
-                    // Track pointer-to-struct for field access through pointers.
-                    const pointee_te = if (te.kind == .ptr_type) te.kind.ptr_type.pointee else te.kind.ref_type.pointee;
-                    if (pointee_te.kind == .named) {
-                        const ps = pointee_te.kind.named;
+            if (te.kind == .fn_type) {
+                fn_sig = self.buildFnTypeFromAst(te.kind.fn_type) catch null;
+            } else if (dynTraitFromTypeExpr(self, te)) |trait_sym| {
+                // Track dyn-typed parameters (`dyn`, `&dyn`, `Box[dyn]`) for
+                // dynamic method dispatch in `x.method(...)`.
+                self.trait_locals.put(self.allocator, param.name, trait_sym) catch {};
+            } else if (te.kind == .generic and std.mem.eql(u8, self.pool.resolve(te.kind.generic.name), "Vec")) {
+                if (self.resolveType(te)) |vec_ty| {
+                    self.vec_local_types.put(self.allocator, param.name, vec_ty) catch {};
+                } else |_| {}
+            } else if (te.kind == .ref_type and te.kind.ref_type.pointee.kind == .generic and
+                std.mem.eql(u8, self.pool.resolve(te.kind.ref_type.pointee.kind.generic.name), "Vec"))
+            {
+                if (self.resolveType(te.kind.ref_type.pointee)) |vec_ty| {
+                    self.vec_local_types.put(self.allocator, param.name, vec_ty) catch {};
+                } else |_| {}
+            } else if (te.kind == .slice_type) {
+                if (self.resolveType(te.kind.slice_type)) |elem_ty| {
+                    self.slice_elem_types.put(self.allocator, param.name, elem_ty) catch {};
+                } else |_| {}
+            } else if (te.kind == .ref_type and te.kind.ref_type.pointee.kind == .slice_type) {
+                if (self.resolveType(te.kind.ref_type.pointee.kind.slice_type)) |elem_ty| {
+                    self.slice_elem_types.put(self.allocator, param.name, elem_ty) catch {};
+                } else |_| {}
+            } else if (te.kind == .ptr_type or te.kind == .ref_type) {
+                // Track pointer-to-struct for field access through pointers.
+                const pointee_te = if (te.kind == .ptr_type) te.kind.ptr_type.pointee else te.kind.ref_type.pointee;
+                if (pointee_te.kind == .named) {
+                    const ps = pointee_te.kind.named;
                     if (self.struct_types.get(ps) != null) {
                         pointee_struct = ps;
                     }
@@ -1856,6 +1862,16 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
             .fn_sig = fn_sig,
             .pointee_struct = pointee_struct,
         }) catch return error.CodegenAlloc;
+
+        if (param.type_expr) |te| {
+            if (self.typeExprTaskResultType(te)) |task_result_ty| {
+                self.task_locals.put(self.allocator, param.name, {}) catch return error.CodegenAlloc;
+                self.task_local_result_types.put(self.allocator, param.name, task_result_ty) catch return error.CodegenAlloc;
+            }
+            if (self.typeExprTaskContainerElementTypeFromTypeExpr(te)) |task_elem_ty| {
+                self.task_container_local_elem_types.put(self.allocator, param.name, task_elem_ty) catch return error.CodegenAlloc;
+            }
+        }
     }
 
     // @[tailrec]: create body BB that recursive calls branch back to.
@@ -1918,7 +1934,7 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
                 const wrapped = try self.buildResultOk(body_val, ret_type);
                 _ = c.LLVMBuildRet(self.builder, wrapped);
             } else {
-                const coerced = self.coerceInt(body_val, ret_type);
+                const coerced = try self.coerceValueForType(body_val, ret_type);
                 _ = c.LLVMBuildRet(self.builder, coerced);
             }
         } else {
@@ -3337,6 +3353,7 @@ fn genAsyncFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
         self.locals.clearRetainingCapacity();
         self.task_locals.clearRetainingCapacity();
         self.task_local_result_types.clearRetainingCapacity();
+        self.task_container_local_elem_types.clearRetainingCapacity();
         self.vec_local_types.clearRetainingCapacity();
         self.defer_depth = 0;
         self.scope_local_count = 0;
@@ -3372,6 +3389,14 @@ fn genAsyncFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
                         self.vec_local_types.put(self.allocator, param.name, vec_ty) catch {};
                     } else |_| {}
                 }
+
+                if (self.typeExprTaskResultType(te)) |task_result_ty| {
+                    self.task_locals.put(self.allocator, param.name, {}) catch return error.CodegenAlloc;
+                    self.task_local_result_types.put(self.allocator, param.name, task_result_ty) catch return error.CodegenAlloc;
+                }
+                if (self.typeExprTaskContainerElementTypeFromTypeExpr(te)) |task_elem_ty| {
+                    self.task_container_local_elem_types.put(self.allocator, param.name, task_elem_ty) catch return error.CodegenAlloc;
+                }
             }
         }
 
@@ -3397,7 +3422,7 @@ fn genAsyncFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
                         _ = c.LLVMBuildRet(self.builder, c.LLVMGetUndef(ret_type));
                     }
                 } else {
-                    const coerced = self.coerceInt(body_val, ret_type);
+                    const coerced = try self.coerceValueForType(body_val, ret_type);
                     _ = c.LLVMBuildRet(self.builder, coerced);
                 }
             } else {
@@ -3503,7 +3528,76 @@ fn findActiveAsyncScopeFrame(self: *Codegen, sym: u32) ?*AsyncScopeFrame {
     return null;
 }
 
+fn typeExprTaskResultType(self: *Codegen, te: *const Ast.TypeExpr) ?c.LLVMTypeRef {
+    return switch (te.kind) {
+        .ref_type => |rt| self.typeExprTaskResultType(rt.pointee),
+        .ptr_type => |pt| self.typeExprTaskResultType(pt.pointee),
+        .generic => |g| blk: {
+            const n = self.pool.resolve(g.name);
+            if (!(std.mem.eql(u8, n, "Task") and g.args.len == 1)) break :blk null;
+            break :blk self.resolveType(g.args[0]) catch null;
+        },
+        else => null,
+    };
+}
+
+fn typeExprTaskContainerElementTypeFromTypeExpr(self: *Codegen, te: *const Ast.TypeExpr) ?c.LLVMTypeRef {
+    return switch (te.kind) {
+        .ref_type => |rt| self.typeExprTaskContainerElementTypeFromTypeExpr(rt.pointee),
+        .ptr_type => |pt| self.typeExprTaskContainerElementTypeFromTypeExpr(pt.pointee),
+        .array_type => |at| self.typeExprTaskResultType(at.element),
+        .slice_type => |inner| self.typeExprTaskResultType(inner),
+        .generic => |g| blk: {
+            const n = self.pool.resolve(g.name);
+            if (!(std.mem.eql(u8, n, "Vec") and g.args.len == 1)) break :blk null;
+            break :blk self.typeExprTaskResultType(g.args[0]);
+        },
+        else => null,
+    };
+}
+
+fn typeExprTaskResultTypeWithParams(
+    self: *Codegen,
+    te: *const Ast.TypeExpr,
+    type_params: []const Ast.TypeParam,
+    type_map: *[16]TypeBinding,
+    type_map_len: u32,
+) ?c.LLVMTypeRef {
+    return switch (te.kind) {
+        .ref_type => |rt| self.typeExprTaskResultTypeWithParams(rt.pointee, type_params, type_map, type_map_len),
+        .ptr_type => |pt| self.typeExprTaskResultTypeWithParams(pt.pointee, type_params, type_map, type_map_len),
+        .generic => |g| blk: {
+            const n = self.pool.resolve(g.name);
+            if (!(std.mem.eql(u8, n, "Task") and g.args.len == 1)) break :blk null;
+            break :blk self.resolveTypeWithParams(g.args[0], type_params, type_map, type_map_len) catch null;
+        },
+        else => null,
+    };
+}
+
+fn typeExprTaskContainerElementTypeWithParams(
+    self: *Codegen,
+    te: *const Ast.TypeExpr,
+    type_params: []const Ast.TypeParam,
+    type_map: *[16]TypeBinding,
+    type_map_len: u32,
+) ?c.LLVMTypeRef {
+    return switch (te.kind) {
+        .ref_type => |rt| self.typeExprTaskContainerElementTypeWithParams(rt.pointee, type_params, type_map, type_map_len),
+        .ptr_type => |pt| self.typeExprTaskContainerElementTypeWithParams(pt.pointee, type_params, type_map, type_map_len),
+        .array_type => |at| self.typeExprTaskResultTypeWithParams(at.element, type_params, type_map, type_map_len),
+        .slice_type => |inner| self.typeExprTaskResultTypeWithParams(inner, type_params, type_map, type_map_len),
+        .generic => |g| blk: {
+            const n = self.pool.resolve(g.name);
+            if (!(std.mem.eql(u8, n, "Vec") and g.args.len == 1)) break :blk null;
+            break :blk self.typeExprTaskResultTypeWithParams(g.args[0], type_params, type_map, type_map_len);
+        },
+        else => null,
+    };
+}
+
 fn exprProducesTask(self: *Codegen, expr: *const Ast.Expr) bool {
+    if (self.inferTaskResultType(expr) != null) return true;
     return switch (expr.kind) {
         .ident => |sym| self.task_locals.get(sym) != null,
         .call => |call_e| blk: {
@@ -3519,8 +3613,60 @@ fn exprProducesTask(self: *Codegen, expr: *const Ast.Expr) bool {
             break :blk false;
         },
         .async_block => true,
+        .tuple => |elems| blk: {
+            if (elems.len < 2 or elems.len > 12) break :blk false;
+            for (elems) |elem| {
+                if (!self.exprProducesTask(elem)) break :blk false;
+            }
+            break :blk true;
+        },
+        .index => |idx| self.inferTaskContainerElementType(idx.expr) != null,
         .grouped => |inner| self.exprProducesTask(inner),
         else => false,
+    };
+}
+
+fn inferTaskContainerElementType(self: *Codegen, expr: *const Ast.Expr) ?c.LLVMTypeRef {
+    return switch (expr.kind) {
+        .ident => |sym| self.task_container_local_elem_types.get(sym),
+        .grouped => |inner| self.inferTaskContainerElementType(inner),
+        .slice => |sl| self.inferTaskContainerElementType(sl.expr),
+        .array_literal => |elems| blk: {
+            var elem_ty: ?c.LLVMTypeRef = null;
+            for (elems) |elem| {
+                const cur = self.inferTaskResultType(elem) orelse break :blk null;
+                if (elem_ty == null) {
+                    elem_ty = cur;
+                } else if (elem_ty.? != cur) {
+                    break :blk null;
+                }
+            }
+            break :blk elem_ty;
+        },
+        .call => |call_e| blk: {
+            if (call_e.callee.kind != .field_access) break :blk null;
+            const fa = call_e.callee.kind.field_access;
+            const method_name = self.pool.resolve(fa.field);
+            if (std.mem.eql(u8, method_name, "iter") and call_e.args.len == 0) {
+                break :blk self.inferTaskContainerElementType(fa.expr);
+            }
+            if (fa.expr.kind != .ident) break :blk null;
+            const type_name = self.pool.resolve(fa.expr.kind.ident);
+            if (!(std.mem.eql(u8, type_name, "Vec") and std.mem.eql(u8, method_name, "of"))) {
+                break :blk null;
+            }
+            var elem_ty: ?c.LLVMTypeRef = null;
+            for (call_e.args) |arg| {
+                const cur = self.inferTaskResultType(arg) orelse break :blk null;
+                if (elem_ty == null) {
+                    elem_ty = cur;
+                } else if (elem_ty.? != cur) {
+                    break :blk null;
+                }
+            }
+            break :blk elem_ty;
+        },
+        else => null,
     };
 }
 
@@ -3540,9 +3686,13 @@ fn inferTaskResultType(self: *Codegen, expr: *const Ast.Expr) ?c.LLVMTypeRef {
                 {
                     break :blk self.inferTaskResultType(call_e.args[0]);
                 }
+                if (std.mem.eql(u8, self.pool.resolve(fa.field), "get") and call_e.args.len >= 1) {
+                    break :blk self.inferTaskContainerElementType(fa.expr);
+                }
             }
             break :blk null;
         },
+        .index => |idx| self.inferTaskContainerElementType(idx.expr),
         // Async blocks currently lower through an i32-returning impl.
         .async_block => c.LLVMInt32TypeInContext(self.context),
         else => null,
@@ -3675,6 +3825,7 @@ fn genAsyncBlock(self: *Codegen, body: *const Ast.Expr) Error!c.LLVMValueRef {
     const saved_locals = self.locals;
     const saved_task_locals = self.task_locals;
     const saved_task_result_locals = self.task_local_result_types;
+    const saved_task_container_locals = self.task_container_local_elem_types;
     const saved_scope_local_count = self.scope_local_count;
     const saved_defer_depth = self.defer_depth;
     const saved_expected = self.expected_type;
@@ -3685,6 +3836,7 @@ fn genAsyncBlock(self: *Codegen, body: *const Ast.Expr) Error!c.LLVMValueRef {
     self.locals = .empty;
     self.task_locals = .{};
     self.task_local_result_types = .{};
+    self.task_container_local_elem_types = .{};
     self.scope_local_count = 0;
     self.defer_depth = 0;
     self.expected_type = i32_type;
@@ -3716,12 +3868,16 @@ fn genAsyncBlock(self: *Codegen, body: *const Ast.Expr) Error!c.LLVMValueRef {
     self.locals.deinit(self.allocator);
     self.task_locals.deinit(self.allocator);
     self.task_local_result_types.deinit(self.allocator);
+    self.task_container_local_elem_types.deinit(self.allocator);
+    self.task_container_local_elem_types.deinit(self.allocator);
     self.trait_locals.deinit(self.allocator);
     self.current_function = saved_function;
     self.current_ret_type = saved_ret_type;
     self.locals = saved_locals;
     self.task_locals = saved_task_locals;
     self.task_local_result_types = saved_task_result_locals;
+    self.task_container_local_elem_types = saved_task_container_locals;
+    self.task_container_local_elem_types = saved_task_container_locals;
     self.scope_local_count = saved_scope_local_count;
     self.defer_depth = saved_defer_depth;
     self.expected_type = saved_expected;
@@ -3789,6 +3945,10 @@ fn genAsyncBlock(self: *Codegen, body: *const Ast.Expr) Error!c.LLVMValueRef {
 
 /// Generate an await expression: calls with_fiber_await(task_id).
 fn genAwait(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef {
+    if (inner.kind == .tuple) {
+        return self.genAwaitTuple(inner.kind.tuple);
+    }
+
     if (!self.exprProducesTask(inner)) {
         // Non-task await is treated as identity for async-block expression ergonomics.
         return self.genExpr(inner);
@@ -3824,6 +3984,52 @@ fn genAwait(self: *Codegen, inner: *const Ast.Expr) Error!c.LLVMValueRef {
     }
     // Default: truncate to i32.
     return c.LLVMBuildTrunc(self.builder, result_i64, i32_type, "await.trunc");
+}
+
+fn genAwaitTuple(self: *Codegen, elems: []const *const Ast.Expr) Error!c.LLVMValueRef {
+    if (elems.len < 2 or elems.len > 12) return error.UnsupportedExpr;
+
+    self.declareAsyncRuntime();
+
+    const await_fn = c.LLVMGetNamedFunction(self.module, "with_fiber_await") orelse return error.UnsupportedExpr;
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    var await_params = [_]c.LLVMTypeRef{i32_type};
+    const await_ft = c.LLVMFunctionType(i64_type, &await_params, 1, 0);
+
+    var task_ids: [16]c.LLVMValueRef = undefined;
+    for (elems, 0..) |elem, i| {
+        task_ids[i] = try self.genExpr(elem);
+    }
+
+    var values: [16]c.LLVMValueRef = undefined;
+    var types: [16]c.LLVMTypeRef = undefined;
+    for (elems, 0..) |elem, i| {
+        var args = [_]c.LLVMValueRef{task_ids[i]};
+        const result_i64 = c.LLVMBuildCall2(self.builder, await_ft, await_fn, &args, 1, "await.result");
+
+        const value = if (self.inferTaskResultType(elem)) |task_result_type|
+            try self.unpackTaskResultFromI64(result_i64, task_result_type)
+        else
+            c.LLVMBuildTrunc(self.builder, result_i64, i32_type, "await.trunc");
+
+        values[i] = value;
+        types[i] = c.LLVMTypeOf(value);
+    }
+
+    const count: u32 = @intCast(elems.len);
+    const tuple_type = c.LLVMStructTypeInContext(self.context, &types, count, 0);
+    const alloca = c.LLVMBuildAlloca(self.builder, tuple_type, "await.tuple");
+    for (0..count) |i| {
+        const idx: u32 = @intCast(i);
+        var indices = [_]c.LLVMValueRef{
+            c.LLVMConstInt(i32_type, 0, 0),
+            c.LLVMConstInt(i32_type, idx, 0),
+        };
+        const gep = c.LLVMBuildGEP2(self.builder, tuple_type, alloca, &indices, 2, "");
+        _ = c.LLVMBuildStore(self.builder, values[i], gep);
+    }
+    return c.LLVMBuildLoad2(self.builder, tuple_type, alloca, "await.tuple.val");
 }
 
 /// Generate a spawn expression: fire-and-forget async task.
@@ -4955,6 +5161,9 @@ fn genUnary(self: *Codegen, un: Ast.UnaryExpr) Error!c.LLVMValueRef {
         },
         .try_op => {
             // expr? — try/unwrap: extract payload on tag==0 (Some/Ok), early return on tag==1 (None/Err).
+            if (un.operand.kind == .await_expr and un.operand.kind.await_expr.kind == .tuple) {
+                return self.genTryTupleOp(un.operand);
+            }
             return self.genTryOp(un.operand);
         },
         else => {
@@ -4987,6 +5196,68 @@ fn genTryOp(self: *Codegen, operand: *const Ast.Expr) Error!c.LLVMValueRef {
     const val = try self.genExpr(operand);
     const val_type = c.LLVMTypeOf(val);
     const src_err_sym = self.trySourceErrSymbol(operand);
+    if (self.isTupleTryType(val_type)) {
+        return self.genTryTupleValue(val, val_type);
+    }
+    return self.genTryValue(val, val_type, src_err_sym);
+}
+
+fn genTryTupleOp(self: *Codegen, operand: *const Ast.Expr) Error!c.LLVMValueRef {
+    const tuple_val = try self.genExpr(operand);
+    const tuple_type = c.LLVMTypeOf(tuple_val);
+    return self.genTryTupleValue(tuple_val, tuple_type);
+}
+
+fn genTryTupleValue(self: *Codegen, tuple_val: c.LLVMValueRef, tuple_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    if (c.LLVMGetTypeKind(tuple_type) != c.LLVMStructTypeKind) return error.UnsupportedExpr;
+
+    const elem_count_u32 = c.LLVMCountStructElementTypes(tuple_type);
+    const elem_count: usize = @intCast(elem_count_u32);
+    if (elem_count == 0) return error.UnsupportedExpr;
+
+    var payload_types: [32]c.LLVMTypeRef = undefined;
+    var unwrapped_vals: [32]c.LLVMValueRef = undefined;
+    if (elem_count > payload_types.len) return error.UnsupportedExpr;
+
+    for (0..elem_count) |i| {
+        const elem_val = c.LLVMBuildExtractValue(self.builder, tuple_val, @intCast(i), "try.tuple.elem");
+        const elem_type = c.LLVMTypeOf(elem_val);
+        const unwrapped = try self.genTryValue(elem_val, elem_type, null);
+        unwrapped_vals[i] = unwrapped;
+        payload_types[i] = c.LLVMTypeOf(unwrapped);
+    }
+
+    const out_tuple_type = c.LLVMStructTypeInContext(self.context, &payload_types, @intCast(elem_count), 0);
+    const out_alloca = c.LLVMBuildAlloca(self.builder, out_tuple_type, "try.tuple.out");
+
+    for (0..elem_count) |i| {
+        const gep = c.LLVMBuildStructGEP2(self.builder, out_tuple_type, out_alloca, @intCast(i), "try.tuple.gep");
+        _ = c.LLVMBuildStore(self.builder, unwrapped_vals[i], gep);
+    }
+
+    return c.LLVMBuildLoad2(self.builder, out_tuple_type, out_alloca, "try.tuple.val");
+}
+
+fn isTupleTryType(self: *Codegen, ty: c.LLVMTypeRef) bool {
+    if (c.LLVMGetTypeKind(ty) != c.LLVMStructTypeKind) return false;
+    if (self.isOptionType(ty) or self.isResultType(ty)) return false;
+    if (self.findStructTypeByLlvm(ty) != null) return false;
+
+    const elem_count_u32 = c.LLVMCountStructElementTypes(ty);
+    const elem_count: usize = @intCast(elem_count_u32);
+    if (elem_count == 0 or elem_count > 32) return false;
+
+    var elem_types: [32]c.LLVMTypeRef = undefined;
+    c.LLVMGetStructElementTypes(ty, &elem_types);
+    for (0..elem_count) |i| {
+        const et = elem_types[i];
+        if (c.LLVMGetTypeKind(et) != c.LLVMStructTypeKind) return false;
+        if (!self.isOptionType(et) and !self.isResultType(et)) return false;
+    }
+    return true;
+}
+
+fn genTryValue(self: *Codegen, val: c.LLVMValueRef, val_type: c.LLVMTypeRef, src_err_sym: ?u32) Error!c.LLVMValueRef {
     const dst_err_sym = self.current_result_err_symbol;
 
     // Must be a struct type (enum with payload: { i32 tag, [N x i8] payload }).
@@ -5518,12 +5789,7 @@ fn getOrCreateVecType(self: *Codegen, elem_type: c.LLVMTypeRef) Error!VecTypeInf
 
 /// Check if an LLVM type is a Vec type.
 fn isVecType(self: *Codegen, ty: c.LLVMTypeRef) bool {
-    if (c.LLVMGetTypeKind(ty) != c.LLVMStructTypeKind) return false;
-    var it = self.vec_type_cache.iterator();
-    while (it.next()) |entry| {
-        if (entry.value_ptr.llvm_type == ty) return true;
-    }
-    return false;
+    return self.getVecElemType(ty) != null;
 }
 
 /// Get element type for a Vec type.
@@ -5531,6 +5797,23 @@ fn getVecElemType(self: *Codegen, vec_type: c.LLVMTypeRef) ?c.LLVMTypeRef {
     var it = self.vec_type_cache.iterator();
     while (it.next()) |entry| {
         if (entry.value_ptr.llvm_type == vec_type) return entry.value_ptr.elem_type;
+    }
+    if (c.LLVMGetTypeKind(vec_type) == c.LLVMStructTypeKind) {
+        const target_name_ptr = c.LLVMGetStructName(vec_type);
+        if (target_name_ptr != null) {
+            const target_name = std.mem.span(target_name_ptr);
+            var it2 = self.vec_type_cache.iterator();
+            while (it2.next()) |entry| {
+                const cached_ty = entry.value_ptr.llvm_type;
+                if (c.LLVMGetTypeKind(cached_ty) != c.LLVMStructTypeKind) continue;
+                const cached_name_ptr = c.LLVMGetStructName(cached_ty);
+                if (cached_name_ptr == null) continue;
+                const cached_name = std.mem.span(cached_name_ptr);
+                if (std.mem.eql(u8, cached_name, target_name)) {
+                    return entry.value_ptr.elem_type;
+                }
+            }
+        }
     }
     return null;
 }
@@ -7615,6 +7898,19 @@ fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
     else
         c.LLVMTypeOf(val);
 
+    var local_fn_sig: ?c.LLVMTypeRef = null;
+    if (let_b.type_expr) |te| {
+        if (te.kind == .fn_type) {
+            local_fn_sig = self.buildFnTypeFromAst(te.kind.fn_type) catch null;
+        }
+    }
+    if (local_fn_sig == null) {
+        local_fn_sig = self.inferCallableFnSigFromExpr(let_b.value);
+    }
+    if (local_fn_sig == null) {
+        local_fn_sig = self.inferCallableFnSigFromStorageType(ty);
+    }
+
     // In generator mode, reuse the pre-created alloca from the entry block
     // to avoid SSA dominance violations.
     const alloca = if (self.gen_state_ptr != null) blk: {
@@ -7623,13 +7919,14 @@ fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
         }
         break :blk c.LLVMBuildAlloca(self.builder, ty, "");
     } else c.LLVMBuildAlloca(self.builder, ty, "");
-    const coerced = self.coerceInt(val, ty);
+    const coerced = try self.coerceValueForType(val, ty);
     _ = c.LLVMBuildStore(self.builder, coerced, alloca);
 
     self.locals.put(self.allocator, let_b.name, .{
         .alloca = alloca,
         .ty = ty,
         .is_mut = let_b.is_mut,
+        .fn_sig = local_fn_sig,
     }) catch return error.CodegenAlloc;
 
     if (dyn_trait_sym) |trait_sym| {
@@ -7656,6 +7953,11 @@ fn genLetBinding(self: *Codegen, let_b: Ast.LetBinding) Error!c.LLVMValueRef {
     } else {
         _ = self.task_locals.remove(let_b.name);
         _ = self.task_local_result_types.remove(let_b.name);
+    }
+    if (self.inferTaskContainerElementType(let_b.value)) |task_elem_ty| {
+        self.task_container_local_elem_types.put(self.allocator, let_b.name, task_elem_ty) catch return error.CodegenAlloc;
+    } else {
+        _ = self.task_container_local_elem_types.remove(let_b.name);
     }
 
     // Track this local for Drop emission at scope exit.
@@ -8141,6 +8443,81 @@ fn genCall(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
     };
 }
 
+fn inferCallableFnSigFromStorageType(self: *Codegen, storage_ty: c.LLVMTypeRef) ?c.LLVMTypeRef {
+    _ = self;
+
+    const kind = c.LLVMGetTypeKind(storage_ty);
+    if (kind == c.LLVMPointerTypeKind) {
+        const pointee = c.LLVMGetElementType(storage_ty);
+        if (c.LLVMGetTypeKind(pointee) == c.LLVMFunctionTypeKind) {
+            return pointee;
+        }
+        return null;
+    }
+
+    if (kind == c.LLVMStructTypeKind) {
+        const elem_count_u32 = c.LLVMCountStructElementTypes(storage_ty);
+        if (elem_count_u32 < 1) return null;
+        const elem_count: usize = @intCast(elem_count_u32);
+        if (elem_count > 16) return null;
+
+        var elem_types: [16]c.LLVMTypeRef = undefined;
+        c.LLVMGetStructElementTypes(storage_ty, &elem_types);
+
+        const fn_ptr_ty = elem_types[0];
+        if (c.LLVMGetTypeKind(fn_ptr_ty) != c.LLVMPointerTypeKind) return null;
+
+        const maybe_fn_ty = c.LLVMGetElementType(fn_ptr_ty);
+        if (c.LLVMGetTypeKind(maybe_fn_ty) == c.LLVMFunctionTypeKind) {
+            return maybe_fn_ty;
+        }
+    }
+
+    return null;
+}
+
+fn buildFnSigFromClosureExpr(self: *Codegen, cl: Ast.ClosureExpr) ?c.LLVMTypeRef {
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
+
+    const param_count = cl.params.len;
+    if (param_count > 16) return null;
+
+    var fn_param_types: [17]c.LLVMTypeRef = undefined;
+    fn_param_types[0] = ptr_type; // closure context/captures
+    for (0..param_count) |i| {
+        if (i < cl.param_types.len) {
+            if (cl.param_types[i]) |te| {
+                fn_param_types[1 + i] = self.resolveType(te) catch return null;
+            } else {
+                fn_param_types[1 + i] = i32_type;
+            }
+        } else {
+            fn_param_types[1 + i] = i32_type;
+        }
+    }
+
+    const ret_type = if (cl.return_type) |rt|
+        self.resolveType(rt) catch return null
+    else
+        i32_type;
+
+    return c.LLVMFunctionType(ret_type, &fn_param_types, @intCast(1 + param_count), 0);
+}
+
+fn inferCallableFnSigFromExpr(self: *Codegen, expr: *const Ast.Expr) ?c.LLVMTypeRef {
+    return switch (expr.kind) {
+        .ident => |sym| blk: {
+            if (self.functions.get(sym)) |fi| break :blk fi.fn_type;
+            if (self.locals.get(sym)) |li| break :blk li.fn_sig orelse self.inferCallableFnSigFromStorageType(li.ty);
+            break :blk null;
+        },
+        .closure => |cl| self.buildFnSigFromClosureExpr(cl),
+        .grouped => |inner| self.inferCallableFnSigFromExpr(inner),
+        else => null,
+    };
+}
+
 fn genCallInner(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
     // Handle method call syntax: `obj.method(args)` → look up `Type.method(obj, args)`
     if (call_e.callee.kind == .field_access) {
@@ -8413,7 +8790,7 @@ fn genCallInner(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
             } else if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
                 args_buf[i] = self.extractStrPtr(args_buf[i]);
             } else {
-                args_buf[i] = self.coerceInt(args_buf[i], param_type);
+                args_buf[i] = try self.coerceValueForType(args_buf[i], param_type);
             }
         }
 
@@ -8474,7 +8851,7 @@ fn genCallInner(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
             // It's a bare function pointer (non-capturing closure or fn param).
             const arg_count: u32 = @intCast(call_e.args.len);
 
-            const fn_type = local_info.fn_sig orelse {
+            const fn_type = local_info.fn_sig orelse self.inferCallableFnSigFromStorageType(local_info.ty) orelse {
                 var msg_buf: [256]u8 = undefined;
                 const name = self.pool.resolve(fn_sym);
                 const msg = std.fmt.bufPrint(
@@ -8497,7 +8874,7 @@ fn genCallInner(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
                 var fn_param_types: [16]c.LLVMTypeRef = undefined;
                 c.LLVMGetParamTypes(fn_type, &fn_param_types);
                 for (0..@min(call_e.args.len, param_count)) |i| {
-                    args_buf[i] = self.coerceInt(args_buf[i], fn_param_types[i]);
+                    args_buf[i] = try self.coerceValueForType(args_buf[i], fn_param_types[i]);
                 }
             }
 
@@ -8522,7 +8899,7 @@ fn genCallInner(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
             const total_params = 1 + arg_count;
 
             // Require a resolved closure signature in Stage 0.
-            const call_fn_type = local_info.fn_sig orelse {
+            const call_fn_type = local_info.fn_sig orelse self.inferCallableFnSigFromStorageType(local_info.ty) orelse {
                 var msg_buf: [256]u8 = undefined;
                 const name = self.pool.resolve(fn_sym);
                 const msg = std.fmt.bufPrint(
@@ -8547,7 +8924,7 @@ fn genCallInner(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
                 var fn_param_types_arr: [17]c.LLVMTypeRef = undefined;
                 c.LLVMGetParamTypes(call_fn_type, &fn_param_types_arr);
                 for (1..@min(1 + call_e.args.len, sig_param_count)) |pi| {
-                    args_buf[pi] = self.coerceInt(args_buf[pi], fn_param_types_arr[pi]);
+                    args_buf[pi] = try self.coerceValueForType(args_buf[pi], fn_param_types_arr[pi]);
                 }
             }
 
@@ -8705,6 +9082,7 @@ fn monomorphizeCall(self: *Codegen, gen_fn: Ast.FnDecl, args: []const *const Ast
     const saved_locals = self.locals;
     const saved_task_locals = self.task_locals;
     const saved_task_result_locals = self.task_local_result_types;
+    const saved_task_container_locals = self.task_container_local_elem_types;
     const saved_type_bindings = self.active_type_bindings;
     const saved_type_bindings_len = self.active_type_bindings_len;
 
@@ -8713,6 +9091,7 @@ fn monomorphizeCall(self: *Codegen, gen_fn: Ast.FnDecl, args: []const *const Ast
     self.locals = .empty;
     self.task_locals = .{};
     self.task_local_result_types = .{};
+    self.task_container_local_elem_types = .{};
     self.active_type_bindings_len = type_map_len;
     for (0..type_map_len) |i| {
         self.active_type_bindings[i] = type_map[i];
@@ -8747,6 +9126,16 @@ fn monomorphizeCall(self: *Codegen, gen_fn: Ast.FnDecl, args: []const *const Ast
             .is_mut = param.is_mut,
             .fn_sig = fn_sig,
         }) catch return error.CodegenAlloc;
+
+        if (param.type_expr) |te| {
+            if (self.typeExprTaskResultTypeWithParams(te, gen_fn.type_params, &type_map, type_map_len)) |task_result_ty| {
+                self.task_locals.put(self.allocator, param.name, {}) catch return error.CodegenAlloc;
+                self.task_local_result_types.put(self.allocator, param.name, task_result_ty) catch return error.CodegenAlloc;
+            }
+            if (self.typeExprTaskContainerElementTypeWithParams(te, gen_fn.type_params, &type_map, type_map_len)) |task_elem_ty| {
+                self.task_container_local_elem_types.put(self.allocator, param.name, task_elem_ty) catch return error.CodegenAlloc;
+            }
+        }
     }
 
     // Generate body.
@@ -8757,7 +9146,7 @@ fn monomorphizeCall(self: *Codegen, gen_fn: Ast.FnDecl, args: []const *const Ast
     if (c.LLVMGetBasicBlockTerminator(current_bb) == null) {
         const is_void = ret_llvm_type == c.LLVMVoidTypeInContext(self.context);
         if (!is_void) {
-            const coerced = self.coerceInt(body_val, ret_llvm_type);
+            const coerced = try self.coerceValueForType(body_val, ret_llvm_type);
             _ = c.LLVMBuildRet(self.builder, coerced);
         } else {
             _ = c.LLVMBuildRetVoid(self.builder);
@@ -8768,11 +9157,13 @@ fn monomorphizeCall(self: *Codegen, gen_fn: Ast.FnDecl, args: []const *const Ast
     self.locals.deinit(self.allocator);
     self.task_locals.deinit(self.allocator);
     self.task_local_result_types.deinit(self.allocator);
+    self.task_container_local_elem_types.deinit(self.allocator);
     self.current_function = saved_function;
     self.current_ret_type = saved_ret_type;
     self.locals = saved_locals;
     self.task_locals = saved_task_locals;
     self.task_local_result_types = saved_task_result_locals;
+    self.task_container_local_elem_types = saved_task_container_locals;
     self.active_type_bindings = saved_type_bindings;
     self.active_type_bindings_len = saved_type_bindings_len;
     c.LLVMPositionBuilderAtEnd(self.builder, saved_bb);
@@ -8780,7 +9171,7 @@ fn monomorphizeCall(self: *Codegen, gen_fn: Ast.FnDecl, args: []const *const Ast
     // Now call the monomorphized function.
     // Coerce args to match the specialization's param types.
     for (0..@min(args.len, param_count)) |i| {
-        args_buf[i] = self.coerceInt(args_buf[i], param_types[i]);
+        args_buf[i] = try self.coerceValueForType(args_buf[i], param_types[i]);
     }
 
     const is_void = ret_llvm_type == c.LLVMVoidTypeInContext(self.context);
@@ -9056,6 +9447,13 @@ fn resolveTypeWithParams(
         },
         .generic => |g| {
             const name = self.pool.resolve(g.name);
+            if (std.mem.eql(u8, name, "Task")) {
+                if (g.args.len != 1) return error.UnsupportedType;
+                // Task[T] is represented as an opaque task handle in Stage0.
+                // Still resolve T so invalid payload type expressions fail early.
+                _ = try self.resolveTypeWithParams(g.args[0], type_params, type_map, type_map_len);
+                return c.LLVMInt32TypeInContext(self.context);
+            }
             if (std.mem.eql(u8, name, "Option")) {
                 if (g.args.len != 1) return error.UnsupportedType;
                 const payload_type = try self.resolveTypeWithParams(g.args[0], type_params, type_map, type_map_len);
@@ -9552,7 +9950,7 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
                         } else if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
                             args_buf[i] = self.extractStrPtr(args_buf[i]);
                         } else {
-                            args_buf[i] = self.coerceInt(args_buf[i], param_type);
+                            args_buf[i] = try self.coerceValueForType(args_buf[i], param_type);
                         }
                     }
                     const ret_type = c.LLVMGetReturnType(fn_info.fn_type);
@@ -9947,7 +10345,7 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
         }
     }
     if (self.isVecType(vec_obj_type)) {
-        if (std.mem.eql(u8, method_name, "len")) {
+        if (std.mem.eql(u8, method_name, "len") or std.mem.eql(u8, method_name, "count")) {
             return self.genVecLen(vec_obj_val, vec_obj_type);
         } else if (std.mem.eql(u8, method_name, "get")) {
             if (args.len < 1) return error.UnsupportedExpr;
@@ -10013,7 +10411,7 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
     // len(), get(key), contains(key), insert(key, val), remove(key),
     // increment(key), decrement(key), update(key, default, f), append(key, value).
     if (self.isHashMapType(obj_type)) {
-        if (std.mem.eql(u8, method_name, "len")) {
+        if (std.mem.eql(u8, method_name, "len") or std.mem.eql(u8, method_name, "count")) {
             return self.genHashMapLen(obj_val, obj_type);
         } else if (std.mem.eql(u8, method_name, "get")) {
             if (args.len < 1) return error.UnsupportedExpr;
@@ -10060,9 +10458,9 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
         }
     }
 
-    // Built-in HashSet methods: len(), is_empty(), insert(val), contains(val), remove(val).
+    // Built-in HashSet methods: len()/count, is_empty(), insert(val), contains(val), remove(val).
     if (self.isHashSetType(obj_type)) {
-        if (std.mem.eql(u8, method_name, "len")) {
+        if (std.mem.eql(u8, method_name, "len") or std.mem.eql(u8, method_name, "count")) {
             return self.genHashSetLen(obj_val);
         } else if (std.mem.eql(u8, method_name, "is_empty")) {
             const i64_type = c.LLVMInt64TypeInContext(self.context);
@@ -10154,9 +10552,9 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
         }
     }
 
-    // Built-in array methods: len(), is_empty(), first(), last(), contains(val).
+    // Built-in array methods: len()/count, is_empty(), first(), last(), contains(val).
     if (c.LLVMGetTypeKind(obj_type) == c.LLVMArrayTypeKind) {
-        if (std.mem.eql(u8, method_name, "len")) {
+        if (std.mem.eql(u8, method_name, "len") or std.mem.eql(u8, method_name, "count")) {
             const len = c.LLVMGetArrayLength2(obj_type);
             return c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), len, 0);
         } else if (std.mem.eql(u8, method_name, "is_empty")) {
@@ -10234,28 +10632,28 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
             const mangled = name_buf[0 .. tn.len + 1 + method_name.len];
             const fn_sym = self.pool.intern(mangled) catch return error.CodegenAlloc;
 
-                if (self.functions.get(fn_sym)) |fn_info| {
-                    // Call with obj as first arg.
-                    var args_buf: [64]c.LLVMValueRef = undefined;
-                    // Check if first param expects a pointer (e.g. self: *mut T).
-                    const first_param_type = if (c.LLVMCountParams(fn_info.value) > 0)
-                        c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, 0))
-                    else
-                        null;
-                    if (first_param_type != null and c.LLVMGetTypeKind(first_param_type.?) == c.LLVMPointerTypeKind and
-                        c.LLVMGetTypeKind(dispatch_obj_type) != c.LLVMPointerTypeKind)
-                    {
-                        // Method expects pointer but we have a value.
-                        // Prefer a real mutable receiver pointer (ident/field/deref lvalues);
-                        // only fall back to a temporary for unsupported expressions.
-                        args_buf[0] = self.getMutableReceiverPtr(fa.expr) catch blk: {
-                            const tmp = c.LLVMBuildAlloca(self.builder, dispatch_obj_type, "tmp.self");
-                            _ = c.LLVMBuildStore(self.builder, dispatch_obj_val, tmp);
-                            break :blk tmp;
-                        };
-                    } else {
-                        args_buf[0] = dispatch_obj_val;
-                    }
+            if (self.functions.get(fn_sym)) |fn_info| {
+                // Call with obj as first arg.
+                var args_buf: [64]c.LLVMValueRef = undefined;
+                // Check if first param expects a pointer (e.g. self: *mut T).
+                const first_param_type = if (c.LLVMCountParams(fn_info.value) > 0)
+                    c.LLVMTypeOf(c.LLVMGetParam(fn_info.value, 0))
+                else
+                    null;
+                if (first_param_type != null and c.LLVMGetTypeKind(first_param_type.?) == c.LLVMPointerTypeKind and
+                    c.LLVMGetTypeKind(dispatch_obj_type) != c.LLVMPointerTypeKind)
+                {
+                    // Method expects pointer but we have a value.
+                    // Prefer a real mutable receiver pointer (ident/field/deref lvalues);
+                    // only fall back to a temporary for unsupported expressions.
+                    args_buf[0] = self.getMutableReceiverPtr(fa.expr) catch blk: {
+                        const tmp = c.LLVMBuildAlloca(self.builder, dispatch_obj_type, "tmp.self");
+                        _ = c.LLVMBuildStore(self.builder, dispatch_obj_val, tmp);
+                        break :blk tmp;
+                    };
+                } else {
+                    args_buf[0] = dispatch_obj_val;
+                }
                 for (args, 0..) |arg, i| {
                     args_buf[i + 1] = try self.genExpr(arg);
                 }
@@ -10290,7 +10688,7 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
                     } else if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
                         args_buf[i] = self.extractStrPtr(args_buf[i]);
                     } else if (c.LLVMGetTypeKind(param_type) != c.LLVMPointerTypeKind or c.LLVMGetTypeKind(arg_type) != c.LLVMPointerTypeKind) {
-                        args_buf[i] = self.coerceInt(args_buf[i], param_type);
+                        args_buf[i] = try self.coerceValueForType(args_buf[i], param_type);
                     }
                 }
 
@@ -10364,7 +10762,7 @@ fn genPipeline(self: *Codegen, p: Ast.PipelineExpr) Error!c.LLVMValueRef {
                 if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
                     args_buf[i] = self.extractStrPtr(args_buf[i]);
                 } else {
-                    args_buf[i] = self.coerceInt(args_buf[i], param_type);
+                    args_buf[i] = try self.coerceValueForType(args_buf[i], param_type);
                 }
             }
 
@@ -10394,7 +10792,12 @@ fn genPipeline(self: *Codegen, p: Ast.PipelineExpr) Error!c.LLVMValueRef {
         return self.genMethodCall(.{
             .expr = p.lhs,
             .field = fn_sym,
-        }, call_e.args);
+        }, call_e.args) catch |err| switch (err) {
+            // Implicit iterator insertion:
+            // `lhs |> map(f)` -> `lhs.iter().map(f)` when direct method dispatch is unavailable.
+            error.UnsupportedExpr => self.genPipelineViaImplicitIter(p.lhs, fn_sym, call_e.args),
+            else => err,
+        };
     }
 
     // If rhs is an identifier (bare function name), call as f(lhs).
@@ -10413,7 +10816,7 @@ fn genPipeline(self: *Codegen, p: Ast.PipelineExpr) Error!c.LLVMValueRef {
                 if (c.LLVMGetTypeKind(param_type) == c.LLVMPointerTypeKind and self.isStrType(arg_type)) {
                     args_buf[0] = self.extractStrPtr(args_buf[0]);
                 } else {
-                    args_buf[0] = self.coerceInt(args_buf[0], param_type);
+                    args_buf[0] = try self.coerceValueForType(args_buf[0], param_type);
                 }
             }
 
@@ -10440,7 +10843,7 @@ fn genPipeline(self: *Codegen, p: Ast.PipelineExpr) Error!c.LLVMValueRef {
                 const fn_ptr = c.LLVMBuildExtractValue(self.builder, loaded, 0, "fn_ptr");
                 const cap_ptr = c.LLVMBuildExtractValue(self.builder, loaded, 1, "cap_ptr");
 
-                const call_fn_type = local_info.fn_sig orelse {
+                const call_fn_type = local_info.fn_sig orelse self.inferCallableFnSigFromStorageType(local_info.ty) orelse {
                     var msg_buf: [256]u8 = undefined;
                     const name = self.pool.resolve(fn_sym);
                     const msg = std.fmt.bufPrint(
@@ -10463,7 +10866,7 @@ fn genPipeline(self: *Codegen, p: Ast.PipelineExpr) Error!c.LLVMValueRef {
                 args_buf[0] = cap_ptr;
                 var param_types_arr: [17]c.LLVMTypeRef = undefined;
                 c.LLVMGetParamTypes(call_fn_type, &param_types_arr);
-                args_buf[1] = self.coerceInt(lhs_val, param_types_arr[1]);
+                args_buf[1] = try self.coerceValueForType(lhs_val, param_types_arr[1]);
 
                 const ret_type = c.LLVMGetReturnType(call_fn_type);
                 const is_void = ret_type == c.LLVMVoidTypeInContext(self.context);
@@ -10483,9 +10886,59 @@ fn genPipeline(self: *Codegen, p: Ast.PipelineExpr) Error!c.LLVMValueRef {
         return self.genMethodCall(.{
             .expr = p.lhs,
             .field = fn_sym,
-        }, &.{});
+        }, &.{}) catch |err| switch (err) {
+            // Implicit iterator insertion:
+            // `lhs |> count` -> `lhs.iter().count` when direct method dispatch is unavailable.
+            error.UnsupportedExpr => self.genPipelineViaImplicitIter(p.lhs, fn_sym, &.{}),
+            else => err,
+        };
     }
 
+    return error.UnsupportedExpr;
+}
+
+fn genPipelineViaImplicitIter(
+    self: *Codegen,
+    lhs: *const Ast.Expr,
+    fn_sym: u32,
+    args: []const *const Ast.Expr,
+) Error!c.LLVMValueRef {
+    const method_name = self.pool.resolve(fn_sym);
+    if (!(std.mem.eql(u8, method_name, "map") or
+        std.mem.eql(u8, method_name, "filter") or
+        std.mem.eql(u8, method_name, "count") or
+        std.mem.eql(u8, method_name, "collect")))
+    {
+        return error.UnsupportedExpr;
+    }
+
+    const iter_sym = self.pool.intern("iter") catch return error.CodegenAlloc;
+    const iter_val = self.genMethodCall(.{
+        .expr = lhs,
+        .field = iter_sym,
+    }, &.{}) catch return error.UnsupportedExpr;
+
+    const iter_ty = c.LLVMTypeOf(iter_val);
+    if (!self.isVecType(iter_ty)) return error.UnsupportedExpr;
+
+    if (std.mem.eql(u8, method_name, "collect")) {
+        if (args.len != 0) return error.UnsupportedExpr;
+        return iter_val;
+    }
+    if (std.mem.eql(u8, method_name, "count")) {
+        if (args.len != 0) return error.UnsupportedExpr;
+        return self.genVecLen(iter_val, iter_ty);
+    }
+    if (std.mem.eql(u8, method_name, "map")) {
+        if (args.len < 1) return error.UnsupportedExpr;
+        const fn_val = try self.genExpr(args[0]);
+        return self.genVecMap(iter_val, iter_ty, fn_val);
+    }
+    if (std.mem.eql(u8, method_name, "filter")) {
+        if (args.len < 1) return error.UnsupportedExpr;
+        const fn_val = try self.genExpr(args[0]);
+        return self.genVecFilter(iter_val, iter_ty, fn_val);
+    }
     return error.UnsupportedExpr;
 }
 
@@ -10503,7 +10956,7 @@ fn genReturn(self: *Codegen, ret_val: ?*const Ast.Expr) Error!c.LLVMValueRef {
                 if (self.isResultType(v_type)) return error.UnsupportedExpr;
                 break :blk try self.buildResultOk(v, ret_type);
             }
-            break :blk self.coerceInt(v, ret_type);
+            break :blk try self.coerceValueForType(v, ret_type);
         };
         // Emit drops and deferred expressions before return.
         try self.emitDrops(0);
@@ -10538,9 +10991,25 @@ fn genAssign(self: *Codegen, assign: Ast.AssignExpr) Error!c.LLVMValueRef {
                 return error.ImmutableAssign;
             }
             const val = try self.genExpr(assign.value);
-            const coerced = self.coerceInt(val, info.ty);
+            const coerced = try self.coerceValueForType(val, info.ty);
             _ = c.LLVMBuildStore(self.builder, coerced, info.alloca);
             _ = self.trait_local_concrete_types.remove(sym);
+            if (self.exprProducesTask(assign.value)) {
+                self.task_locals.put(self.allocator, sym, {}) catch return error.CodegenAlloc;
+                if (self.inferTaskResultType(assign.value)) |task_result_ty| {
+                    self.task_local_result_types.put(self.allocator, sym, task_result_ty) catch return error.CodegenAlloc;
+                } else {
+                    _ = self.task_local_result_types.remove(sym);
+                }
+            } else {
+                _ = self.task_locals.remove(sym);
+                _ = self.task_local_result_types.remove(sym);
+            }
+            if (self.inferTaskContainerElementType(assign.value)) |task_elem_ty| {
+                self.task_container_local_elem_types.put(self.allocator, sym, task_elem_ty) catch return error.CodegenAlloc;
+            } else {
+                _ = self.task_container_local_elem_types.remove(sym);
+            }
         },
         .field_access => |fa| {
             // p.x = expr → GEP into the local's alloca + store
@@ -10828,6 +11297,7 @@ fn genForArray(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
 
     // Create element variable for the binding.
     const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
+    const loop_task_elem_ty = self.inferTaskContainerElementType(for_e.iterable);
 
     if (for_e.binding_pattern == null) {
         self.locals.put(self.allocator, for_e.binding, .{
@@ -10835,6 +11305,13 @@ fn genForArray(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
             .ty = elem_type,
             .is_mut = false,
         }) catch return error.CodegenAlloc;
+        if (loop_task_elem_ty) |task_ty| {
+            self.task_locals.put(self.allocator, for_e.binding, {}) catch return error.CodegenAlloc;
+            self.task_local_result_types.put(self.allocator, for_e.binding, task_ty) catch return error.CodegenAlloc;
+        } else {
+            _ = self.task_locals.remove(for_e.binding);
+            _ = self.task_local_result_types.remove(for_e.binding);
+        }
     }
 
     // If there's an index binding (for x, i in arr), expose the index as a local.
@@ -10913,6 +11390,7 @@ fn genForVec(self: *Codegen, for_e: Ast.ForExpr, vec_val: c.LLVMValueRef) Error!
     const idx_alloca = c.LLVMBuildAlloca(self.builder, i64_type, "for.idx");
     _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), idx_alloca);
     const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
+    const loop_task_elem_ty = self.inferTaskContainerElementType(for_e.iterable);
 
     if (for_e.binding_pattern == null) {
         self.locals.put(self.allocator, for_e.binding, .{
@@ -10920,6 +11398,13 @@ fn genForVec(self: *Codegen, for_e: Ast.ForExpr, vec_val: c.LLVMValueRef) Error!
             .ty = elem_type,
             .is_mut = false,
         }) catch return error.CodegenAlloc;
+        if (loop_task_elem_ty) |task_ty| {
+            self.task_locals.put(self.allocator, for_e.binding, {}) catch return error.CodegenAlloc;
+            self.task_local_result_types.put(self.allocator, for_e.binding, task_ty) catch return error.CodegenAlloc;
+        } else {
+            _ = self.task_locals.remove(for_e.binding);
+            _ = self.task_local_result_types.remove(for_e.binding);
+        }
     }
 
     // If there's an index binding (for x, i in vec), expose the index as a local.
@@ -10994,12 +11479,20 @@ fn genForSlice(self: *Codegen, for_e: Ast.ForExpr) Error!c.LLVMValueRef {
 
     // Create element variable for the binding.
     const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
+    const loop_task_elem_ty = self.inferTaskContainerElementType(for_e.iterable);
     if (for_e.binding_pattern == null) {
         self.locals.put(self.allocator, for_e.binding, .{
             .alloca = elem_alloca,
             .ty = elem_type,
             .is_mut = false,
         }) catch return error.CodegenAlloc;
+        if (loop_task_elem_ty) |task_ty| {
+            self.task_locals.put(self.allocator, for_e.binding, {}) catch return error.CodegenAlloc;
+            self.task_local_result_types.put(self.allocator, for_e.binding, task_ty) catch return error.CodegenAlloc;
+        } else {
+            _ = self.task_locals.remove(for_e.binding);
+            _ = self.task_local_result_types.remove(for_e.binding);
+        }
     }
 
     const function = self.current_function;
@@ -11217,6 +11710,7 @@ fn genForIteratorFromPtr(
     const elem_val = c.LLVMBuildLoad2(self.builder, elem_type, payload_ptr, "iter.elem");
 
     const elem_alloca = c.LLVMBuildAlloca(self.builder, elem_type, "for.elem");
+    const loop_task_elem_ty = self.inferTaskContainerElementType(for_e.iterable);
     _ = c.LLVMBuildStore(self.builder, elem_val, elem_alloca);
     if (for_e.binding_pattern == null) {
         self.locals.put(self.allocator, for_e.binding, .{
@@ -11224,6 +11718,13 @@ fn genForIteratorFromPtr(
             .ty = elem_type,
             .is_mut = false,
         }) catch return error.CodegenAlloc;
+        if (loop_task_elem_ty) |task_ty| {
+            self.task_locals.put(self.allocator, for_e.binding, {}) catch return error.CodegenAlloc;
+            self.task_local_result_types.put(self.allocator, for_e.binding, task_ty) catch return error.CodegenAlloc;
+        } else {
+            _ = self.task_locals.remove(for_e.binding);
+            _ = self.task_local_result_types.remove(for_e.binding);
+        }
     }
     if (for_e.binding_pattern) |bp| {
         try self.bindPatternFromValue(bp, elem_val, elem_type, false);
@@ -15634,6 +16135,49 @@ fn coerceToBool(self: *Codegen, val: c.LLVMValueRef) c.LLVMValueRef {
 
 /// If `val` is an integer and `target_type` is a different-width integer,
 /// insert a trunc or sext.  Otherwise return `val` unchanged.
+fn coerceValueForType(self: *Codegen, val: c.LLVMValueRef, target_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
+    const val_type = c.LLVMTypeOf(val);
+    // Auto-collect: array-valued pipeline termini can materialize into Vec[T]
+    // when destination type context requires Vec[T].
+    if (self.isVecType(target_type) and c.LLVMGetTypeKind(val_type) == c.LLVMArrayTypeKind) {
+        return try self.coerceArrayToVec(val, val_type, target_type);
+    }
+    return self.coerceInt(val, target_type);
+}
+
+fn coerceArrayToVec(
+    self: *Codegen,
+    arr_val: c.LLVMValueRef,
+    arr_type: c.LLVMTypeRef,
+    vec_type: c.LLVMTypeRef,
+) Error!c.LLVMValueRef {
+    const elem_type = self.getVecElemType(vec_type) orelse return error.UnsupportedExpr;
+    const i64_type = c.LLVMInt64TypeInContext(self.context);
+    const arr_len: usize = @intCast(c.LLVMGetArrayLength2(arr_type));
+
+    var vec_val = try self.genVecNew(elem_type);
+    const vec_alloca = c.LLVMBuildAlloca(self.builder, vec_type, "autocollect.vec");
+    _ = c.LLVMBuildStore(self.builder, vec_val, vec_alloca);
+
+    const arr_alloca = c.LLVMBuildAlloca(self.builder, arr_type, "autocollect.arr");
+    _ = c.LLVMBuildStore(self.builder, arr_val, arr_alloca);
+
+    for (0..arr_len) |i| {
+        var idxs = [_]c.LLVMValueRef{
+            c.LLVMConstInt(i64_type, 0, 0),
+            c.LLVMConstInt(i64_type, i, 0),
+        };
+        const elem_ptr = c.LLVMBuildGEP2(self.builder, arr_type, arr_alloca, &idxs, 2, "autocollect.elem.ptr");
+        const src_elem_ty = c.LLVMGetElementType(arr_type);
+        var elem_val = c.LLVMBuildLoad2(self.builder, src_elem_ty, elem_ptr, "autocollect.elem");
+        elem_val = self.coerceInt(elem_val, elem_type);
+        _ = try self.genVecPush(vec_alloca, vec_type, elem_val);
+    }
+
+    vec_val = c.LLVMBuildLoad2(self.builder, vec_type, vec_alloca, "autocollect.vec.val");
+    return vec_val;
+}
+
 fn coerceInt(self: *Codegen, val: c.LLVMValueRef, target_type: c.LLVMTypeRef) c.LLVMValueRef {
     const val_type = c.LLVMTypeOf(val);
     const val_kind = c.LLVMGetTypeKind(val_type);
@@ -16164,10 +16708,9 @@ fn genStrSplit(self: *Codegen, obj_val: c.LLVMValueRef, delim: c.LLVMValueRef) E
 
     // Call with_str_split(src, src_len, delim, delim_len, ptrs_buf, lens_buf, max_parts)
     var call_args = [_]c.LLVMValueRef{
-        s.ptr,                                         d.len,
-        d.ptr,                                         d.len,
-        ptrs_buf,
-        lens_buf,
+        s.ptr,                                  d.len,
+        d.ptr,                                  d.len,
+        ptrs_buf,                               lens_buf,
         c.LLVMConstInt(i64_type, max_parts, 0),
     };
     // Fix: first arg is src, second is src_len
@@ -17101,6 +17644,12 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
         },
         .generic => |g| {
             const name = self.pool.resolve(g.name);
+            if (std.mem.eql(u8, name, "Task")) {
+                if (g.args.len != 1) return error.UnsupportedType;
+                // Task[T] lowers to runtime task-id handles (i32).
+                _ = try self.resolveType(g.args[0]);
+                return c.LLVMInt32TypeInContext(self.context);
+            }
             if (std.mem.eql(u8, name, "Option")) {
                 if (g.args.len != 1) return error.UnsupportedType;
                 const payload_type = try self.resolveType(g.args[0]);

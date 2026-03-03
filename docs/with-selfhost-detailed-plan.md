@@ -61,6 +61,30 @@ Secondary influence: **Rust compiler discipline**
 
 ---
 
+### 1.5 Stage0-Safe Subset Constraint
+
+Self-host compiler source must remain in the subset known to compile under Stage0.
+
+Rules during self-host bootstrap:
+
+* Prefer rewriting self-host code over extending Stage0 for convenience features.
+* Keep compiler-core code synchronous and deterministic.
+* Treat Stage0 gaps as coding constraints for Withc2 until semantic fixpoint is reached.
+
+Disallowed in Withc2 core (pre-fixpoint):
+
+* Generic async task-collection patterns (`Vec[Task[T]]`, `impl IntoIter[Task[_]]` in async generic paths).
+* Collection combinator usage (`await_all`, `await_first`, `await_any`, `await_settled`) in the compiler pipeline.
+* Any design requiring bootstrap generic-async lowering improvements.
+
+Required style:
+
+* Synchronous pass pipeline (`lex -> parse -> sema -> MIR -> codegen -> link`).
+* Explicit loops and dataflow.
+* Stable-ID state threading with deterministic behavior.
+
+---
+
 # 2. Compiler Architecture Overview
 
 ```

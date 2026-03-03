@@ -861,7 +861,9 @@ fn handleCompletion(self: *Self, body: []const u8, id: ?i64, stdout: std.fs.File
     // 2. Built-in functions.
     const builtins = [_][]const u8{
         "println", "print", "assert", "Some", "Ok", "Err", "None",
-        "Vec",     "HashMap", "HashSet", "Channel",
+        "Vec",     "HashMap", "HashSet", "Channel", "String",
+        "Debug",   "Display", "Default", "Iter",    "IntoIter",
+        "Eq",      "Hash",    "Ord",
     };
     for (builtins) |bi| {
         if (prefix.len == 0 or std.mem.startsWith(u8, bi, prefix)) {
@@ -1198,7 +1200,8 @@ fn isBuiltinName(name: []const u8) bool {
     const builtins = [_][]const u8{
         "println", "print", "assert", "Some", "Ok",      "Err",
         "None",    "Vec",   "HashMap", "HashSet", "Channel", "send",
-        "recv",    "close",
+        "recv",    "close", "String",  "Debug",   "Display", "Default",
+        "Iter",    "IntoIter", "Eq",   "Hash",    "Ord",
     };
     for (builtins) |bi| {
         if (std.mem.eql(u8, name, bi)) return true;

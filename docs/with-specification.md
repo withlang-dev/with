@@ -648,8 +648,14 @@ wrap, or saturation; the default is panic.
 
 Explicit wrapping operators: `+%`, `-%`, `*%`.
 
-**Implicit widening** (lossless) is allowed: `i32` → `i64`,
-`u8` → `u32`, `f32` → `f64`.
+**Implicit widening** is only allowed for lossless numeric conversions:
+- Signed integers: `i8 -> i16 -> i32 -> i64`
+- Unsigned integers: `u8 -> u16 -> u32 -> u64`
+- Floats: `f32 -> f64`
+- Unsigned to signed only when destination is strictly wider
+  (`u8 -> i16`, `u16 -> i32`, `u32 -> i64`)
+
+No other implicit numeric conversion is allowed.
 
 **Implicit narrowing is a compile error:**
 
@@ -2315,8 +2321,26 @@ for { name, age, .. } in users:
     println("{name}: {age}")
 ```
 
-All match expressions are exhaustive. Non-exhaustive matches are
-compile errors.
+Exhaustiveness depends on position:
+
+- **Expression-position match** (value is used/returned): must be exhaustive.
+- **Statement-position match** (value ignored): may be partial; unmatched
+  variants are a no-op.
+
+Examples:
+
+```
+// expression-position: exhaustive required
+let label = match status
+    Ok(v) -> "ok"
+    Err(e) -> "err"
+
+// statement-position: partial allowed
+match event
+    Click(pos) -> handle_click(pos)
+    KeyDown(k) -> handle_key(k)
+// other variants are ignored
+```
 
 **Reference pattern ergonomics:** When a pattern is matched against
 a reference type `&T`, the pattern automatically binds variables as
@@ -3733,7 +3757,7 @@ gen fn ok_generator -> str:
 
 This restriction does NOT apply to `async fn` — fibers have real
 stacks that don't move, so references across `.await` are safe
-(§14.12). Generators are the exception because they compile to
+(§14.13). Generators are the exception because they compile to
 movable structs.
 
 **Zero-copy iteration:** Generators cannot yield references to
@@ -3959,7 +3983,7 @@ an internal compiler property used for safety checks:
    function while a `@[no_await_guard]` guard is live is a compile
    error — even if the `.await` is buried three calls deep.
 2. **FFI callback safety:** Functions passed as `extern "C"`
-   callbacks must not be `may_suspend` (see §14.18).
+   callbacks must not be `may_suspend` (see §14.19).
 
 This is NOT function coloring. There are no separate `async` and
 `sync` function types. No traits split. No closure type changes.
@@ -4065,7 +4089,7 @@ boilerplate when the logic is small and context-specific.
 
 **Capture rules:** `async:` blocks follow the same capture rules
 as closures. They may capture references (making the resulting
-`Task` ephemeral) or owned values (storable `Task`). See §14.21.
+`Task` ephemeral) or owned values (storable `Task`). See §14.22.
 
 ### 14.7 `Task[T]`
 
@@ -4082,7 +4106,7 @@ type Task[T]       // opaque handle to a running fiber
 `Task[T]` is `Send` when `T: Send` and `T` is not ephemeral. It is
 an owned value. It can be stored in data structures when non-ephemeral.
 
-A `Task[T]` that captures references is **ephemeral** (see §14.21).
+A `Task[T]` that captures references is **ephemeral** (see §14.22).
 Ephemeral tasks cannot be stored, returned, or sent to other threads.
 They must be awaited or tracked in a scope before the borrowed data
 goes out of scope.
@@ -4423,7 +4447,110 @@ At least one branch must be present. If all expressions complete
 with values that don't match their patterns, the select panics
 (same as a non-exhaustive match).
 
-### 14.11 Why Fibers, Not State Machines?
+### 14.11 Concurrent Await
+
+When `.await` is applied to a tuple of tasks, all elements execute
+concurrently and the result is a tuple of their results.
+
+```
+let (user, posts) = (fetch_user(id), fetch_posts(id)).await
+let (user, posts) = (fetch_user(id), fetch_posts(id)).await?
+let (a, b, c) = (fetch_a(), fetch_b(), fetch_c()).await
+```
+
+Given `(Task[A], Task[B], ..., Task[N])`, tuple `.await` returns
+`(A, B, ..., N)`.
+
+Calling an `async fn` eagerly spawns a fiber (§14.4), so tuple
+`.await` is a join operation over already-running tasks.
+
+Error handling with `?` composes in tuple order:
+
+`(Task[Result[A, E]], Task[Result[B, E]]).await?` has type `(A, B)`.
+
+If `?` triggers early return from an `async scope`, tracked siblings
+are cancelled by normal scope unwinding rules. Outside `async scope`,
+normal `Task` drop semantics apply (§14.7).
+
+```
+async scope |s|:
+    let (user, posts) = (
+        s.track(fetch_user(id)),
+        s.track(fetch_posts(id)),
+    ).await
+    (user?, posts?)
+```
+
+Tuple `.await` supports tuple sizes 2..12 (same as tuple arity limits
+in §4.6). For dynamic or larger sets, use collection combinators.
+
+Desugaring (2-tuple):
+
+```
+(task_a, task_b).await
+// desugars to:
+{
+    let __ta = task_a
+    let __tb = task_b
+    (__ta.await, __tb.await)
+}
+```
+
+Runtime implementations may use a multi-wait join internally; observable
+semantics are completion of all tasks with results in tuple order.
+
+| Need | Construct |
+|------|-----------|
+| Await 2–12 heterogeneous tasks | `(task_a, task_b).await` |
+| Await N homogeneous tasks | `tasks |> await_all` |
+| First task to complete | `tasks |> await_first` |
+| First successful task | `tasks |> await_any` |
+| All results including errors | `tasks |> await_settled` |
+| First of N with pattern dispatch | `select await` (§14.10) |
+| Dynamic spawn + cancellation scope | `async scope` (§14.9) |
+| Fire-and-forget | `spawn expr` (§14.7) |
+
+#### 14.11.1 Collection Await (Standard Library)
+
+Collection await is a standard-library surface, not special syntax:
+
+```
+let users = ids |> map(fetch_user) |> await_all?
+let fastest = tasks |> await_first
+let winner = tasks |> await_any?
+let results = tasks |> await_settled
+```
+
+Collection combinators follow deterministic semantics:
+
+- `await_all(Task[T]) -> Vec[T]` waits for all tasks and returns results in input order.
+- `await_all(Task[Result[T, E]]) -> Result[Vec[T], E]` is fail-fast: on first `Err`, it cancels and joins remaining tasks, then returns that `Err`.
+- `await_first(Task[T]) -> T` returns the first completed result, then cancels and joins losers before returning.
+- `await_any(Task[Result[T, E]]) -> Result[T, Vec[E]]` returns first `Ok(T)` (then cancels + joins losers); if all fail, returns `Err(Vec[E])` in input order.
+- `await_settled(Task[Result[T, E]]) -> Vec[Result[T, E]]` never cancels, waits for all, and returns in input order.
+
+Empty-input behavior:
+
+- `await_first([])` panics with stable message:
+  `"await_first: empty input"`.
+- `await_any([])` returns `Err(Vec.new())`.
+- For non-empty input, `await_any` all-fail result is guaranteed
+  non-empty (`Err(errors)` where `errors.len() > 0`).
+
+Ordering guarantee for `await_any` all-fail:
+
+- Errors are aggregated in **input order**, not completion order.
+
+Cancellation/drop contract for collection combinators:
+
+- If a combinator returns early (winner found or fail-fast trigger),
+  it cancels all remaining owned tasks and joins them before return.
+- If the combinator itself is cancelled/dropped mid-flight, it
+  cancels remaining owned tasks and joins them before unwinding.
+
+See `lib/std/async.w` and `lib/std/async/` docs for API details.
+
+### 14.12 Why Fibers, Not State Machines?
 
 | | Rust async | With |
 |---|---|---|
@@ -4440,7 +4567,7 @@ The fiber model was chosen because it preserves the ownership model's
 invariants without special-casing for async code. References on the
 stack survive suspension. No lifetime gymnastics required.
 
-### 14.12 Interaction with Ownership
+### 14.13 Interaction with Ownership
 
 Because fibers have real stacks, references across `await` are safe:
 
@@ -4488,7 +4615,7 @@ transparently. Raw pointers (`*const T`, `*mut T`) obtained via
 §19.3 forbids raw pointers to stack locals across `await`. Safe code
 is never affected.
 
-### 14.13 OS Threads (Always Available)
+### 14.14 OS Threads (Always Available)
 
 OS threads exist independently of the fiber runtime and are available
 in all builds, including `no_runtime`:
@@ -4507,7 +4634,7 @@ scope |s|:
 // both complete here
 ```
 
-### 14.14 Channels
+### 14.15 Channels
 
 ```
 let (tx, rx) = chan[Message](buffer: 10)
@@ -4546,7 +4673,7 @@ let (tx, rx) = chan[String](10)
 tx.send("hello").await                  // str literal, String is Send
 ```
 
-### 14.15 Send, Sync, and ScopedSend
+### 14.16 Send, Sync, and ScopedSend
 
 - `Send`: safe to transfer across thread boundaries (value may
   outlive the sender). Ephemeral types are **not** `Send`.
@@ -4563,7 +4690,7 @@ tx.send("hello").await                  // str literal, String is Send
   channel." Channels decouple sender and receiver lifetimes.
   `ScopedSend` only covers direct capture in the spawned closure —
   the reference's lifetime is guaranteed by the scope's join.
-  Channel element types require full `Send` (see §14.14).
+  Channel element types require full `Send` (see §14.15).
 
 ```
 // thread.spawn_os requires Send — no ephemerals
@@ -4588,7 +4715,7 @@ async scope |s|:
 | `Task[T]` (non-ephemeral) | Yes (if `T: Send`) | Yes |
 | `Task[T]` (ephemeral) | No | Yes |
 
-### 14.16 Synchronization Primitives
+### 14.17 Synchronization Primitives
 
 - `Mutex[T]` — mutual exclusion with scoped access
 - `RwLock[T]` — reader-writer lock with scoped access
@@ -4598,7 +4725,7 @@ async scope |s|:
 All implement `Scoped`/`ScopedMut` for `with` blocks. Lock operations
 are fiber-aware: contended locks yield the fiber, not the OS thread.
 
-### 14.17 The Fiber Runtime
+### 14.18 The Fiber Runtime
 
 The fiber scheduler is part of the standard library. It is:
 
@@ -4612,7 +4739,7 @@ acceptable because: (a) it is opt-in via `async`, (b) suspension
 points are always marked with `await`, and (c) `no_runtime` builds
 can disable it entirely.
 
-### 14.18 Fiber Stack Management
+### 14.19 Fiber Stack Management
 
 Each fiber has a dedicated stack. Stack memory is the primary resource
 cost of the fiber model and must be understood to use `async`
@@ -4743,7 +4870,7 @@ into owned data structures and process with a smaller fixed pool of
 worker fibers. For >100K suspended tasks, prefer channel-driven
 worker pool architectures.
 
-### 14.19 Generators vs. Async: A Clarification
+### 14.20 Generators vs. Async: A Clarification
 
 Generators (`gen fn`) and async functions (`async fn`) look
 syntactically similar but compile to fundamentally different
@@ -4771,7 +4898,7 @@ If you want a lazy sequence that works everywhere, use `gen fn`. If
 you want concurrent I/O, use `async fn`. They are complementary
 tools, not alternatives.
 
-### 14.20 Real-World Example
+### 14.21 Real-World Example
 
 ```
 async fn main:
@@ -4800,7 +4927,7 @@ async fn handle_connection(conn: TcpStream):
 Reads like synchronous code. Each connection is a fiber. Thousands
 concurrent. No callbacks, no state machines, no type gymnastics.
 
-### 14.21 Task Ephemerality and Send
+### 14.22 Task Ephemerality and Send
 
 A `Task[T]` may capture values from its spawning environment. The
 ephemerality and `Send`-ability of the task depends on what it
@@ -4895,7 +5022,7 @@ referents — no lifetime annotations needed.
 | References/views | Yes | No | No |
 | `@[no_await_guard]` guards | N/A | N/A | Compile error (§7.9) |
 
-This is the same rule as generators (§14.19): if the suspended
+This is the same rule as generators (§14.20): if the suspended
 environment contains ephemerals, the handle is ephemeral. This
 avoids reintroducing lifetime annotations while preserving safety.
 
@@ -5534,9 +5661,14 @@ use math.vector.{Vec3, dot, cross}
 - Primitive types (`i32`, `i64`, `f64`, `bool`, `Int`, `UInt`, etc.)
 - `Unit`
 - `Vec[T]`, `String` / `str`
+- Traits: `Debug`, `Display`, `Default`, `Iter`, `IntoIter`, `Eq`, `Hash`, `Ord`
 - `print`, `println`, `eprint`, `eprintln`
 - `assert`, `assert_eq`, `assert_ne`, `panic`, `unreachable`, `todo`
 - `drop[T](val: T)` — explicitly drop a value to trigger cleanup
+
+Name precedence is deterministic: local bindings and explicit `use`
+imports win over prelude names. If you define `print` in a module,
+calls to `print(...)` resolve to your definition in that scope.
 
 `drop` is a built-in identity function that takes any value by
 move and does nothing — the value is destroyed when the argument
@@ -7561,7 +7693,7 @@ type Color = { r: u8, g: u8, b: u8, a: u8 }
 impl Copy for Color               // OK: all fields are Copy
 ```
 
-### 25.32 Task Ephemerality (Section 14.20)
+### 25.32 Task Ephemerality (Section 14.22)
 
 ```
 // PASS: owned-argument task is storable
@@ -8402,7 +8534,7 @@ fn test:
     assert(items == vec![1, 2])
 ```
 
-### 25.58 Await Inside Iterators (Section 14.12)
+### 25.58 Await Inside Iterators (Section 14.13)
 
 ```
 // PASS: .await inside map closure
@@ -8516,7 +8648,7 @@ async fn test:
     // fetch fiber may still be running briefly
 ```
 
-### 25.63 ScopedSend (Section 14.15)
+### 25.63 ScopedSend (Section 14.16)
 
 ```
 // PASS: scoped thread can use &mut local
@@ -8611,7 +8743,7 @@ fn test:
         safe_helper(*data)           // OK: safe_helper is not may_suspend
 ```
 
-### 25.68 FFI Callback No-Suspend (Section 14.18)
+### 25.68 FFI Callback No-Suspend (Section 14.19)
 
 ```
 // FAIL: may_suspend in extern "C" callback
@@ -8742,7 +8874,7 @@ fn test_custom:
             toks.push(tok)             // OwnedToken has no borrows
 ```
 
-### 25.76 Channel Send Requires Send (Section 14.14)
+### 25.76 Channel Send Requires Send (Section 14.15)
 
 ```
 // FAIL: ephemeral values cannot be sent over channels
@@ -8760,7 +8892,7 @@ fn test:
     tx.send("hello").await                  // str literal, String is Send
 ```
 
-### 25.77 Ephemeral Owned Passing Restriction (Section 14.21)
+### 25.77 Ephemeral Owned Passing Restriction (Section 14.22)
 
 ```
 // FAIL: ephemeral by-value to external function
@@ -9463,7 +9595,7 @@ collections code without any `c_import`.
 
 ### Phase 4: Concurrency
 
-Fiber runtime (§14.17–14.18). `async`/`await` lowering. Task type.
+Fiber runtime (§14.18–14.19). `async`/`await` lowering. Task type.
 Structured concurrency. Channels. Select. `no_runtime` gate.
 Send/Sync trait enforcement. `std.net` (TcpListener, TcpStream,
 UdpSocket, DNS). `std.signal`.
@@ -9493,7 +9625,7 @@ Optimization. `c_import` macro translation improvements.
 | Cannot return iterators that borrow | May require allocation at function boundaries | Use `collect`, generators, callbacks, or inline pipelines (§13.1) |
 | Cannot build self-referential structs | Must restructure as separate arena + handle | Use arenas with handles |
 | Handle dereference slower than pointer | ~2-3ns vs ~0.3ns per access | Use `for_each`/`iter` for bulk; `unsafe` for rare hot paths (§6.3) |
-| Fibers use 8–64KB stack each | 100K fibers ≈ 800MB worst case (vs state-machine-sized for Rust futures) | Growable stacks; channel-driven worker pools for >100K tasks (§14.18) |
+| Fibers use 8–64KB stack each | 100K fibers ≈ 800MB worst case (vs state-machine-sized for Rust futures) | Growable stacks; channel-driven worker pools for >100K tasks (§14.19) |
 | No RAII wrappers around borrowed resources | Cannot `Drop` a struct holding `&mut File` | Use `defer` or `with` blocks |
 | No higher-kinded types | Cannot abstract over `Option`/`Result`/etc. generically | Use concrete generic parameters |
 | No associated types on traits | Verbose generic signatures | Use additional generic parameters |

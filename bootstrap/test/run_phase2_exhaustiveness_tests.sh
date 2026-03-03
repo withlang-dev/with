@@ -96,6 +96,23 @@ fn main -> i32: score(true)
 EOF4
 expect_build_fail_msg "$tmpdir/non_exhaustive_bool_warn.w" "non-exhaustive match on bool"
 
+cat >"$tmpdir/statement_partial_match_ok.w" <<'EOF5'
+type Event = Click | Key | Resize
+
+fn handle(e: Event) -> i32:
+    var seen = 0
+    match e
+        Click -> seen = seen + 1
+        Key -> seen = seen + 2
+    seen
+
+fn main -> i32:
+    let a = handle(Click)
+    let b = handle(Resize)
+    if a == 1 and b == 0 then 0 else 1
+EOF5
+expect_build_no_warn "$tmpdir/statement_partial_match_ok.w"
+
 if [[ "$failures" -ne 0 ]]; then
   echo "phase2 exhaustiveness tests: $failures failure(s)"
   exit 1
