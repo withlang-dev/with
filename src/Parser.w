@@ -2378,17 +2378,40 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         is_mut = true
         self.advance()
 
-    // Tuple destructuring
+    // Tuple destructuring (currently supports flat identifier/wildcard bindings).
     if self.peek() == TK_L_PAREN():
-        let pat = self.parse_pattern()
+        self.advance()
+        self.skip_newlines()
+        let names: Vec[i32] = Vec.new()
+        while self.peek() != TK_R_PAREN() and self.peek() != TK_EOF():
+            if self.peek() == TK_IDENT():
+                let n_sym = self.intern_current()
+                self.advance()
+                if self.intern.resolve(n_sym) == "_":
+                    names.push(0)
+                else:
+                    names.push(n_sym)
+            else:
+                self.emit_error("tuple destructuring requires identifier bindings")
+                while self.peek() != TK_COMMA() and self.peek() != TK_R_PAREN() and self.peek() != TK_EOF():
+                    self.advance()
+
+            self.skip_newlines()
+            if self.peek() == TK_COMMA():
+                self.advance()
+                self.skip_newlines()
+            else:
+                break
+
+        self.expect(TK_R_PAREN())
         if self.expect(TK_EQ()) == 0:
             return 0
         self.skip_newlines()
         let value = self.parse_expr()
-        var flags = 0
-        if is_mut:
-            flags = 1
-        return self.pool.add_node(NK_TUPLE_DESTRUCTURE(), start, self.prev_end(), self.pool.extra_len(), 0, value)
+        let extra_start = self.pool.extra_len()
+        for ni in 0..names.len() as i32:
+            self.pool.add_extra(names.get(ni as i64))
+        return self.pool.add_node(NK_TUPLE_DESTRUCTURE(), start, self.prev_end(), extra_start, names.len() as i32, value)
 
     let name_sym = self.expect_ident()
     if name_sym == 0:

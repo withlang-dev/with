@@ -15,6 +15,8 @@ use Span
 use Sema
 use Mir
 use MirLower
+use AsyncMir
+use AsyncLower
 use Codegen
 use CImport
 use Resolve
@@ -60,6 +62,9 @@ type Driver = {
     last_sema: Sema,
     last_mir_module: MirModule,
     last_mir_dump: str,
+    // Wave 9 Async-MIR artifacts derived from MIR.
+    last_async_mir_module: AsyncMirModule,
+    last_async_mir_dump: str,
 }
 
 fn Driver.init -> Driver:
@@ -86,6 +91,8 @@ fn Driver.init -> Driver:
         last_sema: sema_seed,
         last_mir_module: MirModule.init(),
         last_mir_dump: "",
+        last_async_mir_module: AsyncMirModule.init(),
+        last_async_mir_dump: "",
     }
 
 fn Driver.deinit(self: Driver):
@@ -112,6 +119,8 @@ fn Driver.compile_file(self: Driver, path: str) -> AstPool:
         self.resolved_root_path = path
         self.last_mir_module = MirModule.init()
         self.last_mir_dump = ""
+        self.last_async_mir_module = AsyncMirModule.init()
+        self.last_async_mir_dump = ""
         return AstPool.new()
 
     self.current_source_text = text
@@ -161,6 +170,8 @@ fn Driver.resolve_file(self: Driver, path: str, emit_resolve_diags: bool) -> Res
 
 // Compile from already-loaded source text.
 fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> AstPool:
+    self.reset_pending_warnings()
+
     // Phase 1: Lex.
     var lexer = Lexer.init(text, file_id)
     let tokens = lexer.tokenize()
@@ -210,8 +221,23 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
     // dump lazily only on explicit --dump-typed paths.
     self.last_typed_dump = ""
     self.last_sema = sema
+
+    if self.diagnostics.has_errors():
+        let source = Source.from_string(name, text, file_id)
+        self.diagnostics.render_all(source)
+        self.last_mir_module = MirModule.init()
+        self.last_mir_dump = ""
+        self.last_async_mir_module = AsyncMirModule.init()
+        self.last_async_mir_dump = ""
+        return AstPool.new()
+
     self.last_mir_module = lower_module(sema, pool, self.pool)
     self.last_mir_dump = ""
+    let async_artifacts = lower_async_module(self.last_mir_module, pool, self.pool, sema, self.diagnostics)
+    self.last_async_mir_module = async_artifacts.out_mod
+    self.last_async_mir_dump = ""
+    self.diagnostics = async_artifacts.diags
+    self.capture_pending_warnings()
 
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
@@ -223,6 +249,20 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
         return AstPool.new()
 
     pool
+
+fn Driver.reset_pending_warnings(self: Driver):
+    while self.pending_warnings.len() > 0:
+        self.pending_warnings.pop()
+
+fn Driver.capture_pending_warnings(self: Driver):
+    self.reset_pending_warnings()
+    for i in 0..self.diagnostics.items.len() as i32:
+        let diag = self.diagnostics.items.get(i as i64)
+        if diag.severity == DIAG_SEVERITY_WARNING():
+            if diag.code.len() > 0:
+                self.pending_warnings.push("warning[" ++ diag.code ++ "]: " ++ diag.message)
+            else:
+                self.pending_warnings.push("warning: " ++ diag.message)
 
 fn Driver.dump_typed(self: Driver, pool: AstPool) -> str:
     var sema = Sema.init(self.pool, self.diagnostics, pool)
@@ -241,11 +281,14 @@ fn Driver.dump_typed(self: Driver, pool: AstPool) -> str:
     self.last_typed_dump = sema.dump_typed_module()
     self.last_sema = sema
     self.last_mir_dump = ""
+    self.last_async_mir_module = AsyncMirModule.init()
+    self.last_async_mir_dump = ""
 
     if self.diagnostics.has_errors():
         let source = Source.from_string(self.current_source_path, self.current_source_text, 0)
         self.diagnostics.render_all(source)
         self.last_mir_module = MirModule.init()
+        self.last_async_mir_module = AsyncMirModule.init()
         return ""
 
     self.last_typed_dump
@@ -271,11 +314,25 @@ fn Driver.run_mir_lower(self: Driver, pool: AstPool) -> MirModule:
         self.diagnostics.render_all(source)
         self.last_mir_module = MirModule.init()
         self.last_mir_dump = ""
+        self.last_async_mir_module = AsyncMirModule.init()
+        self.last_async_mir_dump = ""
         return self.last_mir_module
 
     self.last_mir_module = lower_module(sema, pool, self.pool)
     self.last_mir_dump = ""
+    let async_artifacts = lower_async_module(self.last_mir_module, pool, self.pool, sema, self.diagnostics)
+    self.last_async_mir_module = async_artifacts.out_mod
+    self.last_async_mir_dump = ""
+    self.diagnostics = async_artifacts.diags
     self.last_mir_module
+
+fn Driver.run_async_mir_lower(self: Driver, pool: AstPool) -> AsyncMirModule:
+    let _ = self.run_mir_lower(pool)
+    if self.diagnostics.has_errors():
+        self.last_async_mir_module = AsyncMirModule.init()
+        self.last_async_mir_dump = ""
+        return self.last_async_mir_module
+    self.last_async_mir_module
 
 fn Driver.dump_mir(self: Driver, pool: AstPool) -> str:
     if self.last_mir_module.body_count() == 0:
@@ -283,6 +340,14 @@ fn Driver.dump_mir(self: Driver, pool: AstPool) -> str:
 
     self.last_mir_dump = dump_mir_module(self.last_mir_module, self.pool, self.last_sema)
     self.last_mir_dump
+
+fn Driver.dump_async_mir(self: Driver, pool: AstPool) -> str:
+    if self.last_async_mir_module.body_count() == 0:
+        let _ = self.run_async_mir_lower(pool)
+    if self.last_async_mir_module.body_count() == 0:
+        return ""
+    self.last_async_mir_dump = dump_async_mir_module(self.last_async_mir_module, self.pool)
+    self.last_async_mir_dump
 
 // ── Codegen + link ───────────────────────────────────────────────
 
@@ -350,6 +415,21 @@ fn find_llvm_bridge_path() -> str:
 
     ""
 
+fn find_runtime_object_path(name: str) -> str:
+    let p1 = compiler_runtime_dir() ++ "/" ++ name
+    if with_fs_read_file(p1).len() > 0:
+        return p1
+
+    let p2 = "bootstrap/zig-out/bin/runtime/" ++ name
+    if with_fs_read_file(p2).len() > 0:
+        return p2
+
+    let p3 = "runtime/" ++ name
+    if with_fs_read_file(p3).len() > 0:
+        return p3
+
+    ""
+
 fn should_link_llvm_bridge(source_path: str) -> bool:
     source_path == "src/main.w" or source_path.ends_with("/src/main.w") or source_path.ends_with("\\src\\main.w")
 
@@ -385,17 +465,34 @@ fn Driver.build_binary_at(self: Driver, source_path: str, output_dir: str) -> st
     if result != 0:
         return ""
 
-    var link_ok = false
+    let extras: Vec[str] = Vec.new()
+
+    // Always link helpers runtime object when available (std.* runtime symbols).
+    let helpers_path = find_runtime_object_path("helpers.o")
+    if helpers_path.len() > 0:
+        extras.push(helpers_path)
+
+    // Async runtime objects are linked only when Async-MIR indicates async
+    // suspension/runtime operations are present.
+    let needs_async_runtime = self.last_async_mir_module.requires_async_runtime()
+    if needs_async_runtime:
+        let fiber_path = find_runtime_object_path("fiber.o")
+        if fiber_path.len() > 0:
+            extras.push(fiber_path)
+        let fiber_asm_path = find_runtime_object_path("fiber_asm.o")
+        if fiber_asm_path.len() > 0:
+            extras.push(fiber_asm_path)
+
     if should_link_llvm_bridge(source_path):
         let bridge_path = find_llvm_bridge_path()
         if bridge_path.len() == 0:
             with_eprintln("error: missing runtime/libwith_llvm_bridge.dylib")
             return ""
-        let extras: Vec[str] = Vec.new()
         extras.push(bridge_path)
-        link_ok = link_with_extras(obj_path, bin_path, extras)
+    let link_ok = if extras.len() > 0:
+        link_with_extras(obj_path, bin_path, extras)
     else:
-        link_ok = link(obj_path, bin_path)
+        link(obj_path, bin_path)
     if not link_ok:
         with_eprintln("error: linking failed")
         return ""

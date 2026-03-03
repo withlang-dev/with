@@ -196,89 +196,89 @@ Any uncovered script behavior requires either:
 
 ## 0) Freeze Wave 9 Contract and Corpus
 
-- [ ] Freeze exact Wave 9 parity target against current Stage0 behavior.
-- [ ] Create `test/wave9/async_corpus.txt` with explicit `check`/`build`/`run` mode entries.
-- [ ] Map every Stage0 phase4 async script to at least one Wave 9 coverage bucket.
-- [ ] Require explicit `KNOWN_DIVERGENCE` for any excluded behavior (no silent exclusions).
+- [x] Freeze exact Wave 9 parity target against current Stage0 behavior.
+- [x] Create `test/wave9/async_corpus.txt` with explicit `check`/`build`/`run` mode entries.
+- [x] Map every Stage0 phase4 async script to at least one Wave 9 coverage bucket.
+- [x] Require explicit `KNOWN_DIVERGENCE` for any excluded behavior (no silent exclusions).
 
 ## 1) Async-MIR Pass Boundary
 
-- [ ] Introduce `src/AsyncMir.w` as a distinct IR after MIR + borrow phases.
-- [ ] Introduce `src/AsyncLower.w` as the sole Wave 9 lowering pass.
-- [ ] Define input/output contract:
+- [x] Introduce `src/AsyncMir.w` as a distinct IR after MIR + borrow phases.
+- [x] Introduce `src/AsyncLower.w` as the sole Wave 9 lowering pass.
+- [x] Define input/output contract:
   - input: borrow-validated `MirModule` + sema/type/source metadata
   - output: `AsyncMirModule` + diagnostics only
-- [ ] Keep pass execution deterministic and single-threaded.
+- [x] Keep pass execution deterministic and single-threaded.
 
 ## 2) Suspend-Aware IR Model
 
-- [ ] Model suspension points explicitly (await/select/yield boundaries).
-- [ ] Model resume targets and state transitions explicitly.
-- [ ] Preserve source-span mapping for diagnostics through lowering.
-- [ ] Encode storage/drop state required across suspend points.
+- [x] Model suspension points explicitly (await/select/yield boundaries).
+- [x] Model resume targets and state transitions explicitly.
+- [x] Preserve source-span mapping for diagnostics through lowering.
+- [x] Encode storage/drop state required across suspend points.
 
 ## 3) Generator vs Async Split
 
-- [ ] Define distinct lowering tracks for generator bodies vs async task bodies.
-- [ ] Enforce `yield` legality in generator context only.
-- [ ] Ensure async tasks and generator iterators do not share ambiguous runtime shape.
-- [ ] Add explicit diagnostics parity tests for misuse cases.
+- [x] Define distinct lowering tracks for generator bodies vs async task bodies.
+- [x] Enforce `yield` legality in generator context only.
+- [x] Ensure async tasks and generator iterators do not share ambiguous runtime shape.
+- [x] Add explicit diagnostics parity tests for misuse cases.
 
 ## 4) Await Lowering
 
-- [ ] Lower single-task `.await` to explicit async runtime operations.
-- [ ] Lower tuple-await forms (2..12) with Stage0-compatible constraints.
-- [ ] Preserve `await?`/Result-flow behavior.
-- [ ] Support task-container await paths (`tasks[i].await`, loop-bound task awaits).
-- [ ] Match non-task await diagnostics.
+- [x] Lower single-task `.await` to explicit async runtime operations.
+- [x] Lower tuple-await forms (2..12) with Stage0-compatible constraints.
+- [x] Preserve `await?`/Result-flow behavior.
+- [x] Support task-container await paths (`tasks[i].await`, loop-bound task awaits).
+- [x] Match non-task await diagnostics.
 
 ## 5) Async Function and Async Block Lowering
 
-- [ ] Lower `async fn` calls to task-handle-producing form.
-- [ ] Lower `async: ...` blocks with explicit capture payload semantics.
-- [ ] Preserve capture-mode parity (owned vs borrowed) with Stage0 behavior.
-- [ ] Match diagnostics for invalid async-block capture/scope cases.
+- [x] Lower `async fn` calls to task-handle-producing form.
+- [x] Lower `async: ...` blocks with explicit capture payload semantics.
+- [x] Preserve capture-mode parity (owned vs borrowed) with Stage0 behavior.
+- [x] Match diagnostics for invalid async-block capture/scope cases.
 
 ## 6) Spawn and Task Lifecycle Lowering
 
-- [ ] Lower `spawn expr` with task-type validation parity.
-- [ ] Ensure spawned tasks are treated as consumed for task-must-use diagnostics.
-- [ ] Preserve detach semantics and no-spurious-warning behavior.
-- [ ] Add cancel/await lifecycle parity tests where Stage0 performs cleanup.
+- [x] Lower `spawn expr` with task-type validation parity.
+- [x] Ensure spawned tasks are treated as consumed for task-must-use diagnostics.
+- [x] Preserve detach semantics and no-spurious-warning behavior.
+- [x] Add cancel/await lifecycle parity tests where Stage0 performs cleanup.
 
 ## 7) Async Scope Lowering
 
-- [ ] Lower `async scope |s|:` with explicit scope-frame tracking.
-- [ ] Lower `s.track(task)` semantics with Stage0-compatible restrictions.
-- [ ] Enforce `track()` availability only inside active async scope.
-- [ ] Preserve scoped-task cleanup semantics on scope exit.
+- [x] Lower `async scope |s|:` with explicit scope-frame tracking.
+- [x] Lower `s.track(task)` semantics with Stage0-compatible restrictions.
+- [x] Enforce `track()` availability only inside active async scope.
+- [x] Preserve scoped-task cleanup semantics on scope exit.
 
 ## 8) Select Await Lowering
 
-- [ ] Lower `select await` arms to explicit race/select runtime operations.
-- [ ] Preserve arm-binding scope behavior and winner-value flow.
-- [ ] Enforce non-empty arm list and task-typed arm diagnostics.
-- [ ] Ensure deterministic arm-order behavior where required by Stage0.
+- [x] Lower `select await` arms to explicit race/select runtime operations.
+- [x] Preserve arm-binding scope behavior and winner-value flow.
+- [x] Enforce non-empty arm list and task-typed arm diagnostics.
+- [x] Ensure deterministic arm-order behavior where required by Stage0.
 
 ## 9) Diagnostics and Warning Parity
 
-- [ ] Match Stage0 async diagnostics for `await`/`spawn`/`select await`/`track`.
-- [ ] Match `E0801` task-must-use warning behavior.
-- [ ] Match `E0701` may_suspend/no_await_guard behavior.
-- [ ] Stabilize diagnostic/warning emission ordering.
+- [x] Match Stage0 async diagnostics for `await`/`spawn`/`select await`/`track`.
+- [x] Match `E0801` task-must-use warning behavior.
+- [x] Match `E0701` may_suspend/no_await_guard behavior.
+- [x] Stabilize diagnostic/warning emission ordering.
 
 ## 10) Runtime Linkage and Driver Integration
 
-- [ ] Wire Async-MIR pass into `check`/`build`/`run` pipeline after borrow pass.
-- [ ] Ensure async binaries link required runtime objects exactly when needed.
-- [ ] Ensure sync binaries do not pull async runtime symbols.
-- [ ] Preserve existing `--dump-mir` behavior.
-- [ ] Add `--dump-async-mir` (or equivalent) deterministic dump path.
+- [x] Wire Async-MIR pass into `check`/`build`/`run` pipeline after borrow pass.
+- [x] Ensure async binaries link required runtime objects exactly when needed.
+- [x] Ensure sync binaries do not pull async runtime symbols.
+- [x] Preserve existing `--dump-mir` behavior.
+- [x] Add `--dump-async-mir` (or equivalent) deterministic dump path.
 
 ## 11) Unit Test Harness
 
-- [ ] Add `scripts/run_wave9_async_unit_tests.sh`.
-- [ ] Add positive/negative unit cases for:
+- [x] Add `scripts/run_wave9_async_unit_tests.sh`.
+- [x] Add positive/negative unit cases for:
   - await lowering (single + tuple + container)
   - async fn lowering
   - async block capture behavior
@@ -290,47 +290,74 @@ Any uncovered script behavior requires either:
 
 ## 12) Stage0 Parity Harness
 
-- [ ] Add `scripts/run_wave9_async_parity.sh`.
-- [ ] Build Stage0 and self-host binaries in harness setup.
-- [ ] Run all Wave 9 corpus entries in declared mode (`check`/`build`/`run`) for both compilers.
-- [ ] Compare:
+- [x] Add `scripts/run_wave9_async_parity.sh`.
+- [x] Build Stage0 and self-host binaries in harness setup.
+- [x] Run all Wave 9 corpus entries in declared mode (`check`/`build`/`run`) for both compilers.
+- [x] Compare:
   - status codes,
   - normalized primary diagnostics/warnings,
   - runtime stdout/stderr and exit code for run-mode entries.
-- [ ] Re-run self-host to assert determinism.
-- [ ] Report exactly one of `PASS`, `FAIL`, `KNOWN_DIVERGENCE` per entry.
-- [ ] Fail harness on stale, duplicate, or malformed `KNOWN_DIVERGENCE` entries.
+- [x] Re-run self-host to assert determinism.
+- [x] Report exactly one of `PASS`, `FAIL`, `KNOWN_DIVERGENCE` per entry.
+- [x] Fail harness on stale, duplicate, or malformed `KNOWN_DIVERGENCE` entries.
 
 ## 13) Known Divergence Governance
 
-- [ ] Extend/reuse `scripts/parity_states.sh` for mode-aware Wave 9 entries.
-- [ ] Require every `KNOWN_DIVERGENCE` to be exercised during the run.
-- [ ] Fail if declared `KNOWN_DIVERGENCE` count differs from used count.
-- [ ] Keep accepted divergence list reviewable and small; no growth without rationale.
+- [x] Extend/reuse `scripts/parity_states.sh` for mode-aware Wave 9 entries.
+- [x] Require every `KNOWN_DIVERGENCE` to be exercised during the run.
+- [x] Fail if declared `KNOWN_DIVERGENCE` count differs from used count.
+- [x] Keep accepted divergence list reviewable and small; no growth without rationale.
 
 ## 14) Coverage Closure (Full Coverage Requirement)
 
-- [ ] Produce explicit Stage0 script -> Wave 9 case mapping table.
-- [ ] Confirm all Phase4 async scripts are covered by Wave 9 unit/parity entries.
-- [ ] Confirm `run_phase2_denied_patterns_tests.sh` `E0701` scenario is covered.
-- [ ] Fail Wave 9 harness when mapping has uncovered Stage0 behaviors.
+- [x] Produce explicit Stage0 script -> Wave 9 case mapping table.
+- [x] Confirm all Phase4 async scripts are covered by Wave 9 unit/parity entries.
+- [x] Confirm `run_phase2_denied_patterns_tests.sh` `E0701` scenario is covered.
+- [x] Fail Wave 9 harness when mapping has uncovered Stage0 behaviors.
 
 ## 15) Documentation and Status Updates
 
-- [ ] Update `docs/with-selfhost-wave9.md` with execution notes as work lands.
-- [ ] Update `docs/with-selfhost-plan.md` Wave 9 status after exit gate passes.
-- [ ] Update `docs/with-selfhost-detailed-plan.md` with Wave 9 completion notes.
-- [ ] Record accepted Wave 9 divergences with rationale and test linkage.
+- [x] Update `docs/with-selfhost-wave9.md` with execution notes as work lands.
+- [x] Update `docs/with-selfhost-plan.md` Wave 9 status after exit gate passes.
+- [x] Update `docs/with-selfhost-detailed-plan.md` with Wave 9 completion notes.
+- [x] Record accepted Wave 9 divergences with rationale and test linkage.
 
 ---
 
 ## Validation Gates (Wave 9 Exit)
 
-- [ ] `scripts/run_wave9_async_unit_tests.sh` passes.
-- [ ] `scripts/run_wave9_async_parity.sh` passes.
-- [ ] All Wave 9 corpus entries resolve to `PASS` or documented `KNOWN_DIVERGENCE`.
-- [ ] No unresolved `FAIL` entries remain.
-- [ ] Full Stage0 phase4 async coverage is demonstrated and reviewable.
-- [ ] No bootstrap changes were required for Wave 9 feature scope.
-- [ ] Async behavior parity with Stage0 is achieved for Wave 9 scope.
+- [x] `scripts/run_wave9_async_unit_tests.sh` passes.
+- [x] `scripts/run_wave9_async_parity.sh` passes.
+- [x] All Wave 9 corpus entries resolve to `PASS` or documented `KNOWN_DIVERGENCE`.
+- [x] No unresolved `FAIL` entries remain.
+- [x] Full Stage0 phase4 async coverage is demonstrated and reviewable.
+- [x] No bootstrap changes were required for Wave 9 feature scope.
+- [x] Async behavior parity with Stage0 is achieved for Wave 9 scope.
 
+## Execution Notes (Current)
+
+- Added `test/wave9/cases/*` corpus covering async fn/await/async block/async scope/select/spawn plus warning/guard divergence probes.
+- Added `scripts/run_wave9_async_unit_tests.sh` and `scripts/run_wave9_async_parity.sh`.
+- Extended `scripts/parity_states.sh` with mode-aware `KNOWN_DIVERGENCE` validation helpers for `check|build|run` corpus entries.
+- Added `test/wave9/async_corpus.txt` with tri-state parity outcomes and explicit divergence rationale.
+- Added `test/wave9/coverage_matrix.md` mapping current Wave 9 cases to Stage0 phase4 script buckets.
+- Added `test/wave9/coverage_manifest.txt` and `scripts/verify_wave9_coverage.sh` to enforce complete Phase4 script mapping coverage at parity-harness start.
+- Added `src/AsyncMir.w` and `src/AsyncLower.w` for deterministic post-MIR Async-MIR artifact lowering.
+- Wired Async-MIR into `src/Driver.w` post-MIR pipeline and exposed deterministic `--dump-async-mir` in `src/main.w`.
+- Runtime linkage now gates async runtime objects (`fiber.o`, `fiber_asm.o`) on Async-MIR async usage while preserving existing sync behavior.
+- Added `test/wave9/cases/yield_outside_generator_fail.w` and parity coverage for generator-context `yield` misuse diagnostics.
+- Extended unit harness to assert deterministic `--dump-async-mir` output.
+- Implemented Wave 9 parity fixes in self-host:
+  - `E0701` may_suspend/no_await_guard enforcement for `await` and `select await`.
+  - `E0801` discarded Task warning emission in block statements.
+  - Ephemeral Task escape warning parity at call sites.
+  - Tuple-destructure binding propagation for tuple-await downstream scope usage.
+  - Stage0-compatible `Channel/send/recv/close` builtin argument and Send-value checks.
+- Current harness status:
+  - `scripts/run_wave9_async_unit_tests.sh`: `PASS`.
+  - `scripts/run_wave9_async_parity.sh`: `PASS` (`processed=38`, `failures=0`, `known_divergences=2`, coverage verification gate enabled).
+- Current accepted divergences:
+  - Stage0 run instability (`incorrect alignment`) on `run|test/wave9/cases/async_block_inline_await_ok.w`.
+  - Stage0 run instability (`incorrect alignment`) on `run|test/wave9/cases/select_await_prefer_fast_ok.w`.
+- Resolved parity gap:
+  - `run|bootstrap/test/cases/import_std_net.w` now passes after self-host runtime object linking was aligned with Stage0 behavior.

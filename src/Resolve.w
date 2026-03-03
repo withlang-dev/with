@@ -12,6 +12,7 @@ use Span
 
 extern fn with_fs_read_file(path: str) -> str
 extern fn int_to_string(n: i32) -> str
+extern fn print(s: str) -> void
 
 fn IMPORT_KIND_USE -> i32: 1
 fn IMPORT_KIND_C_IMPORT -> i32: 2
@@ -130,7 +131,7 @@ type ResolveState = {
 
     module_map: HashMap[str, i32],
     link_lib_set: HashMap[i32, i32],
-    binding_map: HashMap[str, i32],
+    binding_map: HashMap[i64, i32],
     root_source_dir: str,
 
     next_file_id: i32,
@@ -218,8 +219,8 @@ fn resolve_extra_or_zero(pool: AstPool, idx: i32) -> i32:
         return 0
     pool.get_extra(idx)
 
-fn resolve_binding_key(scope_id: i32, symbol: i32) -> str:
-    int_to_string(scope_id) ++ ":" ++ int_to_string(symbol)
+fn resolve_binding_key(scope_id: i32, symbol: i32) -> i64:
+    (scope_id as i64) * 4294967296 + (symbol as i64)
 
 fn ResolveState.reserve_module(self: ResolveState, path: str, source_dir: str, file_id_hint: i32) -> i32:
     let canon = resolve_normalize_path(path)
@@ -1047,6 +1048,43 @@ fn resolved_scope_kind_name(kind: i32) -> str:
     if kind == SCOPE_KIND_CLOSURE(): return "closure"
     if kind == SCOPE_KIND_COMPREHENSION(): return "comprehension"
     "unknown"
+
+fn print_resolved(result: ResolveResult, pool: InternPool, root_path: str):
+    print("resolved root=" ++ root_path ++ " modules=" ++ int_to_string(result.modules.len() as i32) ++ " defs=" ++ int_to_string(result.defs.len() as i32) ++ "\n")
+
+    for mi in 0..result.modules.len() as i32:
+        let m = result.modules.get(mi as i64)
+        print("module[" ++ int_to_string(m.module_id) ++ "] file=" ++ int_to_string(m.file_id) ++ " path=" ++ m.path ++ " imports=" ++ int_to_string(m.import_count) ++ " decls=" ++ int_to_string(m.decl_count) ++ "\n")
+
+        for ii in 0..m.import_count:
+            let imp = result.imports.get((m.import_start + ii) as i64)
+            if imp.kind == IMPORT_KIND_USE():
+                print("import[" ++ int_to_string(m.module_id) ++ ":" ++ int_to_string(ii) ++ "] kind=use path=" ++ imp.path_text ++ " target=" ++ int_to_string(imp.target_module) ++ "\n")
+            else:
+                print("import[" ++ int_to_string(m.module_id) ++ ":" ++ int_to_string(ii) ++ "] kind=c_import header=\"" ++ imp.path_text ++ "\" target=" ++ int_to_string(imp.target_module) ++ "\n")
+
+    for di in 0..result.defs.len() as i32:
+        let d = result.defs.get(di as i64)
+        let name = if d.name_sym > 0: pool.resolve(d.name_sym) else: ""
+        print("def[" ++ int_to_string(d.def_id) ++ "] module=" ++ int_to_string(d.module_id) ++ " parent=" ++ int_to_string(d.parent_def) ++ " kind=" ++ resolved_def_kind_name(d.kind) ++ " name=" ++ name ++ " span=" ++ int_to_string(d.span_start) ++ ".." ++ int_to_string(d.span_end) ++ "\n")
+
+    for bi in 0..result.bindings.len() as i32:
+        let b = result.bindings.get(bi as i64)
+        let sym = pool.resolve(b.symbol)
+        print("bind[" ++ int_to_string(b.scope_id) ++ ":" ++ sym ++ "] def=" ++ int_to_string(b.def_id) ++ "\n")
+
+    for ui in 0..result.uses.len() as i32:
+        let u = result.uses.get(ui as i64)
+        let sym = pool.resolve(u.symbol)
+        print("use[" ++ int_to_string(ui) ++ "] module=" ++ int_to_string(u.module_id) ++ " node=" ++ int_to_string(u.node_id) ++ " sym=" ++ sym ++ " def=" ++ int_to_string(u.def_id) ++ " span=" ++ int_to_string(u.span_start) ++ ".." ++ int_to_string(u.span_end) ++ "\n")
+
+    if result.link_libs.len() > 0:
+        var line = "link_libs="
+        for li in 0..result.link_libs.len() as i32:
+            if li > 0:
+                line = line ++ ","
+            line = line ++ pool.resolve(result.link_libs.get(li as i64))
+        print(line ++ "\n")
 
 fn dump_resolved(result: ResolveResult, pool: InternPool, root_path: str) -> str:
     var out = ""

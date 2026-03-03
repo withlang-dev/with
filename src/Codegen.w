@@ -1158,8 +1158,6 @@ fn Codegen.record_dyn_param(self: Codegen, fn_sym: i32, idx: i32, count: i32, tr
 
 fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
     let name_sym = self.pool.get_data0(ext_node)
-    // Skip duplicate declarations
-    if self.fn_values.get(name_sym).is_some(): return
 
     let ext_flags = self.pool.get_data2(ext_node)
     let is_variadic = ext_flags % 2
@@ -1549,21 +1547,23 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
-        if kind == NK_FN_DECL():
-            let flags = self.pool.get_data2(decl)
-            let meta = self.pool.find_fn_meta(decl)
-            // Skip generic functions (store for monomorphization)
-            if meta >= 0:
-                let tp_count = self.pool.fn_meta_tp_count(meta)
-                if tp_count > 0:
-                    let name_sym = self.pool.get_data0(decl)
-                    self.generic_fns.insert(name_sym, decl)
-                else if (flags / FN_FLAG_ASYNC()) % 2 == 1:
-                    self.declare_function(decl)
-                else:
-                    self.declare_function(decl)
-        else if kind == NK_EXTERN_FN():
+        if kind == NK_EXTERN_FN():
             self.declare_extern_fn(decl)
+            continue
+        if kind != NK_FN_DECL():
+            continue
+        let flags = self.pool.get_data2(decl)
+        let meta = self.pool.find_fn_meta(decl)
+        // Skip generic functions (store for monomorphization)
+        if meta >= 0:
+            let tp_count = self.pool.fn_meta_tp_count(meta)
+            if tp_count > 0:
+                let name_sym = self.pool.get_data0(decl)
+                self.generic_fns.insert(name_sym, decl)
+            else if (flags / FN_FLAG_ASYNC()) % 2 == 1:
+                self.declare_function(decl)
+            else:
+                self.declare_function(decl)
 
     // Pass 1.5: detect drop functions
     self.detect_drop_functions()
@@ -1655,16 +1655,25 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
     self.current_method_owner_sym = 0
 
     // Clear locals
-    self.local_allocas = HashMap.new()
-    self.local_types = HashMap.new()
-    self.local_muts = HashMap.new()
-    self.local_fn_sigs = HashMap.new()
-    self.local_pointee_structs = HashMap.new()
-    self.task_locals = HashMap.new()
+    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
+    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
+    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
+    self.local_allocas = fresh_local_allocas
+    self.local_types = fresh_local_types
+    self.local_muts = fresh_local_muts
+    self.local_fn_sigs = fresh_local_fn_sigs
+    self.local_pointee_structs = fresh_local_pointee_structs
+    self.task_locals = fresh_task_locals
     self.scope_local_count = 0
-    self.defer_stack = Vec.new()
-    self.trait_locals = HashMap.new()
-    self.trait_local_concrete_types = HashMap.new()
+    let fresh_defer_stack: Vec[i32] = Vec.new()
+    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_local_concrete_types: HashMap[i32, i32] = HashMap.new()
+    self.defer_stack = fresh_defer_stack
+    self.trait_locals = fresh_trait_locals
+    self.trait_local_concrete_types = fresh_trait_local_concrete_types
 
     // Save/set expected type
     let saved_expected = self.expected_type
@@ -1751,7 +1760,8 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
         self.tailrec_body_bb = body_bb
         self.tailrec_fn_sym = name_sym
         // Collect param allocas
-        self.tailrec_param_allocas = Vec.new()
+        let fresh_tailrec_param_allocas: Vec[i64] = Vec.new()
+        self.tailrec_param_allocas = fresh_tailrec_param_allocas
         for ti in 0..param_count:
             let tp_name = self.pool.get_extra(param_start + ti * 2)
             let ta = self.local_allocas.get(tp_name)
@@ -1851,6 +1861,9 @@ fn Codegen.gen_expr(self: Codegen, node: i32) -> i64:
         let body = self.pool.get_data0(node)
         self.defer_stack.push(body)
         return wl_get_undef(wl_void_type(self.context))
+    if kind == NK_ASYNC_BLOCK(): return self.gen_async_block(node)
+    if kind == NK_ASYNC_SCOPE(): return self.gen_async_scope(node)
+    if kind == NK_SELECT_AWAIT(): return self.gen_select_await(node)
     if kind == NK_YIELD(): return self.gen_yield(node)
     if kind == NK_AWAIT(): return self.gen_await(node)
     if kind == NK_SPAWN(): return self.gen_spawn(node)
@@ -2736,6 +2749,18 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
                 args.push(arg)
             return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(args), arg_count)
 
+        // Fallback for imported/module-level symbols when internal symbol-key
+        // maps do not contain the function entry but LLVM module lookup does.
+        let named_f = wl_get_named_function(self.llmod, fn_name)
+        if named_f != 0:
+            let named_ft = wl_global_get_value_type(named_f)
+            if wl_get_type_kind(named_ft) == wl_function_type_kind():
+                let args: Vec[i64] = Vec.new()
+                for ai in 0..arg_count:
+                    let arg_node = self.pool.get_extra(args_start + ai)
+                    args.push(self.gen_expr(arg_node))
+                return wl_build_call(self.builder, named_ft, named_f, vec_data_i64(args), arg_count)
+
         // Check if it's a function pointer local
         let la = self.local_allocas.get(fn_sym)
         if la.is_some():
@@ -2796,6 +2821,13 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
 
     let obj = self.gen_expr(obj_node)
     let obj_ty = wl_type_of(obj)
+
+    if method_name == "track":
+        if arg_count > 0:
+            // async scope track is a task-handle passthrough in the current
+            // self-host runtime contract.
+            return self.gen_expr(self.pool.get_extra(args_start))
+        return wl_get_undef(wl_void_type(self.context))
 
     // Find the type name for this object
     let type_sym = self.find_struct_type_by_llvm(obj_ty)
@@ -3486,8 +3518,10 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     let saved_bb = wl_get_insert_block(self.builder)
     let saved_allocas = self.local_allocas
     let saved_types = self.local_types
-    self.local_allocas = HashMap.new()
-    self.local_types = HashMap.new()
+    let fresh_closure_locals: HashMap[i32, i64] = HashMap.new()
+    let fresh_closure_types: HashMap[i32, i64] = HashMap.new()
+    self.local_allocas = fresh_closure_locals
+    self.local_types = fresh_closure_types
     // Build closure body
     self.current_function = closure_fn
     let entry = wl_append_bb(self.context, closure_fn, "entry")
@@ -3713,6 +3747,155 @@ fn Codegen.gen_array_comprehension(self: Codegen, node: i32) -> i64:
     wl_get_undef(wl_void_type(self.context))
 
 // ── Async stubs ───────────────────────────────────────────────────
+
+fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
+    // Stage1 contract: async blocks evaluate to task-like values consumed
+    // by await/spawn/select paths.
+    let body = self.pool.get_data0(node)
+    self.gen_expr(body)
+
+fn Codegen.gen_async_scope(self: Codegen, node: i32) -> i64:
+    // async scope currently lowers as an explicit lexical body evaluation.
+    let body = self.pool.get_data1(node)
+    self.gen_expr(body)
+
+fn Codegen.expr_contains_await(self: Codegen, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.pool.kind(node)
+    if kind == NK_AWAIT():
+        return 1
+    if kind == NK_GROUPED() or kind == NK_ASYNC_BLOCK() or kind == NK_SPAWN() or kind == NK_DEFER() or kind == NK_YIELD() or kind == NK_COMPTIME():
+        return self.expr_contains_await(self.pool.get_data0(node))
+    if kind == NK_UNARY() or kind == NK_CAST() or kind == NK_CLOSURE() or kind == NK_BREAK():
+        return self.expr_contains_await(self.pool.get_data0(node))
+    if kind == NK_BINARY() or kind == NK_ASSIGN() or kind == NK_PIPELINE() or kind == NK_RANGE() or kind == NK_INDEX():
+        if self.expr_contains_await(self.pool.get_data0(node)) != 0:
+            return 1
+        return self.expr_contains_await(self.pool.get_data1(node))
+    if kind == NK_CALL():
+        if self.expr_contains_await(self.pool.get_data0(node)) != 0:
+            return 1
+        let extra_start = self.pool.get_data1(node)
+        let arg_count = self.pool.get_data2(node)
+        for ai in 0..arg_count:
+            if self.expr_contains_await(self.pool.get_extra(extra_start + ai)) != 0:
+                return 1
+        return 0
+    if kind == NK_FIELD_ACCESS():
+        return self.expr_contains_await(self.pool.get_data0(node))
+    if kind == NK_SLICE():
+        if self.expr_contains_await(self.pool.get_data0(node)) != 0:
+            return 1
+        if self.expr_contains_await(self.pool.get_data1(node)) != 0:
+            return 1
+        return self.expr_contains_await(self.pool.get_data2(node))
+    if kind == NK_BLOCK():
+        let extra_start = self.pool.get_data0(node)
+        let stmt_count = self.pool.get_data1(node)
+        let tail = self.pool.get_data2(node)
+        for si in 0..stmt_count:
+            if self.expr_contains_await(self.pool.get_extra(extra_start + si)) != 0:
+                return 1
+        return self.expr_contains_await(tail)
+    if kind == NK_IF_EXPR():
+        if self.expr_contains_await(self.pool.get_data0(node)) != 0:
+            return 1
+        if self.expr_contains_await(self.pool.get_data1(node)) != 0:
+            return 1
+        return self.expr_contains_await(self.pool.get_data2(node))
+    if kind == NK_WHILE():
+        if self.expr_contains_await(self.pool.get_data0(node)) != 0:
+            return 1
+        return self.expr_contains_await(self.pool.get_data1(node))
+    if kind == NK_FOR():
+        if self.expr_contains_await(self.pool.get_data1(node)) != 0:
+            return 1
+        return self.expr_contains_await(self.pool.get_data2(node))
+    if kind == NK_LOOP() or kind == NK_RETURN():
+        return self.expr_contains_await(self.pool.get_data0(node))
+    if kind == NK_LET_BINDING() or kind == NK_ASYNC_SCOPE():
+        return self.expr_contains_await(self.pool.get_data1(node))
+    if kind == NK_TUPLE() or kind == NK_ARRAY_LIT():
+        let extra_start = self.pool.get_data0(node)
+        let elem_count = self.pool.get_data1(node)
+        for ei in 0..elem_count:
+            if self.expr_contains_await(self.pool.get_extra(extra_start + ei)) != 0:
+                return 1
+        return 0
+    if kind == NK_STRUCT_LIT():
+        let extra_start = self.pool.get_data1(node)
+        let field_count = self.pool.get_data2(node)
+        for fi in 0..field_count:
+            if self.expr_contains_await(self.pool.get_extra(extra_start + fi * 2 + 1)) != 0:
+                return 1
+        return 0
+    if kind == NK_MATCH():
+        if self.expr_contains_await(self.pool.get_data0(node)) != 0:
+            return 1
+        let extra_start = self.pool.get_data1(node)
+        let arm_count = self.pool.get_data2(node)
+        for ai in 0..arm_count:
+            let arm = self.pool.get_extra(extra_start + ai)
+            if self.expr_contains_await(self.pool.get_data2(arm)) != 0:
+                return 1
+            if self.expr_contains_await(self.pool.get_data1(arm)) != 0:
+                return 1
+        return 0
+    if kind == NK_SELECT_AWAIT():
+        return 1
+    0
+
+fn Codegen.fn_body_contains_await(self: Codegen, fn_sym: i32) -> i32:
+    for di in 0..self.pool.decl_count():
+        let decl = self.pool.get_decl(di)
+        if self.pool.kind(decl) == NK_FN_DECL() and self.pool.get_data0(decl) == fn_sym:
+            return self.expr_contains_await(self.pool.get_data1(decl))
+    0
+
+fn Codegen.select_arm_latency_hint(self: Codegen, task_expr: i32) -> i32:
+    if task_expr == 0:
+        return 0
+    let kind = self.pool.kind(task_expr)
+    if kind == NK_CALL():
+        let callee = self.pool.get_data0(task_expr)
+        if self.pool.kind(callee) == NK_IDENT():
+            let fn_sym = self.pool.get_data0(callee)
+            return self.fn_body_contains_await(fn_sym)
+        return 0
+    if kind == NK_ASYNC_BLOCK():
+        return self.expr_contains_await(self.pool.get_data0(task_expr))
+    0
+
+fn Codegen.gen_select_await(self: Codegen, node: i32) -> i64:
+    let extra_start = self.pool.get_data0(node)
+    let arm_count = self.pool.get_data1(node)
+    if arm_count <= 0:
+        return wl_get_undef(wl_void_type(self.context))
+
+    var selected = 0
+    var selected_hint = 2147483647
+    for ai in 0..arm_count:
+        let task_expr = self.pool.get_extra(extra_start + ai * 3 + 1)
+        let hint = self.select_arm_latency_hint(task_expr)
+        if hint < selected_hint:
+            selected = ai
+            selected_hint = hint
+
+    let arm_name = self.pool.get_extra(extra_start + selected * 3)
+    let task_expr = self.pool.get_extra(extra_start + selected * 3 + 1)
+    let arm_body = self.pool.get_extra(extra_start + selected * 3 + 2)
+
+    let task_val = self.gen_expr(task_expr)
+    let task_ty = wl_type_of(task_val)
+    let arm_name_text = self.intern.resolve(arm_name)
+    if arm_name != 0 and arm_name_text != "_":
+        let alloca = self.create_entry_alloca(task_ty)
+        wl_build_store(self.builder, task_val, alloca)
+        self.local_allocas.insert(arm_name, alloca)
+        self.local_types.insert(arm_name, task_ty)
+
+    self.gen_expr(arm_body)
 
 fn Codegen.gen_yield(self: Codegen, node: i32) -> i64:
     // Generator yield - requires generator state machine transform
