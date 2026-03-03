@@ -1778,13 +1778,14 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
                         let unit_val = wl_const_int(wl_i32_type(self.context), 0, 0)
                         let wrapped = self.build_result_ok(unit_val, ret_type)
                         wl_build_ret(self.builder, wrapped)
-                    else if self.current_fn_saw_explicit_return:
-                        wl_build_unreachable(self.builder)
                     else:
-                        wl_build_unreachable(self.builder)
+                        self.emit_implicit_unreachable(fn_node)
                 else:
-                    let default_val = self.build_default_value(ret_type)
-                    wl_build_ret(self.builder, default_val)
+                    if self.current_fn_saw_explicit_return:
+                        self.emit_implicit_unreachable(fn_node)
+                    else:
+                        let default_val = self.build_default_value(ret_type)
+                        wl_build_ret(self.builder, default_val)
             else if body_type != ret_type and self.current_fn_returns_result:
                 let wrapped = self.build_result_ok(body_val, ret_type)
                 wl_build_ret(self.builder, wrapped)
@@ -4363,3 +4364,23 @@ fn Codegen.emit_exit_call(self: Codegen, code: i32):
         let args: Vec[i64] = Vec.new()
         args.push(wl_const_int(wl_i32_type(self.context), code as i64, 0))
         wl_build_call(self.builder, fn_ty, exit_fn, vec_data_i64(args), 1)
+
+fn Codegen.emit_implicit_unreachable(self: Codegen, node: i32):
+    let i32_ty = wl_i32_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let fprintf_fn = self.ensure_fprintf_declared()
+    let fprintf_ty = wl_global_get_value_type(fprintf_fn)
+    let stderr_global = self.ensure_stderr_declared()
+    let stderr_ptr = wl_build_load(self.builder, ptr_ty, stderr_global)
+    let fmt_ptr = wl_build_global_string_ptr(self.builder, "entered implicit unreachable code at %s:%d\n")
+    let file_ptr = wl_build_global_string_ptr(self.builder, self.source_file)
+    let line_val = wl_const_int(i32_ty, self.span_to_line(node) as i64, 0)
+
+    let args: Vec[i64] = Vec.new()
+    args.push(stderr_ptr)
+    args.push(fmt_ptr)
+    args.push(file_ptr)
+    args.push(line_val)
+    wl_build_call(self.builder, fprintf_ty, fprintf_fn, vec_data_i64(args), 4)
+    self.emit_exit_call(134)
+    wl_build_unreachable(self.builder)

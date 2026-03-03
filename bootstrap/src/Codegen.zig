@@ -1900,18 +1900,17 @@ fn genFunction(self: *Codegen, func: Ast.FnDecl) Error!void {
                         const unit_val = c.LLVMConstInt(c.LLVMInt32TypeInContext(self.context), 0, 0);
                         const wrapped = try self.buildResultOk(unit_val, ret_type);
                         _ = c.LLVMBuildRet(self.builder, wrapped);
-                    } else if (self.current_fn_saw_explicit_return) {
-                        // We are in dead continuation code after one or more
-                        // explicit returns; keep this block unreachable rather
-                        // than forcing a synthetic Result return.
-                        _ = c.LLVMBuildUnreachable(self.builder);
                     } else {
-                        return error.UnsupportedExpr;
+                        try self.emitImplicitUnreachablePanic(func.body.span);
                     }
                 } else {
-                    // Implicit default return: return the type's default value.
-                    const default_val = self.buildDefaultValue(ret_type);
-                    _ = c.LLVMBuildRet(self.builder, default_val);
+                    if (self.current_fn_saw_explicit_return) {
+                        try self.emitImplicitUnreachablePanic(func.body.span);
+                    } else {
+                        // Implicit default return: return the type's default value.
+                        const default_val = self.buildDefaultValue(ret_type);
+                        _ = c.LLVMBuildRet(self.builder, default_val);
+                    }
                 }
             } else if (body_type != ret_type and self.current_fn_returns_result) {
                 // Implicit Ok wrapping: if return type is Result and body is not,
@@ -14188,6 +14187,31 @@ fn ensureExitDeclared(self: *Codegen) Error!FnInfo {
     const info = FnInfo{ .value = func, .fn_type = fn_type };
     self.functions.put(self.allocator, exit_sym, info) catch return error.CodegenAlloc;
     return info;
+}
+
+/// Emit an implicit unreachable panic that reports source file and line.
+fn emitImplicitUnreachablePanic(self: *Codegen, span: @import("Span.zig")) Error!void {
+    const write_info = try self.ensureWriteDeclared();
+    const exit_info = try self.ensureExitDeclared();
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    const line = self.spanToLine(span);
+    var msg_buf: [1200]u8 = undefined;
+    const panic_msg: [:0]const u8 = std.fmt.bufPrintZ(
+        &msg_buf,
+        "entered implicit unreachable code at {s}:{d}\n",
+        .{ self.source_file, line },
+    ) catch "entered implicit unreachable code\n";
+    const msg_ptr = c.LLVMBuildGlobalStringPtr(self.builder, panic_msg, "implicit.unreachable.msg");
+    var write_args = [_]c.LLVMValueRef{
+        c.LLVMConstInt(i32_type, 2, 0), // stderr fd
+        msg_ptr,
+        c.LLVMConstInt(i32_type, @intCast(panic_msg.len), 0),
+    };
+    _ = c.LLVMBuildCall2(self.builder, write_info.fn_type, write_info.value, &write_args, 3, "");
+
+    var exit_args = [_]c.LLVMValueRef{c.LLVMConstInt(i32_type, 134, 0)};
+    _ = c.LLVMBuildCall2(self.builder, exit_info.fn_type, exit_info.value, &exit_args, 1, "");
+    _ = c.LLVMBuildUnreachable(self.builder);
 }
 
 /// Declare or look up a C library function by name.
