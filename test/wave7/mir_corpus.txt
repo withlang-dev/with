@@ -1,0 +1,29 @@
+# Wave 7 MIR parity corpus
+# Keep inputs deterministic and sema-clean.
+
+bootstrap/test/cases/assign.w
+bootstrap/test/cases/arithmetic_mixed.w
+bootstrap/test/cases/bool_logic.w
+bootstrap/test/cases/calls.w
+bootstrap/test/cases/if_simple.w
+bootstrap/test/cases/loop_simple.w
+bootstrap/test/cases/while_cond.w
+bootstrap/test/cases/for_loop.w
+bootstrap/test/cases/break_continue.w
+bootstrap/test/cases/match_int.w
+bootstrap/test/cases/match_guard.w
+bootstrap/test/cases/match_or_enum.w
+bootstrap/test/cases/let_else.w
+bootstrap/test/cases/pipeline.w
+bootstrap/test/cases/record_update.w
+bootstrap/test/cases/with_form1.w
+bootstrap/test/cases/with_builder.w
+bootstrap/test/cases/with_scoped.w
+bootstrap/test/cases/option_unwrap_or.w
+bootstrap/test/cases/opt_chain.w
+bootstrap/test/cases/closure_capture.w
+bootstrap/test/cases/by_value_method.w
+bootstrap/test/cases/generic_multi.w
+test/wave7/cases/drop_scope_exit.w
+test/wave7/cases/drop_early_return.w
+test/wave7/cases/drop_break_continue.w

@@ -24,6 +24,7 @@ run_case() {
   local src="$2"
   local out="$tmpdir/${name}.resolved"
   local err="$tmpdir/${name}.stderr"
+  local case_failures=0
 
   if ! "$SELFHOST_BIN" check "$src" --dump-resolved >"$out" 2>"$err"; then
     echo "FAIL(wave4-resolve-unit-check) $src"
@@ -35,62 +36,88 @@ run_case() {
   if ! head -n 1 "$out" | grep -Eq '^resolved root=.* modules=[0-9]+ defs=[0-9]+$'; then
     echo "FAIL(wave4-resolve-unit-header) $src"
     head -n 3 "$out" || true
-    failures=$((failures + 1))
-    return
+    case_failures=$((case_failures + 1))
   fi
 
   if ! grep -q '^module\[0\] ' "$out"; then
     echo "FAIL(wave4-resolve-unit-root-module) $src"
-    failures=$((failures + 1))
-    return
+    case_failures=$((case_failures + 1))
   fi
 
   if [[ "$name" == "basic" ]]; then
     if ! grep -Eq 'path=.*test/wave4/cases/support/alpha\.w' "$out"; then
-      echo "FAIL(wave4-resolve-unit-basic-alpha-import)"
-      failures=$((failures + 1))
+      echo "FAIL(wave4-resolve-unit-basic-alpha-import) $src"
+      case_failures=$((case_failures + 1))
     fi
     if ! grep -Eq 'path=.*test/wave4/cases/support/beta\.w' "$out"; then
-      echo "FAIL(wave4-resolve-unit-basic-beta-import)"
-      failures=$((failures + 1))
+      echo "FAIL(wave4-resolve-unit-basic-beta-import) $src"
+      case_failures=$((case_failures + 1))
     fi
   fi
 
   if [[ "$name" == "cycle" ]]; then
     if ! head -n 1 "$out" | grep -Eq 'modules=3 '; then
-      echo "FAIL(wave4-resolve-unit-cycle-module-count)"
-      failures=$((failures + 1))
+      echo "FAIL(wave4-resolve-unit-cycle-module-count) $src"
+      case_failures=$((case_failures + 1))
     fi
     if [[ "$(grep -c '^module\[' "$out")" -ne 3 ]]; then
-      echo "FAIL(wave4-resolve-unit-cycle-module-lines)"
-      failures=$((failures + 1))
+      echo "FAIL(wave4-resolve-unit-cycle-module-lines) $src"
+      case_failures=$((case_failures + 1))
     fi
   fi
 
   if [[ "$name" == "fallback" ]]; then
     if ! grep -Eq 'import\[0:0\] kind=use path=fallback\.pkg\.Item target=[0-9]+' "$out"; then
-      echo "FAIL(wave4-resolve-unit-fallback-edge)"
-      failures=$((failures + 1))
+      echo "FAIL(wave4-resolve-unit-fallback-edge) $src"
+      case_failures=$((case_failures + 1))
     fi
     if ! grep -Eq 'path=.*test/wave4/cases/fallback/pkg\.w' "$out"; then
-      echo "FAIL(wave4-resolve-unit-fallback-target)"
-      failures=$((failures + 1))
+      echo "FAIL(wave4-resolve-unit-fallback-target) $src"
+      case_failures=$((case_failures + 1))
     fi
   fi
 
   if [[ "$name" == "cimport" ]]; then
     if ! grep -q 'kind=c_import header="stdio.h"' "$out"; then
-      echo "FAIL(wave4-resolve-unit-cimport-edge)"
-      failures=$((failures + 1))
+      echo "FAIL(wave4-resolve-unit-cimport-edge) $src"
+      case_failures=$((case_failures + 1))
     fi
     if ! grep -q '^link_libs=c$' "$out"; then
-      echo "FAIL(wave4-resolve-unit-cimport-link-lib)"
-      failures=$((failures + 1))
+      echo "FAIL(wave4-resolve-unit-cimport-link-lib) $src"
+      case_failures=$((case_failures + 1))
     fi
   fi
 
-  if [[ "$failures" -eq 0 ]]; then
+  if [[ "$case_failures" -eq 0 ]]; then
     echo "PASS(wave4-resolve-unit) $src"
+  else
+    failures=$((failures + case_failures))
+  fi
+}
+
+run_error_case() {
+  local name="$1"
+  local src="$2"
+  local expected_pattern="$3"
+  local out="$tmpdir/${name}.resolved"
+  local err="$tmpdir/${name}.stderr"
+  local case_failures=0
+
+  if "$SELFHOST_BIN" check "$src" --dump-resolved >"$out" 2>"$err"; then
+    echo "FAIL(wave4-resolve-unit-expected-error) $src (expected non-zero exit)"
+    case_failures=$((case_failures + 1))
+  else
+    if [[ -n "$expected_pattern" ]] && ! grep -q "$expected_pattern" "$err"; then
+      echo "FAIL(wave4-resolve-unit-error-pattern) $src (expected: $expected_pattern)"
+      cat "$err"
+      case_failures=$((case_failures + 1))
+    fi
+  fi
+
+  if [[ "$case_failures" -eq 0 ]]; then
+    echo "PASS(wave4-resolve-unit-error) $src"
+  else
+    failures=$((failures + case_failures))
   fi
 }
 
@@ -98,6 +125,7 @@ run_case "basic" "test/wave4/cases/basic_root.w"
 run_case "cycle" "test/wave4/cases/cycle_root.w"
 run_case "fallback" "test/wave4/cases/fallback_root.w"
 run_case "cimport" "test/wave4/cases/cimport_root.w"
+run_error_case "unresolved_import" "test/wave4/cases/unresolved_import.w" "import module not found"
 
 if [[ "$failures" -ne 0 ]]; then
   echo "wave4 resolve unit tests: $failures failure(s)"

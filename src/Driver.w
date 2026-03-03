@@ -13,6 +13,8 @@ use Diagnostic
 use Source
 use Span
 use Sema
+use Mir
+use MirLower
 use Codegen
 use CImport
 use Resolve
@@ -54,9 +56,14 @@ type Driver = {
     typed_binding_names: HashMap[i32, i32],
     typed_binding_muts: HashMap[i32, i32],
     last_typed_dump: str,
+    // Wave 7 MIR artifacts from the latest successful semantic pass.
+    last_sema: Sema,
+    last_mir_module: MirModule,
+    last_mir_dump: str,
 }
 
 fn Driver.init -> Driver:
+    let sema_seed = Sema.init(InternPool.init(), DiagnosticList.init(), AstPool.new())
     Driver {
         pool: InternPool.init(),
         diagnostics: DiagnosticList.init(),
@@ -76,6 +83,9 @@ fn Driver.init -> Driver:
         typed_binding_names: HashMap.new(),
         typed_binding_muts: HashMap.new(),
         last_typed_dump: "",
+        last_sema: sema_seed,
+        last_mir_module: MirModule.init(),
+        last_mir_dump: "",
     }
 
 fn Driver.deinit(self: Driver):
@@ -100,6 +110,8 @@ fn Driver.compile_file(self: Driver, path: str) -> AstPool:
         with_eprintln("error: cannot open '" ++ path ++ "'")
         self.last_resolved = ResolveResult.init()
         self.resolved_root_path = path
+        self.last_mir_module = MirModule.init()
+        self.last_mir_dump = ""
         return AstPool.new()
 
     self.current_source_text = text
@@ -197,6 +209,9 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
     // Keep typed sidecars for downstream stages, but build the textual typed
     // dump lazily only on explicit --dump-typed paths.
     self.last_typed_dump = ""
+    self.last_sema = sema
+    self.last_mir_module = lower_module(sema, pool, self.pool)
+    self.last_mir_dump = ""
 
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
@@ -224,13 +239,50 @@ fn Driver.dump_typed(self: Driver, pool: AstPool) -> str:
     self.typed_binding_names = sema.typed_binding_names
     self.typed_binding_muts = sema.typed_binding_muts
     self.last_typed_dump = sema.dump_typed_module()
+    self.last_sema = sema
+    self.last_mir_dump = ""
 
     if self.diagnostics.has_errors():
         let source = Source.from_string(self.current_source_path, self.current_source_text, 0)
         self.diagnostics.render_all(source)
+        self.last_mir_module = MirModule.init()
         return ""
 
     self.last_typed_dump
+
+fn Driver.run_mir_lower(self: Driver, pool: AstPool) -> MirModule:
+    var sema = Sema.init(self.pool, self.diagnostics, pool)
+    if self.no_std:
+        sema.no_std = 1
+    if self.alloc:
+        sema.alloc = 1
+    sema.check_module()
+
+    self.pool = sema.pool
+    self.diagnostics = sema.diags
+    self.typed_expr_types = sema.typed_expr_types
+    self.typed_binding_types = sema.typed_binding_types
+    self.typed_binding_names = sema.typed_binding_names
+    self.typed_binding_muts = sema.typed_binding_muts
+    self.last_sema = sema
+
+    if self.diagnostics.has_errors():
+        let source = Source.from_string(self.current_source_path, self.current_source_text, 0)
+        self.diagnostics.render_all(source)
+        self.last_mir_module = MirModule.init()
+        self.last_mir_dump = ""
+        return self.last_mir_module
+
+    self.last_mir_module = lower_module(sema, pool, self.pool)
+    self.last_mir_dump = ""
+    self.last_mir_module
+
+fn Driver.dump_mir(self: Driver, pool: AstPool) -> str:
+    if self.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+
+    self.last_mir_dump = dump_mir_module(self.last_mir_module, self.pool, self.last_sema)
+    self.last_mir_dump
 
 // ── Codegen + link ───────────────────────────────────────────────
 
@@ -382,6 +434,13 @@ fn Driver.process_imports(self: Driver, pool: AstPool, source_text: str) -> AstP
         let path_name = self.use_path_name(merged_pool, path_start, path_count)
         let file_path = self.resolve_module_path(path_name)
         if file_path.len() == 0:
+            // Emit error matching Stage0 behavior: import module not found.
+            let span = Span {
+                file: 0,
+                start: merged_pool.get_start(decl),
+                end: merged_pool.get_end(decl),
+            }
+            self.diagnostics.emit(Diagnostic.err("import module not found", span))
             continue
 
         if self.imported_paths.contains(file_path):

@@ -1599,10 +1599,10 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         let v_name = self.ast.get_data0(node)
         let v_extra = self.ast.get_data1(node)
         let bind_count = self.ast.get_data2(node)
-        // Bind each payload variable
+        // Recursively check each payload pattern (extra stores pattern nodes, not symbols).
         for bi in 0..bind_count:
-            let b_sym = self.ast.get_extra(v_extra + bi)
-            self.scope_put(b_sym, 0, 0)
+            let inner_pat = self.ast.get_extra(v_extra + bi)
+            self.check_pattern(inner_pat, 0)
         return
 
     if kind == NK_PAT_OR():

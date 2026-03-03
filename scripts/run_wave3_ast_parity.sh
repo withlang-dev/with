@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+source "${ROOT_DIR}/scripts/parity_states.sh"
 
 STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
@@ -29,16 +30,24 @@ if [[ ! -f "$CORPUS_FILE" ]]; then
   echo "error: missing corpus file: $CORPUS_FILE"
   exit 1
 fi
+if ! parity_validate_known_divergences "$CORPUS_FILE"; then
+  exit 1
+fi
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 failures=0
+known_divergences=0
 processed=0
+declared_known_divergences="$(parity_kd_count "$CORPUS_FILE")"
+used_kd_file="$tmpdir/used_known_divergences.txt"
+touch "$used_kd_file"
 
 while IFS= read -r src; do
   [[ -z "$src" ]] && continue
   [[ "${src:0:1}" == "#" ]] && continue
+  [[ "$src" == KNOWN_DIVERGENCE\|* ]] && continue
 
   if [[ ! -f "$src" ]]; then
     echo "FAIL(wave3-ast-parity-missing-source) $src"
@@ -51,17 +60,35 @@ while IFS= read -r src; do
   stage0_out="$tmpdir/${key}.stage0.ast"
   self_out_1="$tmpdir/${key}.selfhost.ast.1"
   self_out_2="$tmpdir/${key}.selfhost.ast.2"
+  kd_line="$(parity_kd_line_for_test "$CORPUS_FILE" "$src")"
 
-  if ! "$STAGE0_BIN" check "$src" --dump-ast >"$stage0_out" 2>"$tmpdir/${key}.stage0.stderr"; then
-    echo "FAIL(wave3-ast-parity-stage0-check) $src"
-    cat "$tmpdir/${key}.stage0.stderr"
-    failures=$((failures + 1))
-    continue
-  fi
+  stage0_rc=0
+  "$STAGE0_BIN" check "$src" --dump-ast >"$stage0_out" 2>"$tmpdir/${key}.stage0.stderr" || stage0_rc=$?
+  self_rc_1=0
+  "$SELFHOST_BIN" check "$src" --dump-ast >"$self_out_1" 2>"$tmpdir/${key}.selfhost.stderr" || self_rc_1=$?
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-ast >"$self_out_1" 2>"$tmpdir/${key}.selfhost.stderr"; then
-    echo "FAIL(wave3-ast-parity-selfhost-check) $src"
-    cat "$tmpdir/${key}.selfhost.stderr"
+  if [[ "$stage0_rc" -ne 0 || "$self_rc_1" -ne 0 ]]; then
+    if [[ "$stage0_rc" -ne "$self_rc_1" ]]; then
+      if [[ -n "$kd_line" ]]; then
+        IFS='|' read -r _ kd_test kd_what kd_correct kd_why <<< "$kd_line"
+        echo "KNOWN_DIVERGENCE(wave3-ast-parity) ${kd_test} what='${kd_what}' correct='${kd_correct}' why='${kd_why}' stage0_rc=$stage0_rc selfhost_rc=$self_rc_1"
+        echo "$kd_test" >> "$used_kd_file"
+        known_divergences=$((known_divergences + 1))
+      else
+        echo "FAIL(wave3-ast-parity-status-mismatch) $src stage0=$stage0_rc selfhost=$self_rc_1"
+        cat "$tmpdir/${key}.stage0.stderr" || true
+        cat "$tmpdir/${key}.selfhost.stderr" || true
+        failures=$((failures + 1))
+      fi
+      continue
+    fi
+    if [[ -n "$kd_line" ]]; then
+      echo "FAIL(wave3-ast-parity-stale-known-divergence) $src"
+    else
+      echo "FAIL(wave3-ast-parity-both-check-failed) $src rc=$self_rc_1"
+      cat "$tmpdir/${key}.stage0.stderr" || true
+      cat "$tmpdir/${key}.selfhost.stderr" || true
+    fi
     failures=$((failures + 1))
     continue
   fi
@@ -93,11 +120,23 @@ while IFS= read -r src; do
   fi
 
   if diff -u "$stage0_out" "$self_out_1" >/dev/null; then
+    if [[ -n "$kd_line" ]]; then
+      echo "FAIL(wave3-ast-parity-stale-known-divergence) $src"
+      failures=$((failures + 1))
+      continue
+    fi
     echo "PASS(wave3-ast-parity) $src"
   else
-    echo "FAIL(wave3-ast-parity-diff) $src"
-    diff -u "$stage0_out" "$self_out_1" || true
-    failures=$((failures + 1))
+    if [[ -n "$kd_line" ]]; then
+      IFS='|' read -r _ kd_test kd_what kd_correct kd_why <<< "$kd_line"
+      echo "KNOWN_DIVERGENCE(wave3-ast-parity) ${kd_test} what='${kd_what}' correct='${kd_correct}' why='${kd_why}'"
+      echo "$kd_test" >> "$used_kd_file"
+      known_divergences=$((known_divergences + 1))
+    else
+      echo "FAIL(wave3-ast-parity-diff) $src"
+      diff -u "$stage0_out" "$self_out_1" || true
+      failures=$((failures + 1))
+    fi
   fi
 done < <(grep -v '^[[:space:]]*$' "$CORPUS_FILE" | sort)
 
@@ -105,9 +144,17 @@ if [[ "$processed" -eq 0 ]]; then
   echo "error: empty corpus: $CORPUS_FILE"
   exit 1
 fi
+used_known_divergences="$(sort -u "$used_kd_file" | sed '/^$/d' | wc -l | tr -d ' ')"
+if [[ "$declared_known_divergences" -ne "$used_known_divergences" ]]; then
+  echo "FAIL(wave3-ast-parity-known-divergence-accounting) declared=$declared_known_divergences used=$used_known_divergences"
+  failures=$((failures + 1))
+fi
+
+echo ""
+echo "wave3 AST parity: processed=$processed failures=$failures known_divergences=$known_divergences"
 
 if [[ "$failures" -ne 0 ]]; then
-  echo "wave3 AST parity: $failures failure(s)"
+  echo "wave3 AST parity: FAIL"
   exit 1
 fi
 

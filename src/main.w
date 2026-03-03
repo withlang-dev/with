@@ -3,7 +3,7 @@
 // Usage:
 //   with run [file.w]     Build + run source file
 //   with build [file.w]   Build source file
-//   with check <file.w>   Parse and type-check (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed)
+//   with check <file.w>   Parse and type-check (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir)
 //   with ir <file.w>      Dump LLVM IR
 //   with ast <file.w>     Parse and dump AST
 //   with tokens <file.w>  Lex and dump tokens
@@ -50,6 +50,7 @@ fn main -> void:
     var dump_ast_flag = false
     var dump_resolved_flag = false
     var dump_typed_flag = false
+    var dump_mir_flag = false
     var deterministic_mode = false
     var i = 2
     while i < argc:
@@ -78,6 +79,8 @@ fn main -> void:
             dump_resolved_flag = true
         if arg == "--dump-typed":
             dump_typed_flag = true
+        if arg == "--dump-mir":
+            dump_mir_flag = true
         if arg == "--deterministic":
             deterministic_mode = true
         i = i + 1
@@ -136,6 +139,9 @@ fn main -> void:
             return
         if dump_typed_flag:
             exit(dump_typed_artifact(source_file, no_std, alloc_mode))
+            return
+        if dump_mir_flag:
+            exit(dump_mir_artifact(source_file, no_std, alloc_mode))
             return
         var comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode)
@@ -335,6 +341,20 @@ fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
     print(typed)
     0
 
+fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode)
+    let pool = comp.compile_file(source_file)
+    if pool.decl_count() == 0:
+        with_eprintln("error: mir dump failed during compilation")
+        return 1
+    let mir_text = comp.driver.dump_mir(pool)
+    if mir_text.len() == 0:
+        with_eprintln("error: mir dump failed during mir lowering")
+        return 1
+    print(mir_text)
+    0
+
 fn escape_dump_lexeme(text: str) -> str:
     var out = ""
     for i in 0..text.len():
@@ -392,7 +412,7 @@ fn print_usage:
     print("Commands:\n")
     print("  build [file.w]    Build a source file\n")
     print("  run [file.w]      Build + run a source file\n")
-    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed)\n")
+    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir)\n")
     print("  test [file.w]     Run tests\n")
     print("  clean             Delete .with/ artifacts\n")
     print("  ir <file.w>       Dump LLVM IR (debug)\n")

@@ -479,19 +479,31 @@ Test infrastructure: `test/wave6/cases/` (10 files), `test/wave6/typed_corpus.tx
 Known divergence: KD-W6-001 (`inferred_return` line not emitted; corpus designed to avoid).
 
 Validation:
-Typed dump identical. (Harness ready; green run pending.)
+Typed dump parity harness passes on Wave 6 corpus with explicit `KNOWN_DIVERGENCE` accounting.
 
 ---
 
-## Wave 7 — MIR Lowering
+## Wave 7 — MIR Lowering ✓ IMPLEMENTED
 
 * CFG construction
 * Explicit drops
 * Desugar everything
 * No sugar beyond this point
 
+Delivered artifacts:
+- `src/Mir.w` rewritten as full SoA MIR model + deterministic dump rendering.
+- `src/MirLower.w` implemented for MIR lowering, drop scheduling/elaboration, pattern/discriminant lowering, and sugar lowering (`?.`, `??`, `with`, record update, `let...else`, pipeline).
+- Driver/CLI plumbing for `--dump-mir` in `src/Driver.w` and `src/main.w`.
+- Test infrastructure:
+  - `test/wave7/mir_corpus.txt`
+  - `scripts/run_wave7_mir_parity.sh`
+  - `scripts/run_wave7_mir_unit_tests.sh`
+  - `test/wave7/cases/*.w`
+
 Validation:
-MIR → LLVM produces semantically identical behavior.
+- Wave 7 MIR parity harness passes deterministic self-host validation on 26/26 corpus files.
+- Wave 7 MIR unit harness passes.
+- No accepted Wave 7 `KNOWN_DIVERGENCE` entries (current count: 0).
 
 ---
 

@@ -1,0 +1,23 @@
+# Async combinator parity corpus (fix_more_annoyances).
+# Stage0 oracle: bootstrap/zig-out/bin/with check <file>
+# Self-host: with-stage2 check <file>
+
+test/annoyances/cases/await_all_infallible.w
+test/annoyances/cases/await_all_result_failfast.w
+test/annoyances/cases/await_any_all_fail.w
+test/annoyances/cases/await_any_success.w
+test/annoyances/cases/await_first_empty.w
+test/annoyances/cases/await_first_non_empty.w
+test/annoyances/cases/await_settled_order.w
+test/annoyances/cases/with_concurrency_passthrough.w
+
+# KNOWN_DIVERGENCE format:
+# KNOWN_DIVERGENCE|<test>|<what_differs>|<correct_compiler>|<why>
+KNOWN_DIVERGENCE|test/annoyances/cases/await_all_infallible.w|stage0 parser rejects keyword segment in use std.async|selfhost|Self-host parser accepts keyword path segments in import declarations, enabling std.async module imports.
+KNOWN_DIVERGENCE|test/annoyances/cases/await_all_result_failfast.w|stage0 parser rejects keyword segment in use std.async|selfhost|Self-host parser accepts keyword path segments in import declarations, enabling std.async module imports.
+KNOWN_DIVERGENCE|test/annoyances/cases/await_any_all_fail.w|stage0 parser rejects keyword segment in use std.async|selfhost|Self-host parser accepts keyword path segments in import declarations, enabling std.async module imports.
+KNOWN_DIVERGENCE|test/annoyances/cases/await_any_success.w|stage0 parser rejects keyword segment in use std.async|selfhost|Self-host parser accepts keyword path segments in import declarations, enabling std.async module imports.
+KNOWN_DIVERGENCE|test/annoyances/cases/await_first_empty.w|stage0 parser rejects keyword segment in use std.async|selfhost|Self-host parser accepts keyword path segments in import declarations, enabling std.async module imports.
+KNOWN_DIVERGENCE|test/annoyances/cases/await_first_non_empty.w|stage0 parser rejects keyword segment in use std.async|selfhost|Self-host parser accepts keyword path segments in import declarations, enabling std.async module imports.
+KNOWN_DIVERGENCE|test/annoyances/cases/await_settled_order.w|stage0 parser rejects keyword segment in use std.async|selfhost|Self-host parser accepts keyword path segments in import declarations, enabling std.async module imports.
+KNOWN_DIVERGENCE|test/annoyances/cases/with_concurrency_passthrough.w|stage0 parser rejects keyword segment in use std.async|selfhost|Self-host parser accepts keyword path segments in import declarations, enabling std.async module imports.
