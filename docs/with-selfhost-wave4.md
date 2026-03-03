@@ -321,6 +321,42 @@ Corpus policy:
 
 ---
 
+## Known Quirks and Gaps (post-review)
+
+### Quirk: "Parity" script does not diff against Stage0 dump
+
+Stage0 has no `--dump-resolved` flag, so `run_wave4_resolved_parity.sh` cannot do a byte-exact diff. What it actually checks is: (1) exit-code concordance between Stage0 `check` and self-host `check`, (2) self-host `--dump-resolved` is deterministic across two runs, (3) the dump header format matches `^resolved root=.* modules=N defs=M$`. The dump *content* is only verified by the unit-test pattern checks in `run_wave4_resolve_unit_tests.sh`. The script name implies stronger parity than it delivers.
+
+### Quirk: Body traversal only for the root module
+
+`walk_bodies = module_id == 0` in `process_module_with_pool` (Resolve.w line ~342). For imported modules (module ID > 0), only parameter types and return types are walked; function bodies are skipped. `use[*]` entries for calls inside imported module bodies are therefore absent from the dump. This is documented as a performance guard and is intentional for Wave 4.
+
+### Quirk: Param defs carry the parent function's span, not the param's own span
+
+`add_def(..., pool.get_start(fn_node), pool.get_end(fn_node))` for params uses the enclosing function's span for every parameter. In the dump, params show the same span as their owning function.
+
+### Gap: Cross-module symbol resolution is incomplete
+
+Calls to imported functions in the root module body show `def=-1` in the use table (e.g. `use[2] sym=alpha def=-1`). The resolver only resolves locally-defined or locally-bound symbols; it does not yet look up defs across module boundaries. Top-level imports are tracked as module edges, but individual call sites through those imports are not resolved to defs.
+
+### Gap: No error-case tests
+
+The plan listed "include targeted error cases" in the corpus. No `unresolved_import_error.w` or similar error-triggering test exists. All 4 corpus files and all 4 unit-test cases are passing cases only.
+
+### Gap: `run_case` PASS message suppressed if any earlier test failed
+
+The `run_case` function checks `if [[ "$failures" -eq 0 ]]; then echo "PASS..." fi` at the end, but `$failures` is global. If an early test increments it, later passing tests will not print PASS. Exit code is still correct; this is a cosmetic/diagnostic issue in the harness.
+
+### Gap: `resolve_normalize_path` does not handle `..` segments
+
+The path normalizer converts `\` → `/` and collapses `//` and `./`, but does not resolve `..` parent-directory traversal. Paths with `..` are passed through verbatim and could fail to canonicalize to the same key as their equivalent without `..`.
+
+### Gap: `resolve_file_exists` reads the full file to check existence
+
+`resolve_file_exists(path) = with_fs_read_file(path).len() > 0`. This reads the entire file content just to check if it exists. For large files this wastes memory. Not correctness-blocking but worth noting for the multi-file resolution hot path.
+
+---
+
 ## Implementation Checklist
 
 - [x] Define Wave 4 resolved dump contract and deterministic ordering rules.

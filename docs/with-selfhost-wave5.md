@@ -295,6 +295,26 @@ Corpus policy:
 
 ---
 
+## Known Quirks and Gaps (post-review)
+
+### Quirk: `dyn Trait` parameters render as `<error>` in typed dump
+
+Stage0 cannot render `dyn Describable` in the typed dump signature — it emits `fn get_value(obj: <error>)` and all expressions through that parameter type as `<error>`. Self-host matches this exactly. This is a known Stage0 limitation, not a self-host bug. The dyn dispatch *semantics* (impl lookup, trait-bound checking, `select_trait_impl`) are correct; only the dump rendering is imprecise.
+
+### Quirk: Generic function signatures render as `<unknown>` in typed dump
+
+Stage0 renders generic function signatures as `fn first(<unknown>)` — it does not emit parameter names/types for generic functions. Self-host matches this. The generic type inference and bound checking are correct; the dump elides generic parameter details.
+
+### Gap: Shadowing error has no source span
+
+`scope_put` always calls `scope_put_at(..., node=0)`, so the "shadowing is not allowed" diagnostic always points to `1:1` (start of file) instead of the actual binding site. The unit test only checks the error message text, so it passes despite the wrong location. Fix: `check_let_binding` should pass the let-binding node to `scope_put_at`.
+
+### Gap: No unit test for orphan rule violation
+
+The orphan-rule check is implemented in `collect_impl_decl` (line ~793) and fires correctly, but there is no `orphan_rule_error.w` test case exercising it directly. Only `duplicate_impl_error.w` and `unknown_trait_error.w` are tested.
+
+---
+
 ## Implementation Checklist
 
 - [x] Freeze Wave 5 typed dump oracle contract against Stage0 current output.
