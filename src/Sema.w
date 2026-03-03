@@ -559,7 +559,9 @@ fn Sema.collect_declarations(self: Sema):
 fn Sema.collect_type_decl(self: Sema, node: i32):
     let name = self.ast.get_data0(node)
     let extra_start = self.ast.get_data1(node)
-    let sub_kind = self.ast.get_data2(node)
+    let packed_kind = self.ast.get_data2(node)
+    let sub_kind = type_decl_sub_kind(packed_kind)
+    let is_ephemeral = type_decl_is_ephemeral(packed_kind)
 
     if sub_kind == TDK_STRUCT():
         let field_count = self.ast.get_extra(extra_start)
@@ -569,6 +571,10 @@ fn Sema.collect_type_decl(self: Sema, node: i32):
             let f_name = self.ast.get_extra(base)
             let f_type_node = self.ast.get_extra(base + 1)
             let f_default = self.ast.get_extra(base + 2)
+            if self.type_expr_contains_ref(f_type_node) != 0:
+                self.emit_error("ephemeral references cannot be stored in structs", f_type_node)
+            if self.type_expr_is_collection_with_ref(f_type_node) != 0:
+                self.emit_error("ephemeral references cannot be stored in collections", f_type_node)
             let f_tid = self.resolve_type_expr(f_type_node)
             self.type_extra.push(f_name)
             self.type_extra.push(f_tid)
@@ -622,6 +628,9 @@ fn Sema.collect_type_decl(self: Sema, node: i32):
         let tid = self.add_type(TY_STRUCT(), name, te_start, 1)
         self.named_types.insert(name, tid)
 
+    if is_ephemeral != 0:
+        self.ephemeral_types.insert(name, 1)
+
     self.local_type_names.insert(name, 1)
 
 fn Sema.collect_fn_decl(self: Sema, node: i32):
@@ -655,6 +664,14 @@ fn Sema.collect_fn_decl(self: Sema, node: i32):
         self.sig_params.push(p_tid)
 
     let ret_type = self.resolve_type_expr(ret_node)
+    if ret_node != 0:
+        if self.type_expr_contains_ref(ret_node) != 0:
+            self.emit_error("ephemeral references cannot be returned from functions", ret_node)
+        let ret_kind = self.ast.kind(ret_node)
+        if ret_kind == NK_TYPE_NAMED():
+            let ret_sym = self.ast.get_data0(ret_node)
+            if self.ephemeral_types.contains(ret_sym):
+                self.emit_error("ephemeral types cannot be returned from functions", ret_node)
     let actual_ret = ret_type
     if actual_ret == 0 and ret_node == 0:
         // no return type annotation → void
@@ -727,7 +744,10 @@ fn Sema.collect_let_decl(self: Sema, node: i32):
     var bind_ty = 0
     let type_extra = self.top_level_let_type_ann_extra(flags)
     if type_extra >= 0:
-        bind_ty = self.resolve_type_expr(self.ast.get_extra(type_extra))
+        let type_node = self.ast.get_extra(type_extra)
+        bind_ty = self.resolve_type_expr(type_node)
+        if self.type_expr_is_collection_with_ref(type_node) != 0:
+            self.emit_error("ephemeral references cannot be stored in collections", node)
     self.scope_put(name, bind_ty, is_mut)
     let span_start = self.ast.get_start(node)
     self.typed_binding_types.insert(span_start, bind_ty)
@@ -917,6 +937,13 @@ fn Sema.check_fn_body(self: Sema, node: i32):
         return
 
     let ret_type = self.sig_return_type(sig_idx)
+
+    // Active borrows are per-function state.
+    while self.borrow_kinds.len() > 0:
+        self.borrow_kinds.pop()
+        self.borrow_places.pop()
+        self.borrow_fields.pop()
+        self.borrow_refs.pop()
 
     // Push function scope
     self.push_scope()
@@ -1270,7 +1297,8 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
 
 fn Sema.check_unary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)
-    let operand = self.check_expr(self.ast.get_data1(node))
+    let operand_node = self.ast.get_data1(node)
+    let operand = self.check_expr(operand_node)
     if operand == 0:
         return 0
 
@@ -1279,8 +1307,10 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
     if op == UOP_NOT():
         return self.ty_bool
     if op == UOP_REF():
+        self.check_borrow_create(operand_node, BK_SHARED(), node)
         return self.add_type(TY_REF(), operand, 0, 0)
     if op == UOP_MUT_REF():
+        self.check_borrow_create(operand_node, BK_EXCLUSIVE(), node)
         return self.add_type(TY_REF(), operand, 1, 0)
     if op == UOP_DEREF():
         let resolved = self.resolve_alias(operand)
@@ -1308,11 +1338,13 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         let stmt = self.ast.get_extra(extra_start + i)
         let stmt_ty = self.check_expr(stmt)
         self.typed_expr_types.insert(self.ast.get_start(stmt), stmt_ty)
+        self.expire_dead_borrows_in_block(extra_start, stmt_count, i + 1, tail)
 
     var result = self.ty_void
     if tail != 0:
         result = self.check_expr(tail)
         self.typed_expr_types.insert(self.ast.get_start(tail), result)
+    self.expire_dead_borrows_in_block(extra_start, stmt_count, stmt_count, 0)
 
     self.pop_scope()
     result
@@ -1325,8 +1357,10 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
 
     let ann_extra = self.local_let_type_ann_extra(flags)
     var ann_type = 0
+    var ann_type_node = 0
     if ann_extra >= 0:
-        ann_type = self.resolve_type_expr(self.ast.get_extra(ann_extra))
+        ann_type_node = self.ast.get_extra(ann_extra)
+        ann_type = self.resolve_type_expr(ann_type_node)
 
     let val_type = self.check_expr(value)
     var bind_type = val_type
@@ -1340,11 +1374,23 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     // Move semantics
     self.mark_moved_if_consumed(value)
 
+    if ann_type_node != 0 and self.type_expr_is_collection_with_ref(ann_type_node) != 0:
+        self.emit_error("ephemeral references cannot be stored in collections", node)
+
     self.scope_put(name, bind_type, is_mut)
     let span_start = self.ast.get_start(node)
     self.typed_binding_types.insert(span_start, bind_type)
     self.typed_binding_names.insert(span_start, name)
     self.typed_binding_muts.insert(span_start, is_mut)
+
+    // If this let binds a borrow, tie the newest active borrow to this binding.
+    if self.ast.kind(value) == NK_UNARY():
+        let uop = self.ast.get_data0(value)
+        if uop == UOP_REF() or uop == UOP_MUT_REF():
+            let blen = self.borrow_refs.len() as i32
+            if blen > 0:
+                self.borrow_refs.set_i32((blen - 1) as i64, name)
+
     self.ty_void
 
 fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
@@ -1679,6 +1725,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     let body = self.ast.get_data0(node)
     let extra_start = self.ast.get_data1(node)
     let param_count = self.ast.get_data2(node)
+    let outer_count = self.bind_names.len() as i32
 
     self.push_scope()
     let te_start = self.type_extra.len() as i32
@@ -1687,6 +1734,17 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
         self.scope_put(p_sym, self.ty_i32, 0)
         self.type_extra.push(self.ty_i32)
     self.check_expr(body)
+
+    // Phase 1 ephemerality rule: closures cannot capture ephemeral refs/values.
+    var bi = 0
+    while bi < outer_count:
+        let cap_sym = self.bind_names.get(bi as i64)
+        if self.expr_uses_symbol(body, cap_sym) != 0:
+            let cap_ty = self.bind_types.get(bi as i64)
+            if self.type_is_ephemeral_value(cap_ty) != 0:
+                self.emit_error("closures cannot capture ephemeral references", node)
+                break
+        bi = bi + 1
     self.pop_scope()
 
     self.add_type(TY_FN(), te_start, param_count, self.ty_i32)
@@ -2231,6 +2289,387 @@ fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i3
                     self.emit_error("todo()/unreachable() message must be str-compatible", self.ast.get_extra(self.ast.get_data1(node)))
                     return 0
         return self.ty_never
+    0
+
+fn Sema.is_collection_type_name(self: Sema, sym: i32) -> i32:
+    let name = self.pool.resolve(sym)
+    if name == "Vec" or name == "HashMap" or name == "HashSet" or name == "BTreeMap" or name == "SlotMap":
+        return 1
+    0
+
+fn Sema.type_expr_contains_ref(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NK_TYPE_REF():
+        return 1
+    if kind == NK_TYPE_GENERIC():
+        let extra_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for ai in 0..arg_count:
+            if self.type_expr_contains_ref(self.ast.get_extra(extra_start + ai)) != 0:
+                return 1
+        return 0
+    if kind == NK_TYPE_PTR() or kind == NK_TYPE_OPTIONAL():
+        return self.type_expr_contains_ref(self.ast.get_data0(node))
+    if kind == NK_TYPE_FN():
+        let extra_start = self.ast.get_data0(node)
+        let param_count = self.ast.get_data1(node)
+        for pi in 0..param_count:
+            if self.type_expr_contains_ref(self.ast.get_extra(extra_start + pi)) != 0:
+                return 1
+        return self.type_expr_contains_ref(self.ast.get_data2(node))
+    if kind == NK_TYPE_TUPLE():
+        let extra_start = self.ast.get_data0(node)
+        let elem_count = self.ast.get_data1(node)
+        for ei in 0..elem_count:
+            if self.type_expr_contains_ref(self.ast.get_extra(extra_start + ei)) != 0:
+                return 1
+        return 0
+    if kind == NK_TYPE_ARRAY() or kind == NK_TYPE_SLICE():
+        return self.type_expr_contains_ref(self.ast.get_data0(node))
+    0
+
+fn Sema.type_expr_is_collection_with_ref(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NK_TYPE_GENERIC():
+        let base = self.ast.get_data0(node)
+        let extra_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        if self.is_collection_type_name(base) != 0:
+            for ai in 0..arg_count:
+                if self.type_expr_contains_ref(self.ast.get_extra(extra_start + ai)) != 0:
+                    return 1
+        for ai in 0..arg_count:
+            if self.type_expr_is_collection_with_ref(self.ast.get_extra(extra_start + ai)) != 0:
+                return 1
+        return 0
+    if kind == NK_TYPE_PTR() or kind == NK_TYPE_OPTIONAL():
+        return self.type_expr_is_collection_with_ref(self.ast.get_data0(node))
+    if kind == NK_TYPE_FN():
+        let extra_start = self.ast.get_data0(node)
+        let param_count = self.ast.get_data1(node)
+        for pi in 0..param_count:
+            if self.type_expr_is_collection_with_ref(self.ast.get_extra(extra_start + pi)) != 0:
+                return 1
+        return self.type_expr_is_collection_with_ref(self.ast.get_data2(node))
+    if kind == NK_TYPE_TUPLE():
+        let extra_start = self.ast.get_data0(node)
+        let elem_count = self.ast.get_data1(node)
+        for ei in 0..elem_count:
+            if self.type_expr_is_collection_with_ref(self.ast.get_extra(extra_start + ei)) != 0:
+                return 1
+        return 0
+    if kind == NK_TYPE_ARRAY() or kind == NK_TYPE_SLICE():
+        return self.type_expr_is_collection_with_ref(self.ast.get_data0(node))
+    0
+
+fn Sema.borrow_root_place(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NK_IDENT():
+        return self.ast.get_data0(node)
+    if kind == NK_FIELD_ACCESS():
+        let base = self.ast.get_data0(node)
+        if self.ast.kind(base) == NK_IDENT():
+            return self.ast.get_data0(base)
+        return 0
+    if kind == NK_INDEX():
+        let base = self.ast.get_data0(node)
+        if self.ast.kind(base) == NK_IDENT():
+            return self.ast.get_data0(base)
+        return 0
+    if kind == NK_GROUPED():
+        return self.borrow_root_place(self.ast.get_data0(node))
+    0
+
+fn Sema.borrow_field(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    if self.ast.kind(node) == NK_FIELD_ACCESS():
+        return self.ast.get_data1(node)
+    0
+
+fn Sema.are_borrows_disjoint(self: Sema, new_field: i32, existing_field: i32) -> i32:
+    let _ = self
+    if new_field == 0 or existing_field == 0:
+        return 0
+    if new_field != existing_field:
+        return 1
+    0
+
+fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: i32):
+    let place = self.borrow_root_place(operand_node)
+    if place == 0:
+        return
+    let new_field = self.borrow_field(operand_node)
+
+    var i = 0
+    while i < self.borrow_kinds.len() as i32:
+        let existing_place = self.borrow_places.get(i as i64)
+        if existing_place != place:
+            i = i + 1
+            continue
+
+        let existing_field = self.borrow_fields.get(i as i64)
+        if self.are_borrows_disjoint(new_field, existing_field) != 0:
+            i = i + 1
+            continue
+
+        let existing_kind = self.borrow_kinds.get(i as i64)
+        if kind == BK_SHARED():
+            if existing_kind == BK_EXCLUSIVE():
+                self.emit_error("cannot borrow: already mutably borrowed", err_node)
+                return
+            i = i + 1
+            continue
+
+        // New exclusive borrow conflicts with any existing borrow.
+        if existing_kind == BK_EXCLUSIVE():
+            self.emit_error("cannot borrow mutably: already mutably borrowed", err_node)
+        else:
+            self.emit_error("cannot borrow mutably: already borrowed", err_node)
+        return
+
+    self.borrow_kinds.push(kind)
+    self.borrow_places.push(place)
+    self.borrow_fields.push(new_field)
+    self.borrow_refs.push(0)
+
+fn Sema.remove_borrow_at(self: Sema, idx: i32):
+    let last = self.borrow_refs.len() as i32 - 1
+    if idx < 0 or idx > last:
+        return
+    if idx < last:
+        self.borrow_kinds.set_i32(idx as i64, self.borrow_kinds.get(last as i64))
+        self.borrow_places.set_i32(idx as i64, self.borrow_places.get(last as i64))
+        self.borrow_fields.set_i32(idx as i64, self.borrow_fields.get(last as i64))
+        self.borrow_refs.set_i32(idx as i64, self.borrow_refs.get(last as i64))
+    self.borrow_kinds.pop()
+    self.borrow_places.pop()
+    self.borrow_fields.pop()
+    self.borrow_refs.pop()
+
+fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NK_IDENT():
+        if self.ast.get_data0(node) == sym:
+            return 1
+        return 0
+    if kind == NK_BINARY():
+        if self.expr_uses_symbol(self.ast.get_data1(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data2(node), sym)
+    if kind == NK_UNARY():
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NK_GROUPED() or kind == NK_AWAIT() or kind == NK_ASYNC_BLOCK() or kind == NK_SPAWN() or kind == NK_DEFER() or kind == NK_YIELD() or kind == NK_COMPTIME():
+        return self.expr_uses_symbol(self.ast.get_data0(node), sym)
+    if kind == NK_CALL():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        let extra_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for ai in 0..arg_count:
+            if self.expr_uses_symbol(self.ast.get_extra(extra_start + ai), sym) != 0:
+                return 1
+        return 0
+    if kind == NK_FIELD_ACCESS():
+        return self.expr_uses_symbol(self.ast.get_data0(node), sym)
+    if kind == NK_OPTIONAL_CHAIN():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        let extra_start = self.ast.get_data2(node)
+        if extra_start != 0:
+            let has_args = self.ast.get_extra(extra_start)
+            if has_args != 0:
+                let arg_count = self.ast.get_extra(extra_start + 1)
+                for ai in 0..arg_count:
+                    if self.expr_uses_symbol(self.ast.get_extra(extra_start + 2 + ai), sym) != 0:
+                        return 1
+        return 0
+    if kind == NK_INDEX():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NK_SLICE():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        if self.expr_uses_symbol(self.ast.get_data1(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data2(node), sym)
+    if kind == NK_BLOCK():
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        let tail = self.ast.get_data2(node)
+        for si in 0..stmt_count:
+            if self.expr_uses_symbol(self.ast.get_extra(extra_start + si), sym) != 0:
+                return 1
+        return self.expr_uses_symbol(tail, sym)
+    if kind == NK_IF_EXPR():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        if self.expr_uses_symbol(self.ast.get_data1(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data2(node), sym)
+    if kind == NK_RETURN():
+        return self.expr_uses_symbol(self.ast.get_data0(node), sym)
+    if kind == NK_LET_BINDING():
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NK_LET_ELSE():
+        if self.expr_uses_symbol(self.ast.get_data1(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data2(node), sym)
+    if kind == NK_TUPLE_DESTRUCTURE():
+        return self.expr_uses_symbol(self.ast.get_data2(node), sym)
+    if kind == NK_ASSIGN():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NK_TUPLE() or kind == NK_ARRAY_LIT():
+        let extra_start = self.ast.get_data0(node)
+        let elem_count = self.ast.get_data1(node)
+        for ei in 0..elem_count:
+            if self.expr_uses_symbol(self.ast.get_extra(extra_start + ei), sym) != 0:
+                return 1
+        return 0
+    if kind == NK_RANGE():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NK_MATCH():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        let extra_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        for ai in 0..arm_count:
+            let arm = self.ast.get_extra(extra_start + ai)
+            let guard = self.ast.get_data2(arm)
+            if self.expr_uses_symbol(guard, sym) != 0:
+                return 1
+            if self.expr_uses_symbol(self.ast.get_data1(arm), sym) != 0:
+                return 1
+        return 0
+    if kind == NK_STRUCT_LIT():
+        let extra_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for fi in 0..field_count:
+            if self.expr_uses_symbol(self.ast.get_extra(extra_start + fi * 2 + 1), sym) != 0:
+                return 1
+        return 0
+    if kind == NK_FOR():
+        if self.expr_uses_symbol(self.ast.get_data1(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data2(node), sym)
+    if kind == NK_WHILE():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NK_LOOP():
+        return self.expr_uses_symbol(self.ast.get_data0(node), sym)
+    if kind == NK_BREAK():
+        return self.expr_uses_symbol(self.ast.get_data0(node), sym)
+    if kind == NK_PIPELINE():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NK_WITH_EXPR():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NK_RECORD_UPDATE():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        let extra_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for fi in 0..field_count:
+            if self.expr_uses_symbol(self.ast.get_extra(extra_start + fi * 2 + 1), sym) != 0:
+                return 1
+        return 0
+    if kind == NK_ENUM_VARIANT():
+        let extra_start = self.ast.get_data2(node)
+        let arg_count = self.ast.get_extra(extra_start)
+        for ai in 0..arg_count:
+            if self.expr_uses_symbol(self.ast.get_extra(extra_start + 1 + ai), sym) != 0:
+                return 1
+        return 0
+    if kind == NK_CLOSURE() or kind == NK_CAST():
+        return self.expr_uses_symbol(self.ast.get_data0(node), sym)
+    if kind == NK_ARRAY_COMPREHENSION():
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        if self.expr_uses_symbol(self.ast.get_data2(node), sym) != 0:
+            return 1
+        return 0
+    if kind == NK_ASYNC_SCOPE():
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NK_SELECT_AWAIT():
+        let extra_start = self.ast.get_data0(node)
+        let arm_count = self.ast.get_data1(node)
+        for ai in 0..arm_count:
+            if self.expr_uses_symbol(self.ast.get_extra(extra_start + ai * 3), sym) != 0:
+                return 1
+            if self.expr_uses_symbol(self.ast.get_extra(extra_start + ai * 3 + 2), sym) != 0:
+                return 1
+        return 0
+    0
+
+fn Sema.expire_dead_borrows_in_block(self: Sema, block_extra_start: i32, stmt_count: i32, next_stmt_index: i32, tail_node: i32):
+    var bi = 0
+    while bi < self.borrow_refs.len() as i32:
+        let ref_sym = self.borrow_refs.get(bi as i64)
+        if ref_sym == 0:
+            bi = bi + 1
+            continue
+
+        var live = 0
+        var si = next_stmt_index
+        while si < stmt_count:
+            if self.expr_uses_symbol(self.ast.get_extra(block_extra_start + si), ref_sym) != 0:
+                live = 1
+                break
+            si = si + 1
+
+        if live == 0 and tail_node != 0:
+            if self.expr_uses_symbol(tail_node, ref_sym) != 0:
+                live = 1
+
+        if live == 0:
+            self.remove_borrow_at(bi)
+        else:
+            bi = bi + 1
+
+fn Sema.type_is_ephemeral_value(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid)
+    let tk = self.get_type_kind(resolved)
+    if tk == TY_REF() or tk == TY_SLICE():
+        return 1
+    if tk == TY_ARRAY():
+        return self.type_is_ephemeral_value(self.get_type_d0(resolved))
+    if tk == TY_TUPLE():
+        let te_start = self.get_type_d0(resolved)
+        let elem_count = self.get_type_d1(resolved)
+        for ei in 0..elem_count:
+            if self.type_is_ephemeral_value(self.type_extra.get((te_start + ei) as i64)) != 0:
+                return 1
+        return 0
+    if tk == TY_STRUCT():
+        let st_name = self.get_type_d0(resolved)
+        if self.ephemeral_types.contains(st_name):
+            return 1
+        let te_start = self.get_type_d1(resolved)
+        let field_count = self.get_type_d2(resolved)
+        for fi in 0..field_count:
+            let ft = self.type_extra.get((te_start + fi * 3 + 1) as i64)
+            if self.type_is_ephemeral_value(ft) != 0:
+                return 1
+        return 0
     0
 
 // ── Helper functions ─────────────────────────────────────────────

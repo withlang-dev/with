@@ -108,6 +108,18 @@ fn TDK_ALIAS -> i32: 0
 fn TDK_STRUCT -> i32: 1
 fn TDK_ENUM -> i32: 2
 fn TDK_DISTINCT -> i32: 3
+fn TDK_FLAG_EPHEMERAL -> i32: 8
+
+fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
+    if is_ephemeral != 0:
+        return sub_kind + TDK_FLAG_EPHEMERAL()
+    sub_kind
+
+fn type_decl_sub_kind(packed: i32) -> i32:
+    packed % TDK_FLAG_EPHEMERAL()
+
+fn type_decl_is_ephemeral(packed: i32) -> i32:
+    (packed / TDK_FLAG_EPHEMERAL()) % 2
 
 // Fn decl flag bits (stored in data2 field)
 fn FN_FLAG_PUB -> i32: 1
@@ -337,7 +349,7 @@ fn AstPool.fn_meta_tp_count(self: AstPool, meta: i32) -> i32:
 // NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
 //                   extra: [return_type(node), param_count, [param_name, param_type]*, type_param_count, [type_param_name, bound_count, bounds...]*]
 //
-// NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=sub_kind(TDK_*)
+// NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TDK_* + flags)
 //                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, type_param_count...]
 //                   For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis]
 //                   For alias: extra=[aliased_type, vis]
