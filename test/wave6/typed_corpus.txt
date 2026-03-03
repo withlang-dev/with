@@ -1,0 +1,17 @@
+# Wave 6 typed parity corpus.
+# Stage0 oracle: bootstrap/zig-out/bin/with check <file> --dump-typed
+#
+# All Wave 5 corpus files (already verified passing):
+bootstrap/test/cases/arithmetic_mixed.w
+bootstrap/test/cases/async_scope.w
+bootstrap/test/cases/dyn_dispatch.w
+bootstrap/test/cases/generic_multi.w
+bootstrap/test/cases/tuples.w
+#
+# Wave 6 expansion — declaration and body checking coverage:
+bootstrap/test/cases/assign.w
+bootstrap/test/cases/bool_logic.w
+bootstrap/test/cases/calls.w
+# chained_if_let.w excluded: self-host parser does not implement comma-chained
+# `if let X = e, let Y = e` syntax (KD-W6-002).
+bootstrap/test/cases/closure.w

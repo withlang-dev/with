@@ -2620,7 +2620,8 @@ fn Sema.dump_typed_module(self: Sema) -> str:
 
         if kind == NK_LET_DECL():
             let name = self.pool.resolve(self.ast.get_data0(decl))
-            if self.typed_binding_types.contains(start):
+            let has_resolved = self.typed_binding_types.contains(start) and self.typed_binding_types.get(start).unwrap() != 0
+            if has_resolved:
                 let ty = self.typed_binding_types.get(start).unwrap()
                 let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: 0
                 out = out ++ "  let " ++ name
@@ -2628,7 +2629,11 @@ fn Sema.dump_typed_module(self: Sema) -> str:
                     out = out ++ " (mut)"
                 out = out ++ ": " ++ self.type_name(ty) ++ "\n"
             else:
-                out = out ++ "  let " ++ name ++ ": <inferred>\n"
+                // Stage0 parity: emit <annotated> when type expr present but unresolved,
+                // <inferred> when no annotation at all.
+                let flags = self.ast.get_data2(decl)
+                let has_ann = self.top_level_let_type_ann_extra(flags) >= 0
+                out = out ++ "  let " ++ name ++ ": " ++ (if has_ann: "<annotated>" else: "<inferred>") ++ "\n"
             continue
 
         if kind == NK_TYPE_DECL():
@@ -2928,6 +2933,8 @@ fn Sema.type_name(self: Sema, tid: i32) -> str:
     if tk == TY_TUPLE():
         return "(_, _)"
     if tk == TY_RANGE():
+        if self.get_type_d1(resolved) != 0:
+            return "RangeInclusive[T]"
         return "Range[T]"
     if tk == TY_FN():
         return "fn"
