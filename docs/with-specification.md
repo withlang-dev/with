@@ -1210,6 +1210,13 @@ priority (returns `Ok(T.default())` if `T` implements `Default`, or
   handled).
 - Explicit return values always work and are never overridden.
 
+**Implicit unreachable on unproven paths:** If the compiler cannot
+statically prove that all code paths return a value of the declared
+return type, it silently inserts `unreachable` at the function exit.
+If this path is reached at runtime, the program panics with a
+diagnostic that includes file and line. You may add an explicit
+`unreachable` for clarity, but it is never required.
+
 ---
 
 ## 5. Ephemeral Types

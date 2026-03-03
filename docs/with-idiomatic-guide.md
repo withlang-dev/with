@@ -164,6 +164,12 @@ fn get_user(id: i32) -> Result[User, DbError]:
 **The rule:** `?` handles the sad path. The happy path just
 returns the value.
 
+**Don't add defensive tail returns just to satisfy control-flow.**
+If some branches `return` and a fallthrough path is not provably
+returning the declared type, the compiler inserts an implicit
+`unreachable` panic at function exit (with file/line). Write
+`unreachable()` explicitly only when it improves readability.
+
 ---
 
 ## Use Enum Variant Shorthand
