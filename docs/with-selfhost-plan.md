@@ -1,6 +1,6 @@
 # Self-Hosting With — Architecture-First Plan
 
-**Status:** Wave 5 complete (`--dump-typed` parity + obligation selection cache + generic bound checks + dyn trait-call compatibility + specialization cache + typed sidecar persistence).
+**Status:** Wave 6 implementation complete (two-pass semantic analysis, typed sidecar population, `--dump-typed` parity fixes, unit test suite, and parity harness implemented; validation run pending).
 
 ---
 

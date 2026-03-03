@@ -461,17 +461,25 @@ Typed dump matches Stage0.
 
 ---
 
-## Wave 6 — Semantic Analysis
+## Wave 6 — Semantic Analysis ✓ IMPLEMENTED
 
 Two-pass:
 
-1. Collect declarations
-2. Check bodies
+1. Collect declarations (`collect_type_decl`, `collect_fn_decl`, `collect_extern_fn`, `collect_let_decl`, `collect_trait_decl`, `collect_impl_decl`)
+2. Check bodies (`check_bodies` → `check_fn_body` → `check_expr`)
 
-No move checking here except Copy knowledge.
+No move checking here except Copy knowledge (`is_copy`, `mark_moved_if_consumed`).
+
+Fixes applied for parity:
+- `TY_RANGE` inclusive → `"RangeInclusive[T]"` in `type_name`
+- `let` decl fallback: `"<annotated>"` vs `"<inferred>"` in `dump_typed_module`
+
+Test infrastructure: `test/wave6/cases/` (10 files), `test/wave6/typed_corpus.txt` (10 corpus entries), `scripts/run_wave6_sema_unit_tests.sh`, `scripts/run_wave6_typed_parity.sh`.
+
+Known divergence: KD-W6-001 (`inferred_return` line not emitted; corpus designed to avoid).
 
 Validation:
-Typed dump identical.
+Typed dump identical. (Harness ready; green run pending.)
 
 ---
 
