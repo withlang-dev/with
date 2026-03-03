@@ -166,23 +166,23 @@ extend UserService:
         }
 
         let id = self.repo.insert(&user).await?
-        let user = { user with id: id }
+        let created_user = { user with id: id }
 
         // Post-creation side effects (concurrent, non-blocking)
         async scope |s|:
             // Audit log
             s.track(self.audit.record(
-                actor, "create_user", "Created user {user.name} ({user.email})",
+                actor, "create_user", "Created user {created_user.name} ({created_user.email})",
             ))
 
             // Send welcome notification if configured
             if self.config.notify_on_create then
-                s.track(self.send_welcome(&user))
+                s.track(self.send_welcome(&created_user))
 
             // Invalidate any cached user lists
             s.track(self.cache.delete("users:active:*"))
 
-        Ok(user)
+        Ok(created_user)
 
     // --- Update User ---
     //

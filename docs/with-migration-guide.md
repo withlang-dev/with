@@ -2230,3 +2230,77 @@ fn start -> i32:
 | Full | (default) | Everything |
 | Alloc | `--no-std --alloc` | Core + heap types (Vec, str, HashMap) |
 | Freestanding | `--no-std` | Core only — no heap |
+
+---
+
+## Rust Shadowing to Pipeline Cookbook
+
+With disallows shadowing-style rebinding. Use `|>` (and `?` / `??`) for transformation chains.
+
+```rust
+// Rust
+let input = std::fs::read_to_string(path)?;
+let input = input.trim();
+let input = serde_json::from_str(&input)?;
+```
+
+```with
+// With
+let input = read_file(path)? |> trim |> parse_json?
+```
+
+```rust
+// Rust
+let port = std::env::var("PORT")?;
+let port: u16 = port.parse()?;
+```
+
+```with
+// With
+let port = env.get("PORT")? |> parse[u16]?
+```
+
+```rust
+// Rust
+let response = client.get(url).send()?;
+let response = response.error_for_status()?;
+let data = response.json::<Data>()?;
+```
+
+```with
+// With
+let data = client.get(url).send()? |> error_for_status? |> json[Data]?
+```
+
+```rust
+// Rust
+let cfg = load_config(path)?;
+let cfg = cfg.validate()?;
+```
+
+```with
+// With
+let cfg = load_config(path)? |> validate?
+```
+
+## Rust Literal/Binding Mappings You Should Apply Early
+
+- Numeric separators map directly (`1_000_000`, `0xFF_AA_22`, `0b1111_0000`).
+- Trailing commas remain optional and are recommended in multiline lists.
+- Raw strings map directly (`r"..."`, `r#"..."#`).
+- Byte literals map directly (`b'A'`, `b'\x41'`).
+- Unused bindings use `_` (`let _ = side_effect()`).
+
+## No-shadowing Diagnostics
+
+When porting Rust code that relied on rebinding, expect diagnostics like:
+
+```
+shadowing is not allowed for 'name'
+```
+
+Migration strategy:
+
+1. Collapse rebinding chains into a single pipeline expression.
+2. Use `with ... as` when a named intermediate is needed temporarily.
+3. Use `_` for intentionally unused values.

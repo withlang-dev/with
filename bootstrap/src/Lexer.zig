@@ -193,21 +193,21 @@ pub fn next(self: *Lexer) Token {
 
         '\'' => {
             self.pos += 1;
-            // Try char literal first: 'x' or '\x'
-            if (self.pos < self.source.len) {
-                if (self.source[self.pos] == '\\') {
-                    // Escape sequence: '\n', '\\', '\'' etc.
-                    if (self.pos + 2 < self.source.len and self.source[self.pos + 2] == '\'') {
-                        self.pos += 3; // skip \X'
-                        return self.makeToken(.char_literal, start, self.pos);
+            // Try char literal first: 'x', '\n', '\x41', ...
+            if (self.pos < self.source.len and self.source[self.pos] == '\\') {
+                if (self.pos + 1 < self.source.len) {
+                    var p = self.pos + 1;
+                    if (self.source[p] == 'x' and p + 2 < self.source.len) {
+                        p += 2;
                     }
-                } else if (self.source[self.pos] != '\'') {
-                    // Single char: 'a' — check for closing quote
-                    if (self.pos + 1 < self.source.len and self.source[self.pos + 1] == '\'') {
-                        self.pos += 2; // skip X'
+                    if (p + 1 < self.source.len and self.source[p + 1] == '\'') {
+                        self.pos = p + 2;
                         return self.makeToken(.char_literal, start, self.pos);
                     }
                 }
+            } else if (self.pos + 1 < self.source.len and self.source[self.pos + 1] == '\'') {
+                self.pos += 2; // skip X'
+                return self.makeToken(.char_literal, start, self.pos);
             }
             // Label: 'name
             if (self.pos < self.source.len and (std.ascii.isAlphabetic(self.source[self.pos]) or self.source[self.pos] == '_')) {
@@ -417,10 +417,67 @@ fn lexIdentifierOrKeyword(self: *Lexer, start: u32) Token {
         if (self.pos < self.source.len) self.pos += 1; // skip closing "
         return self.makeToken(.c_string_literal, start, self.pos);
     }
+
+    // r"..." / r#"..."# raw string literal.
+    if (std.mem.eql(u8, text, "r")) {
+        if (self.lexRawStringPrefixed(start)) |tok| {
+            return tok;
+        }
+    }
+
+    // b'...' byte literal tokenized as char literal.
+    if (std.mem.eql(u8, text, "b") and self.pos < self.source.len and self.source[self.pos] == '\'') {
+        if (self.lexByteCharPrefixed(start)) |tok| {
+            return tok;
+        }
+    }
+
     if (Token.Tag.fromKeyword(text)) |kw| {
         return self.makeToken(kw, start, self.pos);
     }
     return self.makeToken(.identifier, start, self.pos);
+}
+
+fn lexRawStringPrefixed(self: *Lexer, start: u32) ?Token {
+    var p = self.pos;
+    var hash_count: u32 = 0;
+    while (p < self.source.len and self.source[p] == '#') : (p += 1) {
+        hash_count += 1;
+    }
+    if (p >= self.source.len or self.source[p] != '"') return null;
+
+    // Consume opening delimiter.
+    self.pos = p + 1;
+    while (self.pos < self.source.len) : (self.pos += 1) {
+        if (self.source[self.pos] == '"') {
+            var ok = true;
+            var hi: u32 = 0;
+            while (hi < hash_count) : (hi += 1) {
+                const idx = self.pos + 1 + hi;
+                if (idx >= self.source.len or self.source[idx] != '#') {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) {
+                self.pos += 1 + hash_count;
+                return self.makeToken(.string_literal, start, self.pos);
+            }
+        }
+    }
+    self.diagnostics.emit(Diagnostic.err("unterminated raw string literal", self.spanFrom(start, self.pos)));
+    return self.makeToken(.string_literal, start, self.pos);
+}
+
+fn lexByteCharPrefixed(self: *Lexer, start: u32) ?Token {
+    if (self.pos >= self.source.len or self.source[self.pos] != '\'') return null;
+    self.pos += 1; // skip opening '
+    while (self.pos < self.source.len and self.source[self.pos] != '\'') {
+        if (self.source[self.pos] == '\\' and self.pos + 1 < self.source.len) self.pos += 1;
+        self.pos += 1;
+    }
+    if (self.pos < self.source.len and self.source[self.pos] == '\'') self.pos += 1;
+    return self.makeToken(.char_literal, start, self.pos);
 }
 
 fn skipWhitespace(self: *Lexer) void {
@@ -679,6 +736,32 @@ test "lex literal forms including interpolation text" {
         .string_literal,
         .string_literal,
         .c_string_literal,
+        .eof,
+    };
+    for (expected, 0..) |tag, idx| {
+        try std.testing.expectEqual(tag, tokens.tags.items[idx]);
+    }
+    try std.testing.expect(!diags.hasErrors());
+}
+
+test "lex raw strings byte literals and numeric separators" {
+    const source = "1_000_000 0xFF_AA_22 0b1111_0000 3.141_592_653 r\"a\\n{b}\" r#\"x\\t{y}\"# '\\x41' b'A' b'\\x41'";
+    var diags = Diagnostic.DiagnosticList.init(std.testing.allocator);
+    defer diags.deinit();
+    var lexer = Lexer.init(source, 0, &diags);
+    var tokens = try lexer.tokenize(std.testing.allocator);
+    defer tokens.deinit();
+
+    const expected = [_]Token.Tag{
+        .int_literal,
+        .int_literal,
+        .int_literal,
+        .float_literal,
+        .string_literal,
+        .string_literal,
+        .char_literal,
+        .char_literal,
+        .char_literal,
         .eof,
     };
     for (expected, 0..) |tag, idx| {

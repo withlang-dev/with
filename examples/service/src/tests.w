@@ -47,9 +47,9 @@ impl UserRepository for MockUserRepo:
             let id = UserId(*next)
             *next += 1
             id
-        let user = { user.clone() with id: id }
+        let stored_user = { user.clone() with id: id }
         with self.users.write() as mut users:
-            users.insert(id, user)
+            users.insert(id, stored_user)
         id
 
     async fn update(self: &MockUserRepo, id: UserId, fields: &UserUpdate) -> Result[Unit, DbError]:
@@ -269,14 +269,14 @@ async fn test_batch_profiles:
     let (svc, _) = test_service()
 
     // Create 5 users
-    let ids = with Vec.new() as mut ids:
+    let ids = with Vec.new() as mut out:
         for i in 0..5:
             let user = svc.create_user(CreateUserRequest {
                 name: "User {i}",
                 email: "user{i}@example.com",
                 role: .Member,
             }, UserId(0)).await.unwrap()
-            ids.push(user.id)
+            out.push(user.id)
 
     // Batch fetch all profiles
     let profiles = svc.get_profiles_batch(ids).await.unwrap()

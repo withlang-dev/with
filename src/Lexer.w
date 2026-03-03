@@ -262,14 +262,17 @@ fn Lexer.next_token(self: Lexer) -> i32:
     // Character literal or label: 'x' / 'name
     if ch == 39:  // '
         self.pos = self.pos + 1
-        // Try char literal first: 'x' or '\x'
+        // Try char literal first: 'x', '\n', '\x41', ...
         if self.pos < slen and src[self.pos] == 92:  // backslash
-            // Escape sequence: '\n', '\\', '\'' etc.
-            if self.pos + 2 < slen and src[self.pos + 2] == 39:
-                self.pos = self.pos + 3
-                return TK_CHAR_LIT()
+            if self.pos + 1 < slen:
+                var p = self.pos + 1
+                if src[p] == 120 and p + 2 < slen:  // xNN
+                    p = p + 2
+                if p + 1 < slen and src[p + 1] == 39:
+                    self.pos = p + 2
+                    return TK_CHAR_LIT()
         if self.pos + 1 < slen and src[self.pos + 1] == 39:
-            // Single char: 'a' or escaped quote handled above.
+            // Single char: 'a'
             self.pos = self.pos + 2
             return TK_CHAR_LIT()
         // Label: 'name
@@ -365,7 +368,7 @@ fn Lexer.lex_number(self: Lexer) -> i32:
         let prefix = src[self.pos + 1]
         if prefix == 120 or prefix == 88:  // x, X
             self.pos = self.pos + 2
-            while self.pos < slen and is_hex_digit(src[self.pos]):
+            while self.pos < slen and (is_hex_digit(src[self.pos]) or src[self.pos] == 95):
                 self.pos = self.pos + 1
             return TK_INT_LIT()
         if prefix == 98 or prefix == 66:  // b, B
@@ -461,6 +464,18 @@ fn Lexer.lex_ident(self: Lexer) -> i32:
             self.pos = self.pos + 1  // skip closing "
         return TK_C_STRING_LIT()
 
+    // r"..." / r#"..."# -> raw string literal (no escapes/interpolation)
+    if text == "r":
+        let raw_tok = self.lex_raw_string_prefixed()
+        if raw_tok != -1:
+            return raw_tok
+
+    // b'...' -> byte literal (tokenized as char literal).
+    if text == "b" and self.pos < slen and src[self.pos] == 39:
+        let bt = self.lex_byte_char_prefixed()
+        if bt != -1:
+            return bt
+
     let kw = tag_from_keyword(text)
     if kw != -1:
         return kw
@@ -472,6 +487,46 @@ fn Lexer.lex_dot_ident(self: Lexer) -> i32:
     while self.pos < slen and is_ident_continue(src[self.pos]):
         self.pos = self.pos + 1
     TK_DOT_IDENT()
+
+fn Lexer.lex_raw_string_prefixed(self: Lexer) -> i32:
+    let src = self.source
+    let slen = src.len() as i32
+    var p = self.pos
+    var hash_count = 0
+    while p < slen and src[p] == 35:  // #
+        hash_count = hash_count + 1
+        p = p + 1
+    if p >= slen or src[p] != 34:  // opening "
+        return -1
+
+    // Consume opening delimiter.
+    self.pos = p + 1
+    while self.pos < slen:
+        if src[self.pos] == 34:  // "
+            var ok = true
+            for hi in 0..hash_count:
+                if self.pos + 1 + hi >= slen or src[self.pos + 1 + hi] != 35:
+                    ok = false
+            if ok:
+                self.pos = self.pos + 1 + hash_count
+                return TK_STRING_LIT()
+        self.pos = self.pos + 1
+    // Unterminated raw string: still emit string token for recovery.
+    TK_STRING_LIT()
+
+fn Lexer.lex_byte_char_prefixed(self: Lexer) -> i32:
+    let src = self.source
+    let slen = src.len() as i32
+    if self.pos >= slen or src[self.pos] != 39:
+        return -1
+    self.pos = self.pos + 1  // skip opening '
+    while self.pos < slen and src[self.pos] != 39:
+        if src[self.pos] == 92 and self.pos + 1 < slen:
+            self.pos = self.pos + 1
+        self.pos = self.pos + 1
+    if self.pos < slen and src[self.pos] == 39:
+        self.pos = self.pos + 1
+    TK_CHAR_LIT()
 
 
 // --- Character classification ---

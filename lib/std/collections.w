@@ -42,8 +42,7 @@ pub fn slotmap_new -> SlotMap:
     }
 
 pub fn slotmap_insert(map: SlotMap, value: i32) -> (SlotMap, Handle):
-    let next_id = map.generations.len() as i32
-    let key = with_i32_to_str(next_id)
+    let key = map.generations.len() as i32 |> with_i32_to_str
     let generation_value = map.generations.get(key).unwrap_or(0) + 1
     map.generations.insert(key, generation_value)
     map.values.insert(key, value)

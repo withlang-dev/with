@@ -8173,6 +8173,16 @@ fn genCallInner(self: *Codegen, call_e: Ast.CallExpr) Error!c.LLVMValueRef {
         return self.genAssertBuiltin(call_e.args);
     }
 
+    // Built-in: todo([msg]) / unreachable([msg]) — diverge with Never.
+    const todo_sym = self.pool.intern("todo") catch return error.CodegenAlloc;
+    if (fn_sym == todo_sym) {
+        return self.genDivergeBuiltin(call_e.args);
+    }
+    const unreachable_sym = self.pool.intern("unreachable") catch return error.CodegenAlloc;
+    if (fn_sym == unreachable_sym) {
+        return self.genDivergeBuiltin(call_e.args);
+    }
+
     // Built-in: comptime_error("msg") — emit compile-time error
     const comptime_error_sym = self.pool.intern("comptime_error") catch return error.CodegenAlloc;
     if (fn_sym == comptime_error_sym) {
@@ -15008,6 +15018,32 @@ fn resolveInterpPath(self: *Codegen, path_text: []const u8) Error!?c.LLVMValueRe
     return val;
 }
 
+/// Built-in: todo([msg]) / unreachable([msg]) — unconditional divergence.
+fn genDivergeBuiltin(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
+    if (args.len > 1) return error.UnsupportedExpr;
+    if (args.len == 1) {
+        // Evaluate optional message expression for side effects/validation.
+        _ = try self.genExpr(args[0]);
+    }
+
+    const cur_fn = self.current_function;
+    const exit_info = try self.ensureExitDeclared();
+    const i32_type = c.LLVMInt32TypeInContext(self.context);
+    var exit_args = [_]c.LLVMValueRef{c.LLVMConstInt(i32_type, 134, 0)};
+    _ = c.LLVMBuildCall2(self.builder, exit_info.fn_type, exit_info.value, &exit_args, 1, "");
+    _ = c.LLVMBuildUnreachable(self.builder);
+
+    // Keep a valid insertion point for subsequent source statements in the
+    // same syntactic block.
+    const dead_bb = c.LLVMAppendBasicBlockInContext(self.context, cur_fn, "diverge.dead");
+    c.LLVMPositionBuilderAtEnd(self.builder, dead_bb);
+
+    if (self.expected_type) |et| {
+        return c.LLVMGetUndef(et);
+    }
+    return c.LLVMGetUndef(c.LLVMInt32TypeInContext(self.context));
+}
+
 /// Built-in: assert(condition) — abort if false.
 fn genAssertBuiltin(self: *Codegen, args: []const *const Ast.Expr) Error!c.LLVMValueRef {
     if (args.len < 1) return error.UnsupportedExpr;
@@ -15152,7 +15188,11 @@ fn genMathBinaryF64(self: *Codegen, args: []const *const Ast.Expr, intrinsic_nam
 }
 
 fn genStringLiteral(self: *Codegen, sym: u32) Error!c.LLVMValueRef {
-    const text = self.pool.resolve(sym);
+    const tagged = self.pool.resolve(sym);
+    if (stripRawStringTag(tagged)) |raw_text| {
+        return self.genStringLiteralRaw(raw_text);
+    }
+    const text = tagged;
 
     // Check for interpolation: unescaped '{' in the string.
     var has_interp = false;
@@ -15175,6 +15215,13 @@ fn genStringLiteral(self: *Codegen, sym: u32) Error!c.LLVMValueRef {
     return self.genPlainStringLiteral(text);
 }
 
+fn stripRawStringTag(text: []const u8) ?[]const u8 {
+    const prefix = "\x01raw\x01";
+    if (text.len < prefix.len) return null;
+    if (!std.mem.eql(u8, text[0..prefix.len], prefix)) return null;
+    return text[prefix.len..];
+}
+
 /// Generate a plain (non-interpolated) string literal as a str struct.
 fn genPlainStringLiteral(self: *Codegen, text: []const u8) Error!c.LLVMValueRef {
     var buf: [4096]u8 = undefined;
@@ -15186,15 +15233,26 @@ fn genPlainStringLiteral(self: *Codegen, text: []const u8) Error!c.LLVMValueRef 
     while (i < text.len) : (i += 1) {
         if (text[i] == '\\' and i + 1 < text.len) {
             i += 1;
-            buf[out_len] = switch (text[i]) {
-                'n' => '\n',
-                't' => '\t',
-                'r' => '\r',
-                '0' => 0,
-                '\\' => '\\',
-                '"' => '"',
-                else => text[i],
-            };
+            if (text[i] == 'x' and i + 2 < text.len) {
+                const hi = hexDigitValueByte(text[i + 1]);
+                const lo = hexDigitValueByte(text[i + 2]);
+                if (hi >= 0 and lo >= 0) {
+                    buf[out_len] = @intCast((hi * 16) + lo);
+                    i += 2;
+                } else {
+                    buf[out_len] = text[i];
+                }
+            } else {
+                buf[out_len] = switch (text[i]) {
+                    'n' => '\n',
+                    't' => '\t',
+                    'r' => '\r',
+                    '0' => 0,
+                    '\\' => '\\',
+                    '"' => '"',
+                    else => text[i],
+                };
+            }
         } else {
             buf[out_len] = text[i];
         }
@@ -15492,15 +15550,26 @@ fn genCStringLiteral(self: *Codegen, sym: u32) Error!c.LLVMValueRef {
     while (i < text.len) : (i += 1) {
         if (text[i] == '\\' and i + 1 < text.len) {
             i += 1;
-            buf[out_len] = switch (text[i]) {
-                'n' => '\n',
-                't' => '\t',
-                'r' => '\r',
-                '0' => 0,
-                '\\' => '\\',
-                '"' => '"',
-                else => text[i],
-            };
+            if (text[i] == 'x' and i + 2 < text.len) {
+                const hi = hexDigitValueByte(text[i + 1]);
+                const lo = hexDigitValueByte(text[i + 2]);
+                if (hi >= 0 and lo >= 0) {
+                    buf[out_len] = @intCast((hi * 16) + lo);
+                    i += 2;
+                } else {
+                    buf[out_len] = text[i];
+                }
+            } else {
+                buf[out_len] = switch (text[i]) {
+                    'n' => '\n',
+                    't' => '\t',
+                    'r' => '\r',
+                    '0' => 0,
+                    '\\' => '\\',
+                    '"' => '"',
+                    else => text[i],
+                };
+            }
         } else {
             buf[out_len] = text[i];
         }
@@ -15510,6 +15579,13 @@ fn genCStringLiteral(self: *Codegen, sym: u32) Error!c.LLVMValueRef {
 
     // Return a *const i8 pointing to a null-terminated global string constant.
     return c.LLVMBuildGlobalStringPtr(self.builder, @ptrCast(buf[0..out_len :0]), "cstr");
+}
+
+fn hexDigitValueByte(ch: u8) i32 {
+    if (ch >= '0' and ch <= '9') return @as(i32, ch - '0');
+    if (ch >= 'a' and ch <= 'f') return @as(i32, ch - 'a') + 10;
+    if (ch >= 'A' and ch <= 'F') return @as(i32, ch - 'A') + 10;
+    return -1;
 }
 
 // ── Type coercion ────────────────────────────────────────────────
@@ -16935,6 +17011,7 @@ fn resolveType(self: *Codegen, type_expr: *const Ast.TypeExpr) Error!c.LLVMTypeR
             if (std.mem.eql(u8, name, "f64")) return c.LLVMDoubleTypeInContext(self.context);
             if (std.mem.eql(u8, name, "f32")) return c.LLVMFloatTypeInContext(self.context);
             if (std.mem.eql(u8, name, "void")) return c.LLVMVoidTypeInContext(self.context);
+            if (std.mem.eql(u8, name, "Never")) return c.LLVMVoidTypeInContext(self.context);
             if (std.mem.eql(u8, name, "Unit")) return c.LLVMInt32TypeInContext(self.context);
             if (std.mem.eql(u8, name, "String") or std.mem.eql(u8, name, "StrView")) {
                 const str_sym = self.pool.intern("str") catch return error.UnsupportedType;

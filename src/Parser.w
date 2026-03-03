@@ -1299,13 +1299,10 @@ fn Parser.parse_string_literal(self: Parser) -> i32:
     let start = self.current_start()
     let end = self.current_end()
     let text = self.source.slice(start as i64, end as i64)
-    // Handle triple-quoted strings
-    var raw = ""
-    if text.len() >= 6 and text.slice(0, 3) == "\"\"\"":
-        raw = text.slice(3, text.len() as i64 - 3)
-    else:
-        raw = text.slice(1, text.len() as i64 - 1)
-    let sym = self.intern.intern(raw)
+    var content = strip_string_token_text(text)
+    if is_raw_string_token_text(text):
+        content = "\x01raw\x01" ++ content
+    let sym = self.intern.intern(content)
     self.advance()
     let node = self.pool.add_node(NK_STRING_LIT(), start, end, sym, 0, 0)
     self.parse_postfix(node)
@@ -1337,8 +1334,10 @@ fn Parser.parse_char_literal(self: Parser) -> i32:
     // Stage0 parity: char literals lower to integer literals.
     // Supported escapes mirror bootstrap parser behavior.
     var value = 0
-    if text.len() >= 4 and text[1] == 92:  // '\'
-        let esc = text[2]
+    // Support b'X' byte literals as a char-literal token form.
+    let base = if text.len() >= 1 and text[0] == 98: 2 else: 1
+    if text.len() >= base + 3 and text[base] == 92:  // '\'
+        let esc = text[base + 1]
         if esc == 110:  // n
             value = 10
         else if esc == 114:  // r
@@ -1347,6 +1346,13 @@ fn Parser.parse_char_literal(self: Parser) -> i32:
             value = 9
         else if esc == 48:  // 0
             value = 0
+        else if esc == 120 and text.len() >= base + 4:  // xNN
+            let hi = hex_digit_value(text[base + 2])
+            let lo = if text.len() >= base + 5: hex_digit_value(text[base + 3]) else: -1
+            if hi >= 0 and lo >= 0:
+                value = hi * 16 + lo
+            else:
+                value = 0
         else if esc == 92:  // \
             value = 92
         else if esc == 39:  // '
@@ -1355,9 +1361,98 @@ fn Parser.parse_char_literal(self: Parser) -> i32:
             value = 34
         else:
             value = esc as i32
-    else if text.len() >= 3:
-        value = text[1] as i32
+    else if text.len() >= base + 2:
+        value = text[base] as i32
     self.pool.add_node(NK_INT_LIT(), start, end, value, 0, 0)
+
+fn strip_string_token_text(text: str) -> str:
+    if text.len() >= 2 and text[0] == 114:  // r
+        var i = 1
+        while i < text.len() as i32 and text[i] == 35:  // #
+            i = i + 1
+        if i < text.len() as i32 and text[i] == 34:  // opening "
+            let content_start = i + 1
+            var end_q = text.len() as i32 - 1
+            while end_q >= content_start and text[end_q] == 35:
+                end_q = end_q - 1
+            if end_q >= content_start and text[end_q] == 34:
+                return text.slice(content_start as i64, end_q as i64)
+
+    if text.len() >= 6 and text.slice(0, 3) == "\"\"\"":
+        var content = text.slice(3, text.len() as i64 - 3)
+        if content.len() > 0 and content[0] == 10:
+            content = content.slice(1, content.len())
+        if content.len() > 0 and content[content.len() as i32 - 1] == 10:
+            content = content.slice(0, content.len() - 1)
+        return dedent_multiline(content)
+
+    if text.len() >= 2:
+        return text.slice(1, text.len() as i64 - 1)
+    ""
+
+fn is_raw_string_token_text(text: str) -> bool:
+    if text.len() < 3:
+        return false
+    if text[0] != 114:  // r
+        return false
+    var i = 1
+    while i < text.len() as i32 and text[i] == 35:  // #
+        i = i + 1
+    if i < text.len() as i32 and text[i] == 34:  // "
+        return true
+    false
+
+fn dedent_multiline(text: str) -> str:
+    let len = text.len() as i32
+    var min_indent = 0 - 1
+    var line_start = 0
+    var i = 0
+    while i <= len:
+        if i == len or text[i] == 10:
+            var j = line_start
+            while j < i and (text[j] == 32 or text[j] == 9):
+                j = j + 1
+            var has_non_ws = 0
+            var k = j
+            while k < i:
+                if text[k] != 32 and text[k] != 9:
+                    has_non_ws = 1
+                k = k + 1
+            if has_non_ws != 0:
+                let indent = j - line_start
+                if min_indent < 0 or indent < min_indent:
+                    min_indent = indent
+            line_start = i + 1
+        i = i + 1
+
+    if min_indent <= 0:
+        return text
+
+    var out = ""
+    line_start = 0
+    i = 0
+    while i <= len:
+        if i == len or text[i] == 10:
+            var cut = min_indent
+            var j = line_start
+            while cut > 0 and j < i and (text[j] == 32 or text[j] == 9):
+                j = j + 1
+                cut = cut - 1
+            out = out ++ text.slice(j as i64, i as i64)
+            if i != len:
+                out = out ++ "\n"
+            line_start = i + 1
+        i = i + 1
+    out
+
+fn hex_digit_value(ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return ch - 48
+    if ch >= 97 and ch <= 102:
+        return ch - 87
+    if ch >= 65 and ch <= 70:
+        return ch - 55
+    0 - 1
 
 fn Parser.parse_ident_or_call(self: Parser) -> i32:
     let start = self.current_start()
@@ -1402,13 +1497,19 @@ fn Parser.parse_postfix(self: Parser, lhs_in: i32) -> i32:
 
 fn Parser.parse_call(self: Parser, callee: i32) -> i32:
     self.advance()  // consume (
+    self.skip_newlines()
     var args: Vec[i32] = Vec.new()
     if self.peek() != TK_R_PAREN():
-        args.push(self.parse_expr())
-        while self.peek() == TK_COMMA():
+        while self.peek() != TK_R_PAREN() and self.peek() != TK_EOF():
+            args.push(self.parse_expr())
+            self.skip_newlines()
+            if self.peek() != TK_COMMA():
+                break
             self.advance()
             self.skip_newlines()
-            args.push(self.parse_expr())
+            if self.peek() == TK_R_PAREN():
+                break
+    self.skip_newlines()
     self.expect(TK_R_PAREN())
     let extra_start = self.pool.extra_len()
     let arg_count = args.len() as i32
@@ -1563,11 +1664,13 @@ fn Parser.parse_variant_shorthand(self: Parser) -> i32:
     var args: Vec[i32] = Vec.new()
     if self.peek() == TK_L_PAREN():
         self.advance()
+        self.skip_newlines()
         while self.peek() != TK_R_PAREN() and self.peek() != TK_EOF():
             args.push(self.parse_expr())
             if self.peek() == TK_COMMA():
                 self.advance()
                 self.skip_newlines()
+        self.skip_newlines()
         self.expect(TK_R_PAREN())
     let extra_start = self.pool.extra_len()
     let arg_count = args.len() as i32
@@ -2606,12 +2709,15 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
         if self.peek() == TK_L_BRACKET():
             self.advance()
             var args: Vec[i32] = Vec.new()
-            let ty = self.parse_type_expr()
-            args.push(ty)
-            while self.peek() == TK_COMMA():
-                self.advance()
-                let ty2 = self.parse_type_expr()
-                args.push(ty2)
+            if self.peek() != TK_R_BRACKET():
+                while self.peek() != TK_R_BRACKET() and self.peek() != TK_EOF():
+                    let ty = self.parse_type_expr()
+                    args.push(ty)
+                    if self.peek() != TK_COMMA():
+                        break
+                    self.advance()
+                    if self.peek() == TK_R_BRACKET():
+                        break
             self.expect(TK_R_BRACKET())
             let extra_start = self.pool.extra_len()
             for ai in 0..args.len() as i32:
@@ -2691,10 +2797,13 @@ fn Parser.parse_type_params(self: Parser) -> i32:
         return 0
     self.advance()
     var count = 0
-    count = count + self.parse_one_type_param()
-    while self.peek() == TK_COMMA():
-        self.advance()
+    if self.peek() != TK_R_BRACKET():
         count = count + self.parse_one_type_param()
+        while self.peek() == TK_COMMA():
+            self.advance()
+            if self.peek() == TK_R_BRACKET():
+                break
+            count = count + self.parse_one_type_param()
     self.expect(TK_R_BRACKET())
     count
 

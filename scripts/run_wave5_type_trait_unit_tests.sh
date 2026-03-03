@@ -69,10 +69,14 @@ run_expect_fail() {
 
 run_expect_pass_typed "generic_return" "test/wave5/cases/generic_return_infer.w" "bind a: i32"
 run_expect_pass_typed "generic_bound_pass" "test/wave5/cases/generic_bound_pass.w" "impl Show for Foo"
+run_expect_pass_typed "underscore_binding_pass" "test/wave5/cases/underscore_binding_pass.w" "bind x: i32"
+run_expect_pass_typed "never_builtin_pass" "test/wave5/cases/never_builtin_pass.w" "Never"
 run_expect_fail "duplicate_impl" "test/wave5/cases/duplicate_impl_error.w" "duplicate implementation of trait for type"
 run_expect_fail "unknown_trait" "test/wave5/cases/unknown_trait_error.w" "unknown trait"
 run_expect_fail "generic_bound_error" "test/wave5/cases/generic_bound_error.w" "does not implement trait 'Show' required by bound 'T: Show'"
 run_expect_fail "dyn_trait_param_error" "test/wave5/cases/dyn_trait_param_error.w" "does not implement trait 'Describable' required for dyn parameter"
+run_expect_fail "no_shadow_error" "test/wave5/cases/no_shadow_error.w" "shadowing is not allowed"
+run_expect_fail "never_builtin_arity_error" "test/wave5/cases/never_builtin_arity_error.w" "todo()/unreachable() expect zero or one message argument"
 
 if [[ "$failures" -ne 0 ]]; then
   echo "wave5 type+trait unit tests: $failures failure(s)"

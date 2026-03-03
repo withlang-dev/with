@@ -33,6 +33,15 @@ fn test_char_literal_lowering:
     assert(pool.kind(body) == NK_INT_LIT())
     assert(pool.get_data0(body) == 10)
 
+fn test_byte_char_literal_lowering:
+    let src = "fn f:\n    b'\\x41'\n"
+    let pool = parse_module(src)
+    assert(pool.decl_count() == 1)
+    let decl = pool.get_decl(0)
+    let body = pool.get_data1(decl)
+    assert(pool.kind(body) == NK_INT_LIT())
+    assert(pool.get_data0(body) == 65)
+
 fn test_precedence:
     let src = "fn f:\n    1 + 2 * 3\n"
     let pool = parse_module(src)
@@ -132,8 +141,24 @@ fn test_recovery_to_next_top_level_decl:
     assert(diag_count > 0)
     assert(pool.decl_count() == 2)
 
+fn test_trailing_commas_call_and_type_params:
+    let src = "fn f[T,](x: Vec[i32,],) -> i32:\n    add(1, 2,)\n"
+    let pool = parse_module(src)
+    let decl = pool.get_decl(0)
+    let meta = pool.find_fn_meta(decl)
+    assert(meta >= 0)
+    assert(pool.fn_meta_tp_count(meta) == 1)
+    assert(pool.fn_meta_param_count(meta) == 1)
+    let param_start = pool.fn_meta_param_start(meta)
+    let param_type = pool.get_extra(param_start + 1)
+    assert(pool.kind(param_type) == NK_TYPE_GENERIC())
+    let body = pool.get_data1(decl)
+    assert(pool.kind(body) == NK_CALL())
+    assert(pool.get_data2(body) == 2)
+
 fn main:
     test_char_literal_lowering()
+    test_byte_char_literal_lowering()
     test_precedence()
     test_fn_metadata()
     test_type_param_layout()
@@ -143,4 +168,5 @@ fn main:
     test_type_expr_slice_alt()
     test_trait_layout_contains_assoc_and_methods()
     test_recovery_to_next_top_level_decl()
+    test_trailing_commas_call_and_type_params()
     println("ok")

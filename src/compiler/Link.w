@@ -3,8 +3,7 @@ extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_read_file(path: str) -> str
 
 fn link_stage_link(obj_path: str, bin_path: str) -> bool:
-    let cmd = "cc " ++ obj_path ++ " -o " ++ bin_path
-    let result = with_system(cmd)
+    let result = ("cc " ++ obj_path ++ " -o " ++ bin_path) |> with_system
     result == 0
 
 fn link_stage_link_with_extras(obj_path: str, bin_path: str, extras: Vec[str]) -> bool:
@@ -12,7 +11,7 @@ fn link_stage_link_with_extras(obj_path: str, bin_path: str, extras: Vec[str]) -
     for i in 0..extras.len() as i32:
         cmd = cmd ++ " " ++ extras.get(i as i64)
     cmd = cmd ++ " -o " ++ bin_path
-    let result = with_system(cmd)
+    let result = cmd |> with_system
     result == 0
 
 fn link_stage_compiler_runtime_dir() -> str:

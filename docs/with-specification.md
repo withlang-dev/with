@@ -9516,4 +9516,83 @@ Optimization. `c_import` macro translation improvements.
 
 ---
 
+## 29. Additional Lexical and Binding Rules (Wave Language Rules)
+
+### 29.1 Numeric separators
+
+Numeric literals permit `_` separators for readability:
+
+- Decimal: `1_000_000`
+- Hex: `0xFF_AA_22`
+- Binary: `0b1111_0000`
+- Float: `3.141_592_653`
+
+Separators are ignored for numeric value parsing.
+
+### 29.2 Trailing commas
+
+Trailing commas are **permitted but never required** in list-like grammar positions, including:
+
+- Function parameter lists and argument lists
+- Type parameter and type argument lists
+- Record/struct field lists
+- Tuple/array literal element lists
+- Match arms and import/use lists
+
+### 29.3 Raw string literals
+
+Raw string forms are supported:
+
+- `r"..."`  
+- `r#"..."#`  
+- `r##"..."##` (and higher `#` counts)
+
+Raw strings disable escape and interpolation parsing in the lexer/parser path; delimiter matching uses the same `#` count.
+
+### 29.4 Triple-quoted multiline strings
+
+`"""..."""` literals:
+
+- May start with an optional newline immediately after the opening delimiter.
+- May end with a trailing newline immediately before the closing delimiter.
+- Are dedented by common leading indentation across non-empty lines.
+
+### 29.5 Byte literals
+
+`b'X'` and escaped forms (for example `b'\x41'`) are accepted.
+
+Bootstrap lowering treats character and byte literals as integer literal values during AST construction; type-checking follows normal integer coercion rules.
+
+### 29.6 Unused bindings
+
+`_` is an explicit discard binding. It is legal in binding positions (for example `let _ = expr`, parameter bindings, pattern bindings) and does not introduce a usable name.
+
+### 29.7 String escape parity
+
+String processing supports:
+
+- Standard escapes: `\\`, `\"`, `\n`, `\r`, `\t`
+- Null byte: `\0`
+- Hex byte: `\xNN` (two hexadecimal digits)
+
+These rules apply consistently to standard and C-string literal processing.
+
+### 29.8 No-shadowing
+
+Shadowing is disallowed for local bindings. Rebinding an existing visible name emits a diagnostic (for example, `shadowing is not allowed for 'x'`).
+
+### 29.9 Pipeline-first guidance
+
+Because rebinding/shadowing is disallowed, stepwise transformations should use pipelines (`|>`) and scoped `with` bindings instead of repeated `let name = ...` rebinding.
+
+### 29.10 `todo` and `unreachable`
+
+`todo()` and `unreachable()` are divergence-oriented builtins with type `Never`.
+
+- They accept zero arguments or one `str`-compatible message argument.
+- Their type is `Never`, which is compatible in value position with any expected type.
+- They are treated as diverging control-flow points for typing and reachability analysis.
+
+---
+
 *The With Programming Language — End of specification.*

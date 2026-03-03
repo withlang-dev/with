@@ -11,6 +11,7 @@ use InternPool
 use Span
 
 extern fn with_eprintln(s: str) -> void
+extern fn str_from_byte(b: i32) -> str
 
 // ── Bridge function declarations (runtime/llvm_bridge.c) ────────
 
@@ -823,6 +824,7 @@ fn Codegen.resolve_named_type(self: Codegen, sym: i32) -> i64:
     if name == "f64": return wl_f64_type(self.context)
     if name == "f32": return wl_f32_type(self.context)
     if name == "void": return wl_void_type(self.context)
+    if name == "Never": return wl_void_type(self.context)
     if name == "Unit": return wl_i32_type(self.context)
     // Check active type bindings (monomorphization)
     for i in 0..self.type_bindings_len:
@@ -1885,12 +1887,68 @@ fn Codegen.gen_bool_lit(self: Codegen, node: i32) -> i64:
 fn Codegen.gen_string_lit(self: Codegen, node: i32) -> i64:
     let sym = self.pool.get_data0(node)
     let text = self.intern.resolve(sym)
-    self.gen_string_literal_raw(text)
+    let content = self.strip_raw_string_tag(text)
+    if self.is_raw_tagged_string(text):
+        return self.gen_string_literal_raw(content)
+    self.gen_string_literal_raw(self.decode_string_escapes(content))
 
 fn Codegen.gen_c_string_lit(self: Codegen, node: i32) -> i64:
     let sym = self.pool.get_data0(node)
     let text = self.intern.resolve(sym)
-    wl_build_global_string_ptr(self.builder, text)
+    wl_build_global_string_ptr(self.builder, self.decode_string_escapes(text))
+
+fn Codegen.is_raw_tagged_string(self: Codegen, text: str) -> bool:
+    text.len() >= 5 and text.slice(0, 5) == "\x01raw\x01"
+
+fn Codegen.strip_raw_string_tag(self: Codegen, text: str) -> str:
+    if self.is_raw_tagged_string(text):
+        return text.slice(5, text.len())
+    text
+
+fn Codegen.decode_string_escapes(self: Codegen, text: str) -> str:
+    var out = ""
+    let len = text.len() as i32
+    var i = 0
+    while i < len:
+        let ch = text[i]
+        if ch == 92 and i + 1 < len:  // backslash
+            i = i + 1
+            let esc = text[i]
+            if esc == 120 and i + 2 < len:  // xNN
+                let hi = self.hex_digit_value(text[i + 1])
+                let lo = self.hex_digit_value(text[i + 2])
+                if hi >= 0 and lo >= 0:
+                    out = out ++ str_from_byte(hi * 16 + lo)
+                    i = i + 2
+                else:
+                    out = out ++ text.slice(i as i64, i as i64 + 1)
+            else if esc == 110:
+                out = out ++ "\n"
+            else if esc == 116:
+                out = out ++ "\t"
+            else if esc == 114:
+                out = out ++ "\r"
+            else if esc == 48:
+                out = out ++ str_from_byte(0)
+            else if esc == 92:
+                out = out ++ "\\"
+            else if esc == 34:
+                out = out ++ "\""
+            else:
+                out = out ++ text.slice(i as i64, i as i64 + 1)
+        else:
+            out = out ++ text.slice(i as i64, i as i64 + 1)
+        i = i + 1
+    out
+
+fn Codegen.hex_digit_value(self: Codegen, ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return ch - 48
+    if ch >= 97 and ch <= 102:
+        return ch - 87
+    if ch >= 65 and ch <= 70:
+        return ch - 55
+    0 - 1
 
 fn Codegen.gen_string_literal_raw(self: Codegen, text: str) -> i64:
     // Build str struct: { ptr, len }
@@ -2634,6 +2692,8 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
             return self.gen_print_call(args_start, arg_count)
         if fn_name == "eprintln":
             return self.gen_eprintln(args_start, arg_count)
+        if fn_name == "todo" or fn_name == "unreachable":
+            return self.gen_diverge_builtin(args_start, arg_count)
 
         // Built-in: Some/None/Ok/Err
         if fn_name == "Some" and arg_count == 1:
@@ -4269,6 +4329,22 @@ fn Codegen.gen_option_method(self: Codegen, method: str, obj: i64, args_start: i
         return obj // Stub
     if method == "map_err" and arg_count > 0:
         return obj // Stub
+    wl_get_undef(wl_i32_type(self.context))
+
+fn Codegen.gen_diverge_builtin(self: Codegen, args_start: i32, arg_count: i32) -> i64:
+    if arg_count > 1:
+        return wl_get_undef(wl_i32_type(self.context))
+    if arg_count == 1:
+        // Evaluate optional message expression for side effects.
+        self.gen_expr(self.pool.get_extra(args_start))
+    self.emit_exit_call(134)
+    wl_build_unreachable(self.builder)
+
+    // Maintain a valid insertion point for following source statements.
+    let dead_bb = wl_append_bb(self.context, self.current_function, "diverge.dead")
+    wl_position_at_end(self.builder, dead_bb)
+    if self.expected_type != 0:
+        return wl_get_undef(self.expected_type)
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.emit_exit_call(self: Codegen, code: i32):
