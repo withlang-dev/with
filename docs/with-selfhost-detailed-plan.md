@@ -2,7 +2,7 @@
 
 ## Architecture-First Execution Plan
 
-**Status:** Wave 8 parity passes for the current corpus, with explicit `KNOWN_DEBT`: borrow checking behavior is currently Sema-integrated and must be rewritten as a MIR pass after semantic fixpoint (v3 order remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
+**Status:** Wave 9 parity passes for the current corpus. Async-MIR is implemented in self-host (`src/AsyncMir.w`, `src/AsyncLower.w`) and integrated into `check`/`build`/`run` with deterministic harness coverage. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking behavior is currently Sema-integrated and must be rewritten as a MIR pass after semantic fixpoint (v3 order remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
 **Goal:** Build a clean-room, self-hosted With compiler in With.
 **Bootstrap:** Stage0 (Zig implementation) remains semantic oracle.
 
@@ -544,14 +544,24 @@ Known debt (must remain explicit):
 
 ---
 
-## Wave 9 — Async-MIR
+## Wave 9 — Async-MIR ✓
 
-* Suspend-aware lowering
-* Generator vs async split
-* select lowering
+Implemented:
+* Suspend-aware Async-MIR artifact (`src/AsyncMir.w`) and lowering pass (`src/AsyncLower.w`) after MIR.
+* Explicit suspend-point modeling for `await` / `select await` / `yield` with:
+  - deterministic state transitions (`state_from -> state_to`)
+  - source-span preservation
+  - storage/drop snapshot metadata
+* Generator vs async track split via function flavor classification and `yield` legality enforcement.
+* Driver/CLI integration:
+  - Async-MIR pass runs in `check`/`build`/`run` pipeline.
+  - deterministic `--dump-async-mir` output path.
+  - async runtime object linkage (`fiber.o`, `fiber_asm.o`) gated by Async-MIR async usage.
+* Wave 9 unit/parity harnesses and coverage closure remain green with explicit tri-state divergence governance.
 
 Validation:
-Async tests pass identically.
+* `scripts/run_wave9_async_unit_tests.sh`: PASS
+* `scripts/run_wave9_async_parity.sh`: PASS (`processed=38`, `failures=0`, `known_divergences=2`)
 
 ---
 

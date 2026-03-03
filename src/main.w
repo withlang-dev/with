@@ -1,17 +1,4 @@
-// CLI entry point for the With compiler.
-//
-// Usage:
-//   with run [file.w]     Build + run source file
-//   with build [file.w]   Build source file
-//   with check <file.w>   Parse and type-check (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir)
-//   with ir <file.w>      Dump LLVM IR
-//   with ast <file.w>     Parse and dump AST
-//   with tokens <file.w>  Lex and dump tokens
-//   with test [flags]     Run tests
-//   with version          Print compiler version
-//   with help             Show usage
-//
-// Direct port of bootstrap/src/main.zig to With.
+// CLI entry point for With compiler.
 
 use Compilation
 use Lexer
@@ -51,6 +38,7 @@ fn main -> void:
     var dump_resolved_flag = false
     var dump_typed_flag = false
     var dump_mir_flag = false
+    var dump_async_mir_flag = false
     var deterministic_mode = false
     var i = 2
     while i < argc:
@@ -81,6 +69,8 @@ fn main -> void:
             dump_typed_flag = true
         if arg == "--dump-mir":
             dump_mir_flag = true
+        if arg == "--dump-async-mir":
+            dump_async_mir_flag = true
         if arg == "--deterministic":
             deterministic_mode = true
         i = i + 1
@@ -142,6 +132,9 @@ fn main -> void:
             return
         if dump_mir_flag:
             exit(dump_mir_artifact(source_file, no_std, alloc_mode))
+            return
+        if dump_async_mir_flag:
+            exit(dump_async_mir_artifact(source_file, no_std, alloc_mode))
             return
         var comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode)
@@ -324,7 +317,7 @@ fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i
     if comp.driver.diagnostics.has_errors():
         with_eprintln("error: resolved dump failed")
         return 1
-    print(dump_resolved(result, comp.driver.pool, source_file))
+    print_resolved(result, comp.driver.pool, source_file)
     0
 
 fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
@@ -353,6 +346,20 @@ fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
         with_eprintln("error: mir dump failed during mir lowering")
         return 1
     print(mir_text)
+    0
+
+fn dump_async_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode)
+    let pool = comp.compile_file(source_file)
+    if pool.decl_count() == 0:
+        with_eprintln("error: async-mir dump failed during compilation")
+        return 1
+    let async_mir_text = comp.driver.dump_async_mir(pool)
+    if async_mir_text.len() == 0:
+        with_eprintln("error: async-mir dump failed during lowering")
+        return 1
+    print(async_mir_text)
     0
 
 fn escape_dump_lexeme(text: str) -> str:
@@ -412,7 +419,7 @@ fn print_usage:
     print("Commands:\n")
     print("  build [file.w]    Build a source file\n")
     print("  run [file.w]      Build + run a source file\n")
-    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir)\n")
+    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir/--dump-async-mir)\n")
     print("  test [file.w]     Run tests\n")
     print("  clean             Delete .with/ artifacts\n")
     print("  ir <file.w>       Dump LLVM IR (debug)\n")

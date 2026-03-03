@@ -1,0 +1,52 @@
+# Wave 9 async parity corpus.
+# Source entry format:
+#   <mode>|<test_path>
+# KNOWN_DIVERGENCE format:
+#   KNOWN_DIVERGENCE|<mode>|<test>|<what_differs>|<correct_compiler>|<why>
+
+# Check-mode parity
+check|test/wave9/cases/async_basic_ok.w
+check|test/wave9/cases/async_scope_track_and_await_ok.w
+check|test/wave9/cases/select_await_prefer_fast_ok.w
+check|test/wave9/cases/spawn_async_fn_ok.w
+check|test/wave9/cases/async_block_inline_await_ok.w
+check|test/wave9/cases/await_non_task_fail.w
+check|test/wave9/cases/spawn_non_task_fail.w
+check|test/wave9/cases/select_non_task_fail.w
+check|test/wave9/cases/select_empty_fail.w
+check|test/wave9/cases/track_non_task_fail.w
+check|test/wave9/cases/track_outside_fail.w
+check|test/wave9/cases/yield_outside_generator_fail.w
+check|test/wave9/cases/may_suspend_guard_fail.w
+check|test/wave9/cases/await_tuple_ok.w
+check|test/wave9/cases/channel_send_ephemeral_fail.w
+
+# Build-mode parity
+build|test/wave9/cases/task_must_use_await_ok.w
+build|test/wave9/cases/task_must_use_call_warn.w
+build|test/wave9/cases/task_ephemeral_borrow_warn.w
+build|test/wave9/cases/spawn_async_fn_ok.w
+build|test/wave9/cases/runtime_linkage_sync_ok.w
+build|test/wave9/cases/runtime_linkage_async_ok.w
+
+# Run-mode parity
+run|test/wave9/cases/async_basic_ok.w
+run|test/wave9/cases/async_block_inline_await_ok.w
+run|test/wave9/cases/async_scope_track_and_await_ok.w
+run|test/wave9/cases/select_await_prefer_fast_ok.w
+run|test/wave9/cases/spawn_async_fn_ok.w
+run|test/wave9/cases/task_must_use_await_ok.w
+run|test/wave9/cases/await_tuple_ok.w
+run|test/wave9/cases/runtime_linkage_sync_ok.w
+run|test/wave9/cases/runtime_linkage_async_ok.w
+run|test/wave9/cases/channel_send_owned_ok.w
+run|bootstrap/test/cases/task_cancel.w
+run|bootstrap/test/cases/async_multi.w
+run|bootstrap/test/cases/fiber_pool_reuse.w
+run|bootstrap/test/cases/fiber_work_steal.w
+run|bootstrap/test/cases/fiber_stack_limits.w
+run|bootstrap/test/cases/import_std_signal.w
+run|bootstrap/test/cases/import_std_net.w
+
+KNOWN_DIVERGENCE|run|test/wave9/cases/async_block_inline_await_ok.w|Stage0 run path panics with incorrect alignment while self-host run succeeds|selfhost|Stage0 async runtime/lowering on this case is unstable in current environment; self-host produces the expected exit status.
+KNOWN_DIVERGENCE|run|test/wave9/cases/select_await_prefer_fast_ok.w|Stage0 run path panics with incorrect alignment while self-host run succeeds|selfhost|Stage0 select-await runtime execution is unstable in current environment; self-host preserves expected winner behavior.

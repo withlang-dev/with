@@ -1,6 +1,6 @@
 # Self-Hosting With — Architecture-First Plan
 
-**Status:** Wave 8 parity is passing for the current corpus, with explicit `KNOWN_DEBT`: borrow checking is currently Sema-integrated and must be moved to a dedicated MIR pass after semantic fixpoint (v3 architecture remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
+**Status:** Wave 9 parity is passing for the current corpus. Async-MIR is implemented in self-host (`src/AsyncMir.w`, `src/AsyncLower.w`) and wired into `check`/`build`/`run` with deterministic parity harnesses. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking is currently Sema-integrated and must be moved to a dedicated MIR pass after semantic fixpoint (v3 architecture remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
 
 ---
 
@@ -469,12 +469,19 @@ Validate:
 
 ## Phase 6 — Async-MIR
 
-Implement fiber lowering.
+Implemented in self-host:
+
+* `src/AsyncMir.w` deterministic Async-MIR artifact model.
+* `src/AsyncLower.w` post-MIR async lowering pass (await/select/yield suspension points, state transitions, source spans, storage/drop snapshots).
+* Driver integration after MIR lowering in `check`/`build`/`run`.
+* Deterministic CLI dump path via `--dump-async-mir`.
+* Runtime linkage gating for async runtime objects (`fiber.o`, `fiber_asm.o`) based on Async-MIR async usage.
 
 Validate:
 
-* Async test suite passes.
-* Stage0 vs Withc2 behavior identical.
+* Wave 9 async unit suite passes.
+* Wave 9 Stage0 parity harness passes (`processed=38`, `failures=0`, `known_divergences=2`).
+* Stage0 vs Withc2 behavior is identical for PASS entries, with accepted `KNOWN_DIVERGENCE` entries explicitly tracked.
 
 ---
 
