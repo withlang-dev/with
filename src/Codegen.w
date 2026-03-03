@@ -1577,7 +1577,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
             let meta = self.pool.find_fn_meta(decl)
             if meta >= 0:
                 let tp_count = self.pool.fn_meta_tp_count(meta)
-                if tp_count == 0 and (flags / FN_FLAG_ASYNC()) % 2 == 0:
+                if tp_count == 0:
                     self.gen_function(decl)
 
     // Wrap main for exit

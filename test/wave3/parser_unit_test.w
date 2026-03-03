@@ -156,6 +156,14 @@ fn test_trailing_commas_call_and_type_params:
     assert(pool.kind(body) == NK_CALL())
     assert(pool.get_data2(body) == 2)
 
+fn test_use_path_allows_keyword_segments:
+    let src = "use std.async\nfn main -> i32:\n    0\n"
+    let pool = parse_module(src)
+    assert(pool.decl_count() == 2)
+    let use_decl = pool.get_decl(0)
+    assert(pool.kind(use_decl) == NK_USE_DECL())
+    assert(pool.get_data1(use_decl) == 2)
+
 fn main:
     test_char_literal_lowering()
     test_byte_char_literal_lowering()
@@ -169,4 +177,5 @@ fn main:
     test_trait_layout_contains_assoc_and_methods()
     test_recovery_to_next_top_level_decl()
     test_trailing_commas_call_and_type_params()
+    test_use_path_allows_keyword_segments()
     println("ok")

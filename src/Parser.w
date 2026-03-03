@@ -663,16 +663,18 @@ fn Parser.parse_use_decl(self: Parser, start: i32) -> i32:
     let extra_start = self.pool.extra_len()
     var path_count = 0
 
-    if self.peek() == TK_IDENT():
-        let sym = self.expect_ident()
+    let first = self.peek()
+    if first == TK_IDENT() or (first >= TK_KW_FN() and first <= TK_KW_OR()):
+        let sym = self.expect_ident_or_keyword()
         self.pool.add_extra(sym)
         path_count = path_count + 1
 
     while true:
         if self.peek() == TK_DOT():
             self.advance()
-            if self.peek() == TK_IDENT():
-                let sym = self.expect_ident()
+            let next = self.peek()
+            if next == TK_IDENT() or (next >= TK_KW_FN() and next <= TK_KW_OR()):
+                let sym = self.expect_ident_or_keyword()
                 self.pool.add_extra(sym)
                 path_count = path_count + 1
             else if self.peek() == TK_STAR():
@@ -1780,11 +1782,38 @@ fn Parser.parse_if_expr(self: Parser) -> i32:
     self.pool.add_node(NK_IF_EXPR(), start, self.prev_end(), cond, then_body, else_body)
 
 fn Parser.parse_if_let(self: Parser, start: i32) -> i32:
-    self.advance()  // consume let
+    self.advance()  // consume first 'let'
     let pat = self.parse_pattern()
     if self.expect(TK_EQ()) == 0:
         return 0
     let subject = self.parse_expr()
+
+    // Store clauses as flat triples: (kind, data0, data1).
+    // kind=0 → let clause (data0=pattern, data1=subject)
+    // kind=1 → cond clause (data0=cond_expr, data1=0)
+    var clauses: Vec[i32] = Vec.new()
+    clauses.push(0)
+    clauses.push(pat)
+    clauses.push(subject)
+
+    // Chained form: `if let A = x, let B = y, cond, ...`
+    while self.peek() == TK_COMMA():
+        self.advance()
+        self.skip_newlines()
+        if self.peek() == TK_KW_LET():
+            self.advance()  // consume 'let'
+            let p = self.parse_pattern()
+            if self.expect(TK_EQ()) == 0:
+                return 0
+            let s = self.parse_expr()
+            clauses.push(0)
+            clauses.push(p)
+            clauses.push(s)
+        else:
+            let cond = self.parse_expr()
+            clauses.push(1)
+            clauses.push(cond)
+            clauses.push(0)
 
     var use_block = false
     if self.peek() == TK_KW_THEN():
@@ -1811,14 +1840,28 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> i32:
     if else_body == 0:
         else_body = self.pool.add_node(NK_INT_LIT(), start, start, 0, 0, 0)
 
-    // Desugar to match: match subject { pat -> then, _ -> else }
-    let extra_start = self.pool.extra_len()
-    let arm1 = self.pool.add_node(NK_MATCH_ARM(), start, self.prev_end(), pat, then_body, 0)
-    self.pool.add_extra(arm1)
-    let wildcard = self.pool.add_node(NK_PAT_WILDCARD(), start, start, 0, 0, 0)
-    let arm2 = self.pool.add_node(NK_MATCH_ARM(), start, self.prev_end(), wildcard, else_body, 0)
-    self.pool.add_extra(arm2)
-    self.pool.add_node(NK_MATCH(), start, self.prev_end(), subject, extra_start, 2)
+    // Desugar chained if-let into nested match/if expressions from right to left.
+    var acc = then_body
+    let clause_count = clauses.len() as i32 / 3
+    var ci = clause_count - 1
+    while ci >= 0:
+        let kind = clauses.get((ci * 3) as i64)
+        let d0 = clauses.get((ci * 3 + 1) as i64)
+        let d1 = clauses.get((ci * 3 + 2) as i64)
+        if kind == 0:
+            // Let clause → match d1 { d0 -> acc, _ -> else_body }
+            let extra_start = self.pool.extra_len()
+            let arm1 = self.pool.add_node(NK_MATCH_ARM(), start, self.prev_end(), d0, acc, 0)
+            self.pool.add_extra(arm1)
+            let wildcard = self.pool.add_node(NK_PAT_WILDCARD(), start, start, 0, 0, 0)
+            let arm2 = self.pool.add_node(NK_MATCH_ARM(), start, self.prev_end(), wildcard, else_body, 0)
+            self.pool.add_extra(arm2)
+            acc = self.pool.add_node(NK_MATCH(), start, self.prev_end(), d1, extra_start, 2)
+        else:
+            // Cond clause → if d0 then acc else else_body
+            acc = self.pool.add_node(NK_IF_EXPR(), start, self.prev_end(), d0, acc, else_body)
+        ci = ci - 1
+    acc
 
 fn Parser.parse_return(self: Parser) -> i32:
     let start = self.current_start()

@@ -12,6 +12,8 @@ bootstrap/test/cases/tuples.w
 bootstrap/test/cases/assign.w
 bootstrap/test/cases/bool_logic.w
 bootstrap/test/cases/calls.w
-# chained_if_let.w excluded: self-host parser does not implement comma-chained
-# `if let X = e, let Y = e` syntax (KD-W6-002).
+bootstrap/test/cases/chained_if_let.w
+# KNOWN_DIVERGENCE format:
+# KNOWN_DIVERGENCE|<test>|<what_differs>|<correct_compiler>|<why>
+KNOWN_DIVERGENCE|bootstrap/test/cases/chained_if_let.w|spans in desugared if-let match nodes|selfhost|synthesized nodes get start..start spans vs bootstrap start..end
 bootstrap/test/cases/closure.w

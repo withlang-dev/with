@@ -1,6 +1,6 @@
 # Self-Hosting With — Architecture-First Plan
 
-**Status:** Wave 6 implementation complete (two-pass semantic analysis, typed sidecar population, `--dump-typed` parity fixes, unit test suite, and parity harness implemented; validation run pending).
+**Status:** Wave 7 implementation complete (MIR data model + lowering pass, deterministic `--dump-mir`, Wave 7 corpus parity harness, Wave 7 unit harness, and Wave 2–Wave 7 parity state normalization with explicit `PASS`/`FAIL`/`KNOWN_DIVERGENCE` reporting).
 
 ---
 
@@ -457,7 +457,8 @@ Implement full sugar lowering.
 
 Validate:
 
-* MIR dumps identical to Stage0.
+* `--dump-mir` deterministic on the Wave 7 corpus.
+* If Stage0 gains `--dump-mir`, strict Stage0 vs self-host MIR diff gate.
 
 This is the biggest structural checkpoint.
 

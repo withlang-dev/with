@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+source "${ROOT_DIR}/scripts/parity_states.sh"
 
 STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
@@ -29,16 +30,24 @@ if [[ ! -f "$CORPUS_FILE" ]]; then
   echo "error: missing corpus file: $CORPUS_FILE"
   exit 1
 fi
+if ! parity_validate_known_divergences "$CORPUS_FILE"; then
+  exit 1
+fi
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 failures=0
+known_divergences=0
 processed=0
+declared_known_divergences="$(parity_kd_count "$CORPUS_FILE")"
+used_kd_file="$tmpdir/used_known_divergences.txt"
+touch "$used_kd_file"
 
 while IFS= read -r src; do
   [[ -z "$src" ]] && continue
   [[ "${src:0:1}" == "#" ]] && continue
+  [[ "$src" == KNOWN_DIVERGENCE\|* ]] && continue
 
   if [[ ! -f "$src" ]]; then
     echo "FAIL(wave4-resolved-parity-missing-source) $src"
@@ -57,12 +66,32 @@ while IFS= read -r src; do
   "$STAGE0_BIN" check "$src" > /dev/null 2>"$stage0_stderr" || stage0_rc=$?
   self_rc=0
   "$SELFHOST_BIN" check "$src" > /dev/null 2>"$self_stderr" || self_rc=$?
+  kd_line="$(parity_kd_line_for_test "$CORPUS_FILE" "$src")"
 
   if [[ "$stage0_rc" -ne "$self_rc" ]]; then
-    echo "FAIL(wave4-resolved-parity-status-mismatch) $src stage0=$stage0_rc selfhost=$self_rc"
-    cat "$stage0_stderr" || true
-    cat "$self_stderr" || true
+    if [[ -n "$kd_line" ]]; then
+      IFS='|' read -r _ kd_test kd_what kd_correct kd_why <<< "$kd_line"
+      echo "KNOWN_DIVERGENCE(wave4-resolved-parity) ${kd_test} what='${kd_what}' correct='${kd_correct}' why='${kd_why}' stage0=$stage0_rc selfhost=$self_rc"
+      echo "$kd_test" >> "$used_kd_file"
+      known_divergences=$((known_divergences + 1))
+    else
+      echo "FAIL(wave4-resolved-parity-status-mismatch) $src stage0=$stage0_rc selfhost=$self_rc"
+      cat "$stage0_stderr" || true
+      cat "$self_stderr" || true
+      failures=$((failures + 1))
+    fi
+    continue
+  fi
+
+  if [[ -n "$kd_line" ]]; then
+    echo "FAIL(wave4-resolved-parity-stale-known-divergence) $src"
     failures=$((failures + 1))
+    continue
+  fi
+
+  # Both compilers agree on non-zero exit → error case parity PASS.
+  if [[ "$stage0_rc" -ne 0 && "$self_rc" -ne 0 ]]; then
+    echo "PASS(wave4-resolved-parity) $src"
     continue
   fi
 
@@ -106,9 +135,17 @@ if [[ "$processed" -eq 0 ]]; then
   echo "error: empty corpus: $CORPUS_FILE"
   exit 1
 fi
+used_known_divergences="$(sort -u "$used_kd_file" | sed '/^$/d' | wc -l | tr -d ' ')"
+if [[ "$declared_known_divergences" -ne "$used_known_divergences" ]]; then
+  echo "FAIL(wave4-resolved-parity-known-divergence-accounting) declared=$declared_known_divergences used=$used_known_divergences"
+  failures=$((failures + 1))
+fi
+
+echo ""
+echo "wave4 resolved parity: processed=$processed failures=$failures known_divergences=$known_divergences"
 
 if [[ "$failures" -ne 0 ]]; then
-  echo "wave4 resolved parity: $failures failure(s)"
+  echo "wave4 resolved parity: FAIL"
   exit 1
 fi
 

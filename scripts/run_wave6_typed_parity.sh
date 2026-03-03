@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+source "${ROOT_DIR}/scripts/parity_states.sh"
 
 STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
@@ -29,6 +30,9 @@ if [[ ! -f "$CORPUS_FILE" ]]; then
   echo "error: missing corpus file: $CORPUS_FILE"
   exit 1
 fi
+if ! parity_validate_known_divergences "$CORPUS_FILE"; then
+  exit 1
+fi
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
@@ -36,10 +40,14 @@ trap 'rm -rf "$tmpdir"' EXIT
 failures=0
 known_divergences=0
 processed=0
+declared_known_divergences="$(parity_kd_count "$CORPUS_FILE")"
+used_kd_file="$tmpdir/used_known_divergences.txt"
+touch "$used_kd_file"
 
 while IFS= read -r src; do
   [[ -z "$src" ]] && continue
   [[ "${src:0:1}" == "#" ]] && continue
+  [[ "$src" == KNOWN_DIVERGENCE\|* ]] && continue
 
   if [[ ! -f "$src" ]]; then
     echo "FAIL(wave6-typed-parity-missing-source) $src"
@@ -52,17 +60,37 @@ while IFS= read -r src; do
   stage0_out="$tmpdir/${key}.stage0.typed"
   self_out_1="$tmpdir/${key}.selfhost.typed.1"
   self_out_2="$tmpdir/${key}.selfhost.typed.2"
+  kd_line="$(parity_kd_line_for_test "$CORPUS_FILE" "$src")"
 
-  if ! "$STAGE0_BIN" check "$src" --dump-typed >"$stage0_out" 2>"$tmpdir/${key}.stage0.stderr"; then
-    echo "FAIL(wave6-typed-parity-stage0-check) $src"
-    cat "$tmpdir/${key}.stage0.stderr"
-    failures=$((failures + 1))
-    continue
-  fi
+  stage0_rc=0
+  "$STAGE0_BIN" check "$src" --dump-typed >"$stage0_out" 2>"$tmpdir/${key}.stage0.stderr" || stage0_rc=$?
+  self_rc_1=0
+  "$SELFHOST_BIN" check "$src" --dump-typed >"$self_out_1" 2>"$tmpdir/${key}.selfhost.stderr.1" || self_rc_1=$?
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-typed >"$self_out_1" 2>"$tmpdir/${key}.selfhost.stderr.1"; then
-    echo "FAIL(wave6-typed-parity-selfhost-check) $src"
-    cat "$tmpdir/${key}.selfhost.stderr.1"
+  if [[ "$stage0_rc" -ne 0 || "$self_rc_1" -ne 0 ]]; then
+    if [[ "$stage0_rc" -ne "$self_rc_1" ]]; then
+      if [[ -n "$kd_line" ]]; then
+        IFS='|' read -r _ kd_test kd_what kd_correct kd_why <<< "$kd_line"
+        echo "KNOWN_DIVERGENCE(wave6-typed-parity) ${kd_test} what='${kd_what}' correct='${kd_correct}' why='${kd_why}' stage0_rc=$stage0_rc selfhost_rc=$self_rc_1"
+        echo "$kd_test" >> "$used_kd_file"
+        known_divergences=$((known_divergences + 1))
+      else
+        echo "FAIL(wave6-typed-parity-status-mismatch) $src stage0=$stage0_rc selfhost=$self_rc_1"
+        cat "$tmpdir/${key}.stage0.stderr" || true
+        cat "$tmpdir/${key}.selfhost.stderr.1" || true
+        failures=$((failures + 1))
+      fi
+      continue
+    fi
+
+    if [[ -n "$kd_line" ]]; then
+      echo "FAIL(wave6-typed-parity-stale-known-divergence) $src"
+      failures=$((failures + 1))
+      continue
+    fi
+    echo "FAIL(wave6-typed-parity-both-check-failed) $src rc=$self_rc_1"
+    cat "$tmpdir/${key}.stage0.stderr" || true
+    cat "$tmpdir/${key}.selfhost.stderr.1" || true
     failures=$((failures + 1))
     continue
   fi
@@ -90,26 +118,36 @@ while IFS= read -r src; do
     continue
   fi
 
-  # Check for KNOWN_DIVERGENCE annotation in the corpus file.
-  if grep -q "^KNOWN_DIVERGENCE:.*${src}" "$CORPUS_FILE" 2>/dev/null; then
-    echo "KNOWN_DIVERGENCE(wave6-typed-parity) $src"
-    known_divergences=$((known_divergences + 1))
-    continue
-  fi
-
   # Strict diff against Stage0 oracle.
   if diff -u "$stage0_out" "$self_out_1" >/dev/null; then
+    if [[ -n "$kd_line" ]]; then
+      echo "FAIL(wave6-typed-parity-stale-known-divergence) $src"
+      failures=$((failures + 1))
+      continue
+    fi
     echo "PASS(wave6-typed-parity) $src"
   else
-    echo "FAIL(wave6-typed-parity-diff) $src"
-    diff -u "$stage0_out" "$self_out_1" || true
-    failures=$((failures + 1))
+    if [[ -n "$kd_line" ]]; then
+      IFS='|' read -r _ kd_test kd_what kd_correct kd_why <<< "$kd_line"
+      echo "KNOWN_DIVERGENCE(wave6-typed-parity) ${kd_test} what='${kd_what}' correct='${kd_correct}' why='${kd_why}'"
+      echo "$kd_test" >> "$used_kd_file"
+      known_divergences=$((known_divergences + 1))
+    else
+      echo "FAIL(wave6-typed-parity-diff) $src"
+      diff -u "$stage0_out" "$self_out_1" || true
+      failures=$((failures + 1))
+    fi
   fi
 done < <(grep -v '^[[:space:]]*$' "$CORPUS_FILE" | grep -v '^#' | sort)
 
 if [[ "$processed" -eq 0 ]]; then
   echo "error: empty corpus: $CORPUS_FILE"
   exit 1
+fi
+used_known_divergences="$(sort -u "$used_kd_file" | sed '/^$/d' | wc -l | tr -d ' ')"
+if [[ "$declared_known_divergences" -ne "$used_known_divergences" ]]; then
+  echo "FAIL(wave6-typed-parity-known-divergence-accounting) declared=$declared_known_divergences used=$used_known_divergences"
+  failures=$((failures + 1))
 fi
 
 echo ""
