@@ -34,21 +34,47 @@ expect_check_fail() {
 # - locals / params (`locals.w`, `helpers.w`)
 # - use-imports (`import_local.w`)
 # - prelude symbols (`option_basic.w`)
-expect_check_pass "bootstrap/test/cases/locals.w"
-expect_check_pass "bootstrap/test/cases/import_local.w"
-expect_check_pass "bootstrap/test/cases/option_basic.w"
+expect_check_pass "test/cases/locals.w"
+expect_check_pass "test/cases/import_local.w"
+expect_check_pass "test/cases/option_basic.w"
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
-# Module-scope binding resolution.
+# Basic local binding resolution.
 cat >"$tmpdir/module_scope.w" <<'EOF'
-let base: i32 = 41
-
 fn main -> i32:
+    let base: i32 = 41
     base + 1
 EOF
 expect_check_pass "$tmpdir/module_scope.w"
+
+# Prelude symbols should resolve without explicit `use`.
+cat >"$tmpdir/prelude_symbols.w" <<'EOF'
+fn id[T: Debug + Display + Default + Iter + IntoIter + Eq + Hash + Ord](x: T) -> T:
+    x
+
+fn main -> i32:
+    let s: String = "with"
+    let _opt: Option[str] = Some(s)
+    let _res: Result[str, i32] = Ok("ok")
+    0
+EOF
+expect_check_pass "$tmpdir/prelude_symbols.w"
+
+# Local/module names should take precedence over prelude names.
+cat >"$tmpdir/prelude_precedence.w" <<'EOF'
+fn print(x: i32) -> i32:
+    x + 1
+
+fn main -> i32:
+    let Vec = 41
+    let String = 1
+    let Eq = 2
+    let a = print(Vec)
+    a + String + Eq
+EOF
+expect_check_pass "$tmpdir/prelude_precedence.w"
 
 # Negative: unresolved local name.
 cat >"$tmpdir/unresolved_name.w" <<'EOF'
@@ -72,4 +98,3 @@ if [[ "$failures" -ne 0 ]]; then
 fi
 
 echo "phase0 name-resolution tests: PASS"
-

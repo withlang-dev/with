@@ -170,6 +170,9 @@ pub const BindingInfo = struct {
     is_task: bool = false,
     is_ephemeral_task: bool = false,
     is_scoped_task: bool = false,
+    // Non-error when this binding stores a container of Task values.
+    // Used so `tasks[i].await` and `for t in tasks: t.await` are recognized.
+    task_elem_type: TypeId = error_type,
     state: VarState,
     span: Span,
 };
@@ -917,6 +920,14 @@ fn collectFnDecl(self: *Sema, fn_decl: Ast.FnDecl) void {
     if (fn_decl.type_params.len > 0) {
         self.validateGenericFnSignature(fn_decl);
         self.generic_fns.put(self.allocator, fn_decl.name, fn_decl) catch {};
+        // Track async generic calls as Task-producing for await/spawn checks.
+        if (fn_decl.is_async) {
+            self.task_fns.put(self.allocator, fn_decl.name, {}) catch {};
+        }
+        // §18.7 — async fn requires std (fiber runtime).
+        if (self.no_std and fn_decl.is_async) {
+            self.emitError("async fn requires std (fiber runtime not available in no_std mode)", fn_decl.body.span);
+        }
         return;
     }
 
@@ -1104,15 +1115,27 @@ fn collectTraitDecl(self: *Sema, td: Ast.TraitDecl, span: Span) void {
     }
 }
 
+fn isBuiltinTraitName(trait_name: []const u8) bool {
+    return std.mem.eql(u8, trait_name, "Drop") or
+        std.mem.eql(u8, trait_name, "Scoped") or
+        std.mem.eql(u8, trait_name, "ScopedMut") or
+        std.mem.eql(u8, trait_name, "Debug") or
+        std.mem.eql(u8, trait_name, "Display") or
+        std.mem.eql(u8, trait_name, "Default") or
+        std.mem.eql(u8, trait_name, "Iter") or
+        std.mem.eql(u8, trait_name, "IntoIter") or
+        std.mem.eql(u8, trait_name, "Eq") or
+        std.mem.eql(u8, trait_name, "Hash") or
+        std.mem.eql(u8, trait_name, "Ord");
+}
+
 fn collectImplDecl(self: *Sema, id: Ast.ImplDecl, span: Span) void {
     // Record which traits a type implements.
     const trait_sym = id.trait_name orelse return; // plain `impl Type` has no trait
 
     // Built-in traits (no explicit declaration needed).
     const trait_name = self.pool.resolve(trait_sym);
-    const is_builtin_trait = std.mem.eql(u8, trait_name, "Drop") or
-        std.mem.eql(u8, trait_name, "Scoped") or
-        std.mem.eql(u8, trait_name, "ScopedMut");
+    const is_builtin_trait = isBuiltinTraitName(trait_name);
     if (!is_builtin_trait and self.trait_methods.get(trait_sym) == null and self.trait_decls.get(trait_sym) == null) {
         self.emitError("unknown trait", span);
         return;
@@ -1674,6 +1697,36 @@ pub fn resolveTypeExpr(self: *Sema, te: *const Ast.TypeExpr) TypeId {
     };
 }
 
+fn typeExprTaskResultType(self: *Sema, te: *const Ast.TypeExpr) ?TypeId {
+    return switch (te.kind) {
+        .ref_type => |rt| self.typeExprTaskResultType(rt.pointee),
+        .ptr_type => |pt| self.typeExprTaskResultType(pt.pointee),
+        .generic => |g| blk: {
+            const n = self.pool.resolve(g.name);
+            if (!std.mem.eql(u8, n, "Task") or g.args.len != 1) break :blk null;
+            const payload = self.resolveTypeExpr(g.args[0]);
+            if (payload == error_type) break :blk null;
+            break :blk payload;
+        },
+        else => null,
+    };
+}
+
+fn typeExprTaskContainerElemType(self: *Sema, te: *const Ast.TypeExpr) ?TypeId {
+    return switch (te.kind) {
+        .ref_type => |rt| self.typeExprTaskContainerElemType(rt.pointee),
+        .ptr_type => |pt| self.typeExprTaskContainerElemType(pt.pointee),
+        .array_type => |at| self.typeExprTaskResultType(at.element),
+        .slice_type => |inner| self.typeExprTaskResultType(inner),
+        .generic => |g| blk: {
+            const n = self.pool.resolve(g.name);
+            if (!std.mem.eql(u8, n, "Vec") or g.args.len != 1) break :blk null;
+            break :blk self.typeExprTaskResultType(g.args[0]);
+        },
+        else => null,
+    };
+}
+
 // ── Pass 2: Check function bodies ────────────────────────────────
 
 fn checkBodies(self: *Sema, module: *const Ast.Module) void {
@@ -1713,10 +1766,14 @@ fn checkFnBody(self: *Sema, fn_decl: Ast.FnDecl) void {
             sig.param_types[i]
         else
             error_type;
+        const param_task_type = if (param.type_expr) |te| self.typeExprTaskResultType(te) else null;
+        const param_task_elem_type = if (param.type_expr) |te| self.typeExprTaskContainerElemType(te) else null;
 
         self.putBinding(&fn_scope, param.name, .{
             .type_id = param_type,
             .is_mut = param.is_mut,
+            .is_task = param_task_type != null,
+            .task_elem_type = param_task_elem_type orelse error_type,
             .state = .live,
             .span = param.span,
         });
@@ -2288,6 +2345,18 @@ fn checkExpr(self: *Sema, expr: *const Ast.Expr) TypeId {
                 self.emitError("E0701: may_suspend call while no_await_guard value is live", expr.span);
             }
             const awaited_ty = self.checkExpr(inner);
+            if (inner.kind == .tuple) {
+                const elems = inner.kind.tuple;
+                if (elems.len < 2 or elems.len > 12) {
+                    self.emitError("tuple await supports 2..12 task elements", inner.span);
+                }
+                for (elems) |elem| {
+                    if (!self.exprIsTask(elem)) {
+                        self.emitError("tuple await element must be a Task value", elem.span);
+                    }
+                }
+                return awaited_ty;
+            }
             if (!self.exprIsTask(inner)) {
                 self.emitError("await requires a Task value", expr.span);
             }
@@ -2575,6 +2644,55 @@ fn checkUnary(self: *Sema, un: Ast.UnaryExpr, span: Span) TypeId {
                 self.emitError("non-local control flow in defer: ? operator is not allowed inside defer blocks", un.operand.span);
             }
             const resolved = self.resolveAlias(operand);
+            if (self.getType(resolved) == .tuple_type) {
+                const elem_types = self.getType(resolved).tuple_type.elements;
+                if (elem_types.len == 0) {
+                    self.emitError("? operator requires Option or Result", span);
+                    return error_type;
+                }
+
+                const payload_types = self.allocator.alloc(TypeId, elem_types.len) catch return error_type;
+                var bad = false;
+
+                for (elem_types, 0..) |elem_ty, i| {
+                    const elem_resolved = self.resolveAlias(elem_ty);
+                    if (elem_resolved == error_type) {
+                        // Keep sema permissive when generic Result/Option payload typing
+                        // has not been fully resolved yet.
+                        payload_types[i] = error_type;
+                        continue;
+                    }
+                    if (self.getType(elem_resolved) != .enum_type) {
+                        self.emitError("tuple ? requires Option/Result elements", span);
+                        bad = true;
+                        payload_types[i] = error_type;
+                        continue;
+                    }
+
+                    const et = self.getType(elem_resolved).enum_type;
+                    var payload_ty: TypeId = error_type;
+                    var matched = false;
+                    for (et.variant_names, 0..) |vn, vi| {
+                        const name = self.pool.resolve(vn);
+                        if (std.mem.eql(u8, name, "Some") or std.mem.eql(u8, name, "Ok")) {
+                            matched = true;
+                            if (et.variant_payloads[vi]) |payloads| {
+                                if (payloads.len > 0) payload_ty = payloads[0];
+                            }
+                            break;
+                        }
+                    }
+
+                    if (!matched) {
+                        self.emitError("tuple ? requires Option/Result elements", span);
+                        bad = true;
+                    }
+                    payload_types[i] = payload_ty;
+                }
+
+                if (bad) return error_type;
+                return self.addType(.{ .tuple_type = .{ .elements = payload_types } });
+            }
             if (self.getType(resolved) != .enum_type) {
                 self.emitError("? operator requires Option or Result", span);
                 return error_type;
@@ -2624,7 +2742,10 @@ fn checkBlock(self: *Sema, blk: Ast.BlockExpr) TypeId {
             self.emitWarning("E0601: unreachable code after return/break/continue", stmt.span);
             break;
         }
-        const stmt_ty = self.checkExpr(stmt);
+        const stmt_ty = if (stmt.kind == .match_expr)
+            self.checkMatchExprWithMode(stmt.kind.match_expr, false)
+        else
+            self.checkExpr(stmt);
         self.typed_expr_types.put(self.allocator, stmt.span.start, stmt_ty) catch {};
         // Detect diverging statements.
         if (self.exprDefinitelyDiverges(stmt)) {
@@ -2697,6 +2818,17 @@ fn checkLetBinding(self: *Sema, let_b: Ast.LetBinding, span: Span) TypeId {
         break :blk annotated;
     } else val_type;
 
+    // Auto-collect destination inference only applies in typed destination contexts
+    // (typed let/return/typed call args). For untyped let bindings, require an
+    // explicit collect (or annotation) when a pipeline map/filter result is array-like.
+    if (let_b.type_expr == null and self.exprContainsPipelineMapFilter(let_b.value))
+    {
+        self.emitError(
+            "cannot infer destination collection type for pipeline result; add explicit collect[Vec]() or a type annotation",
+            let_b.value.span,
+        );
+    }
+
     if (let_b.type_expr) |te| {
         if (typeExprIsCollectionWithRef(self, te)) {
             self.emitError("ephemeral references cannot be stored in collections", span);
@@ -2708,12 +2840,14 @@ fn checkLetBinding(self: *Sema, let_b: Ast.LetBinding, span: Span) TypeId {
 
     const is_task_binding = self.exprIsTask(let_b.value);
     const is_scoped_task_binding = self.exprIsScopedTask(let_b.value);
+    const task_elem_type = self.exprTaskContainerElemType(let_b.value) orelse error_type;
     self.putBinding(self.current_scope, let_b.name, .{
         .type_id = bind_type,
         .is_mut = let_b.is_mut,
         .is_task = is_task_binding,
         .is_ephemeral_task = is_task_binding and self.exprIsEphemeralTask(let_b.value),
         .is_scoped_task = is_scoped_task_binding,
+        .task_elem_type = task_elem_type,
         .state = .live,
         .span = span,
     });
@@ -2734,6 +2868,28 @@ fn checkLetBinding(self: *Sema, let_b: Ast.LetBinding, span: Span) TypeId {
     }
 
     return self.ty_void;
+}
+
+fn exprContainsPipelineMapFilter(self: *const Sema, expr: *const Ast.Expr) bool {
+    return switch (expr.kind) {
+        .pipeline => |p| blk: {
+            const rhs_name: ?[]const u8 = switch (p.rhs.kind) {
+                .ident => |sym| self.pool.resolve(sym),
+                .call => |call_e| switch (call_e.callee.kind) {
+                    .ident => |sym| self.pool.resolve(sym),
+                    else => null,
+                },
+                else => null,
+            };
+            if (rhs_name) |name| {
+                if (std.mem.eql(u8, name, "collect")) break :blk false;
+                if (std.mem.eql(u8, name, "map") or std.mem.eql(u8, name, "filter")) break :blk true;
+            }
+            break :blk self.exprContainsPipelineMapFilter(p.lhs);
+        },
+        .grouped => |inner| self.exprContainsPipelineMapFilter(inner),
+        else => false,
+    };
 }
 
 fn checkIfExpr(self: *Sema, if_e: Ast.IfExpr) TypeId {
@@ -2824,6 +2980,7 @@ fn checkAssign(self: *Sema, assign_e: Ast.AssignExpr, span: Span) TypeId {
             info.is_task = is_task;
             info.is_ephemeral_task = is_task and self.exprIsEphemeralTask(assign_e.value);
             info.is_scoped_task = self.exprIsScopedTask(assign_e.value);
+            info.task_elem_type = self.exprTaskContainerElemType(assign_e.value) orelse error_type;
         }
     }
 
@@ -2844,7 +3001,106 @@ fn markMovedIfConsumed(self: *Sema, expr: *const Ast.Expr) void {
     }
 }
 
+fn exprTaskResultType(self: *Sema, expr: *const Ast.Expr) ?TypeId {
+    return switch (expr.kind) {
+        .ident => |sym| blk: {
+            if (self.current_scope.lookup(sym)) |info| {
+                if (info.is_task) break :blk info.type_id;
+            }
+            break :blk null;
+        },
+        .grouped => |inner| self.exprTaskResultType(inner),
+        .async_block => self.ty_i32,
+        .call => |call_e| blk: {
+            if (call_e.callee.kind == .field_access) {
+                const fa = call_e.callee.kind.field_access;
+                const method_name = self.pool.resolve(fa.field);
+                if (std.mem.eql(u8, method_name, "track") and
+                    fa.expr.kind == .ident and self.isActiveAsyncScopeSymbol(fa.expr.kind.ident) and
+                    call_e.args.len == 1)
+                {
+                    break :blk self.exprTaskResultType(call_e.args[0]);
+                }
+                if (std.mem.eql(u8, method_name, "get") and call_e.args.len >= 1) {
+                    break :blk self.exprTaskContainerElemType(fa.expr);
+                }
+            }
+            if (call_e.callee.kind == .ident) {
+                const callee = call_e.callee.kind.ident;
+                if (self.task_fns.get(callee) != null) {
+                    if (self.fn_sigs.get(callee)) |sig| {
+                        if (sig.return_type != error_type and sig.return_type != inferred_type) {
+                            break :blk sig.return_type;
+                        }
+                    }
+                    break :blk self.ty_i32;
+                }
+            }
+            break :blk null;
+        },
+        .index => |idx| self.exprTaskContainerElemType(idx.expr),
+        else => null,
+    };
+}
+
+fn exprTaskContainerElemType(self: *Sema, expr: *const Ast.Expr) ?TypeId {
+    return switch (expr.kind) {
+        .ident => |sym| blk: {
+            if (self.current_scope.lookup(sym)) |info| {
+                if (info.task_elem_type != error_type) break :blk info.task_elem_type;
+            }
+            break :blk null;
+        },
+        .grouped => |inner| self.exprTaskContainerElemType(inner),
+        .slice => |sl| self.exprTaskContainerElemType(sl.expr),
+        .array_literal => |elems| blk: {
+            var elem_task_ty: ?TypeId = null;
+            for (elems) |elem| {
+                const cur = self.exprTaskResultType(elem) orelse break :blk null;
+                if (elem_task_ty == null) {
+                    elem_task_ty = cur;
+                    continue;
+                }
+                if (!self.typesCompatible(elem_task_ty.?, cur) and
+                    self.arithmeticResultType(elem_task_ty.?, cur) == error_type)
+                {
+                    break :blk null;
+                }
+            }
+            break :blk elem_task_ty;
+        },
+        .call => |call_e| blk: {
+            if (call_e.callee.kind != .field_access) break :blk null;
+            const fa = call_e.callee.kind.field_access;
+            const method_name = self.pool.resolve(fa.field);
+            if (std.mem.eql(u8, method_name, "iter") and call_e.args.len == 0) {
+                break :blk self.exprTaskContainerElemType(fa.expr);
+            }
+            if (fa.expr.kind != .ident) break :blk null;
+            const type_name = self.pool.resolve(fa.expr.kind.ident);
+            if (!std.mem.eql(u8, type_name, "Vec")) break :blk null;
+            if (!std.mem.eql(u8, method_name, "of")) break :blk null;
+            var elem_task_ty: ?TypeId = null;
+            for (call_e.args) |arg| {
+                const cur = self.exprTaskResultType(arg) orelse break :blk null;
+                if (elem_task_ty == null) {
+                    elem_task_ty = cur;
+                    continue;
+                }
+                if (!self.typesCompatible(elem_task_ty.?, cur) and
+                    self.arithmeticResultType(elem_task_ty.?, cur) == error_type)
+                {
+                    break :blk null;
+                }
+            }
+            break :blk elem_task_ty;
+        },
+        else => null,
+    };
+}
+
 fn exprIsTask(self: *Sema, expr: *const Ast.Expr) bool {
+    if (self.exprTaskResultType(expr) != null) return true;
     return switch (expr.kind) {
         .ident => |sym| blk: {
             if (self.current_scope.lookup(sym)) |info| break :blk info.is_task;
@@ -2863,6 +3119,14 @@ fn exprIsTask(self: *Sema, expr: *const Ast.Expr) bool {
             break :blk false;
         },
         .async_block => true,
+        .tuple => |elems| blk: {
+            if (elems.len < 2 or elems.len > 12) break :blk false;
+            for (elems) |elem| {
+                if (!self.exprIsTask(elem)) break :blk false;
+            }
+            break :blk true;
+        },
+        .index => |idx| self.exprTaskContainerElemType(idx.expr) != null,
         .grouped => |inner| self.exprIsTask(inner),
         else => false,
     };
@@ -3105,7 +3369,12 @@ fn exprDefinitelyDiverges(self: *Sema, expr: *const Ast.Expr) bool {
 
 fn checkFor(self: *Sema, for_e: Ast.ForExpr) TypeId {
     const iterable_type = self.checkExpr(for_e.iterable);
-    const loop_var_type = self.inferForElementType(iterable_type);
+    const inferred_loop_type = self.inferForElementType(iterable_type);
+    const task_loop_type = self.exprTaskContainerElemType(for_e.iterable);
+    const loop_var_type = if (task_loop_type != null)
+        task_loop_type.?
+    else
+        inferred_loop_type;
 
     // Add loop variable to scope.
     var for_scope = Scope.init();
@@ -3124,6 +3393,8 @@ fn checkFor(self: *Sema, for_e: Ast.ForExpr) TypeId {
         self.putBinding(&for_scope, for_e.binding, .{
             .type_id = loop_var_type,
             .is_mut = false,
+            .is_task = task_loop_type != null,
+            .task_elem_type = error_type,
             .state = .live,
             .span = Span.zero,
         });
@@ -3312,6 +3583,10 @@ fn checkIndex(self: *Sema, idx: Ast.IndexExpr, _: Span) TypeId {
     const arr_type = self.checkExpr(idx.expr);
     _ = self.checkExpr(idx.index);
 
+    if (self.exprTaskContainerElemType(idx.expr)) |task_elem_ty| {
+        return task_elem_ty;
+    }
+
     if (arr_type == error_type) return error_type;
 
     const resolved = self.resolveAlias(arr_type);
@@ -3413,6 +3688,10 @@ fn checkStructLiteral(self: *Sema, sl: Ast.StructLiteral, span: Span) TypeId {
 }
 
 fn checkMatchExpr(self: *Sema, m: Ast.MatchExpr) TypeId {
+    return self.checkMatchExprWithMode(m, true);
+}
+
+fn checkMatchExprWithMode(self: *Sema, m: Ast.MatchExpr, require_exhaustive: bool) TypeId {
     const subject_type = self.checkExpr(m.subject);
 
     var result_type: TypeId = error_type;
@@ -3442,8 +3721,10 @@ fn checkMatchExpr(self: *Sema, m: Ast.MatchExpr) TypeId {
         }
     }
 
-    // Exhaustiveness check.
-    self.checkExhaustiveness(m, subject_type);
+    // Expression-position match must be exhaustive. Statement-position may be partial.
+    if (require_exhaustive) {
+        self.checkExhaustiveness(m, subject_type);
+    }
     // Usefulness check (warn on unreachable arms).
     self.checkUsefulness(m, subject_type);
 
@@ -4093,13 +4374,7 @@ fn checkCast(self: *Sema, ca: Ast.CastExpr) TypeId {
 }
 
 fn checkPipeline(self: *Sema, p: Ast.PipelineExpr, _: Span) TypeId {
-    const lhs = self.checkExpr(p.lhs);
-    _ = lhs;
-    // Pipeline RHS gets one extra implicit argument from the pipe.
-    const saved = self.in_pipeline_rhs;
-    self.in_pipeline_rhs = true;
-    defer self.in_pipeline_rhs = saved;
-    const rhs_ty = self.checkExpr(p.rhs);
+    _ = self.checkExpr(p.lhs);
 
     const rhs_supported = switch (p.rhs.kind) {
         .ident => true,
@@ -4110,14 +4385,54 @@ fn checkPipeline(self: *Sema, p: Ast.PipelineExpr, _: Span) TypeId {
         self.emitError("pipeline rhs must be a function name or direct function call", p.rhs.span);
         return error_type;
     }
-    // For bare function names, the rhs_ty is a fn_type; extract the return type.
-    if (rhs_ty != error_type) {
-        const resolved = self.resolveAlias(rhs_ty);
-        if (self.getType(resolved) == .fn_type) {
-            return self.getType(resolved).fn_type.return_type;
+
+    const fn_sym_opt: ?Symbol = switch (p.rhs.kind) {
+        .ident => |sym| sym,
+        .call => |call_e| switch (call_e.callee.kind) {
+            .ident => |sym| sym,
+            else => null,
+        },
+        else => null,
+    };
+    if (fn_sym_opt) |fn_sym| {
+        if (self.isPipelineCallableSymbol(fn_sym)) {
+            // Pipeline RHS gets one extra implicit argument from the pipe.
+            const saved = self.in_pipeline_rhs;
+            self.in_pipeline_rhs = true;
+            defer self.in_pipeline_rhs = saved;
+            const rhs_ty = self.checkExpr(p.rhs);
+            if (rhs_ty != error_type) {
+                const resolved = self.resolveAlias(rhs_ty);
+                if (self.getType(resolved) == .fn_type) {
+                    return self.getType(resolved).fn_type.return_type;
+                }
+            }
+            return rhs_ty;
         }
+
+        // Method-style fallback: `lhs |> map(f)` => `lhs.map(f)`.
+        const method_fa = Ast.FieldAccessExpr{
+            .expr = p.lhs,
+            .field = fn_sym,
+        };
+        return switch (p.rhs.kind) {
+            .ident => self.checkMethodCall(method_fa, &.{}, p.rhs.span),
+            .call => |call_e| self.checkMethodCall(method_fa, call_e.args, p.rhs.span),
+            else => error_type,
+        };
     }
-    return rhs_ty;
+
+    self.emitError("pipeline rhs must be a function name or direct function call", p.rhs.span);
+    return error_type;
+}
+
+fn isPipelineCallableSymbol(self: *Sema, sym: Symbol) bool {
+    if (self.fn_sigs.get(sym) != null) return true;
+    if (self.current_scope.lookup(sym) != null) return true;
+    if (self.generic_fns.get(sym) != null) return true;
+    if (self.variant_lookup.get(sym) != null) return true;
+    if (self.isBuiltinFn(sym)) return true;
+    return false;
 }
 
 fn checkTuple(self: *Sema, elems: []const *const Ast.Expr) TypeId {
@@ -4489,6 +4804,9 @@ fn checkMethodCall(self: *Sema, fa: Ast.FieldAccessExpr, args: []const *const As
         if (self.exprIsTask(fa.expr)) return self.ty_void;
         self.emitError("cancel() requires a Task value", span);
         return error_type;
+    }
+    if (std.mem.eql(u8, method_name, "count") and args.len == 0) {
+        return self.ty_i64;
     }
     if (std.mem.eql(u8, method_name, "as_option")) {
         if (self.getType(resolved) == .ptr_type) return error_type;
@@ -5082,20 +5400,23 @@ fn isImplicitNarrowing(self: *Sema, expected: TypeId, actual: TypeId) bool {
     const act_ty = self.getType(self.resolveAlias(actual));
 
     if (exp_ty == .int and act_ty == .int) {
-        if (act_ty.int.bits > exp_ty.int.bits) return true;
-        // Signed → unsigned at same width: reject (negative values become huge).
-        if (act_ty.int.bits == exp_ty.int.bits and act_ty.int.signed and !exp_ty.int.signed) {
+        // Signed -> unsigned is never implicitly safe.
+        if (act_ty.int.signed and !exp_ty.int.signed) {
             return true;
         }
-        // Unsigned → signed at same width: reject (values > MAX_SIGNED wrap negative).
-        if (act_ty.int.bits == exp_ty.int.bits and !act_ty.int.signed and exp_ty.int.signed) {
-            return true;
+
+        if (!act_ty.int.signed and exp_ty.int.signed) {
+            // Unsigned -> signed is only safe when destination is strictly wider.
+            return exp_ty.int.bits <= act_ty.int.bits;
         }
-        return false;
+
+        // Same signedness: only widening is implicit.
+        return act_ty.int.bits > exp_ty.int.bits;
     }
     if (exp_ty == .float and act_ty == .float) {
         return act_ty.float.bits > exp_ty.float.bits;
     }
+    if (exp_ty == .float and act_ty == .int) return true;
     if (exp_ty == .int and act_ty == .float) return true;
     return false;
 }

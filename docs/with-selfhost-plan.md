@@ -14,6 +14,28 @@
 6. **Determinism is enforced at every layer.**
 7. **No cleverness during bootstrap. Only clarity.**
 
+## 0.1 Stage0-Safe Subset Constraint
+
+Self-host source must stay within the subset that reliably compiles under Stage0.
+
+Until semantic fixpoint:
+
+* Do not add bootstrap features just to support self-host coding style.
+* If Stage0 rejects a pattern, rewrite self-host code into a Stage0-safe form.
+* Keep compiler core implementation synchronous and deterministic (`lex -> parse -> sema -> MIR -> codegen -> link`).
+
+Disallowed in self-host compiler source before fixpoint:
+
+* Generic async task-collection patterns (`Vec[Task[T]]`, `impl IntoIter[Task[_]]` in async generic paths).
+* Collection async combinators (`await_all`, `await_first`, `await_any`, `await_settled`) inside compiler pipeline code.
+* Work that requires bootstrap-side generic async lowering upgrades.
+
+Allowed/expected style:
+
+* Plain synchronous passes and explicit loops.
+* Explicit state threading with stable IDs.
+* Deterministic control flow over concurrency abstractions.
+
 ---
 
 # 1. Compiler Architecture Spine

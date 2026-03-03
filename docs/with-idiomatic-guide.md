@@ -8,6 +8,25 @@ correct version.
 
 ---
 
+## Use Prelude Names Directly
+
+The prelude is always in scope. Prefer unqualified names for common
+types and traits:
+
+```
+let users: Vec[User] = Vec.new()
+let name: String = "alice"
+
+fn render[T: Display](value: T):
+    println("{value}")
+```
+
+No `use` is needed for `Vec`, `String`, `Option`, `Result`,
+`Debug`/`Display`/`Default`, `Iter`/`IntoIter`, `Eq`/`Hash`/`Ord`,
+or core print/assert helpers.
+
+---
+
 ## Functions
 
 **Drop the parens.** If a function takes no arguments, don't
@@ -379,6 +398,10 @@ let report = raw_data
     |> render_chart
 ```
 
+Collection pipelines support implicit `.iter()`: `Vec`, arrays, slices,
+`HashMap`, and `HashSet` can flow directly into `map`/`filter`/`count`
+without calling `.iter()` explicitly.
+
 ---
 
 ## Use `with` for Scoped Operations
@@ -459,9 +482,9 @@ fn process(path: str) -> Result[Unit, IoError]:
 
 ## Pattern Matching
 
-**Use `match`, not chains of `if/else if`.** When you're
-dispatching on variants, `match` is exhaustive and the
-compiler checks you covered everything.
+**Use `match`, not chains of `if/else if`.** For value-producing
+matches, keep arms exhaustive. For statement-only dispatch,
+partial matches are valid when ignored variants should no-op.
 
 ```
 // ✗ if-chains on enums
@@ -472,11 +495,16 @@ else if status == .NotFound:
 else if status == .ServerError:
     handle_500()
 
-// ✓ idiomatic — compiler ensures exhaustiveness
+// ✓ idiomatic — expression-position match is exhaustive
 match status
     .Ok          -> handle_success()
     .NotFound    -> handle_404()
     .ServerError -> handle_500()
+
+// ✓ statement-position partial match
+match event
+    .Click(pos) -> on_click(pos)
+    .KeyDown(k) -> on_key(k)
 ```
 
 **Destructure in the pattern.** Don't match then access.
@@ -725,6 +753,38 @@ async fn process_all(data: &mut Vec[i32]):
         s.track(transform(&data[100..200]))
     // Borrows released, data is accessible again.
 ```
+
+## Concurrent Await
+
+Use tuple `.await` for a small fixed set of independent async
+operations. Avoid serial `.await` chains when there is no dependency.
+
+```
+// ✗ sequential
+let user = fetch_user(id).await
+let posts = fetch_posts(id).await
+
+// ✓ concurrent
+let (user, posts) = (fetch_user(id), fetch_posts(id)).await
+```
+
+Use collection combinators for larger homogeneous sets:
+
+```
+let users = ids |> map(fetch_user) |> await_all
+```
+
+Use `spawn` for detached fire-and-forget work; never `let _ =` on
+an async call result because dropping a `Task` cancels it.
+
+```
+// ✓ detached
+spawn send_analytics(event)
+```
+
+Prefer `async scope` when you need tracked cancellation behavior or
+dynamic task sets. For simple fixed arity fan-out/fan-in, tuple
+`.await` is usually the clearest form.
 
 ---
 

@@ -73,7 +73,9 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     self.typed_binding_types = sema.typed_binding_types
     self.typed_binding_names = sema.typed_binding_names
     self.typed_binding_muts = sema.typed_binding_muts
-    self.last_typed_dump = sema.dump_typed_module()
+    // Keep typed sidecars for downstream stages, but materialize the textual
+    // typed dump only when explicitly requested.
+    self.last_typed_dump = ""
 
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
