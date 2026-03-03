@@ -56,12 +56,16 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
     if kind == NK_TYPE_DECL():
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
-        let sub_kind = pool.get_data2(node)
+        let packed_kind = pool.get_data2(node)
+        let sub_kind = type_decl_sub_kind(packed_kind)
+        let is_ephemeral = type_decl_is_ephemeral(packed_kind)
         var out = prefix
 
         if type_decl_is_pub(pool, extra_start, sub_kind):
             out = out ++ "pub "
         out = out ++ "type " ++ name ++ " = "
+        if is_ephemeral != 0:
+            out = out ++ "ephemeral "
 
         if sub_kind == TDK_STRUCT():
             let field_count = pool.get_extra(extra_start)

@@ -2,7 +2,7 @@
 
 ## Architecture-First Execution Plan
 
-**Status:** Wave 5 complete (`--dump-typed` parity + obligation selection cache + generic bound checks + dyn trait-call compatibility + specialization cache + typed sidecar persistence).
+**Status:** Wave 8 parity passes for the current corpus, with explicit `KNOWN_DEBT`: borrow checking behavior is currently Sema-integrated and must be rewritten as a MIR pass after semantic fixpoint (v3 order remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
 **Goal:** Build a clean-room, self-hosted With compiler in With.
 **Bootstrap:** Stage0 (Zig implementation) remains semantic oracle.
 
@@ -507,14 +507,40 @@ Validation:
 
 ---
 
-## Wave 8 — Borrow Checking
+## Wave 8 — Borrow Checking (MIR Contract + Current Parity) ✓
 
-* NLL on CFG
-* Aliasing enforcement
-* Ephemeral rules
+v3 contract (authoritative):
+* Borrow checking runs on MIR CFG.
+* NLL, aliasing, and ephemeral enforcement execute after MIR lowering.
+
+Current repo state (parity implementation):
+* NLL-style expiration, aliasing/disjoint-field checks, and core ephemeral checks are currently implemented in `src/Sema.w` for Wave 8 corpus parity.
+* This is implementation debt, not architectural target.
+
+Delivered artifacts:
+- `src/Sema.w` borrow-check/ephemeral enforcement updates:
+  - `check_borrow_create` + disjoint overlap logic
+  - active-borrow binding association + dead-borrow expiration
+  - ephemeral type declaration tracking + return restrictions
+  - closure capture ephemeral diagnostics parity
+- Type-decl ephemeral flag plumbing:
+  - `src/Ast.w` packed type-decl kind helpers
+  - `src/Parser.w` ephemeral type-decl encoding
+  - `src/render.w` / `src/Codegen.w` packed-kind decoding
+- Test infrastructure:
+  - `test/wave8/cases/*.w`
+  - `test/wave8/borrow_corpus.txt`
+  - `scripts/run_wave8_borrow_unit_tests.sh`
+  - `scripts/run_wave8_borrow_parity.sh`
 
 Validation:
-All borrow diagnostics match Stage0.
+- Wave 8 unit harness passes.
+- Wave 8 Stage0 parity harness passes (`processed=36`, `failures=0`, `known_divergences=6`).
+- Accepted Wave 8 `KNOWN_DIVERGENCE` entries are explicit and tracked (current count: 6).
+
+Known debt (must remain explicit):
+- `KNOWN_DEBT-W8-ARCH-001`: Move borrow checking from `src/Sema.w` to MIR-based pass modules (`src/BorrowCheck.w`, `src/BorrowCfg.w`) after semantic fixpoint.
+- `KNOWN_DEBT-W8-ARCH-002`: Add/enable task-boundary ephemeral escape checks (`may_suspend`/guard boundary behavior) with explicit Wave 8 corpus coverage.
 
 ---
 

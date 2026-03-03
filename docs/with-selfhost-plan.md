@@ -1,6 +1,6 @@
 # Self-Hosting With — Architecture-First Plan
 
-**Status:** Wave 7 implementation complete (MIR data model + lowering pass, deterministic `--dump-mir`, Wave 7 corpus parity harness, Wave 7 unit harness, and Wave 2–Wave 7 parity state normalization with explicit `PASS`/`FAIL`/`KNOWN_DIVERGENCE` reporting).
+**Status:** Wave 8 parity is passing for the current corpus, with explicit `KNOWN_DEBT`: borrow checking is currently Sema-integrated and must be moved to a dedicated MIR pass after semantic fixpoint (v3 architecture remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
 
 ---
 
@@ -56,9 +56,9 @@ HIR (Resolved + Elaborated)
   ↓
 Typed IR
   ↓
-Borrow / Ephemeral Analysis
-  ↓
 MIR
+  ↓
+Borrow / Ephemeral Analysis (on MIR)
   ↓
 Async-MIR (if needed)
   ↓
@@ -218,54 +218,13 @@ Typed IR still preserves high-level control constructs.
 
 ---
 
-## 2.4 Borrow / Ephemeral Analysis
-
-**Purpose:** Enforce aliasing and ephemeral rules.
-
-### Input:
-
-* Typed IR
-
-### Output:
-
-* Same IR annotated with:
-
-  * Borrow lifetimes
-  * Move tracking
-  * Ephemeral flags
-  * Guard constraints
-  * `may_suspend` flags
-
-### Invariants:
-
-* All borrow errors detected here
-* All ephemeral propagation resolved
-* All `@[no_await_guard]` enforcement validated
-
-### Sugar allowed:
-
-* `with`
-* pattern matching
-* record update
-* async constructs
-
-### Eliminated:
-
-* No borrow ambiguity
-* No move-after-use
-* No ephemeral violations
-
-After this stage, semantics are fixed.
-
----
-
-## 2.5 MIR — Explicit Control Flow
+## 2.4 MIR — Explicit Control Flow
 
 **Purpose:** Remove language sugar and make control flow explicit.
 
 ### Input:
 
-* Typed + Borrow-checked IR
+* Typed IR
 
 ### Output:
 
@@ -303,6 +262,38 @@ After this stage, semantics are fixed.
   * explicit match lowering
 
 MIR is boring and explicit.
+
+---
+
+## 2.5 Borrow / Ephemeral Analysis
+
+**Purpose:** Enforce aliasing and ephemeral rules.
+
+Runs on MIR.
+
+### Input:
+
+* MIR
+
+### Output:
+
+* MIR plus borrow/ephemeral analysis state and diagnostics:
+
+  * Borrow lifetimes
+  * Move tracking
+  * Ephemeral flags
+  * Guard constraints
+  * `may_suspend` flags
+
+### Required safety checks:
+
+* No borrow ambiguity
+* No move-after-use
+* No ephemeral violations
+* Task-boundary ephemeral escape checks across `may_suspend` boundaries
+* `@[no_await_guard]` enforcement with Stage0-equivalent severity
+
+After this stage, ownership/ephemeral semantics are fixed.
 
 ---
 
@@ -384,6 +375,11 @@ This is how you prevent architecture drift.
 
 Now we adapt your Waves to this architecture.
 
+Wave mapping (v3, authoritative):
+* Wave 6: Sema (typed IR)
+* Wave 7: MIR lowering (CFG + explicit drops)
+* Wave 8: Borrow/Ephemeral checking on MIR
+
 ---
 
 ## Phase 0 — Deterministic Stage0
@@ -437,30 +433,37 @@ Validate typed dump vs Stage0.
 
 ---
 
-## Phase 4 — Borrow + Ephemeral
+## Phase 4 — MIR
 
 Implement:
 
-* NLL
-* Disjoint field borrowing
-* Ephemeral propagation
-* Guard enforcement
-* `may_suspend`
-
-Diagnostics must match Stage0.
-
----
-
-## Phase 5 — MIR
-
-Implement full sugar lowering.
+* Full sugar lowering to MIR
+* Explicit CFG/basic blocks
+* Explicit drops and control flow
 
 Validate:
 
 * `--dump-mir` deterministic on the Wave 7 corpus.
 * If Stage0 gains `--dump-mir`, strict Stage0 vs self-host MIR diff gate.
 
-This is the biggest structural checkpoint.
+---
+
+## Phase 5 — Borrow + Ephemeral (on MIR)
+
+Implement:
+
+* NLL dataflow on MIR CFG
+* Disjoint field borrowing
+* Ephemeral propagation
+* Guard enforcement
+* `may_suspend`-aware task-boundary escape checks
+
+Validate:
+
+* Diagnostics must match Stage0.
+* Explicit task-boundary ephemeral tests must pass in the Wave 8 corpus.
+
+`KNOWN_DEBT` (current repo state): Wave 8 behavior currently lives in `src/Sema.w` for corpus parity and must be rewritten onto MIR (`src/BorrowCheck.w` + `src/BorrowCfg.w`) after semantic fixpoint.
 
 ---
 

@@ -1507,7 +1507,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
         let kind = self.pool.kind(decl)
         if kind == NK_TYPE_DECL():
             let name_sym = self.pool.get_data0(decl)
-            let sub_kind = self.pool.get_data2(decl)
+            let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
             if sub_kind == TDK_STRUCT():
                 self.predeclare_struct_type(name_sym)
             else if sub_kind == TDK_ENUM():
@@ -1519,7 +1519,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
         let kind = self.pool.kind(decl)
         if kind == NK_TYPE_DECL():
             let name_sym = self.pool.get_data0(decl)
-            let sub_kind = self.pool.get_data2(decl)
+            let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
             if sub_kind == TDK_STRUCT():
                 self.declare_struct_type(name_sym, decl)
             else if sub_kind == TDK_ENUM():
