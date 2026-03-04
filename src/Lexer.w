@@ -7,6 +7,44 @@
 use Token
 use Span
 
+// Named character constants for readability.
+fn CH_NEWLINE -> i32: 10
+fn CH_CR -> i32: 13
+fn CH_TAB -> i32: 9
+fn CH_SPACE -> i32: 32
+fn CH_DQUOTE -> i32: 34
+fn CH_SQUOTE -> i32: 39
+fn CH_BACKSLASH -> i32: 92
+fn CH_LBRACE -> i32: 123
+fn CH_RBRACE -> i32: 125
+fn CH_LPAREN -> i32: 40
+fn CH_RPAREN -> i32: 41
+fn CH_LBRACKET -> i32: 91
+fn CH_RBRACKET -> i32: 93
+fn CH_COMMA -> i32: 44
+fn CH_SEMICOLON -> i32: 59
+fn CH_COLON -> i32: 58
+fn CH_TILDE -> i32: 126
+fn CH_AT -> i32: 64
+fn CH_CARET -> i32: 94
+fn CH_AMPERSAND -> i32: 38
+fn CH_PLUS -> i32: 43
+fn CH_MINUS -> i32: 45
+fn CH_STAR -> i32: 42
+fn CH_PERCENT -> i32: 37
+fn CH_EQ -> i32: 61
+fn CH_BANG -> i32: 33
+fn CH_QUESTION -> i32: 63
+fn CH_LT -> i32: 60
+fn CH_GT -> i32: 62
+fn CH_PIPE -> i32: 124
+fn CH_SLASH -> i32: 47
+fn CH_DOT -> i32: 46
+fn CH_HASH -> i32: 35
+fn CH_UNDERSCORE -> i32: 95
+fn CH_0 -> i32: 48
+fn CH_9 -> i32: 57
+
 type Lexer = {
     source: str,
     pos: i32,
@@ -316,7 +354,7 @@ fn Lexer.lex_string(self: Lexer) -> i32:
             if src[self.pos] == 92:  // backslash
                 self.pos = self.pos + 1
             self.pos = self.pos + 1
-        // Unterminated multi-line string
+        // Unterminated multi-line string — return STRING_LIT for parser recovery.
         return TK_STRING_LIT()
 
     // Track brace depth so that `"` inside interpolation holes `{...}` is not
@@ -325,8 +363,12 @@ fn Lexer.lex_string(self: Lexer) -> i32:
     while self.pos < slen:
         let ch = src[self.pos]
         if ch == 123 and brace_depth == 0:  // {
-            // Don't count escaped braces.
-            if self.pos > 0 and src[self.pos - 1] != 92:
+            // Don't count escaped braces. Count consecutive backslashes
+            // preceding this '{' — an odd count means the brace is escaped.
+            var bs = 0
+            while bs < self.pos and src[self.pos - 1 - bs] == 92:
+                bs = bs + 1
+            if bs % 2 == 0:
                 brace_depth = brace_depth + 1
                 self.pos = self.pos + 1
                 continue
@@ -354,7 +396,7 @@ fn Lexer.lex_string(self: Lexer) -> i32:
         if ch == 92:  // backslash escape
             self.pos = self.pos + 1
         self.pos = self.pos + 1
-    // Unterminated
+    // Unterminated — return STRING_LIT for parser recovery.
     TK_STRING_LIT()
 
 fn Lexer.lex_number(self: Lexer) -> i32:
@@ -400,35 +442,26 @@ fn Lexer.lex_number(self: Lexer) -> i32:
         if ch2 == 105 or ch2 == 117 or ch2 == 102:  // i, u, f
             if suffix_accept(src, self.pos, slen, "i8", 2):
                 self.pos = self.pos + 2
-            else:
-                if suffix_accept(src, self.pos, slen, "i16", 3):
-                    self.pos = self.pos + 3
-                else:
-                    if suffix_accept(src, self.pos, slen, "i32", 3):
-                        self.pos = self.pos + 3
-                    else:
-                        if suffix_accept(src, self.pos, slen, "i64", 3):
-                            self.pos = self.pos + 3
-                        else:
-                            if suffix_accept(src, self.pos, slen, "u8", 2):
-                                self.pos = self.pos + 2
-                            else:
-                                if suffix_accept(src, self.pos, slen, "u16", 3):
-                                    self.pos = self.pos + 3
-                                else:
-                                    if suffix_accept(src, self.pos, slen, "u32", 3):
-                                        self.pos = self.pos + 3
-                                    else:
-                                        if suffix_accept(src, self.pos, slen, "u64", 3):
-                                            self.pos = self.pos + 3
-                                        else:
-                                            if suffix_accept(src, self.pos, slen, "f32", 3):
-                                                self.pos = self.pos + 3
-                                                is_float = true
-                                            else:
-                                                if suffix_accept(src, self.pos, slen, "f64", 3):
-                                                    self.pos = self.pos + 3
-                                                    is_float = true
+            else if suffix_accept(src, self.pos, slen, "i16", 3):
+                self.pos = self.pos + 3
+            else if suffix_accept(src, self.pos, slen, "i32", 3):
+                self.pos = self.pos + 3
+            else if suffix_accept(src, self.pos, slen, "i64", 3):
+                self.pos = self.pos + 3
+            else if suffix_accept(src, self.pos, slen, "u8", 2):
+                self.pos = self.pos + 2
+            else if suffix_accept(src, self.pos, slen, "u16", 3):
+                self.pos = self.pos + 3
+            else if suffix_accept(src, self.pos, slen, "u32", 3):
+                self.pos = self.pos + 3
+            else if suffix_accept(src, self.pos, slen, "u64", 3):
+                self.pos = self.pos + 3
+            else if suffix_accept(src, self.pos, slen, "f32", 3):
+                self.pos = self.pos + 3
+                is_float = true
+            else if suffix_accept(src, self.pos, slen, "f64", 3):
+                self.pos = self.pos + 3
+                is_float = true
 
     if is_float:
         return TK_FLOAT_LIT()

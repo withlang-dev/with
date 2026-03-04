@@ -10,6 +10,7 @@ STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
 CORPUS_FILE="test/wave3/ast_corpus.txt"
 VERIFY_COVERAGE_SCRIPT="scripts/verify_wave3_coverage.sh"
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "building bootstrap compiler for Wave 3 AST parity..."
 (
@@ -74,9 +75,9 @@ while IFS= read -r src; do
   kd_line="$(parity_kd_line_for_test "$CORPUS_FILE" "$src")"
 
   stage0_rc=0
-  "$STAGE0_BIN" check "$src" --dump-ast >"$stage0_out" 2>"$tmpdir/${key}.stage0.stderr" || stage0_rc=$?
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" "$stage0_out" "$tmpdir/${key}.stage0.stderr" "$STAGE0_BIN" check "$src" --dump-ast || stage0_rc=$?
   self_rc_1=0
-  "$SELFHOST_BIN" check "$src" --dump-ast >"$self_out_1" 2>"$tmpdir/${key}.selfhost.stderr" || self_rc_1=$?
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" "$self_out_1" "$tmpdir/${key}.selfhost.stderr" "$SELFHOST_BIN" check "$src" --dump-ast || self_rc_1=$?
 
   if [[ "$stage0_rc" -ne 0 || "$self_rc_1" -ne 0 ]]; then
     if [[ "$stage0_rc" -ne "$self_rc_1" ]]; then
@@ -116,7 +117,7 @@ while IFS= read -r src; do
     continue
   fi
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-ast >"$self_out_2" 2>"$tmpdir/${key}.selfhost.stderr.2"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$self_out_2" "$tmpdir/${key}.selfhost.stderr.2" "$SELFHOST_BIN" check "$src" --dump-ast; then
     echo "FAIL(wave3-ast-parity-selfhost-recheck) $src"
     cat "$tmpdir/${key}.selfhost.stderr.2"
     failures=$((failures + 1))

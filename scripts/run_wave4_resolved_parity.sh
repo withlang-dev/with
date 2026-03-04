@@ -10,6 +10,7 @@ STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
 CORPUS_FILE="test/wave4/resolved_corpus.txt"
 VERIFY_COVERAGE_SCRIPT="scripts/verify_wave4_coverage.sh"
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "building bootstrap compiler for Wave 4 resolved parity..."
 (
@@ -74,9 +75,9 @@ while IFS= read -r src; do
   self_out_2="$tmpdir/${key}.self.resolved.2"
 
   stage0_rc=0
-  "$STAGE0_BIN" check "$src" > /dev/null 2>"$stage0_stderr" || stage0_rc=$?
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" /dev/null "$stage0_stderr" "$STAGE0_BIN" check "$src" || stage0_rc=$?
   self_rc=0
-  "$SELFHOST_BIN" check "$src" > /dev/null 2>"$self_stderr" || self_rc=$?
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" /dev/null "$self_stderr" "$SELFHOST_BIN" check "$src" || self_rc=$?
   kd_line="$(parity_kd_line_for_test "$CORPUS_FILE" "$src")"
 
   if [[ "$stage0_rc" -ne "$self_rc" ]]; then
@@ -106,14 +107,14 @@ while IFS= read -r src; do
     continue
   fi
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-resolved >"$self_out_1" 2>"$tmpdir/${key}.self.resolved.stderr.1"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$self_out_1" "$tmpdir/${key}.self.resolved.stderr.1" "$SELFHOST_BIN" check "$src" --dump-resolved; then
     echo "FAIL(wave4-resolved-parity-selfhost-dump) $src"
     cat "$tmpdir/${key}.self.resolved.stderr.1"
     failures=$((failures + 1))
     continue
   fi
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-resolved >"$self_out_2" 2>"$tmpdir/${key}.self.resolved.stderr.2"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$self_out_2" "$tmpdir/${key}.self.resolved.stderr.2" "$SELFHOST_BIN" check "$src" --dump-resolved; then
     echo "FAIL(wave4-resolved-parity-selfhost-redump) $src"
     cat "$tmpdir/${key}.self.resolved.stderr.2"
     failures=$((failures + 1))

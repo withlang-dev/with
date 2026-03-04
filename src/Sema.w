@@ -127,6 +127,8 @@ type Sema = {
     sym_send: i32,
     sym_recv: i32,
     sym_close: i32,
+    sym_cancel: i32,
+    sym_is_done: i32,
     sym_todo: i32,
     sym_unreachable: i32,
     sym_track: i32,
@@ -262,6 +264,8 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         sym_send: 0,
         sym_recv: 0,
         sym_close: 0,
+        sym_cancel: 0,
+        sym_is_done: 0,
         sym_todo: 0,
         sym_unreachable: 0,
         sym_track: 0,
@@ -383,6 +387,8 @@ fn Sema.seed_builtin_symbols(self: Sema):
     self.sym_send = self.pool.intern("send")
     self.sym_recv = self.pool.intern("recv")
     self.sym_close = self.pool.intern("close")
+    self.sym_cancel = self.pool.intern("cancel")
+    self.sym_is_done = self.pool.intern("is_done")
     self.sym_todo = self.pool.intern("todo")
     self.sym_unreachable = self.pool.intern("unreachable")
     self.sym_track = self.pool.intern("track")
@@ -400,6 +406,8 @@ fn Sema.seed_builtin_symbols(self: Sema):
     self.register_builtin_fn_name("send")
     self.register_builtin_fn_name("recv")
     self.register_builtin_fn_name("close")
+    self.register_builtin_fn_name("cancel")
+    self.register_builtin_fn_name("is_done")
     self.register_builtin_fn_name("todo")
     self.register_builtin_fn_name("unreachable")
     self.register_builtin_fn_name("Vec")
@@ -958,14 +966,15 @@ fn Sema.collect_declarations(self: Sema):
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         let kind = self.ast.kind(decl)
+        let is_local = self.is_local_decl(di)
         if kind == NK_FN_DECL():
             let fn_name = self.ast.get_data0(decl)
             if self.should_skip_trait_method(di, fn_name) == 0:
-                self.collect_fn_decl(decl)
+                self.collect_fn_decl(decl, is_local)
         if kind == NK_EXTERN_FN():
-            self.collect_extern_fn(decl)
+            self.collect_extern_fn(decl, is_local)
         if kind == NK_LET_DECL():
-            self.collect_let_decl(decl)
+            self.collect_let_decl(decl, is_local)
 
 fn Sema.is_local_decl(self: Sema, decl_index: i32) -> i32:
     let limit = self.ast.local_decl_count()
@@ -977,7 +986,8 @@ fn Sema.is_local_decl(self: Sema, decl_index: i32) -> i32:
 
 fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
-    self.set_pretty_symbol(name, self.extract_decl_name_after(node, "type"))
+    if is_local != 0:
+        self.set_pretty_symbol(name, self.extract_decl_name_after(node, "type"))
     let extra_start = self.ast.get_data1(node)
     let packed_kind = self.ast.get_data2(node)
     let sub_kind = type_decl_sub_kind(packed_kind)
@@ -1054,9 +1064,10 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
     if is_local != 0:
         self.local_type_names.insert(name, 1)
 
-fn Sema.collect_fn_decl(self: Sema, node: i32):
+fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let fn_name = self.ast.get_data0(node)
-    self.set_pretty_symbol(fn_name, self.extract_decl_name_after(node, "fn"))
+    if is_local != 0:
+        self.set_pretty_symbol(fn_name, self.extract_decl_name_after(node, "fn"))
     self.fn_decl_nodes.insert(fn_name, node)
 
     // Look up fn_meta for parameter info
@@ -1086,7 +1097,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32):
     let sig_param_start = self.sig_params.len() as i32
     for pi in 0..param_count:
         let p_name_sym = self.ast.get_extra(param_start + pi * 2)
-        self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
+        if is_local != 0:
+            self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
         let p_type_node = self.ast.get_extra(param_start + pi * 2 + 1)
         let p_tid = self.resolve_type_expr(p_type_node)
         self.sig_params.push(p_tid)
@@ -1122,9 +1134,10 @@ fn Sema.collect_fn_decl(self: Sema, node: i32):
     if (flags / FN_FLAG_ASYNC()) % 2 == 1:
         self.task_fns.insert(fn_name, 1)
 
-fn Sema.collect_extern_fn(self: Sema, node: i32):
+fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
-    self.set_pretty_symbol(name, self.extract_decl_name_after(node, "fn"))
+    if is_local != 0:
+        self.set_pretty_symbol(name, self.extract_decl_name_after(node, "fn"))
     let flags = self.ast.get_data2(node)
     let is_variadic = flags % 2
 
@@ -1142,7 +1155,8 @@ fn Sema.collect_extern_fn(self: Sema, node: i32):
     let sig_param_start = self.sig_params.len() as i32
     for pi in 0..param_count:
         let p_name_sym = self.ast.get_extra(param_start + pi * 2)
-        self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
+        if is_local != 0:
+            self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
         // extern params use the same parser extra layout as regular fns: [name, type]*
         let p_type_node = self.ast.get_extra(param_start + pi * 2 + 1)
         let p_tid = self.resolve_type_expr(p_type_node)
@@ -1219,12 +1233,13 @@ fn Sema.local_let_type_ann_extra(self: Sema, flags: i32) -> i32:
         return -1
     packed - 1
 
-fn Sema.collect_let_decl(self: Sema, node: i32):
+fn Sema.collect_let_decl(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
-    var bind_name = self.extract_decl_name_after(node, "let")
-    if bind_name.len() == 0:
-        bind_name = self.extract_decl_name_after(node, "var")
-    self.set_pretty_symbol(name, bind_name)
+    if is_local != 0:
+        var bind_name = self.extract_decl_name_after(node, "let")
+        if bind_name.len() == 0:
+            bind_name = self.extract_decl_name_after(node, "var")
+        self.set_pretty_symbol(name, bind_name)
     let flags = self.ast.get_data2(node)
     let is_mut = flags % 2
     var bind_ty = 0
@@ -1242,7 +1257,8 @@ fn Sema.collect_let_decl(self: Sema, node: i32):
 
 fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
-    self.set_pretty_symbol(name, self.extract_decl_name_after(node, "trait"))
+    if is_local != 0:
+        self.set_pretty_symbol(name, self.extract_decl_name_after(node, "trait"))
     let extra_start = self.ast.get_data1(node)
     // Store trait info
     let trait_idx = self.trait_name_syms.len() as i32
@@ -2662,18 +2678,51 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         let v_name = self.ast.get_data0(node)
         let v_extra = self.ast.get_data1(node)
         let bind_count = self.ast.get_data2(node)
-        // Recursively check each payload pattern (extra stores pattern nodes, not symbols).
+        var payload_start = 0
+        var payload_count = 0
+        let resolved = self.resolve_alias(subject_type)
+        if self.get_type_kind(resolved) == TY_ENUM():
+            let te_start = self.get_type_d1(resolved)
+            let variant_count = self.get_type_d2(resolved)
+            var pos = te_start
+            for vi in 0..variant_count:
+                let name_sym = self.type_extra.get(pos as i64)
+                let pc = self.type_extra.get((pos + 1) as i64)
+                if name_sym == v_name:
+                    payload_start = pos + 2
+                    payload_count = pc
+                    break
+                pos = pos + 2 + pc
+        // Recursively check each payload pattern (extra stores pattern nodes).
         for bi in 0..bind_count:
             let inner_pat = self.ast.get_extra(v_extra + bi)
-            self.check_pattern(inner_pat, 0)
+            let inner_ty = if bi < payload_count: self.type_extra.get((payload_start + bi) as i64) else: 0
+            self.check_pattern(inner_pat, inner_ty)
         return
 
     if kind == NK_PAT_ENUM_SHORTHAND():
+        let v_name = self.ast.get_data0(node)
         let v_extra = self.ast.get_data1(node)
         let bind_count = self.ast.get_data2(node)
+        var payload_start = 0
+        var payload_count = 0
+        let resolved = self.resolve_alias(subject_type)
+        if self.get_type_kind(resolved) == TY_ENUM():
+            let te_start = self.get_type_d1(resolved)
+            let variant_count = self.get_type_d2(resolved)
+            var pos = te_start
+            for vi in 0..variant_count:
+                let name_sym = self.type_extra.get(pos as i64)
+                let pc = self.type_extra.get((pos + 1) as i64)
+                if name_sym == v_name:
+                    payload_start = pos + 2
+                    payload_count = pc
+                    break
+                pos = pos + 2 + pc
         for bi in 0..bind_count:
             let bind_sym = self.ast.get_extra(v_extra + bi)
-            self.scope_put(bind_sym, 0, 0)
+            let bind_ty = if bi < payload_count: self.type_extra.get((payload_start + bi) as i64) else: 0
+            self.scope_put(bind_sym, bind_ty, 0)
         return
 
     if kind == NK_PAT_OR():
@@ -2693,8 +2742,15 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
     if kind == NK_PAT_TUPLE():
         let t_extra = self.ast.get_data0(node)
         let t_count = self.ast.get_data1(node)
+        var elem_start = 0
+        var elem_count = 0
+        let resolved = self.resolve_alias(subject_type)
+        if self.get_type_kind(resolved) == TY_TUPLE():
+            elem_start = self.get_type_d0(resolved)
+            elem_count = self.get_type_d1(resolved)
         for ti in 0..t_count:
-            self.check_pattern(self.ast.get_extra(t_extra + ti), 0)
+            let elem_ty = if ti < elem_count: self.type_extra.get((elem_start + ti) as i64) else: 0
+            self.check_pattern(self.ast.get_extra(t_extra + ti), elem_ty)
         return
 
     if kind == NK_PAT_SLICE():
@@ -2726,13 +2782,25 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         let sp_extra = self.ast.get_data1(node)
         let sp_count = self.ast.get_data2(node)
         let has_rest = self.ast.get_extra(sp_extra)
+        var field_start = 0
+        var field_count = 0
+        let resolved = self.resolve_alias(subject_type)
+        if self.get_type_kind(resolved) == TY_STRUCT():
+            field_start = self.get_type_d1(resolved)
+            field_count = self.get_type_d2(resolved)
         for spi in 0..sp_count:
             let f_name = self.ast.get_extra(sp_extra + 1 + spi * 2)
             let f_pat = self.ast.get_extra(sp_extra + 1 + spi * 2 + 1)
+            var field_ty = 0
+            for fi in 0..field_count:
+                let name_sym = self.type_extra.get((field_start + fi * 3) as i64)
+                if name_sym == f_name:
+                    field_ty = self.type_extra.get((field_start + fi * 3 + 1) as i64)
+                    break
             if f_pat != 0:
-                self.check_pattern(f_pat, 0)
+                self.check_pattern(f_pat, field_ty)
             else:
-                self.scope_put(f_name, 0, 0)
+                self.scope_put(f_name, field_ty, 0)
         return
 
 fn Sema.check_enum_variant(self: Sema, node: i32) -> i32:
@@ -2814,12 +2882,18 @@ fn Sema.check_range(self: Sema, node: i32) -> i32:
 fn Sema.check_with_expr(self: Sema, node: i32) -> i32:
     let source = self.ast.get_data0(node)
     let body = self.ast.get_data1(node)
-    let name = self.ast.get_data2(node)
+    let encoded_name = self.ast.get_data2(node)
+    let name = decode_with_binding_sym(encoded_name)
+    let is_mut = decode_with_binding_is_mut(encoded_name)
     let source_ty = self.check_expr(source)
     self.push_scope()
-    self.scope_put(name, source_ty, 0)
+    self.scope_put(name, source_ty, is_mut)
     let body_ty = self.check_expr(body)
     self.pop_scope()
+    // Form 2 builder rule: `with <expr> as mut x:` returns `x` when body
+    // ends in Unit; otherwise returns the final expression value.
+    if is_mut != 0 and body_ty == self.ty_void:
+        return source_ty
     body_ty
 
 fn Sema.check_record_update(self: Sema, node: i32) -> i32:
@@ -3340,6 +3414,17 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     let arg_types: Vec[i32] = Vec.new()
     for ai in 0..arg_count:
         arg_types.push(self.check_expr(self.ast.get_extra(extra_start + ai)))
+
+    // Task/ScopedTask surface methods (spec §14.7): cancel(), is_done().
+    if field == self.sym_cancel or field == self.sym_is_done:
+        if self.expr_is_task_value(expr) == 0 and self.expr_is_scoped_task_value(expr) == 0:
+            return 0
+        if arg_count != 0:
+            self.emit_error("task method expects zero arguments", node)
+            return 0
+        if field == self.sym_cancel:
+            return self.ty_void
+        return self.ty_bool
 
     if field == self.sym_track:
         if self.ast.kind(expr) != NK_IDENT() or self.is_active_async_scope_symbol(self.ast.get_data0(expr)) == 0:

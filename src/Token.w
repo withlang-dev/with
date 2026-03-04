@@ -309,6 +309,7 @@ fn TokenList.new -> TokenList:
         ends: Vec.new(),
     }
 
+// No-op: reserved for future manual memory management.
 fn TokenList.deinit(self: TokenList):
     return
 

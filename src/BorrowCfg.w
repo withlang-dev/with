@@ -1,5 +1,9 @@
 // BorrowCfg — Control-flow graph (CFG) construction for borrow-check analysis.
 //
+// STUB: CFG construction from AST expression trees is not yet implemented.
+// The build_cfg entry point produces entry/exit nodes but does not walk
+// the AST to create interior control-flow edges.
+//
 // This graph is intentionally lightweight: it captures sequencing,
 // branching, and loop back-edges from expression trees so later
 // analyses (NLL/liveness) can reason over explicit control-flow.
@@ -40,6 +44,7 @@ fn CfgGraph.init -> CfgGraph:
         exit: 0,
     }
 
+// No-op: reserved for future manual memory management.
 fn CfgGraph.deinit(self: CfgGraph):
     return
 

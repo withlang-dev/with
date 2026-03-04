@@ -716,7 +716,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
     if kind == NK_WITH_EXPR():
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         let with_scope = self.add_scope(module_id, current_scope, parent_def, SCOPE_KIND_BLOCK())
-        let name_sym = pool.get_data2(node)
+        let name_sym = decode_with_binding_sym(pool.get_data2(node))
         let bdef = self.add_def(module_id, parent_def, DEF_KIND_LOCAL(), name_sym, pool.get_start(node), pool.get_end(node))
         self.add_binding(with_scope, name_sym, bdef)
         self.walk_expr(pool, module_id, parent_def, with_scope, pool.get_data1(node))

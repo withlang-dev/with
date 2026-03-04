@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="./with-stage2"
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "rebuilding self-host compiler for Wave 5 unit tests..."
 ./scripts/rebuild_selfhost.sh stage2 >/dev/null
@@ -29,7 +30,7 @@ run_expect_pass_typed() {
   local out="$tmpdir/${name}.out"
   local err="$tmpdir/${name}.err"
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-typed >"$out" 2>"$err"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$SELFHOST_BIN" check "$src" --dump-typed; then
     echo "FAIL(wave5-unit-pass-check) $src"
     cat "$err"
     failures=$((failures + 1))
@@ -53,7 +54,9 @@ run_expect_fail() {
   local out="$tmpdir/${name}.out"
   local err="$tmpdir/${name}.err"
 
-  if "$SELFHOST_BIN" check "$src" >"$out" 2>"$err"; then
+  local rc=0
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$SELFHOST_BIN" check "$src" || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
     echo "FAIL(wave5-unit-fail-expected-error) $src"
     cat "$out"
     failures=$((failures + 1))
@@ -78,7 +81,9 @@ run_expect_fail_span() {
   local out="$tmpdir/${name}.out"
   local err="$tmpdir/${name}.err"
 
-  if "$SELFHOST_BIN" check "$src" >"$out" 2>"$err"; then
+  local rc=0
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$SELFHOST_BIN" check "$src" || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
     echo "FAIL(wave5-unit-fail-expected-error) $src"
     cat "$out"
     failures=$((failures + 1))

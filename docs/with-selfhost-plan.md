@@ -1,6 +1,6 @@
 # Self-Hosting With — Architecture-First Plan
 
-**Status:** Wave 11 parity is passing for the current corpus. Driver/CLI/link/c_import orchestration is implemented in self-host and validated by Wave 11 harnesses (`processed=30`, `failures=0`, `known_divergences=2`) with coverage verification passing (`processed=9`). Accepted Wave 11 divergences are both macro-path checks where self-host is correct and Stage0 is behind: `check|test/wave11/cases/c_import_macro_constants_ok.w` and `check|test/wave11/cases/c_import_macro_function_like_ok.w`. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking is currently Sema-integrated and must be moved to a dedicated MIR pass after semantic fixpoint (v3 architecture remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
+**Status:** Wave 12 self-host fixpoint infrastructure is complete. Stage1 → Stage2 → Stage3 build chain, full-suite validation, IR structural comparison, structured diagnostic comparison, and optional binary equality gate are implemented and wired into `scripts/run_wave12_selfhost_fixpoint.sh`. Stage2 is the canonical self-host compiler. All future compiler development targets self-host only; Stage0 is frozen in `/bootstrap` as recovery oracle. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking is currently Sema-integrated and must be moved to a dedicated MIR pass (v3 architecture remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
 
 ---
 
@@ -504,7 +504,7 @@ Validate:
 
 ---
 
-## Phase 8 — Self-Host
+## Phase 8 — Self-Host ✓
 
 ```
 Stage1 = Withc2 compiled by Stage0
@@ -512,12 +512,20 @@ Stage2 = Withc2 compiled by Stage1
 Stage3 = Withc2 compiled by Stage2
 ```
 
-Check:
+Implemented:
+* End-to-end stage chain automation (`scripts/rebuild_selfhost.sh stage3`).
+* Full-suite validation runner (`scripts/run_all_wave_tests.sh` with waves 1-12).
+* IR structural comparator with LLVM metadata normalization and SSA renumbering (`scripts/compare_ir_structural.sh`).
+* Structured diagnostic comparator with path/column/case normalization (`scripts/compare_structured_diagnostics.sh`).
+* Optional binary equality gate with symbol-table diff on mismatch (`scripts/compare_binaries_optional.sh`).
+* Fixpoint corpus covering sync, async, generics, trait objects, c_import, enums, closures (`test/wave12/fixpoint_corpus.txt`).
+* Normalized diagnostic schema documented (`test/wave12/diagnostic_schema.md`).
 
-* Full test suite passes
-* Demos build
-* Stage2 IR structurally equals Stage3 IR
-* Optional: binary fixpoint
+Validation:
+* `scripts/run_wave12_selfhost_fixpoint.sh`: orchestrates all three validation levels.
+* Validation Level 1: full test suite (waves 1-11) green with Stage2.
+* Validation Level 2: Stage2 IR structurally equals Stage3 IR for fixpoint corpus.
+* Validation Level 3 (optional): binary hash comparison with symbol-table diff. Non-blocking; LLVM codegen may have legitimate non-determinism (pointer metadata, debug info ordering).
 
 ---
 

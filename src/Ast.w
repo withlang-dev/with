@@ -72,6 +72,24 @@ fn NK_ASYNC_SCOPE -> i32: 65
 fn NK_SELECT_AWAIT -> i32: 66
 fn NK_POISONED_EXPR -> i32: 69
 
+// With-expression binding encoding in d2:
+// - positive value: immutable binding symbol id
+// - negative value: mutable binding symbol id
+fn encode_with_binding(sym: i32, is_mut: i32) -> i32:
+    if is_mut != 0 and sym > 0:
+        return 0 - sym
+    sym
+
+fn decode_with_binding_sym(encoded: i32) -> i32:
+    if encoded < 0:
+        return 0 - encoded
+    encoded
+
+fn decode_with_binding_is_mut(encoded: i32) -> i32:
+    if encoded < 0:
+        return 1
+    0
+
 // Type expressions
 fn NK_TYPE_NAMED -> i32: 80
 fn NK_TYPE_GENERIC -> i32: 81
@@ -229,6 +247,12 @@ type AstPool = {
 
     // Auxiliary for-loop metadata: [node, index_binding(sym,0=none), label(sym,0=none)]*
     for_meta: Vec[i32],
+
+    // O(1) lookup maps: node → index into corresponding metadata Vec.
+    fn_meta_map: HashMap[i32, i32],
+    type_meta_map: HashMap[i32, i32],
+    fn_param_pattern_meta_map: HashMap[i32, i32],
+    for_meta_map: HashMap[i32, i32],
 }
 
 fn AstPool.new -> AstPool:
@@ -248,6 +272,10 @@ fn AstPool.new -> AstPool:
         fn_param_patterns: Vec.new(),
         fn_param_pattern_meta: Vec.new(),
         for_meta: Vec.new(),
+        fn_meta_map: HashMap.new(),
+        type_meta_map: HashMap.new(),
+        fn_param_pattern_meta_map: HashMap.new(),
+        for_meta_map: HashMap.new(),
     }
     // Reserve node 0 as null sentinel
     pool.kinds.push(0)
@@ -339,6 +367,7 @@ fn AstPool.set_data2(self: AstPool, idx: i32, val: i32):
 
 // Store fn decl metadata: [node, flags, ret_type, param_start, param_count, tp_start, tp_count]
 fn AstPool.add_fn_meta(self: AstPool, node: i32, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):
+    let idx = self.fn_meta.len() as i32
     self.fn_meta.push(node)
     self.fn_meta.push(flags)
     self.fn_meta.push(ret)
@@ -346,15 +375,13 @@ fn AstPool.add_fn_meta(self: AstPool, node: i32, flags: i32, ret: i32, ps: i32, 
     self.fn_meta.push(pc)
     self.fn_meta.push(ts)
     self.fn_meta.push(tc)
+    self.fn_meta_map.insert(node, idx)
 
 // Get fn metadata for a given fn decl node. Returns 7-int record start or -1.
 fn AstPool.find_fn_meta(self: AstPool, node: i32) -> i32:
-    var i = 0
-    let len = self.fn_meta.len() as i32
-    while i < len:
-        if self.fn_meta.get(i as i64) == node:
-            return i
-        i = i + 7
+    let found = self.fn_meta_map.get(node)
+    if found.is_some():
+        return found.unwrap()
     0 - 1
 
 fn AstPool.fn_meta_flags(self: AstPool, meta: i32) -> i32:
@@ -376,17 +403,16 @@ fn AstPool.fn_meta_tp_count(self: AstPool, meta: i32) -> i32:
     self.fn_meta.get((meta + 6) as i64)
 
 fn AstPool.add_type_meta(self: AstPool, node: i32, derive_start: i32, derive_count: i32):
+    let idx = self.type_meta.len() as i32
     self.type_meta.push(node)
     self.type_meta.push(derive_start)
     self.type_meta.push(derive_count)
+    self.type_meta_map.insert(node, idx)
 
 fn AstPool.find_type_meta(self: AstPool, node: i32) -> i32:
-    var i = 0
-    let len = self.type_meta.len() as i32
-    while i < len:
-        if self.type_meta.get(i as i64) == node:
-            return i
-        i = i + 3
+    let found = self.type_meta_map.get(node)
+    if found.is_some():
+        return found.unwrap()
     0 - 1
 
 fn AstPool.type_meta_derive_start(self: AstPool, meta: i32) -> i32:
@@ -405,17 +431,16 @@ fn AstPool.fn_param_pattern_value(self: AstPool, idx: i32) -> i32:
     self.fn_param_patterns.get(idx as i64)
 
 fn AstPool.add_fn_param_pattern_meta(self: AstPool, node: i32, start: i32, count: i32):
+    let idx = self.fn_param_pattern_meta.len() as i32
     self.fn_param_pattern_meta.push(node)
     self.fn_param_pattern_meta.push(start)
     self.fn_param_pattern_meta.push(count)
+    self.fn_param_pattern_meta_map.insert(node, idx)
 
 fn AstPool.find_fn_param_pattern_meta(self: AstPool, node: i32) -> i32:
-    var i = 0
-    let len = self.fn_param_pattern_meta.len() as i32
-    while i < len:
-        if self.fn_param_pattern_meta.get(i as i64) == node:
-            return i
-        i = i + 3
+    let found = self.fn_param_pattern_meta_map.get(node)
+    if found.is_some():
+        return found.unwrap()
     0 - 1
 
 fn AstPool.fn_param_pattern_meta_start(self: AstPool, meta: i32) -> i32:
@@ -425,17 +450,16 @@ fn AstPool.fn_param_pattern_meta_count(self: AstPool, meta: i32) -> i32:
     self.fn_param_pattern_meta.get((meta + 2) as i64)
 
 fn AstPool.add_for_meta(self: AstPool, node: i32, index_binding: i32, label: i32):
+    let idx = self.for_meta.len() as i32
     self.for_meta.push(node)
     self.for_meta.push(index_binding)
     self.for_meta.push(label)
+    self.for_meta_map.insert(node, idx)
 
 fn AstPool.find_for_meta(self: AstPool, node: i32) -> i32:
-    var i = 0
-    let len = self.for_meta.len() as i32
-    while i < len:
-        if self.for_meta.get(i as i64) == node:
-            return i
-        i = i + 3
+    let found = self.for_meta_map.get(node)
+    if found.is_some():
+        return found.unwrap()
     0 - 1
 
 fn AstPool.for_meta_index_binding(self: AstPool, meta: i32) -> i32:
@@ -509,8 +533,7 @@ fn AstPool.for_meta_label(self: AstPool, meta: i32) -> i32:
 // NK_RANGE:         d0=start(node,0=none), d1=end(node,0=none), d2=inclusive(0/1)
 // NK_GROUPED:       d0=inner(node), d1=0, d2=0
 // NK_VARIANT_SHORTHAND: d0=name(sym), d1=extra_start, d2=arg_count
-// NK_WITH_EXPR:     d0=source(node), d1=body(node), d2=name(sym)
-//                   extra: [is_mut(0/1)]
+// NK_WITH_EXPR:     d0=source(node), d1=body(node), d2=encoded_binding(sym+mut)
 // NK_RECORD_UPDATE: d0=source(node), d1=extra_start, d2=field_count
 // NK_ENUM_VARIANT:  d0=type_name(sym), d1=variant_name(sym), d2=extra_start
 //                   extra: [arg_count, args...]

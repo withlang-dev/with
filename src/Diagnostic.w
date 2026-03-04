@@ -101,6 +101,7 @@ fn DiagnosticList.init -> DiagnosticList:
         items: Vec.new(),
     }
 
+// No-op: reserved for future manual memory management.
 fn DiagnosticList.deinit(self: DiagnosticList):
     return
 

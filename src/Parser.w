@@ -2594,9 +2594,8 @@ fn Parser.parse_with_expr(self: Parser) -> i32:
     if self.peek() == TK_COLON():
         self.advance()
     let body = self.parse_block_or_expr()
-    let extra_start = self.pool.extra_len()
-    self.pool.add_extra(is_mut)
-    self.pool.add_node(NK_WITH_EXPR(), start, self.prev_end(), source, body, name)
+    let encoded_name = encode_with_binding(name, is_mut)
+    self.pool.add_node(NK_WITH_EXPR(), start, self.prev_end(), source, body, encoded_name)
 
 // ── Record update ────────────────────────────────────────────────
 

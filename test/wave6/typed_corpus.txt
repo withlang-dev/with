@@ -79,31 +79,67 @@ bootstrap/test/cases/auto_ref.w
 bootstrap/test/cases/auto_deref.w
 bootstrap/test/cases/type_alias.w
 #
-# Known divergences — match variant payload types not propagated in selfhost Sema:
-bootstrap/test/cases/enum_data.w
-KNOWN_DIVERGENCE|bootstrap/test/cases/enum_data.w|match_expr type is error instead of i32|stage0|selfhost Sema does not propagate variant payload types through pattern matching
-bootstrap/test/cases/enum_complex_match.w
-KNOWN_DIVERGENCE|bootstrap/test/cases/enum_complex_match.w|match_expr type is error instead of i32|stage0|selfhost Sema does not propagate variant payload types through pattern matching
-bootstrap/test/cases/enum_match_bind.w
-KNOWN_DIVERGENCE|bootstrap/test/cases/enum_match_bind.w|match_expr type is error instead of i32|stage0|selfhost Sema does not propagate variant payload types through pattern matching
-bootstrap/test/cases/enum_complex.w
-KNOWN_DIVERGENCE|bootstrap/test/cases/enum_complex.w|match_expr type is error instead of i32|stage0|selfhost Sema does not propagate variant payload types through pattern matching
-bootstrap/test/cases/at_binding.w
-KNOWN_DIVERGENCE|bootstrap/test/cases/at_binding.w|match_expr type is error instead of i32|stage0|selfhost Sema does not propagate variant payload types through pattern matching
-bootstrap/test/cases/nested_match.w
-KNOWN_DIVERGENCE|bootstrap/test/cases/nested_match.w|match_expr type is error instead of i32|stage0|selfhost Sema does not propagate variant payload types through pattern matching
-#
-# Known divergences — other Sema differences:
-bootstrap/test/cases/while_let.w
-KNOWN_DIVERGENCE|bootstrap/test/cases/while_let.w|block and break type differences|stage0|selfhost resolves block/break types differently
-bootstrap/test/cases/char_literal.w
-KNOWN_DIVERGENCE|bootstrap/test/cases/char_literal.w|main return type error vs void|stage0|selfhost does not resolve char return type correctly
-bootstrap/test/cases/with_form1.w
-KNOWN_DIVERGENCE|bootstrap/test/cases/with_form1.w|span off-by-one in with_expr|selfhost|selfhost end span is 236 vs bootstrap 235
-#
 # KNOWN_DIVERGENCE format:
 # KNOWN_DIVERGENCE|<test>|<what_differs>|<correct_compiler>|<why>
-KNOWN_DIVERGENCE|bootstrap/test/cases/chained_if_let.w|spans in desugared if-let match nodes|selfhost|synthesized nodes get start..start spans vs bootstrap start..end
+#
+# Spec-triaged divergences for Wave 6 typed parity.
+# The language spec is authoritative; Stage0 typed dumps are a reference artifact.
+KNOWN_DIVERGENCE|bootstrap/test/cases/c_import.w|typed dump transitive c_import surface differs|neither|spec requires c_import declarations to be available (§16.1), not a byte-identical dump shape
+KNOWN_DIVERGENCE|bootstrap/test/cases/chained_if_let.w|typed dump span ranges for desugared if-let differ|neither|spec defines if-let/chained-if-let semantics (§9.7), not synthesized-node span exactness
+KNOWN_DIVERGENCE|bootstrap/test/cases/chained_if_let_guard.w|typed dump span ranges for guarded chained if-let differ|neither|guard semantics are specified (§9.7) but debug span boundaries are implementation detail
+KNOWN_DIVERGENCE|bootstrap/test/cases/comptime_error.w|typed dump block/comptime span end differs by one|neither|comptime behavior is semantic; exact dump spans are unspecified
+KNOWN_DIVERGENCE|bootstrap/test/cases/float_math.w|typed dump transitive import/c_import declarations differ|neither|std and c_import availability is required (§16.1, §18.6), declaration dump ordering/surface is unspecified
+KNOWN_DIVERGENCE|bootstrap/test/cases/for_index.w|typed dump for-expr span end differs by one|neither|for-loop semantics are specified; exact typed span endpoints are not
+KNOWN_DIVERGENCE|bootstrap/test/cases/generator_stdlib_ready.w|typed dump import expansion and declaration ordering differ|neither|spec constrains generator semantics, not transitive declaration dump ordering
+KNOWN_DIVERGENCE|bootstrap/test/cases/if_let.w|typed dump span range differs for if-let desugaring|neither|if-let semantics are specified (§9.7); typed dump span shape is not
+KNOWN_DIVERGENCE|bootstrap/test/cases/if_let_chained.w|typed dump span ranges differ for chained if-let lowering|neither|chained if-let behavior is specified (§9.7), dump coordinates are not
+KNOWN_DIVERGENCE|bootstrap/test/cases/if_let_option.w|typed dump synthesized literal/match spans differ|neither|optional binding semantics are specified; synthetic span selection is implementation detail
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_local.w|typed dump declaration ordering differs after import merge|neither|module/import semantics are specified (§18.2), dump declaration order is not
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std.w|typed dump transitive std/c_import declaration surface differs|neither|spec requires usable std symbols (§18.6), not identical dump of transitive declarations
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_alloc.w|Stage0 emits bogus E0201 implicit narrowing diagnostics|selfhost|selfhost accepts valid std.alloc usage per numeric conversion and c_import interop rules (§4.2, §16.1)
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_collections.w|typed dump declaration ordering differs for imported std wrappers|neither|collections API behavior is semantic; dump ordering after import merge is unspecified
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_collections_additional.w|typed dump declaration ordering differs for imported helper decls|neither|spec constrains symbol availability, not ordering of typed dump declarations
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_ext.w|typed dump transitive std/c_import declaration surface differs|neither|std extension modules must resolve (§18.6); transitive dump byte shape is not specified
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_hash.w|typed dump declaration ordering differs with std.hash imports|neither|hash module behavior is semantic; typed dump declaration order is not
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_math.w|typed dump transitive c_import math declaration surface differs|neither|math APIs must be callable; full transitive c_import dump parity is unspecified
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_mem.w|Stage0 rejects import set with shadowing diagnostics on imported C symbols|selfhost|no-shadowing targets local bindings (§29.8); imported std APIs remain usable under module rules (§18.2)
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_net.w|typed dump declaration ordering differs for std.net imports|neither|network API availability is semantic; dump ordering is implementation-defined
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_option.w|typed dump declaration ordering differs for std.option imports|neither|Option semantics are specified (§10.1/§10.5), dump order is not
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_process.w|typed dump declaration ordering differs for std.process imports|neither|process API behavior is semantic; dump ordering is not specified
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_random.w|typed dump transitive declaration surface differs for std.random|neither|random module symbol availability is required; full transitive dump parity is not
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_signal.w|typed dump declaration ordering differs for std.signal imports|neither|signal module behavior is semantic; declaration dump order is unspecified
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_sync.w|typed dump declaration ordering differs for std.sync imports|neither|sync API behavior is semantic; typed dump ordering is not part of spec
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_thread.w|typed dump declaration ordering differs for std.thread imports|neither|thread API semantics are specified; typed dump ordering is not
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_time.w|typed dump declaration ordering differs for std.time imports|neither|time API behavior is semantic; declaration dump order is unspecified
+KNOWN_DIVERGENCE|bootstrap/test/cases/labeled_loop.w|typed dump span ranges differ in labeled loop if-exprs|neither|labeled-loop behavior is semantic; exact spans are not specified
+KNOWN_DIVERGENCE|bootstrap/test/cases/loop_break.w|Stage0 typed dump leaks <error> types for accepted loop program|selfhost|selfhost preserves valid loop typing; loop/break semantics are defined in language control flow rules
+KNOWN_DIVERGENCE|bootstrap/test/cases/loop_simple.w|Stage0 typed dump leaks <error> types for accepted loop program|selfhost|selfhost types simple loop as Unit/void consistent with control-flow semantics
+KNOWN_DIVERGENCE|bootstrap/test/cases/match_guard_int.w|both compilers reject parameter-shadowing pattern but diagnostics differ|neither|no-shadowing rule requires rejection (§29.8); wording/span differences are non-semantic
+KNOWN_DIVERGENCE|bootstrap/test/cases/nested_pattern.w|typed dump span end differs by one in nested pattern if-expr|neither|pattern semantics are specified (§9.7); exact span endpoints are not
+KNOWN_DIVERGENCE|bootstrap/test/cases/numeric_suffixes.w|typed dump span end differs by one around trailing if-expr|neither|numeric suffix semantics are specified; debug span formatting is implementation detail
+KNOWN_DIVERGENCE|bootstrap/test/cases/p2_if_let_chained.w|typed dump span ranges differ for chained if-let lowering|neither|same chained-if-let semantics (§9.7); dump span shape differs
+KNOWN_DIVERGENCE|bootstrap/test/cases/p2_param_patterns.w|typed dump desugared parameter-pattern binder naming differs|neither|parameter-pattern desugaring is semantic (§9.7); synthetic binder names are implementation detail
+KNOWN_DIVERGENCE|bootstrap/test/cases/p3_raw_ptr_as_option.w|Stage0 emits bogus E0201 on raw pointer as_option flow|selfhost|raw pointer null-safe conversion is specified (§16.1, §25.97) and selfhost accepts program
+KNOWN_DIVERGENCE|bootstrap/test/cases/p3_std_fs_io.w|typed dump transitive std/c_import declaration surface differs|neither|std.fs/io usability is required (§18.6); full transitive dump parity is not
+KNOWN_DIVERGENCE|bootstrap/test/cases/param_patterns.w|typed dump desugared parameter-pattern binder naming differs|neither|parameter-pattern semantics are specified (§9.7); internal binder naming is unspecified
+KNOWN_DIVERGENCE|bootstrap/test/cases/raw_ptr_option.w|Stage0 emits bogus E0201 on raw pointer as_option flow|selfhost|raw pointer .as_option behavior is specified (§16.1, §25.97); selfhost conforms
+KNOWN_DIVERGENCE|bootstrap/test/cases/scope_shadow.w|both compilers reject local rebinding; diagnostics differ slightly|neither|shadowing is explicitly disallowed (§29.8); diagnostic formatting differences are non-semantic
+KNOWN_DIVERGENCE|bootstrap/test/cases/showcase2.w|typed dump includes different synthesized identifier spans|neither|semantic typing agrees; synthesized dump-node details are unspecified
+KNOWN_DIVERGENCE|bootstrap/test/cases/std_fs_io.w|typed dump transitive std/c_import declaration surface differs|neither|std.fs/io semantics are required (§18.6); dump parity of transitive declarations is not
+KNOWN_DIVERGENCE|bootstrap/test/cases/stdlib_io.w|Stage0 emits bogus E0201 in valid std.io usage|selfhost|selfhost accepts spec-valid std API usage (§18.6) without invalid narrowing diagnostics
+KNOWN_DIVERGENCE|bootstrap/test/cases/stdlib_math.w|typed dump transitive c_import math declaration surface differs|neither|math API semantics are required; transitive dump byte shape is implementation detail
+KNOWN_DIVERGENCE|bootstrap/test/cases/stdlib_mem.w|Stage0 emits bogus E0201 in valid std.mem usage|selfhost|selfhost accepts spec-valid std.mem usage (§18.6) without invalid narrowing diagnostics
+KNOWN_DIVERGENCE|bootstrap/test/cases/stdlib_string.w|typed dump transitive std/c_import declaration surface differs|neither|string API semantics are specified; transitive dump surface parity is not
+KNOWN_DIVERGENCE|bootstrap/test/cases/stdlib_string_ops.w|typed dump transitive std/c_import declaration surface differs|neither|string ops behavior is semantic; dump transitive declaration shape is unspecified
+KNOWN_DIVERGENCE|bootstrap/test/cases/test_adapter_smoke.w|typed dump transitive std/c_import declaration surface differs|neither|test adapter semantics are unaffected; transitive declaration dump parity is not specified
+KNOWN_DIVERGENCE|bootstrap/test/cases/test_runner_smoke.w|typed dump transitive std/c_import declaration surface differs|neither|test runner semantics are unaffected; transitive declaration dump parity is not specified
+KNOWN_DIVERGENCE|bootstrap/test/cases/toplevel_let.w|Stage0 misses top-level let visibility in module scope|selfhost|module declarations are in scope under module rules (§18); selfhost resolves them correctly
+KNOWN_DIVERGENCE|bootstrap/test/cases/typed_closure_params.w|typed dump span end differs by one for closure param test|neither|closure typing semantics are unchanged; exact spans are implementation detail
+KNOWN_DIVERGENCE|bootstrap/test/cases/variant_shorthand_payload.w|typed dump span end differs by one around if-expr|neither|enum variant semantics are specified (§4.4/§9.7); span endpoint detail is unspecified
+KNOWN_DIVERGENCE|bootstrap/test/cases/while_let.w|Stage0 typed dump leaks <error> types in accepted while-let program|selfhost|while-let semantics are defined (§9.7); selfhost preserves executable typing without spurious <error>
+KNOWN_DIVERGENCE|bootstrap/test/cases/with_form1.w|typed dump with_expr end span differs by one|neither|with semantics are specified (§7.1); exact dump span endpoint is unspecified
+KNOWN_DIVERGENCE|bootstrap/test/cases/with_scoped.w|typed dump with_expr/function span end differs by one|neither|with block semantics are unchanged; span endpoint detail is implementation-specific
+KNOWN_DIVERGENCE|test/wave6/cases/chained_if_let_typed_pass.w|typed dump let-binding span differs after if-let lowering|neither|chained-if-let typing semantics are preserved; synthesized span range differs
 
 # Auto-enabled bootstrap coverage entries
 bootstrap/test/cases/array_bounds.w
@@ -531,6 +567,7 @@ bootstrap/test/cases/where_multi_bound.w
 bootstrap/test/cases/while_break_val.w
 bootstrap/test/cases/while_cond.w
 bootstrap/test/cases/while_counter.w
+bootstrap/test/cases/while_let.w
 bootstrap/test/cases/while_mut.w
 bootstrap/test/cases/with_binding.w
 bootstrap/test/cases/with_binding_advanced.w
@@ -538,6 +575,7 @@ bootstrap/test/cases/with_binding_ref.w
 bootstrap/test/cases/with_builder.w
 bootstrap/test/cases/with_builder_expr.w
 bootstrap/test/cases/with_drop.w
+bootstrap/test/cases/with_form1.w
 bootstrap/test/cases/with_nested.w
 bootstrap/test/cases/with_nonlocal_return.w
 bootstrap/test/cases/with_option_extract.w

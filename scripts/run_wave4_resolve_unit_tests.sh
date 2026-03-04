@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="./with-stage2"
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "rebuilding self-host compiler for Wave 4 resolve unit tests..."
 ./scripts/rebuild_selfhost.sh stage2 >/dev/null
@@ -29,7 +30,7 @@ run_case() {
   local err="$tmpdir/${name}.stderr"
   local case_failures=0
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-resolved >"$out" 2>"$err"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$SELFHOST_BIN" check "$src" --dump-resolved; then
     echo "FAIL(wave4-resolve-unit-check) $src"
     cat "$err"
     failures=$((failures + 1))
@@ -215,7 +216,9 @@ run_error_case() {
   local err="$tmpdir/${name}.stderr"
   local case_failures=0
 
-  if "$SELFHOST_BIN" check "$src" --dump-resolved >"$out" 2>"$err"; then
+  local rc=0
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$SELFHOST_BIN" check "$src" --dump-resolved || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
     echo "FAIL(wave4-resolve-unit-expected-error) $src (expected non-zero exit)"
     case_failures=$((case_failures + 1))
   else
@@ -245,7 +248,7 @@ run_golden_case() {
     failures=$((failures + 1))
     return
   fi
-  if ! "$SELFHOST_BIN" check "$src" --dump-resolved >"$out" 2>"$err"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$SELFHOST_BIN" check "$src" --dump-resolved; then
     echo "FAIL(wave4-resolve-unit-golden-check) $src"
     cat "$err" || true
     failures=$((failures + 1))

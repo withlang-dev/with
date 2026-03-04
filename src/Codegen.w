@@ -6601,7 +6601,7 @@ fn Codegen.gen_with_expr(self: Codegen, node: i32) -> i64:
     // with expr as binding: body
     let expr_node = self.pool.get_data0(node)
     let body_node = self.pool.get_data1(node)
-    let binding_sym = self.pool.get_data2(node)
+    let binding_sym = decode_with_binding_sym(self.pool.get_data2(node))
     let val = self.gen_expr(expr_node)
     let val_ty = wl_type_of(val)
     // Store binding as local

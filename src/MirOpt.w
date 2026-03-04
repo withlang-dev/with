@@ -1,5 +1,9 @@
 // MirOpt — Analysis data structures for optimization passes.
 //
+// STUB: The optimization passes (devirtualize, promote_non_escaping_boxes,
+// eliminate_dead_fields, elide_redundant_moves) currently only count
+// candidates without mutating MIR. Full transforms are not yet implemented.
+//
 // Defines call-site analysis, allocation tracking, field usage,
 // and move analysis for devirtualization, escape analysis,
 // dead-field elimination, and move elision.
@@ -70,6 +74,7 @@ fn MirOptModule.init -> MirOptModule:
         types: Vec.new(),
     }
 
+// No-op: reserved for future manual memory management.
 fn MirOptModule.deinit(self: MirOptModule):
     return
 

@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="./with-stage2"
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "rebuilding self-host compiler for Wave 8 borrow unit tests..."
 ./scripts/rebuild_selfhost.sh stage2 >/dev/null
@@ -16,13 +17,14 @@ if [[ ! -x "$SELFHOST_BIN" ]]; then
 fi
 
 SELFHOST_BIN="$(prepare_selfhost_runner "$ROOT_DIR" "$SELFHOST_BIN")"
-trap 'cleanup_selfhost_runner' EXIT
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"; cleanup_selfhost_runner' EXIT
 
 failures=0
 
 expect_pass() {
   local file="$1"
-  if "$SELFHOST_BIN" check "$file" >/dev/null 2>/dev/null; then
+  if runner_exec_capture "$CHECK_TIMEOUT_SECS" /dev/null /dev/null "$SELFHOST_BIN" check "$file"; then
     echo "PASS(wave8-unit-pass) $file"
   else
     echo "FAIL(wave8-unit-pass) $file"
@@ -33,12 +35,16 @@ expect_pass() {
 expect_fail_msg() {
   local file="$1"
   local msg="$2"
-  local out
-  if out=$("$SELFHOST_BIN" check "$file" 2>&1 >/dev/null); then
+  local out=""
+  local err="$tmpdir/${file//\//__}.fail.err"
+  local rc=0
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" /dev/null "$err" "$SELFHOST_BIN" check "$file" || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
     echo "FAIL(wave8-unit-fail) $file"
     failures=$((failures + 1))
     return
   fi
+  out="$(cat "$err" 2>/dev/null || true)"
   if [[ "$out" != *"$msg"* ]]; then
     echo "FAIL(wave8-unit-msg) $file"
     echo "expected message: $msg"
@@ -53,12 +59,14 @@ expect_fail_msg() {
 expect_warn_msg() {
   local file="$1"
   local msg="$2"
-  local out
-  if ! out=$("$SELFHOST_BIN" check "$file" 2>&1 >/dev/null); then
+  local out=""
+  local err="$tmpdir/${file//\//__}.warn.err"
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" /dev/null "$err" "$SELFHOST_BIN" check "$file"; then
     echo "FAIL(wave8-unit-warn-status) $file"
     failures=$((failures + 1))
     return
   fi
+  out="$(cat "$err" 2>/dev/null || true)"
   if [[ "$out" != *"$msg"* ]]; then
     echo "FAIL(wave8-unit-warn-msg) $file"
     echo "expected warning: $msg"

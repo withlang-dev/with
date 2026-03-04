@@ -10,6 +10,7 @@ STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
 CORPUS_FILE="test/wave8/borrow_corpus.txt"
 VERIFY_COVERAGE_SCRIPT="scripts/verify_wave8_coverage.sh"
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "building bootstrap compiler for Wave 8 borrow parity..."
 (
@@ -95,13 +96,13 @@ while IFS= read -r src; do
   self_err_2="$tmpdir/${key}.selfhost.err.2"
 
   stage0_rc=0
-  "$STAGE0_BIN" check "$src" >/dev/null 2>"$stage0_err" || stage0_rc=$?
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" /dev/null "$stage0_err" "$STAGE0_BIN" check "$src" || stage0_rc=$?
 
   self_rc_1=0
-  "$SELFHOST_BIN" check "$src" >/dev/null 2>"$self_err_1" || self_rc_1=$?
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" /dev/null "$self_err_1" "$SELFHOST_BIN" check "$src" || self_rc_1=$?
 
   self_rc_2=0
-  "$SELFHOST_BIN" check "$src" >/dev/null 2>"$self_err_2" || self_rc_2=$?
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" /dev/null "$self_err_2" "$SELFHOST_BIN" check "$src" || self_rc_2=$?
 
   if [[ "$self_rc_1" -ne "$self_rc_2" ]]; then
     echo "FAIL(wave8-borrow-parity-nondeterministic-selfhost-status) $src rc1=$self_rc_1 rc2=$self_rc_2"

@@ -2,9 +2,9 @@
 
 ## Architecture-First Execution Plan
 
-**Status:** Wave 11 parity passes for the current corpus. Driver/CLI/link/c_import behavior is implemented in self-host with deterministic harness coverage (`processed=30`, `failures=0`, `known_divergences=2`) and coverage verification (`processed=9`). Accepted Wave 11 divergences are macro-path checks where self-host is correct and Stage0 remains behind: `check|test/wave11/cases/c_import_macro_constants_ok.w` and `check|test/wave11/cases/c_import_macro_function_like_ok.w`. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking behavior is currently Sema-integrated and must be rewritten as a MIR pass after semantic fixpoint (v3 order remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
+**Status:** Wave 12 self-host fixpoint infrastructure is complete. Stage2 is the canonical self-host compiler. Stage1 → Stage2 → Stage3 build chain, full-suite validation (waves 1-11), IR structural comparison, and optional binary equality gate are wired into `scripts/run_wave12_selfhost_fixpoint.sh`. All future compiler development targets self-host only. Stage0 is frozen in `/bootstrap` as recovery oracle. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking behavior is currently Sema-integrated and must be rewritten as a MIR pass (v3 order remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
 **Goal:** Build a clean-room, self-hosted With compiler in With.
-**Bootstrap:** Stage0 (Zig implementation) remains semantic oracle.
+**Bootstrap:** Stage0 (Zig implementation) frozen as recovery oracle.
 
 ---
 
@@ -612,17 +612,29 @@ Validation:
 
 ---
 
-## Wave 12 — Self-Host
+## Wave 12 — Self-Host Fixpoint ✓
 
 Stage1 = Withc2 built by Stage0
 Stage2 = Withc2 built by Stage1
 Stage3 = Withc2 built by Stage2
 
+Implemented:
+* End-to-end stage chain automation (`scripts/rebuild_selfhost.sh stage3`).
+* Fixpoint orchestrator (`scripts/run_wave12_selfhost_fixpoint.sh`) with three validation levels.
+* IR structural comparator (`scripts/compare_ir_structural.sh`): LLVM metadata normalization (strip comments, `source_filename`, `!dbg`, `target` lines) + SSA value renumbering.
+* Structured diagnostic comparator (`scripts/compare_structured_diagnostics.sh`): path-to-basename normalization, column stripping, severity/count comparison.
+* Optional binary equality gate (`scripts/compare_binaries_optional.sh`): SHA-256 + `nm -g` symbol diff. Non-blocking.
+* Fixpoint corpus (`test/wave12/fixpoint_corpus.txt`): `ir`, `check`, `build`, `run` entries from waves 9-11.
+* Diagnostic schema (`test/wave12/diagnostic_schema.md`).
+* Wired into `scripts/run_all_wave_tests.sh` (conditional, like wave 11).
+
 Validation levels:
 
-1. Full test suite passes.
-2. Stage2 IR structurally equals Stage3 IR.
-3. Optional binary equality.
+1. Full test suite (waves 1-11) passes with Stage2.
+2. Stage2 IR structurally equals Stage3 IR for fixpoint corpus.
+3. Optional: binary hash equality. Deferred when LLVM codegen non-determinism is the sole cause (pointer metadata, debug info ordering).
+
+Canonical-stage decision: Stage2 is canonical. Stage0 frozen in `/bootstrap`.
 
 ---
 
@@ -638,11 +650,13 @@ Validation levels:
 
 # 9. Post-Fixpoint Policy
 
-After fixpoint:
+After fixpoint (active):
 
-* Stage2 becomes canonical.
-* Stage0 frozen in `/bootstrap`.
-* All future development happens in With.
-* CI builds bootstrap as recovery path.
+* Stage2 is canonical compiler for all development.
+* Stage0 frozen in `/bootstrap` as recovery/oracle path.
+* All future compiler feature work targets self-host only.
+* CI builds bootstrap as recovery path, not primary dev path.
+* `scripts/run_wave12_selfhost_fixpoint.sh` is the authoritative fixpoint gate.
+* `scripts/run_all_wave_tests.sh` includes wave 12 when the script is executable.
 
 ---
