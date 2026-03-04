@@ -209,6 +209,15 @@ type AstPool = {
     // Auxiliary fn decl metadata: [node, flags, ret_type, param_start, param_count, tp_start, tp_count]*
     // Each fn decl stores 7 ints. Used by Sema to access param info.
     fn_meta: Vec[i32],
+
+    // Auxiliary fn parameter-pattern metadata:
+    // - fn_param_patterns stores flat pattern nodes (0 for plain identifier param)
+    // - fn_param_pattern_meta stores [node, start, count] records
+    fn_param_patterns: Vec[i32],
+    fn_param_pattern_meta: Vec[i32],
+
+    // Auxiliary for-loop metadata: [node, index_binding(sym,0=none), label(sym,0=none)]*
+    for_meta: Vec[i32],
 }
 
 fn AstPool.new -> AstPool:
@@ -223,6 +232,9 @@ fn AstPool.new -> AstPool:
         decls: Vec.new(),
         strings: Vec.new(),
         fn_meta: Vec.new(),
+        fn_param_patterns: Vec.new(),
+        fn_param_pattern_meta: Vec.new(),
+        for_meta: Vec.new(),
     }
     // Reserve node 0 as null sentinel
     pool.kinds.push(0)
@@ -344,15 +356,64 @@ fn AstPool.fn_meta_tp_start(self: AstPool, meta: i32) -> i32:
 fn AstPool.fn_meta_tp_count(self: AstPool, meta: i32) -> i32:
     self.fn_meta.get((meta + 6) as i64)
 
+fn AstPool.fn_param_patterns_len(self: AstPool) -> i32:
+    self.fn_param_patterns.len() as i32
+
+fn AstPool.add_fn_param_pattern_value(self: AstPool, node: i32):
+    self.fn_param_patterns.push(node)
+
+fn AstPool.fn_param_pattern_value(self: AstPool, idx: i32) -> i32:
+    self.fn_param_patterns.get(idx as i64)
+
+fn AstPool.add_fn_param_pattern_meta(self: AstPool, node: i32, start: i32, count: i32):
+    self.fn_param_pattern_meta.push(node)
+    self.fn_param_pattern_meta.push(start)
+    self.fn_param_pattern_meta.push(count)
+
+fn AstPool.find_fn_param_pattern_meta(self: AstPool, node: i32) -> i32:
+    var i = 0
+    let len = self.fn_param_pattern_meta.len() as i32
+    while i < len:
+        if self.fn_param_pattern_meta.get(i as i64) == node:
+            return i
+        i = i + 3
+    0 - 1
+
+fn AstPool.fn_param_pattern_meta_start(self: AstPool, meta: i32) -> i32:
+    self.fn_param_pattern_meta.get((meta + 1) as i64)
+
+fn AstPool.fn_param_pattern_meta_count(self: AstPool, meta: i32) -> i32:
+    self.fn_param_pattern_meta.get((meta + 2) as i64)
+
+fn AstPool.add_for_meta(self: AstPool, node: i32, index_binding: i32, label: i32):
+    self.for_meta.push(node)
+    self.for_meta.push(index_binding)
+    self.for_meta.push(label)
+
+fn AstPool.find_for_meta(self: AstPool, node: i32) -> i32:
+    var i = 0
+    let len = self.for_meta.len() as i32
+    while i < len:
+        if self.for_meta.get(i as i64) == node:
+            return i
+        i = i + 3
+    0 - 1
+
+fn AstPool.for_meta_index_binding(self: AstPool, meta: i32) -> i32:
+    self.for_meta.get((meta + 1) as i64)
+
+fn AstPool.for_meta_label(self: AstPool, meta: i32) -> i32:
+    self.for_meta.get((meta + 2) as i64)
+
 // ── Node Data Layout Reference ───────────────────────────────────
 //
 // NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
 //                   extra: [return_type(node), param_count, [param_name, param_type]*, type_param_count, [type_param_name, bound_count, bounds...]*]
 //
 // NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TDK_* + flags)
-//                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, type_param_count...]
-//                   For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis]
-//                   For alias: extra=[aliased_type, vis]
+//                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, tp_start, tp_count]
+//                   For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis, tp_start, tp_count]
+//                   For alias/distinct: extra=[aliased_or_inner_type, vis, tp_start, tp_count]
 //
 // NK_USE_DECL:      d0=extra_start, d1=path_count, d2=0
 //                   extra: [sym, sym, ...]

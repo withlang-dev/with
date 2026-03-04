@@ -341,6 +341,14 @@ fn Driver.dump_mir(self: Driver, pool: AstPool) -> str:
     self.last_mir_dump = dump_mir_module(self.last_mir_module, self.pool, self.last_sema)
     self.last_mir_dump
 
+fn Driver.print_mir(self: Driver, pool: AstPool) -> bool:
+    if self.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.last_mir_module.body_count() == 0:
+        return false
+    print_mir_module(self.last_mir_module, self.pool, self.last_sema)
+    true
+
 fn Driver.dump_async_mir(self: Driver, pool: AstPool) -> str:
     if self.last_async_mir_module.body_count() == 0:
         let _ = self.run_async_mir_lower(pool)
@@ -351,12 +359,23 @@ fn Driver.dump_async_mir(self: Driver, pool: AstPool) -> str:
 
 // ── Codegen + link ───────────────────────────────────────────────
 
+fn Driver.ensure_codegen_mir(self: Driver, pool: AstPool) -> bool:
+    if self.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.diagnostics.has_errors():
+        return false
+    self.last_mir_module.body_count() > 0
+
 // Compile a module to an object file. Returns 0 on success, 1 on failure.
 fn Driver.compile_to_object(self: Driver, pool: AstPool, output_path: str) -> i32:
+    if not self.ensure_codegen_mir(pool):
+        with_eprintln("error: code generation failed")
+        return 1
     var cg = Codegen.init("with_module")
     cg.source_file = self.current_source_path
     cg.source_text = self.current_source_text
-    let result = cg.gen_module(pool, self.pool)
+    cg.intern = self.pool
+    let result = cg.gen_module_from_mir(self.last_mir_module, pool)
     if result != 0:
         with_eprintln("error: code generation failed")
         return 1
@@ -370,10 +389,14 @@ fn Driver.compile_to_object(self: Driver, pool: AstPool, output_path: str) -> i3
 
 // Dump LLVM IR to stdout.
 fn Driver.emit_ir(self: Driver, pool: AstPool) -> bool:
+    if not self.ensure_codegen_mir(pool):
+        with_eprintln("error: code generation failed")
+        return false
     var cg = Codegen.init("with_module")
     cg.source_file = self.current_source_path
     cg.source_text = self.current_source_text
-    let result = cg.gen_module(pool, self.pool)
+    cg.intern = self.pool
+    let result = cg.gen_module_from_mir(self.last_mir_module, pool)
     if result != 0:
         with_eprintln("error: code generation failed")
         return false
@@ -382,17 +405,90 @@ fn Driver.emit_ir(self: Driver, pool: AstPool) -> bool:
 
 // Link an object file into a binary using the system linker.
 fn link(obj_path: str, bin_path: str) -> bool:
-    let result = ("cc " ++ obj_path ++ " -o " ++ bin_path) |> with_system
-    result == 0
+    let extras: Vec[str] = Vec.new()
+    let link_libs: Vec[str] = Vec.new()
+    link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
 
 // Link with extra object files.
 fn link_with_extras(obj_path: str, bin_path: str, extras: Vec[str]) -> bool:
+    let link_libs: Vec[str] = Vec.new()
+    link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
+
+// Link with extra object files and explicit -l<name> directives.
+fn link_with_extras_and_libs(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> bool:
     var cmd = "cc " ++ obj_path
     for i in 0..extras.len() as i32:
         cmd = cmd ++ " " ++ extras.get(i as i64)
     cmd = cmd ++ " -o " ++ bin_path
+    for i in 0..link_libs.len() as i32:
+        cmd = cmd ++ " -l" ++ link_libs.get(i as i64)
     let result = cmd |> with_system
     result == 0
+
+fn str_contains(hay: str, needle: str) -> bool:
+    let hay_len = hay.len() as i32
+    let needle_len = needle.len() as i32
+    if needle_len <= 0:
+        return true
+    if hay_len < needle_len:
+        return false
+
+    var i = 0
+    while i <= hay_len - needle_len:
+        var matched = true
+        var j = 0
+        while j < needle_len:
+            if hay.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+                matched = false
+                break
+            j = j + 1
+        if matched:
+            return true
+        i = i + 1
+    false
+
+fn undefined_symbols_for_object(obj_path: str) -> str:
+    let report_path = obj_path ++ ".undef"
+    let probe_cmd = "nm -u " ++ obj_path ++ " > " ++ report_path ++ " 2>/dev/null"
+    let probe_rc = probe_cmd |> with_system
+    if probe_rc != 0:
+        let _ = ("rm -f " ++ report_path) |> with_system
+        return "<probe-failed>"
+    let symbols = with_fs_read_file(report_path)
+    let _ = ("rm -f " ++ report_path) |> with_system
+    symbols
+
+fn object_needs_helpers_runtime(obj_path: str) -> i32:
+    // Probe the unresolved symbol set first; this lets us avoid linking helpers
+    // into binaries that do not reference runtime helper symbols.
+    let undef = undefined_symbols_for_object(obj_path)
+    if undef == "<probe-failed>":
+        // Keep prior behavior if symbol probing is unavailable.
+        return 1
+    if undef.len() == 0:
+        return 0
+    if str_contains(undef, "_with_"):
+        return 1
+    if str_contains(undef, "_int_to_string"):
+        return 1
+    if str_contains(undef, "_i32_to_str"):
+        return 1
+    if str_contains(undef, "_str_from_byte"):
+        return 1
+    0
+
+fn object_needs_fiber_runtime(obj_path: str) -> i32:
+    // Channel runtime symbols are implemented in runtime/fiber.o.
+    // Keep this symbol-probe path narrow so sync-only programs avoid
+    // unnecessary fiber runtime linkage.
+    let undef = undefined_symbols_for_object(obj_path)
+    if undef == "<probe-failed>":
+        return 0
+    if undef.len() == 0:
+        return 0
+    if str_contains(undef, "_with_channel_"):
+        return 1
+    0
 
 fn compiler_runtime_dir() -> str:
     let argv0 = with_arg_at(0)
@@ -433,6 +529,15 @@ fn find_runtime_object_path(name: str) -> str:
 fn should_link_llvm_bridge(source_path: str) -> bool:
     source_path == "src/main.w" or source_path.ends_with("/src/main.w") or source_path.ends_with("\\src\\main.w")
 
+fn Driver.collect_link_libs(self: Driver) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    for li in 0..self.last_resolved.link_libs.len() as i32:
+        let lib_sym = self.last_resolved.link_libs.get(li as i64)
+        let lib_name = self.pool.resolve(lib_sym)
+        if lib_name.len() > 0:
+            out.push(lib_name)
+    out
+
 // Full pipeline: parse → codegen → link → binary.
 // Returns the output binary path on success, "" on failure.
 fn Driver.build_binary(self: Driver, source_path: str) -> str:
@@ -465,23 +570,33 @@ fn Driver.build_binary_at(self: Driver, source_path: str, output_dir: str) -> st
     if result != 0:
         return ""
 
+    let link_libs = self.collect_link_libs()
     let extras: Vec[str] = Vec.new()
-
-    // Always link helpers runtime object when available (std.* runtime symbols).
-    let helpers_path = find_runtime_object_path("helpers.o")
-    if helpers_path.len() > 0:
-        extras.push(helpers_path)
 
     // Async runtime objects are linked only when Async-MIR indicates async
     // suspension/runtime operations are present.
     let needs_async_runtime = self.last_async_mir_module.requires_async_runtime()
-    if needs_async_runtime:
+    let needs_fiber_runtime = if needs_async_runtime: 1 else: object_needs_fiber_runtime(obj_path)
+    if needs_fiber_runtime != 0:
         let fiber_path = find_runtime_object_path("fiber.o")
-        if fiber_path.len() > 0:
-            extras.push(fiber_path)
+        if fiber_path.len() == 0:
+            with_eprintln("error: missing runtime/fiber.o")
+            return ""
+        extras.push(fiber_path)
         let fiber_asm_path = find_runtime_object_path("fiber_asm.o")
-        if fiber_asm_path.len() > 0:
-            extras.push(fiber_asm_path)
+        if fiber_asm_path.len() == 0:
+            with_eprintln("error: missing runtime/fiber_asm.o")
+            return ""
+        extras.push(fiber_asm_path)
+
+    // Link helpers runtime object only when object symbols require it.
+    let needs_helpers_runtime = object_needs_helpers_runtime(obj_path)
+    if needs_helpers_runtime != 0:
+        let helpers_path = find_runtime_object_path("helpers.o")
+        if helpers_path.len() == 0:
+            with_eprintln("error: missing runtime/helpers.o")
+            return ""
+        extras.push(helpers_path)
 
     if should_link_llvm_bridge(source_path):
         let bridge_path = find_llvm_bridge_path()
@@ -489,8 +604,8 @@ fn Driver.build_binary_at(self: Driver, source_path: str, output_dir: str) -> st
             with_eprintln("error: missing runtime/libwith_llvm_bridge.dylib")
             return ""
         extras.push(bridge_path)
-    let link_ok = if extras.len() > 0:
-        link_with_extras(obj_path, bin_path, extras)
+    let link_ok = if extras.len() > 0 or link_libs.len() > 0:
+        link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
     else:
         link(obj_path, bin_path)
     if not link_ok:

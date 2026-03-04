@@ -4,10 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/parity_states.sh"
+source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
 CORPUS_FILE="test/wave7/mir_corpus.txt"
+TIMEOUT_BIN="$(command -v timeout || true)"
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "building bootstrap compiler for Wave 7 MIR parity..."
 (
@@ -34,8 +37,47 @@ if ! parity_validate_known_divergences "$CORPUS_FILE"; then
   exit 1
 fi
 
+run_check_with_timeout() {
+  local bin="$1"
+  local src="$2"
+  local out="$3"
+  local err="$4"
+  if [[ -n "$TIMEOUT_BIN" ]]; then
+    "$TIMEOUT_BIN" -k 5 "$CHECK_TIMEOUT_SECS" "$bin" check "$src" --dump-mir >"$out" 2>"$err"
+    return $?
+  fi
+  "$bin" check "$src" --dump-mir >"$out" 2>"$err"
+}
+
+run_check_with_retry() {
+  local bin="$1"
+  local src="$2"
+  local out="$3"
+  local err="$4"
+  local attempts=0
+  local rc=0
+  while true; do
+    run_check_with_timeout "$bin" "$src" "$out" "$err"
+    rc=$?
+    if [[ "$rc" -eq 0 ]]; then
+      return 0
+    fi
+    attempts=$((attempts + 1))
+    if [[ "$attempts" -ge 2 ]]; then
+      return "$rc"
+    fi
+    # Transient timeout/kill under load: retry once.
+    if [[ "$rc" -eq 124 || "$rc" -eq 137 || "$rc" -eq 143 ]]; then
+      continue
+    fi
+    return "$rc"
+  done
+}
+
+SELFHOST_BIN="$(prepare_selfhost_runner "$ROOT_DIR" "$SELFHOST_BIN")"
+
 tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"' EXIT
+trap 'rm -rf "$tmpdir"; cleanup_selfhost_runner' EXIT
 
 failures=0
 known_divergences=0
@@ -52,7 +94,7 @@ if [[ -z "$probe_src" ]]; then
 fi
 
 stage0_supports_mir=0
-if "$STAGE0_BIN" check "$probe_src" --dump-mir >"$tmpdir/stage0_probe.out" 2>"$tmpdir/stage0_probe.err"; then
+if run_check_with_timeout "$STAGE0_BIN" "$probe_src" "$tmpdir/stage0_probe.out" "$tmpdir/stage0_probe.err"; then
   stage0_supports_mir=1
 else
   if grep -q "unknown check flag '--dump-mir'" "$tmpdir/stage0_probe.err"; then
@@ -87,14 +129,14 @@ while IFS= read -r src; do
   self_out_2="$tmpdir/${key}.selfhost.mir.2"
   stage0_out="$tmpdir/${key}.stage0.mir"
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-mir >"$self_out_1" 2>"$tmpdir/${key}.selfhost.err.1"; then
+  if ! run_check_with_retry "$SELFHOST_BIN" "$src" "$self_out_1" "$tmpdir/${key}.selfhost.err.1"; then
     echo "FAIL(wave7-mir-parity-selfhost-check) $src"
     cat "$tmpdir/${key}.selfhost.err.1"
     failures=$((failures + 1))
     continue
   fi
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-mir >"$self_out_2" 2>"$tmpdir/${key}.selfhost.err.2"; then
+  if ! run_check_with_retry "$SELFHOST_BIN" "$src" "$self_out_2" "$tmpdir/${key}.selfhost.err.2"; then
     echo "FAIL(wave7-mir-parity-selfhost-recheck) $src"
     cat "$tmpdir/${key}.selfhost.err.2"
     failures=$((failures + 1))
@@ -117,7 +159,7 @@ while IFS= read -r src; do
 
   kd_line="$(parity_kd_line_for_test "$CORPUS_FILE" "$src")"
   if [[ "$stage0_supports_mir" -eq 1 ]]; then
-    if ! "$STAGE0_BIN" check "$src" --dump-mir >"$stage0_out" 2>"$tmpdir/${key}.stage0.err"; then
+    if ! run_check_with_timeout "$STAGE0_BIN" "$src" "$stage0_out" "$tmpdir/${key}.stage0.err"; then
       echo "FAIL(wave7-mir-parity-stage0-check) $src"
       cat "$tmpdir/${key}.stage0.err"
       failures=$((failures + 1))

@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="./with-stage2"
 
@@ -14,8 +15,10 @@ if [[ ! -x "$SELFHOST_BIN" ]]; then
   exit 1
 fi
 
+SELFHOST_BIN="$(prepare_selfhost_runner "$ROOT_DIR" "$SELFHOST_BIN")"
+
 tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"' EXIT
+trap 'rm -rf "$tmpdir"; cleanup_selfhost_runner' EXIT
 
 failures=0
 
@@ -100,7 +103,7 @@ run_expect_pattern "builder_terminator" "bootstrap/test/cases/assign.w" "goto ->
 run_expect_pattern "builder_storage_live" "bootstrap/test/cases/assign.w" "StorageLive\\(_"
 
 # Literals / arithmetic / field access.
-run_expect_pattern "lower_literals" "bootstrap/test/cases/arithmetic_mixed.w" "const [0-9]+i32|const true|const false"
+run_expect_pattern "lower_literals" "bootstrap/test/cases/arithmetic_mixed.w" "const [0-9]+(i32|ty[0-9]+)|const true|const false"
 run_expect_pattern "lower_arithmetic" "bootstrap/test/cases/arithmetic_mixed.w" "binop\\(add|binop\\(sub|binop\\(mul|binop\\(div"
 run_expect_pattern "lower_field_access" "bootstrap/test/cases/record_update.w" "copy _[0-9]+\\.f"
 
@@ -143,13 +146,73 @@ run_expect_pattern "drop_scope_exit" "test/wave7/cases/drop_scope_exit.w" "drop\
 run_expect_pattern "drop_early_return" "test/wave7/cases/drop_early_return.w" "drop\\("
 run_expect_pattern "drop_break_continue" "test/wave7/cases/drop_break_continue.w" "drop\\("
 
+# Array / collection lowering.
+run_expect_pattern "lower_array_aggregate" "bootstrap/test/cases/arrays.w" "aggregate\\(|const .*(i32|ty[0-9]+)"
+run_expect_pattern "lower_vec_call" "bootstrap/test/cases/vec_push_pop.w" "call "
+run_expect_pattern "lower_hashmap_call" "bootstrap/test/cases/hashmap_basic.w" "call "
+
+# String lowering.
+run_expect_pattern "lower_string_const" "bootstrap/test/cases/string_concat.w" "const "
+run_expect_pattern "lower_string_interp" "bootstrap/test/cases/string_interp.w" "call "
+
+# Struct / enum lowering.
+run_expect_pattern "lower_struct_aggregate" "bootstrap/test/cases/structs.w" "call const \\(\\)|copy _[0-9]+\\.f"
+run_expect_pattern "lower_enum_discriminant" "bootstrap/test/cases/enum_simple.w" "discriminant\\(|const "
+run_expect_pattern "lower_enum_match_bind" "bootstrap/test/cases/enum_match_bind.w" "switchInt\\("
+run_expect_pattern "lower_nested_field" "bootstrap/test/cases/nested_field.w" "copy _[0-9]+\\.f"
+
+# Closure lowering.
+run_expect_pattern "lower_closure_zst" "bootstrap/test/cases/closure.w" "const zst\\("
+run_expect_pattern "lower_closure_capture" "bootstrap/test/cases/closure_capture_basic.w" "const zst\\("
+run_expect_pattern "lower_nested_closure" "bootstrap/test/cases/nested_closure.w" "call const \\(\\)|call copy _"
+
+# Defer lowering.
+run_expect_pattern "lower_defer" "bootstrap/test/cases/defer_simple.w" "call "
+run_expect_pattern "lower_defer_multi" "bootstrap/test/cases/defer_multi.w" "call "
+run_expect_pattern "lower_defer_return" "bootstrap/test/cases/defer_return.w" "call const \\(\\)"
+
+# Casting.
+run_expect_pattern "lower_cast" "bootstrap/test/cases/cast.w" "cast\\(|as "
+
+# Async lowering.
+run_expect_pattern "lower_async" "bootstrap/test/cases/async_basic.w" "call "
+
+# Trait dispatch.
+run_expect_pattern "lower_dyn_dispatch" "bootstrap/test/cases/dyn_dispatch.w" "call "
+run_expect_pattern "lower_trait_method" "bootstrap/test/cases/trait.w" "call "
+
+# Float operations.
+run_expect_pattern "lower_float" "bootstrap/test/cases/float_basic.w" "const.*f64|binop\\("
+
+# Boolean operations.
+run_expect_pattern "lower_bool_short_circuit" "bootstrap/test/cases/bool_short_circuit.w" "binop\\(and|binop\\(or"
+
+# While-let lowering.
+run_expect_pattern "lower_while_let" "bootstrap/test/cases/while_let.w" "switchInt\\(|discriminant\\("
+
+# Labeled loop.
+run_expect_pattern "lower_labeled_loop" "bootstrap/test/cases/labeled_loop.w" "goto -> bb"
+
+# Break with value.
+run_expect_pattern "lower_break_value" "bootstrap/test/cases/break_value.w" "goto -> bb"
+
+# Multiple functions emitted.
+run_expect_pattern "multi_fn_header" "bootstrap/test/cases/multi_fn.w" "^fn "
+
 # No sugar tokens should remain in MIR dump text.
 run_expect_no_pattern "no_sugar_tokens" "bootstrap/test/cases/with_record_methods.w" "optional_chain|record_update|with_expr|let_else|pipeline"
 
-# Determinism checks.
+# Determinism checks — cover diverse features.
 run_determinism_check "determinism_arithmetic" "bootstrap/test/cases/arithmetic_mixed.w"
 run_determinism_check "determinism_match" "bootstrap/test/cases/match_or_enum.w"
 run_determinism_check "determinism_with" "bootstrap/test/cases/with_form1.w"
+run_determinism_check "determinism_enum" "bootstrap/test/cases/enum_complex.w"
+run_determinism_check "determinism_closure" "bootstrap/test/cases/closure_capture.w"
+run_determinism_check "determinism_struct" "bootstrap/test/cases/struct_method_chain.w"
+run_determinism_check "determinism_defer" "bootstrap/test/cases/defer_complex.w"
+run_determinism_check "determinism_option" "bootstrap/test/cases/option_chain.w"
+run_determinism_check "determinism_result" "bootstrap/test/cases/result_chain.w"
+run_determinism_check "determinism_vec" "bootstrap/test/cases/vec_operations.w"
 
 if [[ "$failures" -ne 0 ]]; then
   echo "wave7 MIR unit tests: $failures failure(s)"

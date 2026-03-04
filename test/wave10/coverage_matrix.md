@@ -1,0 +1,19 @@
+# Wave 10 Coverage Matrix
+
+Stage0 script coverage mapping to Wave 10 corpus/harness buckets.
+
+| Stage0 Script | Coverage State | Wave 10 Evidence | Notes |
+| --- | --- | --- | --- |
+| `run_phase0_llvm_codegen_tests.sh` | `COVERED` | `ir|test/wave10/cases/llvm_minimal.w`, `run|test/wave10/cases/llvm_extern.w`, `build|test/wave10/cases/llvm_negative.w` | LLVM positive and negative codegen paths are covered. |
+| `run_phase0_llvm_verify_ir_tests.sh` | `COVERED` | `ir|test/wave10/cases/llvm_ir_simple.w`, `ir|test/wave10/cases/llvm_ir_cimport.w`, `ir|test/wave10/cases/llvm_ir_parse_fail.w`, `ir|test/wave10/cases/llvm_ir_type_fail.w` | IR verification success/failure paths are covered. |
+| `run_phase2_monomorphization_tests.sh` | `COVERED` | `run|bootstrap/test/cases/generic_identity.w`, `ir|test/wave10/cases/single_instantiation.w`, `check|test/wave10/cases/generic_infer_uninferred_fail.w` | Instantiation emission and inference rejection are covered. |
+| `run_phase2_generic_function_definition_tests.sh` | `COVERED` | `run|bootstrap/test/cases/generic_identity.w`, `check|test/wave10/cases/generic_fn_unknown_type_fail.w` | Generic function declaration and invalid-signature diagnostics are covered. |
+| `run_phase2_generic_type_definition_tests.sh` | `COVERED` | `check|test/wave10/cases/generic_type_struct_ok.w`, `check|test/wave10/cases/generic_type_unknown_param_fail.w` | Generic type declaration success/failure paths are covered. |
+| `run_phase2_generic_inference_tests.sh` | `COVERED` | `check|test/wave10/cases/generic_infer_conflict_fail.w`, `check|test/wave10/cases/generic_infer_uninferred_fail.w` | Inference conflict and uninferred rejection paths are covered. |
+| `run_phase2_unused_instantiation_tests.sh` | `COVERED` | `ir|test/wave10/cases/unused_generic.w`, `ir|test/wave10/cases/single_instantiation.w` | Unused/single-instantiation IR emission parity covered. |
+| `run_phase2_enum_accessors_tests.sh` | `COVERED` | `run|bootstrap/test/cases/enum_accessor.w`, `ir|test/wave10/cases/enum_accessors_unit_as_fail.w`, `build|test/wave10/cases/enum_accessors_unit_as_fail.w` | Enum accessor runtime and unit `as_*` rejection behavior are parity-covered. |
+| `run_phase2_enum_variant_shorthand_tests.sh` | `COVERED` | `check|test/wave10/cases/enum_shorthand_wrong_expected_fail.w`, `run|test/wave10/cases/enum_shorthand_context_ok.w` | Variant shorthand diagnostics and typed-context runtime behavior are parity-covered. |
+| `run_phase5_dyn_trait_vtable_tests.sh` | `COVERED` | `run|bootstrap/test/cases/dyn_trait.w`, `run|bootstrap/test/cases/dyn_dispatch.w`, `run|bootstrap/test/cases/dyn_dispatch_multi.w`, `run|bootstrap/test/cases/trait_dyn_advanced.w`, `run|bootstrap/test/cases/impl_trait_dyn.w`, `run|bootstrap/test/cases/dyn_default_dispatch.w`, `check|test/wave10/cases/dyn_missing_impl_fail.w` | Dyn/vtable positive paths and missing-impl diagnostics are covered. |
+| `run_phase5_devirtualization_tests.sh` | `COVERED` | `run|test/wave10/cases/devirt_known_local.w`, `run|test/wave10/cases/devirt_unknown_param.w`, `ir|test/wave10/cases/devirt_known_local.w`, `ir|test/wave10/cases/devirt_unknown_param.w` | Known-local and unknown-param dispatch behavior covered in run+IR modes. |
+| `run_phase5_box_ref_dyn_tests.sh` | `COVERED` | `run|test/wave10/cases/box_dyn_dispatch_ok.w`, `check|test/wave10/cases/box_dyn_missing_impl_fail.w`, `run|test/wave10/cases/ref_dyn_dispatch_ok.w`, `build|test/wave10/cases/ref_dyn_dispatch_ok.w`, `check|test/wave10/cases/ref_dyn_missing_impl_fail.w` | Box/ref dyn dispatch and missing-impl diagnostics are parity-covered. |
+| `run_phase5_object_safety_diagnostics_tests.sh` | `COVERED` | `run|bootstrap/test/cases/dyn_trait.w`, `check|test/wave10/cases/object_safety_no_self_fail.w`, `check|test/wave10/cases/object_safety_generic_method_fail.w`, `check|test/wave10/cases/object_safety_returns_self_fail.w` | Object-safety diagnostics are now covered in parity corpus. |

@@ -211,122 +211,181 @@ Any uncovered behavior requires either:
 
 ## 0) Freeze Wave 10 Contract and Corpus
 
-- [ ] Freeze exact Wave 10 parity target against current Stage0 behavior.
-- [ ] Create `test/wave10/codegen_corpus.txt` with explicit `check|ir|build|run` entries.
-- [ ] Map each Stage0 coverage bucket to Wave 10 corpus evidence.
-- [ ] Require explicit `KNOWN_DIVERGENCE` for any excluded behavior.
+- [x] Freeze exact Wave 10 parity target against current Stage0 behavior.
+- [x] Create `test/wave10/codegen_corpus.txt` with explicit `check|ir|build|run` entries.
+- [x] Map each Stage0 coverage bucket to Wave 10 corpus evidence.
+- [x] Require explicit `KNOWN_DIVERGENCE` for any excluded behavior.
 
 ## 1) Backend Boundary (MIR -> LLVM)
 
-- [ ] Define Wave 10 backend boundary as MIR (not AST) input contract.
-- [ ] Ensure MIR invariants needed by backend are explicit and validated.
-- [ ] Keep backend execution deterministic and single-threaded.
-- [ ] Preserve existing `ir/build/run` UX behavior while switching internals.
+- [x] Define Wave 10 backend boundary as MIR (not AST) input contract.
+- [x] Ensure MIR invariants needed by backend are explicit and validated.
+- [x] Keep backend execution deterministic and single-threaded.
+- [x] Preserve existing `ir/build/run` UX behavior while switching internals.
 
 ## 2) MIR Instruction Lowering
 
-- [ ] Lower MIR statements (`assign`, storage live/dead, drop) to LLVM operations.
-- [ ] Lower MIR terminators (`goto`, `switch`, `call`, `return`, cleanup edges) to LLVM CFG.
-- [ ] Preserve evaluation order and side-effect ordering parity with Stage0.
-- [ ] Ensure block/phi wiring is deterministic and verifier-clean.
+- [x] Lower MIR statements (`assign`, storage live/dead, drop) to LLVM operations.
+- [x] Lower MIR terminators (`goto`, `switch`, `call`, `return`, cleanup edges) to LLVM CFG.
+- [x] Preserve evaluation order and side-effect ordering parity with Stage0.
+- [x] Ensure block/phi wiring is deterministic and verifier-clean.
 
 ## 3) LLVM Type + ABI Lowering
 
-- [ ] Centralize With type -> LLVM type mapping used by backend.
-- [ ] Align primitive/integer cast and width behavior to Stage0.
-- [ ] Align aggregate passing/return strategy to Stage0-visible behavior.
-- [ ] Keep object emission verifier-clean across all Wave 10 corpus entries.
+- [x] Centralize With type -> LLVM type mapping used by backend.
+- [x] Align primitive/integer cast and width behavior to Stage0.
+- [x] Align aggregate passing/return strategy to Stage0-visible behavior.
+- [x] Keep object emission verifier-clean across all Wave 10 corpus entries.
 
 ## 4) Monomorphization
 
-- [ ] Ensure generic function instantiation keys are deterministic and stable.
-- [ ] Ensure only used instantiations are emitted (no missing and no accidental duplication).
-- [ ] Preserve mangling parity expectations for `ir` corpus checks.
-- [ ] Match Stage0 behavior for uninferred/invalid generic use diagnostics.
+- [x] Ensure generic function instantiation keys are deterministic and stable.
+- [x] Ensure only used instantiations are emitted (no missing and no accidental duplication).
+- [x] Preserve mangling parity expectations for `ir` corpus checks.
+- [x] Match Stage0 behavior for uninferred/invalid generic use diagnostics.
 
 ## 5) Vtable Generation + Dyn Dispatch
 
-- [ ] Generate trait vtable globals with deterministic method slot ordering.
-- [ ] Lower `dyn` coercions to concrete `{data_ptr, vtable_ptr}` representation parity.
-- [ ] Lower dyn method dispatch via vtable call path with Stage0-compatible behavior.
-- [ ] Preserve devirtualization behavior for known-concrete dyn values where Stage0 does.
+- [x] Generate trait vtable globals with deterministic method slot ordering.
+- [x] Lower `dyn` coercions to concrete `{data_ptr, vtable_ptr}` representation parity.
+- [x] Lower dyn method dispatch via vtable call path with Stage0-compatible behavior.
+- [x] Preserve devirtualization behavior for known-concrete dyn values where Stage0 does.
 
 ## 6) Enum Layout + Discriminants
 
-- [ ] Define deterministic enum layout contract (tag + payload strategy) for self-host.
-- [ ] Align discriminant/tag semantics with Stage0 runtime behavior.
-- [ ] Align payload storage/reads/writes and variant accessor behavior.
-- [ ] Add explicit tests for unit/payload/multi-payload enum runtime correctness.
+- [x] Define deterministic enum layout contract (tag + payload strategy) for self-host.
+- [x] Align discriminant/tag semantics with Stage0 runtime behavior.
+- [x] Align payload storage/reads/writes and variant accessor behavior.
+- [x] Add explicit tests for unit/payload/multi-payload enum runtime correctness.
 
 ## 7) Runtime and Link Integration
 
-- [ ] Ensure codegen-required runtime symbols are linked exactly when needed.
-- [ ] Keep sync and async runtime linkage policies consistent with Wave 9 behavior.
-- [ ] Ensure no spurious LLVM bridge/runtime dependencies in unrelated binaries.
-- [ ] Keep object cleanup and deterministic artifact paths stable.
+- [x] Ensure codegen-required runtime symbols are linked exactly when needed.
+- [x] Keep sync and async runtime linkage policies consistent with Wave 9 behavior.
+- [x] Ensure no spurious LLVM bridge/runtime dependencies in unrelated binaries.
+- [x] Keep object cleanup and deterministic artifact paths stable.
 
 ## 8) Diagnostics + Determinism
 
-- [ ] Match Stage0 primary diagnostics for codegen-time rejects.
-- [ ] Stabilize codegen error detail ordering and text normalization for parity harness.
-- [ ] Re-run self-host `ir/build/run` to enforce deterministic outputs/status.
-- [ ] Guard against nondeterministic symbol emission order.
+- [x] Match Stage0 primary diagnostics for codegen-time rejects.
+- [x] Stabilize codegen error detail ordering and text normalization for parity harness.
+- [x] Re-run self-host `ir/build/run` to enforce deterministic outputs/status.
+- [x] Guard against nondeterministic symbol emission order.
 
 ## 9) Unit Test Harness
 
-- [ ] Add `scripts/run_wave10_codegen_unit_tests.sh`.
-- [ ] Add focused positive/negative unit cases for:
+- [x] Add `scripts/run_wave10_codegen_unit_tests.sh`.
+- [x] Add focused positive/negative unit cases for:
   - MIR->LLVM control-flow lowering
   - monomorphization (multi-instantiation + uninferred failure)
   - vtable generation and dyn dispatch
   - devirtualization known-concrete path
   - enum layout/accessor runtime behavior
   - LLVM IR emission success/failure paths
-- [ ] Add deterministic `ir` emission assertion for selected corpus entries.
+- [x] Add deterministic `ir` emission assertion for selected corpus entries.
 
 ## 10) Stage0 Parity Harness
 
-- [ ] Add `scripts/run_wave10_codegen_parity.sh`.
-- [ ] Build Stage0 and self-host binaries in harness setup.
-- [ ] Run all Wave 10 corpus entries by declared mode (`check|ir|build|run`) on both compilers.
-- [ ] Compare status, normalized primary diagnostics, and runtime output/exit status.
-- [ ] Re-run self-host entries for determinism checks.
-- [ ] Report exactly one of `PASS`, `FAIL`, `KNOWN_DIVERGENCE` per entry.
+- [x] Add `scripts/run_wave10_codegen_parity.sh`.
+- [x] Build Stage0 and self-host binaries in harness setup.
+- [x] Run all Wave 10 corpus entries by declared mode (`check|ir|build|run`) on both compilers.
+- [x] Compare status, normalized primary diagnostics, and runtime output/exit status.
+- [x] Re-run self-host entries for determinism checks.
+- [x] Report exactly one of `PASS`, `FAIL`, `KNOWN_DIVERGENCE` per entry.
 
 ## 11) Known Divergence Governance
 
-- [ ] Reuse/extend `scripts/parity_states.sh` mode-aware validation for Wave 10.
-- [ ] Require every `KNOWN_DIVERGENCE` entry to be exercised.
-- [ ] Fail on stale/duplicate/malformed `KNOWN_DIVERGENCE` entries.
-- [ ] Fail if declared known-divergence count differs from observed used count.
+- [x] Reuse/extend `scripts/parity_states.sh` mode-aware validation for Wave 10.
+- [x] Require every `KNOWN_DIVERGENCE` entry to be exercised.
+- [x] Fail on stale/duplicate/malformed `KNOWN_DIVERGENCE` entries.
+- [x] Fail if declared known-divergence count differs from observed used count.
 
 ## 12) Coverage Closure
 
-- [ ] Produce explicit Stage0-script -> Wave 10 evidence mapping table.
-- [ ] Add `scripts/verify_wave10_coverage.sh` and fail parity harness on uncovered buckets.
-- [ ] Keep accepted divergence list reviewable and small.
-- [ ] Prevent silent corpus shrinkage.
+- [x] Produce explicit Stage0-script -> Wave 10 evidence mapping table.
+- [x] Add `scripts/verify_wave10_coverage.sh` and fail parity harness on uncovered buckets.
+- [x] Keep accepted divergence list reviewable and small.
+- [x] Prevent silent corpus shrinkage.
 
 ## 13) Documentation and Status Updates
 
-- [ ] Update `docs/with-selfhost-wave10.md` execution notes as work lands.
-- [ ] Update `docs/with-selfhost-plan.md` Wave 10 status after exit gate passes.
-- [ ] Update `docs/with-selfhost-detailed-plan.md` with Wave 10 completion notes.
-- [ ] Record accepted Wave 10 divergences with rationale and test linkage.
+- [x] Update `docs/with-selfhost-wave10.md` execution notes as work lands.
+- [x] Update `docs/with-selfhost-plan.md` Wave 10 status after exit gate passes.
+- [x] Update `docs/with-selfhost-detailed-plan.md` with Wave 10 completion notes.
+- [x] Record accepted Wave 10 divergences with rationale and test linkage.
 
 ---
 
 ## Validation Gates (Wave 10 Exit)
 
-- [ ] `scripts/run_wave10_codegen_unit_tests.sh` passes.
-- [ ] `scripts/run_wave10_codegen_parity.sh` passes.
-- [ ] All Wave 10 corpus entries resolve to `PASS` or documented `KNOWN_DIVERGENCE`.
-- [ ] No unresolved `FAIL` entries remain.
-- [ ] Coverage verification gate passes for required Stage0 buckets.
-- [ ] No bootstrap changes were required for Wave 10 feature scope.
-- [ ] Programs behave identically to Stage0 for Wave 10 scope.
+- [x] `scripts/run_wave10_codegen_unit_tests.sh` passes.
+- [x] `scripts/run_wave10_codegen_parity.sh` passes.
+- [x] All Wave 10 corpus entries resolve to `PASS` or documented `KNOWN_DIVERGENCE`.
+- [x] No unresolved `FAIL` entries remain.
+- [x] Coverage verification gate passes for required Stage0 buckets.
+- [x] No bootstrap changes were required for Wave 10 feature scope.
+- [x] Programs behave identically to Stage0 for Wave 10 scope.
 
 ## Execution Notes (Current)
 
-- Wave 10 planning document initialized.
-- Implementation intentionally deferred to execution phase.
+- Added Wave 10 harness artifacts:
+  - `scripts/run_wave10_codegen_unit_tests.sh`
+  - `scripts/run_wave10_codegen_parity.sh`
+  - `scripts/verify_wave10_coverage.sh`
+  - `test/wave10/coverage_manifest.txt`
+  - `test/wave10/coverage_matrix.md`
+- Expanded `test/wave10/codegen_corpus.txt` to include explicit `check|ir|build|run` coverage across LLVM/codegen, generics/monomorphization, enum accessors/shorthand, dyn/vtable, devirtualization, and object-safety diagnostics.
+- Parity state governance was extended to support `ir` mode entries in `scripts/parity_states.sh`.
+- Added Wave 10 regression cases for dyn missing-impl diagnostics:
+  - `test/wave10/cases/dyn_missing_impl_fail.w`
+  - `test/wave10/cases/ref_dyn_missing_impl_fail.w`
+  - `test/wave10/cases/box_dyn_missing_impl_fail.w`
+- Self-host codegen now emits unresolved `printf` calls from `c_import`-style programs (`src/Codegen.w`) via a minimal variadic fallback declaration path, restoring `llvm_extern` run parity.
+- Backend entry for `ir/build/run` now consumes MIR first (`Driver.ensure_codegen_mir` + `Codegen.gen_module_from_mir`) and validates MIR invariants through `validate_mir_module` before LLVM emission.
+- MIR validation now enforces explicit backend invariants (table length coherence, index/span bounds, terminator/statement/reference integrity, and deterministic body symbol mapping) in `src/Mir.w`.
+- Section 3 LLVM type/ABI lowering updates landed in `src/Codegen.w`:
+  - centralized primitive/user type lookup (`resolve_primitive_named_type` + `resolve_user_named_type`),
+  - Stage0-style integer-width coercion only for implicit type adaptation,
+  - aggregate autoref for call arguments to `&T`/pointer params,
+  - shared coercion enforcement in AST+MIR call lowering to prevent verifier-invalid calls.
+- Added Wave 10 ABI regression corpus case:
+  - `test/wave10/cases/abi_ref_param_autoref.w`
+  - wired into unit harness and parity corpus (`check|ir|build|run`).
+- Section 4 monomorphization hardening landed in `src/Codegen.w`:
+  - removed implicit `i32` fallback for unbound generic params in function monomorphization,
+  - require full type-parameter binding before mangling/emission (`unknown type` failure parity),
+  - aligned fallback mangling tokens with Stage0 (`int`/`unknown`),
+  - added dedicated monomorphized-function cache tracking (`mono_values`/`mono_types`) to keep specialization emission deterministic and non-duplicated.
+- Added Wave 10 monomorphization regression cases:
+  - `test/wave10/cases/generic_instantiation_key_order.w`
+  - `test/wave10/cases/generic_instantiation_reuse.w`
+  - wired into unit harness + parity corpus (`check|ir|build|run`) with explicit IR symbol-count assertions.
+- Section 6 enum/discriminant alignment landed in `src/Codegen.w`:
+  - deterministic enum-type selection by LLVM type + variant symbol (avoids map-collision ambiguity),
+  - Stage0-compatible enum accessor lowering for `.is_*()` and `.as_*[_ref|_mut]()` on enum values,
+  - unit-variant `as_*` now rejects at codegen time (`unsupported call`) to match Stage0 `ir/build` behavior.
+- Added explicit Wave 10 enum runtime correctness cases:
+  - `test/wave10/cases/enum_layout_unit_runtime.w`
+  - `test/wave10/cases/enum_layout_payload_runtime.w`
+  - `test/wave10/cases/enum_layout_multi_payload_runtime.w`
+  - wired into parity corpus for `check|ir|build|run`.
+- Section 7 runtime/link integration landed in `src/Driver.w`:
+  - helpers runtime object linking is now symbol-driven (`nm -u` probe over emitted object) with conservative fallback when probing is unavailable,
+  - async runtime linkage remains Wave 9-consistent (`AsyncMirModule.requires_async_runtime()` gates `fiber.o` + `fiber_asm.o`),
+  - missing required runtime objects now fail with explicit diagnostics (`runtime/helpers.o`, `runtime/fiber.o`, `runtime/fiber_asm.o`),
+  - `c_import` link libraries collected during resolve are now propagated into linker invocation (`-l<name>`),
+  - LLVM bridge runtime remains scoped to compiler-main builds only (no unrelated binary dependency).
+- Added runtime-linkage parity coverage entries:
+  - `test/wave9/cases/runtime_linkage_sync_ok.w`
+  - `test/wave9/cases/runtime_linkage_async_ok.w`
+  - wired into Wave 10 corpus for `check|build|run`.
+- Current gate status:
+  - `./scripts/run_wave10_codegen_unit_tests.sh` -> PASS
+  - `./scripts/verify_wave10_coverage.sh` -> PASS (`processed=13`)
+  - `./scripts/run_wave10_codegen_parity.sh` -> PASS (`processed=104`, `failures=0`, `known_divergences=1`)
+- Resolved Wave 10 parity gaps in self-host (`src/Sema.w`, `src/Codegen.w`):
+  - enum shorthand typed-context flow now matches Stage0 in `check` and `run`,
+  - enum accessor runtime output now matches Stage0 for `run|bootstrap/test/cases/enum_accessor.w`,
+  - aggregate enum equality lowering is verifier-clean under MIR->LLVM (no struct `icmp` invalid IR).
+- Wave 10 accepted `KNOWN_DIVERGENCE` set is now:
+  - `ir|bootstrap/test/cases/enum_accessor_ref.w` (`selfhost` correct; Stage0 IR path still lacks accessor-ref lowering).

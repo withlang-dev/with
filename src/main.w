@@ -341,11 +341,9 @@ fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
     if pool.decl_count() == 0:
         with_eprintln("error: mir dump failed during compilation")
         return 1
-    let mir_text = comp.driver.dump_mir(pool)
-    if mir_text.len() == 0:
+    if not comp.driver.print_mir(pool):
         with_eprintln("error: mir dump failed during mir lowering")
         return 1
-    print(mir_text)
     0
 
 fn dump_async_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:

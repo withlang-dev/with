@@ -2,7 +2,7 @@
 
 ## Architecture-First Execution Plan
 
-**Status:** Wave 9 parity passes for the current corpus. Async-MIR is implemented in self-host (`src/AsyncMir.w`, `src/AsyncLower.w`) and integrated into `check`/`build`/`run` with deterministic harness coverage. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking behavior is currently Sema-integrated and must be rewritten as a MIR pass after semantic fixpoint (v3 order remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
+**Status:** Wave 10 parity passes for the current corpus. MIR-first codegen is implemented in self-host (`src/Codegen.w`, `src/Driver.w`) with deterministic harness coverage (`processed=104`, `failures=0`, `known_divergences=1`). The only accepted Wave 10 divergence is `ir|bootstrap/test/cases/enum_accessor_ref.w` where self-host is correct and Stage0 IR path is behind. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking behavior is currently Sema-integrated and must be rewritten as a MIR pass after semantic fixpoint (v3 order remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
 **Goal:** Build a clean-room, self-hosted With compiler in With.
 **Bootstrap:** Stage0 (Zig implementation) remains semantic oracle.
 
@@ -565,15 +565,23 @@ Validation:
 
 ---
 
-## Wave 10 — Codegen
+## Wave 10 — Codegen ✓
 
-* MIR → LLVM
-* Monomorphization
-* Vtable generation
-* Enum layout
+Implemented:
+* MIR → LLVM backend contract is active in `ir`/`build`/`run` (`Driver.ensure_codegen_mir` + `Codegen.gen_module_from_mir`).
+* MIR backend invariants are validated before LLVM emission (`validate_mir_module`).
+* Deterministic monomorphization keys/emission and stable symbol-count behavior are enforced in Wave 10 unit/parity corpus.
+* Trait-object vtable generation, dyn coercions, dyn dispatch, and known-concrete devirtualization paths are parity-covered.
+* Enum layout/discriminant/accessor lowering parity now includes typed-context shorthand and runtime accessor behavior.
+* Runtime/link integration remains Wave 9-consistent for sync/async object linkage policy.
+* Diagnostics/parity normalization is deterministic, with tri-state accounting (`PASS`/`FAIL`/`KNOWN_DIVERGENCE`) and stale-divergence gates.
 
 Validation:
-Programs behave identically to Stage0.
+* `scripts/run_wave10_codegen_unit_tests.sh`: PASS
+* `scripts/verify_wave10_coverage.sh`: PASS (`processed=13`)
+* `scripts/run_wave10_codegen_parity.sh`: PASS (`processed=104`, `failures=0`, `known_divergences=1`)
+* Accepted `KNOWN_DIVERGENCE`:
+  - `ir|bootstrap/test/cases/enum_accessor_ref.w` (`selfhost` correct; Stage0 IR path missing accessor-ref lowering)
 
 ---
 
@@ -619,101 +627,3 @@ After fixpoint:
 * CI builds bootstrap as recovery path.
 
 ---
-
-# 10. Debugging Playbook (Stage2 on macOS ARM64)
-
-Use this when `with-stage2` is hanging, crashing, or showing suspicious memory behavior.
-
-## 10.1 Quick triage (repro + timing)
-
-```bash
-time ./with-stage2 check src/main.w --dump-resolved
-```
-
-If this is unexpectedly slow, keep the exact command line and use it for all tools below.
-
-## 10.2 Crash triage with LLDB
-
-```bash
-lldb -- ./with-stage2 check src/main.w --dump-resolved
-# inside lldb:
-run
-bt all
-thread list
-```
-
-For repeated crashes, set a breakpoint in likely hot paths (resolver, parser, allocator wrappers) and rerun.
-
-## 10.3 Heap corruption checks (fast, native)
-
-```bash
-MallocScribble=1 MallocGuardEdges=1 ./with-stage2 check src/main.w --dump-resolved
-```
-
-Add stack logging when needed:
-
-```bash
-MallocScribble=1 MallocGuardEdges=1 MallocStackLogging=1 ./with-stage2 check src/main.w --dump-resolved
-```
-
-## 10.4 Leak checks
-
-Single-run leak report:
-
-```bash
-leaks --atExit -- ./with-stage2 check src/main.w --dump-resolved
-```
-
-If attaching to a live process is needed:
-
-```bash
-./with-stage2 check src/main.w --dump-resolved &
-leaks $(pgrep -n with-stage2)
-```
-
-## 10.5 Instruments (`xctrace`) for deeper memory analysis
-
-Record a Leaks trace:
-
-```bash
-xcrun xctrace record --template "Leaks" --output /tmp/with-stage2-leaks.trace --launch -- ./with-stage2 check src/main.w --dump-resolved
-```
-
-Optional export for inspection/diffing:
-
-```bash
-xcrun xctrace export --input /tmp/with-stage2-leaks.trace --output /tmp/with-stage2-leaks.json --format json
-```
-
-## 10.6 macOS debugger permissions (required once per binary/update)
-
-If you see `not debuggable` or `Unable to acquire required task port`, re-sign `with-stage2` with debug entitlement:
-
-```bash
-cat > /tmp/debug.entitlements <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>com.apple.security.get-task-allow</key>
-    <true/>
-</dict>
-</plist>
-EOF
-
-codesign -s - --entitlements /tmp/debug.entitlements --force ./with-stage2
-codesign -d --entitlements :- ./with-stage2
-```
-
-Enable developer debugging access (machine/user setup):
-
-```bash
-sudo DevToolsSecurity -enable
-sudo dseditgroup -o edit -a "$USER" -t user _developer
-```
-
-## 10.7 Tool policy for this repo on ARM64
-
-* Prefer: `lldb`, `MallocScribble`/`MallocGuardEdges`, `leaks`, `xctrace`.
-* Avoid by default: Valgrind on ARM64 (VEX backend limits make it fragile and very slow for this workload).
-* If Valgrind is absolutely required, expect heavy slowdown and use only as a last resort.

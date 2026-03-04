@@ -34,6 +34,8 @@ type Parser = {
     pending_after: i32,
     pending_derive_start: i32,
     pending_derive_count: i32,
+    last_param_pattern_start: i32,
+    last_param_pattern_count: i32,
 }
 
 fn Parser.init(tokens: TokenList, source: str, file_id: i32, intern: InternPool, diags: DiagnosticList) -> Parser:
@@ -61,6 +63,8 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_after: 0,
         pending_derive_start: 0,
         pending_derive_count: 0,
+        last_param_pattern_start: 0,
+        last_param_pattern_count: 0,
     }
 
 // ── Token helpers ────────────────────────────────────────────────
@@ -377,6 +381,8 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     // Parameters
     var params_start = 0
     var param_count = 0
+    self.last_param_pattern_start = self.pool.fn_param_patterns_len()
+    self.last_param_pattern_count = 0
     if self.peek() == TK_L_PAREN():
         self.advance()
         param_count = self.parse_param_list()
@@ -439,6 +445,7 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     // We encode: d0=name, d1=body, d2=flags
     let fn_node = self.pool.add_node(NK_FN_DECL(), start, self.pool.get_end(body), name, body, flags)
     self.pool.add_fn_meta(fn_node, flags, ret_type, params_start, param_count, tp_start, tp_count)
+    self.pool.add_fn_param_pattern_meta(fn_node, self.last_param_pattern_start, self.last_param_pattern_count)
     fn_node
 
 // ── extern fn ────────────────────────────────────────────────────
@@ -492,6 +499,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
     if name == 0:
         return 0
 
+    let tp_start = self.pool.extra_len()
     let tp_count = self.parse_type_params()
     self.parse_optional_where_clause()
 
@@ -510,17 +518,23 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
     if self.peek() == TK_L_BRACE():
         let extra_start = self.parse_struct_body()
         self.pool.add_extra(is_pub)
+        self.pool.add_extra(tp_start)
+        self.pool.add_extra(tp_count)
         return self.pool.add_node(NK_TYPE_DECL(), start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_STRUCT(), is_ephemeral))
 
     // Enum: starts with | or Identifier followed by |
     if self.peek() == TK_PIPE():
         let extra_start = self.parse_enum_variants()
         self.pool.add_extra(is_pub)
+        self.pool.add_extra(tp_start)
+        self.pool.add_extra(tp_count)
         return self.pool.add_node(NK_TYPE_DECL(), start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_ENUM(), is_ephemeral))
 
     if self.peek() == TK_IDENT() and self.is_enum_def():
         let extra_start = self.parse_enum_variants()
         self.pool.add_extra(is_pub)
+        self.pool.add_extra(tp_start)
+        self.pool.add_extra(tp_count)
         return self.pool.add_node(NK_TYPE_DECL(), start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_ENUM(), is_ephemeral))
 
     // Distinct type
@@ -530,6 +544,8 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         let extra_start = self.pool.extra_len()
         self.pool.add_extra(aliased)
         self.pool.add_extra(is_pub)
+        self.pool.add_extra(tp_start)
+        self.pool.add_extra(tp_count)
         return self.pool.add_node(NK_TYPE_DECL(), start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_DISTINCT(), is_ephemeral))
 
     // Type alias
@@ -545,6 +561,8 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         let extra_start = self.pool.extra_len()
         self.pool.add_extra(aliased)
         self.pool.add_extra(is_pub)
+        self.pool.add_extra(tp_start)
+        self.pool.add_extra(tp_count)
         return self.pool.add_node(NK_TYPE_DECL(), start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_ALIAS(), is_ephemeral))
 
     self.emit_error("expected type body")
@@ -626,11 +644,24 @@ fn Parser.parse_enum_variants(self: Parser) -> i32:
         if self.peek() == TK_L_PAREN():
             self.advance()
             while self.peek() != TK_R_PAREN() and self.peek() != TK_EOF():
+                // Support named payload fields: Variant(name: Type, ...)
+                if self.peek() == TK_IDENT() and
+                   self.pos + 1 < self.tokens.len() and
+                   self.tokens.get_tag(self.pos + 1) == TK_COLON():
+                    self.advance()
+                    self.advance()
+                    self.skip_newlines()
+
+                let before_payload = self.pos
                 let pty = self.parse_type_expr()
                 payloads.push(pty)
                 if self.peek() == TK_COMMA():
                     self.advance()
                     self.skip_newlines()
+                else if self.peek() != TK_R_PAREN() and self.peek() != TK_EOF():
+                    self.emit_error("expected ',' or ')' in enum payload")
+                    if self.pos == before_payload:
+                        self.advance()
             self.expect(TK_R_PAREN())
 
         variants.push(vname)
@@ -643,8 +674,10 @@ fn Parser.parse_enum_variants(self: Parser) -> i32:
         if self.peek() == TK_PIPE():
             self.advance()
             self.skip_newlines()
-        else:
-            break
+            continue
+        if self.peek() == TK_IDENT():
+            continue
+        break
 
     let extra_start = self.pool.extra_len()
     self.pool.add_extra(variant_count)
@@ -829,6 +862,8 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> i32:
             self.skip_newlines()
         self.pool.extra.set_i32(count_idx as i64, variant_count)
         self.pool.add_extra(is_pub)
+        self.pool.add_extra(0)
+        self.pool.add_extra(0)
         return self.pool.add_node(NK_TYPE_DECL(), start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TDK_ENUM(), 0))
 
     // error Name = Variant1, Variant2(payload), ...
@@ -838,6 +873,8 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> i32:
 
     let extra_start = self.parse_enum_variants()
     self.pool.add_extra(is_pub)
+    self.pool.add_extra(0)
+    self.pool.add_extra(0)
     self.pool.add_node(NK_TYPE_DECL(), start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TDK_ENUM(), 0))
 
 // ── trait decl ───────────────────────────────────────────────────
@@ -863,6 +900,7 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
     var method_param_starts: Vec[i32] = Vec.new()
     var method_param_counts: Vec[i32] = Vec.new()
     var method_ret_types: Vec[i32] = Vec.new()
+    var method_bodies: Vec[i32] = Vec.new()
 
     var assoc_names: Vec[i32] = Vec.new()
     var assoc_bound_starts: Vec[i32] = Vec.new()
@@ -914,7 +952,7 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
         if self.expect(TK_KW_FN()) == 0:
             break
         let mname = self.expect_ident_or_keyword()
-        self.parse_type_params()
+        let m_tp_count = self.parse_type_params()
 
         var params_start = 0
         var param_count = 0
@@ -932,19 +970,23 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
 
         self.parse_optional_where_clause()
 
+        var method_body = 0
         if self.peek() == TK_EQ() or self.peek() == TK_COLON():
             self.advance()
-            self.parse_block_or_expr()
+            method_body = self.parse_block_or_expr()
 
         method_names.push(mname)
         method_param_starts.push(params_start)
         method_param_counts.push(param_count)
         method_ret_types.push(ret_type)
+        method_bodies.push(method_body)
         var mflags = 0
         if is_async_method != 0:
             mflags = mflags + 1
         if is_pub_method != 0:
             mflags = mflags + 2
+        if m_tp_count > 0:
+            mflags = mflags + 4
         method_flags.push(mflags)
         self.skip_newlines()
 
@@ -968,6 +1010,7 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
         self.pool.add_extra(method_param_starts.get(mi as i64))
         self.pool.add_extra(method_param_counts.get(mi as i64))
         self.pool.add_extra(method_ret_types.get(mi as i64))
+        self.pool.add_extra(method_bodies.get(mi as i64))
 
     let node = self.pool.add_node(NK_TRAIT_DECL(), start, self.prev_end(), name, extra_start, vis)
     self.pool.add_decl(node)
@@ -1515,11 +1558,40 @@ fn Parser.parse_call(self: Parser, callee: i32) -> i32:
                 break
     self.skip_newlines()
     self.expect(TK_R_PAREN())
-    let extra_start = self.pool.extra_len()
     let arg_count = args.len() as i32
+    var placeholder_count = 0
     for ai in 0..arg_count:
-        self.pool.add_extra(args.get(ai as i64))
-    self.pool.add_node(NK_CALL(), self.pool.get_start(callee), self.prev_end(), callee, extra_start, arg_count)
+        let arg = args.get(ai as i64)
+        if self.pool.kind(arg) == NK_IDENT():
+            let sym = self.pool.get_data0(arg)
+            if self.intern.resolve(sym) == "_":
+                placeholder_count = placeholder_count + 1
+
+    let extra_start = self.pool.extra_len()
+    var partial_param_syms: Vec[i32] = Vec.new()
+    for ai in 0..arg_count:
+        let arg = args.get(ai as i64)
+        if self.pool.kind(arg) == NK_IDENT():
+            let sym = self.pool.get_data0(arg)
+            if self.intern.resolve(sym) == "_":
+                let pname = "__partial_arg_" ++ int_to_string(self.pos) ++ "_" ++ int_to_string(partial_param_syms.len() as i32)
+                let psym = self.intern.intern(pname)
+                partial_param_syms.push(psym)
+                let pnode = self.pool.add_node(NK_IDENT(), self.pool.get_start(arg), self.pool.get_end(arg), psym, 0, 0)
+                self.pool.add_extra(pnode)
+                continue
+        self.pool.add_extra(arg)
+    let call_node = self.pool.add_node(NK_CALL(), self.pool.get_start(callee), self.prev_end(), callee, extra_start, arg_count)
+
+    if placeholder_count == 0:
+        return call_node
+
+    let param_start = self.pool.extra_len()
+    let param_count = partial_param_syms.len() as i32
+    for pi in 0..param_count:
+        self.pool.add_extra(partial_param_syms.get(pi as i64))
+        self.pool.add_extra(0)
+    self.pool.add_node(NK_CLOSURE(), self.pool.get_start(callee), self.prev_end(), call_node, param_start, param_count)
 
 fn Parser.parse_dot(self: Parser, lhs: i32) -> i32:
     self.advance()  // consume .
@@ -2045,11 +2117,9 @@ fn Parser.parse_for(self: Parser, label: i32) -> i32:
         self.advance()
     let body = self.parse_block_or_expr()
 
-    // Store index_binding and label in extra
-    let extra_start = self.pool.extra_len()
-    self.pool.add_extra(index_binding)
-    self.pool.add_extra(label)
-    self.pool.add_node(NK_FOR(), start, self.prev_end(), binding, iterable, body)
+    let for_node = self.pool.add_node(NK_FOR(), start, self.prev_end(), binding, iterable, body)
+    self.pool.add_for_meta(for_node, index_binding, label)
+    for_node
 
 fn Parser.parse_labeled_loop(self: Parser) -> i32:
     let start = self.current_start()
@@ -2300,6 +2370,7 @@ fn Parser.parse_struct_pattern(self: Parser, type_name: i32, start: i32) -> i32:
     self.advance()  // consume {
     self.skip_newlines()
     let extra_start = self.pool.extra_len()
+    let has_rest_idx = self.pool.add_extra(0)
     var field_count = 0
     var has_rest = 0
 
@@ -2326,7 +2397,7 @@ fn Parser.parse_struct_pattern(self: Parser, type_name: i32, start: i32) -> i32:
             self.skip_newlines()
 
     self.expect(TK_R_BRACE())
-    self.pool.add_extra(has_rest)
+    self.pool.extra.set_i32(has_rest_idx as i64, has_rest)
     self.pool.add_node(NK_PAT_STRUCT(), start, self.prev_end(), type_name, extra_start, field_count)
 
 fn Parser.parse_slice_pattern(self: Parser, start: i32) -> i32:
@@ -2426,7 +2497,8 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         var binding_count = 0
         while self.peek() != TK_R_PAREN() and self.peek() != TK_EOF():
             let b = self.expect_ident()
-            self.pool.add_extra(b)
+            let pat_node = self.pool.add_node(NK_PAT_IDENT(), self.prev_start(), self.prev_end(), b, 0, 0)
+            self.pool.add_extra(pat_node)
             binding_count = binding_count + 1
             if self.peek() == TK_COMMA():
                 self.advance()
@@ -2803,6 +2875,10 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
 
 fn Parser.parse_param_list(self: Parser) -> i32:
     var params: Vec[i32] = Vec.new()
+    let pattern_start = self.pool.fn_param_patterns_len()
+    var pattern_count = 0
+    self.last_param_pattern_start = pattern_start
+    self.last_param_pattern_count = 0
     if self.peek() == TK_R_PAREN() or self.peek() == TK_DOT_DOT_DOT():
         return 0
     while true:
@@ -2811,7 +2887,18 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             is_mut = 1
             self.advance()
 
-        let name = self.expect_ident()
+        var name = 0
+        var param_pattern = 0
+        if self.peek() == TK_IDENT():
+            name = self.expect_ident()
+        else:
+            let t = self.peek()
+            if t == TK_L_PAREN() or t == TK_L_BRACE() or t == TK_L_BRACKET() or t == TK_DOT_IDENT():
+                param_pattern = self.parse_pattern()
+                let synth = "__param_pat_" ++ int_to_string(self.pos) ++ "_" ++ int_to_string((params.len() / 2) as i32)
+                name = self.intern.intern(synth)
+            else:
+                name = self.expect_ident()
         if name == 0:
             break
 
@@ -2827,6 +2914,8 @@ fn Parser.parse_param_list(self: Parser) -> i32:
 
         params.push(name)
         params.push(type_node)
+        self.pool.add_fn_param_pattern_value(param_pattern)
+        pattern_count = pattern_count + 1
 
         if self.peek() != TK_COMMA():
             break
@@ -2838,6 +2927,8 @@ fn Parser.parse_param_list(self: Parser) -> i32:
     let count = (params.len() / 2) as i32
     for pi in 0..params.len() as i32:
         self.pool.add_extra(params.get(pi as i64))
+    self.last_param_pattern_start = pattern_start
+    self.last_param_pattern_count = pattern_count
     count
 
 fn Parser.parse_one_param(self: Parser) -> i32:

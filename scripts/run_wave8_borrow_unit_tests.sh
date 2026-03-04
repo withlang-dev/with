@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="./with-stage2"
 
@@ -13,6 +14,9 @@ if [[ ! -x "$SELFHOST_BIN" ]]; then
   echo "error: missing self-host compiler: $SELFHOST_BIN"
   exit 1
 fi
+
+SELFHOST_BIN="$(prepare_selfhost_runner "$ROOT_DIR" "$SELFHOST_BIN")"
+trap 'cleanup_selfhost_runner' EXIT
 
 failures=0
 

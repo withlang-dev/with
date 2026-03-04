@@ -9,6 +9,7 @@
 use Ast
 use InternPool
 use Span
+use Mir
 
 extern fn with_eprintln(s: str) -> void
 extern fn str_from_byte(b: i32) -> str
@@ -273,6 +274,7 @@ type Codegen = {
     // Struct types: sym → index into struct_type_* arrays
     struct_type_map: HashMap[i32, i32],
     struct_llvm_types: Vec[i64],
+    struct_index_syms: Vec[i32],
     struct_field_starts: Vec[i32],
     struct_field_counts: Vec[i32],
     struct_field_names: Vec[i32],
@@ -360,6 +362,9 @@ type Codegen = {
     trait_method_names: Vec[i32],
     trait_method_ret_types: Vec[i64],
     trait_method_param_counts: Vec[i32],
+    trait_method_param_starts: Vec[i32],
+    trait_method_ret_nodes: Vec[i32],
+    trait_method_default_bodies: Vec[i32],
 
     // Trait decl nodes: sym → trait_decl_node
     trait_decl_nodes: HashMap[i32, i32],
@@ -370,6 +375,7 @@ type Codegen = {
     // Trait-typed locals
     trait_locals: HashMap[i32, i32],
     trait_local_concrete_types: HashMap[i32, i32],
+    dyn_fat_ptr_type: i64,
 
     // Fn dyn params: fn_sym → start/count in flat array
     fn_dyn_param_starts: HashMap[i32, i32],
@@ -444,6 +450,19 @@ type Codegen = {
     // Source info
     source_file: str,
     source_text: str,
+
+    // Wave 10 MIR backend input (optional).
+    mir_input_enabled: i32,
+    mir_input: MirModule,
+    mir_local_ptrs: HashMap[i32, i64],
+    mir_local_types: HashMap[i32, i64],
+    mir_bb_values: HashMap[i32, i64],
+    mir_default_unreachable_bb: i64,
+}
+
+type DynArgInfo = {
+    type_sym: i32,
+    use_ptr: i32,
 }
 
 // ── Codegen lifecycle ─────────────────────────────────────────────
@@ -474,6 +493,7 @@ fn Codegen.init(module_name: str) -> Codegen:
         fn_fn_types: HashMap.new(),
         struct_type_map: HashMap.new(),
         struct_llvm_types: Vec.new(),
+        struct_index_syms: Vec.new(),
         struct_field_starts: Vec.new(),
         struct_field_counts: Vec.new(),
         struct_field_names: Vec.new(),
@@ -525,10 +545,14 @@ fn Codegen.init(module_name: str) -> Codegen:
         trait_method_names: Vec.new(),
         trait_method_ret_types: Vec.new(),
         trait_method_param_counts: Vec.new(),
+        trait_method_param_starts: Vec.new(),
+        trait_method_ret_nodes: Vec.new(),
+        trait_method_default_bodies: Vec.new(),
         trait_decl_nodes: HashMap.new(),
         vtable_globals: HashMap.new(),
         trait_locals: HashMap.new(),
         trait_local_concrete_types: HashMap.new(),
+        dyn_fat_ptr_type: 0,
         fn_dyn_param_starts: HashMap.new(),
         fn_dyn_param_data: Vec.new(),
         fn_ref_param_starts: HashMap.new(),
@@ -577,6 +601,12 @@ fn Codegen.init(module_name: str) -> Codegen:
         fn_default_counts: HashMap.new(),
         source_file: "<unknown>",
         source_text: "",
+        mir_input_enabled: 0,
+        mir_input: MirModule.init(),
+        mir_local_ptrs: HashMap.new(),
+        mir_local_types: HashMap.new(),
+        mir_bb_values: HashMap.new(),
+        mir_default_unreachable_bb: 0,
     }
 
 fn Codegen.deinit(self: Codegen):
@@ -599,6 +629,16 @@ fn Codegen.print_ir(self: Codegen):
 fn Codegen.verify(self: Codegen) -> i32:
     wl_verify_module(self.llmod)
 
+fn Codegen.gen_module_from_mir(self: Codegen, mir_mod: MirModule, pool: AstPool) -> i32:
+    let mir_err = validate_mir_module(mir_mod)
+    if mir_err.len() > 0:
+        with_eprintln("error: invalid MIR input for LLVM backend: " ++ mir_err)
+        self.had_error = 1
+        return 1
+    self.mir_input = mir_mod
+    self.mir_input_enabled = 1
+    self.gen_module(pool)
+
 // ── Helper: is method symbol ──────────────────────────────────────
 
 fn Codegen.is_method_symbol(self: Codegen, sym: i32) -> bool:
@@ -607,6 +647,319 @@ fn Codegen.is_method_symbol(self: Codegen, sym: i32) -> bool:
         if name.byte_at(i as i64) == 46:  // '.'
             return true
     false
+
+fn Codegen.dyn_trait_from_type_node(self: Codegen, type_node: i32) -> i32:
+    if type_node == 0:
+        return 0
+    let tk = self.pool.kind(type_node)
+    if tk == NK_TYPE_TRAIT_OBJ():
+        return self.pool.get_data0(type_node)
+    if tk == NK_TYPE_REF() or tk == NK_TYPE_PTR():
+        return self.dyn_trait_from_type_node(self.pool.get_data0(type_node))
+    if tk == NK_TYPE_GENERIC():
+        let name_sym = self.pool.get_data0(type_node)
+        let name = self.intern.resolve(name_sym)
+        let g_extra = self.pool.get_data1(type_node)
+        let g_count = self.pool.get_data2(type_node)
+        if name == "Box" and g_count == 1:
+            return self.dyn_trait_from_type_node(self.pool.get_extra(g_extra))
+    0
+
+fn Codegen.hash_type_trait_key(self: Codegen, type_sym: i32, trait_sym: i32) -> i64:
+    (type_sym as i64) * 4294967296 + (trait_sym as i64)
+
+fn Codegen.get_dyn_fat_ptr_type(self: Codegen) -> i64:
+    if self.dyn_fat_ptr_type != 0:
+        return self.dyn_fat_ptr_type
+    let ptr_ty = wl_ptr_type(self.context)
+    let fat_types: Vec[i64] = Vec.new()
+    fat_types.push(ptr_ty)
+    fat_types.push(ptr_ty)
+    self.dyn_fat_ptr_type = wl_struct_type(self.context, vec_data_i64(fat_types), 2, 0)
+    self.dyn_fat_ptr_type
+
+fn Codegen.get_fn_dyn_param_trait(self: Codegen, fn_sym: i32, param_idx: i32) -> i32:
+    let base_opt = self.fn_dyn_param_starts.get(fn_sym)
+    if not base_opt.is_some():
+        return 0
+    if param_idx < 0:
+        return 0
+    let base = base_opt.unwrap()
+    let slot = base + param_idx
+    if slot < 0 or slot >= self.fn_dyn_param_data.len() as i32:
+        return 0
+    self.fn_dyn_param_data.get(slot as i64)
+
+fn Codegen.coerce_value_to_type(self: Codegen, val: i64, target_ty: i64) -> i64:
+    if val == 0 or target_ty == 0:
+        return val
+    let val_ty = wl_type_of(val)
+    if val_ty == target_ty:
+        return val
+
+    let vk = wl_get_type_kind(val_ty)
+    let tk = wl_get_type_kind(target_ty)
+
+    if tk == wl_pointer_type_kind() and self.is_str_type(val_ty):
+        return self.extract_str_ptr(val)
+    if tk == wl_pointer_type_kind() and vk == wl_pointer_type_kind():
+        return wl_build_bitcast(self.builder, val, target_ty)
+
+    if vk == wl_integer_type_kind() and tk == wl_integer_type_kind():
+        return self.coerce_int(val, target_ty)
+
+    val
+
+fn Codegen.enforce_coerced_type(self: Codegen, value: i64, expected_ty: i64, context: str) -> i64:
+    if value == 0 or expected_ty == 0:
+        return value
+
+    var out = if wl_type_of(value) != expected_ty: self.coerce_value_to_type(value, expected_ty) else: value
+    if out != 0 and wl_type_of(out) == expected_ty:
+        return out
+
+    if out != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind() and wl_get_type_kind(wl_type_of(out)) == wl_pointer_type_kind():
+        out = wl_build_bitcast(self.builder, out, expected_ty)
+        if wl_type_of(out) == expected_ty:
+            return out
+
+    self.had_error = 1
+    with_eprintln("error: " ++ context)
+    self.build_default_value(expected_ty)
+
+fn Codegen.arg_lvalue_ptr_for_autoref(self: Codegen, arg_node: i32, arg_ty: i64, arg_val: i64) -> i64:
+    if arg_node != 0 and self.pool.kind(arg_node) == NK_IDENT():
+        let sym = self.pool.get_data0(arg_node)
+        let la = self.local_allocas.get(sym)
+        if la.is_some():
+            return la.unwrap() as i64
+
+    if arg_node != 0 and self.pool.kind(arg_node) == NK_FIELD_ACCESS():
+        let base = self.pool.get_data0(arg_node)
+        let field = self.pool.get_data1(arg_node)
+        let ptr = self.gen_field_access_ptr(base, field)
+        if ptr != 0:
+            return ptr
+
+    let tmp = self.create_entry_alloca(arg_ty)
+    wl_build_store(self.builder, arg_val, tmp)
+    tmp
+
+fn Codegen.coerce_call_arg_to_param(self: Codegen, arg_node: i32, arg_val: i64, param_ty: i64) -> i64:
+    if arg_val == 0 or param_ty == 0:
+        return arg_val
+
+    var out = arg_val
+    let arg_ty = wl_type_of(out)
+    let param_kind = wl_get_type_kind(param_ty)
+    if param_kind == wl_pointer_type_kind() and wl_get_type_kind(arg_ty) == wl_struct_type_kind():
+        let ptr = self.arg_lvalue_ptr_for_autoref(arg_node, arg_ty, out)
+        if ptr != 0:
+            out = ptr
+
+    self.enforce_coerced_type(out, param_ty, "wrong argument type")
+
+fn Codegen.find_dyn_concrete_arg(self: Codegen, arg_node: i32, arg_ty: i64) -> DynArgInfo:
+    if wl_get_type_kind(arg_ty) == wl_struct_type_kind():
+        let st_sym = self.find_struct_type_by_llvm(arg_ty)
+        if st_sym != 0:
+            return DynArgInfo { type_sym: st_sym, use_ptr: 0 }
+
+    if wl_get_type_kind(arg_ty) != wl_pointer_type_kind():
+        return DynArgInfo { type_sym: 0, use_ptr: 0 }
+
+    if arg_node != 0 and self.pool.kind(arg_node) == NK_UNARY():
+        let uop = self.pool.get_data0(arg_node)
+        if uop == UOP_REF() or uop == UOP_MUT_REF():
+            let inner = self.pool.get_data1(arg_node)
+            if self.pool.kind(inner) == NK_IDENT():
+                let base_sym = self.pool.get_data0(inner)
+                let known = self.trait_local_concrete_types.get(base_sym)
+                if known.is_some():
+                    return DynArgInfo { type_sym: known.unwrap(), use_ptr: 1 }
+                let lt = self.local_types.get(base_sym)
+                if lt.is_some():
+                    let st_sym = self.find_struct_type_by_llvm(lt.unwrap() as i64)
+                    if st_sym != 0:
+                        return DynArgInfo { type_sym: st_sym, use_ptr: 1 }
+                let base_name = self.ident_text_from_node(inner)
+                if base_name.len() > 0:
+                    let alias_sym = self.intern.intern(base_name)
+                    let alias_known = self.trait_local_concrete_types.get(alias_sym)
+                    if alias_known.is_some():
+                        return DynArgInfo { type_sym: alias_known.unwrap(), use_ptr: 1 }
+                    let aps = self.local_pointee_structs.get(alias_sym)
+                    if aps.is_some():
+                        return DynArgInfo { type_sym: aps.unwrap(), use_ptr: 1 }
+                    let alt = self.local_types.get(alias_sym)
+                    if alt.is_some():
+                        let st_sym = self.find_struct_type_by_llvm(alt.unwrap() as i64)
+                        if st_sym != 0:
+                            return DynArgInfo { type_sym: st_sym, use_ptr: 1 }
+
+    if arg_node != 0 and self.pool.kind(arg_node) == NK_IDENT():
+        let sym = self.pool.get_data0(arg_node)
+        let known = self.trait_local_concrete_types.get(sym)
+        if known.is_some():
+            return DynArgInfo { type_sym: known.unwrap(), use_ptr: 1 }
+        let ps = self.local_pointee_structs.get(sym)
+        if ps.is_some():
+            return DynArgInfo { type_sym: ps.unwrap(), use_ptr: 1 }
+        let lt = self.local_types.get(sym)
+        if lt.is_some():
+            let st_sym = self.find_struct_type_by_llvm(lt.unwrap() as i64)
+            if st_sym != 0:
+                return DynArgInfo { type_sym: st_sym, use_ptr: 1 }
+        let name = self.ident_text_from_node(arg_node)
+        if name.len() > 0:
+            let alias_sym = self.intern.intern(name)
+            let alias_known = self.trait_local_concrete_types.get(alias_sym)
+            if alias_known.is_some():
+                return DynArgInfo { type_sym: alias_known.unwrap(), use_ptr: 1 }
+            let aps = self.local_pointee_structs.get(alias_sym)
+            if aps.is_some():
+                return DynArgInfo { type_sym: aps.unwrap(), use_ptr: 1 }
+            let alt = self.local_types.get(alias_sym)
+            if alt.is_some():
+                let st_sym = self.find_struct_type_by_llvm(alt.unwrap() as i64)
+                if st_sym != 0:
+                    return DynArgInfo { type_sym: st_sym, use_ptr: 1 }
+
+    // Symbol lookup can miss when parser/resolver symbol IDs diverge; fall
+    // back to pointee LLVM type to recover concrete dyn coercions.
+    let pointee_ty = wl_get_element_type(arg_ty)
+    if pointee_ty != 0:
+        let st_sym = self.find_struct_type_by_llvm(pointee_ty)
+        if st_sym != 0:
+            return DynArgInfo { type_sym: st_sym, use_ptr: 1 }
+
+    DynArgInfo { type_sym: 0, use_ptr: 0 }
+
+fn Codegen.build_dyn_trait_value(self: Codegen, concrete_val: i64, type_sym: i32, trait_sym: i32) -> i64:
+    let key = self.hash_type_trait_key(type_sym, trait_sym)
+    let vg = self.vtable_globals.get(key)
+    if not vg.is_some():
+        return concrete_val
+
+    let alloca = wl_build_alloca(self.builder, wl_type_of(concrete_val))
+    wl_build_store(self.builder, concrete_val, alloca)
+
+    let fat_ty = self.get_dyn_fat_ptr_type()
+    var fat = wl_get_undef(fat_ty)
+    fat = wl_build_insert_value(self.builder, fat, alloca, 0)
+    fat = wl_build_insert_value(self.builder, fat, vg.unwrap() as i64, 1)
+    fat
+
+fn Codegen.build_dyn_trait_value_from_ptr(self: Codegen, data_ptr: i64, type_sym: i32, trait_sym: i32) -> i64:
+    let key = self.hash_type_trait_key(type_sym, trait_sym)
+    let vg = self.vtable_globals.get(key)
+    if not vg.is_some():
+        return data_ptr
+
+    let ptr_ty = wl_ptr_type(self.context)
+    let fat_ty = self.get_dyn_fat_ptr_type()
+    let erased = wl_build_bitcast(self.builder, data_ptr, ptr_ty)
+    var fat = wl_get_undef(fat_ty)
+    fat = wl_build_insert_value(self.builder, fat, erased, 0)
+    fat = wl_build_insert_value(self.builder, fat, vg.unwrap() as i64, 1)
+    fat
+
+fn Codegen.infer_local_pointee_struct(self: Codegen, value_node: i32, declared_type_node: i32, storage_ty: i64) -> i32:
+    if wl_get_type_kind(storage_ty) != wl_pointer_type_kind():
+        return 0
+
+    if declared_type_node != 0:
+        let dk = self.pool.kind(declared_type_node)
+        if dk == NK_TYPE_REF() or dk == NK_TYPE_PTR():
+            let pointee = self.pool.get_data0(declared_type_node)
+            if self.pool.kind(pointee) == NK_TYPE_NAMED():
+                let sym = self.pool.get_data0(pointee)
+                if self.intern.resolve(sym) == "Self" and self.current_method_owner_sym != 0:
+                    return self.current_method_owner_sym
+                if self.struct_type_map.get(sym).is_some():
+                    return sym
+
+    if value_node != 0 and self.pool.kind(value_node) == NK_UNARY():
+        let uop = self.pool.get_data0(value_node)
+        if uop == UOP_REF() or uop == UOP_MUT_REF():
+            let inner = self.pool.get_data1(value_node)
+            if self.pool.kind(inner) == NK_IDENT():
+                let base_sym = self.pool.get_data0(inner)
+                let ps = self.local_pointee_structs.get(base_sym)
+                if ps.is_some():
+                    return ps.unwrap()
+                let lt = self.local_types.get(base_sym)
+                if lt.is_some():
+                    let st_sym = self.find_struct_type_by_llvm(lt.unwrap() as i64)
+                    if st_sym != 0:
+                        return st_sym
+
+    if value_node != 0 and self.pool.kind(value_node) == NK_IDENT():
+        let src_sym = self.pool.get_data0(value_node)
+        let ps = self.local_pointee_structs.get(src_sym)
+        if ps.is_some():
+            return ps.unwrap()
+
+    0
+
+fn Codegen.infer_local_concrete_struct(self: Codegen, value_node: i32, storage_ty: i64) -> i32:
+    let by_ty = self.find_struct_type_by_llvm(storage_ty)
+    if by_ty != 0:
+        return by_ty
+    if value_node == 0:
+        return 0
+    let vk = self.pool.kind(value_node)
+    if vk == NK_STRUCT_LIT():
+        let lit_sym = self.pool.get_data0(value_node)
+        if lit_sym != 0:
+            return lit_sym
+    if vk == NK_IDENT():
+        let sym = self.pool.get_data0(value_node)
+        let known = self.trait_local_concrete_types.get(sym)
+        if known.is_some():
+            return known.unwrap()
+        let name = self.ident_text_from_node(value_node)
+        if name.len() > 0:
+            let alias_sym = self.intern.intern(name)
+            let alias_known = self.trait_local_concrete_types.get(alias_sym)
+            if alias_known.is_some():
+                return alias_known.unwrap()
+    if vk == NK_UNARY():
+        let uop = self.pool.get_data0(value_node)
+        if uop == UOP_REF() or uop == UOP_MUT_REF():
+            let inner = self.pool.get_data1(value_node)
+            if self.pool.kind(inner) == NK_IDENT():
+                let sym = self.pool.get_data0(inner)
+                let known = self.trait_local_concrete_types.get(sym)
+                if known.is_some():
+                    return known.unwrap()
+                let name = self.ident_text_from_node(inner)
+                if name.len() > 0:
+                    let alias_sym = self.intern.intern(name)
+                    let alias_known = self.trait_local_concrete_types.get(alias_sym)
+                    if alias_known.is_some():
+                        return alias_known.unwrap()
+    0
+
+fn Codegen.coerce_call_args_for_fn_value(self: Codegen, fn_sym: i32, fn_val: i64, args_start: i32, args: Vec[i64], arg_count: i32) -> Vec[i64]:
+    let out: Vec[i64] = Vec.new()
+    let param_count = wl_count_params(fn_val)
+    for ai in 0..arg_count:
+        var arg_val = args.get(ai as i64)
+        if ai < param_count:
+            let param_ty = wl_type_of(wl_get_param(fn_val, ai))
+            let arg_node = if args_start >= 0: self.pool.get_extra(args_start + ai) else: 0
+            let trait_sym = self.get_fn_dyn_param_trait(fn_sym, ai)
+            if trait_sym != 0:
+                let info = self.find_dyn_concrete_arg(arg_node, wl_type_of(arg_val))
+                if info.type_sym != 0:
+                    if info.use_ptr != 0:
+                        arg_val = self.build_dyn_trait_value_from_ptr(arg_val, info.type_sym, trait_sym)
+                    else:
+                        arg_val = self.build_dyn_trait_value(arg_val, info.type_sym, trait_sym)
+            arg_val = self.coerce_call_arg_to_param(arg_node, arg_val, param_ty)
+        out.push(arg_val)
+    out
 
 // ── Helper: find struct/enum type symbol from LLVM type ───────────
 
@@ -686,14 +1039,6 @@ fn Codegen.coerce_int(self: Codegen, val: i64, target_ty: i64) -> i64:
             return wl_build_sext(self.builder, val, target_ty)
         if vw > tw:
             return wl_build_trunc(self.builder, val, target_ty)
-    if vk == wl_integer_type_kind() and tk == wl_float_type_kind():
-        return wl_build_si_to_fp(self.builder, val, target_ty)
-    if vk == wl_integer_type_kind() and tk == wl_double_type_kind():
-        return wl_build_si_to_fp(self.builder, val, target_ty)
-    if vk == wl_float_type_kind() and tk == wl_integer_type_kind():
-        return wl_build_fp_to_si(self.builder, val, target_ty)
-    if vk == wl_double_type_kind() and tk == wl_integer_type_kind():
-        return wl_build_fp_to_si(self.builder, val, target_ty)
     val
 
 // ── Helper: build default value for a type ────────────────────────
@@ -709,6 +1054,58 @@ fn Codegen.build_default_value(self: Codegen, ty: i64) -> i64:
     if kind == wl_struct_type_kind():
         return wl_const_null(ty)
     wl_const_int(wl_i32_type(self.context), 0, 0)
+
+fn Codegen.get_memcmp_fn_type(self: Codegen) -> i64:
+    let i32_ty = wl_i32_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+    let param_types: Vec[i64] = Vec.new()
+    param_types.push(ptr_ty)
+    param_types.push(ptr_ty)
+    param_types.push(i64_ty)
+    wl_function_type(i32_ty, vec_data_i64(param_types), 3, 0)
+
+fn Codegen.ensure_memcmp_declared(self: Codegen) -> i64:
+    let existing = wl_get_named_function(self.llmod, "memcmp")
+    if existing != 0:
+        return existing
+    let fn_ty = self.get_memcmp_fn_type()
+    wl_add_function(self.llmod, "memcmp", fn_ty)
+
+fn Codegen.compare_aggregate_eq(self: Codegen, lhs: i64, rhs: i64, op: i32) -> i64:
+    let lhs_ty = wl_type_of(lhs)
+    let rhs_ty = wl_type_of(rhs)
+    let i1_ty = wl_i1_type(self.context)
+    if lhs_ty == 0 or rhs_ty == 0 or lhs_ty != rhs_ty:
+        return wl_get_undef(i1_ty)
+
+    let dl = wl_get_module_data_layout(self.llmod)
+    let byte_size = wl_abi_size_of(dl, lhs_ty)
+    if byte_size <= 0:
+        if op == OP_EQ():
+            return wl_const_int(i1_ty, 1, 0)
+        return wl_const_int(i1_ty, 0, 0)
+
+    let lhs_slot = self.create_entry_alloca(lhs_ty)
+    let rhs_slot = self.create_entry_alloca(rhs_ty)
+    wl_build_store(self.builder, lhs, lhs_slot)
+    wl_build_store(self.builder, rhs, rhs_slot)
+
+    let ptr_ty = wl_ptr_type(self.context)
+    let lhs_ptr = wl_build_bitcast(self.builder, lhs_slot, ptr_ty)
+    let rhs_ptr = wl_build_bitcast(self.builder, rhs_slot, ptr_ty)
+    let args: Vec[i64] = Vec.new()
+    args.push(lhs_ptr)
+    args.push(rhs_ptr)
+    args.push(wl_const_int(wl_i64_type(self.context), byte_size, 0))
+
+    let memcmp_fn = self.ensure_memcmp_declared()
+    let memcmp_ty = self.get_memcmp_fn_type()
+    let cmp = wl_build_call(self.builder, memcmp_ty, memcmp_fn, vec_data_i64(args), 3)
+    let zero = wl_const_int(wl_i32_type(self.context), 0, 0)
+    if op == OP_EQ():
+        return wl_build_icmp(self.builder, wl_int_eq(), cmp, zero)
+    wl_build_icmp(self.builder, wl_int_ne(), cmp, zero)
 
 // ── Helper: create entry alloca ───────────────────────────────────
 
@@ -735,21 +1132,13 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         let pointee = self.pool.get_data0(type_node)
         if self.pool.kind(pointee) == NK_TYPE_TRAIT_OBJ():
             // Fat pointer {data_ptr, vtable_ptr}
-            let ptr_ty = wl_ptr_type(self.context)
-            let fat_types: Vec[i64] = Vec.new()
-            fat_types.push(ptr_ty)
-            fat_types.push(ptr_ty)
-            return wl_struct_type(self.context, vec_data_i64(fat_types), 2, 0)
+            return self.get_dyn_fat_ptr_type()
         return wl_ptr_type(self.context)
 
     if kind == NK_TYPE_REF():
         let pointee = self.pool.get_data0(type_node)
         if self.pool.kind(pointee) == NK_TYPE_TRAIT_OBJ():
-            let ptr_ty = wl_ptr_type(self.context)
-            let fat_types: Vec[i64] = Vec.new()
-            fat_types.push(ptr_ty)
-            fat_types.push(ptr_ty)
-            return wl_struct_type(self.context, vec_data_i64(fat_types), 2, 0)
+            return self.get_dyn_fat_ptr_type()
         return wl_ptr_type(self.context)
 
     if kind == NK_TYPE_FN():
@@ -798,11 +1187,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
 
     if kind == NK_TYPE_TRAIT_OBJ():
         // dyn Trait → fat pointer {data_ptr, vtable_ptr}
-        let ptr_ty = wl_ptr_type(self.context)
-        let fat_types: Vec[i64] = Vec.new()
-        fat_types.push(ptr_ty)
-        fat_types.push(ptr_ty)
-        return wl_struct_type(self.context, vec_data_i64(fat_types), 2, 0)
+        return self.get_dyn_fat_ptr_type()
 
     if kind == NK_TYPE_INFERRED():
         return 0  // Cannot resolve inferred types
@@ -810,8 +1195,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
     // Fallback
     wl_i32_type(self.context)
 
-fn Codegen.resolve_named_type(self: Codegen, sym: i32) -> i64:
-    let name = self.intern.resolve(sym)
+fn Codegen.resolve_primitive_named_type(self: Codegen, name: str) -> i64:
     if name == "i32": return wl_i32_type(self.context)
     if name == "i64": return wl_i64_type(self.context)
     if name == "i16": return wl_i16_type(self.context)
@@ -826,10 +1210,9 @@ fn Codegen.resolve_named_type(self: Codegen, sym: i32) -> i64:
     if name == "void": return wl_void_type(self.context)
     if name == "Never": return wl_void_type(self.context)
     if name == "Unit": return wl_i32_type(self.context)
-    // Check active type bindings (monomorphization)
-    for i in 0..self.type_bindings_len:
-        if self.type_binding_syms.get(i as i64) == sym:
-            return self.type_binding_types.get(i as i64)
+    0
+
+fn Codegen.resolve_user_named_type(self: Codegen, sym: i32) -> i64:
     // User-defined struct types
     let st_opt = self.struct_type_map.get(sym)
     if st_opt.is_some():
@@ -844,8 +1227,19 @@ fn Codegen.resolve_named_type(self: Codegen, sym: i32) -> i64:
     let al_opt = self.type_aliases.get(sym)
     if al_opt.is_some():
         return al_opt.unwrap() as i64
+    // Check active type bindings (monomorphization)
+    for i in 0..self.type_bindings_len:
+        if self.type_binding_syms.get(i as i64) == sym:
+            return self.type_binding_types.get(i as i64)
     // Unsupported
     0
+
+fn Codegen.resolve_named_type(self: Codegen, sym: i32) -> i64:
+    let name = self.intern.resolve(sym)
+    let prim = self.resolve_primitive_named_type(name)
+    if prim != 0:
+        return prim
+    self.resolve_user_named_type(sym)
 
 fn Codegen.resolve_generic_type(self: Codegen, name_sym: i32, extra_start: i32, arg_count: i32) -> i64:
     let name = self.intern.resolve(name_sym)
@@ -876,11 +1270,7 @@ fn Codegen.resolve_generic_type(self: Codegen, name_sym: i32, extra_start: i32, 
     if name == "Box" and arg_count == 1:
         let inner_node = self.pool.get_extra(extra_start)
         if self.pool.kind(inner_node) == NK_TYPE_TRAIT_OBJ():
-            let ptr_ty = wl_ptr_type(self.context)
-            let fat_types: Vec[i64] = Vec.new()
-            fat_types.push(ptr_ty)
-            fat_types.push(ptr_ty)
-            return wl_struct_type(self.context, vec_data_i64(fat_types), 2, 0)
+            return self.get_dyn_fat_ptr_type()
         return wl_ptr_type(self.context)
     if name == "ContextError" and arg_count == 1:
         let src_node = self.pool.get_extra(extra_start)
@@ -902,6 +1292,7 @@ fn Codegen.declare_builtin_str_type(self: Codegen):
 
     let idx = self.struct_llvm_types.len() as i32
     self.struct_llvm_types.push(str_type)
+    self.struct_index_syms.push(str_sym)
     self.struct_field_starts.push(self.struct_field_names.len() as i32)
     self.struct_field_counts.push(2)
 
@@ -923,6 +1314,7 @@ fn Codegen.predeclare_struct_type(self: Codegen, name_sym: i32):
     let st_type = wl_struct_create_named(self.context, name_str)
     let idx = self.struct_llvm_types.len() as i32
     self.struct_llvm_types.push(st_type)
+    self.struct_index_syms.push(name_sym)
     self.struct_field_starts.push(0)
     self.struct_field_counts.push(0)
     self.struct_type_map.insert(name_sym, idx)
@@ -938,6 +1330,40 @@ fn Codegen.predeclare_enum_type(self: Codegen, name_sym: i32):
     self.enum_variant_counts.push(0)
     self.enum_type_map.insert(name_sym, idx)
     self.enum_by_llvm.insert(enum_type, name_sym)
+
+fn Codegen.type_decl_tp_meta_start(self: Codegen, type_node: i32) -> i32:
+    let extra_start = self.pool.get_data1(type_node)
+    let sub_kind = type_decl_sub_kind(self.pool.get_data2(type_node))
+    if sub_kind == TDK_STRUCT():
+        let field_count = self.pool.get_extra(extra_start)
+        return extra_start + 1 + field_count * 3 + 1
+    if sub_kind == TDK_ENUM():
+        let variant_count = self.pool.get_extra(extra_start)
+        var pos = extra_start + 1
+        for vi in 0..variant_count:
+            pos = pos + 1 // variant name
+            let payload_count = self.pool.get_extra(pos)
+            pos = pos + 1 + payload_count
+        return pos + 1
+    if sub_kind == TDK_ALIAS() or sub_kind == TDK_DISTINCT():
+        return extra_start + 2
+    0 - 1
+
+fn Codegen.type_decl_tp_start(self: Codegen, type_node: i32) -> i32:
+    let meta_start = self.type_decl_tp_meta_start(type_node)
+    if meta_start < 0:
+        return 0
+    if meta_start >= self.pool.extra_len():
+        return 0
+    self.pool.get_extra(meta_start)
+
+fn Codegen.type_decl_tp_count(self: Codegen, type_node: i32) -> i32:
+    let meta_start = self.type_decl_tp_meta_start(type_node)
+    if meta_start < 0:
+        return 0
+    if meta_start + 1 >= self.pool.extra_len():
+        return 0
+    self.pool.get_extra(meta_start + 1)
 
 // ── Declare struct type ───────────────────────────────────────────
 
@@ -1008,8 +1434,15 @@ fn Codegen.declare_enum_type(self: Codegen, name_sym: i32, type_node: i32):
         offset = offset + 2
         var payload_ty: i64 = 0
         if v_payload_count > 0:
-            let p_type_node = self.pool.get_extra(offset)
-            payload_ty = self.resolve_type(p_type_node)
+            if v_payload_count == 1:
+                let p_type_node = self.pool.get_extra(offset)
+                payload_ty = self.resolve_type(p_type_node)
+            else:
+                let payload_fields: Vec[i64] = Vec.new()
+                for pi in 0..v_payload_count:
+                    let p_type_node = self.pool.get_extra(offset + pi)
+                    payload_fields.push(self.resolve_type(p_type_node))
+                payload_ty = wl_struct_type(self.context, vec_data_i64(payload_fields), v_payload_count, 0)
             let sz = wl_abi_size_of(dl, payload_ty)
             if sz > max_payload_size:
                 max_payload_size = sz
@@ -1033,8 +1466,102 @@ fn Codegen.declare_enum_type(self: Codegen, name_sym: i32, type_node: i32):
 
 // ── Declare function ──────────────────────────────────────────────
 
+fn Codegen.function_symbol_name(self: Codegen, sym: i32) -> str:
+    let name = self.intern.resolve(sym)
+    if name.len() > 0:
+        return name
+    "__fn_" ++ int_to_string(sym)
+
+fn Codegen.ident_text_from_node(self: Codegen, node: i32) -> str:
+    if node == 0:
+        return ""
+    let start = self.pool.get_start(node)
+    let end = self.pool.get_end(node)
+    if start < 0 or end <= start:
+        return ""
+    if end > self.source_text.len() as i32:
+        return ""
+    self.source_text.slice(start as i64, end as i64)
+
+fn Codegen.method_text_from_field_access(self: Codegen, node: i32) -> str:
+    if node == 0 or self.pool.kind(node) != NK_FIELD_ACCESS():
+        return ""
+    let text = self.ident_text_from_node(node)
+    if text.len() == 0:
+        return ""
+    var dot = 0 - 1
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 46:
+            dot = i
+    if dot < 0 or dot + 1 >= text.len() as i32:
+        return ""
+    text.slice((dot + 1) as i64, text.len())
+
+fn Codegen.fn_decl_name_from_node(self: Codegen, node: i32) -> str:
+    let text = self.ident_text_from_node(node)
+    if text.len() < 3:
+        return ""
+    var i = 0
+    while i < text.len() as i32 and text.byte_at(i as i64) <= 32:
+        i = i + 1
+    if i + 1 >= text.len() as i32:
+        return ""
+    if text.byte_at(i as i64) != 102 or text.byte_at((i + 1) as i64) != 110:
+        return ""
+    i = i + 2
+    while i < text.len() as i32 and text.byte_at(i as i64) <= 32:
+        i = i + 1
+    let start = i
+    while i < text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        let is_alpha = (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122)
+        let is_digit = ch >= 48 and ch <= 57
+        if is_alpha or is_digit or ch == 95 or ch == 46:
+            i = i + 1
+            continue
+        break
+    if i <= start:
+        return ""
+    text.slice(start as i64, i as i64)
+
+fn Codegen.let_binding_name_from_node(self: Codegen, node: i32) -> str:
+    let text = self.ident_text_from_node(node)
+    if text.len() < 4:
+        return ""
+    var i = 0
+    while i < text.len() as i32 and text.byte_at(i as i64) <= 32:
+        i = i + 1
+    if i + 2 >= text.len() as i32:
+        return ""
+    if text.byte_at(i as i64) != 108 or text.byte_at((i + 1) as i64) != 101 or text.byte_at((i + 2) as i64) != 116:
+        return ""
+    i = i + 3
+    while i < text.len() as i32 and text.byte_at(i as i64) <= 32:
+        i = i + 1
+    if i + 2 < text.len() as i32 and text.byte_at(i as i64) == 109 and text.byte_at((i + 1) as i64) == 117 and text.byte_at((i + 2) as i64) == 116:
+        i = i + 3
+        while i < text.len() as i32 and text.byte_at(i as i64) <= 32:
+            i = i + 1
+    let start = i
+    while i < text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        let is_alpha = (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122)
+        let is_digit = ch >= 48 and ch <= 57
+        if is_alpha or is_digit or ch == 95:
+            i = i + 1
+            continue
+        break
+    if i <= start:
+        return ""
+    text.slice(start as i64, i as i64)
+
 fn Codegen.declare_function(self: Codegen, fn_node: i32):
     let name_sym = self.pool.get_data0(fn_node)
+    let name_str = self.intern.resolve(name_sym)
+    if name_sym == 0:
+        return
+    let parsed_name = if name_str.len() == 0: self.fn_decl_name_from_node(fn_node) else: ""
+    let alias_sym = if parsed_name.len() > 0: self.intern.intern(parsed_name) else: 0
     let flags = self.pool.get_data2(fn_node)
     let meta = self.pool.find_fn_meta(fn_node)
     if meta < 0: return
@@ -1043,7 +1570,8 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     let param_start = self.pool.fn_meta_param_start(meta)
     let param_count = self.pool.fn_meta_param_count(meta)
 
-    let ret_ty = self.resolve_type(ret_type_node)
+    let ret_ty_raw = self.resolve_type(ret_type_node)
+    let ret_ty = if ret_ty_raw != 0: ret_ty_raw else: wl_i32_type(self.context)
 
     // Check if this returns Result
     if self.is_result_return_type(ret_type_node):
@@ -1056,9 +1584,9 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
 
     // Resolve param types
     let param_types: Vec[i64] = Vec.new()
-    let name_str = self.intern.resolve(name_sym)
 
-    // Check if method (has dot in name)
+    // Check if method (has dot in name); for missing symbol text, infer owner
+    // from `self: Type` in param 0.
     var method_owner_sym = 0
     for di in 0..name_str.len() as i32:
         if name_str.byte_at(di as i64) == 46:
@@ -1078,14 +1606,19 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         let p_kind = self.pool.kind(p_type_node)
 
         // Method self parameter: lower as pointer
-        if pi == 0 and method_owner_sym != 0 and p_kind == NK_TYPE_NAMED():
+        if pi == 0 and p_kind == NK_TYPE_NAMED():
             let p_sym = self.pool.get_data0(p_type_node)
-            let p_name_str = self.intern.resolve(p_sym)
-            if p_name_str == "Self" or p_sym == method_owner_sym:
+            let p_type_name = self.intern.resolve(p_sym)
+            let p_name_text = self.intern.resolve(p_name)
+            if method_owner_sym == 0 and p_name_text == "self" and self.struct_type_map.get(p_sym).is_some():
+                method_owner_sym = p_sym
+            if method_owner_sym != 0 and (p_type_name == "Self" or p_sym == method_owner_sym):
                 param_types.push(wl_ptr_type(self.context))
                 has_ref_param = true
                 // Record ref param
                 self.record_ref_param(name_sym, pi, param_count)
+                if alias_sym != 0:
+                    self.record_ref_param(alias_sym, pi, param_count)
                 pi = pi + 1
                 continue
 
@@ -1099,29 +1632,44 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             pi = pi + 1
             continue
 
-        // dyn Trait params
-        if p_kind == NK_TYPE_TRAIT_OBJ():
-            let trait_sym = self.pool.get_data0(p_type_node)
-            param_types.push(self.resolve_type(p_type_node))
+        // dyn Trait params (plain or wrapped forms: &dyn, *dyn, Box[dyn]).
+        let trait_sym = self.dyn_trait_from_type_node(p_type_node)
+        if trait_sym != 0:
+            var dyn_ty = self.resolve_type(p_type_node)
+            if dyn_ty == 0:
+                dyn_ty = wl_i32_type(self.context)
+            param_types.push(dyn_ty)
             self.record_dyn_param(name_sym, pi, param_count, trait_sym)
+            if alias_sym != 0:
+                self.record_dyn_param(alias_sym, pi, param_count, trait_sym)
             pi = pi + 1
             continue
 
         // Reference params
         if p_kind == NK_TYPE_REF():
-            param_types.push(self.resolve_type(p_type_node))
+            var ref_ty = self.resolve_type(p_type_node)
+            if ref_ty == 0:
+                ref_ty = wl_ptr_type(self.context)
+            param_types.push(ref_ty)
             has_ref_param = true
             self.record_ref_param(name_sym, pi, param_count)
+            if alias_sym != 0:
+                self.record_ref_param(alias_sym, pi, param_count)
             pi = pi + 1
             continue
 
-        param_types.push(self.resolve_type(p_type_node))
+        var p_ty = self.resolve_type(p_type_node)
+        if p_ty == 0:
+            p_ty = wl_i32_type(self.context)
+        param_types.push(p_ty)
         pi = pi + 1
 
     let fn_type = wl_function_type(ret_ty, vec_data_i64(param_types), param_count, 0)
 
     // Use "main" for @[entry] functions
-    var effective_name = name_str
+    var effective_name = self.function_symbol_name(name_sym)
+    if parsed_name.len() > 0:
+        effective_name = parsed_name
     if (flags / FN_FLAG_ENTRY()) % 2 == 1:
         effective_name = "main"
 
@@ -1135,6 +1683,9 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
 
     self.fn_values.insert(name_sym, function)
     self.fn_fn_types.insert(name_sym, fn_type)
+    if alias_sym != 0:
+        self.fn_values.insert(alias_sym, function)
+        self.fn_fn_types.insert(alias_sym, fn_type)
 
 fn Codegen.record_ref_param(self: Codegen, fn_sym: i32, idx: i32, count: i32):
     if not self.fn_ref_param_starts.get(fn_sym).is_some():
@@ -1276,13 +1827,11 @@ fn Codegen.get_or_create_option_type(self: Codegen, payload_ty: i64) -> i64:
         let idx = cached.unwrap()
         return self.option_llvm_types.get(idx as i64)
 
-    // Option[T] = { i32 tag, [N x i8] payload }
-    let dl = wl_get_module_data_layout(self.llmod)
-    let payload_size = wl_abi_size_of(dl, payload_ty)
+    // Option[T] = { i32 tag, T payload }
     let body: Vec[i64] = Vec.new()
     body.push(wl_i32_type(self.context))
-    if payload_size > 0:
-        body.push(wl_array_type(wl_i8_type(self.context), payload_size))
+    if payload_ty != 0:
+        body.push(payload_ty)
     let opt_type = wl_struct_type(self.context, vec_data_i64(body), body.len() as i32, 0)
 
     let idx = self.option_llvm_types.len() as i32
@@ -1397,33 +1946,136 @@ fn Codegen.get_or_create_hashset_type(self: Codegen, elem_ty: i64) -> i64:
 // ── Monomorphize struct (stub) ────────────────────────────────────
 
 fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, arg_count: i32) -> i64:
-    // TODO: full monomorphization
-    wl_i32_type(self.context)
+    let gs_opt = self.generic_structs.get(name_sym)
+    if not gs_opt.is_some():
+        return 0
+    let type_node = gs_opt.unwrap()
+    let tp_count = self.type_decl_tp_count(type_node)
+    if tp_count <= 0:
+        let st_opt = self.struct_type_map.get(name_sym)
+        if st_opt.is_some():
+            return self.struct_llvm_types.get(st_opt.unwrap() as i64)
+        return 0
+
+    let tp_syms: Vec[i32] = Vec.new()
+    var tp_pos = self.type_decl_tp_start(type_node)
+    for ti in 0..tp_count:
+        let tp_sym = self.pool.get_extra(tp_pos)
+        tp_syms.push(tp_sym)
+        let bound_count = self.pool.get_extra(tp_pos + 1)
+        tp_pos = tp_pos + 2 + bound_count
+
+    let arg_types: Vec[i64] = Vec.new()
+    if arg_count > 0:
+        for ai in 0..arg_count:
+            let arg_node = self.pool.get_extra(extra_start + ai)
+            let arg_ty = self.resolve_type(arg_node)
+            if arg_ty != 0:
+                arg_types.push(arg_ty)
+            else:
+                arg_types.push(wl_i32_type(self.context))
+    else:
+        for ti in 0..tp_count:
+            let tp_sym = tp_syms.get(ti as i64)
+            var bound_ty: i64 = 0
+            for bi in 0..self.type_bindings_len:
+                if self.type_binding_syms.get(bi as i64) == tp_sym:
+                    bound_ty = self.type_binding_types.get(bi as i64)
+                    break
+            if bound_ty == 0:
+                bound_ty = wl_i32_type(self.context)
+            arg_types.push(bound_ty)
+    while arg_types.len() as i32 < tp_count:
+        arg_types.push(wl_i32_type(self.context))
+
+    let base_name = self.intern.resolve(name_sym)
+    var mangled = base_name
+    for ti in 0..tp_count:
+        let arg_ty = arg_types.get(ti as i64)
+        mangled = mangled ++ "__" ++ self.llvm_type_mangle(arg_ty)
+    let mono_sym = self.intern.intern(mangled)
+
+    let mono_idx_opt = self.struct_type_map.get(mono_sym)
+    if mono_idx_opt.is_some():
+        return self.struct_llvm_types.get(mono_idx_opt.unwrap() as i64)
+
+    self.predeclare_struct_type(mono_sym)
+    let mono_idx = self.struct_type_map.get(mono_sym).unwrap()
+    let mono_ty = self.struct_llvm_types.get(mono_idx as i64)
+
+    let saved_bind_syms = self.type_binding_syms
+    let saved_bind_tys = self.type_binding_types
+    let saved_bind_len = self.type_bindings_len
+    let fresh_bind_syms: Vec[i32] = Vec.new()
+    let fresh_bind_tys: Vec[i64] = Vec.new()
+    self.type_binding_syms = fresh_bind_syms
+    self.type_binding_types = fresh_bind_tys
+    self.type_bindings_len = 0
+    for ti in 0..tp_count:
+        self.type_binding_syms.push(tp_syms.get(ti as i64))
+        self.type_binding_types.push(arg_types.get(ti as i64))
+        self.type_bindings_len = self.type_bindings_len + 1
+
+    let decl_extra_start = self.pool.get_data1(type_node)
+    let field_count = self.pool.get_extra(decl_extra_start)
+    self.struct_field_starts.set_i32(mono_idx as i64, self.struct_field_names.len() as i32)
+    self.struct_field_counts.set_i32(mono_idx as i64, field_count)
+
+    let ft_vec: Vec[i64] = Vec.new()
+    var invalid_layout = 0
+    for fi in 0..field_count:
+        let offset = decl_extra_start + 1 + fi * 3
+        let f_name = self.pool.get_extra(offset)
+        let f_type_node = self.pool.get_extra(offset + 1)
+        let f_default = self.pool.get_extra(offset + 2)
+        var f_ty = self.resolve_type(f_type_node)
+        if f_ty == 0:
+            with_eprintln("error: unresolved type for field '" ++ self.intern.resolve(f_name) ++ "' in struct '" ++ base_name ++ "'")
+            invalid_layout = 1
+            self.had_error = 1
+            f_ty = wl_i32_type(self.context)
+        self.struct_field_names.push(f_name)
+        self.struct_field_types.push(f_ty)
+        self.struct_field_defaults.push(f_default)
+        ft_vec.push(f_ty)
+
+    if invalid_layout == 0:
+        wl_struct_set_body(mono_ty, vec_data_i64(ft_vec), field_count, 0)
+
+    self.type_binding_syms = saved_bind_syms
+    self.type_binding_types = saved_bind_tys
+    self.type_bindings_len = saved_bind_len
+
+    mono_ty
 
 // ── Build Option Some/None ────────────────────────────────────────
 
 fn Codegen.build_option_some(self: Codegen, payload: i64, opt_type: i64) -> i64:
     let alloca = wl_build_alloca(self.builder, opt_type)
-    // Store tag = 1 (Some)
+    // Fully initialize to avoid undef/poison in padding bytes.
+    wl_build_store(self.builder, self.build_default_value(opt_type), alloca)
+    // Store tag = 0 (Some)
     let tag_ptr = wl_build_struct_gep(self.builder, opt_type, alloca, 0)
-    wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 1, 0), tag_ptr)
-    // Store payload via bitcast
+    wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 0, 0), tag_ptr)
+    // Store payload
     let elem_count = wl_count_struct_elem_types(opt_type)
     if elem_count > 1:
         let payload_ptr = wl_build_struct_gep(self.builder, opt_type, alloca, 1)
-        let payload_ty = wl_type_of(payload)
-        let cast_ptr = wl_build_bitcast(self.builder, payload_ptr, wl_ptr_type(self.context))
-        wl_build_store(self.builder, payload, cast_ptr)
+        let payload_ty = self.find_option_payload_type_by_llvm(opt_type)
+        let payload_val = if payload_ty != 0: self.coerce_value_to_type(payload, payload_ty) else: payload
+        wl_build_store(self.builder, payload_val, payload_ptr)
     wl_build_load(self.builder, opt_type, alloca)
 
 fn Codegen.build_option_none(self: Codegen, opt_type: i64) -> i64:
     let alloca = wl_build_alloca(self.builder, opt_type)
+    wl_build_store(self.builder, self.build_default_value(opt_type), alloca)
     let tag_ptr = wl_build_struct_gep(self.builder, opt_type, alloca, 0)
-    wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 0, 0), tag_ptr)
+    wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 1, 0), tag_ptr)
     wl_build_load(self.builder, opt_type, alloca)
 
 fn Codegen.build_result_ok(self: Codegen, val: i64, res_type: i64) -> i64:
     let alloca = wl_build_alloca(self.builder, res_type)
+    wl_build_store(self.builder, self.build_default_value(res_type), alloca)
     let tag_ptr = wl_build_struct_gep(self.builder, res_type, alloca, 0)
     wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 0, 0), tag_ptr)
     let elem_count = wl_count_struct_elem_types(res_type)
@@ -1435,6 +2087,7 @@ fn Codegen.build_result_ok(self: Codegen, val: i64, res_type: i64) -> i64:
 
 fn Codegen.build_result_err(self: Codegen, val: i64, res_type: i64) -> i64:
     let alloca = wl_build_alloca(self.builder, res_type)
+    wl_build_store(self.builder, self.build_default_value(res_type), alloca)
     let tag_ptr = wl_build_struct_gep(self.builder, res_type, alloca, 0)
     wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 1, 0), tag_ptr)
     let elem_count = wl_count_struct_elem_types(res_type)
@@ -1492,9 +2145,8 @@ fn Codegen.build_fn_type_from_ast(self: Codegen, fn_type_node: i32) -> i64:
 
 // ── gen_module: multi-pass entry point ────────────────────────────
 
-fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
+fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     self.pool = pool
-    self.intern = intern
 
     // Declare built-in str type before user types
     self.declare_builtin_str_type()
@@ -1503,30 +2155,45 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
-        if kind == NK_TYPE_DECL():
-            let name_sym = self.pool.get_data0(decl)
-            let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
-            if sub_kind == TDK_STRUCT():
+        if kind != NK_TYPE_DECL():
+            continue
+        let name_sym = self.pool.get_data0(decl)
+        let name_str = self.intern.resolve(name_sym)
+        if name_sym == 0 or name_str.len() == 0:
+            continue
+        let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
+        if sub_kind == TDK_STRUCT():
+            if self.type_decl_tp_count(decl) > 0:
+                self.generic_structs.insert(name_sym, decl)
+            else:
                 self.predeclare_struct_type(name_sym)
-            else if sub_kind == TDK_ENUM():
-                self.predeclare_enum_type(name_sym)
+            continue
+        if sub_kind == TDK_ENUM():
+            self.predeclare_enum_type(name_sym)
 
     // Pass 0b: define struct/enum bodies and type aliases.
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
-        if kind == NK_TYPE_DECL():
-            let name_sym = self.pool.get_data0(decl)
-            let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
-            if sub_kind == TDK_STRUCT():
+        if kind != NK_TYPE_DECL():
+            continue
+        let name_sym = self.pool.get_data0(decl)
+        let name_str = self.intern.resolve(name_sym)
+        if name_sym == 0 or name_str.len() == 0:
+            continue
+        let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
+        if sub_kind == TDK_STRUCT():
+            if self.type_decl_tp_count(decl) == 0:
                 self.declare_struct_type(name_sym, decl)
-            else if sub_kind == TDK_ENUM():
-                self.declare_enum_type(name_sym, decl)
-            else if sub_kind == TDK_ALIAS():
-                let extra_start = self.pool.get_data1(decl)
-                let aliased_node = self.pool.get_extra(extra_start)
-                let resolved = self.resolve_type(aliased_node)
-                self.type_aliases.insert(name_sym, resolved)
+            continue
+        if sub_kind == TDK_ENUM():
+            self.declare_enum_type(name_sym, decl)
+            continue
+        if sub_kind == TDK_ALIAS():
+            let extra_start = self.pool.get_data1(decl)
+            let aliased_node = self.pool.get_extra(extra_start)
+            let resolved = self.resolve_type(aliased_node)
+            self.type_aliases.insert(name_sym, resolved)
 
     if self.had_error != 0:
         return 1
@@ -1552,18 +2219,26 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
             continue
         if kind != NK_FN_DECL():
             continue
+        let name_sym = self.pool.get_data0(decl)
+        if name_sym == 0:
+            continue
         let flags = self.pool.get_data2(decl)
         let meta = self.pool.find_fn_meta(decl)
         // Skip generic functions (store for monomorphization)
         if meta >= 0:
             let tp_count = self.pool.fn_meta_tp_count(meta)
             if tp_count > 0:
-                let name_sym = self.pool.get_data0(decl)
                 self.generic_fns.insert(name_sym, decl)
             else if (flags / FN_FLAG_ASYNC()) % 2 == 1:
                 self.declare_function(decl)
             else:
                 self.declare_function(decl)
+
+    // Pass 1.3: synthesize missing impl methods from trait defaults.
+    self.generate_default_trait_methods()
+
+    // Pass 1.25: synthesize trait vtables after all method declarations exist.
+    self.generate_trait_vtables()
 
     // Pass 1.5: detect drop functions
     self.detect_drop_functions()
@@ -1573,12 +2248,18 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
         if kind == NK_FN_DECL():
+            let name_sym = self.pool.get_data0(decl)
+            if name_sym == 0:
+                continue
             let flags = self.pool.get_data2(decl)
             let meta = self.pool.find_fn_meta(decl)
             if meta >= 0:
                 let tp_count = self.pool.fn_meta_tp_count(meta)
                 if tp_count == 0:
-                    self.gen_function(decl)
+                    self.gen_function_dispatch(decl)
+
+    if self.had_error != 0:
+        return 1
 
     // Wrap main for exit
     self.wrap_main_for_exit()
@@ -1591,11 +2272,559 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool, intern: InternPool) -> i32:
 fn Codegen.collect_trait_info(self: Codegen, trait_node: i32):
     let name_sym = self.pool.get_data0(trait_node)
     let extra_start = self.pool.get_data1(trait_node)
-    // Trait extra has method name syms (one per method, added by parser)
-    // We need to figure out method count. Walk the extra until we hit something invalid.
-    // Actually, trait methods were added to extra as just name syms.
-    // For now, store the trait decl node for later use.
+    if self.trait_map.get(name_sym).is_some():
+        return
+
+    var pos = extra_start
+    let assoc_count = self.pool.get_extra(pos)
+    pos = pos + 1
+    for ai in 0..assoc_count:
+        let _assoc_name = self.pool.get_extra(pos)
+        pos = pos + 1
+        let bound_count = self.pool.get_extra(pos)
+        pos = pos + 1 + bound_count
+        pos = pos + 1 // default type
+
+    let method_count = self.pool.get_extra(pos)
+    pos = pos + 1
+
+    let method_start = self.trait_method_names.len() as i32
+    let ptr_ty = wl_ptr_type(self.context)
+    let vtable_fields: Vec[i64] = Vec.new()
+
+    for mi in 0..method_count:
+        let method_sym = self.pool.get_extra(pos)
+        pos = pos + 1
+        let _method_flags = self.pool.get_extra(pos)
+        pos = pos + 1
+        let method_param_start = self.pool.get_extra(pos)
+        pos = pos + 1
+        let method_param_count = self.pool.get_extra(pos)
+        pos = pos + 1
+        let method_ret_node = self.pool.get_extra(pos)
+        pos = pos + 1
+        let method_default_body = self.pool.get_extra(pos)
+        pos = pos + 1
+
+        self.trait_method_names.push(method_sym)
+        self.trait_method_param_starts.push(method_param_start)
+        if method_ret_node != 0:
+            var trait_ret_ty = self.resolve_type(method_ret_node)
+            if trait_ret_ty == 0:
+                trait_ret_ty = wl_i32_type(self.context)
+            self.trait_method_ret_types.push(trait_ret_ty)
+        else:
+            self.trait_method_ret_types.push(wl_void_type(self.context))
+        self.trait_method_ret_nodes.push(method_ret_node)
+        self.trait_method_param_counts.push(method_param_count)
+        self.trait_method_default_bodies.push(method_default_body)
+        vtable_fields.push(ptr_ty)
+
+    let vtable_ty = wl_struct_type(self.context, vec_data_i64(vtable_fields), method_count, 0)
+    let trait_idx = self.trait_vtable_types.len() as i32
+    self.trait_vtable_types.push(vtable_ty)
+    self.trait_method_starts.push(method_start)
+    self.trait_method_counts.push(method_count)
+    self.trait_map.insert(name_sym, trait_idx)
     self.trait_decl_nodes.insert(name_sym, trait_node)
+
+fn Codegen.find_trait_method_offset(self: Codegen, trait_idx: i32, method_sym: i32) -> i32:
+    let start = self.trait_method_starts.get(trait_idx as i64)
+    let count = self.trait_method_counts.get(trait_idx as i64)
+    for i in 0..count:
+        if self.trait_method_names.get((start + i) as i64) == method_sym:
+            return i
+    0 - 1
+
+fn Codegen.find_decl_index(self: Codegen, node: i32) -> i32:
+    for i in 0..self.pool.decl_count():
+        if self.pool.get_decl(i) == node:
+            return i
+    0 - 1
+
+fn Codegen.lookup_impl_method_symbol_by_slot(self: Codegen, impl_node: i32, slot: i32) -> i32:
+    if slot < 0:
+        return 0
+    let impl_extra = self.pool.get_data1(impl_node)
+    if impl_extra < 0 or impl_extra >= self.pool.extra_len():
+        return 0
+    let method_count = self.pool.get_extra(impl_extra)
+    if method_count <= 0 or slot >= method_count:
+        return 0
+    let decl_idx = self.find_decl_index(impl_node)
+    if decl_idx <= 0:
+        return 0
+    let rev_syms: Vec[i32] = Vec.new()
+    var di = decl_idx - 1
+    while di >= 0 and rev_syms.len() as i32 < method_count:
+        let decl = self.pool.get_decl(di)
+        if self.pool.kind(decl) == NK_FN_DECL():
+            rev_syms.push(self.pool.get_data0(decl))
+        di = di - 1
+    if rev_syms.len() as i32 != method_count:
+        return 0
+    let rev_idx = method_count - 1 - slot
+    if rev_idx < 0 or rev_idx >= rev_syms.len() as i32:
+        return 0
+    rev_syms.get(rev_idx as i64)
+
+fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, method_sym: i32, method_fn: i64, method_ft: i64) -> i64:
+    let type_name = self.intern.resolve(impl_type_sym)
+    let method_name = self.intern.resolve(method_sym)
+    let wrapper_name = "__dynwrap_" ++ type_name ++ "_" ++ method_name
+    let existing = wl_get_named_function(self.llmod, wrapper_name)
+    if existing != 0:
+        return existing
+
+    let ptr_ty = wl_ptr_type(self.context)
+    let orig_param_count = wl_count_param_types(method_ft)
+    if orig_param_count <= 0:
+        return method_fn
+    let wrapper_param_types: Vec[i64] = Vec.new()
+    wrapper_param_types.push(ptr_ty)
+    var pi = 1
+    while pi < orig_param_count:
+        let pval = wl_get_param(method_fn, pi)
+        wrapper_param_types.push(wl_type_of(pval))
+        pi = pi + 1
+    let ret_ty = wl_get_return_type(method_ft)
+    let wrapper_ft = wl_function_type(ret_ty, vec_data_i64(wrapper_param_types), orig_param_count, 0)
+    let wrapper_fn = wl_add_function(self.llmod, wrapper_name, wrapper_ft)
+    wl_set_linkage(wrapper_fn, wl_internal_linkage())
+
+    let saved_fn = self.current_function
+    let saved_ret = self.current_ret_type
+    let saved_bb = wl_get_insert_block(self.builder)
+    self.current_function = wrapper_fn
+    self.current_ret_type = ret_ty
+
+    let entry = wl_append_bb(self.context, wrapper_fn, "entry")
+    wl_position_at_end(self.builder, entry)
+
+    let data_ptr = wl_get_param(wrapper_fn, 0)
+    let self_param_ty = if orig_param_count > 0: wl_type_of(wl_get_param(method_fn, 0)) else: ptr_ty
+    let self_arg = if wl_get_type_kind(self_param_ty) == wl_pointer_type_kind():
+        wl_build_bitcast(self.builder, data_ptr, self_param_ty)
+    else:
+        wl_build_load(self.builder, self_param_ty, data_ptr)
+
+    let call_args: Vec[i64] = Vec.new()
+    call_args.push(self_arg)
+    pi = 1
+    while pi < orig_param_count:
+        let p = wl_get_param(wrapper_fn, pi)
+        let target_ty = wl_type_of(wl_get_param(method_fn, pi))
+        call_args.push(self.coerce_value_to_type(p, target_ty))
+        pi = pi + 1
+
+    let call_val = wl_build_call(self.builder, method_ft, method_fn, vec_data_i64(call_args), orig_param_count)
+    if ret_ty == wl_void_type(self.context):
+        wl_build_ret_void(self.builder)
+    else:
+        wl_build_ret(self.builder, call_val)
+
+    self.current_function = saved_fn
+    self.current_ret_type = saved_ret
+    if saved_bb != 0:
+        wl_position_at_end(self.builder, saved_bb)
+
+    wrapper_fn
+
+fn Codegen.resolve_trait_method_type_for_impl(self: Codegen, type_node: i32, impl_type_sym: i32) -> i64:
+    if type_node == 0:
+        return 0
+    var concrete_ty = 0
+    let st = self.struct_type_map.get(impl_type_sym)
+    if st.is_some():
+        concrete_ty = self.struct_llvm_types.get(st.unwrap() as i64)
+    else:
+        let et = self.enum_type_map.get(impl_type_sym)
+        if et.is_some():
+            concrete_ty = self.enum_llvm_types.get(et.unwrap() as i64)
+    if concrete_ty == 0:
+        return self.resolve_type(type_node)
+
+    let saved_syms = self.type_binding_syms
+    let saved_tys = self.type_binding_types
+    let saved_len = self.type_bindings_len
+    let fresh_syms: Vec[i32] = Vec.new()
+    let fresh_tys: Vec[i64] = Vec.new()
+    self.type_binding_syms = fresh_syms
+    self.type_binding_types = fresh_tys
+    self.type_bindings_len = 0
+    let self_sym = self.intern.intern("Self")
+    var found_self = false
+    for i in 0..saved_len:
+        let sym = saved_syms.get(i as i64)
+        var ty = saved_tys.get(i as i64)
+        if sym == self_sym:
+            ty = concrete_ty
+            found_self = true
+        self.type_binding_syms.push(sym)
+        self.type_binding_types.push(ty)
+        self.type_bindings_len = self.type_bindings_len + 1
+    if not found_self:
+        self.type_binding_syms.push(self_sym)
+        self.type_binding_types.push(concrete_ty)
+        self.type_bindings_len = self.type_bindings_len + 1
+
+    let resolved = self.resolve_type(type_node)
+    self.type_binding_syms = saved_syms
+    self.type_binding_types = saved_tys
+    self.type_bindings_len = saved_len
+    resolved
+
+fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: i32, method_idx: i32):
+    let body_node = self.trait_method_default_bodies.get(method_idx as i64)
+    if body_node == 0:
+        return
+
+    let method_sym = self.trait_method_names.get(method_idx as i64)
+    let method_name = self.intern.resolve(method_sym)
+    let type_name = self.intern.resolve(impl_type_sym)
+    let mangled = type_name ++ "." ++ method_name
+    let fn_sym = self.intern.intern(mangled)
+    if self.fn_values.get(fn_sym).is_some():
+        return
+
+    let param_start = self.trait_method_param_starts.get(method_idx as i64)
+    let param_count = self.trait_method_param_counts.get(method_idx as i64)
+    let ret_node = self.trait_method_ret_nodes.get(method_idx as i64)
+    if param_start < 0:
+        return
+    if param_count < 0 or param_count > 64:
+        return
+
+    let param_types: Vec[i64] = Vec.new()
+    var has_ref_param = false
+    for pi in 0..param_count:
+        let type_slot = param_start + pi * 2 + 1
+        if type_slot < 0 or type_slot >= self.pool.extra_len():
+            return
+        let p_type_node = self.pool.get_extra(type_slot)
+        if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NK_TYPE_NAMED():
+            let p_sym = self.pool.get_data0(p_type_node)
+            if p_sym == impl_type_sym or self.intern.resolve(p_sym) == "Self":
+                let p_ty = wl_ptr_type(self.context)
+                has_ref_param = true
+                param_types.push(p_ty)
+                continue
+        var p_ty = self.resolve_trait_method_type_for_impl(p_type_node, impl_type_sym)
+        if p_ty == 0:
+            p_ty = wl_i32_type(self.context)
+        param_types.push(p_ty)
+
+    let ret_ty = if ret_node != 0:
+        self.resolve_trait_method_type_for_impl(ret_node, impl_type_sym)
+    else:
+        wl_void_type(self.context)
+    let final_ret_ty = if ret_ty != 0: ret_ty else: wl_void_type(self.context)
+    let fn_ty = wl_function_type(final_ret_ty, vec_data_i64(param_types), param_count, 0)
+    if fn_ty == 0 or wl_get_type_kind(fn_ty) != wl_function_type_kind():
+        return
+    let function = wl_add_function(self.llmod, mangled, fn_ty)
+    if function == 0 or wl_get_value_kind(function) != wl_function_value_kind():
+        return
+    self.fn_values.insert(fn_sym, function)
+    self.fn_fn_types.insert(fn_sym, fn_ty)
+    if has_ref_param:
+        self.record_ref_param(fn_sym, 0, param_count)
+
+    let saved_fn = self.current_function
+    let saved_ret = self.current_ret_type
+    let saved_owner = self.current_method_owner_sym
+    let saved_allocas = self.local_allocas
+    let saved_types = self.local_types
+    let saved_muts = self.local_muts
+    let saved_fn_sigs = self.local_fn_sigs
+    let saved_pointees = self.local_pointee_structs
+    let saved_task_locals = self.task_locals
+    let saved_trait_locals = self.trait_locals
+    let saved_trait_concrete = self.trait_local_concrete_types
+    let saved_scope_syms = self.scope_local_syms
+    let saved_scope_allocas = self.scope_local_allocas
+    let saved_scope_types = self.scope_local_types
+    let saved_scope_count = self.scope_local_count
+    let saved_defer = self.defer_stack
+    let saved_expected = self.expected_type
+    let saved_result_err = self.current_result_err_symbol
+    let saved_returns_result = self.current_fn_returns_result
+    let saved_saw_return = self.current_fn_saw_explicit_return
+    let saved_tail_bb = self.tailrec_body_bb
+    let saved_tail_sym = self.tailrec_fn_sym
+    let saved_tail_allocas = self.tailrec_param_allocas
+    let saved_bb = wl_get_insert_block(self.builder)
+
+    self.current_function = function
+    self.current_ret_type = final_ret_ty
+    self.current_method_owner_sym = impl_type_sym
+    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
+    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_pointees: HashMap[i32, i32] = HashMap.new()
+    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_concrete: HashMap[i32, i32] = HashMap.new()
+    let fresh_scope_syms: Vec[i32] = Vec.new()
+    let fresh_scope_allocas: Vec[i64] = Vec.new()
+    let fresh_scope_types: Vec[i64] = Vec.new()
+    let fresh_defer_stack: Vec[i32] = Vec.new()
+    let fresh_tail_allocas: Vec[i64] = Vec.new()
+    self.local_allocas = fresh_local_allocas
+    self.local_types = fresh_local_types
+    self.local_muts = fresh_local_muts
+    self.local_fn_sigs = fresh_local_fn_sigs
+    self.local_pointee_structs = fresh_local_pointees
+    self.task_locals = fresh_task_locals
+    self.trait_locals = fresh_trait_locals
+    self.trait_local_concrete_types = fresh_trait_concrete
+    self.scope_local_syms = fresh_scope_syms
+    self.scope_local_allocas = fresh_scope_allocas
+    self.scope_local_types = fresh_scope_types
+    self.scope_local_count = 0
+    self.defer_stack = fresh_defer_stack
+    self.expected_type = final_ret_ty
+    self.current_result_err_symbol = 0
+    self.current_fn_returns_result = false
+    self.current_fn_saw_explicit_return = false
+    self.tailrec_body_bb = 0
+    self.tailrec_fn_sym = 0
+    self.tailrec_param_allocas = fresh_tail_allocas
+
+    let entry = wl_append_bb(self.context, function, "entry")
+    wl_position_at_end(self.builder, entry)
+    var lowered_param_count = param_count
+    let actual_param_count = wl_count_params(function)
+    if actual_param_count >= 0 and actual_param_count < lowered_param_count:
+        lowered_param_count = actual_param_count
+    if lowered_param_count < 0:
+        lowered_param_count = 0
+    var pi = 0
+    while pi < lowered_param_count:
+        let name_slot = param_start + pi * 2
+        let type_slot = param_start + pi * 2 + 1
+        if name_slot < 0 or type_slot < 0 or type_slot >= self.pool.extra_len():
+            break
+        let p_name = self.pool.get_extra(name_slot)
+        let p_type_node = self.pool.get_extra(type_slot)
+        let p_val = wl_get_param(function, pi)
+        let p_ty = wl_type_of(p_val)
+        let p_alloca = wl_build_alloca(self.builder, p_ty)
+        wl_build_store(self.builder, p_val, p_alloca)
+        self.local_allocas.insert(p_name, p_alloca)
+        self.local_types.insert(p_name, p_ty)
+        self.local_muts.insert(p_name, 1)
+        if pi == 0 and wl_get_type_kind(p_ty) == wl_pointer_type_kind():
+            self.local_pointee_structs.insert(p_name, impl_type_sym)
+        if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NK_TYPE_NAMED():
+            let psym = self.pool.get_data0(p_type_node)
+            if self.intern.resolve(psym) == "Self" and wl_get_type_kind(p_ty) == wl_pointer_type_kind():
+                self.local_pointee_structs.insert(p_name, impl_type_sym)
+        pi = pi + 1
+
+    let body_val = self.gen_expr(body_node)
+    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
+        if final_ret_ty == wl_void_type(self.context):
+            wl_build_ret_void(self.builder)
+        else:
+            wl_build_ret(self.builder, self.coerce_value_to_type(body_val, final_ret_ty))
+
+    self.current_function = saved_fn
+    self.current_ret_type = saved_ret
+    self.current_method_owner_sym = saved_owner
+    self.local_allocas = saved_allocas
+    self.local_types = saved_types
+    self.local_muts = saved_muts
+    self.local_fn_sigs = saved_fn_sigs
+    self.local_pointee_structs = saved_pointees
+    self.task_locals = saved_task_locals
+    self.trait_locals = saved_trait_locals
+    self.trait_local_concrete_types = saved_trait_concrete
+    self.scope_local_syms = saved_scope_syms
+    self.scope_local_allocas = saved_scope_allocas
+    self.scope_local_types = saved_scope_types
+    self.scope_local_count = saved_scope_count
+    self.defer_stack = saved_defer
+    self.expected_type = saved_expected
+    self.current_result_err_symbol = saved_result_err
+    self.current_fn_returns_result = saved_returns_result
+    self.current_fn_saw_explicit_return = saved_saw_return
+    self.tailrec_body_bb = saved_tail_bb
+    self.tailrec_fn_sym = saved_tail_sym
+    self.tailrec_param_allocas = saved_tail_allocas
+    if saved_bb != 0:
+        wl_position_at_end(self.builder, saved_bb)
+
+fn Codegen.generate_default_trait_methods_for_impl(self: Codegen, impl_node: i32):
+    let impl_type_sym = self.pool.get_data0(impl_node)
+    let trait_sym = self.pool.get_data2(impl_node)
+    if trait_sym == 0:
+        return
+    let trait_idx_opt = self.trait_map.get(trait_sym)
+    if not trait_idx_opt.is_some():
+        return
+    let trait_idx = trait_idx_opt.unwrap()
+    let method_start = self.trait_method_starts.get(trait_idx as i64)
+    let method_count = self.trait_method_counts.get(trait_idx as i64)
+    for mi in 0..method_count:
+        self.generate_default_trait_method_for_impl(impl_type_sym, method_start + mi)
+
+fn Codegen.generate_default_trait_methods(self: Codegen):
+    for i in 0..self.pool.decl_count():
+        let decl = self.pool.get_decl(i)
+        if self.pool.kind(decl) == NK_IMPL_DECL():
+            self.generate_default_trait_methods_for_impl(decl)
+
+fn Codegen.generate_trait_vtable_for_impl(self: Codegen, impl_node: i32):
+    let impl_type_sym = self.pool.get_data0(impl_node)
+    let trait_sym = self.pool.get_data2(impl_node)
+    if trait_sym == 0:
+        return
+
+    let trait_idx_opt = self.trait_map.get(trait_sym)
+    if not trait_idx_opt.is_some():
+        return
+    let trait_idx = trait_idx_opt.unwrap()
+    let method_start = self.trait_method_starts.get(trait_idx as i64)
+    let method_count = self.trait_method_counts.get(trait_idx as i64)
+    let vtable_ty = self.trait_vtable_types.get(trait_idx as i64)
+
+    let entries: Vec[i64] = Vec.new()
+    for mi in 0..method_count:
+        let method_sym = self.trait_method_names.get((method_start + mi) as i64)
+        let method_name = self.intern.resolve(method_sym)
+        let type_name = self.intern.resolve(impl_type_sym)
+        let mangled = type_name ++ "." ++ method_name
+        var impl_fn_sym = self.intern.intern(mangled)
+        var fv = self.fn_values.get(impl_fn_sym)
+        var ft = self.fn_fn_types.get(impl_fn_sym)
+        if not fv.is_some() or not ft.is_some():
+            let slot_sym = self.lookup_impl_method_symbol_by_slot(impl_node, mi)
+            if slot_sym != 0:
+                impl_fn_sym = slot_sym
+                fv = self.fn_values.get(impl_fn_sym)
+                ft = self.fn_fn_types.get(impl_fn_sym)
+        if fv.is_some() and ft.is_some():
+            let wrapper = self.create_dyn_wrapper(impl_type_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64)
+            entries.push(wrapper)
+        else:
+            entries.push(wl_const_null(wl_ptr_type(self.context)))
+
+    let key = self.hash_type_trait_key(impl_type_sym, trait_sym)
+    if self.vtable_globals.get(key).is_some():
+        return
+
+    let trait_name = self.intern.resolve(trait_sym)
+    let type_name = self.intern.resolve(impl_type_sym)
+    let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_name
+    let vg = wl_add_global(self.llmod, vtable_ty, global_name)
+    let vconst = wl_const_named_struct(vtable_ty, vec_data_i64(entries), method_count)
+    wl_set_initializer(vg, vconst)
+    wl_set_global_constant(vg, 1)
+    wl_set_linkage(vg, wl_internal_linkage())
+    self.vtable_globals.insert(key, vg)
+
+fn Codegen.generate_trait_vtables(self: Codegen):
+    for i in 0..self.pool.decl_count():
+        let decl = self.pool.get_decl(i)
+        if self.pool.kind(decl) == NK_IMPL_DECL():
+            self.generate_trait_vtable_for_impl(decl)
+
+fn Codegen.gen_known_concrete_dispatch(self: Codegen, fat_ptr: i64, concrete_sym: i32, method_sym: i32, args_start: i32, arg_count: i32) -> i64:
+    let type_name = self.intern.resolve(concrete_sym)
+    let method_name = self.intern.resolve(method_sym)
+    let mangled = type_name ++ "." ++ method_name
+    let fn_sym = self.intern.intern(mangled)
+    let fv = self.fn_values.get(fn_sym)
+    let ft = self.fn_fn_types.get(fn_sym)
+    if not fv.is_some() or not ft.is_some():
+        return 0
+
+    let fn_val = fv.unwrap() as i64
+    if wl_count_params(fn_val) <= 0:
+        return 0
+
+    let data_ptr = wl_build_extract_value(self.builder, fat_ptr, 0)
+    let self_param_ty = wl_type_of(wl_get_param(fn_val, 0))
+    let self_arg = if wl_get_type_kind(self_param_ty) == wl_pointer_type_kind():
+        wl_build_bitcast(self.builder, data_ptr, self_param_ty)
+    else:
+        wl_build_load(self.builder, self_param_ty, data_ptr)
+
+    let call_args: Vec[i64] = Vec.new()
+    call_args.push(self_arg)
+    for ai in 0..arg_count:
+        let arg_node = self.pool.get_extra(args_start + ai)
+        call_args.push(self.gen_expr(arg_node))
+
+    let coerced = self.coerce_call_args_for_fn_value(fn_sym, fn_val, 0 - 1, call_args, arg_count + 1)
+    wl_build_call(self.builder, ft.unwrap() as i64, fn_val, vec_data_i64(coerced), arg_count + 1)
+
+fn Codegen.gen_dyn_dispatch(self: Codegen, fat_ptr: i64, trait_sym: i32, method_sym: i32, args_start: i32, arg_count: i32) -> i64:
+    let trait_idx_opt = self.trait_map.get(trait_sym)
+    if not trait_idx_opt.is_some():
+        return wl_get_undef(wl_i32_type(self.context))
+    let trait_idx = trait_idx_opt.unwrap()
+    let method_offset = self.find_trait_method_offset(trait_idx, method_sym)
+    if method_offset < 0:
+        return wl_get_undef(wl_i32_type(self.context))
+
+    let method_start = self.trait_method_starts.get(trait_idx as i64)
+    var method_ret_ty = self.trait_method_ret_types.get((method_start + method_offset) as i64)
+    if method_ret_ty == 0:
+        method_ret_ty = wl_i32_type(self.context)
+    let vtable_ty = self.trait_vtable_types.get(trait_idx as i64)
+    let data_ptr = wl_build_extract_value(self.builder, fat_ptr, 0)
+    let vtable_ptr = wl_build_extract_value(self.builder, fat_ptr, 1)
+    let fn_gep = wl_build_struct_gep(self.builder, vtable_ty, vtable_ptr, method_offset)
+    let fn_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), fn_gep)
+
+    let call_args: Vec[i64] = Vec.new()
+    call_args.push(data_ptr)
+    for ai in 0..arg_count:
+        let arg_node = self.pool.get_extra(args_start + ai)
+        call_args.push(self.gen_expr(arg_node))
+
+    let fn_param_types: Vec[i64] = Vec.new()
+    fn_param_types.push(wl_ptr_type(self.context))
+    for ai in 0..arg_count:
+        var arg_ty = wl_type_of(call_args.get((ai + 1) as i64))
+        if arg_ty == 0:
+            arg_ty = wl_i32_type(self.context)
+        fn_param_types.push(arg_ty)
+    let call_ft = wl_function_type(method_ret_ty, vec_data_i64(fn_param_types), arg_count + 1, 0)
+    let is_null = wl_build_icmp(self.builder, wl_int_eq(), fn_ptr, wl_const_null(wl_ptr_type(self.context)))
+    let call_bb = wl_append_bb(self.context, self.current_function, "dyn.call")
+    let miss_bb = wl_append_bb(self.context, self.current_function, "dyn.missing")
+    let merge_bb = wl_append_bb(self.context, self.current_function, "dyn.merge")
+    wl_build_cond_br(self.builder, is_null, miss_bb, call_bb)
+
+    wl_position_at_end(self.builder, call_bb)
+    let call_val = wl_build_call(self.builder, call_ft, fn_ptr, vec_data_i64(call_args), arg_count + 1)
+    if wl_get_bb_terminator(call_bb) == 0:
+        wl_build_br(self.builder, merge_bb)
+    let call_end = wl_get_insert_block(self.builder)
+
+    wl_position_at_end(self.builder, miss_bb)
+    let miss_val = self.build_default_value(method_ret_ty)
+    if wl_get_bb_terminator(miss_bb) == 0:
+        wl_build_br(self.builder, merge_bb)
+    let miss_end = wl_get_insert_block(self.builder)
+
+    wl_position_at_end(self.builder, merge_bb)
+    if method_ret_ty == wl_void_type(self.context):
+        return wl_get_undef(wl_void_type(self.context))
+
+    let phi = wl_build_phi(self.builder, method_ret_ty)
+    let vals: Vec[i64] = Vec.new()
+    let bbs: Vec[i64] = Vec.new()
+    vals.push(call_val)
+    vals.push(miss_val)
+    bbs.push(call_end)
+    bbs.push(miss_end)
+    wl_add_incoming(phi, vec_data_i64(vals), vec_data_i64(bbs), 2)
+    phi
 
 // ── Generate module constant ──────────────────────────────────────
 
@@ -1636,10 +2865,809 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
         wl_build_call(self.builder, main_ft, main_fn, 0, 0)
         wl_build_ret(self.builder, wl_const_int(i32_ty, 0, 0))
 
+// ── gen_function_dispatch: MIR-first with conservative fallback ──
+
+fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
+    if self.mir_input_enabled != 0:
+        let fn_sym = self.pool.get_data0(fn_node)
+        let body_idx = self.mir_input.find_body(fn_sym)
+        if body_idx >= 0 and body_idx < self.mir_input.bodies.len() as i32:
+            let body = self.mir_input.bodies.get(body_idx as i64)
+            if self.mir_function_is_supported(body):
+                self.gen_function_mir(fn_node, body)
+                return
+    self.gen_function(fn_node)
+
+fn Codegen.mir_place_is_supported(self: Codegen, body: MirBody, place_id: i32) -> bool:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return false
+    let p_count = body.place_proj_counts.get(place_id as i64)
+    // Keep MIR lowering conservative until full typed place metadata is wired.
+    p_count == 0
+
+fn Codegen.mir_operand_is_supported(self: Codegen, body: MirBody, operand_id: i32, for_call_callee: bool) -> bool:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return false
+    let ok = body.operand_kinds.get(operand_id as i64)
+    let od = body.operand_d0.get(operand_id as i64)
+    if ok == OK_COPY() or ok == OK_MOVE():
+        return self.mir_place_is_supported(body, od)
+    if ok == OK_CONSTANT():
+        if od < 0 or od >= body.const_kinds.len() as i32:
+            return false
+        let ck = body.const_kinds.get(od as i64)
+        if for_call_callee:
+            // Current MIR lowering sometimes uses unit as a placeholder callee.
+            if ck == CK_UNIT():
+                return false
+            return false
+        return ck == CK_INT() or ck == CK_BOOL() or ck == CK_STR() or ck == CK_UNIT() or ck == CK_FLOAT() or ck == CK_ZERO_SIZED()
+    false
+
+fn Codegen.mir_function_is_supported(self: Codegen, body: MirBody) -> bool:
+    if body.block_count() <= 0:
+        return false
+
+    for si in 0..body.stmt_kinds.len() as i32:
+        let sk = body.stmt_kinds.get(si as i64)
+        let d0 = body.stmt_d0.get(si as i64)
+        let d1 = body.stmt_d1.get(si as i64)
+        if sk == SK_ASSIGN():
+            if not self.mir_place_is_supported(body, d0):
+                return false
+            if d1 < 0 or d1 >= body.rval_kinds.len() as i32:
+                return false
+            let rk = body.rval_kinds.get(d1 as i64)
+            if rk == RK_USE():
+                if not self.mir_operand_is_supported(body, body.rval_d0.get(d1 as i64), false):
+                    return false
+                continue
+            if rk == RK_BIN_OP():
+                if not self.mir_operand_is_supported(body, body.rval_d1.get(d1 as i64), false):
+                    return false
+                if not self.mir_operand_is_supported(body, body.rval_d2.get(d1 as i64), false):
+                    return false
+                continue
+            if rk == RK_UN_OP():
+                if not self.mir_operand_is_supported(body, body.rval_d1.get(d1 as i64), false):
+                    return false
+                continue
+            if rk == RK_REF() or rk == RK_ADDR_OF() or rk == RK_DISCRIMINANT() or rk == RK_LEN():
+                var place = body.rval_d1.get(d1 as i64)
+                if rk != RK_REF():
+                    place = body.rval_d0.get(d1 as i64)
+                if not self.mir_place_is_supported(body, place):
+                    return false
+                continue
+            if rk == RK_CAST():
+                if not self.mir_operand_is_supported(body, body.rval_d0.get(d1 as i64), false):
+                    return false
+                continue
+            // Aggregate/downcast-sensitive forms still fall back to AST.
+            return false
+        if sk == SK_STORAGE_LIVE() or sk == SK_STORAGE_DEAD():
+            continue
+        if sk == SK_DROP():
+            if not self.mir_place_is_supported(body, d0):
+                return false
+            continue
+        if sk == SK_NOP():
+            continue
+        return false
+
+    for bb in 0..body.bb_term_kinds.len() as i32:
+        let tk = body.bb_term_kinds.get(bb as i64)
+        let d0 = body.bb_term_d0.get(bb as i64)
+        let d2 = body.bb_term_d2.get(bb as i64)
+        if tk == TK_GOTO() or tk == TK_RETURN() or tk == TK_UNREACHABLE():
+            continue
+        if tk == TK_SWITCH_INT():
+            if not self.mir_operand_is_supported(body, d0, false):
+                return false
+            continue
+        if tk == TK_CALL():
+            if not self.mir_operand_is_supported(body, d0, true):
+                return false
+            if not self.mir_place_is_supported(body, d2):
+                return false
+            continue
+        if tk == TK_DROP_AND_GOTO():
+            if not self.mir_place_is_supported(body, d0):
+                return false
+            continue
+        return false
+
+    true
+
+fn Codegen.mir_get_or_create_local_ptr(self: Codegen, local_id: i32, ty: i64) -> i64:
+    let existing = self.mir_local_ptrs.get(local_id)
+    if existing.is_some():
+        return existing.unwrap() as i64
+    let alloc_ty = if ty != 0: ty else: wl_i32_type(self.context)
+    let ptr = self.create_entry_alloca(alloc_ty)
+    self.mir_local_ptrs.insert(local_id, ptr)
+    ptr
+
+fn Codegen.mir_pointee_type(self: Codegen, ptr: i64) -> i64:
+    if ptr == 0:
+        return 0
+    let ptr_ty = wl_type_of(ptr)
+    if wl_get_type_kind(ptr_ty) != wl_pointer_type_kind():
+        return 0
+    wl_get_element_type(ptr_ty)
+
+fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32) -> i32:
+    if wl_get_type_kind(agg_ty) != wl_struct_type_kind():
+        return 0 - 1
+    let elem_count = wl_count_struct_elem_types(agg_ty)
+    if field_token >= 0 and field_token < elem_count:
+        return field_token
+
+    let st_sym = self.find_struct_type_by_llvm(agg_ty)
+    if st_sym != 0:
+        let fi = self.find_field_index(st_sym, field_token)
+        if fi >= 0 and fi < elem_count:
+            return fi
+
+    let field_name = self.intern.resolve(field_token)
+    if field_name.len() == 1:
+        let ch = field_name.byte_at(0)
+        if ch >= 48 and ch <= 57:
+            let idx = (ch - 48) as i32
+            if idx >= 0 and idx < elem_count:
+                return idx
+
+    0 - 1
+
+fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_base: bool, create_type: i64) -> i64:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return 0
+
+    let base_local = body.place_locals.get(place_id as i64)
+    let p_count = body.place_proj_counts.get(place_id as i64)
+    if p_count != 0:
+        return 0
+    let base_opt = self.mir_local_ptrs.get(base_local)
+    var cur_ptr = if base_opt.is_some(): base_opt.unwrap() as i64 else: 0
+    if cur_ptr == 0:
+        if create_base:
+            cur_ptr = self.mir_get_or_create_local_ptr(base_local, create_type)
+            let alloc_ty = if create_type != 0: create_type else: wl_i32_type(self.context)
+            self.mir_local_types.insert(base_local, alloc_ty)
+        else:
+            return 0
+
+    cur_ptr
+
+fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected_ty: i64) -> i64:
+    let fallback_ty = if expected_ty != 0: expected_ty else: wl_i32_type(self.context)
+    if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+        return wl_get_undef(fallback_ty)
+
+    let ck = body.const_kinds.get(const_id as i64)
+    let cd = body.const_d0.get(const_id as i64)
+
+    if ck == CK_INT():
+        var int_ty = expected_ty
+        if int_ty == 0 or wl_get_type_kind(int_ty) != wl_integer_type_kind():
+            int_ty = wl_i32_type(self.context)
+        return wl_const_int(int_ty, cd as i64, 1)
+
+    if ck == CK_BOOL():
+        return wl_const_int(wl_i1_type(self.context), cd as i64, 0)
+
+    if ck == CK_STR():
+        let text = if cd != 0: self.decode_string_escapes(self.intern.resolve(cd)) else: ""
+        return self.gen_string_literal_raw(text)
+
+    if ck == CK_UNIT():
+        if expected_ty != 0 and expected_ty != wl_void_type(self.context):
+            return self.build_default_value(expected_ty)
+        return wl_const_int(wl_i32_type(self.context), 0, 0)
+
+    if ck == CK_FLOAT():
+        var float_ty = expected_ty
+        if float_ty == 0:
+            float_ty = wl_f64_type(self.context)
+        let fk = wl_get_type_kind(float_ty)
+        if fk != wl_float_type_kind() and fk != wl_double_type_kind():
+            float_ty = wl_f64_type(self.context)
+        return wl_const_real(float_ty, 0.0)
+
+    if ck == CK_ZERO_SIZED():
+        if expected_ty != 0:
+            return self.build_default_value(expected_ty)
+        return wl_const_int(wl_i32_type(self.context), 0, 0)
+
+    wl_get_undef(fallback_ty)
+
+fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expected_ty: i64) -> i64:
+    let fallback_ty = if expected_ty != 0: expected_ty else: wl_i32_type(self.context)
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return wl_get_undef(fallback_ty)
+
+    let ok = body.operand_kinds.get(operand_id as i64)
+    let od = body.operand_d0.get(operand_id as i64)
+    if ok == OK_COPY() or ok == OK_MOVE():
+        let ptr = self.mir_place_ptr(body, od, false, 0)
+        if ptr == 0:
+            return wl_get_undef(fallback_ty)
+        if od < 0 or od >= body.place_locals.len() as i32:
+            return wl_get_undef(fallback_ty)
+        let local_id = body.place_locals.get(od as i64)
+        let ptr_ty_opt = self.mir_local_types.get(local_id)
+        if not ptr_ty_opt.is_some():
+            return wl_get_undef(fallback_ty)
+        let ptr_ty = ptr_ty_opt.unwrap() as i64
+        let loaded = wl_build_load(self.builder, ptr_ty, ptr)
+        if expected_ty != 0:
+            return self.coerce_value_to_type(loaded, expected_ty)
+        return loaded
+
+    if ok == OK_CONSTANT():
+        return self.mir_const_value(body, od, expected_ty)
+
+    wl_get_undef(fallback_ty)
+
+fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64) -> i64:
+    let lk = wl_get_type_kind(wl_type_of(lhs))
+    let rk = wl_get_type_kind(wl_type_of(rhs))
+    let is_float = lk == wl_float_type_kind() or lk == wl_double_type_kind() or rk == wl_float_type_kind() or rk == wl_double_type_kind()
+    if is_float:
+        if op == OP_ADD() or op == OP_ADD_WRAP(): return wl_build_fadd(self.builder, lhs, rhs)
+        if op == OP_SUB() or op == OP_SUB_WRAP(): return wl_build_fsub(self.builder, lhs, rhs)
+        if op == OP_MUL() or op == OP_MUL_WRAP(): return wl_build_fmul(self.builder, lhs, rhs)
+        if op == OP_DIV(): return wl_build_fdiv(self.builder, lhs, rhs)
+        if op == OP_MOD(): return wl_build_frem(self.builder, lhs, rhs)
+        if op == OP_EQ(): return wl_build_fcmp(self.builder, wl_real_oeq(), lhs, rhs)
+        if op == OP_NEQ(): return wl_build_fcmp(self.builder, wl_real_one(), lhs, rhs)
+        if op == OP_LT(): return wl_build_fcmp(self.builder, wl_real_olt(), lhs, rhs)
+        if op == OP_GT(): return wl_build_fcmp(self.builder, wl_real_ogt(), lhs, rhs)
+        if op == OP_LTE(): return wl_build_fcmp(self.builder, wl_real_ole(), lhs, rhs)
+        if op == OP_GTE(): return wl_build_fcmp(self.builder, wl_real_oge(), lhs, rhs)
+        return wl_get_undef(wl_i32_type(self.context))
+
+    if op == OP_EQ() or op == OP_NEQ():
+        let lhs_ty = wl_type_of(lhs)
+        let rhs_ty = wl_type_of(rhs)
+        if lhs_ty == rhs_ty:
+            let cmp_kind = wl_get_type_kind(lhs_ty)
+            if cmp_kind == wl_struct_type_kind() or cmp_kind == wl_array_type_kind():
+                return self.compare_aggregate_eq(lhs, rhs, op)
+
+    let l = self.coerce_int(lhs, wl_type_of(rhs))
+    let r = self.coerce_int(rhs, wl_type_of(l))
+    if op == OP_ADD() or op == OP_ADD_WRAP(): return wl_build_add(self.builder, l, r)
+    if op == OP_SUB() or op == OP_SUB_WRAP(): return wl_build_sub(self.builder, l, r)
+    if op == OP_MUL() or op == OP_MUL_WRAP(): return wl_build_mul(self.builder, l, r)
+    if op == OP_DIV(): return wl_build_sdiv(self.builder, l, r)
+    if op == OP_MOD(): return wl_build_srem(self.builder, l, r)
+    if op == OP_EQ(): return wl_build_icmp(self.builder, wl_int_eq(), l, r)
+    if op == OP_NEQ(): return wl_build_icmp(self.builder, wl_int_ne(), l, r)
+    if op == OP_LT(): return wl_build_icmp(self.builder, wl_int_slt(), l, r)
+    if op == OP_GT(): return wl_build_icmp(self.builder, wl_int_sgt(), l, r)
+    if op == OP_LTE(): return wl_build_icmp(self.builder, wl_int_sle(), l, r)
+    if op == OP_GTE(): return wl_build_icmp(self.builder, wl_int_sge(), l, r)
+    if op == OP_BIT_AND(): return wl_build_and(self.builder, l, r)
+    if op == OP_BIT_OR(): return wl_build_or(self.builder, l, r)
+    if op == OP_BIT_XOR(): return wl_build_xor(self.builder, l, r)
+    if op == OP_SHL(): return wl_build_shl(self.builder, l, r)
+    if op == OP_SHR(): return wl_build_ashr(self.builder, l, r)
+    wl_get_undef(wl_i32_type(self.context))
+
+fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: i64) -> i64:
+    let fallback_ty = if dest_ty != 0: dest_ty else: wl_i32_type(self.context)
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return wl_get_undef(fallback_ty)
+
+    let rk = body.rval_kinds.get(rval_id as i64)
+    let d0 = body.rval_d0.get(rval_id as i64)
+    let d1 = body.rval_d1.get(rval_id as i64)
+    let d2 = body.rval_d2.get(rval_id as i64)
+
+    if rk == RK_USE():
+        return self.mir_eval_operand(body, d0, dest_ty)
+
+    if rk == RK_BIN_OP():
+        let lhs = self.mir_eval_operand(body, d1, 0)
+        let rhs = self.mir_eval_operand(body, d2, 0)
+        let out = self.mir_build_bin_op(d0, lhs, rhs)
+        if dest_ty != 0:
+            return self.coerce_value_to_type(out, dest_ty)
+        return out
+
+    if rk == RK_UN_OP():
+        let arg = self.mir_eval_operand(body, d1, dest_ty)
+        if d0 == UOP_NEGATE():
+            let ak = wl_get_type_kind(wl_type_of(arg))
+            if ak == wl_float_type_kind() or ak == wl_double_type_kind():
+                return wl_build_fneg(self.builder, arg)
+            return wl_build_neg(self.builder, arg)
+        if d0 == UOP_NOT():
+            let ak = wl_get_type_kind(wl_type_of(arg))
+            if ak == wl_integer_type_kind() and wl_get_int_type_width(wl_type_of(arg)) == 1:
+                return wl_build_xor(self.builder, arg, wl_const_int(wl_i1_type(self.context), 1, 0))
+            return wl_build_not(self.builder, arg)
+        return arg
+
+    if rk == RK_REF():
+        let ptr = self.mir_place_ptr(body, d1, false, 0)
+        if ptr == 0:
+            return wl_get_undef(fallback_ty)
+        if dest_ty != 0 and wl_type_of(ptr) != dest_ty and wl_get_type_kind(dest_ty) == wl_pointer_type_kind():
+            return wl_build_bitcast(self.builder, ptr, dest_ty)
+        return ptr
+
+    if rk == RK_ADDR_OF():
+        let ptr = self.mir_place_ptr(body, d0, false, 0)
+        if ptr == 0:
+            return wl_get_undef(fallback_ty)
+        if dest_ty != 0 and wl_type_of(ptr) != dest_ty and wl_get_type_kind(dest_ty) == wl_pointer_type_kind():
+            return wl_build_bitcast(self.builder, ptr, dest_ty)
+        return ptr
+
+    if rk == RK_DISCRIMINANT():
+        let ptr = self.mir_place_ptr(body, d0, false, 0)
+        if ptr == 0:
+            return wl_get_undef(wl_i32_type(self.context))
+        if d0 < 0 or d0 >= body.place_locals.len() as i32:
+            return wl_get_undef(wl_i32_type(self.context))
+        let local_id = body.place_locals.get(d0 as i64)
+        let place_ty_opt = self.mir_local_types.get(local_id)
+        if not place_ty_opt.is_some():
+            return wl_get_undef(wl_i32_type(self.context))
+        let place_ty = place_ty_opt.unwrap() as i64
+        if wl_get_type_kind(place_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(place_ty) > 0:
+            let loaded = wl_build_load(self.builder, place_ty, ptr)
+            return wl_build_extract_value(self.builder, loaded, 0)
+        return wl_const_int(wl_i32_type(self.context), 0, 0)
+
+    if rk == RK_CAST():
+        let val = self.mir_eval_operand(body, d0, 0)
+        if dest_ty != 0:
+            return self.coerce_value_to_type(val, dest_ty)
+        return val
+
+    if rk == RK_LEN():
+        let ptr = self.mir_place_ptr(body, d0, false, 0)
+        if ptr == 0:
+            return wl_const_int(wl_i64_type(self.context), 0, 0)
+        if d0 < 0 or d0 >= body.place_locals.len() as i32:
+            return wl_const_int(wl_i64_type(self.context), 0, 0)
+        let local_id = body.place_locals.get(d0 as i64)
+        let place_ty_opt = self.mir_local_types.get(local_id)
+        if not place_ty_opt.is_some():
+            return wl_const_int(wl_i64_type(self.context), 0, 0)
+        let place_ty = place_ty_opt.unwrap() as i64
+        if wl_get_type_kind(place_ty) == wl_array_type_kind():
+            return wl_const_int(wl_i64_type(self.context), wl_get_array_length(place_ty), 0)
+        if wl_get_type_kind(place_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(place_ty) > 1:
+            let loaded = wl_build_load(self.builder, place_ty, ptr)
+            return wl_build_extract_value(self.builder, loaded, 1)
+        return wl_const_int(wl_i64_type(self.context), 0, 0)
+
+    wl_get_undef(fallback_ty)
+
+fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> void:
+    if ptr == 0 or ty == 0:
+        return
+
+    var type_sym = self.find_struct_type_by_llvm(ty)
+    if type_sym == 0:
+        let enum_sym = self.enum_by_llvm.get(ty)
+        if enum_sym.is_some():
+            type_sym = enum_sym.unwrap()
+    if type_sym == 0:
+        return
+
+    let dfv = self.drop_fn_values.get(type_sym)
+    let dft = self.drop_fn_types.get(type_sym)
+    if not dfv.is_some() or not dft.is_some():
+        return
+
+    let value = wl_build_load(self.builder, ty, ptr)
+    let args: Vec[i64] = Vec.new()
+    args.push(value)
+    let _ = wl_build_call(self.builder, dft.unwrap() as i64, dfv.unwrap() as i64, vec_data_i64(args), 1)
+
+fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
+    if stmt_id < 0 or stmt_id >= body.stmt_kinds.len() as i32:
+        return false
+    let sk = body.stmt_kinds.get(stmt_id as i64)
+    let d0 = body.stmt_d0.get(stmt_id as i64)
+    let d1 = body.stmt_d1.get(stmt_id as i64)
+
+    if sk == SK_ASSIGN():
+        if d0 < 0 or d0 >= body.place_locals.len() as i32:
+            return false
+        let dst_local = body.place_locals.get(d0 as i64)
+        var dst_ptr = self.mir_place_ptr(body, d0, false, 0)
+        let dst_ty = if dst_ptr != 0 and self.mir_local_types.get(dst_local).is_some(): self.mir_local_types.get(dst_local).unwrap() as i64 else: 0
+        let value = self.mir_eval_rvalue(body, d1, dst_ty)
+        if dst_ptr == 0:
+            let proj_count = body.place_proj_counts.get(d0 as i64)
+            if proj_count != 0:
+                return false
+            let value_ty = wl_type_of(value)
+            dst_ptr = self.mir_get_or_create_local_ptr(dst_local, value_ty)
+            self.mir_local_types.insert(dst_local, value_ty)
+        let final_ty = if self.mir_local_types.get(dst_local).is_some(): self.mir_local_types.get(dst_local).unwrap() as i64 else: 0
+        if final_ty == 0: return false
+        let coerced = if wl_type_of(value) != final_ty: self.coerce_value_to_type(value, final_ty) else: value
+        wl_build_store(self.builder, coerced, dst_ptr)
+        return true
+
+    if sk == SK_STORAGE_LIVE():
+        // Storage markers do not require dedicated IR in this backend.
+        return true
+
+    if sk == SK_STORAGE_DEAD():
+        return true
+
+    if sk == SK_DROP():
+        if d0 < 0 or d0 >= body.place_locals.len() as i32:
+            return false
+        let local_id = body.place_locals.get(d0 as i64)
+        let ty_opt = self.mir_local_types.get(local_id)
+        let ptr = self.mir_place_ptr(body, d0, false, 0)
+        if ptr != 0 and ty_opt.is_some():
+            self.mir_emit_drop_ptr(ptr, ty_opt.unwrap() as i64)
+        return true
+
+    if sk == SK_NOP():
+        return true
+
+    false
+
+fn Codegen.mir_default_unreachable_bb_value(self: Codegen) -> i64:
+    if self.mir_default_unreachable_bb != 0:
+        return self.mir_default_unreachable_bb
+    let bb = wl_append_bb(self.context, self.current_function, "mir.default.unreachable")
+    self.mir_default_unreachable_bb = bb
+    bb
+
+fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, expected_ty: i64) -> i64:
+    if expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
+        if operand_id >= 0 and operand_id < body.operand_kinds.len() as i32:
+            let ok = body.operand_kinds.get(operand_id as i64)
+            let od = body.operand_d0.get(operand_id as i64)
+            if (ok == OK_COPY() or ok == OK_MOVE()) and od >= 0 and od < body.place_locals.len() as i32:
+                let local_id = body.place_locals.get(od as i64)
+                let place_ty_opt = self.mir_local_types.get(local_id)
+                let place_ptr = self.mir_place_ptr(body, od, false, 0)
+                if place_ptr != 0 and place_ty_opt.is_some():
+                    let place_ty = place_ty_opt.unwrap() as i64
+                    if wl_get_type_kind(place_ty) == wl_struct_type_kind():
+                        return self.enforce_coerced_type(place_ptr, expected_ty, "wrong argument type")
+
+    let val = self.mir_eval_operand(body, operand_id, expected_ty)
+    self.enforce_coerced_type(val, expected_ty, "wrong argument type")
+
+fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    let callee = self.mir_eval_operand(body, callee_operand, 0)
+    var call_ft: i64 = 0
+    let callee_ty = wl_type_of(callee)
+    if wl_get_type_kind(callee_ty) == wl_function_type_kind():
+        call_ft = callee_ty
+    else if wl_get_type_kind(callee_ty) == wl_pointer_type_kind():
+        let pointee = wl_get_element_type(callee_ty)
+        if wl_get_type_kind(pointee) == wl_function_type_kind():
+            call_ft = pointee
+        else:
+            let gvt = wl_global_get_value_type(callee)
+            if gvt != 0 and wl_get_type_kind(gvt) == wl_function_type_kind():
+                call_ft = gvt
+    else:
+        let gvt2 = wl_global_get_value_type(callee)
+        if gvt2 != 0 and wl_get_type_kind(gvt2) == wl_function_type_kind():
+            call_ft = gvt2
+    if call_ft == 0:
+        return false
+
+    var arg_start = 0
+    var arg_count = 0
+    if args_id >= 0 and args_id < body.call_arg_starts.len() as i32:
+        arg_start = body.call_arg_starts.get(args_id as i64)
+        arg_count = body.call_arg_counts.get(args_id as i64)
+
+    let param_count = wl_count_param_types(call_ft)
+    let param_types: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        param_types.push(wl_i32_type(self.context))
+    if param_count > 0:
+        wl_get_param_types(call_ft, vec_data_i64(param_types))
+
+    let args: Vec[i64] = Vec.new()
+    for ai in 0..arg_count:
+        let operand_id = body.call_arg_operands.get((arg_start + ai) as i64)
+        let expected_ty = if ai < param_count: param_types.get(ai as i64) else: 0
+        args.push(self.mir_eval_call_operand(body, operand_id, expected_ty))
+
+    let call_val = wl_build_call(self.builder, call_ft, callee, vec_data_i64(args), arg_count)
+    let ret_ty = wl_get_return_type(call_ft)
+    if ret_ty != wl_void_type(self.context):
+        if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
+            return false
+        let dst_local = body.place_locals.get(dest_place as i64)
+        let dst_ptr = self.mir_place_ptr(body, dest_place, true, ret_ty)
+        if dst_ptr == 0:
+            return false
+        var dst_ty = ret_ty
+        if self.mir_local_types.get(dst_local).is_some():
+            dst_ty = self.mir_local_types.get(dst_local).unwrap() as i64
+        else:
+            self.mir_local_types.insert(dst_local, ret_ty)
+        if dst_ty == 0:
+            return false
+        let stored = self.enforce_coerced_type(call_val, dst_ty, "return type mismatch at call site")
+        wl_build_store(self.builder, stored, dst_ptr)
+
+    let next_opt = self.mir_bb_values.get(next_bb)
+    if not next_opt.is_some():
+        return false
+    wl_build_br(self.builder, next_opt.unwrap() as i64)
+    true
+
+fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
+    if bb < 0 or bb >= body.bb_term_kinds.len() as i32:
+        return false
+    let tk = body.bb_term_kinds.get(bb as i64)
+    let d0 = body.bb_term_d0.get(bb as i64)
+    let d1 = body.bb_term_d1.get(bb as i64)
+    let d2 = body.bb_term_d2.get(bb as i64)
+    let d3 = body.bb_term_d3.get(bb as i64)
+
+    if tk == TK_GOTO():
+        let target = self.mir_bb_values.get(d0)
+        if not target.is_some():
+            return false
+        wl_build_br(self.builder, target.unwrap() as i64)
+        return true
+
+    if tk == TK_RETURN():
+        if self.current_ret_type == wl_void_type(self.context):
+            wl_build_ret_void(self.builder)
+            return true
+        let ret_ptr_opt = self.mir_local_ptrs.get(0)
+        if not ret_ptr_opt.is_some():
+            wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
+            return true
+        let ret_ptr = ret_ptr_opt.unwrap() as i64
+        var ret_ptr_ty = self.current_ret_type
+        if self.mir_local_types.get(0).is_some():
+            ret_ptr_ty = self.mir_local_types.get(0).unwrap() as i64
+        if ret_ptr_ty == 0:
+            wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
+            return true
+        let ret_val = wl_build_load(self.builder, ret_ptr_ty, ret_ptr)
+        wl_build_ret(self.builder, self.enforce_coerced_type(ret_val, self.current_ret_type, "return type mismatch"))
+        return true
+
+    if tk == TK_UNREACHABLE():
+        wl_build_unreachable(self.builder)
+        return true
+
+    if tk == TK_SWITCH_INT():
+        let cond = self.mir_eval_operand(body, d0, 0)
+        var default_bb = self.mir_default_unreachable_bb_value()
+        if d2 >= 0:
+            let def = self.mir_bb_values.get(d2)
+            if def.is_some():
+                default_bb = def.unwrap() as i64
+        var case_start = 0
+        var case_count = 0
+        if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
+            case_start = body.switch_table_starts.get(d1 as i64)
+            case_count = body.switch_table_counts.get(d1 as i64)
+        let sw = wl_build_switch(self.builder, cond, default_bb, case_count)
+        let cond_ty = wl_type_of(cond)
+        let int_ty = if wl_get_type_kind(cond_ty) == wl_integer_type_kind(): cond_ty else: wl_i32_type(self.context)
+        for ci in 0..case_count:
+            let target_bb = body.switch_table_targets.get((case_start + ci) as i64)
+            let target = self.mir_bb_values.get(target_bb)
+            if target.is_some():
+                let val = body.switch_table_vals.get((case_start + ci) as i64)
+                wl_add_case(sw, wl_const_int(int_ty, val as i64, 1), target.unwrap() as i64)
+        return true
+
+    if tk == TK_CALL():
+        return self.mir_emit_call_term(body, d0, d1, d2, d3)
+
+    if tk == TK_DROP_AND_GOTO():
+        if d0 < 0 or d0 >= body.place_locals.len() as i32:
+            return false
+        let local_id = body.place_locals.get(d0 as i64)
+        let ty_opt = self.mir_local_types.get(local_id)
+        let ptr = self.mir_place_ptr(body, d0, false, 0)
+        if ptr != 0 and ty_opt.is_some():
+            self.mir_emit_drop_ptr(ptr, ty_opt.unwrap() as i64)
+        let target = self.mir_bb_values.get(d1)
+        if not target.is_some():
+            return false
+        wl_build_br(self.builder, target.unwrap() as i64)
+        return true
+
+    false
+
+fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
+    let name_sym = self.pool.get_data0(fn_node)
+    let name_str = self.intern.resolve(name_sym)
+    if name_sym == 0:
+        return
+    let fv = self.fn_values.get(name_sym)
+    if not fv.is_some():
+        self.gen_function(fn_node)
+        return
+    let function = fv.unwrap() as i64
+    let ft = self.fn_fn_types.get(name_sym)
+    if not ft.is_some():
+        self.gen_function(fn_node)
+        return
+    let fn_type = ft.unwrap() as i64
+
+    self.current_function = function
+    self.current_ret_type = wl_get_return_type(fn_type)
+    self.current_method_owner_sym = 0
+
+    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
+    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
+    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_defer_stack: Vec[i32] = Vec.new()
+    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_local_concrete_types: HashMap[i32, i32] = HashMap.new()
+    self.local_allocas = fresh_local_allocas
+    self.local_types = fresh_local_types
+    self.local_muts = fresh_local_muts
+    self.local_fn_sigs = fresh_local_fn_sigs
+    self.local_pointee_structs = fresh_local_pointee_structs
+    self.task_locals = fresh_task_locals
+    self.defer_stack = fresh_defer_stack
+    self.trait_locals = fresh_trait_locals
+    self.trait_local_concrete_types = fresh_trait_local_concrete_types
+    self.scope_local_count = 0
+
+    let saved_expected = self.expected_type
+    self.expected_type = self.current_ret_type
+    let saved_result_err = self.current_result_err_symbol
+    let saved_returns_result = self.current_fn_returns_result
+    let saved_saw_return = self.current_fn_saw_explicit_return
+    self.current_result_err_symbol = 0
+    self.current_fn_returns_result = false
+    self.current_fn_saw_explicit_return = false
+    let saved_tailrec_bb = self.tailrec_body_bb
+    let saved_tailrec_sym = self.tailrec_fn_sym
+    self.tailrec_body_bb = 0
+    self.tailrec_fn_sym = 0
+
+    let fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
+    let fresh_mir_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_mir_bbs: HashMap[i32, i64] = HashMap.new()
+    self.mir_local_ptrs = fresh_mir_locals
+    self.mir_local_types = fresh_mir_local_types
+    self.mir_bb_values = fresh_mir_bbs
+    self.mir_default_unreachable_bb = 0
+
+    let entry = wl_append_bb(self.context, function, "entry")
+    wl_position_at_end(self.builder, entry)
+
+    let ret_store_ty = if self.current_ret_type != wl_void_type(self.context): self.current_ret_type else: wl_i32_type(self.context)
+    let ret_alloca = self.create_entry_alloca(ret_store_ty)
+    self.mir_local_ptrs.insert(0, ret_alloca)
+    self.mir_local_types.insert(0, ret_store_ty)
+
+    let meta = self.pool.find_fn_meta(fn_node)
+    var param_start = 0
+    var param_count = 0
+    if meta >= 0:
+        param_start = self.pool.fn_meta_param_start(meta)
+        param_count = self.pool.fn_meta_param_count(meta)
+
+    var method_owner_sym = 0
+    for di in 0..name_str.len() as i32:
+        if name_str.byte_at(di as i64) == 46:
+            method_owner_sym = self.intern.intern(name_str.slice(0, di as i64))
+            break
+    self.current_method_owner_sym = method_owner_sym
+
+    let max_params = param_count
+    for pi in 0..max_params:
+        let p_name = self.pool.get_extra(param_start + pi * 2)
+        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let param_val = wl_get_param(function, pi)
+        let param_type = wl_type_of(param_val)
+        let alloca = self.create_entry_alloca(param_type)
+        wl_build_store(self.builder, param_val, alloca)
+
+        self.local_allocas.insert(p_name, alloca)
+        self.local_types.insert(p_name, param_type)
+        self.local_muts.insert(p_name, 1)
+        self.mir_local_ptrs.insert(pi + 1, alloca)
+        self.mir_local_types.insert(pi + 1, param_type)
+
+        if p_type_node != 0:
+            let pk = self.pool.kind(p_type_node)
+            if pk == NK_TYPE_FN():
+                let fn_sig = self.build_fn_type_from_ast(p_type_node)
+                self.local_fn_sigs.insert(p_name, fn_sig)
+            if pk == NK_TYPE_PTR() or pk == NK_TYPE_REF():
+                let pointee_node = self.pool.get_data0(p_type_node)
+                if self.pool.kind(pointee_node) == NK_TYPE_NAMED():
+                    let ps = self.pool.get_data0(pointee_node)
+                    if self.struct_type_map.get(ps).is_some():
+                        self.local_pointee_structs.insert(p_name, ps)
+            if pi == 0 and pk == NK_TYPE_NAMED():
+                let p_sym = self.pool.get_data0(p_type_node)
+                let p_n = self.intern.resolve(p_sym)
+                let p_name_text = self.intern.resolve(p_name)
+                if method_owner_sym == 0 and p_name_text == "self" and self.struct_type_map.get(p_sym).is_some():
+                    method_owner_sym = p_sym
+                    self.current_method_owner_sym = method_owner_sym
+                if method_owner_sym != 0 and (p_n == "Self" or p_sym == method_owner_sym):
+                    self.local_pointee_structs.insert(p_name, method_owner_sym)
+            if pi == 0 and method_owner_sym != 0:
+                let p_n = self.intern.resolve(p_name)
+                if p_n == "self":
+                    self.local_pointee_structs.insert(p_name, method_owner_sym)
+            let trait_sym = self.dyn_trait_from_type_node(p_type_node)
+            if trait_sym != 0:
+                self.trait_locals.insert(p_name, trait_sym)
+
+    for bb in 0..body.block_count():
+        let bb_name = "mir.bb" ++ int_to_string(bb)
+        let llbb = wl_append_bb(self.context, function, bb_name)
+        self.mir_bb_values.insert(bb, llbb)
+
+    let bb0 = self.mir_bb_values.get(0)
+    if bb0.is_some():
+        wl_build_br(self.builder, bb0.unwrap() as i64)
+    else:
+        if self.current_ret_type == wl_void_type(self.context):
+            wl_build_ret_void(self.builder)
+        else:
+            wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
+
+    for bb in 0..body.block_count():
+        let llbb_opt = self.mir_bb_values.get(bb)
+        if not llbb_opt.is_some():
+            continue
+        let llbb = llbb_opt.unwrap() as i64
+        wl_position_at_end(self.builder, llbb)
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            if not self.mir_emit_stmt(body, stmt_id):
+                if wl_get_bb_terminator(llbb) == 0:
+                    wl_build_unreachable(self.builder)
+                break
+        if wl_get_bb_terminator(llbb) == 0:
+            let ok = self.mir_emit_term(body, bb)
+            if not ok and wl_get_bb_terminator(llbb) == 0:
+                wl_build_unreachable(self.builder)
+
+    if self.mir_default_unreachable_bb != 0:
+        let ubb = self.mir_default_unreachable_bb
+        if wl_get_bb_terminator(ubb) == 0:
+            wl_position_at_end(self.builder, ubb)
+            wl_build_unreachable(self.builder)
+
+    self.expected_type = saved_expected
+    self.current_result_err_symbol = saved_result_err
+    self.current_fn_returns_result = saved_returns_result
+    self.current_fn_saw_explicit_return = saved_saw_return
+    self.tailrec_body_bb = saved_tailrec_bb
+    self.tailrec_fn_sym = saved_tailrec_sym
+
 // ── gen_function: generate a function body ────────────────────────
 
 fn Codegen.gen_function(self: Codegen, fn_node: i32):
     let name_sym = self.pool.get_data0(fn_node)
+    let name_str = self.intern.resolve(name_sym)
+    if name_sym == 0:
+        return
     let body_node = self.pool.get_data1(fn_node)
     let flags = self.pool.get_data2(fn_node)
 
@@ -1704,7 +3732,6 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
     let param_count = self.pool.fn_meta_param_count(meta)
 
     // Detect method owner
-    let name_str = self.intern.resolve(name_sym)
     var method_owner_sym = 0
     for di in 0..name_str.len() as i32:
         if name_str.byte_at(di as i64) == 46:
@@ -1738,18 +3765,22 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
                     if self.struct_type_map.get(ps).is_some():
                         self.local_pointee_structs.insert(p_name, ps)
             // Track method self pointee
-            if pi == 0 and method_owner_sym != 0 and pk == NK_TYPE_NAMED():
+            if pi == 0 and pk == NK_TYPE_NAMED():
                 let p_sym = self.pool.get_data0(p_type_node)
                 let p_n = self.intern.resolve(p_sym)
-                if p_n == "Self" or p_sym == method_owner_sym:
+                let p_name_text = self.intern.resolve(p_name)
+                if method_owner_sym == 0 and p_name_text == "self" and self.struct_type_map.get(p_sym).is_some():
+                    method_owner_sym = p_sym
+                    self.current_method_owner_sym = method_owner_sym
+                if method_owner_sym != 0 and (p_n == "Self" or p_sym == method_owner_sym):
                     self.local_pointee_structs.insert(p_name, method_owner_sym)
             if pi == 0 and method_owner_sym != 0:
                 let p_n = self.intern.resolve(p_name)
                 if p_n == "self":
                     self.local_pointee_structs.insert(p_name, method_owner_sym)
-            // Track dyn trait params
-            if pk == NK_TYPE_TRAIT_OBJ():
-                let trait_sym = self.pool.get_data0(p_type_node)
+            // Track dyn trait params (plain/wrapped forms).
+            let trait_sym = self.dyn_trait_from_type_node(p_type_node)
+            if trait_sym != 0:
                 self.trait_locals.insert(p_name, trait_sym)
 
     // @[tailrec]: create body BB
@@ -2034,6 +4065,7 @@ fn Codegen.gen_ident(self: Codegen, sym: i32) -> i64:
                     // Unit variant
                     let enum_ty = self.enum_llvm_types.get(ei as i64)
                     let alloca = wl_build_alloca(self.builder, enum_ty)
+                    wl_build_store(self.builder, self.build_default_value(enum_ty), alloca)
                     let tag_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 0)
                     wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), vi as i64, 0), tag_ptr)
                     return wl_build_load(self.builder, enum_ty, alloca)
@@ -2077,6 +4109,14 @@ fn Codegen.gen_binary(self: Codegen, node: i32) -> i64:
         let rw = wl_get_int_type_width(rty)
         if lw > rw: r = wl_build_sext(self.builder, rhs, lty)
         else if rw > lw: l = wl_build_sext(self.builder, lhs, rty)
+
+    if op == OP_EQ() or op == OP_NEQ():
+        let cmp_lty = wl_type_of(l)
+        let cmp_rty = wl_type_of(r)
+        if cmp_lty == cmp_rty:
+            let cmp_kind = wl_get_type_kind(cmp_lty)
+            if cmp_kind == wl_struct_type_kind() or cmp_kind == wl_array_type_kind():
+                return self.compare_aggregate_eq(l, r, op)
 
     // Integer operations
     if op == OP_ADD() or op == OP_ADD_WRAP(): return wl_build_add(self.builder, l, r)
@@ -2188,7 +4228,7 @@ fn Codegen.gen_default_op(self: Codegen, lhs_node: i32, rhs_node: i32) -> i64:
     let lty = wl_type_of(lhs)
     // Extract tag
     let tag = wl_build_extract_value(self.builder, lhs, 0)
-    let is_some = wl_build_icmp(self.builder, wl_int_ne(), tag, wl_const_int(wl_i32_type(self.context), 0, 0))
+    let is_some = wl_build_icmp(self.builder, wl_int_eq(), tag, wl_const_int(wl_i32_type(self.context), 0, 0))
     let then_bb = wl_append_bb(self.context, self.current_function, "default.some")
     let else_bb = wl_append_bb(self.context, self.current_function, "default.none")
     let merge_bb = wl_append_bb(self.context, self.current_function, "default.end")
@@ -2367,23 +4407,82 @@ fn Codegen.gen_if_expr(self: Codegen, node: i32) -> i64:
 
 fn Codegen.gen_let_binding(self: Codegen, node: i32) -> i64:
     let name_sym = self.pool.get_data0(node)
+    let name_text = self.intern.resolve(name_sym)
+    let alias_name = if name_text.len() == 0: self.let_binding_name_from_node(node) else: ""
+    let alias_sym = if alias_name.len() > 0: self.intern.intern(alias_name) else: 0
     let value_node = self.pool.get_data1(node)
     let flags = self.pool.get_data2(node)
     let is_mut = flags % 2
-    let val = self.gen_expr(value_node)
-    let val_ty = wl_type_of(val)
-    let alloca = self.create_entry_alloca(val_ty)
-    wl_build_store(self.builder, val, alloca)
+    var val = self.gen_expr(value_node)
+    var val_ty = wl_type_of(val)
+    var declared_ty: i64 = 0
+    var declared_type_node = 0
+    let ann_slot = flags / 2
+    if ann_slot > 0:
+        let type_extra = ann_slot - 1
+        declared_type_node = self.pool.get_extra(type_extra)
+        declared_ty = self.resolve_type(declared_type_node)
+
+        let dyn_trait = self.dyn_trait_from_type_node(declared_type_node)
+        if dyn_trait != 0:
+            var concrete_sym = 0
+            if value_node != 0 and self.pool.kind(value_node) == NK_IDENT():
+                let src_sym = self.pool.get_data0(value_node)
+                let known = self.trait_local_concrete_types.get(src_sym)
+                if known.is_some():
+                    concrete_sym = known.unwrap()
+            if concrete_sym != 0:
+                self.trait_local_concrete_types.insert(name_sym, concrete_sym)
+                if alias_sym != 0:
+                    self.trait_local_concrete_types.insert(alias_sym, concrete_sym)
+            else:
+                let info = self.find_dyn_concrete_arg(value_node, val_ty)
+                if info.type_sym != 0:
+                    if info.use_ptr != 0:
+                        val = self.build_dyn_trait_value_from_ptr(val, info.type_sym, dyn_trait)
+                    else:
+                        val = self.build_dyn_trait_value(val, info.type_sym, dyn_trait)
+                    val_ty = wl_type_of(val)
+                    self.trait_local_concrete_types.insert(name_sym, info.type_sym)
+                    if alias_sym != 0:
+                        self.trait_local_concrete_types.insert(alias_sym, info.type_sym)
+            self.trait_locals.insert(name_sym, dyn_trait)
+            if alias_sym != 0:
+                self.trait_locals.insert(alias_sym, dyn_trait)
+        else if declared_ty != 0:
+            val = self.coerce_value_to_type(val, declared_ty)
+            val_ty = wl_type_of(val)
+
+    let storage_ty = if declared_ty != 0: declared_ty else: val_ty
+    let alloca = self.create_entry_alloca(storage_ty)
+    let stored = self.coerce_value_to_type(val, storage_ty)
+    wl_build_store(self.builder, stored, alloca)
     self.local_allocas.insert(name_sym, alloca)
-    self.local_types.insert(name_sym, val_ty)
+    self.local_types.insert(name_sym, storage_ty)
     self.local_muts.insert(name_sym, is_mut)
+    if alias_sym != 0:
+        self.local_allocas.insert(alias_sym, alloca)
+        self.local_types.insert(alias_sym, storage_ty)
+        self.local_muts.insert(alias_sym, is_mut)
+    let pointee_struct = self.infer_local_pointee_struct(value_node, declared_type_node, storage_ty)
+    if pointee_struct != 0:
+        self.local_pointee_structs.insert(name_sym, pointee_struct)
+        if alias_sym != 0:
+            self.local_pointee_structs.insert(alias_sym, pointee_struct)
+    let concrete_struct = self.infer_local_concrete_struct(value_node, storage_ty)
+    if concrete_struct != 0:
+        self.trait_local_concrete_types.insert(name_sym, concrete_struct)
+        if alias_sym != 0:
+            self.trait_local_concrete_types.insert(alias_sym, concrete_struct)
     // Track for scope drops
     self.scope_local_syms.push(name_sym)
     self.scope_local_allocas.push(alloca)
-    self.scope_local_types.push(val_ty)
+    self.scope_local_types.push(storage_ty)
     self.scope_local_count = self.scope_local_count + 1
     // Track vec/hashmap/enum local types
-    self.track_local_type(name_sym, value_node, val_ty)
+    self.track_local_type(name_sym, value_node, storage_ty)
+    if alias_sym != 0:
+        self.track_local_type(alias_sym, value_node, storage_ty)
     wl_get_undef(wl_void_type(self.context))
 
 fn Codegen.track_local_type(self: Codegen, sym: i32, value_node: i32, val_ty: i64):
@@ -2408,7 +4507,7 @@ fn Codegen.gen_let_else(self: Codegen, node: i32) -> i64:
     // For Option: check tag
     let val_ty = wl_type_of(val)
     let tag = wl_build_extract_value(self.builder, val, 0)
-    let is_some = wl_build_icmp(self.builder, wl_int_ne(), tag, wl_const_int(wl_i32_type(self.context), 0, 0))
+    let is_some = wl_build_icmp(self.builder, wl_int_eq(), tag, wl_const_int(wl_i32_type(self.context), 0, 0))
     let ok_bb = wl_append_bb(self.context, self.current_function, "letelse.ok")
     let else_bb = wl_append_bb(self.context, self.current_function, "letelse.else")
     wl_build_cond_br(self.builder, is_some, ok_bb, else_bb)
@@ -2606,9 +4705,8 @@ fn Codegen.gen_field_access_ptr(self: Codegen, obj_node: i32, field_sym: i32) ->
 fn Codegen.find_struct_type_by_llvm(self: Codegen, llvm_ty: i64) -> i32:
     for i in 0..self.struct_llvm_types.len() as i32:
         if self.struct_llvm_types.get(i as i64) == llvm_ty:
-            // Walk struct_type_map to find the sym
-            // Since we can't iterate HashMap[i32,i32], use a reverse lookup approach
-            // For now, scan decls
+            if i < self.struct_index_syms.len() as i32:
+                return self.struct_index_syms.get(i as i64)
             return self.reverse_struct_lookup(i)
     0
 
@@ -2683,6 +4781,496 @@ fn Codegen.gen_index_ptr(self: Codegen, arr_node: i32, idx_node: i32) -> i64:
                     return wl_build_gep(self.builder, ty, alloca, vec_data_i64(indices), 2)
     0
 
+fn Codegen.find_binding_type(self: Codegen, syms: Vec[i32], tys: Vec[i64], sym: i32) -> i64:
+    for i in 0..syms.len() as i32:
+        if syms.get(i as i64) == sym:
+            return tys.get(i as i64)
+    0
+
+fn Codegen.find_vec_elem_type_by_llvm(self: Codegen, vec_ty: i64) -> i64:
+    for i in 0..self.vec_llvm_types.len() as i32:
+        if self.vec_llvm_types.get(i as i64) == vec_ty:
+            return self.vec_elem_types.get(i as i64)
+    0
+
+fn Codegen.find_hashmap_key_type_by_llvm(self: Codegen, hm_ty: i64) -> i64:
+    for i in 0..self.hm_llvm_types.len() as i32:
+        if self.hm_llvm_types.get(i as i64) == hm_ty:
+            return self.hm_key_types.get(i as i64)
+    0
+
+fn Codegen.find_hashmap_val_type_by_llvm(self: Codegen, hm_ty: i64) -> i64:
+    for i in 0..self.hm_llvm_types.len() as i32:
+        if self.hm_llvm_types.get(i as i64) == hm_ty:
+            return self.hm_val_types.get(i as i64)
+    0
+
+fn Codegen.find_hashset_elem_type_by_llvm(self: Codegen, hs_ty: i64) -> i64:
+    for i in 0..self.hs_llvm_types.len() as i32:
+        if self.hs_llvm_types.get(i as i64) == hs_ty:
+            return self.hs_elem_types.get(i as i64)
+    0
+
+fn Codegen.find_option_payload_type_by_llvm(self: Codegen, opt_ty: i64) -> i64:
+    for i in 0..self.option_llvm_types.len() as i32:
+        if self.option_llvm_types.get(i as i64) == opt_ty:
+            return self.option_payload_types.get(i as i64)
+    0
+
+fn Codegen.find_result_ok_type_by_llvm(self: Codegen, res_ty: i64) -> i64:
+    for i in 0..self.result_llvm_types.len() as i32:
+        if self.result_llvm_types.get(i as i64) == res_ty:
+            return self.result_ok_types.get(i as i64)
+    0
+
+fn Codegen.find_result_err_type_by_llvm(self: Codegen, res_ty: i64) -> i64:
+    for i in 0..self.result_llvm_types.len() as i32:
+        if self.result_llvm_types.get(i as i64) == res_ty:
+            return self.result_err_types.get(i as i64)
+    0
+
+fn Codegen.llvm_type_mangle(self: Codegen, ty: i64) -> str:
+    if ty == 0:
+        return "unknown"
+    let tk = wl_get_type_kind(ty)
+    if tk == wl_void_type_kind():
+        return "void"
+    if tk == wl_integer_type_kind():
+        let w = wl_get_int_type_width(ty)
+        if w == 1: return "bool"
+        if w == 8: return "i8"
+        if w == 16: return "i16"
+        if w == 32: return "i32"
+        if w == 64: return "i64"
+        return "int"
+    if tk == wl_float_type_kind():
+        return "f32"
+    if tk == wl_double_type_kind():
+        return "f64"
+    if tk == wl_pointer_type_kind():
+        return "ptr"
+    if self.is_str_type(ty):
+        return "str"
+    if tk == wl_struct_type_kind():
+        let st_sym = self.find_struct_type_by_llvm(ty)
+        if st_sym != 0:
+            return self.intern.resolve(st_sym)
+        let es = self.enum_by_llvm.get(ty)
+        if es.is_some():
+            return self.intern.resolve(es.unwrap())
+        return "struct"
+    if tk == wl_array_type_kind():
+        return "array"
+    "unknown"
+
+fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, args_start: i32, arg_count: i32) -> i64:
+    var generic_node = fn_node
+    var meta = self.pool.find_fn_meta(generic_node)
+    if self.pool.kind(generic_node) != NK_FN_DECL() or self.pool.get_data0(generic_node) != fn_sym or meta < 0 or self.pool.fn_meta_tp_count(meta) <= 0:
+        for di in 0..self.pool.decl_count():
+            let decl = self.pool.get_decl(di)
+            if self.pool.kind(decl) != NK_FN_DECL():
+                continue
+            if self.pool.get_data0(decl) != fn_sym:
+                continue
+            let dmeta = self.pool.find_fn_meta(decl)
+            if dmeta >= 0 and self.pool.fn_meta_tp_count(dmeta) > 0:
+                generic_node = decl
+                meta = dmeta
+                break
+
+    if meta < 0:
+        return wl_get_undef(wl_i32_type(self.context))
+
+    let ret_type_node = self.pool.fn_meta_ret(meta)
+    let param_start = self.pool.fn_meta_param_start(meta)
+    let param_count = self.pool.fn_meta_param_count(meta)
+    let tp_start = self.pool.fn_meta_tp_start(meta)
+    let tp_count = self.pool.fn_meta_tp_count(meta)
+    let body_node = self.pool.get_data1(generic_node)
+    if param_count < 0 or param_count > 64:
+        return wl_get_undef(wl_i32_type(self.context))
+
+    let arg_vals: Vec[i64] = Vec.new()
+    let arg_tys: Vec[i64] = Vec.new()
+    for ai in 0..arg_count:
+        let arg_node = self.pool.get_extra(args_start + ai)
+        let arg_val = self.gen_expr(arg_node)
+        arg_vals.push(arg_val)
+        arg_tys.push(wl_type_of(arg_val))
+
+    let tp_syms: Vec[i32] = Vec.new()
+    var tp_pos = tp_start
+    for ti in 0..tp_count:
+        let tp_sym = self.pool.get_extra(tp_pos)
+        tp_syms.push(tp_sym)
+        let bound_count = self.pool.get_extra(tp_pos + 1)
+        tp_pos = tp_pos + 2 + bound_count
+
+    let bind_syms: Vec[i32] = Vec.new()
+    let bind_tys: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        if pi >= arg_count:
+            break
+        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        if p_type_node == 0:
+            continue
+
+        let arg_ty = arg_tys.get(pi as i64)
+        let p_kind = self.pool.kind(p_type_node)
+
+        if p_kind == NK_TYPE_NAMED():
+            let p_sym = self.pool.get_data0(p_type_node)
+            var is_tp = false
+            for ti in 0..tp_syms.len() as i32:
+                if tp_syms.get(ti as i64) == p_sym:
+                    is_tp = true
+                    break
+            if is_tp:
+                var exists = false
+                for bi in 0..bind_syms.len() as i32:
+                    if bind_syms.get(bi as i64) == p_sym:
+                        exists = true
+                        break
+                if not exists:
+                    bind_syms.push(p_sym)
+                    bind_tys.push(arg_ty)
+            continue
+
+        if p_kind == NK_TYPE_GENERIC():
+            let g_name_sym = self.pool.get_data0(p_type_node)
+            let g_name = self.intern.resolve(g_name_sym)
+            let g_extra = self.pool.get_data1(p_type_node)
+            let g_count = self.pool.get_data2(p_type_node)
+
+            if g_name == "Vec" and g_count == 1:
+                let inner = self.pool.get_extra(g_extra)
+                if self.pool.kind(inner) == NK_TYPE_NAMED():
+                    let inner_sym = self.pool.get_data0(inner)
+                    var is_tp = false
+                    for ti in 0..tp_syms.len() as i32:
+                        if tp_syms.get(ti as i64) == inner_sym:
+                            is_tp = true
+                            break
+                    if is_tp:
+                        let elem_ty = self.find_vec_elem_type_by_llvm(arg_ty)
+                        if elem_ty != 0:
+                            var exists = false
+                            for bi in 0..bind_syms.len() as i32:
+                                if bind_syms.get(bi as i64) == inner_sym:
+                                    exists = true
+                                    break
+                            if not exists:
+                                bind_syms.push(inner_sym)
+                                bind_tys.push(elem_ty)
+                continue
+
+            if g_name == "HashMap" and g_count == 2:
+                let k_node = self.pool.get_extra(g_extra)
+                let v_node = self.pool.get_extra(g_extra + 1)
+                let key_ty = self.find_hashmap_key_type_by_llvm(arg_ty)
+                let val_ty = self.find_hashmap_val_type_by_llvm(arg_ty)
+                if key_ty != 0 and self.pool.kind(k_node) == NK_TYPE_NAMED():
+                    let k_sym = self.pool.get_data0(k_node)
+                    var is_tp_k = false
+                    for ti in 0..tp_syms.len() as i32:
+                        if tp_syms.get(ti as i64) == k_sym:
+                            is_tp_k = true
+                            break
+                    if is_tp_k:
+                        var exists_k = false
+                        for bi in 0..bind_syms.len() as i32:
+                            if bind_syms.get(bi as i64) == k_sym:
+                                exists_k = true
+                                break
+                        if not exists_k:
+                            bind_syms.push(k_sym)
+                            bind_tys.push(key_ty)
+                if val_ty != 0 and self.pool.kind(v_node) == NK_TYPE_NAMED():
+                    let v_sym = self.pool.get_data0(v_node)
+                    var is_tp_v = false
+                    for ti in 0..tp_syms.len() as i32:
+                        if tp_syms.get(ti as i64) == v_sym:
+                            is_tp_v = true
+                            break
+                    if is_tp_v:
+                        var exists_v = false
+                        for bi in 0..bind_syms.len() as i32:
+                            if bind_syms.get(bi as i64) == v_sym:
+                                exists_v = true
+                                break
+                        if not exists_v:
+                            bind_syms.push(v_sym)
+                            bind_tys.push(val_ty)
+                continue
+
+            if g_name == "HashSet" and g_count == 1:
+                let inner = self.pool.get_extra(g_extra)
+                if self.pool.kind(inner) == NK_TYPE_NAMED():
+                    let inner_sym = self.pool.get_data0(inner)
+                    let elem_ty = self.find_hashset_elem_type_by_llvm(arg_ty)
+                    if elem_ty != 0:
+                        var is_tp = false
+                        for ti in 0..tp_syms.len() as i32:
+                            if tp_syms.get(ti as i64) == inner_sym:
+                                is_tp = true
+                                break
+                        if is_tp:
+                            var exists = false
+                            for bi in 0..bind_syms.len() as i32:
+                                if bind_syms.get(bi as i64) == inner_sym:
+                                    exists = true
+                                    break
+                            if not exists:
+                                bind_syms.push(inner_sym)
+                                bind_tys.push(elem_ty)
+                continue
+
+            if g_name == "Option" and g_count == 1:
+                let inner = self.pool.get_extra(g_extra)
+                if self.pool.kind(inner) == NK_TYPE_NAMED():
+                    let inner_sym = self.pool.get_data0(inner)
+                    let payload_ty = self.find_option_payload_type_by_llvm(arg_ty)
+                    if payload_ty != 0:
+                        var is_tp = false
+                        for ti in 0..tp_syms.len() as i32:
+                            if tp_syms.get(ti as i64) == inner_sym:
+                                is_tp = true
+                                break
+                        if is_tp:
+                            var exists = false
+                            for bi in 0..bind_syms.len() as i32:
+                                if bind_syms.get(bi as i64) == inner_sym:
+                                    exists = true
+                                    break
+                            if not exists:
+                                bind_syms.push(inner_sym)
+                                bind_tys.push(payload_ty)
+                continue
+
+            if g_name == "Result" and g_count == 2:
+                let ok_node = self.pool.get_extra(g_extra)
+                let err_node = self.pool.get_extra(g_extra + 1)
+                let ok_ty = self.find_result_ok_type_by_llvm(arg_ty)
+                let err_ty = self.find_result_err_type_by_llvm(arg_ty)
+                if ok_ty != 0 and self.pool.kind(ok_node) == NK_TYPE_NAMED():
+                    let ok_sym = self.pool.get_data0(ok_node)
+                    var is_tp_ok = false
+                    for ti in 0..tp_syms.len() as i32:
+                        if tp_syms.get(ti as i64) == ok_sym:
+                            is_tp_ok = true
+                            break
+                    if is_tp_ok:
+                        var exists_ok = false
+                        for bi in 0..bind_syms.len() as i32:
+                            if bind_syms.get(bi as i64) == ok_sym:
+                                exists_ok = true
+                                break
+                        if not exists_ok:
+                            bind_syms.push(ok_sym)
+                            bind_tys.push(ok_ty)
+                if err_ty != 0 and self.pool.kind(err_node) == NK_TYPE_NAMED():
+                    let err_sym = self.pool.get_data0(err_node)
+                    var is_tp_err = false
+                    for ti in 0..tp_syms.len() as i32:
+                        if tp_syms.get(ti as i64) == err_sym:
+                            is_tp_err = true
+                            break
+                    if is_tp_err:
+                        var exists_err = false
+                        for bi in 0..bind_syms.len() as i32:
+                            if bind_syms.get(bi as i64) == err_sym:
+                                exists_err = true
+                                break
+                        if not exists_err:
+                            bind_syms.push(err_sym)
+                            bind_tys.push(err_ty)
+                continue
+
+    let base_name = self.intern.resolve(fn_sym)
+    var mangled = base_name
+    for ti in 0..tp_syms.len() as i32:
+        let tp_sym = tp_syms.get(ti as i64)
+        let bty = self.find_binding_type(bind_syms, bind_tys, tp_sym)
+        if bty == 0:
+            with_eprintln("error: unknown type")
+            self.had_error = 1
+            return wl_get_undef(wl_i32_type(self.context))
+        mangled = mangled ++ "__" ++ self.llvm_type_mangle(bty)
+
+    let mono_sym = self.intern.intern(mangled)
+    let mono_key = mono_sym as i64
+    let mono_cached_fv = self.mono_values.get(mono_key)
+    let mono_cached_ft = self.mono_types.get(mono_key)
+    if mono_cached_fv.is_some() and mono_cached_ft.is_some():
+        let coerced = self.coerce_call_args_for_fn_value(mono_sym, mono_cached_fv.unwrap() as i64, args_start, arg_vals, arg_count)
+        return wl_build_call(self.builder, mono_cached_ft.unwrap() as i64, mono_cached_fv.unwrap() as i64, vec_data_i64(coerced), arg_count)
+
+    let cached_fv = self.fn_values.get(mono_sym)
+    let cached_ft = self.fn_fn_types.get(mono_sym)
+    if cached_fv.is_some() and cached_ft.is_some():
+        self.mono_values.insert(mono_key, cached_fv.unwrap() as i64)
+        self.mono_types.insert(mono_key, cached_ft.unwrap() as i64)
+        let coerced = self.coerce_call_args_for_fn_value(mono_sym, cached_fv.unwrap() as i64, args_start, arg_vals, arg_count)
+        return wl_build_call(self.builder, cached_ft.unwrap() as i64, cached_fv.unwrap() as i64, vec_data_i64(coerced), arg_count)
+
+    let saved_bind_syms = self.type_binding_syms
+    let saved_bind_tys = self.type_binding_types
+    let saved_bind_len = self.type_bindings_len
+    let fresh_bind_syms: Vec[i32] = Vec.new()
+    let fresh_bind_tys: Vec[i64] = Vec.new()
+    self.type_binding_syms = fresh_bind_syms
+    self.type_binding_types = fresh_bind_tys
+    self.type_bindings_len = 0
+    for bi in 0..bind_syms.len() as i32:
+        self.type_binding_syms.push(bind_syms.get(bi as i64))
+        self.type_binding_types.push(bind_tys.get(bi as i64))
+        self.type_bindings_len = self.type_bindings_len + 1
+
+    let mono_param_types: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        if p_type_node != 0:
+            let p_ty = self.resolve_type(p_type_node)
+            if p_ty == 0:
+                self.type_binding_syms = saved_bind_syms
+                self.type_binding_types = saved_bind_tys
+                self.type_bindings_len = saved_bind_len
+                with_eprintln("error: unknown type")
+                self.had_error = 1
+                return wl_get_undef(wl_i32_type(self.context))
+            mono_param_types.push(p_ty)
+        else if pi < arg_count:
+            mono_param_types.push(arg_tys.get(pi as i64))
+        else:
+            mono_param_types.push(wl_i32_type(self.context))
+    let mono_ret_ty = if ret_type_node != 0: self.resolve_type(ret_type_node) else: wl_i32_type(self.context)
+    if mono_ret_ty == 0:
+        self.type_binding_syms = saved_bind_syms
+        self.type_binding_types = saved_bind_tys
+        self.type_bindings_len = saved_bind_len
+        with_eprintln("error: unknown type")
+        self.had_error = 1
+        return wl_get_undef(wl_i32_type(self.context))
+    let mono_ft = wl_function_type(mono_ret_ty, vec_data_i64(mono_param_types), param_count, 0)
+    let mono_fn = wl_add_function(self.llmod, mangled, mono_ft)
+    self.mono_values.insert(mono_key, mono_fn)
+    self.mono_types.insert(mono_key, mono_ft)
+    self.fn_values.insert(mono_sym, mono_fn)
+    self.fn_fn_types.insert(mono_sym, mono_ft)
+
+    let saved_fn = self.current_function
+    let saved_ret = self.current_ret_type
+    let saved_owner = self.current_method_owner_sym
+    let saved_allocas = self.local_allocas
+    let saved_types = self.local_types
+    let saved_muts = self.local_muts
+    let saved_fn_sigs = self.local_fn_sigs
+    let saved_pointees = self.local_pointee_structs
+    let saved_task_locals = self.task_locals
+    let saved_trait_locals = self.trait_locals
+    let saved_trait_concrete = self.trait_local_concrete_types
+    let saved_scope_syms = self.scope_local_syms
+    let saved_scope_allocas = self.scope_local_allocas
+    let saved_scope_types = self.scope_local_types
+    let saved_scope_count = self.scope_local_count
+    let saved_defer = self.defer_stack
+    let saved_expected = self.expected_type
+    let saved_tail_bb = self.tailrec_body_bb
+    let saved_tail_sym = self.tailrec_fn_sym
+    let saved_tail_allocas = self.tailrec_param_allocas
+    let saved_bb = wl_get_insert_block(self.builder)
+
+    self.current_function = mono_fn
+    self.current_ret_type = mono_ret_ty
+    self.current_method_owner_sym = 0
+    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
+    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_pointees: HashMap[i32, i32] = HashMap.new()
+    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_concrete: HashMap[i32, i32] = HashMap.new()
+    let fresh_scope_syms: Vec[i32] = Vec.new()
+    let fresh_scope_allocas: Vec[i64] = Vec.new()
+    let fresh_scope_types: Vec[i64] = Vec.new()
+    let fresh_defer_stack: Vec[i32] = Vec.new()
+    let fresh_tail_allocas: Vec[i64] = Vec.new()
+    self.local_allocas = fresh_local_allocas
+    self.local_types = fresh_local_types
+    self.local_muts = fresh_local_muts
+    self.local_fn_sigs = fresh_local_fn_sigs
+    self.local_pointee_structs = fresh_local_pointees
+    self.task_locals = fresh_task_locals
+    self.trait_locals = fresh_trait_locals
+    self.trait_local_concrete_types = fresh_trait_concrete
+    self.scope_local_syms = fresh_scope_syms
+    self.scope_local_allocas = fresh_scope_allocas
+    self.scope_local_types = fresh_scope_types
+    self.scope_local_count = 0
+    self.defer_stack = fresh_defer_stack
+    self.expected_type = mono_ret_ty
+    self.tailrec_body_bb = 0
+    self.tailrec_fn_sym = 0
+    self.tailrec_param_allocas = fresh_tail_allocas
+
+    let entry = wl_append_bb(self.context, mono_fn, "entry")
+    wl_position_at_end(self.builder, entry)
+    for pi in 0..param_count:
+        let p_name = self.pool.get_extra(param_start + pi * 2)
+        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let p_val = wl_get_param(mono_fn, pi)
+        let p_ty = wl_type_of(p_val)
+        let p_alloca = wl_build_alloca(self.builder, p_ty)
+        wl_build_store(self.builder, p_val, p_alloca)
+        self.local_allocas.insert(p_name, p_alloca)
+        self.local_types.insert(p_name, p_ty)
+        self.local_muts.insert(p_name, 1)
+        if p_type_node != 0:
+            let pk = self.pool.kind(p_type_node)
+            if pk == NK_TYPE_FN():
+                self.local_fn_sigs.insert(p_name, self.build_fn_type_from_ast(p_type_node))
+            let dyn_trait = self.dyn_trait_from_type_node(p_type_node)
+            if dyn_trait != 0:
+                self.trait_locals.insert(p_name, dyn_trait)
+
+    let body_val = self.gen_expr(body_node)
+    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
+        if mono_ret_ty == wl_void_type(self.context):
+            wl_build_ret_void(self.builder)
+        else:
+            wl_build_ret(self.builder, self.coerce_value_to_type(body_val, mono_ret_ty))
+
+    self.current_function = saved_fn
+    self.current_ret_type = saved_ret
+    self.current_method_owner_sym = saved_owner
+    self.local_allocas = saved_allocas
+    self.local_types = saved_types
+    self.local_muts = saved_muts
+    self.local_fn_sigs = saved_fn_sigs
+    self.local_pointee_structs = saved_pointees
+    self.task_locals = saved_task_locals
+    self.trait_locals = saved_trait_locals
+    self.trait_local_concrete_types = saved_trait_concrete
+    self.scope_local_syms = saved_scope_syms
+    self.scope_local_allocas = saved_scope_allocas
+    self.scope_local_types = saved_scope_types
+    self.scope_local_count = saved_scope_count
+    self.defer_stack = saved_defer
+    self.expected_type = saved_expected
+    self.tailrec_body_bb = saved_tail_bb
+    self.tailrec_fn_sym = saved_tail_sym
+    self.tailrec_param_allocas = saved_tail_allocas
+    self.type_binding_syms = saved_bind_syms
+    self.type_binding_types = saved_bind_tys
+    self.type_bindings_len = saved_bind_len
+    if saved_bb != 0:
+        wl_position_at_end(self.builder, saved_bb)
+
+    let coerced = self.coerce_call_args_for_fn_value(mono_sym, mono_fn, args_start, arg_vals, arg_count)
+    wl_build_call(self.builder, mono_ft, mono_fn, vec_data_i64(coerced), arg_count)
+
 // ── Call expression ───────────────────────────────────────────────
 
 fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
@@ -2697,7 +5285,12 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
     // Direct call by name
     if self.pool.kind(callee_node) == NK_IDENT():
         let fn_sym = self.pool.get_data0(callee_node)
-        let fn_name = self.intern.resolve(fn_sym)
+        var fn_name = self.intern.resolve(fn_sym)
+        if fn_name.len() == 0:
+            fn_name = self.ident_text_from_node(callee_node)
+        var lookup_sym = fn_sym
+        if fn_name.len() > 0:
+            lookup_sym = self.intern.intern(fn_name)
 
         // Built-in: println/print
         if fn_name == "println":
@@ -2706,8 +5299,24 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
             return self.gen_print_call(args_start, arg_count)
         if fn_name == "eprintln":
             return self.gen_eprintln(args_start, arg_count)
+        if fn_name == "assert":
+            return self.gen_assert_call(args_start, arg_count)
         if fn_name == "todo" or fn_name == "unreachable":
             return self.gen_diverge_builtin(args_start, arg_count)
+
+        let has_direct_fn = self.fn_values.get(lookup_sym).is_some()
+        let has_generic_fn = self.generic_fns.get(lookup_sym).is_some()
+        if not has_direct_fn and not has_generic_fn:
+            // Built-in channels use runtime fiber primitives and are only
+            // active when no user-defined function shadows the name.
+            if fn_name == "Channel":
+                return self.gen_channel_create(args_start, arg_count)
+            if fn_name == "send":
+                return self.gen_channel_send(args_start, arg_count)
+            if fn_name == "recv":
+                return self.gen_channel_recv(args_start, arg_count)
+            if fn_name == "close":
+                return self.gen_channel_close(args_start, arg_count)
 
         // Built-in: Some/None/Ok/Err
         if fn_name == "Some" and arg_count == 1:
@@ -2734,20 +5343,36 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
                 return self.build_result_err(arg, self.expected_type)
             return arg
 
+        // Enum variant constructor calls: Variant(args...)
+        let enum_variant = self.gen_enum_variant_call(lookup_sym, args_start, arg_count)
+        if enum_variant != 0:
+            return enum_variant
+
         // Tail-call optimization
-        if self.tailrec_body_bb != 0 and fn_sym == self.tailrec_fn_sym:
+        if self.tailrec_body_bb != 0 and lookup_sym == self.tailrec_fn_sym:
             return self.gen_tailrec_call(args_start, arg_count)
 
         // Regular function call
-        let fv = self.fn_values.get(fn_sym)
-        let ft = self.fn_fn_types.get(fn_sym)
+        var call_sym = fn_sym
+        var fv = self.fn_values.get(call_sym)
+        var ft = self.fn_fn_types.get(call_sym)
+        if (not fv.is_some() or not ft.is_some()) and lookup_sym != call_sym:
+            call_sym = lookup_sym
+            fv = self.fn_values.get(call_sym)
+            ft = self.fn_fn_types.get(call_sym)
         if fv.is_some() and ft.is_some():
             let args: Vec[i64] = Vec.new()
             for ai in 0..arg_count:
                 let arg_node = self.pool.get_extra(args_start + ai)
                 let arg = self.gen_expr(arg_node)
                 args.push(arg)
-            return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(args), arg_count)
+            let coerced = self.coerce_call_args_for_fn_value(call_sym, fv.unwrap() as i64, args_start, args, arg_count)
+            return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(coerced), arg_count)
+
+        // Generic function call: instantiate a concrete specialization.
+        let gf = self.generic_fns.get(lookup_sym)
+        if gf.is_some():
+            return self.monomorphize_generic_call(lookup_sym, gf.unwrap(), args_start, arg_count)
 
         // Fallback for imported/module-level symbols when internal symbol-key
         // maps do not contain the function entry but LLVM module lookup does.
@@ -2759,15 +5384,27 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
                 for ai in 0..arg_count:
                     let arg_node = self.pool.get_extra(args_start + ai)
                     args.push(self.gen_expr(arg_node))
-                return wl_build_call(self.builder, named_ft, named_f, vec_data_i64(args), arg_count)
+                let coerced = self.coerce_call_args_for_fn_value(lookup_sym, named_f, args_start, args, arg_count)
+                return wl_build_call(self.builder, named_ft, named_f, vec_data_i64(coerced), arg_count)
+
+        // Minimal c_import fallback: support unresolved printf calls by
+        // declaring a variadic printf symbol in IR and emitting the call.
+        if fn_name == "printf":
+            let printf_fn = self.ensure_printf_declared()
+            let printf_ty = self.get_printf_fn_type()
+            let args: Vec[i64] = Vec.new()
+            for ai in 0..arg_count:
+                let arg_node = self.pool.get_extra(args_start + ai)
+                args.push(self.gen_expr(arg_node))
+            return wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(args), arg_count)
 
         // Check if it's a function pointer local
-        let la = self.local_allocas.get(fn_sym)
+        let la = self.local_allocas.get(lookup_sym)
         if la.is_some():
-            let fs = self.local_fn_sigs.get(fn_sym)
+            let fs = self.local_fn_sigs.get(lookup_sym)
             if fs.is_some():
                 let fn_ptr_alloca = la.unwrap() as i64
-                let fn_ty_opt = self.local_types.get(fn_sym)
+                let fn_ty_opt = self.local_types.get(lookup_sym)
                 if fn_ty_opt.is_some():
                     let fat_ptr = wl_build_load(self.builder, fn_ty_opt.unwrap() as i64, fn_ptr_alloca)
                     let fn_ptr = wl_build_extract_value(self.builder, fat_ptr, 0)
@@ -2778,6 +5415,11 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
                         let arg_node = self.pool.get_extra(args_start + ai)
                         args.push(self.gen_expr(arg_node))
                     return wl_build_call(self.builder, fs.unwrap() as i64, fn_ptr, vec_data_i64(args), arg_count + 1)
+
+        let err_name = if fn_name.len() > 0: fn_name else: self.function_symbol_name(fn_sym)
+        with_eprintln("error: unsupported call to '" ++ err_name ++ "'")
+        self.had_error = 1
+        return wl_get_undef(wl_i32_type(self.context))
 
     // Indirect call (expression as callee)
     let callee = self.gen_expr(callee_node)
@@ -2792,6 +5434,108 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
         if wl_get_type_kind(gvt) == wl_function_type_kind():
             return wl_build_call(self.builder, gvt, callee, vec_data_i64(args), arg_count)
     wl_get_undef(wl_i32_type(self.context))
+
+fn Codegen.ensure_channel_create_decl(self: Codegen) -> i64:
+    let existing = wl_get_named_function(self.llmod, "with_channel_create")
+    if existing != 0:
+        return existing
+    let params: Vec[i64] = Vec.new()
+    params.push(wl_i32_type(self.context))
+    let fn_ty = wl_function_type(wl_ptr_type(self.context), vec_data_i64(params), 1, 0)
+    wl_add_function(self.llmod, "with_channel_create", fn_ty)
+
+fn Codegen.ensure_channel_send_decl(self: Codegen) -> i64:
+    let existing = wl_get_named_function(self.llmod, "with_channel_send")
+    if existing != 0:
+        return existing
+    let params: Vec[i64] = Vec.new()
+    params.push(wl_ptr_type(self.context))
+    params.push(wl_i64_type(self.context))
+    let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(params), 2, 0)
+    wl_add_function(self.llmod, "with_channel_send", fn_ty)
+
+fn Codegen.ensure_channel_recv_decl(self: Codegen) -> i64:
+    let existing = wl_get_named_function(self.llmod, "with_channel_recv")
+    if existing != 0:
+        return existing
+    let params: Vec[i64] = Vec.new()
+    params.push(wl_ptr_type(self.context))
+    let fn_ty = wl_function_type(wl_i64_type(self.context), vec_data_i64(params), 1, 0)
+    wl_add_function(self.llmod, "with_channel_recv", fn_ty)
+
+fn Codegen.ensure_channel_close_decl(self: Codegen) -> i64:
+    let existing = wl_get_named_function(self.llmod, "with_channel_close")
+    if existing != 0:
+        return existing
+    let params: Vec[i64] = Vec.new()
+    params.push(wl_ptr_type(self.context))
+    let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(params), 1, 0)
+    wl_add_function(self.llmod, "with_channel_close", fn_ty)
+
+fn Codegen.gen_channel_create(self: Codegen, args_start: i32, arg_count: i32) -> i64:
+    let i32_ty = wl_i32_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+    var capacity = wl_const_int(i32_ty, 256, 0)
+    if arg_count >= 1:
+        let cap_val = self.gen_expr(self.pool.get_extra(args_start))
+        capacity = self.coerce_int(cap_val, i32_ty)
+    let create_fn = self.ensure_channel_create_decl()
+    let create_ty = wl_global_get_value_type(create_fn)
+    let args: Vec[i64] = Vec.new()
+    args.push(capacity)
+    let ch_ptr = wl_build_call(self.builder, create_ty, create_fn, vec_data_i64(args), 1)
+    wl_build_ptr_to_int(self.builder, ch_ptr, i64_ty)
+
+fn Codegen.gen_channel_send(self: Codegen, args_start: i32, arg_count: i32) -> i64:
+    if arg_count != 2:
+        return wl_get_undef(wl_i32_type(self.context))
+    let i64_ty = wl_i64_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let ch_handle = self.gen_expr(self.pool.get_extra(args_start))
+    let payload = self.gen_expr(self.pool.get_extra(args_start + 1))
+    let ch_i64 = self.coerce_int(ch_handle, i64_ty)
+    let payload_i64 = self.coerce_int(payload, i64_ty)
+    let ch_ptr = wl_build_int_to_ptr(self.builder, ch_i64, ptr_ty)
+    let send_fn = self.ensure_channel_send_decl()
+    let send_ty = wl_global_get_value_type(send_fn)
+    let args: Vec[i64] = Vec.new()
+    args.push(ch_ptr)
+    args.push(payload_i64)
+    let _ = wl_build_call(self.builder, send_ty, send_fn, vec_data_i64(args), 2)
+    wl_const_int(wl_i32_type(self.context), 0, 0)
+
+fn Codegen.gen_channel_recv(self: Codegen, args_start: i32, arg_count: i32) -> i64:
+    if arg_count != 1:
+        return wl_get_undef(wl_i32_type(self.context))
+    let i32_ty = wl_i32_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let ch_handle = self.gen_expr(self.pool.get_extra(args_start))
+    let ch_i64 = self.coerce_int(ch_handle, i64_ty)
+    let ch_ptr = wl_build_int_to_ptr(self.builder, ch_i64, ptr_ty)
+    let recv_fn = self.ensure_channel_recv_decl()
+    let recv_ty = wl_global_get_value_type(recv_fn)
+    let args: Vec[i64] = Vec.new()
+    args.push(ch_ptr)
+    let result_i64 = wl_build_call(self.builder, recv_ty, recv_fn, vec_data_i64(args), 1)
+    if self.expected_type == i64_ty:
+        return result_i64
+    wl_build_trunc(self.builder, result_i64, i32_ty)
+
+fn Codegen.gen_channel_close(self: Codegen, args_start: i32, arg_count: i32) -> i64:
+    if arg_count != 1:
+        return wl_get_undef(wl_i32_type(self.context))
+    let i64_ty = wl_i64_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let ch_handle = self.gen_expr(self.pool.get_extra(args_start))
+    let ch_i64 = self.coerce_int(ch_handle, i64_ty)
+    let ch_ptr = wl_build_int_to_ptr(self.builder, ch_i64, ptr_ty)
+    let close_fn = self.ensure_channel_close_decl()
+    let close_ty = wl_global_get_value_type(close_fn)
+    let args: Vec[i64] = Vec.new()
+    args.push(ch_ptr)
+    let _ = wl_build_call(self.builder, close_ty, close_fn, vec_data_i64(args), 1)
+    wl_const_int(wl_i32_type(self.context), 0, 0)
 
 fn Codegen.gen_tailrec_call(self: Codegen, args_start: i32, arg_count: i32) -> i64:
     // Store args to param allocas, then branch to body BB
@@ -2817,7 +5561,12 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
 
     let obj_node = self.pool.get_data0(callee_node)
     let method_sym = self.pool.get_data1(callee_node)
-    let method_name = self.intern.resolve(method_sym)
+    var method_name = self.intern.resolve(method_sym)
+    if method_name.len() == 0:
+        method_name = self.method_text_from_field_access(callee_node)
+    var method_lookup_sym = method_sym
+    if method_name.len() > 0:
+        method_lookup_sym = self.intern.intern(method_name)
 
     let obj = self.gen_expr(obj_node)
     let obj_ty = wl_type_of(obj)
@@ -2848,9 +5597,14 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
         return self.gen_hashmap_method(method_name, obj, args_start, arg_count, hmc.unwrap())
 
     // Option methods (is_some, unwrap, etc.)
-    let oc = self.option_cache_map.get(obj_ty)
-    if oc.is_some():
+    let option_payload_ty = self.find_option_payload_type_by_llvm(obj_ty)
+    if option_payload_ty != 0:
         return self.gen_option_method(method_name, obj, args_start, arg_count)
+
+    // Auto-generated enum accessors: .is_X() and .as_X[_ref|_mut]().
+    let enum_accessor = self.gen_enum_accessor_method(callee_node, obj_node, obj, obj_ty, method_name, arg_count)
+    if enum_accessor != 0:
+        return enum_accessor
 
     // Try Type.method lookup
     if type_sym != 0:
@@ -2871,7 +5625,8 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
             for ai in 0..arg_count:
                 let arg_node = self.pool.get_extra(args_start + ai)
                 args.push(self.gen_expr(arg_node))
-            return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(args), arg_count + 1)
+            let coerced = self.coerce_call_args_for_fn_value(fn_sym, fv.unwrap() as i64, 0 - 1, args, arg_count + 1)
+            return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(coerced), arg_count + 1)
 
     // Check pointer-to-struct methods
     if wl_get_type_kind(obj_ty) == wl_pointer_type_kind():
@@ -2890,7 +5645,20 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
                     for ai in 0..arg_count:
                         let arg_node = self.pool.get_extra(args_start + ai)
                         args.push(self.gen_expr(arg_node))
-                    return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(args), arg_count + 1)
+                    let coerced = self.coerce_call_args_for_fn_value(fn_sym, fv.unwrap() as i64, 0 - 1, args, arg_count + 1)
+                    return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(coerced), arg_count + 1)
+
+    // Dyn trait method dispatch via fat-pointer {data_ptr, vtable_ptr}.
+    if self.pool.kind(obj_node) == NK_IDENT():
+        let obj_sym = self.pool.get_data0(obj_node)
+        let trait_sym = self.trait_locals.get(obj_sym)
+        if trait_sym.is_some():
+            let concrete_sym = self.trait_local_concrete_types.get(obj_sym)
+            if concrete_sym.is_some():
+                let direct = self.gen_known_concrete_dispatch(obj, concrete_sym.unwrap(), method_lookup_sym, args_start, arg_count)
+                if direct != 0:
+                    return direct
+            return self.gen_dyn_dispatch(obj, trait_sym.unwrap(), method_lookup_sym, args_start, arg_count)
 
     wl_get_undef(wl_i32_type(self.context))
 
@@ -3148,8 +5916,28 @@ fn Codegen.gen_match(self: Codegen, node: i32) -> i64:
     let subject_node = self.pool.get_data0(node)
     let arms_start = self.pool.get_data1(node)
     let arm_count = self.pool.get_data2(node)
-    let subject = self.gen_expr(subject_node)
-    let subject_ty = wl_type_of(subject)
+    var subject = self.gen_expr(subject_node)
+    var subject_ty = wl_type_of(subject)
+
+    // Method `self` values are often lowered as pointers; load enum/struct
+    // pointees so match lowering can build a switch over tags/integers.
+    if wl_get_type_kind(subject_ty) == wl_pointer_type_kind() and self.pool.kind(subject_node) == NK_IDENT():
+        let subj_sym = self.pool.get_data0(subject_node)
+        let ps = self.local_pointee_structs.get(subj_sym)
+        if ps.is_some():
+            let pointee_sym = ps.unwrap()
+            var pointee_ty: i64 = 0
+            let et = self.enum_type_map.get(pointee_sym)
+            if et.is_some():
+                pointee_ty = self.enum_llvm_types.get(et.unwrap() as i64)
+            else:
+                let st = self.struct_type_map.get(pointee_sym)
+                if st.is_some():
+                    pointee_ty = self.struct_llvm_types.get(st.unwrap() as i64)
+            if pointee_ty != 0:
+                subject = wl_build_load(self.builder, pointee_ty, subject)
+                subject_ty = pointee_ty
+
     let merge_bb = wl_append_bb(self.context, self.current_function, "match.end")
 
     // Check if matching on integer or enum
@@ -3188,6 +5976,9 @@ fn Codegen.gen_match(self: Codegen, node: i32) -> i64:
                     wl_add_case(sw, wl_const_int(wl_i32_type(self.context), v_idx as i64, 0), arm_bb)
             else if pk == NK_PAT_WILDCARD() or pk == NK_PAT_IDENT():
                 // Default arm
+                wl_position_at_end(self.builder, arm_bb)
+                if wl_get_bb_terminator(arm_bb) == 0:
+                    wl_build_unreachable(self.builder)
                 wl_position_at_end(self.builder, default_bb)
                 if pk == NK_PAT_IDENT():
                     let bind_sym = self.pool.get_data0(pat_node)
@@ -3214,14 +6005,49 @@ fn Codegen.gen_match(self: Codegen, node: i32) -> i64:
                 let v_bind_count = self.pool.get_data2(pat_node)
                 if v_bind_count > 0:
                     let v_extra = self.pool.get_data1(pat_node)
-                    let bind_sym = self.pool.get_extra(v_extra)
-                    let payload = wl_build_extract_value(self.builder, subject, 1)
-                    let pay_ty = wl_type_of(payload)
-                    let alloca = self.create_entry_alloca(pay_ty)
-                    wl_build_store(self.builder, payload, alloca)
-                    self.local_allocas.insert(bind_sym, alloca)
-                    self.local_types.insert(bind_sym, pay_ty)
-                    self.local_muts.insert(bind_sym, 0)
+                    let raw_payload = wl_build_extract_value(self.builder, subject, 1)
+                    var payload_val = raw_payload
+                    var payload_ty = wl_type_of(raw_payload)
+
+                    let variant_sym = self.pool.get_data0(pat_node)
+                    let variant_idx = self.find_variant_index(subject_ty, variant_sym)
+                    if variant_idx >= 0:
+                        let es = self.enum_by_llvm.get(subject_ty)
+                        if es.is_some():
+                            let et = self.enum_type_map.get(es.unwrap())
+                            if et.is_some():
+                                let v_start = self.enum_variant_starts.get(et.unwrap() as i64)
+                                let declared_payload_ty = self.enum_variant_payloads.get((v_start + variant_idx) as i64)
+                                if declared_payload_ty != 0:
+                                    let raw_ty = wl_type_of(raw_payload)
+                                    let raw_alloca = wl_build_alloca(self.builder, raw_ty)
+                                    wl_build_store(self.builder, raw_payload, raw_alloca)
+                                    let cast_ptr = wl_build_bitcast(self.builder, raw_alloca, wl_ptr_type(self.context))
+                                    payload_val = wl_build_load(self.builder, declared_payload_ty, cast_ptr)
+                                    payload_ty = declared_payload_ty
+
+                    let payload_fields = if wl_get_type_kind(payload_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(payload_ty) else: 0
+                    for bi in 0..v_bind_count:
+                        var bind_sym = 0
+                        if pk == NK_PAT_VARIANT():
+                            let bind_pat = self.pool.get_extra(v_extra + bi)
+                            if self.pool.kind(bind_pat) == NK_PAT_IDENT():
+                                bind_sym = self.pool.get_data0(bind_pat)
+                            else:
+                                continue
+                        else:
+                            bind_sym = self.pool.get_extra(v_extra + bi)
+                        if bind_sym == 0:
+                            continue
+                        var bind_val = payload_val
+                        if v_bind_count > 1 and payload_fields > bi:
+                            bind_val = wl_build_extract_value(self.builder, payload_val, bi)
+                        let bind_ty = wl_type_of(bind_val)
+                        let alloca = self.create_entry_alloca(bind_ty)
+                        wl_build_store(self.builder, bind_val, alloca)
+                        self.local_allocas.insert(bind_sym, alloca)
+                        self.local_types.insert(bind_sym, bind_ty)
+                        self.local_muts.insert(bind_sym, 0)
 
             let body_val = self.gen_expr(body_node)
             if not has_result and wl_type_of(body_val) != wl_void_type(self.context):
@@ -3245,18 +6071,199 @@ fn Codegen.gen_match(self: Codegen, node: i32) -> i64:
     wl_get_undef(wl_void_type(self.context))
 
 fn Codegen.find_variant_index(self: Codegen, enum_ty: i64, variant_sym: i32) -> i32:
+    // Prefer deterministic vector-order lookup by LLVM type and variant symbol.
+    // This avoids map-key collision issues when multiple enums share a lowered
+    // LLVM layout.
+    var fallback_idx = 0 - 1
+    for ei in 0..self.enum_llvm_types.len() as i32:
+        if self.enum_llvm_types.get(ei as i64) != enum_ty:
+            continue
+        if fallback_idx < 0:
+            fallback_idx = ei
+        let v_start = self.enum_variant_starts.get(ei as i64)
+        let v_count = self.enum_variant_counts.get(ei as i64)
+        for vi in 0..v_count:
+            if self.enum_variant_names.get((v_start + vi) as i64) == variant_sym:
+                return vi
+    if fallback_idx >= 0:
+        let v_start = self.enum_variant_starts.get(fallback_idx as i64)
+        let v_count = self.enum_variant_counts.get(fallback_idx as i64)
+        for vi in 0..v_count:
+            if self.enum_variant_names.get((v_start + vi) as i64) == variant_sym:
+                return vi
     let es = self.enum_by_llvm.get(enum_ty)
-    if not es.is_some(): return 0 - 1
-    let enum_sym = es.unwrap()
-    let et = self.enum_type_map.get(enum_sym)
-    if not et.is_some(): return 0 - 1
-    let idx = et.unwrap()
-    let v_start = self.enum_variant_starts.get(idx as i64)
-    let v_count = self.enum_variant_counts.get(idx as i64)
-    for i in 0..v_count:
-        if self.enum_variant_names.get((v_start + i) as i64) == variant_sym:
-            return i
+    if es.is_some():
+        let enum_sym = es.unwrap()
+        let et = self.enum_type_map.get(enum_sym)
+        if et.is_some():
+            let idx = et.unwrap()
+            let v_start = self.enum_variant_starts.get(idx as i64)
+            let v_count = self.enum_variant_counts.get(idx as i64)
+            for i in 0..v_count:
+                if self.enum_variant_names.get((v_start + i) as i64) == variant_sym:
+                    return i
     0 - 1
+
+fn Codegen.find_enum_index_for_receiver(self: Codegen, obj_node: i32, obj_ty: i64, requested_variant_sym: i32) -> i32:
+    // Prefer local tracked enum symbol for stable disambiguation.
+    if self.pool.kind(obj_node) == NK_IDENT():
+        let sym = self.pool.get_data0(obj_node)
+        let es = self.enum_local_types.get(sym)
+        if es.is_some():
+            let et = self.enum_type_map.get(es.unwrap())
+            if et.is_some():
+                let idx = et.unwrap()
+                if idx >= 0 and idx < self.enum_llvm_types.len() as i32:
+                    if self.enum_llvm_types.get(idx as i64) == obj_ty:
+                        return idx
+
+    var fallback_idx = 0 - 1
+    for ei in 0..self.enum_llvm_types.len() as i32:
+        if self.enum_llvm_types.get(ei as i64) != obj_ty:
+            continue
+        if fallback_idx < 0:
+            fallback_idx = ei
+        if requested_variant_sym != 0:
+            let v_start = self.enum_variant_starts.get(ei as i64)
+            let v_count = self.enum_variant_counts.get(ei as i64)
+            for vi in 0..v_count:
+                if self.enum_variant_names.get((v_start + vi) as i64) == requested_variant_sym:
+                    return ei
+    fallback_idx
+
+fn Codegen.gen_enum_accessor_method(self: Codegen, callee_node: i32, obj_node: i32, obj: i64, obj_ty: i64, method_name: str, arg_count: i32) -> i64:
+    let method_len = method_name.len() as i32
+    let is_is = method_len > 3 and method_name.slice(0, 3) == "is_"
+    let is_as = method_len > 3 and method_name.slice(0, 3) == "as_"
+    if not is_is and not is_as:
+        return 0
+    if arg_count != 0:
+        return 0
+
+    var variant_name = ""
+    if is_is:
+        variant_name = method_name.slice(3, method_name.len())
+    else:
+        variant_name = method_name.slice(3, method_name.len())
+        if variant_name.len() > 4:
+            let suffix = variant_name.slice(variant_name.len() - 4, variant_name.len())
+            if suffix == "_ref" or suffix == "_mut":
+                variant_name = variant_name.slice(0, variant_name.len() - 4)
+    if variant_name.len() == 0:
+        return 0
+
+    let variant_sym = self.intern.intern(variant_name)
+    let enum_idx = self.find_enum_index_for_receiver(obj_node, obj_ty, variant_sym)
+    if enum_idx < 0:
+        return 0
+
+    let v_start = self.enum_variant_starts.get(enum_idx as i64)
+    let v_count = self.enum_variant_counts.get(enum_idx as i64)
+    var v_idx = 0 - 1
+    for vi in 0..v_count:
+        if self.enum_variant_names.get((v_start + vi) as i64) == variant_sym:
+            v_idx = vi
+            break
+    if v_idx < 0:
+        return 0
+
+    let tag = wl_build_extract_value(self.builder, obj, 0)
+    let expected_tag = wl_const_int(wl_i32_type(self.context), v_idx as i64, 0)
+    let is_match = wl_build_icmp(self.builder, wl_int_eq(), tag, expected_tag)
+    if is_is:
+        return is_match
+
+    let payload_ty = self.enum_variant_payloads.get((v_start + v_idx) as i64)
+    if payload_ty == 0:
+        let call_text = self.ident_text_from_node(callee_node)
+        let err_name = if call_text.len() > 0: call_text else: method_name
+        with_eprintln("error: unsupported call to '" ++ err_name ++ "'")
+        self.had_error = 1
+        return wl_get_undef(wl_i32_type(self.context))
+
+    let opt_ty = self.get_or_create_option_type(payload_ty)
+    let match_bb = wl_append_bb(self.context, self.current_function, "enum.as.match")
+    let nomatch_bb = wl_append_bb(self.context, self.current_function, "enum.as.nomatch")
+    let merge_bb = wl_append_bb(self.context, self.current_function, "enum.as.merge")
+    wl_build_cond_br(self.builder, is_match, match_bb, nomatch_bb)
+
+    wl_position_at_end(self.builder, match_bb)
+    let raw_payload = wl_build_extract_value(self.builder, obj, 1)
+    let raw_ty = wl_type_of(raw_payload)
+    let raw_alloca = wl_build_alloca(self.builder, raw_ty)
+    wl_build_store(self.builder, raw_payload, raw_alloca)
+    let cast_ptr = wl_build_bitcast(self.builder, raw_alloca, wl_ptr_type(self.context))
+    let payload_val = wl_build_load(self.builder, payload_ty, cast_ptr)
+    let some_val = self.build_option_some(payload_val, opt_ty)
+    wl_build_br(self.builder, merge_bb)
+    let match_end = wl_get_insert_block(self.builder)
+
+    wl_position_at_end(self.builder, nomatch_bb)
+    let none_val = self.build_option_none(opt_ty)
+    wl_build_br(self.builder, merge_bb)
+    let nomatch_end = wl_get_insert_block(self.builder)
+
+    wl_position_at_end(self.builder, merge_bb)
+    let phi = wl_build_phi(self.builder, opt_ty)
+    let vals: Vec[i64] = Vec.new()
+    let bbs: Vec[i64] = Vec.new()
+    vals.push(some_val)
+    vals.push(none_val)
+    bbs.push(match_end)
+    bbs.push(nomatch_end)
+    wl_add_incoming(phi, vec_data_i64(vals), vec_data_i64(bbs), 2)
+    phi
+
+fn Codegen.build_variant_payload(self: Codegen, payload_ty: i64, args_start: i32, arg_count: i32) -> i64:
+    if arg_count <= 0:
+        return wl_get_undef(wl_i32_type(self.context))
+    if payload_ty == 0:
+        return self.gen_expr(self.pool.get_extra(args_start))
+    if arg_count == 1:
+        let arg = self.gen_expr(self.pool.get_extra(args_start))
+        return self.coerce_value_to_type(arg, payload_ty)
+
+    if wl_get_type_kind(payload_ty) == wl_struct_type_kind():
+        var payload = wl_get_undef(payload_ty)
+        let field_count = wl_count_struct_elem_types(payload_ty)
+        var ai = 0
+        while ai < arg_count and ai < field_count:
+            let arg = self.gen_expr(self.pool.get_extra(args_start + ai))
+            let field_ty = wl_struct_get_type_at(payload_ty, ai)
+            let coerced = self.coerce_value_to_type(arg, field_ty)
+            payload = wl_build_insert_value(self.builder, payload, coerced, ai)
+            ai = ai + 1
+        return payload
+
+    let first = self.gen_expr(self.pool.get_extra(args_start))
+    self.coerce_value_to_type(first, payload_ty)
+
+fn Codegen.gen_enum_variant_call(self: Codegen, variant_sym: i32, args_start: i32, arg_count: i32) -> i64:
+    let variant_name = self.intern.resolve(variant_sym)
+    for ei in 0..self.enum_llvm_types.len() as i32:
+        let v_start = self.enum_variant_starts.get(ei as i64)
+        let v_count = self.enum_variant_counts.get(ei as i64)
+        for vi in 0..v_count:
+            let stored_sym = self.enum_variant_names.get((v_start + vi) as i64)
+            if stored_sym != variant_sym:
+                let stored_name = self.intern.resolve(stored_sym)
+                if stored_name != variant_name:
+                    continue
+            let enum_ty = self.enum_llvm_types.get(ei as i64)
+            let alloca = wl_build_alloca(self.builder, enum_ty)
+            wl_build_store(self.builder, self.build_default_value(enum_ty), alloca)
+            let tag_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 0)
+            wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), vi as i64, 0), tag_ptr)
+            if arg_count > 0:
+                let payload_ty = self.enum_variant_payloads.get((v_start + vi) as i64)
+                let elem_count = wl_count_struct_elem_types(enum_ty)
+                if payload_ty != 0 and elem_count > 1:
+                    let payload = self.build_variant_payload(payload_ty, args_start, arg_count)
+                    let payload_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 1)
+                    let cast_ptr = wl_build_bitcast(self.builder, payload_ptr, wl_ptr_type(self.context))
+                    wl_build_store(self.builder, payload, cast_ptr)
+            return wl_build_load(self.builder, enum_ty, alloca)
+    0
 
 // ── Struct literal ────────────────────────────────────────────────
 
@@ -3264,9 +6271,23 @@ fn Codegen.gen_struct_lit(self: Codegen, node: i32) -> i64:
     let type_sym = self.pool.get_data0(node)
     let fields_start = self.pool.get_data1(node)
     let field_count = self.pool.get_data2(node)
+    var actual_type_sym = type_sym
+    var st_idx = 0 - 1
     let st_opt = self.struct_type_map.get(type_sym)
-    if not st_opt.is_some(): return wl_get_undef(wl_i32_type(self.context))
-    let st_idx = st_opt.unwrap()
+    if st_opt.is_some():
+        st_idx = st_opt.unwrap()
+    else:
+        let gs_opt = self.generic_structs.get(type_sym)
+        if gs_opt.is_some():
+            let mono_ty = self.monomorphize_struct(type_sym, 0, 0)
+            if mono_ty != 0:
+                let mono_idx = self.find_struct_index_by_type(mono_ty)
+                if mono_idx >= 0:
+                    st_idx = mono_idx
+                    if mono_idx < self.struct_index_syms.len() as i32:
+                        actual_type_sym = self.struct_index_syms.get(mono_idx as i64)
+    if st_idx < 0:
+        return wl_get_undef(wl_i32_type(self.context))
     let st_ty = self.struct_llvm_types.get(st_idx as i64)
     let st_field_start = self.struct_field_starts.get(st_idx as i64)
     let st_field_count = self.struct_field_counts.get(st_idx as i64)
@@ -3282,7 +6303,7 @@ fn Codegen.gen_struct_lit(self: Codegen, node: i32) -> i64:
     for i in 0..field_count:
         let f_name = self.pool.get_extra(fields_start + i * 2)
         let f_val_node = self.pool.get_extra(fields_start + i * 2 + 1)
-        let fi = self.find_field_index(type_sym, f_name)
+        let fi = self.find_field_index(actual_type_sym, f_name)
         if fi >= 0:
             let fty = self.struct_field_types.get((st_field_start + fi) as i64)
             self.expected_type = fty
@@ -3315,14 +6336,15 @@ fn Codegen.gen_enum_variant(self: Codegen, node: i32) -> i64:
             break
 
     let alloca = wl_build_alloca(self.builder, enum_ty)
+    wl_build_store(self.builder, self.build_default_value(enum_ty), alloca)
     let tag_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 0)
     wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), v_idx as i64, 0), tag_ptr)
 
     if arg_count > 0:
-        let payload_node = self.pool.get_extra(extra_start + 1)
-        let payload = self.gen_expr(payload_node)
+        let payload_ty = self.enum_variant_payloads.get((v_start + v_idx) as i64)
+        let payload = self.build_variant_payload(payload_ty, extra_start + 1, arg_count)
         let elem_count = wl_count_struct_elem_types(enum_ty)
-        if elem_count > 1:
+        if payload_ty != 0 and elem_count > 1:
             let payload_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 1)
             let cast_ptr = wl_build_bitcast(self.builder, payload_ptr, wl_ptr_type(self.context))
             wl_build_store(self.builder, payload, cast_ptr)
@@ -3346,13 +6368,14 @@ fn Codegen.gen_variant_shorthand(self: Codegen, node: i32) -> i64:
             if self.enum_variant_names.get((v_start + vi) as i64) == name_sym:
                 let enum_ty = self.enum_llvm_types.get(ei as i64)
                 let alloca = wl_build_alloca(self.builder, enum_ty)
+                wl_build_store(self.builder, self.build_default_value(enum_ty), alloca)
                 let tag_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 0)
                 wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), vi as i64, 0), tag_ptr)
                 if arg_count > 0:
-                    let arg_node = self.pool.get_extra(args_start)
-                    let payload = self.gen_expr(arg_node)
+                    let payload_ty = self.enum_variant_payloads.get((v_start + vi) as i64)
+                    let payload = self.build_variant_payload(payload_ty, args_start, arg_count)
                     let elem_count = wl_count_struct_elem_types(enum_ty)
-                    if elem_count > 1:
+                    if payload_ty != 0 and elem_count > 1:
                         let payload_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 1)
                         let cast_ptr = wl_build_bitcast(self.builder, payload_ptr, wl_ptr_type(self.context))
                         wl_build_store(self.builder, payload, cast_ptr)
@@ -4530,6 +7553,37 @@ fn Codegen.gen_diverge_builtin(self: Codegen, args_start: i32, arg_count: i32) -
     if self.expected_type != 0:
         return wl_get_undef(self.expected_type)
     wl_get_undef(wl_i32_type(self.context))
+
+fn Codegen.gen_assert_call(self: Codegen, args_start: i32, arg_count: i32) -> i64:
+    if arg_count < 1:
+        return wl_get_undef(wl_i32_type(self.context))
+
+    let cond = self.gen_expr(self.pool.get_extra(args_start))
+    var cond_bool = cond
+    let cond_ty = wl_type_of(cond)
+    if cond_ty != wl_i1_type(self.context):
+        cond_bool = wl_build_icmp(self.builder, wl_int_ne(), cond, wl_const_int(cond_ty, 0, 0))
+
+    let fail_bb = wl_append_bb(self.context, self.current_function, "assert.fail")
+    let ok_bb = wl_append_bb(self.context, self.current_function, "assert.ok")
+    wl_build_cond_br(self.builder, cond_bool, ok_bb, fail_bb)
+
+    wl_position_at_end(self.builder, fail_bb)
+    if arg_count > 1:
+        let printf_fn = self.ensure_printf_declared()
+        let printf_ty = self.get_printf_fn_type()
+        let msg = self.gen_expr(self.pool.get_extra(args_start + 1))
+        self.gen_print_value(msg, printf_fn, printf_ty)
+        let nl = wl_build_global_string_ptr(self.builder, "\n")
+        let nl_args: Vec[i64] = Vec.new()
+        nl_args.push(nl)
+        wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(nl_args), 1)
+
+    self.emit_exit_call(134)
+    wl_build_unreachable(self.builder)
+
+    wl_position_at_end(self.builder, ok_bb)
+    wl_const_int(wl_i32_type(self.context), 0, 0)
 
 fn Codegen.emit_exit_call(self: Codegen, code: i32):
     let exit_fn = wl_get_named_function(self.llmod, "_exit")

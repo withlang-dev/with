@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="./with-stage2"
 TIMEOUT_BIN="$(command -v timeout || true)"
@@ -15,6 +16,8 @@ if [[ ! -x "$SELFHOST_BIN" ]]; then
   echo "error: missing self-host compiler: $SELFHOST_BIN"
   exit 1
 fi
+
+SELFHOST_BIN="$(prepare_selfhost_runner "$ROOT_DIR" "$SELFHOST_BIN")"
 
 run_compiler() {
   local mode="$1"
@@ -40,7 +43,7 @@ run_check_with_flag() {
 
 failures=0
 tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"' EXIT
+trap 'rm -rf "$tmpdir"; cleanup_selfhost_runner' EXIT
 
 expect_check_pass() {
   local file="$1"
