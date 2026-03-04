@@ -623,9 +623,14 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
     if kind == NK_WITH_EXPR():
         let source = pool.get_data0(node)
         let body = pool.get_data1(node)
-        let name = intern.resolve(pool.get_data2(node))
+        let encoded = pool.get_data2(node)
+        let name = intern.resolve(decode_with_binding_sym(encoded))
+        let is_mut = decode_with_binding_is_mut(encoded)
         var out = prefix ++ "with " ++ render_expr(pool, intern, source, 0)
-        out = out ++ " as " ++ name ++ ":\n"
+        if is_mut != 0:
+            out = out ++ " as mut " ++ name ++ ":\n"
+        else:
+            out = out ++ " as " ++ name ++ ":\n"
         out = out ++ render_expr(pool, intern, body, indent + 2)
         return out
 

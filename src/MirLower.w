@@ -1249,7 +1249,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NK_WITH_EXPR():
         let source = self.ast.get_data0(node)
         let body = self.ast.get_data1(node)
-        let name = self.ast.get_data2(node)
+        let name = decode_with_binding_sym(self.ast.get_data2(node))
         if name != 0:
             let fake_ident = self.ast.add_node(NK_IDENT(), self.ast.get_start(node), self.ast.get_end(node), name, 0, 0)
             return self.lower_with_form2_3(fake_ident, source, body)

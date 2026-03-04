@@ -160,6 +160,7 @@ fn MirModule.init -> MirModule:
         body_fn_syms: Vec.new(),
     }
 
+// No-op: reserved for future manual memory management.
 fn MirModule.deinit(self: MirModule):
     return
 

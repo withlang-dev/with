@@ -10,10 +10,10 @@ STAGE0_BIN="${ROOT_DIR}/bootstrap/zig-out/bin/with"
 SELFHOST_BIN="${ROOT_DIR}/with-stage2"
 CORPUS_FILE="test/wave11/driver_corpus.txt"
 VERIFY_COVERAGE_SCRIPT="scripts/verify_wave11_coverage.sh"
-TIMEOUT_BIN="$(command -v timeout || true)"
-RUN_TIMEOUT_SECS=25
-CLI_TIMEOUT_SECS=25
-MODE_TIMEOUT_SECS=40
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
+RUN_TIMEOUT_SECS="${PARITY_RUN_TIMEOUT_SECS:-25}"
+CLI_TIMEOUT_SECS="${PARITY_CLI_TIMEOUT_SECS:-25}"
+MODE_TIMEOUT_SECS="${PARITY_MODE_TIMEOUT_SECS:-40}"
 
 echo "building bootstrap compiler for Wave 11 driver parity..."
 (
@@ -79,27 +79,21 @@ run_mode() {
   local src="$3"
   local out_file="$4"
   local err_file="$5"
+  local timeout_secs="$MODE_TIMEOUT_SECS"
 
-  if [[ -n "$TIMEOUT_BIN" ]]; then
-    if [[ "$mode" == "run" ]]; then
-      "$TIMEOUT_BIN" -k 5 "$RUN_TIMEOUT_SECS" "$bin" "$mode" "$src" >"$out_file" 2>"$err_file"
-      return $?
-    fi
-    "$TIMEOUT_BIN" -k 5 "$MODE_TIMEOUT_SECS" "$bin" "$mode" "$src" >"$out_file" 2>"$err_file"
-    return $?
+  if [[ "$mode" == "run" ]]; then
+    timeout_secs="$RUN_TIMEOUT_SECS"
   fi
 
-  "$bin" "$mode" "$src" >"$out_file" 2>"$err_file"
+  runner_exec_capture "$timeout_secs" "$out_file" "$err_file" "$bin" "$mode" "$src"
 }
 
 run_cli_cmd() {
   local timeout_secs="$1"
-  shift
-  if [[ -n "$TIMEOUT_BIN" ]]; then
-    "$TIMEOUT_BIN" -k 5 "$timeout_secs" "$@"
-    return $?
-  fi
-  "$@"
+  local out_file="$2"
+  local err_file="$3"
+  shift 3
+  runner_exec_capture "$timeout_secs" "$out_file" "$err_file" "$@"
 }
 
 run_cli_key() {
@@ -110,20 +104,20 @@ run_cli_key() {
 
   case "$key" in
     help)
-      run_cli_cmd "$CLI_TIMEOUT_SECS" "$bin" help >"$out_file" 2>"$err_file"
+      run_cli_cmd "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$bin" help
       ;;
     version)
-      run_cli_cmd "$CLI_TIMEOUT_SECS" "$bin" version >"$out_file" 2>"$err_file"
+      run_cli_cmd "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$bin" version
       ;;
     unknown_command)
-      run_cli_cmd "$CLI_TIMEOUT_SECS" "$bin" does_not_exist >"$out_file" 2>"$err_file"
+      run_cli_cmd "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$bin" does_not_exist
       ;;
     build_missing_arg)
       local build_dir="$tmpdir/build_missing_arg_${bin##*/}_$RANDOM"
       mkdir -p "$build_dir"
       (
         cd "$build_dir"
-        run_cli_cmd "$CLI_TIMEOUT_SECS" "$bin" build >"$out_file" 2>"$err_file"
+        run_cli_cmd "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$bin" build
       )
       ;;
     run_missing_arg)
@@ -131,7 +125,7 @@ run_cli_key() {
       mkdir -p "$run_dir"
       (
         cd "$run_dir"
-        run_cli_cmd "$CLI_TIMEOUT_SECS" "$bin" run >"$out_file" 2>"$err_file"
+        run_cli_cmd "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$bin" run
       )
       ;;
     test_unknown_flag)
@@ -139,7 +133,7 @@ run_cli_key() {
       mkdir -p "$test_dir"
       (
         cd "$test_dir"
-        run_cli_cmd "$CLI_TIMEOUT_SECS" "$bin" test --unknown-flag >"$out_file" 2>"$err_file"
+        run_cli_cmd "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$bin" test --unknown-flag
       )
       ;;
     clean)
@@ -147,7 +141,7 @@ run_cli_key() {
       mkdir -p "$clean_dir/.with"
       (
         cd "$clean_dir"
-        run_cli_cmd "$CLI_TIMEOUT_SECS" "$bin" clean >"$out_file" 2>"$err_file"
+        run_cli_cmd "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$bin" clean
       )
       ;;
     *)

@@ -86,6 +86,7 @@ fn AsyncMirModule.init -> AsyncMirModule:
         body_fn_syms: Vec.new(),
     }
 
+// No-op: reserved for future manual memory management.
 fn AsyncMirModule.deinit(self: AsyncMirModule):
     return
 

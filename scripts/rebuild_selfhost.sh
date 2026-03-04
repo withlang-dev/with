@@ -6,6 +6,7 @@ MODE="${1:-stage2}"
 TIMEOUT_SECS="${WITH_BUILD_TIMEOUT_SECS:-300}"
 TIMEOUT_BIN=""
 LAST_RUNTIME_DIR=""
+LAST_STAGE_BIN=""
 
 if command -v timeout >/dev/null 2>&1; then
   TIMEOUT_BIN="timeout"
@@ -15,16 +16,18 @@ fi
 
 run_cmd() {
   local log_file="$1"
+  local run_dir="$2"
+  shift
   shift
   if [ -n "$TIMEOUT_BIN" ]; then
     (
-      cd "$ROOT_DIR"
+      cd "$run_dir"
       "$TIMEOUT_BIN" -k 15s "${TIMEOUT_SECS}s" "$@" >"$log_file" 2>&1
     )
   else
     echo "[warn] no timeout command found; running without timeout" >&2
     (
-      cd "$ROOT_DIR"
+      cd "$run_dir"
       "$@" >"$log_file" 2>&1
     )
   fi
@@ -67,6 +70,7 @@ run_local_build() {
     fi
   fi
   ln -s "${runtime_dir}" "${tmp_dir}/runtime"
+  ln -s "${ROOT_DIR}/bootstrap" "${tmp_dir}/bootstrap"
 
   echo "[${stage_name}] compiler: $compiler_bin"
   echo "[${stage_name}] local runner: $tmp_bin"
@@ -74,7 +78,7 @@ run_local_build() {
   echo "[${stage_name}] timeout: ${TIMEOUT_SECS}s"
 
   local rc=0
-  run_cmd "$log_file" "$tmp_bin" build "${ROOT_DIR}/src/main.w" || rc=$?
+  run_cmd "$log_file" "$tmp_dir" "$tmp_bin" build "${ROOT_DIR}/src/main.w" || rc=$?
   if [ "$rc" -ne 0 ]; then
     if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
       echo "[${stage_name}] build timed out after ${TIMEOUT_SECS}s" >&2
@@ -89,8 +93,9 @@ run_local_build() {
     return 1
   fi
 
-  if [ ! -s "${ROOT_DIR}/.with/build/main" ]; then
-    echo "[${stage_name}] build failed: missing .with/build/main (silent failure)" >&2
+  local tmp_main="${tmp_dir}/.with/build/main"
+  if [ ! -s "$tmp_main" ]; then
+    echo "[${stage_name}] build failed: missing ${tmp_main} (silent failure)" >&2
     if [ -s "$log_file" ]; then
       tail -n 80 "$log_file" >&2 || true
     else
@@ -98,6 +103,19 @@ run_local_build() {
     fi
     rm -rf "$tmp_dir"
     return 1
+  fi
+
+  local staged_bin
+  staged_bin="$(mktemp /tmp/with-${stage_name}-bin.XXXXXX)"
+  cp "$tmp_main" "$staged_bin"
+  chmod +x "$staged_bin"
+  LAST_STAGE_BIN="$staged_bin"
+
+  if [ -d "${tmp_dir}/.with/build/runtime" ] && [ -f "${tmp_dir}/.with/build/runtime/libwith_llvm_bridge.dylib" ]; then
+    LAST_RUNTIME_DIR="${tmp_dir}/.with/build/runtime"
+    # Keep temp dir alive for runtime sync call.
+    # It will be removed by sync_runtime_artifacts once copied.
+    return 0
   fi
 
   LAST_RUNTIME_DIR="$runtime_dir"
@@ -136,6 +154,12 @@ sync_runtime_artifacts() {
       cp "${src_runtime}/${f}" "${repo_runtime}/${f}"
     fi
   done
+
+  case "$src_runtime" in
+    /tmp/with-stage*/.with/build/runtime)
+      rm -rf "$(dirname "$(dirname "$(dirname "$src_runtime")")")" >/dev/null 2>&1 || true
+      ;;
+  esac
 }
 
 stage1() {
@@ -144,8 +168,10 @@ stage1() {
   rm -f "${ROOT_DIR}/with-stage1" "${ROOT_DIR}/with"
   run_local_build "${ROOT_DIR}/bootstrap/zig-out/bin/with" "stage1"
   sync_runtime_artifacts "stage1"
-  cp "${ROOT_DIR}/.with/build/main" "${ROOT_DIR}/with-stage1"
-  cp "${ROOT_DIR}/.with/build/main" "${ROOT_DIR}/with"
+  cp "${LAST_STAGE_BIN}" "${ROOT_DIR}/with-stage1"
+  cp "${LAST_STAGE_BIN}" "${ROOT_DIR}/with"
+  rm -f "${LAST_STAGE_BIN}"
+  LAST_STAGE_BIN=""
   echo "[stage1] wrote with-stage1"
 }
 
@@ -154,7 +180,9 @@ stage2() {
   rm -f "${ROOT_DIR}/with-stage2"
   run_local_build "${ROOT_DIR}/with-stage1" "stage2"
   sync_runtime_artifacts "stage2"
-  cp "${ROOT_DIR}/.with/build/main" "${ROOT_DIR}/with-stage2"
+  cp "${LAST_STAGE_BIN}" "${ROOT_DIR}/with-stage2"
+  rm -f "${LAST_STAGE_BIN}"
+  LAST_STAGE_BIN=""
   echo "[stage2] wrote with-stage2"
 }
 
@@ -163,7 +191,9 @@ stage3() {
   rm -f "${ROOT_DIR}/with-stage3"
   run_local_build "${ROOT_DIR}/with-stage2" "stage3"
   sync_runtime_artifacts "stage3"
-  cp "${ROOT_DIR}/.with/build/main" "${ROOT_DIR}/with-stage3"
+  cp "${LAST_STAGE_BIN}" "${ROOT_DIR}/with-stage3"
+  rm -f "${LAST_STAGE_BIN}"
+  LAST_STAGE_BIN=""
   echo "[stage3] wrote with-stage3"
 }
 

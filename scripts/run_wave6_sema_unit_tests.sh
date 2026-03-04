@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="./with-stage2"
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "rebuilding self-host compiler for Wave 6 sema unit tests..."
 ./scripts/rebuild_selfhost.sh stage2 >/dev/null
@@ -32,7 +33,7 @@ run_expect_pass_typed() {
   local out="$tmpdir/${name}.out"
   local err="$tmpdir/${name}.err"
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-typed >"$out" 2>"$err"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$SELFHOST_BIN" check "$src" --dump-typed; then
     echo "FAIL(wave6-unit-pass-check) $name: $src"
     cat "$err"
     failures=$((failures + 1))
@@ -57,14 +58,14 @@ run_determinism_check() {
   local out2="$tmpdir/${name}.det.2"
   local err="$tmpdir/${name}.det.err"
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-typed >"$out1" 2>"$err"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out1" "$err" "$SELFHOST_BIN" check "$src" --dump-typed; then
     echo "FAIL(wave6-unit-determinism-run1) $name: $src"
     cat "$err"
     failures=$((failures + 1))
     return
   fi
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-typed >"$out2" 2>/dev/null; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out2" /dev/null "$SELFHOST_BIN" check "$src" --dump-typed; then
     echo "FAIL(wave6-unit-determinism-run2) $name: $src"
     failures=$((failures + 1))
     return
@@ -88,7 +89,9 @@ run_expect_fail() {
   local out="$tmpdir/${name}.out"
   local err="$tmpdir/${name}.err"
 
-  if "$SELFHOST_BIN" check "$src" >"$out" 2>"$err"; then
+  local rc=0
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$SELFHOST_BIN" check "$src" || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
     echo "FAIL(wave6-unit-fail-expected-error) $name: $src"
     cat "$out"
     failures=$((failures + 1))

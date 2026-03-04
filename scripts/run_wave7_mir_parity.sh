@@ -10,7 +10,6 @@ STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
 CORPUS_FILE="test/wave7/mir_corpus.txt"
 VERIFY_COVERAGE_SCRIPT="scripts/verify_wave7_coverage.sh"
-TIMEOUT_BIN="$(command -v timeout || true)"
 CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "building bootstrap compiler for Wave 7 MIR parity..."
@@ -50,11 +49,7 @@ run_check_with_timeout() {
   local src="$2"
   local out="$3"
   local err="$4"
-  if [[ -n "$TIMEOUT_BIN" ]]; then
-    "$TIMEOUT_BIN" -k 5 "$CHECK_TIMEOUT_SECS" "$bin" check "$src" --dump-mir >"$out" 2>"$err"
-    return $?
-  fi
-  "$bin" check "$src" --dump-mir >"$out" 2>"$err"
+  runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$bin" check "$src" --dump-mir
 }
 
 run_check_with_retry() {

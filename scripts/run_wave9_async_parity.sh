@@ -10,8 +10,8 @@ STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
 CORPUS_FILE="test/wave9/async_corpus.txt"
 VERIFY_COVERAGE_SCRIPT="scripts/verify_wave9_coverage.sh"
-TIMEOUT_BIN="$(command -v timeout || true)"
-RUN_TIMEOUT_SECS=25
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
+RUN_TIMEOUT_SECS="${PARITY_RUN_TIMEOUT_SECS:-25}"
 
 echo "building bootstrap compiler for Wave 9 async parity..."
 (
@@ -73,13 +73,13 @@ run_compiler_mode() {
   local src="$3"
   local out_file="$4"
   local err_file="$5"
+  local timeout_secs="$CHECK_TIMEOUT_SECS"
 
-  if [[ "$mode" == "run" && -n "$TIMEOUT_BIN" ]]; then
-    "$TIMEOUT_BIN" -k 5 "$RUN_TIMEOUT_SECS" "$bin" "$mode" "$src" >"$out_file" 2>"$err_file"
-    return $?
+  if [[ "$mode" == "run" ]]; then
+    timeout_secs="$RUN_TIMEOUT_SECS"
   fi
 
-  "$bin" "$mode" "$src" >"$out_file" 2>"$err_file"
+  runner_exec_capture "$timeout_secs" "$out_file" "$err_file" "$bin" "$mode" "$src"
 }
 
 tmpdir="$(mktemp -d)"

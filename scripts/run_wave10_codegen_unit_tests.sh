@@ -6,8 +6,8 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="./with-stage2"
-TIMEOUT_BIN="$(command -v timeout || true)"
-RUN_TIMEOUT_SECS=25
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
+RUN_TIMEOUT_SECS="${PARITY_RUN_TIMEOUT_SECS:-25}"
 
 echo "rebuilding self-host compiler for Wave 10 codegen unit tests..."
 ./scripts/rebuild_selfhost.sh stage2 >/dev/null
@@ -40,13 +40,13 @@ run_compiler() {
   local src="$2"
   local out_file="$3"
   local err_file="$4"
+  local timeout_secs="$CHECK_TIMEOUT_SECS"
 
-  if [[ "$mode" == "run" && -n "$TIMEOUT_BIN" ]]; then
-    "$TIMEOUT_BIN" -k 5 "$RUN_TIMEOUT_SECS" "$SELFHOST_BIN" "$mode" "$src" >"$out_file" 2>"$err_file"
-    return $?
+  if [[ "$mode" == "run" ]]; then
+    timeout_secs="$RUN_TIMEOUT_SECS"
   fi
 
-  "$SELFHOST_BIN" "$mode" "$src" >"$out_file" 2>"$err_file"
+  runner_exec_capture "$timeout_secs" "$out_file" "$err_file" "$SELFHOST_BIN" "$mode" "$src"
 }
 
 failures=0

@@ -57,6 +57,8 @@ type Driver = {
     trace_c_import_cache: i32,
     // Wave 4 resolve artifact from the most recent compile/resolve run.
     last_resolved: ResolveResult,
+    // Stable link library names captured from the Wave 4 resolve result.
+    last_link_lib_names: Vec[str],
     // Root path used when producing the last resolve artifact.
     resolved_root_path: str,
     // Wave 5 canonical typed sidecars from the latest semantic pass.
@@ -98,6 +100,7 @@ fn Driver.init -> Driver:
         c_import_cache: HashMap.new(),
         trace_c_import_cache: 0,
         last_resolved: ResolveResult.init(),
+        last_link_lib_names: Vec.new(),
         resolved_root_path: "",
         typed_expr_types: HashMap.new(),
         typed_binding_types: HashMap.new(),
@@ -114,6 +117,7 @@ fn Driver.init -> Driver:
         last_async_mir_dump: "",
     }
 
+// No-op: reserved for future manual memory management.
 fn Driver.deinit(self: Driver):
     return
 
@@ -121,6 +125,22 @@ fn Driver.configure(self: Driver, opt_level: i32, no_std: bool, alloc_mode: bool
     self.opt_level = opt_level
     self.no_std = no_std
     self.alloc = alloc_mode
+
+fn Driver.reset_last_link_lib_names(self: Driver) -> void:
+    while self.last_link_lib_names.len() > 0:
+        self.last_link_lib_names.pop()
+    return
+
+fn Driver.capture_last_link_lib_names(self: Driver, pool: InternPool, result: ResolveResult) -> void:
+    self.reset_last_link_lib_names()
+    for li in 0..result.link_libs.len() as i32:
+        let lib_sym = result.link_libs.get(li as i64)
+        if lib_sym <= 0:
+            continue
+        let lib_name = pool.resolve(lib_sym)
+        if lib_name.len() > 0:
+            self.last_link_lib_names.push(lib_name)
+    return
 
 // ── Compile pipeline ─────────────────────────────────────────────
 
@@ -135,6 +155,7 @@ fn Driver.compile_file(self: Driver, path: str) -> AstPool:
     if text.len() == 0:
         with_eprintln("error: cannot open '" ++ path ++ "'")
         self.last_resolved = ResolveResult.init()
+        self.reset_last_link_lib_names()
         self.resolved_root_path = path
         self.last_mir_module = MirModule.init()
         self.last_mir_dump = ""
@@ -156,6 +177,7 @@ fn Driver.resolve_file(self: Driver, path: str, emit_resolve_diags: bool) -> Res
     if text.len() == 0:
         with_eprintln("error: cannot open '" ++ path ++ "'")
         self.last_resolved = ResolveResult.init()
+        self.reset_last_link_lib_names()
         self.resolved_root_path = path
         return self.last_resolved
 
@@ -172,6 +194,7 @@ fn Driver.resolve_file(self: Driver, path: str, emit_resolve_diags: bool) -> Res
         let source = Source.from_string(path, text, 0)
         self.diagnostics.render_all(source)
         self.last_resolved = ResolveResult.init()
+        self.reset_last_link_lib_names()
         self.resolved_root_path = path
         return self.last_resolved
 
@@ -179,6 +202,7 @@ fn Driver.resolve_file(self: Driver, path: str, emit_resolve_diags: bool) -> Res
     self.pool = artifacts.pool
     self.diagnostics = artifacts.diags
     self.last_resolved = artifacts.result
+    self.capture_last_link_lib_names(self.pool, self.last_resolved)
     self.resolved_root_path = path
 
     if emit_resolve_diags and self.diagnostics.has_errors():
@@ -190,6 +214,7 @@ fn Driver.resolve_file(self: Driver, path: str, emit_resolve_diags: bool) -> Res
 // Compile from already-loaded source text.
 fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> AstPool:
     self.reset_pending_warnings()
+    self.reset_last_link_lib_names()
     self.trace_c_import_cache = self.read_trace_c_import_cache()
     self.typed_emitted_during_compile = 0
 
@@ -219,6 +244,7 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
     self.pool = artifacts.pool
     self.diagnostics = artifacts.diags
     self.last_resolved = artifacts.result
+    self.capture_last_link_lib_names(self.pool, self.last_resolved)
     self.resolved_root_path = name
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
@@ -256,13 +282,7 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
     sema.source_text = text
     sema.check_module()
 
-    // Propagate sema's changes back.
-    self.pool = sema.pool
-    self.diagnostics = sema.diags
-    self.typed_expr_types = sema.typed_expr_types
-    self.typed_binding_types = sema.typed_binding_types
-    self.typed_binding_names = sema.typed_binding_names
-    self.typed_binding_muts = sema.typed_binding_muts
+    self.sync_sema(sema)
     // Keep typed sidecars for downstream stages, but build the textual typed
     // dump lazily only on explicit --dump-typed paths.
     self.last_typed_dump = ""
@@ -308,6 +328,15 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
 
     pool
 
+// Sync sema's by-value copies back to the driver after a check pass.
+fn Driver.sync_sema(self: Driver, sema: Sema):
+    self.pool = sema.pool
+    self.diagnostics = sema.diags
+    self.typed_expr_types = sema.typed_expr_types
+    self.typed_binding_types = sema.typed_binding_types
+    self.typed_binding_names = sema.typed_binding_names
+    self.typed_binding_muts = sema.typed_binding_muts
+
 fn Driver.reset_pending_warnings(self: Driver) -> void:
     while self.pending_warnings.len() > 0:
         self.pending_warnings.pop()
@@ -345,12 +374,7 @@ fn Driver.dump_typed(self: Driver, pool: AstPool) -> str:
         sema.alloc = 1
     sema.check_module()
 
-    self.pool = sema.pool
-    self.diagnostics = sema.diags
-    self.typed_expr_types = sema.typed_expr_types
-    self.typed_binding_types = sema.typed_binding_types
-    self.typed_binding_names = sema.typed_binding_names
-    self.typed_binding_muts = sema.typed_binding_muts
+    self.sync_sema(sema)
     // Keep sema's pool in sync with driver ownership before rendering.
     sema.pool = self.pool
     self.last_typed_dump = sema.dump_typed_module()
@@ -388,12 +412,7 @@ fn Driver.emit_typed(self: Driver, pool: AstPool) -> i32:
         sema.alloc = 1
     sema.check_module()
 
-    self.pool = sema.pool
-    self.diagnostics = sema.diags
-    self.typed_expr_types = sema.typed_expr_types
-    self.typed_binding_types = sema.typed_binding_types
-    self.typed_binding_names = sema.typed_binding_names
-    self.typed_binding_muts = sema.typed_binding_muts
+    self.sync_sema(sema)
     self.last_sema = sema
     self.last_typed_dump = ""
     self.last_mir_dump = ""
@@ -419,12 +438,7 @@ fn Driver.run_mir_lower(self: Driver, pool: AstPool) -> MirModule:
         sema.alloc = 1
     sema.check_module()
 
-    self.pool = sema.pool
-    self.diagnostics = sema.diags
-    self.typed_expr_types = sema.typed_expr_types
-    self.typed_binding_types = sema.typed_binding_types
-    self.typed_binding_names = sema.typed_binding_names
-    self.typed_binding_muts = sema.typed_binding_muts
+    self.sync_sema(sema)
     self.last_sema = sema
 
     if self.diagnostics.has_errors():
@@ -649,6 +663,12 @@ fn should_link_llvm_bridge(source_path: str) -> bool:
 
 fn Driver.collect_link_libs(self: Driver) -> Vec[str]:
     let out: Vec[str] = Vec.new()
+    for li in 0..self.last_link_lib_names.len() as i32:
+        let lib_name = self.last_link_lib_names.get(li as i64)
+        if lib_name.len() > 0:
+            out.push(lib_name)
+    if out.len() > 0:
+        return out
     for li in 0..self.last_resolved.link_libs.len() as i32:
         let lib_sym = self.last_resolved.link_libs.get(li as i64)
         let lib_name = self.pool.resolve(lib_sym)

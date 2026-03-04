@@ -6,9 +6,9 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="${ROOT_DIR}/with-stage2"
-TIMEOUT_BIN="$(command -v timeout || true)"
-RUN_TIMEOUT_SECS=25
-CLI_TIMEOUT_SECS=25
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
+RUN_TIMEOUT_SECS="${PARITY_RUN_TIMEOUT_SECS:-25}"
+CLI_TIMEOUT_SECS="${PARITY_CLI_TIMEOUT_SECS:-25}"
 
 echo "rebuilding self-host compiler for Wave 11 unit tests..."
 ./scripts/rebuild_selfhost.sh stage2 >/dev/null
@@ -51,23 +51,21 @@ run_mode() {
   local src="$2"
   local out_file="$3"
   local err_file="$4"
+  local timeout_secs="$CHECK_TIMEOUT_SECS"
 
-  if [[ "$mode" == "run" && -n "$TIMEOUT_BIN" ]]; then
-    "$TIMEOUT_BIN" -k 5 "$RUN_TIMEOUT_SECS" "$SELFHOST_BIN" "$mode" "$src" >"$out_file" 2>"$err_file"
-    return $?
+  if [[ "$mode" == "run" ]]; then
+    timeout_secs="$RUN_TIMEOUT_SECS"
   fi
 
-  "$SELFHOST_BIN" "$mode" "$src" >"$out_file" 2>"$err_file"
+  runner_exec_capture "$timeout_secs" "$out_file" "$err_file" "$SELFHOST_BIN" "$mode" "$src"
 }
 
 run_with_optional_timeout() {
   local timeout_secs="$1"
-  shift
-  if [[ -n "$TIMEOUT_BIN" ]]; then
-    "$TIMEOUT_BIN" -k 5 "$timeout_secs" "$@"
-    return $?
-  fi
-  "$@"
+  local out_file="$2"
+  local err_file="$3"
+  shift 3
+  runner_exec_capture "$timeout_secs" "$out_file" "$err_file" "$@"
 }
 
 run_cli_key() {
@@ -77,20 +75,20 @@ run_cli_key() {
 
   case "$key" in
     help)
-      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$SELFHOST_BIN" help >"$out_file" 2>"$err_file"
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" help
       ;;
     version)
-      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$SELFHOST_BIN" version >"$out_file" 2>"$err_file"
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" version
       ;;
     unknown_command)
-      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$SELFHOST_BIN" does_not_exist >"$out_file" 2>"$err_file"
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" does_not_exist
       ;;
     build_missing_arg)
       local build_dir="$tmpdir/build_missing_arg_case"
       mkdir -p "$build_dir"
       (
         cd "$build_dir"
-        run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$SELFHOST_BIN" build >"$out_file" 2>"$err_file"
+        run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" build
       )
       ;;
     run_missing_arg)
@@ -98,7 +96,7 @@ run_cli_key() {
       mkdir -p "$run_dir"
       (
         cd "$run_dir"
-        run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$SELFHOST_BIN" run >"$out_file" 2>"$err_file"
+        run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" run
       )
       ;;
     test_unknown_flag)
@@ -106,7 +104,7 @@ run_cli_key() {
       mkdir -p "$test_dir"
       (
         cd "$test_dir"
-        run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$SELFHOST_BIN" test --unknown-flag >"$out_file" 2>"$err_file"
+        run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test --unknown-flag
       )
       ;;
     clean)
@@ -114,7 +112,7 @@ run_cli_key() {
       mkdir -p "$clean_dir/.with"
       (
         cd "$clean_dir"
-        run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$SELFHOST_BIN" clean >"$out_file" 2>"$err_file"
+        run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" clean
       )
       ;;
     *)

@@ -192,6 +192,7 @@ fn main -> void:
 
 // ── Command implementations ──────────────────────────────────────
 
+// Assumes all flags start with '-' and no flags take separate value arguments.
 fn find_source_arg(argc: i32) -> str:
     var i = 2
     while i < argc:
@@ -365,24 +366,30 @@ fn dump_async_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> 
 
 fn escape_dump_lexeme(text: str) -> str:
     var out = ""
+    var run_start = 0
     for i in 0..text.len():
         let ch = text[i]
+        var esc = ""
         if ch == 92:  // '\'
-            out = out ++ "\\\\"
+            esc = "\\\\"
+        else if ch == 34:  // '"'
+            esc = "\\\""
+        else if ch == 10:  // '\n'
+            esc = "\\n"
+        else if ch == 13:  // '\r'
+            esc = "\\r"
+        else if ch == 9:  // '\t'
+            esc = "\\t"
+        else:
             continue
-        if ch == 34:  // '"'
-            out = out ++ "\\\""
-            continue
-        if ch == 10:  // '\n'
-            out = out ++ "\\n"
-            continue
-        if ch == 13:  // '\r'
-            out = out ++ "\\r"
-            continue
-        if ch == 9:  // '\t'
-            out = out ++ "\\t"
-            continue
-        out = out ++ text.slice(i as i64, (i + 1) as i64)
+        // Flush the non-special run before this escape.
+        if i > run_start:
+            out = out ++ text.slice(run_start as i64, i as i64)
+        out = out ++ esc
+        run_start = i + 1
+    // Flush any remaining non-special run.
+    if run_start < text.len():
+        out = out ++ text.slice(run_start as i64, text.len() as i64)
     out
 
 fn dump_tag_name(tag: i32, lexeme: str) -> str:

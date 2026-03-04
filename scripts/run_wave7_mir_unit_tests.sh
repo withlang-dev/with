@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="./with-stage2"
+CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "rebuilding self-host compiler for Wave 7 MIR unit tests..."
 ./scripts/rebuild_selfhost.sh stage2 >/dev/null
@@ -29,7 +30,7 @@ run_expect_pattern() {
   local out="$tmpdir/${name}.out"
   local err="$tmpdir/${name}.err"
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-mir >"$out" 2>"$err"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$SELFHOST_BIN" check "$src" --dump-mir; then
     echo "FAIL(wave7-unit-check) $name: $src"
     cat "$err"
     failures=$((failures + 1))
@@ -53,7 +54,7 @@ run_expect_no_pattern() {
   local out="$tmpdir/${name}.out"
   local err="$tmpdir/${name}.err"
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-mir >"$out" 2>"$err"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$SELFHOST_BIN" check "$src" --dump-mir; then
     echo "FAIL(wave7-unit-check) $name: $src"
     cat "$err"
     failures=$((failures + 1))
@@ -77,7 +78,7 @@ run_storage_pairing_check() {
   local out="$tmpdir/${name}.out"
   local err="$tmpdir/${name}.err"
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-mir >"$out" 2>"$err"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out" "$err" "$SELFHOST_BIN" check "$src" --dump-mir; then
     echo "FAIL(wave7-unit-storage-check-run) $name: $src"
     cat "$err"
     failures=$((failures + 1))
@@ -119,13 +120,13 @@ run_determinism_check() {
   local out2="$tmpdir/${name}.det.2"
   local err="$tmpdir/${name}.det.err"
 
-  if ! "$SELFHOST_BIN" check "$src" --dump-mir >"$out1" 2>"$err"; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out1" "$err" "$SELFHOST_BIN" check "$src" --dump-mir; then
     echo "FAIL(wave7-unit-determinism-run1) $name: $src"
     cat "$err"
     failures=$((failures + 1))
     return
   fi
-  if ! "$SELFHOST_BIN" check "$src" --dump-mir >"$out2" 2>/dev/null; then
+  if ! runner_exec_capture "$CHECK_TIMEOUT_SECS" "$out2" /dev/null "$SELFHOST_BIN" check "$src" --dump-mir; then
     echo "FAIL(wave7-unit-determinism-run2) $name: $src"
     failures=$((failures + 1))
     return
