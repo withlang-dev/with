@@ -10,10 +10,14 @@ test/wave4/cases/diamond_root.w
 test/wave4/cases/deep_root.w
 test/wave4/cases/multi_import_root.w
 test/wave4/cases/types_root.w
+test/wave4/cases/duplicate_import_root.w
+test/wave4/cases/alias_cycle_root.w
+test/wave4/cases/cimport_links_root.w
 #
 # Error cases:
 test/wave4/cases/unresolved_import.w
 test/wave4/cases/multi_error.w
+test/wave4/cases/nested_missing_root.w
 #
 # Bootstrap single-file tests (exit-code + determinism + format checks):
 bootstrap/test/cases/arithmetic_mixed.w
@@ -516,3 +520,13 @@ bootstrap/test/cases/with_option_extract.w
 bootstrap/test/cases/with_record_methods.w
 bootstrap/test/cases/with_scoped.w
 bootstrap/test/cases/wrap_ops.w
+
+# Known divergences:
+# KNOWN_DIVERGENCE|<test>|<what_differs>|<correct_compiler>|<why>
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_alloc.w|stage0 rejects std alloc path with E0201 while selfhost accepts|selfhost|selfhost behavior matches current std alloc semantics and wave2/wave3 accepted divergences
+KNOWN_DIVERGENCE|bootstrap/test/cases/import_std_mem.w|stage0 rejects std mem path with E0201 while selfhost accepts|selfhost|selfhost behavior matches current std mem semantics and wave2/wave3 accepted divergences
+KNOWN_DIVERGENCE|bootstrap/test/cases/p3_raw_ptr_as_option.w|stage0 rejects raw pointer option path with E0201 while selfhost accepts|selfhost|selfhost behavior matches current raw pointer option semantics and earlier-wave accepted divergences
+KNOWN_DIVERGENCE|bootstrap/test/cases/raw_ptr_option.w|stage0 rejects raw pointer option path with E0201 while selfhost accepts|selfhost|selfhost behavior matches current raw pointer option semantics and earlier-wave accepted divergences
+KNOWN_DIVERGENCE|bootstrap/test/cases/stdlib_io.w|stage0 rejects stdlib io path with E0201 while selfhost accepts|selfhost|selfhost behavior matches current stdlib io semantics and earlier-wave accepted divergences
+KNOWN_DIVERGENCE|bootstrap/test/cases/stdlib_mem.w|stage0 rejects stdlib mem path with E0201 while selfhost accepts|selfhost|selfhost behavior matches current stdlib mem semantics and earlier-wave accepted divergences
+KNOWN_DIVERGENCE|bootstrap/test/cases/toplevel_let.w|stage0 rejects top-level let resolution while selfhost accepts|selfhost|selfhost supports top-level let behavior used by the current corpus

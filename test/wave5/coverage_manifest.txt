@@ -1,0 +1,6 @@
+# Wave 5 coverage manifest
+# Format: <stage0_script>|<status>|<evidence_csv>|<note>
+
+run_phase5_trait_definition_parsing_tests.sh|covered|bootstrap/test/cases/trait.w,bootstrap/test/cases/trait_default.w|trait declaration and default method typing surface is covered.
+run_phase5_method_resolution_order_tests.sh|covered|bootstrap/test/cases/by_value_method.w,bootstrap/test/cases/chained_methods.w|method lookup and call typing order surface is covered.
+run_phase5_orphan_coherence_tests.sh|covered|bootstrap/test/cases/trait.w,bootstrap/test/cases/dyn_dispatch.w|trait-impl coherence-adjacent typing paths are covered.

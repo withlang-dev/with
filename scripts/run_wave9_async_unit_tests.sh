@@ -141,6 +141,8 @@ expect_check_pass "test/wave9/cases/task_must_use_await_ok.w"
 expect_check_pass "test/wave9/cases/runtime_linkage_sync_ok.w"
 expect_check_pass "test/wave9/cases/runtime_linkage_async_ok.w"
 expect_check_pass "test/wave9/cases/channel_send_owned_ok.w"
+expect_check_pass "test/wave9/cases/channel_cancel_interaction_ok.w"
+expect_check_pass "test/wave9/cases/select_await_tie_deterministic_ok.w"
 
 expect_check_fail_msg "test/wave9/cases/await_non_task_fail.w" "await requires a Task value"
 expect_check_fail_msg "test/wave9/cases/spawn_non_task_fail.w" "spawn requires a Task value"
@@ -159,13 +161,22 @@ expect_run_pass "test/wave9/cases/task_must_use_await_ok.w"
 expect_run_pass "test/wave9/cases/runtime_linkage_sync_ok.w"
 expect_run_pass "test/wave9/cases/runtime_linkage_async_ok.w"
 expect_run_pass "test/wave9/cases/channel_send_owned_ok.w"
+expect_run_pass "test/wave9/cases/channel_cancel_interaction_ok.w"
+expect_run_pass "test/wave9/cases/select_await_tie_deterministic_ok.w"
 
 expect_build_pass_no_msg "test/wave9/cases/task_must_use_await_ok.w" "E0801: unused Task value"
 expect_build_pass_no_msg "test/wave9/cases/spawn_async_fn_ok.w" "E0801: unused Task value"
 expect_build_pass_no_msg "test/wave9/cases/runtime_linkage_sync_ok.w" "warning:"
 expect_build_pass_no_msg "test/wave9/cases/runtime_linkage_async_ok.w" "warning:"
+expect_build_pass_no_msg "test/wave9/cases/channel_cancel_interaction_ok.w" "warning:"
+expect_build_pass_no_msg "test/wave9/cases/select_await_tie_deterministic_ok.w" "warning:"
 
 expect_check_dump_contains "test/wave9/cases/async_basic_ok.w" "--dump-async-mir" "async-mir module bodies="
+expect_check_dump_contains "test/wave9/cases/select_await_prefer_fast_ok.w" "--dump-async-mir" "select_await"
+expect_check_dump_contains "test/wave9/cases/select_await_tie_deterministic_ok.w" "--dump-async-mir" "select_await"
+expect_check_dump_contains "test/wave9/cases/async_scope_track_and_await_ok.w" "--dump-async-mir" "suspend[1] await"
+expect_check_dump_contains "test/wave9/cases/runtime_linkage_sync_ok.w" "--dump-async-mir" "suspend_points=0"
+expect_check_dump_contains "test/wave9/cases/runtime_linkage_async_ok.w" "--dump-async-mir" "suspend_points=1"
 
 # Covered in parity harness as KNOWN_DIVERGENCE:
 # - test/wave9/cases/async_block_inline_await_ok.w (Stage0 runtime instability)

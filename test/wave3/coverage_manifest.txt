@@ -1,0 +1,6 @@
+# Wave 3 coverage manifest
+# Format: <stage0_script>|<status>|<evidence_csv>|<note>
+
+run_phase2_if_let_tests.sh|known_divergence|bootstrap/test/cases/if_let.w,bootstrap/test/cases/if_let_chained.w|if-let parse/AST coverage is present with documented Wave 3 AST divergences.
+run_phase2_param_patterns_tests.sh|covered|bootstrap/test/cases/at_binding.w,bootstrap/test/cases/slice_pattern.w|pattern parse surface coverage is present.
+run_phase2_chained_if_let_tests.sh|known_divergence|bootstrap/test/cases/if_let.w|if-let AST span/literal divergence is intentionally tracked.

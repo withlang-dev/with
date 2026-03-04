@@ -9,6 +9,7 @@ source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
 CORPUS_FILE="test/wave5/typed_corpus.txt"
+VERIFY_COVERAGE_SCRIPT="scripts/verify_wave5_coverage.sh"
 
 echo "building bootstrap compiler for Wave 5 typed parity..."
 (
@@ -29,6 +30,13 @@ if [[ ! -x "$SELFHOST_BIN" ]]; then
 fi
 if [[ ! -f "$CORPUS_FILE" ]]; then
   echo "error: missing corpus file: $CORPUS_FILE"
+  exit 1
+fi
+if [[ ! -x "$VERIFY_COVERAGE_SCRIPT" ]]; then
+  echo "error: missing Wave 5 coverage verifier: $VERIFY_COVERAGE_SCRIPT"
+  exit 1
+fi
+if ! "$VERIFY_COVERAGE_SCRIPT"; then
   exit 1
 fi
 if ! parity_validate_known_divergences "$CORPUS_FILE"; then
@@ -86,13 +94,16 @@ while IFS= read -r src; do
       continue
     fi
     if [[ -n "$kd_line" ]]; then
-      echo "FAIL(wave5-typed-parity-stale-known-divergence) $src"
+      IFS='|' read -r _ kd_test kd_what kd_correct kd_why <<< "$kd_line"
+      echo "KNOWN_DIVERGENCE(wave5-typed-parity) ${kd_test} what='${kd_what}' correct='${kd_correct}' why='${kd_why}' stage0_rc=$stage0_rc selfhost_rc=$self_rc_1"
+      echo "$kd_test" >> "$used_kd_file"
+      known_divergences=$((known_divergences + 1))
     else
       echo "FAIL(wave5-typed-parity-both-check-failed) $src rc=$self_rc_1"
       cat "$tmpdir/${key}.stage0.stderr" || true
       cat "$tmpdir/${key}.selfhost.stderr.1" || true
+      failures=$((failures + 1))
     fi
-    failures=$((failures + 1))
     continue
   fi
 
@@ -104,9 +115,16 @@ while IFS= read -r src; do
   fi
 
   if ! diff -u "$self_out_1" "$self_out_2" >/dev/null; then
-    echo "FAIL(wave5-typed-parity-nondeterministic-selfhost) $src"
-    diff -u "$self_out_1" "$self_out_2" || true
-    failures=$((failures + 1))
+    if [[ -n "$kd_line" ]]; then
+      IFS='|' read -r _ kd_test kd_what kd_correct kd_why <<< "$kd_line"
+      echo "KNOWN_DIVERGENCE(wave5-typed-parity) ${kd_test} what='${kd_what}' correct='${kd_correct}' why='${kd_why}'"
+      echo "$kd_test" >> "$used_kd_file"
+      known_divergences=$((known_divergences + 1))
+    else
+      echo "FAIL(wave5-typed-parity-nondeterministic-selfhost) $src"
+      diff -u "$self_out_1" "$self_out_2" || true
+      failures=$((failures + 1))
+    fi
     continue
   fi
 

@@ -1,6 +1,6 @@
 # Self-Hosting With — Architecture-First Plan
 
-**Status:** Wave 10 parity is passing for the current corpus. MIR-first codegen is implemented in self-host (`src/Codegen.w`, `src/Driver.w`) and validated by Wave 10 harnesses (`processed=104`, `failures=0`, `known_divergences=1`). The only accepted Wave 10 divergence is `ir|bootstrap/test/cases/enum_accessor_ref.w` where self-host is correct and Stage0 IR path is behind. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking is currently Sema-integrated and must be moved to a dedicated MIR pass after semantic fixpoint (v3 architecture remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
+**Status:** Wave 11 parity is passing for the current corpus. Driver/CLI/link/c_import orchestration is implemented in self-host and validated by Wave 11 harnesses (`processed=30`, `failures=0`, `known_divergences=2`) with coverage verification passing (`processed=9`). Accepted Wave 11 divergences are both macro-path checks where self-host is correct and Stage0 is behind: `check|test/wave11/cases/c_import_macro_constants_ok.w` and `check|test/wave11/cases/c_import_macro_function_like_ok.w`. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking is currently Sema-integrated and must be moved to a dedicated MIR pass after semantic fixpoint (v3 architecture remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
 
 ---
 

@@ -27,6 +27,7 @@ extern fn with_system(cmd: str) -> i32
 extern fn int_to_string(n: i32) -> str
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
+extern fn with_getenv_str(name: str) -> str
 
 type Driver = {
     pool: InternPool,
@@ -46,8 +47,14 @@ type Driver = {
     current_source_path: str,
     // Source text of the main file.
     current_source_text: str,
+    // Root-module non-use declaration count for bounded textual dumps.
+    last_root_decl_count: i32,
     // Pending warning messages.
     pending_warnings: Vec[str],
+    // c_import expansion cache: key -> synthetic declaration source.
+    c_import_cache: HashMap[str, str],
+    // Emit cache hit/miss diagnostics when enabled.
+    trace_c_import_cache: i32,
     // Wave 4 resolve artifact from the most recent compile/resolve run.
     last_resolved: ResolveResult,
     // Root path used when producing the last resolve artifact.
@@ -57,6 +64,12 @@ type Driver = {
     typed_binding_types: HashMap[i32, i32],
     typed_binding_names: HashMap[i32, i32],
     typed_binding_muts: HashMap[i32, i32],
+    // Cached post-frontend AST used by dump-only paths to avoid unstable
+    // by-value AstPool handoff through function return values.
+    typed_pool_cache: AstPool,
+    // Direct typed-emission mode (avoids AstPool by-value handoff).
+    emit_typed_during_compile: i32,
+    typed_emitted_during_compile: i32,
     last_typed_dump: str,
     // Wave 7 MIR artifacts from the latest successful semantic pass.
     last_sema: Sema,
@@ -80,13 +93,19 @@ fn Driver.init -> Driver:
         alloc: false,
         current_source_path: "<unknown>",
         current_source_text: "",
+        last_root_decl_count: 0,
         pending_warnings: Vec.new(),
+        c_import_cache: HashMap.new(),
+        trace_c_import_cache: 0,
         last_resolved: ResolveResult.init(),
         resolved_root_path: "",
         typed_expr_types: HashMap.new(),
         typed_binding_types: HashMap.new(),
         typed_binding_names: HashMap.new(),
         typed_binding_muts: HashMap.new(),
+        typed_pool_cache: AstPool.new(),
+        emit_typed_during_compile: 0,
+        typed_emitted_during_compile: 0,
         last_typed_dump: "",
         last_sema: sema_seed,
         last_mir_module: MirModule.init(),
@@ -171,6 +190,8 @@ fn Driver.resolve_file(self: Driver, path: str, emit_resolve_diags: bool) -> Res
 // Compile from already-loaded source text.
 fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> AstPool:
     self.reset_pending_warnings()
+    self.trace_c_import_cache = self.read_trace_c_import_cache()
+    self.typed_emitted_during_compile = 0
 
     // Phase 1: Lex.
     var lexer = Lexer.init(text, file_id)
@@ -179,6 +200,8 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
     // Phase 2: Parse.
     var parser = Parser.init(tokens, text, file_id, self.pool, self.diagnostics)
     var pool = parser.parse_module()
+    let root_local_decl_count = count_non_use_decls(pool)
+    self.last_root_decl_count = root_local_decl_count
 
     // Propagate parser's intern pool and diagnostics back to the driver.
     // (Struct params are passed by value, so the parser operated on copies.)
@@ -188,26 +211,49 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
+        self.typed_pool_cache = AstPool.new()
         return AstPool.new()
 
     // Wave 4: build a deterministic resolved module graph sidecar.
-    let artifacts = resolve_from_root_pool(name, text, file_id, pool, self.pool, self.diagnostics, false)
+    let artifacts = resolve_from_root_pool(name, text, file_id, pool, self.pool, self.diagnostics, true)
     self.pool = artifacts.pool
     self.diagnostics = artifacts.diags
     self.last_resolved = artifacts.result
     self.resolved_root_path = name
+    if self.diagnostics.has_errors():
+        let source = Source.from_string(name, text, file_id)
+        self.diagnostics.render_all(source)
+        self.last_mir_module = MirModule.init()
+        self.last_mir_dump = ""
+        self.last_async_mir_module = AsyncMirModule.init()
+        self.last_async_mir_dump = ""
+        self.typed_pool_cache = AstPool.new()
+        return AstPool.new()
 
-    // Phase 2.5: Process use imports.
-    // Iterate to a fixed point so nested imports are resolved.
-    for import_passes in 0..64:
-        let before = pool.decl_count()
-        pool = self.process_imports(pool, text)
-        let after = pool.decl_count()
-        if after == before:
-            break
+    // Phase 2.5: Merge resolved import modules into a single pool.
+    // Use the Wave 4 resolver graph as the import oracle so nested relative
+    // imports resolve from each module's own directory (not only root dir).
+    pool = self.merge_resolved_modules(pool, name, text)
+
+    // Phase 2.6: Expand c_import declarations into synthetic extern/const
+    // declarations before semantic analysis.
+    pool = self.expand_c_imports(pool)
+    // Preserve root-module ownership boundary for orphan-rule checks.
+    pool.set_local_decl_count(root_local_decl_count)
+    self.typed_pool_cache = pool
+    if self.diagnostics.has_errors():
+        let source = Source.from_string(name, text, file_id)
+        self.diagnostics.render_all(source)
+        self.last_mir_module = MirModule.init()
+        self.last_mir_dump = ""
+        self.last_async_mir_module = AsyncMirModule.init()
+        self.last_async_mir_dump = ""
+        self.typed_pool_cache = AstPool.new()
+        return AstPool.new()
 
     // Phase 3: Semantic analysis.
     var sema = Sema.init(self.pool, self.diagnostics, pool)
+    sema.source_text = text
     sema.check_module()
 
     // Propagate sema's changes back.
@@ -220,16 +266,23 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
     // Keep typed sidecars for downstream stages, but build the textual typed
     // dump lazily only on explicit --dump-typed paths.
     self.last_typed_dump = ""
-    self.last_sema = sema
 
     if self.diagnostics.has_errors():
+        sema.pool = self.pool
+        self.last_sema = sema
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
         self.last_mir_module = MirModule.init()
         self.last_mir_dump = ""
         self.last_async_mir_module = AsyncMirModule.init()
         self.last_async_mir_dump = ""
+        self.typed_pool_cache = AstPool.new()
         return AstPool.new()
+
+    if self.emit_typed_during_compile != 0:
+        sema.pool = self.pool
+        sema.emit_typed_module(0)
+        self.typed_emitted_during_compile = 1
 
     self.last_mir_module = lower_module(sema, pool, self.pool)
     self.last_mir_dump = ""
@@ -237,11 +290,16 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
     self.last_async_mir_module = async_artifacts.out_mod
     self.last_async_mir_dump = ""
     self.diagnostics = async_artifacts.diags
+    // Lowering stages may mutate copied pool ownership; refresh cached sema
+    // with the current driver pool before any future typed rendering.
+    sema.pool = self.pool
+    self.last_sema = sema
     self.capture_pending_warnings()
 
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
+        self.typed_pool_cache = AstPool.new()
         return AstPool.new()
 
     if pool.decl_count() == 0:
@@ -250,11 +308,12 @@ fn Driver.compile_source(self: Driver, text: str, name: str, file_id: i32) -> As
 
     pool
 
-fn Driver.reset_pending_warnings(self: Driver):
+fn Driver.reset_pending_warnings(self: Driver) -> void:
     while self.pending_warnings.len() > 0:
         self.pending_warnings.pop()
+    return
 
-fn Driver.capture_pending_warnings(self: Driver):
+fn Driver.capture_pending_warnings(self: Driver) -> void:
     self.reset_pending_warnings()
     for i in 0..self.diagnostics.items.len() as i32:
         let diag = self.diagnostics.items.get(i as i64)
@@ -263,9 +322,23 @@ fn Driver.capture_pending_warnings(self: Driver):
                 self.pending_warnings.push("warning[" ++ diag.code ++ "]: " ++ diag.message)
             else:
                 self.pending_warnings.push("warning: " ++ diag.message)
+    return
+
+fn Driver.set_emit_typed_during_compile(self: Driver, enabled: i32) -> void:
+    self.emit_typed_during_compile = enabled
+    if enabled == 0:
+        self.typed_emitted_during_compile = 0
+    return
+
+fn Driver.did_emit_typed_during_compile(self: Driver) -> i32:
+    self.typed_emitted_during_compile
 
 fn Driver.dump_typed(self: Driver, pool: AstPool) -> str:
+    // Always build a fresh semantic view for textual typed dumps. Reusing a
+    // cached, by-value Sema copy here can corrupt large symbol payloads under
+    // repeated dump paths and lead to pathological hangs.
     var sema = Sema.init(self.pool, self.diagnostics, pool)
+    sema.source_text = self.current_source_text
     if self.no_std:
         sema.no_std = 1
     if self.alloc:
@@ -278,6 +351,8 @@ fn Driver.dump_typed(self: Driver, pool: AstPool) -> str:
     self.typed_binding_types = sema.typed_binding_types
     self.typed_binding_names = sema.typed_binding_names
     self.typed_binding_muts = sema.typed_binding_muts
+    // Keep sema's pool in sync with driver ownership before rendering.
+    sema.pool = self.pool
     self.last_typed_dump = sema.dump_typed_module()
     self.last_sema = sema
     self.last_mir_dump = ""
@@ -293,8 +368,51 @@ fn Driver.dump_typed(self: Driver, pool: AstPool) -> str:
 
     self.last_typed_dump
 
+fn Driver.emit_typed(self: Driver, pool: AstPool) -> i32:
+    // Reuse cached sema from the immediately preceding compile/check pipeline
+    // when available to keep dump-typed behavior aligned with the checked AST.
+    if self.last_sema.ast.decl_count() == pool.decl_count() and pool.decl_count() > 0:
+        self.last_sema.emit_typed_module(0)
+        return 1
+
+    // Always run a fresh sema pass for typed emission. This avoids depending on
+    // cached by-value Sema copies during dump-only paths.
+    var typed_pool = pool
+    if self.typed_pool_cache.decl_count() > 0:
+        typed_pool = self.typed_pool_cache
+    var sema = Sema.init(self.pool, self.diagnostics, typed_pool)
+    sema.source_text = self.current_source_text
+    if self.no_std:
+        sema.no_std = 1
+    if self.alloc:
+        sema.alloc = 1
+    sema.check_module()
+
+    self.pool = sema.pool
+    self.diagnostics = sema.diags
+    self.typed_expr_types = sema.typed_expr_types
+    self.typed_binding_types = sema.typed_binding_types
+    self.typed_binding_names = sema.typed_binding_names
+    self.typed_binding_muts = sema.typed_binding_muts
+    self.last_sema = sema
+    self.last_typed_dump = ""
+    self.last_mir_dump = ""
+    self.last_async_mir_module = AsyncMirModule.init()
+    self.last_async_mir_dump = ""
+
+    if self.diagnostics.has_errors():
+        let source = Source.from_string(self.current_source_path, self.current_source_text, 0)
+        self.diagnostics.render_all(source)
+        self.last_mir_module = MirModule.init()
+        self.last_async_mir_module = AsyncMirModule.init()
+        return 0
+
+    self.last_sema.emit_typed_module(0)
+    1
+
 fn Driver.run_mir_lower(self: Driver, pool: AstPool) -> MirModule:
     var sema = Sema.init(self.pool, self.diagnostics, pool)
+    sema.source_text = self.current_source_text
     if self.no_std:
         sema.no_std = 1
     if self.alloc:
@@ -620,6 +738,586 @@ fn should_delegate_compiler_build(source_path: str) -> bool:
     source_path == "src/main.w" or source_path.ends_with("/src/main.w") or source_path.ends_with("\\src\\main.w")
 
 // ── Import resolution ────────────────────────────────────────────
+
+fn count_non_use_decls(pool: AstPool) -> i32:
+    var count = 0
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NK_USE_DECL():
+            count = count + 1
+    count
+
+fn Driver.recompute_root_decl_count(self: Driver) -> i32:
+    if self.current_source_text.len() == 0:
+        return 0
+    var lexer = Lexer.init(self.current_source_text, 0)
+    let tokens = lexer.tokenize()
+    var parser = Parser.init(tokens, self.current_source_text, 0, self.pool, self.diagnostics)
+    let root_pool = parser.parse_module()
+    count_non_use_decls(root_pool)
+
+fn Driver.merge_resolved_modules(self: Driver, root_pool: AstPool, root_path: str, root_text: str) -> AstPool:
+    var merged_pool = root_pool
+
+    // Merge every resolved module exactly once in deterministic module-id
+    // order; module 0 is the root module that is already parsed.
+    for mi in 0..self.last_resolved.modules.len() as i32:
+        let mod = self.last_resolved.modules.get(mi as i64)
+        if mod.module_id == 0:
+            continue
+
+        let path = mod.path
+        if path.len() == 0 or path == root_path:
+            continue
+
+        let text = with_fs_read_file(path)
+        if text.len() == 0:
+            let span = Span { file: 0, start: 0, end: 0 }
+            self.diagnostics.emit(Diagnostic.err("failed to read imported module", span))
+            continue
+
+        var lexer = Lexer.init(text, mod.file_id)
+        let tokens = lexer.tokenize()
+        var parser = Parser.init_with_pool(tokens, text, mod.file_id, self.pool, self.diagnostics, merged_pool)
+        merged_pool = parser.parse_module()
+        self.pool = parser.intern
+        self.diagnostics = parser.diags
+    self.strip_use_decls(merged_pool)
+
+fn Driver.strip_use_decls(self: Driver, pool: AstPool) -> AstPool:
+    var out = pool
+    var has_use = 0
+    for i in 0..out.decl_count():
+        let decl = out.get_decl(i)
+        if out.kind(decl) == NK_USE_DECL():
+            has_use = 1
+            break
+    if has_use == 0:
+        return out
+
+    let ordered: Vec[i32] = Vec.new()
+    for i in 0..out.decl_count():
+        let decl = out.get_decl(i)
+        if out.kind(decl) != NK_USE_DECL():
+            ordered.push(decl)
+
+    while out.decl_count() > 0:
+        out.decls.pop()
+    for oi in 0..ordered.len() as i32:
+        out.add_decl(ordered.get(oi as i64))
+    out
+
+fn Driver.read_trace_c_import_cache(self: Driver) -> i32:
+    let raw = with_getenv_str("WITH_TRACE_CIMPORT_CACHE")
+    if raw.len() == 0:
+        return 0
+    if raw == "0":
+        return 0
+    1
+
+fn Driver.expand_c_imports(self: Driver, pool: AstPool) -> AstPool:
+    var out = pool
+    let ordered: Vec[i32] = Vec.new()
+    let base_count = out.decl_count()
+    var has_c_import = 0
+    for i in 0..base_count:
+        let decl = out.get_decl(i)
+        if out.kind(decl) == NK_C_IMPORT():
+            has_c_import = 1
+            break
+    if has_c_import == 0:
+        return out
+
+    for i in 0..base_count:
+        let decl = out.get_decl(i)
+        if out.kind(decl) != NK_C_IMPORT():
+            ordered.push(decl)
+            continue
+
+        let header_sym = out.get_data0(decl)
+        let header_spec = self.pool.resolve(header_sym)
+        let cache_key = self.c_import_cache_key(out, decl, header_spec)
+
+        var synthetic = ""
+        let cached = self.c_import_cache.get(cache_key)
+        if cached.is_some():
+            if self.trace_c_import_cache != 0:
+                with_eprintln("c_import cache hit")
+            synthetic = cached.unwrap()
+        else:
+            if self.trace_c_import_cache != 0:
+                with_eprintln("c_import cache miss")
+            synthetic = self.c_import_expand_header_spec(header_spec, decl)
+            if self.diagnostics.has_errors():
+                continue
+            self.c_import_cache.insert(cache_key, synthetic)
+
+        if synthetic.len() == 0:
+            continue
+
+        let before = out.decl_count()
+        var lexer = Lexer.init(synthetic, 0)
+        let tokens = lexer.tokenize()
+        var parser = Parser.init_with_pool(tokens, synthetic, 0, self.pool, self.diagnostics, out)
+        out = parser.parse_module()
+        self.pool = parser.intern
+        self.diagnostics = parser.diags
+
+        let after = out.decl_count()
+        var di = before
+        while di < after:
+            ordered.push(out.get_decl(di))
+            di = di + 1
+
+    while out.decl_count() > 0:
+        out.decls.pop()
+    for oi in 0..ordered.len() as i32:
+        out.add_decl(ordered.get(oi as i64))
+    out
+
+fn Driver.c_import_cache_key(self: Driver, pool: AstPool, decl: i32, header_spec: str) -> str:
+    var key = header_spec ++ "\n#links:"
+    let link_start = pool.get_data1(decl)
+    let link_count = pool.get_data2(decl)
+    for li in 0..link_count:
+        let lib_sym = pool.get_extra(link_start + li)
+        key = key ++ "|" ++ self.pool.resolve(lib_sym)
+    let epoch = with_getenv_str("WITH_CIMPORT_CACHE_EPOCH")
+    if epoch.len() > 0:
+        key = key ++ "\n#epoch:" ++ epoch
+    key
+
+fn Driver.c_import_emit_header_error(self: Driver, decl: i32, header_spec: str):
+    let span = Span {
+        file: 0,
+        start: self.current_source_text.len() as i32,
+        end: self.current_source_text.len() as i32,
+    }
+    let msg = if header_spec.len() > 0:
+        "failed to compile C header snippet: " ++ header_spec
+    else:
+        "failed to compile C header snippet"
+    self.diagnostics.emit(Diagnostic.err(msg, span))
+
+fn Driver.c_import_expand_header_spec(self: Driver, header_spec_raw: str, decl: i32) -> str:
+    let decoded = c_import_decode_escapes(header_spec_raw)
+    let rendered = c_import_render_header_spec(decoded)
+    let header = c_import_trim(rendered)
+    if header.len() == 0:
+        self.c_import_emit_header_error(decl, header_spec_raw)
+        return ""
+
+    var generated = ""
+    var body = ""
+
+    var line_start = 0
+    var i = 0
+    let total = header.len() as i32
+    while i <= total:
+        if i == total or header.byte_at(i as i64) == 10:
+            let raw_line = header.slice(line_start as i64, i as i64)
+            let line = c_import_trim(raw_line)
+            if line.len() > 0:
+                if c_import_starts_with(line, "#include"):
+                    let inc = self.c_import_include_decls(line, decl, header_spec_raw)
+                    if self.diagnostics.has_errors():
+                        return ""
+                    generated = generated ++ inc
+                else if c_import_starts_with(line, "#define"):
+                    generated = generated ++ c_import_macro_decl(line)
+                else:
+                    body = body ++ line ++ "\n"
+            line_start = i + 1
+        i = i + 1
+
+    var stmt_start = 0
+    var si = 0
+    let body_len = body.len() as i32
+    while si <= body_len:
+        if si == body_len or body.byte_at(si as i64) == 59:
+            let stmt = c_import_trim(body.slice(stmt_start as i64, si as i64))
+            if stmt.len() > 0:
+                let fn_decl = c_import_function_decl(stmt)
+                if fn_decl.len() == 0:
+                    self.c_import_emit_header_error(decl, header_spec_raw)
+                    return ""
+                generated = generated ++ fn_decl
+            stmt_start = si + 1
+        si = si + 1
+
+    generated
+
+fn Driver.c_import_include_decls(self: Driver, line: str, decl: i32, header_spec_raw: str) -> str:
+    let rest = c_import_trim(line.slice(8, line.len()))
+    if rest.len() < 3:
+        self.c_import_emit_header_error(decl, header_spec_raw)
+        return ""
+
+    var header_name = ""
+    let first = rest.byte_at(0)
+    let last = rest.byte_at(rest.len() as i64 - 1)
+    if first == 60 and last == 62:  // <...>
+        header_name = rest.slice(1, rest.len() - 1)
+    else if first == 34 and last == 34:  // "..."
+        header_name = rest.slice(1, rest.len() - 1)
+    else:
+        self.c_import_emit_header_error(decl, header_spec_raw)
+        return ""
+
+    if header_name == "stdio.h":
+        return "extern fn puts(p0: *const i8) -> i32\n" ++
+               "extern fn printf(p0: *const i8, ...) -> i32\n" ++
+               "extern fn fopen(p0: *const i8, p1: *const i8) -> *const i8\n" ++
+               "extern fn fclose(p0: *const i8) -> i32\n" ++
+               "extern fn fputs(p0: *const i8, p1: *const i8) -> i32\n" ++
+               "extern fn fread(p0: *const i8, p1: i64, p2: i64, p3: *const i8) -> i64\n" ++
+               "extern fn remove(p0: *const i8) -> i32\n" ++
+               "extern fn rename(p0: *const i8, p1: *const i8) -> i32\n"
+    if header_name == "string.h":
+        return "extern fn strlen(p0: *const i8) -> i64\n" ++
+               "extern fn strcmp(p0: *const i8, p1: *const i8) -> i32\n" ++
+               "extern fn memcpy(p0: *const i8, p1: *const i8, p2: i64) -> *const i8\n" ++
+               "extern fn memmove(p0: *const i8, p1: *const i8, p2: i64) -> *const i8\n" ++
+               "extern fn memset(p0: *const i8, p1: i32, p2: i64) -> *const i8\n" ++
+               "extern fn memcmp(p0: *const i8, p1: *const i8, p2: i64) -> i32\n"
+    if header_name == "stdlib.h":
+        return "extern fn malloc(p0: i64) -> *const i8\n" ++
+               "extern fn free(p0: *const i8) -> void\n" ++
+               "extern fn calloc(p0: i64, p1: i64) -> *const i8\n" ++
+               "extern fn realloc(p0: *const i8, p1: i64) -> *const i8\n" ++
+               "extern fn atol(p0: *const i8) -> i64\n" ++
+               "extern fn rand() -> i32\n" ++
+               "extern fn srand(p0: i32) -> void\n"
+    if header_name == "unistd.h":
+        return "extern fn access(p0: *const i8, p1: i32) -> i32\n" ++
+               "extern fn rmdir(p0: *const i8) -> i32\n"
+    if header_name == "sys/stat.h":
+        return "extern fn mkdir(p0: *const i8, p1: u16) -> i32\n"
+    if header_name == "ctype.h":
+        return "extern fn isalpha(p0: i32) -> i32\n" ++
+               "extern fn isdigit(p0: i32) -> i32\n" ++
+               "extern fn isspace(p0: i32) -> i32\n"
+    if header_name == "math.h":
+        return "extern fn sqrt(p0: f64) -> f64\n" ++
+               "extern fn pow(p0: f64, p1: f64) -> f64\n" ++
+               "extern fn floor(p0: f64) -> f64\n" ++
+               "extern fn ceil(p0: f64) -> f64\n" ++
+               "extern fn round(p0: f64) -> f64\n" ++
+               "extern fn sin(p0: f64) -> f64\n" ++
+               "extern fn cos(p0: f64) -> f64\n" ++
+               "extern fn tan(p0: f64) -> f64\n" ++
+               "extern fn log(p0: f64) -> f64\n" ++
+               "extern fn log10(p0: f64) -> f64\n" ++
+               "extern fn exp(p0: f64) -> f64\n" ++
+               "extern fn fabs(p0: f64) -> f64\n" ++
+               "extern fn fmod(p0: f64, p1: f64) -> f64\n" ++
+               "extern fn asin(p0: f64) -> f64\n" ++
+               "extern fn acos(p0: f64) -> f64\n" ++
+               "extern fn atan(p0: f64) -> f64\n" ++
+               "extern fn atan2(p0: f64, p1: f64) -> f64\n"
+
+    self.c_import_emit_header_error(decl, header_spec_raw)
+    ""
+
+fn c_import_render_header_spec(spec_raw: str) -> str:
+    let spec = c_import_trim(spec_raw)
+    if spec.len() == 0:
+        return ""
+
+    let has_newline = str_contains(spec, "\n")
+    let has_directive = c_import_starts_with(spec, "#")
+    let has_statement = str_contains(spec, ";")
+    if has_newline or has_directive or has_statement:
+        return spec
+
+    let first = spec.byte_at(0)
+    let last = spec.byte_at(spec.len() as i64 - 1)
+    if (first == 60 and last == 62) or (first == 34 and last == 34):
+        return "#include " ++ spec
+    "#include <" ++ spec ++ ">"
+
+fn c_import_macro_decl(line: str) -> str:
+    var rest = line
+    if c_import_starts_with(rest, "#define"):
+        rest = c_import_trim(rest.slice(7, rest.len()))
+    else:
+        return ""
+    if rest.len() == 0:
+        return ""
+
+    var i = 0
+    while i < rest.len() as i32 and c_import_is_ident_char(rest.byte_at(i as i64)):
+        i = i + 1
+    if i <= 0:
+        return ""
+    let name = rest.slice(0, i as i64)
+    if i < rest.len() as i32 and rest.byte_at(i as i64) == 40:  // function-like macro
+        return ""
+
+    var value = c_import_trim(rest.slice(i as i64, rest.len()))
+    if value.len() == 0:
+        return ""
+    value = c_import_trim_outer_parens(value)
+
+    if c_import_is_int_literal(value):
+        return "let " ++ name ++ " = " ++ value ++ "\n"
+
+    if value.len() >= 2 and value.byte_at(0) == 34 and value.byte_at(value.len() as i64 - 1) == 34:
+        let inner = value.slice(1, value.len() - 1)
+        let escaped = c_import_escape_with_string(inner)
+        return "let " ++ name ++ " = \"" ++ escaped ++ "\"\n"
+
+    ""
+
+fn c_import_function_decl(stmt_raw: str) -> str:
+    let stmt = c_import_trim(stmt_raw)
+    if stmt.len() == 0:
+        return ""
+
+    var open = 0 - 1
+    var close = 0 - 1
+    for i in 0..stmt.len() as i32:
+        let ch = stmt.byte_at(i as i64)
+        if ch == 40 and open < 0:  // (
+            open = i
+        if ch == 41:  // )
+            close = i
+    if open <= 0 or close <= open:
+        return ""
+
+    let trailing = c_import_trim(stmt.slice((close + 1) as i64, stmt.len()))
+    if trailing.len() > 0:
+        return ""
+
+    var ne = open - 1
+    while ne >= 0 and c_import_is_space(stmt.byte_at(ne as i64)):
+        ne = ne - 1
+    if ne < 0:
+        return ""
+    var ns = ne
+    while ns >= 0 and c_import_is_ident_char(stmt.byte_at(ns as i64)):
+        ns = ns - 1
+    ns = ns + 1
+    if ns > ne:
+        return ""
+
+    let fn_name = stmt.slice(ns as i64, (ne + 1) as i64)
+    let ret_spec = c_import_trim(stmt.slice(0, ns as i64))
+    if ret_spec.len() == 0:
+        return ""
+    let ret_ty = c_import_map_c_type(ret_spec)
+
+    let params_text = c_import_trim(stmt.slice((open + 1) as i64, close as i64))
+    var params_out = ""
+    var has_variadic = 0
+    var param_index = 0
+    if params_text.len() > 0 and params_text != "void":
+        var seg_start = 0
+        var i = 0
+        let plen = params_text.len() as i32
+        while i <= plen:
+            if i == plen or params_text.byte_at(i as i64) == 44:  // ,
+                let seg = c_import_trim(params_text.slice(seg_start as i64, i as i64))
+                if seg.len() > 0:
+                    if seg == "...":
+                        has_variadic = 1
+                    else:
+                        let pty = c_import_param_type(seg)
+                        if pty.len() == 0:
+                            return ""
+                        if params_out.len() > 0:
+                            params_out = params_out ++ ", "
+                        params_out = params_out ++ "p" ++ int_to_string(param_index) ++ ": " ++ pty
+                        param_index = param_index + 1
+                seg_start = i + 1
+            i = i + 1
+
+    if has_variadic != 0:
+        if params_out.len() > 0:
+            params_out = params_out ++ ", ..."
+        else:
+            params_out = "..."
+
+    "extern fn " ++ fn_name ++ "(" ++ params_out ++ ") -> " ++ ret_ty ++ "\n"
+
+fn c_import_param_type(param_raw: str) -> str:
+    var param = c_import_trim_outer_parens(c_import_trim(param_raw))
+    if param.len() == 0:
+        return ""
+    if param == "void":
+        return ""
+
+    let len = param.len() as i32
+    var end = len - 1
+    while end >= 0 and c_import_is_space(param.byte_at(end as i64)):
+        end = end - 1
+
+    var type_spec = param
+    if end >= 0 and c_import_is_ident_char(param.byte_at(end as i64)):
+        var j = end
+        while j >= 0 and c_import_is_ident_char(param.byte_at(j as i64)):
+            j = j - 1
+        let prefix = c_import_trim(param.slice(0, (j + 1) as i64))
+        if prefix.len() > 0:
+            type_spec = prefix
+
+    c_import_map_c_type(type_spec)
+
+fn c_import_map_c_type(spec_raw: str) -> str:
+    let spec = c_import_trim(spec_raw)
+    if spec.len() == 0:
+        return "i32"
+
+    var star_count = 0
+    for i in 0..spec.len() as i32:
+        if spec.byte_at(i as i64) == 42:  // *
+            star_count = star_count + 1
+
+    var base = "i32"
+    if str_contains(spec, "unsigned long long"):
+        base = "u64"
+    else if str_contains(spec, "unsigned long"):
+        base = "u64"
+    else if str_contains(spec, "long long"):
+        base = "i64"
+    else if str_contains(spec, "size_t"):
+        base = "u64"
+    else if str_contains(spec, "unsigned int"):
+        base = "u32"
+    else if str_contains(spec, "unsigned short"):
+        base = "u16"
+    else if str_contains(spec, "unsigned char"):
+        base = "u8"
+    else if str_contains(spec, "short"):
+        base = "i16"
+    else if str_contains(spec, "char"):
+        base = "i8"
+    else if str_contains(spec, "double"):
+        base = "f64"
+    else if str_contains(spec, "float"):
+        base = "f32"
+    else if str_contains(spec, "long"):
+        base = "i64"
+    else if str_contains(spec, "void"):
+        base = "void"
+    else if str_contains(spec, "int"):
+        base = "i32"
+
+    if star_count <= 0:
+        return base
+
+    var inner = base
+    if inner == "void":
+        inner = "i8"
+    var out = inner
+    for i in 0..star_count:
+        out = "*const " ++ out
+    out
+
+fn c_import_decode_escapes(raw: str) -> str:
+    var out = ""
+    var i = 0
+    let len = raw.len() as i32
+    while i < len:
+        let ch = raw.byte_at(i as i64)
+        if ch != 92 or i + 1 >= len:  // '\'
+            out = out ++ raw.slice(i as i64, (i + 1) as i64)
+            i = i + 1
+            continue
+
+        let esc = raw.byte_at((i + 1) as i64)
+        if esc == 110:  // n
+            out = out ++ "\n"
+        else if esc == 114:  // r
+            out = out ++ "\r"
+        else if esc == 116:  // t
+            out = out ++ "\t"
+        else if esc == 92:  // \
+            out = out ++ "\\"
+        else if esc == 34:  // "
+            out = out ++ "\""
+        else:
+            out = out ++ raw.slice((i + 1) as i64, (i + 2) as i64)
+        i = i + 2
+    out
+
+fn c_import_trim_outer_parens(value_raw: str) -> str:
+    var v = c_import_trim(value_raw)
+    while v.len() >= 2 and v.byte_at(0) == 40 and v.byte_at(v.len() as i64 - 1) == 41:  // (...)
+        v = c_import_trim(v.slice(1, v.len() - 1))
+    v
+
+fn c_import_escape_with_string(value: str) -> str:
+    var out = ""
+    for i in 0..value.len() as i32:
+        let ch = value.byte_at(i as i64)
+        if ch == 92:  // \
+            out = out ++ "\\\\"
+        else if ch == 34:  // "
+            out = out ++ "\\\""
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 13:
+            out = out ++ "\\r"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else:
+            out = out ++ value.slice(i as i64, (i + 1) as i64)
+    out
+
+fn c_import_is_int_literal(text_raw: str) -> i32:
+    let text = c_import_trim(text_raw)
+    if text.len() == 0:
+        return 0
+
+    var i = 0
+    if text.byte_at(0) == 45 or text.byte_at(0) == 43:  // +/- 
+        i = 1
+    if i >= text.len() as i32:
+        return 0
+
+    if i + 1 < text.len() as i32 and text.byte_at(i as i64) == 48 and (text.byte_at((i + 1) as i64) == 120 or text.byte_at((i + 1) as i64) == 88):
+        i = i + 2
+        if i >= text.len() as i32:
+            return 0
+        while i < text.len() as i32:
+            let ch = text.byte_at(i as i64)
+            let is_digit = ch >= 48 and ch <= 57
+            let is_hex_lo = ch >= 97 and ch <= 102
+            let is_hex_hi = ch >= 65 and ch <= 70
+            if not (is_digit or is_hex_lo or is_hex_hi):
+                return 0
+            i = i + 1
+        return 1
+
+    while i < text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return 0
+        i = i + 1
+    1
+
+fn c_import_is_space(ch: i32) -> bool:
+    ch == 32 or ch == 9 or ch == 10 or ch == 13
+
+fn c_import_trim(s: str) -> str:
+    var start = 0
+    var end = s.len() as i32
+    while start < end and c_import_is_space(s.byte_at(start as i64)):
+        start = start + 1
+    while end > start and c_import_is_space(s.byte_at((end - 1) as i64)):
+        end = end - 1
+    s.slice(start as i64, end as i64)
+
+fn c_import_starts_with(text: str, prefix: str) -> bool:
+    if prefix.len() > text.len():
+        return false
+    text.slice(0, prefix.len()) == prefix
+
+fn c_import_is_ident_char(ch: i32) -> bool:
+    let is_alpha = (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122)
+    let is_digit = ch >= 48 and ch <= 57
+    is_alpha or is_digit or ch == 95
 
 fn Driver.process_imports(self: Driver, pool: AstPool, source_text: str) -> AstPool:
     // Keep declaration order stable by replacing each `use` with imported decls.

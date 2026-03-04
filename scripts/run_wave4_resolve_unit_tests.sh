@@ -91,6 +91,51 @@ run_case() {
     fi
   fi
 
+  if [[ "$name" == "duplicate_import" ]]; then
+    # Duplicate imports should resolve to the same module target (deduped graph node).
+    if ! head -n 1 "$out" | grep -Eq 'modules=2 '; then
+      echo "FAIL(wave4-resolve-unit-duplicate-import-module-count) $src"
+      case_failures=$((case_failures + 1))
+    fi
+    local target_a target_b
+    target_a="$(grep 'import\[0:0\]' "$out" | grep -o 'target=[0-9]*' | head -1)"
+    target_b="$(grep 'import\[0:1\]' "$out" | grep -o 'target=[0-9]*' | head -1)"
+    if [[ -z "$target_a" || "$target_a" != "$target_b" ]]; then
+      echo "FAIL(wave4-resolve-unit-duplicate-import-target-match) $src target_a=$target_a target_b=$target_b"
+      case_failures=$((case_failures + 1))
+    fi
+  fi
+
+  if [[ "$name" == "alias_cycle" ]]; then
+    if ! head -n 1 "$out" | grep -Eq 'modules=3 '; then
+      echo "FAIL(wave4-resolve-unit-alias-cycle-module-count) $src"
+      case_failures=$((case_failures + 1))
+    fi
+    if [[ "$(grep -c 'alias_cycle/left\.w' "$out")" -ne 1 ]]; then
+      echo "FAIL(wave4-resolve-unit-alias-cycle-left-dedup) $src"
+      case_failures=$((case_failures + 1))
+    fi
+    if [[ "$(grep -c 'alias_cycle/right\.w' "$out")" -ne 1 ]]; then
+      echo "FAIL(wave4-resolve-unit-alias-cycle-right-dedup) $src"
+      case_failures=$((case_failures + 1))
+    fi
+  fi
+
+  if [[ "$name" == "cimport_links" ]]; then
+    if ! grep -q 'kind=c_import header="stdio.h"' "$out"; then
+      echo "FAIL(wave4-resolve-unit-cimport-links-stdio) $src"
+      case_failures=$((case_failures + 1))
+    fi
+    if ! grep -q 'kind=c_import header="string.h"' "$out"; then
+      echo "FAIL(wave4-resolve-unit-cimport-links-string) $src"
+      case_failures=$((case_failures + 1))
+    fi
+    if ! grep -q '^link_libs=m,c$' "$out"; then
+      echo "FAIL(wave4-resolve-unit-cimport-links-order-dedup) $src"
+      case_failures=$((case_failures + 1))
+    fi
+  fi
+
   if [[ "$name" == "diamond" ]]; then
     # Diamond: root -> left + right, both -> shared. Must be 4 modules.
     if ! head -n 1 "$out" | grep -Eq 'modules=4 '; then
@@ -188,6 +233,33 @@ run_error_case() {
   fi
 }
 
+run_golden_case() {
+  local name="$1"
+  local src="$2"
+  local golden="$3"
+  local out="$tmpdir/${name}.golden.out"
+  local err="$tmpdir/${name}.golden.err"
+
+  if [[ ! -f "$golden" ]]; then
+    echo "FAIL(wave4-resolve-unit-golden-missing) $src golden=$golden"
+    failures=$((failures + 1))
+    return
+  fi
+  if ! "$SELFHOST_BIN" check "$src" --dump-resolved >"$out" 2>"$err"; then
+    echo "FAIL(wave4-resolve-unit-golden-check) $src"
+    cat "$err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if ! diff -u "$golden" "$out" >/dev/null; then
+    echo "FAIL(wave4-resolve-unit-golden-diff) $src"
+    diff -u "$golden" "$out" || true
+    failures=$((failures + 1))
+    return
+  fi
+  echo "PASS(wave4-resolve-unit-golden) $src"
+}
+
 run_case "basic" "test/wave4/cases/basic_root.w"
 run_case "cycle" "test/wave4/cases/cycle_root.w"
 run_case "fallback" "test/wave4/cases/fallback_root.w"
@@ -200,7 +272,14 @@ run_case "diamond" "test/wave4/cases/diamond_root.w"
 run_case "deep" "test/wave4/cases/deep_root.w"
 run_case "multi_import" "test/wave4/cases/multi_import_root.w"
 run_case "types" "test/wave4/cases/types_root.w"
+run_case "duplicate_import" "test/wave4/cases/duplicate_import_root.w"
+run_case "alias_cycle" "test/wave4/cases/alias_cycle_root.w"
+run_case "cimport_links" "test/wave4/cases/cimport_links_root.w"
 run_error_case "multi_error" "test/wave4/cases/multi_error.w" "import module not found"
+run_error_case "nested_missing" "test/wave4/cases/nested_missing_root.w" "import module not found"
+
+run_golden_case "types_golden" "test/wave4/cases/types_root.w" "test/wave4/golden/types_root.resolved.txt"
+run_golden_case "diamond_golden" "test/wave4/cases/diamond_root.w" "test/wave4/golden/diamond_root.resolved.txt"
 
 if [[ "$failures" -ne 0 ]]; then
   echo "wave4 resolve unit tests: $failures failure(s)"

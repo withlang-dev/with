@@ -171,6 +171,14 @@ run_expect_pass_typed "method_call_get" \
   "test/wave6/cases/method_call_pass.w" \
   "fn Counter.get"
 
+run_expect_pass_typed "method_resolution_order_inherent_over_trait" \
+  "test/wave6/cases/method_resolution_order_pass.w" \
+  "fn Item.eval"
+
+run_expect_pass_typed "method_resolution_multi_trait_order" \
+  "test/wave6/cases/method_resolution_multi_trait_order_pass.w" \
+  "trait Left"
+
 # ── Trait and impl declarations ──────────────────────────────────
 
 run_expect_pass_typed "trait_impl_decl" \
@@ -201,6 +209,18 @@ run_expect_pass_typed "control_return" \
   "test/wave6/cases/control_flow_pass.w" \
   "return_expr"
 
+run_expect_pass_typed "control_break_value_join" \
+  "test/wave6/cases/break_value_join_pass.w" \
+  "bind out: i32"
+
+run_expect_pass_typed "pattern_shadow_branch_bindings" \
+  "test/wave6/cases/pattern_shadow_branches_pass.w" \
+  "bind branch: i32"
+
+run_expect_pass_typed "chained_if_let_typed" \
+  "test/wave6/cases/chained_if_let_typed_pass.w" \
+  "bind sum: i32"
+
 # ── Diagnostics — expected failures ──────────────────────────────
 
 run_expect_fail "undefined_var" \
@@ -214,6 +234,10 @@ run_expect_fail "type_mismatch" \
 run_expect_fail "arity_mismatch" \
   "test/wave6/cases/arity_mismatch_error.w" \
   "arity\|argument"
+
+run_expect_fail "break_value_join_mismatch" \
+  "test/wave6/cases/break_value_join_mismatch_error.w" \
+  "type mismatch\|return type mismatch\|break value"
 
 # ── Wave 5 regression — must still pass ──────────────────────────
 
@@ -247,6 +271,9 @@ run_determinism_check "determinism_body_typing" \
 
 run_determinism_check "determinism_trait_impl" \
   "test/wave6/cases/trait_impl_pass.w"
+
+run_determinism_check "determinism_method_resolution_order" \
+  "test/wave6/cases/method_resolution_multi_trait_order_pass.w"
 
 # ── Summary ──────────────────────────────────────────────────────
 

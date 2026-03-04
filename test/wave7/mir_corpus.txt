@@ -395,6 +395,9 @@ bootstrap/test/cases/move_copy_ok.w
 test/wave7/cases/drop_scope_exit.w
 test/wave7/cases/drop_early_return.w
 test/wave7/cases/drop_break_continue.w
+test/wave7/cases/cleanup_edge_shape.w
+test/wave7/cases/loop_drop_interaction.w
+test/wave7/cases/storage_live_dead_complex.w
 #
 # Casting, type aliases, distinct types:
 bootstrap/test/cases/cast.w
@@ -427,6 +430,7 @@ bootstrap/test/cases/no_await_guard.w
 bootstrap/test/cases/fiber_pool_reuse.w
 bootstrap/test/cases/fiber_stack_limits.w
 bootstrap/test/cases/fiber_work_steal.w
+test/wave7/cases/async_generator_boundary.w
 #
 # Comptime:
 bootstrap/test/cases/comptime.w

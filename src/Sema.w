@@ -12,6 +12,7 @@ use Diagnostic
 use InternPool
 
 extern fn int_to_string(n: i32) -> str
+extern fn print(s: str) -> void
 
 // ── Type kind constants ──────────────────────────────────────────
 
@@ -64,6 +65,8 @@ type Sema = {
 
     // Named type lookup: sym → TypeId
     named_types: HashMap[i32, i32],
+    // Fallback pretty names keyed by symbol id.
+    pretty_symbol_names: HashMap[i32, str],
 
     // Function signatures (parallel arrays)
     sig_names: Vec[i32],
@@ -113,11 +116,31 @@ type Sema = {
     must_use_fns: HashMap[i32, i32],
     result_option_fns: HashMap[i32, i32],
     task_fns: HashMap[i32, i32],
+    builtin_fn_syms: HashMap[i32, i32],
+    builtin_value_syms: HashMap[i32, i32],
+
+    // Hot builtin symbols used in fast semantic dispatch paths.
+    sym_println: i32,
+    sym_print: i32,
+    sym_assert: i32,
+    sym_channel: i32,
+    sym_send: i32,
+    sym_recv: i32,
+    sym_close: i32,
+    sym_todo: i32,
+    sym_unreachable: i32,
+    sym_track: i32,
+    sym_vec: i32,
+    sym_hashmap: i32,
+    sym_hashset: i32,
 
     // Method origin tracking
     method_decl_origins: HashMap[i32, i32],
     method_has_inherent: HashMap[i32, i32],
+    method_symbol_flags: HashMap[i32, i32],
     method_key_cache: HashMap[str, i32],
+    drop_method_cache: HashMap[i32, i32],
+    copy_visit_stack: Vec[i32],
 
     // Scope binding storage (stack-based with watermarks)
     bind_names: Vec[i32],
@@ -141,12 +164,15 @@ type Sema = {
     typed_binding_types: HashMap[i32, i32],
     typed_binding_names: HashMap[i32, i32],
     typed_binding_muts: HashMap[i32, i32],
+    typed_dump_seen_nodes: HashMap[i32, i32],
+    typed_dump_visit_budget: i32,
     // Generic substitution map + specialization cache
     generic_subst_param_syms: Vec[i32],
     generic_subst_type_ids: Vec[i32],
     generic_specialization_cache: HashMap[str, i32],
 
     // Current state
+    source_text: str,
     current_return_type: i32,
     current_gen_yield_type: i32,
     has_gen_yield_type: i32,
@@ -163,6 +189,7 @@ type Sema = {
     has_expected_type: i32,
     local_file_id: i32,
     collecting_types: i32,
+    discard_sym: i32,
 
     // Canonical primitive TypeIds
     ty_i8: i32,
@@ -193,6 +220,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         type_d2: Vec.new(),
         type_extra: Vec.new(),
         named_types: HashMap.new(),
+        pretty_symbol_names: HashMap.new(),
         sig_names: Vec.new(),
         sig_type_ids: Vec.new(),
         sig_ret_types: Vec.new(),
@@ -225,9 +253,27 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         must_use_fns: HashMap.new(),
         result_option_fns: HashMap.new(),
         task_fns: HashMap.new(),
+        builtin_fn_syms: HashMap.new(),
+        builtin_value_syms: HashMap.new(),
+        sym_println: 0,
+        sym_print: 0,
+        sym_assert: 0,
+        sym_channel: 0,
+        sym_send: 0,
+        sym_recv: 0,
+        sym_close: 0,
+        sym_todo: 0,
+        sym_unreachable: 0,
+        sym_track: 0,
+        sym_vec: 0,
+        sym_hashmap: 0,
+        sym_hashset: 0,
         method_decl_origins: HashMap.new(),
         method_has_inherent: HashMap.new(),
+        method_symbol_flags: HashMap.new(),
         method_key_cache: HashMap.new(),
+        drop_method_cache: HashMap.new(),
+        copy_visit_stack: Vec.new(),
         bind_names: Vec.new(),
         bind_types: Vec.new(),
         bind_muts: Vec.new(),
@@ -245,9 +291,12 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         typed_binding_types: HashMap.new(),
         typed_binding_names: HashMap.new(),
         typed_binding_muts: HashMap.new(),
+        typed_dump_seen_nodes: HashMap.new(),
+        typed_dump_visit_budget: 0,
         generic_subst_param_syms: Vec.new(),
         generic_subst_type_ids: Vec.new(),
         generic_specialization_cache: HashMap.new(),
+        source_text: "",
         current_return_type: 0,
         current_gen_yield_type: 0,
         has_gen_yield_type: 0,
@@ -264,6 +313,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         has_expected_type: 0,
         local_file_id: 0,
         collecting_types: 0,
+        discard_sym: 0,
         ty_i8: 0, ty_i16: 0, ty_i32: 0, ty_i64: 0,
         ty_u8: 0, ty_u16: 0, ty_u32: 0, ty_u64: 0,
         ty_f32: 0, ty_f64: 0, ty_bool: 0, ty_void: 0,
@@ -307,14 +357,289 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.register_prim("str", s.ty_str)
     s.register_prim("String", s.ty_str)
     s.register_prim("StrView", s.ty_str_view)
+    s.discard_sym = s.pool.intern("_")
 
     // Push root scope marker
     s.scope_starts.push(0)
+    s.seed_builtin_symbols()
     s
 
 fn Sema.register_prim(self: Sema, name: str, tid: i32):
     let sym = self.pool.intern(name)
     self.named_types.insert(sym, tid)
+    self.pretty_symbol_names.insert(sym, name)
+
+fn Sema.register_builtin_fn_name(self: Sema, name: str):
+    self.builtin_fn_syms.insert(self.pool.intern(name), 1)
+
+fn Sema.register_builtin_value_name(self: Sema, name: str):
+    self.builtin_value_syms.insert(self.pool.intern(name), 1)
+
+fn Sema.seed_builtin_symbols(self: Sema):
+    self.sym_println = self.pool.intern("println")
+    self.sym_print = self.pool.intern("print")
+    self.sym_assert = self.pool.intern("assert")
+    self.sym_channel = self.pool.intern("Channel")
+    self.sym_send = self.pool.intern("send")
+    self.sym_recv = self.pool.intern("recv")
+    self.sym_close = self.pool.intern("close")
+    self.sym_todo = self.pool.intern("todo")
+    self.sym_unreachable = self.pool.intern("unreachable")
+    self.sym_track = self.pool.intern("track")
+    self.sym_vec = self.pool.intern("Vec")
+    self.sym_hashmap = self.pool.intern("HashMap")
+    self.sym_hashset = self.pool.intern("HashSet")
+
+    self.register_builtin_fn_name("println")
+    self.register_builtin_fn_name("print")
+    self.register_builtin_fn_name("assert")
+    self.register_builtin_fn_name("Some")
+    self.register_builtin_fn_name("Ok")
+    self.register_builtin_fn_name("Err")
+    self.register_builtin_fn_name("Channel")
+    self.register_builtin_fn_name("send")
+    self.register_builtin_fn_name("recv")
+    self.register_builtin_fn_name("close")
+    self.register_builtin_fn_name("todo")
+    self.register_builtin_fn_name("unreachable")
+    self.register_builtin_fn_name("Vec")
+    self.register_builtin_fn_name("HashMap")
+    self.register_builtin_fn_name("HashSet")
+    self.register_builtin_fn_name("abs")
+    self.register_builtin_fn_name("min")
+    self.register_builtin_fn_name("max")
+    self.register_builtin_fn_name("clamp")
+    self.register_builtin_fn_name("sqrt_f64")
+    self.register_builtin_fn_name("pow_f64")
+    self.register_builtin_fn_name("floor_f64")
+    self.register_builtin_fn_name("ceil_f64")
+    self.register_builtin_fn_name("sin_f64")
+    self.register_builtin_fn_name("cos_f64")
+    self.register_builtin_fn_name("log_f64")
+    self.register_builtin_fn_name("exp_f64")
+    self.register_builtin_fn_name("fabs_f64")
+
+    self.register_builtin_value_name("None")
+    self.register_builtin_value_name("TypeInfo")
+    self.register_builtin_value_name("PI")
+    self.register_builtin_value_name("E")
+    self.register_builtin_value_name("INFINITY")
+    self.register_builtin_value_name("NAN")
+    self.register_builtin_value_name("__FILE__")
+    self.register_builtin_value_name("__LINE__")
+
+fn sema_is_name_char(ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return 1
+    if ch >= 65 and ch <= 90:
+        return 1
+    if ch >= 97 and ch <= 122:
+        return 1
+    if ch == 95 or ch == 46:
+        return 1
+    0
+
+fn sema_is_ident_start_char(ch: i32) -> i32:
+    if ch == 95:
+        return 1
+    if ch >= 65 and ch <= 90:
+        return 1
+    if ch >= 97 and ch <= 122:
+        return 1
+    0
+
+fn sema_is_ident_char(ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return 1
+    sema_is_ident_start_char(ch)
+
+fn sema_is_space_char(ch: i32) -> i32:
+    if ch == 32:
+        return 1
+    if ch == 9:
+        return 1
+    if ch == 10:
+        return 1
+    if ch == 13:
+        return 1
+    return 0
+
+fn extract_name_after_keyword_in_text(text: str, keyword: str) -> str:
+    if text.len() == 0 or keyword.len() == 0:
+        return ""
+    var i = 0
+    while i + keyword.len() <= text.len():
+        if text.slice(i as i64, (i + keyword.len()) as i64) != keyword:
+            i = i + 1
+            continue
+        if i > 0 and sema_is_ident_char(text[i - 1]) != 0:
+            i = i + 1
+            continue
+        if i + keyword.len() < text.len() and sema_is_ident_char(text[i + keyword.len()]) != 0:
+            i = i + 1
+            continue
+
+        var j = i + keyword.len()
+        while j < text.len() and sema_is_space_char(text[j]) != 0:
+            j = j + 1
+
+        // let mut x = ... -> capture x
+        if keyword == "let" and j + 3 <= text.len() and text.slice(j as i64, (j + 3) as i64) == "mut":
+            if j + 3 == text.len() or sema_is_ident_char(text[j + 3]) == 0:
+                j = j + 3
+                while j < text.len() and sema_is_space_char(text[j]) != 0:
+                    j = j + 1
+
+        if j >= text.len() or sema_is_ident_start_char(text[j]) == 0:
+            i = i + 1
+            continue
+        let start = j
+        j = j + 1
+        while j < text.len():
+            let ch = text[j]
+            if sema_is_name_char(ch) == 0:
+                break
+            j = j + 1
+        if j > start:
+            return text.slice(start as i64, j as i64)
+        i = i + 1
+    ""
+
+fn extract_param_name_from_segment(segment: str) -> str:
+    if segment.len() == 0:
+        return ""
+
+    var start = 0
+    var end = segment.len()
+    while start < end and sema_is_space_char(segment[start]) != 0:
+        start = start + 1
+    while end > start and sema_is_space_char(segment[end - 1]) != 0:
+        end = end - 1
+    if end <= start:
+        return ""
+
+    // Skip optional mut prefix.
+    if start + 3 <= end and segment.slice(start as i64, (start + 3) as i64) == "mut":
+        if start + 3 == end or sema_is_ident_char(segment[start + 3]) == 0:
+            start = start + 3
+            while start < end and sema_is_space_char(segment[start]) != 0:
+                start = start + 1
+            if end <= start:
+                return ""
+
+    var colon = -1
+    var i = start
+    while i < end:
+        if segment[i] == 58:  // ':'
+            colon = i
+            break
+        i = i + 1
+    if colon <= start:
+        return ""
+
+    var name_end = colon
+    while name_end > start and sema_is_space_char(segment[name_end - 1]) != 0:
+        name_end = name_end - 1
+    if name_end <= start:
+        return ""
+
+    if sema_is_ident_start_char(segment[start]) == 0:
+        return ""
+    i = start + 1
+    while i < name_end:
+        if sema_is_ident_char(segment[i]) == 0:
+            return ""
+        i = i + 1
+    segment.slice(start as i64, name_end as i64)
+
+fn extract_fn_param_name_in_text(text: str, param_index: i32) -> str:
+    if text.len() == 0 or param_index < 0:
+        return ""
+
+    var open = -1
+    var i = 0
+    while i < text.len():
+        if text[i] == 40:  // '('
+            open = i
+            break
+        i = i + 1
+    if open < 0:
+        return ""
+
+    i = open + 1
+    var seg_start = i
+    var depth = 0
+    var current = 0
+    while i <= text.len():
+        let at_end = i == text.len()
+        var ch = 41
+        if not at_end:
+            ch = text[i]
+        if not at_end:
+            if ch == 40 or ch == 91 or ch == 123 or ch == 60:
+                depth = depth + 1
+            else if ch == 41 or ch == 93 or ch == 125 or ch == 62:
+                if depth > 0:
+                    depth = depth - 1
+                else:
+                    if current == param_index:
+                        return extract_param_name_from_segment(text.slice(seg_start as i64, i as i64))
+                    return ""
+            else if ch == 44 and depth == 0:
+                if current == param_index:
+                    return extract_param_name_from_segment(text.slice(seg_start as i64, i as i64))
+                current = current + 1
+                seg_start = i + 1
+        i = i + 1
+    ""
+
+fn Sema.extract_decl_name_after(self: Sema, node: i32, keyword: str) -> str:
+    if self.source_text.len() == 0:
+        return ""
+    let source_len = self.source_text.len() as i32
+    var start = self.ast.get_start(node)
+    var end = self.ast.get_end(node)
+    if start < 0:
+        start = 0
+    if end < start:
+        return ""
+    if start > source_len:
+        return ""
+    if end > source_len:
+        end = source_len
+    if end <= start:
+        return ""
+    let snippet = self.source_text.slice(start as i64, end as i64)
+    extract_name_after_keyword_in_text(snippet, keyword)
+
+fn Sema.set_pretty_symbol(self: Sema, sym: i32, name: str):
+    if sym <= 0:
+        return
+    if name.len() == 0:
+        return
+    if self.pretty_symbol_names.contains(sym):
+        let existing = self.pretty_symbol_names.get(sym).unwrap()
+        if existing.len() > 0 and existing != "_" and existing != "mut" and sema_str_contains_char(existing, 46) != 0:
+            return
+        if existing.len() > 0 and existing != "_" and existing != "mut":
+            return
+    // Keep textual pretty names detached from pooled symbol storage to avoid
+    // lifetime issues during typed dump rendering.
+    self.pretty_symbol_names.insert(sym, name ++ "")
+
+fn Sema.extract_fn_param_name(self: Sema, node: i32, param_index: i32) -> str:
+    if self.source_text.len() == 0:
+        return ""
+    let source_len = self.source_text.len() as i32
+    var start = self.ast.get_start(node)
+    var end = self.ast.get_end(node)
+    if start < 0:
+        start = 0
+    if end > source_len:
+        end = source_len
+    if end <= start:
+        return ""
+    extract_fn_param_name_in_text(self.source_text.slice(start as i64, end as i64), param_index)
 
 // ── Type management ──────────────────────────────────────────────
 
@@ -381,8 +706,7 @@ fn Sema.pop_scope(self: Sema):
 fn Sema.is_discard_binding_symbol(self: Sema, sym: i32) -> i32:
     if sym == 0:
         return 1
-    let name = self.pool.resolve(sym)
-    if name == "_":
+    if self.discard_sym != 0 and sym == self.discard_sym:
         return 1
     0
 
@@ -391,6 +715,10 @@ fn Sema.scope_put(self: Sema, sym: i32, tid: i32, is_mut: i32):
 
 fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
     if self.is_discard_binding_symbol(sym) != 0:
+        return
+    if self.scope_lookup(sym) >= 0:
+        let name = self.pool.resolve(sym)
+        self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
         return
     self.bind_names.push(sym)
     self.bind_types.push(tid)
@@ -526,11 +854,27 @@ fn Sema.sig_get_param_count(self: Sema, idx: i32) -> i32:
 fn Sema.sig_is_variadic(self: Sema, idx: i32) -> i32:
     self.sig_variadic.get(idx as i64)
 
+fn Sema.sig_idx_valid(self: Sema, idx: i32) -> i32:
+    if idx < 0:
+        return 0
+    if idx >= self.sig_names.len() as i32:
+        return 0
+    1
+
+fn Sema.set_sig_return_type(self: Sema, idx: i32, ret: i32):
+    if self.sig_idx_valid(idx) == 0:
+        return
+    self.sig_ret_types.set_i32(idx as i64, ret)
+    let fn_tid = self.sig_type_ids.get(idx as i64)
+    if fn_tid >= 0 and fn_tid < self.type_d2.len() as i32:
+        self.type_d2.set_i32(fn_tid as i64, ret)
+
 // ── Main entry point ─────────────────────────────────────────────
 
 fn Sema.check_module(self: Sema):
     self.compute_method_origins()
     self.collect_declarations()
+    self.validate_copy_derives()
     self.validate_generic_type_decls()
     self.check_bodies()
 
@@ -557,25 +901,27 @@ fn Sema.compute_method_origins(self: Sema):
                     break
                 let fn_name = self.ast.get_data0(md)
                 self.method_decl_origins.insert(j, origin)
+                self.method_symbol_flags.insert(fn_name, 1)
                 if origin == 0:
-                    if self.is_method_symbol(fn_name):
-                        self.method_has_inherent.insert(fn_name, 1)
+                    self.method_has_inherent.insert(fn_name, 1)
 
     // Top-level method syntax
     for di in 0..dc:
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NK_FN_DECL():
             let fn_name = self.ast.get_data0(decl)
-            if self.is_method_symbol(fn_name):
+            let parsed_fn_name = self.extract_decl_name_after(decl, "fn")
+            if sema_str_contains_char(parsed_fn_name, 46) != 0:
+                self.method_symbol_flags.insert(fn_name, 1)
                 if not self.method_decl_origins.contains(di):
                     self.method_has_inherent.insert(fn_name, 1)
 
 fn Sema.is_method_symbol(self: Sema, sym: i32) -> i32:
-    let name = self.pool.resolve(sym)
-    for i in 0..name.len() as i32:
-        if name[i] == 46:
-            return 1
-    0
+    if sym <= 0:
+        return 0
+    if self.method_symbol_flags.contains(sym):
+        return 1
+    return 0
 
 fn Sema.should_skip_trait_method(self: Sema, decl_idx: i32, fn_sym: i32) -> i32:
     if self.is_method_symbol(fn_sym) == 0:
@@ -594,10 +940,11 @@ fn Sema.collect_declarations(self: Sema):
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         let kind = self.ast.kind(decl)
+        let is_local = self.is_local_decl(di)
         if kind == NK_TYPE_DECL():
-            self.collect_type_decl(decl)
+            self.collect_type_decl(decl, is_local)
         if kind == NK_TRAIT_DECL():
-            self.collect_trait_decl(decl)
+            self.collect_trait_decl(decl, is_local)
 
     // Pass 2: collect impl declarations once trait/type tables exist.
     for di in 0..self.ast.decl_count():
@@ -620,8 +967,17 @@ fn Sema.collect_declarations(self: Sema):
         if kind == NK_LET_DECL():
             self.collect_let_decl(decl)
 
-fn Sema.collect_type_decl(self: Sema, node: i32):
+fn Sema.is_local_decl(self: Sema, decl_index: i32) -> i32:
+    let limit = self.ast.local_decl_count()
+    if limit < 0:
+        return 1
+    if decl_index < limit:
+        return 1
+    0
+
+fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
+    self.set_pretty_symbol(name, self.extract_decl_name_after(node, "type"))
     let extra_start = self.ast.get_data1(node)
     let packed_kind = self.ast.get_data2(node)
     let sub_kind = type_decl_sub_kind(packed_kind)
@@ -695,10 +1051,12 @@ fn Sema.collect_type_decl(self: Sema, node: i32):
     if is_ephemeral != 0:
         self.ephemeral_types.insert(name, 1)
 
-    self.local_type_names.insert(name, 1)
+    if is_local != 0:
+        self.local_type_names.insert(name, 1)
 
 fn Sema.collect_fn_decl(self: Sema, node: i32):
     let fn_name = self.ast.get_data0(node)
+    self.set_pretty_symbol(fn_name, self.extract_decl_name_after(node, "fn"))
     self.fn_decl_nodes.insert(fn_name, node)
 
     // Look up fn_meta for parameter info
@@ -727,6 +1085,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32):
     // Resolve param types
     let sig_param_start = self.sig_params.len() as i32
     for pi in 0..param_count:
+        let p_name_sym = self.ast.get_extra(param_start + pi * 2)
+        self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
         let p_type_node = self.ast.get_extra(param_start + pi * 2 + 1)
         let p_tid = self.resolve_type_expr(p_type_node)
         self.sig_params.push(p_tid)
@@ -752,6 +1112,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32):
     let fn_tid = self.add_type(TY_FN(), fn_extra_start, param_count, ret_type)
 
     self.add_sig(fn_name, fn_tid, ret_type, sig_param_start, param_count, 0)
+    let fn_sig_idx = self.get_sig(fn_name)
+    self.register_method_sig_alias(node, fn_name, fn_sig_idx)
 
     // Track must_use
     if (flags / FN_FLAG_MUST_USE()) % 2 == 1:
@@ -762,6 +1124,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32):
 
 fn Sema.collect_extern_fn(self: Sema, node: i32):
     let name = self.ast.get_data0(node)
+    self.set_pretty_symbol(name, self.extract_decl_name_after(node, "fn"))
     let flags = self.ast.get_data2(node)
     let is_variadic = flags % 2
 
@@ -778,6 +1141,8 @@ fn Sema.collect_extern_fn(self: Sema, node: i32):
 
     let sig_param_start = self.sig_params.len() as i32
     for pi in 0..param_count:
+        let p_name_sym = self.ast.get_extra(param_start + pi * 2)
+        self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
         // extern params use the same parser extra layout as regular fns: [name, type]*
         let p_type_node = self.ast.get_extra(param_start + pi * 2 + 1)
         let p_tid = self.resolve_type_expr(p_type_node)
@@ -793,6 +1158,55 @@ fn Sema.collect_extern_fn(self: Sema, node: i32):
     self.add_sig(name, fn_tid, ret_type, sig_param_start, param_count, is_variadic)
     self.extern_fn_names.insert(name, 1)
 
+fn sema_str_find_char(text: str, needle: i32) -> i32:
+    for i in 0..text.len() as i32:
+        if text[i] == needle:
+            return i
+    return 0 - 1
+
+fn Sema.impl_owner_type_sym_for_decl(self: Sema, decl: i32) -> i32:
+    let start = self.ast.get_start(decl)
+    let end = self.ast.get_end(decl)
+    var best_span = 0
+    var best_sym = 0
+    for di in 0..self.ast.decl_count():
+        let cand = self.ast.get_decl(di)
+        if self.ast.kind(cand) != NK_IMPL_DECL():
+            continue
+        let impl_start = self.ast.get_start(cand)
+        let impl_end = self.ast.get_end(cand)
+        if impl_start <= start and end <= impl_end:
+            let span = impl_end - impl_start
+            if best_sym == 0 or span < best_span:
+                best_span = span
+                best_sym = self.ast.get_data0(cand)
+    best_sym
+
+fn Sema.register_method_sig_alias(self: Sema, node: i32, fn_sym: i32, sig_idx: i32):
+    if sig_idx < 0:
+        return
+
+    var owner_sym = self.impl_owner_type_sym_for_decl(node)
+    var method_name = self.extract_decl_name_after(node, "fn")
+    if method_name.len() == 0:
+        return
+
+    let dot = sema_str_find_char(method_name, 46)
+    if dot >= 0:
+        let owner_name = method_name.slice(0, dot as i64)
+        let base_name = method_name.slice((dot + 1) as i64, method_name.len() as i64)
+        if owner_name.len() > 0:
+            owner_sym = self.pool.intern(owner_name)
+        method_name = base_name
+
+    if owner_sym == 0 or method_name.len() == 0:
+        return
+
+    let method_sym = self.pool.intern(method_name)
+    let key_sym = self.method_key(owner_sym, method_sym)
+    self.sig_lookup.insert(key_sym, sig_idx)
+    self.method_symbol_flags.insert(fn_sym, 1)
+
 fn Sema.top_level_let_type_ann_extra(self: Sema, flags: i32) -> i32:
     let packed = flags / 4
     if packed <= 0:
@@ -807,6 +1221,10 @@ fn Sema.local_let_type_ann_extra(self: Sema, flags: i32) -> i32:
 
 fn Sema.collect_let_decl(self: Sema, node: i32):
     let name = self.ast.get_data0(node)
+    var bind_name = self.extract_decl_name_after(node, "let")
+    if bind_name.len() == 0:
+        bind_name = self.extract_decl_name_after(node, "var")
+    self.set_pretty_symbol(name, bind_name)
     let flags = self.ast.get_data2(node)
     let is_mut = flags % 2
     var bind_ty = 0
@@ -816,14 +1234,15 @@ fn Sema.collect_let_decl(self: Sema, node: i32):
         bind_ty = self.resolve_type_expr(type_node)
         if self.type_expr_is_collection_with_ref(type_node) != 0:
             self.emit_error("ephemeral references cannot be stored in collections", node)
-    self.scope_put(name, bind_ty, is_mut)
+    self.scope_put_at(name, bind_ty, is_mut, node)
     let span_start = self.ast.get_start(node)
     self.typed_binding_types.insert(span_start, bind_ty)
     self.typed_binding_names.insert(span_start, name)
     self.typed_binding_muts.insert(span_start, is_mut)
 
-fn Sema.collect_trait_decl(self: Sema, node: i32):
+fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
+    self.set_pretty_symbol(name, self.extract_decl_name_after(node, "trait"))
     let extra_start = self.ast.get_data1(node)
     // Store trait info
     let trait_idx = self.trait_name_syms.len() as i32
@@ -848,7 +1267,8 @@ fn Sema.collect_trait_decl(self: Sema, node: i32):
         pos = pos + 6
     self.trait_method_counts.push(method_count)
     self.trait_lookup.insert(name, trait_idx)
-    self.local_trait_names.insert(name, 1)
+    if is_local != 0:
+        self.local_trait_names.insert(name, 1)
 
 fn sema_is_builtin_trait_name(name: str) -> bool:
     name == "Drop" or
@@ -866,6 +1286,7 @@ fn sema_is_builtin_trait_name(name: str) -> bool:
 fn Sema.collect_impl_decl(self: Sema, node: i32):
     let type_name = self.ast.get_data0(node)
     let trait_sym = self.ast.get_data2(node)
+    // print("DBG collect_impl_decl type_sym=" ++ int_to_string(type_name) ++ " trait_sym=" ++ int_to_string(trait_sym) ++ "\n")
     if trait_sym == 0:
         return
 
@@ -1064,6 +1485,49 @@ fn Sema.type_decl_tp_count(self: Sema, node: i32) -> i32:
     if sub_kind == TDK_ALIAS() or sub_kind == TDK_DISTINCT():
         return self.ast.get_extra(extra_start + 3)
     0
+
+fn Sema.type_decl_has_derive(self: Sema, node: i32, trait_sym: i32) -> i32:
+    let meta = self.ast.find_type_meta(node)
+    if meta < 0:
+        return 0
+    let derive_start = self.ast.type_meta_derive_start(meta)
+    let derive_count = self.ast.type_meta_derive_count(meta)
+    for i in 0..derive_count:
+        if self.ast.get_extra(derive_start + i) == trait_sym:
+            return 1
+    0
+
+fn Sema.validate_copy_derives(self: Sema):
+    let copy_sym = self.pool.intern("Copy")
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NK_TYPE_DECL():
+            continue
+        if self.type_decl_has_derive(decl, copy_sym) == 0:
+            continue
+
+        let type_name = self.ast.get_data0(decl)
+        if self.has_drop_method(type_name) != 0:
+            self.emit_error("type cannot be both Copy and Drop", decl)
+            continue
+
+        if not self.named_types.contains(type_name):
+            continue
+        let tid = self.named_types.get(type_name).unwrap()
+        let resolved = self.resolve_alias(tid)
+        if self.get_type_kind(resolved) != TY_STRUCT():
+            continue
+
+        let te_start = self.get_type_d1(resolved)
+        let field_count = self.get_type_d2(resolved)
+        var has_noncopy_field = 0
+        for fi in 0..field_count:
+            let field_tid = self.type_extra.get((te_start + fi * 3 + 1) as i64)
+            if field_tid == 0 or self.is_copy(field_tid) == 0:
+                has_noncopy_field = 1
+                break
+        if has_noncopy_field != 0:
+            self.emit_error("cannot derive Copy for a type with non-Copy fields", decl)
 
 fn Sema.validate_generic_type_decls(self: Sema):
     for di in 0..self.ast.decl_count():
@@ -1312,6 +1776,9 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     // Check body
     let body_ty = self.check_expr(body)
     self.typed_expr_types.insert(self.ast.get_start(body), body_ty)
+    if meta >= 0 and self.ast.fn_meta_ret(meta) == 0:
+        let inferred_ret = if body_ty != 0: body_ty else: self.ty_void
+        self.set_sig_return_type(sig_idx, inferred_ret)
 
     // Restore state
     self.current_return_type = saved_ret
@@ -1412,6 +1879,8 @@ fn Sema.expr_is_ephemeral_task(self: Sema, node: i32) -> i32:
         return self.expr_is_ephemeral_task(self.ast.get_data0(node))
     if kind == NK_IDENT():
         return self.scope_lookup_is_ephemeral_task(self.ast.get_data0(node))
+    if kind == NK_ASYNC_BLOCK():
+        return self.expr_is_ephemeral_value(self.ast.get_data0(node))
     if kind == NK_CALL():
         let callee = self.ast.get_data0(node)
         if self.ast.kind(callee) == NK_IDENT():
@@ -1537,8 +2006,18 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
         if val != 0:
             let vt = self.check_expr(val)
             if vt != 0:
-                self.break_value_type = vt
-                self.has_break_value_type = 1
+                if self.has_break_value_type == 0:
+                    self.break_value_type = vt
+                    self.has_break_value_type = 1
+                else:
+                    if not self.types_compatible(self.break_value_type, vt):
+                        let widened = self.arithmetic_result_type(self.break_value_type, vt)
+                        if widened == 0:
+                            self.emit_error("type mismatch in break value", node)
+                        else:
+                            self.break_value_type = widened
+                    else:
+                        self.break_value_type = vt
         return self.ty_void
 
     if kind == NK_CONTINUE():
@@ -1874,6 +2353,10 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
 
 fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     let name = self.ast.get_data0(node)
+    var bind_name = self.extract_decl_name_after(node, "let")
+    if bind_name.len() == 0:
+        bind_name = self.extract_decl_name_after(node, "var")
+    self.set_pretty_symbol(name, bind_name)
     let value = self.ast.get_data1(node)
     let flags = self.ast.get_data2(node)
     let is_mut = flags % 2
@@ -1900,7 +2383,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     if ann_type_node != 0 and self.type_expr_is_collection_with_ref(ann_type_node) != 0:
         self.emit_error("ephemeral references cannot be stored in collections", node)
 
-    self.scope_put(name, bind_type, is_mut)
+    self.scope_put_at(name, bind_type, is_mut, node)
     let span_start = self.ast.get_start(node)
     self.typed_binding_types.insert(span_start, bind_type)
     self.typed_binding_names.insert(span_start, name)
@@ -2425,12 +2908,18 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     // Known function
     if sig_idx >= 0:
         let ret = self.sig_return_type(sig_idx)
-        // Check arg count
+        // Check arg count (supports default parameters via required-count
+        // metadata packed into fn_meta flags by the parser).
         let expected = self.sig_get_param_count(sig_idx)
+        let min_expected = self.fn_min_expected_arg_count(fn_sym, expected)
         let actual = arg_count + param_offset
         if self.sig_is_variadic(sig_idx) == 0:
-            if actual > expected:
-                self.emit_error("wrong argument count", node)
+            if actual < min_expected or actual > expected:
+                let fn_name = self.pool.resolve(fn_sym)
+                if min_expected == expected:
+                    self.emit_error("function '" ++ fn_name ++ "' expects " ++ int_to_string(expected) ++ " argument(s), found " ++ int_to_string(actual), node)
+                else:
+                    self.emit_error("function '" ++ fn_name ++ "' expects " ++ int_to_string(min_expected) ++ "-" ++ int_to_string(expected) ++ " argument(s), found " ++ int_to_string(actual), node)
 
         for ai in 0..arg_count:
             let param_i = ai + param_offset
@@ -2474,6 +2963,23 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         return self.check_builtin_call(fn_sym, node, arg_types, arg_count)
 
     0
+
+fn Sema.fn_min_expected_arg_count(self: Sema, fn_sym: i32, fallback_expected: i32) -> i32:
+    if fallback_expected <= 0:
+        return fallback_expected
+    if not self.fn_decl_nodes.contains(fn_sym):
+        return fallback_expected
+    let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return fallback_expected
+    let meta_flags = self.ast.fn_meta_flags(meta)
+    let required = meta_flags / FN_META_REQUIRED_UNIT()
+    if required < 0:
+        return fallback_expected
+    if required > fallback_expected:
+        return fallback_expected
+    required
 
 fn Sema.check_expr_with_expected(self: Sema, node: i32, expected: i32) -> i32:
     let saved_expected = self.expected_expr_type
@@ -2835,8 +3341,7 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     for ai in 0..arg_count:
         arg_types.push(self.check_expr(self.ast.get_extra(extra_start + ai)))
 
-    let field_name = self.pool.resolve(field)
-    if field_name == "track":
+    if field == self.sym_track:
         if self.ast.kind(expr) != NK_IDENT() or self.is_active_async_scope_symbol(self.ast.get_data0(expr)) == 0:
             self.emit_error("track() is only available inside async scope", node)
             return 0
@@ -2871,16 +3376,15 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     0
 
 fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i32], arg_count: i32) -> i32:
-    let name = self.pool.resolve(fn_sym)
     let args_start = self.ast.get_data1(node)
-    if name == "println" or name == "print":
+    if fn_sym == self.sym_println or fn_sym == self.sym_print:
         return self.ty_void
-    if name == "assert":
+    if fn_sym == self.sym_assert:
         if arg_count != 1:
             self.emit_error("assert() expects exactly one argument", node)
             return 0
         return self.ty_void
-    if name == "Channel":
+    if fn_sym == self.sym_channel:
         if arg_count > 1:
             self.emit_error("Channel() expects zero or one capacity argument", node)
             return 0
@@ -2892,7 +3396,7 @@ fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i3
                     self.emit_error("Channel() capacity must be an integer", self.ast.get_extra(args_start))
                     return 0
         return self.ty_i64
-    if name == "send":
+    if fn_sym == self.sym_send:
         if arg_count != 2:
             self.emit_error("send() expects exactly two arguments", node)
             return 0
@@ -2913,7 +3417,7 @@ fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i3
                 self.emit_error("send() currently supports integer payloads", payload_node)
                 return 0
         return self.ty_void
-    if name == "recv":
+    if fn_sym == self.sym_recv:
         if arg_count != 1:
             self.emit_error("recv() expects exactly one argument", node)
             return 0
@@ -2924,7 +3428,7 @@ fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i3
                 self.emit_error("recv() expects channel handle as integer value", self.ast.get_extra(args_start))
                 return 0
         return self.ty_i32
-    if name == "close":
+    if fn_sym == self.sym_close:
         if arg_count != 1:
             self.emit_error("close() expects exactly one argument", node)
             return 0
@@ -2935,7 +3439,7 @@ fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i3
                 self.emit_error("close() expects channel handle as integer value", self.ast.get_extra(args_start))
                 return 0
         return self.ty_void
-    if name == "todo" or name == "unreachable":
+    if fn_sym == self.sym_todo or fn_sym == self.sym_unreachable:
         if arg_count > 1:
             self.emit_error("todo()/unreachable() expect zero or one message argument", node)
             return 0
@@ -2949,8 +3453,7 @@ fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i3
     0
 
 fn Sema.is_collection_type_name(self: Sema, sym: i32) -> i32:
-    let name = self.pool.resolve(sym)
-    if name == "Vec" or name == "HashMap" or name == "HashSet" or name == "BTreeMap" or name == "SlotMap":
+    if sym == self.sym_vec or sym == self.sym_hashmap or sym == self.sym_hashset:
         return 1
     0
 
@@ -3358,29 +3861,14 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
         self.mark_moved_if_consumed(self.ast.get_data0(node))
 
 fn Sema.method_key(self: Sema, type_sym: i32, method_sym: i32) -> i32:
-    // Fast path: already-qualified method symbols should not be re-mangled.
-    if self.is_method_symbol(method_sym) != 0:
-        return method_sym
-
-    // If a method symbol leaks into the type position, recover the base type
-    // segment to avoid pathological key growth (e.g. Type.method.method...).
-    var type_name = self.pool.resolve(type_sym)
-    if self.is_method_symbol(type_sym) != 0:
-        var dot = 0 - 1
-        for i in 0..type_name.len() as i32:
-            if type_name[i] == 46: // '.'
-                dot = i
-                break
-        if dot > 0:
-            type_name = type_name.slice(0, dot as i64)
-
+    if type_sym <= 0 or method_sym <= 0:
+        return 0
     let cache_key = int_to_string(type_sym) ++ "|" ++ int_to_string(method_sym)
     let cached = self.method_key_cache.get(cache_key)
     if cached.is_some():
         return cached.unwrap()
 
-    let method_name = self.pool.resolve(method_sym)
-    let out = self.pool.intern(type_name ++ "." ++ method_name)
+    let out = self.pool.intern("$m$" ++ cache_key)
     self.method_key_cache.insert(cache_key, out)
     out
 
@@ -3532,66 +4020,87 @@ fn Sema.is_copy(self: Sema, tid: i32) -> i32:
         return 1
     if tk == TY_PTR() or tk == TY_REF() or tk == TY_FN() or tk == TY_GENERIC_FN():
         return 1
-    if tk == TY_STRUCT():
-        let name = self.get_type_d0(resolved)
-        if self.has_drop_method(name):
-            return 0
-        let te_start = self.get_type_d1(resolved)
-        let field_count = self.get_type_d2(resolved)
-        for fi in 0..field_count:
-            let ft = self.type_extra.get((te_start + fi * 3 + 1) as i64)
-            if self.is_copy(ft) == 0:
+    if tk == TY_STRUCT() or tk == TY_ARRAY() or tk == TY_TUPLE() or tk == TY_RANGE():
+        // Break copy-check recursion on cyclic type graphs.
+        for vi in 0..self.copy_visit_stack.len() as i32:
+            if self.copy_visit_stack.get(vi as i64) == resolved:
                 return 0
-        return 1
+        self.copy_visit_stack.push(resolved)
+
+        var out = 1
+        if tk == TY_STRUCT():
+            let name = self.get_type_d0(resolved)
+            if self.has_drop_method(name):
+                out = 0
+            else:
+                let struct_te_start = self.get_type_d1(resolved)
+                let struct_field_count = self.get_type_d2(resolved)
+                for fi in 0..struct_field_count:
+                    let ft = self.type_extra.get((struct_te_start + fi * 3 + 1) as i64)
+                    if self.is_copy(ft) == 0:
+                        out = 0
+                        break
+        else if tk == TY_ARRAY():
+            out = self.is_copy(self.get_type_d0(resolved))
+        else if tk == TY_TUPLE():
+            let tuple_te_start = self.get_type_d0(resolved)
+            let tuple_elem_count = self.get_type_d1(resolved)
+            for ei in 0..tuple_elem_count:
+                if self.is_copy(self.type_extra.get((tuple_te_start + ei) as i64)) == 0:
+                    out = 0
+                    break
+        else: // TY_RANGE
+            out = self.is_copy(self.get_type_d0(resolved))
+
+        self.copy_visit_stack.pop()
+        return out
     if tk == TY_ENUM():
         return 1
-    if tk == TY_ARRAY():
-        return self.is_copy(self.get_type_d0(resolved))
     if tk == TY_SLICE():
         return 1
-    if tk == TY_TUPLE():
-        let te_start = self.get_type_d0(resolved)
-        let elem_count = self.get_type_d1(resolved)
-        for ei in 0..elem_count:
-            if self.is_copy(self.type_extra.get((te_start + ei) as i64)) == 0:
-                return 0
-        return 1
-    if tk == TY_RANGE():
-        return self.is_copy(self.get_type_d0(resolved))
     1
 
 fn Sema.has_drop_method(self: Sema, type_name: i32) -> i32:
-    let drop_sym = self.pool.intern("drop")
-    let key = self.method_key(type_name, drop_sym)
-    if self.sig_lookup.contains(key):
-        return 1
-    0
+    if type_name <= 0:
+        return 0
+    if self.drop_method_cache.contains(type_name):
+        return self.drop_method_cache.get(type_name).unwrap()
+
+    let type_text = self.pool.resolve(type_name)
+    if type_text.len() == 0:
+        self.drop_method_cache.insert(type_name, 0)
+        return 0
+    if type_text.len() > 512:
+        self.drop_method_cache.insert(type_name, 0)
+        return 0
+
+    // Keep drop lookup idempotent when a method key leaks in as the "type".
+    var key = type_name
+    if not (type_text.len() >= 5 and
+            type_text[type_text.len() - 5] == 46 and // '.'
+            type_text[type_text.len() - 4] == 100 and // d
+            type_text[type_text.len() - 3] == 114 and // r
+            type_text[type_text.len() - 2] == 111 and // o
+            type_text[type_text.len() - 1] == 112): // p
+        key = self.pool.intern(type_text ++ ".drop")
+
+    let has = if self.sig_lookup.contains(key): 1 else: 0
+    self.drop_method_cache.insert(type_name, has)
+    if key != type_name:
+        self.drop_method_cache.insert(key, has)
+    has
 
 fn Sema.is_builtin_fn(self: Sema, sym: i32) -> i32:
-    let name = self.pool.resolve(sym)
-    if name == "println" or name == "print" or name == "assert":
-        return 1
-    if name == "Some" or name == "Ok" or name == "Err":
-        return 1
-    if name == "Channel" or name == "send" or name == "recv" or name == "close":
-        return 1
-    if name == "todo" or name == "unreachable":
-        return 1
-    if name == "Vec" or name == "HashMap" or name == "HashSet":
-        return 1
-    if name == "abs" or name == "min" or name == "max" or name == "clamp":
-        return 1
-    if name == "sqrt_f64" or name == "pow_f64" or name == "floor_f64" or name == "ceil_f64":
-        return 1
-    if name == "sin_f64" or name == "cos_f64" or name == "log_f64" or name == "exp_f64" or name == "fabs_f64":
+    if sym <= 0:
+        return 0
+    if self.builtin_fn_syms.contains(sym):
         return 1
     0
 
 fn Sema.is_builtin_value(self: Sema, sym: i32) -> i32:
-    let name = self.pool.resolve(sym)
-    if name == "None" or name == "TypeInfo" or name == "PI" or name == "E":
-        return 1
-    if name == "INFINITY" or name == "NAN" or name == "__FILE__" or name == "__LINE__":
+    if sym <= 0:
+        return 0
+    if self.builtin_value_syms.contains(sym):
         return 1
     0
 
@@ -3704,11 +4213,99 @@ fn typed_indent(indent: i32) -> str:
         out = out ++ "  "
     out
 
-fn Sema.dump_typed_module(self: Sema) -> str:
-    var out = ""
-    out = out ++ "typed module decls=" ++ int_to_string(self.ast.decl_count()) ++ "\n"
+fn emit_typed_indent(indent: i32):
+    for i in 0..indent:
+        print("  ")
 
+fn sema_str_contains_char(text: str, needle: i32) -> i32:
+    for i in 0..text.len():
+        if text[i] == needle:
+            return 1
+    0
+
+fn Sema.safe_symbol_text(self: Sema, sym: i32) -> str:
+    if sym <= 0:
+        return ""
+    if self.pretty_symbol_names.contains(sym):
+        let pretty = self.pretty_symbol_names.get(sym).unwrap()
+        if pretty.len() > 0:
+            return pretty
+    let pooled = self.pool.resolve(sym)
+    if pooled.len() > 0:
+        return pooled
+    "sym" ++ int_to_string(sym)
+
+fn Sema.impl_owner_type_name_for_decl(self: Sema, decl: i32) -> str:
+    let start = self.ast.get_start(decl)
+    let end = self.ast.get_end(decl)
+    var best_span = 0
+    var best_name = ""
     for di in 0..self.ast.decl_count():
+        let cand = self.ast.get_decl(di)
+        if self.ast.kind(cand) != NK_IMPL_DECL():
+            continue
+        let impl_start = self.ast.get_start(cand)
+        let impl_end = self.ast.get_end(cand)
+        if impl_start <= start and end <= impl_end:
+            let span = impl_end - impl_start
+            if best_name.len() == 0 or span < best_span:
+                best_span = span
+                best_name = self.safe_symbol_text(self.ast.get_data0(cand))
+    best_name
+
+fn Sema.reset_typed_dump_safety(self: Sema):
+    self.typed_dump_seen_nodes = HashMap.new()
+    self.typed_dump_visit_budget = 1000
+
+fn Sema.mark_typed_dump_visit(self: Sema, node: i32) -> i32:
+    if self.typed_dump_visit_budget <= 0:
+        return 0
+    if self.typed_dump_seen_nodes.contains(node):
+        return 0
+    self.typed_dump_visit_budget = self.typed_dump_visit_budget - 1
+    self.typed_dump_seen_nodes.insert(node, 1)
+    1
+
+fn Sema.clamp_extra_span_count(self: Sema, extra_start: i32, raw_count: i32, stride: i32, hard_cap: i32) -> i32:
+    if raw_count <= 0:
+        return 0
+    if extra_start < 0 or extra_start >= self.ast.extra_len():
+        return 0
+    if stride <= 0:
+        return 0
+    let available = self.ast.extra_len() - extra_start
+    if available <= 0:
+        return 0
+    var max_count = available / stride
+    if max_count < 0:
+        max_count = 0
+    var count = raw_count
+    if count > max_count:
+        count = max_count
+    if hard_cap > 0 and count > hard_cap:
+        count = hard_cap
+    if count < 0:
+        count = 0
+    count
+
+fn Sema.clamp_sig_param_count(self: Sema, sig_idx: i32, meta_param_count: i32) -> i32:
+    var count = self.sig_get_param_count(sig_idx)
+    if meta_param_count >= 0 and meta_param_count < count:
+        count = meta_param_count
+    if count < 0:
+        return 0
+    if count > 64:
+        return 64
+    count
+
+fn Sema.dump_typed_module(self: Sema) -> str:
+    self.reset_typed_dump_safety()
+    var out = ""
+    let total_decl_count = self.ast.decl_count()
+    let dump_decl_count = total_decl_count
+    out = out ++ "typed module decls=" ++ int_to_string(dump_decl_count) ++ "\n"
+
+    for di in 0..dump_decl_count:
         let decl = self.ast.get_decl(di)
         let kind = self.ast.kind(decl)
         let start = self.ast.get_start(decl)
@@ -3718,22 +4315,33 @@ fn Sema.dump_typed_module(self: Sema) -> str:
 
         if kind == NK_FN_DECL():
             let fn_name_sym = self.ast.get_data0(decl)
-            let fn_name = self.pool.resolve(fn_name_sym)
+            var fn_name = self.safe_symbol_text(fn_name_sym)
+            let owner_type_name = self.impl_owner_type_name_for_decl(decl)
+            let parsed_fn_name = self.extract_decl_name_after(decl, "fn")
+            if owner_type_name.len() > 0:
+                if parsed_fn_name.len() > 0:
+                    fn_name = owner_type_name ++ "." ++ parsed_fn_name
+                else if sema_str_contains_char(fn_name, 46) == 0:
+                    fn_name = owner_type_name ++ "." ++ fn_name
             let sig_idx = self.get_sig(fn_name_sym)
-            if sig_idx >= 0:
+            if fn_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
                 out = out ++ "  fn " ++ fn_name ++ "("
                 let meta = self.ast.find_fn_meta(decl)
                 var param_start = 0
+                var meta_param_count = 0
                 if meta >= 0:
                     param_start = self.ast.fn_meta_param_start(meta)
-                let param_count = self.sig_get_param_count(sig_idx)
+                    meta_param_count = self.ast.fn_meta_param_count(meta)
+                let param_count = self.clamp_sig_param_count(sig_idx, meta_param_count)
                 for pi in 0..param_count:
                     if pi > 0:
                         out = out ++ ", "
                     let p_name_sym = if meta >= 0: self.ast.get_extra(param_start + pi * 2) else: 0
-                    let p_name = if p_name_sym != 0: self.pool.resolve(p_name_sym) else: "_"
+                    let p_name = if p_name_sym != 0: self.safe_symbol_text(p_name_sym) else: "_"
                     out = out ++ p_name ++ ": " ++ self.type_name(self.sig_param_type(sig_idx, pi))
                 out = out ++ ") -> " ++ self.type_name(self.sig_return_type(sig_idx)) ++ "\n"
+                if meta >= 0 and self.ast.fn_meta_ret(meta) == 0:
+                    out = out ++ "  inferred_return: " ++ self.type_name(self.sig_return_type(sig_idx)) ++ "\n"
             else:
                 out = out ++ "  fn " ++ fn_name ++ "(<unknown>)\n"
             out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(decl), 2)
@@ -3741,28 +4349,30 @@ fn Sema.dump_typed_module(self: Sema) -> str:
 
         if kind == NK_EXTERN_FN():
             let ext_name_sym = self.ast.get_data0(decl)
-            let ext_name = self.pool.resolve(ext_name_sym)
+            let ext_name = self.safe_symbol_text(ext_name_sym)
             let sig_idx = self.get_sig(ext_name_sym)
-            if sig_idx >= 0:
+            if ext_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
                 out = out ++ "  extern fn " ++ ext_name ++ "("
                 let meta = self.ast.find_fn_meta(decl)
                 var param_start = 0
+                var meta_param_count = 0
                 if meta >= 0:
                     param_start = self.ast.fn_meta_param_start(meta)
-                let param_count = self.sig_get_param_count(sig_idx)
+                    meta_param_count = self.ast.fn_meta_param_count(meta)
+                let param_count = self.clamp_sig_param_count(sig_idx, meta_param_count)
                 for pi in 0..param_count:
                     if pi > 0:
                         out = out ++ ", "
                     let p_name_sym = if meta >= 0: self.ast.get_extra(param_start + pi * 2) else: 0
-                    let p_name = if p_name_sym != 0: self.pool.resolve(p_name_sym) else: "_"
+                    let p_name = if p_name_sym != 0: self.safe_symbol_text(p_name_sym) else: "_"
                     out = out ++ p_name ++ ": " ++ self.type_name(self.sig_param_type(sig_idx, pi))
                 out = out ++ ") -> " ++ self.type_name(self.sig_return_type(sig_idx)) ++ "\n"
             else:
-                out = out ++ "  extern fn " ++ ext_name ++ "(<unknown>)\n"
+                out = out ++ "  extern fn (<unknown>)\n"
             continue
 
         if kind == NK_LET_DECL():
-            let name = self.pool.resolve(self.ast.get_data0(decl))
+            let name = self.safe_symbol_text(self.ast.get_data0(decl))
             let has_resolved = self.typed_binding_types.contains(start) and self.typed_binding_types.get(start).unwrap() != 0
             if has_resolved:
                 let ty = self.typed_binding_types.get(start).unwrap()
@@ -3780,18 +4390,18 @@ fn Sema.dump_typed_module(self: Sema) -> str:
             continue
 
         if kind == NK_TYPE_DECL():
-            out = out ++ "  type " ++ self.pool.resolve(self.ast.get_data0(decl)) ++ "\n"
+            out = out ++ "  type " ++ self.safe_symbol_text(self.ast.get_data0(decl)) ++ "\n"
             continue
 
         if kind == NK_TRAIT_DECL():
-            out = out ++ "  trait " ++ self.pool.resolve(self.ast.get_data0(decl)) ++ "\n"
+            out = out ++ "  trait " ++ self.safe_symbol_text(self.ast.get_data0(decl)) ++ "\n"
             continue
 
         if kind == NK_IMPL_DECL():
-            let type_name = self.pool.resolve(self.ast.get_data0(decl))
+            let type_name = self.safe_symbol_text(self.ast.get_data0(decl))
             let trait_sym = self.ast.get_data2(decl)
             if trait_sym != 0:
-                out = out ++ "  impl " ++ self.pool.resolve(trait_sym) ++ " for " ++ type_name ++ "\n"
+                out = out ++ "  impl " ++ self.safe_symbol_text(trait_sym) ++ " for " ++ type_name ++ "\n"
             else:
                 out = out ++ "  impl " ++ type_name ++ "\n"
             continue
@@ -3803,12 +4413,12 @@ fn Sema.dump_typed_module(self: Sema) -> str:
             for pi in 0..path_count:
                 if pi > 0:
                     out = out ++ "."
-                out = out ++ self.pool.resolve(self.ast.get_extra(extra_start + pi))
+                out = out ++ self.safe_symbol_text(self.ast.get_extra(extra_start + pi))
             out = out ++ "\n"
             continue
 
         if kind == NK_C_IMPORT():
-            out = out ++ "  c_import \"" ++ self.pool.resolve(self.ast.get_data0(decl)) ++ "\"\n"
+            out = out ++ "  c_import \"" ++ self.safe_symbol_text(self.ast.get_data0(decl)) ++ "\"\n"
             continue
 
         if kind == NK_POISONED_DECL():
@@ -3816,16 +4426,181 @@ fn Sema.dump_typed_module(self: Sema) -> str:
 
     out
 
+fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
+    self.reset_typed_dump_safety()
+    let total_decl_count = self.ast.decl_count()
+    var dump_decl_count = total_decl_count
+    if requested_limit > 0 and requested_limit <= total_decl_count:
+        dump_decl_count = requested_limit
+    print("typed module decls=" ++ int_to_string(dump_decl_count) ++ "\n")
+
+    for di in 0..dump_decl_count:
+        let decl = self.ast.get_decl(di)
+        let kind = self.ast.kind(decl)
+        let start = self.ast.get_start(decl)
+        let end = self.ast.get_end(decl)
+
+        print("decl[" ++ int_to_string(di) ++ "] kind=" ++ typed_decl_kind_name(kind) ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ "\n")
+
+        if kind == NK_FN_DECL():
+            let fn_name_sym = self.ast.get_data0(decl)
+            var fn_name = self.safe_symbol_text(fn_name_sym)
+            let owner_type_name = self.impl_owner_type_name_for_decl(decl)
+            let parsed_fn_name = self.extract_decl_name_after(decl, "fn")
+            if owner_type_name.len() > 0:
+                if parsed_fn_name.len() > 0:
+                    fn_name = owner_type_name ++ "." ++ parsed_fn_name
+                else if sema_str_contains_char(fn_name, 46) == 0:
+                    fn_name = owner_type_name ++ "." ++ fn_name
+            let sig_idx = self.get_sig(fn_name_sym)
+            if fn_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
+                print("  fn ")
+                print(fn_name)
+                print("(")
+                let meta = self.ast.find_fn_meta(decl)
+                var param_start = 0
+                var meta_param_count = 0
+                if meta >= 0:
+                    param_start = self.ast.fn_meta_param_start(meta)
+                    meta_param_count = self.ast.fn_meta_param_count(meta)
+                let param_count = self.clamp_sig_param_count(sig_idx, meta_param_count)
+                for pi in 0..param_count:
+                    if pi > 0:
+                        print(", ")
+                    let p_name_sym = if meta >= 0: self.ast.get_extra(param_start + pi * 2) else: 0
+                    let p_name = if p_name_sym != 0: self.safe_symbol_text(p_name_sym) else: "_"
+                    print(p_name)
+                    print(": ")
+                    print(self.type_name(self.sig_param_type(sig_idx, pi)))
+                print(") -> ")
+                print(self.type_name(self.sig_return_type(sig_idx)))
+                print("\n")
+                if meta >= 0 and self.ast.fn_meta_ret(meta) == 0:
+                    print("  inferred_return: ")
+                    print(self.type_name(self.sig_return_type(sig_idx)))
+                    print("\n")
+            else:
+                print("  fn ")
+                print(fn_name)
+                print("(<unknown>)\n")
+            self.emit_typed_expr_tree(self.ast.get_data1(decl), 2)
+            continue
+
+        if kind == NK_EXTERN_FN():
+            let ext_name_sym = self.ast.get_data0(decl)
+            let ext_name = self.safe_symbol_text(ext_name_sym)
+            let sig_idx = self.get_sig(ext_name_sym)
+            if ext_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
+                print("  extern fn ")
+                print(ext_name)
+                print("(")
+                let meta = self.ast.find_fn_meta(decl)
+                var param_start = 0
+                var meta_param_count = 0
+                if meta >= 0:
+                    param_start = self.ast.fn_meta_param_start(meta)
+                    meta_param_count = self.ast.fn_meta_param_count(meta)
+                let param_count = self.clamp_sig_param_count(sig_idx, meta_param_count)
+                for pi in 0..param_count:
+                    if pi > 0:
+                        print(", ")
+                    let p_name_sym = if meta >= 0: self.ast.get_extra(param_start + pi * 2) else: 0
+                    let p_name = if p_name_sym != 0: self.safe_symbol_text(p_name_sym) else: "_"
+                    print(p_name)
+                    print(": ")
+                    print(self.type_name(self.sig_param_type(sig_idx, pi)))
+                print(") -> ")
+                print(self.type_name(self.sig_return_type(sig_idx)))
+                print("\n")
+            else:
+                print("  extern fn (<unknown>)\n")
+            continue
+
+        if kind == NK_LET_DECL():
+            let name = self.safe_symbol_text(self.ast.get_data0(decl))
+            let has_resolved = self.typed_binding_types.contains(start) and self.typed_binding_types.get(start).unwrap() != 0
+            if has_resolved:
+                let ty = self.typed_binding_types.get(start).unwrap()
+                let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: 0
+                print("  let ")
+                print(name)
+                if is_mut != 0:
+                    print(" (mut)")
+                print(": ")
+                print(self.type_name(ty))
+                print("\n")
+            else:
+                let flags = self.ast.get_data2(decl)
+                let has_ann = self.top_level_let_type_ann_extra(flags) >= 0
+                print("  let ")
+                print(name)
+                print(": ")
+                print(if has_ann: "<annotated>" else: "<inferred>")
+                print("\n")
+            continue
+
+        if kind == NK_TYPE_DECL():
+            print("  type ")
+            print(self.safe_symbol_text(self.ast.get_data0(decl)))
+            print("\n")
+            continue
+
+        if kind == NK_TRAIT_DECL():
+            print("  trait ")
+            print(self.safe_symbol_text(self.ast.get_data0(decl)))
+            print("\n")
+            continue
+
+        if kind == NK_IMPL_DECL():
+            let type_name = self.safe_symbol_text(self.ast.get_data0(decl))
+            let trait_sym = self.ast.get_data2(decl)
+            if trait_sym != 0:
+                print("  impl ")
+                print(self.safe_symbol_text(trait_sym))
+                print(" for ")
+                print(type_name)
+                print("\n")
+            else:
+                print("  impl ")
+                print(type_name)
+                print("\n")
+            continue
+
+        if kind == NK_USE_DECL():
+            let extra_start = self.ast.get_data0(decl)
+            let path_count = self.ast.get_data1(decl)
+            print("  use ")
+            for pi in 0..path_count:
+                if pi > 0:
+                    print(".")
+                print(self.safe_symbol_text(self.ast.get_extra(extra_start + pi)))
+            print("\n")
+            continue
+
+        if kind == NK_C_IMPORT():
+            print("  c_import \"")
+            print(self.safe_symbol_text(self.ast.get_data0(decl)))
+            print("\"\n")
+            continue
+
+        if kind == NK_POISONED_DECL():
+            print("  <poisoned>\n")
+
 fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
     if node == 0:
+        return ""
+    if node < 0 or node >= self.ast.node_count():
+        return ""
+    if indent > 80:
         return ""
 
     var out = ""
     let kind = self.ast.kind(node)
     let start = self.ast.get_start(node)
     let end = self.ast.get_end(node)
+    let has_typed_expr = self.typed_expr_types.contains(start)
 
-    if self.typed_expr_types.contains(start):
+    if has_typed_expr:
         let tid = self.typed_expr_types.get(start).unwrap()
         out = out ++ typed_indent(indent) ++ "expr " ++ typed_expr_kind_name(kind) ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ " : " ++ self.type_name(tid) ++ "\n"
 
@@ -3833,7 +4608,7 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
         if self.typed_binding_types.contains(start):
             let name_sym = if self.typed_binding_names.contains(start): self.typed_binding_names.get(start).unwrap() else: self.ast.get_data0(node)
             let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: (self.ast.get_data2(node) % 2)
-            out = out ++ typed_indent(indent + 1) ++ "bind " ++ self.pool.resolve(name_sym)
+            out = out ++ typed_indent(indent + 1) ++ "bind " ++ self.safe_symbol_text(name_sym)
             if is_mut != 0:
                 out = out ++ " (mut)"
             out = out ++ ": " ++ self.type_name(self.typed_binding_types.get(start).unwrap()) ++ "\n"
@@ -3850,8 +4625,9 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
     if kind == NK_CALL():
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
+        let safe_arg_count = self.clamp_extra_span_count(extra_start, arg_count, 1, 64)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
-        for ai in 0..arg_count:
+        for ai in 0..safe_arg_count:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + ai), indent + 1)
         return out
 
@@ -3861,9 +4637,12 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
 
     if kind == NK_OPTIONAL_CHAIN():
         let extra_start = self.ast.get_data2(node)
+        if extra_start < 0 or extra_start >= self.ast.extra_len():
+            return out
         let arg_count = self.ast.get_extra(extra_start)
+        let safe_arg_count = self.clamp_extra_span_count(extra_start + 1, arg_count, 1, 64)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
-        for ai in 0..arg_count:
+        for ai in 0..safe_arg_count:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + 1 + ai), indent + 1)
         return out
 
@@ -3882,7 +4661,8 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
         let extra_start = self.ast.get_data0(node)
         let stmt_count = self.ast.get_data1(node)
         let tail = self.ast.get_data2(node)
-        for si in 0..stmt_count:
+        let safe_stmt_count = self.clamp_extra_span_count(extra_start, stmt_count, 1, 256)
+        for si in 0..safe_stmt_count:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + si), indent + 1)
         out = out ++ self.dump_typed_expr_tree(tail, indent + 1)
         return out
@@ -3918,7 +4698,8 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
     if kind == NK_TUPLE():
         let extra_start = self.ast.get_data0(node)
         let count = self.ast.get_data1(node)
-        for i in 0..count:
+        let safe_count = self.clamp_extra_span_count(extra_start, count, 1, 64)
+        for i in 0..safe_count:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return out
 
@@ -3930,7 +4711,8 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
     if kind == NK_VARIANT_SHORTHAND():
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
-        for i in 0..arg_count:
+        let safe_arg_count = self.clamp_extra_span_count(extra_start, arg_count, 1, 64)
+        for i in 0..safe_arg_count:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return out
 
@@ -3964,7 +4746,8 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
     if kind == NK_ARRAY_LIT():
         let extra_start = self.ast.get_data0(node)
         let count = self.ast.get_data1(node)
-        for i in 0..count:
+        let safe_count = self.clamp_extra_span_count(extra_start, count, 1, 128)
+        for i in 0..safe_count:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return out
 
@@ -3976,15 +4759,17 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
     if kind == NK_STRUCT_LIT():
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
-        for i in 0..field_count:
+        let safe_field_count = self.clamp_extra_span_count(extra_start, field_count, 2, 128)
+        for i in 0..safe_field_count:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
         return out
 
     if kind == NK_MATCH():
         let extra_start = self.ast.get_data1(node)
         let arm_count = self.ast.get_data2(node)
+        let safe_arm_count = self.clamp_extra_span_count(extra_start, arm_count, 1, 128)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
-        for i in 0..arm_count:
+        for i in 0..safe_arm_count:
             let arm = self.ast.get_extra(extra_start + i)
             let guard = self.ast.get_data2(arm)
             if guard != 0:
@@ -3994,8 +4779,11 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
 
     if kind == NK_ENUM_VARIANT():
         let extra_start = self.ast.get_data2(node)
+        if extra_start < 0 or extra_start >= self.ast.extra_len():
+            return out
         let arg_count = self.ast.get_extra(extra_start)
-        for i in 0..arg_count:
+        let safe_arg_count = self.clamp_extra_span_count(extra_start + 1, arg_count, 1, 64)
+        for i in 0..safe_arg_count:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + 1 + i), indent + 1)
         return out
 
@@ -4016,7 +4804,8 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
-        for i in 0..field_count:
+        let safe_field_count = self.clamp_extra_span_count(extra_start, field_count, 2, 128)
+        for i in 0..safe_field_count:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
         return out
 
@@ -4027,12 +4816,261 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
     if kind == NK_SELECT_AWAIT():
         let extra_start = self.ast.get_data0(node)
         let arm_count = self.ast.get_data1(node)
-        for i in 0..arm_count:
+        let safe_arm_count = self.clamp_extra_span_count(extra_start, arm_count, 3, 32)
+        for i in 0..safe_arm_count:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 3 + 1), indent + 1)
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 3 + 2), indent + 1)
         return out
 
     out
+
+fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
+    if node == 0:
+        return
+    if node < 0 or node >= self.ast.node_count():
+        return
+    if indent > 80:
+        return
+
+    let kind = self.ast.kind(node)
+    let start = self.ast.get_start(node)
+    let end = self.ast.get_end(node)
+    let has_typed_expr = self.typed_expr_types.contains(start)
+
+    if has_typed_expr:
+        let tid = self.typed_expr_types.get(start).unwrap()
+        emit_typed_indent(indent)
+        print("expr ")
+        print(typed_expr_kind_name(kind))
+        print(" span=")
+        print(int_to_string(start))
+        print("..")
+        print(int_to_string(end))
+        print(" : ")
+        print(self.type_name(tid))
+        print("\n")
+
+    if kind == NK_LET_BINDING():
+        if self.typed_binding_types.contains(start):
+            let name_sym = if self.typed_binding_names.contains(start): self.typed_binding_names.get(start).unwrap() else: self.ast.get_data0(node)
+            let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: (self.ast.get_data2(node) % 2)
+            emit_typed_indent(indent + 1)
+            print("bind ")
+            print(self.safe_symbol_text(name_sym))
+            if is_mut != 0:
+                print(" (mut)")
+            print(": ")
+            print(self.type_name(self.typed_binding_types.get(start).unwrap()))
+            print("\n")
+
+    if kind == NK_BINARY():
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return
+
+    if kind == NK_UNARY():
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NK_CALL():
+        let extra_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        let safe_arg_count = self.clamp_extra_span_count(extra_start, arg_count, 1, 64)
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        for ai in 0..safe_arg_count:
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + ai), indent + 1)
+        return
+
+    if kind == NK_FIELD_ACCESS():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return
+
+    if kind == NK_OPTIONAL_CHAIN():
+        let extra_start = self.ast.get_data2(node)
+        if extra_start < 0 or extra_start >= self.ast.extra_len():
+            return
+        let arg_count = self.ast.get_extra(extra_start)
+        let safe_arg_count = self.clamp_extra_span_count(extra_start + 1, arg_count, 1, 64)
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        for ai in 0..safe_arg_count:
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + 1 + ai), indent + 1)
+        return
+
+    if kind == NK_INDEX():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NK_SLICE():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return
+
+    if kind == NK_BLOCK():
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        let tail = self.ast.get_data2(node)
+        let safe_stmt_count = self.clamp_extra_span_count(extra_start, stmt_count, 1, 256)
+        for si in 0..safe_stmt_count:
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + si), indent + 1)
+        self.emit_typed_expr_tree(tail, indent + 1)
+        return
+
+    if kind == NK_IF_EXPR():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return
+
+    if kind == NK_RETURN():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return
+
+    if kind == NK_LET_BINDING():
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NK_LET_ELSE():
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return
+
+    if kind == NK_TUPLE_DESTRUCTURE():
+        self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return
+
+    if kind == NK_ASSIGN():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NK_TUPLE():
+        let extra_start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        let safe_count = self.clamp_extra_span_count(extra_start, count, 1, 64)
+        for i in 0..safe_count:
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
+        return
+
+    if kind == NK_RANGE():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NK_VARIANT_SHORTHAND():
+        let extra_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        let safe_arg_count = self.clamp_extra_span_count(extra_start, arg_count, 1, 64)
+        for i in 0..safe_arg_count:
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
+        return
+
+    if kind == NK_AWAIT() or kind == NK_ASYNC_BLOCK() or kind == NK_SPAWN() or kind == NK_GROUPED() or kind == NK_DEFER() or kind == NK_YIELD() or kind == NK_COMPTIME():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return
+
+    if kind == NK_PIPELINE():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NK_WHILE():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NK_LOOP():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return
+
+    if kind == NK_FOR():
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return
+
+    if kind == NK_BREAK():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return
+
+    if kind == NK_ARRAY_LIT():
+        let extra_start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        let safe_count = self.clamp_extra_span_count(extra_start, count, 1, 128)
+        for i in 0..safe_count:
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
+        return
+
+    if kind == NK_ARRAY_COMPREHENSION():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return
+
+    if kind == NK_STRUCT_LIT():
+        let extra_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        let safe_field_count = self.clamp_extra_span_count(extra_start, field_count, 2, 128)
+        for i in 0..safe_field_count:
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
+        return
+
+    if kind == NK_MATCH():
+        let extra_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        let safe_arm_count = self.clamp_extra_span_count(extra_start, arm_count, 1, 128)
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        for i in 0..safe_arm_count:
+            let arm = self.ast.get_extra(extra_start + i)
+            let guard = self.ast.get_data2(arm)
+            if guard != 0:
+                self.emit_typed_expr_tree(guard, indent + 1)
+            self.emit_typed_expr_tree(self.ast.get_data1(arm), indent + 1)
+        return
+
+    if kind == NK_ENUM_VARIANT():
+        let extra_start = self.ast.get_data2(node)
+        if extra_start < 0 or extra_start >= self.ast.extra_len():
+            return
+        let arg_count = self.ast.get_extra(extra_start)
+        let safe_arg_count = self.clamp_extra_span_count(extra_start + 1, arg_count, 1, 64)
+        for i in 0..safe_arg_count:
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + 1 + i), indent + 1)
+        return
+
+    if kind == NK_CLOSURE():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return
+
+    if kind == NK_CAST():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return
+
+    if kind == NK_WITH_EXPR():
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NK_RECORD_UPDATE():
+        let extra_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        let safe_field_count = self.clamp_extra_span_count(extra_start, field_count, 2, 128)
+        for i in 0..safe_field_count:
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
+        return
+
+    if kind == NK_ASYNC_SCOPE():
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NK_SELECT_AWAIT():
+        let extra_start = self.ast.get_data0(node)
+        let arm_count = self.ast.get_data1(node)
+        let safe_arm_count = self.clamp_extra_span_count(extra_start, arm_count, 3, 32)
+        for i in 0..safe_arm_count:
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i * 3 + 1), indent + 1)
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i * 3 + 2), indent + 1)
+        return
 
 // ── Type name formatting ─────────────────────────────────────────
 
@@ -4066,9 +5104,9 @@ fn Sema.type_name(self: Sema, tid: i32) -> str:
     if tk == TY_STR():
         return "str"
     if tk == TY_STRUCT():
-        return self.pool.resolve(self.get_type_d0(resolved))
+        return self.safe_symbol_text(self.get_type_d0(resolved))
     if tk == TY_ENUM():
-        return self.pool.resolve(self.get_type_d0(resolved))
+        return self.safe_symbol_text(self.get_type_d0(resolved))
     if tk == TY_ARRAY():
         return "[_]T"
     if tk == TY_SLICE():

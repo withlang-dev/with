@@ -1,0 +1,18 @@
+# Wave 11 coverage manifest
+# Format:
+#   <stage0_script>|<status>|<evidence_csv>|<note>
+# status:
+#   covered
+#   known_divergence
+# evidence item:
+#   <mode>:<entry> where mode is check|build|run|test|cli.
+
+run_phase0_driver_commands_tests.sh|covered|cli:help,cli:version,cli:unknown_command,cli:build_missing_arg,cli:run_missing_arg,cli:test_unknown_flag,test:test/wave11/cases/c_import_bad_header_fail.w|driver command and CLI error-path coverage
+run_phase0_object_link_tests.sh|covered|build:test/wave11/cases/c_import_link_ok.w,run:test/wave11/cases/c_import_link_ok.w,build:test/wave11/cases/c_import_link_missing_fail.w,build:test/wave9/cases/runtime_linkage_sync_ok.w,build:test/wave9/cases/runtime_linkage_async_ok.w,run:test/wave9/cases/runtime_linkage_sync_ok.w,run:test/wave9/cases/runtime_linkage_async_ok.w|object/link success, runtime object selection, and missing-link negative coverage
+run_phase0_import_path_regression_tests.sh|covered|check:test/wave11/cases/imports/relative_root.w,check:test/wave11/cases/imports/qualified_root.w,check:test/wave11/cases/imports/missing_root.w|relative/qualified/missing import-path behavior
+run_phase0_c_import_tests.sh|covered|run:test/wave11/cases/c_import_stdio_ok.w,check:test/wave11/cases/c_import_bad_header_fail.w|c_import runtime and malformed header behavior
+run_phase0_c_import_link_tests.sh|covered|run:test/wave11/cases/c_import_link_ok.w,build:test/wave11/cases/c_import_link_missing_fail.w|link-lib success and missing-link coverage
+run_phase0_c_import_cache_tests.sh|covered|check:test/wave11/cases/c_import_cache_same.w,check:test/wave11/cases/c_import_cache_diff_links.w|c_import cache-key behavior coverage
+run_phase0_c_import_milestone_tests.sh|covered|run:test/wave11/cases/c_import_stdio_ok.w,build:test/wave11/cases/c_import_bad_header_fail.w|milestone stdio and negative header path coverage
+run_phase6_c_import_cache_invalidation_tests.sh|covered|check:test/wave11/cases/c_import_cache_diff_links.w,check:test/wave11/cases/c_import_cache_epoch_override.w|cache invalidation and epoch-override behavior coverage
+run_phase6_c_import_macro_diagnostics_tests.sh|covered|check:test/wave11/cases/c_import_macro_constants_ok.w,check:test/wave11/cases/c_import_macro_function_like_ok.w,check:test/wave11/cases/c_import_bad_header_fail.w|macro constants/function-like macro skip and bad-header diagnostics

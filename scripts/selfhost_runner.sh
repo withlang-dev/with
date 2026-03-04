@@ -12,6 +12,16 @@ prepare_selfhost_runner() {
   local dylib_path=""
   local cand=""
 
+  # On the system volume (e.g. /Users/*), execute in-place. The tmp-copy
+  # launcher workaround is only needed for external /Volumes mounts.
+  case "$root_dir" in
+    /Volumes/*) ;;
+    *)
+      echo "$bin_path"
+      return 0
+      ;;
+  esac
+
   for cand in \
     "${root_dir}/runtime/libwith_llvm_bridge.dylib" \
     "${root_dir}/.with/build/runtime/libwith_llvm_bridge.dylib" \
@@ -43,4 +53,3 @@ cleanup_selfhost_runner() {
   fi
   SELFHOST_RUNNER_DIR=""
 }
-

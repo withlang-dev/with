@@ -18,9 +18,13 @@ test/wave8/cases/whole_place_conflict_fail.w
 # CFG / NLL
 
 test/wave8/cases/cfg_branch_borrow_ok.w
+test/wave8/cases/dataflow_pred_succ_ok.w
+test/wave8/cases/dataflow_live_conflict_fail.w
 test/wave8/cases/nll_shared_then_mut_ok.w
 test/wave8/cases/nll_mut_then_shared_ok.w
 test/wave8/cases/nll_conflict_live_borrow_fail.w
+test/wave8/cases/branch_loop_disjoint_reborrow_ok.w
+test/wave8/cases/loop_same_field_reborrow_fail.w
 
 # Move / copy semantics
 
@@ -58,13 +62,6 @@ test/wave8/cases/task_ephemeral_async_block_warn.w
 test/wave8/cases/task_ephemeral_owned_ok.w
 test/wave8/cases/task_ephemeral_byref_ok.w
 test/wave8/cases/may_suspend_guard_fail.w
-
-KNOWN_DIVERGENCE|test/wave8/cases/copy_drop_exclusive_copy_drop_conflict_fail.w|Stage0 emits copy-drop exclusivity error and self-host currently accepts|stage0|Copy-vs-Drop exclusivity checks are not yet implemented in self-host Wave 8 path.
-KNOWN_DIVERGENCE|test/wave8/cases/copy_drop_exclusive_noncopy_field_fail.w|Stage0 rejects derive Copy with non-Copy field and self-host currently accepts|stage0|Self-host does not yet enforce derive-Copy field eligibility parity.
-KNOWN_DIVERGENCE|test/wave8/cases/task_ephemeral_borrow_warn.w|Stage0 emits ephemeral Task escape warning and self-host currently emits no warning|stage0|Task-boundary ephemeral escape diagnostics are known debt in Wave 8.
-KNOWN_DIVERGENCE|test/wave8/cases/task_ephemeral_assign_warn.w|Stage0 emits ephemeral Task escape warning and self-host currently emits no warning|stage0|Task-boundary ephemeral escape diagnostics are known debt in Wave 8.
-KNOWN_DIVERGENCE|test/wave8/cases/task_ephemeral_async_block_warn.w|Stage0 emits ephemeral Task escape warning and self-host currently emits no warning|stage0|Task-boundary ephemeral escape diagnostics are known debt in Wave 8.
-KNOWN_DIVERGENCE|test/wave8/cases/may_suspend_guard_fail.w|Stage0 emits E0701 may_suspend/no_await_guard error and self-host currently accepts|stage0|No-await-guard and may_suspend enforcement parity is not yet implemented in self-host Wave 8 path.
 
 # Auto-enabled bootstrap coverage entries
 bootstrap/test/cases/arithmetic_mixed.w

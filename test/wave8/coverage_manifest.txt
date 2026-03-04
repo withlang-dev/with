@@ -1,0 +1,7 @@
+# Wave 8 coverage manifest
+# Format: <stage0_script>|<status>|<evidence_csv>|<note>
+
+run_phase1_nll_tests.sh|covered|test/wave8/cases/nll_shared_then_mut_ok.w,test/wave8/cases/nll_conflict_live_borrow_fail.w|NLL borrow conflict/release coverage is present.
+run_phase1_copy_drop_exclusive_tests.sh|covered|test/wave8/cases/copy_drop_exclusive_copy_drop_conflict_fail.w,test/wave8/cases/copy_drop_exclusive_noncopy_field_fail.w|copy/drop exclusivity diagnostics are covered.
+run_phase1_ephemeral_boundary_tests.sh|covered|test/wave8/cases/ephemeral_return_fail.w,test/wave8/cases/task_ephemeral_borrow_warn.w|ephemeral boundary/task-escape behavior is covered.
+run_phase1_drop_order_tests.sh|covered|test/wave8/cases/drop_order_scope_check_ok.w,test/wave8/cases/drop_order_early_return_check_ok.w|drop-order borrow interaction smoke coverage is present.

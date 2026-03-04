@@ -20,6 +20,8 @@ check|test/wave9/cases/yield_outside_generator_fail.w
 check|test/wave9/cases/may_suspend_guard_fail.w
 check|test/wave9/cases/await_tuple_ok.w
 check|test/wave9/cases/channel_send_ephemeral_fail.w
+check|test/wave9/cases/channel_cancel_interaction_ok.w
+check|test/wave9/cases/select_await_tie_deterministic_ok.w
 
 # Build-mode parity
 build|test/wave9/cases/task_must_use_await_ok.w
@@ -28,6 +30,8 @@ build|test/wave9/cases/task_ephemeral_borrow_warn.w
 build|test/wave9/cases/spawn_async_fn_ok.w
 build|test/wave9/cases/runtime_linkage_sync_ok.w
 build|test/wave9/cases/runtime_linkage_async_ok.w
+build|test/wave9/cases/channel_cancel_interaction_ok.w
+build|test/wave9/cases/select_await_tie_deterministic_ok.w
 
 # Run-mode parity
 run|test/wave9/cases/async_basic_ok.w
@@ -40,6 +44,8 @@ run|test/wave9/cases/await_tuple_ok.w
 run|test/wave9/cases/runtime_linkage_sync_ok.w
 run|test/wave9/cases/runtime_linkage_async_ok.w
 run|test/wave9/cases/channel_send_owned_ok.w
+run|test/wave9/cases/channel_cancel_interaction_ok.w
+run|test/wave9/cases/select_await_tie_deterministic_ok.w
 run|bootstrap/test/cases/task_cancel.w
 run|bootstrap/test/cases/async_multi.w
 run|bootstrap/test/cases/fiber_pool_reuse.w

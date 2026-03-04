@@ -97,15 +97,39 @@ parity_mode_kd_line_for_entry() {
   awk -F'|' -v m="$mode" -v t="$test_path" '$1=="KNOWN_DIVERGENCE" && $2==m && $3==t {print; exit}' "$corpus_file"
 }
 
-parity_validate_known_divergences_mode() {
+parity_mode_is_allowed() {
+  local mode="$1"
+  shift
+  for allowed in "$@"; do
+    if [[ "$mode" == "$allowed" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+parity_validate_known_divergences_mode_allowed() {
   local corpus_file="$1"
+  shift
+  local allowed_modes=("$@")
+  if [[ "${#allowed_modes[@]}" -eq 0 ]]; then
+    allowed_modes=(check ir build run)
+  fi
+  local allowed_modes_csv
+  allowed_modes_csv="$(IFS='|'; echo "${allowed_modes[*]}")"
   local tmp_sources
   local tmp_kd
   local failures=0
   tmp_sources="$(mktemp)"
   tmp_kd="$(mktemp)"
 
-  awk -F'|' '
+  awk -F'|' -v modes="$allowed_modes_csv" '
+    BEGIN {
+      n = split(modes, mode_list, "|")
+      for (i = 1; i <= n; i++) {
+        allowed[mode_list[i]] = 1
+      }
+    }
     /^[[:space:]]*$/ { next }
     /^[[:space:]]*#/ { next }
     /^KNOWN_DIVERGENCE\|/ { next }
@@ -115,7 +139,7 @@ parity_validate_known_divergences_mode() {
         bad=1
         next
       }
-      if ($1 != "check" && $1 != "ir" && $1 != "build" && $1 != "run") {
+      if (!($1 in allowed)) {
         print "FAIL(parity-mode-source-mode) " $0 > "/dev/stderr"
         bad=1
         next
@@ -151,7 +175,7 @@ parity_validate_known_divergences_mode() {
       continue
     fi
 
-    if [[ "${mode}" != "check" && "${mode}" != "ir" && "${mode}" != "build" && "${mode}" != "run" ]]; then
+    if ! parity_mode_is_allowed "$mode" "${allowed_modes[@]}"; then
       echo "FAIL(parity-mode-known-divergence-mode) ${mode}|${test_path}"
       failures=$((failures + 1))
     fi
@@ -188,4 +212,9 @@ parity_validate_known_divergences_mode() {
     return 1
   fi
   return 0
+}
+
+parity_validate_known_divergences_mode() {
+  local corpus_file="$1"
+  parity_validate_known_divergences_mode_allowed "$corpus_file" check ir build run
 }

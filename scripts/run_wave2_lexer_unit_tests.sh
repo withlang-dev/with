@@ -21,6 +21,9 @@ tests=(
   "test/wave2/lexer_operators_test.w"
   "test/wave2/lexer_literals_test.w"
   "test/wave2/lexer_structure_test.w"
+  "test/wave2/lexer_invalid_test.w"
+  "test/wave2/lexer_numeric_edges_test.w"
+  "test/wave2/lexer_fuzz_smoke_test.w"
 )
 
 failures=0

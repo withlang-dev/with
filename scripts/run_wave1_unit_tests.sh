@@ -20,9 +20,13 @@ tests=(
   "test/wave1/ids_test.w"
   "test/wave1/arena_test.w"
   "test/wave1/intern_pool_test.w"
+  "test/wave1/intern_pool_stress_test.w"
   "test/wave1/span_source_test.w"
   "test/wave1/source_map_test.w"
+  "test/wave1/source_map_crlf_test.w"
+  "test/wave1/source_map_utf8_crlf_test.w"
   "test/wave1/diagnostic_test.w"
+  "test/wave1/diagnostic_multilabel_determinism_test.w"
 )
 
 failures=0
