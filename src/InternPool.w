@@ -24,6 +24,9 @@ type InternPool = {
     value_map: HashMap[str, i32],
 }
 
+fn clone_symbol_text(s: str) -> str:
+    s ++ ""
+
 fn InternPool.init -> InternPool:
     var p = InternPool {
         symbol_texts: Vec.new(),
@@ -53,8 +56,9 @@ fn InternPool.intern_str(self: InternPool, s: str) -> Symbol:
         return existing.unwrap()
 
     let id = self.symbol_texts.len() as i32
-    self.symbol_texts.push(s)
-    self.symbol_map.insert(s, id)
+    let owned = clone_symbol_text(s)
+    self.symbol_texts.push(owned)
+    self.symbol_map.insert(owned, id)
     id
 
 fn InternPool.resolve_symbol(self: InternPool, sym: Symbol) -> str:

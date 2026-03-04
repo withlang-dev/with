@@ -70,6 +70,48 @@ run_expect_no_pattern() {
   echo "PASS(wave7-unit) $name"
 }
 
+run_storage_pairing_check() {
+  local name="$1"
+  local src="$2"
+  local min_live="$3"
+  local out="$tmpdir/${name}.out"
+  local err="$tmpdir/${name}.err"
+
+  if ! "$SELFHOST_BIN" check "$src" --dump-mir >"$out" 2>"$err"; then
+    echo "FAIL(wave7-unit-storage-check-run) $name: $src"
+    cat "$err"
+    failures=$((failures + 1))
+    return
+  fi
+
+  local live_count
+  live_count="$(grep -o 'StorageLive(_[0-9][0-9]*)' "$out" | wc -l | tr -d '[:space:]')"
+  if [[ "$live_count" -lt "$min_live" ]]; then
+    echo "FAIL(wave7-unit-storage-live-count) $name: $src expected>=$min_live got=$live_count"
+    failures=$((failures + 1))
+    return
+  fi
+
+  local bad=0
+  while IFS= read -r dead; do
+    [[ -z "$dead" ]] && continue
+    local id
+    id="$(echo "$dead" | sed -E 's/StorageDead\\((_([0-9]+))\\)/\\1/')"
+    if ! grep -q "StorageLive(${id})" "$out"; then
+      bad=1
+      break
+    fi
+  done < <(grep -o 'StorageDead(_[0-9][0-9]*)' "$out" || true)
+
+  if [[ "$bad" -ne 0 ]]; then
+    echo "FAIL(wave7-unit-storage-pairing) $name: $src has StorageDead without prior StorageLive"
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(wave7-unit-storage-pairing) $name"
+}
+
 run_determinism_check() {
   local name="$1"
   local src="$2"
@@ -145,6 +187,16 @@ run_expect_pattern "call_generic_mono" "bootstrap/test/cases/generic_multi.w" "c
 run_expect_pattern "drop_scope_exit" "test/wave7/cases/drop_scope_exit.w" "drop\\("
 run_expect_pattern "drop_early_return" "test/wave7/cases/drop_early_return.w" "drop\\("
 run_expect_pattern "drop_break_continue" "test/wave7/cases/drop_break_continue.w" "drop\\("
+run_expect_pattern "cleanup_edge_shape_drop" "test/wave7/cases/cleanup_edge_shape.w" "drop\\("
+run_expect_pattern "cleanup_edge_shape_cfg" "test/wave7/cases/cleanup_edge_shape.w" "switchInt\\("
+run_expect_pattern "loop_drop_interaction_drop" "test/wave7/cases/loop_drop_interaction.w" "drop\\("
+run_expect_pattern "loop_drop_interaction_backedge" "test/wave7/cases/loop_drop_interaction.w" "goto -> bb1;"
+run_storage_pairing_check "storage_live_complex_pairing" "test/wave7/cases/storage_live_dead_complex.w" "6"
+
+# Async/generator boundary before Async-MIR lowering.
+run_expect_pattern "async_generator_boundary_call" "test/wave7/cases/async_generator_boundary.w" "call "
+run_expect_pattern "async_generator_boundary_cfg" "test/wave7/cases/async_generator_boundary.w" "switchInt\\(|discriminant\\("
+run_expect_no_pattern "async_generator_boundary_no_surface_tokens" "test/wave7/cases/async_generator_boundary.w" "await|yield|select_await|async_scope"
 
 # Array / collection lowering.
 run_expect_pattern "lower_array_aggregate" "bootstrap/test/cases/arrays.w" "aggregate\\(|const .*(i32|ty[0-9]+)"

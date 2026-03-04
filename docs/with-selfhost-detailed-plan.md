@@ -2,7 +2,7 @@
 
 ## Architecture-First Execution Plan
 
-**Status:** Wave 10 parity passes for the current corpus. MIR-first codegen is implemented in self-host (`src/Codegen.w`, `src/Driver.w`) with deterministic harness coverage (`processed=104`, `failures=0`, `known_divergences=1`). The only accepted Wave 10 divergence is `ir|bootstrap/test/cases/enum_accessor_ref.w` where self-host is correct and Stage0 IR path is behind. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking behavior is currently Sema-integrated and must be rewritten as a MIR pass after semantic fixpoint (v3 order remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
+**Status:** Wave 11 parity passes for the current corpus. Driver/CLI/link/c_import behavior is implemented in self-host with deterministic harness coverage (`processed=30`, `failures=0`, `known_divergences=2`) and coverage verification (`processed=9`). Accepted Wave 11 divergences are macro-path checks where self-host is correct and Stage0 remains behind: `check|test/wave11/cases/c_import_macro_constants_ok.w` and `check|test/wave11/cases/c_import_macro_function_like_ok.w`. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking behavior is currently Sema-integrated and must be rewritten as a MIR pass after semantic fixpoint (v3 order remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
 **Goal:** Build a clean-room, self-hosted With compiler in With.
 **Bootstrap:** Stage0 (Zig implementation) remains semantic oracle.
 
@@ -585,11 +585,30 @@ Validation:
 
 ---
 
-## Wave 11 — Driver + CLI
+## Wave 11 — Driver + CLI ✓
 
-* Full pipeline orchestration
-* Linking
-* c_import finalization
+Implemented:
+* Full `check`/`build`/`run`/`test`/`clean`/`help`/`version` command orchestration and deterministic command-status mapping in self-host harnesses.
+* Wave 11 driver unit and parity harnesses:
+  - `scripts/run_wave11_driver_unit_tests.sh`
+  - `scripts/run_wave11_driver_parity.sh`
+  - tri-state parity accounting (`PASS`/`FAIL`/`KNOWN_DIVERGENCE`) with stale-divergence gating.
+* Stage0 coverage closure mapping and enforcement:
+  - `test/wave11/coverage_manifest.txt`
+  - `test/wave11/coverage_matrix.md`
+  - `scripts/verify_wave11_coverage.sh`
+* CLI parity harness hardening:
+  - isolated temp-directory execution for missing-arg/unknown-flag CLI checks
+  - timeout-wrapped CLI invocations to prevent false hangs
+  - absolute binary-path invocation for temp-dir command runs.
+
+Validation:
+* `scripts/run_wave11_driver_unit_tests.sh`: PASS
+* `scripts/verify_wave11_coverage.sh`: PASS (`processed=9`)
+* `scripts/run_wave11_driver_parity.sh`: PASS (`processed=30`, `failures=0`, `known_divergences=2`)
+* Accepted `KNOWN_DIVERGENCE`:
+  - `check|test/wave11/cases/c_import_macro_constants_ok.w` (`selfhost` correct; Stage0 macro constant path behind)
+  - `check|test/wave11/cases/c_import_macro_function_like_ok.w` (`selfhost` correct; Stage0 function-like macro diagnostics path behind)
 
 ---
 

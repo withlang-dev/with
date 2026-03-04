@@ -9,6 +9,7 @@ source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
 CORPUS_FILE="test/wave7/mir_corpus.txt"
+VERIFY_COVERAGE_SCRIPT="scripts/verify_wave7_coverage.sh"
 TIMEOUT_BIN="$(command -v timeout || true)"
 CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
@@ -31,6 +32,13 @@ if [[ ! -x "$SELFHOST_BIN" ]]; then
 fi
 if [[ ! -f "$CORPUS_FILE" ]]; then
   echo "error: missing corpus file: $CORPUS_FILE"
+  exit 1
+fi
+if [[ ! -x "$VERIFY_COVERAGE_SCRIPT" ]]; then
+  echo "error: missing Wave 7 coverage verifier: $VERIFY_COVERAGE_SCRIPT"
+  exit 1
+fi
+if ! "$VERIFY_COVERAGE_SCRIPT"; then
   exit 1
 fi
 if ! parity_validate_known_divergences "$CORPUS_FILE"; then

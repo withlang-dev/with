@@ -137,6 +137,9 @@ fn FN_FLAG_NO_MAIN -> i32: 2048
 fn FN_FLAG_TEST -> i32: 4096
 fn FN_FLAG_BEFORE -> i32: 8192
 fn FN_FLAG_AFTER -> i32: 16384
+// Metadata packing unit used to encode required-parameter count into
+// fn_meta flags without affecting existing FN_FLAG_* parity checks.
+fn FN_META_REQUIRED_UNIT -> i32: 32768
 
 // Visibility flags
 fn VIS_PRIVATE -> i32: 0
@@ -202,6 +205,10 @@ type AstPool = {
 
     // Top-level declaration indices
     decls: Vec[i32],
+    // Number of declarations that originate from the root module after
+    // import-merging/strip. -1 means "unknown", and consumers should
+    // conservatively treat all declarations as local.
+    local_decl_count: i32,
 
     // String table for source text slices
     strings: Vec[str],
@@ -209,6 +216,10 @@ type AstPool = {
     // Auxiliary fn decl metadata: [node, flags, ret_type, param_start, param_count, tp_start, tp_count]*
     // Each fn decl stores 7 ints. Used by Sema to access param info.
     fn_meta: Vec[i32],
+
+    // Auxiliary type decl metadata: [node, derive_start, derive_count]*
+    // derive_start/derive_count reference AstPool.extra symbols.
+    type_meta: Vec[i32],
 
     // Auxiliary fn parameter-pattern metadata:
     // - fn_param_patterns stores flat pattern nodes (0 for plain identifier param)
@@ -230,8 +241,10 @@ fn AstPool.new -> AstPool:
         data2: Vec.new(),
         extra: Vec.new(),
         decls: Vec.new(),
+        local_decl_count: 0 - 1,
         strings: Vec.new(),
         fn_meta: Vec.new(),
+        type_meta: Vec.new(),
         fn_param_patterns: Vec.new(),
         fn_param_pattern_meta: Vec.new(),
         for_meta: Vec.new(),
@@ -306,6 +319,12 @@ fn AstPool.decl_count(self: AstPool) -> i32:
 fn AstPool.get_decl(self: AstPool, idx: i32) -> i32:
     self.decls.get(idx as i64)
 
+fn AstPool.set_local_decl_count(self: AstPool, n: i32):
+    self.local_decl_count = n
+
+fn AstPool.local_decl_count(self: AstPool) -> i32:
+    self.local_decl_count
+
 fn AstPool.extra_len(self: AstPool) -> i32:
     self.extra.len() as i32
 
@@ -355,6 +374,26 @@ fn AstPool.fn_meta_tp_start(self: AstPool, meta: i32) -> i32:
 
 fn AstPool.fn_meta_tp_count(self: AstPool, meta: i32) -> i32:
     self.fn_meta.get((meta + 6) as i64)
+
+fn AstPool.add_type_meta(self: AstPool, node: i32, derive_start: i32, derive_count: i32):
+    self.type_meta.push(node)
+    self.type_meta.push(derive_start)
+    self.type_meta.push(derive_count)
+
+fn AstPool.find_type_meta(self: AstPool, node: i32) -> i32:
+    var i = 0
+    let len = self.type_meta.len() as i32
+    while i < len:
+        if self.type_meta.get(i as i64) == node:
+            return i
+        i = i + 3
+    0 - 1
+
+fn AstPool.type_meta_derive_start(self: AstPool, meta: i32) -> i32:
+    self.type_meta.get((meta + 1) as i64)
+
+fn AstPool.type_meta_derive_count(self: AstPool, meta: i32) -> i32:
+    self.type_meta.get((meta + 2) as i64)
 
 fn AstPool.fn_param_patterns_len(self: AstPool) -> i32:
     self.fn_param_patterns.len() as i32

@@ -8,6 +8,7 @@
 check|test/wave10/cases/llvm_minimal.w
 check|test/wave10/cases/llvm_extern.w
 check|test/wave10/cases/abi_ref_param_autoref.w
+check|test/wave10/cases/abi_aggregate_roundtrip_ok.w
 check|test/wave10/cases/llvm_ir_parse_fail.w
 check|test/wave10/cases/enum_shorthand_wrong_expected_fail.w
 check|test/wave10/cases/enum_accessors_unit_as_fail.w
@@ -37,13 +38,18 @@ check|bootstrap/test/cases/enum_accessor.w
 check|test/wave10/cases/enum_shorthand_context_ok.w
 check|test/wave10/cases/ref_dyn_dispatch_ok.w
 check|test/wave10/cases/box_dyn_dispatch_ok.w
+check|test/wave10/cases/vtable_slot_ordering_ok.w
 check|test/wave10/cases/devirt_known_local.w
 check|test/wave10/cases/devirt_unknown_param.w
+check|test/wave10/cases/generic_cross_module_dedup.w
+check|test/wave10/cases/generic_cross_module_multi_type.w
+check|test/wave10/cases/enum_layout_tag_payload_probe_ok.w
 
 # IR-mode parity
 ir|test/wave10/cases/llvm_minimal.w
 ir|test/wave10/cases/llvm_extern.w
 ir|test/wave10/cases/abi_ref_param_autoref.w
+ir|test/wave10/cases/abi_aggregate_roundtrip_ok.w
 ir|test/wave10/cases/llvm_ir_simple.w
 ir|test/wave10/cases/llvm_ir_cimport.w
 ir|test/wave10/cases/llvm_ir_parse_fail.w
@@ -62,6 +68,10 @@ ir|bootstrap/test/cases/dyn_dispatch.w
 ir|bootstrap/test/cases/dyn_default_dispatch.w
 ir|test/wave10/cases/devirt_known_local.w
 ir|test/wave10/cases/devirt_unknown_param.w
+ir|test/wave10/cases/vtable_slot_ordering_ok.w
+ir|test/wave10/cases/generic_cross_module_dedup.w
+ir|test/wave10/cases/generic_cross_module_multi_type.w
+ir|test/wave10/cases/enum_layout_tag_payload_probe_ok.w
 ir|bootstrap/test/cases/enum_accessor.w
 ir|bootstrap/test/cases/enum_accessor_ref.w
 ir|test/wave10/cases/enum_accessors_all_ok.w
@@ -70,6 +80,7 @@ ir|test/wave10/cases/enum_accessors_all_ok.w
 build|test/wave10/cases/llvm_minimal.w
 build|test/wave10/cases/llvm_extern.w
 build|test/wave10/cases/abi_ref_param_autoref.w
+build|test/wave10/cases/abi_aggregate_roundtrip_ok.w
 build|test/wave10/cases/llvm_negative.w
 build|test/wave10/cases/llvm_ir_type_fail.w
 build|test/wave10/cases/enum_accessors_unit_as_fail.w
@@ -87,14 +98,21 @@ build|bootstrap/test/cases/enum_accessor.w
 build|test/wave10/cases/enum_accessors_all_ok.w
 build|test/wave10/cases/box_dyn_dispatch_ok.w
 build|test/wave10/cases/ref_dyn_dispatch_ok.w
+build|test/wave10/cases/vtable_slot_ordering_ok.w
+build|test/wave10/cases/generic_cross_module_dedup.w
+build|test/wave10/cases/generic_cross_module_multi_type.w
+build|test/wave10/cases/enum_layout_tag_payload_probe_ok.w
 
 # Run-mode parity
 run|test/wave10/cases/llvm_minimal.w
 run|test/wave10/cases/llvm_extern.w
 run|test/wave10/cases/abi_ref_param_autoref.w
+run|test/wave10/cases/abi_aggregate_roundtrip_ok.w
 run|bootstrap/test/cases/generic_identity.w
 run|bootstrap/test/cases/generic_struct_fn.w
 run|test/wave10/cases/generic_instantiation_reuse.w
+run|test/wave10/cases/generic_cross_module_dedup.w
+run|test/wave10/cases/generic_cross_module_multi_type.w
 run|bootstrap/test/cases/dyn_trait.w
 run|bootstrap/test/cases/dyn_dispatch.w
 run|bootstrap/test/cases/dyn_dispatch_multi.w
@@ -113,8 +131,10 @@ run|test/wave9/cases/runtime_linkage_async_ok.w
 run|test/wave10/cases/enum_shorthand_context_ok.w
 run|test/wave10/cases/box_dyn_dispatch_ok.w
 run|test/wave10/cases/ref_dyn_dispatch_ok.w
+run|test/wave10/cases/vtable_slot_ordering_ok.w
 run|test/wave10/cases/devirt_known_local.w
 run|test/wave10/cases/devirt_unknown_param.w
+run|test/wave10/cases/enum_layout_tag_payload_probe_ok.w
 
 KNOWN_DIVERGENCE|ir|bootstrap/test/cases/enum_accessor_ref.w|Stage0 IR path rejects as_Circle_ref while self-host emits IR successfully|selfhost|Stage0 lacks this accessor-ref IR lowering path; self-host behavior matches intended accessor-ref support.
 

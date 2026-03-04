@@ -70,6 +70,38 @@ run_expect_fail() {
   echo "PASS(wave5-unit-fail) $src"
 }
 
+run_expect_fail_span() {
+  local name="$1"
+  local src="$2"
+  local expect_err_pat="$3"
+  local expect_loc="$4"
+  local out="$tmpdir/${name}.out"
+  local err="$tmpdir/${name}.err"
+
+  if "$SELFHOST_BIN" check "$src" >"$out" 2>"$err"; then
+    echo "FAIL(wave5-unit-fail-expected-error) $src"
+    cat "$out"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -q "$expect_err_pat" "$err"; then
+    echo "FAIL(wave5-unit-fail-pattern) $src pattern=$expect_err_pat"
+    cat "$err"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -q "$expect_loc" "$err"; then
+    echo "FAIL(wave5-unit-fail-span) $src expected_loc=$expect_loc"
+    cat "$err"
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(wave5-unit-fail-span) $src"
+}
+
 run_expect_pass_typed "generic_return" "test/wave5/cases/generic_return_infer.w" "bind a: i32"
 run_expect_pass_typed "generic_bound_pass" "test/wave5/cases/generic_bound_pass.w" "impl Show for Foo"
 run_expect_pass_typed "underscore_binding_pass" "test/wave5/cases/underscore_binding_pass.w" "bind x: i32"
@@ -80,6 +112,10 @@ run_expect_fail "generic_bound_error" "test/wave5/cases/generic_bound_error.w" "
 run_expect_fail "dyn_trait_param_error" "test/wave5/cases/dyn_trait_param_error.w" "does not implement trait 'Describable' required for dyn parameter"
 run_expect_fail "no_shadow_error" "test/wave5/cases/no_shadow_error.w" "shadowing is not allowed"
 run_expect_fail "never_builtin_arity_error" "test/wave5/cases/never_builtin_arity_error.w" "todo()/unreachable() expect zero or one message argument"
+run_expect_fail_span "shadow_span_error" "test/wave5/cases/shadow_span_error.w" "shadowing is not allowed" "shadow_span_error\\.w:3:5"
+run_expect_fail "assoc_type_unknown_type_error" "test/wave5/cases/assoc_type_unknown_type_error.w" "unknown type"
+run_expect_fail "where_bound_failure_error" "test/wave5/cases/where_bound_failure_error.w" "required by bound 'T: Show'"
+run_expect_fail "orphan_rule_violation_error" "test/wave5/cases/orphan_rule_violation_error.w" "orphan rule violation: impl requires a local trait or local type"
 
 if [[ "$failures" -ne 0 ]]; then
   echo "wave5 type+trait unit tests: $failures failure(s)"

@@ -14,6 +14,11 @@ bootstrap/test/cases/bool_logic.w
 bootstrap/test/cases/calls.w
 bootstrap/test/cases/chained_if_let.w
 bootstrap/test/cases/closure.w
+test/wave6/cases/method_resolution_order_pass.w
+test/wave6/cases/method_resolution_multi_trait_order_pass.w
+test/wave6/cases/break_value_join_pass.w
+test/wave6/cases/pattern_shadow_branches_pass.w
+test/wave6/cases/chained_if_let_typed_pass.w
 #
 # Broad typed parity — enums, structs, traits, control flow, patterns:
 #

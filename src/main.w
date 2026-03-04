@@ -323,15 +323,18 @@ fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i
 fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode)
+    comp.driver.set_emit_typed_during_compile(1)
     let pool = comp.compile_file(source_file)
     if pool.decl_count() == 0:
         with_eprintln("error: typed dump failed during compilation")
         return 1
-    let typed = comp.driver.dump_typed(pool)
-    if typed.len() == 0:
-        with_eprintln("error: typed dump failed during semantic analysis")
+    if comp.driver.did_emit_typed_during_compile() != 0:
+        return 0
+    // Stream typed output directly to stdout to avoid constructing a very
+    // large immutable string via repeated `++` concatenation.
+    if not comp.driver.emit_typed(pool):
+        with_eprintln("error: typed dump failed during semantic analysis or emission")
         return 1
-    print(typed)
     0
 
 fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
@@ -384,9 +387,11 @@ fn escape_dump_lexeme(text: str) -> str:
 
 fn dump_tag_name(tag: i32, lexeme: str) -> str:
     // Keep deterministic dump names identical to Stage0 for brace delimiters.
-    if tag == TK_L_BRACE() or tag == TK_R_BRACE():
+    if tag == TK_L_BRACE():
         return "'" ++ lexeme ++ "'"
-    tag_name(tag)
+    if tag == TK_R_BRACE():
+        return "'" ++ lexeme ++ "'"
+    return tag_name(tag)
 
 fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool) -> i32:
     // Find test file/dir argument

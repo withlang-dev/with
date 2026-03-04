@@ -1,0 +1,6 @@
+# Wave 4 coverage manifest
+# Format: <stage0_script>|<status>|<evidence_csv>|<note>
+
+run_phase0_name_resolution_tests.sh|covered|test/wave4/cases/basic_root.w,test/wave4/cases/diamond_root.w|multi-module resolve graphs and dedup are covered.
+run_phase0_import_path_regression_tests.sh|covered|test/wave4/cases/fallback_root.w,test/wave4/cases/nested_missing_root.w|import fallback and nested missing-path diagnostics are covered.
+run_phase0_c_import_link_tests.sh|covered|test/wave4/cases/cimport_root.w,test/wave4/cases/cimport_links_root.w|c_import link-lib resolve behavior is covered.

@@ -200,123 +200,134 @@ Any uncovered behavior requires either:
 
 ## 0) Freeze Wave 11 Contract and Corpus
 
-- [ ] Freeze exact Wave 11 parity target against current Stage0 behavior.
-- [ ] Create `test/wave11/driver_corpus.txt` with explicit `check|build|run|test|cli` entries.
-- [ ] Map each Stage0 driver/c_import script bucket to Wave 11 corpus evidence.
-- [ ] Require explicit `KNOWN_DIVERGENCE` for any excluded behavior.
+- [x] Freeze exact Wave 11 parity target against current Stage0 behavior.
+- [x] Create `test/wave11/driver_corpus.txt` with explicit `check|build|run|test|cli` entries.
+- [x] Map each Stage0 driver/c_import script bucket to Wave 11 corpus evidence.
+- [x] Require explicit `KNOWN_DIVERGENCE` for any excluded behavior.
 
 ## 1) CLI Surface and Command Parsing
 
-- [ ] Align command set parity (`build`, `run`, `check`, `ir`, `test`, `clean`, `help`, `version`).
-- [ ] Align missing-arg/unknown-flag/unknown-command diagnostics classes.
-- [ ] Align mode-specific flag acceptance/rejection behavior.
-- [ ] Keep command parsing deterministic and side-effect free before execution.
+- [x] Align command set parity (`build`, `run`, `check`, `ir`, `test`, `clean`, `help`, `version`).
+- [x] Align missing-arg/unknown-flag/unknown-command diagnostics classes.
+- [x] Align mode-specific flag acceptance/rejection behavior.
+- [x] Keep command parsing deterministic and side-effect free before execution.
 
 ## 2) Pipeline Orchestration Boundaries
 
-- [ ] Make `check` stage boundaries parity-clean (parse/resolve/sema/mir/async-mir failure edges).
-- [ ] Align `build` orchestration (compile -> object -> link -> cleanup) to Stage0 behavior.
-- [ ] Align `run` orchestration (`build` reuse + process execution status propagation).
-- [ ] Align `test` command orchestration behavior for package/file filters and status mapping.
+- [x] Make `check` stage boundaries parity-clean (parse/resolve/sema/mir/async-mir failure edges).
+- [x] Align `build` orchestration (compile -> object -> link -> cleanup) to Stage0 behavior.
+- [x] Align `run` orchestration (`build` reuse + process execution status propagation).
+- [x] Align `test` command orchestration behavior for package/file filters and status mapping.
 
 ## 3) Link Orchestration and Artifact Policy
 
-- [ ] Align link command assembly for base object + extras + `-l<name>` ordering.
-- [ ] Align runtime object selection policy (`helpers.o`, `fiber.o`, `fiber_asm.o`) by symbol/use.
-- [ ] Align compiler-main bridge linkage policy without leaking to unrelated binaries.
-- [ ] Keep artifact paths and cleanup deterministic across repeated invocations.
+- [x] Align link command assembly for base object + extras + `-l<name>` ordering.
+- [x] Align runtime object selection policy (`helpers.o`, `fiber.o`, `fiber_asm.o`) by symbol/use.
+- [x] Align compiler-main bridge linkage policy without leaking to unrelated binaries.
+- [x] Keep artifact paths and cleanup deterministic across repeated invocations.
 
 ## 4) Import Path and Module Resolution Parity
 
-- [ ] Align nested relative and package-qualified import-path resolution behavior.
-- [ ] Align cycle handling and duplicate-import suppression behavior.
-- [ ] Align unresolved import diagnostics (primary class + command status).
-- [ ] Preserve deterministic import expansion order and module graph side effects.
+- [x] Align nested relative and package-qualified import-path resolution behavior.
+- [x] Align cycle handling and duplicate-import suppression behavior.
+- [x] Align unresolved import diagnostics (primary class + command status).
+- [x] Preserve deterministic import expansion order and module graph side effects.
 
 ## 5) `c_import` Parse/Resolve Finalization
 
-- [ ] Align `use c_import("...", link: "...")` parse acceptance/rejection behavior.
-- [ ] Align `link:` keyword handling and diagnostics for malformed link arguments.
-- [ ] Align resolve-side collection and de-duplication order for `link_libs`.
-- [ ] Align header snippet error reporting class/content to Stage0 parity expectations.
+- [x] Align `use c_import("...", link: "...")` parse acceptance/rejection behavior.
+- [x] Align `link:` keyword handling and diagnostics for malformed link arguments.
+- [x] Align resolve-side collection and de-duplication order for `link_libs`.
+- [x] Align header snippet error reporting class/content to Stage0 parity expectations.
 
 ## 6) `c_import` Link and Runtime Behavior
 
-- [ ] Align symbol availability behavior for c_import-backed extern calls in `build`/`run`.
-- [ ] Align missing-link-library failure behavior and command exit status.
-- [ ] Align multi-library link behavior and deterministic ordering.
-- [ ] Ensure c_import behavior is parity-clean through imported-module paths.
+- [x] Align symbol availability behavior for c_import-backed extern calls in `build`/`run`.
+- [x] Align missing-link-library failure behavior and command exit status.
+- [x] Align multi-library link behavior and deterministic ordering.
+- [x] Ensure c_import behavior is parity-clean through imported-module paths.
 
 ## 7) `c_import` Cache and Invalidation
 
-- [ ] Implement deterministic cache key semantics matching Stage0 behavior.
-- [ ] Align trace behavior under `WITH_TRACE_CIMPORT_CACHE=1` (hit/miss accounting).
-- [ ] Align invalidation behavior for link-lib changes and epoch overrides.
-- [ ] Prevent silent cache growth/regression across multi-module imports.
+- [x] Implement deterministic cache key semantics matching Stage0 behavior.
+- [x] Align trace behavior under `WITH_TRACE_CIMPORT_CACHE=1` (hit/miss accounting).
+- [x] Align invalidation behavior for link-lib changes and epoch overrides.
+- [x] Prevent silent cache growth/regression across multi-module imports.
 
 ## 8) Macro and Diagnostics Finalization
 
-- [ ] Align simple object-like macro exposure behavior expected by Stage0 tests.
-- [ ] Align function-like macro handling behavior (skip/ignore semantics) to Stage0 parity.
-- [ ] Align malformed c_import header diagnostics with context snippet behavior.
-- [ ] Stabilize diagnostic ordering for multiple c_import diagnostics in one module.
+- [x] Align simple object-like macro exposure behavior expected by Stage0 tests.
+- [x] Align function-like macro handling behavior (skip/ignore semantics) to Stage0 parity.
+- [x] Align malformed c_import header diagnostics with context snippet behavior.
+- [x] Stabilize diagnostic ordering for multiple c_import diagnostics in one module.
 
 ## 9) Determinism and Output Stability
 
-- [ ] Re-run identical `check/build/run/test` entries and assert byte-identical stdout/stderr.
-- [ ] Assert deterministic artifact emission and cleanup paths.
-- [ ] Assert deterministic command exit-code mapping.
-- [ ] Guard against nondeterministic link-lib/runtime-object ordering.
+- [x] Re-run identical `check/build/run/test` entries and assert byte-identical stdout/stderr.
+- [x] Assert deterministic artifact emission and cleanup paths.
+- [x] Assert deterministic command exit-code mapping.
+- [x] Guard against nondeterministic link-lib/runtime-object ordering.
 
 ## 10) Unit Test Harness
 
-- [ ] Add `scripts/run_wave11_driver_unit_tests.sh`.
-- [ ] Add focused positive/negative unit cases for:
+- [x] Add `scripts/run_wave11_driver_unit_tests.sh`.
+- [x] Add focused positive/negative unit cases for:
   - CLI argument/flag diagnostics,
   - build/run/test command behavior,
   - object/link behavior,
   - import-path regression buckets,
   - c_import parse/link/cache/macro diagnostics buckets.
-- [ ] Add deterministic rerun checks for selected high-signal entries.
+- [x] Add deterministic rerun checks for selected high-signal entries.
 
 ## 11) Stage0 Parity Harness
 
-- [ ] Add `scripts/run_wave11_driver_parity.sh`.
-- [ ] Build Stage0 and self-host binaries in harness setup.
-- [ ] Run all Wave 11 corpus entries by declared mode on both compilers.
-- [ ] Compare status, normalized primary diagnostics, runtime output, and artifact expectations.
-- [ ] Re-run self-host entries to enforce determinism checks.
-- [ ] Report exactly one of `PASS`, `FAIL`, `KNOWN_DIVERGENCE` per entry.
+- [x] Add `scripts/run_wave11_driver_parity.sh`.
+- [x] Build Stage0 and self-host binaries in harness setup.
+- [x] Run all Wave 11 corpus entries by declared mode on both compilers.
+- [x] Compare status, normalized primary diagnostics, runtime output, and artifact expectations.
+- [x] Re-run self-host entries to enforce determinism checks.
+- [x] Report exactly one of `PASS`, `FAIL`, `KNOWN_DIVERGENCE` per entry.
 
 ## 12) Known Divergence Governance
 
-- [ ] Reuse/extend `scripts/parity_states.sh` for Wave 11 mode set (`check|build|run|test|cli`).
-- [ ] Require every `KNOWN_DIVERGENCE` entry to be exercised.
-- [ ] Fail on stale/duplicate/malformed `KNOWN_DIVERGENCE` entries.
-- [ ] Fail if declared known-divergence count differs from observed used count.
+- [x] Reuse/extend `scripts/parity_states.sh` for Wave 11 mode set (`check|build|run|test|cli`).
+- [x] Require every `KNOWN_DIVERGENCE` entry to be exercised.
+- [x] Fail on stale/duplicate/malformed `KNOWN_DIVERGENCE` entries.
+- [x] Fail if declared known-divergence count differs from observed used count.
 
 ## 13) Coverage Closure
 
-- [ ] Produce explicit Stage0-script -> Wave 11 evidence mapping table.
-- [ ] Add `scripts/verify_wave11_coverage.sh` and fail parity harness on uncovered buckets.
-- [ ] Keep accepted divergence list reviewable and small.
-- [ ] Prevent silent corpus shrinkage.
+- [x] Produce explicit Stage0-script -> Wave 11 evidence mapping table.
+- [x] Add `scripts/verify_wave11_coverage.sh` and fail parity harness on uncovered buckets.
+- [x] Keep accepted divergence list reviewable and small.
+- [x] Prevent silent corpus shrinkage.
 
 ## 14) Documentation and Status Updates
 
-- [ ] Update `docs/with-selfhost-wave11.md` execution notes as work lands.
-- [ ] Update `docs/with-selfhost-plan.md` Wave 11 status after exit gate passes.
-- [ ] Update `docs/with-selfhost-detailed-plan.md` with Wave 11 completion notes.
-- [ ] Record accepted Wave 11 divergences with rationale and test linkage.
+- [x] Update `docs/with-selfhost-wave11.md` execution notes as work lands.
+- [x] Update `docs/with-selfhost-plan.md` Wave 11 status after exit gate passes.
+- [x] Update `docs/with-selfhost-detailed-plan.md` with Wave 11 completion notes.
+- [x] Record accepted Wave 11 divergences with rationale and test linkage.
 
 ---
 
+
+## Execution Notes
+
+- 2026-03-04: Wave 11 unit harness passes via `scripts/run_wave11_driver_unit_tests.sh`.
+- 2026-03-04: Wave 11 parity harness passes via `scripts/run_wave11_driver_parity.sh` (`processed=30`, `failures=0`, `known_divergences=2`).
+- Accepted Wave 11 known divergences are documented in `test/wave11/driver_corpus.txt`:
+  - `check|test/wave11/cases/c_import_macro_constants_ok.w` (`correct_compiler=selfhost`)
+  - `check|test/wave11/cases/c_import_macro_function_like_ok.w` (`correct_compiler=selfhost`)
+- Coverage gate passes via `scripts/verify_wave11_coverage.sh` (`processed=9`).
+- Wave 11 CLI parity harness now executes missing-arg/unknown-flag checks in isolated temp directories and applies CLI timeouts to avoid false hangs.
+
 ## Validation Gates (Wave 11 Exit)
 
-- [ ] `scripts/run_wave11_driver_unit_tests.sh` passes.
-- [ ] `scripts/run_wave11_driver_parity.sh` passes.
-- [ ] All Wave 11 corpus entries resolve to `PASS` or documented `KNOWN_DIVERGENCE`.
-- [ ] No unresolved `FAIL` entries remain.
-- [ ] Coverage verification gate passes for required Stage0 buckets.
-- [ ] No bootstrap changes were required for Wave 11 feature scope.
-- [ ] Driver/CLI/link/c_import behavior is parity-clean for Wave 11 scope.
+- [x] `scripts/run_wave11_driver_unit_tests.sh` passes.
+- [x] `scripts/run_wave11_driver_parity.sh` passes.
+- [x] All Wave 11 corpus entries resolve to `PASS` or documented `KNOWN_DIVERGENCE`.
+- [x] No unresolved `FAIL` entries remain.
+- [x] Coverage verification gate passes for required Stage0 buckets.
+- [x] No bootstrap changes were required for Wave 11 feature scope.
+- [x] Driver/CLI/link/c_import behavior is parity-clean for Wave 11 scope.
