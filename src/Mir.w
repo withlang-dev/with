@@ -9,6 +9,7 @@ use Sema
 
 extern fn int_to_string(n: i32) -> str
 extern fn str_from_byte(b: i32) -> str
+extern fn print(s: str) -> void
 
 fn lbrace -> str:
     str_from_byte(123)
@@ -448,37 +449,85 @@ fn dump_mir_module(mir_mod: MirModule, pool: InternPool, sema: Sema) -> str:
         out = out ++ dump_mir_body(mir_mod.bodies.get(i as i64), pool, sema)
     out
 
+// Streaming variant of dump_mir_module to avoid quadratic whole-module
+// concatenation when dumping large MIR corpora.
+fn print_mir_module(mir_mod: MirModule, pool: InternPool, sema: Sema):
+    print("mir module functions=" ++ int_to_string(mir_mod.bodies.len() as i32) ++ "\n")
+    for i in 0..mir_mod.bodies.len() as i32:
+        if i > 0:
+            print("\n")
+        print(dump_mir_body(mir_mod.bodies.get(i as i64), pool, sema))
+
+fn mir_clip_text(s: str, max_len: i32) -> str:
+    if max_len <= 0:
+        return ""
+    if s.len() as i32 <= max_len:
+        return s
+    if max_len <= 3:
+        return s.slice(0, max_len as i64)
+    s.slice(0, (max_len - 3) as i64) ++ "..."
+
 fn dump_mir_body(body: MirBody, pool: InternPool, sema: Sema) -> str:
     var out = ""
-    let fn_name = if body.fn_sym != 0: pool.resolve(body.fn_sym) else: "<anon>"
+    let fn_name = if body.fn_sym != 0: "sym" ++ int_to_string(body.fn_sym) else: "<anon>"
     out = out ++ "fn " ++ fn_name ++ " " ++ lbrace() ++ "\n"
     out = out ++ "  locals:\n"
 
-    for li in 0..body.local_type_ids.len() as i32:
+    let local_total = body.local_type_ids.len() as i32
+    let bb_total = body.bb_stmt_starts.len() as i32
+    let stmt_total = body.stmt_kinds.len() as i32
+    if local_total > 50000 or bb_total > 20000 or stmt_total > 500000:
+        out = out ++ "    <mir dump omitted: body too large locals=" ++ int_to_string(local_total)
+        out = out ++ " bbs=" ++ int_to_string(bb_total)
+        out = out ++ " stmts=" ++ int_to_string(stmt_total) ++ ">\n"
+        out = out ++ rbrace() ++ "\n"
+        return out
+
+    var local_count = local_total
+    if local_count > 1024:
+        local_count = 1024
+    for li in 0..local_count:
         let tid = body.local_type_ids.get(li as i64)
-        let ty_name = if tid != 0: sema.type_name(tid) else: "<inferred>"
+        let ty_name = if tid != 0: "ty" ++ int_to_string(tid) else: "<inferred>"
         var line = "    _" ++ int_to_string(li) ++ ": " ++ ty_name
         if li == 0:
             line = line ++ "  // return"
         let name_sym = body.local_names.get(li as i64)
         if body.local_is_user_var.get(li as i64) != 0 and name_sym != 0:
-            line = line ++ "  // " ++ pool.resolve(name_sym)
+            line = line ++ "  // sym" ++ int_to_string(name_sym)
         if body.local_mutables.get(li as i64) != 0:
             line = line ++ " [mut]"
         out = out ++ line ++ "\n"
+    if local_total > local_count:
+        out = out ++ "    ... locals truncated (" ++ int_to_string(local_total - local_count) ++ " more)\n"
 
-    for bb in 0..body.bb_stmt_starts.len() as i32:
+    var bb_count = bb_total
+    if bb_count > 512:
+        bb_count = 512
+    for bb in 0..bb_count:
         out = out ++ "\n"
         out = out ++ "  bb" ++ int_to_string(bb) ++ ": " ++ lbrace() ++ "\n"
 
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
-        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        let raw_stmt_count = body.bb_stmt_counts.get(bb as i64)
+        var stmt_count = raw_stmt_count
+        if stmt_start < 0 or raw_stmt_count < 0 or stmt_start > stmt_total:
+            out = out ++ "    <invalid statement span>\n"
+            stmt_count = 0
+        else if stmt_start + raw_stmt_count > stmt_total:
+            stmt_count = stmt_total - stmt_start
+            out = out ++ "    <statement span truncated>\n"
+        if stmt_count > 2048:
+            stmt_count = 2048
+            out = out ++ "    <statement dump capped>\n"
         for si in 0..stmt_count:
             let stmt_id = stmt_start + si
             out = out ++ "    " ++ mir_stmt_text(body, stmt_id, pool, sema) ++ "\n"
 
         out = out ++ "    " ++ mir_term_text(body, bb, pool, sema) ++ "\n"
         out = out ++ "  " ++ rbrace() ++ "\n"
+    if bb_total > bb_count:
+        out = out ++ "\n  ... blocks truncated (" ++ int_to_string(bb_total - bb_count) ++ " more)\n"
 
     out = out ++ rbrace() ++ "\n"
     out
@@ -522,12 +571,28 @@ fn mir_term_text(body: MirBody, bb: i32, pool: InternPool, sema: Sema) -> str:
         var table_text = ""
         if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
             let start = body.switch_table_starts.get(d1 as i64)
-            let count = body.switch_table_counts.get(d1 as i64)
+            let raw_count = body.switch_table_counts.get(d1 as i64)
+            var count = raw_count
+            let vals_len = body.switch_table_vals.len() as i32
+            let tgts_len = body.switch_table_targets.len() as i32
+            if start < 0 or raw_count < 0 or start > vals_len or start > tgts_len:
+                count = 0
+                table_text = "<invalid switch table>"
+            else:
+                let max_len = if vals_len < tgts_len: vals_len else: tgts_len
+                if start + raw_count > max_len:
+                    count = max_len - start
+            if count > 256:
+                count = 256
             for i in 0..count:
                 if i > 0:
                     table_text = table_text ++ ", "
                 table_text = table_text ++ int_to_string(body.switch_table_vals.get((start + i) as i64))
                 table_text = table_text ++ ": bb" ++ int_to_string(body.switch_table_targets.get((start + i) as i64))
+            if raw_count > count:
+                if table_text.len() > 0:
+                    table_text = table_text ++ ", "
+                table_text = table_text ++ "..."
         if d2 != 0 or table_text.len() == 0:
             if table_text.len() > 0:
                 table_text = table_text ++ ", "
@@ -606,7 +671,7 @@ fn mir_rvalue_text(body: MirBody, rval_id: i32, pool: InternPool, sema: Sema) ->
         return "discriminant(" ++ mir_place_text(body, d0) ++ ")"
 
     if k == RK_CAST():
-        let ty = if d1 != 0: sema.type_name(d1) else: "<inferred>"
+        let ty = if d1 != 0: "ty" ++ int_to_string(d1) else: "<inferred>"
         return "cast(" ++ mir_operand_text(body, d0, pool, sema) ++ " as " ++ ty ++ ")"
 
     if k == RK_LEN():
@@ -639,7 +704,7 @@ fn mir_const_text(body: MirBody, const_id: i32, pool: InternPool, sema: Sema) ->
     let ty = body.const_types.get(const_id as i64)
 
     if k == CK_INT():
-        let ty_name = if ty != 0: sema.type_name(ty) else: "i32"
+        let ty_name = if ty != 0: "ty" ++ int_to_string(ty) else: "i32"
         return "const " ++ int_to_string(d0) ++ ty_name
 
     if k == CK_BOOL():
@@ -648,18 +713,18 @@ fn mir_const_text(body: MirBody, const_id: i32, pool: InternPool, sema: Sema) ->
     if k == CK_STR():
         if d0 == 0:
             return "const \"\""
-        return "const \"" ++ pool.resolve(d0) ++ "\""
+        return "const \"sym" ++ int_to_string(d0) ++ "\""
 
     if k == CK_UNIT():
         return "const ()"
 
     if k == CK_FLOAT():
         if d0 != 0:
-            return "const " ++ pool.resolve(d0)
+            return "const sym" ++ int_to_string(d0)
         return "const 0.0"
 
     if k == CK_ZERO_SIZED():
-        let ty_name = if ty != 0: sema.type_name(ty) else: "<zst>"
+        let ty_name = if ty != 0: "ty" ++ int_to_string(ty) else: "<zst>"
         return "const zst(" ++ ty_name ++ ")"
 
     "const<" ++ int_to_string(k) ++ ">(" ++ int_to_string(d0) ++ ")"
@@ -669,12 +734,21 @@ fn mir_agg_fields_text(body: MirBody, fields_id: i32, pool: InternPool, sema: Se
         return ""
 
     let start = body.agg_field_starts.get(fields_id as i64)
-    let count = body.agg_field_counts.get(fields_id as i64)
+    let raw_count = body.agg_field_counts.get(fields_id as i64)
+    let ops_len = body.agg_field_operands.len() as i32
+    if start < 0 or raw_count < 0 or start > ops_len:
+        return "<invalid aggregate fields>"
+    let count = if start + raw_count > ops_len: ops_len - start else: raw_count
+    let capped = if count > 256: 256 else: count
     var out = ""
-    for i in 0..count:
+    for i in 0..capped:
         if i > 0:
             out = out ++ ", "
         out = out ++ mir_operand_text(body, body.agg_field_operands.get((start + i) as i64), pool, sema)
+    if raw_count > capped:
+        if out.len() > 0:
+            out = out ++ ", "
+        out = out ++ "..."
     out
 
 fn mir_call_args_text(body: MirBody, args_id: i32, pool: InternPool, sema: Sema) -> str:
@@ -682,12 +756,21 @@ fn mir_call_args_text(body: MirBody, args_id: i32, pool: InternPool, sema: Sema)
         return ""
 
     let start = body.call_arg_starts.get(args_id as i64)
-    let count = body.call_arg_counts.get(args_id as i64)
+    let raw_count = body.call_arg_counts.get(args_id as i64)
+    let ops_len = body.call_arg_operands.len() as i32
+    if start < 0 or raw_count < 0 or start > ops_len:
+        return "<invalid call args>"
+    let count = if start + raw_count > ops_len: ops_len - start else: raw_count
+    let capped = if count > 256: 256 else: count
     var out = ""
-    for i in 0..count:
+    for i in 0..capped:
         if i > 0:
             out = out ++ ", "
         out = out ++ mir_operand_text(body, body.call_arg_operands.get((start + i) as i64), pool, sema)
+    if raw_count > capped:
+        if out.len() > 0:
+            out = out ++ ", "
+        out = out ++ "..."
     out
 
 fn mir_binop_name(op: i32) -> str:
@@ -726,3 +809,307 @@ fn mir_unop_name(op: i32) -> str:
     if op == UOP_DEREF(): return "deref"
     if op == UOP_TRY(): return "try"
     "uop" ++ int_to_string(op)
+
+// ── MIR validation (Wave 10 backend contract) ───────────────────
+
+fn mir_index_in_range(idx: i32, len: i32) -> bool:
+    idx >= 0 and idx < len
+
+fn mir_span_in_range(start: i32, count: i32, len: i32) -> bool:
+    start >= 0 and count >= 0 and start + count <= len
+
+fn validate_mir_module(mir_mod: MirModule) -> str:
+    let body_count = mir_mod.bodies.len() as i32
+    if body_count != mir_mod.body_fn_syms.len() as i32:
+        return "bodies/body_fn_syms length mismatch"
+
+    let seen_fn_syms: HashMap[i32, i32] = HashMap.new()
+    for bi in 0..body_count:
+        let body = mir_mod.bodies.get(bi as i64)
+        let fn_sym = mir_mod.body_fn_syms.get(bi as i64)
+        if body.fn_sym != fn_sym:
+            return "body_fn_syms mismatch at body index " ++ int_to_string(bi)
+        if fn_sym != 0 and seen_fn_syms.contains(fn_sym):
+            return "duplicate MIR body for fn symbol " ++ int_to_string(fn_sym)
+        if fn_sym != 0:
+            seen_fn_syms.insert(fn_sym, 1)
+
+        let body_err = validate_mir_body(body)
+        if body_err.len() > 0:
+            let body_label = if fn_sym != 0: int_to_string(fn_sym) else: int_to_string(bi)
+            return "body[" ++ body_label ++ "]: " ++ body_err
+
+    ""
+
+fn validate_mir_body(body: MirBody) -> str:
+    let local_count = body.local_type_ids.len() as i32
+    if local_count <= 0:
+        return "missing return local"
+    if local_count != body.local_mutables.len() as i32:
+        return "locals/local_mutables length mismatch"
+    if local_count != body.local_names.len() as i32:
+        return "locals/local_names length mismatch"
+    if local_count != body.local_is_user_var.len() as i32:
+        return "locals/local_is_user_var length mismatch"
+    if body.n_params < 0 or body.n_params > local_count:
+        return "invalid n_params"
+
+    let bb_count = body.bb_stmt_starts.len() as i32
+    if bb_count <= 0:
+        return "missing basic blocks"
+    if bb_count != body.bb_stmt_counts.len() as i32:
+        return "bb_stmt_starts/bb_stmt_counts length mismatch"
+    if bb_count != body.bb_term_kinds.len() as i32:
+        return "bb_stmt_starts/bb_term_kinds length mismatch"
+    if bb_count != body.bb_term_d0.len() as i32 or
+       bb_count != body.bb_term_d1.len() as i32 or
+       bb_count != body.bb_term_d2.len() as i32 or
+       bb_count != body.bb_term_d3.len() as i32:
+        return "bb terminator payload length mismatch"
+    if bb_count != body.bb_is_cleanup.len() as i32:
+        return "bb cleanup flag length mismatch"
+
+    let stmt_count = body.stmt_kinds.len() as i32
+    if stmt_count != body.stmt_d0.len() as i32 or
+       stmt_count != body.stmt_d1.len() as i32 or
+       stmt_count != body.stmt_spans.len() as i32:
+        return "statement table length mismatch"
+
+    let place_count = body.place_locals.len() as i32
+    if place_count != body.place_proj_starts.len() as i32 or
+       place_count != body.place_proj_counts.len() as i32:
+        return "place table length mismatch"
+
+    let proj_count = body.proj_kinds.len() as i32
+    if proj_count != body.proj_d0.len() as i32:
+        return "projection table length mismatch"
+
+    let rval_count = body.rval_kinds.len() as i32
+    if rval_count != body.rval_d0.len() as i32 or
+       rval_count != body.rval_d1.len() as i32 or
+       rval_count != body.rval_d2.len() as i32:
+        return "rvalue table length mismatch"
+
+    let operand_count = body.operand_kinds.len() as i32
+    if operand_count != body.operand_d0.len() as i32:
+        return "operand table length mismatch"
+
+    let const_count = body.const_kinds.len() as i32
+    if const_count != body.const_d0.len() as i32 or
+       const_count != body.const_types.len() as i32:
+        return "constant table length mismatch"
+
+    let switch_count = body.switch_table_starts.len() as i32
+    if switch_count != body.switch_table_counts.len() as i32:
+        return "switch table length mismatch"
+    if body.switch_table_vals.len() as i32 != body.switch_table_targets.len() as i32:
+        return "switch value/target table length mismatch"
+
+    let agg_count = body.agg_field_starts.len() as i32
+    if agg_count != body.agg_field_counts.len() as i32:
+        return "aggregate field table length mismatch"
+
+    let call_args_count = body.call_arg_starts.len() as i32
+    if call_args_count != body.call_arg_counts.len() as i32:
+        return "call args table length mismatch"
+
+    for bb in 0..bb_count:
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_span_count = body.bb_stmt_counts.get(bb as i64)
+        if not mir_span_in_range(stmt_start, stmt_span_count, stmt_count):
+            return "bb" ++ int_to_string(bb) ++ ": statement span out of range"
+
+        let term_kind = body.bb_term_kinds.get(bb as i64)
+        let d0 = body.bb_term_d0.get(bb as i64)
+        let d1 = body.bb_term_d1.get(bb as i64)
+        let d2 = body.bb_term_d2.get(bb as i64)
+        let d3 = body.bb_term_d3.get(bb as i64)
+
+        if term_kind == TK_GOTO():
+            if not mir_index_in_range(d0, bb_count):
+                return "bb" ++ int_to_string(bb) ++ ": goto target out of range"
+            continue
+        if term_kind == TK_RETURN() or term_kind == TK_UNREACHABLE():
+            continue
+        if term_kind == TK_SWITCH_INT():
+            if not mir_index_in_range(d0, operand_count):
+                return "bb" ++ int_to_string(bb) ++ ": switch operand out of range"
+            if not mir_index_in_range(d1, switch_count):
+                return "bb" ++ int_to_string(bb) ++ ": switch table id out of range"
+            if d2 != 0 and not mir_index_in_range(d2, bb_count):
+                return "bb" ++ int_to_string(bb) ++ ": switch default target out of range"
+            continue
+        if term_kind == TK_CALL():
+            if not mir_index_in_range(d0, operand_count):
+                return "bb" ++ int_to_string(bb) ++ ": call callee operand out of range"
+            if not mir_index_in_range(d1, call_args_count):
+                return "bb" ++ int_to_string(bb) ++ ": call arg table id out of range"
+            if not mir_index_in_range(d2, place_count):
+                return "bb" ++ int_to_string(bb) ++ ": call destination place out of range"
+            if not mir_index_in_range(d3, bb_count):
+                return "bb" ++ int_to_string(bb) ++ ": call next block out of range"
+            continue
+        if term_kind == TK_DROP_AND_GOTO():
+            if not mir_index_in_range(d0, place_count):
+                return "bb" ++ int_to_string(bb) ++ ": drop place out of range"
+            if not mir_index_in_range(d1, bb_count):
+                return "bb" ++ int_to_string(bb) ++ ": drop target out of range"
+            continue
+
+        return "bb" ++ int_to_string(bb) ++ ": unknown terminator kind " ++ int_to_string(term_kind)
+
+    for si in 0..stmt_count:
+        let stmt_kind = body.stmt_kinds.get(si as i64)
+        let d0 = body.stmt_d0.get(si as i64)
+        let d1 = body.stmt_d1.get(si as i64)
+
+        if stmt_kind == SK_ASSIGN():
+            if not mir_index_in_range(d0, place_count):
+                return "stmt" ++ int_to_string(si) ++ ": assign destination out of range"
+            if not mir_index_in_range(d1, rval_count):
+                return "stmt" ++ int_to_string(si) ++ ": assign rvalue out of range"
+            continue
+        if stmt_kind == SK_STORAGE_LIVE() or stmt_kind == SK_STORAGE_DEAD():
+            if not mir_index_in_range(d0, local_count):
+                return "stmt" ++ int_to_string(si) ++ ": storage local out of range"
+            continue
+        if stmt_kind == SK_DROP():
+            if not mir_index_in_range(d0, place_count):
+                return "stmt" ++ int_to_string(si) ++ ": drop place out of range"
+            continue
+        if stmt_kind == SK_NOP():
+            continue
+        return "stmt" ++ int_to_string(si) ++ ": unknown statement kind " ++ int_to_string(stmt_kind)
+
+    for pi in 0..place_count:
+        let local_id = body.place_locals.get(pi as i64)
+        if not mir_index_in_range(local_id, local_count):
+            return "place" ++ int_to_string(pi) ++ ": base local out of range"
+
+        let proj_start = body.place_proj_starts.get(pi as i64)
+        let proj_span_count = body.place_proj_counts.get(pi as i64)
+        if not mir_span_in_range(proj_start, proj_span_count, proj_count):
+            return "place" ++ int_to_string(pi) ++ ": projection span out of range"
+
+        for ji in 0..proj_span_count:
+            let proj_idx = proj_start + ji
+            let proj_kind = body.proj_kinds.get(proj_idx as i64)
+            let proj_d0 = body.proj_d0.get(proj_idx as i64)
+
+            if proj_kind == PK_FIELD():
+                if proj_d0 < 0:
+                    return "place" ++ int_to_string(pi) ++ ": field projection has negative index"
+                continue
+            if proj_kind == PK_INDEX():
+                if not mir_index_in_range(proj_d0, local_count):
+                    return "place" ++ int_to_string(pi) ++ ": index projection local out of range"
+                continue
+            if proj_kind == PK_DEREF():
+                continue
+            if proj_kind == PK_DOWNCAST():
+                if proj_d0 < 0:
+                    return "place" ++ int_to_string(pi) ++ ": downcast projection has negative variant index"
+                continue
+
+            return "place" ++ int_to_string(pi) ++ ": unknown projection kind " ++ int_to_string(proj_kind)
+
+    for oi in 0..operand_count:
+        let op_kind = body.operand_kinds.get(oi as i64)
+        let d0 = body.operand_d0.get(oi as i64)
+        if op_kind == OK_COPY() or op_kind == OK_MOVE():
+            if not mir_index_in_range(d0, place_count):
+                return "operand" ++ int_to_string(oi) ++ ": place out of range"
+            continue
+        if op_kind == OK_CONSTANT():
+            if not mir_index_in_range(d0, const_count):
+                return "operand" ++ int_to_string(oi) ++ ": const out of range"
+            continue
+        return "operand" ++ int_to_string(oi) ++ ": unknown operand kind " ++ int_to_string(op_kind)
+
+    for ri in 0..rval_count:
+        let rv_kind = body.rval_kinds.get(ri as i64)
+        let d0 = body.rval_d0.get(ri as i64)
+        let d1 = body.rval_d1.get(ri as i64)
+        let d2 = body.rval_d2.get(ri as i64)
+
+        if rv_kind == RK_USE():
+            if not mir_index_in_range(d0, operand_count):
+                return "rvalue" ++ int_to_string(ri) ++ ": use operand out of range (idx=" ++ int_to_string(d0) ++ ", total=" ++ int_to_string(operand_count) ++ ")"
+            continue
+        if rv_kind == RK_BIN_OP():
+            if not mir_index_in_range(d1, operand_count) or not mir_index_in_range(d2, operand_count):
+                return "rvalue" ++ int_to_string(ri) ++ ": binop operand out of range"
+            continue
+        if rv_kind == RK_UN_OP():
+            if not mir_index_in_range(d1, operand_count):
+                return "rvalue" ++ int_to_string(ri) ++ ": unop operand out of range"
+            continue
+        if rv_kind == RK_REF():
+            if d0 != BK_SHARED() and d0 != BK_EXCLUSIVE():
+                return "rvalue" ++ int_to_string(ri) ++ ": invalid borrow kind"
+            if not mir_index_in_range(d1, place_count):
+                return "rvalue" ++ int_to_string(ri) ++ ": ref place out of range"
+            continue
+        if rv_kind == RK_ADDR_OF():
+            if not mir_index_in_range(d0, place_count):
+                return "rvalue" ++ int_to_string(ri) ++ ": addr_of place out of range"
+            continue
+        if rv_kind == RK_AGGREGATE():
+            if not mir_index_in_range(d1, agg_count):
+                return "rvalue" ++ int_to_string(ri) ++ ": aggregate field table out of range"
+            continue
+        if rv_kind == RK_DISCRIMINANT():
+            if not mir_index_in_range(d0, place_count):
+                return "rvalue" ++ int_to_string(ri) ++ ": discriminant place out of range"
+            continue
+        if rv_kind == RK_CAST():
+            if not mir_index_in_range(d0, operand_count):
+                return "rvalue" ++ int_to_string(ri) ++ ": cast operand out of range"
+            continue
+        if rv_kind == RK_LEN():
+            if not mir_index_in_range(d0, place_count):
+                return "rvalue" ++ int_to_string(ri) ++ ": len place out of range"
+            continue
+
+        return "rvalue" ++ int_to_string(ri) ++ ": unknown rvalue kind " ++ int_to_string(rv_kind)
+
+    for ci in 0..const_count:
+        let ck = body.const_kinds.get(ci as i64)
+        if ck == CK_INT() or ck == CK_BOOL() or ck == CK_STR() or ck == CK_UNIT() or ck == CK_FLOAT() or ck == CK_ZERO_SIZED():
+            continue
+        return "const" ++ int_to_string(ci) ++ ": unknown const kind " ++ int_to_string(ck)
+
+    for ti in 0..switch_count:
+        let start = body.switch_table_starts.get(ti as i64)
+        let count = body.switch_table_counts.get(ti as i64)
+        let total = body.switch_table_vals.len() as i32
+        if not mir_span_in_range(start, count, total):
+            return "switch table" ++ int_to_string(ti) ++ ": span out of range"
+        for i in 0..count:
+            let target = body.switch_table_targets.get((start + i) as i64)
+            if not mir_index_in_range(target, bb_count):
+                return "switch table" ++ int_to_string(ti) ++ ": target out of range"
+
+    for ai in 0..agg_count:
+        let start = body.agg_field_starts.get(ai as i64)
+        let count = body.agg_field_counts.get(ai as i64)
+        let total = body.agg_field_operands.len() as i32
+        if not mir_span_in_range(start, count, total):
+            return "aggregate table" ++ int_to_string(ai) ++ ": span out of range"
+        for i in 0..count:
+            let op_idx = body.agg_field_operands.get((start + i) as i64)
+            if not mir_index_in_range(op_idx, operand_count):
+                return "aggregate table" ++ int_to_string(ai) ++ ": operand out of range"
+
+    for ai in 0..call_args_count:
+        let start = body.call_arg_starts.get(ai as i64)
+        let count = body.call_arg_counts.get(ai as i64)
+        let total = body.call_arg_operands.len() as i32
+        if not mir_span_in_range(start, count, total):
+            return "call args table" ++ int_to_string(ai) ++ ": span out of range"
+        for i in 0..count:
+            let op_idx = body.call_arg_operands.get((start + i) as i64)
+            if not mir_index_in_range(op_idx, operand_count):
+                return "call args table" ++ int_to_string(ai) ++ ": operand out of range"
+
+    ""

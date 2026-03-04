@@ -194,7 +194,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         out = out ++ "trait " ++ name ++ " =\n"
 
         // Layout:
-        // [assoc_count, (name, bound_count, bounds..., default_type)*, method_count, (name, flags, param_start, param_count, ret_type)*]
+        // [assoc_count, (name, bound_count, bounds..., default_type)*, method_count, (name, flags, param_start, param_count, ret_type, default_body)*]
         let assoc_count = pool.get_extra(extra_start)
         var ep = extra_start + 1
         for ai in 0..assoc_count:
@@ -228,6 +228,8 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             ep = ep + 1
             let ret_ty = pool.get_extra(ep)
             ep = ep + 1
+            let default_body = pool.get_extra(ep)
+            ep = ep + 1
 
             out = out ++ make_indent(indent + 4)
             out = out ++ "fn " ++ mname ++ "("
@@ -235,6 +237,8 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ ")"
             if ret_ty != 0:
                 out = out ++ " -> " ++ render_type_expr(pool, intern, ret_ty)
+            if default_body != 0:
+                out = out ++ ": <default>"
             out = out ++ "\n"
 
         return out

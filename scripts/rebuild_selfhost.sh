@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 MODE="${1:-stage2}"
 TIMEOUT_SECS="${WITH_BUILD_TIMEOUT_SECS:-300}"
 TIMEOUT_BIN=""

@@ -81,7 +81,7 @@ parity_validate_known_divergences() {
 # Mode-aware corpus helpers for Wave 9+ parity harnesses.
 # Source entry format:
 #   <mode>|<test>
-# where mode in {check,build,run}
+# where mode in {check,ir,build,run}
 # Known divergence entry format:
 #   KNOWN_DIVERGENCE|<mode>|<test>|<what_differs>|<correct_compiler>|<why>
 
@@ -115,7 +115,7 @@ parity_validate_known_divergences_mode() {
         bad=1
         next
       }
-      if ($1 != "check" && $1 != "build" && $1 != "run") {
+      if ($1 != "check" && $1 != "ir" && $1 != "build" && $1 != "run") {
         print "FAIL(parity-mode-source-mode) " $0 > "/dev/stderr"
         bad=1
         next
@@ -151,7 +151,7 @@ parity_validate_known_divergences_mode() {
       continue
     fi
 
-    if [[ "${mode}" != "check" && "${mode}" != "build" && "${mode}" != "run" ]]; then
+    if [[ "${mode}" != "check" && "${mode}" != "ir" && "${mode}" != "build" && "${mode}" != "run" ]]; then
       echo "FAIL(parity-mode-known-divergence-mode) ${mode}|${test_path}"
       failures=$((failures + 1))
     fi

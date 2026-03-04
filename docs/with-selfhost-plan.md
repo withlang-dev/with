@@ -1,6 +1,6 @@
 # Self-Hosting With — Architecture-First Plan
 
-**Status:** Wave 9 parity is passing for the current corpus. Async-MIR is implemented in self-host (`src/AsyncMir.w`, `src/AsyncLower.w`) and wired into `check`/`build`/`run` with deterministic parity harnesses. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking is currently Sema-integrated and must be moved to a dedicated MIR pass after semantic fixpoint (v3 architecture remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
+**Status:** Wave 10 parity is passing for the current corpus. MIR-first codegen is implemented in self-host (`src/Codegen.w`, `src/Driver.w`) and validated by Wave 10 harnesses (`processed=104`, `failures=0`, `known_divergences=1`). The only accepted Wave 10 divergence is `ir|bootstrap/test/cases/enum_accessor_ref.w` where self-host is correct and Stage0 IR path is behind. Wave 8 keeps explicit `KNOWN_DEBT`: borrow checking is currently Sema-integrated and must be moved to a dedicated MIR pass after semantic fixpoint (v3 architecture remains authoritative: Wave 6 Sema, Wave 7 MIR, Wave 8 Borrow on MIR).
 
 ---
 
@@ -485,17 +485,22 @@ Validate:
 
 ---
 
-## Phase 7 — LLVM Backend
+## Phase 7 — LLVM Backend ✓
 
-Implement:
+Implemented in self-host:
 
-* Type layout
-* Vtables
-* Trait objects
-* Task lowering
-* Channels
+* MIR → LLVM backend boundary with explicit MIR invariant validation.
+* Deterministic monomorphization emission and mangling behavior.
+* Trait-object vtable generation, dyn coercions, and dyn dispatch/devirtualization paths.
+* Enum layout/discriminant/accessor lowering parity for runtime behavior.
+* Runtime/link integration policy consistency for sync/async codegen outputs.
+* Diagnostics normalization and deterministic parity-state accounting.
 
-Validate normalized LLVM IR.
+Validate:
+
+* `scripts/run_wave10_codegen_unit_tests.sh`: PASS
+* `scripts/run_wave10_codegen_parity.sh`: PASS (`processed=104`, `failures=0`, `known_divergences=1`)
+* `scripts/verify_wave10_coverage.sh`: PASS (`processed=13`)
 
 ---
 

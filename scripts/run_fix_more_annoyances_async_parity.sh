@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/parity_states.sh"
+source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 STAGE0_BIN="./bootstrap/zig-out/bin/with"
 SELFHOST_BIN="./with-stage2"
@@ -43,8 +44,10 @@ if ! parity_validate_known_divergences "$CORPUS_FILE"; then
   exit 1
 fi
 
+SELFHOST_BIN="$(prepare_selfhost_runner "$ROOT_DIR" "$SELFHOST_BIN")"
+
 tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"' EXIT
+trap 'rm -rf "$tmpdir"; cleanup_selfhost_runner' EXIT
 
 failures=0
 known_divergences=0

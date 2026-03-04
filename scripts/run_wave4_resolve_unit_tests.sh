@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="./with-stage2"
 
@@ -14,8 +15,10 @@ if [[ ! -x "$SELFHOST_BIN" ]]; then
   exit 1
 fi
 
+SELFHOST_BIN="$(prepare_selfhost_runner "$ROOT_DIR" "$SELFHOST_BIN")"
+
 tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"' EXIT
+trap 'rm -rf "$tmpdir"; cleanup_selfhost_runner' EXIT
 
 failures=0
 
@@ -88,6 +91,70 @@ run_case() {
     fi
   fi
 
+  if [[ "$name" == "diamond" ]]; then
+    # Diamond: root -> left + right, both -> shared. Must be 4 modules.
+    if ! head -n 1 "$out" | grep -Eq 'modules=4 '; then
+      echo "FAIL(wave4-resolve-unit-diamond-module-count) $src"
+      case_failures=$((case_failures + 1))
+    fi
+    # shared.w must appear exactly once (deduplication).
+    if [[ "$(grep -c 'diamond/shared\.w' "$out")" -ne 1 ]]; then
+      echo "FAIL(wave4-resolve-unit-diamond-shared-dedup) $src"
+      case_failures=$((case_failures + 1))
+    fi
+    # Both left and right must import shared with same target id.
+    local left_target right_target
+    left_target="$(grep 'import\[1:0\].*diamond\.shared' "$out" | grep -o 'target=[0-9]*' | head -1)"
+    right_target="$(grep 'import\[2:0\].*diamond\.shared' "$out" | grep -o 'target=[0-9]*' | head -1)"
+    if [[ -z "$left_target" || "$left_target" != "$right_target" ]]; then
+      echo "FAIL(wave4-resolve-unit-diamond-target-match) $src left=$left_target right=$right_target"
+      case_failures=$((case_failures + 1))
+    fi
+  fi
+
+  if [[ "$name" == "deep" ]]; then
+    # Deep: 3 levels of nesting (deep/level1/level2/leaf.w).
+    if ! grep -q 'deep/level1/level2/leaf\.w' "$out"; then
+      echo "FAIL(wave4-resolve-unit-deep-leaf-path) $src"
+      case_failures=$((case_failures + 1))
+    fi
+    if ! head -n 1 "$out" | grep -Eq 'modules=2 '; then
+      echo "FAIL(wave4-resolve-unit-deep-module-count) $src"
+      case_failures=$((case_failures + 1))
+    fi
+  fi
+
+  if [[ "$name" == "multi_import" ]]; then
+    # Multi-import: root imports alpha, beta, and shared from different dirs.
+    if ! head -n 1 "$out" | grep -Eq 'modules=4 '; then
+      echo "FAIL(wave4-resolve-unit-multi-import-module-count) $src"
+      case_failures=$((case_failures + 1))
+    fi
+    if ! grep -q 'support/alpha\.w' "$out"; then
+      echo "FAIL(wave4-resolve-unit-multi-import-alpha) $src"
+      case_failures=$((case_failures + 1))
+    fi
+    if ! grep -q 'diamond/shared\.w' "$out"; then
+      echo "FAIL(wave4-resolve-unit-multi-import-shared) $src"
+      case_failures=$((case_failures + 1))
+    fi
+  fi
+
+  if [[ "$name" == "types" ]]; then
+    # Cross-module types: imported module defines types + functions.
+    if ! grep -q 'types/defs\.w' "$out"; then
+      echo "FAIL(wave4-resolve-unit-types-defs-path) $src"
+      case_failures=$((case_failures + 1))
+    fi
+    # Should have defs for Shape, Point, origin, describe, main, Circle, Rect, etc.
+    local def_count
+    def_count="$(head -n 1 "$out" | grep -o 'defs=[0-9]*' | cut -d= -f2)"
+    if [[ "$def_count" -lt 5 ]]; then
+      echo "FAIL(wave4-resolve-unit-types-def-count) $src defs=$def_count"
+      case_failures=$((case_failures + 1))
+    fi
+  fi
+
   if [[ "$case_failures" -eq 0 ]]; then
     echo "PASS(wave4-resolve-unit) $src"
   else
@@ -126,6 +193,14 @@ run_case "cycle" "test/wave4/cases/cycle_root.w"
 run_case "fallback" "test/wave4/cases/fallback_root.w"
 run_case "cimport" "test/wave4/cases/cimport_root.w"
 run_error_case "unresolved_import" "test/wave4/cases/unresolved_import.w" "import module not found"
+
+# --- New multi-module scenario tests ---
+
+run_case "diamond" "test/wave4/cases/diamond_root.w"
+run_case "deep" "test/wave4/cases/deep_root.w"
+run_case "multi_import" "test/wave4/cases/multi_import_root.w"
+run_case "types" "test/wave4/cases/types_root.w"
+run_error_case "multi_error" "test/wave4/cases/multi_error.w" "import module not found"
 
 if [[ "$failures" -ne 0 ]]; then
   echo "wave4 resolve unit tests: $failures failure(s)"
