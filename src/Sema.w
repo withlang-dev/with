@@ -4340,8 +4340,8 @@ fn Sema.dump_typed_module(self: Sema) -> str:
                     let p_name = if p_name_sym != 0: self.safe_symbol_text(p_name_sym) else: "_"
                     out = out ++ p_name ++ ": " ++ self.type_name(self.sig_param_type(sig_idx, pi))
                 out = out ++ ") -> " ++ self.type_name(self.sig_return_type(sig_idx)) ++ "\n"
-                if meta >= 0 and self.ast.fn_meta_ret(meta) == 0:
-                    out = out ++ "  inferred_return: " ++ self.type_name(self.sig_return_type(sig_idx)) ++ "\n"
+                let inferred_ret = if meta >= 0 and self.ast.fn_meta_ret(meta) == 0: self.sig_return_type(sig_idx) else: 0
+                out = out ++ (if inferred_ret != 0 and inferred_ret != self.ty_void: "  inferred_return: " ++ self.type_name(inferred_ret) ++ "\n" else: "")
             else:
                 out = out ++ "  fn " ++ fn_name ++ "(<unknown>)\n"
             out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(decl), 2)
@@ -4475,10 +4475,8 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
                 print(") -> ")
                 print(self.type_name(self.sig_return_type(sig_idx)))
                 print("\n")
-                if meta >= 0 and self.ast.fn_meta_ret(meta) == 0:
-                    print("  inferred_return: ")
-                    print(self.type_name(self.sig_return_type(sig_idx)))
-                    print("\n")
+                let inferred_ret = if meta >= 0 and self.ast.fn_meta_ret(meta) == 0: self.sig_return_type(sig_idx) else: 0
+                print(if inferred_ret != 0 and inferred_ret != self.ty_void: "  inferred_return: " ++ self.type_name(inferred_ret) ++ "\n" else: "")
             else:
                 print("  fn ")
                 print(fn_name)
