@@ -10331,15 +10331,31 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
     var vec_obj_type = obj_type;
     var vec_obj_val = obj_val;
     var vec_recv_ptr_override: ?c.LLVMValueRef = null;
-    if (!self.isVecType(vec_obj_type) and fa.expr.kind == .ident) {
+    if (fa.expr.kind == .ident) {
         const recv_sym = fa.expr.kind.ident;
         if (self.vec_local_types.get(recv_sym)) |tracked_vec_ty| {
+            if (tracked_vec_ty != vec_obj_type) {
+                if (self.locals.get(recv_sym)) |recv_local| {
+                    if (c.LLVMGetTypeKind(recv_local.ty) == c.LLVMPointerTypeKind) {
+                        const vec_ptr = c.LLVMBuildLoad2(self.builder, recv_local.ty, recv_local.alloca, "vec.ref.ptr");
+                        vec_recv_ptr_override = vec_ptr;
+                        vec_obj_type = tracked_vec_ty;
+                        vec_obj_val = c.LLVMBuildLoad2(self.builder, tracked_vec_ty, vec_ptr, "vec.ref.val");
+                    } else {
+                        vec_obj_type = tracked_vec_ty;
+                    }
+                }
+            }
+        } else if (!self.isVecType(vec_obj_type)) {
+            // Fallback: check locals for pointer-to-vec pattern
             if (self.locals.get(recv_sym)) |recv_local| {
                 if (c.LLVMGetTypeKind(recv_local.ty) == c.LLVMPointerTypeKind) {
-                    const vec_ptr = c.LLVMBuildLoad2(self.builder, recv_local.ty, recv_local.alloca, "vec.ref.ptr");
-                    vec_recv_ptr_override = vec_ptr;
-                    vec_obj_type = tracked_vec_ty;
-                    vec_obj_val = c.LLVMBuildLoad2(self.builder, tracked_vec_ty, vec_ptr, "vec.ref.val");
+                    if (self.isVecType(recv_local.ty)) {
+                        const vec_ptr = c.LLVMBuildLoad2(self.builder, recv_local.ty, recv_local.alloca, "vec.ref.ptr");
+                        vec_recv_ptr_override = vec_ptr;
+                        vec_obj_type = recv_local.ty;
+                        vec_obj_val = c.LLVMBuildLoad2(self.builder, recv_local.ty, vec_ptr, "vec.ref.val");
+                    }
                 }
             }
         }
@@ -10358,8 +10374,23 @@ fn genMethodCall(self: *Codegen, fa: Ast.FieldAccessExpr, args: []const *const A
         } else if (std.mem.eql(u8, method_name, "push")) {
             if (args.len < 1) return error.UnsupportedExpr;
             const val = try self.genExpr(args[0]);
+            const actual_elem_ty = c.LLVMTypeOf(val);
+            // If the Vec was created without a type annotation (defaulting to
+            // i32), upgrade the Vec type to match the first push.
+            var push_vec_type = vec_obj_type;
+            const cached_elem = self.getVecElemType(vec_obj_type);
+            if (cached_elem != null and cached_elem.? != actual_elem_ty) {
+                const vec_info = self.getOrCreateVecType(actual_elem_ty) catch null;
+                if (vec_info) |vi| {
+                    push_vec_type = vi.llvm_type;
+                    if (fa.expr.kind == .ident) {
+                        const recv_sym = fa.expr.kind.ident;
+                        self.vec_local_types.put(self.allocator, recv_sym, vi.llvm_type) catch {};
+                    }
+                }
+            }
             const recv_ptr = vec_recv_ptr_override orelse try self.getMutableReceiverPtr(fa.expr);
-            return self.genVecPush(recv_ptr, vec_obj_type, val);
+            return self.genVecPush(recv_ptr, push_vec_type, val);
         } else if (std.mem.eql(u8, method_name, "set_i32")) {
             if (args.len < 2) return error.UnsupportedExpr;
             const idx = try self.genExpr(args[0]);

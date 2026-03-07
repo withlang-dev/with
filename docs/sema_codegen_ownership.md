@@ -287,7 +287,9 @@ Work items:
 
 Exit criteria:
 - [x] user-facing names resolve only via std/prelude imports.
-- [ ] `--no-prelude`/`--freestanding` diagnostics behave as expected.
+- [x] `--no-prelude`/`--freestanding` diagnostics behave as expected.
+      `inject_prelude_frontend()` returns unchanged pool when `PRELUDE_NONE`;
+      `Sema.check_ident()` produces "undefined variable" with no builtin backdoor.
 - [x] no production logic lives in `Driver`.
 
 ---
@@ -345,7 +347,9 @@ This section translates phase items into concrete code-edit batches.
 ## Current Status / Active Blockers (2026-03-07)
 
 - [x] Ownership migration complete across all three phases.
-- [ ] Compiler LLVM path free of fallback-related type mismatch regressions.
+- [x] Compiler LLVM path free of fallback-related type mismatch regressions.
+      Vec.new() type upgrade: push detects element type mismatch and upgrades
+      the Vec type (both Zig bootstrap and .w Codegen).
 - [x] Self-host fresh rebuild path fully stable on current `src/main.w`.
 - [x] Prelude Phase B builtin de-hardcoding complete.
 
@@ -452,7 +456,9 @@ These are the next patch-sized work items to execute in order.
 - [x] Normalize codegen/CCodegen builtin dispatch to use MIR-level intrinsic
       markers instead of name-heuristic inference for Vec/HashMap/Option.
       `MirBody.call_intrinsic_kinds` set during lowering; CCodegen reads first.
-- [ ] Make missing prelude names produce normal undefined-name diagnostics.
+- [x] Make missing prelude names produce normal undefined-name diagnostics.
+      Self-hosted `Sema.check_ident()` has no hardcoded `println`/`assert`/`Vec`;
+      all fall through to "undefined variable" when not imported.
 
 ### Step 7: Shrink or Remove `Driver`
 
@@ -491,8 +497,12 @@ These are the next patch-sized work items to execute in order.
 
 - [x] `main` commands do not require `comp.driver`.
 - [x] LLVM backend consumes MIR path (not AST path) in compiler pipeline.
-- [ ] Builtin names absent without prelude/module import.
-- [ ] Runtime link picks one runtime root and reports it.
+- [x] Builtin names absent without prelude/module import.
+      Verified: `src/Sema.w` has zero references to `println`/`assert`/`Vec`;
+      `src/Resolve.w` likewise clean. Only `sema_is_builtin_trait_name` remains
+      for true compiler traits (Drop, Display, Iter, etc.).
+- [x] Runtime link picks one runtime root and reports it.
+      `link_stage_resolve_runtime_root()` probes once; all file lookups use it.
 
 ---
 
