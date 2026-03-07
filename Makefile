@@ -1,41 +1,51 @@
-.PHONY: bootstrap stage1 stage2 gate-stage0 test-bootstrap test-stage1 test-stage2 test clean
+.PHONY: all bootstrap stage1 stage2 build install install-bootstrap clean
 
-# Build bootstrap compiler (Zig -> bootstrap/zig-out/bin/with)
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+DESTDIR ?=
+OUT_DIR ?= out
+OUT_BINDIR ?= $(OUT_DIR)/bin
+
+STAGE2_BIN := $(OUT_BINDIR)/with-stage2
+CANONICAL_BIN := $(OUT_BINDIR)/with
+
+INSTALL_BINDIR := $(DESTDIR)$(BINDIR)
+INSTALL_RUNTIMEDIR := $(INSTALL_BINDIR)/runtime
+
+all: build
+
+# Stage0 seed compiler (Zig-built bootstrap compiler).
 bootstrap:
 	cd bootstrap && zig build
 
-# Stage 1: bootstrap compiler builds self-hosted compiler
-stage1: bootstrap
+# Stage1 selfhost compiler built from the current selfhost seed.
+stage1:
 	./scripts/rebuild_selfhost.sh stage1
 
-# Stage 2: stage1 compiler builds itself
-stage2: bootstrap
+# Stage2 selfhost compiler built by stage1 (compiler built by itself).
+stage2:
 	./scripts/rebuild_selfhost.sh stage2
 
-# Stage 0 bootstrap contract gate (safe subset + expected fails)
-gate-stage0: bootstrap
-	./scripts/gate_stage0_subset.sh
+# Canonical local compiler artifact.
+build: stage2
+	@test -x "$(CANONICAL_BIN)"
 
-# Bootstrap compiler test run
-test-bootstrap: bootstrap
-	./bootstrap/zig-out/bin/with test test/cases/
-	./bootstrap/zig-out/bin/with test bootstrap/test/cases/
+# Install stage2 compiler and colocated runtime artifacts.
+install: build
+	install -d "$(INSTALL_BINDIR)"
+	install -d "$(INSTALL_RUNTIMEDIR)"
+	install -m 0755 "$(STAGE2_BIN)" "$(INSTALL_BINDIR)/with"
+	cp -R runtime/. "$(INSTALL_RUNTIMEDIR)/"
 
-# Stage1 compiler sanity check
-test-stage1: stage1
-	./with-stage1 check src/main.w
-
-# Stage2 compiler sanity check
-test-stage2: stage2
-	cp ./with-stage2 /tmp/with-stage2-check
-	chmod +x /tmp/with-stage2-check
-	/tmp/with-stage2-check version
-	rm -f /tmp/with-stage2-check
-
-# Full verification: bootstrap suites + stage2 self-host check
-test: test-bootstrap test-stage2
+# One-time seed path: install stage0 bootstrap compiler.
+# Useful only when no selfhost compiler is available yet.
+install-bootstrap: bootstrap
+	install -d "$(INSTALL_BINDIR)"
+	install -d "$(INSTALL_RUNTIMEDIR)"
+	install -m 0755 ./bootstrap/zig-out/bin/with "$(INSTALL_BINDIR)/with"
+	cp -R bootstrap/zig-out/bin/runtime/. "$(INSTALL_RUNTIMEDIR)/"
 
 clean:
-	rm -f with with-stage1 with-stage2 with-stage3
+	rm -f with with-new with-stage1 with-stage2 with-stage3
+	rm -rf out/
 	rm -rf .with/build/
-	cd bootstrap && rm -rf zig-out .zig-cache

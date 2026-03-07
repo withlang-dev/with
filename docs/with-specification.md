@@ -1,7 +1,7 @@
 # The With Programming Language — Specification v6.5
 
 **Status:** Reference specification for prototype implementation
-**Positioning:** The Kotlin of systems programming.
+**Positioning:** Systems programming that feels like a modern language.
 **Principle:** Make the common case delightful. Be safe where it matters. Trust the programmer at the edges.
 
 ---
@@ -22,13 +22,10 @@ bugs, and stays out of your way for everything else.
 
 ### 1.1 Identity
 
-With is the **Kotlin of systems programming.**
+With is **systems programming that feels like a modern language.**
 
-Kotlin looked at Java and asked: what if we kept the good parts and
-made everything else *nice*? With asks the same question about Rust.
-
-The core idea: most lifetime complexity comes from storing references
-in structs. Ban that, and 90% of the borrow checker pain disappears.
+Most lifetime complexity comes from storing references in structs.
+Ban that, and 90% of the borrow checker pain disappears.
 The remaining 10%? The compiler is smart about it, the stdlib handles
 the tricky parts internally, and if you hit a genuine edge case,
 `unsafe` is right there — no shame, no ceremony.
@@ -79,12 +76,12 @@ like Python, runs like C.
 
 ### 1.2 Positioning
 
-- **Kotlin to Rust's Java.** Rust proved that compile-time memory safety
+- **Safety without the ceremony.** Compile-time memory safety
   works. With takes that proof and asks: "what if it was fun?"
   No lifetime annotations, no `Pin`, no `PhantomData`, no `where`
   clauses that scroll off the screen.
 
-- **Zig's control, Rust's safety.** Explicit allocation, C interop
+- **Explicit control, compile-time safety.** Explicit allocation, C interop
   on day one, no hidden runtime costs — with compile-time safety
   that Zig deliberately omits.
 
@@ -155,18 +152,18 @@ features listed above. This is the core design invariant.
 
 ### 1.6 Comparison
 
-| | Rust | With | Kotlin | Go |
-|---|---|---|---|---|
-| **Memory safety** | Compile-time | Compile-time | GC | GC |
-| **Lifetime annotations** | Yes (`'a`) | None | None | None |
-| **Stored references** | Yes | No (handles) | Yes (GC) | Yes (GC) |
-| **Borrow checker** | Full | Simplified | None | None |
-| **Async model** | State machines | Fibers | Coroutines | Goroutines |
-| **Runtime** | Optional | Optional | JVM/Native | Mandatory GC |
-| **Generics** | Yes | Yes | Yes | Yes |
-| **C interop** | Via FFI | Native | Via JNI/cinterop | Via cgo |
-| **Learning curve** | Steep | Gentle | Gentle | Gentle |
-| **Coding feel** | Explicit | Kotlin-like | Kotlin | Go |
+| | Rust | With |
+|---|---|---|
+| **Memory safety** | Compile-time | Compile-time |
+| **Lifetime annotations** | Yes (`'a`) | None |
+| **Stored references** | Yes | No (handles) |
+| **Borrow checker** | Full | Simplified |
+| **Async model** | State machines | Fibers |
+| **Runtime** | Optional | Optional |
+| **Generics** | Yes | Yes |
+| **C interop** | Via FFI | Native |
+| **Learning curve** | Steep | Gentle |
+| **Coding feel** | Explicit | Expressive |
 
 ---
 
@@ -1653,7 +1650,7 @@ releases at block exit).
 ### 7.7 Control Flow Inside `with` Blocks
 
 All `with` forms are **transparent for control flow** (analogous to
-Kotlin's `inline` lambdas or Swift's `@noescape` closures):
+inline lambdas or non-escaping closures):
 
 - **`return`** inside a `with` block returns from the **enclosing
   function**, not from the desugared closure.

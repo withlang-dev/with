@@ -77,7 +77,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if self.pos >= slen:
         return TK_EOF()
 
-    let ch = src[self.pos]
+    let ch = src.byte_at((self.pos) as i64)
 
     // Newline
     if ch == 10:
@@ -129,7 +129,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if ch == 43:  // +
         self.pos = self.pos + 1
         if self.pos < slen:
-            let c2 = src[self.pos]
+            let c2 = src.byte_at((self.pos) as i64)
             if c2 == 43:  // ++
                 self.pos = self.pos + 1
                 return TK_PLUS_PLUS()
@@ -145,7 +145,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if ch == 45:  // -
         self.pos = self.pos + 1
         if self.pos < slen:
-            let c2 = src[self.pos]
+            let c2 = src.byte_at((self.pos) as i64)
             if c2 == 62:  // ->
                 self.pos = self.pos + 1
                 return TK_ARROW()
@@ -161,7 +161,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if ch == 42:  // *
         self.pos = self.pos + 1
         if self.pos < slen:
-            let c2 = src[self.pos]
+            let c2 = src.byte_at((self.pos) as i64)
             if c2 == 37:  // *%
                 self.pos = self.pos + 1
                 return TK_STAR_WRAP()
@@ -174,7 +174,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if ch == 37:  // %
         self.pos = self.pos + 1
         if self.pos < slen:
-            if src[self.pos] == 61:  // %=
+            if src.byte_at((self.pos) as i64) == 61:  // %=
                 self.pos = self.pos + 1
                 return TK_PERCENT_EQ()
         return TK_PERCENT()
@@ -183,7 +183,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if ch == 61:  // =
         self.pos = self.pos + 1
         if self.pos < slen:
-            let c2 = src[self.pos]
+            let c2 = src.byte_at((self.pos) as i64)
             if c2 == 61:  // ==
                 self.pos = self.pos + 1
                 return TK_EQ_EQ()
@@ -195,7 +195,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
     // ! compound
     if ch == 33:  // !
         self.pos = self.pos + 1
-        if self.pos < slen and src[self.pos] == 61:  // !=
+        if self.pos < slen and src.byte_at((self.pos) as i64) == 61:  // !=
             self.pos = self.pos + 1
             return TK_BANG_EQ()
         return TK_BANG()
@@ -204,7 +204,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if ch == 63:  // ?
         self.pos = self.pos + 1
         if self.pos < slen:
-            let c2 = src[self.pos]
+            let c2 = src.byte_at((self.pos) as i64)
             if c2 == 46:  // ?.
                 self.pos = self.pos + 1
                 return TK_QUESTION_DOT()
@@ -217,7 +217,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if ch == 60:  // <
         self.pos = self.pos + 1
         if self.pos < slen:
-            let c2 = src[self.pos]
+            let c2 = src.byte_at((self.pos) as i64)
             if c2 == 61:  // <=
                 self.pos = self.pos + 1
                 return TK_LT_EQ()
@@ -233,7 +233,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if ch == 62:  // >
         self.pos = self.pos + 1
         if self.pos < slen:
-            let c2 = src[self.pos]
+            let c2 = src.byte_at((self.pos) as i64)
             if c2 == 61:  // >=
                 self.pos = self.pos + 1
                 return TK_GT_EQ()
@@ -245,7 +245,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
     // | compound
     if ch == 124:  // |
         self.pos = self.pos + 1
-        if self.pos < slen and src[self.pos] == 62:  // |>
+        if self.pos < slen and src.byte_at((self.pos) as i64) == 62:  // |>
             self.pos = self.pos + 1
             return TK_PIPE_GT()
         return TK_PIPE()
@@ -254,10 +254,10 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if ch == 47:  // /
         self.pos = self.pos + 1
         if self.pos < slen:
-            let c2 = src[self.pos]
+            let c2 = src.byte_at((self.pos) as i64)
             if c2 == 47:  // // comment
                 // Skip the rest of the line (comment is dropped)
-                while self.pos < slen and src[self.pos] != 10:
+                while self.pos < slen and src.byte_at((self.pos) as i64) != 10:
                     self.pos = self.pos + 1
                 // Recurse to get the next real token
                 return self.next_token()
@@ -270,13 +270,13 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if ch == 46:  // .
         self.pos = self.pos + 1
         if self.pos < slen:
-            let c2 = src[self.pos]
+            let c2 = src.byte_at((self.pos) as i64)
             if c2 == 46:  // ..
                 self.pos = self.pos + 1
-                if self.pos < slen and src[self.pos] == 61:  // ..=
+                if self.pos < slen and src.byte_at((self.pos) as i64) == 61:  // ..=
                     self.pos = self.pos + 1
                     return TK_DOT_DOT_EQ()
-                if self.pos < slen and src[self.pos] == 46:  // ...
+                if self.pos < slen and src.byte_at((self.pos) as i64) == 46:  // ...
                     self.pos = self.pos + 1
                     return TK_DOT_DOT_DOT()
                 return TK_DOT_DOT()
@@ -301,21 +301,21 @@ fn Lexer.next_token(self: Lexer) -> i32:
     if ch == 39:  // '
         self.pos = self.pos + 1
         // Try char literal first: 'x', '\n', '\x41', ...
-        if self.pos < slen and src[self.pos] == 92:  // backslash
+        if self.pos < slen and src.byte_at((self.pos) as i64) == 92:  // backslash
             if self.pos + 1 < slen:
                 var p = self.pos + 1
-                if src[p] == 120 and p + 2 < slen:  // xNN
+                if src.byte_at((p) as i64) == 120 and p + 2 < slen:  // xNN
                     p = p + 2
-                if p + 1 < slen and src[p + 1] == 39:
+                if p + 1 < slen and src.byte_at((p + 1) as i64) == 39:
                     self.pos = p + 2
                     return TK_CHAR_LIT()
-        if self.pos + 1 < slen and src[self.pos + 1] == 39:
+        if self.pos + 1 < slen and src.byte_at((self.pos + 1) as i64) == 39:
             // Single char: 'a'
             self.pos = self.pos + 2
             return TK_CHAR_LIT()
         // Label: 'name
-        if self.pos < slen and is_ident_start(src[self.pos]):
-            while self.pos < slen and is_ident_continue(src[self.pos]):
+        if self.pos < slen and is_ident_start(src.byte_at((self.pos) as i64)):
+            while self.pos < slen and is_ident_continue(src.byte_at((self.pos) as i64)):
                 self.pos = self.pos + 1
             return TK_LABEL()
         return TK_INVALID()
@@ -331,7 +331,7 @@ fn Lexer.skip_whitespace(self: Lexer):
     let src = self.source
     let slen = src.len() as i32
     while self.pos < slen:
-        let ch = src[self.pos]
+        let ch = src.byte_at((self.pos) as i64)
         if not (ch == 32 or ch == 9 or ch == 13):
             break
         self.pos = self.pos + 1
@@ -342,16 +342,16 @@ fn Lexer.lex_string(self: Lexer) -> i32:
     self.pos = self.pos + 1  // skip opening "
 
     // Check for triple-quoted multi-line string: """..."""
-    if self.pos + 1 < slen and src[self.pos] == 34 and src[self.pos + 1] == 34:
+    if self.pos + 1 < slen and src.byte_at((self.pos) as i64) == 34 and src.byte_at((self.pos + 1) as i64) == 34:
         self.pos = self.pos + 2  // skip the two additional quotes
         // Skip optional leading newline after opening """
-        if self.pos < slen and src[self.pos] == 10:
+        if self.pos < slen and src.byte_at((self.pos) as i64) == 10:
             self.pos = self.pos + 1
         while self.pos + 2 < slen:
-            if src[self.pos] == 34 and src[self.pos + 1] == 34 and src[self.pos + 2] == 34:
+            if src.byte_at((self.pos) as i64) == 34 and src.byte_at((self.pos + 1) as i64) == 34 and src.byte_at((self.pos + 2) as i64) == 34:
                 self.pos = self.pos + 3
                 return TK_STRING_LIT()
-            if src[self.pos] == 92:  // backslash
+            if src.byte_at((self.pos) as i64) == 92:  // backslash
                 self.pos = self.pos + 1
             self.pos = self.pos + 1
         // Unterminated multi-line string — return STRING_LIT for parser recovery.
@@ -361,12 +361,12 @@ fn Lexer.lex_string(self: Lexer) -> i32:
     // treated as the end of the string.
     var brace_depth = 0
     while self.pos < slen:
-        let ch = src[self.pos]
+        let ch = src.byte_at((self.pos) as i64)
         if ch == 123 and brace_depth == 0:  // {
             // Don't count escaped braces. Count consecutive backslashes
             // preceding this '{' — an odd count means the brace is escaped.
             var bs = 0
-            while bs < self.pos and src[self.pos - 1 - bs] == 92:
+            while bs < self.pos and src.byte_at((self.pos - 1 - bs) as i64) == 92:
                 bs = bs + 1
             if bs % 2 == 0:
                 brace_depth = brace_depth + 1
@@ -386,8 +386,8 @@ fn Lexer.lex_string(self: Lexer) -> i32:
         if ch == 34 and brace_depth > 0:
             // Inside an interpolation hole: skip nested string literal.
             self.pos = self.pos + 1
-            while self.pos < slen and src[self.pos] != 34:
-                if src[self.pos] == 92:
+            while self.pos < slen and src.byte_at((self.pos) as i64) != 34:
+                if src.byte_at((self.pos) as i64) == 92:
                     self.pos = self.pos + 1
                 self.pos = self.pos + 1
             if self.pos < slen:
@@ -406,39 +406,39 @@ fn Lexer.lex_number(self: Lexer) -> i32:
     var is_float = false
 
     // Check for 0x, 0b, 0o prefixes
-    if src[self.pos] == 48 and self.pos + 1 < slen:
-        let prefix = src[self.pos + 1]
+    if src.byte_at((self.pos) as i64) == 48 and self.pos + 1 < slen:
+        let prefix = src.byte_at((self.pos + 1) as i64)
         if prefix == 120 or prefix == 88:  // x, X
             self.pos = self.pos + 2
-            while self.pos < slen and (is_hex_digit(src[self.pos]) or src[self.pos] == 95):
+            while self.pos < slen and (is_hex_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
                 self.pos = self.pos + 1
             return TK_INT_LIT()
         if prefix == 98 or prefix == 66:  // b, B
             self.pos = self.pos + 2
-            while self.pos < slen and (src[self.pos] == 48 or src[self.pos] == 49 or src[self.pos] == 95):
+            while self.pos < slen and (src.byte_at((self.pos) as i64) == 48 or src.byte_at((self.pos) as i64) == 49 or src.byte_at((self.pos) as i64) == 95):
                 self.pos = self.pos + 1
             return TK_INT_LIT()
         if prefix == 111 or prefix == 79:  // o, O
             self.pos = self.pos + 2
-            while self.pos < slen and ((src[self.pos] >= 48 and src[self.pos] <= 55) or src[self.pos] == 95):
+            while self.pos < slen and ((src.byte_at((self.pos) as i64) >= 48 and src.byte_at((self.pos) as i64) <= 55) or src.byte_at((self.pos) as i64) == 95):
                 self.pos = self.pos + 1
             return TK_INT_LIT()
 
     // Decimal digits
-    while self.pos < slen and (is_digit(src[self.pos]) or src[self.pos] == 95):
+    while self.pos < slen and (lex_is_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
         self.pos = self.pos + 1
 
     // Check for decimal point (but not .. range)
-    if self.pos < slen and src[self.pos] == 46:
-        if self.pos + 1 < slen and src[self.pos + 1] != 46:
+    if self.pos < slen and src.byte_at((self.pos) as i64) == 46:
+        if self.pos + 1 < slen and src.byte_at((self.pos + 1) as i64) != 46:
             is_float = true
             self.pos = self.pos + 1
-            while self.pos < slen and (is_digit(src[self.pos]) or src[self.pos] == 95):
+            while self.pos < slen and (lex_is_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
                 self.pos = self.pos + 1
 
     // Check for type suffix: 100_i64, 3.14_f32, etc.
-    if self.pos > start and self.pos < slen and src[self.pos - 1] == 95:
-        let ch2 = src[self.pos]
+    if self.pos > start and self.pos < slen and src.byte_at((self.pos - 1) as i64) == 95:
+        let ch2 = src.byte_at((self.pos) as i64)
         if ch2 == 105 or ch2 == 117 or ch2 == 102:  // i, u, f
             if suffix_accept(src, self.pos, slen, "i8", 2):
                 self.pos = self.pos + 2
@@ -471,10 +471,10 @@ fn suffix_accept(src: str, pos: i32, slen: i32, suffix: str, suf_len: i32) -> bo
     if pos + suf_len > slen:
         return false
     for i in 0..suf_len:
-        if src[pos + i] != suffix[i]:
+        if src.byte_at((pos + i) as i64) != suffix[i]:
             return false
     // Make sure it's not followed by more identifier chars.
-    if pos + suf_len < slen and is_ident_continue(src[pos + suf_len]):
+    if pos + suf_len < slen and is_ident_continue(src.byte_at((pos + suf_len) as i64)):
         return false
     true
 
@@ -482,15 +482,15 @@ fn Lexer.lex_ident(self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
     let start = self.token_start
-    while self.pos < slen and is_ident_continue(src[self.pos]):
+    while self.pos < slen and is_ident_continue(src.byte_at((self.pos) as i64)):
         self.pos = self.pos + 1
     let text = src.slice(start as i64, self.pos as i64)
 
     // c"..." -> C-string literal
-    if text == "c" and self.pos < slen and src[self.pos] == 34:
+    if text == "c" and self.pos < slen and src.byte_at((self.pos) as i64) == 34:
         self.pos = self.pos + 1  // skip opening "
-        while self.pos < slen and src[self.pos] != 34:
-            if src[self.pos] == 92:
+        while self.pos < slen and src.byte_at((self.pos) as i64) != 34:
+            if src.byte_at((self.pos) as i64) == 92:
                 self.pos = self.pos + 1
             self.pos = self.pos + 1
         if self.pos < slen:
@@ -504,7 +504,7 @@ fn Lexer.lex_ident(self: Lexer) -> i32:
             return raw_tok
 
     // b'...' -> byte literal (tokenized as char literal).
-    if text == "b" and self.pos < slen and src[self.pos] == 39:
+    if text == "b" and self.pos < slen and src.byte_at((self.pos) as i64) == 39:
         let bt = self.lex_byte_char_prefixed()
         if bt != -1:
             return bt
@@ -517,7 +517,7 @@ fn Lexer.lex_ident(self: Lexer) -> i32:
 fn Lexer.lex_dot_ident(self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
-    while self.pos < slen and is_ident_continue(src[self.pos]):
+    while self.pos < slen and is_ident_continue(src.byte_at((self.pos) as i64)):
         self.pos = self.pos + 1
     TK_DOT_IDENT()
 
@@ -526,19 +526,19 @@ fn Lexer.lex_raw_string_prefixed(self: Lexer) -> i32:
     let slen = src.len() as i32
     var p = self.pos
     var hash_count = 0
-    while p < slen and src[p] == 35:  // #
+    while p < slen and src.byte_at((p) as i64) == 35:  // #
         hash_count = hash_count + 1
         p = p + 1
-    if p >= slen or src[p] != 34:  // opening "
+    if p >= slen or src.byte_at((p) as i64) != 34:  // opening "
         return -1
 
     // Consume opening delimiter.
     self.pos = p + 1
     while self.pos < slen:
-        if src[self.pos] == 34:  // "
+        if src.byte_at((self.pos) as i64) == 34:  // "
             var ok = true
             for hi in 0..hash_count:
-                if self.pos + 1 + hi >= slen or src[self.pos + 1 + hi] != 35:
+                if self.pos + 1 + hi >= slen or src.byte_at((self.pos + 1 + hi) as i64) != 35:
                     ok = false
             if ok:
                 self.pos = self.pos + 1 + hash_count
@@ -550,14 +550,14 @@ fn Lexer.lex_raw_string_prefixed(self: Lexer) -> i32:
 fn Lexer.lex_byte_char_prefixed(self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
-    if self.pos >= slen or src[self.pos] != 39:
+    if self.pos >= slen or src.byte_at((self.pos) as i64) != 39:
         return -1
     self.pos = self.pos + 1  // skip opening '
-    while self.pos < slen and src[self.pos] != 39:
-        if src[self.pos] == 92 and self.pos + 1 < slen:
+    while self.pos < slen and src.byte_at((self.pos) as i64) != 39:
+        if src.byte_at((self.pos) as i64) == 92 and self.pos + 1 < slen:
             self.pos = self.pos + 1
         self.pos = self.pos + 1
-    if self.pos < slen and src[self.pos] == 39:
+    if self.pos < slen and src.byte_at((self.pos) as i64) == 39:
         self.pos = self.pos + 1
     TK_CHAR_LIT()
 
@@ -570,7 +570,7 @@ fn is_ident_start(ch: i32) -> bool:
 fn is_ident_continue(ch: i32) -> bool:
     is_ident_start(ch) or (ch >= 48 and ch <= 57)
 
-fn is_digit(ch: i32) -> bool:
+fn lex_is_digit(ch: i32) -> bool:
     ch >= 48 and ch <= 57
 
 fn is_hex_digit(ch: i32) -> bool:
@@ -581,6 +581,6 @@ fn column_of(source: str, pos: i32) -> i32:
     var p = pos
     while p > 0:
         p = p - 1
-        if source[p] == 10:
+        if source.byte_at((p) as i64) == 10:
             return pos - p - 1
     pos

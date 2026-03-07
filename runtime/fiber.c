@@ -219,14 +219,22 @@ int32_t with_fiber_spawn(void (*entry_fn)(void*), void *arg) {
     f->cancel_requested = 0;
     live_fiber_count++;
 
-    // Set up initial context: sp at top of stack (aligned), lr to trampoline.
+    // Set up initial context with ABI-correct stack alignment.
     void *stack_top = (void *)((uintptr_t)f->stack + f->stack_size);
-    // Align to 16 bytes (ABI requirement).
-    stack_top = (void *)((uintptr_t)stack_top & ~0xFUL);
+    stack_top = (void *)((uintptr_t)stack_top & ~0xFUL); // 16-byte alignment
 
-    f->ctx.regs[12] = (uint64_t)stack_top; // sp
+#if defined(__x86_64__)
+    // SysV entry expects RSP%16 == 8. Seed a dummy return slot.
+    uint8_t *initial_rsp = ((uint8_t *)stack_top) - 8;
+    *(uint64_t *)initial_rsp = 0;
+    f->ctx.regs[12] = (uint64_t)initial_rsp;      // rsp
+    f->ctx.regs[11] = (uint64_t)fiber_trampoline; // rip
+    f->ctx.regs[10] = (uint64_t)initial_rsp;      // rbp
+#else
+    f->ctx.regs[12] = (uint64_t)stack_top;        // sp
     f->ctx.regs[11] = (uint64_t)fiber_trampoline; // lr (x30)
-    f->ctx.regs[10] = (uint64_t)stack_top; // fp (x29)
+    f->ctx.regs[10] = (uint64_t)stack_top;        // fp (x29)
+#endif
 
     if ((f->id & 1) == 0) {
         enqueue_steal(f);

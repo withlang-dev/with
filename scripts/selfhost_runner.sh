@@ -1,17 +1,58 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# macOS on external volumes can leave direct executions of with-stage2 stuck in
+# Some macOS environments can leave direct executions of with-stage2 stuck in
 # uninterruptible launcher state. Run tests via a local tmp copy instead.
 
 SELFHOST_RUNNER_DIR=""
 SELFHOST_RUNNER_ACTIVE_PID=""
+SELFHOST_RUNNER_LOCK_DIR=""
+SELFHOST_RUNNER_SPAWN_ISOLATED=0
+
+acquire_selfhost_runner_lock() {
+  local root_dir="$1"
+  local lock_dir="${root_dir}/.with/.selfhost_runner.lock"
+  local owner_pid=""
+
+  mkdir -p "${root_dir}/.with"
+
+  if mkdir "$lock_dir" 2>/dev/null; then
+    echo "$$" > "${lock_dir}/pid"
+    SELFHOST_RUNNER_LOCK_DIR="$lock_dir"
+    return 0
+  fi
+
+  if [[ -f "${lock_dir}/pid" ]]; then
+    owner_pid="$(cat "${lock_dir}/pid" 2>/dev/null || true)"
+  fi
+
+  if [[ -n "$owner_pid" ]] && ! kill -0 "$owner_pid" 2>/dev/null; then
+    rm -rf "$lock_dir"
+    if mkdir "$lock_dir" 2>/dev/null; then
+      echo "$$" > "${lock_dir}/pid"
+      SELFHOST_RUNNER_LOCK_DIR="$lock_dir"
+      return 0
+    fi
+  fi
+
+  echo "error: selfhost runner lock is held (${lock_dir}, pid=${owner_pid:-unknown})" >&2
+  return 1
+}
+
+release_selfhost_runner_lock() {
+  if [[ -n "${SELFHOST_RUNNER_LOCK_DIR}" ]] && [[ -d "${SELFHOST_RUNNER_LOCK_DIR}" ]]; then
+    rm -rf "${SELFHOST_RUNNER_LOCK_DIR}" >/dev/null 2>&1 || true
+  fi
+  SELFHOST_RUNNER_LOCK_DIR=""
+}
 
 prepare_selfhost_runner() {
   local root_dir="$1"
   local bin_path="$2"
   local dylib_path=""
   local cand=""
+
+  acquire_selfhost_runner_lock "$root_dir"
 
   for cand in \
     "${root_dir}/runtime/libwith_llvm_bridge.dylib" \
@@ -39,10 +80,17 @@ prepare_selfhost_runner() {
 }
 
 cleanup_selfhost_runner() {
+  if [[ -n "${SELFHOST_RUNNER_ACTIVE_PID}" ]]; then
+    _runner_kill_tree "${SELFHOST_RUNNER_ACTIVE_PID}" TERM
+    _runner_kill_tree "${SELFHOST_RUNNER_ACTIVE_PID}" KILL
+  fi
+  SELFHOST_RUNNER_ACTIVE_PID=""
+  SELFHOST_RUNNER_SPAWN_ISOLATED=0
   if [[ -n "${SELFHOST_RUNNER_DIR}" && -d "${SELFHOST_RUNNER_DIR}" ]]; then
     rm -rf "${SELFHOST_RUNNER_DIR}"
   fi
   SELFHOST_RUNNER_DIR=""
+  release_selfhost_runner_lock
 }
 
 _runner_restore_trap() {
@@ -66,6 +114,71 @@ _runner_kill_tree() {
     _runner_kill_tree "$child" "$signal_name"
   done
   kill "-${signal_name}" "$pid" 2>/dev/null || kill -"$signal_name" "$pid" 2>/dev/null || true
+}
+
+_runner_group_id() {
+  local pid="$1"
+  ps -o pgid= -p "$pid" 2>/dev/null | tr -d '[:space:]'
+}
+
+_runner_kill_group() {
+  local pid="$1"
+  local signal_name="$2"
+  local pgid=""
+  pgid="$(_runner_group_id "$pid")"
+  if [[ -z "$pgid" ]]; then
+    return 0
+  fi
+  kill "-${signal_name}" "--" "-${pgid}" 2>/dev/null || true
+}
+
+_runner_wait_briefly_for_exit() {
+  local pid="$1"
+  local spins="${2:-20}"
+  local i=0
+  while kill -0 "$pid" 2>/dev/null; do
+    if [[ "$i" -ge "$spins" ]]; then
+      return 1
+    fi
+    i=$((i + 1))
+    sleep 0.1
+  done
+  return 0
+}
+
+_runner_spawn_capture() {
+  local out_file="$1"
+  local err_file="$2"
+  shift 2
+
+  SELFHOST_RUNNER_SPAWN_ISOLATED=0
+
+  if command -v setsid >/dev/null 2>&1; then
+    setsid "$@" >"$out_file" 2>"$err_file" &
+    SELFHOST_RUNNER_ACTIVE_PID="$!"
+    SELFHOST_RUNNER_SPAWN_ISOLATED=1
+    return 0
+  fi
+
+  if command -v perl >/dev/null 2>&1; then
+    perl -MPOSIX=setsid -e 'POSIX::setsid() || die("setsid"); exec @ARGV' "$@" >"$out_file" 2>"$err_file" &
+    SELFHOST_RUNNER_ACTIVE_PID="$!"
+    SELFHOST_RUNNER_SPAWN_ISOLATED=1
+    return 0
+  fi
+
+  "$@" >"$out_file" 2>"$err_file" &
+  SELFHOST_RUNNER_ACTIVE_PID="$!"
+}
+
+_runner_stop_child() {
+  local pid="$1"
+  local signal_name="$2"
+
+  if [[ "${SELFHOST_RUNNER_SPAWN_ISOLATED}" -ne 0 ]]; then
+    _runner_kill_group "$pid" "$signal_name"
+  fi
+  _runner_kill_tree "$pid" "$signal_name"
 }
 
 # Run command in a controllable background child with optional timeout.
@@ -92,18 +205,19 @@ runner_exec_capture() {
   old_term="$(trap -p TERM || true)"
   trap 'interrupted=1' INT TERM
 
-  "$@" >"$out_file" 2>"$err_file" &
-  child_pid=$!
-  SELFHOST_RUNNER_ACTIVE_PID="$child_pid"
+  _runner_spawn_capture "$out_file" "$err_file" "$@"
+  child_pid="$SELFHOST_RUNNER_ACTIVE_PID"
   start_time="$(date +%s)"
 
   while kill -0 "$child_pid" 2>/dev/null; do
     if [[ "$interrupted" -ne 0 ]]; then
-      _runner_kill_tree "$child_pid" TERM
-      sleep 1
-      _runner_kill_tree "$child_pid" KILL
+      _runner_stop_child "$child_pid" TERM
+      _runner_wait_briefly_for_exit "$child_pid" 20 || true
+      _runner_stop_child "$child_pid" KILL
+      _runner_wait_briefly_for_exit "$child_pid" 20 || true
       rc=130
       SELFHOST_RUNNER_ACTIVE_PID=""
+      SELFHOST_RUNNER_SPAWN_ISOLATED=0
       _runner_restore_trap INT "$old_int"
       _runner_restore_trap TERM "$old_term"
       return "$rc"
@@ -122,11 +236,13 @@ runner_exec_capture() {
   done
 
   if [[ "$timed_out" -ne 0 ]]; then
-    _runner_kill_tree "$child_pid" TERM
-    sleep 1
-    _runner_kill_tree "$child_pid" KILL
+    _runner_stop_child "$child_pid" TERM
+    _runner_wait_briefly_for_exit "$child_pid" 20 || true
+    _runner_stop_child "$child_pid" KILL
+    _runner_wait_briefly_for_exit "$child_pid" 20 || true
     rc=124
     SELFHOST_RUNNER_ACTIVE_PID=""
+    SELFHOST_RUNNER_SPAWN_ISOLATED=0
     _runner_restore_trap INT "$old_int"
     _runner_restore_trap TERM "$old_term"
     return "$rc"
@@ -135,6 +251,7 @@ runner_exec_capture() {
   wait "$child_pid"
   rc=$?
   SELFHOST_RUNNER_ACTIVE_PID=""
+  SELFHOST_RUNNER_SPAWN_ISOLATED=0
   _runner_restore_trap INT "$old_int"
   _runner_restore_trap TERM "$old_term"
   return "$rc"

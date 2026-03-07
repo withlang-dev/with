@@ -271,15 +271,15 @@ When `run_wave12_selfhost_fixpoint.sh` fails:
    - New LLVM metadata not covered by normalization → add stripping rule.
 4. To debug: run both compilers manually on the failing source:
    ```bash
-   ./with-stage2 ir <source.w> > /tmp/stage2.ll
-   ./with-stage3 ir <source.w> > /tmp/stage3.ll
+   ./out/bin/with-stage2 ir <source.w> > /tmp/stage2.ll
+   ./out/bin/with-stage3 ir <source.w> > /tmp/stage3.ll
    diff -u /tmp/stage2.ll /tmp/stage3.ll
    ```
 
 **Level 3 info (binary divergence):**
 
 - Non-blocking. Check `INFO(fixpoint-binary)` output.
-- If symbols differ, investigate with `nm -g ./with-stage2 | sort > s2.txt` etc.
+- If symbols differ, investigate with `nm -g ./out/bin/with-stage2 | sort > s2.txt` etc.
 - Common causes: LLVM build-id, debug info paths, timestamp metadata.
 
 ---

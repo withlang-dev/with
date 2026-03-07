@@ -60,6 +60,7 @@ fn CK_STR -> i32: 2
 fn CK_UNIT -> i32: 3
 fn CK_FLOAT -> i32: 4
 fn CK_ZERO_SIZED -> i32: 5
+fn CK_FN -> i32: 6
 
 // ── Projection kinds ─────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ type MirLocalInfo = {
 
 type MirBody = {
     fn_sym: i32,
+    lowering_failed: i32,
 
     // Locals
     local_type_ids: Vec[i32],
@@ -150,6 +152,7 @@ type MirBody = {
 type MirModule = {
     bodies: Vec[MirBody],
     body_fn_syms: Vec[i32],
+    body_index_by_fn_sym: HashMap[i32, i32],
 }
 
 // ── MirModule helpers ────────────────────────────────────────────
@@ -158,23 +161,29 @@ fn MirModule.init -> MirModule:
     MirModule {
         bodies: Vec.new(),
         body_fn_syms: Vec.new(),
+        body_index_by_fn_sym: HashMap.new(),
     }
 
 // No-op: reserved for future manual memory management.
-fn MirModule.deinit(self: MirModule):
+fn MirModule.deinit(self: &mut MirModule):
     return
 
-fn MirModule.add_body(self: MirModule, body: MirBody):
+fn MirModule.add_body(self: &mut MirModule, body: MirBody):
+    let body_idx = self.bodies.len() as i32
     self.bodies.push(body)
     self.body_fn_syms.push(body.fn_sym)
+    if body.fn_sym != 0:
+        self.body_index_by_fn_sym.insert(body.fn_sym, body_idx)
 
-fn MirModule.body_count(self: MirModule) -> i32:
+fn MirModule.body_count(self: &MirModule) -> i32:
     self.bodies.len() as i32
 
-fn MirModule.find_body(self: MirModule, fn_sym: i32) -> i32:
-    for i in 0..self.body_fn_syms.len() as i32:
-        if self.body_fn_syms.get(i as i64) == fn_sym:
-            return i
+fn MirModule.find_body(self: &MirModule, fn_sym: i32) -> i32:
+    if fn_sym == 0:
+        return 0 - 1
+    let body_idx = self.body_index_by_fn_sym.get(fn_sym)
+    if body_idx.is_some():
+        return body_idx.unwrap()
     0 - 1
 
 // ── MirBody builders ─────────────────────────────────────────────
@@ -182,6 +191,7 @@ fn MirModule.find_body(self: MirModule, fn_sym: i32) -> i32:
 fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
     var body = MirBody {
         fn_sym,
+        lowering_failed: 0,
         local_type_ids: Vec.new(),
         local_mutables: Vec.new(),
         local_names: Vec.new(),
@@ -235,7 +245,7 @@ fn MirBody.init(fn_sym: i32, sema: Sema) -> MirBody:
         body.local_type_ids.set_i32(0, sema.ty_void)
     body
 
-fn MirBody.new_block(self: MirBody) -> i32:
+fn MirBody.new_block(self: &mut MirBody) -> i32:
     let id = self.bb_stmt_starts.len() as i32
     self.bb_stmt_starts.push(self.stmt_kinds.len() as i32)
     self.bb_stmt_counts.push(0)
@@ -247,7 +257,7 @@ fn MirBody.new_block(self: MirBody) -> i32:
     self.bb_is_cleanup.push(0)
     id
 
-fn MirBody.push_stmt(self: MirBody, bb: i32, kind: i32, d0: i32, d1: i32, span: i32):
+fn MirBody.push_stmt(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i32, span: i32):
     let stmt_id = self.stmt_kinds.len() as i32
     self.stmt_kinds.push(kind)
     self.stmt_d0.push(d0)
@@ -257,19 +267,19 @@ fn MirBody.push_stmt(self: MirBody, bb: i32, kind: i32, d0: i32, d1: i32, span: 
     if bb >= 0 and bb < self.bb_stmt_counts.len() as i32:
         let old_count = self.bb_stmt_counts.get(bb as i64)
         if old_count == 0:
-            self.bb_stmt_starts.set_i32(bb as i64, stmt_id)
-        self.bb_stmt_counts.set_i32(bb as i64, old_count + 1)
+            self.bb_stmt_starts.set_i32(bb, stmt_id)
+        self.bb_stmt_counts.set_i32(bb, old_count + 1)
 
-fn MirBody.set_terminator(self: MirBody, bb: i32, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32):
+fn MirBody.set_terminator(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32):
     if bb < 0 or bb >= self.bb_term_kinds.len() as i32:
         return
-    self.bb_term_kinds.set_i32(bb as i64, kind)
-    self.bb_term_d0.set_i32(bb as i64, d0)
-    self.bb_term_d1.set_i32(bb as i64, d1)
-    self.bb_term_d2.set_i32(bb as i64, d2)
-    self.bb_term_d3.set_i32(bb as i64, d3)
+    self.bb_term_kinds.set_i32(bb, kind)
+    self.bb_term_d0.set_i32(bb, d0)
+    self.bb_term_d1.set_i32(bb, d1)
+    self.bb_term_d2.set_i32(bb, d2)
+    self.bb_term_d3.set_i32(bb, d3)
 
-fn MirBody.new_local(self: MirBody, type_id: i32, mutable: i32, name: i32, is_user_var: i32) -> i32:
+fn MirBody.new_local(self: &mut MirBody, type_id: i32, mutable: i32, name: i32, is_user_var: i32) -> i32:
     let id = self.local_type_ids.len() as i32
     self.local_type_ids.push(type_id)
     self.local_mutables.push(mutable)
@@ -277,17 +287,17 @@ fn MirBody.new_local(self: MirBody, type_id: i32, mutable: i32, name: i32, is_us
     self.local_is_user_var.push(is_user_var)
     id
 
-fn MirBody.new_temp(self: MirBody, type_id: i32) -> i32:
+fn MirBody.new_temp(self: &mut MirBody, type_id: i32) -> i32:
     self.new_local(type_id, 1, 0, 0)
 
-fn MirBody.new_place(self: MirBody, local_id: i32) -> i32:
+fn MirBody.new_place(self: &mut MirBody, local_id: i32) -> i32:
     let id = self.place_locals.len() as i32
     self.place_locals.push(local_id)
     self.place_proj_starts.push(self.proj_kinds.len() as i32)
     self.place_proj_counts.push(0)
     id
 
-fn MirBody.new_place_with_projection(self: MirBody, base: i32, proj_kind: i32, proj_data: i32) -> i32:
+fn MirBody.new_place_with_projection(self: &mut MirBody, base: i32, proj_kind: i32, proj_data: i32) -> i32:
     if base < 0 or base >= self.place_locals.len() as i32:
         return self.new_place(0)
 
@@ -309,19 +319,19 @@ fn MirBody.new_place_with_projection(self: MirBody, base: i32, proj_kind: i32, p
     self.place_proj_counts.push(base_proj_count + 1)
     id
 
-fn MirBody.new_field_place(self: MirBody, base: i32, field_idx: i32) -> i32:
+fn MirBody.new_field_place(self: &mut MirBody, base: i32, field_idx: i32) -> i32:
     self.new_place_with_projection(base, PK_FIELD(), field_idx)
 
-fn MirBody.new_index_place(self: MirBody, base: i32, idx_local: i32) -> i32:
+fn MirBody.new_index_place(self: &mut MirBody, base: i32, idx_local: i32) -> i32:
     self.new_place_with_projection(base, PK_INDEX(), idx_local)
 
-fn MirBody.new_deref_place(self: MirBody, base: i32) -> i32:
+fn MirBody.new_deref_place(self: &mut MirBody, base: i32) -> i32:
     self.new_place_with_projection(base, PK_DEREF(), 0)
 
-fn MirBody.new_downcast_place(self: MirBody, base: i32, variant_idx: i32) -> i32:
+fn MirBody.new_downcast_place(self: &mut MirBody, base: i32, variant_idx: i32) -> i32:
     self.new_place_with_projection(base, PK_DOWNCAST(), variant_idx)
 
-fn MirBody.new_rvalue(self: MirBody, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
+fn MirBody.new_rvalue(self: &mut MirBody, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
     let id = self.rval_kinds.len() as i32
     self.rval_kinds.push(kind)
     self.rval_d0.push(d0)
@@ -329,20 +339,20 @@ fn MirBody.new_rvalue(self: MirBody, kind: i32, d0: i32, d1: i32, d2: i32) -> i3
     self.rval_d2.push(d2)
     id
 
-fn MirBody.new_operand(self: MirBody, kind: i32, d0: i32) -> i32:
+fn MirBody.new_operand(self: &mut MirBody, kind: i32, d0: i32) -> i32:
     let id = self.operand_kinds.len() as i32
     self.operand_kinds.push(kind)
     self.operand_d0.push(d0)
     id
 
-fn MirBody.new_const(self: MirBody, kind: i32, d0: i32, type_id: i32) -> i32:
+fn MirBody.new_const(self: &mut MirBody, kind: i32, d0: i32, type_id: i32) -> i32:
     let id = self.const_kinds.len() as i32
     self.const_kinds.push(kind)
     self.const_d0.push(d0)
     self.const_types.push(type_id)
     id
 
-fn MirBody.new_switch_table(self: MirBody, vals: Vec[i32], targets: Vec[i32]) -> i32:
+fn MirBody.new_switch_table(self: &mut MirBody, vals: Vec[i32], targets: Vec[i32]) -> i32:
     let id = self.switch_table_starts.len() as i32
     let start = self.switch_table_vals.len() as i32
     let count = vals.len() as i32
@@ -358,7 +368,7 @@ fn MirBody.new_switch_table(self: MirBody, vals: Vec[i32], targets: Vec[i32]) ->
 
     id
 
-fn MirBody.new_agg_fields(self: MirBody, operands: Vec[i32]) -> i32:
+fn MirBody.new_agg_fields(self: &mut MirBody, operands: Vec[i32]) -> i32:
     let id = self.agg_field_starts.len() as i32
     let start = self.agg_field_operands.len() as i32
     let count = operands.len() as i32
@@ -368,7 +378,7 @@ fn MirBody.new_agg_fields(self: MirBody, operands: Vec[i32]) -> i32:
         self.agg_field_operands.push(operands.get(i as i64))
     id
 
-fn MirBody.new_call_args(self: MirBody, operands: Vec[i32]) -> i32:
+fn MirBody.new_call_args(self: &mut MirBody, operands: Vec[i32]) -> i32:
     let id = self.call_arg_starts.len() as i32
     let start = self.call_arg_operands.len() as i32
     let count = operands.len() as i32
@@ -380,16 +390,16 @@ fn MirBody.new_call_args(self: MirBody, operands: Vec[i32]) -> i32:
 
 // ── Query helpers ────────────────────────────────────────────────
 
-fn MirBody.local_count(self: MirBody) -> i32:
+fn MirBody.local_count(self: &MirBody) -> i32:
     self.local_type_ids.len() as i32
 
-fn MirBody.block_count(self: MirBody) -> i32:
+fn MirBody.block_count(self: &MirBody) -> i32:
     self.bb_stmt_starts.len() as i32
 
-fn MirBody.stmt_count(self: MirBody) -> i32:
+fn MirBody.stmt_count(self: &MirBody) -> i32:
     self.stmt_kinds.len() as i32
 
-fn MirBody.get_local(self: MirBody, idx: i32) -> MirLocalInfo:
+fn MirBody.get_local(self: &MirBody, idx: i32) -> MirLocalInfo:
     if idx < 0 or idx >= self.local_type_ids.len() as i32:
         return MirLocalInfo { type_id: 0, is_mutable: 0, name_sym: 0, is_user_var: 0 }
     MirLocalInfo {
@@ -399,42 +409,42 @@ fn MirBody.get_local(self: MirBody, idx: i32) -> MirLocalInfo:
         is_user_var: self.local_is_user_var.get(idx as i64),
     }
 
-fn MirBody.stmt_kind(self: MirBody, idx: i32) -> i32:
+fn MirBody.stmt_kind(self: &MirBody, idx: i32) -> i32:
     if idx < 0 or idx >= self.stmt_kinds.len() as i32:
         return SK_NOP()
     self.stmt_kinds.get(idx as i64)
 
-fn MirBody.stmt_data0(self: MirBody, idx: i32) -> i32:
+fn MirBody.stmt_data0(self: &MirBody, idx: i32) -> i32:
     if idx < 0 or idx >= self.stmt_d0.len() as i32:
         return 0
     self.stmt_d0.get(idx as i64)
 
-fn MirBody.stmt_data1(self: MirBody, idx: i32) -> i32:
+fn MirBody.stmt_data1(self: &MirBody, idx: i32) -> i32:
     if idx < 0 or idx >= self.stmt_d1.len() as i32:
         return 0
     self.stmt_d1.get(idx as i64)
 
-fn MirBody.term_kind(self: MirBody, bb: i32) -> i32:
+fn MirBody.term_kind(self: &MirBody, bb: i32) -> i32:
     if bb < 0 or bb >= self.bb_term_kinds.len() as i32:
         return TK_UNREACHABLE()
     self.bb_term_kinds.get(bb as i64)
 
-fn MirBody.term_data0(self: MirBody, bb: i32) -> i32:
+fn MirBody.term_data0(self: &MirBody, bb: i32) -> i32:
     if bb < 0 or bb >= self.bb_term_d0.len() as i32:
         return 0
     self.bb_term_d0.get(bb as i64)
 
-fn MirBody.term_data1(self: MirBody, bb: i32) -> i32:
+fn MirBody.term_data1(self: &MirBody, bb: i32) -> i32:
     if bb < 0 or bb >= self.bb_term_d1.len() as i32:
         return 0
     self.bb_term_d1.get(bb as i64)
 
-fn MirBody.term_data2(self: MirBody, bb: i32) -> i32:
+fn MirBody.term_data2(self: &MirBody, bb: i32) -> i32:
     if bb < 0 or bb >= self.bb_term_d2.len() as i32:
         return 0
     self.bb_term_d2.get(bb as i64)
 
-fn MirBody.term_data3(self: MirBody, bb: i32) -> i32:
+fn MirBody.term_data3(self: &MirBody, bb: i32) -> i32:
     if bb < 0 or bb >= self.bb_term_d3.len() as i32:
         return 0
     self.bb_term_d3.get(bb as i64)
@@ -447,7 +457,8 @@ fn dump_mir_module(mir_mod: MirModule, pool: InternPool, sema: Sema) -> str:
     for i in 0..mir_mod.bodies.len() as i32:
         if i > 0:
             out = out ++ "\n"
-        out = out ++ dump_mir_body(mir_mod.bodies.get(i as i64), pool, sema)
+        let body: MirBody = mir_mod.bodies.get(i as i64)
+        out = out ++ dump_mir_body(body, pool, sema)
     out
 
 // Streaming variant of dump_mir_module to avoid quadratic whole-module
@@ -457,7 +468,8 @@ fn print_mir_module(mir_mod: MirModule, pool: InternPool, sema: Sema):
     for i in 0..mir_mod.bodies.len() as i32:
         if i > 0:
             print("\n")
-        print(dump_mir_body(mir_mod.bodies.get(i as i64), pool, sema))
+        let body: MirBody = mir_mod.bodies.get(i as i64)
+        print(dump_mir_body(body, pool, sema))
 
 fn mir_clip_text(s: str, max_len: i32) -> str:
     if max_len <= 0:
@@ -470,7 +482,10 @@ fn mir_clip_text(s: str, max_len: i32) -> str:
 
 fn dump_mir_body(body: MirBody, pool: InternPool, sema: Sema) -> str:
     var out = ""
-    let fn_name = if body.fn_sym != 0: "sym" ++ int_to_string(body.fn_sym) else: "<anon>"
+    let fn_name = if body.fn_sym != 0:
+        "sym" ++ int_to_string(body.fn_sym) ++ "(" ++ pool.resolve(body.fn_sym) ++ ")"
+    else:
+        "<anon>"
     out = out ++ "fn " ++ fn_name ++ " " ++ lbrace() ++ "\n"
     out = out ++ "  locals:\n"
 
@@ -728,6 +743,11 @@ fn mir_const_text(body: MirBody, const_id: i32, pool: InternPool, sema: Sema) ->
         let ty_name = if ty != 0: "ty" ++ int_to_string(ty) else: "<zst>"
         return "const zst(" ++ ty_name ++ ")"
 
+    if k == CK_FN():
+        if d0 != 0:
+            return "const fn sym" ++ int_to_string(d0)
+        return "const fn <unknown>"
+
     "const<" ++ int_to_string(k) ++ ">(" ++ int_to_string(d0) ++ ")"
 
 fn mir_agg_fields_text(body: MirBody, fields_id: i32, pool: InternPool, sema: Sema) -> str:
@@ -826,7 +846,7 @@ fn validate_mir_module(mir_mod: MirModule) -> str:
 
     let seen_fn_syms: HashMap[i32, i32] = HashMap.new()
     for bi in 0..body_count:
-        let body = mir_mod.bodies.get(bi as i64)
+        let body: MirBody = mir_mod.bodies.get(bi as i64)
         let fn_sym = mir_mod.body_fn_syms.get(bi as i64)
         if body.fn_sym != fn_sym:
             return "body_fn_syms mismatch at body index " ++ int_to_string(bi)
@@ -834,6 +854,10 @@ fn validate_mir_module(mir_mod: MirModule) -> str:
             return "duplicate MIR body for fn symbol " ++ int_to_string(fn_sym)
         if fn_sym != 0:
             seen_fn_syms.insert(fn_sym, 1)
+            if not mir_mod.body_index_by_fn_sym.contains(fn_sym):
+                return "missing body index for fn symbol " ++ int_to_string(fn_sym)
+            if mir_mod.body_index_by_fn_sym.get(fn_sym).unwrap() != bi:
+                return "body index map mismatch for fn symbol " ++ int_to_string(fn_sym)
 
         let body_err = validate_mir_body(body)
         if body_err.len() > 0:
@@ -918,7 +942,10 @@ fn validate_mir_body(body: MirBody) -> str:
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
         let stmt_span_count = body.bb_stmt_counts.get(bb as i64)
         if not mir_span_in_range(stmt_start, stmt_span_count, stmt_count):
-            return "bb" ++ int_to_string(bb) ++ ": statement span out of range"
+            return "bb" ++ int_to_string(bb) ++
+                ": statement span out of range (start=" ++ int_to_string(stmt_start) ++
+                ", count=" ++ int_to_string(stmt_span_count) ++
+                ", total=" ++ int_to_string(stmt_count) ++ ")"
 
         let term_kind = body.bb_term_kinds.get(bb as i64)
         let d0 = body.bb_term_d0.get(bb as i64)
@@ -1076,7 +1103,7 @@ fn validate_mir_body(body: MirBody) -> str:
 
     for ci in 0..const_count:
         let ck = body.const_kinds.get(ci as i64)
-        if ck == CK_INT() or ck == CK_BOOL() or ck == CK_STR() or ck == CK_UNIT() or ck == CK_FLOAT() or ck == CK_ZERO_SIZED():
+        if ck == CK_INT() or ck == CK_BOOL() or ck == CK_STR() or ck == CK_UNIT() or ck == CK_FLOAT() or ck == CK_ZERO_SIZED() or ck == CK_FN():
             continue
         return "const" ++ int_to_string(ci) ++ ": unknown const kind " ++ int_to_string(ck)
 

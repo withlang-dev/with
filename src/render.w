@@ -70,7 +70,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         if sub_kind == TDK_STRUCT():
             let field_count = pool.get_extra(extra_start)
             var ep = extra_start + 1
-            out = out ++ lbrace() ++ " "
+            out = out ++ render_lbrace() ++ " "
             for fi in 0..field_count:
                 if fi > 0:
                     out = out ++ ", "
@@ -81,7 +81,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
                 out = out ++ field_name ++ ": " ++ render_type_expr(pool, intern, field_type)
                 if field_default != 0:
                     out = out ++ " = " ++ render_expr(pool, intern, field_default, 0)
-            out = out ++ " " ++ rbrace()
+            out = out ++ " " ++ render_rbrace()
             return out
 
         if sub_kind == TDK_ALIAS():
@@ -549,14 +549,14 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
-        var out = prefix ++ name ++ " " ++ lbrace() ++ " "
+        var out = prefix ++ name ++ " " ++ render_lbrace() ++ " "
         for fi in 0..field_count:
             if fi > 0:
                 out = out ++ ", "
             let field_name = intern.resolve(pool.get_extra(extra_start + fi * 2))
             let field_val = pool.get_extra(extra_start + fi * 2 + 1)
             out = out ++ field_name ++ ": " ++ render_expr(pool, intern, field_val, 0)
-        return out ++ " " ++ rbrace()
+        return out ++ " " ++ render_rbrace()
 
     if kind == NK_GROUPED():
         let inner = pool.get_data0(node)
@@ -638,14 +638,14 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         let source = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
-        var out = prefix ++ lbrace() ++ " " ++ render_expr(pool, intern, source, 0) ++ " with "
+        var out = prefix ++ render_lbrace() ++ " " ++ render_expr(pool, intern, source, 0) ++ " with "
         for fi in 0..field_count:
             if fi > 0:
                 out = out ++ ", "
             let fname = intern.resolve(pool.get_extra(extra_start + fi * 2))
             let fval = pool.get_extra(extra_start + fi * 2 + 1)
             out = out ++ fname ++ ": " ++ render_expr(pool, intern, fval, 0)
-        return out ++ " " ++ rbrace()
+        return out ++ " " ++ render_rbrace()
 
     if kind == NK_YIELD():
         let value = pool.get_data0(node)
@@ -768,7 +768,7 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
         var out = ""
         if type_name != 0:
             out = out ++ intern.resolve(type_name) ++ " "
-        out = out ++ lbrace() ++ " "
+        out = out ++ render_lbrace() ++ " "
         for fi in 0..field_count:
             if fi > 0:
                 out = out ++ ", "
@@ -781,7 +781,7 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
             if field_count > 0:
                 out = out ++ ", "
             out = out ++ ".."
-        return out ++ " " ++ rbrace()
+        return out ++ " " ++ render_rbrace()
 
     "<pat:" ++ int_to_string(kind) ++ ">"
 
@@ -988,8 +988,8 @@ fn make_indent(n: i32) -> str:
         out = out ++ " "
     out
 
-fn lbrace -> str:
+fn render_lbrace -> str:
     str_from_byte(123)
 
-fn rbrace -> str:
+fn render_rbrace -> str:
     str_from_byte(125)

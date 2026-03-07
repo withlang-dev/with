@@ -59,11 +59,19 @@ fn value_key_type_marker(ty: TypeId) -> ValueKey:
 
 fn value_key_to_string(key: ValueKey) -> str:
     if key.tag == VALUE_KEY_INT():
-        return "int:" ++ int_to_string(key.int_value)
+        var out = "int:"
+        out = out ++ int_to_string(key.int_value)
+        return out
     if key.tag == VALUE_KEY_BOOL():
-        return "bool:" ++ int_to_string(key.int_value)
+        var out = "bool:"
+        out = out ++ int_to_string(key.int_value)
+        return out
     if key.tag == VALUE_KEY_STRING():
-        return "str:" ++ key.text_value
+        var out = "str:"
+        out = out ++ key.text_value
+        return out
     if key.tag == VALUE_KEY_TYPE_MARKER():
-        return "ty:" ++ int_to_string(key.type_ref)
+        var out = "ty:"
+        out = out ++ int_to_string(key.type_ref)
+        return out
     "invalid"

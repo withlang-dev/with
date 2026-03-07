@@ -23,8 +23,10 @@
 //   [20] d15
 
 .globl _with_fiber_switch
+.globl with_fiber_switch
 .p2align 2
 _with_fiber_switch:
+with_fiber_switch:
     // x0 = pointer to current fiber context (save here)
     // x1 = pointer to target fiber context (restore from here)
 

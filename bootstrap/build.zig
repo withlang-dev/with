@@ -65,10 +65,36 @@ const llvm_lib_flags = [_][]const u8{
     "-lLLVMDemangle",
 };
 
+fn defaultLlvmPrefix() []const u8 {
+    const candidates = [_]struct {
+        prefix: []const u8,
+        dylib: []const u8,
+    }{
+        .{
+            .prefix = "/opt/homebrew/opt/llvm",
+            .dylib = "/opt/homebrew/opt/llvm/lib/libLLVM.dylib",
+        },
+        .{
+            .prefix = "/usr/local/opt/llvm",
+            .dylib = "/usr/local/opt/llvm/lib/libLLVM.dylib",
+        },
+        .{
+            .prefix = "/usr/local/llvm",
+            .dylib = "/usr/local/llvm/lib/libLLVM.dylib",
+        },
+    };
+    for (candidates) |prefix| {
+        if (std.fs.accessAbsolute(prefix.dylib, .{})) |_| {
+            return prefix.prefix;
+        } else |_| {}
+    }
+    return "/usr/local/llvm";
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    const llvm_prefix = b.graph.env_map.get("LLVM_PREFIX") orelse "/usr/local/llvm";
+    const llvm_prefix = b.graph.env_map.get("LLVM_PREFIX") orelse defaultLlvmPrefix();
     const llvm_include = b.pathJoin(&.{ llvm_prefix, "include" });
     const llvm_lib = b.pathJoin(&.{ llvm_prefix, "lib" });
     const clangxx = b.pathJoin(&.{ llvm_prefix, "bin", "clang++" });
@@ -152,8 +178,11 @@ pub fn build(b: *std.Build) void {
     bridge_c.addArg("-o");
     const bridge_c_out = bridge_c.addOutputFileArg("llvm_bridge.o");
 
-    // Link LLVM bridge shared library used by self-hosted compiler binaries.
-    const bridge_link = b.addSystemCommand(&.{clangxx});
+    // Link the LLVM bridge as a thin dynamic wrapper around libLLVM.dylib.
+    // Using the static archive set here produces a very large dylib and can
+    // leave libc++ as an unresolved @rpath dependency at launch time, which
+    // causes detached selfhost stages to stall in dyld before main().
+    const bridge_link = b.addSystemCommand(&.{"cc"});
     bridge_link.addFileArg(bridge_c_out);
     bridge_link.addArgs(&.{
         "-dynamiclib",
@@ -162,15 +191,7 @@ pub fn build(b: *std.Build) void {
         sdk_path,
         "-Wl,-install_name,@executable_path/runtime/libwith_llvm_bridge.dylib",
         b.fmt("-Wl,-rpath,{s}", .{llvm_lib}),
-    });
-    bridge_link.addArgs(&llvm_lib_flags);
-    bridge_link.addArgs(&.{
-        "-L/opt/homebrew/lib",
-        "-lc++",
-        "-lc++abi",
-        "-lz",
-        "-lzstd",
-        "-lxml2",
+        "-lLLVM",
     });
     bridge_link.addArgs(&.{"-o"});
     const bridge_dylib_out = bridge_link.addOutputFileArg("libwith_llvm_bridge.dylib");

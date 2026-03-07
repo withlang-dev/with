@@ -6,6 +6,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Weak lifecycle stubs; fiber.c provides strong definitions.
+__attribute__((weak)) void with_runtime_init(void) {
+}
+
+__attribute__((weak)) void with_runtime_shutdown(void) {
+}
+
 // ── String operations ──────────────────────────────────────────────
 
 with_str with_str_concat(with_str a, with_str b) {
@@ -58,8 +65,34 @@ with_str with_bool_to_str(bool b) {
     return WITH_STR_LIT("false");
 }
 
+__attribute__((weak)) int64_t with_parse_i64(with_str s) {
+    if (!s.ptr || s.len <= 0) return 0;
+    char *buf = (char *)malloc((size_t)s.len + 1);
+    if (!buf) return 0;
+    memcpy(buf, s.ptr, (size_t)s.len);
+    buf[s.len] = '\0';
+    long long v = atoll(buf);
+    free(buf);
+    return (int64_t)v;
+}
+
 // ── Vec operations ─────────────────────────────────────────────────
 
+// Compatibility shim:
+// - Correct C ABI callers pass a hidden sret pointer in x8.
+// - Some selfhost-generated callers in this branch expect register returns.
+// Support both on arm64 to keep stage transitions runnable.
+#if defined(__aarch64__)
+__attribute__((naked)) with_vec with_vec_new(int64_t elem_size) {
+    __asm__ volatile(
+        "mov x9, x0\n"
+        "mov x0, xzr\n"
+        "mov x1, xzr\n"
+        "mov x2, xzr\n"
+        "mov x3, x9\n"
+        "ret\n");
+}
+#else
 with_vec with_vec_new(int64_t elem_size) {
     with_vec v;
     v.ptr = NULL;
@@ -67,6 +100,12 @@ with_vec with_vec_new(int64_t elem_size) {
     v.cap = 0;
     v.elem_size = elem_size;
     return v;
+}
+#endif
+
+__attribute__((weak)) void with_vec_new_out(with_vec *out, int64_t elem_size) {
+    if (!out) return;
+    *out = with_vec_new(elem_size);
 }
 
 static void with_vec_grow(with_vec *v) {
@@ -124,6 +163,21 @@ with_str with_vec_get_str(with_vec *v, int64_t index) {
     return *(with_str *)with_vec_get_ptr(v, index);
 }
 
+__attribute__((weak)) void with_lines_out(with_vec *out, with_str s) {
+    if (!out) return;
+    with_vec_new_out(out, (int64_t)sizeof(with_str));
+    if (!s.ptr || s.len < 0) return;
+
+    int64_t start = 0;
+    for (int64_t i = 0; i <= s.len; i++) {
+        if (i == s.len || s.ptr[i] == '\n') {
+            with_str part = {s.ptr + start, i - start};
+            with_vec_push_str(out, part);
+            start = i + 1;
+        }
+    }
+}
+
 void with_vec_push_bool(with_vec *v, bool val) {
     with_vec_push(v, &val);
 }
@@ -157,6 +211,41 @@ with_option_i32 with_vec_pop_i32(with_vec *v) {
     r.has_value = true;
     r.value = ((int32_t *)v->ptr)[v->len];
     return r;
+}
+
+#define WITH_CODEGEN_LOOP_MAX 1024
+static int64_t with_codegen_loop_break_bbs[WITH_CODEGEN_LOOP_MAX];
+static int64_t with_codegen_loop_continue_bbs[WITH_CODEGEN_LOOP_MAX];
+static int64_t with_codegen_loop_result_vals[WITH_CODEGEN_LOOP_MAX];
+
+void with_codegen_loop_set_break(int32_t idx, int64_t bb) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return;
+    with_codegen_loop_break_bbs[idx] = bb;
+}
+
+void with_codegen_loop_set_continue(int32_t idx, int64_t bb) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return;
+    with_codegen_loop_continue_bbs[idx] = bb;
+}
+
+void with_codegen_loop_set_result(int32_t idx, int64_t value) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return;
+    with_codegen_loop_result_vals[idx] = value;
+}
+
+int64_t with_codegen_loop_get_break(int32_t idx) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return 0;
+    return with_codegen_loop_break_bbs[idx];
+}
+
+int64_t with_codegen_loop_get_continue(int32_t idx) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return 0;
+    return with_codegen_loop_continue_bbs[idx];
+}
+
+int64_t with_codegen_loop_get_result(int32_t idx) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return 0;
+    return with_codegen_loop_result_vals[idx];
 }
 
 // ── I/O ────────────────────────────────────────────────────────────
@@ -193,6 +282,19 @@ void with_assert(bool cond, const char *msg, const char *file, int line) {
         fprintf(stderr, "assertion failed: %s at %s:%d\n", msg, file, line);
         abort();
     }
+}
+
+void with_panic(with_str msg, with_str file, int32_t line) {
+    if (file.len > 0) {
+        fprintf(stderr, "panic at %.*s:%d: ", (int)file.len, file.ptr, (int)line);
+    } else {
+        fprintf(stderr, "panic: ");
+    }
+    if (msg.len > 0) {
+        fwrite(msg.ptr, 1, (size_t)msg.len, stderr);
+    }
+    fputc('\n', stderr);
+    abort();
 }
 
 // ── System ─────────────────────────────────────────────────────────

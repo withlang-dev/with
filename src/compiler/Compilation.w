@@ -1,91 +1,256 @@
 use Ast
+use Resolve
+use InternPool
+use Sema
+use Mir
+use MirLower
+use AsyncMir
+use AsyncLower
+use CCodegen
 use compiler.Compilation.Config
-use compiler.Zcu
-use compiler.Frontend
 use compiler.Backend
+use compiler.Frontend
 use compiler.Link
+use compiler.Zcu
 
 extern fn with_eprintln(s: str) -> void
+extern fn with_fs_write_file(path: str, data: str) -> i32
+extern fn with_getenv_str(name: str) -> str
+extern fn int_to_string(n: i32) -> str
 extern fn with_system(cmd: str) -> i32
 
-// Zig-shaped orchestration root for the With compiler pipeline.
+fn compilation_debug_pool_flow_enabled() -> i32:
+    let raw = with_getenv_str("WITH_DEBUG_POOL_FLOW")
+    if raw.len() == 0:
+        return 0
+    1
+
+fn compilation_debug_pool_flow(label: str, pool: InternPool, typed_pool: AstPool, sema: Sema):
+    if compilation_debug_pool_flow_enabled() == 0:
+        return
+    with_eprintln("[comp] " ++ label ++ " pool.symbols=" ++ int_to_string(pool.symbol_texts.len() as i32) ++
+        " typed.decls=" ++ int_to_string(typed_pool.decl_count()) ++
+        " sema.pool.symbols=" ++ int_to_string(sema.pool.symbol_texts.len() as i32) ++
+        " sema.ast.decls=" ++ int_to_string(sema.ast.decl_count()))
+
+// Transitional orchestration root:
+// owns compiler-facing config/Zcu state while reusing Driver execution per call.
+// This removes long-lived Driver field ownership from Compilation.
 type Compilation = {
     zcu: Zcu,
     config: CompilationConfig,
 }
 
 fn Compilation.init -> Compilation:
+    let zcu: Zcu = Zcu.init()
     Compilation {
-        zcu: Zcu.init(),
+        zcu: zcu,
         config: compilation_config_default(),
     }
 
 fn Compilation.configure(self: Compilation, opt_level: i32, no_std: bool, alloc_mode: bool):
-    self.config = compilation_config_from_cli(opt_level, no_std, alloc_mode)
+    self.config = compilation_config_from_cli(opt_level, no_std, alloc_mode, self.config.prelude_mode)
+    var zcu = self.zcu
+    zcu.set_prelude_mode(self.config.prelude_mode)
+    self.zcu = zcu
+
+fn Compilation.set_prelude_mode(self: Compilation, mode: i32):
+    var cfg = self.config
+    cfg.prelude_mode = compilation_normalize_prelude_mode(mode)
+    self.config = cfg
+    var zcu = self.zcu
+    zcu.set_prelude_mode(cfg.prelude_mode)
+    self.zcu = zcu
 
 fn Compilation.compile_file(self: Compilation, path: str) -> AstPool:
-    self.zcu.compile_file_frontend(path)
+    var zcu = self.zcu
+    let pool = zcu.compile_file_frontend(path)
+    self.zcu = zcu
+    pool
+
+fn Compilation.resolve_file(self: Compilation, path: str, emit_resolve_diags: bool) -> ResolveResult:
+    let _ = emit_resolve_diags
+    let _ = self.compile_file(path)
+    self.zcu.last_resolved
+
+fn Compilation.has_errors(self: Compilation) -> bool:
+    self.zcu.diagnostics.has_errors()
+
+fn Compilation.get_pool(self: Compilation) -> InternPool:
+    self.zcu.pool
 
 fn Compilation.emit_ir(self: Compilation, pool: AstPool) -> bool:
-    self.zcu.emit_ir_backend(pool)
+    if not self.ensure_codegen_mir(pool):
+        return false
+    self.zcu.emit_ir_backend(self.active_pool(pool), self.config.opt_level)
 
 fn Compilation.build_binary(self: Compilation, source_path: str) -> str:
-    let dir = compilation_dirname(source_path)
+    let dir = link_stage_dirname(source_path)
     self.build_binary_at(source_path, dir)
 
 fn Compilation.build_binary_at(self: Compilation, source_path: str, output_dir: str) -> str:
-    let pool = self.compile_file(source_path)
-    if pool.decl_count() == 0:
-        return ""
-
-    let stem = compilation_source_stem(source_path)
+    let stem = link_stage_source_stem(source_path)
     let obj_path = output_dir ++ "/" ++ stem ++ ".o"
     let bin_path = output_dir ++ "/" ++ stem
 
-    let result = self.zcu.compile_to_object_backend(pool, self.config.opt_level, obj_path)
-    if result != 0:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
         return ""
-
-    var link_ok = false
-    if link_stage_should_link_llvm_bridge(source_path):
-        let bridge_path = link_stage_find_llvm_bridge_path()
-        if bridge_path.len() == 0:
-            with_eprintln("error: missing runtime/libwith_llvm_bridge.dylib")
-            return ""
-        let extras: Vec[str] = Vec.new()
-        extras.push(bridge_path)
-        link_ok = link_stage_link_with_extras(obj_path, bin_path, extras)
-    else:
-        link_ok = link_stage_link(obj_path, bin_path)
-    if not link_ok:
-        with_eprintln("error: linking failed")
+    if not self.ensure_codegen_mir(pool):
+        let _ = ("rm -f " ++ obj_path) |> with_system
         return ""
-
-    with_system("rm -f " ++ obj_path)
+    let active_pool: AstPool = self.active_pool(pool)
+    let opt_level = self.config.opt_level
+    let requires_async_runtime = self.zcu.last_async_mir_module.requires_async_runtime()
+    compilation_debug_pool_flow("build_binary_at:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
+    let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path)
+    if backend_rc != 0:
+        let _ = ("rm -f " ++ obj_path) |> with_system
+        return ""
+    if not link_stage_link_object_to_binary(obj_path, bin_path, self.zcu.last_link_lib_names, requires_async_runtime):
+        let _ = ("rm -f " ++ obj_path) |> with_system
+        return ""
+    let _ = ("rm -f " ++ obj_path) |> with_system
     bin_path
+
+fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    if not self.ensure_codegen_mir(pool):
+        with_eprintln("error: C emission failed during MIR lowering")
+        return ""
+    let typed_pool: AstPool = self.active_pool(pool)
+
+    var final_output = output_path
+    if final_output.len() == 0:
+        final_output = link_stage_dirname(source_path) ++ "/" ++ link_stage_source_stem(source_path) ++ ".c"
+
+    let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, self.zcu.pool, self.zcu.last_sema)
+    if emitted.ok == 0:
+        with_eprintln("error: C emission failed: " ++ emitted.err_msg)
+        return ""
+
+    let write_rc = with_fs_write_file(final_output, emitted.source)
+    if write_rc != 0:
+        with_eprintln("error: failed to write '" ++ final_output ++ "'")
+        return ""
+
+    final_output
+
+fn Compilation.emit_typed(self: Compilation, pool: AstPool) -> bool:
+    var zcu = self.zcu
+    let typed_pool = pool
+    if typed_pool.decl_count() == 0:
+        with_eprintln("error: no source loaded for typed emission")
+        return false
+    if zcu.last_sema.ast.decl_count() == typed_pool.decl_count() and typed_pool.decl_count() > 0:
+        zcu.last_sema.emit_typed_module(0)
+        self.zcu = zcu
+        return true
+
+    var sema = Sema.init(zcu.pool, zcu.diagnostics, typed_pool)
+    sema.source_text = zcu.current_source_text
+    if self.config.no_std:
+        sema.no_std = 1
+    if self.config.alloc_mode:
+        sema.alloc = 1
+    sema.check_module()
+
+    zcu.sync_from_sema(sema)
+    zcu.set_typed_snapshot("", typed_pool)
+    zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
+
+    if zcu.diagnostics.has_errors():
+        zcu.render_current_diagnostics()
+        self.zcu = zcu
+        return false
+
+    zcu.last_sema.emit_typed_module(0)
+    self.zcu = zcu
+    true
+
+fn Compilation.emit_typed_file(self: Compilation, source_path: str) -> bool:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return false
+    self.emit_typed(pool)
+
+fn Compilation.print_mir(self: Compilation, pool: AstPool) -> bool:
+    if self.zcu.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.zcu.last_mir_module.body_count() == 0:
+        return false
+    print_mir_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
+    true
+
+fn Compilation.print_mir_file(self: Compilation, source_path: str) -> bool:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return false
+    self.print_mir(pool)
+
+fn Compilation.dump_async_mir(self: Compilation, pool: AstPool) -> str:
+    if self.zcu.last_async_mir_module.body_count() == 0:
+        let _ = self.run_async_mir_lower(pool)
+    if self.zcu.last_async_mir_module.body_count() == 0:
+        return ""
+    let text: str = dump_async_mir_module(self.zcu.last_async_mir_module, self.zcu.pool)
+    self.zcu.set_codegen_snapshot(self.zcu.last_mir_module, self.zcu.last_mir_dump, self.zcu.last_async_mir_module, text)
+    text
+
+fn Compilation.dump_async_mir_file(self: Compilation, source_path: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    self.dump_async_mir(pool)
 
 fn Compilation.print_warnings(self: Compilation):
     self.zcu.print_warnings()
 
-fn compilation_dirname(path: str) -> str:
-    var last_slash = -1
-    for i in 0..path.len():
-        if path[i] == 47: // '/'
-            last_slash = i as i32
-    if last_slash < 0:
-        return "."
-    path.slice(0, last_slash as i64)
+fn Compilation.active_pool(self: Compilation, pool: AstPool) -> AstPool:
+    let _ = self
+    pool
 
-fn compilation_source_stem(source_path: str) -> str:
-    // Extract basename and remove .w extension.
-    var last_slash = -1
-    for i in 0..source_path.len():
-        if source_path[i] == 47: // '/'
-            last_slash = i as i32
-    let base = if last_slash >= 0:
-        source_path.slice((last_slash + 1) as i64, source_path.len() as i64)
-    else:
-        source_path
-    if base.len() > 2 and base.ends_with(".w"):
-        return base.slice(0, (base.len() - 2) as i64)
-    base
+fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
+    var zcu = self.zcu
+    let active_pool = pool
+    compilation_debug_pool_flow("run_mir_lower:start", zcu.pool, active_pool, zcu.last_sema)
+    var sema = Sema.init(zcu.pool, zcu.diagnostics, active_pool)
+    compilation_debug_pool_flow("run_mir_lower:after_init", zcu.pool, active_pool, sema)
+    sema.source_text = zcu.current_source_text
+    if self.config.no_std:
+        sema.no_std = 1
+    if self.config.alloc_mode:
+        sema.alloc = 1
+    sema.check_module()
+    compilation_debug_pool_flow("run_mir_lower:after_check", zcu.pool, active_pool, sema)
+
+    zcu.sync_from_sema(sema)
+    compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
+    if zcu.diagnostics.has_errors():
+        zcu.render_current_diagnostics()
+        zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
+        self.zcu = zcu
+        return zcu.last_mir_module
+
+    let mir_mod: MirModule = lower_module(sema, active_pool, zcu.pool)
+    let async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, zcu.pool, sema, zcu.diagnostics)
+    zcu.diagnostics = async_artifacts.diags
+    zcu.set_codegen_snapshot(mir_mod, "", async_artifacts.out_mod, "")
+    self.zcu = zcu
+    zcu.last_mir_module
+
+fn Compilation.run_async_mir_lower(self: Compilation, pool: AstPool) -> AsyncMirModule:
+    let _ = self.run_mir_lower(pool)
+    if self.zcu.diagnostics.has_errors():
+        self.zcu.set_codegen_snapshot(self.zcu.last_mir_module, self.zcu.last_mir_dump, AsyncMirModule.init(), "")
+        return self.zcu.last_async_mir_module
+    self.zcu.last_async_mir_module
+
+fn Compilation.ensure_codegen_mir(self: Compilation, pool: AstPool) -> bool:
+    if self.zcu.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.zcu.diagnostics.has_errors():
+        return false
+    self.zcu.last_mir_module.body_count() > 0

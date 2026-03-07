@@ -1,0 +1,3797 @@
+// CCodegen — conservative MIR → C11 emitter used by `with build --emit-c`.
+//
+// This backend intentionally supports the same conservative MIR subset that
+// LLVM MIR codegen currently accepts directly. When MIR contains unsupported
+// constructs, emission fails with a clear error.
+
+use Mir
+use Ast
+use InternPool
+use Sema
+
+extern fn int_to_string(n: i32) -> str
+extern fn str_from_byte(b: i32) -> str
+extern fn with_interrupt_requested() -> i32
+
+fn cc_intern_resolve(intern: InternPool, sym: i32) -> str:
+    if sym <= 0 or sym >= intern.symbol_texts.len() as i32:
+        return ""
+    intern.symbol_texts.get(sym as i64)
+
+fn cc_intern_intern(intern: &mut InternPool, s: str) -> i32:
+    intern.intern(s)
+
+fn cc_lbrace -> str:
+    str_from_byte(123)
+
+fn cc_rbrace -> str:
+    str_from_byte(125)
+
+fn cc_pseudo_tid_vec -> i32:
+    1900001
+
+fn cc_place_kind_unknown -> i32:
+    0
+
+fn cc_place_kind_vec -> i32:
+    1
+
+fn cc_place_kind_hashmap -> i32:
+    2
+
+fn cc_place_kind_option -> i32:
+    3
+
+fn cc_builtin_none -> i32:
+    0
+
+fn cc_builtin_vec_new -> i32:
+    1
+
+fn cc_builtin_vec_push -> i32:
+    2
+
+fn cc_builtin_vec_get -> i32:
+    3
+
+fn cc_builtin_vec_len -> i32:
+    4
+
+fn cc_builtin_vec_set_i32 -> i32:
+    5
+
+fn cc_builtin_vec_remove -> i32:
+    6
+
+fn cc_builtin_vec_clear -> i32:
+    7
+
+fn cc_builtin_map_new -> i32:
+    8
+
+fn cc_builtin_map_insert -> i32:
+    9
+
+fn cc_builtin_map_get -> i32:
+    10
+
+fn cc_builtin_map_contains -> i32:
+    11
+
+fn cc_builtin_map_len -> i32:
+    12
+
+fn cc_builtin_map_remove -> i32:
+    13
+
+fn cc_builtin_opt_is_some -> i32:
+    14
+
+fn cc_builtin_opt_unwrap -> i32:
+    15
+
+fn cc_builtin_vec_pop -> i32:
+    16
+
+fn cc_callee_hint_none -> i32:
+    0
+
+fn cc_callee_hint_vec_recv -> i32:
+    1
+
+fn cc_callee_hint_map_recv -> i32:
+    2
+
+fn cc_callee_hint_opt_recv -> i32:
+    3
+
+fn cc_callee_hint_vec_new -> i32:
+    4
+
+fn cc_callee_hint_map_new -> i32:
+    5
+
+fn cc_callee_hint_opt_new -> i32:
+    6
+
+type CEmitResult = {
+    ok: i32,
+    source: str,
+    err_msg: str,
+}
+
+type CCodegen = {
+    mir_mod: MirModule,
+    ast: AstPool,
+    intern: InternPool,
+    sema: Sema,
+    had_error: i32,
+    err_msg: str,
+    body_fn_map: HashMap[i32, i32],
+    body_fn_name_map: HashMap[str, i32],
+    canonical_body_cache: HashMap[i32, i32],
+    sig_idx_cache: HashMap[i32, i32],
+    infer_local_depth: i32,
+    active_local_body_fns: Vec[i32],
+    active_local_ids: Vec[i32],
+    active_method_syms: Vec[i32],
+    active_method_args: Vec[i32],
+    active_method_dests: Vec[i32],
+    active_direct_args: Vec[i32],
+    active_direct_dests: Vec[i32],
+    direct_cache_body_fns: Vec[i32],
+    direct_cache_args: Vec[i32],
+    direct_cache_dests: Vec[i32],
+    direct_cache_values: Vec[i32],
+    method_cache_body_fns: Vec[i32],
+    method_cache_syms: Vec[i32],
+    method_cache_args: Vec[i32],
+    method_cache_dests: Vec[i32],
+    method_cache_values: Vec[i32],
+    field_cache_struct_tids: Vec[i32],
+    field_cache_syms: Vec[i32],
+    field_cache_tids: Vec[i32],
+    field_cache_ready: i32,
+    in_field_cache_build: i32,
+    local_infer_body_fns: Vec[i32],
+    local_infer_ids: Vec[i32],
+    local_infer_vals: Vec[i32],
+    local_usage_hint_body_fns: Vec[i32],
+    local_usage_hint_ids: Vec[i32],
+    local_usage_hint_vals: Vec[i32],
+    place_kind_cache_body_fns: Vec[i32],
+    place_kind_cache_place_ids: Vec[i32],
+    place_kind_cache_vals: Vec[i32],
+    callee_hint_cache: HashMap[i32, i32],
+}
+
+fn CCodegen.intern_intern(self: CCodegen, s: str) -> i32:
+    let intern = &mut self.intern
+    cc_intern_intern(intern, s)
+
+fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sema) -> CEmitResult:
+    var cg = CCodegen {
+        mir_mod,
+        ast,
+        intern,
+        sema,
+        had_error: 0,
+        err_msg: "",
+        body_fn_map: HashMap.new(),
+        body_fn_name_map: HashMap.new(),
+        canonical_body_cache: HashMap.new(),
+        sig_idx_cache: HashMap.new(),
+        infer_local_depth: 0,
+        active_local_body_fns: Vec.new(),
+        active_local_ids: Vec.new(),
+        active_method_syms: Vec.new(),
+        active_method_args: Vec.new(),
+        active_method_dests: Vec.new(),
+        active_direct_args: Vec.new(),
+        active_direct_dests: Vec.new(),
+        direct_cache_body_fns: Vec.new(),
+        direct_cache_args: Vec.new(),
+        direct_cache_dests: Vec.new(),
+        direct_cache_values: Vec.new(),
+        method_cache_body_fns: Vec.new(),
+        method_cache_syms: Vec.new(),
+        method_cache_args: Vec.new(),
+        method_cache_dests: Vec.new(),
+        method_cache_values: Vec.new(),
+        field_cache_struct_tids: Vec.new(),
+        field_cache_syms: Vec.new(),
+        field_cache_tids: Vec.new(),
+        field_cache_ready: 0,
+        in_field_cache_build: 0,
+        local_infer_body_fns: Vec.new(),
+        local_infer_ids: Vec.new(),
+        local_infer_vals: Vec.new(),
+        local_usage_hint_body_fns: Vec.new(),
+        local_usage_hint_ids: Vec.new(),
+        local_usage_hint_vals: Vec.new(),
+        place_kind_cache_body_fns: Vec.new(),
+        place_kind_cache_place_ids: Vec.new(),
+        place_kind_cache_vals: Vec.new(),
+        callee_hint_cache: HashMap.new(),
+    }
+    for i in 0..mir_mod.body_fn_syms.len() as i32:
+        let sym = mir_mod.body_fn_syms.get(i as i64)
+        cg.body_fn_map.insert(sym, 1)
+    let src = cg.emit_module()
+    if cg.had_error != 0:
+        return CEmitResult { ok: 0, source: "", err_msg: cg.err_msg }
+    CEmitResult { ok: 1, source: src, err_msg: "" }
+
+fn CCodegen.fail(self: CCodegen, msg: str):
+    if self.had_error != 0:
+        return
+    self.had_error = 1
+    self.err_msg = msg
+
+fn CCodegen.check_interrupted(self: CCodegen) -> i32:
+    if with_interrupt_requested() == 0:
+        return 0
+    self.fail("interrupted by signal")
+    1
+
+fn cc_is_ident_start(ch: i32) -> i32:
+    if ch == 95:
+        return 1
+    if ch >= 65 and ch <= 90:
+        return 1
+    if ch >= 97 and ch <= 122:
+        return 1
+    0
+
+fn cc_is_ident_char(ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return 1
+    cc_is_ident_start(ch)
+
+fn cc_hex_digit(v: i32) -> str:
+    if v >= 0 and v <= 9:
+        return int_to_string(v)
+    if v == 10: return "A"
+    if v == 11: return "B"
+    if v == 12: return "C"
+    if v == 13: return "D"
+    if v == 14: return "E"
+    "F"
+
+fn cc_escape_c_string(text: str) -> str:
+    var out = ""
+    for i in 0..text.len():
+        let b = text.byte_at(i as i64)
+        if b == 92: // '\'
+            out = out ++ "\\\\"
+            continue
+        if b == 34: // '"'
+            out = out ++ "\\\""
+            continue
+        if b == 10:
+            out = out ++ "\\n"
+            continue
+        if b == 13:
+            out = out ++ "\\r"
+            continue
+        if b == 9:
+            out = out ++ "\\t"
+            continue
+        if b >= 32 and b <= 126:
+            out = out ++ text.slice(i as i64, (i + 1) as i64)
+            continue
+        let hi = b / 16
+        let lo = b % 16
+        out = out ++ "\\x" ++ cc_hex_digit(hi) ++ cc_hex_digit(lo)
+    out
+
+fn cc_sanitize_ident(raw: str) -> str:
+    if raw.len() == 0:
+        return "sym"
+    var out = ""
+    for i in 0..raw.len():
+        if with_interrupt_requested() != 0:
+            return "__with_interrupted"
+        let b = raw.byte_at(i as i64)
+        if cc_is_ident_char(b) != 0:
+            out = out ++ raw.slice(i as i64, (i + 1) as i64)
+        else:
+            out = out ++ "_"
+    if out.len() == 0:
+        return "sym"
+    let first = out.byte_at(0)
+    if cc_is_ident_start(first) == 0:
+        return "_" ++ out
+    out
+
+fn cc_str_ends_with(text: str, suffix: str) -> i32:
+    if suffix.len() == 0:
+        return 1
+    if text.len() < suffix.len():
+        return 0
+    let start = text.len() - suffix.len()
+    if text.slice(start as i64, text.len() as i64) == suffix:
+        return 1
+    0
+
+fn cc_str_find_last_char(text: str, ch: i32) -> i32:
+    var i = text.len() as i32 - 1
+    while i >= 0:
+        if text.byte_at(i as i64) == ch:
+            return i
+        i = i - 1
+    0 - 1
+
+fn cc_owner_prefix(sym_text: str) -> str:
+    let dot = cc_str_find_last_char(sym_text, 46)
+    if dot <= 0:
+        return ""
+    sym_text.slice(0, dot as i64)
+
+fn cc_str_contains_dot(text: str) -> i32:
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 46:
+            return 1
+    0
+
+fn cc_str_contains(text: str, needle: str) -> i32:
+    if needle.len() == 0:
+        return 1
+    if text.len() < needle.len():
+        return 0
+    let end = text.len() - needle.len()
+    for i in 0..(end + 1):
+        if text.slice(i as i64, (i + needle.len()) as i64) == needle:
+            return 1
+    0
+
+fn cc_name_matches(raw: str, wanted: str) -> i32:
+    if raw == wanted:
+        return 1
+    cc_str_ends_with(raw, "." ++ wanted)
+
+fn cc_base_name(raw: str) -> str:
+    let dot = cc_str_find_last_char(raw, 46)
+    if dot < 0:
+        return raw
+    raw.slice((dot + 1) as i64, raw.len() as i64)
+
+fn cc_is_vec_method_name(name: str) -> i32:
+    if name == "new":
+        return 1
+    if name == "push" or name == "get" or name == "len":
+        return 1
+    if name == "set_i32" or name == "remove" or name == "clear" or name == "pop":
+        return 1
+    0
+
+fn cc_is_hashmap_method_name(name: str) -> i32:
+    if name == "insert" or name == "contains" or name == "remove":
+        return 1
+    if name == "get" or name == "len" or name == "new":
+        return 1
+    0
+
+fn cc_is_option_method_name(name: str) -> i32:
+    if name == "is_some" or name == "unwrap":
+        return 1
+    0
+
+fn cc_is_generic_builtin_method_name(name: str) -> i32:
+    if cc_is_vec_method_name(name) != 0:
+        return 1
+    if cc_is_hashmap_method_name(name) != 0:
+        return 1
+    if cc_is_option_method_name(name) != 0:
+        return 1
+    0
+
+fn cc_is_generic_builtin_call_symbol(raw: str) -> i32:
+    if cc_is_generic_builtin_method_name(cc_base_name(raw)) == 0:
+        return 0
+    let owner = cc_owner_prefix(raw)
+    if owner.len() == 0:
+        return 0
+    if cc_str_contains(owner, "Vec") != 0:
+        return 1
+    if cc_str_contains(owner, "HashMap") != 0:
+        return 1
+    if cc_str_contains(owner, "Option") != 0:
+        return 1
+    0
+
+fn CCodegen.fn_c_name(self: CCodegen, fn_sym: i32) -> str:
+    if fn_sym == 0:
+        return "sym0"
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    let id = cc_sanitize_ident(raw)
+    if id == "main":
+        return "__with_main__" ++ int_to_string(fn_sym)
+    id ++ "__" ++ int_to_string(fn_sym)
+
+fn CCodegen.extern_sym_c_name(self: CCodegen, fn_sym: i32) -> str:
+    if fn_sym == 0:
+        return "sym0"
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() == 0:
+        return "sym0"
+    cc_sanitize_ident(raw)
+
+fn CCodegen.canonical_body_sym(self: CCodegen, fn_sym: i32) -> i32:
+    if fn_sym == 0:
+        return 0
+    if self.canonical_body_cache.contains(fn_sym):
+        return self.canonical_body_cache.get(fn_sym).unwrap()
+    var out = 0
+    if self.body_fn_map.contains(fn_sym):
+        out = fn_sym
+    if out != 0:
+        self.canonical_body_cache.insert(fn_sym, out)
+        return out
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() == 0:
+        self.canonical_body_cache.insert(fn_sym, 0)
+        return 0
+    let by_name = self.lookup_body_sym_by_name(raw)
+    if by_name != 0:
+        out = by_name
+        self.canonical_body_cache.insert(fn_sym, out)
+        return out
+    self.canonical_body_cache.insert(fn_sym, out)
+    out
+
+fn CCodegen.lookup_body_sym_by_name(self: CCodegen, name: str) -> i32:
+    if name.len() == 0:
+        return 0
+    let cached = self.body_fn_name_map.get(name)
+    if cached.is_some():
+        return cached.unwrap()
+    var out = 0
+    for i in 0..self.mir_mod.body_fn_syms.len() as i32:
+        let sym = self.mir_mod.body_fn_syms.get(i as i64)
+        if cc_intern_resolve(self.intern, sym) == name:
+            out = sym
+            break
+    self.body_fn_name_map.insert(name, out)
+    out
+
+fn CCodegen.has_body_for_sym(self: CCodegen, fn_sym: i32) -> i32:
+    if self.canonical_body_sym(fn_sym) != 0:
+        return 1
+    0
+
+fn CCodegen.body_sig_index(self: CCodegen, fn_sym: i32) -> i32:
+    let direct = self.sema.get_sig(fn_sym)
+    if direct >= 0:
+        return direct
+    self.sig_index_for_sym(fn_sym)
+
+fn CCodegen.is_void_tid(self: CCodegen, tid: i32) -> i32:
+    if tid == 0:
+        return 1
+    let resolved = self.sema.resolve_alias(tid)
+    if resolved == 0:
+        return 0
+    if self.sema.get_type_kind(resolved) == TY_VOID():
+        return 1
+    0
+
+fn CCodegen.struct_c_name(self: CCodegen, tid: i32) -> str:
+    if self.check_interrupted() != 0:
+        return "with_interrupted"
+    let resolved = self.sema.resolve_alias(tid)
+    let name_sym = self.sema.get_type_d0(resolved)
+    let raw = cc_intern_resolve(self.intern, name_sym)
+    if raw.len() == 0:
+        return "with_struct_" ++ int_to_string(resolved)
+    let out = cc_sanitize_ident(raw)
+    if self.check_interrupted() != 0:
+        return "with_interrupted"
+    out
+
+fn CCodegen.named_struct_tid(self: CCodegen, type_name: str) -> i32:
+    let sym = self.intern_intern(type_name)
+    if not self.sema.named_types.contains(sym):
+        return 0
+    let tid = self.sema.named_types.get(sym).unwrap()
+    let resolved = self.sema.resolve_alias(tid)
+    if self.sema.get_type_kind(resolved) != TY_STRUCT():
+        return 0
+    resolved
+
+fn CCodegen.struct_field_tid(self: CCodegen, struct_tid: i32, field_sym: i32) -> i32:
+    let resolved = self.sema.resolve_alias(struct_tid)
+    if self.sema.get_type_kind(resolved) != TY_STRUCT():
+        return 0
+    let start = self.sema.get_type_d1(resolved)
+    let count = self.sema.get_type_d2(resolved)
+    for fi in 0..count:
+        let f_sym = self.sema.type_extra.get((start + fi * 3) as i64)
+        if f_sym == field_sym:
+            return self.sema.type_extra.get((start + fi * 3 + 1) as i64)
+    0
+
+fn CCodegen.place_tid(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+    let lid = self.place_local_id(body, place_id)
+    var base_tid = self.local_effective_tid(body, lid)
+    if self.is_void_tid(base_tid) != 0:
+        base_tid = self.place_local_tid(body, place_id)
+    if base_tid == 0:
+        return 0
+    var tid = base_tid
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return tid
+    let start = body.place_proj_starts.get(place_id as i64)
+    let count = body.place_proj_counts.get(place_id as i64)
+    for i in 0..count:
+        let pk = body.proj_kinds.get((start + i) as i64)
+        let pd = body.proj_d0.get((start + i) as i64)
+        let resolved = self.sema.resolve_alias(tid)
+        let tk = self.sema.get_type_kind(resolved)
+        if pk == PK_FIELD():
+            if tk == TY_STRUCT():
+                let ft_raw = self.struct_field_tid(resolved, pd)
+                let ft = self.effective_field_tid(resolved, pd, ft_raw)
+                if ft == 0:
+                    return 0
+                tid = ft
+                continue
+            if tk == TY_STR():
+                let field_name = cc_intern_resolve(self.intern, pd)
+                if field_name == "len":
+                    tid = self.sema.ty_i64
+                    continue
+                return 0
+            return 0
+        if pk == PK_INDEX():
+            if tk == TY_STR():
+                tid = self.sema.ty_i32
+                continue
+            if tk == TY_ARRAY() or tk == TY_SLICE():
+                tid = self.sema.get_type_d0(resolved)
+                continue
+            return 0
+        if pk == PK_DEREF():
+            if tk == TY_PTR() or tk == TY_REF():
+                tid = self.sema.get_type_d0(resolved)
+                continue
+            return 0
+        if pk == PK_DOWNCAST():
+            continue
+        return 0
+    tid
+
+fn CCodegen.place_tid_no_infer(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+    let base_tid = self.place_local_tid(body, place_id)
+    if base_tid == 0:
+        return 0
+    var tid = base_tid
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return tid
+    let start = body.place_proj_starts.get(place_id as i64)
+    let count = body.place_proj_counts.get(place_id as i64)
+    for i in 0..count:
+        let pk = body.proj_kinds.get((start + i) as i64)
+        let pd = body.proj_d0.get((start + i) as i64)
+        let resolved = self.sema.resolve_alias(tid)
+        let tk = self.sema.get_type_kind(resolved)
+        if pk == PK_FIELD():
+            if tk == TY_STRUCT():
+                let ft_raw = self.struct_field_tid(resolved, pd)
+                let ft = self.effective_field_tid(resolved, pd, ft_raw)
+                if ft == 0:
+                    return 0
+                tid = ft
+                continue
+            if tk == TY_STR():
+                let field_name = cc_intern_resolve(self.intern, pd)
+                if field_name == "len":
+                    tid = self.sema.ty_i64
+                    continue
+                return 0
+            return 0
+        if pk == PK_INDEX():
+            if tk == TY_STR():
+                tid = self.sema.ty_i32
+                continue
+            if tk == TY_ARRAY() or tk == TY_SLICE():
+                tid = self.sema.get_type_d0(resolved)
+                continue
+            return 0
+        if pk == PK_DEREF():
+            if tk == TY_PTR() or tk == TY_REF():
+                tid = self.sema.get_type_d0(resolved)
+                continue
+            return 0
+        if pk == PK_DOWNCAST():
+            continue
+        return 0
+    tid
+
+fn CCodegen.type_match(self: CCodegen, expected: i32, actual: i32) -> i32:
+    if expected == 0 or actual == 0:
+        return 1
+    if self.sema.types_compatible(expected, actual) != 0:
+        return 1
+    if self.sema.types_compatible(actual, expected) != 0:
+        return 1
+    0
+
+fn CCodegen.strict_type_match(self: CCodegen, expected: i32, actual: i32) -> i32:
+    if expected == 0 or actual == 0:
+        return 1
+    let e = self.sema.resolve_alias(expected)
+    let a = self.sema.resolve_alias(actual)
+    let ek = self.sema.get_type_kind(e)
+    let ak = self.sema.get_type_kind(a)
+    if ek == TY_STRUCT() and ak == TY_STRUCT():
+        let en = self.sema.get_type_d0(e)
+        let an = self.sema.get_type_d0(a)
+        if en == an:
+            return 1
+        return 0
+    self.type_match(e, a)
+
+fn CCodegen.is_scalar_like_tid(self: CCodegen, tid: i32) -> i32:
+    let resolved = self.sema.resolve_alias(tid)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TY_INT() or tk == TY_BOOL() or tk == TY_FLOAT() or tk == TY_ENUM():
+        return 1
+    0
+
+fn CCodegen.prefer_inferred_tid(self: CCodegen, current_tid: i32, candidate_tid: i32) -> i32:
+    let cand = self.sema.resolve_alias(candidate_tid)
+    if cand == 0 or self.is_void_tid(cand) != 0:
+        return current_tid
+    if self.sema.get_type_kind(cand) == TY_ERR():
+        return current_tid
+    if current_tid == 0 or self.is_void_tid(current_tid) != 0:
+        return cand
+    if self.strict_type_match(current_tid, cand) != 0:
+        return current_tid
+    let cur_scalar = self.is_scalar_like_tid(current_tid)
+    let cand_scalar = self.is_scalar_like_tid(cand)
+    if cur_scalar != 0 and cand_scalar == 0:
+        return cand
+    if cur_scalar == 0 and cand_scalar != 0:
+        return current_tid
+    cand
+
+fn CCodegen.c_type(self: CCodegen, tid: i32, as_return: i32) -> str:
+    if tid == cc_pseudo_tid_vec():
+        return "with_vec"
+    let resolved = self.sema.resolve_alias(tid)
+    if resolved == cc_pseudo_tid_vec():
+        return "with_vec"
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TY_VOID():
+        if as_return != 0:
+            return "void"
+        return "int32_t"
+    if tk == TY_BOOL():
+        return "bool"
+    if tk == TY_INT():
+        let bits = self.sema.get_type_d0(resolved)
+        let signed = self.sema.get_type_d1(resolved)
+        if bits == 8:
+            return if signed != 0: "int8_t" else: "uint8_t"
+        if bits == 16:
+            return if signed != 0: "int16_t" else: "uint16_t"
+        if bits == 32:
+            return if signed != 0: "int32_t" else: "uint32_t"
+        if bits == 64:
+            return if signed != 0: "int64_t" else: "uint64_t"
+        return "int64_t"
+    if tk == TY_FLOAT():
+        if self.sema.get_type_d0(resolved) == 32:
+            return "float"
+        return "double"
+    if tk == TY_STR():
+        return "with_str"
+    if tk == TY_STRUCT():
+        return self.struct_c_name(resolved)
+    if tk == TY_ENUM():
+        return "int32_t"
+    if tk == TY_PTR() or tk == TY_REF():
+        let inner_tid = self.sema.get_type_d0(resolved)
+        var base = self.c_type(inner_tid, 0)
+        if base == "void":
+            base = "uint8_t"
+        if tk == TY_REF() and self.sema.get_type_d1(resolved) == 0:
+            return "const " ++ base ++ "*"
+        return base ++ "*"
+    // Conservative fallback for currently unsupported higher-level layouts.
+    "int64_t"
+
+fn CCodegen.place_local_id(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return 0
+    body.place_locals.get(place_id as i64)
+
+fn CCodegen.local_declared_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        return 0
+    let declared = body.local_type_ids.get(local_id as i64)
+    if local_id <= 0:
+        return declared
+    if self.is_void_tid(declared) == 0:
+        return declared
+    let sig_idx = self.body_sig_index(body.fn_sym)
+    if sig_idx < 0:
+        return declared
+    let param_count = self.sema.sig_get_param_count(sig_idx)
+    if local_id >= 1 and local_id <= param_count:
+        return self.sema.sig_param_type(sig_idx, local_id - 1)
+    declared
+
+fn CCodegen.local_effective_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+    let declared = self.local_declared_tid(body, local_id)
+    if local_id <= 0:
+        return declared
+    if self.in_field_cache_build != 0:
+        return declared
+    let sig_idx = self.body_sig_index(body.fn_sym)
+    let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
+    if local_id <= param_count:
+        return declared
+    let declared_resolved = self.sema.resolve_alias(declared)
+    let declared_kind = self.sema.get_type_kind(declared_resolved)
+    let inferred = self.infer_local_tid(body, local_id)
+    if self.is_void_tid(declared) == 0 and (declared_resolved == 0 or declared_kind != TY_ERR()):
+        if inferred != 0 and self.is_void_tid(inferred) == 0:
+            let inferred_resolved = self.sema.resolve_alias(inferred)
+            let inferred_kind = self.sema.get_type_kind(inferred_resolved)
+            if declared_kind != inferred_kind:
+                return inferred
+            if self.strict_type_match(declared, inferred) == 0:
+                return inferred
+        return declared
+    if inferred != 0 and self.is_void_tid(inferred) == 0:
+        return inferred
+    declared
+
+fn CCodegen.place_local_tid(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+    let local_id = self.place_local_id(body, place_id)
+    self.local_declared_tid(body, local_id)
+
+fn CCodegen.place_is_direct_local(self: CCodegen, body: MirBody, place_id: i32, local_id: i32) -> i32:
+    let _ = self
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return 0
+    if body.place_locals.get(place_id as i64) != local_id:
+        return 0
+    if body.place_proj_counts.get(place_id as i64) != 0:
+        return 0
+    1
+
+fn CCodegen.operand_tid(self: CCodegen, body: MirBody, operand_id: i32) -> i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return 0
+    let ok = body.operand_kinds.get(operand_id as i64)
+    let od = body.operand_d0.get(operand_id as i64)
+    if ok == OK_COPY() or ok == OK_MOVE():
+        return self.place_tid(body, od)
+    if ok == OK_CONSTANT():
+        if od < 0 or od >= body.const_types.len() as i32:
+            return 0
+        return body.const_types.get(od as i64)
+    0
+
+fn CCodegen.operand_tid_no_infer(self: CCodegen, body: MirBody, operand_id: i32) -> i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return 0
+    let ok = body.operand_kinds.get(operand_id as i64)
+    let od = body.operand_d0.get(operand_id as i64)
+    if ok == OK_COPY() or ok == OK_MOVE():
+        return self.place_tid_no_infer(body, od)
+    if ok == OK_CONSTANT():
+        if od < 0 or od >= body.const_types.len() as i32:
+            return 0
+        return body.const_types.get(od as i64)
+    0
+
+fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        self.fail("invalid place id " ++ int_to_string(place_id))
+        return "_0"
+    let base_local = body.place_locals.get(place_id as i64)
+    var out = "_" ++ int_to_string(base_local)
+    var current_tid = self.local_effective_tid(body, base_local)
+    if self.is_void_tid(current_tid) != 0:
+        current_tid = self.place_local_tid(body, place_id)
+    let start = body.place_proj_starts.get(place_id as i64)
+    let count = body.place_proj_counts.get(place_id as i64)
+    for i in 0..count:
+        let pk = body.proj_kinds.get((start + i) as i64)
+        let pd = body.proj_d0.get((start + i) as i64)
+        let resolved = self.sema.resolve_alias(current_tid)
+        let tk = self.sema.get_type_kind(resolved)
+        if pk == PK_FIELD():
+            out = out ++ ".f" ++ int_to_string(pd)
+            if tk == TY_STRUCT():
+                let ft_raw = self.struct_field_tid(resolved, pd)
+                let ft = self.effective_field_tid(resolved, pd, ft_raw)
+                current_tid = ft
+            else if tk == TY_STR():
+                let field_name = cc_intern_resolve(self.intern, pd)
+                if field_name == "len":
+                    current_tid = self.sema.ty_i64
+                else:
+                    current_tid = 0
+            else:
+                current_tid = 0
+            continue
+        if pk == PK_INDEX():
+            if tk == TY_STR():
+                out = out ++ ".ptr[_" ++ int_to_string(pd) ++ "]"
+                current_tid = self.sema.ty_i32
+                continue
+            out = out ++ "[_" ++ int_to_string(pd) ++ "]"
+            if tk == TY_ARRAY() or tk == TY_SLICE():
+                current_tid = self.sema.get_type_d0(resolved)
+            else:
+                current_tid = 0
+            continue
+        if pk == PK_DEREF():
+            out = "(*" ++ out ++ ")"
+            if tk == TY_PTR() or tk == TY_REF():
+                current_tid = self.sema.get_type_d0(resolved)
+            else:
+                current_tid = 0
+            continue
+        if pk == PK_DOWNCAST():
+            out = out ++ "/*downcast" ++ int_to_string(pd) ++ "*/"
+            current_tid = 0
+            continue
+        self.fail("unsupported place projection kind " ++ int_to_string(pk))
+    out
+
+fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
+    if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+        self.fail("invalid const id " ++ int_to_string(const_id))
+        return "0"
+    let ck = body.const_kinds.get(const_id as i64)
+    let cd = body.const_d0.get(const_id as i64)
+    if ck == CK_INT():
+        return int_to_string(cd)
+    if ck == CK_BOOL():
+        return if cd != 0: "true" else: "false"
+    if ck == CK_STR():
+        let text = if cd != 0: cc_intern_resolve(self.intern, cd) else: ""
+        return "WITH_STR_LIT(\"" ++ cc_escape_c_string(text) ++ "\")"
+    if ck == CK_UNIT():
+        return "0"
+    if ck == CK_FLOAT():
+        if cd != 0:
+            let lit = cc_intern_resolve(self.intern, cd)
+            if lit.len() > 0:
+                return lit
+        return "0.0"
+    if ck == CK_ZERO_SIZED():
+        return "0"
+    if ck == CK_FN():
+        if cd == 0:
+            self.fail("invalid function symbol in constant")
+            return "0"
+        let body_sym = self.canonical_body_sym(cd)
+        if body_sym != 0:
+            return self.fn_c_name(body_sym)
+        return self.extern_sym_c_name(cd)
+    self.fail("unsupported const kind " ++ int_to_string(ck))
+    "0"
+
+fn CCodegen.operand_text(self: CCodegen, body: MirBody, operand_id: i32) -> str:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        self.fail("invalid operand id " ++ int_to_string(operand_id))
+        return "0"
+    let ok = body.operand_kinds.get(operand_id as i64)
+    let od = body.operand_d0.get(operand_id as i64)
+    if ok == OK_COPY() or ok == OK_MOVE():
+        return self.place_text(body, od)
+    if ok == OK_CONSTANT():
+        return self.const_text(body, od)
+    self.fail("unsupported operand kind " ++ int_to_string(ok))
+    "0"
+
+fn CCodegen.binop_token(self: CCodegen, op: i32) -> str:
+    if op == OP_ADD() or op == OP_ADD_WRAP(): return "+"
+    if op == OP_SUB() or op == OP_SUB_WRAP(): return "-"
+    if op == OP_MUL() or op == OP_MUL_WRAP(): return "*"
+    if op == OP_DIV(): return "/"
+    if op == OP_MOD(): return "%"
+    if op == OP_EQ(): return "=="
+    if op == OP_NEQ(): return "!="
+    if op == OP_LT(): return "<"
+    if op == OP_GT(): return ">"
+    if op == OP_LTE(): return "<="
+    if op == OP_GTE(): return ">="
+    if op == OP_AND(): return "&&"
+    if op == OP_OR(): return "||"
+    if op == OP_BIT_AND(): return "&"
+    if op == OP_BIT_OR(): return "|"
+    if op == OP_BIT_XOR(): return "^"
+    if op == OP_SHL(): return "<<"
+    if op == OP_SHR(): return ">>"
+    ""
+
+fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        self.fail("invalid rvalue id " ++ int_to_string(rval_id))
+        return "0"
+    let rk = body.rval_kinds.get(rval_id as i64)
+    let d0 = body.rval_d0.get(rval_id as i64)
+    let d1 = body.rval_d1.get(rval_id as i64)
+    let d2 = body.rval_d2.get(rval_id as i64)
+    if rk == RK_USE():
+        return self.operand_text(body, d0)
+    if rk == RK_BIN_OP():
+        let lhs = self.operand_text(body, d1)
+        let rhs = self.operand_text(body, d2)
+        if d0 == OP_CONCAT():
+            return "with_str_concat(" ++ lhs ++ ", " ++ rhs ++ ")"
+        if d0 == OP_EQ() or d0 == OP_NEQ():
+            let lhs_tid = self.sema.resolve_alias(self.operand_tid(body, d1))
+            let rhs_tid = self.sema.resolve_alias(self.operand_tid(body, d2))
+            if self.sema.get_type_kind(lhs_tid) == TY_STR() and self.sema.get_type_kind(rhs_tid) == TY_STR():
+                let eq_expr = "with_str_eq(" ++ lhs ++ ", " ++ rhs ++ ")"
+                if d0 == OP_EQ():
+                    return eq_expr
+                return "(!(" ++ eq_expr ++ "))"
+        let tok = self.binop_token(d0)
+        if tok.len() == 0:
+            self.fail("unsupported binop " ++ int_to_string(d0))
+            return "0"
+        return "(" ++ lhs ++ " " ++ tok ++ " " ++ rhs ++ ")"
+    if rk == RK_UN_OP():
+        let inner = self.operand_text(body, d1)
+        if d0 == UOP_NEGATE():
+            return "(-(" ++ inner ++ "))"
+        if d0 == UOP_NOT():
+            return "(!(" ++ inner ++ "))"
+        self.fail("unsupported unary op " ++ int_to_string(d0))
+        return inner
+    if rk == RK_REF():
+        return "(&" ++ self.place_text(body, d1) ++ ")"
+    if rk == RK_ADDR_OF():
+        return "(&" ++ self.place_text(body, d0) ++ ")"
+    if rk == RK_CAST():
+        return "((" ++ self.c_type(d1, 0) ++ ")(" ++ self.operand_text(body, d0) ++ "))"
+    if rk == RK_DISCRIMINANT():
+        return "(" ++ self.place_text(body, d0) ++ ").tag"
+    if rk == RK_LEN():
+        let p = self.place_text(body, d0)
+        let pt = self.place_tid(body, d0)
+        if pt == cc_pseudo_tid_vec():
+            return "with_vec_len(&(" ++ p ++ "))"
+        return "with_len(" ++ p ++ ")"
+    if rk == RK_AGGREGATE():
+        if d1 < 0 or d1 >= body.agg_field_starts.len() as i32:
+            return "0"
+        let start = body.agg_field_starts.get(d1 as i64)
+        let count = body.agg_field_counts.get(d1 as i64)
+        if count <= 0:
+            return "0"
+        // Conservative lowering: record updates and implicit wrappers both
+        // preserve payload/shape in operand 0 for this bootstrap path.
+        let first = body.agg_field_operands.get(start as i64)
+        return self.operand_text(body, first)
+    self.fail("unknown MIR rvalue kind " ++ int_to_string(rk))
+    "0"
+
+fn CCodegen.call_arg_count(self: CCodegen, body: MirBody, args_id: i32) -> i32:
+    if args_id < 0 or args_id >= body.call_arg_counts.len() as i32:
+        return 0
+    body.call_arg_counts.get(args_id as i64)
+
+fn CCodegen.call_arg_operand(self: CCodegen, body: MirBody, args_id: i32, idx: i32) -> i32:
+    if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        return 0
+    let start = body.call_arg_starts.get(args_id as i64)
+    let count = body.call_arg_counts.get(args_id as i64)
+    if idx < 0 or idx >= count:
+        return 0
+    let at = start + idx
+    if at < 0 or at >= body.call_arg_operands.len() as i32:
+        return 0
+    body.call_arg_operands.get(at as i64)
+
+fn CCodegen.local_assigned_fn_sym_depth(self: CCodegen, body: MirBody, local_id: i32, depth: i32) -> i32:
+    if local_id < 0:
+        return 0
+    if depth > 8:
+        return 0
+    var out = 0
+    for bb in 0..body.block_count():
+        let start = body.bb_stmt_starts.get(bb as i64)
+        let count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..count:
+            let stmt_id = start + si
+            if body.stmt_kinds.get(stmt_id as i64) != SK_ASSIGN():
+                continue
+            let dst_place = body.stmt_d0.get(stmt_id as i64)
+            if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                continue
+            let rval_id = body.stmt_d1.get(stmt_id as i64)
+            if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+                continue
+            if body.rval_kinds.get(rval_id as i64) != RK_USE():
+                continue
+            let src_operand = body.rval_d0.get(rval_id as i64)
+            if src_operand < 0 or src_operand >= body.operand_kinds.len() as i32:
+                continue
+            let ok = body.operand_kinds.get(src_operand as i64)
+            let od = body.operand_d0.get(src_operand as i64)
+            var cand = 0
+            if ok == OK_CONSTANT():
+                if od < 0 or od >= body.const_kinds.len() as i32:
+                    continue
+                if body.const_kinds.get(od as i64) != CK_FN():
+                    continue
+                cand = body.const_d0.get(od as i64)
+            else if ok == OK_COPY() or ok == OK_MOVE():
+                let src_local = self.place_local_id(body, od)
+                if src_local < 0:
+                    continue
+                if self.place_is_direct_local(body, od, src_local) == 0:
+                    continue
+                cand = self.local_assigned_fn_sym_depth(body, src_local, depth + 1)
+                if cand == 0 - 2:
+                    return 0 - 2
+            else:
+                continue
+            if cand <= 0:
+                continue
+            if out == 0:
+                out = cand
+                continue
+            if out != cand:
+                return 0 - 2
+    out
+
+fn CCodegen.local_assigned_fn_sym(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+    self.local_assigned_fn_sym_depth(body, local_id, 0)
+
+fn CCodegen.call_callee_fn_sym(self: CCodegen, body: MirBody, callee_operand: i32) -> i32:
+    if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
+        return 0
+    let ok = body.operand_kinds.get(callee_operand as i64)
+    let od = body.operand_d0.get(callee_operand as i64)
+    if ok == OK_CONSTANT():
+        let const_id = od
+        if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+            return 0
+        if body.const_kinds.get(const_id as i64) != CK_FN():
+            return 0
+        return body.const_d0.get(const_id as i64)
+    if ok == OK_COPY() or ok == OK_MOVE():
+        let local_id = self.place_local_id(body, od)
+        if local_id < 0:
+            return 0
+        if self.place_is_direct_local(body, od, local_id) == 0:
+            return 0
+        let inferred = self.local_assigned_fn_sym(body, local_id)
+        if inferred > 0:
+            return inferred
+    0
+
+fn CCodegen.call_method_base_name(self: CCodegen, body: MirBody, callee_operand: i32) -> str:
+    let fn_sym = self.call_callee_fn_sym(body, callee_operand)
+    if fn_sym == 0:
+        return ""
+    cc_base_name(cc_intern_resolve(self.intern, fn_sym))
+
+fn CCodegen.call_first_arg_place_id(self: CCodegen, body: MirBody, args_id: i32) -> i32:
+    if self.call_arg_count(body, args_id) <= 0:
+        return 0 - 1
+    let first_arg = self.call_arg_operand(body, args_id, 0)
+    if first_arg < 0 or first_arg >= body.operand_kinds.len() as i32:
+        return 0 - 1
+    let ok = body.operand_kinds.get(first_arg as i64)
+    if ok != OK_COPY() and ok != OK_MOVE():
+        return 0 - 1
+    body.operand_d0.get(first_arg as i64)
+
+fn CCodegen.place_same(self: CCodegen, body: MirBody, a: i32, b: i32) -> i32:
+    let _ = self
+    if a < 0 or b < 0:
+        return 0
+    if a >= body.place_locals.len() as i32 or b >= body.place_locals.len() as i32:
+        return 0
+    if body.place_locals.get(a as i64) != body.place_locals.get(b as i64):
+        return 0
+    let ac = body.place_proj_counts.get(a as i64)
+    let bc = body.place_proj_counts.get(b as i64)
+    if ac != bc:
+        return 0
+    let astart = body.place_proj_starts.get(a as i64)
+    let bstart = body.place_proj_starts.get(b as i64)
+    for i in 0..ac:
+        if body.proj_kinds.get((astart + i) as i64) != body.proj_kinds.get((bstart + i) as i64):
+            return 0
+        if body.proj_d0.get((astart + i) as i64) != body.proj_d0.get((bstart + i) as i64):
+            return 0
+    1
+
+fn CCodegen.place_kind_cache_lookup(self: CCodegen, body_fn_sym: i32, place_id: i32) -> i32:
+    for i in 0..self.place_kind_cache_body_fns.len() as i32:
+        if self.place_kind_cache_body_fns.get(i as i64) != body_fn_sym:
+            continue
+        if self.place_kind_cache_place_ids.get(i as i64) != place_id:
+            continue
+        return self.place_kind_cache_vals.get(i as i64)
+    0 - 1234567
+
+fn CCodegen.place_kind_cache_store(self: CCodegen, body_fn_sym: i32, place_id: i32, kind: i32):
+    self.place_kind_cache_body_fns.push(body_fn_sym)
+    self.place_kind_cache_place_ids.push(place_id)
+    self.place_kind_cache_vals.push(kind)
+
+fn CCodegen.callee_hint_cache_lookup(self: CCodegen, fn_sym: i32) -> i32:
+    if self.callee_hint_cache.contains(fn_sym):
+        let v = self.callee_hint_cache.get(fn_sym)
+        if v.is_some():
+            return v.unwrap()
+    0 - 1234567
+
+fn CCodegen.callee_hint_cache_store(self: CCodegen, fn_sym: i32, kind: i32):
+    self.callee_hint_cache.insert(fn_sym, kind)
+
+fn CCodegen.callee_field_hint(self: CCodegen, fn_sym: i32) -> i32:
+    if fn_sym == 0:
+        return cc_callee_hint_none()
+    let cache_hit = self.callee_hint_cache_lookup(fn_sym)
+    if cache_hit != 0 - 1234567:
+        return cache_hit
+
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    let base = cc_base_name(raw)
+    let owner = cc_owner_prefix(raw)
+    var out = cc_callee_hint_none()
+
+    if base == "push" or base == "get" or base == "len" or base == "set_i32" or base == "remove" or base == "clear" or base == "pop":
+        out = cc_callee_hint_vec_recv()
+    else if base == "insert" or base == "get" or base == "contains" or base == "len" or base == "remove":
+        out = cc_callee_hint_map_recv()
+    else if base == "is_some" or base == "unwrap":
+        out = cc_callee_hint_opt_recv()
+    else if base == "new":
+        if cc_str_contains(owner, "HashMap") != 0 or cc_str_contains(raw, "HashMap") != 0:
+            out = cc_callee_hint_map_new()
+        else if cc_str_contains(owner, "Vec") != 0 or cc_str_contains(raw, "Vec") != 0:
+            out = cc_callee_hint_vec_new()
+        else if cc_str_contains(owner, "Option") != 0 or cc_str_contains(raw, "Option") != 0:
+            out = cc_callee_hint_opt_new()
+
+    self.callee_hint_cache_store(fn_sym, out)
+    out
+
+fn CCodegen.infer_place_kind_impl(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return cc_place_kind_unknown()
+
+    var vec_score = 0
+    var map_score = 0
+    var opt_score = 0
+
+    for bb in 0..body.block_count():
+        if body.term_kind(bb) != TK_CALL():
+            continue
+        let args_id = body.term_data1(bb)
+        let first_place = self.call_first_arg_place_id(body, args_id)
+        if self.place_same(body, first_place, place_id) == 0:
+            continue
+        let method = self.call_method_base_name(body, body.term_data0(bb))
+        if method.len() == 0:
+            continue
+        if method == "push" or method == "set_i32" or method == "clear" or method == "pop":
+            vec_score = vec_score + 3
+            continue
+        if method == "insert":
+            map_score = map_score + 3
+            continue
+        if method == "is_some" or method == "unwrap":
+            opt_score = opt_score + 3
+            continue
+        if method == "get" or method == "len":
+            vec_score = vec_score + 1
+            map_score = map_score + 1
+            continue
+        if method == "contains" or method == "remove":
+            map_score = map_score + 1
+            continue
+        if method == "new":
+            vec_score = vec_score + 1
+            map_score = map_score + 1
+            continue
+    if vec_score <= 0 and map_score <= 0 and opt_score <= 0:
+        return cc_place_kind_unknown()
+    if vec_score >= map_score and vec_score >= opt_score:
+        return cc_place_kind_vec()
+    if map_score >= opt_score:
+        return cc_place_kind_hashmap()
+    cc_place_kind_option()
+
+fn CCodegen.infer_place_kind(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+    let cache_hit = self.place_kind_cache_lookup(body.fn_sym, place_id)
+    if cache_hit != 0 - 1234567:
+        return cache_hit
+    let kind = self.infer_place_kind_impl(body, place_id)
+    self.place_kind_cache_store(body.fn_sym, place_id, kind)
+    kind
+
+fn CCodegen.local_place_kind_depth(self: CCodegen, body: MirBody, local_id: i32, depth: i32) -> i32:
+    if local_id < 0:
+        return cc_place_kind_unknown()
+    if depth > 1:
+        return cc_place_kind_unknown()
+
+    var vec_score = 0
+    var map_score = 0
+    var opt_score = 0
+
+    for bb in 0..body.block_count():
+        if body.term_kind(bb) != TK_CALL():
+            continue
+        let args_id = body.term_data1(bb)
+        let first_place = self.call_first_arg_place_id(body, args_id)
+        if self.place_is_direct_local(body, first_place, local_id) == 0:
+            continue
+        let method = self.call_method_base_name(body, body.term_data0(bb))
+        if method.len() == 0:
+            continue
+        if method == "push" or method == "set_i32" or method == "clear" or method == "pop":
+            vec_score = vec_score + 4
+            continue
+        if method == "insert" or method == "contains":
+            map_score = map_score + 4
+            continue
+        if method == "is_some" or method == "unwrap":
+            opt_score = opt_score + 4
+            continue
+        if method == "get" or method == "len":
+            vec_score = vec_score + 1
+            map_score = map_score + 1
+            continue
+        if method == "remove":
+            map_score = map_score + 2
+            vec_score = vec_score + 1
+            continue
+
+    for bb in 0..body.block_count():
+        let start = body.bb_stmt_starts.get(bb as i64)
+        let count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..count:
+            let stmt_id = start + si
+            if body.stmt_kinds.get(stmt_id as i64) != SK_ASSIGN():
+                continue
+            let rval_id = body.stmt_d1.get(stmt_id as i64)
+            if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+                continue
+            if body.rval_kinds.get(rval_id as i64) != RK_USE():
+                continue
+            let src_operand = body.rval_d0.get(rval_id as i64)
+            if src_operand < 0 or src_operand >= body.operand_kinds.len() as i32:
+                continue
+            let ok = body.operand_kinds.get(src_operand as i64)
+            if ok != OK_COPY() and ok != OK_MOVE():
+                continue
+            let src_place = body.operand_d0.get(src_operand as i64)
+            let dst_place = body.stmt_d0.get(stmt_id as i64)
+            let src_local = self.place_local_id(body, src_place)
+            let dst_local = self.place_local_id(body, dst_place)
+            if src_local < 0 or dst_local < 0:
+                continue
+            if self.place_is_direct_local(body, src_place, src_local) == 0:
+                continue
+            if self.place_is_direct_local(body, dst_place, dst_local) == 0:
+                continue
+            if src_local == local_id:
+                let k = self.local_place_kind_depth(body, dst_local, depth + 1)
+                if k == cc_place_kind_vec():
+                    vec_score = vec_score + 2
+                else if k == cc_place_kind_hashmap():
+                    map_score = map_score + 2
+                else if k == cc_place_kind_option():
+                    opt_score = opt_score + 2
+            if dst_local == local_id:
+                let k = self.local_place_kind_depth(body, src_local, depth + 1)
+                if k == cc_place_kind_vec():
+                    vec_score = vec_score + 2
+                else if k == cc_place_kind_hashmap():
+                    map_score = map_score + 2
+                else if k == cc_place_kind_option():
+                    opt_score = opt_score + 2
+
+    if vec_score <= 0 and map_score <= 0 and opt_score <= 0:
+        return cc_place_kind_unknown()
+    if vec_score >= map_score and vec_score >= opt_score:
+        return cc_place_kind_vec()
+    if map_score >= opt_score:
+        return cc_place_kind_hashmap()
+    cc_place_kind_option()
+
+fn CCodegen.local_place_kind(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+    self.local_place_kind_depth(body, local_id, 0)
+
+fn CCodegen.call_dest_expected_tid(self: CCodegen, body: MirBody, dest_place: i32) -> i32:
+    let dest_tid = self.place_local_tid(body, dest_place)
+    if self.in_field_cache_build != 0:
+        return dest_tid
+    if dest_tid == cc_pseudo_tid_vec():
+        return dest_tid
+    let dst_local = self.place_local_id(body, dest_place)
+    if dst_local < 0:
+        return dest_tid
+    let sig_idx = self.body_sig_index(body.fn_sym)
+    let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
+    if dst_local >= 1 and dst_local <= param_count:
+        return dest_tid
+    let hinted = self.local_usage_hint_tid(body, dst_local)
+    if hinted != 0 and self.is_void_tid(hinted) == 0:
+        return hinted
+    let resolved = self.sema.resolve_alias(dest_tid)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TY_STRUCT() or tk == TY_PTR() or tk == TY_REF():
+        return dest_tid
+    0
+
+fn CCodegen.sig_matches_call_name(self: CCodegen, sig_sym: i32, fn_sym: i32) -> i32:
+    if sig_sym == fn_sym:
+        return 1
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() == 0:
+        return 0
+    let sig_text = cc_intern_resolve(self.intern, sig_sym)
+    if cc_str_contains_dot(raw) != 0:
+        if sig_text == raw:
+            return 1
+        return 0
+    if sig_text == raw:
+        return 1
+    if cc_str_ends_with(sig_text, "." ++ raw) != 0:
+        return 1
+    0
+
+fn CCodegen.infer_named_call_sym_scan(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() == 0:
+        return 0
+    let base_name = cc_base_name(raw)
+    if cc_is_generic_builtin_call_symbol(raw) != 0:
+        return 0
+    let arg_count = self.call_arg_count(body, args_id)
+    let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
+    var match_sym = 0
+    var match_score = 0 - 1
+    for si in 0..self.sema.sig_names.len() as i32:
+        let sym = self.sema.sig_names.get(si as i64)
+        if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            continue
+        if self.sig_matches_call_name(sym, fn_sym) == 0:
+            continue
+        if self.sema.sig_get_param_count(si) != arg_count:
+            continue
+        let sym_text = cc_intern_resolve(self.intern, sym)
+        let ret_tid = self.sema.sig_return_type(si)
+        if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            continue
+        var params_ok = 1
+        for ai in 0..arg_count:
+            let arg_operand = self.call_arg_operand(body, args_id, ai)
+            var arg_tid = self.operand_tid_no_infer(body, arg_operand)
+            if self.is_void_tid(arg_tid) != 0 and self.infer_local_depth == 0:
+                arg_tid = self.operand_tid(body, arg_operand)
+            let p_tid = self.sema.sig_param_type(si, ai)
+            if self.is_void_tid(arg_tid) == 0 and self.strict_type_match(p_tid, arg_tid) == 0:
+                params_ok = 0
+                break
+        if params_ok == 0:
+            continue
+        var score = 0
+        if sym == fn_sym or sym_text == raw:
+            score = score + 4
+        if cc_str_contains_dot(raw) == 0 and cc_str_ends_with(sym_text, "." ++ raw) != 0:
+            score = score + 2
+        if self.has_body_for_sym(sym) != 0:
+            score = score + 1
+        if score > match_score:
+            match_score = score
+            match_sym = sym
+    match_sym
+
+fn CCodegen.infer_named_call_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
+    self.infer_named_call_sym_scan(body, fn_sym, args_id, dest_place, 1)
+
+fn CCodegen.infer_body_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() == 0:
+        return 0
+    let base_name = cc_base_name(raw)
+    if cc_is_generic_builtin_call_symbol(raw) != 0:
+        return 0
+    let argc = self.call_arg_count(body, args_id)
+    let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
+    let first_owner = self.type_owner_text(self.call_first_arg_resolved_tid(body, args_id))
+    var match_sym = 0
+    var match_score = 0 - 1
+    for i in 0..self.mir_mod.body_fn_syms.len() as i32:
+        let cand = self.mir_mod.body_fn_syms.get(i as i64)
+        let cand_text = cc_intern_resolve(self.intern, cand)
+        if cc_name_matches(cand_text, raw) == 0:
+            continue
+        let sig_idx = self.sig_index_for_sym(cand)
+        if sig_idx < 0:
+            continue
+        if self.sema.sig_get_param_count(sig_idx) != argc:
+            continue
+        let ret_tid = self.sema.sig_return_type(sig_idx)
+        if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            continue
+        var params_ok = 1
+        for ai in 0..argc:
+            let arg_operand = self.call_arg_operand(body, args_id, ai)
+            var arg_tid = self.operand_tid_no_infer(body, arg_operand)
+            if self.is_void_tid(arg_tid) != 0 and self.infer_local_depth == 0:
+                arg_tid = self.operand_tid(body, arg_operand)
+            let p_tid = self.sema.sig_param_type(sig_idx, ai)
+            if self.is_void_tid(arg_tid) == 0 and self.strict_type_match(p_tid, arg_tid) == 0:
+                params_ok = 0
+                break
+        if params_ok == 0:
+            continue
+        var score = 0
+        if cand_text == raw:
+            score = score + 4
+        if cc_str_ends_with(cand_text, "." ++ raw) != 0:
+            score = score + 3
+        if first_owner.len() > 0:
+            let owner = cc_owner_prefix(cand_text)
+            if owner == first_owner or cc_str_ends_with(owner, "." ++ first_owner) != 0:
+                score = score + 2
+        if score > match_score:
+            match_score = score
+            match_sym = cand
+    match_sym
+
+fn CCodegen.infer_direct_call_sym_scan(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
+    let arg_count = self.call_arg_count(body, args_id)
+    let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
+    var match_sym = 0
+    var match_score = 0 - 1
+    for si in 0..self.sema.sig_names.len() as i32:
+        let sym = self.sema.sig_names.get(si as i64)
+        if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            continue
+        if self.sema.sig_get_param_count(si) != arg_count:
+            continue
+        let ret_tid = self.sema.sig_return_type(si)
+        if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            continue
+        var params_ok = 1
+        for ai in 0..arg_count:
+            let arg_operand = self.call_arg_operand(body, args_id, ai)
+            var arg_tid = self.operand_tid_no_infer(body, arg_operand)
+            if self.is_void_tid(arg_tid) != 0 and self.infer_local_depth == 0:
+                arg_tid = self.operand_tid(body, arg_operand)
+            let p_tid = self.sema.sig_param_type(si, ai)
+            if self.is_void_tid(arg_tid) == 0 and self.strict_type_match(p_tid, arg_tid) == 0:
+                params_ok = 0
+                break
+        if params_ok == 0:
+            continue
+        var score = 0
+        if self.has_body_for_sym(sym) != 0:
+            score = score + 2
+        if self.is_void_tid(want_ret_tid) == 0:
+            score = score + 1
+        if score > match_score:
+            match_score = score
+            match_sym = sym
+    match_sym
+
+fn CCodegen.describe_call_candidates(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32, only_local_defs: i32) -> str:
+    let arg_count = self.call_arg_count(body, args_id)
+    let dest_tid = self.place_local_tid(body, dest_place)
+    var out = ""
+    var kept = 0
+    for si in 0..self.sema.sig_names.len() as i32:
+        let sym = self.sema.sig_names.get(si as i64)
+        if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            continue
+        if self.sema.sig_get_param_count(si) != arg_count:
+            continue
+        let ret_tid = self.sema.sig_return_type(si)
+        if self.type_match(dest_tid, ret_tid) == 0:
+            continue
+        var params_ok = 1
+        for ai in 0..arg_count:
+            let arg_operand = self.call_arg_operand(body, args_id, ai)
+            let arg_tid = self.operand_tid(body, arg_operand)
+            let p_tid = self.sema.sig_param_type(si, ai)
+            if self.type_match(p_tid, arg_tid) == 0:
+                params_ok = 0
+                break
+        if params_ok == 0:
+            continue
+        if kept > 0:
+            out = out ++ ","
+        out = out ++ cc_intern_resolve(self.intern, sym) ++ "#" ++ int_to_string(sym)
+        kept = kept + 1
+        if kept >= 12:
+            out = out ++ ",..."
+            break
+    out
+
+fn CCodegen.describe_qualified_method_candidates(self: CCodegen, body: MirBody, method_sym: i32, args_id: i32, only_local_defs: i32) -> str:
+    let raw = cc_intern_resolve(self.intern, method_sym)
+    if raw.len() == 0:
+        return ""
+    let wanted = "." ++ raw
+    let arg_count = self.call_arg_count(body, args_id)
+    var out = ""
+    for si in 0..self.sema.sig_names.len() as i32:
+        let sym = self.sema.sig_names.get(si as i64)
+        if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            continue
+        if self.sema.sig_get_param_count(si) != arg_count:
+            continue
+        let sym_text = cc_intern_resolve(self.intern, sym)
+        if cc_str_ends_with(sym_text, wanted) == 0:
+            continue
+        if out.len() > 0:
+            out = out ++ ", "
+        out = out ++ sym_text
+        if out.len() > 512:
+            return out ++ ", ..."
+    out
+
+fn CCodegen.call_arg_tids_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+    let arg_count = self.call_arg_count(body, args_id)
+    var out = ""
+    for ai in 0..arg_count:
+        if ai > 0:
+            out = out ++ ","
+        let arg_operand = self.call_arg_operand(body, args_id, ai)
+        out = out ++ int_to_string(self.operand_tid(body, arg_operand))
+    out
+
+fn CCodegen.call_first_arg_hint_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+    if self.call_arg_count(body, args_id) <= 0:
+        return ""
+    let first_arg = self.call_arg_operand(body, args_id, 0)
+    let first_arg_tid = self.operand_tid(body, first_arg)
+    let owner_text = self.type_owner_text(first_arg_tid)
+    "tid=" ++ int_to_string(first_arg_tid) ++ " type=" ++ self.sema.type_name(first_arg_tid) ++ " owner=" ++ owner_text
+
+fn CCodegen.call_first_arg_resolved_tid(self: CCodegen, body: MirBody, args_id: i32) -> i32:
+    if self.call_arg_count(body, args_id) <= 0:
+        return 0
+    let first_arg = self.call_arg_operand(body, args_id, 0)
+    let first_arg_tid = self.operand_tid(body, first_arg)
+    self.sema.resolve_alias(first_arg_tid)
+
+fn CCodegen.type_owner_text(self: CCodegen, tid: i32) -> str:
+    let resolved = self.sema.resolve_alias(tid)
+    if resolved == 0:
+        return ""
+    if self.sema.get_type_kind(resolved) == TY_STRUCT():
+        let sym = self.sema.get_type_d0(resolved)
+        if sym != 0:
+            return cc_intern_resolve(self.intern, sym)
+    let owner_sym = self.sema.dyn_arg_concrete_type_symbol(resolved)
+    if owner_sym != 0:
+        return cc_intern_resolve(self.intern, owner_sym)
+    ""
+
+fn CCodegen.owner_named_body_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32) -> i32:
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() == 0:
+        return 0
+    if cc_str_contains_dot(raw) != 0:
+        return 0
+    if self.call_arg_count(body, args_id) <= 0:
+        return 0
+    let owner_tid = self.call_first_arg_resolved_tid(body, args_id)
+    let owner = self.type_owner_text(owner_tid)
+    if owner.len() == 0:
+        return 0
+    let full = owner ++ "." ++ raw
+    self.lookup_body_sym_by_name(full)
+
+fn CCodegen.method_infer_active(self: CCodegen, method_sym: i32, args_id: i32, dest_place: i32) -> i32:
+    for i in 0..self.active_method_syms.len() as i32:
+        if self.active_method_syms.get(i as i64) != method_sym:
+            continue
+        if self.active_method_args.get(i as i64) != args_id:
+            continue
+        if self.active_method_dests.get(i as i64) != dest_place:
+            continue
+        return 1
+    0
+
+fn CCodegen.method_infer_push(self: CCodegen, method_sym: i32, args_id: i32, dest_place: i32):
+    self.active_method_syms.push(method_sym)
+    self.active_method_args.push(args_id)
+    self.active_method_dests.push(dest_place)
+
+fn CCodegen.method_infer_pop(self: CCodegen):
+    if self.active_method_syms.len() as i32 == 0:
+        return
+    self.active_method_syms.pop()
+    self.active_method_args.pop()
+    self.active_method_dests.pop()
+
+fn CCodegen.direct_infer_active(self: CCodegen, args_id: i32, dest_place: i32) -> i32:
+    for i in 0..self.active_direct_args.len() as i32:
+        if self.active_direct_args.get(i as i64) != args_id:
+            continue
+        if self.active_direct_dests.get(i as i64) != dest_place:
+            continue
+        return 1
+    0
+
+fn CCodegen.direct_infer_push(self: CCodegen, args_id: i32, dest_place: i32):
+    self.active_direct_args.push(args_id)
+    self.active_direct_dests.push(dest_place)
+
+fn CCodegen.direct_infer_pop(self: CCodegen):
+    if self.active_direct_args.len() as i32 == 0:
+        return
+    self.active_direct_args.pop()
+    self.active_direct_dests.pop()
+
+fn CCodegen.direct_cache_lookup(self: CCodegen, body_fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
+    for i in 0..self.direct_cache_body_fns.len() as i32:
+        if self.direct_cache_body_fns.get(i as i64) != body_fn_sym:
+            continue
+        if self.direct_cache_args.get(i as i64) != args_id:
+            continue
+        if self.direct_cache_dests.get(i as i64) != dest_place:
+            continue
+        return self.direct_cache_values.get(i as i64)
+    0 - 1234567
+
+fn CCodegen.direct_cache_store(self: CCodegen, body_fn_sym: i32, args_id: i32, dest_place: i32, value: i32):
+    self.direct_cache_body_fns.push(body_fn_sym)
+    self.direct_cache_args.push(args_id)
+    self.direct_cache_dests.push(dest_place)
+    self.direct_cache_values.push(value)
+
+fn CCodegen.method_cache_lookup(self: CCodegen, body_fn_sym: i32, method_sym: i32, args_id: i32, dest_place: i32) -> i32:
+    for i in 0..self.method_cache_body_fns.len() as i32:
+        if self.method_cache_body_fns.get(i as i64) != body_fn_sym:
+            continue
+        if self.method_cache_syms.get(i as i64) != method_sym:
+            continue
+        if self.method_cache_args.get(i as i64) != args_id:
+            continue
+        if self.method_cache_dests.get(i as i64) != dest_place:
+            continue
+        return self.method_cache_values.get(i as i64)
+    0 - 1234567
+
+fn CCodegen.method_cache_store(self: CCodegen, body_fn_sym: i32, method_sym: i32, args_id: i32, dest_place: i32, value: i32):
+    self.method_cache_body_fns.push(body_fn_sym)
+    self.method_cache_syms.push(method_sym)
+    self.method_cache_args.push(args_id)
+    self.method_cache_dests.push(dest_place)
+    self.method_cache_values.push(value)
+
+fn CCodegen.field_cache_lookup(self: CCodegen, struct_tid: i32, field_sym: i32) -> i32:
+    for i in 0..self.field_cache_struct_tids.len() as i32:
+        if self.field_cache_struct_tids.get(i as i64) != struct_tid:
+            continue
+        if self.field_cache_syms.get(i as i64) != field_sym:
+            continue
+        return self.field_cache_tids.get(i as i64)
+    0 - 1234567
+
+fn CCodegen.field_cache_store(self: CCodegen, struct_tid: i32, field_sym: i32, tid: i32):
+    self.field_cache_struct_tids.push(struct_tid)
+    self.field_cache_syms.push(field_sym)
+    self.field_cache_tids.push(tid)
+
+fn CCodegen.field_cache_record(self: CCodegen, struct_tid: i32, field_sym: i32, tid: i32):
+    if tid == 0 or self.is_void_tid(tid) != 0:
+        return
+    if self.field_cache_lookup(struct_tid, field_sym) != 0 - 1234567:
+        return
+    self.field_cache_store(struct_tid, field_sym, self.sema.resolve_alias(tid))
+
+fn CCodegen.local_infer_cache_lookup(self: CCodegen, body_fn_sym: i32, local_id: i32) -> i32:
+    for i in 0..self.local_infer_body_fns.len() as i32:
+        if self.local_infer_body_fns.get(i as i64) != body_fn_sym:
+            continue
+        if self.local_infer_ids.get(i as i64) != local_id:
+            continue
+        return self.local_infer_vals.get(i as i64)
+    0 - 1234567
+
+fn CCodegen.local_infer_cache_store(self: CCodegen, body_fn_sym: i32, local_id: i32, tid: i32):
+    self.local_infer_body_fns.push(body_fn_sym)
+    self.local_infer_ids.push(local_id)
+    self.local_infer_vals.push(tid)
+
+fn CCodegen.local_usage_hint_cache_lookup(self: CCodegen, body_fn_sym: i32, local_id: i32) -> i32:
+    for i in 0..self.local_usage_hint_body_fns.len() as i32:
+        if self.local_usage_hint_body_fns.get(i as i64) != body_fn_sym:
+            continue
+        if self.local_usage_hint_ids.get(i as i64) != local_id:
+            continue
+        return self.local_usage_hint_vals.get(i as i64)
+    0 - 1234567
+
+fn CCodegen.local_usage_hint_cache_store(self: CCodegen, body_fn_sym: i32, local_id: i32, tid: i32):
+    self.local_usage_hint_body_fns.push(body_fn_sym)
+    self.local_usage_hint_ids.push(local_id)
+    self.local_usage_hint_vals.push(tid)
+
+fn CCodegen.local_usage_hint_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+    if local_id < 0:
+        return 0
+    let cache_hit = self.local_usage_hint_cache_lookup(body.fn_sym, local_id)
+    if cache_hit != 0 - 1234567:
+        return cache_hit
+    var hint_tid = 0
+
+    // Prefer concrete typed use-sites where this local flows into a known call parameter.
+    for bb in 0..body.block_count():
+        if body.term_kind(bb) != TK_CALL():
+            continue
+        let callee_operand = body.term_data0(bb)
+        let args_id = body.term_data1(bb)
+        var sig_idx = 0 - 1
+        let fn_sym = self.call_callee_fn_sym(body, callee_operand)
+        if fn_sym != 0:
+            sig_idx = self.sig_index_for_sym(fn_sym)
+        if sig_idx < 0:
+            continue
+        let argc = self.call_arg_count(body, args_id)
+        for ai in 0..argc:
+            let arg_operand = self.call_arg_operand(body, args_id, ai)
+            if arg_operand < 0 or arg_operand >= body.operand_kinds.len() as i32:
+                continue
+            let ok = body.operand_kinds.get(arg_operand as i64)
+            if ok != OK_COPY() and ok != OK_MOVE():
+                continue
+            let p = body.operand_d0.get(arg_operand as i64)
+            if self.place_is_direct_local(body, p, local_id) == 0:
+                continue
+            let param_count = self.sema.sig_get_param_count(sig_idx)
+            if ai < 0 or ai >= param_count:
+                continue
+            let p_tid = self.sema.sig_param_type(sig_idx, ai)
+            if p_tid == 0 or self.is_void_tid(p_tid) != 0:
+                continue
+            if hint_tid == 0 or self.is_void_tid(hint_tid) != 0:
+                hint_tid = p_tid
+                continue
+            if self.type_match(hint_tid, p_tid) != 0:
+                continue
+        if hint_tid != 0 and self.is_void_tid(hint_tid) == 0:
+            self.local_usage_hint_cache_store(body.fn_sym, local_id, hint_tid)
+            return hint_tid
+
+    // Fallback: assignments from this local into a concretely typed local.
+    for bb in 0..body.block_count():
+        let start = body.bb_stmt_starts.get(bb as i64)
+        let count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..count:
+            let stmt_id = start + si
+            if body.stmt_kinds.get(stmt_id as i64) != SK_ASSIGN():
+                continue
+            let rval_id = body.stmt_d1.get(stmt_id as i64)
+            if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+                continue
+            if body.rval_kinds.get(rval_id as i64) != RK_USE():
+                continue
+            let src_operand = body.rval_d0.get(rval_id as i64)
+            if src_operand < 0 or src_operand >= body.operand_kinds.len() as i32:
+                continue
+            let ok = body.operand_kinds.get(src_operand as i64)
+            if ok != OK_COPY() and ok != OK_MOVE():
+                continue
+            let src_place = body.operand_d0.get(src_operand as i64)
+            if self.place_is_direct_local(body, src_place, local_id) == 0:
+                continue
+            let dst_place = body.stmt_d0.get(stmt_id as i64)
+            if self.place_is_direct_local(body, dst_place, local_id) != 0:
+                continue
+            let dst_tid = self.place_tid_no_infer(body, dst_place)
+            if dst_tid == 0 or self.is_void_tid(dst_tid) != 0:
+                continue
+            hint_tid = dst_tid
+            self.local_usage_hint_cache_store(body.fn_sym, local_id, hint_tid)
+            return hint_tid
+
+    self.local_usage_hint_cache_store(body.fn_sym, local_id, hint_tid)
+    hint_tid
+
+fn CCodegen.infer_direct_call_sym(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32) -> i32:
+    let cache_hit = self.direct_cache_lookup(body.fn_sym, args_id, dest_place)
+    if cache_hit != 0 - 1234567:
+        return cache_hit
+    if self.direct_infer_active(args_id, dest_place) != 0:
+        self.direct_cache_store(body.fn_sym, args_id, dest_place, 0)
+        return 0
+    self.direct_infer_push(args_id, dest_place)
+    let local_scan = self.infer_direct_call_sym_scan(body, args_id, dest_place, 1)
+    var result = 0
+    if local_scan == 0 - 2 or local_scan > 0:
+        result = local_scan
+    else:
+        result = self.infer_direct_call_sym_scan(body, args_id, dest_place, 0)
+    self.direct_infer_pop()
+    self.direct_cache_store(body.fn_sym, args_id, dest_place, result)
+    result
+
+fn CCodegen.unique_method_owner_from_name(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32) -> str:
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() == 0:
+        return ""
+    if cc_str_contains_dot(raw) != 0:
+        return cc_owner_prefix(raw)
+    let wanted = "." ++ raw
+    let arg_count = self.call_arg_count(body, args_id)
+    var out = ""
+    for si in 0..self.sema.sig_names.len() as i32:
+        if self.sema.sig_get_param_count(si) != arg_count:
+            continue
+        let sym_text = cc_intern_resolve(self.intern, self.sema.sig_names.get(si as i64))
+        if cc_str_ends_with(sym_text, wanted) == 0:
+            continue
+        let owner = cc_owner_prefix(sym_text)
+        if owner.len() == 0:
+            continue
+        if out.len() == 0:
+            out = owner
+        else if out != owner:
+            return ""
+    out
+
+fn CCodegen.local_owner_hint_depth(self: CCodegen, body: MirBody, local_id: i32, depth: i32) -> str:
+    if depth > 8:
+        return ""
+    for bb in 0..body.block_count():
+        if body.term_kind(bb) != TK_CALL():
+            continue
+        let dest_place = body.term_data2(bb)
+        if self.place_is_direct_local(body, dest_place, local_id) == 0:
+            continue
+        let callee_operand = body.term_data0(bb)
+        if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
+            continue
+        if body.operand_kinds.get(callee_operand as i64) != OK_CONSTANT():
+            continue
+        let const_id = body.operand_d0.get(callee_operand as i64)
+        if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+            continue
+        if body.const_kinds.get(const_id as i64) != CK_FN():
+            continue
+        let fn_sym = body.const_d0.get(const_id as i64)
+        if fn_sym == 0:
+            continue
+        let raw = cc_intern_resolve(self.intern, fn_sym)
+        let owner = cc_owner_prefix(raw)
+        if owner.len() > 0:
+            return owner
+
+    for bb in 0..body.block_count():
+        let start = body.bb_stmt_starts.get(bb as i64)
+        let count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..count:
+            let stmt_id = start + si
+            if body.stmt_kinds.get(stmt_id as i64) != SK_ASSIGN():
+                continue
+            let dst_place = body.stmt_d0.get(stmt_id as i64)
+            if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                continue
+            let rval_id = body.stmt_d1.get(stmt_id as i64)
+            if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+                continue
+            if body.rval_kinds.get(rval_id as i64) != RK_USE():
+                continue
+            let op = body.rval_d0.get(rval_id as i64)
+            if op < 0 or op >= body.operand_kinds.len() as i32:
+                continue
+            let ok = body.operand_kinds.get(op as i64)
+            if ok != OK_COPY() and ok != OK_MOVE():
+                continue
+            let p = body.operand_d0.get(op as i64)
+            let src_local = self.place_local_id(body, p)
+            if src_local < 0 or src_local == local_id:
+                continue
+            let owner = self.local_owner_hint_depth(body, src_local, depth + 1)
+            if owner.len() > 0:
+                return owner
+    for bb in 0..body.block_count():
+        if body.term_kind(bb) != TK_CALL():
+            continue
+        let args_id = body.term_data1(bb)
+        if self.call_arg_count(body, args_id) <= 0:
+            continue
+        let first_arg = self.call_arg_operand(body, args_id, 0)
+        if first_arg < 0 or first_arg >= body.operand_kinds.len() as i32:
+            continue
+        let ok = body.operand_kinds.get(first_arg as i64)
+        if ok != OK_COPY() and ok != OK_MOVE():
+            continue
+        let p = body.operand_d0.get(first_arg as i64)
+        if self.place_is_direct_local(body, p, local_id) == 0:
+            continue
+        let callee_operand = body.term_data0(bb)
+        if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
+            continue
+        if body.operand_kinds.get(callee_operand as i64) != OK_CONSTANT():
+            continue
+        let const_id = body.operand_d0.get(callee_operand as i64)
+        if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+            continue
+        if body.const_kinds.get(const_id as i64) != CK_FN():
+            continue
+        let fn_sym = body.const_d0.get(const_id as i64)
+        if fn_sym == 0:
+            continue
+        let owner = self.unique_method_owner_from_name(body, fn_sym, args_id)
+        if owner.len() > 0:
+            return owner
+    ""
+
+fn CCodegen.local_owner_hint(self: CCodegen, body: MirBody, local_id: i32) -> str:
+    self.local_owner_hint_depth(body, local_id, 0)
+
+fn CCodegen.infer_qualified_method_sym_scan(self: CCodegen, body: MirBody, method_sym: i32, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
+    let raw = cc_intern_resolve(self.intern, method_sym)
+    if raw.len() == 0:
+        return 0
+    if cc_is_generic_builtin_call_symbol(raw) != 0:
+        return 0
+    let wanted = "." ++ raw
+    let arg_count = self.call_arg_count(body, args_id)
+    let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
+    var preferred_owner = ""
+    if arg_count > 0:
+        let first_arg_tid = self.call_first_arg_resolved_tid(body, args_id)
+        preferred_owner = self.type_owner_text(first_arg_tid)
+
+    var match_sym = 0
+    var match_score = 0 - 1
+    for si in 0..self.sema.sig_names.len() as i32:
+        let sym = self.sema.sig_names.get(si as i64)
+        if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            continue
+        if self.sema.sig_get_param_count(si) != arg_count:
+            continue
+        let sym_text = cc_intern_resolve(self.intern, sym)
+        if cc_str_ends_with(sym_text, wanted) == 0:
+            continue
+        let owner = cc_owner_prefix(sym_text)
+        let owner_matched = if preferred_owner.len() > 0 and owner == preferred_owner: 1 else: 0
+        let ret_tid = self.sema.sig_return_type(si)
+        if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            continue
+        var params_ok = 1
+        for ai in 0..arg_count:
+            let arg_operand = self.call_arg_operand(body, args_id, ai)
+            var arg_tid = self.operand_tid_no_infer(body, arg_operand)
+            if self.is_void_tid(arg_tid) != 0 and self.infer_local_depth == 0:
+                arg_tid = self.operand_tid(body, arg_operand)
+            let p_tid = self.sema.sig_param_type(si, ai)
+            if ai == 0 and owner_matched != 0:
+                continue
+            if self.is_void_tid(arg_tid) == 0 and self.strict_type_match(p_tid, arg_tid) == 0:
+                params_ok = 0
+                break
+        if params_ok == 0:
+            continue
+        var score = 0
+        if owner_matched != 0:
+            score = score + 4
+        if self.has_body_for_sym(sym) != 0:
+            score = score + 2
+        if score > match_score:
+            match_score = score
+            match_sym = sym
+    match_sym
+
+fn CCodegen.infer_qualified_method_sym(self: CCodegen, body: MirBody, method_sym: i32, args_id: i32, dest_place: i32) -> i32:
+    if self.infer_local_depth > 0:
+        return self.infer_qualified_method_sym_scan(body, method_sym, args_id, dest_place, 1)
+    let cache_hit = self.method_cache_lookup(body.fn_sym, method_sym, args_id, dest_place)
+    if cache_hit != 0 - 1234567:
+        return cache_hit
+    if self.method_infer_active(method_sym, args_id, dest_place) != 0:
+        self.method_cache_store(body.fn_sym, method_sym, args_id, dest_place, 0)
+        return 0
+    self.method_infer_push(method_sym, args_id, dest_place)
+    let local_scan = self.infer_qualified_method_sym_scan(body, method_sym, args_id, dest_place, 1)
+    var result = 0
+    if local_scan == 0 - 2 or local_scan > 0:
+        result = local_scan
+    else:
+        result = self.infer_qualified_method_sym_scan(body, method_sym, args_id, dest_place, 0)
+    self.method_infer_pop()
+    self.method_cache_store(body.fn_sym, method_sym, args_id, dest_place, result)
+    result
+
+fn CCodegen.infer_owner_method_sym_scan(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
+    if self.call_arg_count(body, args_id) <= 0:
+        return 0
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() == 0:
+        return 0
+    if cc_is_generic_builtin_call_symbol(raw) != 0:
+        return 0
+    if cc_str_contains_dot(raw) != 0:
+        return 0
+    let first_arg_tid = self.call_first_arg_resolved_tid(body, args_id)
+    let owner_text = self.type_owner_text(first_arg_tid)
+    if owner_text.len() == 0:
+        return 0
+    let wanted = "." ++ raw
+    let argc = self.call_arg_count(body, args_id)
+    let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
+    var match_sym = 0
+    var match_score = 0 - 1
+    for si in 0..self.sema.sig_names.len() as i32:
+        let sym = self.sema.sig_names.get(si as i64)
+        if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            continue
+        if self.sema.sig_get_param_count(si) != argc:
+            continue
+        let sym_text = cc_intern_resolve(self.intern, sym)
+        if cc_str_ends_with(sym_text, wanted) == 0:
+            continue
+        let owner = cc_owner_prefix(sym_text)
+        if owner != owner_text and cc_str_ends_with(owner, "." ++ owner_text) == 0:
+            continue
+        let ret_tid = self.sema.sig_return_type(si)
+        if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            continue
+        var params_ok = 1
+        for ai in 0..argc:
+            let arg_operand = self.call_arg_operand(body, args_id, ai)
+            var arg_tid = self.operand_tid_no_infer(body, arg_operand)
+            if self.is_void_tid(arg_tid) != 0 and self.infer_local_depth == 0:
+                arg_tid = self.operand_tid(body, arg_operand)
+            let p_tid = self.sema.sig_param_type(si, ai)
+            if self.is_void_tid(arg_tid) == 0 and self.strict_type_match(p_tid, arg_tid) == 0:
+                params_ok = 0
+                break
+        if params_ok == 0:
+            continue
+        var score = 0
+        if owner == owner_text:
+            score = score + 4
+        if self.has_body_for_sym(sym) != 0:
+            score = score + 2
+        if score > match_score:
+            match_score = score
+            match_sym = sym
+    match_sym
+
+fn CCodegen.infer_owner_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
+    let local = self.infer_owner_method_sym_scan(body, fn_sym, args_id, dest_place, 1)
+    if local > 0:
+        return local
+    self.infer_owner_method_sym_scan(body, fn_sym, args_id, dest_place, 0)
+
+fn CCodegen.infer_builtin_call_name(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32) -> str:
+    if self.call_arg_count(body, args_id) != 1:
+        return ""
+    let dest_tid = self.place_local_tid(body, dest_place)
+    if self.is_void_tid(dest_tid) == 0:
+        return ""
+    let arg_operand = self.call_arg_operand(body, args_id, 0)
+    let arg_tid = self.sema.resolve_alias(self.operand_tid(body, arg_operand))
+    let arg_kind = self.sema.get_type_kind(arg_tid)
+    if arg_kind == TY_STR():
+        return "with_println_str"
+    if arg_kind == TY_BOOL():
+        return "with_println_bool"
+    if arg_kind == TY_INT():
+        let bits = self.sema.get_type_d0(arg_tid)
+        if bits <= 32:
+            return "with_println_i32"
+        return "with_println_i64"
+    ""
+
+fn CCodegen.infer_print_call_name(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32) -> str:
+    if self.call_arg_count(body, args_id) != 1:
+        return ""
+    let dest_tid = self.place_local_tid(body, dest_place)
+    if self.is_void_tid(dest_tid) == 0:
+        return ""
+    let arg_operand = self.call_arg_operand(body, args_id, 0)
+    let arg_tid = self.sema.resolve_alias(self.operand_tid(body, arg_operand))
+    if self.sema.get_type_kind(arg_tid) == TY_STR():
+        return "with_print_str"
+    ""
+
+fn CCodegen.extern_call_name(self: CCodegen, sym: i32, body: MirBody, args_id: i32, dest_place: i32) -> str:
+    let raw = cc_intern_resolve(self.intern, sym)
+    if raw == "println":
+        let println_name = self.infer_builtin_call_name(body, args_id, dest_place)
+        if println_name.len() > 0:
+            return println_name
+    if raw == "print":
+        let print_name = self.infer_print_call_name(body, args_id, dest_place)
+        if print_name.len() > 0:
+            return print_name
+    self.extern_sym_c_name(sym)
+
+fn CCodegen.sig_index_for_sym(self: CCodegen, fn_sym: i32) -> i32:
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() > 0 and cc_is_generic_builtin_call_symbol(raw) != 0:
+        return 0 - 1
+    if self.sig_idx_cache.contains(fn_sym):
+        return self.sig_idx_cache.get(fn_sym).unwrap()
+
+    var out = 0 - 1
+    let canon = self.canonical_body_sym(fn_sym)
+    if canon != 0:
+        let canon_sig = self.sema.get_sig(canon)
+        if canon_sig >= 0:
+            out = canon_sig
+    if out < 0:
+        let direct = self.sema.get_sig(fn_sym)
+        if direct >= 0:
+            out = direct
+    if out < 0 and raw.len() > 0:
+        for si in 0..self.sema.sig_names.len() as i32:
+            let sym = self.sema.sig_names.get(si as i64)
+            if sym == fn_sym:
+                out = si
+                break
+        if out < 0 and cc_str_contains_dot(raw) != 0:
+            var match_idx = 0 - 1
+            for si in 0..self.sema.sig_names.len() as i32:
+                let sym_text = cc_intern_resolve(self.intern, self.sema.sig_names.get(si as i64))
+                if sym_text != raw:
+                    continue
+                if match_idx < 0:
+                    match_idx = si
+                else:
+                    match_idx = 0 - 2
+                    break
+            if match_idx >= 0:
+                out = match_idx
+        if out < 0 and cc_str_contains_dot(raw) == 0:
+            let wanted = "." ++ raw
+            var match_idx = 0 - 1
+            for si in 0..self.sema.sig_names.len() as i32:
+                let sym_text = cc_intern_resolve(self.intern, self.sema.sig_names.get(si as i64))
+                if cc_str_ends_with(sym_text, wanted) == 0:
+                    continue
+                if match_idx < 0:
+                    match_idx = si
+                else:
+                    match_idx = 0 - 2
+                    break
+            if match_idx >= 0:
+                out = match_idx
+
+    self.sig_idx_cache.insert(fn_sym, out)
+    out
+
+fn CCodegen.unqualified_builtin_method_name(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32) -> str:
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() == 0:
+        return ""
+    if cc_str_contains_dot(raw) != 0:
+        return ""
+    let first_kind = self.sema.get_type_kind(self.call_first_arg_resolved_tid(body, args_id))
+    if first_kind != TY_STR():
+        return ""
+    let argc = self.call_arg_count(body, args_id)
+    if raw == "len" and argc == 1:
+        return "with_len"
+    if raw == "is_empty" and argc == 1:
+        return "with_is_empty"
+    if raw == "starts_with" and argc == 2:
+        return "with_str_starts_with"
+    if raw == "ends_with" and argc == 2:
+        return "with_str_ends_with"
+    if raw == "contains" and argc == 2:
+        return "with_str_contains"
+    if raw == "find" and argc == 2:
+        return "with_str_index_of"
+    if raw == "slice" and argc == 3:
+        return "with_str_slice"
+    if raw == "byte_at" and argc == 2:
+        return "with_str_byte_at"
+    ""
+
+fn CCodegen.unqualified_builtin_method_ret_tid(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32) -> i32:
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() == 0:
+        return 0
+    if cc_str_contains_dot(raw) != 0:
+        return 0
+    let first_kind = self.sema.get_type_kind(self.call_first_arg_resolved_tid(body, args_id))
+    if first_kind != TY_STR():
+        return 0
+    let argc = self.call_arg_count(body, args_id)
+    if raw == "len" and argc == 1:
+        return self.sema.ty_i64
+    if raw == "is_empty" and argc == 1:
+        return self.sema.ty_bool
+    if raw == "starts_with" and argc == 2:
+        return self.sema.ty_bool
+    if raw == "ends_with" and argc == 2:
+        return self.sema.ty_bool
+    if raw == "contains" and argc == 2:
+        return self.sema.ty_bool
+    if raw == "find" and argc == 2:
+        return self.sema.ty_i64
+    if raw == "slice" and argc == 3:
+        return self.sema.ty_str
+    if raw == "byte_at" and argc == 2:
+        return self.sema.ty_i32
+    0
+
+fn CCodegen.call_builtin_kind(self: CCodegen, body: MirBody, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
+    let method = self.call_method_base_name(body, callee_operand)
+    if method.len() == 0:
+        return cc_builtin_none()
+
+    let callee_sym = self.call_callee_fn_sym(body, callee_operand)
+    let callee_hint = self.callee_field_hint(callee_sym)
+    let first_owner = self.type_owner_text(self.call_first_arg_resolved_tid(body, args_id))
+    let recv_is_vec =
+        if callee_hint == cc_callee_hint_vec_recv():
+            1
+        else if cc_str_contains(first_owner, "Vec") != 0:
+            1
+        else:
+            0
+    let recv_is_map =
+        if callee_hint == cc_callee_hint_map_recv():
+            1
+        else if cc_str_contains(first_owner, "HashMap") != 0:
+            1
+        else:
+            0
+    let recv_is_opt =
+        if callee_hint == cc_callee_hint_opt_recv():
+            1
+        else if cc_str_contains(first_owner, "Option") != 0:
+            1
+        else:
+            0
+
+    if method == "new":
+        var dst_kind = self.infer_place_kind(body, dest_place)
+        if dst_kind == cc_place_kind_unknown():
+            let dst_local = self.place_local_id(body, dest_place)
+            if dst_local >= 0:
+                dst_kind = self.local_place_kind(body, dst_local)
+        if dst_kind == cc_place_kind_vec():
+            return cc_builtin_vec_new()
+        if dst_kind == cc_place_kind_hashmap():
+            return cc_builtin_map_new()
+        if callee_hint == cc_callee_hint_vec_new():
+            return cc_builtin_vec_new()
+        if callee_hint == cc_callee_hint_map_new():
+            return cc_builtin_map_new()
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted == cc_pseudo_tid_vec():
+            return cc_builtin_vec_new()
+        return cc_builtin_none()
+
+    let argc = self.call_arg_count(body, args_id)
+    if argc <= 0:
+        return cc_builtin_none()
+
+    let first_place = self.call_first_arg_place_id(body, args_id)
+    let place_kind = if first_place >= 0: self.infer_place_kind(body, first_place) else: cc_place_kind_unknown()
+    let first_tid = self.sema.resolve_alias(self.call_first_arg_resolved_tid(body, args_id))
+    let first_tk = self.sema.get_type_kind(first_tid)
+    let recv_kind_is_vec = if place_kind == cc_place_kind_vec() or recv_is_vec != 0: 1 else: 0
+    let recv_kind_is_map = if place_kind == cc_place_kind_hashmap() or recv_is_map != 0: 1 else: 0
+    let recv_kind_is_opt = if recv_is_opt != 0: 1 else: 0
+
+    if method == "push":
+        if recv_kind_is_vec != 0:
+            return cc_builtin_vec_push()
+        return cc_builtin_none()
+    if method == "set_i32":
+        if recv_kind_is_vec != 0:
+            return cc_builtin_vec_set_i32()
+        return cc_builtin_none()
+    if method == "clear":
+        if recv_kind_is_vec != 0:
+            return cc_builtin_vec_clear()
+        return cc_builtin_none()
+    if method == "pop":
+        if recv_kind_is_vec != 0:
+            return cc_builtin_vec_pop()
+        return cc_builtin_none()
+    if method == "insert":
+        if recv_kind_is_map != 0:
+            return cc_builtin_map_insert()
+        return cc_builtin_none()
+    if method == "is_some":
+        if recv_kind_is_opt != 0:
+            return cc_builtin_opt_is_some()
+        return cc_builtin_none()
+    if method == "unwrap":
+        if recv_kind_is_opt != 0:
+            return cc_builtin_opt_unwrap()
+        return cc_builtin_none()
+
+    if method == "get":
+        if recv_kind_is_map != 0:
+            return cc_builtin_map_get()
+        if recv_kind_is_vec != 0:
+            return cc_builtin_vec_get()
+        return cc_builtin_none()
+
+    if method == "len":
+        if first_tk == TY_STR():
+            return cc_builtin_none()
+        if recv_kind_is_map != 0:
+            return cc_builtin_map_len()
+        if recv_kind_is_vec != 0:
+            return cc_builtin_vec_len()
+        return cc_builtin_none()
+
+    if method == "contains":
+        if first_tk == TY_STR():
+            return cc_builtin_none()
+        if recv_kind_is_map != 0:
+            return cc_builtin_map_contains()
+        return cc_builtin_none()
+
+    if method == "remove":
+        if recv_kind_is_map != 0:
+            return cc_builtin_map_remove()
+        if recv_kind_is_vec != 0:
+            return cc_builtin_vec_remove()
+        return cc_builtin_none()
+
+    cc_builtin_none()
+
+fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
+    let kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
+    if kind == cc_builtin_none():
+        return 0
+    if kind == cc_builtin_vec_new():
+        return cc_pseudo_tid_vec()
+    if kind == cc_builtin_vec_push() or kind == cc_builtin_vec_set_i32() or kind == cc_builtin_vec_remove() or kind == cc_builtin_vec_clear():
+        return self.sema.ty_void
+    if kind == cc_builtin_vec_pop():
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted != 0 and self.is_void_tid(hinted) == 0:
+            return hinted
+        let dst = self.place_local_tid(body, dest_place)
+        if dst != 0 and self.is_void_tid(dst) == 0:
+            return dst
+        return self.sema.ty_i64
+    if kind == cc_builtin_vec_get():
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted != 0 and self.is_void_tid(hinted) == 0:
+            return hinted
+        let dst = self.place_local_tid(body, dest_place)
+        if dst != 0 and self.is_void_tid(dst) == 0:
+            return dst
+        return self.sema.ty_i64
+    if kind == cc_builtin_vec_len():
+        return self.sema.ty_i64
+    if kind == cc_builtin_map_new():
+        return self.sema.ty_i64
+    if kind == cc_builtin_map_insert():
+        return self.sema.ty_void
+    if kind == cc_builtin_map_get():
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted != 0 and self.is_void_tid(hinted) == 0:
+            return hinted
+        let dst = self.place_local_tid(body, dest_place)
+        if dst != 0 and self.is_void_tid(dst) == 0:
+            return dst
+        return self.sema.ty_i64
+    if kind == cc_builtin_map_contains():
+        return self.sema.ty_bool
+    if kind == cc_builtin_map_len():
+        return self.sema.ty_i64
+    if kind == cc_builtin_map_remove():
+        return self.sema.ty_bool
+    if kind == cc_builtin_opt_is_some():
+        return self.sema.ty_bool
+    if kind == cc_builtin_opt_unwrap():
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted != 0 and self.is_void_tid(hinted) == 0:
+            return hinted
+        let dst = self.place_local_tid(body, dest_place)
+        if dst != 0 and self.is_void_tid(dst) == 0:
+            return dst
+        return self.sema.ty_i64
+    0
+
+fn CCodegen.resolve_call_named_callee(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> str:
+    let fn_body_sym = self.canonical_body_sym(fn_sym)
+    if fn_body_sym != 0:
+        return self.fn_c_name(fn_body_sym)
+    let owner_named = self.owner_named_body_sym(body, fn_sym, args_id)
+    if owner_named != 0:
+        return self.fn_c_name(owner_named)
+    let builtin_method = self.unqualified_builtin_method_name(body, fn_sym, args_id)
+    if builtin_method.len() > 0:
+        return builtin_method
+    let inferred_named = self.infer_named_call_sym(body, fn_sym, args_id, dest_place)
+    if inferred_named > 0:
+        let named_body_sym = self.canonical_body_sym(inferred_named)
+        if named_body_sym != 0:
+            return self.fn_c_name(named_body_sym)
+        return self.extern_call_name(inferred_named, body, args_id, dest_place)
+    let inferred_method = self.infer_qualified_method_sym(body, fn_sym, args_id, dest_place)
+    if inferred_method == 0 - 2:
+        return "/*ambiguous_method*/"
+    if inferred_method > 0:
+        let method_body_sym = self.canonical_body_sym(inferred_method)
+        if method_body_sym != 0:
+            return self.fn_c_name(method_body_sym)
+        return self.extern_call_name(inferred_method, body, args_id, dest_place)
+    let owner_method = self.infer_owner_method_sym(body, fn_sym, args_id, dest_place)
+    if owner_method > 0:
+        let owner_body_sym = self.canonical_body_sym(owner_method)
+        if owner_body_sym != 0:
+            return self.fn_c_name(owner_body_sym)
+        return self.extern_call_name(owner_method, body, args_id, dest_place)
+    let body_method = self.infer_body_method_sym(body, fn_sym, args_id, dest_place)
+    if body_method > 0:
+        return self.fn_c_name(body_method)
+    self.extern_call_name(fn_sym, body, args_id, dest_place)
+
+fn CCodegen.call_return_tid_for_fn_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32, fallback: i32) -> i32:
+    let fn_body_sym = self.canonical_body_sym(fn_sym)
+    if fn_body_sym != 0:
+        let body_sig = self.sig_index_for_sym(fn_body_sym)
+        if body_sig >= 0:
+            return self.sema.sig_return_type(body_sig)
+    let owner_named = self.owner_named_body_sym(body, fn_sym, args_id)
+    if owner_named != 0:
+        let owner_named_sig = self.sig_index_for_sym(owner_named)
+        if owner_named_sig >= 0:
+            return self.sema.sig_return_type(owner_named_sig)
+    let builtin_method_ret = self.unqualified_builtin_method_ret_tid(body, fn_sym, args_id)
+    if builtin_method_ret != 0:
+        return builtin_method_ret
+    let inferred_named = self.infer_named_call_sym(body, fn_sym, args_id, dest_place)
+    if inferred_named > 0:
+        let named_sig = self.sig_index_for_sym(inferred_named)
+        if named_sig >= 0:
+            return self.sema.sig_return_type(named_sig)
+    let inferred_method = self.infer_qualified_method_sym(body, fn_sym, args_id, dest_place)
+    if inferred_method > 0:
+        let method_sig = self.sig_index_for_sym(inferred_method)
+        if method_sig >= 0:
+            return self.sema.sig_return_type(method_sig)
+    let owner_method = self.infer_owner_method_sym(body, fn_sym, args_id, dest_place)
+    if owner_method > 0:
+        let owner_sig = self.sig_index_for_sym(owner_method)
+        if owner_sig >= 0:
+            return self.sema.sig_return_type(owner_sig)
+    let body_method = self.infer_body_method_sym(body, fn_sym, args_id, dest_place)
+    if body_method > 0:
+        let body_sig = self.sig_index_for_sym(body_method)
+        if body_sig >= 0:
+            return self.sema.sig_return_type(body_sig)
+    let sig_idx = self.sig_index_for_sym(fn_sym)
+    if sig_idx >= 0:
+        return self.sema.sig_return_type(sig_idx)
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw == "print" or raw == "println":
+        return self.sema.ty_void
+    if raw == "with_str_concat" or raw == "with_fs_read_file" or raw == "int_to_string":
+        return self.sema.ty_str
+    if raw == "with_str_eq":
+        return self.sema.ty_bool
+    if raw == "dump_async_mir" or raw == "Driver.dump_async_mir":
+        return self.sema.ty_str
+    fallback
+
+fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> str:
+    if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
+        self.fail("invalid call callee operand id " ++ int_to_string(callee_operand))
+        return "/*invalid_callee*/"
+
+    let ok = body.operand_kinds.get(callee_operand as i64)
+    let od = body.operand_d0.get(callee_operand as i64)
+    if ok == OK_COPY() or ok == OK_MOVE():
+        let local_id = self.place_local_id(body, od)
+        if local_id >= 0 and self.place_is_direct_local(body, od, local_id) != 0:
+            let local_fn_sym = self.local_assigned_fn_sym(body, local_id)
+            if local_fn_sym == 0 - 2:
+                return "/*ambiguous_call*/"
+            if local_fn_sym > 0:
+                return self.resolve_call_named_callee(body, local_fn_sym, args_id, dest_place)
+        let callee_tid = self.sema.resolve_alias(self.operand_tid_no_infer(body, callee_operand))
+        if self.sema.get_type_kind(callee_tid) == TY_FN():
+            return self.place_text(body, od)
+        let inferred = self.infer_direct_call_sym(body, args_id, dest_place)
+        if inferred == 0 - 2:
+            return "/*ambiguous_call*/"
+        if inferred > 0:
+            let inferred_body_sym = self.canonical_body_sym(inferred)
+            if inferred_body_sym != 0:
+                return self.fn_c_name(inferred_body_sym)
+            return self.extern_call_name(inferred, body, args_id, dest_place)
+        let builtin = self.infer_builtin_call_name(body, args_id, dest_place)
+        if builtin.len() > 0:
+            return builtin
+        let print_builtin = self.infer_print_call_name(body, args_id, dest_place)
+        if print_builtin.len() > 0:
+            return print_builtin
+        return "/*unresolved_call*/"
+
+    if ok == OK_CONSTANT():
+        if od < 0 or od >= body.const_kinds.len() as i32:
+            self.fail("invalid call callee constant id " ++ int_to_string(od))
+            return "/*invalid_call_const*/"
+        let ck = body.const_kinds.get(od as i64)
+        if ck == CK_FN():
+            let fn_sym = body.const_d0.get(od as i64)
+            if fn_sym == 0:
+                self.fail("invalid function symbol in call constant")
+                return "/*invalid_fn_symbol*/"
+            return self.resolve_call_named_callee(body, fn_sym, args_id, dest_place)
+        // Current MIR lowering often uses a unit-const placeholder for direct
+        // calls. Recover the callee from semantic signatures.
+        let inferred = self.infer_direct_call_sym(body, args_id, dest_place)
+        if inferred == 0 - 2:
+            return "/*ambiguous_call*/"
+        if inferred > 0:
+            let inferred_body_sym = self.canonical_body_sym(inferred)
+            if inferred_body_sym != 0:
+                return self.fn_c_name(inferred_body_sym)
+            return self.extern_call_name(inferred, body, args_id, dest_place)
+        let builtin = self.infer_builtin_call_name(body, args_id, dest_place)
+        if builtin.len() > 0:
+            return builtin
+        return "/*unresolved_call*/"
+
+    self.fail("unsupported call callee operand kind " ++ int_to_string(ok))
+    "/*unsupported_callee*/"
+
+fn CCodegen.call_return_tid(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
+    let fallback = self.place_local_tid(body, dest_place)
+    let _ = bb
+    let builtin_ret = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
+    if builtin_ret != 0:
+        return builtin_ret
+    if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
+        return fallback
+
+    let ok = body.operand_kinds.get(callee_operand as i64)
+    let od = body.operand_d0.get(callee_operand as i64)
+
+    if ok == OK_COPY() or ok == OK_MOVE():
+        let callee_tid = self.sema.resolve_alias(self.operand_tid(body, callee_operand))
+        if self.sema.get_type_kind(callee_tid) == TY_FN():
+            return self.sema.get_type_d2(callee_tid)
+        let local_id = self.place_local_id(body, od)
+        if local_id >= 0 and self.place_is_direct_local(body, od, local_id) != 0:
+            let local_fn_sym = self.local_assigned_fn_sym(body, local_id)
+            if local_fn_sym > 0:
+                return self.call_return_tid_for_fn_sym(body, local_fn_sym, args_id, dest_place, fallback)
+        let inferred = self.infer_direct_call_sym(body, args_id, dest_place)
+        if inferred > 0:
+            let sig_idx = self.sig_index_for_sym(inferred)
+            if sig_idx >= 0:
+                return self.sema.sig_return_type(sig_idx)
+        let builtin = self.infer_builtin_call_name(body, args_id, dest_place)
+        if builtin.len() > 0:
+            return self.sema.ty_void
+        let print_builtin = self.infer_print_call_name(body, args_id, dest_place)
+        if print_builtin.len() > 0:
+            return self.sema.ty_void
+        return fallback
+
+    if ok == OK_CONSTANT():
+        if od < 0 or od >= body.const_kinds.len() as i32:
+            return fallback
+        let ck = body.const_kinds.get(od as i64)
+        if ck == CK_FN():
+            let fn_sym = body.const_d0.get(od as i64)
+            if fn_sym > 0:
+                return self.call_return_tid_for_fn_sym(body, fn_sym, args_id, dest_place, fallback)
+        let inferred = self.infer_direct_call_sym(body, args_id, dest_place)
+        if inferred > 0:
+            let sig_idx = self.sig_index_for_sym(inferred)
+            if sig_idx >= 0:
+                return self.sema.sig_return_type(sig_idx)
+        let builtin = self.infer_builtin_call_name(body, args_id, dest_place)
+        if builtin.len() > 0:
+            return self.sema.ty_void
+        let print_builtin = self.infer_print_call_name(body, args_id, dest_place)
+        if print_builtin.len() > 0:
+            return self.sema.ty_void
+        return fallback
+
+    fallback
+
+fn CCodegen.call_callee_sig_return_tid(self: CCodegen, body: MirBody, callee_operand: i32) -> i32:
+    if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
+        return 0
+    if body.operand_kinds.get(callee_operand as i64) != OK_CONSTANT():
+        return 0
+    let const_id = body.operand_d0.get(callee_operand as i64)
+    if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+        return 0
+    if body.const_kinds.get(const_id as i64) != CK_FN():
+        return 0
+    let fn_sym = body.const_d0.get(const_id as i64)
+    if fn_sym == 0:
+        return 0
+    let sig_idx = self.sig_index_for_sym(fn_sym)
+    if sig_idx < 0:
+        return 0
+    self.sema.sig_return_type(sig_idx)
+
+fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+    let declared = self.local_declared_tid(body, local_id)
+    let declared_resolved = self.sema.resolve_alias(declared)
+    let allow_container_receiver_infer =
+        if self.is_void_tid(declared) == 0 and self.sema.get_type_kind(declared_resolved) != TY_ERR():
+            0
+        else:
+            1
+    var recv_hint = 0
+
+    for bb in 0..body.block_count():
+        let tk = body.term_kind(bb)
+        if tk == TK_CALL():
+            let callee_operand = body.term_data0(bb)
+            let args_id = body.term_data1(bb)
+            let dest_place = body.term_data2(bb)
+            let recv_place = self.call_first_arg_place_id(body, args_id)
+            if allow_container_receiver_infer != 0 and self.place_is_direct_local(body, recv_place, local_id) != 0:
+                let kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
+                if kind == cc_builtin_vec_new() or kind == cc_builtin_vec_push() or kind == cc_builtin_vec_get() or kind == cc_builtin_vec_len() or kind == cc_builtin_vec_set_i32() or kind == cc_builtin_vec_remove() or kind == cc_builtin_vec_clear() or kind == cc_builtin_vec_pop():
+                    if recv_hint == 0:
+                        recv_hint = cc_pseudo_tid_vec()
+                if kind == cc_builtin_map_new() or kind == cc_builtin_map_insert() or kind == cc_builtin_map_get() or kind == cc_builtin_map_contains() or kind == cc_builtin_map_len() or kind == cc_builtin_map_remove():
+                    if recv_hint == 0:
+                        recv_hint = self.sema.ty_i64
+                if kind == cc_builtin_opt_is_some() or kind == cc_builtin_opt_unwrap():
+                    if recv_hint == 0:
+                        recv_hint = self.sema.ty_i64
+            if self.place_is_direct_local(body, dest_place, local_id) != 0:
+                let rt = self.call_return_tid(body, bb, callee_operand, args_id, dest_place)
+                if rt != 0 and self.is_void_tid(rt) == 0:
+                    return rt
+
+        let start = body.bb_stmt_starts.get(bb as i64)
+        let count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..count:
+            let stmt_id = start + si
+            if body.stmt_kinds.get(stmt_id as i64) != SK_ASSIGN():
+                continue
+            let dst_place = body.stmt_d0.get(stmt_id as i64)
+            if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                continue
+            let rval_id = body.stmt_d1.get(stmt_id as i64)
+            if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+                continue
+            let rk = body.rval_kinds.get(rval_id as i64)
+            let d0 = body.rval_d0.get(rval_id as i64)
+            let d1 = body.rval_d1.get(rval_id as i64)
+            let d2 = body.rval_d2.get(rval_id as i64)
+            if rk == RK_USE():
+                let t = self.operand_tid(body, d0)
+                if t != 0 and self.is_void_tid(t) == 0:
+                    return t
+                continue
+            if rk == RK_BIN_OP():
+                if d0 == OP_EQ() or d0 == OP_NEQ() or d0 == OP_LT() or d0 == OP_GT() or d0 == OP_LTE() or d0 == OP_GTE() or d0 == OP_AND() or d0 == OP_OR():
+                    return self.sema.ty_bool
+                if d0 == OP_CONCAT():
+                    return self.sema.ty_str
+                let lt = self.operand_tid(body, d1)
+                if lt != 0 and self.is_void_tid(lt) == 0:
+                    return lt
+                let rt = self.operand_tid(body, d2)
+                if rt != 0 and self.is_void_tid(rt) == 0:
+                    return rt
+                continue
+            if rk == RK_UN_OP():
+                if d0 == UOP_NOT():
+                    return self.sema.ty_bool
+                let t = self.operand_tid(body, d1)
+                if t != 0 and self.is_void_tid(t) == 0:
+                    return t
+                continue
+            if rk == RK_CAST():
+                if d1 != 0 and self.is_void_tid(d1) == 0:
+                    return d1
+                continue
+            if rk == RK_DISCRIMINANT():
+                return self.sema.ty_i32
+            if rk == RK_LEN():
+                return self.sema.ty_i64
+
+    if recv_hint != 0 and self.is_void_tid(recv_hint) == 0:
+        return recv_hint
+    0
+
+fn CCodegen.infer_local_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        return 0
+    let cache_hit = self.local_infer_cache_lookup(body.fn_sym, local_id)
+    if cache_hit != 0 - 1234567:
+        return cache_hit
+    let declared = self.local_declared_tid(body, local_id)
+    let declared_resolved = self.sema.resolve_alias(declared)
+    let declared_kind = self.sema.get_type_kind(declared_resolved)
+    if local_id == 0:
+        self.local_infer_cache_store(body.fn_sym, local_id, declared)
+        return declared
+    let sig_idx = self.body_sig_index(body.fn_sym)
+    let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
+    if local_id >= 1 and local_id <= param_count and self.is_void_tid(declared) == 0:
+        self.local_infer_cache_store(body.fn_sym, local_id, declared)
+        return declared
+    var active = 0
+    for i in 0..self.active_local_ids.len() as i32:
+        if self.active_local_body_fns.get(i as i64) != body.fn_sym:
+            continue
+        if self.active_local_ids.get(i as i64) == local_id:
+            active = 1
+            break
+    if active != 0:
+        return declared
+
+    self.infer_local_depth = self.infer_local_depth + 1
+    self.active_local_body_fns.push(body.fn_sym)
+    self.active_local_ids.push(local_id)
+    let inferred = self.infer_local_tid_impl(body, local_id)
+    self.active_local_ids.pop()
+    self.active_local_body_fns.pop()
+    self.infer_local_depth = self.infer_local_depth - 1
+    let hinted = self.local_usage_hint_tid(body, local_id)
+    if hinted != 0 and self.is_void_tid(hinted) == 0:
+        if inferred == 0 or self.is_void_tid(inferred) != 0:
+            self.local_infer_cache_store(body.fn_sym, local_id, hinted)
+            return hinted
+        if self.strict_type_match(inferred, hinted) == 0:
+            let inferred_scalar = self.is_scalar_like_tid(inferred)
+            let hinted_scalar = self.is_scalar_like_tid(hinted)
+            if inferred_scalar != 0 and hinted_scalar != 0:
+                self.local_infer_cache_store(body.fn_sym, local_id, hinted)
+                return hinted
+    if inferred != 0 and self.is_void_tid(inferred) == 0:
+        self.local_infer_cache_store(body.fn_sym, local_id, inferred)
+        return inferred
+    self.local_infer_cache_store(body.fn_sym, local_id, declared)
+    declared
+
+fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+    if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        return ""
+    let start = body.call_arg_starts.get(args_id as i64)
+    let count = body.call_arg_counts.get(args_id as i64)
+    var out = ""
+    for i in 0..count:
+        if i > 0:
+            out = out ++ ", "
+        let op_id = body.call_arg_operands.get((start + i) as i64)
+        out = out ++ self.operand_text(body, op_id)
+    out
+
+fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> str:
+    let kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
+    if kind == cc_builtin_none():
+        return ""
+    let _ = bb
+    let argc = self.call_arg_count(body, args_id)
+    let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
+    let has_ret = if self.is_void_tid(ret_tid) == 0: 1 else: 0
+
+    if kind == cc_builtin_vec_new():
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";\n"
+        else:
+            out = out ++ "    (void)0;\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_vec_push():
+        if argc < 2:
+            self.fail("vec.push expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let elem_operand = self.call_arg_operand(body, args_id, 1)
+        let elem_text = self.operand_text(body, elem_operand)
+        var elem_tid = self.operand_tid(body, elem_operand)
+        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            elem_tid = self.sema.ty_i64
+        let elem_ty = self.c_type(elem_tid, 0)
+        var out = "    " ++ cc_lbrace() ++ " " ++ elem_ty ++ " __with_tmp = " ++ elem_text ++ "; with_vec_push(&(" ++ recv ++ "), &__with_tmp); " ++ cc_rbrace() ++ "\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_vec_get():
+        if argc < 2:
+            self.fail("vec.get expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        let dst = self.place_text(body, dest_place)
+        var out = "    memset(&(" ++ dst ++ "), 0, sizeof(" ++ dst ++ "));\n"
+        out = out ++ "    if ((int64_t)(" ++ idx ++ ") >= 0 && (int64_t)(" ++ idx ++ ") < with_vec_len(&(" ++ recv ++ "))) " ++ cc_lbrace() ++ " memcpy(&(" ++ dst ++ "), with_vec_get_ptr(&(" ++ recv ++ "), (int64_t)(" ++ idx ++ ")), sizeof(" ++ dst ++ ")); " ++ cc_rbrace() ++ "\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_vec_len():
+        if argc < 1:
+            self.fail("vec.len expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_vec_len(&(" ++ recv ++ "));\n"
+        else:
+            out = out ++ "    (void)with_vec_len(&(" ++ recv ++ "));\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_vec_set_i32():
+        if argc < 3:
+            self.fail("vec.set_i32 expects three arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        let val = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
+        var out = "    with_vec_set_i32(&(" ++ recv ++ "), (int64_t)(" ++ idx ++ "), (int32_t)(" ++ val ++ "));\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_vec_remove():
+        if argc < 2:
+            self.fail("vec.remove expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = "    with_vec_remove(&(" ++ recv ++ "), (int64_t)(" ++ idx ++ "));\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_vec_clear():
+        if argc < 1:
+            self.fail("vec.clear expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = "    with_vec_clear(&(" ++ recv ++ "));\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_vec_pop():
+        if argc < 1:
+            self.fail("vec.pop expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = "    " ++ cc_lbrace() ++ " int64_t __with_n = with_vec_len(&(" ++ recv ++ "));\n"
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "        memset(&(" ++ dst ++ "), 0, sizeof(" ++ dst ++ "));\n"
+            out = out ++ "        if (__with_n > 0) " ++ cc_lbrace() ++ " memcpy(&(" ++ dst ++ "), with_vec_get_ptr(&(" ++ recv ++ "), __with_n - 1), sizeof(" ++ dst ++ ")); with_vec_remove(&(" ++ recv ++ "), __with_n - 1); " ++ cc_rbrace() ++ "\n"
+        else:
+            out = out ++ "        if (__with_n > 0) " ++ cc_lbrace() ++ " with_vec_remove(&(" ++ recv ++ "), __with_n - 1); " ++ cc_rbrace() ++ "\n"
+        out = out ++ "    " ++ cc_rbrace() ++ "\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_map_new():
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = 0;\n"
+        else:
+            out = out ++ "    (void)0;\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_map_insert():
+        if argc < 3:
+            self.fail("map.insert expects three arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let key_operand = self.call_arg_operand(body, args_id, 1)
+        let val_operand = self.call_arg_operand(body, args_id, 2)
+        let key_text = self.operand_text(body, key_operand)
+        let val_text = self.operand_text(body, val_operand)
+        var key_tid = self.operand_tid(body, key_operand)
+        if key_tid == 0 or self.is_void_tid(key_tid) != 0:
+            key_tid = self.sema.ty_i64
+        var val_tid = self.operand_tid(body, val_operand)
+        if val_tid == 0 or self.is_void_tid(val_tid) != 0:
+            val_tid = self.sema.ty_i64
+        let key_ty = self.c_type(key_tid, 0)
+        let val_ty = self.c_type(val_tid, 0)
+        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid)) == TY_STR(): "1" else: "0"
+        var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; " ++ val_ty ++ " __with_v = " ++ val_text ++ ";"
+        out = out ++ " if ((" ++ recv ++ ") == 0) " ++ cc_lbrace() ++ " " ++ recv ++ " = (int64_t)(intptr_t)with_hashmap_new(sizeof(__with_k), sizeof(__with_v)); " ++ cc_rbrace()
+        out = out ++ " with_hashmap_insert((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_v, " ++ is_str_key ++ "); " ++ cc_rbrace() ++ "\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_map_contains():
+        if argc < 2:
+            self.fail("map.contains expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let key_operand = self.call_arg_operand(body, args_id, 1)
+        let key_text = self.operand_text(body, key_operand)
+        var key_tid = self.operand_tid(body, key_operand)
+        if key_tid == 0 or self.is_void_tid(key_tid) != 0:
+            key_tid = self.sema.ty_i64
+        let key_ty = self.c_type(key_tid, 0)
+        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid)) == TY_STR(): "1" else: "0"
+        var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; "
+        if has_ret != 0:
+            out = out ++ self.place_text(body, dest_place) ++ " = "
+        out = out ++ "(((" ++ recv ++ ") != 0) && (with_hashmap_contains((void*)(intptr_t)(" ++ recv ++ "), &__with_k, " ++ is_str_key ++ ") != 0)); " ++ cc_rbrace() ++ "\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_map_len():
+        if argc < 1:
+            self.fail("map.len expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (((" ++ recv ++ ") != 0) ? with_hashmap_len((void*)(intptr_t)(" ++ recv ++ ")) : 0);\n"
+        else:
+            out = out ++ "    (void)(((" ++ recv ++ ") != 0) ? with_hashmap_len((void*)(intptr_t)(" ++ recv ++ ")) : 0);\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_map_remove():
+        if argc < 2:
+            self.fail("map.remove expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let key_operand = self.call_arg_operand(body, args_id, 1)
+        let key_text = self.operand_text(body, key_operand)
+        var key_tid = self.operand_tid(body, key_operand)
+        if key_tid == 0 or self.is_void_tid(key_tid) != 0:
+            key_tid = self.sema.ty_i64
+        let key_ty = self.c_type(key_tid, 0)
+        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid)) == TY_STR(): "1" else: "0"
+        var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; "
+        if has_ret != 0:
+            out = out ++ self.place_text(body, dest_place) ++ " = "
+        out = out ++ "(((" ++ recv ++ ") != 0) && (with_hashmap_remove((void*)(intptr_t)(" ++ recv ++ "), &__with_k, " ++ is_str_key ++ ") != 0)); " ++ cc_rbrace() ++ "\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_map_get():
+        if argc < 2:
+            self.fail("map.get expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let key_operand = self.call_arg_operand(body, args_id, 1)
+        let key_text = self.operand_text(body, key_operand)
+        var key_tid = self.operand_tid(body, key_operand)
+        if key_tid == 0 or self.is_void_tid(key_tid) != 0:
+            key_tid = self.sema.ty_i64
+        let key_ty = self.c_type(key_tid, 0)
+        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid)) == TY_STR(): "1" else: "0"
+        let dst = self.place_text(body, dest_place)
+        var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; int64_t __with_v = 0;"
+        out = out ++ " if ((" ++ recv ++ ") != 0 && with_hashmap_get((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_v, " ++ is_str_key ++ ") != 0) "
+        out = out ++ cc_lbrace() ++ " " ++ dst ++ " = (__with_v + 1); " ++ cc_rbrace() ++ " else " ++ cc_lbrace() ++ " " ++ dst ++ " = 0; " ++ cc_rbrace()
+        out = out ++ " " ++ cc_rbrace() ++ "\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_opt_is_some():
+        if argc < 1:
+            self.fail("Option.is_some expects one argument")
+            return "    abort();"
+        let opt_text = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = ((" ++ opt_text ++ ") != 0);\n"
+        else:
+            out = out ++ "    (void)((" ++ opt_text ++ ") != 0);\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    if kind == cc_builtin_opt_unwrap():
+        if argc < 1:
+            self.fail("Option.unwrap expects one argument")
+            return "    abort();"
+        let opt_text = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let dst = self.place_text(body, dest_place)
+        var out = "    " ++ dst ++ " = ((" ++ opt_text ++ ") - 1);\n"
+        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        return out
+
+    ""
+
+fn CCodegen.field_place_matches(self: CCodegen, body: MirBody, place_id: i32, struct_tid: i32, field_sym: i32) -> i32:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return 0
+    let count = body.place_proj_counts.get(place_id as i64)
+    if count != 1:
+        return 0
+    let start = body.place_proj_starts.get(place_id as i64)
+    if body.proj_kinds.get(start as i64) != PK_FIELD():
+        return 0
+    if body.proj_d0.get(start as i64) != field_sym:
+        return 0
+    let lid = body.place_locals.get(place_id as i64)
+    if lid < 0 or lid >= body.local_type_ids.len() as i32:
+        return 0
+    let base_tid = self.local_declared_tid(body, lid)
+    if self.is_void_tid(base_tid) != 0:
+        return 0
+    let base_resolved = self.sema.resolve_alias(base_tid)
+    let want_resolved = self.sema.resolve_alias(struct_tid)
+    if self.sema.get_type_kind(base_resolved) != TY_STRUCT():
+        return 0
+    if self.sema.get_type_kind(want_resolved) != TY_STRUCT():
+        return 0
+    let base_name = self.sema.get_type_d0(base_resolved)
+    let want_name = self.sema.get_type_d0(want_resolved)
+    if base_name == want_name:
+        return 1
+    if base_name != 0 and want_name != 0 and cc_intern_resolve(self.intern, base_name) == cc_intern_resolve(self.intern, want_name):
+        return 1
+    0
+
+fn CCodegen.rvalue_infer_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return 0
+    let no_infer = if self.in_field_cache_build != 0: 1 else: 0
+    let rk = body.rval_kinds.get(rval_id as i64)
+    let d0 = body.rval_d0.get(rval_id as i64)
+    let d1 = body.rval_d1.get(rval_id as i64)
+    let d2 = body.rval_d2.get(rval_id as i64)
+    if rk == RK_USE():
+        if no_infer != 0:
+            return self.operand_tid_no_infer(body, d0)
+        return self.operand_tid(body, d0)
+    if rk == RK_BIN_OP():
+        if d0 == OP_EQ() or d0 == OP_NEQ() or d0 == OP_LT() or d0 == OP_GT() or d0 == OP_LTE() or d0 == OP_GTE() or d0 == OP_AND() or d0 == OP_OR():
+            return self.sema.ty_bool
+        if d0 == OP_CONCAT():
+            return self.sema.ty_str
+        let lt = if no_infer != 0: self.operand_tid_no_infer(body, d1) else: self.operand_tid(body, d1)
+        if lt != 0 and self.is_void_tid(lt) == 0:
+            return lt
+        if no_infer != 0:
+            return self.operand_tid_no_infer(body, d2)
+        return self.operand_tid(body, d2)
+    if rk == RK_UN_OP():
+        if d0 == UOP_NOT():
+            return self.sema.ty_bool
+        if no_infer != 0:
+            return self.operand_tid_no_infer(body, d1)
+        return self.operand_tid(body, d1)
+    if rk == RK_CAST():
+        return d1
+    if rk == RK_AGGREGATE():
+        if d1 < 0 or d1 >= body.agg_field_starts.len() as i32:
+            return 0
+        let start = body.agg_field_starts.get(d1 as i64)
+        let count = body.agg_field_counts.get(d1 as i64)
+        if count <= 0:
+            return 0
+        let first = body.agg_field_operands.get(start as i64)
+        if no_infer != 0:
+            return self.operand_tid_no_infer(body, first)
+        return self.operand_tid(body, first)
+    if rk == RK_LEN():
+        return self.sema.ty_i64
+    if rk == RK_DISCRIMINANT():
+        return self.sema.ty_i32
+    0
+
+fn CCodegen.record_field_tid_from_place(self: CCodegen, body: MirBody, place_id: i32, tid: i32):
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return
+    if tid == 0:
+        return
+    let count = body.place_proj_counts.get(place_id as i64)
+    if count != 1:
+        return
+    let start = body.place_proj_starts.get(place_id as i64)
+    if body.proj_kinds.get(start as i64) != PK_FIELD():
+        return
+    let field_sym = body.proj_d0.get(start as i64)
+    let lid = body.place_locals.get(place_id as i64)
+    if lid < 0 or lid >= body.local_type_ids.len() as i32:
+        return
+    var base_tid = self.local_effective_tid(body, lid)
+    if self.is_void_tid(base_tid) != 0:
+        base_tid = self.local_declared_tid(body, lid)
+    let base_resolved = self.sema.resolve_alias(base_tid)
+    if self.sema.get_type_kind(base_resolved) != TY_STRUCT():
+        return
+    self.field_cache_record(base_resolved, field_sym, tid)
+
+fn CCodegen.place_is_single_field(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+    let _ = self
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return 0
+    if body.place_proj_counts.get(place_id as i64) != 1:
+        return 0
+    let start = body.place_proj_starts.get(place_id as i64)
+    if body.proj_kinds.get(start as i64) != PK_FIELD():
+        return 0
+    1
+
+fn CCodegen.build_field_cache_from_usage(self: CCodegen):
+    if self.field_cache_ready != 0:
+        return
+    self.field_cache_ready = 1
+    self.in_field_cache_build = 1
+
+    for bi in 0..self.mir_mod.bodies.len() as i32:
+        if self.check_interrupted() != 0:
+            self.in_field_cache_build = 0
+            return
+        let body: MirBody = self.mir_mod.bodies.get(bi as i64)
+        for bb in 0..body.block_count():
+            if self.check_interrupted() != 0:
+                self.in_field_cache_build = 0
+                return
+            if body.term_kind(bb) != TK_CALL():
+                continue
+            let callee_operand = body.term_data0(bb)
+            let args_id = body.term_data1(bb)
+            let dest_place = body.term_data2(bb)
+            let recv_place = self.call_first_arg_place_id(body, args_id)
+            let recv_is_field = if recv_place >= 0: self.place_is_single_field(body, recv_place) else: 0
+            let dest_is_field = self.place_is_single_field(body, dest_place)
+            if recv_is_field == 0 and dest_is_field == 0:
+                continue
+
+            let callee_sym = self.call_callee_fn_sym(body, callee_operand)
+            let hint = self.callee_field_hint(callee_sym)
+            if hint == cc_callee_hint_none():
+                continue
+
+            if recv_is_field != 0:
+                if hint == cc_callee_hint_vec_recv():
+                    self.record_field_tid_from_place(body, recv_place, cc_pseudo_tid_vec())
+                    continue
+                if hint == cc_callee_hint_map_recv():
+                    self.record_field_tid_from_place(body, recv_place, self.sema.ty_i64)
+                    continue
+                if hint == cc_callee_hint_opt_recv():
+                    self.record_field_tid_from_place(body, recv_place, self.sema.ty_i64)
+                    continue
+
+            if dest_is_field != 0:
+                if hint == cc_callee_hint_map_new():
+                    self.record_field_tid_from_place(body, dest_place, self.sema.ty_i64)
+                    continue
+                if hint == cc_callee_hint_vec_new():
+                    self.record_field_tid_from_place(body, dest_place, cc_pseudo_tid_vec())
+                    continue
+                if hint == cc_callee_hint_opt_new():
+                    self.record_field_tid_from_place(body, dest_place, self.sema.ty_i64)
+                    continue
+    self.in_field_cache_build = 0
+
+fn CCodegen.infer_struct_field_tid_from_usage(self: CCodegen, struct_tid: i32, field_sym: i32) -> i32:
+    let resolved_struct = self.sema.resolve_alias(struct_tid)
+    if resolved_struct == 0:
+        return 0
+    if self.sema.get_type_kind(resolved_struct) != TY_STRUCT():
+        return 0
+    let cached = self.field_cache_lookup(resolved_struct, field_sym)
+    if cached != 0 - 1234567:
+        return cached
+
+    self.build_field_cache_from_usage()
+    let hinted = self.field_cache_lookup(resolved_struct, field_sym)
+    if hinted != 0 - 1234567:
+        return hinted
+
+    var inferred = 0
+    for bi in 0..self.mir_mod.bodies.len() as i32:
+        if self.check_interrupted() != 0:
+            return 0
+        let body: MirBody = self.mir_mod.bodies.get(bi as i64)
+
+        for bb in 0..body.block_count():
+            if self.check_interrupted() != 0:
+                return 0
+
+            if body.term_kind(bb) == TK_CALL():
+                let callee_operand = body.term_data0(bb)
+                let args_id = body.term_data1(bb)
+                let dest_place = body.term_data2(bb)
+
+                var sig_idx = 0 - 1
+                if callee_operand >= 0 and callee_operand < body.operand_kinds.len() as i32:
+                    if body.operand_kinds.get(callee_operand as i64) == OK_CONSTANT():
+                        let const_id = body.operand_d0.get(callee_operand as i64)
+                        if const_id >= 0 and const_id < body.const_kinds.len() as i32:
+                            if body.const_kinds.get(const_id as i64) == CK_FN():
+                                let fn_sym = body.const_d0.get(const_id as i64)
+                                if fn_sym != 0:
+                                    sig_idx = self.sig_index_for_sym(fn_sym)
+
+                if sig_idx >= 0:
+                    let argc = self.call_arg_count(body, args_id)
+                    let param_count = self.sema.sig_get_param_count(sig_idx)
+                    for ai in 0..argc:
+                        if ai >= param_count:
+                            break
+                        let arg_operand = self.call_arg_operand(body, args_id, ai)
+                        if arg_operand < 0 or arg_operand >= body.operand_kinds.len() as i32:
+                            continue
+                        let ok = body.operand_kinds.get(arg_operand as i64)
+                        if ok != OK_COPY() and ok != OK_MOVE():
+                            continue
+                        let arg_place = body.operand_d0.get(arg_operand as i64)
+                        if self.field_place_matches(body, arg_place, resolved_struct, field_sym) == 0:
+                            continue
+                        let p_tid = self.sema.sig_param_type(sig_idx, ai)
+                        inferred = self.prefer_inferred_tid(inferred, p_tid)
+
+                    if self.field_place_matches(body, dest_place, resolved_struct, field_sym) != 0:
+                        let ret_tid = self.sema.sig_return_type(sig_idx)
+                        inferred = self.prefer_inferred_tid(inferred, ret_tid)
+
+            let start = body.bb_stmt_starts.get(bb as i64)
+            let count = body.bb_stmt_counts.get(bb as i64)
+            for si in 0..count:
+                let stmt_id = start + si
+                if body.stmt_kinds.get(stmt_id as i64) != SK_ASSIGN():
+                    continue
+                let dst_place = body.stmt_d0.get(stmt_id as i64)
+                let rval_id = body.stmt_d1.get(stmt_id as i64)
+
+                if self.field_place_matches(body, dst_place, resolved_struct, field_sym) != 0:
+                    var rv_tid = 0
+                    if rval_id >= 0 and rval_id < body.rval_kinds.len() as i32:
+                        let rk = body.rval_kinds.get(rval_id as i64)
+                        let rd0 = body.rval_d0.get(rval_id as i64)
+                        let rd1 = body.rval_d1.get(rval_id as i64)
+                        if rk == RK_USE():
+                            if rd0 >= 0 and rd0 < body.operand_kinds.len() as i32:
+                                let ok = body.operand_kinds.get(rd0 as i64)
+                                let od = body.operand_d0.get(rd0 as i64)
+                                if ok == OK_COPY() or ok == OK_MOVE():
+                                    let src_local = self.place_local_id(body, od)
+                                    if src_local >= 0 and self.place_is_direct_local(body, od, src_local) != 0:
+                                        rv_tid = self.local_declared_tid(body, src_local)
+                                else if ok == OK_CONSTANT():
+                                    if od >= 0 and od < body.const_types.len() as i32:
+                                        rv_tid = body.const_types.get(od as i64)
+                        else if rk == RK_BIN_OP():
+                            if rd0 == OP_EQ() or rd0 == OP_NEQ() or rd0 == OP_LT() or rd0 == OP_GT() or rd0 == OP_LTE() or rd0 == OP_GTE() or rd0 == OP_AND() or rd0 == OP_OR():
+                                rv_tid = self.sema.ty_bool
+                            else if rd0 == OP_CONCAT():
+                                rv_tid = self.sema.ty_str
+                        else if rk == RK_UN_OP():
+                            if rd0 == UOP_NOT():
+                                rv_tid = self.sema.ty_bool
+                        else if rk == RK_CAST():
+                            rv_tid = rd1
+                        else if rk == RK_LEN():
+                            rv_tid = self.sema.ty_i64
+                        else if rk == RK_DISCRIMINANT():
+                            rv_tid = self.sema.ty_i32
+                    inferred = self.prefer_inferred_tid(inferred, rv_tid)
+
+                if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+                    continue
+                if body.rval_kinds.get(rval_id as i64) != RK_USE():
+                    continue
+                let src_operand = body.rval_d0.get(rval_id as i64)
+                if src_operand < 0 or src_operand >= body.operand_kinds.len() as i32:
+                    continue
+                let src_ok = body.operand_kinds.get(src_operand as i64)
+                if src_ok != OK_COPY() and src_ok != OK_MOVE():
+                    continue
+                let src_place = body.operand_d0.get(src_operand as i64)
+                if self.field_place_matches(body, src_place, resolved_struct, field_sym) == 0:
+                    continue
+                let dst_local = self.place_local_id(body, dst_place)
+                if dst_local < 0:
+                    continue
+                if self.place_is_direct_local(body, dst_place, dst_local) == 0:
+                    continue
+                let dst_tid = self.local_declared_tid(body, dst_local)
+                inferred = self.prefer_inferred_tid(inferred, dst_tid)
+
+    self.field_cache_store(resolved_struct, field_sym, inferred)
+    inferred
+
+fn CCodegen.effective_field_tid(self: CCodegen, struct_tid: i32, field_sym: i32, raw_field_tid: i32) -> i32:
+    let resolved = self.sema.resolve_alias(raw_field_tid)
+    if resolved != 0 and self.is_void_tid(resolved) == 0 and self.sema.get_type_kind(resolved) != TY_ERR():
+        return resolved
+    if self.in_field_cache_build != 0:
+        if resolved != 0:
+            return resolved
+        return raw_field_tid
+    let owner_tid = self.sema.resolve_alias(struct_tid)
+    if owner_tid != 0 and self.sema.get_type_kind(owner_tid) == TY_STRUCT():
+        var cached = self.field_cache_lookup(owner_tid, field_sym)
+        if cached == 0 - 1234567:
+            self.build_field_cache_from_usage()
+            cached = self.field_cache_lookup(owner_tid, field_sym)
+        if cached != 0 - 1234567 and cached != 0 and self.is_void_tid(cached) == 0:
+            let cached_resolved = self.sema.resolve_alias(cached)
+            if cached_resolved != 0 and self.sema.get_type_kind(cached_resolved) != TY_ERR():
+                return cached_resolved
+            return cached
+        let owner_name = cc_intern_resolve(self.intern, self.sema.get_type_d0(owner_tid))
+        let field_name = cc_intern_resolve(self.intern, field_sym)
+        if owner_name == "Parser":
+            if field_name == "intern" or field_sym == 144:
+                let intern_tid = self.named_struct_tid("InternPool")
+                if intern_tid != 0:
+                    return intern_tid
+            if field_name == "diags" or field_name == "diagnostics" or field_sym == 145:
+                let diags_tid = self.named_struct_tid("DiagnosticList")
+                if diags_tid != 0:
+                    return diags_tid
+        if owner_name == "Compilation":
+            if field_name == "driver" or field_sym == 213:
+                let driver_tid = self.named_struct_tid("Driver")
+                if driver_tid != 0:
+                    return driver_tid
+        if owner_name == "ResolveState":
+            if field_name == "pool":
+                let pool_tid = self.named_struct_tid("InternPool")
+                if pool_tid != 0:
+                    return pool_tid
+            if field_name == "diags" or field_name == "diagnostics":
+                let diags_tid = self.named_struct_tid("DiagnosticList")
+                if diags_tid != 0:
+                    return diags_tid
+            if field_name == "result":
+                let result_tid = self.named_struct_tid("ResolveResult")
+                if result_tid != 0:
+                    return result_tid
+            if field_name == "root_source_dir":
+                return self.sema.ty_str
+            if field_name == "module_paths" or field_name == "module_dirs" or field_name == "module_file_ids" or field_name == "module_decl_counts" or field_name == "module_import_starts" or field_name == "module_import_counts" or field_name == "module_scope_ids" or field_name == "module_processed":
+                return cc_pseudo_tid_vec()
+            if field_name == "module_map" or field_name == "link_lib_set" or field_name == "binding_map":
+                return self.sema.ty_i64
+    raw_field_tid
+
+fn CCodegen.is_unit_rvalue(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
+    let _ = self
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return 0
+    if body.rval_kinds.get(rval_id as i64) != RK_USE():
+        return 0
+    let op = body.rval_d0.get(rval_id as i64)
+    if op < 0 or op >= body.operand_kinds.len() as i32:
+        return 0
+    if body.operand_kinds.get(op as i64) != OK_CONSTANT():
+        return 0
+    let const_id = body.operand_d0.get(op as i64)
+    if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+        return 0
+    let ck = body.const_kinds.get(const_id as i64)
+    if ck == CK_UNIT() or ck == CK_ZERO_SIZED():
+        return 1
+    0
+
+fn CCodegen.zero_value_text(self: CCodegen, tid: i32) -> str:
+    let resolved = self.sema.resolve_alias(tid)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TY_BOOL():
+        return "false"
+    if tk == TY_FLOAT():
+        return "0.0"
+    if tk == TY_PTR() or tk == TY_REF():
+        return "NULL"
+    if tk == TY_STR() or tk == TY_STRUCT():
+        return "(" ++ self.c_type(resolved, 0) ++ ")" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
+    "0"
+
+fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
+    if stmt_id < 0 or stmt_id >= body.stmt_kinds.len() as i32:
+        self.fail("invalid statement id " ++ int_to_string(stmt_id))
+        return "    /* invalid statement */"
+    let sk = body.stmt_kinds.get(stmt_id as i64)
+    let d0 = body.stmt_d0.get(stmt_id as i64)
+    let d1 = body.stmt_d1.get(stmt_id as i64)
+    if sk == SK_ASSIGN():
+        if self.is_unit_rvalue(body, d1) != 0:
+            let dst_tid = self.place_tid(body, d0)
+            return "    " ++ self.place_text(body, d0) ++ " = " ++ self.zero_value_text(dst_tid) ++ ";"
+        return "    " ++ self.place_text(body, d0) ++ " = " ++ self.rvalue_text(body, d1) ++ ";"
+    if sk == SK_STORAGE_LIVE():
+        return "    /* StorageLive(_" ++ int_to_string(d0) ++ "); */"
+    if sk == SK_STORAGE_DEAD():
+        return "    /* StorageDead(_" ++ int_to_string(d0) ++ "); */"
+    if sk == SK_DROP():
+        let p = self.place_text(body, d0)
+        let pt = self.place_tid(body, d0)
+        if pt == cc_pseudo_tid_vec():
+            return "    with_vec_clear(&(" ++ p ++ "));"
+        return "    /* drop(" ++ p ++ "); */"
+    if sk == SK_NOP():
+        return "    /* nop */"
+    self.fail("unsupported statement kind " ++ int_to_string(sk))
+    "    /* unsupported statement */"
+
+fn CCodegen.emit_switch_term(self: CCodegen, body: MirBody, d0: i32, d1: i32, d2: i32) -> str:
+    let cond = self.operand_text(body, d0)
+    if d1 < 0 or d1 >= body.switch_table_starts.len() as i32:
+        self.fail("invalid switch table id " ++ int_to_string(d1))
+        if d2 != 0:
+            return "    goto bb" ++ int_to_string(d2) ++ ";"
+        return "    abort();"
+
+    let start = body.switch_table_starts.get(d1 as i64)
+    let count = body.switch_table_counts.get(d1 as i64)
+    var out = ""
+    for i in 0..count:
+        let val = body.switch_table_vals.get((start + i) as i64)
+        let tgt = body.switch_table_targets.get((start + i) as i64)
+        let head = if i == 0: "if" else: "else if"
+        out = out ++ "    " ++ head ++ " (" ++ cond ++ " == " ++ int_to_string(val) ++ ") " ++ cc_lbrace() ++ "\n"
+        out = out ++ "        goto bb" ++ int_to_string(tgt) ++ ";\n"
+        out = out ++ "    " ++ cc_rbrace() ++ "\n"
+    out = out ++ "    else " ++ cc_lbrace() ++ "\n"
+    if d2 != 0:
+        out = out ++ "        goto bb" ++ int_to_string(d2) ++ ";\n"
+    else:
+        out = out ++ "        abort();\n"
+    out = out ++ "    " ++ cc_rbrace()
+    out
+
+fn CCodegen.emit_term(self: CCodegen, body: MirBody, bb: i32) -> str:
+    let tk = body.term_kind(bb)
+    let d0 = body.term_data0(bb)
+    let d1 = body.term_data1(bb)
+    let d2 = body.term_data2(bb)
+    let d3 = body.term_data3(bb)
+    if tk == TK_GOTO():
+        return "    goto bb" ++ int_to_string(d0) ++ ";"
+    if tk == TK_RETURN():
+        let sig_idx = self.body_sig_index(body.fn_sym)
+        let ret_tid = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else:
+            if body.local_type_ids.len() as i32 > 0: body.local_type_ids.get(0) else: self.sema.ty_void
+        if self.is_void_tid(ret_tid) != 0:
+            return "    return;"
+        return "    return _0;"
+    if tk == TK_UNREACHABLE():
+        return "    abort();"
+    if tk == TK_SWITCH_INT():
+        return self.emit_switch_term(body, d0, d1, d2)
+    if tk == TK_CALL():
+        let builtin_term = self.emit_builtin_call_term(body, bb, d0, d1, d2, d3)
+        if builtin_term.len() > 0:
+            return builtin_term
+        let callee = self.resolve_call_callee_text(body, bb, d0, d1, d2)
+        let ret_tid = self.call_return_tid(body, bb, d0, d1, d2)
+        if callee == "/*unresolved_call*/" or callee == "/*ambiguous_call*/" or callee == "/*ambiguous_method*/":
+            var out = ""
+            if self.is_void_tid(ret_tid) == 0:
+                out = out ++ "    " ++ self.place_text(body, d2) ++ " = " ++ self.zero_value_text(ret_tid) ++ ";\n"
+            else:
+                out = out ++ "    /* unresolved call elided */\n"
+            out = out ++ "    goto bb" ++ int_to_string(d3) ++ ";"
+            return out
+        let args = self.call_args_text(body, d1)
+        var out = ""
+        if self.is_void_tid(ret_tid) != 0:
+            out = out ++ "    " ++ callee ++ "(" ++ args ++ ");\n"
+        else:
+            out = out ++ "    " ++ self.place_text(body, d2) ++ " = " ++ callee ++ "(" ++ args ++ ");\n"
+        out = out ++ "    goto bb" ++ int_to_string(d3) ++ ";"
+        return out
+    if tk == TK_DROP_AND_GOTO():
+        let p = self.place_text(body, d0)
+        let pt = self.place_tid(body, d0)
+        var out = ""
+        if pt == cc_pseudo_tid_vec():
+            out = out ++ "    with_vec_clear(&(" ++ p ++ "));\n"
+        else:
+            out = out ++ "    /* drop(" ++ p ++ "); */\n"
+        out = out ++ "    goto bb" ++ int_to_string(d1) ++ ";"
+        return out
+    self.fail("unsupported terminator kind " ++ int_to_string(tk))
+    "    abort();"
+
+fn CCodegen.collect_struct_types_from_tid(self: CCodegen, out: Vec[i32], seen_names: HashMap[i32, i32], tid: i32):
+    let resolved = self.sema.resolve_alias(tid)
+    if resolved == 0:
+        return
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TY_STRUCT():
+        let name_sym = self.sema.get_type_d0(resolved)
+        if not seen_names.contains(name_sym):
+            seen_names.insert(name_sym, 1)
+            out.push(resolved)
+        return
+    if tk == TY_PTR() or tk == TY_REF() or tk == TY_ARRAY() or tk == TY_SLICE():
+        let inner_tid = self.sema.get_type_d0(resolved)
+        self.collect_struct_types_from_tid(out, seen_names, inner_tid)
+
+fn CCodegen.collect_used_struct_types(self: CCodegen) -> Vec[i32]:
+    let out: Vec[i32] = Vec.new()
+    let seen_names: HashMap[i32, i32] = HashMap.new()
+
+    for bi in 0..self.mir_mod.bodies.len() as i32:
+        if self.check_interrupted() != 0:
+            return out
+        let body: MirBody = self.mir_mod.bodies.get(bi as i64)
+        for li in 0..body.local_type_ids.len() as i32:
+            if self.check_interrupted() != 0:
+                return out
+            let tid = body.local_type_ids.get(li as i64)
+            self.collect_struct_types_from_tid(out, seen_names, tid)
+        let sig_idx = self.body_sig_index(body.fn_sym)
+        if sig_idx >= 0:
+            let ret_tid = self.sema.sig_return_type(sig_idx)
+            self.collect_struct_types_from_tid(out, seen_names, ret_tid)
+            let param_count = self.sema.sig_get_param_count(sig_idx)
+            for pi in 0..param_count:
+                let p_tid = self.sema.sig_param_type(sig_idx, pi)
+                self.collect_struct_types_from_tid(out, seen_names, p_tid)
+
+    var i = 0
+    while i < out.len() as i32:
+        if self.check_interrupted() != 0:
+            return out
+        let tid = out.get(i as i64)
+        i = i + 1
+        let start = self.sema.get_type_d1(tid)
+        let count = self.sema.get_type_d2(tid)
+        for fi in 0..count:
+            if self.check_interrupted() != 0:
+                return out
+            let raw_field_tid = self.sema.type_extra.get((start + fi * 3 + 1) as i64)
+            self.collect_struct_types_from_tid(out, seen_names, raw_field_tid)
+
+    out
+
+fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
+    let struct_tids = self.collect_used_struct_types()
+    if self.had_error != 0:
+        return ""
+    if struct_tids.len() as i32 == 0:
+        return ""
+
+    let ordered: Vec[i32] = Vec.new()
+    let emitted_names: HashMap[i32, i32] = HashMap.new()
+    while ordered.len() as i32 < struct_tids.len() as i32:
+        if self.check_interrupted() != 0:
+            return ""
+        var progressed = 0
+        for i in 0..struct_tids.len() as i32:
+            if self.check_interrupted() != 0:
+                return ""
+            let resolved = self.sema.resolve_alias(struct_tids.get(i as i64))
+            let name_sym = self.sema.get_type_d0(resolved)
+            if emitted_names.contains(name_sym):
+                continue
+            let start = self.sema.get_type_d1(resolved)
+            let count = self.sema.get_type_d2(resolved)
+            var ready = 1
+            for fi in 0..count:
+                if self.check_interrupted() != 0:
+                    return ""
+                let field_sym = self.sema.type_extra.get((start + fi * 3) as i64)
+                let raw_field_tid = self.sema.type_extra.get((start + fi * 3 + 1) as i64)
+                let field_tid = self.sema.resolve_alias(self.effective_field_tid(resolved, field_sym, raw_field_tid))
+                if self.sema.get_type_kind(field_tid) != TY_STRUCT():
+                    continue
+                let dep_name = self.sema.get_type_d0(field_tid)
+                if dep_name != name_sym and not emitted_names.contains(dep_name):
+                    ready = 0
+                    break
+            if ready == 0:
+                continue
+            ordered.push(resolved)
+            emitted_names.insert(name_sym, 1)
+            progressed = 1
+        if progressed == 0:
+            for i in 0..struct_tids.len() as i32:
+                if self.check_interrupted() != 0:
+                    return ""
+                let resolved = self.sema.resolve_alias(struct_tids.get(i as i64))
+                let name_sym = self.sema.get_type_d0(resolved)
+                if emitted_names.contains(name_sym):
+                    continue
+                ordered.push(resolved)
+                emitted_names.insert(name_sym, 1)
+
+    var out = ""
+    for i in 0..ordered.len() as i32:
+        if self.check_interrupted() != 0:
+            return ""
+        let tid = ordered.get(i as i64)
+        let name = self.struct_c_name(tid)
+        out = out ++ "typedef struct " ++ name ++ " " ++ name ++ ";\n"
+    out = out ++ "\n"
+
+    for i in 0..ordered.len() as i32:
+        if self.check_interrupted() != 0:
+            return ""
+        let tid = ordered.get(i as i64)
+        let resolved = self.sema.resolve_alias(tid)
+        let name = self.struct_c_name(resolved)
+        let start = self.sema.get_type_d1(resolved)
+        let count = self.sema.get_type_d2(resolved)
+        out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
+        for fi in 0..count:
+            if self.check_interrupted() != 0:
+                return ""
+            let field_sym = self.sema.type_extra.get((start + fi * 3) as i64)
+            let raw_field_tid = self.sema.type_extra.get((start + fi * 3 + 1) as i64)
+            let field_tid = self.effective_field_tid(resolved, field_sym, raw_field_tid)
+            out = out ++ "    " ++ self.c_type(field_tid, 0) ++ " f" ++ int_to_string(field_sym) ++ ";\n"
+        out = out ++ cc_rbrace() ++ ";\n\n"
+    out
+
+fn CCodegen.emit_fn_decl(self: CCodegen, body: MirBody) -> str:
+    let fn_sym = body.fn_sym
+    let fn_name = self.fn_c_name(fn_sym)
+    let sig_idx = self.body_sig_index(fn_sym)
+    let ret_tid = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else:
+        if body.local_type_ids.len() > 0: body.local_type_ids.get(0) else: self.sema.ty_void
+    var out = self.c_type(ret_tid, 1) ++ " " ++ fn_name ++ "("
+    let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
+    for i in 0..param_count:
+        if i > 0:
+            out = out ++ ", "
+        let p_tid = self.sema.sig_param_type(sig_idx, i)
+        out = out ++ self.c_type(p_tid, 0) ++ " _" ++ int_to_string(i + 1)
+    out = out ++ ")"
+    out
+
+fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
+    if self.check_interrupted() != 0:
+        return ""
+    let fn_sig = self.emit_fn_decl(body)
+    let fn_sym = body.fn_sym
+    let sig_idx = self.body_sig_index(fn_sym)
+    let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
+    var out = fn_sig ++ " " ++ cc_lbrace() ++ "\n"
+    let call_override_locals: Vec[i32] = Vec.new()
+    let call_override_tids: Vec[i32] = Vec.new()
+    for bb in 0..body.block_count():
+        if self.check_interrupted() != 0:
+            return ""
+        if body.term_kind(bb) != TK_CALL():
+            continue
+        let callee_operand = body.term_data0(bb)
+        let args_id = body.term_data1(bb)
+        let dest_place = body.term_data2(bb)
+        let local_id = self.place_local_id(body, dest_place)
+        if local_id < 0:
+            continue
+        if self.place_is_direct_local(body, dest_place, local_id) == 0:
+            continue
+        let ret_tid = self.call_return_tid(body, bb, callee_operand, args_id, dest_place)
+        if ret_tid == 0 or self.is_void_tid(ret_tid) != 0:
+            continue
+        var seen = 0
+        for oi in 0..call_override_locals.len() as i32:
+            if call_override_locals.get(oi as i64) == local_id:
+                seen = 1
+                break
+        if seen != 0:
+            continue
+        call_override_locals.push(local_id)
+        call_override_tids.push(ret_tid)
+    for li in 0..body.local_count():
+        if self.check_interrupted() != 0:
+            return ""
+        if li >= 1 and li <= param_count:
+            continue
+        let declared_tid = if li == 0 and sig_idx >= 0: self.sema.sig_return_type(sig_idx) else:
+            if li < body.local_type_ids.len() as i32: body.local_type_ids.get(li as i64) else: self.sema.ty_i32
+        var use_tid = declared_tid
+        let declared_resolved = self.sema.resolve_alias(declared_tid)
+        let declared_kind = self.sema.get_type_kind(declared_resolved)
+        if self.is_void_tid(declared_tid) == 0 and declared_resolved != 0 and declared_kind != TY_ERR():
+            for oi in 0..call_override_locals.len() as i32:
+                if call_override_locals.get(oi as i64) != li:
+                    continue
+                let override_tid = call_override_tids.get(oi as i64)
+                let declared_kind_for_override = self.sema.get_type_kind(self.sema.resolve_alias(declared_tid))
+                let override_kind = self.sema.get_type_kind(self.sema.resolve_alias(override_tid))
+                if declared_kind_for_override != override_kind or self.strict_type_match(declared_tid, override_tid) == 0:
+                    use_tid = override_tid
+                break
+        let inferred_tid = self.infer_local_tid(body, li)
+        if inferred_tid != 0 and self.is_void_tid(inferred_tid) == 0:
+            let use_kind = self.sema.get_type_kind(self.sema.resolve_alias(use_tid))
+            let inferred_kind = self.sema.get_type_kind(self.sema.resolve_alias(inferred_tid))
+            if self.is_void_tid(use_tid) != 0 or use_kind != inferred_kind or self.strict_type_match(use_tid, inferred_tid) == 0:
+                use_tid = inferred_tid
+        let local_ty = if li == 0 and self.is_void_tid(use_tid) != 0: "int32_t" else: self.c_type(use_tid, 0)
+        out = out ++ "    " ++ local_ty ++ " _" ++ int_to_string(li) ++ " __attribute__((unused)) = " ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";\n"
+    if body.block_count() == 0:
+        self.fail("function has no basic blocks: " ++ cc_intern_resolve(self.intern, fn_sym))
+        out = out ++ "    abort();\n"
+        out = out ++ cc_rbrace() ++ "\n"
+        return out
+    out = out ++ "    goto bb0;\n"
+    for bb in 0..body.block_count():
+        if self.check_interrupted() != 0:
+            return ""
+        out = out ++ "bb" ++ int_to_string(bb) ++ ":\n"
+        let start = body.bb_stmt_starts.get(bb as i64)
+        let count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..count:
+            if self.check_interrupted() != 0:
+                return ""
+            out = out ++ self.emit_stmt_line(body, start + si) ++ "\n"
+        out = out ++ self.emit_term(body, bb) ++ "\n"
+    out = out ++ cc_rbrace() ++ "\n"
+    out
+
+fn CCodegen.find_main_sym(self: CCodegen) -> i32:
+    for i in 0..self.mir_mod.body_fn_syms.len() as i32:
+        let sym = self.mir_mod.body_fn_syms.get(i as i64)
+        if cc_intern_resolve(self.intern, sym) == "main":
+            return sym
+    0
+
+fn CCodegen.emit_main_wrapper(self: CCodegen) -> str:
+    let main_sym = self.find_main_sym()
+    if main_sym == 0:
+        return ""
+    let main_name = self.fn_c_name(main_sym)
+    let sig_idx = self.sema.get_sig(main_sym)
+    let ret_tid = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else: self.sema.ty_void
+    var out = "int main(int argc, char** argv) " ++ cc_lbrace() ++ "\n"
+    out = out ++ "    with_runtime_set_argv(argc, argv);\n"
+    out = out ++ "    with_runtime_init();\n"
+    if self.is_void_tid(ret_tid) != 0:
+        out = out ++ "    " ++ main_name ++ "();\n"
+        out = out ++ "    with_runtime_shutdown();\n"
+        out = out ++ "    return 0;\n"
+    else:
+        out = out ++ "    int __with_exit_code = (int)(" ++ main_name ++ "());\n"
+        out = out ++ "    with_runtime_shutdown();\n"
+        out = out ++ "    return __with_exit_code;\n"
+    out = out ++ cc_rbrace() ++ "\n"
+    out
+
+fn CCodegen.emit_module(self: CCodegen) -> str:
+    if self.check_interrupted() != 0:
+        return ""
+    var out = ""
+    out = out ++ "/* Generated by with --emit-c (conservative MIR subset). */\n"
+    out = out ++ "#include <stdint.h>\n"
+    out = out ++ "#include <stdbool.h>\n"
+    out = out ++ "#include <stdlib.h>\n"
+    out = out ++ "#include <string.h>\n"
+    out = out ++ "#include \"with_runtime.h\"\n\n"
+
+    out = out ++ self.emit_struct_type_defs()
+    if self.had_error != 0:
+        return ""
+
+    // Forward declarations for all lowered functions.
+    for i in 0..self.mir_mod.bodies.len() as i32:
+        if self.check_interrupted() != 0:
+            return ""
+        let body: MirBody = self.mir_mod.bodies.get(i as i64)
+        out = out ++ self.emit_fn_decl(body) ++ ";\n"
+    if self.mir_mod.bodies.len() as i32 > 0:
+        out = out ++ "\n"
+
+    // Function bodies.
+    for i in 0..self.mir_mod.bodies.len() as i32:
+        if self.check_interrupted() != 0:
+            return ""
+        let body: MirBody = self.mir_mod.bodies.get(i as i64)
+        out = out ++ self.emit_fn_body(body) ++ "\n"
+
+    // C entrypoint wrapper for With `main`.
+    out = out ++ self.emit_main_wrapper()
+    out

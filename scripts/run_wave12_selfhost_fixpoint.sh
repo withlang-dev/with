@@ -18,8 +18,8 @@ source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 source "${ROOT_DIR}/scripts/parity_states.sh"
 
 CORPUS_FILE="test/wave12/fixpoint_corpus.txt"
-STAGE2_BIN="./with-stage2"
-STAGE3_BIN="./with-stage3"
+STAGE2_BIN="./out/bin/with-stage2"
+STAGE3_BIN="./out/bin/with-stage3"
 
 level1_status="SKIP"
 level2_status="SKIP"

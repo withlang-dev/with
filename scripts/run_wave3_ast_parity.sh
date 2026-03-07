@@ -7,7 +7,7 @@ source "${ROOT_DIR}/scripts/parity_states.sh"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 STAGE0_BIN="./bootstrap/zig-out/bin/with"
-SELFHOST_BIN="./with-stage2"
+SELFHOST_BIN="./out/bin/with-stage2"
 CORPUS_FILE="test/wave3/ast_corpus.txt"
 VERIFY_COVERAGE_SCRIPT="scripts/verify_wave3_coverage.sh"
 CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"

@@ -1,11 +1,11 @@
 # 10. Debugging Playbook (Stage2 on macOS ARM64)
 
-Use this when `with-stage2` is hanging, crashing, or showing suspicious memory behavior.
+Use this when `out/bin/with-stage2` is hanging, crashing, or showing suspicious memory behavior. This playbook does not assume any specific storage location.
 
 ## 10.1 Quick triage (repro + timing)
 
 ```bash
-time ./with-stage2 check src/main.w --dump-resolved
+time ./out/bin/with-stage2 check src/main.w --dump-resolved
 ```
 
 If this is unexpectedly slow, keep the exact command line and use it for all tools below.
@@ -13,7 +13,7 @@ If this is unexpectedly slow, keep the exact command line and use it for all too
 ## 10.2 Crash triage with LLDB
 
 ```bash
-lldb -- ./with-stage2 check src/main.w --dump-resolved
+lldb -- ./out/bin/with-stage2 check src/main.w --dump-resolved
 # inside lldb:
 run
 bt all
@@ -25,13 +25,13 @@ For repeated crashes, set a breakpoint in likely hot paths (resolver, parser, al
 ## 10.3 Heap corruption checks (fast, native)
 
 ```bash
-MallocScribble=1 MallocGuardEdges=1 ./with-stage2 check src/main.w --dump-resolved
+MallocScribble=1 MallocGuardEdges=1 ./out/bin/with-stage2 check src/main.w --dump-resolved
 ```
 
 Add stack logging when needed:
 
 ```bash
-MallocScribble=1 MallocGuardEdges=1 MallocStackLogging=1 ./with-stage2 check src/main.w --dump-resolved
+MallocScribble=1 MallocGuardEdges=1 MallocStackLogging=1 ./out/bin/with-stage2 check src/main.w --dump-resolved
 ```
 
 ## 10.4 Leak checks
@@ -39,13 +39,13 @@ MallocScribble=1 MallocGuardEdges=1 MallocStackLogging=1 ./with-stage2 check src
 Single-run leak report:
 
 ```bash
-leaks --atExit -- ./with-stage2 check src/main.w --dump-resolved
+leaks --atExit -- ./out/bin/with-stage2 check src/main.w --dump-resolved
 ```
 
 If attaching to a live process is needed:
 
 ```bash
-./with-stage2 check src/main.w --dump-resolved &
+./out/bin/with-stage2 check src/main.w --dump-resolved &
 leaks $(pgrep -n with-stage2)
 ```
 
@@ -54,7 +54,7 @@ leaks $(pgrep -n with-stage2)
 Record a Leaks trace:
 
 ```bash
-xcrun xctrace record --template "Leaks" --output /tmp/with-stage2-leaks.trace --launch -- ./with-stage2 check src/main.w --dump-resolved
+xcrun xctrace record --template "Leaks" --output /tmp/with-stage2-leaks.trace --launch -- ./out/bin/with-stage2 check src/main.w --dump-resolved
 ```
 
 Optional export for inspection/diffing:
@@ -65,7 +65,7 @@ xcrun xctrace export --input /tmp/with-stage2-leaks.trace --output /tmp/with-sta
 
 ## 10.6 macOS debugger permissions (required once per binary/update)
 
-If you see `not debuggable` or `Unable to acquire required task port`, re-sign `with-stage2` with debug entitlement:
+If you see `not debuggable` or `Unable to acquire required task port`, re-sign `out/bin/with-stage2` with debug entitlement:
 
 ```bash
 cat > /tmp/debug.entitlements <<'EOF'
@@ -79,8 +79,8 @@ cat > /tmp/debug.entitlements <<'EOF'
 </plist>
 EOF
 
-codesign -s - --entitlements /tmp/debug.entitlements --force ./with-stage2
-codesign -d --entitlements :- ./with-stage2
+codesign -s - --entitlements /tmp/debug.entitlements --force ./out/bin/with-stage2
+codesign -d --entitlements :- ./out/bin/with-stage2
 ```
 
 Enable developer debugging access (machine/user setup):

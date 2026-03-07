@@ -53,7 +53,16 @@ int32_t wl_init_native_target(void) { return LLVMInitializeNativeTarget(); }
 int32_t wl_init_native_asm_printer(void) { return LLVMInitializeNativeAsmPrinter(); }
 
 // Combined: init target machine + set module triple/layout. Returns TM or 0.
-int64_t wl_init_target_machine(int64_t module) {
+static LLVMCodeGenOptLevel with_codegen_level(int32_t level) {
+    switch (level) {
+        case 0: return LLVMCodeGenLevelNone;
+        case 1: return LLVMCodeGenLevelLess;
+        case 3: return LLVMCodeGenLevelAggressive;
+        default: return LLVMCodeGenLevelDefault;
+    }
+}
+
+int64_t wl_init_target_machine(int64_t module, int32_t level) {
     char *triple = LLVMGetDefaultTargetTriple();
     LLVMTargetRef target;
     char *err = NULL;
@@ -64,7 +73,7 @@ int64_t wl_init_target_machine(int64_t module) {
     }
     LLVMTargetMachineRef tm = LLVMCreateTargetMachine(
         target, triple, "generic", "",
-        LLVMCodeGenLevelDefault, LLVMRelocDefault, LLVMCodeModelDefault);
+        with_codegen_level(level), LLVMRelocDefault, LLVMCodeModelDefault);
     LLVMTargetDataRef layout = LLVMCreateTargetDataLayout(tm);
     LLVMSetModuleDataLayout(M(module), layout);
     char *triple2 = LLVMGetDefaultTargetTriple();
