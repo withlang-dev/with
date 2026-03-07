@@ -29,10 +29,10 @@ fn test_41_option_result_wrappers_are_generic() -> i32:
 
 fn test_42_cli_surface_commands_present() -> i32:
     var failures = 0
-    failures = failures + expect_eq_i32(with_system("./with test --help > /dev/null 2>&1"), 0, "42 cli has `with test`")
-    failures = failures + expect_eq_i32(with_system("./with fmt --help > /dev/null 2>&1"), 0, "42 cli has `with fmt`")
-    failures = failures + expect_eq_i32(with_system("./with doc --help > /dev/null 2>&1"), 0, "42 cli has `with doc`")
-    failures = failures + expect_eq_i32(with_system("./with repl --help > /dev/null 2>&1"), 0, "42 cli has `with repl`")
+    failures = failures + expect_eq_i32(with_system("./out/bin/with test --help > /dev/null 2>&1"), 0, "42 cli has `with test`")
+    failures = failures + expect_eq_i32(with_system("./out/bin/with fmt --help > /dev/null 2>&1"), 0, "42 cli has `with fmt`")
+    failures = failures + expect_eq_i32(with_system("./out/bin/with doc --help > /dev/null 2>&1"), 0, "42 cli has `with doc`")
+    failures = failures + expect_eq_i32(with_system("./out/bin/with repl --help > /dev/null 2>&1"), 0, "42 cli has `with repl`")
     failures
 
 fn main:

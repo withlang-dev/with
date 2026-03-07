@@ -8,11 +8,11 @@
 /// Await all tasks. Returns Vec[T] in input order.
 /// Fails fast on first Err.
 pub async fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[Vec[T], E]:
-    let pending = Vec.new()
+    let pending: Vec[Task[Result[T, E]]] = Vec.new()
     for task in tasks:
         pending.push(task)
 
-    let values = Vec.new()
+    let values: Vec[T] = Vec.new()
     let total = pending.len() as i32
     var i = 0
     while i < total:
@@ -33,11 +33,11 @@ pub async fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result
 
 /// Await all tasks (infallible version). Returns Vec[T] in input order.
 pub async fn await_all[T](tasks: impl IntoIter[Task[T]]) -> Vec[T]:
-    let pending = Vec.new()
+    let pending: Vec[Task[T]] = Vec.new()
     for task in tasks:
         pending.push(task)
 
-    let values = Vec.new()
+    let values: Vec[T] = Vec.new()
     let total = pending.len() as i32
     var i = 0
     while i < total:
@@ -47,7 +47,7 @@ pub async fn await_all[T](tasks: impl IntoIter[Task[T]]) -> Vec[T]:
 
 /// Return the result of the first task to complete.
 pub async fn await_first[T](tasks: impl IntoIter[Task[T]]) -> T:
-    let pending = Vec.new()
+    let pending: Vec[Task[T]] = Vec.new()
     for task in tasks:
         pending.push(task)
 
@@ -67,11 +67,11 @@ pub async fn await_first[T](tasks: impl IntoIter[Task[T]]) -> T:
 /// Return the first successful result.
 /// Fails only if all tasks fail.
 pub async fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, Vec[E]]:
-    let pending = Vec.new()
+    let pending: Vec[Task[Result[T, E]]] = Vec.new()
     for task in tasks:
         pending.push(task)
 
-    let errors = Vec.new()
+    let errors: Vec[E] = Vec.new()
     let total = pending.len() as i32
     if pending.is_empty():
         return Err(errors)
@@ -94,11 +94,11 @@ pub async fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result
 
 /// Await all tasks and return all results (including errors).
 pub async fn await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Vec[Result[T, E]]:
-    let pending = Vec.new()
+    let pending: Vec[Task[Result[T, E]]] = Vec.new()
     for task in tasks:
         pending.push(task)
 
-    let settled = Vec.new()
+    let settled: Vec[Result[T, E]] = Vec.new()
     let total = pending.len() as i32
     var i = 0
     while i < total:

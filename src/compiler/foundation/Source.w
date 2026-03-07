@@ -3,6 +3,8 @@
 use compiler.foundation.Ids
 
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_vec_new_out(v: &Vec[i32], elem_size: i64) -> void
+extern fn with_vec_push_i32(v: &Vec[i32], val: i32) -> void
 
 type Source = {
     path: str,
@@ -70,9 +72,10 @@ fn Source.line_text(self: Source, line: i32) -> str:
     slice
 
 fn source_compute_line_offsets(text: str) -> Vec[i32]:
-    var offsets = Vec.new()
-    offsets.push(0)
+    let offsets: Vec[i32] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    with_vec_new_out(&offsets, 4)
+    with_vec_push_i32(&offsets, 0)
     for i in 0..text.len():
         if text[i] == 10:
-            offsets.push((i as i32) + 1)
+            with_vec_push_i32(&offsets, (i as i32) + 1)
     offsets

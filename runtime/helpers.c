@@ -1,12 +1,19 @@
 // With Language Runtime Helpers
 // Small C wrapper functions for stdlib features that need special handling.
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <time.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <sys/resource.h>
 #ifdef __APPLE__
 #include <crt_externs.h>
 #endif
@@ -18,10 +25,82 @@ typedef struct {
 } with_str;
 
 typedef struct {
+    void *ptr;
+    int64_t len;
+    int64_t cap;
+    int64_t elem_size;
+} with_vec;
+
+typedef struct {
+    bool has_value;
+    int32_t value;
+} with_option_i32;
+
+typedef struct {
     char *buf;
     int64_t len;
     int64_t cap;
 } with_str_builder;
+
+static int32_t with_saved_argc = 0;
+static char **with_saved_argv = NULL;
+static volatile sig_atomic_t with_interrupt_flag = 0;
+static volatile sig_atomic_t with_interrupt_count = 0;
+static int64_t with_hashmap_trace_count = 0;
+
+static int with_trace_hashmap_enabled(void) {
+    static int cached = -1;
+    if (cached >= 0) return cached;
+    const char *raw = getenv("WITH_TRACE_HASHMAP");
+    cached = (raw && raw[0] != '\0' && !(raw[0] == '0' && raw[1] == '\0')) ? 1 : 0;
+    return cached;
+}
+
+static void with_interrupt_signal_handler(int signo) {
+    (void)signo;
+    with_interrupt_flag = 1;
+    with_interrupt_count = with_interrupt_count + 1;
+    if (with_interrupt_count >= 2) {
+        _exit(130);
+    }
+}
+
+void with_runtime_set_argv(int32_t argc, char **argv) {
+    with_saved_argc = argc;
+    with_saved_argv = argv;
+}
+
+void with_install_interrupt_handlers(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = with_interrupt_signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    (void)sigaction(SIGINT, &sa, NULL);
+    (void)sigaction(SIGTERM, &sa, NULL);
+}
+
+void with_raise_stack_limit(void) {
+#ifdef RLIMIT_STACK
+    struct rlimit lim;
+    if (getrlimit(RLIMIT_STACK, &lim) != 0) {
+        return;
+    }
+
+    rlim_t want = (rlim_t)(64ull * 1024ull * 1024ull);
+    if (lim.rlim_max != RLIM_INFINITY && want > lim.rlim_max) {
+        want = lim.rlim_max;
+    }
+    if (want > lim.rlim_cur) {
+        lim.rlim_cur = want;
+        (void)setrlimit(RLIMIT_STACK, &lim);
+    }
+#endif
+}
+
+int32_t with_interrupt_requested(void) {
+    return with_interrupt_flag ? 1 : 0;
+}
 
 static void with_sb_reserve(with_str_builder *sb, int64_t need) {
     if (need <= sb->cap) return;
@@ -62,6 +141,170 @@ with_str with_sb_build(int64_t handle) {
     return out;
 }
 
+// Compatibility shim:
+// - Correct C ABI callers pass a hidden sret pointer in x8.
+// - Some selfhost-generated callers in this branch expect register returns.
+// Support both on arm64 to keep stage transitions runnable.
+#if defined(__aarch64__)
+__attribute__((naked)) with_vec with_vec_new(int64_t elem_size) {
+    __asm__ volatile(
+        "mov x9, x0\n"
+        "mov x0, xzr\n"
+        "mov x1, xzr\n"
+        "mov x2, xzr\n"
+        "mov x3, x9\n"
+        "ret\n");
+}
+#else
+with_vec with_vec_new(int64_t elem_size) {
+    with_vec v;
+    v.ptr = NULL;
+    v.len = 0;
+    v.cap = 0;
+    v.elem_size = elem_size;
+    return v;
+}
+#endif
+
+void with_vec_new_out(with_vec *out, int64_t elem_size) {
+    if (!out) return;
+    out->ptr = NULL;
+    out->len = 0;
+    out->cap = 0;
+    out->elem_size = elem_size;
+}
+
+static void with_vec_grow(with_vec *v) {
+    int64_t new_cap = v->cap == 0 ? 8 : v->cap * 2;
+    void *new_ptr = realloc(v->ptr, (size_t)(new_cap * v->elem_size));
+    if (!new_ptr) {
+        fprintf(stderr, "with: out of memory in vec grow\n");
+        abort();
+    }
+    v->ptr = new_ptr;
+    v->cap = new_cap;
+}
+
+void with_vec_push(with_vec *v, const void *elem) {
+    if (!v || !elem) return;
+    if (v->len >= v->cap) {
+        with_vec_grow(v);
+    }
+    memcpy((char *)v->ptr + v->len * v->elem_size, elem, (size_t)v->elem_size);
+    v->len++;
+}
+
+void *with_vec_get_ptr(with_vec *v, int64_t index) {
+    if (!v) return NULL;
+    return (char *)v->ptr + index * v->elem_size;
+}
+
+int64_t with_vec_len(with_vec *v) {
+    if (!v) return 0;
+    return v->len;
+}
+
+void with_vec_clear(with_vec *v) {
+    if (!v) return;
+    v->len = 0;
+}
+
+void with_vec_push_i32(with_vec *v, int32_t val) {
+    with_vec_push(v, &val);
+}
+
+int32_t with_vec_get_i32(with_vec *v, int64_t index) {
+    return *(int32_t *)with_vec_get_ptr(v, index);
+}
+
+void with_vec_push_i64(with_vec *v, int64_t val) {
+    with_vec_push(v, &val);
+}
+
+int64_t with_vec_get_i64(with_vec *v, int64_t index) {
+    return *(int64_t *)with_vec_get_ptr(v, index);
+}
+
+void with_vec_push_str(with_vec *v, with_str val) {
+    with_vec_push(v, &val);
+}
+
+with_str with_vec_get_str(with_vec *v, int64_t index) {
+    return *(with_str *)with_vec_get_ptr(v, index);
+}
+
+void with_vec_push_bool(with_vec *v, bool val) {
+    with_vec_push(v, &val);
+}
+
+bool with_vec_get_bool(with_vec *v, int64_t index) {
+    return *(bool *)with_vec_get_ptr(v, index);
+}
+
+void with_vec_set_i32(with_vec *v, int64_t index, int32_t val) {
+    if (!v) return;
+    if (index >= 0 && index < v->len) {
+        ((int32_t *)v->ptr)[index] = val;
+    }
+}
+
+void with_vec_remove(with_vec *v, int64_t index) {
+    if (!v) return;
+    if (index < 0 || index >= v->len) return;
+    char *base = (char *)v->ptr;
+    int64_t es = v->elem_size;
+    memmove(base + index * es, base + (index + 1) * es, (size_t)((v->len - index - 1) * es));
+    v->len--;
+}
+
+with_option_i32 with_vec_pop_i32(with_vec *v) {
+    with_option_i32 r;
+    if (!v || v->len <= 0) {
+        r.has_value = false;
+        r.value = 0;
+        return r;
+    }
+    v->len--;
+    r.has_value = true;
+    r.value = ((int32_t *)v->ptr)[v->len];
+    return r;
+}
+
+#define WITH_CODEGEN_LOOP_MAX 1024
+static int64_t with_codegen_loop_break_bbs[WITH_CODEGEN_LOOP_MAX];
+static int64_t with_codegen_loop_continue_bbs[WITH_CODEGEN_LOOP_MAX];
+static int64_t with_codegen_loop_result_vals[WITH_CODEGEN_LOOP_MAX];
+
+void with_codegen_loop_set_break(int32_t idx, int64_t bb) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return;
+    with_codegen_loop_break_bbs[idx] = bb;
+}
+
+void with_codegen_loop_set_continue(int32_t idx, int64_t bb) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return;
+    with_codegen_loop_continue_bbs[idx] = bb;
+}
+
+void with_codegen_loop_set_result(int32_t idx, int64_t value) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return;
+    with_codegen_loop_result_vals[idx] = value;
+}
+
+int64_t with_codegen_loop_get_break(int32_t idx) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return 0;
+    return with_codegen_loop_break_bbs[idx];
+}
+
+int64_t with_codegen_loop_get_continue(int32_t idx) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return 0;
+    return with_codegen_loop_continue_bbs[idx];
+}
+
+int64_t with_codegen_loop_get_result(int32_t idx) {
+    if (idx < 0 || idx >= WITH_CODEGEN_LOOP_MAX) return 0;
+    return with_codegen_loop_result_vals[idx];
+}
+
 // Convert i32 to owned string.
 with_str with_i32_to_str(int32_t n) {
     char tmp[32];
@@ -90,12 +333,41 @@ with_str int_to_string(int32_t n) {
     return with_i32_to_str(n);
 }
 
+// Alias used by self-hosted compiler (extern fn i64_to_string).
+with_str i64_to_string(int64_t n) {
+    char tmp[32];
+    int wrote = snprintf(tmp, sizeof(tmp), "%lld", (long long)n);
+    if (wrote <= 0) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    char *buf = (char *)malloc((size_t)wrote + 1);
+    if (!buf) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    memcpy(buf, tmp, (size_t)wrote + 1);
+    with_str out = { buf, (int64_t)wrote };
+    return out;
+}
+
 // Print a string to stderr with trailing newline.
 void with_eprintln(with_str s) {
     if (s.ptr && s.len > 0) {
         fwrite(s.ptr, 1, (size_t)s.len, stderr);
     }
     fputc('\n', stderr);
+}
+
+// Aliases used by self-hosted compiler externs.
+void eprintln(with_str s) {
+    with_eprintln(s);
+}
+
+void print(with_str s) {
+    if (s.ptr && s.len > 0) {
+        fwrite(s.ptr, 1, (size_t)s.len, stdout);
+    }
 }
 
 // Convert a single byte value to a one-char string.
@@ -120,6 +392,9 @@ int64_t with_time_now(void) {
 
 // Command-line argument count.
 int32_t with_arg_count(void) {
+    if (with_saved_argv) {
+        return with_saved_argc;
+    }
 #ifdef __APPLE__
     int *argc_ptr = _NSGetArgc();
     return argc_ptr ? (int32_t)(*argc_ptr) : 0;
@@ -130,6 +405,19 @@ int32_t with_arg_count(void) {
 
 // Command-line argument at index. Returns "" when out of range.
 with_str with_arg_at(int32_t idx) {
+    if (with_saved_argv) {
+        if (idx < 0 || idx >= with_saved_argc) {
+            with_str out = { "", 0 };
+            return out;
+        }
+        const char *s = with_saved_argv[idx];
+        if (!s) {
+            with_str out = { "", 0 };
+            return out;
+        }
+        with_str out = { s, (int64_t)strlen(s) };
+        return out;
+    }
 #ifdef __APPLE__
     int *argc_ptr = _NSGetArgc();
     char ***argv_ptr = _NSGetArgv();
@@ -197,6 +485,23 @@ const char *with_getenv(const char *name) {
     return val ? val : "";
 }
 
+int64_t with_parse_i64(with_str s) {
+    if (!s.ptr || s.len <= 0) {
+        return 0;
+    }
+
+    char *buf = (char *)malloc((size_t)s.len + 1);
+    if (!buf) {
+        return 0;
+    }
+
+    memcpy(buf, s.ptr, (size_t)s.len);
+    buf[s.len] = '\0';
+    long long v = atoll(buf);
+    free(buf);
+    return (int64_t)v;
+}
+
 // String split: splits src (ptr+len) by delim (ptr+len).
 // Returns number of parts found. Writes ptr+len pairs into out_parts buffer.
 // out_parts layout: [ptr0, len0, ptr1, len1, ...]
@@ -235,6 +540,42 @@ int64_t with_str_split(const char *src, int64_t src_len,
     return count;
 }
 
+void with_lines_out(with_vec *out, with_str s) {
+    if (!out) return;
+    with_vec_new_out(out, (int64_t)sizeof(with_str));
+    if (s.len < 0) {
+        return;
+    }
+
+    int64_t max_parts = s.len + 1;
+    if (max_parts < 1) {
+        max_parts = 1;
+    }
+
+    void **parts = (void **)malloc((size_t)max_parts * sizeof(void *));
+    int64_t *lens = (int64_t *)malloc((size_t)max_parts * sizeof(int64_t));
+    if (!parts || !lens) {
+        free(parts);
+        free(lens);
+        return;
+    }
+
+    int64_t count = with_str_split(s.ptr, s.len, "\n", 1, parts, lens, max_parts);
+    for (int64_t i = 0; i < count; i++) {
+        with_str seg = { (const char *)parts[i], lens[i] };
+        with_vec_push_str(out, seg);
+    }
+
+    free(parts);
+    free(lens);
+}
+
+with_vec with_lines(with_str s) {
+    with_vec out;
+    with_lines_out(&out, s);
+    return out;
+}
+
 // String join: joins count strings (ptrs+lens) with separator.
 // Returns a newly malloc'd string. Sets *out_len to result length.
 char *with_str_join(void **ptrs, int64_t *lens, int64_t count,
@@ -262,6 +603,34 @@ char *with_str_join(void **ptrs, int64_t *lens, int64_t count,
 }
 
 // ---- String helpers ----
+
+with_str with_str_concat(with_str a, with_str b) {
+    int64_t total = a.len + b.len;
+    char *buf = (char *)malloc((size_t)total + 1);
+    if (!buf) {
+        with_str out = {"", 0};
+        return out;
+    }
+    if (a.len > 0) memcpy(buf, a.ptr, (size_t)a.len);
+    if (b.len > 0) memcpy(buf + a.len, b.ptr, (size_t)b.len);
+    buf[total] = '\0';
+    with_str out = {buf, total};
+    return out;
+}
+
+bool with_str_eq(with_str a, with_str b) {
+    if (a.len != b.len) {
+        return false;
+    }
+    if (a.len == 0) {
+        return true;
+    }
+    return memcmp(a.ptr, b.ptr, (size_t)a.len) == 0;
+}
+
+int64_t with_str_len(with_str s) {
+    return s.len;
+}
 
 // Check if string ends with suffix
 int32_t with_str_ends_with(with_str s, with_str suffix) {
@@ -322,6 +691,16 @@ with_str with_str_substr(with_str s, int64_t start, int64_t len) {
     out.ptr = s.ptr + start;
     out.len = len;
     return out;
+}
+
+with_str with_str_slice(with_str s, int64_t start, int64_t end) {
+    if (end < start) end = start;
+    return with_str_substr(s, start, end - start);
+}
+
+int32_t with_str_byte_at(with_str s, int64_t index) {
+    if (index < 0 || index >= s.len) return 0;
+    return (int32_t)(unsigned char)s.ptr[index];
 }
 
 // Convert string to uppercase. Returns newly allocated string.
@@ -453,6 +832,15 @@ static int keys_equal(const void *a, const void *b, int64_t key_size, int64_t is
 
 static void hashmap_grow(WithHashMap *m, int64_t is_str_key);
 
+static int hashmap_invalid(WithHashMap *m) {
+    if (!m) return 1;
+    if (m->cap <= 0 || m->cap > (1LL << 30)) return 1;
+    if (m->key_size <= 0 || m->key_size > (1LL << 20)) return 1;
+    if (m->val_size <= 0 || m->val_size > (1LL << 20)) return 1;
+    if (!m->keys || !m->values || !m->states) return 1;
+    return 0;
+}
+
 void *with_hashmap_new(int64_t key_size, int64_t val_size) {
     WithHashMap *m = (WithHashMap *)calloc(1, sizeof(WithHashMap));
     m->cap = 16;
@@ -461,11 +849,31 @@ void *with_hashmap_new(int64_t key_size, int64_t val_size) {
     m->keys = (char *)calloc(16, key_size);
     m->values = (char *)calloc(16, val_size);
     m->states = (uint8_t *)calloc(16, 1);
+    if (with_trace_hashmap_enabled()) {
+        fprintf(stderr, "[trace-hashmap] new handle=%p key_size=%lld val_size=%lld cap=%lld\n",
+                (void *)m, (long long)key_size, (long long)val_size, (long long)m->cap);
+    }
     return m;
+}
+
+void with_hashmap_new_out(void **out, int64_t key_size, int64_t val_size) {
+    if (!out) return;
+    *out = with_hashmap_new(key_size, val_size);
+}
+
+void with_hashmap_new_at(void *base, int64_t offset, int64_t key_size, int64_t val_size) {
+    if (!base) return;
+    void **slot = (void **)((char *)base + offset);
+    *slot = with_hashmap_new(key_size, val_size);
 }
 
 void with_hashmap_insert(void *handle, const void *key, const void *val, int64_t is_str_key) {
     WithHashMap *m = (WithHashMap *)handle;
+    if (hashmap_invalid(m)) {
+        void *ra = __builtin_return_address(0);
+        fprintf(stderr, "with_hashmap_insert: invalid handle=%p ra=%p\n", handle, ra);
+        return;
+    }
     if (m->len * 10 >= m->cap * 7) {
         hashmap_grow(m, is_str_key);
     }
@@ -495,6 +903,47 @@ void with_hashmap_insert(void *handle, const void *key, const void *val, int64_t
 // Returns 1 if found (writes value to out_val), 0 if not found.
 int64_t with_hashmap_get(void *handle, const void *key, void *out_val, int64_t is_str_key) {
     WithHashMap *m = (WithHashMap *)handle;
+    if (hashmap_invalid(m)) {
+        void *ra = __builtin_return_address(0);
+        fprintf(stderr, "with_hashmap_get: invalid handle=%p ra=%p\n", handle, ra);
+        return 0;
+    }
+    if (with_trace_hashmap_enabled()) {
+        int should_trace = 0;
+        if (with_hashmap_trace_count < 8) should_trace = 1;
+        if ((with_hashmap_trace_count % 10000) == 0) should_trace = 1;
+        if (m->key_size > 64 || m->val_size > 64) should_trace = 1;
+        if (m->cap > 131072 || m->len > 131072) should_trace = 1;
+        if (should_trace) {
+            uint8_t b0 = 0;
+            uint8_t b1 = 0;
+            uint8_t b2 = 0;
+            uint8_t b3 = 0;
+            if (key && m->key_size > 0) {
+                const uint8_t *kb = (const uint8_t *)key;
+                b0 = kb[0];
+                if (m->key_size > 1) b1 = kb[1];
+                if (m->key_size > 2) b2 = kb[2];
+                if (m->key_size > 3) b3 = kb[3];
+            }
+            fprintf(stderr,
+                    "[trace-hashmap] get #%lld handle=%p key=%p out=%p key_size=%lld val_size=%lld cap=%lld len=%lld is_str=%lld key_bytes=%u,%u,%u,%u\n",
+                    (long long)with_hashmap_trace_count,
+                    handle,
+                    key,
+                    out_val,
+                    (long long)m->key_size,
+                    (long long)m->val_size,
+                    (long long)m->cap,
+                    (long long)m->len,
+                    (long long)is_str_key,
+                    (unsigned)b0,
+                    (unsigned)b1,
+                    (unsigned)b2,
+                    (unsigned)b3);
+        }
+        with_hashmap_trace_count++;
+    }
     uint64_t h = hash_key(key, m->key_size, is_str_key);
     int64_t idx = (int64_t)(h % (uint64_t)m->cap);
     for (int64_t probe = 0; probe < m->cap; probe++) {
@@ -510,6 +959,10 @@ int64_t with_hashmap_get(void *handle, const void *key, void *out_val, int64_t i
 
 int64_t with_hashmap_contains(void *handle, const void *key, int64_t is_str_key) {
     WithHashMap *m = (WithHashMap *)handle;
+    if (hashmap_invalid(m)) {
+        fprintf(stderr, "with_hashmap_contains: invalid handle=%p\n", handle);
+        return 0;
+    }
     uint64_t h = hash_key(key, m->key_size, is_str_key);
     int64_t idx = (int64_t)(h % (uint64_t)m->cap);
     for (int64_t probe = 0; probe < m->cap; probe++) {
@@ -523,6 +976,10 @@ int64_t with_hashmap_contains(void *handle, const void *key, int64_t is_str_key)
 
 int64_t with_hashmap_remove(void *handle, const void *key, int64_t is_str_key) {
     WithHashMap *m = (WithHashMap *)handle;
+    if (hashmap_invalid(m)) {
+        fprintf(stderr, "with_hashmap_remove: invalid handle=%p\n", handle);
+        return 0;
+    }
     uint64_t h = hash_key(key, m->key_size, is_str_key);
     int64_t idx = (int64_t)(h % (uint64_t)m->cap);
     for (int64_t probe = 0; probe < m->cap; probe++) {
@@ -538,7 +995,12 @@ int64_t with_hashmap_remove(void *handle, const void *key, int64_t is_str_key) {
 }
 
 int64_t with_hashmap_len(void *handle) {
-    return ((WithHashMap *)handle)->len;
+    WithHashMap *m = (WithHashMap *)handle;
+    if (hashmap_invalid(m)) {
+        fprintf(stderr, "with_hashmap_len: invalid handle=%p\n", handle);
+        return 0;
+    }
+    return m->len;
 }
 
 void with_hashmap_free(void *handle) {
@@ -555,6 +1017,17 @@ static void hashmap_grow(WithHashMap *m, int64_t is_str_key) {
     char *old_values = m->values;
     uint8_t *old_states = m->states;
     m->cap = old_cap * 2;
+    if (with_trace_hashmap_enabled()) {
+        fprintf(stderr,
+                "[trace-hashmap] grow handle=%p old_cap=%lld new_cap=%lld key_size=%lld val_size=%lld len=%lld is_str=%lld\n",
+                (void *)m,
+                (long long)old_cap,
+                (long long)m->cap,
+                (long long)m->key_size,
+                (long long)m->val_size,
+                (long long)m->len,
+                (long long)is_str_key);
+    }
     m->keys = (char *)calloc(m->cap, m->key_size);
     m->values = (char *)calloc(m->cap, m->val_size);
     m->states = (uint8_t *)calloc(m->cap, 1);
@@ -672,7 +1145,10 @@ static void with_net_wait_step(void) {
     if (with_fiber_in_fiber()) {
         with_fiber_yield();
     } else {
-        usleep(1000);
+        struct timespec ts;
+        ts.tv_sec = 0;
+        ts.tv_nsec = 1000 * 1000; // 1ms
+        nanosleep(&ts, NULL);
     }
 }
 

@@ -5,17 +5,17 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
-SELFHOST_BIN="./with-stage2"
+SELFHOST_BIN="./out/bin/with-stage2"
 
 if [[ ! -x "$SELFHOST_BIN" ]]; then
-  if [[ -x "./with-stage1" ]]; then
-    SELFHOST_BIN="./with-stage1"
+  if [[ -x "./out/bin/with-stage1" ]]; then
+    SELFHOST_BIN="./out/bin/with-stage1"
   else
     ./scripts/rebuild_selfhost.sh stage2 >/dev/null
-    if [[ -x "./with-stage2" ]]; then
-      SELFHOST_BIN="./with-stage2"
+    if [[ -x "./out/bin/with-stage2" ]]; then
+      SELFHOST_BIN="./out/bin/with-stage2"
     else
-      SELFHOST_BIN="./with-stage1"
+      SELFHOST_BIN="./out/bin/with-stage1"
     fi
   fi
 fi

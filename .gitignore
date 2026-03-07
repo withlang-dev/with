@@ -10,16 +10,11 @@ bootstrap/.zig-cache/
 bootstrap/zig-out-root/
 bootstrap/.zig-cache-root/
 .with/
+out/
 *.o
 *.a
 *.so
 *.dylib
-
-# Self-hosted compiler outputs
-with
-with-stage1
-with-stage2
-with-stage3
 
 # Editor / OS
 .DS_Store

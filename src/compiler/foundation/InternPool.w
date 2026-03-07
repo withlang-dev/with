@@ -7,6 +7,9 @@ use compiler.foundation.Ids
 use compiler.foundation.Types
 use compiler.foundation.Values
 
+extern fn with_vec_new_out(v: &T, elem_size: i64) -> void
+extern fn with_hashmap_new_at(base: &T, offset: i64, key_size: i64, val_size: i64) -> void
+
 type InternPool = {
     // Symbols
     symbol_texts: Vec[str],
@@ -21,15 +24,34 @@ type InternPool = {
     value_map: HashMap[str, i32],
 }
 
+fn foundation_intern_text_eq(a: str, b: str) -> bool:
+    if a.len() != b.len():
+        return false
+    var i = 0
+    while i < a.len() as i32:
+        if a.byte_at(i as i64) != b.byte_at(i as i64):
+            return false
+        i = i + 1
+    true
+
 fn InternPool.init -> InternPool:
+    let symbol_texts: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    with_vec_new_out(&symbol_texts, 16)
+    let type_keys: Vec[TypeKey] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    with_vec_new_out(&type_keys, 24)
+    let value_keys: Vec[ValueKey] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    with_vec_new_out(&value_keys, 24)
     var p = InternPool {
-        symbol_texts: Vec.new(),
-        symbol_map: HashMap.new(),
-        type_keys: Vec.new(),
-        type_map: HashMap.new(),
-        value_keys: Vec.new(),
-        value_map: HashMap.new(),
+        symbol_texts,
+        symbol_map: HashMap { ptr: 0 },
+        type_keys,
+        type_map: HashMap { ptr: 0 },
+        value_keys,
+        value_map: HashMap { ptr: 0 },
     }
+    with_hashmap_new_at(&p, 32, 16, 4)
+    with_hashmap_new_at(&p, 72, 16, 4)
+    with_hashmap_new_at(&p, 112, 16, 4)
 
     // Reserve index 0 as sentinel for each lane.
     p.symbol_texts.push("")
@@ -41,6 +63,14 @@ fn InternPool.intern_str(self: InternPool, s: str) -> Symbol:
     let existing = self.symbol_map.get(s)
     if existing.is_some():
         return symbol_from_raw(existing.unwrap())
+
+    var raw = 1
+    while raw < self.symbol_texts.len() as i32:
+        let existing_text = self.symbol_texts.get(raw as i64)
+        if foundation_intern_text_eq(existing_text, s):
+            self.symbol_map.insert(existing_text, raw)
+            return symbol_from_raw(raw)
+        raw = raw + 1
 
     let id = self.symbol_texts.len() as i32
     self.symbol_texts.push(s)

@@ -903,25 +903,14 @@ fn ResolveState.resolve_module_rel(self: ResolveState, module_dir: str, rel_path
         return cand1
 
     // Strategy 2: walk parent directories and check lib/<rel_path>.
-    var cur = module_dir
-    while true:
-        let cand = resolve_join(resolve_join(cur, "lib"), rel_path)
-        if resolve_file_exists(cand):
-            return cand
-        let parent = resolve_dirname(cur)
-        if parent == cur:
-            break
-        cur = parent
+    let parent_walk = resolve_parent_lib_candidate(module_dir, rel_path)
+    if parent_walk.len() > 0:
+        return parent_walk
 
     // Strategy 3/4: project root (directory containing build.zig), then lib/ and src/.
-    let root = resolve_find_project_root(module_dir)
-    if root.len() > 0:
-        let cand3 = resolve_join(resolve_join(root, "lib"), rel_path)
-        if resolve_file_exists(cand3):
-            return cand3
-        let cand4 = resolve_join(resolve_join(root, "src"), rel_path)
-        if resolve_file_exists(cand4):
-            return cand4
+    let rooted = resolve_project_root_candidate(module_dir, rel_path)
+    if rooted.len() > 0:
+        return rooted
 
     // Strategy 5: src/<rel_path> from cwd.
     let cand5 = resolve_join("src", rel_path)
@@ -937,6 +926,34 @@ fn ResolveState.resolve_module_rel(self: ResolveState, module_dir: str, rel_path
 
 fn resolve_file_exists(path: str) -> bool:
     with_fs_read_file(path).len() > 0
+
+fn resolve_parent_lib_candidate(module_dir: str, rel_path: str) -> str:
+    var cur = module_dir
+    while true:
+        let lib_dir = resolve_join(cur, "lib")
+        let cand = resolve_join(lib_dir, rel_path)
+        if resolve_file_exists(cand):
+            return cand
+        let parent = resolve_dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+    ""
+
+fn resolve_project_root_candidate(module_dir: str, rel_path: str) -> str:
+    let root = resolve_find_project_root(module_dir)
+    if root.len() == 0:
+        return ""
+
+    let lib_cand = resolve_join(resolve_join(root, "lib"), rel_path)
+    if resolve_file_exists(lib_cand):
+        return lib_cand
+
+    let src_cand = resolve_join(resolve_join(root, "src"), rel_path)
+    if resolve_file_exists(src_cand):
+        return src_cand
+
+    ""
 
 fn resolve_join(a: str, b: str) -> str:
     if a.len() == 0:

@@ -35,7 +35,7 @@ Foundation sources of truth:
   - `./bootstrap/zig-out/bin/with test bootstrap/test/cases/`
   - `./scripts/rebuild_selfhost.sh stage2`
 - [x] Save baseline logs/artifacts for comparison.
-  Note: both `with test .../cases/` commands currently return `error: no tests matched filter` in this tree; practical gating used was `run_wave1_unit_tests.sh`, `rebuild_selfhost.sh stage2`, and `with-stage1 check src/main.w`.
+  Note: both `with test .../cases/` commands currently return `error: no tests matched filter` in this tree; practical gating used was `run_wave1_unit_tests.sh`, `rebuild_selfhost.sh stage2`, and `out/bin/with-stage1 check src/main.w`.
 
 ---
 

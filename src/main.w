@@ -13,201 +13,316 @@ use Source
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
+extern fn with_str_eq(a: str, b: str) -> i32
+extern fn with_str_len(s: str) -> i64
+extern fn with_str_byte_at(s: str, index: i64) -> i32
+extern fn with_str_starts_with(s: str, prefix: str) -> i32
+extern fn with_str_slice(s: str, start: i64, end: i64) -> str
 extern fn with_eprintln(s: str) -> void
 extern fn with_system(cmd: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn int_to_string(n: i32) -> str
 extern fn print(s: str) -> void
 extern fn exit(code: i32) -> void
+extern fn with_install_interrupt_handlers() -> void
+extern fn with_raise_stack_limit() -> void
 
-fn main -> void:
-    let argc = with_arg_count()
-    if argc < 2:
-        print_usage()
-        return
+fn CLI_PRELUDE_FULL_MODE -> i32: 0
+fn CLI_PRELUDE_CORE_MODE -> i32: 1
+fn CLI_PRELUDE_NONE_MODE -> i32: 2
 
-    let command = with_arg_at(1)
+type CliOptions = {
+    command: str,
+    source_file: str,
+    output_path: str,
+    opt_level: i32,
+    no_std: bool,
+    alloc_mode: bool,
+    dump_tokens_flag: bool,
+    dump_ast_flag: bool,
+    dump_resolved_flag: bool,
+    dump_typed_flag: bool,
+    dump_mir_flag: bool,
+    dump_async_mir_flag: bool,
+    deterministic_mode: bool,
+    emit_c_mode: bool,
+    prelude_mode: i32,
+}
 
-    // Parse flags from remaining args.
-    var opt_level = 0
-    var no_std = false
-    var alloc_mode = false
-    var release_mode = false
-    var dump_tokens_flag = false
-    var dump_ast_flag = false
-    var dump_resolved_flag = false
-    var dump_typed_flag = false
-    var dump_mir_flag = false
-    var dump_async_mir_flag = false
-    var deterministic_mode = false
+fn cli_options_default -> CliOptions:
+    CliOptions {
+        command: "",
+        source_file: "",
+        output_path: "",
+        opt_level: 0,
+        no_std: false,
+        alloc_mode: false,
+        dump_tokens_flag: false,
+        dump_ast_flag: false,
+        dump_resolved_flag: false,
+        dump_typed_flag: false,
+        dump_mir_flag: false,
+        dump_async_mir_flag: false,
+        deterministic_mode: false,
+        emit_c_mode: false,
+        prelude_mode: CLI_PRELUDE_FULL_MODE(),
+    }
+
+fn cli_command(argc: i32) -> str:
+    if argc >= 2:
+        return with_arg_at(1)
+    ""
+
+fn cli_has_flag(argc: i32, flag: str) -> bool:
+    var i = 2
+    while i < argc:
+        if with_arg_at(i) == flag:
+            return true
+        i = i + 1
+    false
+
+fn cli_opt_level(argc: i32) -> i32:
+    var level = 0
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
         if arg == "-O0":
-            opt_level = 0
-        if arg == "-O1":
-            opt_level = 1
-        if arg == "-O2":
-            opt_level = 2
-        if arg == "-O3":
-            opt_level = 3
-        if arg == "--release":
-            release_mode = true
-            if opt_level < 2:
-                opt_level = 2
-        if arg == "--no-std":
-            no_std = true
-        if arg == "--alloc":
-            alloc_mode = true
-        if arg == "--dump-tokens":
-            dump_tokens_flag = true
-        if arg == "--dump-ast":
-            dump_ast_flag = true
-        if arg == "--dump-resolved":
-            dump_resolved_flag = true
-        if arg == "--dump-typed":
-            dump_typed_flag = true
-        if arg == "--dump-mir":
-            dump_mir_flag = true
-        if arg == "--dump-async-mir":
-            dump_async_mir_flag = true
-        if arg == "--deterministic":
-            deterministic_mode = true
+            level = 0
+        else if arg == "-O1":
+            level = 1
+        else if arg == "-O2":
+            level = 2
+        else if arg == "-O3":
+            level = 3
+        else if arg == "--release":
+            if level < 2:
+                level = 2
         i = i + 1
+    level
 
-    // Find the first non-flag positional argument after the command.
-    let source_file = find_source_arg(argc)
+fn cli_prelude_mode(argc: i32) -> i32:
+    var mode = CLI_PRELUDE_FULL_MODE()
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == "--no-prelude":
+            mode = CLI_PRELUDE_NONE_MODE()
+        else if arg == "--freestanding":
+            mode = CLI_PRELUDE_NONE_MODE()
+        else if with_str_starts_with(arg, "--prelude=") != 0:
+            let value = with_str_slice(arg, 10, with_str_len(arg))
+            if value == "core":
+                mode = CLI_PRELUDE_CORE_MODE()
+            else if value == "full":
+                mode = CLI_PRELUDE_FULL_MODE()
+            else if value == "none":
+                mode = CLI_PRELUDE_NONE_MODE()
+            else:
+                with_eprintln("error: invalid --prelude value '" ++ value ++ "' (expected full|core|none)")
+                exit(1)
+                return CLI_PRELUDE_FULL_MODE()
+        i = i + 1
+    mode
+
+fn parse_cli_options(argc: i32) -> CliOptions:
+    CliOptions {
+        command: cli_command(argc),
+        source_file: find_source_arg(argc),
+        output_path: find_output_arg(argc),
+        opt_level: cli_opt_level(argc),
+        no_std: cli_has_flag(argc, "--no-std") or cli_has_flag(argc, "--freestanding"),
+        alloc_mode: cli_has_flag(argc, "--alloc"),
+        dump_tokens_flag: cli_has_flag(argc, "--dump-tokens"),
+        dump_ast_flag: cli_has_flag(argc, "--dump-ast"),
+        dump_resolved_flag: cli_has_flag(argc, "--dump-resolved"),
+        dump_typed_flag: cli_has_flag(argc, "--dump-typed"),
+        dump_mir_flag: cli_has_flag(argc, "--dump-mir"),
+        dump_async_mir_flag: cli_has_flag(argc, "--dump-async-mir"),
+        deterministic_mode: cli_has_flag(argc, "--deterministic"),
+        emit_c_mode: cli_has_flag(argc, "--emit-c"),
+        prelude_mode: cli_prelude_mode(argc),
+    }
+
+fn tokenize_text(text: str) -> TokenList:
+    var lexer = Lexer.init(text, 0)
+    return lexer.tokenize()
+
+fn run_cli(argc: i32, opts: CliOptions) -> i32:
+    let command = opts.command
+    let source_file = opts.source_file
+    let opt_level = opts.opt_level
+    let no_std = opts.no_std
+    let alloc_mode = opts.alloc_mode
+    let emit_c_mode = opts.emit_c_mode
+    let output_path = opts.output_path
+    let prelude_mode = opts.prelude_mode
+    let deterministic_mode = opts.deterministic_mode
+    let dump_tokens_flag = opts.dump_tokens_flag
+    let dump_ast_flag = opts.dump_ast_flag
+    let dump_resolved_flag = opts.dump_resolved_flag
+    let dump_typed_flag = opts.dump_typed_flag
+    let dump_mir_flag = opts.dump_mir_flag
+    let dump_async_mir_flag = opts.dump_async_mir_flag
 
     if command == "build":
-        exit(run_build_command(source_file, opt_level, no_std, alloc_mode))
-        return
+        return run_build_command(source_file, opt_level, no_std, alloc_mode, emit_c_mode, output_path, prelude_mode)
     if command == "run":
-        exit(run_run_command(source_file, opt_level, no_std, alloc_mode))
-        return
+        if emit_c_mode:
+            with_eprintln("error: '--emit-c' is only supported with 'build'")
+            return 1
+        return run_run_command(source_file, opt_level, no_std, alloc_mode, prelude_mode)
     if command == "ir":
         if source_file == "":
             with_eprintln("error: 'ir' requires a source file argument")
-            exit(1)
-            return
+            return 1
         var comp = Compilation.init()
         comp.configure(opt_level, no_std, alloc_mode)
+        comp.set_prelude_mode(prelude_mode)
         let pool = comp.compile_file(source_file)
         if pool.decl_count() == 0:
             with_eprintln("error: IR generation failed during compilation")
-            exit(1)
-            return
+            return 1
         let ok = comp.emit_ir(pool)
         if not ok:
-            exit(1)
-            return
-        return
+            return 1
+        return 0
     if command == "ast":
         if source_file == "":
             with_eprintln("error: 'ast' requires a source file argument")
-            exit(1)
-            return
-        exit(dump_ast(source_file, no_std, alloc_mode, deterministic_mode))
-        return
+            return 1
+        return dump_ast(source_file, no_std, alloc_mode, deterministic_mode)
     if command == "check":
         if source_file == "":
             with_eprintln("error: 'check' requires a source file argument")
-            exit(1)
-            return
+            return 1
         if dump_tokens_flag:
             let rc_tokens = dump_tokens(source_file, true)
             if rc_tokens != 0:
-                exit(rc_tokens)
-                return
+                return rc_tokens
             if not dump_ast_flag:
-                exit(0)
-                return
+                return 0
         if dump_ast_flag:
-            exit(dump_ast(source_file, no_std, alloc_mode, true))
-            return
+            return dump_ast(source_file, no_std, alloc_mode, true)
         if dump_resolved_flag:
-            exit(dump_resolved_artifact(source_file, no_std, alloc_mode))
-            return
+            return dump_resolved_artifact(source_file, no_std, alloc_mode, prelude_mode)
         if dump_typed_flag:
-            exit(dump_typed_artifact(source_file, no_std, alloc_mode))
-            return
+            return dump_typed_artifact(source_file, no_std, alloc_mode, prelude_mode)
         if dump_mir_flag:
-            exit(dump_mir_artifact(source_file, no_std, alloc_mode))
-            return
+            return dump_mir_artifact(source_file, no_std, alloc_mode, prelude_mode)
         if dump_async_mir_flag:
-            exit(dump_async_mir_artifact(source_file, no_std, alloc_mode))
-            return
+            return dump_async_mir_artifact(source_file, no_std, alloc_mode, prelude_mode)
         var comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode)
+        comp.set_prelude_mode(prelude_mode)
         let pool = comp.compile_file(source_file)
         if pool.decl_count() == 0:
             with_eprintln("error: check failed during compilation")
-            exit(1)
-            return
+            return 1
         print("ok\n")
         comp.print_warnings()
-        return
+        return 0
     if command == "tokens":
         if source_file == "":
             with_eprintln("error: 'tokens' requires a source file argument")
-            exit(1)
-            return
-        exit(dump_tokens(source_file, deterministic_mode))
-        return
+            return 1
+        return dump_tokens(source_file, deterministic_mode)
     if command == "test":
-        exit(run_test_command(argc, opt_level, no_std, alloc_mode))
-        return
+        return run_test_command(argc, opt_level, no_std, alloc_mode, prelude_mode)
     if command == "version" or command == "--version":
         print("with 0.0.1\n")
-        return
+        return 0
     if command == "help" or command == "--help" or command == "-h":
         print_usage()
-        return
+        return 0
     if command == "clean":
-        exit(run_clean_command())
-        return
+        return run_clean_command()
     if command == "lsp":
         with_eprintln("error: LSP not yet available in self-hosted compiler")
-        exit(1)
-        return
+        return 1
     if command == "migrate":
         with_eprintln("error: migrate not yet available in self-hosted compiler")
-        exit(1)
-        return
+        return 1
     if command == "repl":
         with_eprintln("error: REPL not yet available in self-hosted compiler")
-        exit(1)
-        return
+        return 1
     if command == "doc":
         with_eprintln("error: doc not yet available in self-hosted compiler")
-        exit(1)
-        return
+        return 1
     if command == "fmt":
         with_eprintln("error: fmt not yet available in self-hosted compiler")
-        exit(1)
-        return
-
-    with_eprintln("error: unknown command '{command}'")
+        return 1
+    with_eprintln("error: unknown command '" ++ command ++ "'")
     print_usage()
-    exit(1)
+    1
+
+fn main -> void:
+    with_raise_stack_limit()
+    with_install_interrupt_handlers()
+    let argc = with_arg_count()
+    if argc < 2:
+        print_usage()
+        return
+    let opts = parse_cli_options(argc)
+    exit(run_cli(argc, opts))
 
 // ── Command implementations ──────────────────────────────────────
 
-// Assumes all flags start with '-' and no flags take separate value arguments.
+fn str_eq_text(a: str, b: str) -> bool:
+    with_str_eq(a, b) != 0
+
+fn has_output_prefix(arg: str) -> bool:
+    if with_str_len(arg) < 9:
+        return false
+    with_str_starts_with(arg, "--output=") != 0
+
 fn find_source_arg(argc: i32) -> str:
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
-        if arg.len() > 0 and arg[0] != 45: // not '-'
-            return arg
+        var step = 1
+        var skip = false
+        if str_eq_text(arg, "-o"):
+            step = 2
+            skip = true
+        if not skip and has_output_prefix(arg):
+            skip = true
+        if not skip:
+            if with_str_len(arg) > 0:
+                if with_str_byte_at(arg, 0) != 45: // not '-'
+                    return arg
+        i = i + step
+    ""
+
+fn find_output_arg(argc: i32) -> str:
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if str_eq_text(arg, "-o"):
+            if i + 1 < argc:
+                return with_arg_at(i + 1)
+            return ""
+        if has_output_prefix(arg):
+            return with_str_slice(arg, 9, with_str_len(arg))
         i = i + 1
     ""
 
-fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool) -> i32:
+fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, output_path: str, prelude_mode: i32) -> i32:
     if source_file == "":
         with_eprintln("error: 'build' requires a source file argument")
         return 1
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
+    comp.set_prelude_mode(prelude_mode)
+    if emit_c_mode:
+        let c_path = comp.emit_c(source_file, output_path)
+        if c_path == "":
+            with_eprintln("error: build failed")
+            return 1
+        with_eprintln("emitted C: " ++ c_path)
+        with_eprintln("compile with zig cc (example):")
+        with_eprintln("  zig cc -target <triple> -I runtime " ++ c_path ++ " runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_<arch>.s -o <output>")
+        comp.print_warnings()
+        return 0
     let bin_path = comp.build_binary(source_file)
     if bin_path == "":
         with_eprintln("error: build failed")
@@ -215,18 +330,19 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
     comp.print_warnings()
     0
 
-fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool) -> i32:
+fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
     if source_file == "":
         with_eprintln("error: 'run' requires a source file argument")
         return 1
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
+    comp.set_prelude_mode(prelude_mode)
     let bin_path = comp.build_binary(source_file)
     if bin_path == "":
-        with_eprintln("error: run command failed to build target")
+        with_eprintln("error: run failed")
         return 1
     comp.print_warnings()
-    with_system(bin_path)
+    return with_system(bin_path)
 
 fn dump_ast(source_file: str, no_std: bool, alloc_mode: bool, include_header: bool) -> i32:
     let text = with_fs_read_file(source_file)
@@ -311,55 +427,46 @@ fn dump_tokens(source_file: str, deterministic: bool) -> i32:
         print(tag_text ++ " |" ++ text_slice ++ "|\n")
     0
 
-fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
+fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode)
-    let result = comp.driver.resolve_file(source_file, true)
-    if comp.driver.diagnostics.has_errors():
+    comp.set_prelude_mode(prelude_mode)
+    let result = comp.resolve_file(source_file, true)
+    let has_errors = comp.has_errors()
+    if has_errors:
         with_eprintln("error: resolved dump failed")
         return 1
-    print_resolved(result, comp.driver.pool, source_file)
+    let resolved_text = dump_resolved(result, comp.get_pool(), source_file)
+    print(resolved_text)
     0
 
-fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
+fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode)
-    comp.driver.set_emit_typed_during_compile(1)
-    let pool = comp.compile_file(source_file)
-    if pool.decl_count() == 0:
-        with_eprintln("error: typed dump failed during compilation")
-        return 1
-    if comp.driver.did_emit_typed_during_compile() != 0:
-        return 0
-    // Stream typed output directly to stdout to avoid constructing a very
-    // large immutable string via repeated `++` concatenation.
-    if not comp.driver.emit_typed(pool):
-        with_eprintln("error: typed dump failed during semantic analysis or emission")
+    comp.set_prelude_mode(prelude_mode)
+    let typed_ok = comp.emit_typed_file(source_file)
+    if not typed_ok:
+        with_eprintln("error: typed dump failed during compilation or semantic analysis")
         return 1
     0
 
-fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
+fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode)
-    let pool = comp.compile_file(source_file)
-    if pool.decl_count() == 0:
-        with_eprintln("error: mir dump failed during compilation")
-        return 1
-    if not comp.driver.print_mir(pool):
-        with_eprintln("error: mir dump failed during mir lowering")
+    comp.set_prelude_mode(prelude_mode)
+    let mir_ok = comp.print_mir_file(source_file)
+    if not mir_ok:
+        with_eprintln("error: mir dump failed during compilation or mir lowering")
         return 1
     0
 
-fn dump_async_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
+fn dump_async_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode)
-    let pool = comp.compile_file(source_file)
-    if pool.decl_count() == 0:
-        with_eprintln("error: async-mir dump failed during compilation")
-        return 1
-    let async_mir_text = comp.driver.dump_async_mir(pool)
+    comp.set_prelude_mode(prelude_mode)
+    let async_mir_text = comp.dump_async_mir_file(source_file)
     if async_mir_text.len() == 0:
-        with_eprintln("error: async-mir dump failed during lowering")
+        with_eprintln("error: async-mir dump failed during compilation or lowering")
         return 1
     print(async_mir_text)
     0
@@ -368,7 +475,7 @@ fn escape_dump_lexeme(text: str) -> str:
     var out = ""
     var run_start = 0
     for i in 0..text.len():
-        let ch = text[i]
+        let ch = text.byte_at((i) as i64)
         var esc = ""
         if ch == 92:  // '\'
             esc = "\\\\"
@@ -389,7 +496,7 @@ fn escape_dump_lexeme(text: str) -> str:
         run_start = i + 1
     // Flush any remaining non-special run.
     if run_start < text.len():
-        out = out ++ text.slice(run_start as i64, text.len() as i64)
+        out = out ++ text.slice(run_start as i64, text.len())
     out
 
 fn dump_tag_name(tag: i32, lexeme: str) -> str:
@@ -400,7 +507,7 @@ fn dump_tag_name(tag: i32, lexeme: str) -> str:
         return "'" ++ lexeme ++ "'"
     return tag_name(tag)
 
-fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool) -> i32:
+fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
     // Find test file/dir argument
     let target = find_source_arg(argc)
     if target == "":
@@ -409,11 +516,13 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool) -
     // Compile and run as test
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
+    comp.set_prelude_mode(prelude_mode)
     let bin_path = comp.build_binary(target)
     if bin_path == "":
         with_eprintln("error: test build failed")
         return 1
-    with_system(bin_path)
+    let run_rc = with_system(bin_path)
+    run_rc
 
 fn run_clean_command -> i32:
     let result = with_system("rm -rf .with")
@@ -427,7 +536,7 @@ fn print_usage:
     print("Usage: with <command> [options]\n")
     print("\n")
     print("Commands:\n")
-    print("  build [file.w]    Build a source file\n")
+    print("  build [file.w]    Build a source file (use --emit-c to emit C)\n")
     print("  run [file.w]      Build + run a source file\n")
     print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir/--dump-async-mir)\n")
     print("  test [file.w]     Run tests\n")
@@ -437,3 +546,8 @@ fn print_usage:
     print("  tokens <file.w>   Lex and dump tokens (debug)\n")
     print("  version           Print compiler version\n")
     print("  help              Show this message\n")
+    print("\n")
+    print("Common options:\n")
+    print("  --no-prelude          Disable implicit std prelude import\n")
+    print("  --prelude=full|core|none  Select implicit prelude mode\n")
+    print("  --freestanding        Alias for --no-std --no-prelude\n")

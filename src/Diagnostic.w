@@ -73,24 +73,30 @@ fn Diagnostic.add_help(self: Diagnostic, message: str):
     self.helps.push(message)
 
 fn Diagnostic.render(self: Diagnostic, source: Source):
-    with_eprintln(render_diag_header(self.severity, self.code, self.message))
+    let code: str = self.code
+    let message: str = self.message
+    with_eprintln(render_diag_header(self.severity, code, message))
 
     let loc = source.offset_to_location(self.primary.start)
-    with_eprintln(render_diag_location(source.path, loc.line, loc.col))
+    let source_path: str = source.path
+    with_eprintln(render_diag_location(source_path, loc.line, loc.col))
 
-    let line_text = source.line_text(loc.line)
+    let line_text: str = source.line_text(loc.line)
     with_eprintln(render_diag_source_line(loc.line, line_text))
     with_eprintln(render_diag_marker_line(loc.col, span_underline_len(self.primary.start, self.primary.end)))
 
     for i in 0..self.labels.len() as i32:
-        let lab = self.labels.get(i as i64)
+        let lab: DiagnosticLabel = self.labels.get(i as i64)
         let lloc = source.offset_to_location(lab.span.start)
-        with_eprintln(render_diag_label_line(lloc.line, lloc.col, lab.message))
+        let label_message: str = lab.message
+        with_eprintln(render_diag_label_line(lloc.line, lloc.col, label_message))
 
     for i in 0..self.notes.len() as i32:
-        with_eprintln(render_diag_note_line(self.notes.get(i as i64)))
+        let note: str = self.notes.get(i as i64)
+        with_eprintln(render_diag_note_line(note))
     for i in 0..self.helps.len() as i32:
-        with_eprintln(render_diag_help_line(self.helps.get(i as i64)))
+        let help: str = self.helps.get(i as i64)
+        with_eprintln(render_diag_help_line(help))
 
 type DiagnosticList = {
     items: Vec[Diagnostic],
@@ -126,3 +132,13 @@ fn DiagnosticList.render_all(self: DiagnosticList, source: Source):
         self.items.get(i as i64).render(source)
         if i + 1 < self.items.len() as i32:
             with_eprintln("")
+
+fn DiagnosticList.render_warnings(self: DiagnosticList, source: Source):
+    var printed = 0
+    for i in 0..self.items.len() as i32:
+        if self.items.get(i as i64).severity != DIAG_SEVERITY_WARNING():
+            continue
+        if printed != 0:
+            with_eprintln("")
+        self.items.get(i as i64).render(source)
+        printed = printed + 1

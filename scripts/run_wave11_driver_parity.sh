@@ -7,7 +7,7 @@ source "${ROOT_DIR}/scripts/parity_states.sh"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 STAGE0_BIN="${ROOT_DIR}/bootstrap/zig-out/bin/with"
-SELFHOST_BIN="${ROOT_DIR}/with-stage2"
+SELFHOST_BIN="${ROOT_DIR}/out/bin/with-stage2"
 CORPUS_FILE="test/wave11/driver_corpus.txt"
 VERIFY_COVERAGE_SCRIPT="scripts/verify_wave11_coverage.sh"
 CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"

@@ -12,7 +12,6 @@ use Diagnostic
 
 extern fn int_to_string(n: i32) -> str
 extern fn with_eprintln(s: str) -> void
-
 type Parser = {
     tokens: TokenList,
     pos: i32,
@@ -179,7 +178,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_test = 0
     self.pending_before = 0
     self.pending_after = 0
-    var derive_syms = Vec.new()
+    var derive_syms: Vec[i32] = Vec.new()
 
     while self.peek() == TK_AT():
         let saved = self.pos
@@ -1404,9 +1403,9 @@ fn Parser.parse_char_literal(self: Parser) -> i32:
     // Supported escapes mirror bootstrap parser behavior.
     var value = 0
     // Support b'X' byte literals as a char-literal token form.
-    let base = if text.len() >= 1 and text[0] == 98: 2 else: 1
-    if text.len() >= base + 3 and text[base] == 92:  // '\'
-        let esc = text[base + 1]
+    let base = if text.len() >= 1 and text.byte_at((0) as i64) == 98: 2 else: 1
+    if text.len() >= base + 3 and text.byte_at((base) as i64) == 92:  // '\'
+        let esc = text.byte_at((base + 1) as i64)
         if esc == 110:  // n
             value = 10
         else if esc == 114:  // r
@@ -1416,8 +1415,8 @@ fn Parser.parse_char_literal(self: Parser) -> i32:
         else if esc == 48:  // 0
             value = 0
         else if esc == 120 and text.len() >= base + 4:  // xNN
-            let hi = hex_digit_value(text[base + 2])
-            let lo = if text.len() >= base + 5: hex_digit_value(text[base + 3]) else: -1
+            let hi = hex_digit_value(text.byte_at((base + 2) as i64))
+            let lo = if text.len() >= base + 5: hex_digit_value(text.byte_at((base + 3) as i64)) else: -1
             if hi >= 0 and lo >= 0:
                 value = hi * 16 + lo
             else:
@@ -1431,27 +1430,27 @@ fn Parser.parse_char_literal(self: Parser) -> i32:
         else:
             value = esc as i32
     else if text.len() >= base + 2:
-        value = text[base] as i32
+        value = text.byte_at((base) as i64) as i32
     self.pool.add_node(NK_INT_LIT(), start, end, value, 0, 0)
 
 fn strip_string_token_text(text: str) -> str:
-    if text.len() >= 2 and text[0] == 114:  // r
+    if text.len() >= 2 and text.byte_at((0) as i64) == 114:  // r
         var i = 1
-        while i < text.len() as i32 and text[i] == 35:  // #
+        while i < text.len() as i32 and text.byte_at((i) as i64) == 35:  // #
             i = i + 1
-        if i < text.len() as i32 and text[i] == 34:  // opening "
+        if i < text.len() as i32 and text.byte_at((i) as i64) == 34:  // opening "
             let content_start = i + 1
             var end_q = text.len() as i32 - 1
-            while end_q >= content_start and text[end_q] == 35:
+            while end_q >= content_start and text.byte_at((end_q) as i64) == 35:
                 end_q = end_q - 1
-            if end_q >= content_start and text[end_q] == 34:
+            if end_q >= content_start and text.byte_at((end_q) as i64) == 34:
                 return text.slice(content_start as i64, end_q as i64)
 
     if text.len() >= 6 and text.slice(0, 3) == "\"\"\"":
         var content = text.slice(3, text.len() as i64 - 3)
-        if content.len() > 0 and content[0] == 10:
+        if content.len() > 0 and content.byte_at((0) as i64) == 10:
             content = content.slice(1, content.len())
-        if content.len() > 0 and content[content.len() as i32 - 1] == 10:
+        if content.len() > 0 and content.byte_at((content.len() as i32 - 1) as i64) == 10:
             content = content.slice(0, content.len() - 1)
         return dedent_multiline(content)
 
@@ -1462,12 +1461,12 @@ fn strip_string_token_text(text: str) -> str:
 fn is_raw_string_token_text(text: str) -> bool:
     if text.len() < 3:
         return false
-    if text[0] != 114:  // r
+    if text.byte_at((0) as i64) != 114:  // r
         return false
     var i = 1
-    while i < text.len() as i32 and text[i] == 35:  // #
+    while i < text.len() as i32 and text.byte_at((i) as i64) == 35:  // #
         i = i + 1
-    if i < text.len() as i32 and text[i] == 34:  // "
+    if i < text.len() as i32 and text.byte_at((i) as i64) == 34:  // "
         return true
     false
 
@@ -1477,14 +1476,14 @@ fn dedent_multiline(text: str) -> str:
     var line_start = 0
     var i = 0
     while i <= len:
-        if i == len or text[i] == 10:
+        if i == len or text.byte_at((i) as i64) == 10:
             var j = line_start
-            while j < i and (text[j] == 32 or text[j] == 9):
+            while j < i and (text.byte_at((j) as i64) == 32 or text.byte_at((j) as i64) == 9):
                 j = j + 1
             var has_non_ws = 0
             var k = j
             while k < i:
-                if text[k] != 32 and text[k] != 9:
+                if text.byte_at((k) as i64) != 32 and text.byte_at((k) as i64) != 9:
                     has_non_ws = 1
                 k = k + 1
             if has_non_ws != 0:
@@ -1501,10 +1500,10 @@ fn dedent_multiline(text: str) -> str:
     line_start = 0
     i = 0
     while i <= len:
-        if i == len or text[i] == 10:
+        if i == len or text.byte_at((i) as i64) == 10:
             var cut = min_indent
             var j = line_start
-            while cut > 0 and j < i and (text[j] == 32 or text[j] == 9):
+            while cut > 0 and j < i and (text.byte_at((j) as i64) == 32 or text.byte_at((j) as i64) == 9):
                 j = j + 1
                 cut = cut - 1
             out = out ++ text.slice(j as i64, i as i64)
@@ -2329,7 +2328,7 @@ fn Parser.parse_pattern(self: Parser) -> i32:
             self.expect(TK_R_PAREN())
             return self.pool.add_node(NK_PAT_VARIANT(), start, self.prev_end(), name, extra_start, binding_count)
         // Uppercase = unit variant
-        if name_str.len() > 0 and name_str[0] >= 65 and name_str[0] <= 90:
+        if name_str.len() > 0 and name_str.byte_at((0) as i64) >= 65 and name_str.byte_at((0) as i64) <= 90:
             if self.peek() == TK_L_BRACE():
                 return self.parse_struct_pattern(name, start)
             return self.pool.add_node(NK_PAT_VARIANT(), start, self.prev_end(), name, 0, 0)
@@ -2512,7 +2511,7 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
     if name_sym == 0:
         return 0
     let name_str = self.intern.resolve(name_sym)
-    let is_upper = name_str.len() > 0 and name_str[0] >= 65 and name_str[0] <= 90
+    let is_upper = name_str.len() > 0 and name_str.byte_at((0) as i64) >= 65 and name_str.byte_at((0) as i64) <= 90
 
     // Let-else variant: let Some(x) = expr else body
     if is_upper and self.peek() == TK_L_PAREN():
@@ -2723,7 +2722,7 @@ fn Parser.parse_block_or_expr(self: Parser) -> i32:
         return 0
 
     let block_col = column_of(self.source, self.current_start())
-    var stmts = Vec.new()
+    var stmts: Vec[i32] = Vec.new()
     var last_expr = self.parse_expr()
 
     while true:
@@ -3042,30 +3041,27 @@ fn Parser.parse_optional_where_clause(self: Parser):
 
 // ── Integer parsing helper ───────────────────────────────────────
 
-fn i64_from_i32(n: i32) -> i64:
-    n as i64
-
 fn parse_int(text: str) -> i32:
     let len = text.len() as i32
     if len == 0:
         return 0
-    let max_i32 = i64_from_i32(2147483647)
+    let max_i32 = 2147483647
     // Handle 0x hex
-    if len > 2 and text[0] == 48 and (text[1] == 120 or text[1] == 88):
-        var val = i64_from_i32(0)
+    if len > 2 and text.byte_at(0) == 48 and (text.byte_at(1) == 120 or text.byte_at(1) == 88):
+        var val = 0
         var i = 2
         while i < len:
-            let ch = text[i]
+            let ch = text.byte_at(i as i64)
             if ch == 95:
                 i = i + 1
                 continue
-            var digit = i64_from_i32(0)
+            var digit = 0
             if ch >= 48 and ch <= 57:
-                digit = (ch - 48) as i64
+                digit = ch - 48
             else if ch >= 97 and ch <= 102:
-                digit = (ch - 87) as i64
+                digit = ch - 87
             else if ch >= 65 and ch <= 70:
-                digit = (ch - 55) as i64
+                digit = ch - 55
             if val <= (max_i32 - digit) / 16:
                 val = val * 16 + digit
             else:
@@ -3073,15 +3069,15 @@ fn parse_int(text: str) -> i32:
             i = i + 1
         return val as i32
     // Handle 0b binary
-    if len > 2 and text[0] == 48 and (text[1] == 98 or text[1] == 66):
-        var val = i64_from_i32(0)
+    if len > 2 and text.byte_at(0) == 48 and (text.byte_at(1) == 98 or text.byte_at(1) == 66):
+        var val = 0
         var i = 2
         while i < len:
-            let ch = text[i]
+            let ch = text.byte_at(i as i64)
             if ch == 95:
                 i = i + 1
                 continue
-            var digit = i64_from_i32(0)
+            var digit = 0
             if ch == 49:
                 digit = 1
             if val <= (max_i32 - digit) / 2:
@@ -3091,15 +3087,15 @@ fn parse_int(text: str) -> i32:
             i = i + 1
         return val as i32
     // Handle 0o octal
-    if len > 2 and text[0] == 48 and (text[1] == 111 or text[1] == 79):
-        var val = i64_from_i32(0)
+    if len > 2 and text.byte_at(0) == 48 and (text.byte_at(1) == 111 or text.byte_at(1) == 79):
+        var val = 0
         var i = 2
         while i < len:
-            let ch = text[i]
+            let ch = text.byte_at(i as i64)
             if ch == 95:
                 i = i + 1
                 continue
-            let digit = (ch - 48) as i64
+            let digit = ch - 48
             if val <= (max_i32 - digit) / 8:
                 val = val * 8 + digit
             else:
@@ -3110,23 +3106,23 @@ fn parse_int(text: str) -> i32:
     var end_pos = len
     var si = 0
     while si < len:
-        if text[si] == 95:
+        if text.byte_at(si as i64) == 95:
             // Check for type suffix: _i32, _u64, etc.
             let remain = len - si
             if remain >= 4:
-                let c1 = text[si + 1]
+                let c1 = text.byte_at((si + 1) as i64)
                 if c1 == 105 or c1 == 117:  // i or u
                     end_pos = si
                     break
         si = si + 1
-    var val = i64_from_i32(0)
+    var val = 0
     var i = 0
     while i < end_pos:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         if ch == 95:
             i = i + 1
             continue
-        let digit = (ch - 48) as i64
+        let digit = ch - 48
         if val <= (max_i32 - digit) / 10:
             val = val * 10 + digit
         else:

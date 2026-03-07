@@ -18,13 +18,12 @@
 // This module provides additional utility functions.
 
 use c_import("string.h")
-use c_import("stdlib.h")
-use c_import("stdio.h")
-use c_import("ctype.h")
+extern fn with_lines_out(out: &Vec[str], s: str) -> void
+extern fn with_parse_i64(s: str) -> i64
 
 // String length (same as s.len())
 pub fn string_len(s: str) -> i64:
-    strlen(s) as i64
+    strlen(s as *const i8) as i64
 
 // StrView length helper (same as v.len)
 pub fn view_len(v: &str) -> i64:
@@ -40,24 +39,35 @@ pub fn view_eq(a: &str, b: &str) -> bool:
 
 // String comparison (returns true if equal)
 pub fn string_eq(a: str, b: str) -> bool:
-    strcmp(a, b) == 0
+    strcmp(a as *const i8, b as *const i8) == 0
 
 // String comparison (returns negative, 0, or positive)
 pub fn string_cmp(a: str, b: str) -> i32:
-    strcmp(a, b)
+    strcmp(a as *const i8, b as *const i8)
 
 // Check if character is alphabetic
 pub fn is_alpha(c: i32) -> bool:
-    isalpha(c) != 0
+    (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
 
 // Check if character is a digit
 pub fn is_digit(c: i32) -> bool:
-    isdigit(c) != 0
+    c >= 48 and c <= 57
 
 // Check if character is whitespace
 pub fn is_space(c: i32) -> bool:
-    isspace(c) != 0
+    c == 32 or c == 9 or c == 10 or c == 13 or c == 12 or c == 11
 
 // Convert string to integer
 pub fn string_to_int(s: str) -> i64:
-    atol(s)
+    with_parse_i64(s)
+
+// Split text by newline boundaries.
+pub fn lines(s: str) -> Vec[str]:
+    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    with_lines_out(&out, s)
+    out
+
+// Parse a trimmed string into i32.
+pub fn parse(s: str) -> i32:
+    let n = string_to_int(s)
+    n as i32

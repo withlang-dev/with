@@ -7,7 +7,7 @@ source "${ROOT_DIR}/scripts/parity_states.sh"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 STAGE0_BIN="./bootstrap/zig-out/bin/with"
-SELFHOST_BIN="./with-stage2"
+SELFHOST_BIN="./out/bin/with-stage2"
 CORPUS_FILE="test/annoyances/async_parity_corpus.txt"
 
 echo "building bootstrap compiler for fix_more_annoyances async parity..."
@@ -17,13 +17,13 @@ echo "building bootstrap compiler for fix_more_annoyances async parity..."
 )
 
 if [[ ! -x "$SELFHOST_BIN" ]]; then
-  if [[ -x "./with-stage1" ]]; then
-    SELFHOST_BIN="./with-stage1"
+  if [[ -x "./out/bin/with-stage1" ]]; then
+    SELFHOST_BIN="./out/bin/with-stage1"
   else
     echo "rebuilding self-host compiler for fix_more_annoyances async parity..."
     ./scripts/rebuild_selfhost.sh stage2 >/dev/null
     if [[ ! -x "$SELFHOST_BIN" ]]; then
-      SELFHOST_BIN="./with-stage1"
+      SELFHOST_BIN="./out/bin/with-stage1"
     fi
   fi
 fi

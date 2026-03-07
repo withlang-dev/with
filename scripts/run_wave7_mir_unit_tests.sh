@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
-SELFHOST_BIN="./with-stage2"
+SELFHOST_BIN="./out/bin/with-stage2"
 CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "rebuilding self-host compiler for Wave 7 MIR unit tests..."

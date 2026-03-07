@@ -12,8 +12,8 @@ fi
 echo "[gate-stage0] rebuilding stage2 from bootstrap"
 ./scripts/rebuild_selfhost.sh stage2
 
-if [[ ! -x "./with-stage2" ]]; then
-  echo "[gate-stage0] missing with-stage2 after rebuild" >&2
+if [[ ! -x "./out/bin/with-stage2" ]]; then
+  echo "[gate-stage0] missing out/bin/with-stage2 after rebuild" >&2
   exit 1
 fi
 

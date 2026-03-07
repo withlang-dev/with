@@ -194,13 +194,79 @@ fn MirBuilder.expr_type(self: MirBuilder, node: i32) -> i32:
         return self.sema.ty_void
     let start = self.ast.get_start(node)
     if self.sema.typed_expr_types.contains(start):
-        return self.sema.typed_expr_types.get(start).unwrap()
-    self.sema.ty_void
+        let typed = self.sema.typed_expr_types.get(start).unwrap()
+        if typed != 0:
+            return typed
+    self.fallback_expr_type(node)
 
 fn MirBuilder.binding_type(self: MirBuilder, node: i32) -> i32:
     let start = self.ast.get_start(node)
     if self.sema.typed_binding_types.contains(start):
-        return self.sema.typed_binding_types.get(start).unwrap()
+        let typed = self.sema.typed_binding_types.get(start).unwrap()
+        if typed != 0:
+            return typed
+    let rhs = self.ast.get_data1(node)
+    let rhs_ty = self.expr_type(rhs)
+    if rhs_ty != 0:
+        return rhs_ty
+    self.sema.ty_void
+
+fn MirBuilder.local_type(self: MirBuilder, local_id: i32) -> i32:
+    if local_id < 0 or local_id >= self.body.local_type_ids.len() as i32:
+        return self.sema.ty_void
+    self.body.local_type_ids.get(local_id as i64)
+
+fn MirBuilder.ident_type(self: MirBuilder, sym: i32) -> i32:
+    let local = self.lookup_local(sym)
+    if local >= 0:
+        return self.local_type(local)
+    let sig_idx = self.sema.get_sig(sym)
+    if sig_idx >= 0:
+        return self.sema.sig_type_ids.get(sig_idx as i64)
+    if self.sema.named_types.contains(sym):
+        return self.sema.named_types.get(sym).unwrap()
+    if self.sema.variant_lookup.contains(sym):
+        return self.sema.variant_lookup.get(sym).unwrap() / 65536
+    self.sema.ty_void
+
+fn MirBuilder.call_return_type(self: MirBuilder, callee: i32) -> i32:
+    if callee == 0:
+        return self.sema.ty_void
+    let kind = self.ast.kind(callee)
+    if kind == NK_IDENT():
+        let sym = self.ast.get_data0(callee)
+        let sig_idx = self.sema.get_sig(sym)
+        if sig_idx >= 0:
+            return self.sema.sig_return_type(sig_idx)
+        return self.sema.ty_void
+    if kind == NK_FIELD_ACCESS():
+        let base = self.ast.get_data0(callee)
+        let method_sym = self.ast.get_data1(callee)
+        let resolved = self.resolve_method_callee_sym(base, method_sym)
+        let resolved_sig = self.sema.get_sig(resolved)
+        if resolved_sig >= 0:
+            return self.sema.sig_return_type(resolved_sig)
+        let bare_sig = self.sema.get_sig(method_sym)
+        if bare_sig >= 0:
+            return self.sema.sig_return_type(bare_sig)
+    self.sema.ty_void
+
+fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
+    if node == 0:
+        return self.sema.ty_void
+    let kind = self.ast.kind(node)
+    if kind == NK_IDENT():
+        return self.ident_type(self.ast.get_data0(node))
+    if kind == NK_GROUPED():
+        return self.expr_type(self.ast.get_data0(node))
+    if kind == NK_INT_LIT():
+        return self.sema.ty_i32
+    if kind == NK_BOOL_LIT():
+        return self.sema.ty_bool
+    if kind == NK_STRING_LIT() or kind == NK_C_STRING_LIT():
+        return self.sema.ty_str
+    if kind == NK_CALL():
+        return self.call_return_type(self.ast.get_data0(node))
     self.sema.ty_void
 
 fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
@@ -248,6 +314,9 @@ fn MirBuilder.const_operand(self: MirBuilder, kind: i32, d0: i32, type_id: i32) 
 fn MirBuilder.unit_operand(self: MirBuilder) -> i32:
     self.const_operand(CK_UNIT(), 0, self.sema.ty_void)
 
+fn MirBuilder.mark_unsupported(self: MirBuilder):
+    self.body.lowering_failed = 1
+
 fn MirBuilder.lower_int_lit(self: MirBuilder, value: i32, type_id: i32) -> i32:
     let ty = if type_id == 0 or self.sema.get_type_kind(type_id) == TY_VOID(): self.sema.ty_i32 else: type_id
     self.const_operand(CK_INT(), value, ty)
@@ -266,12 +335,19 @@ fn MirBuilder.lower_unit(self: MirBuilder) -> i32:
 
 fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
     let local = self.lookup_local(sym)
-    if local < 0:
-        return self.unit_operand()
-    let place = self.body.new_place(local)
-    if self.sema.is_copy(type_id) != 0:
-        return self.body.new_operand(OK_COPY(), place)
-    self.body.new_operand(OK_MOVE(), place)
+    if local >= 0:
+        let place = self.body.new_place(local)
+        if self.sema.is_copy(type_id) != 0:
+            return self.body.new_operand(OK_COPY(), place)
+        return self.body.new_operand(OK_MOVE(), place)
+
+    let sig_idx = self.sema.get_sig(sym)
+    if sig_idx >= 0:
+        let fn_ty = if type_id != 0: type_id else: self.sema.sig_type_ids.get(sig_idx as i64)
+        return self.const_operand(CK_FN(), sym, fn_ty)
+
+    self.mark_unsupported()
+    self.unit_operand()
 
 fn MirBuilder.assign_operand_to_place(self: MirBuilder, place: i32, operand_id: i32, span: i32):
     let rval = self.body.new_rvalue(RK_USE(), operand_id, 0, 0)
@@ -932,9 +1008,28 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
         return self.body.new_operand(OK_COPY(), result_place)
     self.body.new_operand(OK_MOVE(), result_place)
 
+fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method_sym: i32) -> i32:
+    let obj_type = self.expr_type(self_expr)
+    if obj_type != 0:
+        let resolved = self.sema.resolve_alias(obj_type)
+        let type_name_sym = self.sema.get_type_name(resolved)
+        if type_name_sym != 0:
+            let method_key = self.sema.method_key(type_name_sym, method_sym)
+            if self.sema.get_sig(method_key) >= 0:
+                return method_key
+
+    if self.ast.kind(self_expr) == NK_IDENT():
+        let type_sym = self.ast.get_data0(self_expr)
+        let method_key = self.sema.method_key(type_sym, method_sym)
+        if self.sema.get_sig(method_key) >= 0:
+            return method_key
+
+    method_sym
+
 fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
     // Lower method calls as normal calls with receiver inserted as first arg.
-    let method_ident = self.ast.add_node(NK_IDENT(), self.ast.get_start(node), self.ast.get_end(node), method_sym, 0, 0)
+    let callee_sym = self.resolve_method_callee_sym(self_expr, method_sym)
+    let method_ident = self.ast.add_node(NK_IDENT(), self.ast.get_start(node), self.ast.get_end(node), callee_sym, 0, 0)
     let args: Vec[i32] = Vec.new()
     args.push(self_expr)
     for i in 0..arg_count:
@@ -1238,7 +1333,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.lower_match(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node)
 
     if kind == NK_CALL():
-        return self.lower_call(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), self.expr_type(node), node)
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NK_FIELD_ACCESS():
+            return self.lower_method_call(self.ast.get_data0(callee), self.ast.get_data1(callee), self.ast.get_data1(node), self.ast.get_data2(node), node)
+        return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), self.expr_type(node), node)
 
     if kind == NK_PIPELINE():
         let rhs = self.ast.get_data1(node)
@@ -1269,6 +1367,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
     if kind == NK_AWAIT() or kind == NK_ASYNC_BLOCK() or kind == NK_ASYNC_SCOPE() or kind == NK_SELECT_AWAIT() or kind == NK_SPAWN() or kind == NK_YIELD() or kind == NK_COMPTIME():
         // Async/comptime lowering is deferred to later waves.
+        self.mark_unsupported()
         if self.ast.get_data0(node) != 0:
             let _ = self.lower_expr(self.ast.get_data0(node))
         if self.ast.get_data1(node) != 0:
@@ -1277,6 +1376,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             let _ = self.lower_expr(self.ast.get_data2(node))
         return self.unit_operand()
 
+    self.mark_unsupported()
     self.unit_operand()
 
 fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:

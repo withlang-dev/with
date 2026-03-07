@@ -28,6 +28,7 @@ extern fn int_to_string(n: i32) -> str
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_getenv_str(name: str) -> str
+extern fn with_hashmap_new(key_size: i64, val_size: i64) -> *T
 
 type Driver = {
     pool: InternPool,
@@ -87,7 +88,7 @@ fn Driver.init -> Driver:
     Driver {
         pool: InternPool.init(),
         diagnostics: DiagnosticList.init(),
-        imported_paths: HashMap.new(),
+        imported_paths: HashMap { ptr: with_hashmap_new(16, 4) },
         source_dir: ".",
         next_file_id: 1,
         opt_level: 0,
@@ -97,15 +98,15 @@ fn Driver.init -> Driver:
         current_source_text: "",
         last_root_decl_count: 0,
         pending_warnings: Vec.new(),
-        c_import_cache: HashMap.new(),
+        c_import_cache: HashMap { ptr: with_hashmap_new(16, 16) },
         trace_c_import_cache: 0,
         last_resolved: ResolveResult.init(),
         last_link_lib_names: Vec.new(),
         resolved_root_path: "",
-        typed_expr_types: HashMap.new(),
-        typed_binding_types: HashMap.new(),
-        typed_binding_names: HashMap.new(),
-        typed_binding_muts: HashMap.new(),
+        typed_expr_types: HashMap { ptr: with_hashmap_new(4, 4) },
+        typed_binding_types: HashMap { ptr: with_hashmap_new(4, 4) },
+        typed_binding_names: HashMap { ptr: with_hashmap_new(4, 4) },
+        typed_binding_muts: HashMap { ptr: with_hashmap_new(4, 4) },
         typed_pool_cache: AstPool.new(),
         emit_typed_during_compile: 0,
         typed_emitted_during_compile: 0,
