@@ -3,11 +3,27 @@
 // Root `InternPool` now follows the foundation layout while preserving
 // historical string-only entrypoints used across existing compiler code.
 
+use std.prelude_core
+
 use compiler.foundation.Types
 use compiler.foundation.Values
 
 extern fn with_vec_new_out(v: &T, elem_size: i64) -> void
+extern fn with_hashmap_new_out(out: &T, key_size: i64, val_size: i64) -> void
 extern fn with_hashmap_new_at(base: &T, offset: i64, key_size: i64, val_size: i64) -> void
+extern fn with_getenv_str(name: str) -> str
+extern fn with_eprintln(s: str) -> void
+
+fn intern_debug_init_enabled() -> i32:
+    let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
+    if raw.len() == 0:
+        return 0
+    1
+
+fn intern_debug_init(msg: str):
+    if intern_debug_init_enabled() == 0:
+        return
+    with_eprintln("[intern-init] " ++ msg)
 
 type Symbol = i32
 type TypeId = i32
@@ -27,6 +43,13 @@ type InternPool = {
     value_map: HashMap[str, i32],
 }
 
+fn intern_new_map_str_i32 -> HashMap[str, i32]:
+    intern_debug_init("intern_new_map_str_i32:start")
+    let map: HashMap[str, i32] = HashMap { ptr: 0 }
+    with_hashmap_new_out(&map, 16, 4)
+    intern_debug_init("intern_new_map_str_i32:new_out")
+    map
+
 fn intern_text_eq(a: str, b: str) -> bool:
     if a.len() != b.len():
         return false
@@ -38,28 +61,39 @@ fn intern_text_eq(a: str, b: str) -> bool:
     true
 
 fn InternPool.init -> InternPool:
-    let symbol_texts: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    intern_debug_init("InternPool.init:start")
+    let symbol_texts: Vec[str] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
     with_vec_new_out(&symbol_texts, 16)
-    let type_keys: Vec[TypeKey] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    intern_debug_init("InternPool.init:symbol_texts")
+    let type_keys: Vec[TypeKey] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
     with_vec_new_out(&type_keys, 24)
-    let value_keys: Vec[ValueKey] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    intern_debug_init("InternPool.init:type_keys")
+    let value_keys: Vec[ValueKey] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
     with_vec_new_out(&value_keys, 24)
+    intern_debug_init("InternPool.init:value_keys")
+    let symbol_map = intern_new_map_str_i32()
+    intern_debug_init("InternPool.init:symbol_map")
+    let type_map = intern_new_map_str_i32()
+    intern_debug_init("InternPool.init:type_map")
+    let value_map = intern_new_map_str_i32()
+    intern_debug_init("InternPool.init:value_map")
     var p = InternPool {
         symbol_texts,
-        symbol_map: HashMap { ptr: 0 },
+        symbol_map,
         type_keys,
-        type_map: HashMap { ptr: 0 },
+        type_map,
         value_keys,
-        value_map: HashMap { ptr: 0 },
+        value_map,
     }
-    with_hashmap_new_at(&p, 32, 16, 4)
-    with_hashmap_new_at(&p, 72, 16, 4)
-    with_hashmap_new_at(&p, 112, 16, 4)
+    intern_debug_init("InternPool.init:assembled")
 
     // Reserve index 0 as sentinel for each lane.
     p.symbol_texts.push("")
+    intern_debug_init("InternPool.init:sentinel_symbols")
     p.type_keys.push(type_key_invalid())
+    intern_debug_init("InternPool.init:sentinel_types")
     p.value_keys.push(value_key_invalid())
+    intern_debug_init("InternPool.init:sentinel_values")
     p
 
 fn InternPool.new -> InternPool:

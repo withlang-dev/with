@@ -3,6 +3,8 @@
 // Consumes a TokenList and produces nodes in an AstPool.
 // On parse errors, emits a diagnostic and recovers to next top-level decl.
 
+use std.prelude_core
+
 use Ast
 use Token
 use Span
@@ -12,6 +14,7 @@ use Diagnostic
 
 extern fn int_to_string(n: i32) -> str
 extern fn with_eprintln(s: str) -> void
+extern fn with_parse_i64(s: str) -> i64
 type Parser = {
     tokens: TokenList,
     pos: i32,
@@ -1351,9 +1354,8 @@ fn Parser.parse_int_literal(self: Parser) -> i32:
     let end = self.current_end()
     let text = self.source.slice(start as i64, end as i64)
     self.advance()
-    // Parse integer value (simplified - handles decimal)
-    let val = parse_int(text)
-    self.pool.add_node(NK_INT_LIT(), start, end, val, 0, 0)
+    let val = parse_i64(text)
+    self.pool.add_node(NK_INT_LIT(), start, end, ast_int_part0(val), ast_int_part1(val), ast_int_part2(val))
 
 fn Parser.parse_float_literal(self: Parser) -> i32:
     let start = self.current_start()
@@ -1431,7 +1433,8 @@ fn Parser.parse_char_literal(self: Parser) -> i32:
             value = esc as i32
     else if text.len() >= base + 2:
         value = text.byte_at((base) as i64) as i32
-    self.pool.add_node(NK_INT_LIT(), start, end, value, 0, 0)
+    let value64 = value as i64
+    self.pool.add_node(NK_INT_LIT(), start, end, ast_int_part0(value64), ast_int_part1(value64), ast_int_part2(value64))
 
 fn strip_string_token_text(text: str) -> str:
     if text.len() >= 2 and text.byte_at((0) as i64) == 114:  // r
@@ -1816,6 +1819,12 @@ fn Parser.parse_grouped_or_tuple(self: Parser) -> i32:
 fn Parser.parse_unary_negate(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
+    if self.peek() == TK_INT_LIT():
+        let end = self.current_end()
+        let text = self.source.slice(start as i64 + 1, end as i64)
+        let value = 0 - parse_i64(text)
+        self.advance()
+        return self.pool.add_node(NK_INT_LIT(), start, end, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value))
     let operand = self.parse_primary()
     self.pool.add_node(NK_UNARY(), start, self.prev_end(), UOP_NEGATE(), operand, 0)
 
@@ -3042,90 +3051,75 @@ fn Parser.parse_optional_where_clause(self: Parser):
 // ── Integer parsing helper ───────────────────────────────────────
 
 fn parse_int(text: str) -> i32:
+    let value = parse_i64(text)
+    if value < -2147483648:
+        return -2147483648
+    if value > 2147483647:
+        return 2147483647
+    value as i32
+
+fn parse_i64(text: str) -> i64:
     let len = text.len() as i32
     if len == 0:
         return 0
-    let max_i32 = 2147483647
-    // Handle 0x hex
     if len > 2 and text.byte_at(0) == 48 and (text.byte_at(1) == 120 or text.byte_at(1) == 88):
-        var val = 0
+        var val: i64 = 0
         var i = 2
         while i < len:
             let ch = text.byte_at(i as i64)
             if ch == 95:
                 i = i + 1
                 continue
-            var digit = 0
+            var digit: i64 = 0
             if ch >= 48 and ch <= 57:
-                digit = ch - 48
+                digit = (ch - 48) as i64
             else if ch >= 97 and ch <= 102:
-                digit = ch - 87
+                digit = (ch - 87) as i64
             else if ch >= 65 and ch <= 70:
-                digit = ch - 55
-            if val <= (max_i32 - digit) / 16:
-                val = val * 16 + digit
-            else:
-                val = max_i32
+                digit = (ch - 55) as i64
+            val = val * 16 + digit
             i = i + 1
-        return val as i32
-    // Handle 0b binary
+        return val
     if len > 2 and text.byte_at(0) == 48 and (text.byte_at(1) == 98 or text.byte_at(1) == 66):
-        var val = 0
+        var val: i64 = 0
         var i = 2
         while i < len:
             let ch = text.byte_at(i as i64)
             if ch == 95:
                 i = i + 1
                 continue
-            var digit = 0
-            if ch == 49:
-                digit = 1
-            if val <= (max_i32 - digit) / 2:
-                val = val * 2 + digit
-            else:
-                val = max_i32
+            let digit = if ch == 49: 1 else: 0
+            val = val * 2 + digit
             i = i + 1
-        return val as i32
-    // Handle 0o octal
+        return val
     if len > 2 and text.byte_at(0) == 48 and (text.byte_at(1) == 111 or text.byte_at(1) == 79):
-        var val = 0
+        var val: i64 = 0
         var i = 2
         while i < len:
             let ch = text.byte_at(i as i64)
             if ch == 95:
                 i = i + 1
                 continue
-            let digit = ch - 48
-            if val <= (max_i32 - digit) / 8:
-                val = val * 8 + digit
-            else:
-                val = max_i32
+            let digit = (ch - 48) as i64
+            val = val * 8 + digit
             i = i + 1
-        return val as i32
-    // Decimal - strip type suffix
+        return val
     var end_pos = len
     var si = 0
     while si < len:
         if text.byte_at(si as i64) == 95:
-            // Check for type suffix: _i32, _u64, etc.
             let remain = len - si
             if remain >= 4:
                 let c1 = text.byte_at((si + 1) as i64)
-                if c1 == 105 or c1 == 117:  // i or u
+                if c1 == 105 or c1 == 117:
                     end_pos = si
                     break
         si = si + 1
-    var val = 0
+    var clean = ""
     var i = 0
     while i < end_pos:
         let ch = text.byte_at(i as i64)
-        if ch == 95:
-            i = i + 1
-            continue
-        let digit = ch - 48
-        if val <= (max_i32 - digit) / 10:
-            val = val * 10 + digit
-        else:
-            val = max_i32
+        if ch != 95:
+            clean = clean ++ str_from_byte(ch)
         i = i + 1
-    val as i32
+    with_parse_i64(clean)

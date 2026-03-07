@@ -4,12 +4,15 @@
 // LLVM MIR codegen currently accepts directly. When MIR contains unsupported
 // constructs, emission fails with a clear error.
 
+use std.prelude_core
+
 use Mir
 use Ast
 use InternPool
 use Sema
 
 extern fn int_to_string(n: i32) -> str
+extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn with_interrupt_requested() -> i32
 
@@ -22,10 +25,10 @@ fn cc_intern_intern(intern: &mut InternPool, s: str) -> i32:
     intern.intern(s)
 
 fn cc_lbrace -> str:
-    str_from_byte(123)
+    str_from_byte123
 
 fn cc_rbrace -> str:
-    str_from_byte(125)
+    str_from_byte125
 
 fn cc_pseudo_tid_vec -> i32:
     1900001
@@ -374,29 +377,6 @@ fn cc_is_hashmap_method_name(name: str) -> i32:
 
 fn cc_is_option_method_name(name: str) -> i32:
     if name == "is_some" or name == "unwrap":
-        return 1
-    0
-
-fn cc_is_generic_builtin_method_name(name: str) -> i32:
-    if cc_is_vec_method_name(name) != 0:
-        return 1
-    if cc_is_hashmap_method_name(name) != 0:
-        return 1
-    if cc_is_option_method_name(name) != 0:
-        return 1
-    0
-
-fn cc_is_generic_builtin_call_symbol(raw: str) -> i32:
-    if cc_is_generic_builtin_method_name(cc_base_name(raw)) == 0:
-        return 0
-    let owner = cc_owner_prefix(raw)
-    if owner.len() == 0:
-        return 0
-    if cc_str_contains(owner, "Vec") != 0:
-        return 1
-    if cc_str_contains(owner, "HashMap") != 0:
-        return 1
-    if cc_str_contains(owner, "Option") != 0:
         return 1
     0
 
@@ -853,7 +833,7 @@ fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
     let ck = body.const_kinds.get(const_id as i64)
     let cd = body.const_d0.get(const_id as i64)
     if ck == CK_INT():
-        return int_to_string(cd)
+        return with_i64_to_str(mir_const_int_value(body, const_id))
     if ck == CK_BOOL():
         return if cd != 0: "true" else: "false"
     if ck == CK_STR():
@@ -1148,19 +1128,23 @@ fn CCodegen.callee_field_hint(self: CCodegen, fn_sym: i32) -> i32:
     let owner = cc_owner_prefix(raw)
     var out = cc_callee_hint_none()
 
-    if base == "push" or base == "get" or base == "len" or base == "set_i32" or base == "remove" or base == "clear" or base == "pop":
-        out = cc_callee_hint_vec_recv()
-    else if base == "insert" or base == "get" or base == "contains" or base == "len" or base == "remove":
-        out = cc_callee_hint_map_recv()
-    else if base == "is_some" or base == "unwrap":
-        out = cc_callee_hint_opt_recv()
-    else if base == "new":
+    if base == "new":
         if cc_str_contains(owner, "HashMap") != 0 or cc_str_contains(raw, "HashMap") != 0:
             out = cc_callee_hint_map_new()
         else if cc_str_contains(owner, "Vec") != 0 or cc_str_contains(raw, "Vec") != 0:
             out = cc_callee_hint_vec_new()
         else if cc_str_contains(owner, "Option") != 0 or cc_str_contains(raw, "Option") != 0:
             out = cc_callee_hint_opt_new()
+    else if owner.len() > 0:
+        if cc_str_contains(owner, "HashMap") != 0:
+            if base == "insert" or base == "get" or base == "contains" or base == "len" or base == "remove":
+                out = cc_callee_hint_map_recv()
+        else if cc_str_contains(owner, "Vec") != 0:
+            if base == "push" or base == "get" or base == "len" or base == "set_i32" or base == "remove" or base == "clear" or base == "pop":
+                out = cc_callee_hint_vec_recv()
+        else if cc_str_contains(owner, "Option") != 0:
+            if base == "is_some" or base == "unwrap":
+                out = cc_callee_hint_opt_recv()
 
     self.callee_hint_cache_store(fn_sym, out)
     out
@@ -1357,8 +1341,6 @@ fn CCodegen.infer_named_call_sym_scan(self: CCodegen, body: MirBody, fn_sym: i32
     if raw.len() == 0:
         return 0
     let base_name = cc_base_name(raw)
-    if cc_is_generic_builtin_call_symbol(raw) != 0:
-        return 0
     let arg_count = self.call_arg_count(body, args_id)
     let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
     var match_sym = 0
@@ -1407,8 +1389,6 @@ fn CCodegen.infer_body_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, ar
     if raw.len() == 0:
         return 0
     let base_name = cc_base_name(raw)
-    if cc_is_generic_builtin_call_symbol(raw) != 0:
-        return 0
     let argc = self.call_arg_count(body, args_id)
     let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
     let first_owner = self.type_owner_text(self.call_first_arg_resolved_tid(body, args_id))
@@ -1944,8 +1924,6 @@ fn CCodegen.infer_qualified_method_sym_scan(self: CCodegen, body: MirBody, metho
     let raw = cc_intern_resolve(self.intern, method_sym)
     if raw.len() == 0:
         return 0
-    if cc_is_generic_builtin_call_symbol(raw) != 0:
-        return 0
     let wanted = "." ++ raw
     let arg_count = self.call_arg_count(body, args_id)
     let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
@@ -2020,8 +1998,6 @@ fn CCodegen.infer_owner_method_sym_scan(self: CCodegen, body: MirBody, fn_sym: i
     let raw = cc_intern_resolve(self.intern, fn_sym)
     if raw.len() == 0:
         return 0
-    if cc_is_generic_builtin_call_symbol(raw) != 0:
-        return 0
     if cc_str_contains_dot(raw) != 0:
         return 0
     let first_arg_tid = self.call_first_arg_resolved_tid(body, args_id)
@@ -2077,53 +2053,27 @@ fn CCodegen.infer_owner_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, a
     self.infer_owner_method_sym_scan(body, fn_sym, args_id, dest_place, 0)
 
 fn CCodegen.infer_builtin_call_name(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32) -> str:
-    if self.call_arg_count(body, args_id) != 1:
-        return ""
-    let dest_tid = self.place_local_tid(body, dest_place)
-    if self.is_void_tid(dest_tid) == 0:
-        return ""
-    let arg_operand = self.call_arg_operand(body, args_id, 0)
-    let arg_tid = self.sema.resolve_alias(self.operand_tid(body, arg_operand))
-    let arg_kind = self.sema.get_type_kind(arg_tid)
-    if arg_kind == TY_STR():
-        return "with_println_str"
-    if arg_kind == TY_BOOL():
-        return "with_println_bool"
-    if arg_kind == TY_INT():
-        let bits = self.sema.get_type_d0(arg_tid)
-        if bits <= 32:
-            return "with_println_i32"
-        return "with_println_i64"
+    let _ = self
+    let _ = body
+    let _ = args_id
+    let _ = dest_place
     ""
 
 fn CCodegen.infer_print_call_name(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32) -> str:
-    if self.call_arg_count(body, args_id) != 1:
-        return ""
-    let dest_tid = self.place_local_tid(body, dest_place)
-    if self.is_void_tid(dest_tid) == 0:
-        return ""
-    let arg_operand = self.call_arg_operand(body, args_id, 0)
-    let arg_tid = self.sema.resolve_alias(self.operand_tid(body, arg_operand))
-    if self.sema.get_type_kind(arg_tid) == TY_STR():
-        return "with_print_str"
+    let _ = self
+    let _ = body
+    let _ = args_id
+    let _ = dest_place
     ""
 
 fn CCodegen.extern_call_name(self: CCodegen, sym: i32, body: MirBody, args_id: i32, dest_place: i32) -> str:
-    let raw = cc_intern_resolve(self.intern, sym)
-    if raw == "println":
-        let println_name = self.infer_builtin_call_name(body, args_id, dest_place)
-        if println_name.len() > 0:
-            return println_name
-    if raw == "print":
-        let print_name = self.infer_print_call_name(body, args_id, dest_place)
-        if print_name.len() > 0:
-            return print_name
+    let _ = body
+    let _ = args_id
+    let _ = dest_place
     self.extern_sym_c_name(sym)
 
 fn CCodegen.sig_index_for_sym(self: CCodegen, fn_sym: i32) -> i32:
     let raw = cc_intern_resolve(self.intern, fn_sym)
-    if raw.len() > 0 and cc_is_generic_builtin_call_symbol(raw) != 0:
-        return 0 - 1
     if self.sig_idx_cache.contains(fn_sym):
         return self.sig_idx_cache.get(fn_sym).unwrap()
 
@@ -2353,7 +2303,10 @@ fn CCodegen.call_builtin_kind(self: CCodegen, body: MirBody, callee_operand: i32
     cc_builtin_none()
 
 fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
-    let kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
+    let mir_intrinsic = body.call_intrinsic(args_id)
+    var kind = cc_builtin_from_mir_intrinsic(mir_intrinsic)
+    if kind == cc_builtin_none():
+        kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
     if kind == cc_builtin_none():
         return 0
     if kind == cc_builtin_vec_new():
@@ -2481,8 +2434,6 @@ fn CCodegen.call_return_tid_for_fn_sym(self: CCodegen, body: MirBody, fn_sym: i3
     if sig_idx >= 0:
         return self.sema.sig_return_type(sig_idx)
     let raw = cc_intern_resolve(self.intern, fn_sym)
-    if raw == "print" or raw == "println":
-        return self.sema.ty_void
     if raw == "with_str_concat" or raw == "with_fs_read_file" or raw == "int_to_string":
         return self.sema.ty_str
     if raw == "with_str_eq":
@@ -2517,12 +2468,6 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
             if inferred_body_sym != 0:
                 return self.fn_c_name(inferred_body_sym)
             return self.extern_call_name(inferred, body, args_id, dest_place)
-        let builtin = self.infer_builtin_call_name(body, args_id, dest_place)
-        if builtin.len() > 0:
-            return builtin
-        let print_builtin = self.infer_print_call_name(body, args_id, dest_place)
-        if print_builtin.len() > 0:
-            return print_builtin
         return "/*unresolved_call*/"
 
     if ok == OK_CONSTANT():
@@ -2546,9 +2491,6 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
             if inferred_body_sym != 0:
                 return self.fn_c_name(inferred_body_sym)
             return self.extern_call_name(inferred, body, args_id, dest_place)
-        let builtin = self.infer_builtin_call_name(body, args_id, dest_place)
-        if builtin.len() > 0:
-            return builtin
         return "/*unresolved_call*/"
 
     self.fail("unsupported call callee operand kind " ++ int_to_string(ok))
@@ -2580,12 +2522,6 @@ fn CCodegen.call_return_tid(self: CCodegen, body: MirBody, bb: i32, callee_opera
             let sig_idx = self.sig_index_for_sym(inferred)
             if sig_idx >= 0:
                 return self.sema.sig_return_type(sig_idx)
-        let builtin = self.infer_builtin_call_name(body, args_id, dest_place)
-        if builtin.len() > 0:
-            return self.sema.ty_void
-        let print_builtin = self.infer_print_call_name(body, args_id, dest_place)
-        if print_builtin.len() > 0:
-            return self.sema.ty_void
         return fallback
 
     if ok == OK_CONSTANT():
@@ -2601,12 +2537,6 @@ fn CCodegen.call_return_tid(self: CCodegen, body: MirBody, bb: i32, callee_opera
             let sig_idx = self.sig_index_for_sym(inferred)
             if sig_idx >= 0:
                 return self.sema.sig_return_type(sig_idx)
-        let builtin = self.infer_builtin_call_name(body, args_id, dest_place)
-        if builtin.len() > 0:
-            return self.sema.ty_void
-        let print_builtin = self.infer_print_call_name(body, args_id, dest_place)
-        if print_builtin.len() > 0:
-            return self.sema.ty_void
         return fallback
 
     fallback
@@ -2779,8 +2709,32 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
         out = out ++ self.operand_text(body, op_id)
     out
 
+fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
+    if intrinsic == MIR_INTRINSIC_VEC_NEW(): return cc_builtin_vec_new()
+    if intrinsic == MIR_INTRINSIC_VEC_PUSH(): return cc_builtin_vec_push()
+    if intrinsic == MIR_INTRINSIC_VEC_GET(): return cc_builtin_vec_get()
+    if intrinsic == MIR_INTRINSIC_VEC_LEN(): return cc_builtin_vec_len()
+    if intrinsic == MIR_INTRINSIC_VEC_SET(): return cc_builtin_vec_set_i32()
+    if intrinsic == MIR_INTRINSIC_VEC_REMOVE(): return cc_builtin_vec_remove()
+    if intrinsic == MIR_INTRINSIC_VEC_CLEAR(): return cc_builtin_vec_clear()
+    if intrinsic == MIR_INTRINSIC_VEC_POP(): return cc_builtin_vec_pop()
+    if intrinsic == MIR_INTRINSIC_MAP_NEW(): return cc_builtin_map_new()
+    if intrinsic == MIR_INTRINSIC_MAP_INSERT(): return cc_builtin_map_insert()
+    if intrinsic == MIR_INTRINSIC_MAP_GET(): return cc_builtin_map_get()
+    if intrinsic == MIR_INTRINSIC_MAP_CONTAINS(): return cc_builtin_map_contains()
+    if intrinsic == MIR_INTRINSIC_MAP_LEN(): return cc_builtin_map_len()
+    if intrinsic == MIR_INTRINSIC_MAP_REMOVE(): return cc_builtin_map_remove()
+    if intrinsic == MIR_INTRINSIC_OPT_IS_SOME(): return cc_builtin_opt_is_some()
+    if intrinsic == MIR_INTRINSIC_OPT_UNWRAP(): return cc_builtin_opt_unwrap()
+    cc_builtin_none()
+
 fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> str:
-    let kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
+    // Read intrinsic marker from MIR instead of name-heuristic inference.
+    let mir_intrinsic = body.call_intrinsic(args_id)
+    var kind = cc_builtin_from_mir_intrinsic(mir_intrinsic)
+    // Fall back to legacy heuristic for MIR produced without markers.
+    if kind == cc_builtin_none():
+        kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
     if kind == cc_builtin_none():
         return ""
     let _ = bb

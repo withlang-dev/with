@@ -5,6 +5,9 @@
 // once up front into an internal Vec for stable ordering and cancellation
 // bookkeeping.
 
+use std.collections
+use std.result
+
 /// Await all tasks. Returns Vec[T] in input order.
 /// Fails fast on first Err.
 pub async fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[Vec[T], E]:

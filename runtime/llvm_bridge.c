@@ -409,9 +409,15 @@ int64_t wl_get_module_data_layout(int64_t m) {
     return P2I(LLVMGetModuleDataLayout(M(m)));
 }
 int64_t wl_abi_size_of(int64_t dl, int64_t ty) {
+    if (dl == 0 || ty == 0) {
+        return 0;
+    }
     return (int64_t)LLVMABISizeOfType((LLVMTargetDataRef)(intptr_t)dl, T(ty));
 }
 int32_t wl_abi_align_of(int64_t dl, int64_t ty) {
+    if (dl == 0 || ty == 0) {
+        return 1;
+    }
     return (int32_t)LLVMABIAlignmentOfType((LLVMTargetDataRef)(intptr_t)dl, T(ty));
 }
 

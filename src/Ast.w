@@ -6,6 +6,8 @@
 // This follows a SoA (Struct of Arrays) approach for cache-friendly
 // access and avoids the need for heap-allocated pointer trees.
 
+use std.prelude_core
+
 use Span
 use Token
 
@@ -318,6 +320,24 @@ fn AstPool.get_data1(self: &AstPool, idx: i32) -> i32:
 
 fn AstPool.get_data2(self: &AstPool, idx: i32) -> i32:
     self.data2.get(idx as i64)
+
+fn AST_INT_PART_BASE -> i64: 2097152
+fn AST_INT_PART_BASE2 -> i64: 4398046511104
+
+fn ast_int_part0(value: i64) -> i32:
+    (value % AST_INT_PART_BASE()) as i32
+
+fn ast_int_part1(value: i64) -> i32:
+    ((value / AST_INT_PART_BASE()) % AST_INT_PART_BASE()) as i32
+
+fn ast_int_part2(value: i64) -> i32:
+    (value / AST_INT_PART_BASE2()) as i32
+
+fn ast_int_from_parts(d0: i32, d1: i32, d2: i32) -> i64:
+    (d0 as i64) + (d1 as i64) * AST_INT_PART_BASE() + (d2 as i64) * AST_INT_PART_BASE2()
+
+fn AstPool.int_lit_value(self: &AstPool, idx: i32) -> i64:
+    ast_int_from_parts(self.get_data0(idx), self.get_data1(idx), self.get_data2(idx))
 
 fn AstPool.get_extra(self: &AstPool, idx: i32) -> i32:
     self.extra.get(idx as i64)

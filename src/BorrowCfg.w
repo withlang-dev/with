@@ -8,6 +8,8 @@
 // branching, and loop back-edges from expression trees so later
 // analyses (NLL/liveness) can reason over explicit control-flow.
 
+use std.prelude_core
+
 use Ast
 use Span
 

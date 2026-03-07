@@ -17,6 +17,7 @@
 //
 // This module provides additional utility functions.
 
+use std.collections
 use c_import("string.h")
 extern fn with_lines_out(out: &Vec[str], s: str) -> void
 extern fn with_parse_i64(s: str) -> i64

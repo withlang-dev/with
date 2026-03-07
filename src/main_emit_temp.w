@@ -354,53 +354,38 @@ fn dump_tokens(source_file: str, deterministic: bool) -> i32:
 fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode)
-    let result = comp.driver.resolve_file(source_file, true)
-    if comp.driver.diagnostics.has_errors():
+    let result = comp.resolve_file(source_file, true)
+    if comp.has_errors():
         with_eprintln("error: resolved dump failed")
         return 1
-    let resolved_text = dump_resolved(result, comp.driver.pool, source_file)
+    let resolved_text = dump_resolved(result, comp.get_pool(), source_file)
     print(resolved_text)
     0
 
 fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode)
-    comp.driver.set_emit_typed_during_compile(1)
-    let pool = comp.compile_file(source_file)
-    if pool.decl_count() == 0:
-        with_eprintln("error: typed dump failed during compilation")
-        return 1
-    if comp.driver.did_emit_typed_during_compile() != 0:
-        return 0
-    // Stream typed output directly to stdout to avoid constructing a very
-    // large immutable string via repeated `++` concatenation.
-    if not comp.driver.emit_typed(pool):
-        with_eprintln("error: typed dump failed during semantic analysis or emission")
+    let typed_ok = comp.emit_typed_file(source_file)
+    if not typed_ok:
+        with_eprintln("error: typed dump failed during compilation or semantic analysis")
         return 1
     0
 
 fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode)
-    let pool = comp.compile_file(source_file)
-    if pool.decl_count() == 0:
-        with_eprintln("error: mir dump failed during compilation")
-        return 1
-    if not comp.driver.print_mir(pool):
-        with_eprintln("error: mir dump failed during mir lowering")
+    let mir_ok = comp.print_mir_file(source_file)
+    if not mir_ok:
+        with_eprintln("error: mir dump failed during compilation or mir lowering")
         return 1
     0
 
 fn dump_async_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode)
-    let pool = comp.compile_file(source_file)
-    if pool.decl_count() == 0:
-        with_eprintln("error: async-mir dump failed during compilation")
-        return 1
-    let async_mir_text = comp.driver.dump_async_mir(pool)
+    let async_mir_text = comp.dump_async_mir_file(source_file)
     if async_mir_text.len() == 0:
-        with_eprintln("error: async-mir dump failed during lowering")
+        with_eprintln("error: async-mir dump failed during compilation or lowering")
         return 1
     print(async_mir_text)
     0

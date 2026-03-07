@@ -3,6 +3,8 @@
 // This is a simple bump-style arena with two storage lanes (`i32`, `str`)
 // keyed by `ArenaId`. Deallocation is bulk-only via reset.
 
+use std.prelude_core
+
 use compiler.foundation.Ids
 
 fn ARENA_SLOT_EMPTY -> i32: 0
