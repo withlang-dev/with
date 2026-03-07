@@ -89,34 +89,31 @@ fn link_stage_compiler_runtime_dir() -> str:
         return "runtime"
     link_stage_dirname(argv0) ++ "/runtime"
 
+fn link_stage_resolve_runtime_root() -> str:
+    let candidates: Vec[str] = Vec.new()
+    candidates.push(link_stage_compiler_runtime_dir())
+    candidates.push("runtime")
+    candidates.push("bootstrap/zig-out/bin/runtime")
+    for i in 0..candidates.len() as i32:
+        let dir = candidates.get(i as i64)
+        let probe = dir ++ "/helpers.o"
+        if with_fs_read_file(probe).len() > 0:
+            return dir
+    // Fall back to compiler-relative dir even if probe failed.
+    link_stage_compiler_runtime_dir()
+
 fn link_stage_find_llvm_bridge_path() -> str:
-    let p1 = link_stage_compiler_runtime_dir() ++ "/libwith_llvm_bridge.dylib"
-    if with_fs_read_file(p1).len() > 0:
-        return p1
-
-    let p3 = "runtime/libwith_llvm_bridge.dylib"
-    if with_fs_read_file(p3).len() > 0:
-        return p3
-
-    let p2 = "bootstrap/zig-out/bin/runtime/libwith_llvm_bridge.dylib"
-    if with_fs_read_file(p2).len() > 0:
-        return p2
-
+    let root = link_stage_resolve_runtime_root()
+    let p = root ++ "/libwith_llvm_bridge.dylib"
+    if with_fs_read_file(p).len() > 0:
+        return p
     ""
 
 fn link_stage_find_runtime_object_path(name: str) -> str:
-    let p1 = link_stage_compiler_runtime_dir() ++ "/" ++ name
-    if with_fs_read_file(p1).len() > 0:
-        return p1
-
-    let p3 = "runtime/" ++ name
-    if with_fs_read_file(p3).len() > 0:
-        return p3
-
-    let p2 = "bootstrap/zig-out/bin/runtime/" ++ name
-    if with_fs_read_file(p2).len() > 0:
-        return p2
-
+    let root = link_stage_resolve_runtime_root()
+    let p = root ++ "/" ++ name
+    if with_fs_read_file(p).len() > 0:
+        return p
     ""
 
 fn link_stage_object_needs_llvm_bridge(obj_path: str) -> bool:

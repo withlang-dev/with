@@ -8235,6 +8235,11 @@ fn Codegen.gen_vec_method(self: Codegen, method: str, obj: i64, args_start: i32,
         let elem_ty = wl_type_of(elem)
         let elem_alloca = wl_build_alloca(self.builder, elem_ty)
         wl_build_store(self.builder, elem, elem_alloca)
+        // Record element type so subsequent get/pop calls know the type.
+        if self.pool.kind(obj_node) == NK_IDENT():
+            let obj_sym = self.pool.get_data0(obj_node)
+            if not self.vec_local_types.get(obj_sym).is_some():
+                self.vec_local_types.insert(obj_sym, elem_ty)
         let push_fn = self.ensure_vec_runtime_fn("with_vec_push", wl_void_type(self.context), 2)
         let push_ty = self.get_vec_fn_type("with_vec_push", wl_void_type(self.context), 2)
         let args: Vec[i64] = Vec.new()
