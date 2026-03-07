@@ -565,18 +565,16 @@ fn Zcu.inject_prelude_frontend(self: Zcu, pool: AstPool) -> AstPool:
     merged_pool
 
 fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
-    self.source_dir = frontend_dirname(path)
-    self.current_source_path = path
-    self.reset_import_state()
+    let source_dir = frontend_dirname(path)
+    self.reset_for_new_invocation(source_dir, path, "")
 
     let text = with_fs_read_file(path)
     if text.len() == 0:
         with_eprintln("error: cannot open '" ++ path ++ "'")
-        self.last_resolved = ResolveResult.init()
-        self.resolved_root_path = path
+        self.set_resolve_snapshot(ResolveResult.init(), path)
         return AstPool.new()
 
-    self.current_source_text = text
+    self.set_current_source(source_dir, path, text)
     let pool = self.compile_source_frontend(text, path, 0)
     if pool.decl_count() == 0 and not self.diagnostics.has_errors():
         with_eprintln("error: compiler produced an empty module for '" ++ path ++ "'")
@@ -599,30 +597,27 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
-        self.last_resolved = ResolveResult.init()
-        self.resolved_root_path = name
+        self.set_resolve_snapshot(ResolveResult.init(), name)
         return AstPool.new()
 
     pool = self.inject_prelude_frontend(pool)
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
-        self.last_resolved = ResolveResult.init()
-        self.resolved_root_path = name
+        self.set_resolve_snapshot(ResolveResult.init(), name)
         return AstPool.new()
 
     // Wave 4: sidecar resolved artifact.
     let artifacts = resolve_from_root_pool(name, text, file_id, pool, self.pool, self.diagnostics, false)
     self.pool = artifacts.pool
     self.diagnostics = artifacts.diags
-    self.last_resolved = artifacts.result
+    self.set_resolve_snapshot(artifacts.result, name)
     self.capture_last_link_lib_names(self.pool, self.last_resolved)
-    self.resolved_root_path = name
 
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
-        self.typed_pool_cache = AstPool.new()
+        self.set_typed_snapshot("", AstPool.new())
         return AstPool.new()
 
     // Build the sema/codegen pool via recursive syntactic import expansion.
@@ -632,12 +627,12 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     self.trace_c_import_cache = self.read_trace_c_import_cache_frontend()
     pool = self.expand_c_imports_frontend(pool)
     pool.set_local_decl_count(root_local_decl_count)
-    self.typed_pool_cache = pool
+    self.set_typed_snapshot("", pool)
 
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
-        self.typed_pool_cache = AstPool.new()
+        self.set_typed_snapshot("", AstPool.new())
         return AstPool.new()
 
     // Phase 3: Semantic analysis.
@@ -652,7 +647,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
-        self.typed_pool_cache = AstPool.new()
+        self.set_typed_snapshot("", AstPool.new())
         return AstPool.new()
 
     if pool.decl_count() == 0:
