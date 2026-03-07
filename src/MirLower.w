@@ -2,6 +2,8 @@
 //
 // This pass builds explicit control-flow MIR from the semantic result.
 
+use std.prelude_core
+
 use Ast
 use InternPool
 use Mir
@@ -260,6 +262,9 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     if kind == NK_GROUPED():
         return self.expr_type(self.ast.get_data0(node))
     if kind == NK_INT_LIT():
+        let value = self.ast.int_lit_value(node)
+        if value < -2147483648 or value > 2147483647:
+            return self.sema.ty_i64
         return self.sema.ty_i32
     if kind == NK_BOOL_LIT():
         return self.sema.ty_bool
@@ -308,7 +313,11 @@ fn MirBuilder.place_for_local(self: MirBuilder, local_id: i32) -> i32:
     self.body.new_place(local_id)
 
 fn MirBuilder.const_operand(self: MirBuilder, kind: i32, d0: i32, type_id: i32) -> i32:
-    let c = self.body.new_const(kind, d0, type_id)
+    let c = self.body.new_const(kind, d0, 0, 0, type_id)
+    self.body.new_operand(OK_CONSTANT(), c)
+
+fn MirBuilder.int_const_operand(self: MirBuilder, value: i64, type_id: i32) -> i32:
+    let c = self.body.new_const(CK_INT(), ast_int_part0(value), ast_int_part1(value), ast_int_part2(value), type_id)
     self.body.new_operand(OK_CONSTANT(), c)
 
 fn MirBuilder.unit_operand(self: MirBuilder) -> i32:
@@ -317,9 +326,9 @@ fn MirBuilder.unit_operand(self: MirBuilder) -> i32:
 fn MirBuilder.mark_unsupported(self: MirBuilder):
     self.body.lowering_failed = 1
 
-fn MirBuilder.lower_int_lit(self: MirBuilder, value: i32, type_id: i32) -> i32:
+fn MirBuilder.lower_int_lit(self: MirBuilder, value: i64, type_id: i32) -> i32:
     let ty = if type_id == 0 or self.sema.get_type_kind(type_id) == TY_VOID(): self.sema.ty_i32 else: type_id
-    self.const_operand(CK_INT(), value, ty)
+    self.int_const_operand(value, ty)
 
 fn MirBuilder.lower_bool_lit(self: MirBuilder, value: i32) -> i32:
     self.const_operand(CK_BOOL(), value, self.sema.ty_bool)
@@ -813,7 +822,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
     let scrutinee_op = self.body.new_operand(OK_COPY(), scrutinee_place)
     if pk == NK_PAT_INT() or pk == NK_PAT_BOOL() or pk == NK_PAT_STRING():
         let lit = if pk == NK_PAT_INT():
-            self.lower_int_lit(self.ast.get_data0(pat_node), self.sema.ty_i32)
+            self.lower_int_lit(self.ast.int_lit_value(pat_node), self.sema.ty_i32)
         else if pk == NK_PAT_BOOL():
             self.lower_bool_lit(self.ast.get_data0(pat_node))
         else:
@@ -1026,6 +1035,49 @@ fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method
 
     method_sym
 
+fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: str) -> i32:
+    if recv_type == 0 or method_name.len() == 0:
+        return MIR_INTRINSIC_NONE()
+    let resolved = self.sema.resolve_alias(recv_type)
+    let type_name_sym = self.sema.get_type_name(resolved)
+    if type_name_sym == 0:
+        return MIR_INTRINSIC_NONE()
+    let type_name = self.pool.resolve_symbol(type_name_sym)
+    if type_name == "Vec":
+        if method_name == "new": return MIR_INTRINSIC_VEC_NEW()
+        if method_name == "push": return MIR_INTRINSIC_VEC_PUSH()
+        if method_name == "get": return MIR_INTRINSIC_VEC_GET()
+        if method_name == "len": return MIR_INTRINSIC_VEC_LEN()
+        if method_name == "set_i32": return MIR_INTRINSIC_VEC_SET()
+        if method_name == "remove": return MIR_INTRINSIC_VEC_REMOVE()
+        if method_name == "clear": return MIR_INTRINSIC_VEC_CLEAR()
+        if method_name == "pop": return MIR_INTRINSIC_VEC_POP()
+        return MIR_INTRINSIC_NONE()
+    if type_name == "HashMap":
+        if method_name == "new": return MIR_INTRINSIC_MAP_NEW()
+        if method_name == "insert": return MIR_INTRINSIC_MAP_INSERT()
+        if method_name == "get": return MIR_INTRINSIC_MAP_GET()
+        if method_name == "contains": return MIR_INTRINSIC_MAP_CONTAINS()
+        if method_name == "len": return MIR_INTRINSIC_MAP_LEN()
+        if method_name == "remove": return MIR_INTRINSIC_MAP_REMOVE()
+        return MIR_INTRINSIC_NONE()
+    if type_name == "HashSet":
+        if method_name == "new": return MIR_INTRINSIC_MAP_NEW()
+        if method_name == "insert": return MIR_INTRINSIC_MAP_INSERT()
+        if method_name == "contains": return MIR_INTRINSIC_MAP_CONTAINS()
+        if method_name == "len": return MIR_INTRINSIC_MAP_LEN()
+        if method_name == "remove": return MIR_INTRINSIC_MAP_REMOVE()
+        return MIR_INTRINSIC_NONE()
+    if type_name == "Option":
+        if method_name == "is_some": return MIR_INTRINSIC_OPT_IS_SOME()
+        if method_name == "unwrap": return MIR_INTRINSIC_OPT_UNWRAP()
+        return MIR_INTRINSIC_NONE()
+    if type_name == "Result":
+        if method_name == "is_ok": return MIR_INTRINSIC_OPT_IS_SOME()
+        if method_name == "unwrap": return MIR_INTRINSIC_OPT_UNWRAP()
+        return MIR_INTRINSIC_NONE()
+    MIR_INTRINSIC_NONE()
+
 fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
     // Lower method calls as normal calls with receiver inserted as first arg.
     let callee_sym = self.resolve_method_callee_sym(self_expr, method_sym)
@@ -1039,7 +1091,29 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     for i in 0..args.len() as i32:
         self.ast.add_extra(args.get(i as i64))
 
-    self.lower_call(method_ident, tmp_start, args.len() as i32, self.expr_type(node), node)
+    // Classify intrinsic before lowering the call.
+    // For instance methods (vec.push), recv_type comes from the receiver expression.
+    // For static calls (Vec.new), the receiver is a type ident — use its symbol to
+    // look up the type name, and fall back to the call's return type.
+    var recv_type = self.expr_type(self_expr)
+    if recv_type == 0 or recv_type == self.sema.ty_void:
+        if self.ast.kind(self_expr) == NK_IDENT():
+            let type_sym = self.ast.get_data0(self_expr)
+            let ret_type = self.expr_type(node)
+            let ret_name_sym = self.sema.get_type_name(ret_type)
+            if ret_name_sym == type_sym:
+                recv_type = ret_type
+    let method_name = self.pool.resolve_symbol(method_sym)
+    let intrinsic = self.classify_intrinsic(recv_type, method_name)
+
+    let result = self.lower_call(method_ident, tmp_start, args.len() as i32, self.expr_type(node), node)
+
+    // Tag the call that was just emitted.
+    if intrinsic != MIR_INTRINSIC_NONE():
+        let last_call_id = self.body.call_arg_starts.len() as i32 - 1
+        self.body.set_call_intrinsic(last_call_id, intrinsic)
+
+    result
 
 fn MirBuilder.lower_vtable_call(self: MirBuilder, dyn_expr: i32, _trait_sym: i32, method_sym: i32, args_start: i32, args_count: i32, node: i32) -> i32:
     // Conservative lowering: treat as method call on dynamic receiver.
@@ -1188,7 +1262,7 @@ fn MirBuilder.lower_closure(self: MirBuilder, _captured_start: i32, _captured_co
         return self.unit_operand()
     let tmp = self.new_temp(ty)
     let place = self.place_for_local(tmp)
-    let zst = self.body.new_const(CK_ZERO_SIZED(), ty, ty)
+    let zst = self.body.new_const(CK_ZERO_SIZED(), ty, 0, 0, ty)
     let op = self.body.new_operand(OK_CONSTANT(), zst)
     let rv = self.body.new_rvalue(RK_USE(), op, 0, 0)
     self.body.push_stmt(self.cur_bb, SK_ASSIGN(), place, rv, self.ast.get_start(node))
@@ -1253,7 +1327,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     let kind = self.ast.kind(node)
 
     if kind == NK_INT_LIT():
-        return self.lower_int_lit(self.ast.get_data0(node), self.expr_type(node))
+        return self.lower_int_lit(self.ast.int_lit_value(node), self.expr_type(node))
 
     if kind == NK_BOOL_LIT():
         return self.lower_bool_lit(self.ast.get_data0(node))

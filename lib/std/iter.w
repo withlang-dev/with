@@ -2,6 +2,8 @@
 //
 // Helper functions for common iterator patterns.
 
+use std.collections
+
 extern fn with_vec_len(v: &Vec[i32]) -> i64
 extern fn with_vec_get_i32(v: &Vec[i32], index: i64) -> i32
 extern fn with_vec_get_str(v: &Vec[str], index: i64) -> str

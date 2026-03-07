@@ -1,5 +1,7 @@
 // Wave 1 foundations: diagnostics model + deterministic rendering.
 
+use std.prelude_core
+
 use Span
 use Source
 use DiagnosticRender

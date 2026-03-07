@@ -5,6 +5,8 @@
 // requires JSON parsing and TCP/stdio stream handling.
 // Direct port of bootstrap/src/Lsp.zig to With.
 
+use std.prelude_core
+
 use Driver
 use Source
 use Lexer

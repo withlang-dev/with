@@ -19,6 +19,17 @@ extern fn with_getenv_str(name: str) -> str
 extern fn int_to_string(n: i32) -> str
 extern fn with_system(cmd: str) -> i32
 
+fn compilation_debug_init_enabled() -> i32:
+    let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
+    if raw.len() == 0:
+        return 0
+    1
+
+fn compilation_debug_init(msg: str):
+    if compilation_debug_init_enabled() == 0:
+        return
+    with_eprintln("[comp-init] " ++ msg)
+
 fn compilation_debug_pool_flow_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_POOL_FLOW")
     if raw.len() == 0:
@@ -42,7 +53,9 @@ type Compilation = {
 }
 
 fn Compilation.init -> Compilation:
+    compilation_debug_init("Compilation.init:start")
     let zcu: Zcu = Zcu.init()
+    compilation_debug_init("Compilation.init:zcu_ready")
     Compilation {
         zcu: zcu,
         config: compilation_config_default(),
@@ -63,9 +76,11 @@ fn Compilation.set_prelude_mode(self: Compilation, mode: i32):
     self.zcu = zcu
 
 fn Compilation.compile_file(self: Compilation, path: str) -> AstPool:
+    compilation_debug_init("Compilation.compile_file:start " ++ path)
     var zcu = self.zcu
     let pool = zcu.compile_file_frontend(path)
     self.zcu = zcu
+    compilation_debug_init("Compilation.compile_file:done decls=" ++ int_to_string(pool.decl_count()))
     pool
 
 fn Compilation.resolve_file(self: Compilation, path: str, emit_resolve_diags: bool) -> ResolveResult:
@@ -124,7 +139,7 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
 
     var final_output = output_path
     if final_output.len() == 0:
-        final_output = link_stage_dirname(source_path) ++ "/" ++ link_stage_source_stem(source_path) ++ ".c"
+        final_output = ".with/build/" ++ link_stage_source_stem(source_path) ++ ".c"
 
     let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, self.zcu.pool, self.zcu.last_sema)
     if emitted.ok == 0:
@@ -209,7 +224,8 @@ fn Compilation.print_warnings(self: Compilation):
     self.zcu.print_warnings()
 
 fn Compilation.active_pool(self: Compilation, pool: AstPool) -> AstPool:
-    let _ = self
+    if self.zcu.typed_pool_cache.decl_count() > 0:
+        return self.zcu.typed_pool_cache
     pool
 
 fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
@@ -254,3 +270,5 @@ fn Compilation.ensure_codegen_mir(self: Compilation, pool: AstPool) -> bool:
     if self.zcu.diagnostics.has_errors():
         return false
     self.zcu.last_mir_module.body_count() > 0
+
+let _compiler_compilation_eof_guard = 0

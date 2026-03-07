@@ -5,6 +5,10 @@
 
 use std.math
 use std.string
+use std.builtins
+use std.collections
+use std.option
+use std.result
 use std.iter
 use std.fs
 use std.process

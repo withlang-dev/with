@@ -2,6 +2,8 @@
 //
 // Provides process-level operations wrapping C stdlib.
 
+use std.collections
+
 extern fn exit(code: i32) -> void
 extern fn getpid() -> i32
 extern fn system(cmd: *const i8) -> i32

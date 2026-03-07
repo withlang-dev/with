@@ -1,3 +1,5 @@
+use std.prelude_core
+
 use Ast
 use InternPool
 use Diagnostic
@@ -11,6 +13,17 @@ use compiler.Compilation.Config
 extern fn with_eprintln(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
 extern fn int_to_string(n: i32) -> str
+
+fn zcu_debug_init_enabled() -> i32:
+    let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
+    if raw.len() == 0:
+        return 0
+    1
+
+fn zcu_debug_init(msg: str):
+    if zcu_debug_init_enabled() == 0:
+        return
+    with_eprintln("[zcu-init] " ++ msg)
 
 fn zcu_debug_pool_flow_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_POOL_FLOW")
@@ -54,9 +67,13 @@ type Zcu = {
 }
 
 fn Zcu.init -> Zcu:
+    zcu_debug_init("Zcu.init:start")
     let pool: InternPool = InternPool.init()
+    zcu_debug_init("Zcu.init:pool")
     let diagnostics: DiagnosticList = DiagnosticList.init()
+    zcu_debug_init("Zcu.init:diagnostics")
     let sema_seed: Sema = Sema.placeholder(pool, diagnostics, AstPool.new())
+    zcu_debug_init("Zcu.init:sema_seed")
     Zcu {
         pool: pool,
         frontend_pool: pool,

@@ -4,3 +4,5 @@
 // behavior through `src/compiler/Compilation.w`.
 
 use compiler.Compilation
+
+let _compilation_facade_eof_guard = 0

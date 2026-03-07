@@ -6,6 +6,8 @@
 //
 // Direct port of bootstrap/src/Codegen.zig to With.
 
+use std.prelude_core
+
 use Ast
 use InternPool
 use Span
@@ -659,6 +661,26 @@ fn Codegen.print_ir(self: Codegen):
 fn Codegen.verify(self: Codegen) -> i32:
     wl_verify_module(self.llmod)
 
+fn Codegen.abi_size_of(self: Codegen, ty: i64) -> i64:
+    if ty == 0:
+        self.had_error = 1
+        return 0
+    let dl = wl_get_module_data_layout(self.llmod)
+    if dl == 0:
+        self.had_error = 1
+        return 0
+    wl_abi_size_of(dl, ty)
+
+fn Codegen.abi_align_of(self: Codegen, ty: i64) -> i32:
+    if ty == 0:
+        self.had_error = 1
+        return 1
+    let dl = wl_get_module_data_layout(self.llmod)
+    if dl == 0:
+        self.had_error = 1
+        return 1
+    wl_abi_align_of(dl, ty)
+
 fn Codegen.gen_module_from_mir(self: Codegen, mir_mod: MirModule, pool: AstPool) -> i32:
     let mir_err = validate_mir_module(mir_mod)
     if mir_err.len() > 0:
@@ -732,13 +754,40 @@ fn Codegen.coerce_value_to_type(self: Codegen, val: i64, target_ty: i64) -> i64:
 
     if tk == wl_pointer_type_kind() and self.is_str_type(val_ty):
         return self.extract_str_ptr(val)
+    if vk == wl_integer_type_kind() and tk == wl_pointer_type_kind():
+        if wl_is_constant(val) != 0 and wl_const_int_sext_val(val) == 0:
+            return wl_const_null(target_ty)
     if tk == wl_pointer_type_kind() and vk == wl_pointer_type_kind():
         return wl_build_bitcast(self.builder, val, target_ty)
+    if vk == wl_struct_type_kind() and tk == wl_struct_type_kind():
+        let coerced_agg = self.coerce_struct_value(val, target_ty)
+        if wl_type_of(coerced_agg) == target_ty:
+            return coerced_agg
 
     if vk == wl_integer_type_kind() and tk == wl_integer_type_kind():
         return self.coerce_int(val, target_ty)
 
     val
+
+fn Codegen.coerce_struct_value(self: Codegen, val: i64, target_ty: i64) -> i64:
+    if val == 0 or target_ty == 0:
+        return val
+    let val_ty = wl_type_of(val)
+    if val_ty == target_ty:
+        return val
+    if wl_get_type_kind(val_ty) != wl_struct_type_kind() or wl_get_type_kind(target_ty) != wl_struct_type_kind():
+        return val
+    let val_fields = wl_count_struct_elem_types(val_ty)
+    let target_fields = wl_count_struct_elem_types(target_ty)
+    if val_fields <= 0 or target_fields <= 0 or val_fields != target_fields:
+        return val
+    var out = wl_get_undef(target_ty)
+    for fi in 0..target_fields:
+        let field_val = wl_build_extract_value(self.builder, val, fi)
+        let field_ty = wl_struct_get_type_at(target_ty, fi)
+        let coerced_field = if field_ty != 0: self.coerce_value_to_type(field_val, field_ty) else: field_val
+        out = wl_build_insert_value(self.builder, out, coerced_field, fi)
+    out
 
 fn Codegen.debug_call_coerce_enabled(self: Codegen) -> bool:
     let raw = with_getenv_str("WITH_DEBUG_CALL_COERCE")
@@ -754,6 +803,11 @@ fn Codegen.debug_local_flow_enabled(self: Codegen) -> bool:
 
 fn Codegen.debug_method_dispatch_enabled(self: Codegen) -> bool:
     let raw = with_getenv_str("WITH_DEBUG_METHOD_DISPATCH")
+    raw.len() > 0 and raw != "0"
+
+fn Codegen.debug_pool_flow_enabled(self: Codegen) -> bool:
+    let _ = self
+    let raw = with_getenv_str("WITH_DEBUG_POOL_FLOW")
     raw.len() > 0 and raw != "0"
 
 fn Codegen.capture_loop_state(self: Codegen) -> LoopState:
@@ -1361,8 +1415,7 @@ fn Codegen.compare_aggregate_eq(self: Codegen, lhs: i64, rhs: i64, op: i32) -> i
     if self.is_str_type(lhs_ty):
         return self.compare_str_eq(lhs, rhs, op)
 
-    let dl = wl_get_module_data_layout(self.llmod)
-    let byte_size = wl_abi_size_of(dl, lhs_ty)
+    let byte_size = self.abi_size_of(lhs_ty)
     if byte_size <= 0:
         if op == OP_EQ():
             return wl_const_int(i1_ty, 1, 0)
@@ -1538,16 +1591,25 @@ fn Codegen.resolve_generic_type(self: Codegen, name_sym: i32, extra_start: i32, 
     if name == "Vec" and arg_count == 1:
         let elem_node = self.pool.get_extra(extra_start)
         let elem_ty = self.resolve_type(elem_node)
+        let mono_ty = self.monomorphize_struct(name_sym, extra_start, arg_count)
+        if mono_ty != 0:
+            return self.cache_vec_type(elem_ty, mono_ty)
         return self.get_or_create_vec_type(elem_ty)
     if name == "HashMap" and arg_count == 2:
         let key_node = self.pool.get_extra(extra_start)
         let val_node = self.pool.get_extra(extra_start + 1)
         let key_ty = self.resolve_type(key_node)
         let val_ty = self.resolve_type(val_node)
+        let mono_ty = self.monomorphize_struct(name_sym, extra_start, arg_count)
+        if mono_ty != 0:
+            return self.cache_hashmap_type(key_ty, val_ty, mono_ty)
         return self.get_or_create_hashmap_type(key_ty, val_ty)
     if name == "HashSet" and arg_count == 1:
         let elem_node = self.pool.get_extra(extra_start)
         let elem_ty = self.resolve_type(elem_node)
+        let mono_ty = self.monomorphize_struct(name_sym, extra_start, arg_count)
+        if mono_ty != 0:
+            return self.cache_hashset_type(elem_ty, mono_ty)
         return self.get_or_create_hashset_type(elem_ty)
     if name == "Box" and arg_count == 1:
         let inner_node = self.pool.get_extra(extra_start)
@@ -1705,12 +1767,12 @@ fn Codegen.declare_struct_type(self: Codegen, name_sym: i32, type_node: i32):
 fn Codegen.declare_enum_type(self: Codegen, name_sym: i32, type_node: i32):
     let extra_start = self.pool.get_data1(type_node)
     let variant_count = self.pool.get_extra(extra_start)
+    let enum_name = self.intern.resolve(name_sym)
 
     // Find the largest payload to determine enum struct size.
     // Enum is { i32 tag, [N x i8] payload }.
     var max_payload_size: i64 = 0
-    let dl = wl_get_module_data_layout(self.llmod)
-
+    var invalid_layout = 0
     let v_starts = self.enum_variant_names.len() as i32
     var offset = extra_start + 1
     for vi in 0..variant_count:
@@ -1722,18 +1784,32 @@ fn Codegen.declare_enum_type(self: Codegen, name_sym: i32, type_node: i32):
             if v_payload_count == 1:
                 let p_type_node = self.pool.get_extra(offset)
                 payload_ty = self.resolve_type(p_type_node)
+                if payload_ty == 0:
+                    with_eprintln("error: unresolved payload type for enum variant '" ++ self.intern.resolve(v_name) ++ "' in '" ++ enum_name ++ "'")
+                    self.had_error = 1
+                    invalid_layout = 1
             else:
                 let payload_fields: Vec[i64] = Vec.new()
                 for pi in 0..v_payload_count:
-                    let p_type_node = self.pool.get_extra(offset + pi)
-                    payload_fields.push(self.resolve_type(p_type_node))
-                payload_ty = wl_struct_type(self.context, vec_data_i64(payload_fields), v_payload_count, 0)
-            let sz = wl_abi_size_of(dl, payload_ty)
-            if sz > max_payload_size:
-                max_payload_size = sz
+                    let payload_type_node = self.pool.get_extra(offset + pi)
+                    let field_ty = self.resolve_type(payload_type_node)
+                    if field_ty == 0:
+                        with_eprintln("error: unresolved payload type for enum variant '" ++ self.intern.resolve(v_name) ++ "' in '" ++ enum_name ++ "'")
+                        self.had_error = 1
+                        invalid_layout = 1
+                    payload_fields.push(field_ty)
+                if invalid_layout == 0:
+                    payload_ty = wl_struct_type(self.context, vec_data_i64(payload_fields), v_payload_count, 0)
+            if payload_ty != 0:
+                let sz = self.abi_size_of(payload_ty)
+                if sz > max_payload_size:
+                    max_payload_size = sz
             offset = offset + v_payload_count
         self.enum_variant_names.push(v_name)
         self.enum_variant_payloads.push(payload_ty)
+
+    if invalid_layout != 0:
+        return
 
     // Build enum struct: { i32, [N x i8] }
     if not self.enum_type_map.get(name_sym).is_some():
@@ -1826,8 +1902,7 @@ fn Codegen.gen_builtin_vec_new(self: Codegen, vec_ty: i64, vec_type_node: i32) -
         if cache_idx < 0:
             return self.build_default_value(concrete_vec_ty)
         elem_ty = self.vec_elem_types.get(cache_idx as i64)
-    let dl = wl_get_module_data_layout(self.llmod)
-    let elem_size = wl_abi_size_of(dl, elem_ty)
+    let elem_size = self.abi_size_of(elem_ty)
     let alloca = self.create_entry_alloca(concrete_vec_ty)
     wl_build_store(self.builder, self.build_default_value(concrete_vec_ty), alloca)
     let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", wl_void_type(self.context), 2)
@@ -1873,9 +1948,8 @@ fn Codegen.gen_builtin_hashmap_new(self: Codegen, hm_ty: i64, hm_type_node: i32)
             return self.build_default_value(concrete_hm_ty)
         key_ty = self.hm_key_types.get(cache_idx as i64)
         val_ty = self.hm_val_types.get(cache_idx as i64)
-    let dl = wl_get_module_data_layout(self.llmod)
-    let key_size = wl_abi_size_of(dl, key_ty)
-    let val_size = wl_abi_size_of(dl, val_ty)
+    let key_size = self.abi_size_of(key_ty)
+    let val_size = self.abi_size_of(val_ty)
     let new_fn = self.ensure_hashmap_new_declared()
     let new_ty = self.get_hashmap_new_fn_type()
     let args: Vec[i64] = Vec.new()
@@ -2250,9 +2324,8 @@ fn Codegen.get_or_create_result_type(self: Codegen, ok_ty: i64, err_ty: i64) -> 
         let idx = cached.unwrap()
         return self.result_llvm_types.get(idx as i64)
 
-    let dl = wl_get_module_data_layout(self.llmod)
-    let ok_size = wl_abi_size_of(dl, ok_ty)
-    let err_size = wl_abi_size_of(dl, err_ty)
+    let ok_size = self.abi_size_of(ok_ty)
+    let err_size = self.abi_size_of(err_ty)
     var max_size = ok_size
     if err_size > max_size: max_size = err_size
 
@@ -2298,6 +2371,13 @@ fn Codegen.get_or_create_vec_type(self: Codegen, elem_ty: i64) -> i64:
     body.push(wl_i64_type(self.context))
     body.push(wl_i64_type(self.context))
     let vec_ty = wl_struct_type(self.context, vec_data_i64(body), 4, 0)
+    self.cache_vec_type(elem_ty, vec_ty)
+    vec_ty
+
+fn Codegen.cache_vec_type(self: Codegen, elem_ty: i64, vec_ty: i64) -> i64:
+    let cached = self.vec_cache_map.get(elem_ty)
+    if cached.is_some():
+        return self.vec_llvm_types.get(cached.unwrap() as i64)
     let idx = self.vec_llvm_types.len() as i32
     self.vec_llvm_types.push(vec_ty)
     self.vec_elem_types.push(elem_ty)
@@ -2314,6 +2394,14 @@ fn Codegen.get_or_create_hashmap_type(self: Codegen, key_ty: i64, val_ty: i64) -
     let body: Vec[i64] = Vec.new()
     body.push(wl_ptr_type(self.context))
     let hm_ty = wl_struct_type(self.context, vec_data_i64(body), 1, 0)
+    self.cache_hashmap_type(key_ty, val_ty, hm_ty)
+    hm_ty
+
+fn Codegen.cache_hashmap_type(self: Codegen, key_ty: i64, val_ty: i64, hm_ty: i64) -> i64:
+    let hash = key_ty * 65537 + val_ty
+    let cached = self.hm_cache_map.get(hash)
+    if cached.is_some():
+        return self.hm_llvm_types.get(cached.unwrap() as i64)
     let idx = self.hm_llvm_types.len() as i32
     self.hm_llvm_types.push(hm_ty)
     self.hm_key_types.push(key_ty)
@@ -2337,6 +2425,13 @@ fn Codegen.get_or_create_hashset_type(self: Codegen, elem_ty: i64) -> i64:
     let body: Vec[i64] = Vec.new()
     body.push(wl_ptr_type(self.context))
     let hs_ty = wl_struct_type(self.context, vec_data_i64(body), 1, 0)
+    self.cache_hashset_type(elem_ty, hs_ty)
+    hs_ty
+
+fn Codegen.cache_hashset_type(self: Codegen, elem_ty: i64, hs_ty: i64) -> i64:
+    let cached = self.hs_cache_map.get(elem_ty)
+    if cached.is_some():
+        return self.hs_llvm_types.get(cached.unwrap() as i64)
     let idx = self.hs_llvm_types.len() as i32
     self.hs_llvm_types.push(hs_ty)
     self.hs_elem_types.push(elem_ty)
@@ -2547,7 +2642,13 @@ fn Codegen.build_fn_type_from_ast(self: Codegen, fn_type_node: i32) -> i64:
 // ── gen_module: multi-pass entry point ────────────────────────────
 
 fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
+    if self.debug_pool_flow_enabled():
+        with_eprintln("[llvm-cg] gen_module input.decls=" ++ int_to_string(pool.decl_count()) ++
+            " input.nodes=" ++ int_to_string(pool.node_count()))
     self.pool = pool
+    if self.debug_pool_flow_enabled():
+        with_eprintln("[llvm-cg] gen_module self.decls=" ++ int_to_string(self.pool.decl_count()) ++
+            " self.nodes=" ++ int_to_string(self.pool.node_count()))
 
     // Declare built-in str type before user types
     self.declare_builtin_str_type()
@@ -2570,6 +2671,8 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
                 self.predeclare_struct_type(name_sym)
             continue
         if sub_kind == TDK_ENUM():
+            if self.type_decl_tp_count(decl) > 0:
+                continue
             self.predeclare_enum_type(name_sym)
 
     // Pass 0b: define struct/enum bodies and type aliases.
@@ -2588,6 +2691,8 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
                 self.declare_struct_type(name_sym, decl)
             continue
         if sub_kind == TDK_ENUM():
+            if self.type_decl_tp_count(decl) > 0:
+                continue
             self.declare_enum_type(name_sym, decl)
             continue
         if sub_kind == TDK_ALIAS():
@@ -3254,11 +3359,11 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     // Only handle simple constants (int/float/bool/string literals)
     let vk = self.pool.kind(value_node)
     if vk == NK_INT_LIT():
-        let val_lo = self.pool.get_data0(value_node)
-        let global_ty = wl_i32_type(self.context)
+        let val = self.pool.int_lit_value(value_node)
+        let global_ty = if val < -2147483648 or val > 2147483647: wl_i64_type(self.context) else: wl_i32_type(self.context)
         let name_str = self.intern.resolve(name_sym)
         let global = wl_add_global(self.llmod, global_ty, name_str)
-        wl_set_initializer(global, wl_const_int(global_ty, val_lo as i64, 1))
+        wl_set_initializer(global, wl_const_int(global_ty, val, 1))
         wl_set_global_constant(global, 1)
         wl_set_linkage(global, wl_internal_linkage())
         self.module_constants.insert(name_sym, global)
@@ -3266,22 +3371,67 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
 // ── Wrap main for exit ────────────────────────────────────────────
 
 fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
-    // If user's main returns void, create an OS-facing wrapper that returns 0.
+    // Create an OS-facing wrapper that preserves argv/runtime setup before
+    // calling the user's `main`.
     let main_fn = wl_get_named_function(self.llmod, "main")
     if main_fn == 0: return
     let main_ft = wl_global_get_value_type(main_fn)
     let ret_ty = wl_get_return_type(main_ft)
+    // Rename user main to __with_main.
+    wl_set_value_name(main_fn, "__with_main")
+
+    let i32_ty = wl_i32_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let wrapper_params: Vec[i64] = Vec.new()
+    wrapper_params.push(i32_ty)
+    wrapper_params.push(ptr_ty)
+    let wrapper_ft = wl_function_type(i32_ty, vec_data_i64(wrapper_params), 2, 0)
+    let wrapper = wl_add_function(self.llmod, "main", wrapper_ft)
+    let bb = wl_append_bb(self.context, wrapper, "entry")
+    wl_position_at_end(self.builder, bb)
+
+    let argc_val = wl_get_param(wrapper, 0)
+    let argv_val = wl_get_param(wrapper, 1)
+
+    var set_argv_fn = wl_get_named_function(self.llmod, "with_runtime_set_argv")
+    if set_argv_fn == 0:
+        let set_argv_params: Vec[i64] = Vec.new()
+        set_argv_params.push(i32_ty)
+        set_argv_params.push(ptr_ty)
+        let set_argv_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(set_argv_params), 2, 0)
+        set_argv_fn = wl_add_function(self.llmod, "with_runtime_set_argv", set_argv_ft)
+    let set_argv_ft = wl_global_get_value_type(set_argv_fn)
+    let set_argv_args: Vec[i64] = Vec.new()
+    set_argv_args.push(argc_val)
+    set_argv_args.push(argv_val)
+    wl_build_call(self.builder, set_argv_ft, set_argv_fn, vec_data_i64(set_argv_args), 2)
+
+    var runtime_init_fn = wl_get_named_function(self.llmod, "with_runtime_init")
+    if runtime_init_fn == 0:
+        let runtime_init_ft_new = wl_function_type(wl_void_type(self.context), 0, 0, 0)
+        runtime_init_fn = wl_add_function(self.llmod, "with_runtime_init", runtime_init_ft_new)
+    let runtime_init_ft = wl_global_get_value_type(runtime_init_fn)
+    wl_build_call(self.builder, runtime_init_ft, runtime_init_fn, 0, 0)
+
+    let main_call = wl_build_call(self.builder, main_ft, main_fn, 0, 0)
+
+    var runtime_shutdown_fn = wl_get_named_function(self.llmod, "with_runtime_shutdown")
+    if runtime_shutdown_fn == 0:
+        let runtime_shutdown_ft_new = wl_function_type(wl_void_type(self.context), 0, 0, 0)
+        runtime_shutdown_fn = wl_add_function(self.llmod, "with_runtime_shutdown", runtime_shutdown_ft_new)
+    let runtime_shutdown_ft = wl_global_get_value_type(runtime_shutdown_fn)
+    wl_build_call(self.builder, runtime_shutdown_ft, runtime_shutdown_fn, 0, 0)
+
     if ret_ty == wl_void_type(self.context):
-        // Rename user main to __with_main
-        wl_set_value_name(main_fn, "__with_main")
-        // Create new main: i32 main() { __with_main(); return 0; }
-        let i32_ty = wl_i32_type(self.context)
-        let wrapper_ft = wl_function_type(i32_ty, 0, 0, 0)
-        let wrapper = wl_add_function(self.llmod, "main", wrapper_ft)
-        let bb = wl_append_bb(self.context, wrapper, "entry")
-        wl_position_at_end(self.builder, bb)
-        wl_build_call(self.builder, main_ft, main_fn, 0, 0)
         let _ = wl_build_ret(self.builder, wl_const_int(i32_ty, 0, 0))
+        return
+
+    let exit_val =
+        if ret_ty == i32_ty:
+            main_call
+        else:
+            self.coerce_int(main_call, i32_ty)
+    let _ = wl_build_ret(self.builder, exit_val)
 
 // ── gen_function_dispatch: MIR-first with conservative fallback ──
 
@@ -3479,10 +3629,11 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
     let cd = body.const_d0.get(const_id as i64)
 
     if ck == CK_INT():
+        let int_value = mir_const_int_value(body, const_id)
         var int_ty = expected_ty
         if int_ty == 0 or wl_get_type_kind(int_ty) != wl_integer_type_kind():
-            int_ty = wl_i32_type(self.context)
-        return wl_const_int(int_ty, cd as i64, 1)
+            int_ty = if int_value < -2147483648 or int_value > 2147483647: wl_i64_type(self.context) else: wl_i32_type(self.context)
+        return wl_const_int(int_ty, int_value, 1)
 
     if ck == CK_BOOL():
         return wl_const_int(wl_i1_type(self.context), cd as i64, 0)
@@ -4391,13 +4542,24 @@ fn Codegen.gen_expr(self: Codegen, node: i32) -> i64:
     // Unsupported
     wl_get_undef(wl_void_type(self.context))
 
+fn Codegen.gen_expr_discard(self: Codegen, node: i32) -> void:
+    if node == 0: return
+    let kind = self.pool.kind(node)
+    if kind == NK_BLOCK():
+        self.gen_block_discard(node)
+        return
+    if kind == NK_IF_EXPR():
+        self.gen_if_discard(node)
+        return
+    self.gen_expr(node)
+
 // ── Literal expressions ───────────────────────────────────────────
 
 fn Codegen.gen_int_lit(self: Codegen, node: i32) -> i64:
-    let val_lo = self.pool.get_data0(node)
-    let val_hi = self.pool.get_data1(node)
-    let val = (val_hi as i64) * 65536 * 65536 + (val_lo as i64)
-    if val >= (0 - 2147483647 - 1) as i64 and val <= 2147483647:
+    let val = self.pool.int_lit_value(node)
+    if self.expected_type != 0 and wl_get_type_kind(self.expected_type) == wl_pointer_type_kind() and val == 0:
+        return wl_const_null(self.expected_type)
+    if val >= -2147483648 and val <= 2147483647:
         return wl_const_int(wl_i32_type(self.context), val, 1)
     wl_const_int(wl_i64_type(self.context), val, 1)
 
@@ -4832,7 +4994,7 @@ fn Codegen.gen_block(self: Codegen, node: i32) -> i64:
     var result: i64 = wl_get_undef(wl_void_type(self.context))
     for si in 0..stmt_count:
         let stmt = self.pool.get_extra(extra_start + si)
-        self.gen_expr(stmt)
+        self.gen_expr_discard(stmt)
         // Check if current block is terminated
         let bb = wl_get_insert_block(self.builder)
         if wl_get_bb_terminator(bb) != 0:
@@ -4842,6 +5004,18 @@ fn Codegen.gen_block(self: Codegen, node: i32) -> i64:
         result = self.gen_expr(tail_node)
     self.emit_drops(saved_scope)
     result
+
+fn Codegen.gen_block_discard(self: Codegen, node: i32) -> void:
+    let extra_start = self.pool.get_data0(node)
+    let stmt_count = self.pool.get_data1(node)
+    let tail_node = self.pool.get_data2(node)
+    let saved_scope = self.scope_local_count
+    for si in 0..stmt_count:
+        let stmt = self.pool.get_extra(extra_start + si)
+        self.gen_expr_discard(stmt)
+    if tail_node != 0:
+        self.gen_expr_discard(tail_node)
+    self.emit_drops(saved_scope)
 
 // ── If expression ─────────────────────────────────────────────────
 
@@ -4880,6 +5054,8 @@ fn Codegen.gen_if_expr(self: Codegen, node: i32) -> i64:
     if then_terminated and else_terminated:
         wl_build_unreachable(self.builder)
         return wl_get_undef(wl_void_type(self.context))
+    if else_node == 0:
+        return wl_get_undef(wl_void_type(self.context))
     // If both branches produce values and neither is terminated, use phi
     if else_node != 0 and not then_terminated and not else_terminated:
         let then_ty = wl_type_of(then_val)
@@ -4896,6 +5072,30 @@ fn Codegen.gen_if_expr(self: Codegen, node: i32) -> i64:
             return phi
     if not then_terminated: return then_val
     wl_get_undef(wl_void_type(self.context))
+
+fn Codegen.gen_if_discard(self: Codegen, node: i32) -> void:
+    let cond_node = self.pool.get_data0(node)
+    let then_node = self.pool.get_data1(node)
+    let else_node = self.pool.get_data2(node)
+    let cond = self.gen_expr(cond_node)
+    let cond_ty = wl_type_of(cond)
+    var bool_cond = cond
+    if cond_ty != wl_i1_type(self.context):
+        bool_cond = wl_build_icmp(self.builder, wl_int_ne(), cond, wl_const_int(cond_ty, 0, 0))
+    let then_bb = wl_append_bb(self.context, self.current_function, "if.then")
+    let else_bb = wl_append_bb(self.context, self.current_function, "if.else")
+    let merge_bb = wl_append_bb(self.context, self.current_function, "if.end")
+    wl_build_cond_br(self.builder, bool_cond, then_bb, else_bb)
+    wl_position_at_end(self.builder, then_bb)
+    self.gen_expr_discard(then_node)
+    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
+        wl_build_br(self.builder, merge_bb)
+    wl_position_at_end(self.builder, else_bb)
+    if else_node != 0:
+        self.gen_expr_discard(else_node)
+    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
+        wl_build_br(self.builder, merge_bb)
+    wl_position_at_end(self.builder, merge_bb)
 
 // ── Let binding ───────────────────────────────────────────────────
 
@@ -6052,15 +6252,8 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
             if dotted_owner == "HashMap":
                 return self.gen_builtin_hashmap_new(self.expected_type, self.expected_type_node)
 
-        // Built-in: println/print
-        if fn_name == "println":
-            return self.gen_println(args_start, arg_count)
-        if fn_name == "print":
-            return self.gen_print_call(args_start, arg_count)
         if fn_name == "eprintln":
             return self.gen_eprintln(args_start, arg_count)
-        if fn_name == "assert":
-            return self.gen_assert_call(args_start, arg_count)
         if fn_name == "todo" or fn_name == "unreachable":
             return self.gen_diverge_builtin(args_start, arg_count)
 
@@ -6545,7 +6738,7 @@ fn Codegen.gen_while(self: Codegen, node: i32) -> i64:
     // Push loop context
     self.push_loop_context(end_bb, cond_bb, 0, label_sym)
     wl_position_at_end(self.builder, body_bb)
-    self.gen_expr(body_node)
+    self.gen_expr_discard(body_node)
     if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
         wl_build_br(self.builder, cond_bb)
     // Pop loop context
@@ -6563,7 +6756,7 @@ fn Codegen.gen_loop(self: Codegen, node: i32) -> i64:
     wl_build_br(self.builder, body_bb)
     self.push_loop_context(end_bb, body_bb, 0, label_sym)
     wl_position_at_end(self.builder, body_bb)
-    self.gen_expr(body_node)
+    self.gen_expr_discard(body_node)
     if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
         wl_build_br(self.builder, body_bb)
     self.pop_loop_context()
@@ -6616,7 +6809,7 @@ fn Codegen.gen_for_range(self: Codegen, binding_sym: i32, range_node: i32, body_
     wl_build_cond_br(self.builder, cond, body_bb, end_bb)
     self.push_loop_context(end_bb, inc_bb, 0, 0)
     wl_position_at_end(self.builder, body_bb)
-    self.gen_expr(body_node)
+    self.gen_expr_discard(body_node)
     if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
         wl_build_br(self.builder, inc_bb)
     wl_position_at_end(self.builder, inc_bb)
@@ -6656,7 +6849,7 @@ fn Codegen.gen_for_array(self: Codegen, binding_sym: i32, arr: i64, body_node: i
     let elem_ptr = wl_build_gep(self.builder, arr_ty, arr_alloca, vec_data_i64(indices), 2)
     let elem = wl_build_load(self.builder, elem_ty, elem_ptr)
     wl_build_store(self.builder, elem, elem_alloca)
-    self.gen_expr(body_node)
+    self.gen_expr_discard(body_node)
     if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
         wl_build_br(self.builder, inc_bb)
     wl_position_at_end(self.builder, inc_bb)
@@ -7057,15 +7250,40 @@ fn Codegen.gen_struct_lit(self: Codegen, node: i32) -> i64:
     if st_opt.is_some():
         st_idx = st_opt.unwrap()
     else:
-        let gs_opt = self.generic_structs.get(type_sym)
-        if gs_opt.is_some():
-            let mono_ty = self.monomorphize_struct(type_sym, 0, 0)
-            if mono_ty != 0:
-                let mono_idx = self.find_struct_index_by_type(mono_ty)
-                if mono_idx >= 0:
-                    st_idx = mono_idx
-                    if mono_idx < self.struct_index_syms.len() as i32:
-                        actual_type_sym = self.struct_index_syms.get(mono_idx as i64)
+        if self.expected_type_node != 0 and self.pool.kind(self.expected_type_node) == NK_TYPE_GENERIC():
+            let expected_name_sym = self.pool.get_data0(self.expected_type_node)
+            if expected_name_sym == type_sym:
+                let mono_ty = self.monomorphize_struct(type_sym, self.pool.get_data1(self.expected_type_node), self.pool.get_data2(self.expected_type_node))
+                if mono_ty != 0:
+                    let mono_idx = self.find_struct_index_by_type(mono_ty)
+                    if mono_idx >= 0:
+                        st_idx = mono_idx
+                        if mono_idx < self.struct_index_syms.len() as i32:
+                            actual_type_sym = self.struct_index_syms.get(mono_idx as i64)
+        if st_idx < 0 and self.expected_type != 0:
+            let expected_idx = self.find_struct_index_by_type(self.expected_type)
+            if expected_idx >= 0:
+                var expected_sym = 0
+                if expected_idx < self.struct_index_syms.len() as i32:
+                    expected_sym = self.struct_index_syms.get(expected_idx as i64)
+                else:
+                    expected_sym = self.reverse_struct_lookup(expected_idx)
+                if expected_sym != 0:
+                    let expected_name = self.intern.resolve(expected_sym)
+                    let base_name = self.intern.resolve(type_sym)
+                    if expected_sym == type_sym or expected_name == base_name or (expected_name.len() > base_name.len() + 2 and expected_name.slice(0, base_name.len()) == base_name and expected_name.slice(base_name.len(), base_name.len() + 2) == "__"):
+                        st_idx = expected_idx
+                        actual_type_sym = expected_sym
+        if st_idx < 0:
+            let gs_opt = self.generic_structs.get(type_sym)
+            if gs_opt.is_some():
+                let mono_ty = self.monomorphize_struct(type_sym, 0, 0)
+                if mono_ty != 0:
+                    let mono_idx = self.find_struct_index_by_type(mono_ty)
+                    if mono_idx >= 0:
+                        st_idx = mono_idx
+                        if mono_idx < self.struct_index_syms.len() as i32:
+                            actual_type_sym = self.struct_index_syms.get(mono_idx as i64)
     if st_idx < 0:
         return wl_get_undef(wl_i32_type(self.context))
     let st_ty = self.struct_llvm_types.get(st_idx as i64)
@@ -8259,7 +8477,7 @@ fn Codegen.gen_option_method(self: Codegen, method: str, obj: i64, args_start: i
         wl_build_cond_br(self.builder, is_some, then_bb, panic_bb)
         // Panic path: call exit(134)
         wl_position_at_end(self.builder, panic_bb)
-        self.emit_exit_call(134)
+        self.emit_exit_call134
         wl_build_unreachable(self.builder)
         // Ok path: extract payload
         wl_position_at_end(self.builder, then_bb)
@@ -8275,7 +8493,7 @@ fn Codegen.gen_option_method(self: Codegen, method: str, obj: i64, args_start: i
         let printf_fn = self.ensure_printf_declared()
         let printf_ty = self.get_printf_fn_type()
         self.gen_print_value(msg, printf_fn, printf_ty)
-        self.emit_exit_call(134)
+        self.emit_exit_call134
         wl_build_unreachable(self.builder)
         wl_position_at_end(self.builder, then_bb)
         return wl_build_extract_value(self.builder, obj, 1)
@@ -8381,7 +8599,7 @@ fn Codegen.gen_diverge_builtin(self: Codegen, args_start: i32, arg_count: i32) -
     if arg_count == 1:
         // Evaluate optional message expression for side effects.
         self.gen_expr(self.pool.get_extra(args_start))
-    self.emit_exit_call(134)
+    self.emit_exit_call134
     wl_build_unreachable(self.builder)
 
     // Maintain a valid insertion point for following source statements.
@@ -8416,7 +8634,7 @@ fn Codegen.gen_assert_call(self: Codegen, args_start: i32, arg_count: i32) -> i6
         nl_args.push(nl)
         wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(nl_args), 1)
 
-    self.emit_exit_call(134)
+    self.emit_exit_call134
     wl_build_unreachable(self.builder)
 
     wl_position_at_end(self.builder, ok_bb)
@@ -8456,5 +8674,5 @@ fn Codegen.emit_implicit_unreachable(self: Codegen, node: i32):
     args.push(file_ptr)
     args.push(line_val)
     wl_build_call(self.builder, fprintf_ty, fprintf_fn, vec_data_i64(args), 4)
-    self.emit_exit_call(134)
+    self.emit_exit_call134
     wl_build_unreachable(self.builder)

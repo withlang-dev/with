@@ -1,3 +1,5 @@
+use std.prelude_core
+
 extern fn with_system(cmd: str) -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_read_file(path: str) -> str
@@ -160,6 +162,11 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
 
     let needs_helpers_runtime = link_stage_object_needs_helpers_runtime(obj_path)
     if needs_helpers_runtime != 0:
+        let support_runtime_path = link_stage_find_runtime_object_path("support_runtime.o")
+        if support_runtime_path.len() == 0:
+            with_eprintln("error: missing runtime/support_runtime.o")
+            return false
+        extras.push(support_runtime_path)
         let helpers_path = link_stage_find_runtime_object_path("helpers.o")
         if helpers_path.len() == 0:
             with_eprintln("error: missing runtime/helpers.o")

@@ -3,19 +3,22 @@
 // This module owns the MIR in-memory representation used after semantic
 // analysis. MIR is intentionally explicit and deterministic.
 
+use std.prelude_core
+
 use Ast
 use InternPool
 use Sema
 
 extern fn int_to_string(n: i32) -> str
+extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn print(s: str) -> void
 
 fn lbrace -> str:
-    str_from_byte(123)
+    str_from_byte123
 
 fn rbrace -> str:
-    str_from_byte(125)
+    str_from_byte125
 
 // ── Statement kinds ──────────────────────────────────────────────
 
@@ -61,6 +64,29 @@ fn CK_UNIT -> i32: 3
 fn CK_FLOAT -> i32: 4
 fn CK_ZERO_SIZED -> i32: 5
 fn CK_FN -> i32: 6
+
+// ── Call intrinsic kinds ─────────────────────────────────────────
+// Attached to TK_CALL terminators to mark known container/builtin
+// operations. Both LLVM and C backends read these instead of
+// inferring builtin kind from method names at codegen time.
+
+fn MIR_INTRINSIC_NONE -> i32: 0
+fn MIR_INTRINSIC_VEC_NEW -> i32: 1
+fn MIR_INTRINSIC_VEC_PUSH -> i32: 2
+fn MIR_INTRINSIC_VEC_GET -> i32: 3
+fn MIR_INTRINSIC_VEC_LEN -> i32: 4
+fn MIR_INTRINSIC_VEC_SET -> i32: 5
+fn MIR_INTRINSIC_VEC_REMOVE -> i32: 6
+fn MIR_INTRINSIC_VEC_CLEAR -> i32: 7
+fn MIR_INTRINSIC_VEC_POP -> i32: 8
+fn MIR_INTRINSIC_MAP_NEW -> i32: 9
+fn MIR_INTRINSIC_MAP_INSERT -> i32: 10
+fn MIR_INTRINSIC_MAP_GET -> i32: 11
+fn MIR_INTRINSIC_MAP_CONTAINS -> i32: 12
+fn MIR_INTRINSIC_MAP_LEN -> i32: 13
+fn MIR_INTRINSIC_MAP_REMOVE -> i32: 14
+fn MIR_INTRINSIC_OPT_IS_SOME -> i32: 15
+fn MIR_INTRINSIC_OPT_UNWRAP -> i32: 16
 
 // ── Projection kinds ─────────────────────────────────────────────
 
@@ -130,6 +156,8 @@ type MirBody = {
     // Constants
     const_kinds: Vec[i32],
     const_d0: Vec[i32],
+    const_d1: Vec[i32],
+    const_d2: Vec[i32],
     const_types: Vec[i32],
 
     // Switch tables
@@ -147,6 +175,9 @@ type MirBody = {
     call_arg_starts: Vec[i32],
     call_arg_counts: Vec[i32],
     call_arg_operands: Vec[i32],
+
+    // Call intrinsic markers (parallel to call_arg_starts)
+    call_intrinsic_kinds: Vec[i32],
 }
 
 type MirModule = {
@@ -222,6 +253,8 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         operand_d0: Vec.new(),
         const_kinds: Vec.new(),
         const_d0: Vec.new(),
+        const_d1: Vec.new(),
+        const_d2: Vec.new(),
         const_types: Vec.new(),
         switch_table_starts: Vec.new(),
         switch_table_counts: Vec.new(),
@@ -233,6 +266,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         call_arg_starts: Vec.new(),
         call_arg_counts: Vec.new(),
         call_arg_operands: Vec.new(),
+        call_intrinsic_kinds: Vec.new(),
     }
 
     // Local 0 is always the return place.
@@ -345,12 +379,21 @@ fn MirBody.new_operand(self: &mut MirBody, kind: i32, d0: i32) -> i32:
     self.operand_d0.push(d0)
     id
 
-fn MirBody.new_const(self: &mut MirBody, kind: i32, d0: i32, type_id: i32) -> i32:
+fn MirBody.new_const(self: &mut MirBody, kind: i32, d0: i32, d1: i32, d2: i32, type_id: i32) -> i32:
     let id = self.const_kinds.len() as i32
     self.const_kinds.push(kind)
     self.const_d0.push(d0)
+    self.const_d1.push(d1)
+    self.const_d2.push(d2)
     self.const_types.push(type_id)
     id
+
+fn mir_const_int_value(body: MirBody, const_id: i32) -> i64:
+    ast_int_from_parts(
+        body.const_d0.get(const_id as i64),
+        body.const_d1.get(const_id as i64),
+        body.const_d2.get(const_id as i64),
+    )
 
 fn MirBody.new_switch_table(self: &mut MirBody, vals: Vec[i32], targets: Vec[i32]) -> i32:
     let id = self.switch_table_starts.len() as i32
@@ -384,9 +427,19 @@ fn MirBody.new_call_args(self: &mut MirBody, operands: Vec[i32]) -> i32:
     let count = operands.len() as i32
     self.call_arg_starts.push(start)
     self.call_arg_counts.push(count)
+    self.call_intrinsic_kinds.push(MIR_INTRINSIC_NONE())
     for i in 0..count:
         self.call_arg_operands.push(operands.get(i as i64))
     id
+
+fn MirBody.set_call_intrinsic(self: &mut MirBody, call_id: i32, kind: i32):
+    if call_id >= 0 and call_id < self.call_intrinsic_kinds.len() as i32:
+        self.call_intrinsic_kinds.set_i32(call_id, kind)
+
+fn MirBody.call_intrinsic(self: &MirBody, call_id: i32) -> i32:
+    if call_id < 0 or call_id >= self.call_intrinsic_kinds.len() as i32:
+        return MIR_INTRINSIC_NONE()
+    self.call_intrinsic_kinds.get(call_id as i64)
 
 // ── Query helpers ────────────────────────────────────────────────
 
@@ -721,7 +774,7 @@ fn mir_const_text(body: MirBody, const_id: i32, pool: InternPool, sema: Sema) ->
 
     if k == CK_INT():
         let ty_name = if ty != 0: "ty" ++ int_to_string(ty) else: "i32"
-        return "const " ++ int_to_string(d0) ++ ty_name
+        return "const " ++ with_i64_to_str(mir_const_int_value(body, const_id)) ++ ty_name
 
     if k == CK_BOOL():
         return if d0 != 0: "const true" else: "const false"
@@ -921,6 +974,8 @@ fn validate_mir_body(body: MirBody) -> str:
 
     let const_count = body.const_kinds.len() as i32
     if const_count != body.const_d0.len() as i32 or
+       const_count != body.const_d1.len() as i32 or
+       const_count != body.const_d2.len() as i32 or
        const_count != body.const_types.len() as i32:
         return "constant table length mismatch"
 

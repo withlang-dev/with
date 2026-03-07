@@ -1,5 +1,7 @@
 // Wave 1 foundations: source text + line mapping.
 
+use std.prelude_core
+
 use compiler.foundation.Ids
 
 extern fn with_fs_read_file(path: str) -> str

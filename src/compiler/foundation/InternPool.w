@@ -3,11 +3,14 @@
 // Single source of truth for interned symbols, types, and values.
 // Identity is ID-based, and canonicalization is key-string based.
 
+use std.prelude_core
+
 use compiler.foundation.Ids
 use compiler.foundation.Types
 use compiler.foundation.Values
 
 extern fn with_vec_new_out(v: &T, elem_size: i64) -> void
+extern fn with_hashmap_new_out(out: &T, key_size: i64, val_size: i64) -> void
 extern fn with_hashmap_new_at(base: &T, offset: i64, key_size: i64, val_size: i64) -> void
 
 type InternPool = {
@@ -24,6 +27,11 @@ type InternPool = {
     value_map: HashMap[str, i32],
 }
 
+fn foundation_new_map_str_i32 -> HashMap[str, i32]:
+    let map: HashMap[str, i32] = HashMap { ptr: 0 }
+    with_hashmap_new_out(&map, 16, 4)
+    map
+
 fn foundation_intern_text_eq(a: str, b: str) -> bool:
     if a.len() != b.len():
         return false
@@ -35,23 +43,23 @@ fn foundation_intern_text_eq(a: str, b: str) -> bool:
     true
 
 fn InternPool.init -> InternPool:
-    let symbol_texts: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    let symbol_texts: Vec[str] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
     with_vec_new_out(&symbol_texts, 16)
-    let type_keys: Vec[TypeKey] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    let type_keys: Vec[TypeKey] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
     with_vec_new_out(&type_keys, 24)
-    let value_keys: Vec[ValueKey] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    let value_keys: Vec[ValueKey] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
     with_vec_new_out(&value_keys, 24)
+    let symbol_map = foundation_new_map_str_i32()
+    let type_map = foundation_new_map_str_i32()
+    let value_map = foundation_new_map_str_i32()
     var p = InternPool {
         symbol_texts,
-        symbol_map: HashMap { ptr: 0 },
+        symbol_map,
         type_keys,
-        type_map: HashMap { ptr: 0 },
+        type_map,
         value_keys,
-        value_map: HashMap { ptr: 0 },
+        value_map,
     }
-    with_hashmap_new_at(&p, 32, 16, 4)
-    with_hashmap_new_at(&p, 72, 16, 4)
-    with_hashmap_new_at(&p, 112, 16, 4)
 
     // Reserve index 0 as sentinel for each lane.
     p.symbol_texts.push("")

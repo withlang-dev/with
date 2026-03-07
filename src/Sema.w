@@ -5,6 +5,8 @@
 // reports type errors with source spans. Codegen continues to work as
 // before — Sema is purely additive validation.
 
+use std.prelude_core
+
 use Ast
 use BorrowCfg
 use Span
@@ -13,9 +15,11 @@ use InternPool
 
 extern fn int_to_string(n: i32) -> str
 extern fn print(s: str) -> void
+extern fn with_eprintln(s: str) -> void
+extern fn with_getenv_str(name: str) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_hashmap_new(key_size: i64, val_size: i64) -> *T
-extern fn with_hashmap_new_at(base: &T, offset: i64, key_size: i64, val_size: i64) -> void
+extern fn with_hashmap_new_out(out: &T, key_size: i64, val_size: i64) -> void
 
 // ── Type kind constants ──────────────────────────────────────────
 
@@ -119,13 +123,8 @@ type Sema = {
     must_use_fns: HashMap[i32, i32],
     result_option_fns: HashMap[i32, i32],
     task_fns: HashMap[i32, i32],
-    builtin_fn_syms: HashMap[i32, i32],
-    builtin_value_syms: HashMap[i32, i32],
 
-    // Hot builtin symbols used in fast semantic dispatch paths.
-    sym_println: i32,
-    sym_print: i32,
-    sym_assert: i32,
+    // Hot intrinsic symbols used in semantic dispatch paths.
     sym_channel: i32,
     sym_send: i32,
     sym_recv: i32,
@@ -135,9 +134,6 @@ type Sema = {
     sym_todo: i32,
     sym_unreachable: i32,
     sym_track: i32,
-    sym_vec: i32,
-    sym_hashmap: i32,
-    sym_hashset: i32,
 
     // Method origin tracking
     method_decl_origins: HashMap[i32, i32],
@@ -214,7 +210,71 @@ type Sema = {
     ty_str_view: i32,
 }
 
-fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
+fn sema_debug_stage1_enabled -> i32:
+    let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
+    if raw.len() == 0:
+        return 0
+    1
+
+fn Sema.debug_unknown_type(self: Sema, sym: i32, node: i32, context: str):
+    if sema_debug_stage1_enabled() == 0:
+        return
+    let name = self.pool.resolve_symbol(sym)
+    let prim = self.primitive_type_by_sym(sym)
+    let named = if self.named_types.contains(sym): 1 else: 0
+    with_eprintln(
+        "[unknown-type] " ++ context ++
+        " sym=" ++ int_to_string(sym) ++
+        " name=" ++ name ++
+        " prim=" ++ int_to_string(prim) ++
+        " named=" ++ int_to_string(named) ++
+        " collecting=" ++ int_to_string(self.collecting_types) ++
+        " node_kind=" ++ int_to_string(self.ast.kind(node))
+    )
+
+fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
+    let map: HashMap[i32, i32] = HashMap { ptr: 0 }
+    with_hashmap_new_out(&map, 4, 4)
+    map
+
+fn sema_new_map_i32_str -> HashMap[i32, str]:
+    let map: HashMap[i32, str] = HashMap { ptr: 0 }
+    with_hashmap_new_out(&map, 4, 16)
+    map
+
+fn sema_new_map_str_i32 -> HashMap[str, i32]:
+    let map: HashMap[str, i32] = HashMap { ptr: 0 }
+    with_hashmap_new_out(&map, 16, 4)
+    map
+
+fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
+    let named_types = sema_new_map_i32_i32()
+    let pretty_symbol_names = sema_new_map_i32_str()
+    let sig_lookup = sema_new_map_i32_i32()
+    let extern_fn_names = sema_new_map_i32_i32()
+    let fn_decl_nodes = sema_new_map_i32_i32()
+    let generic_fn_nodes = sema_new_map_i32_i32()
+    let variant_lookup = sema_new_map_i32_i32()
+    let trait_lookup = sema_new_map_i32_i32()
+    let impl_lookup = sema_new_map_i32_i32()
+    let selection_cache = sema_new_map_str_i32()
+    let local_trait_names = sema_new_map_i32_i32()
+    let local_type_names = sema_new_map_i32_i32()
+    let ephemeral_types = sema_new_map_i32_i32()
+    let must_use_fns = sema_new_map_i32_i32()
+    let result_option_fns = sema_new_map_i32_i32()
+    let task_fns = sema_new_map_i32_i32()
+    let method_decl_origins = sema_new_map_i32_i32()
+    let method_has_inherent = sema_new_map_i32_i32()
+    let method_symbol_flags = sema_new_map_i32_i32()
+    let method_key_cache = sema_new_map_str_i32()
+    let drop_method_cache = sema_new_map_i32_i32()
+    let typed_expr_types = sema_new_map_i32_i32()
+    let typed_binding_types = sema_new_map_i32_i32()
+    let typed_binding_names = sema_new_map_i32_i32()
+    let typed_binding_muts = sema_new_map_i32_i32()
+    let typed_dump_seen_nodes = sema_new_map_i32_i32()
+    let generic_specialization_cache = sema_new_map_str_i32()
     var s = Sema {
         pool: pool,
         diags: diags,
@@ -224,8 +284,8 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         type_d1: Vec.new(),
         type_d2: Vec.new(),
         type_extra: Vec.new(),
-        named_types: HashMap { ptr: 0 },
-        pretty_symbol_names: HashMap { ptr: 0 },
+        named_types,
+        pretty_symbol_names,
         sig_names: Vec.new(),
         sig_type_ids: Vec.new(),
         sig_ret_types: Vec.new(),
@@ -233,36 +293,31 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         sig_param_counts: Vec.new(),
         sig_variadic: Vec.new(),
         sig_params: Vec.new(),
-        sig_lookup: HashMap { ptr: 0 },
-        extern_fn_names: HashMap { ptr: 0 },
-        fn_decl_nodes: HashMap { ptr: 0 },
-        generic_fn_nodes: HashMap { ptr: 0 },
-        variant_lookup: HashMap { ptr: 0 },
+        sig_lookup,
+        extern_fn_names,
+        fn_decl_nodes,
+        generic_fn_nodes,
+        variant_lookup,
         trait_method_names: Vec.new(),
         trait_method_starts: Vec.new(),
         trait_method_counts: Vec.new(),
         trait_name_syms: Vec.new(),
-        trait_lookup: HashMap { ptr: 0 },
+        trait_lookup,
         impl_extra: Vec.new(),
         impl_starts: Vec.new(),
         impl_counts: Vec.new(),
         impl_type_syms: Vec.new(),
-        impl_lookup: HashMap { ptr: 0 },
+        impl_lookup,
         obligation_trait_syms: Vec.new(),
         obligation_type_syms: Vec.new(),
         obligation_nodes: Vec.new(),
-        selection_cache: HashMap { ptr: 0 },
-        local_trait_names: HashMap { ptr: 0 },
-        local_type_names: HashMap { ptr: 0 },
-        ephemeral_types: HashMap { ptr: 0 },
-        must_use_fns: HashMap { ptr: 0 },
-        result_option_fns: HashMap { ptr: 0 },
-        task_fns: HashMap { ptr: 0 },
-        builtin_fn_syms: HashMap { ptr: 0 },
-        builtin_value_syms: HashMap { ptr: 0 },
-        sym_println: 0,
-        sym_print: 0,
-        sym_assert: 0,
+        selection_cache,
+        local_trait_names,
+        local_type_names,
+        ephemeral_types,
+        must_use_fns,
+        result_option_fns,
+        task_fns,
         sym_channel: 0,
         sym_send: 0,
         sym_recv: 0,
@@ -272,14 +327,11 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         sym_todo: 0,
         sym_unreachable: 0,
         sym_track: 0,
-        sym_vec: 0,
-        sym_hashmap: 0,
-        sym_hashset: 0,
-        method_decl_origins: HashMap { ptr: 0 },
-        method_has_inherent: HashMap { ptr: 0 },
-        method_symbol_flags: HashMap { ptr: 0 },
-        method_key_cache: HashMap { ptr: 0 },
-        drop_method_cache: HashMap { ptr: 0 },
+        method_decl_origins,
+        method_has_inherent,
+        method_symbol_flags,
+        method_key_cache,
+        drop_method_cache,
         copy_visit_stack: Vec.new(),
         bind_names: Vec.new(),
         bind_types: Vec.new(),
@@ -294,15 +346,15 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         borrow_places: Vec.new(),
         borrow_fields: Vec.new(),
         borrow_refs: Vec.new(),
-        typed_expr_types: HashMap { ptr: 0 },
-        typed_binding_types: HashMap { ptr: 0 },
-        typed_binding_names: HashMap { ptr: 0 },
-        typed_binding_muts: HashMap { ptr: 0 },
-        typed_dump_seen_nodes: HashMap { ptr: 0 },
+        typed_expr_types,
+        typed_binding_types,
+        typed_binding_names,
+        typed_binding_muts,
+        typed_dump_seen_nodes,
         typed_dump_visit_budget: 0,
         generic_subst_param_syms: Vec.new(),
         generic_subst_type_ids: Vec.new(),
-        generic_specialization_cache: HashMap { ptr: 0 },
+        generic_specialization_cache,
         source_text: "",
         current_return_type: 0,
         current_gen_yield_type: 0,
@@ -326,10 +378,13 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
         ty_f32: 0, ty_f64: 0, ty_bool: 0, ty_void: 0,
         ty_never: 0, ty_str: 0, ty_str_view: 0,
     }
+    return s
 
-    s.init_primary_maps()
-    s.init_secondary_maps()
-    s.init_typed_maps()
+fn Sema.placeholder(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
+    return sema_empty_state(pool, diags, ast)
+
+fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
+    var s = sema_empty_state(pool, diags, ast)
 
     // Index 0 = error type (sentinel).
     s.add_type(TY_ERR(), 0, 0, 0)
@@ -372,59 +427,15 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
 
     // Push root scope marker
     s.scope_starts.push(0)
-    s.seed_builtin_symbols()
+    s.init_intrinsic_symbols()
     s
-
-fn Sema.init_primary_maps(self: &mut Sema):
-    with_hashmap_new_at(self, 768, 4, 4)
-    with_hashmap_new_at(self, 776, 4, 16)
-    with_hashmap_new_at(self, 1008, 4, 4)
-    with_hashmap_new_at(self, 1016, 4, 4)
-    with_hashmap_new_at(self, 1024, 4, 4)
-    with_hashmap_new_at(self, 1032, 4, 4)
-    with_hashmap_new_at(self, 1040, 4, 4)
-    with_hashmap_new_at(self, 1176, 4, 4)
-    with_hashmap_new_at(self, 1312, 4, 4)
-    with_hashmap_new_at(self, 1416, 16, 4)
-
-fn Sema.init_secondary_maps(self: &mut Sema):
-    with_hashmap_new_at(self, 1424, 4, 4)
-    with_hashmap_new_at(self, 1432, 4, 4)
-    with_hashmap_new_at(self, 1440, 4, 4)
-    with_hashmap_new_at(self, 1448, 4, 4)
-    with_hashmap_new_at(self, 1456, 4, 4)
-    with_hashmap_new_at(self, 1464, 4, 4)
-    with_hashmap_new_at(self, 1472, 4, 4)
-    with_hashmap_new_at(self, 1480, 4, 4)
-    with_hashmap_new_at(self, 1552, 4, 4)
-    with_hashmap_new_at(self, 1560, 4, 4)
-    with_hashmap_new_at(self, 1568, 4, 4)
-    with_hashmap_new_at(self, 1576, 16, 4)
-    with_hashmap_new_at(self, 1584, 4, 4)
-
-fn Sema.init_typed_maps(self: &mut Sema):
-    with_hashmap_new_at(self, 2040, 4, 4)
-    with_hashmap_new_at(self, 2048, 4, 4)
-    with_hashmap_new_at(self, 2056, 4, 4)
-    with_hashmap_new_at(self, 2064, 4, 4)
-    with_hashmap_new_at(self, 2072, 4, 4)
-    with_hashmap_new_at(self, 2152, 16, 4)
 
 fn Sema.register_prim(self: &mut Sema, name: str, tid: i32):
     let sym = self.pool.intern(name)
     self.named_types.insert(sym, tid)
     self.pretty_symbol_names.insert(sym, name)
 
-fn Sema.register_builtin_fn_name(self: &mut Sema, name: str):
-    self.builtin_fn_syms.insert(self.pool.intern(name), 1)
-
-fn Sema.register_builtin_value_name(self: &mut Sema, name: str):
-    self.builtin_value_syms.insert(self.pool.intern(name), 1)
-
-fn Sema.seed_builtin_symbols(self: &mut Sema):
-    self.sym_println = self.pool.intern("println")
-    self.sym_print = self.pool.intern("print")
-    self.sym_assert = self.pool.intern("assert")
+fn Sema.init_intrinsic_symbols(self: &mut Sema):
     self.sym_channel = self.pool.intern("Channel")
     self.sym_send = self.pool.intern("send")
     self.sym_recv = self.pool.intern("recv")
@@ -434,49 +445,6 @@ fn Sema.seed_builtin_symbols(self: &mut Sema):
     self.sym_todo = self.pool.intern("todo")
     self.sym_unreachable = self.pool.intern("unreachable")
     self.sym_track = self.pool.intern("track")
-    self.sym_vec = self.pool.intern("Vec")
-    self.sym_hashmap = self.pool.intern("HashMap")
-    self.sym_hashset = self.pool.intern("HashSet")
-
-    self.register_builtin_fn_name("println")
-    self.register_builtin_fn_name("print")
-    self.register_builtin_fn_name("assert")
-    self.register_builtin_fn_name("Some")
-    self.register_builtin_fn_name("Ok")
-    self.register_builtin_fn_name("Err")
-    self.register_builtin_fn_name("Channel")
-    self.register_builtin_fn_name("send")
-    self.register_builtin_fn_name("recv")
-    self.register_builtin_fn_name("close")
-    self.register_builtin_fn_name("cancel")
-    self.register_builtin_fn_name("is_done")
-    self.register_builtin_fn_name("todo")
-    self.register_builtin_fn_name("unreachable")
-    self.register_builtin_fn_name("Vec")
-    self.register_builtin_fn_name("HashMap")
-    self.register_builtin_fn_name("HashSet")
-    self.register_builtin_fn_name("abs")
-    self.register_builtin_fn_name("min")
-    self.register_builtin_fn_name("max")
-    self.register_builtin_fn_name("clamp")
-    self.register_builtin_fn_name("sqrt_f64")
-    self.register_builtin_fn_name("pow_f64")
-    self.register_builtin_fn_name("floor_f64")
-    self.register_builtin_fn_name("ceil_f64")
-    self.register_builtin_fn_name("sin_f64")
-    self.register_builtin_fn_name("cos_f64")
-    self.register_builtin_fn_name("log_f64")
-    self.register_builtin_fn_name("exp_f64")
-    self.register_builtin_fn_name("fabs_f64")
-
-    self.register_builtin_value_name("None")
-    self.register_builtin_value_name("TypeInfo")
-    self.register_builtin_value_name("PI")
-    self.register_builtin_value_name("E")
-    self.register_builtin_value_name("INFINITY")
-    self.register_builtin_value_name("NAN")
-    self.register_builtin_value_name("__FILE__")
-    self.register_builtin_value_name("__LINE__")
 
 fn sema_is_name_char(ch: i32) -> i32:
     if ch >= 48 and ch <= 57:
@@ -1046,7 +1014,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             if self.type_expr_contains_ref(f_type_node) != 0:
                 self.emit_error("ephemeral references cannot be stored in structs", f_type_node)
             if self.type_expr_is_collection_with_ref(f_type_node) != 0:
-                self.emit_error("ephemeral references cannot be stored in collections", f_type_node)
+                self.emit_error("ephemeral references cannot be stored in generic containers", f_type_node)
             let f_tid = self.resolve_type_expr(f_type_node)
             self.type_extra.push(f_name)
             self.type_extra.push(f_tid)
@@ -1285,7 +1253,7 @@ fn Sema.collect_let_decl(self: Sema, node: i32, is_local: i32):
         let type_node = self.ast.get_extra(type_extra)
         bind_ty = self.resolve_type_expr(type_node)
         if self.type_expr_is_collection_with_ref(type_node) != 0:
-            self.emit_error("ephemeral references cannot be stored in collections", node)
+            self.emit_error("ephemeral references cannot be stored in generic containers", node)
     self.scope_put_at(name, bind_ty, is_mut, node)
     let span_start = self.ast.get_start(node)
     self.typed_binding_types.insert(span_start, bind_ty)
@@ -1456,10 +1424,13 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
     let kind = self.ast.kind(node)
     if kind == NK_TYPE_NAMED():
         let sym = self.ast.get_data0(node)
+        if self.primitive_type_by_sym(sym) != 0:
+            return
         if self.named_types.contains(sym):
             return
         if self.type_param_exists(tp_start, tp_count, sym) != 0:
             return
+        self.debug_unknown_type(sym, node, "validate_type_expr")
         self.emit_error("unknown type", node)
         return
 
@@ -1485,7 +1456,9 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
 
     if kind == NK_TYPE_GENERIC():
         let base_sym = self.ast.get_data0(node)
-        if not self.named_types.contains(base_sym) and self.type_param_exists(tp_start, tp_count, base_sym) == 0 and self.is_collection_type_name(base_sym) == 0:
+        let base_prim = self.primitive_type_by_sym(base_sym)
+        if base_prim == 0 and not self.named_types.contains(base_sym) and self.type_param_exists(tp_start, tp_count, base_sym) == 0:
+            self.debug_unknown_type(base_sym, node, "validate_type_generic")
             self.emit_error("unknown type", node)
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
@@ -1710,6 +1683,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
             return self.named_types.get(sym).unwrap()
         if self.collecting_types != 0:
             return 0
+        self.debug_unknown_type(sym, node, "resolve_type_expr")
         self.emit_error("unknown type", node)
         return 0
 
@@ -2003,6 +1977,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
     let kind = self.ast.kind(node)
 
     if kind == NK_INT_LIT():
+        let value = self.ast.int_lit_value(node)
+        if value < -2147483648 or value > 2147483647:
+            return self.ty_i64
         return self.ty_i32
 
     if kind == NK_FLOAT_LIT():
@@ -2299,14 +2276,6 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
         let vi = self.variant_lookup.get(sym).unwrap()
         return vi / 65536
 
-    // Built-in functions
-    if self.is_builtin_fn(sym):
-        return 0
-
-    // Built-in values
-    if self.is_builtin_value(sym):
-        return 0
-
     // Unknown identifier
     self.emit_error("undefined variable", node)
     0
@@ -2461,7 +2430,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     self.mark_moved_if_consumed(value)
 
     if ann_type_node != 0 and self.type_expr_is_collection_with_ref(ann_type_node) != 0:
-        self.emit_error("ephemeral references cannot be stored in collections", node)
+        self.emit_error("ephemeral references cannot be stored in generic containers", node)
 
     self.scope_put_at(name, bind_type, is_mut, node)
     let span_start = self.ast.get_start(node)
@@ -2500,7 +2469,7 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
             return then_type
         return else_type
 
-    then_type
+    self.ty_void
 
 fn Sema.check_return(self: Sema, node: i32) -> i32:
     if self.in_defer != 0:
@@ -3086,6 +3055,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         let resolved = self.resolve_alias(local_tid)
         if self.get_type_kind(resolved) == TY_FN():
             return self.get_type_d2(resolved)
+        self.emit_error("value is not callable", callee)
         return 0
 
     // Generic function
@@ -3098,10 +3068,13 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         let vi = self.variant_lookup.get(fn_sym).unwrap()
         return vi / 65536
 
-    // Built-in function
-    if self.is_builtin_fn(fn_sym):
-        return self.check_builtin_call(fn_sym, node, arg_types, arg_count)
+    // Intrinsic function
+    if self.is_intrinsic_fn_sym(fn_sym) != 0:
+        return self.check_intrinsic_call(fn_sym, node, arg_types, arg_count)
 
+    let callee_ty = self.check_ident(fn_sym, callee)
+    if callee_ty != 0:
+        self.emit_error("value is not callable", callee)
     0
 
 fn Sema.fn_min_expected_arg_count(self: Sema, fn_sym: i32, fallback_expected: i32) -> i32:
@@ -3475,6 +3448,7 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     let expr = self.ast.get_data0(callee)
     let field = self.ast.get_data1(callee)
     let obj_type = self.check_expr(expr)
+    let static_type_sym = self.static_receiver_base_sym(expr)
 
     // Check all arguments
     let arg_types: Vec[i32] = Vec.new()
@@ -3505,6 +3479,8 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
         return arg_types.get(0)
 
     if obj_type == 0:
+        if static_type_sym != 0 and self.static_receiver_type_is_known(expr) == 0:
+            self.emit_error("unknown type", expr)
         return 0
 
     let resolved = self.resolve_alias(obj_type)
@@ -3516,25 +3492,24 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
         if sig_idx >= 0:
             return self.sig_return_type(sig_idx)
 
-    // Static method call
-    if self.ast.kind(expr) == NK_IDENT():
-        let type_sym = self.ast.get_data0(expr)
-        let method_key = self.method_key(type_sym, field)
+    // Static method call on a named type expression.
+    if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
+        let method_key = self.method_key(static_type_sym, field)
         let sig_idx = self.get_sig(method_key)
         if sig_idx >= 0:
             return self.sig_return_type(sig_idx)
 
     0
 
-fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i32], arg_count: i32) -> i32:
+fn Sema.is_intrinsic_fn_sym(self: Sema, fn_sym: i32) -> i32:
+    if fn_sym == self.sym_channel or fn_sym == self.sym_send or fn_sym == self.sym_recv or fn_sym == self.sym_close:
+        return 1
+    if fn_sym == self.sym_todo or fn_sym == self.sym_unreachable:
+        return 1
+    0
+
+fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i32], arg_count: i32) -> i32:
     let args_start = self.ast.get_data1(node)
-    if fn_sym == self.sym_println or fn_sym == self.sym_print:
-        return self.ty_void
-    if fn_sym == self.sym_assert:
-        if arg_count != 1:
-            self.emit_error("assert() expects exactly one argument", node)
-            return 0
-        return self.ty_void
     if fn_sym == self.sym_channel:
         if arg_count > 1:
             self.emit_error("Channel() expects zero or one capacity argument", node)
@@ -3603,8 +3578,22 @@ fn Sema.check_builtin_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i3
         return self.ty_never
     0
 
-fn Sema.is_collection_type_name(self: Sema, sym: i32) -> i32:
-    if sym == self.sym_vec or sym == self.sym_hashmap or sym == self.sym_hashset:
+fn Sema.static_receiver_base_sym(self: Sema, expr: i32) -> i32:
+    let _ = self
+    if expr == 0:
+        return 0
+    let kind = self.ast.kind(expr)
+    if kind == NK_IDENT() or kind == NK_TYPE_NAMED() or kind == NK_TYPE_GENERIC():
+        return self.ast.get_data0(expr)
+    0
+
+fn Sema.static_receiver_type_is_known(self: Sema, expr: i32) -> i32:
+    let base_sym = self.static_receiver_base_sym(expr)
+    if base_sym == 0:
+        return 0
+    if self.primitive_type_by_sym(base_sym) != 0:
+        return 1
+    if self.named_types.contains(base_sym):
         return 1
     0
 
@@ -3646,15 +3635,13 @@ fn Sema.type_expr_is_collection_with_ref(self: Sema, node: i32) -> i32:
         return 0
     let kind = self.ast.kind(node)
     if kind == NK_TYPE_GENERIC():
-        let base = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
-        if self.is_collection_type_name(base) != 0:
-            for ai in 0..arg_count:
-                if self.type_expr_contains_ref(self.ast.get_extra(extra_start + ai)) != 0:
-                    return 1
         for ai in 0..arg_count:
-            if self.type_expr_is_collection_with_ref(self.ast.get_extra(extra_start + ai)) != 0:
+            let arg_node = self.ast.get_extra(extra_start + ai)
+            if self.type_expr_contains_ref(arg_node) != 0:
+                return 1
+            if self.type_expr_is_collection_with_ref(arg_node) != 0:
                 return 1
         return 0
     if kind == NK_TYPE_PTR() or kind == NK_TYPE_OPTIONAL():
@@ -4260,20 +4247,6 @@ fn Sema.has_drop_method(self: Sema, type_name: i32) -> i32:
     if key != type_name:
         self.drop_method_cache.insert(key, has)
     has
-
-fn Sema.is_builtin_fn(self: Sema, sym: i32) -> i32:
-    if sym <= 0:
-        return 0
-    if self.builtin_fn_syms.contains(sym):
-        return 1
-    0
-
-fn Sema.is_builtin_value(self: Sema, sym: i32) -> i32:
-    if sym <= 0:
-        return 0
-    if self.builtin_value_syms.contains(sym):
-        return 1
-    0
 
 // ── Borrow checking ──────────────────────────────────────────────
 

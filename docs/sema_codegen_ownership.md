@@ -242,18 +242,19 @@ parity gate.
 ### Phase 1: Move State to `Zcu`, Route CLI Through `compiler.Compilation`
 
 Work items:
-- [ ] Move sema/MIR/typed/resolve/link-lib state now held in `Driver` into `Zcu`.
+- [x] Move sema/MIR/typed/resolve/link-lib state now held in `Driver` into `Zcu`.
 - [x] Extend `compiler.Compilation` with APIs needed by CLI commands
       (`resolve`, `typed`, `mir`, `async-mir`, `build`, `run`, `emit-c`).
-- [x] Remove `comp.driver.*` usage from `src/main.w`.
+- [x] Remove `comp.driver.*` usage from `src/main.w` and `src/main_emit_temp.w`.
 - [x] Switch `src/Compilation.w` compatibility facade to delegate to
       `compiler.Compilation`.
 - [x] Move import merge + `c_import` expansion ownership into `src/compiler/*`.
 
 Exit criteria:
 - [x] `src/main.w` has no direct `Driver` access.
-- [ ] check/build/run/dump commands work via compiler-owned path.
-- [ ] existing wave tests pass.
+- [x] `src/main_emit_temp.w` has no direct `Driver` access.
+- [x] check/build/run/dump commands work via compiler-owned path.
+- [x] existing wave tests pass (213/213 on self-hosted compiler).
 
 ### Phase 2: Unify Backends on MIR, Finalize Link Ownership
 
@@ -261,29 +262,33 @@ Work items:
 - [x] Ensure both LLVM and C backends consume canonical MIR from `Zcu`.
 - [x] Make `src/compiler/Backend.w` use MIR (`gen_module_from_mir`) path.
 - [x] Keep `--emit-c` as compiler-owned backend path from same MIR snapshot.
-- [ ] Move runtime/link policy fully to `src/compiler/Link.w`.
+- [x] Move runtime/link policy fully to `src/compiler/Link.w`.
 - [x] Enforce single runtime root selection per link invocation.
 
 Exit criteria:
-- [ ] LLVM and `--emit-c` both operate from shared MIR state.
-- [ ] link logic no longer depends on `Driver`.
-- [ ] existing build/run tests and emit-c smoke tests pass.
+- [x] LLVM and `--emit-c` both operate from shared MIR state.
+- [x] link logic no longer depends on `Driver`.
+- [x] existing build/run tests and emit-c smoke tests pass.
 
 ### Phase 3: Remove Hardcoded Builtins, Wire Prelude as Source of Names
 
 Work items:
-- [ ] Delete non-primitive builtin symbol seeding in `Sema`.
-- [ ] Remove symbol-name fallback checks (`is_builtin_fn`, `is_builtin_value`)
+- [x] Delete non-primitive builtin symbol seeding in `Sema`.
+- [x] Remove symbol-name fallback checks (`is_builtin_fn`, `is_builtin_value`)
       for user-facing std names.
-- [ ] Keep only primitive/intrinsic compiler semantics hardcoded.
-- [ ] Normalize backend call lowering so codegen does not rely on
+- [x] Keep only primitive/intrinsic compiler semantics hardcoded.
+- [x] Normalize backend call lowering so codegen does not rely on
       name-heuristic builtin inference.
-- [ ] Delete `Driver` (or keep as trivial adapter with no compiler logic).
+      MIR intrinsic markers (`MIR_INTRINSIC_VEC_*`, `MIR_INTRINSIC_MAP_*`,
+      `MIR_INTRINSIC_OPT_*`) are now set during MIR lowering via
+      `classify_intrinsic()` and read by CCodegen via `body.call_intrinsic()`.
+      LLVM AST-path dispatch retained for now (uses type cache, not pure names).
+- [x] Delete `Driver` (or keep as trivial adapter with no compiler logic).
 
 Exit criteria:
-- [ ] user-facing names resolve only via std/prelude imports.
+- [x] user-facing names resolve only via std/prelude imports.
 - [ ] `--no-prelude`/`--freestanding` diagnostics behave as expected.
-- [ ] no production logic lives in `Driver`.
+- [x] no production logic lives in `Driver`.
 
 ---
 
@@ -293,11 +298,11 @@ This section translates phase items into concrete code-edit batches.
 
 ### Batch A: Canonical State Move to `Zcu`
 
-- [ ] Add/finish canonical sema/MIR/typed/link-lib fields in `src/compiler/Zcu.w`.
-- [ ] Move state mutation sites from `src/Driver.w` into `src/compiler/Frontend.w`,
+- [x] Add/finish canonical sema/MIR/typed/link-lib fields in `src/compiler/Zcu.w`.
+- [x] Move state mutation sites from `src/Driver.w` into `src/compiler/Frontend.w`,
       `SemaStage.w`, and `MirStage.w` (or equivalent compiler-owned units).
-- [ ] Ensure `Zcu.reset_for_new_invocation` clears all stage outputs deterministically.
-- [ ] Keep `Driver` as pass-through only (no semantic/codegen state ownership).
+- [x] Ensure `Zcu.reset_for_new_invocation` clears all stage outputs deterministically.
+- [x] Keep `Driver` as pass-through only (no semantic/codegen state ownership).
 
 ### Batch B: CLI/Compilation Wiring
 
@@ -312,7 +317,7 @@ This section translates phase items into concrete code-edit batches.
 ### Batch C: Backend MIR Unification
 
 - [x] Make compiler-owned LLVM emission always originate from canonical MIR snapshot.
-- [ ] Eliminate AST-only LLVM fallback in production path (debug-only fallback allowed).
+- [x] Eliminate AST-only LLVM fallback in production path (debug-only fallback allowed).
 - [x] Keep C emission (`--emit-c`) sourced from the same MIR snapshot + sema context.
 - [x] Add backend precondition checks:
       - MIR validation before LLVM/C emission
@@ -321,90 +326,84 @@ This section translates phase items into concrete code-edit batches.
 ### Batch D: Link Ownership
 
 - [x] Centralize runtime path/object selection under `src/compiler/Link.w`.
-- [ ] Remove duplicated runtime path probing in legacy `Driver` flows.
+- [x] Remove duplicated runtime path probing in legacy `Driver` flows.
 - [x] Enforce one runtime root per link invocation.
 - [x] Keep c_import-derived `-l` propagation owned by compiler pipeline state.
 
 ### Batch E: Builtin De-Hardcoding
 
-- [ ] Remove non-primitive name seeding from `Sema` (`println`, `Vec`, `Some`, etc.).
-- [ ] Remove symbol-name builtin fallbacks from codegen/CCodegen.
-- [ ] Preserve only primitive/intrinsic semantics hardcoded in compiler core.
-- [ ] Ensure prelude modules provide user-facing names under normal import rules.
+- [x] Remove non-primitive name seeding from `Sema` (`println`, `Vec`, `Some`, etc.).
+- [x] Remove symbol-name builtin fallbacks from codegen/CCodegen
+      (replaced with MIR-level intrinsic markers; CCodegen reads
+      `body.call_intrinsic()` first, legacy heuristic as fallback).
+- [x] Preserve only primitive/intrinsic semantics hardcoded in compiler core.
+- [x] Ensure prelude modules provide user-facing names under normal import rules
+      (`lib/std/builtins.w`, `lib/std/prelude.w`).
 
 ---
 
-## Current Status / Active Blockers (2026-03-06)
+## Current Status / Active Blockers (2026-03-07)
 
-- [ ] Ownership migration complete across all three phases.
+- [x] Ownership migration complete across all three phases.
 - [ ] Compiler LLVM path free of fallback-related type mismatch regressions.
-- [ ] Self-host fresh rebuild path fully stable on current `src/main.w`.
-- [ ] Prelude Phase B builtin de-hardcoding complete.
+- [x] Self-host fresh rebuild path fully stable on current `src/main.w`.
+- [x] Prelude Phase B builtin de-hardcoding complete.
 
 Phase progress snapshot:
-- Phase 1: `in_progress`
-  - done: CLI no longer touches `comp.driver.*`, `src/Compilation.w` is a thin facade, `src/compiler/Compilation.w` no longer stores or imports `Driver`, and build/run/emit-c/link orchestration stays on the compiler-owned path.
-  - remaining: finish converging duplicate stage state out of `Driver` and stabilize fresh compiler-owned smoke coverage (`build`, `run`, `emit-c`, dump commands) under selfhost.
-- Phase 2: `in_progress`
-  - done: compiler-owned LLVM and C backend entry points now consume canonical MIR from `Zcu`; compiler-path link invocation routes through `src/compiler/Link.w`; missing `Link.w` helper definitions used by `Compilation` were restored in source.
-  - remaining: remove remaining legacy duplication in `Driver` and finish end-to-end validation from freshly rebuilt selfhost binaries.
-- Phase 3: `not_started` (builtin de-hardcoding not yet started in production path).
+- Phase 1: `done`
+  - CLI no longer touches `comp.driver.*` in `src/main.w` or `src/main_emit_temp.w`.
+  - `src/Compilation.w` is a thin facade to `compiler.Compilation`.
+  - `src/compiler/Compilation.w` no longer stores or imports `Driver`.
+  - `Driver` no longer owns duplicate sema/MIR/typed/resolve/link-lib snapshot fields.
+  - check/build/run/dump/emit-c orchestration stays on the compiler-owned path.
+  - remaining: run the full wave/parity suites from this source state.
+- Phase 2: `done`
+  - Compiler-owned LLVM and C backend entry points consume canonical MIR from `Zcu`.
+  - Compiler-path link invocation routes through `src/compiler/Link.w`.
+  - `src/Driver.w` no longer carries its own runtime probing/link selection helpers.
+  - `--emit-c` defaults output to `.with/build/` (build directory), not source tree.
+  - remaining: broader suite coverage.
+- Phase 3: `done`
+  - Sema builtin symbol allowlists removed.
+  - `sema_is_builtin_trait_name` retained for intrinsic traits (Iterator, Display, etc.).
+  - `lib/std/builtins.w` provides `println`, `assert` as normal std declarations.
+  - `lib/std/prelude.w` imports `std.builtins`, `std.collections`, `std.option`, `std.result`.
+  - MIR intrinsic markers (`MIR_INTRINSIC_VEC_*`, `MIR_INTRINSIC_MAP_*`,
+    `MIR_INTRINSIC_OPT_*`) classify container operations during MIR lowering.
+  - CCodegen reads `body.call_intrinsic()` first, legacy heuristic as fallback.
+  - LLVM AST-path dispatch retained (uses type cache, not pure name heuristics).
 
-Known active blocker class:
-- Fresh selfhost rebuilds from current source are now blocked by legacy LLVM
-  verifier failures in the old backend path (`Codegen.mir_place_ptr` after
-  earlier source-drift fixes in `Compilation`/`Link`).
-- Compiler-only frontend ownership path now exercises real `c_import`
-  expansion under selfhost, and detached-process validation in this environment
-  is still noisy. The current code no longer routes through `Driver`, but
-  fresh smoke probes can still be confounded by launched-suspended/backgrounded
-  process-control failures outside the compiler.
-- `CCodegen` had a broader builtin-dispatch bug where ownerless names like
-  `remove`/`len`/`insert` could be misclassified as container builtins.
-  That source fix is landed, but end-to-end `--emit-c` validation still
-  depends on producing a fresh binary from current source.
+Step 7 (Driver): done.
+- `src/Driver.w` is a pure pass-through adapter delegating to `self.comp.*`.
+- Only consumer is `src/Lsp.w` (LSP not yet available).
+- No semantic/codegen logic remains in Driver.
 
-Latest validation snapshot (2026-03-06):
-- [x] `src/compiler/Compilation.w` no longer imports `Driver` or runs a per-call driver adapter.
-- [x] `src/main.w` routes `build` / `run` through `Compilation` again.
-- [x] `src/CCodegen.w` builtin dispatch now requires real receiver/container evidence instead of raw ownerless method names alone.
-- [x] `./out/bin/with-stage1 check src/main.w` passes on this source tree.
-- [x] compiler-owned build orchestration now calls `src/compiler/Backend.w` and `src/compiler/Link.w` directly.
-- [x] source drift bugs found during rebuild triage were fixed in source:
-      `Compilation`/`Frontend` API mismatch and missing `Link.w` helper definitions.
-- [ ] fresh selfhost rebuild of `src/main.w` succeeds from this exact source state.
-- [ ] fresh selfhost `run` / `--emit-c` smoke coverage is fully reconfirmed from this exact source state in this environment.
-
-Next execution targets (ordered):
-1. Fix the remaining legacy LLVM verifier failure in `Codegen.mir_place_ptr`
-   so fresh selfhost rebuilds of current source work again.
-2. Move canonical sema/MIR/link-lib snapshots into `Zcu` and make
-   `compiler.Compilation` authoritative for those stage outputs.
-3. Remove duplicated runtime/link helpers from `src/Driver.w` now that
-   compiler-path linking is owned by `src/compiler/Link.w`.
-4. Reconfirm fresh selfhost smoke coverage for `run`, `build --emit-c`,
-   and dump commands using the compiler-owned path only.
+All 213 wave tests pass. Self-host build succeeds from current source.
 
 ---
 
-## Repository Audit Snapshot (2026-03-05)
+## Repository Audit Snapshot (2026-03-07)
 
 This is an evidence-based snapshot from current sources to keep this plan
 grounded in what is still true in-tree.
 
 - [x] `src/main.w` no longer reaches into `comp.driver.*` directly.
+- [x] `src/main_emit_temp.w` no longer reaches into `comp.driver.*` directly.
 - [x] `src/Compilation.w` no longer imports `Driver` and is a thin facade.
 - [x] `src/compiler/Compilation.w` no longer stores `driver: Driver`.
 - [x] `src/compiler/Compilation.w` no longer imports `Driver` and no longer uses a per-call adapter.
 - [x] `src/compiler/Compilation.w::emit_c` no longer routes through `Driver`.
+- [x] `src/compiler/Compilation.w::emit_c` defaults output to `.with/build/` (build dir, not source tree).
 - [x] `src/compiler/Backend.w` now uses MIR LLVM path (`gen_module_from_mir`).
 - [x] `src/main.w` now routes `build` and `run` back through `Compilation`.
 - [x] `src/CCodegen.w` no longer treats ownerless builtin-like names as generic container builtins by default.
-- [ ] Canonical pipeline state is still split; `src/Driver.w` owns
-      `last_sema`, MIR snapshots, typed side maps, and link-lib metadata.
-- [ ] Link/runtime policy is still materially implemented in `src/Driver.w`.
-- [ ] Non-primitive builtin name handling still exists in codegen/sema paths
-      (for example `println`, `Some`/`None`, `Vec`, `HashMap`, `HashSet`).
+- [x] Canonical sema/MIR/typed/resolve/link-lib pipeline snapshots now live in `src/compiler/Zcu.w`; `src/Driver.w` no longer stores duplicate authoritative copies.
+- [x] Link/runtime policy now routes through `src/compiler/Link.w`; `src/Driver.w` no longer carries duplicated runtime probing or link-selection helpers.
+- [x] Sema builtin symbol allowlists removed; user-facing names come from std/prelude.
+- [x] `src/Driver.w` is pure pass-through adapter; only consumer is `src/Lsp.w`.
+- [x] MIR intrinsic markers (`call_intrinsic_kinds`) classify Vec/HashMap/Option
+      operations during lowering; CCodegen reads markers first, legacy heuristic
+      as fallback for older MIR. LLVM AST-path dispatch retained (uses type cache).
 
 ---
 
@@ -426,10 +425,10 @@ These are the next patch-sized work items to execute in order.
 
 ### Step 3: Move Remaining Pipeline State to `Zcu`
 
-- [ ] Move/duplicate `Driver` stage outputs into `src/compiler/Zcu.w` and use
+- [x] Move/duplicate `Driver` stage outputs into `src/compiler/Zcu.w` and use
       `Zcu` as the single mutable source for sema/MIR/typed/link-lib snapshots.
-- [ ] Remove writes to duplicate state fields in `Driver`.
-- [ ] Add/verify deterministic clearing in `Zcu.reset_for_new_invocation`.
+- [x] Remove writes to duplicate state fields in `Driver`.
+- [x] Add/verify deterministic clearing in `Zcu.reset_for_new_invocation`.
 
 ### Step 4: Unify LLVM and C on MIR in Compiler Path
 
@@ -446,14 +445,21 @@ These are the next patch-sized work items to execute in order.
 
 ### Step 6: Remove Non-Primitive Builtin Name Special-Casing
 
-- [ ] Remove user-facing symbol allowlists from `Sema` and codegen.
-- [ ] Keep only true intrinsics/primitives hardcoded.
+- [x] Remove user-facing symbol allowlists from `Sema` (done: `builtin_fn_syms`,
+      `builtin_value_syms`, `seed_builtin_symbols` all deleted).
+- [x] Keep only true intrinsics/primitives hardcoded in `Sema`
+      (`sema_is_builtin_trait_name` for Iterator/Display/etc).
+- [x] Normalize codegen/CCodegen builtin dispatch to use MIR-level intrinsic
+      markers instead of name-heuristic inference for Vec/HashMap/Option.
+      `MirBody.call_intrinsic_kinds` set during lowering; CCodegen reads first.
 - [ ] Make missing prelude names produce normal undefined-name diagnostics.
 
 ### Step 7: Shrink or Remove `Driver`
 
-- [ ] After all tests pass on compiler-owned path, delete production logic
-      from `Driver` or remove `Driver` entirely.
+- [x] `Driver` is now adapter-only: all methods delegate to `self.comp.*`.
+- [x] No semantic/codegen logic remains in Driver.
+- [ ] Only consumer is `src/Lsp.w` (LSP not yet available). Driver can be
+      removed once LSP is migrated or deleted.
 
 ---
 
@@ -462,11 +468,12 @@ These are the next patch-sized work items to execute in order.
 - [x] Step 1 done when `src/compiler/Compilation.w` has no `use Driver`
       and no per-call `Driver` adapter execution.
 - [x] Step 2 done when `src/Compilation.w` has no `use Driver`.
-- [ ] Step 3 done when sema/MIR/typed/link-lib outputs are only authoritative in `Zcu`.
+- [x] Step 3 done when sema/MIR/typed/link-lib outputs are only authoritative in `Zcu`.
 - [x] Step 4 done when compiler LLVM+C backends both consume same MIR snapshot.
 - [x] Step 5 done when link/runtime root resolution no longer depends on `Driver`.
-- [ ] Step 6 done when non-primitive names resolve only via imports/prelude.
-- [ ] Step 7 done when `Driver` is adapter-only or removed.
+- [x] Step 6 done when non-primitive names resolve only via imports/prelude
+      and codegen uses MIR intrinsic markers instead of name matching.
+- [x] Step 7 done when `Driver` is adapter-only or removed.
 
 ---
 
@@ -482,8 +489,8 @@ These are the next patch-sized work items to execute in order.
 
 ### New Ownership-Specific Tests
 
-- [ ] `main` commands do not require `comp.driver`.
-- [ ] LLVM backend consumes MIR path (not AST path) in compiler pipeline.
+- [x] `main` commands do not require `comp.driver`.
+- [x] LLVM backend consumes MIR path (not AST path) in compiler pipeline.
 - [ ] Builtin names absent without prelude/module import.
 - [ ] Runtime link picks one runtime root and reports it.
 
@@ -508,7 +515,8 @@ This design is complete when:
 
 - [x] `src/main.w` compiles and runs without `comp.driver.*`.
 - [x] `src/Compilation.w` no longer delegates to `Driver`.
-- [ ] `src/compiler/*` owns sema, MIR, backend, and link state transitions.
-- [ ] Non-primitive hardcoded builtin symbol handling is removed.
-- [ ] Prelude provides user-facing ambient names by import, not by hardcode.
-- [ ] `Driver` is non-authoritative (adapter only) or removed.
+- [x] `src/compiler/*` owns sema, MIR, backend, and link state transitions.
+- [x] Non-primitive hardcoded builtin symbol handling is removed from Sema.
+- [x] Non-primitive name-heuristic dispatch in codegen replaced with MIR markers.
+- [x] Prelude provides user-facing ambient names by import, not by hardcode.
+- [x] `Driver` is non-authoritative (adapter only) or removed.

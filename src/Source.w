@@ -2,6 +2,8 @@
 //
 // Root `Source` now follows the foundation implementation shape.
 
+use std.prelude_core
+
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_vec_new_out(v: &Vec[i32], elem_size: i64) -> void
 extern fn with_vec_push_i32(v: &Vec[i32], val: i32) -> void

@@ -1,3 +1,5 @@
+use std.prelude_core
+
 use Ast
 use Lexer
 use Parser
@@ -565,6 +567,8 @@ fn Zcu.inject_prelude_frontend(self: Zcu, pool: AstPool) -> AstPool:
     merged_pool
 
 fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
+    if zcu_debug_init_enabled() != 0:
+        with_eprintln("[frontend] compile_file:start " ++ path)
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
 
@@ -575,16 +579,22 @@ fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
         return AstPool.new()
 
     self.set_current_source(source_dir, path, text)
+    if zcu_debug_init_enabled() != 0:
+        with_eprintln("[frontend] compile_file:source_ready bytes=" ++ int_to_string(text.len() as i32))
     let pool = self.compile_source_frontend(text, path, 0)
     if pool.decl_count() == 0 and not self.diagnostics.has_errors():
         with_eprintln("error: compiler produced an empty module for '" ++ path ++ "'")
     pool
 
 fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) -> AstPool:
+    if zcu_debug_init_enabled() != 0:
+        with_eprintln("[frontend] compile_source:lex")
     // Phase 1: Lex.
     var lexer = Lexer.init(text, file_id)
     let tokens = lexer.tokenize()
 
+    if zcu_debug_init_enabled() != 0:
+        with_eprintln("[frontend] compile_source:parse")
     // Phase 2: Parse.
     var parser = Parser.init(tokens, text, file_id, self.pool, self.diagnostics)
     var pool = parser.parse_module()
@@ -600,6 +610,8 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         self.set_resolve_snapshot(ResolveResult.init(), name)
         return AstPool.new()
 
+    if zcu_debug_init_enabled() != 0:
+        with_eprintln("[frontend] compile_source:inject_prelude")
     pool = self.inject_prelude_frontend(pool)
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
@@ -607,6 +619,8 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         self.set_resolve_snapshot(ResolveResult.init(), name)
         return AstPool.new()
 
+    if zcu_debug_init_enabled() != 0:
+        with_eprintln("[frontend] compile_source:resolve")
     // Wave 4: sidecar resolved artifact.
     let artifacts = resolve_from_root_pool(name, text, file_id, pool, self.pool, self.diagnostics, false)
     self.pool = artifacts.pool
@@ -620,6 +634,8 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         self.set_typed_snapshot("", AstPool.new())
         return AstPool.new()
 
+    if zcu_debug_init_enabled() != 0:
+        with_eprintln("[frontend] compile_source:imports")
     // Build the sema/codegen pool via recursive syntactic import expansion.
     // This still sees implicit prelude imports because `inject_prelude_frontend`
     // materializes them as normal `use` declarations in the root pool.
@@ -635,6 +651,8 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         self.set_typed_snapshot("", AstPool.new())
         return AstPool.new()
 
+    if zcu_debug_init_enabled() != 0:
+        with_eprintln("[frontend] compile_source:sema")
     // Phase 3: Semantic analysis.
     var sema = Sema.init(self.pool, self.diagnostics, pool)
     sema.source_text = text

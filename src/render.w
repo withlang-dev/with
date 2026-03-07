@@ -7,6 +7,7 @@ use Token
 use InternPool
 
 extern fn int_to_string(n: i32) -> str
+extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
 
 fn render_module(pool: AstPool, intern: InternPool) -> str:
@@ -263,7 +264,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
     let prefix = if kind == NK_BLOCK(): "" else: make_indent(indent)
 
     if kind == NK_INT_LIT():
-        return prefix ++ int_to_string(pool.get_data0(node))
+        return prefix ++ with_i64_to_str(pool.int_lit_value(node))
 
     if kind == NK_FLOAT_LIT():
         let float_idx = pool.get_data0(node)
