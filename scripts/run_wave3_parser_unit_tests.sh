@@ -4,15 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-echo "building bootstrap compiler for Wave 3 parser unit tests..."
-(
-  cd bootstrap
-  zig build -Doptimize=Debug >/dev/null
-)
-
-WITH_BIN="./bootstrap/zig-out/bin/with"
+WITH_BIN="${WITH:-./out/bin/with-stage2}"
 if [[ ! -x "$WITH_BIN" ]]; then
-  echo "error: missing bootstrap with binary"
+  echo "error: missing with binary: $WITH_BIN"
   exit 1
 fi
 

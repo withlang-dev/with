@@ -7,15 +7,23 @@ We own this codebase. There is no such thing as a "pre-existing" bug. If we see 
 Intermittent hangs and performance issues are P0. When encountered, investigate and solve them deeply — do not dismiss them as flakes, do not work around them, do not move on. Root-cause them.
 
 ## Build Integrity
-The self-host build must never be broken. The pipeline is:
+The self-host build must never be broken. The compiler compiles itself. The pipeline is:
 - Seed compiler → stage1 (compiles current source)
 - Stage1 → stage2 (stage1 compiles current source)
 - Stage2 → stage3 (stage2 compiles current source)
 
-If the build breaks, fixing it is the top priority.
+Stage2 and stage3 must be byte-identical (fixpoint). If the build breaks, fixing it is the top priority.
 
-## Bootstrap
-Bootstrap code (bootstrap/) is frozen except for critical bugs. The bootstrap compiler is a Zig implementation used only as a fallback seed. Source code in src/ must work around bootstrap limitations — src/ should contain no code that the bootstrap compiler cannot compile. Do not change bootstrap's architecture to accommodate src/.
+## Self-Hosting Recovery
+The compiler is fully self-hosted. The Zig bootstrap (`bootstrap/`) is a historical artifact and must never be used. Recovery from a broken build uses prior selfhost checkpoints:
+- `src/main` — the binary seed checked into the repo (a fixpoint-verified stage2)
+- `out/bin/with-stage2` — the last successfully built stage2
+- `out/bin/with-stage1` — fallback if stage2 is broken
+- `WITH_SELFHOST_SEED=<path>` — override with any known-good selfhost binary
+
+The rebuild script (`scripts/rebuild_selfhost.sh`) tries seed candidates in order: stage3, stage2, canonical, stage1, `src/main`. It never falls back to the Zig bootstrap.
+
+If `src/main` is corrupted and no working selfhost binary exists anywhere, that is a catastrophic loss scenario. Prevent this by keeping `src/main` updated with each fixpoint-verified build.
 
 ## Language
 Source files use `.w` extension. The language uses indentation-based syntax (like Python), with `fn`, `type`, `let`, `use`, `extern fn` as top-level declarations.
@@ -25,7 +33,7 @@ Source files use `.w` extension. The language uses indentation-based syntax (lik
 - **Verify before writing code.** Don't guess at APIs, node layouts, or conventions from memory. Read the source definitions first (e.g., check Ast.w for node kinds before writing AST-walking code).
 - **Bisect, don't spiral.** When a stage binary is broken, systematically bisect which source change caused it (revert half, rebuild, test) rather than chasing symptoms with a debugger. Corrupted stacks and pointers rarely yield useful debugger output.
 - **Test incrementally.** Rebuild and smoke-test after each individual change. Batching multiple changes makes it hard to isolate which one broke things.
-- **Seed corruption awareness.** In a self-hosting compiler, always ask: "is the seed compiler itself producing bad code?" before debugging the output binary. Bugs in the seed propagate through the stage chain. If the seed has a codegen bug, fix it in the bootstrap — that's exactly what "critical flaws" means.
+- **Seed corruption awareness.** In a self-hosting compiler, always ask: "is the seed compiler itself producing bad code?" before debugging the output binary. Bugs in the seed propagate through the stage chain. If the seed is bad, replace it with the last known-good checkpoint from `src/main`.
 
 ## AST Node Layouts (common pitfalls)
 - `NK_LET_DECL` (4): top-level let. d0=name(sym), d1=value(node), d2=flags (bit0=mut, bit1=pub)
@@ -48,9 +56,3 @@ When a stage binary crashes or hangs:
 5. **Instruments**: `xcrun xctrace record --template "Leaks" --output /tmp/trace.trace --launch -- ./out/bin/with-stage2 check src/main.w`
 6. **Debug entitlement** (if "not debuggable"): `codesign -s - --entitlements /tmp/debug.entitlements --force ./out/bin/with-stage2`
 - Prefer lldb, MallocScribble, leaks, xctrace. Avoid Valgrind on ARM64.
-
-## Self-Host Bootstrapping
-When the self-host build is broken and the seed compiler has codegen bugs, the stage chain can propagate corruption (bad seed → broken stage1 → broken stage2). To break the cycle:
-- The bootstrap compiler (Zig) has no prelude support — it cannot compile current source that depends on Vec/HashMap from prelude.
-- The rebuild script (`scripts/rebuild_selfhost.sh`) tries seed candidates in order: stage3, stage2, canonical, stage1, bootstrap.
-- When `src/main` (the binary seed in the source tree) is updated, it can serve as a known-good seed to bootstrap from.

@@ -6,28 +6,17 @@ on:
 
 jobs:
   selfhost-macos:
-    name: bootstrap + selfhost (macOS)
+    name: selfhost (macOS)
     runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Zig
-        uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: 0.15.2
 
       - name: Install LLVM
         run: brew install llvm
 
       - name: Export LLVM_PREFIX
         run: echo "LLVM_PREFIX=$(brew --prefix llvm)" >> "$GITHUB_ENV"
-
-      - name: Build bootstrap compiler
-        run: make bootstrap
-
-      - name: Bootstrap test suites
-        run: make test-bootstrap
 
       - name: Build stage2 self-hosted compiler
         run: make stage2

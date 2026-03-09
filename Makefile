@@ -1,4 +1,4 @@
-.PHONY: all bootstrap stage1 stage2 build install install-bootstrap clean
+.PHONY: all stage1 stage2 build test test-stage2 fixpoint install clean
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
@@ -14,10 +14,6 @@ INSTALL_RUNTIMEDIR := $(INSTALL_BINDIR)/runtime
 
 all: build
 
-# Stage0 seed compiler (Zig-built bootstrap compiler).
-bootstrap:
-	cd bootstrap && zig build
-
 # Stage1 selfhost compiler built from the current selfhost seed.
 stage1:
 	./scripts/rebuild_selfhost.sh stage1
@@ -30,20 +26,24 @@ stage2:
 build: stage2
 	@test -x "$(CANONICAL_BIN)"
 
+# Run the selfhost test suite.
+test: build
+	./scripts/run_tests.sh
+
+# Alias for CI compatibility.
+test-stage2: test
+
+# Fixpoint verification (stage2 == stage3).
+fixpoint:
+	./scripts/rebuild_selfhost.sh stage3
+	@diff "$(OUT_BINDIR)/with-stage2" "$(OUT_BINDIR)/with-stage3" && echo "FIXPOINT"
+
 # Install stage2 compiler and colocated runtime artifacts.
 install: build
 	install -d "$(INSTALL_BINDIR)"
 	install -d "$(INSTALL_RUNTIMEDIR)"
 	install -m 0755 "$(STAGE2_BIN)" "$(INSTALL_BINDIR)/with"
 	cp -R runtime/. "$(INSTALL_RUNTIMEDIR)/"
-
-# One-time seed path: install stage0 bootstrap compiler.
-# Useful only when no selfhost compiler is available yet.
-install-bootstrap: bootstrap
-	install -d "$(INSTALL_BINDIR)"
-	install -d "$(INSTALL_RUNTIMEDIR)"
-	install -m 0755 ./bootstrap/zig-out/bin/with "$(INSTALL_BINDIR)/with"
-	cp -R bootstrap/zig-out/bin/runtime/. "$(INSTALL_RUNTIMEDIR)/"
 
 clean:
 	rm -f with with-new with-stage1 with-stage2 with-stage3

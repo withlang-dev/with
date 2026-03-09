@@ -4,12 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [[ ! -x "./bootstrap/zig-out/bin/with" ]]; then
-  echo "[gate-stage0] building bootstrap compiler"
-  (cd bootstrap && zig build)
+# selfhost seed checkpoint — validate that src/main can build stage2
+SEED_BIN="${ROOT_DIR}/src/main"
+
+if [[ ! -x "$SEED_BIN" ]]; then
+  echo "[gate-stage0] error: missing selfhost seed binary: $SEED_BIN" >&2
+  exit 1
 fi
 
-echo "[gate-stage0] rebuilding stage2 from bootstrap"
+echo "[gate-stage0] rebuilding stage2 from selfhost seed"
 ./scripts/rebuild_selfhost.sh stage2
 
 if [[ ! -x "./out/bin/with-stage2" ]]; then

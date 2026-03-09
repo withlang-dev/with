@@ -673,3 +673,338 @@ not be used as identifiers. The compiler should reject them with
 
 Verify none of these are currently used as identifiers in
 stdlib, tests, or example code.
+
+# Spec Addition: `const` Declarations and Enum Discriminants
+
+---
+
+## §3.X `const` Declarations
+
+### Spec Language
+
+A `const` declaration introduces a named compile-time constant.
+The value must be evaluable at compile time. `const` values are
+inlined at every use site — they have no runtime storage.
+
+```
+const MAX_CONNECTIONS: i32 = 1024
+const PI: f64 = 3.141592653589793
+const DEFAULT_NAME: str = "unnamed"
+const DEBUG: bool = false
+```
+
+**Syntax:**
+
+```
+const_decl = 'const' IDENT ':' type '=' expr
+```
+
+**Rules:**
+
+1. The right-hand side must be a compile-time constant expression:
+   literals, arithmetic on literals, other `const` values, and
+   `comptime` function calls.
+2. `const` values are immutable. There is no `mut` form.
+3. `const` declarations are permitted at module scope and inside
+   function bodies.
+4. The type annotation is required. (Type inference on `let` is a
+   convenience for runtime values. Constants should be explicit
+   about their type.)
+
+```
+// Module-level
+const BUFFER_SIZE: i32 = 4096
+const VERSION: str = "0.1.0"
+
+// Function-level
+fn allocate_buffer:
+    const HEADER_SIZE: i32 = 16
+    let buf = alloc(BUFFER_SIZE + HEADER_SIZE)
+```
+
+**Interaction with `comptime`:**
+
+`const` is sugar for a `comptime`-evaluated binding. The following
+are equivalent:
+
+```
+const X: i32 = 42
+let X = comptime 42
+```
+
+`const` is preferred for named constants because intent is clearer.
+`comptime` is for inline compile-time evaluation within expressions.
+
+**Interaction with `let`:**
+
+| Declaration | Mutable | Storage | Evaluated |
+|---|---|---|---|
+| `const X: T = expr` | No | None (inlined) | Compile time |
+| `let x = expr` | No | Stack | Runtime |
+| `var x = expr` | Yes | Stack | Runtime |
+
+**`const` is NOT a type qualifier.** It does not modify types,
+parameters, or references. It only introduces named constants.
+`const` in generic parameters (`fn foo[const N: i32]`) is a
+separate feature (const generics) and uses `const` in a different
+syntactic position with no ambiguity.
+
+---
+
+## §5.X Enum Discriminants
+
+### Spec Language
+
+Enum variants may have explicit integer discriminants. This enables
+enums to serve as named integer constant sets with exhaustive
+matching, replacing the C pattern of `#define` / `const int` groups.
+
+**Simple enums (no associated data):**
+
+```
+type NodeKind: i32 =
+    // Declarations
+    FnDecl = 1
+    TypeDecl = 2
+    UseDecl = 3
+    LetDecl = 4
+    ExternFn = 5
+    CImport = 6
+    TraitDecl = 7
+    ImplDecl = 8
+    PoisonedDecl = 9
+
+    // Expressions
+    IntLit = 20
+    FloatLit = 21
+    StringLit = 22
+    BoolLit = 23
+    Ident = 24
+    Binary = 25
+    Unary = 26
+    Call = 27
+```
+
+**Syntax:**
+
+```
+enum_decl = 'type' IDENT ':' repr_type '='
+                indent (IDENT ['=' integer_literal]) ...
+```
+
+The `: i32` after the enum name is the **representation type**
+(the underlying integer type used to store the discriminant).
+Permitted representation types: `i8`, `i16`, `i32`, `i64`,
+`u8`, `u16`, `u32`, `u64`.
+
+**Auto-incrementing:** If a variant does not specify a discriminant,
+it receives the previous variant's value plus one. The first
+variant defaults to 0 if unspecified.
+
+```
+type Color: u8 =
+    Red         // 0
+    Green       // 1
+    Blue        // 2
+
+type HttpStatus: u16 =
+    Ok = 200
+    Created = 201
+    NotFound = 404        // gap is fine
+    InternalError = 500
+```
+
+**Accessing the discriminant:** The discriminant value is accessible
+via an `as` cast to the representation type:
+
+```
+let kind = NodeKind.Binary
+let raw: i32 = kind as i32    // 25
+```
+
+**Constructing from integer:** Conversion from integer to enum
+requires explicit construction and is fallible:
+
+```
+let kind = NodeKind.from_int(25)   // Ok(.Binary)
+let bad = NodeKind.from_int(999)   // Err(.InvalidDiscriminant)
+```
+
+**Matching:** Discriminant enums support all standard pattern
+matching, including exhaustiveness checking:
+
+```
+match kind
+    .FnDecl -> handle_fn()
+    .TypeDecl -> handle_type()
+    .Binary -> handle_binary()
+    // ... compiler enforces all variants handled
+```
+
+**Enums with discriminants AND associated data:**
+
+Discriminant enums may also carry data per variant, combining
+the tag value with a payload:
+
+```
+type Instruction: u8 =
+    Nop = 0
+    Load(register: u8, address: u16) = 1
+    Store(register: u8, address: u16) = 2
+    Add(dst: u8, src: u8) = 3
+    Halt = 0xFF
+```
+
+When data is present, the enum is represented as a tagged union
+with the specified discriminant values as tags.
+
+**Flags / bitfield enums:**
+
+For bitwise-combinable flags, use `@[flags]`:
+
+```
+@[flags]
+type Permissions: u8 =
+    Read = 1
+    Write = 2
+    Execute = 4
+
+let rw = Permissions.Read | Permissions.Write
+```
+
+`@[flags]` changes the auto-increment rule: the first variant
+defaults to 1, and subsequent variants default to the previous
+value times 2 (left shift by one).
+
+```
+@[flags]
+type Mode: u32 =
+    Debug       // 1
+    Verbose     // 2
+    Trace       // 4
+    Profile     // 8
+```
+
+---
+
+## Before and After
+
+The current workaround in the self-hosted compiler:
+
+```
+// BEFORE: zero-arg functions as fake constants
+fn NK_FN_DECL -> i32: 1
+fn NK_TYPE_DECL -> i32: 2
+fn NK_USE_DECL -> i32: 3
+fn NK_BINARY -> i32: 25
+fn NK_UNARY -> i32: 26
+
+// Usage: C-style integer comparison
+if kind == NK_BINARY():
+    handle_binary()
+```
+
+With `const`:
+
+```
+// BETTER: named constants
+const NK_FN_DECL: i32 = 1
+const NK_TYPE_DECL: i32 = 2
+const NK_USE_DECL: i32 = 3
+const NK_BINARY: i32 = 25
+const NK_UNARY: i32 = 26
+
+// Usage: still integer comparison, but cleaner
+if kind == NK_BINARY:
+    handle_binary()
+```
+
+With discriminant enums:
+
+```
+// BEST: proper enum with exhaustive matching
+type NodeKind: i32 =
+    FnDecl = 1
+    TypeDecl = 2
+    UseDecl = 3
+    LetDecl = 4
+    ExternFn = 5
+    CImport = 6
+    TraitDecl = 7
+    ImplDecl = 8
+    PoisonedDecl = 9
+
+    IntLit = 20
+    FloatLit = 21
+    StringLit = 22
+    BoolLit = 23
+    Ident = 24
+    Binary = 25
+    Unary = 26
+    Call = 27
+    FieldAccess = 28
+    Index = 29
+    Block = 30
+    IfExpr = 31
+    Return = 32
+    LetBinding = 33
+    Assign = 34
+    While = 35
+    Loop = 36
+    For = 37
+    Break = 38
+    Continue = 39
+    Match = 40
+    Tuple = 41
+    ArrayLit = 42
+    StructLit = 43
+    Closure = 44
+    Cast = 45
+    Defer = 46
+    Pipeline = 47
+    Range = 48
+    Grouped = 49
+    CStringLit = 50
+    VariantShorthand = 51
+    WithExpr = 52
+    RecordUpdate = 53
+    EnumVariant = 54
+    Slice = 55
+    OptionalChain = 56
+    Await = 57
+    AsyncBlock = 58
+    Spawn = 59
+    Yield = 60
+    Comptime = 61
+    LetElse = 62
+    TupleDestructure = 63
+    ArrayComprehension = 64
+    AsyncScope = 65
+    SelectAwait = 66
+    PoisonedExpr = 69
+
+// Usage: exhaustive pattern matching
+match kind
+    .FnDecl -> handle_fn()
+    .Binary -> handle_binary()
+    .Call -> handle_call()
+    // ... compiler error if you miss a variant
+```
+
+**The enum form is the correct answer.** `const` is for standalone
+named values (buffer sizes, version strings, PI). Discriminant enums
+are for finite sets of related values with exhaustive matching.
+`NodeKind` is a finite set — it should always have been an enum.
+
+---
+
+## Reserved Keywords
+
+Add `const` to the reserved keyword list. It now appears in
+three positions:
+
+| Position | Meaning |
+|---|---|
+| `const X: T = expr` | Named compile-time constant |
+| `fn foo[const N: i32]` | Const generic parameter (reserved) |
+| (NOT a type qualifier) | `const` never modifies types or references |

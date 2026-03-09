@@ -2,22 +2,26 @@
 
 With is a systems language with a self-hosted compiler.
 
-This repository has two compiler implementations:
-- `bootstrap/` (Zig): trusted bootstrap compiler
-- `src/` (With): self-hosted compiler and backend
+The compiler is written in With and compiles itself. The repository includes a
+frozen Zig bootstrap compiler (`bootstrap/`) as a historical artifact — it is
+no longer used in the build pipeline.
 
 ## Requirements
 
-- Zig `0.15.x`
 - clang/LLVM toolchain available on PATH
 
 ## Build Flow (Staged)
 
-The compiler follows a staged selfhost model:
+The compiler follows a staged selfhost model. Each stage compiles the same
+source (`src/main.w`) using the previous stage as the seed:
 
-- Stage 0: `bootstrap/zig-out/bin/with` (emergency seed only)
-- Stage 1: self-host compiler built from the current selfhost seed
-- Stage 2: self-host compiler built by stage 1 (canonical compiler)
+- Seed: `src/main` (checked-in binary) or a prior selfhost checkpoint
+- Stage 1: selfhost compiler built from the seed
+- Stage 2: selfhost compiler built by stage 1 (canonical compiler)
+- Stage 3: selfhost compiler built by stage 2 (fixpoint verification)
+
+**Fixpoint:** Stage 2 and Stage 3 produce byte-identical binaries, proving the
+compiler is stable.
 
 Use the Make targets:
 
@@ -40,8 +44,6 @@ For reliable rebuilds on macOS/external-volume setups, staging uses:
 
 This prefers an existing selfhost compiler (`WITH`, `WITH_SELFHOST_SEED`, `out/bin/with`, `out/bin/with-stage2`, `out/bin/with-stage1`, or `with` on PATH), runs it from `/tmp`, and writes logs to `.with/build/.stage*.log`.
 
-Bootstrap is used only if no working selfhost seed can be found.
-
 ## Install
 
 Preferred (no sudo, fish):
@@ -62,15 +64,6 @@ sudo make install
 
 - stage2 self-host compiler as `with`
 - runtime files into `$(BINDIR)/runtime`
-
-One-time seed only (when no working `with` exists yet):
-
-```sh
-make install-bootstrap PREFIX=$HOME/.local
-```
-
-This installs the stage0 bootstrap compiler and its runtime only as a recovery seed. After seeding, use
-`make install` so your active compiler returns to the stage2 self-host compiler.
 
 ## Use
 
@@ -98,17 +91,10 @@ C emission path:
 
 ```sh
 with build --emit-c examples/hello.w -o hello.c
-zig cc -target <triple> -I runtime hello.c runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_<arch>.s -o hello
+cc -I runtime hello.c runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_aarch64.s -o hello
 ```
 
 ## Test
-
-Bootstrap harness tests:
-
-```sh
-./bootstrap/zig-out/bin/with test test/cases/
-./bootstrap/zig-out/bin/with test bootstrap/test/cases/
-```
 
 Wave11 driver/unit regression suite:
 
@@ -116,15 +102,23 @@ Wave11 driver/unit regression suite:
 ./scripts/run_wave11_driver_unit_tests.sh
 ```
 
+Fixpoint verification (stage2 == stage3):
+
+```sh
+./scripts/run_wave12_selfhost_fixpoint.sh
+```
+
 ## Repo Layout
 
 ```text
-bootstrap/           Zig bootstrap compiler
 src/                 self-hosted compiler (.w)
-src/compiler/        Zig-style architecture port layer (Compilation-first)
+src/main             binary seed (fixpoint-verified selfhost checkpoint)
+src/compiler/        Compilation-first architecture port layer
 runtime/             C runtime support
+lib/std/             standard library
 test/cases/          self-hosted behavior tests
-bootstrap/test/cases/ bootstrap parser/codegen tests
+bootstrap/           historical Zig bootstrap compiler (frozen, unused)
+bootstrap/test/cases/ legacy parser/codegen tests (used as test corpus)
 ```
 
 ## Troubleshooting
