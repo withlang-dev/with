@@ -7,13 +7,13 @@
 ### Prerequisites
 
 - macOS ARM64 (primary development platform)
-- LLVM 18+ (`brew install llvm@18`)
-- That's it. No Zig, no Rust, no special toolchains.
+- LLVM installed at `/usr/local/llvm` (override with `LLVM_PREFIX` env var)
+- Zig (optional, for cross-compilation via `--emit-c`)
 
 ### Clone and Build
 
 ```bash
-git clone https://github.com/cognitivecomputations/with.git
+git clone https://github.com/QuixiAI/with.git
 cd with
 make
 ```
@@ -25,7 +25,7 @@ output is `out/bin/with-stage2`.
 
 ```bash
 echo 'fn main: println("Hello, World!")' > /tmp/hello.w
-./out/bin/with-stage2 build /tmp/hello.w -o /tmp/hello
+./out/bin/with-stage2 build /tmp/hello.w
 /tmp/hello
 ```
 
@@ -96,7 +96,7 @@ lib/
 runtime/
     fiber.c             fiber runtime (C)
     fiber_asm_aarch64.s stack switching (ARM64 assembly)
-    llvm_bridge.c       LLVM-C API bridge
+    llvm_bridge.c       LLVM-C API bridge (statically linked into compiler)
     helpers.c           runtime helpers
 
 test/
@@ -137,7 +137,7 @@ made ambient by the prelude, not compiler builtins.
 ### Workflow
 
 1. Make your change.
-2. Rebuild: `./out/bin/with-stage2 build src/main.w -o out/bin/with-stage2-new`
+2. Rebuild: `make build`
 3. Run tests: `./scripts/run_tests.sh`
 4. If you changed the compiler, verify fixpoint (see below).
 5. Open a PR.
@@ -148,12 +148,10 @@ If your change touches the compiler itself (anything in `src/`),
 verify the compiler still reproduces itself:
 
 ```bash
-# Your new compiler compiles itself
-./out/bin/with-stage2-new build src/main.w -o out/bin/with-stage3-new
-
-# Stage 2 and Stage 3 must be identical
-diff out/bin/with-stage2-new out/bin/with-stage3-new && echo "FIXPOINT"
+make fixpoint
 ```
+
+This builds stage3 from stage2 and checks they are byte-identical.
 
 If fixpoint breaks, your change introduced nondeterminism. Common
 causes: hash map iteration order, pointer values in output,
