@@ -134,8 +134,7 @@ resolve_runtime_dir() {
   for candidate in \
     "${ROOT_DIR}/runtime" \
     "${ROOT_DIR}/src/runtime" \
-    "${compiler_dir}/runtime" \
-    "${ROOT_DIR}/bootstrap/zig-out/bin/runtime"; do
+    "${compiler_dir}/runtime"; do
     if [ -n "${candidate}" ] && [ -d "${candidate}" ] && [ -f "${candidate}/libwith_llvm_bridge.dylib" ]; then
       echo "${candidate}"
       return 0
@@ -203,28 +202,6 @@ emit_stage_entry_candidates() {
   local stage_name="$1"
   local compiler_bin="$2"
   local main_entry="${ROOT_DIR}/src/main.w"
-  local compat_entry="${ROOT_DIR}/src/main_emit_temp.w"
-  local bootstrap_entry="${ROOT_DIR}/src/bootstrap_main.w"
-
-  if is_bootstrap_seed "${compiler_bin}"; then
-    if [ -f "${bootstrap_entry}" ]; then
-      printf '%s\n' "${bootstrap_entry}"
-    fi
-    return 0
-  fi
-
-  if [ "$stage_name" = "stage1" ]; then
-    if [ -f "${main_entry}" ]; then
-      printf '%s\n' "${main_entry}"
-    fi
-    if [ -f "${compat_entry}" ]; then
-      printf '%s\n' "${compat_entry}"
-    fi
-    if [ -f "${bootstrap_entry}" ]; then
-      printf '%s\n' "${bootstrap_entry}"
-    fi
-    return 0
-  fi
 
   if [ -f "${main_entry}" ]; then
     printf '%s\n' "${main_entry}"
@@ -423,23 +400,6 @@ install_stage_binary() {
   mv -f "${tmp_bin}" "${dst_bin}"
 }
 
-ensure_bootstrap() {
-  if [ ! -x "${ROOT_DIR}/bootstrap/zig-out/bin/with" ]; then
-    echo "[bootstrap] building bootstrap compiler"
-    (cd "${ROOT_DIR}/bootstrap" && zig build)
-  fi
-}
-
-is_bootstrap_seed() {
-  local candidate="$1"
-  case "$candidate" in
-    "${ROOT_DIR}/bootstrap/zig-out/bin/with"|*/bootstrap/zig-out/bin/with)
-      return 0
-      ;;
-  esac
-  return 1
-}
-
 resolve_seed_compiler() {
   local candidate=""
   if [ -n "${WITH_SELFHOST_SEED:-}" ] && [ -x "${WITH_SELFHOST_SEED}" ]; then
@@ -451,20 +411,22 @@ resolve_seed_compiler() {
     "${STAGE2_BIN}" \
     "${CANONICAL_BIN}" \
     "${STAGE1_BIN}"; do
-    if [ -n "$candidate" ] && [ -x "$candidate" ] && ! is_bootstrap_seed "$candidate"; then
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
       echo "$candidate"
     fi
   done
 
   candidate="$(command -v with 2>/dev/null || true)"
-  if [ -n "$candidate" ] && [ -x "$candidate" ] && ! is_bootstrap_seed "$candidate"; then
+  if [ -n "$candidate" ] && [ -x "$candidate" ]; then
     echo "$candidate"
   fi
 
   emit_workspace_seed_candidates
 
-  ensure_bootstrap
-  echo "${ROOT_DIR}/bootstrap/zig-out/bin/with"
+  # Last resort: binary seed checked into the repo (fixpoint-verified checkpoint)
+  if [ -x "${ROOT_DIR}/src/main" ]; then
+    echo "${ROOT_DIR}/src/main"
+  fi
 }
 
 ensure_out_layout() {

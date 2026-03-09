@@ -6,15 +6,10 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/parity_states.sh"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
-STAGE0_BIN="./bootstrap/zig-out/bin/with"
+# selfhost seed checkpoint
+STAGE0_BIN="${ROOT_DIR:-./}/src/main"
 SELFHOST_BIN="./out/bin/with-stage2"
 CORPUS_FILE="test/annoyances/async_parity_corpus.txt"
-
-echo "building bootstrap compiler for fix_more_annoyances async parity..."
-(
-  cd bootstrap
-  zig build -Doptimize=Debug >/dev/null
-)
 
 if [[ ! -x "$SELFHOST_BIN" ]]; then
   if [[ -x "./out/bin/with-stage1" ]]; then

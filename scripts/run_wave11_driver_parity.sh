@@ -6,7 +6,8 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/parity_states.sh"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
-STAGE0_BIN="${ROOT_DIR}/bootstrap/zig-out/bin/with"
+# selfhost seed checkpoint
+STAGE0_BIN="${ROOT_DIR:-./}/src/main"
 SELFHOST_BIN="${ROOT_DIR}/out/bin/with-stage2"
 CORPUS_FILE="test/wave11/driver_corpus.txt"
 VERIFY_COVERAGE_SCRIPT="scripts/verify_wave11_coverage.sh"
@@ -14,12 +15,6 @@ CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 RUN_TIMEOUT_SECS="${PARITY_RUN_TIMEOUT_SECS:-25}"
 CLI_TIMEOUT_SECS="${PARITY_CLI_TIMEOUT_SECS:-25}"
 MODE_TIMEOUT_SECS="${PARITY_MODE_TIMEOUT_SECS:-40}"
-
-echo "building bootstrap compiler for Wave 11 driver parity..."
-(
-  cd bootstrap
-  zig build -Doptimize=Debug >/dev/null
-)
 
 echo "rebuilding self-host compiler for Wave 11 driver parity..."
 ./scripts/rebuild_selfhost.sh stage2 >/dev/null

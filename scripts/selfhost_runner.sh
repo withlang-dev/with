@@ -56,8 +56,7 @@ prepare_selfhost_runner() {
 
   for cand in \
     "${root_dir}/runtime/libwith_llvm_bridge.dylib" \
-    "${root_dir}/.with/build/runtime/libwith_llvm_bridge.dylib" \
-    "${root_dir}/bootstrap/zig-out/bin/runtime/libwith_llvm_bridge.dylib"; do
+    "${root_dir}/.with/build/runtime/libwith_llvm_bridge.dylib"; do
     if [[ -f "$cand" ]]; then
       dylib_path="$cand"
       break
