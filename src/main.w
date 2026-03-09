@@ -1,6 +1,5 @@
 // CLI entry point for With compiler.
 
-use Compilation
 use Lexer
 use Token
 use Ast
@@ -10,6 +9,7 @@ use Parser
 use InternPool
 use Diagnostic
 use Source
+use Compilation
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
@@ -125,60 +125,57 @@ fn cli_prelude_mode(argc: i32) -> i32:
     mode
 
 fn parse_cli_options(argc: i32) -> CliOptions:
-    CliOptions {
-        command: cli_command(argc),
-        source_file: find_source_arg(argc),
-        output_path: find_output_arg(argc),
-        opt_level: cli_opt_level(argc),
-        no_std: cli_has_flag(argc, "--no-std") or cli_has_flag(argc, "--freestanding"),
-        alloc_mode: cli_has_flag(argc, "--alloc"),
-        dump_tokens_flag: cli_has_flag(argc, "--dump-tokens"),
-        dump_ast_flag: cli_has_flag(argc, "--dump-ast"),
-        dump_resolved_flag: cli_has_flag(argc, "--dump-resolved"),
-        dump_typed_flag: cli_has_flag(argc, "--dump-typed"),
-        dump_mir_flag: cli_has_flag(argc, "--dump-mir"),
-        dump_async_mir_flag: cli_has_flag(argc, "--dump-async-mir"),
-        deterministic_mode: cli_has_flag(argc, "--deterministic"),
-        emit_c_mode: cli_has_flag(argc, "--emit-c"),
-        prelude_mode: cli_prelude_mode(argc),
-    }
+    var opts = cli_options_default()
+    opts.command = cli_command(argc)
+    opts.source_file = find_source_arg(argc)
+    opts.output_path = find_output_arg(argc)
+    opts.opt_level = cli_opt_level(argc)
+    opts.no_std = cli_has_flag(argc, "--no-std") or cli_has_flag(argc, "--freestanding")
+    opts.alloc_mode = cli_has_flag(argc, "--alloc")
+    opts.dump_tokens_flag = cli_has_flag(argc, "--dump-tokens")
+    opts.dump_ast_flag = cli_has_flag(argc, "--dump-ast")
+    opts.dump_resolved_flag = cli_has_flag(argc, "--dump-resolved")
+    opts.dump_typed_flag = cli_has_flag(argc, "--dump-typed")
+    opts.dump_mir_flag = cli_has_flag(argc, "--dump-mir")
+    opts.dump_async_mir_flag = cli_has_flag(argc, "--dump-async-mir")
+    opts.deterministic_mode = cli_has_flag(argc, "--deterministic")
+    opts.emit_c_mode = cli_has_flag(argc, "--emit-c")
+    opts.prelude_mode = cli_prelude_mode(argc)
+    opts
 
 fn tokenize_text(text: str) -> TokenList:
     var lexer = Lexer.init(text, 0)
     return lexer.tokenize()
 
-fn run_cli(argc: i32, opts: CliOptions) -> i32:
-    let command = opts.command
-    let source_file = opts.source_file
-    let opt_level = opts.opt_level
-    let no_std = opts.no_std
-    let alloc_mode = opts.alloc_mode
-    let emit_c_mode = opts.emit_c_mode
-    let output_path = opts.output_path
-    let prelude_mode = opts.prelude_mode
-    let deterministic_mode = opts.deterministic_mode
-    let dump_tokens_flag = opts.dump_tokens_flag
-    let dump_ast_flag = opts.dump_ast_flag
-    let dump_resolved_flag = opts.dump_resolved_flag
-    let dump_typed_flag = opts.dump_typed_flag
-    let dump_mir_flag = opts.dump_mir_flag
-    let dump_async_mir_flag = opts.dump_async_mir_flag
+fn run_cli(argc: i32) -> i32:
+    let opt_level = cli_opt_level(argc)
+    let no_std = cli_has_flag(argc, "--no-std") or cli_has_flag(argc, "--freestanding")
+    let alloc_mode = cli_has_flag(argc, "--alloc")
+    let emit_c_mode = cli_has_flag(argc, "--emit-c")
+    let prelude_mode = cli_prelude_mode(argc)
+    let deterministic_mode = cli_has_flag(argc, "--deterministic")
+    let dump_tokens_flag = cli_has_flag(argc, "--dump-tokens")
+    let dump_ast_flag = cli_has_flag(argc, "--dump-ast")
+    let dump_resolved_flag = cli_has_flag(argc, "--dump-resolved")
+    let dump_typed_flag = cli_has_flag(argc, "--dump-typed")
+    let dump_mir_flag = cli_has_flag(argc, "--dump-mir")
+    let dump_async_mir_flag = cli_has_flag(argc, "--dump-async-mir")
 
-    if command == "build":
-        return run_build_command(source_file, opt_level, no_std, alloc_mode, emit_c_mode, output_path, prelude_mode)
-    if command == "run":
+    if cli_command(argc) == "build":
+        return run_build_command(find_source_arg(argc), opt_level, no_std, alloc_mode, emit_c_mode, find_output_arg(argc), prelude_mode)
+    if cli_command(argc) == "run":
         if emit_c_mode:
             with_eprintln("error: '--emit-c' is only supported with 'build'")
             return 1
-        return run_run_command(source_file, opt_level, no_std, alloc_mode, prelude_mode)
-    if command == "ir":
-        if source_file == "":
+        return run_run_command(find_source_arg(argc), opt_level, no_std, alloc_mode, prelude_mode)
+    if cli_command(argc) == "ir":
+        if find_source_arg(argc) == "":
             with_eprintln("error: 'ir' requires a source file argument")
             return 1
         var comp = Compilation.init()
         comp.configure(opt_level, no_std, alloc_mode)
         comp.set_prelude_mode(prelude_mode)
-        let pool = comp.compile_file(source_file)
+        let pool = comp.compile_file(find_source_arg(argc))
         if pool.decl_count() == 0:
             with_eprintln("error: IR generation failed during compilation")
             return 1
@@ -186,71 +183,72 @@ fn run_cli(argc: i32, opts: CliOptions) -> i32:
         if not ok:
             return 1
         return 0
-    if command == "ast":
-        if source_file == "":
+    if cli_command(argc) == "ast":
+        if find_source_arg(argc) == "":
             with_eprintln("error: 'ast' requires a source file argument")
             return 1
-        return dump_ast(source_file, no_std, alloc_mode, deterministic_mode)
-    if command == "check":
-        if source_file == "":
+        return dump_ast(find_source_arg(argc), no_std, alloc_mode, deterministic_mode)
+    if cli_command(argc) == "check":
+        if find_source_arg(argc) == "":
             with_eprintln("error: 'check' requires a source file argument")
             return 1
         if dump_tokens_flag:
-            let rc_tokens = dump_tokens(source_file, true)
+            let rc_tokens = dump_tokens(find_source_arg(argc), true)
             if rc_tokens != 0:
                 return rc_tokens
             if not dump_ast_flag:
                 return 0
         if dump_ast_flag:
-            return dump_ast(source_file, no_std, alloc_mode, true)
+            return dump_ast(find_source_arg(argc), no_std, alloc_mode, true)
         if dump_resolved_flag:
-            return dump_resolved_artifact(source_file, no_std, alloc_mode, prelude_mode)
+            return dump_resolved_artifact(find_source_arg(argc), no_std, alloc_mode, prelude_mode)
         if dump_typed_flag:
-            return dump_typed_artifact(source_file, no_std, alloc_mode, prelude_mode)
+            return dump_typed_artifact(find_source_arg(argc), no_std, alloc_mode, prelude_mode)
         if dump_mir_flag:
-            return dump_mir_artifact(source_file, no_std, alloc_mode, prelude_mode)
+            return dump_mir_artifact(find_source_arg(argc), no_std, alloc_mode, prelude_mode)
         if dump_async_mir_flag:
-            return dump_async_mir_artifact(source_file, no_std, alloc_mode, prelude_mode)
+            return dump_async_mir_artifact(find_source_arg(argc), no_std, alloc_mode, prelude_mode)
         var comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode)
         comp.set_prelude_mode(prelude_mode)
-        let pool = comp.compile_file(source_file)
+        let pool = comp.compile_file(find_source_arg(argc))
         if pool.decl_count() == 0:
             with_eprintln("error: check failed during compilation")
             return 1
         print("ok\n")
         comp.print_warnings()
         return 0
-    if command == "tokens":
-        if source_file == "":
+    if cli_command(argc) == "tokens":
+        if find_source_arg(argc) == "":
             with_eprintln("error: 'tokens' requires a source file argument")
             return 1
-        return dump_tokens(source_file, deterministic_mode)
-    if command == "test":
+        return dump_tokens(find_source_arg(argc), deterministic_mode)
+    if cli_command(argc) == "test":
         return run_test_command(argc, opt_level, no_std, alloc_mode, prelude_mode)
-    if command == "version" or command == "--version":
+    if cli_command(argc) == "version" or cli_command(argc) == "--version":
         print("with 0.0.1\n")
         return 0
-    if command == "help" or command == "--help" or command == "-h":
+    if cli_command(argc) == "help" or cli_command(argc) == "--help" or cli_command(argc) == "-h":
         print_usage()
         return 0
-    if command == "clean":
+    if cli_command(argc) == "clean":
         return run_clean_command()
-    if command == "lsp":
+    if cli_command(argc) == "lsp":
         with_eprintln("error: LSP not yet available in self-hosted compiler")
         return 1
-    if command == "migrate":
+    if cli_command(argc) == "migrate":
         with_eprintln("error: migrate not yet available in self-hosted compiler")
         return 1
-    if command == "repl":
+    if cli_command(argc) == "repl":
         with_eprintln("error: REPL not yet available in self-hosted compiler")
         return 1
-    if command == "doc":
+    if cli_command(argc) == "doc":
         with_eprintln("error: doc not yet available in self-hosted compiler")
         return 1
-    if command == "fmt":
+    if cli_command(argc) == "fmt":
         with_eprintln("error: fmt not yet available in self-hosted compiler")
         return 1
+    let command = cli_command(argc)
     with_eprintln("error: unknown command '" ++ command ++ "'")
     print_usage()
     1
@@ -262,8 +260,7 @@ fn main -> void:
     if argc < 2:
         print_usage()
         return
-    let opts = parse_cli_options(argc)
-    exit(run_cli(argc, opts))
+    exit(run_cli(argc))
 
 // ── Command implementations ──────────────────────────────────────
 

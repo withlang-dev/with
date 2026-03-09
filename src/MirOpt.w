@@ -9,8 +9,6 @@
 // dead-field elimination, and move elision.
 
 // Call kinds
-use std.prelude_core
-
 fn CK_DYN_DISPATCH -> i32: 0
 fn CK_DIRECT -> i32: 1
 

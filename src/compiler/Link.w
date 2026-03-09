@@ -1,5 +1,3 @@
-use std.prelude_core
-
 extern fn with_system(cmd: str) -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_read_file(path: str) -> str

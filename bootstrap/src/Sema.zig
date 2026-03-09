@@ -1598,6 +1598,15 @@ pub fn resolveTypeExpr(self: *Sema, te: *const Ast.TypeExpr) TypeId {
     return switch (te.kind) {
         .named => |sym| {
             if (self.named_types.get(sym)) |tid| return tid;
+            // Accept single-letter uppercase names (T, E, K, V, …) as
+            // opaque type parameters.  In extern declarations these
+            // represent "any pointer / reference target"; mapping them to
+            // i8 so *T becomes *i8 (opaque byte pointer), matching
+            // HashMap.ptr's *const i8 field type.
+            const name = self.pool.resolve(sym);
+            if (name.len == 1 and name[0] >= 'A' and name[0] <= 'Z') {
+                return self.ty_i8;
+            }
             self.emitError("unknown type", te.span);
             return error_type;
         },

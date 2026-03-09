@@ -3,14 +3,10 @@
 // Single source of truth for interned symbols, types, and values.
 // Identity is ID-based, and canonicalization is key-string based.
 
-use std.prelude_core
-
 use compiler.foundation.Ids
 use compiler.foundation.Types
 use compiler.foundation.Values
 
-extern fn with_vec_new_out(v: &T, elem_size: i64) -> void
-extern fn with_hashmap_new_out(out: &T, key_size: i64, val_size: i64) -> void
 extern fn with_hashmap_new_at(base: &T, offset: i64, key_size: i64, val_size: i64) -> void
 
 type InternPool = {
@@ -28,8 +24,7 @@ type InternPool = {
 }
 
 fn foundation_new_map_str_i32 -> HashMap[str, i32]:
-    let map: HashMap[str, i32] = HashMap { ptr: 0 }
-    with_hashmap_new_out(&map, 16, 4)
+    let map: HashMap[str, i32] = HashMap.new()
     map
 
 fn foundation_intern_text_eq(a: str, b: str) -> bool:
@@ -43,12 +38,9 @@ fn foundation_intern_text_eq(a: str, b: str) -> bool:
     true
 
 fn InternPool.init -> InternPool:
-    let symbol_texts: Vec[str] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_vec_new_out(&symbol_texts, 16)
-    let type_keys: Vec[TypeKey] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_vec_new_out(&type_keys, 24)
-    let value_keys: Vec[ValueKey] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_vec_new_out(&value_keys, 24)
+    let symbol_texts: Vec[str] = Vec.new()
+    let type_keys: Vec[TypeKey] = Vec.new()
+    let value_keys: Vec[ValueKey] = Vec.new()
     let symbol_map = foundation_new_map_str_i32()
     let type_map = foundation_new_map_str_i32()
     let value_map = foundation_new_map_str_i32()

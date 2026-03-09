@@ -2,10 +2,8 @@
 //
 // Root `Source` now follows the foundation implementation shape.
 
-use std.prelude_core
-
 extern fn with_fs_read_file(path: str) -> str
-extern fn with_vec_new_out(v: &Vec[i32], elem_size: i64) -> void
+
 extern fn with_vec_push_i32(v: &Vec[i32], val: i32) -> void
 
 type Source = {
@@ -77,8 +75,7 @@ fn Source.line_text(self: Source, line: i32) -> str:
     slice
 
 fn source_compute_line_offsets(text: str) -> Vec[i32]:
-    let offsets: Vec[i32] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_vec_new_out(&offsets, 4)
+    let offsets: Vec[i32] = Vec.new()
     with_vec_push_i32(&offsets, 0)
     for i in 0..text.len():
         if text[i] == 10:

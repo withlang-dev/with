@@ -4,8 +4,6 @@
 // and a span pointing back into the source text. Literal values and
 // identifier text are recovered from the source via the span.
 
-use std.prelude_core
-
 use Span
 
 // All token kinds produced by the lexer.

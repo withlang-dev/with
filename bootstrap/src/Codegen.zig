@@ -693,28 +693,14 @@ pub fn genModule(self: *Codegen, module: *const Ast.Module, pool: *InternPool) E
 fn verify(self: *const Codegen) Error!void {
     var err_msg: [*c]u8 = null;
     if (c.LLVMVerifyModule(self.module, c.LLVMReturnStatusAction, &err_msg) != 0) {
+        // Dump IR before reporting error so we can investigate.
+        _ = c.LLVMPrintModuleToFile(self.module, "/tmp/bootstrap_verify_fail.ll", null);
         if (err_msg) |msg| {
             const slice = std.mem.span(msg);
-            var buf: [8192]u8 = undefined;
-            var w = std.fs.File.stderr().writer(&buf);
-            w.interface.print("LLVM verify error: {s}\n", .{slice}) catch {};
-            w.interface.flush() catch {};
+            // Print the full verification error to stderr.
+            std.fs.File.stderr().writeAll(slice) catch {};
+            std.fs.File.stderr().writeAll("\n") catch {};
             c.LLVMDisposeMessage(msg);
-        }
-        // Best-effort: identify which function fails verification.
-        var fn_val = c.LLVMGetFirstFunction(self.module);
-        while (fn_val != null) : (fn_val = c.LLVMGetNextFunction(fn_val)) {
-            if (c.LLVMIsDeclaration(fn_val) != 0) continue;
-            if (c.LLVMVerifyFunction(fn_val, c.LLVMReturnStatusAction) != 0) {
-                var name_len: usize = 0;
-                const name_ptr = c.LLVMGetValueName2(fn_val, &name_len);
-                const name_slice: []const u8 = if (name_ptr != null) name_ptr[0..name_len] else "<unknown>";
-                var buf2: [1024]u8 = undefined;
-                var w2 = std.fs.File.stderr().writer(&buf2);
-                w2.interface.print("LLVM verify function: {s}\n", .{name_slice}) catch {};
-                w2.interface.flush() catch {};
-                break;
-            }
         }
         return error.VerifyFailed;
     }
@@ -5776,11 +5762,11 @@ fn getOrCreateVecType(self: *Codegen, elem_type: c.LLVMTypeRef) Error!VecTypeInf
     const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
     const i64_type = c.LLVMInt64TypeInContext(self.context);
 
-    var body_types = [_]c.LLVMTypeRef{ ptr_type, i64_type, i64_type };
+    var body_types = [_]c.LLVMTypeRef{ ptr_type, i64_type, i64_type, i64_type };
     var name_buf: [64]u8 = undefined;
     const name_z = std.fmt.bufPrintZ(&name_buf, "__with.Vec.{x}", .{key}) catch return error.CodegenAlloc;
     const llvm_type = c.LLVMStructCreateNamed(self.context, name_z);
-    c.LLVMStructSetBody(llvm_type, &body_types, 3, 0);
+    c.LLVMStructSetBody(llvm_type, &body_types, 4, 0);
 
     const info = VecTypeInfo{ .llvm_type = llvm_type, .elem_type = elem_type };
     self.vec_type_cache.put(self.allocator, key, info) catch return error.CodegenAlloc;
@@ -5846,13 +5832,17 @@ fn genVecNew(self: *Codegen, elem_type: c.LLVMTypeRef) Error!c.LLVMValueRef {
     const ptr_type = c.LLVMPointerTypeInContext(self.context, 0);
     const i64_type = c.LLVMInt64TypeInContext(self.context);
     const alloca = c.LLVMBuildAlloca(self.builder, vec_info.llvm_type, "vec");
-    // ptr = null, len = 0, cap = 0
+    // ptr = null, len = 0, cap = 0, elem_size = sizeof(elem)
     const ptr_gep = c.LLVMBuildStructGEP2(self.builder, vec_info.llvm_type, alloca, 0, "");
     _ = c.LLVMBuildStore(self.builder, c.LLVMConstNull(ptr_type), ptr_gep);
     const len_gep = c.LLVMBuildStructGEP2(self.builder, vec_info.llvm_type, alloca, 1, "");
     _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), len_gep);
     const cap_gep = c.LLVMBuildStructGEP2(self.builder, vec_info.llvm_type, alloca, 2, "");
     _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, 0, 0), cap_gep);
+    const elem_size_gep = c.LLVMBuildStructGEP2(self.builder, vec_info.llvm_type, alloca, 3, "");
+    const dl = c.LLVMGetModuleDataLayout(self.module);
+    const elem_sz = c.LLVMABISizeOfType(dl, elem_type);
+    _ = c.LLVMBuildStore(self.builder, c.LLVMConstInt(i64_type, elem_sz, 0), elem_size_gep);
     return c.LLVMBuildLoad2(self.builder, vec_info.llvm_type, alloca, "vec.val");
 }
 
@@ -8375,7 +8365,14 @@ fn genIfExpr(self: *Codegen, if_e: Ast.IfExpr) Error!c.LLVMValueRef {
         const then_type = c.LLVMTypeOf(then_val);
         const else_type = c.LLVMTypeOf(else_val);
         if (then_type != else_type) {
-            if (self.isResultType(then_type) and !self.isResultType(else_type)) {
+            const void_type = c.LLVMVoidTypeInContext(self.context);
+            if (then_type == void_type and else_type != void_type) {
+                // Then branch is void, else is not: treat as void statement.
+                return c.LLVMGetUndef(void_type);
+            } else if (else_type == void_type and then_type != void_type) {
+                // Else branch is void, then is not: treat as void statement.
+                return c.LLVMGetUndef(void_type);
+            } else if (self.isResultType(then_type) and !self.isResultType(else_type)) {
                 // Wrap else in Ok.
                 c.LLVMPositionBuilderAtEnd(self.builder, else_end_bb);
                 c.LLVMInstructionEraseFromParent(c.LLVMGetBasicBlockTerminator(else_end_bb));
@@ -8391,6 +8388,10 @@ fn genIfExpr(self: *Codegen, if_e: Ast.IfExpr) Error!c.LLVMValueRef {
                 _ = c.LLVMBuildBr(self.builder, merge_bb);
                 c.LLVMPositionBuilderAtEnd(self.builder, merge_bb);
                 phi_type = else_type;
+            } else {
+                // Types differ but neither is void/Result: coerce the else to match.
+                final_else = c.LLVMGetUndef(then_type);
+                phi_type = then_type;
             }
         }
     }

@@ -3,8 +3,6 @@
 // This module owns the MIR in-memory representation used after semantic
 // analysis. MIR is intentionally explicit and deterministic.
 
-use std.prelude_core
-
 use Ast
 use InternPool
 use Sema
@@ -15,10 +13,10 @@ extern fn str_from_byte(b: i32) -> str
 extern fn print(s: str) -> void
 
 fn lbrace -> str:
-    str_from_byte123
+    str_from_byte(123)
 
 fn rbrace -> str:
-    str_from_byte125
+    str_from_byte(125)
 
 // ── Statement kinds ──────────────────────────────────────────────
 

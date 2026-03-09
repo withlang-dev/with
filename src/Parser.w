@@ -3,8 +3,6 @@
 // Consumes a TokenList and produces nodes in an AstPool.
 // On parse errors, emits a diagnostic and recovers to next top-level decl.
 
-use std.prelude_core
-
 use Ast
 use Token
 use Span
@@ -3053,7 +3051,7 @@ fn Parser.parse_optional_where_clause(self: Parser):
 fn parse_int(text: str) -> i32:
     let value = parse_i64(text)
     if value < -2147483648:
-        return -2147483648
+        return (0 - 2147483648) as i32
     if value > 2147483647:
         return 2147483647
     value as i32
