@@ -26,3 +26,11 @@ pub fn println_bool(v: bool) -> void:
 pub fn assert(cond: bool) -> void:
     if not cond:
         with_panic("assertion failed", "", 0)
+
+pub fn require(cond: bool, msg: str) -> void:
+    if not cond:
+        with_panic(msg, "", 0)
+
+pub fn check(cond: bool, msg: str) -> void:
+    if not cond:
+        with_panic(msg, "", 0)

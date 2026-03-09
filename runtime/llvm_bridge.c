@@ -211,6 +211,9 @@ int64_t wl_add_function(int64_t m, with_str name, int64_t fn_type) {
 int64_t wl_get_named_function(int64_t m, with_str name) {
     return P2I(LLVMGetNamedFunction(M(m), to_cstr(name)));
 }
+int64_t wl_get_named_global(int64_t m, with_str name) {
+    return P2I(LLVMGetNamedGlobal(M(m), to_cstr(name)));
+}
 int64_t wl_get_first_function(int64_t m) { return P2I(LLVMGetFirstFunction(M(m))); }
 int64_t wl_get_next_function(int64_t v)  { return P2I(LLVMGetNextFunction(V(v))); }
 int32_t wl_is_declaration(int64_t v)     { return LLVMIsDeclaration(V(v)); }

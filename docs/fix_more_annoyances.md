@@ -21,7 +21,56 @@
 ## 2. Compiler/Runtime Parity Tasks (for spec correctness)
 - [x] Audit current parser/sema/codegen behavior for `(task_a, task_b).await`.
 - [x] Implement tuple-await typing rules if any gaps exist.
-- [x] Implement tuple-await lowering/runtime join behavior if any gaps exist.
+- [x] Implement async function codegen (fiber trampoline pattern) and gen_await.
+      Async functions now generate impl/trampoline/spawn wrapper. gen_await
+      calls `with_fiber_await` and unpacks i64 result. Tuple await supported.
+      Async blocks with captures still deferred.
+
+      ### 2a. Async Runtime Function Declarations (`src/Codegen.w`) — DONE
+      Implemented `ensure_async_runtime_declared()` which lazily declares all fiber
+      runtime functions: `with_runtime_init/run/shutdown`, `with_fiber_spawn/await/
+      cancel/set_result/yield/select`. Also added `ensure_malloc_declared()` for
+      args struct heap allocation, `pack_result_to_i64`, `unpack_result_from_i64`.
+
+      ### 2b. Async Function Declaration (`src/Codegen.w`) — DONE
+      Implemented `declare_async_function()` and `gen_async_function()`:
+      - [x] `declare_async_function`: creates `name_async` (impl), `name_fiber`
+            (trampoline), `name` (spawn wrapper) LLVM functions.
+      - [x] `gen_async_function`: generates bodies for all three:
+            impl runs the body, trampoline loads args + calls impl + sets result,
+            spawn wrapper mallocs args struct + stores params + calls `with_fiber_spawn`.
+      - [x] Pass 1 routes FN_FLAG_ASYNC to `declare_async_function`.
+      - [x] Pass 2 routes FN_FLAG_ASYNC to `gen_async_function`.
+
+      ### 2c. Implement `gen_await` for Single Task (`src/Codegen.w`) — DONE
+      - [x] Evaluates inner expression → task ID (i32).
+      - [x] Calls `with_fiber_await(task_id)` → i64.
+      - [x] Unpacks i64 to expected type (i32 trunc, i64 passthrough, ptr inttoptr).
+
+      ### 2d. Implement `gen_await` for Tuple Case (`src/Codegen.w`) — DONE
+      - [x] Detects NK_TUPLE in await node.
+      - [x] For each element: gen_expr → task_id → with_fiber_await → unpack.
+      - [x] Builds result tuple via insert_value.
+
+      ### 2e. Implement `gen_async_block` — DEFERRED
+      Async blocks with local capture require closure-like codegen (walk body to
+      find captured locals, create capture struct, etc.). Kept as passthrough stub
+      for now. Simple async blocks (no captures) work via async fn wrapping.
+
+      ### 2f. Implement `gen_spawn` — KEPT AS IS
+      Spawn evaluates inner expression (async fn call) which already returns task
+      ID. The existing passthrough is correct.
+
+      ### 2g. Tests — PARTIAL
+      - [x] `test/wave9/cases/runtime_linkage_async_ok.w` — single async fn + await.
+      - [x] `test/cases/async_basic.w` — multi-param async fn, multiple awaits.
+      - [x] Stage chain passes with async codegen changes.
+      - [ ] Tuple await runtime test (needs real concurrent workload).
+      - [ ] Async block with captures test (deferred to 2e).
+
+      ### 2h. Linker Fix (`src/compiler/Link.w`)
+      - [x] Added `_with_fiber_` symbol detection to `link_stage_object_needs_fiber_runtime`
+            so fiber.o/fiber_asm.o are linked when async functions generate fiber calls.
 - [x] Add diagnostics for invalid tuple-await arity and non-task tuple elements.
 - [x] Validate tuple-await + `?` behavior for tuple-of-`Result` tasks.
 
@@ -47,6 +96,8 @@ Implementation note:
 
 ## 4. Stdlib Docs
 - [x] Add `lib/std/async/` documentation pages for each public function.
+      All pages exist: `await_all.md`, `await_first.md`, `await_any.md`,
+      `await_settled.md`, `with_concurrency.md`, and `README.md`.
 - [x] Document empty-input behavior for `await_first` and `await_any`.
 - [x] Document cancellation, ordering, and complexity guarantees.
 - [x] Include pipeline-first examples matching spec/guide wording.
@@ -100,45 +151,197 @@ Locked decisions:
 - [x] Spec text and guide behavior mismatches are explicitly tracked as `KNOWN_DIVERGENCE` (no silent exclusions).
 
 ## 9. Implicit `.iter()` via `IntoIter`
+
+Spec text exists (§4.2 implicit `.iter()` insertion for `for` loops).
+`IntoIter` trait is registered in sema as a prelude builtin.
+Stdlib async combinators use `impl IntoIter[T]` signatures.
+
 - [x] Update iterator-facing stdlib pipeline functions (`map`, `filter`, `count`, and peers) to accept `impl IntoIter[T]` instead of `Iter[T]`.
-- [x] Add compiler behavior to insert implicit `.iter()` when a collection is piped into an iterator function.
+- [ ] Add compiler behavior to insert implicit `.iter()` when a collection is piped into an iterator function.
+      BLOCKED: Parser doesn't support generic trait parameters (`trait Iter[T]`).
+      Depends on Section 13a (trait definitions for `Iter[T]` and `IntoIter[T]`).
+
+      ### 9a. Rewrite `lib/std/iter.w` to Use `Iter[T]` Trait
+      Currently iter.w has concrete functions: `sum(arr: Vec[i32])`, `map(arr: Vec[str], f)`,
+      `filter(arr: Vec[i32], pred)`, `count[T](arr: [T])`, `contains(arr: [i32], target)`.
+      These need to accept `Iter[T]` once the trait exists.
+      - [ ] After Section 13a lands, add `impl IntoIter[i32] for Vec[i32]` and peers in `lib/std/collections.w`.
+            Method: `fn iter(self: Vec[T]) -> VecIter[T]` returning a `VecIter` wrapper.
+      - [ ] Define `type VecIter[T] = { ptr: *const T, len: i64, idx: i64 }` in `lib/std/collections.w`.
+      - [ ] Implement `impl Iter[T] for VecIter[T]` with `fn next(self: &mut VecIter[T]) -> Option[T]`.
+      - [ ] Rewrite `sum`, `map`, `filter` to accept `impl Iter[T]` or `impl IntoIter[T]`.
+      - [ ] Keep `count[T](arr: [T])` and `contains` working for arrays (overload or separate).
+
+      ### 9b. Implicit `.iter()` Insertion in Sema (`src/Sema.w`)
+      Rule: if a value of type T is passed where `Iter[U]` or `impl IntoIter[U]` is expected,
+      and T implements `IntoIter[U]`, insert `.iter()` call.
+      Restricted to known stdlib iterator functions — NOT general implicit conversion.
+      - [ ] In `check_call_args` (or `check_pipe_expr`), detect type mismatch where:
+            callee expects `Iter[T]`/`impl IntoIter[T]` but argument is a collection type.
+      - [ ] Look up `IntoIter` impl on the argument type via `select_trait_impl`.
+      - [ ] If found, rewrite the argument node to wrap in `.iter()` method call.
+      - [ ] Ensure explicit `.iter()` calls still work (no double-insertion).
+
+      ### 9c. Tests
+      - [ ] Add test: `Vec[i32] |> sum` works without explicit `.iter()`.
+      - [ ] Add test: `vec.iter() |> sum` still works (explicit, no regression).
+      - [ ] Add test: `[1, 2, 3] |> filter(fn(x) x > 1) |> count` works.
+      - [ ] Add test: custom type with `IntoIter` impl works in pipeline.
+      - [ ] Add test: type without `IntoIter` piped to iterator fn is a compile error.
+
 - [x] Preserve explicit `.iter()` behavior (no regression) and keep method-resolution deterministic.
-- [x] Add tests for `Vec`, slice, array, and map/set pipelines without explicit `.iter()`.
+- [ ] Add tests for `Vec`, slice, array, and map/set pipelines without explicit `.iter()`.
+      Blocked on 9a-9c above.
 - [x] Document this as ergonomics behavior in guides (no new syntax).
 
-## 10. Drop `collect` When Target Type Is Known
-- [x] Define destination contexts that trigger auto-collect: typed `let`, function return position, and typed call-argument position.
-- [x] Implement pipeline terminus inference so iterator pipelines materialize into the known destination collection type automatically.
-- [x] Keep explicit `collect[...]` available and required when destination type is unknown or ambiguous.
-- [x] Add diagnostics for unresolved destination type (ask for explicit `collect[...]`).
-- [x] Add tests for success and ambiguity/error cases.
+## 10. Drop `collect` When Target Type Is Known (REMOVED)
 
-## 11. Implicit `self` in `extend`/`impl`
-- [x] Allow methods in `extend`/`impl` blocks to omit explicit first `self` parameter.
-- [x] Infer `self` mode from usage: read-only -> `&Self`, mutation -> `&mut Self`, move/consume -> `Self`.
-- [x] Lower inferred `self` to explicit internal method signature before downstream phases.
-- [x] Add diagnostics for conflicting self-mode usage in one method body.
-- [x] Preserve compatibility for methods that still declare explicit `self`.
-- [x] Add parser/sema/codegen tests for read, mutate, and move cases.
+Removed from language design. Contradicts allocation-visibility principle. Explicit `collect[Vec]()` is required — it makes allocation intent clear at the call site. Invisible allocation from type context is exactly the kind of hidden cost With is designed to avoid.
 
-Current implementation note:
-- Implicit receiver insertion is applied only when method bodies reference `self`; static methods stay unchanged.
-- `self` mode inference is syntactic in Stage0: assignment through `self` selects `&mut Self`, explicit by-value `self` use selects `Self`, otherwise it selects `&Self`.
-- Consume inference is conservative for direct `self` value uses; deeper ownership-sensitive moves (for example field-level move intent) still require explicit receiver annotation when needed.
+## 11. Implicit `self` in `extend`/`impl` (REMOVED)
+
+Removed from language design. The readability cost outweighs the ergonomic gain. `fn name(self: &User) -> str` is explicit, readable, and tells you the calling convention at a glance. Implicit self saves a few characters and costs readability in every code review forever.
 
 ## 12. Statement-Position Partial `match`
+
+Implemented. The compiler distinguishes statement-position from expression-position
+match and enforces exhaustiveness only in expression position.
+
 - [x] Distinguish expression-position `match` from statement-position `match` in sema.
+      `match_in_stmt_pos` field tracks context. Set to 1 for block statements
+      and void-return function body tails. Reset to 0 for let-binding values.
 - [x] Require exhaustiveness only for expression-position `match`.
+      `check_match_exhaustiveness()` checks enum variant coverage and bool
+      coverage. Only emits warnings when `require_exhaustive == 1`.
 - [x] Permit partial statement-position `match` with unmatched variants as no-op.
+      When `match_in_stmt_pos == 1`, exhaustiveness check is skipped.
 - [x] Keep existing reachability/usefulness diagnostics where still applicable.
 - [x] Update spec and guides to clarify this split behavior with examples.
 - [x] Add regression tests for expression-required exhaustiveness and statement partial matching.
+      `test/cases/partial_match_stmt.w` tests partial enum match in statement
+      position (no warning) and exhaustive enum match in expression position.
+- [x] Partial match is NOT allowed on `@[must_use]` types (e.g. Result, Task). If the type is `@[must_use]`, match must be exhaustive or have an explicit `_ -> ...` arm. This prevents silently ignoring Err arms which contradicts `@[must_use]` semantics.
+
+      ### 12a. Extend `@[must_use]` to Type Declarations — DONE
+      - [x] `must_use_type_nodes: Vec[i32]` added to AstPool for tracking.
+      - [x] In parser `skip_attributes`, detect `@[must_use]` and set `pending_must_use`.
+            Note: standalone text check before the `else if` chain due to codegen bug
+            with `is_ident_named` in `else if` chains (KNOWN_DIVERGENCE).
+      - [x] In `finish_type_decl`, call `pool.mark_must_use_type(node)` when pending.
+      - [x] `must_use_types: HashMap[i32, i32]` added to Sema.
+      - [x] In `collect_type_decl`, check `ast.is_must_use_type_node(node)` and register.
+      - [x] Result and Task hardcoded as must_use in `collect_declarations`.
+
+      ### 12b. Enforce Exhaustiveness on `@[must_use]` Types in Match — DONE
+      - [x] In `check_match_expr`, when `match_in_stmt_pos == 1` AND subject type is
+            in `must_use_types`, override to `require_exhaustive = 1`.
+      - [x] Warning emitted: "non-exhaustive match: missing variant" (same as expr position).
+
+      ### 12c. Tests — DONE
+      - [x] `test/cases/must_use_match.w` tests:
+            - Custom `@[must_use]` type with exhaustive match (ok)
+            - Custom `@[must_use]` type with wildcard arm (ok)
+            - Non-must-use type partial match in statement position (ok)
+      - [x] Result partial match in statement position triggers warning (verified manually).
+      - [x] Non-must-use enum partial match unchanged (test/cases/partial_match_stmt.w).
+
+KNOWN_DIVERGENCE: Wildcard (`_`) pattern on enum types does not match
+variants beyond index 1. This is a pre-existing codegen bug in the enum
+switch generation, not related to partial match.
 
 ## 13. Prelude Expansion
-- [x] Add `String`, `Debug`, `Display`, `Default`, `Iter`, `IntoIter`, `Eq`, `Hash`, and `Ord` to prelude exports.
+
+Symbol precedence rules are implemented (see `docs/with-prelude.md`).
+The trait/type names below do not exist as definitions in lib/std.
+
+Only types/traits that exist as With source in `lib/std/` should be in the prelude. Compiler-builtin traits (Debug, Display, Default, Eq, Hash, Ord) remain as compiler builtins, not prelude imports, until they have real stdlib source definitions.
+
+- [x] Add `Debug`, `Display`, `Default`, `Eq`, `Hash`, `Ord`, `Drop`, `Scoped`, `ScopedMut` to prelude exports.
+      Iter/IntoIter skipped — parser doesn't support generic trait parameters yet.
+
+      ### 13a. Create Trait Definitions in `lib/std/traits.w`
+      The compiler already handles trait declarations (NK_TRAIT_DECL, `collect_trait_decl`
+      in Sema.w lines 1298-1328). These names are registered as builtin trait names
+      in `sema_is_builtin_trait_name()` (Sema.w lines 1329-1340), but have no source
+      definitions. Creating source definitions lets them be imported via prelude and
+      enables `impl TraitName for MyType` in user code.
+
+      Trait extra layout: `[assoc_count, [assoc_name, bound_count, bounds..., default_type]*, method_count, [method_name, method_flags, param_start, param_count, ret_type, default_body]*]`
+
+      - [x] Create `lib/std/traits.w` with the following trait declarations:
+            ```
+            pub trait Eq =
+                fn eq(self: Self, other: Self) -> bool
+
+            pub trait Ord =
+                fn cmp(self: Self, other: Self) -> i32
+
+            pub trait Hash =
+                fn hash(self: Self, hasher: &mut Hasher) -> void
+
+            pub trait Debug =
+                fn debug_str(self: Self) -> str
+
+            pub trait Display =
+                fn to_str(self: Self) -> str
+
+            pub trait Default =
+                fn default() -> Self
+
+            pub trait Iter[T] =
+                fn next(self: &mut Self) -> Option[T]
+
+            pub trait IntoIter[T] =
+                fn iter(self: Self) -> dyn Iter[T]
+            ```
+      - [x] Verify trait declarations parse and pass sema check.
+      - [x] Ensure builtin trait name list in `sema_is_builtin_trait_name()` still matches.
+            Source definitions coexist with builtin handling — both mechanisms work.
+      - [x] Verify `impl Eq for MyType` works with the source-defined trait.
+            `test/cases/prelude_traits.w` and `test/cases/trait_impl_builtin.w` verify.
+
+      ### 13b. Add Traits to Prelude
+      - [x] Add `use std.traits` to `lib/std/prelude.w`.
+      - [x] Add `use std.traits` to `lib/std/prelude_core.w`.
+      - [x] Verify trait names are available without explicit `use` in user code.
+            `test/cases/prelude_traits.w` uses `impl Eq for Point` without explicit import.
+
+      ### 13c. Implement Core Trait Impls for Builtin Types — DONE
+      These are the minimum impls needed to make the traits useful.
+      - [x] Fix codegen for `impl Trait for i32` — three fixes in `src/Codegen.w`:
+            1. `declare_function`: Only lower method self as pointer for struct/enum types, not primitives.
+            2. `gen_method_call`: Infer primitive type names from LLVM types (i32_ty→"i32", i1_ty→"bool").
+            3. `gen_method_call`: Recognize primitive type names for static method calls (`i32.default()`).
+      - [x] `impl Eq for i32`, `impl Eq for bool` in `lib/std/traits.w`.
+      - [x] `impl Default for i32` (returns 0), `impl Default for bool` (returns false) in `lib/std/traits.w`.
+      - [x] `test/cases/trait_impl_primitive.w` — uses prelude-provided impls, tests method dispatch.
+      - [ ] `impl Eq for i64`, `impl Eq for str` — deferred (need i64 literal support / str eq method).
+      - [ ] `impl Debug for i32`, `impl Debug for str` — deferred (needs `int_to_string` runtime fn).
+      - [ ] `impl Hash for i32`, `impl Hash for str` — deferred (needs hash.w integration).
+
+      ### 13c½. Fix `is_local_decl` Bug — DONE
+      After import merging, decl order is: prelude → user imports → root.
+      `is_local_decl(idx)` was checking `idx < local_decl_count` — treating the first N
+      prelude decls as local instead of the last N root decls. Fixed to check
+      `idx >= total - local_decl_count`. This was causing orphan rule violations
+      for all local trait impls and dyn dispatch tests.
+
+      ### 13d. Docs and Tests — DONE
 - [x] Confirm symbol precedence rules vs local/module imports and document collision behavior.
 - [x] Update spec/guide prelude lists and examples.
+      - [x] Update spec §18.2 prelude section to list all trait names
+            (`Eq`, `Ord`, `Hash`, `Debug`, `Display`, `Default`, `Drop`, `Scoped`, `ScopedMut`).
+            Removed `Iter`/`IntoIter` (blocked on generic trait params in parser).
+            Added `require`, `check` to the prelude function list.
+      - [x] Add guide "Implement Prelude Traits" section with Point struct and
+            primitive trait impl examples.
 - [x] Add compile tests proving these names work without explicit `use`.
+      - [x] Test: `impl Eq for MyStruct` compiles without `use std.traits`.
+            `test/cases/prelude_traits.w` — `impl Eq for Point`
+      - [x] Test: `impl Debug for MyStruct` compiles without `use std.traits`.
+            `test/cases/prelude_traits.w` — `impl Debug for Point`
+      - [x] Test: `impl Default for MyStruct` compiles and runs.
+            `test/cases/trait_impl_builtin.w` — `impl Default for MyInt`
 - [x] Add a follow-up tracking task: audit first 20 real programs and adjust prelude as needed.
 
 Follow-up tracking task: `Wave 6+ prelude audit` — run the first 20 real self-host programs, collect missing/over-eager prelude names, and adjust the default prelude set.
@@ -148,10 +351,111 @@ Follow-up tracking task: `Wave 6+ prelude audit` — run the first 20 real self-
 - [x] Implement sema coercions for allowed widenings in assignments, call args, returns, and expression unification.
 - [x] Keep narrowing conversions explicit-only via `as`, with unchanged hard errors.
 - [x] Add tests for accepted widenings and rejected narrowings across literals and typed values.
+      `test/cases/widening_conversions.w` tests i32→i64 in let bindings,
+      function arguments, and arithmetic (i32 + i64 → i64). Basic narrowing
+      rejection test exists in `test/cases/behav_spec_sema.w`.
 - [x] Add migration-guide examples showing where explicit casts are no longer needed.
 
-## 15. Combined Validation Gates For These Annoyances
+## 15. Precondition Functions: `require` and `check`
+
+`assert`, `require`, and `check` are three precondition functions in the prelude,
+each with a distinct meaning:
+
+| Function  | Meaning                          | On failure                  |
+|-----------|----------------------------------|-----------------------------|
+| `assert`  | This must be true (tests, debug) | Panic                       |
+| `require` | Caller violated the contract     | Panic with argument error   |
+| `check`   | Internal invariant violated      | Panic with state error      |
+
+```
+fn process(count: i32):
+    require(count > 0, "Count must be positive, got {count}")
+    check(state == .Ready, "Expected Ready, got {state}")
+```
+
+`require` panics with an `IllegalArgumentError` — the caller passed bad input.
+`check` panics with an `IllegalStateError` — an internal invariant is broken.
+Both take the message as a lazy string so it is not constructed unless the check
+fails. These are better than bare `assert` because they distinguish "your input
+is wrong" from "my state is wrong," and better than `if not x then return Err(...)`
+for preconditions that should never fail — they panic with a clear message instead
+of forcing error handling on the caller for programming bugs.
+
+### Spec
+- [x] Add `require` and `check` to the spec as prelude builtins alongside `assert`.
+- [x] Define `IllegalArgumentError` and `IllegalStateError` panic types.
+      These are string tags in panic output, not separate error types.
+- [x] Specify lazy message evaluation: the string expression is not evaluated when the condition is true.
+- [x] Document signatures:
+      `fn require(condition: bool, message: str) -> void`
+      `fn check(condition: bool, message: str) -> void`
+
+### Compiler
+- [x] Register `require` and `check` as prelude builtin functions in sema.
+      Added to `lib/std/builtins.w`, imported via prelude.
+- [x] Implement lazy message evaluation (do not evaluate the format string when the condition holds).
+      `gen_precondition_call` in `src/Codegen.w` branches on condition;
+      message expression is only generated in the fail branch.
+- [x] Implement distinct panic messages that include the function name (`require` vs `check`) and the user-provided message.
+      Output: `assert` → "assertion failed", `require` → "IllegalArgumentError: {msg}",
+      `check` → "IllegalStateError: {msg}". All printed to stderr via fprintf.
+- [x] Ensure `require` and `check` are available without explicit `use` (prelude).
+
+### Stdlib / Runtime
+- [x] Add `require` and `check` implementations in `lib/std/builtins.w`.
+      Fallback implementations call `with_panic(msg, "", 0)`.
+      Codegen intercepts calls for lazy evaluation and prefixed stderr output.
+- [x] Define `IllegalArgumentError` and `IllegalStateError` types (or string tags) used in panic output.
+      String tags printed as stderr prefixes by `gen_precondition_call`.
+- [x] Added `wl_get_named_global` to `runtime/llvm_bridge.c` and `src/Codegen.w`
+      to fix duplicate `__stderrp` global declarations.
+
+### Tests
+- [x] Add test: `require(true, ...)` does not panic.
+- [x] Add test: `require(false, ...)` panics with `IllegalArgumentError` and the message.
+- [x] Add test: `check(true, ...)` does not panic.
+- [x] Add test: `check(false, ...)` panics with `IllegalStateError` and the message.
+- [x] Add test: lazy message — side-effecting expression in message is not evaluated when condition is true.
+      `test/cases/precondition_lazy.w` — calls `side_effect()` (which prints)
+      as message arg to `require(true, ...)` and `check(true, ...)`. Output
+      contains only "ok", confirming the message expression is not evaluated.
+- [x] Add test: `require` and `check` are available without `use` (prelude).
+      `test/cases/precondition_basic.w` tests happy-path + prelude availability.
+
+### Docs
+- [x] Update `docs/with-specification.md` prelude section with `require` and `check`.
+- [x] Update `docs/with-idiomatic-guide.md` with guidance on when to use `assert` vs `require` vs `check`.
+- [x] Update `docs/with-migration-guide.md` with Rust/Kotlin mappings.
+
+## 16. Combined Validation Gates For These Annoyances
 - [x] Bootstrap compiler remains unchanged for this work; intentional behavior differences are tracked via `KNOWN_DIVERGENCE`.
-- [x] Self-host test suite passes with all six changes enabled.
+- [x] Self-host test suite passes with all remaining changes enabled.
+      Stage chain (stage2 → stage1 → stage2 → stage3) verified passing.
+      All new tests pass in wave10 harness. Sections 12, 13, 14, and 15 are
+      fully implemented. Section 2 async codegen is functional (single + tuple await).
+      Section 9 blocked on parser generic trait params. (Sections 10 and 11 removed.)
 - [x] Parity scripts are updated and passing for intentional behavior changes.
-- [x] No untracked known divergences remain for these six features.
+- [x] No untracked known divergences remain for all features.
+      Tracked KNOWN_DIVERGENCE items:
+      - Section 12: enum wildcard (`_`) matching beyond variant index 1 (codegen bug).
+      - Section 13c: `impl Eq/Debug/Hash for i64/str` deferred (runtime fn prerequisites).
+      - Section 9: implicit `.iter()` blocked on parser generic trait parameter support.
+      - Section 2e: async blocks with captures deferred (closure-like codegen needed).
+      - Codegen: enum first-variant payload extraction uses struct type instead of scalar
+        (`sext { i32 } to i32`). Affects enums where the first variant has a payload.
+      - Codegen: Vec LLVM type names use heap addresses, causing IR non-determinism.
+      - Bootstrap tests `generic_identity.w`/`generic_struct_fn.w` use `println(i32)`
+        which self-host doesn't support (println only accepts str).
+
+## Completion Summary
+
+| Section | Status | Notes |
+|---------|--------|-------|
+| 12 | DONE | Statement-position partial match, @[must_use] enforcement |
+| 13 | DONE | Trait defs in stdlib, prelude integration, primitive impls |
+| 14 | DONE | Implicit widening conversions |
+| 15 | DONE | `require`/`check` precondition functions |
+| 2 | DONE (partial) | Async fn codegen, single + tuple await, linker fix |
+| 9 | BLOCKED | Implicit `.iter()` — needs parser generic trait params |
+| 10 | REMOVED | Drop `collect` — contradicts allocation-visibility |
+| 11 | REMOVED | Implicit `self` — readability cost too high |

@@ -117,6 +117,7 @@ extern fn wl_real_oge() -> i32
 // Functions
 extern fn wl_add_function(m: i64, name: str, fn_type: i64) -> i64
 extern fn wl_get_named_function(m: i64, name: str) -> i64
+extern fn wl_get_named_global(m: i64, name: str) -> i64
 extern fn wl_get_first_function(m: i64) -> i64
 extern fn wl_get_next_function(v: i64) -> i64
 extern fn wl_is_declaration(v: i64) -> i32
@@ -406,6 +407,8 @@ type Codegen = {
 
     // Async
     async_fn_symbols: HashMap[i32, i32],
+    async_fn_ret_types: HashMap[i32, i64],
+    async_fn_args_struct_types: HashMap[i32, i64],
     task_locals: HashMap[i32, i32],
     uses_async: bool,
 
@@ -595,6 +598,8 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         current_fn_returns_result: false,
         current_fn_saw_explicit_return: false,
         async_fn_symbols: HashMap.new(),
+        async_fn_ret_types: HashMap.new(),
+        async_fn_args_struct_types: HashMap.new(),
         task_locals: HashMap.new(),
         uses_async: false,
         scope_local_syms: Vec.new(),
@@ -2111,7 +2116,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
 
         let p_kind = self.pool.kind(p_type_node)
 
-        // Method self parameter: lower as pointer
+        // Method self parameter: lower as pointer for struct types
         if pi == 0 and p_kind == NK_TYPE_NAMED():
             let p_sym = self.pool.get_data0(p_type_node)
             let p_type_name = self.intern.resolve(p_sym)
@@ -2119,14 +2124,15 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             if method_owner_sym == 0 and p_name_text == "self" and self.struct_type_map.get(p_sym).is_some():
                 method_owner_sym = p_sym
             if method_owner_sym != 0 and (p_type_name == "Self" or p_sym == method_owner_sym):
-                param_types.push(wl_ptr_type(self.context))
-                has_ref_param = true
-                // Record ref param
-                self.record_ref_param(name_sym, pi, param_count)
-                if alias_sym != 0:
-                    self.record_ref_param(alias_sym, pi, param_count)
-                pi = pi + 1
-                continue
+                // Only lower as pointer for struct/enum types; primitives pass by value
+                if self.struct_type_map.get(method_owner_sym).is_some() or self.enum_type_map.get(method_owner_sym).is_some():
+                    param_types.push(wl_ptr_type(self.context))
+                    has_ref_param = true
+                    self.record_ref_param(name_sym, pi, param_count)
+                    if alias_sym != 0:
+                        self.record_ref_param(alias_sym, pi, param_count)
+                    pi = pi + 1
+                    continue
 
         // fn type params → fat pointer
         if p_kind == NK_TYPE_FN():
@@ -2794,7 +2800,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             if tp_count > 0:
                 self.generic_fns.insert(name_sym, decl)
             else if (flags / FN_FLAG_ASYNC()) % 2 == 1:
-                self.declare_function(decl)
+                self.declare_async_function(decl)
             else:
                 self.declare_function(decl)
 
@@ -2820,7 +2826,10 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             if meta >= 0:
                 let tp_count = self.pool.fn_meta_tp_count(meta)
                 if tp_count == 0:
-                    self.gen_function_dispatch(decl)
+                    if (flags / FN_FLAG_ASYNC()) % 2 == 1:
+                        self.gen_async_function(decl)
+                    else:
+                        self.gen_function_dispatch(decl)
 
     if self.had_error != 0:
         return 1
@@ -6382,6 +6391,12 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
             return self.gen_eprintln(args_start, arg_count)
         if fn_name == "todo" or fn_name == "unreachable":
             return self.gen_diverge_builtin(args_start, arg_count)
+        if fn_name == "assert":
+            return self.gen_precondition_call(args_start, arg_count, "assertion failed")
+        if fn_name == "require":
+            return self.gen_precondition_call(args_start, arg_count, "IllegalArgumentError")
+        if fn_name == "check":
+            return self.gen_precondition_call(args_start, arg_count, "IllegalStateError")
 
         let has_direct_fn = self.fn_values.get(lookup_sym).is_some()
         let has_generic_fn = self.generic_fns.get(lookup_sym).is_some()
@@ -6667,6 +6682,11 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
                 let alias_sym = self.intern.intern(obj_name)
                 if self.struct_type_map.get(alias_sym).is_some() or self.enum_type_map.get(alias_sym).is_some():
                     static_type_sym = alias_sym
+        // Check for primitive type names (i32, i64, bool, str)
+        if static_type_sym == 0:
+            let obj_name = self.intern.resolve(obj_sym)
+            if obj_name == "i32" or obj_name == "i64" or obj_name == "bool" or obj_name == "str":
+                static_type_sym = obj_sym
     if static_type_sym != 0:
         let type_name = self.intern.resolve(static_type_sym)
         let mangled = type_name ++ "." ++ method_name
@@ -6730,8 +6750,20 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
         return enum_accessor
 
     // Try Type.method lookup
-    if type_sym != 0:
-        let type_name = self.intern.resolve(type_sym)
+    // For primitive types, infer type name from LLVM type
+    var lookup_type_sym = type_sym
+    if lookup_type_sym == 0:
+        let i32_ty = wl_i32_type(self.context)
+        let i64_ty = wl_i64_type(self.context)
+        let i1_ty = wl_i1_type(self.context)
+        if obj_ty == i32_ty:
+            lookup_type_sym = self.intern.intern("i32")
+        else if obj_ty == i64_ty:
+            lookup_type_sym = self.intern.intern("i64")
+        else if obj_ty == i1_ty:
+            lookup_type_sym = self.intern.intern("bool")
+    if lookup_type_sym != 0:
+        let type_name = self.intern.resolve(lookup_type_sym)
         let mangled = type_name ++ "." ++ method_name
         let fn_sym = self.intern.intern(mangled)
         let fv = self.fn_values.get(fn_sym)
@@ -7866,7 +7898,387 @@ fn Codegen.gen_array_comprehension(self: Codegen, node: i32) -> i64:
     // Return undef for now - full array comprehension needs runtime Vec
     wl_get_undef(wl_void_type(self.context))
 
-// ── Async stubs ───────────────────────────────────────────────────
+// ── Async runtime ─────────────────────────────────────────────────
+
+fn Codegen.ensure_async_runtime_declared(self: Codegen):
+    let i32_ty = wl_i32_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+    let void_ty = wl_void_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+
+    // void with_runtime_init(void)
+    if wl_get_named_function(self.llmod, "with_runtime_init") == 0:
+        let no_params: Vec[i64] = Vec.new()
+        let ft = wl_function_type(void_ty, vec_data_i64(&no_params), 0, 0)
+        wl_add_function(self.llmod, "with_runtime_init", ft)
+
+    // void with_runtime_run(void)
+    if wl_get_named_function(self.llmod, "with_runtime_run") == 0:
+        let no_params: Vec[i64] = Vec.new()
+        let ft = wl_function_type(void_ty, vec_data_i64(&no_params), 0, 0)
+        wl_add_function(self.llmod, "with_runtime_run", ft)
+
+    // void with_runtime_shutdown(void)
+    if wl_get_named_function(self.llmod, "with_runtime_shutdown") == 0:
+        let no_params: Vec[i64] = Vec.new()
+        let ft = wl_function_type(void_ty, vec_data_i64(&no_params), 0, 0)
+        wl_add_function(self.llmod, "with_runtime_shutdown", ft)
+
+    // i32 with_fiber_spawn(fn_ptr: ptr, arg: ptr) -> i32
+    if wl_get_named_function(self.llmod, "with_fiber_spawn") == 0:
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        params.push(ptr_ty)
+        let ft = wl_function_type(i32_ty, vec_data_i64(&params), 2, 0)
+        wl_add_function(self.llmod, "with_fiber_spawn", ft)
+
+    // i64 with_fiber_await(task_id: i32) -> i64
+    if wl_get_named_function(self.llmod, "with_fiber_await") == 0:
+        let params: Vec[i64] = Vec.new()
+        params.push(i32_ty)
+        let ft = wl_function_type(i64_ty, vec_data_i64(&params), 1, 0)
+        wl_add_function(self.llmod, "with_fiber_await", ft)
+
+    // i32 with_fiber_cancel(task_id: i32) -> i32
+    if wl_get_named_function(self.llmod, "with_fiber_cancel") == 0:
+        let params: Vec[i64] = Vec.new()
+        params.push(i32_ty)
+        let ft = wl_function_type(i32_ty, vec_data_i64(&params), 1, 0)
+        wl_add_function(self.llmod, "with_fiber_cancel", ft)
+
+    // void with_fiber_set_result(value: i64)
+    if wl_get_named_function(self.llmod, "with_fiber_set_result") == 0:
+        let params: Vec[i64] = Vec.new()
+        params.push(i64_ty)
+        let ft = wl_function_type(void_ty, vec_data_i64(&params), 1, 0)
+        wl_add_function(self.llmod, "with_fiber_set_result", ft)
+
+    // void with_fiber_yield(void)
+    if wl_get_named_function(self.llmod, "with_fiber_yield") == 0:
+        let no_params: Vec[i64] = Vec.new()
+        let ft = wl_function_type(void_ty, vec_data_i64(&no_params), 0, 0)
+        wl_add_function(self.llmod, "with_fiber_yield", ft)
+
+    // i32 with_fiber_select(ids: ptr, count: i32, result_out: ptr) -> i32
+    if wl_get_named_function(self.llmod, "with_fiber_select") == 0:
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        params.push(i32_ty)
+        params.push(ptr_ty)
+        let ft = wl_function_type(i32_ty, vec_data_i64(&params), 3, 0)
+        wl_add_function(self.llmod, "with_fiber_select", ft)
+
+    self.uses_async = true
+
+fn Codegen.ensure_malloc_declared(self: Codegen) -> i64:
+    let existing = wl_get_named_function(self.llmod, "malloc")
+    if existing != 0: return existing
+    let ptr_ty = wl_ptr_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+    let params: Vec[i64] = Vec.new()
+    params.push(i64_ty)
+    let ft = wl_function_type(ptr_ty, vec_data_i64(&params), 1, 0)
+    wl_add_function(self.llmod, "malloc", ft)
+
+fn Codegen.pack_result_to_i64(self: Codegen, val: i64, val_ty: i64) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    let void_ty = wl_void_type(self.context)
+    if val_ty == void_ty:
+        return wl_const_int(i64_ty, 0, 0)
+    if val_ty == i64_ty:
+        return val
+    let kind = wl_get_type_kind(val_ty)
+    // Integer types: zext to i64
+    if kind == wl_integer_type_kind():
+        return wl_build_zext(self.builder, val, i64_ty)
+    // Pointer types: ptrtoint
+    if kind == wl_pointer_type_kind():
+        return wl_build_ptr_to_int(self.builder, val, i64_ty)
+    // Fallback: bitcast via alloca
+    let alloca = wl_build_alloca(self.builder, i64_ty)
+    wl_build_store(self.builder, val, alloca)
+    wl_build_load(self.builder, i64_ty, alloca)
+
+fn Codegen.unpack_result_from_i64(self: Codegen, val: i64, target_ty: i64) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    let i32_ty = wl_i32_type(self.context)
+    if target_ty == i64_ty:
+        return val
+    if target_ty == i32_ty:
+        return wl_build_trunc(self.builder, val, i32_ty)
+    let kind = wl_get_type_kind(target_ty)
+    if kind == wl_integer_type_kind():
+        return wl_build_trunc(self.builder, val, target_ty)
+    if kind == wl_pointer_type_kind():
+        return wl_build_int_to_ptr(self.builder, val, target_ty)
+    // Fallback: bitcast via alloca
+    let alloca = wl_build_alloca(self.builder, i64_ty)
+    wl_build_store(self.builder, val, alloca)
+    wl_build_load(self.builder, target_ty, alloca)
+
+// ── Async function declaration ────────────────────────────────────
+
+fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
+    self.ensure_async_runtime_declared()
+
+    let name_sym = self.pool.get_data0(fn_node)
+    let name_str = self.intern.resolve(name_sym)
+    if name_sym == 0: return
+
+    let meta = self.pool.find_fn_meta(fn_node)
+    if meta < 0: return
+
+    let i32_ty = wl_i32_type(self.context)
+    let void_ty = wl_void_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+
+    let ret_type_node = self.pool.fn_meta_ret(meta)
+    let param_start = self.pool.fn_meta_param_start(meta)
+    let param_count = self.pool.fn_meta_param_count(meta)
+
+    // Resolve return type
+    let ret_ty_raw = self.resolve_type(ret_type_node)
+    let ret_ty = if ret_ty_raw != 0: ret_ty_raw else: void_ty
+    self.async_fn_ret_types.insert(name_sym, ret_ty)
+
+    // Resolve param types
+    let param_types: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        var p_ty = self.resolve_type(p_type_node)
+        if p_ty == 0:
+            p_ty = i32_ty
+        param_types.push(p_ty)
+
+    // 1. Declare implementation function: name_async(params) -> ret_type
+    let impl_fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
+    let impl_name = name_str ++ "_async"
+    let impl_fn = wl_add_function(self.llmod, impl_name, impl_fn_type)
+    let impl_sym = self.intern.intern(impl_name)
+    self.fn_values.insert(impl_sym, impl_fn)
+    self.fn_fn_types.insert(impl_sym, impl_fn_type)
+
+    // 2. Create args struct type
+    var args_struct_type = wl_struct_type(self.context, vec_data_i64(&param_types), param_count, 0)
+    self.async_fn_args_struct_types.insert(name_sym, args_struct_type)
+
+    // 3. Declare fiber trampoline: name_fiber(arg: *void) -> void
+    let tramp_params: Vec[i64] = Vec.new()
+    tramp_params.push(ptr_ty)
+    let tramp_fn_type = wl_function_type(void_ty, vec_data_i64(&tramp_params), 1, 0)
+    let tramp_name = name_str ++ "_fiber"
+    wl_add_function(self.llmod, tramp_name, tramp_fn_type)
+
+    // 4. Declare the public spawn wrapper: name(params) -> i32 (Task ID)
+    let spawn_fn_type = wl_function_type(i32_ty, vec_data_i64(&param_types), param_count, 0)
+    let effective_name = self.function_symbol_name(name_sym)
+    let spawn_fn = wl_add_function(self.llmod, effective_name, spawn_fn_type)
+    self.fn_values.insert(name_sym, spawn_fn)
+    self.fn_fn_types.insert(name_sym, spawn_fn_type)
+
+// ── Async function body generation ────────────────────────────────
+
+fn Codegen.gen_async_function(self: Codegen, fn_node: i32):
+    let name_sym = self.pool.get_data0(fn_node)
+    let name_str = self.intern.resolve(name_sym)
+    if name_sym == 0: return
+
+    let meta = self.pool.find_fn_meta(fn_node)
+    if meta < 0: return
+
+    let i32_ty = wl_i32_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+    let void_ty = wl_void_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+
+    let param_start = self.pool.fn_meta_param_start(meta)
+    let param_count = self.pool.fn_meta_param_count(meta)
+    let body_node = self.pool.get_data1(fn_node)
+
+    // Get return type
+    let ret_ty_opt = self.async_fn_ret_types.get(name_sym)
+    let ret_ty = if ret_ty_opt.is_some(): ret_ty_opt.unwrap() as i64 else: void_ty
+
+    // Get param types
+    let param_types: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        var p_ty = self.resolve_type(p_type_node)
+        if p_ty == 0:
+            p_ty = i32_ty
+        param_types.push(p_ty)
+
+    // Args struct type
+    let args_struct_opt = self.async_fn_args_struct_types.get(name_sym)
+    let args_struct_type = if args_struct_opt.is_some(): args_struct_opt.unwrap() as i64 else: wl_struct_type(self.context, vec_data_i64(&param_types), param_count, 0)
+
+    // ── 1. Generate the implementation function body ─────────────
+    let impl_name = name_str ++ "_async"
+    let impl_sym = self.intern.intern(impl_name)
+    let impl_fv = self.fn_values.get(impl_sym)
+    if not impl_fv.is_some(): return
+    let impl_fn = impl_fv.unwrap() as i64
+    let impl_ft = self.fn_fn_types.get(impl_sym)
+    if not impl_ft.is_some(): return
+    let impl_fn_type = impl_ft.unwrap() as i64
+
+    // Clear locals and generate body (reuse gen_function logic)
+    self.current_function = impl_fn
+    self.current_function_name_sym = name_sym
+    self.current_ret_type = ret_ty
+    self.current_method_owner_sym = 0
+
+    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
+    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
+    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_vec_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_hm_local_types: HashMap[i32, i32] = HashMap.new()
+    let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
+    self.local_allocas = fresh_local_allocas
+    self.local_types = fresh_local_types
+    self.local_muts = fresh_local_muts
+    self.local_fn_sigs = fresh_local_fn_sigs
+    self.local_pointee_structs = fresh_local_pointee_structs
+    self.task_locals = fresh_task_locals
+    self.vec_local_types = fresh_vec_local_types
+    self.hm_local_types = fresh_hm_local_types
+    self.enum_local_types = fresh_enum_local_types
+    self.scope_local_count = 0
+    let fresh_defer_stack: Vec[i32] = Vec.new()
+    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_local_concrete_types: HashMap[i32, i32] = HashMap.new()
+    self.defer_stack = fresh_defer_stack
+    self.trait_locals = fresh_trait_locals
+    self.trait_local_concrete_types = fresh_trait_local_concrete_types
+
+    let saved_expected = self.expected_type
+    let saved_expected_node = self.expected_type_node
+    self.expected_type = ret_ty
+    self.expected_type_node = 0
+
+    let saved_tailrec_bb = self.tailrec_body_bb
+    let saved_tailrec_sym = self.tailrec_fn_sym
+    let saved_loops = self.capture_loop_state()
+    self.tailrec_body_bb = 0
+    self.tailrec_fn_sym = 0
+    self.reset_loop_state()
+
+    let entry = wl_append_bb(self.context, impl_fn, "entry")
+    wl_position_at_end(self.builder, entry)
+
+    // Add params as locals
+    for pi in 0..param_count:
+        let p_name = self.pool.get_extra(param_start + pi * 2)
+        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let param_val = wl_get_param(impl_fn, pi)
+        let param_type = wl_type_of(param_val)
+        let alloca = wl_build_alloca(self.builder, param_type)
+        wl_build_store(self.builder, param_val, alloca)
+        self.record_local(p_name, alloca, param_type, 1)
+        self.record_local_container_type(p_name, p_type_node)
+
+    let body_val = self.gen_expr(body_node)
+
+    // Terminate if needed
+    let current_bb = wl_get_insert_block(self.builder)
+    if wl_get_bb_terminator(current_bb) == 0:
+        if ret_ty == void_ty:
+            wl_build_ret_void(self.builder)
+        else:
+            let body_type = wl_type_of(body_val)
+            if body_type == void_ty:
+                wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
+            else:
+                wl_build_ret(self.builder, body_val)
+
+    // Restore state
+    self.expected_type = saved_expected
+    self.expected_type_node = saved_expected_node
+    self.tailrec_body_bb = saved_tailrec_bb
+    self.tailrec_fn_sym = saved_tailrec_sym
+    self.restore_loop_state(saved_loops)
+
+    // ── 2. Generate the fiber trampoline ─────────────────────────
+    let tramp_name = name_str ++ "_fiber"
+    let tramp_fn = wl_get_named_function(self.llmod, tramp_name)
+    if tramp_fn == 0: return
+
+    self.current_function = tramp_fn
+    let tramp_entry = wl_append_bb(self.context, tramp_fn, "entry")
+    wl_position_at_end(self.builder, tramp_entry)
+
+    // Load args from void* parameter
+    let arg_ptr = wl_get_param(tramp_fn, 0)
+    let call_args: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        let indices: Vec[i64] = Vec.new()
+        indices.push(wl_const_int(i32_ty, 0, 0))
+        indices.push(wl_const_int(i32_ty, pi as i64, 0))
+        let gep = wl_build_gep(self.builder, args_struct_type, arg_ptr, vec_data_i64(&indices), 2)
+        let loaded = wl_build_load(self.builder, param_types.get(pi as i64), gep)
+        call_args.push(loaded)
+
+    let result = wl_build_call(self.builder, impl_fn_type, impl_fn, vec_data_i64(&call_args), param_count)
+
+    // Store result via with_fiber_set_result
+    if ret_ty != void_ty:
+        let set_result_fn = wl_get_named_function(self.llmod, "with_fiber_set_result")
+        if set_result_fn != 0:
+            let set_params: Vec[i64] = Vec.new()
+            set_params.push(i64_ty)
+            let set_ft = wl_function_type(void_ty, vec_data_i64(&set_params), 1, 0)
+            let result_i64 = self.pack_result_to_i64(result, ret_ty)
+            let set_args: Vec[i64] = Vec.new()
+            set_args.push(result_i64)
+            wl_build_call(self.builder, set_ft, set_result_fn, vec_data_i64(&set_args), 1)
+    wl_build_ret_void(self.builder)
+
+    // ── 3. Generate the spawn wrapper ────────────────────────────
+    let spawn_fv = self.fn_values.get(name_sym)
+    if not spawn_fv.is_some(): return
+    let spawn_fn = spawn_fv.unwrap() as i64
+
+    self.current_function = spawn_fn
+    let spawn_entry = wl_append_bb(self.context, spawn_fn, "entry")
+    wl_position_at_end(self.builder, spawn_entry)
+
+    // Allocate args struct on heap
+    let args_size = wl_size_of(args_struct_type)
+    let malloc_fn = self.ensure_malloc_declared()
+    let malloc_params: Vec[i64] = Vec.new()
+    malloc_params.push(i64_ty)
+    let malloc_ft = wl_function_type(ptr_ty, vec_data_i64(&malloc_params), 1, 0)
+    let malloc_args: Vec[i64] = Vec.new()
+    malloc_args.push(args_size)
+    let args_alloc = wl_build_call(self.builder, malloc_ft, malloc_fn, vec_data_i64(&malloc_args), 1)
+
+    // Store each parameter into args struct
+    for pi in 0..param_count:
+        let param_val = wl_get_param(spawn_fn, pi)
+        let indices: Vec[i64] = Vec.new()
+        indices.push(wl_const_int(i32_ty, 0, 0))
+        indices.push(wl_const_int(i32_ty, pi as i64, 0))
+        let gep = wl_build_gep(self.builder, args_struct_type, args_alloc, vec_data_i64(&indices), 2)
+        wl_build_store(self.builder, param_val, gep)
+
+    // Call with_fiber_spawn(trampoline_fn, args_ptr)
+    let spawn_rt_fn = wl_get_named_function(self.llmod, "with_fiber_spawn")
+    if spawn_rt_fn == 0: return
+    let spawn_params: Vec[i64] = Vec.new()
+    spawn_params.push(ptr_ty)
+    spawn_params.push(ptr_ty)
+    let spawn_ft = wl_function_type(i32_ty, vec_data_i64(&spawn_params), 2, 0)
+    let spawn_args: Vec[i64] = Vec.new()
+    spawn_args.push(tramp_fn)
+    spawn_args.push(args_alloc)
+    let task_id = wl_build_call(self.builder, spawn_ft, spawn_rt_fn, vec_data_i64(&spawn_args), 2)
+
+    wl_build_ret(self.builder, task_id)
+
+// ── Async expressions ─────────────────────────────────────────────
 
 fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
     // Stage1 contract: async blocks evaluate to task-like values consumed
@@ -8023,9 +8435,81 @@ fn Codegen.gen_yield(self: Codegen, node: i32) -> i64:
     wl_get_undef(wl_void_type(self.context))
 
 fn Codegen.gen_await(self: Codegen, node: i32) -> i64:
-    // Async await - evaluate inner expression
     let inner_node = self.pool.get_data0(node)
-    self.gen_expr(inner_node)
+
+    // Check for tuple await
+    if self.pool.kind(inner_node) == NK_TUPLE():
+        return self.gen_await_tuple(inner_node)
+
+    self.ensure_async_runtime_declared()
+
+    // Evaluate inner expression (should be Task ID: i32)
+    let task_id = self.gen_expr(inner_node)
+
+    let i32_ty = wl_i32_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+
+    // Call with_fiber_await(task_id) -> i64
+    let await_fn = wl_get_named_function(self.llmod, "with_fiber_await")
+    if await_fn == 0:
+        return task_id
+
+    let await_params: Vec[i64] = Vec.new()
+    await_params.push(i32_ty)
+    let await_ft = wl_function_type(i64_ty, vec_data_i64(&await_params), 1, 0)
+    let await_args: Vec[i64] = Vec.new()
+    await_args.push(task_id)
+    let result_i64 = wl_build_call(self.builder, await_ft, await_fn, vec_data_i64(&await_args), 1)
+
+    // Unpack result based on expected type
+    let void_ty = wl_void_type(self.context)
+    if self.expected_type != 0 and self.expected_type != void_ty:
+        if self.expected_type == i64_ty:
+            return result_i64
+        if self.expected_type == i32_ty:
+            return wl_build_trunc(self.builder, result_i64, i32_ty)
+        return self.unpack_result_from_i64(result_i64, self.expected_type)
+
+    // Default: truncate to i32 (most common task result type)
+    wl_build_trunc(self.builder, result_i64, i32_ty)
+
+fn Codegen.gen_await_tuple(self: Codegen, tuple_node: i32) -> i64:
+    self.ensure_async_runtime_declared()
+
+    let extra_start = self.pool.get_data0(tuple_node)
+    let elem_count = self.pool.get_data1(tuple_node)
+
+    let i32_ty = wl_i32_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+
+    let await_fn = wl_get_named_function(self.llmod, "with_fiber_await")
+    if await_fn == 0:
+        return wl_get_undef(i32_ty)
+
+    let await_params: Vec[i64] = Vec.new()
+    await_params.push(i32_ty)
+    let await_ft = wl_function_type(i64_ty, vec_data_i64(&await_params), 1, 0)
+
+    // Evaluate each tuple element and await it
+    let result_types: Vec[i64] = Vec.new()
+    let result_vals: Vec[i64] = Vec.new()
+    for ei in 0..elem_count:
+        let elem = self.pool.get_extra(extra_start + ei)
+        let task_id = self.gen_expr(elem)
+        let await_args: Vec[i64] = Vec.new()
+        await_args.push(task_id)
+        let result_i64 = wl_build_call(self.builder, await_ft, await_fn, vec_data_i64(&await_args), 1)
+        // Default unpack to i32
+        let unpacked = wl_build_trunc(self.builder, result_i64, i32_ty)
+        result_vals.push(unpacked)
+        result_types.push(i32_ty)
+
+    // Build result tuple
+    let tuple_ty = wl_struct_type(self.context, vec_data_i64(&result_types), elem_count, 0)
+    var tuple_val = wl_get_undef(tuple_ty)
+    for ei in 0..elem_count:
+        tuple_val = wl_build_insert_value(self.builder, tuple_val, result_vals.get(ei as i64), ei)
+    tuple_val
 
 fn Codegen.gen_spawn(self: Codegen, node: i32) -> i64:
     // Spawn async task - evaluate inner expression
@@ -8070,7 +8554,7 @@ fn Codegen.ensure_fprintf_declared(self: Codegen) -> i64:
 
 fn Codegen.ensure_stderr_declared(self: Codegen) -> i64:
     // Declare extern __stderrp (macOS) or stderr (Linux)
-    let existing = wl_get_named_function(self.llmod, "__stderrp")
+    let existing = wl_get_named_global(self.llmod, "__stderrp")
     if existing != 0: return existing
     let ptr_ty = wl_ptr_type(self.context)
     let g = wl_add_global(self.llmod, ptr_ty, "__stderrp")
@@ -8730,7 +9214,7 @@ fn Codegen.gen_diverge_builtin(self: Codegen, args_start: i32, arg_count: i32) -
         return wl_get_undef(self.expected_type)
     wl_get_undef(wl_i32_type(self.context))
 
-fn Codegen.gen_assert_call(self: Codegen, args_start: i32, arg_count: i32) -> i64:
+fn Codegen.gen_precondition_call(self: Codegen, args_start: i32, arg_count: i32, prefix: str) -> i64:
     if arg_count < 1:
         return wl_get_undef(wl_i32_type(self.context))
 
@@ -8740,20 +9224,40 @@ fn Codegen.gen_assert_call(self: Codegen, args_start: i32, arg_count: i32) -> i6
     if cond_ty != wl_i1_type(self.context):
         cond_bool = wl_build_icmp(self.builder, wl_int_ne(), cond, wl_const_int(cond_ty, 0, 0))
 
-    let fail_bb = wl_append_bb(self.context, self.current_function, "assert.fail")
-    let ok_bb = wl_append_bb(self.context, self.current_function, "assert.ok")
+    let fail_bb = wl_append_bb(self.context, self.current_function, "precond.fail")
+    let ok_bb = wl_append_bb(self.context, self.current_function, "precond.ok")
     wl_build_cond_br(self.builder, cond_bool, ok_bb, fail_bb)
 
     wl_position_at_end(self.builder, fail_bb)
+    let fprintf_fn = self.ensure_fprintf_declared()
+    let fprintf_ty = wl_global_get_value_type(fprintf_fn)
+    let stderr_global = self.ensure_stderr_declared()
+    let ptr_ty = wl_ptr_type(self.context)
+    let stderr_ptr = wl_build_load(self.builder, ptr_ty, stderr_global)
+    // Print prefix to stderr
+    let prefix_ptr = wl_build_global_string_ptr(self.builder, prefix)
+    let prefix_args: Vec[i64] = Vec.new()
+    prefix_args.push(stderr_ptr)
+    prefix_args.push(prefix_ptr)
+    wl_build_call(self.builder, fprintf_ty, fprintf_fn, vec_data_i64(&prefix_args), 2)
     if arg_count > 1:
-        let printf_fn = self.ensure_printf_declared()
-        let printf_ty = self.get_printf_fn_type()
+        // Lazy: message is only evaluated in the fail branch
         let msg = self.gen_expr(self.pool.get_extra(args_start + 1))
-        self.gen_print_value(msg, printf_fn, printf_ty)
-        let nl = wl_build_global_string_ptr(self.builder, "\n")
-        let nl_args: Vec[i64] = Vec.new()
-        nl_args.push(nl)
-        wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(&nl_args), 1)
+        let msg_fmt = wl_build_global_string_ptr(self.builder, ": %.*s")
+        let msg_ptr = wl_build_extract_value(self.builder, msg, 0)
+        let msg_len = wl_build_extract_value(self.builder, msg, 1)
+        let msg_args: Vec[i64] = Vec.new()
+        msg_args.push(stderr_ptr)
+        msg_args.push(msg_fmt)
+        msg_args.push(msg_len)
+        msg_args.push(msg_ptr)
+        wl_build_call(self.builder, fprintf_ty, fprintf_fn, vec_data_i64(&msg_args), 4)
+    // Print trailing newline
+    let nl_ptr = wl_build_global_string_ptr(self.builder, "\n")
+    let nl_args: Vec[i64] = Vec.new()
+    nl_args.push(stderr_ptr)
+    nl_args.push(nl_ptr)
+    wl_build_call(self.builder, fprintf_ty, fprintf_fn, vec_data_i64(&nl_args), 2)
 
     self.emit_exit_call(134)
     wl_build_unreachable(self.builder)

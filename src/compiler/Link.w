@@ -79,6 +79,8 @@ fn link_stage_object_needs_fiber_runtime(obj_path: str) -> i32:
         return 0
     if link_stage_str_contains(undef, "_with_channel_"):
         return 1
+    if link_stage_str_contains(undef, "_with_fiber_"):
+        return 1
     0
 
 fn link_stage_compiler_runtime_dir() -> str:

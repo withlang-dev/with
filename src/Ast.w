@@ -252,6 +252,9 @@ type AstPool = {
     // Auxiliary for-loop metadata: [node, index_binding(sym,0=none), label(sym,0=none)]*
     for_meta: Vec[i32],
 
+    // Must-use type declaration nodes
+    must_use_type_nodes: Vec[i32],
+
 }
 
 fn AstPool.new -> AstPool:
@@ -272,6 +275,7 @@ fn AstPool.new -> AstPool:
         fn_param_patterns: Vec.new(),
         fn_param_pattern_meta: Vec.new(),
         for_meta: Vec.new(),
+        must_use_type_nodes: Vec.new(),
     }
     // Reserve node 0 as null sentinel
     pool.kinds.push(0)
@@ -446,6 +450,17 @@ fn AstPool.type_meta_derive_start(self: &AstPool, meta: i32) -> i32:
 
 fn AstPool.type_meta_derive_count(self: &AstPool, meta: i32) -> i32:
     self.type_meta.get((meta + 2) as i64)
+
+fn AstPool.mark_must_use_type(self: &mut AstPool, node: i32):
+    self.must_use_type_nodes.push(node)
+
+fn AstPool.is_must_use_type_node(self: &AstPool, node: i32) -> i32:
+    var i = 0
+    while i < self.must_use_type_nodes.len() as i32:
+        if self.must_use_type_nodes.get(i as i64) == node:
+            return 1
+        i = i + 1
+    0
 
 fn AstPool.fn_param_patterns_len(self: &AstPool) -> i32:
     self.fn_param_patterns.len() as i32
