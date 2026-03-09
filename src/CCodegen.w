@@ -4,8 +4,6 @@
 // LLVM MIR codegen currently accepts directly. When MIR contains unsupported
 // constructs, emission fails with a clear error.
 
-use std.prelude_core
-
 use Mir
 use Ast
 use InternPool
@@ -25,10 +23,10 @@ fn cc_intern_intern(intern: &mut InternPool, s: str) -> i32:
     intern.intern(s)
 
 fn cc_lbrace -> str:
-    str_from_byte123
+    str_from_byte(123)
 
 fn cc_rbrace -> str:
-    str_from_byte125
+    str_from_byte(125)
 
 fn cc_pseudo_tid_vec -> i32:
     1900001

@@ -3,24 +3,26 @@ const std = @import("std");
 /// LLVM static libraries (from: llvm-config --libs core analysis native).
 /// Using inline for so the names stay comptime for string concatenation.
 const llvm_lib_flags = [_][]const u8{
-    "-lLLVMAArch64Disassembler",
-    "-lLLVMMCDisassembler",
-    "-lLLVMAArch64AsmParser",
-    "-lLLVMAArch64CodeGen",
+    // Generated from: llvm-config --link-static --libs core analysis native
+    //                 asmprinter asmparser codegen target ipo instrumentation
+    //                 vectorize linker irreader bitwriter bitreader passes
+    //                 irprinter mc mcparser object support demangle
     "-lLLVMPasses",
     "-lLLVMIRPrinter",
     "-lLLVMHipStdPar",
     "-lLLVMCoroutines",
     "-lLLVMipo",
     "-lLLVMInstrumentation",
-    "-lLLVMVectorize",
-    "-lLLVMSandboxIR",
     "-lLLVMLinker",
     "-lLLVMFrontendOpenMP",
-    "-lLLVMFrontendDirective",
     "-lLLVMFrontendAtomic",
     "-lLLVMFrontendOffloading",
-    "-lLLVMObjectYAML",
+    "-lLLVMAArch64Disassembler",
+    "-lLLVMMCDisassembler",
+    "-lLLVMAArch64AsmParser",
+    "-lLLVMAArch64CodeGen",
+    "-lLLVMVectorize",
+    "-lLLVMSandboxIR",
     "-lLLVMGlobalISel",
     "-lLLVMSelectionDAG",
     "-lLLVMCFGuard",
@@ -45,7 +47,6 @@ const llvm_lib_flags = [_][]const u8{
     "-lLLVMDebugInfoPDB",
     "-lLLVMDebugInfoMSF",
     "-lLLVMDebugInfoCodeView",
-    "-lLLVMDebugInfoGSYM",
     "-lLLVMDebugInfoDWARF",
     "-lLLVMObject",
     "-lLLVMTextAPI",
@@ -53,9 +54,7 @@ const llvm_lib_flags = [_][]const u8{
     "-lLLVMIRReader",
     "-lLLVMAsmParser",
     "-lLLVMMC",
-    "-lLLVMDebugInfoDWARFLowLevel",
     "-lLLVMBitReader",
-    "-lLLVMFrontendHLSL",
     "-lLLVMCore",
     "-lLLVMRemarks",
     "-lLLVMBitstreamReader",

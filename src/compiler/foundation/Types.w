@@ -2,8 +2,6 @@
 //
 // Canonical keys are encoded to deterministic strings for HashMap lookups.
 
-use std.prelude_core
-
 use compiler.foundation.Ids
 
 extern fn int_to_string(n: i32) -> str

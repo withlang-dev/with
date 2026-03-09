@@ -1,7 +1,5 @@
 // Wave 1 foundations: SourceMap registry keyed by FileId.
 
-use std.prelude_core
-
 use compiler.foundation.Ids
 use compiler.foundation.Source
 

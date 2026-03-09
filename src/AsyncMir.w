@@ -3,8 +3,6 @@
 // Async-MIR is a deterministic, explicit view of async/generator lowering
 // boundaries produced after MIR/borrow phases.
 
-use std.prelude_core
-
 use InternPool
 
 extern fn int_to_string(n: i32) -> str

@@ -1,5 +1,3 @@
-use std.prelude_core
-
 use Ast
 use InternPool
 use Diagnostic
@@ -88,10 +86,10 @@ fn Zcu.init -> Zcu:
         pending_warnings: Vec.new(),
         last_resolved: ResolveResult.init(),
         resolved_root_path: "",
-        typed_expr_types: HashMap { ptr: 0 },
-        typed_binding_types: HashMap { ptr: 0 },
-        typed_binding_names: HashMap { ptr: 0 },
-        typed_binding_muts: HashMap { ptr: 0 },
+        typed_expr_types: HashMap.new(),
+        typed_binding_types: HashMap.new(),
+        typed_binding_names: HashMap.new(),
+        typed_binding_muts: HashMap.new(),
         last_typed_dump: "",
         typed_pool_cache: AstPool.new(),
         last_sema: sema_seed,
@@ -105,7 +103,8 @@ fn Zcu.init -> Zcu:
     }
 
 fn Zcu.reset_import_state(self: Zcu):
-    self.imported_paths.clear()
+    let empty: Vec[str] = Vec.new()
+    self.imported_paths = empty
     self.next_file_id = 1
 
 fn Zcu.has_imported_path(self: Zcu, path: str) -> i32:
@@ -135,7 +134,8 @@ fn Zcu.print_warnings(self: Zcu):
     self.diagnostics.render_warnings(source)
 
 fn Zcu.reset_pending_warnings(self: Zcu):
-    self.pending_warnings.clear()
+    let empty: Vec[str] = Vec.new()
+    self.pending_warnings = empty
 
 fn Zcu.capture_pending_warnings(self: Zcu):
     self.reset_pending_warnings()
@@ -148,10 +148,10 @@ fn Zcu.set_current_source(self: Zcu, source_dir: str, path: str, text: str):
 fn Zcu.clear_stage_outputs(self: Zcu):
     self.last_resolved = ResolveResult.init()
     self.resolved_root_path = ""
-    self.typed_expr_types = HashMap { ptr: 0 }
-    self.typed_binding_types = HashMap { ptr: 0 }
-    self.typed_binding_names = HashMap { ptr: 0 }
-    self.typed_binding_muts = HashMap { ptr: 0 }
+    self.typed_expr_types = HashMap.new()
+    self.typed_binding_types = HashMap.new()
+    self.typed_binding_names = HashMap.new()
+    self.typed_binding_muts = HashMap.new()
     self.last_typed_dump = ""
     self.typed_pool_cache = AstPool.new()
     self.last_sema = Sema.placeholder(self.pool, self.diagnostics, AstPool.new())
@@ -212,7 +212,8 @@ fn Zcu.set_link_lib_names(self: Zcu, names: Vec[str]):
     self.last_link_lib_names = names
 
 fn Zcu.reset_last_link_lib_names(self: Zcu):
-    self.last_link_lib_names.clear()
+    let empty: Vec[str] = Vec.new()
+    self.last_link_lib_names = empty
 
 fn Zcu.capture_last_link_lib_names(self: Zcu, pool: InternPool, result: ResolveResult):
     self.reset_last_link_lib_names()

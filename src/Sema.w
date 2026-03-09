@@ -5,8 +5,6 @@
 // reports type errors with source spans. Codegen continues to work as
 // before — Sema is purely additive validation.
 
-use std.prelude_core
-
 use Ast
 use BorrowCfg
 use Span
@@ -19,7 +17,6 @@ extern fn with_eprintln(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_hashmap_new(key_size: i64, val_size: i64) -> *T
-extern fn with_hashmap_new_out(out: &T, key_size: i64, val_size: i64) -> void
 
 // ── Type kind constants ──────────────────────────────────────────
 
@@ -216,10 +213,26 @@ fn sema_debug_stage1_enabled -> i32:
         return 0
     1
 
+fn sema_debug_move_enabled -> i32:
+    let raw = with_getenv_str("WITH_DEBUG_MOVE")
+    if raw.len() == 0:
+        return 0
+    1
+
+fn sema_str_eq(a: str, b: str) -> i32:
+    if a.len() != b.len():
+        return 0
+    var i = 0
+    while i < a.len() as i32:
+        if a[i as i64] != b[i as i64]:
+            return 0
+        i = i + 1
+    1
+
 fn Sema.debug_unknown_type(self: Sema, sym: i32, node: i32, context: str):
     if sema_debug_stage1_enabled() == 0:
         return
-    let name = self.pool.resolve_symbol(sym)
+    let name = self.pool_resolve_symbol(sym)
     let prim = self.primitive_type_by_sym(sym)
     let named = if self.named_types.contains(sym): 1 else: 0
     with_eprintln(
@@ -232,20 +245,40 @@ fn Sema.debug_unknown_type(self: Sema, sym: i32, node: i32, context: str):
         " node_kind=" ++ int_to_string(self.ast.kind(node))
     )
 
+fn Sema.pool_resolve_symbol(self: Sema, sym: i32) -> str:
+    if sym <= 0 or sym >= self.pool.symbol_texts.len() as i32:
+        return ""
+    self.pool.symbol_texts.get(sym as i64)
+
+fn Sema.pool_resolve(self: Sema, sym: i32) -> str:
+    self.pool_resolve_symbol(sym)
+
+fn Sema.pool_intern(self: &mut Sema, name: str) -> i32:
+    let existing = self.pool.symbol_map.get(name)
+    if existing.is_some():
+        return existing.unwrap()
+
+    var i = 1
+    while i < self.pool.symbol_texts.len() as i32:
+        let existing_text = self.pool.symbol_texts.get(i as i64)
+        if sema_str_eq(existing_text, name) != 0:
+            self.pool.symbol_map.insert(existing_text, i)
+            return i
+        i = i + 1
+
+    let id = self.pool.symbol_texts.len() as i32
+    self.pool.symbol_texts.push(name)
+    self.pool.symbol_map.insert(name, id)
+    id
+
 fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
-    let map: HashMap[i32, i32] = HashMap { ptr: 0 }
-    with_hashmap_new_out(&map, 4, 4)
-    map
+    HashMap.new()
 
 fn sema_new_map_i32_str -> HashMap[i32, str]:
-    let map: HashMap[i32, str] = HashMap { ptr: 0 }
-    with_hashmap_new_out(&map, 4, 16)
-    map
+    HashMap.new()
 
 fn sema_new_map_str_i32 -> HashMap[str, i32]:
-    let map: HashMap[str, i32] = HashMap { ptr: 0 }
-    with_hashmap_new_out(&map, 16, 4)
-    map
+    HashMap.new()
 
 fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     let named_types = sema_new_map_i32_i32()
@@ -423,7 +456,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.register_prim("str", s.ty_str)
     s.register_prim("String", s.ty_str)
     s.register_prim("StrView", s.ty_str_view)
-    s.discard_sym = s.pool.intern("_")
+    s.discard_sym = s.pool_intern("_")
 
     // Push root scope marker
     s.scope_starts.push(0)
@@ -431,20 +464,20 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s
 
 fn Sema.register_prim(self: &mut Sema, name: str, tid: i32):
-    let sym = self.pool.intern(name)
+    let sym = self.pool_intern(name)
     self.named_types.insert(sym, tid)
     self.pretty_symbol_names.insert(sym, name)
 
 fn Sema.init_intrinsic_symbols(self: &mut Sema):
-    self.sym_channel = self.pool.intern("Channel")
-    self.sym_send = self.pool.intern("send")
-    self.sym_recv = self.pool.intern("recv")
-    self.sym_close = self.pool.intern("close")
-    self.sym_cancel = self.pool.intern("cancel")
-    self.sym_is_done = self.pool.intern("is_done")
-    self.sym_todo = self.pool.intern("todo")
-    self.sym_unreachable = self.pool.intern("unreachable")
-    self.sym_track = self.pool.intern("track")
+    self.sym_channel = self.pool_intern("Channel")
+    self.sym_send = self.pool_intern("send")
+    self.sym_recv = self.pool_intern("recv")
+    self.sym_close = self.pool_intern("close")
+    self.sym_cancel = self.pool_intern("cancel")
+    self.sym_is_done = self.pool_intern("is_done")
+    self.sym_todo = self.pool_intern("todo")
+    self.sym_unreachable = self.pool_intern("unreachable")
+    self.sym_track = self.pool_intern("track")
 
 fn sema_is_name_char(ch: i32) -> i32:
     if ch >= 48 and ch <= 57:
@@ -735,7 +768,7 @@ fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
     if self.is_discard_binding_symbol(sym) != 0:
         return
     if self.scope_lookup(sym) >= 0:
-        let name = self.pool.resolve(sym)
+        let name = self.pool_resolve(sym)
         self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
         return
     self.bind_names.push(sym)
@@ -1061,7 +1094,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         let inner = self.resolve_type_expr(inner_node)
         // Distinct type: treat as single-field struct
         let te_start = self.type_extra.len() as i32
-        let val_sym = self.pool.intern("value")
+        let val_sym = self.pool_intern("value")
         self.type_extra.push(val_sym)
         self.type_extra.push(inner)
         self.type_extra.push(0)
@@ -1209,7 +1242,7 @@ fn Sema.register_method_sig_alias(self: Sema, node: i32, fn_sym: i32, sig_idx: i
     if sig_idx < 0:
         return
 
-    let qualified = self.pool.resolve(fn_sym)
+    let qualified = self.pool_resolve(fn_sym)
     if qualified.len() == 0:
         return
     let dot = sema_str_find_char(qualified, 46)
@@ -1220,8 +1253,8 @@ fn Sema.register_method_sig_alias(self: Sema, node: i32, fn_sym: i32, sig_idx: i
     if owner_name.len() == 0 or method_name.len() == 0:
         return
 
-    let owner_sym = self.pool.intern(owner_name)
-    let method_sym = self.pool.intern(method_name)
+    let owner_sym = self.pool_intern(owner_name)
+    let method_sym = self.pool_intern(method_name)
     let key_sym = self.method_key(owner_sym, method_sym)
     self.sig_lookup.insert(key_sym, sig_idx)
     self.method_symbol_flags.insert(fn_sym, 1)
@@ -1311,7 +1344,7 @@ fn Sema.collect_impl_decl(self: Sema, node: i32):
     if trait_sym == 0:
         return
 
-    let trait_name = self.pool.resolve(trait_sym)
+    let trait_name = self.pool_resolve(trait_sym)
     let is_builtin_trait = sema_is_builtin_trait_name(trait_name)
     if not is_builtin_trait and not self.trait_lookup.contains(trait_sym):
         self.emit_error("unknown trait", node)
@@ -1363,8 +1396,8 @@ fn Sema.find_trait_decl_node(self: Sema, trait_sym: i32) -> i32:
     0
 
 fn Sema.emit_trait_object_safety_error(self: Sema, trait_sym: i32, method_sym: i32, reason: str, node: i32):
-    let trait_name = self.pool.resolve(trait_sym)
-    let method_name = self.pool.resolve(method_sym)
+    let trait_name = self.pool_resolve(trait_sym)
+    let method_name = self.pool_resolve(method_sym)
     self.emit_error("trait '" ++ trait_name ++ "' is not object-safe: method '" ++ method_name ++ "' " ++ reason, node)
 
 fn Sema.ensure_trait_object_safe(self: Sema, trait_sym: i32, node: i32) -> i32:
@@ -1383,8 +1416,8 @@ fn Sema.ensure_trait_object_safe(self: Sema, trait_sym: i32, node: i32) -> i32:
     let method_count = self.ast.get_extra(pos)
     pos = pos + 1
 
-    let self_name_sym = self.pool.intern("self")
-    let self_type_sym = self.pool.intern("Self")
+    let self_name_sym = self.pool_intern("self")
+    let self_type_sym = self.pool_intern("Self")
     for mi in 0..method_count:
         let method_sym = self.ast.get_extra(pos)
         pos = pos + 1
@@ -1468,7 +1501,7 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
 
     if kind == NK_TYPE_TRAIT_OBJ():
         let trait_sym = self.ast.get_data0(node)
-        let trait_name = self.pool.resolve(trait_sym)
+        let trait_name = self.pool_resolve(trait_sym)
         let is_builtin_trait = sema_is_builtin_trait_name(trait_name)
         if not is_builtin_trait and not self.trait_lookup.contains(trait_sym):
             self.emit_error("unknown trait", node)
@@ -1524,7 +1557,7 @@ fn Sema.type_decl_has_derive(self: Sema, node: i32, trait_sym: i32) -> i32:
     0
 
 fn Sema.validate_copy_derives(self: Sema):
-    let copy_sym = self.pool.intern("Copy")
+    let copy_sym = self.pool_intern("Copy")
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) != NK_TYPE_DECL():
@@ -1646,7 +1679,7 @@ fn Sema.ensure_generic_substitutions(self: Sema, tp_start: i32, tp_count: i32, p
         pos = pos + 2 + bound_count
 
 fn Sema.primitive_type_by_sym(self: Sema, sym: i32) -> i32:
-    let name = self.pool.resolve_symbol(sym)
+    let name = self.pool_resolve_symbol(sym)
     if with_str_eq(name, "i8") != 0: return self.ty_i8
     if with_str_eq(name, "i16") != 0: return self.ty_i16
     if with_str_eq(name, "i32") != 0: return self.ty_i32
@@ -1733,7 +1766,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
 
     if kind == NK_TYPE_TRAIT_OBJ():
         let trait_sym = self.ast.get_data0(node)
-        let trait_name = self.pool.resolve(trait_sym)
+        let trait_name = self.pool_resolve(trait_sym)
         let is_builtin_trait = sema_is_builtin_trait_name(trait_name)
         if not is_builtin_trait and not self.trait_lookup.contains(trait_sym):
             self.emit_error("unknown trait", node)
@@ -1851,7 +1884,7 @@ fn Sema.is_call_expr_task(self: Sema, node: i32) -> i32:
     if self.ast.kind(callee) == NK_FIELD_ACCESS():
         let recv = self.ast.get_data0(callee)
         let method = self.ast.get_data1(callee)
-        if self.ast.kind(recv) == NK_IDENT() and self.is_active_async_scope_symbol(self.ast.get_data0(recv)) != 0 and self.pool.resolve(method) == "track":
+        if self.ast.kind(recv) == NK_IDENT() and self.is_active_async_scope_symbol(self.ast.get_data0(recv)) != 0 and self.pool_resolve(method) == "track":
             return 1
     0
 
@@ -1899,7 +1932,7 @@ fn Sema.expr_is_scoped_task_value(self: Sema, node: i32) -> i32:
         if self.ast.kind(callee) == NK_FIELD_ACCESS():
             let recv = self.ast.get_data0(callee)
             let method = self.ast.get_data1(callee)
-            if self.ast.kind(recv) == NK_IDENT() and self.is_active_async_scope_symbol(self.ast.get_data0(recv)) != 0 and self.pool.resolve(method) == "track":
+            if self.ast.kind(recv) == NK_IDENT() and self.is_active_async_scope_symbol(self.ast.get_data0(recv)) != 0 and self.pool_resolve(method) == "track":
                 return 1
     0
 
@@ -1907,7 +1940,7 @@ fn Sema.has_live_await_guard(self: Sema) -> i32:
     var i = self.bind_names.len() as i32 - 1
     while i >= 0:
         if self.bind_states.get(i as i64) == VS_LIVE():
-            let name = self.pool.resolve(self.bind_names.get(i as i64))
+            let name = self.pool_resolve(self.bind_names.get(i as i64))
             if name.ends_with("_guard"):
                 return 1
         i = i - 1
@@ -2252,6 +2285,13 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     if tid >= 0:
         let state = self.scope_lookup_state(sym)
         if state == VS_MOVED():
+            if sema_debug_move_enabled() != 0:
+                let name = self.pool_resolve(sym)
+                with_eprintln(
+                    "[moved-use] sym=" ++ name ++
+                    " tid=" ++ int_to_string(tid) ++
+                    " node_kind=" ++ int_to_string(self.ast.kind(node))
+                )
             self.emit_error("use of moved value", node)
         return tid
 
@@ -2315,7 +2355,7 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
                 if op == OP_MUL(): "mul" else:
                 if op == OP_DIV(): "div" else:
                 "mod"
-            let method_sym = self.pool.intern(method_name)
+            let method_sym = self.pool_intern(method_name)
             let method_key = self.method_key(lhs_name, method_sym)
             let method_sig = self.get_sig(method_key)
             if method_sig >= 0:
@@ -2570,7 +2610,7 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
     if ftk == TY_TUPLE():
         let te_start = self.get_type_d0(field_base)
         let elem_count = self.get_type_d1(field_base)
-        let field_name = self.pool.resolve(field)
+        let field_name = self.pool_resolve(field)
         // Parse field index
         var idx = 0
         for vi in 0..field_name.len() as i32:
@@ -2582,7 +2622,7 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
         return 0
 
     if ftk == TY_ARRAY() or ftk == TY_SLICE() or ftk == TY_STR():
-        let field_name = self.pool.resolve(field)
+        let field_name = self.pool_resolve(field)
         if field_name == "len":
             return self.ty_i64
         return 0
@@ -3024,7 +3064,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         let actual = arg_count + param_offset
         if self.sig_is_variadic(sig_idx) == 0:
             if actual < min_expected or actual > expected:
-                let fn_name = self.pool.resolve(fn_sym)
+                let fn_name = self.pool_resolve(fn_sym)
                 if min_expected == expected:
                     self.emit_error("function '" ++ fn_name ++ "' expects " ++ int_to_string(expected) ++ " argument(s), found " ++ int_to_string(actual), node)
                 else:
@@ -3146,8 +3186,8 @@ fn Sema.check_dyn_trait_call_compat(self: Sema, fn_sym: i32, call_extra_start: i
             continue
 
         if self.select_trait_impl(concrete_sym, trait_sym) == 0:
-            let type_str = self.pool.resolve(concrete_sym)
-            let trait_str = self.pool.resolve(trait_sym)
+            let type_str = self.pool_resolve(concrete_sym)
+            let trait_str = self.pool_resolve(trait_sym)
             self.emit_error("type '" ++ type_str ++ "' does not implement trait '" ++ trait_str ++ "' required for dyn parameter", self.ast.get_extra(call_extra_start + ai))
             continue
 
@@ -3213,7 +3253,7 @@ fn Sema.put_generic_subst(self: Sema, param_sym: i32, tid: i32, node: i32):
     if existing != 0:
         if self.types_compatible(existing, tid) == 0:
             if self.arithmetic_result_type(existing, tid) == 0:
-                let tp_name = self.pool.resolve(param_sym)
+                let tp_name = self.pool_resolve(param_sym)
                 let a = self.type_name(existing)
                 let b = self.type_name(tid)
                 self.emit_error("cannot infer a single type for '" ++ tp_name ++ "': saw '" ++ a ++ "' and '" ++ b ++ "'", node)
@@ -3305,7 +3345,7 @@ fn Sema.check_generic_trait_bounds(self: Sema, tp_start: i32, tp_count: i32, cal
         let concrete_tid = self.lookup_generic_subst(tp_name)
         for bi in 0..bound_count:
             let trait_sym = self.ast.get_extra(pos + 2 + bi)
-            let trait_name = self.pool.resolve(trait_sym)
+            let trait_name = self.pool_resolve(trait_sym)
             if trait_name == "type":
                 continue
             if concrete_tid == 0:
@@ -3317,8 +3357,8 @@ fn Sema.check_generic_trait_bounds(self: Sema, tp_start: i32, tp_count: i32, cal
             self.obligation_type_syms.push(concrete_sym)
             self.obligation_nodes.push(call_node)
             if self.select_trait_impl(concrete_sym, trait_sym) == 0:
-                let type_str = self.pool.resolve(concrete_sym)
-                let tp_str = self.pool.resolve(tp_name)
+                let type_str = self.pool_resolve(concrete_sym)
+                let tp_str = self.pool_resolve(tp_name)
                 self.emit_error("type '" ++ type_str ++ "' does not implement trait '" ++ trait_name ++ "' required by bound '" ++ tp_str ++ ": " ++ trait_name ++ "'", call_node)
         pos = pos + 2 + bound_count
 
@@ -3393,29 +3433,29 @@ fn Sema.type_symbol_for_bounds(self: Sema, tid: i32) -> i32:
         let signed = self.get_type_d1(resolved)
         if bits == 8:
             if signed != 0:
-                return self.pool.intern("i8")
-            return self.pool.intern("u8")
+                return self.pool_intern("i8")
+            return self.pool_intern("u8")
         if bits == 16:
             if signed != 0:
-                return self.pool.intern("i16")
-            return self.pool.intern("u16")
+                return self.pool_intern("i16")
+            return self.pool_intern("u16")
         if bits == 32:
             if signed != 0:
-                return self.pool.intern("i32")
-            return self.pool.intern("u32")
+                return self.pool_intern("i32")
+            return self.pool_intern("u32")
         if bits == 64:
             if signed != 0:
-                return self.pool.intern("i64")
-            return self.pool.intern("u64")
+                return self.pool_intern("i64")
+            return self.pool_intern("u64")
         return 0
     if tk == TY_FLOAT():
         if self.get_type_d0(resolved) == 32:
-            return self.pool.intern("f32")
-        return self.pool.intern("f64")
+            return self.pool_intern("f32")
+        return self.pool_intern("f64")
     if tk == TY_BOOL():
-        return self.pool.intern("bool")
+        return self.pool_intern("bool")
     if tk == TY_STR():
-        return self.pool.intern("str")
+        return self.pool_intern("str")
     0
 
 fn Sema.trait_object_from_type_node(self: Sema, type_node: i32) -> i32:
@@ -3428,7 +3468,7 @@ fn Sema.trait_object_from_type_node(self: Sema, type_node: i32) -> i32:
         return self.trait_object_from_type_node(self.ast.get_data0(type_node))
     if kind == NK_TYPE_GENERIC():
         let base = self.ast.get_data0(type_node)
-        if self.pool.resolve(base) != "Box":
+        if self.pool_resolve(base) != "Box":
             return 0
         let extra_start = self.ast.get_data1(type_node)
         let arg_count = self.ast.get_data2(type_node)
@@ -3479,8 +3519,6 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
         return arg_types.get(0)
 
     if obj_type == 0:
-        if static_type_sym != 0 and self.static_receiver_type_is_known(expr) == 0:
-            self.emit_error("unknown type", expr)
         return 0
 
     let resolved = self.resolve_alias(obj_type)
@@ -3994,6 +4032,15 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
         if self.scope_has(sym) != 0:
             let tid = self.scope_lookup(sym)
             if not self.is_copy(tid):
+                if sema_debug_move_enabled() != 0:
+                    let resolved = self.resolve_alias(tid)
+                    let name = self.pool_resolve(sym)
+                    with_eprintln(
+                        "[move] sym=" ++ name ++
+                        " tid=" ++ int_to_string(tid) ++
+                        " resolved=" ++ int_to_string(resolved) ++
+                        " kind=" ++ int_to_string(self.get_type_kind(resolved))
+                    )
                 self.scope_set_state(sym, VS_MOVED())
     if kind == NK_GROUPED():
         self.mark_moved_if_consumed(self.ast.get_data0(node))
@@ -4006,7 +4053,7 @@ fn Sema.method_key(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     if cached.is_some():
         return cached.unwrap()
 
-    let out = self.pool.intern("$m$" ++ cache_key)
+    let out = self.pool_intern("$m$" ++ cache_key)
     self.method_key_cache.insert(cache_key, out)
     out
 
@@ -4189,6 +4236,8 @@ fn Sema.is_copy(self: Sema, tid: i32) -> i32:
         if tk == TY_STRUCT():
             let name = self.get_type_d0(resolved)
             if self.has_drop_method(name):
+                if sema_debug_move_enabled() != 0:
+                    with_eprintln("[noncopy] type=" ++ self.pool_resolve(name) ++ " reason=drop")
                 out = 0
             else:
                 let struct_te_start = self.get_type_d1(resolved)
@@ -4196,6 +4245,13 @@ fn Sema.is_copy(self: Sema, tid: i32) -> i32:
                 for fi in 0..struct_field_count:
                     let ft = self.type_extra.get((struct_te_start + fi * 3 + 1) as i64)
                     if self.is_copy(ft) == 0:
+                        if sema_debug_move_enabled() != 0:
+                            let field_name = self.type_extra.get((struct_te_start + fi * 3) as i64)
+                            with_eprintln(
+                                "[noncopy] type=" ++ self.pool_resolve(name) ++
+                                " field=" ++ self.pool_resolve(field_name) ++
+                                " field_ty=" ++ self.type_name(ft)
+                            )
                         out = 0
                         break
         else if tk == TY_ARRAY():
@@ -4224,7 +4280,7 @@ fn Sema.has_drop_method(self: Sema, type_name: i32) -> i32:
     if self.drop_method_cache.contains(type_name):
         return self.drop_method_cache.get(type_name).unwrap()
 
-    let type_text = self.pool.resolve(type_name)
+    let type_text = self.pool_resolve(type_name)
     if type_text.len() == 0:
         self.drop_method_cache.insert(type_name, 0)
         return 0
@@ -4232,20 +4288,24 @@ fn Sema.has_drop_method(self: Sema, type_name: i32) -> i32:
         self.drop_method_cache.insert(type_name, 0)
         return 0
 
-    // Keep drop lookup idempotent when a method key leaks in as the "type".
-    var key = type_name
-    if not (type_text.len() >= 5 and
-            type_text[type_text.len() - 5] == 46 and // '.'
-            type_text[type_text.len() - 4] == 100 and // d
-            type_text[type_text.len() - 3] == 114 and // r
-            type_text[type_text.len() - 2] == 111 and // o
-            type_text[type_text.len() - 1] == 112): // p
-        key = self.pool.intern(type_text ++ ".drop")
+    let target = if type_text.len() >= 5 and
+                    type_text[type_text.len() - 5] == 46 and // '.'
+                    type_text[type_text.len() - 4] == 100 and // d
+                    type_text[type_text.len() - 3] == 114 and // r
+                    type_text[type_text.len() - 2] == 111 and // o
+                    type_text[type_text.len() - 1] == 112: // p
+        type_text
+    else:
+        type_text ++ ".drop"
 
-    let has = if self.sig_lookup.contains(key): 1 else: 0
+    var has = 0
+    for si in 0..self.sig_names.len() as i32:
+        let sig_sym = self.sig_names.get(si as i64)
+        if with_str_eq(self.pool_resolve(sig_sym), target) != 0:
+            has = 1
+            break
+
     self.drop_method_cache.insert(type_name, has)
-    if key != type_name:
-        self.drop_method_cache.insert(key, has)
     has
 
 // ── Borrow checking ──────────────────────────────────────────────
@@ -4374,7 +4434,7 @@ fn Sema.safe_symbol_text(self: Sema, sym: i32) -> str:
         let pretty = self.pretty_symbol_names.get(sym).unwrap()
         if pretty.len() > 0:
             return pretty
-    let pooled = self.pool.resolve(sym)
+    let pooled = self.pool_resolve(sym)
     if pooled.len() > 0:
         return pooled
     "sym" ++ int_to_string(sym)
@@ -4398,7 +4458,7 @@ fn Sema.impl_owner_type_name_for_decl(self: Sema, decl: i32) -> str:
     best_name
 
 fn Sema.reset_typed_dump_safety(self: Sema):
-    self.typed_dump_seen_nodes = HashMap { ptr: with_hashmap_new(4, 4) }
+    self.typed_dump_seen_nodes = sema_new_map_i32_i32()
     self.typed_dump_visit_budget = 1000
 
 fn Sema.mark_typed_dump_visit(self: Sema, node: i32) -> i32:

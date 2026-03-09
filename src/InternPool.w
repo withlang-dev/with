@@ -3,13 +3,9 @@
 // Root `InternPool` now follows the foundation layout while preserving
 // historical string-only entrypoints used across existing compiler code.
 
-use std.prelude_core
-
 use compiler.foundation.Types
 use compiler.foundation.Values
 
-extern fn with_vec_new_out(v: &T, elem_size: i64) -> void
-extern fn with_hashmap_new_out(out: &T, key_size: i64, val_size: i64) -> void
 extern fn with_hashmap_new_at(base: &T, offset: i64, key_size: i64, val_size: i64) -> void
 extern fn with_getenv_str(name: str) -> str
 extern fn with_eprintln(s: str) -> void
@@ -45,8 +41,7 @@ type InternPool = {
 
 fn intern_new_map_str_i32 -> HashMap[str, i32]:
     intern_debug_init("intern_new_map_str_i32:start")
-    let map: HashMap[str, i32] = HashMap { ptr: 0 }
-    with_hashmap_new_out(&map, 16, 4)
+    let map: HashMap[str, i32] = HashMap.new()
     intern_debug_init("intern_new_map_str_i32:new_out")
     map
 
@@ -62,14 +57,11 @@ fn intern_text_eq(a: str, b: str) -> bool:
 
 fn InternPool.init -> InternPool:
     intern_debug_init("InternPool.init:start")
-    let symbol_texts: Vec[str] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_vec_new_out(&symbol_texts, 16)
+    let symbol_texts: Vec[str] = Vec.new()
     intern_debug_init("InternPool.init:symbol_texts")
-    let type_keys: Vec[TypeKey] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_vec_new_out(&type_keys, 24)
+    let type_keys: Vec[TypeKey] = Vec.new()
     intern_debug_init("InternPool.init:type_keys")
-    let value_keys: Vec[ValueKey] = Vec { ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_vec_new_out(&value_keys, 24)
+    let value_keys: Vec[ValueKey] = Vec.new()
     intern_debug_init("InternPool.init:value_keys")
     let symbol_map = intern_new_map_str_i32()
     intern_debug_init("InternPool.init:symbol_map")

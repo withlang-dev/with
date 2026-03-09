@@ -2,8 +2,6 @@
 //
 // This pass builds explicit control-flow MIR from the semantic result.
 
-use std.prelude_core
-
 use Ast
 use InternPool
 use Mir
@@ -324,7 +322,9 @@ fn MirBuilder.unit_operand(self: MirBuilder) -> i32:
     self.const_operand(CK_UNIT(), 0, self.sema.ty_void)
 
 fn MirBuilder.mark_unsupported(self: MirBuilder):
-    self.body.lowering_failed = 1
+    var b = self.body
+    b.lowering_failed = 1
+    self.body = b
 
 fn MirBuilder.lower_int_lit(self: MirBuilder, value: i64, type_id: i32) -> i32:
     let ty = if type_id == 0 or self.sema.get_type_kind(type_id) == TY_VOID(): self.sema.ty_i32 else: type_id

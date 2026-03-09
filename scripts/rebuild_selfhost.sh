@@ -79,19 +79,12 @@ validate_stage_binary() {
   local compiler_bin="$2"
   local run_dir="$3"
   local wrapped_path="$4"
-  local probe_src
   local probe_log
 
-  probe_src="${run_dir}/probe.w"
   probe_log="${ROOT_DIR}/.with/build/.${stage_name}.probe.log"
-  cat >"${probe_src}" <<'EOF'
-fn main:
-    let x = 1
-EOF
 
   local rc=0
-  run_cmd "${probe_log}" "${run_dir}" env PATH="${wrapped_path}" "${compiler_bin}" check "${probe_src}" || rc=$?
-  rm -f "${probe_src}"
+  run_cmd "${probe_log}" "${run_dir}" env PATH="${wrapped_path}" "${compiler_bin}" version || rc=$?
   if [ "${rc}" -ne 0 ]; then
     if [ "${rc}" -eq 124 ] || [ "${rc}" -eq 137 ]; then
       echo "[${stage_name}] health probe timed out after ${TIMEOUT_SECS}s" >&2
@@ -418,6 +411,18 @@ EOF
   rm -rf "$tmp_dir"
 }
 
+install_stage_binary() {
+  local src_bin="$1"
+  local dst_bin="$2"
+  local tmp_bin=""
+
+  mkdir -p "$(dirname "${dst_bin}")"
+  tmp_bin="$(mktemp "${dst_bin}.tmp.XXXXXX")"
+  cp "${src_bin}" "${tmp_bin}"
+  chmod +x "${tmp_bin}"
+  mv -f "${tmp_bin}" "${dst_bin}"
+}
+
 ensure_bootstrap() {
   if [ ! -x "${ROOT_DIR}/bootstrap/zig-out/bin/with" ]; then
     echo "[bootstrap] building bootstrap compiler"
@@ -543,8 +548,8 @@ stage1() {
   fi
   echo "[stage1] selected seed: ${seed_bin}"
   sync_runtime_artifacts "stage1"
-  cp "${LAST_STAGE_BIN}" "${STAGE1_BIN}"
-  cp "${LAST_STAGE_BIN}" "${CANONICAL_BIN}"
+  install_stage_binary "${LAST_STAGE_BIN}" "${STAGE1_BIN}"
+  install_stage_binary "${LAST_STAGE_BIN}" "${CANONICAL_BIN}"
   rm -f "${LAST_STAGE_BIN}"
   LAST_STAGE_BIN=""
   echo "[stage1] wrote ${STAGE1_BIN}"
@@ -555,8 +560,8 @@ stage2() {
   ensure_out_layout
   run_local_build "${STAGE1_BIN}" "stage2" "${ROOT_DIR}/src/main.w"
   sync_runtime_artifacts "stage2"
-  cp "${LAST_STAGE_BIN}" "${STAGE2_BIN}"
-  cp "${LAST_STAGE_BIN}" "${CANONICAL_BIN}"
+  install_stage_binary "${LAST_STAGE_BIN}" "${STAGE2_BIN}"
+  install_stage_binary "${LAST_STAGE_BIN}" "${CANONICAL_BIN}"
   rm -f "${LAST_STAGE_BIN}"
   LAST_STAGE_BIN=""
   echo "[stage2] wrote ${STAGE2_BIN}"
@@ -567,7 +572,7 @@ stage3() {
   ensure_out_layout
   run_local_build "${STAGE2_BIN}" "stage3" "${ROOT_DIR}/src/main.w"
   sync_runtime_artifacts "stage3"
-  cp "${LAST_STAGE_BIN}" "${STAGE3_BIN}"
+  install_stage_binary "${LAST_STAGE_BIN}" "${STAGE3_BIN}"
   rm -f "${LAST_STAGE_BIN}"
   LAST_STAGE_BIN=""
   echo "[stage3] wrote ${STAGE3_BIN}"

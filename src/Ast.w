@@ -6,8 +6,6 @@
 // This follows a SoA (Struct of Arrays) approach for cache-friendly
 // access and avoids the need for heap-allocated pointer trees.
 
-use std.prelude_core
-
 use Span
 use Token
 

@@ -19,9 +19,12 @@ fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, outpu
         with_eprintln("error: missing MIR input for LLVM backend")
         return 1
     var backend_pool = pool
+    var backend_intern = self.pool
     if self.last_sema.ast.decl_count() > 0:
         backend_pool = self.last_sema.ast
-    var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, self.pool)
+    if self.last_sema.pool.symbol_texts.len() as i32 > 1:
+        backend_intern = self.last_sema.pool
+    var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern)
     cg.source_file = self.current_source_path
     cg.source_text = self.current_source_text
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
@@ -49,9 +52,12 @@ fn Zcu.emit_ir_backend(self: Zcu, pool: AstPool, opt_level: i32) -> bool:
         with_eprintln("error: missing MIR input for LLVM backend")
         return false
     var backend_pool = pool
+    var backend_intern = self.pool
     if self.last_sema.ast.decl_count() > 0:
         backend_pool = self.last_sema.ast
-    var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, self.pool)
+    if self.last_sema.pool.symbol_texts.len() as i32 > 1:
+        backend_intern = self.last_sema.pool
+    var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern)
     cg.source_file = self.current_source_path
     cg.source_text = self.current_source_text
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:

@@ -1,5 +1,3 @@
-use std.prelude_core
-
 use Ast
 use Lexer
 use Parser
@@ -45,6 +43,40 @@ fn Zcu.read_trace_c_import_cache_frontend(self: Zcu) -> i32:
     if raw == "0":
         return 0
     1
+
+fn frontend_debug_type_names_enabled() -> i32:
+    let raw = with_getenv_str("WITH_DEBUG_TYPE_NAMES")
+    if raw.len() == 0:
+        return 0
+    if raw == "0":
+        return 0
+    1
+
+fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
+    if frontend_debug_type_names_enabled() == 0:
+        return
+    with_eprintln("[type-names] stage=" ++ stage ++ " decls=" ++ int_to_string(pool.decl_count()))
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NK_TYPE_DECL():
+            continue
+        let sub_kind = type_decl_sub_kind(pool.get_data2(decl))
+        var kind_name = "alias"
+        if sub_kind == TDK_STRUCT():
+            kind_name = "struct"
+        else if sub_kind == TDK_ENUM():
+            kind_name = "enum"
+        else if sub_kind == TDK_DISTINCT():
+            kind_name = "distinct"
+        let name_sym = pool.get_data0(decl)
+        let name = intern.resolve(name_sym)
+        let msg = "[type-names] " ++ stage ++
+            " decl=" ++ int_to_string(di) ++
+            " node=" ++ int_to_string(decl) ++
+            " kind=" ++ kind_name ++
+            " name_sym=" ++ int_to_string(name_sym) ++
+            " name=" ++ name
+        with_eprintln(msg)
 
 fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var out = pool
@@ -566,6 +598,31 @@ fn Zcu.inject_prelude_frontend(self: Zcu, pool: AstPool) -> AstPool:
     self.diagnostics = parser.diags
     merged_pool
 
+// Parse the prelude USE declaration into a fresh pool, then parse the user
+// source into the same pool so the prelude USE comes first in decl order.
+// This ensures prelude-provided types (Vec, HashMap, etc.) are imported
+// before any user modules that depend on them.
+fn Zcu.parse_with_prelude_first(self: Zcu, text: str, file_id: i32) -> AstPool:
+    let prelude_module = if self.prelude_mode == PRELUDE_CORE(): "std.prelude_core" else: "std.prelude"
+    let synthetic = "use " ++ prelude_module ++ "\n"
+
+    // Step 1: parse prelude USE into a fresh pool
+    var plexer = Lexer.init(synthetic, 0)
+    let ptokens = plexer.tokenize()
+    var pparser = Parser.init(ptokens, synthetic, 0, self.pool, self.diagnostics)
+    var pool = pparser.parse_module()
+    self.pool = pparser.intern
+    self.diagnostics = pparser.diags
+
+    // Step 2: parse user source into the same pool (appends after prelude USE)
+    var ulexer = Lexer.init(text, file_id)
+    let utokens = ulexer.tokenize()
+    var uparser = Parser.init_with_pool(utokens, text, file_id, self.pool, self.diagnostics, pool)
+    pool = uparser.parse_module()
+    self.pool = uparser.intern
+    self.diagnostics = uparser.diags
+    pool
+
 fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
     if zcu_debug_init_enabled() != 0:
         with_eprintln("[frontend] compile_file:start " ++ path)
@@ -588,31 +645,24 @@ fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
 
 fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) -> AstPool:
     if zcu_debug_init_enabled() != 0:
-        with_eprintln("[frontend] compile_source:lex")
-    // Phase 1: Lex.
-    var lexer = Lexer.init(text, file_id)
-    let tokens = lexer.tokenize()
-
-    if zcu_debug_init_enabled() != 0:
         with_eprintln("[frontend] compile_source:parse")
-    // Phase 2: Parse.
-    var parser = Parser.init(tokens, text, file_id, self.pool, self.diagnostics)
-    var pool = parser.parse_module()
+
+    // Phase 1+2: Lex + Parse.  When prelude is enabled, parse the prelude
+    // USE declaration first so it appears at decl position 0, ensuring
+    // prelude-provided types are imported before user modules.
+    var pool: AstPool = AstPool.new()
+    if self.prelude_mode != PRELUDE_NONE():
+        pool = self.parse_with_prelude_first(text, file_id)
+    else:
+        var lexer = Lexer.init(text, file_id)
+        let tokens = lexer.tokenize()
+        var parser = Parser.init(tokens, text, file_id, self.pool, self.diagnostics)
+        pool = parser.parse_module()
+        self.pool = parser.intern
+        self.diagnostics = parser.diags
+
     let root_local_decl_count = count_non_use_decls_frontend(pool)
 
-    // Propagate parser updates (intern + diagnostics) back into ZCU.
-    self.pool = parser.intern
-    self.diagnostics = parser.diags
-
-    if self.diagnostics.has_errors():
-        let source = Source.from_string(name, text, file_id)
-        self.diagnostics.render_all(source)
-        self.set_resolve_snapshot(ResolveResult.init(), name)
-        return AstPool.new()
-
-    if zcu_debug_init_enabled() != 0:
-        with_eprintln("[frontend] compile_source:inject_prelude")
-    pool = self.inject_prelude_frontend(pool)
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
         self.diagnostics.render_all(source)
@@ -644,6 +694,8 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     pool = self.expand_c_imports_frontend(pool)
     pool.set_local_decl_count(root_local_decl_count)
     self.set_typed_snapshot("", pool)
+    self.set_frontend_pool(self.pool)
+    frontend_dump_type_decl_names("post-imports", pool, self.pool)
 
     if self.diagnostics.has_errors():
         let source = Source.from_string(name, text, file_id)
@@ -658,6 +710,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     sema.source_text = text
     sema.check_module()
     self.sync_from_sema(sema)
+    frontend_dump_type_decl_names("post-sema", self.last_sema.ast, self.last_sema.pool)
     // Keep typed sidecars for downstream stages, but materialize the textual
     // typed dump only when explicitly requested.
     self.last_typed_dump = ""

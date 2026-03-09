@@ -490,6 +490,9 @@ fn sourceStem(source_path: []const u8) []const u8 {
 fn shouldLinkLlvmBridge(source_path: []const u8) bool {
     if (std.mem.eql(u8, source_path, "src/main.w")) return true;
     if (std.mem.endsWith(u8, source_path, "/src/main.w")) return true;
+    if (std.mem.eql(u8, source_path, "src/bootstrap_main.w")) return true;
+    if (std.mem.endsWith(u8, source_path, "/src/bootstrap_main.w")) return true;
+    if (std.mem.endsWith(u8, source_path, "/bootstrap_main.w")) return true;
     return std.mem.endsWith(u8, source_path, "\\src\\main.w");
 }
 
@@ -556,7 +559,7 @@ pub fn buildBinaryAt(
         };
     }
 
-    var extras: [4][]const u8 = undefined;
+    var extras: [8][]const u8 = undefined;
     var extra_count: usize = 0;
     if (uses_async.?) {
         if (exe_dir) |ed| {
@@ -580,6 +583,19 @@ pub fn buildBinaryAt(
         extras[extra_count] = hp;
         extra_count += 1;
     }
+
+    // Link support_runtime.o for runtime helper symbols (e.g. with_i64_to_str).
+    var support_rt_buf: [4096]u8 = undefined;
+    if (exe_dir) |ed| {
+        const support_rt = std.fmt.bufPrint(&support_rt_buf, "{s}/runtime/support_runtime.o", .{ed}) catch null;
+        if (support_rt) |sp| {
+            if (std.fs.accessAbsolute(sp, .{})) |_| {
+                extras[extra_count] = sp;
+                extra_count += 1;
+            } else |_| {}
+        }
+    }
+
     if (bridge_path) |bp| {
         extras[extra_count] = bp;
         extra_count += 1;

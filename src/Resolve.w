@@ -3,8 +3,6 @@
 // This pass builds deterministic module/import/def/binding/use tables from AST.
 // It does not replace Sema yet; it provides a stable resolved artifact for Wave 4.
 
-use std.prelude_core
-
 use Ast
 use Lexer
 use Parser

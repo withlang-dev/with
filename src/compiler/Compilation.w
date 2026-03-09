@@ -44,6 +44,40 @@ fn compilation_debug_pool_flow(label: str, pool: InternPool, typed_pool: AstPool
         " sema.pool.symbols=" ++ int_to_string(sema.pool.symbol_texts.len() as i32) ++
         " sema.ast.decls=" ++ int_to_string(sema.ast.decl_count()))
 
+fn compilation_debug_type_names_enabled() -> i32:
+    let raw = with_getenv_str("WITH_DEBUG_TYPE_NAMES")
+    if raw.len() == 0:
+        return 0
+    if raw == "0":
+        return 0
+    1
+
+fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
+    if compilation_debug_type_names_enabled() == 0:
+        return
+    with_eprintln("[type-names] stage=" ++ stage ++ " decls=" ++ int_to_string(pool.decl_count()))
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NK_TYPE_DECL():
+            continue
+        let sub_kind = type_decl_sub_kind(pool.get_data2(decl))
+        var kind_name = "alias"
+        if sub_kind == TDK_STRUCT():
+            kind_name = "struct"
+        else if sub_kind == TDK_ENUM():
+            kind_name = "enum"
+        else if sub_kind == TDK_DISTINCT():
+            kind_name = "distinct"
+        let name_sym = pool.get_data0(decl)
+        let name = intern.resolve(name_sym)
+        let msg = "[type-names] " ++ stage ++
+            " decl=" ++ int_to_string(di) ++
+            " node=" ++ int_to_string(decl) ++
+            " kind=" ++ kind_name ++
+            " name_sym=" ++ int_to_string(name_sym) ++
+            " name=" ++ name
+        with_eprintln(msg)
+
 // Transitional orchestration root:
 // owns compiler-facing config/Zcu state while reusing Driver execution per call.
 // This removes long-lived Driver field ownership from Compilation.
@@ -253,6 +287,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     let mir_mod: MirModule = lower_module(sema, active_pool, zcu.pool)
     let async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, zcu.pool, sema, zcu.diagnostics)
     zcu.diagnostics = async_artifacts.diags
+    compilation_dump_type_names("post-mir-lower", active_pool, zcu.pool)
     zcu.set_codegen_snapshot(mir_mod, "", async_artifacts.out_mod, "")
     self.zcu = zcu
     zcu.last_mir_module

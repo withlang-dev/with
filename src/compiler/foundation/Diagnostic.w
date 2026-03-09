@@ -1,7 +1,5 @@
 // Wave 1 foundations: structured diagnostics model.
 
-use std.prelude_core
-
 use compiler.foundation.Span
 
 fn DIAG_SEVERITY_ERROR -> i32: 1

@@ -2,8 +2,6 @@
 //
 // Validates that all required logical modules exist in the project.
 
-use std.prelude_core
-
 extern fn with_fs_read_file(path: str) -> str
 
 type ModuleSpec = {
