@@ -147,6 +147,10 @@ int32_t with_vec_get_i32(with_vec *v, int64_t index) {
     return *(int32_t *)with_vec_get_ptr(v, index);
 }
 
+int32_t with_ptr_get_i32(void *ptr, int64_t index) {
+    return ((int32_t *)ptr)[index];
+}
+
 void with_vec_push_i64(with_vec *v, int64_t val) {
     with_vec_push(v, &val);
 }

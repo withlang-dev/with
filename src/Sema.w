@@ -1322,11 +1322,13 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
     self.trait_name_syms.push(name)
     self.trait_method_starts.push(self.trait_method_names.len() as i32)
     // Trait extra layout:
-    // [assoc_count,
+    // [tp_count, tp_start,
+    //  assoc_count,
     //   [assoc_name, bound_count, bounds..., default_type]*,
     //  method_count,
     //   [method_name, method_flags, param_start, param_count, ret_type, default_body]*]
     var pos = extra_start
+    pos = pos + 2  // skip tp_count and tp_start
     let assoc_count = self.ast.get_extra(pos)
     pos = pos + 1
     for ai in 0..assoc_count:
@@ -1426,6 +1428,7 @@ fn Sema.ensure_trait_object_safe(self: Sema, trait_sym: i32, node: i32) -> i32:
 
     let extra_start = self.ast.get_data1(trait_node)
     var pos = extra_start
+    pos = pos + 2  // skip tp_count and tp_start
     let assoc_count = self.ast.get_extra(pos)
     pos = pos + 1
     for ai in 0..assoc_count:

@@ -50,3 +50,15 @@ pub fn contains(arr: [i32], target: i32) -> bool:
     for x in arr:
         if x == target then return true
     false
+
+// Iterator-based functions using VecIter_i32
+pub fn iter_sum(iter: VecIter_i32) -> i32:
+    var total = 0
+    var done = false
+    while not done:
+        let item = iter.next()
+        if item.is_some():
+            total = total + item.unwrap()
+        else:
+            done = true
+    total
