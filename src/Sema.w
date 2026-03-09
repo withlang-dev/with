@@ -117,6 +117,7 @@ type Sema = {
     ephemeral_types: HashMap[i32, i32],
 
     // Must-use / result-option / task fn tracking
+    must_use_types: HashMap[i32, i32],
     must_use_fns: HashMap[i32, i32],
     result_option_fns: HashMap[i32, i32],
     task_fns: HashMap[i32, i32],
@@ -175,6 +176,7 @@ type Sema = {
     current_gen_yield_type: i32,
     has_gen_yield_type: i32,
     in_pipeline_rhs: i32,
+    match_in_stmt_pos: i32,
     in_comptime_fn: i32,
     no_std: i32,
     alloc: i32,
@@ -294,6 +296,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let local_trait_names = sema_new_map_i32_i32()
     let local_type_names = sema_new_map_i32_i32()
     let ephemeral_types = sema_new_map_i32_i32()
+    let must_use_types = sema_new_map_i32_i32()
     let must_use_fns = sema_new_map_i32_i32()
     let result_option_fns = sema_new_map_i32_i32()
     let task_fns = sema_new_map_i32_i32()
@@ -348,6 +351,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         local_trait_names,
         local_type_names,
         ephemeral_types,
+        must_use_types,
         must_use_fns,
         result_option_fns,
         task_fns,
@@ -393,6 +397,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_gen_yield_type: 0,
         has_gen_yield_type: 0,
         in_pipeline_rhs: 0,
+        match_in_stmt_pos: 0,
         in_comptime_fn: 0,
         no_std: 0,
         alloc: 0,
@@ -1019,11 +1024,22 @@ fn Sema.collect_declarations(self: Sema):
         if kind == NK_LET_DECL():
             self.collect_let_decl(decl, is_local)
 
+    // Hardcode Result and Task as must_use types
+    let sym_result = self.pool_intern("Result")
+    let sym_task = self.pool_intern("Task")
+    if sym_result != 0:
+        self.must_use_types.insert(sym_result, 1)
+    if sym_task != 0:
+        self.must_use_types.insert(sym_task, 1)
+
 fn Sema.is_local_decl(self: Sema, decl_index: i32) -> i32:
     let limit = self.ast.local_decl_count()
     if limit < 0:
         return 1
-    if decl_index < limit:
+    // After import merging, decl order is: prelude → user imports → root.
+    // Root (local) decls are the last `limit` entries in the merged pool.
+    let total = self.ast.decl_count()
+    if decl_index >= total - limit:
         return 1
     0
 
@@ -1103,6 +1119,9 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
 
     if is_ephemeral != 0:
         self.ephemeral_types.insert(name, 1)
+
+    if self.ast.is_must_use_type_node(node) != 0:
+        self.must_use_types.insert(name, 1)
 
     if is_local != 0:
         self.local_type_names.insert(name, 1)
@@ -1792,6 +1811,13 @@ fn Sema.check_bodies(self: Sema):
         if self.ast.kind(decl) == NK_FN_DECL():
             let fn_name = self.ast.get_data0(decl)
             if self.should_skip_trait_method(di, fn_name) == 0:
+                // Skip shadowed functions: if a later decl registered with
+                // the same name, this decl's body would be checked against
+                // the wrong signature. The shadowed function is unreachable.
+                if self.fn_decl_nodes.contains(fn_name):
+                    let active_node = self.fn_decl_nodes.get(fn_name).unwrap()
+                    if active_node != decl:
+                        continue
                 // Skip generic functions
                 let meta = self.ast.find_fn_meta(decl)
                 var tp_count = 0
@@ -2422,7 +2448,10 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
 
     for i in 0..stmt_count:
         let stmt = self.ast.get_extra(extra_start + i)
+        let saved_stmt_pos = self.match_in_stmt_pos
+        self.match_in_stmt_pos = 1
         let stmt_ty = self.check_expr(stmt)
+        self.match_in_stmt_pos = saved_stmt_pos
         self.typed_expr_types.insert(self.ast.get_start(stmt), stmt_ty)
         let stmt_kind = self.ast.kind(stmt)
         let can_discard_task = stmt_kind == NK_CALL() or stmt_kind == NK_IDENT() or stmt_kind == NK_GROUPED() or stmt_kind == NK_ASYNC_BLOCK() or stmt_kind == NK_TUPLE()
@@ -2433,7 +2462,14 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
 
     var result = self.ty_void
     if tail != 0:
+        // If the tail is a match in a void/unspecified-return context, treat as statement
+        // position so partial enum match is allowed (value is not used).
+        let saved_stmt_pos = self.match_in_stmt_pos
+        let ret_is_void = self.current_return_type == self.ty_void or self.current_return_type == 0
+        if ret_is_void and self.ast.kind(tail) == NK_MATCH():
+            self.match_in_stmt_pos = 1
         result = self.check_expr(tail)
+        self.match_in_stmt_pos = saved_stmt_pos
         self.typed_expr_types.insert(self.ast.get_start(tail), result)
     self.expire_dead_borrows_in_block(extra_start, stmt_count, stmt_count, 0)
 
@@ -2457,7 +2493,11 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
         ann_type_node = self.ast.get_extra(ann_extra)
         ann_type = self.resolve_type_expr(ann_type_node)
 
+    // Let binding value is expression position — match inside must be exhaustive.
+    let saved_match_stmt = self.match_in_stmt_pos
+    self.match_in_stmt_pos = 0
     let val_type = if ann_type != 0: self.check_expr_with_expected(value, ann_type) else: self.check_expr(value)
+    self.match_in_stmt_pos = saved_match_stmt
     var bind_type = val_type
     if ann_type != 0:
         bind_type = ann_type
@@ -2730,7 +2770,119 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
             // Bottom-type merge: allow concrete arm types after Never arms.
             result_type = arm_type
 
+    // Exhaustiveness checking for enum and bool subjects.
+    // Expression-position match always requires exhaustiveness.
+    // Statement-position match allows partial match (unmatched variants are no-op),
+    // UNLESS the subject type is @[must_use] (Result, Task).
+    var require_exhaustive = 0
+    if self.match_in_stmt_pos == 0:
+        require_exhaustive = 1
+    else:
+        // Must-use types require exhaustive match even in statement position
+        let type_sym = self.get_type_d0(self.resolve_alias(subject_type))
+        if type_sym != 0 and self.must_use_types.contains(type_sym):
+            require_exhaustive = 1
+    self.check_match_exhaustiveness(node, subject_type, extra_start, arm_count, require_exhaustive)
+
     result_type
+
+fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, extra_start: i32, arm_count: i32, require_exhaustive: i32):
+    if subject_type == 0:
+        return
+    let resolved = self.resolve_alias(subject_type)
+    let tk = self.get_type_kind(resolved)
+
+    // Check if any arm is a catch-all (wildcard or binding pattern without guard)
+    var has_catchall = 0
+    for ai in 0..arm_count:
+        let arm_node = self.ast.get_extra(extra_start + ai)
+        let pat = self.ast.get_data0(arm_node)
+        let guard = self.ast.get_data2(arm_node)
+        if guard != 0:
+            continue
+        if sema_pattern_is_catchall(self.ast, pat):
+            has_catchall = 1
+            break
+    if has_catchall != 0:
+        return
+
+    // Bool exhaustiveness
+    if tk == TY_BOOL():
+        if require_exhaustive == 0:
+            return
+        var has_true = 0
+        var has_false = 0
+        for ai in 0..arm_count:
+            let arm_node = self.ast.get_extra(extra_start + ai)
+            let pat = self.ast.get_data0(arm_node)
+            let guard = self.ast.get_data2(arm_node)
+            if guard != 0:
+                continue
+            let pk = self.ast.kind(pat)
+            if pk == NK_PAT_BOOL():
+                let v = self.ast.get_data0(pat)
+                if v != 0:
+                    has_true = 1
+                else:
+                    has_false = 1
+        if has_true == 0 or has_false == 0:
+            self.emit_warning("non-exhaustive match on bool", node)
+        return
+
+    // Enum exhaustiveness
+    if tk != TY_ENUM():
+        return
+    if require_exhaustive == 0:
+        return
+    let te_start = self.get_type_d1(resolved)
+    let variant_count = self.get_type_d2(resolved)
+    // Collect all variant name syms
+    var pos = te_start
+    for vi in 0..variant_count:
+        let v_name_sym = self.type_extra.get(pos as i64)
+        let pc = self.type_extra.get((pos + 1) as i64)
+        // Check if this variant is covered by any arm
+        var covered = 0
+        for ai in 0..arm_count:
+            let arm_node = self.ast.get_extra(extra_start + ai)
+            let pat = self.ast.get_data0(arm_node)
+            let guard = self.ast.get_data2(arm_node)
+            if guard != 0:
+                continue
+            if sema_pattern_covers_variant(self.ast, pat, v_name_sym):
+                covered = 1
+                break
+        if covered == 0:
+            self.emit_warning("non-exhaustive match: missing variant", node)
+            return
+        pos = pos + 2 + pc
+
+fn sema_pattern_is_catchall(ast: AstPool, pat: i32) -> bool:
+    if pat == 0:
+        return true
+    let kind = ast.kind(pat)
+    if kind == NK_PAT_WILDCARD():
+        return true
+    if kind == NK_PAT_IDENT():
+        return true
+    false
+
+fn sema_pattern_covers_variant(ast: AstPool, pat: i32, variant_sym: i32) -> bool:
+    if pat == 0:
+        return false
+    let kind = ast.kind(pat)
+    if kind == NK_PAT_WILDCARD() or kind == NK_PAT_IDENT():
+        return true
+    if kind == NK_PAT_VARIANT() or kind == NK_PAT_ENUM_SHORTHAND():
+        return ast.get_data0(pat) == variant_sym
+    if kind == NK_PAT_OR():
+        let or_start = ast.get_data0(pat)
+        let or_count = ast.get_data1(pat)
+        for oi in 0..or_count:
+            let inner = ast.get_extra(or_start + oi)
+            if sema_pattern_covers_variant(ast, inner, variant_sym):
+                return true
+    false
 
 fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
     if node == 0:

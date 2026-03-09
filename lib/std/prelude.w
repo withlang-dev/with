@@ -10,5 +10,6 @@ use std.collections
 use std.option
 use std.result
 use std.iter
+use std.traits
 use std.fs
 use std.process

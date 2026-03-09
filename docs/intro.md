@@ -65,7 +65,7 @@ It appears in four forms:
 
 ```
 with lock.read() as data:
-    data.iter() |> filter(_.active) |> count()
+    data.iter() |> filter(it.active) |> count()
 ```
 
 The lock is held for exactly the block. The compiler knows the type implements `Scoped`, dispatches through the guard automatically. No keywords, no ceremony — the type tells the compiler everything.

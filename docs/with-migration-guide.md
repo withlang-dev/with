@@ -12,7 +12,8 @@ equivalent, and what to watch for.
 2. [From Zig](#from-zig)
 3. [From Go](#from-go)
 4. [From Swift](#from-swift)
-5. [Universal Patterns](#universal-patterns)
+5. [From Kotlin](#from-kotlin)
+6. [Universal Patterns](#universal-patterns)
 
 ---
 
@@ -502,6 +503,8 @@ replace many `map`/`filter`/`collect` chains.
 | `vec![1, 2, 3]` | `vec![1, 2, 3]` (built-in syntax) |
 | `#[derive(Debug, Clone)]` | `@[derive(Debug, Clone)]` |
 | `#[derive(Debug, Clone, PartialEq, Eq, Hash)]` | `@[derive(all)]` |
+| `assert!(cond)` | `assert(cond)` |
+| `assert!(cond, "msg")` | `assert(cond, "msg")` or `require()`/`check()` for preconditions/invariants |
 | `assert_eq!(a, b)` | `assert_eq(a, b)` |
 | `todo!()` | `todo()` |
 | `unreachable!()` | `unreachable()` |
@@ -2133,6 +2136,67 @@ let set = HashSet[i32].from([1, 2, 3])
 | `@Sendable` | (not needed) |
 | `MainActor` | (not needed — no actor isolation) |
 | `@Published` / Combine | (no equivalent — use channels) |
+
+---
+
+# From Kotlin
+
+Kotlin and With share a fondness for concise syntax, null safety,
+and expression-oriented design. The main shifts are: nullable
+types (`T?`) become `Option[T]`, coroutines become fiber-based
+`async fn`, and the GC/JVM goes away in favour of compile-time
+ownership.
+
+## Assertions and Preconditions
+
+Kotlin's `require`, `check`, and `assert` map directly to With
+builtins with the same names and semantics:
+
+```kotlin
+// Kotlin
+fun withdraw(account: Account, amount: Long) {
+    require(amount > 0) { "amount must be positive" }
+    require(amount <= account.balance)
+
+    account.balance -= amount
+    check(account.balance >= 0) { "balance invariant violated" }
+}
+
+fun testWithdraw() {
+    val acct = Account(balance = 100)
+    withdraw(acct, 50)
+    assert(acct.balance == 50L)
+}
+```
+
+```with
+// With
+fn withdraw(account: &mut Account, amount: i64):
+    require(amount > 0, "amount must be positive")
+    require(amount <= account.balance)
+
+    account.balance -= amount
+    check(account.balance >= 0, "balance invariant violated")
+
+fn test_withdraw:
+    var acct = Account { balance: 100 }
+    withdraw(&mut acct, 50)
+    assert(acct.balance == 50)
+```
+
+| Kotlin | With |
+|--------|------|
+| `require(cond)` | `require(cond)` |
+| `require(cond) { "msg" }` | `require(cond, "msg")` |
+| `check(cond)` | `check(cond)` |
+| `check(cond) { "msg" }` | `check(cond, "msg")` |
+| `assert(cond)` | `assert(cond)` |
+| `IllegalArgumentException` | `IllegalArgumentError` |
+| `IllegalStateException` | `IllegalStateError` |
+
+`require` raises `IllegalArgumentError` (the caller passed bad
+input). `check` raises `IllegalStateError` (internal state is
+corrupt). `assert` panics unconditionally (test/debug assertion).
 
 ---
 

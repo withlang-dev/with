@@ -969,6 +969,33 @@ extend Database:
 
 ---
 
+## Implement Prelude Traits
+
+Prelude traits (`Eq`, `Ord`, `Debug`, `Display`, `Default`, `Drop`) are
+always in scope — no `use` needed to implement them:
+
+```
+type Point = { x: i32, y: i32 }
+
+impl Eq for Point =
+    fn eq(self: Point, other: Point) -> bool:
+        self.x == other.x and self.y == other.y
+
+impl Default for Point =
+    fn default() -> Point:
+        Point { x: 0, y: 0 }
+```
+
+Primitive types have prelude-provided impls for `Eq` and `Default`:
+
+```
+let a: i32 = 42
+assert(a.eq(42))           // instance method
+let zero = i32.default()   // static method
+```
+
+---
+
 ## Naming
 
 With follows Rust's naming conventions:
@@ -1061,6 +1088,49 @@ let input = read_file(path)? |> trim |> parse_json?
 
 Use `todo()` for intentional not-yet-implemented branches and `unreachable()` for logically impossible branches. Keep them short-lived and remove them before release code.
 
+### `assert` vs `require` vs `check`
+
+With has three assertion builtins. Each communicates a different
+intent about **who is at fault** when the condition fails:
+
+- **`assert(cond)`** — for tests and debugging. "This must be
+  true; if not, something is deeply wrong." Panics unconditionally.
+- **`require(cond)`** — for validating caller input. "The caller
+  violated this function's contract." Raises
+  `IllegalArgumentError`.
+- **`check(cond)`** — for internal invariants. "My own state is
+  wrong — I have a bug." Raises `IllegalStateError`.
+
+```
+fn withdraw(account: &mut Account, amount: i64):
+    // require: caller must satisfy the contract
+    require(amount > 0)
+    require(amount <= account.balance)
+
+    // check: internal invariant — balance should never go negative
+    account.balance -= amount
+    check(account.balance >= 0)
+
+fn test_withdraw:
+    var acct = Account { balance: 100 }
+    withdraw(&mut acct, 50)
+
+    // assert: test expectation
+    assert(acct.balance == 50)
+```
+
+**When to use which:**
+
+| Situation | Use |
+|-----------|-----|
+| Test assertions ("did I get the right answer?") | `assert` |
+| Preconditions on public API arguments | `require` |
+| Postconditions / class invariants | `check` |
+| Should-never-happen branches | `unreachable` |
+
+All three accept an `Option[str]` message as a second argument
+when one is available (e.g. `require(x > 0, "x must be positive")`).
+
 ---
 
 ## Summary: The Idiomatic Checklist
@@ -1093,3 +1163,4 @@ Before submitting code, check:
 24. **No full `match` for single variant tests** — use `let ... else`
 25. **No runtime checks for compile-time facts** — use `comptime if`
 26. **No manual `extern fn` declarations** — use `c_import` with `c"..."` strings
+27. **No generic `assert` for contract violations** — use `require` for caller errors, `check` for internal invariants

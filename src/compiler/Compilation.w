@@ -143,20 +143,26 @@ fn Compilation.build_binary_at(self: Compilation, source_path: str, output_dir: 
     let bin_path = output_dir ++ "/" ++ stem
 
     let pool = self.compile_file(source_path)
+    compilation_debug_init("build_binary_at:compile_file done decls=" ++ int_to_string(pool.decl_count()))
     if pool.decl_count() == 0:
         return ""
     if not self.ensure_codegen_mir(pool):
+        compilation_debug_init("build_binary_at:ensure_codegen_mir FAILED")
         let _ = ("rm -f " ++ obj_path) |> with_system
         return ""
     let active_pool: AstPool = self.active_pool(pool)
     let opt_level = self.config.opt_level
     let requires_async_runtime = self.zcu.last_async_mir_module.requires_async_runtime()
     compilation_debug_pool_flow("build_binary_at:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
+    compilation_debug_init("build_binary_at:compile_to_object_backend")
     let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path)
     if backend_rc != 0:
+        compilation_debug_init("build_binary_at:backend FAILED rc=" ++ int_to_string(backend_rc))
         let _ = ("rm -f " ++ obj_path) |> with_system
         return ""
+    compilation_debug_init("build_binary_at:linking")
     if not link_stage_link_object_to_binary(obj_path, bin_path, self.zcu.last_link_lib_names, requires_async_runtime):
+        compilation_debug_init("build_binary_at:link FAILED")
         let _ = ("rm -f " ++ obj_path) |> with_system
         return ""
     let _ = ("rm -f " ++ obj_path) |> with_system

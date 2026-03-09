@@ -195,7 +195,7 @@ With prioritizes joy. The common case should be effortless:
 - **C functions just call** — `c_import` functions are callable
   directly. No `unsafe {}` wrapper on every FFI call. (§16.1)
 - **Postfix `.await`** — chains naturally with `?` and `|>` (§14.5)
-- **Pipeline operator** — `data |> filter(_.active) |> map(_.name)` (§12)
+- **Pipeline operator** — `data |> filter(it.active) |> map(it.name)` (§12)
 - **Membership test** — `if x in [1, 2, 3]:` and `if x not in banned:`
   — reads like English, works on any collection, optimized for
   literals (§9.9)
@@ -1967,10 +1967,43 @@ marked `@[tailrec]`. Non-tail-position recursive calls in a
 || println("hello")
 ```
 
-Placeholder syntax:
+Implicit `it` parameter (see §9.3.1):
 ```
-items |> filter(_.age > 21) |> map(_.name)
+items |> filter(it.age > 21) |> map(it.name)
 ```
+
+#### 9.3.1 Implicit `it` Parameter
+
+When a function expects a single-parameter closure, the expression can
+use `it` to refer to the implicit parameter instead of declaring an
+explicit closure with `|param|` syntax:
+
+```
+items |> filter(it.age > 21)     // equivalent to |x| x.age > 21
+items |> map(it.name)            // equivalent to |x| x.name
+items |> filter(it % 2 == 0)    // equivalent to |n| n % 2 == 0
+items |> sort_by(it.score)       // equivalent to |x| x.score
+```
+
+`it` is a reserved keyword. It may only appear in expression positions
+where the surrounding call site expects a single-parameter function type.
+The compiler infers `it`'s type from the expected function parameter type.
+
+**Nested `it` is forbidden:** If an `it`-expression appears inside
+another `it`-expression, the inner closure must use explicit `|param|`
+syntax. This prevents ambiguity about which closure level `it` refers to.
+
+```
+// OK: outer uses it, inner uses explicit parameter
+items |> map(it.children |> filter(|c| c.active))
+
+// ERROR: nested it is ambiguous
+items |> map(it.children |> filter(it.active))
+```
+
+**`_` is not a closure placeholder.** `_` means discard (in patterns)
+or placeholder (in partial application). For closure shorthand, `it` is
+the one way.
 
 ### 9.4 Partial Application
 
@@ -2323,6 +2356,11 @@ Exhaustiveness depends on position:
 - **Expression-position match** (value is used/returned): must be exhaustive.
 - **Statement-position match** (value ignored): may be partial; unmatched
   variants are a no-op.
+- **`@[must_use]` types** (e.g. `Result`, `Task`): match must always be
+  exhaustive or include an explicit `_ -> ...` catch-all arm, regardless
+  of position. Partial match on `@[must_use]` types is a compile error.
+  This prevents silently ignoring `Err` arms, which would contradict
+  `@[must_use]` semantics.
 
 Examples:
 
@@ -2332,11 +2370,17 @@ let label = match status
     Ok(v) -> "ok"
     Err(e) -> "err"
 
-// statement-position: partial allowed
+// statement-position: partial allowed (non-must_use enum)
 match event
     Click(pos) -> handle_click(pos)
     KeyDown(k) -> handle_key(k)
 // other variants are ignored
+
+// statement-position on @[must_use] type: catch-all required
+match result
+    Ok(v) -> process(v)
+    _ -> {}                  // explicit: "I'm intentionally ignoring errors"
+// without the _ arm, this would be a compile error
 ```
 
 **Reference pattern ergonomics:** When a pattern is matched against
@@ -5658,9 +5702,9 @@ use math.vector.{Vec3, dot, cross}
 - Primitive types (`i32`, `i64`, `f64`, `bool`, `Int`, `UInt`, etc.)
 - `Unit`
 - `Vec[T]`, `String` / `str`
-- Traits: `Debug`, `Display`, `Default`, `Iter`, `IntoIter`, `Eq`, `Hash`, `Ord`
+- Traits: `Eq`, `Ord`, `Hash`, `Debug`, `Display`, `Default`, `Drop`, `Scoped`, `ScopedMut`
 - `print`, `println`, `eprint`, `eprintln`
-- `assert`, `assert_eq`, `assert_ne`, `panic`, `unreachable`, `todo`
+- `assert`, `assert_eq`, `assert_ne`, `require`, `check`, `panic`, `unreachable`, `todo`
 - `drop[T](val: T)` — explicitly drop a value to trigger cleanup
 
 Name precedence is deterministic: local bindings and explicit `use`
@@ -5981,6 +6025,8 @@ Replaces: `stdio.h` (sprintf, snprintf, fprintf)
 | Function | Description |
 |----------|-------------|
 | `assert(condition: bool)` | Panics if false (prelude) |
+| `require(condition: bool, message: str)` | Panics with "IllegalArgumentError: {message}" if false (prelude) |
+| `check(condition: bool, message: str)` | Panics with "IllegalStateError: {message}" if false (prelude) |
 | `assert_eq(left, right)` | Panics if `left != right`, shows both values |
 | `assert_ne(left, right)` | Panics if `left == right`, shows both values |
 | `assert_matches(value, pattern)` | Panics if `value` does not match `pattern` |
@@ -5990,8 +6036,26 @@ Replaces: `stdio.h` (sprintf, snprintf, fprintf)
 | `todo() -> Never` | Panics with "not yet implemented" (prelude) |
 | `todo(msg: &str) -> Never` | Panics with custom "not yet implemented" message |
 
-`assert`, `panic`, `unreachable`, and `todo` are in the prelude —
-no import needed.
+`assert`, `require`, `check`, `panic`, `unreachable`, and `todo` are
+in the prelude — no import needed.
+
+`require` and `check` are contract-style assertions that distinguish
+between caller errors and internal invariant violations:
+
+```
+fn withdraw(amount: i64, balance: i64) -> i64:
+    require(amount > 0, "amount must be positive")
+    require(amount <= balance, "insufficient funds")
+    let result = balance - amount
+    check(result >= 0, "balance went negative after withdrawal")
+    result
+```
+
+`require` signals that the **caller** violated a precondition — it
+panics with `IllegalArgumentError: {message}`. `check` signals that
+an **internal invariant** was violated — it panics with
+`IllegalStateError: {message}`. Both have lazy message evaluation:
+the message string is not constructed when the condition is true.
 
 `assert_matches` checks a value against a pattern:
 

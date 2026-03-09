@@ -189,6 +189,14 @@ fn Parser.skip_attributes(self: Parser):
             return
         self.advance()
 
+        // Check for must_use BEFORE the else-if chain
+        if self.peek() == TK_IDENT():
+            let attr_s = self.current_start()
+            let attr_e = self.current_end()
+            let attr_text = self.source.slice(attr_s as i64, attr_e as i64)
+            if attr_text == "must_use":
+                self.pending_must_use = 1
+
         if self.is_ident_named("derive"):
             self.advance()
             if self.peek() == TK_L_PAREN():
@@ -215,7 +223,7 @@ fn Parser.skip_attributes(self: Parser):
             self.pending_noinline = 1
             self.advance()
         else if self.is_ident_named("must_use"):
-            self.pending_must_use = 1
+            // Already handled by standalone check above
             self.advance()
         else if self.is_ident_named("panic_handler"):
             self.pending_panic_handler = 1
@@ -515,6 +523,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
     self.skip_newlines()
 
     var is_ephemeral = 0
+
     // Check for ephemeral
     if self.peek() == TK_KW_EPHEMERAL():
         is_ephemeral = 1
@@ -585,6 +594,8 @@ fn Parser.finish_type_decl(self: Parser, node: i32) -> i32:
         self.pool.add_type_meta(node, self.pending_derive_start, self.pending_derive_count)
     self.pending_derive_start = 0
     self.pending_derive_count = 0
+    if self.pending_must_use != 0:
+        self.pool.mark_must_use_type(node)
     node
 
 fn Parser.parse_struct_body(self: Parser) -> i32:
