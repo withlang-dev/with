@@ -55,8 +55,8 @@ prepare_selfhost_runner() {
   acquire_selfhost_runner_lock "$root_dir"
 
   for cand in \
-    "${root_dir}/runtime/libwith_llvm_bridge.dylib" \
-    "${root_dir}/.with/build/runtime/libwith_llvm_bridge.dylib"; do
+    "${root_dir}/out/lib/libwith_llvm_bridge.dylib" \
+    "${root_dir}/runtime/libwith_llvm_bridge.dylib"; do
     if [[ -f "$cand" ]]; then
       dylib_path="$cand"
       break

@@ -10,6 +10,8 @@ LAST_STAGE_BIN=""
 LAST_STAGE_LOG=""
 OUT_DIR="${ROOT_DIR}/out"
 OUT_BIN_DIR="${OUT_DIR}/bin"
+OUT_LIB_DIR="${OUT_DIR}/lib"
+OUT_LOG_DIR="${OUT_DIR}/log"
 OUT_RUNTIME_LINK="${OUT_BIN_DIR}/runtime"
 STAGE1_BIN="${OUT_BIN_DIR}/with-stage1"
 STAGE2_BIN="${OUT_BIN_DIR}/with-stage2"
@@ -81,7 +83,7 @@ validate_stage_binary() {
   local wrapped_path="$4"
   local probe_log
 
-  probe_log="${ROOT_DIR}/.with/build/.${stage_name}.probe.log"
+  probe_log="${OUT_LOG_DIR}/${stage_name}.probe.log"
 
   local rc=0
   run_cmd "${probe_log}" "${run_dir}" env PATH="${wrapped_path}" "${compiler_bin}" version || rc=$?
@@ -100,12 +102,12 @@ validate_stage_binary() {
   fi
 }
 
-copy_runtime_artifacts_if_present() {
-  local src_runtime="$1"
-  local dst_runtime="$2"
+copy_lib_artifacts_if_present() {
+  local src_lib="$1"
+  local dst_lib="$2"
   local name=""
 
-  mkdir -p "${dst_runtime}"
+  mkdir -p "${dst_lib}"
   for name in \
     libwith_llvm_bridge.dylib \
     llvm_bridge.o \
@@ -116,13 +118,14 @@ copy_runtime_artifacts_if_present() {
     fiber_asm.o \
     llvm_cc \
     llvm_link.rsp; do
-    if [ -f "${src_runtime}/${name}" ] && [ "${src_runtime}/${name}" != "${dst_runtime}/${name}" ]; then
-      cp "${src_runtime}/${name}" "${dst_runtime}/${name}"
+    if [ -f "${src_lib}/${name}" ] && [ "${src_lib}/${name}" != "${dst_lib}/${name}" ]; then
+      cp "${src_lib}/${name}" "${dst_lib}/${name}"
     fi
   done
 }
 
-resolve_runtime_dir() {
+# Find a directory containing compiled runtime artifacts (libwith_llvm_bridge.dylib).
+resolve_lib_dir() {
   local compiler_bin="${1:-}"
   local compiler_dir=""
   local candidate=""
@@ -132,9 +135,9 @@ resolve_runtime_dir() {
   fi
 
   for candidate in \
-    "${ROOT_DIR}/runtime" \
-    "${ROOT_DIR}/src/runtime" \
-    "${compiler_dir}/runtime"; do
+    "${OUT_LIB_DIR}" \
+    "${compiler_dir}/runtime" \
+    "${compiler_dir}/../lib"; do
     if [ -n "${candidate}" ] && [ -d "${candidate}" ] && [ -f "${candidate}/libwith_llvm_bridge.dylib" ]; then
       echo "${candidate}"
       return 0
@@ -144,9 +147,13 @@ resolve_runtime_dir() {
   return 1
 }
 
-refresh_repo_runtime_objects() {
-  local repo_runtime="${ROOT_DIR}/runtime"
+# Compile runtime C sources into out/lib/.
+refresh_lib_objects() {
+  local runtime_src="${ROOT_DIR}/runtime"
+  local lib_dir="${OUT_LIB_DIR}"
   local sdk_path=""
+
+  mkdir -p "${lib_dir}"
 
   if ! command -v cc >/dev/null 2>&1; then
     return 0
@@ -154,29 +161,29 @@ refresh_repo_runtime_objects() {
 
   sdk_path="$(xcrun --show-sdk-path 2>/dev/null || true)"
   if [ -n "${sdk_path}" ]; then
-    cc -isysroot "${sdk_path}" -c "${repo_runtime}/helpers.c" -o "${repo_runtime}/helpers.o" >/dev/null 2>&1 || true
-    cc -isysroot "${sdk_path}" -c "${repo_runtime}/support_runtime.c" -o "${repo_runtime}/support_runtime.o" >/dev/null 2>&1 || true
-    cc -isysroot "${sdk_path}" -c "${repo_runtime}/with_runtime.c" -o "${repo_runtime}/with_runtime.o" >/dev/null 2>&1 || true
+    cc -isysroot "${sdk_path}" -c "${runtime_src}/helpers.c" -o "${lib_dir}/helpers.o" >/dev/null 2>&1 || true
+    cc -isysroot "${sdk_path}" -c "${runtime_src}/support_runtime.c" -o "${lib_dir}/support_runtime.o" >/dev/null 2>&1 || true
+    cc -isysroot "${sdk_path}" -c "${runtime_src}/with_runtime.c" -o "${lib_dir}/with_runtime.o" >/dev/null 2>&1 || true
   else
-    cc -c "${repo_runtime}/helpers.c" -o "${repo_runtime}/helpers.o" >/dev/null 2>&1 || true
-    cc -c "${repo_runtime}/support_runtime.c" -o "${repo_runtime}/support_runtime.o" >/dev/null 2>&1 || true
-    cc -c "${repo_runtime}/with_runtime.c" -o "${repo_runtime}/with_runtime.o" >/dev/null 2>&1 || true
+    cc -c "${runtime_src}/helpers.c" -o "${lib_dir}/helpers.o" >/dev/null 2>&1 || true
+    cc -c "${runtime_src}/support_runtime.c" -o "${lib_dir}/support_runtime.o" >/dev/null 2>&1 || true
+    cc -c "${runtime_src}/with_runtime.c" -o "${lib_dir}/with_runtime.o" >/dev/null 2>&1 || true
   fi
 }
 
-ensure_repo_runtime_seeded() {
-  local repo_runtime="${ROOT_DIR}/runtime"
-  local runtime_dir=""
+ensure_lib_seeded() {
+  local lib_dir="${OUT_LIB_DIR}"
+  local src_lib=""
 
-  mkdir -p "${repo_runtime}"
-  if [ ! -f "${repo_runtime}/libwith_llvm_bridge.dylib" ]; then
-    runtime_dir="$(resolve_runtime_dir "${1:-}" || true)"
-    if [ -n "${runtime_dir}" ] && [ "${runtime_dir}" != "${repo_runtime}" ]; then
-      copy_runtime_artifacts_if_present "${runtime_dir}" "${repo_runtime}"
+  mkdir -p "${lib_dir}"
+  if [ ! -f "${lib_dir}/libwith_llvm_bridge.dylib" ]; then
+    src_lib="$(resolve_lib_dir "${1:-}" || true)"
+    if [ -n "${src_lib}" ] && [ "${src_lib}" != "${lib_dir}" ]; then
+      copy_lib_artifacts_if_present "${src_lib}" "${lib_dir}"
     fi
   fi
 
-  refresh_repo_runtime_objects
+  refresh_lib_objects
 }
 
 emit_workspace_seed_candidates() {
@@ -186,12 +193,12 @@ emit_workspace_seed_candidates() {
   local candidate=""
   local seed_dir=""
 
-  candidate="${ROOT_DIR}/.with/build/main"
+  candidate="${OUT_DIR}/main"
   if [ -x "${candidate}" ]; then
     echo "${candidate}"
   fi
 
-  for seed_dir in "${ROOT_DIR}"/.with/build.*; do
+  for seed_dir in "${OUT_DIR}"/build.*; do
     if [ -x "${seed_dir}/main" ]; then
       echo "${seed_dir}/main"
     fi
@@ -215,7 +222,7 @@ run_local_build() {
   local tmp_dir
   local tmp_bin
   local compiler_dir
-  local runtime_dir
+  local lib_dir
   local log_file
   local build_entry
   local host_cc
@@ -230,17 +237,18 @@ run_local_build() {
   compiler_dir="$(cd "$(dirname "$compiler_bin")" && pwd)"
   entry_name="$(basename "${source_entry}")"
   entry_stem="${entry_name%.w}"
-  log_file="${ROOT_DIR}/.with/build/.${stage_name}.${entry_stem}.log"
+  log_file="${OUT_LOG_DIR}/${stage_name}.${entry_stem}.log"
   LAST_STAGE_LOG="${log_file}"
   cp "$compiler_bin" "$tmp_bin"
   chmod +x "$tmp_bin"
-  runtime_dir="$(resolve_runtime_dir "${compiler_bin}" || true)"
-  if [ -z "${runtime_dir}" ]; then
-    runtime_dir="${ROOT_DIR}/runtime"
+  lib_dir="$(resolve_lib_dir "${compiler_bin}" || true)"
+  if [ -z "${lib_dir}" ]; then
+    lib_dir="${OUT_LIB_DIR}"
   fi
-  ln -s "${runtime_dir}" "${tmp_dir}/runtime"
-  mkdir -p "${tmp_dir}/.with/build"
-  ln -s "${runtime_dir}" "${tmp_dir}/.with/build/runtime"
+  # The compiler resolves runtime at <argv0>/runtime/ — symlink to lib_dir.
+  ln -s "${lib_dir}" "${tmp_dir}/runtime"
+  mkdir -p "${tmp_dir}/out"
+  ln -s "${lib_dir}" "${tmp_dir}/out/lib"
   ln -s "${ROOT_DIR}/lib" "${tmp_dir}/lib"
   ln -s "${ROOT_DIR}/src" "${tmp_dir}/src"
   if [ -d "${ROOT_DIR}/src/compiler" ]; then
@@ -331,7 +339,7 @@ EOF
   echo "[${stage_name}] compiler: $compiler_bin"
   echo "[${stage_name}] local runner: $tmp_bin"
   echo "[${stage_name}] entry: $source_entry"
-  echo "[${stage_name}] runtime dir: $runtime_dir"
+  echo "[${stage_name}] lib dir: $lib_dir"
   echo "[${stage_name}] timeout: ${TIMEOUT_SECS}s"
 
   local rc=0
@@ -350,12 +358,17 @@ EOF
     return 1
   fi
 
+  # The compiler outputs binary to cwd or out/ depending on version.
   local tmp_main="${tmp_dir}/main"
   if [ ! -s "$tmp_main" ]; then
+    tmp_main="${tmp_dir}/out/main"
+  fi
+  if [ ! -s "$tmp_main" ]; then
+    # Legacy: older seeds output to .with/build/
     tmp_main="${tmp_dir}/.with/build/main"
   fi
   if [ ! -s "$tmp_main" ]; then
-    echo "[${stage_name}] build failed: missing ${tmp_main} (silent failure)" >&2
+    echo "[${stage_name}] build failed: no output binary found (silent failure)" >&2
     if [ -s "$log_file" ]; then
       tail -n 80 "$log_file" >&2 || true
     else
@@ -376,15 +389,19 @@ EOF
   chmod +x "$staged_bin"
   LAST_STAGE_BIN="$staged_bin"
 
-  if [ -d "${tmp_dir}/.with/build/runtime" ] && [ -f "${tmp_dir}/.with/build/runtime/libwith_llvm_bridge.dylib" ]; then
-    LAST_RUNTIME_DIR="${tmp_dir}/.with/build/runtime"
-    # Keep temp dir alive for runtime sync call.
-    # It will be removed by sync_runtime_artifacts once copied.
-    return 0
-  fi
+  # Check if the build produced new runtime artifacts.
+  local build_runtime=""
+  for build_runtime in \
+    "${tmp_dir}/out/lib" \
+    "${tmp_dir}/.with/build/runtime"; do
+    if [ -d "${build_runtime}" ] && [ -f "${build_runtime}/libwith_llvm_bridge.dylib" ]; then
+      LAST_RUNTIME_DIR="${build_runtime}"
+      # Keep temp dir alive for sync call.
+      return 0
+    fi
+  done
 
-  LAST_RUNTIME_DIR="$runtime_dir"
-
+  LAST_RUNTIME_DIR="$lib_dir"
   rm -rf "$tmp_dir"
 }
 
@@ -430,61 +447,57 @@ resolve_seed_compiler() {
 }
 
 ensure_out_layout() {
-  ensure_repo_runtime_seeded
-  mkdir -p "${OUT_BIN_DIR}"
+  ensure_lib_seeded
+  mkdir -p "${OUT_BIN_DIR}" "${OUT_LIB_DIR}" "${OUT_LOG_DIR}"
   if [ -L "${OUT_RUNTIME_LINK}" ]; then
     rm -f "${OUT_RUNTIME_LINK}"
   elif [ -e "${OUT_RUNTIME_LINK}" ]; then
     rm -rf "${OUT_RUNTIME_LINK}"
   fi
-  ln -s "${ROOT_DIR}/runtime" "${OUT_RUNTIME_LINK}"
+  ln -s ../lib "${OUT_RUNTIME_LINK}"
 }
 
-sync_runtime_artifacts() {
+sync_lib_artifacts() {
   local stage_name="$1"
-  local build_runtime="${ROOT_DIR}/.with/build/runtime"
-  local src_runtime=""
-  local repo_runtime="${ROOT_DIR}/runtime"
-  local src_runtime_real=""
-  local repo_runtime_real=""
+  local src_lib=""
+  local dst_lib="${OUT_LIB_DIR}"
+  local src_lib_real=""
+  local dst_lib_real=""
 
-  if [ -d "$build_runtime" ] && [ -f "${build_runtime}/libwith_llvm_bridge.dylib" ]; then
-    src_runtime="$build_runtime"
-  elif [ -n "$LAST_RUNTIME_DIR" ] && [ -d "$LAST_RUNTIME_DIR" ] && [ -f "${LAST_RUNTIME_DIR}/libwith_llvm_bridge.dylib" ]; then
-    src_runtime="$LAST_RUNTIME_DIR"
+  if [ -n "$LAST_RUNTIME_DIR" ] && [ -d "$LAST_RUNTIME_DIR" ] && [ -f "${LAST_RUNTIME_DIR}/libwith_llvm_bridge.dylib" ]; then
+    src_lib="$LAST_RUNTIME_DIR"
   else
-    echo "[${stage_name}] build failed: no runtime dir with libwith_llvm_bridge.dylib found" >&2
+    echo "[${stage_name}] build failed: no lib dir with libwith_llvm_bridge.dylib found" >&2
     return 1
   fi
 
-  mkdir -p "$repo_runtime"
-  src_runtime_real="$(cd "$src_runtime" && pwd -P)"
-  repo_runtime_real="$(cd "$repo_runtime" && pwd -P)"
+  mkdir -p "$dst_lib"
+  src_lib_real="$(cd "$src_lib" && pwd -P)"
+  dst_lib_real="$(cd "$dst_lib" && pwd -P)"
 
-  if [ "$src_runtime_real" != "$repo_runtime_real" ]; then
-    cp "${src_runtime}/libwith_llvm_bridge.dylib" "${repo_runtime}/libwith_llvm_bridge.dylib"
+  if [ "$src_lib_real" != "$dst_lib_real" ]; then
+    cp "${src_lib}/libwith_llvm_bridge.dylib" "${dst_lib}/libwith_llvm_bridge.dylib"
 
     for f in llvm_bridge.o helpers.o support_runtime.o with_runtime.o fiber.o fiber_asm.o llvm_cc llvm_link.rsp; do
-      if [ -f "${src_runtime}/${f}" ]; then
-        cp "${src_runtime}/${f}" "${repo_runtime}/${f}"
+      if [ -f "${src_lib}/${f}" ]; then
+        cp "${src_lib}/${f}" "${dst_lib}/${f}"
       fi
     done
   fi
 
-  # Keep runtime helper objects aligned with source symbols required by the
-  # current std/prelude surface (for example with_lines_out/with_parse_i64).
-  refresh_repo_runtime_objects
+  # Keep runtime helper objects aligned with source symbols.
+  refresh_lib_objects
 
-  case "$src_runtime" in
-    /tmp/with-stage*/.with/build/runtime)
-      rm -rf "$(dirname "$(dirname "$(dirname "$src_runtime")")")" >/dev/null 2>&1 || true
+  case "$src_lib" in
+    /tmp/with-stage*/.with/build/runtime|/tmp/with-stage*/out/lib)
+      rm -rf "$(dirname "$(dirname "$src_lib")")" >/dev/null 2>&1 || true
       ;;
   esac
 }
 
 stage1() {
   ensure_out_layout
-  mkdir -p "${ROOT_DIR}/.with/build"
+  mkdir -p "${OUT_LOG_DIR}"
   local seed_bin=""
   local source_entry=""
   local built=0
@@ -509,7 +522,7 @@ stage1() {
     return 1
   fi
   echo "[stage1] selected seed: ${seed_bin}"
-  sync_runtime_artifacts "stage1"
+  sync_lib_artifacts "stage1"
   install_stage_binary "${LAST_STAGE_BIN}" "${STAGE1_BIN}"
   install_stage_binary "${LAST_STAGE_BIN}" "${CANONICAL_BIN}"
   rm -f "${LAST_STAGE_BIN}"
@@ -521,7 +534,7 @@ stage2() {
   stage1
   ensure_out_layout
   run_local_build "${STAGE1_BIN}" "stage2" "${ROOT_DIR}/src/main.w"
-  sync_runtime_artifacts "stage2"
+  sync_lib_artifacts "stage2"
   install_stage_binary "${LAST_STAGE_BIN}" "${STAGE2_BIN}"
   install_stage_binary "${LAST_STAGE_BIN}" "${CANONICAL_BIN}"
   rm -f "${LAST_STAGE_BIN}"
@@ -533,7 +546,7 @@ stage3() {
   stage2
   ensure_out_layout
   run_local_build "${STAGE2_BIN}" "stage3" "${ROOT_DIR}/src/main.w"
-  sync_runtime_artifacts "stage3"
+  sync_lib_artifacts "stage3"
   install_stage_binary "${LAST_STAGE_BIN}" "${STAGE3_BIN}"
   rm -f "${LAST_STAGE_BIN}"
   LAST_STAGE_BIN=""
@@ -565,8 +578,8 @@ if [ "$MODE" = "stage2" ] || [ "$MODE" = "stage3" ] || [ "$MODE" = "all" ]; then
     tmpv="${tmpd}/with"
     cp "${STAGE2_BIN}" "$tmpv"
     chmod +x "$tmpv"
-    if [ -d "${ROOT_DIR}/runtime" ]; then
-      ln -s "${ROOT_DIR}/runtime" "${tmpd}/runtime"
+    if [ -d "${OUT_LIB_DIR}" ]; then
+      ln -s "${OUT_LIB_DIR}" "${tmpd}/runtime"
     fi
     if version_out="$("$tmpv" version 2>&1)"; then
       echo "[stage2] version: ${version_out}"

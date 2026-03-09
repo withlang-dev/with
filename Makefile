@@ -1,51 +1,42 @@
-.PHONY: all stage1 stage2 build test test-stage2 fixpoint install clean
+.PHONY: all build test fixpoint install clean
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 DESTDIR ?=
-OUT_DIR ?= out
-OUT_BINDIR ?= $(OUT_DIR)/bin
+OUT ?= out
 
-STAGE2_BIN := $(OUT_BINDIR)/with-stage2
-CANONICAL_BIN := $(OUT_BINDIR)/with
+# Seed compiler: use WITH env var, or `with` on PATH.
+WITH ?= $(shell command -v with 2>/dev/null)
 
 INSTALL_BINDIR := $(DESTDIR)$(BINDIR)
-INSTALL_RUNTIMEDIR := $(INSTALL_BINDIR)/runtime
+INSTALL_LIBDIR := $(INSTALL_BINDIR)/runtime
 
 all: build
 
-# Stage1 selfhost compiler built from the current selfhost seed.
-stage1:
-	./scripts/rebuild_selfhost.sh stage1
+# Two-stage self-hosted build.
+# The compiler outputs <stem> next to the source file, so we build and move.
+build:
+	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH or add with to PATH" >&2; exit 1; fi
+	@mkdir -p $(OUT)/bin $(OUT)/lib $(OUT)/log
+	@./scripts/ensure_runtime.sh
+	@rm -f $(OUT)/bin/runtime && ln -s ../lib $(OUT)/bin/runtime
+	$(WITH) build src/main.w && mv src/main $(OUT)/bin/with-stage1
+	$(OUT)/bin/with-stage1 build src/main.w && mv src/main $(OUT)/bin/with-stage2
+	@cp $(OUT)/bin/with-stage2 $(OUT)/bin/with
+	@echo "build complete: $(OUT)/bin/with"
 
-# Stage2 selfhost compiler built by stage1 (compiler built by itself).
-stage2:
-	./scripts/rebuild_selfhost.sh stage2
-
-# Canonical local compiler artifact.
-build: stage2
-	@test -x "$(CANONICAL_BIN)"
-
-# Run the selfhost test suite.
 test: build
 	./scripts/run_tests.sh
 
-# Alias for CI compatibility.
-test-stage2: test
+fixpoint: build
+	$(OUT)/bin/with-stage2 build src/main.w && mv src/main $(OUT)/bin/with-stage3
+	@diff $(OUT)/bin/with-stage2 $(OUT)/bin/with-stage3 && echo "FIXPOINT"
 
-# Fixpoint verification (stage2 == stage3).
-fixpoint:
-	./scripts/rebuild_selfhost.sh stage3
-	@diff "$(OUT_BINDIR)/with-stage2" "$(OUT_BINDIR)/with-stage3" && echo "FIXPOINT"
-
-# Install stage2 compiler and colocated runtime artifacts.
 install: build
 	install -d "$(INSTALL_BINDIR)"
-	install -d "$(INSTALL_RUNTIMEDIR)"
-	install -m 0755 "$(STAGE2_BIN)" "$(INSTALL_BINDIR)/with"
-	cp -R runtime/. "$(INSTALL_RUNTIMEDIR)/"
+	install -d "$(INSTALL_LIBDIR)"
+	install -m 0755 $(OUT)/bin/with-stage2 "$(INSTALL_BINDIR)/with"
+	cp -R $(OUT)/lib/. "$(INSTALL_LIBDIR)/"
 
 clean:
-	rm -f with with-new with-stage1 with-stage2 with-stage3
-	rm -rf out/
-	rm -rf .with/build/
+	rm -rf $(OUT)/

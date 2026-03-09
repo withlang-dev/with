@@ -22,6 +22,16 @@ fn link_stage_link_with_extras_and_libs(obj_path: str, bin_path: str, extras: Ve
     let result = cmd |> with_system
     result == 0
 
+fn link_stage_link_with_llvm(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], llvm_cc: str) -> bool:
+    var cmd = llvm_cc ++ " -fuse-ld=lld " ++ obj_path
+    for i in 0..extras.len() as i32:
+        cmd = cmd ++ " " ++ extras.get(i as i64)
+    cmd = cmd ++ " -o " ++ bin_path
+    for i in 0..link_libs.len() as i32:
+        cmd = cmd ++ " -l" ++ link_libs.get(i as i64)
+    let result = cmd |> with_system
+    result == 0
+
 fn link_stage_str_contains(hay: str, needle: str) -> bool:
     let hay_len = hay.len() as i32
     let needle_len = needle.len() as i32
@@ -90,17 +100,22 @@ fn link_stage_compiler_runtime_dir() -> str:
     link_stage_dirname(argv0) ++ "/runtime"
 
 fn link_stage_resolve_runtime_root() -> str:
+    let argv0 = with_arg_at(0)
+    let compiler_dir = if argv0.len() > 0: link_stage_dirname(argv0) else: "."
     let candidates: Vec[str] = Vec.new()
-    candidates.push(link_stage_compiler_runtime_dir())
-    candidates.push("runtime")
-    candidates.push("bootstrap/zig-out/bin/runtime")
+    // <compiler_dir>/runtime/ (symlink to ../lib in out/bin/)
+    candidates.push(compiler_dir ++ "/runtime")
+    // <compiler_dir>/../lib/ (direct FHS-style path)
+    candidates.push(compiler_dir ++ "/../lib")
+    // out/lib/ (from repo root)
+    candidates.push("out/lib")
     for i in 0..candidates.len() as i32:
         let dir = candidates.get(i as i64)
         let probe = dir ++ "/helpers.o"
         if with_fs_read_file(probe).len() > 0:
             return dir
-    // Fall back to compiler-relative dir even if probe failed.
-    link_stage_compiler_runtime_dir()
+    // Fall back to compiler-relative runtime dir.
+    compiler_dir ++ "/runtime"
 
 fn link_stage_find_llvm_bridge_path() -> str:
     let root = link_stage_resolve_runtime_root()
@@ -108,6 +123,25 @@ fn link_stage_find_llvm_bridge_path() -> str:
     if with_fs_read_file(p).len() > 0:
         return p
     ""
+
+fn link_stage_find_llvm_static_bridge() -> str:
+    let root = link_stage_resolve_runtime_root()
+    let bridge_o = root ++ "/llvm_bridge.o"
+    let rsp = root ++ "/llvm_link.rsp"
+    let cc_file = root ++ "/llvm_cc"
+    if with_fs_read_file(bridge_o).len() > 0 and with_fs_read_file(rsp).len() > 0 and with_fs_read_file(cc_file).len() > 0:
+        return bridge_o
+    ""
+
+fn link_stage_read_file_trimmed(path: str) -> str:
+    let content = with_fs_read_file(path)
+    if content.len() == 0:
+        return ""
+    // Trim trailing newline
+    var end = content.len() as i32
+    while end > 0 and content.byte_at((end - 1) as i64) == 10:
+        end = end - 1
+    content.slice(0, end as i64)
 
 fn link_stage_find_runtime_object_path(name: str) -> str:
     let root = link_stage_resolve_runtime_root()
@@ -171,9 +205,18 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
         extras.push(helpers_path)
 
     if link_stage_object_needs_llvm_bridge(obj_path):
+        let static_bridge = link_stage_find_llvm_static_bridge()
+        if static_bridge.len() > 0:
+            // Static LLVM linking: use llvm_bridge.o + LLVM static libs
+            let root = link_stage_resolve_runtime_root()
+            let rsp_path = root ++ "/llvm_link.rsp"
+            let cc_path = link_stage_read_file_trimmed(root ++ "/llvm_cc")
+            extras.push(static_bridge)
+            extras.push("@" ++ rsp_path)
+            return link_stage_link_with_llvm(obj_path, bin_path, extras, link_libs, cc_path)
         let bridge_path = link_stage_find_llvm_bridge_path()
         if bridge_path.len() == 0:
-            with_eprintln("error: missing runtime/libwith_llvm_bridge.dylib")
+            with_eprintln("error: missing LLVM bridge (need llvm_bridge.o + llvm_link.rsp + llvm_cc, or libwith_llvm_bridge.dylib)")
             return false
         extras.push(bridge_path)
 
