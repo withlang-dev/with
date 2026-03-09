@@ -8,7 +8,9 @@ no longer used in the build pipeline.
 
 ## Requirements
 
-- clang/LLVM toolchain available on PATH
+- LLVM toolchain (default: `/usr/local/llvm`, override with `LLVM_PREFIX`)
+- clang available on PATH (for linking user programs)
+- Zig (optional, for cross-compilation)
 
 ## Build
 
@@ -100,7 +102,7 @@ lib/std/             standard library (.w)
 test/cases/          behavior tests
 out/                 all build output (gitignored)
   bin/               compiler binaries
-  lib/               compiled runtime (.o, .dylib)
+  lib/               compiled runtime objects (.o), LLVM link config
   log/               build logs
 bootstrap/           historical Zig bootstrap compiler (frozen, unused)
 ```
@@ -109,7 +111,7 @@ bootstrap/           historical Zig bootstrap compiler (frozen, unused)
 
 - `install: ... Operation not permitted` under `/usr/local`:
   use `PREFIX=$HOME/.local` or run `sudo make install`.
-- `missing runtime/libwith_llvm_bridge.dylib`:
-  keep `runtime/` adjacent to the `with` binary (the Makefile install targets do this).
+- `no LLVM bridge available`: install LLVM at `/usr/local/llvm` or set `LLVM_PREFIX`.
+  The compiler statically links LLVM — no dynamic library needed at runtime.
 - Stuck/hanging staged rebuilds on macOS external volumes:
   use `./scripts/rebuild_selfhost.sh stage2` (runs via `/tmp`).

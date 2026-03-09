@@ -1,125 +1,575 @@
-# With Compiler - Project Guidelines
+# AGENTS.md — With Compiler
 
-## Ownership Mindset
-We own this codebase. There is no such thing as a "pre-existing" bug. If we see a bug, we fix it — no hedging, no deferring, no labeling it as someone else's problem. Every bug in this repo is our bug.
+This document defines **rules for AI agents working in this repository**.
 
-## Reliability
-Intermittent hangs and performance issues are P0. When encountered, investigate and solve them deeply — do not dismiss them as flakes, do not work around them, do not move on. Root-cause them.
+The With compiler is **self-hosting**. Small mistakes can corrupt the stage chain, so strict discipline is required.
 
-## Build Integrity
-The self-host build must never be broken. The compiler compiles itself:
-```
-make build       # seed → stage1 → stage2
-make fixpoint    # verify stage2 == stage3 (byte-identical)
-```
-The seed compiler is `with` on PATH, overridden by `WITH=<path>`. If the build breaks, fixing it is the top priority.
+---
 
-## Self-Hosting Recovery
-The compiler is fully self-hosted. The Zig bootstrap (`bootstrap/`) is a historical artifact and must never be used. Recovery uses prior selfhost checkpoints:
-- `src/main` — the binary seed checked into the repo (a fixpoint-verified stage2)
-- `~/.local/bin/with` — the installed compiler
-- `WITH=<path>` — override with any known-good selfhost binary
+# Core Principles
 
-## Build Output
-All build artifacts go under `out/` (gitignored). Source directories are source-only:
-- `runtime/` — C runtime source (.c, .h, .s). No .o or .dylib files.
-- `out/bin/` — compiler binaries
-- `out/lib/` — compiled runtime objects (.o, .dylib)
-- `out/log/` — build logs
+## Ownership
 
-## Language
-Source files use `.w` extension. The language uses indentation-based syntax (like Python), with `fn`, `type`, `let`, `use`, `extern fn` as top-level declarations.
+We own this entire codebase.
 
-## Work Discipline
-- **Fix bugs, don't work around them.** Don't disable a subsystem to avoid a bug in it. Don't add detection heuristics to route around broken code. Fix the broken code. Workarounds that try to enumerate failure cases are fragile and compound over time.
-- **Do a 5 whys root-cause analysis.** When debugging a bug, trace it down with a 5 whys analysis until the deepest credible cause is clear, then fix that root cause instead of patching over the surface symptom.
-- **Verify before writing code.** Don't guess at APIs, node layouts, or conventions from memory. Read the source definitions first (e.g., check Ast.w for node kinds before writing AST-walking code).
-- **Bisect, don't spiral.** When a stage binary is broken, systematically bisect which source change caused it (revert half, rebuild, test) rather than chasing symptoms with a debugger. Corrupted stacks and pointers rarely yield useful debugger output.
-- **Test incrementally.** Rebuild and smoke-test after each individual change. Batching multiple changes makes it hard to isolate which one broke things.
-- **Seed corruption awareness.** In a self-hosting compiler, always ask: "is the seed compiler itself producing bad code?" before debugging the output binary. Bugs in the seed propagate through the stage chain. If the seed is bad, replace it with the last known-good checkpoint from `src/main`.
+There is no such thing as a "pre-existing bug".
+If a bug exists, **we fix it**.
 
-## AST Node Layouts (common pitfalls)
-- `NK_LET_DECL` (4): top-level let. d0=name(sym), d1=value(node), d2=flags (bit0=mut, bit1=pub)
-- `NK_LET_BINDING` (33): let inside function bodies. d0=name(sym), d1=value(node), d2=flags (bit0=mut). There is NO `NK_VAR_DECL` — mutable bindings use LET_BINDING/LET_DECL with the mut flag.
-- `NK_IF_EXPR` (31): d0=cond, d1=then, d2=else. NOT called `NK_IF`.
-- `NK_FOR` (37): d0=binding(sym), d1=iterable(node), d2=body(node). Body is d2, NOT d1.
-- `NK_WHILE` (35): d0=cond, d1=body, d2=label
-- `NK_MATCH` (40): d0=subject, d1=extra_start, d2=arm_count
-- `NK_MATCH_ARM` (110): d0=pattern, d1=body, d2=guard
-- `NK_BLOCK` (30): d0=extra_start, d1=stmt_count, d2=tail(node)
-- `NK_RETURN` (32): d0=value(node)
-- `NK_STRUCT_LIT` (43): d0=name(sym), d1=extra_start, d2=field_count
+Never defer or work around bugs.
 
-## Debugging on macOS ARM64
-When a stage binary crashes or hangs:
-1. **Quick repro**: `time ./out/bin/with-stage2 check src/main.w`
-2. **LLDB**: `lldb -- ./out/bin/with-stage2 check src/main.w` then `run` / `bt all`
-3. **Heap corruption**: `MallocScribble=1 MallocGuardEdges=1 ./out/bin/with-stage2 check src/main.w`
-4. **Leak check**: `leaks --atExit -- ./out/bin/with-stage2 check src/main.w`
-5. **Instruments**: `xcrun xctrace record --template "Leaks" --output /tmp/trace.trace --launch -- ./out/bin/with-stage2 check src/main.w`
-6. **Debug entitlement** (if "not debuggable"): `codesign -s - --entitlements /tmp/debug.entitlements --force ./out/bin/with-stage2`
-- Prefer lldb, MallocScribble, leaks, xctrace. Avoid Valgrind on ARM64.
-
-# With Compiler - Project Guidelines
-
-## Ownership Mindset
-We own this codebase. There is no such thing as a "pre-existing" bug. If we see a bug, we fix it — no hedging, no deferring, no labeling it as someone else's problem. Every bug in this repo is our bug.
+---
 
 ## Reliability
-Intermittent hangs and performance issues are P0. When encountered, investigate and solve them deeply — do not dismiss them as flakes, do not work around them, do not move on. Root-cause them.
 
-## Build Integrity
-The self-host build must never be broken. The compiler compiles itself:
+Intermittent hangs and performance regressions are **P0**.
+
+Never:
+
+* dismiss as flakes
+* add workarounds
+* add detection heuristics
+* disable functionality
+
+Always **root-cause the issue**.
+
+---
+
+# Build System
+
+The compiler compiles itself.
+
+Build:
+
 ```
-make build       # seed → stage1 → stage2
-make fixpoint    # verify stage2 == stage3 (byte-identical)
+make build
 ```
-The seed compiler is `with` on PATH, overridden by `WITH=<path>`. If the build breaks, fixing it is the top priority.
 
-## Self-Hosting Recovery
-The compiler is fully self-hosted. The Zig bootstrap (`bootstrap/`) is a historical artifact and must never be used. Recovery uses prior selfhost checkpoints:
-- `src/main` — the binary seed checked into the repo (a fixpoint-verified stage2)
-- `~/.local/bin/with` — the installed compiler
-- `WITH=<path>` — override with any known-good selfhost binary
+Stages:
 
-If `src/main` is corrupted and no working selfhost binary exists anywhere, that is a catastrophic loss scenario. Keep `src/main` updated with each fixpoint-verified build.
+```
+seed → stage1 → stage2
+```
 
-## Build Output
-All build artifacts go under `out/` (gitignored). Source directories are source-only:
-- `runtime/` — C runtime source (.c, .h, .s). No .o or .dylib files.
-- `out/bin/` — compiler binaries
-- `out/lib/` — compiled runtime objects (.o, .dylib)
-- `out/log/` — build logs
+Verify determinism:
 
-## Language
-Source files use `.w` extension. The language uses indentation-based syntax (like Python), with `fn`, `type`, `let`, `use`, `extern fn` as top-level declarations.
+```
+make fixpoint
+```
 
-## Work Discipline
-- **Fix bugs, don't work around them.** Don't disable a subsystem to avoid a bug in it. Don't add detection heuristics to route around broken code. Fix the broken code. Workarounds that try to enumerate failure cases are fragile and compound over time.
-- **Verify before writing code.** Don't guess at APIs, node layouts, or conventions from memory. Read the source definitions first (e.g., check Ast.w for node kinds before writing AST-walking code).
-- **Bisect, don't spiral.** When a stage binary is broken, systematically bisect which source change caused it (revert half, rebuild, test) rather than chasing symptoms with a debugger. Corrupted stacks and pointers rarely yield useful debugger output.
-- **Test incrementally.** Rebuild and smoke-test after each individual change. Batching multiple changes makes it hard to isolate which one broke things.
-- **Seed corruption awareness.** In a self-hosting compiler, always ask: "is the seed compiler itself producing bad code?" before debugging the output binary. Bugs in the seed propagate through the stage chain. If the seed is bad, replace it with the last known-good checkpoint from `src/main`.
+This verifies:
 
-## AST Node Layouts (common pitfalls)
-- `NK_LET_DECL` (4): top-level let. d0=name(sym), d1=value(node), d2=flags (bit0=mut, bit1=pub)
-- `NK_LET_BINDING` (33): let inside function bodies. d0=name(sym), d1=value(node), d2=flags (bit0=mut). There is NO `NK_VAR_DECL` — mutable bindings use LET_BINDING/LET_DECL with the mut flag.
-- `NK_IF_EXPR` (31): d0=cond, d1=then, d2=else. NOT called `NK_IF`.
-- `NK_FOR` (37): d0=binding(sym), d1=iterable(node), d2=body(node). Body is d2, NOT d1.
-- `NK_WHILE` (35): d0=cond, d1=body, d2=label
-- `NK_MATCH` (40): d0=subject, d1=extra_start, d2=arm_count
-- `NK_MATCH_ARM` (110): d0=pattern, d1=body, d2=guard
-- `NK_BLOCK` (30): d0=extra_start, d1=stmt_count, d2=tail(node)
-- `NK_RETURN` (32): d0=value(node)
-- `NK_STRUCT_LIT` (43): d0=name(sym), d1=extra_start, d2=field_count
+```
+stage2 == stage3
+```
 
-## Debugging on macOS ARM64
+(byte-identical)
+
+If the build breaks, **fixing the build is the top priority**.
+
+---
+
+# Seed Compiler
+
+The seed compiler is resolved in this order:
+
+1. `WITH=<path>`
+2. `with` on PATH
+3. `src/main`
+
+`src/main` is a **fixpoint-verified stage2 binary** committed to the repo.
+
+After a successful fixpoint build, update the seed.
+
+Catastrophic loss scenario:
+
+If these are all broken:
+
+* `src/main`
+* installed compiler
+* external selfhost binaries
+
+then **the compiler cannot be recovered**.
+
+---
+
+# Repository Layout
+
+All build artifacts must live under `out/`.
+
+```
+runtime/      C runtime source (.c .h .s)
+
+out/bin/      compiler binaries
+out/lib/      compiled runtime (.o), LLVM link config
+out/log/      build logs
+```
+
+Source directories must **never contain build artifacts**.
+
+---
+
+# LLVM Linking
+
+LLVM is **statically linked** into the compiler binary. No dynamic `libwith_llvm_bridge.dylib` dependency.
+
+Build-time setup (`scripts/ensure_runtime.sh`):
+
+1. Compiles `runtime/llvm_bridge.c` → `out/lib/llvm_bridge.o` using LLVM's clang
+2. Generates `out/lib/llvm_link.rsp` with LLVM static lib paths + system deps
+3. Writes `out/lib/llvm_cc` with path to LLVM's clang
+
+At link time (`src/compiler/Link.w`):
+
+* Detects `llvm_bridge.o` + `llvm_link.rsp` + `llvm_cc` → static linking via LLVM's clang with `-fuse-ld=lld`
+* Falls back to `libwith_llvm_bridge.dylib` if static bridge not available
+
+LLVM location: `/usr/local/llvm` (override with `LLVM_PREFIX` env var).
+
+Apple's system linker cannot parse LLVM 22 bitcode — the compiler **must** use LLVM's own `ld.lld`.
+
+---
+
+# Language Overview
+
+Source files use `.w`.
+
+The language is indentation-based (similar to Python).
+
+Top-level declarations:
+
+```
+fn
+type
+let
+use
+extern fn
+```
+
+---
+
+# Agent Editing Protocol
+
+When modifying compiler code, follow this exact workflow.
+
+---
+
+## 1. Read Before Editing
+
+Before writing code:
+
+* read relevant source files
+* confirm AST layouts
+* verify naming conventions
+
+Never rely on memory.
+
+---
+
+## 2. Make One Logical Change
+
+Avoid batching unrelated changes.
+
+Small commits make debugging possible.
+
+---
+
+## 3. Rebuild Immediately
+
+After each change:
+
+```
+make build
+```
+
+Smoke test:
+
+```
+./out/bin/with-stage2 check src/main.w
+```
+
+---
+
+## 4. If the Compiler Breaks
+
+Stop adding new changes.
+
+Begin **bisect debugging**.
+
+---
+
+# Stage Debugging Playbook
+
 When a stage binary crashes or hangs:
-1. **Quick repro**: `time ./out/bin/with-stage2 check src/main.w`
-2. **LLDB**: `lldb -- ./out/bin/with-stage2 check src/main.w` then `run` / `bt all`
-3. **Heap corruption**: `MallocScribble=1 MallocGuardEdges=1 ./out/bin/with-stage2 check src/main.w`
-4. **Leak check**: `leaks --atExit -- ./out/bin/with-stage2 check src/main.w`
-5. **Instruments**: `xcrun xctrace record --template "Leaks" --output /tmp/trace.trace --launch -- ./out/bin/with-stage2 check src/main.w`
-6. **Debug entitlement** (if "not debuggable"): `codesign -s - --entitlements /tmp/debug.entitlements --force ./out/bin/with-stage2`
-- Prefer lldb, MallocScribble, leaks, xctrace. Avoid Valgrind on ARM64.
 
+### Quick repro
+
+```
+time ./out/bin/with-stage2 check src/main.w
+```
+
+### LLDB
+
+```
+lldb -- ./out/bin/with-stage2 check src/main.w
+run
+bt all
+```
+
+### Heap corruption
+
+```
+MallocScribble=1 MallocGuardEdges=1 \
+./out/bin/with-stage2 check src/main.w
+```
+
+### Leak detection
+
+```
+leaks --atExit -- ./out/bin/with-stage2 check src/main.w
+```
+
+### Instruments
+
+```
+xcrun xctrace record \
+  --template "Leaks" \
+  --output /tmp/trace.trace \
+  --launch \
+  -- ./out/bin/with-stage2 check src/main.w
+```
+
+Preferred tools:
+
+* lldb
+* MallocScribble
+* leaks
+* xctrace
+
+Avoid **Valgrind on ARM64**.
+
+---
+
+# Root Cause Discipline
+
+When debugging a bug:
+
+Perform a **5 Whys analysis**.
+
+Trace the failure chain until the deepest credible cause.
+
+Fix the root cause — **never the symptom**.
+
+---
+
+# Seed Corruption Awareness
+
+In self-hosting compilers, the seed compiler may produce incorrect machine code.
+
+Symptoms include:
+
+* crashes in unrelated code
+* impossible pointer values
+* corrupted stacks
+* deterministic failures after small changes
+
+If suspected:
+
+Replace the seed compiler with a known-good binary.
+
+---
+
+# Compiler Invariants
+
+These rules must **always remain true**.
+
+If any invariant is violated, it is a compiler bug.
+
+---
+
+## AST Node Validity
+
+Every AST node must have a valid `kind`.
+
+Invalid kinds indicate:
+
+* parser bugs
+* memory corruption
+* incorrect node allocation
+
+---
+
+## Node Field Semantics
+
+Node field meanings must never change without updating all consumers.
+
+Example:
+
+```
+NK_IF_EXPR
+d0 = condition
+d1 = then
+d2 = else
+```
+
+---
+
+## Symbol References
+
+Symbol nodes must reference a valid symbol table entry.
+
+Invalid references indicate scope resolution bugs.
+
+---
+
+## Block Structure
+
+```
+NK_BLOCK
+d0 = extra_start
+d1 = stmt_count
+d2 = tail expression
+```
+
+Rules:
+
+* statement count must match stored statements
+* tail must be valid node or null
+
+---
+
+## Match Arm Counts
+
+```
+NK_MATCH
+d2 = arm_count
+```
+
+Stored arms must equal `arm_count`.
+
+---
+
+# Semantic Invariants
+
+### Variable Mutability
+
+Mutable variables use the **mut flag**.
+
+There is **no `var` declaration**.
+
+---
+
+### Expression Validity
+
+Expressions must never produce:
+
+```
+null
+invalid node
+uninitialized node
+```
+
+---
+
+### Control Flow
+
+Nodes like `if`, `match`, and `block` must produce a value in expression context.
+
+---
+
+# Stage Chain Invariants
+
+The stage chain must follow:
+
+```
+seed → stage1 → stage2 → stage3
+```
+
+Invariant:
+
+```
+stage2 == stage3
+```
+
+If fixpoint fails, code generation is nondeterministic.
+
+---
+
+# AST Node Layouts (Common Pitfalls)
+
+```
+NK_LET_DECL (4)
+d0 = name(sym)
+d1 = value(node)
+d2 = flags
+  bit0 = mut
+  bit1 = pub
+```
+
+```
+NK_LET_BINDING (33)
+d0 = name(sym)
+d1 = value(node)
+d2 = flags
+  bit0 = mut
+```
+
+Important:
+
+There is **NO `NK_VAR_DECL`**.
+
+---
+
+```
+NK_IF_EXPR (31)
+d0 = cond
+d1 = then
+d2 = else
+```
+
+---
+
+```
+NK_FOR (37)
+d0 = binding(sym)
+d1 = iterable(node)
+d2 = body(node)
+```
+
+Body is **d2**, not d1.
+
+---
+
+```
+NK_WHILE (35)
+d0 = cond
+d1 = body
+d2 = label
+```
+
+---
+
+```
+NK_MATCH (40)
+d0 = subject
+d1 = extra_start
+d2 = arm_count
+```
+
+---
+
+```
+NK_MATCH_ARM (110)
+d0 = pattern
+d1 = body
+d2 = guard
+```
+
+---
+
+```
+NK_BLOCK (30)
+d0 = extra_start
+d1 = stmt_count
+d2 = tail
+```
+
+---
+
+```
+NK_RETURN (32)
+d0 = value
+```
+
+---
+
+```
+NK_STRUCT_LIT (43)
+d0 = name(sym)
+d1 = extra_start
+d2 = field_count
+```
+
+---
+
+# Where Compiler Bugs Usually Hide
+
+When debugging, check these areas first.
+
+1. AST construction
+2. symbol resolution
+3. block statement accounting
+4. control flow construction
+5. match lowering
+6. iteration nodes
+7. codegen ordering
+8. seed corruption
+
+Most compiler bugs occur in the first three.
+
+---
+
+# Code Generation Determinism
+
+The compiler must produce deterministic output.
+
+Avoid:
+
+* iterating unordered maps
+* pointer-address ordering
+* nondeterministic traversal
+
+These break fixpoint verification.
+
+---
+
+# Dangerous Mistakes
+
+Avoid these common errors.
+
+### Misreading AST layouts
+
+Always confirm field meanings.
+
+---
+
+### Introducing build artifacts into source directories
+
+All artifacts must go under `out/`.
+
+---
+
+### Guessing APIs
+
+Read the source first.
+
+---
+
+### Working around compiler bugs
+
+Always fix the root cause.
+
+---
+
+### Debugging corrupted stage binaries
+
+If stacks are nonsense, suspect seed corruption.
+
+---
+
+# Agent Success Checklist
+
+A change is acceptable only if all of these succeed:
+
+```
+make build
+```
+
+```
+make fixpoint
+```
+
+```
+./out/bin/with-stage2 check src/main.w
+```
+
+If any step fails, continue debugging until it passes.
