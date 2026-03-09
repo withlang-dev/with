@@ -10,6 +10,7 @@ extern fn with_println_i32(n: i32) -> void
 extern fn with_println_i64(n: i64) -> void
 extern fn with_println_bool(v: bool) -> void
 extern fn with_panic(msg: str, file: str, line: i32) -> void
+extern fn int_to_string(n: i32) -> str
 
 pub fn println(s: str) -> void:
     with_println_str(s)

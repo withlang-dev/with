@@ -918,6 +918,9 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
     let name = self.expect_ident()
     if name == 0:
         return
+    // Parse optional type parameters: trait Iter[T] = ...
+    let trait_tp_start = self.pool.extra_len()
+    let trait_tp_count = self.parse_type_params()
     if self.peek() == TK_EQ() or self.peek() == TK_COLON():
         self.advance()
     else:
@@ -1021,6 +1024,9 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
         self.skip_newlines()
 
     let extra_start = self.pool.extra_len()
+    // Type params: count and start index into extra pool
+    self.pool.add_extra(trait_tp_count)
+    self.pool.add_extra(trait_tp_start)
     let assoc_count = assoc_names.len() as i32
     self.pool.add_extra(assoc_count)
     for ai in 0..assoc_count:
