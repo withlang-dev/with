@@ -10,60 +10,41 @@ no longer used in the build pipeline.
 
 - clang/LLVM toolchain available on PATH
 
-## Build Flow (Staged)
+## Build
 
-The compiler follows a staged selfhost model. Each stage compiles the same
-source (`src/main.w`) using the previous stage as the seed:
-
-- Seed: `src/main` (checked-in binary) or a prior selfhost checkpoint
-- Stage 1: selfhost compiler built from the seed
-- Stage 2: selfhost compiler built by stage 1 (canonical compiler)
-- Stage 3: selfhost compiler built by stage 2 (fixpoint verification)
-
-**Fixpoint:** Stage 2 and Stage 3 produce byte-identical binaries, proving the
-compiler is stable.
-
-Use the Make targets:
+The compiler compiles itself in two stages:
 
 ```sh
-make stage1
-make stage2
+make build         # seed → stage1 → stage2
+make fixpoint      # verify stage2 == stage3
+make test          # run test suite
+make install       # install to ~/.local/bin (or /usr/local/bin)
 ```
 
-`make build` runs through stage2 and refreshes `out/bin/with` from `out/bin/with-stage2`:
+The seed compiler is resolved from `WITH` env var or `with` on PATH:
 
 ```sh
-make build
+make build                           # uses `with` on PATH
+WITH=./src/main make build           # uses checked-in binary seed
+WITH=~/other/with make build         # uses explicit binary
 ```
 
-For reliable rebuilds on macOS/external-volume setups, staging uses:
-
-```sh
-./scripts/rebuild_selfhost.sh stage2
-```
-
-This prefers an existing selfhost compiler (`WITH`, `WITH_SELFHOST_SEED`, `out/bin/with`, `out/bin/with-stage2`, `out/bin/with-stage1`, or `with` on PATH), runs it from `/tmp`, and writes logs to `.with/build/.stage*.log`.
+**How it works:** The seed compiles `src/main.w` → stage1, then stage1
+compiles `src/main.w` → stage2. Stage2 is the canonical compiler.
+Stage2 and stage3 produce byte-identical binaries (fixpoint).
 
 ## Install
 
-Preferred (no sudo, fish):
+```sh
+make install PREFIX=$HOME/.local     # installs to ~/.local/bin/with
+sudo make install                    # installs to /usr/local/bin/with
+```
+
+For fish shell:
 
 ```sh
-make install PREFIX=$HOME/.local
 fish_add_path -g ~/.local/bin
-set -Ux WITH $HOME/.local/bin/with
 ```
-
-System-wide:
-
-```sh
-sudo make install
-```
-
-`make install` installs:
-
-- stage2 self-host compiler as `with`
-- runtime files into `$(BINDIR)/runtime`
 
 ## Use
 
@@ -114,11 +95,14 @@ Fixpoint verification (stage2 == stage3):
 src/                 self-hosted compiler (.w)
 src/main             binary seed (fixpoint-verified selfhost checkpoint)
 src/compiler/        Compilation-first architecture port layer
-runtime/             C runtime support
-lib/std/             standard library
-test/cases/          self-hosted behavior tests
+runtime/             C runtime source (.c, .h, .s)
+lib/std/             standard library (.w)
+test/cases/          behavior tests
+out/                 all build output (gitignored)
+  bin/               compiler binaries
+  lib/               compiled runtime (.o, .dylib)
+  log/               build logs
 bootstrap/           historical Zig bootstrap compiler (frozen, unused)
-bootstrap/test/cases/ legacy parser/codegen tests (used as test corpus)
 ```
 
 ## Troubleshooting

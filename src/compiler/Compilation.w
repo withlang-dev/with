@@ -179,7 +179,7 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
 
     var final_output = output_path
     if final_output.len() == 0:
-        final_output = ".with/build/" ++ link_stage_source_stem(source_path) ++ ".c"
+        final_output = "out/" ++ link_stage_source_stem(source_path) ++ ".c"
 
     let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, self.zcu.pool, self.zcu.last_sema)
     if emitted.ok == 0:
