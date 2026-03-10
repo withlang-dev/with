@@ -1,7 +1,6 @@
 //! expect-stdout: ok
 
-use Type
-use Traits
+use Types
 
 fn test_trait_def:
     var solver = TraitSolver.new()
@@ -12,8 +11,8 @@ fn test_trait_def:
     mparams.push(1)
     mparams.push(0)
     var mrets = Vec.new()
-    mrets.push(TYPE_STR())
-    mrets.push(TYPE_VOID())
+    mrets.push(TYPE_STR)
+    mrets.push(TYPE_VOID)
     TraitSolver.add_trait(solver, 100, mnames, mparams, mrets)
     assert(TraitSolver.find_trait(solver, 100) == 0)
     assert(TraitSolver.find_trait(solver, 999) == -1)
@@ -23,7 +22,7 @@ fn test_trait_def:
     assert(TraitSolver.trait_method_name(solver, 0, 0) == 10)
     assert(TraitSolver.trait_method_name(solver, 0, 1) == 11)
     assert(TraitSolver.trait_method_param_count(solver, 0, 0) == 1)
-    assert(TraitSolver.trait_method_ret_type(solver, 0, 0) == TYPE_STR())
+    assert(TraitSolver.trait_method_ret_type(solver, 0, 0) == TYPE_STR)
 
 fn test_impl_and_resolve:
     var solver = TraitSolver.new()
@@ -33,7 +32,7 @@ fn test_impl_and_resolve:
     var mparams = Vec.new()
     mparams.push(1)
     var mrets = Vec.new()
-    mrets.push(TYPE_STR())
+    mrets.push(TYPE_STR)
     TraitSolver.add_trait(solver, 100, mnames, mparams, mrets)
 
     // Impl: type 50 implements trait 100
@@ -63,7 +62,7 @@ fn test_coherence:
     var mparams = Vec.new()
     mparams.push(1)
     var mrets = Vec.new()
-    mrets.push(TYPE_STR())
+    mrets.push(TYPE_STR)
     TraitSolver.add_trait(solver, 100, mnames, mparams, mrets)
 
     // Single impl — coherent
@@ -91,7 +90,7 @@ fn test_obligation_list:
     var mparams = Vec.new()
     mparams.push(1)
     var mrets = Vec.new()
-    mrets.push(TYPE_STR())
+    mrets.push(TYPE_STR)
     TraitSolver.add_trait(solver, 100, mnames, mparams, mrets)
 
     var impl1 = Vec.new()

@@ -15,46 +15,46 @@ fn lex(source: str) -> TokenList:
 
 fn test_plus_wrap_token:
     var tokens = lex("+%")
-    assert(TokenList.tag_at(tokens, 0) == TK_PLUS_WRAP())
-    assert(TK_PLUS_WRAP() == 59)
+    assert(TokenList.tag_at(tokens, 0) == TK_PLUS_WRAP)
+    assert(TK_PLUS_WRAP == 59)
 
 fn test_minus_wrap_token:
     var tokens = lex("-%")
-    assert(TokenList.tag_at(tokens, 0) == TK_MINUS_WRAP())
-    assert(TK_MINUS_WRAP() == 60)
+    assert(TokenList.tag_at(tokens, 0) == TK_MINUS_WRAP)
+    assert(TK_MINUS_WRAP == 60)
 
 fn test_star_wrap_token:
     var tokens = lex("*%")
-    assert(TokenList.tag_at(tokens, 0) == TK_STAR_WRAP())
-    assert(TK_STAR_WRAP() == 61)
+    assert(TokenList.tag_at(tokens, 0) == TK_STAR_WRAP)
+    assert(TK_STAR_WRAP == 61)
 
 fn test_wrap_in_expression_tokens:
     // a +% b
     var tokens = lex("a +% b")
-    assert(TokenList.tag_at(tokens, 0) == TK_IDENT())  // a
-    assert(TokenList.tag_at(tokens, 1) == TK_PLUS_WRAP())
-    assert(TokenList.tag_at(tokens, 2) == TK_IDENT())  // b
+    assert(TokenList.tag_at(tokens, 0) == TK_IDENT)  // a
+    assert(TokenList.tag_at(tokens, 1) == TK_PLUS_WRAP)
+    assert(TokenList.tag_at(tokens, 2) == TK_IDENT)  // b
 
 fn test_wrap_sub_expression_tokens:
     // x -% y
     var tokens = lex("x -% y")
-    assert(TokenList.tag_at(tokens, 0) == TK_IDENT())
-    assert(TokenList.tag_at(tokens, 1) == TK_MINUS_WRAP())
-    assert(TokenList.tag_at(tokens, 2) == TK_IDENT())
+    assert(TokenList.tag_at(tokens, 0) == TK_IDENT)
+    assert(TokenList.tag_at(tokens, 1) == TK_MINUS_WRAP)
+    assert(TokenList.tag_at(tokens, 2) == TK_IDENT)
 
 fn test_wrap_mul_expression_tokens:
     // x *% y
     var tokens = lex("x *% y")
-    assert(TokenList.tag_at(tokens, 0) == TK_IDENT())
-    assert(TokenList.tag_at(tokens, 1) == TK_STAR_WRAP())
-    assert(TokenList.tag_at(tokens, 2) == TK_IDENT())
+    assert(TokenList.tag_at(tokens, 0) == TK_IDENT)
+    assert(TokenList.tag_at(tokens, 1) == TK_STAR_WRAP)
+    assert(TokenList.tag_at(tokens, 2) == TK_IDENT)
 
 fn test_regular_arith_unchanged:
     // + - * should still produce normal tokens
     var tokens = lex("+ - *")
-    assert(TokenList.tag_at(tokens, 0) == TK_PLUS())
-    assert(TokenList.tag_at(tokens, 1) == TK_MINUS())
-    assert(TokenList.tag_at(tokens, 2) == TK_STAR())
+    assert(TokenList.tag_at(tokens, 0) == TK_PLUS)
+    assert(TokenList.tag_at(tokens, 1) == TK_MINUS)
+    assert(TokenList.tag_at(tokens, 2) == TK_STAR)
 
 fn main:
     test_plus_wrap_token()

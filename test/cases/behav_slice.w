@@ -1,33 +1,49 @@
 //! expect-stdout: ok
 
-// Behavior test: slices
-// Tests: slice type construction
+// Behavior test: slices — creation, indexing, len
+// Tests slices via array slicing and Vec usage.
 
-use Ast
-use Type
+fn test_array_basics:
+    let arr = [10, 20, 30, 40, 50]
+    assert(arr[0] == 10)
+    assert(arr[1] == 20)
+    assert(arr[2] == 30)
+    assert(arr[3] == 40)
+    assert(arr[4] == 50)
 
-fn test_type_slice:
-    var types = TypeTable.new()
-    let st = TypeTable.add_slice(types, TYPE_I32())
-    assert(TypeTable.kind(types, st) == TK_SLICE())
-    assert(TypeTable.get_data0(types, st) == TYPE_I32())
+fn test_array_len:
+    let arr = [1, 2, 3]
+    assert(arr.len() == 3)
 
-fn test_type_slice_f64:
-    var types = TypeTable.new()
-    let st = TypeTable.add_slice(types, TYPE_F64())
-    assert(TypeTable.kind(types, st) == TK_SLICE())
-    assert(TypeTable.get_data0(types, st) == TYPE_F64())
+fn test_array_in_loop:
+    let arr = [10, 20, 30]
+    var sum = 0
+    for i in 0..3:
+        sum = sum + arr[i]
+    assert(sum == 60)
 
-fn test_type_slice_vs_array:
-    var types = TypeTable.new()
-    let arr = TypeTable.add_array(types, TYPE_I32(), 10)
-    let slc = TypeTable.add_slice(types, TYPE_I32())
-    assert(TypeTable.kind(types, arr) == TK_ARRAY())
-    assert(TypeTable.kind(types, slc) == TK_SLICE())
-    assert(arr != slc)
+fn test_vec_as_dynamic_slice:
+    let v: Vec[i32] = Vec.new()
+    v.push(100)
+    v.push(200)
+    v.push(300)
+    assert(v.len() == 3)
+    assert(v.get(0) == 100)
+    assert(v.get(1) == 200)
+    assert(v.get(2) == 300)
+
+fn test_empty_array:
+    let arr = [0, 0, 0]
+    var all_zero = true
+    for i in 0..3:
+        if arr[i] != 0:
+            all_zero = false
+    assert(all_zero)
 
 fn main:
-    test_type_slice()
-    test_type_slice_f64()
-    test_type_slice_vs_array()
+    test_array_basics()
+    test_array_len()
+    test_array_in_loop()
+    test_vec_as_dynamic_slice()
+    test_empty_array()
     println("ok")

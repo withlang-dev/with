@@ -7,7 +7,7 @@
 use Token
 use Lexer
 use Ast
-use Type
+use Types
 use Mir
 use Parser
 
@@ -17,7 +17,7 @@ fn lex(source: str) -> TokenList:
 
 fn test_match_keyword:
     var tokens = lex("match")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_MATCH())
+    assert(TokenList.tag_at(tokens, 0) == TK_KW_MATCH)
 
 fn test_parse_match_with_guard:
     // match x:
@@ -29,39 +29,39 @@ fn test_parse_match_with_guard:
     Parser.parse_module(p)
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_MATCH())
+    assert(AstPool.kind(p.pool, body) == NK_MATCH)
 
 fn test_match_arm_patterns:
     // Int pattern
-    assert(NK_PAT_INT() == 102)
+    assert(NK_PAT_INT == 102)
     // Bool pattern
-    assert(NK_PAT_BOOL() == 103)
+    assert(NK_PAT_BOOL == 103)
     // String pattern
-    assert(NK_PAT_STRING() == 104)
+    assert(NK_PAT_STRING == 104)
     // Wildcard pattern
-    assert(NK_PAT_WILDCARD() == 100)
+    assert(NK_PAT_WILDCARD == 100)
     // Ident pattern
-    assert(NK_PAT_IDENT() == 101)
+    assert(NK_PAT_IDENT == 101)
     // Variant pattern
-    assert(NK_PAT_VARIANT() == 105)
+    assert(NK_PAT_VARIANT == 105)
     // Tuple pattern
-    assert(NK_PAT_TUPLE() == 106)
+    assert(NK_PAT_TUPLE == 106)
     // Struct pattern
-    assert(NK_PAT_STRUCT() == 107)
+    assert(NK_PAT_STRUCT == 107)
     // Range pattern
-    assert(NK_PAT_RANGE() == 108)
+    assert(NK_PAT_RANGE == 108)
     // Or pattern
-    assert(NK_PAT_OR() == 109)
+    assert(NK_PAT_OR == 109)
     // Enum shorthand pattern
-    assert(NK_PAT_ENUM_SHORTHAND() == 111)
+    assert(NK_PAT_ENUM_SHORTHAND == 111)
 
 fn test_match_arm_node:
-    assert(NK_MATCH_ARM() == 110)
+    assert(NK_MATCH_ARM == 110)
 
 fn test_mir_switch_int_for_match:
     // match lowering uses TM_SWITCH_INT to branch on value
     var body = MirBody.new()
-    let local = MirBody.add_local(body, 0, TYPE_I32(), 0)
+    let local = MirBody.add_local(body, 0, TYPE_I32, 0)
     let bb0 = MirBody.add_block(body)
     let bb1 = MirBody.add_block(body)
     let bb2 = MirBody.add_block(body)
@@ -71,7 +71,7 @@ fn test_mir_switch_int_for_match:
     assert(MirBody.block_count(body) == 3)
     // Verify switch_int stored in extra
     let extra_base = 0
-    assert(MirBody.get_extra(body, extra_base) == TM_SWITCH_INT())
+    assert(MirBody.get_extra(body, extra_base) == TM_SWITCH_INT)
     assert(MirBody.get_extra(body, extra_base + 1) == local)
     assert(MirBody.get_extra(body, extra_base + 2) == bb1)
     assert(MirBody.get_extra(body, extra_base + 3) == bb2)
@@ -102,17 +102,17 @@ fn test_match_enum_with_payload:
     vpayloads.push(1)  // Some: 1 payload
     vpayloads.push(0)  // None: no payload
     var vptypes = Vec.new()
-    vptypes.push(TYPE_I32())  // Some(i32)
+    vptypes.push(TYPE_I32)  // Some(i32)
     let eid = TypeTable.add_enum(types, 20, vnames, vpayloads, vptypes)
     assert(TypeTable.enum_variant_count(types, eid) == 2)
     assert(TypeTable.enum_variant_payload_count(types, eid, 0) == 1)
-    assert(TypeTable.enum_variant_payload_type(types, eid, 0, 0) == TYPE_I32())
+    assert(TypeTable.enum_variant_payload_type(types, eid, 0, 0) == TYPE_I32)
     assert(TypeTable.enum_variant_payload_count(types, eid, 1) == 0)
 
 fn test_multi_arm_match_cfg:
     // match with 3 arms needs a chain of switch_int blocks
     var body = MirBody.new()
-    let scrutinee = MirBody.add_local(body, 0, TYPE_I32(), 0)
+    let scrutinee = MirBody.add_local(body, 0, TYPE_I32, 0)
     let bb_entry = MirBody.add_block(body)
     let bb_arm1 = MirBody.add_block(body)
     let bb_arm2 = MirBody.add_block(body)

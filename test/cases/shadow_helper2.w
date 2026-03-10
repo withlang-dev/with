@@ -1,3 +1,4 @@
+//! check-only
 // Second helper module for import conflict test.
 // Provides a map function with yet another signature.
 // When two explicit imports both define map, the later import wins.

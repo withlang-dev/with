@@ -5,9 +5,9 @@
 // scope-based drop emission in MIR
 
 use Ast
-use Type
+use Types
 use Mir
-use MirBuild
+use MirLower
 
 fn test_reverse_drop_order:
     // MirBuilder should emit drops in reverse declaration order
@@ -19,7 +19,7 @@ fn test_reverse_drop_order:
     var names = Vec.new()
     names.push(0)
     var ftypes = Vec.new()
-    ftypes.push(TYPE_I32())
+    ftypes.push(TYPE_I32)
     var defaults = Vec.new()
     defaults.push(0)
     let struct_type = TypeTable.add_struct(types, 99, names, ftypes, defaults)
@@ -42,7 +42,7 @@ fn test_reverse_drop_order:
     let sc = MirBody.stmt_count(builder.body)
     assert(sc == 3)
     // Verify drop order: first drop is for local c (last declared)
-    assert(MirBody.stmt_kind(builder.body, 0) == SK_DROP())
+    assert(MirBody.stmt_kind(builder.body, 0) == SK_DROP)
     assert(MirBody.stmt_d0(builder.body, 0) == c)
     assert(MirBody.stmt_d0(builder.body, 1) == b)
     assert(MirBody.stmt_d0(builder.body, 2) == a)
@@ -56,11 +56,11 @@ fn test_copy_types_not_dropped:
     MirBuilder.switch_to(builder, entry)
     MirBuilder.push_scope(builder)
     // Add copy-type locals
-    let x = MirBody.add_local(builder.body, 1, TYPE_I32(), 0)
+    let x = MirBody.add_local(builder.body, 1, TYPE_I32, 0)
     MirBuilder.track_local(builder, x)
-    let y = MirBody.add_local(builder.body, 2, TYPE_BOOL(), 0)
+    let y = MirBody.add_local(builder.body, 2, TYPE_BOOL, 0)
     MirBuilder.track_local(builder, y)
-    let z = MirBody.add_local(builder.body, 3, TYPE_F64(), 0)
+    let z = MirBody.add_local(builder.body, 3, TYPE_F64, 0)
     MirBuilder.track_local(builder, z)
     MirBuilder.pop_scope(builder)
     // No drop stmts should be emitted for copy types
@@ -73,7 +73,7 @@ fn test_mixed_copy_noncopy:
     var names = Vec.new()
     names.push(0)
     var ftypes = Vec.new()
-    ftypes.push(TYPE_I32())
+    ftypes.push(TYPE_I32)
     var defaults = Vec.new()
     defaults.push(0)
     let s_type = TypeTable.add_struct(types, 88, names, ftypes, defaults)
@@ -82,16 +82,16 @@ fn test_mixed_copy_noncopy:
     MirBuilder.switch_to(builder, entry)
     MirBuilder.push_scope(builder)
     // a: i32 (copy), b: struct (non-copy), c: bool (copy)
-    let a = MirBody.add_local(builder.body, 1, TYPE_I32(), 0)
+    let a = MirBody.add_local(builder.body, 1, TYPE_I32, 0)
     MirBuilder.track_local(builder, a)
     let b = MirBody.add_local(builder.body, 2, s_type, 0)
     MirBuilder.track_local(builder, b)
-    let c = MirBody.add_local(builder.body, 3, TYPE_BOOL(), 0)
+    let c = MirBody.add_local(builder.body, 3, TYPE_BOOL, 0)
     MirBuilder.track_local(builder, c)
     MirBuilder.pop_scope(builder)
     // Only 1 drop: for b (the non-copy local)
     assert(MirBody.stmt_count(builder.body) == 1)
-    assert(MirBody.stmt_kind(builder.body, 0) == SK_DROP())
+    assert(MirBody.stmt_kind(builder.body, 0) == SK_DROP)
     assert(MirBody.stmt_d0(builder.body, 0) == b)
 
 fn test_nested_scope_drops:
@@ -101,7 +101,7 @@ fn test_nested_scope_drops:
     var names = Vec.new()
     names.push(0)
     var ftypes = Vec.new()
-    ftypes.push(TYPE_I32())
+    ftypes.push(TYPE_I32)
     var defaults = Vec.new()
     defaults.push(0)
     let s_type = TypeTable.add_struct(types, 77, names, ftypes, defaults)
@@ -131,9 +131,9 @@ fn test_defer_lifo_order:
     var pool = AstPool.new()
     var types = TypeTable.new()
     // Create some AST nodes to serve as defer bodies
-    let d1 = AstPool.add_node(pool, NK_INT_LIT(), 0, 0, 1, 0, 0)
-    let d2 = AstPool.add_node(pool, NK_INT_LIT(), 0, 0, 2, 0, 0)
-    let d3 = AstPool.add_node(pool, NK_INT_LIT(), 0, 0, 3, 0, 0)
+    let d1 = AstPool.add_node(pool, NK_INT_LIT, 0, 0, 1, 0, 0)
+    let d2 = AstPool.add_node(pool, NK_INT_LIT, 0, 0, 2, 0, 0)
+    let d3 = AstPool.add_node(pool, NK_INT_LIT, 0, 0, 3, 0, 0)
     var builder = MirBuilder.new(pool, types, "")
     let entry = MirBuilder.new_block(builder)
     MirBuilder.switch_to(builder, entry)

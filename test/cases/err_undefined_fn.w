@@ -4,7 +4,7 @@
 // Tests that Sema detects calls to undeclared functions
 
 use Ast
-use Type
+use Types
 use Sema
 use InternPool
 
@@ -24,9 +24,9 @@ fn test_fn_found_after_registration:
     var s = Sema.new(pool, "", intern)
     s.fn_names.push("foo")
     var ptypes = Vec.new()
-    let ft = TypeTable.add_fn(s.types, ptypes, TYPE_VOID(), 0)
+    let ft = TypeTable.add_fn(s.types, ptypes, TYPE_VOID, 0)
     s.fn_type_ids.push(ft)
-    s.fn_ret_types.push(TYPE_VOID())
+    s.fn_ret_types.push(TYPE_VOID)
     s.fn_param_starts.push(0)
     s.fn_param_counts.push(0)
     s.fn_is_generic.push(0)

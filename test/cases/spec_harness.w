@@ -18,18 +18,18 @@ pub fn write_case(name: str, src: str) -> str:
 
 pub fn run_check_case(name: str, src: str) -> i32:
     let path = write_case(name, src)
-    var d = Driver.new(MODE_CHECK(), path)
+    var d = Driver.new(MODE_CHECK, path)
     Driver.run_pipeline(d)
 
 pub fn run_run_case(name: str, src: str) -> i32:
     let path = write_case(name, src)
-    var d = Driver.new(MODE_RUN(), path)
+    var d = Driver.new(MODE_RUN, path)
     Driver.compile_and_run(d)
 
 pub fn run_build_case(name: str, src: str) -> i32:
     let path = write_case(name, src)
     let exe = ".with/build/spec_" ++ name
-    var d = Driver.new(MODE_BUILD(), path)
+    var d = Driver.new(MODE_BUILD, path)
     Driver.compile_to_c(d, exe)
 
 pub fn expect_eq_i32(actual: i32, expected: i32, label: str) -> i32:

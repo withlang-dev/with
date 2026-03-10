@@ -1,90 +1,52 @@
 //! expect-stdout: ok
 
-// Behavior test: non-capturing closures as fn pointers (Rust ui/closures/)
-// Tests: fn pointer type creation, fn arrays, fn type equality,
-// variadic fn types
+// Behavior test: closures as function pointers / higher-order functions
+// Tests: fn pointers, passing functions, returning from higher-order fns
 
-use Type
+fn add_one(x: i32) -> i32:
+    x + 1
 
-fn test_fn_ptr_basic:
-    var types = TypeTable.new()
-    var params = Vec.new()
-    params.push(TYPE_I32())
-    let ft = TypeTable.add_fn(types, params, TYPE_I32(), 0)
-    assert(TypeTable.kind(types, ft) == TK_FN())
-    assert(TypeTable.fn_is_variadic(types, ft) == 0)
+fn triple(x: i32) -> i32:
+    x * 3
 
-fn test_fn_ptr_not_variadic:
-    var types = TypeTable.new()
-    var params = Vec.new()
-    params.push(TYPE_STR())
-    let ft = TypeTable.add_fn(types, params, TYPE_VOID(), 0)
-    assert(TypeTable.fn_is_variadic(types, ft) == 0)
+fn negate(x: i32) -> i32:
+    0 - x
 
-fn test_fn_ptr_variadic:
-    var types = TypeTable.new()
-    var params = Vec.new()
-    params.push(TYPE_STR())
-    let ft = TypeTable.add_fn(types, params, TYPE_I32(), 1)
-    assert(TypeTable.fn_is_variadic(types, ft) == 1)
+fn apply(f: fn(i32) -> i32, x: i32) -> i32:
+    f(x)
 
-fn test_fn_ptr_array:
-    // Array of fn pointers: [3]fn(i32)->i32
-    var types = TypeTable.new()
-    var params = Vec.new()
-    params.push(TYPE_I32())
-    let fn_type = TypeTable.add_fn(types, params, TYPE_I32(), 0)
-    let arr_type = TypeTable.add_array(types, fn_type, 3)
-    assert(TypeTable.is_array(types, arr_type))
-    assert(TypeTable.array_size(types, arr_type) == 3)
-    assert(TypeTable.array_elem_type(types, arr_type) == fn_type)
-    assert(TypeTable.is_fn(types, TypeTable.array_elem_type(types, arr_type)))
+fn test_named_fn_as_ptr:
+    assert(apply(add_one, 10) == 11)
+    assert(apply(triple, 10) == 30)
+    assert(apply(negate, 10) == -10)
 
-fn test_fn_ptr_not_copy:
-    // fn types are not copy (they're complex types)
-    var types = TypeTable.new()
-    var params = Vec.new()
-    let ft = TypeTable.add_fn(types, params, TYPE_I32(), 0)
-    // fn types are not in the copy list
-    assert(not TypeTable.is_copy(types, ft))
+fn test_closure_as_fn_ptr:
+    assert(apply(|x| x * 2, 5) == 10)
+    assert(apply(|x| x + 100, 0) == 100)
 
-fn test_fn_ptr_in_struct:
-    // Struct with fn pointer field
-    var types = TypeTable.new()
-    var params = Vec.new()
-    params.push(TYPE_I32())
-    let fn_type = TypeTable.add_fn(types, params, TYPE_I32(), 0)
-    var field_names = Vec.new()
-    field_names.push(1)  // "callback"
-    var field_types = Vec.new()
-    field_types.push(fn_type)
-    var field_defaults = Vec.new()
-    field_defaults.push(0)
-    let st = TypeTable.add_struct(types, 50, field_names, field_types, field_defaults)
-    assert(TypeTable.struct_field_count(types, st) == 1)
-    assert(TypeTable.struct_field_type(types, st, 0) == fn_type)
+fn apply_twice(f: fn(i32) -> i32, x: i32) -> i32:
+    f(f(x))
 
-fn test_fn_type_equality:
-    // Two fn types with same signature should be structurally different
-    // (each add_fn creates a new type id)
-    var types = TypeTable.new()
-    var p1 = Vec.new()
-    p1.push(TYPE_I32())
-    let ft1 = TypeTable.add_fn(types, p1, TYPE_I32(), 0)
-    var p2 = Vec.new()
-    p2.push(TYPE_I32())
-    let ft2 = TypeTable.add_fn(types, p2, TYPE_I32(), 0)
-    // Different TypeIds (structural equality not checked for fn types by types_equal)
-    assert(ft1 != ft2)
-    // But same kind
-    assert(TypeTable.kind(types, ft1) == TypeTable.kind(types, ft2))
+fn test_apply_twice:
+    assert(apply_twice(add_one, 0) == 2)
+    assert(apply_twice(triple, 2) == 18)
+    assert(apply_twice(|x| x + 10, 0) == 20)
+
+fn apply_predicate(f: fn(i32) -> bool, x: i32) -> bool:
+    f(x)
+
+fn is_even(x: i32) -> bool:
+    x % 2 == 0
+
+fn test_predicate_fn_ptr:
+    assert(apply_predicate(is_even, 4) == true)
+    assert(apply_predicate(is_even, 3) == false)
+    assert(apply_predicate(|x| x > 0, 5) == true)
+    assert(apply_predicate(|x| x > 0, -1) == false)
 
 fn main:
-    test_fn_ptr_basic()
-    test_fn_ptr_not_variadic()
-    test_fn_ptr_variadic()
-    test_fn_ptr_array()
-    test_fn_ptr_not_copy()
-    test_fn_ptr_in_struct()
-    test_fn_type_equality()
+    test_named_fn_as_ptr()
+    test_closure_as_fn_ptr()
+    test_apply_twice()
+    test_predicate_fn_ptr()
     println("ok")

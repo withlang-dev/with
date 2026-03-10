@@ -218,6 +218,42 @@ expect_check_dump_not_contains() {
   echo "PASS(wave11-unit-prelude-${label})"
 }
 
+expect_embedded_std_standalone_check_pass() {
+  local standalone_dir="$tmpdir/standalone_compiler"
+  local foreign_cwd="$tmpdir/foreign_cwd"
+  local foreign_src="$tmpdir/foreign_src/hello.w"
+  mkdir -p "$standalone_dir" "$foreign_cwd" "$(dirname "$foreign_src")"
+
+  cp "$SELFHOST_BIN" "$standalone_dir/with"
+  chmod +x "$standalone_dir/with"
+
+  local runner_runtime=""
+  runner_runtime="$(cd "$(dirname "$SELFHOST_BIN")" && pwd)/runtime/libwith_llvm_bridge.dylib"
+  if [[ -f "$runner_runtime" ]]; then
+    mkdir -p "$standalone_dir/runtime"
+    cp "$runner_runtime" "$standalone_dir/runtime/libwith_llvm_bridge.dylib"
+  elif [[ -f "$ROOT_DIR/out/lib/libwith_llvm_bridge.dylib" ]]; then
+    mkdir -p "$standalone_dir/runtime"
+    cp "$ROOT_DIR/out/lib/libwith_llvm_bridge.dylib" "$standalone_dir/runtime/libwith_llvm_bridge.dylib"
+  fi
+
+  cat >"$foreign_src" <<'EOF'
+fn main:
+    println("ok")
+EOF
+
+  if (
+    cd "$foreign_cwd"
+    run_with_optional_timeout "$CHECK_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$standalone_dir/with" check "$foreign_src"
+  ); then
+    echo "PASS(wave11-unit-embedded-std-standalone-check)"
+  else
+    echo "FAIL(wave11-unit-embedded-std-standalone-check)"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+  fi
+}
+
 expect_mode_pass check "test/wave11/cases/driver_simple.w"
 expect_mode_pass check "test/wave11/cases/imports/relative_root.w"
 expect_mode_pass check "test/wave11/cases/imports/qualified_root.w"
@@ -232,20 +268,21 @@ expect_mode_pass check "test/wave11/cases/prelude/pinned_root.w"
 expect_mode_fail_msg check "test/wave11/cases/imports/missing_root.w" "import module not found"
 expect_mode_fail_msg check "test/wave11/cases/c_import_bad_header_fail.w" "failed to compile C header snippet"
 
-expect_check_dump_contains "full" "path=lib/std/prelude.w" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_contains "full-iter" "path=lib/std/iter.w" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_contains "full-fs" "path=lib/std/fs.w" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_contains "full-process" "path=lib/std/process.w" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_contains "core" "path=lib/std/prelude_core.w" "--prelude=core" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_not_contains "core-iter" "path=lib/std/iter.w" "--prelude=core" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_not_contains "core-fs" "path=lib/std/fs.w" "--prelude=core" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_not_contains "core-process" "path=lib/std/process.w" "--prelude=core" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_not_contains "none" "path=lib/std/prelude" "--no-prelude" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_not_contains "none-math" "path=lib/std/math.w" "--no-prelude" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_not_contains "none-process" "path=lib/std/process.w" "--no-prelude" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_not_contains "freestanding" "path=lib/std/prelude" "--freestanding" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_not_contains "freestanding-math" "path=lib/std/math.w" "--freestanding" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_not_contains "freestanding-process" "path=lib/std/process.w" "--freestanding" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_contains "full" "path=<embedded-std>/std/prelude.w" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_contains "full-iter" "path=<embedded-std>/std/iter.w" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_contains "full-fs" "path=<embedded-std>/std/fs.w" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_contains "full-process" "path=<embedded-std>/std/process.w" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_contains "core" "path=<embedded-std>/std/prelude_core.w" "--prelude=core" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "core-iter" "path=<embedded-std>/std/iter.w" "--prelude=core" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "core-fs" "path=<embedded-std>/std/fs.w" "--prelude=core" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "core-process" "path=<embedded-std>/std/process.w" "--prelude=core" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "none" "path=<embedded-std>/std/prelude" "--no-prelude" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "none-math" "path=<embedded-std>/std/math.w" "--no-prelude" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "none-process" "path=<embedded-std>/std/process.w" "--no-prelude" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "freestanding" "path=<embedded-std>/std/prelude" "--freestanding" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "freestanding-math" "path=<embedded-std>/std/math.w" "--freestanding" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "freestanding-process" "path=<embedded-std>/std/process.w" "--freestanding" "test/wave11/cases/prelude/simple_root.w"
+expect_embedded_std_standalone_check_pass
 
 expect_mode_pass build "test/wave11/cases/driver_simple.w"
 expect_mode_pass build "test/wave11/cases/c_import_link_ok.w"

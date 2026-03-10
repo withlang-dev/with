@@ -47,9 +47,9 @@ fn canonical_file_path(idx: i32) -> str:
     ""
 
 // Validate error codes
-fn VE_OK -> i32: 0
-fn VE_MISSING_MODULE -> i32: 1
-fn VE_DUPLICATE_MODULE -> i32: 2
+const VE_OK: i32 = 0
+const VE_MISSING_MODULE: i32 = 1
+const VE_DUPLICATE_MODULE: i32 = 2
 
 // Validate project scaffold. Returns VE_OK on success.
 fn validate_scaffold(spec_names: Vec[str], spec_paths: Vec[str]) -> i32:
@@ -60,7 +60,7 @@ fn validate_scaffold(spec_names: Vec[str], spec_paths: Vec[str]) -> i32:
             if spec_names.get(si as i64) == req:
                 count = count + 1
         if count == 0:
-            return VE_MISSING_MODULE()
+            return VE_MISSING_MODULE
         if count > 1:
-            return VE_DUPLICATE_MODULE()
-    VE_OK()
+            return VE_DUPLICATE_MODULE
+    VE_OK

@@ -16,29 +16,29 @@ fn lex(source: str) -> TokenList:
 fn test_file_magic_lexes_as_ident:
     // __FILE__ currently lexes as a regular identifier
     var tokens = lex("__FILE__")
-    assert(TokenList.tag_at(tokens, 0) == TK_IDENT())
+    assert(TokenList.tag_at(tokens, 0) == TK_IDENT)
 
 fn test_line_magic_lexes_as_ident:
     // __LINE__ currently lexes as a regular identifier
     var tokens = lex("__LINE__")
-    assert(TokenList.tag_at(tokens, 0) == TK_IDENT())
+    assert(TokenList.tag_at(tokens, 0) == TK_IDENT)
 
 fn test_fn_magic_lexes_as_ident:
     // __FN__ currently lexes as a regular identifier
     var tokens = lex("__FN__")
-    assert(TokenList.tag_at(tokens, 0) == TK_IDENT())
+    assert(TokenList.tag_at(tokens, 0) == TK_IDENT)
 
 fn test_magic_in_expression_tokens:
     // println(__FILE__ ++ ":" ++ __LINE__)
     var tokens = lex("__FILE__ ++ __LINE__")
-    assert(TokenList.tag_at(tokens, 0) == TK_IDENT())  // __FILE__
-    assert(TokenList.tag_at(tokens, 1) == TK_PLUS_PLUS())
-    assert(TokenList.tag_at(tokens, 2) == TK_IDENT())  // __LINE__
+    assert(TokenList.tag_at(tokens, 0) == TK_IDENT)  // __FILE__
+    assert(TokenList.tag_at(tokens, 1) == TK_PLUS_PLUS)
+    assert(TokenList.tag_at(tokens, 2) == TK_IDENT)  // __LINE__
 
 fn test_comptime_node:
     // Magic constants are related to comptime evaluation
-    assert(NK_COMPTIME() == 61)
-    assert(TK_KW_COMPTIME() == 42)
+    assert(NK_COMPTIME == 61)
+    assert(TK_KW_COMPTIME == 42)
 
 fn main:
     test_file_magic_lexes_as_ident()

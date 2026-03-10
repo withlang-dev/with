@@ -9,12 +9,11 @@ use Diag
 use Token
 use Lexer
 use Ast
-use Type
-use Traits
+use Types
 use Sema
 use Mir
-use MirBuild
-use Borrow
+use MirLower
+use BorrowCfg
 use Codegen
 use Source
 use CImport
@@ -35,19 +34,19 @@ fn test_all_modules_loadable:
     DiagList.add_error(diag, "test error", 0, 5)
     assert(DiagList.count(diag) == 1)
     // Token
-    assert(TK_KW_FN() == 13)
-    assert(TK_EOF() == 106)
+    assert(TK_KW_FN == 13)
+    assert(TK_EOF == 106)
     // Lexer
     var l = Lexer.new("fn main", 0)
     var tokens = Lexer.tokenize(l)
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_FN())
+    assert(TokenList.tag_at(tokens, 0) == TK_KW_FN)
     // Ast
     var pool = AstPool.new()
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     assert(AstPool.node_count(pool) == 1)
     // Type
     var types = TypeTable.new()
-    assert(TypeTable.lookup(types, "i32") == TYPE_I32())
+    assert(TypeTable.lookup(types, "i32") == TYPE_I32)
     // Traits
     var solver = TraitSolver.new()
     TraitSolver.add_trait(solver, "Test", 0)
@@ -60,7 +59,7 @@ fn test_all_modules_loadable:
     assert(s.error_count == 0)
     // Mir
     var body = MirBody.new()
-    MirBody.add_local(body, TYPE_I32(), 0)
+    MirBody.add_local(body, TYPE_I32, 0)
     assert(MirBody.local_count(body) == 1)
     // Borrow
     var bc = BorrowChecker.new(body, types)
@@ -72,10 +71,10 @@ fn test_all_modules_loadable:
     let cr = process_c_import("")
     assert(CImportResult.decl_count(cr) == 0)
     // render
-    assert(node_kind_name(NK_FN_DECL()) == "FnDecl")
+    assert(node_kind_name(NK_FN_DECL) == "FnDecl")
     // Driver
-    var d = Driver.new(MODE_CHECK(), "test.w")
-    assert(d.mode == MODE_CHECK())
+    var d = Driver.new(MODE_CHECK, "test.w")
+    assert(d.mode == MODE_CHECK)
 
 fn main:
     test_all_modules_loadable()

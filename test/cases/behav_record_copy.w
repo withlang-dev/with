@@ -7,7 +7,7 @@
 use Token
 use Lexer
 use Ast
-use Type
+use Types
 use InternPool
 use Parser
 
@@ -25,16 +25,16 @@ fn test_struct_type_construction:
     field_names.push(fx)
     field_names.push(fy)
     var field_types = Vec.new()
-    field_types.push(TYPE_I32())
-    field_types.push(TYPE_I32())
+    field_types.push(TYPE_I32)
+    field_types.push(TYPE_I32)
     var field_defaults = Vec.new()
     field_defaults.push(0)
     field_defaults.push(0)
     let tid = TypeTable.add_struct(types, name, field_names, field_types, field_defaults)
     assert(TypeTable.is_struct(types, tid))
     assert(TypeTable.struct_field_count(types, tid) == 2)
-    assert(TypeTable.struct_field_type(types, tid, 0) == TYPE_I32())
-    assert(TypeTable.struct_field_type(types, tid, 1) == TYPE_I32())
+    assert(TypeTable.struct_field_type(types, tid, 0) == TYPE_I32)
+    assert(TypeTable.struct_field_type(types, tid, 1) == TYPE_I32)
 
 fn test_struct_not_copy:
     // Structs are NOT copy types by default
@@ -42,7 +42,7 @@ fn test_struct_not_copy:
     var fn1 = Vec.new()
     fn1.push(0)
     var ft1 = Vec.new()
-    ft1.push(TYPE_I32())
+    ft1.push(TYPE_I32)
     var fd1 = Vec.new()
     fd1.push(0)
     let st = TypeTable.add_struct(types, 1, fn1, ft1, fd1)
@@ -54,8 +54,8 @@ fn test_struct_with_defaults:
     fn1.push(1)
     fn1.push(2)
     var ft1 = Vec.new()
-    ft1.push(TYPE_I32())
-    ft1.push(TYPE_I32())
+    ft1.push(TYPE_I32)
+    ft1.push(TYPE_I32)
     var fd1 = Vec.new()
     fd1.push(1)  // field 0 has default
     fd1.push(0)  // field 1 no default
@@ -71,14 +71,14 @@ fn test_parse_record_update:
     Parser.parse_module(p)
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_RECORD_UPDATE())
+    assert(AstPool.kind(p.pool, body) == NK_RECORD_UPDATE)
 
 fn test_struct_name_lookup:
     var types = TypeTable.new()
     var fn1 = Vec.new()
     fn1.push(0)
     var ft1 = Vec.new()
-    ft1.push(TYPE_I32())
+    ft1.push(TYPE_I32)
     var fd1 = Vec.new()
     fd1.push(0)
     let st = TypeTable.add_struct(types, 42, fn1, ft1, fd1)
@@ -91,7 +91,7 @@ fn test_struct_type_equality:
     var fn1 = Vec.new()
     fn1.push(0)
     var ft1 = Vec.new()
-    ft1.push(TYPE_I32())
+    ft1.push(TYPE_I32)
     var fd1 = Vec.new()
     fd1.push(0)
     let st1 = TypeTable.add_struct(types, 1, fn1, ft1, fd1)
@@ -99,7 +99,7 @@ fn test_struct_type_equality:
     var fn2 = Vec.new()
     fn2.push(0)
     var ft2 = Vec.new()
-    ft2.push(TYPE_I32())
+    ft2.push(TYPE_I32)
     var fd2 = Vec.new()
     fd2.push(0)
     let st2 = TypeTable.add_struct(types, 2, fn2, ft2, fd2)
@@ -113,14 +113,14 @@ fn test_copy_types_after_update:
     // Copy types (i32, bool, f64) remain valid after being "used"
     // This verifies the is_copy predicate covers all primitive types
     var types = TypeTable.new()
-    assert(TypeTable.is_copy(types, TYPE_I32()))
-    assert(TypeTable.is_copy(types, TYPE_I64()))
-    assert(TypeTable.is_copy(types, TYPE_F32()))
-    assert(TypeTable.is_copy(types, TYPE_F64()))
-    assert(TypeTable.is_copy(types, TYPE_BOOL()))
-    assert(TypeTable.is_copy(types, TYPE_U8()))
-    assert(TypeTable.is_copy(types, TYPE_UNIT()))
-    assert(TypeTable.is_copy(types, TYPE_VOID()))
+    assert(TypeTable.is_copy(types, TYPE_I32))
+    assert(TypeTable.is_copy(types, TYPE_I64))
+    assert(TypeTable.is_copy(types, TYPE_F32))
+    assert(TypeTable.is_copy(types, TYPE_F64))
+    assert(TypeTable.is_copy(types, TYPE_BOOL))
+    assert(TypeTable.is_copy(types, TYPE_U8))
+    assert(TypeTable.is_copy(types, TYPE_UNIT))
+    assert(TypeTable.is_copy(types, TYPE_VOID))
 
 fn main:
     test_struct_type_construction()

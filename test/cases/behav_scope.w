@@ -1,77 +1,57 @@
 //! expect-stdout: ok
 
 // Behavior test: variable scoping
-// Tests: let/var, shadowing, nested scopes
+// Tests: let/var, nested scopes, mutation
 
-use Token
-use Lexer
-use Ast
-use Type
-use Sema
-use InternPool
-use Parser
+fn test_let_immutable:
+    let x = 42
+    assert(x == 42)
 
-fn lex(source: str) -> TokenList:
-    var l = Lexer.new(source, 0)
-    Lexer.tokenize(l)
+fn test_var_mutable:
+    var x = 10
+    assert(x == 10)
+    x = 20
+    assert(x == 20)
+    x = x + 5
+    assert(x == 25)
 
-fn test_let_var_keywords:
-    var tokens = lex("let var")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_LET())
-    assert(TokenList.tag_at(tokens, 1) == TK_KW_VAR())
+fn test_nested_scope:
+    let x = 10
+    var result = 0
+    if true:
+        let y = 20
+        result = x + y
+    assert(result == 30)
 
-fn test_parse_let:
-    let src = "fn f:\n    let x = 42\n    x\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    let decl = AstPool.get_decl(p.pool, 0)
-    let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_BLOCK())
+fn test_block_scope_var:
+    var total = 0
+    for i in 0..5:
+        let contrib = i * 2
+        total = total + contrib
+    // contrib is not visible here, total is 0+2+4+6+8 = 20
+    assert(total == 20)
 
-fn test_parse_var:
-    let src = "fn f:\n    var x = 42\n    x\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    let decl = AstPool.get_decl(p.pool, 0)
-    let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_BLOCK())
+fn test_nested_if_scope:
+    var result = 0
+    let a = 5
+    if a > 0:
+        let b = 10
+        if b > 5:
+            let c = 20
+            result = a + b + c
+    assert(result == 35)
 
-fn test_scope_chain:
-    var intern = InternPool.new()
-    var pool = AstPool.new()
-    AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
-    var s = Sema.new(pool, "", intern)
-    Sema.define_var(s, "x", TYPE_I32(), 0)
-    assert(Sema.lookup_var(s, "x") >= 0)
-    Sema.push_scope(s)
-    // x visible from parent
-    assert(Sema.lookup_var(s, "x") >= 0)
-    // Shadow with new x
-    Sema.define_var(s, "x", TYPE_BOOL(), 0)
-    let info = Sema.lookup_var(s, "x")
-    assert(var_type_id(info) == TYPE_BOOL())
-    // Define y only in child
-    Sema.define_var(s, "y", TYPE_STR(), 1)
-    assert(Sema.lookup_var(s, "y") >= 0)
-    Sema.pop_scope(s)
-    // After pop, original x should still be visible
-    assert(Sema.lookup_var(s, "x") >= 0)
-
-fn test_assign_parse:
-    let src = "fn f:\n    x = 42\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    let decl = AstPool.get_decl(p.pool, 0)
-    let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_ASSIGN())
+fn test_for_loop_scope:
+    var last = 0
+    for i in 0..10:
+        last = i
+    assert(last == 9)
 
 fn main:
-    test_let_var_keywords()
-    test_parse_let()
-    test_parse_var()
-    test_scope_chain()
-    test_assign_parse()
+    test_let_immutable()
+    test_var_mutable()
+    test_nested_scope()
+    test_block_scope_var()
+    test_nested_if_scope()
+    test_for_loop_scope()
     println("ok")

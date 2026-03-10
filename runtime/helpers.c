@@ -42,6 +42,23 @@ typedef struct {
     int64_t cap;
 } with_str_builder;
 
+#ifndef WITH_EMBEDDED_STDLIB_HEADER
+#define WITH_EMBEDDED_STDLIB_HEADER "../out/lib/embedded_stdlib.inc.h"
+#endif
+#if defined(__has_include)
+#if __has_include(WITH_EMBEDDED_STDLIB_HEADER)
+#include WITH_EMBEDDED_STDLIB_HEADER
+#else
+with_str with_embedded_std_source(with_str path) {
+    (void)path;
+    with_str out = { "", 0 };
+    return out;
+}
+#endif
+#else
+#include WITH_EMBEDDED_STDLIB_HEADER
+#endif
+
 static int32_t with_saved_argc = 0;
 static char **with_saved_argv = NULL;
 static volatile sig_atomic_t with_interrupt_flag = 0;

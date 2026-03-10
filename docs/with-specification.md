@@ -408,6 +408,21 @@ defer conn.close().unwrap_or(())
 defer if let Err(e) = f.sync(): log.warn("sync failed: {e}")
 ```
 
+**`errdefer`:** Like `defer` but only executes when the function returns an
+error (via `?` propagation). On normal return paths, `errdefer` is skipped:
+
+```
+fn connect(url: str) -> Result[Connection, Error]:
+    let conn = open_socket(url)?
+    errdefer conn.close()       // only runs if a later ? fails
+    let auth = authenticate(conn)?  // if this fails, conn.close() runs
+    Connection { conn, auth }       // success: errdefer does NOT run
+```
+
+`errdefer` and `defer` execute in LIFO order relative to each other. On error
+return, both `errdefer` and `defer` blocks run. On success return, only `defer`
+blocks run.
+
 ---
 
 ## 3. References and Borrowing
@@ -952,6 +967,71 @@ Unit variants (no data) generate only `.is_variant()`.
 
 These methods are generated unconditionally for all enums — no
 `@[derive]` needed. They are always available.
+
+### 4.4a Discriminant Enums
+
+Enums can specify an integer representation type and explicit discriminant
+values for each variant:
+
+```
+type Color: i32 =
+    Red = 1
+    Green = 2
+    Blue = 4
+```
+
+The type after the colon (`:`) is the **representation type** — an integer type
+(`i8`, `i16`, `i32`, `i64`) that determines the underlying storage. Each variant
+is assigned an explicit integer value with `= N`.
+
+**Auto-incrementing:** If a variant omits the `= N`, it defaults to the previous
+variant's value plus one (or zero for the first variant):
+
+```
+type Status: i32 =
+    Pending = 0
+    Active          // 1 (auto)
+    Suspended = 10
+    Archived        // 11 (auto)
+```
+
+**Discriminant enums with payloads:** Variants can carry associated data just
+like regular enums, combined with explicit discriminant values:
+
+```
+type Msg: i32 =
+    Quit = 0
+    Move(i32, i32) = 1
+    Write(str) = 2
+```
+
+When any variant has a payload, the LLVM representation is a tagged union
+`{ repr_ty, [max_payload_size x i8] }` — the same layout as regular enums but
+with the tag being the discriminant value. Pattern matching extracts payloads
+the same way as regular enums.
+
+**`@[flags]` attribute:** For bitflag enums, `@[flags]` changes auto-increment
+to power-of-two doubling:
+
+```
+@[flags]
+type Perms: i32 =
+    Read         // 1 (default first)
+    Write        // 2
+    Execute      // 4
+```
+
+Bitwise operations work naturally since the enum **is** its integer value.
+
+**Conversion:** `Type.from_int(n)` converts an integer to `Option[Type]`,
+returning `.None` for values that don't match any defined discriminant:
+
+```
+let c = Color.from_int(2)    // Some(Color.Green)
+let x = Color.from_int(99)   // None
+```
+
+**Casting:** `value as i32` extracts the underlying integer (identity cast).
 
 ### 4.5 Distinct Types
 
@@ -1942,6 +2022,35 @@ fn assert_eq(left: i32, right: i32, file: str = __FILE__, line: u32 = __LINE__):
         abort()
 ```
 
+### 9.1b `const` Declarations
+
+Compile-time constants are declared with `const`:
+
+```
+const MAX_SIZE: i32 = 1024
+const PI: f64 = 3.14159
+const HEADER: str = "X-Custom"
+```
+
+**Syntax:** `const NAME: TYPE = EXPR`
+
+The type annotation is required. The expression must be evaluable at compile
+time — integer literals, arithmetic (`+`, `-`, `*`, `/`, `%`), unary negate,
+logical `not`, and references to other `const` values.
+
+```
+const WIDTH: i32 = 80
+const HEIGHT: i32 = 24
+const AREA: i32 = WIDTH * HEIGHT    // computed at compile time
+```
+
+`const` values are inlined at every use site. They have no runtime address and
+cannot be mutated. They may appear at module scope or inside function bodies.
+
+**Difference from `let`:** `let` bindings are runtime values (even if initialized
+from a constant). `const` values are guaranteed to be compile-time constants and
+are always inlined.
+
 ### 9.2 Tail Call Optimization
 
 Functions marked `@[tailrec]` are guaranteed to compile to loops.
@@ -2004,6 +2113,11 @@ items |> map(it.children |> filter(it.active))
 **`_` is not a closure placeholder.** `_` means discard (in patterns)
 or placeholder (in partial application). For closure shorthand, `it` is
 the one way.
+
+**Error codes:**
+- E0951: nested implicit `it` is ambiguous — use explicit `|param|` for inner closure
+- E0952: `it` used in context expecting N != 1 parameters
+- E0953: `it` is a reserved keyword and cannot be used as an identifier
 
 ### 9.4 Partial Application
 
@@ -2232,6 +2346,12 @@ match items
     [only]          -> "single"
     [first, ..rest] -> "head: {first}, {rest.len()} more"
 ```
+
+For fixed-size arrays, the compiler performs compile-time length matching:
+- `[a, b, c]` matches exactly 3 elements
+- `[first, ..rest]` matches any array with 1+ elements, `rest` is bound to the remaining count
+- `[first, ..mid, last]` matches 2+ elements, extracting both ends
+- `[]` matches empty arrays (`[0]T`)
 
 **`let` destructuring:**
 
@@ -3044,6 +3164,40 @@ fn debug[T: Show + Hash](x: &T):
     println("{x.show()} (hash: {x.hash()})")
 ```
 
+### 11.2a `where` Clauses
+
+Trait bounds can also be specified with `where` clauses, placed after the
+function signature, type definition, or impl header:
+
+```
+fn display[T](x: T) where T: Printable:
+    print(x.to_string())
+
+fn multi[T](x: T) where T: Show, T: Hash:
+    println("{x.show()} (hash: {x.hash()})")
+```
+
+`where` clauses are equivalent to inline bounds (`T: Trait` in the generic
+parameter list) but scale better when there are many constraints:
+
+```
+fn merge[A, B, C](a: A, b: B) -> C
+    where A: Serialize, B: Serialize, C: Deserialize + Default:
+    ...
+```
+
+`where` clauses may appear on functions, type declarations, and impl blocks:
+
+```
+type Wrapper[T] where T: Eq = { inner: T }
+
+impl Showable for Pair where Pair: Describable:
+    fn show(self: &Self) -> str: self.describe()
+```
+
+The compiler validates that each constraint references a known type parameter
+and a known trait. Unknown type parameters or traits produce compile errors.
+
 ### 11.3 Static Dispatch by Default
 
 Trait calls are monomorphized. Dynamic dispatch via explicit `dyn Trait`.
@@ -3160,40 +3314,56 @@ concrete type.
 ### 11.6 Feature Scope (v1.0)
 
 Supported: generic type parameters with bounds, multiple bounds,
-default methods, async methods in traits.
+default methods, async methods in traits, `where` clauses, blanket impls,
+associated types (basic), sealed traits.
 
-Not supported in v1.0: associated types, higher-kinded types,
-lifetime parameters on traits.
+Not supported in v1.0: `Self` type in associated type references,
+associated type bound checking, higher-kinded types, lifetime
+parameters on traits.
 
-**Why associated types are deferred:** Associated types complicate
-trait resolution and coherence rules. v1.0 prioritizes simplicity
-and a correct, well-tested trait resolver over feature breadth.
-
-**Impact of missing associated types:** The primary cost is in
-iterator and collection traits. Without associated types, `Iter[T]`
-requires the element type to be a type parameter on the trait rather
-than an output type determined by the implementor. This means a type
-cannot implement `Iter` for multiple element types, and the element
-type must always be specified at the call site. In practice this
-affects custom container types most:
+**Associated types (basic):** Traits can declare associated types and impls
+can provide concrete bindings:
 
 ```
-// Without associated types, cannot do:
-//   trait Container { type Item; fn get(...) -> &Self::Item }
+trait Container:
+    type Item
 
-// Instead, parameterize the implementing type:
-type MyMap[K, V] = { ... }
-
-impl Iter[(K, V)] for MyMap[K, V]: ...
+impl Container for IntVec:
+    type Item = i32
 ```
 
-Async methods in traits are **not affected** by this limitation —
-they work because `async fn` lowers to `Task[T]`, not because of
-associated types.
+Default associated types are supported (`type Item = i32` in the trait).
+Missing required associated types produce a compile error. `Self.Item`
+references in type expressions and associated type bound checking
+(`type Item: Eq`) are deferred.
 
-Associated types are a planned v2.0 feature. The standard library is
-designed to avoid patterns that require them. Third-party library
-authors should expect to restructure some APIs when they land.
+**Sealed traits:** The `@[sealed]` attribute restricts a trait so that only
+the defining module can implement it:
+
+```
+@[sealed]
+trait Node:
+    fn eval(self: &Self) -> i32
+
+impl Node for Literal: ...    // OK: same module
+impl Node for BinOp: ...      // OK: same module
+// impl Node for External: ... // ERROR: cannot implement sealed trait
+```
+
+Sealed traits guarantee a closed set of implementors, enabling optimizations
+and exhaustive reasoning. Implementors outside the defining module produce
+a compile error.
+
+**Blanket impls:** A blanket impl provides a trait implementation for all types
+satisfying a bound:
+
+```
+impl[T: Display] Printable for T:
+    fn print(self: &Self): println(self.display())
+```
+
+The compiler checks for overlaps between blanket and direct impls to prevent
+ambiguity.
 
 ### 11.7 Syntax Traits
 
@@ -5631,6 +5801,30 @@ comptime fn hash_str(s: str) -> u64:
 
 const SHADER_PARAM_ID = comptime hash_str("world_matrix")
 ```
+
+### 17.6a Compiler Intrinsics
+
+**`src()`** returns the source location of the call site as a string
+in `"file:line:col"` format:
+
+```
+fn log(msg: str):
+    print(src() ++ ": " ++ msg)
+
+log("hello")    // prints "src/main.w:4:5: hello"
+```
+
+**`embed_file(path)`** reads a file at compile time and embeds its
+contents as a string constant:
+
+```
+const HELP_TEXT: str = embed_file("help.txt")
+const TEMPLATE: str = embed_file("templates/page.html")
+```
+
+The path is resolved relative to the source file. If the file does not
+exist, a compile error is emitted. The file contents are embedded verbatim
+as a string constant in the binary.
 
 ### 17.7 Constraints
 
@@ -9792,6 +9986,55 @@ Because rebinding/shadowing is disallowed, stepwise transformations should use p
 - They accept zero arguments or one `str`-compatible message argument.
 - Their type is `Never`, which is compatible in value position with any expected type.
 - They are treated as diverging control-flow points for typing and reachability analysis.
+
+### 29.11 Reserved Keywords
+
+The following keywords are reserved and cannot be used as identifiers:
+
+| Keyword | Purpose |
+|---------|---------|
+| `fn` | Function declaration |
+| `let` | Variable binding |
+| `mut` | Mutable binding modifier |
+| `type` | Type declaration |
+| `use` | Import |
+| `extern` | External function declaration |
+| `if` | Conditional |
+| `else` | Conditional branch |
+| `match` | Pattern matching |
+| `for` | Loop over iterables |
+| `while` | Conditional loop |
+| `return` | Early return |
+| `break` | Break from loop |
+| `continue` | Continue to next iteration |
+| `true`, `false` | Boolean literals |
+| `and`, `or`, `not` | Logical operators |
+| `in` | Membership/iteration operator |
+| `as` | Type cast |
+| `defer` | Deferred execution |
+| `errdefer` | Error-path deferred execution |
+| `async`, `await` | Async function/await |
+| `spawn` | Fiber creation |
+| `trait`, `impl` | Trait definition/implementation |
+| `pub` | Visibility modifier |
+| `const` | Compile-time constant |
+| `it` | Implicit closure parameter |
+| `where` | Trait bound clauses |
+| `move` | Move closure (reserved for future use) |
+| `unsafe` | Unsafe block |
+| `comptime` | Compile-time evaluation |
+
+### 29.12 Error Codes
+
+| Code | Description |
+|------|-------------|
+| E0901 | Non-local control flow (`return`, `break`, `?`) inside `defer`/`errdefer` |
+| E0951 | Nested implicit `it` is ambiguous — use explicit `\|param\|` for inner closure |
+| E0952 | `it` used in context expecting N != 1 parameters |
+| E0953 | `it` is a reserved keyword and cannot be used as an identifier |
+| E1101 | Orphan rule violation: impl requires a local trait or local type |
+| E1102 | Duplicate implementation of trait for type |
+| E1201 | Overlapping trait implementations |
 
 ---
 

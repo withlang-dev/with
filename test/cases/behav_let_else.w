@@ -15,25 +15,25 @@ fn lex(source: str) -> TokenList:
 
 fn test_let_else_node_constant:
     // NK_LET_ELSE is defined in the AST
-    assert(NK_LET_ELSE() == 62)
+    assert(NK_LET_ELSE == 62)
 
 fn test_else_keyword_lexed:
     var tokens = lex("else")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_ELSE())
+    assert(TokenList.tag_at(tokens, 0) == TK_KW_ELSE)
 
 fn test_let_keyword_lexed:
     var tokens = lex("let")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_LET())
+    assert(TokenList.tag_at(tokens, 0) == TK_KW_LET)
 
 fn test_let_else_token_sequence:
     // Verify "let ... else" lexes into correct token sequence
     var tokens = lex("let x = 1 else 0")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_LET())
-    assert(TokenList.tag_at(tokens, 1) == TK_IDENT())  // x
-    assert(TokenList.tag_at(tokens, 2) == TK_EQ())
-    assert(TokenList.tag_at(tokens, 3) == TK_INT_LIT())
-    assert(TokenList.tag_at(tokens, 4) == TK_KW_ELSE())
-    assert(TokenList.tag_at(tokens, 5) == TK_INT_LIT())
+    assert(TokenList.tag_at(tokens, 0) == TK_KW_LET)
+    assert(TokenList.tag_at(tokens, 1) == TK_IDENT)  // x
+    assert(TokenList.tag_at(tokens, 2) == TK_EQ)
+    assert(TokenList.tag_at(tokens, 3) == TK_INT_LIT)
+    assert(TokenList.tag_at(tokens, 4) == TK_KW_ELSE)
+    assert(TokenList.tag_at(tokens, 5) == TK_INT_LIT)
 
 fn main:
     test_let_else_node_constant()

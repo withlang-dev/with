@@ -19,75 +19,75 @@ fn lex(source: str) -> TokenList:
     Lexer.tokenize(l)
 
 fn test_or_pattern_node_constant:
-    assert(NK_PAT_OR() == 109)
+    assert(NK_PAT_OR == 109)
 
 fn test_range_pattern_node_constant:
-    assert(NK_PAT_RANGE() == 108)
+    assert(NK_PAT_RANGE == 108)
 
 fn test_struct_pattern_node_constant:
-    assert(NK_PAT_STRUCT() == 107)
+    assert(NK_PAT_STRUCT == 107)
 
 fn test_or_pattern_token_sequence:
     // Or-pattern in match arm: 1 | 2 | 3 -> body
     // The | token is TK_PIPE
     var tokens = lex("1 | 2 | 3")
-    assert(TokenList.tag_at(tokens, 0) == TK_INT_LIT())
-    assert(TokenList.tag_at(tokens, 1) == TK_PIPE())
-    assert(TokenList.tag_at(tokens, 2) == TK_INT_LIT())
-    assert(TokenList.tag_at(tokens, 3) == TK_PIPE())
-    assert(TokenList.tag_at(tokens, 4) == TK_INT_LIT())
+    assert(TokenList.tag_at(tokens, 0) == TK_INT_LIT)
+    assert(TokenList.tag_at(tokens, 1) == TK_PIPE)
+    assert(TokenList.tag_at(tokens, 2) == TK_INT_LIT)
+    assert(TokenList.tag_at(tokens, 3) == TK_PIPE)
+    assert(TokenList.tag_at(tokens, 4) == TK_INT_LIT)
 
 fn test_range_pattern_token_sequence:
     // Range pattern: 200..=299
     var tokens = lex("200..=299")
-    assert(TokenList.tag_at(tokens, 0) == TK_INT_LIT())
-    assert(TokenList.tag_at(tokens, 1) == TK_DOT_DOT_EQ())
-    assert(TokenList.tag_at(tokens, 2) == TK_INT_LIT())
+    assert(TokenList.tag_at(tokens, 0) == TK_INT_LIT)
+    assert(TokenList.tag_at(tokens, 1) == TK_DOT_DOT_EQ)
+    assert(TokenList.tag_at(tokens, 2) == TK_INT_LIT)
 
 fn test_struct_pattern_token_sequence:
     // Struct pattern: { name, age, .. }
     var tokens = lex("{ name, age, .. }")
-    assert(TokenList.tag_at(tokens, 0) == TK_L_BRACE())
-    assert(TokenList.tag_at(tokens, 1) == TK_IDENT())  // name
-    assert(TokenList.tag_at(tokens, 2) == TK_COMMA())
-    assert(TokenList.tag_at(tokens, 3) == TK_IDENT())  // age
-    assert(TokenList.tag_at(tokens, 4) == TK_COMMA())
-    assert(TokenList.tag_at(tokens, 5) == TK_DOT_DOT())  // ..
-    assert(TokenList.tag_at(tokens, 6) == TK_R_BRACE())
+    assert(TokenList.tag_at(tokens, 0) == TK_L_BRACE)
+    assert(TokenList.tag_at(tokens, 1) == TK_IDENT)  // name
+    assert(TokenList.tag_at(tokens, 2) == TK_COMMA)
+    assert(TokenList.tag_at(tokens, 3) == TK_IDENT)  // age
+    assert(TokenList.tag_at(tokens, 4) == TK_COMMA)
+    assert(TokenList.tag_at(tokens, 5) == TK_DOT_DOT)  // ..
+    assert(TokenList.tag_at(tokens, 6) == TK_R_BRACE)
 
 fn test_slice_pattern_token_sequence:
     // Slice pattern: [first, ..rest]
     var tokens = lex("[first, ..rest]")
-    assert(TokenList.tag_at(tokens, 0) == TK_L_BRACKET())
-    assert(TokenList.tag_at(tokens, 1) == TK_IDENT())  // first
-    assert(TokenList.tag_at(tokens, 2) == TK_COMMA())
-    assert(TokenList.tag_at(tokens, 3) == TK_DOT_DOT())  // ..
-    assert(TokenList.tag_at(tokens, 4) == TK_IDENT())  // rest
-    assert(TokenList.tag_at(tokens, 5) == TK_R_BRACKET())
+    assert(TokenList.tag_at(tokens, 0) == TK_L_BRACKET)
+    assert(TokenList.tag_at(tokens, 1) == TK_IDENT)  // first
+    assert(TokenList.tag_at(tokens, 2) == TK_COMMA)
+    assert(TokenList.tag_at(tokens, 3) == TK_DOT_DOT)  // ..
+    assert(TokenList.tag_at(tokens, 4) == TK_IDENT)  // rest
+    assert(TokenList.tag_at(tokens, 5) == TK_R_BRACKET)
 
 fn test_at_binding_token_sequence:
     // @ binding: x @ Some(val)
     var tokens = lex("x @ .Some(val)")
-    assert(TokenList.tag_at(tokens, 0) == TK_IDENT())  // x
-    assert(TokenList.tag_at(tokens, 1) == TK_AT())
-    assert(TokenList.tag_at(tokens, 2) == TK_DOT_IDENT())  // .Some
-    assert(TokenList.tag_at(tokens, 3) == TK_L_PAREN())
-    assert(TokenList.tag_at(tokens, 4) == TK_IDENT())  // val
-    assert(TokenList.tag_at(tokens, 5) == TK_R_PAREN())
+    assert(TokenList.tag_at(tokens, 0) == TK_IDENT)  // x
+    assert(TokenList.tag_at(tokens, 1) == TK_AT)
+    assert(TokenList.tag_at(tokens, 2) == TK_DOT_IDENT)  // .Some
+    assert(TokenList.tag_at(tokens, 3) == TK_L_PAREN)
+    assert(TokenList.tag_at(tokens, 4) == TK_IDENT)  // val
+    assert(TokenList.tag_at(tokens, 5) == TK_R_PAREN)
 
 fn test_all_pattern_node_kinds:
     // Verify all pattern node kinds are distinct
-    assert(NK_PAT_WILDCARD() == 100)
-    assert(NK_PAT_IDENT() == 101)
-    assert(NK_PAT_INT() == 102)
-    assert(NK_PAT_BOOL() == 103)
-    assert(NK_PAT_STRING() == 104)
-    assert(NK_PAT_VARIANT() == 105)
-    assert(NK_PAT_TUPLE() == 106)
-    assert(NK_PAT_STRUCT() == 107)
-    assert(NK_PAT_RANGE() == 108)
-    assert(NK_PAT_OR() == 109)
-    assert(NK_PAT_ENUM_SHORTHAND() == 111)
+    assert(NK_PAT_WILDCARD == 100)
+    assert(NK_PAT_IDENT == 101)
+    assert(NK_PAT_INT == 102)
+    assert(NK_PAT_BOOL == 103)
+    assert(NK_PAT_STRING == 104)
+    assert(NK_PAT_VARIANT == 105)
+    assert(NK_PAT_TUPLE == 106)
+    assert(NK_PAT_STRUCT == 107)
+    assert(NK_PAT_RANGE == 108)
+    assert(NK_PAT_OR == 109)
+    assert(NK_PAT_ENUM_SHORTHAND == 111)
 
 fn main:
     test_or_pattern_node_constant()

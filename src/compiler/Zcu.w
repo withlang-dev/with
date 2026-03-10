@@ -38,6 +38,7 @@ type Zcu = {
     frontend_pool: InternPool,
     diagnostics: DiagnosticList,
     imported_paths: Vec[str],
+    decl_source_paths: Vec[str],
     c_import_cache_keys: Vec[str],
     c_import_cache_values: Vec[str],
     source_dir: str,
@@ -77,6 +78,7 @@ fn Zcu.init -> Zcu:
         frontend_pool: pool,
         diagnostics: diagnostics,
         imported_paths: Vec.new(),
+        decl_source_paths: Vec.new(),
         c_import_cache_keys: Vec.new(),
         c_import_cache_values: Vec.new(),
         source_dir: ".",
@@ -105,6 +107,7 @@ fn Zcu.init -> Zcu:
 fn Zcu.reset_import_state(self: Zcu):
     let empty: Vec[str] = Vec.new()
     self.imported_paths = empty
+    self.decl_source_paths = Vec.new()
     self.next_file_id = 1
 
 fn Zcu.has_imported_path(self: Zcu, path: str) -> i32:
@@ -115,6 +118,26 @@ fn Zcu.has_imported_path(self: Zcu, path: str) -> i32:
 
 fn Zcu.add_imported_path(self: Zcu, path: str):
     self.imported_paths.push(path)
+
+fn Zcu.seed_decl_source_paths(self: Zcu, pool: AstPool, path: str):
+    self.decl_source_paths = Vec.new()
+    for _ in 0..pool.decl_count():
+        self.decl_source_paths.push(path)
+
+fn Zcu.append_decl_source_paths(self: Zcu, count: i32, path: str):
+    for _ in 0..count:
+        self.decl_source_paths.push(path)
+
+fn Zcu.decl_source_path_frontend(self: Zcu, decl_index: i32) -> str:
+    if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
+        return self.decl_source_paths.get(decl_index as i64)
+    self.current_source_path
+
+fn Zcu.decl_source_dir_frontend(self: Zcu, decl_index: i32) -> str:
+    let path = self.decl_source_path_frontend(decl_index)
+    if path.len() == 0:
+        return self.source_dir
+    resolve_dirname(path)
 
 fn Zcu.c_import_cache_lookup(self: Zcu, key: str) -> str:
     for i in 0..self.c_import_cache_keys.len() as i32:

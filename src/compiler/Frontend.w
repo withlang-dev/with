@@ -6,6 +6,7 @@ use Sema
 use Resolve
 use Span
 use Diagnostic
+use compiler.EmbeddedStdlib
 use compiler.Zcu
 
 extern fn with_fs_read_file(path: str) -> str
@@ -18,9 +19,17 @@ fn count_non_use_decls_frontend(pool: AstPool) -> i32:
     var count = 0
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
-        if pool.kind(decl) != NK_USE_DECL():
+        if pool.kind(decl) != NK_USE_DECL:
             count = count + 1
     count
+
+fn Zcu.emit_missing_import_frontend(self: Zcu, pool: AstPool, decl: i32):
+    let span = Span {
+        file: 0,
+        start: pool.get_start(decl),
+        end: pool.get_end(decl),
+    }
+    self.diagnostics.emit(Diagnostic.err("import module not found", span))
 
 fn c_import_str_contains(text: str, needle: str) -> bool:
     if needle.len() == 0:
@@ -58,15 +67,17 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
     with_eprintln("[type-names] stage=" ++ stage ++ " decls=" ++ int_to_string(pool.decl_count()))
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
-        if pool.kind(decl) != NK_TYPE_DECL():
+        if pool.kind(decl) != NK_TYPE_DECL:
             continue
         let sub_kind = type_decl_sub_kind(pool.get_data2(decl))
         var kind_name = "alias"
-        if sub_kind == TDK_STRUCT():
+        if sub_kind == TDK_STRUCT:
             kind_name = "struct"
-        else if sub_kind == TDK_ENUM():
+        else if sub_kind == TDK_ENUM:
             kind_name = "enum"
-        else if sub_kind == TDK_DISTINCT():
+        else if sub_kind == TDK_DISC_ENUM:
+            kind_name = "disc_enum"
+        else if sub_kind == TDK_DISTINCT:
             kind_name = "distinct"
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)
@@ -85,7 +96,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var has_c_import = 0
     for i in 0..base_count:
         let decl = out.get_decl(i)
-        if out.kind(decl) == NK_C_IMPORT():
+        if out.kind(decl) == NK_C_IMPORT:
             has_c_import = 1
             break
     if has_c_import == 0:
@@ -93,7 +104,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
 
     for i in 0..base_count:
         let decl = out.get_decl(i)
-        if out.kind(decl) != NK_C_IMPORT():
+        if out.kind(decl) != NK_C_IMPORT:
             ordered.push(decl)
             continue
 
@@ -661,6 +672,8 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         self.pool = parser.intern
         self.diagnostics = parser.diags
 
+    self.seed_decl_source_paths(pool, name)
+
     let root_local_decl_count = count_non_use_decls_frontend(pool)
 
     if self.diagnostics.has_errors():
@@ -747,10 +760,12 @@ fn Zcu.merge_resolved_modules_frontend(self: Zcu, root_pool: AstPool, root_path:
 
         var lexer = Lexer.init(text, mod.file_id)
         let tokens = lexer.tokenize()
+        let before = merged_pool.decl_count()
         var parser = Parser.init_with_pool(tokens, text, mod.file_id, self.pool, self.diagnostics, merged_pool)
         merged_pool = parser.parse_module()
         self.pool = parser.intern
         self.diagnostics = parser.diags
+        self.append_decl_source_paths(merged_pool.decl_count() - before, path)
 
     self.strip_use_decls_frontend(merged_pool)
 
@@ -760,7 +775,7 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var has_use = 0
     for i in 0..out.decl_count():
         let decl = out.get_decl(i)
-        if out.kind(decl) == NK_USE_DECL():
+        if out.kind(decl) == NK_USE_DECL:
             has_use = 1
             break
     if has_use == 0:
@@ -769,7 +784,7 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
     let ordered: Vec[i32] = Vec.new()
     for i in 0..out.decl_count():
         let decl = out.get_decl(i)
-        if out.kind(decl) != NK_USE_DECL():
+        if out.kind(decl) != NK_USE_DECL:
             ordered.push(decl)
 
     while out.decl_count() > 0:
@@ -792,24 +807,26 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var root_ordered: Vec[i32] = Vec.new()
 
     // Phase 1: Expand prelude USE (position 0) and its transitive imports.
-    let has_prelude = self.prelude_mode != PRELUDE_NONE() and initial_count > 0 and merged_pool.kind(merged_pool.get_decl(0)) == NK_USE_DECL()
+    let has_prelude = self.prelude_mode != PRELUDE_NONE() and initial_count > 0 and merged_pool.kind(merged_pool.get_decl(0)) == NK_USE_DECL
     if has_prelude:
         let first = merged_pool.get_decl(0)
         let ps = merged_pool.get_data0(first)
         let pc = merged_pool.get_data1(first)
         if pc > 0:
             let pname = self.use_path_name_frontend(merged_pool, ps, pc)
-            let fpath = self.resolve_module_path_frontend(pname)
+            let fpath = self.resolve_module_path_frontend(pname, self.decl_source_dir_frontend(0))
             if fpath.len() > 0 and self.has_imported_path(fpath) == 0:
                 self.add_imported_path(fpath)
                 merged_pool = self.parse_imported_file_frontend(fpath, merged_pool)
+            else if fpath.len() == 0:
+                self.emit_missing_import_frontend(merged_pool, first)
         // Scan all decls added by prelude expansion (from initial_count onward).
         // Nested USE decls get expanded transitively.
         var pi = initial_count
         while pi < merged_pool.decl_count():
             let decl = merged_pool.get_decl(pi)
             let kind = merged_pool.kind(decl)
-            if kind != NK_USE_DECL():
+            if kind != NK_USE_DECL:
                 prelude_ordered.push(decl)
                 pi = pi + 1
                 continue
@@ -817,10 +834,12 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             let ppc = merged_pool.get_data1(decl)
             if ppc > 0:
                 let ppname = self.use_path_name_frontend(merged_pool, pps, ppc)
-                let ppfpath = self.resolve_module_path_frontend(ppname)
+                let ppfpath = self.resolve_module_path_frontend(ppname, self.decl_source_dir_frontend(pi))
                 if ppfpath.len() > 0 and self.has_imported_path(ppfpath) == 0:
                     self.add_imported_path(ppfpath)
                     merged_pool = self.parse_imported_file_frontend(ppfpath, merged_pool)
+                else if ppfpath.len() == 0:
+                    self.emit_missing_import_frontend(merged_pool, decl)
             pi = pi + 1
     let after_prelude = merged_pool.decl_count()
 
@@ -830,24 +849,26 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for ui in user_start..initial_count:
         let decl = merged_pool.get_decl(ui)
         let kind = merged_pool.kind(decl)
-        if kind != NK_USE_DECL():
+        if kind != NK_USE_DECL:
             root_ordered.push(decl)
             continue
         let ups = merged_pool.get_data0(decl)
         let upc = merged_pool.get_data1(decl)
         if upc > 0:
             let upname = self.use_path_name_frontend(merged_pool, ups, upc)
-            let upfpath = self.resolve_module_path_frontend(upname)
+            let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui))
             if upfpath.len() > 0 and self.has_imported_path(upfpath) == 0:
                 self.add_imported_path(upfpath)
                 merged_pool = self.parse_imported_file_frontend(upfpath, merged_pool)
+            else if upfpath.len() == 0:
+                self.emit_missing_import_frontend(merged_pool, decl)
 
     // Scan decls added by user-import expansion (from after_prelude onward).
     var ui2 = after_prelude
     while ui2 < merged_pool.decl_count():
         let decl = merged_pool.get_decl(ui2)
         let kind = merged_pool.kind(decl)
-        if kind != NK_USE_DECL():
+        if kind != NK_USE_DECL:
             user_import_ordered.push(decl)
             ui2 = ui2 + 1
             continue
@@ -855,10 +876,12 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let upc = merged_pool.get_data1(decl)
         if upc > 0:
             let upname = self.use_path_name_frontend(merged_pool, ups, upc)
-            let upfpath = self.resolve_module_path_frontend(upname)
+            let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui2))
             if upfpath.len() > 0 and self.has_imported_path(upfpath) == 0:
                 self.add_imported_path(upfpath)
                 merged_pool = self.parse_imported_file_frontend(upfpath, merged_pool)
+            else if upfpath.len() == 0:
+                self.emit_missing_import_frontend(merged_pool, decl)
         ui2 = ui2 + 1
 
     // Collect fn names from higher-priority tiers for deduplication.
@@ -866,14 +889,14 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for ri in 0..root_ordered.len() as i32:
         let rd = root_ordered.get(ri as i64)
         let rk = merged_pool.kind(rd)
-        if rk == NK_FN_DECL() or rk == NK_EXTERN_FN():
+        if rk == NK_FN_DECL or rk == NK_EXTERN_FN:
             root_fn_names.push(merged_pool.get_data0(rd))
 
     var user_fn_names: Vec[i32] = Vec.new()
     for ui in 0..user_import_ordered.len() as i32:
         let ud = user_import_ordered.get(ui as i64)
         let uk = merged_pool.kind(ud)
-        if uk == NK_FN_DECL() or uk == NK_EXTERN_FN():
+        if uk == NK_FN_DECL or uk == NK_EXTERN_FN:
             user_fn_names.push(merged_pool.get_data0(ud))
 
     // Rebuild decl list: prelude → user imports → root.
@@ -889,13 +912,13 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for oi in 0..prelude_ordered.len() as i32:
         let id = prelude_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
-        if (ik == NK_FN_DECL() or ik == NK_EXTERN_FN()) and frontend_fn_shadowed_in_tier(prelude_ordered, merged_pool, oi, higher_fn_names):
+        if (ik == NK_FN_DECL or ik == NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, merged_pool, oi, higher_fn_names):
             continue
         merged_pool.add_decl(id)
     for oi in 0..user_import_ordered.len() as i32:
         let id = user_import_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
-        if (ik == NK_FN_DECL() or ik == NK_EXTERN_FN()) and frontend_fn_shadowed_in_tier(user_import_ordered, merged_pool, oi, root_fn_names):
+        if (ik == NK_FN_DECL or ik == NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(user_import_ordered, merged_pool, oi, root_fn_names):
             continue
         merged_pool.add_decl(id)
     for oi in 0..root_ordered.len() as i32:
@@ -912,7 +935,7 @@ fn frontend_fn_shadowed_in_tier(tier: Vec[i32], pool: AstPool, idx: i32, higher_
     while j < tier.len() as i32:
         let jd = tier.get(j as i64)
         let jk = pool.kind(jd)
-        if (jk == NK_FN_DECL() or jk == NK_EXTERN_FN()) and pool.get_data0(jd) == iname:
+        if (jk == NK_FN_DECL or jk == NK_EXTERN_FN) and pool.get_data0(jd) == iname:
             return true
         j = j + 1
     false
@@ -923,6 +946,38 @@ fn frontend_vec_contains_i32(v: Vec[i32], target: i32) -> bool:
             return true
     false
 
+fn frontend_parent_module_rel(module_rel: str) -> str:
+    var last_slash = -1
+    for i in 0..module_rel.len():
+        if module_rel[i] == 47:
+            last_slash = i as i32
+    if last_slash <= 0:
+        return ""
+    module_rel.slice(0, last_slash as i64)
+
+fn frontend_resolve_module_rel(module_dir: str, rel_path: str) -> str:
+    let cand1 = resolve_join(module_dir, rel_path)
+    if resolve_file_exists(cand1):
+        return cand1
+
+    let parent_walk = resolve_parent_lib_candidate(module_dir, rel_path)
+    if parent_walk.len() > 0:
+        return parent_walk
+
+    let rooted = resolve_project_root_candidate(module_dir, rel_path)
+    if rooted.len() > 0:
+        return rooted
+
+    let cand5 = resolve_join("src", rel_path)
+    if resolve_file_exists(cand5):
+        return cand5
+
+    let cand6 = resolve_join("lib", rel_path)
+    if resolve_file_exists(cand6):
+        return cand6
+
+    ""
+
 fn Zcu.use_path_name_frontend(self: Zcu, pool: AstPool, path_start: i32, path_count: i32) -> str:
     var path = ""
     for pi in 0..path_count:
@@ -932,43 +987,46 @@ fn Zcu.use_path_name_frontend(self: Zcu, pool: AstPool, path_start: i32, path_co
         path = path ++ self.pool.resolve(seg)
     path
 
-fn Zcu.resolve_module_path_frontend(self: Zcu, module_name: str) -> str:
+fn Zcu.resolve_module_path_frontend(self: Zcu, module_name: str, source_dir_raw: str) -> str:
     let module_rel = frontend_normalize_module_path(module_name)
+    let rel_primary = module_rel ++ ".w"
+    let rel_fallback = if frontend_parent_module_rel(module_rel).len() > 0: frontend_parent_module_rel(module_rel) ++ ".w" else: ""
 
-    // Stdlib-pinned prelude paths: resolve directly to lib/ to prevent
-    // project-local files from shadowing the standard prelude.
-    if module_rel == "std/prelude" or module_rel == "std/prelude_core":
-        let pinned = "lib/" ++ module_rel ++ ".w"
-        let pinned_text = with_fs_read_file(pinned)
-        if pinned_text.len() > 0:
-            return pinned
+    if embedded_std_is_module_rel(module_rel):
+        let embedded_primary = embedded_std_resolve_path(rel_primary)
+        if embedded_primary.len() > 0:
+            return embedded_primary
+        if rel_fallback.len() > 0:
+            let embedded_fallback = embedded_std_resolve_path(rel_fallback)
+            if embedded_fallback.len() > 0:
+                return embedded_fallback
         return ""
 
-    // Strategy 1: relative to source directory
-    let path1 = self.source_dir ++ "/" ++ module_rel ++ ".w"
-    let text1 = with_fs_read_file(path1)
-    if text1.len() > 0:
-        return path1
+    let source_dir = if source_dir_raw.len() > 0: source_dir_raw else: self.source_dir
+    let has_root_fallback = source_dir != self.source_dir
 
-    // Strategy 2: lib/ relative to working directory
-    let path2 = "lib/" ++ module_rel ++ ".w"
-    let text2 = with_fs_read_file(path2)
-    if text2.len() > 0:
-        return path2
-
-    // Strategy 3: src/ directory (for self-hosted imports)
-    let path3 = "src/" ++ module_rel ++ ".w"
-    let text3 = with_fs_read_file(path3)
-    if text3.len() > 0:
-        return path3
-
+    let primary = frontend_resolve_module_rel(source_dir, rel_primary)
+    if primary.len() > 0:
+        return primary
+    if has_root_fallback:
+        let root_primary = frontend_resolve_module_rel(self.source_dir, rel_primary)
+        if root_primary.len() > 0:
+            return root_primary
+    if rel_fallback.len() > 0:
+        let fallback = frontend_resolve_module_rel(source_dir, rel_fallback)
+        if fallback.len() > 0:
+            return fallback
+        if has_root_fallback:
+            return frontend_resolve_module_rel(self.source_dir, rel_fallback)
     ""
 
 fn Zcu.parse_imported_file_frontend(self: Zcu, path: str, target_pool: AstPool) -> AstPool:
-    let text = with_fs_read_file(path)
+    let embedded_rel = embedded_std_rel_path(path)
+    let text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel) else: with_fs_read_file(path)
     if text.len() == 0:
         return target_pool
 
+    let before = target_pool.decl_count()
     let file_id = self.next_file_id
     self.next_file_id = self.next_file_id + 1
 
@@ -979,6 +1037,7 @@ fn Zcu.parse_imported_file_frontend(self: Zcu, path: str, target_pool: AstPool) 
     let merged_pool = parser.parse_module()
     self.pool = parser.intern
     self.diagnostics = parser.diags
+    self.append_decl_source_paths(merged_pool.decl_count() - before, path)
     merged_pool
 
 fn frontend_normalize_module_path(module_name: str) -> str:

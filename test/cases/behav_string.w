@@ -1,68 +1,48 @@
 //! expect-stdout: ok
 
-// Behavior test: strings
-// Tests: string literals, escape sequences, string methods
+// End-to-end test: string operations
+// Tests: string literals, concatenation (++), len(), comparisons
 
-use Token
-use Lexer
-use Ast
-use Type
-use Sema
-use InternPool
-use Parser
+fn test_string_literal:
+    let s = "hello"
+    assert(s == "hello")
 
-fn lex(source: str) -> TokenList:
-    var l = Lexer.new(source, 0)
-    Lexer.tokenize(l)
+fn test_string_concat:
+    let a = "hello"
+    let b = " world"
+    let c = a ++ b
+    assert(c == "hello world")
 
-fn test_string_literal_token:
-    let src = "\"hello world\""
-    var tokens = lex(src)
-    assert(TokenList.tag_at(tokens, 0) == TK_STRING_LIT())
+fn test_string_len:
+    assert("".len() == 0)
+    assert("a".len() == 1)
+    assert("hello".len() == 5)
 
-fn test_string_with_escape:
-    let src = "\"hello\\nworld\""
-    var tokens = lex(src)
-    assert(TokenList.tag_at(tokens, 0) == TK_STRING_LIT())
+fn test_string_comparison:
+    assert("abc" == "abc")
+    assert("abc" != "def")
+    assert("a" != "b")
 
-fn test_c_string_token:
-    let src = "c\"hello\""
-    var tokens = lex(src)
-    assert(TokenList.tag_at(tokens, 0) == TK_C_STRING_LIT())
+fn test_string_concat_chain:
+    let result = "a" ++ "b" ++ "c"
+    assert(result == "abc")
 
-fn test_parse_string_lit:
-    let src = "fn f:\n    \"hello\"\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    let decl = AstPool.get_decl(p.pool, 0)
-    let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_STRING_LIT())
-
-fn test_sema_string_type:
-    var intern = InternPool.new()
-    var pool = AstPool.new()
-    AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
-    var s = Sema.new(pool, "", intern)
-    let n = AstPool.add_node(pool, NK_STRING_LIT(), 0, 7, 0, 0, 0)
-    let t = Sema.check_expr(s, n)
-    assert(t == TYPE_STR())
-
-fn test_type_str_is_not_copy:
-    var types = TypeTable.new()
-    assert(not TypeTable.is_copy(types, TYPE_STR()))
+fn test_string_with_numbers:
+    let label = "count: " ++ int_to_string(42)
+    assert(label == "count: 42")
 
 fn test_empty_string:
-    let src = "\"\""
-    var tokens = lex(src)
-    assert(TokenList.tag_at(tokens, 0) == TK_STRING_LIT())
+    let empty = ""
+    assert(empty.len() == 0)
+    let nonempty = empty ++ "x"
+    assert(nonempty == "x")
 
 fn main:
-    test_string_literal_token()
-    test_string_with_escape()
-    test_c_string_token()
-    test_parse_string_lit()
-    test_sema_string_type()
-    test_type_str_is_not_copy()
+    test_string_literal()
+    test_string_concat()
+    test_string_len()
+    test_string_comparison()
+    test_string_concat_chain()
+    test_string_with_numbers()
     test_empty_string()
     println("ok")

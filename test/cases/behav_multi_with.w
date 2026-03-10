@@ -14,38 +14,38 @@ fn lex(source: str) -> TokenList:
 
 fn test_with_keyword:
     var tokens = lex("with")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_WITH())
-    assert(TK_KW_WITH() == 27)
+    assert(TokenList.tag_at(tokens, 0) == TK_KW_WITH)
+    assert(TK_KW_WITH == 27)
 
 fn test_as_keyword:
     var tokens = lex("as")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_AS())
-    assert(TK_KW_AS() == 28)
+    assert(TokenList.tag_at(tokens, 0) == TK_KW_AS)
+    assert(TK_KW_AS == 28)
 
 fn test_multi_with_token_sequence:
     // with a as x, b as y:
     var tokens = lex("with a as x, b as y:")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_WITH())
-    assert(TokenList.tag_at(tokens, 1) == TK_IDENT())  // a
-    assert(TokenList.tag_at(tokens, 2) == TK_KW_AS())
-    assert(TokenList.tag_at(tokens, 3) == TK_IDENT())  // x
-    assert(TokenList.tag_at(tokens, 4) == TK_COMMA())
-    assert(TokenList.tag_at(tokens, 5) == TK_IDENT())  // b
-    assert(TokenList.tag_at(tokens, 6) == TK_KW_AS())
-    assert(TokenList.tag_at(tokens, 7) == TK_IDENT())  // y
-    assert(TokenList.tag_at(tokens, 8) == TK_COLON())
+    assert(TokenList.tag_at(tokens, 0) == TK_KW_WITH)
+    assert(TokenList.tag_at(tokens, 1) == TK_IDENT)  // a
+    assert(TokenList.tag_at(tokens, 2) == TK_KW_AS)
+    assert(TokenList.tag_at(tokens, 3) == TK_IDENT)  // x
+    assert(TokenList.tag_at(tokens, 4) == TK_COMMA)
+    assert(TokenList.tag_at(tokens, 5) == TK_IDENT)  // b
+    assert(TokenList.tag_at(tokens, 6) == TK_KW_AS)
+    assert(TokenList.tag_at(tokens, 7) == TK_IDENT)  // y
+    assert(TokenList.tag_at(tokens, 8) == TK_COLON)
 
 fn test_with_mut_tokens:
     // with expr as mut name:
     var tokens = lex("with expr as mut name:")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_WITH())
-    assert(TokenList.tag_at(tokens, 1) == TK_IDENT())  // expr
-    assert(TokenList.tag_at(tokens, 2) == TK_KW_AS())
-    assert(TokenList.tag_at(tokens, 3) == TK_KW_MUT())
-    assert(TokenList.tag_at(tokens, 4) == TK_IDENT())  // name
+    assert(TokenList.tag_at(tokens, 0) == TK_KW_WITH)
+    assert(TokenList.tag_at(tokens, 1) == TK_IDENT)  // expr
+    assert(TokenList.tag_at(tokens, 2) == TK_KW_AS)
+    assert(TokenList.tag_at(tokens, 3) == TK_KW_MUT)
+    assert(TokenList.tag_at(tokens, 4) == TK_IDENT)  // name
 
 fn test_with_expr_node:
-    assert(NK_WITH_EXPR() == 52)
+    assert(NK_WITH_EXPR == 52)
 
 fn main:
     test_with_keyword()

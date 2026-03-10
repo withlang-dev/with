@@ -8,12 +8,11 @@ use InternPool
 use Token
 use Lexer
 use Ast
-use Type
-use Traits
+use Types
 use Sema
 use Mir
-use MirBuild
-use Borrow
+use MirLower
+use BorrowCfg
 use Codegen
 use Source
 use CImport
@@ -32,13 +31,13 @@ fn test_lex_parse_sema:
     Parser.parse_module(p)
     assert(AstPool.decl_count(p.pool) == 1)
     let decl = AstPool.get_decl(p.pool, 0)
-    assert(AstPool.kind(p.pool, decl) == NK_FN_DECL())
+    assert(AstPool.kind(p.pool, decl) == NK_FN_DECL)
     // Phase 3: Sema
     var intern = InternPool.new()
     var s = Sema.new(p.pool, src, intern)
     let body = AstPool.get_data1(p.pool, decl)
     let t = Sema.check_expr(s, body)
-    assert(t == TYPE_I32())
+    assert(t == TYPE_I32)
 
 fn test_full_pipeline:
     let src = "fn main:\n    42\n"
@@ -76,25 +75,25 @@ fn test_c_import_integration:
     assert(CImportResult.decl_count(result) == 0)
 
 fn test_render_integration:
-    assert(node_kind_name(NK_FN_DECL()) == "FnDecl")
-    assert(node_kind_name(NK_INT_LIT()) == "IntLit")
-    assert(binop_name(OP_ADD()) == "+")
-    assert(type_kind_name(TK_INT()) == "int")
+    assert(node_kind_name(NK_FN_DECL) == "FnDecl")
+    assert(node_kind_name(NK_INT_LIT) == "IntLit")
+    assert(binop_name(OP_ADD) == "+")
+    assert(type_kind_name(TK_INT) == "int")
 
 fn test_driver_integration:
-    var d = Driver.new(MODE_RUN(), "test.w")
-    assert(d.mode == MODE_RUN())
+    var d = Driver.new(MODE_RUN, "test.w")
+    assert(d.mode == MODE_RUN)
     assert(d.source_path == "test.w")
     assert(Driver.error_count(d) == 0)
 
 fn test_compilation_results:
-    assert(CR_OK() == 0)
-    assert(CR_LEX_ERROR() == 1)
-    assert(CR_PARSE_ERROR() == 2)
-    assert(CR_SEMA_ERROR() == 3)
-    assert(CR_BORROW_ERROR() == 4)
-    assert(CR_CODEGEN_ERROR() == 5)
-    assert(CR_LINK_ERROR() == 6)
+    assert(CR_OK == 0)
+    assert(CR_LEX_ERROR == 1)
+    assert(CR_PARSE_ERROR == 2)
+    assert(CR_SEMA_ERROR == 3)
+    assert(CR_BORROW_ERROR == 4)
+    assert(CR_CODEGEN_ERROR == 5)
+    assert(CR_LINK_ERROR == 6)
 
 fn main:
     test_lex_parse_sema()

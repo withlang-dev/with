@@ -3,8 +3,7 @@
 use Token
 use Lexer
 use Ast
-use Type
-use Traits
+use Types
 use Sema
 use InternPool
 
@@ -29,10 +28,10 @@ fn test_builtin_types:
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
     // Verify builtins are registered
-    assert(TypeTable.lookup(s.types, "i32") == TYPE_I32())
-    assert(TypeTable.lookup(s.types, "bool") == TYPE_BOOL())
-    assert(TypeTable.lookup(s.types, "str") == TYPE_STR())
-    assert(TypeTable.lookup(s.types, "void") == TYPE_VOID())
+    assert(TypeTable.lookup(s.types, "i32") == TYPE_I32)
+    assert(TypeTable.lookup(s.types, "bool") == TYPE_BOOL)
+    assert(TypeTable.lookup(s.types, "str") == TYPE_STR)
+    assert(TypeTable.lookup(s.types, "void") == TYPE_VOID)
 
 fn test_scope_chain:
     var intern = InternPool.new()
@@ -40,21 +39,21 @@ fn test_scope_chain:
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
     // Define x in root scope
-    Sema.define_var(s, "x", TYPE_I32(), 0)
+    Sema.define_var(s, "x", TYPE_I32, 0)
     let x_info = Sema.lookup_var(s, "x")
     assert(x_info >= 0)
-    assert(var_type_id(x_info) == TYPE_I32())
+    assert(var_type_id(x_info) == TYPE_I32)
     // Push child scope
     Sema.push_scope(s)
     // x should still be visible
     let x_info2 = Sema.lookup_var(s, "x")
     assert(x_info2 >= 0)
-    assert(var_type_id(x_info2) == TYPE_I32())
+    assert(var_type_id(x_info2) == TYPE_I32)
     // Define y in child scope
-    Sema.define_var(s, "y", TYPE_BOOL(), 1)
+    Sema.define_var(s, "y", TYPE_BOOL, 1)
     let y_info = Sema.lookup_var(s, "y")
     assert(y_info >= 0)
-    assert(var_type_id(y_info) == TYPE_BOOL())
+    assert(var_type_id(y_info) == TYPE_BOOL)
     assert(var_is_mut(y_info) == 1)
     // Pop child scope
     Sema.pop_scope(s)
@@ -71,11 +70,11 @@ fn test_fn_registration:
     // Manually register a function
     s.fn_names.push("add")
     var ptypes = Vec.new()
-    ptypes.push(TYPE_I32())
-    ptypes.push(TYPE_I32())
-    let ft = TypeTable.add_fn(s.types, ptypes, TYPE_I32(), 0)
+    ptypes.push(TYPE_I32)
+    ptypes.push(TYPE_I32)
+    let ft = TypeTable.add_fn(s.types, ptypes, TYPE_I32, 0)
     s.fn_type_ids.push(ft)
-    s.fn_ret_types.push(TYPE_I32())
+    s.fn_ret_types.push(TYPE_I32)
     s.fn_param_starts.push(0)
     s.fn_param_counts.push(2)
     s.fn_is_generic.push(0)
@@ -89,17 +88,17 @@ fn test_type_compatibility:
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
     // Same type
-    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_I32()))
+    assert(Sema.types_compatible(s, TYPE_I32, TYPE_I32))
     // Error type is compatible with anything
-    assert(Sema.types_compatible(s, TYPE_ERROR(), TYPE_I32()))
-    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_ERROR()))
+    assert(Sema.types_compatible(s, TYPE_ERROR, TYPE_I32))
+    assert(Sema.types_compatible(s, TYPE_I32, TYPE_ERROR))
     // Never type is compatible with anything
-    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_NEVER()))
+    assert(Sema.types_compatible(s, TYPE_I32, TYPE_NEVER))
     // Int widening
-    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_I64()))
+    assert(Sema.types_compatible(s, TYPE_I32, TYPE_I64))
     // Different types
-    assert(not Sema.types_compatible(s, TYPE_I32(), TYPE_STR()))
-    assert(not Sema.types_compatible(s, TYPE_BOOL(), TYPE_I32()))
+    assert(not Sema.types_compatible(s, TYPE_I32, TYPE_STR))
+    assert(not Sema.types_compatible(s, TYPE_BOOL, TYPE_I32))
 
 fn test_check_int_lit:
     var intern = InternPool.new()
@@ -107,43 +106,43 @@ fn test_check_int_lit:
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
     // Add an int literal node
-    let n = AstPool.add_node(pool, NK_INT_LIT(), 0, 1, 42, 0, 0)
+    let n = AstPool.add_node(pool, NK_INT_LIT, 0, 1, 42, 0, 0)
     let t = Sema.check_expr(s, n)
-    assert(t == TYPE_I32())
+    assert(t == TYPE_I32)
 
 fn test_check_bool_lit:
     var intern = InternPool.new()
     var pool = AstPool.new()
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
-    let n = AstPool.add_node(pool, NK_BOOL_LIT(), 0, 4, 1, 0, 0)
+    let n = AstPool.add_node(pool, NK_BOOL_LIT, 0, 4, 1, 0, 0)
     let t = Sema.check_expr(s, n)
-    assert(t == TYPE_BOOL())
+    assert(t == TYPE_BOOL)
 
 fn test_check_string_lit:
     var intern = InternPool.new()
     var pool = AstPool.new()
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
-    let n = AstPool.add_node(pool, NK_STRING_LIT(), 0, 7, 0, 0, 0)
+    let n = AstPool.add_node(pool, NK_STRING_LIT, 0, 7, 0, 0, 0)
     let t = Sema.check_expr(s, n)
-    assert(t == TYPE_STR())
+    assert(t == TYPE_STR)
 
 fn test_check_binary:
     var intern = InternPool.new()
     var pool = AstPool.new()
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
-    let lhs = AstPool.add_node(pool, NK_INT_LIT(), 0, 1, 1, 0, 0)
-    let rhs = AstPool.add_node(pool, NK_INT_LIT(), 4, 5, 2, 0, 0)
+    let lhs = AstPool.add_node(pool, NK_INT_LIT, 0, 1, 1, 0, 0)
+    let rhs = AstPool.add_node(pool, NK_INT_LIT, 4, 5, 2, 0, 0)
     // Add: i32 + i32 → i32
-    let add = AstPool.add_node(pool, NK_BINARY(), 0, 5, lhs, rhs, OP_ADD())
+    let add = AstPool.add_node(pool, NK_BINARY, 0, 5, lhs, rhs, OP_ADD)
     let t = Sema.check_expr(s, add)
-    assert(t == TYPE_I32())
+    assert(t == TYPE_I32)
     // Eq: i32 == i32 → bool
-    let eq = AstPool.add_node(pool, NK_BINARY(), 0, 5, lhs, rhs, OP_EQ())
+    let eq = AstPool.add_node(pool, NK_BINARY, 0, 5, lhs, rhs, OP_EQ)
     let t2 = Sema.check_expr(s, eq)
-    assert(t2 == TYPE_BOOL())
+    assert(t2 == TYPE_BOOL)
 
 fn test_check_ident:
     var intern = InternPool.new()
@@ -151,17 +150,17 @@ fn test_check_ident:
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
     var s = Sema.new(pool, "", intern)
     // Define a variable
-    Sema.define_var(s, "x", TYPE_I32(), 0)
+    Sema.define_var(s, "x", TYPE_I32, 0)
     // Create ident node
     let sym = AstPool.add_string(pool, "x")
-    let n = AstPool.add_node(pool, NK_IDENT(), 0, 1, sym, 0, 0)
+    let n = AstPool.add_node(pool, NK_IDENT, 0, 1, sym, 0, 0)
     let t = Sema.check_expr(s, n)
-    assert(t == TYPE_I32())
+    assert(t == TYPE_I32)
     // Undeclared ident
     let sym2 = AstPool.add_string(pool, "unknown")
-    let n2 = AstPool.add_node(pool, NK_IDENT(), 0, 7, sym2, 0, 0)
+    let n2 = AstPool.add_node(pool, NK_IDENT, 0, 7, sym2, 0, 0)
     let t2 = Sema.check_expr(s, n2)
-    assert(t2 == TYPE_ERROR())
+    assert(t2 == TYPE_ERROR)
     assert(Sema.diag_count(s) >= 1)
 
 fn test_variant_lookup:
@@ -187,7 +186,7 @@ fn test_variant_lookup:
     s.variant_indices.push(1)
     // Check ident "Red" resolves to enum type
     let sym = AstPool.add_string(pool, "Red")
-    let n = AstPool.add_node(pool, NK_IDENT(), 0, 3, sym, 0, 0)
+    let n = AstPool.add_node(pool, NK_IDENT, 0, 3, sym, 0, 0)
     let t = Sema.check_expr(s, n)
     assert(t == eid)
 

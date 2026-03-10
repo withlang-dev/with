@@ -1,88 +1,53 @@
 //! expect-stdout: ok
 
 // Behavior test: references and borrowing
-// Tests: &x, &mut x, *ptr, ref/ptr type construction
+// Tests: pass by reference, dereferencing, &x syntax
 
-use Token
-use Lexer
-use Ast
-use Type
-use Sema
-use InternPool
-use Borrow
-use Mir
-use Parser
+type Point = { x: i32, y: i32 }
 
-fn lex(source: str) -> TokenList:
-    var l = Lexer.new(source, 0)
-    Lexer.tokenize(l)
+fn read_x(p: &Point) -> i32:
+    p.x
 
-fn test_ampersand_token:
-    var tokens = lex("&x")
-    assert(TokenList.tag_at(tokens, 0) == TK_AMPERSAND())
-    assert(TokenList.tag_at(tokens, 1) == TK_IDENT())
+fn read_y(p: &Point) -> i32:
+    p.y
 
-fn test_mut_keyword:
-    var tokens = lex("mut")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_MUT())
+fn sum_coords(p: &Point) -> i32:
+    p.x + p.y
 
-fn test_parse_ref:
-    let src = "fn f:\n    &x\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    let decl = AstPool.get_decl(p.pool, 0)
-    let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_UNARY())
-    assert(AstPool.get_data1(p.pool, body) == UOP_REF())
+fn test_pass_by_ref:
+    let p = Point { x: 10, y: 20 }
+    assert(read_x(&p) == 10)
+    assert(read_y(&p) == 20)
+    assert(sum_coords(&p) == 30)
 
-fn test_parse_deref:
-    let src = "fn f:\n    *p\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    let decl = AstPool.get_decl(p.pool, 0)
-    let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_UNARY())
-    assert(AstPool.get_data1(p.pool, body) == UOP_DEREF())
+fn test_ref_multiple_reads:
+    let p = Point { x: 3, y: 7 }
+    // Multiple shared borrows are allowed
+    let a = read_x(&p)
+    let b = read_y(&p)
+    assert(a == 3)
+    assert(b == 7)
 
-fn test_type_ref:
-    var types = TypeTable.new()
-    let r = TypeTable.add_ref(types, TYPE_I32(), 0)  // immutable ref
-    assert(TypeTable.kind(types, r) == TK_REF())
-    assert(TypeTable.get_data0(types, r) == TYPE_I32())
-    assert(TypeTable.get_data1(types, r) == 0)  // not mut
+fn add_points(a: &Point, b: &Point) -> Point:
+    Point { x: a.x + b.x, y: a.y + b.y }
 
-fn test_type_mut_ref:
-    var types = TypeTable.new()
-    let r = TypeTable.add_ref(types, TYPE_I32(), 1)  // mutable ref
-    assert(TypeTable.kind(types, r) == TK_REF())
-    assert(TypeTable.get_data0(types, r) == TYPE_I32())
-    assert(TypeTable.get_data1(types, r) == 1)  // mut
+fn test_multiple_refs:
+    let p1 = Point { x: 1, y: 2 }
+    let p2 = Point { x: 3, y: 4 }
+    let p3 = add_points(&p1, &p2)
+    assert(p3.x == 4)
+    assert(p3.y == 6)
 
-fn test_type_ptr:
-    var types = TypeTable.new()
-    let p = TypeTable.add_ptr(types, TYPE_I32(), 0)
-    assert(TypeTable.kind(types, p) == TK_PTR())
-    assert(TypeTable.get_data0(types, p) == TYPE_I32())
-
-fn test_borrow_checker_clean:
-    var types = TypeTable.new()
-    var body = MirBody.new()
-    MirBody.add_local(body, 0, TYPE_I32(), 0)  // return place (name=0, type=i32, not mutable)
-    let bb0 = MirBody.add_block(body)
-    MirBody.set_return(body, bb0)
-    var bc = BorrowChecker.new(body, types)
-    BorrowChecker.check(bc)
-    assert(BorrowChecker.error_count(bc) == 0)
+fn test_ref_after_use:
+    let p = Point { x: 100, y: 200 }
+    let s1 = sum_coords(&p)
+    let s2 = sum_coords(&p)
+    assert(s1 == s2)
+    assert(s1 == 300)
 
 fn main:
-    test_ampersand_token()
-    test_mut_keyword()
-    test_parse_ref()
-    test_parse_deref()
-    test_type_ref()
-    test_type_mut_ref()
-    test_type_ptr()
-    test_borrow_checker_clean()
+    test_pass_by_ref()
+    test_ref_multiple_reads()
+    test_multiple_refs()
+    test_ref_after_use()
     println("ok")

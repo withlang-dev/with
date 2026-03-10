@@ -58,15 +58,17 @@ fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
     with_eprintln("[type-names] stage=" ++ stage ++ " decls=" ++ int_to_string(pool.decl_count()))
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
-        if pool.kind(decl) != NK_TYPE_DECL():
+        if pool.kind(decl) != NK_TYPE_DECL:
             continue
         let sub_kind = type_decl_sub_kind(pool.get_data2(decl))
         var kind_name = "alias"
-        if sub_kind == TDK_STRUCT():
+        if sub_kind == TDK_STRUCT:
             kind_name = "struct"
-        else if sub_kind == TDK_ENUM():
+        else if sub_kind == TDK_ENUM:
             kind_name = "enum"
-        else if sub_kind == TDK_DISTINCT():
+        else if sub_kind == TDK_DISC_ENUM:
+            kind_name = "disc_enum"
+        else if sub_kind == TDK_DISTINCT:
             kind_name = "distinct"
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)

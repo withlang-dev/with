@@ -27,7 +27,7 @@ type DiagnosticStore = {
 
 fn diagnostic_error(message: str, primary: Span) -> Diagnostic:
     Diagnostic {
-        severity: DIAG_SEVERITY_ERROR(),
+        severity: DIAG_SEVERITY_ERROR,
         code: "",
         message,
         primary,
@@ -38,7 +38,7 @@ fn diagnostic_error(message: str, primary: Span) -> Diagnostic:
 
 fn diagnostic_warning(message: str, primary: Span) -> Diagnostic:
     Diagnostic {
-        severity: DIAG_SEVERITY_WARNING(),
+        severity: DIAG_SEVERITY_WARNING,
         code: "",
         message,
         primary,
@@ -78,4 +78,4 @@ fn DiagnosticStore.count_by_severity(self: DiagnosticStore, severity: i32) -> i3
     n
 
 fn DiagnosticStore.has_errors(self: DiagnosticStore) -> bool:
-    self.count_by_severity(DIAG_SEVERITY_ERROR()) > 0
+    self.count_by_severity(DIAG_SEVERITY_ERROR) > 0

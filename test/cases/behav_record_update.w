@@ -19,12 +19,12 @@ fn test_parse_record_update:
     Parser.parse_module(p)
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_RECORD_UPDATE())
+    assert(AstPool.kind(p.pool, body) == NK_RECORD_UPDATE)
 
 fn test_brace_tokens:
     var tokens = lex("{ }")
-    assert(TokenList.tag_at(tokens, 0) == TK_L_BRACE())
-    assert(TokenList.tag_at(tokens, 1) == TK_R_BRACE())
+    assert(TokenList.tag_at(tokens, 0) == TK_L_BRACE)
+    assert(TokenList.tag_at(tokens, 1) == TK_R_BRACE)
 
 fn main:
     test_parse_record_update()
