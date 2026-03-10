@@ -1,111 +1,54 @@
 //! expect-stdout: ok
 
 // Behavior test: type casting (as)
-// Tests: int↔int, int↔float, widening, narrowing
+// Tests: i32<->i64, bool->i32, widening, narrowing
 
-use Token
-use Lexer
-use Ast
-use Type
-use Codegen
-use Sema
-use InternPool
-use Parser
+fn test_i32_to_i64:
+    let x: i32 = 42
+    let y: i64 = x as i64
+    assert(y == 42)
 
-fn lex(source: str) -> TokenList:
-    var l = Lexer.new(source, 0)
-    Lexer.tokenize(l)
+fn test_i64_to_i32:
+    let x: i64 = 100
+    let y: i32 = x as i32
+    assert(y == 100)
 
-fn test_as_keyword:
-    var tokens = lex("x as i32")
-    assert(TokenList.tag_at(tokens, 0) == TK_IDENT())
-    assert(TokenList.tag_at(tokens, 1) == TK_KW_AS())
-    assert(TokenList.tag_at(tokens, 2) == TK_IDENT())
+fn test_negative_cast:
+    let x: i32 = -5
+    let y: i64 = x as i64
+    assert(y == -5)
 
-fn test_parse_cast:
-    let src = "fn f:\n    42 as i64\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    let decl = AstPool.get_decl(p.pool, 0)
-    let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_CAST())
+fn test_bool_to_i32:
+    let t = true
+    let f = false
+    assert(t as i32 == 1)
+    assert(f as i32 == 0)
 
-fn test_type_int_widening:
-    var types = TypeTable.new()
-    // i32 can widen to i64
-    assert(TypeTable.is_int(types, TYPE_I32()))
-    assert(TypeTable.is_int(types, TYPE_I64()))
-    // All int types are numeric
-    assert(TypeTable.is_numeric(types, TYPE_I8()))
-    assert(TypeTable.is_numeric(types, TYPE_I16()))
-    assert(TypeTable.is_numeric(types, TYPE_I32()))
-    assert(TypeTable.is_numeric(types, TYPE_I64()))
-    assert(TypeTable.is_numeric(types, TYPE_U8()))
-    assert(TypeTable.is_numeric(types, TYPE_U16()))
-    assert(TypeTable.is_numeric(types, TYPE_U32()))
-    assert(TypeTable.is_numeric(types, TYPE_U64()))
+fn test_bool_to_i64:
+    let t = true
+    let f = false
+    assert(t as i64 == 1)
+    assert(f as i64 == 0)
 
-fn test_type_float_checks:
-    var types = TypeTable.new()
-    assert(TypeTable.is_float(types, TYPE_F32()))
-    assert(TypeTable.is_float(types, TYPE_F64()))
-    assert(not TypeTable.is_float(types, TYPE_I32()))
-    assert(TypeTable.is_numeric(types, TYPE_F32()))
-    assert(TypeTable.is_numeric(types, TYPE_F64()))
+fn test_comparison_cast:
+    let x = 10
+    let cmp = x > 5
+    assert(cmp as i32 == 1)
+    let cmp2 = x < 5
+    assert(cmp2 as i32 == 0)
 
-fn test_type_non_numeric:
-    var types = TypeTable.new()
-    assert(not TypeTable.is_numeric(types, TYPE_BOOL()))
-    assert(not TypeTable.is_numeric(types, TYPE_STR()))
-    assert(not TypeTable.is_numeric(types, TYPE_VOID()))
-
-fn test_codegen_cast_instructions:
-    // Test the cast_instruction helper in Codegen
-    var types = TypeTable.new()
-    // i32 → i64 should be sext (sign extend)
-    let inst = cast_instruction(types, TYPE_I32(), TYPE_I64())
-    assert(inst == LI_SEXT())
-    // i64 → i32 should be trunc
-    let inst2 = cast_instruction(types, TYPE_I64(), TYPE_I32())
-    assert(inst2 == LI_TRUNC())
-    // i32 → f64 should be sitofp
-    let inst3 = cast_instruction(types, TYPE_I32(), TYPE_F64())
-    assert(inst3 == LI_SITOFP())
-    // f64 → i32 should be fptosi
-    let inst4 = cast_instruction(types, TYPE_F64(), TYPE_I32())
-    assert(inst4 == LI_FPTOSI())
-    // f32 → f64 should be fpext
-    let inst5 = cast_instruction(types, TYPE_F32(), TYPE_F64())
-    assert(inst5 == LI_FPEXT())
-    // f64 → f32 should be fptrunc
-    let inst6 = cast_instruction(types, TYPE_F64(), TYPE_F32())
-    assert(inst6 == LI_FPTRUNC())
-    // u32 → u64 should be zext
-    let inst7 = cast_instruction(types, TYPE_U32(), TYPE_U64())
-    assert(inst7 == LI_ZEXT())
-    // u32 → f64 should be uitofp
-    let inst8 = cast_instruction(types, TYPE_U32(), TYPE_F64())
-    assert(inst8 == LI_UITOFP())
-
-fn test_sema_type_compat_widening:
-    var intern = InternPool.new()
-    var pool = AstPool.new()
-    AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
-    var s = Sema.new(pool, "", intern)
-    // i32 widens to i64
-    assert(Sema.types_compatible(s, TYPE_I32(), TYPE_I64()))
-    // f32 widens to f64
-    assert(Sema.types_compatible(s, TYPE_F32(), TYPE_F64()))
-    // But not str to i32
-    assert(not Sema.types_compatible(s, TYPE_STR(), TYPE_I32()))
+fn test_cast_in_expression:
+    let a: i32 = 10
+    let b: i64 = 20
+    let sum: i64 = (a as i64) + b
+    assert(sum == 30)
 
 fn main:
-    test_as_keyword()
-    test_parse_cast()
-    test_type_int_widening()
-    test_type_float_checks()
-    test_type_non_numeric()
-    test_codegen_cast_instructions()
-    test_sema_type_compat_widening()
+    test_i32_to_i64()
+    test_i64_to_i32()
+    test_negative_cast()
+    test_bool_to_i32()
+    test_bool_to_i64()
+    test_comparison_cast()
+    test_cast_in_expression()
     println("ok")

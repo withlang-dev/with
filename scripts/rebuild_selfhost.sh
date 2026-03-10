@@ -152,6 +152,7 @@ refresh_lib_objects() {
   local runtime_src="${ROOT_DIR}/runtime"
   local lib_dir="${OUT_LIB_DIR}"
   local sdk_path=""
+  local embedded_inc="${lib_dir}/embedded_stdlib.inc.h"
 
   mkdir -p "${lib_dir}"
 
@@ -159,6 +160,7 @@ refresh_lib_objects() {
     return 0
   fi
 
+  python3 "${ROOT_DIR}/scripts/generate_embedded_stdlib.py" "${ROOT_DIR}" "${embedded_inc}"
   sdk_path="$(xcrun --show-sdk-path 2>/dev/null || true)"
   if [ -n "${sdk_path}" ]; then
     cc -isysroot "${sdk_path}" -c "${runtime_src}/helpers.c" -o "${lib_dir}/helpers.o" >/dev/null 2>&1 || true

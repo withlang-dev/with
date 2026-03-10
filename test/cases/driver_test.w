@@ -5,12 +5,11 @@ use InternPool
 use Token
 use Lexer
 use Ast
-use Type
-use Traits
+use Types
 use Sema
 use Mir
-use MirBuild
-use Borrow
+use MirLower
+use BorrowCfg
 use Codegen
 use Source
 use CImport
@@ -45,32 +44,32 @@ fn test_c_import_result:
     assert(d2.is_variadic == 1)
 
 fn test_render_names:
-    assert(node_kind_name(NK_FN_DECL()) == "FnDecl")
-    assert(node_kind_name(NK_INT_LIT()) == "IntLit")
-    assert(node_kind_name(NK_BINARY()) == "Binary")
-    assert(binop_name(OP_ADD()) == "+")
-    assert(binop_name(OP_EQ()) == "==")
-    assert(type_kind_name(TK_INT()) == "int")
-    assert(type_kind_name(TK_STRUCT()) == "struct")
+    assert(node_kind_name(NK_FN_DECL) == "FnDecl")
+    assert(node_kind_name(NK_INT_LIT) == "IntLit")
+    assert(node_kind_name(NK_BINARY) == "Binary")
+    assert(binop_name(OP_ADD) == "+")
+    assert(binop_name(OP_EQ) == "==")
+    assert(type_kind_name(TK_INT) == "int")
+    assert(type_kind_name(TK_STRUCT) == "struct")
     var types = TypeTable.new()
-    assert(type_name(types, TYPE_I32()) == "i32")
-    assert(type_name(types, TYPE_BOOL()) == "bool")
-    assert(type_name(types, TYPE_STR()) == "str")
-    assert(stmt_kind_name(SK_ASSIGN()) == "Assign")
-    assert(stmt_kind_name(SK_DROP()) == "Drop")
-    assert(terminator_kind_name(TM_RETURN()) == "Return")
-    assert(terminator_kind_name(TM_GOTO()) == "Goto")
+    assert(type_name(types, TYPE_I32) == "i32")
+    assert(type_name(types, TYPE_BOOL) == "bool")
+    assert(type_name(types, TYPE_STR) == "str")
+    assert(stmt_kind_name(SK_ASSIGN) == "Assign")
+    assert(stmt_kind_name(SK_DROP) == "Drop")
+    assert(terminator_kind_name(TM_RETURN) == "Return")
+    assert(terminator_kind_name(TM_GOTO) == "Goto")
 
 fn test_driver_new:
-    var d = Driver.new(MODE_RUN(), "test.w")
-    assert(d.mode == MODE_RUN())
+    var d = Driver.new(MODE_RUN, "test.w")
+    assert(d.mode == MODE_RUN)
     assert(d.source_path == "test.w")
     assert(Driver.error_count(d) == 0)
 
 fn test_compilation_results:
-    assert(CR_OK() == 0)
-    assert(CR_LEX_ERROR() == 1)
-    assert(CR_SEMA_ERROR() == 3)
+    assert(CR_OK == 0)
+    assert(CR_LEX_ERROR == 1)
+    assert(CR_SEMA_ERROR == 3)
 
 fn test_process_c_import:
     let result = process_c_import("#include <stdio.h>")
@@ -81,12 +80,12 @@ fn test_full_pipeline_integration:
     // Create a simple AST manually and run through sema
     var pool = AstPool.new()
     AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
-    let body = AstPool.add_node(pool, NK_INT_LIT(), 5, 7, 42, 0, 0)
+    let body = AstPool.add_node(pool, NK_INT_LIT, 5, 7, 42, 0, 0)
     let name_sym = AstPool.add_string(pool, "main")
     let e0 = AstPool.add_extra(pool, 0)
     AstPool.add_extra(pool, 0)
     AstPool.add_extra(pool, 0)
-    let fn_node = AstPool.add_node(pool, NK_FN_DECL(), 0, 20, name_sym, body, e0)
+    let fn_node = AstPool.add_node(pool, NK_FN_DECL, 0, 20, name_sym, body, e0)
     AstPool.add_decl(pool, fn_node)
     // Run sema
     var intern = InternPool.new()

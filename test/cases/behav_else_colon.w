@@ -19,7 +19,7 @@ fn test_parse_else_colon:
     Parser.parse_module(p)
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_IF_EXPR())
+    assert(AstPool.kind(p.pool, body) == NK_IF_EXPR)
     // Verify else branch exists (d2 != 0)
     let else_body = AstPool.get_data2(p.pool, body)
     assert(else_body != 0)
@@ -31,11 +31,11 @@ fn test_parse_else_if_else_colon:
     Parser.parse_module(p)
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_IF_EXPR())
+    assert(AstPool.kind(p.pool, body) == NK_IF_EXPR)
     // The else branch should be a nested if-expr
     let else_branch = AstPool.get_data2(p.pool, body)
     assert(else_branch != 0)
-    assert(AstPool.kind(p.pool, else_branch) == NK_IF_EXPR())
+    assert(AstPool.kind(p.pool, else_branch) == NK_IF_EXPR)
     // The nested if-expr should have its own else branch
     let inner_else = AstPool.get_data2(p.pool, else_branch)
     assert(inner_else != 0)

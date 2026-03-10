@@ -311,15 +311,15 @@ fn dump_ast(source_file: str, no_std: bool, alloc_mode: bool, include_header: bo
     0
 
 fn ast_decl_kind_name(kind: i32) -> str:
-    if kind == NK_FN_DECL(): return "function"
-    if kind == NK_TYPE_DECL(): return "type_decl"
-    if kind == NK_USE_DECL(): return "use_decl"
-    if kind == NK_LET_DECL(): return "let_decl"
-    if kind == NK_EXTERN_FN(): return "extern_fn"
-    if kind == NK_C_IMPORT(): return "c_import"
-    if kind == NK_TRAIT_DECL(): return "trait_decl"
-    if kind == NK_IMPL_DECL(): return "impl_decl"
-    if kind == NK_POISONED_DECL(): return "poisoned"
+    if kind == NK_FN_DECL: return "function"
+    if kind == NK_TYPE_DECL: return "type_decl"
+    if kind == NK_USE_DECL: return "use_decl"
+    if kind == NK_LET_DECL: return "let_decl"
+    if kind == NK_EXTERN_FN: return "extern_fn"
+    if kind == NK_C_IMPORT: return "c_import"
+    if kind == NK_TRAIT_DECL: return "trait_decl"
+    if kind == NK_IMPL_DECL: return "impl_decl"
+    if kind == NK_POISONED_DECL: return "poisoned"
     "unknown"
 
 fn dump_tokens(source_file: str, deterministic: bool) -> i32:
@@ -420,9 +420,9 @@ fn escape_dump_lexeme(text: str) -> str:
 
 fn dump_tag_name(tag: i32, lexeme: str) -> str:
     // Keep deterministic dump names identical to Stage0 for brace delimiters.
-    if tag == TK_L_BRACE():
+    if tag == TK_L_BRACE:
         return "'" ++ lexeme ++ "'"
-    if tag == TK_R_BRACE():
+    if tag == TK_R_BRACE:
         return "'" ++ lexeme ++ "'"
     return tag_name(tag)
 

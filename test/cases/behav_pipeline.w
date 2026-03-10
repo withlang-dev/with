@@ -14,11 +14,11 @@ fn lex(source: str) -> TokenList:
 
 fn test_pipe_token:
     var tokens = lex("|>")
-    assert(TokenList.tag_at(tokens, 0) == TK_PIPE_GT())
+    assert(TokenList.tag_at(tokens, 0) == TK_PIPE_GT)
 
 fn test_backward_pipe_token:
     var tokens = lex("<|")
-    assert(TokenList.tag_at(tokens, 0) == TK_LT_PIPE())
+    assert(TokenList.tag_at(tokens, 0) == TK_LT_PIPE)
 
 fn test_parse_pipeline:
     let src = "fn f:\n    x |> foo\n"
@@ -27,17 +27,17 @@ fn test_parse_pipeline:
     Parser.parse_module(p)
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_PIPELINE())
+    assert(AstPool.kind(p.pool, body) == NK_PIPELINE)
     let lhs = AstPool.get_data0(p.pool, body)
-    assert(AstPool.kind(p.pool, lhs) == NK_IDENT())
+    assert(AstPool.kind(p.pool, lhs) == NK_IDENT)
     let rhs = AstPool.get_data1(p.pool, body)
-    assert(AstPool.kind(p.pool, rhs) == NK_IDENT())
+    assert(AstPool.kind(p.pool, rhs) == NK_IDENT)
 
 fn test_pipe_plus_regular:
     // | alone is TK_PIPE, |> is TK_PIPE_GT
     var tokens = lex("| |>")
-    assert(TokenList.tag_at(tokens, 0) == TK_PIPE())
-    assert(TokenList.tag_at(tokens, 1) == TK_PIPE_GT())
+    assert(TokenList.tag_at(tokens, 0) == TK_PIPE)
+    assert(TokenList.tag_at(tokens, 1) == TK_PIPE_GT)
 
 fn main:
     test_pipe_token()

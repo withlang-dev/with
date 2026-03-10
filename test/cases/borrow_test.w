@@ -1,12 +1,12 @@
 //! expect-stdout: ok
 
-use Type
+use Types
 use Mir
-use Borrow
+use BorrowCfg
 
 fn test_borrow_info:
-    let bi = BorrowInfo.new(BK_SHARED(), 5, 10, 0, 3)
-    assert(bi.kind == BK_SHARED())
+    let bi = BorrowInfo.new(BK_SHARED, 5, 10, 0, 3)
+    assert(bi.kind == BK_SHARED)
     assert(bi.local == 5)
     assert(bi.ref_local == 10)
     assert(bi.created_bb == 0)
@@ -37,11 +37,11 @@ fn test_empty_body:
 
 fn test_single_borrow_ok:
     var body = MirBody.new()
-    let local = MirBody.add_local(body, 10, TYPE_I32(), 1)
-    let ref_local = MirBody.add_local(body, 11, TYPE_I32(), 0)
+    let local = MirBody.add_local(body, 10, TYPE_I32, 1)
+    let ref_local = MirBody.add_local(body, 11, TYPE_I32, 0)
     let bb = MirBody.add_block(body)
     // ref_local = &local (shared borrow)
-    MirBody.add_assign(body, bb, ref_local, RV_REF(), local, 0)
+    MirBody.add_assign(body, bb, ref_local, RV_REF, local, 0)
     MirBody.set_return(body, bb)
     var types = TypeTable.new()
     var bc = BorrowChecker.new(body, types)
@@ -54,11 +54,11 @@ fn test_single_borrow_ok:
 fn test_no_escape:
     var body = MirBody.new()
     // Make return local (0) a reference type
-    let ref_type = TypeTable.add_ref(TypeTable.new(), TYPE_I32(), 0)
+    let ref_type = TypeTable.add_ref(TypeTable.new(), TYPE_I32, 0)
     // The return local was created as void; add a ref-typed local
     let ref_local = MirBody.add_local(body, -1, ref_type, 0)
     var types = TypeTable.new()
-    let rt = TypeTable.add_ref(types, TYPE_I32(), 0)
+    let rt = TypeTable.add_ref(types, TYPE_I32, 0)
     // Manually track that local 0 has ref type (via types table)
     var bc = BorrowChecker.new(body, types)
     BorrowChecker.check_no_escape(bc)
@@ -67,10 +67,10 @@ fn test_no_escape:
 
 fn test_active_borrows_at:
     var body = MirBody.new()
-    let local = MirBody.add_local(body, 10, TYPE_I32(), 1)
-    let ref1 = MirBody.add_local(body, 11, TYPE_I32(), 0)
+    let local = MirBody.add_local(body, 10, TYPE_I32, 1)
+    let ref1 = MirBody.add_local(body, 11, TYPE_I32, 0)
     let bb0 = MirBody.add_block(body)
-    MirBody.add_assign(body, bb0, ref1, RV_REF(), local, 0)
+    MirBody.add_assign(body, bb0, ref1, RV_REF, local, 0)
     var types = TypeTable.new()
     var bc = BorrowChecker.new(body, types)
     BorrowChecker.collect_borrows(bc)

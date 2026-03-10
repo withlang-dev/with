@@ -6,25 +6,25 @@
 // - Drop as implicit use for borrow-checking (SS21.1 rule 7)
 // - Ephemeral return conservation (SS21.1 rule 6)
 
-use Type
+use Types
 use Mir
 
 fn test_borrow_kind_constants:
-    assert(BK_SHARED() == 0)
-    assert(BK_MUTABLE() == 1)
+    assert(BK_SHARED == 0)
+    assert(BK_MUTABLE == 1)
 
 fn test_mir_drop_statement:
     // SK_DROP exists for explicit drop
-    assert(SK_DROP() == 1)
+    assert(SK_DROP == 1)
 
 fn test_mir_drop_terminator:
     // TM_DROP exists for drop-then-branch
-    assert(TM_DROP() == 5)
+    assert(TM_DROP == 5)
 
 fn test_mir_statement_kinds:
-    assert(SK_ASSIGN() == 0)
-    assert(SK_DROP() == 1)
-    assert(SK_NOP() == 2)
+    assert(SK_ASSIGN == 0)
+    assert(SK_DROP == 1)
+    assert(SK_NOP == 2)
 
 fn test_mir_projection_kinds:
     // PJ_FIELD needed for disjoint field borrowing
@@ -35,20 +35,20 @@ fn test_mir_projection_kinds:
 
 fn test_mir_operand_kinds:
     // OP_COPY vs OP_MOVE distinction needed for move checking
-    assert(OP_COPY() == 0)
-    assert(OP_MOVE() == 1)
-    assert(OP_CONSTANT() == 2)
+    assert(OP_COPY == 0)
+    assert(OP_MOVE == 1)
+    assert(OP_CONSTANT == 2)
 
 fn test_mir_rvalue_kinds:
-    assert(RV_USE() == 0)
-    assert(RV_REF() == 1)
-    assert(RV_BINARY_OP() == 2)
-    assert(RV_UNARY_OP() == 3)
-    assert(RV_CALL() == 4)
-    assert(RV_AGGREGATE() == 5)
-    assert(RV_CAST() == 6)
-    assert(RV_DISCRIMINANT() == 7)
-    assert(RV_CONSTANT() == 8)
+    assert(RV_USE == 0)
+    assert(RV_REF == 1)
+    assert(RV_BINARY_OP == 2)
+    assert(RV_UNARY_OP == 3)
+    assert(RV_CALL == 4)
+    assert(RV_AGGREGATE == 5)
+    assert(RV_CAST == 6)
+    assert(RV_DISCRIMINANT == 7)
+    assert(RV_CONSTANT == 8)
 
 fn test_mir_aggregate_kinds:
     assert(AK_STRUCT() == 0)
@@ -57,13 +57,13 @@ fn test_mir_aggregate_kinds:
     assert(AK_ARRAY() == 3)
 
 fn test_mir_terminator_kinds:
-    assert(TM_GOTO() == 0)
-    assert(TM_SWITCH_INT() == 1)
-    assert(TM_RETURN() == 2)
-    assert(TM_UNREACHABLE() == 3)
-    assert(TM_CALL() == 4)
-    assert(TM_DROP() == 5)
-    assert(TM_ASSERT() == 6)
+    assert(TM_GOTO == 0)
+    assert(TM_SWITCH_INT == 1)
+    assert(TM_RETURN == 2)
+    assert(TM_UNREACHABLE == 3)
+    assert(TM_CALL == 4)
+    assert(TM_DROP == 5)
+    assert(TM_ASSERT == 6)
 
 fn test_nll_region_basic:
     // NLL region infrastructure exists

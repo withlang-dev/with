@@ -130,6 +130,30 @@ let config: ServerConfig = parse(args)
 
 ---
 
+## Use `const` for Compile-Time Constants
+
+**Don't use `let` for values known at compile time.**
+
+```
+// ✗ runtime binding for a fixed value
+let MAX_RETRIES = 3
+
+// ✓ compile-time constant, inlined at every use
+const MAX_RETRIES: i32 = 3
+```
+
+`const` requires a type annotation and a compile-time evaluable
+expression. Use it for configuration values, sizes, sentinel values,
+and any named value that never changes.
+
+```
+const BUFFER_SIZE: i32 = 4096
+const DEFAULT_TIMEOUT: i64 = 30000
+const VERSION: str = "1.0.0"
+```
+
+---
+
 ## Don't Return What's Implied
 
 **Don't write trailing `0`.** If a function returns a type
@@ -225,6 +249,27 @@ move_player(.North, 10.0)
 
 // ✓ in error returns
 if age < 0 then return Err(.InvalidAge)
+```
+
+**Use discriminant enums for protocol/wire values.** When enum values
+must map to specific integers (protocol codes, file formats, FFI):
+
+```
+// ✓ discriminant enum — explicit integer mapping
+type HttpMethod: i32 =
+    Get = 1
+    Post = 2
+    Put = 3
+    Delete = 4
+
+// ✓ @[flags] for bitfield enums
+@[flags]
+type Perms: i32 =
+    Read         // 1
+    Write        // 2
+    Execute      // 4
+
+let rw = Perms.Read as i32 | Perms.Write as i32
 ```
 
 ---
@@ -478,6 +523,17 @@ fn process(path: str) -> Result[Unit, IoError]:
     let data = f.read_all()?
 ```
 
+**Use `errdefer` for error-only cleanup.** When you need cleanup that
+should only run on error (not on success), use `errdefer`:
+
+```
+fn connect(url: str) -> Result[Connection, Error]:
+    let conn = open_socket(url)?
+    errdefer conn.close()         // only runs if a later ? fails
+    let auth = authenticate(conn)?
+    Connection { conn, auth }     // success: errdefer skipped
+```
+
 ---
 
 ## Pattern Matching
@@ -590,6 +646,24 @@ items.filter(|item: &Item| -> bool { item.active == true })
 
 // ✓ idiomatic — types inferred, expression body
 items.filter(|item| item.active)
+
+// ✓ best — use `it` for single-parameter closures
+items.filter(it.active)
+items.map(it.name)
+items.filter(it > 0)
+```
+
+**Use `it` for simple closures.** When a function expects a
+single-parameter closure, `it` refers to the implicit parameter.
+Reserve explicit `|param|` for multi-parameter closures or when
+the body is complex:
+
+```
+// ✓ use it for short, clear expressions
+numbers |> filter(it > 0) |> map(it * 2)
+
+// ✓ use explicit param for multi-param or clarity
+pairs.sort_by(|a, b| a.score - b.score)
 ```
 
 ---

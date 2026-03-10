@@ -21,16 +21,16 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
     let kind = pool.kind(node)
     let prefix = make_indent(indent)
 
-    if kind == NK_FN_DECL():
+    if kind == NK_FN_DECL:
         let name = intern.resolve(pool.get_data0(node))
         let flags = pool.get_data2(node)
         let body = pool.get_data1(node)
         var out = prefix
-        if has_flag(flags, FN_FLAG_PUB()):
+        if has_flag(flags, FN_FLAG_PUB):
             out = out ++ "pub "
-        if has_flag(flags, FN_FLAG_ASYNC()):
+        if has_flag(flags, FN_FLAG_ASYNC):
             out = out ++ "async "
-        if has_flag(flags, FN_FLAG_GEN()):
+        if has_flag(flags, FN_FLAG_GEN):
             out = out ++ "gen "
         out = out ++ "fn " ++ name
 
@@ -54,7 +54,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         out = out ++ render_expr(pool, intern, body, indent + 2)
         return out
 
-    if kind == NK_TYPE_DECL():
+    if kind == NK_TYPE_DECL:
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let packed_kind = pool.get_data2(node)
@@ -68,7 +68,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         if is_ephemeral != 0:
             out = out ++ "ephemeral "
 
-        if sub_kind == TDK_STRUCT():
+        if sub_kind == TDK_STRUCT:
             let field_count = pool.get_extra(extra_start)
             var ep = extra_start + 1
             out = out ++ render_lbrace() ++ " "
@@ -85,17 +85,17 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ " " ++ render_rbrace()
             return out
 
-        if sub_kind == TDK_ALIAS():
+        if sub_kind == TDK_ALIAS:
             let aliased = pool.get_extra(extra_start)
             out = out ++ render_type_expr(pool, intern, aliased)
             return out
 
-        if sub_kind == TDK_DISTINCT():
+        if sub_kind == TDK_DISTINCT:
             let aliased = pool.get_extra(extra_start)
             out = out ++ "distinct " ++ render_type_expr(pool, intern, aliased)
             return out
 
-        if sub_kind == TDK_ENUM():
+        if sub_kind == TDK_ENUM:
             let variant_count = pool.get_extra(extra_start)
             var ep = extra_start + 1
             out = out ++ "\n"
@@ -119,9 +119,36 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
                 out = out ++ "\n"
             return out
 
+        if sub_kind == TDK_DISC_ENUM:
+            let repr_node = pool.get_extra(extra_start)
+            let variant_count = pool.get_extra(extra_start + 1)
+            var ep = extra_start + 2
+            out = out ++ ": " ++ render_type_expr(pool, intern, repr_node) ++ "\n"
+            for vi in 0..variant_count:
+                out = out ++ make_indent(indent + 2)
+                if vi > 0:
+                    out = out ++ "| "
+                let vname = intern.resolve(pool.get_extra(ep))
+                ep = ep + 1
+                let disc_val = pool.get_extra(ep)
+                ep = ep + 1
+                let payload_count = pool.get_extra(ep)
+                ep = ep + 1
+                out = out ++ vname ++ " = " ++ int_to_string(disc_val)
+                if payload_count > 0:
+                    out = out ++ "("
+                    for pi in 0..payload_count:
+                        if pi > 0:
+                            out = out ++ ", "
+                        out = out ++ render_type_expr(pool, intern, pool.get_extra(ep))
+                        ep = ep + 1
+                    out = out ++ ")"
+                out = out ++ "\n"
+            return out
+
         return out ++ "<unknown type decl>"
 
-    if kind == NK_USE_DECL():
+    if kind == NK_USE_DECL:
         let extra_start = pool.get_data0(node)
         let path_count = pool.get_data1(node)
         var out = prefix ++ "use "
@@ -131,7 +158,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ intern.resolve(pool.get_extra(extra_start + pi))
         return out
 
-    if kind == NK_LET_DECL():
+    if kind == NK_LET_DECL:
         let name = intern.resolve(pool.get_data0(node))
         let value = pool.get_data1(node)
         let flags = pool.get_data2(node)
@@ -149,7 +176,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         out = out ++ " = " ++ render_expr(pool, intern, value, 0)
         return out
 
-    if kind == NK_EXTERN_FN():
+    if kind == NK_EXTERN_FN:
         let name = intern.resolve(pool.get_data0(node))
         let variadic = pool.get_data2(node) % 2
         var out = prefix ++ "extern fn " ++ name ++ "("
@@ -172,7 +199,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ "..."
         return out ++ ")"
 
-    if kind == NK_C_IMPORT():
+    if kind == NK_C_IMPORT:
         let header = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let link_count = pool.get_data2(node)
@@ -185,12 +212,12 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
                 out = out ++ "\"" ++ intern.resolve(pool.get_extra(extra_start + li)) ++ "\""
         return out ++ ")"
 
-    if kind == NK_TRAIT_DECL():
+    if kind == NK_TRAIT_DECL:
         let name = intern.resolve(pool.get_data0(node))
         let vis = pool.get_data2(node)
         let extra_start = pool.get_data1(node)
         var out = prefix
-        if vis == VIS_PUBLIC():
+        if vis == VIS_PUBLIC:
             out = out ++ "pub "
         out = out ++ "trait " ++ name ++ " =\n"
 
@@ -244,14 +271,14 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
 
         return out
 
-    if kind == NK_IMPL_DECL():
+    if kind == NK_IMPL_DECL:
         let type_name = intern.resolve(pool.get_data0(node))
         let trait_sym = pool.get_data2(node)
         if trait_sym != 0:
             return prefix ++ "impl " ++ intern.resolve(trait_sym) ++ " for " ++ type_name
         return prefix ++ "extend " ++ type_name
 
-    if kind == NK_POISONED_DECL():
+    if kind == NK_POISONED_DECL:
         return prefix ++ "<poisoned>"
 
     prefix ++ "<unknown decl>"
@@ -261,41 +288,41 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         return "<null>"
 
     let kind = pool.kind(node)
-    let prefix = if kind == NK_BLOCK(): "" else: make_indent(indent)
+    let prefix = if kind == NK_BLOCK: "" else: make_indent(indent)
 
-    if kind == NK_INT_LIT():
+    if kind == NK_INT_LIT:
         return prefix ++ with_i64_to_str(pool.int_lit_value(node))
 
-    if kind == NK_FLOAT_LIT():
+    if kind == NK_FLOAT_LIT:
         let float_idx = pool.get_data0(node)
         return prefix ++ pool.get_string(float_idx)
 
-    if kind == NK_STRING_LIT():
+    if kind == NK_STRING_LIT:
         return prefix ++ "\"" ++ intern.resolve(pool.get_data0(node)) ++ "\""
 
-    if kind == NK_C_STRING_LIT():
+    if kind == NK_C_STRING_LIT:
         return prefix ++ "c\"" ++ intern.resolve(pool.get_data0(node)) ++ "\""
 
-    if kind == NK_BOOL_LIT():
+    if kind == NK_BOOL_LIT:
         if pool.get_data0(node) != 0:
             return prefix ++ "true"
         return prefix ++ "false"
 
-    if kind == NK_IDENT():
+    if kind == NK_IDENT:
         return prefix ++ intern.resolve(pool.get_data0(node))
 
-    if kind == NK_BINARY():
+    if kind == NK_BINARY:
         let op = pool.get_data0(node)
         let lhs = pool.get_data1(node)
         let rhs = pool.get_data2(node)
         return prefix ++ "(" ++ render_expr(pool, intern, lhs, 0) ++ " " ++ bin_op_str(op) ++ " " ++ render_expr(pool, intern, rhs, 0) ++ ")"
 
-    if kind == NK_UNARY():
+    if kind == NK_UNARY:
         let op = pool.get_data0(node)
         let operand = pool.get_data1(node)
         return prefix ++ "(" ++ unary_op_str(op) ++ render_expr(pool, intern, operand, 0) ++ ")"
 
-    if kind == NK_CALL():
+    if kind == NK_CALL:
         let callee = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let arg_count = pool.get_data2(node)
@@ -306,12 +333,12 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ render_expr(pool, intern, pool.get_extra(extra_start + i), 0)
         return out ++ ")"
 
-    if kind == NK_FIELD_ACCESS():
+    if kind == NK_FIELD_ACCESS:
         let expr = pool.get_data0(node)
         let field = intern.resolve(pool.get_data1(node))
         return prefix ++ render_expr(pool, intern, expr, 0) ++ "." ++ field
 
-    if kind == NK_OPTIONAL_CHAIN():
+    if kind == NK_OPTIONAL_CHAIN:
         let expr = pool.get_data0(node)
         let member = intern.resolve(pool.get_data1(node))
         let extra_start = pool.get_data2(node)
@@ -326,12 +353,12 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ ")"
         return out
 
-    if kind == NK_INDEX():
+    if kind == NK_INDEX:
         let expr = pool.get_data0(node)
         let idx = pool.get_data1(node)
         return prefix ++ render_expr(pool, intern, expr, 0) ++ "[" ++ render_expr(pool, intern, idx, 0) ++ "]"
 
-    if kind == NK_SLICE():
+    if kind == NK_SLICE:
         let expr = pool.get_data0(node)
         let start_expr = pool.get_data1(node)
         let end_expr = pool.get_data2(node)
@@ -343,7 +370,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ render_expr(pool, intern, end_expr, 0)
         return out ++ "]"
 
-    if kind == NK_BLOCK():
+    if kind == NK_BLOCK:
         let extra_start = pool.get_data0(node)
         let stmt_count = pool.get_data1(node)
         let tail = pool.get_data2(node)
@@ -354,7 +381,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ render_expr(pool, intern, tail, indent)
         return out
 
-    if kind == NK_IF_EXPR():
+    if kind == NK_IF_EXPR:
         let cond = pool.get_data0(node)
         let then_body = pool.get_data1(node)
         let else_body = pool.get_data2(node)
@@ -363,13 +390,13 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ " else " ++ render_expr(pool, intern, else_body, 0)
         return out
 
-    if kind == NK_RETURN():
+    if kind == NK_RETURN:
         let value = pool.get_data0(node)
         if value != 0:
             return prefix ++ "return " ++ render_expr(pool, intern, value, 0)
         return prefix ++ "return"
 
-    if kind == NK_LET_BINDING():
+    if kind == NK_LET_BINDING:
         let name = intern.resolve(pool.get_data0(node))
         let value = pool.get_data1(node)
         let flags = pool.get_data2(node)
@@ -385,7 +412,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         out = out ++ " = " ++ render_expr(pool, intern, value, 0)
         return out
 
-    if kind == NK_SELECT_AWAIT():
+    if kind == NK_SELECT_AWAIT:
         let extra_start = pool.get_data0(node)
         let arm_count = pool.get_data1(node)
         var out = prefix ++ "select await:\n"
@@ -396,13 +423,13 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ "    " ++ intern.resolve(name_sym) ++ " = " ++ render_expr(pool, intern, task, 0) ++ " -> " ++ render_expr(pool, intern, body, 0) ++ "\n"
         return out
 
-    if kind == NK_LET_ELSE():
+    if kind == NK_LET_ELSE:
         let pattern = pool.get_data0(node)
         let value = pool.get_data1(node)
         let else_body = pool.get_data2(node)
         return prefix ++ "let " ++ render_pattern(pool, intern, pattern) ++ " = " ++ render_expr(pool, intern, value, 0) ++ " else " ++ render_expr(pool, intern, else_body, 0)
 
-    if kind == NK_TUPLE_DESTRUCTURE():
+    if kind == NK_TUPLE_DESTRUCTURE:
         let extra_start = pool.get_data0(node)
         let binding_count = pool.get_data1(node)
         let value = pool.get_data2(node)
@@ -419,12 +446,12 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         out = out ++ " = " ++ render_expr(pool, intern, value, 0)
         return out
 
-    if kind == NK_ASSIGN():
+    if kind == NK_ASSIGN:
         let target = pool.get_data0(node)
         let value = pool.get_data1(node)
         return prefix ++ render_expr(pool, intern, target, 0) ++ " = " ++ render_expr(pool, intern, value, 0)
 
-    if kind == NK_TUPLE():
+    if kind == NK_TUPLE:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)
         var out = prefix ++ "("
@@ -434,7 +461,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ render_expr(pool, intern, pool.get_extra(extra_start + i), 0)
         return out ++ ")"
 
-    if kind == NK_RANGE():
+    if kind == NK_RANGE:
         let start_expr = pool.get_data0(node)
         let end_expr = pool.get_data1(node)
         let inclusive = pool.get_data2(node)
@@ -449,7 +476,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ render_expr(pool, intern, end_expr, 0)
         return out
 
-    if kind == NK_VARIANT_SHORTHAND():
+    if kind == NK_VARIANT_SHORTHAND:
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let arg_count = pool.get_data2(node)
@@ -463,33 +490,33 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ ")"
         return out
 
-    if kind == NK_AWAIT():
+    if kind == NK_AWAIT:
         let inner = pool.get_data0(node)
         return prefix ++ render_expr(pool, intern, inner, 0) ++ ".await"
 
-    if kind == NK_ASYNC_BLOCK():
+    if kind == NK_ASYNC_BLOCK:
         let body = pool.get_data0(node)
         return prefix ++ "async:\n" ++ render_expr(pool, intern, body, indent + 2)
 
-    if kind == NK_SPAWN():
+    if kind == NK_SPAWN:
         let inner = pool.get_data0(node)
         return prefix ++ "spawn " ++ render_expr(pool, intern, inner, 0)
 
-    if kind == NK_COMPTIME():
+    if kind == NK_COMPTIME:
         let inner = pool.get_data0(node)
         return prefix ++ "comptime " ++ render_expr(pool, intern, inner, 0)
 
-    if kind == NK_ASYNC_SCOPE():
+    if kind == NK_ASYNC_SCOPE:
         let name = intern.resolve(pool.get_data0(node))
         let body = pool.get_data1(node)
         return prefix ++ "async scope |" ++ name ++ "|:\n" ++ render_expr(pool, intern, body, indent + 2)
 
-    if kind == NK_PIPELINE():
+    if kind == NK_PIPELINE:
         let lhs = pool.get_data0(node)
         let rhs = pool.get_data1(node)
         return prefix ++ render_expr(pool, intern, lhs, 0) ++ " |> " ++ render_expr(pool, intern, rhs, 0)
 
-    if kind == NK_BREAK():
+    if kind == NK_BREAK:
         let value = pool.get_data0(node)
         let label = pool.get_data1(node)
         var out = prefix ++ "break"
@@ -499,18 +526,18 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ " " ++ render_expr(pool, intern, value, 0)
         return out
 
-    if kind == NK_CONTINUE():
+    if kind == NK_CONTINUE:
         let label = pool.get_data0(node)
         var out = prefix ++ "continue"
         if label != 0:
             out = out ++ " '" ++ intern.resolve(label)
         return out
 
-    if kind == NK_LOOP():
+    if kind == NK_LOOP:
         let body = pool.get_data0(node)
         return prefix ++ "loop:\n" ++ render_expr(pool, intern, body, indent + 2)
 
-    if kind == NK_FOR():
+    if kind == NK_FOR:
         let binding = pool.get_data0(node)
         let iterable = pool.get_data1(node)
         let body = pool.get_data2(node)
@@ -523,12 +550,12 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         out = out ++ render_expr(pool, intern, body, indent + 2)
         return out
 
-    if kind == NK_WHILE():
+    if kind == NK_WHILE:
         let cond = pool.get_data0(node)
         let body = pool.get_data1(node)
         return prefix ++ "while " ++ render_expr(pool, intern, cond, 0) ++ ":\n" ++ render_expr(pool, intern, body, indent + 2)
 
-    if kind == NK_ARRAY_LIT():
+    if kind == NK_ARRAY_LIT:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)
         var out = prefix ++ "["
@@ -538,7 +565,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ render_expr(pool, intern, pool.get_extra(extra_start + i), 0)
         return out ++ "]"
 
-    if kind == NK_ARRAY_COMPREHENSION():
+    if kind == NK_ARRAY_COMPREHENSION:
         let expr = pool.get_data0(node)
         let binding = pool.get_data1(node)
         let iterable = pool.get_data2(node)
@@ -546,7 +573,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         out = out ++ " for " ++ intern.resolve(binding) ++ " in " ++ render_expr(pool, intern, iterable, 0)
         return out ++ "]"
 
-    if kind == NK_STRUCT_LIT():
+    if kind == NK_STRUCT_LIT:
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
@@ -559,11 +586,11 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ field_name ++ ": " ++ render_expr(pool, intern, field_val, 0)
         return out ++ " " ++ render_rbrace()
 
-    if kind == NK_GROUPED():
+    if kind == NK_GROUPED:
         let inner = pool.get_data0(node)
         return prefix ++ "(" ++ render_expr(pool, intern, inner, 0) ++ ")"
 
-    if kind == NK_MATCH():
+    if kind == NK_MATCH:
         let subject = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let arm_count = pool.get_data2(node)
@@ -580,16 +607,20 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ " -> " ++ render_expr(pool, intern, body, 0) ++ "\n"
         return out
 
-    if kind == NK_CAST():
+    if kind == NK_CAST:
         let expr = pool.get_data0(node)
         let target = pool.get_data1(node)
         return prefix ++ render_expr(pool, intern, expr, 0) ++ " as " ++ render_type_expr(pool, intern, target)
 
-    if kind == NK_DEFER():
+    if kind == NK_DEFER:
         let body = pool.get_data0(node)
         return prefix ++ "defer " ++ render_expr(pool, intern, body, 0)
 
-    if kind == NK_CLOSURE():
+    if kind == NK_ERRDEFER:
+        let body = pool.get_data0(node)
+        return prefix ++ "errdefer " ++ render_expr(pool, intern, body, 0)
+
+    if kind == NK_CLOSURE:
         let body = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let param_count = pool.get_data2(node)
@@ -605,7 +636,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         out = out ++ "| " ++ render_expr(pool, intern, body, 0)
         return out
 
-    if kind == NK_ENUM_VARIANT():
+    if kind == NK_ENUM_VARIANT:
         let type_name = intern.resolve(pool.get_data0(node))
         let variant_name = intern.resolve(pool.get_data1(node))
         let extra_start = pool.get_data2(node)
@@ -621,7 +652,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
                 out = out ++ ")"
         return out
 
-    if kind == NK_WITH_EXPR():
+    if kind == NK_WITH_EXPR:
         let source = pool.get_data0(node)
         let body = pool.get_data1(node)
         let encoded = pool.get_data2(node)
@@ -635,7 +666,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         out = out ++ render_expr(pool, intern, body, indent + 2)
         return out
 
-    if kind == NK_RECORD_UPDATE():
+    if kind == NK_RECORD_UPDATE:
         let source = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
@@ -648,11 +679,11 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ fname ++ ": " ++ render_expr(pool, intern, fval, 0)
         return out ++ " " ++ render_rbrace()
 
-    if kind == NK_YIELD():
+    if kind == NK_YIELD:
         let value = pool.get_data0(node)
         return prefix ++ "yield " ++ render_expr(pool, intern, value, 0)
 
-    if kind == NK_POISONED_EXPR():
+    if kind == NK_POISONED_EXPR:
         return prefix ++ "<poisoned>"
 
     prefix ++ "<expr:" ++ int_to_string(kind) ++ ">"
@@ -662,24 +693,24 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
         return "_"
     let kind = pool.kind(node)
 
-    if kind == NK_PAT_WILDCARD():
+    if kind == NK_PAT_WILDCARD:
         return "_"
 
-    if kind == NK_PAT_IDENT():
+    if kind == NK_PAT_IDENT:
         return intern.resolve(pool.get_data0(node))
 
-    if kind == NK_PAT_INT():
+    if kind == NK_PAT_INT:
         return int_to_string(pool.get_data0(node))
 
-    if kind == NK_PAT_BOOL():
+    if kind == NK_PAT_BOOL:
         if pool.get_data0(node) != 0:
             return "true"
         return "false"
 
-    if kind == NK_PAT_STRING():
+    if kind == NK_PAT_STRING:
         return "\"" ++ intern.resolve(pool.get_data0(node)) ++ "\""
 
-    if kind == NK_PAT_VARIANT():
+    if kind == NK_PAT_VARIANT:
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let binding_count = pool.get_data2(node)
@@ -697,7 +728,7 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
             out = out ++ ")"
         return out
 
-    if kind == NK_PAT_ENUM_SHORTHAND():
+    if kind == NK_PAT_ENUM_SHORTHAND:
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let binding_count = pool.get_data2(node)
@@ -711,7 +742,7 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
             out = out ++ ")"
         return out
 
-    if kind == NK_PAT_TUPLE():
+    if kind == NK_PAT_TUPLE:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)
         var out = "("
@@ -721,14 +752,14 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
             out = out ++ render_pattern(pool, intern, pool.get_extra(extra_start + i))
         return out ++ ")"
 
-    if kind == NK_PAT_RANGE():
+    if kind == NK_PAT_RANGE:
         let start_val = int_to_string(pool.get_data0(node))
         let end_val = int_to_string(pool.get_data1(node))
         if pool.get_data2(node) != 0:
             return start_val ++ "..=" ++ end_val
         return start_val ++ ".." ++ end_val
 
-    if kind == NK_PAT_OR():
+    if kind == NK_PAT_OR:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)
         var out = ""
@@ -738,12 +769,12 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
             out = out ++ render_pattern(pool, intern, pool.get_extra(extra_start + i))
         return out
 
-    if kind == NK_PAT_AT_BINDING():
+    if kind == NK_PAT_AT_BINDING:
         let name = intern.resolve(pool.get_data0(node))
         let inner = pool.get_data1(node)
         return name ++ " @ " ++ render_pattern(pool, intern, inner)
 
-    if kind == NK_PAT_SLICE():
+    if kind == NK_PAT_SLICE:
         let extra_start = pool.get_data0(node)
         let head_count = pool.get_data1(node)
         let rest_sym = pool.get_data2(node)
@@ -761,7 +792,7 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
                 out = out ++ intern.resolve(rest_sym)
         return out ++ "]"
 
-    if kind == NK_PAT_STRUCT():
+    if kind == NK_PAT_STRUCT:
         let type_name = pool.get_data0(node)
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
@@ -791,10 +822,10 @@ fn render_type_expr(pool: AstPool, intern: InternPool, node: i32) -> str:
         return "_"
     let kind = pool.kind(node)
 
-    if kind == NK_TYPE_NAMED():
+    if kind == NK_TYPE_NAMED:
         return intern.resolve(pool.get_data0(node))
 
-    if kind == NK_TYPE_GENERIC():
+    if kind == NK_TYPE_GENERIC:
         let name = intern.resolve(pool.get_data0(node))
         let extra_start = pool.get_data1(node)
         let arg_count = pool.get_data2(node)
@@ -805,21 +836,21 @@ fn render_type_expr(pool: AstPool, intern: InternPool, node: i32) -> str:
             out = out ++ render_type_expr(pool, intern, pool.get_extra(extra_start + i))
         return out ++ "]"
 
-    if kind == NK_TYPE_REF():
+    if kind == NK_TYPE_REF:
         let pointee = pool.get_data0(node)
         let is_mut = pool.get_data1(node)
         if is_mut != 0:
             return "&mut " ++ render_type_expr(pool, intern, pointee)
         return "&" ++ render_type_expr(pool, intern, pointee)
 
-    if kind == NK_TYPE_PTR():
+    if kind == NK_TYPE_PTR:
         let pointee = pool.get_data0(node)
         let is_mut = pool.get_data1(node)
         if is_mut != 0:
             return "*mut " ++ render_type_expr(pool, intern, pointee)
         return "*const " ++ render_type_expr(pool, intern, pointee)
 
-    if kind == NK_TYPE_FN():
+    if kind == NK_TYPE_FN:
         let extra_start = pool.get_data0(node)
         let param_count = pool.get_data1(node)
         let ret = pool.get_data2(node)
@@ -831,7 +862,7 @@ fn render_type_expr(pool: AstPool, intern: InternPool, node: i32) -> str:
         out = out ++ ") -> " ++ render_type_expr(pool, intern, ret)
         return out
 
-    if kind == NK_TYPE_TUPLE():
+    if kind == NK_TYPE_TUPLE:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)
         var out = "("
@@ -841,23 +872,23 @@ fn render_type_expr(pool: AstPool, intern: InternPool, node: i32) -> str:
             out = out ++ render_type_expr(pool, intern, pool.get_extra(extra_start + ti))
         return out ++ ")"
 
-    if kind == NK_TYPE_OPTIONAL():
+    if kind == NK_TYPE_OPTIONAL:
         let inner = pool.get_data0(node)
         return "?" ++ render_type_expr(pool, intern, inner)
 
-    if kind == NK_TYPE_ARRAY():
+    if kind == NK_TYPE_ARRAY:
         let elem = pool.get_data0(node)
         let size = pool.get_data1(node)
         return "[" ++ int_to_string(size) ++ "]" ++ render_type_expr(pool, intern, elem)
 
-    if kind == NK_TYPE_SLICE():
+    if kind == NK_TYPE_SLICE:
         let elem = pool.get_data0(node)
         return "[]" ++ render_type_expr(pool, intern, elem)
 
-    if kind == NK_TYPE_TRAIT_OBJ():
+    if kind == NK_TYPE_TRAIT_OBJ:
         return "dyn " ++ intern.resolve(pool.get_data0(node))
 
-    if kind == NK_TYPE_INFERRED():
+    if kind == NK_TYPE_INFERRED:
         return "_"
 
     "<type:" ++ int_to_string(kind) ++ ">"
@@ -897,20 +928,29 @@ fn has_flag(flags: i32, bit: i32) -> bool:
     (flags / bit) % 2 == 1
 
 fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
-    if sub_kind == TDK_STRUCT():
+    if sub_kind == TDK_STRUCT:
         let field_count = pool.get_extra(extra_start)
         let vis_idx = extra_start + 1 + field_count * 3
-        return pool.get_extra(vis_idx) == VIS_PUBLIC()
-    if sub_kind == TDK_ENUM():
+        return pool.get_extra(vis_idx) == VIS_PUBLIC
+    if sub_kind == TDK_ENUM:
         var ep = extra_start + 1
         let variant_count = pool.get_extra(extra_start)
         for vi in 0..variant_count:
             ep = ep + 1  // name
             let payload_count = pool.get_extra(ep)
             ep = ep + 1 + payload_count
-        return pool.get_extra(ep) == VIS_PUBLIC()
+        return pool.get_extra(ep) == VIS_PUBLIC
+    if sub_kind == TDK_DISC_ENUM:
+        var ep = extra_start + 2 // skip repr_type_node, get variant_count
+        let variant_count = pool.get_extra(extra_start + 1)
+        for vi in 0..variant_count:
+            ep = ep + 1  // name
+            ep = ep + 1  // disc value
+            let payload_count = pool.get_extra(ep)
+            ep = ep + 1 + payload_count
+        return pool.get_extra(ep) == VIS_PUBLIC
     // Alias / distinct: [aliased_type, vis]
-    return pool.get_extra(extra_start + 1) == VIS_PUBLIC()
+    return pool.get_extra(extra_start + 1) == VIS_PUBLIC
 
 fn top_level_let_type_ann(pool: AstPool, flags: i32) -> i32:
     let encoded = flags / 4
@@ -932,55 +972,55 @@ fn is_pattern_node(pool: AstPool, node: i32) -> bool:
     is_pattern_kind(pool.kind(node))
 
 fn is_pattern_kind(kind: i32) -> bool:
-    kind == NK_PAT_WILDCARD() or
-    kind == NK_PAT_IDENT() or
-    kind == NK_PAT_INT() or
-    kind == NK_PAT_BOOL() or
-    kind == NK_PAT_STRING() or
-    kind == NK_PAT_VARIANT() or
-    kind == NK_PAT_TUPLE() or
-    kind == NK_PAT_STRUCT() or
-    kind == NK_PAT_RANGE() or
-    kind == NK_PAT_OR() or
-    kind == NK_PAT_ENUM_SHORTHAND() or
-    kind == NK_PAT_AT_BINDING() or
-    kind == NK_PAT_SLICE()
+    kind == NK_PAT_WILDCARD or
+    kind == NK_PAT_IDENT or
+    kind == NK_PAT_INT or
+    kind == NK_PAT_BOOL or
+    kind == NK_PAT_STRING or
+    kind == NK_PAT_VARIANT or
+    kind == NK_PAT_TUPLE or
+    kind == NK_PAT_STRUCT or
+    kind == NK_PAT_RANGE or
+    kind == NK_PAT_OR or
+    kind == NK_PAT_ENUM_SHORTHAND or
+    kind == NK_PAT_AT_BINDING or
+    kind == NK_PAT_SLICE
 
 fn bin_op_str(op: i32) -> str:
-    if op == OP_ADD(): return "+"
-    if op == OP_SUB(): return "-"
-    if op == OP_MUL(): return "*"
-    if op == OP_DIV(): return "/"
-    if op == OP_MOD(): return "%"
-    if op == OP_EQ(): return "=="
-    if op == OP_NEQ(): return "!="
-    if op == OP_LT(): return "<"
-    if op == OP_GT(): return ">"
-    if op == OP_LTE(): return "<="
-    if op == OP_GTE(): return ">="
-    if op == OP_AND(): return "and"
-    if op == OP_OR(): return "or"
-    if op == OP_BIT_AND(): return "&"
-    if op == OP_BIT_OR(): return "|"
-    if op == OP_BIT_XOR(): return "^"
-    if op == OP_SHL(): return "<<"
-    if op == OP_SHR(): return ">>"
-    if op == OP_DEFAULT(): return "??"
-    if op == OP_CONCAT(): return "++"
-    if op == OP_ADD_WRAP(): return "+%"
-    if op == OP_SUB_WRAP(): return "-%"
-    if op == OP_MUL_WRAP(): return "*%"
-    if op == OP_IN(): return "in"
-    if op == OP_NOT_IN(): return "not in"
+    if op == OP_ADD: return "+"
+    if op == OP_SUB: return "-"
+    if op == OP_MUL: return "*"
+    if op == OP_DIV: return "/"
+    if op == OP_MOD: return "%"
+    if op == OP_EQ: return "=="
+    if op == OP_NEQ: return "!="
+    if op == OP_LT: return "<"
+    if op == OP_GT: return ">"
+    if op == OP_LTE: return "<="
+    if op == OP_GTE: return ">="
+    if op == OP_AND: return "and"
+    if op == OP_OR: return "or"
+    if op == OP_BIT_AND: return "&"
+    if op == OP_BIT_OR: return "|"
+    if op == OP_BIT_XOR: return "^"
+    if op == OP_SHL: return "<<"
+    if op == OP_SHR: return ">>"
+    if op == OP_DEFAULT: return "??"
+    if op == OP_CONCAT: return "++"
+    if op == OP_ADD_WRAP: return "+%"
+    if op == OP_SUB_WRAP: return "-%"
+    if op == OP_MUL_WRAP: return "*%"
+    if op == OP_IN: return "in"
+    if op == OP_NOT_IN: return "not in"
     "?op?"
 
 fn unary_op_str(op: i32) -> str:
-    if op == UOP_NEGATE(): return "-"
-    if op == UOP_NOT(): return "not "
-    if op == UOP_REF(): return "&"
-    if op == UOP_MUT_REF(): return "&mut "
-    if op == UOP_DEREF(): return "*"
-    if op == UOP_TRY(): return "?"
+    if op == UOP_NEGATE: return "-"
+    if op == UOP_NOT: return "not "
+    if op == UOP_REF: return "&"
+    if op == UOP_MUT_REF: return "&mut "
+    if op == UOP_DEREF: return "*"
+    if op == UOP_TRY: return "?"
     "?uop?"
 
 fn make_indent(n: i32) -> str:

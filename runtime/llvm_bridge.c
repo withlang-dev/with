@@ -436,6 +436,14 @@ with_str wl_get_struct_name(int64_t ty) {
 void wl_get_param_types(int64_t fn_ty, int64_t out_ptr) {
     LLVMGetParamTypes(T(fn_ty), (LLVMTypeRef*)(intptr_t)out_ptr);
 }
+int64_t wl_get_fn_param_type(int64_t fn_ty, int32_t index) {
+    unsigned count = LLVMCountParamTypes(T(fn_ty));
+    if ((unsigned)index >= count) return 0;
+    LLVMTypeRef params[128];
+    if (count > 128) count = 128;
+    LLVMGetParamTypes(T(fn_ty), params);
+    return P2I(params[index]);
+}
 
 // ── Module verification / emission ─────────────────────────
 int32_t wl_verify_module(int64_t m) {

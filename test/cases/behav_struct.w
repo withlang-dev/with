@@ -1,106 +1,58 @@
 //! expect-stdout: ok
 
-// Behavior test: structs
-// Tests: type declaration, construction, field access, methods, defaults
+// End-to-end test: struct definition, construction, field access
+// Tests: struct type, construction, field access, methods
 
-use Token
-use Lexer
-use Ast
-use Type
-use Sema
-use InternPool
-use Parser
+type Point = {
+    x: i32,
+    y: i32,
+}
 
-fn lex(source: str) -> TokenList:
-    var l = Lexer.new(source, 0)
-    Lexer.tokenize(l)
+fn make_point(x: i32, y: i32) -> Point:
+    Point { x: x, y: y }
 
-fn test_type_keyword:
-    var tokens = lex("type impl extend")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_TYPE())
-    assert(TokenList.tag_at(tokens, 1) == TK_KW_IMPL())
-    assert(TokenList.tag_at(tokens, 2) == TK_KW_EXTEND())
+fn test_struct_construction:
+    let p = Point { x: 10, y: 20 }
+    assert(p.x == 10)
+    assert(p.y == 20)
 
-fn test_parse_struct_decl:
-    let src = "type Point = {\n    x: i32,\n    y: i32,\n}\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    assert(AstPool.decl_count(p.pool) == 1)
-    let decl = AstPool.get_decl(p.pool, 0)
-    assert(AstPool.kind(p.pool, decl) == NK_TYPE_DECL())
+fn test_struct_from_fn:
+    let p = make_point(3, 4)
+    assert(p.x == 3)
+    assert(p.y == 4)
 
-fn test_parse_struct_lit:
-    let src = "fn f:\n    Point { x: 1, y: 2 }\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    let decl = AstPool.get_decl(p.pool, 0)
-    let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_STRUCT_LIT())
+fn test_struct_field_arithmetic:
+    let p = Point { x: 5, y: 7 }
+    let sum = p.x + p.y
+    assert(sum == 12)
 
-fn test_parse_field_access:
-    let src = "fn f:\n    p.x\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    let decl = AstPool.get_decl(p.pool, 0)
-    let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_FIELD_ACCESS())
+type Rect = {
+    width: i32,
+    height: i32,
+}
 
-fn test_type_struct:
-    var types = TypeTable.new()
-    var pool = AstPool.new()
-    var field_names = Vec.new()
-    field_names.push(AstPool.add_string(pool, "x"))
-    field_names.push(AstPool.add_string(pool, "y"))
-    var field_types = Vec.new()
-    field_types.push(TYPE_I32())
-    field_types.push(TYPE_I32())
-    var field_defaults = Vec.new()
-    field_defaults.push(0)
-    field_defaults.push(0)
-    let name_sym = AstPool.add_string(pool, "Point")
-    let sid = TypeTable.add_struct(types, name_sym, field_names, field_types, field_defaults)
-    assert(TypeTable.kind(types, sid) == TK_STRUCT())
-    assert(TypeTable.struct_field_count(types, sid) == 2)
-    assert(TypeTable.struct_field_type(types, sid, 0) == TYPE_I32())
-    assert(TypeTable.struct_field_type(types, sid, 1) == TYPE_I32())
+fn area(r: Rect) -> i32:
+    r.width * r.height
 
-fn test_type_struct_lookup:
-    var types = TypeTable.new()
-    var pool = AstPool.new()
-    var field_names = Vec.new()
-    field_names.push(AstPool.add_string(pool, "x"))
-    var field_types = Vec.new()
-    field_types.push(TYPE_F64())
-    var field_defaults = Vec.new()
-    field_defaults.push(0)
-    let name_sym = AstPool.add_string(pool, "Vec3")
-    let sid = TypeTable.add_struct(types, name_sym, field_names, field_types, field_defaults)
-    TypeTable.register_name(types, "Vec3", sid)
-    // Look up by name
-    let found = TypeTable.lookup(types, "Vec3")
-    assert(found == sid)
-    // Non-existent struct
-    let not_found = TypeTable.lookup(types, "NoSuchType")
-    assert(not_found == -1)
+fn test_struct_pass_to_fn:
+    let r = Rect { width: 3, height: 4 }
+    assert(area(r) == 12)
 
-fn test_type_copy:
-    var types = TypeTable.new()
-    // Primitive types are copy
-    assert(TypeTable.is_copy(types, TYPE_I32()))
-    assert(TypeTable.is_copy(types, TYPE_BOOL()))
-    assert(TypeTable.is_copy(types, TYPE_F64()))
-    // Str is not copy (has heap allocation in general)
-    assert(not TypeTable.is_copy(types, TYPE_STR()))
+fn test_two_structs:
+    let p = Point { x: 1, y: 2 }
+    let r = Rect { width: 10, height: 20 }
+    assert(p.x + r.width == 11)
+
+fn test_nested_field_expression:
+    let r = Rect { width: 6, height: 7 }
+    let double_area = area(r) * 2
+    assert(double_area == 84)
 
 fn main:
-    test_type_keyword()
-    test_parse_struct_decl()
-    test_parse_struct_lit()
-    test_parse_field_access()
-    test_type_struct()
-    test_type_struct_lookup()
-    test_type_copy()
+    test_struct_construction()
+    test_struct_from_fn()
+    test_struct_field_arithmetic()
+    test_struct_pass_to_fn()
+    test_two_structs()
+    test_nested_field_expression()
     println("ok")

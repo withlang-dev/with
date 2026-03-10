@@ -20,38 +20,38 @@ extern fn with_hashmap_new(key_size: i64, val_size: i64) -> *T
 
 // ── Type kind constants ──────────────────────────────────────────
 
-fn TY_ERR -> i32: 0
-fn TY_INT -> i32: 1
-fn TY_FLOAT -> i32: 2
-fn TY_BOOL -> i32: 3
-fn TY_VOID -> i32: 4
-fn TY_STR -> i32: 5
-fn TY_STRUCT -> i32: 6
-fn TY_ENUM -> i32: 7
-fn TY_ARRAY -> i32: 8
-fn TY_SLICE -> i32: 9
-fn TY_TUPLE -> i32: 10
-fn TY_RANGE -> i32: 11
-fn TY_FN -> i32: 12
-fn TY_PTR -> i32: 13
-fn TY_REF -> i32: 14
-fn TY_ALIAS -> i32: 15
-fn TY_GENERIC_FN -> i32: 16
-fn TY_TRAIT_OBJ -> i32: 17
-fn TY_NEVER -> i32: 18
+const TY_ERR: i32 = 0
+const TY_INT: i32 = 1
+const TY_FLOAT: i32 = 2
+const TY_BOOL: i32 = 3
+const TY_VOID: i32 = 4
+const TY_STR: i32 = 5
+const TY_STRUCT: i32 = 6
+const TY_ENUM: i32 = 7
+const TY_ARRAY: i32 = 8
+const TY_SLICE: i32 = 9
+const TY_TUPLE: i32 = 10
+const TY_RANGE: i32 = 11
+const TY_FN: i32 = 12
+const TY_PTR: i32 = 13
+const TY_REF: i32 = 14
+const TY_ALIAS: i32 = 15
+const TY_GENERIC_FN: i32 = 16
+const TY_TRAIT_OBJ: i32 = 17
+const TY_NEVER: i32 = 18
 
 // Var state constants
-fn VS_LIVE -> i32: 0
-fn VS_MOVED -> i32: 1
+const VS_LIVE: i32 = 0
+const VS_MOVED: i32 = 1
 
 // Borrow kind constants
-fn BK_SHARED -> i32: 0
-fn BK_EXCLUSIVE -> i32: 1
+const BK_SHARED: i32 = 0
+const BK_EXCLUSIVE: i32 = 1
 
 // Derive requirement constants
-fn DR_COPY -> i32: 0
-fn DR_CLONE -> i32: 1
-fn DR_EQ -> i32: 2
+const DR_COPY: i32 = 0
+const DR_CLONE: i32 = 1
+const DR_EQ: i32 = 2
 
 // ── Sema state ───────────────────────────────────────────────────
 
@@ -92,6 +92,10 @@ type Sema = {
     // Methods: hash(type_sym, method_sym) → sig index
     // Variant lookup: variant_sym → (enum_tid * 65536 + variant_index)
     variant_lookup: HashMap[i32, i32],
+    // Discriminant enum data
+    disc_repr_types: HashMap[i32, i32],
+    disc_values: HashMap[i32, i32],
+    disc_has_payload: HashMap[i32, i32],
 
     // Trait declarations
     trait_method_names: Vec[i32],
@@ -99,22 +103,35 @@ type Sema = {
     trait_method_counts: Vec[i32],
     trait_name_syms: Vec[i32],
     trait_lookup: HashMap[i32, i32],
+    // Trait associated types: flat vec of [name_sym, default_type_node]*
+    trait_assoc_names: Vec[i32],
+    trait_assoc_defaults: Vec[i32],
+    trait_assoc_starts: Vec[i32],
+    trait_assoc_counts: Vec[i32],
     // Type implementations: type_sym → list of trait syms (encoded in impl_extra)
     impl_extra: Vec[i32],
     impl_starts: Vec[i32],
     impl_counts: Vec[i32],
     impl_type_syms: Vec[i32],
     impl_lookup: HashMap[i32, i32],
+    // Blanket impls: impl[T: Bound] Trait for T
+    blanket_trait_syms: Vec[i32],
+    blanket_bound_syms: Vec[i32],
+    blanket_bound_starts: Vec[i32],
+    blanket_bound_counts: Vec[i32],
     // Trait obligations + deterministic selection cache
     obligation_trait_syms: Vec[i32],
     obligation_type_syms: Vec[i32],
     obligation_nodes: Vec[i32],
     selection_cache: HashMap[str, i32],
+    // Blanket impl recursion guard: keys currently being resolved
+    blanket_guard: Vec[str],
 
     // Local trait/type names
     local_trait_names: HashMap[i32, i32],
     local_type_names: HashMap[i32, i32],
     ephemeral_types: HashMap[i32, i32],
+    sealed_traits: HashMap[i32, i32],
 
     // Must-use / result-option / task fn tracking
     must_use_types: HashMap[i32, i32],
@@ -132,6 +149,8 @@ type Sema = {
     sym_todo: i32,
     sym_unreachable: i32,
     sym_track: i32,
+    sym_src: i32,
+    sym_embed_file: i32,
 
     // Method origin tracking
     method_decl_origins: HashMap[i32, i32],
@@ -290,12 +309,16 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let fn_decl_nodes = sema_new_map_i32_i32()
     let generic_fn_nodes = sema_new_map_i32_i32()
     let variant_lookup = sema_new_map_i32_i32()
+    let disc_repr_types = sema_new_map_i32_i32()
+    let disc_values = sema_new_map_i32_i32()
+    let disc_has_payload = sema_new_map_i32_i32()
     let trait_lookup = sema_new_map_i32_i32()
     let impl_lookup = sema_new_map_i32_i32()
     let selection_cache = sema_new_map_str_i32()
     let local_trait_names = sema_new_map_i32_i32()
     let local_type_names = sema_new_map_i32_i32()
     let ephemeral_types = sema_new_map_i32_i32()
+    let sealed_traits = sema_new_map_i32_i32()
     let must_use_types = sema_new_map_i32_i32()
     let must_use_fns = sema_new_map_i32_i32()
     let result_option_fns = sema_new_map_i32_i32()
@@ -334,23 +357,36 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         fn_decl_nodes,
         generic_fn_nodes,
         variant_lookup,
+        disc_repr_types,
+        disc_values,
+        disc_has_payload,
         trait_method_names: Vec.new(),
         trait_method_starts: Vec.new(),
         trait_method_counts: Vec.new(),
         trait_name_syms: Vec.new(),
         trait_lookup,
+        trait_assoc_names: Vec.new(),
+        trait_assoc_defaults: Vec.new(),
+        trait_assoc_starts: Vec.new(),
+        trait_assoc_counts: Vec.new(),
         impl_extra: Vec.new(),
         impl_starts: Vec.new(),
         impl_counts: Vec.new(),
         impl_type_syms: Vec.new(),
         impl_lookup,
+        blanket_trait_syms: Vec.new(),
+        blanket_bound_syms: Vec.new(),
+        blanket_bound_starts: Vec.new(),
+        blanket_bound_counts: Vec.new(),
         obligation_trait_syms: Vec.new(),
         obligation_type_syms: Vec.new(),
         obligation_nodes: Vec.new(),
         selection_cache,
+        blanket_guard: Vec.new(),
         local_trait_names,
         local_type_names,
         ephemeral_types,
+        sealed_traits,
         must_use_types,
         must_use_fns,
         result_option_fns,
@@ -364,6 +400,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sym_todo: 0,
         sym_unreachable: 0,
         sym_track: 0,
+        sym_src: 0,
+        sym_embed_file: 0,
         method_decl_origins,
         method_has_inherent,
         method_symbol_flags,
@@ -425,24 +463,24 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     var s = sema_empty_state(pool, diags, ast)
 
     // Index 0 = error type (sentinel).
-    s.add_type(TY_ERR(), 0, 0, 0)
+    s.add_type(TY_ERR, 0, 0, 0)
 
     // Register primitive types.
-    s.ty_i8 = s.add_type(TY_INT(), 8, 1, 0)
-    s.ty_i16 = s.add_type(TY_INT(), 16, 1, 0)
-    s.ty_i32 = s.add_type(TY_INT(), 32, 1, 0)
-    s.ty_i64 = s.add_type(TY_INT(), 64, 1, 0)
-    s.ty_u8 = s.add_type(TY_INT(), 8, 0, 0)
-    s.ty_u16 = s.add_type(TY_INT(), 16, 0, 0)
-    s.ty_u32 = s.add_type(TY_INT(), 32, 0, 0)
-    s.ty_u64 = s.add_type(TY_INT(), 64, 0, 0)
-    s.ty_f32 = s.add_type(TY_FLOAT(), 32, 0, 0)
-    s.ty_f64 = s.add_type(TY_FLOAT(), 64, 0, 0)
-    s.ty_bool = s.add_type(TY_BOOL(), 0, 0, 0)
-    s.ty_void = s.add_type(TY_VOID(), 0, 0, 0)
-    s.ty_never = s.add_type(TY_NEVER(), 0, 0, 0)
-    s.ty_str = s.add_type(TY_STR(), 0, 0, 0)
-    s.ty_str_view = s.add_type(TY_REF(), s.ty_str, 0, 0)
+    s.ty_i8 = s.add_type(TY_INT, 8, 1, 0)
+    s.ty_i16 = s.add_type(TY_INT, 16, 1, 0)
+    s.ty_i32 = s.add_type(TY_INT, 32, 1, 0)
+    s.ty_i64 = s.add_type(TY_INT, 64, 1, 0)
+    s.ty_u8 = s.add_type(TY_INT, 8, 0, 0)
+    s.ty_u16 = s.add_type(TY_INT, 16, 0, 0)
+    s.ty_u32 = s.add_type(TY_INT, 32, 0, 0)
+    s.ty_u64 = s.add_type(TY_INT, 64, 0, 0)
+    s.ty_f32 = s.add_type(TY_FLOAT, 32, 0, 0)
+    s.ty_f64 = s.add_type(TY_FLOAT, 64, 0, 0)
+    s.ty_bool = s.add_type(TY_BOOL, 0, 0, 0)
+    s.ty_void = s.add_type(TY_VOID, 0, 0, 0)
+    s.ty_never = s.add_type(TY_NEVER, 0, 0, 0)
+    s.ty_str = s.add_type(TY_STR, 0, 0, 0)
+    s.ty_str_view = s.add_type(TY_REF, s.ty_str, 0, 0)
 
     // Register primitive names.
     s.register_prim("i8", s.ty_i8)
@@ -483,6 +521,8 @@ fn Sema.init_intrinsic_symbols(self: &mut Sema):
     self.sym_todo = self.pool_intern("todo")
     self.sym_unreachable = self.pool_intern("unreachable")
     self.sym_track = self.pool_intern("track")
+    self.sym_src = self.pool_intern("src")
+    self.sym_embed_file = self.pool_intern("embed_file")
 
 fn sema_is_name_char(ch: i32) -> i32:
     if ch >= 48 and ch <= 57:
@@ -709,7 +749,7 @@ fn Sema.add_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
 
 fn Sema.get_type_kind(self: Sema, tid: i32) -> i32:
     if tid < 0 or tid >= self.type_kinds.len() as i32:
-        return TY_ERR()
+        return TY_ERR
     self.type_kinds.get(tid as i64)
 
 fn Sema.get_type_d0(self: Sema, tid: i32) -> i32:
@@ -730,7 +770,7 @@ fn Sema.get_type_d2(self: Sema, tid: i32) -> i32:
 fn Sema.resolve_alias(self: Sema, tid: i32) -> i32:
     var current = tid
     for depth in 0..32:
-        if self.get_type_kind(current) == TY_ALIAS():
+        if self.get_type_kind(current) == TY_ALIAS:
             current = self.get_type_d0(current)
         else:
             return current
@@ -779,7 +819,7 @@ fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
     self.bind_names.push(sym)
     self.bind_types.push(tid)
     self.bind_muts.push(is_mut)
-    self.bind_states.push(VS_LIVE())
+    self.bind_states.push(VS_LIVE)
     self.bind_is_task.push(0)
     self.bind_is_scoped_task.push(0)
     self.bind_is_ephemeral_task.push(0)
@@ -806,7 +846,7 @@ fn Sema.scope_lookup_state(self: Sema, sym: i32) -> i32:
         if self.bind_names.get(i as i64) == sym:
             return self.bind_states.get(i as i64)
         i = i - 1
-    VS_LIVE()
+    VS_LIVE
 
 fn Sema.scope_lookup_is_task(self: Sema, sym: i32) -> i32:
     var i = self.bind_names.len() as i32 - 1
@@ -941,7 +981,7 @@ fn Sema.compute_method_origins(self: Sema):
     for di in 0..dc:
         let decl = self.ast.get_decl(di)
         let kind = self.ast.kind(decl)
-        if kind == NK_IMPL_DECL():
+        if kind == NK_IMPL_DECL:
             let trait_sym = self.ast.get_data2(decl)
             var origin = 0
             if trait_sym != 0:
@@ -953,7 +993,7 @@ fn Sema.compute_method_origins(self: Sema):
             while j > 0:
                 j = j - 1
                 let md = self.ast.get_decl(j)
-                if self.ast.kind(md) != NK_FN_DECL():
+                if self.ast.kind(md) != NK_FN_DECL:
                     break
                 let fn_name = self.ast.get_data0(md)
                 self.method_decl_origins.insert(j, origin)
@@ -964,7 +1004,7 @@ fn Sema.compute_method_origins(self: Sema):
     // Top-level method syntax
     for di in 0..dc:
         let decl = self.ast.get_decl(di)
-        if self.ast.kind(decl) == NK_FN_DECL():
+        if self.ast.kind(decl) == NK_FN_DECL:
             let fn_name = self.ast.get_data0(decl)
             let parsed_fn_name = self.extract_decl_name_after(decl, "fn")
             if sema_str_contains_char(parsed_fn_name, 46) != 0:
@@ -997,15 +1037,15 @@ fn Sema.collect_declarations(self: Sema):
         let decl = self.ast.get_decl(di)
         let kind = self.ast.kind(decl)
         let is_local = self.is_local_decl(di)
-        if kind == NK_TYPE_DECL():
+        if kind == NK_TYPE_DECL:
             self.collect_type_decl(decl, is_local)
-        if kind == NK_TRAIT_DECL():
+        if kind == NK_TRAIT_DECL:
             self.collect_trait_decl(decl, is_local)
 
     // Pass 2: collect impl declarations once trait/type tables exist.
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
-        if self.ast.kind(decl) == NK_IMPL_DECL():
+        if self.ast.kind(decl) == NK_IMPL_DECL:
             self.collect_impl_decl(decl)
 
     self.collecting_types = 0
@@ -1015,13 +1055,13 @@ fn Sema.collect_declarations(self: Sema):
         let decl = self.ast.get_decl(di)
         let kind = self.ast.kind(decl)
         let is_local = self.is_local_decl(di)
-        if kind == NK_FN_DECL():
+        if kind == NK_FN_DECL:
             let fn_name = self.ast.get_data0(decl)
             if self.should_skip_trait_method(di, fn_name) == 0:
                 self.collect_fn_decl(decl, is_local)
-        if kind == NK_EXTERN_FN():
+        if kind == NK_EXTERN_FN:
             self.collect_extern_fn(decl, is_local)
-        if kind == NK_LET_DECL():
+        if kind == NK_LET_DECL:
             self.collect_let_decl(decl, is_local)
 
     // Hardcode Result and Task as must_use types
@@ -1052,7 +1092,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
     let sub_kind = type_decl_sub_kind(packed_kind)
     let is_ephemeral = type_decl_is_ephemeral(packed_kind)
 
-    if sub_kind == TDK_STRUCT():
+    if sub_kind == TDK_STRUCT:
         let field_count = self.ast.get_extra(extra_start)
         let te_start = self.type_extra.len() as i32
         for fi in 0..field_count:
@@ -1068,10 +1108,10 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             self.type_extra.push(f_name)
             self.type_extra.push(f_tid)
             self.type_extra.push(f_default)
-        let tid = self.add_type(TY_STRUCT(), name, te_start, field_count)
+        let tid = self.add_type(TY_STRUCT, name, te_start, field_count)
         self.named_types.insert(name, tid)
 
-    if sub_kind == TDK_ENUM():
+    if sub_kind == TDK_ENUM:
         let variant_count = self.ast.get_extra(extra_start)
         let te_start = self.type_extra.len() as i32
         var epos = extra_start + 1
@@ -1089,7 +1129,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
                 self.type_extra.push(pt_tid)
             // Register variant lookup
             self.variant_lookup.insert(v_name, vi)
-        let tid = self.add_type(TY_ENUM(), name, te_start, variant_count)
+        let tid = self.add_type(TY_ENUM, name, te_start, variant_count)
         self.named_types.insert(name, tid)
         // Re-register variants with actual enum TypeId
         var vpos = te_start
@@ -1099,13 +1139,70 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             let pc = self.type_extra.get((vpos + 1) as i64)
             vpos = vpos + 2 + pc
 
-    if sub_kind == TDK_ALIAS():
+    if sub_kind == TDK_DISC_ENUM:
+        let repr_type_node = self.ast.get_extra(extra_start)
+        let repr_type_tid = self.resolve_type_expr(repr_type_node)
+        let variant_count = self.ast.get_extra(extra_start + 1)
+        let te_start = self.type_extra.len() as i32
+        var epos = extra_start + 2
+        var disc_vals: Vec[i32] = Vec.new()
+        for vi in 0..variant_count:
+            let v_name = self.ast.get_extra(epos)
+            epos = epos + 1
+            let disc_value = self.ast.get_extra(epos)
+            epos = epos + 1
+            let payload_count = self.ast.get_extra(epos)
+            epos = epos + 1
+            self.type_extra.push(v_name)
+            self.type_extra.push(payload_count)
+            // Check for duplicate discriminant values
+            for prev in 0..disc_vals.len() as i32:
+                if disc_vals.get(prev as i64) == disc_value:
+                    self.emit_error("duplicate discriminant value " ++ int_to_string(disc_value), node)
+            // Check discriminant fits in repr type range
+            if repr_type_tid == self.ty_i8:
+                if disc_value < (0 - 128) or disc_value > 127:
+                    self.emit_error("discriminant value " ++ int_to_string(disc_value) ++ " out of range for i8", node)
+            if repr_type_tid == self.ty_i16:
+                if disc_value < (0 - 32768) or disc_value > 32767:
+                    self.emit_error("discriminant value " ++ int_to_string(disc_value) ++ " out of range for i16", node)
+            disc_vals.push(disc_value)
+            for pi in 0..payload_count:
+                let pt_node = self.ast.get_extra(epos)
+                epos = epos + 1
+                let pt_tid = self.resolve_type_expr(pt_node)
+                self.type_extra.push(pt_tid)
+            self.variant_lookup.insert(v_name, vi)
+        let tid = self.add_type(TY_ENUM, name, te_start, variant_count)
+        self.named_types.insert(name, tid)
+        self.disc_repr_types.insert(tid, repr_type_tid)
+        // Check if any variant has payloads
+        var any_payload = 0
+        var check_pos = te_start
+        for cv in 0..variant_count:
+            check_pos = check_pos + 1  // v_name
+            let pc = self.type_extra.get(check_pos as i64)
+            check_pos = check_pos + 1 + pc
+            if pc > 0:
+                any_payload = 1
+        if any_payload != 0:
+            self.disc_has_payload.insert(tid, 1)
+        // Re-register variants with actual enum TypeId and store disc values
+        var vpos = te_start
+        for vi in 0..variant_count:
+            let v_name = self.type_extra.get(vpos as i64)
+            self.variant_lookup.insert(v_name, tid * 65536 + vi)
+            self.disc_values.insert(tid * 65536 + vi, disc_vals.get(vi as i64))
+            let pc = self.type_extra.get((vpos + 1) as i64)
+            vpos = vpos + 2 + pc
+
+    if sub_kind == TDK_ALIAS:
         let aliased_node = self.ast.get_extra(extra_start)
         let target = self.resolve_type_expr(aliased_node)
-        let tid = self.add_type(TY_ALIAS(), target, 0, 0)
+        let tid = self.add_type(TY_ALIAS, target, 0, 0)
         self.named_types.insert(name, tid)
 
-    if sub_kind == TDK_DISTINCT():
+    if sub_kind == TDK_DISTINCT:
         let inner_node = self.ast.get_extra(extra_start)
         let inner = self.resolve_type_expr(inner_node)
         // Distinct type: treat as single-field struct
@@ -1114,7 +1211,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         self.type_extra.push(val_sym)
         self.type_extra.push(inner)
         self.type_extra.push(0)
-        let tid = self.add_type(TY_STRUCT(), name, te_start, 1)
+        let tid = self.add_type(TY_STRUCT, name, te_start, 1)
         self.named_types.insert(name, tid)
 
     if is_ephemeral != 0:
@@ -1136,7 +1233,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let meta = self.ast.find_fn_meta(node)
     if meta < 0:
         // No meta available — register with no params
-        let fn_tid = self.add_type(TY_FN(), 0, 0, self.ty_void)
+        let fn_tid = self.add_type(TY_FN, 0, 0, self.ty_void)
         self.add_sig(fn_name, fn_tid, self.ty_void, 0, 0, 0)
         return
 
@@ -1153,6 +1250,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
             let p_type_node = self.ast.get_extra(param_start + pi * 2 + 1)
             self.validate_type_expr_with_type_params(p_type_node, self.ast.fn_meta_tp_start(meta), tp_count)
         self.validate_type_expr_with_type_params(ret_node, self.ast.fn_meta_tp_start(meta), tp_count)
+        // Validate where clause references
+        self.validate_where_clause(node, self.ast.fn_meta_tp_start(meta), tp_count)
         return
 
     // Resolve param types
@@ -1170,7 +1269,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
         if self.type_expr_contains_ref(ret_node) != 0:
             self.emit_error("ephemeral references cannot be returned from functions", ret_node)
         let ret_kind = self.ast.kind(ret_node)
-        if ret_kind == NK_TYPE_NAMED():
+        if ret_kind == NK_TYPE_NAMED:
             let ret_sym = self.ast.get_data0(ret_node)
             if self.ephemeral_types.contains(ret_sym):
                 self.emit_error("ephemeral types cannot be returned from functions", ret_node)
@@ -1183,17 +1282,17 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let fn_extra_start = self.type_extra.len() as i32
     for pi in 0..param_count:
         self.type_extra.push(self.sig_params.get((sig_param_start + pi) as i64))
-    let fn_tid = self.add_type(TY_FN(), fn_extra_start, param_count, ret_type)
+    let fn_tid = self.add_type(TY_FN, fn_extra_start, param_count, ret_type)
 
     self.add_sig(fn_name, fn_tid, ret_type, sig_param_start, param_count, 0)
     let fn_sig_idx = self.get_sig(fn_name)
     self.register_method_sig_alias(node, fn_name, fn_sig_idx)
 
     // Track must_use
-    if (flags / FN_FLAG_MUST_USE()) % 2 == 1:
+    if (flags / FN_FLAG_MUST_USE) % 2 == 1:
         self.must_use_fns.insert(fn_name, 1)
     // Track async fns
-    if (flags / FN_FLAG_ASYNC()) % 2 == 1:
+    if (flags / FN_FLAG_ASYNC) % 2 == 1:
         self.task_fns.insert(fn_name, 1)
 
 fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
@@ -1205,7 +1304,7 @@ fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
 
     let meta = self.ast.find_fn_meta(node)
     if meta < 0:
-        let fn_tid = self.add_type(TY_FN(), 0, 0, self.ty_void)
+        let fn_tid = self.add_type(TY_FN, 0, 0, self.ty_void)
         self.add_sig(name, fn_tid, self.ty_void, 0, 0, is_variadic)
         self.extern_fn_names.insert(name, 1)
         return
@@ -1228,7 +1327,7 @@ fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
     let fn_extra_start = self.type_extra.len() as i32
     for pi in 0..param_count:
         self.type_extra.push(self.sig_params.get((sig_param_start + pi) as i64))
-    let fn_tid = self.add_type(TY_FN(), fn_extra_start, param_count, ret_type)
+    let fn_tid = self.add_type(TY_FN, fn_extra_start, param_count, ret_type)
 
     self.add_sig(name, fn_tid, ret_type, sig_param_start, param_count, is_variadic)
     self.extern_fn_names.insert(name, 1)
@@ -1246,7 +1345,7 @@ fn Sema.impl_owner_type_sym_for_decl(self: Sema, decl: i32) -> i32:
     var best_sym = 0
     for di in 0..self.ast.decl_count():
         let cand = self.ast.get_decl(di)
-        if self.ast.kind(cand) != NK_IMPL_DECL():
+        if self.ast.kind(cand) != NK_IMPL_DECL:
             continue
         let impl_start = self.ast.get_start(cand)
         let impl_end = self.ast.get_end(cand)
@@ -1331,9 +1430,17 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
     pos = pos + 2  // skip tp_count and tp_start
     let assoc_count = self.ast.get_extra(pos)
     pos = pos + 1
+    // Store associated type declarations for this trait
+    self.trait_assoc_starts.push(self.trait_assoc_names.len() as i32)
+    self.trait_assoc_counts.push(assoc_count)
     for ai in 0..assoc_count:
+        let at_name = self.ast.get_extra(pos)
         let bound_count = self.ast.get_extra(pos + 1)
-        pos = pos + 2 + bound_count + 1
+        pos = pos + 2 + bound_count
+        let default_type = self.ast.get_extra(pos)
+        pos = pos + 1
+        self.trait_assoc_names.push(at_name)
+        self.trait_assoc_defaults.push(default_type)
 
     let method_count = self.ast.get_extra(pos)
     pos = pos + 1
@@ -1342,6 +1449,8 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
         pos = pos + 6
     self.trait_method_counts.push(method_count)
     self.trait_lookup.insert(name, trait_idx)
+    if self.ast.is_sealed_trait_node(node) != 0:
+        self.sealed_traits.insert(name, 1)
     if is_local != 0:
         self.local_trait_names.insert(name, 1)
 
@@ -1358,10 +1467,47 @@ fn sema_is_builtin_trait_name(name: str) -> bool:
     name == "Hash" or
     name == "Ord"
 
+// Check if a new direct impl overlaps with any existing blanket impl
+fn Sema.check_direct_overlap(self: Sema, type_name: i32, trait_sym: i32, node: i32):
+    for bi in 0..self.blanket_trait_syms.len() as i32:
+        if self.blanket_trait_syms.get(bi as i64) != trait_sym:
+            continue
+        let b_start = self.blanket_bound_starts.get(bi as i64)
+        let b_count = self.blanket_bound_counts.get(bi as i64)
+        var all_ok = 1
+        for bj in 0..b_count:
+            let bound_trait = self.blanket_bound_syms.get((b_start + bj) as i64)
+            if self.select_trait_impl(type_name, bound_trait) == 0:
+                all_ok = 0
+        if all_ok != 0:
+            let tn = self.pool_resolve(trait_sym)
+            self.emit_error("overlapping implementations of '" ++ tn ++ "'", node)
+
+// Check if a new blanket impl overlaps with any existing direct impl
+fn Sema.check_blanket_overlap(self: Sema, trait_sym: i32, bound_start: i32, bound_count: i32, node: i32):
+    for ti in 0..self.impl_type_syms.len() as i32:
+        let t_sym = self.impl_type_syms.get(ti as i64)
+        let t_start = self.impl_starts.get(ti as i64)
+        let t_count = self.impl_counts.get(ti as i64)
+        var has_trait = 0
+        for i in 0..t_count:
+            if self.impl_extra.get((t_start + i) as i64) == trait_sym:
+                has_trait = 1
+        if has_trait == 0:
+            continue
+        // This type has a direct impl of the same trait — check bounds
+        var all_ok = 1
+        for bj in 0..bound_count:
+            let bound_trait = self.blanket_bound_syms.get((bound_start + bj) as i64)
+            if self.select_trait_impl(t_sym, bound_trait) == 0:
+                all_ok = 0
+        if all_ok != 0:
+            let tn = self.pool_resolve(trait_sym)
+            self.emit_error("overlapping implementations of '" ++ tn ++ "'", node)
+
 fn Sema.collect_impl_decl(self: Sema, node: i32):
     let type_name = self.ast.get_data0(node)
     let trait_sym = self.ast.get_data2(node)
-    // print("DBG collect_impl_decl type_sym=" ++ int_to_string(type_name) ++ " trait_sym=" ++ int_to_string(trait_sym) ++ "\n")
     if trait_sym == 0:
         return
 
@@ -1377,17 +1523,80 @@ fn Sema.collect_impl_decl(self: Sema, node: i32):
         self.emit_error("orphan rule violation: impl requires a local trait or local type", node)
         return
 
-    // Record impl
+    // Sealed trait check: only the defining module can impl
+    if self.sealed_traits.contains(trait_sym) and not trait_is_local:
+        self.emit_error("cannot implement sealed trait '" ++ self.pool_resolve(trait_sym) ++ "' outside its defining module", node)
+        return
+
+    // Validate associated types: impl must provide all required (no-default) associated types
+    if not is_builtin_trait and self.trait_lookup.contains(trait_sym):
+        let trait_idx = self.trait_lookup.get(trait_sym).unwrap()
+        let at_start = self.trait_assoc_starts.get(trait_idx as i64)
+        let at_count = self.trait_assoc_counts.get(trait_idx as i64)
+        if at_count > 0:
+            // Read impl's associated type bindings from AST extra
+            let impl_extra_start = self.ast.get_data1(node)
+            let impl_at_count = self.ast.get_extra(impl_extra_start)
+            for ati in 0..at_count:
+                let required_name = self.trait_assoc_names.get((at_start + ati) as i64)
+                let default_type = self.trait_assoc_defaults.get((at_start + ati) as i64)
+                if default_type != 0:
+                    continue
+                // Check if impl provides this associated type
+                var found = 0
+                for iai in 0..impl_at_count:
+                    let impl_at_name = self.ast.get_extra(impl_extra_start + 1 + iai * 2)
+                    if impl_at_name == required_name:
+                        found = 1
+                if found == 0:
+                    self.emit_error("impl missing required associated type '" ++ self.pool_resolve(required_name) ++ "'", node)
+                    return
+
+    // Check for blanket impl (impl-level type params)
+    let tp_meta_idx = self.ast.find_impl_type_params(node)
+    if tp_meta_idx >= 0:
+        // Blanket impl: collect bounds and register
+        let tp_start = self.ast.impl_type_params.get((tp_meta_idx + 1) as i64)
+        let tp_count = self.ast.impl_type_params.get((tp_meta_idx + 2) as i64)
+        let bound_start = self.blanket_bound_syms.len() as i32
+        var total_bounds = 0
+        var tp_off = tp_start
+        for tpi in 0..tp_count:
+            let bound_count = self.ast.get_extra(tp_off + 1)
+            tp_off = tp_off + 2
+            for bi in 0..bound_count:
+                let bound_sym = self.ast.get_extra(tp_off + bi)
+                self.blanket_bound_syms.push(bound_sym)
+                total_bounds = total_bounds + 1
+            tp_off = tp_off + bound_count
+        self.blanket_trait_syms.push(trait_sym)
+        self.blanket_bound_starts.push(bound_start)
+        self.blanket_bound_counts.push(total_bounds)
+        // Overlap check: blanket vs existing direct impls
+        self.check_blanket_overlap(trait_sym, bound_start, total_bounds, node)
+        return
+
+    // Overlap check: direct impl vs existing blanket impls
+    self.check_direct_overlap(type_name, trait_sym, node)
+
+    // Record direct impl
+    // When appending to an existing type, relocate all entries to keep them
+    // contiguous (the flat impl_extra vec is shared across all types).
     if self.impl_lookup.contains(type_name):
         let idx = self.impl_lookup.get(type_name).unwrap()
-        let start = self.impl_starts.get(idx as i64)
-        let count = self.impl_counts.get(idx as i64)
-        for i in 0..count:
-            if self.impl_extra.get((start + i) as i64) == trait_sym:
+        let old_start = self.impl_starts.get(idx as i64)
+        let old_count = self.impl_counts.get(idx as i64)
+        for i in 0..old_count:
+            if self.impl_extra.get((old_start + i) as i64) == trait_sym:
                 self.emit_error("duplicate implementation of trait for type", node)
                 return
+        // Copy existing entries to end for contiguity
+        let new_start = self.impl_extra.len() as i32
+        for i in 0..old_count:
+            self.impl_extra.push(self.impl_extra.get((old_start + i) as i64))
         self.impl_extra.push(trait_sym)
-        self.impl_counts.set_i32(idx as i64, count + 1)
+        self.impl_starts.set_i32(idx as i64, new_start)
+        self.impl_counts.set_i32(idx as i64, old_count + 1)
     else:
         let idx = self.impl_type_syms.len() as i32
         self.impl_type_syms.push(type_name)
@@ -1403,16 +1612,16 @@ fn Sema.type_is_dyn_object(self: Sema, tid: i32) -> i32:
         return 0
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_TRAIT_OBJ():
+    if tk == TY_TRAIT_OBJ:
         return 1
-    if tk == TY_REF() or tk == TY_PTR():
+    if tk == TY_REF or tk == TY_PTR:
         return self.type_is_dyn_object(self.get_type_d0(resolved))
     0
 
 fn Sema.find_trait_decl_node(self: Sema, trait_sym: i32) -> i32:
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
-        if self.ast.kind(decl) == NK_TRAIT_DECL() and self.ast.get_data0(decl) == trait_sym:
+        if self.ast.kind(decl) == NK_TRAIT_DECL and self.ast.get_data0(decl) == trait_sym:
             return decl
     0
 
@@ -1466,7 +1675,7 @@ fn Sema.ensure_trait_object_safe(self: Sema, trait_sym: i32, node: i32) -> i32:
             self.emit_trait_object_safety_error(trait_sym, method_sym, "is generic", node)
             return 0
 
-        if ret_node != 0 and self.ast.kind(ret_node) == NK_TYPE_NAMED() and self.ast.get_data0(ret_node) == self_type_sym:
+        if ret_node != 0 and self.ast.kind(ret_node) == NK_TYPE_NAMED and self.ast.get_data0(ret_node) == self_type_sym:
             self.emit_trait_object_safety_error(trait_sym, method_sym, "returns Self", node)
             return 0
 
@@ -1477,7 +1686,7 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
         return
 
     let kind = self.ast.kind(node)
-    if kind == NK_TYPE_NAMED():
+    if kind == NK_TYPE_NAMED:
         let sym = self.ast.get_data0(node)
         if self.primitive_type_by_sym(sym) != 0:
             return
@@ -1489,11 +1698,11 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
         self.emit_error("unknown type", node)
         return
 
-    if kind == NK_TYPE_PTR() or kind == NK_TYPE_REF() or kind == NK_TYPE_OPTIONAL() or kind == NK_TYPE_SLICE() or kind == NK_TYPE_ARRAY():
+    if kind == NK_TYPE_PTR or kind == NK_TYPE_REF or kind == NK_TYPE_OPTIONAL or kind == NK_TYPE_SLICE or kind == NK_TYPE_ARRAY:
         self.validate_type_expr_with_type_params(self.ast.get_data0(node), tp_start, tp_count)
         return
 
-    if kind == NK_TYPE_FN():
+    if kind == NK_TYPE_FN:
         let extra_start = self.ast.get_data0(node)
         let param_count = self.ast.get_data1(node)
         let ret_node = self.ast.get_data2(node)
@@ -1502,14 +1711,14 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
         self.validate_type_expr_with_type_params(ret_node, tp_start, tp_count)
         return
 
-    if kind == NK_TYPE_TUPLE():
+    if kind == NK_TYPE_TUPLE:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         for ei in 0..elem_count:
             self.validate_type_expr_with_type_params(self.ast.get_extra(extra_start + ei), tp_start, tp_count)
         return
 
-    if kind == NK_TYPE_GENERIC():
+    if kind == NK_TYPE_GENERIC:
         let base_sym = self.ast.get_data0(node)
         let base_prim = self.primitive_type_by_sym(base_sym)
         if base_prim == 0 and not self.named_types.contains(base_sym) and self.type_param_exists(tp_start, tp_count, base_sym) == 0:
@@ -1521,7 +1730,7 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
             self.validate_type_expr_with_type_params(self.ast.get_extra(extra_start + ai), tp_start, tp_count)
         return
 
-    if kind == NK_TYPE_TRAIT_OBJ():
+    if kind == NK_TYPE_TRAIT_OBJ:
         let trait_sym = self.ast.get_data0(node)
         let trait_name = self.pool_resolve(trait_sym)
         let is_builtin_trait = sema_is_builtin_trait_name(trait_name)
@@ -1530,6 +1739,31 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
             return
         let _ok = self.ensure_trait_object_safe(trait_sym, node)
         return
+
+fn Sema.validate_where_clause(self: Sema, fn_node: i32, tp_start: i32, tp_count: i32):
+    let where_idx = self.ast.find_where_meta(fn_node)
+    if where_idx < 0:
+        return
+    let where_start = self.ast.where_meta.get((where_idx + 1) as i64)
+    let where_count = self.ast.where_meta.get((where_idx + 2) as i64)
+    var pos = where_start
+    for wi in 0..where_count:
+        let wp_name = self.ast.get_extra(pos)
+        let bound_count = self.ast.get_extra(pos + 1)
+        // Validate type param references a known type parameter
+        if self.type_param_exists(tp_start, tp_count, wp_name) == 0:
+            let wp_str = self.pool_resolve(wp_name)
+            self.emit_error("where clause references unknown type parameter '" ++ wp_str ++ "'", fn_node)
+        // Validate each bound references a known trait
+        for bi in 0..bound_count:
+            let trait_sym = self.ast.get_extra(pos + 2 + bi)
+            let trait_name = self.pool_resolve(trait_sym)
+            if trait_name == "type":
+                continue
+            let is_builtin = sema_is_builtin_trait_name(trait_name)
+            if not is_builtin and not self.trait_lookup.contains(trait_sym):
+                self.emit_error("where clause references unknown trait '" ++ trait_name ++ "'", fn_node)
+        pos = pos + 2 + bound_count
 
 fn Sema.type_decl_enum_tail_index(self: Sema, extra_start: i32) -> i32:
     var pos = extra_start
@@ -1541,29 +1775,46 @@ fn Sema.type_decl_enum_tail_index(self: Sema, extra_start: i32) -> i32:
         pos = pos + 1 + payload_count
     pos
 
+fn Sema.type_decl_disc_enum_tail_index(self: Sema, extra_start: i32) -> i32:
+    var pos = extra_start + 1 // skip repr_type_node
+    let variant_count = self.ast.get_extra(pos)
+    pos = pos + 1
+    for vi in 0..variant_count:
+        pos = pos + 1 // variant name
+        pos = pos + 1 // disc value
+        let payload_count = self.ast.get_extra(pos)
+        pos = pos + 1 + payload_count
+    pos
+
 fn Sema.type_decl_tp_start(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data1(node)
     let sub_kind = type_decl_sub_kind(self.ast.get_data2(node))
-    if sub_kind == TDK_STRUCT():
+    if sub_kind == TDK_STRUCT:
         let field_count = self.ast.get_extra(extra_start)
         return self.ast.get_extra(extra_start + 1 + field_count * 3 + 1)
-    if sub_kind == TDK_ENUM():
+    if sub_kind == TDK_ENUM:
         let tail = self.type_decl_enum_tail_index(extra_start)
         return self.ast.get_extra(tail + 1)
-    if sub_kind == TDK_ALIAS() or sub_kind == TDK_DISTINCT():
+    if sub_kind == TDK_DISC_ENUM:
+        let tail = self.type_decl_disc_enum_tail_index(extra_start)
+        return self.ast.get_extra(tail + 1)
+    if sub_kind == TDK_ALIAS or sub_kind == TDK_DISTINCT:
         return self.ast.get_extra(extra_start + 2)
     0
 
 fn Sema.type_decl_tp_count(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data1(node)
     let sub_kind = type_decl_sub_kind(self.ast.get_data2(node))
-    if sub_kind == TDK_STRUCT():
+    if sub_kind == TDK_STRUCT:
         let field_count = self.ast.get_extra(extra_start)
         return self.ast.get_extra(extra_start + 1 + field_count * 3 + 2)
-    if sub_kind == TDK_ENUM():
+    if sub_kind == TDK_ENUM:
         let tail = self.type_decl_enum_tail_index(extra_start)
         return self.ast.get_extra(tail + 2)
-    if sub_kind == TDK_ALIAS() or sub_kind == TDK_DISTINCT():
+    if sub_kind == TDK_DISC_ENUM:
+        let tail = self.type_decl_disc_enum_tail_index(extra_start)
+        return self.ast.get_extra(tail + 2)
+    if sub_kind == TDK_ALIAS or sub_kind == TDK_DISTINCT:
         return self.ast.get_extra(extra_start + 3)
     0
 
@@ -1582,7 +1833,7 @@ fn Sema.validate_copy_derives(self: Sema):
     let copy_sym = self.pool_intern("Copy")
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
-        if self.ast.kind(decl) != NK_TYPE_DECL():
+        if self.ast.kind(decl) != NK_TYPE_DECL:
             continue
         if self.type_decl_has_derive(decl, copy_sym) == 0:
             continue
@@ -1596,7 +1847,7 @@ fn Sema.validate_copy_derives(self: Sema):
             continue
         let tid = self.named_types.get(type_name).unwrap()
         let resolved = self.resolve_alias(tid)
-        if self.get_type_kind(resolved) != TY_STRUCT():
+        if self.get_type_kind(resolved) != TY_STRUCT:
             continue
 
         let te_start = self.get_type_d1(resolved)
@@ -1613,7 +1864,7 @@ fn Sema.validate_copy_derives(self: Sema):
 fn Sema.validate_generic_type_decls(self: Sema):
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
-        if self.ast.kind(decl) != NK_TYPE_DECL():
+        if self.ast.kind(decl) != NK_TYPE_DECL:
             continue
 
         let tp_count = self.type_decl_tp_count(decl)
@@ -1623,14 +1874,14 @@ fn Sema.validate_generic_type_decls(self: Sema):
         let extra_start = self.ast.get_data1(decl)
         let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
 
-        if sub_kind == TDK_STRUCT():
+        if sub_kind == TDK_STRUCT:
             let field_count = self.ast.get_extra(extra_start)
             for fi in 0..field_count:
                 let field_type = self.ast.get_extra(extra_start + 1 + fi * 3 + 1)
                 self.validate_type_expr_with_type_params(field_type, tp_start, tp_count)
             continue
 
-        if sub_kind == TDK_ENUM():
+        if sub_kind == TDK_ENUM:
             var pos = extra_start
             let variant_count = self.ast.get_extra(pos)
             pos = pos + 1
@@ -1644,16 +1895,31 @@ fn Sema.validate_generic_type_decls(self: Sema):
                 pos = pos + payload_count
             continue
 
-        if sub_kind == TDK_ALIAS() or sub_kind == TDK_DISTINCT():
+        if sub_kind == TDK_DISC_ENUM:
+            var pos = extra_start + 1 // skip repr_type_node
+            let variant_count = self.ast.get_extra(pos)
+            pos = pos + 1
+            for vi in 0..variant_count:
+                pos = pos + 1 // variant name
+                pos = pos + 1 // disc value
+                let payload_count = self.ast.get_extra(pos)
+                pos = pos + 1
+                for pi in 0..payload_count:
+                    let payload_ty = self.ast.get_extra(pos + pi)
+                    self.validate_type_expr_with_type_params(payload_ty, tp_start, tp_count)
+                pos = pos + payload_count
+            continue
+
+        if sub_kind == TDK_ALIAS or sub_kind == TDK_DISTINCT:
             self.validate_type_expr_with_type_params(self.ast.get_extra(extra_start), tp_start, tp_count)
 
 fn Sema.type_expr_mentions_type_param(self: Sema, type_node: i32, tp_sym: i32) -> i32:
     if type_node == 0:
         return 0
     let kind = self.ast.kind(type_node)
-    if kind == NK_TYPE_NAMED():
+    if kind == NK_TYPE_NAMED:
         return if self.ast.get_data0(type_node) == tp_sym: 1 else: 0
-    if kind == NK_TYPE_GENERIC():
+    if kind == NK_TYPE_GENERIC:
         if self.ast.get_data0(type_node) == tp_sym:
             return 1
         let extra_start = self.ast.get_data1(type_node)
@@ -1662,16 +1928,16 @@ fn Sema.type_expr_mentions_type_param(self: Sema, type_node: i32, tp_sym: i32) -
             if self.type_expr_mentions_type_param(self.ast.get_extra(extra_start + ai), tp_sym) != 0:
                 return 1
         return 0
-    if kind == NK_TYPE_PTR() or kind == NK_TYPE_REF() or kind == NK_TYPE_OPTIONAL() or kind == NK_TYPE_SLICE() or kind == NK_TYPE_ARRAY():
+    if kind == NK_TYPE_PTR or kind == NK_TYPE_REF or kind == NK_TYPE_OPTIONAL or kind == NK_TYPE_SLICE or kind == NK_TYPE_ARRAY:
         return self.type_expr_mentions_type_param(self.ast.get_data0(type_node), tp_sym)
-    if kind == NK_TYPE_TUPLE():
+    if kind == NK_TYPE_TUPLE:
         let extra_start = self.ast.get_data0(type_node)
         let elem_count = self.ast.get_data1(type_node)
         for ei in 0..elem_count:
             if self.type_expr_mentions_type_param(self.ast.get_extra(extra_start + ei), tp_sym) != 0:
                 return 1
         return 0
-    if kind == NK_TYPE_FN():
+    if kind == NK_TYPE_FN:
         let extra_start = self.ast.get_data0(type_node)
         let param_count = self.ast.get_data1(type_node)
         for pi in 0..param_count:
@@ -1729,7 +1995,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
 
     let kind = self.ast.kind(node)
 
-    if kind == NK_TYPE_NAMED():
+    if kind == NK_TYPE_NAMED:
         let sym = self.ast.get_data0(node)
         let prim = self.primitive_type_by_sym(sym)
         if prim != 0:
@@ -1742,17 +2008,17 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
         self.emit_error("unknown type", node)
         return 0
 
-    if kind == NK_TYPE_PTR():
+    if kind == NK_TYPE_PTR:
         let pointee = self.resolve_type_expr(self.ast.get_data0(node))
         let is_mut = self.ast.get_data1(node)
-        return self.add_type(TY_PTR(), pointee, is_mut, 0)
+        return self.add_type(TY_PTR, pointee, is_mut, 0)
 
-    if kind == NK_TYPE_REF():
+    if kind == NK_TYPE_REF:
         let pointee = self.resolve_type_expr(self.ast.get_data0(node))
         let is_mut = self.ast.get_data1(node)
-        return self.add_type(TY_REF(), pointee, is_mut, 0)
+        return self.add_type(TY_REF, pointee, is_mut, 0)
 
-    if kind == NK_TYPE_FN():
+    if kind == NK_TYPE_FN:
         let extra_start = self.ast.get_data0(node)
         let param_count = self.ast.get_data1(node)
         let ret_node = self.ast.get_data2(node)
@@ -1761,32 +2027,32 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
             let p_node = self.ast.get_extra(extra_start + pi)
             self.type_extra.push(self.resolve_type_expr(p_node))
         let ret = self.resolve_type_expr(ret_node)
-        return self.add_type(TY_FN(), te_start, param_count, ret)
+        return self.add_type(TY_FN, te_start, param_count, ret)
 
-    if kind == NK_TYPE_ARRAY():
+    if kind == NK_TYPE_ARRAY:
         let elem = self.resolve_type_expr(self.ast.get_data0(node))
         let size = self.ast.get_data1(node)
-        return self.add_type(TY_ARRAY(), elem, size, 0)
+        return self.add_type(TY_ARRAY, elem, size, 0)
 
-    if kind == NK_TYPE_SLICE():
+    if kind == NK_TYPE_SLICE:
         let elem = self.resolve_type_expr(self.ast.get_data0(node))
-        return self.add_type(TY_SLICE(), elem, 0, 0)
+        return self.add_type(TY_SLICE, elem, 0, 0)
 
-    if kind == NK_TYPE_TUPLE():
+    if kind == NK_TYPE_TUPLE:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         let te_start = self.type_extra.len() as i32
         for ei in 0..elem_count:
             let e_node = self.ast.get_extra(extra_start + ei)
             self.type_extra.push(self.resolve_type_expr(e_node))
-        return self.add_type(TY_TUPLE(), te_start, elem_count, 0)
+        return self.add_type(TY_TUPLE, te_start, elem_count, 0)
 
-    if kind == NK_TYPE_OPTIONAL():
+    if kind == NK_TYPE_OPTIONAL:
         let inner = self.resolve_type_expr(self.ast.get_data0(node))
         // Optional lowering remains deferred in bootstrap sema path.
         return 0
 
-    if kind == NK_TYPE_TRAIT_OBJ():
+    if kind == NK_TYPE_TRAIT_OBJ:
         let trait_sym = self.ast.get_data0(node)
         let trait_name = self.pool_resolve(trait_sym)
         let is_builtin_trait = sema_is_builtin_trait_name(trait_name)
@@ -1795,13 +2061,13 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
             return 0
         if self.ensure_trait_object_safe(trait_sym, node) == 0:
             return 0
-        return self.add_type(TY_TRAIT_OBJ(), trait_sym, 0, 0)
+        return self.add_type(TY_TRAIT_OBJ, trait_sym, 0, 0)
 
-    if kind == NK_TYPE_GENERIC():
+    if kind == NK_TYPE_GENERIC:
         // Generic type applications are resolved by codegen/later waves.
         return 0
 
-    if kind == NK_TYPE_INFERRED():
+    if kind == NK_TYPE_INFERRED:
         return 0
 
     0
@@ -1811,7 +2077,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
 fn Sema.check_bodies(self: Sema):
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
-        if self.ast.kind(decl) == NK_FN_DECL():
+        if self.ast.kind(decl) == NK_FN_DECL:
             let fn_name = self.ast.get_data0(decl)
             if self.should_skip_trait_method(di, fn_name) == 0:
                 // Skip shadowed functions: if a later decl registered with
@@ -1873,7 +2139,7 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     let saved_ret = self.current_return_type
     let saved_gen_yield_type = self.current_gen_yield_type
     let saved_has_gen_yield_type = self.has_gen_yield_type
-    let is_gen = (flags / FN_FLAG_GEN()) % 2
+    let is_gen = (flags / FN_FLAG_GEN) % 2
     if is_gen == 1:
         self.current_return_type = self.ty_void
         self.current_gen_yield_type = ret_type
@@ -1883,7 +2149,7 @@ fn Sema.check_fn_body(self: Sema, node: i32):
         self.current_gen_yield_type = 0
         self.has_gen_yield_type = 0
     let saved_comptime = self.in_comptime_fn
-    if (flags / FN_FLAG_COMPTIME()) % 2 == 1:
+    if (flags / FN_FLAG_COMPTIME) % 2 == 1:
         self.in_comptime_fn = 1
 
     // Check body
@@ -1903,22 +2169,22 @@ fn Sema.check_fn_body(self: Sema, node: i32):
 // ── Expression type checking ─────────────────────────────────────
 
 fn Sema.is_call_expr_task(self: Sema, node: i32) -> i32:
-    if node == 0 or self.ast.kind(node) != NK_CALL():
+    if node == 0 or self.ast.kind(node) != NK_CALL:
         return 0
     let callee = self.ast.get_data0(node)
-    if self.ast.kind(callee) == NK_IDENT():
+    if self.ast.kind(callee) == NK_IDENT:
         let fn_sym = self.ast.get_data0(callee)
         if self.task_fns.contains(fn_sym):
             return 1
-    if self.ast.kind(callee) == NK_FIELD_ACCESS():
+    if self.ast.kind(callee) == NK_FIELD_ACCESS:
         let recv = self.ast.get_data0(callee)
         let method = self.ast.get_data1(callee)
-        if self.ast.kind(recv) == NK_IDENT() and self.is_active_async_scope_symbol(self.ast.get_data0(recv)) != 0 and self.pool_resolve(method) == "track":
+        if self.ast.kind(recv) == NK_IDENT and self.is_active_async_scope_symbol(self.ast.get_data0(recv)) != 0 and self.pool_resolve(method) == "track":
             return 1
     0
 
 fn Sema.expr_is_tuple_of_tasks(self: Sema, node: i32) -> i32:
-    if node == 0 or self.ast.kind(node) != NK_TUPLE():
+    if node == 0 or self.ast.kind(node) != NK_TUPLE:
         return 0
     let extra_start = self.ast.get_data0(node)
     let elem_count = self.ast.get_data1(node)
@@ -1933,18 +2199,18 @@ fn Sema.expr_is_task_value(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NK_GROUPED():
+    if kind == NK_GROUPED:
         return self.expr_is_task_value(self.ast.get_data0(node))
-    if kind == NK_ASYNC_BLOCK():
+    if kind == NK_ASYNC_BLOCK:
         return 1
-    if kind == NK_CALL():
+    if kind == NK_CALL:
         return self.is_call_expr_task(node)
-    if kind == NK_IDENT():
+    if kind == NK_IDENT:
         return self.scope_lookup_is_task(self.ast.get_data0(node))
-    if kind == NK_INDEX() or kind == NK_FIELD_ACCESS() or kind == NK_OPTIONAL_CHAIN():
+    if kind == NK_INDEX or kind == NK_FIELD_ACCESS or kind == NK_OPTIONAL_CHAIN:
         // Conservative task-container handling.
         return 1
-    if kind == NK_TUPLE():
+    if kind == NK_TUPLE:
         return self.expr_is_tuple_of_tasks(node)
     0
 
@@ -1952,23 +2218,23 @@ fn Sema.expr_is_scoped_task_value(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NK_GROUPED():
+    if kind == NK_GROUPED:
         return self.expr_is_scoped_task_value(self.ast.get_data0(node))
-    if kind == NK_IDENT():
+    if kind == NK_IDENT:
         return self.scope_lookup_is_scoped_task(self.ast.get_data0(node))
-    if kind == NK_CALL():
+    if kind == NK_CALL:
         let callee = self.ast.get_data0(node)
-        if self.ast.kind(callee) == NK_FIELD_ACCESS():
+        if self.ast.kind(callee) == NK_FIELD_ACCESS:
             let recv = self.ast.get_data0(callee)
             let method = self.ast.get_data1(callee)
-            if self.ast.kind(recv) == NK_IDENT() and self.is_active_async_scope_symbol(self.ast.get_data0(recv)) != 0 and self.pool_resolve(method) == "track":
+            if self.ast.kind(recv) == NK_IDENT and self.is_active_async_scope_symbol(self.ast.get_data0(recv)) != 0 and self.pool_resolve(method) == "track":
                 return 1
     0
 
 fn Sema.has_live_await_guard(self: Sema) -> i32:
     var i = self.bind_names.len() as i32 - 1
     while i >= 0:
-        if self.bind_states.get(i as i64) == VS_LIVE():
+        if self.bind_states.get(i as i64) == VS_LIVE:
             let name = self.pool_resolve(self.bind_names.get(i as i64))
             if name.ends_with("_guard"):
                 return 1
@@ -1980,7 +2246,7 @@ fn Sema.param_is_by_reference(self: Sema, tid: i32) -> i32:
         return 0
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_REF() or tk == TY_PTR():
+    if tk == TY_REF or tk == TY_PTR:
         return 1
     0
 
@@ -1988,15 +2254,15 @@ fn Sema.expr_is_ephemeral_task(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NK_GROUPED():
+    if kind == NK_GROUPED:
         return self.expr_is_ephemeral_task(self.ast.get_data0(node))
-    if kind == NK_IDENT():
+    if kind == NK_IDENT:
         return self.scope_lookup_is_ephemeral_task(self.ast.get_data0(node))
-    if kind == NK_ASYNC_BLOCK():
+    if kind == NK_ASYNC_BLOCK:
         return self.expr_is_ephemeral_value(self.ast.get_data0(node))
-    if kind == NK_CALL():
+    if kind == NK_CALL:
         let callee = self.ast.get_data0(node)
-        if self.ast.kind(callee) == NK_IDENT():
+        if self.ast.kind(callee) == NK_IDENT:
             let fn_sym = self.ast.get_data0(callee)
             if self.task_fns.contains(fn_sym):
                 let args_start = self.ast.get_data1(node)
@@ -2011,9 +2277,9 @@ fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NK_GROUPED():
+    if kind == NK_GROUPED:
         return self.expr_is_ephemeral_value(self.ast.get_data0(node))
-    if kind == NK_IDENT():
+    if kind == NK_IDENT:
         let sym = self.ast.get_data0(node)
         if self.scope_lookup_is_ephemeral_task(sym) != 0:
             return 1
@@ -2021,14 +2287,14 @@ fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
         if tid >= 0:
             return self.type_is_ephemeral_value(tid)
         return 0
-    if kind == NK_UNARY():
+    if kind == NK_UNARY:
         let op = self.ast.get_data0(node)
-        if op == UOP_REF() or op == UOP_MUT_REF():
+        if op == UOP_REF or op == UOP_MUT_REF:
             return 1
         return self.expr_is_ephemeral_value(self.ast.get_data1(node))
-    if kind == NK_SLICE():
+    if kind == NK_SLICE:
         return 1
-    if kind == NK_CALL():
+    if kind == NK_CALL:
         return self.expr_is_ephemeral_task(node)
     0
 
@@ -2038,55 +2304,55 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
 
     let kind = self.ast.kind(node)
 
-    if kind == NK_INT_LIT():
+    if kind == NK_INT_LIT:
         let value = self.ast.int_lit_value(node)
         if value < -2147483648 or value > 2147483647:
             return self.ty_i64
         return self.ty_i32
 
-    if kind == NK_FLOAT_LIT():
+    if kind == NK_FLOAT_LIT:
         return self.ty_f64
 
-    if kind == NK_BOOL_LIT():
+    if kind == NK_BOOL_LIT:
         return self.ty_bool
 
-    if kind == NK_STRING_LIT():
+    if kind == NK_STRING_LIT:
         return self.ty_str
 
-    if kind == NK_C_STRING_LIT():
-        return self.add_type(TY_PTR(), self.ty_i8, 0, 0)
+    if kind == NK_C_STRING_LIT:
+        return self.add_type(TY_PTR, self.ty_i8, 0, 0)
 
-    if kind == NK_IDENT():
+    if kind == NK_IDENT:
         return self.check_ident(self.ast.get_data0(node), node)
 
-    if kind == NK_BINARY():
+    if kind == NK_BINARY:
         return self.check_binary(node)
 
-    if kind == NK_UNARY():
+    if kind == NK_UNARY:
         return self.check_unary(node)
 
-    if kind == NK_GROUPED():
+    if kind == NK_GROUPED:
         return self.check_expr(self.ast.get_data0(node))
 
-    if kind == NK_BLOCK():
+    if kind == NK_BLOCK:
         return self.check_block(node)
 
-    if kind == NK_LET_BINDING():
+    if kind == NK_LET_BINDING:
         return self.check_let_binding(node)
 
-    if kind == NK_IF_EXPR():
+    if kind == NK_IF_EXPR:
         return self.check_if_expr(node)
 
-    if kind == NK_CALL():
+    if kind == NK_CALL:
         return self.check_call(node)
 
-    if kind == NK_RETURN():
+    if kind == NK_RETURN:
         return self.check_return(node)
 
-    if kind == NK_ASSIGN():
+    if kind == NK_ASSIGN:
         return self.check_assign(node)
 
-    if kind == NK_WHILE():
+    if kind == NK_WHILE:
         let cond = self.ast.get_data0(node)
         let body = self.ast.get_data1(node)
         self.check_expr(cond)
@@ -2095,7 +2361,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
         self.loop_depth = self.loop_depth - 1
         return self.ty_void
 
-    if kind == NK_LOOP():
+    if kind == NK_LOOP:
         let saved_break = self.break_value_type
         let saved_has = self.has_break_value_type
         self.break_value_type = 0
@@ -2110,10 +2376,10 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
         self.has_break_value_type = saved_has
         return result
 
-    if kind == NK_FOR():
+    if kind == NK_FOR:
         return self.check_for(node)
 
-    if kind == NK_BREAK():
+    if kind == NK_BREAK:
         if self.in_defer != 0:
             self.emit_error("break not allowed in defer", node)
         if self.loop_depth == 0:
@@ -2136,62 +2402,62 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
                         self.break_value_type = vt
         return self.ty_void
 
-    if kind == NK_CONTINUE():
+    if kind == NK_CONTINUE:
         if self.in_defer != 0:
             self.emit_error("continue not allowed in defer", node)
         if self.loop_depth == 0:
             self.emit_error("continue outside of loop", node)
         return self.ty_void
 
-    if kind == NK_FIELD_ACCESS():
+    if kind == NK_FIELD_ACCESS:
         return self.check_field_access(node)
 
-    if kind == NK_INDEX():
+    if kind == NK_INDEX:
         return self.check_index(node)
 
-    if kind == NK_SLICE():
+    if kind == NK_SLICE:
         return self.check_slice(node)
 
-    if kind == NK_ARRAY_LIT():
+    if kind == NK_ARRAY_LIT:
         return self.check_array_literal(node)
 
-    if kind == NK_STRUCT_LIT():
+    if kind == NK_STRUCT_LIT:
         return self.check_struct_literal(node)
 
-    if kind == NK_MATCH():
+    if kind == NK_MATCH:
         return self.check_match_expr(node)
 
-    if kind == NK_ENUM_VARIANT():
+    if kind == NK_ENUM_VARIANT:
         return self.check_enum_variant(node)
 
-    if kind == NK_CLOSURE():
+    if kind == NK_CLOSURE:
         return self.check_closure(node)
 
-    if kind == NK_CAST():
+    if kind == NK_CAST:
         self.check_expr(self.ast.get_data0(node))
         return self.resolve_type_expr(self.ast.get_data1(node))
 
-    if kind == NK_PIPELINE():
+    if kind == NK_PIPELINE:
         return self.check_pipeline(node)
 
-    if kind == NK_DEFER():
+    if kind == NK_DEFER or kind == NK_ERRDEFER:
         let saved = self.in_defer
         self.in_defer = 1
         self.check_expr(self.ast.get_data0(node))
         self.in_defer = saved
         return self.ty_void
 
-    if kind == NK_TUPLE():
+    if kind == NK_TUPLE:
         return self.check_tuple(node)
 
-    if kind == NK_RANGE():
+    if kind == NK_RANGE:
         return self.check_range(node)
 
-    if kind == NK_VARIANT_SHORTHAND():
+    if kind == NK_VARIANT_SHORTHAND:
         let name = self.ast.get_data0(node)
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
             let expected = self.resolve_alias(self.expected_expr_type)
-            if self.get_type_kind(expected) == TY_ENUM():
+            if self.get_type_kind(expected) == TY_ENUM:
                 if self.enum_has_variant(expected, name) != 0:
                     return expected
                 self.emit_error("enum variant shorthand does not match expected enum type", node)
@@ -2201,24 +2467,24 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
             return vi / 65536
         return 0
 
-    if kind == NK_WITH_EXPR():
+    if kind == NK_WITH_EXPR:
         return self.check_with_expr(node)
 
-    if kind == NK_RECORD_UPDATE():
+    if kind == NK_RECORD_UPDATE:
         return self.check_record_update(node)
 
-    if kind == NK_LET_ELSE():
+    if kind == NK_LET_ELSE:
         return self.check_let_else(node)
 
-    if kind == NK_TUPLE_DESTRUCTURE():
+    if kind == NK_TUPLE_DESTRUCTURE:
         return self.check_tuple_destructure(node)
 
-    if kind == NK_AWAIT():
+    if kind == NK_AWAIT:
         if self.has_live_await_guard() != 0:
             self.emit_error("E0701: may_suspend call while no_await_guard value is live", node)
         let inner = self.ast.get_data0(node)
         let inner_ty = self.check_expr(inner)
-        if self.ast.kind(inner) == NK_TUPLE():
+        if self.ast.kind(inner) == NK_TUPLE:
             let elem_count = self.ast.get_data1(inner)
             if elem_count < 2 or elem_count > 12:
                 self.emit_error("await tuple requires between 2 and 12 tasks", node)
@@ -2231,26 +2497,26 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
             self.emit_error("await requires a Task value", node)
         return inner_ty
 
-    if kind == NK_ASYNC_BLOCK():
+    if kind == NK_ASYNC_BLOCK:
         return self.check_expr(self.ast.get_data0(node))
 
-    if kind == NK_SPAWN():
+    if kind == NK_SPAWN:
         let inner = self.ast.get_data0(node)
         self.check_expr(inner)
         if self.expr_is_task_value(inner) == 0:
             self.emit_error("spawn requires a Task value", node)
         return self.ty_void
 
-    if kind == NK_YIELD():
+    if kind == NK_YIELD:
         let inner = self.check_expr(self.ast.get_data0(node))
         if self.has_gen_yield_type == 0:
             self.emit_error("yield used outside generator function", node)
         return self.ty_void
 
-    if kind == NK_COMPTIME():
+    if kind == NK_COMPTIME:
         return self.check_expr(self.ast.get_data0(node))
 
-    if kind == NK_ASYNC_SCOPE():
+    if kind == NK_ASYNC_SCOPE:
         let body = self.ast.get_data1(node)
         let name = self.ast.get_data0(node)
         self.push_scope()
@@ -2261,7 +2527,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
         self.pop_scope()
         return result
 
-    if kind == NK_SELECT_AWAIT():
+    if kind == NK_SELECT_AWAIT:
         if self.has_live_await_guard() != 0:
             self.emit_error("E0701: may_suspend call while no_await_guard value is live", node)
         let extra_start = self.ast.get_data0(node)
@@ -2285,7 +2551,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
             self.pop_scope()
         return result
 
-    if kind == NK_ARRAY_COMPREHENSION():
+    if kind == NK_ARRAY_COMPREHENSION:
         let expr = self.ast.get_data0(node)
         let binding = self.ast.get_data1(node)
         let iterable = self.ast.get_data2(node)
@@ -2295,13 +2561,13 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
         self.scope_put(binding, elem_ty, 0)
         let result_elem = self.check_expr(expr)
         self.pop_scope()
-        return self.add_type(TY_ARRAY(), result_elem, 0, 0)
+        return self.add_type(TY_ARRAY, result_elem, 0, 0)
 
-    if kind == NK_OPTIONAL_CHAIN():
+    if kind == NK_OPTIONAL_CHAIN:
         let base = self.check_expr(self.ast.get_data0(node))
         return base
 
-    if kind == NK_POISONED_EXPR():
+    if kind == NK_POISONED_EXPR:
         return 0
 
     0
@@ -2313,7 +2579,7 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     let tid = self.scope_lookup(sym)
     if tid >= 0:
         let state = self.scope_lookup_state(sym)
-        if state == VS_MOVED():
+        if state == VS_MOVED:
             if sema_debug_move_enabled() != 0:
                 let name = self.pool_resolve(sym)
                 with_eprintln(
@@ -2358,11 +2624,11 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         return 0
 
     // Comparison operators return bool
-    if op == OP_EQ() or op == OP_NEQ() or op == OP_LT() or op == OP_GT() or op == OP_LTE() or op == OP_GTE() or op == OP_IN() or op == OP_NOT_IN():
+    if op == OP_EQ or op == OP_NEQ or op == OP_LT or op == OP_GT or op == OP_LTE or op == OP_GTE or op == OP_IN or op == OP_NOT_IN:
         return self.ty_bool
 
     // Logical operators
-    if op == OP_AND() or op == OP_OR():
+    if op == OP_AND or op == OP_OR:
         if lhs != self.ty_bool:
             self.emit_error("left operand of logical operator must be bool", node)
         if rhs != self.ty_bool:
@@ -2370,8 +2636,8 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         return self.ty_bool
 
     // Arithmetic
-    if op == OP_ADD() or op == OP_SUB() or op == OP_MUL() or op == OP_DIV() or op == OP_MOD():
-        if op == OP_ADD() and lhs == self.ty_str and rhs == self.ty_str:
+    if op == OP_ADD or op == OP_SUB or op == OP_MUL or op == OP_DIV or op == OP_MOD:
+        if op == OP_ADD and lhs == self.ty_str and rhs == self.ty_str:
             return self.ty_str
         let result = self.arithmetic_result_type(lhs, rhs)
         if result != 0:
@@ -2379,10 +2645,10 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         let lhs_resolved = self.resolve_alias(lhs)
         let lhs_name = self.get_type_name(lhs_resolved)
         if lhs_name != 0:
-            let method_name = if op == OP_ADD(): "add" else:
-                if op == OP_SUB(): "sub" else:
-                if op == OP_MUL(): "mul" else:
-                if op == OP_DIV(): "div" else:
+            let method_name = if op == OP_ADD: "add" else:
+                if op == OP_SUB: "sub" else:
+                if op == OP_MUL: "mul" else:
+                if op == OP_DIV: "div" else:
                 "mod"
             let method_sym = self.pool_intern(method_name)
             let method_key = self.method_key(lhs_name, method_sym)
@@ -2393,19 +2659,19 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         return 0
 
     // Bitwise
-    if op == OP_BIT_AND() or op == OP_BIT_OR() or op == OP_BIT_XOR() or op == OP_SHL() or op == OP_SHR():
+    if op == OP_BIT_AND or op == OP_BIT_OR or op == OP_BIT_XOR or op == OP_SHL or op == OP_SHR:
         return lhs
 
     // Wrapping arithmetic
-    if op == OP_ADD_WRAP() or op == OP_SUB_WRAP() or op == OP_MUL_WRAP():
+    if op == OP_ADD_WRAP or op == OP_SUB_WRAP or op == OP_MUL_WRAP:
         return lhs
 
     // Default (??)
-    if op == OP_DEFAULT():
+    if op == OP_DEFAULT:
         return lhs
 
     // Concat (++)
-    if op == OP_CONCAT():
+    if op == OP_CONCAT:
         return self.ty_str
 
     0
@@ -2417,25 +2683,25 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
     if operand == 0:
         return 0
 
-    if op == UOP_NEGATE():
+    if op == UOP_NEGATE:
         return operand
-    if op == UOP_NOT():
+    if op == UOP_NOT:
         return self.ty_bool
-    if op == UOP_REF():
-        self.check_borrow_create(operand_node, BK_SHARED(), node)
-        return self.add_type(TY_REF(), operand, 0, 0)
-    if op == UOP_MUT_REF():
-        self.check_borrow_create(operand_node, BK_EXCLUSIVE(), node)
-        return self.add_type(TY_REF(), operand, 1, 0)
-    if op == UOP_DEREF():
+    if op == UOP_REF:
+        self.check_borrow_create(operand_node, BK_SHARED, node)
+        return self.add_type(TY_REF, operand, 0, 0)
+    if op == UOP_MUT_REF:
+        self.check_borrow_create(operand_node, BK_EXCLUSIVE, node)
+        return self.add_type(TY_REF, operand, 1, 0)
+    if op == UOP_DEREF:
         let resolved = self.resolve_alias(operand)
         let tk = self.get_type_kind(resolved)
-        if tk == TY_REF():
+        if tk == TY_REF:
             return self.get_type_d0(resolved)
-        if tk == TY_PTR():
+        if tk == TY_PTR:
             return self.get_type_d0(resolved)
         return 0
-    if op == UOP_TRY():
+    if op == UOP_TRY:
         if self.in_defer != 0:
             self.emit_error("? operator not allowed in defer", node)
         return 0
@@ -2457,8 +2723,8 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         self.match_in_stmt_pos = saved_stmt_pos
         self.typed_expr_types.insert(self.ast.get_start(stmt), stmt_ty)
         let stmt_kind = self.ast.kind(stmt)
-        let can_discard_task = stmt_kind == NK_CALL() or stmt_kind == NK_IDENT() or stmt_kind == NK_GROUPED() or stmt_kind == NK_ASYNC_BLOCK() or stmt_kind == NK_TUPLE()
-        let is_discarded_task = can_discard_task and stmt_kind != NK_SPAWN() and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
+        let can_discard_task = stmt_kind == NK_CALL or stmt_kind == NK_IDENT or stmt_kind == NK_GROUPED or stmt_kind == NK_ASYNC_BLOCK or stmt_kind == NK_TUPLE
+        let is_discarded_task = can_discard_task and stmt_kind != NK_SPAWN and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
         if is_discarded_task:
             self.emit_warning("E0801: unused Task value", stmt)
         self.expire_dead_borrows_in_block(extra_start, stmt_count, i + 1, tail)
@@ -2469,7 +2735,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         // position so partial enum match is allowed (value is not used).
         let saved_stmt_pos = self.match_in_stmt_pos
         let ret_is_void = self.current_return_type == self.ty_void or self.current_return_type == 0
-        if ret_is_void and self.ast.kind(tail) == NK_MATCH():
+        if ret_is_void and self.ast.kind(tail) == NK_MATCH:
             self.match_in_stmt_pos = 1
         result = self.check_expr(tail)
         self.match_in_stmt_pos = saved_stmt_pos
@@ -2525,9 +2791,9 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     self.scope_set_is_ephemeral_task(name, self.expr_is_ephemeral_task(value))
 
     // If this let binds a borrow, tie the newest active borrow to this binding.
-    if self.ast.kind(value) == NK_UNARY():
+    if self.ast.kind(value) == NK_UNARY:
         let uop = self.ast.get_data0(value)
-        if uop == UOP_REF() or uop == UOP_MUT_REF():
+        if uop == UOP_REF or uop == UOP_MUT_REF:
             let blen = self.borrow_refs.len() as i32
             if blen > 0:
                 self.borrow_refs.set_i32((blen - 1) as i64, name)
@@ -2576,7 +2842,7 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
     let value_type = if target_type != 0: self.check_expr_with_expected(value, target_type) else: self.check_expr(value)
 
     // Check mutability
-    if self.ast.kind(target) == NK_IDENT():
+    if self.ast.kind(target) == NK_IDENT:
         let target_sym = self.ast.get_data0(target)
         if self.scope_has(target_sym) != 0:
             if self.scope_lookup_mut(target_sym) == 0:
@@ -2592,9 +2858,9 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
     self.mark_moved_if_consumed(value)
 
     // Reinitialize target
-    if self.ast.kind(target) == NK_IDENT():
+    if self.ast.kind(target) == NK_IDENT:
         let target_sym = self.ast.get_data0(target)
-        self.scope_set_state(target_sym, VS_LIVE())
+        self.scope_set_state(target_sym, VS_LIVE)
         self.scope_set_is_task(target_sym, self.expr_is_task_value(value))
         self.scope_set_is_scoped_task(target_sym, self.expr_is_scoped_task_value(value))
         self.scope_set_is_ephemeral_task(target_sym, self.expr_is_ephemeral_task(value))
@@ -2635,12 +2901,12 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
 
     // Auto-deref through ptrs and refs
     var field_base = resolved
-    if tk == TY_PTR() or tk == TY_REF():
+    if tk == TY_PTR or tk == TY_REF:
         field_base = self.resolve_alias(self.get_type_d0(resolved))
 
     let ftk = self.get_type_kind(field_base)
 
-    if ftk == TY_STRUCT():
+    if ftk == TY_STRUCT:
         let st_name = self.get_type_d0(field_base)
         let te_start = self.get_type_d1(field_base)
         let field_count = self.get_type_d2(field_base)
@@ -2650,7 +2916,7 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
                 return self.type_extra.get((te_start + fi * 3 + 1) as i64)
         return 0
 
-    if ftk == TY_TUPLE():
+    if ftk == TY_TUPLE:
         let te_start = self.get_type_d0(field_base)
         let elem_count = self.get_type_d1(field_base)
         let field_name = self.pool_resolve(field)
@@ -2664,13 +2930,20 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
             return self.type_extra.get((te_start + idx) as i64)
         return 0
 
-    if ftk == TY_ARRAY() or ftk == TY_SLICE() or ftk == TY_STR():
+    if ftk == TY_ARRAY or ftk == TY_SLICE or ftk == TY_STR:
         let field_name = self.pool_resolve(field)
         if field_name == "len":
             return self.ty_i64
         return 0
 
-    if ftk == TY_ENUM():
+    if ftk == TY_ENUM:
+        // Discriminant enums: with payloads return enum type, without return repr type
+        let repr_opt = self.disc_repr_types.get(field_base)
+        if repr_opt.is_some():
+            let hp = self.disc_has_payload.get(field_base)
+            if hp.is_some() and hp.unwrap() != 0:
+                return field_base
+            return repr_opt.unwrap()
         return field_base
 
     0
@@ -2686,9 +2959,9 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
 
     let resolved = self.resolve_alias(arr_type)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_ARRAY():
+    if tk == TY_ARRAY:
         return self.get_type_d0(resolved)
-    if tk == TY_SLICE():
+    if tk == TY_SLICE:
         return self.get_type_d0(resolved)
     0
 
@@ -2707,10 +2980,10 @@ fn Sema.check_slice(self: Sema, node: i32) -> i32:
 
     let resolved = self.resolve_alias(arr_type)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_ARRAY():
+    if tk == TY_ARRAY:
         let elem = self.get_type_d0(resolved)
-        return self.add_type(TY_SLICE(), elem, 0, 0)
-    if tk == TY_SLICE():
+        return self.add_type(TY_SLICE, elem, 0, 0)
+    if tk == TY_SLICE:
         return resolved
     0
 
@@ -2727,7 +3000,7 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
         if elem_type == 0:
             elem_type = et
 
-    self.add_type(TY_ARRAY(), elem_type, elem_count, 0)
+    self.add_type(TY_ARRAY, elem_type, elem_count, 0)
 
 fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
     let name = self.ast.get_data0(node)
@@ -2737,7 +3010,7 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
     if self.named_types.contains(name):
         let tid = self.named_types.get(name).unwrap()
         let resolved = self.resolve_alias(tid)
-        if self.get_type_kind(resolved) == TY_STRUCT():
+        if self.get_type_kind(resolved) == TY_STRUCT:
             // Check field initializers
             for fi in 0..field_count:
                 let f_name = self.ast.get_extra(extra_start + fi * 2)
@@ -2810,7 +3083,7 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
         return
 
     // Bool exhaustiveness
-    if tk == TY_BOOL():
+    if tk == TY_BOOL:
         if require_exhaustive == 0:
             return
         var has_true = 0
@@ -2822,7 +3095,7 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
             if guard != 0:
                 continue
             let pk = self.ast.kind(pat)
-            if pk == NK_PAT_BOOL():
+            if pk == NK_PAT_BOOL:
                 let v = self.ast.get_data0(pat)
                 if v != 0:
                     has_true = 1
@@ -2833,7 +3106,7 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
         return
 
     // Enum exhaustiveness
-    if tk != TY_ENUM():
+    if tk != TY_ENUM:
         return
     if require_exhaustive == 0:
         return
@@ -2864,9 +3137,9 @@ fn sema_pattern_is_catchall(ast: AstPool, pat: i32) -> bool:
     if pat == 0:
         return true
     let kind = ast.kind(pat)
-    if kind == NK_PAT_WILDCARD():
+    if kind == NK_PAT_WILDCARD:
         return true
-    if kind == NK_PAT_IDENT():
+    if kind == NK_PAT_IDENT:
         return true
     false
 
@@ -2874,11 +3147,11 @@ fn sema_pattern_covers_variant(ast: AstPool, pat: i32, variant_sym: i32) -> bool
     if pat == 0:
         return false
     let kind = ast.kind(pat)
-    if kind == NK_PAT_WILDCARD() or kind == NK_PAT_IDENT():
+    if kind == NK_PAT_WILDCARD or kind == NK_PAT_IDENT:
         return true
-    if kind == NK_PAT_VARIANT() or kind == NK_PAT_ENUM_SHORTHAND():
+    if kind == NK_PAT_VARIANT or kind == NK_PAT_ENUM_SHORTHAND:
         return ast.get_data0(pat) == variant_sym
-    if kind == NK_PAT_OR():
+    if kind == NK_PAT_OR:
         let or_start = ast.get_data0(pat)
         let or_count = ast.get_data1(pat)
         for oi in 0..or_count:
@@ -2893,25 +3166,25 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
 
     let kind = self.ast.kind(node)
 
-    if kind == NK_PAT_WILDCARD():
+    if kind == NK_PAT_WILDCARD:
         return
 
-    if kind == NK_PAT_IDENT():
+    if kind == NK_PAT_IDENT:
         let sym = self.ast.get_data0(node)
         self.scope_put(sym, subject_type, 0)
         return
 
-    if kind == NK_PAT_INT() or kind == NK_PAT_BOOL() or kind == NK_PAT_STRING():
+    if kind == NK_PAT_INT or kind == NK_PAT_BOOL or kind == NK_PAT_STRING:
         return
 
-    if kind == NK_PAT_VARIANT():
+    if kind == NK_PAT_VARIANT:
         let v_name = self.ast.get_data0(node)
         let v_extra = self.ast.get_data1(node)
         let bind_count = self.ast.get_data2(node)
         var payload_start = 0
         var payload_count = 0
         let resolved = self.resolve_alias(subject_type)
-        if self.get_type_kind(resolved) == TY_ENUM():
+        if self.get_type_kind(resolved) == TY_ENUM:
             let te_start = self.get_type_d1(resolved)
             let variant_count = self.get_type_d2(resolved)
             var pos = te_start
@@ -2930,14 +3203,14 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
             self.check_pattern(inner_pat, inner_ty)
         return
 
-    if kind == NK_PAT_ENUM_SHORTHAND():
+    if kind == NK_PAT_ENUM_SHORTHAND:
         let v_name = self.ast.get_data0(node)
         let v_extra = self.ast.get_data1(node)
         let bind_count = self.ast.get_data2(node)
         var payload_start = 0
         var payload_count = 0
         let resolved = self.resolve_alias(subject_type)
-        if self.get_type_kind(resolved) == TY_ENUM():
+        if self.get_type_kind(resolved) == TY_ENUM:
             let te_start = self.get_type_d1(resolved)
             let variant_count = self.get_type_d2(resolved)
             var pos = te_start
@@ -2950,32 +3223,36 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                     break
                 pos = pos + 2 + pc
         for bi in 0..bind_count:
-            let bind_sym = self.ast.get_extra(v_extra + bi)
+            let inner = self.ast.get_extra(v_extra + bi)
+            // Extras may be NK_PAT_IDENT nodes (from parser); extract symbol.
+            var bind_sym = inner
+            if inner > 0 and inner < self.ast.node_count() and self.ast.kind(inner) == NK_PAT_IDENT:
+                bind_sym = self.ast.get_data0(inner)
             let bind_ty = if bi < payload_count: self.type_extra.get((payload_start + bi) as i64) else: 0
             self.scope_put(bind_sym, bind_ty, 0)
         return
 
-    if kind == NK_PAT_OR():
+    if kind == NK_PAT_OR:
         let p_extra = self.ast.get_data0(node)
         let p_count = self.ast.get_data1(node)
         for pi in 0..p_count:
             self.check_pattern(self.ast.get_extra(p_extra + pi), subject_type)
         return
 
-    if kind == NK_PAT_AT_BINDING():
+    if kind == NK_PAT_AT_BINDING:
         let at_name = self.ast.get_data0(node)
         let inner = self.ast.get_data1(node)
         self.scope_put(at_name, subject_type, 0)
         self.check_pattern(inner, subject_type)
         return
 
-    if kind == NK_PAT_TUPLE():
+    if kind == NK_PAT_TUPLE:
         let t_extra = self.ast.get_data0(node)
         let t_count = self.ast.get_data1(node)
         var elem_start = 0
         var elem_count = 0
         let resolved = self.resolve_alias(subject_type)
-        if self.get_type_kind(resolved) == TY_TUPLE():
+        if self.get_type_kind(resolved) == TY_TUPLE:
             elem_start = self.get_type_d0(resolved)
             elem_count = self.get_type_d1(resolved)
         for ti in 0..t_count:
@@ -2983,16 +3260,16 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
             self.check_pattern(self.ast.get_extra(t_extra + ti), elem_ty)
         return
 
-    if kind == NK_PAT_SLICE():
+    if kind == NK_PAT_SLICE:
         let s_extra = self.ast.get_data0(node)
         let head_count = self.ast.get_data1(node)
         let rest_sym = self.ast.get_data2(node)
         var elem_type = 0
         let resolved = self.resolve_alias(subject_type)
         let stk = self.get_type_kind(resolved)
-        if stk == TY_ARRAY():
+        if stk == TY_ARRAY:
             elem_type = self.get_type_d0(resolved)
-        if stk == TY_SLICE():
+        if stk == TY_SLICE:
             elem_type = self.get_type_d0(resolved)
         let has_rest = self.ast.get_extra(s_extra)
         for hi in 0..head_count:
@@ -3008,14 +3285,14 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                 self.scope_put(t_sym, elem_type, 0)
         return
 
-    if kind == NK_PAT_STRUCT():
+    if kind == NK_PAT_STRUCT:
         let sp_extra = self.ast.get_data1(node)
         let sp_count = self.ast.get_data2(node)
         let has_rest = self.ast.get_extra(sp_extra)
         var field_start = 0
         var field_count = 0
         let resolved = self.resolve_alias(subject_type)
-        if self.get_type_kind(resolved) == TY_STRUCT():
+        if self.get_type_kind(resolved) == TY_STRUCT:
             field_start = self.get_type_d1(resolved)
             field_count = self.get_type_d2(resolved)
         for spi in 0..sp_count:
@@ -3070,7 +3347,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
         bi = bi + 1
     self.pop_scope()
 
-    self.add_type(TY_FN(), te_start, param_count, self.ty_i32)
+    self.add_type(TY_FN, te_start, param_count, self.ty_i32)
 
 fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
     let lhs = self.ast.get_data0(node)
@@ -3082,7 +3359,7 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
     self.in_pipeline_rhs = saved
     if rhs_ty != 0:
         let resolved = self.resolve_alias(rhs_ty)
-        if self.get_type_kind(resolved) == TY_FN():
+        if self.get_type_kind(resolved) == TY_FN:
             return self.get_type_d2(resolved)
     rhs_ty
 
@@ -3094,7 +3371,7 @@ fn Sema.check_tuple(self: Sema, node: i32) -> i32:
         let elem = self.ast.get_extra(extra_start + ei)
         let et = self.check_expr(elem)
         self.type_extra.push(et)
-    self.add_type(TY_TUPLE(), te_start, elem_count, 0)
+    self.add_type(TY_TUPLE, te_start, elem_count, 0)
 
 fn Sema.check_range(self: Sema, node: i32) -> i32:
     let start = self.ast.get_data0(node)
@@ -3107,7 +3384,7 @@ fn Sema.check_range(self: Sema, node: i32) -> i32:
         let end_ty = self.check_expr(end)
         if start == 0:
             elem_type = end_ty
-    self.add_type(TY_RANGE(), elem_type, inclusive, 0)
+    self.add_type(TY_RANGE, elem_type, inclusive, 0)
 
 fn Sema.check_with_expr(self: Sema, node: i32) -> i32:
     let source = self.ast.get_data0(node)
@@ -3152,7 +3429,7 @@ fn Sema.check_tuple_destructure(self: Sema, node: i32) -> i32:
     let value = self.ast.get_data2(node)
     let val_type = self.check_expr(value)
     let resolved = self.resolve_alias(val_type)
-    let is_tuple = self.get_type_kind(resolved) == TY_TUPLE()
+    let is_tuple = self.get_type_kind(resolved) == TY_TUPLE
     if is_tuple == 0:
         self.emit_error("tuple destructuring requires tuple type", node)
     let elem_start = if is_tuple != 0: self.get_type_d0(resolved) else: 0
@@ -3176,12 +3453,12 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     let arg_count = self.ast.get_data2(node)
 
     // Method call: callee is field_access
-    if self.ast.kind(callee) == NK_FIELD_ACCESS():
+    if self.ast.kind(callee) == NK_FIELD_ACCESS:
         return self.check_method_call(callee, extra_start, arg_count, node)
 
     // Direct call: callee should be ident
     var fn_sym = 0
-    if self.ast.kind(callee) == NK_IDENT():
+    if self.ast.kind(callee) == NK_IDENT:
         fn_sym = self.ast.get_data0(callee)
     else:
         self.check_expr(callee)
@@ -3248,7 +3525,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     let local_tid = self.scope_lookup(fn_sym)
     if local_tid >= 0:
         let resolved = self.resolve_alias(local_tid)
-        if self.get_type_kind(resolved) == TY_FN():
+        if self.get_type_kind(resolved) == TY_FN:
             return self.get_type_d2(resolved)
         self.emit_error("value is not callable", callee)
         return 0
@@ -3282,7 +3559,7 @@ fn Sema.fn_min_expected_arg_count(self: Sema, fn_sym: i32, fallback_expected: i3
     if meta < 0:
         return fallback_expected
     let meta_flags = self.ast.fn_meta_flags(meta)
-    let required = meta_flags / FN_META_REQUIRED_UNIT()
+    let required = meta_flags / FN_META_REQUIRED_UNIT
     if required < 0:
         return fallback_expected
     if required > fallback_expected:
@@ -3301,7 +3578,7 @@ fn Sema.check_expr_with_expected(self: Sema, node: i32, expected: i32) -> i32:
 
 fn Sema.enum_has_variant(self: Sema, enum_tid: i32, variant_sym: i32) -> i32:
     let resolved = self.resolve_alias(enum_tid)
-    if self.get_type_kind(resolved) != TY_ENUM():
+    if self.get_type_kind(resolved) != TY_ENUM:
         return 0
     let te_start = self.get_type_d1(resolved)
     let variant_count = self.get_type_d2(resolved)
@@ -3378,6 +3655,12 @@ fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: Vec
 
     // Obligation model: collect and solve trait bounds for each bound type parameter.
     self.check_generic_trait_bounds(tp_start, tp_count, call_node)
+    // Also check where clause bounds if present
+    let where_idx = self.ast.find_where_meta(fn_node)
+    if where_idx >= 0:
+        let where_start = self.ast.where_meta.get((where_idx + 1) as i64)
+        let where_count = self.ast.where_meta.get((where_idx + 2) as i64)
+        self.check_generic_trait_bounds(where_start, where_count, call_node)
     self.ensure_generic_substitutions(tp_start, tp_count, param_start, param_count, call_node)
 
     let spec_key = self.generic_specialization_key(fn_sym, tp_start, tp_count)
@@ -3433,45 +3716,45 @@ fn Sema.bind_type_params_from_type_expr(self: Sema, type_node: i32, arg_tid: i32
 
     let kind = self.ast.kind(type_node)
 
-    if kind == NK_TYPE_NAMED():
+    if kind == NK_TYPE_NAMED:
         let sym = self.ast.get_data0(type_node)
         if self.type_param_exists(tp_start, tp_count, sym) != 0:
             self.put_generic_subst(sym, arg_tid, err_node)
         return
 
-    if kind == NK_TYPE_REF():
+    if kind == NK_TYPE_REF:
         let inner_node = self.ast.get_data0(type_node)
         let resolved = self.resolve_alias(arg_tid)
-        if self.get_type_kind(resolved) == TY_REF():
+        if self.get_type_kind(resolved) == TY_REF:
             self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
         return
 
-    if kind == NK_TYPE_PTR():
+    if kind == NK_TYPE_PTR:
         let inner_node = self.ast.get_data0(type_node)
         let resolved = self.resolve_alias(arg_tid)
-        if self.get_type_kind(resolved) == TY_PTR():
+        if self.get_type_kind(resolved) == TY_PTR:
             self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
         return
 
-    if kind == NK_TYPE_ARRAY():
+    if kind == NK_TYPE_ARRAY:
         let inner_node = self.ast.get_data0(type_node)
         let resolved = self.resolve_alias(arg_tid)
-        if self.get_type_kind(resolved) == TY_ARRAY():
+        if self.get_type_kind(resolved) == TY_ARRAY:
             self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
         return
 
-    if kind == NK_TYPE_SLICE():
+    if kind == NK_TYPE_SLICE:
         let inner_node = self.ast.get_data0(type_node)
         let resolved = self.resolve_alias(arg_tid)
-        if self.get_type_kind(resolved) == TY_SLICE():
+        if self.get_type_kind(resolved) == TY_SLICE:
             self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
         return
 
-    if kind == NK_TYPE_TUPLE():
+    if kind == NK_TYPE_TUPLE:
         let inner_start = self.ast.get_data0(type_node)
         let inner_count = self.ast.get_data1(type_node)
         let resolved = self.resolve_alias(arg_tid)
-        if self.get_type_kind(resolved) != TY_TUPLE():
+        if self.get_type_kind(resolved) != TY_TUPLE:
             return
         let te_start = self.get_type_d0(resolved)
         let elem_count = self.get_type_d1(resolved)
@@ -3523,51 +3806,64 @@ fn Sema.resolve_generic_return_type_node(self: Sema, ret_node: i32, tp_start: i3
 
     let kind = self.ast.kind(ret_node)
 
-    if kind == NK_TYPE_NAMED():
+    if kind == NK_TYPE_NAMED:
         let sym = self.ast.get_data0(ret_node)
         if self.type_param_exists(tp_start, tp_count, sym) != 0:
             return self.lookup_generic_subst(sym)
         return self.resolve_type_expr(ret_node)
 
-    if kind == NK_TYPE_REF():
+    if kind == NK_TYPE_REF:
         let pointee = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
         let is_mut = self.ast.get_data1(ret_node)
-        return self.add_type(TY_REF(), pointee, is_mut, 0)
+        return self.add_type(TY_REF, pointee, is_mut, 0)
 
-    if kind == NK_TYPE_PTR():
+    if kind == NK_TYPE_PTR:
         let pointee = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
         let is_mut = self.ast.get_data1(ret_node)
-        return self.add_type(TY_PTR(), pointee, is_mut, 0)
+        return self.add_type(TY_PTR, pointee, is_mut, 0)
 
-    if kind == NK_TYPE_ARRAY():
+    if kind == NK_TYPE_ARRAY:
         let elem = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
         let size = self.ast.get_data1(ret_node)
-        return self.add_type(TY_ARRAY(), elem, size, 0)
+        return self.add_type(TY_ARRAY, elem, size, 0)
 
-    if kind == NK_TYPE_SLICE():
+    if kind == NK_TYPE_SLICE:
         let elem = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
-        return self.add_type(TY_SLICE(), elem, 0, 0)
+        return self.add_type(TY_SLICE, elem, 0, 0)
 
-    if kind == NK_TYPE_TUPLE():
+    if kind == NK_TYPE_TUPLE:
         let extra_start = self.ast.get_data0(ret_node)
         let elem_count = self.ast.get_data1(ret_node)
         let te_start = self.type_extra.len() as i32
         for ei in 0..elem_count:
             let e_node = self.ast.get_extra(extra_start + ei)
             self.type_extra.push(self.resolve_generic_return_type_node(e_node, tp_start, tp_count))
-        return self.add_type(TY_TUPLE(), te_start, elem_count, 0)
+        return self.add_type(TY_TUPLE, te_start, elem_count, 0)
 
     self.resolve_type_expr(ret_node)
 
 fn Sema.selection_cache_key(self: Sema, type_sym: i32, trait_sym: i32) -> str:
     int_to_string(type_sym) ++ ":" ++ int_to_string(trait_sym)
 
+fn Sema.blanket_guard_contains(self: Sema, key: str) -> i32:
+    var i = 0
+    while i < self.blanket_guard.len() as i32:
+        if self.blanket_guard.get(i as i64) == key:
+            return 1
+        i = i + 1
+    0
+
 fn Sema.select_trait_impl(self: Sema, type_sym: i32, trait_sym: i32) -> i32:
     let key = self.selection_cache_key(type_sym, trait_sym)
     if self.selection_cache.contains(key):
         return self.selection_cache.get(key).unwrap()
 
+    // Cycle guard: if already resolving this pair, assume not found
+    if self.blanket_guard_contains(key) != 0:
+        return 0
+
     var found = 0
+    // Check direct impls
     if self.impl_lookup.contains(type_sym):
         let idx = self.impl_lookup.get(type_sym).unwrap()
         let start = self.impl_starts.get(idx as i64)
@@ -3575,15 +3871,35 @@ fn Sema.select_trait_impl(self: Sema, type_sym: i32, trait_sym: i32) -> i32:
         for i in 0..count:
             if self.impl_extra.get((start + i) as i64) == trait_sym:
                 found = 1
+
+    // Check blanket impls: impl[T: Bound] Trait for T
+    if found == 0:
+        self.blanket_guard.push(key)
+        for bi in 0..self.blanket_trait_syms.len() as i32:
+            if self.blanket_trait_syms.get(bi as i64) != trait_sym:
+                continue
+            // Check if type_sym satisfies all bounds
+            let b_start = self.blanket_bound_starts.get(bi as i64)
+            let b_count = self.blanket_bound_counts.get(bi as i64)
+            var all_satisfied = 1
+            for bj in 0..b_count:
+                let bound_trait = self.blanket_bound_syms.get((b_start + bj) as i64)
+                let bound_ok = self.select_trait_impl(type_sym, bound_trait)
+                if bound_ok == 0:
+                    all_satisfied = 0
+            if all_satisfied != 0:
+                found = 1
+        self.blanket_guard.pop()
+
     self.selection_cache.insert(key, found)
     found
 
 fn Sema.type_symbol_for_bounds(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_STRUCT() or tk == TY_ENUM():
+    if tk == TY_STRUCT or tk == TY_ENUM:
         return self.get_type_d0(resolved)
-    if tk == TY_INT():
+    if tk == TY_INT:
         let bits = self.get_type_d0(resolved)
         let signed = self.get_type_d1(resolved)
         if bits == 8:
@@ -3603,13 +3919,13 @@ fn Sema.type_symbol_for_bounds(self: Sema, tid: i32) -> i32:
                 return self.pool_intern("i64")
             return self.pool_intern("u64")
         return 0
-    if tk == TY_FLOAT():
+    if tk == TY_FLOAT:
         if self.get_type_d0(resolved) == 32:
             return self.pool_intern("f32")
         return self.pool_intern("f64")
-    if tk == TY_BOOL():
+    if tk == TY_BOOL:
         return self.pool_intern("bool")
-    if tk == TY_STR():
+    if tk == TY_STR:
         return self.pool_intern("str")
     0
 
@@ -3617,11 +3933,11 @@ fn Sema.trait_object_from_type_node(self: Sema, type_node: i32) -> i32:
     if type_node == 0:
         return 0
     let kind = self.ast.kind(type_node)
-    if kind == NK_TYPE_TRAIT_OBJ():
+    if kind == NK_TYPE_TRAIT_OBJ:
         return self.ast.get_data0(type_node)
-    if kind == NK_TYPE_REF() or kind == NK_TYPE_PTR():
+    if kind == NK_TYPE_REF or kind == NK_TYPE_PTR:
         return self.trait_object_from_type_node(self.ast.get_data0(type_node))
-    if kind == NK_TYPE_GENERIC():
+    if kind == NK_TYPE_GENERIC:
         let base = self.ast.get_data0(type_node)
         if self.pool_resolve(base) != "Box":
             return 0
@@ -3635,7 +3951,7 @@ fn Sema.trait_object_from_type_node(self: Sema, type_node: i32) -> i32:
 fn Sema.dyn_arg_concrete_type_symbol(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_REF() or tk == TY_PTR():
+    if tk == TY_REF or tk == TY_PTR:
         return self.type_symbol_for_bounds(self.get_type_d0(resolved))
     self.type_symbol_for_bounds(resolved)
 
@@ -3662,7 +3978,7 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
         return self.ty_bool
 
     if field == self.sym_track:
-        if self.ast.kind(expr) != NK_IDENT() or self.is_active_async_scope_symbol(self.ast.get_data0(expr)) == 0:
+        if self.ast.kind(expr) != NK_IDENT or self.is_active_async_scope_symbol(self.ast.get_data0(expr)) == 0:
             self.emit_error("track() is only available inside async scope", node)
             return 0
         if arg_count <= 0:
@@ -3699,6 +4015,10 @@ fn Sema.is_intrinsic_fn_sym(self: Sema, fn_sym: i32) -> i32:
         return 1
     if fn_sym == self.sym_todo or fn_sym == self.sym_unreachable:
         return 1
+    if fn_sym == self.sym_src:
+        return 1
+    if fn_sym == self.sym_embed_file:
+        return 1
     0
 
 fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i32], arg_count: i32) -> i32:
@@ -3711,7 +4031,7 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
             let cap_ty = arg_types.get(0)
             if cap_ty != 0:
                 let cap_kind = self.get_type_kind(self.resolve_alias(cap_ty))
-                if cap_kind != TY_INT():
+                if cap_kind != TY_INT:
                     self.emit_error("Channel() capacity must be an integer", self.ast.get_extra(args_start))
                     return 0
         return self.ty_i64
@@ -3722,7 +4042,7 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
         let ch_ty = arg_types.get(0)
         if ch_ty != 0:
             let ch_kind = self.get_type_kind(self.resolve_alias(ch_ty))
-            if ch_kind != TY_INT():
+            if ch_kind != TY_INT:
                 self.emit_error("send() expects channel handle as integer value", self.ast.get_extra(args_start))
                 return 0
         let payload_node = self.ast.get_extra(args_start + 1)
@@ -3732,7 +4052,7 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
         let payload_ty = arg_types.get(1)
         if payload_ty != 0:
             let payload_kind = self.get_type_kind(self.resolve_alias(payload_ty))
-            if payload_kind != TY_INT():
+            if payload_kind != TY_INT:
                 self.emit_error("send() currently supports integer payloads", payload_node)
                 return 0
         return self.ty_void
@@ -3743,7 +4063,7 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
         let ch_ty = arg_types.get(0)
         if ch_ty != 0:
             let ch_kind = self.get_type_kind(self.resolve_alias(ch_ty))
-            if ch_kind != TY_INT():
+            if ch_kind != TY_INT:
                 self.emit_error("recv() expects channel handle as integer value", self.ast.get_extra(args_start))
                 return 0
         return self.ty_i32
@@ -3754,7 +4074,7 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
         let ch_ty = arg_types.get(0)
         if ch_ty != 0:
             let ch_kind = self.get_type_kind(self.resolve_alias(ch_ty))
-            if ch_kind != TY_INT():
+            if ch_kind != TY_INT:
                 self.emit_error("close() expects channel handle as integer value", self.ast.get_extra(args_start))
                 return 0
         return self.ty_void
@@ -3769,6 +4089,15 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
                     self.emit_error("todo()/unreachable() message must be str-compatible", self.ast.get_extra(self.ast.get_data1(node)))
                     return 0
         return self.ty_never
+    if fn_sym == self.sym_src:
+        if arg_count != 0:
+            self.emit_error("src() takes no arguments", node)
+        return self.ty_str
+    if fn_sym == self.sym_embed_file:
+        if arg_count != 1:
+            self.emit_error("embed_file() takes exactly one string argument", node)
+            return self.ty_str
+        return self.ty_str
     0
 
 fn Sema.static_receiver_base_sym(self: Sema, expr: i32) -> i32:
@@ -3776,7 +4105,7 @@ fn Sema.static_receiver_base_sym(self: Sema, expr: i32) -> i32:
     if expr == 0:
         return 0
     let kind = self.ast.kind(expr)
-    if kind == NK_IDENT() or kind == NK_TYPE_NAMED() or kind == NK_TYPE_GENERIC():
+    if kind == NK_IDENT or kind == NK_TYPE_NAMED or kind == NK_TYPE_GENERIC:
         return self.ast.get_data0(expr)
     0
 
@@ -3794,32 +4123,32 @@ fn Sema.type_expr_contains_ref(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NK_TYPE_REF():
+    if kind == NK_TYPE_REF:
         return 1
-    if kind == NK_TYPE_GENERIC():
+    if kind == NK_TYPE_GENERIC:
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
         for ai in 0..arg_count:
             if self.type_expr_contains_ref(self.ast.get_extra(extra_start + ai)) != 0:
                 return 1
         return 0
-    if kind == NK_TYPE_PTR() or kind == NK_TYPE_OPTIONAL():
+    if kind == NK_TYPE_PTR or kind == NK_TYPE_OPTIONAL:
         return self.type_expr_contains_ref(self.ast.get_data0(node))
-    if kind == NK_TYPE_FN():
+    if kind == NK_TYPE_FN:
         let extra_start = self.ast.get_data0(node)
         let param_count = self.ast.get_data1(node)
         for pi in 0..param_count:
             if self.type_expr_contains_ref(self.ast.get_extra(extra_start + pi)) != 0:
                 return 1
         return self.type_expr_contains_ref(self.ast.get_data2(node))
-    if kind == NK_TYPE_TUPLE():
+    if kind == NK_TYPE_TUPLE:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         for ei in 0..elem_count:
             if self.type_expr_contains_ref(self.ast.get_extra(extra_start + ei)) != 0:
                 return 1
         return 0
-    if kind == NK_TYPE_ARRAY() or kind == NK_TYPE_SLICE():
+    if kind == NK_TYPE_ARRAY or kind == NK_TYPE_SLICE:
         return self.type_expr_contains_ref(self.ast.get_data0(node))
     0
 
@@ -3827,7 +4156,7 @@ fn Sema.type_expr_is_collection_with_ref(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NK_TYPE_GENERIC():
+    if kind == NK_TYPE_GENERIC:
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
         for ai in 0..arg_count:
@@ -3837,23 +4166,23 @@ fn Sema.type_expr_is_collection_with_ref(self: Sema, node: i32) -> i32:
             if self.type_expr_is_collection_with_ref(arg_node) != 0:
                 return 1
         return 0
-    if kind == NK_TYPE_PTR() or kind == NK_TYPE_OPTIONAL():
+    if kind == NK_TYPE_PTR or kind == NK_TYPE_OPTIONAL:
         return self.type_expr_is_collection_with_ref(self.ast.get_data0(node))
-    if kind == NK_TYPE_FN():
+    if kind == NK_TYPE_FN:
         let extra_start = self.ast.get_data0(node)
         let param_count = self.ast.get_data1(node)
         for pi in 0..param_count:
             if self.type_expr_is_collection_with_ref(self.ast.get_extra(extra_start + pi)) != 0:
                 return 1
         return self.type_expr_is_collection_with_ref(self.ast.get_data2(node))
-    if kind == NK_TYPE_TUPLE():
+    if kind == NK_TYPE_TUPLE:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         for ei in 0..elem_count:
             if self.type_expr_is_collection_with_ref(self.ast.get_extra(extra_start + ei)) != 0:
                 return 1
         return 0
-    if kind == NK_TYPE_ARRAY() or kind == NK_TYPE_SLICE():
+    if kind == NK_TYPE_ARRAY or kind == NK_TYPE_SLICE:
         return self.type_expr_is_collection_with_ref(self.ast.get_data0(node))
     0
 
@@ -3861,26 +4190,26 @@ fn Sema.borrow_root_place(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NK_IDENT():
+    if kind == NK_IDENT:
         return self.ast.get_data0(node)
-    if kind == NK_FIELD_ACCESS():
+    if kind == NK_FIELD_ACCESS:
         let base = self.ast.get_data0(node)
-        if self.ast.kind(base) == NK_IDENT():
+        if self.ast.kind(base) == NK_IDENT:
             return self.ast.get_data0(base)
         return 0
-    if kind == NK_INDEX():
+    if kind == NK_INDEX:
         let base = self.ast.get_data0(node)
-        if self.ast.kind(base) == NK_IDENT():
+        if self.ast.kind(base) == NK_IDENT:
             return self.ast.get_data0(base)
         return 0
-    if kind == NK_GROUPED():
+    if kind == NK_GROUPED:
         return self.borrow_root_place(self.ast.get_data0(node))
     0
 
 fn Sema.borrow_field(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
-    if self.ast.kind(node) == NK_FIELD_ACCESS():
+    if self.ast.kind(node) == NK_FIELD_ACCESS:
         return self.ast.get_data1(node)
     0
 
@@ -3911,15 +4240,15 @@ fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: 
             continue
 
         let existing_kind = self.borrow_kinds.get(i as i64)
-        if kind == BK_SHARED():
-            if existing_kind == BK_EXCLUSIVE():
+        if kind == BK_SHARED:
+            if existing_kind == BK_EXCLUSIVE:
                 self.emit_error("cannot borrow: already mutably borrowed", err_node)
                 return
             i = i + 1
             continue
 
         // New exclusive borrow conflicts with any existing borrow.
-        if existing_kind == BK_EXCLUSIVE():
+        if existing_kind == BK_EXCLUSIVE:
             self.emit_error("cannot borrow mutably: already mutably borrowed", err_node)
         else:
             self.emit_error("cannot borrow mutably: already borrowed", err_node)
@@ -3948,19 +4277,19 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NK_IDENT():
+    if kind == NK_IDENT:
         if self.ast.get_data0(node) == sym:
             return 1
         return 0
-    if kind == NK_BINARY():
+    if kind == NK_BINARY:
         if self.expr_uses_symbol(self.ast.get_data1(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data2(node), sym)
-    if kind == NK_UNARY():
+    if kind == NK_UNARY:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
-    if kind == NK_GROUPED() or kind == NK_AWAIT() or kind == NK_ASYNC_BLOCK() or kind == NK_SPAWN() or kind == NK_DEFER() or kind == NK_YIELD() or kind == NK_COMPTIME():
+    if kind == NK_GROUPED or kind == NK_AWAIT or kind == NK_ASYNC_BLOCK or kind == NK_SPAWN or kind == NK_DEFER or kind == NK_ERRDEFER or kind == NK_YIELD or kind == NK_COMPTIME:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
-    if kind == NK_CALL():
+    if kind == NK_CALL:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         let extra_start = self.ast.get_data1(node)
@@ -3969,9 +4298,9 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
             if self.expr_uses_symbol(self.ast.get_extra(extra_start + ai), sym) != 0:
                 return 1
         return 0
-    if kind == NK_FIELD_ACCESS():
+    if kind == NK_FIELD_ACCESS:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
-    if kind == NK_OPTIONAL_CHAIN():
+    if kind == NK_OPTIONAL_CHAIN:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         let extra_start = self.ast.get_data2(node)
@@ -3983,17 +4312,17 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
                     if self.expr_uses_symbol(self.ast.get_extra(extra_start + 2 + ai), sym) != 0:
                         return 1
         return 0
-    if kind == NK_INDEX():
+    if kind == NK_INDEX:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
-    if kind == NK_SLICE():
+    if kind == NK_SLICE:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         if self.expr_uses_symbol(self.ast.get_data1(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data2(node), sym)
-    if kind == NK_BLOCK():
+    if kind == NK_BLOCK:
         let extra_start = self.ast.get_data0(node)
         let stmt_count = self.ast.get_data1(node)
         let tail = self.ast.get_data2(node)
@@ -4001,38 +4330,38 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
             if self.expr_uses_symbol(self.ast.get_extra(extra_start + si), sym) != 0:
                 return 1
         return self.expr_uses_symbol(tail, sym)
-    if kind == NK_IF_EXPR():
+    if kind == NK_IF_EXPR:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         if self.expr_uses_symbol(self.ast.get_data1(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data2(node), sym)
-    if kind == NK_RETURN():
+    if kind == NK_RETURN:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
-    if kind == NK_LET_BINDING():
+    if kind == NK_LET_BINDING:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
-    if kind == NK_LET_ELSE():
+    if kind == NK_LET_ELSE:
         if self.expr_uses_symbol(self.ast.get_data1(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data2(node), sym)
-    if kind == NK_TUPLE_DESTRUCTURE():
+    if kind == NK_TUPLE_DESTRUCTURE:
         return self.expr_uses_symbol(self.ast.get_data2(node), sym)
-    if kind == NK_ASSIGN():
+    if kind == NK_ASSIGN:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
-    if kind == NK_TUPLE() or kind == NK_ARRAY_LIT():
+    if kind == NK_TUPLE or kind == NK_ARRAY_LIT:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         for ei in 0..elem_count:
             if self.expr_uses_symbol(self.ast.get_extra(extra_start + ei), sym) != 0:
                 return 1
         return 0
-    if kind == NK_RANGE():
+    if kind == NK_RANGE:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
-    if kind == NK_MATCH():
+    if kind == NK_MATCH:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         let extra_start = self.ast.get_data1(node)
@@ -4045,34 +4374,34 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
             if self.expr_uses_symbol(self.ast.get_data1(arm), sym) != 0:
                 return 1
         return 0
-    if kind == NK_STRUCT_LIT():
+    if kind == NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
         for fi in 0..field_count:
             if self.expr_uses_symbol(self.ast.get_extra(extra_start + fi * 2 + 1), sym) != 0:
                 return 1
         return 0
-    if kind == NK_FOR():
+    if kind == NK_FOR:
         if self.expr_uses_symbol(self.ast.get_data1(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data2(node), sym)
-    if kind == NK_WHILE():
+    if kind == NK_WHILE:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
-    if kind == NK_LOOP():
+    if kind == NK_LOOP:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
-    if kind == NK_BREAK():
+    if kind == NK_BREAK:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
-    if kind == NK_PIPELINE():
+    if kind == NK_PIPELINE:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
-    if kind == NK_WITH_EXPR():
+    if kind == NK_WITH_EXPR:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
-    if kind == NK_RECORD_UPDATE():
+    if kind == NK_RECORD_UPDATE:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         let extra_start = self.ast.get_data1(node)
@@ -4081,24 +4410,24 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
             if self.expr_uses_symbol(self.ast.get_extra(extra_start + fi * 2 + 1), sym) != 0:
                 return 1
         return 0
-    if kind == NK_ENUM_VARIANT():
+    if kind == NK_ENUM_VARIANT:
         let extra_start = self.ast.get_data2(node)
         let arg_count = self.ast.get_extra(extra_start)
         for ai in 0..arg_count:
             if self.expr_uses_symbol(self.ast.get_extra(extra_start + 1 + ai), sym) != 0:
                 return 1
         return 0
-    if kind == NK_CLOSURE() or kind == NK_CAST():
+    if kind == NK_CLOSURE or kind == NK_CAST:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
-    if kind == NK_ARRAY_COMPREHENSION():
+    if kind == NK_ARRAY_COMPREHENSION:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         if self.expr_uses_symbol(self.ast.get_data2(node), sym) != 0:
             return 1
         return 0
-    if kind == NK_ASYNC_SCOPE():
+    if kind == NK_ASYNC_SCOPE:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
-    if kind == NK_SELECT_AWAIT():
+    if kind == NK_SELECT_AWAIT:
         let extra_start = self.ast.get_data0(node)
         let arm_count = self.ast.get_data1(node)
         for ai in 0..arm_count:
@@ -4139,18 +4468,18 @@ fn Sema.type_is_ephemeral_value(self: Sema, tid: i32) -> i32:
         return 0
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_REF() or tk == TY_SLICE():
+    if tk == TY_REF or tk == TY_SLICE:
         return 1
-    if tk == TY_ARRAY():
+    if tk == TY_ARRAY:
         return self.type_is_ephemeral_value(self.get_type_d0(resolved))
-    if tk == TY_TUPLE():
+    if tk == TY_TUPLE:
         let te_start = self.get_type_d0(resolved)
         let elem_count = self.get_type_d1(resolved)
         for ei in 0..elem_count:
             if self.type_is_ephemeral_value(self.type_extra.get((te_start + ei) as i64)) != 0:
                 return 1
         return 0
-    if tk == TY_STRUCT():
+    if tk == TY_STRUCT:
         let st_name = self.get_type_d0(resolved)
         if self.ephemeral_types.contains(st_name):
             return 1
@@ -4170,11 +4499,11 @@ fn Sema.infer_for_element_type(self: Sema, iter_type: i32) -> i32:
         return 0
     let resolved = self.resolve_alias(iter_type)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_RANGE():
+    if tk == TY_RANGE:
         return self.get_type_d0(resolved)
-    if tk == TY_ARRAY():
+    if tk == TY_ARRAY:
         return self.get_type_d0(resolved)
-    if tk == TY_SLICE():
+    if tk == TY_SLICE:
         return self.get_type_d0(resolved)
     self.ty_i32
 
@@ -4182,7 +4511,7 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
     if node == 0:
         return
     let kind = self.ast.kind(node)
-    if kind == NK_IDENT():
+    if kind == NK_IDENT:
         let sym = self.ast.get_data0(node)
         if self.scope_has(sym) != 0:
             let tid = self.scope_lookup(sym)
@@ -4196,8 +4525,8 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
                         " resolved=" ++ int_to_string(resolved) ++
                         " kind=" ++ int_to_string(self.get_type_kind(resolved))
                     )
-                self.scope_set_state(sym, VS_MOVED())
-    if kind == NK_GROUPED():
+                self.scope_set_state(sym, VS_MOVED)
+    if kind == NK_GROUPED:
         self.mark_moved_if_consumed(self.ast.get_data0(node))
 
 fn Sema.method_key(self: Sema, type_sym: i32, method_sym: i32) -> i32:
@@ -4215,11 +4544,11 @@ fn Sema.method_key(self: Sema, type_sym: i32, method_sym: i32) -> i32:
 fn Sema.get_type_name(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_REF() or tk == TY_PTR():
+    if tk == TY_REF or tk == TY_PTR:
         return self.get_type_name(self.get_type_d0(resolved))
-    if tk == TY_STRUCT():
+    if tk == TY_STRUCT:
         return self.get_type_d0(resolved)
-    if tk == TY_ENUM():
+    if tk == TY_ENUM:
         return self.get_type_d0(resolved)
     0
 
@@ -4239,35 +4568,35 @@ fn Sema.types_compatible_fast(self: Sema, expected: i32, actual: i32) -> i32:
     let exp_k = self.get_type_kind(exp_r)
     let act_k = self.get_type_kind(act_r)
 
-    if act_k == TY_NEVER():
+    if act_k == TY_NEVER:
         return 1
-    if exp_k == TY_BOOL() and act_k == TY_BOOL():
+    if exp_k == TY_BOOL and act_k == TY_BOOL:
         return 1
-    if exp_k == TY_VOID() and act_k == TY_VOID():
+    if exp_k == TY_VOID and act_k == TY_VOID:
         return 1
-    if exp_k == TY_STR() and act_k == TY_STR():
+    if exp_k == TY_STR and act_k == TY_STR:
         return 1
-    if exp_k == TY_INT() and act_k == TY_INT():
+    if exp_k == TY_INT and act_k == TY_INT:
         return 1
-    if exp_k == TY_FLOAT() and act_k == TY_FLOAT():
+    if exp_k == TY_FLOAT and act_k == TY_FLOAT:
         return 1
-    if exp_k == TY_FLOAT() and act_k == TY_INT():
+    if exp_k == TY_FLOAT and act_k == TY_INT:
         return 1
-    if exp_k == TY_INT() and act_k == TY_FLOAT():
+    if exp_k == TY_INT and act_k == TY_FLOAT:
         return 1
-    if (exp_k == TY_PTR() or exp_k == TY_REF()) and act_k == TY_STR():
+    if (exp_k == TY_PTR or exp_k == TY_REF) and act_k == TY_STR:
         return 1
-    if exp_k == TY_STR() and (act_k == TY_PTR() or act_k == TY_REF()):
+    if exp_k == TY_STR and (act_k == TY_PTR or act_k == TY_REF):
         return 1
-    if exp_k == TY_FN() and act_k == TY_FN():
+    if exp_k == TY_FN and act_k == TY_FN:
         return 1
-    if (exp_k == TY_PTR() or exp_k == TY_REF()) and act_k == TY_FN():
+    if (exp_k == TY_PTR or exp_k == TY_REF) and act_k == TY_FN:
         return 1
-    if exp_k == TY_FN() and (act_k == TY_PTR() or act_k == TY_REF()):
+    if exp_k == TY_FN and (act_k == TY_PTR or act_k == TY_REF):
         return 1
-    if exp_k == TY_STRUCT() and act_k == TY_STRUCT():
+    if exp_k == TY_STRUCT and act_k == TY_STRUCT:
         return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
-    if exp_k == TY_ENUM() and act_k == TY_ENUM():
+    if exp_k == TY_ENUM and act_k == TY_ENUM:
         return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
     0
 
@@ -4281,45 +4610,45 @@ fn Sema.types_compatible(self: Sema, expected: i32, actual: i32) -> i32:
     let act_k = self.get_type_kind(act_r)
 
     // Structural compatibility for non-interned compound types.
-    if exp_k == TY_PTR() and act_k == TY_PTR():
-        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TY_VOID():
+    if exp_k == TY_PTR and act_k == TY_PTR:
+        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TY_VOID:
             return 1
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
             return 0
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
-    if exp_k == TY_PTR() and act_k == TY_REF():
-        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TY_VOID():
+    if exp_k == TY_PTR and act_k == TY_REF:
+        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TY_VOID:
             return 1
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
             return 0
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
-    if exp_k == TY_REF() and act_k == TY_REF():
-        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TY_VOID():
+    if exp_k == TY_REF and act_k == TY_REF:
+        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TY_VOID:
             return 1
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
             return 0
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
-    if exp_k == TY_REF() and act_k == TY_PTR():
-        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TY_VOID():
+    if exp_k == TY_REF and act_k == TY_PTR:
+        if self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r))) == TY_VOID:
             return 1
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
             return 0
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
-    if exp_k == TY_SLICE() and act_k == TY_SLICE():
+    if exp_k == TY_SLICE and act_k == TY_SLICE:
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
-    if exp_k == TY_ARRAY() and act_k == TY_ARRAY():
+    if exp_k == TY_ARRAY and act_k == TY_ARRAY:
         if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
             return 0
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
-    if exp_k == TY_TUPLE() and act_k == TY_TUPLE():
+    if exp_k == TY_TUPLE and act_k == TY_TUPLE:
         let exp_count = self.get_type_d1(exp_r)
         let act_count = self.get_type_d1(act_r)
         if exp_count != act_count:
@@ -4334,7 +4663,7 @@ fn Sema.types_compatible(self: Sema, expected: i32, actual: i32) -> i32:
         return 1
 
     // Auto-referencing: T → &T
-    if exp_k == TY_REF():
+    if exp_k == TY_REF:
         if self.get_type_d1(exp_r) == 0:
             if self.types_compatible(self.get_type_d0(exp_r), act_r):
                 return 1
@@ -4347,23 +4676,23 @@ fn Sema.arithmetic_result_type(self: Sema, lhs: i32, rhs: i32) -> i32:
         return lhs
     let lk = self.get_type_kind(self.resolve_alias(lhs))
     let rk = self.get_type_kind(self.resolve_alias(rhs))
-    if lk == TY_NEVER():
+    if lk == TY_NEVER:
         return rhs
-    if rk == TY_NEVER():
+    if rk == TY_NEVER:
         return lhs
     // Float wins over int
-    if lk == TY_FLOAT() and rk == TY_FLOAT():
+    if lk == TY_FLOAT and rk == TY_FLOAT:
         let lb = self.get_type_d0(self.resolve_alias(lhs))
         let rb = self.get_type_d0(self.resolve_alias(rhs))
         if lb >= rb:
             return lhs
         return rhs
-    if lk == TY_FLOAT():
+    if lk == TY_FLOAT:
         return lhs
-    if rk == TY_FLOAT():
+    if rk == TY_FLOAT:
         return rhs
     // Wider int wins
-    if lk == TY_INT() and rk == TY_INT():
+    if lk == TY_INT and rk == TY_INT:
         let lb = self.get_type_d0(self.resolve_alias(lhs))
         let rb = self.get_type_d0(self.resolve_alias(rhs))
         if lb >= rb:
@@ -4376,11 +4705,11 @@ fn Sema.is_copy(self: Sema, tid: i32) -> i32:
         return 1
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_ERR() or tk == TY_INT() or tk == TY_FLOAT() or tk == TY_BOOL() or tk == TY_VOID() or tk == TY_NEVER() or tk == TY_STR():
+    if tk == TY_ERR or tk == TY_INT or tk == TY_FLOAT or tk == TY_BOOL or tk == TY_VOID or tk == TY_NEVER or tk == TY_STR:
         return 1
-    if tk == TY_PTR() or tk == TY_REF() or tk == TY_FN() or tk == TY_GENERIC_FN():
+    if tk == TY_PTR or tk == TY_REF or tk == TY_FN or tk == TY_GENERIC_FN:
         return 1
-    if tk == TY_STRUCT() or tk == TY_ARRAY() or tk == TY_TUPLE() or tk == TY_RANGE():
+    if tk == TY_STRUCT or tk == TY_ARRAY or tk == TY_TUPLE or tk == TY_RANGE:
         // Break copy-check recursion on cyclic type graphs.
         for vi in 0..self.copy_visit_stack.len() as i32:
             if self.copy_visit_stack.get(vi as i64) == resolved:
@@ -4388,7 +4717,7 @@ fn Sema.is_copy(self: Sema, tid: i32) -> i32:
         self.copy_visit_stack.push(resolved)
 
         var out = 1
-        if tk == TY_STRUCT():
+        if tk == TY_STRUCT:
             let name = self.get_type_d0(resolved)
             if self.has_drop_method(name):
                 if sema_debug_move_enabled() != 0:
@@ -4409,9 +4738,9 @@ fn Sema.is_copy(self: Sema, tid: i32) -> i32:
                             )
                         out = 0
                         break
-        else if tk == TY_ARRAY():
+        else if tk == TY_ARRAY:
             out = self.is_copy(self.get_type_d0(resolved))
-        else if tk == TY_TUPLE():
+        else if tk == TY_TUPLE:
             let tuple_te_start = self.get_type_d0(resolved)
             let tuple_elem_count = self.get_type_d1(resolved)
             for ei in 0..tuple_elem_count:
@@ -4423,9 +4752,9 @@ fn Sema.is_copy(self: Sema, tid: i32) -> i32:
 
         self.copy_visit_stack.pop()
         return out
-    if tk == TY_ENUM():
+    if tk == TY_ENUM:
         return 1
-    if tk == TY_SLICE():
+    if tk == TY_SLICE:
         return 1
     1
 
@@ -4504,66 +4833,67 @@ fn Sema.emit_warning(self: Sema, msg: str, node: i32):
 // ── Typed dump rendering ────────────────────────────────────────
 
 fn typed_decl_kind_name(kind: i32) -> str:
-    if kind == NK_FN_DECL(): return "function"
-    if kind == NK_TYPE_DECL(): return "type_decl"
-    if kind == NK_USE_DECL(): return "use_decl"
-    if kind == NK_LET_DECL(): return "let_decl"
-    if kind == NK_EXTERN_FN(): return "extern_fn"
-    if kind == NK_C_IMPORT(): return "c_import"
-    if kind == NK_TRAIT_DECL(): return "trait_decl"
-    if kind == NK_IMPL_DECL(): return "impl_decl"
-    if kind == NK_POISONED_DECL(): return "poisoned"
+    if kind == NK_FN_DECL: return "function"
+    if kind == NK_TYPE_DECL: return "type_decl"
+    if kind == NK_USE_DECL: return "use_decl"
+    if kind == NK_LET_DECL: return "let_decl"
+    if kind == NK_EXTERN_FN: return "extern_fn"
+    if kind == NK_C_IMPORT: return "c_import"
+    if kind == NK_TRAIT_DECL: return "trait_decl"
+    if kind == NK_IMPL_DECL: return "impl_decl"
+    if kind == NK_POISONED_DECL: return "poisoned"
     "unknown"
 
 fn typed_expr_kind_name(kind: i32) -> str:
-    if kind == NK_INT_LIT(): return "int_literal"
-    if kind == NK_FLOAT_LIT(): return "float_literal"
-    if kind == NK_STRING_LIT(): return "string_literal"
-    if kind == NK_C_STRING_LIT(): return "c_string_literal"
-    if kind == NK_BOOL_LIT(): return "bool_literal"
-    if kind == NK_IDENT(): return "ident"
-    if kind == NK_BINARY(): return "binary"
-    if kind == NK_UNARY(): return "unary"
-    if kind == NK_CALL(): return "call"
-    if kind == NK_FIELD_ACCESS(): return "field_access"
-    if kind == NK_INDEX(): return "index"
-    if kind == NK_SLICE(): return "slice"
-    if kind == NK_BLOCK(): return "block"
-    if kind == NK_IF_EXPR(): return "if_expr"
-    if kind == NK_RETURN(): return "return_expr"
-    if kind == NK_LET_BINDING(): return "let_binding"
-    if kind == NK_LET_ELSE(): return "let_else"
-    if kind == NK_TUPLE_DESTRUCTURE(): return "tuple_destructure"
-    if kind == NK_ASSIGN(): return "assign"
-    if kind == NK_TUPLE(): return "tuple"
-    if kind == NK_RANGE(): return "range"
-    if kind == NK_VARIANT_SHORTHAND(): return "variant_shorthand"
-    if kind == NK_AWAIT(): return "await_expr"
-    if kind == NK_ASYNC_BLOCK(): return "async_block"
-    if kind == NK_SPAWN(): return "spawn_expr"
-    if kind == NK_PIPELINE(): return "pipeline"
-    if kind == NK_GROUPED(): return "grouped"
-    if kind == NK_WHILE(): return "while_expr"
-    if kind == NK_LOOP(): return "loop_expr"
-    if kind == NK_FOR(): return "for_expr"
-    if kind == NK_BREAK(): return "break_expr"
-    if kind == NK_CONTINUE(): return "continue_expr"
-    if kind == NK_ARRAY_LIT(): return "array_literal"
-    if kind == NK_ARRAY_COMPREHENSION(): return "array_comprehension"
-    if kind == NK_STRUCT_LIT(): return "struct_literal"
-    if kind == NK_MATCH(): return "match_expr"
-    if kind == NK_ENUM_VARIANT(): return "enum_variant"
-    if kind == NK_CLOSURE(): return "closure"
-    if kind == NK_CAST(): return "cast"
-    if kind == NK_DEFER(): return "defer_expr"
-    if kind == NK_WITH_EXPR(): return "with_expr"
-    if kind == NK_RECORD_UPDATE(): return "record_update"
-    if kind == NK_YIELD(): return "yield_expr"
-    if kind == NK_COMPTIME(): return "comptime_expr"
-    if kind == NK_ASYNC_SCOPE(): return "async_scope"
-    if kind == NK_SELECT_AWAIT(): return "select_await"
-    if kind == NK_OPTIONAL_CHAIN(): return "optional_chain"
-    if kind == NK_POISONED_EXPR(): return "poisoned"
+    if kind == NK_INT_LIT: return "int_literal"
+    if kind == NK_FLOAT_LIT: return "float_literal"
+    if kind == NK_STRING_LIT: return "string_literal"
+    if kind == NK_C_STRING_LIT: return "c_string_literal"
+    if kind == NK_BOOL_LIT: return "bool_literal"
+    if kind == NK_IDENT: return "ident"
+    if kind == NK_BINARY: return "binary"
+    if kind == NK_UNARY: return "unary"
+    if kind == NK_CALL: return "call"
+    if kind == NK_FIELD_ACCESS: return "field_access"
+    if kind == NK_INDEX: return "index"
+    if kind == NK_SLICE: return "slice"
+    if kind == NK_BLOCK: return "block"
+    if kind == NK_IF_EXPR: return "if_expr"
+    if kind == NK_RETURN: return "return_expr"
+    if kind == NK_LET_BINDING: return "let_binding"
+    if kind == NK_LET_ELSE: return "let_else"
+    if kind == NK_TUPLE_DESTRUCTURE: return "tuple_destructure"
+    if kind == NK_ASSIGN: return "assign"
+    if kind == NK_TUPLE: return "tuple"
+    if kind == NK_RANGE: return "range"
+    if kind == NK_VARIANT_SHORTHAND: return "variant_shorthand"
+    if kind == NK_AWAIT: return "await_expr"
+    if kind == NK_ASYNC_BLOCK: return "async_block"
+    if kind == NK_SPAWN: return "spawn_expr"
+    if kind == NK_PIPELINE: return "pipeline"
+    if kind == NK_GROUPED: return "grouped"
+    if kind == NK_WHILE: return "while_expr"
+    if kind == NK_LOOP: return "loop_expr"
+    if kind == NK_FOR: return "for_expr"
+    if kind == NK_BREAK: return "break_expr"
+    if kind == NK_CONTINUE: return "continue_expr"
+    if kind == NK_ARRAY_LIT: return "array_literal"
+    if kind == NK_ARRAY_COMPREHENSION: return "array_comprehension"
+    if kind == NK_STRUCT_LIT: return "struct_literal"
+    if kind == NK_MATCH: return "match_expr"
+    if kind == NK_ENUM_VARIANT: return "enum_variant"
+    if kind == NK_CLOSURE: return "closure"
+    if kind == NK_CAST: return "cast"
+    if kind == NK_DEFER: return "defer_expr"
+    if kind == NK_ERRDEFER: return "errdefer_expr"
+    if kind == NK_WITH_EXPR: return "with_expr"
+    if kind == NK_RECORD_UPDATE: return "record_update"
+    if kind == NK_YIELD: return "yield_expr"
+    if kind == NK_COMPTIME: return "comptime_expr"
+    if kind == NK_ASYNC_SCOPE: return "async_scope"
+    if kind == NK_SELECT_AWAIT: return "select_await"
+    if kind == NK_OPTIONAL_CHAIN: return "optional_chain"
+    if kind == NK_POISONED_EXPR: return "poisoned"
     "unknown"
 
 fn typed_indent(indent: i32) -> str:
@@ -4601,7 +4931,7 @@ fn Sema.impl_owner_type_name_for_decl(self: Sema, decl: i32) -> str:
     var best_name = ""
     for di in 0..self.ast.decl_count():
         let cand = self.ast.get_decl(di)
-        if self.ast.kind(cand) != NK_IMPL_DECL():
+        if self.ast.kind(cand) != NK_IMPL_DECL:
             continue
         let impl_start = self.ast.get_start(cand)
         let impl_end = self.ast.get_end(cand)
@@ -4672,7 +5002,7 @@ fn Sema.dump_typed_module(self: Sema) -> str:
 
         out = out ++ "decl[" ++ int_to_string(di) ++ "] kind=" ++ typed_decl_kind_name(kind) ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ "\n"
 
-        if kind == NK_FN_DECL():
+        if kind == NK_FN_DECL:
             let fn_name_sym = self.ast.get_data0(decl)
             var fn_name = self.safe_symbol_text(fn_name_sym)
             let owner_type_name = self.impl_owner_type_name_for_decl(decl)
@@ -4706,7 +5036,7 @@ fn Sema.dump_typed_module(self: Sema) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(decl), 2)
             continue
 
-        if kind == NK_EXTERN_FN():
+        if kind == NK_EXTERN_FN:
             let ext_name_sym = self.ast.get_data0(decl)
             let ext_name = self.safe_symbol_text(ext_name_sym)
             let sig_idx = self.get_sig(ext_name_sym)
@@ -4730,7 +5060,7 @@ fn Sema.dump_typed_module(self: Sema) -> str:
                 out = out ++ "  extern fn (<unknown>)\n"
             continue
 
-        if kind == NK_LET_DECL():
+        if kind == NK_LET_DECL:
             let name = self.safe_symbol_text(self.ast.get_data0(decl))
             let has_resolved = self.typed_binding_types.contains(start) and self.typed_binding_types.get(start).unwrap() != 0
             if has_resolved:
@@ -4748,15 +5078,15 @@ fn Sema.dump_typed_module(self: Sema) -> str:
                 out = out ++ "  let " ++ name ++ ": " ++ (if has_ann: "<annotated>" else: "<inferred>") ++ "\n"
             continue
 
-        if kind == NK_TYPE_DECL():
+        if kind == NK_TYPE_DECL:
             out = out ++ "  type " ++ self.safe_symbol_text(self.ast.get_data0(decl)) ++ "\n"
             continue
 
-        if kind == NK_TRAIT_DECL():
+        if kind == NK_TRAIT_DECL:
             out = out ++ "  trait " ++ self.safe_symbol_text(self.ast.get_data0(decl)) ++ "\n"
             continue
 
-        if kind == NK_IMPL_DECL():
+        if kind == NK_IMPL_DECL:
             let type_name = self.safe_symbol_text(self.ast.get_data0(decl))
             let trait_sym = self.ast.get_data2(decl)
             if trait_sym != 0:
@@ -4765,7 +5095,7 @@ fn Sema.dump_typed_module(self: Sema) -> str:
                 out = out ++ "  impl " ++ type_name ++ "\n"
             continue
 
-        if kind == NK_USE_DECL():
+        if kind == NK_USE_DECL:
             let extra_start = self.ast.get_data0(decl)
             let path_count = self.ast.get_data1(decl)
             out = out ++ "  use "
@@ -4776,11 +5106,11 @@ fn Sema.dump_typed_module(self: Sema) -> str:
             out = out ++ "\n"
             continue
 
-        if kind == NK_C_IMPORT():
+        if kind == NK_C_IMPORT:
             out = out ++ "  c_import \"" ++ self.safe_symbol_text(self.ast.get_data0(decl)) ++ "\"\n"
             continue
 
-        if kind == NK_POISONED_DECL():
+        if kind == NK_POISONED_DECL:
             out = out ++ "  <poisoned>\n"
 
     out
@@ -4801,7 +5131,7 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
 
         print("decl[" ++ int_to_string(di) ++ "] kind=" ++ typed_decl_kind_name(kind) ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ "\n")
 
-        if kind == NK_FN_DECL():
+        if kind == NK_FN_DECL:
             let fn_name_sym = self.ast.get_data0(decl)
             var fn_name = self.safe_symbol_text(fn_name_sym)
             let owner_type_name = self.impl_owner_type_name_for_decl(decl)
@@ -4843,7 +5173,7 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
             self.emit_typed_expr_tree(self.ast.get_data1(decl), 2)
             continue
 
-        if kind == NK_EXTERN_FN():
+        if kind == NK_EXTERN_FN:
             let ext_name_sym = self.ast.get_data0(decl)
             let ext_name = self.safe_symbol_text(ext_name_sym)
             let sig_idx = self.get_sig(ext_name_sym)
@@ -4873,7 +5203,7 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
                 print("  extern fn (<unknown>)\n")
             continue
 
-        if kind == NK_LET_DECL():
+        if kind == NK_LET_DECL:
             let name = self.safe_symbol_text(self.ast.get_data0(decl))
             let has_resolved = self.typed_binding_types.contains(start) and self.typed_binding_types.get(start).unwrap() != 0
             if has_resolved:
@@ -4896,19 +5226,19 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
                 print("\n")
             continue
 
-        if kind == NK_TYPE_DECL():
+        if kind == NK_TYPE_DECL:
             print("  type ")
             print(self.safe_symbol_text(self.ast.get_data0(decl)))
             print("\n")
             continue
 
-        if kind == NK_TRAIT_DECL():
+        if kind == NK_TRAIT_DECL:
             print("  trait ")
             print(self.safe_symbol_text(self.ast.get_data0(decl)))
             print("\n")
             continue
 
-        if kind == NK_IMPL_DECL():
+        if kind == NK_IMPL_DECL:
             let type_name = self.safe_symbol_text(self.ast.get_data0(decl))
             let trait_sym = self.ast.get_data2(decl)
             if trait_sym != 0:
@@ -4923,7 +5253,7 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
                 print("\n")
             continue
 
-        if kind == NK_USE_DECL():
+        if kind == NK_USE_DECL:
             let extra_start = self.ast.get_data0(decl)
             let path_count = self.ast.get_data1(decl)
             print("  use ")
@@ -4934,13 +5264,13 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
             print("\n")
             continue
 
-        if kind == NK_C_IMPORT():
+        if kind == NK_C_IMPORT:
             print("  c_import \"")
             print(self.safe_symbol_text(self.ast.get_data0(decl)))
             print("\"\n")
             continue
 
-        if kind == NK_POISONED_DECL():
+        if kind == NK_POISONED_DECL:
             print("  <poisoned>\n")
 
 fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
@@ -4961,7 +5291,7 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
         let tid = self.typed_expr_types.get(start).unwrap()
         out = out ++ typed_indent(indent) ++ "expr " ++ typed_expr_kind_name(kind) ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ " : " ++ self.type_name(tid) ++ "\n"
 
-    if kind == NK_LET_BINDING():
+    if kind == NK_LET_BINDING:
         if self.typed_binding_types.contains(start):
             let name_sym = if self.typed_binding_names.contains(start): self.typed_binding_names.get(start).unwrap() else: self.ast.get_data0(node)
             let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: (self.ast.get_data2(node) % 2)
@@ -4970,16 +5300,16 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
                 out = out ++ " (mut)"
             out = out ++ ": " ++ self.type_name(self.typed_binding_types.get(start).unwrap()) ++ "\n"
 
-    if kind == NK_BINARY():
+    if kind == NK_BINARY:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return out
 
-    if kind == NK_UNARY():
+    if kind == NK_UNARY:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
-    if kind == NK_CALL():
+    if kind == NK_CALL:
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
         let safe_arg_count = self.clamp_extra_span_count(extra_start, arg_count, 1, 64)
@@ -4988,11 +5318,11 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + ai), indent + 1)
         return out
 
-    if kind == NK_FIELD_ACCESS():
+    if kind == NK_FIELD_ACCESS:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return out
 
-    if kind == NK_OPTIONAL_CHAIN():
+    if kind == NK_OPTIONAL_CHAIN:
         let extra_start = self.ast.get_data2(node)
         if extra_start < 0 or extra_start >= self.ast.extra_len():
             return out
@@ -5003,18 +5333,18 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + 1 + ai), indent + 1)
         return out
 
-    if kind == NK_INDEX():
+    if kind == NK_INDEX:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
-    if kind == NK_SLICE():
+    if kind == NK_SLICE:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return out
 
-    if kind == NK_BLOCK():
+    if kind == NK_BLOCK:
         let extra_start = self.ast.get_data0(node)
         let stmt_count = self.ast.get_data1(node)
         let tail = self.ast.get_data2(node)
@@ -5024,35 +5354,35 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
         out = out ++ self.dump_typed_expr_tree(tail, indent + 1)
         return out
 
-    if kind == NK_IF_EXPR():
+    if kind == NK_IF_EXPR:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return out
 
-    if kind == NK_RETURN():
+    if kind == NK_RETURN:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return out
 
-    if kind == NK_LET_BINDING():
+    if kind == NK_LET_BINDING:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
-    if kind == NK_LET_ELSE():
+    if kind == NK_LET_ELSE:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return out
 
-    if kind == NK_TUPLE_DESTRUCTURE():
+    if kind == NK_TUPLE_DESTRUCTURE:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return out
 
-    if kind == NK_ASSIGN():
+    if kind == NK_ASSIGN:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
-    if kind == NK_TUPLE():
+    if kind == NK_TUPLE:
         let extra_start = self.ast.get_data0(node)
         let count = self.ast.get_data1(node)
         let safe_count = self.clamp_extra_span_count(extra_start, count, 1, 64)
@@ -5060,12 +5390,12 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return out
 
-    if kind == NK_RANGE():
+    if kind == NK_RANGE:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
-    if kind == NK_VARIANT_SHORTHAND():
+    if kind == NK_VARIANT_SHORTHAND:
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
         let safe_arg_count = self.clamp_extra_span_count(extra_start, arg_count, 1, 64)
@@ -5073,34 +5403,34 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return out
 
-    if kind == NK_AWAIT() or kind == NK_ASYNC_BLOCK() or kind == NK_SPAWN() or kind == NK_GROUPED() or kind == NK_DEFER() or kind == NK_YIELD() or kind == NK_COMPTIME():
+    if kind == NK_AWAIT or kind == NK_ASYNC_BLOCK or kind == NK_SPAWN or kind == NK_GROUPED or kind == NK_DEFER or kind == NK_ERRDEFER or kind == NK_YIELD or kind == NK_COMPTIME:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return out
 
-    if kind == NK_PIPELINE():
-        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
-        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
-        return out
-
-    if kind == NK_WHILE():
+    if kind == NK_PIPELINE:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
-    if kind == NK_LOOP():
+    if kind == NK_WHILE:
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
+    if kind == NK_LOOP:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return out
 
-    if kind == NK_FOR():
+    if kind == NK_FOR:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return out
 
-    if kind == NK_BREAK():
+    if kind == NK_BREAK:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return out
 
-    if kind == NK_ARRAY_LIT():
+    if kind == NK_ARRAY_LIT:
         let extra_start = self.ast.get_data0(node)
         let count = self.ast.get_data1(node)
         let safe_count = self.clamp_extra_span_count(extra_start, count, 1, 128)
@@ -5108,12 +5438,12 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return out
 
-    if kind == NK_ARRAY_COMPREHENSION():
+    if kind == NK_ARRAY_COMPREHENSION:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return out
 
-    if kind == NK_STRUCT_LIT():
+    if kind == NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
         let safe_field_count = self.clamp_extra_span_count(extra_start, field_count, 2, 128)
@@ -5121,7 +5451,7 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
         return out
 
-    if kind == NK_MATCH():
+    if kind == NK_MATCH:
         let extra_start = self.ast.get_data1(node)
         let arm_count = self.ast.get_data2(node)
         let safe_arm_count = self.clamp_extra_span_count(extra_start, arm_count, 1, 128)
@@ -5134,7 +5464,7 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(arm), indent + 1)
         return out
 
-    if kind == NK_ENUM_VARIANT():
+    if kind == NK_ENUM_VARIANT:
         let extra_start = self.ast.get_data2(node)
         if extra_start < 0 or extra_start >= self.ast.extra_len():
             return out
@@ -5144,20 +5474,20 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + 1 + i), indent + 1)
         return out
 
-    if kind == NK_CLOSURE():
+    if kind == NK_CLOSURE:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return out
 
-    if kind == NK_CAST():
+    if kind == NK_CAST:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return out
 
-    if kind == NK_WITH_EXPR():
+    if kind == NK_WITH_EXPR:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
-    if kind == NK_RECORD_UPDATE():
+    if kind == NK_RECORD_UPDATE:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
@@ -5166,11 +5496,11 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
         return out
 
-    if kind == NK_ASYNC_SCOPE():
+    if kind == NK_ASYNC_SCOPE:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
-    if kind == NK_SELECT_AWAIT():
+    if kind == NK_SELECT_AWAIT:
         let extra_start = self.ast.get_data0(node)
         let arm_count = self.ast.get_data1(node)
         let safe_arm_count = self.clamp_extra_span_count(extra_start, arm_count, 3, 32)
@@ -5207,7 +5537,7 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
         print(self.type_name(tid))
         print("\n")
 
-    if kind == NK_LET_BINDING():
+    if kind == NK_LET_BINDING:
         if self.typed_binding_types.contains(start):
             let name_sym = if self.typed_binding_names.contains(start): self.typed_binding_names.get(start).unwrap() else: self.ast.get_data0(node)
             let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: (self.ast.get_data2(node) % 2)
@@ -5220,16 +5550,16 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             print(self.type_name(self.typed_binding_types.get(start).unwrap()))
             print("\n")
 
-    if kind == NK_BINARY():
+    if kind == NK_BINARY:
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return
 
-    if kind == NK_UNARY():
+    if kind == NK_UNARY:
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return
 
-    if kind == NK_CALL():
+    if kind == NK_CALL:
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
         let safe_arg_count = self.clamp_extra_span_count(extra_start, arg_count, 1, 64)
@@ -5238,11 +5568,11 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_extra(extra_start + ai), indent + 1)
         return
 
-    if kind == NK_FIELD_ACCESS():
+    if kind == NK_FIELD_ACCESS:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return
 
-    if kind == NK_OPTIONAL_CHAIN():
+    if kind == NK_OPTIONAL_CHAIN:
         let extra_start = self.ast.get_data2(node)
         if extra_start < 0 or extra_start >= self.ast.extra_len():
             return
@@ -5253,18 +5583,18 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_extra(extra_start + 1 + ai), indent + 1)
         return
 
-    if kind == NK_INDEX():
+    if kind == NK_INDEX:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return
 
-    if kind == NK_SLICE():
+    if kind == NK_SLICE:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return
 
-    if kind == NK_BLOCK():
+    if kind == NK_BLOCK:
         let extra_start = self.ast.get_data0(node)
         let stmt_count = self.ast.get_data1(node)
         let tail = self.ast.get_data2(node)
@@ -5274,35 +5604,35 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
         self.emit_typed_expr_tree(tail, indent + 1)
         return
 
-    if kind == NK_IF_EXPR():
+    if kind == NK_IF_EXPR:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return
 
-    if kind == NK_RETURN():
+    if kind == NK_RETURN:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return
 
-    if kind == NK_LET_BINDING():
+    if kind == NK_LET_BINDING:
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return
 
-    if kind == NK_LET_ELSE():
+    if kind == NK_LET_ELSE:
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return
 
-    if kind == NK_TUPLE_DESTRUCTURE():
+    if kind == NK_TUPLE_DESTRUCTURE:
         self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return
 
-    if kind == NK_ASSIGN():
+    if kind == NK_ASSIGN:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return
 
-    if kind == NK_TUPLE():
+    if kind == NK_TUPLE:
         let extra_start = self.ast.get_data0(node)
         let count = self.ast.get_data1(node)
         let safe_count = self.clamp_extra_span_count(extra_start, count, 1, 64)
@@ -5310,12 +5640,12 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return
 
-    if kind == NK_RANGE():
+    if kind == NK_RANGE:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return
 
-    if kind == NK_VARIANT_SHORTHAND():
+    if kind == NK_VARIANT_SHORTHAND:
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
         let safe_arg_count = self.clamp_extra_span_count(extra_start, arg_count, 1, 64)
@@ -5323,34 +5653,34 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return
 
-    if kind == NK_AWAIT() or kind == NK_ASYNC_BLOCK() or kind == NK_SPAWN() or kind == NK_GROUPED() or kind == NK_DEFER() or kind == NK_YIELD() or kind == NK_COMPTIME():
+    if kind == NK_AWAIT or kind == NK_ASYNC_BLOCK or kind == NK_SPAWN or kind == NK_GROUPED or kind == NK_DEFER or kind == NK_ERRDEFER or kind == NK_YIELD or kind == NK_COMPTIME:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return
 
-    if kind == NK_PIPELINE():
-        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
-        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
-        return
-
-    if kind == NK_WHILE():
+    if kind == NK_PIPELINE:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return
 
-    if kind == NK_LOOP():
+    if kind == NK_WHILE:
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NK_LOOP:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return
 
-    if kind == NK_FOR():
+    if kind == NK_FOR:
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return
 
-    if kind == NK_BREAK():
+    if kind == NK_BREAK:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return
 
-    if kind == NK_ARRAY_LIT():
+    if kind == NK_ARRAY_LIT:
         let extra_start = self.ast.get_data0(node)
         let count = self.ast.get_data1(node)
         let safe_count = self.clamp_extra_span_count(extra_start, count, 1, 128)
@@ -5358,12 +5688,12 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return
 
-    if kind == NK_ARRAY_COMPREHENSION():
+    if kind == NK_ARRAY_COMPREHENSION:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data2(node), indent + 1)
         return
 
-    if kind == NK_STRUCT_LIT():
+    if kind == NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
         let safe_field_count = self.clamp_extra_span_count(extra_start, field_count, 2, 128)
@@ -5371,7 +5701,7 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
         return
 
-    if kind == NK_MATCH():
+    if kind == NK_MATCH:
         let extra_start = self.ast.get_data1(node)
         let arm_count = self.ast.get_data2(node)
         let safe_arm_count = self.clamp_extra_span_count(extra_start, arm_count, 1, 128)
@@ -5384,7 +5714,7 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_data1(arm), indent + 1)
         return
 
-    if kind == NK_ENUM_VARIANT():
+    if kind == NK_ENUM_VARIANT:
         let extra_start = self.ast.get_data2(node)
         if extra_start < 0 or extra_start >= self.ast.extra_len():
             return
@@ -5394,20 +5724,20 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_extra(extra_start + 1 + i), indent + 1)
         return
 
-    if kind == NK_CLOSURE():
+    if kind == NK_CLOSURE:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return
 
-    if kind == NK_CAST():
+    if kind == NK_CAST:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return
 
-    if kind == NK_WITH_EXPR():
+    if kind == NK_WITH_EXPR:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return
 
-    if kind == NK_RECORD_UPDATE():
+    if kind == NK_RECORD_UPDATE:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
@@ -5416,11 +5746,11 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
         return
 
-    if kind == NK_ASYNC_SCOPE():
+    if kind == NK_ASYNC_SCOPE:
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return
 
-    if kind == NK_SELECT_AWAIT():
+    if kind == NK_SELECT_AWAIT:
         let extra_start = self.ast.get_data0(node)
         let arm_count = self.ast.get_data1(node)
         let safe_arm_count = self.clamp_extra_span_count(extra_start, arm_count, 3, 32)
@@ -5434,9 +5764,9 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
 fn Sema.type_name(self: Sema, tid: i32) -> str:
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
-    if tk == TY_ERR():
+    if tk == TY_ERR:
         return "<error>"
-    if tk == TY_INT():
+    if tk == TY_INT:
         let bits = self.get_type_d0(resolved)
         let signed = self.get_type_d1(resolved)
         if bits == 8:
@@ -5448,43 +5778,43 @@ fn Sema.type_name(self: Sema, tid: i32) -> str:
         if bits == 64:
             return if signed != 0: "i64" else: "u64"
         return "<int>"
-    if tk == TY_FLOAT():
+    if tk == TY_FLOAT:
         if self.get_type_d0(resolved) == 32:
             return "f32"
         return "f64"
-    if tk == TY_BOOL():
+    if tk == TY_BOOL:
         return "bool"
-    if tk == TY_VOID():
+    if tk == TY_VOID:
         return "void"
-    if tk == TY_NEVER():
+    if tk == TY_NEVER:
         return "Never"
-    if tk == TY_STR():
+    if tk == TY_STR:
         return "str"
-    if tk == TY_STRUCT():
+    if tk == TY_STRUCT:
         return self.safe_symbol_text(self.get_type_d0(resolved))
-    if tk == TY_ENUM():
+    if tk == TY_ENUM:
         return self.safe_symbol_text(self.get_type_d0(resolved))
-    if tk == TY_ARRAY():
+    if tk == TY_ARRAY:
         return "[_]T"
-    if tk == TY_SLICE():
+    if tk == TY_SLICE:
         return "[]T"
-    if tk == TY_TUPLE():
+    if tk == TY_TUPLE:
         return "(_, _)"
-    if tk == TY_RANGE():
+    if tk == TY_RANGE:
         if self.get_type_d1(resolved) != 0:
             return "RangeInclusive[T]"
         return "Range[T]"
-    if tk == TY_FN():
+    if tk == TY_FN:
         return "fn"
-    if tk == TY_PTR():
+    if tk == TY_PTR:
         return "*T"
-    if tk == TY_REF():
+    if tk == TY_REF:
         return "&T"
-    if tk == TY_ALIAS():
+    if tk == TY_ALIAS:
         return "<alias>"
-    if tk == TY_GENERIC_FN():
+    if tk == TY_GENERIC_FN:
         return "<generic>"
-    if tk == TY_TRAIT_OBJ():
+    if tk == TY_TRAIT_OBJ:
         // Stage0 parity: dyn trait-object type expressions currently print as <error>.
         return "<error>"
     "<unknown>"

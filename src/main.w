@@ -27,9 +27,9 @@ extern fn exit(code: i32) -> void
 extern fn with_install_interrupt_handlers() -> void
 extern fn with_raise_stack_limit() -> void
 
-fn CLI_PRELUDE_FULL_MODE -> i32: 0
-fn CLI_PRELUDE_CORE_MODE -> i32: 1
-fn CLI_PRELUDE_NONE_MODE -> i32: 2
+const CLI_PRELUDE_FULL_MODE: i32 = 0
+const CLI_PRELUDE_CORE_MODE: i32 = 1
+const CLI_PRELUDE_NONE_MODE: i32 = 2
 
 type CliOptions = {
     command: str,
@@ -65,7 +65,7 @@ fn cli_options_default -> CliOptions:
         dump_async_mir_flag: false,
         deterministic_mode: false,
         emit_c_mode: false,
-        prelude_mode: CLI_PRELUDE_FULL_MODE(),
+        prelude_mode: CLI_PRELUDE_FULL_MODE,
     }
 
 fn cli_command(argc: i32) -> str:
@@ -101,26 +101,26 @@ fn cli_opt_level(argc: i32) -> i32:
     level
 
 fn cli_prelude_mode(argc: i32) -> i32:
-    var mode = CLI_PRELUDE_FULL_MODE()
+    var mode = CLI_PRELUDE_FULL_MODE
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
         if arg == "--no-prelude":
-            mode = CLI_PRELUDE_NONE_MODE()
+            mode = CLI_PRELUDE_NONE_MODE
         else if arg == "--freestanding":
-            mode = CLI_PRELUDE_NONE_MODE()
+            mode = CLI_PRELUDE_NONE_MODE
         else if with_str_starts_with(arg, "--prelude=") != 0:
             let value = with_str_slice(arg, 10, with_str_len(arg))
             if value == "core":
-                mode = CLI_PRELUDE_CORE_MODE()
+                mode = CLI_PRELUDE_CORE_MODE
             else if value == "full":
-                mode = CLI_PRELUDE_FULL_MODE()
+                mode = CLI_PRELUDE_FULL_MODE
             else if value == "none":
-                mode = CLI_PRELUDE_NONE_MODE()
+                mode = CLI_PRELUDE_NONE_MODE
             else:
                 with_eprintln("error: invalid --prelude value '" ++ value ++ "' (expected full|core|none)")
                 exit(1)
-                return CLI_PRELUDE_FULL_MODE()
+                return CLI_PRELUDE_FULL_MODE
         i = i + 1
     mode
 
@@ -384,15 +384,15 @@ fn dump_ast(source_file: str, no_std: bool, alloc_mode: bool, include_header: bo
     0
 
 fn ast_decl_kind_name(kind: i32) -> str:
-    if kind == NK_FN_DECL(): return "function"
-    if kind == NK_TYPE_DECL(): return "type_decl"
-    if kind == NK_USE_DECL(): return "use_decl"
-    if kind == NK_LET_DECL(): return "let_decl"
-    if kind == NK_EXTERN_FN(): return "extern_fn"
-    if kind == NK_C_IMPORT(): return "c_import"
-    if kind == NK_TRAIT_DECL(): return "trait_decl"
-    if kind == NK_IMPL_DECL(): return "impl_decl"
-    if kind == NK_POISONED_DECL(): return "poisoned"
+    if kind == NK_FN_DECL: return "function"
+    if kind == NK_TYPE_DECL: return "type_decl"
+    if kind == NK_USE_DECL: return "use_decl"
+    if kind == NK_LET_DECL: return "let_decl"
+    if kind == NK_EXTERN_FN: return "extern_fn"
+    if kind == NK_C_IMPORT: return "c_import"
+    if kind == NK_TRAIT_DECL: return "trait_decl"
+    if kind == NK_IMPL_DECL: return "impl_decl"
+    if kind == NK_POISONED_DECL: return "poisoned"
     "unknown"
 
 fn dump_tokens(source_file: str, deterministic: bool) -> i32:
@@ -498,9 +498,9 @@ fn escape_dump_lexeme(text: str) -> str:
 
 fn dump_tag_name(tag: i32, lexeme: str) -> str:
     // Keep deterministic dump names identical to Stage0 for brace delimiters.
-    if tag == TK_L_BRACE():
+    if tag == TK_L_BRACE:
         return "'" ++ lexeme ++ "'"
-    if tag == TK_R_BRACE():
+    if tag == TK_R_BRACE:
         return "'" ++ lexeme ++ "'"
     return tag_name(tag)
 

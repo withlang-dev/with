@@ -102,6 +102,23 @@ let f64v: f64 = 3.0 as f32   // f32 -> f64 is implicit once value is f32
 
 Narrowing or sign-risky conversions still require `as`.
 
+**Discriminant enums** (Rust's `#[repr(i32)]` enums) map directly:
+
+```rust
+// Rust
+#[repr(i32)]
+enum Color { Red = 1, Green = 2, Blue = 4 }
+```
+
+```with
+// With
+type Color: i32 = Red = 1 | Green = 2 | Blue = 4
+```
+
+Discriminant enums with payloads, `@[flags]` for bitfields, and
+`Type.from_int(n)` for safe integer-to-enum conversion are also
+supported.
+
 ## Variables and Mutability
 
 ```rust
@@ -119,6 +136,18 @@ y += 1
 ```
 
 No semicolons. `let mut` → `var`.
+
+**`const`:** Rust's `const` maps directly to With's `const`:
+
+```rust
+// Rust
+const MAX: i32 = 100;
+```
+
+```with
+// With
+const MAX: i32 = 100
+```
 
 ## Functions
 
@@ -394,6 +423,18 @@ stays the same syntax as Rust.
 Trait objects: `Box<dyn Trait>` → `Box[dyn Trait]`.
 `&dyn Trait` → `&dyn Trait`.
 
+**`where` clauses:** Rust's `where` syntax maps directly:
+
+```rust
+// Rust
+fn process<T>(x: T) where T: Display + Debug { ... }
+```
+
+```with
+// With
+fn process[T](x: T) where T: Display, T: Debug: ...
+```
+
 ## Lifetimes
 
 **Delete them.** With has no explicit lifetime annotations. The
@@ -533,9 +574,17 @@ let callback = |x| captured_value + x
 ```
 
 With infers whether a closure captures by reference or by move
-based on how the captured variable is used. No `move` keyword.
-Iterator pipelines also accept collections directly (`Vec`, arrays,
-slices, map/set) via implicit `.iter()` insertion.
+based on how the captured variable is used. Iterator pipelines
+accept collections directly.
+
+**Implicit `it`:** For single-parameter closures, use `it` instead
+of `|param|` syntax (similar to Kotlin's `it`):
+
+```with
+// Rust: nums.iter().filter(|x| *x > 0).map(|x| x * 2)
+// With:
+nums |> filter(it > 0) |> map(it * 2)
+```
 
 ## The `with` Block (New)
 
@@ -770,12 +819,12 @@ errdefer std.log.err("failed processing {s}", .{path});
 // With
 let file = fs.open(path)?
 defer file.close()
-// errdefer has no direct equivalent — use ? propagation
+errdefer log.err("failed processing " ++ path)
 ```
 
-`defer` is identical in both languages. `errdefer` doesn't exist
-in With, but most uses are covered by RAII (resources clean up
-automatically) and error context (`.context("msg")?`).
+`defer` is identical in both languages. `errdefer` works the same way:
+it executes only when the function returns an error (via `?`). On
+normal return, `errdefer` blocks are skipped.
 
 ## Comptime
 
@@ -949,7 +998,7 @@ runtime cost.
 | `@as(T, val)` | `val as T` |
 | `@intCast(val)` | `val as T` |
 | `defer` | `defer` |
-| `errdefer` | (no equivalent — use RAII + `?`) |
+| `errdefer` | `errdefer` (identical) |
 | `comptime` | `comptime` |
 | `@typeInfo(T)` | `T.fields()` (or `TypeInfo.fields[T]()` in non-generic contexts) |
 | `inline for` | `for` inside `comptime fn` (or `comptime for` at top-level) |
@@ -1904,7 +1953,14 @@ match result
     Err(e) -> println("{e}")
 ```
 
-`{ $0.name }` → `|u| u.name`. No `$0`/`$1` shorthand.
+`{ $0.name }` → `|u| u.name` or just `it.name`. Swift's `$0` maps
+to With's `it` for single-parameter closures:
+
+```with
+let names = users |> map(it.name)
+let adults = users |> filter(it.age >= 18)
+```
+
 No trailing closure syntax — With uses pipelines and `match`.
 
 ## Async/Await and Structured Concurrency

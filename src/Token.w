@@ -10,288 +10,303 @@ use Span
 // Represented as integer constants for fast comparison.
 
 // -- Literals --
-fn TK_INT_LIT -> i32: 0
-fn TK_FLOAT_LIT -> i32: 1
-fn TK_STRING_LIT -> i32: 2
-fn TK_C_STRING_LIT -> i32: 3
-fn TK_STRING_START -> i32: 4
-fn TK_STRING_END -> i32: 5
-fn TK_STRING_FRAGMENT -> i32: 6
-fn TK_CHAR_LIT -> i32: 7
-fn TK_TRUE -> i32: 8
-fn TK_FALSE -> i32: 9
+const TK_INT_LIT: i32 = 0
+const TK_FLOAT_LIT: i32 = 1
+const TK_STRING_LIT: i32 = 2
+const TK_C_STRING_LIT: i32 = 3
+const TK_STRING_START: i32 = 4
+const TK_STRING_END: i32 = 5
+const TK_STRING_FRAGMENT: i32 = 6
+const TK_CHAR_LIT: i32 = 7
+const TK_TRUE: i32 = 8
+const TK_FALSE: i32 = 9
 
 // -- Identifiers --
-fn TK_IDENT -> i32: 10
-fn TK_DOT_IDENT -> i32: 11
-fn TK_LABEL -> i32: 12
+const TK_IDENT: i32 = 10
+const TK_DOT_IDENT: i32 = 11
+const TK_LABEL: i32 = 12
 
 // -- Keywords --
-fn TK_KW_FN -> i32: 13
-fn TK_KW_LET -> i32: 14
-fn TK_KW_VAR -> i32: 15
-fn TK_KW_IF -> i32: 16
-fn TK_KW_ELSE -> i32: 17
-fn TK_KW_THEN -> i32: 18
-fn TK_KW_MATCH -> i32: 19
-fn TK_KW_FOR -> i32: 20
-fn TK_KW_IN -> i32: 21
-fn TK_KW_WHILE -> i32: 22
-fn TK_KW_LOOP -> i32: 23
-fn TK_KW_RETURN -> i32: 24
-fn TK_KW_BREAK -> i32: 25
-fn TK_KW_CONTINUE -> i32: 26
-fn TK_KW_WITH -> i32: 27
-fn TK_KW_AS -> i32: 28
-fn TK_KW_MUT -> i32: 29
-fn TK_KW_TYPE -> i32: 30
-fn TK_KW_TRAIT -> i32: 31
-fn TK_KW_IMPL -> i32: 32
-fn TK_KW_EXTEND -> i32: 33
-fn TK_KW_DYN -> i32: 34
-fn TK_KW_USE -> i32: 35
-fn TK_KW_MODULE -> i32: 36
-fn TK_KW_PUB -> i32: 37
-fn TK_KW_ASYNC -> i32: 38
-fn TK_KW_AWAIT -> i32: 39
-fn TK_KW_SPAWN -> i32: 40
-fn TK_KW_UNSAFE -> i32: 41
-fn TK_KW_COMPTIME -> i32: 42
-fn TK_KW_GEN -> i32: 43
-fn TK_KW_YIELD -> i32: 44
-fn TK_KW_DEFER -> i32: 45
-fn TK_KW_ERROR -> i32: 46
-fn TK_KW_EXTERN -> i32: 47
-fn TK_KW_C_IMPORT -> i32: 48
-fn TK_KW_EPHEMERAL -> i32: 49
-fn TK_KW_SELECT -> i32: 50
-fn TK_KW_NOT -> i32: 51
-fn TK_KW_AND -> i32: 52
-fn TK_KW_OR -> i32: 53
+const TK_KW_FN: i32 = 13
+const TK_KW_LET: i32 = 14
+const TK_KW_VAR: i32 = 15
+const TK_KW_IF: i32 = 16
+const TK_KW_ELSE: i32 = 17
+const TK_KW_THEN: i32 = 18
+const TK_KW_MATCH: i32 = 19
+const TK_KW_FOR: i32 = 20
+const TK_KW_IN: i32 = 21
+const TK_KW_WHILE: i32 = 22
+const TK_KW_LOOP: i32 = 23
+const TK_KW_RETURN: i32 = 24
+const TK_KW_BREAK: i32 = 25
+const TK_KW_CONTINUE: i32 = 26
+const TK_KW_WITH: i32 = 27
+const TK_KW_AS: i32 = 28
+const TK_KW_MUT: i32 = 29
+const TK_KW_TYPE: i32 = 30
+const TK_KW_TRAIT: i32 = 31
+const TK_KW_IMPL: i32 = 32
+const TK_KW_EXTEND: i32 = 33
+const TK_KW_DYN: i32 = 34
+const TK_KW_USE: i32 = 35
+const TK_KW_MODULE: i32 = 36
+const TK_KW_PUB: i32 = 37
+const TK_KW_ASYNC: i32 = 38
+const TK_KW_AWAIT: i32 = 39
+const TK_KW_SPAWN: i32 = 40
+const TK_KW_UNSAFE: i32 = 41
+const TK_KW_COMPTIME: i32 = 42
+const TK_KW_GEN: i32 = 43
+const TK_KW_YIELD: i32 = 44
+const TK_KW_DEFER: i32 = 45
+const TK_KW_ERROR: i32 = 46
+const TK_KW_EXTERN: i32 = 47
+const TK_KW_C_IMPORT: i32 = 48
+const TK_KW_EPHEMERAL: i32 = 49
+const TK_KW_SELECT: i32 = 50
+const TK_KW_NOT: i32 = 51
+const TK_KW_AND: i32 = 52
+const TK_KW_OR: i32 = 53
+const TK_KW_CONST: i32 = 109
+const TK_KW_IT: i32 = 110
+const TK_KW_ERRDEFER: i32 = 111
+const TK_KW_MOVE: i32 = 112
+const TK_KW_WHERE: i32 = 113
 
 // -- Operators --
-fn TK_PLUS -> i32: 54
-fn TK_MINUS -> i32: 55
-fn TK_STAR -> i32: 56
-fn TK_SLASH -> i32: 57
-fn TK_PERCENT -> i32: 58
-fn TK_PLUS_WRAP -> i32: 59
-fn TK_MINUS_WRAP -> i32: 60
-fn TK_STAR_WRAP -> i32: 61
-fn TK_EQ -> i32: 62
-fn TK_EQ_EQ -> i32: 63
-fn TK_BANG -> i32: 64
-fn TK_BANG_EQ -> i32: 65
-fn TK_LT -> i32: 66
-fn TK_GT -> i32: 67
-fn TK_LT_EQ -> i32: 68
-fn TK_GT_EQ -> i32: 69
-fn TK_AMPERSAND -> i32: 70
-fn TK_PIPE -> i32: 71
-fn TK_CARET -> i32: 72
-fn TK_TILDE -> i32: 73
-fn TK_AT -> i32: 74
-fn TK_QUESTION -> i32: 75
-fn TK_QUESTION_DOT -> i32: 76
-fn TK_QUESTION_QUESTION -> i32: 77
-fn TK_ARROW -> i32: 78
-fn TK_FAT_ARROW -> i32: 79
-fn TK_DOT_DOT -> i32: 80
-fn TK_DOT_DOT_EQ -> i32: 81
-fn TK_DOT_DOT_DOT -> i32: 82
-fn TK_PIPE_GT -> i32: 83
-fn TK_LT_PIPE -> i32: 84
-fn TK_GT_GT -> i32: 85
-fn TK_LT_LT -> i32: 86
-fn TK_PLUS_PLUS -> i32: 87
-fn TK_PLUS_EQ -> i32: 88
-fn TK_MINUS_EQ -> i32: 89
-fn TK_STAR_EQ -> i32: 90
-fn TK_SLASH_EQ -> i32: 91
-fn TK_PERCENT_EQ -> i32: 92
+const TK_PLUS: i32 = 54
+const TK_MINUS: i32 = 55
+const TK_STAR: i32 = 56
+const TK_SLASH: i32 = 57
+const TK_PERCENT: i32 = 58
+const TK_PLUS_WRAP: i32 = 59
+const TK_MINUS_WRAP: i32 = 60
+const TK_STAR_WRAP: i32 = 61
+const TK_EQ: i32 = 62
+const TK_EQ_EQ: i32 = 63
+const TK_BANG: i32 = 64
+const TK_BANG_EQ: i32 = 65
+const TK_LT: i32 = 66
+const TK_GT: i32 = 67
+const TK_LT_EQ: i32 = 68
+const TK_GT_EQ: i32 = 69
+const TK_AMPERSAND: i32 = 70
+const TK_PIPE: i32 = 71
+const TK_CARET: i32 = 72
+const TK_TILDE: i32 = 73
+const TK_AT: i32 = 74
+const TK_QUESTION: i32 = 75
+const TK_QUESTION_DOT: i32 = 76
+const TK_QUESTION_QUESTION: i32 = 77
+const TK_ARROW: i32 = 78
+const TK_FAT_ARROW: i32 = 79
+const TK_DOT_DOT: i32 = 80
+const TK_DOT_DOT_EQ: i32 = 81
+const TK_DOT_DOT_DOT: i32 = 82
+const TK_PIPE_GT: i32 = 83
+const TK_LT_PIPE: i32 = 84
+const TK_GT_GT: i32 = 85
+const TK_LT_LT: i32 = 86
+const TK_PLUS_PLUS: i32 = 87
+const TK_PLUS_EQ: i32 = 88
+const TK_MINUS_EQ: i32 = 89
+const TK_STAR_EQ: i32 = 90
+const TK_SLASH_EQ: i32 = 91
+const TK_PERCENT_EQ: i32 = 92
 
 // -- Delimiters --
-fn TK_L_PAREN -> i32: 93
-fn TK_R_PAREN -> i32: 94
-fn TK_L_BRACKET -> i32: 95
-fn TK_R_BRACKET -> i32: 96
-fn TK_L_BRACE -> i32: 97
-fn TK_R_BRACE -> i32: 98
+const TK_L_PAREN: i32 = 93
+const TK_R_PAREN: i32 = 94
+const TK_L_BRACKET: i32 = 95
+const TK_R_BRACKET: i32 = 96
+const TK_L_BRACE: i32 = 97
+const TK_R_BRACE: i32 = 98
 
 // -- Punctuation --
-fn TK_COLON -> i32: 99
-fn TK_COMMA -> i32: 100
-fn TK_DOT -> i32: 101
-fn TK_SEMICOLON -> i32: 102
+const TK_COLON: i32 = 99
+const TK_COMMA: i32 = 100
+const TK_DOT: i32 = 101
+const TK_SEMICOLON: i32 = 102
 
 // -- Structural --
-fn TK_NEWLINE -> i32: 103
-fn TK_INDENT -> i32: 104
-fn TK_DEDENT -> i32: 105
+const TK_NEWLINE: i32 = 103
+const TK_INDENT: i32 = 104
+const TK_DEDENT: i32 = 105
 
 // -- Special --
-fn TK_COMMENT -> i32: 106
-fn TK_EOF -> i32: 107
-fn TK_INVALID -> i32: 108
+const TK_COMMENT: i32 = 106
+const TK_EOF: i32 = 107
+const TK_INVALID: i32 = 108
 
 // Lookup table: keyword string -> tag. Returns -1 if not a keyword.
 fn tag_from_keyword(s: str) -> i32:
-    if s == "fn": return TK_KW_FN()
-    if s == "let": return TK_KW_LET()
-    if s == "var": return TK_KW_VAR()
-    if s == "if": return TK_KW_IF()
-    if s == "else": return TK_KW_ELSE()
-    if s == "then": return TK_KW_THEN()
-    if s == "match": return TK_KW_MATCH()
-    if s == "for": return TK_KW_FOR()
-    if s == "in": return TK_KW_IN()
-    if s == "while": return TK_KW_WHILE()
-    if s == "loop": return TK_KW_LOOP()
-    if s == "return": return TK_KW_RETURN()
-    if s == "break": return TK_KW_BREAK()
-    if s == "continue": return TK_KW_CONTINUE()
-    if s == "with": return TK_KW_WITH()
-    if s == "as": return TK_KW_AS()
-    if s == "mut": return TK_KW_MUT()
-    if s == "type": return TK_KW_TYPE()
-    if s == "trait": return TK_KW_TRAIT()
-    if s == "impl": return TK_KW_IMPL()
-    if s == "extend": return TK_KW_EXTEND()
-    if s == "dyn": return TK_KW_DYN()
-    if s == "use": return TK_KW_USE()
-    if s == "module": return TK_KW_MODULE()
-    if s == "pub": return TK_KW_PUB()
-    if s == "async": return TK_KW_ASYNC()
-    if s == "await": return TK_KW_AWAIT()
-    if s == "spawn": return TK_KW_SPAWN()
-    if s == "unsafe": return TK_KW_UNSAFE()
-    if s == "comptime": return TK_KW_COMPTIME()
-    if s == "gen": return TK_KW_GEN()
-    if s == "yield": return TK_KW_YIELD()
-    if s == "defer": return TK_KW_DEFER()
-    if s == "error": return TK_KW_ERROR()
-    if s == "extern": return TK_KW_EXTERN()
-    if s == "c_import": return TK_KW_C_IMPORT()
-    if s == "ephemeral": return TK_KW_EPHEMERAL()
-    if s == "select": return TK_KW_SELECT()
-    if s == "true": return TK_TRUE()
-    if s == "false": return TK_FALSE()
-    if s == "not": return TK_KW_NOT()
-    if s == "and": return TK_KW_AND()
-    if s == "or": return TK_KW_OR()
+    if s == "fn": return TK_KW_FN
+    if s == "let": return TK_KW_LET
+    if s == "var": return TK_KW_VAR
+    if s == "if": return TK_KW_IF
+    if s == "else": return TK_KW_ELSE
+    if s == "then": return TK_KW_THEN
+    if s == "match": return TK_KW_MATCH
+    if s == "for": return TK_KW_FOR
+    if s == "in": return TK_KW_IN
+    if s == "while": return TK_KW_WHILE
+    if s == "loop": return TK_KW_LOOP
+    if s == "return": return TK_KW_RETURN
+    if s == "break": return TK_KW_BREAK
+    if s == "continue": return TK_KW_CONTINUE
+    if s == "with": return TK_KW_WITH
+    if s == "as": return TK_KW_AS
+    if s == "mut": return TK_KW_MUT
+    if s == "type": return TK_KW_TYPE
+    if s == "trait": return TK_KW_TRAIT
+    if s == "impl": return TK_KW_IMPL
+    if s == "extend": return TK_KW_EXTEND
+    if s == "dyn": return TK_KW_DYN
+    if s == "use": return TK_KW_USE
+    if s == "module": return TK_KW_MODULE
+    if s == "pub": return TK_KW_PUB
+    if s == "async": return TK_KW_ASYNC
+    if s == "await": return TK_KW_AWAIT
+    if s == "spawn": return TK_KW_SPAWN
+    if s == "unsafe": return TK_KW_UNSAFE
+    if s == "comptime": return TK_KW_COMPTIME
+    if s == "gen": return TK_KW_GEN
+    if s == "yield": return TK_KW_YIELD
+    if s == "defer": return TK_KW_DEFER
+    if s == "error": return TK_KW_ERROR
+    if s == "extern": return TK_KW_EXTERN
+    if s == "c_import": return TK_KW_C_IMPORT
+    if s == "ephemeral": return TK_KW_EPHEMERAL
+    if s == "select": return TK_KW_SELECT
+    if s == "true": return TK_TRUE
+    if s == "false": return TK_FALSE
+    if s == "not": return TK_KW_NOT
+    if s == "and": return TK_KW_AND
+    if s == "or": return TK_KW_OR
+    if s == "const": return TK_KW_CONST
+    if s == "it": return TK_KW_IT
+    if s == "errdefer": return TK_KW_ERRDEFER
+    if s == "move": return TK_KW_MOVE
+    if s == "where": return TK_KW_WHERE
     -1
 
 // Returns a human-readable name for a token tag (for diagnostics).
 fn tag_name(tag: i32) -> str:
-    if tag == TK_INT_LIT(): return "integer literal"
-    if tag == TK_FLOAT_LIT(): return "float literal"
-    if tag == TK_STRING_LIT(): return "string literal"
-    if tag == TK_C_STRING_LIT(): return "c-string literal"
-    if tag == TK_STRING_START(): return "string start"
-    if tag == TK_STRING_END(): return "string end"
-    if tag == TK_STRING_FRAGMENT(): return "string fragment"
-    if tag == TK_CHAR_LIT(): return "character literal"
-    if tag == TK_TRUE(): return "'true'"
-    if tag == TK_FALSE(): return "'false'"
-    if tag == TK_IDENT(): return "identifier"
-    if tag == TK_DOT_IDENT(): return "dot-identifier"
-    if tag == TK_LABEL(): return "label"
-    if tag == TK_KW_FN(): return "'fn'"
-    if tag == TK_KW_LET(): return "'let'"
-    if tag == TK_KW_VAR(): return "'var'"
-    if tag == TK_KW_IF(): return "'if'"
-    if tag == TK_KW_ELSE(): return "'else'"
-    if tag == TK_KW_THEN(): return "'then'"
-    if tag == TK_KW_MATCH(): return "'match'"
-    if tag == TK_KW_FOR(): return "'for'"
-    if tag == TK_KW_IN(): return "'in'"
-    if tag == TK_KW_WHILE(): return "'while'"
-    if tag == TK_KW_LOOP(): return "'loop'"
-    if tag == TK_KW_RETURN(): return "'return'"
-    if tag == TK_KW_BREAK(): return "'break'"
-    if tag == TK_KW_CONTINUE(): return "'continue'"
-    if tag == TK_KW_WITH(): return "'with'"
-    if tag == TK_KW_AS(): return "'as'"
-    if tag == TK_KW_MUT(): return "'mut'"
-    if tag == TK_KW_TYPE(): return "'type'"
-    if tag == TK_KW_TRAIT(): return "'trait'"
-    if tag == TK_KW_IMPL(): return "'impl'"
-    if tag == TK_KW_EXTEND(): return "'extend'"
-    if tag == TK_KW_DYN(): return "'dyn'"
-    if tag == TK_KW_USE(): return "'use'"
-    if tag == TK_KW_MODULE(): return "'module'"
-    if tag == TK_KW_PUB(): return "'pub'"
-    if tag == TK_KW_ASYNC(): return "'async'"
-    if tag == TK_KW_AWAIT(): return "'await'"
-    if tag == TK_KW_SPAWN(): return "'spawn'"
-    if tag == TK_KW_UNSAFE(): return "'unsafe'"
-    if tag == TK_KW_COMPTIME(): return "'comptime'"
-    if tag == TK_KW_GEN(): return "'gen'"
-    if tag == TK_KW_YIELD(): return "'yield'"
-    if tag == TK_KW_DEFER(): return "'defer'"
-    if tag == TK_KW_ERROR(): return "'error'"
-    if tag == TK_KW_EXTERN(): return "'extern'"
-    if tag == TK_KW_C_IMPORT(): return "'c_import'"
-    if tag == TK_KW_EPHEMERAL(): return "'ephemeral'"
-    if tag == TK_KW_SELECT(): return "'select'"
-    if tag == TK_KW_NOT(): return "'not'"
-    if tag == TK_KW_AND(): return "'and'"
-    if tag == TK_KW_OR(): return "'or'"
-    if tag == TK_PLUS(): return "'+'"
-    if tag == TK_MINUS(): return "'-'"
-    if tag == TK_STAR(): return "'*'"
-    if tag == TK_SLASH(): return "'/'"
-    if tag == TK_PERCENT(): return "'%'"
-    if tag == TK_PLUS_WRAP(): return "'+%'"
-    if tag == TK_MINUS_WRAP(): return "'-%'"
-    if tag == TK_STAR_WRAP(): return "'*%'"
-    if tag == TK_EQ(): return "'='"
-    if tag == TK_EQ_EQ(): return "'=='"
-    if tag == TK_BANG(): return "'!'"
-    if tag == TK_BANG_EQ(): return "'!='"
-    if tag == TK_LT(): return "'<'"
-    if tag == TK_GT(): return "'>'"
-    if tag == TK_LT_EQ(): return "'<='"
-    if tag == TK_GT_EQ(): return "'>='"
-    if tag == TK_AMPERSAND(): return "'&'"
-    if tag == TK_PIPE(): return "'|'"
-    if tag == TK_CARET(): return "'^'"
-    if tag == TK_TILDE(): return "'~'"
-    if tag == TK_AT(): return "'@'"
-    if tag == TK_QUESTION(): return "'?'"
-    if tag == TK_QUESTION_DOT(): return "'?.'"
-    if tag == TK_QUESTION_QUESTION(): return "'??'"
-    if tag == TK_ARROW(): return "'->'"
-    if tag == TK_FAT_ARROW(): return "'=>'"
-    if tag == TK_DOT_DOT(): return "'..'"
-    if tag == TK_DOT_DOT_EQ(): return "'..='"
-    if tag == TK_DOT_DOT_DOT(): return "'...'"
-    if tag == TK_PIPE_GT(): return "'|>'"
-    if tag == TK_LT_PIPE(): return "'<|'"
-    if tag == TK_GT_GT(): return "'>>'"
-    if tag == TK_LT_LT(): return "'<<'"
-    if tag == TK_PLUS_PLUS(): return "'++'"
-    if tag == TK_PLUS_EQ(): return "'+='"
-    if tag == TK_MINUS_EQ(): return "'-='"
-    if tag == TK_STAR_EQ(): return "'*='"
-    if tag == TK_SLASH_EQ(): return "'/='"
-    if tag == TK_PERCENT_EQ(): return "'%='"
-    if tag == TK_L_PAREN(): return "'('"
-    if tag == TK_R_PAREN(): return "')'"
-    if tag == TK_L_BRACKET(): return "'['"
-    if tag == TK_R_BRACKET(): return "']'"
-    if tag == TK_L_BRACE(): return "left brace"
-    if tag == TK_R_BRACE(): return "right brace"
-    if tag == TK_COLON(): return "':'"
-    if tag == TK_COMMA(): return "','"
-    if tag == TK_DOT(): return "'.'"
-    if tag == TK_SEMICOLON(): return "';'"
-    if tag == TK_NEWLINE(): return "newline"
-    if tag == TK_INDENT(): return "indent"
-    if tag == TK_DEDENT(): return "dedent"
-    if tag == TK_COMMENT(): return "comment"
-    if tag == TK_EOF(): return "end of file"
-    if tag == TK_INVALID(): return "invalid token"
+    if tag == TK_INT_LIT: return "integer literal"
+    if tag == TK_FLOAT_LIT: return "float literal"
+    if tag == TK_STRING_LIT: return "string literal"
+    if tag == TK_C_STRING_LIT: return "c-string literal"
+    if tag == TK_STRING_START: return "string start"
+    if tag == TK_STRING_END: return "string end"
+    if tag == TK_STRING_FRAGMENT: return "string fragment"
+    if tag == TK_CHAR_LIT: return "character literal"
+    if tag == TK_TRUE: return "'true'"
+    if tag == TK_FALSE: return "'false'"
+    if tag == TK_IDENT: return "identifier"
+    if tag == TK_DOT_IDENT: return "dot-identifier"
+    if tag == TK_LABEL: return "label"
+    if tag == TK_KW_FN: return "'fn'"
+    if tag == TK_KW_LET: return "'let'"
+    if tag == TK_KW_VAR: return "'var'"
+    if tag == TK_KW_IF: return "'if'"
+    if tag == TK_KW_ELSE: return "'else'"
+    if tag == TK_KW_THEN: return "'then'"
+    if tag == TK_KW_MATCH: return "'match'"
+    if tag == TK_KW_FOR: return "'for'"
+    if tag == TK_KW_IN: return "'in'"
+    if tag == TK_KW_WHILE: return "'while'"
+    if tag == TK_KW_LOOP: return "'loop'"
+    if tag == TK_KW_RETURN: return "'return'"
+    if tag == TK_KW_BREAK: return "'break'"
+    if tag == TK_KW_CONTINUE: return "'continue'"
+    if tag == TK_KW_WITH: return "'with'"
+    if tag == TK_KW_AS: return "'as'"
+    if tag == TK_KW_MUT: return "'mut'"
+    if tag == TK_KW_TYPE: return "'type'"
+    if tag == TK_KW_TRAIT: return "'trait'"
+    if tag == TK_KW_IMPL: return "'impl'"
+    if tag == TK_KW_EXTEND: return "'extend'"
+    if tag == TK_KW_DYN: return "'dyn'"
+    if tag == TK_KW_USE: return "'use'"
+    if tag == TK_KW_MODULE: return "'module'"
+    if tag == TK_KW_PUB: return "'pub'"
+    if tag == TK_KW_ASYNC: return "'async'"
+    if tag == TK_KW_AWAIT: return "'await'"
+    if tag == TK_KW_SPAWN: return "'spawn'"
+    if tag == TK_KW_UNSAFE: return "'unsafe'"
+    if tag == TK_KW_COMPTIME: return "'comptime'"
+    if tag == TK_KW_GEN: return "'gen'"
+    if tag == TK_KW_YIELD: return "'yield'"
+    if tag == TK_KW_DEFER: return "'defer'"
+    if tag == TK_KW_ERROR: return "'error'"
+    if tag == TK_KW_EXTERN: return "'extern'"
+    if tag == TK_KW_C_IMPORT: return "'c_import'"
+    if tag == TK_KW_EPHEMERAL: return "'ephemeral'"
+    if tag == TK_KW_SELECT: return "'select'"
+    if tag == TK_KW_NOT: return "'not'"
+    if tag == TK_KW_AND: return "'and'"
+    if tag == TK_KW_OR: return "'or'"
+    if tag == TK_KW_CONST: return "'const'"
+    if tag == TK_KW_IT: return "'it'"
+    if tag == TK_KW_ERRDEFER: return "'errdefer'"
+    if tag == TK_KW_MOVE: return "'move'"
+    if tag == TK_KW_WHERE: return "'where'"
+    if tag == TK_PLUS: return "'+'"
+    if tag == TK_MINUS: return "'-'"
+    if tag == TK_STAR: return "'*'"
+    if tag == TK_SLASH: return "'/'"
+    if tag == TK_PERCENT: return "'%'"
+    if tag == TK_PLUS_WRAP: return "'+%'"
+    if tag == TK_MINUS_WRAP: return "'-%'"
+    if tag == TK_STAR_WRAP: return "'*%'"
+    if tag == TK_EQ: return "'='"
+    if tag == TK_EQ_EQ: return "'=='"
+    if tag == TK_BANG: return "'!'"
+    if tag == TK_BANG_EQ: return "'!='"
+    if tag == TK_LT: return "'<'"
+    if tag == TK_GT: return "'>'"
+    if tag == TK_LT_EQ: return "'<='"
+    if tag == TK_GT_EQ: return "'>='"
+    if tag == TK_AMPERSAND: return "'&'"
+    if tag == TK_PIPE: return "'|'"
+    if tag == TK_CARET: return "'^'"
+    if tag == TK_TILDE: return "'~'"
+    if tag == TK_AT: return "'@'"
+    if tag == TK_QUESTION: return "'?'"
+    if tag == TK_QUESTION_DOT: return "'?.'"
+    if tag == TK_QUESTION_QUESTION: return "'??'"
+    if tag == TK_ARROW: return "'->'"
+    if tag == TK_FAT_ARROW: return "'=>'"
+    if tag == TK_DOT_DOT: return "'..'"
+    if tag == TK_DOT_DOT_EQ: return "'..='"
+    if tag == TK_DOT_DOT_DOT: return "'...'"
+    if tag == TK_PIPE_GT: return "'|>'"
+    if tag == TK_LT_PIPE: return "'<|'"
+    if tag == TK_GT_GT: return "'>>'"
+    if tag == TK_LT_LT: return "'<<'"
+    if tag == TK_PLUS_PLUS: return "'++'"
+    if tag == TK_PLUS_EQ: return "'+='"
+    if tag == TK_MINUS_EQ: return "'-='"
+    if tag == TK_STAR_EQ: return "'*='"
+    if tag == TK_SLASH_EQ: return "'/='"
+    if tag == TK_PERCENT_EQ: return "'%='"
+    if tag == TK_L_PAREN: return "'('"
+    if tag == TK_R_PAREN: return "')'"
+    if tag == TK_L_BRACKET: return "'['"
+    if tag == TK_R_BRACKET: return "']'"
+    if tag == TK_L_BRACE: return "left brace"
+    if tag == TK_R_BRACE: return "right brace"
+    if tag == TK_COLON: return "':'"
+    if tag == TK_COMMA: return "','"
+    if tag == TK_DOT: return "'.'"
+    if tag == TK_SEMICOLON: return "';'"
+    if tag == TK_NEWLINE: return "newline"
+    if tag == TK_INDENT: return "indent"
+    if tag == TK_DEDENT: return "dedent"
+    if tag == TK_COMMENT: return "comment"
+    if tag == TK_EOF: return "end of file"
+    if tag == TK_INVALID: return "invalid token"
     "unknown"
 
 // A growable list of tokens stored as parallel arrays for

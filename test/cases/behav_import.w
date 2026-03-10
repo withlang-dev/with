@@ -14,7 +14,7 @@ fn lex(source: str) -> TokenList:
 
 fn test_use_keyword:
     var tokens = lex("use")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_USE())
+    assert(TokenList.tag_at(tokens, 0) == TK_KW_USE)
 
 fn test_parse_use:
     let src = "use Token\n"
@@ -23,7 +23,7 @@ fn test_parse_use:
     Parser.parse_module(p)
     assert(AstPool.decl_count(p.pool) == 1)
     let decl = AstPool.get_decl(p.pool, 0)
-    assert(AstPool.kind(p.pool, decl) == NK_USE_DECL())
+    assert(AstPool.kind(p.pool, decl) == NK_USE_DECL)
 
 fn test_parse_multiple_use:
     let src = "use Token\nuse Lexer\nuse Ast\n"
@@ -34,7 +34,7 @@ fn test_parse_multiple_use:
 
 fn test_module_keyword:
     var tokens = lex("module")
-    assert(TokenList.tag_at(tokens, 0) == TK_KW_MODULE())
+    assert(TokenList.tag_at(tokens, 0) == TK_KW_MODULE)
 
 fn main:
     test_use_keyword()

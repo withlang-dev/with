@@ -44,6 +44,7 @@ run_test() {
   local expect_check_fail=""
   local expect_build_fail=""
   local check_only=0
+  local extra_args=""
 
   # Parse directives from file header
   while IFS= read -r line; do
@@ -54,11 +55,18 @@ run_test() {
       "//! expect-check-fail: "*)
         expect_check_fail="${line#//! expect-check-fail: }"
         ;;
+      "//! expect-error: "*)
+        # Alias for expect-check-fail
+        expect_check_fail="${line#//! expect-error: }"
+        ;;
       "//! expect-build-fail: "*)
         expect_build_fail="${line#//! expect-build-fail: }"
         ;;
       "//! check-only"*)
         check_only=1
+        ;;
+      "//! args: "*)
+        extra_args="${line#//! args: }"
         ;;
       "//!"*)
         ;;
@@ -74,7 +82,7 @@ run_test() {
   # Case 1: expect check to fail with message
   if [[ -n "$expect_check_fail" ]]; then
     local rc=0
-    runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" check "$file" || rc=$?
+    runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" check $extra_args "$file" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
       echo "FAIL $name (expected check failure)"
       failed=$((failed + 1))
@@ -95,7 +103,7 @@ run_test() {
   # Case 2: expect build to fail with message
   if [[ -n "$expect_build_fail" ]]; then
     local rc=0
-    runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" build "$file" || rc=$?
+    runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" build $extra_args "$file" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
       echo "FAIL $name (expected build failure)"
       failed=$((failed + 1))
@@ -117,7 +125,7 @@ run_test() {
   # Case 3: check-only (no build/run)
   if [[ "$check_only" -eq 1 ]]; then
     local rc=0
-    runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" check "$file" || rc=$?
+    runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" check $extra_args "$file" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
       echo "PASS $name"
       passed=$((passed + 1))
@@ -130,14 +138,9 @@ run_test() {
     return
   fi
 
-  # Case 4: build+run, check stdout
-  if [[ -z "$expect_stdout" ]]; then
-    # No directive — default to expecting "ok"
-    expect_stdout="ok"
-  fi
-
+  # Case 4: build+run
   local rc=0
-  runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" run "$file" || rc=$?
+  runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" run $extra_args "$file" || rc=$?
 
   # Clean up artifacts
   local stem="${file%.w}"
@@ -155,6 +158,13 @@ run_test() {
     tail -5 "$tmpdir/err" 2>/dev/null || true
     failed=$((failed + 1))
     failures_list="${failures_list}  ${file}\n"
+    return
+  fi
+
+  # If no expect-stdout directive, pass on exit 0
+  if [[ -z "$expect_stdout" ]]; then
+    echo "PASS $name"
+    passed=$((passed + 1))
     return
   fi
 

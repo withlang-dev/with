@@ -1,86 +1,75 @@
 //! expect-stdout: ok
 
-// Behavior test: move semantics
-// Tests: copy types, non-copy types, variable state tracking
+// Behavior test: move semantics — ownership transfer, copy types
+// Copy types (i32, bool, f64) are copied on assignment.
+// Non-copy types (str used as owned) transfer ownership.
 
-use Token
-use Lexer
-use Ast
-use Type
-use Sema
-use InternPool
+fn test_copy_i32:
+    let a = 42
+    let b = a
+    // Both a and b are valid for copy types
+    assert(a == 42)
+    assert(b == 42)
 
-fn lex(source: str) -> TokenList:
-    var l = Lexer.new(source, 0)
-    Lexer.tokenize(l)
+fn test_copy_bool:
+    let a = true
+    let b = a
+    assert(a == true)
+    assert(b == true)
 
-fn test_copy_types:
-    var types = TypeTable.new()
-    // Primitive integers are copy
-    assert(TypeTable.is_copy(types, TYPE_I8()))
-    assert(TypeTable.is_copy(types, TYPE_I16()))
-    assert(TypeTable.is_copy(types, TYPE_I32()))
-    assert(TypeTable.is_copy(types, TYPE_I64()))
-    assert(TypeTable.is_copy(types, TYPE_U8()))
-    assert(TypeTable.is_copy(types, TYPE_U16()))
-    assert(TypeTable.is_copy(types, TYPE_U32()))
-    assert(TypeTable.is_copy(types, TYPE_U64()))
-    // Floats are copy
-    assert(TypeTable.is_copy(types, TYPE_F32()))
-    assert(TypeTable.is_copy(types, TYPE_F64()))
-    // Bool is copy
-    assert(TypeTable.is_copy(types, TYPE_BOOL()))
+fn test_copy_in_loop:
+    let x = 10
+    var sum = 0
+    for i in 0..5:
+        sum = sum + x  // x is copied each iteration
+    assert(sum == 50)
+    assert(x == 10)  // x still valid
 
-fn test_non_copy_types:
-    var types = TypeTable.new()
-    // str is not copy
-    assert(not TypeTable.is_copy(types, TYPE_STR()))
+fn test_copy_to_function:
+    let n = 7
+    let r = double(n)
+    assert(r == 14)
+    assert(n == 7)  // n still valid after pass
 
-fn test_var_state_encoding:
-    // Variable info encoding: type_id * 4 + is_mut * 2 + state
-    // state: 0=live, 1=moved
-    let encoded = 5 * 4 + 1 * 2 + 0  // TYPE_I32, mutable, live
-    assert(var_type_id(encoded) == 5)
-    assert(var_is_mut(encoded) == 1)
-    assert(var_state(encoded) == 0)
+fn double(x: i32) -> i32:
+    x * 2
 
-fn test_scope_define_lookup:
-    var intern = InternPool.new()
-    var pool = AstPool.new()
-    AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
-    var s = Sema.new(pool, "", intern)
-    // Define mutable x
-    Sema.define_var(s, "x", TYPE_I32(), 1)
-    let info = Sema.lookup_var(s, "x")
-    assert(info >= 0)
-    assert(var_type_id(info) == TYPE_I32())
-    assert(var_is_mut(info) == 1)
-    // Define immutable y
-    Sema.define_var(s, "y", TYPE_STR(), 0)
-    let info2 = Sema.lookup_var(s, "y")
-    assert(info2 >= 0)
-    assert(var_type_id(info2) == TYPE_STR())
-    assert(var_is_mut(info2) == 0)
+fn test_var_reassign:
+    var x = 10
+    x = 20
+    assert(x == 20)
+    x = x + 5
+    assert(x == 25)
 
-fn test_scope_nested:
-    var intern = InternPool.new()
-    var pool = AstPool.new()
-    AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
-    var s = Sema.new(pool, "", intern)
-    Sema.define_var(s, "outer", TYPE_I32(), 0)
-    Sema.push_scope(s)
-    Sema.define_var(s, "inner", TYPE_BOOL(), 0)
-    // Both visible
-    assert(Sema.lookup_var(s, "outer") >= 0)
-    assert(Sema.lookup_var(s, "inner") >= 0)
-    Sema.pop_scope(s)
-    // Only outer visible (scope model keeps all, but inner was in child)
-    assert(Sema.lookup_var(s, "outer") >= 0)
+fn test_shadow_move:
+    let x = 100
+    let x = x + 1  // shadow, not move
+    assert(x == 101)
+
+fn consume_string(s: str) -> i32:
+    if s == "hello":
+        1
+    else:
+        0
+
+fn test_string_pass:
+    let s = "hello"
+    let r = consume_string(s)
+    assert(r == 1)
+
+fn test_move_closure:
+    let offset = 10
+    let f = move |x: i32| -> i32: x + offset
+    let result = f(32)
+    assert(result == 42)
 
 fn main:
-    test_copy_types()
-    test_non_copy_types()
-    test_var_state_encoding()
-    test_scope_define_lookup()
-    test_scope_nested()
+    test_copy_i32()
+    test_copy_bool()
+    test_copy_in_loop()
+    test_copy_to_function()
+    test_var_reassign()
+    test_shadow_move()
+    test_string_pass()
+    test_move_closure()
     println("ok")

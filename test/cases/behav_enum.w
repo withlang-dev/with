@@ -1,91 +1,65 @@
 //! expect-stdout: ok
 
 // Behavior test: enums
-// Tests: simple enums, payload enums, match on enums, variant shorthand
+// Tests: simple enums, discriminant enums, match on enums, variant shorthand
 
-use Token
-use Lexer
-use Ast
-use Type
-use Sema
-use InternPool
-use Parser
+type Direction = North | South | East | West
 
-fn lex(source: str) -> TokenList:
-    var l = Lexer.new(source, 0)
-    Lexer.tokenize(l)
+type Color: i32 = Red = 1 | Green = 2 | Blue = 4
 
-fn test_parse_enum_decl:
-    let src = "type Color = enum:\n    Red\n    Green\n    Blue\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    assert(AstPool.decl_count(p.pool) == 1)
-    let decl = AstPool.get_decl(p.pool, 0)
-    assert(AstPool.kind(p.pool, decl) == NK_TYPE_DECL())
+fn test_enum_shorthand:
+    // Use shorthand syntax with type annotation for simple enums
+    let d: Direction = .South
+    let result = match d
+        .North -> "north"
+        .South -> "south"
+        .East -> "east"
+        .West -> "west"
+    assert(result == "south")
 
-fn test_type_enum:
-    var types = TypeTable.new()
-    var pool = AstPool.new()
-    var vnames = Vec.new()
-    vnames.push(AstPool.add_string(pool, "Red"))
-    vnames.push(AstPool.add_string(pool, "Green"))
-    vnames.push(AstPool.add_string(pool, "Blue"))
-    var vpayloads = Vec.new()
-    vpayloads.push(0)
-    vpayloads.push(0)
-    vpayloads.push(0)
-    var vptypes = Vec.new()
-    let name_sym = AstPool.add_string(pool, "Color")
-    let eid = TypeTable.add_enum(types, name_sym, vnames, vpayloads, vptypes)
-    assert(TypeTable.kind(types, eid) == TK_ENUM())
-    assert(TypeTable.enum_variant_count(types, eid) == 3)
+fn test_enum_match_wildcard:
+    let d: Direction = .East
+    let result = match d
+        .North -> "north"
+        _ -> "other"
+    assert(result == "other")
 
-fn test_sema_variant_lookup:
-    var intern = InternPool.new()
-    var pool = AstPool.new()
-    AstPool.add_node(pool, 0, 0, 0, 0, 0, 0)
-    var s = Sema.new(pool, "", intern)
-    // Register Color enum — use s.pool (Sema's copy), not pool
-    var vnames = Vec.new()
-    vnames.push(AstPool.add_string(s.pool, "Red"))
-    vnames.push(AstPool.add_string(s.pool, "Green"))
-    var vpayloads = Vec.new()
-    vpayloads.push(0)
-    vpayloads.push(0)
-    var vptypes = Vec.new()
-    let eid = TypeTable.add_enum(s.types, AstPool.add_string(s.pool, "Color"), vnames, vpayloads, vptypes)
-    s.variant_names.push("Red")
-    s.variant_enum_types.push(eid)
-    s.variant_indices.push(0)
-    s.variant_names.push("Green")
-    s.variant_enum_types.push(eid)
-    s.variant_indices.push(1)
-    // Check that "Red" resolves to Color type
-    let sym = AstPool.add_string(s.pool, "Red")
-    let n = AstPool.add_node(s.pool, NK_IDENT(), 0, 3, sym, 0, 0)
-    let t = Sema.check_expr(s, n)
-    assert(t == eid)
+fn test_enum_equality:
+    let a: Direction = .West
+    let b: Direction = .West
+    let c: Direction = .East
+    assert(a == b)
+    assert(a != c)
 
-fn test_parse_match_enum:
-    let src = "fn f:\n    match x\n        0 -> 1\n        _ -> 2\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    let decl = AstPool.get_decl(p.pool, 0)
-    let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_MATCH())
-    assert(AstPool.get_data2(p.pool, body) == 2)  // 2 arms
+fn test_discriminant_enum:
+    let c = Color.Green
+    let result = match c
+        .Red -> "red"
+        .Green -> "green"
+        .Blue -> "blue"
+        _ -> "unknown"
+    assert(result == "green")
 
-fn test_dot_ident_token:
-    // .Red is a variant shorthand token
-    var tokens = lex(".Red")
-    assert(TokenList.tag_at(tokens, 0) == TK_DOT_IDENT())
+fn test_discriminant_cast:
+    let n: i32 = Color.Green as i32
+    assert(n == 2)
+    let n2: i32 = Color.Blue as i32
+    assert(n2 == 4)
+
+fn test_discriminant_shorthand:
+    let c: Color = .Blue
+    let r = match c
+        .Red -> "r"
+        .Green -> "g"
+        .Blue -> "b"
+        _ -> "?"
+    assert(r == "b")
 
 fn main:
-    test_parse_enum_decl()
-    test_type_enum()
-    test_sema_variant_lookup()
-    test_parse_match_enum()
-    test_dot_ident_token()
+    test_enum_shorthand()
+    test_enum_match_wildcard()
+    test_enum_equality()
+    test_discriminant_enum()
+    test_discriminant_cast()
+    test_discriminant_shorthand()
     println("ok")

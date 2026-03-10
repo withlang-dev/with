@@ -16,11 +16,11 @@ fn test_simple_fn:
     Parser.parse_module(p)
     assert(AstPool.decl_count(p.pool) == 1)
     let decl = AstPool.get_decl(p.pool, 0)
-    assert(AstPool.kind(p.pool, decl) == NK_FN_DECL())
+    assert(AstPool.kind(p.pool, decl) == NK_FN_DECL)
     let name_str = AstPool.get_data0(p.pool, decl)
     assert(AstPool.get_string(p.pool, name_str) == "main")
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_INT_LIT())
+    assert(AstPool.kind(p.pool, body) == NK_INT_LIT)
 
 fn test_fn_with_params:
     let src = "fn add(a: i32, b: i32) -> i32:\n    a\n"
@@ -29,7 +29,7 @@ fn test_fn_with_params:
     Parser.parse_module(p)
     assert(AstPool.decl_count(p.pool) == 1)
     let decl = AstPool.get_decl(p.pool, 0)
-    assert(AstPool.kind(p.pool, decl) == NK_FN_DECL())
+    assert(AstPool.kind(p.pool, decl) == NK_FN_DECL)
     let name_str = AstPool.get_data0(p.pool, decl)
     assert(AstPool.get_string(p.pool, name_str) == "add")
     // Check extra: [param_count=2, flags=0, ret_type, a_name, a_type, b_name, b_type]
@@ -43,8 +43,8 @@ fn test_binary_expr:
     Parser.parse_module(p)
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_BINARY())
-    assert(AstPool.get_data2(p.pool, body) == OP_ADD())
+    assert(AstPool.kind(p.pool, body) == NK_BINARY)
+    assert(AstPool.get_data2(p.pool, body) == OP_ADD)
 
 fn test_if_expr:
     let src = "fn f:\n    if true then 1 else 2\n"
@@ -53,13 +53,13 @@ fn test_if_expr:
     Parser.parse_module(p)
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_IF_EXPR())
+    assert(AstPool.kind(p.pool, body) == NK_IF_EXPR)
     let cond = AstPool.get_data0(p.pool, body)
-    assert(AstPool.kind(p.pool, cond) == NK_BOOL_LIT())
+    assert(AstPool.kind(p.pool, cond) == NK_BOOL_LIT)
     let then_body = AstPool.get_data1(p.pool, body)
-    assert(AstPool.kind(p.pool, then_body) == NK_INT_LIT())
+    assert(AstPool.kind(p.pool, then_body) == NK_INT_LIT)
     let else_body = AstPool.get_data2(p.pool, body)
-    assert(AstPool.kind(p.pool, else_body) == NK_INT_LIT())
+    assert(AstPool.kind(p.pool, else_body) == NK_INT_LIT)
 
 fn test_let_binding:
     let src = "fn f:\n    let x = 42\n    x\n"
@@ -69,9 +69,9 @@ fn test_let_binding:
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
     // Body should be a block with one stmt (let) and tail (x)
-    assert(AstPool.kind(p.pool, body) == NK_BLOCK())
+    assert(AstPool.kind(p.pool, body) == NK_BLOCK)
     let tail = AstPool.get_data2(p.pool, body)
-    assert(AstPool.kind(p.pool, tail) == NK_IDENT())
+    assert(AstPool.kind(p.pool, tail) == NK_IDENT)
 
 fn test_call:
     let src = "fn f:\n    foo(1, 2)\n"
@@ -80,7 +80,7 @@ fn test_call:
     Parser.parse_module(p)
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_CALL())
+    assert(AstPool.kind(p.pool, body) == NK_CALL)
     assert(AstPool.get_data2(p.pool, body) == 2)  // arg_count
 
 fn test_type_decl_struct:
@@ -90,7 +90,7 @@ fn test_type_decl_struct:
     Parser.parse_module(p)
     assert(AstPool.decl_count(p.pool) == 1)
     let decl = AstPool.get_decl(p.pool, 0)
-    assert(AstPool.kind(p.pool, decl) == NK_TYPE_DECL())
+    assert(AstPool.kind(p.pool, decl) == NK_TYPE_DECL)
     let flags = AstPool.get_data2(p.pool, decl)
     let kind_bits = (flags / 256)  // field_count in upper bits
     assert(kind_bits == 2)  // 2 fields
@@ -102,7 +102,7 @@ fn test_use_decl:
     Parser.parse_module(p)
     assert(AstPool.decl_count(p.pool) == 1)
     let decl = AstPool.get_decl(p.pool, 0)
-    assert(AstPool.kind(p.pool, decl) == NK_USE_DECL())
+    assert(AstPool.kind(p.pool, decl) == NK_USE_DECL)
 
 fn test_type_named:
     let src = "fn f(x: i32) -> bool:\n    true\n"
@@ -112,7 +112,7 @@ fn test_type_named:
     let decl = AstPool.get_decl(p.pool, 0)
     let extra_idx = AstPool.get_data2(p.pool, decl)
     let ret_type_node = AstPool.get_extra(p.pool, extra_idx + 2)
-    assert(AstPool.kind(p.pool, ret_type_node) == NK_TYPE_NAMED())
+    assert(AstPool.kind(p.pool, ret_type_node) == NK_TYPE_NAMED)
 
 fn test_while_loop:
     let src = "fn f:\n    while true:\n        42\n"
@@ -121,7 +121,7 @@ fn test_while_loop:
     Parser.parse_module(p)
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_WHILE())
+    assert(AstPool.kind(p.pool, body) == NK_WHILE)
 
 fn test_match:
     let src = "fn f:\n    match x\n        0 -> 1\n        _ -> 2\n"
@@ -130,7 +130,7 @@ fn test_match:
     Parser.parse_module(p)
     let decl = AstPool.get_decl(p.pool, 0)
     let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_MATCH())
+    assert(AstPool.kind(p.pool, body) == NK_MATCH)
     assert(AstPool.get_data2(p.pool, body) == 2)  // 2 arms
 
 fn main:

@@ -7,8 +7,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 OUT_LIB="${ROOT_DIR}/out/lib"
 RUNTIME_SRC="${ROOT_DIR}/runtime"
+EMBEDDED_STDLIB_INC="${OUT_LIB}/embedded_stdlib.inc.h"
 
 mkdir -p "${OUT_LIB}"
+python3 "${ROOT_DIR}/scripts/generate_embedded_stdlib.py" "${ROOT_DIR}" "${EMBEDDED_STDLIB_INC}"
 
 # Compile C runtime objects from source.
 sdk_path="$(xcrun --show-sdk-path 2>/dev/null || true)"

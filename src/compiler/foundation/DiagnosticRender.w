@@ -69,11 +69,11 @@ fn render_all_diagnostics(store: DiagnosticStore, sm: SourceMap) -> str:
     out
 
 fn render_severity(severity: i32) -> str:
-    if severity == DIAG_SEVERITY_ERROR():
+    if severity == DIAG_SEVERITY_ERROR:
         return "error"
-    if severity == DIAG_SEVERITY_WARNING():
+    if severity == DIAG_SEVERITY_WARNING:
         return "warning"
-    if severity == DIAG_SEVERITY_NOTE():
+    if severity == DIAG_SEVERITY_NOTE:
         return "note"
     "diag"
 
