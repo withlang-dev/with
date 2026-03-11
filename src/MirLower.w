@@ -447,6 +447,8 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         let local = self.lookup_local(sym)
         if local >= 0:
             return self.place_for_local(local)
+        // Unknown ident (likely a global) — mark as unsupported
+        self.mark_unsupported()
         return self.place_for_local(0)
 
     if kind == NK_FIELD_ACCESS:

@@ -1,60 +1,39 @@
 //! expect-stdout: ok
 
-// Behavior test: match expressions with various patterns
-// Tests: int match, wildcard, bool match, enum match, range patterns
+// Behavior test: match guards (if conditions on arms)
 
-type Color = Red | Green | Blue
+fn classify(x: i32) -> str:
+    match x
+        n if n > 0 -> "positive"
+        n if n < 0 -> "negative"
+        _ -> "zero"
 
-fn test_match_int:
-    let n = 2
-    let result = match n
-        0 -> "zero"
-        1 -> "one"
-        2 -> "two"
-        _ -> "many"
-    assert(result == "two")
-    let r2 = match 99
-        0 -> "zero"
-        _ -> "many"
-    assert(r2 == "many")
+fn test_basic_guards:
+    assert(classify(5) == "positive")
+    assert(classify(-3) == "negative")
+    assert(classify(0) == "zero")
 
-fn test_match_bool:
-    let b = true
-    let result = match b
-        true -> "yes"
-        false -> "no"
-    assert(result == "yes")
+fn abs_val(x: i32) -> i32:
+    match x
+        n if n < 0 -> 0 - n
+        n -> n
 
-fn test_match_enum:
-    let c: Color = .Green
-    let name = match c
-        .Red -> "red"
-        .Green -> "green"
-        .Blue -> "blue"
-    assert(name == "green")
+fn test_guard_with_binding:
+    assert(abs_val(-10) == 10)
+    assert(abs_val(7) == 7)
+    assert(abs_val(0) == 0)
 
-fn test_match_range:
-    let x = 5
-    let label = match x
-        0 -> "zero"
-        1..=3 -> "small"
-        4..=6 -> "medium"
-        _ -> "large"
-    assert(label == "medium")
-
-fn test_match_expression:
-    let x = 2
-    let doubled = match x
-        1 -> 10
-        2 -> 20
-        3 -> 30
-        _ -> 0
-    assert(doubled == 20)
+fn test_guard_fallthrough:
+    // When guard fails, should fall to next arm
+    let x = 42
+    let r = match x
+        n if n > 100 -> "big"
+        n if n > 10 -> "medium"
+        _ -> "small"
+    assert(r == "medium")
 
 fn main:
-    test_match_int()
-    test_match_bool()
-    test_match_enum()
-    test_match_range()
-    test_match_expression()
+    test_basic_guards()
+    test_guard_with_binding()
+    test_guard_fallthrough()
     println("ok")

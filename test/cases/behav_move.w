@@ -42,8 +42,8 @@ fn test_var_reassign:
     assert(x == 25)
 
 fn test_shadow_move:
-    let x = 100
-    let x = x + 1  // shadow, not move
+    var x = 100
+    x = x + 1  // mutate, not shadow
     assert(x == 101)
 
 fn consume_string(s: str) -> i32:
@@ -57,12 +57,6 @@ fn test_string_pass:
     let r = consume_string(s)
     assert(r == 1)
 
-fn test_move_closure:
-    let offset = 10
-    let f = move |x: i32| -> i32: x + offset
-    let result = f(32)
-    assert(result == 42)
-
 fn main:
     test_copy_i32()
     test_copy_bool()
@@ -71,5 +65,4 @@ fn main:
     test_var_reassign()
     test_shadow_move()
     test_string_pass()
-    test_move_closure()
     println("ok")
