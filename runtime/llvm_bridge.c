@@ -195,6 +195,7 @@ int32_t wl_int_sge(void) { return LLVMIntSGE; }
 int32_t wl_int_ult(void) { return LLVMIntULT; }
 int32_t wl_int_ule(void) { return LLVMIntULE; }
 int32_t wl_int_uge(void) { return LLVMIntUGE; }
+int32_t wl_int_ugt(void) { return LLVMIntUGT; }
 
 // ── FCmp predicates ────────────────────────────────────────
 int32_t wl_real_oeq(void) { return LLVMRealOEQ; }
@@ -266,6 +267,7 @@ WL_BINOP(build_or, LLVMBuildOr)
 WL_BINOP(build_xor, LLVMBuildXor)
 WL_BINOP(build_shl, LLVMBuildShl)
 WL_BINOP(build_ashr, LLVMBuildAShr)
+WL_BINOP(build_lshr, LLVMBuildLShr)
 
 // ── Builder: unary ─────────────────────────────────────────
 #define WL_UNOP(name, fn) \
