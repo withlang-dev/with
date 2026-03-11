@@ -69,6 +69,11 @@ type Sema = {
 
     // Named type lookup: sym → TypeId
     named_types: HashMap[i32, i32],
+    // Type declaration AST nodes: sym → node (for cycle diagnostics)
+    type_decl_nodes: HashMap[i32, i32],
+    // Temporary accumulators for cycle detection (accessed through self)
+    cycle_dep_syms: Vec[i32],
+    cycle_dep_nodes: Vec[i32],
     // Fallback pretty names keyed by symbol id.
     pretty_symbol_names: HashMap[i32, str],
 
@@ -307,6 +312,7 @@ fn sema_new_map_str_i32 -> HashMap[str, i32]:
 
 fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     let named_types = sema_new_map_i32_i32()
+    let type_decl_nodes = sema_new_map_i32_i32()
     let pretty_symbol_names = sema_new_map_i32_str()
     let sig_lookup = sema_new_map_i32_i32()
     let extern_fn_names = sema_new_map_i32_i32()
@@ -351,6 +357,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         type_d2: Vec.new(),
         type_extra: Vec.new(),
         named_types,
+        type_decl_nodes,
+        cycle_dep_syms: Vec.new(),
+        cycle_dep_nodes: Vec.new(),
         pretty_symbol_names,
         sig_names: Vec.new(),
         sig_type_ids: Vec.new(),
@@ -1052,6 +1061,9 @@ fn Sema.collect_declarations(self: Sema):
         if kind == NK_TRAIT_DECL:
             self.collect_trait_decl(decl, is_local)
 
+    // Check for circular type dependencies before proceeding.
+    self.check_type_cycles()
+
     // Pass 2: collect impl declarations once trait/type tables exist.
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
@@ -1097,6 +1109,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
     if is_local != 0:
         self.set_pretty_symbol(name, self.extract_decl_name_after(node, "type"))
+    self.type_decl_nodes.insert(name, node)
     let extra_start = self.ast.get_data1(node)
     let packed_kind = self.ast.get_data2(node)
     let sub_kind = type_decl_sub_kind(packed_kind)
@@ -1232,6 +1245,230 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
 
     if is_local != 0:
         self.local_type_names.insert(name, 1)
+
+// ── Type dependency cycle detection ──────────────────────────────
+
+// Collect named types that a type expression directly embeds (by value).
+// Pointers, references, and slices are indirections — not followed.
+// Collect named types that a type expression directly embeds (by value).
+// Results are accumulated in self.cycle_dep_syms / self.cycle_dep_nodes.
+// Pointers, references, and slices are indirections — not followed.
+fn Sema.collect_value_type_deps(self: Sema, type_node: i32):
+    if type_node == 0:
+        return
+    let kind = self.ast.kind(type_node)
+    if kind == NK_TYPE_NAMED:
+        let sym = self.ast.get_data0(type_node)
+        // Only track user-declared types, not primitives.
+        if self.type_decl_nodes.contains(sym):
+            self.cycle_dep_syms.push(sym)
+            self.cycle_dep_nodes.push(type_node)
+        return
+    if kind == NK_TYPE_ARRAY:
+        // Arrays embed their element type by value.
+        self.collect_value_type_deps(self.ast.get_data0(type_node))
+        return
+    if kind == NK_TYPE_TUPLE:
+        let extra_start = self.ast.get_data0(type_node)
+        let elem_count = self.ast.get_data1(type_node)
+        for ei in 0..elem_count:
+            let e_node = self.ast.get_extra(extra_start + ei)
+            self.collect_value_type_deps(e_node)
+        return
+    if kind == NK_TYPE_OPTIONAL:
+        // Option embeds the inner type by value.
+        self.collect_value_type_deps(self.ast.get_data0(type_node))
+        return
+    // NK_TYPE_PTR, NK_TYPE_REF, NK_TYPE_SLICE, NK_TYPE_GENERIC,
+    // NK_TYPE_FN: all provide indirection — do not follow.
+
+fn Sema.check_type_cycles(self: Sema):
+    // Build directed graph: for each type decl, find value-type deps.
+    // Use self.cycle_dep_syms/cycle_dep_nodes as accumulators (must go through
+    // self for mutation to be visible — Vec params are pass-by-value).
+
+    // Accumulate all edges into cycle_dep_syms (flat: [from, to, from, to, ...])
+    // and cycle_dep_nodes (flat: [edge_node, edge_node, ...]) using a stride of 2.
+    // Actually, use three separate Sema-level Vecs to avoid complexity.
+    // Re-purpose cycle_dep_syms for dep_from and cycle_dep_nodes for dep_to.
+    // Add edge node info separately.
+
+    // Instead, accumulate edges directly. For each field type, call
+    // collect_value_type_deps which pushes to self.cycle_dep_syms/nodes,
+    // then read them back.
+    self.cycle_dep_syms = Vec.new()
+    self.cycle_dep_nodes = Vec.new()
+
+    // Phase 1: collect all edges. Each edge is 3 consecutive entries:
+    // cycle_dep_syms: [from_sym, to_sym, from_sym, to_sym, ...]
+    // cycle_dep_nodes: [0, edge_node, 0, edge_node, ...]
+    // We'll use a simpler scheme: collect into flat arrays indexed by edge.
+    // dep_edge_count tracks how many edges we've collected.
+
+    // Actually simplest: save len before collect, push owner info after.
+    var edge_from: Vec[i32] = Vec.new()
+    var edge_to: Vec[i32] = Vec.new()
+    var edge_node: Vec[i32] = Vec.new()
+
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NK_TYPE_DECL:
+            continue
+        let name = self.ast.get_data0(decl)
+        let extra_start = self.ast.get_data1(decl)
+        let packed_kind = self.ast.get_data2(decl)
+        let sub_kind = type_decl_sub_kind(packed_kind)
+
+        if sub_kind == TDK_STRUCT:
+            let field_count = self.ast.get_extra(extra_start)
+            for fi in 0..field_count:
+                let base = extra_start + 1 + fi * 3
+                let f_type_node = self.ast.get_extra(base + 1)
+                let before = self.cycle_dep_syms.len() as i32
+                self.collect_value_type_deps(f_type_node)
+                let after = self.cycle_dep_syms.len() as i32
+                for di2 in before..after:
+                    edge_from.push(name)
+                    edge_to.push(self.cycle_dep_syms.get(di2 as i64))
+                    edge_node.push(self.cycle_dep_nodes.get(di2 as i64))
+
+        if sub_kind == TDK_ENUM or sub_kind == TDK_DISC_ENUM:
+            let variant_start = if sub_kind == TDK_DISC_ENUM: extra_start + 2 else: extra_start + 1
+            let variant_count = if sub_kind == TDK_DISC_ENUM: self.ast.get_extra(extra_start + 1) else: self.ast.get_extra(extra_start)
+            var epos = variant_start
+            for vi in 0..variant_count:
+                epos = epos + 1  // v_name
+                if sub_kind == TDK_DISC_ENUM:
+                    epos = epos + 1  // disc_value
+                let payload_count = self.ast.get_extra(epos)
+                epos = epos + 1
+                for pi in 0..payload_count:
+                    let pt_node = self.ast.get_extra(epos)
+                    epos = epos + 1
+                    let before = self.cycle_dep_syms.len() as i32
+                    self.collect_value_type_deps(pt_node)
+                    let after = self.cycle_dep_syms.len() as i32
+                    for di2 in before..after:
+                        edge_from.push(name)
+                        edge_to.push(self.cycle_dep_syms.get(di2 as i64))
+                        edge_node.push(self.cycle_dep_nodes.get(di2 as i64))
+
+        if sub_kind == TDK_ALIAS:
+            let aliased_node = self.ast.get_extra(extra_start)
+            let before = self.cycle_dep_syms.len() as i32
+            self.collect_value_type_deps(aliased_node)
+            let after = self.cycle_dep_syms.len() as i32
+            for di2 in before..after:
+                edge_from.push(name)
+                edge_to.push(self.cycle_dep_syms.get(di2 as i64))
+                edge_node.push(self.cycle_dep_nodes.get(di2 as i64))
+
+        if sub_kind == TDK_DISTINCT:
+            let inner_node = self.ast.get_extra(extra_start)
+            let before = self.cycle_dep_syms.len() as i32
+            self.collect_value_type_deps(inner_node)
+            let after = self.cycle_dep_syms.len() as i32
+            for di2 in before..after:
+                edge_from.push(name)
+                edge_to.push(self.cycle_dep_syms.get(di2 as i64))
+                edge_node.push(self.cycle_dep_nodes.get(di2 as i64))
+
+    if edge_from.len() == 0:
+        return
+
+    // DFS cycle detection with coloring.
+    // 0=white, 1=gray (in path), 2=black (done)
+    var color: HashMap[i32, i32] = sema_new_map_i32_i32()
+    // Parent tracking for cycle path reconstruction.
+    var parent_sym: HashMap[i32, i32] = sema_new_map_i32_i32()
+    var parent_edge: HashMap[i32, i32] = sema_new_map_i32_i32()
+
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NK_TYPE_DECL:
+            continue
+        let name = self.ast.get_data0(decl)
+        if color.contains(name) and color.get(name).unwrap() != 0:
+            continue
+        // Iterative DFS using explicit stack.
+        var stack: Vec[i32] = Vec.new()
+        stack.push(name)
+        while stack.len() > 0:
+            let cur = stack.get(stack.len() - 1)
+            let cur_color = if color.contains(cur): color.get(cur).unwrap() else: 0
+            if cur_color == 0:
+                // First visit: mark gray.
+                color.insert(cur, 1)
+                // Push neighbors.
+                for ei in 0..edge_from.len() as i32:
+                    if edge_from.get(ei as i64) != cur:
+                        continue
+                    let neighbor = edge_to.get(ei as i64)
+                    let n_color = if color.contains(neighbor): color.get(neighbor).unwrap() else: 0
+                    if n_color == 0:
+                        parent_sym.insert(neighbor, cur)
+                        parent_edge.insert(neighbor, edge_node.get(ei as i64))
+                        stack.push(neighbor)
+                    if n_color == 1:
+                        // Cycle found! Reconstruct the loop.
+                        self.emit_type_cycle_error(neighbor, cur, edge_node.get(ei as i64), parent_sym, parent_edge)
+                        return
+            else:
+                // Already visited (gray revisit or black). Pop and mark black.
+                let _ = stack.pop()
+                color.insert(cur, 2)
+
+fn Sema.emit_type_cycle_error(self: Sema, cycle_start: i32, cycle_end: i32, closing_edge_node: i32, parent_sym: HashMap[i32, i32], parent_edge: HashMap[i32, i32]):
+    // Reconstruct cycle path: cycle_start → ... → cycle_end → cycle_start
+    var path_syms: Vec[i32] = Vec.new()
+    var path_edges: Vec[i32] = Vec.new()
+
+    // Walk from cycle_end back to cycle_start via parent chain.
+    var cur = cycle_end
+    while cur != cycle_start:
+        path_syms.push(cur)
+        if parent_edge.contains(cur):
+            path_edges.push(parent_edge.get(cur).unwrap())
+        else:
+            path_edges.push(0)
+        if not parent_sym.contains(cur):
+            break
+        cur = parent_sym.get(cur).unwrap()
+    path_syms.push(cycle_start)
+
+    // Reverse to get forward order: cycle_start → ... → cycle_end
+    var fwd_syms: Vec[i32] = Vec.new()
+    var fwd_edges: Vec[i32] = Vec.new()
+    for i in 0..path_syms.len() as i32:
+        fwd_syms.push(path_syms.get((path_syms.len() as i32 - 1 - i) as i64))
+    for i in 0..path_edges.len() as i32:
+        fwd_edges.push(path_edges.get((path_edges.len() as i32 - 1 - i) as i64))
+    // Add closing edge: cycle_end → cycle_start
+    fwd_edges.push(closing_edge_node)
+
+    let loop_len = fwd_syms.len() as i32
+
+    // Build diagnostic with primary span at first type decl.
+    let first_sym = fwd_syms.get(0)
+    let first_node = if self.type_decl_nodes.contains(first_sym): self.type_decl_nodes.get(first_sym).unwrap() else: 0
+    let primary_start = self.ast.get_start(first_node)
+    let primary_end = self.ast.get_end(first_node)
+    var diag = Diagnostic.err("dependency loop with length " ++ int_to_string(loop_len), Span { file: self.local_file_id, start: primary_start, end: primary_end })
+
+    // Add a label for each edge in the loop.
+    for i in 0..loop_len:
+        let from_sym = fwd_syms.get(i as i64)
+        let to_sym = if i + 1 < loop_len: fwd_syms.get((i + 1) as i64) else: fwd_syms.get(0)
+        let edge_node = fwd_edges.get(i as i64)
+        if edge_node != 0:
+            let from_name = self.pool_resolve_symbol(from_sym)
+            let to_name = self.pool_resolve_symbol(to_sym)
+            let e_start = self.ast.get_start(edge_node)
+            let e_end = self.ast.get_end(edge_node)
+            diag.add_label(Span { file: self.local_file_id, start: e_start, end: e_end }, "type `" ++ from_name ++ "` depends on `" ++ to_name ++ "` here")
+
+    diag.add_help("break the cycle by using a pointer (`*" ++ self.pool_resolve_symbol(fwd_syms.get(0)) ++ "`) or reference (`&" ++ self.pool_resolve_symbol(fwd_syms.get(0)) ++ "`) for one field")
+    self.diags.emit(diag)
 
 fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let fn_name = self.ast.get_data0(node)

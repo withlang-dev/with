@@ -10,6 +10,7 @@
 #include <llvm-c/TargetMachine.h>
 #include <llvm-c/Analysis.h>
 #include <llvm-c/Transforms/PassBuilder.h>
+#include <llvm-c/DebugInfo.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
@@ -528,6 +529,7 @@ int64_t wl_create_entry_alloca(int64_t builder, int64_t fn, int64_t ty) {
     LLVMBasicBlockRef entry = LLVMGetEntryBasicBlock(V(fn));
     LLVMValueRef first = LLVMGetFirstInstruction(entry);
     LLVMBasicBlockRef saved = LLVMGetInsertBlock(B(builder));
+    LLVMMetadataRef saved_loc = LLVMGetCurrentDebugLocation2(B(builder));
     if (first) {
         LLVMPositionBuilderBefore(B(builder), first);
     } else {
@@ -535,5 +537,111 @@ int64_t wl_create_entry_alloca(int64_t builder, int64_t fn, int64_t ty) {
     }
     LLVMValueRef alloca = LLVMBuildAlloca(B(builder), T(ty), "");
     LLVMPositionBuilderAtEnd(B(builder), saved);
+    LLVMSetCurrentDebugLocation2(B(builder), saved_loc);
     return P2I(alloca);
 }
+
+// ── Debug info (DWARF) ─────────────────────────────────────
+#define DI(i) ((LLVMMetadataRef)(intptr_t)(i))
+
+int64_t wl_di_create_builder(int64_t module) {
+    return P2I(LLVMCreateDIBuilder(M(module)));
+}
+
+void wl_di_dispose_builder(int64_t builder) {
+    LLVMDisposeDIBuilder((LLVMDIBuilderRef)(intptr_t)builder);
+}
+
+void wl_di_finalize(int64_t builder) {
+    LLVMDIBuilderFinalize((LLVMDIBuilderRef)(intptr_t)builder);
+}
+
+int32_t wl_debug_metadata_version(void) {
+    return (int32_t)LLVMDebugMetadataVersion();
+}
+
+void wl_add_module_flag_int(int64_t module, with_str key, int32_t val) {
+    const char *k = to_cstr(key);
+    LLVMAddModuleFlag(M(module), LLVMModuleFlagBehaviorWarning,
+        k, strlen(k),
+        LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(
+            LLVMGetModuleContext(M(module))), (uint64_t)val, 0)));
+}
+
+int64_t wl_di_create_file(int64_t builder, with_str filename, with_str directory) {
+    return P2I(LLVMDIBuilderCreateFile(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        filename.ptr, (size_t)filename.len,
+        directory.ptr, (size_t)directory.len));
+}
+
+int64_t wl_di_create_compile_unit(int64_t builder, int64_t file,
+    with_str producer, int32_t is_optimized, int32_t dwarf_version) {
+    (void)dwarf_version;
+    return P2I(LLVMDIBuilderCreateCompileUnit(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        LLVMDWARFSourceLanguageC,  // Use C until DW_LANG registered
+        DI(file),
+        producer.ptr, (size_t)producer.len,
+        is_optimized,
+        "",  0,  // flags
+        0,       // runtime version
+        "",  0,  // split name
+        LLVMDWARFEmissionFull,
+        0,       // DWOId
+        0,       // split debug inlining
+        0,       // debug info for profiling
+        "",  0,  // sys root
+        "",  0   // SDK
+    ));
+}
+
+int64_t wl_di_create_subroutine_type(int64_t builder, int64_t file,
+    int64_t param_types_ptr, int32_t count) {
+    return P2I(LLVMDIBuilderCreateSubroutineType(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        DI(file),
+        count > 0 ? (LLVMMetadataRef*)(intptr_t)param_types_ptr : NULL,
+        (unsigned)count,
+        LLVMDIFlagZero));
+}
+
+int64_t wl_di_create_function(int64_t builder, int64_t scope,
+    with_str name, with_str linkage_name, int64_t file,
+    int32_t line, int64_t type, int32_t is_definition,
+    int32_t scope_line, int32_t is_optimized) {
+    return P2I(LLVMDIBuilderCreateFunction(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        DI(scope),
+        name.ptr, (size_t)name.len,
+        linkage_name.ptr, (size_t)linkage_name.len,
+        DI(file),
+        (unsigned)line,
+        DI(type),
+        0,  // is_local_to_unit
+        is_definition,
+        (unsigned)scope_line,
+        LLVMDIFlagZero,
+        is_optimized));
+}
+
+void wl_di_set_subprogram(int64_t function, int64_t subprogram) {
+    LLVMSetSubprogram(V(function), DI(subprogram));
+}
+
+int64_t wl_di_create_debug_location(int64_t context, int32_t line,
+    int32_t col, int64_t scope) {
+    return P2I(LLVMDIBuilderCreateDebugLocation(
+        C(context), (unsigned)line, (unsigned)col, DI(scope), NULL));
+}
+
+void wl_di_set_current_location(int64_t builder, int64_t location) {
+    LLVMSetCurrentDebugLocation2(B(builder), DI(location));
+}
+
+void wl_di_clear_current_location(int64_t builder) {
+    LLVMSetCurrentDebugLocation2(B(builder), NULL);
+}
+
+int32_t wl_di_flag_zero(void) { return (int32_t)LLVMDIFlagZero; }
+int32_t wl_dwarf_lang_c(void) { return (int32_t)LLVMDWARFSourceLanguageC; }

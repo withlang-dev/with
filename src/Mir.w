@@ -127,6 +127,7 @@ type MirBody = {
     bb_term_d2: Vec[i32],
     bb_term_d3: Vec[i32],
     bb_is_cleanup: Vec[i32],
+    bb_term_spans: Vec[i32],
 
     // Statements
     stmt_kinds: Vec[i32],
@@ -234,6 +235,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         bb_term_d2: Vec.new(),
         bb_term_d3: Vec.new(),
         bb_is_cleanup: Vec.new(),
+        bb_term_spans: Vec.new(),
         stmt_kinds: Vec.new(),
         stmt_d0: Vec.new(),
         stmt_d1: Vec.new(),
@@ -287,6 +289,7 @@ fn MirBody.new_block(self: &mut MirBody) -> i32:
     self.bb_term_d2.push(0)
     self.bb_term_d3.push(0)
     self.bb_is_cleanup.push(0)
+    self.bb_term_spans.push(0)
     id
 
 fn MirBody.push_stmt(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i32, span: i32):
@@ -302,7 +305,7 @@ fn MirBody.push_stmt(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i32, s
             self.bb_stmt_starts.set_i32(bb, stmt_id)
         self.bb_stmt_counts.set_i32(bb, old_count + 1)
 
-fn MirBody.set_terminator(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32):
+fn MirBody.set_terminator(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32, span: i32):
     if bb < 0 or bb >= self.bb_term_kinds.len() as i32:
         return
     self.bb_term_kinds.set_i32(bb, kind)
@@ -310,6 +313,7 @@ fn MirBody.set_terminator(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i
     self.bb_term_d1.set_i32(bb, d1)
     self.bb_term_d2.set_i32(bb, d2)
     self.bb_term_d3.set_i32(bb, d3)
+    self.bb_term_spans.set_i32(bb, span)
 
 fn MirBody.new_local(self: &mut MirBody, type_id: i32, mutable: i32, name: i32, is_user_var: i32) -> i32:
     let id = self.local_type_ids.len() as i32
@@ -944,6 +948,8 @@ fn validate_mir_body(body: MirBody) -> str:
         return "bb terminator payload length mismatch"
     if bb_count != body.bb_is_cleanup.len() as i32:
         return "bb cleanup flag length mismatch"
+    if bb_count != body.bb_term_spans.len() as i32:
+        return "bb_term_spans length mismatch"
 
     let stmt_count = body.stmt_kinds.len() as i32
     if stmt_count != body.stmt_d0.len() as i32 or
