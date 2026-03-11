@@ -1,44 +1,52 @@
 //! expect-stdout: ok
 
-// Behavior test: infinite loops with while true and break
-// TODO: loop: keyword as distinct from while true: not yet parsed.
+// Behavior test: loop statement and while-true with break
 
-fn test_while_true_break:
+fn test_loop_break:
     var count = 0
-    while true:
-        count += 1
+    loop:
+        count = count + 1
         if count == 5:
             break
     assert(count == 5)
 
-fn test_while_true_accumulate:
+fn test_loop_accumulate:
     var sum = 0
     var i = 1
-    while true:
-        sum += i
-        i += 1
+    loop:
+        sum = sum + i
+        i = i + 1
         if i > 10:
             break
     // 1+2+...+10 = 55
     assert(sum == 55)
 
-fn test_nested_while_true:
+fn test_while_true_break:
+    var count = 0
+    while true:
+        count = count + 1
+        if count == 5:
+            break
+    assert(count == 5)
+
+fn test_nested_loops:
     var total = 0
     var outer = 0
-    while true:
+    loop:
         var inner = 0
-        while true:
-            total += 1
-            inner += 1
+        loop:
+            total = total + 1
+            inner = inner + 1
             if inner == 3:
                 break
-        outer += 1
+        outer = outer + 1
         if outer == 4:
             break
     assert(total == 12)
 
 fn main:
+    test_loop_break()
+    test_loop_accumulate()
     test_while_true_break()
-    test_while_true_accumulate()
-    test_nested_while_true()
+    test_nested_loops()
     println("ok")

@@ -3730,13 +3730,15 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     if self.pool.kind(value_node) == NK_COMPTIME:
         value_node = self.pool.get_data0(value_node)
 
+    let flags = self.pool.get_data2(let_node)
+    let is_mut = flags % 2
     let val = self.try_eval_const_int(value_node)
     if val != CONST_EVAL_FAIL():
-        self.const_int_syms.push(name_sym)
-        self.const_int_vals.push(val)
+        if is_mut == 0:
+            self.const_int_syms.push(name_sym)
+            self.const_int_vals.push(val)
         // Respect type annotation: if declared as i64, always use i64
         var global_ty = if val < -2147483648 or val > 2147483647: wl_i64_type(self.context) else: wl_i32_type(self.context)
-        let flags = self.pool.get_data2(let_node)
         let type_extra_packed = flags / 4
         if type_extra_packed > 0:
             let type_ann_node = self.pool.get_extra(type_extra_packed - 1)
@@ -3747,7 +3749,8 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         let name_str = self.intern.resolve(name_sym)
         let global = wl_add_global(self.llmod, global_ty, name_str)
         wl_set_initializer(global, wl_const_int(global_ty, val, 1))
-        wl_set_global_constant(global, 1)
+        if is_mut == 0:
+            wl_set_global_constant(global, 1)
         wl_set_linkage(global, wl_internal_linkage())
         self.module_constants.insert(name_sym, global)
 
@@ -5619,7 +5622,28 @@ fn Codegen.gen_unary(self: Codegen, node: i32) -> i64:
         wl_position_at_end(self.builder, ok_bb)
         let elem_count = wl_count_struct_elem_types(wl_type_of(val))
         if elem_count > 1:
-            return wl_build_extract_value(self.builder, val, 1)
+            let raw_payload = wl_build_extract_value(self.builder, val, 1)
+            let raw_ty = wl_type_of(raw_payload)
+            // For disc enums with payload, raw_payload is [N x i8] — bitcast to actual payload type
+            if wl_get_type_kind(raw_ty) == wl_array_type_kind():
+                let val_ty = wl_type_of(val)
+                let es = self.enum_by_llvm.get(val_ty)
+                if es.is_some():
+                    let et = self.enum_type_map.get(es.unwrap())
+                    if et.is_some():
+                        let v_start = self.enum_variant_starts.get(et.unwrap() as i64)
+                        let ok_payload_ty = self.enum_variant_payloads.get(v_start as i64)
+                        if ok_payload_ty != 0:
+                            let raw_alloca = wl_build_alloca(self.builder, raw_ty)
+                            wl_build_store(self.builder, raw_payload, raw_alloca)
+                            let cast_ptr = wl_build_bitcast(self.builder, raw_alloca, wl_ptr_type(self.context))
+                            var payload_val = wl_build_load(self.builder, ok_payload_ty, cast_ptr)
+                            // Unwrap single-element struct wrapper { T } -> T
+                            if wl_get_type_kind(ok_payload_ty) == wl_struct_type_kind():
+                                if wl_count_struct_elem_types(ok_payload_ty) == 1:
+                                    payload_val = wl_build_extract_value(self.builder, payload_val, 0)
+                            return payload_val
+            return raw_payload
         return wl_const_int(wl_i32_type(self.context), 0, 0)
 
     wl_get_undef(wl_i32_type(self.context))
@@ -5940,6 +5964,11 @@ fn Codegen.gen_assign(self: Codegen, node: i32) -> i64:
         let la = self.local_allocas.get(sym)
         if la.is_some():
             wl_build_store(self.builder, val, la.unwrap() as i64)
+            return wl_get_undef(wl_void_type(self.context))
+        // Check mutable globals
+        let mc = self.module_constants.get(sym)
+        if mc.is_some():
+            wl_build_store(self.builder, val, mc.unwrap() as i64)
             return wl_get_undef(wl_void_type(self.context))
     if tk == NK_FIELD_ACCESS:
         let obj_node = self.pool.get_data0(target_node)
@@ -7825,19 +7854,23 @@ fn Codegen.gen_match(self: Codegen, node: i32) -> i64:
         if wl_get_type_kind(subject_ty) == wl_struct_type_kind():
             tag = wl_build_extract_value(self.builder, subject, 0)
 
-        // Check if any arm uses a range pattern (requires deferred wildcard processing)
+        // Check if any arm uses a range pattern or guard (requires deferred wildcard processing)
         var has_range_arms = false
+        var has_guard_arms = false
         var range_check_i = 0
         while range_check_i < arm_count:
             let rc_arm = self.pool.get_extra(arms_start + range_check_i)
             let rc_pat = self.pool.get_data0(rc_arm)
             let rc_pk = self.pool.kind(rc_pat)
+            let rc_guard = self.pool.get_data2(rc_arm)
             if rc_pk == NK_PAT_RANGE:
                 has_range_arms = true
             if rc_pk == NK_PAT_AT_BINDING:
                 let rc_inner = self.pool.get_data1(rc_pat)
                 if self.pool.kind(rc_inner) == NK_PAT_RANGE:
                     has_range_arms = true
+            if rc_guard != 0 and self.pool.kind(rc_guard) != 0:
+                has_guard_arms = true
             range_check_i = range_check_i + 1
 
         // Collect arms
@@ -7857,9 +7890,10 @@ fn Codegen.gen_match(self: Codegen, node: i32) -> i64:
 
             // Handle wildcard/ident default arm
             if pk == NK_PAT_WILDCARD or pk == NK_PAT_IDENT:
-                if has_range_arms:
-                    // Defer wildcard processing until after range checks
-                    wildcard_arm_idx = ai
+                if has_range_arms or has_guard_arms:
+                    // Defer wildcard/ident processing until after range/guard checks
+                    if wildcard_arm_idx < 0:
+                        wildcard_arm_idx = ai
                     wl_position_at_end(self.builder, arm_bb)
                     if wl_get_bb_terminator(arm_bb) == 0:
                         wl_build_unreachable(self.builder)
@@ -8104,9 +8138,56 @@ fn Codegen.gen_match(self: Codegen, node: i32) -> i64:
                     wl_position_at_end(self.builder, range_next_bb)
             ri = ri + 1
 
-        // Generate deferred wildcard arm (after range checks)
+        // Generate guarded ident/wildcard arms as if-else chain on default path
+        if has_guard_arms:
+            var gi = 0
+            while gi < arm_count:
+                let g_arm_node = self.pool.get_extra(arms_start + gi)
+                let g_pat_node = self.pool.get_data0(g_arm_node)
+                let g_body_node = self.pool.get_data1(g_arm_node)
+                let g_guard_node = self.pool.get_data2(g_arm_node)
+                let g_pk = self.pool.kind(g_pat_node)
+                if (g_pk == NK_PAT_IDENT or g_pk == NK_PAT_WILDCARD) and g_guard_node != 0 and self.pool.kind(g_guard_node) != 0:
+                    // Bind the ident pattern variable before evaluating guard
+                    if g_pk == NK_PAT_IDENT:
+                        let bind_sym = self.pool.get_data0(g_pat_node)
+                        let alloca = self.create_entry_alloca(subject_ty)
+                        wl_build_store(self.builder, subject, alloca)
+                        self.record_local(bind_sym, alloca, subject_ty, 0)
+                    let guard_val = self.gen_expr(g_guard_node)
+                    var guard_cond = guard_val
+                    if wl_type_of(guard_val) != wl_i1_type(self.context):
+                        guard_cond = wl_build_icmp(self.builder, wl_int_ne(), guard_val, wl_const_int(wl_type_of(guard_val), 0, 0))
+                    let guard_body_bb = wl_append_bb(self.context, self.current_function, "match.guard.body")
+                    let guard_next_bb = wl_append_bb(self.context, self.current_function, "match.guard.next")
+                    wl_build_cond_br(self.builder, guard_cond, guard_body_bb, guard_next_bb)
+                    wl_position_at_end(self.builder, guard_body_bb)
+                    let g_body_val = self.gen_expr(g_body_node)
+                    if not has_result and wl_type_of(g_body_val) != wl_void_type(self.context):
+                        result_alloca = self.create_entry_alloca(wl_type_of(g_body_val))
+                        has_result = true
+                    if has_result and result_alloca != 0:
+                        wl_build_store(self.builder, g_body_val, result_alloca)
+                    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
+                        wl_build_br(self.builder, merge_bb)
+                    wl_position_at_end(self.builder, guard_next_bb)
+                gi = gi + 1
+
+        // Generate deferred wildcard arm (after range/guard checks)
         if wildcard_arm_idx >= 0:
-            let wc_arm_node = self.pool.get_extra(arms_start + wildcard_arm_idx)
+            // Find the first unguarded wildcard/ident arm
+            var final_wc_idx = wildcard_arm_idx
+            var fwi = wildcard_arm_idx
+            while fwi < arm_count:
+                let fw_arm = self.pool.get_extra(arms_start + fwi)
+                let fw_pat = self.pool.get_data0(fw_arm)
+                let fw_guard = self.pool.get_data2(fw_arm)
+                let fw_pk = self.pool.kind(fw_pat)
+                if (fw_pk == NK_PAT_WILDCARD or fw_pk == NK_PAT_IDENT) and (fw_guard == 0 or self.pool.kind(fw_guard) == 0):
+                    final_wc_idx = fwi
+                    break
+                fwi = fwi + 1
+            let wc_arm_node = self.pool.get_extra(arms_start + final_wc_idx)
             let wc_pat_node = self.pool.get_data0(wc_arm_node)
             let wc_body_node = self.pool.get_data1(wc_arm_node)
             let wc_pk = self.pool.kind(wc_pat_node)

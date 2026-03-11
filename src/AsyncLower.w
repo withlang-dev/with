@@ -262,7 +262,16 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 
-    if kind == NK_STRUCT_LIT or kind == NK_RECORD_UPDATE:
+    if kind == NK_STRUCT_LIT:
+        // d0 is a symbol, not a node — don't walk it
+        let field_start = async_ast_get_data1(self.ast, node)
+        let field_count = async_ast_get_data2(self.ast, node)
+        for fi in 0..field_count:
+            let val = async_extra_or_zero(self.ast, field_start + fi * 2 + 1)
+            self.walk_expr(val)
+        return
+
+    if kind == NK_RECORD_UPDATE:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         let field_start = async_ast_get_data1(self.ast, node)
         let field_count = async_ast_get_data2(self.ast, node)
