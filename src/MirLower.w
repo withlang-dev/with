@@ -44,6 +44,7 @@ type MirBuilder = {
     loop_break_drop_depths: Vec[i32],
 
     next_temp: i32,
+    cur_node: i32,
 
     sema: Sema,
     ast: AstPool,
@@ -66,6 +67,7 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         loop_break_bbs: Vec.new(),
         loop_break_drop_depths: Vec.new(),
         next_temp: 0,
+        cur_node: 0,
         sema,
         ast,
         pool,
@@ -78,7 +80,11 @@ fn MirBuilder.switch_to(self: MirBuilder, bb: i32):
     self.cur_bb = bb
 
 fn MirBuilder.terminate(self: MirBuilder, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32):
-    self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, d3)
+    let span = if self.cur_node > 0: self.ast.get_start(self.cur_node) else: 0
+    self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, d3, span)
+
+fn MirBuilder.terminate_with_span(self: MirBuilder, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32, span: i32):
+    self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, d3, span)
 
 fn MirBuilder.push_scope(self: MirBuilder):
     self.drop_scope_starts.push(self.drop_local_ids.len() as i32)
@@ -1402,6 +1408,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if node == 0:
         return self.unit_operand()
 
+    self.cur_node = node
     let kind = self.ast.kind(node)
 
     if kind == NK_INT_LIT:

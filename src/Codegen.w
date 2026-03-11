@@ -12,6 +12,7 @@ use Span
 use Mir
 use Sema
 use Diagnostic
+use Source
 
 extern fn with_parse_float(s: str) -> f64
 extern fn with_eprintln(s: str) -> void
@@ -250,6 +251,21 @@ extern fn wl_vec_data_ptr(v: &Vec[i64]) -> i64
 
 // Entry alloca helper
 extern fn wl_create_entry_alloca(builder: i64, f: i64, ty: i64) -> i64
+
+// Debug info (DWARF)
+extern fn wl_di_create_builder(m: i64) -> i64
+extern fn wl_di_dispose_builder(b: i64) -> void
+extern fn wl_di_finalize(b: i64) -> void
+extern fn wl_debug_metadata_version() -> i32
+extern fn wl_add_module_flag_int(m: i64, key: str, val: i32) -> void
+extern fn wl_di_create_file(b: i64, filename: str, directory: str) -> i64
+extern fn wl_di_create_compile_unit(b: i64, file: i64, producer: str, is_optimized: i32, dwarf_version: i32) -> i64
+extern fn wl_di_create_subroutine_type(b: i64, file: i64, param_types_ptr: i64, count: i32) -> i64
+extern fn wl_di_create_function(b: i64, scope: i64, name: str, linkage_name: str, file: i64, line: i32, ty: i64, is_definition: i32, scope_line: i32, is_optimized: i32) -> i64
+extern fn wl_di_set_subprogram(f: i64, subprogram: i64) -> void
+extern fn wl_di_create_debug_location(ctx: i64, line: i32, col: i32, scope: i64) -> i64
+extern fn wl_di_set_current_location(b: i64, location: i64) -> void
+extern fn wl_di_clear_current_location(b: i64) -> void
 
 // Runtime helpers
 extern fn with_str_concat(a: str, b: str) -> str
@@ -491,6 +507,13 @@ type Codegen = {
     source_file: str,
     source_text: str,
 
+    // Debug info (DWARF)
+    di_builder: i64,
+    di_compile_unit: i64,
+    di_file: i64,
+    di_source: Source,
+    di_fn_subprograms: HashMap[i32, i64],
+
     // Wave 10 MIR backend input (optional).
     mir_input_enabled: i32,
     mir_dispatch_count: i32,
@@ -686,6 +709,11 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         mir_local_types: HashMap.new(),
         mir_bb_values: Vec.new(),
         mir_default_unreachable_bbs: Vec.new(),
+        di_builder: 0,
+        di_compile_unit: 0,
+        di_file: 0,
+        di_source: Source.from_string("<unknown>", "", 0),
+        di_fn_subprograms: HashMap.new(),
     }
 
 fn Codegen.deinit(self: Codegen):
@@ -707,6 +735,78 @@ fn Codegen.print_ir(self: Codegen):
 
 fn Codegen.verify(self: Codegen) -> i32:
     wl_verify_module(self.llmod)
+
+// ── Debug info helpers ────────────────────────────────────────────
+
+fn Codegen.debug_init_module(self: Codegen):
+    self.di_source = Source.from_string(self.source_file, self.source_text, 0)
+    self.di_builder = wl_di_create_builder(self.llmod)
+
+    // Split source path into directory and filename
+    var last_slash = 0 - 1
+    for i in 0..self.source_file.len() as i32:
+        if self.source_file.byte_at(i as i64) == 47:
+            last_slash = i
+
+    var dir = "."
+    var file = self.source_file
+    if last_slash >= 0:
+        dir = self.source_file.slice(0, last_slash as i64)
+        file = self.source_file.slice((last_slash + 1) as i64, self.source_file.len())
+
+    self.di_file = wl_di_create_file(self.di_builder, file, dir)
+
+    wl_add_module_flag_int(self.llmod, "Debug Info Version", wl_debug_metadata_version())
+    wl_add_module_flag_int(self.llmod, "Dwarf Version", 5)
+
+    let is_opt = 0
+    self.di_compile_unit = wl_di_create_compile_unit(
+        self.di_builder, self.di_file, "with", is_opt, 5)
+
+fn Codegen.debug_finalize_module(self: Codegen):
+    if self.di_builder != 0:
+        wl_di_finalize(self.di_builder)
+
+fn Codegen.debug_enter_function(self: Codegen, fn_node: i32, fn_sym: i32, function: i64):
+    if self.di_builder == 0:
+        return
+    let fn_name = self.intern.resolve(fn_sym)
+    if fn_name.len() == 0:
+        return
+
+    var fn_line = 1
+    let span = self.pool.get_start(fn_node)
+    if span > 0:
+        let loc = self.di_source.offset_to_location(span)
+        fn_line = loc.line + 1
+
+    let sub_type = wl_di_create_subroutine_type(self.di_builder, self.di_file, 0, 0)
+    let subprogram = wl_di_create_function(
+        self.di_builder, self.di_file, fn_name, fn_name,
+        self.di_file, fn_line, sub_type, 1, fn_line, 0)
+    wl_di_set_subprogram(function, subprogram)
+    self.di_fn_subprograms.insert(fn_sym, subprogram)
+
+fn Codegen.debug_set_location(self: Codegen, byte_offset: i32):
+    if self.di_builder == 0:
+        return
+    if byte_offset <= 0:
+        wl_di_clear_current_location(self.builder)
+        return
+    let loc = self.di_source.offset_to_location(byte_offset)
+    let line = loc.line + 1
+    let col = loc.col + 1
+    let sp = self.di_fn_subprograms.get(self.current_function_name_sym)
+    if not sp.is_some():
+        return
+    let scope = sp.unwrap() as i64
+    let di_loc = wl_di_create_debug_location(self.context, line, col, scope)
+    wl_di_set_current_location(self.builder, di_loc)
+
+fn Codegen.debug_clear_location(self: Codegen):
+    if self.di_builder == 0:
+        return
+    wl_di_clear_current_location(self.builder)
 
 fn Codegen.abi_size_of(self: Codegen, ty: i64) -> i64:
     if ty == 0:
@@ -2964,6 +3064,8 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
         with_eprintln("[llvm-cg] gen_module self.decls=" ++ int_to_string(self.pool.decl_count()) ++
             " self.nodes=" ++ int_to_string(self.pool.node_count()))
 
+    self.debug_init_module()
+
     // Declare built-in str type before user types
     self.declare_builtin_str_type()
 
@@ -3092,6 +3194,9 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
     // Wrap main for exit
     self.wrap_main_for_exit()
+
+    // Finalize debug info before verification
+    self.debug_finalize_module()
 
     // Verify
     self.verify()
@@ -3851,7 +3956,15 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
                 if self.debug_mir_codegen_enabled():
                     let fn_name = self.intern.resolve(fn_sym)
                     with_eprintln("[mir-dispatch] using MIR for: " ++ fn_name)
+                // Attach debug info only for MIR-codegen'd functions
+                let fv = self.fn_values.get(fn_sym)
+                if fv.is_some():
+                    self.current_function_name_sym = fn_sym
+                    self.debug_enter_function(fn_node, fn_sym, fv.unwrap() as i64)
+                    let fn_span = self.pool.get_start(fn_node)
+                    self.debug_set_location(fn_span)
                 self.gen_function_mir(fn_node, body)
+                self.debug_clear_location()
                 return
     self.gen_function(fn_node)
 
@@ -4958,6 +5071,9 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         let stmt_count = body.bb_stmt_counts.get(bb as i64)
         for si in 0..stmt_count:
             let stmt_id = stmt_start + si
+            let stmt_span = body.stmt_spans.get(stmt_id as i64)
+            if stmt_span > 0:
+                self.debug_set_location(stmt_span)
             if not self.mir_emit_stmt(body, stmt_id):
                 if self.debug_mir_codegen_enabled():
                     with_eprintln("[mir-cg] fn=" ++ name_str ++ " bb=" ++ int_to_string(bb) ++ " stmt_fail=" ++ int_to_string(stmt_id))
@@ -4965,6 +5081,9 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
                     wl_build_unreachable(self.builder)
                 break
         if wl_get_bb_terminator(llbb) == 0:
+            let term_span = body.bb_term_spans.get(bb as i64)
+            if term_span > 0:
+                self.debug_set_location(term_span)
             let ok = self.mir_emit_term(body, bb)
             if self.debug_mir_codegen_enabled():
                 var ok_i = 0
@@ -4979,6 +5098,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         if wl_get_bb_terminator(ubb) == 0:
             wl_position_at_end(self.builder, ubb)
             wl_build_unreachable(self.builder)
+
 
     self.expected_type = saved_expected
     self.expected_type_node = saved_expected_node

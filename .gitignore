@@ -15,6 +15,7 @@ out/
 *.a
 *.so
 *.dylib
+*.dSYM/
 
 # Editor / OS
 .DS_Store

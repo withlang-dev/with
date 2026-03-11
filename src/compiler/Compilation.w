@@ -167,6 +167,8 @@ fn Compilation.build_binary_at(self: Compilation, source_path: str, output_dir: 
         compilation_debug_init("build_binary_at:link FAILED")
         let _ = ("rm -f " ++ obj_path) |> with_system
         return ""
+    // Generate .dSYM bundle for macOS debug info (DWARF stays in .o until dsymutil runs)
+    let _ = ("dsymutil " ++ bin_path ++ " 2>/dev/null") |> with_system
     let _ = ("rm -f " ++ obj_path) |> with_system
     bin_path
 

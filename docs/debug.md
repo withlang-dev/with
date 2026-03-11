@@ -424,31 +424,31 @@ show disassembly. This is why step 3 must come before step 5.
 
 ### Phase 1
 
-- [ ] Add `llvm-c/DebugInfo.h` to `runtime/llvm_bridge.c`
-- [ ] Add `wl_di_*` wrapper functions to bridge
-- [ ] Declare bridge functions in `src/Codegen.w`
-- [ ] Add debug state fields to `Codegen`
-- [ ] Add `Source` for cached offset-to-location lookup
-- [ ] Implement `debug_init_module`
-- [ ] Add module flags for debug version and DWARF version
-- [ ] Implement `debug_finalize_module`, call before verify
-- [ ] Add `bb_term_spans` to `MirBody`
-- [ ] Thread spans through `MirBody.set_terminator`
-- [ ] Thread spans through `MirBuilder.terminate`
-- [ ] Populate terminator spans from AST node spans
-- [ ] Implement `debug_enter_function`
-- [ ] Create `DISubprogram` per user function
-- [ ] Attach subprograms with `wl_di_set_subprogram`
-- [ ] Implement `debug_set_location` and `debug_clear_location`
-- [ ] Set location from `stmt_spans` before each MIR statement
-- [ ] Set location from `term_spans` before each MIR terminator
-- [ ] Set location for function prologue (param stores, allocas)
-- [ ] Clear location for synthetic instructions
-- [ ] Verify `examples/hello.w` shows source in LLDB
-- [ ] Verify loop/match example steps through source
-- [ ] `make build` passes
-- [ ] `make fixpoint` passes
-- [ ] `./out/bin/with-stage2 check src/main.w` passes
+- [x] Add `llvm-c/DebugInfo.h` to `runtime/llvm_bridge.c`
+- [x] Add `wl_di_*` wrapper functions to bridge
+- [x] Declare bridge functions in `src/Codegen.w`
+- [x] Add debug state fields to `Codegen`
+- [x] Add `Source` for cached offset-to-location lookup
+- [x] Implement `debug_init_module`
+- [x] Add module flags for debug version and DWARF version
+- [x] Implement `debug_finalize_module`, call before verify
+- [x] Add `bb_term_spans` to `MirBody`
+- [x] Thread spans through `MirBody.set_terminator`
+- [x] Thread spans through `MirBuilder.terminate`
+- [x] Populate terminator spans from AST node spans
+- [x] Implement `debug_enter_function`
+- [x] Create `DISubprogram` per user function
+- [x] Attach subprograms with `wl_di_set_subprogram`
+- [x] Implement `debug_set_location` and `debug_clear_location`
+- [x] Set location from `stmt_spans` before each MIR statement
+- [x] Set location from `term_spans` before each MIR terminator
+- [x] Set location for function prologue (param stores, allocas)
+- [x] Clear location for synthetic instructions
+- [x] Verify `examples/hello.w` shows source in LLDB
+- [x] Verify loop/match example steps through source
+- [x] `make build` passes
+- [x] `make fixpoint` passes
+- [x] `./out/bin/with-stage2 check src/main.w` passes
 
 ### Phase 2
 
@@ -458,4 +458,4 @@ show disassembly. This is why step 3 must come before step 5.
 - [ ] Rich DI types for structs, enums, generics
 - [ ] Lexical block scopes
 - [ ] Register `DW_LANG` for With
-- [ ] dSYM packaging on macOS
+- [x] dSYM packaging on macOS
