@@ -32,9 +32,9 @@ trait CacheService:
 
 async fn cache_get[T: Deserialize](cache: &dyn CacheService, key: &str) -> Result[Option[T], CacheError]:
     match cache.get_bytes(key).await
-        Ok(Some(bytes)) -> Ok(Some(deserialize(&bytes)?))
-        Ok(None) -> Ok(None)
-        Err(e) -> Err(e)
+        Ok(Some(bytes)) => Ok(Some(deserialize(&bytes)?))
+        Ok(None) => Ok(None)
+        Err(e) => Err(e)
 
 async fn cache_set[T: Serialize](cache: &dyn CacheService, key: &str, val: &T, ttl: Duration) -> Result[Unit, CacheError]:
     let bytes = serialize(val)

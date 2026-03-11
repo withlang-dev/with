@@ -8,26 +8,26 @@ fn main:
     // Field access construction
     let c = Color.Green
     let r = match c
-        .Red -> "red"
-        .Green -> "green"
-        .Blue -> "blue"
-        _ -> "unknown"
+        .Red => "red"
+        .Green => "green"
+        .Blue => "blue"
+        _ => "unknown"
     assert(r == "green")
 
     // Shorthand construction
     let c2: Color = .Blue
     let r2 = match c2
-        .Red -> "r"
-        .Green -> "g"
-        .Blue -> "b"
-        _ -> "?"
+        .Red => "r"
+        .Green => "g"
+        .Blue => "b"
+        _ => "?"
     assert(r2 == "b")
 
     // Wildcard catches non-matched
     let c3 = Color.Blue
     let r3 = match c3
-        .Red -> "r"
-        _ -> "other"
+        .Red => "r"
+        _ => "other"
     assert(r3 == "other")
 
     // as repr_type cast

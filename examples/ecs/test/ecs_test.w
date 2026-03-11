@@ -75,11 +75,11 @@ type InputDir = Idle | Up | Down | Left | Right
 
 fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity:
     match dir
-        Idle -> make_velocity(0.0, 0.0)
-        Up -> make_velocity(0.0, 0.0 - speed)
-        Down -> make_velocity(0.0, speed)
-        Left -> make_velocity(0.0 - speed, 0.0)
-        Right -> make_velocity(speed, 0.0)
+        Idle => make_velocity(0.0, 0.0)
+        Up => make_velocity(0.0, 0.0 - speed)
+        Down => make_velocity(0.0, speed)
+        Left => make_velocity(0.0 - speed, 0.0)
+        Right => make_velocity(speed, 0.0)
 
 @[test]
 fn test_ecs_example:

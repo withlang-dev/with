@@ -48,7 +48,7 @@ extend DenseStorage[T]:
                     self.sparse.insert(self.dense_entities[idx], idx)
                 let _ = self.dense_entities.pop()
                 self.dense_data.pop()
-            None -> None
+            None => None
 
     fn contains(self: &DenseStorage[T], entity: Entity) -> bool:
         self.sparse.contains_key(&entity)

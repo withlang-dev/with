@@ -22,9 +22,9 @@ impl NotificationService for EmailNotifier:
             msg.subject = notif.subject.clone()
             msg.body = notif.body.clone()
             msg.priority = match notif.priority
-                .Urgent -> 1
-                .Normal -> 3
-                .Low    -> 5
+                .Urgent => 1
+                .Normal => 3
+                .Low    => 5
 
         let transport = SmtpTransport.connect(&self.smtp_host, self.smtp_port).await?
         transport.send(&email).await?
@@ -34,7 +34,7 @@ impl NotificationService for EmailNotifier:
         var sent = 0
         for notif in notifs:
             match self.send(notif).await
-                Ok() -> sent += 1
-                Err(.RateLimited(d)) -> return Err(.RateLimited(d))
-                Err(_) -> ()  // skip individual failures
+                Ok() => sent += 1
+                Err(.RateLimited(d)) => return Err(.RateLimited(d))
+                Err(_) => ()  // skip individual failures
         sent

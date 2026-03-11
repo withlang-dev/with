@@ -116,7 +116,7 @@ extend UserService:
             ?? return Err(.Db(.NotFound("users", "{id}")))
 
         // Structured concurrency: fire off stat queries in parallel
-        let (posts, followers, last_login) = async scope |s|:
+        let (posts, followers, last_login) = async scope s =>
             let posts_task = s.track(self.repo.count_posts(id))
             let followers_task = s.track(self.repo.count_followers(id))
             let login_task = s.track(cache_get[Instant](&*self.cache, "last_login:{id}"))
@@ -169,7 +169,7 @@ extend UserService:
         let created_user = { user with id: id }
 
         // Post-creation side effects (concurrent, non-blocking)
-        async scope |s|:
+        async scope s =>
             // Audit log
             s.track(self.audit.record(
                 actor, "create_user", "Created user {created_user.name} ({created_user.email})",
@@ -236,7 +236,7 @@ extend UserService:
         self.repo.delete(id).await?
         self.cache.delete("profile:{id}").await.unwrap_or()
 
-        async scope |s|:
+        async scope s =>
             s.track(self.audit.record(
                 actor,
                 "delete_user",
@@ -271,7 +271,7 @@ extend UserService:
                 Ok(Some(cached)) ->
                     self.bump_cache_hit()
                     return cached
-                _ -> ()
+                _ => ()
 
         let users = self.repo.list_active(limit, offset).await?
 
@@ -297,21 +297,21 @@ extend UserService:
     ) -> Result[Vec[UserProfile], ServiceError]:
         self.bump_requests()
 
-        async scope |s|:
-            ids |> map(|id| s.track(self.get_profile(id)))
+        async scope s =>
+            ids |> map(id => s.track(self.get_profile(id)))
                 |> collect[Vec]()
-                |> map(|task| task.await)
+                |> map(task => task.await)
                 |> collect[Vec]()
-                |> traverse(|r| r)    // Vec[Result] -> Result[Vec]
+                |> traverse(r => r)    // Vec[Result] -> Result[Vec]
 
     // --- Internal Helpers ---
 
     async fn send_welcome(self: &UserService, user: &User) -> Result[Unit, NotifyError]:
         let body = match user.role
-            .Admin     -> "Welcome, administrator. Full access granted."
-            .Moderator -> "Welcome, moderator. You can manage content."
-            .Member    -> "Welcome to the platform, {user.name}!"
-            .Guest     -> "You've been added as a guest."
+            .Admin     => "Welcome, administrator. Full access granted."
+            .Moderator => "Welcome, moderator. You can manage content."
+            .Member    => "Welcome to the platform, {user.name}!"
+            .Guest     => "You've been added as a guest."
 
         self.notifier.send(&Notification {
             recipient: user.email.clone(),

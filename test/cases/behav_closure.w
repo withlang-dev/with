@@ -15,22 +15,22 @@ fn main:
     assert(r1 == 10)
 
     // Inline closure
-    let r2 = apply(|x| x + 1, 10)
+    let r2 = apply(x => x + 1, 10)
     assert(r2 == 11)
 
     // Closure with multiply
-    let r3 = apply(|x| x * 3, 7)
+    let r3 = apply(x => x * 3, 7)
     assert(r3 == 21)
 
     // Closure capturing outer variable
     let offset = 100
-    let r4 = apply(|x| x + offset, 5)
+    let r4 = apply(x => x + offset, 5)
     assert(r4 == 105)
 
     // Closure with multiple captures
     let a = 10
     let b = 20
-    let r5 = apply(|x| x + a + b, 5)
+    let r5 = apply(x => x + a + b, 5)
     assert(r5 == 35)
 
     // Apply twice

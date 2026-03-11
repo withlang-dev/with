@@ -4,9 +4,9 @@
 
 fn classify(n: i32) -> str:
     match n
-        1 | 2 | 3 -> "small"
-        4 | 5 | 6 -> "medium"
-        _ -> "large"
+        1 | 2 | 3 => "small"
+        4 | 5 | 6 => "medium"
+        _ => "large"
 
 fn main:
     assert(classify(1) == "small")

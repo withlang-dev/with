@@ -94,14 +94,14 @@ fn row_to_user(row: &Row) -> User:
 
 fn role_to_str(role: Role) -> &str:
     match role
-        .Admin     -> "admin"
-        .Moderator -> "moderator"
-        .Member    -> "member"
-        .Guest     -> "guest"
+        .Admin     => "admin"
+        .Moderator => "moderator"
+        .Member    => "member"
+        .Guest     => "guest"
 
 fn str_to_role(s: &str) -> Role:
     match s
-        "admin"     -> .Admin
-        "moderator" -> .Moderator
-        "member"    -> .Member
-        _           -> .Guest
+        "admin"     => .Admin
+        "moderator" => .Moderator
+        "member"    => .Member
+        _           => .Guest

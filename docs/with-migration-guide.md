@@ -197,8 +197,8 @@ let Some(user) = find_user(id) else {
 ```with
 // With
 match shape
-    .Circle(r) -> std.math.PI * r * r
-    .Rectangle(w, h) -> w * h
+    .Circle(r) => std.math.PI * r * r
+    .Rectangle(w, h) => w * h
 
 // if let
 if let Some(user) = find_user(id):
@@ -213,7 +213,7 @@ let Some(user) = find_user(id) else return Err(.NotFound)
 ```
 
 Variant shorthand: `.Circle` instead of `Shape::Circle` when the
-type is known from context. `=>` becomes `->`. Braces become `:` +
+type is known from context. `=>` stays `=>`. Braces become `:` +
 indentation.
 
 Enum variants auto-generate accessor methods (§4.4):
@@ -486,7 +486,7 @@ async fn fetch(url: &str) -> Result[str, Error]:
     body                             // implicit Ok wrapping
 
 // Structured concurrency
-let (a, b) = async scope |s|:
+let (a, b) = async scope s =>
     let ta = s.track(fetch("a"))
     let tb = s.track(fetch("b"))
     (ta.await?, tb.await?)
@@ -527,7 +527,7 @@ for item in collection:
 for (i, item) in collection.enumerate():
     println("{i}: {item}")
 
-let squares = [x * x for x in 0..10]
+let squares = [x * x for x in 0..10]    // comprehension syntax
 ```
 
 `.iter()` is implicit in `for` loops. Collection comprehensions
@@ -567,10 +567,10 @@ let callback = move |x| captured_value + x;
 
 ```with
 // With
-let add = |a, b| a + b
-let double = nums |> map(|x| x * 2) |> collect[Vec]()
+let add = (a, b) => a + b
+let double = nums |> map(x => x * 2) |> collect[Vec]()
 // move closures: With infers capture mode from usage
-let callback = |x| captured_value + x
+let callback = x => captured_value + x
 ```
 
 With infers whether a closure captures by reference or by move
@@ -578,7 +578,7 @@ based on how the captured variable is used. Iterator pipelines
 accept collections directly.
 
 **Implicit `it`:** For single-parameter closures, use `it` instead
-of `|param|` syntax (similar to Kotlin's `it`):
+of explicit `param => body` syntax (similar to Kotlin's `it`):
 
 ```with
 // Rust: nums.iter().filter(|x| *x > 0).map(|x| x * 2)
@@ -615,7 +615,7 @@ let updated = { user with name: "new_name", active: false }
 | `impl Foo` | `extend Foo` |
 | `impl Trait for Foo` | `impl Trait for Foo` (same) |
 | `&self` | `self: &Foo` |
-| `match x { A => ..., }` | `match x` ⟨newline⟩ `A -> ...` |
+| `match x { A => ..., }` | `match x` ⟨newline⟩ `A => ...` |
 | `#[attr]` | `@[attr]` |
 | `String::from("x")` / `"x".to_string()` | `"x"` (auto-promoted) |
 | `Ok(value)` | `value` (implicit wrapping) or `Ok()` for early returns |
@@ -969,7 +969,7 @@ References prevent moves:
 
 ```with
 fn sum(data: &[i32]) -> i32:   // borrows, doesn't take ownership
-    data.iter() |> fold(0, |a, x| a + x)
+    data.iter() |> fold(0, (a, x) => a + x)
 
 let nums = vec![1, 2, 3]
 let total = sum(&nums)       // nums still valid
@@ -1269,9 +1269,9 @@ let val = rx.recv().await
 
 // With select
 select await
-    msg = inbox.recv() -> process(msg)
-    _ = cancel.cancelled() -> return Err(.Cancelled)
-    _ = timeout(5.secs()) -> return Err(.Timeout)
+    msg = inbox.recv() => process(msg)
+    _ = cancel.cancelled() => return Err(.Cancelled)
+    _ = timeout(5.secs()) => return Err(.Timeout)
 ```
 
 `go func()` → `spawn async:`. `chan T` → `chan[T]`. `select`
@@ -1361,7 +1361,7 @@ Go slices → `Vec[T]`. Go maps → `HashMap[K, V]`. Append →
 `.push()`. `delete` → `.remove()`.
 
 v6.3 also adds common map-mutation helpers:
-`m.update("a", 0, |n| n + 1)` and `m.increment("a")`.
+`m.update("a", 0, n => n + 1)` and `m.increment("a")`.
 
 ## Defer
 
@@ -1427,7 +1427,7 @@ let b = a                 // ownership MOVES to b
 
 // Borrowing: temporary access without ownership transfer
 fn print_sum(data: &[i32]):     // borrows immutably
-    let sum = data.iter() |> fold(0, |a, x| a + x)
+    let sum = data.iter() |> fold(0, (a, x) => a + x)
     println("sum: {sum}")
 
 let nums = vec![1, 2, 3]
@@ -1460,7 +1460,7 @@ let clone = shared.clone()   // both point to same data
 | `interface { Method() }` | `trait Foo: fn method()` |
 | `go func() { }()` | `spawn async: ...` |
 | `chan T` | `chan[T]` |
-| `select { case ... }` | `select await ... ->` |
+| `select { case ... }` | `select await ... =>` |
 | `context.Context` | (deleted — structured concurrency) |
 | `defer` | `defer` |
 | `nil` | `None` |
@@ -1517,7 +1517,7 @@ v6.3 adds null-safe pointer conversion:
 ```with
 let name_ptr: *const c_char = c_get_name(id)
 let name = name_ptr.as_option()
-    .map(|p| CStr.from_ptr(p).to_str())
+    .map(p => CStr.from_ptr(p).to_str())
     .unwrap_or("unknown")
 ```
 
@@ -1857,8 +1857,8 @@ fn load_config(path: &str) -> Result[Config, AppError]:
     config                           // implicit Ok wrapping
 
 match load_config("config.json")
-    Ok(config) -> use_config(config)
-    Err(e) -> println("Failed: {e}")
+    Ok(config) => use_config(config)
+    Err(e) => println("Failed: {e}")
 ```
 
 `throws` → return `Result[T, E]`. `try expr` → `expr?`.
@@ -1911,7 +1911,7 @@ impl Drawable for Circle {
 
 extend Vec[T: Add]
     fn sum(self: &Vec[T]) -> T:
-        self.iter() |> fold(T.zero(), |a, x| a + x)
+        self.iter() |> fold(T.zero(), (a, x) => a + x)
 ```
 
 `protocol` → `trait`. `extension Type: Protocol` →
@@ -1941,19 +1941,19 @@ fetchData(from: url) { result in
 
 ```with
 // With
-let double = |x: i32| -> i32 x * 2
-let names = users.iter() |> map(|u| u.name) |> collect[Vec]()
-let adults = users.iter() |> filter(|u| u.age >= 18) |> collect[Vec]()
-let sorted = users.iter() |> sorted_by(|a, b| a.name.cmp(&b.name)) |> collect[Vec]()
+let double = (x: i32) => x * 2
+let names = users.iter() |> map(u => u.name) |> collect[Vec]()
+let adults = users.iter() |> filter(u => u.age >= 18) |> collect[Vec]()
+let sorted = users.iter() |> sorted_by((a, b) => a.name.cmp(&b.name)) |> collect[Vec]()
 
 // No trailing closure syntax — use pipeline or named functions
 let result = fetch_data(url).await
 match result
-    Ok(data) -> process(data)
-    Err(e) -> println("{e}")
+    Ok(data) => process(data)
+    Err(e) => println("{e}")
 ```
 
-`{ $0.name }` → `|u| u.name` or just `it.name`. Swift's `$0` maps
+`{ $0.name }` → `u => u.name` or just `it.name`. Swift's `$0` maps
 to With's `it` for single-parameter closures:
 
 ```with
@@ -1994,11 +1994,11 @@ async fn fetch_user(id: i32) -> Result[User, ApiError]:
     json.parse[User](&data)
 
 // async scope (= Swift's withThrowingTaskGroup)
-async scope |s|:
+async scope s =>
     let tasks = ids.iter()
-        |> map(|id| s.track(fetch_user(id)))
+        |> map(id => s.track(fetch_user(id)))
         |> collect[Vec]()
-    tasks |> map(|t| t.await) |> collect[Vec]()
+    tasks |> map(t => t.await) |> collect[Vec]()
 ```
 
 `async throws` → `async fn ... -> Result[T, E]`.
@@ -2117,9 +2117,9 @@ type NetworkResult =
     | Loading(progress: f64)
 
 match result
-    .Success(data) -> process(data)
-    .Failure(error) -> println("Error: {error}")
-    .Loading(progress) -> update_progress(progress)
+    .Success(data) => process(data)
+    .Failure(error) => println("Error: {error}")
+    .Loading(progress) => update_progress(progress)
 ```
 
 Nearly identical. `.success` → `.Success`. `case` keyword dropped.
@@ -2178,11 +2178,11 @@ let set = HashSet[i32].from([1, 2, 3])
 | `class` | `type` (or `Arc[T]` if shared) |
 | `struct` | `type` |
 | `enum { case a(T) }` | `type Foo = A(T) \| B(U)` |
-| `switch x { case .a: }` | `match x` ⟨newline⟩ `.A ->` |
+| `switch x { case .a: }` | `match x` ⟨newline⟩ `.A =>` |
 | `\(expr)` | `{expr}` |
 | `async throws` | `async fn -> Result[T, E]` |
 | `try await expr` | `expr.await?` |
-| `withThrowingTaskGroup` | `async scope \|s\|:` |
+| `withThrowingTaskGroup` | `async scope s =>` |
 | `group.addTask` | `s.track(task)` |
 | `defer { }` | `defer expr` |
 | `[T]` (Array) | `Vec[T]` |
@@ -2354,12 +2354,12 @@ let user = find_user(id) ?? return Err(.NotFound)
 
 // Exhaustive enum handling
 match status
-    .Active -> process()
-    .Inactive -> skip()
-    .Deleted -> unreachable()
+    .Active => process()
+    .Inactive => skip()
+    .Deleted => unreachable()
 
 // Parallel work with structured concurrency
-let (a, b) = async scope |s|:
+let (a, b) = async scope s =>
     let ta = s.track(compute_a())
     let tb = s.track(compute_b())
     (ta.await?, tb.await?)

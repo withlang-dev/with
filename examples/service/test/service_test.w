@@ -21,10 +21,10 @@ type ServiceResult = Ok | NotFound | InvalidInput | ServerError
 
 fn result_code(r: ServiceResult) -> i32:
     match r
-        Ok -> 0
-        NotFound -> 1
-        InvalidInput -> 2
-        ServerError -> 3
+        Ok => 0
+        NotFound => 1
+        InvalidInput => 2
+        ServerError => 3
 
 fn make_user(id: i32, name: str, email: str, score: i32) -> User: User { id, name, email, score }
 
@@ -57,14 +57,14 @@ fn validate_id(id: i32) -> ServiceResult: if id in 1..=1000 then Ok else Invalid
 fn validate_and_find(users: [5]User, id: i32) -> ServiceResult:
     let validation = validate_id(id)
     match validation
-        Ok -> find_user(users, id)
-        _ -> validation
+        Ok => find_user(users, id)
+        _ => validation
 
 fn handle_request(users: [5]User, endpoint: i32, user_id: i32) -> ServiceResult:
     match endpoint
-        1 -> validate_and_find(users, user_id)
-        2 -> Ok
-        _ -> NotFound
+        1 => validate_and_find(users, user_id)
+        2 => Ok
+        _ => NotFound
 
 fn identity[T](x: T) -> T: x
 

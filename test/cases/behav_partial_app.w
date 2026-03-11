@@ -9,5 +9,5 @@ fn apply(f: fn(i32) -> i32, x: i32) -> i32:
 
 fn main:
     // Closures work as a manual alternative to partial application
-    let add_five = |x| x + 5
+    let add_five = x => x + 5
     assert(apply(add_five, 3) == 8)

@@ -224,16 +224,16 @@ of the full `TypeName.Variant`.
 // ✗ verbose
 fn color_name(c: Color) -> str:
     match c
-        Color.Red   -> "red"
-        Color.Green -> "green"
-        Color.Blue  -> "blue"
+        Color.Red   => "red"
+        Color.Green => "green"
+        Color.Blue  => "blue"
 
 // ✓ idiomatic
 fn color_name(c: Color) -> str:
     match c
-        .Red   -> "red"
-        .Green -> "green"
-        .Blue  -> "blue"
+        .Red   => "red"
+        .Green => "green"
+        .Blue  => "blue"
 ```
 
 Works everywhere the compiler can infer the enum type: match
@@ -340,8 +340,8 @@ when you just want to propagate the error.
 ```
 // ✗ manual propagation
 let user = match db.find_user(id)
-    Ok(u)  -> u
-    Err(e) -> return Err(e)
+    Ok(u)  => u
+    Err(e) => return Err(e)
 
 // ✓ idiomatic
 let user = db.find_user(id)?
@@ -353,8 +353,8 @@ fallback.
 ```
 // ✗ manual default
 let name = match user.nickname
-    Some(n) -> n
-    None    -> "anonymous"
+    Some(n) => n
+    None    => "anonymous"
 
 // ✓ idiomatic
 let name = user.nickname ?? "anonymous"
@@ -366,10 +366,10 @@ without unwrapping each layer.
 ```
 // ✗ nested matching
 let city = match user.address
-    Some(addr) -> match addr.city
-        Some(c) -> Some(c)
-        None    -> None
-    None -> None
+    Some(addr) => match addr.city
+        Some(c) => Some(c)
+        None    => None
+    None => None
 
 // ✓ idiomatic
 let city = user.address?.city
@@ -384,9 +384,9 @@ When you need to unwrap or bail, `let ... else` reads cleanly.
 ```
 // ✗ nested
 match parse_config(path)
-    Ok(config) ->
+    Ok(config) =>
         // rest of function indented
-    Err(e) ->
+    Err(e) =>
         return Err(e)
 
 // ✓ idiomatic — flat
@@ -431,8 +431,8 @@ let result = data
 ```
 // ✓ methods — the value is the subject
 let names = users.iter()
-    .filter(|u| u.active)
-    .map(|u| u.name)
+    .filter(u => u.active)
+    .map(u => u.name)
     .collect[Vec]()
 
 // ✓ pipeline — data flows through transformations
@@ -553,14 +553,14 @@ else if status == .ServerError:
 
 // ✓ idiomatic — expression-position match is exhaustive
 match status
-    .Ok          -> handle_success()
-    .NotFound    -> handle_404()
-    .ServerError -> handle_500()
+    .Ok          => handle_success()
+    .NotFound    => handle_404()
+    .ServerError => handle_500()
 
 // ✓ statement-position partial match
 match event
-    .Click(pos) -> on_click(pos)
-    .KeyDown(k) -> on_key(k)
+    .Click(pos) => on_click(pos)
+    .KeyDown(k) => on_key(k)
 ```
 
 **Destructure in the pattern.** Don't match then access.
@@ -568,13 +568,13 @@ match event
 ```
 // ✗ match then access
 match result
-    Ok(val) -> println("{val.name}: {val.score}")
-    Err(e)  -> println("error: {e}")
+    Ok(val) => println("{val.name}: {val.score}")
+    Err(e)  => println("error: {e}")
 
 // ✓ idiomatic — destructure deeper if it helps
 match result
-    Ok({ name, score }) -> println("{name}: {score}")
-    Err(e)              -> println("error: {e}")
+    Ok({ name, score }) => println("{name}: {score}")
+    Err(e)              => println("error: {e}")
 ```
 
 ---
@@ -642,10 +642,10 @@ way.
 
 ```
 // ✗ over-specified
-items.filter(|item: &Item| -> bool { item.active == true })
+items.filter((item: &Item) => item.active == true)
 
 // ✓ idiomatic — types inferred, expression body
-items.filter(|item| item.active)
+items.filter(item => item.active)
 
 // ✓ best — use `it` for single-parameter closures
 items.filter(it.active)
@@ -655,15 +655,15 @@ items.filter(it > 0)
 
 **Use `it` for simple closures.** When a function expects a
 single-parameter closure, `it` refers to the implicit parameter.
-Reserve explicit `|param|` for multi-parameter closures or when
+Reserve explicit `param => body` for multi-parameter closures or when
 the body is complex:
 
 ```
 // ✓ use it for short, clear expressions
 numbers |> filter(it > 0) |> map(it * 2)
 
-// ✓ use explicit param for multi-param or clarity
-pairs.sort_by(|a, b| a.score - b.score)
+// ✓ use explicit params for multi-param or clarity
+pairs.sort_by((a, b) => a.score - b.score)
 ```
 
 ---
@@ -762,11 +762,11 @@ Use `sequence` when you already have `Vec[Result[T, E]]`.
 var results = Vec.new[i32]()
 for s in strings:
     match s.parse_int()
-        Ok(n)  -> results.push(n)
-        Err(e) -> return Err(e)
+        Ok(n)  => results.push(n)
+        Err(e) => return Err(e)
 
 // ✓ idiomatic — traverse = map + collect-or-fail
-let results = strings.traverse(|s| s.parse_int())?
+let results = strings.traverse(s => s.parse_int())?
 ```
 
 `sequence` converts `Vec[Result[T, E]]` to `Result[Vec[T], E]`:
@@ -800,7 +800,7 @@ let r1 = t1.await
 let r2 = t2.await
 
 // ✓ idiomatic — structured concurrency
-async scope |s|:
+async scope s =>
     let t1 = s.track(fetch_user(1))
     let t2 = s.track(fetch_user(2))
     let (r1, r2) = (t1.await, t2.await)
@@ -811,10 +811,10 @@ Scatter-gather pattern:
 
 ```
 // Fire off N parallel fetches, collect results
-let profiles = async scope |s|:
-    ids |> map(|id| s.track(get_profile(id)))
+let profiles = async scope s =>
+    ids |> map(id => s.track(get_profile(id)))
         |> collect[Vec]()
-        |> map(|task| task.await)
+        |> map(task => task.await)
         |> collect[Vec]()
 ```
 
@@ -822,7 +822,7 @@ Scoped borrows — tasks can borrow local data without lifetimes:
 
 ```
 async fn process_all(data: &mut Vec[i32]):
-    async scope |s|:
+    async scope s =>
         s.track(transform(&data[0..100]))
         s.track(transform(&data[100..200]))
     // Borrows released, data is accessible again.
@@ -882,9 +882,9 @@ Works in match arms:
 
 ```
 match token
-    in [.Red, .Green, .Blue] -> "color"
-    in [.Bold, .Italic]      -> "style"
-    _                         -> "other"
+    in [.Red, .Green, .Blue] => "color"
+    in [.Bold, .Italic]      => "style"
+    _                         => "other"
 ```
 
 `not in` reads naturally:
@@ -936,8 +936,8 @@ When you expect a specific variant and want to bail otherwise,
 ```
 // ✗ verbose match for a single expected variant
 let value = match token
-    .TString(s) -> s
-    _ -> return Err(.UnexpectedToken)
+    .TString(s) => s
+    _ => return Err(.UnexpectedToken)
 
 // ✓ idiomatic — assert the pattern, bail in else
 let .TString(value) = token else return Err(.UnexpectedToken)
@@ -955,10 +955,10 @@ Inside `select` branches:
 
 ```
 select await
-    opt = rx.recv() ->
+    opt = rx.recv() =>
         let Some(item) = opt else break
         items.push(item)
-    _ = timeout(Duration.from_secs(5)) ->
+    _ = timeout(Duration.from_secs(5)) =>
         break
 ```
 

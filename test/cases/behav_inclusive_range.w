@@ -32,9 +32,9 @@ fn test_inclusive_vs_exclusive:
 fn test_inclusive_range_in_match:
     let x = 5
     let result = match x
-        1..=3 -> "low"
-        4..=6 -> "mid"
-        _ -> "high"
+        1..=3 => "low"
+        4..=6 => "mid"
+        _ => "high"
     assert(result == "mid")
 
 fn main:

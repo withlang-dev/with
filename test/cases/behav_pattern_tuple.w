@@ -4,10 +4,10 @@
 
 fn classify(pair: (i32, i32)) -> str:
     match pair
-        (0, 0) -> "origin"
-        (0, _) -> "y-axis"
-        (_, 0) -> "x-axis"
-        _ -> "other"
+        (0, 0) => "origin"
+        (0, _) => "y-axis"
+        (_, 0) => "x-axis"
+        _ => "other"
 
 fn main:
     assert(classify((0, 0)) == "origin")

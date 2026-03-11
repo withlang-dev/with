@@ -484,8 +484,8 @@ fn first(xs: &Vec[i32]) -> Option[&i32]:
 fn caller(xs: &Vec[i32]):
     let r = first(xs)        // OK: ephemeral local binding
     match r
-        Some(v) -> println(v) // OK: local use
-        None    -> ()
+        Some(v) => println(v) // OK: local use
+        None    => ()
 
 // OK: wraps ephemeral return in another ephemeral return
 fn get_name(user: &User) -> StrView: user.name.as_view()
@@ -537,9 +537,9 @@ This is critical for parallel data-oriented code:
 
 ```
 // Each closure captures disjoint fields of `world`
-scope |s|:
-    s.spawn(|| run_physics(&world.transforms, &mut world.velocities))
-    s.spawn(|| run_render(&world.transforms, &world.sprites))
+scope s =>
+    s.spawn(() => run_physics(&world.transforms, &mut world.velocities))
+    s.spawn(() => run_render(&world.transforms, &world.sprites))
 // OK: both closures borrow world.transforms immutably,
 // only the first borrows world.velocities mutably.
 // No conflict — the captures are disjoint.
@@ -865,9 +865,9 @@ fn default_role -> Role: .Member
 // Match subject type is known → .Admin, .Member, .Guest work
 fn describe(role: Role) -> str:
     match role
-        .Admin   -> "Administrator"
-        .Member  -> "Member"
-        .Guest   -> "Guest"
+        .Admin   => "Administrator"
+        .Member  => "Member"
+        .Guest   => "Guest"
 
 // Parameter type is known → .Urgent works
 fn send(msg: str, priority: Priority): ...
@@ -946,8 +946,8 @@ let name = token.as_tstr_ref()?.to_upper()
 
 // Filter a collection
 let strings = tokens.iter()
-    |> filter(|t| t.is_tstr())
-    |> map(|t| t.as_tstr_ref().unwrap())
+    |> filter(t => t.is_tstr())
+    |> map(t => t.as_tstr_ref().unwrap())
     |> collect()
 ```
 
@@ -1071,9 +1071,9 @@ if x in 1..=100:               // membership test (§9.9)
     handle_valid(x)
 
 match code
-    200..=299 -> "success"
-    400..=499 -> "client error"
-    _         -> "other"
+    200..=299 => "success"
+    400..=499 => "client error"
+    _         => "other"
 ```
 
 ---
@@ -1395,9 +1395,9 @@ structs.
 // OK: local use, pattern matching, passing around
 let tok = next_token(&mut parser)?
 match tok.kind
-    .Ident   -> handle_ident(tok.text)
-    .Number  -> handle_number(tok.text)
-    .String  -> handle_string(tok.text)
+    .Ident   => handle_ident(tok.text)
+    .Number  => handle_number(tok.text)
+    .String  => handle_string(tok.text)
 
 // OK: for-loop processes each token — tok drops at iteration end
 while let Some(tok) = next_token(&mut parser):
@@ -1512,7 +1512,7 @@ everything.
 
 ```
 with lock.read() as data:
-    data.iter() |> filter(|x| x.active) |> count()
+    data.iter() |> filter(x => x.active) |> count()
 
 with db.connection() as conn:
     conn.query("SELECT * FROM users WHERE id = ?", user_id)
@@ -1539,10 +1539,10 @@ trait ScopedMut[T]:
 **Desugaring:**
 ```
 with lock.read() as data: body
-// → lock.read().enter(|data| body)
+// → lock.read().enter(data => body)
 
 with store.write() as mut data: body
-// → store.write().enter_mut(|data| body)
+// → store.write().enter_mut(data => body)
 ```
 
 Multiple guarded bindings are flat, nesting left-to-right:
@@ -1551,9 +1551,9 @@ with a.read() as textures,
      b.read() as meshes,
      c.write() as mut materials:
     body
-// → a.read().enter(|textures|
-//     b.read().enter(|meshes|
-//       c.write().enter_mut(|materials| body)))
+// → a.read().enter(textures =>
+//     b.read().enter(meshes =>
+//       c.write().enter_mut(materials => body)))
 ```
 
 ### 7.2 Form 2: Scoped Mutation (Builder Pattern)
@@ -1676,8 +1676,8 @@ expression:
 
 ```
 // If expr implements Scoped → guarded access
-with lock.read() as data:          →  expr.enter(|data| body)
-with store.write() as mut data:    →  expr.enter_mut(|data| body)
+with lock.read() as data:          →  expr.enter(data => body)
+with store.write() as mut data:    →  expr.enter_mut(data => body)
 
 // Otherwise → simple binding
 with expr as mut name:             →  { var name = expr; body }
@@ -1742,8 +1742,8 @@ inline lambdas or non-escaping closures):
 fn find_value(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32]:
     with lock.lock() as map:
         match map.get(key)
-            Some(v) -> return Some(v)   // returns from find_value
-            None    -> ()
+            Some(v) => return Some(v)   // returns from find_value
+            None    => ()
     None
 
 fn process_all(lock: &Mutex[Vec[Item]]) -> Result[Unit, AppError]:
@@ -1786,7 +1786,7 @@ let response = with HttpResponse.new(200) as mut r:
 
 // Processing a batch (Form 1: guarded + Form 3: binding)
 with db.transaction() as tx:
-    let results = users.traverse(|u|
+    let results = users.traverse(u =>
         with calculate_discount(u.tier, u.years) as discount:  // Form 3
             tx.update_price(u.id, u.base_price * (1.0 - discount))
     )
@@ -1891,7 +1891,7 @@ extracting values from behind a guard:
 // Clone at boundary: the idiomatic pattern
 let name = with db.read() as users:
     users.get(id)
-        .map(|u| u.name.clone())   // clone to escape the guard
+        .map(u => u.name.clone())   // clone to escape the guard
 
 // If the value is Copy, no explicit clone needed:
 let count = with store.read() as data:
@@ -2060,8 +2060,8 @@ If the function is not tail-recursive, the compiler rejects it.
 @[tailrec]
 fn factorial(n: Int, acc: Int) -> Int:
     match n
-        0 -> acc
-        _ -> factorial(n - 1, n * acc)
+        0 => acc
+        _ => factorial(n - 1, n * acc)
 ```
 
 Mutual tail recursion supported when all functions in the cycle are
@@ -2071,10 +2071,14 @@ marked `@[tailrec]`. Non-tail-position recursive calls in a
 ### 9.3 Closures
 
 ```
-|x| x + 1
-|x, y| x * y
-|| println("hello")
+x => x + 1
+(x, y) => x * y
+() => println("hello")
 ```
+
+The `=>` token means "produces this value" and is used in both closures
+and match arms. The `->` token is reserved exclusively for return type
+annotations (e.g., `fn foo() -> i32`).
 
 Implicit `it` parameter (see §9.3.1):
 ```
@@ -2085,13 +2089,13 @@ items |> filter(it.age > 21) |> map(it.name)
 
 When a function expects a single-parameter closure, the expression can
 use `it` to refer to the implicit parameter instead of declaring an
-explicit closure with `|param|` syntax:
+explicit closure with `x => expr` syntax:
 
 ```
-items |> filter(it.age > 21)     // equivalent to |x| x.age > 21
-items |> map(it.name)            // equivalent to |x| x.name
-items |> filter(it % 2 == 0)    // equivalent to |n| n % 2 == 0
-items |> sort_by(it.score)       // equivalent to |x| x.score
+items |> filter(it.age > 21)     // equivalent to x => x.age > 21
+items |> map(it.name)            // equivalent to x => x.name
+items |> filter(it % 2 == 0)    // equivalent to n => n % 2 == 0
+items |> sort_by(it.score)       // equivalent to x => x.score
 ```
 
 `it` is a reserved keyword. It may only appear in expression positions
@@ -2099,12 +2103,12 @@ where the surrounding call site expects a single-parameter function type.
 The compiler infers `it`'s type from the expected function parameter type.
 
 **Nested `it` is forbidden:** If an `it`-expression appears inside
-another `it`-expression, the inner closure must use explicit `|param|`
+another `it`-expression, the inner closure must use explicit `param => expr`
 syntax. This prevents ambiguity about which closure level `it` refers to.
 
 ```
 // OK: outer uses it, inner uses explicit parameter
-items |> map(it.children |> filter(|c| c.active))
+items |> map(it.children |> filter(c => c.active))
 
 // ERROR: nested it is ambiguous
 items |> map(it.children |> filter(it.active))
@@ -2115,7 +2119,7 @@ or placeholder (in partial application). For closure shorthand, `it` is
 the one way.
 
 **Error codes:**
-- E0951: nested implicit `it` is ambiguous — use explicit `|param|` for inner closure
+- E0951: nested implicit `it` is ambiguous — use explicit `param => expr` for inner closure
 - E0952: `it` used in context expecting N != 1 parameters
 - E0953: `it` is a reserved keyword and cannot be used as an identifier
 
@@ -2211,8 +2215,8 @@ let process = parse >> validate >> transform
 let prepare = transform << validate << parse
 ```
 
-`f >> g` produces a function `|x| g(f(x))` (left-to-right).
-`f << g` produces a function `|x| f(g(x))` (right-to-left).
+`f >> g` produces a function `x => g(f(x))` (left-to-right).
+`f << g` produces a function `x => f(g(x))` (right-to-left).
 
 Composition creates a closure. It has zero runtime cost beyond what
 the closure itself has. Useful when building functions to pass to
@@ -2232,39 +2236,39 @@ matching.
 **Basic:**
 ```
 match shape
-    Circle(r)         -> pi * r * r
-    Rectangle(w, h)   -> w * h
-    Triangle(a, b, c) -> herons_formula(a, b, c)
+    Circle(r)         => pi * r * r
+    Rectangle(w, h)   => w * h
+    Triangle(a, b, c) => herons_formula(a, b, c)
 ```
 
 **Guards:**
 ```
 match value
-    x if x > 0 -> "positive"
-    x if x < 0 -> "negative"
-    _           -> "zero"
+    x if x > 0 => "positive"
+    x if x < 0 => "negative"
+    _           => "zero"
 ```
 
 **Nested / deep patterns:**
 ```
 match expr
-    Add(Lit(a), Lit(b))                 -> Lit(a + b)
-    Add(Lit(0), rhs)                    -> rhs
-    Mul(Lit(0), _) | Mul(_, Lit(0))     -> Lit(0)
-    other                               -> other
+    Add(Lit(a), Lit(b))                 => Lit(a + b)
+    Add(Lit(0), rhs)                    => rhs
+    Mul(Lit(0), _) | Mul(_, Lit(0))     => Lit(0)
+    other                               => other
 ```
 
 **Or-patterns** share a body:
 ```
 match day
-    Monday | Tuesday | Wednesday | Thursday | Friday -> "weekday"
-    Saturday | Sunday -> "weekend"
+    Monday | Tuesday | Wednesday | Thursday | Friday => "weekday"
+    Saturday | Sunday => "weekend"
 ```
 
 **`@` binding:**
 ```
 match event
-    click @ MouseClick { button: Left, pos } ->
+    click @ MouseClick { button: Left, pos } =>
         log("click at {pos}")
         handle(click)
 ```
@@ -2272,10 +2276,10 @@ match event
 **Literal and range patterns:**
 ```
 match status_code
-    200         -> "ok"
-    301 | 302   -> "redirect"
-    400..=499   -> "client error"
-    _           -> "unknown"
+    200         => "ok"
+    301 | 302   => "redirect"
+    400..=499   => "client error"
+    _           => "unknown"
 ```
 
 **`in` patterns:**
@@ -2286,18 +2290,18 @@ or user types:
 
 ```
 match method
-    in ["map", "filter", "take", "skip"] -> handle_lazy()
-    in ["collect", "fold", "sum", "count"] -> handle_eager()
-    _ -> handle_other()
+    in ["map", "filter", "take", "skip"] => handle_lazy()
+    in ["collect", "fold", "sum", "count"] => handle_eager()
+    _ => handle_other()
 ```
 
 This is syntactic sugar for a guard:
 
 ```
 match method
-    m if m in ["map", "filter", "take", "skip"] -> handle_lazy()
-    m if m in ["collect", "fold", "sum", "count"] -> handle_eager()
-    _ -> handle_other()
+    m if m in ["map", "filter", "take", "skip"] => handle_lazy()
+    m if m in ["collect", "fold", "sum", "count"] => handle_eager()
+    _ => handle_other()
 ```
 
 The `in` pattern does not introduce a binding. Use `@` if you need
@@ -2305,10 +2309,10 @@ one:
 
 ```
 match status_code
-    code @ in 200..=299 -> log("success: {code}")
-    code @ in 400..=499 -> log("client error: {code}")
-    code @ in 500..=599 -> log("server error: {code}")
-    other               -> log("unexpected: {other}")
+    code @ in 200..=299 => log("success: {code}")
+    code @ in 400..=499 => log("client error: {code}")
+    code @ in 500..=599 => log("server error: {code}")
+    other               => log("unexpected: {other}")
 ```
 
 `in` patterns compose naturally with other match features:
@@ -2316,35 +2320,35 @@ match status_code
 ```
 fn categorize(token: TokenKind) -> Category:
     match token
-        in [Plus, Minus, Star, Slash]  -> .Operator
-        in [LParen, RParen, LBrace, RBrace] -> .Delimiter
-        in [If, Else, While, For, Match]    -> .Keyword
-        Ident(_)                             -> .Identifier
-        IntLit(_) | FloatLit(_)              -> .Literal
-        _                                    -> .Other
+        in [Plus, Minus, Star, Slash]  => .Operator
+        in [LParen, RParen, LBrace, RBrace] => .Delimiter
+        in [If, Else, While, For, Match]    => .Keyword
+        Ident(_)                             => .Identifier
+        IntLit(_) | FloatLit(_)              => .Literal
+        _                                    => .Other
 ```
 
 **Struct patterns with `..` rest:**
 ```
 match user
-    { name, age } if age >= 18 -> grant_access(name)
-    { name, .. }               -> deny_access(name)
+    { name, age } if age >= 18 => grant_access(name)
+    { name, .. }               => deny_access(name)
 ```
 
 **Tuple patterns:**
 ```
 match (x, y)
-    (0, 0) -> "origin"
-    (x, 0) -> "x-axis at {x}"
-    _      -> "elsewhere"
+    (0, 0) => "origin"
+    (x, 0) => "x-axis at {x}"
+    _      => "elsewhere"
 ```
 
 **Slice patterns:**
 ```
 match items
-    []              -> "empty"
-    [only]          -> "single"
-    [first, ..rest] -> "head: {first}, {rest.len()} more"
+    []              => "empty"
+    [only]          => "single"
+    [first, ..rest] => "head: {first}, {rest.len()} more"
 ```
 
 For fixed-size arrays, the compiler performs compile-time length matching:
@@ -2458,8 +2462,8 @@ an `else`.
 **`match` in pipelines:**
 ```
 let result = input |> parse |> match
-    Ok(ast)  -> transform(ast)
-    Err(e)   -> default_ast()
+    Ok(ast)  => transform(ast)
+    Err(e)   => default_ast()
 ```
 
 **Destructuring in `for` loops:**
@@ -2477,7 +2481,7 @@ Exhaustiveness depends on position:
 - **Statement-position match** (value ignored): may be partial; unmatched
   variants are a no-op.
 - **`@[must_use]` types** (e.g. `Result`, `Task`): match must always be
-  exhaustive or include an explicit `_ -> ...` catch-all arm, regardless
+  exhaustive or include an explicit `_ => ...` catch-all arm, regardless
   of position. Partial match on `@[must_use]` types is a compile error.
   This prevents silently ignoring `Err` arms, which would contradict
   `@[must_use]` semantics.
@@ -2487,19 +2491,19 @@ Examples:
 ```
 // expression-position: exhaustive required
 let label = match status
-    Ok(v) -> "ok"
-    Err(e) -> "err"
+    Ok(v) => "ok"
+    Err(e) => "err"
 
 // statement-position: partial allowed (non-must_use enum)
 match event
-    Click(pos) -> handle_click(pos)
-    KeyDown(k) -> handle_key(k)
+    Click(pos) => handle_click(pos)
+    KeyDown(k) => handle_key(k)
 // other variants are ignored
 
 // statement-position on @[must_use] type: catch-all required
 match result
-    Ok(v) -> process(v)
-    _ -> {}                  // explicit: "I'm intentionally ignoring errors"
+    Ok(v) => process(v)
+    _ => {}                  // explicit: "I'm intentionally ignoring errors"
 // without the _ arm, this would be a compile error
 ```
 
@@ -2523,8 +2527,8 @@ for &(key, val) in items:
 // Works with match on borrowed enums:
 fn describe(opt: &Option[String]) -> &str:
     match opt
-        Some(s) -> s       // s: &String, not String
-        None    -> "none"
+        Some(s) => s       // s: &String, not String
+        None    => "none"
 ```
 
 This rule applies transitively: matching `&(A, &B)` against a
@@ -2543,8 +2547,8 @@ No macros or special syntax required.
 ```
 let results = world
     |> query[Position, Velocity]()
-    |> where(|(pos, _)| pos.x > 0.0)
-    |> order_by(|(_, vel)| vel.magnitude())
+    |> where((pos, _) => pos.x > 0.0)
+    |> order_by((_, vel) => vel.magnitude())
     |> limit(100)
     |> collect[Vec]()
 ```
@@ -2740,7 +2744,7 @@ test. The membership test appears in filter expressions:
 
 ```
 let valid = tokens
-    |> filter(|t| t.kind in [Ident, Number, String])
+    |> filter(t => t.kind in [Ident, Number, String])
     |> collect[Vec]()
 ```
 
@@ -2789,7 +2793,7 @@ fn is_valid_port(port: u16) -> bool:
 // Filtering
 let dangerous_ops = ["rm", "format", "drop", "truncate"]
 let safe_commands = commands
-    |> filter(|cmd| cmd.op not in dangerous_ops)
+    |> filter(cmd => cmd.op not in dangerous_ops)
     |> collect[Vec]()
 
 // Compound conditions
@@ -2877,7 +2881,7 @@ The `?.` operator accesses a field or method on an `Option` or
 
 ```
 // Without optional chaining
-let city = user.address.and_then(|a| a.city)
+let city = user.address.and_then(a => a.city)
 
 // With optional chaining
 let city = user.address?.city
@@ -2889,9 +2893,9 @@ let zip = user.address?.city?.zip_code
 **Desugaring:** The desugaring is **type-aware** to avoid producing
 `Option[Option[T]]`:
 
-- If `field` has type `U` (non-Optional): `expr?.field` → `expr.map(|v| v.field)` — result is `Option[U]`.
-- If `field` has type `Option[U]`: `expr?.field` → `expr.and_then(|v| v.field)` — result is `Option[U]` (flattened).
-- `expr?.method(args)` → `expr.and_then(|v| v.method(args))` when the method returns `Option`/`Result`.
+- If `field` has type `U` (non-Optional): `expr?.field` → `expr.map(v => v.field)` — result is `Option[U]`.
+- If `field` has type `Option[U]`: `expr?.field` → `expr.and_then(v => v.field)` — result is `Option[U]` (flattened).
+- `expr?.method(args)` → `expr.and_then(v => v.method(args))` when the method returns `Option`/`Result`.
 
 ```
 type Address = { city: Option[str], zip: str }
@@ -2942,8 +2946,8 @@ cases. The desugaring is:
 // user = find_user(id) ?? return Err(.NotFound)
 // desugars to:
 let user = match find_user(id)
-    Some(v) -> v
-    None -> return Err(.NotFound)
+    Some(v) => v
+    None => return Err(.NotFound)
 ```
 
 ### 10.5 Option Combinators (Standard Library Requirement)
@@ -2973,14 +2977,14 @@ The standard library must provide these methods on `Option[T]`:
 ```
 // Without combinators:
 let name = match find_user(id)
-    Some(user) -> match user.display_name
-        Some(n) -> n
-        None    -> user.username
-    None -> "anonymous"
+    Some(user) => match user.display_name
+        Some(n) => n
+        None    => user.username
+    None => "anonymous"
 
 // With combinators:
 let name = find_user(id)
-    .and_then(|u| u.display_name.or_else(|| Some(u.username)))
+    .and_then(u => u.display_name.or_else(() => Some(u.username)))
     .unwrap_or("anonymous")
 ```
 
@@ -3053,7 +3057,7 @@ useful when building the message is expensive:
 
 ```
 let user = db.find_user(id)
-    .with_context(|| "failed to find user {id}")?
+    .with_context(() => "failed to find user {id}")?
 ```
 
 `ContextError[E]` implements `Error` when `E: Error`, and the
@@ -3073,9 +3077,9 @@ impl Error for ContextError[E] where E: Error:
 **Examples:**
 ```
 let config = read_file(path)
-    .map_err(|e| AppError.Io(e))
-    .and_then(|text| parse_config(text))
-    .unwrap_or_else(|_| Config.default())
+    .map_err(e => AppError.Io(e))
+    .and_then(text => parse_config(text))
+    .unwrap_or_else(_ => Config.default())
 ```
 
 ### 10.7 Collection Combinators: `sequence` and `traverse`
@@ -3110,11 +3114,11 @@ It is `map` + `sequence` fused into one pass:
 // Apply a fallible function to each element, collect successes
 // or fail on first error
 let names = vec!["1", "2", "three"]
-let parsed = names.traverse(|s| s.parse_int())
+let parsed = names.traverse(s => s.parse_int())
 // Err(ParseError) — "three" fails
 
 let names = vec!["1", "2", "3"]
-let parsed = names.traverse(|s| s.parse_int())
+let parsed = names.traverse(s => s.parse_int())
 // Ok(vec![1, 2, 3])
 ```
 
@@ -3407,8 +3411,8 @@ type ParseResult[T] = ParseOk(T, remaining: str)
 impl Try[T, ParseError] for ParseResult[T]:
     fn branch(self: Self) -> ControlFlow[ParseError, T]:
         match self
-            ParseOk(v, _) -> ControlFlow.Continue(v)
-            ParseErr(m, p) -> ControlFlow.Break(ParseError { msg: m, pos: p })
+            ParseOk(v, _) => ControlFlow.Continue(v)
+            ParseErr(m, p) => ControlFlow.Break(ParseError { msg: m, pos: p })
 
 // Now ? works naturally in parser combinators:
 fn parse_pair(input: &str) -> ParseResult[(Expr, Expr)]:
@@ -3662,19 +3666,19 @@ argument to a function call**. All other closures are escaping.
 Specifically, the following are all **escaping** in v1.0:
 
 ```
-let f = |x| x + 1           // bound to a named variable: escaping
-let closures = vec![|x| x]  // stored in a container: escaping
-return |x| x + 1            // returned from function: escaping
-some_struct.callback = |x| x // stored in a field: escaping
+let f = x => x + 1           // bound to a named variable: escaping
+let closures = vec![x => x]  // stored in a container: escaping
+return x => x + 1            // returned from function: escaping
+some_struct.callback = x => x // stored in a field: escaping
 ```
 
 The following are **non-escaping**:
 
 ```
-items.for_each(|x| println(x))      // direct argument: non-escaping
-items |> filter(|x| x > 0)          // direct argument: non-escaping
+items.for_each(x => println(x))      // direct argument: non-escaping
+items |> filter(x => x > 0)          // direct argument: non-escaping
 with lock.read() as data:           // with block body: non-escaping
-    data.iter() |> map(|x| x + 1)   // direct argument: non-escaping
+    data.iter() |> map(x => x + 1)   // direct argument: non-escaping
 ```
 
 This is deliberately conservative. A closure bound to a named local
@@ -3720,7 +3724,7 @@ ephemerality, preventing the caller from knowing the restriction.
 ```
 // 1. Collect into owned container (small allocation cost)
 fn find_matches(text: &String, pat: &str) -> Vec[String]:
-    text.split(pat) |> map(|s| s.to_string()) |> collect()
+    text.split(pat) |> map(s => s.to_string()) |> collect()
 
 // 2. Generator that owns its data (lazy, no allocation)
 gen fn find_matches(text: String, pat: String) -> String:
@@ -3734,8 +3738,8 @@ fn find_matches(text: &String, pat: &str, f: fn(StrView)):
 
 // 4. Process inline (no function boundary)
 let results = text.split(pat)
-    |> filter(|s| s.len() > 0)
-    |> map(|s| s.to_string())
+    |> filter(s => s.len() > 0)
+    |> map(s => s.to_string())
     |> collect[Vec]()
 ```
 
@@ -3852,30 +3856,30 @@ error with a clear message.
 
 **Examples:**
 ```
-let total = numbers.iter() |> fold(0, |acc, x| acc + x)
+let total = numbers.iter() |> fold(0, (acc, x) => acc + x)
 
 let words = lines.iter()
-    |> flat_map(|line| line.split(' '))
+    |> flat_map(line => line.split(' '))
     |> collect[Vec[String]]()
 
 let (adults, minors) = people.iter()
-    |> partition(|p| p.age >= 18)
+    |> partition(p => p.age >= 18)
 
 // zip_with: combine two iterators with a function
 let distances = xs.iter()
-    |> zip_with(ys.iter(), |x, y| (x - y).abs())
+    |> zip_with(ys.iter(), (x, y) => (x - y).abs())
     |> collect[Vec]()
 
 // unfold: generate sequence from state
-let powers_of_2 = Iter.unfold(1, |n| Some((n, n * 2)))
+let powers_of_2 = Iter.unfold(1, n => Some((n, n * 2)))
     |> take(10) |> collect[Vec]()
 // [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
 
 let report = transactions.iter()
-    |> filter(|t| t.amount > 100.0)
-    |> sorted_by(|a, b| b.date.cmp(a.date))
+    |> filter(t => t.amount > 100.0)
+    |> sorted_by((a, b) => b.date.cmp(a.date))
     |> take(10)
-    |> map(|t| "{t.date}: ${t.amount}")
+    |> map(t => "{t.date}: ${t.amount}")
     |> join("\n")
 ```
 
@@ -3889,12 +3893,12 @@ ergonomic mutation methods:
 worker_counts.entry(id).or_insert(0)
 
 // Convenience: update with default and transform
-worker_counts.update(id, 0, |n| n + 1)
+worker_counts.update(id, 0, n => n + 1)
 // equivalent to: entry(id).or_insert(0); *entry += 1
 
 // Convenience: increment/decrement
-worker_counts.increment(id)       // .update(id, 0, |n| n + 1)
-worker_counts.decrement(id)       // .update(id, 0, |n| n - 1)
+worker_counts.increment(id)       // .update(id, 0, n => n + 1)
+worker_counts.decrement(id)       // .update(id, 0, n => n - 1)
 
 // Convenience: append to collection values
 event_log.append(user_id, event)  // .entry(id).or_insert(Vec.new()).push(event)
@@ -4058,7 +4062,7 @@ let coords = [(x, y) for x in 0..3 for y in 0..3 if x != y]
 ```
 [expr for x in iter if cond]
 // →
-iter |> filter(|x| cond) |> map(|x| expr) |> collect[Vec]()
+iter |> filter(x => cond) |> map(x => expr) |> collect[Vec]()
 ```
 
 Yes, this allocates a `Vec`. It's obvious from the syntax — you're
@@ -4257,7 +4261,7 @@ let body = http.get(url).await?.read_body().await?
 
 // Chain with |> for pipelines
 let users = fetch_all(ids).await?
-    |> filter(|u| u.active)
+    |> filter(u => u.active)
     |> collect()
 ```
 
@@ -4282,7 +4286,7 @@ This is the async analog of a regular block expression and is
 essential for inline structured concurrency:
 
 ```
-async scope |s|:
+async scope s =>
     s.track(async:
         for i in 0..5:
             sleep(50.millis()).await
@@ -4389,7 +4393,7 @@ tasks. When `cancel()` is called or a non-ephemeral `Task` is dropped:
    and catchable at `async scope` boundaries.
 
    ```
-   async scope |s|:
+   async scope s =>
        let t1 = s.spawn(fetch_user(id))
        let t2 = s.spawn(fetch_posts(id))
        let user = t1.await?           // if this fails...
@@ -4407,9 +4411,9 @@ tasks. When `cancel()` is called or a non-ephemeral `Task` is dropped:
 
    ```
    match task.await
-       Ok(value) -> use(value)
-       Err(e) if e.is_cancelled() -> log("task was cancelled")
-       Err(e) -> return Err(e)
+       Ok(value) => use(value)
+       Err(e) if e.is_cancelled() => log("task was cancelled")
+       Err(e) => return Err(e)
    ```
 
    `TaskCancelled` is a standard library error type that all error
@@ -4486,14 +4490,14 @@ guarantee that **all tasks complete before the scope exits**.
 **Formal semantics:**
 
 ```
-async scope |s|:
+async scope s =>
     body
 ```
 
 desugars to:
 
 ```
-runtime::structured_scope(|s| { body })
+runtime::structured_scope(s => { body })
 ```
 
 The scope object `s` provides:
@@ -4504,13 +4508,13 @@ The scope object `s` provides:
 
 **Why `track`, not `spawn`:** In With, calling an `async fn` eagerly
 allocates a fiber and returns a `Task[T]` (§14.4). If a scope took
-a closure like `s.spawn(|| async_fn())`, the closure would run on
+a closure like `s.spawn(() => async_fn())`, the closure would run on
 one fiber and `async_fn()` would spawn a second — creating a
 detached task that escapes structured concurrency. Instead,
 `s.track()` accepts the `Task[T]` directly:
 
 ```
-async scope |s|:
+async scope s =>
     // fetch_user(id) eagerly spawns a fiber, returns Task
     // s.track() registers it with the scope
     let task = s.track(fetch_user(id))
@@ -4526,7 +4530,7 @@ tasks that haven't been awaited are cancelled and joined.
 This solves the `?` interaction problem:
 
 ```
-async scope |s|:
+async scope s =>
     let posts_task = s.track(self.repo.count_posts(id))
     let followers_task = s.track(self.repo.count_followers(id))
 
@@ -4549,24 +4553,24 @@ async scope |s|:
 
 ```
 async fn handle_batch(ids: Vec[UserId]) -> Vec[Result[User, ApiError]]:
-    async scope |s|:
+    async scope s =>
         let tasks = ids.iter()
-            |> map(|id| s.track(fetch_user(id)))
+            |> map(id => s.track(fetch_user(id)))
             |> collect[Vec]()
-        tasks |> map(|t| t.await) |> collect()
+        tasks |> map(t => t.await) |> collect()
     // all tracked tasks guaranteed complete here
 ```
 
 For CPU-bound parallelism on OS threads (no fiber runtime required):
 
 ```
-scope |s|:
-    s.spawn(|| compute_chunk_a())
-    s.spawn(|| compute_chunk_b())
+scope s =>
+    s.spawn(() => compute_chunk_a())
+    s.spawn(() => compute_chunk_b())
 // both complete here
 ```
 
-The non-async `scope` uses `s.spawn(|| closure)` because OS-thread
+The non-async `scope` uses `s.spawn(() => closure)` because OS-thread
 work items are sync closures — no eager fiber spawning occurs.
 `scope` is available in `no_runtime` builds.
 
@@ -4577,12 +4581,12 @@ branch of the first to complete. Remaining expressions are cancelled.
 
 ```
 select await
-    msg = rx_fast.recv() -> println("fast: {msg}")
-    msg = rx_slow.recv() -> println("slow: {msg}")
-    _ = timeout(1.secs()) -> println("timeout")
+    msg = rx_fast.recv() => println("fast: {msg}")
+    msg = rx_slow.recv() => println("slow: {msg}")
+    _ = timeout(1.secs()) => println("timeout")
 ```
 
-Each branch has the form `pattern = async_expr -> body`. The runtime
+Each branch has the form `pattern = async_expr => body`. The runtime
 starts all expressions concurrently, the first to resolve fires its
 branch, and all siblings are cancelled (structured cancellation).
 
@@ -4596,17 +4600,17 @@ number of branches without `First`/`Second`/`Third` boilerplate.
 // Select in a loop (event loop pattern)
 loop:
     select await
-        msg = inbox.recv() ->
+        msg = inbox.recv() =>
             process(msg)?
-        _ = shutdown.recv() ->
+        _ = shutdown.recv() =>
             break
-        _ = timeout(idle_timeout) ->
+        _ = timeout(idle_timeout) =>
             send_heartbeat().await?
 
 // Select with error propagation
 select await
-    data = stream.next() -> process(data?)?
-    _ = cancel.cancelled() -> return Err(.Cancelled)
+    data = stream.next() => process(data?)?
+    _ = cancel.cancelled() => return Err(.Cancelled)
 ```
 
 **Fair selection (default):** If multiple expressions complete
@@ -4618,8 +4622,8 @@ signal or heartbeat timer.
 ```
 loop:
     select await
-        data = fast_stream.recv() -> handle(data)
-        _ = shutdown.recv() -> break    // will eventually fire
+        data = fast_stream.recv() => handle(data)
+        _ = shutdown.recv() => break    // will eventually fire
 ```
 
 **Biased selection:** For cases where deterministic priority is
@@ -4628,9 +4632,9 @@ branch that is ready (top-to-bottom priority):
 
 ```
 select await biased
-    urgent = priority_rx.recv() -> handle_urgent(urgent)
-    normal = normal_rx.recv() -> handle_normal(normal)
-    _ = timeout(1.secs()) -> send_heartbeat().await
+    urgent = priority_rx.recv() => handle_urgent(urgent)
+    normal = normal_rx.recv() => handle_normal(normal)
+    _ = timeout(1.secs()) => send_heartbeat().await
 ```
 
 Use `biased` when you need guaranteed priority ordering and
@@ -4643,13 +4647,13 @@ reuses existing syntax and keeps the grammar simple:
 ```
 loop:
     select await
-        opt_msg = rx.recv() ->
+        opt_msg = rx.recv() =>
             let Some(msg) = opt_msg else break
             process(msg)
-        result = listener.accept() ->
+        result = listener.accept() =>
             let Ok(conn) = result else continue
             handle(conn)
-        _ = timeout(idle_timeout) ->
+        _ = timeout(idle_timeout) =>
             send_heartbeat().await
 ```
 
@@ -4684,7 +4688,7 @@ are cancelled by normal scope unwinding rules. Outside `async scope`,
 normal `Task` drop semantics apply (§14.7).
 
 ```
-async scope |s|:
+async scope s =>
     let (user, posts) = (
         s.track(fetch_user(id)),
         s.track(fetch_posts(id)),
@@ -4802,13 +4806,13 @@ No specialized `AsyncIterator` or `Stream` traits are needed:
 ```
 // This is valid With code — impossible in Rust without Stream
 let results = urls.iter()
-    |> map(|url| fetch(url).await)
-    |> filter(|r| r.is_ok())
+    |> map(url => fetch(url).await)
+    |> filter(r => r.is_ok())
     |> collect[Vec]()
 
 // .await inside fold
 let total = ids.iter()
-    |> fold(0, |sum, id| sum + get_count(id).await)
+    |> fold(0, (sum, id) => sum + get_count(id).await)
 ```
 
 This is one of the most significant ergonomic advantages of the
@@ -4839,9 +4843,9 @@ JoinHandle.join() -> T
 For structured CPU-bound parallelism:
 
 ```
-scope |s|:
-    s.spawn(|| compute_chunk_a())
-    s.spawn(|| compute_chunk_b())
+scope s =>
+    s.spawn(() => compute_chunk_a())
+    s.spawn(() => compute_chunk_b())
 // both complete here
 ```
 
@@ -4855,8 +4859,8 @@ let msg = rx.recv().await   // suspends fiber if empty
 
 // Non-blocking:
 match rx.try_recv()
-    Some(msg) -> handle(msg)
-    None      -> ()
+    Some(msg) => handle(msg)
+    None      => ()
 ```
 
 Channels transfer ownership: sending moves the value. **Channel
@@ -4869,7 +4873,7 @@ fibers, but not that Fiber 1's locals outlive Fiber 2's reads.
 
 ```
 // ERROR: ephemeral values cannot be sent over channels
-async scope |s|:
+async scope s =>
     let (tx, rx) = chan[&str](10)
     s.track(async:
         let local = "hello".to_owned()
@@ -4905,14 +4909,14 @@ tx.send("hello").await                  // str literal, String is Send
 
 ```
 // thread.spawn_os requires Send — no ephemerals
-thread.spawn_os(|| use_ref(&local))   // ERROR: &local is not Send
+thread.spawn_os(() => use_ref(&local))   // ERROR: &local is not Send
 
 // scope requires ScopedSend — ephemerals allowed
-scope |s|:
-    s.spawn(|| use_ref(&local))       // OK: ScopedSend, joins before scope exits
+scope s =>
+    s.spawn(() => use_ref(&local))       // OK: ScopedSend, joins before scope exits
 
 // async scope requires ScopedSend — ephemerals allowed
-async scope |s|:
+async scope s =>
     s.track(process(&local))          // OK: ScopedSend, tracked task joins
 ```
 
@@ -5029,18 +5033,18 @@ transitively called while C frames are on the stack, must not be
 
 ```
 // ERROR: callback must not suspend
-unsafe { c_sort(items.ptr, items.len, |a, b|
+unsafe { c_sort(items.ptr, items.len, (a, b) =>
     fetch_weight(a).await <=> fetch_weight(b).await
     //              ^^^^^^ ERROR: may_suspend in extern "C" callback
 ) }
 
 // OK: no suspension in callback
-unsafe { c_sort(items.ptr, items.len, |a, b|
+unsafe { c_sort(items.ptr, items.len, (a, b) =>
     a.weight <=> b.weight
 ) }
 
 // OK: spawn a detached task (no .await needed)
-unsafe { c_on_event(|event|
+unsafe { c_on_event(event =>
     spawn handle_event(event)   // detached, runs to completion
 ) }
 ```
@@ -5211,7 +5215,7 @@ task.await?                       // OK: used immediately
 
 ```
 async fn process_all(data: &mut Vec[i32]):
-    async scope |s|:
+    async scope s =>
         // These tasks borrow data — ephemeral
         let t1 = s.track(transform(&data[0..100]))
         let t2 = s.track(transform(&data[100..200]))
@@ -5432,7 +5436,7 @@ let name_ptr: *const c_char = get_user_name(id)
 
 // Convert to Option — null becomes None
 let name = name_ptr.as_option()
-    .map(|p| CStr.from_ptr(p).to_str())
+    .map(p => CStr.from_ptr(p).to_str())
     .unwrap_or("unknown")
 
 // Also works with ?? 
@@ -6256,8 +6260,8 @@ the message string is not constructed when the condition is true.
 ```
 // Before:
 match result
-    Err(.Db(.NotFound(..))) -> assert(true)
-    _ -> assert(false)
+    Err(.Db(.NotFound(..))) => assert(true)
+    _ => assert(false)
 
 // After:
 assert_matches(result, Err(.Db(.NotFound(..))))
@@ -6268,11 +6272,11 @@ The return type is `Never`, so it satisfies any type context:
 
 ```
 match direction
-    .North -> go_north()
-    .South -> go_south()
-    .East  -> go_east()
-    .West  -> go_west()
-    _      -> unreachable()     // enum is exhaustive
+    .North => go_north()
+    .South => go_south()
+    .East  => go_east()
+    .West  => go_west()
+    _      => unreachable()     // enum is exhaustive
 
 fn get_config -> Config:
     // This function always succeeds in our deployment
@@ -6828,8 +6832,8 @@ The compiler selects the `with` form based on the expression's type:
 
 | Syntax | Type has `Scoped`/`ScopedMut`? | Desugaring |
 |--------|-------------------------------|------------|
-| `with e as x: body` | Yes (`Scoped`) | `e.enter(\|x\| body)` |
-| `with e as mut x: body` | Yes (`ScopedMut`) | `e.enter_mut(\|x\| body)` |
+| `with e as x: body` | Yes (`Scoped`) | `e.enter(x => body)` |
+| `with e as mut x: body` | Yes (`ScopedMut`) | `e.enter_mut(x => body)` |
 | `with e as mut x: body` | No | `{ var x = e; body }` |
 | `with e as x: body` | No | `{ let x = e; body }` |
 
@@ -6840,7 +6844,7 @@ implements the trait, the guarded form is used.
 
 Multiple bindings nest left-to-right:
 `with a as x, b as mut y: body` is equivalent to
-`a.enter(|x| b.enter_mut(|y| body))`.
+`a.enter(x => b.enter_mut(y => body))`.
 
 Multiple bindings in the non-guarded (binding) forms follow the
 same nesting: each binding is in scope for all subsequent bindings
@@ -6948,13 +6952,13 @@ fn test:
 fn test:
     let x = 42
     let r = &x
-    vec![1, 2, 3].for_each(|item| println("{item} {r}"))
+    vec![1, 2, 3].for_each(item => println("{item} {r}"))
 
 // FAIL: escaping closure captures ref
 fn test:
     let x = 42
     let r = &x
-    thread.spawn_os(|| println(r))   // ERROR
+    thread.spawn_os(() => println(r))   // ERROR
 ```
 
 ### 25.3 Returning References (Section 3.4)
@@ -6967,8 +6971,8 @@ fn first(xs: &Vec[i32]) -> Option[&i32]:
 fn test:
     let v = vec![1, 2, 3]
     match first(&v)
-        Some(x) -> println(x)
-        None    -> ()
+        Some(x) => println(x)
+        None    => ()
 
 // PASS: ephemeral to owned conversion
 fn get_name(user: &User) -> StrView: user.name.as_view()
@@ -7078,8 +7082,8 @@ fn test(lock: &Mutex[Vec[i32]]):
 fn test(store: &Shared[SlotMap[Texture]]) -> Vec[Handle[Texture]]:
     with store.read() as textures:
         textures.iter()
-        |> filter(|(_h, t)| t.width > 1024)
-        |> map(|(h, _)| h)
+        |> filter((_h, t) => t.width > 1024)
+        |> map((h, _) => h)
         |> collect()
 
 // PASS: error propagation with implicit Ok wrapping
@@ -7093,8 +7097,8 @@ fn test(lock: &Mutex[File]) -> Result[Unit, IoError]:
 fn find_val(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32]:
     with lock.lock() as map:
         match map.get(key)
-            Some(v) -> return Some(v)    // returns from find_val
-            None    -> ()
+            Some(v) => return Some(v)    // returns from find_val
+            None    => ()
     None
 
 // PASS: break/continue inside with block inside loop
@@ -7165,8 +7169,8 @@ fn test:
     let a = map.insert(10)
     let b = map.insert(20)
     match map.get2_mut(a, b)
-        Some((va, vb)) -> { *va += 1; *vb += 1 }
-        None -> ()
+        Some((va, vb)) => { *va += 1; *vb += 1 }
+        None => ()
 
 // PASS: handles in containers
 fn test:
@@ -7191,13 +7195,13 @@ fn load(path: &str) -> Result[Ast, AppError]:
 // PASS: match converted error
 fn handle(e: AppError):
     match e
-        AppError.Io(io)    -> println("io: {io}")
-        AppError.Parse(pe) -> println("parse: {pe}")
+        AppError.Io(io)    => println("io: {io}")
+        AppError.Parse(pe) => println("parse: {pe}")
 
 // FAIL: non-exhaustive
 fn bad(e: AppError):
     match e
-        AppError.Io(_) -> ()          // ERROR: missing Parse
+        AppError.Io(_) => ()          // ERROR: missing Parse
 ```
 
 ### 25.10 Traits and Coherence (Section 11)
@@ -7244,12 +7248,12 @@ fn test: puts(c"hello".ptr)
 
 // PASS: non-capturing closure to fn ptr
 fn test:
-    let f: extern "C" fn(i32) -> i32 = |x| x + 1
+    let f: extern "C" fn(i32) -> i32 = x => x + 1
 
 // FAIL: capturing closure to fn ptr
 fn test:
     let offset = 5
-    let f: extern "C" fn(i32) -> i32 = |x| x + offset  // ERROR
+    let f: extern "C" fn(i32) -> i32 = x => x + offset  // ERROR
 
 // PASS: c_import constants available
 use c_import("limits.h")
@@ -7264,12 +7268,12 @@ fn test:
 // PASS: valid
 @[tailrec]
 fn factorial(n: Int, acc: Int) -> Int:
-    match n { 0 -> acc; _ -> factorial(n - 1, n * acc) }
+    match n { 0 => acc; _ => factorial(n - 1, n * acc) }
 
 // FAIL: not in tail position
 @[tailrec]
 fn bad(n: Int) -> Int:
-    match n { 0 -> 1; _ -> n * bad(n - 1) }  // ERROR
+    match n { 0 => 1; _ => n * bad(n - 1) }  // ERROR
 ```
 
 ### 25.13 Partial Application (Section 9.4)
@@ -7294,15 +7298,15 @@ fn test:
 type Expr = Lit(i32) | Add(Expr, Expr) | Mul(Expr, Expr)
 fn simplify(e: Expr) -> Expr:
     match e
-        Add(Lit(0), rhs) -> rhs
-        Mul(Lit(0), _) | Mul(_, Lit(0)) -> Lit(0)
-        other -> other
+        Add(Lit(0), rhs) => rhs
+        Mul(Lit(0), _) | Mul(_, Lit(0)) => Lit(0)
+        other => other
 
 // PASS: or-patterns
 fn classify(day: Day) -> str:
     match day
-        Monday | Tuesday | Wednesday | Thursday | Friday -> "weekday"
-        Saturday | Sunday -> "weekend"
+        Monday | Tuesday | Wednesday | Thursday | Friday => "weekday"
+        Saturday | Sunday => "weekend"
 
 // PASS: if-let
 fn test(opt: Option[i32]):
@@ -7311,20 +7315,20 @@ fn test(opt: Option[i32]):
 // PASS: range
 fn category(code: i32) -> str:
     match code
-        200 -> "ok"; 400..=499 -> "client error"; _ -> "unknown"
+        200 => "ok"; 400..=499 => "client error"; _ => "unknown"
 
 // PASS: slice
 fn describe(items: &[i32]) -> str:
     match items
-        [] -> "empty"
-        [x] -> "one"
-        [first, ..rest] -> "{rest.len()} more"
+        [] => "empty"
+        [x] => "one"
+        [first, ..rest] => "{rest.len()} more"
 
 // FAIL: non-exhaustive nested
 fn bad(e: Expr):
     match e
-        Lit(_) -> "lit"
-        Add(_, _) -> "add"       // ERROR: missing Mul
+        Lit(_) => "lit"
+        Add(_, _) => "add"       // ERROR: missing Mul
 ```
 
 ### 25.15 Collection Operations (Section 13.3)
@@ -7332,18 +7336,18 @@ fn bad(e: Expr):
 ```
 // PASS: reduce
 fn test:
-    let sum = vec![1, 2, 3, 4].iter() |> reduce(|a, b| a + b)
+    let sum = vec![1, 2, 3, 4].iter() |> reduce((a, b) => a + b)
     assert(sum == Some(10))
 
 // PASS: fold
 fn test:
-    let sum = vec![1, 2, 3].iter() |> fold(0, |acc, x| acc + x)
+    let sum = vec![1, 2, 3].iter() |> fold(0, (acc, x) => acc + x)
     assert(sum == 6)
 
 // PASS: flat_map
 fn test:
     let words = vec!["hello world", "foo bar"].iter()
-        |> flat_map(|s| s.split(' '))
+        |> flat_map(s => s.split(' '))
         |> collect[Vec]()
     assert(words.len() == 4)
 
@@ -7357,14 +7361,14 @@ fn test:
 // PASS: partition
 fn test:
     let (evens, odds) = vec![1, 2, 3, 4].iter()
-        |> partition(|x| x % 2 == 0)
+        |> partition(x => x % 2 == 0)
     assert(evens == vec![2, 4])
 
 // PASS: complex pipeline
 fn test:
     let result = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].iter()
-        |> filter(|x| x % 2 == 0)
-        |> map(|x| x * x)
+        |> filter(x => x % 2 == 0)
+        |> map(x => x * x)
         |> take(3)
         |> sum()
     assert(result == 56)
@@ -7398,8 +7402,8 @@ gen fn fibonacci -> Int:
 
 fn test:
     let even_fibs = fibonacci()
-        |> take_while(|x| x < 100)
-        |> filter(|x| x % 2 == 0)
+        |> take_while(x => x < 100)
+        |> filter(x => x % 2 == 0)
         |> collect[Vec]()
     assert(even_fibs == vec![0, 2, 8, 34])
 ```
@@ -7430,7 +7434,7 @@ async fn process(data: &mut Vec[i32]):
 
 // PASS: structured concurrency
 async fn test_scope:
-    async scope |s|:
+    async scope s =>
         s.track(fetch_data("http://a.com"))
         s.track(fetch_data("http://b.com"))
 
@@ -7475,10 +7479,10 @@ fn fire_and_forget:
 // PASS: store tasks, compose them as values
 fn test:
     let tasks = urls
-        |> map(|u| fetch_data(u))  // no .await here — just Task values
+        |> map(u => fetch_data(u))  // no .await here — just Task values
         |> collect[Vec]()
     let results = tasks
-        |> map(|t| t.await)
+        |> map(t => t.await)
         |> collect[Vec]()
 
 // PASS: async fn in trait (just works)
@@ -7526,17 +7530,17 @@ type Color = Red | Green | Blue
 // PASS
 fn name(c: Color) -> str:
     match c
-        Red -> "red"; Green -> "green"; Blue -> "blue"
+        Red => "red"; Green => "green"; Blue => "blue"
 
 // FAIL
 fn name(c: Color) -> str:
     match c
-        Red -> "red"; Green -> "green"   // ERROR: missing Blue
+        Red => "red"; Green => "green"   // ERROR: missing Blue
 
 // PASS: wildcard
 fn name(c: Color) -> str:
     match c
-        Red -> "red"; _ -> "other"
+        Red => "red"; _ => "other"
 ```
 
 ### 25.21 Record Update Syntax (Section 4.3)
@@ -7574,27 +7578,27 @@ fn test:
 // PASS: option chaining
 fn test:
     let x: Option[i32] = Some(5)
-    let y = x.map(|n| n * 2).unwrap_or(0)
+    let y = x.map(n => n * 2).unwrap_or(0)
     assert(y == 10)
 
 // PASS: and_then chains
 fn test:
     let result = Some(10)
-        .filter(|x| x > 5)
-        .and_then(|x| if x < 20 then Some(x) else None)
+        .filter(x => x > 5)
+        .and_then(x => if x < 20 then Some(x) else None)
         .unwrap_or(0)
     assert(result == 10)
 
 // PASS: result map_err
 fn test:
     let r: Result[i32, String] = Err("bad")
-    let r2 = r.map_err(|s| s.len())
+    let r2 = r.map_err(s => s.len())
     assert(r2 == Err(3))
 
 // PASS: option on None
 fn test:
     let x: Option[i32] = None
-    let y = x.map(|n| n * 2).unwrap_or(42)
+    let y = x.map(n => n * 2).unwrap_or(42)
     assert(y == 42)
 ```
 
@@ -7615,14 +7619,14 @@ fn test:
 
 // PASS: range as iterator
 fn test:
-    let squares = (0..5) |> map(|x| x * x) |> collect[Vec]()
+    let squares = (0..5) |> map(x => x * x) |> collect[Vec]()
     assert(squares == vec![0, 1, 4, 9, 16])
 
 // PASS: range in pattern
 fn test(code: i32) -> str:
     match code
-        200..=299 -> "ok"
-        _ -> "other"
+        200..=299 => "ok"
+        _ => "other"
 ```
 
 ### 25.24 Function Composition (Section 9.6)
@@ -7682,9 +7686,9 @@ use Color.{Red, Green, Blue}
 fn test:
     let c = Red                // no prefix needed
     match c
-        Red   -> "red"
-        Green -> "green"
-        Blue  -> "blue"
+        Red   => "red"
+        Green => "green"
+        Blue  => "blue"
 
 // PASS: Option/Result always unqualified (prelude)
 fn test:
@@ -7807,13 +7811,13 @@ fn test:
 // PASS: traverse applies function then sequences
 fn test:
     let strs = vec!["1", "2", "3"]
-    let parsed = strs.traverse(|s| s.parse_int())
+    let parsed = strs.traverse(s => s.parse_int())
     assert(parsed == Ok(vec![1, 2, 3]))
 
 // PASS: traverse fails on first error
 fn test:
     let strs = vec!["1", "bad", "3"]
-    assert(strs.traverse(|s| s.parse_int()).is_err())
+    assert(strs.traverse(s => s.parse_int()).is_err())
 
 // PASS: transpose Option[Result] → Result[Option]
 fn test:
@@ -7967,7 +7971,7 @@ fn test:
 // PASS: borrowing task in async scope
 async fn test:
     var v = vec![1, 2, 3]
-    async scope |s|:
+    async scope s =>
         let t = s.track(process(&mut v))
         t.await                            // OK: completes before scope exit
 ```
@@ -8037,9 +8041,9 @@ fn default_color -> Color: .Blue
 // PASS: shorthand in match arms
 fn describe(c: Color) -> str:
     match c
-        .Red   -> "red"
-        .Green -> "green"
-        .Blue  -> "blue"
+        .Red   => "red"
+        .Green => "green"
+        .Blue  => "blue"
 
 // PASS: shorthand in function arguments
 fn paint(c: Color): ...
@@ -8241,9 +8245,9 @@ fn test:
 // PASS: ephemeral struct in pattern matching
 fn describe(tok: Token) -> str:
     match tok.kind
-        .Ident  -> "identifier: {tok.text}"
-        .Number -> "number: {tok.text}"
-        _       -> "other"
+        .Ident  => "identifier: {tok.text}"
+        .Number => "number: {tok.text}"
+        _       => "other"
 
 // PASS: Vec of ephemeral struct (Vec itself becomes ephemeral)
 fn tokenize(src: StrView) -> Vec[Token]:
@@ -8322,10 +8326,10 @@ fn load(path: &str) -> Result[str, ContextError[IoError]]:
 
 fn test:
     match load("/nonexistent")
-        Err(e) ->
+        Err(e) =>
             assert(e.message == "failed to read config")
             assert(e.source.is_not_found())
-        Ok(_) -> panic("expected error")
+        Ok(_) => panic("expected error")
 
 // PASS: chained context
 fn load_and_parse(path: &str) -> Result[Config, AppError]:
@@ -8338,7 +8342,7 @@ fn load_and_parse(path: &str) -> Result[Config, AppError]:
 // PASS: lazy context with .with_context()
 fn find_user(id: UserId) -> Result[User, ContextError[DbError]]:
     db.query_one("SELECT * FROM users WHERE id = $1", &[&id])
-        .with_context(|| "failed to find user {id}")?
+        .with_context(() => "failed to find user {id}")?
 ```
 
 ### 25.44 String Literals (Section 15.3)
@@ -8395,8 +8399,8 @@ fn test:
 fn test:
     let r: Result[Unit, str] = Ok()
     match r
-        Ok() -> assert(true)
-        Err(_) -> assert(false)
+        Ok() => assert(true)
+        Err(_) => assert(false)
 
 // PASS: no elision when T != Unit (Ok still requires argument)
 fn test:
@@ -8503,11 +8507,11 @@ fn test_panics:
 type Direction = North | South | East | West
 fn go(d: Direction) -> i32:
     match d
-        .North -> 1
-        .South -> 2
-        .East  -> 3
-        .West  -> 4
-        _      -> unreachable()
+        .North => 1
+        .South => 2
+        .East  => 3
+        .West  => 4
+        _      => unreachable()
 
 // PASS: todo() compiles but panics at runtime
 fn future_feature(x: i32) -> str:
@@ -8582,8 +8586,8 @@ async fn test:
     let (tx, rx) = channel[str]()
     tx.send("hello").await
     select await
-        msg = rx.recv() -> assert(msg == "hello")
-        _ = timeout(1.secs()) -> unreachable()
+        msg = rx.recv() => assert(msg == "hello")
+        _ = timeout(1.secs()) => unreachable()
 
 // PASS: select in a loop with break
 async fn test:
@@ -8594,15 +8598,15 @@ async fn test:
     tx.close()
     loop:
         select await
-            n = rx.recv() -> sum += n
-            _ = timeout(100.millis()) -> break
+            n = rx.recv() => sum += n
+            _ = timeout(100.millis()) => break
     assert(sum == 3)
 
 // PASS: select with error propagation
 async fn do_work(rx: Receiver[str], cancel: CancelToken) -> Result[str, AppError]:
     select await
-        msg = rx.recv() -> Ok(msg)
-        _ = cancel.cancelled() -> Err(.Cancelled)
+        msg = rx.recv() => Ok(msg)
+        _ = cancel.cancelled() => Err(.Cancelled)
 ```
 
 ### 25.52 Enum Accessor Methods (Section 4.4)
@@ -8656,21 +8660,21 @@ fn test:
 ```
 // PASS: s.track registers task with scope
 async fn test:
-    async scope |s|:
+    async scope s =>
         let t = s.track(fetch_data("http://example.com"))
         let result = t.await
         assert(result.is_ok())
 
 // PASS: ScopedTask is exempt from @[must_use] — scope handles cleanup
 async fn test:
-    async scope |s|:
+    async scope s =>
         s.track(fire_and_forget_in_scope())
         // ScopedTask dropped — no compile error
         // scope will cancel+join it on exit
 
 // PASS: early ? return with ScopedTask — no E0801
 async fn test -> Result[i32, AppError]:
-    async scope |s|:
+    async scope s =>
         let task_a = s.track(compute_a())
         let task_b = s.track(compute_b())
         // If task_a.await? fails, task_b is cancelled by scope
@@ -8680,11 +8684,11 @@ async fn test -> Result[i32, AppError]:
 
 // PASS: scatter-gather pattern
 async fn test:
-    let results = async scope |s|:
+    let results = async scope s =>
         let tasks = vec![1, 2, 3].iter()
-            |> map(|id| s.track(fetch_user(id)))
+            |> map(id => s.track(fetch_user(id)))
             |> collect[Vec]()
-        tasks |> map(|t| t.await) |> collect[Vec]()
+        tasks |> map(t => t.await) |> collect[Vec]()
     assert(results.len() == 3)
 
 // FAIL: bare Task (not ScopedTask) is still @[must_use]
@@ -8736,9 +8740,9 @@ type World = { positions: Vec[Vec2], velocities: Vec[Vec2], sprites: Vec[Sprite]
 // PASS: closures capture disjoint fields
 fn test:
     var world = World { ... }
-    scope |s|:
-        s.spawn(|| update_physics(&mut world.velocities, &world.positions))
-        s.spawn(|| render(&world.positions, &world.sprites))
+    scope s =>
+        s.spawn(() => update_physics(&mut world.velocities, &world.positions))
+        s.spawn(() => render(&world.positions, &world.sprites))
     // OK: first captures velocities (mut) + positions (shared)
     //     second captures positions (shared) + sprites (shared)
     //     no conflict — disjoint mutable access
@@ -8746,9 +8750,9 @@ fn test:
 // FAIL: overlapping mutable capture
 fn test_fail:
     var world = World { ... }
-    scope |s|:
-        s.spawn(|| modify(&mut world.positions))
-        s.spawn(|| modify(&mut world.positions))  // ERROR: conflicting borrows
+    scope s =>
+        s.spawn(() => modify(&mut world.positions))
+        s.spawn(() => modify(&mut world.positions))  // ERROR: conflicting borrows
 ```
 
 ### 25.56 Select Await with Let-Else in Branches (Section 14.9)
@@ -8759,19 +8763,19 @@ async fn test(rx: Receiver[i32]):
     var items = Vec.new()
     loop:
         select await
-            opt = rx.recv() ->
+            opt = rx.recv() =>
                 let Some(item) = opt else break
                 items.push(item)
-            _ = timeout(1.secs()) -> break
+            _ = timeout(1.secs()) => break
 
 // PASS: multiple branches with let...else
 async fn serve(listener: TcpListener, ctrl: Receiver[str]):
     loop:
         select await
-            result = listener.accept() ->
+            result = listener.accept() =>
                 let Ok(conn) = result else continue
                 handle(conn)
-            opt = ctrl.recv() ->
+            opt = ctrl.recv() =>
                 let Some(msg) = opt else break
                 process(msg)
 ```
@@ -8796,7 +8800,7 @@ fn test:
 async fn test:
     let urls = vec!["http://a.com", "http://b.com"]
     let results = urls.iter()
-        |> map(|url| fetch(url).await)
+        |> map(url => fetch(url).await)
         |> collect[Vec]()
     assert(results.len() == 2)
 
@@ -8804,7 +8808,7 @@ async fn test:
 async fn test:
     let ids = vec![1, 2, 3]
     let total = ids.iter()
-        |> fold(0, |sum, id| sum + get_count(id).await)
+        |> fold(0, (sum, id) => sum + get_count(id).await)
     assert(total > 0)
 ```
 
@@ -8821,7 +8825,7 @@ async fn test:
 
 // PASS: async: block in structured concurrency
 async fn test:
-    async scope |s|:
+    async scope s =>
         s.track(async:
             println("hello from fiber 1")
         )
@@ -8850,8 +8854,8 @@ fn test:
 // PASS: match on borrowed Option
 fn describe(opt: &Option[String]) -> &str:
     match opt
-        Some(s) -> s.as_str()         // s: &String
-        None    -> "none"
+        Some(s) => s.as_str()         // s: &String
+        None    => "none"
 
 fn test:
     let x = Some("hello".to_string())
@@ -8909,21 +8913,21 @@ async fn test:
 // PASS: scoped thread can use &mut local
 fn test:
     var data = vec![1, 2, 3]
-    scope |s|:
-        s.spawn(|| data.push(4))     // OK: &mut data is ScopedSend
+    scope s =>
+        s.spawn(() => data.push(4))     // OK: &mut data is ScopedSend
     assert(data.len() == 4)
 
 // PASS: async scope can track ephemeral tasks
 async fn test:
     var data = vec![1, 2, 3]
-    async scope |s|:
+    async scope s =>
         s.track(process(&mut data))  // OK: ScopedSend
     assert(data.len() > 0)
 
 // FAIL: unscoped thread.spawn_os rejects ephemeral
 fn test_fail:
     var data = vec![1, 2, 3]
-    thread.spawn_os(|| data.push(4)) // ERROR: &mut Vec is not Send
+    thread.spawn_os(() => data.push(4)) // ERROR: &mut Vec is not Send
 ```
 
 ### 25.64 Partial Move from Drop Types (Section 2.4)
@@ -9003,14 +9007,14 @@ fn test:
 ```
 // FAIL: may_suspend in extern "C" callback
 fn test_fail:
-    unsafe { c_sort(items.ptr, items.len, |a, b|
+    unsafe { c_sort(items.ptr, items.len, (a, b) =>
         fetch_weight(a).await <=> fetch_weight(b).await
         //              ^^^^^^ ERROR: may_suspend in C callback
     ) }
 
 // PASS: no suspension in callback
 fn test:
-    unsafe { c_sort(items.ptr, items.len, |a, b|
+    unsafe { c_sort(items.ptr, items.len, (a, b) =>
         a.weight <=> b.weight        // OK: no suspension
     ) }
 ```
@@ -9067,13 +9071,13 @@ impl Add[Vector, Matrix] for Vector: ...   // ERROR: Vector + Vector
 // PASS: fair select (default — random among ready branches)
 loop:
     select await
-        data = fast_stream.recv() -> handle(data)
-        _ = shutdown.recv() -> break    // will eventually fire
+        data = fast_stream.recv() => handle(data)
+        _ = shutdown.recv() => break    // will eventually fire
 
 // PASS: biased select (explicit — top-to-bottom priority)
 select await biased
-    urgent = priority_rx.recv() -> handle_urgent(urgent)
-    normal = normal_rx.recv() -> handle_normal(normal)
+    urgent = priority_rx.recv() => handle_urgent(urgent)
+    normal = normal_rx.recv() => handle_normal(normal)
 ```
 
 ### 25.73 Defer Control Flow Restriction (Section 2.4)
@@ -9134,7 +9138,7 @@ fn test_custom:
 ```
 // FAIL: ephemeral values cannot be sent over channels
 fn test_fail:
-    async scope |s|:
+    async scope s =>
         let (tx, rx) = chan[&str](10)
         s.track(async:
             let local = "hello".to_owned()
@@ -9292,7 +9296,7 @@ fn test:
 ```
 // FAIL: ephemeral task on bare OS thread
 fn test_fail:
-    thread.spawn_os(||
+    thread.spawn_os(() =>
         var data = vec![1, 2, 3]
         let task = process(&mut data)  // ERROR: ephemeral task in OS thread
     )
@@ -9560,7 +9564,7 @@ fn test:
 // PASS: as_option composes with ?? 
 fn test:
     let p: *const i32 = null
-    let val = p.as_option().map(|p| unsafe { *p }).unwrap_or(0)
+    let val = p.as_option().map(p => unsafe { *p }).unwrap_or(0)
     assert(val == 0)
 ```
 
@@ -9570,8 +9574,8 @@ fn test:
 // PASS: update with default and transform
 fn test:
     var counts: HashMap[str, i32] = HashMap.new()
-    counts.update("alice", 0, |n| n + 1)
-    counts.update("alice", 0, |n| n + 1)
+    counts.update("alice", 0, n => n + 1)
+    counts.update("alice", 0, n => n + 1)
     assert(counts.get("alice") == Some(&2))
 
 // PASS: increment shorthand
@@ -9607,8 +9611,8 @@ fn test:
     type Command = Reset | Set(u8) | Get
     let cmd = Command.Set(42)
     match cmd
-        .Set(val) -> assert(val == 42)
-        _ -> panic("wrong variant")
+        .Set(val) => assert(val == 42)
+        _ => panic("wrong variant")
 
 // FAIL: Vec requires std or alloc
 // @[cfg(no_std)]
@@ -9705,7 +9709,7 @@ fn test:
 fn test:
     let nums = Vec.from([1, 2, 3, 4, 5, 6])
     let evens = nums.iter()
-        |> filter(|x| *x in [2, 4, 6])
+        |> filter(x => *x in [2, 4, 6])
         |> collect[Vec]()
     assert(evens.len() == 3)
 
@@ -9713,18 +9717,18 @@ fn test:
 fn test:
     let method = "map"
     let result = match method
-        in ["map", "filter", "take"] -> "lazy"
-        in ["collect", "fold", "sum"] -> "eager"
-        _ -> "other"
+        in ["map", "filter", "take"] => "lazy"
+        in ["collect", "fold", "sum"] => "eager"
+        _ => "other"
     assert(result == "lazy")
 
 // PASS: match with in pattern and @ binding
 fn test:
     let code = 404
     let msg = match code
-        c @ in 200..=299 -> "ok: {c}"
-        c @ in 400..=499 -> "client error: {c}"
-        _ -> "other"
+        c @ in 200..=299 => "ok: {c}"
+        c @ in 400..=499 => "client error: {c}"
+        _ => "other"
     assert(msg == "client error: 404")
 
 // PASS: user type implementing Contains
@@ -10029,7 +10033,7 @@ The following keywords are reserved and cannot be used as identifiers:
 | Code | Description |
 |------|-------------|
 | E0901 | Non-local control flow (`return`, `break`, `?`) inside `defer`/`errdefer` |
-| E0951 | Nested implicit `it` is ambiguous — use explicit `\|param\|` for inner closure |
+| E0951 | Nested implicit `it` is ambiguous — use explicit `param => expr` for inner closure |
 | E0952 | `it` used in context expecting N != 1 parameters |
 | E0953 | `it` is a reserved keyword and cannot be used as an identifier |
 | E1101 | Orphan rule violation: impl requires a local trait or local type |

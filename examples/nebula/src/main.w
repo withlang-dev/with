@@ -53,7 +53,7 @@ fn main:
     let (shutdown_tx, shutdown_rx) = chan[Unit](1)
 
     // Register SIGINT handler — dropping the sender signals shutdown
-    on_signal(.SIGINT, || drop(shutdown_tx))
+    on_signal(.SIGINT, () => drop(shutdown_tx))
 
     // --- OS Thread: Background Analyzer ---
     //
@@ -61,7 +61,7 @@ fn main:
     // Fibers should never block on CPU work. The compiler prevents
     // calling .await inside non-async functions.
 
-    let _worker = thread.spawn_os(|| background_analyzer(db.clone(), pool.clone()))
+    let _worker = thread.spawn_os(() => background_analyzer(db.clone(), pool.clone()))
 
     // --- Fiber Runtime: Async Server ---
     //
@@ -73,7 +73,7 @@ fn main:
 
         // Structured concurrency: async scope guarantees all tracked
         // fibers complete or are cancelled before the scope exits.
-        async scope |s|:
+        async scope s =>
             loop:
                 // Fair select await: races new connections vs shutdown.
                 select await
@@ -95,8 +95,8 @@ fn main:
 
     // Postfix await blocks the main thread until the server completes.
     match server_task.await
-        Ok()   -> println("Clean shutdown complete.")
-        Err(e) -> eprintln("Fatal error: {e}")
+        Ok()   => println("Clean shutdown complete.")
+        Err(e) => eprintln("Fatal error: {e}")
 
 // --- Background Analyzer ---
 //
@@ -116,5 +116,5 @@ fn background_analyzer(db: Arc[Database], pool: SessionPool):
 
         // Periodic maintenance — blocking is safe on OS threads
         match db.execute("DELETE FROM telemetry WHERE ts < strftime('%s','now') - 86400")
-            Ok()   -> ()
-            Err(e) -> eprintln("[analyzer] cleanup error: {e}")
+            Ok()   => ()
+            Err(e) => eprintln("[analyzer] cleanup error: {e}")

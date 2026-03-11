@@ -25,17 +25,17 @@ fn run_input_events(
     for (_, state) in iter_mut(input_states):
         for event in events:
             match event
-                .KeyDown(.Up)    -> state.up = true
-                .KeyUp(.Up)      -> state.up = false
-                .KeyDown(.Down)  -> state.down = true
-                .KeyUp(.Down)    -> state.down = false
-                .KeyDown(.Left)  -> state.left = true
-                .KeyUp(.Left)    -> state.left = false
-                .KeyDown(.Right) -> state.right = true
-                .KeyUp(.Right)   -> state.right = false
-                .KeyDown(.Space) -> state.fire = true
-                .KeyUp(.Space)   -> state.fire = false
-                _ -> ()
+                .KeyDown(.Up)    => state.up = true
+                .KeyUp(.Up)      => state.up = false
+                .KeyDown(.Down)  => state.down = true
+                .KeyUp(.Down)    => state.down = false
+                .KeyDown(.Left)  => state.left = true
+                .KeyUp(.Left)    => state.left = false
+                .KeyDown(.Right) => state.right = true
+                .KeyUp(.Right)   => state.right = false
+                .KeyDown(.Space) => state.fire = true
+                .KeyUp(.Space)   => state.fire = false
+                _ => ()
 
 // --- Player Controller ---
 //
@@ -179,7 +179,7 @@ fn run_render(
         )
 
     // Sort by layer for correct draw order (painter's algorithm)
-    entries.sort_by(|a, b| a.layer.cmp(&b.layer))
+    entries.sort_by((a, b) => a.layer.cmp(&b.layer))
 
     // Draw (mock — print to stdout for this demo)
     println("  Render: {entries.len()} sprites")
@@ -230,14 +230,14 @@ fn run_frame(world: &mut World, input_events: &[InputEvent]):
     //
     // All paths are disjoint or shared-compatible. Safe parallelism
     // with zero runtime checks, enforced at compile time.
-    scope |s|:
-        s.spawn(|| run_collision(
+    scope s =>
+        s.spawn(() => run_collision(
             &world.transforms,
             &world.colliders,
             &mut world.collision_events,
             &world.frame_arena,
         ))
-        s.spawn(|| run_render(
+        s.spawn(() => run_render(
             &world.transforms,
             &world.sprites,
             &world.frame_arena,

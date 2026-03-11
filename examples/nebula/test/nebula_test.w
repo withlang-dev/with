@@ -26,14 +26,14 @@ type ServerConfig = {
 
 fn is_fatal(s: Status) -> bool:
     match s
-        Fatal(_) -> true
-        _        -> false
+        Fatal(_) => true
+        _        => false
 
 fn status_label(s: Status) -> i32:
     match s
-        Ok         -> 0
-        Warning(_) -> 1
-        Fatal(_)   -> 2
+        Ok         => 0
+        Warning(_) => 1
+        Fatal(_)   => 2
 
 // --- Temperature classification ---
 

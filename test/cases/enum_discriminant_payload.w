@@ -12,9 +12,9 @@ type Msg: i32 =
 
 fn describe(m: Msg) -> str:
     match m
-        .Quit -> "quit"
-        .Move(x, y) -> "move " ++ int_to_string(x) ++ " " ++ int_to_string(y)
-        .Write(s) -> "write " ++ s
+        .Quit => "quit"
+        .Move(x, y) => "move " ++ int_to_string(x) ++ " " ++ int_to_string(y)
+        .Write(s) => "write " ++ s
 
 fn main:
     let q = Msg.Quit

@@ -4,17 +4,17 @@
 
 fn classify(n: i32) -> str:
     match n
-        0 -> "zero"
-        1..5 -> "small"
-        5..=10 -> "medium"
-        _ -> "large"
+        0 => "zero"
+        1..5 => "small"
+        5..=10 => "medium"
+        _ => "large"
 
 fn classify_signed(n: i32) -> str:
     match n
-        -10..0 -> "negative"
-        0 -> "zero"
-        1..=100 -> "positive"
-        _ -> "other"
+        -10..0 => "negative"
+        0 => "zero"
+        1..=100 => "positive"
+        _ => "other"
 
 fn main:
     assert(classify(0) == "zero")

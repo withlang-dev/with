@@ -88,7 +88,7 @@ extend World:
         self.entities.contains(entity)
 
     fn entity_name(self: &World, entity: Entity) -> Option[&str]:
-        self.entities.get(entity).map(|row| row.name.as_view())
+        self.entities.get(entity).map(row => row.name.as_view())
 
     fn entity_count(self: &World) -> usize: self.entities.len()
 
