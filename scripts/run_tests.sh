@@ -13,6 +13,9 @@ set -euo pipefail
 #   //! expect-check-fail: <msg> — check mode should fail with <msg>
 #   //! expect-build-fail: <msg> — build mode should fail with <msg>
 #   //! check-only               — only run check mode (no build/run)
+#
+# Environment:
+#   WITH_TEST_JOBS=N  — number of parallel jobs (default: CPU count)
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -20,6 +23,7 @@ source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 COMPILER="${WITH:-./out/bin/with-stage2}"
 RUN_TIMEOUT_SECS="${WITH_TEST_TIMEOUT:-30}"
+JOBS="${WITH_TEST_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)}"
 
 if [[ ! -x "$COMPILER" ]]; then
   echo "error: missing compiler: $COMPILER" >&2
@@ -30,21 +34,41 @@ fi
 COMPILER="$(prepare_selfhost_runner "$ROOT_DIR" "$COMPILER")"
 trap 'cleanup_selfhost_runner' EXIT
 
-tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"; cleanup_selfhost_runner' EXIT
+results_dir="$(mktemp -d)"
+trap 'rm -rf "$results_dir"; cleanup_selfhost_runner' EXIT
 
-passed=0
-failed=0
-skipped=0
-failures_list=""
+# Collect test files
+if [[ "$#" -gt 0 ]]; then
+  test_files=("$@")
+else
+  test_files=()
+  for f in test/cases/*.w; do
+    [[ -e "$f" ]] && test_files+=("$f")
+  done
+fi
 
-run_test() {
+echo "=== selfhost test suite ==="
+echo "compiler: $COMPILER"
+echo "tests: ${#test_files[@]}"
+echo "jobs: $JOBS"
+echo ""
+
+# Export variables needed by the worker
+export COMPILER RUN_TIMEOUT_SECS
+
+run_single_test() {
   local file="$1"
+  local result_file="$2"
   local expect_stdout=""
   local expect_check_fail=""
   local expect_build_fail=""
   local check_only=0
   local extra_args=""
+  local name
+  name="$(basename "$file" .w)"
+
+  local my_tmp
+  my_tmp="$(mktemp -d)"
 
   # Parse directives from file header
   while IFS= read -r line; do
@@ -56,7 +80,6 @@ run_test() {
         expect_check_fail="${line#//! expect-check-fail: }"
         ;;
       "//! expect-error: "*)
-        # Alias for expect-check-fail
         expect_check_fail="${line#//! expect-error: }"
         ;;
       "//! expect-build-fail: "*)
@@ -76,126 +99,129 @@ run_test() {
     esac
   done < "$file"
 
-  local name
-  name="$(basename "$file" .w)"
-
   # Case 1: expect check to fail with message
   if [[ -n "$expect_check_fail" ]]; then
     local rc=0
-    runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" check $extra_args "$file" || rc=$?
+    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
-      echo "FAIL $name (expected check failure)"
-      failed=$((failed + 1))
-      failures_list="${failures_list}  ${file}\n"
+      echo "FAIL $name (expected check failure)" > "$result_file"
+      rm -rf "$my_tmp"
       return
     fi
-    if grep -Fq "$expect_check_fail" "$tmpdir/err"; then
-      echo "PASS $name"
-      passed=$((passed + 1))
+    if grep -Fq "$expect_check_fail" "$my_tmp/err"; then
+      echo "PASS $name" > "$result_file"
     else
-      echo "FAIL $name (missing error: $expect_check_fail)"
-      failed=$((failed + 1))
-      failures_list="${failures_list}  ${file}\n"
+      echo "FAIL $name (missing error: $expect_check_fail)" > "$result_file"
     fi
+    rm -rf "$my_tmp"
     return
   fi
 
   # Case 2: expect build to fail with message
   if [[ -n "$expect_build_fail" ]]; then
     local rc=0
-    runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" build $extra_args "$file" || rc=$?
+    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" build $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
-      echo "FAIL $name (expected build failure)"
-      failed=$((failed + 1))
-      failures_list="${failures_list}  ${file}\n"
-    elif grep -Fq "$expect_build_fail" "$tmpdir/err"; then
-      echo "PASS $name"
-      passed=$((passed + 1))
+      echo "FAIL $name (expected build failure)" > "$result_file"
+    elif grep -Fq "$expect_build_fail" "$my_tmp/err"; then
+      echo "PASS $name" > "$result_file"
     else
-      echo "FAIL $name (missing error: $expect_build_fail)"
-      failed=$((failed + 1))
-      failures_list="${failures_list}  ${file}\n"
+      echo "FAIL $name (missing error: $expect_build_fail)" > "$result_file"
     fi
-    # Clean up any artifacts
     local stem="${file%.w}"
     rm -f "$stem" "${stem}.o" 2>/dev/null || true
+    rm -rf "$my_tmp"
     return
   fi
 
   # Case 3: check-only (no build/run)
   if [[ "$check_only" -eq 1 ]]; then
     local rc=0
-    runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" check $extra_args "$file" || rc=$?
+    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
     if [[ "$rc" -eq 0 ]]; then
-      echo "PASS $name"
-      passed=$((passed + 1))
+      echo "PASS $name" > "$result_file"
     else
-      echo "FAIL $name (check failed)"
-      tail -5 "$tmpdir/err" 2>/dev/null || true
-      failed=$((failed + 1))
-      failures_list="${failures_list}  ${file}\n"
+      echo "FAIL $name (check failed)" > "$result_file"
     fi
+    rm -rf "$my_tmp"
     return
   fi
 
   # Case 4: build+run
   local rc=0
-  runner_exec_capture "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$COMPILER" run $extra_args "$file" || rc=$?
+  timeout "$RUN_TIMEOUT_SECS" "$COMPILER" run $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
 
   # Clean up artifacts
   local stem="${file%.w}"
   rm -f "$stem" "${stem}.o" 2>/dev/null || true
 
   if [[ "$rc" -eq 124 ]]; then
-    echo "FAIL $name (timeout after ${RUN_TIMEOUT_SECS}s)"
-    failed=$((failed + 1))
-    failures_list="${failures_list}  ${file}\n"
+    echo "FAIL $name (timeout after ${RUN_TIMEOUT_SECS}s)" > "$result_file"
+    rm -rf "$my_tmp"
     return
   fi
 
   if [[ "$rc" -ne 0 ]]; then
-    echo "FAIL $name (exit code $rc)"
-    tail -5 "$tmpdir/err" 2>/dev/null || true
-    failed=$((failed + 1))
-    failures_list="${failures_list}  ${file}\n"
+    local errtail
+    errtail="$(tail -3 "$my_tmp/err" 2>/dev/null || true)"
+    echo "FAIL $name (exit code $rc) $errtail" > "$result_file"
+    rm -rf "$my_tmp"
     return
   fi
 
   # If no expect-stdout directive, pass on exit 0
   if [[ -z "$expect_stdout" ]]; then
-    echo "PASS $name"
-    passed=$((passed + 1))
+    echo "PASS $name" > "$result_file"
+    rm -rf "$my_tmp"
     return
   fi
 
-  if grep -Fq "$expect_stdout" "$tmpdir/out"; then
-    echo "PASS $name"
-    passed=$((passed + 1))
+  if grep -Fq "$expect_stdout" "$my_tmp/out"; then
+    echo "PASS $name" > "$result_file"
   else
-    echo "FAIL $name (stdout mismatch, expected: $expect_stdout)"
-    echo "  got: $(head -1 "$tmpdir/out" 2>/dev/null || echo "(empty)")"
-    failed=$((failed + 1))
-    failures_list="${failures_list}  ${file}\n"
+    local got
+    got="$(head -1 "$my_tmp/out" 2>/dev/null || echo "(empty)")"
+    echo "FAIL $name (stdout mismatch, expected: $expect_stdout, got: $got)" > "$result_file"
   fi
+  rm -rf "$my_tmp"
 }
 
-# Collect test files
-if [[ "$#" -gt 0 ]]; then
-  test_files=("$@")
-else
-  test_files=()
-  for f in test/cases/*.w; do
-    [[ -e "$f" ]] && test_files+=("$f")
-  done
-fi
+export -f run_single_test
+export results_dir
 
-echo "=== selfhost test suite ==="
-echo "compiler: $COMPILER"
-echo "tests: ${#test_files[@]}"
-echo ""
-
+# Run tests in parallel
+idx=0
 for f in "${test_files[@]}"; do
-  run_test "$f"
+  result_file="$results_dir/result_$(printf '%04d' $idx)"
+  run_single_test "$f" "$result_file" &
+
+  idx=$((idx + 1))
+
+  # Limit parallelism
+  if [[ $(( idx % JOBS )) -eq 0 ]]; then
+    wait
+  fi
+done
+wait
+
+# Collect results
+passed=0
+failed=0
+failures_list=""
+
+for result_file in "$results_dir"/result_*; do
+  [[ -e "$result_file" ]] || continue
+  line="$(cat "$result_file")"
+  echo "$line"
+  case "$line" in
+    PASS*)
+      passed=$((passed + 1))
+      ;;
+    FAIL*)
+      failed=$((failed + 1))
+      failures_list="${failures_list}  ${line}\n"
+      ;;
+  esac
 done
 
 echo ""

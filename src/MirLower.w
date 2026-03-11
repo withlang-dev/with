@@ -270,6 +270,22 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         return self.sema.ty_str
     if kind == NK_CALL:
         return self.call_return_type(self.ast.get_data0(node))
+    if kind == NK_STRUCT_LIT:
+        let st_name = self.ast.get_data0(node)
+        if self.sema.named_types.contains(st_name):
+            return self.sema.named_types.get(st_name).unwrap()
+        // Self struct literal — resolve via method context
+        let st_name_str = self.sema.pool_resolve(st_name)
+        if st_name_str == "Self":
+            let fn_sym = self.body.fn_sym
+            let fn_name_str = self.sema.pool_resolve(fn_sym)
+            for ci in 0..fn_name_str.len() as i32:
+                if fn_name_str.byte_at(ci as i64) == 46:
+                    let owner_name = fn_name_str.slice(0, ci as i64)
+                    let owner_sym = self.sema.pool_intern(owner_name)
+                    if self.sema.named_types.contains(owner_sym):
+                        return self.sema.named_types.get(owner_sym).unwrap()
+                    break
     self.sema.ty_void
 
 fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
@@ -790,8 +806,16 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         return
 
     let pk = self.ast.kind(pat_node)
-    if pk == NK_PAT_WILDCARD or pk == NK_PAT_IDENT or pk == NK_PAT_AT_BINDING:
+    if pk == NK_PAT_WILDCARD or pk == NK_PAT_IDENT:
         self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
+        return
+
+    if pk == NK_PAT_AT_BINDING:
+        let inner_pat = self.ast.get_data1(pat_node)
+        if inner_pat != 0:
+            self.lower_pattern_match(scrutinee_place, inner_pat, arm_bb, fail_bb)
+        else:
+            self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
         return
 
     if pk == NK_PAT_OR:
@@ -842,7 +866,59 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         self.terminate(TK_SWITCH_INT, cmp_op, table, fail_bb, 0)
         return
 
-    // Tuple/struct/slice/range patterns are conservatively accepted here.
+    if pk == NK_PAT_RANGE:
+        let range_lo = self.ast.get_data0(pat_node)
+        let range_hi = self.ast.get_data1(pat_node)
+        let inclusive = self.ast.get_data2(pat_node)
+        let lo_lit = self.lower_int_lit(range_lo as i64, self.sema.ty_i32)
+        let hi_lit = self.lower_int_lit(range_hi as i64, self.sema.ty_i32)
+        let ge_rv = self.body.new_rvalue(RK_BIN_OP, OP_GTE, scrutinee_op, lo_lit)
+        let ge_tmp = self.new_temp(self.sema.ty_bool)
+        let ge_place = self.place_for_local(ge_tmp)
+        self.body.push_stmt(self.cur_bb, SK_ASSIGN, ge_place, ge_rv, self.ast.get_start(pat_node))
+        let ge_op = self.body.new_operand(OK_COPY, ge_place)
+        let range_hi_bb = self.new_block()
+        let ge_vals: Vec[i32] = Vec.new()
+        ge_vals.push(1)
+        let ge_targets: Vec[i32] = Vec.new()
+        ge_targets.push(range_hi_bb)
+        let ge_table = self.body.new_switch_table(ge_vals, ge_targets)
+        self.terminate(TK_SWITCH_INT, ge_op, ge_table, fail_bb, 0)
+        self.switch_to(range_hi_bb)
+        let scrutinee_op2 = self.body.new_operand(OK_COPY, scrutinee_place)
+        let hi_cmp_op = if inclusive != 0: OP_LTE else: OP_LT
+        let le_rv = self.body.new_rvalue(RK_BIN_OP, hi_cmp_op, scrutinee_op2, hi_lit)
+        let le_tmp = self.new_temp(self.sema.ty_bool)
+        let le_place = self.place_for_local(le_tmp)
+        self.body.push_stmt(self.cur_bb, SK_ASSIGN, le_place, le_rv, self.ast.get_start(pat_node))
+        let le_op = self.body.new_operand(OK_COPY, le_place)
+        let le_vals: Vec[i32] = Vec.new()
+        le_vals.push(1)
+        let le_targets: Vec[i32] = Vec.new()
+        le_targets.push(arm_bb)
+        let le_table = self.body.new_switch_table(le_vals, le_targets)
+        self.terminate(TK_SWITCH_INT, le_op, le_table, fail_bb, 0)
+        return
+
+    if pk == NK_PAT_TUPLE:
+        let tup_start = self.ast.get_data0(pat_node)
+        let tup_count = self.ast.get_data1(pat_node)
+        var cur_test_bb = self.cur_bb
+        for ti in 0..tup_count:
+            let elem_pat = self.ast.get_extra(tup_start + ti)
+            let elem_pk = self.ast.kind(elem_pat)
+            if elem_pk == NK_PAT_WILDCARD or elem_pk == NK_PAT_IDENT:
+                continue
+            let elem_place = self.body.new_field_place(scrutinee_place, ti)
+            let next_test = if ti + 1 < tup_count: self.new_block() else: arm_bb
+            self.switch_to(cur_test_bb)
+            self.lower_pattern_match(elem_place, elem_pat, next_test, fail_bb)
+            cur_test_bb = next_test
+        if cur_test_bb == self.cur_bb:
+            self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
+        return
+
+    // Other patterns (struct/slice) are conservatively accepted here.
     self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
 
 fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i32) -> Vec[i32]:

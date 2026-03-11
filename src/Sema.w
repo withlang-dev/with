@@ -132,6 +132,10 @@ type Sema = {
     local_type_names: HashMap[i32, i32],
     ephemeral_types: HashMap[i32, i32],
     sealed_traits: HashMap[i32, i32],
+    // Sealed trait implementors: flat vec of type syms, with start/count per trait
+    sealed_impl_types: Vec[i32],
+    sealed_impl_starts: HashMap[i32, i32],
+    sealed_impl_counts: HashMap[i32, i32],
 
     // Must-use / result-option / task fn tracking
     must_use_types: HashMap[i32, i32],
@@ -319,6 +323,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let local_type_names = sema_new_map_i32_i32()
     let ephemeral_types = sema_new_map_i32_i32()
     let sealed_traits = sema_new_map_i32_i32()
+    let sealed_impl_types: Vec[i32] = Vec.new()
+    let sealed_impl_starts = sema_new_map_i32_i32()
+    let sealed_impl_counts = sema_new_map_i32_i32()
     let must_use_types = sema_new_map_i32_i32()
     let must_use_fns = sema_new_map_i32_i32()
     let result_option_fns = sema_new_map_i32_i32()
@@ -387,6 +394,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         local_type_names,
         ephemeral_types,
         sealed_traits,
+        sealed_impl_types,
+        sealed_impl_starts,
+        sealed_impl_counts,
         must_use_types,
         must_use_fns,
         result_option_fns,
@@ -1243,6 +1253,19 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let param_count = self.ast.fn_meta_param_count(meta)
     let tp_count = self.ast.fn_meta_tp_count(meta)
 
+    // Bind Self to method owner type for dot-name methods
+    let self_sym = self.pool_intern("Self")
+    var self_type_id = 0
+    let fn_name_str = self.pool_resolve(fn_name)
+    for ci in 0..fn_name_str.len() as i32:
+        if fn_name_str.byte_at(ci as i64) == 46:
+            let owner_name = fn_name_str.slice(0, ci as i64)
+            let owner_sym = self.pool_intern(owner_name)
+            if self.named_types.contains(owner_sym):
+                self_type_id = self.named_types.get(owner_sym).unwrap()
+                self.named_types.insert(self_sym, self_type_id)
+            break
+
     // Generic functions: store for later monomorphization
     if tp_count > 0:
         self.generic_fn_nodes.insert(fn_name, node)
@@ -1252,6 +1275,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
         self.validate_type_expr_with_type_params(ret_node, self.ast.fn_meta_tp_start(meta), tp_count)
         // Validate where clause references
         self.validate_where_clause(node, self.ast.fn_meta_tp_start(meta), tp_count)
+        if self_type_id != 0:
+            self.named_types.remove(self_sym)
         return
 
     // Resolve param types
@@ -1294,6 +1319,10 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     // Track async fns
     if (flags / FN_FLAG_ASYNC) % 2 == 1:
         self.task_fns.insert(fn_name, 1)
+
+    // Unbind Self
+    if self_type_id != 0:
+        self.named_types.remove(self_sym)
 
 fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
@@ -1605,6 +1634,30 @@ fn Sema.collect_impl_decl(self: Sema, node: i32):
         self.impl_extra.push(trait_sym)
         self.impl_lookup.insert(type_name, idx)
 
+    // Track sealed trait implementors
+    if self.sealed_traits.contains(trait_sym):
+        if self.sealed_impl_starts.contains(trait_sym):
+            let si_start = self.sealed_impl_starts.get(trait_sym).unwrap()
+            let si_count = self.sealed_impl_counts.get(trait_sym).unwrap()
+            // Check for duplicate
+            var already = false
+            for si in 0..si_count:
+                if self.sealed_impl_types.get((si_start + si) as i64) == type_name:
+                    already = true
+                    break
+            if not already:
+                // Relocate to end for contiguity
+                let new_start = self.sealed_impl_types.len() as i32
+                for si in 0..si_count:
+                    self.sealed_impl_types.push(self.sealed_impl_types.get((si_start + si) as i64))
+                self.sealed_impl_types.push(type_name)
+                self.sealed_impl_starts.insert(trait_sym, new_start)
+                self.sealed_impl_counts.insert(trait_sym, si_count + 1)
+        else:
+            self.sealed_impl_starts.insert(trait_sym, self.sealed_impl_types.len() as i32)
+            self.sealed_impl_counts.insert(trait_sym, 1)
+            self.sealed_impl_types.push(type_name)
+
 fn sema_trait_method_flag_generic -> i32: 4
 
 fn Sema.type_is_dyn_object(self: Sema, tid: i32) -> i32:
@@ -1693,6 +1746,9 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
         if self.named_types.contains(sym):
             return
         if self.type_param_exists(tp_start, tp_count, sym) != 0:
+            return
+        // Allow Self in method contexts (resolved at codegen time)
+        if self.pool_resolve(sym) == "Self":
             return
         self.debug_unknown_type(sym, node, "validate_type_expr")
         self.emit_error("unknown type", node)
@@ -2002,6 +2058,9 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
             return prim
         if self.named_types.contains(sym):
             return self.named_types.get(sym).unwrap()
+        // Self is resolved at codegen time
+        if self.pool_resolve(sym) == "Self":
+            return 0
         if self.collecting_types != 0:
             return 0
         self.debug_unknown_type(sym, node, "resolve_type_expr")
@@ -3105,6 +3164,31 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
             self.emit_warning("non-exhaustive match on bool", node)
         return
 
+    // Sealed trait object exhaustiveness
+    if tk == TY_TRAIT_OBJ:
+        let trait_sym = self.get_type_d0(resolved)
+        if self.sealed_traits.contains(trait_sym) and self.sealed_impl_counts.contains(trait_sym):
+            let si_count = self.sealed_impl_counts.get(trait_sym).unwrap()
+            let si_start = self.sealed_impl_starts.get(trait_sym).unwrap()
+            // Check that each implementor is covered by an arm
+            for si in 0..si_count:
+                let impl_sym = self.sealed_impl_types.get((si_start + si) as i64)
+                var covered = 0
+                for ai in 0..arm_count:
+                    let arm_node = self.ast.get_extra(extra_start + ai)
+                    let pat = self.ast.get_data0(arm_node)
+                    let guard = self.ast.get_data2(arm_node)
+                    if guard != 0:
+                        continue
+                    if sema_pattern_covers_variant(self.ast, pat, impl_sym):
+                        covered = 1
+                        break
+                if covered == 0:
+                    let impl_name = self.pool_resolve(impl_sym)
+                    self.emit_warning("non-exhaustive match on sealed trait: missing implementor '" ++ impl_name ++ "'", node)
+                    return
+        return
+
     // Enum exhaustiveness
     if tk != TY_ENUM:
         return
@@ -3326,6 +3410,18 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data1(node)
     let param_count = self.ast.get_data2(node)
     let outer_count = self.bind_names.len() as i32
+
+    // `it` arity validation: if this is an implicit `it` closure (param_count==1,
+    // param name is "__it") and the expected type is a fn with != 1 params, error.
+    if param_count == 1 and self.has_expected_type != 0:
+        let p_sym = self.ast.get_extra(extra_start)
+        let p_name = self.pool_resolve(p_sym)
+        if p_name == "__it":
+            let expected = self.resolve_alias(self.expected_expr_type)
+            if self.get_type_kind(expected) == TY_FN:
+                let expected_params = self.get_type_d1(expected)
+                if expected_params != 1:
+                    self.emit_error("`it` used in context expecting " ++ int_to_string(expected_params) ++ " parameter(s)", node)
 
     self.push_scope()
     let te_start = self.type_extra.len() as i32
