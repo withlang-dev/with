@@ -64,11 +64,11 @@ fn apply_processor(p: &dyn Processor, items: &[&str]) -> Vec[String]:
     // This closure is non-escaping (passed directly to map). It is allowed
     // to capture `p` (ephemeral) and `s` (ephemeral).
     items.iter()
-        |> map(|s| p.process(s))
+        |> map(s => p.process(s))
         |> collect[Vec]()
 
     // IF WE WROTE THIS, IT WOULD BE A COMPILE ERROR (Rule 9):
-    // let bad_closure = |s| p.process(s)
+    // let bad_closure = s => p.process(s)
     // return bad_closure // ERROR: escaping closure captures ephemeral value `p`
 
 async fn test_async_ephemeral_interaction -> Result[Unit, AppError]:
@@ -78,7 +78,7 @@ async fn test_async_ephemeral_interaction -> Result[Unit, AppError]:
     // `process_buffer` takes `&mut Vec`. It returns a Task that captures it.
     // The compiler marks `task` as EPHEMERAL. It cannot be returned or stored.
 
-    async scope |s|:
+    async scope s =>
         // s.track() accepts the ephemeral task. The scope guarantees
         // the task will join/cancel before `shared_buffer` goes out of scope.
         let task = s.track(process_buffer(&mut shared_buffer))

@@ -3,9 +3,9 @@ type Color = Red | Green | Blue | Yellow
 
 fn describe(c: Color) -> str:
     match c
-        .Red -> "red"
-        .Green -> "green"
-        _ -> "other"
+        .Red => "red"
+        .Green => "green"
+        _ => "other"
 
 fn main:
     let b = describe(.Blue)

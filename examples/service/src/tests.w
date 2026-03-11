@@ -30,13 +30,13 @@ impl UserRepository for MockUserRepo:
     async fn find_by_email(self: &MockUserRepo, email: &str) -> Result[Option[User], DbError]:
         with self.users.read() as users:
             users.values()
-                |> find(|u| u.email == email)
-                |> map(|u| u.clone())
+                |> find(u => u.email == email)
+                |> map(u => u.clone())
 
     async fn list_active(self: &MockUserRepo, limit: i32, offset: i32) -> Result[Vec[User], DbError]:
         with self.users.read() as users:
             users.values()
-                |> filter(|u| u.active)
+                |> filter(u => u.active)
                 |> skip(offset as usize)
                 |> take(limit as usize)
                 |> cloned()
@@ -60,12 +60,12 @@ impl UserRepository for MockUserRepo:
                     if let Some(email) = &fields.email then user.email = email.clone()
                     if let Some(role) = &fields.role then user.role = *role
                     if let Some(active) = &fields.active then user.active = *active
-                None -> Err(.NotFound("users", "{id}"))
+                None => Err(.NotFound("users", "{id}"))
 
     async fn delete(self: &MockUserRepo, id: UserId) -> Result[Unit, DbError]:
         with self.users.write() as mut users:
             users.remove(&id)
-                .map(|_| ())
+                .map(_ => ())
                 .ok_or(.NotFound("users", "{id}"))
 
     async fn count_posts(self: &MockUserRepo, _id: UserId) -> Result[i32, DbError]:
@@ -206,7 +206,7 @@ async fn test_duplicate_email_rejected:
     match svc.create_user(req, UserId(0)).await
         Err(.Validation(msg)) ->
             assert(msg.contains("already registered"))
-        _ -> unreachable()
+        _ => unreachable()
 
 async fn test_update_partial_fields:
     let (svc, _) = test_service()

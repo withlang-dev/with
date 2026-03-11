@@ -21,8 +21,8 @@ fn test_named_fn_as_ptr:
     assert(apply(negate, 10) == -10)
 
 fn test_closure_as_fn_ptr:
-    assert(apply(|x| x * 2, 5) == 10)
-    assert(apply(|x| x + 100, 0) == 100)
+    assert(apply(x => x * 2, 5) == 10)
+    assert(apply(x => x + 100, 0) == 100)
 
 fn apply_twice(f: fn(i32) -> i32, x: i32) -> i32:
     f(f(x))
@@ -30,7 +30,7 @@ fn apply_twice(f: fn(i32) -> i32, x: i32) -> i32:
 fn test_apply_twice:
     assert(apply_twice(add_one, 0) == 2)
     assert(apply_twice(triple, 2) == 18)
-    assert(apply_twice(|x| x + 10, 0) == 20)
+    assert(apply_twice(x => x + 10, 0) == 20)
 
 fn apply_predicate(f: fn(i32) -> bool, x: i32) -> bool:
     f(x)
@@ -41,8 +41,8 @@ fn is_even(x: i32) -> bool:
 fn test_predicate_fn_ptr:
     assert(apply_predicate(is_even, 4) == true)
     assert(apply_predicate(is_even, 3) == false)
-    assert(apply_predicate(|x| x > 0, 5) == true)
-    assert(apply_predicate(|x| x > 0, -1) == false)
+    assert(apply_predicate(x => x > 0, 5) == true)
+    assert(apply_predicate(x => x > 0, -1) == false)
 
 fn main:
     test_named_fn_as_ptr()

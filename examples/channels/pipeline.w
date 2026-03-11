@@ -67,7 +67,7 @@ async fn worker(
                     worker_id: id,
                 }
                 tx.send(result).await
-            None -> break  // channel closed, no more items
+            None => break  // channel closed, no more items
 
 // --- Stage 3: Collector (Fan-in) ---
 //
@@ -103,10 +103,10 @@ fn compute_stats(results: &[ProcessedItem]):
     Stats {
         total: results.len64(),
         successes: results.iter()
-            |> filter(|r| not r.result.is_empty())
+            |> filter(r => not r.result.is_empty())
             |> count() as u64,
         failures: results.iter()
-            |> filter(|r| r.result.is_empty())
+            |> filter(r => r.result.is_empty())
             |> count() as u64,
     }
 
@@ -119,7 +119,7 @@ async fn demo_simple_pipeline:
     let (result_tx, result_rx) = chan[ProcessedItem](buffer: 8)
     let item_count: u64 = 10
 
-    async scope |s|:
+    async scope s =>
         // producer
         s.track(produce(work_tx, item_count))
 
@@ -142,7 +142,7 @@ async fn demo_fan_out:
     let item_count: u64 = 15
     let worker_count: u32 = 3
 
-    async scope |s|:
+    async scope s =>
         // producer
         s.track(produce(work_tx, item_count))
 
@@ -186,7 +186,7 @@ async fn demo_select:
     let (fast_tx, fast_rx) = chan[str](buffer: 4)
     let (slow_tx, slow_rx) = chan[str](buffer: 4)
 
-    async scope |s|:
+    async scope s =>
         // fast producer — sends every 50ms
         s.track(async:
             for i in 0..5:

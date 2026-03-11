@@ -7,5 +7,5 @@ fn apply(f: fn(i32) -> i32, x: i32) -> i32:
 
 fn main:
     let offset = 10
-    let result = apply(|x| x + offset, 42)
+    let result = apply(x => x + offset, 42)
     print(int_to_string(result))

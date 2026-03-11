@@ -27,7 +27,7 @@ impl Processor for BorrowingProcessor:
 
 fn apply_processor(p: &dyn Processor, items: &[&str]) -> Vec[String]:
     items.iter()
-        |> map(|s| p.process(s))
+        |> map(s => p.process(s))
         |> collect[Vec]()
 
 @[test]
@@ -46,7 +46,7 @@ fn test_ephemeral_boundaries:
 async fn test_async_ephemeral_interaction -> Result[Unit, AppError]:
     var shared_buffer = vec![1, 2, 3]
 
-    async scope |s|:
+    async scope s =>
         let task = s.track(process_buffer(&mut shared_buffer))
         let pool = ConnectionPool { url: "localhost" }
 

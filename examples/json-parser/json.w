@@ -83,7 +83,7 @@ extend Tokenizer:
             match self.peek()
                 Some(ch) if is_whitespace(ch) ->
                     self.pos = self.pos + 1
-                _ -> break
+                _ => break
 
     fn read_number_token(self: &mut Self) -> Result[Option[Token], JsonError]:
         self.pos = self.pos - 1
@@ -92,37 +92,37 @@ extend Tokenizer:
     fn next_token(self: &mut Self) -> Result[Option[Token], JsonError]:
         self.skip_whitespace()
         match self.advance()
-            None         -> Ok(None)
-            Some(123)    -> Ok(Some(.LBrace))      // '{'
-            Some(125)    -> Ok(Some(.RBrace))      // '}'
-            Some(91)     -> Ok(Some(.LBracket))    // '['
-            Some(93)     -> Ok(Some(.RBracket))    // ']'
-            Some(58)     -> Ok(Some(.Colon))       // ':'
-            Some(44)     -> Ok(Some(.Comma))       // ','
-            Some(34)     -> self.read_string() |> Result.map(.TString) |> Result.map(Some)
-            Some(116)    -> self.expect_literal("rue") |> Result.map(|_| Some(.TBool(true)))
-            Some(102)    -> self.expect_literal("alse") |> Result.map(|_| Some(.TBool(false)))
-            Some(110)    -> self.expect_literal("ull") |> Result.map(|_| Some(.TNull))
-            Some(ch) if ch == 45 or is_digit(ch) -> self.read_number_token()
-            Some(ch) -> Err(.UnexpectedChar(self.pos - 1, "valid JSON token", ch))
+            None         => Ok(None)
+            Some(123)    => Ok(Some(.LBrace))      // '{'
+            Some(125)    => Ok(Some(.RBrace))      // '}'
+            Some(91)     => Ok(Some(.LBracket))    // '['
+            Some(93)     => Ok(Some(.RBracket))    // ']'
+            Some(58)     => Ok(Some(.Colon))       // ':'
+            Some(44)     => Ok(Some(.Comma))       // ','
+            Some(34)     => self.read_string() |> Result.map(.TString) |> Result.map(Some)
+            Some(116)    => self.expect_literal("rue") |> Result.map(_ => Some(.TBool(true)))
+            Some(102)    => self.expect_literal("alse") |> Result.map(_ => Some(.TBool(false)))
+            Some(110)    => self.expect_literal("ull") |> Result.map(_ => Some(.TNull))
+            Some(ch) if ch == 45 or is_digit(ch) => self.read_number_token()
+            Some(ch) => Err(.UnexpectedChar(self.pos - 1, "valid JSON token", ch))
 
     fn read_string(self: &mut Self) -> Result[str, JsonError]:
         with str.new() as mut buf:
             loop:
                 match self.advance()
-                    None -> return Err(.UnexpectedEof(self.pos, "unterminated string"))
-                    Some(34) -> break                     // '"'
-                    Some(92) ->                           // '\\'
+                    None => return Err(.UnexpectedEof(self.pos, "unterminated string"))
+                    Some(34) => break                     // '"'
+                    Some(92) =>                           // '\\'
                         match self.advance()
-                            Some(34)  -> buf.push(34)     // '"'
-                            Some(92)  -> buf.push(92)     // '\\'
-                            Some(47)  -> buf.push(47)     // '/'
-                            Some(110) -> buf.push(10)     // 'n' -> newline
-                            Some(116) -> buf.push(9)      // 't' -> tab
-                            Some(114) -> buf.push(13)     // 'r' -> carriage return
-                            Some(ch)  -> return Err(.InvalidEscape(self.pos - 1, ch))
-                            None -> return Err(.UnexpectedEof(self.pos, "escape sequence"))
-                    Some(ch) -> buf.push(ch)
+                            Some(34)  => buf.push(34)     // '"'
+                            Some(92)  => buf.push(92)     // '\\'
+                            Some(47)  => buf.push(47)     // '/'
+                            Some(110) => buf.push(10)     // 'n' => newline
+                            Some(116) => buf.push(9)      // 't' => tab
+                            Some(114) => buf.push(13)     // 'r' => carriage return
+                            Some(ch)  => return Err(.InvalidEscape(self.pos - 1, ch))
+                            None => return Err(.UnexpectedEof(self.pos, "escape sequence"))
+                    Some(ch) => buf.push(ch)
             buf
 
     fn read_number(self: &mut Self) -> Result[f64, JsonError]:
@@ -146,20 +146,20 @@ extend Tokenizer:
             self.read_digits()
 
         let text = str.from_utf8_lossy(&self.input[start..self.pos])
-        text.parse_f64().map_err(|_| .InvalidNumber(start, text.to_string()))
+        text.parse_f64().map_err(_ => .InvalidNumber(start, text.to_string()))
 
     fn read_digits(self: &mut Self):
         loop:
             match self.peek()
-                Some(ch) if is_digit(ch) -> self.pos = self.pos + 1
-                _ -> break
+                Some(ch) if is_digit(ch) => self.pos = self.pos + 1
+                _ => break
 
     fn expect_literal(self: &mut Self, expected: &str) -> Result[Unit, JsonError]:
         for ch in expected.bytes():
             match self.advance()
-                Some(got) if got == ch -> ()
-                Some(got) -> return Err(.UnexpectedChar(self.pos - 1, expected.to_string(), got))
-                None -> return Err(.UnexpectedEof(self.pos, "literal"))
+                Some(got) if got == ch => ()
+                Some(got) => return Err(.UnexpectedChar(self.pos - 1, expected.to_string(), got))
+                None => return Err(.UnexpectedEof(self.pos, "literal"))
 
 // --- Recursive Descent Parser ---
 
@@ -190,23 +190,23 @@ extend Parser:
 
     fn parse_value(self: &mut Self) -> Result[JsonValue, JsonError]:
         match &self.current
-            Some(.LBrace)   -> self.parse_object()
-            Some(.LBracket) -> self.parse_array()
+            Some(.LBrace)   => self.parse_object()
+            Some(.LBracket) => self.parse_array()
             Some(.TNull)    ->
                 self.bump()?
                 .Null
             Some(.TBool(_)) ->
                 match self.expect_token("bool")?
-                    .TBool(b) -> .Bool(b)
-                    _ -> .Null
+                    .TBool(b) => .Bool(b)
+                    _ => .Null
             Some(.TNumber(_)) ->
                 match self.expect_token("number")?
-                    .TNumber(n) -> .Number(n)
-                    _ -> .Null
+                    .TNumber(n) => .Number(n)
+                    _ => .Null
             Some(.TString(_)) ->
                 match self.expect_token("string")?
-                    .TString(s) -> .Str(s)
-                    _ -> .Null
+                    .TString(s) => .Str(s)
+                    _ => .Null
             Some(_) ->
                 Err(.UnexpectedChar(
                     pos: self.tokenizer.pos,
@@ -237,7 +237,7 @@ extend Parser:
                     Some(.RBracket) ->
                         self.bump()?
                         break
-                    _ -> return Err(.UnexpectedEof(
+                    _ => return Err(.UnexpectedEof(
                         pos: self.tokenizer.pos,
                         context: "array element or ']'",
                     ))
@@ -261,7 +261,7 @@ extend Parser:
                     Some(.RBrace) ->
                         self.bump()?
                         break
-                    _ -> return Err(.UnexpectedEof(
+                    _ => return Err(.UnexpectedEof(
                         pos: self.tokenizer.pos,
                         context: "object entry or '}'",
                     ))
@@ -269,16 +269,16 @@ extend Parser:
 
     fn parse_kv(self: &mut Self) -> Result[(str, JsonValue), JsonError]:
         let key = match self.expect_token("object key")?
-            .TString(s) -> s
-            _ -> return Err(.UnexpectedChar(
+            .TString(s) => s
+            _ => return Err(.UnexpectedChar(
                 pos: self.tokenizer.pos,
                 expected: "string key",
                 got: 0,
             ))
         // expect colon
         match self.expect_token("':'")?
-            .Colon -> ()
-            _ -> return Err(.UnexpectedChar(
+            .Colon => ()
+            _ => return Err(.UnexpectedChar(
                 pos: self.tokenizer.pos,
                 expected: "':'",
                 got: 0,
@@ -318,19 +318,19 @@ gen fn walk_leaves(value: &JsonValue, path: str) -> (str, &JsonValue):
 extend JsonValue:
     fn to_string(self: &Self) -> str:
         match self
-            .Null       -> "null"
-            .Bool(b)    -> "{b}"
-            .Number(n)  -> "{n}"
-            .Str(s)     -> "\"{s}\""
+            .Null       => "null"
+            .Bool(b)    => "{b}"
+            .Number(n)  => "{n}"
+            .Str(s)     => "\"{s}\""
             .Array(items) ->
                 let inner = items.iter()
-                    |> map(|item| "{item}")
+                    |> map(item => "{item}")
                     |> collect[Vec]()
                     |> join(", ")
                 "[{inner}]"
             .Object(entries) ->
                 let inner = entries.iter()
-                    |> map(|entry| "\"{entry.0}\": {entry.1}")
+                    |> map(entry => "\"{entry.0}\": {entry.1}")
                     |> collect[Vec]()
                     |> join(", ")
                 "\\{{inner}\\}"
@@ -341,14 +341,14 @@ extend JsonValue:
         match self
             .Object(entries) ->
                 entries.iter()
-                    |> find(|entry| entry.0 == key)
-                    |> Option.map(|entry| &entry.1)
-            _ -> None
+                    |> find(entry => entry.0 == key)
+                    |> Option.map(entry => &entry.1)
+            _ => None
 
     fn index(self: &Self, i: usize) -> Option[&JsonValue]:
         match self
-            .Array(items) if i < items.len() -> Some(&items[i])
-            _ -> None
+            .Array(items) if i < items.len() => Some(&items[i])
+            _ => None
 
 // Accessor methods — .as_str(), .as_number(), .as_bool(), .as_array(),
 // .as_object() and .is_null(), .is_str(), etc. — are auto-generated
@@ -399,7 +399,7 @@ fn main:
     ]
     for (input, description) in bad_inputs:
         match parse(input.to_string())
-            Ok(_)  -> println("  {description}: unexpectedly succeeded")
-            Err(e) -> println("  {description}: {e}")
+            Ok(_)  => println("  {description}: unexpectedly succeeded")
+            Err(e) => println("  {description}: {e}")
 
     println("\n=== Demo complete ===")

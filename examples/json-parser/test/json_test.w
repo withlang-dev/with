@@ -6,13 +6,13 @@ type JsonTag = Null | Bool | Number | Str
 
 fn classify_char(ch: i32) -> i32:
     match ch
-        123 -> 1   // {
-        125 -> 2   // }
-        91  -> 3   // [
-        93  -> 4   // ]
-        58  -> 5   // :
-        44  -> 6   // ,
-        _   -> 0
+        123 => 1   // {
+        125 => 2   // }
+        91  => 3   // [
+        93  => 4   // ]
+        58  => 5   // :
+        44  => 6   // ,
+        _   => 0
 
 fn update_depth(depth: i32, cls: i32) -> i32:
     if cls in [1, 3] then depth + 1
@@ -50,10 +50,10 @@ fn fib(n: i32) -> i32:
 
 fn tag_to_int(t: JsonTag) -> i32:
     match t
-        Null -> 0
-        Bool -> 1
-        Number -> 2
-        Str -> 3
+        Null => 0
+        Bool => 1
+        Number => 2
+        Str => 3
 
 @[test]
 fn test_json_parser_example:

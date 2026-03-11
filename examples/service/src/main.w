@@ -42,7 +42,7 @@ async fn main -> Result[Unit, ServiceError]:
 
     // Structured concurrency: all connection fibers are children of this scope.
     // On shutdown, the scope cancels all children and waits for cleanup.
-    async scope |s|:
+    async scope s =>
         let shutdown = s.track(listen_for_shutdown())
 
         loop:
@@ -79,9 +79,9 @@ async fn handle_connection(state: Arc[AppState], conn: TcpStream):
     ).await
 
     let resp = match result
-        Ok(r)              -> r
-        Err(.Timeout(..))  -> HttpResponse.json(408, "\"request timeout\"")
-        Err(e)             -> HttpResponse.internal_error(&e.to_string())
+        Ok(r)              => r
+        Err(.Timeout(..))  => HttpResponse.json(408, "\"request timeout\"")
+        Err(e)             => HttpResponse.internal_error(&e.to_string())
 
     conn.write_all(resp.as_bytes()).await
 

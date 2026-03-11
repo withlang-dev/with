@@ -1510,7 +1510,11 @@ fn Parser.parse_primary(self: Parser) -> i32:
     if t == TK_C_STRING_LIT: return self.parse_c_string_literal()
     if t == TK_CHAR_LIT: return self.parse_char_literal()
     if t == TK_TRUE or t == TK_FALSE: return self.parse_bool_literal()
-    if t == TK_IDENT: return self.parse_ident_or_call()
+    if t == TK_IDENT:
+        if self.pos + 1 < self.tokens.len():
+            if self.tokens.get_tag(self.pos + 1) == TK_FAT_ARROW:
+                return self.parse_fat_arrow_single()
+        return self.parse_ident_or_call()
     if t == TK_KW_IT:
         let start = self.current_start()
         let end_pos = self.current_end()
@@ -1553,11 +1557,35 @@ fn Parser.parse_primary(self: Parser) -> i32:
     if t == TK_KW_MATCH: return self.parse_match_expr()
     if t == TK_KW_WITH: return self.parse_with_expr()
     if t == TK_L_BRACE: return self.parse_record_update()
-    if t == TK_PIPE: return self.parse_closure()
+    if t == TK_PIPE:
+        self.emit_error("use 'x => body' instead of '|x| body'")
+        return 0
     if t == TK_KW_MOVE:
         self.advance()
-        if self.peek() == TK_PIPE:
-            return self.parse_move_closure()
+        // move IDENT => expr
+        if self.peek() == TK_IDENT:
+            if self.pos + 1 < self.tokens.len():
+                if self.tokens.get_tag(self.pos + 1) == TK_FAT_ARROW:
+                    let node = self.parse_fat_arrow_single()
+                    if node != 0: self.pool.mark_move_closure(node)
+                    return node
+        // move (params) => expr
+        if self.peek() == TK_L_PAREN:
+            let save = self.pos
+            self.advance()
+            self.skip_newlines()
+            var is_closure = 0
+            if self.peek() == TK_R_PAREN:
+                self.advance()
+                if self.peek() == TK_FAT_ARROW or self.peek() == TK_ARROW:
+                    is_closure = 1
+            else:
+                is_closure = self.scan_is_paren_closure()
+            self.pos = save
+            if is_closure == 1:
+                let node = self.parse_fat_arrow_paren_closure()
+                if node != 0: self.pool.mark_move_closure(node)
+                return node
         self.emit_error("'move' must be followed by a closure")
         return 0
 
@@ -2023,14 +2051,24 @@ fn Parser.parse_variant_shorthand(self: Parser) -> i32:
 
 fn Parser.parse_grouped_or_tuple(self: Parser) -> i32:
     let start = self.current_start()
+    let open_paren_pos = self.pos
     self.advance()  // consume (
     self.skip_newlines()
 
     if self.peek() == TK_R_PAREN:
         let end = self.current_end()
         self.advance()
+        // () => expr or () -> Type => expr is a zero-param closure
+        if self.peek() == TK_FAT_ARROW or self.peek() == TK_ARROW:
+            self.pos = open_paren_pos
+            return self.parse_fat_arrow_paren_closure()
         let node = self.pool.add_node(NK_TUPLE, start, end, self.pool.extra_len(), 0, 0)
         return self.parse_postfix(node)
+
+    // Check if (params) => closure
+    if self.scan_is_paren_closure() == 1:
+        self.pos = open_paren_pos
+        return self.parse_fat_arrow_paren_closure()
 
     let first = self.parse_expr()
     if self.peek() == TK_COMMA:
@@ -2332,7 +2370,7 @@ fn Parser.parse_select_await(self: Parser) -> i32:
         self.advance()
         self.skip_newlines()
         let task_expr = self.parse_expr()
-        self.expect(TK_ARROW)
+        self.expect(TK_FAT_ARROW)
         let body = self.parse_block_or_expr()
         arm_entries.push(name_sym)
         arm_entries.push(task_expr)
@@ -2522,7 +2560,7 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
             self.advance()
             guard = self.parse_expr()
 
-        if self.expect(TK_ARROW) == 0:
+        if self.expect(TK_FAT_ARROW) == 0:
             break
         self.skip_newlines()
         let body = self.parse_block_or_expr()
@@ -3046,6 +3084,86 @@ fn Parser.parse_array_literal(self: Parser) -> i32:
     self.pool.add_node(NK_ARRAY_LIT, start, self.prev_end(), extra_start, count, 0)
 
 // ── Closure ──────────────────────────────────────────────────────
+
+// Scan ahead (non-consuming) to check if we're inside a paren closure.
+// Called after consuming '(' (and possibly newlines).
+// Returns 1 if matching ')' is followed by '=>' or '->', 0 otherwise.
+fn Parser.scan_is_paren_closure(self: Parser) -> i32:
+    var scan = self.pos
+    var depth = 1
+    while scan < self.tokens.len():
+        let tag = self.tokens.get_tag(scan)
+        if tag == TK_L_PAREN:
+            depth = depth + 1
+        else if tag == TK_R_PAREN:
+            depth = depth - 1
+            if depth == 0:
+                let next = scan + 1
+                if next < self.tokens.len():
+                    let nt = self.tokens.get_tag(next)
+                    if nt == TK_FAT_ARROW: return 1
+                    if nt == TK_ARROW: return 1
+                return 0
+        else if tag == TK_EOF:
+            return 0
+        scan = scan + 1
+    0
+
+// Parse: IDENT => expr (single untyped parameter fat-arrow closure)
+fn Parser.parse_fat_arrow_single(self: Parser) -> i32:
+    let start = self.current_start()
+    let param_sym = self.expect_ident()
+    self.expect(TK_FAT_ARROW)
+    let extra_start = self.pool.extra_len()
+    self.pool.add_extra(param_sym)
+    self.pool.add_extra(0)
+    let body = self.parse_block_or_expr()
+    self.pool.add_node(NK_CLOSURE, start, self.prev_end(), body, extra_start, 1)
+
+// Parse: (params) [-> RetType] => expr (paren fat-arrow closure)
+// Starts at '(' token.
+fn Parser.parse_fat_arrow_paren_closure(self: Parser) -> i32:
+    let start = self.current_start()
+    self.advance()  // consume (
+    self.skip_newlines()
+    let extra_start = self.pool.extra_len()
+    var param_count = 0
+    while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+        if self.peek() == TK_KW_IT:
+            self.emit_error("'it' is a reserved keyword and cannot be used as a parameter name")
+            self.advance()
+            self.pool.add_extra(0)
+            self.pool.add_extra(0)
+            param_count = param_count + 1
+            if self.peek() == TK_COMMA:
+                self.advance()
+                self.skip_newlines()
+            continue
+        let p = self.expect_ident()
+        if p == 0:
+            self.advance()
+            continue
+        self.pool.add_extra(p)
+        if self.peek() == TK_COLON:
+            self.advance()
+            let ty = self.parse_type_expr()
+            self.pool.add_extra(ty)
+        else:
+            self.pool.add_extra(0)
+        param_count = param_count + 1
+        if self.peek() == TK_COMMA:
+            self.advance()
+            self.skip_newlines()
+    self.expect(TK_R_PAREN)
+    self.skip_newlines()
+    // Optional return type
+    if self.peek() == TK_ARROW:
+        self.advance()
+        self.parse_type_expr()
+        self.skip_newlines()
+    self.expect(TK_FAT_ARROW)
+    let body = self.parse_block_or_expr()
+    self.pool.add_node(NK_CLOSURE, start, self.prev_end(), body, extra_start, param_count)
 
 fn Parser.parse_closure(self: Parser) -> i32:
     let start = self.current_start()

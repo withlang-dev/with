@@ -9,18 +9,18 @@ fn apply_void(f: fn() -> i32):
 fn main:
     // Capture a string
     let s = "hello"
-    let f = || println(s)
+    let f = () => println(s)
     apply_void(f)
 
     // Capture an integer
     let x = 42
-    let g = || x
+    let g = () => x
     assert(apply(g) == 42)
 
     // Capture multiple variables
     let a = 10
     let b = 20
-    let h = || a + b
+    let h = () => a + b
     assert(apply(h) == 30)
 
     println("ok")

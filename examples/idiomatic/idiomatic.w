@@ -31,7 +31,7 @@ async fn get_dashboard(req: &Request, db: &Pool) -> Result[Response, ApiError]:
                 user,
                 posts: posts?,
                 notifications: notifs?,
-                unread: notifs?.iter() |> filter(|n| n.unread) |> count,
+                unread: notifs?.iter() |> filter(n => n.unread) |> count,
                 generated_at: Timestamp.now(),
             }
 
@@ -49,9 +49,9 @@ async fn get_dashboard(req: &Request, db: &Pool) -> Result[Response, ApiError]:
 async fn with_retry[T, E](attempts: i32, f: async fn -> Result[T, E]) -> Result[T, E]:
     for i in 0..attempts:
         match f().await
-            Ok(val) -> return Ok(val)
-            Err(e) if i == attempts - 1 -> return Err(e)
-            Err(_) -> sleep(Duration.millis(100 * (2 ** i))).await
+            Ok(val) => return Ok(val)
+            Err(e) if i == attempts - 1 => return Err(e)
+            Err(_) => sleep(Duration.millis(100 * (2 ** i))).await
 
 
 // --- Route setup ---
@@ -60,7 +60,7 @@ fn main:
     let db = Pool.connect(env("DATABASE_URL") ?? "postgres://localhost/app")
 
     let app = with Router.new() as mut r:
-        r.get("/dashboard/:id", |req| get_dashboard(req, &db))
-        r.get("/health", |_| Response.ok() |> text("ok"))
+        r.get("/dashboard/:id", req => get_dashboard(req, &db))
+        r.get("/health", _ => Response.ok() |> text("ok"))
 
     serve(app, port: 8080)

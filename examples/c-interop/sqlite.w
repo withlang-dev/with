@@ -150,9 +150,9 @@ extend Statement:
     fn step(self: &Self) -> Result[bool, SqliteError]:
         let rc = unsafe { sqlite3_step(self.handle) }
         match rc
-            SQLITE_ROW  -> Ok(true)
-            SQLITE_DONE -> Ok(false)
-            _           -> Err(.StepFailed(code: rc))
+            SQLITE_ROW  => Ok(true)
+            SQLITE_DONE => Ok(false)
+            _           => Err(.StepFailed(code: rc))
 
     fn reset(self: &Self) -> Result[Unit, SqliteError]:
         let rc = unsafe { sqlite3_reset(self.handle) }
@@ -183,9 +183,9 @@ extend Statement:
 gen fn rows(stmt: &Statement) -> &Statement:
     loop:
         match stmt.step()
-            Ok(true)  -> yield stmt
-            Ok(false) -> break
-            Err(_)    -> break
+            Ok(true)  => yield stmt
+            Ok(false) => break
+            Err(_)    => break
 
 // --- Helper ---
 
@@ -216,7 +216,7 @@ fn main -> Result[Unit, SqliteError]:
     println("Created users table")
 
     // Insert with prepared statement inside a transaction
-    let inserted = db.transaction(|db|
+    let inserted = db.transaction(db =>
         let stmt = db.prepare("INSERT INTO users (name, email, score) VALUES (?, ?, ?)")?
 
         let users = [
@@ -276,7 +276,7 @@ fn main -> Result[Unit, SqliteError]:
     // Demonstrate error handling
     println("\n--- Error handling ---")
     match db.execute("INSERT INTO users (name, email) VALUES ('Duplicate', 'alice@example.com')")
-        Ok(_)  -> println("  unexpected success")
-        Err(e) -> println("  expected error: {e}")
+        Ok(_)  => println("  unexpected success")
+        Err(e) => println("  expected error: {e}")
 
     println("\n=== Demo complete ===")

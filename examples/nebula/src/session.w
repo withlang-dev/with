@@ -81,10 +81,10 @@ fn parse_telemetry(raw: &str) -> Option[Telemetry]:
 
         let status = if let Some(status_str) = parts.get(2):
             match status_str.trim()
-                "ok"      -> .Ok
-                "warning" -> .Warning("from device")
-                "fatal"   -> .Fatal(code: 1)
-                _         -> .Ok
+                "ok"      => .Ok
+                "warning" => .Warning("from device")
+                "fatal"   => .Fatal(code: 1)
+                _         => .Ok
         else:
             .Ok
 
@@ -102,7 +102,7 @@ fn parse_telemetry(raw: &str) -> Option[Telemetry]:
 // Uses traverse: map + collect-or-fail in a single pass.
 
 fn parse_batch(lines: &[str]) -> Result[Vec[Telemetry], SessionError]:
-    lines.traverse(|line|
+    lines.traverse(line =>
         parse_telemetry(line)
             .ok_or(.ParseFailed(reason: "invalid: {line}"))
     )
@@ -155,8 +155,8 @@ pub async fn handle_client(
 
                 // Pipeline: extract → parse → filter → collect
                 let valid_packets = extract_packets(&buf)
-                    |> filter_map(|s| parse_telemetry(&s))
-                    |> filter(|p| p.status not in [.Fatal(code: 1), .Fatal(code: 2)])
+                    |> filter_map(s => parse_telemetry(&s))
+                    |> filter(p => p.status not in [.Fatal(code: 1), .Fatal(code: 2)])
                     |> collect[Vec]()
 
                 // Bulk insert the valid telemetry records
@@ -184,9 +184,9 @@ pub fn compute_stats(pool: &SessionPool) -> SessionStats:
         SessionStats {
             active_count: sessions.len(),
             total_packets: sessions.iter()
-                |> map(|s| s.packets_received)
+                |> map(s => s.packets_received)
                 |> sum(),
             total_bytes: sessions.iter()
-                |> map(|s| s.buffer.len() as u64)
+                |> map(s => s.buffer.len() as u64)
                 |> sum(),
         }

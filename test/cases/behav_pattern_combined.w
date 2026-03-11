@@ -4,21 +4,21 @@
 
 fn at_range(n: i32) -> i32:
     match n
-        x @ 1..=10 -> x * 2
-        _ -> -1
+        x @ 1..=10 => x * 2
+        _ => -1
 
 fn or_range(n: i32) -> str:
     match n
-        0 -> "zero"
-        1..5 | 10..15 -> "low"
-        _ -> "other"
+        0 => "zero"
+        1..5 | 10..15 => "low"
+        _ => "other"
 
 fn neg_range(n: i32) -> str:
     match n
-        -100..0 -> "negative"
-        0 -> "zero"
-        1..=100 -> "positive"
-        _ -> "huge"
+        -100..0 => "negative"
+        0 => "zero"
+        1..=100 => "positive"
+        _ => "huge"
 
 fn main:
     // @ binding with range

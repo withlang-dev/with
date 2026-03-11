@@ -11,17 +11,17 @@ fn test_enum_shorthand:
     // Use shorthand syntax with type annotation for simple enums
     let d: Direction = .South
     let result = match d
-        .North -> "north"
-        .South -> "south"
-        .East -> "east"
-        .West -> "west"
+        .North => "north"
+        .South => "south"
+        .East => "east"
+        .West => "west"
     assert(result == "south")
 
 fn test_enum_match_wildcard:
     let d: Direction = .East
     let result = match d
-        .North -> "north"
-        _ -> "other"
+        .North => "north"
+        _ => "other"
     assert(result == "other")
 
 fn test_enum_equality:
@@ -34,10 +34,10 @@ fn test_enum_equality:
 fn test_discriminant_enum:
     let c = Color.Green
     let result = match c
-        .Red -> "red"
-        .Green -> "green"
-        .Blue -> "blue"
-        _ -> "unknown"
+        .Red => "red"
+        .Green => "green"
+        .Blue => "blue"
+        _ => "unknown"
     assert(result == "green")
 
 fn test_discriminant_cast:
@@ -49,10 +49,10 @@ fn test_discriminant_cast:
 fn test_discriminant_shorthand:
     let c: Color = .Blue
     let r = match c
-        .Red -> "r"
-        .Green -> "g"
-        .Blue -> "b"
-        _ -> "?"
+        .Red => "r"
+        .Green => "g"
+        .Blue => "b"
+        _ => "?"
     assert(r == "b")
 
 fn main:
