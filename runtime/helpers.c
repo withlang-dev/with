@@ -639,6 +639,16 @@ with_str with_str_concat(with_str a, with_str b) {
     return out;
 }
 
+double with_parse_float(with_str s) {
+    // Null-terminate for strtod (with_str is not null-terminated)
+    char buf[64];
+    size_t n = (size_t)s.len;
+    if (n >= sizeof(buf)) n = sizeof(buf) - 1;
+    memcpy(buf, s.ptr, n);
+    buf[n] = '\0';
+    return strtod(buf, NULL);
+}
+
 bool with_str_eq(with_str a, with_str b) {
     if (a.len != b.len) {
         return false;
@@ -802,6 +812,61 @@ with_str with_str_replace(with_str s, with_str old_s, with_str new_s) {
     buf[total] = '\0';
     with_str out = { buf, total };
     return out;
+}
+
+// ---- Vec.join ----
+
+with_str with_vec_str_join(with_vec *v, with_str sep) {
+    if (!v || v->len == 0) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    // Calculate total length
+    int64_t total = 0;
+    for (int64_t i = 0; i < v->len; i++) {
+        with_str s = *(with_str *)((char *)v->ptr + i * v->elem_size);
+        total += s.len;
+        if (i > 0) total += sep.len;
+    }
+    char *buf = (char *)malloc(total + 1);
+    int64_t pos = 0;
+    for (int64_t i = 0; i < v->len; i++) {
+        if (i > 0) {
+            memcpy(buf + pos, sep.ptr, sep.len);
+            pos += sep.len;
+        }
+        with_str s = *(with_str *)((char *)v->ptr + i * v->elem_size);
+        memcpy(buf + pos, s.ptr, s.len);
+        pos += s.len;
+    }
+    buf[total] = '\0';
+    with_str out = { buf, total };
+    return out;
+}
+
+// ---- str.split (Vec[str] version) ----
+
+void with_str_split_vec(with_vec *out, with_str s, with_str delim) {
+    with_vec_new_out(out, (int64_t)sizeof(with_str));
+    if (s.len <= 0 && delim.len > 0) {
+        with_str empty = { "", 0 };
+        with_vec_push(out, &empty);
+        return;
+    }
+
+    int64_t max_parts = s.len + 1;
+    if (max_parts < 1) max_parts = 1;
+    void **parts = (void **)malloc((size_t)max_parts * sizeof(void *));
+    int64_t *lens = (int64_t *)malloc((size_t)max_parts * sizeof(int64_t));
+    if (!parts || !lens) { free(parts); free(lens); return; }
+
+    int64_t count = with_str_split(s.ptr, s.len, delim.ptr, delim.len, parts, lens, max_parts);
+    for (int64_t i = 0; i < count; i++) {
+        with_str part = { (const char *)parts[i], lens[i] };
+        with_vec_push(out, &part);
+    }
+    free(parts);
+    free(lens);
 }
 
 // ---- HashMap ----
@@ -1062,6 +1127,31 @@ static void hashmap_grow(WithHashMap *m, int64_t is_str_key) {
     free(old_keys);
     free(old_values);
     free(old_states);
+}
+
+void with_hashmap_increment(void *handle, const void *key, int64_t is_str_key) {
+    WithHashMap *m = (WithHashMap *)handle;
+    if (hashmap_invalid(m)) return;
+    int64_t val = 0;
+    // Try to get existing value
+    if (with_hashmap_get(handle, key, &val, is_str_key)) {
+        val++;
+    } else {
+        val = 1;
+    }
+    with_hashmap_insert(handle, key, &val, is_str_key);
+}
+
+void with_hashmap_decrement(void *handle, const void *key, int64_t is_str_key) {
+    WithHashMap *m = (WithHashMap *)handle;
+    if (hashmap_invalid(m)) return;
+    int64_t val = 0;
+    if (with_hashmap_get(handle, key, &val, is_str_key)) {
+        val--;
+    } else {
+        val = -1;
+    }
+    with_hashmap_insert(handle, key, &val, is_str_key);
 }
 
 // ---- std.fs ----
