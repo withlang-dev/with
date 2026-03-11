@@ -1,32 +1,28 @@
 //! expect-stdout: ok
 
 // Behavior test: record update syntax { expr with field: val }
-// Tests: parsing record update expressions
 
-use Token
-use Lexer
-use Ast
-use Parser
+type Config = {
+    width: i32,
+    height: i32,
+    depth: i32,
+}
 
-fn lex(source: str) -> TokenList:
-    var l = Lexer.new(source, 0)
-    Lexer.tokenize(l)
+fn test_basic_update:
+    let c = Config { width: 100, height: 200, depth: 50 }
+    let c2 = { c with width: 300 }
+    assert(c2.width == 300)
+    assert(c2.height == 200)
+    assert(c2.depth == 50)
 
-fn test_parse_record_update:
-    let src = "fn f:\n    { p with x: 10 }\n"
-    var tokens = lex(src)
-    var p = Parser.new(tokens, src)
-    Parser.parse_module(p)
-    let decl = AstPool.get_decl(p.pool, 0)
-    let body = AstPool.get_data1(p.pool, decl)
-    assert(AstPool.kind(p.pool, body) == NK_RECORD_UPDATE)
-
-fn test_brace_tokens:
-    var tokens = lex("{ }")
-    assert(TokenList.tag_at(tokens, 0) == TK_L_BRACE)
-    assert(TokenList.tag_at(tokens, 1) == TK_R_BRACE)
+fn test_update_multiple_fields:
+    let c = Config { width: 10, height: 20, depth: 30 }
+    let c2 = { c with width: 100, height: 200 }
+    assert(c2.width == 100)
+    assert(c2.height == 200)
+    assert(c2.depth == 30)
 
 fn main:
-    test_parse_record_update()
-    test_brace_tokens()
+    test_basic_update()
+    test_update_multiple_fields()
     println("ok")

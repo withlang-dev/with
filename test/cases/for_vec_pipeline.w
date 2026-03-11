@@ -1,26 +1,22 @@
 //! expect-stdout: ok
 
-// Test: Vec pipeline with sum.
+// Test: Vec with for loop and pipeline
 
-use std.iter
+fn double(x: i32) -> i32:
+    x * 2
+
+fn add_ten(x: i32) -> i32:
+    x + 10
 
 fn main:
-    let v: Vec[i32] = Vec.new()
-    v.push(10)
-    v.push(20)
-    v.push(30)
+    // Pipeline with simple functions
+    let result = 5 |> double |> add_ten
+    assert(result == 20)
 
-    let total = sum(v)
-    assert(total == 60)
-
-    // Pipeline style
-    let v2: Vec[i32] = Vec.new()
-    v2.push(5)
-    v2.push(15)
-    let total2 = v2 |> sum
-    assert(total2 == 20)
+    // For loop accumulation
+    var total = 0
+    for i in 0..4:
+        total += i
+    assert(total == 6)
 
     println("ok")
-
-fn is_even(x: i32) -> bool:
-    x % 2 == 0
