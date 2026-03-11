@@ -1,413 +1,488 @@
-# The With Compiler: Quality Pass Manifesto
+# 07 — Quality Pass Implementation Plan
 
-The compiler reached fixpoint on March 6, 2026. Stage 2 and Stage 3
-are byte-identical. The bootstrap is dead. Everything from here is
-the compiler improving itself.
+The compiler reached fixpoint on March 6, 2026. Stage 2 and
+Stage 3 are byte-identical. The bootstrap is dead. Everything
+from here is the compiler improving itself.
 
-This document governs the quality pass — the systematic rewrite of
-the compiler from "code that works" to "code that is right." Every
-decision in this pass is guided by the principles below.
-
----
-
-## The Prime Directive
-
-**If the compiler already knows it, don't make the developer type it.**
-
-This is the language's design philosophy. It is also the compiler's
-implementation philosophy. If the type system knows a fact, don't
-re-derive it in codegen. If sema resolved a name, don't resolve it
-again in MIR lowering. If a function's return type is known, don't
-store a sentinel and guess later. Information flows forward through
-the pipeline. It never flows backward. It is never re-invented.
+This plan turns the quality pass manifesto into trackable work
+items. It covers the 6 phases, the 15 principles, and the
+non-negotiables. Work defined in detail in other docs is
+cross-referenced, not duplicated.
 
 ---
 
-## Principles
+## Phase 1: Idiomatic Rewrite
 
-### 1. The compiler eats its own food.
+**Detailed plan:** `docs/06_idiomatic.md`
 
-The self-hosted compiler is the most important With program in
-existence. It must be written in idiomatic With. If a pattern is
-ugly in the compiler, it will be ugly in every user's code.
+Summary of work (see 06 for full checkboxes):
 
-This means:
-
-- `fn NK_BINARY -> i32: 25` becomes a `NodeKind` enum with
-  discriminant values and exhaustive matching.
-- Integer constant functions become `const` declarations.
-- `if kind == NK_BINARY()` becomes `match kind` with `.Binary ->`.
-- Parallel arrays indexed by raw `i32` become arrays indexed by
-  `distinct` handle types.
-- Pipelines replace nested function calls where data flows
-  linearly.
-- `it` replaces `|x| x.field` in closures.
-- `?` replaces manual error matching.
-
-If the compiler can't be written idiomatically in With, something
-is wrong with the language, not the compiler. Every awkwardness
-found here is a language design bug to be fixed.
-
-### 2. One source of truth per fact.
-
-The bootstrap compiler's worst architectural flaw was type
-re-inference. Sema resolved types. Codegen re-inferred them from
-LLVM values. When inference disagreed, the compiler crashed at
-LLVM verify time — far from the actual bug.
-
-In the quality pass:
-
-- Sema produces typed information. MIR consumes it. Codegen
-  consumes MIR. No phase re-derives what a previous phase computed.
-- The intern pool is the single owner of type identity. `Vec[i32]`
-  has one `TypeId` everywhere. No pointer-identity caches, no
-  parallel tracking maps, no `vec_cache_map`.
-- `Zcu` is the single owner of pipeline state. No `Driver` holding
-  a second copy. No fields duplicated across modules.
-- Every `i32` fallback — every place the compiler says "I don't
-  know the type, assume `i32`" — becomes a hard compile error.
-  Unknown types are errors, not defaults.
-
-### 3. Every stage earns its existence.
-
-The pipeline is:
-
-```
-Source → Lexer → Parser → Resolve → Sema → MIR → Backend → Link
-```
-
-Each stage exists because it transforms information in a way the
-previous stage cannot:
-
-- **Lexer:** bytes → tokens. Handles encoding, whitespace
-  significance, keywords.
-- **Parser:** tokens → AST. Handles grammar, precedence, nesting.
-- **Resolve:** AST → named AST. Handles imports, module graph,
-  name binding.
-- **Sema:** named AST → typed AST. Handles types, traits,
-  generics, borrow rules.
-- **MIR:** typed AST → desugared CFG. Handles sugar elimination,
-  drop insertion, control flow flattening.
-- **Backend:** MIR → output. LLVM IR for optimized native code.
-  C for cross-compilation. Both read the same MIR.
-- **Link:** objects → binary. Handles runtime selection, platform
-  specifics.
-
-If a stage cannot justify itself in one sentence, it should be
-merged with its neighbor. If a stage is doing work that belongs
-to another stage, move it.
-
-### 4. Phase boundaries are contracts.
-
-Each stage produces a defined output and consumes a defined input.
-The contract is:
-
-- **What you receive:** fully validated by the previous stage.
-  You may assume it. You do not re-check it.
-- **What you produce:** fully validated before handoff. The next
-  stage may assume it.
-- **What you do not touch:** anything owned by another stage.
-  Sema does not emit LLVM. Codegen does not resolve names.
-  The parser does not type-check.
-
-If a bug manifests in codegen but the root cause is in sema,
-fix sema. Do not patch codegen. Principle 2 depends on this
-discipline — if codegen compensates for sema's gaps, you have
-two sources of truth.
-
-### 5. Determinism is structural, not aspirational.
-
-The compiler produces byte-identical output for identical input.
-This is not a test — it is an invariant enforced by data
-structure choice:
-
-- All maps are ordered. No `HashMap` in the compiler. Use
-  `OrderedMap` or index-based arrays.
-- All iteration is deterministic. No iteration over pointer
-  values, memory addresses, or hash buckets.
-- All intern pool lookups produce the same `TypeId` for the
-  same semantic type, regardless of insertion order.
-- Fixpoint is checked on every change. If stage2 != stage3,
-  the change is rejected.
-
-Nondeterminism in a self-hosting compiler is a silent corruption
-vector. A nondeterministic stage2 produces a nondeterministic
-stage3, and fixpoint passes by coincidence. Determinism is the
-only way to trust the self-hosting chain.
-
-### 6. Data lives in arrays, not trees.
-
-The compiler uses SoA (Struct of Arrays) indexed by integer
-handles. Not pointer trees. Not heap-allocated node objects.
-
-- AST nodes live in `AstPool` — parallel arrays indexed by
-  `NodeId`.
-- Types live in the intern pool — indexed by `TypeId`.
-- MIR basic blocks, statements, operands — all parallel arrays
-  indexed by `i32` handles (to be rewritten as `distinct` types).
-
-This gives: cache-friendly traversal, trivial serialization,
-no use-after-free on nodes, no garbage collection, and natural
-arena semantics (free the whole pool at phase end).
-
-Handle types must be `distinct`:
-
-```
-type NodeId = distinct i32
-type TypeId = distinct i32
-type BlockId = distinct i32
-```
-
-Not raw `i32`. The type system prevents accidentally passing a
-`NodeId` where a `TypeId` is expected.
-
-### 7. Generic types are distinct types.
-
-`Vec[i32]` and `Vec[str]` are different types. They have different
-methods, different trait implementations, different memory layouts.
-The type table represents them as distinct entries keyed by
-`(base_type, type_args)`.
-
-The quality pass adds `GenericInst` to `TypeKind`. Sema produces
-fully instantiated types. Codegen never re-infers element types
-from LLVM values. The parallel caches (`vec_cache_map`,
-`vec_local_types`, `vec_elem_types`) are deleted.
-
-Type substitution — replacing `T` with `i32` in `Option[T]` to
-get `Option[i32]` — is a single function used by trait resolution,
-method lookup, and for-loop desugaring. It lives in one place.
-
-### 8. Errors are values, silence is a bug.
-
-Every error the compiler detects must be reported. Silent error
-swallowing — where sema detects a problem, returns a sentinel,
-and codegen later crashes on the sentinel — is the most common
-class of compiler bug.
-
-Rules:
-
-- If a phase detects an error, it emits a diagnostic immediately.
-- If a phase cannot continue after an error, it returns a
-  `Poisoned` node, not a sentinel integer.
-- No function may return `0` to mean "I don't know." Use
-  `Result[TypeId, Error]` or `Option[TypeId]`.
-- The diagnostic must include: what's wrong, where it is, and
-  (where possible) how to fix it.
-
-### 9. The prelude is a normal module.
-
-User-facing names (`println`, `map`, `filter`, `Vec`, `Result`)
-are defined in `lib/std/` and made ambient by
-`lib/std/prelude.w`. They are not hardcoded in sema. They are
-not special-cased in codegen.
-
-The quality pass removes all hardcoded symbol name lists from
-sema and codegen. `is_builtin_fn`, `is_builtin_value`, and
-name-based dispatch are deleted. If `println` is not imported,
-it does not exist.
-
-The only names hardcoded in the compiler are language primitives
-that cannot be defined in With: primitive types, `c_import`,
-`comptime`, operator desugaring hooks, and `it`.
-
-### 10. The C backend is a first-class citizen.
-
-The compiler has two backends: LLVM (optimized native code) and
-C (portable, cross-compilable). Both read the same MIR. Both
-produce correct output. Neither is a toy.
-
-The C backend enables:
-
-- Cross-compilation from a single machine.
-- Universal bootstrap (any C compiler can build With).
-- Debugging with standard C tools (ASan, gdb, valgrind on x86).
-- Auditable output (you can read the generated C).
-
-If a MIR construct cannot be translated to C, that is a design
-flaw in the MIR, not a limitation of the C backend.
-
-### 11. Files have a complexity budget, not a line count.
-
-No file should be so large that its API cannot be held in one
-person's head. For most files, this means 1,000–5,000 lines.
-Some files (a parser for 60+ node types) may be larger. Some
-files (a single data structure) should be smaller.
-
-The rule is not "split at 5,000 lines." The rule is: if you
-open a file and can't understand what it does in 60 seconds of
-scanning, it's too big or too coupled. Split by responsibility,
-not by line count.
-
-### 12. Measure, then optimize.
-
-Track self-compile time (`with-stage2 build src/main.w`) in CI.
-Record it on every commit. A 0.5% regression per change becomes
-a 10x slowdown over a year. One number, tracked automatically,
-prevents this.
-
-When optimizing: profile first. Use Instruments (Time Profiler),
-`sample`, or Tracy integration. Never guess where time is spent.
-Compiler hot paths are counterintuitive — the bottleneck is
-almost never where you think it is.
-
-### 13. Tests verify contracts, not implementations.
-
-Each phase has a dump flag (`--dump-tokens`, `--dump-ast`,
-`--dump-resolved`, `--dump-typed`, `--dump-mir`). Tests verify
-the dump output at each phase boundary. When something breaks,
-you immediately know which phase produced wrong output.
-
-Test categories:
-
-- **Phase output tests.** Does the lexer produce the right
-  tokens? Does the parser produce the right AST? Does MIR
-  lowering produce the right basic blocks?
-- **Error message tests.** Does a specific mistake produce a
-  specific diagnostic? If you change an error message, the test
-  should break — that's intentional, so you review the change.
-- **Fixpoint tests.** Does stage2 == stage3? Run on every
-  compiler change.
-- **Round-trip tests.** Does `--emit-c` → C compiler → run
-  produce the same output as LLVM backend → run?
-
-Tests are not afterthoughts. A feature without a test does not
-exist.
-
-### 14. Reserve syntax before you need it.
-
-Adding a keyword after release is a breaking change. The quality
-pass reserves all keywords and syntax forms that are planned but
-not yet implemented:
-
-- `const` (named compile-time constants)
-- `where` (complex trait bounds)
-- `errdefer` (error-path cleanup)
-- `move` (explicit closure capture)
-- `const` in generic params (const generics)
-- `it` (implicit closure parameter)
-
-The compiler rejects these with "reserved for future use" until
-the feature is implemented. No user code can depend on these
-being valid identifiers.
-
-### 15. The seed is sacred.
-
-The seed binary (`src/main`) is the root of trust for the entire
-self-hosting chain. A corrupted seed produces a corrupted stage1,
-which produces a corrupted stage2 — and fixpoint passes because
-the corruption is self-consistent.
-
-Rules:
-
-- The seed is updated only from a fixpoint-verified stage2.
-- The seed update is a deliberate act with its own commit.
-- The previous seed is preserved as a release artifact.
-- When the C backend lands, `with_compiler.c` replaces the
-  binary seed — auditable, platform-independent, version-
-  controllable.
+- [ ] Enum conversions: NK_* (60 constants, 690 if-chains),
+      TK_* (141), TY_* (19), MIR groups (36+), OP_*/UOP_*/TDK_*/VIS_*
+- [ ] Handle types: NodeId, TypeId, BlockId as `distinct i32`
+- [ ] Idiomatic patterns: `it`, `?`, `|>` where appropriate
+- [ ] Verify: compiler source reads as idiomatic With
 
 ---
 
-## The Quality Pass: What Changes
+## Phase 2: Type System Completion
 
-### Phase 1: Idiomatic Rewrite
+**Detailed plan:** `docs/05_Generics.md`
 
-Rewrite compiler source to idiomatic With. This is the highest
-priority because it proves the language works and finds bugs
-that only surface in real code.
+Summary of work (see 05 for full checkboxes):
 
-- Integer constant functions → `const` declarations and
-  discriminant enums.
-- Raw `i32` handles → `distinct` handle types.
-- `if kind == NK_X()` chains → `match` on enums.
-- Manual error propagation → `?` operator.
-- Nested function calls → pipelines where data flows linearly.
-- Verbose closures → `it` where single-parameter.
-- C-style loops → `for ... in` with iterators.
-
-### Phase 2: Type System Completion
-
-Fix sema's generic type erasure. This is the single largest
-architectural gap.
-
-- Add `GenericInst` to `TypeKind`.
-- Instantiation cache keyed by `(base_type, type_args)`.
-- Fix `resolve_type_expr` (stop returning 0).
-- Type substitution function.
-- Trait/impl resolution with full instantiation keys.
-- Delete codegen's parallel type tracking.
-
-### Phase 3: Pipeline Ownership
-
-Complete the `src/compiler/*` ownership migration. Delete `Driver`.
-
-- `Zcu` owns all pipeline state.
-- `main.w` talks to `Compilation`, not `Driver`.
-- Both backends consume MIR from `Zcu`.
-- Link logic lives in `Link.w`.
-- No semantic or codegen logic outside `src/compiler/*`.
-
-### Phase 4: Hardcode Removal
-
-Remove all non-primitive hardcoded symbol names.
-
-- Delete `is_builtin_fn`, `is_builtin_value` in sema.
-- Delete name-based dispatch in codegen.
-- Wire the prelude as the sole source of ambient names.
-- Verify: `--no-prelude` makes `println` unavailable.
-
-### Phase 5: C Backend
-
-Add `--emit-c` for cross-compilation and universal bootstrap.
-
-- `src/CCodegen.w`: MIR → C translation.
-- `fiber_asm_x86_64.s`: x86_64 stack switching.
-- `with_runtime.h` / `with_runtime.c`: portable C runtime.
-- Ship `with_compiler.c` as the new seed.
-
-### Phase 6: Tooling
-
-Ship the tools that make the language usable.
-
-- `with fmt`: one style, no configuration, non-negotiable.
-- `with test`: zero-config test runner with `@[test]` functions.
-- `with bench`: zero-config benchmarking.
-- Error messages with suggestions and source locations.
+- [ ] Add TY_GENERIC_INST to TypeKind
+- [ ] Instantiation cache: `(base_type, type_args)` → TypeId
+- [ ] Fix `resolve_type_expr` (stop returning 0 for generics)
+- [ ] Type substitution function (single function, used everywhere)
+- [ ] Update trait/impl resolution with instantiation keys
+- [ ] Delete codegen parallel type tracking (~2000 lines)
+- [ ] Verify: `Vec[i32] != Vec[str]` enforced in sema
 
 ---
 
-## Non-Negotiables
+## Phase 3: Pipeline Ownership
 
-These are not guidelines. They are requirements. Code that
-violates them does not merge.
+**Detailed plan:** `docs/06_idiomatic.md` Phase 5
 
-1. **Fixpoint holds.** stage2 == stage3 after every change.
-2. **Tests pass.** No exceptions, no "known failures" without
-   a tracking issue.
-3. **No `i32` fallbacks.** Unknown types are errors, not defaults.
-4. **No hardcoded user-facing names.** If it's not in the prelude
-   or explicitly imported, it doesn't exist.
-5. **Deterministic output.** Same input → same binary, always.
-6. **Every error has a location.** No "error: something went wrong"
-   without a file and line.
+Summary of work (see 06 for full checkboxes):
+
+- [ ] Move state from Driver to Zcu
+- [ ] Route main.w through compiler.Compilation
+- [ ] Delete Driver or reduce to thin adapter
+- [ ] Verify: no semantic or codegen logic outside `src/compiler/*`
 
 ---
 
-## When Is The Quality Pass Done?
+## Phase 4: Hardcode Removal
 
-The quality pass is done when:
+**Detailed plan:** `docs/06_idiomatic.md` Phase 6
 
-1. The compiler source reads as idiomatic With — enums, const,
-   match, pipelines, distinct types, `it`.
-2. `Vec[i32] != Vec[str]` is enforced in sema, not worked around
-   in codegen.
-3. `Driver` is deleted.
-4. `--emit-c` cross-compiles the compiler for four targets from
-   one machine.
-5. `with fmt` exists and the compiler source passes it.
-6. A new contributor can clone, build, test, and submit a fix
-   in under 30 minutes using only CONTRIBUTING.md.
+Summary of work (see 06 for full checkboxes):
 
-None of these are aspirational. All of them are measurable.
-All of them are achievable. The compiler already works.
-Now we make it right.
+- [ ] Delete `is_builtin_fn`, `is_builtin_value` from sema
+- [ ] Delete name-based dispatch from codegen (133+ string comparisons)
+- [ ] Wire prelude as sole source of ambient names
+- [ ] Verify: `--no-prelude` makes `println` unavailable
+
+---
+
+## Phase 5: C Backend Completion
+
+**Current state:** CCodegen.w is functional (3,749 lines). Reads
+MIR. `--emit-c` flag works. Runtime files exist (with_runtime.h,
+with_runtime.c, helpers.c, fiber.c, fiber_asm for x86_64 and
+aarch64). Not yet capable of cross-compiling the compiler itself
+for 4 targets.
+
+**Files:** `src/CCodegen.w`, `runtime/`, `src/compiler/Link.w`
+
+### 5.1 Audit CCodegen Coverage Gaps
+
+- [ ] Read src/CCodegen.w (3,749 lines) end-to-end to identify
+      MIR constructs not yet translated to C
+- [ ] Compile a simple test program with `--emit-c`, verify output
+      compiles with `cc` and produces correct results
+- [ ] Compile a more complex test program (Vec, HashMap, Option,
+      closures, traits) with `--emit-c` and verify
+- [ ] List all MIR intrinsics (17 total) and verify CCodegen handles
+      each one (MIR_INTRINSIC_VEC_NEW through MIR_INTRINSIC_OPT_UNWRAP)
+- [ ] List all runtime functions called by CCodegen and verify they
+      exist in with_runtime.c / helpers.c
+- [ ] `make build && make fixpoint`
+
+### 5.2 Self-Compile via C Backend
+
+- [ ] Attempt: `./out/bin/with-stage2 build src/main.w --emit-c`
+      to emit the compiler as C
+- [ ] Catalog all CCodegen failures/errors during self-compile
+- [ ] Fix CCodegen gaps one at a time (each gap is a sub-task):
+- [ ] Gap fix 1: (to be determined by audit)
+- [ ] Gap fix 2: (to be determined by audit)
+- [ ] Gap fix 3: (to be determined by audit)
+- [ ] After each fix: `make build && make fixpoint`
+- [ ] Verify: `with-stage2 build src/main.w --emit-c` completes
+      without errors and produces `out/main.c`
+
+### 5.3 Compile Emitted C to Working Binary
+
+- [ ] Compile `out/main.c` with host C compiler (LLVM clang):
+      `clang -O2 -I runtime out/main.c runtime/with_runtime.c
+      runtime/helpers.c runtime/fiber.c runtime/fiber_asm_aarch64.s
+      -o out/bin/with-from-c`
+- [ ] Run `out/bin/with-from-c check src/main.w` — must succeed
+- [ ] Run `out/bin/with-from-c build src/main.w` — must produce
+      a working binary
+- [ ] Compare output of C-compiled compiler vs LLVM-compiled compiler:
+      both must produce identical output for the same input
+- [ ] `make fixpoint` with C-compiled binary as seed
+
+### 5.4 Cross-Compilation for 4 Targets
+
+- [ ] Define target triples:
+      `aarch64-apple-darwin`, `x86_64-unknown-linux-gnu`,
+      `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`
+- [ ] For each target, verify CCodegen emits platform-appropriate C:
+      - Correct integer sizes and alignment
+      - Correct fiber assembly selection (x86_64 vs aarch64)
+      - Correct system library dependencies
+- [ ] Cross-compile with `zig cc -target <triple>` for each target
+- [ ] Verify each cross-compiled binary runs correctly on its target
+      (use QEMU for Linux targets if on macOS)
+- [ ] Document cross-compilation workflow in CONTRIBUTING.md
+
+### 5.5 Ship with_compiler.c as New Seed
+
+- [ ] Generate `with_compiler.c` from self-compile via C backend
+- [ ] Verify `with_compiler.c` compiles to a working compiler on
+      a clean machine with only a C compiler
+- [ ] Add `with_compiler.c` to repository (replaces binary `src/main`
+      as auditable, platform-independent seed)
+- [ ] Update Makefile to support building from C seed:
+      `make bootstrap-from-c`
+- [ ] Update CONTRIBUTING.md with C seed bootstrap instructions
+- [ ] Preserve previous binary seed as release artifact
+- [ ] `make build && make fixpoint`
+
+---
+
+## Phase 6: Tooling
+
+### 6.1 `with fmt` — Code Formatter
+
+**Current state:** Stub in main.w (prints "not yet available").
+
+- [ ] Design formatting rules:
+      - Indentation: 4 spaces (match compiler source convention)
+      - Line width: 80 columns (match manifesto prose style)
+      - Trailing whitespace: removed
+      - Trailing newline: required
+      - Blank lines: at most 2 consecutive
+      - Import grouping: std imports first, then local
+- [ ] Implement formatter as AST round-trip:
+      parse → walk AST → emit formatted source
+- [ ] Create `src/Formatter.w` (or extend render.w)
+- [ ] Wire `with fmt` command in main.w (replace stub)
+- [ ] Write test: format a messy file, verify output matches expected
+- [ ] Run `with fmt` on compiler source — catalog all changes
+- [ ] Fix any formatting rule conflicts found by formatting
+      compiler source
+- [ ] Verify: `with fmt` is idempotent (format twice = same output)
+- [ ] Verify: formatted compiler source still passes fixpoint
+- [ ] `make build && make fixpoint`
+
+### 6.2 `with test` — Zero-Config Test Runner
+
+**Current state:** Basic implementation compiles and runs binary.
+No `@[test]` attribute discovery.
+
+- [ ] Design `@[test]` attribute support:
+      - Parser recognizes `@[test]` attribute on functions
+      - Test functions have signature `fn test_name()` (no args, no return)
+      - `with test <file>` discovers and runs all `@[test]` functions
+      - `with test <dir>` discovers all `.w` files recursively
+- [ ] Implement `@[test]` function collection in sema
+- [ ] Implement test runner codegen: generate `main` that calls all
+      test functions, reports pass/fail per function
+- [ ] Add `--filter <pattern>` flag to run subset of tests
+- [ ] Add output: test name, pass/fail, duration, summary
+- [ ] Write test for the test runner itself
+- [ ] `make build && make fixpoint`
+
+### 6.3 `with bench` — Zero-Config Benchmarking
+
+**Current state:** No command handler exists.
+
+- [ ] Design `@[bench]` attribute support:
+      - `@[bench]` functions receive iteration count parameter
+      - Runner warms up, then measures N iterations
+      - Reports: min, median, mean, std dev per benchmark
+- [ ] Implement `@[bench]` function collection
+- [ ] Implement benchmark runner with timing infrastructure
+- [ ] Add `with bench` command to main.w
+- [ ] Write benchmark for compiler self-compile time
+- [ ] `make build && make fixpoint`
+
+### 6.4 Error Messages with Suggestions
+
+**Current state:** Diagnostic type supports notes and helps fields
+(src/Diagnostic.w). Quality varies — some errors include
+suggestions, many don't.
+
+- [ ] Audit error messages in src/Sema.w: catalog errors missing
+      source locations, suggestions, or fix hints
+- [ ] Audit error messages in src/Parser.w: same
+- [ ] For each common error, add a help suggestion:
+- [ ] "undefined variable X" → "did you mean Y?" (Levenshtein)
+- [ ] "type mismatch: expected X, got Y" → show both locations
+- [ ] "missing return" → "add return statement or change return type"
+- [ ] "immutable variable" → "add `mut` to the declaration"
+- [ ] "wrong argument count" → show function signature
+- [ ] Verify: every error has a file and line (non-negotiable #6)
+- [ ] `make build && make fixpoint`
+
+---
+
+## Principle Enforcement
+
+These items enforce the 15 manifesto principles. They are not
+tied to a single phase — they are cross-cutting concerns.
+
+### P2: One Source of Truth — Eliminate i32 Fallbacks
+
+**Current state:** Codegen.w has multiple `wl_i32_type` fallbacks
+(lines 4036, 4079, 4122, 4150, 4155). Sema.w returns 0 from
+type resolution in 30+ places.
+
+**Detailed plan for codegen fallbacks:** `docs/01_Codegen_Bug_Fixes.md`
+Priority 5 (i32 Fallback Elimination)
+
+- [ ] Audit all `wl_i32_type` fallback sites in Codegen.w
+- [ ] Convert each fallback to a hard compile error
+- [ ] Audit all `return 0` in Sema.w type resolution
+- [ ] Replace sentinel 0 returns with proper error propagation
+- [ ] Verify: no silent i32 defaults remain (non-negotiable #3)
+- [ ] `make build && make fixpoint`
+
+### P5: Determinism — HashMap Audit
+
+**Current state:** 243 HashMap declarations across the compiler.
+OrderedMap does not exist. The manifesto requires ordered maps.
+
+**Critical insight:** The compiler currently achieves fixpoint
+WITH HashMaps, meaning iteration order is currently deterministic
+enough (or iteration over HashMaps doesn't affect output order).
+This must be verified, not assumed.
+
+- [ ] Audit all 243 HashMap usages and categorize:
+      - **Safe:** HashMap used only for lookup, never iterated
+        (key→value queries only). These are fine.
+      - **Unsafe:** HashMap iterated (for-in loop over keys/values).
+        These must be replaced with ordered structures.
+      - **Unknown:** Need investigation.
+- [ ] Count unsafe (iterated) HashMaps:
+      - Codegen.w: 172 HashMap declarations
+      - Sema.w: 38 HashMap declarations
+      - CCodegen.w: 16 HashMap declarations
+      - Other files: 17 HashMap declarations
+- [ ] Design OrderedMap type:
+      - Option A: Vec of (key, value) pairs with linear scan
+        (simple, good for small maps)
+      - Option B: Vec of entries + HashMap index for O(1) lookup
+        with deterministic iteration order
+      - Option C: BTreeMap-style sorted map
+- [ ] Implement OrderedMap in `lib/std/collections.w`
+- [ ] Replace unsafe (iterated) HashMaps with OrderedMap
+- [ ] Verify: fixpoint still holds after each replacement
+- [ ] Verify: no HashMap iteration remains in compiler source
+- [ ] `make build && make fixpoint`
+
+### P8: Errors Are Values — Poisoned Nodes
+
+**Current state:** No Poisoned node type. Error recovery uses
+token skipping + sentinel values (0, -1). Downstream phases
+receive invalid data from error cases.
+
+- [ ] Design NK_POISONED node kind:
+      - Represents an AST subtree that had errors
+      - Carries the original error diagnostic
+      - All downstream phases must handle NK_POISONED gracefully
+        (skip it, don't crash)
+- [ ] Add NK_POISONED to src/Ast.w
+- [ ] Update src/Parser.w: emit NK_POISONED on parse errors
+      instead of returning 0 or skipping
+- [ ] Update src/Resolve.w: propagate NK_POISONED (don't resolve
+      names inside poisoned subtrees)
+- [ ] Update src/Sema.w: propagate NK_POISONED (return TY_ERR
+      for poisoned nodes without emitting duplicate errors)
+- [ ] Update src/Codegen.w: skip NK_POISONED nodes (emit nothing)
+- [ ] Verify: a file with parse errors produces diagnostics but
+      doesn't crash in later phases
+- [ ] `make build && make fixpoint`
+
+### P11: File Complexity Budget
+
+**Current state:** Codegen.w is 10,821 lines (2x the 5,000 line
+budget). Sema.w is 5,820 lines (borderline).
+
+- [ ] Audit Codegen.w for natural split boundaries:
+      - String method codegen (~200 lines) → `src/CodegenStr.w`
+      - Vec method codegen (~300 lines) → `src/CodegenVec.w`
+      - HashMap method codegen (~200 lines) → `src/CodegenHashMap.w`
+      - Option/Result codegen (~200 lines) → `src/CodegenOption.w`
+      - Closure codegen (~800 lines) → `src/CodegenClosure.w`
+      - Match codegen (~500 lines) → `src/CodegenMatch.w`
+      - Async codegen → already in AsyncLower.w
+- [ ] Split Codegen.w into main file + extracted modules
+      (each split is a separate step with fixpoint verification)
+- [ ] Split 1: extract string methods to CodegenStr.w
+- [ ] `make build && make fixpoint`
+- [ ] Split 2: extract Vec methods to CodegenVec.w
+- [ ] `make build && make fixpoint`
+- [ ] Split 3: extract HashMap methods to CodegenHashMap.w
+- [ ] `make build && make fixpoint`
+- [ ] Split 4: extract Option/Result methods to CodegenOption.w
+- [ ] `make build && make fixpoint`
+- [ ] Split 5: extract closure codegen to CodegenClosure.w
+- [ ] `make build && make fixpoint`
+- [ ] Split 6: extract match codegen to CodegenMatch.w
+- [ ] `make build && make fixpoint`
+- [ ] Verify: Codegen.w is under 5,000 lines after splits
+- [ ] Audit Sema.w (5,820 lines) for potential splits if needed
+- [ ] `make build && make fixpoint`
+
+### P12: Measure, Then Optimize — Compile Time Tracking
+
+**Current state:** No timing infrastructure. No CI.
+
+- [ ] Add timing to Makefile: wrap stage1 and stage2 builds with
+      `time` and log to `out/log/build_times.txt`
+- [ ] Create `scripts/benchmark_self_compile.sh`:
+      - Runs `time ./out/bin/with-stage2 build src/main.w` 3 times
+      - Reports min/median/mean wall-clock time
+      - Appends to `out/log/compile_time_history.csv`
+- [ ] Add git hook or Makefile target to record compile time on
+      each successful fixpoint
+- [ ] Document baseline compile time in CONTRIBUTING.md
+- [ ] Set regression threshold: warn if compile time increases >2%
+      vs baseline
+- [ ] `make build && make fixpoint`
+
+### P13: Tests Verify Contracts — Phase Boundary Tests
+
+**Current state:** All 6 dump flags implemented (--dump-tokens,
+--dump-ast, --dump-resolved, --dump-typed, --dump-mir,
+--dump-async-mir). No systematic phase output tests.
+
+- [ ] Write phase output test infrastructure:
+      `//! expect-dump-ast: <substring>` directive in test runner
+- [ ] Add `expect-dump-ast` support to scripts/run_tests.sh
+- [ ] Write 3 phase output tests for lexer (--dump-tokens):
+      - Verify keyword tokens produced correctly
+      - Verify string interpolation tokens
+      - Verify indentation tokens
+- [ ] Write 3 phase output tests for parser (--dump-ast):
+      - Verify if-else AST structure
+      - Verify match arm structure
+      - Verify function declaration structure
+- [ ] Write 3 phase output tests for sema (--dump-typed):
+      - Verify type annotations on expressions
+      - Verify inferred types
+      - Verify error type propagation
+- [ ] Write 3 phase output tests for MIR (--dump-mir):
+      - Verify basic block structure
+      - Verify drop insertion
+      - Verify control flow flattening
+- [ ] Write round-trip tests:
+      `--emit-c` → C compiler → run vs LLVM backend → run
+      must produce identical stdout
+- [ ] Create `test/cases/roundtrip_*.w` test files:
+- [ ] roundtrip_arithmetic.w — basic math
+- [ ] roundtrip_strings.w — string operations
+- [ ] roundtrip_structs.w — struct creation and field access
+- [ ] roundtrip_enums.w — enum match and variant access
+- [ ] roundtrip_closures.w — closure capture and call
+- [ ] Add roundtrip test support to scripts/run_tests.sh:
+      `//! roundtrip` directive compiles both ways and compares
+- [ ] `make build && make fixpoint`
+
+### P14: Reserved Syntax
+
+**Current state:** All 5 keywords reserved (const, it, errdefer,
+move, where). `const` and `it` are implemented. `where` has
+parser support. `errdefer` and `move` emit errors.
+
+- [ ] Verify `const` fully works (compile-time constants):
+      write test with `const X: i32 = 42` + `println("{X}")`
+- [ ] Verify `it` fully works: write test with `v.filter(it > 0)`
+- [ ] Verify `where` clause parsing works or emits proper error
+- [ ] Verify `errdefer` emits "reserved for future use" error
+- [ ] Verify `move` closures emit "reserved for future use" error
+- [ ] Audit for any other syntax that should be reserved
+      (e.g., `async`, `await`, `yield`, `macro`)
+- [ ] Reserve any missing keywords
+- [ ] `make build && make fixpoint`
+
+### P15: Seed Management
+
+**Current state:** Binary seed at `src/main` (~49MB). Manual
+update process. No C seed yet.
+
+- [ ] Document current seed update process:
+      1. `make fixpoint` succeeds
+      2. Copy `out/bin/with-stage2` to `src/main`
+      3. Commit with message "update seed"
+- [ ] Add `make update-seed` target to Makefile:
+      verifies fixpoint, copies stage2 to src/main
+- [ ] Add safety check: refuse to update seed if tests fail
+- [ ] Preserve previous seed as `src/main.prev` before overwrite
+- [ ] When C backend can self-compile (Phase 5.5):
+      replace binary seed with `with_compiler.c`
+- [ ] `make build && make fixpoint`
+
+---
+
+## Non-Negotiable Verification
+
+These must hold at all times. Run after every change.
+
+- [ ] **Fixpoint holds:** `make fixpoint` (stage2 == stage3)
+- [ ] **Tests pass:** `./scripts/run_tests.sh` — zero failures
+- [ ] **No i32 fallbacks:** grep for `wl_i32_type.*fallback` in
+      Codegen.w returns zero results
+- [ ] **No hardcoded user-facing names:** `is_builtin_fn` and
+      `is_builtin_value` deleted from sema
+- [ ] **Deterministic output:** same input → same binary
+      (verified by fixpoint)
+- [ ] **Every error has a location:** grep for `emit_error` calls
+      without span/node argument returns zero results
+
+---
+
+## Execution Protocol
+
+For each change:
+
+1. Read the relevant source before editing.
+2. Make one logical change.
+3. `make build`
+4. Run specific test(s) if applicable.
+5. Run full test suite: `./scripts/run_tests.sh`
+6. `make fixpoint`
+
+If the build breaks, stop and bisect. Do not batch changes.
+
+**Recommended order across all docs:**
+
+1. `docs/01_Codegen_Bug_Fixes.md` — fix silent miscompilations
+2. `docs/02_Rewrite_stale_tests.md` — clean test suite
+3. `docs/04_complete_partial_implementations.md` — finish features
+4. `docs/06_idiomatic.md` Phase 4 — compiler quality (HashMaps,
+   scope lookup, lexer cleanup)
+5. `docs/05_Generics.md` — type system completion
+6. `docs/06_idiomatic.md` Phases 1-3 — enum conversions, handle
+   types, idiomatic patterns
+7. `docs/06_idiomatic.md` Phases 5-6 — pipeline ownership,
+   hardcode removal
+8. `docs/07_quality.md` Phase 5 — C backend completion
+9. `docs/07_quality.md` Phase 6 — tooling
+10. `docs/07_quality.md` principle enforcement — determinism,
+    poisoned nodes, file splits, timing
+
+---
+
+## Exit Gate: When Is the Quality Pass Done?
+
+- [ ] 1. Compiler source reads as idiomatic With — enums, const,
+      match, pipelines, distinct types, `it`
+- [ ] 2. `Vec[i32] != Vec[str]` enforced in sema, not worked
+      around in codegen
+- [ ] 3. `Driver` is deleted
+- [ ] 4. `--emit-c` cross-compiles the compiler for four targets
+      from one machine
+- [ ] 5. `with fmt` exists and the compiler source passes it
+- [ ] 6. A new contributor can clone, build, test, and submit a
+      fix in under 30 minutes using only CONTRIBUTING.md
+- [ ] All 6 non-negotiables verified
+- [ ] All tests pass under `./scripts/run_tests.sh`
+- [ ] `make fixpoint` holds

@@ -24,7 +24,7 @@ fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, outpu
         backend_pool = self.last_sema.ast
     if self.last_sema.pool.symbol_texts.len() as i32 > 1:
         backend_intern = self.last_sema.pool
-    var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern)
+    var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, self.last_sema)
     cg.source_file = self.current_source_path
     cg.source_text = self.current_source_text
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
@@ -57,7 +57,7 @@ fn Zcu.emit_ir_backend(self: Zcu, pool: AstPool, opt_level: i32) -> bool:
         backend_pool = self.last_sema.ast
     if self.last_sema.pool.symbol_texts.len() as i32 > 1:
         backend_intern = self.last_sema.pool
-    var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern)
+    var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, self.last_sema)
     cg.source_file = self.current_source_path
     cg.source_text = self.current_source_text
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:

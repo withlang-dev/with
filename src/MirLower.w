@@ -1427,6 +1427,21 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             return self.lower_with_form2_3(fake_ident, source, body)
         return self.lower_with_form1(source, body)
 
+    if kind == NK_STRUCT_LIT:
+        let sl_fields_start = self.ast.get_data1(node)
+        let sl_field_count = self.ast.get_data2(node)
+        let sl_fields: Vec[i32] = Vec.new()
+        for i in 0..sl_field_count:
+            let f_val_node = self.ast.get_extra(sl_fields_start + i * 2 + 1)
+            sl_fields.push(self.lower_expr(f_val_node))
+        let sl_fid = self.body.new_agg_fields(sl_fields)
+        let sl_rv = self.body.new_rvalue(RK_AGGREGATE, 0, sl_fid, 0)
+        let sl_ty = self.expr_type(node)
+        let sl_tmp = self.new_temp(sl_ty)
+        let sl_place = self.place_for_local(sl_tmp)
+        self.body.push_stmt(self.cur_bb, SK_ASSIGN, sl_place, sl_rv, self.ast.get_start(node))
+        return self.body.new_operand(OK_COPY, sl_place)
+
     if kind == NK_RECORD_UPDATE:
         return self.lower_record_update(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node)
 

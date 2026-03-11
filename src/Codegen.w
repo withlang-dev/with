@@ -10,7 +10,10 @@ use Ast
 use InternPool
 use Span
 use Mir
+use Sema
+use Diagnostic
 
+extern fn with_parse_float(s: str) -> f64
 extern fn with_eprintln(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
 extern fn with_fs_read_file(path: str) -> str
@@ -266,6 +269,7 @@ type Codegen = {
     // AST access
     pool: AstPool,
     intern: InternPool,
+    sema: Sema,
 
     // Current function state
     current_ret_type: i64,
@@ -487,6 +491,7 @@ type Codegen = {
 
     // Wave 10 MIR backend input (optional).
     mir_input_enabled: i32,
+    mir_dispatch_count: i32,
     mir_input: MirModule,
     mir_local_ptrs: HashMap[i32, i64],
     mir_local_types: HashMap[i32, i64],
@@ -512,9 +517,10 @@ type LoopState = {
 fn Codegen.init(module_name: str) -> Codegen:
     Codegen.init_with_opt(module_name, 0)
 
-fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: InternPool) -> Codegen:
+fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: InternPool, sema: Sema) -> Codegen:
     var cg = Codegen.init_with_opt(module_name, opt_level)
     cg.intern = intern
+    cg.sema = sema
     cg
 
 fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
@@ -531,6 +537,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         target_machine: tm,
         pool: AstPool.new(),
         intern: InternPool.init(),
+        sema: Sema.init(InternPool.init(), DiagnosticList.init(), AstPool.new()),
         current_ret_type: 0,
         current_function: 0,
         current_function_name_sym: 0,
@@ -671,6 +678,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         source_file: "<unknown>",
         source_text: "",
         mir_input_enabled: 0,
+        mir_dispatch_count: 0,
         mir_input: MirModule.init(),
         mir_local_ptrs: HashMap.new(),
         mir_local_types: HashMap.new(),
@@ -905,6 +913,11 @@ fn Codegen.debug_pool_flow_enabled(self: Codegen) -> bool:
 fn Codegen.debug_type_layout_enabled(self: Codegen) -> bool:
     let _ = self
     let raw = with_getenv_str("WITH_DEBUG_TYPE_LAYOUT")
+    raw.len() > 0 and raw != "0"
+
+fn Codegen.debug_fallback_enabled(self: Codegen) -> bool:
+    let _ = self
+    let raw = with_getenv_str("WITH_DEBUG_FALLBACK")
     raw.len() > 0 and raw != "0"
 
 fn Codegen.debug_type_layout_field(self: Codegen, owner_name: str, field_index: i32, field_name: i32, type_node: i32, resolved_ty: i64):
@@ -1654,13 +1667,11 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
     if kind == NK_TYPE_INFERRED:
         return 0  // Cannot resolve inferred types
 
-    // Fallback
-    if self.debug_type_layout_enabled():
-        var msg = "[type-resolve] fallback"
-        msg = msg ++ " node=" ++ int_to_string(type_node)
-        msg = msg ++ " kind=" ++ int_to_string(kind)
-        msg = msg ++ " span=" ++ int_to_string(self.pool.get_start(type_node)) ++ ".." ++ int_to_string(self.pool.get_end(type_node))
-        with_eprintln(msg)
+    // Fallback — always warn so silent miscompilation is visible
+    var msg = "warning: [type-resolve] unhandled type node kind=" ++ int_to_string(kind)
+    msg = msg ++ " node=" ++ int_to_string(type_node)
+    msg = msg ++ " span=" ++ int_to_string(self.pool.get_start(type_node)) ++ ".." ++ int_to_string(self.pool.get_end(type_node))
+    with_eprintln(msg)
     wl_i32_type(self.context)
 
 fn Codegen.resolve_primitive_named_type(self: Codegen, name: str) -> i64:
@@ -2403,6 +2414,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     if alias_sym != 0:
         self.fn_values.insert(alias_sym, function)
         self.fn_fn_types.insert(alias_sym, fn_type)
+
 
 fn Codegen.record_ref_param(self: Codegen, fn_sym: i32, idx: i32, count: i32):
     if not self.fn_ref_param_starts.get(fn_sym).is_some():
@@ -3594,10 +3606,12 @@ fn Codegen.gen_known_concrete_dispatch(self: Codegen, fat_ptr: i64, concrete_sym
 fn Codegen.gen_dyn_dispatch(self: Codegen, fat_ptr: i64, trait_sym: i32, method_sym: i32, args_start: i32, arg_count: i32) -> i64:
     let trait_idx_opt = self.trait_map.get(trait_sym)
     if not trait_idx_opt.is_some():
+        with_eprintln("warning: [dyn-dispatch] trait not found")
         return wl_get_undef(wl_i32_type(self.context))
     let trait_idx = trait_idx_opt.unwrap()
     let method_offset = self.find_trait_method_offset(trait_idx, method_sym)
     if method_offset < 0:
+        with_eprintln("warning: [dyn-dispatch] method not found")
         return wl_get_undef(wl_i32_type(self.context))
 
     let method_start = self.trait_method_starts.get(trait_idx as i64)
@@ -3805,10 +3819,26 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
 // ── gen_function_dispatch: MIR-first with conservative fallback ──
 
 fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
-    // MIR codegen disabled: MIR lowering produces incorrect code for struct
-    // literals (zeroinitializer instead of field values) and possibly other
-    // constructs.  AST codegen is reliable.  Re-enable MIR path once
-    // MirLower is fixed.
+    // MIR-first: try MIR codegen, fall back to AST if unsupported.
+    if self.mir_input_enabled != 0:
+        let fn_sym = self.pool.get_data0(fn_node)
+        let body_idx = self.mir_input.find_body(fn_sym)
+        if body_idx >= 0:
+            let body = self.mir_input.bodies.get(body_idx as i64)
+            if self.mir_function_is_supported(body):
+                // Bisect: WITH_MIR_LIMIT=N limits MIR to first N functions
+                let limit_str = with_getenv_str("WITH_MIR_LIMIT")
+                if limit_str.len() > 0:
+                    let limit = string_to_int(limit_str)
+                    if self.mir_dispatch_count >= limit:
+                        self.gen_function(fn_node)
+                        return
+                self.mir_dispatch_count = self.mir_dispatch_count + 1
+                if self.debug_mir_codegen_enabled():
+                    let fn_name = self.intern.resolve(fn_sym)
+                    with_eprintln("[mir-dispatch] using MIR for: " ++ fn_name)
+                self.gen_function_mir(fn_node, body)
+                return
     self.gen_function(fn_node)
 
 fn Codegen.ast_contains_struct_lit(self: Codegen, node: i32) -> bool:
@@ -3880,9 +3910,6 @@ fn Codegen.mir_operand_is_supported(self: Codegen, body: MirBody, operand_id: i3
             return false
         let ck = body.const_kinds.get(od as i64)
         if for_call_callee:
-            // Current MIR lowering sometimes uses unit as a placeholder callee.
-            if ck == CK_UNIT:
-                return false
             return false
         return ck == CK_INT or ck == CK_BOOL or ck == CK_STR or ck == CK_UNIT or ck == CK_FLOAT or ck == CK_ZERO_SIZED
     false
@@ -3892,12 +3919,7 @@ fn Codegen.mir_function_is_supported(self: Codegen, body: MirBody) -> bool:
         return false
     if body.block_count() <= 0:
         return false
-    // Aggregate rvalues still rely on AST fallback until MIR backend support
-    // is complete. Accepting them here can silently miscompile named struct
-    // literals such as CLI option records.
-    for ri in 0..body.rval_kinds.len() as i32:
-        if body.rval_kinds.get(ri as i64) == RK_AGGREGATE:
-            return false
+    // RK_AGGREGATE is now handled by mir_eval_rvalue.
 
     for si in 0..body.stmt_kinds.len() as i32:
         let sk = body.stmt_kinds.get(si as i64)
@@ -3934,7 +3956,9 @@ fn Codegen.mir_function_is_supported(self: Codegen, body: MirBody) -> bool:
                 if not self.mir_operand_is_supported(body, body.rval_d0.get(d1 as i64), false):
                     return false
                 continue
-            // Aggregate/downcast-sensitive forms still fall back to AST.
+            if rk == RK_AGGREGATE:
+                continue
+            // Downcast-sensitive forms still fall back to AST.
             return false
         if sk == SK_STORAGE_LIVE or sk == SK_STORAGE_DEAD:
             continue
@@ -4016,8 +4040,6 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
 
     let base_local = body.place_locals.get(place_id as i64)
     let p_count = body.place_proj_counts.get(place_id as i64)
-    if p_count != 0:
-        return 0
     let base_opt = self.mir_local_ptrs.get(base_local)
     var cur_ptr: i64 = 0
     if base_opt.is_some():
@@ -4030,11 +4052,58 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
         else:
             return 0
 
+    if p_count == 0:
+        return cur_ptr
+
+    // Walk projections: field access, index, deref
+    let p_start = body.place_proj_starts.get(place_id as i64)
+    var cur_ty: i64 = 0
+    let cur_ty_opt = self.mir_local_types.get(base_local)
+    if cur_ty_opt.is_some():
+        cur_ty = cur_ty_opt.unwrap() as i64
+    // Resolve type via sema if LLVM type not yet known
+    if cur_ty == 0 and base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+        let sema_ty = body.local_type_ids.get(base_local as i64)
+        if sema_ty > 0:
+            let type_name_sym = self.sema.get_type_name(sema_ty)
+            if type_name_sym != 0:
+                cur_ty = self.resolve_named_type(type_name_sym)
+                self.mir_local_types.insert(base_local, cur_ty)
+    for i in 0..p_count:
+        let pk = body.proj_kinds.get((p_start + i) as i64)
+        let pd = body.proj_d0.get((p_start + i) as i64)
+        if pk == 0: // PK_FIELD
+            if cur_ty == 0 or wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
+                // Base is a pointer (e.g., self param) — load the pointer first
+                if cur_ty == 0:
+                    cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
+                else:
+                    cur_ptr = wl_build_load(self.builder, cur_ty, cur_ptr)
+                // Resolve the pointee struct type via sema
+                if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+                    let sema_ty = body.local_type_ids.get(base_local as i64)
+                    if sema_ty > 0:
+                        let type_name_sym = self.sema.get_type_name(sema_ty)
+                        if type_name_sym != 0:
+                            cur_ty = self.resolve_named_type(type_name_sym)
+            let fi = self.mir_resolve_field_index(cur_ty, pd)
+            if fi < 0:
+                return 0
+            cur_ptr = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, fi)
+            if fi < wl_count_struct_elem_types(cur_ty):
+                cur_ty = wl_struct_get_type_at(cur_ty, fi)
+            else:
+                cur_ty = 0
+        else:
+            return 0
+
     cur_ptr
 
 fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected_ty: i64) -> i64:
     let fallback_ty = if expected_ty != 0: expected_ty else: wl_i32_type(self.context)
     if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+        if self.debug_fallback_enabled():
+            with_eprintln("warning: [fallback] mir_const_value: invalid const_id=" ++ int_to_string(const_id))
         return wl_get_undef(fallback_ty)
 
     let ck = body.const_kinds.get(const_id as i64)
@@ -4073,11 +4142,26 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
             return self.build_default_value(expected_ty)
         return wl_const_int(wl_i32_type(self.context), 0, 0)
 
+    if ck == CK_FN:
+        let fn_sym = cd
+        let fv_opt = self.fn_values.get(fn_sym)
+        if fv_opt.is_some():
+            return fv_opt.unwrap() as i64
+        let fn_name = self.function_symbol_name(fn_sym)
+        let found = wl_get_named_function(self.llmod, fn_name)
+        if found != 0:
+            return found
+        if self.debug_fallback_enabled():
+            with_eprintln("warning: [fallback] mir_const_value: CK_FN not found for sym=" ++ int_to_string(fn_sym) ++ " name=" ++ fn_name)
+        return wl_get_undef(fallback_ty)
+
     wl_get_undef(fallback_ty)
 
 fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expected_ty: i64) -> i64:
     let fallback_ty = if expected_ty != 0: expected_ty else: wl_i32_type(self.context)
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        if self.debug_fallback_enabled():
+            with_eprintln("warning: [fallback] mir_eval_operand: invalid operand_id=" ++ int_to_string(operand_id))
         return wl_get_undef(fallback_ty)
 
     let ok = body.operand_kinds.get(operand_id as i64)
@@ -4142,16 +4226,42 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64) -> i64:
     if op == OP_GT: return wl_build_icmp(self.builder, wl_int_sgt(), l, r)
     if op == OP_LTE: return wl_build_icmp(self.builder, wl_int_sle(), l, r)
     if op == OP_GTE: return wl_build_icmp(self.builder, wl_int_sge(), l, r)
-    if op == OP_BIT_AND: return wl_build_and(self.builder, l, r)
-    if op == OP_BIT_OR: return wl_build_or(self.builder, l, r)
+    if op == OP_AND or op == OP_BIT_AND: return wl_build_and(self.builder, l, r)
+    if op == OP_OR or op == OP_BIT_OR: return wl_build_or(self.builder, l, r)
     if op == OP_BIT_XOR: return wl_build_xor(self.builder, l, r)
     if op == OP_SHL: return wl_build_shl(self.builder, l, r)
     if op == OP_SHR: return wl_build_ashr(self.builder, l, r)
+    if op == OP_CONCAT: return self.mir_str_concat(lhs, rhs)
+    with_eprintln("warning: [mir-binop] unhandled binary op")
     wl_get_undef(wl_i32_type(self.context))
+
+fn Codegen.mir_str_concat(self: Codegen, lhs: i64, rhs: i64) -> i64:
+    let concat_sym = self.intern.intern("with_str_concat")
+    let fv = self.fn_values.get(concat_sym)
+    let ft = self.fn_fn_types.get(concat_sym)
+    if fv.is_some() and ft.is_some():
+        let args: Vec[i64] = Vec.new()
+        args.push(lhs)
+        args.push(rhs)
+        return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(&args), 2)
+    let str_ty = self.resolve_named_type(self.intern.intern("str"))
+    let param_types: Vec[i64] = Vec.new()
+    param_types.push(str_ty)
+    param_types.push(str_ty)
+    let fn_type = wl_function_type(str_ty, vec_data_i64(&param_types), 2, 0)
+    let func = wl_add_function(self.llmod, "with_str_concat", fn_type)
+    self.fn_values.insert(concat_sym, func)
+    self.fn_fn_types.insert(concat_sym, fn_type)
+    let args: Vec[i64] = Vec.new()
+    args.push(lhs)
+    args.push(rhs)
+    wl_build_call(self.builder, fn_type, func, vec_data_i64(&args), 2)
 
 fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: i64) -> i64:
     let fallback_ty = if dest_ty != 0: dest_ty else: wl_i32_type(self.context)
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        if self.debug_fallback_enabled():
+            with_eprintln("warning: [fallback] mir_eval_rvalue: invalid rval_id=" ++ int_to_string(rval_id))
         return wl_get_undef(fallback_ty)
 
     let rk = body.rval_kinds.get(rval_id as i64)
@@ -4215,6 +4325,32 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             let loaded = wl_build_load(self.builder, place_ty, ptr)
             return wl_build_extract_value(self.builder, loaded, 0)
         return wl_const_int(wl_i32_type(self.context), 0, 0)
+
+    if rk == RK_AGGREGATE:
+        // d1 = fields_id — index into agg_field_starts/counts/operands
+        let agg_fields_id = d1
+        if agg_fields_id >= 0 and agg_fields_id < body.agg_field_starts.len() as i32:
+            let agg_start = body.agg_field_starts.get(agg_fields_id as i64)
+            let agg_count = body.agg_field_counts.get(agg_fields_id as i64)
+            var struct_ty = dest_ty
+            if struct_ty == 0 or wl_get_type_kind(struct_ty) != wl_struct_type_kind():
+                with_eprintln("error: RK_AGGREGATE with unknown dest type")
+                return wl_get_undef(fallback_ty)
+            let alloca = self.create_entry_alloca(struct_ty)
+            wl_build_store(self.builder, self.build_default_value(struct_ty), alloca)
+            let struct_field_count = wl_count_struct_elem_types(struct_ty)
+            var fi = 0
+            for i in 0..agg_count:
+                if fi >= struct_field_count:
+                    break
+                let op_id = body.agg_field_operands.get((agg_start + i) as i64)
+                let field_ty = wl_struct_get_type_at(struct_ty, fi)
+                let val = self.mir_eval_operand(body, op_id, field_ty)
+                let gep = wl_build_struct_gep(self.builder, struct_ty, alloca, fi)
+                wl_build_store(self.builder, self.coerce_value_to_type(val, field_ty), gep)
+                fi = fi + 1
+            return wl_build_load(self.builder, struct_ty, alloca)
+        return wl_get_undef(fallback_ty)
 
     if rk == RK_CAST:
         let val = self.mir_eval_operand(body, d0, 0)
@@ -4280,6 +4416,13 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
         let dst_ty_opt = self.mir_local_types.get(dst_local)
         if dst_ptr != 0 and dst_ty_opt.is_some():
             dst_ty = dst_ty_opt.unwrap() as i64
+        // Resolve type via sema when LLVM type is not yet known
+        if dst_ty == 0 and dst_local >= 0 and dst_local < body.local_type_ids.len() as i32:
+            let sema_ty = body.local_type_ids.get(dst_local as i64)
+            if sema_ty > 0:
+                let type_name_sym = self.sema.get_type_name(sema_ty)
+                if type_name_sym != 0:
+                    dst_ty = self.resolve_named_type(type_name_sym)
         let value = self.mir_eval_rvalue(body, d1, dst_ty)
         if dst_ptr == 0:
             let proj_count = body.place_proj_counts.get(d0 as i64)
@@ -4974,7 +5117,10 @@ fn Codegen.gen_expr(self: Codegen, node: i32) -> i64:
     if kind == NK_COMPTIME: return self.gen_comptime(node)
     if kind == NK_ARRAY_COMPREHENSION: return self.gen_array_comprehension(node)
 
-    // Unsupported
+    // Unsupported — emit warning so unhandled node kinds are visible
+    var msg = "warning: [gen_expr] unhandled node kind=" ++ int_to_string(kind)
+    msg = msg ++ " node=" ++ int_to_string(node)
+    with_eprintln(msg)
     wl_get_undef(wl_void_type(self.context))
 
 fn Codegen.gen_expr_discard(self: Codegen, node: i32) -> void:
@@ -5005,9 +5151,7 @@ fn Codegen.gen_float_lit(self: Codegen, node: i32) -> i64:
     wl_const_real(wl_f64_type(self.context), self.parse_float(s))
 
 fn Codegen.parse_float(self: Codegen, s: str) -> f64:
-    // Simple float parser
-    // TODO: handle edge cases
-    0.0
+    with_parse_float(s)
 
 fn Codegen.gen_bool_lit(self: Codegen, node: i32) -> i64:
     let val = self.pool.get_data0(node)
@@ -5083,7 +5227,9 @@ fn Codegen.gen_string_literal_raw(self: Codegen, text: str) -> i64:
     // Build str struct: { ptr, len }
     let str_sym = self.intern.intern("str")
     let st_opt = self.struct_type_map.get(str_sym)
-    if not st_opt.is_some(): return wl_get_undef(wl_i32_type(self.context))
+    if not st_opt.is_some():
+        with_eprintln("warning: [string-lit] str struct type not found")
+        return wl_get_undef(wl_i32_type(self.context))
     let str_type = self.struct_llvm_types.get(st_opt.unwrap() as i64)
 
     let global_str = wl_build_global_string_ptr(self.builder, text)
@@ -5214,6 +5360,7 @@ fn Codegen.gen_ident(self: Codegen, sym: i32) -> i64:
         if sym_text.len() > 0:
             msg = msg ++ " name=" ++ sym_text
         with_eprintln(msg)
+    with_eprintln("warning: [gen-ident-expr] unresolved identifier")
     wl_get_undef(wl_i32_type(self.context))
 
 // ── Binary expression ─────────────────────────────────────────────
@@ -5279,6 +5426,7 @@ fn Codegen.gen_binary(self: Codegen, node: i32) -> i64:
     if op == OP_SHL: return wl_build_shl(self.builder, l, r)
     if op == OP_SHR: return wl_build_ashr(self.builder, l, r)
 
+    with_eprintln("warning: [gen-ident] unresolved identifier")
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.gen_float_binary(self: Codegen, op: i32, lhs: i64, rhs: i64) -> i64:
@@ -5849,6 +5997,7 @@ fn Codegen.gen_field_access(self: Codegen, node: i32) -> i64:
                     return wl_const_int(repr_ty, disc_val as i64, 1)
             with_eprintln("error: unknown variant '" ++ field_name ++ "' for discriminant enum")
             self.had_error = 1
+            with_eprintln("warning: [variant-shorthand] variant not found")
             return wl_get_undef(wl_i32_type(self.context))
 
     // Handle method calls: obj.method becomes a call lookup
@@ -6358,6 +6507,7 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
                 break
 
     if meta < 0:
+        with_eprintln("warning: [optional-chain] chain resolution failed")
         return wl_get_undef(wl_i32_type(self.context))
 
     let ret_type_node = self.pool.fn_meta_ret(meta)
@@ -6367,6 +6517,7 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
     let tp_count = self.pool.fn_meta_tp_count(meta)
     let body_node = self.pool.get_data1(generic_node)
     if param_count < 0 or param_count > 64:
+        with_eprintln("warning: [optional-chain] chain resolution failed")
         return wl_get_undef(wl_i32_type(self.context))
 
     let arg_vals: Vec[i64] = Vec.new()
@@ -6964,6 +7115,7 @@ fn Codegen.gen_call(self: Codegen, node: i32) -> i64:
         let gvt = wl_global_get_value_type(callee)
         if wl_get_type_kind(gvt) == wl_function_type_kind():
             return wl_build_call(self.builder, gvt, callee, vec_data_i64(&args), arg_count)
+    with_eprintln("warning: [gen-call] indirect call type unknown")
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.ensure_channel_create_decl(self: Codegen) -> i64:
@@ -7273,6 +7425,7 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
                     return direct
             return self.gen_dyn_dispatch(obj, trait_sym.unwrap(), method_lookup_sym, args_start, arg_count)
 
+    with_eprintln("warning: [gen_method_call] no dispatch for method '" ++ method_name ++ "' on node kind=" ++ int_to_string(self.pool.kind(obj_node)))
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.get_mutable_receiver_ptr(self: Codegen, recv_node: i32, recv_val: i64, recv_ty: i64) -> i64:
@@ -8225,6 +8378,7 @@ fn Codegen.gen_enum_accessor_method(self: Codegen, callee_node: i32, obj_node: i
 
 fn Codegen.build_variant_payload(self: Codegen, payload_ty: i64, args_start: i32, arg_count: i32) -> i64:
     if arg_count <= 0:
+        with_eprintln("warning: [variant-payload] no arguments")
         return wl_get_undef(wl_i32_type(self.context))
     if payload_ty == 0:
         return self.gen_expr(self.pool.get_extra(args_start))
@@ -8336,6 +8490,7 @@ fn Codegen.gen_struct_lit(self: Codegen, node: i32) -> i64:
                         if mono_idx < self.struct_index_syms.len() as i32:
                             actual_type_sym = self.struct_index_syms.get(mono_idx as i64)
     if st_idx < 0:
+        with_eprintln("warning: [struct-lit] struct type not found")
         return wl_get_undef(wl_i32_type(self.context))
     let st_ty = self.struct_llvm_types.get(st_idx as i64)
     let st_field_start = self.struct_field_starts.get(st_idx as i64)
@@ -8376,7 +8531,9 @@ fn Codegen.gen_enum_variant(self: Codegen, node: i32) -> i64:
     let arg_count = self.pool.get_extra(extra_start)
 
     let et_opt = self.enum_type_map.get(type_sym)
-    if not et_opt.is_some(): return wl_get_undef(wl_i32_type(self.context))
+    if not et_opt.is_some():
+        with_eprintln("warning: [enum-variant] enum type not found")
+        return wl_get_undef(wl_i32_type(self.context))
     let et_idx = et_opt.unwrap()
     let enum_ty = self.enum_llvm_types.get(et_idx as i64)
     let v_start = self.enum_variant_starts.get(et_idx as i64)
@@ -8514,6 +8671,7 @@ fn Codegen.gen_variant_shorthand(self: Codegen, node: i32) -> i64:
         wl_build_store(self.builder, payload_val, payload_ptr)
         return wl_build_load(self.builder, opt_ty, alloca)
 
+    with_eprintln("warning: [variant-shorthand] no matching variant")
     wl_get_undef(wl_i32_type(self.context))
 
 // ── Array literal ─────────────────────────────────────────────────
@@ -10052,6 +10210,9 @@ fn Codegen.gen_str_method(self: Codegen, method: str, obj: i64, args_start: i32,
     let i32_ty = wl_i32_type(self.context)
     let i8_ty = wl_i8_type(self.context)
     let ptr_ty = wl_ptr_type(self.context)
+    let str_sym = self.intern.intern("str")
+    let st_opt = self.struct_type_map.get(str_sym)
+    let str_type = if st_opt.is_some(): self.struct_llvm_types.get(st_opt.unwrap() as i64) else: wl_i64_type(self.context)
     // Extract ptr and len from str struct
     let str_ptr = wl_build_extract_value(self.builder, obj, 0)
     let str_len = wl_build_extract_value(self.builder, obj, 1)
@@ -10111,25 +10272,64 @@ fn Codegen.gen_str_method(self: Codegen, method: str, obj: i64, args_start: i32,
         args.push(obj)
         args.push(index64)
         return wl_build_call(self.builder, self.get_runtime_fn_type("with_str_byte_at", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
-    if method == "to_upper" or method == "to_lower":
-        // Call with_str_to_upper/to_lower runtime functions if available
-        // For now, return the string unchanged
-        return obj
+    if method == "to_upper":
+        let fn_val = self.ensure_c_fn("with_str_to_upper", str_type, 1)
+        let args: Vec[i64] = Vec.new()
+        args.push(obj)
+        return wl_build_call(self.builder, self.get_runtime_fn_type("with_str_to_upper", str_type, 1), fn_val, vec_data_i64(&args), 1)
+    if method == "to_lower":
+        let fn_val = self.ensure_c_fn("with_str_to_lower", str_type, 1)
+        let args: Vec[i64] = Vec.new()
+        args.push(obj)
+        return wl_build_call(self.builder, self.get_runtime_fn_type("with_str_to_lower", str_type, 1), fn_val, vec_data_i64(&args), 1)
     if method == "trim":
-        return obj // Stub - needs runtime support
+        let fn_val = self.ensure_c_fn("with_str_trim", str_type, 1)
+        let args: Vec[i64] = Vec.new()
+        args.push(obj)
+        return wl_build_call(self.builder, self.get_runtime_fn_type("with_str_trim", str_type, 1), fn_val, vec_data_i64(&args), 1)
     if method == "repeat" and arg_count > 0:
-        return obj // Stub - needs runtime support
+        let n = self.gen_expr(self.pool.get_extra(args_start))
+        let n64 = self.coerce_int(n, i64_ty)
+        let fn_val = self.ensure_c_fn("with_str_repeat", str_type, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(obj)
+        args.push(n64)
+        return wl_build_call(self.builder, self.get_runtime_fn_type("with_str_repeat", str_type, 2), fn_val, vec_data_i64(&args), 2)
     if method == "split" and arg_count > 0:
-        return wl_get_undef(wl_i32_type(self.context)) // Stub
+        let split_delim = self.gen_expr(self.pool.get_extra(args_start))
+        let split_vec_ty = self.get_or_create_vec_type(str_type)
+        let split_out = self.create_entry_alloca(split_vec_ty)
+        let split_fn = self.ensure_c_fn("with_str_split_vec", wl_void_type(self.context), 3)
+        let split_params: Vec[i64] = Vec.new()
+        split_params.push(wl_ptr_type(self.context))
+        split_params.push(str_type)
+        split_params.push(str_type)
+        let split_fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&split_params), 3, 0)
+        let split_args: Vec[i64] = Vec.new()
+        split_args.push(split_out)
+        split_args.push(obj)
+        split_args.push(split_delim)
+        let _ = wl_build_call(self.builder, split_fn_ty, split_fn, vec_data_i64(&split_args), 3)
+        return wl_build_load(self.builder, split_vec_ty, split_out)
     if method == "replace" and arg_count >= 2:
-        return obj // Stub - needs runtime support
+        let old_s = self.gen_expr(self.pool.get_extra(args_start))
+        let new_s = self.gen_expr(self.pool.get_extra(args_start + 1))
+        let fn_val = self.ensure_c_fn("with_str_replace", str_type, 3)
+        let args: Vec[i64] = Vec.new()
+        args.push(obj)
+        args.push(old_s)
+        args.push(new_s)
+        return wl_build_call(self.builder, self.get_runtime_fn_type("with_str_replace", str_type, 3), fn_val, vec_data_i64(&args), 3)
     // Unknown method
+    with_eprintln("warning: [str-method] unknown string method")
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.build_str_value(self: Codegen, ptr: i64, len: i64) -> i64:
     let str_sym = self.intern.intern("str")
     let st_opt = self.struct_type_map.get(str_sym)
-    if not st_opt.is_some(): return wl_get_undef(wl_i32_type(self.context))
+    if not st_opt.is_some():
+        with_eprintln("warning: [build-str] str struct type not found")
+        return wl_get_undef(wl_i32_type(self.context))
     let str_type = self.struct_llvm_types.get(st_opt.unwrap() as i64)
     var result = wl_get_undef(str_type)
     result = wl_build_insert_value(self.builder, result, ptr, 0)
@@ -10151,10 +10351,17 @@ fn Codegen.get_runtime_fn_type(self: Codegen, name: str, ret_ty: i64, param_coun
     if name == "with_str_contains" or
        name == "with_str_starts_with" or
        name == "with_str_ends_with" or
-       name == "with_str_index_of":
+       name == "with_str_index_of" or
+       name == "with_str_trim" or
+       name == "with_str_to_upper" or
+       name == "with_str_to_lower" or
+       name == "with_str_replace":
         for i in 0..param_count:
             params.push(str_type)
     else if name == "with_str_byte_at":
+        params.push(str_type)
+        params.push(i64_ty)
+    else if name == "with_str_repeat":
         params.push(str_type)
         params.push(i64_ty)
     else:
@@ -10168,6 +10375,9 @@ fn Codegen.gen_vec_method(self: Codegen, method: str, obj: i64, args_start: i32,
     let i64_ty = wl_i64_type(self.context)
     let i32_ty = wl_i32_type(self.context)
     let ptr_ty = wl_ptr_type(self.context)
+    let str_sym_v = self.intern.intern("str")
+    let str_st_opt_v = self.struct_type_map.get(str_sym_v)
+    let str_type = if str_st_opt_v.is_some(): self.struct_llvm_types.get(str_st_opt_v.unwrap() as i64) else: wl_i64_type(self.context)
 
     // Vec is a struct: {data_ptr, len, cap, elem_size}
     // We need to get a mutable pointer to the Vec for push/pop
@@ -10264,6 +10474,7 @@ fn Codegen.gen_vec_method(self: Codegen, method: str, obj: i64, args_start: i32,
             phi_bbs.push(empty_bb)
             wl_add_incoming(phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
             return phi
+        with_eprintln("warning: [vec-method] pop: no element type")
         return wl_get_undef(wl_i32_type(self.context))
     if method == "set_i32" and arg_count >= 2 and vec_ptr != 0:
         let idx_expr = self.gen_expr(self.pool.get_extra(args_start))
@@ -10439,9 +10650,77 @@ fn Codegen.gen_vec_method(self: Codegen, method: str, obj: i64, args_start: i32,
         wl_build_br(self.builder, filt_cond)
         wl_position_at_end(self.builder, filt_end)
         return wl_build_load(self.builder, filt_vec_ty, filt_result_alloca)
-    // Remaining higher-order methods: fold, join, sequence, traverse — stubs
-    if method == "fold" or method == "join" or method == "sequence" or method == "traverse":
+    // Vec.fold(init, fn) — accumulate over elements
+    if method == "fold" and arg_count >= 2:
+        let fold_init = self.gen_expr(self.pool.get_extra(args_start))
+        let fold_closure_val = self.gen_expr(self.pool.get_extra(args_start + 1))
+        let fold_closure_ty = wl_type_of(fold_closure_val)
+        var fold_fn_ptr = fold_closure_val
+        var fold_ctx_ptr: i64 = 0
+        var fold_is_fat = 0
+        if wl_get_type_kind(fold_closure_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(fold_closure_ty) == 2:
+            fold_fn_ptr = wl_build_extract_value(self.builder, fold_closure_val, 0)
+            fold_ctx_ptr = wl_build_extract_value(self.builder, fold_closure_val, 1)
+            fold_is_fat = 1
+        let fold_fn_ty = wl_global_get_value_type(fold_fn_ptr)
+        var fold_elem_ty = self.infer_vec_elem_type_from_receiver(obj_node, wl_type_of(obj))
+        if fold_elem_ty == 0:
+            fold_elem_ty = i32_ty
+        let fold_acc_ty = wl_type_of(fold_init)
+        let fold_acc = self.create_entry_alloca(fold_acc_ty)
+        wl_build_store(self.builder, fold_init, fold_acc)
+        let fold_src = self.create_entry_alloca(wl_type_of(obj))
+        wl_build_store(self.builder, obj, fold_src)
+        let fold_len = wl_build_extract_value(self.builder, obj, 1)
+        let fold_counter = self.create_entry_alloca(i64_ty)
+        wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), fold_counter)
+        let fold_cond = wl_append_bb(self.context, self.current_function, "fold.cond")
+        let fold_body = wl_append_bb(self.context, self.current_function, "fold.body")
+        let fold_end = wl_append_bb(self.context, self.current_function, "fold.end")
+        wl_build_br(self.builder, fold_cond)
+        wl_position_at_end(self.builder, fold_cond)
+        let fold_i = wl_build_load(self.builder, i64_ty, fold_counter)
+        let fold_cmp = wl_build_icmp(self.builder, wl_int_slt(), fold_i, fold_len)
+        wl_build_cond_br(self.builder, fold_cmp, fold_body, fold_end)
+        wl_position_at_end(self.builder, fold_body)
+        let fold_get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+        let fold_get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
+        let fold_get_args: Vec[i64] = Vec.new()
+        fold_get_args.push(fold_src)
+        fold_get_args.push(wl_build_load(self.builder, i64_ty, fold_counter))
+        let fold_elem_ptr = wl_build_call(self.builder, fold_get_ty, fold_get_fn, vec_data_i64(&fold_get_args), 2)
+        let fold_elem = wl_build_load(self.builder, fold_elem_ty, fold_elem_ptr)
+        let fold_call_args: Vec[i64] = Vec.new()
+        if fold_is_fat != 0:
+            fold_call_args.push(fold_ctx_ptr)
+        fold_call_args.push(wl_build_load(self.builder, fold_acc_ty, fold_acc))
+        fold_call_args.push(fold_elem)
+        let fold_call_count = if fold_is_fat != 0: 3 else: 2
+        let fold_result = wl_build_call(self.builder, fold_fn_ty, fold_fn_ptr, vec_data_i64(&fold_call_args), fold_call_count)
+        wl_build_store(self.builder, fold_result, fold_acc)
+        let fold_next = wl_build_add(self.builder, wl_build_load(self.builder, i64_ty, fold_counter), wl_const_int(i64_ty, 1, 0))
+        wl_build_store(self.builder, fold_next, fold_counter)
+        wl_build_br(self.builder, fold_cond)
+        wl_position_at_end(self.builder, fold_end)
+        return wl_build_load(self.builder, fold_acc_ty, fold_acc)
+    // Vec.join(sep) — join Vec[str] with separator
+    if method == "join" and arg_count > 0:
+        let join_sep = self.gen_expr(self.pool.get_extra(args_start))
+        let join_fn = self.ensure_c_fn("with_vec_str_join", str_type, 2)
+        let join_args: Vec[i64] = Vec.new()
+        let join_src = self.create_entry_alloca(wl_type_of(obj))
+        wl_build_store(self.builder, obj, join_src)
+        join_args.push(join_src)
+        join_args.push(join_sep)
+        let join_params: Vec[i64] = Vec.new()
+        join_params.push(ptr_ty)
+        join_params.push(str_type)
+        let join_fn_ty = wl_function_type(str_type, vec_data_i64(&join_params), 2, 0)
+        return wl_build_call(self.builder, join_fn_ty, join_fn, vec_data_i64(&join_args), 2)
+    if method == "sequence" or method == "traverse":
+        with_eprintln("error: not yet implemented: Vec." ++ method ++ "()")
         return wl_get_undef(wl_i32_type(self.context))
+    with_eprintln("warning: [vec-method] unhandled vec method")
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.ensure_vec_runtime_fn(self: Codegen, name: str, ret_ty: i64, param_count: i32) -> i64:
@@ -10562,7 +10841,40 @@ fn Codegen.gen_hashmap_method(self: Codegen, method: str, obj: i64, args_start: 
         args.push(key_alloca)
         args.push(is_str_val)
         return wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 3)
-    // increment, decrement, update, append — stubs for now
+    if method == "increment" and arg_count > 0:
+        let key = self.gen_expr(self.pool.get_extra(args_start))
+        let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
+        wl_build_store(self.builder, key, key_alloca)
+        let fn_val = self.ensure_hm_fn("with_hashmap_increment", wl_void_type(self.context))
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        params.push(ptr_ty)
+        params.push(i64_ty)
+        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 3, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(map_ptr)
+        args.push(key_alloca)
+        args.push(is_str_val)
+        return wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 3)
+    if method == "decrement" and arg_count > 0:
+        let key = self.gen_expr(self.pool.get_extra(args_start))
+        let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
+        wl_build_store(self.builder, key, key_alloca)
+        let fn_val = self.ensure_hm_fn("with_hashmap_decrement", wl_void_type(self.context))
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        params.push(ptr_ty)
+        params.push(i64_ty)
+        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 3, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(map_ptr)
+        args.push(key_alloca)
+        args.push(is_str_val)
+        return wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 3)
+    if method == "update" or method == "append":
+        with_eprintln("error: not yet implemented: HashMap." ++ method ++ "()")
+        return wl_get_undef(wl_i32_type(self.context))
+    with_eprintln("warning: [hashmap-method] unhandled hashmap method")
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.ensure_hm_fn(self: Codegen, name: str, ret_ty: i64) -> i64:
@@ -10675,6 +10987,7 @@ fn Codegen.gen_option_method(self: Codegen, method: str, obj: i64, args_start: i
         let then_end = wl_get_insert_block(self.builder)
         wl_position_at_end(self.builder, else_bb)
         let result_ty = wl_type_of(then_result)
+        with_eprintln("warning: [option-method] map: then_result missing")
         let none_result = wl_get_undef(result_ty)
         wl_build_br(self.builder, merge_bb)
         let else_end = wl_get_insert_block(self.builder)
@@ -10690,34 +11003,111 @@ fn Codegen.gen_option_method(self: Codegen, method: str, obj: i64, args_start: i
         return phi
     if method == "filter" and arg_count > 0:
         // opt.filter(pred) → if Some(x) and pred(x) then Some(x) else None
-        return obj // Simplified stub
+        let filt_closure_val = self.gen_expr(self.pool.get_extra(args_start))
+        let filt_closure_ty = wl_type_of(filt_closure_val)
+        var filt_fn_ptr = filt_closure_val
+        var filt_ctx_ptr: i64 = 0
+        var filt_is_fat = 0
+        if wl_get_type_kind(filt_closure_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(filt_closure_ty) == 2:
+            filt_fn_ptr = wl_build_extract_value(self.builder, filt_closure_val, 0)
+            filt_ctx_ptr = wl_build_extract_value(self.builder, filt_closure_val, 1)
+            filt_is_fat = 1
+        let filt_fn_ty = wl_global_get_value_type(filt_fn_ptr)
+        let filt_then = wl_append_bb(self.context, self.current_function, "filt.some")
+        let filt_else = wl_append_bb(self.context, self.current_function, "filt.none")
+        let filt_check = wl_append_bb(self.context, self.current_function, "filt.check")
+        let filt_merge = wl_append_bb(self.context, self.current_function, "filt.merge")
+        wl_build_cond_br(self.builder, is_some, filt_then, filt_else)
+        wl_position_at_end(self.builder, filt_then)
+        let filt_payload = wl_build_extract_value(self.builder, obj, 1)
+        let filt_args: Vec[i64] = Vec.new()
+        if filt_is_fat != 0:
+            filt_args.push(filt_ctx_ptr)
+        filt_args.push(filt_payload)
+        let filt_arg_count = if filt_is_fat != 0: 2 else: 1
+        let filt_pred_result = wl_build_call(self.builder, filt_fn_ty, filt_fn_ptr, vec_data_i64(&filt_args), filt_arg_count)
+        var filt_bool = filt_pred_result
+        if wl_type_of(filt_pred_result) != wl_i1_type(self.context):
+            filt_bool = wl_build_icmp(self.builder, wl_int_ne(), filt_pred_result, wl_const_int(wl_type_of(filt_pred_result), 0, 0))
+        wl_build_cond_br(self.builder, filt_bool, filt_check, filt_else)
+        wl_position_at_end(self.builder, filt_check)
+        wl_build_br(self.builder, filt_merge)
+        let filt_check_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, filt_else)
+        let filt_none = self.build_option_none(obj_ty)
+        wl_build_br(self.builder, filt_merge)
+        let filt_else_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, filt_merge)
+        let filt_phi = wl_build_phi(self.builder, obj_ty)
+        let filt_phi_vals: Vec[i64] = Vec.new()
+        let filt_phi_bbs: Vec[i64] = Vec.new()
+        filt_phi_vals.push(obj)
+        filt_phi_vals.push(filt_none)
+        filt_phi_bbs.push(filt_check_end)
+        filt_phi_bbs.push(filt_else_end)
+        wl_add_incoming(filt_phi, vec_data_i64(&filt_phi_vals), vec_data_i64(&filt_phi_bbs), 2)
+        return filt_phi
     if method == "or_else" and arg_count > 0:
-        // opt.or_else(fn) → if Some return self else fn()
-        return obj // Simplified stub
+        with_eprintln("error: not yet implemented: Option.or_else() — requires lambda return type unification")
+        return wl_get_undef(obj_ty)
     if method == "flatten":
-        // Option[Option[T]].flatten() → Option[T]
-        return obj // Stub
+        // Option[Option[T]].flatten() → if None, None; if Some, extract inner
+        let fl_then = wl_append_bb(self.context, self.current_function, "fl.some")
+        let fl_else = wl_append_bb(self.context, self.current_function, "fl.none")
+        let fl_merge = wl_append_bb(self.context, self.current_function, "fl.merge")
+        wl_build_cond_br(self.builder, is_some, fl_then, fl_else)
+        wl_position_at_end(self.builder, fl_then)
+        let fl_inner = wl_build_extract_value(self.builder, obj, 1)
+        let fl_inner_ty = wl_type_of(fl_inner)
+        wl_build_br(self.builder, fl_merge)
+        let fl_then_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, fl_else)
+        let fl_none = self.build_option_none(fl_inner_ty)
+        wl_build_br(self.builder, fl_merge)
+        let fl_else_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, fl_merge)
+        let fl_phi = wl_build_phi(self.builder, fl_inner_ty)
+        let fl_phi_vals: Vec[i64] = Vec.new()
+        let fl_phi_bbs: Vec[i64] = Vec.new()
+        fl_phi_vals.push(fl_inner)
+        fl_phi_vals.push(fl_none)
+        fl_phi_bbs.push(fl_then_end)
+        fl_phi_bbs.push(fl_else_end)
+        wl_add_incoming(fl_phi, vec_data_i64(&fl_phi_vals), vec_data_i64(&fl_phi_bbs), 2)
+        return fl_phi
     if method == "cloned":
         return obj // Clone is identity for most types
-    if method == "zip" and arg_count > 0:
-        return wl_get_undef(wl_i32_type(self.context)) // Stub
+    if method == "zip":
+        with_eprintln("error: not yet implemented: Option.zip()")
+        return wl_get_undef(wl_i32_type(self.context))
     if method == "transpose":
-        return obj // Stub
+        with_eprintln("error: not yet implemented: Option.transpose()")
+        return wl_get_undef(wl_i32_type(self.context))
     if method == "ok":
         // Result.ok() → Option[T]
         let payload = wl_build_extract_value(self.builder, obj, 1)
         let opt_ty = self.get_or_create_option_type(wl_type_of(payload))
         return wl_build_select(self.builder, is_some, self.build_option_some(payload, opt_ty), self.build_option_none(opt_ty))
     if method == "err":
-        return wl_get_undef(wl_i32_type(self.context)) // Stub
-    if method == "context" and arg_count > 0:
-        return obj // Stub
+        // Result.err() → Option[E] — tag=0 is Ok, tag!=0 is Err
+        // For Result, payload at index 1 is Ok value, error at index 2 (if exists)
+        // But Result uses same {tag, payload} layout; err value IS the payload when tag!=0
+        let err_payload = wl_build_extract_value(self.builder, obj, 1)
+        let err_opt_ty = self.get_or_create_option_type(wl_type_of(err_payload))
+        let is_err = wl_build_icmp(self.builder, wl_int_ne(), tag, wl_const_int(i32_ty, 0, 0))
+        return wl_build_select(self.builder, is_err, self.build_option_some(err_payload, err_opt_ty), self.build_option_none(err_opt_ty))
+    if method == "context":
+        with_eprintln("error: not yet implemented: Result.context()")
+        return wl_get_undef(wl_i32_type(self.context))
     if method == "map_err" and arg_count > 0:
-        return obj // Stub
+        with_eprintln("error: not yet implemented: Result.map_err() — requires lambda return type unification")
+        return wl_get_undef(obj_ty)
+    with_eprintln("warning: [option-method] unhandled option/result method")
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.gen_diverge_builtin(self: Codegen, args_start: i32, arg_count: i32) -> i64:
     if arg_count > 1:
+        with_eprintln("warning: [diverge] unexpected arg_count")
         return wl_get_undef(wl_i32_type(self.context))
     if arg_count == 1:
         // Evaluate optional message expression for side effects.
@@ -10734,6 +11124,7 @@ fn Codegen.gen_diverge_builtin(self: Codegen, args_start: i32, arg_count: i32) -
 
 fn Codegen.gen_precondition_call(self: Codegen, args_start: i32, arg_count: i32, prefix: str) -> i64:
     if arg_count < 1:
+        with_eprintln("warning: [precondition] missing argument")
         return wl_get_undef(wl_i32_type(self.context))
 
     let cond = self.gen_expr(self.pool.get_extra(args_start))
