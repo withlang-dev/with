@@ -4,11 +4,11 @@
 
 use std.collections
 
-extern fn with_vec_len(v: &Vec[i32]) -> i64
-extern fn with_vec_get_i32(v: &Vec[i32], index: i64) -> i32
-extern fn with_vec_get_str(v: &Vec[str], index: i64) -> str
-extern fn with_vec_push_i32(v: &Vec[i32], val: i32) -> void
-extern fn with_vec_new_out(v: &Vec[i32], elem_size: i64) -> void
+extern fn with_vec_len(v: *void) -> i64
+extern fn with_vec_get_i32(v: *void, index: i64) -> i32
+extern fn with_vec_get_str(v: *void, index: i64) -> str
+extern fn with_vec_push_i32(v: *void, val: i32) -> void
+extern fn with_vec_new_out(v: *void, elem_size: i64) -> void
 
 pub fn sum(arr: Vec[i32]) -> i32:
     var total: i32 = 0

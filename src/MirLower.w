@@ -1448,7 +1448,15 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.lower_un_op(op, operand, node)
 
     if kind == NK_CAST:
-        return self.lower_cast(self.ast.get_data0(node), self.sema.resolve_type_expr(self.ast.get_data1(node)), node)
+        // Read pre-resolved cast type from sema sidecar (avoids add_type on
+        // shallow-copied Sema — see resolve_type_expr aliasing bug).
+        let cast_start = self.ast.get_start(node)
+        var cast_tid = 0
+        if self.sema.typed_expr_types.contains(cast_start):
+            cast_tid = self.sema.typed_expr_types.get(cast_start).unwrap()
+        else:
+            cast_tid = self.sema.resolve_type_expr(self.ast.get_data1(node))
+        return self.lower_cast(self.ast.get_data0(node), cast_tid, node)
 
     if kind == NK_FIELD_ACCESS:
         let place = self.lower_field_access(self.ast.get_data0(node), self.ast.get_data1(node))

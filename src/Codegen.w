@@ -317,6 +317,9 @@ type Codegen = {
     local_fn_sigs: HashMap[i32, i64],
     local_pointee_structs: HashMap[i32, i32],
 
+    // Sema type annotations: sym → sema TypeId (for generic type dispatch)
+    local_sema_types: HashMap[i32, i32],
+
     // Declared functions: sym → value/type
     fn_values: HashMap[i32, i64],
     fn_fn_types: HashMap[i32, i64],
@@ -590,6 +593,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         local_muts: HashMap.new(),
         local_fn_sigs: HashMap.new(),
         local_pointee_structs: HashMap.new(),
+        local_sema_types: HashMap.new(),
         fn_values: HashMap.new(),
         fn_fn_types: HashMap.new(),
         struct_type_map: HashMap.new(),
@@ -3596,6 +3600,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     let saved_vec_local_types = self.vec_local_types
     let saved_hm_local_types = self.hm_local_types
     let saved_enum_local_types = self.enum_local_types
+    let saved_sema_local_types = self.local_sema_types
     let saved_expected = self.expected_type
     let saved_expected_node = self.expected_type_node
     let saved_result_err = self.current_result_err_symbol
@@ -3705,6 +3710,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     self.vec_local_types = saved_vec_local_types
     self.hm_local_types = saved_hm_local_types
     self.enum_local_types = saved_enum_local_types
+    self.local_sema_types = saved_sema_local_types
     self.scope_local_syms = saved_scope_syms
     self.scope_local_allocas = saved_scope_allocas
     self.scope_local_types = saved_scope_types
@@ -5358,6 +5364,11 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
 
         self.record_local(p_name, alloca, param_type, 1)  // treat all as mutable for codegen
         self.record_local_container_type(p_name, p_type_node)
+        // Record sema type for generic type params
+        if p_type_node != 0 and self.pool.kind(p_type_node) == NK_TYPE_GENERIC:
+            let p_sema_tid = self.sema.resolve_type_expr(p_type_node)
+            if p_sema_tid > 0:
+                self.local_sema_types.insert(p_name, p_sema_tid)
 
         // Track fn_sig for function pointer params
         if p_type_node != 0:
@@ -6302,10 +6313,19 @@ fn Codegen.gen_let_binding(self: Codegen, node: i32) -> i64:
     self.record_local(name_sym, alloca, storage_ty, is_mut)
     if declared_type_node != 0:
         self.record_local_container_type(name_sym, declared_type_node)
+        // Track sema type for generic type annotations
+        if self.pool.kind(declared_type_node) == NK_TYPE_GENERIC:
+            let sema_tid = self.sema.resolve_type_expr(declared_type_node)
+            if sema_tid > 0:
+                self.local_sema_types.insert(name_sym, sema_tid)
     if alias_sym != 0:
         self.record_local(alias_sym, alloca, storage_ty, is_mut)
         if declared_type_node != 0:
             self.record_local_container_type(alias_sym, declared_type_node)
+            if self.pool.kind(declared_type_node) == NK_TYPE_GENERIC:
+                let sema_tid_a = self.sema.resolve_type_expr(declared_type_node)
+                if sema_tid_a > 0:
+                    self.local_sema_types.insert(alias_sym, sema_tid_a)
     let pointee_struct = self.infer_local_pointee_struct(value_node, declared_type_node, storage_ty)
     if pointee_struct != 0:
         self.record_local_pointee_struct(name_sym, pointee_struct)
@@ -6948,6 +6968,12 @@ fn Codegen.find_option_idx_by_llvm(self: Codegen, opt_ty: i64) -> i32:
             return i
     0 - 1
 
+fn Codegen.find_result_idx_by_llvm(self: Codegen, res_ty: i64) -> i32:
+    for i in 0..self.result_llvm_types.len() as i32:
+        if self.result_llvm_types.get(i as i64) == res_ty:
+            return i
+    0 - 1
+
 fn Codegen.find_result_ok_type_by_llvm(self: Codegen, res_ty: i64) -> i64:
     for i in 0..self.result_llvm_types.len() as i32:
         if self.result_llvm_types.get(i as i64) == res_ty:
@@ -7312,6 +7338,7 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
     let saved_vec_local_types = self.vec_local_types
     let saved_hm_local_types = self.hm_local_types
     let saved_enum_local_types = self.enum_local_types
+    let saved_sema_local_types = self.local_sema_types
     let saved_expected = self.expected_type
     let saved_expected_node = self.expected_type_node
     let saved_tail_bb = self.tailrec_body_bb
@@ -7404,6 +7431,7 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
     self.vec_local_types = saved_vec_local_types
     self.hm_local_types = saved_hm_local_types
     self.enum_local_types = saved_enum_local_types
+    self.local_sema_types = saved_sema_local_types
     self.scope_local_syms = saved_scope_syms
     self.scope_local_allocas = saved_scope_allocas
     self.scope_local_types = saved_scope_types
@@ -9269,6 +9297,33 @@ fn Codegen.gen_variant_shorthand(self: Codegen, node: i32) -> i64:
             let payload_ptr = wl_build_struct_gep(self.builder, opt_ty, alloca, 1)
             wl_build_store(self.builder, payload_val, payload_ptr)
             return wl_build_load(self.builder, opt_ty, alloca)
+
+    // Result .Ok(val) / .Err(val): when current_ret_type or expected_type is a Result
+    if (variant_name == "Ok" or variant_name == "Err") and arg_count > 0:
+        var res_ctx_ty: i64 = 0
+        if self.current_ret_type != 0 and self.find_result_idx_by_llvm(self.current_ret_type) >= 0:
+            res_ctx_ty = self.current_ret_type
+        else if self.expected_type != 0 and self.find_result_idx_by_llvm(self.expected_type) >= 0:
+            res_ctx_ty = self.expected_type
+        if res_ctx_ty != 0:
+            let res_idx = self.find_result_idx_by_llvm(res_ctx_ty)
+            let ok_ty = self.result_ok_types.get(res_idx as i64)
+            let err_ty = self.result_err_types.get(res_idx as i64)
+            let payload_node = self.pool.get_extra(args_start)
+            let payload_val = self.gen_expr(payload_node)
+            let res_ty = self.get_or_create_result_type(ok_ty, err_ty)
+            let alloca = wl_build_alloca(self.builder, res_ty)
+            wl_build_store(self.builder, self.build_default_value(res_ty), alloca)
+            let tag_ptr = wl_build_struct_gep(self.builder, res_ty, alloca, 0)
+            // Result layout: tag=0 for Ok, tag=1 for Err
+            let tag_val = if variant_name == "Ok": 0 else: 1
+            wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), tag_val as i64, 0), tag_ptr)
+            let elem_count = wl_count_struct_elem_types(res_ty)
+            if elem_count > 1:
+                let payload_ptr = wl_build_struct_gep(self.builder, res_ty, alloca, 1)
+                let cast_ptr = wl_build_bitcast(self.builder, payload_ptr, wl_ptr_type(self.context))
+                wl_build_store(self.builder, payload_val, cast_ptr)
+            return wl_build_load(self.builder, res_ty, alloca)
 
     // .Variant(args) — try to find the variant and construct it
     // Search through enum types for matching variant

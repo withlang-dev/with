@@ -771,9 +771,11 @@ fn ResolveState.bind_pattern(self: ResolveState, pool: AstPool, module_id: i32, 
     if kind == NK_PAT_VARIANT or kind == NK_PAT_ENUM_SHORTHAND:
         let start = pool.get_data1(pat)
         let count = pool.get_data2(pat)
+        let pat_start = pool.get_start(pat)
+        let pat_end = pool.get_end(pat)
         for i in 0..count:
             let inner = resolve_extra_or_zero(pool, start + i)
-            if resolve_node_valid(pool, inner) and pool.kind(inner) >= NK_PAT_WILDCARD and pool.kind(inner) <= NK_PAT_SLICE:
+            if inner != pat and resolve_node_valid(pool, inner) and pool.kind(inner) >= NK_PAT_WILDCARD and pool.kind(inner) <= NK_PAT_SLICE and pool.get_start(inner) >= pat_start and pool.get_end(inner) <= pat_end:
                 self.bind_pattern(pool, module_id, parent_def, current_scope, inner)
             else if inner > 0:
                 let d = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, inner, pool.get_start(pat), pool.get_end(pat))
