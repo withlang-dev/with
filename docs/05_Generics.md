@@ -229,21 +229,33 @@ distinguishable from `impl Trait for Vec[str]`.
 
 ### Tasks
 
-- [ ] Read current impl collection: `impl_lookup`, `impl_extra`,
+- [x] Read current impl collection: `impl_lookup`, `impl_extra`,
       `impl_starts`, `impl_counts`, `impl_type_syms` (lines 112-116)
+- [x] Add argument type checking in `check_method_call` for
+      TY_GENERIC_INST receivers: resolves method parameter type nodes
+      via `resolve_generic_return_type_node` with substitution, compares
+      against actual argument types. Works for user-defined methods.
+- [x] Add builtin generic method arg checking for Vec.push,
+      HashMap.insert — checks arg types against generic instance type
+      args without fn_decl nodes. Enables `err_vec_type_mismatch.w`.
 - [ ] In `collect_impl_decl`: when impl target is a generic type
       (e.g., `impl Display for Vec[i32]`), store TY_GENERIC_INST
       TypeId as the impl key, not just the base type symbol
+      **Blocked:** Parser only stores base type name as symbol for
+      impl targets — generic args `[i32]` are discarded. Needs
+      parser change to capture generic args in impl type position.
 - [ ] In `select_trait_impl`: when querying for a TY_GENERIC_INST
       type, match against both exact instantiation impls and
-      blanket impls
+      blanket impls (depends on collect_impl_decl change above)
 - [ ] Handle `impl[T] Trait for Vec[T]` — blanket impls over
       generic types require matching TY_GENERIC_INST args against
-      type parameters
+      type parameters (depends on parser changes)
 - [ ] Use `substitute_type` (Phase 5) when resolving trait methods
-      on generic instances
-- [ ] `make build`
-- [ ] `make fixpoint`
+      on generic instances — partially done via
+      substitute_method_return_for_generic_inst (return types) and
+      check_method_call arg checking (parameter types)
+- [x] `make build`
+- [x] `make fixpoint`
 
 ---
 
@@ -393,14 +405,22 @@ keyword). `Self` resolves to the implementing type in impl blocks,
 but `Self.Name` (e.g., `Self.Output`, `Self.Item`) does not resolve
 to the associated type defined in the current impl.
 
-- [ ] In sema type resolution: when encountering `Self.Name` (field
+- [x] In sema type resolution: when encountering `Self.Name` (field
       access on `Self` in a type position), look up the associated
       type binding from the current impl's trait
-- [ ] In impl block processing: record the mapping from associated
+      Added NK_TYPE_ASSOC (kind 91) to Ast.w. Parser handles both
+      TK_DOT_IDENT (.Uppercase) and TK_DOT (lowercase) after ident.
+- [x] In impl block processing: record the mapping from associated
       type names to their concrete types for the current impl
-- [ ] Handle `Self.Name` in return types, parameter types, and
+      Added method_impl_nodes HashMap (fn_sym → impl_node) in Sema,
+      populated during compute_method_origins. assoc_type_bindings
+      HashMap populated in collect_fn_decl and check_fn_body.
+- [x] Handle `Self.Name` in return types, parameter types, and
       expressions within impl methods
-- [ ] Write test `test/cases/behav_self_assoc_type.w`:
+      Sema: NK_TYPE_ASSOC handler in resolve_type_expr looks up
+      assoc_type_bindings. Codegen: NK_TYPE_ASSOC handler in
+      resolve_type looks up impl node via sema.method_impl_nodes.
+- [x] Write test `test/cases/behav_self_assoc_type.w`:
       ```
       trait Transform =
           type Output
@@ -411,7 +431,7 @@ to the associated type defined in the current impl.
           type Output = i32
           fn apply(self: Doubler, x: i32) -> Self.Output: x * 2
       ```
-- [ ] `make build && make fixpoint`
+- [x] `make build && make fixpoint` — 225/225 tests pass, fixpoint holds
 
 ---
 
@@ -422,9 +442,10 @@ previously invisible.
 
 ### Tasks
 
-- [ ] Write `test/cases/err_vec_type_mismatch.w`:
-      Blocked: sema does not yet type-check method call arguments
-      against generic type parameters. Requires Phase 8 impl resolution.
+- [x] Write `test/cases/err_vec_type_mismatch.w`:
+      Added argument type checking for builtin generic methods (Vec.push,
+      HashMap.insert) and user-defined methods on TY_GENERIC_INST receivers.
+      check_method_call now resolves parameter types via substitution.
 - [x] Write `test/cases/err_generic_return_mismatch.w`:
       Tail expression return type mismatch now caught via check_fn_body.
       Added expected_expr_type propagation for variant shorthand resolution.
@@ -435,7 +456,7 @@ previously invisible.
 - [x] Write `test/cases/behav_result_generic.w`:
       Fixed: Result match dispatch (find_variant_index Ok=0/Err=1) and
       payload extraction (bitcast [N x i8] to declared Ok/Err type).
-- [x] Run `./scripts/run_tests.sh` — 222/222 tests pass
+- [x] Run `./scripts/run_tests.sh` — 225/225 tests pass
 - [x] `make fixpoint`
 
 ---

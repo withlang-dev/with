@@ -3384,6 +3384,19 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
     if t == TK_IDENT:
         let sym = self.intern_current()
         self.advance()
+        if self.peek() == TK_DOT_IDENT:
+            // Self.Output — dot + uppercase ident combined by lexer
+            let dot_s = self.current_start()
+            let dot_e = self.current_end()
+            let assoc_text = self.source.slice((dot_s + 1) as i64, dot_e as i64)
+            let assoc_sym = self.intern.intern(assoc_text)
+            self.advance()
+            return self.pool.add_node(NK_TYPE_ASSOC, start, self.prev_end(), sym, assoc_sym, 0)
+        if self.peek() == TK_DOT:
+            // Self.output — dot + lowercase ident are separate tokens
+            self.advance()
+            let assoc_sym = self.expect_ident()
+            return self.pool.add_node(NK_TYPE_ASSOC, start, self.prev_end(), sym, assoc_sym, 0)
         if self.peek() == TK_L_BRACKET:
             self.advance()
             var args: Vec[i32] = Vec.new()
