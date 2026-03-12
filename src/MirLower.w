@@ -924,6 +924,12 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
         return
 
+    // Dyn trait typed-bind pattern: fall back to AST codegen.
+    if pk == NK_PAT_TYPED_BIND:
+        self.body.lowering_failed = 1
+        self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
+        return
+
     // Other patterns (struct/slice) are conservatively accepted here.
     self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
 

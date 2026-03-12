@@ -437,7 +437,7 @@ type Codegen = {
     trait_decl_nodes: HashMap[i32, i32],
 
     // VTable globals: hash(type,trait) → global
-    vtable_globals: HashMap[i64, i64],
+    vtable_globals: HashMap[i32, i64],
 
     // Trait-typed locals
     trait_locals: HashMap[i32, i32],
@@ -969,8 +969,8 @@ fn Codegen.dyn_trait_from_type_node(self: Codegen, type_node: i32) -> i32:
             return self.dyn_trait_from_type_node(self.pool.get_extra(g_extra))
     0
 
-fn codegen_hash_type_trait_key(type_sym: i32, trait_sym: i32) -> i64:
-    (type_sym as i64) * 4294967296 + (trait_sym as i64)
+fn codegen_hash_type_trait_key(type_sym: i32, trait_sym: i32) -> i32:
+    type_sym * 10007 + trait_sym
 
 fn Codegen.get_dyn_fat_ptr_type(self: Codegen) -> i64:
     if self.dyn_fat_ptr_type != 0:
@@ -4053,7 +4053,8 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
         let body_idx = self.mir_input.find_body(fn_sym)
         if body_idx >= 0:
             let body = self.mir_input.bodies.get(body_idx as i64)
-            if self.mir_function_is_supported(body):
+            let supported = self.mir_function_is_supported(body)
+            if supported:
                 // Bisect: WITH_MIR_LIMIT=N limits MIR to first N functions
                 let limit_str = with_getenv_str("WITH_MIR_LIMIT")
                 if limit_str.len() > 0:
@@ -4887,6 +4888,15 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     if param_count > 0:
         wl_get_param_types(call_ft, vec_data_i64(&param_types))
 
+    // Resolve callee fn_sym for dyn trait parameter lookup
+    var callee_fn_sym: i32 = 0
+    if callee_operand >= 0 and callee_operand < body.operand_kinds.len() as i32:
+        let co_k = body.operand_kinds.get(callee_operand as i64)
+        let co_d = body.operand_d0.get(callee_operand as i64)
+        if co_k == OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
+            if body.const_kinds.get(co_d as i64) == CK_FN:
+                callee_fn_sym = body.const_d0.get(co_d as i64)
+
     let args: Vec[i64] = Vec.new()
     if is_indirect:
         args.push(ctx_ptr_val)
@@ -4896,7 +4906,27 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         let param_offset = if is_indirect: ai + 1 else: ai
         if param_offset < param_count:
             expected_ty = param_types.get(param_offset as i64)
-        args.push(self.mir_eval_call_operand(body, operand_id, expected_ty, call_context, ai))
+        // Check for dyn param BEFORE evaluating operand — coercion would
+        // mangle the concrete struct into the fat-pointer shape.
+        var dyn_trait_sym: i32 = 0
+        if callee_fn_sym != 0:
+            dyn_trait_sym = self.get_fn_dyn_param_trait(callee_fn_sym, ai)
+        var arg_val: i64 = 0
+        if dyn_trait_sym != 0:
+            // Evaluate without coercion so we get the raw concrete value.
+            arg_val = self.mir_eval_operand(body, operand_id, 0)
+            let arg_ty = wl_type_of(arg_val)
+            var concrete_sym: i32 = 0
+            for si in 0..self.struct_llvm_types.len() as i32:
+                if self.struct_llvm_types.get(si as i64) == arg_ty:
+                    if si < self.struct_index_syms.len() as i32:
+                        concrete_sym = self.struct_index_syms.get(si as i64)
+                    break
+            if concrete_sym != 0:
+                arg_val = self.build_dyn_trait_value(arg_val, concrete_sym, dyn_trait_sym)
+        else:
+            arg_val = self.mir_eval_call_operand(body, operand_id, expected_ty, call_context, ai)
+        args.push(arg_val)
 
     let actual_callee = if is_indirect: fn_ptr_val else: callee
     let actual_arg_count = if is_indirect: arg_count + 1 else: arg_count
@@ -8199,6 +8229,97 @@ fn Codegen.gen_match(self: Codegen, node: i32) -> i64:
 
     let merge_bb = wl_append_bb(self.context, self.current_function, "match.end")
 
+    // Detect dyn trait match: subject is a dyn trait fat pointer {data_ptr, vtable_ptr}
+    var is_dyn_match = false
+    var dyn_trait_sym: i32 = 0
+    if self.pool.kind(subject_node) == NK_IDENT:
+        let subj_sym = self.pool.get_data0(subject_node)
+        let tl = self.trait_locals.get(subj_sym)
+        if tl.is_some():
+            // Check if any arm uses NK_PAT_TYPED_BIND
+            for dci in 0..arm_count:
+                let dc_arm = self.pool.get_extra(arms_start + dci)
+                let dc_pat = self.pool.get_data0(dc_arm)
+                if self.pool.kind(dc_pat) == NK_PAT_TYPED_BIND:
+                    is_dyn_match = true
+                    dyn_trait_sym = tl.unwrap()
+                    break
+
+    if is_dyn_match:
+        let ptr_ty = wl_ptr_type(self.context)
+        let vtable_ptr = wl_build_extract_value(self.builder, subject, 1)
+        let data_ptr = wl_build_extract_value(self.builder, subject, 0)
+        var result_alloca: i64 = 0
+        var has_result = false
+        var di = 0
+        while di < arm_count:
+            let d_arm_node = self.pool.get_extra(arms_start + di)
+            let d_pat_node = self.pool.get_data0(d_arm_node)
+            let d_body_node = self.pool.get_data1(d_arm_node)
+            let d_pk = self.pool.kind(d_pat_node)
+
+            if d_pk == NK_PAT_WILDCARD or d_pk == NK_PAT_IDENT:
+                // Default arm — generate body directly
+                if d_pk == NK_PAT_IDENT:
+                    let bind_sym = self.pool.get_data0(d_pat_node)
+                    let alloca = self.create_entry_alloca(subject_ty)
+                    wl_build_store(self.builder, subject, alloca)
+                    self.record_local(bind_sym, alloca, subject_ty, 0)
+                let body_val = self.gen_expr(d_body_node)
+                if not has_result and wl_type_of(body_val) != wl_void_type(self.context):
+                    result_alloca = self.create_entry_alloca(wl_type_of(body_val))
+                    has_result = true
+                if has_result and result_alloca != 0:
+                    wl_build_store(self.builder, body_val, result_alloca)
+                if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
+                    wl_build_br(self.builder, merge_bb)
+                di = di + 1
+                continue
+
+            if d_pk == NK_PAT_TYPED_BIND:
+                let bind_sym = self.pool.get_data0(d_pat_node)
+                let type_sym = self.pool.get_data1(d_pat_node)
+                // Look up vtable global for this concrete type + trait
+                let vt_key = codegen_hash_type_trait_key(type_sym, dyn_trait_sym)
+                let vt_opt = self.vtable_globals.get(vt_key)
+                if vt_opt.is_some():
+                    let expected_vt = vt_opt.unwrap() as i64
+                    let i64_ty = wl_i64_type(self.context)
+                    let vt_int = wl_build_ptr_to_int(self.builder, vtable_ptr, i64_ty)
+                    let exp_int = wl_build_ptr_to_int(self.builder, expected_vt, i64_ty)
+                    let cmp = wl_build_icmp(self.builder, wl_int_eq(), vt_int, exp_int)
+                    let arm_bb = wl_append_bb(self.context, self.current_function, "match.dyn.arm")
+                    let next_bb = wl_append_bb(self.context, self.current_function, "match.dyn.next")
+                    wl_build_cond_br(self.builder, cmp, arm_bb, next_bb)
+                    wl_position_at_end(self.builder, arm_bb)
+                    // Bind: load concrete value from data_ptr
+                    let st = self.struct_type_map.get(type_sym)
+                    if st.is_some():
+                        let concrete_ty = self.struct_llvm_types.get(st.unwrap() as i64)
+                        let concrete_val = wl_build_load(self.builder, concrete_ty, data_ptr)
+                        let alloca = self.create_entry_alloca(concrete_ty)
+                        wl_build_store(self.builder, concrete_val, alloca)
+                        self.record_local(bind_sym, alloca, concrete_ty, 0)
+                        self.record_local_pointee_struct(bind_sym, type_sym)
+                    let body_val = self.gen_expr(d_body_node)
+                    if not has_result and wl_type_of(body_val) != wl_void_type(self.context):
+                        result_alloca = self.create_entry_alloca(wl_type_of(body_val))
+                        has_result = true
+                    if has_result and result_alloca != 0:
+                        wl_build_store(self.builder, body_val, result_alloca)
+                    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
+                        wl_build_br(self.builder, merge_bb)
+                    wl_position_at_end(self.builder, next_bb)
+            di = di + 1
+
+        // Dyn match fallthrough
+        if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
+            wl_build_br(self.builder, merge_bb)
+        wl_position_at_end(self.builder, merge_bb)
+        if has_result and result_alloca != 0:
+            return wl_build_load(self.builder, wl_get_allocated_type(result_alloca), result_alloca)
+        return wl_const_int(wl_i32_type(self.context), 0, 0)
+
     // Check if matching on integer or enum
     let is_int = wl_get_type_kind(subject_ty) == wl_integer_type_kind()
 
@@ -9372,15 +9493,31 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
             captures.push(sym)
     let capture_count = captures.len() as i32
 
+    // Determine if this is a non-escaping closure (reference capture)
+    let is_ref_capture = self.pool.is_non_escaping_closure(node) == 1 and self.pool.is_move_closure(node) == 0
+
     // Build capture struct type from captured variable types
     let cap_types: Vec[i64] = Vec.new()
     for ci in 0..capture_count:
         let sym = captures.get(ci as i64)
-        let ty_opt = self.local_types.get(sym)
-        if ty_opt.is_some():
-            cap_types.push(ty_opt.unwrap() as i64)
+        if is_ref_capture:
+            cap_types.push(ptr_ty)
         else:
-            cap_types.push(i32_ty)
+            let ty_opt = self.local_types.get(sym)
+            if ty_opt.is_some():
+                cap_types.push(ty_opt.unwrap() as i64)
+            else:
+                cap_types.push(i32_ty)
+    // Collect original types for ref capture (needed inside closure body)
+    let cap_orig_types: Vec[i64] = Vec.new()
+    if is_ref_capture:
+        for ci in 0..capture_count:
+            let sym = captures.get(ci as i64)
+            let ty_opt = self.local_types.get(sym)
+            if ty_opt.is_some():
+                cap_orig_types.push(ty_opt.unwrap() as i64)
+            else:
+                cap_orig_types.push(i32_ty)
     var cap_struct_type: i64 = 0
     if capture_count > 0:
         cap_struct_type = wl_struct_type(self.context, vec_data_i64(&cap_types), capture_count, 0)
@@ -9429,10 +9566,20 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
             indices.push(wl_const_int(i32_ty, 0, 0))
             indices.push(wl_const_int(i32_ty, ci as i64, 0))
             let gep = wl_build_gep(self.builder, cap_struct_type, cap_ptr, vec_data_i64(&indices), 2)
-            let loaded = wl_build_load(self.builder, cap_ty, gep)
-            let alloca = self.create_entry_alloca(cap_ty)
-            wl_build_store(self.builder, loaded, alloca)
-            self.record_local(sym, alloca, cap_ty, 0)
+            if is_ref_capture:
+                // Reference capture: load the pointer to outer alloca, use directly
+                let outer_ptr = wl_build_load(self.builder, ptr_ty, gep)
+                let orig_ty = cap_orig_types.get(ci as i64)
+                // Look up outer mutability
+                let outer_mut_opt = saved_muts.get(sym)
+                let outer_mut = if outer_mut_opt.is_some(): outer_mut_opt.unwrap() else: 0
+                self.record_local(sym, outer_ptr, orig_ty, outer_mut)
+            else:
+                // Value capture: load value, create fresh alloca
+                let loaded = wl_build_load(self.builder, cap_ty, gep)
+                let alloca = self.create_entry_alloca(cap_ty)
+                wl_build_store(self.builder, loaded, alloca)
+                self.record_local(sym, alloca, cap_ty, 0)
 
     // Add params as locals (skip param 0 which is context ptr)
     for i in 0..param_count:
@@ -9472,12 +9619,17 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
             let cap_ty = cap_types.get(ci as i64)
             let alloca_opt = saved_allocas.get(sym)
             if alloca_opt.is_some():
-                let val = wl_build_load(self.builder, cap_ty, alloca_opt.unwrap() as i64)
                 let indices: Vec[i64] = Vec.new()
                 indices.push(wl_const_int(i32_ty, 0, 0))
                 indices.push(wl_const_int(i32_ty, ci as i64, 0))
                 let gep = wl_build_gep(self.builder, cap_struct_type, cap_alloca, vec_data_i64(&indices), 2)
-                wl_build_store(self.builder, val, gep)
+                if is_ref_capture:
+                    // Store pointer to outer alloca (not the value)
+                    wl_build_store(self.builder, alloca_opt.unwrap() as i64, gep)
+                else:
+                    // Store the value
+                    let val = wl_build_load(self.builder, cap_ty, alloca_opt.unwrap() as i64)
+                    wl_build_store(self.builder, val, gep)
         ctx_ptr = cap_alloca
 
     // Build fat pointer {fn_ptr, ctx_ptr}
