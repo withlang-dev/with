@@ -8662,6 +8662,25 @@ fn Codegen.gen_match(self: Codegen, node: i32) -> i64:
                                     payload_val = wl_build_load(self.builder, declared_payload_ty, cast_ptr)
                                     payload_ty = declared_payload_ty
 
+                    // Result type payload extraction: when enum lookup fails,
+                    // try the Result infrastructure to find declared payload type.
+                    if wl_get_type_kind(payload_ty) == wl_array_type_kind():
+                        let res_idx = self.find_result_idx_by_llvm(subject_ty)
+                        if res_idx >= 0:
+                            let v_name_str = self.intern.resolve(variant_sym)
+                            var declared_res_ty: i64 = 0
+                            if v_name_str == "Ok":
+                                declared_res_ty = self.result_ok_types.get(res_idx as i64)
+                            else if v_name_str == "Err":
+                                declared_res_ty = self.result_err_types.get(res_idx as i64)
+                            if declared_res_ty != 0:
+                                let raw_ty = wl_type_of(raw_payload)
+                                let raw_alloca = wl_build_alloca(self.builder, raw_ty)
+                                wl_build_store(self.builder, raw_payload, raw_alloca)
+                                let cast_ptr = wl_build_bitcast(self.builder, raw_alloca, wl_ptr_type(self.context))
+                                payload_val = wl_build_load(self.builder, declared_res_ty, cast_ptr)
+                                payload_ty = declared_res_ty
+
                     let payload_fields = if wl_get_type_kind(payload_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(payload_ty) else: 0
                     // Unwrap single-element struct wrapper { T } -> T for single bindings
                     if v_bind_count == 1 and payload_fields == 1:
@@ -8978,6 +8997,16 @@ fn Codegen.find_variant_index(self: Codegen, enum_ty: i64, variant_sym: i32) -> 
             if variant_sym == some_sym:
                 return 0
             if variant_sym == none_sym:
+                return 1
+            return 0 - 1
+    // Check Result types: Ok=0, Err=1
+    for ri in 0..self.result_llvm_types.len() as i32:
+        if self.result_llvm_types.get(ri as i64) == enum_ty:
+            let ok_sym = self.intern.intern("Ok")
+            let err_sym = self.intern.intern("Err")
+            if variant_sym == ok_sym:
+                return 0
+            if variant_sym == err_sym:
                 return 1
             return 0 - 1
     0 - 1
