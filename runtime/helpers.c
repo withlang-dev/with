@@ -1089,6 +1089,13 @@ int64_t with_hashmap_len(void *handle) {
     return m->len;
 }
 
+void with_hashmap_clear(void *handle) {
+    WithHashMap *m = (WithHashMap *)handle;
+    if (hashmap_invalid(m)) return;
+    memset(m->states, 0, m->cap);
+    m->len = 0;
+}
+
 void with_hashmap_free(void *handle) {
     WithHashMap *m = (WithHashMap *)handle;
     free(m->keys);

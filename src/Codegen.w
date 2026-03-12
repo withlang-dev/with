@@ -1878,6 +1878,23 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
     if kind == NK_TYPE_INFERRED:
         return 0  // Cannot resolve inferred types
 
+    if kind == NK_TYPE_ASSOC:
+        // Self.Name — resolve associated type from current impl
+        let base_sym = self.pool.get_data0(type_node)
+        let assoc_sym = self.pool.get_data1(type_node)
+        if self.intern.resolve(base_sym) == "Self" and self.current_function_name_sym != 0:
+            let impl_opt = self.sema.method_impl_nodes.get(self.current_function_name_sym)
+            if impl_opt.is_some():
+                let impl_nd = impl_opt.unwrap()
+                let impl_ex = self.pool.get_data1(impl_nd)
+                let impl_ac = self.pool.get_extra(impl_ex)
+                for iai in 0..impl_ac:
+                    let at_name = self.pool.get_extra(impl_ex + 1 + iai * 2)
+                    if at_name == assoc_sym:
+                        let at_type_nd = self.pool.get_extra(impl_ex + 1 + iai * 2 + 1)
+                        return self.resolve_type(at_type_nd)
+        return wl_i32_type(self.context)
+
     // Fallback — always warn so silent miscompilation is visible
     var msg = "warning: [type-resolve] unhandled type node kind=" ++ int_to_string(kind)
     msg = msg ++ " node=" ++ int_to_string(type_node)
@@ -11528,7 +11545,10 @@ fn Codegen.gen_vec_method(self: Codegen, method: str, obj: i64, args_start: i32,
     if method == "sequence" or method == "traverse":
         with_eprintln("error: not yet implemented: Vec." ++ method ++ "()")
         return wl_get_undef(wl_i32_type(self.context))
-    with_eprintln("warning: [vec-method] unhandled vec method")
+    var dbg_name = ""
+    if self.pool.kind(obj_node) == NK_IDENT:
+        dbg_name = self.intern.resolve(self.pool.get_data0(obj_node))
+    with_eprintln("warning: [vec-method] unhandled vec method: " ++ method ++ " on obj=" ++ dbg_name ++ " kind=" ++ int_to_string(self.pool.kind(obj_node) as i64))
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.ensure_vec_runtime_fn(self: Codegen, name: str, ret_ty: i64, param_count: i32) -> i64:
@@ -11567,6 +11587,12 @@ fn Codegen.gen_hashmap_method(self: Codegen, method: str, obj: i64, args_start: 
     if method == "len":
         let fn_val = self.ensure_hm_fn("with_hashmap_len", i64_ty)
         let fn_ty = wl_function_type(i64_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(map_ptr)
+        return wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+    if method == "clear":
+        let fn_val = self.ensure_hm_fn("with_hashmap_clear", wl_void_type(self.context))
+        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&self.make_ptr_vec()), 1, 0)
         let args: Vec[i64] = Vec.new()
         args.push(map_ptr)
         return wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
@@ -11682,7 +11708,7 @@ fn Codegen.gen_hashmap_method(self: Codegen, method: str, obj: i64, args_start: 
     if method == "update" or method == "append":
         with_eprintln("error: not yet implemented: HashMap." ++ method ++ "()")
         return wl_get_undef(wl_i32_type(self.context))
-    with_eprintln("warning: [hashmap-method] unhandled hashmap method")
+    with_eprintln("warning: [hashmap-method] unhandled hashmap method: " ++ method)
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.ensure_hm_fn(self: Codegen, name: str, ret_ty: i64) -> i64:

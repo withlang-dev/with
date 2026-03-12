@@ -103,6 +103,7 @@ int64_t with_hashmap_get(void *handle, const void *key, void *out_val, int64_t i
 int64_t with_hashmap_contains(void *handle, const void *key, int64_t is_str_key);
 int64_t with_hashmap_remove(void *handle, const void *key, int64_t is_str_key);
 int64_t with_hashmap_len(void *handle);
+void with_hashmap_clear(void *handle);
 void with_hashmap_free(void *handle);
 
 // ── I/O ────────────────────────────────────────────────────────────

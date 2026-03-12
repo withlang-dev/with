@@ -163,6 +163,7 @@ type Sema = {
     sym_embed_file: i32,
 
     // Method origin tracking
+    method_impl_nodes: HashMap[i32, i32],
     method_decl_origins: HashMap[i32, i32],
     method_has_inherent: HashMap[i32, i32],
     method_symbol_flags: HashMap[i32, i32],
@@ -207,6 +208,9 @@ type Sema = {
     generic_subst_type_ids: Vec[i32],
     generic_specialization_cache: HashMap[str, i32],
     generic_inst_cache: HashMap[str, i32],
+
+    // Associated type bindings from current impl (for Self.Name resolution)
+    assoc_type_bindings: HashMap[i32, i32],
 
     // Current state
     source_text: str,
@@ -346,6 +350,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let must_use_fns = sema_new_map_i32_i32()
     let result_option_fns = sema_new_map_i32_i32()
     let task_fns = sema_new_map_i32_i32()
+    let method_impl_nodes = sema_new_map_i32_i32()
     let method_decl_origins = sema_new_map_i32_i32()
     let method_has_inherent = sema_new_map_i32_i32()
     let method_symbol_flags = sema_new_map_i32_i32()
@@ -432,6 +437,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sym_track: 0,
         sym_src: 0,
         sym_embed_file: 0,
+        method_impl_nodes,
         method_decl_origins,
         method_has_inherent,
         method_symbol_flags,
@@ -466,6 +472,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         generic_subst_type_ids: Vec.new(),
         generic_specialization_cache,
         generic_inst_cache,
+        assoc_type_bindings: sema_new_map_i32_i32(),
         source_text: "",
         current_return_type: 0,
         current_gen_yield_type: 0,
@@ -1171,6 +1178,7 @@ fn Sema.compute_method_origins(self: Sema):
                     break
                 let fn_name = self.ast.get_data0(md)
                 self.method_decl_origins.insert(j, origin)
+                self.method_impl_nodes.insert(fn_name, decl)
                 self.method_symbol_flags.insert(fn_name, 1)
                 if origin == 0:
                     self.method_has_inherent.insert(fn_name, 1)
@@ -1657,6 +1665,19 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
                 self_type_id = self.named_types.get(owner_sym).unwrap()
                 self.named_types.insert(self_sym, self_type_id)
             break
+
+    // Set up associated type bindings if inside a trait impl
+    self.assoc_type_bindings.clear()
+    if self.method_impl_nodes.contains(fn_name):
+        let impl_nd = self.method_impl_nodes.get(fn_name).unwrap()
+        let impl_ex = self.ast.get_data1(impl_nd)
+        let impl_ac = self.ast.get_extra(impl_ex)
+        for iai in 0..impl_ac:
+            let at_name = self.ast.get_extra(impl_ex + 1 + iai * 2)
+            let at_type_nd = self.ast.get_extra(impl_ex + 1 + iai * 2 + 1)
+            let at_tid = self.resolve_type_expr(at_type_nd)
+            if at_tid != 0:
+                self.assoc_type_bindings.insert(at_name, at_tid)
 
     // Generic functions: store for later monomorphization
     if tp_count > 0:
@@ -2459,6 +2480,14 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
         self.emit_error("unknown type", node)
         return 0
 
+    if kind == NK_TYPE_ASSOC:
+        let base_sym = self.ast.get_data0(node)
+        let assoc_sym = self.ast.get_data1(node)
+        if self.pool_resolve(base_sym) == "Self":
+            if self.assoc_type_bindings.contains(assoc_sym):
+                return self.assoc_type_bindings.get(assoc_sym).unwrap()
+        return 0
+
     if kind == NK_TYPE_GENERIC:
         return self.resolve_generic_type(node)
 
@@ -2567,6 +2596,19 @@ fn Sema.check_fn_body(self: Sema, node: i32):
 
     // Push function scope
     self.push_scope()
+
+    // Set up associated type bindings if inside a trait impl
+    self.assoc_type_bindings.clear()
+    if self.method_impl_nodes.contains(fn_name):
+        let impl_nd = self.method_impl_nodes.get(fn_name).unwrap()
+        let impl_ex = self.ast.get_data1(impl_nd)
+        let impl_ac = self.ast.get_extra(impl_ex)
+        for iai in 0..impl_ac:
+            let at_name = self.ast.get_extra(impl_ex + 1 + iai * 2)
+            let at_type_nd = self.ast.get_extra(impl_ex + 1 + iai * 2 + 1)
+            let at_tid = self.resolve_type_expr(at_type_nd)
+            if at_tid != 0:
+                self.assoc_type_bindings.insert(at_name, at_tid)
 
     // Add parameters to scope
     let meta = self.ast.find_fn_meta(node)
@@ -4894,13 +4936,95 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
         let sig_idx = self.get_sig(method_key)
         if sig_idx >= 0:
             let mc_ret = self.sig_return_type(sig_idx)
-            // For TY_GENERIC_INST receivers, substitute type params in return type
+            // For TY_GENERIC_INST receivers, check arg types and substitute return type
             let mc_resolved_tk = self.get_type_kind(resolved)
             if mc_resolved_tk == TY_GENERIC_INST:
+                // Check argument types against substituted parameter types
+                let mc_method_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
+                let mc_method_fn_sym = self.pool_intern(mc_method_name)
+                if self.fn_decl_nodes.contains(mc_method_fn_sym):
+                    let mc_fn_node = self.fn_decl_nodes.get(mc_method_fn_sym).unwrap()
+                    let mc_meta = self.ast.find_fn_meta(mc_fn_node)
+                    if mc_meta >= 0:
+                        let mc_ps = self.ast.fn_meta_param_start(mc_meta)
+                        let mc_pc = self.ast.fn_meta_param_count(mc_meta)
+                        if self.setup_generic_inst_substitution(resolved, type_name_sym) != 0:
+                            if self.type_decl_nodes.contains(type_name_sym):
+                                let mc_td = self.type_decl_nodes.get(type_name_sym).unwrap()
+                                let mc_td_ex = self.ast.get_data1(mc_td)
+                                let mc_td_sk = type_decl_sub_kind(self.ast.get_data2(mc_td))
+                                var mc_tps = 0
+                                var mc_tpc = 0
+                                if mc_td_sk == TDK_STRUCT:
+                                    let fc = self.ast.get_extra(mc_td_ex)
+                                    let after = mc_td_ex + 1 + fc * 3
+                                    mc_tps = self.ast.get_extra(after + 1)
+                                    mc_tpc = self.ast.get_extra(after + 2)
+                                else if mc_td_sk == TDK_ALIAS or mc_td_sk == TDK_DISTINCT:
+                                    mc_tps = self.ast.get_extra(mc_td_ex + 2)
+                                    mc_tpc = self.ast.get_extra(mc_td_ex + 3)
+                                else if mc_td_sk == TDK_ENUM:
+                                    let vc = self.ast.get_extra(mc_td_ex)
+                                    var epos = mc_td_ex + 1
+                                    for vi in 0..vc:
+                                        epos = epos + 1
+                                        let pc = self.ast.get_extra(epos)
+                                        epos = epos + 1
+                                        epos = epos + pc
+                                    mc_tps = self.ast.get_extra(epos + 1)
+                                    mc_tpc = self.ast.get_extra(epos + 2)
+                                // Determine self parameter offset
+                                let mc_self_sym = self.pool_intern("self")
+                                var mc_poff = 0
+                                if mc_pc > 0 and self.ast.get_extra(mc_ps) == mc_self_sym:
+                                    mc_poff = 1
+                                for pi in mc_poff..mc_pc:
+                                    let p_ty_node = self.ast.get_extra(mc_ps + pi * 2 + 1)
+                                    let exp_ty = self.resolve_generic_return_type_node(p_ty_node, mc_tps, mc_tpc)
+                                    let ai = pi - mc_poff
+                                    if ai < arg_count:
+                                        let arg_ty = arg_types.get(ai as i64)
+                                        if exp_ty != 0 and arg_ty != 0:
+                                            let exp_r = self.resolve_alias(exp_ty)
+                                            if self.type_is_dyn_object(exp_r) == 0:
+                                                if self.types_compatible(exp_ty, arg_ty) == 0:
+                                                    if self.arithmetic_result_type(exp_ty, arg_ty) == 0:
+                                                        self.emit_error("wrong argument type", self.ast.get_extra(extra_start + ai))
                 let mc_subst_ret = self.substitute_method_return_for_generic_inst(resolved, type_name_sym, field, mc_ret)
                 if mc_subst_ret != 0:
                     return mc_subst_ret
             return mc_ret
+
+    // For TY_GENERIC_INST receivers without a registered signature,
+    // check argument types for builtin generic methods (Vec, HashMap, HashSet)
+    if self.get_type_kind(resolved) == TY_GENERIC_INST:
+        let mc_push_sym = self.pool_intern("push")
+        let mc_insert_sym = self.pool_intern("insert")
+        if field == mc_push_sym:
+            // Vec.push(value: T) / HashSet.insert(value: T) — arg[0] must be T
+            if arg_count >= 1:
+                let elem_ty = self.get_generic_inst_arg(resolved, 0)
+                let a0_ty = arg_types.get(0)
+                if elem_ty != 0 and a0_ty != 0:
+                    if self.types_compatible(elem_ty, a0_ty) == 0:
+                        if self.arithmetic_result_type(elem_ty, a0_ty) == 0:
+                            self.emit_error("wrong argument type", self.ast.get_extra(extra_start))
+        else if field == mc_insert_sym:
+            // HashMap.insert(key: K, value: V) — arg[0] must be K, arg[1] must be V
+            let gi_argc = self.get_generic_inst_arg_count(resolved)
+            if gi_argc >= 2 and arg_count >= 2:
+                let key_ty = self.get_generic_inst_arg(resolved, 0)
+                let val_ty = self.get_generic_inst_arg(resolved, 1)
+                let a0_ty = arg_types.get(0)
+                let a1_ty = arg_types.get(1)
+                if key_ty != 0 and a0_ty != 0:
+                    if self.types_compatible(key_ty, a0_ty) == 0:
+                        if self.arithmetic_result_type(key_ty, a0_ty) == 0:
+                            self.emit_error("wrong argument type", self.ast.get_extra(extra_start))
+                if val_ty != 0 and a1_ty != 0:
+                    if self.types_compatible(val_ty, a1_ty) == 0:
+                        if self.arithmetic_result_type(val_ty, a1_ty) == 0:
+                            self.emit_error("wrong argument type", self.ast.get_extra(extra_start + 1))
 
     // Static method call on a named type expression.
     if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
