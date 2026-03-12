@@ -6911,6 +6911,12 @@ fn Codegen.find_hashset_cache_index_by_llvm(self: Codegen, hs_ty: i64) -> i32:
     0 - 1
 
 fn Codegen.find_vec_cache_index_by_llvm(self: Codegen, vec_ty: i64) -> i32:
+    // Vec struct layout is { ptr, i64, i64, i64 } — exactly 4 fields.
+    // Guard against false matches from non-Vec struct types (e.g. Option, arrays).
+    if wl_get_type_kind(vec_ty) != wl_struct_type_kind():
+        return 0 - 1
+    if wl_count_struct_elem_types(vec_ty) != 4:
+        return 0 - 1
     for i in 0..self.vec_llvm_types.len() as i32:
         let cached_ty = self.vec_llvm_types.get(i as i64)
         if cached_ty == vec_ty or self.llvm_named_struct_matches(cached_ty, vec_ty):
