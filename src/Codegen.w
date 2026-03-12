@@ -4719,6 +4719,40 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
 
     wl_get_undef(fallback_ty)
 
+// Convert a sema type ID to an LLVM type for MIR codegen.
+fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
+    let kind = self.sema.get_type_kind(sema_ty)
+    if kind == 1:
+        // TY_INT
+        let width = self.sema.get_type_d0(sema_ty)
+        if width == 8: return wl_i8_type(self.context)
+        if width == 16: return wl_i16_type(self.context)
+        if width == 64: return wl_i64_type(self.context)
+        return wl_i32_type(self.context)
+    if kind == 2:
+        // TY_FLOAT
+        let width = self.sema.get_type_d0(sema_ty)
+        if width == 32: return wl_f32_type(self.context)
+        return wl_f64_type(self.context)
+    if kind == 3:
+        // TY_BOOL
+        return wl_i1_type(self.context)
+    if kind == 5:
+        // TY_STR — str is a struct {ptr, i64} in LLVM
+        let str_sym = self.intern.intern("str")
+        let st_opt = self.struct_type_map.get(str_sym)
+        if st_opt.is_some():
+            return self.struct_llvm_types.get(st_opt.unwrap() as i64)
+    if kind == 6 or kind == 7 or kind == 19:
+        // TY_STRUCT / TY_ENUM / TY_GENERIC_INST
+        let name_sym = self.sema.get_type_d0(sema_ty)
+        if name_sym != 0:
+            return self.resolve_named_type(name_sym)
+    if kind == 13 or kind == 14:
+        // TY_PTR / TY_REF
+        return wl_ptr_type(self.context)
+    0
+
 fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> void:
     if ptr == 0 or ty == 0:
         return
@@ -4761,9 +4795,16 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
         if dst_ty == 0 and dst_local >= 0 and dst_local < body.local_type_ids.len() as i32:
             let sema_ty = body.local_type_ids.get(dst_local as i64)
             if sema_ty > 0:
-                let type_name_sym = self.sema.get_type_name(sema_ty)
-                if type_name_sym != 0:
-                    dst_ty = self.resolve_named_type(type_name_sym)
+                dst_ty = self.mir_sema_type_to_llvm(sema_ty)
+            // For RK_AGGREGATE (struct construction), if sema type didn't resolve,
+            // fall back to the function's return type (local 0).
+            if dst_ty == 0 and d1 >= 0 and d1 < body.rval_kinds.len() as i32:
+                if body.rval_kinds.get(d1 as i64) == RK_AGGREGATE:
+                    let ret_ty_opt = self.mir_local_types.get(0)
+                    if ret_ty_opt.is_some():
+                        let ret_ty = ret_ty_opt.unwrap() as i64
+                        if wl_get_type_kind(ret_ty) == wl_struct_type_kind():
+                            dst_ty = ret_ty
         let value = self.mir_eval_rvalue(body, d1, dst_ty)
         if dst_ptr == 0:
             let proj_count = body.place_proj_counts.get(d0 as i64)
