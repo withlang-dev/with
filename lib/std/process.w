@@ -11,8 +11,8 @@ extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
-extern fn with_vec_new_out(v: &Vec[str], elem_size: i64) -> void
-extern fn with_vec_push_str(v: &Vec[str], val: str) -> void
+extern fn with_vec_new_out(v: *void, elem_size: i64) -> void
+extern fn with_vec_push_str(v: *void, val: str) -> void
 extern fn with_str_len(s: str) -> i64
 // Exit the process with given code
 pub fn exit_code(code: i32) -> void:
