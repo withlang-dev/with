@@ -1995,6 +1995,71 @@ fn Codegen.resolve_generic_type(self: Codegen, name_sym: i32, extra_start: i32, 
         return self.monomorphize_struct(name_sym, extra_start, arg_count)
     0
 
+// Map sema TypeId to LLVM type. Handles TY_GENERIC_INST for builtin containers.
+fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
+    if tid <= 0:
+        return 0
+    let tk = self.sema.get_type_kind(tid)
+    if tk == TY_GENERIC_INST:
+        let base_name = self.intern.resolve(self.sema.get_type_d0(tid))
+        let arg_count = self.sema.get_generic_inst_arg_count(tid)
+        if base_name == "Vec" and arg_count > 0:
+            let elem_tid = self.sema.get_generic_inst_arg(tid, 0)
+            let elem_ty = self.sema_type_to_llvm(elem_tid)
+            if elem_ty != 0:
+                return self.get_or_create_vec_type(elem_ty)
+        if base_name == "HashMap" and arg_count > 1:
+            let key_tid = self.sema.get_generic_inst_arg(tid, 0)
+            let val_tid = self.sema.get_generic_inst_arg(tid, 1)
+            let key_ty = self.sema_type_to_llvm(key_tid)
+            let val_ty = self.sema_type_to_llvm(val_tid)
+            if key_ty != 0 and val_ty != 0:
+                return self.get_or_create_hashmap_type(key_ty, val_ty)
+        if base_name == "HashSet" and arg_count > 0:
+            let elem_tid = self.sema.get_generic_inst_arg(tid, 0)
+            let elem_ty = self.sema_type_to_llvm(elem_tid)
+            if elem_ty != 0:
+                return self.get_or_create_hashset_type(elem_ty)
+        if base_name == "Option" and arg_count > 0:
+            let payload_tid = self.sema.get_generic_inst_arg(tid, 0)
+            let payload_ty = self.sema_type_to_llvm(payload_tid)
+            if payload_ty != 0:
+                return self.get_or_create_option_type(payload_ty)
+        if base_name == "Result" and arg_count > 1:
+            let ok_tid = self.sema.get_generic_inst_arg(tid, 0)
+            let err_tid = self.sema.get_generic_inst_arg(tid, 1)
+            let ok_ty = self.sema_type_to_llvm(ok_tid)
+            let err_ty = self.sema_type_to_llvm(err_tid)
+            if ok_ty != 0 and err_ty != 0:
+                return self.get_or_create_result_type(ok_ty, err_ty)
+        return 0
+    if tk == TY_INT:
+        let bits = self.sema.get_type_d0(tid)
+        if bits == 1:
+            return wl_i1_type(self.context)
+        if bits == 8:
+            return wl_i8_type(self.context)
+        if bits == 16:
+            return wl_i16_type(self.context)
+        if bits == 32:
+            return wl_i32_type(self.context)
+        if bits == 64:
+            return wl_i64_type(self.context)
+        return wl_i32_type(self.context)
+    if tk == TY_BOOL:
+        return wl_i1_type(self.context)
+    if tk == TY_STR:
+        let str_sym = self.intern.intern("str")
+        return self.resolve_named_type(str_sym)
+    if tk == TY_VOID:
+        return wl_void_type(self.context)
+    if tk == TY_STRUCT or tk == TY_ENUM:
+        let sym = self.sema.get_type_d0(tid)
+        return self.resolve_named_type(sym)
+    if tk == TY_PTR or tk == TY_REF:
+        return wl_ptr_type(self.context)
+    0
+
 // ── Builtin str type ──────────────────────────────────────────────
 
 fn Codegen.declare_builtin_str_type(self: Codegen):
@@ -6408,6 +6473,13 @@ fn Codegen.gen_let_binding(self: Codegen, node: i32) -> i64:
             let sema_tid = self.sema.resolve_type_expr(declared_type_node)
             if sema_tid > 0:
                 self.local_sema_types.insert(name_sym, sema_tid)
+    else:
+        // No type annotation — try to get sema type from typed_binding_types
+        let span_start = self.pool.get_start(node)
+        if self.sema.typed_binding_types.contains(span_start):
+            let sema_tid = self.sema.typed_binding_types.get(span_start).unwrap()
+            if sema_tid > 0 and self.sema.get_type_kind(sema_tid) == TY_GENERIC_INST:
+                self.local_sema_types.insert(name_sym, sema_tid)
     if alias_sym != 0:
         self.record_local(alias_sym, alloca, storage_ty, is_mut)
         if declared_type_node != 0:
@@ -8153,6 +8225,16 @@ fn Codegen.gen_for(self: Codegen, node: i32) -> i64:
         let vec_idx = self.find_vec_cache_index_by_llvm(iter_ty)
         if vec_idx >= 0:
             return self.gen_for_vec(binding_sym, iterable, iterable_node, body_node)
+        // Fallback: check sema type for Vec
+        if self.pool.kind(iterable_node) == NK_IDENT:
+            let iter_sym = self.pool.get_data0(iterable_node)
+            let sema_opt = self.local_sema_types.get(iter_sym)
+            if sema_opt.is_some():
+                let sema_tid = sema_opt.unwrap()
+                if self.sema.get_type_kind(sema_tid) == TY_GENERIC_INST:
+                    let base_name = self.intern.resolve(self.sema.get_type_d0(sema_tid))
+                    if base_name == "Vec":
+                        return self.gen_for_vec(binding_sym, iterable, iterable_node, body_node)
 
     // Default: treat as range 0..n
     wl_get_undef(wl_void_type(self.context))
