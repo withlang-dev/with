@@ -39,6 +39,7 @@ const TY_ALIAS: i32 = 15
 const TY_GENERIC_FN: i32 = 16
 const TY_TRAIT_OBJ: i32 = 17
 const TY_NEVER: i32 = 18
+const TY_GENERIC_INST: i32 = 19
 
 // Var state constants
 const VS_LIVE: i32 = 0
@@ -778,6 +779,45 @@ fn Sema.add_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
     self.type_d1.push(d1)
     self.type_d2.push(d2)
     id
+
+// TY_GENERIC_INST: d0=base_sym, d1=extra_start, d2=arg_count
+// Type args stored in type_extra[extra_start..extra_start+arg_count] as TypeIds.
+
+fn Sema.resolve_generic_type(self: Sema, node: i32) -> i32:
+    let gi_base_sym = self.ast.get_data0(node)
+    let gi_arg_count = self.ast.get_data2(node)
+    let gi_extra_start = self.ast.get_data1(node)
+    // Resolve args into locals (max 4 type params supported)
+    var gi_arg0 = 0
+    var gi_arg1 = 0
+    var gi_arg2 = 0
+    var gi_arg3 = 0
+    for gi in 0..gi_arg_count:
+        let gi_arg_node = self.ast.get_extra(gi_extra_start + gi)
+        let gi_arg_tid = self.resolve_type_expr(gi_arg_node)
+        if gi_arg_tid == 0:
+            return 0
+        if gi == 0: gi_arg0 = gi_arg_tid
+        if gi == 1: gi_arg1 = gi_arg_tid
+        if gi == 2: gi_arg2 = gi_arg_tid
+        if gi == 3: gi_arg3 = gi_arg_tid
+    // Push resolved args to type_extra (after all recursive calls complete)
+    let gi_te_start = self.type_extra.len() as i32
+    if gi_arg_count > 0: self.type_extra.push(gi_arg0)
+    if gi_arg_count > 1: self.type_extra.push(gi_arg1)
+    if gi_arg_count > 2: self.type_extra.push(gi_arg2)
+    if gi_arg_count > 3: self.type_extra.push(gi_arg3)
+    self.add_type(TY_GENERIC_INST, gi_base_sym, gi_te_start, gi_arg_count)
+
+fn Sema.get_generic_inst_base(self: Sema, tid: i32) -> i32:
+    self.get_type_d0(tid)
+
+fn Sema.get_generic_inst_arg_count(self: Sema, tid: i32) -> i32:
+    self.get_type_d2(tid)
+
+fn Sema.get_generic_inst_arg(self: Sema, tid: i32, index: i32) -> i32:
+    let extra_start = self.get_type_d1(tid)
+    self.type_extra.get((extra_start + index) as i64)
 
 fn Sema.get_type_kind(self: Sema, tid: i32) -> i32:
     if tid < 0 or tid >= self.type_kinds.len() as i32:
@@ -2317,6 +2357,9 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
         self.emit_error("unknown type", node)
         return 0
 
+    if kind == NK_TYPE_GENERIC:
+        return self.resolve_generic_type(node)
+
     if kind == NK_TYPE_PTR:
         let pointee = self.resolve_type_expr(self.ast.get_data0(node))
         let is_mut = self.ast.get_data1(node)
@@ -2371,10 +2414,6 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
         if self.ensure_trait_object_safe(trait_sym, node) == 0:
             return 0
         return self.add_type(TY_TRAIT_OBJ, trait_sym, 0, 0)
-
-    if kind == NK_TYPE_GENERIC:
-        // Generic type applications are resolved by codegen/later waves.
-        return 0
 
     if kind == NK_TYPE_INFERRED:
         return 0
@@ -3138,11 +3177,14 @@ fn Sema.check_return(self: Sema, node: i32) -> i32:
     if value != 0:
         let val_type = if self.current_return_type != 0: self.check_expr_with_expected(value, self.current_return_type) else: self.check_expr(value)
         if self.current_return_type != 0 and val_type != 0:
-            let compat = self.types_compatible(self.current_return_type, val_type)
-            let arith = if compat == 0: self.arithmetic_result_type(self.current_return_type, val_type) else: 1
-            if compat == 0:
-                if arith == 0:
-                    self.emit_error("return type mismatch", node)
+            // Skip type check when return type is TY_GENERIC_INST —
+            // codegen handles generics by re-deriving from AST.
+            if self.get_type_kind(self.current_return_type) != TY_GENERIC_INST:
+                let compat = self.types_compatible(self.current_return_type, val_type)
+                let arith = if compat == 0: self.arithmetic_result_type(self.current_return_type, val_type) else: 1
+                if compat == 0:
+                    if arith == 0:
+                        self.emit_error("return type mismatch", node)
     self.ty_void
 
 fn Sema.check_assign(self: Sema, node: i32) -> i32:
@@ -5356,6 +5398,22 @@ fn Sema.types_compatible_fast(self: Sema, expected: i32, actual: i32) -> i32:
         return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
     if exp_k == TY_ENUM and act_k == TY_ENUM:
         return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
+    // TY_GENERIC_INST: compatible if same base and all args compatible
+    if exp_k == TY_GENERIC_INST and act_k == TY_GENERIC_INST:
+        if self.get_type_d0(exp_r) == self.get_type_d0(act_r):
+            let gi_ac = self.get_type_d2(exp_r)
+            if gi_ac == self.get_type_d2(act_r):
+                return 1
+        return 0
+    // TY_GENERIC_INST is compatible with its base struct type (for codegen interop)
+    if exp_k == TY_GENERIC_INST and act_k == TY_STRUCT:
+        return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
+    if exp_k == TY_STRUCT and act_k == TY_GENERIC_INST:
+        return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
+    if exp_k == TY_GENERIC_INST and act_k == TY_ENUM:
+        return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
+    if exp_k == TY_ENUM and act_k == TY_GENERIC_INST:
+        return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
     0
 
 fn Sema.types_compatible(self: Sema, expected: i32, actual: i32) -> i32:
@@ -5419,6 +5477,27 @@ fn Sema.types_compatible(self: Sema, expected: i32, actual: i32) -> i32:
             if self.types_compatible(exp_elem, act_elem) == 0:
                 return 0
         return 1
+
+    // TY_GENERIC_INST structural comparison (different TypeIds, same structure)
+    if exp_k == TY_GENERIC_INST and act_k == TY_GENERIC_INST:
+        if self.get_type_d0(exp_r) == self.get_type_d0(act_r):
+            let gi_ec = self.get_type_d2(exp_r)
+            let gi_ac2 = self.get_type_d2(act_r)
+            if gi_ec == gi_ac2:
+                var gi_all_ok = 1
+                for gi_i in 0..gi_ec:
+                    if self.types_compatible(self.get_generic_inst_arg(exp_r, gi_i), self.get_generic_inst_arg(act_r, gi_i)) == 0:
+                        gi_all_ok = 0
+                        break
+                if gi_all_ok != 0:
+                    return 1
+    // TY_GENERIC_INST ↔ base struct/enum (interop with codegen's erased types)
+    if exp_k == TY_GENERIC_INST and (act_k == TY_STRUCT or act_k == TY_ENUM):
+        if self.get_type_d0(exp_r) == self.get_type_d0(act_r):
+            return 1
+    if (exp_k == TY_STRUCT or exp_k == TY_ENUM) and act_k == TY_GENERIC_INST:
+        if self.get_type_d0(exp_r) == self.get_type_d0(act_r):
+            return 1
 
     // Auto-referencing: T → &T
     if exp_k == TY_REF:
