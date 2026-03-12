@@ -432,10 +432,10 @@ previously invisible.
       Already existed and passes (Vec[i32] and Vec[str] basic usage).
 - [x] Write `test/cases/behav_option_generic.w`:
       Already existed and passes (Option[i32] match).
-- [ ] Write `test/cases/behav_result_generic.w`:
-      Blocked: Result variant construction (.Ok/.Err shorthand) not yet
-      supported in codegen. Requires Result codegen variant dispatch.
-- [x] Run `./scripts/run_tests.sh` — 221/221 tests pass
+- [x] Write `test/cases/behav_result_generic.w`:
+      Fixed: Result match dispatch (find_variant_index Ok=0/Err=1) and
+      payload extraction (bitcast [N x i8] to declared Ok/Err type).
+- [x] Run `./scripts/run_tests.sh` — 222/222 tests pass
 - [x] `make fixpoint`
 
 ---
