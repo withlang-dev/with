@@ -1213,6 +1213,27 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
 
 // ── impl/extend block ────────────────────────────────────────────
 
+// Parse optional generic type args after an impl target type name.
+// e.g., for `impl Trait for Vec[i32]`, parses `[i32]` after "Vec".
+// Returns NK_TYPE_GENERIC node if args present, 0 otherwise.
+fn Parser.parse_optional_impl_target_args(self: Parser, type_name: i32) -> i32:
+    if self.peek() != TK_L_BRACKET:
+        return 0
+    let start = self.current_start()
+    self.advance()
+    var args: Vec[i32] = Vec.new()
+    while self.peek() != TK_R_BRACKET and self.peek() != TK_EOF:
+        let ty = self.parse_type_expr()
+        args.push(ty)
+        if self.peek() != TK_COMMA:
+            break
+        self.advance()
+    self.expect(TK_R_BRACKET)
+    let extra_start = self.pool.extra_len()
+    for ai in 0..args.len() as i32:
+        self.pool.add_extra(args.get(ai as i64))
+    self.pool.add_node(NK_TYPE_GENERIC, start, self.prev_end(), type_name, extra_start, args.len() as i32)
+
 fn Parser.parse_impl_block(self: Parser, vis: i32):
     let start = self.current_start()
     if self.peek() == TK_KW_PUB:
@@ -1237,6 +1258,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
 
     var trait_name = 0
     var type_name = first_name
+    var target_type_node = 0
     if self.peek() == TK_L_BRACKET:
         self.advance()
         var depth = 1
@@ -1254,12 +1276,14 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
         type_name = self.expect_ident()
         if type_name == 0:
             return
+        target_type_node = self.parse_optional_impl_target_args(type_name)
     else if self.peek() == TK_KW_FOR:
         self.advance()
         trait_name = first_name
         type_name = self.expect_ident()
         if type_name == 0:
             return
+        target_type_node = self.parse_optional_impl_target_args(type_name)
 
     // Defensive fallback: if `for` was not consumed above, consume it now.
     if trait_name == 0 and (self.peek() == TK_KW_FOR or self.is_ident_named("for")):
@@ -1268,6 +1292,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
         type_name = self.expect_ident()
         if type_name == 0:
             return
+        target_type_node = self.parse_optional_impl_target_args(type_name)
 
     self.parse_optional_where_clause()
 
@@ -1372,6 +1397,10 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     // Store impl type params if present (blanket impl)
     if impl_tp_count > 0:
         self.pool.add_impl_type_params(impl_node, impl_tp_start, impl_tp_count)
+
+    // Store impl target type node if generic (e.g., impl Trait for Vec[i32])
+    if target_type_node != 0:
+        self.pool.add_impl_target_type_node(impl_node, target_type_node)
 
 // ── Expression parsing ───────────────────────────────────────────
 
@@ -1990,8 +2019,13 @@ fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> i32:
             end_expr = self.parse_expr()
         self.expect(TK_R_BRACKET)
         return self.pool.add_node(NK_SLICE, self.pool.get_start(lhs), self.prev_end(), lhs, index, end_expr)
+    // Support two-arg subscript for HashMap[K, V].new() syntax
+    var second = 0
+    if self.peek() == TK_COMMA:
+        self.advance()
+        second = self.parse_index_expr()
     self.expect(TK_R_BRACKET)
-    self.pool.add_node(NK_INDEX, self.pool.get_start(lhs), self.prev_end(), lhs, index, 0)
+    self.pool.add_node(NK_INDEX, self.pool.get_start(lhs), self.prev_end(), lhs, index, second)
 
 fn Parser.parse_index_expr(self: Parser) -> i32:
     self.parse_precedence(6)

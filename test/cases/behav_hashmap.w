@@ -4,7 +4,7 @@
 // Tests: basic HashMap operations (the HashMap used throughout compiler)
 
 fn test_hashmap_basic:
-    var m: HashMap[str, i32] = HashMap.new()
+    var m = HashMap[str, i32].new()
     m.insert("hello", 1)
     m.insert("world", 2)
     let v1 = m.get("hello")
@@ -13,7 +13,7 @@ fn test_hashmap_basic:
     assert(v2.unwrap() == 2)
 
 fn test_hashmap_overwrite:
-    var m: HashMap[str, i32] = HashMap.new()
+    var m = HashMap[str, i32].new()
     m.insert("key", 10)
     let v1 = m.get("key")
     assert(v1.unwrap() == 10)
@@ -22,13 +22,13 @@ fn test_hashmap_overwrite:
     assert(v2.unwrap() == 20)
 
 fn test_hashmap_missing:
-    var m: HashMap[str, i32] = HashMap.new()
+    var m = HashMap[str, i32].new()
     m.insert("present", 42)
     let v = m.get("missing")
     assert(v.is_none())
 
 fn test_hashmap_many:
-    var m: HashMap[str, i32] = HashMap.new()
+    var m = HashMap[str, i32].new()
     m.insert("a", 1)
     m.insert("b", 2)
     m.insert("c", 3)

@@ -4,7 +4,7 @@
 // Tests: push, get, len (testing the built-in Vec type used throughout)
 
 fn test_vec_basic:
-    var v: Vec[i32] = Vec.new()
+    var v = Vec[i32].new()
     v.push(10)
     v.push(20)
     v.push(30)
@@ -14,11 +14,11 @@ fn test_vec_basic:
     assert(v.get(2) == 30)
 
 fn test_vec_empty:
-    var v: Vec[i32] = Vec.new()
+    var v = Vec[i32].new()
     assert(v.len() == 0)
 
 fn test_vec_large:
-    var v: Vec[i32] = Vec.new()
+    var v = Vec[i32].new()
     for i in 0..100:
         v.push(i)
     assert(v.len() == 100)
@@ -28,7 +28,7 @@ fn test_vec_large:
 
 fn test_vec_push_pop_pattern:
     // Simulate stack behavior with Vec
-    var stack: Vec[i32] = Vec.new()
+    var stack = Vec[i32].new()
     stack.push(1)
     stack.push(2)
     stack.push(3)

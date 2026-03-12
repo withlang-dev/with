@@ -120,11 +120,16 @@ type Sema = {
     impl_counts: Vec[i32],
     impl_type_syms: Vec[i32],
     impl_lookup: HashMap[i32, i32],
+    // Generic inst impls: impl Trait for Type[Args]
+    // Key: "TypeId:trait_sym" → 1
+    impl_generic_inst: HashMap[str, i32],
     // Blanket impls: impl[T: Bound] Trait for T
     blanket_trait_syms: Vec[i32],
     blanket_bound_syms: Vec[i32],
     blanket_bound_starts: Vec[i32],
     blanket_bound_counts: Vec[i32],
+    // Blanket impl target type: 0 = bare type param, else = base_sym of generic target
+    blanket_target_base_syms: Vec[i32],
     // Trait obligations + deterministic selection cache
     obligation_trait_syms: Vec[i32],
     obligation_type_syms: Vec[i32],
@@ -406,10 +411,12 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         impl_counts: Vec.new(),
         impl_type_syms: Vec.new(),
         impl_lookup,
+        impl_generic_inst: HashMap.new(),
         blanket_trait_syms: Vec.new(),
         blanket_bound_syms: Vec.new(),
         blanket_bound_starts: Vec.new(),
         blanket_bound_counts: Vec.new(),
+        blanket_target_base_syms: Vec.new(),
         obligation_trait_syms: Vec.new(),
         obligation_type_syms: Vec.new(),
         obligation_nodes: Vec.new(),
@@ -2014,9 +2021,24 @@ fn Sema.collect_impl_decl(self: Sema, node: i32):
         self.blanket_trait_syms.push(trait_sym)
         self.blanket_bound_starts.push(bound_start)
         self.blanket_bound_counts.push(total_bounds)
+        // Store target base sym for generic blanket impls (e.g., impl[T] Trait for Vec[T])
+        let target_type_nd = self.ast.find_impl_target_type_node(node)
+        if target_type_nd != 0 and self.ast.kind(target_type_nd) == NK_TYPE_GENERIC:
+            self.blanket_target_base_syms.push(self.ast.get_data0(target_type_nd))
+        else:
+            self.blanket_target_base_syms.push(0)
         // Overlap check: blanket vs existing direct impls
         self.check_blanket_overlap(trait_sym, bound_start, total_bounds, node)
         return
+
+    // If the impl target is a generic type (e.g., impl Trait for Vec[i32]),
+    // resolve the full type and record it for exact-match trait selection.
+    let target_type_node = self.ast.find_impl_target_type_node(node)
+    if target_type_node != 0:
+        let target_tid = self.resolve_type_expr(target_type_node)
+        if target_tid != 0 and self.get_type_kind(target_tid) == TY_GENERIC_INST:
+            let gi_key = i64_to_string(target_tid as i64) ++ ":" ++ i64_to_string(trait_sym as i64)
+            self.impl_generic_inst.insert(gi_key, 1)
 
     // Overlap check: direct impl vs existing blanket impls
     self.check_direct_overlap(type_name, trait_sym, node)
@@ -4717,6 +4739,11 @@ fn Sema.select_trait_impl(self: Sema, type_sym: i32, trait_sym: i32) -> i32:
         for bi in 0..self.blanket_trait_syms.len() as i32:
             if self.blanket_trait_syms.get(bi as i64) != trait_sym:
                 continue
+            // For generic blanket impls (impl[T] Trait for Vec[T]),
+            // only match if query type's base sym matches the target.
+            let target_base = self.blanket_target_base_syms.get(bi as i64)
+            if target_base != 0 and target_base != type_sym:
+                continue
             // Check if type_sym satisfies all bounds
             let b_start = self.blanket_bound_starts.get(bi as i64)
             let b_count = self.blanket_bound_counts.get(bi as i64)
@@ -4732,6 +4759,15 @@ fn Sema.select_trait_impl(self: Sema, type_sym: i32, trait_sym: i32) -> i32:
 
     self.selection_cache.insert(key, found)
     found
+
+// Check if a TY_GENERIC_INST type implements a trait via exact-match impls.
+fn Sema.select_trait_impl_for_generic_inst(self: Sema, tid: i32, trait_sym: i32) -> i32:
+    let gi_key = i64_to_string(tid as i64) ++ ":" ++ i64_to_string(trait_sym as i64)
+    if self.impl_generic_inst.contains(gi_key):
+        return 1
+    // Fall back to base symbol lookup (handles impl Trait for Vec without args)
+    let base_sym = self.get_type_d0(tid)
+    self.select_trait_impl(base_sym, trait_sym)
 
 fn Sema.type_symbol_for_bounds(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)
@@ -5855,6 +5891,10 @@ fn Sema.infer_for_element_type(self: Sema, iter_type: i32) -> i32:
         return self.get_type_d0(resolved)
     if tk == TY_SLICE:
         return self.get_type_d0(resolved)
+    if tk == TY_GENERIC_INST:
+        let base_name = self.pool_resolve(self.get_type_d0(resolved))
+        if base_name == "Vec" and self.get_generic_inst_arg_count(resolved) > 0:
+            return self.get_generic_inst_arg(resolved, 0)
     self.ty_i32
 
 fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
