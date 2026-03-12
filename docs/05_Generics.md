@@ -387,6 +387,33 @@ Currently only `VecIter_i32` exists as a concrete type.
 - [ ] Write test for associated type usage
 - [ ] `make build && make fixpoint`
 
+### 10.5 `Self.Name` associated type lookups in impl blocks
+
+Deferred from `04_complete_partial_implementations.md` item 6 (Self
+keyword). `Self` resolves to the implementing type in impl blocks,
+but `Self.Name` (e.g., `Self.Output`, `Self.Item`) does not resolve
+to the associated type defined in the current impl.
+
+- [ ] In sema type resolution: when encountering `Self.Name` (field
+      access on `Self` in a type position), look up the associated
+      type binding from the current impl's trait
+- [ ] In impl block processing: record the mapping from associated
+      type names to their concrete types for the current impl
+- [ ] Handle `Self.Name` in return types, parameter types, and
+      expressions within impl methods
+- [ ] Write test `test/cases/behav_self_assoc_type.w`:
+      ```
+      trait Transform =
+          type Output
+          fn apply(self: Self, x: i32) -> Self.Output
+
+      type Doubler = {}
+      impl Transform for Doubler =
+          type Output = i32
+          fn apply(self: Doubler, x: i32) -> Self.Output: x * 2
+      ```
+- [ ] `make build && make fixpoint`
+
 ---
 
 ## Phase 11: Type Error Tests
@@ -484,5 +511,6 @@ are verified to agree. Downstream features (Phase 10) are last.
 - [ ] `behav_vec.w` and `behav_hashmap.w` pass without explicit
       type annotations
 - [ ] Generic VecIter[T] replaces concrete VecIter_i32
+- [ ] `Self.Name` resolves to associated type in impl blocks
 - [ ] All tests pass under `./scripts/run_tests.sh`
 - [ ] `make fixpoint` holds after all phases

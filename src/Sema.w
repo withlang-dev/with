@@ -185,6 +185,14 @@ type Sema = {
     borrow_places: Vec[i32],
     borrow_fields: Vec[i32],
     borrow_refs: Vec[i32],
+    // Multi-level field path data for borrow disjointness.
+    // Each borrow has a path_start and path_count into this Vec.
+    borrow_path_starts: Vec[i32],
+    borrow_path_counts: Vec[i32],
+    borrow_path_data: Vec[i32],
+    // Transient storage for closure field-level capture analysis.
+    capture_field_syms: Vec[i32],
+    capture_field_kinds: Vec[i32],
 
     // Typed dump sidecar maps (keyed by span start byte offset)
     typed_expr_types: HashMap[i32, i32],
@@ -440,6 +448,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         borrow_places: Vec.new(),
         borrow_fields: Vec.new(),
         borrow_refs: Vec.new(),
+        borrow_path_starts: Vec.new(),
+        borrow_path_counts: Vec.new(),
+        borrow_path_data: Vec.new(),
+        capture_field_syms: Vec.new(),
+        capture_field_kinds: Vec.new(),
         typed_expr_types,
         typed_binding_types,
         typed_binding_names,
@@ -2408,6 +2421,8 @@ fn Sema.check_fn_body(self: Sema, node: i32):
         self.borrow_places.pop()
         self.borrow_fields.pop()
         self.borrow_refs.pop()
+        self.borrow_path_starts.pop()
+        self.borrow_path_counts.pop()
 
     // Push function scope
     self.push_scope()
@@ -3422,7 +3437,7 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
                         break
                 if covered == 0:
                     let impl_name = self.pool_resolve(impl_sym)
-                    self.emit_warning("non-exhaustive match on sealed trait: missing implementor '" ++ impl_name ++ "'", node)
+                    self.emit_error("non-exhaustive match on sealed trait: missing implementor '" ++ impl_name ++ "'", node)
                     return
         return
 
@@ -3472,6 +3487,8 @@ fn sema_pattern_covers_variant(ast: AstPool, pat: i32, variant_sym: i32) -> bool
         return true
     if kind == NK_PAT_VARIANT or kind == NK_PAT_ENUM_SHORTHAND:
         return ast.get_data0(pat) == variant_sym
+    if kind == NK_PAT_TYPED_BIND:
+        return ast.get_data1(pat) == variant_sym
     if kind == NK_PAT_OR:
         let or_start = ast.get_data0(pat)
         let or_count = ast.get_data1(pat)
@@ -3496,6 +3513,18 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         return
 
     if kind == NK_PAT_INT or kind == NK_PAT_BOOL or kind == NK_PAT_STRING:
+        return
+
+    if kind == NK_PAT_TYPED_BIND:
+        let bind_sym = self.ast.get_data0(node)
+        let type_sym = self.ast.get_data1(node)
+        var concrete_type = 0
+        if self.named_types.contains(type_sym):
+            concrete_type = self.named_types.get(type_sym).unwrap()
+        if concrete_type != 0:
+            self.scope_put(bind_sym, concrete_type, 0)
+        else:
+            self.scope_put(bind_sym, subject_type, 0)
         return
 
     if kind == NK_PAT_VARIANT:
@@ -3660,6 +3689,9 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
                 if expected_params != 1:
                     self.emit_error("`it` used in context expecting " ++ int_to_string(expected_params) ++ " parameter(s)", node)
 
+    // Save borrow state — closure body borrows are local to the closure.
+    let saved_borrow_len = self.borrow_kinds.len() as i32
+
     self.push_scope()
     let te_start = self.type_extra.len() as i32
     for pi in 0..param_count:
@@ -3679,6 +3711,63 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
                 break
         bi = bi + 1
     self.pop_scope()
+
+    // Restore borrow state — discard borrows created inside closure body.
+    while self.borrow_kinds.len() as i32 > saved_borrow_len:
+        self.borrow_kinds.pop()
+        self.borrow_places.pop()
+        self.borrow_fields.pop()
+        self.borrow_refs.pop()
+        self.borrow_path_starts.pop()
+        self.borrow_path_counts.pop()
+
+    // Mark non-escaping if this closure is a direct call argument
+    let is_non_escaping = self.closure_direct_arg_depth > 0 and self.ast.is_move_closure(node) == 0
+    if is_non_escaping:
+        self.ast.mark_non_escaping_closure(node)
+        // Register borrows for captured variables.
+        // Non-escaping closures capture by reference — register as borrows
+        // so the borrow checker can detect conflicts with other borrows.
+        // If the variable is only accessed through field paths, register
+        // field-level borrows for disjoint capture checking.
+        var ci = 0
+        while ci < outer_count:
+            let cap_sym = self.bind_names.get(ci as i64)
+            if self.expr_uses_symbol(body, cap_sym) != 0:
+                if self.capture_is_field_only(body, cap_sym) != 0:
+                    // Field-level capture: register borrow per field path
+                    // Clear transient capture field storage
+                    while self.capture_field_syms.len() > 0:
+                        self.capture_field_syms.pop()
+                        self.capture_field_kinds.pop()
+                    self.collect_capture_fields(body, cap_sym)
+                    var fi = 0
+                    while fi < self.capture_field_syms.len() as i32:
+                        let field_sym = self.capture_field_syms.get(fi as i64)
+                        let bk = self.capture_field_kinds.get(fi as i64)
+                        let path_start = self.borrow_path_data.len() as i32
+                        self.borrow_path_data.push(field_sym)
+                        self.check_borrow_create_direct(cap_sym, bk, field_sym, path_start, 1, node)
+                        fi = fi + 1
+                else:
+                    // Whole-variable capture
+                    let bk = if self.expr_mutates_place(body, cap_sym) != 0: BK_EXCLUSIVE else: BK_SHARED
+                    let path_start = self.borrow_path_data.len() as i32
+                    self.check_borrow_create_direct(cap_sym, bk, 0, path_start, 0, node)
+            ci = ci + 1
+
+    // Escaping closures (including move closures) consume non-Copy captures.
+    // Mark captured non-Copy variables as moved so subsequent uses error.
+    let is_escaping = not is_non_escaping
+    if is_escaping:
+        var ci = 0
+        while ci < outer_count:
+            let cap_sym = self.bind_names.get(ci as i64)
+            if self.expr_uses_symbol(body, cap_sym) != 0:
+                let cap_ty = self.bind_types.get(ci as i64)
+                if not self.is_copy(cap_ty):
+                    self.scope_set_state(cap_sym, VS_MOVED)
+            ci = ci + 1
 
     self.add_type(TY_FN, te_start, param_count, self.ty_i32)
 
@@ -3812,7 +3901,12 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             let param_i = ai + param_offset
             if param_i < self.sig_get_param_count(sig_idx):
                 expected_ty = self.sig_param_type(sig_idx, param_i)
+        let is_closure_arg = self.ast.kind(arg_node) == NK_CLOSURE
+        if is_closure_arg:
+            self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
         let arg_ty = if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty) else: self.check_expr(arg_node)
+        if is_closure_arg:
+            self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
         arg_types.push(arg_ty)
 
     // Mark non-Copy args as moved
@@ -4297,7 +4391,13 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     // Check all arguments
     let arg_types: Vec[i32] = Vec.new()
     for ai in 0..arg_count:
-        arg_types.push(self.check_expr(self.ast.get_extra(extra_start + ai)))
+        let mc_arg_node = self.ast.get_extra(extra_start + ai)
+        let mc_is_closure = self.ast.kind(mc_arg_node) == NK_CLOSURE
+        if mc_is_closure:
+            self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
+        arg_types.push(self.check_expr(mc_arg_node))
+        if mc_is_closure:
+            self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
 
     // Task/ScopedTask surface methods (spec §14.7): cancel(), is_done().
     if field == self.sym_cancel or field == self.sym_is_done:
@@ -4526,24 +4626,52 @@ fn Sema.borrow_root_place(self: Sema, node: i32) -> i32:
     if kind == NK_IDENT:
         return self.ast.get_data0(node)
     if kind == NK_FIELD_ACCESS:
-        let base = self.ast.get_data0(node)
-        if self.ast.kind(base) == NK_IDENT:
-            return self.ast.get_data0(base)
-        return 0
+        return self.borrow_root_place(self.ast.get_data0(node))
     if kind == NK_INDEX:
-        let base = self.ast.get_data0(node)
-        if self.ast.kind(base) == NK_IDENT:
-            return self.ast.get_data0(base)
-        return 0
+        return self.borrow_root_place(self.ast.get_data0(node))
     if kind == NK_GROUPED:
         return self.borrow_root_place(self.ast.get_data0(node))
     0
+
+// Collect full field path from an expression into borrow_path_data.
+// Returns (path_start, path_count) by storing the path and returning
+// the start index. Fields are stored root-to-leaf order.
+fn Sema.borrow_collect_path(self: Sema, node: i32) -> i32:
+    let start = self.borrow_path_data.len() as i32
+    self.borrow_collect_path_inner(node)
+    self.borrow_path_data.len() as i32 - start
+
+fn Sema.borrow_collect_path_inner(self: Sema, node: i32):
+    if node == 0:
+        return
+    let kind = self.ast.kind(node)
+    if kind == NK_FIELD_ACCESS:
+        // Recurse into base first (root-to-leaf ordering)
+        self.borrow_collect_path_inner(self.ast.get_data0(node))
+        self.borrow_path_data.push(self.ast.get_data1(node))
+    // NK_IDENT, NK_INDEX, NK_GROUPED: no field to add
 
 fn Sema.borrow_field(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     if self.ast.kind(node) == NK_FIELD_ACCESS:
         return self.ast.get_data1(node)
+    0
+
+// Two borrows are disjoint if their field paths diverge at some level.
+// A zero-length path (whole variable) overlaps with everything.
+fn Sema.are_borrows_disjoint_paths(self: Sema, start_a: i32, count_a: i32, start_b: i32, count_b: i32) -> i32:
+    if count_a == 0 or count_b == 0:
+        return 0
+    let min_count = if count_a < count_b: count_a else: count_b
+    var i = 0
+    while i < min_count:
+        let fa = self.borrow_path_data.get((start_a + i) as i64)
+        let fb = self.borrow_path_data.get((start_b + i) as i64)
+        if fa != fb:
+            return 1
+        i = i + 1
+    // One is a prefix of the other — overlapping
     0
 
 fn Sema.are_borrows_disjoint(self: Sema, new_field: i32, existing_field: i32) -> i32:
@@ -4559,6 +4687,8 @@ fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: 
     if place == 0:
         return
     let new_field = self.borrow_field(operand_node)
+    let path_start = self.borrow_path_data.len() as i32
+    let path_count = self.borrow_collect_path(operand_node)
 
     var i = 0
     while i < self.borrow_kinds.len() as i32:
@@ -4567,8 +4697,10 @@ fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: 
             i = i + 1
             continue
 
-        let existing_field = self.borrow_fields.get(i as i64)
-        if self.are_borrows_disjoint(new_field, existing_field) != 0:
+        // Check disjointness using full field paths
+        let ex_path_start = self.borrow_path_starts.get(i as i64)
+        let ex_path_count = self.borrow_path_counts.get(i as i64)
+        if self.are_borrows_disjoint_paths(path_start, path_count, ex_path_start, ex_path_count) != 0:
             i = i + 1
             continue
 
@@ -4591,6 +4723,41 @@ fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: 
     self.borrow_places.push(place)
     self.borrow_fields.push(new_field)
     self.borrow_refs.push(0)
+    self.borrow_path_starts.push(path_start)
+    self.borrow_path_counts.push(path_count)
+
+// Register a borrow with pre-computed place/kind/field/path.
+// Used by closure capture registration.
+fn Sema.check_borrow_create_direct(self: Sema, place: i32, kind: i32, field: i32, path_start: i32, path_count: i32, err_node: i32):
+    var i = 0
+    while i < self.borrow_kinds.len() as i32:
+        let existing_place = self.borrow_places.get(i as i64)
+        if existing_place != place:
+            i = i + 1
+            continue
+        let ex_path_start = self.borrow_path_starts.get(i as i64)
+        let ex_path_count = self.borrow_path_counts.get(i as i64)
+        if self.are_borrows_disjoint_paths(path_start, path_count, ex_path_start, ex_path_count) != 0:
+            i = i + 1
+            continue
+        let existing_kind = self.borrow_kinds.get(i as i64)
+        if kind == BK_SHARED:
+            if existing_kind == BK_EXCLUSIVE:
+                self.emit_error("cannot borrow: already mutably borrowed", err_node)
+                return
+            i = i + 1
+            continue
+        if existing_kind == BK_EXCLUSIVE:
+            self.emit_error("cannot borrow mutably: already mutably borrowed", err_node)
+        else:
+            self.emit_error("cannot borrow mutably: already borrowed", err_node)
+        return
+    self.borrow_kinds.push(kind)
+    self.borrow_places.push(place)
+    self.borrow_fields.push(field)
+    self.borrow_refs.push(0)
+    self.borrow_path_starts.push(path_start)
+    self.borrow_path_counts.push(path_count)
 
 fn Sema.remove_borrow_at(self: Sema, idx: i32):
     let last = self.borrow_refs.len() as i32 - 1
@@ -4601,10 +4768,14 @@ fn Sema.remove_borrow_at(self: Sema, idx: i32):
         self.borrow_places.set_i32(idx as i64, self.borrow_places.get(last as i64))
         self.borrow_fields.set_i32(idx as i64, self.borrow_fields.get(last as i64))
         self.borrow_refs.set_i32(idx as i64, self.borrow_refs.get(last as i64))
+        self.borrow_path_starts.set_i32(idx as i64, self.borrow_path_starts.get(last as i64))
+        self.borrow_path_counts.set_i32(idx as i64, self.borrow_path_counts.get(last as i64))
     self.borrow_kinds.pop()
     self.borrow_places.pop()
     self.borrow_fields.pop()
     self.borrow_refs.pop()
+    self.borrow_path_starts.pop()
+    self.borrow_path_counts.pop()
 
 fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
     if node == 0:
@@ -4770,6 +4941,260 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
                 return 1
         return 0
     0
+
+// Check if an expression mutates a variable rooted at `sym`.
+// Returns 1 if any subexpression assigns to or takes &mut of the variable.
+fn Sema.expr_mutates_place(self: Sema, node: i32, sym: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    // Assignment: check if target is rooted at sym
+    if kind == NK_ASSIGN:
+        let target = self.ast.get_data0(node)
+        if self.place_root_sym(target) == sym:
+            return 1
+        // Also check value side for nested mutations
+        return self.expr_mutates_place(self.ast.get_data1(node), sym)
+    // &mut borrow of sym
+    if kind == NK_UNARY:
+        let op = self.ast.get_data0(node)
+        if op == UOP_MUT_REF:
+            let operand = self.ast.get_data1(node)
+            if self.place_root_sym(operand) == sym:
+                return 1
+        return self.expr_mutates_place(self.ast.get_data1(node), sym)
+    // Recursive cases
+    if kind == NK_BINARY:
+        if self.expr_mutates_place(self.ast.get_data1(node), sym) != 0:
+            return 1
+        return self.expr_mutates_place(self.ast.get_data2(node), sym)
+    if kind == NK_BLOCK:
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        let tail = self.ast.get_data2(node)
+        for si in 0..stmt_count:
+            if self.expr_mutates_place(self.ast.get_extra(extra_start + si), sym) != 0:
+                return 1
+        return self.expr_mutates_place(tail, sym)
+    if kind == NK_IF_EXPR:
+        if self.expr_mutates_place(self.ast.get_data0(node), sym) != 0:
+            return 1
+        if self.expr_mutates_place(self.ast.get_data1(node), sym) != 0:
+            return 1
+        return self.expr_mutates_place(self.ast.get_data2(node), sym)
+    if kind == NK_CALL:
+        if self.expr_mutates_place(self.ast.get_data0(node), sym) != 0:
+            return 1
+        let ea = self.ast.get_data1(node)
+        let ac = self.ast.get_data2(node)
+        for ai in 0..ac:
+            if self.expr_mutates_place(self.ast.get_extra(ea + ai), sym) != 0:
+                return 1
+        return 0
+    if kind == NK_LET_BINDING:
+        return self.expr_mutates_place(self.ast.get_data1(node), sym)
+    if kind == NK_RETURN:
+        return self.expr_mutates_place(self.ast.get_data0(node), sym)
+    if kind == NK_FIELD_ACCESS:
+        return self.expr_mutates_place(self.ast.get_data0(node), sym)
+    if kind == NK_INDEX:
+        if self.expr_mutates_place(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_mutates_place(self.ast.get_data1(node), sym)
+    if kind == NK_GROUPED:
+        return self.expr_mutates_place(self.ast.get_data0(node), sym)
+    if kind == NK_WHILE:
+        if self.expr_mutates_place(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_mutates_place(self.ast.get_data1(node), sym)
+    if kind == NK_FOR:
+        if self.expr_mutates_place(self.ast.get_data1(node), sym) != 0:
+            return 1
+        return self.expr_mutates_place(self.ast.get_data2(node), sym)
+    0
+
+// Get the root symbol of a place expression (ident, field access chain, index).
+fn Sema.place_root_sym(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NK_IDENT:
+        return self.ast.get_data0(node)
+    if kind == NK_FIELD_ACCESS or kind == NK_INDEX or kind == NK_GROUPED:
+        return self.place_root_sym(self.ast.get_data0(node))
+    0
+
+// Check if a captured variable is used only through field accesses, never whole.
+// Returns 1 if all uses of `sym` in `node` are of the form `sym.field`.
+// Returns 0 if `sym` is used directly (passed as arg, assigned, etc).
+fn Sema.capture_is_field_only(self: Sema, node: i32, sym: i32) -> i32:
+    if node == 0:
+        return 1
+    let kind = self.ast.kind(node)
+    if kind == NK_IDENT:
+        // Direct use of sym — not field-only
+        if self.ast.get_data0(node) == sym:
+            return 0
+        return 1
+    if kind == NK_FIELD_ACCESS:
+        // sym.field — check if base is sym (OK) or recurse
+        let base = self.ast.get_data0(node)
+        if self.ast.kind(base) == NK_IDENT and self.ast.get_data0(base) == sym:
+            return 1
+        return self.capture_is_field_only(base, sym)
+    if kind == NK_BINARY:
+        if self.capture_is_field_only(self.ast.get_data1(node), sym) == 0:
+            return 0
+        return self.capture_is_field_only(self.ast.get_data2(node), sym)
+    if kind == NK_UNARY:
+        let operand = self.ast.get_data1(node)
+        // &mut sym.field or &sym.field — check the operand
+        return self.capture_is_field_only(operand, sym)
+    if kind == NK_CALL:
+        if self.capture_is_field_only(self.ast.get_data0(node), sym) == 0:
+            return 0
+        let ea = self.ast.get_data1(node)
+        let ac = self.ast.get_data2(node)
+        for ai in 0..ac:
+            if self.capture_is_field_only(self.ast.get_extra(ea + ai), sym) == 0:
+                return 0
+        return 1
+    if kind == NK_BLOCK:
+        let ea = self.ast.get_data0(node)
+        let sc = self.ast.get_data1(node)
+        let tail = self.ast.get_data2(node)
+        for si in 0..sc:
+            if self.capture_is_field_only(self.ast.get_extra(ea + si), sym) == 0:
+                return 0
+        return self.capture_is_field_only(tail, sym)
+    if kind == NK_ASSIGN:
+        if self.capture_is_field_only(self.ast.get_data0(node), sym) == 0:
+            return 0
+        return self.capture_is_field_only(self.ast.get_data1(node), sym)
+    if kind == NK_IF_EXPR:
+        if self.capture_is_field_only(self.ast.get_data0(node), sym) == 0:
+            return 0
+        if self.capture_is_field_only(self.ast.get_data1(node), sym) == 0:
+            return 0
+        return self.capture_is_field_only(self.ast.get_data2(node), sym)
+    if kind == NK_LET_BINDING:
+        return self.capture_is_field_only(self.ast.get_data1(node), sym)
+    if kind == NK_RETURN:
+        return self.capture_is_field_only(self.ast.get_data0(node), sym)
+    if kind == NK_INDEX:
+        if self.capture_is_field_only(self.ast.get_data0(node), sym) == 0:
+            return 0
+        return self.capture_is_field_only(self.ast.get_data1(node), sym)
+    if kind == NK_GROUPED:
+        return self.capture_is_field_only(self.ast.get_data0(node), sym)
+    1
+
+// Collect top-level field syms accessed on a captured variable in a closure body.
+// Pushes (field_sym, borrow_kind) pairs into capture_field_syms/capture_field_kinds.
+// These are parallel Vecs used transiently during closure checking.
+fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
+    if node == 0:
+        return
+    let kind = self.ast.kind(node)
+    if kind == NK_FIELD_ACCESS:
+        let base = self.ast.get_data0(node)
+        if self.ast.kind(base) == NK_IDENT and self.ast.get_data0(base) == sym:
+            let field_sym = self.ast.get_data1(node)
+            // Check if this field is already collected
+            var found = 0
+            var fi = 0
+            while fi < self.capture_field_syms.len() as i32:
+                if self.capture_field_syms.get(fi as i64) == field_sym:
+                    found = 1
+                    break
+                fi = fi + 1
+            if found == 0:
+                self.capture_field_syms.push(field_sym)
+                self.capture_field_kinds.push(BK_SHARED)
+            return
+        self.collect_capture_fields(base, sym)
+        return
+    if kind == NK_ASSIGN:
+        // Check if target is sym.field — if so, mark that field as exclusive
+        let target = self.ast.get_data0(node)
+        if self.ast.kind(target) == NK_FIELD_ACCESS:
+            let tbase = self.ast.get_data0(target)
+            if self.ast.kind(tbase) == NK_IDENT and self.ast.get_data0(tbase) == sym:
+                let field_sym = self.ast.get_data1(target)
+                var found = 0
+                var fi = 0
+                while fi < self.capture_field_syms.len() as i32:
+                    if self.capture_field_syms.get(fi as i64) == field_sym:
+                        found = 1
+                        self.capture_field_kinds.set_i32(fi as i64, BK_EXCLUSIVE)
+                        break
+                    fi = fi + 1
+                if found == 0:
+                    self.capture_field_syms.push(field_sym)
+                    self.capture_field_kinds.push(BK_EXCLUSIVE)
+        self.collect_capture_fields(self.ast.get_data0(node), sym)
+        self.collect_capture_fields(self.ast.get_data1(node), sym)
+        return
+    if kind == NK_UNARY:
+        let op = self.ast.get_data0(node)
+        let operand = self.ast.get_data1(node)
+        if op == UOP_MUT_REF:
+            // &mut sym.field — mark field as exclusive
+            if self.ast.kind(operand) == NK_FIELD_ACCESS:
+                let fbase = self.ast.get_data0(operand)
+                if self.ast.kind(fbase) == NK_IDENT and self.ast.get_data0(fbase) == sym:
+                    let field_sym = self.ast.get_data1(operand)
+                    var found = 0
+                    var fi = 0
+                    while fi < self.capture_field_syms.len() as i32:
+                        if self.capture_field_syms.get(fi as i64) == field_sym:
+                            found = 1
+                            self.capture_field_kinds.set_i32(fi as i64, BK_EXCLUSIVE)
+                            break
+                        fi = fi + 1
+                    if found == 0:
+                        self.capture_field_syms.push(field_sym)
+                        self.capture_field_kinds.push(BK_EXCLUSIVE)
+                    return
+        self.collect_capture_fields(operand, sym)
+        return
+    // Recursive cases
+    if kind == NK_BINARY:
+        self.collect_capture_fields(self.ast.get_data1(node), sym)
+        self.collect_capture_fields(self.ast.get_data2(node), sym)
+        return
+    if kind == NK_BLOCK:
+        let ea = self.ast.get_data0(node)
+        let sc = self.ast.get_data1(node)
+        let tail = self.ast.get_data2(node)
+        for si in 0..sc:
+            self.collect_capture_fields(self.ast.get_extra(ea + si), sym)
+        self.collect_capture_fields(tail, sym)
+        return
+    if kind == NK_CALL:
+        self.collect_capture_fields(self.ast.get_data0(node), sym)
+        let ea = self.ast.get_data1(node)
+        let ac = self.ast.get_data2(node)
+        for ai in 0..ac:
+            self.collect_capture_fields(self.ast.get_extra(ea + ai), sym)
+        return
+    if kind == NK_IF_EXPR:
+        self.collect_capture_fields(self.ast.get_data0(node), sym)
+        self.collect_capture_fields(self.ast.get_data1(node), sym)
+        self.collect_capture_fields(self.ast.get_data2(node), sym)
+        return
+    if kind == NK_LET_BINDING:
+        self.collect_capture_fields(self.ast.get_data1(node), sym)
+        return
+    if kind == NK_RETURN:
+        self.collect_capture_fields(self.ast.get_data0(node), sym)
+        return
+    if kind == NK_INDEX:
+        self.collect_capture_fields(self.ast.get_data0(node), sym)
+        self.collect_capture_fields(self.ast.get_data1(node), sym)
+        return
+    if kind == NK_GROUPED:
+        self.collect_capture_fields(self.ast.get_data0(node), sym)
 
 fn Sema.expire_dead_borrows_in_block(self: Sema, block_extra_start: i32, stmt_count: i32, next_stmt_index: i32, tail_node: i32):
     var bi = 0
@@ -5142,10 +5567,14 @@ fn Sema.expire_borrows_in_scope(self: Sema, scope_start: i32):
                     self.borrow_places.set_i32(bi as i64, self.borrow_places.get(last as i64))
                     self.borrow_fields.set_i32(bi as i64, self.borrow_fields.get(last as i64))
                     self.borrow_refs.set_i32(bi as i64, self.borrow_refs.get(last as i64))
+                    self.borrow_path_starts.set_i32(bi as i64, self.borrow_path_starts.get(last as i64))
+                    self.borrow_path_counts.set_i32(bi as i64, self.borrow_path_counts.get(last as i64))
                 self.borrow_kinds.pop()
                 self.borrow_places.pop()
                 self.borrow_fields.pop()
                 self.borrow_refs.pop()
+                self.borrow_path_starts.pop()
+                self.borrow_path_counts.pop()
                 bi = bi  // keep same type as else branch for phi
             else:
                 bi = bi + 1

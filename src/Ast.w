@@ -118,6 +118,7 @@ const NK_PAT_OR: i32 = 109
 const NK_PAT_ENUM_SHORTHAND: i32 = 111
 const NK_PAT_AT_BINDING: i32 = 112
 const NK_PAT_SLICE: i32 = 113
+const NK_PAT_TYPED_BIND: i32 = 114
 
 // Match arm
 const NK_MATCH_ARM: i32 = 110
@@ -263,6 +264,9 @@ type AstPool = {
     // Move closure nodes
     move_closure_nodes: Vec[i32],
 
+    // Non-escaping closure nodes (passed as direct call argument)
+    non_escaping_closure_nodes: Vec[i32],
+
     // Where clause metadata: [fn_node, extra_start, clause_count]*
     where_meta: Vec[i32],
 
@@ -292,6 +296,7 @@ fn AstPool.new -> AstPool:
         must_use_type_nodes: Vec.new(),
         sealed_trait_nodes: Vec.new(),
         move_closure_nodes: Vec.new(),
+        non_escaping_closure_nodes: Vec.new(),
         where_meta: Vec.new(),
         impl_type_params: Vec.new(),
     }
@@ -502,6 +507,17 @@ fn AstPool.is_move_closure(self: &AstPool, node: i32) -> i32:
         i = i + 1
     0
 
+fn AstPool.mark_non_escaping_closure(self: &mut AstPool, node: i32):
+    self.non_escaping_closure_nodes.push(node)
+
+fn AstPool.is_non_escaping_closure(self: &AstPool, node: i32) -> i32:
+    var i = 0
+    while i < self.non_escaping_closure_nodes.len() as i32:
+        if self.non_escaping_closure_nodes.get(i as i64) == node:
+            return 1
+        i = i + 1
+    0
+
 fn AstPool.add_where_meta(self: &mut AstPool, fn_node: i32, extra_start: i32, clause_count: i32):
     self.where_meta.push(fn_node)
     self.where_meta.push(extra_start)
@@ -683,4 +699,5 @@ fn AstPool.for_meta_label(self: &AstPool, meta: i32) -> i32:
 // NK_PAT_AT_BINDING: d0=name(sym), d1=pattern(node), d2=0
 // NK_PAT_SLICE:     d0=extra_start, d1=head_count, d2=rest(sym,0=none)
 //                   extra: [has_rest(0/1), head_syms..., tail_count, tail_syms...]
+// NK_PAT_TYPED_BIND:  d0=binding(sym), d1=type(sym), d2=0
 // NK_PAT_ENUM_SHORTHAND: d0=name(sym), d1=extra_start, d2=binding_count

@@ -2680,6 +2680,11 @@ fn Parser.parse_pattern(self: Parser) -> i32:
             self.advance()
             let inner = self.parse_pattern()
             return self.pool.add_node(NK_PAT_AT_BINDING, start, self.prev_end(), name, inner, 0)
+        // Typed binding: ident: Type (for dyn trait matching)
+        if self.peek() == TK_COLON:
+            self.advance()
+            let type_sym = self.expect_ident()
+            return self.pool.add_node(NK_PAT_TYPED_BIND, start, self.prev_end(), name, type_sym, 0)
         // Variable binding
         return self.pool.add_node(NK_PAT_IDENT, start, self.prev_end(), name, 0, 0)
 
