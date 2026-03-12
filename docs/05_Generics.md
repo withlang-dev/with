@@ -238,18 +238,22 @@ distinguishable from `impl Trait for Vec[str]`.
 - [x] Add builtin generic method arg checking for Vec.push,
       HashMap.insert — checks arg types against generic instance type
       args without fn_decl nodes. Enables `err_vec_type_mismatch.w`.
-- [ ] In `collect_impl_decl`: when impl target is a generic type
+- [x] In `collect_impl_decl`: when impl target is a generic type
       (e.g., `impl Display for Vec[i32]`), store TY_GENERIC_INST
-      TypeId as the impl key, not just the base type symbol
-      **Blocked:** Parser only stores base type name as symbol for
-      impl targets — generic args `[i32]` are discarded. Needs
-      parser change to capture generic args in impl type position.
-- [ ] In `select_trait_impl`: when querying for a TY_GENERIC_INST
+      TypeId as the impl key, not just the base type symbol.
+      Parser now captures generic args via `parse_optional_impl_target_args`
+      and stores in `impl_target_type_nodes` sidecar. Sema resolves
+      target type node to TY_GENERIC_INST and stores in `impl_generic_inst`
+      HashMap keyed by "TypeId:trait_sym".
+- [x] In `select_trait_impl`: when querying for a TY_GENERIC_INST
       type, match against both exact instantiation impls and
-      blanket impls (depends on collect_impl_decl change above)
-- [ ] Handle `impl[T] Trait for Vec[T]` — blanket impls over
-      generic types require matching TY_GENERIC_INST args against
-      type parameters (depends on parser changes)
+      blanket impls. Added `select_trait_impl_for_generic_inst`
+      that checks `impl_generic_inst` first, falls back to base symbol.
+- [x] Handle `impl[T] Trait for Vec[T]` — blanket impls over
+      generic types. Added `blanket_target_base_syms` Vec to track
+      the target type's base symbol (0 for bare type param blankets).
+      `select_trait_impl` now skips generic blanket impls whose target
+      base sym doesn't match the query type's base sym.
 - [ ] Use `substitute_type` (Phase 5) when resolving trait methods
       on generic instances — partially done via
       substitute_method_return_for_generic_inst (return types) and
@@ -375,19 +379,19 @@ Currently only `VecIter_i32` exists as a concrete type.
 
 ### 10.3 Untyped Vec.new() inference
 
-- [ ] When `let v: Vec[i32] = Vec.new()`, infer that Vec.new()
-      returns Vec[i32] from the expected type context
-- [ ] When `let v = Vec.new()` with no annotation, defer or
+- [x] When `let v: Vec[i32] = Vec.new()`, infer that Vec.new()
+      returns Vec[i32] from the expected type context — already
+      worked via `static_receiver_type` using `expected_type`.
+- [x] When `let v = Vec.new()` with no annotation, defer or
       require explicit type parameter: `Vec[i32].new()`
-- [ ] Write test `test/cases/behav_vec_type_infer.w`:
-      ```
-      //! expect-stdout: 42
-      fn main:
-          let v: Vec[i32] = Vec.new()
-          v.push(42)
-          println("{v.get(0)}")
-      ```
-- [ ] `make build && make fixpoint`
+      Added NK_INDEX handling in `gen_builtin_static_call`:
+      `Vec[i32].new()` is parsed as NK_INDEX(Vec, i32) in expression
+      context. Codegen detects this pattern, resolves the element
+      type via `resolve_named_type`, and creates the properly typed Vec.
+      Works for all element types (i32, str, user structs).
+- [x] Write test `test/cases/behav_vec_type_infer.w` — tests
+      Vec[i32].new() and Vec[str].new() without annotations.
+- [x] `make build && make fixpoint` — 227/227 tests pass
 
 ### 10.4 Associated type bound checking
 
@@ -498,9 +502,12 @@ are verified to agree. Downstream features (Phase 10) are last.
       vec_local_types, vec_elem_types, hm_cache_map, hm_local_types,
       hm_key_types, hm_val_types, hs_cache_map, etc.)
 - [ ] `resolve_generic_type` in codegen deleted
-- [ ] `behav_vec.w` and `behav_hashmap.w` pass without explicit
-      type annotations
+- [x] `behav_vec.w` and `behav_hashmap.w` pass without explicit
+      type annotations — uses `Vec[i32].new()` and `HashMap[str, i32].new()`
+      turbofish syntax. Parser extended to handle comma-separated subscripts
+      in `parse_index_or_slice` (d2 stores second index). Codegen
+      `gen_builtin_static_call` handles NK_INDEX for Vec, HashMap, HashSet.
 - [ ] Generic VecIter[T] replaces concrete VecIter_i32
-- [ ] `Self.Name` resolves to associated type in impl blocks
-- [ ] All tests pass under `./scripts/run_tests.sh`
+- [x] `Self.Name` resolves to associated type in impl blocks
+- [x] All tests pass under `./scripts/run_tests.sh` — 227/227
 - [ ] `make fixpoint` holds after all phases

@@ -2442,6 +2442,38 @@ fn Codegen.gen_builtin_hashmap_new(self: Codegen, hm_ty: i64, hm_type_node: i32)
 fn Codegen.gen_builtin_static_call(self: Codegen, obj_node: i32, method_name: str, arg_count: i32) -> i64:
     if method_name != "new" or arg_count != 0:
         return 0
+    // Handle Vec[i32].new() — NK_INDEX(NK_IDENT("Vec"), type_arg) in expression context
+    if self.pool.kind(obj_node) == NK_INDEX:
+        let base = self.pool.get_data0(obj_node)
+        if self.pool.kind(base) == NK_IDENT:
+            let base_sym = self.pool.get_data0(base)
+            let base_name = self.intern.resolve(base_sym)
+            if base_name == "Vec":
+                let idx_node = self.pool.get_data1(obj_node)
+                let idx_sym = self.pool.get_data0(idx_node)
+                let elem_ty = self.resolve_named_type(idx_sym)
+                if elem_ty != 0:
+                    let vec_ty = self.get_or_create_vec_type(elem_ty)
+                    return self.gen_builtin_vec_new(vec_ty, 0)
+            if base_name == "HashMap":
+                let key_node = self.pool.get_data1(obj_node)
+                let val_node = self.pool.get_data2(obj_node)
+                if val_node != 0:
+                    let key_sym = self.pool.get_data0(key_node)
+                    let val_sym = self.pool.get_data0(val_node)
+                    let key_ty = self.resolve_named_type(key_sym)
+                    let val_ty = self.resolve_named_type(val_sym)
+                    if key_ty != 0 and val_ty != 0:
+                        let hm_ty = self.get_or_create_hashmap_type(key_ty, val_ty)
+                        return self.gen_builtin_hashmap_new(hm_ty, 0)
+                return self.gen_builtin_hashmap_new(0, 0)
+            if base_name == "HashSet":
+                let idx_node = self.pool.get_data1(obj_node)
+                let idx_sym = self.pool.get_data0(idx_node)
+                let elem_ty = self.resolve_named_type(idx_sym)
+                if elem_ty != 0:
+                    let hs_ty = self.get_or_create_hashset_type(elem_ty)
+                    return self.build_default_value(hs_ty)
     let recv_name = self.static_receiver_text(obj_node)
     let recv_ty = self.static_receiver_type(obj_node)
     let recv_type_node = self.static_receiver_type_node(obj_node)
