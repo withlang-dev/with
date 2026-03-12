@@ -111,6 +111,11 @@ fn Compilation.set_prelude_mode(self: Compilation, mode: i32):
     zcu.set_prelude_mode(cfg.prelude_mode)
     self.zcu = zcu
 
+fn Compilation.set_debug_info(self: Compilation, enabled: bool):
+    var cfg = self.config
+    cfg.debug_info = enabled
+    self.config = cfg
+
 fn Compilation.compile_file(self: Compilation, path: str) -> AstPool:
     compilation_debug_init("Compilation.compile_file:start " ++ path)
     var zcu = self.zcu
@@ -157,7 +162,7 @@ fn Compilation.build_binary_at(self: Compilation, source_path: str, output_dir: 
     let requires_async_runtime = self.zcu.last_async_mir_module.requires_async_runtime()
     compilation_debug_pool_flow("build_binary_at:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
     compilation_debug_init("build_binary_at:compile_to_object_backend")
-    let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path)
+    let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info)
     if backend_rc != 0:
         compilation_debug_init("build_binary_at:backend FAILED rc=" ++ int_to_string(backend_rc))
         let _ = ("rm -f " ++ obj_path) |> with_system
@@ -168,7 +173,8 @@ fn Compilation.build_binary_at(self: Compilation, source_path: str, output_dir: 
         let _ = ("rm -f " ++ obj_path) |> with_system
         return ""
     // Generate .dSYM bundle for macOS debug info (DWARF stays in .o until dsymutil runs)
-    let _ = ("dsymutil " ++ bin_path ++ " 2>/dev/null") |> with_system
+    if self.config.debug_info:
+        let _ = ("dsymutil " ++ bin_path ++ " 2>/dev/null") |> with_system
     let _ = ("rm -f " ++ obj_path) |> with_system
     bin_path
 
@@ -185,7 +191,7 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
     if final_output.len() == 0:
         final_output = "out/" ++ link_stage_source_stem(source_path) ++ ".c"
 
-    let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, self.zcu.pool, self.zcu.last_sema)
+    let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, self.zcu.pool, self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text)
     if emitted.ok == 0:
         with_eprintln("error: C emission failed: " ++ emitted.err_msg)
         return ""

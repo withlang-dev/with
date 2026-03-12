@@ -73,6 +73,12 @@ fn cli_command(argc: i32) -> str:
         return with_arg_at(1)
     ""
 
+fn cli_is_implicit_run(argc: i32) -> bool:
+    if argc < 2:
+        return false
+    let arg = with_arg_at(1)
+    arg.ends_with(".w")
+
 fn cli_has_flag(argc: i32, flag: str) -> bool:
     var i = 2
     while i < argc:
@@ -160,14 +166,19 @@ fn run_cli(argc: i32) -> i32:
     let dump_typed_flag = cli_has_flag(argc, "--dump-typed")
     let dump_mir_flag = cli_has_flag(argc, "--dump-mir")
     let dump_async_mir_flag = cli_has_flag(argc, "--dump-async-mir")
+    let debug_info = not cli_has_flag(argc, "-g0") and not cli_has_flag(argc, "--release")
+
+    // `with hello.w` is shorthand for `with run hello.w`
+    if cli_is_implicit_run(argc):
+        return run_run_command(cli_command(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
 
     if cli_command(argc) == "build":
-        return run_build_command(find_source_arg(argc), opt_level, no_std, alloc_mode, emit_c_mode, find_output_arg(argc), prelude_mode)
+        return run_build_command(find_source_arg(argc), opt_level, no_std, alloc_mode, emit_c_mode, find_output_arg(argc), prelude_mode, debug_info)
     if cli_command(argc) == "run":
         if emit_c_mode:
             with_eprintln("error: '--emit-c' is only supported with 'build'")
             return 1
-        return run_run_command(find_source_arg(argc), opt_level, no_std, alloc_mode, prelude_mode)
+        return run_run_command(find_source_arg(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
     if cli_command(argc) == "ir":
         if find_source_arg(argc) == "":
             with_eprintln("error: 'ir' requires a source file argument")
@@ -258,6 +269,7 @@ fn main -> void:
     with_install_interrupt_handlers()
     let argc = with_arg_count()
     if argc < 2:
+        with_eprintln("error: REPL not yet available")
         print_usage()
         return
     exit(run_cli(argc))
@@ -303,13 +315,14 @@ fn find_output_arg(argc: i32) -> str:
         i = i + 1
     ""
 
-fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, output_path: str, prelude_mode: i32) -> i32:
+fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
     if source_file == "":
         with_eprintln("error: 'build' requires a source file argument")
         return 1
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
+    comp.set_debug_info(debug_info)
     if emit_c_mode:
         let c_path = comp.emit_c(source_file, output_path)
         if c_path == "":
@@ -327,13 +340,14 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
     comp.print_warnings()
     0
 
-fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
+fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
     if source_file == "":
         with_eprintln("error: 'run' requires a source file argument")
         return 1
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
+    comp.set_debug_info(debug_info)
     let bin_path = comp.build_binary(source_file)
     if bin_path == "":
         with_eprintln("error: run failed")
