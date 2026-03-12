@@ -1459,3 +1459,13 @@ int32_t with_net_udp_bind(int32_t port) {
     }
     return (int32_t)fd;
 }
+
+// Weak stub for embedded runtime object extraction.
+// The real implementation lives in embedded_objects.o (linked into the compiler).
+// This stub allows user programs (which link helpers.o but not embedded_objects.o)
+// to resolve the symbol without error — it simply returns "not available".
+__attribute__((weak))
+int32_t with_extract_runtime_obj(with_str name, with_str path) {
+    (void)name; (void)path;
+    return 1; // not available
+}

@@ -8,6 +8,7 @@ use Mir
 use Ast
 use InternPool
 use Sema
+use Source
 
 extern fn int_to_string(n: i32) -> str
 extern fn with_i64_to_str(n: i64) -> str
@@ -128,6 +129,10 @@ type CCodegen = {
     sema: Sema,
     had_error: i32,
     err_msg: str,
+    source_path: str,
+    source_text: str,
+    di_source: Source,
+    last_line_directive: i32,
     body_fn_map: HashMap[i32, i32],
     body_fn_name_map: HashMap[str, i32],
     canonical_body_cache: HashMap[i32, i32],
@@ -170,7 +175,7 @@ fn CCodegen.intern_intern(self: CCodegen, s: str) -> i32:
     let intern = &mut self.intern
     cc_intern_intern(intern, s)
 
-fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sema) -> CEmitResult:
+fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sema, source_path: str, source_text: str) -> CEmitResult:
     var cg = CCodegen {
         mir_mod,
         ast,
@@ -178,6 +183,10 @@ fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sem
         sema,
         had_error: 0,
         err_msg: "",
+        source_path,
+        source_text,
+        di_source: Source.from_string(source_path, source_text, 0),
+        last_line_directive: 0,
         body_fn_map: HashMap.new(),
         body_fn_name_map: HashMap.new(),
         canonical_body_cache: HashMap.new(),
@@ -3347,6 +3356,21 @@ fn CCodegen.zero_value_text(self: CCodegen, tid: i32) -> str:
         return "(" ++ self.c_type(resolved, 0) ++ ")" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
     "0"
 
+fn CCodegen.line_directive(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
+    if self.source_path.len() == 0:
+        return ""
+    if stmt_id < 0 or stmt_id >= body.stmt_spans.len() as i32:
+        return ""
+    let span = body.stmt_spans.get(stmt_id as i64)
+    if span <= 0:
+        return ""
+    let loc = self.di_source.offset_to_location(span)
+    let line = loc.line + 1
+    if line == self.last_line_directive:
+        return ""
+    self.last_line_directive = line
+    "#line " ++ int_to_string(line) ++ " \"" ++ self.source_path ++ "\"\n"
+
 fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
     if stmt_id < 0 or stmt_id >= body.stmt_kinds.len() as i32:
         self.fail("invalid statement id " ++ int_to_string(stmt_id))
@@ -3680,7 +3704,7 @@ fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
         for si in 0..count:
             if self.check_interrupted() != 0:
                 return ""
-            out = out ++ self.emit_stmt_line(body, start + si) ++ "\n"
+            out = out ++ self.line_directive(body, start + si) ++ self.emit_stmt_line(body, start + si) ++ "\n"
         out = out ++ self.emit_term(body, bb) ++ "\n"
     out = out ++ cc_rbrace() ++ "\n"
     out

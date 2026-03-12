@@ -9,6 +9,7 @@ type CompilationConfig = {
     emit_bin: bool,
     is_test: bool,
     prelude_mode: i32,
+    debug_info: bool,
 }
 
 fn PRELUDE_FULL -> i32: 0
@@ -31,6 +32,7 @@ fn compilation_config_default -> CompilationConfig:
         emit_bin: true,
         is_test: false,
         prelude_mode: PRELUDE_FULL(),
+        debug_info: true,
     }
 
 fn compilation_config_from_cli(opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> CompilationConfig:

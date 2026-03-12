@@ -39,6 +39,12 @@ if [ -n "$asm_file" ] && [ -f "$asm_file" ]; then
   compile "$asm_file" "${OUT_LIB}/fiber_asm.o" || true
 fi
 
+# ── Embed runtime objects into compiler ─────────────────────────────────
+# Convert .o files to C byte arrays so the compiler doesn't need external .o at link time.
+EMBEDDED_INC="${RUNTIME_SRC}/embedded_objects.inc.h"
+bash "${ROOT_DIR}/scripts/embed_runtime_objects.sh" "${OUT_LIB}" "${EMBEDDED_INC}"
+compile "${RUNTIME_SRC}/embedded_objects.c" "${OUT_LIB}/embedded_objects.o" || true
+
 # ── Static LLVM bridge ──────────────────────────────────────────────────
 # Statically link LLVM into the compiler binary (like Zig does).
 # Requires LLVM installed at LLVM_PREFIX (default: /usr/local/llvm).

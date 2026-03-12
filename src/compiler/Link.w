@@ -2,6 +2,7 @@ extern fn with_system(cmd: str) -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_eprintln(s: str) -> void
+extern fn with_extract_runtime_obj(name: str, path: str) -> i32
 
 fn link_stage_link(obj_path: str, bin_path: str) -> bool:
     let extras: Vec[str] = Vec.new()
@@ -16,7 +17,7 @@ fn link_stage_link_with_extras_and_libs(obj_path: str, bin_path: str, extras: Ve
     var cmd = "cc " ++ obj_path
     for i in 0..extras.len() as i32:
         cmd = cmd ++ " " ++ extras.get(i as i64)
-    cmd = cmd ++ " -o " ++ bin_path
+    cmd = cmd ++ " -Wl,-dead_strip -o " ++ bin_path
     for i in 0..link_libs.len() as i32:
         cmd = cmd ++ " -l" ++ link_libs.get(i as i64)
     let result = cmd |> with_system
@@ -26,7 +27,7 @@ fn link_stage_link_with_llvm(obj_path: str, bin_path: str, extras: Vec[str], lin
     var cmd = llvm_cc ++ " -fuse-ld=lld " ++ obj_path
     for i in 0..extras.len() as i32:
         cmd = cmd ++ " " ++ extras.get(i as i64)
-    cmd = cmd ++ " -o " ++ bin_path
+    cmd = cmd ++ " -Wl,-dead_strip -o " ++ bin_path
     for i in 0..link_libs.len() as i32:
         cmd = cmd ++ " -l" ++ link_libs.get(i as i64)
     let result = cmd |> with_system
@@ -148,6 +149,12 @@ fn link_stage_find_runtime_object_path(name: str) -> str:
     let p = root ++ "/" ++ name
     if with_fs_read_file(p).len() > 0:
         return p
+    // Fall back to embedded runtime objects (self-contained binary)
+    let tmp_dir = "/tmp/with_runtime"
+    let _ = ("mkdir -p " ++ tmp_dir) |> with_system
+    let tmp_path = tmp_dir ++ "/" ++ name
+    if with_extract_runtime_obj(name, tmp_path) == 0:
+        return tmp_path
     ""
 
 fn link_stage_object_needs_llvm_bridge(obj_path: str) -> bool:
@@ -212,6 +219,10 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
             let rsp_path = root ++ "/llvm_link.rsp"
             let cc_path = link_stage_read_file_trimmed(root ++ "/llvm_cc")
             extras.push(static_bridge)
+            // Include embedded runtime objects for self-contained binary
+            let embedded_path = root ++ "/embedded_objects.o"
+            if with_fs_read_file(embedded_path).len() > 0:
+                extras.push(embedded_path)
             extras.push("@" ++ rsp_path)
             return link_stage_link_with_llvm(obj_path, bin_path, extras, link_libs, cc_path)
         let bridge_path = link_stage_find_llvm_bridge_path()

@@ -14,7 +14,7 @@ fn backend_debug_pool_flow_enabled() -> i32:
 
 // Backend stage wrapper over existing LLVM codegen.
 
-fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, output_path: str) -> i32:
+fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, output_path: str, debug_info: bool) -> i32:
     if self.last_mir_module.body_count() == 0:
         with_eprintln("error: missing MIR input for LLVM backend")
         return 1
@@ -27,6 +27,8 @@ fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, outpu
     var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, self.last_sema)
     cg.source_file = self.current_source_path
     cg.source_text = self.current_source_text
+    if not debug_info:
+        cg.debug_info = 0
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
         with_eprintln("[backend] zcu.pool symbols=" ++ int_to_string(self.pool.symbol_texts.len() as i32))
         with_eprintln("[backend] frontend.pool symbols=" ++ int_to_string(self.frontend_pool.symbol_texts.len() as i32))

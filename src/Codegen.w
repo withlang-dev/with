@@ -259,13 +259,28 @@ extern fn wl_di_finalize(b: i64) -> void
 extern fn wl_debug_metadata_version() -> i32
 extern fn wl_add_module_flag_int(m: i64, key: str, val: i32) -> void
 extern fn wl_di_create_file(b: i64, filename: str, directory: str) -> i64
-extern fn wl_di_create_compile_unit(b: i64, file: i64, producer: str, is_optimized: i32, dwarf_version: i32) -> i64
+extern fn wl_di_create_compile_unit(b: i64, file: i64, producer: str, is_optimized: i32, dwarf_version: i32, lang: i32) -> i64
+extern fn wl_dwarf_lang_with() -> i32
 extern fn wl_di_create_subroutine_type(b: i64, file: i64, param_types_ptr: i64, count: i32) -> i64
 extern fn wl_di_create_function(b: i64, scope: i64, name: str, linkage_name: str, file: i64, line: i32, ty: i64, is_definition: i32, scope_line: i32, is_optimized: i32) -> i64
 extern fn wl_di_set_subprogram(f: i64, subprogram: i64) -> void
 extern fn wl_di_create_debug_location(ctx: i64, line: i32, col: i32, scope: i64) -> i64
 extern fn wl_di_set_current_location(b: i64, location: i64) -> void
 extern fn wl_di_clear_current_location(b: i64) -> void
+extern fn wl_dwarf_ate_boolean() -> i32
+extern fn wl_dwarf_ate_float() -> i32
+extern fn wl_dwarf_ate_signed() -> i32
+extern fn wl_dwarf_ate_unsigned() -> i32
+extern fn wl_di_create_basic_type(b: i64, name: str, size_in_bits: i64, encoding: i32) -> i64
+extern fn wl_di_create_pointer_type(b: i64, pointee_ty: i64, size_in_bits: i64) -> i64
+extern fn wl_di_create_struct_type(b: i64, scope: i64, name: str, file: i64, line: i32, size_in_bits: i64, align_in_bits: i32, elements: i64, num_elements: i32) -> i64
+extern fn wl_di_create_member_type(b: i64, scope: i64, name: str, file: i64, line: i32, size_in_bits: i64, align_in_bits: i32, offset_in_bits: i64, ty: i64) -> i64
+extern fn wl_di_create_unspecified_type(b: i64, name: str) -> i64
+extern fn wl_di_create_auto_variable(b: i64, scope: i64, name: str, file: i64, line: i32, ty: i64) -> i64
+extern fn wl_di_create_parameter_variable(b: i64, scope: i64, name: str, file: i64, line: i32, ty: i64, arg_no: i32) -> i64
+extern fn wl_di_create_expression(b: i64) -> i64
+extern fn wl_di_insert_declare_at_end(b: i64, storage: i64, var_info: i64, expr: i64, loc: i64, block: i64) -> void
+extern fn wl_di_create_lexical_block(b: i64, scope: i64, file: i64, line: i32, col: i32) -> i64
 
 // Runtime helpers
 extern fn with_str_concat(a: str, b: str) -> str
@@ -508,11 +523,14 @@ type Codegen = {
     source_text: str,
 
     // Debug info (DWARF)
+    debug_info: i32,
     di_builder: i64,
     di_compile_unit: i64,
     di_file: i64,
     di_source: Source,
     di_fn_subprograms: HashMap[i32, i64],
+    di_type_cache: HashMap[i32, i64],
+    di_current_scope: i64,
 
     // Wave 10 MIR backend input (optional).
     mir_input_enabled: i32,
@@ -709,11 +727,14 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         mir_local_types: HashMap.new(),
         mir_bb_values: Vec.new(),
         mir_default_unreachable_bbs: Vec.new(),
+        debug_info: 1,
         di_builder: 0,
         di_compile_unit: 0,
         di_file: 0,
         di_source: Source.from_string("<unknown>", "", 0),
         di_fn_subprograms: HashMap.new(),
+        di_type_cache: HashMap.new(),
+        di_current_scope: 0,
     }
 
 fn Codegen.deinit(self: Codegen):
@@ -739,6 +760,8 @@ fn Codegen.verify(self: Codegen) -> i32:
 // ── Debug info helpers ────────────────────────────────────────────
 
 fn Codegen.debug_init_module(self: Codegen):
+    if self.debug_info == 0:
+        return
     self.di_source = Source.from_string(self.source_file, self.source_text, 0)
     self.di_builder = wl_di_create_builder(self.llmod)
 
@@ -761,7 +784,7 @@ fn Codegen.debug_init_module(self: Codegen):
 
     let is_opt = 0
     self.di_compile_unit = wl_di_create_compile_unit(
-        self.di_builder, self.di_file, "with", is_opt, 5)
+        self.di_builder, self.di_file, "with", is_opt, 5, wl_dwarf_lang_with())
 
 fn Codegen.debug_finalize_module(self: Codegen):
     if self.di_builder != 0:
@@ -786,6 +809,7 @@ fn Codegen.debug_enter_function(self: Codegen, fn_node: i32, fn_sym: i32, functi
         self.di_file, fn_line, sub_type, 1, fn_line, 0)
     wl_di_set_subprogram(function, subprogram)
     self.di_fn_subprograms.insert(fn_sym, subprogram)
+    self.di_current_scope = subprogram
 
 fn Codegen.debug_set_location(self: Codegen, byte_offset: i32):
     if self.di_builder == 0:
@@ -796,10 +820,12 @@ fn Codegen.debug_set_location(self: Codegen, byte_offset: i32):
     let loc = self.di_source.offset_to_location(byte_offset)
     let line = loc.line + 1
     let col = loc.col + 1
-    let sp = self.di_fn_subprograms.get(self.current_function_name_sym)
-    if not sp.is_some():
-        return
-    let scope = sp.unwrap() as i64
+    var scope = self.di_current_scope
+    if scope == 0:
+        let sp = self.di_fn_subprograms.get(self.current_function_name_sym)
+        if not sp.is_some():
+            return
+        scope = sp.unwrap() as i64
     let di_loc = wl_di_create_debug_location(self.context, line, col, scope)
     wl_di_set_current_location(self.builder, di_loc)
 
@@ -807,6 +833,85 @@ fn Codegen.debug_clear_location(self: Codegen):
     if self.di_builder == 0:
         return
     wl_di_clear_current_location(self.builder)
+
+fn Codegen.debug_push_lexical_block(self: Codegen, byte_offset: i32):
+    if self.di_builder == 0:
+        return
+    if self.di_current_scope == 0:
+        return
+    var line = 1
+    var col = 0
+    if byte_offset > 0:
+        let loc = self.di_source.offset_to_location(byte_offset)
+        line = loc.line + 1
+        col = loc.col + 1
+    let block = wl_di_create_lexical_block(self.di_builder, self.di_current_scope, self.di_file, line, col)
+    self.di_current_scope = block
+
+fn Codegen.debug_get_di_type(self: Codegen, sema_tid: i32) -> i64:
+    let cached = self.di_type_cache.get(sema_tid)
+    if cached.is_some():
+        return cached.unwrap() as i64
+    let di_ty = self.debug_create_di_type(sema_tid)
+    self.di_type_cache.insert(sema_tid, di_ty)
+    di_ty
+
+fn Codegen.debug_create_di_type(self: Codegen, sema_tid: i32) -> i64:
+    let kind = self.sema.get_type_kind(sema_tid)
+    if kind == 3:
+        // TY_BOOL
+        return wl_di_create_basic_type(self.di_builder, "bool", 8, wl_dwarf_ate_boolean())
+    if kind == 1:
+        // TY_INT: d0 = width, d1 = signed
+        let width = self.sema.get_type_d0(sema_tid)
+        let is_signed = self.sema.get_type_d1(sema_tid)
+        if is_signed == 1:
+            return wl_di_create_basic_type(self.di_builder, "i" ++ int_to_string(width), width as i64, wl_dwarf_ate_signed())
+        else:
+            return wl_di_create_basic_type(self.di_builder, "u" ++ int_to_string(width), width as i64, wl_dwarf_ate_unsigned())
+    if kind == 2:
+        // TY_FLOAT: d0 = width
+        let width = self.sema.get_type_d0(sema_tid)
+        return wl_di_create_basic_type(self.di_builder, "f" ++ int_to_string(width), width as i64, wl_dwarf_ate_float())
+    if kind == 5:
+        // TY_STR
+        return wl_di_create_unspecified_type(self.di_builder, "str")
+    if kind == 4:
+        // TY_VOID
+        return wl_di_create_unspecified_type(self.di_builder, "void")
+    if kind == 13 or kind == 14:
+        // TY_PTR / TY_REF: d0 = pointee tid
+        let pointee_tid = self.sema.get_type_d0(sema_tid)
+        let pointee_di = self.debug_get_di_type(pointee_tid)
+        return wl_di_create_pointer_type(self.di_builder, pointee_di, 64)
+    if kind == 6 or kind == 7:
+        // TY_STRUCT / TY_ENUM: d0 = name sym
+        let name_sym = self.sema.get_type_d0(sema_tid)
+        let name = self.intern.resolve(name_sym)
+        return wl_di_create_unspecified_type(self.di_builder, name)
+    wl_di_create_unspecified_type(self.di_builder, "unknown")
+
+fn Codegen.debug_declare_variable(self: Codegen, name_sym: i32, alloca: i64, sema_tid: i32, byte_offset: i32, is_param: bool, param_idx: i32):
+    if self.debug_info == 0 or self.di_builder == 0:
+        return
+    let di_ty = self.debug_get_di_type(sema_tid)
+    var scope = self.di_current_scope
+    if scope == 0:
+        scope = self.di_compile_unit
+    let name = self.intern.resolve(name_sym)
+    var line = 1
+    if byte_offset > 0:
+        let loc = self.di_source.offset_to_location(byte_offset)
+        line = loc.line + 1
+    var var_info: i64 = 0
+    if is_param:
+        var_info = wl_di_create_parameter_variable(self.di_builder, scope, name, self.di_file, line, di_ty, param_idx + 1)
+    else:
+        var_info = wl_di_create_auto_variable(self.di_builder, scope, name, self.di_file, line, di_ty)
+    let expr = wl_di_create_expression(self.di_builder)
+    let di_loc = wl_di_create_debug_location(self.context, line, 0, scope)
+    let block = wl_get_insert_block(self.builder)
+    wl_di_insert_declare_at_end(self.di_builder, alloca, var_info, expr, di_loc, block)
 
 fn Codegen.abi_size_of(self: Codegen, ty: i64) -> i64:
     if ty == 0:
@@ -2512,6 +2617,10 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         effective_name = "main"
 
     let function = wl_add_function(self.llmod, effective_name, fn_type)
+
+    // Mark non-main functions internal so the linker can dead-strip them.
+    if effective_name != "main":
+        wl_set_linkage(function, wl_internal_linkage())
 
     // Apply attributes
     if (flags / FN_FLAG_INLINE) % 2 == 1:
@@ -5060,6 +5169,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         else:
             let _ = wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
 
+    let saved_fn_scope = self.di_current_scope
     for bb in 0..body.block_count():
         if bb < 0 or bb >= self.mir_bb_values.len() as i32:
             continue
@@ -5069,6 +5179,12 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         wl_position_at_end(self.builder, llbb)
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
         let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        // Push a lexical block scope for non-entry BBs
+        if bb > 0 and stmt_count > 0:
+            let first_span = body.stmt_spans.get(stmt_start as i64)
+            if first_span > 0:
+                self.di_current_scope = saved_fn_scope
+                self.debug_push_lexical_block(first_span)
         for si in 0..stmt_count:
             let stmt_id = stmt_start + si
             let stmt_span = body.stmt_spans.get(stmt_id as i64)
@@ -5092,6 +5208,8 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
                 with_eprintln("[mir-cg] fn=" ++ name_str ++ " bb=" ++ int_to_string(bb) ++ " term_ok=" ++ int_to_string(ok_i))
             if not ok and wl_get_bb_terminator(llbb) == 0:
                 wl_build_unreachable(self.builder)
+
+    self.di_current_scope = saved_fn_scope
 
     if self.mir_default_unreachable_bbs.len() as i32 > 0:
         let ubb = self.mir_default_unreachable_bbs.get(0)

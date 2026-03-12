@@ -576,11 +576,12 @@ int64_t wl_di_create_file(int64_t builder, with_str filename, with_str directory
 }
 
 int64_t wl_di_create_compile_unit(int64_t builder, int64_t file,
-    with_str producer, int32_t is_optimized, int32_t dwarf_version) {
+    with_str producer, int32_t is_optimized, int32_t dwarf_version,
+    int32_t lang) {
     (void)dwarf_version;
     return P2I(LLVMDIBuilderCreateCompileUnit(
         (LLVMDIBuilderRef)(intptr_t)builder,
-        LLVMDWARFSourceLanguageC,  // Use C until DW_LANG registered
+        (LLVMDWARFSourceLanguage)lang,
         DI(file),
         producer.ptr, (size_t)producer.len,
         is_optimized,
@@ -645,3 +646,124 @@ void wl_di_clear_current_location(int64_t builder) {
 
 int32_t wl_di_flag_zero(void) { return (int32_t)LLVMDIFlagZero; }
 int32_t wl_dwarf_lang_c(void) { return (int32_t)LLVMDWARFSourceLanguageC; }
+// With language DW_LANG value.
+// Until a dedicated DW_LANG is registered with the DWARF committee,
+// use C — debuggers understand C semantics (pointer layout, calling convention).
+int32_t wl_dwarf_lang_with(void) { return (int32_t)LLVMDWARFSourceLanguageC; }
+
+// DW_ATE encoding constants
+int32_t wl_dwarf_ate_boolean(void) { return 0x02; }
+int32_t wl_dwarf_ate_float(void)   { return 0x04; }
+int32_t wl_dwarf_ate_signed(void)  { return 0x05; }
+int32_t wl_dwarf_ate_unsigned(void) { return 0x07; }
+
+// DI type constructors
+int64_t wl_di_create_basic_type(int64_t builder, with_str name,
+    uint64_t size_in_bits, int32_t encoding) {
+    return P2I(LLVMDIBuilderCreateBasicType(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        name.ptr, (size_t)name.len,
+        size_in_bits, (LLVMDWARFTypeEncoding)encoding, LLVMDIFlagZero));
+}
+
+int64_t wl_di_create_pointer_type(int64_t builder, int64_t pointee_ty,
+    uint64_t size_in_bits) {
+    return P2I(LLVMDIBuilderCreatePointerType(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        pointee_ty ? DI(pointee_ty) : NULL,
+        size_in_bits, 0, 0, "", 0));
+}
+
+int64_t wl_di_create_struct_type(int64_t builder, int64_t scope,
+    with_str name, int64_t file, int32_t line,
+    uint64_t size_in_bits, uint32_t align_in_bits,
+    int64_t elements_ptr, int32_t num_elements) {
+    return P2I(LLVMDIBuilderCreateStructType(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        scope ? DI(scope) : NULL,
+        name.ptr, (size_t)name.len,
+        file ? DI(file) : NULL,
+        (unsigned)line,
+        size_in_bits, align_in_bits,
+        LLVMDIFlagZero,
+        NULL,  // derived from
+        num_elements > 0 ? (LLVMMetadataRef*)(intptr_t)elements_ptr : NULL,
+        (unsigned)num_elements,
+        0,     // runtime lang
+        NULL,  // vtable holder
+        "", 0  // unique id
+    ));
+}
+
+int64_t wl_di_create_member_type(int64_t builder, int64_t scope,
+    with_str name, int64_t file, int32_t line,
+    uint64_t size_in_bits, uint32_t align_in_bits,
+    uint64_t offset_in_bits, int64_t ty) {
+    return P2I(LLVMDIBuilderCreateMemberType(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        scope ? DI(scope) : NULL,
+        name.ptr, (size_t)name.len,
+        file ? DI(file) : NULL,
+        (unsigned)line,
+        size_in_bits, align_in_bits,
+        offset_in_bits,
+        LLVMDIFlagZero,
+        DI(ty)));
+}
+
+int64_t wl_di_create_unspecified_type(int64_t builder, with_str name) {
+    return P2I(LLVMDIBuilderCreateUnspecifiedType(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        name.ptr, (size_t)name.len));
+}
+
+// Variable debug records
+int64_t wl_di_create_auto_variable(int64_t builder, int64_t scope,
+    with_str name, int64_t file, int32_t line, int64_t ty) {
+    return P2I(LLVMDIBuilderCreateAutoVariable(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        DI(scope),
+        name.ptr, (size_t)name.len,
+        DI(file),
+        (unsigned)line,
+        DI(ty),
+        1,  // always preserve
+        LLVMDIFlagZero,
+        0   // align
+    ));
+}
+
+int64_t wl_di_create_parameter_variable(int64_t builder, int64_t scope,
+    with_str name, int32_t arg_no, int64_t file, int32_t line, int64_t ty) {
+    return P2I(LLVMDIBuilderCreateParameterVariable(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        DI(scope),
+        name.ptr, (size_t)name.len,
+        (unsigned)arg_no,
+        DI(file),
+        (unsigned)line,
+        DI(ty),
+        1,  // always preserve
+        LLVMDIFlagZero));
+}
+
+int64_t wl_di_create_expression(int64_t builder) {
+    return P2I(LLVMDIBuilderCreateExpression(
+        (LLVMDIBuilderRef)(intptr_t)builder, NULL, 0));
+}
+
+void wl_di_insert_declare_at_end(int64_t builder, int64_t storage,
+    int64_t var_info, int64_t expr, int64_t debug_loc, int64_t block) {
+    LLVMDIBuilderInsertDeclareRecordAtEnd(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        V(storage), DI(var_info), DI(expr), DI(debug_loc), BB(block));
+}
+
+// Lexical block scope
+int64_t wl_di_create_lexical_block(int64_t builder, int64_t scope,
+    int64_t file, int32_t line, int32_t col) {
+    return P2I(LLVMDIBuilderCreateLexicalBlock(
+        (LLVMDIBuilderRef)(intptr_t)builder,
+        DI(scope), DI(file), (unsigned)line, (unsigned)col));
+}
+
