@@ -1758,6 +1758,37 @@ fn Codegen.compare_aggregate_eq(self: Codegen, lhs: i64, rhs: i64, op: i32) -> i
             return wl_const_int(i1_ty, 1, 0)
         return wl_const_int(i1_ty, 0, 0)
 
+    // Field-wise comparison for structs to avoid padding byte mismatches.
+    let ty_kind = wl_get_type_kind(lhs_ty)
+    if ty_kind == wl_struct_type_kind():
+        let field_count = wl_count_struct_elem_types(lhs_ty)
+        if field_count == 0:
+            if op == OP_EQ:
+                return wl_const_int(i1_ty, 1, 0)
+            return wl_const_int(i1_ty, 0, 0)
+        var result = wl_const_int(i1_ty, 1, 0)
+        var fi = 0
+        while fi < field_count:
+            let lf = wl_build_extract_value(self.builder, lhs, fi)
+            let rf = wl_build_extract_value(self.builder, rhs, fi)
+            let fk = wl_get_type_kind(wl_struct_get_type_at(lhs_ty, fi))
+            var field_eq: i64 = 0
+            if fk == wl_struct_type_kind():
+                field_eq = self.compare_aggregate_eq(lf, rf, OP_EQ)
+            else if self.is_str_type(wl_struct_get_type_at(lhs_ty, fi)):
+                field_eq = self.compare_str_eq(lf, rf, OP_EQ)
+            else:
+                if fk == wl_float_type_kind() or fk == wl_double_type_kind():
+                    field_eq = wl_build_fcmp(self.builder, wl_real_oeq(), lf, rf)
+                else:
+                    field_eq = wl_build_icmp(self.builder, wl_int_eq(), lf, rf)
+            result = wl_build_and(self.builder, result, field_eq)
+            fi = fi + 1
+        if op == OP_EQ:
+            return result
+        return wl_build_not(self.builder, result)
+
+    // Fallback: memcmp for arrays and other non-struct aggregates.
     let lhs_slot = self.create_entry_alloca(lhs_ty)
     let rhs_slot = self.create_entry_alloca(rhs_ty)
     wl_build_store(self.builder, lhs, lhs_slot)
@@ -1873,6 +1904,20 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
             let llvm_ty = self.sema_type_to_llvm(sema_tid)
             if llvm_ty != 0:
                 return llvm_ty
+        // Codegen-level resolution when sema fails (e.g. type bindings active)
+        if name == "Option" and g_count == 1:
+            let opt_arg = self.resolve_type(self.pool.get_extra(g_extra))
+            if opt_arg != 0:
+                return self.get_or_create_option_type(opt_arg)
+        if name == "Vec" and g_count == 1:
+            let vec_arg = self.resolve_type(self.pool.get_extra(g_extra))
+            if vec_arg != 0:
+                return self.get_or_create_vec_type(vec_arg)
+        if name == "Result" and g_count == 2:
+            let res_ok = self.resolve_type(self.pool.get_extra(g_extra))
+            let res_err = self.resolve_type(self.pool.get_extra(g_extra + 1))
+            if res_ok != 0 and res_err != 0:
+                return self.get_or_create_result_type(res_ok, res_err)
         // Monomorphize user-defined generic structs
         let gs_opt = self.generic_structs.get(name_sym)
         if gs_opt.is_some():
@@ -8104,6 +8149,9 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
                 fn_sym_early = self.intern.intern(base_mangled)
                 fv_early = self.fn_values.get(fn_sym_early)
                 ft_early = self.fn_fn_types.get(fn_sym_early)
+                // VecIter.next() — codegen intrinsic
+                if base_name == "VecIter" and method_name == "next":
+                    return self.gen_veciter_next(lookup_type_sym, obj, obj_node, obj_ty)
                 // If base method not compiled, try generic struct method monomorphization
                 if not fv_early.is_some():
                     let gsm_opt = self.generic_struct_methods.get(fn_sym_early)
@@ -11364,6 +11412,80 @@ fn Codegen.get_runtime_fn_type(self: Codegen, name: str, ret_ty: i64, param_coun
             params.push(i64_ty)
     wl_function_type(ret_ty, vec_data_i64(&params), param_count, 0)
 
+// ── VecIter.next() codegen intrinsic ──────────────────────────────
+// VecIter[T] = { data_ptr: i64, len: i64, idx: i64 }
+// next() returns Option[T]: checks idx < len, loads T from data_ptr, increments idx.
+
+fn Codegen.gen_veciter_next(self: Codegen, mono_type_sym: i32, obj: i64, obj_node: i32, obj_ty: i64) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    let i32_ty = wl_i32_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+
+    // Look up element type from mono struct type params
+    let tp_start_opt = self.mono_struct_tp_starts.get(mono_type_sym)
+    if not tp_start_opt.is_some():
+        with_eprintln("error: no type param bindings for VecIter")
+        self.had_error = 1
+        return wl_get_undef(i32_ty)
+    let tp_start = tp_start_opt.unwrap()
+    let elem_ty = self.mono_struct_tp_flat_types.get(tp_start as i64)
+
+    let opt_type = self.get_or_create_option_type(elem_ty)
+
+    // Get mutable pointer to the VecIter struct
+    var iter_ptr: i64 = 0
+    if self.pool.kind(obj_node) == NK_IDENT:
+        iter_ptr = self.lookup_local_alloca(self.pool.get_data0(obj_node))
+    if iter_ptr == 0:
+        iter_ptr = wl_build_alloca(self.builder, obj_ty)
+        wl_build_store(self.builder, obj, iter_ptr)
+
+    // Load fields: data_ptr (field 0), len (field 1), idx (field 2)
+    let data_ptr_ptr = wl_build_struct_gep(self.builder, obj_ty, iter_ptr, 0)
+    let data_ptr = wl_build_load(self.builder, i64_ty, data_ptr_ptr)
+    let len_ptr = wl_build_struct_gep(self.builder, obj_ty, iter_ptr, 1)
+    let len = wl_build_load(self.builder, i64_ty, len_ptr)
+    let idx_ptr = wl_build_struct_gep(self.builder, obj_ty, iter_ptr, 2)
+    let idx = wl_build_load(self.builder, i64_ty, idx_ptr)
+
+    // Branch: idx < len?
+    let cond = wl_build_icmp(self.builder, wl_int_slt(), idx, len)
+    let some_bb = wl_append_bb(self.context, self.current_function, "veciter.some")
+    let none_bb = wl_append_bb(self.context, self.current_function, "veciter.none")
+    let merge_bb = wl_append_bb(self.context, self.current_function, "veciter.merge")
+    wl_build_cond_br(self.builder, cond, some_bb, none_bb)
+
+    // Some path: load element, increment idx, return Some(val)
+    wl_position_at_end(self.builder, some_bb)
+    let typed_ptr = wl_build_int_to_ptr(self.builder, data_ptr, ptr_ty)
+    let indices: Vec[i64] = Vec.new()
+    indices.push(idx)
+    let elem_ptr = wl_build_gep(self.builder, elem_ty, typed_ptr, vec_data_i64(&indices), 1)
+    let val = wl_build_load(self.builder, elem_ty, elem_ptr)
+    let next_idx = wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0))
+    wl_build_store(self.builder, next_idx, idx_ptr)
+    let some_val = self.build_option_some(val, opt_type)
+    wl_build_br(self.builder, merge_bb)
+    let some_bb_end = wl_get_insert_block(self.builder)
+
+    // None path: return None
+    wl_position_at_end(self.builder, none_bb)
+    let none_val = self.build_option_none(opt_type)
+    wl_build_br(self.builder, merge_bb)
+    let none_bb_end = wl_get_insert_block(self.builder)
+
+    // Merge: phi node
+    wl_position_at_end(self.builder, merge_bb)
+    let phi = wl_build_phi(self.builder, opt_type)
+    let phi_vals: Vec[i64] = Vec.new()
+    let phi_bbs: Vec[i64] = Vec.new()
+    phi_vals.push(some_val)
+    phi_vals.push(none_val)
+    phi_bbs.push(some_bb_end)
+    phi_bbs.push(none_bb_end)
+    wl_add_incoming(phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+    phi
+
 // ── Vec method dispatch ───────────────────────────────────────────
 
 fn Codegen.gen_vec_method(self: Codegen, method: str, obj: i64, args_start: i32, arg_count: i32, obj_node: i32) -> i64:
@@ -11707,6 +11829,42 @@ fn Codegen.gen_vec_method(self: Codegen, method: str, obj: i64, args_start: i32,
         join_params.push(str_type)
         let join_fn_ty = wl_function_type(str_type, vec_data_i64(&join_params), 2, 0)
         return wl_build_call(self.builder, join_fn_ty, join_fn, vec_data_i64(&join_args), 2)
+    // Vec.iter() — create a VecIter[T] for this Vec
+    if method == "iter":
+        let iter_elem_ty = self.infer_vec_elem_type_from_receiver(obj_node, wl_type_of(obj))
+        if iter_elem_ty != 0:
+            let veciter_sym = self.intern.intern("VecIter")
+            let t_sym = self.intern.intern("T")
+            let saved_bind_syms = self.type_binding_syms
+            let saved_bind_tys = self.type_binding_types
+            let saved_bind_len = self.type_bindings_len
+            let fresh_syms: Vec[i32] = Vec.new()
+            let fresh_tys: Vec[i64] = Vec.new()
+            fresh_syms.push(t_sym)
+            fresh_tys.push(iter_elem_ty)
+            self.type_binding_syms = fresh_syms
+            self.type_binding_types = fresh_tys
+            self.type_bindings_len = 1
+            let iter_ty = self.monomorphize_struct(veciter_sym, 0, 0)
+            self.type_binding_syms = saved_bind_syms
+            self.type_binding_types = saved_bind_tys
+            self.type_bindings_len = saved_bind_len
+            if iter_ty != 0:
+                // Build VecIter struct: { data_ptr (i64), len (i64), idx (i64) }
+                let iter_alloca = wl_build_alloca(self.builder, iter_ty)
+                // data_ptr = v.ptr as i64
+                let data_raw = wl_build_extract_value(self.builder, obj, 0)
+                let data_i64 = wl_build_ptr_to_int(self.builder, data_raw, i64_ty)
+                let f0 = wl_build_struct_gep(self.builder, iter_ty, iter_alloca, 0)
+                wl_build_store(self.builder, data_i64, f0)
+                // len
+                let vlen = wl_build_extract_value(self.builder, obj, 1)
+                let f1 = wl_build_struct_gep(self.builder, iter_ty, iter_alloca, 1)
+                wl_build_store(self.builder, vlen, f1)
+                // idx = 0
+                let f2 = wl_build_struct_gep(self.builder, iter_ty, iter_alloca, 2)
+                wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), f2)
+                return wl_build_load(self.builder, iter_ty, iter_alloca)
     if method == "sequence" or method == "traverse":
         with_eprintln("error: not yet implemented: Vec." ++ method ++ "()")
         return wl_get_undef(wl_i32_type(self.context))
