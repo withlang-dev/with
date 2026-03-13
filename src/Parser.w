@@ -1442,6 +1442,7 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> i32:
     var lhs = self.parse_primary()
     if lhs == 0:
         return 0
+    lhs = self.parse_postfix(lhs)
 
     while true:
         if self.peek() == TK_NEWLINE:

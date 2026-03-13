@@ -16,7 +16,7 @@ extern fn print(s: str) -> void
 extern fn with_eprintln(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
-extern fn with_hashmap_new(key_size: i64, val_size: i64) -> *T
+extern fn with_hashmap_new(key_size: i64, val_size: i64) -> *i8
 
 // ── Type kind constants ──────────────────────────────────────────
 
@@ -1686,6 +1686,30 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
             if at_tid != 0:
                 self.assoc_type_bindings.insert(at_name, at_tid)
 
+    // Methods in blanket impls: treat as generic (type params come from impl)
+    if tp_count == 0 and self.method_impl_nodes.contains(fn_name):
+        let bi_impl = self.method_impl_nodes.get(fn_name).unwrap()
+        let bi_tp_meta = self.ast.find_impl_type_params(bi_impl)
+        if bi_tp_meta >= 0:
+            self.generic_fn_nodes.insert(fn_name, node)
+            if self_type_id != 0:
+                self.named_types.remove(self_sym)
+            return
+
+    // Methods on generic structs: treat as generic (type params come from struct)
+    if tp_count == 0 and self_type_id != 0:
+        for cfi in 0..fn_name_str.len() as i32:
+            if fn_name_str.byte_at(cfi as i64) == 46:
+                let cf_owner = fn_name_str.slice(0, cfi as i64)
+                let cf_owner_sym = self.pool_intern(cf_owner)
+                if self.type_decl_nodes.contains(cf_owner_sym):
+                    let cf_td = self.type_decl_nodes.get(cf_owner_sym).unwrap()
+                    if self.type_decl_tp_count(cf_td) > 0:
+                        self.generic_fn_nodes.insert(fn_name, node)
+                        self.named_types.remove(self_sym)
+                        return
+                break
+
     // Generic functions: store for later monomorphization
     if tp_count > 0:
         self.generic_fn_nodes.insert(fn_name, node)
@@ -2472,7 +2496,6 @@ fn Sema.primitive_type_by_sym(self: Sema, sym: i32) -> i32:
     if with_str_eq(name, "bool") != 0: return self.ty_bool
     if with_str_eq(name, "void") != 0: return self.ty_void
     if with_str_eq(name, "Never") != 0: return self.ty_never
-    if with_str_eq(name, "T") != 0: return self.ty_void
     if with_str_eq(name, "str") != 0: return self.ty_str
     if with_str_eq(name, "String") != 0: return self.ty_str
     if with_str_eq(name, "StrView") != 0: return self.ty_str_view
