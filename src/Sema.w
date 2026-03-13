@@ -4878,7 +4878,16 @@ fn Sema.setup_generic_inst_substitution(self: Sema, gi_tid: i32, type_sym: i32) 
     1
 
 fn Sema.substitute_method_return_for_generic_inst(self: Sema, gi_tid: i32, type_sym: i32, method_sym: i32, sig_ret: i32) -> i32:
-    // Look up the method's fn_decl_node to get its return type AST node
+    // Set up type param → concrete arg substitution
+    if self.setup_generic_inst_substitution(gi_tid, type_sym) == 0:
+        return 0
+    // Try substitute_type on the stored sig_ret first
+    if sig_ret > 0:
+        let subst_count = self.generic_subst_param_syms.len() as i32
+        let result = self.substitute_type(sig_ret, self.generic_subst_param_syms, self.generic_subst_type_ids, subst_count)
+        if result > 0:
+            return result
+    // Fallback: re-resolve from the method's return type AST node
     let method_name = self.pool_resolve(type_sym) ++ "." ++ self.pool_resolve(method_sym)
     let method_fn_sym = self.pool_intern(method_name)
     if not self.fn_decl_nodes.contains(method_fn_sym):
@@ -4890,10 +4899,6 @@ fn Sema.substitute_method_return_for_generic_inst(self: Sema, gi_tid: i32, type_
     let ret_node = self.ast.fn_meta_ret(meta)
     if ret_node == 0:
         return 0
-    // Set up type param → concrete arg substitution
-    if self.setup_generic_inst_substitution(gi_tid, type_sym) == 0:
-        return 0
-    // Look up tp_start/tp_count for resolve_generic_return_type_node
     let td_node = self.type_decl_nodes.get(type_sym).unwrap()
     let td_extra_start = self.ast.get_data1(td_node)
     let td_packed = self.ast.get_data2(td_node)
@@ -4918,7 +4923,6 @@ fn Sema.substitute_method_return_for_generic_inst(self: Sema, gi_tid: i32, type_
             epos = epos + pc
         td_tp_start = self.ast.get_extra(epos + 1)
         td_tp_count = self.ast.get_extra(epos + 2)
-    // Resolve the return type with substitutions
     self.resolve_generic_return_type_node(ret_node, td_tp_start, td_tp_count)
 
 fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
@@ -4978,54 +4982,27 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 // Check argument types against substituted parameter types
                 let mc_method_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
                 let mc_method_fn_sym = self.pool_intern(mc_method_name)
-                if self.fn_decl_nodes.contains(mc_method_fn_sym):
-                    let mc_fn_node = self.fn_decl_nodes.get(mc_method_fn_sym).unwrap()
-                    let mc_meta = self.ast.find_fn_meta(mc_fn_node)
-                    if mc_meta >= 0:
-                        let mc_ps = self.ast.fn_meta_param_start(mc_meta)
-                        let mc_pc = self.ast.fn_meta_param_count(mc_meta)
-                        if self.setup_generic_inst_substitution(resolved, type_name_sym) != 0:
-                            if self.type_decl_nodes.contains(type_name_sym):
-                                let mc_td = self.type_decl_nodes.get(type_name_sym).unwrap()
-                                let mc_td_ex = self.ast.get_data1(mc_td)
-                                let mc_td_sk = type_decl_sub_kind(self.ast.get_data2(mc_td))
-                                var mc_tps = 0
-                                var mc_tpc = 0
-                                if mc_td_sk == TDK_STRUCT:
-                                    let fc = self.ast.get_extra(mc_td_ex)
-                                    let after = mc_td_ex + 1 + fc * 3
-                                    mc_tps = self.ast.get_extra(after + 1)
-                                    mc_tpc = self.ast.get_extra(after + 2)
-                                else if mc_td_sk == TDK_ALIAS or mc_td_sk == TDK_DISTINCT:
-                                    mc_tps = self.ast.get_extra(mc_td_ex + 2)
-                                    mc_tpc = self.ast.get_extra(mc_td_ex + 3)
-                                else if mc_td_sk == TDK_ENUM:
-                                    let vc = self.ast.get_extra(mc_td_ex)
-                                    var epos = mc_td_ex + 1
-                                    for vi in 0..vc:
-                                        epos = epos + 1
-                                        let pc = self.ast.get_extra(epos)
-                                        epos = epos + 1
-                                        epos = epos + pc
-                                    mc_tps = self.ast.get_extra(epos + 1)
-                                    mc_tpc = self.ast.get_extra(epos + 2)
-                                // Determine self parameter offset
-                                let mc_self_sym = self.pool_intern("self")
-                                var mc_poff = 0
-                                if mc_pc > 0 and self.ast.get_extra(mc_ps) == mc_self_sym:
-                                    mc_poff = 1
-                                for pi in mc_poff..mc_pc:
-                                    let p_ty_node = self.ast.get_extra(mc_ps + pi * 2 + 1)
-                                    let exp_ty = self.resolve_generic_return_type_node(p_ty_node, mc_tps, mc_tpc)
-                                    let ai = pi - mc_poff
-                                    if ai < arg_count:
-                                        let arg_ty = arg_types.get(ai as i64)
-                                        if exp_ty != 0 and arg_ty != 0:
-                                            let exp_r = self.resolve_alias(exp_ty)
-                                            if self.type_is_dyn_object(exp_r) == 0:
-                                                if self.types_compatible(exp_ty, arg_ty) == 0:
-                                                    if self.arithmetic_result_type(exp_ty, arg_ty) == 0:
-                                                        self.emit_error("wrong argument type", self.ast.get_extra(extra_start + ai))
+                if self.setup_generic_inst_substitution(resolved, type_name_sym) != 0:
+                    let mc_subst_count = self.generic_subst_param_syms.len() as i32
+                    // Check argument types via substitute_type on stored sig param types
+                    let mc_sig_pc = self.sig_get_param_count(sig_idx)
+                    // sig params include self as first param; user args start at index 1
+                    let mc_sig_poff = if mc_sig_pc > 0: 1 else 0
+                    for mc_ai in 0..arg_count:
+                        let mc_sig_pi = mc_ai + mc_sig_poff
+                        if mc_sig_pi >= mc_sig_pc:
+                            break
+                        let mc_stored_ty = self.sig_param_type(sig_idx, mc_sig_pi)
+                        if mc_stored_ty <= 0:
+                            continue
+                        let exp_ty = self.substitute_type(mc_stored_ty, self.generic_subst_param_syms, self.generic_subst_type_ids, mc_subst_count)
+                        let arg_ty = arg_types.get(mc_ai as i64)
+                        if exp_ty != 0 and arg_ty != 0:
+                            let exp_r = self.resolve_alias(exp_ty)
+                            if self.type_is_dyn_object(exp_r) == 0:
+                                if self.types_compatible(exp_ty, arg_ty) == 0:
+                                    if self.arithmetic_result_type(exp_ty, arg_ty) == 0:
+                                        self.emit_error("wrong argument type", self.ast.get_extra(extra_start + mc_ai))
                 let mc_subst_ret = self.substitute_method_return_for_generic_inst(resolved, type_name_sym, field, mc_ret)
                 if mc_subst_ret != 0:
                     return mc_subst_ret

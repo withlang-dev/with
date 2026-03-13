@@ -254,10 +254,12 @@ distinguishable from `impl Trait for Vec[str]`.
       the target type's base symbol (0 for bare type param blankets).
       `select_trait_impl` now skips generic blanket impls whose target
       base sym doesn't match the query type's base sym.
-- [ ] Use `substitute_type` (Phase 5) when resolving trait methods
-      on generic instances — partially done via
-      substitute_method_return_for_generic_inst (return types) and
-      check_method_call arg checking (parameter types)
+- [x] Use `substitute_type` (Phase 5) when resolving trait methods
+      on generic instances — substitute_method_return_for_generic_inst
+      now calls substitute_type(sig_ret) as primary path (AST fallback
+      retained). check_method_call arg checking refactored to use
+      substitute_type on stored sig param types instead of
+      resolve_generic_return_type_node with type-decl introspection.
 - [x] `make build`
 - [x] `make fixpoint`
 
@@ -273,45 +275,51 @@ group at a time, verifying fixpoint after each deletion.
 
 ### 9.1 Delete Vec cache workarounds
 
-- [ ] Delete `vec_cache_map: HashMap[i64, i32]` (line 457)
-- [ ] Delete `vec_llvm_types: Vec[i64]` (line 458)
-- [ ] Delete `vec_elem_types: Vec[i64]` (line 459)
-- [ ] Delete `vec_local_types: HashMap[i32, i64]` (line 460)
-- [ ] Delete `find_vec_cache_index_by_llvm` (line 6182)
-- [ ] Delete `find_vec_elem_type_by_llvm` (line 6158)
-- [ ] Delete `type_node_vec_elem_type` (line 6227)
-- [ ] Delete `infer_vec_elem_type_from_receiver` (line 6240)
-- [ ] Delete `record_local_container_type` Vec tracking (line 1080)
-- [ ] Delete `track_local_type` Vec tracking (line 5683)
-- [ ] Update all callers to use sema-provided type info
-- [ ] `make build && make fixpoint`
+- [x] Delete `vec_llvm_types: Vec[i64]` — replaced by direct HashMap
+- [x] Delete `vec_elem_types: Vec[i64]` — replaced by vec_type_to_elem HashMap
+- [x] Simplify `vec_cache_map` from `HashMap[i64, i32]` to `HashMap[i64, i64]`
+      (elem_ty → vec_ty direct mapping, no index indirection)
+- [x] Add `vec_type_to_elem: HashMap[i64, i64]` for O(1) reverse lookup
+      (replaces O(n) find_vec_cache_index_by_llvm scan + vec_elem_types)
+- [x] Update `find_vec_cache_index_by_llvm` to use vec_type_to_elem (O(1))
+- [x] Update `find_vec_elem_type_by_llvm` to use vec_type_to_elem (O(1))
+- [x] Add sema-based primary path in `infer_vec_elem_type_from_receiver`
+- [x] Delete Vec/HashMap/Option/Result fallback blocks in monomorphize_generic_call
+      — sema-based unified type param binding handles all generic containers
+- [ ] Delete `vec_local_types: HashMap[i32, i64]` (Phase 9.6)
+- [ ] Delete `type_node_vec_elem_type` (still used by record_local_container_type)
+- [ ] Delete `record_local_container_type` Vec tracking
+- [ ] Delete `track_local_type` Vec tracking
+- [x] `make build && make fixpoint` — 230/230 tests pass
 
 ### 9.2 Delete HashMap cache workarounds
 
-- [ ] Delete `hm_cache_map: HashMap[i64, i32]` (line 463)
-- [ ] Delete `hm_llvm_types: Vec[i64]` (line 464)
-- [ ] Delete `hm_key_types: Vec[i64]` (line 465)
-- [ ] Delete `hm_val_types: Vec[i64]` (line 466)
-- [ ] Delete `hm_is_str_keys: Vec[i32]` (line 467)
-- [ ] Delete `hm_local_types: HashMap[i32, i32]` (line 468)
-- [ ] Delete `find_hashmap_cache_index_by_llvm` (line 6195)
-- [ ] Delete `find_hashmap_key_type_by_llvm` (line 6189)
-- [ ] Delete `find_hashmap_val_type_by_llvm` (line 6274)
-- [ ] Delete `find_hashmap_cache_index_by_parts` (line 6202)
-- [ ] Delete `type_node_hashmap_cache_index` (line 6208)
-- [ ] Delete `infer_hashmap_cache_index_from_receiver` (line 6256)
-- [ ] Update all callers to use sema-provided type info
+- [x] Delete `find_hashmap_key_type_by_llvm` — dead code after sema path
+- [x] Delete `find_hashmap_val_type_by_llvm` — dead code after sema path
+- [x] Delete HashMap fallback block in monomorphize_generic_call
+- [ ] Delete `hm_cache_map: HashMap[i64, i32]` — still used for creation cache
+- [ ] Delete `hm_llvm_types: Vec[i64]` — still used by creation cache
+- [ ] Delete `hm_key_types: Vec[i64]` — still used by gen_hashmap_method
+- [ ] Delete `hm_val_types: Vec[i64]` — still used by gen_hashmap_method
+- [ ] Delete `hm_is_str_keys: Vec[i32]` — still used by gen_hashmap_method
+- [ ] Delete `hm_local_types: HashMap[i32, i32]` (Phase 9.6)
+- [ ] Delete `find_hashmap_cache_index_by_llvm` — still has callers
+- [ ] Delete `find_hashmap_cache_index_by_parts` — internal to creation cache
+- [ ] Delete `type_node_hashmap_cache_index` — still used
+- [ ] Delete `infer_hashmap_cache_index_from_receiver` — still used
 - [ ] `make build && make fixpoint`
 
 ### 9.3 Delete HashSet cache workarounds
 
-- [ ] Delete `hs_cache_map: HashMap[i64, i32]` (line 471)
-- [ ] Delete `hs_llvm_types: Vec[i64]` (line 472)
-- [ ] Delete `hs_elem_types: Vec[i64]` (line 473)
-- [ ] Delete `find_hashset_cache_index_by_llvm` (line 6276)
-- [ ] Delete `find_hashset_elem_type_by_llvm` (line 6282)
-- [ ] Update all callers
-- [ ] `make build && make fixpoint`
+- [x] Delete `hs_llvm_types: Vec[i64]` — replaced by direct HashMap
+- [x] Delete `hs_elem_types: Vec[i64]` — reverse lookup no longer needed
+- [x] Simplify `hs_cache_map` from `HashMap[i64, i32]` (index-based) to
+      `HashMap[i64, i64]` (elem_ty → hs_ty direct mapping)
+- [x] Delete `find_hashset_cache_index_by_llvm` — no more parallel vec indexing
+- [x] Delete `find_hashset_elem_type_by_llvm` — replaced by sema-based path
+- [x] Delete HashSet fallback block in monomorphize_generic_call —
+      sema-based unified type param binding handles all generic containers
+- [x] `make build && make fixpoint` — 230/230 tests pass
 
 ### 9.4 Delete resolve_generic_type dispatcher
 
@@ -395,12 +403,19 @@ Currently only `VecIter_i32` exists as a concrete type.
 
 ### 10.4 Associated type bound checking
 
-- [ ] Read current trait_assoc_names/defaults (Sema.w lines 107-110)
-- [ ] When a trait bound requires an associated type (e.g.,
-      `T: Iterator[Item=i32]`), verify the impl provides it
-- [ ] Substitute associated types during generic instantiation
-- [ ] Write test for associated type usage
-- [ ] `make build && make fixpoint`
+- [x] Read current trait_assoc_names/defaults (Sema.w lines 107-110)
+- [x] Impl validation: check that all required (no-default) associated
+      types are provided — already implemented in collect_impl_decl
+- [ ] When a trait bound requires an associated type constraint (e.g.,
+      `T: Iterator[Item=i32]`), verify the impl provides the matching
+      type — requires parser support for `[Name=Type]` in bounds (future)
+- [ ] Substitute associated types during generic function instantiation
+      — requires resolving `T.Name` where T is a type param (future)
+- [x] Write test `test/cases/err_missing_assoc_type.w` — validates
+      impl-level associated type checking
+- [x] Write test `test/cases/behav_assoc_type_default.w` — validates
+      associated types with defaults
+- [x] `make build && make fixpoint` — 230/230 tests pass
 
 ### 10.5 `Self.Name` associated type lookups in impl blocks
 
@@ -496,11 +511,17 @@ are verified to agree. Downstream features (Phase 10) are last.
 - [x] `Vec[i32]` and `Vec[str]` have distinct TypeIds in sema
       (no dedup cache yet — duplicates created but harmless)
 - [x] `types_compatible(Vec[i32], Vec[str])` returns 0
-- [ ] Type substitution function used by trait resolution, method
-      lookup, and for-loop desugaring (one function, not three)
-- [ ] All codegen parallel caches deleted (vec_cache_map,
-      vec_local_types, vec_elem_types, hm_cache_map, hm_local_types,
-      hm_key_types, hm_val_types, hs_cache_map, etc.)
+- [x] Type substitution function used by trait resolution, method
+      lookup, and for-loop desugaring — substitute_type now used in
+      substitute_method_return_for_generic_inst (return types) and
+      check_method_call (parameter type checking)
+- [ ] All codegen parallel caches deleted — progress:
+      HashSet: hs_llvm_types, hs_elem_types deleted, hs_cache_map
+      simplified to HashMap[i64,i64]. Vec: vec_llvm_types, vec_elem_types
+      deleted, vec_cache_map simplified, vec_type_to_elem added.
+      HashMap: find_hashmap_key/val_type_by_llvm deleted, fallback blocks
+      deleted. Remaining: hm_* parallel vecs, vec_local_types, hm_local_types,
+      type_node_* helpers, record_local_container_type
 - [ ] `resolve_generic_type` in codegen deleted
 - [x] `behav_vec.w` and `behav_hashmap.w` pass without explicit
       type annotations — uses `Vec[i32].new()` and `HashMap[str, i32].new()`
@@ -509,5 +530,5 @@ are verified to agree. Downstream features (Phase 10) are last.
       `gen_builtin_static_call` handles NK_INDEX for Vec, HashMap, HashSet.
 - [ ] Generic VecIter[T] replaces concrete VecIter_i32
 - [x] `Self.Name` resolves to associated type in impl blocks
-- [x] All tests pass under `./scripts/run_tests.sh` — 227/227
+- [x] All tests pass under `./scripts/run_tests.sh` — 230/230
 - [ ] `make fixpoint` holds after all phases
