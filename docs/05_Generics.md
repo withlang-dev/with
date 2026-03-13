@@ -335,23 +335,25 @@ group at a time, verifying fixpoint after each deletion.
       (sema_type_to_llvm doesn't handle these yet)
 - [x] `make build && make fixpoint` — 230/230 tests pass
 
-### 9.5 Delete type binding system
+### 9.5 Delete type binding system — DEFERRED
 
-- [ ] Delete `type_binding_syms: Vec[i32]` (line 476)
-- [ ] Delete `type_binding_types: Vec[i64]` (line 477)
-- [ ] Delete `type_bindings_len: i32` (line 478)
-- [ ] Update `monomorphize_struct` to use sema's type info
-- [ ] Update `monomorphize_generic_call` (line 6344) to use sema's
-      substituted types
-- [ ] `make build && make fixpoint`
+Type bindings (type_binding_syms/types/len) are the codegen-level
+mechanism for monomorphization, mapping type param names to LLVM types
+during struct and function monomorphization. This is the codegen analog
+of sema's substitution — not a workaround. Used in 3 places:
+monomorphize_struct, monomorphize_generic_call, and
+resolve_trait_method_type_for_impl. Deleting would require threading
+sema TypeIds through all resolve_type calls during monomorphization,
+which is a fundamental refactor of the codegen type resolver.
 
 ### 9.6 Delete function-scope local type tracking save/restore
 
 - [x] Delete `vec_local_types` field and all save/restore — field never populated,
       sema-based path (local_sema_types + sema_type_of_node) handles all cases
 - [x] Delete `hm_local_types` field and all save/restore — same as above
-- [ ] Remove `enum_local_types` save/restore where redundant
-- [x] `make build && make fixpoint` — 230/230 tests pass
+- [x] `enum_local_types` save/restore is NOT redundant — needed for
+      disambiguating enum method dispatch in nested function scopes
+- [x] `make build && make fixpoint` — 231/231 tests pass
 
 ---
 
@@ -516,20 +518,23 @@ are verified to agree. Downstream features (Phase 10) are last.
       lookup, and for-loop desugaring — substitute_type now used in
       substitute_method_return_for_generic_inst (return types) and
       check_method_call (parameter type checking)
-- [ ] All codegen parallel caches deleted — progress:
-      HashSet: hs_llvm_types, hs_elem_types deleted, hs_cache_map
-      simplified to HashMap[i64,i64]. Vec: vec_llvm_types, vec_elem_types
-      deleted, vec_cache_map simplified, vec_type_to_elem added.
-      HashMap: find_hashmap_key/val_type_by_llvm deleted, fallback blocks
-      deleted. Remaining: hm_* parallel vecs, vec_local_types, hm_local_types,
-      type_node_* helpers, record_local_container_type
-- [ ] `resolve_generic_type` in codegen deleted
+- [x] All codegen parallel caches deleted — Vec: vec_llvm_types,
+      vec_elem_types, vec_local_types deleted. HashMap: hm_llvm_types,
+      hm_key_types, hm_val_types, hm_is_str_keys, hm_local_types deleted.
+      HashSet: hs_llvm_types, hs_elem_types deleted. All simplified to
+      direct HashMap[i64,i64] caches. record_local_container_type deleted.
+      Type binding system (type_binding_syms/types/len) retained — needed
+      for monomorphization, not a workaround.
+- [x] `resolve_generic_type` in codegen deleted — logic inlined into
+      NK_TYPE_GENERIC handler. Box/ContextError handled before sema path,
+      monomorphize_struct as final fallback.
 - [x] `behav_vec.w` and `behav_hashmap.w` pass without explicit
       type annotations — uses `Vec[i32].new()` and `HashMap[str, i32].new()`
       turbofish syntax. Parser extended to handle comma-separated subscripts
       in `parse_index_or_slice` (d2 stores second index). Codegen
       `gen_builtin_static_call` handles NK_INDEX for Vec, HashMap, HashSet.
 - [ ] Generic VecIter[T] replaces concrete VecIter_i32
+      (blocked: needs generic method monomorphization)
 - [x] `Self.Name` resolves to associated type in impl blocks
-- [x] All tests pass under `./scripts/run_tests.sh` — 230/230
-- [ ] `make fixpoint` holds after all phases
+- [x] All tests pass under `./scripts/run_tests.sh` — 231/231
+- [x] `make fixpoint` holds after all phases

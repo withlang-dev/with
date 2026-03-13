@@ -1842,17 +1842,32 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         return wl_struct_type(self.context, vec_data_i64(&elem_types), elem_count, 0)
 
     if kind == NK_TYPE_GENERIC:
-        // Sema-based primary path: resolve via TY_GENERIC_INST
+        let name_sym = self.pool.get_data0(type_node)
+        let g_extra = self.pool.get_data1(type_node)
+        let g_count = self.pool.get_data2(type_node)
+        let name = self.intern.resolve(name_sym)
+        // Box[T] is always a pointer (fat pointer for Box[dyn Trait])
+        if name == "Box" and g_count == 1:
+            let inner_node = self.pool.get_extra(g_extra)
+            if self.pool.kind(inner_node) == NK_TYPE_TRAIT_OBJ:
+                return self.get_dyn_fat_ptr_type()
+            return wl_ptr_type(self.context)
+        // ContextError[E] = { str, E }
+        if name == "ContextError" and g_count == 1:
+            let src_node = self.pool.get_extra(g_extra)
+            let src_ty = self.resolve_type(src_node)
+            return self.get_or_create_context_error_type(src_ty)
+        // Sema-based path for builtin containers (Vec, HashMap, HashSet, Option, Result)
         let sema_tid = self.sema.resolve_type_expr(type_node)
         if sema_tid > 0:
             let llvm_ty = self.sema_type_to_llvm(sema_tid)
             if llvm_ty != 0:
                 return llvm_ty
-        // Fallback for types sema_type_to_llvm doesn't handle (Box, ContextError, monomorphize)
-        let name_sym = self.pool.get_data0(type_node)
-        let g_extra = self.pool.get_data1(type_node)
-        let g_count = self.pool.get_data2(type_node)
-        return self.resolve_generic_type(name_sym, g_extra, g_count)
+        // Monomorphize user-defined generic structs
+        let gs_opt = self.generic_structs.get(name_sym)
+        if gs_opt.is_some():
+            return self.monomorphize_struct(name_sym, g_extra, g_count)
+        0
 
     if kind == NK_TYPE_TRAIT_OBJ:
         // dyn Trait → fat pointer {data_ptr, vtable_ptr}
@@ -1933,24 +1948,6 @@ fn Codegen.resolve_named_type(self: Codegen, sym: i32) -> i64:
     if prim != 0:
         return prim
     self.resolve_user_named_type(sym)
-
-fn Codegen.resolve_generic_type(self: Codegen, name_sym: i32, extra_start: i32, arg_count: i32) -> i64:
-    // Handles types not covered by sema_type_to_llvm (Box, ContextError, monomorphize_struct)
-    let name = self.intern.resolve(name_sym)
-    if name == "Box" and arg_count == 1:
-        let inner_node = self.pool.get_extra(extra_start)
-        if self.pool.kind(inner_node) == NK_TYPE_TRAIT_OBJ:
-            return self.get_dyn_fat_ptr_type()
-        return wl_ptr_type(self.context)
-    if name == "ContextError" and arg_count == 1:
-        let src_node = self.pool.get_extra(extra_start)
-        let src_ty = self.resolve_type(src_node)
-        return self.get_or_create_context_error_type(src_ty)
-    // Unknown generic - check if it's a monomorphizable struct
-    let gs_opt = self.generic_structs.get(name_sym)
-    if gs_opt.is_some():
-        return self.monomorphize_struct(name_sym, extra_start, arg_count)
-    0
 
 // Get sema TypeId for an expression node. Uses local_sema_types for idents.
 fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
