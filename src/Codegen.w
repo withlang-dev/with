@@ -6951,11 +6951,6 @@ fn Codegen.find_vec_cache_index_by_llvm(self: Codegen, vec_ty: i64) -> i32:
         return 0
     0 - 1
 
-fn Codegen.find_hashmap_cache_index_by_llvm(self: Codegen, hm_ty: i64) -> i32:
-    if self.hm_type_to_key.contains(hm_ty):
-        return 0
-    0 - 1
-
 fn Codegen.type_node_hashmap_llvm_type(self: Codegen, type_node: i32) -> i64:
     if type_node == 0 or self.pool.kind(type_node) != NK_TYPE_GENERIC:
         return 0
