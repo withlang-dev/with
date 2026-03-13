@@ -277,6 +277,9 @@ type AstPool = {
     // Impl target type node: [impl_node, type_node]* for generic impl targets
     impl_target_type_nodes: Vec[i32],
 
+    // Impl trait type args: [impl_node, args_start, args_count]* for impl Trait[T1, T2] for Type
+    impl_trait_type_args: Vec[i32],
+
 }
 
 fn AstPool.new -> AstPool:
@@ -304,6 +307,7 @@ fn AstPool.new -> AstPool:
         where_meta: Vec.new(),
         impl_type_params: Vec.new(),
         impl_target_type_nodes: Vec.new(),
+        impl_trait_type_args: Vec.new(),
     }
     // Reserve node 0 as null sentinel
     pool.kinds.push(0)
@@ -560,6 +564,19 @@ fn AstPool.find_impl_target_type_node(self: &AstPool, impl_node: i32) -> i32:
             return self.impl_target_type_nodes.get((i + 1) as i64)
         i = i + 2
     0
+
+fn AstPool.add_impl_trait_type_args(self: &mut AstPool, impl_node: i32, args_start: i32, args_count: i32):
+    self.impl_trait_type_args.push(impl_node)
+    self.impl_trait_type_args.push(args_start)
+    self.impl_trait_type_args.push(args_count)
+
+fn AstPool.find_impl_trait_type_args(self: &AstPool, impl_node: i32) -> i32:
+    var i = 0
+    while i < self.impl_trait_type_args.len() as i32:
+        if self.impl_trait_type_args.get(i as i64) == impl_node:
+            return i
+        i = i + 3
+    0 - 1
 
 fn AstPool.fn_param_patterns_len(self: &AstPool) -> i32:
     self.fn_param_patterns.len() as i32

@@ -381,18 +381,17 @@ Currently only `VecIter_i32` exists as a concrete type.
 
 ### 10.2 impl IntoIter[T] for Vec[T]
 
-Deferred — requires generic trait infrastructure (`trait Name[T]`)
-which is parsed but not wired through sema/codegen. For-loops
-already work with Vec[T] directly via `gen_for_vec`. Vec.iter()
-returns VecIter[T] via codegen intrinsic.
+Generic trait infrastructure wired through parser, sema, and codegen.
 
-- [ ] Define `trait IntoIter[T]` with `fn iter(self) -> VecIter[T]`
-      in `lib/std/collections.w` (future: needs generic trait sema)
-- [ ] Implement `impl[T] IntoIter[T] for Vec[T]` (future)
-- [ ] Update for-loop desugaring to call `.iter()` on types
-      implementing IntoIter (future)
-- [ ] Write test verifying `for x in vec:` works via trait (future)
-- [ ] `make build && make fixpoint`
+- [x] Store trait type params in sema (`trait_tp_starts/counts/syms`)
+- [x] Store trait type params in codegen (`trait_tp_starts/counts/flat_syms`)
+- [x] Fix parser: store trait type args in impl blocks (`impl_trait_type_args`)
+- [x] Bind trait type params during impl method compilation
+- [x] Update trait stubs: `Iter[T].next() -> Option[T]`, `IntoIter[T].iter() -> VecIter[T]`
+- [x] Implement `impl[T] IntoIter[T] for Vec[T]` in `lib/std/traits.w`
+- [x] VecIter-based for-loop dispatch in `gen_for` → `gen_for_veciter`
+- [x] Write tests: `behav_for_veciter.w`, `behav_intoiter_vec.w`
+- [x] `make build && make fixpoint` — 241/241 tests pass
 
 ### 10.3 Untyped Vec.new() inference
 
@@ -415,16 +414,16 @@ returns VecIter[T] via codegen intrinsic.
 - [x] Read current trait_assoc_names/defaults (Sema.w lines 107-110)
 - [x] Impl validation: check that all required (no-default) associated
       types are provided — already implemented in collect_impl_decl
-- [ ] When a trait bound requires an associated type constraint (e.g.,
-      `T: Iterator[Item=i32]`), verify the impl provides the matching
-      type — requires parser support for `[Name=Type]` in bounds (future)
-- [ ] Substitute associated types during generic function instantiation
-      — requires resolving `T.Name` where T is a type param (future)
+- [x] Store associated type bounds in sema (`trait_assoc_bound_syms/starts/counts`)
+- [x] Validate impl associated types against bounds — emit error if bound not satisfied
+- [x] Parse `T: Trait[Item=Type]` constraint syntax (consumed, stored for future checking)
+- [x] Resolve `T.Name` for type parameter associated types in sema and codegen
+- [x] Write tests: `err_assoc_type_bound.w`, `behav_type_param_assoc.w`
 - [x] Write test `test/cases/err_missing_assoc_type.w` — validates
       impl-level associated type checking
 - [x] Write test `test/cases/behav_assoc_type_default.w` — validates
       associated types with defaults
-- [x] `make build && make fixpoint` — 230/230 tests pass
+- [x] `make build && make fixpoint` — 241/241 tests pass
 
 ### 10.5 `Self.Name` associated type lookups in impl blocks
 
@@ -542,5 +541,17 @@ are verified to agree. Downstream features (Phase 10) are last.
 - [x] Generic VecIter[T] replaces concrete VecIter_i32
       VecIter.next() and Vec.iter() are codegen intrinsics
 - [x] `Self.Name` resolves to associated type in impl blocks
-- [x] All tests pass under `./scripts/run_tests.sh` — 231/231
+- [x] Generic trait infrastructure: trait type params stored in sema
+      and codegen, trait type args stored in impl blocks via parser
+- [x] `impl[T] IntoIter[T] for Vec[T]` in `lib/std/traits.w`
+      with correct `Iter[T].next() -> Option[T]` and
+      `IntoIter[T].iter() -> VecIter[T]` signatures
+- [x] VecIter-based for-loop dispatch: `gen_for_veciter` inlines
+      iterator loop (idx < len, GEP load, increment) with break/continue
+- [x] Associated type bound validation: impl associated types checked
+      against declared bounds (`type Item: Eq` → verify impl provides Eq type)
+- [x] `T: Trait[Item=Type]` constraint syntax parsed (consumed, not yet enforced)
+- [x] `T.Name` associated type resolution in sema and codegen via
+      generic substitution + impl lookup
+- [x] All tests pass under `./scripts/run_tests.sh` — 241/241
 - [x] `make fixpoint` holds after all phases
