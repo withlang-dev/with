@@ -3163,14 +3163,32 @@ impl Show for Point:
 
 ### 11.2 Generic Bounds
 
+Generic type parameters may omit bounds entirely. Unbounded generics
+are checked when they are instantiated with concrete types:
+
+```
+fn double[T](x: T): x + x
+```
+
+If `double(5)` is instantiated, the compiler checks that `i32`
+supports `+`. If `double("hi")` is instantiated and the concrete
+type does not support the required operator or method, the compiler
+emits an error for that specialization.
+
+Explicit bounds remain available as optional contracts:
+
 ```
 fn debug[T: Show + Hash](x: &T):
     println("{x.show()} (hash: {x.hash()})")
 ```
 
+Use bounds when they improve the public API contract or produce
+clearer caller-facing errors. Omit them when the body already makes
+the requirement obvious.
+
 ### 11.2a `where` Clauses
 
-Trait bounds can also be specified with `where` clauses, placed after the
+Trait bounds may also be specified with `where` clauses, placed after the
 function signature, type definition, or impl header:
 
 ```
@@ -3182,7 +3200,10 @@ fn multi[T](x: T) where T: Show, T: Hash:
 ```
 
 `where` clauses are equivalent to inline bounds (`T: Trait` in the generic
-parameter list) but scale better when there are many constraints:
+parameter list) when present, but neither form is required. Generic
+functions and types may omit both inline bounds and `where` clauses
+and rely on instantiation-time checking instead. When bounds are
+written, `where` clauses scale better when there are many constraints:
 
 ```
 fn merge[A, B, C](a: A, b: B) -> C
@@ -3317,7 +3338,7 @@ concrete type.
 
 ### 11.6 Feature Scope (v1.0)
 
-Supported: generic type parameters with bounds, multiple bounds,
+Supported: generic type parameters, optional bounds, multiple bounds,
 default methods, async methods in traits, `where` clauses, blanket impls,
 associated types (basic), sealed traits.
 
@@ -3375,6 +3396,12 @@ Certain traits, when implemented, unlock participation in language
 syntax. This is a deliberate design pattern: library types opt into
 language constructs by implementing a known trait. The set of syntax
 traits is **fixed and closed** — users cannot define new syntax hooks.
+Arithmetic and comparison operators are the main exception: they use
+fixed method names on the concrete type (`add`, `sub`, `mul`, `div`,
+`eq`, `lt`, and so on). The prelude traits `Add`, `Sub`, `Mul`,
+`Div`, `Neg`, `Eq`, and `Ord` remain available for explicit bounds
+and documentation, but an unbounded generic does not need to name
+them.
 
 | Trait | Unlocks | Syntax |
 |-------|---------|--------|
@@ -3384,8 +3411,6 @@ traits is **fixed and closed** — users cannot define new syntax hooks.
 | `ScopedMut[T]` | `with` blocks (guarded, mutable) | `with expr as mut name:` |
 | `Index[I, O]` | Subscript read | `expr[index]` |
 | `IndexMut[I, O]` | Subscript write | `expr[index] = val` |
-| `Add`, `Sub`, `Mul`, `Div`, `Neg` | Arithmetic operators | `a + b`, `-x`, etc. |
-| `Eq`, `Ord` | Comparison operators | `a == b`, `a < b` |
 | `Try[T, E]` | `?` operator | `expr?` |
 | `Drop` | Destructor | automatic at scope exit |
 
@@ -3429,13 +3454,34 @@ fn parse_pair(input: &str) -> ParseResult[(Expr, Expr)]:
    chains, no dynamic dispatch (unless the user explicitly writes
    `dyn Trait`).
 3. The compiler knows at compile time exactly which trait
-   implementation controls each syntactic form.
+   implementation or concrete method resolution controls each
+   syntactic form.
 4. Pattern matching extensibility (Scala-style `unapply`) is **not
    included** in v1.0. It introduces hidden runtime behavior into
    match resolution and conflicts with exhaustiveness checking. This
    may be revisited in a future version.
 
-**Arithmetic operator traits:**
+**Arithmetic and comparison operator methods:**
+
+Arithmetic and comparison operators use fixed method names on the
+concrete type:
+
+| Operator | Method |
+|----------|--------|
+| `+` | `add` |
+| `-` | `sub` |
+| `*` | `mul` |
+| `/` | `div` |
+| unary `-` | `neg` |
+| `==` | `eq` |
+| `!=` | `ne` |
+| `<` | `lt` |
+| `<=` | `le` |
+| `>` | `gt` |
+| `>=` | `ge` |
+
+The prelude also defines optional traits with matching names and
+signatures for explicit bounds and documentation:
 
 ```
 trait Add[Rhs, Output]:
@@ -3450,8 +3496,6 @@ trait Div[Rhs, Output]:
 trait Neg[Output]:
     fn neg(self: Self) -> Output
 ```
-
-**One-implementation rule for operator output:** A type may implement
 
 **The `Contains` trait:**
 
@@ -3498,30 +3542,10 @@ if user.name in whitelist:
     grant_access()
 ```
 
-**One-implementation rule for operator output:** A type may implement
-`Add[Rhs, Output]` for a given `(Self, Rhs)` pair **at most once**.
-The `Output` type is uniquely determined by `Self` and `Rhs`:
-
-```
-impl Add[Vector, Vector] for Vector: ...    // OK: Vector + Vector = Vector
-impl Add[f32, Vector] for Vector: ...       // OK: Vector + f32 = Vector
-
-impl Add[Vector, Matrix] for Vector: ...    // ERROR: conflicting Output
-    // Vector + Vector already defined with Output = Vector
-    // Cannot also be Output = Matrix
-```
-
-This is the same principle as the `Iter[T]` one-implementation
-rule (§13.2). It substitutes for associated types in v1.0: given
-`Self` and `Rhs`, the compiler determines `Output` unambiguously.
-The compiler resolves `a + b` by looking up the unique `Output`
-for `(typeof a, typeof b)` — no type annotation needed:
-
-```
-let v1 = Vector.new(1.0, 2.0)
-let v2 = Vector.new(3.0, 4.0)
-let v3 = v1 + v2              // Output uniquely determined: Vector
-```
+**Optional operator traits:** The prelude operator traits are
+ordinary traits. Use them for explicit bounds, blanket impls, and
+documentation. Operator syntax itself still resolves through the
+matching concrete method (`add`, `mul`, `eq`, `lt`, and so on).
 
 ### 11.8 Derive
 
@@ -5488,7 +5512,7 @@ perfecting). Phase 0 translates only `#define` constants:
 ```c
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 // → NOT translated. Compiler warning: untranslated macro MAX
-// User must write: fn max[T: Ord](a: T, b: T) -> T: if a > b then a else b
+// User must write: fn max[T](a: T, b: T) -> T: if a > b then a else b
 ```
 
 Complex macros (token pasting, stringification, variadic macros,
@@ -5848,26 +5872,24 @@ as a string constant in the binary.
 
 **Comptime in generic functions:** When a generic function contains
 `comptime if` branches that depend on the type parameter `T`, the
-type checker uses **deferred branch checking**: the initial generic
-check verifies syntax and validates code *outside* comptime branches
-normally, but code *inside* `comptime if` branches that depend on
-`T` is deferred until monomorphization. When `T` is known, the
+type checker uses **deferred branch checking**. The compiler validates
+syntax and declared types up front, but operations that depend on the
+concrete capabilities of `T` are checked when the generic is
+instantiated. Code inside `comptime if` branches that depend on `T`
+is likewise deferred until monomorphization. When `T` is known, the
 `comptime if` condition is evaluated, the taken branch is type-
 checked against the concrete `T`, and the erased branch is discarded
 without checking.
 
-This is narrower than C++ templates (the non-comptime body is still
-fully checked against the declared bounds on `T`) and broader than
-Rust generics (comptime branches can use capabilities not declared
-in bounds). The trade-off: a comptime branch error only appears
-when that branch is instantiated with a specific `T`, similar to
-Zig's compile-time generics.
+This is intentionally close to C++ and Zig style instantiation-time
+checking, but With keeps optional explicit bounds for APIs that want
+the contract written at the signature.
 
 ```
 fn process[T](val: &T):
-    val.len()   // ERROR at generic check: T has no .len() method
+    val.len()   // Checked when process[T] is instantiated
     comptime if T.implements(Serialize):
-        val.serialize()   // Deferred: checked only when T: Serialize
+        val.serialize()   // Checked only in instantiations that take this branch
 ```
 
 ---

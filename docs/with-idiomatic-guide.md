@@ -17,7 +17,7 @@ types and traits:
 let users: Vec[User] = Vec.new()
 let name: String = "alice"
 
-fn render[T: Display](value: T):
+fn render[T](value: T):
     println("{value}")
 ```
 
@@ -97,6 +97,40 @@ fn main -> i32:
 // ✓ idiomatic
 fn main:
     println("Hello, World!")
+```
+
+---
+
+## Generic Bounds
+
+**Omit bounds when the body already says what it needs.** Unbounded
+generics are checked when they are instantiated with concrete types.
+For local helpers and obvious one-liners, the shorter form is usually
+the better one.
+
+```
+// ✓ idiomatic helper
+fn double[T](x: T): x + x
+```
+
+**Keep bounds when the signature should carry the contract.** Public
+APIs, library entry points, and longer generic functions often read
+better when the requirement is explicit.
+
+```
+// ✓ explicit contract
+fn max[T: Ord](a: T, b: T):
+    if a > b then a else b
+```
+
+**Use `where` when it improves readability, not because the language
+requires it.** Inline bounds and `where` clauses are both optional.
+
+```
+fn compare[T](a: T, b: T) where T: Eq + Ord:
+    if a == b then 0
+    else if a < b then -1
+    else 1
 ```
 
 ---
