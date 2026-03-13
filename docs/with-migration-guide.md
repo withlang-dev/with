@@ -423,7 +423,9 @@ stays the same syntax as Rust.
 Trait objects: `Box<dyn Trait>` → `Box[dyn Trait]`.
 `&dyn Trait` → `&dyn Trait`.
 
-**`where` clauses:** Rust's `where` syntax maps directly:
+**`where` clauses:** Rust's `where` syntax maps directly. In With,
+bounds are optional, so use inline bounds or `where` clauses when you
+want the constraint spelled out in the signature:
 
 ```rust
 // Rust
@@ -433,6 +435,12 @@ fn process<T>(x: T) where T: Display + Debug { ... }
 ```with
 // With
 fn process[T](x: T) where T: Display, T: Debug: ...
+```
+
+Unbounded generics are also valid:
+
+```with
+fn double[T](x: T): x + x
 ```
 
 ## Lifetimes
@@ -629,7 +637,7 @@ let updated = { user with name: "new_name", active: false }
 | `Box::new(x)` | `Box.new(x)` |
 | `::` (path separator) | `.` |
 | `'a` (lifetimes) | (deleted — ephemeral system) |
-| `where T: Trait` | `[T: Trait]` in signature |
+| `where T: Trait` | `[T: Trait]` in signature or `where T: Trait` |
 | `impl Default for Foo` + `..Default::default()` | Default field values: `type Foo = { x: i32 = 0 }`, `Foo {}` |
 | `thiserror` `#[from]` | `error AppError from IoError, DbError` |
 | `.unwrap_or(())` | `.unwrap_or()` (unit elision) |
@@ -1634,11 +1642,21 @@ T max(T a, T b) {
 
 ```with
 // With
+fn max[T](a: T, b: T) -> T:
+    if a > b then a else b
+```
+
+With generics are also checked at instantiation. The difference is
+that With keeps the surface syntax small and still lets you add an
+explicit contract when it helps:
+
+```with
 fn max[T: Ord](a: T, b: T) -> T:
     if a > b then a else b
 ```
 
-C++ templates are duck-typed and checked at instantiation (resulting in famously terrible error messages). With generics are constrained by traits (`[T: Ord]`). If you forget the trait bound, the compiler tells you immediately at the function definition, not inside a 500-line compiler dump.
+Write `[T: Ord]` or `where T: Ord` when the bound belongs in the API
+contract. Omit it when the body already makes the requirement obvious.
 
 ## Constexpr and Macros
 
