@@ -1259,15 +1259,18 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     var trait_name = 0
     var type_name = first_name
     var target_type_node = 0
+    var trait_arg_extra_start = 0
+    var trait_arg_count = 0
     if self.peek() == TK_L_BRACKET:
         self.advance()
-        var depth = 1
-        while depth > 0 and self.peek() != TK_EOF:
-            if self.peek() == TK_L_BRACKET:
-                depth = depth + 1
-            if self.peek() == TK_R_BRACKET:
-                depth = depth - 1
-            self.advance()
+        trait_arg_extra_start = self.pool.extra_len()
+        while self.peek() != TK_R_BRACKET and self.peek() != TK_EOF:
+            let arg = self.parse_type_expr()
+            self.pool.add_extra(arg)
+            trait_arg_count = trait_arg_count + 1
+            if self.peek() == TK_COMMA:
+                self.advance()
+        self.expect(TK_R_BRACKET)
         if self.peek() != TK_KW_FOR:
             self.emit_error("expected 'for' after trait generic arguments in impl")
             return
@@ -1401,6 +1404,10 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     // Store impl target type node if generic (e.g., impl Trait for Vec[i32])
     if target_type_node != 0:
         self.pool.add_impl_target_type_node(impl_node, target_type_node)
+
+    // Store impl trait type args if present (e.g., impl IntoIter[i32] for Type)
+    if trait_arg_count > 0:
+        self.pool.add_impl_trait_type_args(impl_node, trait_arg_extra_start, trait_arg_count)
 
 // ── Expression parsing ───────────────────────────────────────────
 
@@ -3582,7 +3589,21 @@ fn Parser.parse_one_type_param(self: Parser) -> i32:
 
 fn Parser.parse_type_bound_symbol(self: Parser) -> i32:
     if self.peek() == TK_IDENT:
-        return self.expect_ident()
+        let sym = self.expect_ident()
+        // Consume optional parameterized bound: Trait[Item=Type, ...] or Trait[T]
+        if self.peek() == TK_L_BRACKET:
+            self.advance()
+            var depth = 1
+            while depth > 0 and self.peek() != TK_EOF:
+                if self.peek() == TK_L_BRACKET:
+                    depth = depth + 1
+                if self.peek() == TK_R_BRACKET:
+                    depth = depth - 1
+                    if depth == 0:
+                        self.advance()
+                        break
+                self.advance()
+        return sym
     if self.peek() == TK_KW_TYPE:
         self.advance()
         return self.intern.intern("type")

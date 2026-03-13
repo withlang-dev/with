@@ -445,6 +445,11 @@ type Codegen = {
     // Trait decl nodes: sym → trait_decl_node
     trait_decl_nodes: HashMap[i32, i32],
 
+    // Trait type params: trait name_sym → flat start/count in trait_tp_flat_syms
+    trait_tp_starts: HashMap[i32, i32],
+    trait_tp_counts: HashMap[i32, i32],
+    trait_tp_flat_syms: Vec[i32],
+
     // VTable globals: hash(type,trait) → global
     vtable_globals: HashMap[i32, i64],
 
@@ -674,6 +679,9 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         trait_method_ret_nodes: Vec.new(),
         trait_method_default_bodies: Vec.new(),
         trait_decl_nodes: HashMap.new(),
+        trait_tp_starts: HashMap.new(),
+        trait_tp_counts: HashMap.new(),
+        trait_tp_flat_syms: Vec.new(),
         vtable_globals: HashMap.new(),
         trait_locals: HashMap.new(),
         trait_local_concrete_types: HashMap.new(),
@@ -1922,7 +1930,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         let gs_opt = self.generic_structs.get(name_sym)
         if gs_opt.is_some():
             return self.monomorphize_struct(name_sym, g_extra, g_count)
-        0
+        return 0
 
     if kind == NK_TYPE_TRAIT_OBJ:
         // dyn Trait → fat pointer {data_ptr, vtable_ptr}
@@ -1946,6 +1954,16 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
                     if at_name == assoc_sym:
                         let at_type_nd = self.pool.get_extra(impl_ex + 1 + iai * 2 + 1)
                         return self.resolve_type(at_type_nd)
+        // Type parameter: check type_binding_syms for base_sym → resolve via sema
+        for tbi in 0..self.type_bindings_len:
+            if self.type_binding_syms.get(tbi as i64) == base_sym:
+                // base_sym is a bound type param — use sema to resolve assoc type
+                let sema_resolved = self.sema.resolve_type_expr(type_node)
+                if sema_resolved > 0:
+                    let llvm_ty = self.sema_type_to_llvm(sema_resolved)
+                    if llvm_ty != 0:
+                        return llvm_ty
+                break
         return wl_i32_type(self.context)
 
     // Fallback — always warn so silent miscompilation is visible
@@ -3708,7 +3726,17 @@ fn Codegen.collect_trait_info(self: Codegen, trait_node: i32):
         return
 
     var pos = extra_start
-    pos = pos + 2  // skip tp_count and tp_start
+    let tp_count = self.pool.get_extra(pos)
+    let tp_start_ast = self.pool.get_extra(pos + 1)
+    pos = pos + 2
+    let tp_flat_start = self.trait_tp_flat_syms.len() as i32
+    self.trait_tp_starts.insert(name_sym, tp_flat_start)
+    self.trait_tp_counts.insert(name_sym, tp_count)
+    var tp_pos = tp_start_ast
+    for tpi in 0..tp_count:
+        self.trait_tp_flat_syms.push(self.pool.get_extra(tp_pos))
+        let bc = self.pool.get_extra(tp_pos + 1)
+        tp_pos = tp_pos + 2 + bc
     let assoc_count = self.pool.get_extra(pos)
     pos = pos + 1
     for ai in 0..assoc_count:
@@ -3866,6 +3894,9 @@ fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, method_sym: i32
     wrapper_fn
 
 fn Codegen.resolve_trait_method_type_for_impl(self: Codegen, type_node: i32, impl_type_sym: i32) -> i64:
+    return self.resolve_trait_method_type_for_impl_with_trait(type_node, impl_type_sym, 0, 0)
+
+fn Codegen.resolve_trait_method_type_for_impl_with_trait(self: Codegen, type_node: i32, impl_type_sym: i32, trait_sym: i32, impl_node: i32) -> i64:
     if type_node == 0:
         return 0
     var concrete_ty = 0
@@ -3903,11 +3934,65 @@ fn Codegen.resolve_trait_method_type_for_impl(self: Codegen, type_node: i32, imp
         self.type_binding_types.push(concrete_ty)
         self.type_bindings_len = self.type_bindings_len + 1
 
+    // Bind trait type params from impl trait type args
+    if trait_sym != 0 and impl_node != 0:
+        let tp_count_opt = self.trait_tp_counts.get(trait_sym)
+        if tp_count_opt.is_some():
+            let tp_count = tp_count_opt.unwrap()
+            let tp_start = self.trait_tp_starts.get(trait_sym).unwrap()
+            let tta_idx = self.pool.find_impl_trait_type_args(impl_node)
+            if tta_idx >= 0:
+                let arg_start = self.pool.impl_trait_type_args.get((tta_idx + 1) as i64)
+                let arg_count = self.pool.impl_trait_type_args.get((tta_idx + 2) as i64)
+                var ti = 0
+                while ti < tp_count and ti < arg_count:
+                    let tp_sym = self.trait_tp_flat_syms.get((tp_start + ti) as i64)
+                    let arg_node = self.pool.get_extra(arg_start + ti)
+                    let arg_ty = self.resolve_type(arg_node)
+                    if arg_ty != 0:
+                        self.type_binding_syms.push(tp_sym)
+                        self.type_binding_types.push(arg_ty)
+                        self.type_bindings_len = self.type_bindings_len + 1
+                    ti = ti + 1
+
     let resolved = self.resolve_type(type_node)
     self.type_binding_syms = saved_syms
     self.type_binding_types = saved_tys
     self.type_bindings_len = saved_len
     resolved
+
+fn Codegen.generate_default_trait_method_for_impl_ext(self: Codegen, impl_type_sym: i32, method_idx: i32, trait_sym: i32, impl_node: i32):
+    // Set up trait type param bindings before generating the method
+    let saved_syms = self.type_binding_syms
+    let saved_tys = self.type_binding_types
+    let saved_len = self.type_bindings_len
+
+    if trait_sym != 0 and impl_node != 0:
+        let tp_count_opt = self.trait_tp_counts.get(trait_sym)
+        if tp_count_opt.is_some():
+            let tp_count = tp_count_opt.unwrap()
+            let tp_start = self.trait_tp_starts.get(trait_sym).unwrap()
+            // Try to bind from explicit trait type args (impl Trait[i32] for Type)
+            let tta_idx = self.pool.find_impl_trait_type_args(impl_node)
+            if tta_idx >= 0:
+                let arg_start = self.pool.impl_trait_type_args.get((tta_idx + 1) as i64)
+                let arg_count = self.pool.impl_trait_type_args.get((tta_idx + 2) as i64)
+                var ti = 0
+                while ti < tp_count and ti < arg_count:
+                    let tp_sym = self.trait_tp_flat_syms.get((tp_start + ti) as i64)
+                    let arg_node = self.pool.get_extra(arg_start + ti)
+                    let arg_ty = self.resolve_type(arg_node)
+                    if arg_ty != 0:
+                        self.type_binding_syms.push(tp_sym)
+                        self.type_binding_types.push(arg_ty)
+                        self.type_bindings_len = self.type_bindings_len + 1
+                    ti = ti + 1
+
+    self.generate_default_trait_method_for_impl(impl_type_sym, method_idx)
+
+    self.type_binding_syms = saved_syms
+    self.type_binding_types = saved_tys
+    self.type_bindings_len = saved_len
 
 fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: i32, method_idx: i32):
     let body_node = self.trait_method_default_bodies.get(method_idx as i64)
@@ -4118,7 +4203,7 @@ fn Codegen.generate_default_trait_methods_for_impl(self: Codegen, impl_node: i32
     let method_start = self.trait_method_starts.get(trait_idx as i64)
     let method_count = self.trait_method_counts.get(trait_idx as i64)
     for mi in 0..method_count:
-        self.generate_default_trait_method_for_impl(impl_type_sym, method_start + mi)
+        self.generate_default_trait_method_for_impl_ext(impl_type_sym, method_start + mi, trait_sym, impl_node)
 
 fn Codegen.generate_default_trait_methods(self: Codegen):
     for i in 0..self.pool.decl_count():
@@ -8338,6 +8423,15 @@ fn Codegen.gen_for(self: Codegen, node: i32) -> i64:
                     if base_name == "Vec":
                         return self.gen_for_vec(binding_sym, iterable, iterable_node, body_node)
 
+    // VecIter-based for
+    if tk == wl_struct_type_kind():
+        let si = self.find_struct_index_by_type(iter_ty)
+        if si >= 0 and si < self.struct_index_syms.len() as i32:
+            let type_sym = self.struct_index_syms.get(si as i64)
+            let base_opt = self.mono_struct_base.get(type_sym)
+            if base_opt.is_some() and self.intern.resolve(base_opt.unwrap()) == "VecIter":
+                return self.gen_for_veciter(binding_sym, iterable, iterable_node, type_sym, body_node)
+
     // Default: treat as range 0..n
     wl_get_undef(wl_void_type(self.context))
 
@@ -8473,6 +8567,79 @@ fn Codegen.gen_for_vec(self: Codegen, binding_sym: i32, iterable: i64, iterable_
     wl_position_at_end(self.builder, inc_bb)
     let next = wl_build_add(self.builder, wl_build_load(self.builder, i64_ty, i_alloca), wl_const_int(i64_ty, 1, 0))
     wl_build_store(self.builder, next, i_alloca)
+    wl_build_br(self.builder, cond_bb)
+
+    // End
+    self.pop_loop_context()
+    wl_position_at_end(self.builder, end_bb)
+    wl_get_undef(wl_void_type(self.context))
+
+// ── VecIter-based for loop ───────────────────────────────────────
+
+fn Codegen.gen_for_veciter(self: Codegen, binding_sym: i32, iterable: i64, iterable_node: i32, type_sym: i32, body_node: i32) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    let i32_ty = wl_i32_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let iter_ty = wl_type_of(iterable)
+
+    // Look up element type from mono struct type params
+    let tp_start_opt = self.mono_struct_tp_starts.get(type_sym)
+    if not tp_start_opt.is_some():
+        return wl_get_undef(wl_void_type(self.context))
+    let tp_start = tp_start_opt.unwrap()
+    let elem_ty = self.mono_struct_tp_flat_types.get(tp_start as i64)
+
+    // Store VecIter in mutable alloca
+    var iter_ptr: i64 = 0
+    if self.pool.kind(iterable_node) == NK_IDENT:
+        iter_ptr = self.lookup_local_alloca(self.pool.get_data0(iterable_node))
+    if iter_ptr == 0:
+        iter_ptr = wl_build_alloca(self.builder, iter_ty)
+        wl_build_store(self.builder, iterable, iter_ptr)
+
+    // Create element alloca for binding
+    let elem_alloca = self.create_entry_alloca(elem_ty)
+    self.record_local(binding_sym, elem_alloca, elem_ty, 0)
+
+    // Create option type for next() result
+    let opt_type = self.get_or_create_option_type(elem_ty)
+
+    // Basic blocks
+    let cond_bb = wl_append_bb(self.context, self.current_function, "foriter.cond")
+    let body_bb = wl_append_bb(self.context, self.current_function, "foriter.body")
+    let inc_bb = wl_append_bb(self.context, self.current_function, "foriter.inc")
+    let end_bb = wl_append_bb(self.context, self.current_function, "foriter.end")
+    wl_build_br(self.builder, cond_bb)
+
+    // Condition: call next(), check if Some
+    wl_position_at_end(self.builder, cond_bb)
+    let data_ptr_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 0)
+    let data_ptr = wl_build_load(self.builder, i64_ty, data_ptr_ptr)
+    let len_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 1)
+    let len = wl_build_load(self.builder, i64_ty, len_ptr)
+    let idx_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 2)
+    let idx = wl_build_load(self.builder, i64_ty, idx_ptr)
+    let cond = wl_build_icmp(self.builder, wl_int_slt(), idx, len)
+    wl_build_cond_br(self.builder, cond, body_bb, end_bb)
+
+    // Body: extract element, increment idx
+    self.push_loop_context(end_bb, inc_bb, 0, 0)
+    wl_position_at_end(self.builder, body_bb)
+    let typed_ptr = wl_build_int_to_ptr(self.builder, data_ptr, ptr_ty)
+    let indices: Vec[i64] = Vec.new()
+    indices.push(idx)
+    let elem_ptr = wl_build_gep(self.builder, elem_ty, typed_ptr, vec_data_i64(&indices), 1)
+    let val = wl_build_load(self.builder, elem_ty, elem_ptr)
+    wl_build_store(self.builder, val, elem_alloca)
+    self.gen_expr_discard(body_node)
+    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
+        wl_build_br(self.builder, inc_bb)
+
+    // Increment idx
+    wl_position_at_end(self.builder, inc_bb)
+    let cur_idx = wl_build_load(self.builder, i64_ty, idx_ptr)
+    let next_idx = wl_build_add(self.builder, cur_idx, wl_const_int(i64_ty, 1, 0))
+    wl_build_store(self.builder, next_idx, idx_ptr)
     wl_build_br(self.builder, cond_bb)
 
     // End

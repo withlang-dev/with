@@ -109,11 +109,19 @@ type Sema = {
     trait_method_counts: Vec[i32],
     trait_name_syms: Vec[i32],
     trait_lookup: HashMap[i32, i32],
+    // Trait type params: flat vec of type param name syms per trait
+    trait_tp_starts: Vec[i32],
+    trait_tp_counts: Vec[i32],
+    trait_tp_syms: Vec[i32],
     // Trait associated types: flat vec of [name_sym, default_type_node]*
     trait_assoc_names: Vec[i32],
     trait_assoc_defaults: Vec[i32],
     trait_assoc_starts: Vec[i32],
     trait_assoc_counts: Vec[i32],
+    // Trait assoc type bounds: flat vec of bound trait syms per assoc type
+    trait_assoc_bound_syms: Vec[i32],
+    trait_assoc_bound_starts: Vec[i32],
+    trait_assoc_bound_counts: Vec[i32],
     // Type implementations: type_sym → list of trait syms (encoded in impl_extra)
     impl_extra: Vec[i32],
     impl_starts: Vec[i32],
@@ -402,10 +410,16 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         trait_method_counts: Vec.new(),
         trait_name_syms: Vec.new(),
         trait_lookup,
+        trait_tp_starts: Vec.new(),
+        trait_tp_counts: Vec.new(),
+        trait_tp_syms: Vec.new(),
         trait_assoc_names: Vec.new(),
         trait_assoc_defaults: Vec.new(),
         trait_assoc_starts: Vec.new(),
         trait_assoc_counts: Vec.new(),
+        trait_assoc_bound_syms: Vec.new(),
+        trait_assoc_bound_starts: Vec.new(),
+        trait_assoc_bound_counts: Vec.new(),
         impl_extra: Vec.new(),
         impl_starts: Vec.new(),
         impl_counts: Vec.new(),
@@ -1900,7 +1914,16 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
     //  method_count,
     //   [method_name, method_flags, param_start, param_count, ret_type, default_body]*]
     var pos = extra_start
-    pos = pos + 2  // skip tp_count and tp_start
+    let tp_count = self.ast.get_extra(pos)
+    let tp_start_ast = self.ast.get_extra(pos + 1)
+    pos = pos + 2
+    self.trait_tp_starts.push(self.trait_tp_syms.len() as i32)
+    self.trait_tp_counts.push(tp_count)
+    var tp_pos = tp_start_ast
+    for tpi in 0..tp_count:
+        self.trait_tp_syms.push(self.ast.get_extra(tp_pos))
+        let bc = self.ast.get_extra(tp_pos + 1)
+        tp_pos = tp_pos + 2 + bc
     let assoc_count = self.ast.get_extra(pos)
     pos = pos + 1
     // Store associated type declarations for this trait
@@ -1909,6 +1932,10 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
     for ai in 0..assoc_count:
         let at_name = self.ast.get_extra(pos)
         let bound_count = self.ast.get_extra(pos + 1)
+        self.trait_assoc_bound_starts.push(self.trait_assoc_bound_syms.len() as i32)
+        self.trait_assoc_bound_counts.push(bound_count)
+        for bi in 0..bound_count:
+            self.trait_assoc_bound_syms.push(self.ast.get_extra(pos + 2 + bi))
         pos = pos + 2 + bound_count
         let default_type = self.ast.get_extra(pos)
         pos = pos + 1
@@ -2024,6 +2051,32 @@ fn Sema.collect_impl_decl(self: Sema, node: i32):
                 if found == 0:
                     self.emit_error("impl missing required associated type '" ++ self.pool_resolve(required_name) ++ "'", node)
                     return
+            // Validate associated type bounds
+            for ati in 0..at_count:
+                let at_global_idx = at_start + ati
+                if at_global_idx < self.trait_assoc_bound_starts.len() as i32:
+                    let ab_start = self.trait_assoc_bound_starts.get(at_global_idx as i64)
+                    let ab_count = self.trait_assoc_bound_counts.get(at_global_idx as i64)
+                    if ab_count > 0:
+                        let at_name_sym = self.trait_assoc_names.get(at_global_idx as i64)
+                        // Find the concrete type from impl's associated type bindings
+                        var impl_at_type_node = 0
+                        for iai in 0..impl_at_count:
+                            let impl_at_name = self.ast.get_extra(impl_extra_start + 1 + iai * 2)
+                            if impl_at_name == at_name_sym:
+                                impl_at_type_node = self.ast.get_extra(impl_extra_start + 1 + iai * 2 + 1)
+                        if impl_at_type_node != 0:
+                            let impl_at_tid = self.resolve_type_expr(impl_at_type_node)
+                            if impl_at_tid > 0:
+                                let impl_at_type_sym = self.get_type_d0(impl_at_tid)
+                                if impl_at_type_sym != 0:
+                                    for bi in 0..ab_count:
+                                        let bound_sym = self.trait_assoc_bound_syms.get((ab_start + bi) as i64)
+                                        if self.select_trait_impl(impl_at_type_sym, bound_sym) == 0:
+                                            let tname = self.pool_resolve(at_name_sym)
+                                            let bname = self.pool_resolve(bound_sym)
+                                            self.emit_error("associated type '" ++ tname ++ "' does not satisfy bound '" ++ bname ++ "'", node)
+                                            return
 
     // Check for blanket impl (impl-level type params)
     let tp_meta_idx = self.ast.find_impl_type_params(node)
@@ -2531,6 +2584,22 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
         if self.pool_resolve(base_sym) == "Self":
             if self.assoc_type_bindings.contains(assoc_sym):
                 return self.assoc_type_bindings.get(assoc_sym).unwrap()
+        // Type parameter: look up concrete type via generic substitution
+        let concrete = self.lookup_generic_subst(base_sym)
+        if concrete != 0:
+            let concrete_sym = self.get_type_d0(concrete)
+            if concrete_sym != 0:
+                // Find which trait provides assoc_sym for concrete_sym
+                for ti in 0..self.trait_name_syms.len() as i32:
+                    let at_start_t = self.trait_assoc_starts.get(ti as i64)
+                    let at_count_t = self.trait_assoc_counts.get(ti as i64)
+                    for ai in 0..at_count_t:
+                        if self.trait_assoc_names.get((at_start_t + ai) as i64) == assoc_sym:
+                            let trait_sym_t = self.trait_name_syms.get(ti as i64)
+                            if self.select_trait_impl(concrete_sym, trait_sym_t) != 0:
+                                let resolved_at = self.resolve_impl_assoc_type(concrete_sym, trait_sym_t, assoc_sym)
+                                if resolved_at != 0:
+                                    return resolved_at
         return 0
 
     if kind == NK_TYPE_GENERIC:
@@ -4810,6 +4879,29 @@ fn Sema.select_trait_impl_for_generic_inst(self: Sema, tid: i32, trait_sym: i32)
     // Fall back to base symbol lookup (handles impl Trait for Vec without args)
     let base_sym = self.get_type_d0(tid)
     self.select_trait_impl(base_sym, trait_sym)
+
+// Resolve an associated type from a specific impl: find the impl block for (type_sym, trait_sym)
+// and look up the associated type binding for assoc_sym.
+fn Sema.resolve_impl_assoc_type(self: Sema, type_sym: i32, trait_sym: i32, assoc_sym: i32) -> i32:
+    // Search all impl decls for matching (type_sym, trait_sym)
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NK_IMPL_DECL:
+            continue
+        let impl_type = self.ast.get_data0(decl)
+        let impl_trait = self.ast.get_data2(decl)
+        if impl_type != type_sym or impl_trait != trait_sym:
+            continue
+        // Found the impl — read its associated type bindings
+        let impl_extra_start = self.ast.get_data1(decl)
+        let impl_at_count = self.ast.get_extra(impl_extra_start)
+        for iai in 0..impl_at_count:
+            let at_name = self.ast.get_extra(impl_extra_start + 1 + iai * 2)
+            if at_name == assoc_sym:
+                let at_type_node = self.ast.get_extra(impl_extra_start + 1 + iai * 2 + 1)
+                return self.resolve_type_expr(at_type_node)
+        return 0
+    0
 
 fn Sema.type_symbol_for_bounds(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)

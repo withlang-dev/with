@@ -35,10 +35,15 @@ pub trait ScopedMut =
     fn exit(self) -> void
 
 pub trait Iter[T] =
-    fn next(self) -> i32
+    fn next(self) -> Option[T]
 
 pub trait IntoIter[T] =
-    fn iter(self) -> i32
+    fn iter(self) -> VecIter[T]
+
+// IntoIter for Vec — enables `for x in vec.iter()` via trait dispatch
+impl[T] IntoIter[T] for Vec[T] =
+    fn iter(self: Vec[T]) -> VecIter[T]:
+        self.iter()
 
 // Core trait impls for primitive types
 
