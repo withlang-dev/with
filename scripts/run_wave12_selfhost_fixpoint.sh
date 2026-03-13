@@ -81,7 +81,8 @@ STAGE2_RUNNER_DIR="$SELFHOST_RUNNER_DIR"
 
 # Prepare stage3 runner in a separate temp dir
 STAGE3_RUNNER_DIR=""
-stage3_tmp="$(mktemp -d /tmp/with-selfhost-runner.XXXXXX)"
+mkdir -p "${ROOT_DIR}/out/tmp"
+stage3_tmp="$(mktemp -d "${ROOT_DIR}/out/tmp/with-selfhost-runner.XXXXXX")"
 if [[ -f "${ROOT_DIR}/out/lib/libwith_llvm_bridge.dylib" ]]; then
   mkdir -p "${stage3_tmp}/runtime"
   cp "$STAGE3_BIN" "${stage3_tmp}/with-stage2"

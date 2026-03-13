@@ -9,12 +9,19 @@ SELFHOST_RUNNER_ACTIVE_PID=""
 SELFHOST_RUNNER_LOCK_DIR=""
 SELFHOST_RUNNER_SPAWN_ISOLATED=0
 
+ensure_selfhost_runner_tmp_root() {
+  local root_dir="$1"
+  local tmp_root="${root_dir}/out/tmp"
+  mkdir -p "${tmp_root}" "${root_dir}/out/locks"
+  export TMPDIR="${tmp_root}"
+}
+
 acquire_selfhost_runner_lock() {
   local root_dir="$1"
-  local lock_dir="${root_dir}/.with/.selfhost_runner.lock"
+  local lock_dir="${root_dir}/out/locks/selfhost_runner.lock"
   local owner_pid=""
 
-  mkdir -p "${root_dir}/.with"
+  ensure_selfhost_runner_tmp_root "$root_dir"
 
   if mkdir "$lock_dir" 2>/dev/null; then
     echo "$$" > "${lock_dir}/pid"
@@ -69,7 +76,7 @@ prepare_selfhost_runner() {
   fi
 
   local tmp_dir
-  tmp_dir="$(mktemp -d /tmp/with-selfhost-runner.XXXXXX)"
+  tmp_dir="$(mktemp -d "${root_dir}/out/tmp/with-selfhost-runner.XXXXXX")"
   mkdir -p "${tmp_dir}/runtime"
   cp "$bin_path" "${tmp_dir}/with-stage2"
   chmod +x "${tmp_dir}/with-stage2"

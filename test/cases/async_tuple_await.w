@@ -2,11 +2,9 @@
 
 // Test: tuple concurrent await — spawn two tasks, await both as a tuple.
 
-async fn double(x: i32) -> i32:
-    x * 2
+async fn double(x: i32): x * 2
 
-async fn triple(x: i32) -> i32:
-    x * 3
+async fn triple(x: i32): x * 3
 
 fn main:
     // Spawn two tasks

@@ -3,6 +3,7 @@ extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_eprintln(s: str) -> void
 extern fn with_extract_runtime_obj(name: str, path: str) -> i32
+extern fn with_getenv_str(name: str) -> str
 
 fn link_stage_link(obj_path: str, bin_path: str) -> bool:
     let extras: Vec[str] = Vec.new()
@@ -144,13 +145,19 @@ fn link_stage_read_file_trimmed(path: str) -> str:
         end = end - 1
     content.slice(0, end as i64)
 
+fn link_stage_artifact_root() -> str:
+    let env_root = with_getenv_str("WITH_OUT_DIR")
+    if env_root.len() > 0:
+        return env_root
+    "out"
+
 fn link_stage_find_runtime_object_path(name: str) -> str:
     let root = link_stage_resolve_runtime_root()
     let p = root ++ "/" ++ name
     if with_fs_read_file(p).len() > 0:
         return p
     // Fall back to embedded runtime objects (self-contained binary)
-    let tmp_dir = "/tmp/with_runtime"
+    let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
     let _ = ("mkdir -p " ++ tmp_dir) |> with_system
     let tmp_path = tmp_dir ++ "/" ++ name
     if with_extract_runtime_obj(name, tmp_path) == 0:
@@ -182,6 +189,37 @@ fn link_stage_source_stem(source_path: str) -> str:
     if base.len() > 2 and base.ends_with(".w"):
         return base.slice(0, (base.len() - 2) as i64)
     base
+
+fn link_stage_sanitize_relative_dir(path: str) -> str:
+    var out = ""
+    var segment_start = 0
+    var i = 0
+    while i <= path.len():
+        let at_end = i == path.len()
+        let ch = if at_end: 47 else: path.byte_at(i as i64)
+        if ch == 47:
+            if i > segment_start:
+                let segment = path.slice(segment_start as i64, i as i64)
+                if segment != ".":
+                    if out.len() > 0:
+                        out = out ++ "/"
+                    if segment == "..":
+                        out = out ++ "__up__"
+                    else:
+                        out = out ++ segment
+            segment_start = i + 1
+        i = i + 1
+    out
+
+fn link_stage_output_dir_for_source(source_path: str) -> str:
+    let artifact_root = link_stage_artifact_root()
+    let dir = link_stage_sanitize_relative_dir(link_stage_dirname(source_path))
+    if dir.len() == 0:
+        return artifact_root
+    artifact_root ++ "/" ++ dir
+
+fn link_stage_output_path_for_source(source_path: str) -> str:
+    link_stage_output_dir_for_source(source_path) ++ "/" ++ link_stage_source_stem(source_path)
 
 fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec[str], needs_async_runtime: bool) -> bool:
     let extras: Vec[str] = Vec.new()
