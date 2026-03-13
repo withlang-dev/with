@@ -373,19 +373,25 @@ Currently only `VecIter_i32` exists as a concrete type.
 - [x] For-loop Vec[T] iteration already works generically via
       `gen_for_vec` (uses `with_vec_get_ptr` + `infer_vec_elem_type`)
 - [x] Test `test/cases/behav_vec_iter_generic.w` passes (added earlier)
-- [ ] Replace `type VecIter_i32` with generic `type VecIter[T]`
-      (blocked: needs generic method monomorphization for
-      `VecIter[T].next() -> Option[T]` — method body uses T)
-- [ ] `make build && make fixpoint`
+- [x] Replace `type VecIter_i32` with generic `type VecIter[T]`
+      in lib/std/collections.w. VecIter.next() is a codegen intrinsic
+      that uses mono_struct type param bindings to determine elem type.
+      Vec.iter() codegen intrinsic creates VecIter[T] from Vec[T].
+- [x] `make build && make fixpoint` — 236/236 tests pass
 
 ### 10.2 impl IntoIter[T] for Vec[T]
 
+Deferred — requires generic trait infrastructure (`trait Name[T]`)
+which is parsed but not wired through sema/codegen. For-loops
+already work with Vec[T] directly via `gen_for_vec`. Vec.iter()
+returns VecIter[T] via codegen intrinsic.
+
 - [ ] Define `trait IntoIter[T]` with `fn iter(self) -> VecIter[T]`
-      in `lib/std/collections.w`
-- [ ] Implement `impl[T] IntoIter[T] for Vec[T]`
+      in `lib/std/collections.w` (future: needs generic trait sema)
+- [ ] Implement `impl[T] IntoIter[T] for Vec[T]` (future)
 - [ ] Update for-loop desugaring to call `.iter()` on types
-      implementing IntoIter
-- [ ] Write test verifying `for x in vec:` works via trait
+      implementing IntoIter (future)
+- [ ] Write test verifying `for x in vec:` works via trait (future)
 - [ ] `make build && make fixpoint`
 
 ### 10.3 Untyped Vec.new() inference
@@ -533,8 +539,8 @@ are verified to agree. Downstream features (Phase 10) are last.
       turbofish syntax. Parser extended to handle comma-separated subscripts
       in `parse_index_or_slice` (d2 stores second index). Codegen
       `gen_builtin_static_call` handles NK_INDEX for Vec, HashMap, HashSet.
-- [ ] Generic VecIter[T] replaces concrete VecIter_i32
-      (blocked: needs generic method monomorphization)
+- [x] Generic VecIter[T] replaces concrete VecIter_i32
+      VecIter.next() and Vec.iter() are codegen intrinsics
 - [x] `Self.Name` resolves to associated type in impl blocks
 - [x] All tests pass under `./scripts/run_tests.sh` — 231/231
 - [x] `make fixpoint` holds after all phases
