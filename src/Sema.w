@@ -2594,7 +2594,26 @@ fn Sema.check_bodies(self: Sema):
                 if meta >= 0:
                     tp_count = self.ast.fn_meta_tp_count(meta)
                 if tp_count == 0:
-                    self.check_fn_body(decl)
+                    // Skip methods on generic structs (monomorphized lazily)
+                    let fn_name_sym = self.ast.get_data0(decl)
+                    let fn_name_str = self.pool_resolve_symbol(fn_name_sym)
+                    var is_generic_struct_method = false
+                    for gsm_i in 0..fn_name_str.len() as i32:
+                        if fn_name_str.byte_at(gsm_i as i64) == 46:
+                            let owner_name = fn_name_str.slice(0, gsm_i as i64)
+                            let owner_sym = self.pool_intern(owner_name)
+                            if self.type_decl_nodes.contains(owner_sym):
+                                let td_node = self.type_decl_nodes.get(owner_sym).unwrap()
+                                if self.type_decl_tp_count(td_node) > 0:
+                                    let gsm_p_start = self.ast.fn_meta_param_start(meta)
+                                    let gsm_p_count = self.ast.fn_meta_param_count(meta)
+                                    if gsm_p_count > 0:
+                                        let p0_tn = self.ast.get_extra(gsm_p_start + 1)
+                                        if p0_tn != 0 and self.ast.kind(p0_tn) == NK_TYPE_GENERIC:
+                                            is_generic_struct_method = true
+                            break
+                    if not is_generic_struct_method:
+                        self.check_fn_body(decl)
 
 fn Sema.check_fn_body(self: Sema, node: i32):
     let fn_name = self.ast.get_data0(node)

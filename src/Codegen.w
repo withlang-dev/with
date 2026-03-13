@@ -360,7 +360,12 @@ type Codegen = {
     // Generic functions/structs: sym → node
     generic_fns: HashMap[i32, i32],
     generic_structs: HashMap[i32, i32],
+    generic_struct_methods: HashMap[i32, i32],
     mono_struct_base: HashMap[i32, i32],
+    mono_struct_tp_starts: HashMap[i32, i32],
+    mono_struct_tp_counts: HashMap[i32, i32],
+    mono_struct_tp_flat_syms: Vec[i32],
+    mono_struct_tp_flat_types: Vec[i64],
 
     // Monomorphization cache: mangled_hash → value/type
     mono_values: HashMap[i64, i64],
@@ -618,7 +623,12 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         disc_enum_variant_payloads: Vec.new(),
         generic_fns: HashMap.new(),
         generic_structs: HashMap.new(),
+        generic_struct_methods: HashMap.new(),
         mono_struct_base: HashMap.new(),
+        mono_struct_tp_starts: HashMap.new(),
+        mono_struct_tp_counts: HashMap.new(),
+        mono_struct_tp_flat_syms: Vec.new(),
+        mono_struct_tp_flat_types: Vec.new(),
         mono_values: HashMap.new(),
         mono_types: HashMap.new(),
         type_aliases: HashMap.new(),
@@ -2614,6 +2624,31 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             method_owner_sym = self.intern.intern(name_str.slice(0, di as i64))
             break
 
+    // Defer methods on generic structs that use struct type params
+    if method_owner_sym != 0:
+        let gs_decl_opt = self.generic_structs.get(method_owner_sym)
+        if gs_decl_opt.is_some():
+            let struct_decl = gs_decl_opt.unwrap()
+            let stp_count = self.type_decl_tp_count(struct_decl)
+            if stp_count > 0 and param_count > 0:
+                let p0_tn = self.pool.get_extra(param_start + 1)
+                if p0_tn != 0 and self.pool.kind(p0_tn) == NK_TYPE_GENERIC:
+                    let p0_extra = self.pool.get_data1(p0_tn)
+                    let p0_count = self.pool.get_data2(p0_tn)
+                    var stp_pos = self.type_decl_tp_start(struct_decl)
+                    var has_struct_tp = false
+                    for sti in 0..stp_count:
+                        let stp_sym = self.pool.get_extra(stp_pos)
+                        for gi in 0..p0_count:
+                            let arg_nd = self.pool.get_extra(p0_extra + gi)
+                            if self.pool.kind(arg_nd) == NK_TYPE_NAMED and self.pool.get_data0(arg_nd) == stp_sym:
+                                has_struct_tp = true
+                        let bc = self.pool.get_extra(stp_pos + 1)
+                        stp_pos = stp_pos + 2 + bc
+                    if has_struct_tp:
+                        self.generic_struct_methods.insert(name_sym, fn_node)
+                        return
+
     // Set method owner before resolving return type so Self can resolve
     let saved_owner = self.current_method_owner_sym
     if method_owner_sym != 0:
@@ -3088,6 +3123,12 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
 
     self.predeclare_struct_type(mono_sym)
     self.mono_struct_base.insert(mono_sym, name_sym)
+    let tp_flat_start = self.mono_struct_tp_flat_syms.len() as i32
+    for ti in 0..tp_count:
+        self.mono_struct_tp_flat_syms.push(tp_syms.get(ti as i64))
+        self.mono_struct_tp_flat_types.push(arg_types.get(ti as i64))
+    self.mono_struct_tp_starts.insert(mono_sym, tp_flat_start)
+    self.mono_struct_tp_counts.insert(mono_sym, tp_count)
     let mono_idx = self.struct_type_map.get(mono_sym).unwrap()
     let mono_ty = self.struct_llvm_types.get(mono_idx as i64)
 
@@ -3137,6 +3178,231 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
     self.type_bindings_len = saved_bind_len
 
     mono_ty
+
+// ── Monomorphize generic struct method ───────────────────────────
+// Compiles a method body with the struct's type params bound to concrete types.
+// Called lazily when the method is first invoked on a monomorphized struct.
+
+fn Codegen.monomorphize_struct_method(self: Codegen, mono_type_sym: i32, method_name: str, decl: i32, obj: i64, obj_node: i32, obj_ty: i64, args_start: i32, arg_count: i32, call_node: i32) -> i64:
+    let tp_start_opt = self.mono_struct_tp_starts.get(mono_type_sym)
+    if not tp_start_opt.is_some():
+        with_eprintln("error: no type param bindings for monomorphized struct")
+        self.had_error = 1
+        return wl_get_undef(wl_i32_type(self.context))
+    let tp_flat_start = tp_start_opt.unwrap()
+    let tp_count = self.mono_struct_tp_counts.get(mono_type_sym).unwrap()
+
+    let mono_type_name = self.intern.resolve(mono_type_sym)
+    let mangled = mono_type_name ++ "." ++ method_name
+    let mono_sym = self.intern.intern(mangled)
+
+    // Check cache — method already monomorphized for this struct instantiation
+    let cached_fv = self.fn_values.get(mono_sym)
+    let cached_ft = self.fn_fn_types.get(mono_sym)
+    if cached_fv.is_some() and cached_ft.is_some():
+        let args: Vec[i64] = Vec.new()
+        let is_ref = self.fn_ref_param_starts.get(mono_sym).is_some()
+        if is_ref:
+            args.push(self.get_mutable_receiver_ptr(obj_node, obj, obj_ty))
+        else:
+            args.push(obj)
+        for ai in 0..arg_count:
+            let arg_node = self.pool.get_extra(args_start + ai)
+            args.push(self.gen_expr(arg_node))
+        let coerced = self.coerce_call_args_for_fn_value(mono_sym, cached_fv.unwrap() as i64, args_start, 1, args, arg_count + 1, "method " ++ mangled, call_node)
+        return wl_build_call(self.builder, cached_ft.unwrap() as i64, cached_fv.unwrap() as i64, vec_data_i64(&coerced), arg_count + 1)
+
+    // Set up type bindings from the monomorphized struct
+    let saved_bind_syms = self.type_binding_syms
+    let saved_bind_tys = self.type_binding_types
+    let saved_bind_len = self.type_bindings_len
+    let fresh_bind_syms: Vec[i32] = Vec.new()
+    let fresh_bind_tys: Vec[i64] = Vec.new()
+    self.type_binding_syms = fresh_bind_syms
+    self.type_binding_types = fresh_bind_tys
+    self.type_bindings_len = 0
+    for ti in 0..tp_count:
+        self.type_binding_syms.push(self.mono_struct_tp_flat_syms.get((tp_flat_start + ti) as i64))
+        self.type_binding_types.push(self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64))
+        self.type_bindings_len = self.type_bindings_len + 1
+
+    let meta = self.pool.find_fn_meta(decl)
+    let ret_type_node = self.pool.fn_meta_ret(meta)
+    let param_start = self.pool.fn_meta_param_start(meta)
+    let param_count = self.pool.fn_meta_param_count(meta)
+    let body_node = self.pool.get_data1(decl)
+
+    // Resolve param and return types with type bindings active
+    let mono_param_types: Vec[i64] = Vec.new()
+    var has_ref_self = false
+    for pi in 0..param_count:
+        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        if p_type_node != 0:
+            var p_ty = self.resolve_type(p_type_node)
+            if p_ty == 0:
+                p_ty = wl_i32_type(self.context)
+            // Methods pass struct self as pointer
+            if pi == 0:
+                let p_kind = self.pool.kind(p_type_node)
+                if p_kind == NK_TYPE_GENERIC or p_kind == NK_TYPE_NAMED:
+                    let p_name_sym = self.pool.get_data0(p_type_node)
+                    let st_opt = self.struct_type_map.get(p_name_sym)
+                    if not st_opt.is_some():
+                        // Check for monomorphized struct
+                        let base = self.mono_struct_base.get(p_name_sym)
+                        if not base.is_some():
+                            // It's a generic self param — use the monomorphized struct type as pointer
+                            has_ref_self = true
+                            p_ty = wl_ptr_type(self.context)
+                    else:
+                        has_ref_self = true
+                        p_ty = wl_ptr_type(self.context)
+            mono_param_types.push(p_ty)
+        else:
+            mono_param_types.push(wl_i32_type(self.context))
+
+    let mono_ret_ty_raw = self.resolve_type(ret_type_node)
+    let mono_ret_ty = if mono_ret_ty_raw != 0: mono_ret_ty_raw else: wl_i32_type(self.context)
+
+    let mono_ft = wl_function_type(mono_ret_ty, vec_data_i64(&mono_param_types), param_count, 0)
+    let mono_fn = wl_add_function(self.llmod, mangled, mono_ft)
+    self.fn_values.insert(mono_sym, mono_fn)
+    self.fn_fn_types.insert(mono_sym, mono_ft)
+    if has_ref_self:
+        self.fn_ref_param_starts.insert(mono_sym, 0)
+
+    // Save and set up fresh function scope
+    let saved_fn = self.current_function
+    let saved_ret = self.current_ret_type
+    let saved_owner = self.current_method_owner_sym
+    let saved_allocas = self.local_allocas
+    let saved_types = self.local_types
+    let saved_muts = self.local_muts
+    let saved_fn_sigs = self.local_fn_sigs
+    let saved_pointees = self.local_pointee_structs
+    let saved_task_locals = self.task_locals
+    let saved_trait_locals = self.trait_locals
+    let saved_trait_concrete = self.trait_local_concrete_types
+    let saved_scope_syms = self.scope_local_syms
+    let saved_scope_allocas = self.scope_local_allocas
+    let saved_scope_types = self.scope_local_types
+    let saved_scope_count = self.scope_local_count
+    let saved_defer = self.defer_stack
+    let saved_errdefer = self.errdefer_stack
+    let saved_enum_local_types = self.enum_local_types
+    let saved_sema_local_types = self.local_sema_types
+    let saved_expected = self.expected_type
+    let saved_expected_node = self.expected_type_node
+    let saved_tail_bb = self.tailrec_body_bb
+    let saved_tail_sym = self.tailrec_fn_sym
+    let saved_tail_allocas = self.tailrec_param_allocas
+    let saved_loops = self.capture_loop_state()
+    let saved_bb = wl_get_insert_block(self.builder)
+
+    self.current_function = mono_fn
+    self.current_ret_type = mono_ret_ty
+    self.current_method_owner_sym = mono_type_sym
+    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
+    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_pointees: HashMap[i32, i32] = HashMap.new()
+    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_concrete: HashMap[i32, i32] = HashMap.new()
+    let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
+    let fresh_scope_syms: Vec[i32] = Vec.new()
+    let fresh_scope_allocas: Vec[i64] = Vec.new()
+    let fresh_scope_types: Vec[i64] = Vec.new()
+    let fresh_defer_stack: Vec[i32] = Vec.new()
+    let fresh_errdefer_stack: Vec[i32] = Vec.new()
+    let fresh_tail_allocas: Vec[i64] = Vec.new()
+    self.local_allocas = fresh_local_allocas
+    self.local_types = fresh_local_types
+    self.local_muts = fresh_local_muts
+    self.local_fn_sigs = fresh_local_fn_sigs
+    self.local_pointee_structs = fresh_local_pointees
+    self.task_locals = fresh_task_locals
+    self.trait_locals = fresh_trait_locals
+    self.trait_local_concrete_types = fresh_trait_concrete
+    self.enum_local_types = fresh_enum_local_types
+    self.scope_local_syms = fresh_scope_syms
+    self.scope_local_allocas = fresh_scope_allocas
+    self.scope_local_types = fresh_scope_types
+    self.scope_local_count = 0
+    self.defer_stack = fresh_defer_stack
+    self.errdefer_stack = fresh_errdefer_stack
+    self.expected_type = mono_ret_ty
+    self.expected_type_node = 0
+    self.tailrec_body_bb = 0
+    self.tailrec_fn_sym = 0
+    self.tailrec_param_allocas = fresh_tail_allocas
+    self.reset_loop_state()
+
+    let entry = wl_append_bb(self.context, mono_fn, "entry")
+    wl_position_at_end(self.builder, entry)
+    for pi in 0..param_count:
+        let p_name = self.pool.get_extra(param_start + pi * 2)
+        let p_val = wl_get_param(mono_fn, pi)
+        let p_ty = wl_type_of(p_val)
+        if pi == 0 and has_ref_self:
+            // Self param is a pointer to the struct — record it directly
+            self.record_local(p_name, p_val, obj_ty, 1)
+        else:
+            let p_alloca = wl_build_alloca(self.builder, p_ty)
+            wl_build_store(self.builder, p_val, p_alloca)
+            self.record_local(p_name, p_alloca, p_ty, 1)
+
+    let body_val = self.gen_expr(body_node)
+    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
+        if mono_ret_ty == wl_void_type(self.context):
+            let _ = wl_build_ret_void(self.builder)
+        else:
+            let _ = wl_build_ret(self.builder, self.coerce_value_to_type(body_val, mono_ret_ty))
+
+    // Restore all saved state
+    self.current_function = saved_fn
+    self.current_ret_type = saved_ret
+    self.current_method_owner_sym = saved_owner
+    self.local_allocas = saved_allocas
+    self.local_types = saved_types
+    self.local_muts = saved_muts
+    self.local_fn_sigs = saved_fn_sigs
+    self.local_pointee_structs = saved_pointees
+    self.task_locals = saved_task_locals
+    self.trait_locals = saved_trait_locals
+    self.trait_local_concrete_types = saved_trait_concrete
+    self.enum_local_types = saved_enum_local_types
+    self.local_sema_types = saved_sema_local_types
+    self.scope_local_syms = saved_scope_syms
+    self.scope_local_allocas = saved_scope_allocas
+    self.scope_local_types = saved_scope_types
+    self.scope_local_count = saved_scope_count
+    self.defer_stack = saved_defer
+    self.errdefer_stack = saved_errdefer
+    self.expected_type = saved_expected
+    self.expected_type_node = saved_expected_node
+    self.tailrec_body_bb = saved_tail_bb
+    self.tailrec_fn_sym = saved_tail_sym
+    self.tailrec_param_allocas = saved_tail_allocas
+    self.restore_loop_state(saved_loops)
+    self.type_binding_syms = saved_bind_syms
+    self.type_binding_types = saved_bind_tys
+    self.type_bindings_len = saved_bind_len
+    if saved_bb != 0:
+        wl_position_at_end(self.builder, saved_bb)
+
+    // Now call the monomorphized method
+    let call_args: Vec[i64] = Vec.new()
+    if has_ref_self:
+        call_args.push(self.get_mutable_receiver_ptr(obj_node, obj, obj_ty))
+    else:
+        call_args.push(obj)
+    for ai in 0..arg_count:
+        let arg_node = self.pool.get_extra(args_start + ai)
+        call_args.push(self.gen_expr(arg_node))
+    let coerced = self.coerce_call_args_for_fn_value(mono_sym, mono_fn, args_start, 1, call_args, arg_count + 1, "method " ++ mangled, call_node)
+    wl_build_call(self.builder, mono_ft, mono_fn, vec_data_i64(&coerced), arg_count + 1)
 
 // ── Build Option Some/None ────────────────────────────────────────
 
@@ -7832,11 +8098,17 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
         if not fv_early.is_some():
             let base_opt = self.mono_struct_base.get(lookup_type_sym)
             if base_opt.is_some():
-                let base_name = self.intern.resolve(base_opt.unwrap())
+                let base_sym = base_opt.unwrap()
+                let base_name = self.intern.resolve(base_sym)
                 let base_mangled = base_name ++ "." ++ method_name
                 fn_sym_early = self.intern.intern(base_mangled)
                 fv_early = self.fn_values.get(fn_sym_early)
                 ft_early = self.fn_fn_types.get(fn_sym_early)
+                // If base method not compiled, try generic struct method monomorphization
+                if not fv_early.is_some():
+                    let gsm_opt = self.generic_struct_methods.get(fn_sym_early)
+                    if gsm_opt.is_some():
+                        return self.monomorphize_struct_method(lookup_type_sym, method_name, gsm_opt.unwrap(), obj, obj_node, obj_ty, args_start, arg_count, node)
         if fv_early.is_some() and ft_early.is_some():
             let args: Vec[i64] = Vec.new()
             let is_ref = self.fn_ref_param_starts.get(fn_sym_early).is_some()
