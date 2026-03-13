@@ -494,6 +494,10 @@ type Codegen = {
     codegen_error_detail: str,
     had_error: i32,
 
+    // Monomorphization context (for duck-typing error messages)
+    mono_inst_name: i32,
+    mono_inst_node: i32,
+
     // Generator state
     gen_state_ptr: i64,
     gen_state_type: i64,
@@ -6288,6 +6292,27 @@ fn Codegen.op_method_name(self: Codegen, op: i32) -> str:
     if op == OP_GTE: return "ge"
     ""
 
+fn Codegen.op_symbol(self: Codegen, op: i32) -> str:
+    if op == OP_ADD or op == OP_ADD_WRAP: return "+"
+    if op == OP_SUB or op == OP_SUB_WRAP: return "-"
+    if op == OP_MUL or op == OP_MUL_WRAP: return "*"
+    if op == OP_DIV: return "/"
+    if op == OP_MOD: return "%"
+    if op == OP_EQ: return "=="
+    if op == OP_NEQ: return "!="
+    if op == OP_LT: return "<"
+    if op == OP_GT: return ">"
+    if op == OP_LTE: return "<="
+    if op == OP_GTE: return ">="
+    if op == OP_BIT_AND: return "&"
+    if op == OP_BIT_OR: return "|"
+    if op == OP_BIT_XOR: return "^"
+    if op == OP_SHL: return "<<"
+    if op == OP_SHR: return ">>"
+    if op == OP_AND: return "&&"
+    if op == OP_OR: return "||"
+    "?"
+
 fn Codegen.try_op_overload(self: Codegen, op: i32, lhs_node: i32, rhs_node: i32) -> i64:
     let method_name = self.op_method_name(op)
     if method_name.len() == 0:
@@ -6392,6 +6417,17 @@ fn Codegen.gen_binary(self: Codegen, node: i32) -> i64:
             if cmp_kind == wl_struct_type_kind() or cmp_kind == wl_array_type_kind():
                 return self.compare_aggregate_eq(l, r, op)
 
+    // Non-integer, non-float types cannot use arithmetic/bitwise operators
+    if lk != wl_integer_type_kind():
+        let op_str = self.op_symbol(op)
+        let type_str = self.llvm_type_mangle(lty)
+        var msg = "error: unsupported operator '" ++ op_str ++ "' for type '" ++ type_str ++ "'"
+        if self.mono_inst_name != 0:
+            msg = msg ++ " in instantiation of '" ++ self.intern.resolve(self.mono_inst_name) ++ "'"
+        with_eprintln(msg)
+        self.had_error = 1
+        return wl_get_undef(wl_i32_type(self.context))
+
     // Integer operations
     if op == OP_ADD or op == OP_ADD_WRAP: return wl_build_add(self.builder, l, r)
     if op == OP_SUB or op == OP_SUB_WRAP: return wl_build_sub(self.builder, l, r)
@@ -6410,7 +6446,13 @@ fn Codegen.gen_binary(self: Codegen, node: i32) -> i64:
     if op == OP_SHL: return wl_build_shl(self.builder, l, r)
     if op == OP_SHR: return wl_build_ashr(self.builder, l, r)
 
-    with_eprintln("warning: [gen-ident] unresolved identifier")
+    let op_str = self.op_symbol(op)
+    let type_str = self.llvm_type_mangle(lty)
+    var msg = "error: unsupported operator '" ++ op_str ++ "' for type '" ++ type_str ++ "'"
+    if self.mono_inst_name != 0:
+        msg = msg ++ " in instantiation of '" ++ self.intern.resolve(self.mono_inst_name) ++ "'"
+    with_eprintln(msg)
+    self.had_error = 1
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.gen_float_binary(self: Codegen, op: i32, lhs: i64, rhs: i64) -> i64:
@@ -7748,6 +7790,11 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
             if dyn_trait != 0:
                 self.record_trait_local(p_name, dyn_trait)
 
+    let saved_mono_name = self.mono_inst_name
+    let saved_mono_node = self.mono_inst_node
+    self.mono_inst_name = mono_sym
+    self.mono_inst_node = call_node
+
     let body_val = self.gen_expr(body_node)
     if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
         if mono_ret_ty == wl_void_type(self.context):
@@ -7755,6 +7802,8 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
         else:
             let _ = wl_build_ret(self.builder, self.coerce_value_to_type(body_val, mono_ret_ty))
 
+    self.mono_inst_name = saved_mono_name
+    self.mono_inst_node = saved_mono_node
     self.current_function = saved_fn
     self.current_ret_type = saved_ret
     self.current_method_owner_sym = saved_owner
@@ -8312,7 +8361,12 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
                     return direct
             return self.gen_dyn_dispatch(obj, trait_sym.unwrap(), method_lookup_sym, args_start, arg_count)
 
-    with_eprintln("warning: [gen_method_call] no dispatch for method '" ++ method_name ++ "' on node kind=" ++ int_to_string(self.pool.kind(obj_node)))
+    let obj_type_str = self.llvm_type_mangle(obj_ty)
+    var method_msg = "error: no method '" ++ method_name ++ "' on type '" ++ obj_type_str ++ "'"
+    if self.mono_inst_name != 0:
+        method_msg = method_msg ++ " in instantiation of '" ++ self.intern.resolve(self.mono_inst_name) ++ "'"
+    with_eprintln(method_msg)
+    self.had_error = 1
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.get_mutable_receiver_ptr(self: Codegen, recv_node: i32, recv_val: i64, recv_ty: i64) -> i64:
