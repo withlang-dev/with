@@ -360,6 +360,7 @@ type Codegen = {
     // Generic functions/structs: sym → node
     generic_fns: HashMap[i32, i32],
     generic_structs: HashMap[i32, i32],
+    mono_struct_base: HashMap[i32, i32],
 
     // Monomorphization cache: mangled_hash → value/type
     mono_values: HashMap[i64, i64],
@@ -617,6 +618,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         disc_enum_variant_payloads: Vec.new(),
         generic_fns: HashMap.new(),
         generic_structs: HashMap.new(),
+        mono_struct_base: HashMap.new(),
         mono_values: HashMap.new(),
         mono_types: HashMap.new(),
         type_aliases: HashMap.new(),
@@ -3088,6 +3090,7 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
         return self.struct_llvm_types.get(mono_idx_opt.unwrap() as i64)
 
     self.predeclare_struct_type(mono_sym)
+    self.mono_struct_base.insert(mono_sym, name_sym)
     let mono_idx = self.struct_type_map.get(mono_sym).unwrap()
     let mono_ty = self.struct_llvm_types.get(mono_idx as i64)
 
@@ -7825,9 +7828,18 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
     if lookup_type_sym != 0:
         let type_name_early = self.intern.resolve(lookup_type_sym)
         let mangled_early = type_name_early ++ "." ++ method_name
-        let fn_sym_early = self.intern.intern(mangled_early)
-        let fv_early = self.fn_values.get(fn_sym_early)
-        let ft_early = self.fn_fn_types.get(fn_sym_early)
+        var fn_sym_early = self.intern.intern(mangled_early)
+        var fv_early = self.fn_values.get(fn_sym_early)
+        var ft_early = self.fn_fn_types.get(fn_sym_early)
+        // Fallback: if this is a monomorphized generic struct, try base name
+        if not fv_early.is_some():
+            let base_opt = self.mono_struct_base.get(lookup_type_sym)
+            if base_opt.is_some():
+                let base_name = self.intern.resolve(base_opt.unwrap())
+                let base_mangled = base_name ++ "." ++ method_name
+                fn_sym_early = self.intern.intern(base_mangled)
+                fv_early = self.fn_values.get(fn_sym_early)
+                ft_early = self.fn_fn_types.get(fn_sym_early)
         if fv_early.is_some() and ft_early.is_some():
             let args: Vec[i64] = Vec.new()
             let is_ref = self.fn_ref_param_starts.get(fn_sym_early).is_some()
