@@ -65,23 +65,37 @@ fn has_emit_c_flag(argc: i32) -> bool:
         i = i + 1
     false
 
+fn parse_output_arg(argc: i32) -> str:
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == "-o":
+            if i + 1 < argc:
+                return with_arg_at(i + 1)
+            return ""
+        if has_output_prefix(arg):
+            return arg.slice(9, arg.len())
+        i = i + 1
+    ""
+
 fn run_build(argc: i32) -> i32:
     let source_file = parse_source_arg(argc)
     if source_file == "":
         with_eprintln("error: 'build' requires a source file argument")
         return 1
     let emit_c_mode = has_emit_c_flag(argc)
+    let output_path = parse_output_arg(argc)
     var comp = Compilation.init()
     comp.configure(0, false, false)
     if emit_c_mode:
-        let c_path = comp.emit_c(source_file, "")
+        let c_path = comp.emit_c(source_file, output_path)
         if c_path == "":
             with_eprintln("error: build failed")
             return 1
         with_eprintln("emitted C: " ++ c_path)
         comp.print_warnings()
         return 0
-    let bin_path = comp.build_binary(source_file)
+    let bin_path = comp.build_binary_to_path(source_file, output_path)
     if bin_path == "":
         with_eprintln("error: build failed")
         return 1

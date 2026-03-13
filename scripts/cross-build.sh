@@ -58,11 +58,11 @@ SANITIZED_TARGET="${TARGET_TRIPLE//\//_}"
 SANITIZED_TARGET="${SANITIZED_TARGET//:/_}"
 SANITIZED_TARGET="${SANITIZED_TARGET//-/_}"
 
-mkdir -p "${ROOT_DIR}/.with/build/cross"
-C_OUT="${ROOT_DIR}/.with/build/cross/${SOURCE_STEM}.${SANITIZED_TARGET}.c"
+mkdir -p "${ROOT_DIR}/out/build/cross"
+C_OUT="${ROOT_DIR}/out/build/cross/${SOURCE_STEM}.${SANITIZED_TARGET}.c"
 
 if [ -z "$OUTPUT_BIN" ]; then
-  OUTPUT_BIN="${ROOT_DIR}/.with/build/cross/${SOURCE_STEM}.${SANITIZED_TARGET}"
+  OUTPUT_BIN="${ROOT_DIR}/out/build/cross/${SOURCE_STEM}.${SANITIZED_TARGET}"
 fi
 
 echo "[cross-build] compiler: $COMPILER"

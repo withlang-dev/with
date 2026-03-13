@@ -140,37 +140,50 @@ fn Compilation.emit_ir(self: Compilation, pool: AstPool) -> bool:
         return false
     self.zcu.emit_ir_backend(self.active_pool(pool), self.config.opt_level)
 
+fn compilation_cleanup_build_products(obj_path: str, bin_path: str):
+    if obj_path.len() > 0:
+        let _ = ("rm -f " ++ obj_path) |> with_system
+    if bin_path.len() > 0:
+        let _ = ("rm -f " ++ bin_path) |> with_system
+        let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+
 fn Compilation.build_binary(self: Compilation, source_path: str) -> str:
-    let dir = link_stage_dirname(source_path)
-    self.build_binary_at(source_path, dir)
+    self.build_binary_to_path(source_path, link_stage_output_path_for_source(source_path))
 
 fn Compilation.build_binary_at(self: Compilation, source_path: str, output_dir: str) -> str:
     let stem = link_stage_source_stem(source_path)
-    let obj_path = output_dir ++ "/" ++ stem ++ ".o"
-    let bin_path = output_dir ++ "/" ++ stem
+    self.build_binary_to_path(source_path, output_dir ++ "/" ++ stem)
+
+fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_path: str) -> str:
+    if bin_path.len() == 0:
+        return self.build_binary(source_path)
+    let obj_path = bin_path ++ ".o"
+    let output_dir = link_stage_dirname(bin_path)
+    let _ = ("mkdir -p " ++ output_dir) |> with_system
+    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
 
     let pool = self.compile_file(source_path)
-    compilation_debug_init("build_binary_at:compile_file done decls=" ++ int_to_string(pool.decl_count()))
+    compilation_debug_init("build_binary_to_path:compile_file done decls=" ++ int_to_string(pool.decl_count()))
     if pool.decl_count() == 0:
         return ""
     if not self.ensure_codegen_mir(pool):
-        compilation_debug_init("build_binary_at:ensure_codegen_mir FAILED")
-        let _ = ("rm -f " ++ obj_path) |> with_system
+        compilation_debug_init("build_binary_to_path:ensure_codegen_mir FAILED")
+        compilation_cleanup_build_products(obj_path, "")
         return ""
     let active_pool: AstPool = self.active_pool(pool)
     let opt_level = self.config.opt_level
     let requires_async_runtime = self.zcu.last_async_mir_module.requires_async_runtime()
-    compilation_debug_pool_flow("build_binary_at:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
-    compilation_debug_init("build_binary_at:compile_to_object_backend")
+    compilation_debug_pool_flow("build_binary_to_path:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
+    compilation_debug_init("build_binary_to_path:compile_to_object_backend")
     let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info)
     if backend_rc != 0:
-        compilation_debug_init("build_binary_at:backend FAILED rc=" ++ int_to_string(backend_rc))
-        let _ = ("rm -f " ++ obj_path) |> with_system
+        compilation_debug_init("build_binary_to_path:backend FAILED rc=" ++ int_to_string(backend_rc))
+        compilation_cleanup_build_products(obj_path, "")
         return ""
-    compilation_debug_init("build_binary_at:linking")
+    compilation_debug_init("build_binary_to_path:linking")
     if not link_stage_link_object_to_binary(obj_path, bin_path, self.zcu.last_link_lib_names, requires_async_runtime):
-        compilation_debug_init("build_binary_at:link FAILED")
-        let _ = ("rm -f " ++ obj_path) |> with_system
+        compilation_debug_init("build_binary_to_path:link FAILED")
+        compilation_cleanup_build_products(obj_path, bin_path)
         return ""
     // Generate .dSYM bundle for macOS debug info (DWARF stays in .o until dsymutil runs)
     if self.config.debug_info:
@@ -189,7 +202,8 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
 
     var final_output = output_path
     if final_output.len() == 0:
-        final_output = "out/" ++ link_stage_source_stem(source_path) ++ ".c"
+        final_output = link_stage_output_path_for_source(source_path) ++ ".c"
+    let _ = ("mkdir -p " ++ link_stage_dirname(final_output)) |> with_system
 
     let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, self.zcu.pool, self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text)
     if emitted.ok == 0:

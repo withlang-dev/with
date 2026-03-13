@@ -235,7 +235,7 @@ fn run_cli(argc: i32) -> i32:
             return 1
         return dump_tokens(find_source_arg(argc), deterministic_mode)
     if cli_command(argc) == "test":
-        return run_test_command(argc, opt_level, no_std, alloc_mode, prelude_mode)
+        return run_test_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
     if cli_command(argc) == "version" or cli_command(argc) == "--version":
         print("with 0.0.1\n")
         return 0
@@ -315,6 +315,12 @@ fn find_output_arg(argc: i32) -> str:
         i = i + 1
     ""
 
+fn cleanup_binary_artifacts(bin_path: str):
+    if bin_path.len() == 0:
+        return
+    let _ = ("rm -f " ++ bin_path) |> with_system
+    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+
 fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
     if source_file == "":
         with_eprintln("error: 'build' requires a source file argument")
@@ -333,7 +339,7 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
         with_eprintln("  zig cc -target <triple> -I runtime " ++ c_path ++ " runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_<arch>.s -o <output>")
         comp.print_warnings()
         return 0
-    let bin_path = comp.build_binary(source_file)
+    let bin_path = comp.build_binary_to_path(source_file, output_path)
     if bin_path == "":
         with_eprintln("error: build failed")
         return 1
@@ -353,7 +359,9 @@ fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: b
         with_eprintln("error: run failed")
         return 1
     comp.print_warnings()
-    return with_system(bin_path)
+    let run_rc = with_system(bin_path)
+    cleanup_binary_artifacts(bin_path)
+    run_rc
 
 fn dump_ast(source_file: str, no_std: bool, alloc_mode: bool, include_header: bool) -> i32:
     let text = with_fs_read_file(source_file)
@@ -518,7 +526,7 @@ fn dump_tag_name(tag: i32, lexeme: str) -> str:
         return "'" ++ lexeme ++ "'"
     return tag_name(tag)
 
-fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
+fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
     // Find test file/dir argument
     let target = find_source_arg(argc)
     if target == "":
@@ -528,19 +536,21 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
+    comp.set_debug_info(debug_info)
     let bin_path = comp.build_binary(target)
     if bin_path == "":
         with_eprintln("error: test build failed")
         return 1
     let run_rc = with_system(bin_path)
+    cleanup_binary_artifacts(bin_path)
     run_rc
 
 fn run_clean_command -> i32:
-    let result = with_system("rm -rf .with")
+    let result = with_system("rm -rf out .with")
     if result != 0:
         with_eprintln("error: clean failed")
         return 1
-    print("cleaned .with/\n")
+    print("cleaned out/ and legacy .with/\n")
     0
 
 fn print_usage:
@@ -551,7 +561,7 @@ fn print_usage:
     print("  run [file.w]      Build + run a source file\n")
     print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir/--dump-async-mir)\n")
     print("  test [file.w]     Run tests\n")
-    print("  clean             Delete .with/ artifacts\n")
+    print("  clean             Delete out/ and legacy .with/ artifacts\n")
     print("  ir <file.w>       Dump LLVM IR (debug)\n")
     print("  ast <file.w>      Parse and dump the AST (debug)\n")
     print("  tokens <file.w>   Lex and dump tokens (debug)\n")

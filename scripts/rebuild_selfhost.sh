@@ -12,11 +12,15 @@ OUT_DIR="${ROOT_DIR}/out"
 OUT_BIN_DIR="${OUT_DIR}/bin"
 OUT_LIB_DIR="${OUT_DIR}/lib"
 OUT_LOG_DIR="${OUT_DIR}/log"
+OUT_TMP_DIR="${OUT_DIR}/tmp"
 OUT_RUNTIME_LINK="${OUT_BIN_DIR}/runtime"
 STAGE1_BIN="${OUT_BIN_DIR}/with-stage1"
 STAGE2_BIN="${OUT_BIN_DIR}/with-stage2"
 STAGE3_BIN="${OUT_BIN_DIR}/with-stage3"
 CANONICAL_BIN="${OUT_BIN_DIR}/with"
+
+mkdir -p "${OUT_TMP_DIR}"
+export TMPDIR="${OUT_TMP_DIR}"
 
 if command -v timeout >/dev/null 2>&1; then
   TIMEOUT_BIN="timeout"
@@ -234,7 +238,7 @@ run_local_build() {
   local entry_name
   local entry_stem
 
-  tmp_dir="$(mktemp -d /tmp/with-${stage_name}-XXXXXX)"
+  tmp_dir="$(mktemp -d "${OUT_TMP_DIR}/with-${stage_name}-XXXXXX")"
   tmp_bin="${tmp_dir}/with"
   compiler_dir="$(cd "$(dirname "$compiler_bin")" && pwd)"
   entry_name="$(basename "${source_entry}")"
@@ -386,7 +390,7 @@ EOF
   fi
 
   local staged_bin
-  staged_bin="$(mktemp /tmp/with-${stage_name}-bin.XXXXXX)"
+  staged_bin="$(mktemp "${OUT_TMP_DIR}/with-${stage_name}-bin.XXXXXX")"
   cp "$tmp_main" "$staged_bin"
   chmod +x "$staged_bin"
   LAST_STAGE_BIN="$staged_bin"
@@ -491,7 +495,7 @@ sync_lib_artifacts() {
   refresh_lib_objects
 
   case "$src_lib" in
-    /tmp/with-stage*/.with/build/runtime|/tmp/with-stage*/out/lib)
+    "${OUT_TMP_DIR}"/with-stage*/.with/build/runtime|"${OUT_TMP_DIR}"/with-stage*/out/lib)
       rm -rf "$(dirname "$(dirname "$src_lib")")" >/dev/null 2>&1 || true
       ;;
   esac
@@ -576,7 +580,7 @@ esac
 
 if [ "$MODE" = "stage2" ] || [ "$MODE" = "stage3" ] || [ "$MODE" = "all" ]; then
   if [ -x "${STAGE2_BIN}" ]; then
-    tmpd="$(mktemp -d /tmp/with-ver-XXXXXX)"
+    tmpd="$(mktemp -d "${OUT_TMP_DIR}/with-ver-XXXXXX")"
     tmpv="${tmpd}/with"
     cp "${STAGE2_BIN}" "$tmpv"
     chmod +x "$tmpv"

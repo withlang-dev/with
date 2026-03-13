@@ -4,296 +4,215 @@
 
 Delete the AST codegen path from `src/Codegen.w`. The compiler
 goes through MIR for all functions, no exceptions, no fallback.
-The pipeline becomes:
 
 ```
 Source → Lex → Parse → Resolve → Sema → MIR → LLVM IR → Binary
 ```
 
-There is no AST → LLVM IR path. MIR is the only input to codegen.
+---
+
+## Current State (March 2026)
+
+MIR does NOT handle everything. Discovery:
+
+- **1,217 functions** have `lowering_failed` set in MirLower.
+- Only functions passing `mir_function_is_supported` go through MIR.
+- The rest silently fall back to AST codegen.
+- Fixpoint holds because the SAME subset goes through MIR in
+  both stage2 and stage3. AST handles the rest consistently.
+- 225/225 tests pass, but most test functions compile through
+  AST, not MIR.
+
+**The blocker is MirLower, not MIR codegen.** The codegen is
+correct for what it receives. MirLower can't convert most
+functions from AST to MIR.
 
 ---
 
-## Why Now
+## Revised Plan
 
-- MIR codegen is the active path. All tests pass. Fixpoint holds.
-- The AST codegen path is dead code kept as a safety net.
-- DWARF debug info is about to be added — instrumenting dead code
-  is wasted work.
-- Every bug fix and feature addition currently has to consider
-  two codegen paths. Removing one halves the maintenance surface.
-- The quality pass manifesto says: "one source of truth per fact."
-  Two codegen paths is two sources of truth for code generation.
+### Phase 0: Audit MirLower Gaps (do first)
 
----
+Categorize the 1,217 failing functions by pattern.
 
-## What Gets Deleted
+Add instrumentation to `src/MirLower.w` that logs the AST node
+kind that caused `lowering_failed` to be set. The failures will
+cluster into a few categories. Expected top categories:
 
-The AST codegen path is everything that walks AST nodes directly
-to emit LLVM IR. This includes:
+1. **Complex match expressions** — nested patterns, guards,
+   destructuring in match arms
+2. **Closures** — capture lowering, closure body as expression
+3. **String interpolation** — desugaring to concat chains
+4. **Iterator sugar** — for-in with method iterators
+5. **Pipeline operator** — `|>` desugaring
+6. **Optional chaining** — `?.` desugaring
+7. **Async constructs** — spawn, await, async scope
+8. **Method calls with complex receivers** — chained access
+9. **Operator overloading** — trait method dispatch
+10. **Let-else** — `let x = expr else: fallback`
 
-**Top-level dispatch:**
-- `gen_function` — the AST function codegen entry point
-- `gen_function_dispatch` — the MIR-vs-AST routing logic
-  (becomes unconditional MIR dispatch)
+Track progress with a counter:
 
-**Expression emitters:**
-- `gen_expr`
-- `gen_bin_op` / `gen_binary`
-- `gen_unary`
-- `gen_call`
-- `gen_method_call`
-- `gen_field_access`
-- `gen_index`
-- `gen_cast`
-- `gen_closure` (AST path)
-- `gen_string_interp`
-- `gen_pipeline`
-- `gen_range`
-- `gen_array_lit`
-- `gen_struct_lit`
-- `gen_tuple`
-- `gen_grouped`
+```bash
+make build 2>&1 | grep "FATAL" | wc -l
+# Before: 1,217. Target: 0.
+```
 
-**Statement emitters:**
-- `gen_let_binding` (AST path)
-- `gen_assign` (AST path)
-- `gen_return` (AST path)
-- `gen_defer` / `emit_defers`
-- `gen_block` / `gen_block_discard`
+### Phase 1: Fix MirLower One Category at a Time
 
-**Control flow emitters:**
-- `gen_if_expr`
-- `gen_while`
-- `gen_loop`
-- `gen_for` / `gen_for_range` / `gen_for_iter` / `gen_for_vec`
-- `gen_match`
-- `gen_break`
-- `gen_continue`
+For each category, in order of frequency:
 
-**Sugar emitters:**
-- `gen_with_expr`
-- `gen_record_update`
-- `gen_optional_chain`
-- `gen_let_else`
-- `gen_variant_shorthand`
-- `gen_await`
-- `gen_async_block`
-- `gen_spawn`
-- `gen_async_scope`
-- `gen_select_await`
-- `gen_comptime`
-- `gen_array_comprehension`
+1. Pick the most common failure pattern.
+2. Add the lowering code in `src/MirLower.w`.
+3. `make build` — confirm fewer failures.
+4. `make fixpoint` — confirm no regressions.
+5. `./scripts/run_tests.sh` — confirm all pass.
+6. Repeat until category is empty.
 
-**Support functions that exist only for AST codegen:**
-- `gen_builtin_call` / `gen_builtin_static_call`
-- `try_op_overload` (AST path — verify MIR has equivalent)
-- `collect_captures` (AST path — verify MIR closure lowering)
-- `static_receiver_type`
-- `infer_type` / `inferExprType` (AST-based type inference)
-- Any `expected_type` threading through AST emitters
+Do not batch. One pattern at a time. The compiler is
+self-hosting — every change compiles through itself.
 
-**What stays:**
-- `gen_function_mir` — the MIR codegen entry point
-- `mir_emit_stmt` / `mir_emit_terminator`
-- `mir_eval_rvalue` / `mir_eval_operand`
-- `mir_build_bin_op` / `mir_str_concat`
-- `mir_const_value` / `mir_place_ptr`
-- All LLVM bridge calls
-- `declare_function` — function declaration is shared
-- `gen_module` — module-level orchestration (simplified)
-- `gen_module_constant` — top-level constants
-- `resolve_type` — type resolution is shared
-- Type helpers, struct layout, enum layout
-- All `wl_*` bridge wrappers
+### Phase 2: Remove `mir_function_is_supported`
 
----
+Once Phase 1 reaches 0 failures:
 
-## Preconditions
+1. Remove the `mir_function_is_supported` check.
+2. Route all functions unconditionally through MIR.
+3. `make build` — no errors.
+4. `make fixpoint`.
+5. `./scripts/run_tests.sh` — all pass.
 
-Before deleting anything, verify these are true:
+### Phase 3: Add Fatal Assertion
 
-- [ ] All 200+ tests pass with MIR codegen as the only path.
-- [ ] `make fixpoint` passes.
-- [ ] `gen_function_dispatch` never falls through to `gen_function`
-  in practice. Add a counter or log to confirm: zero AST fallbacks
-  across the full test suite and self-compilation.
-- [ ] No function in `src/*.w` (the compiler's own source) triggers
-  AST fallback.
-
-If any function still falls through to AST, that function's MIR
-lowering is incomplete. Fix MIR lowering first, don't keep AST
-as a crutch.
-
----
-
-## Execution Order
-
-One step at a time. Build and fixpoint after each step. Do not
-batch.
-
-### Step 1: Verify zero AST fallback
-
-Add a hard assertion in `gen_function_dispatch`:
+Replace AST fallback with a hard error:
 
 ```
 fn gen_function_dispatch(self: Codegen, fn_node: i32):
     let fn_sym = self.pool.get_data0(fn_node)
     let body_idx = self.mir_input.find_body(fn_sym)
-    if body_idx >= 0:
-        let body = self.mir_input.bodies.get(body_idx as i64)
-        if self.mir_function_is_supported(body):
-            self.gen_function_mir(fn_node, body)
-            return
-    // If we get here, a function has no MIR or MIR doesn't support it
-    let fn_name = self.intern.resolve(fn_sym)
-    panic("AST fallback triggered for: {fn_name}")
-```
-
-Run `make build` and `make fixpoint`. If the panic fires, fix the
-MIR gap before proceeding. If it doesn't fire, every function goes
-through MIR and the AST path is confirmed dead.
-
-### Step 2: Remove `mir_function_is_supported`
-
-Once step 1 proves every function goes through MIR, the support
-check is unnecessary. All functions are supported. Simplify:
-
-```
-fn gen_function_dispatch(self: Codegen, fn_node: i32):
-    let fn_sym = self.pool.get_data0(fn_node)
-    let body_idx = self.mir_input.find_body(fn_sym)
-    assert(body_idx >= 0, "no MIR body for function")
+    assert(body_idx >= 0, "no MIR body for: " ++ self.intern.resolve(fn_sym))
     let body = self.mir_input.bodies.get(body_idx as i64)
     self.gen_function_mir(fn_node, body)
 ```
 
-Build. Fixpoint.
+Build. Fixpoint. Full test suite. If anything panics, it's a
+MirLower gap that Phase 1 missed. Fix it before proceeding.
 
-### Step 3: Delete `gen_function`
+### Phase 4: Delete AST Codegen
 
-Remove the entire AST function codegen entry point. This is the
-big function that dispatches to all the expression/statement/
-control flow emitters. Removing it will cause compile errors
-for every AST emitter it calls — that's expected and desired.
+Only after Phase 3 proves zero AST usage.
 
-Build will fail. That's fine — proceed to step 4.
+```bash
+git tag pre-ast-removal
+```
 
-### Step 4: Delete AST expression emitters
+Delete in order, building after each step:
 
-Delete every `gen_expr`, `gen_bin_op`, `gen_call`, etc. that was
-only reachable from `gen_function`. Work through the compile
-errors from step 3. Each deleted function may reveal other
-functions that were only called from it — delete those too.
+1. `gen_function` — the AST entry point
+2. AST expression emitters (`gen_expr`, `gen_bin_op`, `gen_call`,
+   `gen_method_call`, `gen_field_access`, `gen_index`, `gen_cast`,
+   `gen_closure`, `gen_string_interp`, `gen_pipeline`, `gen_range`,
+   `gen_array_lit`, `gen_struct_lit`, `gen_tuple`, `gen_grouped`)
+3. AST statement emitters (`gen_let_binding`, `gen_assign`,
+   `gen_return`, `gen_defer`, `emit_defers`, `gen_block`,
+   `gen_block_discard`)
+4. AST control flow (`gen_if_expr`, `gen_while`, `gen_loop`,
+   `gen_for`, `gen_for_range`, `gen_for_iter`, `gen_for_vec`,
+   `gen_match`, `gen_break`, `gen_continue`)
+5. AST sugar (`gen_with_expr`, `gen_record_update`,
+   `gen_optional_chain`, `gen_let_else`, `gen_variant_shorthand`,
+   `gen_await`, `gen_async_block`, `gen_spawn`, `gen_async_scope`,
+   `gen_select_await`, `gen_comptime`, `gen_array_comprehension`)
+6. AST support (`gen_builtin_call`, `gen_builtin_static_call`,
+   `try_op_overload`, `collect_captures`, `static_receiver_type`,
+   `infer_type`, `inferExprType`)
+7. Codegen struct fields only used by AST (`expected_type`,
+   `defer_stack`, `loop_stack`, `break_stack`)
+8. `mir_function_is_supported` and all gating infrastructure
 
-Keep a running list of what you delete. If a function is called
-from BOTH the AST and MIR paths, don't delete it — it's shared
-infrastructure.
+Follow compile errors — they tell you what else to delete. If a
+function is called from both AST and MIR paths, keep it.
 
-### Step 5: Delete AST control flow emitters
-
-Delete `gen_if_expr`, `gen_while`, `gen_for`, `gen_match`,
-`gen_loop`, etc. Same process — follow the compile errors.
-
-### Step 6: Delete AST sugar emitters
-
-Delete `gen_with_expr`, `gen_record_update`, `gen_pipeline`,
-`gen_optional_chain`, etc. MIR desugars all of these before
-codegen sees them.
-
-### Step 7: Delete AST support functions
-
-Delete `gen_builtin_call`, `static_receiver_type`,
-`inferExprType`, `collect_captures` (AST path), and any
-remaining functions that only existed to support the AST
-codegen path.
-
-### Step 8: Clean up Codegen struct
-
-Remove any fields that were only used by the AST path:
-
-- `expected_type` stack/threading
-- `defer_stack` (MIR handles drops explicitly)
-- `loop_stack` / `break_stack` (MIR has explicit break blocks)
-- Any `HashMap` that tracked AST-specific state
-
-### Step 9: Remove `mir_function_is_supported` infrastructure
-
-Delete the operand checking functions, the rvalue checking
-functions, and the MIR support classification logic. All of
-it was gatekeeping for the AST fallback. With no fallback,
-no gatekeeping needed.
-
-### Step 10: Final validation
+### Phase 5: Final Validation
 
 ```bash
 make build
 make fixpoint
-./scripts/run_tests.sh    # all tests pass
-wc -l src/Codegen.w       # should be significantly smaller
+./scripts/run_tests.sh      # all pass
+wc -l src/Codegen.w         # expect 3,000-5,000 lines removed
+```
+
+Update seed:
+
+```bash
+cp out/bin/with-stage2 src/main
+cp out/bin/with-stage2 ~/.local/bin/with
 ```
 
 ---
 
-## Expected Impact
+## What NOT To Do
 
-**Lines removed:** Rough estimate 3,000-5,000 lines from
-`Codegen.w`. The AST codegen path is the largest section of
-the file. Removing it may cut the file nearly in half.
+- **Don't remove AST codegen before MirLower is complete.**
+  The agent tried this. 1,217 functions broke.
 
-**Compile speed:** Fewer lines to compile in the compiler's own
-source. The self-host chain gets faster.
+- **Don't bypass `mir_function_is_supported` as a shortcut.**
+  The check protects against real MirLower gaps. Remove it
+  only after the gaps are fixed.
 
-**Bug surface:** Every codegen bug now has one place to look.
-No more "is this the AST path or the MIR path?" debugging.
+- **Don't batch MirLower fixes.** One pattern at a time. Build
+  and fixpoint after each.
 
-**Feature velocity:** New features only need MIR lowering +
-MIR codegen. No need to implement anything in the AST path.
-
-**DWARF:** Debug info instrumentation (the next task) only needs
-to touch the MIR path. No wasted work.
+- **Don't fix MIR codegen for patterns MirLower can't produce.**
+  The codegen is fine. The lowering is the problem.
 
 ---
 
-## Risk Mitigation
+## Progress Tracking
 
-**What if a test fails after deletion?**
+```
+Phase 0: Audit
+  [ ] Add lowering failure instrumentation to MirLower
+  [ ] Categorize 1,217 failures by AST node kind
+  [ ] Rank categories by frequency
+  [ ] Document top 10 categories with counts
 
-The test was relying on AST codegen behavior that differs from
-MIR codegen. This is a MIR bug, not a reason to keep AST.
-Fix the MIR bug. Step 1 (panic on fallback) should catch these
-before deletion begins.
+Phase 1: Fix MirLower (target: 0 failures)
+  Current failure count: 1,217
+  [ ] Category 1: _____ (count: _____)
+  [ ] Category 2: _____ (count: _____)
+  [ ] Category 3: _____ (count: _____)
+  [ ] Category 4: _____ (count: _____)
+  [ ] Category 5: _____ (count: _____)
+  [ ] ...remaining categories...
 
-**What if fixpoint breaks after deletion?**
+Phase 2: Remove support check
+  [ ] Remove mir_function_is_supported
+  [ ] Build succeeds with no fallbacks
+  [ ] Fixpoint holds
 
-The deletion changed some compile-time behavior (fewer functions
-in the binary, different symbol order). Check if the break is
-in the hash (benign — the compiler binary changed because code
-was removed) or in behavior (real bug). If hash-only, rebuild
-the seed. If behavioral, revert the last deletion step and
-investigate.
+Phase 3: Assert no AST usage
+  [ ] Replace fallback with assertion
+  [ ] Build succeeds
+  [ ] Fixpoint holds
+  [ ] Full test suite passes
 
-**What if I need AST codegen back?**
+Phase 4: Delete AST codegen
+  [ ] Tag: pre-ast-removal
+  [ ] Delete gen_function
+  [ ] Delete expression emitters
+  [ ] Delete statement emitters
+  [ ] Delete control flow emitters
+  [ ] Delete sugar emitters
+  [ ] Delete support functions
+  [ ] Clean up Codegen struct
+  [ ] Delete gating infrastructure
 
-You don't. But if you're worried, tag the commit before step 3.
-`git tag pre-ast-removal`. You can always check it out. But
-you won't need to — the MIR path handles everything. That's
-what steps 1 and 2 prove before any deletion begins.
-
----
-
-## Checklist
-
-- [ ] Step 1: Panic on AST fallback — confirm zero triggers
-- [ ] Step 2: Remove `mir_function_is_supported` gating
-- [ ] Step 3: Delete `gen_function`
-- [ ] Step 4: Delete AST expression emitters
-- [ ] Step 5: Delete AST control flow emitters
-- [ ] Step 6: Delete AST sugar emitters
-- [ ] Step 7: Delete AST support functions
-- [ ] Step 8: Clean up Codegen struct fields
-- [ ] Step 9: Remove MIR support checking infrastructure
-- [ ] Step 10: Final validation — build, fixpoint, all tests pass
-- [ ] Update CONTRIBUTING.md: remove references to AST codegen path
-- [ ] Update architecture docs: pipeline is MIR-only
-- [ ] Celebrate: Codegen.w is half the size it was
+Phase 5: Validate
+  [ ] make build
+  [ ] make fixpoint
+  [ ] ./scripts/run_tests.sh — all pass
+  [ ] Update seed
+  [ ] Update CONTRIBUTING.md
+  [ ] Codegen.w line count: _____
+```
