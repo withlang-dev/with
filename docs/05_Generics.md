@@ -364,23 +364,16 @@ Implement one at a time.
 
 Currently only `VecIter_i32` exists as a concrete type.
 
-- [ ] Replace `type VecIter_i32` in `lib/std/collections.w` with
-      generic `type VecIter[T]`
-- [ ] Update `VecIter_i32.next() -> Option[i32]` to
-      `VecIter[T].next() -> Option[T]`
-- [ ] Replace `with_ptr_get_i32` with generic element access
-- [ ] Update codegen to monomorphize VecIter for each element type
-- [ ] Write test `test/cases/behav_vec_iter_generic.w`:
-      ```
-      //! expect-stdout: hello
-      //! expect-stdout: world
-      fn main:
-          let v: Vec[str] = Vec.new()
-          v.push("hello")
-          v.push("world")
-          for s in v:
-              println(s)
-      ```
+- [x] Generic struct method dispatch: `mono_struct_base` fallback in
+      `gen_method_call` allows methods defined on base generic struct
+      to be called on monomorphized instances. Test:
+      `test/cases/behav_generic_struct_method.w`
+- [x] For-loop Vec[T] iteration already works generically via
+      `gen_for_vec` (uses `with_vec_get_ptr` + `infer_vec_elem_type`)
+- [x] Test `test/cases/behav_vec_iter_generic.w` passes (added earlier)
+- [ ] Replace `type VecIter_i32` with generic `type VecIter[T]`
+      (blocked: needs generic method monomorphization for
+      `VecIter[T].next() -> Option[T]` — method body uses T)
 - [ ] `make build && make fixpoint`
 
 ### 10.2 impl IntoIter[T] for Vec[T]
