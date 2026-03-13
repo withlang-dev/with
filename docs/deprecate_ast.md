@@ -168,23 +168,77 @@ cp out/bin/with-stage2 ~/.local/bin/with
 
 ---
 
+## Audit Results (2026-03-13)
+
+Total functions in self-host build: **1,574**
+
+| Path | Count | % |
+|---|---|---|
+| MIR codegen (working) | 151 | 9.6% |
+| AST fallback: lowering failed | 1,218 | 77.4% |
+| AST fallback: codegen unsupported | 205 | 13.0% |
+
+### Lowering failures by first failure kind
+
+| First failure | AST node kind | Count | % of failures |
+|---|---|---|---|
+| `NK_IDENT` (24) | Unresolved identifier | 1,119 | 91.8% |
+| `NK_RANGE` (48) | Range expression | 100 | 8.2% |
+
+### Root cause: method resolution in `lower_var`
+
+The 1,119 NK_IDENT failures are almost entirely **method calls on struct
+fields** where `resolve_method_callee_sym` fails to qualify the method name.
+
+The flow: `self.pool.get_data0(node)` → `lower_method_call` →
+`resolve_method_callee_sym(self_expr, method_sym)` → tries to build
+`TypeName.method` key via sema type lookup → `expr_type` returns 0 →
+falls back to bare `method_sym` (e.g., `get_data0`) → `lower_var`
+can't find it → `mark_unsupported`.
+
+**The fix**: improve `expr_type` coverage so `resolve_method_callee_sym`
+can build the qualified method key. This is a sema type propagation
+issue, not a structural MIR lowering gap. Fixing `expr_type` for
+field access chains would resolve ~92% of all lowering failures.
+
+### Codegen-unsupported (205 functions)
+
+These pass MirLower but fail `mir_function_is_supported` in Codegen.w.
+Root cause: rvalue kinds or terminator kinds that the MIR codegen
+doesn't handle yet. Need to audit which specific RK_*/TK_* are missing.
+
+### Instrumentation
+
+Environment-gated diagnostics added:
+
+- `WITH_MIR_AUDIT=1` — logs `[mir-fallback]` per AST-fallback function
+  and `[mir-lower-fail]` per `mark_unsupported` call with node kind
+- `WITH_DEBUG_MIR_CODEGEN=1` — logs `[mir-dispatch]` per MIR function
+
+Track progress:
+```bash
+WITH_MIR_AUDIT=1 ./out/bin/with-stage2 build src/main.w -o /dev/null 2>&1 | grep '\[mir-fallback\]' | awk '{print $2}' | sort | uniq -c | sort -rn
+```
+
 ## Progress Tracking
 
 ```
 Phase 0: Audit
-  [ ] Add lowering failure instrumentation to MirLower
-  [ ] Categorize 1,217 failures by AST node kind
-  [ ] Rank categories by frequency
-  [ ] Document top 10 categories with counts
+  [x] Add lowering failure instrumentation to MirLower
+  [x] Categorize failures by AST node kind
+  [x] Rank categories by frequency
+  [x] Document root cause (method resolution / expr_type)
 
-Phase 1: Fix MirLower (target: 0 failures)
-  Current failure count: 1,217
-  [ ] Category 1: _____ (count: _____)
-  [ ] Category 2: _____ (count: _____)
-  [ ] Category 3: _____ (count: _____)
-  [ ] Category 4: _____ (count: _____)
-  [ ] Category 5: _____ (count: _____)
-  [ ] ...remaining categories...
+Phase 1: Fix MirLower (target: 0 lowering failures)
+  Current: 1,218 lowering-failed
+  [ ] Fix expr_type for field access chains (~1,119 functions)
+  [ ] Add NK_RANGE lowering (~100 functions)
+  [ ] Fix remaining edge cases
+
+Phase 1b: Fix MIR codegen support (target: 0 codegen-unsupported)
+  Current: 205 codegen-unsupported
+  [ ] Audit which RK_*/TK_* kinds are unsupported
+  [ ] Add missing rvalue/terminator handlers
 
 Phase 2: Remove support check
   [ ] Remove mir_function_is_supported
@@ -213,6 +267,5 @@ Phase 5: Validate
   [ ] make fixpoint
   [ ] ./scripts/run_tests.sh — all pass
   [ ] Update seed
-  [ ] Update CONTRIBUTING.md
   [ ] Codegen.w line count: _____
 ```

@@ -4526,6 +4526,15 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
         if body_idx >= 0:
             let body = self.mir_input.bodies.get(body_idx as i64)
             let supported = self.mir_function_is_supported(body)
+            if not supported:
+                if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
+                    let fn_name = self.intern.resolve(fn_sym)
+                    var reason = "codegen-unsupported"
+                    if body.lowering_failed != 0:
+                        reason = "lowering-failed"
+                    else if body.block_count() <= 0:
+                        reason = "no-blocks"
+                    with_eprintln("[mir-fallback] " ++ reason ++ " " ++ fn_name)
             if supported:
                 // Bisect: WITH_MIR_LIMIT=N limits MIR to first N functions
                 let limit_str = with_getenv_str("WITH_MIR_LIMIT")
@@ -4796,6 +4805,48 @@ fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32)
 
     0 - 1
 
+fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32) -> i64:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return 0
+    let base_local = body.place_locals.get(place_id as i64)
+    let p_count = body.place_proj_counts.get(place_id as i64)
+    if p_count == 0:
+        return 0
+    var cur_ty: i64 = 0
+    let cur_ty_opt = self.mir_local_types.get(base_local)
+    if cur_ty_opt.is_some():
+        cur_ty = cur_ty_opt.unwrap() as i64
+    if cur_ty == 0 and base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+        let sema_ty = body.local_type_ids.get(base_local as i64)
+        if sema_ty > 0:
+            let type_name_sym = self.sema.get_type_name(sema_ty)
+            if type_name_sym != 0:
+                cur_ty = self.resolve_named_type(type_name_sym)
+    if cur_ty == 0:
+        return 0
+    let p_start = body.place_proj_starts.get(place_id as i64)
+    for i in 0..p_count:
+        let pk = body.proj_kinds.get((p_start + i) as i64)
+        let pd = body.proj_d0.get((p_start + i) as i64)
+        if pk == 0:
+            if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
+                if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+                    let sema_ty = body.local_type_ids.get(base_local as i64)
+                    if sema_ty > 0:
+                        let type_name_sym = self.sema.get_type_name(sema_ty)
+                        if type_name_sym != 0:
+                            cur_ty = self.resolve_named_type(type_name_sym)
+            let fi = self.mir_resolve_field_index(cur_ty, pd)
+            if fi < 0:
+                return 0
+            if fi < wl_count_struct_elem_types(cur_ty):
+                cur_ty = wl_struct_get_type_at(cur_ty, fi)
+            else:
+                return 0
+        else:
+            return 0
+    cur_ty
+
 fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_base: bool, create_type: i64) -> i64:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return 0
@@ -4942,10 +4993,15 @@ fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expec
                     ptr = self.mir_place_ptr(body, od, true, sema_llvm_ty)
         if ptr == 0:
             return wl_get_undef(fallback_ty)
-        let ptr_ty_opt = self.mir_local_types.get(local_id)
         var ptr_ty: i64 = 0
-        if ptr_ty_opt.is_some():
-            ptr_ty = ptr_ty_opt.unwrap() as i64
+        let p_count = body.place_proj_counts.get(od as i64)
+        if p_count > 0:
+            // Place has projections — walk them to get the final field type
+            ptr_ty = self.mir_place_projected_type(body, od)
+        if ptr_ty == 0:
+            let ptr_ty_opt = self.mir_local_types.get(local_id)
+            if ptr_ty_opt.is_some():
+                ptr_ty = ptr_ty_opt.unwrap() as i64
         // Fall back to sema type resolution when LLVM type not yet known
         if ptr_ty == 0 and local_id >= 0 and local_id < body.local_type_ids.len() as i32:
             let sema_ty = body.local_type_ids.get(local_id as i64)
@@ -5327,17 +5383,29 @@ fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, 
             let od = body.operand_d0.get(operand_id as i64)
             if (ok == OK_COPY or ok == OK_MOVE) and od >= 0 and od < body.place_locals.len() as i32:
                 let local_id = body.place_locals.get(od as i64)
-                let place_ty_opt = self.mir_local_types.get(local_id)
                 let place_ptr = self.mir_place_ptr(body, od, false, 0)
                 if place_ptr != 0:
-                    if place_ty_opt.is_some():
-                        let place_ty = place_ty_opt.unwrap() as i64
-                        if wl_get_type_kind(place_ty) == wl_struct_type_kind():
-                            let had_error_before = self.had_error
-                            let coerced = self.enforce_coerced_type(place_ptr, expected_ty, "wrong argument type")
-                            if self.had_error != had_error_before:
-                                self.debug_call_coerce_failure(call_context, 0, arg_index, 0, place_ptr, expected_ty)
-                            return coerced
+                    // Check if the value at this place is a struct (needs pass-by-ref).
+                    // For projected places (e.g., self.pool), check the projected type.
+                    // For simple places, check the local's type.
+                    var is_struct_val = false
+                    let p_count = body.place_proj_counts.get(od as i64)
+                    if p_count > 0:
+                        let proj_ty = self.mir_place_projected_type(body, od)
+                        if proj_ty != 0 and wl_get_type_kind(proj_ty) == wl_struct_type_kind():
+                            is_struct_val = true
+                    if not is_struct_val:
+                        let place_ty_opt = self.mir_local_types.get(local_id)
+                        if place_ty_opt.is_some():
+                            let place_ty = place_ty_opt.unwrap() as i64
+                            if wl_get_type_kind(place_ty) == wl_struct_type_kind():
+                                is_struct_val = true
+                    if is_struct_val:
+                        let had_error_before = self.had_error
+                        let coerced = self.enforce_coerced_type(place_ptr, expected_ty, "wrong argument type")
+                        if self.had_error != had_error_before:
+                            self.debug_call_coerce_failure(call_context, 0, arg_index, 0, place_ptr, expected_ty)
+                        return coerced
 
     let val = self.mir_eval_operand(body, operand_id, expected_ty)
     let had_error_before = self.had_error

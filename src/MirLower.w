@@ -257,6 +257,29 @@ fn MirBuilder.call_return_type(self: MirBuilder, callee: i32) -> i32:
             return self.sema.sig_return_type(bare_sig)
     self.sema.ty_void
 
+fn MirBuilder.struct_field_type(self: MirBuilder, struct_tid: i32, field_sym: i32) -> i32:
+    let resolved = self.sema.resolve_alias(struct_tid)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TY_REF or tk == TY_PTR:
+        let inner = self.sema.get_type_d0(resolved)
+        return self.struct_field_type(inner, field_sym)
+    if tk == TY_GENERIC_INST:
+        // For generic instances (e.g., Vec[i32]), look up field on the base type
+        let base_sym = self.sema.get_type_d0(resolved)
+        if self.sema.named_types.contains(base_sym):
+            let base_tid = self.sema.named_types.get(base_sym).unwrap()
+            return self.struct_field_type(base_tid, field_sym)
+        return 0
+    if tk != TY_STRUCT:
+        return 0
+    let extra_start = self.sema.get_type_d1(resolved)
+    let field_count = self.sema.get_type_d2(resolved)
+    for fi in 0..field_count:
+        let f_name = self.sema.type_extra.get((extra_start + fi * 3) as i64)
+        if f_name == field_sym:
+            return self.sema.type_extra.get((extra_start + fi * 3 + 1) as i64)
+    0
+
 fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     if node == 0:
         return self.sema.ty_void
@@ -265,6 +288,15 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         return self.ident_type(self.ast.get_data0(node))
     if kind == NK_GROUPED:
         return self.expr_type(self.ast.get_data0(node))
+    if kind == NK_FIELD_ACCESS:
+        let base_node = self.ast.get_data0(node)
+        let field_sym = self.ast.get_data1(node)
+        let base_ty = self.expr_type(base_node)
+        if base_ty != 0 and base_ty != self.sema.ty_void:
+            let ft = self.struct_field_type(base_ty, field_sym)
+            if ft != 0:
+                return ft
+        return self.sema.ty_void
     if kind == NK_INT_LIT:
         let value = self.ast.int_lit_value(node)
         if value < -2147483648 or value > 2147483647:
@@ -343,7 +375,69 @@ fn MirBuilder.int_const_operand(self: MirBuilder, value: i64, type_id: i32) -> i
 fn MirBuilder.unit_operand(self: MirBuilder) -> i32:
     self.const_operand(CK_UNIT, 0, self.sema.ty_void)
 
+fn MirBuilder.try_eval_const(self: MirBuilder, node: i32) -> i64:
+    let kind = self.ast.kind(node)
+    if kind == NK_INT_LIT:
+        return self.ast.int_lit_value(node)
+    if kind == NK_COMPTIME:
+        return self.try_eval_const(self.ast.get_data0(node))
+    if kind == NK_GROUPED:
+        return self.try_eval_const(self.ast.get_data0(node))
+    if kind == NK_BOOL_LIT:
+        return self.ast.get_data0(node) as i64
+    if kind == NK_UNARY:
+        let op = self.ast.get_data0(node)
+        let inner = self.try_eval_const(self.ast.get_data1(node))
+        if inner == -9223372036854775807: return -9223372036854775807
+        if op == UOP_NEGATE: return -inner
+        if op == UOP_NOT:
+            if inner == 0: return 1
+            return 0
+        return -9223372036854775807
+    if kind == NK_BINARY:
+        let op = self.ast.get_data0(node)
+        let lv = self.try_eval_const(self.ast.get_data1(node))
+        if lv == -9223372036854775807: return -9223372036854775807
+        let rv = self.try_eval_const(self.ast.get_data2(node))
+        if rv == -9223372036854775807: return -9223372036854775807
+        if op == OP_ADD: return lv + rv
+        if op == OP_SUB: return lv - rv
+        if op == OP_MUL: return lv * rv
+        if op == OP_DIV:
+            if rv == 0: return -9223372036854775807
+            return lv / rv
+        if op == OP_MOD:
+            if rv == 0: return -9223372036854775807
+            return lv % rv
+        return -9223372036854775807
+    if kind == NK_IDENT:
+        // Cross-reference to another constant
+        let ref_sym = self.ast.get_data0(node)
+        return self.try_resolve_module_const_val(ref_sym)
+    -9223372036854775807
+
+fn MirBuilder.try_resolve_module_const_val(self: MirBuilder, sym: i32) -> i64:
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NK_LET_DECL:
+            continue
+        if self.ast.get_data0(decl) != sym:
+            continue
+        let flags = self.ast.get_data2(decl)
+        let is_mut = flags % 2
+        if is_mut != 0:
+            continue
+        var value_node = self.ast.get_data1(decl)
+        if value_node == 0:
+            continue
+        return self.try_eval_const(value_node)
+    -9223372036854775807
+
 fn MirBuilder.mark_unsupported(self: MirBuilder):
+    if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
+        let node_kind = if self.cur_node != 0: self.ast.kind(self.cur_node) else: 0
+        let fn_name = self.pool.resolve(self.body.fn_sym)
+        with_eprintln("[mir-lower-fail] kind=" ++ int_to_string(node_kind) ++ " fn=" ++ fn_name)
     var b = self.body
     b.lowering_failed = 1
     self.body = b
@@ -377,6 +471,16 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
         let fn_ty = if type_id != 0: type_id else: self.sema.sig_type_ids.get(sig_idx as i64)
         return self.const_operand(CK_FN, sym, fn_ty)
 
+    // Try module-level constant (const X = 42)
+    let const_val = self.try_resolve_module_const_val(sym)
+    if const_val != -9223372036854775807:
+        let ty = if const_val < -2147483648 or const_val > 2147483647: self.sema.ty_i64 else: self.sema.ty_i32
+        return self.int_const_operand(const_val, ty)
+
+    if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
+        let var_name = self.pool.resolve(sym)
+        let fn_name = self.pool.resolve(self.body.fn_sym)
+        with_eprintln("[mir-var-miss] sym=" ++ var_name ++ " fn=" ++ fn_name)
     self.mark_unsupported()
     self.unit_operand()
 
@@ -1109,11 +1213,28 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
 
 fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method_sym: i32) -> i32:
     let obj_type = self.expr_type(self_expr)
-    if obj_type != 0:
+    if with_getenv_str("WITH_MIR_AUDIT").len() > 0 and obj_type == self.sema.ty_void:
+        let method_name = self.pool.resolve(method_sym)
+        let fn_name = self.pool.resolve(self.body.fn_sym)
+        let expr_kind = self.ast.kind(self_expr)
+        with_eprintln("[mir-resolve-miss] method=" ++ method_name ++ " expr_kind=" ++ int_to_string(expr_kind) ++ " fn=" ++ fn_name)
+    if obj_type != 0 and obj_type != self.sema.ty_void:
         let resolved = self.sema.resolve_alias(obj_type)
         let type_name_sym = self.sema.get_type_name(resolved)
         if type_name_sym != 0:
             let method_key = self.sema.method_key(type_name_sym, method_sym)
+            if self.sema.get_sig(method_key) >= 0:
+                return method_key
+        // For builtin types (i32, str, bool, etc.), try the type kind name
+        let tk = self.sema.get_type_kind(resolved)
+        if tk == TY_INT:
+            let int_sym = self.pool.intern("i32")
+            let method_key = self.sema.method_key(int_sym, method_sym)
+            if self.sema.get_sig(method_key) >= 0:
+                return method_key
+        if tk == TY_STR:
+            let str_sym = self.pool.intern("str")
+            let method_key = self.sema.method_key(str_sym, method_sym)
             if self.sema.get_sig(method_key) >= 0:
                 return method_key
 
@@ -1171,6 +1292,14 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
 fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
     // Lower method calls as normal calls with receiver inserted as first arg.
     let callee_sym = self.resolve_method_callee_sym(self_expr, method_sym)
+
+    // If resolution returned bare method_sym, the method is unresolved.
+    // Mark unsupported to avoid accidentally matching an unrelated function
+    // with the same name (e.g., bare "contains" matching SourceMap.contains
+    // instead of HashMap.contains).
+    if callee_sym == method_sym:
+        self.mark_unsupported()
+
     let method_ident = self.ast.add_node(NK_IDENT, self.ast.get_start(node), self.ast.get_end(node), callee_sym, 0, 0)
     let args: Vec[i32] = Vec.new()
     args.push(self_expr)
