@@ -286,10 +286,10 @@ group at a time, verifying fixpoint after each deletion.
 - [x] Add sema-based primary path in `infer_vec_elem_type_from_receiver`
 - [x] Delete Vec/HashMap/Option/Result fallback blocks in monomorphize_generic_call
       — sema-based unified type param binding handles all generic containers
-- [ ] Delete `vec_local_types: HashMap[i32, i64]` (Phase 9.6)
-- [ ] Delete `type_node_vec_elem_type` (still used by record_local_container_type)
-- [ ] Delete `record_local_container_type` Vec tracking
-- [ ] Delete `track_local_type` Vec tracking
+- [x] Delete `vec_local_types: HashMap[i32, i64]` — sema path handles all cases
+- [x] Delete `record_local_container_type` — Vec/HashMap tracking replaced by local_sema_types
+- [x] Delete `track_local_type` Vec tracking — sema path handles all cases
+- [x] Delete vec_local_types push tracking in gen_vec_method
 - [x] `make build && make fixpoint` — 230/230 tests pass
 
 ### 9.2 Delete HashMap cache workarounds
@@ -310,7 +310,7 @@ group at a time, verifying fixpoint after each deletion.
       (returns LLVM type, 0 if not HashMap)
 - [x] Update `gen_hashmap_method` to take hm_ty: i64 instead of cache_idx: i32,
       uses hm_type_to_val/hm_type_to_is_str for O(1) lookups
-- [ ] Delete `hm_local_types: HashMap[i32, i64]` (Phase 9.6)
+- [x] Delete `hm_local_types: HashMap[i32, i64]` — sema path handles all cases
 - [x] `make build && make fixpoint` — 230/230 tests pass
 
 ### 9.3 Delete HashSet cache workarounds
@@ -347,10 +347,11 @@ group at a time, verifying fixpoint after each deletion.
 
 ### 9.6 Delete function-scope local type tracking save/restore
 
-- [ ] Remove `vec_local_types` save/restore in function entry/exit
-- [ ] Remove `hm_local_types` save/restore in function entry/exit
+- [x] Delete `vec_local_types` field and all save/restore — field never populated,
+      sema-based path (local_sema_types + sema_type_of_node) handles all cases
+- [x] Delete `hm_local_types` field and all save/restore — same as above
 - [ ] Remove `enum_local_types` save/restore where redundant
-- [ ] `make build && make fixpoint`
+- [x] `make build && make fixpoint` — 230/230 tests pass
 
 ---
 
