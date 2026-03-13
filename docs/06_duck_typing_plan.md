@@ -1,231 +1,110 @@
-# Duck Typing Plan
+# Duck Typing — Implementation Plan
 
-## Decision
+## Current State
 
-Resolve the operator question up front:
+The compiler already does most of the work:
 
-- operators are methods
-- duck typing means "the concrete instantiated type has the required method or operator support"
-- traits and `where` clauses remain valid as explicit contracts, but they are optional
+- **Parser** (`src/Parser.w:3554-3658`): parses optional `[T: Trait]` bounds and `where` clauses; `bound_count` is 0 when no bounds are written
+- **Sema** (`src/Sema.w:4720-4743`): `check_generic_trait_bounds` only iterates explicit bounds — if `bound_count == 0`, the inner loop is a no-op, so unbounded generics already pass sema
+- **Sema** (`src/Sema.w:2524-2535`): `ensure_generic_substitutions` infers T from call arguments; only errors if T is unresolvable (doesn't appear in any parameter)
+- **Codegen** (`src/Codegen.w:7476-7770`): `monomorphize_generic_call` substitutes concrete types and compiles the body — this is where duck typing is actually checked
 
-This matches the current backend shape better than trying to move checking into sema first.
+**What this means:** unbounded `fn double[T](x: T): x + x` called with `double(5)` likely already compiles. The feature gap is not "make it work" — it's "make failures useful."
 
-## Current Reality
+**What was broken:**
+1. Binary op failures emit a warning and return undef (`gen_binary`, line ~6413) — bad code silently compiles
+2. Method call failures emit a warning and return undef (`gen_method_call`, line ~8315) — same problem
+3. No instantiation context in any diagnostic — user can't tell which `fn[T=concrete]` caused the failure
+4. No test coverage for unbounded generic success or failure paths
 
-The existing compiler already does most of the hard work:
+## Phase 0 — Verify assumptions
 
-- [src/Parser.w](/Users/eric/with/src/Parser.w) already parses optional bounds and `where` clauses
-- [src/Sema.w](/Users/eric/with/src/Sema.w) currently enforces explicit bounds in `check_generic_call`
-- [src/Sema.w](/Users/eric/with/src/Sema.w) skips generic bodies during normal body checking
-- [src/Codegen.w](/Users/eric/with/src/Codegen.w) already monomorphizes generic calls and generic methods with concrete types
+- [x] Write a throwaway `fn double[T](x: T): x + x` with `double(5)` — confirm it compiles and runs correctly today
+- [x] Write `double("hi")` — confirm it either silently miscompiles or crashes (not a clean error)
+- [x] Write an unbounded generic that calls a method (`x.len()`) on a type that has it — confirm it works
+- [x] Write the same calling a method on a type that doesn't have it — confirm the failure mode
 
-That means the minimal feature is not "build a second generic checker in sema." The minimal feature is:
+## Phase 1 — Sema: make unbounded generics explicitly legal
 
-1. stop rejecting unbounded generic calls in sema
-2. let the existing monomorphizer instantiate concrete code
-3. improve the backend failure message when the concrete type does not support an operation
+**File:** `src/Sema.w`
 
-## Implementation Plan
+- [x] Trace `check_generic_call` (line ~4596) end-to-end for an unbounded generic call — confirm `bound_count == 0` causes no rejection
+- [x] Trace `ensure_generic_substitutions` (lines 2524-2535) — confirm inferrable params don't hit the `"unknown type"` fallback
+- [x] If any code path rejects unbounded generics that should be allowed, remove the rejection — **no changes needed, already works**
+- [x] Verify explicit bounds still work: `[T: Trait]` and `where T: Trait` must still fail early via `check_generic_trait_bounds` (lines 4720-4743)
 
-### Phase 1: make unbounded generics legal
+## Phase 2 — Codegen: upgrade failure paths to real errors with context
 
-Primary file: [src/Sema.w](/Users/eric/with/src/Sema.w)
+**File:** `src/Codegen.w`
 
-Change `check_generic_call` so that:
+### 2a — Thread instantiation context through monomorphization
 
-- type argument inference still happens exactly as it does now
-- explicit inline bounds are still enforced when they are written
-- explicit `where` bounds are still enforced when they are written
-- missing bounds are not treated as an error
-- the call is allowed to proceed to codegen monomorphization
+- [x] Add to Codegen struct: `mono_inst_name: i32` (symbol for "double__str"), `mono_inst_node: i32` (call-site node for source location)
+- [x] Set both at the top of `monomorphize_generic_call` before compiling the body
+- [x] Save/restore both when monomorphization completes (supports nested monomorphization)
 
-Important constraint:
+### 2b — Binary operator failures → errors
 
-- do not add a new sema-side instantiation engine
-- do not add a new sema specialization cache beyond what is required for current behavior
-- do not try to sema-check generic bodies abstractly
+- [x] In `gen_binary`: added early type-kind guard — non-integer, non-float types emit error before reaching integer ops
+- [x] Error includes: operator symbol, concrete type name, instantiation context if available
+- [x] Sets `had_error = 1`
 
-The feature here is removing the current eager rejection path for generic operations that are only meant to be checked after substitution.
+### 2c — Method call failures → errors
 
-### Phase 2: use codegen monomorphization as the concrete checker
+- [x] In `gen_method_call`: upgraded warning to error with type name and method name
+- [x] Error includes instantiation context if available
+- [x] Sets `had_error = 1`
 
-Primary file: [src/Codegen.w](/Users/eric/with/src/Codegen.w)
+### 2d — Operator overload lookup
 
-Keep the current architecture:
+- [x] `try_op_overload` returns 0 on failure, falling through to builtin dispatch — confirmed; the error surfaces in 2b when builtin dispatch also fails
 
-- `monomorphize_generic_call` remains the place where concrete substitutions become real generated code
-- generic method monomorphization remains in the existing codegen path
+### Helper: `op_symbol`
 
-Required work:
+- [x] Added `Codegen.op_symbol(op) -> str` mapping operator codes to human-readable symbols (`+`, `-`, `*`, etc.)
 
-- identify the existing failure paths for:
-  - unsupported operators
-  - missing methods
-  - failed generic method dispatch
-  - unresolved generic type substitution during monomorphization
-- improve those messages so they mention the specialization being instantiated
-
-Minimum acceptable diagnostic for first ship:
-
-- error mentions the unsupported operation or missing method
-- error mentions the concrete type
-- error mentions `in instantiation of foo[T...]`
-
-Example target shape:
-
-```text
-error: type `str` does not support operator `*`
-  = note: in instantiation of triple[str]
+**Actual diagnostic output:**
+```
+error: unsupported operator '+' for type 'str' in instantiation of 'double__str'
+error: no method 'len' on type 'i32' in instantiation of 'get_len__i32'
 ```
 
-Do not block the feature on full dual-site span rendering. That can come later.
+## Phase 3 — Tests
 
-### Phase 3: keep explicit bounds working
+### Existing bound tests verified
 
-Primary files:
+- [x] `test/cases/err_trait_bound.w` — `[T: Show]` with wrong type → early error
+- [x] `test/cases/where_violation.w` — `where T: Printable` violated → early error
+- [x] `test/wave5/cases/generic_bound_pass.w` — `[T: Show]` with correct type → success
 
-- [src/Sema.w](/Users/eric/with/src/Sema.w)
-- existing bound-related tests under `test/`
+### New duck-typing tests
 
-Regression requirement:
+- [x] `test/cases/duck_binop_ok.w` — `fn double[T](x: T): x + x` with `i32` → `//! expect-stdout: 10`
+- [x] `test/cases/duck_binop_fail.w` — `fn double[T](x: T): x + x` with `str` → `//! expect-build-fail: unsupported operator`
+- [x] `test/cases/duck_method_ok.w` — unbounded generic calling `.len()` on `str` → success
+- [x] `test/cases/duck_method_fail.w` — unbounded generic calling `.len()` on `i32` → `//! expect-build-fail: no method 'len'`
+- [x] `test/cases/duck_unused_generic.w` — `fn broken[T](x: T): x.nope()` never called → `//! check-only` → no error
 
-- `[T: Trait]` still fails early when the concrete type does not satisfy the bound
-- `where T: Trait` still fails early when the concrete type does not satisfy the bound
-- boundless generics fall through to monomorphization-time checking instead
+## Phase 4 — Docs
 
-This preserves the useful distinction:
+- [x] `docs/with-specification.md` — generics may omit bounds, checked at instantiation
+- [x] `docs/with-idiomatic-guide.md` — when to use bounds vs duck typing
+- [x] `docs/with-migration-guide.md` — unbounded generics now legal
 
-- write bounds when you want a contract and earlier caller-facing errors
-- omit bounds when you want duck typing
+## Phase 5 — Self-host validation
 
-## Test Plan
+- [x] `make build`
+- [x] `./out/bin/with-stage2 check src/main.w`
+- [x] `make fixpoint` (byte-identical stage2 == stage3)
 
-### Keep existing bound tests
+## Done criteria
 
-These should continue to pass with minimal or no change:
+All of the following are true:
 
-- [test/cases/err_trait_bound.w](/Users/eric/with/test/cases/err_trait_bound.w)
-- [test/cases/where_violation.w](/Users/eric/with/test/cases/where_violation.w)
-- [test/wave5/cases/generic_bound_pass.w](/Users/eric/with/test/wave5/cases/generic_bound_pass.w)
-- [test/wave5/cases/generic_bound_error.w](/Users/eric/with/test/wave5/cases/generic_bound_error.w)
-- [test/wave5/cases/where_bound_failure_error.w](/Users/eric/with/test/wave5/cases/where_bound_failure_error.w)
-
-### Add new duck-typing tests
-
-Add a small focused set first, not a large matrix.
-
-Suggested new cases:
-
-- `test/cases/duck_generic_binop_ok.w`
-  - `fn double[T](x: T): x + x`
-  - instantiate with `i32` and `f64`
-- `test/cases/duck_generic_binop_fail.w`
-  - `fn triple[T](x: T): x * 3`
-  - instantiate with `str`
-  - expected error substring should mention unsupported `*` and the specialization name
-- `test/cases/duck_generic_method_ok.w`
-  - unbounded generic method call that succeeds for a concrete type with the method
-- `test/cases/duck_generic_method_fail.w`
-  - unbounded generic method call that fails for a concrete type without the method
-- `test/wave10/cases/unused_generic.w`
-  - keep as the regression that broken-but-unused generics still do not fail
-
-### Only extend the harness if the first diagnostics need it
-
-Primary file: [scripts/run_tests.sh](/Users/eric/with/scripts/run_tests.sh)
-
-Do not pre-emptively redesign the runner.
-
-If one `//! expect-error:` substring is enough, keep the harness as-is.
-Only add repeated error/note expectations if the new diagnostics genuinely need it.
-
-## Docs Plan
-
-Docs should follow the implementation, not lead it.
-
-### After the feature works, update:
-
-- [docs/with-specification.md](/Users/eric/with/docs/with-specification.md)
-- [docs/with-idiomatic-guide.md](/Users/eric/with/docs/with-idiomatic-guide.md)
-- [docs/with-migration-guide.md](/Users/eric/with/docs/with-migration-guide.md)
-
-Required doc changes:
-
-- generics may omit bounds
-- explicit bounds and `where` clauses are optional contracts
-- unbounded generics are checked when instantiated
-- operators are method-based for duck typing
-- explicit bounds still provide earlier and clearer call-site errors
-
-Keep the first doc pass small. The goal is to make the docs match the compiler, not to rewrite the entire generic chapter before the code lands.
-
-## Delivery Sequence
-
-### 1. Land the compiler behavior
-
-- update `check_generic_call`
-- preserve explicit bound enforcement
-- let unbounded calls reach codegen monomorphization
-
-Validation:
-
-- `make build`
-- `./out/bin/with-stage2 check src/main.w`
-
-### 2. Improve the backend error message
-
-- thread specialization context through the existing codegen failure path
-- get the first useful duck-typing diagnostic shipped
-
-Validation:
-
-- targeted duck-typing failure tests
-- targeted generic method tests
-
-### 3. Add the small regression set
-
-- bound tests still pass
-- new duck-typing success and failure tests pass
-- unused broken generics still stay lazy
-
-Validation:
-
-- `./scripts/run_tests.sh test/cases/duck_generic_*.w`
-- `./scripts/run_tests.sh test/cases/err_trait_bound.w test/cases/where_violation.w`
-- `./scripts/run_tests.sh test/wave5/cases/generic_bound_*.w test/wave5/cases/where_bound_failure_error.w`
-- `./scripts/run_tests.sh test/wave10/cases/unused_generic.w`
-
-### 4. Update docs to match shipped behavior
-
-- spec
-- idiomatic guide
-- migration guide
-
-### 5. Run full self-host validation
-
-- `make build`
-- `./out/bin/with-stage2 check src/main.w`
-- `make fixpoint`
-
-## Non-Goals For The First Landing
-
-Do not turn the first implementation into a compiler rewrite.
-
-Out of scope for the first pass:
-
-- a new sema-side instantiation framework
-- nested instantiation stacks and rich multi-site diagnostic plumbing
-- full generic-body rechecking infrastructure in sema
-- a large doc rewrite before the compiler behavior exists
-- perfect diagnostics on day one
-
-## Done Criteria
-
-The first landing is done when all of the following are true:
-
-- unbounded generics compile when the instantiated concrete type supports the required operations
-- unbounded generics fail when the instantiated concrete type does not support the required operations
-- explicit bounds and `where` clauses still fail early
-- the failure message mentions the concrete operation/type and the specialization being instantiated
-- the focused regression set passes
-- `make build`, `./out/bin/with-stage2 check src/main.w`, and `make fixpoint` all pass
+- [x] Unbounded generics compile when the concrete type supports the required operations
+- [x] Unbounded generics fail with a clear error when the concrete type does not support the required operations
+- [x] The failure message mentions the concrete type, the operation, and the instantiation being compiled
+- [x] Explicit `[T: Trait]` and `where T: Trait` bounds still fail early at the call site
+- [x] Unused generic functions with broken bodies produce no error
+- [x] The focused test set passes
+- [x] `make build`, `./out/bin/with-stage2 check src/main.w`, and `make fixpoint` all pass

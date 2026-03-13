@@ -113,9 +113,15 @@ the better one.
 fn double[T](x: T): x + x
 ```
 
+When an unbounded generic is called with a type that doesn't support
+the required operation, the compiler error names the concrete type
+and the instantiation — so the caller can immediately see what went wrong.
+
 **Keep bounds when the signature should carry the contract.** Public
 APIs, library entry points, and longer generic functions often read
-better when the requirement is explicit.
+better when the requirement is explicit. Bounded generics produce
+errors at the call site (before monomorphization), which is earlier
+and more targeted.
 
 ```
 // ✓ explicit contract

@@ -437,11 +437,16 @@ fn process<T>(x: T) where T: Display + Debug { ... }
 fn process[T](x: T) where T: Display, T: Debug: ...
 ```
 
-Unbounded generics are also valid:
+Unbounded generics are also valid — the compiler checks the body when
+it is instantiated with a concrete type:
 
 ```with
-fn double[T](x: T): x + x
+fn double[T](x: T): x + x   // OK: checked when called, not when declared
 ```
+
+If the concrete type doesn't support the required operation, the error
+names the type and the instantiation. Existing bounded generics are
+unchanged.
 
 ## Lifetimes
 

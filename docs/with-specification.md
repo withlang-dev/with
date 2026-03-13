@@ -3173,7 +3173,15 @@ fn double[T](x: T): x + x
 If `double(5)` is instantiated, the compiler checks that `i32`
 supports `+`. If `double("hi")` is instantiated and the concrete
 type does not support the required operator or method, the compiler
-emits an error for that specialization.
+emits an error naming the concrete type, the unsupported operation,
+and the instantiation:
+
+```
+error: unsupported operator '+' for type 'str' in instantiation of 'double__str'
+```
+
+If a generic function is never called, its body is never compiled and
+no errors are reported — even if the body contains invalid operations.
 
 Explicit bounds remain available as optional contracts:
 
