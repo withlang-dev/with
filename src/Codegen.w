@@ -494,9 +494,9 @@ type Codegen = {
     gen_current_yield: i32,
 
     // Vec type cache
-    vec_cache_map: HashMap[i64, i32],
-    vec_llvm_types: Vec[i64],
-    vec_elem_types: Vec[i64],
+    // Vec type cache: forward (elem → vec) and reverse (vec → elem) maps
+    vec_cache_map: HashMap[i64, i64],
+    vec_type_to_elem: HashMap[i64, i64],
     vec_local_types: HashMap[i32, i64],
 
     // HashMap type cache
@@ -507,10 +507,8 @@ type Codegen = {
     hm_is_str_keys: Vec[i32],
     hm_local_types: HashMap[i32, i32],
 
-    // HashSet type cache
-    hs_cache_map: HashMap[i64, i32],
-    hs_llvm_types: Vec[i64],
-    hs_elem_types: Vec[i64],
+    // HashSet type cache (elem LLVM type → HashSet LLVM struct type)
+    hs_cache_map: HashMap[i64, i64],
 
     // Active type bindings (for monomorphization)
     type_binding_syms: Vec[i32],
@@ -705,8 +703,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         gen_yield_count: 0,
         gen_current_yield: 0,
         vec_cache_map: HashMap.new(),
-        vec_llvm_types: Vec.new(),
-        vec_elem_types: Vec.new(),
+        vec_type_to_elem: HashMap.new(),
         vec_local_types: HashMap.new(),
         hm_cache_map: HashMap.new(),
         hm_llvm_types: Vec.new(),
@@ -715,8 +712,6 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         hm_is_str_keys: Vec.new(),
         hm_local_types: HashMap.new(),
         hs_cache_map: HashMap.new(),
-        hs_llvm_types: Vec.new(),
-        hs_elem_types: Vec.new(),
         type_binding_syms: Vec.new(),
         type_binding_types: Vec.new(),
         type_bindings_len: 0,
@@ -1995,6 +1990,34 @@ fn Codegen.resolve_generic_type(self: Codegen, name_sym: i32, extra_start: i32, 
         return self.monomorphize_struct(name_sym, extra_start, arg_count)
     0
 
+// Get sema TypeId for an expression node. Uses local_sema_types for idents.
+fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
+    if node == 0:
+        return 0
+    if self.pool.kind(node) == NK_IDENT:
+        let sym = self.pool.get_data0(node)
+        let opt = self.local_sema_types.get(sym)
+        if opt.is_some():
+            return opt.unwrap()
+        let canon = self.canonical_local_sym(sym)
+        if canon != 0 and canon != sym:
+            let canon_opt = self.local_sema_types.get(canon)
+            if canon_opt.is_some():
+                return canon_opt.unwrap()
+    0
+
+// Extract LLVM type of the i'th generic arg from a sema TY_GENERIC_INST type.
+fn Codegen.sema_generic_arg_llvm(self: Codegen, sema_tid: i32, arg_idx: i32) -> i64:
+    if sema_tid <= 0:
+        return 0
+    if self.sema.get_type_kind(sema_tid) != TY_GENERIC_INST:
+        return 0
+    let ac = self.sema.get_generic_inst_arg_count(sema_tid)
+    if arg_idx >= ac:
+        return 0
+    let inner_tid = self.sema.get_generic_inst_arg(sema_tid, arg_idx)
+    self.sema_type_to_llvm(inner_tid)
+
 // Map sema TypeId to LLVM type. Handles TY_GENERIC_INST for builtin containers.
 fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
     if tid <= 0:
@@ -2443,10 +2466,9 @@ fn Codegen.gen_builtin_vec_new(self: Codegen, vec_ty: i64, vec_type_node: i32) -
     if concrete_vec_ty == 0:
         return wl_get_undef(wl_i32_type(self.context))
     if elem_ty == 0:
-        let cache_idx = self.find_vec_cache_index_by_llvm(concrete_vec_ty)
-        if cache_idx < 0:
+        elem_ty = self.find_vec_elem_type_by_llvm(concrete_vec_ty)
+        if elem_ty == 0:
             return self.build_default_value(concrete_vec_ty)
-        elem_ty = self.vec_elem_types.get(cache_idx as i64)
     let elem_size = self.abi_size_of(elem_ty)
     let alloca = self.create_entry_alloca(concrete_vec_ty)
     wl_build_store(self.builder, self.build_default_value(concrete_vec_ty), alloca)
@@ -2976,8 +2998,7 @@ fn Codegen.collection_wrapper_name_2(self: Codegen, prefix: str, t0: i64, t1: i6
 fn Codegen.get_or_create_vec_type(self: Codegen, elem_ty: i64) -> i64:
     let cached = self.vec_cache_map.get(elem_ty)
     if cached.is_some():
-        let idx = cached.unwrap()
-        return self.vec_llvm_types.get(idx as i64)
+        return cached.unwrap()
     // Vec[T] = { ptr, i64, i64 } — ptr, len, cap (elem_size at runtime)
     let body: Vec[i64] = Vec.new()
     body.push(wl_ptr_type(self.context))
@@ -2993,11 +3014,9 @@ fn Codegen.get_or_create_vec_type(self: Codegen, elem_ty: i64) -> i64:
 fn Codegen.cache_vec_type(self: Codegen, elem_ty: i64, vec_ty: i64) -> i64:
     let cached = self.vec_cache_map.get(elem_ty)
     if cached.is_some():
-        return self.vec_llvm_types.get(cached.unwrap() as i64)
-    let idx = self.vec_llvm_types.len() as i32
-    self.vec_llvm_types.push(vec_ty)
-    self.vec_elem_types.push(elem_ty)
-    self.vec_cache_map.insert(elem_ty, idx)
+        return cached.unwrap()
+    self.vec_cache_map.insert(elem_ty, vec_ty)
+    self.vec_type_to_elem.insert(vec_ty, elem_ty)
     vec_ty
 
 fn Codegen.get_or_create_hashmap_type(self: Codegen, key_ty: i64, val_ty: i64) -> i64:
@@ -3051,24 +3070,13 @@ fn Codegen.cache_hashmap_type(self: Codegen, key_ty: i64, val_ty: i64, hm_ty: i6
 fn Codegen.get_or_create_hashset_type(self: Codegen, elem_ty: i64) -> i64:
     let cached = self.hs_cache_map.get(elem_ty)
     if cached.is_some():
-        let idx = cached.unwrap()
-        return self.hs_llvm_types.get(idx as i64)
+        return cached.unwrap()
     let body: Vec[i64] = Vec.new()
     body.push(wl_ptr_type(self.context))
     let name = self.collection_wrapper_name_1("__with.HashSet", elem_ty)
     let hs_ty = wl_struct_create_named(self.context, name)
     wl_struct_set_body(hs_ty, vec_data_i64(&body), 1, 0)
-    self.cache_hashset_type(elem_ty, hs_ty)
-    hs_ty
-
-fn Codegen.cache_hashset_type(self: Codegen, elem_ty: i64, hs_ty: i64) -> i64:
-    let cached = self.hs_cache_map.get(elem_ty)
-    if cached.is_some():
-        return self.hs_llvm_types.get(cached.unwrap() as i64)
-    let idx = self.hs_llvm_types.len() as i32
-    self.hs_llvm_types.push(hs_ty)
-    self.hs_elem_types.push(elem_ty)
-    self.hs_cache_map.insert(elem_ty, idx)
+    self.hs_cache_map.insert(elem_ty, hs_ty)
     hs_ty
 
 // ── Monomorphize struct (stub) ────────────────────────────────────
@@ -6514,9 +6522,9 @@ fn Codegen.track_local_type(self: Codegen, sym: i32, value_node: i32, val_ty: i6
     let _ = value_node
     let existing_vec = self.vec_local_types.get(sym)
     if not existing_vec.is_some():
-        let idx = self.find_vec_cache_index_by_llvm(val_ty)
-        if idx >= 0:
-            self.vec_local_types.insert(sym, self.vec_elem_types.get(idx as i64))
+        let vec_elem = self.find_vec_elem_type_by_llvm(val_ty)
+        if vec_elem != 0:
+            self.vec_local_types.insert(sym, vec_elem)
     // Track enum local types
     let existing_enum = self.enum_local_types.get(sym)
     if not existing_enum.is_some():
@@ -6991,9 +6999,9 @@ fn Codegen.find_binding_type(self: Codegen, syms: Vec[i32], tys: Vec[i64], sym: 
     0
 
 fn Codegen.find_vec_elem_type_by_llvm(self: Codegen, vec_ty: i64) -> i64:
-    let idx = self.find_vec_cache_index_by_llvm(vec_ty)
-    if idx >= 0:
-        return self.vec_elem_types.get(idx as i64)
+    let elem = self.vec_type_to_elem.get(vec_ty)
+    if elem.is_some():
+        return elem.unwrap()
     0
 
 fn Codegen.llvm_named_struct_matches(self: Codegen, lhs: i64, rhs: i64) -> bool:
@@ -7007,31 +7015,13 @@ fn Codegen.llvm_named_struct_matches(self: Codegen, lhs: i64, rhs: i64) -> bool:
         return false
     with_str_eq(lhs_name, rhs_name) != 0
 
-fn Codegen.find_hashset_cache_index_by_llvm(self: Codegen, hs_ty: i64) -> i32:
-    for i in 0..self.hs_llvm_types.len() as i32:
-        let cached_ty = self.hs_llvm_types.get(i as i64)
-        if cached_ty == hs_ty or self.llvm_named_struct_matches(cached_ty, hs_ty):
-            return i
-    0 - 1
 
 fn Codegen.find_vec_cache_index_by_llvm(self: Codegen, vec_ty: i64) -> i32:
-    // Vec struct layout is { ptr, i64, i64, i64 } — exactly 4 fields.
-    // Guard against false matches from non-Vec struct types (e.g. Option, arrays).
-    if wl_get_type_kind(vec_ty) != wl_struct_type_kind():
-        return 0 - 1
-    if wl_count_struct_elem_types(vec_ty) != 4:
-        return 0 - 1
-    for i in 0..self.vec_llvm_types.len() as i32:
-        let cached_ty = self.vec_llvm_types.get(i as i64)
-        if cached_ty == vec_ty or self.llvm_named_struct_matches(cached_ty, vec_ty):
-            return i
+    // Returns 0 if vec_ty is a known Vec type, -1 otherwise.
+    // Used as a dispatch check: >= 0 means "is a Vec".
+    if self.vec_type_to_elem.contains(vec_ty):
+        return 0
     0 - 1
-
-fn Codegen.find_hashmap_key_type_by_llvm(self: Codegen, hm_ty: i64) -> i64:
-    let idx = self.find_hashmap_cache_index_by_llvm(hm_ty)
-    if idx >= 0:
-        return self.hm_key_types.get(idx as i64)
-    0
 
 fn Codegen.find_hashmap_cache_index_by_llvm(self: Codegen, hm_ty: i64) -> i32:
     for i in 0..self.hm_llvm_types.len() as i32:
@@ -7079,6 +7069,13 @@ fn Codegen.type_node_vec_elem_type(self: Codegen, type_node: i32) -> i64:
     self.resolve_type(elem_node)
 
 fn Codegen.infer_vec_elem_type_from_receiver(self: Codegen, obj_node: i32, obj_ty: i64) -> i64:
+    // Sema-based path: look up sema type of receiver
+    let sema_tid = self.sema_type_of_node(obj_node)
+    if sema_tid > 0:
+        let elem_llvm = self.sema_generic_arg_llvm(sema_tid, 0)
+        if elem_llvm != 0:
+            return elem_llvm
+    // Legacy paths
     if obj_node != 0 and self.pool.kind(obj_node) == NK_IDENT:
         let sym = self.pool.get_data0(obj_node)
         let elem_ty = self.vec_local_types.get(sym)
@@ -7089,9 +7086,9 @@ fn Codegen.infer_vec_elem_type_from_receiver(self: Codegen, obj_node: i32, obj_t
         let elem_ty = self.type_node_vec_elem_type(field_type_node)
         if elem_ty != 0:
             return elem_ty
-    let idx = self.find_vec_cache_index_by_llvm(obj_ty)
-    if idx >= 0:
-        return self.vec_elem_types.get(idx as i64)
+    let vec_elem = self.find_vec_elem_type_by_llvm(obj_ty)
+    if vec_elem != 0:
+        return vec_elem
     0
 
 fn Codegen.infer_hashmap_cache_index_from_receiver(self: Codegen, obj_node: i32, obj_ty: i64) -> i32:
@@ -7112,17 +7109,8 @@ fn Codegen.infer_hashmap_cache_index_from_receiver(self: Codegen, obj_node: i32,
             return field_idx
     self.find_hashmap_cache_index_by_llvm(obj_ty)
 
-fn Codegen.find_hashmap_val_type_by_llvm(self: Codegen, hm_ty: i64) -> i64:
-    let idx = self.find_hashmap_cache_index_by_llvm(hm_ty)
-    if idx >= 0:
-        return self.hm_val_types.get(idx as i64)
-    0
 
-fn Codegen.find_hashset_elem_type_by_llvm(self: Codegen, hs_ty: i64) -> i64:
-    let idx = self.find_hashset_cache_index_by_llvm(hs_ty)
-    if idx >= 0:
-        return self.hs_elem_types.get(idx as i64)
-    0
+
 
 fn Codegen.find_option_payload_type_by_llvm(self: Codegen, opt_ty: i64) -> i64:
     for i in 0..self.option_llvm_types.len() as i32:
@@ -7220,11 +7208,13 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
 
     let arg_vals: Vec[i64] = Vec.new()
     let arg_tys: Vec[i64] = Vec.new()
+    let arg_nodes: Vec[i32] = Vec.new()
     for ai in 0..arg_count:
         let arg_node = self.pool.get_extra(args_start + ai)
         let arg_val = self.gen_expr(arg_node)
         arg_vals.push(arg_val)
         arg_tys.push(wl_type_of(arg_val))
+        arg_nodes.push(arg_node)
 
     let tp_syms: Vec[i32] = Vec.new()
     var tp_pos = tp_start
@@ -7270,149 +7260,38 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
             let g_extra = self.pool.get_data1(p_type_node)
             let g_count = self.pool.get_data2(p_type_node)
 
-            if g_name == "Vec" and g_count == 1:
-                let inner = self.pool.get_extra(g_extra)
-                if self.pool.kind(inner) == NK_TYPE_NAMED:
-                    let inner_sym = self.pool.get_data0(inner)
-                    var is_tp = false
+            // Sema-based generic type param binding: infer from sema types first
+            let mg_arg_sema_tid = self.sema_type_of_node(arg_nodes.get(pi as i64))
+            if mg_arg_sema_tid > 0 and self.sema.get_type_kind(mg_arg_sema_tid) == TY_GENERIC_INST:
+                var mg_sema_bound = true
+                for gi in 0..g_count:
+                    let mg_inner_node = self.pool.get_extra(g_extra + gi)
+                    if self.pool.kind(mg_inner_node) != NK_TYPE_NAMED:
+                        mg_sema_bound = false
+                        break
+                    let mg_inner_sym = self.pool.get_data0(mg_inner_node)
+                    var mg_is_tp = false
                     for ti in 0..tp_syms.len() as i32:
-                        if tp_syms.get(ti as i64) == inner_sym:
-                            is_tp = true
+                        if tp_syms.get(ti as i64) == mg_inner_sym:
+                            mg_is_tp = true
                             break
-                    if is_tp:
-                        let elem_ty = self.find_vec_elem_type_by_llvm(arg_ty)
-                        if elem_ty != 0:
-                            var exists = false
-                            for bi in 0..bind_syms.len() as i32:
-                                if bind_syms.get(bi as i64) == inner_sym:
-                                    exists = true
-                                    break
-                            if not exists:
-                                bind_syms.push(inner_sym)
-                                bind_tys.push(elem_ty)
-                continue
-
-            if g_name == "HashMap" and g_count == 2:
-                let k_node = self.pool.get_extra(g_extra)
-                let v_node = self.pool.get_extra(g_extra + 1)
-                let key_ty = self.find_hashmap_key_type_by_llvm(arg_ty)
-                let val_ty = self.find_hashmap_val_type_by_llvm(arg_ty)
-                if key_ty != 0 and self.pool.kind(k_node) == NK_TYPE_NAMED:
-                    let k_sym = self.pool.get_data0(k_node)
-                    var is_tp_k = false
-                    for ti in 0..tp_syms.len() as i32:
-                        if tp_syms.get(ti as i64) == k_sym:
-                            is_tp_k = true
+                    if not mg_is_tp:
+                        mg_sema_bound = false
+                        break
+                    let mg_inner_ty = self.sema_generic_arg_llvm(mg_arg_sema_tid, gi)
+                    if mg_inner_ty == 0:
+                        mg_sema_bound = false
+                        break
+                    var mg_exists = false
+                    for bi in 0..bind_syms.len() as i32:
+                        if bind_syms.get(bi as i64) == mg_inner_sym:
+                            mg_exists = true
                             break
-                    if is_tp_k:
-                        var exists_k = false
-                        for bi in 0..bind_syms.len() as i32:
-                            if bind_syms.get(bi as i64) == k_sym:
-                                exists_k = true
-                                break
-                        if not exists_k:
-                            bind_syms.push(k_sym)
-                            bind_tys.push(key_ty)
-                if val_ty != 0 and self.pool.kind(v_node) == NK_TYPE_NAMED:
-                    let v_sym = self.pool.get_data0(v_node)
-                    var is_tp_v = false
-                    for ti in 0..tp_syms.len() as i32:
-                        if tp_syms.get(ti as i64) == v_sym:
-                            is_tp_v = true
-                            break
-                    if is_tp_v:
-                        var exists_v = false
-                        for bi in 0..bind_syms.len() as i32:
-                            if bind_syms.get(bi as i64) == v_sym:
-                                exists_v = true
-                                break
-                        if not exists_v:
-                            bind_syms.push(v_sym)
-                            bind_tys.push(val_ty)
-                continue
-
-            if g_name == "HashSet" and g_count == 1:
-                let inner = self.pool.get_extra(g_extra)
-                if self.pool.kind(inner) == NK_TYPE_NAMED:
-                    let inner_sym = self.pool.get_data0(inner)
-                    let elem_ty = self.find_hashset_elem_type_by_llvm(arg_ty)
-                    if elem_ty != 0:
-                        var is_tp = false
-                        for ti in 0..tp_syms.len() as i32:
-                            if tp_syms.get(ti as i64) == inner_sym:
-                                is_tp = true
-                                break
-                        if is_tp:
-                            var exists = false
-                            for bi in 0..bind_syms.len() as i32:
-                                if bind_syms.get(bi as i64) == inner_sym:
-                                    exists = true
-                                    break
-                            if not exists:
-                                bind_syms.push(inner_sym)
-                                bind_tys.push(elem_ty)
-                continue
-
-            if g_name == "Option" and g_count == 1:
-                let inner = self.pool.get_extra(g_extra)
-                if self.pool.kind(inner) == NK_TYPE_NAMED:
-                    let inner_sym = self.pool.get_data0(inner)
-                    let payload_ty = self.find_option_payload_type_by_llvm(arg_ty)
-                    if payload_ty != 0:
-                        var is_tp = false
-                        for ti in 0..tp_syms.len() as i32:
-                            if tp_syms.get(ti as i64) == inner_sym:
-                                is_tp = true
-                                break
-                        if is_tp:
-                            var exists = false
-                            for bi in 0..bind_syms.len() as i32:
-                                if bind_syms.get(bi as i64) == inner_sym:
-                                    exists = true
-                                    break
-                            if not exists:
-                                bind_syms.push(inner_sym)
-                                bind_tys.push(payload_ty)
-                continue
-
-            if g_name == "Result" and g_count == 2:
-                let ok_node = self.pool.get_extra(g_extra)
-                let err_node = self.pool.get_extra(g_extra + 1)
-                let ok_ty = self.find_result_ok_type_by_llvm(arg_ty)
-                let err_ty = self.find_result_err_type_by_llvm(arg_ty)
-                if ok_ty != 0 and self.pool.kind(ok_node) == NK_TYPE_NAMED:
-                    let ok_sym = self.pool.get_data0(ok_node)
-                    var is_tp_ok = false
-                    for ti in 0..tp_syms.len() as i32:
-                        if tp_syms.get(ti as i64) == ok_sym:
-                            is_tp_ok = true
-                            break
-                    if is_tp_ok:
-                        var exists_ok = false
-                        for bi in 0..bind_syms.len() as i32:
-                            if bind_syms.get(bi as i64) == ok_sym:
-                                exists_ok = true
-                                break
-                        if not exists_ok:
-                            bind_syms.push(ok_sym)
-                            bind_tys.push(ok_ty)
-                if err_ty != 0 and self.pool.kind(err_node) == NK_TYPE_NAMED:
-                    let err_sym = self.pool.get_data0(err_node)
-                    var is_tp_err = false
-                    for ti in 0..tp_syms.len() as i32:
-                        if tp_syms.get(ti as i64) == err_sym:
-                            is_tp_err = true
-                            break
-                    if is_tp_err:
-                        var exists_err = false
-                        for bi in 0..bind_syms.len() as i32:
-                            if bind_syms.get(bi as i64) == err_sym:
-                                exists_err = true
-                                break
-                        if not exists_err:
-                            bind_syms.push(err_sym)
-                            bind_tys.push(err_ty)
-                continue
+                    if not mg_exists:
+                        bind_syms.push(mg_inner_sym)
+                        bind_tys.push(mg_inner_ty)
+                if mg_sema_bound:
+                    continue
 
     let base_name = self.intern.resolve(fn_sym)
     var mangled = base_name
