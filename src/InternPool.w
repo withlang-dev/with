@@ -6,7 +6,7 @@
 use compiler.foundation.Types
 use compiler.foundation.Values
 
-extern fn with_hashmap_new_at(base: &T, offset: i64, key_size: i64, val_size: i64) -> void
+extern fn with_hashmap_new_at(base: &i8, offset: i64, key_size: i64, val_size: i64) -> void
 extern fn with_getenv_str(name: str) -> str
 extern fn with_eprintln(s: str) -> void
 
