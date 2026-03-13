@@ -497,14 +497,11 @@ type Codegen = {
     // Vec type cache: forward (elem → vec) and reverse (vec → elem) maps
     vec_cache_map: HashMap[i64, i64],
     vec_type_to_elem: HashMap[i64, i64],
-    vec_local_types: HashMap[i32, i64],
-
     // HashMap type cache
     hm_cache_map: HashMap[i64, i64],
     hm_type_to_key: HashMap[i64, i64],
     hm_type_to_val: HashMap[i64, i64],
     hm_type_to_is_str: HashMap[i64, i32],
-    hm_local_types: HashMap[i32, i64],
 
     // HashSet type cache (elem LLVM type → HashSet LLVM struct type)
     hs_cache_map: HashMap[i64, i64],
@@ -703,12 +700,10 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         gen_current_yield: 0,
         vec_cache_map: HashMap.new(),
         vec_type_to_elem: HashMap.new(),
-        vec_local_types: HashMap.new(),
         hm_cache_map: HashMap.new(),
         hm_type_to_key: HashMap.new(),
         hm_type_to_val: HashMap.new(),
         hm_type_to_is_str: HashMap.new(),
-        hm_local_types: HashMap.new(),
         hs_cache_map: HashMap.new(),
         type_binding_syms: Vec.new(),
         type_binding_types: Vec.new(),
@@ -1293,20 +1288,6 @@ fn Codegen.record_trait_local_concrete(self: Codegen, sym: i32, type_sym: i32):
     let canon = self.canonical_local_sym(sym)
     if canon != 0 and canon != sym:
         self.trait_local_concrete_types.insert(canon, type_sym)
-
-fn Codegen.record_local_container_type(self: Codegen, sym: i32, type_node: i32):
-    let vec_elem_ty = self.type_node_vec_elem_type(type_node)
-    if vec_elem_ty != 0:
-        self.vec_local_types.insert(sym, vec_elem_ty)
-        let canon = self.canonical_local_sym(sym)
-        if canon != 0 and canon != sym:
-            self.vec_local_types.insert(canon, vec_elem_ty)
-    let hm_llvm = self.type_node_hashmap_llvm_type(type_node)
-    if hm_llvm != 0:
-        self.hm_local_types.insert(sym, hm_llvm)
-        let canon = self.canonical_local_sym(sym)
-        if canon != 0 and canon != sym:
-            self.hm_local_types.insert(canon, hm_llvm)
 
 fn Codegen.lookup_local_alloca(self: Codegen, sym: i32) -> i64:
     let direct = self.local_allocas.get(sym)
@@ -3690,8 +3671,6 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     let saved_scope_count = self.scope_local_count
     let saved_defer = self.defer_stack
     let saved_errdefer = self.errdefer_stack
-    let saved_vec_local_types = self.vec_local_types
-    let saved_hm_local_types = self.hm_local_types
     let saved_enum_local_types = self.enum_local_types
     let saved_sema_local_types = self.local_sema_types
     let saved_expected = self.expected_type
@@ -3716,8 +3695,6 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_trait_concrete: HashMap[i32, i32] = HashMap.new()
-    let fresh_vec_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_hm_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
     let fresh_scope_syms: Vec[i32] = Vec.new()
     let fresh_scope_allocas: Vec[i64] = Vec.new()
@@ -3733,8 +3710,6 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     self.task_locals = fresh_task_locals
     self.trait_locals = fresh_trait_locals
     self.trait_local_concrete_types = fresh_trait_concrete
-    self.vec_local_types = fresh_vec_local_types
-    self.hm_local_types = fresh_hm_local_types
     self.enum_local_types = fresh_enum_local_types
     self.scope_local_syms = fresh_scope_syms
     self.scope_local_allocas = fresh_scope_allocas
@@ -3773,7 +3748,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
         let p_alloca = wl_build_alloca(self.builder, p_ty)
         wl_build_store(self.builder, p_val, p_alloca)
         self.record_local(p_name, p_alloca, p_ty, 1)
-        self.record_local_container_type(p_name, p_type_node)
+
         if pi == 0 and wl_get_type_kind(p_ty) == wl_pointer_type_kind():
             self.record_local_pointee_struct(p_name, impl_type_sym)
         if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NK_TYPE_NAMED:
@@ -3800,8 +3775,6 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     self.task_locals = saved_task_locals
     self.trait_locals = saved_trait_locals
     self.trait_local_concrete_types = saved_trait_concrete
-    self.vec_local_types = saved_vec_local_types
-    self.hm_local_types = saved_hm_local_types
     self.enum_local_types = saved_enum_local_types
     self.local_sema_types = saved_sema_local_types
     self.scope_local_syms = saved_scope_syms
@@ -5214,8 +5187,6 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
     let fresh_errdefer_stack: Vec[i32] = Vec.new()
     let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_trait_local_concrete_types: HashMap[i32, i32] = HashMap.new()
-    let fresh_vec_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_hm_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
     self.local_allocas = fresh_local_allocas
     self.local_types = fresh_local_types
@@ -5227,8 +5198,6 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
     self.errdefer_stack = fresh_errdefer_stack
     self.trait_locals = fresh_trait_locals
     self.trait_local_concrete_types = fresh_trait_local_concrete_types
-    self.vec_local_types = fresh_vec_local_types
-    self.hm_local_types = fresh_hm_local_types
     self.enum_local_types = fresh_enum_local_types
     self.scope_local_count = 0
 
@@ -5288,7 +5257,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         wl_build_store(self.builder, param_val, alloca)
 
         self.record_local(p_name, alloca, param_type, 1)
-        self.record_local_container_type(p_name, p_type_node)
+
         self.mir_local_ptrs.insert(pi + 1, alloca)
         self.mir_local_types.insert(pi + 1, param_type)
 
@@ -5426,8 +5395,6 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
     let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
     let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
     let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
-    let fresh_vec_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_hm_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
     self.local_allocas = fresh_local_allocas
     self.local_types = fresh_local_types
@@ -5435,8 +5402,6 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
     self.local_fn_sigs = fresh_local_fn_sigs
     self.local_pointee_structs = fresh_local_pointee_structs
     self.task_locals = fresh_task_locals
-    self.vec_local_types = fresh_vec_local_types
-    self.hm_local_types = fresh_hm_local_types
     self.enum_local_types = fresh_enum_local_types
     self.scope_local_count = 0
     let fresh_defer_stack: Vec[i32] = Vec.new()
@@ -5497,7 +5462,7 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
         wl_build_store(self.builder, param_val, alloca)
 
         self.record_local(p_name, alloca, param_type, 1)  // treat all as mutable for codegen
-        self.record_local_container_type(p_name, p_type_node)
+
         // Record sema type for generic type params
         if p_type_node != 0 and self.pool.kind(p_type_node) == NK_TYPE_GENERIC:
             let p_sema_tid = self.sema.resolve_type_expr(p_type_node)
@@ -6446,7 +6411,6 @@ fn Codegen.gen_let_binding(self: Codegen, node: i32) -> i64:
     wl_build_store(self.builder, stored, alloca)
     self.record_local(name_sym, alloca, storage_ty, is_mut)
     if declared_type_node != 0:
-        self.record_local_container_type(name_sym, declared_type_node)
         // Track sema type for generic type annotations
         if self.pool.kind(declared_type_node) == NK_TYPE_GENERIC:
             let sema_tid = self.sema.resolve_type_expr(declared_type_node)
@@ -6462,7 +6426,6 @@ fn Codegen.gen_let_binding(self: Codegen, node: i32) -> i64:
     if alias_sym != 0:
         self.record_local(alias_sym, alloca, storage_ty, is_mut)
         if declared_type_node != 0:
-            self.record_local_container_type(alias_sym, declared_type_node)
             if self.pool.kind(declared_type_node) == NK_TYPE_GENERIC:
                 let sema_tid_a = self.sema.resolve_type_expr(declared_type_node)
                 if sema_tid_a > 0:
@@ -6489,13 +6452,7 @@ fn Codegen.gen_let_binding(self: Codegen, node: i32) -> i64:
     wl_get_undef(wl_void_type(self.context))
 
 fn Codegen.track_local_type(self: Codegen, sym: i32, value_node: i32, val_ty: i64):
-    // Track vec element types for Vec locals
     let _ = value_node
-    let existing_vec = self.vec_local_types.get(sym)
-    if not existing_vec.is_some():
-        let vec_elem = self.find_vec_elem_type_by_llvm(val_ty)
-        if vec_elem != 0:
-            self.vec_local_types.insert(sym, vec_elem)
     // Track enum local types
     let existing_enum = self.enum_local_types.get(sym)
     if not existing_enum.is_some():
@@ -7038,11 +6995,6 @@ fn Codegen.infer_vec_elem_type_from_receiver(self: Codegen, obj_node: i32, obj_t
         if elem_llvm != 0:
             return elem_llvm
     // Legacy paths
-    if obj_node != 0 and self.pool.kind(obj_node) == NK_IDENT:
-        let sym = self.pool.get_data0(obj_node)
-        let elem_ty = self.vec_local_types.get(sym)
-        if elem_ty.is_some():
-            return elem_ty.unwrap() as i64
     if obj_node != 0 and self.pool.kind(obj_node) == NK_FIELD_ACCESS:
         let field_type_node = self.field_access_type_node(obj_node)
         let elem_ty = self.type_node_vec_elem_type(field_type_node)
@@ -7054,16 +7006,6 @@ fn Codegen.infer_vec_elem_type_from_receiver(self: Codegen, obj_node: i32, obj_t
     0
 
 fn Codegen.infer_hashmap_type_from_receiver(self: Codegen, obj_node: i32, obj_ty: i64) -> i64:
-    if obj_node != 0 and self.pool.kind(obj_node) == NK_IDENT:
-        let sym = self.pool.get_data0(obj_node)
-        let local_hm = self.hm_local_types.get(sym)
-        if local_hm.is_some():
-            return local_hm.unwrap() as i64
-        let canon = self.canonical_local_sym(sym)
-        if canon != 0 and canon != sym:
-            let canon_hm = self.hm_local_types.get(canon)
-            if canon_hm.is_some():
-                return canon_hm.unwrap() as i64
     if obj_node != 0 and self.pool.kind(obj_node) == NK_FIELD_ACCESS:
         let field_type_node = self.field_access_type_node(obj_node)
         let field_hm = self.type_node_hashmap_llvm_type(field_type_node)
@@ -7346,8 +7288,6 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
     let saved_scope_count = self.scope_local_count
     let saved_defer = self.defer_stack
     let saved_errdefer = self.errdefer_stack
-    let saved_vec_local_types = self.vec_local_types
-    let saved_hm_local_types = self.hm_local_types
     let saved_enum_local_types = self.enum_local_types
     let saved_sema_local_types = self.local_sema_types
     let saved_expected = self.expected_type
@@ -7369,8 +7309,6 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
     let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_trait_concrete: HashMap[i32, i32] = HashMap.new()
-    let fresh_vec_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_hm_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
     let fresh_scope_syms: Vec[i32] = Vec.new()
     let fresh_scope_allocas: Vec[i64] = Vec.new()
@@ -7386,8 +7324,6 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
     self.task_locals = fresh_task_locals
     self.trait_locals = fresh_trait_locals
     self.trait_local_concrete_types = fresh_trait_concrete
-    self.vec_local_types = fresh_vec_local_types
-    self.hm_local_types = fresh_hm_local_types
     self.enum_local_types = fresh_enum_local_types
     self.scope_local_syms = fresh_scope_syms
     self.scope_local_allocas = fresh_scope_allocas
@@ -7412,7 +7348,7 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
         let p_alloca = wl_build_alloca(self.builder, p_ty)
         wl_build_store(self.builder, p_val, p_alloca)
         self.record_local(p_name, p_alloca, p_ty, 1)
-        self.record_local_container_type(p_name, p_type_node)
+
         if p_type_node != 0:
             let pk = self.pool.kind(p_type_node)
             if pk == NK_TYPE_FN:
@@ -7439,8 +7375,6 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
     self.task_locals = saved_task_locals
     self.trait_locals = saved_trait_locals
     self.trait_local_concrete_types = saved_trait_concrete
-    self.vec_local_types = saved_vec_local_types
-    self.hm_local_types = saved_hm_local_types
     self.enum_local_types = saved_enum_local_types
     self.local_sema_types = saved_sema_local_types
     self.scope_local_syms = saved_scope_syms
@@ -10176,8 +10110,6 @@ fn Codegen.gen_async_function(self: Codegen, fn_node: i32):
     let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
     let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
     let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
-    let fresh_vec_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_hm_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
     self.local_allocas = fresh_local_allocas
     self.local_types = fresh_local_types
@@ -10185,8 +10117,6 @@ fn Codegen.gen_async_function(self: Codegen, fn_node: i32):
     self.local_fn_sigs = fresh_local_fn_sigs
     self.local_pointee_structs = fresh_local_pointee_structs
     self.task_locals = fresh_task_locals
-    self.vec_local_types = fresh_vec_local_types
-    self.hm_local_types = fresh_hm_local_types
     self.enum_local_types = fresh_enum_local_types
     self.scope_local_count = 0
     let fresh_defer_stack: Vec[i32] = Vec.new()
@@ -10222,7 +10152,7 @@ fn Codegen.gen_async_function(self: Codegen, fn_node: i32):
         let alloca = wl_build_alloca(self.builder, param_type)
         wl_build_store(self.builder, param_val, alloca)
         self.record_local(p_name, alloca, param_type, 1)
-        self.record_local_container_type(p_name, p_type_node)
+
 
     let body_val = self.gen_expr(body_node)
 
@@ -11190,11 +11120,6 @@ fn Codegen.gen_vec_method(self: Codegen, method: str, obj: i64, args_start: i32,
         let elem_ty = wl_type_of(elem)
         let elem_alloca = wl_build_alloca(self.builder, elem_ty)
         wl_build_store(self.builder, elem, elem_alloca)
-        // Record element type so subsequent get/pop calls know the type.
-        if self.pool.kind(obj_node) == NK_IDENT:
-            let obj_sym = self.pool.get_data0(obj_node)
-            if not self.vec_local_types.get(obj_sym).is_some():
-                self.vec_local_types.insert(obj_sym, elem_ty)
         let push_fn = self.ensure_vec_runtime_fn("with_vec_push", wl_void_type(self.context), 2)
         let push_ty = self.get_vec_fn_type("with_vec_push", wl_void_type(self.context), 2)
         let args: Vec[i64] = Vec.new()
