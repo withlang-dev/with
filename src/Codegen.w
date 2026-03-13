@@ -500,12 +500,11 @@ type Codegen = {
     vec_local_types: HashMap[i32, i64],
 
     // HashMap type cache
-    hm_cache_map: HashMap[i64, i32],
-    hm_llvm_types: Vec[i64],
-    hm_key_types: Vec[i64],
-    hm_val_types: Vec[i64],
-    hm_is_str_keys: Vec[i32],
-    hm_local_types: HashMap[i32, i32],
+    hm_cache_map: HashMap[i64, i64],
+    hm_type_to_key: HashMap[i64, i64],
+    hm_type_to_val: HashMap[i64, i64],
+    hm_type_to_is_str: HashMap[i64, i32],
+    hm_local_types: HashMap[i32, i64],
 
     // HashSet type cache (elem LLVM type → HashSet LLVM struct type)
     hs_cache_map: HashMap[i64, i64],
@@ -706,10 +705,9 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         vec_type_to_elem: HashMap.new(),
         vec_local_types: HashMap.new(),
         hm_cache_map: HashMap.new(),
-        hm_llvm_types: Vec.new(),
-        hm_key_types: Vec.new(),
-        hm_val_types: Vec.new(),
-        hm_is_str_keys: Vec.new(),
+        hm_type_to_key: HashMap.new(),
+        hm_type_to_val: HashMap.new(),
+        hm_type_to_is_str: HashMap.new(),
         hm_local_types: HashMap.new(),
         hs_cache_map: HashMap.new(),
         type_binding_syms: Vec.new(),
@@ -1303,12 +1301,12 @@ fn Codegen.record_local_container_type(self: Codegen, sym: i32, type_node: i32):
         let canon = self.canonical_local_sym(sym)
         if canon != 0 and canon != sym:
             self.vec_local_types.insert(canon, vec_elem_ty)
-    let hm_idx = self.type_node_hashmap_cache_index(type_node)
-    if hm_idx >= 0:
-        self.hm_local_types.insert(sym, hm_idx)
+    let hm_llvm = self.type_node_hashmap_llvm_type(type_node)
+    if hm_llvm != 0:
+        self.hm_local_types.insert(sym, hm_llvm)
         let canon = self.canonical_local_sym(sym)
         if canon != 0 and canon != sym:
-            self.hm_local_types.insert(canon, hm_idx)
+            self.hm_local_types.insert(canon, hm_llvm)
 
 fn Codegen.lookup_local_alloca(self: Codegen, sym: i32) -> i64:
     let direct = self.local_allocas.get(sym)
@@ -1861,6 +1859,13 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         return wl_struct_type(self.context, vec_data_i64(&elem_types), elem_count, 0)
 
     if kind == NK_TYPE_GENERIC:
+        // Sema-based primary path: resolve via TY_GENERIC_INST
+        let sema_tid = self.sema.resolve_type_expr(type_node)
+        if sema_tid > 0:
+            let llvm_ty = self.sema_type_to_llvm(sema_tid)
+            if llvm_ty != 0:
+                return llvm_ty
+        // Fallback for types sema_type_to_llvm doesn't handle (Box, ContextError, monomorphize)
         let name_sym = self.pool.get_data0(type_node)
         let g_extra = self.pool.get_data1(type_node)
         let g_count = self.pool.get_data2(type_node)
@@ -1947,34 +1952,8 @@ fn Codegen.resolve_named_type(self: Codegen, sym: i32) -> i64:
     self.resolve_user_named_type(sym)
 
 fn Codegen.resolve_generic_type(self: Codegen, name_sym: i32, extra_start: i32, arg_count: i32) -> i64:
+    // Handles types not covered by sema_type_to_llvm (Box, ContextError, monomorphize_struct)
     let name = self.intern.resolve(name_sym)
-    if name == "Option" and arg_count == 1:
-        let payload_node = self.pool.get_extra(extra_start)
-        let payload_ty = self.resolve_type(payload_node)
-        return self.get_or_create_option_type(payload_ty)
-    if name == "Result" and arg_count == 2:
-        let ok_node = self.pool.get_extra(extra_start)
-        let err_node = self.pool.get_extra(extra_start + 1)
-        let ok_ty = self.resolve_type(ok_node)
-        let err_ty = self.resolve_type(err_node)
-        return self.get_or_create_result_type(ok_ty, err_ty)
-    if name == "Vec" and arg_count == 1:
-        let elem_node = self.pool.get_extra(extra_start)
-        let elem_ty = self.resolve_type(elem_node)
-        // Keep std collections on the builtin runtime layout path.
-        // Older self-host seeds miscompile monomorphized Vec field bodies,
-        // which then poisons stage1/stage2 collection layouts.
-        return self.get_or_create_vec_type(elem_ty)
-    if name == "HashMap" and arg_count == 2:
-        let key_node = self.pool.get_extra(extra_start)
-        let val_node = self.pool.get_extra(extra_start + 1)
-        let key_ty = self.resolve_type(key_node)
-        let val_ty = self.resolve_type(val_node)
-        return self.get_or_create_hashmap_type(key_ty, val_ty)
-    if name == "HashSet" and arg_count == 1:
-        let elem_node = self.pool.get_extra(extra_start)
-        let elem_ty = self.resolve_type(elem_node)
-        return self.get_or_create_hashset_type(elem_ty)
     if name == "Box" and arg_count == 1:
         let inner_node = self.pool.get_extra(extra_start)
         if self.pool.kind(inner_node) == NK_TYPE_TRAIT_OBJ:
@@ -2510,11 +2489,12 @@ fn Codegen.gen_builtin_hashmap_new(self: Codegen, hm_ty: i64, hm_type_node: i32)
     if concrete_hm_ty == 0:
         return wl_get_undef(wl_i32_type(self.context))
     if key_ty == 0 or val_ty == 0:
-        let cache_idx = self.find_hashmap_cache_index_by_llvm(concrete_hm_ty)
-        if cache_idx < 0:
+        let key_opt = self.hm_type_to_key.get(concrete_hm_ty)
+        let val_opt = self.hm_type_to_val.get(concrete_hm_ty)
+        if not key_opt.is_some() or not val_opt.is_some():
             return self.build_default_value(concrete_hm_ty)
-        key_ty = self.hm_key_types.get(cache_idx as i64)
-        val_ty = self.hm_val_types.get(cache_idx as i64)
+        key_ty = key_opt.unwrap() as i64
+        val_ty = val_opt.unwrap() as i64
     let key_size = self.abi_size_of(key_ty)
     let val_size = self.abi_size_of(val_ty)
     let new_fn = self.ensure_hashmap_new_declared()
@@ -3023,14 +3003,9 @@ fn Codegen.get_or_create_hashmap_type(self: Codegen, key_ty: i64, val_ty: i64) -
     let hash = key_ty * 65537 + val_ty
     let cached = self.hm_cache_map.get(hash)
     if cached.is_some():
-        let idx = cached.unwrap()
-        if idx >= 0 and idx < self.hm_llvm_types.len() as i32:
-            if self.hm_key_types.get(idx as i64) == key_ty and self.hm_val_types.get(idx as i64) == val_ty:
-                return self.hm_llvm_types.get(idx as i64)
-    let exact_idx = self.find_hashmap_cache_index_by_parts(key_ty, val_ty)
-    if exact_idx >= 0:
-        self.hm_cache_map.insert(hash, exact_idx)
-        return self.hm_llvm_types.get(exact_idx as i64)
+        let existing = cached.unwrap() as i64
+        if self.hm_type_to_key.contains(existing):
+            return existing
     // HashMap is opaque { ptr }
     let body: Vec[i64] = Vec.new()
     body.push(wl_ptr_type(self.context))
@@ -3044,18 +3019,14 @@ fn Codegen.cache_hashmap_type(self: Codegen, key_ty: i64, val_ty: i64, hm_ty: i6
     let hash = key_ty * 65537 + val_ty
     let cached = self.hm_cache_map.get(hash)
     if cached.is_some():
-        let idx = cached.unwrap()
-        if idx >= 0 and idx < self.hm_llvm_types.len() as i32:
-            if self.hm_key_types.get(idx as i64) == key_ty and self.hm_val_types.get(idx as i64) == val_ty:
-                return self.hm_llvm_types.get(idx as i64)
-    let exact_idx = self.find_hashmap_cache_index_by_parts(key_ty, val_ty)
-    if exact_idx >= 0:
-        self.hm_cache_map.insert(hash, exact_idx)
-        return self.hm_llvm_types.get(exact_idx as i64)
-    let idx = self.hm_llvm_types.len() as i32
-    self.hm_llvm_types.push(hm_ty)
-    self.hm_key_types.push(key_ty)
-    self.hm_val_types.push(val_ty)
+        let existing = cached.unwrap()
+        if self.hm_type_to_key.contains(existing):
+            return existing
+    if self.hm_type_to_key.contains(hm_ty):
+        self.hm_cache_map.insert(hash, hm_ty)
+        return hm_ty
+    self.hm_type_to_key.insert(hm_ty, key_ty)
+    self.hm_type_to_val.insert(hm_ty, val_ty)
     // Check if str key
     let str_sym = self.intern.intern("str")
     let str_opt = self.struct_type_map.get(str_sym)
@@ -3063,8 +3034,8 @@ fn Codegen.cache_hashmap_type(self: Codegen, key_ty: i64, val_ty: i64, hm_ty: i6
     if str_opt.is_some():
         if key_ty == self.struct_llvm_types.get(str_opt.unwrap() as i64):
             is_str = 1
-    self.hm_is_str_keys.push(is_str)
-    self.hm_cache_map.insert(hash, idx)
+    self.hm_type_to_is_str.insert(hm_ty, is_str)
+    self.hm_cache_map.insert(hash, hm_ty)
     hm_ty
 
 fn Codegen.get_or_create_hashset_type(self: Codegen, elem_ty: i64) -> i64:
@@ -3746,7 +3717,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_trait_concrete: HashMap[i32, i32] = HashMap.new()
     let fresh_vec_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_hm_local_types: HashMap[i32, i32] = HashMap.new()
+    let fresh_hm_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
     let fresh_scope_syms: Vec[i32] = Vec.new()
     let fresh_scope_allocas: Vec[i64] = Vec.new()
@@ -5244,7 +5215,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
     let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_trait_local_concrete_types: HashMap[i32, i32] = HashMap.new()
     let fresh_vec_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_hm_local_types: HashMap[i32, i32] = HashMap.new()
+    let fresh_hm_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
     self.local_allocas = fresh_local_allocas
     self.local_types = fresh_local_types
@@ -5456,7 +5427,7 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
     let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
     let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_vec_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_hm_local_types: HashMap[i32, i32] = HashMap.new()
+    let fresh_hm_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
     self.local_allocas = fresh_local_allocas
     self.local_types = fresh_local_types
@@ -7024,36 +6995,27 @@ fn Codegen.find_vec_cache_index_by_llvm(self: Codegen, vec_ty: i64) -> i32:
     0 - 1
 
 fn Codegen.find_hashmap_cache_index_by_llvm(self: Codegen, hm_ty: i64) -> i32:
-    for i in 0..self.hm_llvm_types.len() as i32:
-        let cached_ty = self.hm_llvm_types.get(i as i64)
-        if cached_ty == hm_ty or self.llvm_named_struct_matches(cached_ty, hm_ty):
-            return i
+    if self.hm_type_to_key.contains(hm_ty):
+        return 0
     0 - 1
 
-fn Codegen.find_hashmap_cache_index_by_parts(self: Codegen, key_ty: i64, val_ty: i64) -> i32:
-    for i in 0..self.hm_llvm_types.len() as i32:
-        if self.hm_key_types.get(i as i64) == key_ty and self.hm_val_types.get(i as i64) == val_ty:
-            return i
-    0 - 1
-
-fn Codegen.type_node_hashmap_cache_index(self: Codegen, type_node: i32) -> i32:
+fn Codegen.type_node_hashmap_llvm_type(self: Codegen, type_node: i32) -> i64:
     if type_node == 0 or self.pool.kind(type_node) != NK_TYPE_GENERIC:
-        return 0 - 1
+        return 0
     let name_sym = self.pool.get_data0(type_node)
     if self.intern.resolve(name_sym) != "HashMap":
-        return 0 - 1
+        return 0
     let extra_start = self.pool.get_data1(type_node)
     let arg_count = self.pool.get_data2(type_node)
     if arg_count != 2:
-        return 0 - 1
+        return 0
     let key_node = self.pool.get_extra(extra_start)
     let val_node = self.pool.get_extra(extra_start + 1)
     let key_ty = self.resolve_type(key_node)
     let val_ty = self.resolve_type(val_node)
     if key_ty == 0 or val_ty == 0:
-        return 0 - 1
-    let _ = self.get_or_create_hashmap_type(key_ty, val_ty)
-    self.find_hashmap_cache_index_by_parts(key_ty, val_ty)
+        return 0
+    self.get_or_create_hashmap_type(key_ty, val_ty)
 
 fn Codegen.type_node_vec_elem_type(self: Codegen, type_node: i32) -> i64:
     if type_node == 0 or self.pool.kind(type_node) != NK_TYPE_GENERIC:
@@ -7091,23 +7053,25 @@ fn Codegen.infer_vec_elem_type_from_receiver(self: Codegen, obj_node: i32, obj_t
         return vec_elem
     0
 
-fn Codegen.infer_hashmap_cache_index_from_receiver(self: Codegen, obj_node: i32, obj_ty: i64) -> i32:
+fn Codegen.infer_hashmap_type_from_receiver(self: Codegen, obj_node: i32, obj_ty: i64) -> i64:
     if obj_node != 0 and self.pool.kind(obj_node) == NK_IDENT:
         let sym = self.pool.get_data0(obj_node)
-        let local_idx = self.hm_local_types.get(sym)
-        if local_idx.is_some():
-            return local_idx.unwrap()
+        let local_hm = self.hm_local_types.get(sym)
+        if local_hm.is_some():
+            return local_hm.unwrap() as i64
         let canon = self.canonical_local_sym(sym)
         if canon != 0 and canon != sym:
-            let canon_idx = self.hm_local_types.get(canon)
-            if canon_idx.is_some():
-                return canon_idx.unwrap()
+            let canon_hm = self.hm_local_types.get(canon)
+            if canon_hm.is_some():
+                return canon_hm.unwrap() as i64
     if obj_node != 0 and self.pool.kind(obj_node) == NK_FIELD_ACCESS:
         let field_type_node = self.field_access_type_node(obj_node)
-        let field_idx = self.type_node_hashmap_cache_index(field_type_node)
-        if field_idx >= 0:
-            return field_idx
-    self.find_hashmap_cache_index_by_llvm(obj_ty)
+        let field_hm = self.type_node_hashmap_llvm_type(field_type_node)
+        if field_hm != 0:
+            return field_hm
+    if self.hm_type_to_key.contains(obj_ty):
+        return obj_ty
+    0
 
 
 
@@ -7406,7 +7370,7 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
     let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_trait_concrete: HashMap[i32, i32] = HashMap.new()
     let fresh_vec_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_hm_local_types: HashMap[i32, i32] = HashMap.new()
+    let fresh_hm_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
     let fresh_scope_syms: Vec[i32] = Vec.new()
     let fresh_scope_allocas: Vec[i64] = Vec.new()
@@ -7895,13 +7859,14 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
     let obj_ty = wl_type_of(obj)
     if self.debug_method_dispatch_enabled() and method_name == "get":
         let vec_idx = self.find_vec_cache_index_by_llvm(obj_ty)
-        let hm_idx = self.find_hashmap_cache_index_by_llvm(obj_ty)
+        var is_hm = 0
+        if self.hm_type_to_key.contains(obj_ty): is_hm = 1
         var msg = "[method-dispatch] method=get"
         if self.current_function_name_sym != 0:
             msg = msg ++ " fn=" ++ self.function_symbol_name(self.current_function_name_sym)
         msg = msg ++ " obj_ty=" ++ self.llvm_type_mangle(obj_ty)
         msg = msg ++ " vec_idx=" ++ int_to_string(vec_idx)
-        msg = msg ++ " hm_idx=" ++ int_to_string(hm_idx)
+        msg = msg ++ " is_hm=" ++ int_to_string(is_hm)
         with_eprintln(msg)
 
     if method_name == "track":
@@ -7958,9 +7923,9 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
         return self.gen_vec_method(method_name, obj, args_start, arg_count, obj_node)
 
     // HashMap methods
-    let hmc = self.infer_hashmap_cache_index_from_receiver(obj_node, obj_ty)
-    if hmc >= 0:
-        return self.gen_hashmap_method(method_name, obj, args_start, arg_count, hmc)
+    let hm_llvm_ty = self.infer_hashmap_type_from_receiver(obj_node, obj_ty)
+    if hm_llvm_ty != 0:
+        return self.gen_hashmap_method(method_name, obj, args_start, arg_count, hm_llvm_ty)
 
     // Option methods (is_some, unwrap, etc.)
     let option_payload_ty = self.find_option_payload_type_by_llvm(obj_ty)
@@ -10212,7 +10177,7 @@ fn Codegen.gen_async_function(self: Codegen, fn_node: i32):
     let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
     let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_vec_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_hm_local_types: HashMap[i32, i32] = HashMap.new()
+    let fresh_hm_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
     self.local_allocas = fresh_local_allocas
     self.local_types = fresh_local_types
@@ -11573,14 +11538,17 @@ fn Codegen.get_vec_fn_type(self: Codegen, name: str, ret_ty: i64, param_count: i
 
 // ── HashMap method dispatch ───────────────────────────────────────
 
-fn Codegen.gen_hashmap_method(self: Codegen, method: str, obj: i64, args_start: i32, arg_count: i32, cache_idx: i32) -> i64:
+fn Codegen.gen_hashmap_method(self: Codegen, method: str, obj: i64, args_start: i32, arg_count: i32, hm_ty: i64) -> i64:
     let i64_ty = wl_i64_type(self.context)
     let i32_ty = wl_i32_type(self.context)
     let ptr_ty = wl_ptr_type(self.context)
 
     // HashMap stores an opaque pointer
     let map_ptr = wl_build_extract_value(self.builder, obj, 0)
-    let is_str = self.hm_is_str_keys.get(cache_idx as i64)
+    var is_str = 0
+    let is_str_opt = self.hm_type_to_is_str.get(hm_ty)
+    if is_str_opt.is_some():
+        is_str = is_str_opt.unwrap()
     let is_str_val = wl_const_int(i64_ty, is_str as i64, 0)
 
     if method == "len":
@@ -11636,7 +11604,7 @@ fn Codegen.gen_hashmap_method(self: Codegen, method: str, obj: i64, args_start: 
         let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
         wl_build_store(self.builder, key, key_alloca)
         // Allocate output buffer
-        let val_ty = self.hm_val_types.get(cache_idx as i64)
+        let val_ty = self.hm_type_to_val.get(hm_ty).unwrap() as i64
         let out_alloca = wl_build_alloca(self.builder, val_ty)
         let fn_val = self.ensure_hm_fn("with_hashmap_get", i64_ty)
         let params: Vec[i64] = Vec.new()

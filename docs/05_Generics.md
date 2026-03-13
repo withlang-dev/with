@@ -297,17 +297,21 @@ group at a time, verifying fixpoint after each deletion.
 - [x] Delete `find_hashmap_key_type_by_llvm` — dead code after sema path
 - [x] Delete `find_hashmap_val_type_by_llvm` — dead code after sema path
 - [x] Delete HashMap fallback block in monomorphize_generic_call
-- [ ] Delete `hm_cache_map: HashMap[i64, i32]` — still used for creation cache
-- [ ] Delete `hm_llvm_types: Vec[i64]` — still used by creation cache
-- [ ] Delete `hm_key_types: Vec[i64]` — still used by gen_hashmap_method
-- [ ] Delete `hm_val_types: Vec[i64]` — still used by gen_hashmap_method
-- [ ] Delete `hm_is_str_keys: Vec[i32]` — still used by gen_hashmap_method
-- [ ] Delete `hm_local_types: HashMap[i32, i32]` (Phase 9.6)
-- [ ] Delete `find_hashmap_cache_index_by_llvm` — still has callers
-- [ ] Delete `find_hashmap_cache_index_by_parts` — internal to creation cache
-- [ ] Delete `type_node_hashmap_cache_index` — still used
-- [ ] Delete `infer_hashmap_cache_index_from_receiver` — still used
-- [ ] `make build && make fixpoint`
+- [x] Simplify `hm_cache_map` from `HashMap[i64, i32]` to `HashMap[i64, i64]`
+      (hash → LLVM type direct mapping, no index indirection)
+- [x] Delete `hm_llvm_types: Vec[i64]` — replaced by hm_type_to_key HashMap
+- [x] Delete `hm_key_types: Vec[i64]` — replaced by hm_type_to_key HashMap
+- [x] Delete `hm_val_types: Vec[i64]` — replaced by hm_type_to_val HashMap
+- [x] Delete `hm_is_str_keys: Vec[i32]` — replaced by hm_type_to_is_str HashMap
+- [x] Delete `find_hashmap_cache_index_by_parts` — no more parallel vec indexing
+- [x] Rename `type_node_hashmap_cache_index` → `type_node_hashmap_llvm_type`
+      (returns LLVM type directly, 0 if not HashMap)
+- [x] Rename `infer_hashmap_cache_index_from_receiver` → `infer_hashmap_type_from_receiver`
+      (returns LLVM type, 0 if not HashMap)
+- [x] Update `gen_hashmap_method` to take hm_ty: i64 instead of cache_idx: i32,
+      uses hm_type_to_val/hm_type_to_is_str for O(1) lookups
+- [ ] Delete `hm_local_types: HashMap[i32, i64]` (Phase 9.6)
+- [x] `make build && make fixpoint` — 230/230 tests pass
 
 ### 9.3 Delete HashSet cache workarounds
 
@@ -323,10 +327,13 @@ group at a time, verifying fixpoint after each deletion.
 
 ### 9.4 Delete resolve_generic_type dispatcher
 
-- [ ] Delete `resolve_generic_type` (lines 1712-1754) — all dispatch
-      now handled by sema's TY_GENERIC_INST
-- [ ] Update `resolve_type` to read TY_GENERIC_INST directly
-- [ ] `make build && make fixpoint`
+- [x] Add sema-based primary path in `resolve_type(NK_TYPE_GENERIC)`:
+      calls `sema.resolve_type_expr` → `sema_type_to_llvm` before fallback
+- [x] Delete Vec/HashMap/HashSet/Option/Result cases from `resolve_generic_type`
+      — handled by sema_type_to_llvm via TY_GENERIC_INST
+- [x] Retain Box, ContextError, and monomorphize_struct fallback
+      (sema_type_to_llvm doesn't handle these yet)
+- [x] `make build && make fixpoint` — 230/230 tests pass
 
 ### 9.5 Delete type binding system
 
