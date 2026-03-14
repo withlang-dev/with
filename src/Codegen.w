@@ -4690,9 +4690,7 @@ fn Codegen.mir_operand_is_supported(self: Codegen, body: MirBody, operand_id: i3
             return false
         let ck = body.const_kinds.get(od as i64)
         if for_call_callee:
-            if ck == CK_FN and with_getenv_str("WITH_CK_FN").len() > 0:
-                return true
-            return false
+            return ck == CK_FN
         return ck == CK_INT or ck == CK_BOOL or ck == CK_STR or ck == CK_UNIT or ck == CK_FLOAT or ck == CK_ZERO_SIZED
     false
 
