@@ -198,17 +198,15 @@ fn MirBuilder.lookup_local(self: MirBuilder, sym: i32) -> i32:
 fn MirBuilder.expr_type(self: MirBuilder, node: i32) -> i32:
     if node == 0:
         return self.sema.ty_void
-    let start = self.ast.get_start(node)
-    if self.sema.typed_expr_types.contains(start):
-        let typed = self.sema.typed_expr_types.get(start).unwrap()
+    if self.sema.typed_expr_types.contains(node):
+        let typed = self.sema.typed_expr_types.get(node).unwrap()
         if typed != 0:
             return typed
     self.fallback_expr_type(node)
 
 fn MirBuilder.binding_type(self: MirBuilder, node: i32) -> i32:
-    let start = self.ast.get_start(node)
-    if self.sema.typed_binding_types.contains(start):
-        let typed = self.sema.typed_binding_types.get(start).unwrap()
+    if self.sema.typed_binding_types.contains(node):
+        let typed = self.sema.typed_binding_types.get(node).unwrap()
         if typed != 0:
             return typed
     let rhs = self.ast.get_data1(node)
@@ -1598,10 +1596,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NK_CAST:
         // Read pre-resolved cast type from sema sidecar (avoids add_type on
         // shallow-copied Sema — see resolve_type_expr aliasing bug).
-        let cast_start = self.ast.get_start(node)
         var cast_tid = 0
-        if self.sema.typed_expr_types.contains(cast_start):
-            cast_tid = self.sema.typed_expr_types.get(cast_start).unwrap()
+        if self.sema.typed_expr_types.contains(node):
+            cast_tid = self.sema.typed_expr_types.get(node).unwrap()
         else:
             cast_tid = self.sema.resolve_type_expr(self.ast.get_data1(node))
         return self.lower_cast(self.ast.get_data0(node), cast_tid, node)

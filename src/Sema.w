@@ -1893,10 +1893,9 @@ fn Sema.collect_let_decl(self: Sema, node: i32, is_local: i32):
         if self.type_expr_is_collection_with_ref(type_node) != 0:
             self.emit_error("ephemeral references cannot be stored in generic containers", node)
     self.scope_put_at(name, bind_ty, is_mut, node)
-    let span_start = self.ast.get_start(node)
-    self.typed_binding_types.insert(span_start, bind_ty)
-    self.typed_binding_names.insert(span_start, name)
-    self.typed_binding_muts.insert(span_start, is_mut)
+    self.typed_binding_types.insert(node, bind_ty)
+    self.typed_binding_names.insert(node, name)
+    self.typed_binding_muts.insert(node, is_mut)
 
 fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
@@ -2788,7 +2787,7 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     let body_ty = self.check_expr(body)
     self.expected_expr_type = saved_expected_et
     self.has_expected_type = saved_has_et
-    self.typed_expr_types.insert(self.ast.get_start(body), body_ty)
+    self.typed_expr_types.insert(body, body_ty)
     let has_ret_annotation = meta >= 0 and self.ast.fn_meta_ret(meta) != 0
     if not has_ret_annotation:
         let inferred_ret = if body_ty != 0: body_ty else: self.ty_void
@@ -3080,7 +3079,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
         let cast_tid = self.resolve_type_expr(self.ast.get_data1(node))
         // Store resolved cast type so MIR lowering can read it without
         // calling resolve_type_expr (which would add_type on a shallow-copied Sema).
-        self.typed_expr_types.insert(self.ast.get_start(node), cast_tid)
+        self.typed_expr_types.insert(node, cast_tid)
         return cast_tid
 
     if kind == NK_PIPELINE:
@@ -3375,7 +3374,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         self.match_in_stmt_pos = 1
         let stmt_ty = self.check_expr(stmt)
         self.match_in_stmt_pos = saved_stmt_pos
-        self.typed_expr_types.insert(self.ast.get_start(stmt), stmt_ty)
+        self.typed_expr_types.insert(stmt, stmt_ty)
         let stmt_kind = self.ast.kind(stmt)
         let can_discard_task = stmt_kind == NK_CALL or stmt_kind == NK_IDENT or stmt_kind == NK_GROUPED or stmt_kind == NK_ASYNC_BLOCK or stmt_kind == NK_TUPLE
         let is_discarded_task = can_discard_task and stmt_kind != NK_SPAWN and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
@@ -3393,12 +3392,12 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
             self.match_in_stmt_pos = 1
         result = self.check_expr(tail)
         self.match_in_stmt_pos = saved_stmt_pos
-        self.typed_expr_types.insert(self.ast.get_start(tail), result)
+        self.typed_expr_types.insert(tail, result)
     self.expire_dead_borrows_in_block(extra_start, stmt_count, stmt_count, 0)
 
     self.pop_scope()
     if result != 0 and result != self.ty_void:
-        self.typed_expr_types.insert(self.ast.get_start(node), result)
+        self.typed_expr_types.insert(node, result)
     result
 
 fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
@@ -3438,10 +3437,9 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
         self.emit_error("ephemeral references cannot be stored in generic containers", node)
 
     self.scope_put_at(name, bind_type, is_mut, node)
-    let span_start = self.ast.get_start(node)
-    self.typed_binding_types.insert(span_start, bind_type)
-    self.typed_binding_names.insert(span_start, name)
-    self.typed_binding_muts.insert(span_start, is_mut)
+    self.typed_binding_types.insert(node, bind_type)
+    self.typed_binding_names.insert(node, name)
+    self.typed_binding_muts.insert(node, is_mut)
     self.scope_set_is_task(name, self.expr_is_task_value(value))
     self.scope_set_is_scoped_task(name, self.expr_is_scoped_task_value(value))
     self.scope_set_is_ephemeral_task(name, self.expr_is_ephemeral_task(value))
@@ -3477,7 +3475,7 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
         else:
             result_type = else_type
     if result_type != 0 and result_type != self.ty_void:
-        self.typed_expr_types.insert(self.ast.get_start(node), result_type)
+        self.typed_expr_types.insert(node, result_type)
     result_type
 
 fn Sema.check_return(self: Sema, node: i32) -> i32:
@@ -3755,9 +3753,9 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                             if tp_count > 2: self.type_extra.push(ga2)
                             if tp_count > 3: self.type_extra.push(ga3)
                             let gi = self.add_type(TY_GENERIC_INST, name, te, tp_count)
-                            self.typed_expr_types.insert(self.ast.get_start(node), gi)
+                            self.typed_expr_types.insert(node, gi)
                             return gi
-            self.typed_expr_types.insert(self.ast.get_start(node), resolved)
+            self.typed_expr_types.insert(node, resolved)
             return resolved
     0
 
@@ -3803,7 +3801,7 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
     self.check_match_exhaustiveness(node, subject_type, extra_start, arm_count, require_exhaustive)
 
     if result_type != 0:
-        self.typed_expr_types.insert(self.ast.get_start(node), result_type)
+        self.typed_expr_types.insert(node, result_type)
     result_type
 
 fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, extra_start: i32, arm_count: i32, require_exhaustive: i32):
@@ -6624,10 +6622,10 @@ fn Sema.dump_typed_module(self: Sema) -> str:
 
         if kind == NK_LET_DECL:
             let name = self.safe_symbol_text(self.ast.get_data0(decl))
-            let has_resolved = self.typed_binding_types.contains(start) and self.typed_binding_types.get(start).unwrap() != 0
+            let has_resolved = self.typed_binding_types.contains(decl) and self.typed_binding_types.get(decl).unwrap() != 0
             if has_resolved:
-                let ty = self.typed_binding_types.get(start).unwrap()
-                let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: 0
+                let ty = self.typed_binding_types.get(decl).unwrap()
+                let is_mut = if self.typed_binding_muts.contains(decl): self.typed_binding_muts.get(decl).unwrap() else: 0
                 out = out ++ "  let " ++ name
                 if is_mut != 0:
                     out = out ++ " (mut)"
@@ -6767,10 +6765,10 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
 
         if kind == NK_LET_DECL:
             let name = self.safe_symbol_text(self.ast.get_data0(decl))
-            let has_resolved = self.typed_binding_types.contains(start) and self.typed_binding_types.get(start).unwrap() != 0
+            let has_resolved = self.typed_binding_types.contains(decl) and self.typed_binding_types.get(decl).unwrap() != 0
             if has_resolved:
-                let ty = self.typed_binding_types.get(start).unwrap()
-                let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: 0
+                let ty = self.typed_binding_types.get(decl).unwrap()
+                let is_mut = if self.typed_binding_muts.contains(decl): self.typed_binding_muts.get(decl).unwrap() else: 0
                 print("  let ")
                 print(name)
                 if is_mut != 0:
@@ -6847,20 +6845,20 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
     let kind = self.ast.kind(node)
     let start = self.ast.get_start(node)
     let end = self.ast.get_end(node)
-    let has_typed_expr = self.typed_expr_types.contains(start)
+    let has_typed_expr = self.typed_expr_types.contains(node)
 
     if has_typed_expr:
-        let tid = self.typed_expr_types.get(start).unwrap()
+        let tid = self.typed_expr_types.get(node).unwrap()
         out = out ++ typed_indent(indent) ++ "expr " ++ typed_expr_kind_name(kind) ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ " : " ++ self.type_name(tid) ++ "\n"
 
     if kind == NK_LET_BINDING:
-        if self.typed_binding_types.contains(start):
-            let name_sym = if self.typed_binding_names.contains(start): self.typed_binding_names.get(start).unwrap() else: self.ast.get_data0(node)
-            let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: (self.ast.get_data2(node) % 2)
+        if self.typed_binding_types.contains(node):
+            let name_sym = if self.typed_binding_names.contains(node): self.typed_binding_names.get(node).unwrap() else: self.ast.get_data0(node)
+            let is_mut = if self.typed_binding_muts.contains(node): self.typed_binding_muts.get(node).unwrap() else: (self.ast.get_data2(node) % 2)
             out = out ++ typed_indent(indent + 1) ++ "bind " ++ self.safe_symbol_text(name_sym)
             if is_mut != 0:
                 out = out ++ " (mut)"
-            out = out ++ ": " ++ self.type_name(self.typed_binding_types.get(start).unwrap()) ++ "\n"
+            out = out ++ ": " ++ self.type_name(self.typed_binding_types.get(node).unwrap()) ++ "\n"
 
     if kind == NK_BINARY:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
@@ -7084,10 +7082,10 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
     let kind = self.ast.kind(node)
     let start = self.ast.get_start(node)
     let end = self.ast.get_end(node)
-    let has_typed_expr = self.typed_expr_types.contains(start)
+    let has_typed_expr = self.typed_expr_types.contains(node)
 
     if has_typed_expr:
-        let tid = self.typed_expr_types.get(start).unwrap()
+        let tid = self.typed_expr_types.get(node).unwrap()
         emit_typed_indent(indent)
         print("expr ")
         print(typed_expr_kind_name(kind))
@@ -7100,16 +7098,16 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
         print("\n")
 
     if kind == NK_LET_BINDING:
-        if self.typed_binding_types.contains(start):
-            let name_sym = if self.typed_binding_names.contains(start): self.typed_binding_names.get(start).unwrap() else: self.ast.get_data0(node)
-            let is_mut = if self.typed_binding_muts.contains(start): self.typed_binding_muts.get(start).unwrap() else: (self.ast.get_data2(node) % 2)
+        if self.typed_binding_types.contains(node):
+            let name_sym = if self.typed_binding_names.contains(node): self.typed_binding_names.get(node).unwrap() else: self.ast.get_data0(node)
+            let is_mut = if self.typed_binding_muts.contains(node): self.typed_binding_muts.get(node).unwrap() else: (self.ast.get_data2(node) % 2)
             emit_typed_indent(indent + 1)
             print("bind ")
             print(self.safe_symbol_text(name_sym))
             if is_mut != 0:
                 print(" (mut)")
             print(": ")
-            print(self.type_name(self.typed_binding_types.get(start).unwrap()))
+            print(self.type_name(self.typed_binding_types.get(node).unwrap()))
             print("\n")
 
     if kind == NK_BINARY:
