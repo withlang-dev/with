@@ -4,9 +4,9 @@ Ship as one atomic commit. Neither half works alone.
 
 ## Current State
 
-- 177 MIR-dispatched, 1143 lowering-failed, 258 codegen-unsupported
-- CK_FN gate disabled (`return false` in `mir_operand_is_supported`)
-- Prerequisites landed, seed updated, fixpoint verified
+- CK_FN gate **enabled** — MIR handles function call dispatch
+- 246/246 tests pass, fixpoint verified
+- Remaining AST fallbacks: closures, indirect calls, lowering-failed, codegen-unsupported
 
 ## The Two Problems
 
@@ -40,7 +40,7 @@ MIR codegen never checks `fn_ref_param_starts`.
 - [x] **A1.** Compute `method_key_sym` early in `declare_function`
 - [x] **A2.** Register method_key in `fn_values` / `fn_fn_types`
 - [x] **A3.** Register ref_param / dyn_param under method_key
-- [ ] **A4.** Re-enable CK_FN gate — all 182 tests pass with `WITH_CK_FN=1`, ready to flip
+- [x] **A4.** Re-enable CK_FN gate — enabled permanently, fixpoint verified
 
 ---
 
@@ -65,20 +65,10 @@ MIR codegen never checks `fn_ref_param_starts`.
 
 ---
 
-## Remaining: Re-enable CK_FN (A4)
+## CK_FN: DONE
 
-All 182 non-skipped tests pass with `WITH_CK_FN=1` forced on.
-The `WITH_CK_FN` env var gate is in `mir_operand_is_supported`.
-
-Next step: flip the gate permanently and fix the self-host chain.
-
-1. Change `mir_operand_is_supported` to `return ck == CK_FN` (remove env var check)
-2. Build — self-host chain may expose new MIR codegen bugs in compiler functions
-3. Fix any self-host failures
-4. Fixpoint + full test suite
-5. Update seed
-
-Do NOT binary-search crashes one at a time. Use IR diff for systematic debugging.
+CK_FN gate enabled permanently. 246/246 tests pass. Fixpoint verified.
+Self-host chain required no additional fixes beyond the test-harness work.
 
 ---
 
