@@ -174,9 +174,8 @@ Total functions in self-host build: **~1,580**
 
 | Path | Count | % |
 |---|---|---|
-| MIR codegen (working) | ~1,557 | 98.5% |
+| MIR codegen (working) | ~1,577 | 99.8% |
 | AST fallback: unsupported-callee | 3 | 0.2% |
-| AST fallback: intrinsic-call | 20 | 1.3% |
 
 Previous: 698 MIR / 883 lowering-failed / 3 codegen-unsupported.
 Gains from: intrinsic gate removal, expected_type propagation, struct literal field
@@ -217,6 +216,7 @@ Environment-gated diagnostics added:
 - `WITH_MIR_AUDIT=1` — logs `[mir-fallback]` per AST-fallback function
   and `[mir-lower-fail]` per `mark_unsupported` call with node kind
 - `WITH_DEBUG_MIR_CODEGEN=1` — logs `[mir-dispatch]` per MIR function
+- `WITH_MIR_STRICT=1` — aborts on unexpected AST fallback (non-closure, non-lowering-failed)
 
 Track progress:
 ```bash
@@ -233,7 +233,7 @@ Phase 0: Audit
   [x] Document root cause (method resolution / expr_type)
 
 Phase 1: Fix MirLower (target: 0 lowering failures)
-  Current: 23 fallback (was 883, was 1,218)
+  Current: 3 fallback — closures only (was 23, was 883, was 1,218)
   [x] Sema builtin method return types (check_method_call)
   [x] typed_expr_types key fix (node index vs byte offset)
   [x] Remove MIR dispatch count cap (376→uncapped, 537 through MIR)
@@ -246,8 +246,8 @@ Phase 1: Fix MirLower (target: 0 lowering failures)
   [x] Struct literal field name mapping (aggregate field index != LLVM struct index)
   [x] Short-circuit evaluation for logical and/or operators
   [x] Remove intrinsic gate (WITH_MIR_INTRINSICS no longer needed)
+  [x] PK_INDEX + PK_DEREF projections in mir_place_ptr/mir_place_is_supported
   [ ] 3 remaining: unsupported-callee (closure/indirect calls)
-  [ ] 20 remaining: intrinsic-call edge cases (str ops, Source, HashSet)
 
 Phase 1b: Fix MIR codegen support (target: 0 codegen-unsupported)
   Current: 0 codegen-unsupported (was 205)
@@ -262,10 +262,10 @@ Phase 2: Remove support check
   [ ] Fixpoint holds
 
 Phase 3: Assert no AST usage
-  [ ] Replace fallback with assertion
-  [ ] Build succeeds
-  [ ] Fixpoint holds
-  [ ] Full test suite passes
+  [x] WITH_MIR_STRICT=1 fatal assertion for unexpected fallback
+  [x] Self-host passes strict mode (0 unexpected fallbacks)
+  [x] Fixpoint holds
+  [x] 243/246 tests pass (3 pre-existing failures)
 
 Phase 4: Delete AST codegen
   [ ] Tag: pre-ast-removal
