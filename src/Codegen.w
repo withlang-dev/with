@@ -4589,6 +4589,8 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
                         reason = "lowering-failed"
                     else if body.block_count() <= 0:
                         reason = "no-blocks"
+                    else:
+                        reason = self.mir_unsupported_reason(body)
                     with_eprintln("[mir-fallback] " ++ reason ++ " " ++ fn_name)
             if supported:
                 // Bisect: WITH_MIR_LIMIT=N limits MIR to first N functions
@@ -4673,8 +4675,15 @@ fn Codegen.mir_place_is_supported(self: Codegen, body: MirBody, place_id: i32) -
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return false
     let p_count = body.place_proj_counts.get(place_id as i64)
-    // Keep MIR lowering conservative until full typed place metadata is wired.
-    p_count == 0
+    if p_count == 0:
+        return true
+    // Allow places whose projections are all PK_FIELD (handled by mir_place_ptr)
+    let p_start = body.place_proj_starts.get(place_id as i64)
+    for i in 0..p_count:
+        let pk = body.proj_kinds.get((p_start + i) as i64)
+        if pk != 0: // PK_FIELD = 0
+            return false
+    true
 
 fn Codegen.mir_operand_is_supported(self: Codegen, body: MirBody, operand_id: i32, for_call_callee: bool) -> bool:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
@@ -4779,6 +4788,63 @@ fn Codegen.mir_function_is_supported(self: Codegen, body: MirBody) -> bool:
 
     true
 
+fn Codegen.mir_unsupported_reason(self: Codegen, body: MirBody) -> str:
+    for ci in 0..body.const_kinds.len() as i32:
+        if body.const_kinds.get(ci as i64) == CK_ZERO_SIZED:
+            return "closure(CK_ZERO_SIZED)"
+    for si in 0..body.stmt_kinds.len() as i32:
+        let sk = body.stmt_kinds.get(si as i64)
+        let d0 = body.stmt_d0.get(si as i64)
+        let d1 = body.stmt_d1.get(si as i64)
+        if sk == SK_ASSIGN:
+            if not self.mir_place_is_supported(body, d0):
+                return "unsupported-place(stmt=" ++ int_to_string(si) ++ ")"
+            if d1 < 0 or d1 >= body.rval_kinds.len() as i32:
+                return "bad-rval-idx(stmt=" ++ int_to_string(si) ++ ")"
+            let rk = body.rval_kinds.get(d1 as i64)
+            if rk == RK_USE or rk == RK_BIN_OP or rk == RK_UN_OP or rk == RK_REF or rk == RK_ADDR_OF or rk == RK_DISCRIMINANT or rk == RK_LEN or rk == RK_CAST or rk == RK_AGGREGATE:
+                if rk == RK_USE:
+                    if not self.mir_operand_is_supported(body, body.rval_d0.get(d1 as i64), false):
+                        return "unsupported-operand(rk=USE,stmt=" ++ int_to_string(si) ++ ")"
+                if rk == RK_BIN_OP:
+                    if not self.mir_operand_is_supported(body, body.rval_d1.get(d1 as i64), false):
+                        return "unsupported-operand(rk=BIN_OP,lhs,stmt=" ++ int_to_string(si) ++ ")"
+                    if not self.mir_operand_is_supported(body, body.rval_d2.get(d1 as i64), false):
+                        return "unsupported-operand(rk=BIN_OP,rhs,stmt=" ++ int_to_string(si) ++ ")"
+                if rk == RK_UN_OP:
+                    if not self.mir_operand_is_supported(body, body.rval_d1.get(d1 as i64), false):
+                        return "unsupported-operand(rk=UN_OP,stmt=" ++ int_to_string(si) ++ ")"
+                if rk == RK_CAST:
+                    if not self.mir_operand_is_supported(body, body.rval_d0.get(d1 as i64), false):
+                        return "unsupported-operand(rk=CAST,stmt=" ++ int_to_string(si) ++ ")"
+                continue
+            return "unknown-rk(" ++ int_to_string(rk) ++ ",stmt=" ++ int_to_string(si) ++ ")"
+        if sk == SK_ASSIGN or sk == SK_STORAGE_LIVE or sk == SK_STORAGE_DEAD or sk == SK_DROP or sk == SK_NOP:
+            continue
+        return "unknown-sk(" ++ int_to_string(sk) ++ ",stmt=" ++ int_to_string(si) ++ ")"
+    for bb in 0..body.bb_term_kinds.len() as i32:
+        let tk = body.bb_term_kinds.get(bb as i64)
+        let d0 = body.bb_term_d0.get(bb as i64)
+        let d2 = body.bb_term_d2.get(bb as i64)
+        if tk == TK_GOTO or tk == TK_RETURN or tk == TK_UNREACHABLE:
+            continue
+        if tk == TK_SWITCH_INT:
+            if not self.mir_operand_is_supported(body, d0, false):
+                return "unsupported-operand(tk=SWITCH,bb=" ++ int_to_string(bb) ++ ")"
+            continue
+        if tk == TK_CALL:
+            if not self.mir_operand_is_supported(body, d0, true):
+                return "unsupported-callee(bb=" ++ int_to_string(bb) ++ ")"
+            if not self.mir_place_is_supported(body, d2):
+                return "unsupported-dest-place(bb=" ++ int_to_string(bb) ++ ")"
+            continue
+        if tk == TK_DROP_AND_GOTO:
+            if not self.mir_place_is_supported(body, d0):
+                return "unsupported-drop-place(bb=" ++ int_to_string(bb) ++ ")"
+            continue
+        return "unknown-tk(" ++ int_to_string(tk) ++ ",bb=" ++ int_to_string(bb) ++ ")"
+    "unknown"
+
 fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     let resolved = self.sema.resolve_alias(sema_ty)
     let tk = self.sema.get_type_kind(resolved)
@@ -4800,9 +4866,28 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     if tk == TY_STRUCT or tk == TY_ENUM:
         let name_sym = self.sema.get_type_d0(resolved)
         if name_sym != 0:
-            return self.resolve_named_type(name_sym)
+            // Translate sema pool sym to codegen intern pool sym
+            var cg_sym = name_sym
+            if name_sym > 0 and name_sym < self.sema.pool.symbol_texts.len() as i32:
+                let sema_text = self.sema.pool.symbol_texts.get(name_sym as i64)
+                if sema_text.len() > 0:
+                    cg_sym = self.intern.intern(sema_text)
+            return self.resolve_named_type(cg_sym)
     if tk == TY_GENERIC_INST:
         return self.sema_type_to_llvm(resolved)
+    if tk == TY_TUPLE:
+        let te_start = self.sema.get_type_d0(resolved)
+        let te_count = self.sema.get_type_d1(resolved)
+        let elem_types: Vec[i64] = Vec.new()
+        for i in 0..te_count:
+            let elem_tid = self.sema.type_extra.get((te_start + i) as i64)
+            let elem_llvm = self.mir_sema_type_to_llvm(elem_tid)
+            if elem_llvm == 0:
+                elem_llvm = wl_i32_type(self.context)
+            elem_types.push(elem_llvm)
+        if te_count > 0:
+            return wl_struct_type(self.context, vec_data_i64(&elem_types), te_count, 0)
+        return wl_i32_type(self.context)
     if tk == TY_PTR or tk == TY_REF:
         return wl_ptr_type(self.context)
     if tk == TY_FN:
@@ -4956,6 +5041,9 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
             let type_name_sym = self.sema.get_type_name(sema_ty)
             if type_name_sym != 0:
                 cur_ty = self.resolve_named_type(type_name_sym)
+            if cur_ty == 0:
+                cur_ty = self.mir_sema_type_to_llvm(sema_ty)
+            if cur_ty != 0:
                 self.mir_local_types.insert(base_local, cur_ty)
     for i in 0..p_count:
         let pk = body.proj_kinds.get((p_start + i) as i64)
@@ -4974,6 +5062,8 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                         let type_name_sym = self.sema.get_type_name(sema_ty)
                         if type_name_sym != 0:
                             cur_ty = self.resolve_named_type(type_name_sym)
+                        if cur_ty == 0:
+                            cur_ty = self.mir_sema_type_to_llvm(sema_ty)
             let fi = self.mir_resolve_field_index(cur_ty, pd)
             if fi < 0:
                 return 0

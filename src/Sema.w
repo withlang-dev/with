@@ -4358,6 +4358,8 @@ fn Sema.check_record_update(self: Sema, node: i32) -> i32:
         let f_name = self.ast.get_extra(extra_start + fi * 2)
         let f_value = self.ast.get_extra(extra_start + fi * 2 + 1)
         self.check_expr(f_value)
+    if source_ty != 0 and source_ty != self.ty_void:
+        self.typed_expr_types.insert(node, source_ty)
     source_ty
 
 fn Sema.check_let_else(self: Sema, node: i32) -> i32:

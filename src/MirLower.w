@@ -506,6 +506,20 @@ fn MirBuilder.assign_operand_to_place(self: MirBuilder, place: i32, operand_id: 
     self.body.push_stmt(self.cur_bb, SK_ASSIGN, place, rval, span)
 
 fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
+    // Check for operator overloading: if LHS is a struct with an operator method, lower as call
+    let lhs_ty = self.expr_type(lhs_expr)
+    if lhs_ty != 0:
+        let lhs_resolved = self.sema.resolve_alias(lhs_ty)
+        let lhs_tk = self.sema.get_type_kind(lhs_resolved)
+        if lhs_tk == TY_STRUCT:
+            let method_name = mir_op_method_name(op)
+            if method_name.len() > 0:
+                let type_name_sym = self.sema.get_type_d0(lhs_resolved)
+                if type_name_sym != 0:
+                    let method_sym = self.sema.pool_intern(self.sema.pool_resolve(type_name_sym) ++ "." ++ method_name)
+                    let sig = self.sema.get_sig(method_sym)
+                    if sig >= 0:
+                        return self.lower_method_bin_op(lhs_expr, rhs_expr, method_sym, node)
     let lhs = self.lower_expr(lhs_expr)
     let rhs = self.lower_expr(rhs_expr)
     let rv = self.body.new_rvalue(RK_BIN_OP, op, lhs, rhs)
@@ -516,6 +530,28 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
     if self.sema.is_copy(ty) != 0:
         return self.body.new_operand(OK_COPY, place)
     self.body.new_operand(OK_MOVE, place)
+
+fn mir_op_method_name(op: i32) -> str:
+    if op == 0: return "add"    // OP_ADD
+    if op == 1: return "sub"    // OP_SUB
+    if op == 2: return "mul"    // OP_MUL
+    if op == 3: return "div"    // OP_DIV
+    if op == 4: return "mod"    // OP_MOD
+    if op == 5: return "eq"     // OP_EQ
+    if op == 6: return "ne"     // OP_NEQ
+    if op == 7: return "lt"     // OP_LT
+    if op == 8: return "gt"     // OP_GT
+    if op == 9: return "le"     // OP_LTE
+    if op == 10: return "ge"    // OP_GTE
+    ""
+
+fn MirBuilder.lower_method_bin_op(self: MirBuilder, lhs_expr: i32, rhs_expr: i32, method_sym: i32, node: i32) -> i32:
+    // Lower as: method_sym(lhs, rhs)
+    let callee_ident = self.ast.add_node(NK_IDENT, self.ast.get_start(node), self.ast.get_end(node), method_sym, 0, 0)
+    let tmp_start = self.ast.extra_len()
+    self.ast.add_extra(lhs_expr)
+    self.ast.add_extra(rhs_expr)
+    self.lower_call(callee_ident, tmp_start, 2, self.expr_type(node), node)
 
 fn MirBuilder.lower_un_op(self: MirBuilder, op: i32, expr: i32, node: i32) -> i32:
     if op == UOP_REF or op == UOP_MUT_REF:
@@ -1452,19 +1488,34 @@ fn MirBuilder.lower_with_form2_3(self: MirBuilder, pat_or_name: i32, rhs_expr: i
     result
 
 fn MirBuilder.lower_record_update(self: MirBuilder, base_expr: i32, field_updates_start: i32, field_updates_count: i32, node: i32) -> i32:
+    // Copy base struct to a temp, then overwrite specified fields
     let base = self.lower_expr(base_expr)
-    let fields: Vec[i32] = Vec.new()
-    fields.push(base)
-    for i in 0..field_updates_count:
-        let v = self.ast.get_extra(field_updates_start + i * 2 + 1)
-        fields.push(self.lower_expr(v))
-    let fields_id = self.body.new_agg_fields(fields)
-    let rv = self.body.new_rvalue(RK_AGGREGATE, 0, fields_id, 0)
     let ty = self.expr_type(node)
     let tmp = self.new_temp(ty)
-    let place = self.place_for_local(tmp)
-    self.body.push_stmt(self.cur_bb, SK_ASSIGN, place, rv, self.ast.get_start(node))
-    self.body.new_operand(OK_COPY, place)
+    let base_place = self.place_for_local(tmp)
+    // Assign base to temp
+    let use_rv = self.body.new_rvalue(RK_USE, base, 0, 0)
+    self.body.push_stmt(self.cur_bb, SK_ASSIGN, base_place, use_rv, self.ast.get_start(node))
+    // Overwrite each updated field
+    let resolved_ty = self.sema.resolve_alias(ty)
+    let struct_extra = self.sema.get_type_d1(resolved_ty)
+    let struct_fc = self.sema.get_type_d2(resolved_ty)
+    for i in 0..field_updates_count:
+        let f_name_sym = self.ast.get_extra(field_updates_start + i * 2)
+        let f_val_node = self.ast.get_extra(field_updates_start + i * 2 + 1)
+        let f_val = self.lower_expr(f_val_node)
+        // Find field index by name
+        var fi = -1
+        for j in 0..struct_fc:
+            let sf_name = self.sema.type_extra.get((struct_extra + j * 3) as i64)
+            if sf_name == f_name_sym:
+                fi = j
+                break
+        if fi >= 0:
+            let field_place = self.body.new_place_with_projection(base_place, 0, fi)  // PK_FIELD=0
+            let field_rv = self.body.new_rvalue(RK_USE, f_val, 0, 0)
+            self.body.push_stmt(self.cur_bb, SK_ASSIGN, field_place, field_rv, self.ast.get_start(node))
+    self.body.new_operand(OK_COPY, base_place)
 
 fn MirBuilder.lower_implicit_ok(self: MirBuilder, expr: i32, ok_type_id: i32) -> i32:
     let op = self.lower_expr(expr)
