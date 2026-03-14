@@ -341,6 +341,16 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         let tail = self.ast.get_data2(node)
         if tail != 0:
             return self.expr_type(tail)
+    if kind == NK_RANGE:
+        let range_start = self.ast.get_data0(node)
+        let range_end = self.ast.get_data1(node)
+        let range_inclusive = self.ast.get_data2(node)
+        var range_elem = self.sema.ty_i32
+        if range_start != 0:
+            range_elem = self.expr_type(range_start)
+        else if range_end != 0:
+            range_elem = self.expr_type(range_end)
+        return self.sema.add_type(TY_RANGE, range_elem, range_inclusive, 0)
     self.sema.ty_void
 
 fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
@@ -843,6 +853,10 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32) -> i
     self.unit_operand()
 
 fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
+    // Check for range-based for: for i in start..end
+    if self.ast.kind(iter_expr) == NK_RANGE:
+        return self.lower_for_range(pat_or_sym, iter_expr, body_expr)
+
     // Iterator protocol lowering shape:
     //   loop { if iter.next() is Some(x) { body } else { break } }
     let iter_op = self.lower_expr(iter_expr)
@@ -906,6 +920,79 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
             self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(body_expr))
 
     let _ = self.lower_expr(body_expr)
+    self.terminate(TK_GOTO, header_bb, 0, 0, 0)
+
+    self.pop_loop()
+    self.switch_to(exit_bb)
+    self.unit_operand()
+
+fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32, body_expr: i32) -> i32:
+    // for i in start..end  →  counter = start; while counter < end: body; counter += 1
+    let start_node = self.ast.get_data0(range_node)
+    let end_node = self.ast.get_data1(range_node)
+    let inclusive = self.ast.get_data2(range_node)
+    let elem_ty = self.sema.infer_for_element_type(self.expr_type(range_node))
+
+    // Evaluate start and end
+    let start_op = if start_node != 0: self.lower_expr(start_node) else: self.int_const_operand(0, elem_ty)
+    let end_op = self.lower_expr(end_node)
+
+    // Create counter local
+    let counter_local = self.new_temp(elem_ty)
+    let counter_place = self.place_for_local(counter_local)
+    let start_rv = self.body.new_rvalue(RK_USE, start_op, 0, 0)
+    self.body.push_stmt(self.cur_bb, SK_ASSIGN, counter_place, start_rv, self.ast.get_start(range_node))
+
+    // Store end value in a temp
+    let end_local = self.new_temp(elem_ty)
+    let end_place = self.place_for_local(end_local)
+    let end_rv = self.body.new_rvalue(RK_USE, end_op, 0, 0)
+    self.body.push_stmt(self.cur_bb, SK_ASSIGN, end_place, end_rv, self.ast.get_start(range_node))
+
+    let header_bb = self.new_block()
+    let body_bb = self.new_block()
+    let inc_bb = self.new_block()
+    let exit_bb = self.new_block()
+
+    self.terminate(TK_GOTO, header_bb, 0, 0, 0)
+    self.push_loop(inc_bb, exit_bb)
+
+    // Header: compare counter < end (or <=)
+    self.switch_to(header_bb)
+    let counter_op = self.body.new_operand(OK_COPY, counter_place)
+    let end_read_op = self.body.new_operand(OK_COPY, end_place)
+    let cmp_op = if inclusive != 0: OP_LTE else: OP_LT
+    let cmp_rv = self.body.new_rvalue(RK_BIN_OP, cmp_op, counter_op, end_read_op)
+    let cmp_local = self.new_temp(self.sema.ty_bool)
+    let cmp_place = self.place_for_local(cmp_local)
+    self.body.push_stmt(self.cur_bb, SK_ASSIGN, cmp_place, cmp_rv, self.ast.get_start(range_node))
+    let cmp_result = self.body.new_operand(OK_COPY, cmp_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(body_bb)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
+
+    // Body: bind loop variable = counter, execute body
+    self.switch_to(body_bb)
+    if pat_or_sym != 0:
+        let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
+        self.bind_local(pat_or_sym, bind_local)
+        self.body.push_stmt(self.cur_bb, SK_STORAGE_LIVE, bind_local, 0, self.ast.get_start(body_expr))
+        let bind_place = self.place_for_local(bind_local)
+        let cur_op = self.body.new_operand(OK_COPY, counter_place)
+        self.assign_operand_to_place(bind_place, cur_op, self.ast.get_start(body_expr))
+
+    let _ = self.lower_expr(body_expr)
+    self.terminate(TK_GOTO, inc_bb, 0, 0, 0)
+
+    // Increment: counter = counter + 1, goto header
+    self.switch_to(inc_bb)
+    let cur_op2 = self.body.new_operand(OK_COPY, counter_place)
+    let one_op = self.int_const_operand(1, elem_ty)
+    let add_rv = self.body.new_rvalue(RK_BIN_OP, OP_ADD, cur_op2, one_op)
+    self.body.push_stmt(self.cur_bb, SK_ASSIGN, counter_place, add_rv, self.ast.get_start(range_node))
     self.terminate(TK_GOTO, header_bb, 0, 0, 0)
 
     self.pop_loop()
