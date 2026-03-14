@@ -14,6 +14,7 @@ use Sema
 use Diagnostic
 use Source
 
+extern fn exit(code: i32) -> void
 extern fn with_parse_float(s: str) -> f64
 extern fn with_eprintln(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
@@ -4595,16 +4596,24 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
             let body = self.mir_input.bodies.get(body_idx as i64)
             let supported = self.mir_function_is_supported(body)
             if not supported:
+                var reason = "codegen-unsupported"
+                if body.lowering_failed != 0:
+                    reason = "lowering-failed"
+                else if body.block_count() <= 0:
+                    reason = "no-blocks"
+                else:
+                    reason = self.mir_unsupported_reason(body)
                 if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
                     let fn_name = self.intern.resolve(fn_sym)
-                    var reason = "codegen-unsupported"
-                    if body.lowering_failed != 0:
-                        reason = "lowering-failed"
-                    else if body.block_count() <= 0:
-                        reason = "no-blocks"
-                    else:
-                        reason = self.mir_unsupported_reason(body)
                     with_eprintln("[mir-fallback] " ++ reason ++ " " ++ fn_name)
+                // Fatal in strict mode: unexpected AST fallback
+                // Allowed: unsupported-callee (indirect calls), closure (CK_ZERO_SIZED),
+                //          lowering-failed (MirLower gaps)
+                if with_getenv_str("WITH_MIR_STRICT").len() > 0:
+                    if not reason.starts_with("unsupported-callee") and not reason.starts_with("lowering-failed") and not reason.starts_with("closure"):
+                        let fn_name = self.intern.resolve(fn_sym)
+                        with_eprintln("FATAL: unexpected AST fallback for: " ++ fn_name ++ " reason=" ++ reason)
+                        exit(1)
             if supported:
                 // Bisect: WITH_MIR_LIMIT=N limits MIR to first N functions
                 let limit_str = with_getenv_str("WITH_MIR_LIMIT")
