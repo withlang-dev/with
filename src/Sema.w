@@ -3397,6 +3397,8 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
     self.expire_dead_borrows_in_block(extra_start, stmt_count, stmt_count, 0)
 
     self.pop_scope()
+    if result != 0 and result != self.ty_void:
+        self.typed_expr_types.insert(self.ast.get_start(node), result)
     result
 
 fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
@@ -3462,17 +3464,21 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
     self.check_expr(cond)
     let then_type = self.check_expr(then_body)
 
+    var result_type = self.ty_void
     if else_body != 0:
         let else_type = self.check_expr(else_body)
         if then_type != 0 and else_type != 0:
             if self.types_compatible(then_type, else_type):
-                return then_type
-            return self.arithmetic_result_type(then_type, else_type)
-        if then_type != 0:
-            return then_type
-        return else_type
-
-    self.ty_void
+                result_type = then_type
+            else:
+                result_type = self.arithmetic_result_type(then_type, else_type)
+        else if then_type != 0:
+            result_type = then_type
+        else:
+            result_type = else_type
+    if result_type != 0 and result_type != self.ty_void:
+        self.typed_expr_types.insert(self.ast.get_start(node), result_type)
+    result_type
 
 fn Sema.check_return(self: Sema, node: i32) -> i32:
     if self.in_defer != 0:
@@ -3748,7 +3754,10 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                             if tp_count > 1: self.type_extra.push(ga1)
                             if tp_count > 2: self.type_extra.push(ga2)
                             if tp_count > 3: self.type_extra.push(ga3)
-                            return self.add_type(TY_GENERIC_INST, name, te, tp_count)
+                            let gi = self.add_type(TY_GENERIC_INST, name, te, tp_count)
+                            self.typed_expr_types.insert(self.ast.get_start(node), gi)
+                            return gi
+            self.typed_expr_types.insert(self.ast.get_start(node), resolved)
             return resolved
     0
 
@@ -3793,6 +3802,8 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
             require_exhaustive = 1
     self.check_match_exhaustiveness(node, subject_type, extra_start, arm_count, require_exhaustive)
 
+    if result_type != 0:
+        self.typed_expr_types.insert(self.ast.get_start(node), result_type)
     result_type
 
 fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, extra_start: i32, arm_count: i32, require_exhaustive: i32):
