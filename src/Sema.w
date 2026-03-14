@@ -1301,7 +1301,11 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
 
     if sub_kind == TDK_STRUCT:
         let field_count = self.ast.get_extra(extra_start)
-        let te_start = self.type_extra.len() as i32
+        // Resolve all field types first — resolve_type_expr can push to type_extra
+        // (e.g. for generic instances), so we must capture te_start AFTER resolving.
+        let field_names: Vec[i32] = Vec.new()
+        let field_tids: Vec[i32] = Vec.new()
+        let field_defaults: Vec[i32] = Vec.new()
         for fi in 0..field_count:
             let base = extra_start + 1 + fi * 3
             let f_name = self.ast.get_extra(base)
@@ -1312,9 +1316,14 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             if self.type_expr_is_collection_with_ref(f_type_node) != 0:
                 self.emit_error("ephemeral references cannot be stored in generic containers", f_type_node)
             let f_tid = self.resolve_type_expr(f_type_node)
-            self.type_extra.push(f_name)
-            self.type_extra.push(f_tid)
-            self.type_extra.push(f_default)
+            field_names.push(f_name)
+            field_tids.push(f_tid)
+            field_defaults.push(f_default)
+        let te_start = self.type_extra.len() as i32
+        for fi in 0..field_count:
+            self.type_extra.push(field_names.get(fi as i64))
+            self.type_extra.push(field_tids.get(fi as i64))
+            self.type_extra.push(field_defaults.get(fi as i64))
         let tid = self.add_type(TY_STRUCT, name, te_start, field_count)
         self.named_types.insert(name, tid)
 
