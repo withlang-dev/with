@@ -1073,12 +1073,14 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             if elem_pk == NK_PAT_WILDCARD or elem_pk == NK_PAT_IDENT:
                 continue
             let elem_place = self.body.new_field_place(scrutinee_place, ti)
-            let next_test = if ti + 1 < tup_count: self.new_block() else: arm_bb
+            let next_test = self.new_block()
             self.switch_to(cur_test_bb)
             self.lower_pattern_match(elem_place, elem_pat, next_test, fail_bb)
             cur_test_bb = next_test
-        if cur_test_bb == self.cur_bb:
-            self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
+        // cur_test_bb is the block reached after all concrete checks pass.
+        // Emit a goto to the arm block.
+        self.switch_to(cur_test_bb)
+        self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
         return
 
     // Dyn trait typed-bind pattern: fall back to AST codegen.
