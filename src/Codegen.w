@@ -4652,6 +4652,8 @@ fn Codegen.mir_operand_is_supported(self: Codegen, body: MirBody, operand_id: i3
     let ok = body.operand_kinds.get(operand_id as i64)
     let od = body.operand_d0.get(operand_id as i64)
     if ok == OK_COPY or ok == OK_MOVE:
+        if for_call_callee:
+            return false  // MIR codegen doesn't support indirect (fn pointer) calls
         return self.mir_place_is_supported(body, od)
     if ok == OK_CONSTANT:
         if od < 0 or od >= body.const_kinds.len() as i32:
@@ -4670,6 +4672,11 @@ fn Codegen.mir_function_is_supported(self: Codegen, body: MirBody) -> bool:
     if body.block_count() <= 0:
         return false
     // RK_AGGREGATE is now handled by mir_eval_rvalue.
+
+    // Reject functions containing closures (CK_ZERO_SIZED is only emitted for closures)
+    for ci in 0..body.const_kinds.len() as i32:
+        if body.const_kinds.get(ci as i64) == CK_ZERO_SIZED:
+            return false
 
     for si in 0..body.stmt_kinds.len() as i32:
         let sk = body.stmt_kinds.get(si as i64)
