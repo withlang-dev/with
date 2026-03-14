@@ -262,7 +262,6 @@ fn MirBuilder.struct_field_type(self: MirBuilder, struct_tid: i32, field_sym: i3
         let inner = self.sema.get_type_d0(resolved)
         return self.struct_field_type(inner, field_sym)
     if tk == TY_GENERIC_INST:
-        // For generic instances (e.g., Vec[i32]), look up field on the base type
         let base_sym = self.sema.get_type_d0(resolved)
         if self.sema.named_types.contains(base_sym):
             let base_tid = self.sema.named_types.get(base_sym).unwrap()
