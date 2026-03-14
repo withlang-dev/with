@@ -4699,10 +4699,6 @@ fn Codegen.mir_function_is_supported(self: Codegen, body: MirBody) -> bool:
         return false
     if body.block_count() <= 0:
         return false
-    // Cap: only allow N functions through MIR to avoid exposing codegen bugs.
-    // Raise incrementally as codegen gaps are fixed.
-    if self.mir_dispatch_count >= 376:
-        return false
     // RK_AGGREGATE is now handled by mir_eval_rvalue.
 
     // Reject functions containing closures (CK_ZERO_SIZED is only emitted for closures)
