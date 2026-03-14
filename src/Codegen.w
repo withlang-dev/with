@@ -4690,11 +4690,11 @@ fn Codegen.mir_place_is_supported(self: Codegen, body: MirBody, place_id: i32) -
     let p_count = body.place_proj_counts.get(place_id as i64)
     if p_count == 0:
         return true
-    // Allow places whose projections are all PK_FIELD (handled by mir_place_ptr)
+    // Allow PK_FIELD (0), PK_INDEX (1), PK_DEREF (2) projections
     let p_start = body.place_proj_starts.get(place_id as i64)
     for i in 0..p_count:
         let pk = body.proj_kinds.get((p_start + i) as i64)
-        if pk != 0: // PK_FIELD = 0
+        if pk != 0 and pk != 1 and pk != 2:
             return false
     true
 
@@ -4802,9 +4802,6 @@ fn Codegen.mir_function_is_supported(self: Codegen, body: MirBody) -> bool:
     true
 
 fn Codegen.mir_unsupported_reason(self: Codegen, body: MirBody) -> str:
-    for call_i in 0..body.call_intrinsic_kinds.len() as i32:
-        if body.call_intrinsic(call_i) != MIR_INTRINSIC_NONE:
-            return "intrinsic-call(id=" ++ int_to_string(body.call_intrinsic(call_i)) ++ ")"
     for ci in 0..body.const_kinds.len() as i32:
         if body.const_kinds.get(ci as i64) == CK_ZERO_SIZED:
             return "closure(CK_ZERO_SIZED)"
@@ -5013,7 +5010,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
     for i in 0..p_count:
         let pk = body.proj_kinds.get((p_start + i) as i64)
         let pd = body.proj_d0.get((p_start + i) as i64)
-        if pk == 0:
+        if pk == 0: // PK_FIELD
             if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
                 if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
                     let sema_ty = body.local_type_ids.get(base_local as i64)
@@ -5026,6 +5023,20 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                 return 0
             if fi < wl_count_struct_elem_types(cur_ty):
                 cur_ty = wl_struct_get_type_at(cur_ty, fi)
+            else:
+                return 0
+        else if pk == 2: // PK_DEREF
+            // Resolve pointee type via sema
+            let sema_ty = self.mir_place_sema_type(body, place_id)
+            if sema_ty > 0:
+                cur_ty = self.mir_sema_type_to_llvm(sema_ty)
+            else:
+                return 0
+        else if pk == 1: // PK_INDEX
+            if self.is_str_type(cur_ty):
+                cur_ty = wl_i8_type(self.context)
+            else if wl_get_type_kind(cur_ty) == wl_array_type_kind():
+                cur_ty = wl_get_element_type(cur_ty)
             else:
                 return 0
         else:
@@ -5097,6 +5108,42 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 cur_ty = wl_struct_get_type_at(cur_ty, fi)
             else:
                 cur_ty = 0
+        else if pk == 2: // PK_DEREF
+            // Load the pointer value, then use it as the new base
+            cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
+            // Resolve pointee type via sema
+            let sema_ty = self.mir_place_sema_type(body, place_id)
+            if sema_ty > 0:
+                cur_ty = self.mir_sema_type_to_llvm(sema_ty)
+            else:
+                cur_ty = 0
+        else if pk == 1: // PK_INDEX
+            // pd is a local_id holding the index value
+            let idx_ptr_opt = self.mir_local_ptrs.get(pd)
+            var idx_val: i64 = wl_const_int(wl_i64_type(self.context), 0, 0)
+            if idx_ptr_opt.is_some():
+                let idx_ty_opt = self.mir_local_types.get(pd)
+                var idx_ty = wl_i32_type(self.context)
+                if idx_ty_opt.is_some():
+                    idx_ty = idx_ty_opt.unwrap() as i64
+                idx_val = wl_build_load(self.builder, idx_ty, idx_ptr_opt.unwrap() as i64)
+            if self.is_str_type(cur_ty):
+                // str = {ptr, i64}: load .ptr field, then GEP with index
+                let str_ptr_gep = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 0)
+                let raw_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), str_ptr_gep)
+                let i8_ty = wl_i8_type(self.context)
+                let indices: Vec[i64] = Vec.new()
+                indices.push(idx_val)
+                cur_ptr = wl_build_gep(self.builder, i8_ty, raw_ptr, vec_data_i64(&indices), 1)
+                cur_ty = i8_ty
+            else if wl_get_type_kind(cur_ty) == wl_array_type_kind():
+                let elem_ty = wl_get_element_type(cur_ty)
+                let indices: Vec[i64] = Vec.new()
+                indices.push(idx_val)
+                cur_ptr = wl_build_gep(self.builder, elem_ty, cur_ptr, vec_data_i64(&indices), 1)
+                cur_ty = elem_ty
+            else:
+                return 0
         else:
             return 0
 
@@ -5792,6 +5839,13 @@ fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) 
                 let d_tk = self.sema.get_type_kind(d_resolved)
                 if d_tk == TY_PTR or d_tk == TY_REF:
                     ty = self.sema.get_type_d0(d_resolved)
+            else if pk == PK_INDEX:
+                let i_resolved = self.sema.resolve_alias(ty)
+                let i_tk = self.sema.get_type_kind(i_resolved)
+                if i_tk == TY_STR:
+                    ty = self.sema.ty_i32
+                else if i_tk == TY_ARRAY or i_tk == TY_SLICE:
+                    ty = self.sema.get_type_d0(i_resolved)
     ty
 
 fn Codegen.mir_place_sema_type(self: Codegen, body: MirBody, place_id: i32) -> i32:
@@ -5830,6 +5884,13 @@ fn Codegen.mir_place_sema_type(self: Codegen, body: MirBody, place_id: i32) -> i
                 let d_tk = self.sema.get_type_kind(d_resolved)
                 if d_tk == TY_PTR or d_tk == TY_REF:
                     ty = self.sema.get_type_d0(d_resolved)
+            else if pk == PK_INDEX:
+                let i_resolved = self.sema.resolve_alias(ty)
+                let i_tk = self.sema.get_type_kind(i_resolved)
+                if i_tk == TY_STR:
+                    ty = self.sema.ty_i32
+                else if i_tk == TY_ARRAY or i_tk == TY_SLICE:
+                    ty = self.sema.get_type_d0(i_resolved)
     ty
 
 fn Codegen.mir_dest_llvm_type(self: Codegen, body: MirBody, dest_place: i32) -> i64:
