@@ -40,7 +40,7 @@ MIR codegen never checks `fn_ref_param_starts`.
 - [x] **A1.** Compute `method_key_sym` early in `declare_function`
 - [x] **A2.** Register method_key in `fn_values` / `fn_fn_types`
 - [x] **A3.** Register ref_param / dyn_param under method_key
-- [ ] **A4.** Re-enable CK_FN gate (`return ck == CK_FN` in `mir_operand_is_supported`)
+- [ ] **A4.** Re-enable CK_FN gate — all 182 tests pass with `WITH_CK_FN=1`, ready to flip
 
 ---
 
@@ -67,15 +67,16 @@ MIR codegen never checks `fn_ref_param_starts`.
 
 ## Remaining: Re-enable CK_FN (A4)
 
-The gate flip is the only step that changes which functions go through MIR.
-All infrastructure is in place. Approach for next session:
+All 182 non-skipped tests pass with `WITH_CK_FN=1` forced on.
+The `WITH_CK_FN` env var gate is in `mir_operand_is_supported`.
 
-1. Flip `return false` → `return ck == CK_FN` in `mir_operand_is_supported`
-2. Build — expect runtime crashes from the ~374 newly-MIR-routed functions
-3. Use LLVM IR diff (AST vs MIR output) to identify mismatches systematically
-4. Fix codegen gaps, rebuild, repeat
-5. Fixpoint + full test suite
-6. Update seed
+Next step: flip the gate permanently and fix the self-host chain.
+
+1. Change `mir_operand_is_supported` to `return ck == CK_FN` (remove env var check)
+2. Build — self-host chain may expose new MIR codegen bugs in compiler functions
+3. Fix any self-host failures
+4. Fixpoint + full test suite
+5. Update seed
 
 Do NOT binary-search crashes one at a time. Use IR diff for systematic debugging.
 
