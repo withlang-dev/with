@@ -324,6 +324,25 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
                     if self.sema.named_types.contains(owner_sym):
                         return self.sema.named_types.get(owner_sym).unwrap()
                     break
+    if kind == NK_MATCH:
+        // Infer match type from first arm body
+        let m_arms_start = self.ast.get_data1(node)
+        let m_arms_count = self.ast.get_data2(node)
+        if m_arms_count > 0:
+            let first_arm = self.ast.get_extra(m_arms_start)
+            let arm_body = self.ast.get_data1(first_arm)
+            if arm_body != 0:
+                return self.expr_type(arm_body)
+    if kind == NK_IF_EXPR:
+        // Infer if-expression type from then branch
+        let then_expr = self.ast.get_data1(node)
+        if then_expr != 0:
+            return self.expr_type(then_expr)
+    if kind == NK_BLOCK:
+        // Infer block type from tail expression
+        let tail = self.ast.get_data2(node)
+        if tail != 0:
+            return self.expr_type(tail)
     self.sema.ty_void
 
 fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
