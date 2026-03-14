@@ -244,6 +244,8 @@ extern fn wl_get_param_types(fn_ty: i64, out_ptr: i64) -> void
 extern fn wl_verify_module(m: i64) -> i32
 extern fn wl_emit_object(tm: i64, m: i64, path: str) -> i32
 extern fn wl_optimize(m: i64, tm: i64, level: i32) -> void
+extern fn wl_promote_allocas(fn_val: i64, tm: i64) -> void
+extern fn wl_dump_value(v: i64) -> void
 extern fn wl_print_ir(m: i64) -> void
 
 // Vec data pointer
@@ -1104,13 +1106,24 @@ fn Codegen.coerce_struct_value(self: Codegen, val: i64, target_ty: i64) -> i64:
     let target_fields = wl_count_struct_elem_types(target_ty)
     if val_fields <= 0 or target_fields <= 0 or val_fields != target_fields:
         return val
-    var out = wl_get_undef(target_ty)
-    for fi in 0..target_fields:
-        let field_val = wl_build_extract_value(self.builder, val, fi)
-        let field_ty = wl_struct_get_type_at(target_ty, fi)
-        let coerced_field = if field_ty != 0: self.coerce_value_to_type(field_val, field_ty) else: field_val
-        out = wl_build_insert_value(self.builder, out, coerced_field, fi)
-    out
+    // If both are named struct types with the same name, or all fields have
+    // identical LLVM types, reinterpret through memory (different type identity, same layout).
+    let val_name = wl_get_struct_name(val_ty)
+    let target_name = wl_get_struct_name(target_ty)
+    var same_layout = val_name.len() > 0 and val_name == target_name
+    if not same_layout:
+        same_layout = true
+        for fi in 0..val_fields:
+            if wl_struct_get_type_at(val_ty, fi) != wl_struct_get_type_at(target_ty, fi):
+                same_layout = false
+                break
+    if same_layout:
+        let alloca = self.create_entry_alloca(val_ty)
+        wl_build_store(self.builder, val, alloca)
+        return wl_build_load(self.builder, target_ty, alloca)
+    // Both are named structs with different names — these are different types.
+    // Don't coerce; return unchanged. The caller should fix the type mismatch.
+    val
 
 fn Codegen.debug_call_coerce_enabled(self: Codegen) -> bool:
     let raw = with_getenv_str("WITH_DEBUG_CALL_COERCE")
@@ -4789,6 +4802,9 @@ fn Codegen.mir_function_is_supported(self: Codegen, body: MirBody) -> bool:
     true
 
 fn Codegen.mir_unsupported_reason(self: Codegen, body: MirBody) -> str:
+    for call_i in 0..body.call_intrinsic_kinds.len() as i32:
+        if body.call_intrinsic(call_i) != MIR_INTRINSIC_NONE:
+            return "intrinsic-call(id=" ++ int_to_string(body.call_intrinsic(call_i)) ++ ")"
     for ci in 0..body.const_kinds.len() as i32:
         if body.const_kinds.get(ci as i64) == CK_ZERO_SIZED:
             return "closure(CK_ZERO_SIZED)"
@@ -4950,6 +4966,15 @@ fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32)
         let fi = self.find_field_index(st_sym, field_token)
         if fi >= 0 and fi < elem_count:
             return fi
+
+    // Vec types are created dynamically and not registered in the struct field
+    // registry. Resolve their field names by layout: {ptr, len, cap, elem_size}.
+    if self.vec_type_to_elem.contains(agg_ty):
+        let field_name = self.intern.resolve(field_token)
+        if field_name == "ptr": return 0
+        if field_name == "len": return 1
+        if field_name == "cap": return 2
+        if field_name == "elem_size": return 3
 
     // Fall back to direct numeric index (for tuple fields, match bindings)
     if field_token >= 0 and field_token < elem_count:
@@ -5193,6 +5218,14 @@ fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expec
             return wl_get_undef(fallback_ty)
         let loaded = wl_build_load(self.builder, ptr_ty, ptr)
         if expected_ty != 0:
+            // Don't coerce between incompatible struct types — the local's
+            // LLVM type (from a prior store, e.g. intrinsic result) is
+            // authoritative over sema type hints that may differ
+            // (e.g., VecIter.next() stores Option[T] but sema says T).
+            let lk = wl_get_type_kind(ptr_ty)
+            let ek = wl_get_type_kind(expected_ty)
+            if lk == wl_struct_type_kind() and ek == wl_struct_type_kind() and ptr_ty != expected_ty:
+                return loaded
             return self.coerce_value_to_type(loaded, expected_ty)
         return loaded
 
@@ -5385,22 +5418,30 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             let agg_start = body.agg_field_starts.get(agg_fields_id as i64)
             let agg_count = body.agg_field_counts.get(agg_fields_id as i64)
             var struct_ty = dest_ty
+            if self.debug_mir_codegen_enabled():
+                with_eprintln("[mir-agg] fn=" ++ self.intern.resolve(self.current_function_name_sym) ++ " count=" ++ int_to_string(agg_count) ++ " dest_ty_kind=" ++ int_to_string(if dest_ty != 0: wl_get_type_kind(dest_ty) else: -1) ++ " dest_ty_fields=" ++ int_to_string(if dest_ty != 0 and wl_get_type_kind(dest_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(dest_ty) else: -1))
             if struct_ty == 0 or wl_get_type_kind(struct_ty) != wl_struct_type_kind():
-                with_eprintln("error: RK_AGGREGATE with unknown dest type")
+                with_eprintln("error: RK_AGGREGATE with unknown dest type fn=" ++ self.intern.resolve(self.current_function_name_sym) ++ " count=" ++ int_to_string(agg_count))
                 return wl_get_undef(fallback_ty)
             let alloca = self.create_entry_alloca(struct_ty)
             wl_build_store(self.builder, self.build_default_value(struct_ty), alloca)
             let struct_field_count = wl_count_struct_elem_types(struct_ty)
-            var fi = 0
             for i in 0..agg_count:
-                if fi >= struct_field_count:
-                    break
                 let op_id = body.agg_field_operands.get((agg_start + i) as i64)
+                // Resolve field index from name sym if available
+                var fi = i
+                if (agg_start + i) < body.agg_field_name_syms.len() as i32:
+                    let name_sym = body.agg_field_name_syms.get((agg_start + i) as i64)
+                    if name_sym != 0:
+                        let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym)
+                        if resolved_fi >= 0:
+                            fi = resolved_fi
+                if fi >= struct_field_count:
+                    continue
                 let field_ty = wl_struct_get_type_at(struct_ty, fi)
                 let val = self.mir_eval_operand(body, op_id, field_ty)
                 let gep = wl_build_struct_gep(self.builder, struct_ty, alloca, fi)
                 wl_build_store(self.builder, self.coerce_value_to_type(val, field_ty), gep)
-                fi = fi + 1
             return wl_build_load(self.builder, struct_ty, alloca)
         return wl_get_undef(fallback_ty)
 
@@ -5424,6 +5465,12 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             // Float → Float
             if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and (ck == wl_float_type_kind() or ck == wl_double_type_kind()):
                 return wl_build_fp_cast(self.builder, val, cast_ty)
+            // Ptr → Int
+            if vk == wl_pointer_type_kind() and ck == wl_integer_type_kind():
+                return wl_build_ptr_to_int(self.builder, val, cast_ty)
+            // Int → Ptr
+            if vk == wl_integer_type_kind() and ck == wl_pointer_type_kind():
+                return wl_build_int_to_ptr(self.builder, val, cast_ty)
             return self.coerce_value_to_type(val, cast_ty)
         return val
 
@@ -5518,10 +5565,19 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
             return false
         let dst_local = body.place_locals.get(d0 as i64)
         var dst_ptr = self.mir_place_ptr(body, d0, false, 0)
+        let has_projections = body.place_proj_counts.get(d0 as i64) > 0
         var dst_ty: i64 = 0
-        let dst_ty_opt = self.mir_local_types.get(dst_local)
-        if dst_ptr != 0 and dst_ty_opt.is_some():
-            dst_ty = dst_ty_opt.unwrap() as i64
+        // For projected places (field access), use the projected field's sema type
+        // to get the correct LLVM type. Using the base local's type is wrong —
+        // e.g., storing i32 to self.field would get ptr type from self instead of i32.
+        if has_projections:
+            let proj_sema = self.mir_place_sema_type(body, d0)
+            if proj_sema > 0:
+                dst_ty = self.mir_sema_type_to_llvm(proj_sema)
+        if dst_ty == 0:
+            let dst_ty_opt = self.mir_local_types.get(dst_local)
+            if dst_ptr != 0 and dst_ty_opt.is_some():
+                dst_ty = dst_ty_opt.unwrap() as i64
         // Resolve type via sema when LLVM type is not yet known
         if dst_ty == 0 and dst_local >= 0 and dst_local < body.local_type_ids.len() as i32:
             let sema_ty = body.local_type_ids.get(dst_local as i64)
@@ -5538,16 +5594,16 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
                             dst_ty = ret_ty
         let value = self.mir_eval_rvalue(body, d1, dst_ty)
         if dst_ptr == 0:
-            let proj_count = body.place_proj_counts.get(d0 as i64)
-            if proj_count != 0:
+            if has_projections:
                 return false
             let value_ty = wl_type_of(value)
             dst_ptr = self.mir_get_or_create_local_ptr(dst_local, value_ty)
             self.mir_local_types.insert(dst_local, value_ty)
-        var final_ty: i64 = 0
-        let final_ty_opt = self.mir_local_types.get(dst_local)
-        if final_ty_opt.is_some():
-            final_ty = final_ty_opt.unwrap() as i64
+        var final_ty = dst_ty
+        if final_ty == 0:
+            let final_ty_opt = self.mir_local_types.get(dst_local)
+            if final_ty_opt.is_some():
+                final_ty = final_ty_opt.unwrap() as i64
         if final_ty == 0: return false
         var coerced = value
         if wl_type_of(value) != final_ty:
@@ -5629,8 +5685,672 @@ fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, 
         self.debug_call_coerce_failure(call_context, 0, arg_index, 0, val, expected_ty)
     coerced
 
+fn Codegen.mir_intrinsic_recv_ptr(self: Codegen, body: MirBody, args_id: i32) -> i64:
+    // Get a pointer to the receiver (arg 0) for instance method intrinsics.
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let ok = body.operand_kinds.get(recv_op as i64)
+    let od = body.operand_d0.get(recv_op as i64)
+    // If operand is a place (Copy/Move), try to get its pointer directly.
+    if ok == OK_COPY or ok == OK_MOVE:
+        let ptr = self.mir_place_ptr(body, od, false, 0)
+        if ptr != 0:
+            return ptr
+        // Lazy-create alloca
+        let local_id = body.place_locals.get(od as i64)
+        if local_id >= 0 and local_id < body.local_type_ids.len() as i32:
+            let sema_ty = body.local_type_ids.get(local_id as i64)
+            if sema_ty > 0:
+                let llvm_ty = self.mir_sema_type_to_llvm(sema_ty)
+                if llvm_ty != 0:
+                    let ptr2 = self.mir_place_ptr(body, od, true, llvm_ty)
+                    if ptr2 != 0:
+                        return ptr2
+    // Fallback: evaluate, alloca, store
+    let val = self.mir_eval_operand(body, recv_op, 0)
+    let alloca = wl_build_alloca(self.builder, wl_type_of(val))
+    wl_build_store(self.builder, val, alloca)
+    alloca
+
+fn Codegen.mir_intrinsic_arg(self: Codegen, body: MirBody, args_id: i32, idx: i32) -> i64:
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let op_id = body.call_arg_operands.get((arg_start + idx) as i64)
+    self.mir_eval_operand(body, op_id, 0)
+
+fn Codegen.mir_extract_map_ptr(self: Codegen, recv: i64) -> i64:
+    // HashMap value is either { ptr } struct or raw ptr (from field access).
+    let recv_ty = wl_type_of(recv)
+    if wl_get_type_kind(recv_ty) == wl_pointer_type_kind():
+        return recv
+    if wl_get_type_kind(recv_ty) == wl_struct_type_kind():
+        return wl_build_extract_value(self.builder, recv, 0)
+    recv
+
+fn Codegen.mir_intrinsic_dest_sema_type(self: Codegen, body: MirBody, dest_place: i32) -> i32:
+    if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
+        return 0
+    let local_id = body.place_locals.get(dest_place as i64)
+    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        return 0
+    body.local_type_ids.get(local_id as i64)
+
+fn Codegen.mir_vec_elem_size(self: Codegen, body: MirBody, dest_place: i32) -> i64:
+    // Determine Vec element size from dest place sema type (TY_GENERIC_INST).
+    let sema_ty = self.mir_intrinsic_dest_sema_type(body, dest_place)
+    if sema_ty > 0:
+        let resolved = self.sema.resolve_alias(sema_ty)
+        let tk = self.sema.get_type_kind(resolved)
+        if tk == TY_GENERIC_INST:
+            let arg_count = self.sema.get_type_d2(resolved)
+            if arg_count > 0:
+                let te_start = self.sema.get_type_d1(resolved)
+                let elem_tid = self.sema.type_extra.get(te_start as i64)
+                if elem_tid > 0:
+                    let elem_llvm = self.mir_sema_type_to_llvm(elem_tid)
+                    if elem_llvm != 0:
+                        return self.abi_size_of(elem_llvm)
+    8 // default — safe for pointers, i64, str
+
+fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) -> i32:
+    // Get the sema type for a MIR operand, handling projected places.
+    let ok = body.operand_kinds.get(operand_id as i64)
+    let od = body.operand_d0.get(operand_id as i64)
+    if ok != OK_COPY and ok != OK_MOVE:
+        return 0
+    if od < 0 or od >= body.place_locals.len() as i32:
+        return 0
+    let local_id = body.place_locals.get(od as i64)
+    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        return 0
+    var ty = body.local_type_ids.get(local_id as i64)
+    // Walk projections to resolve through struct fields.
+    let p_count = body.place_proj_counts.get(od as i64)
+    if p_count > 0:
+        let p_start = body.place_proj_starts.get(od as i64)
+        for pi in 0..p_count:
+            let pk = body.proj_kinds.get((p_start + pi) as i64)
+            let pd = body.proj_d0.get((p_start + pi) as i64)
+            if pk == PK_FIELD:
+                let f_resolved = self.sema.resolve_alias(ty)
+                let f_tk = self.sema.get_type_kind(f_resolved)
+                if f_tk == TY_STRUCT:
+                    let f_extra = self.sema.get_type_d1(f_resolved)
+                    let f_count = self.sema.get_type_d2(f_resolved)
+                    if pd >= 0 and pd < f_count:
+                        ty = self.sema.type_extra.get((f_extra + pd * 3 + 1) as i64)
+                else if f_tk == TY_GENERIC_INST:
+                    let base_sym = self.sema.get_type_name(f_resolved)
+                    if base_sym != 0 and self.sema.named_types.contains(base_sym):
+                        let base_tid = self.sema.named_types.get(base_sym).unwrap()
+                        let b_resolved = self.sema.resolve_alias(base_tid)
+                        let b_extra = self.sema.get_type_d1(b_resolved)
+                        let b_count = self.sema.get_type_d2(b_resolved)
+                        if pd >= 0 and pd < b_count:
+                            ty = self.sema.type_extra.get((b_extra + pd * 3 + 1) as i64)
+            else if pk == PK_DEREF:
+                let d_resolved = self.sema.resolve_alias(ty)
+                let d_tk = self.sema.get_type_kind(d_resolved)
+                if d_tk == TY_PTR or d_tk == TY_REF:
+                    ty = self.sema.get_type_d0(d_resolved)
+    ty
+
+fn Codegen.mir_place_sema_type(self: Codegen, body: MirBody, place_id: i32) -> i32:
+    // Get the sema type for a MIR place, walking through field projections.
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return 0
+    let local_id = body.place_locals.get(place_id as i64)
+    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        return 0
+    var ty = body.local_type_ids.get(local_id as i64)
+    let p_count = body.place_proj_counts.get(place_id as i64)
+    if p_count > 0:
+        let p_start = body.place_proj_starts.get(place_id as i64)
+        for pi in 0..p_count:
+            let pk = body.proj_kinds.get((p_start + pi) as i64)
+            let pd = body.proj_d0.get((p_start + pi) as i64)
+            if pk == PK_FIELD:
+                let f_resolved = self.sema.resolve_alias(ty)
+                let f_tk = self.sema.get_type_kind(f_resolved)
+                if f_tk == TY_STRUCT:
+                    let f_extra = self.sema.get_type_d1(f_resolved)
+                    let f_count = self.sema.get_type_d2(f_resolved)
+                    if pd >= 0 and pd < f_count:
+                        ty = self.sema.type_extra.get((f_extra + pd * 3 + 1) as i64)
+                else if f_tk == TY_GENERIC_INST:
+                    let base_sym = self.sema.get_type_name(f_resolved)
+                    if base_sym != 0 and self.sema.named_types.contains(base_sym):
+                        let base_tid = self.sema.named_types.get(base_sym).unwrap()
+                        let b_resolved = self.sema.resolve_alias(base_tid)
+                        let b_extra = self.sema.get_type_d1(b_resolved)
+                        let b_count = self.sema.get_type_d2(b_resolved)
+                        if pd >= 0 and pd < b_count:
+                            ty = self.sema.type_extra.get((b_extra + pd * 3 + 1) as i64)
+            else if pk == PK_DEREF:
+                let d_resolved = self.sema.resolve_alias(ty)
+                let d_tk = self.sema.get_type_kind(d_resolved)
+                if d_tk == TY_PTR or d_tk == TY_REF:
+                    ty = self.sema.get_type_d0(d_resolved)
+    ty
+
+fn Codegen.mir_dest_llvm_type(self: Codegen, body: MirBody, dest_place: i32) -> i64:
+    // Get the LLVM type for a destination place from its sema type.
+    if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
+        return 0
+    let local_id = body.place_locals.get(dest_place as i64)
+    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        return 0
+    let sema_ty = body.local_type_ids.get(local_id as i64)
+    if sema_ty <= 0:
+        return 0
+    self.mir_sema_type_to_llvm(sema_ty)
+
+fn Codegen.mir_vec_elem_type(self: Codegen, body: MirBody, recv_op_id: i32) -> i64:
+    // Infer Vec element LLVM type from the receiver's sema type.
+    let sema_ty = self.mir_operand_sema_type(body, recv_op_id)
+    if sema_ty > 0:
+        let resolved = self.sema.resolve_alias(sema_ty)
+        let tk = self.sema.get_type_kind(resolved)
+        if tk == TY_GENERIC_INST:
+            let arg_count = self.sema.get_type_d2(resolved)
+            if arg_count > 0:
+                let te_start = self.sema.get_type_d1(resolved)
+                let elem_tid = self.sema.type_extra.get(te_start as i64)
+                if elem_tid > 0:
+                    return self.mir_sema_type_to_llvm(elem_tid)
+    0
+
+fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    let i64_ty = wl_i64_type(self.context)
+    let i32_ty = wl_i32_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let void_ty = wl_void_type(self.context)
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let arg_count = body.call_arg_counts.get(args_id as i64)
+    var result: i64 = 0
+
+    if intrinsic == MIR_INTRINSIC_VEC_NEW:
+        let elem_size = self.mir_vec_elem_size(body, dest_place)
+        var vec_elem_ty = wl_i64_type(self.context)
+        let dest_sema_new = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        if dest_sema_new > 0:
+            let resolved_new = self.sema.resolve_alias(dest_sema_new)
+            if self.sema.get_type_kind(resolved_new) == TY_GENERIC_INST:
+                let arg_count_new = self.sema.get_type_d2(resolved_new)
+                if arg_count_new > 0:
+                    let te_start_new = self.sema.get_type_d1(resolved_new)
+                    let elem_tid_new = self.sema.type_extra.get(te_start_new as i64)
+                    if elem_tid_new > 0:
+                        let elem_llvm_new = self.mir_sema_type_to_llvm(elem_tid_new)
+                        if elem_llvm_new != 0:
+                            vec_elem_ty = elem_llvm_new
+        let vec_ty = self.get_or_create_vec_type(vec_elem_ty)
+        let alloca = wl_build_alloca(self.builder, vec_ty)
+        wl_build_store(self.builder, self.build_default_value(vec_ty), alloca)
+        let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
+        let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(alloca)
+        args.push(wl_const_int(i64_ty, elem_size, 0))
+        let _ = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&args), 2)
+        result = wl_build_load(self.builder, vec_ty, alloca)
+
+    else if intrinsic == MIR_INTRINSIC_VEC_PUSH:
+        let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let elem = self.mir_intrinsic_arg(body, args_id, 1)
+        let elem_alloca = wl_build_alloca(self.builder, wl_type_of(elem))
+        wl_build_store(self.builder, elem, elem_alloca)
+        let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
+        let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv_ptr)
+        args.push(elem_alloca)
+        result = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&args), 2)
+
+    else if intrinsic == MIR_INTRINSIC_VEC_GET:
+        let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let idx = self.mir_intrinsic_arg(body, args_id, 1)
+        let idx64 = self.coerce_int(idx, i64_ty)
+        let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+        let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv_ptr)
+        args.push(idx64)
+        let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&args), 2)
+        // Use destination place's sema type to determine element type.
+        var elem_ty = self.mir_dest_llvm_type(body, dest_place)
+        if elem_ty == 0:
+            let recv_op = body.call_arg_operands.get(arg_start as i64)
+            elem_ty = self.mir_vec_elem_type(body, recv_op)
+        if elem_ty == 0:
+            elem_ty = i64_ty
+        result = wl_build_load(self.builder, elem_ty, raw_ptr)
+
+    else if intrinsic == MIR_INTRINSIC_VEC_LEN:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        result = wl_build_extract_value(self.builder, recv, 1)
+
+    else if intrinsic == MIR_INTRINSIC_VEC_SET:
+        let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let idx = self.mir_intrinsic_arg(body, args_id, 1)
+        let val = self.mir_intrinsic_arg(body, args_id, 2)
+        let idx64 = self.coerce_int(idx, i64_ty)
+        let val32 = self.coerce_int(val, i32_ty)
+        let set_fn_name = "with_vec_set_i32"
+        var set_fn = wl_get_named_function(self.llmod, set_fn_name)
+        let param_types: Vec[i64] = Vec.new()
+        param_types.push(ptr_ty)
+        param_types.push(i64_ty)
+        param_types.push(i32_ty)
+        let set_ty = wl_function_type(void_ty, vec_data_i64(&param_types), 3, 0)
+        if set_fn == 0:
+            set_fn = wl_add_function(self.llmod, set_fn_name, set_ty)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv_ptr)
+        args.push(idx64)
+        args.push(val32)
+        result = wl_build_call(self.builder, set_ty, set_fn, vec_data_i64(&args), 3)
+
+    else if intrinsic == MIR_INTRINSIC_VEC_REMOVE:
+        let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let idx = self.mir_intrinsic_arg(body, args_id, 1)
+        let idx64 = self.coerce_int(idx, i64_ty)
+        let remove_fn = self.ensure_vec_runtime_fn("with_vec_remove", void_ty, 2)
+        let remove_ty = self.get_vec_fn_type("with_vec_remove", void_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv_ptr)
+        args.push(idx64)
+        result = wl_build_call(self.builder, remove_ty, remove_fn, vec_data_i64(&args), 2)
+
+    else if intrinsic == MIR_INTRINSIC_VEC_CLEAR:
+        let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let clear_fn = self.ensure_vec_runtime_fn("with_vec_clear", void_ty, 1)
+        let clear_ty = self.get_vec_fn_type("with_vec_clear", void_ty, 1)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv_ptr)
+        result = wl_build_call(self.builder, clear_ty, clear_fn, vec_data_i64(&args), 1)
+
+    else if intrinsic == MIR_INTRINSIC_VEC_POP:
+        // Pop: get last element, remove it. Simplified: just return default.
+        let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let len = wl_build_extract_value(self.builder, recv, 1)
+        let last_idx = wl_build_sub(self.builder, len, wl_const_int(i64_ty, 1, 0))
+        let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+        let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
+        let get_args: Vec[i64] = Vec.new()
+        get_args.push(recv_ptr)
+        get_args.push(last_idx)
+        let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&get_args), 2)
+        let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let elem_ty = self.mir_vec_elem_type(body, recv_op)
+        if elem_ty != 0:
+            result = wl_build_load(self.builder, elem_ty, raw_ptr)
+        else:
+            result = wl_build_load(self.builder, i64_ty, raw_ptr)
+        let remove_fn = self.ensure_vec_runtime_fn("with_vec_remove", void_ty, 2)
+        let remove_ty = self.get_vec_fn_type("with_vec_remove", void_ty, 2)
+        let rm_args: Vec[i64] = Vec.new()
+        rm_args.push(recv_ptr)
+        rm_args.push(last_idx)
+        let _ = wl_build_call(self.builder, remove_ty, remove_fn, vec_data_i64(&rm_args), 2)
+
+    else if intrinsic == MIR_INTRINSIC_MAP_NEW:
+        // Determine key/val sizes from dest sema type (TY_GENERIC_INST).
+        var hm_key_size: i64 = 8
+        var hm_val_size: i64 = 8
+        var hm_ty: i64 = 0
+        let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        if dest_sema > 0:
+            let resolved = self.sema.resolve_alias(dest_sema)
+            let tk = self.sema.get_type_kind(resolved)
+            if tk == TY_GENERIC_INST:
+                let gi_arg_count = self.sema.get_type_d2(resolved)
+                if gi_arg_count == 2:
+                    let args_start = self.sema.get_type_d1(resolved)
+                    let key_sema = self.sema.type_extra.get(args_start as i64)
+                    let val_sema = self.sema.type_extra.get((args_start + 1) as i64)
+                    let key_llvm = self.sema_type_to_llvm(key_sema)
+                    let val_llvm = self.sema_type_to_llvm(val_sema)
+                    if key_llvm != 0 and val_llvm != 0:
+                        hm_key_size = self.abi_size_of(key_llvm)
+                        hm_val_size = self.abi_size_of(val_llvm)
+                        hm_ty = self.get_or_create_hashmap_type(key_llvm, val_llvm)
+        let new_fn = self.ensure_hashmap_new_declared()
+        let fn_ty = self.get_hashmap_new_fn_type()
+        let new_args: Vec[i64] = Vec.new()
+        new_args.push(wl_const_int(i64_ty, hm_key_size, 0))
+        new_args.push(wl_const_int(i64_ty, hm_val_size, 0))
+        let handle = wl_build_call(self.builder, fn_ty, new_fn, vec_data_i64(&new_args), 2)
+        // Wrap handle in HashMap struct { ptr }.
+        if hm_ty == 0:
+            hm_ty = self.get_or_create_hashmap_type(i64_ty, i64_ty)
+        let empty = self.build_default_value(hm_ty)
+        result = wl_build_insert_value(self.builder, empty, handle, 0)
+
+    else if intrinsic == MIR_INTRINSIC_MAP_INSERT:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let map_ptr = self.mir_extract_map_ptr(recv)
+        let key = self.mir_intrinsic_arg(body, args_id, 1)
+        let val = self.mir_intrinsic_arg(body, args_id, 2)
+        let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
+        let val_alloca = wl_build_alloca(self.builder, wl_type_of(val))
+        wl_build_store(self.builder, key, key_alloca)
+        wl_build_store(self.builder, val, val_alloca)
+        let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
+        let fn_val = self.ensure_hm_fn("with_hashmap_insert", void_ty)
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        params.push(ptr_ty)
+        params.push(ptr_ty)
+        params.push(i64_ty)
+        let fn_ty = wl_function_type(void_ty, vec_data_i64(&params), 4, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(map_ptr)
+        args.push(key_alloca)
+        args.push(val_alloca)
+        args.push(is_str_val)
+        result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
+
+    else if intrinsic == MIR_INTRINSIC_MAP_GET:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let map_ptr = self.mir_extract_map_ptr(recv)
+        let key = self.mir_intrinsic_arg(body, args_id, 1)
+        let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
+        wl_build_store(self.builder, key, key_alloca)
+        // Determine value type for the output buffer.
+        // Sema gives us V (the value type), not Option[V].
+        let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        var val_ty = self.mir_sema_type_to_llvm(dest_sema)
+        if val_ty == 0:
+            val_ty = i64_ty
+        let out_alloca = wl_build_alloca(self.builder, val_ty)
+        let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
+        let fn_val = self.ensure_hm_fn("with_hashmap_get", i64_ty)
+        let get_params: Vec[i64] = Vec.new()
+        get_params.push(ptr_ty)
+        get_params.push(ptr_ty)
+        get_params.push(ptr_ty)
+        get_params.push(i64_ty)
+        let fn_ty = wl_function_type(i64_ty, vec_data_i64(&get_params), 4, 0)
+        let get_args: Vec[i64] = Vec.new()
+        get_args.push(map_ptr)
+        get_args.push(key_alloca)
+        get_args.push(out_alloca)
+        get_args.push(is_str_val)
+        let found = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&get_args), 4)
+        let val = wl_build_load(self.builder, val_ty, out_alloca)
+        // Always wrap in Option[V].
+        var dest_llvm = self.get_or_create_option_type(val_ty)
+        if dest_llvm != 0:
+            let is_found = wl_build_icmp(self.builder, wl_int_ne(), found, wl_const_int(i64_ty, 0, 0))
+            let some_val = self.build_option_some(val, dest_llvm)
+            let none_val = self.build_option_none(dest_llvm)
+            result = wl_build_select(self.builder, is_found, some_val, none_val)
+        else:
+            result = val
+
+    else if intrinsic == MIR_INTRINSIC_MAP_CONTAINS:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let map_ptr = self.mir_extract_map_ptr(recv)
+        let key = self.mir_intrinsic_arg(body, args_id, 1)
+        let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
+        wl_build_store(self.builder, key, key_alloca)
+        let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
+        let fn_val = self.ensure_hm_fn("with_hashmap_contains", i64_ty)
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        params.push(ptr_ty)
+        params.push(i64_ty)
+        let fn_ty = wl_function_type(i64_ty, vec_data_i64(&params), 3, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(map_ptr)
+        args.push(key_alloca)
+        args.push(is_str_val)
+        let raw = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 3)
+        result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i64_ty, 0, 0))
+
+    else if intrinsic == MIR_INTRINSIC_MAP_LEN:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let map_ptr = self.mir_extract_map_ptr(recv)
+        let fn_val = self.ensure_hm_fn("with_hashmap_len", i64_ty)
+        let fn_ty = wl_function_type(i64_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(map_ptr)
+        result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+
+    else if intrinsic == MIR_INTRINSIC_MAP_REMOVE:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let map_ptr = self.mir_extract_map_ptr(recv)
+        let key = self.mir_intrinsic_arg(body, args_id, 1)
+        let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
+        wl_build_store(self.builder, key, key_alloca)
+        let is_str_val = wl_const_int(i64_ty, 0, 0)
+        let fn_val = self.ensure_hm_fn("with_hashmap_remove", i64_ty)
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        params.push(ptr_ty)
+        params.push(i64_ty)
+        let fn_ty = wl_function_type(i64_ty, vec_data_i64(&params), 3, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(map_ptr)
+        args.push(key_alloca)
+        args.push(is_str_val)
+        result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 3)
+
+    else if intrinsic == MIR_INTRINSIC_MAP_CLEAR:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let map_ptr = self.mir_extract_map_ptr(recv)
+        let fn_val = self.ensure_hm_fn("with_hashmap_clear", void_ty)
+        let fn_ty = wl_function_type(void_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(map_ptr)
+        result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+
+    else if intrinsic == MIR_INTRINSIC_OPT_IS_SOME:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv_tk = wl_get_type_kind(wl_type_of(recv))
+        if recv_tk == wl_struct_type_kind():
+            let disc = wl_build_extract_value(self.builder, recv, 0)
+            // Some = tag 0, None = tag 1. is_some → tag == 0.
+            result = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
+        else:
+            // Non-struct Option (e.g., raw value) — treat as always Some
+            result = wl_const_int(wl_i1_type(self.context), 1, 0)
+
+    else if intrinsic == MIR_INTRINSIC_OPT_UNWRAP:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv_tk = wl_get_type_kind(wl_type_of(recv))
+        if recv_tk == wl_struct_type_kind():
+            result = wl_build_extract_value(self.builder, recv, 1)
+        else:
+            // Non-struct Option — return the raw value
+            result = recv
+
+    else if intrinsic == MIR_INTRINSIC_STR_LEN:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        if self.debug_mir_codegen_enabled():
+            with_eprintln("[mir-str-len] recv_ty_kind=" ++ int_to_string(wl_get_type_kind(wl_type_of(recv))))
+        result = wl_build_extract_value(self.builder, recv, 1)
+
+    else if intrinsic == MIR_INTRINSIC_STR_BYTE_AT:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let index = self.mir_intrinsic_arg(body, args_id, 1)
+        let index64 = self.coerce_int(index, i64_ty)
+        let fn_val = self.ensure_c_fn("with_str_byte_at", i32_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv)
+        args.push(index64)
+        result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_byte_at", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
+
+    else if intrinsic == MIR_INTRINSIC_STR_SLICE:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let str_ptr = wl_build_extract_value(self.builder, recv, 0)
+        let start = self.mir_intrinsic_arg(body, args_id, 1)
+        let end = self.mir_intrinsic_arg(body, args_id, 2)
+        let start64 = self.coerce_int(start, i64_ty)
+        let end64 = self.coerce_int(end, i64_ty)
+        let i8_ty = wl_i8_type(self.context)
+        let indices: Vec[i64] = Vec.new()
+        indices.push(start64)
+        let new_ptr = wl_build_gep(self.builder, i8_ty, str_ptr, vec_data_i64(&indices), 1)
+        let new_len = wl_build_sub(self.builder, end64, start64)
+        result = self.build_str_value(new_ptr, new_len)
+
+    else if intrinsic == MIR_INTRINSIC_STR_CONTAINS:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let needle = self.mir_intrinsic_arg(body, args_id, 1)
+        let fn_val = self.ensure_c_fn("with_str_contains", i32_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv)
+        args.push(needle)
+        let raw = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_contains", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
+        result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
+
+    else if intrinsic == MIR_INTRINSIC_STR_STARTS_WITH:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let prefix = self.mir_intrinsic_arg(body, args_id, 1)
+        let fn_val = self.ensure_c_fn("with_str_starts_with", i32_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv)
+        args.push(prefix)
+        let raw = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_starts_with", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
+        result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
+
+    else if intrinsic == MIR_INTRINSIC_STR_ENDS_WITH:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let suffix = self.mir_intrinsic_arg(body, args_id, 1)
+        let fn_val = self.ensure_c_fn("with_str_ends_with", i32_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv)
+        args.push(suffix)
+        let raw = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_ends_with", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
+        result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
+
+    else if intrinsic == MIR_INTRINSIC_STR_FIND:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let needle = self.mir_intrinsic_arg(body, args_id, 1)
+        let fn_val = self.ensure_c_fn("with_str_index_of", i64_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv)
+        args.push(needle)
+        result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_index_of", i64_ty, 2), fn_val, vec_data_i64(&args), 2)
+
+    else if intrinsic == MIR_INTRINSIC_VECITER_NEXT:
+        // VecIter[T].next() — advance iterator, return Option[T]
+        // VecIter = { data_ptr: i64, len: i64, idx: i64 }
+        let iter_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let recv_op = body.call_arg_operands.get(arg_start as i64)
+        // Determine element type from dest place (sema returns T, not Option[T]).
+        let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        var elem_ty: i64 = 0
+        if dest_sema > 0:
+            let resolved_dest = self.sema.resolve_alias(dest_sema)
+            elem_ty = self.sema_type_to_llvm(resolved_dest)
+        // Fall back to receiver's generic type argument.
+        if elem_ty == 0:
+            elem_ty = self.mir_vec_elem_type(body, recv_op)
+        if elem_ty == 0:
+            elem_ty = i32_ty
+        let iter_fields: Vec[i64] = Vec.new()
+        iter_fields.push(i64_ty)
+        iter_fields.push(i64_ty)
+        iter_fields.push(i64_ty)
+        let iter_struct_ty = wl_struct_type(self.context, vec_data_i64(&iter_fields), 3, 0)
+        let data_ptr_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 0)
+        let data_ptr = wl_build_load(self.builder, i64_ty, data_ptr_ptr)
+        let len_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 1)
+        let len = wl_build_load(self.builder, i64_ty, len_ptr)
+        let idx_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 2)
+        let idx = wl_build_load(self.builder, i64_ty, idx_ptr)
+        let cond = wl_build_icmp(self.builder, wl_int_slt(), idx, len)
+        let opt_type = self.get_or_create_option_type(elem_ty)
+        let some_bb = wl_append_bb(self.context, self.current_function, "veciter.some")
+        let none_bb = wl_append_bb(self.context, self.current_function, "veciter.none")
+        let merge_bb = wl_append_bb(self.context, self.current_function, "veciter.merge")
+        wl_build_cond_br(self.builder, cond, some_bb, none_bb)
+        wl_position_at_end(self.builder, some_bb)
+        let typed_ptr = wl_build_int_to_ptr(self.builder, data_ptr, ptr_ty)
+        let gep_indices: Vec[i64] = Vec.new()
+        gep_indices.push(idx)
+        let elem_ptr = wl_build_gep(self.builder, elem_ty, typed_ptr, vec_data_i64(&gep_indices), 1)
+        let val = wl_build_load(self.builder, elem_ty, elem_ptr)
+        let next_idx = wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0))
+        wl_build_store(self.builder, next_idx, idx_ptr)
+        let some_val = self.build_option_some(val, opt_type)
+        wl_build_br(self.builder, merge_bb)
+        let some_bb_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, none_bb)
+        let none_val = self.build_option_none(opt_type)
+        wl_build_br(self.builder, merge_bb)
+        let none_bb_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, merge_bb)
+        let phi = wl_build_phi(self.builder, opt_type)
+        let phi_vals: Vec[i64] = Vec.new()
+        let phi_bbs: Vec[i64] = Vec.new()
+        phi_vals.push(some_val)
+        phi_vals.push(none_val)
+        phi_bbs.push(some_bb_end)
+        phi_bbs.push(none_bb_end)
+        wl_add_incoming(phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+        result = phi
+
+    else if intrinsic == MIR_INTRINSIC_VEC_ITER:
+        // Vec.iter() — create VecIter[T] from Vec
+        // VecIter = { data_ptr: i64, len: i64, idx: i64 }
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let iter_fields: Vec[i64] = Vec.new()
+        iter_fields.push(i64_ty)
+        iter_fields.push(i64_ty)
+        iter_fields.push(i64_ty)
+        let iter_struct_ty = wl_struct_type(self.context, vec_data_i64(&iter_fields), 3, 0)
+        let iter_alloca = wl_build_alloca(self.builder, iter_struct_ty)
+        let data_raw = wl_build_extract_value(self.builder, recv, 0)
+        let data_i64 = wl_build_ptr_to_int(self.builder, data_raw, i64_ty)
+        let f0 = wl_build_struct_gep(self.builder, iter_struct_ty, iter_alloca, 0)
+        wl_build_store(self.builder, data_i64, f0)
+        let vlen = wl_build_extract_value(self.builder, recv, 1)
+        let f1 = wl_build_struct_gep(self.builder, iter_struct_ty, iter_alloca, 1)
+        wl_build_store(self.builder, vlen, f1)
+        let f2 = wl_build_struct_gep(self.builder, iter_struct_ty, iter_alloca, 2)
+        wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), f2)
+        result = wl_build_load(self.builder, iter_struct_ty, iter_alloca)
+
+    else:
+        return false
+
+    // Store result to dest place (skip for void-returning intrinsics).
+    if dest_place >= 0 and result != 0:
+        let result_ty = wl_type_of(result)
+        if result_ty != wl_void_type(self.context):
+            let dest_ptr = self.mir_place_ptr(body, dest_place, true, result_ty)
+            if dest_ptr != 0:
+                wl_build_store(self.builder, result, dest_ptr)
+
+    // Branch to next bb.
+    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+    true
+
 fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    // Check for intrinsic-tagged calls (Vec/HashMap/Option builtins).
+    // These have meaningless CK_FN syms — dispatch by intrinsic kind instead.
+    let mir_intrinsic = body.call_intrinsic(args_id)
+    if self.debug_mir_codegen_enabled():
+        with_eprintln("[mir-call-pre] intrinsic=" ++ int_to_string(mir_intrinsic) ++ " callee_op=" ++ int_to_string(callee_operand) ++ " args_id=" ++ int_to_string(args_id) ++ " dest=" ++ int_to_string(dest_place))
+    if mir_intrinsic != MIR_INTRINSIC_NONE:
+        return self.mir_emit_intrinsic_call(body, mir_intrinsic, args_id, dest_place, next_bb)
     let callee = self.mir_eval_operand(body, callee_operand, 0)
+    if self.debug_mir_codegen_enabled():
+        // Debug: show callee operand info for crash diagnosis
+        let co_k = body.operand_kinds.get(callee_operand as i64)
+        let co_d = body.operand_d0.get(callee_operand as i64)
+        var dbg_name = "?"
+        if co_k == OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
+            if body.const_kinds.get(co_d as i64) == CK_FN:
+                let raw_sym = body.const_d0.get(co_d as i64)
+                if raw_sym > 0 and raw_sym < self.sema.pool.symbol_texts.len() as i32:
+                    dbg_name = self.sema.pool.symbol_texts.get(raw_sym as i64)
+        with_eprintln("[mir-call] callee=" ++ dbg_name ++ " callee_ty_kind=" ++ int_to_string(wl_get_type_kind(wl_type_of(callee))))
     let call_context = self.mir_call_context(body, callee_operand)
     var call_ft: i64 = 0
     var is_indirect = false
@@ -5756,6 +6476,11 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
 
     let actual_callee = if is_indirect: fn_ptr_val else: callee
     let actual_arg_count = if is_indirect: arg_count + 1 else: arg_count
+    if self.debug_mir_codegen_enabled():
+        with_eprintln("[mir-call] building call arg_count=" ++ int_to_string(actual_arg_count) ++ " ft_params=" ++ int_to_string(wl_count_param_types(call_ft)))
+        for di in 0..args.len() as i32:
+            let a = args.get(di as i64)
+            with_eprintln("[mir-call]   arg[" ++ int_to_string(di) ++ "] ty_kind=" ++ int_to_string(wl_get_type_kind(wl_type_of(a))))
     let call_val = wl_build_call(self.builder, call_ft, actual_callee, vec_data_i64(&args), actual_arg_count)
     let ret_ty = wl_get_return_type(call_ft)
     if ret_ty != wl_void_type(self.context):
@@ -5790,6 +6515,8 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
     let d1 = body.bb_term_d1.get(bb as i64)
     let d2 = body.bb_term_d2.get(bb as i64)
     let d3 = body.bb_term_d3.get(bb as i64)
+    if self.debug_mir_codegen_enabled():
+        with_eprintln("[mir-term] bb=" ++ int_to_string(bb) ++ " tk=" ++ int_to_string(tk))
 
     if tk == TK_GOTO:
         if d0 < 0 or d0 >= self.mir_bb_values.len() as i32:
@@ -6070,6 +6797,13 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
             wl_build_unreachable(self.builder)
 
 
+    // Run mem2reg to promote allocas to SSA, reducing stack frame sizes.
+    // DISABLED: investigating whether mem2reg causes argument setup issues
+    // wl_promote_allocas(function, self.target_machine)
+
+    if name_str == "Sema.collect_declarations":
+        wl_dump_value(function)
+
     self.expected_type = saved_expected
     self.expected_type_node = saved_expected_node
     self.current_result_err_symbol = saved_result_err
@@ -6269,6 +7003,12 @@ fn Codegen.gen_function(self: Codegen, fn_node: i32):
                 let wrapped = self.build_result_ok(body_val, ret_type)
                 let _ = wl_build_ret(self.builder, wrapped)
             else:
+                if wl_get_type_kind(body_type) == wl_struct_type_kind() and wl_get_type_kind(ret_type) == wl_struct_type_kind() and body_type != ret_type:
+                    let bn = wl_get_struct_name(body_type)
+                    let rn = wl_get_struct_name(ret_type)
+                    let bf = wl_count_struct_elem_types(body_type)
+                    let rf = wl_count_struct_elem_types(ret_type)
+                    with_eprintln("[ret-coerce] fn=" ++ self.intern.resolve(name_sym) ++ " body_name=" ++ bn ++ " ret_name=" ++ rn ++ " body_fields=" ++ int_to_string(bf) ++ " ret_fields=" ++ int_to_string(rf))
                 let coerced = self.coerce_value_to_type(body_val, ret_type)
                 let _ = wl_build_ret(self.builder, coerced)
         else:
@@ -10061,6 +10801,8 @@ fn Codegen.gen_struct_lit(self: Codegen, node: i32) -> i64:
             self.expected_type = fty
             self.expected_type_node = self.struct_field_type_nodes.get((st_field_start + fi) as i64)
             let val = self.gen_expr(f_val_node)
+            if wl_type_of(val) != fty:
+                with_eprintln("[struct-lit-mismatch] fn=" ++ self.intern.resolve(self.current_function_name_sym) ++ " field=" ++ self.intern.resolve(f_name) ++ " fi=" ++ int_to_string(fi) ++ " val_kind=" ++ int_to_string(wl_get_type_kind(wl_type_of(val))) ++ " fty_kind=" ++ int_to_string(wl_get_type_kind(fty)))
             let gep = wl_build_struct_gep(self.builder, st_ty, alloca, fi)
             wl_build_store(self.builder, self.coerce_value_to_type(val, fty), gep)
     self.expected_type = saved_expected

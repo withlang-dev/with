@@ -45,6 +45,7 @@ type MirBuilder = {
 
     next_temp: i32,
     cur_node: i32,
+    expected_type: i32,
 
     sema: Sema,
     ast: AstPool,
@@ -68,6 +69,7 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         loop_break_drop_depths: Vec.new(),
         next_temp: 0,
         cur_node: 0,
+        expected_type: 0,
         sema,
         ast,
         pool,
@@ -253,6 +255,96 @@ fn MirBuilder.call_return_type(self: MirBuilder, callee: i32) -> i32:
         let bare_sig = self.sema.get_sig(method_sym)
         if bare_sig >= 0:
             return self.sema.sig_return_type(bare_sig)
+        // Intrinsic methods (Vec/HashMap/Option/str) have no sema sigs.
+        // Resolve their return types from the receiver type + method name.
+        let base_ty = self.expr_type(base)
+        if base_ty != 0 and base_ty != self.sema.ty_void:
+            let method_name = self.pool.resolve_symbol(method_sym)
+            let iret = self.intrinsic_return_type(base_ty, method_name)
+            if iret != 0 and iret != self.sema.ty_void:
+                return iret
+            // Sema reports raw value types for Option-returning intrinsics
+            // (e.g. HashMap.get returns str, not Option[str]). When .unwrap()
+            // is chained, intrinsic_return_type can't match "unwrap" on str.
+            // The unwrap just returns the same type sema already reports.
+            if method_name == "unwrap":
+                return base_ty
+            if method_name == "is_some" or method_name == "is_none":
+                return self.sema.ty_bool
+    self.sema.ty_void
+
+fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_name: str) -> i32:
+    // Return known return types for intrinsic (builtin) methods.
+    // These methods have no sema signatures, so call_return_type can't resolve them.
+    let resolved = self.sema.resolve_alias(recv_type)
+    let tk = self.sema.get_type_kind(resolved)
+    let type_name_sym = self.sema.get_type_name(resolved)
+    if type_name_sym != 0:
+        let type_name = self.pool.resolve_symbol(type_name_sym)
+        if type_name == "Vec":
+            if method_name == "len": return self.sema.ty_i64
+            if method_name == "new": return recv_type
+            if method_name == "push" or method_name == "set_i32" or method_name == "remove" or method_name == "clear":
+                return self.sema.ty_void
+            if method_name == "get" or method_name == "pop":
+                if tk == TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 0)
+            if method_name == "iter":
+                // Vec.iter() returns VecIter[T] with same T as Vec[T].
+                let vi_sym = self.sema.pool_intern("VecIter")
+                if self.sema.named_types.contains(vi_sym):
+                    if tk == TY_GENERIC_INST:
+                        let elem_ty = self.sema.get_generic_inst_arg(resolved, 0)
+                        if elem_ty > 0:
+                            let te_start = self.sema.type_extra.len() as i32
+                            self.sema.type_extra.push(elem_ty)
+                            return self.sema.add_type(TY_GENERIC_INST, vi_sym, te_start, 1)
+                    return self.sema.named_types.get(vi_sym).unwrap()
+                return self.sema.ty_void
+            return self.sema.ty_void
+        if type_name == "VecIter":
+            if method_name == "next":
+                // VecIter[T].next() returns Option[T] — sema reports as T
+                if tk == TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 0)
+            return self.sema.ty_void
+        if type_name == "HashMap":
+            if method_name == "len": return self.sema.ty_i64
+            if method_name == "contains": return self.sema.ty_bool
+            if method_name == "new": return recv_type
+            if method_name == "insert" or method_name == "clear":
+                return self.sema.ty_void
+            if method_name == "get" or method_name == "remove":
+                if tk == TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 1)
+            return self.sema.ty_void
+        if type_name == "HashSet":
+            if method_name == "len": return self.sema.ty_i64
+            if method_name == "contains" or method_name == "remove": return self.sema.ty_bool
+            if method_name == "new": return recv_type
+            if method_name == "insert" or method_name == "clear":
+                return self.sema.ty_void
+            return self.sema.ty_void
+        if type_name == "Option":
+            if method_name == "is_some": return self.sema.ty_bool
+            if method_name == "unwrap":
+                if tk == TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 0)
+            return self.sema.ty_void
+        if type_name == "Result":
+            if method_name == "is_ok": return self.sema.ty_bool
+            if method_name == "unwrap":
+                if tk == TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 0)
+            return self.sema.ty_void
+    if tk == TY_STR:
+        if method_name == "len": return self.sema.ty_i64
+        if method_name == "byte_at": return self.sema.ty_i32
+        if method_name == "slice": return self.sema.ty_str
+        if method_name == "contains" or method_name == "starts_with" or method_name == "ends_with":
+            return self.sema.ty_bool
+        if method_name == "find": return self.sema.ty_i64
+        return self.sema.ty_void
     self.sema.ty_void
 
 fn MirBuilder.struct_field_type(self: MirBuilder, struct_tid: i32, field_sym: i32) -> i32:
@@ -274,7 +366,21 @@ fn MirBuilder.struct_field_type(self: MirBuilder, struct_tid: i32, field_sym: i3
     for fi in 0..field_count:
         let f_name = self.sema.type_extra.get((extra_start + fi * 3) as i64)
         if f_name == field_sym:
-            return self.sema.type_extra.get((extra_start + fi * 3 + 1) as i64)
+            let f_type = self.sema.type_extra.get((extra_start + fi * 3 + 1) as i64)
+            if f_type != 0:
+                return f_type
+            // Forward-referenced field type stored as 0 during collect_type_decl.
+            // Re-resolve from the AST type declaration node.
+            let struct_name_sym = self.sema.get_type_d0(resolved)
+            if self.sema.type_decl_nodes.contains(struct_name_sym):
+                let td_node = self.sema.type_decl_nodes.get(struct_name_sym).unwrap()
+                let td_extra = self.ast.get_data1(td_node)
+                let td_fc = self.ast.get_extra(td_extra)
+                if fi < td_fc:
+                    let ast_base = td_extra + 1 + fi * 3
+                    let f_type_node = self.ast.get_extra(ast_base + 1)
+                    return self.sema.resolve_type_expr(f_type_node)
+            return 0
     0
 
 fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
@@ -340,6 +446,24 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         let tail = self.ast.get_data2(node)
         if tail != 0:
             return self.expr_type(tail)
+    if kind == NK_INDEX:
+        let base_node = self.ast.get_data0(node)
+        let base_ty = self.expr_type(base_node)
+        if base_ty != 0 and base_ty != self.sema.ty_void:
+            let resolved = self.sema.resolve_alias(base_ty)
+            let tk = self.sema.get_type_kind(resolved)
+            if tk == TY_ARRAY or tk == TY_SLICE:
+                return self.sema.get_type_d0(resolved)
+    if kind == NK_UNARY:
+        let uop = self.ast.get_data0(node)
+        if uop == UOP_DEREF:
+            let inner_node = self.ast.get_data1(node)
+            let inner_ty = self.expr_type(inner_node)
+            if inner_ty != 0 and inner_ty != self.sema.ty_void:
+                let resolved = self.sema.resolve_alias(inner_ty)
+                let tk = self.sema.get_type_kind(resolved)
+                if tk == TY_PTR or tk == TY_REF:
+                    return self.sema.get_type_d0(resolved)
     if kind == NK_RANGE:
         let range_start = self.ast.get_data0(node)
         let range_end = self.ast.get_data1(node)
@@ -515,6 +639,9 @@ fn MirBuilder.assign_operand_to_place(self: MirBuilder, place: i32, operand_id: 
     self.body.push_stmt(self.cur_bb, SK_ASSIGN, place, rval, span)
 
 fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
+    // Short-circuit evaluation for logical and/or
+    if op == 11 or op == 12:
+        return self.lower_short_circuit(op, lhs_expr, rhs_expr, node)
     // Check for operator overloading: if LHS is a struct with an operator method, lower as call
     let lhs_ty = self.expr_type(lhs_expr)
     if lhs_ty != 0:
@@ -539,6 +666,40 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
     if self.sema.is_copy(ty) != 0:
         return self.body.new_operand(OK_COPY, place)
     self.body.new_operand(OK_MOVE, place)
+
+fn MirBuilder.lower_short_circuit(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
+    // Short-circuit: for `a or b`, evaluate a; if true, result is true, else evaluate b.
+    // For `a and b`, evaluate a; if false, result is false, else evaluate b.
+    let result = self.new_temp(self.sema.ty_bool)
+    let result_place = self.place_for_local(result)
+    let lhs = self.lower_expr(lhs_expr)
+    let lhs_rv = self.body.new_rvalue(RK_USE, lhs, 0, 0)
+    self.body.push_stmt(self.cur_bb, SK_ASSIGN, result_place, lhs_rv, self.ast.get_start(node))
+    let rhs_bb = self.new_block()
+    let end_bb = self.new_block()
+    let lhs_read = self.body.new_operand(OK_COPY, result_place)
+    // Use switch_int: value 1 (true) goes to one target, default goes to other
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    if op == 12:
+        // or: if lhs is true (1), skip to end; default (false) → evaluate rhs
+        targets.push(end_bb)
+        let table = self.body.new_switch_table(vals, targets)
+        self.terminate(TK_SWITCH_INT, lhs_read, table, rhs_bb, 0)
+    else:
+        // and: if lhs is true (1), evaluate rhs; default (false) → skip to end
+        targets.push(rhs_bb)
+        let table = self.body.new_switch_table(vals, targets)
+        self.terminate(TK_SWITCH_INT, lhs_read, table, end_bb, 0)
+    self.switch_to(rhs_bb)
+    let rhs = self.lower_expr(rhs_expr)
+    let rhs_rv = self.body.new_rvalue(RK_USE, rhs, 0, 0)
+    let result_place2 = self.place_for_local(result)
+    self.body.push_stmt(self.cur_bb, SK_ASSIGN, result_place2, rhs_rv, self.ast.get_start(node))
+    self.terminate(TK_GOTO, end_bb, 0, 0, 0)
+    self.switch_to(end_bb)
+    self.body.new_operand(OK_COPY, self.place_for_local(result))
 
 fn mir_op_method_name(op: i32) -> str:
     if op == 0: return "add"    // OP_ADD
@@ -621,7 +782,12 @@ fn MirBuilder.lower_ref(self: MirBuilder, expr: i32, borrow_kind: i32, node: i32
 
 fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
     let place = self.lower_expr_place(place_expr)
+    let saved_expected = self.expected_type
+    let dest_ty = self.expr_type(place_expr)
+    if dest_ty != 0 and dest_ty != self.sema.ty_void:
+        self.expected_type = dest_ty
     let rhs = self.lower_expr(rhs_expr)
+    self.expected_type = saved_expected
     self.assign_operand_to_place(place, rhs, self.ast.get_start(place_expr))
 
 fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
@@ -676,7 +842,10 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
     if self.sema.is_copy(bind_ty) == 0:
         self.schedule_drop(local_id, DK_VALUE)
 
+    let saved_expected = self.expected_type
+    self.expected_type = bind_ty
     let rhs_op = self.lower_expr(rhs_expr)
+    self.expected_type = saved_expected
     let place = self.place_for_local(local_id)
     self.assign_operand_to_place(place, rhs_op, self.ast.get_start(node))
 
@@ -1354,11 +1523,6 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
 
 fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method_sym: i32) -> i32:
     let obj_type = self.expr_type(self_expr)
-    if with_getenv_str("WITH_MIR_AUDIT").len() > 0 and obj_type == self.sema.ty_void:
-        let method_name = self.pool.resolve(method_sym)
-        let fn_name = self.pool.resolve(self.body.fn_sym)
-        let expr_kind = self.ast.kind(self_expr)
-        with_eprintln("[mir-resolve-miss] method=" ++ method_name ++ " expr_kind=" ++ int_to_string(expr_kind) ++ " fn=" ++ fn_name)
     if obj_type != 0 and obj_type != self.sema.ty_void:
         let resolved = self.sema.resolve_alias(obj_type)
         let type_name_sym = self.sema.get_type_name(resolved)
@@ -1391,6 +1555,17 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
     if recv_type == 0 or method_name.len() == 0:
         return MIR_INTRINSIC_NONE
     let resolved = self.sema.resolve_alias(recv_type)
+    // Check primitive types first (no type_name_sym for TY_STR, TY_INT, etc.)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TY_STR:
+        if method_name == "len": return MIR_INTRINSIC_STR_LEN
+        if method_name == "byte_at": return MIR_INTRINSIC_STR_BYTE_AT
+        if method_name == "slice": return MIR_INTRINSIC_STR_SLICE
+        if method_name == "contains": return MIR_INTRINSIC_STR_CONTAINS
+        if method_name == "starts_with": return MIR_INTRINSIC_STR_STARTS_WITH
+        if method_name == "ends_with": return MIR_INTRINSIC_STR_ENDS_WITH
+        if method_name == "find": return MIR_INTRINSIC_STR_FIND
+        return MIR_INTRINSIC_NONE
     let type_name_sym = self.sema.get_type_name(resolved)
     if type_name_sym == 0:
         return MIR_INTRINSIC_NONE
@@ -1404,6 +1579,10 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "remove": return MIR_INTRINSIC_VEC_REMOVE
         if method_name == "clear": return MIR_INTRINSIC_VEC_CLEAR
         if method_name == "pop": return MIR_INTRINSIC_VEC_POP
+        if method_name == "iter": return MIR_INTRINSIC_VEC_ITER
+        return MIR_INTRINSIC_NONE
+    if type_name == "VecIter":
+        if method_name == "next": return MIR_INTRINSIC_VECITER_NEXT
         return MIR_INTRINSIC_NONE
     if type_name == "HashMap":
         if method_name == "new": return MIR_INTRINSIC_MAP_NEW
@@ -1412,6 +1591,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "contains": return MIR_INTRINSIC_MAP_CONTAINS
         if method_name == "len": return MIR_INTRINSIC_MAP_LEN
         if method_name == "remove": return MIR_INTRINSIC_MAP_REMOVE
+        if method_name == "clear": return MIR_INTRINSIC_MAP_CLEAR
         return MIR_INTRINSIC_NONE
     if type_name == "HashSet":
         if method_name == "new": return MIR_INTRINSIC_MAP_NEW
@@ -1419,6 +1599,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "contains": return MIR_INTRINSIC_MAP_CONTAINS
         if method_name == "len": return MIR_INTRINSIC_MAP_LEN
         if method_name == "remove": return MIR_INTRINSIC_MAP_REMOVE
+        if method_name == "clear": return MIR_INTRINSIC_MAP_CLEAR
         return MIR_INTRINSIC_NONE
     if type_name == "Option":
         if method_name == "is_some": return MIR_INTRINSIC_OPT_IS_SOME
@@ -1430,28 +1611,37 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         return MIR_INTRINSIC_NONE
     MIR_INTRINSIC_NONE
 
+fn MirBuilder.receiver_option_intrinsic(self: MirBuilder, recv_expr: i32) -> i32:
+    // Check if recv_expr is a call to an intrinsic method that returns Option.
+    // Used to classify chained .unwrap()/.is_some() when the receiver type is void.
+    if self.ast.kind(recv_expr) != NK_CALL:
+        return MIR_INTRINSIC_NONE
+    let callee = self.ast.get_data0(recv_expr)
+    if self.ast.kind(callee) != NK_FIELD_ACCESS:
+        return MIR_INTRINSIC_NONE
+    let base = self.ast.get_data0(callee)
+    let method_sym = self.ast.get_data1(callee)
+    let base_ty = self.expr_type(base)
+    if base_ty == 0 or base_ty == self.sema.ty_void:
+        return MIR_INTRINSIC_NONE
+    let method_name = self.pool.resolve_symbol(method_sym)
+    let resolved = self.sema.resolve_alias(base_ty)
+    let type_name_sym = self.sema.get_type_name(resolved)
+    if type_name_sym == 0:
+        return MIR_INTRINSIC_NONE
+    let type_name = self.pool.resolve_symbol(type_name_sym)
+    // HashMap.get and HashMap.contains return Option-wrapped values
+    if type_name == "HashMap":
+        if method_name == "get": return MIR_INTRINSIC_MAP_GET
+    if type_name == "HashSet":
+        if method_name == "contains": return MIR_INTRINSIC_MAP_CONTAINS
+    MIR_INTRINSIC_NONE
+
 fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
     // Lower method calls as normal calls with receiver inserted as first arg.
     let callee_sym = self.resolve_method_callee_sym(self_expr, method_sym)
 
-    // If resolution returned bare method_sym, the method is unresolved.
-    // Mark unsupported to avoid accidentally matching an unrelated function
-    // with the same name (e.g., bare "contains" matching SourceMap.contains
-    // instead of HashMap.contains).
-    if callee_sym == method_sym:
-        self.mark_unsupported()
-
-    let method_ident = self.ast.add_node(NK_IDENT, self.ast.get_start(node), self.ast.get_end(node), callee_sym, 0, 0)
-    let args: Vec[i32] = Vec.new()
-    args.push(self_expr)
-    for i in 0..arg_count:
-        args.push(self.ast.get_extra(arg_start + i))
-
-    let tmp_start = self.ast.extra_len()
-    for i in 0..args.len() as i32:
-        self.ast.add_extra(args.get(i as i64))
-
-    // Classify intrinsic before lowering the call.
+    // Classify intrinsic early — needed to decide whether to mark_unsupported.
     // For instance methods (vec.push), recv_type comes from the receiver expression.
     // For static calls (Vec.new), the receiver is a type ident — use its symbol to
     // look up the type name, and fall back to the call's return type.
@@ -1464,16 +1654,98 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
             if ret_name_sym == type_sym:
                 recv_type = ret_type
     let method_name = self.pool.resolve_symbol(method_sym)
-    let intrinsic = self.classify_intrinsic(recv_type, method_name)
+    var intrinsic = self.classify_intrinsic(recv_type, method_name)
 
-    let result = self.lower_call(method_ident, tmp_start, args.len() as i32, self.expr_type(node), node)
+    // When classify_intrinsic fails for "unwrap"/"is_some", handle as Option
+    // intrinsic. Sema's type system returns the raw value type for HashMap.get
+    // (e.g., i32 instead of Option[i32]), so classify_intrinsic can't match Option.
+    // Two fallbacks:
+    // 1. Receiver is a direct call to HashMap.get/Vec.get (chained: map.get(k).unwrap())
+    // 2. No sig exists for this method on the receiver type (let x = map.get(k); x.unwrap())
+    if intrinsic == MIR_INTRINSIC_NONE:
+        if method_name == "unwrap" or method_name == "is_some":
+            var is_option_method = false
+            let recv_intr = self.receiver_option_intrinsic(self_expr)
+            if recv_intr != MIR_INTRINSIC_NONE:
+                is_option_method = true
+            else if callee_sym == method_sym:
+                // Unresolved method — no sig found for unwrap/is_some on the receiver type.
+                // User-defined types with "unwrap" would have a sig. This is an Option intrinsic.
+                is_option_method = true
+            if is_option_method:
+                if method_name == "unwrap":
+                    intrinsic = MIR_INTRINSIC_OPT_UNWRAP
+                else:
+                    intrinsic = MIR_INTRINSIC_OPT_IS_SOME
 
-    // Tag the call that was just emitted.
+    // For intrinsic calls (Vec/HashMap/Option), bypass lower_call entirely.
+    // lower_call → lower_var would mark_unsupported on the bare method sym.
+    // Instead, emit the call terminator directly with an intrinsic tag.
     if intrinsic != MIR_INTRINSIC_NONE:
-        let last_call_id = self.body.call_arg_starts.len() as i32 - 1
-        self.body.set_call_intrinsic(last_call_id, intrinsic)
+        return self.lower_intrinsic_call(intrinsic, self_expr, method_sym, arg_start, arg_count, node)
 
-    result
+    // If resolution returned bare method_sym, the method is unresolved.
+    if callee_sym == method_sym:
+        self.mark_unsupported()
+
+    let method_ident = self.ast.add_node(NK_IDENT, self.ast.get_start(node), self.ast.get_end(node), callee_sym, 0, 0)
+    let args: Vec[i32] = Vec.new()
+    // For static method calls (receiver is a type name, not a value),
+    // don't pass the receiver as an argument.
+    var is_static_call = false
+    if self.ast.kind(self_expr) == NK_IDENT:
+        let recv_sym = self.ast.get_data0(self_expr)
+        if self.sema.named_types.contains(recv_sym):
+            is_static_call = true
+    if not is_static_call:
+        args.push(self_expr)
+    for i in 0..arg_count:
+        args.push(self.ast.get_extra(arg_start + i))
+
+    let tmp_start = self.ast.extra_len()
+    for i in 0..args.len() as i32:
+        self.ast.add_extra(args.get(i as i64))
+
+    self.lower_call(method_ident, tmp_start, args.len() as i32, self.expr_type(node), node)
+
+fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
+    // Emit a call terminator with a CK_FN operand and intrinsic tag.
+    // The CK_FN sym is meaningless — codegen dispatches by intrinsic kind.
+    let fn_op = self.const_operand(CK_FN, method_sym, self.sema.ty_void)
+
+    // Build argument operands. For static calls (Vec.new, HashMap.new),
+    // the receiver is a type ident — skip it. For instance methods, include it.
+    let is_static = intrinsic == MIR_INTRINSIC_VEC_NEW or intrinsic == MIR_INTRINSIC_MAP_NEW
+    let call_args: Vec[i32] = Vec.new()
+    if not is_static:
+        call_args.push(self.lower_expr(self_expr))
+    for i in 0..arg_count:
+        let arg_node = self.ast.get_extra(arg_start + i)
+        call_args.push(self.lower_expr(arg_node))
+
+    let args_id = self.body.new_call_args(call_args)
+    var ret_type = self.expr_type(node)
+    // For static constructors (Vec.new, HashMap.new), expr_type often returns
+    // the bare struct type (TY_STRUCT) instead of the generic instance
+    // (TY_GENERIC_INST). Use the expected type from the let binding if available.
+    if self.expected_type > 0:
+        let et_tk = self.sema.get_type_kind(self.expected_type)
+        if et_tk == TY_GENERIC_INST:
+            ret_type = self.expected_type
+    let result_local = self.new_temp(ret_type)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+
+    self.terminate(TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+
+    // Tag call with intrinsic kind for codegen dispatch.
+    let call_id = self.body.call_arg_starts.len() as i32 - 1
+    self.body.set_call_intrinsic(call_id, intrinsic)
+
+    if self.sema.is_copy(ret_type) != 0:
+        return self.body.new_operand(OK_COPY, result_place)
+    self.body.new_operand(OK_MOVE, result_place)
 
 fn MirBuilder.lower_vtable_call(self: MirBuilder, dyn_expr: i32, _trait_sym: i32, method_sym: i32, args_start: i32, args_count: i32, node: i32) -> i32:
     // Conservative lowering: treat as method call on dynamic receiver.
@@ -1609,7 +1881,9 @@ fn MirBuilder.lower_implicit_ok(self: MirBuilder, expr: i32, ok_type_id: i32) ->
     let op = self.lower_expr(expr)
     let fields: Vec[i32] = Vec.new()
     fields.push(op)
-    let fid = self.body.new_agg_fields(fields)
+    let no_names: Vec[i32] = Vec.new()
+    no_names.push(0)
+    let fid = self.body.new_agg_fields(fields, no_names)
     let rv = self.body.new_rvalue(RK_AGGREGATE, 1, fid, 0)
     let tmp = self.new_temp(ok_type_id)
     let place = self.place_for_local(tmp)
@@ -1813,11 +2087,21 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NK_STRUCT_LIT:
         let sl_fields_start = self.ast.get_data1(node)
         let sl_field_count = self.ast.get_data2(node)
+        let sl_name_sym = self.ast.get_data0(node)
+        let sl_struct_ty = self.expr_type(node)
         let sl_fields: Vec[i32] = Vec.new()
+        let sl_names: Vec[i32] = Vec.new()
         for i in 0..sl_field_count:
+            let f_name_sym = self.ast.get_extra(sl_fields_start + i * 2)
             let f_val_node = self.ast.get_extra(sl_fields_start + i * 2 + 1)
+            let saved_expected = self.expected_type
+            let f_ty = self.struct_field_type(sl_struct_ty, f_name_sym)
+            if f_ty != 0:
+                self.expected_type = f_ty
             sl_fields.push(self.lower_expr(f_val_node))
-        let sl_fid = self.body.new_agg_fields(sl_fields)
+            sl_names.push(f_name_sym)
+            self.expected_type = saved_expected
+        let sl_fid = self.body.new_agg_fields(sl_fields, sl_names)
         let sl_rv = self.body.new_rvalue(RK_AGGREGATE, 0, sl_fid, 0)
         let sl_ty = self.expr_type(node)
         let sl_tmp = self.new_temp(sl_ty)
@@ -1876,6 +2160,11 @@ fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
             if builder.sema.is_copy(p_ty) == 0:
                 builder.schedule_drop(local_id, DK_VALUE)
 
+    // Set expected_type to the function's return type so that intrinsic calls
+    // (Vec.new, HashMap.new) in tail position can resolve their generic inst type.
+    let ret_ty = builder.body.local_type_ids.get(0)
+    builder.expected_type = ret_ty
+
     let body_expr = builder.ast.get_data1(fn_node)
     let result = builder.lower_expr(body_expr)
 
@@ -1900,6 +2189,11 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
         let meta = ast_pool.find_fn_meta(decl)
         if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
             // Skip generic fn bodies in this wave.
+            continue
+        // Also skip functions registered as generic via impl-level type params
+        // (e.g. impl[T] Trait for Vec[T] methods have fn_meta_tp_count == 0
+        // but are still generic).
+        if sema.generic_fn_nodes.contains(fn_sym):
             continue
 
         var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
