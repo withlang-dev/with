@@ -5152,8 +5152,10 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
             return mc_ret
 
     // For TY_GENERIC_INST receivers without a registered signature,
-    // check argument types for builtin generic methods (Vec, HashMap, HashSet)
+    // check argument types and return types for builtin generic methods
     if self.get_type_kind(resolved) == TY_GENERIC_INST:
+        let mc_base_name = self.pool_resolve(type_name_sym)
+        let mc_method = self.pool_resolve(field)
         let mc_push_sym = self.pool_intern("push")
         let mc_insert_sym = self.pool_intern("insert")
         if field == mc_push_sym:
@@ -5181,6 +5183,57 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                     if self.types_compatible(val_ty, a1_ty) == 0:
                         if self.arithmetic_result_type(val_ty, a1_ty) == 0:
                             self.emit_error("wrong argument type", self.ast.get_extra(extra_start + 1))
+        // Return types for builtin generic methods
+        if mc_base_name == "Vec":
+            if mc_method == "push" or mc_method == "set_i32" or mc_method == "clear":
+                return self.ty_void
+            if mc_method == "get" or mc_method == "pop" or mc_method == "remove":
+                return self.get_generic_inst_arg(resolved, 0)
+            if mc_method == "len":
+                return self.ty_i32
+        if mc_base_name == "HashMap":
+            if mc_method == "insert" or mc_method == "clear":
+                return self.ty_void
+            if mc_method == "get":
+                return self.get_generic_inst_arg(resolved, 1)
+            if mc_method == "contains":
+                return self.ty_bool
+            if mc_method == "remove":
+                return self.get_generic_inst_arg(resolved, 1)
+            if mc_method == "len":
+                return self.ty_i32
+        if mc_base_name == "HashSet":
+            if mc_method == "insert" or mc_method == "clear":
+                return self.ty_void
+            if mc_method == "contains" or mc_method == "remove":
+                return self.ty_bool
+            if mc_method == "len":
+                return self.ty_i32
+        if mc_base_name == "Option":
+            if mc_method == "unwrap":
+                return self.get_generic_inst_arg(resolved, 0)
+            if mc_method == "is_some" or mc_method == "is_none":
+                return self.ty_bool
+        if mc_base_name == "Result":
+            if mc_method == "unwrap":
+                return self.get_generic_inst_arg(resolved, 0)
+            if mc_method == "is_ok" or mc_method == "is_err":
+                return self.ty_bool
+
+    // Return types for primitive type methods
+    let resolved_tk = self.get_type_kind(resolved)
+    if resolved_tk == TY_STR:
+        let prim_method = self.pool_resolve(field)
+        if prim_method == "len":
+            return self.ty_i32
+        if prim_method == "contains" or prim_method == "starts_with" or prim_method == "ends_with":
+            return self.ty_bool
+        if prim_method == "trim" or prim_method == "to_lower" or prim_method == "to_upper" or prim_method == "replace" or prim_method == "slice":
+            return self.ty_str
+    if resolved_tk == TY_ARRAY:
+        let arr_method = self.pool_resolve(field)
+        if arr_method == "len":
+            return self.ty_i32
 
     // Static method call on a named type expression.
     if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
