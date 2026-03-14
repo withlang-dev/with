@@ -2091,6 +2091,36 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             let err_ty = self.sema_type_to_llvm(err_tid)
             if ok_ty != 0 and err_ty != 0:
                 return self.get_or_create_result_type(ok_ty, err_ty)
+        // User-defined generic structs: monomorphize via type bindings
+        let base_sym = self.sema.get_type_d0(tid)
+        if base_sym != 0 and self.generic_structs.contains(base_sym):
+            let saved_len = self.type_bindings_len
+            let saved_syms = self.type_binding_syms
+            let saved_types = self.type_binding_types
+            let tp_syms: Vec[i32] = Vec.new()
+            let tp_types: Vec[i64] = Vec.new()
+            let gs_node = self.generic_structs.get(base_sym).unwrap()
+            let tp_count = self.type_decl_tp_count(gs_node)
+            var tp_pos = self.type_decl_tp_start(gs_node)
+            for ti in 0..tp_count:
+                let tp_sym = self.pool.get_extra(tp_pos)
+                tp_syms.push(tp_sym)
+                let bc = self.pool.get_extra(tp_pos + 1)
+                tp_pos = tp_pos + 2 + bc
+                var arg_ty: i64 = 0
+                if ti < arg_count:
+                    arg_ty = self.sema_type_to_llvm(self.sema.get_generic_inst_arg(tid, ti))
+                if arg_ty == 0:
+                    arg_ty = wl_i32_type(self.context)
+                tp_types.push(arg_ty)
+            self.type_binding_syms = tp_syms
+            self.type_binding_types = tp_types
+            self.type_bindings_len = tp_count
+            let mono_ty = self.monomorphize_struct(base_sym, 0, 0)
+            self.type_bindings_len = saved_len
+            self.type_binding_syms = saved_syms
+            self.type_binding_types = saved_types
+            return mono_ty
         return 0
     if tk == TY_INT:
         let bits = self.sema.get_type_d0(tid)
