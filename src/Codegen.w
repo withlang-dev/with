@@ -2686,9 +2686,15 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     // Check if method (has dot in name); for missing symbol text, infer owner
     // from `self: Type` in param 0.
     var method_owner_sym = 0
+    var method_key_sym: i32 = 0
     for di in 0..name_str.len() as i32:
         if name_str.byte_at(di as i64) == 46:
             method_owner_sym = self.intern.intern(name_str.slice(0, di as i64))
+            let short_method_name = name_str.slice((di + 1) as i64, name_str.len() as i64)
+            if short_method_name.len() > 0:
+                let short_method_sym = self.intern.intern(short_method_name)
+                let mk_str = "$m$" ++ int_to_string(method_owner_sym) ++ "|" ++ int_to_string(short_method_sym)
+                method_key_sym = self.intern.intern(mk_str)
             break
 
     // Defer methods on generic structs that use struct type params
@@ -2764,6 +2770,8 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
                     self.record_ref_param(name_sym, pi, param_count)
                     if alias_sym != 0:
                         self.record_ref_param(alias_sym, pi, param_count)
+                    if method_key_sym != 0:
+                        self.record_ref_param(method_key_sym, pi, param_count)
                     pi = pi + 1
                     continue
 
@@ -2787,6 +2795,8 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             self.record_dyn_param(name_sym, pi, param_count, trait_sym)
             if alias_sym != 0:
                 self.record_dyn_param(alias_sym, pi, param_count, trait_sym)
+            if method_key_sym != 0:
+                self.record_dyn_param(method_key_sym, pi, param_count, trait_sym)
             pi = pi + 1
             continue
 
@@ -2800,6 +2810,8 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             self.record_ref_param(name_sym, pi, param_count)
             if alias_sym != 0:
                 self.record_ref_param(alias_sym, pi, param_count)
+            if method_key_sym != 0:
+                self.record_ref_param(method_key_sym, pi, param_count)
             pi = pi + 1
             continue
 
@@ -2835,8 +2847,21 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     if alias_sym != 0:
         self.fn_values.insert(alias_sym, function)
         self.fn_fn_types.insert(alias_sym, fn_type)
+    if method_key_sym != 0:
+        self.fn_values.insert(method_key_sym, function)
+        self.fn_fn_types.insert(method_key_sym, fn_type)
 
     self.current_method_owner_sym = saved_owner
+
+fn Codegen.is_ref_param(self: Codegen, fn_sym: i32, param_idx: i32) -> bool:
+    let start_opt = self.fn_ref_param_starts.get(fn_sym)
+    if not start_opt.is_some():
+        return false
+    let start = start_opt.unwrap()
+    let slot = start + param_idx
+    if slot < 0 or slot >= self.fn_ref_param_data.len() as i32:
+        return false
+    self.fn_ref_param_data.get(slot as i64) != 0
 
 fn Codegen.record_ref_param(self: Codegen, fn_sym: i32, idx: i32, count: i32):
     if not self.fn_ref_param_starts.get(fn_sym).is_some():
@@ -4734,6 +4759,8 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
         let name_sym = self.sema.get_type_d0(resolved)
         if name_sym != 0:
             return self.resolve_named_type(name_sym)
+    if tk == TY_GENERIC_INST:
+        return self.sema_type_to_llvm(resolved)
     if tk == TY_PTR or tk == TY_REF:
         return wl_ptr_type(self.context)
     if tk == TY_FN:
@@ -4786,14 +4813,20 @@ fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32)
     if wl_get_type_kind(agg_ty) != wl_struct_type_kind():
         return 0 - 1
     let elem_count = wl_count_struct_elem_types(agg_ty)
-    if field_token >= 0 and field_token < elem_count:
-        return field_token
 
+    // Try symbol-based lookup first (for named struct fields from MIR field projections).
+    // MIR stores field *symbols* as projection data, not numeric indices.
+    // Must do this before the raw range check, because a symbol value (e.g. 132 for "ast")
+    // can accidentally pass field_token < elem_count on large structs.
     let st_sym = self.find_struct_type_by_llvm(agg_ty)
     if st_sym != 0:
         let fi = self.find_field_index(st_sym, field_token)
         if fi >= 0 and fi < elem_count:
             return fi
+
+    // Fall back to direct numeric index (for tuple fields, match bindings)
+    if field_token >= 0 and field_token < elem_count:
+        return field_token
 
     let field_name = self.intern.resolve(field_token)
     if field_name.len() == 1:
@@ -4957,15 +4990,26 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
 
     if ck == CK_FN:
         let fn_sym = cd
-        let fv_opt = self.fn_values.get(fn_sym)
+        // CK_FN sym from MirLower is in sema pool — must translate to codegen pool.
+        // Direct fn_values lookup would return wrong function (pool ID collision).
+        var translated_sym = fn_sym
+        if fn_sym > 0 and fn_sym < self.sema.pool.symbol_texts.len() as i32:
+            let sema_text = self.sema.pool.symbol_texts.get(fn_sym as i64)
+            if sema_text.len() > 0:
+                translated_sym = self.intern.intern(sema_text)
+        let fv_opt = self.fn_values.get(translated_sym)
         if fv_opt.is_some():
+            if self.debug_mir_codegen_enabled():
+                let fn_name = self.function_symbol_name(translated_sym)
+                with_eprintln("[ck-fn] sym=" ++ int_to_string(fn_sym) ++ " -> " ++ fn_name)
             return fv_opt.unwrap() as i64
-        let fn_name = self.function_symbol_name(fn_sym)
+        let fn_name = self.function_symbol_name(translated_sym)
         let found = wl_get_named_function(self.llmod, fn_name)
         if found != 0:
+            if self.debug_mir_codegen_enabled():
+                with_eprintln("[ck-fn] sym=" ++ int_to_string(fn_sym) ++ " -> " ++ fn_name ++ " (llmod)")
             return found
-        if self.debug_fallback_enabled():
-            with_eprintln("warning: [fallback] mir_const_value: CK_FN not found for sym=" ++ int_to_string(fn_sym) ++ " name=" ++ fn_name)
+        with_eprintln("warning: [ck-fn] NOT FOUND sym=" ++ int_to_string(fn_sym) ++ " name=" ++ fn_name)
         return wl_get_undef(fallback_ty)
 
     wl_get_undef(fallback_ty)
@@ -5061,8 +5105,15 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
             if cmp_kind == wl_struct_type_kind() or cmp_kind == wl_array_type_kind():
                 return self.compare_aggregate_eq(lhs, rhs, op)
 
-    let l = self.coerce_int(lhs, wl_type_of(rhs))
-    let r = self.coerce_int(rhs, wl_type_of(l))
+    // Coerce both operands to the wider integer type (never truncate)
+    let lty = wl_type_of(lhs)
+    let rty = wl_type_of(rhs)
+    var wider_ty = lty
+    if wl_get_type_kind(lty) == wl_integer_type_kind() and wl_get_type_kind(rty) == wl_integer_type_kind():
+        if wl_get_int_type_width(rty) > wl_get_int_type_width(lty):
+            wider_ty = rty
+    let l = self.coerce_int(lhs, wider_ty)
+    let r = self.coerce_int(rhs, wider_ty)
     if op == OP_ADD or op == OP_ADD_WRAP: return wl_build_add(self.builder, l, r)
     if op == OP_SUB or op == OP_SUB_WRAP: return wl_build_sub(self.builder, l, r)
     if op == OP_MUL or op == OP_MUL_WRAP: return wl_build_mul(self.builder, l, r)
@@ -5265,11 +5316,14 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
         let st_opt = self.struct_type_map.get(str_sym)
         if st_opt.is_some():
             return self.struct_llvm_types.get(st_opt.unwrap() as i64)
-    if kind == 6 or kind == 7 or kind == 19:
-        // TY_STRUCT / TY_ENUM / TY_GENERIC_INST
+    if kind == 6 or kind == 7:
+        // TY_STRUCT / TY_ENUM
         let name_sym = self.sema.get_type_d0(sema_ty)
         if name_sym != 0:
             return self.resolve_named_type(name_sym)
+    if kind == 19:
+        // TY_GENERIC_INST — delegate to full handler (Vec, HashMap, Option, etc.)
+        return self.sema_type_to_llvm(sema_ty)
     if kind == 13 or kind == 14:
         // TY_PTR / TY_REF
         return wl_ptr_type(self.context)
@@ -5376,6 +5430,15 @@ fn Codegen.mir_default_unreachable_bb_value(self: Codegen) -> i64:
     self.mir_default_unreachable_bbs.push(bb)
     bb
 
+fn Codegen.mir_try_place_ptr_for_ref(self: Codegen, body: MirBody, operand_id: i32) -> i64:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return 0
+    let ok = body.operand_kinds.get(operand_id as i64)
+    let od = body.operand_d0.get(operand_id as i64)
+    if (ok == OK_COPY or ok == OK_MOVE) and od >= 0 and od < body.place_locals.len() as i32:
+        return self.mir_place_ptr(body, od, false, 0)
+    0
+
 fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, expected_ty: i64, call_context: str, arg_index: i32) -> i64:
     if expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
         if operand_id >= 0 and operand_id < body.operand_kinds.len() as i32:
@@ -5385,9 +5448,6 @@ fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, 
                 let local_id = body.place_locals.get(od as i64)
                 let place_ptr = self.mir_place_ptr(body, od, false, 0)
                 if place_ptr != 0:
-                    // Check if the value at this place is a struct (needs pass-by-ref).
-                    // For projected places (e.g., self.pool), check the projected type.
-                    // For simple places, check the local's type.
                     var is_struct_val = false
                     let p_count = body.place_proj_counts.get(od as i64)
                     if p_count > 0:
@@ -5469,14 +5529,20 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     if param_count > 0:
         wl_get_param_types(call_ft, vec_data_i64(&param_types))
 
-    // Resolve callee fn_sym for dyn trait parameter lookup
+    // Resolve callee fn_sym for dyn trait parameter lookup.
+    // CK_FN syms are from sema pool — translate to codegen intern pool.
     var callee_fn_sym: i32 = 0
     if callee_operand >= 0 and callee_operand < body.operand_kinds.len() as i32:
         let co_k = body.operand_kinds.get(callee_operand as i64)
         let co_d = body.operand_d0.get(callee_operand as i64)
         if co_k == OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
             if body.const_kinds.get(co_d as i64) == CK_FN:
-                callee_fn_sym = body.const_d0.get(co_d as i64)
+                let raw_sym = body.const_d0.get(co_d as i64)
+                // Translate sema pool sym to codegen intern pool sym
+                if raw_sym > 0 and raw_sym < self.sema.pool.symbol_texts.len() as i32:
+                    let sym_text = self.sema.pool.symbol_texts.get(raw_sym as i64)
+                    if sym_text.len() > 0:
+                        callee_fn_sym = self.intern.intern(sym_text)
 
     let args: Vec[i64] = Vec.new()
     if is_indirect:
@@ -5487,13 +5553,37 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         let param_offset = if is_indirect: ai + 1 else: ai
         if param_offset < param_count:
             expected_ty = param_types.get(param_offset as i64)
+
+        // Ref param check: pass pointer to place instead of loading value.
+        // This handles struct self params where the ABI uses pointer-passing.
+        var needs_ref = false
+        if callee_fn_sym != 0 and expected_ty != 0:
+            if wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
+                needs_ref = self.is_ref_param(callee_fn_sym, param_offset)
+
         // Check for dyn param BEFORE evaluating operand — coercion would
         // mangle the concrete struct into the fat-pointer shape.
         var dyn_trait_sym: i32 = 0
         if callee_fn_sym != 0:
             dyn_trait_sym = self.get_fn_dyn_param_trait(callee_fn_sym, ai)
         var arg_val: i64 = 0
-        if dyn_trait_sym != 0:
+        if needs_ref:
+            // Evaluate first to check if operand is already a pointer.
+            // Ref params (&T) are already pointers — don't wrap them again.
+            let val = self.mir_eval_operand(body, operand_id, 0)
+            let val_ty = wl_type_of(val)
+            if wl_get_type_kind(val_ty) == wl_pointer_type_kind():
+                // Already a pointer — pass directly
+                arg_val = val
+            else:
+                // Struct value needs pointer-passing. Try place ptr first.
+                arg_val = self.mir_try_place_ptr_for_ref(body, operand_id)
+                if arg_val == 0:
+                    // Fallback: alloca in entry block, store, pass ptr
+                    let tmp = self.create_entry_alloca(val_ty)
+                    wl_build_store(self.builder, val, tmp)
+                    arg_val = tmp
+        else if dyn_trait_sym != 0:
             // Evaluate without coercion so we get the raw concrete value.
             arg_val = self.mir_eval_operand(body, operand_id, 0)
             let arg_ty = wl_type_of(arg_val)
@@ -7128,6 +7218,21 @@ fn Codegen.gen_field_access(self: Codegen, node: i32) -> i64:
             with_eprintln("warning: [variant-shorthand] variant not found")
             return wl_get_undef(wl_i32_type(self.context))
 
+        // Regular enum unit variant: MyEnum.Variant
+        let enum_opt = self.enum_type_map.get(obj_sym)
+        if enum_opt.is_some():
+            let ei = enum_opt.unwrap()
+            let v_start = self.enum_variant_starts.get(ei as i64)
+            let v_count = self.enum_variant_counts.get(ei as i64)
+            for vi in 0..v_count:
+                if self.enum_variant_names.get((v_start + vi) as i64) == field_sym:
+                    let enum_ty = self.enum_llvm_types.get(ei as i64)
+                    let alloca = wl_build_alloca(self.builder, enum_ty)
+                    wl_build_store(self.builder, self.build_default_value(enum_ty), alloca)
+                    let tag_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 0)
+                    wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), vi as i64, 0), tag_ptr)
+                    return wl_build_load(self.builder, enum_ty, alloca)
+
     // Handle method calls: obj.method becomes a call lookup
     let field_ptr = self.gen_field_access_ptr(obj_node, field_sym)
     if field_ptr != 0:
@@ -8253,7 +8358,7 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
         if de_opt.is_some():
             return self.gen_disc_enum_from_int(de_opt.unwrap(), args_start, node)
 
-    // Disc enum variant construction: Msg.Move(10, 20)
+    // Enum variant construction: Msg.Move(10, 20) or MyOption.Some(42)
     if self.pool.kind(obj_node) == NK_IDENT and arg_count > 0:
         let obj_sym = self.pool.get_data0(obj_node)
         let de_vc_opt = self.disc_enum_type_map.get(obj_sym)
@@ -8265,6 +8370,12 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
                 let variant_result = self.gen_enum_variant_call(method_lookup_sym, args_start, arg_count)
                 if variant_result != 0:
                     return variant_result
+        // Regular enum variant construction
+        let enum_vc_opt = self.enum_type_map.get(obj_sym)
+        if enum_vc_opt.is_some():
+            let variant_result = self.gen_enum_variant_call(method_lookup_sym, args_start, arg_count)
+            if variant_result != 0:
+                return variant_result
 
     // Static method call: TypeName.method(args)
     var static_type_sym = 0
@@ -8391,6 +8502,10 @@ fn Codegen.gen_method_call(self: Codegen, node: i32) -> i64:
     let option_payload_ty = self.find_option_payload_type_by_llvm(obj_ty)
     if option_payload_ty != 0:
         return self.gen_option_method(method_name, obj, args_start, arg_count)
+
+    // Array .len()
+    if wl_get_type_kind(obj_ty) == wl_array_type_kind() and method_name == "len":
+        return wl_const_int(wl_i32_type(self.context), wl_get_array_length(obj_ty), 0)
 
     // Auto-generated enum accessors: .is_X() and .as_X[_ref|_mut]().
     let enum_accessor = self.gen_enum_accessor_method(callee_node, obj_node, obj, obj_ty, method_name, arg_count)
@@ -10625,9 +10740,8 @@ fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
     let param_start = self.pool.fn_meta_param_start(meta)
     let param_count = self.pool.fn_meta_param_count(meta)
 
-    // Resolve return type
-    let ret_ty_raw = self.resolve_type(ret_type_node)
-    let ret_ty = if ret_ty_raw != 0: ret_ty_raw else: void_ty
+    // Resolve return type (default to i32 when no annotation, matching non-async functions)
+    let ret_ty = if ret_type_node != 0: self.resolve_type(ret_type_node) else: i32_ty
     self.async_fn_ret_types.insert(name_sym, ret_ty)
 
     // Resolve param types
@@ -10686,7 +10800,7 @@ fn Codegen.gen_async_function(self: Codegen, fn_node: i32):
 
     // Get return type
     let ret_ty_opt = self.async_fn_ret_types.get(name_sym)
-    let ret_ty = if ret_ty_opt.is_some(): ret_ty_opt.unwrap() as i64 else: void_ty
+    let ret_ty = if ret_ty_opt.is_some(): ret_ty_opt.unwrap() as i64 else: i32_ty
 
     // Get param types
     let param_types: Vec[i64] = Vec.new()
