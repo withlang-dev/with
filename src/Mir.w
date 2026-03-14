@@ -85,6 +85,16 @@ const MIR_INTRINSIC_MAP_LEN: i32 = 13
 const MIR_INTRINSIC_MAP_REMOVE: i32 = 14
 const MIR_INTRINSIC_OPT_IS_SOME: i32 = 15
 const MIR_INTRINSIC_OPT_UNWRAP: i32 = 16
+const MIR_INTRINSIC_STR_LEN: i32 = 17
+const MIR_INTRINSIC_STR_BYTE_AT: i32 = 18
+const MIR_INTRINSIC_STR_SLICE: i32 = 19
+const MIR_INTRINSIC_STR_CONTAINS: i32 = 20
+const MIR_INTRINSIC_STR_STARTS_WITH: i32 = 21
+const MIR_INTRINSIC_STR_ENDS_WITH: i32 = 22
+const MIR_INTRINSIC_STR_FIND: i32 = 23
+const MIR_INTRINSIC_MAP_CLEAR: i32 = 24
+const MIR_INTRINSIC_VECITER_NEXT: i32 = 25
+const MIR_INTRINSIC_VEC_ITER: i32 = 26
 
 // ── Projection kinds ─────────────────────────────────────────────
 
@@ -169,6 +179,7 @@ type MirBody = {
     agg_field_starts: Vec[i32],
     agg_field_counts: Vec[i32],
     agg_field_operands: Vec[i32],
+    agg_field_name_syms: Vec[i32],
 
     // Call argument tables
     call_arg_starts: Vec[i32],
@@ -263,6 +274,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         agg_field_starts: Vec.new(),
         agg_field_counts: Vec.new(),
         agg_field_operands: Vec.new(),
+        agg_field_name_syms: Vec.new(),
         call_arg_starts: Vec.new(),
         call_arg_counts: Vec.new(),
         call_arg_operands: Vec.new(),
@@ -413,7 +425,7 @@ fn MirBody.new_switch_table(self: &mut MirBody, vals: Vec[i32], targets: Vec[i32
 
     id
 
-fn MirBody.new_agg_fields(self: &mut MirBody, operands: Vec[i32]) -> i32:
+fn MirBody.new_agg_fields(self: &mut MirBody, operands: Vec[i32], name_syms: Vec[i32]) -> i32:
     let id = self.agg_field_starts.len() as i32
     let start = self.agg_field_operands.len() as i32
     let count = operands.len() as i32
@@ -421,6 +433,7 @@ fn MirBody.new_agg_fields(self: &mut MirBody, operands: Vec[i32]) -> i32:
     self.agg_field_counts.push(count)
     for i in 0..count:
         self.agg_field_operands.push(operands.get(i as i64))
+        self.agg_field_name_syms.push(name_syms.get(i as i64))
     id
 
 fn MirBody.new_call_args(self: &mut MirBody, operands: Vec[i32]) -> i32:

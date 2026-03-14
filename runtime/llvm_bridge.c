@@ -503,6 +503,21 @@ void wl_optimize(int64_t m, int64_t tm, int32_t level) {
     LLVMDisposePassBuilderOptions(opts);
 }
 
+void wl_promote_allocas(int64_t fn, int64_t tm) {
+    LLVMPassBuilderOptionsRef opts = LLVMCreatePassBuilderOptions();
+    LLVMErrorRef err = LLVMRunPassesOnFunction(
+        V(fn), "mem2reg", TM(tm), opts);
+    if (err) {
+        char *msg = LLVMGetErrorMessage(err);
+        if (msg) LLVMDisposeErrorMessage(msg);
+    }
+    LLVMDisposePassBuilderOptions(opts);
+}
+
+void wl_dump_value(int64_t v) {
+    LLVMDumpValue(V(v));
+}
+
 void wl_print_ir(int64_t m) {
     char *ir = LLVMPrintModuleToString(M(m));
     if (ir) {

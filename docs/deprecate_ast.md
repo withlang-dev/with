@@ -170,16 +170,17 @@ cp out/bin/with-stage2 ~/.local/bin/with
 
 ## Audit Results (2026-03-14)
 
-Total functions in self-host build: **1,580**
+Total functions in self-host build: **~1,580**
 
 | Path | Count | % |
 |---|---|---|
-| MIR codegen (working) | 698 | 44.2% |
-| AST fallback: lowering failed | 883 | 55.9% |
-| AST fallback: codegen unsupported | 3 | 0.2% |
+| MIR codegen (working) | ~1,557 | 98.5% |
+| AST fallback: unsupported-callee | 3 | 0.2% |
+| AST fallback: intrinsic-call | 20 | 1.3% |
 
-Previous: 537 MIR / 944 lowering-failed / 99 codegen-unsupported.
-Gains from: PK_FIELD projections, operator overloading, record update, NK_RANGE, tuple type.
+Previous: 698 MIR / 883 lowering-failed / 3 codegen-unsupported.
+Gains from: intrinsic gate removal, expected_type propagation, struct literal field
+name mapping, short-circuit and/or, projected type stores.
 
 ### Lowering failures by first failure kind
 
@@ -232,7 +233,7 @@ Phase 0: Audit
   [x] Document root cause (method resolution / expr_type)
 
 Phase 1: Fix MirLower (target: 0 lowering failures)
-  Current: 883 lowering-failed (was 1,218)
+  Current: 23 fallback (was 883, was 1,218)
   [x] Sema builtin method return types (check_method_call)
   [x] typed_expr_types key fix (node index vs byte offset)
   [x] Remove MIR dispatch count cap (376→uncapped, 537 through MIR)
@@ -241,15 +242,19 @@ Phase 1: Fix MirLower (target: 0 lowering failures)
   [x] Operator overloading detection in lower_bin_op
   [x] Record update rewrite (copy-then-overwrite via PK_FIELD)
   [x] Fix tuple pattern match lowering (unterminated blocks)
-  [ ] Fix expr_type for remaining field access chains (~883 ident failures)
-  [ ] Fix remaining edge cases
+  [x] expected_type for field assignments (Vec.new elem_size in self.field = Vec.new())
+  [x] Struct literal field name mapping (aggregate field index != LLVM struct index)
+  [x] Short-circuit evaluation for logical and/or operators
+  [x] Remove intrinsic gate (WITH_MIR_INTRINSICS no longer needed)
+  [ ] 3 remaining: unsupported-callee (closure/indirect calls)
+  [ ] 20 remaining: intrinsic-call edge cases (str ops, Source, HashSet)
 
 Phase 1b: Fix MIR codegen support (target: 0 codegen-unsupported)
-  Current: 3 codegen-unsupported (was 205)
+  Current: 0 codegen-unsupported (was 205)
   [x] PK_FIELD projection support in mir_place_is_supported
   [x] TY_TUPLE + TY_STRUCT sym translation in mir_sema_type_to_llvm
   [x] mir_place_ptr fallback to mir_sema_type_to_llvm
-  [ ] 3 remaining: unsupported-callee (closure/indirect calls)
+  [x] Projected type in mir_emit_stmt (store to correct type for field assignments)
 
 Phase 2: Remove support check
   [ ] Remove mir_function_is_supported
