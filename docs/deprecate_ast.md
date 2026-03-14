@@ -174,19 +174,18 @@ Total functions in self-host build: **1,580**
 
 | Path | Count | % |
 |---|---|---|
-| MIR codegen (working) | 537 | 34.0% |
-| AST fallback: lowering failed | 944 | 59.7% |
-| AST fallback: codegen unsupported | 99 | 6.3% |
+| MIR codegen (working) | 698 | 44.2% |
+| AST fallback: lowering failed | 883 | 55.9% |
+| AST fallback: codegen unsupported | 3 | 0.2% |
 
-Previous (2026-03-13): 151 MIR / 1,218 lowering-failed / 205 codegen-unsupported.
-Gains from: sema builtin return types, typed_expr key fix (node index vs byte offset), cap removal.
+Previous: 537 MIR / 944 lowering-failed / 99 codegen-unsupported.
+Gains from: PK_FIELD projections, operator overloading, record update, NK_RANGE, tuple type.
 
 ### Lowering failures by first failure kind
 
 | First failure | AST node kind | Count | % of failures |
 |---|---|---|---|
-| `NK_IDENT` (24) | Unresolved identifier | 1,119 | 91.8% |
-| `NK_RANGE` (48) | Range expression | 100 | 8.2% |
+| `NK_IDENT` (24) | Unresolved identifier | ~883 | ~100% |
 
 ### Root cause: method resolution in `lower_var`
 
@@ -233,18 +232,24 @@ Phase 0: Audit
   [x] Document root cause (method resolution / expr_type)
 
 Phase 1: Fix MirLower (target: 0 lowering failures)
-  Current: 944 lowering-failed (was 1,218)
+  Current: 883 lowering-failed (was 1,218)
   [x] Sema builtin method return types (check_method_call)
   [x] typed_expr_types key fix (node index vs byte offset)
   [x] Remove MIR dispatch count cap (376→uncapped, 537 through MIR)
-  [ ] Fix expr_type for remaining field access chains
-  [ ] Add NK_RANGE lowering (~100 functions)
+  [x] Add NK_RANGE lowering (~64 functions unlocked)
+  [x] PK_FIELD projections (struct field access through MIR)
+  [x] Operator overloading detection in lower_bin_op
+  [x] Record update rewrite (copy-then-overwrite via PK_FIELD)
+  [x] Fix tuple pattern match lowering (unterminated blocks)
+  [ ] Fix expr_type for remaining field access chains (~883 ident failures)
   [ ] Fix remaining edge cases
 
 Phase 1b: Fix MIR codegen support (target: 0 codegen-unsupported)
-  Current: 99 codegen-unsupported (was 205)
-  [ ] Audit which RK_*/TK_* kinds are unsupported
-  [ ] Add missing rvalue/terminator handlers
+  Current: 3 codegen-unsupported (was 205)
+  [x] PK_FIELD projection support in mir_place_is_supported
+  [x] TY_TUPLE + TY_STRUCT sym translation in mir_sema_type_to_llvm
+  [x] mir_place_ptr fallback to mir_sema_type_to_llvm
+  [ ] 3 remaining: unsupported-callee (closure/indirect calls)
 
 Phase 2: Remove support check
   [ ] Remove mir_function_is_supported
