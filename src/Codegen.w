@@ -4579,6 +4579,11 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
                     self.debug_enter_function(fn_node, fn_sym, fv.unwrap() as i64)
                     let fn_span = self.pool.get_start(fn_node)
                     self.debug_set_location(fn_span)
+                if self.debug_mir_codegen_enabled():
+                    let fn_name = self.intern.resolve(fn_sym)
+                    if fn_name == "main":
+                        let dump = dump_mir_body(body, self.intern, self.sema)
+                        with_eprintln(dump)
                 self.gen_function_mir(fn_node, body)
                 self.debug_clear_location()
                 return
@@ -4653,6 +4658,8 @@ fn Codegen.mir_operand_is_supported(self: Codegen, body: MirBody, operand_id: i3
             return false
         let ck = body.const_kinds.get(od as i64)
         if for_call_callee:
+            if ck == CK_FN and with_getenv_str("WITH_CK_FN").len() > 0:
+                return true
             return false
         return ck == CK_INT or ck == CK_BOOL or ck == CK_STR or ck == CK_UNIT or ck == CK_FLOAT or ck == CK_ZERO_SIZED
     false
@@ -4981,7 +4988,13 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         let fk = wl_get_type_kind(float_ty)
         if fk != wl_float_type_kind() and fk != wl_double_type_kind():
             float_ty = wl_f64_type(self.context)
-        return wl_const_real(float_ty, 0.0)
+        var fval: f64 = 0.0
+        // CK_FLOAT d0 is an AstPool string table index (from Parser.add_string)
+        if cd >= 0 and cd < self.pool.strings.len() as i32:
+            let float_text = self.pool.get_string(cd)
+            if float_text.len() > 0:
+                fval = with_parse_float(float_text)
+        return wl_const_real(float_ty, fval)
 
     if ck == CK_ZERO_SIZED:
         if expected_ty != 0:
@@ -5268,8 +5281,25 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
 
     if rk == RK_CAST:
         let val = self.mir_eval_operand(body, d0, 0)
-        if dest_ty != 0:
-            return self.coerce_value_to_type(val, dest_ty)
+        // d1 = sema target type id
+        var cast_ty = dest_ty
+        if d1 > 0:
+            let resolved_cast_ty = self.mir_sema_type_to_llvm(d1)
+            if resolved_cast_ty != 0:
+                cast_ty = resolved_cast_ty
+        if cast_ty != 0 and wl_type_of(val) != cast_ty:
+            let vk = wl_get_type_kind(wl_type_of(val))
+            let ck = wl_get_type_kind(cast_ty)
+            // Float → Int
+            if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and ck == wl_integer_type_kind():
+                return wl_build_fp_to_si(self.builder, val, cast_ty)
+            // Int → Float
+            if vk == wl_integer_type_kind() and (ck == wl_float_type_kind() or ck == wl_double_type_kind()):
+                return wl_build_si_to_fp(self.builder, val, cast_ty)
+            // Float → Float
+            if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and (ck == wl_float_type_kind() or ck == wl_double_type_kind()):
+                return wl_build_fp_cast(self.builder, val, cast_ty)
+            return self.coerce_value_to_type(val, cast_ty)
         return val
 
     if rk == RK_LEN:
