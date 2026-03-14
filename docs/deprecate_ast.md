@@ -168,15 +168,18 @@ cp out/bin/with-stage2 ~/.local/bin/with
 
 ---
 
-## Audit Results (2026-03-13)
+## Audit Results (2026-03-14)
 
-Total functions in self-host build: **1,574**
+Total functions in self-host build: **1,580**
 
 | Path | Count | % |
 |---|---|---|
-| MIR codegen (working) | 151 | 9.6% |
-| AST fallback: lowering failed | 1,218 | 77.4% |
-| AST fallback: codegen unsupported | 205 | 13.0% |
+| MIR codegen (working) | 537 | 34.0% |
+| AST fallback: lowering failed | 944 | 59.7% |
+| AST fallback: codegen unsupported | 99 | 6.3% |
+
+Previous (2026-03-13): 151 MIR / 1,218 lowering-failed / 205 codegen-unsupported.
+Gains from: sema builtin return types, typed_expr key fix (node index vs byte offset), cap removal.
 
 ### Lowering failures by first failure kind
 
@@ -230,13 +233,16 @@ Phase 0: Audit
   [x] Document root cause (method resolution / expr_type)
 
 Phase 1: Fix MirLower (target: 0 lowering failures)
-  Current: 1,218 lowering-failed
-  [ ] Fix expr_type for field access chains (~1,119 functions)
+  Current: 944 lowering-failed (was 1,218)
+  [x] Sema builtin method return types (check_method_call)
+  [x] typed_expr_types key fix (node index vs byte offset)
+  [x] Remove MIR dispatch count cap (376→uncapped, 537 through MIR)
+  [ ] Fix expr_type for remaining field access chains
   [ ] Add NK_RANGE lowering (~100 functions)
   [ ] Fix remaining edge cases
 
 Phase 1b: Fix MIR codegen support (target: 0 codegen-unsupported)
-  Current: 205 codegen-unsupported
+  Current: 99 codegen-unsupported (was 205)
   [ ] Audit which RK_*/TK_* kinds are unsupported
   [ ] Add missing rvalue/terminator handlers
 
