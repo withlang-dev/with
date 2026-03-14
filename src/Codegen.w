@@ -7083,9 +7083,8 @@ fn Codegen.gen_let_binding(self: Codegen, node: i32) -> i64:
                 self.local_sema_types.insert(name_sym, sema_tid)
     else:
         // No type annotation — try to get sema type from typed_binding_types
-        let span_start = self.pool.get_start(node)
-        if self.sema.typed_binding_types.contains(span_start):
-            let sema_tid = self.sema.typed_binding_types.get(span_start).unwrap()
+        if self.sema.typed_binding_types.contains(node):
+            let sema_tid = self.sema.typed_binding_types.get(node).unwrap()
             if sema_tid > 0 and self.sema.get_type_kind(sema_tid) == TY_GENERIC_INST:
                 self.local_sema_types.insert(name_sym, sema_tid)
     if alias_sym != 0:
