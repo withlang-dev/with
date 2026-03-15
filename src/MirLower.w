@@ -2660,6 +2660,27 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 self.terminate(TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
                 self.switch_to(gc_next)
                 return self.body.new_operand(OK_COPY, gc_place)
+        // Check for builtin calls (embed_file, src, etc.) — no sig, not a local
+        if self.ast.kind(callee) == NK_IDENT:
+            let bu_sym = self.ast.get_data0(callee)
+            let bu_sig = self.sema.get_sig(bu_sym)
+            let bu_local = self.lookup_local(bu_sym)
+            if bu_sig < 0 and bu_local < 0:
+                // Unresolved bare function — route through gen_call
+                let bu_fn_op = self.const_operand(CK_FN, bu_sym, 0)
+                let bu_args: Vec[i32] = Vec.new()
+                let bu_args_id = self.body.new_call_args(bu_args)
+                self.body.set_call_intrinsic(bu_args_id, MIR_INTRINSIC_GENERIC_CALL)
+                self.body.set_call_ast_node(bu_args_id, node)
+                var bu_ret_ty = self.expr_type(node)
+                if bu_ret_ty == 0:
+                    bu_ret_ty = self.sema.ty_i32
+                let bu_result = self.new_temp(bu_ret_ty)
+                let bu_place = self.place_for_local(bu_result)
+                let bu_next = self.new_block()
+                self.terminate(TK_CALL, bu_fn_op, bu_args_id, bu_place, bu_next)
+                self.switch_to(bu_next)
+                return self.body.new_operand(OK_COPY, bu_place)
         return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), self.expr_type(node), node)
 
     if kind == NK_PIPELINE:
