@@ -2528,6 +2528,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
     let fn_sym = builder.ast.get_data0(fn_node)
     let sig_idx = builder.sema.get_sig(fn_sym)
+    lower_fn_with_sig(builder, fn_node, sig_idx)
+
+fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody:
     if sig_idx >= 0:
         builder.body.local_type_ids.set_i32(0, builder.sema.sig_return_type(sig_idx))
     else:
