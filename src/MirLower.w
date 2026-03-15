@@ -1086,7 +1086,7 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
     if iter_ty != 0:
         let resolved = self.sema.resolve_alias(iter_ty)
         let tk = self.sema.get_type_kind(resolved)
-        if tk == TY_SLICE:
+        if tk == TY_SLICE or tk == TY_ARRAY:
             return self.lower_for_slice(pat_or_sym, iter_expr, body_expr)
         // Vec[T] — use counter-based loop with VEC_LEN / VEC_GET intrinsics
         if tk == TY_GENERIC_INST:
@@ -1095,6 +1095,25 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
                 let type_name = self.pool.resolve(type_name_sym)
                 if type_name == "Vec":
                     return self.lower_for_vec(pat_or_sym, iter_expr, body_expr)
+
+    // Handle for x in vec.iter() — redirect to lower_for_vec with the Vec receiver.
+    if self.ast.kind(iter_expr) == NK_CALL:
+        let call_callee = self.ast.get_data0(iter_expr)
+        if self.ast.kind(call_callee) == NK_FIELD_ACCESS:
+            let recv = self.ast.get_data0(call_callee)
+            let msym = self.ast.get_data1(call_callee)
+            let mname = self.pool.resolve(msym)
+            if mname == "iter":
+                let recv_ty = self.expr_type(recv)
+                if recv_ty != 0:
+                    let recv_resolved = self.sema.resolve_alias(recv_ty)
+                    let recv_tk = self.sema.get_type_kind(recv_resolved)
+                    if recv_tk == TY_GENERIC_INST:
+                        let recv_name_sym = self.sema.get_type_name(recv_resolved)
+                        if recv_name_sym != 0:
+                            let recv_name = self.pool.resolve(recv_name_sym)
+                            if recv_name == "Vec":
+                                return self.lower_for_vec(pat_or_sym, recv, body_expr)
 
     // Iterator protocol: not yet fully implemented in MIR.
     // Fall back to AST codegen for functions using iterator-based for loops.
