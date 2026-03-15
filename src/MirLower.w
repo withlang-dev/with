@@ -1854,24 +1854,36 @@ fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, arg_node_v
     self.body.new_operand(OK_MOVE, result_place)
 
 fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method_sym: i32) -> i32:
+    // Translate method_sym from AST pool to sema pool for method_key lookups
+    let sema_method_sym = self.sema.pool_intern(self.pool.resolve_symbol(method_sym))
     let obj_type = self.expr_type(self_expr)
     if obj_type != 0 and obj_type != self.sema.ty_void:
         let resolved = self.sema.resolve_alias(obj_type)
         let type_name_sym = self.sema.get_type_name(resolved)
         if type_name_sym != 0:
-            let method_key = self.sema.method_key(type_name_sym, method_sym)
+            let method_key = self.sema.method_key(type_name_sym, sema_method_sym)
             if self.sema.get_sig(method_key) >= 0:
                 return method_key
         // For builtin types (i32, str, bool, etc.), try the type kind name
         let tk = self.sema.get_type_kind(resolved)
         if tk == TY_INT:
-            let int_sym = self.pool.intern("i32")
-            let method_key = self.sema.method_key(int_sym, method_sym)
+            let int_sym = self.sema.pool_intern("i32")
+            let method_key = self.sema.method_key(int_sym, sema_method_sym)
             if self.sema.get_sig(method_key) >= 0:
                 return method_key
         if tk == TY_STR:
-            let str_sym = self.pool.intern("str")
-            let method_key = self.sema.method_key(str_sym, method_sym)
+            let str_sym = self.sema.pool_intern("str")
+            let method_key = self.sema.method_key(str_sym, sema_method_sym)
+            if self.sema.get_sig(method_key) >= 0:
+                return method_key
+        if tk == TY_BOOL:
+            let bool_sym = self.sema.pool_intern("bool")
+            let method_key = self.sema.method_key(bool_sym, sema_method_sym)
+            if self.sema.get_sig(method_key) >= 0:
+                return method_key
+        if tk == TY_FLOAT:
+            let float_sym = self.sema.pool_intern("f64")
+            let method_key = self.sema.method_key(float_sym, sema_method_sym)
             if self.sema.get_sig(method_key) >= 0:
                 return method_key
 
