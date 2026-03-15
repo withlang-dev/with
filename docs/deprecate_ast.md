@@ -233,8 +233,8 @@ Phase 0: Audit
   [x] Document root cause (method resolution / expr_type)
 
 Phase 1: Fix MirLower (target: 0 lowering failures)
-  Self-host: 0 fallback. Tests: 252 lowering failures remaining.
-  (was 3 self-host, was 23, was 883, was 1,218)
+  Self-host: 0 fallback. Tests: 0 lowering failures.
+  (was 252 test, was 3 self-host, was 23, was 883, was 1,218)
   [x] Sema builtin method return types (check_method_call)
   [x] typed_expr_types key fix (node index vs byte offset)
   [x] Remove MIR dispatch count cap (376→uncapped, 537 through MIR)
@@ -250,7 +250,10 @@ Phase 1: Fix MirLower (target: 0 lowering failures)
   [x] PK_INDEX + PK_DEREF projections in mir_place_ptr/mir_place_is_supported
   [x] type_receiver_type helper for NK_INDEX type receivers (Vec[i32].new())
   [x] call_return_type + resolve_method_callee_sym NK_INDEX handling
-  [ ] Test-only: closures, generic functions, defer/errdefer, async
+  [x] Defer/errdefer lowering (emit_defers_for_return, emit_errdefers_for_return)
+  [x] Array iteration and Vec.iter() dispatch in lower_for
+  [x] CK_CLOSURE constant kind (delegate closure compilation to gen_closure)
+  [x] Fat pointer fn_ty fix in mir_emit_vec_map/filter/fold
 
 Phase 1b: Fix MIR codegen support (target: 0 codegen-unsupported)
   Current: 0 codegen-unsupported (was 205)
@@ -268,7 +271,7 @@ Phase 3: Assert no AST usage
   [x] WITH_MIR_STRICT=1 fatal assertion for unexpected fallback
   [x] Self-host passes strict mode (0 unexpected fallbacks)
   [x] Fixpoint holds
-  [x] 243/246 tests pass (3 pre-existing failures)
+  [x] 246/246 tests pass
 
 Phase 4: Delete AST codegen
   [ ] Tag: pre-ast-removal
