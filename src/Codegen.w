@@ -4508,8 +4508,7 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
             self.gen_function_mir(fn_node, body)
             self.debug_clear_location()
             return
-    // Fallback to AST codegen for functions with MIR lowering failures
-    // or generic impl functions not in MIR
+    // Fallback to AST codegen
     self.gen_function(fn_node)
 
 fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
@@ -6266,9 +6265,9 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let tk = wl_get_type_kind(wl_type_of(recv))
         if tk == wl_struct_type_kind():
             let disc = wl_build_extract_value(self.builder, recv, 0)
-            result = wl_build_icmp(self.builder, wl_int_ne(), disc, wl_const_int(wl_type_of(disc), 0, 0))
+            result = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
         else:
-            result = wl_const_int(wl_i1_type(self.context), 0, 0)
+            result = wl_const_int(wl_i1_type(self.context), 1, 0)
 
     else if intrinsic == MIR_INTRINSIC_STR_TRIM:
         let r1 = self.mir_intrinsic_arg(body, args_id, 0)
