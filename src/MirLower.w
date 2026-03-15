@@ -1832,6 +1832,32 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             return self.lower_pattern(self.ast.get_extra(p_start), scrutinee_place)
         return out
 
+    if pk == NK_PAT_SLICE:
+        let sp_extra = self.ast.get_data0(pat_node)
+        let sp_head_count = self.ast.get_data1(pat_node)
+        // Get element type from scrutinee's array type
+        let sp_arr_ty = self.place_local_type(scrutinee_place)
+        var sp_elem_ty = self.sema.ty_i32
+        let sp_arr_tk = self.sema.get_type_kind(sp_arr_ty)
+        if sp_arr_tk == TY_ARRAY:
+            let ety = self.sema.get_type_d0(sp_arr_ty)
+            if ety != 0:
+                sp_elem_ty = ety
+        // extras: [has_rest, head_sym0, head_sym1, ..., tail_count, tail_sym0, ...]
+        for si in 0..sp_head_count:
+            let sym = self.ast.get_extra(sp_extra + 1 + si)
+            if sym == 0:
+                continue
+            let field_place = self.body.new_field_place(scrutinee_place, si)
+            let local_id = self.body.new_local(sp_elem_ty, 0, sym, 1)
+            self.bind_local(sym, local_id)
+            self.body.push_stmt(self.cur_bb, SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(pat_node))
+            let src_op = self.body.new_operand(if self.sema.is_copy(sp_elem_ty) != 0: OK_COPY else: OK_MOVE, field_place)
+            self.assign_operand_to_place(self.place_for_local(local_id), src_op, self.ast.get_start(pat_node))
+            out.push(local_id)
+            out.push(field_place)
+        return out
+
     out
 
 fn MirBuilder.lower_match(self: MirBuilder, scrutinee_expr: i32, arms_start: i32, arms_count: i32, node: i32) -> i32:
@@ -2129,13 +2155,13 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
         return self.lower_intrinsic_call(intrinsic, self_expr, method_sym, arg_start, arg_count, node)
 
     // If resolution returned bare method_sym, the method is unresolved.
-    // For generic struct methods (in generic_fn_nodes), emit MIR_INTRINSIC_GENERIC_CALL
-    // so codegen can monomorphize via gen_call → gen_method_call.
+    // Route through MIR_INTRINSIC_GENERIC_CALL so codegen's gen_call handles it
+    // (disc enums, from_int, Option methods, concrete struct methods, etc.).
+    // Exception: generic_fn_nodes entries are monomorphized at call sites,
+    // not directly callable — mark_unsupported for those.
     if callee_sym == method_sym:
-        // Check both bare sym and qualified Type.method in generic_fn_nodes
-        var is_generic_method = self.sema.generic_fn_nodes.contains(callee_sym)
-        if not is_generic_method:
-            // Try qualifying with receiver type name: build "Type.method" in intern pool
+        var is_generic_fn = self.sema.generic_fn_nodes.contains(callee_sym)
+        if not is_generic_fn:
             let gm_recv_type = self.expr_type(self_expr)
             if gm_recv_type != 0:
                 let gm_name_sym = self.sema.get_type_name(gm_recv_type)
@@ -2145,8 +2171,10 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
                     let gm_qualified = gm_type_name ++ "." ++ gm_method_name
                     let gm_key = self.pool.intern(gm_qualified)
                     if self.sema.generic_fn_nodes.contains(gm_key):
-                        is_generic_method = true
-        if is_generic_method:
+                        is_generic_fn = true
+        if is_generic_fn:
+            self.mark_unsupported()
+        else:
             let gc_fn_op = self.const_operand(CK_FN, callee_sym, 0)
             let gc_args: Vec[i32] = Vec.new()
             let gc_args_id = self.body.new_call_args(gc_args)
@@ -2161,7 +2189,6 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
             self.terminate(TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
             self.switch_to(gc_next)
             return self.body.new_operand(OK_COPY, gc_place)
-        self.mark_unsupported()
 
     let fn_op = self.lower_var(callee_sym, 0)
     let arg_nodes: Vec[i32] = Vec.new()
@@ -2551,20 +2578,35 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                     if self.sema.variant_lookup.contains(fa_qual_sym):
                         let fa_enc = self.sema.variant_lookup.get(fa_qual_sym).unwrap()
                         let fa_var_idx = fa_enc % 65536
-                        if self.sema.disc_values.contains(fa_enc):
-                            let fa_disc_val = self.sema.disc_values.get(fa_enc).unwrap()
-                            return self.int_const_operand(fa_disc_val as i64, fa_base_ty)
-                        // No explicit disc value — use variant index as value
-                        return self.int_const_operand(fa_var_idx as i64, fa_base_ty)
+                        let fa_disc_tag = if self.sema.disc_values.contains(fa_enc): self.sema.disc_values.get(fa_enc).unwrap() else: fa_var_idx
+                        // Disc enums with payloads need RK_AGGREGATE so codegen
+                        // builds the full struct {tag, [payload x i8]}
+                        if self.sema.disc_has_payload.contains(fa_resolved):
+                            let fa_fields: Vec[i32] = Vec.new()
+                            let fa_names: Vec[i32] = Vec.new()
+                            let fa_fid = self.body.new_agg_fields(fa_fields, fa_names)
+                            let fa_rv = self.body.new_rvalue(RK_AGGREGATE, 1, fa_fid, fa_disc_tag)
+                            let fa_tmp = self.new_temp(fa_base_ty)
+                            let fa_place = self.place_for_local(fa_tmp)
+                            self.body.push_stmt(self.cur_bb, SK_ASSIGN, fa_place, fa_rv, self.ast.get_start(node))
+                            return self.body.new_operand(OK_COPY, fa_place)
+                        return self.int_const_operand(fa_disc_tag as i64, fa_base_ty)
                     // Also try bare variant sym (some enums register just "Red")
                     if self.sema.variant_lookup.contains(fa_field):
                         let fa_enc2 = self.sema.variant_lookup.get(fa_field).unwrap()
                         let fa_var_tid = fa_enc2 / 65536
                         if fa_var_tid == fa_resolved:
-                            if self.sema.disc_values.contains(fa_enc2):
-                                let fa_disc_val2 = self.sema.disc_values.get(fa_enc2).unwrap()
-                                return self.int_const_operand(fa_disc_val2 as i64, fa_base_ty)
-                            return self.int_const_operand((fa_enc2 % 65536) as i64, fa_base_ty)
+                            let fa_disc_tag2 = if self.sema.disc_values.contains(fa_enc2): self.sema.disc_values.get(fa_enc2).unwrap() else: fa_enc2 % 65536
+                            if self.sema.disc_has_payload.contains(fa_resolved):
+                                let fa_fields2: Vec[i32] = Vec.new()
+                                let fa_names2: Vec[i32] = Vec.new()
+                                let fa_fid2 = self.body.new_agg_fields(fa_fields2, fa_names2)
+                                let fa_rv2 = self.body.new_rvalue(RK_AGGREGATE, 1, fa_fid2, fa_disc_tag2)
+                                let fa_tmp2 = self.new_temp(fa_base_ty)
+                                let fa_place2 = self.place_for_local(fa_tmp2)
+                                self.body.push_stmt(self.cur_bb, SK_ASSIGN, fa_place2, fa_rv2, self.ast.get_start(node))
+                                return self.body.new_operand(OK_COPY, fa_place2)
+                            return self.int_const_operand(fa_disc_tag2 as i64, fa_base_ty)
         let place = self.lower_field_access(fa_base, fa_field)
         return self.body.new_operand(OK_COPY, place)
 
@@ -2765,12 +2807,23 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let vs_arg_count = self.ast.get_data2(node)
         let vs_variant_idx = self.variant_index(vs_name_sym)
         let vs_result_ty = self.expr_type(node)
-        // Check for disc enum: return discriminant value as integer
+        // Check for disc enum: return discriminant value
         if self.sema.variant_lookup.contains(vs_name_sym):
             let vs_enc = self.sema.variant_lookup.get(vs_name_sym).unwrap()
             if self.sema.disc_values.contains(vs_enc):
                 let vs_disc_val = self.sema.disc_values.get(vs_enc).unwrap()
                 if vs_arg_count == 0:
+                    // Disc enums with payloads need full struct via RK_AGGREGATE
+                    let vs_resolved = self.sema.resolve_alias(vs_result_ty)
+                    if self.sema.disc_has_payload.contains(vs_resolved):
+                        let vs_de_fields: Vec[i32] = Vec.new()
+                        let vs_de_names: Vec[i32] = Vec.new()
+                        let vs_de_fid = self.body.new_agg_fields(vs_de_fields, vs_de_names)
+                        let vs_de_rv = self.body.new_rvalue(RK_AGGREGATE, 1, vs_de_fid, vs_disc_val)
+                        let vs_de_tmp = self.new_temp(vs_result_ty)
+                        let vs_de_place = self.place_for_local(vs_de_tmp)
+                        self.body.push_stmt(self.cur_bb, SK_ASSIGN, vs_de_place, vs_de_rv, self.ast.get_start(node))
+                        return self.body.new_operand(OK_COPY, vs_de_place)
                     return self.int_const_operand(vs_disc_val, vs_result_ty)
         let vs_fields: Vec[i32] = Vec.new()
         let vs_names: Vec[i32] = Vec.new()
