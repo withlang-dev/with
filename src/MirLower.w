@@ -38,6 +38,12 @@ type MirBuilder = {
     bind_local_ids: Vec[i32],
     bind_scope_starts: Vec[i32],
 
+    // Defer/errdefer stacks (body AST nodes).
+    defer_nodes: Vec[i32],
+    defer_scope_starts: Vec[i32],
+    errdefer_nodes: Vec[i32],
+    errdefer_scope_starts: Vec[i32],
+
     // Loop stack.
     loop_continue_bbs: Vec[i32],
     loop_break_bbs: Vec[i32],
@@ -64,6 +70,10 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         bind_syms: Vec.new(),
         bind_local_ids: Vec.new(),
         bind_scope_starts: Vec.new(),
+        defer_nodes: Vec.new(),
+        defer_scope_starts: Vec.new(),
+        errdefer_nodes: Vec.new(),
+        errdefer_scope_starts: Vec.new(),
         loop_continue_bbs: Vec.new(),
         loop_break_bbs: Vec.new(),
         loop_break_drop_depths: Vec.new(),
@@ -160,6 +170,20 @@ fn MirBuilder.emit_drops_for_return(self: MirBuilder):
     var i = self.drop_local_ids.len() as i32 - 1
     while i >= 0:
         self.emit_drop_entry(self.drop_local_ids.get(i as i64), self.drop_kinds.get(i as i64))
+        i = i - 1
+
+fn MirBuilder.emit_defers_for_return(self: MirBuilder):
+    var i = self.defer_nodes.len() as i32 - 1
+    while i >= 0:
+        let defer_body = self.defer_nodes.get(i as i64)
+        let _ = self.lower_expr(defer_body)
+        i = i - 1
+
+fn MirBuilder.emit_errdefers_for_return(self: MirBuilder):
+    var i = self.errdefer_nodes.len() as i32 - 1
+    while i >= 0:
+        let errdefer_body = self.errdefer_nodes.get(i as i64)
+        let _ = self.lower_expr(errdefer_body)
         i = i - 1
 
 fn MirBuilder.push_loop(self: MirBuilder, continue_bb: i32, break_bb: i32):
@@ -924,10 +948,15 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
         if sk == NK_CONTINUE:
             let _ = self.lower_continue(stmt)
             continue
-        if sk == NK_DEFER or sk == NK_ERRDEFER:
-            // Defer/errdefer: mark unsupported for now.
-            // Full support requires emitting cleanup at every exit point.
-            self.mark_unsupported()
+        if sk == NK_DEFER:
+            let defer_body = self.ast.get_data0(stmt)
+            if defer_body != 0:
+                self.defer_nodes.push(defer_body)
+            continue
+        if sk == NK_ERRDEFER:
+            let errdefer_body = self.ast.get_data0(stmt)
+            if errdefer_body != 0:
+                self.errdefer_nodes.push(errdefer_body)
             continue
         let _ = self.lower_expr(stmt)
 
@@ -1402,6 +1431,7 @@ fn MirBuilder.lower_return(self: MirBuilder, node: i32) -> i32:
     let ret_place = self.place_for_local(0)
     self.assign_operand_to_place(ret_place, ret_op, self.ast.get_start(node))
 
+    self.emit_defers_for_return()
     self.emit_drops_for_return()
     self.terminate(TK_RETURN, 0, 0, 0, 0)
 
@@ -2023,6 +2053,8 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
     let ret_place = self.place_for_local(0)
     let fail_op = self.body.new_operand(OK_MOVE, value_place)
     self.assign_operand_to_place(ret_place, fail_op, self.ast.get_start(expr))
+    self.emit_errdefers_for_return()
+    self.emit_defers_for_return()
     self.emit_drops_for_return()
     self.terminate(TK_RETURN, 0, 0, 0, 0)
 
@@ -2513,6 +2545,7 @@ fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
     let ret_place = builder.place_for_local(0)
     builder.assign_operand_to_place(ret_place, result, builder.ast.get_end(fn_node))
 
+    builder.emit_defers_for_return()
     builder.pop_scope_inline()
     builder.terminate(TK_RETURN, 0, 0, 0, 0)
 
