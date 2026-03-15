@@ -299,8 +299,10 @@ Phase 4: Delete AST codegen
   [x] sema_type_mangle for correct struct identity in monomorphization
   [x] Sema-derived LLVM type bindings (wl_type_of flattens single-field structs)
   [x] MIR local bridging for generic call arg resolution
+  [x] Option.is_none() MIR intrinsic lowering + codegen fix
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
   [ ] Route async function codegen through MIR
+  [ ] Fix 28 test functions with MIR lowering failures (fall back to AST)
   [ ] Delete gen_function
   [ ] Delete expression emitters
   [ ] Delete statement emitters
