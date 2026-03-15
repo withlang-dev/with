@@ -549,7 +549,6 @@ type Codegen = {
     di_current_scope: i64,
 
     // Wave 10 MIR backend input (optional).
-    mir_input_enabled: i32,
     mir_dispatch_count: i32,
     mir_input: MirModule,
     mir_local_ptrs: HashMap[i32, i64],
@@ -740,7 +739,6 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         fn_default_counts: HashMap.new(),
         source_file: "<unknown>",
         source_text: "",
-        mir_input_enabled: 0,
         mir_dispatch_count: 0,
         mir_input: MirModule.init(),
         mir_local_ptrs: HashMap.new(),
@@ -911,28 +909,6 @@ fn Codegen.debug_create_di_type(self: Codegen, sema_tid: i32) -> i64:
         return wl_di_create_unspecified_type(self.di_builder, name)
     wl_di_create_unspecified_type(self.di_builder, "unknown")
 
-fn Codegen.debug_declare_variable(self: Codegen, name_sym: i32, alloca: i64, sema_tid: i32, byte_offset: i32, is_param: bool, param_idx: i32):
-    if self.debug_info == 0 or self.di_builder == 0:
-        return
-    let di_ty = self.debug_get_di_type(sema_tid)
-    var scope = self.di_current_scope
-    if scope == 0:
-        scope = self.di_compile_unit
-    let name = self.intern.resolve(name_sym)
-    var line = 1
-    if byte_offset > 0:
-        let loc = self.di_source.offset_to_location(byte_offset)
-        line = loc.line + 1
-    var var_info: i64 = 0
-    if is_param:
-        var_info = wl_di_create_parameter_variable(self.di_builder, scope, name, self.di_file, line, di_ty, param_idx + 1)
-    else:
-        var_info = wl_di_create_auto_variable(self.di_builder, scope, name, self.di_file, line, di_ty)
-    let expr = wl_di_create_expression(self.di_builder)
-    let di_loc = wl_di_create_debug_location(self.context, line, 0, scope)
-    let block = wl_get_insert_block(self.builder)
-    wl_di_insert_declare_at_end(self.di_builder, alloca, var_info, expr, di_loc, block)
-
 fn Codegen.abi_size_of(self: Codegen, ty: i64) -> i64:
     if ty == 0:
         self.had_error = 1
@@ -943,16 +919,6 @@ fn Codegen.abi_size_of(self: Codegen, ty: i64) -> i64:
         return 0
     wl_abi_size_of(dl, ty)
 
-fn Codegen.abi_align_of(self: Codegen, ty: i64) -> i32:
-    if ty == 0:
-        self.had_error = 1
-        return 1
-    let dl = wl_get_module_data_layout(self.llmod)
-    if dl == 0:
-        self.had_error = 1
-        return 1
-    wl_abi_align_of(dl, ty)
-
 fn Codegen.gen_module_from_mir(self: Codegen, mir_mod: MirModule, pool: AstPool) -> i32:
     let mir_err = validate_mir_module(mir_mod)
     if mir_err.len() > 0:
@@ -960,7 +926,6 @@ fn Codegen.gen_module_from_mir(self: Codegen, mir_mod: MirModule, pool: AstPool)
         self.had_error = 1
         return 1
     self.mir_input = mir_mod
-    self.mir_input_enabled = 1
     self.gen_module(pool)
 
 // ── Helper: is method symbol ──────────────────────────────────────
@@ -4641,13 +4606,6 @@ fn Codegen.mir_get_or_create_local_ptr(self: Codegen, local_id: i32, ty: i64) ->
     self.mir_local_ptrs.insert(local_id, ptr)
     ptr
 
-fn Codegen.mir_pointee_type(self: Codegen, ptr: i64) -> i64:
-    if ptr == 0:
-        return 0
-    let ptr_ty = wl_type_of(ptr)
-    if wl_get_type_kind(ptr_ty) != wl_pointer_type_kind():
-        return 0
-    wl_get_element_type(ptr_ty)
 
 fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32) -> i32:
     if wl_get_type_kind(agg_ty) != wl_struct_type_kind():
@@ -8961,16 +8919,6 @@ fn Codegen.find_vec_elem_type_by_llvm(self: Codegen, vec_ty: i64) -> i64:
         return elem.unwrap()
     0
 
-fn Codegen.llvm_named_struct_matches(self: Codegen, lhs: i64, rhs: i64) -> bool:
-    if lhs == 0 or rhs == 0:
-        return false
-    if wl_get_type_kind(lhs) != wl_struct_type_kind() or wl_get_type_kind(rhs) != wl_struct_type_kind():
-        return false
-    let lhs_name = wl_get_struct_name(lhs)
-    let rhs_name = wl_get_struct_name(rhs)
-    if lhs_name.len() == 0 or rhs_name.len() == 0:
-        return false
-    with_str_eq(lhs_name, rhs_name) != 0
 
 
 fn Codegen.find_vec_cache_index_by_llvm(self: Codegen, vec_ty: i64) -> i32:
@@ -9059,18 +9007,6 @@ fn Codegen.find_result_idx_by_llvm(self: Codegen, res_ty: i64) -> i32:
         if self.result_llvm_types.get(i as i64) == res_ty:
             return i
     0 - 1
-
-fn Codegen.find_result_ok_type_by_llvm(self: Codegen, res_ty: i64) -> i64:
-    for i in 0..self.result_llvm_types.len() as i32:
-        if self.result_llvm_types.get(i as i64) == res_ty:
-            return self.result_ok_types.get(i as i64)
-    0
-
-fn Codegen.find_result_err_type_by_llvm(self: Codegen, res_ty: i64) -> i64:
-    for i in 0..self.result_llvm_types.len() as i32:
-        if self.result_llvm_types.get(i as i64) == res_ty:
-            return self.result_err_types.get(i as i64)
-    0
 
 fn Codegen.llvm_type_mangle(self: Codegen, ty: i64) -> str:
     if ty == 0:
@@ -12940,12 +12876,6 @@ fn Codegen.gen_print_value(self: Codegen, val: i64, printf_fn: i64, printf_ty: i
     args.push(print_val)
     wl_build_call(self.builder, printf_ty, printf_fn, vec_data_i64(&args), 2)
 
-fn Codegen.gen_println(self: Codegen, args_start: i32, arg_count: i32) -> i64:
-    self.gen_print_or_println(args_start, arg_count, true)
-
-fn Codegen.gen_print_call(self: Codegen, args_start: i32, arg_count: i32) -> i64:
-    self.gen_print_or_println(args_start, arg_count, false)
-
 fn Codegen.gen_eprintln(self: Codegen, args_start: i32, arg_count: i32) -> i64:
     // For eprintln, use fprintf(stderr, ...) — for simplicity, use printf for now
     self.gen_print_or_println(args_start, arg_count, true)
@@ -14096,19 +14026,3 @@ fn Codegen.emit_implicit_unreachable(self: Codegen, node: i32):
     wl_build_call(self.builder, fprintf_ty, fprintf_fn, vec_data_i64(&args), 4)
     self.emit_exit_call(134)
     wl_build_unreachable(self.builder)
-fn Codegen.pad_a0(self: Codegen) -> i32:
-    0
-fn Codegen.pad_a1(self: Codegen) -> i32:
-    0
-fn Codegen.pad_a2(self: Codegen) -> i32:
-    0
-fn Codegen.pad_a3(self: Codegen) -> i32:
-    0
-fn Codegen.pad_a4(self: Codegen) -> i32:
-    0
-fn Codegen.pad_a5(self: Codegen) -> i32:
-    0
-fn Codegen.pad_a6(self: Codegen) -> i32:
-    0
-fn Codegen.pad_a7(self: Codegen) -> i32:
-    0

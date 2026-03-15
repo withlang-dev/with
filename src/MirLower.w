@@ -2387,7 +2387,39 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.lower_cast(self.ast.get_data0(node), cast_tid, node)
 
     if kind == NK_FIELD_ACCESS:
-        let place = self.lower_field_access(self.ast.get_data0(node), self.ast.get_data1(node))
+        let fa_base = self.ast.get_data0(node)
+        let fa_field = self.ast.get_data1(node)
+        // Enum variant access: Color.Red → discriminant value constant
+        if self.ast.kind(fa_base) == NK_IDENT:
+            let fa_base_sym = self.ast.get_data0(fa_base)
+            if self.sema.named_types.contains(fa_base_sym):
+                let fa_base_ty = self.sema.named_types.get(fa_base_sym).unwrap()
+                let fa_resolved = self.sema.resolve_alias(fa_base_ty)
+                let fa_tk = self.sema.get_type_kind(fa_resolved)
+                if fa_tk == TY_ENUM:
+                    // Build qualified variant key: "Color.Red"
+                    let fa_type_name = self.pool.resolve(fa_base_sym)
+                    let fa_field_name = self.pool.resolve(fa_field)
+                    let fa_qual_name = fa_type_name ++ "." ++ fa_field_name
+                    let fa_qual_sym = self.pool.intern(fa_qual_name)
+                    if self.sema.variant_lookup.contains(fa_qual_sym):
+                        let fa_enc = self.sema.variant_lookup.get(fa_qual_sym).unwrap()
+                        let fa_var_idx = fa_enc % 65536
+                        if self.sema.disc_values.contains(fa_enc):
+                            let fa_disc_val = self.sema.disc_values.get(fa_enc).unwrap()
+                            return self.int_const_operand(fa_disc_val as i64, fa_base_ty)
+                        // No explicit disc value — use variant index as value
+                        return self.int_const_operand(fa_var_idx as i64, fa_base_ty)
+                    // Also try bare variant sym (some enums register just "Red")
+                    if self.sema.variant_lookup.contains(fa_field):
+                        let fa_enc2 = self.sema.variant_lookup.get(fa_field).unwrap()
+                        let fa_var_tid = fa_enc2 / 65536
+                        if fa_var_tid == fa_resolved:
+                            if self.sema.disc_values.contains(fa_enc2):
+                                let fa_disc_val2 = self.sema.disc_values.get(fa_enc2).unwrap()
+                                return self.int_const_operand(fa_disc_val2 as i64, fa_base_ty)
+                            return self.int_const_operand((fa_enc2 % 65536) as i64, fa_base_ty)
+        let place = self.lower_field_access(fa_base, fa_field)
         return self.body.new_operand(OK_COPY, place)
 
     if kind == NK_INDEX:
