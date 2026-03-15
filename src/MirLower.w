@@ -2023,18 +2023,20 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     // 1. Receiver is a direct call to HashMap.get/Vec.get (chained: map.get(k).unwrap())
     // 2. No sig exists for this method on the receiver type (let x = map.get(k); x.unwrap())
     if intrinsic == MIR_INTRINSIC_NONE:
-        if method_name == "unwrap" or method_name == "is_some":
+        if method_name == "unwrap" or method_name == "is_some" or method_name == "is_none":
             var is_option_method = false
             let recv_intr = self.receiver_option_intrinsic(self_expr)
             if recv_intr != MIR_INTRINSIC_NONE:
                 is_option_method = true
             else if callee_sym == method_sym:
-                // Unresolved method — no sig found for unwrap/is_some on the receiver type.
-                // User-defined types with "unwrap" would have a sig. This is an Option intrinsic.
+                // Unresolved method — no sig found for unwrap/is_some/is_none on the receiver type.
+                // User-defined types with these names would have a sig. This is an Option intrinsic.
                 is_option_method = true
             if is_option_method:
                 if method_name == "unwrap":
                     intrinsic = MIR_INTRINSIC_OPT_UNWRAP
+                else if method_name == "is_none":
+                    intrinsic = MIR_INTRINSIC_OPT_IS_NONE
                 else:
                     intrinsic = MIR_INTRINSIC_OPT_IS_SOME
 
