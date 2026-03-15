@@ -111,6 +111,7 @@ const MIR_INTRINSIC_VEC_CONTAINS: i32 = 38
 const MIR_INTRINSIC_STR_REPEAT: i32 = 39
 const MIR_INTRINSIC_ARR_LEN: i32 = 40
 const MIR_INTRINSIC_GENERIC_CALL: i32 = 41
+const MIR_INTRINSIC_VEC_JOIN: i32 = 42
 
 // ── Projection kinds ─────────────────────────────────────────────
 

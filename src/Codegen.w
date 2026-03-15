@@ -6386,6 +6386,24 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
     else if intrinsic == MIR_INTRINSIC_VEC_CONTAINS:
         result = wl_const_int(wl_i1_type(self.context), 0, 0)
 
+    else if intrinsic == MIR_INTRINSIC_VEC_JOIN:
+        let vj_recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let vj_sep = self.mir_intrinsic_arg(body, args_id, 1)
+        let vj_str_sym = self.intern.intern("str")
+        let vj_str_ty = self.struct_llvm_types.get(self.struct_type_map.get(vj_str_sym).unwrap() as i64)
+        let vj_ptr_ty = wl_ptr_type(self.context)
+        let vj_fn = self.ensure_c_fn("with_vec_str_join", vj_str_ty, 2)
+        let vj_alloca = wl_build_alloca(self.builder, wl_type_of(vj_recv))
+        wl_build_store(self.builder, vj_recv, vj_alloca)
+        let vj_params: Vec[i64] = Vec.new()
+        vj_params.push(vj_ptr_ty)
+        vj_params.push(vj_str_ty)
+        let vj_ft = wl_function_type(vj_str_ty, vec_data_i64(&vj_params), 2, 0)
+        let vj_args: Vec[i64] = Vec.new()
+        vj_args.push(vj_alloca)
+        vj_args.push(vj_sep)
+        result = wl_build_call(self.builder, vj_ft, vj_fn, vec_data_i64(&vj_args), 2)
+
     else:
         return false
 
@@ -6994,6 +7012,14 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
     let ret_alloca = self.create_entry_alloca(ret_store_ty)
     self.mir_local_ptrs.insert(0, ret_alloca)
     self.mir_local_types.insert(0, ret_store_ty)
+
+    // Pre-populate mir_local_ptrs for global variable proxy locals
+    for gli in 0..body.local_names.len() as i32:
+        let gl_name = body.local_names.get(gli as i64)
+        if gl_name != 0:
+            let gl_mc = self.module_constants.get(gl_name)
+            if gl_mc.is_some():
+                self.mir_local_ptrs.insert(gli, gl_mc.unwrap() as i64)
 
     let meta = self.pool.find_fn_meta(fn_node)
     var param_start = 0

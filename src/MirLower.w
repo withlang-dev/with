@@ -362,6 +362,7 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
             if method_name == "get" or method_name == "pop":
                 if tk == TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
+            if method_name == "join": return self.sema.ty_str
             if method_name == "iter":
                 // Vec.iter() returns VecIter[T] with same T as Vec[T].
                 let vi_sym = self.sema.pool_intern("VecIter")
@@ -710,6 +711,32 @@ fn MirBuilder.lower_float_lit(self: MirBuilder, sym: i32) -> i32:
 fn MirBuilder.lower_unit(self: MirBuilder) -> i32:
     self.unit_operand()
 
+fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
+    // Check if we already created a proxy local for this global
+    let existing = self.lookup_local(sym)
+    if existing >= 0:
+        return existing
+    // Scan module declarations for a mutable let (var)
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NK_LET_DECL:
+            continue
+        if self.ast.get_data0(decl) != sym:
+            continue
+        let flags = self.ast.get_data2(decl)
+        let is_mut = flags % 2
+        // Determine type from the value node
+        var gty = self.sema.ty_i32
+        let val_node = self.ast.get_data1(decl)
+        if val_node != 0:
+            let inferred = self.expr_type(val_node)
+            if inferred != 0:
+                gty = inferred
+        let local_id = self.body.new_local(gty, is_mut, sym, 1)
+        self.bind_local(sym, local_id)
+        return local_id
+    0 - 1
+
 fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
     let local = self.lookup_local(sym)
     if local >= 0:
@@ -748,6 +775,12 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
         let vl_place = self.place_for_local(vl_tmp)
         self.body.push_stmt(self.cur_bb, SK_ASSIGN, vl_place, vl_rv, 0)
         return self.body.new_operand(OK_COPY, vl_place)
+
+    // Try module-level mutable variable (var X = ...)
+    let gv_local = self.ensure_global_local(sym)
+    if gv_local >= 0:
+        let gv_place = self.body.new_place(gv_local)
+        return self.body.new_operand(OK_COPY, gv_place)
 
     if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
         let var_name = self.pool.resolve(sym)
@@ -923,7 +956,10 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         let local = self.lookup_local(sym)
         if local >= 0:
             return self.place_for_local(local)
-        // Unknown ident (likely a global) — mark as unsupported
+        // Try module-level mutable variable
+        let gv_local = self.ensure_global_local(sym)
+        if gv_local >= 0:
+            return self.place_for_local(gv_local)
         self.mark_unsupported()
         return self.place_for_local(0)
 
@@ -1739,7 +1775,9 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let bind_count = self.ast.get_data2(pat_node)
         let variant_place = self.body.new_downcast_place(scrutinee_place, self.variant_index(variant_sym))
         for bi in 0..bind_count:
-            let sym = self.ast.get_extra(bind_start + bi)
+            let raw = self.ast.get_extra(bind_start + bi)
+            // Let-else parser stores NK_PAT_IDENT nodes; match parser stores raw symbols
+            let sym = if self.ast.kind(raw) == NK_PAT_IDENT: self.ast.get_data0(raw) else: raw
             let bind_ty = self.place_local_type(scrutinee_place)
             let local_id = self.body.new_local(bind_ty, 0, sym, 1)
             self.bind_local(sym, local_id)
@@ -1978,6 +2016,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "filter": return MIR_INTRINSIC_VEC_FILTER
         if method_name == "fold": return MIR_INTRINSIC_VEC_FOLD
         if method_name == "contains": return MIR_INTRINSIC_VEC_CONTAINS
+        if method_name == "join": return MIR_INTRINSIC_VEC_JOIN
         return MIR_INTRINSIC_NONE
     if type_name == "VecIter":
         if method_name == "next": return MIR_INTRINSIC_VECITER_NEXT
