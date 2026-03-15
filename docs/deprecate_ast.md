@@ -275,9 +275,8 @@ Phase 3: Assert no AST usage
 
 Phase 4: Delete AST codegen
   Self-host: 0 fallbacks (all functions through MIR).
-  Tests: 242/246 pass (was 241). 4 remaining:
+  Tests: 243/246 pass (was 242). 3 remaining:
   - behav_hashmap: runtime assertion (HashMap codegen issue, pre-existing)
-  - behav_trait_generic: trait method in generic fn body (sema type binding)
   - duck_binop_fail/duck_method_fail: expected-failure tests (duck typing errors)
 
   Generic function calls now route through MIR via MIR_INTRINSIC_GENERIC_CALL.
@@ -297,6 +296,9 @@ Phase 4: Delete AST codegen
   [x] sema_type_of_node literal type inference (str/int/float/bool)
   [x] mir_build_closure_fn_type sema fallback for post-snapshot types
   [x] gen_function_mir_mono: save/restore mir_bb_values + mir_local_ptrs
+  [x] sema_type_mangle for correct struct identity in monomorphization
+  [x] Sema-derived LLVM type bindings (wl_type_of flattens single-field structs)
+  [x] MIR local bridging for generic call arg resolution
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
   [ ] Route async function codegen through MIR
   [ ] Delete gen_function
