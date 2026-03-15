@@ -1,4 +1,4 @@
-.PHONY: all build test fixpoint install clean
+.PHONY: all build test fixpoint install clean seed
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
@@ -6,18 +6,22 @@ DESTDIR ?=
 OUT ?= out
 STAGE_TMP := $(OUT)/bin/with-stage-build
 
-# Seed compiler: use WITH env var, or `with` on PATH.
-WITH ?= $(shell command -v with 2>/dev/null)
+# Seed compiler: WITH env var, `with` on PATH, or src/main (downloaded).
+WITH ?= $(shell command -v with 2>/dev/null || ([ -x src/main ] && echo src/main))
 
 INSTALL_BINDIR := $(DESTDIR)$(BINDIR)
 INSTALL_LIBDIR := $(INSTALL_BINDIR)/runtime
 
 all: build
 
+# Download seed binary from GitHub releases.
+seed:
+	./scripts/download_seed.sh
+
 # Two-stage self-hosted build.
 # The compiler outputs <stem> next to the source file, so we build and move.
 build:
-	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH or add with to PATH" >&2; exit 1; fi
+	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	@mkdir -p $(OUT)/bin $(OUT)/lib $(OUT)/log
 	@./scripts/ensure_runtime.sh
 	@rm -f $(OUT)/bin/runtime && ln -s ../lib $(OUT)/bin/runtime

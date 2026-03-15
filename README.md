@@ -23,11 +23,12 @@ make test          # run test suite
 make install       # install to ~/.local/bin (or /usr/local/bin)
 ```
 
-The seed compiler is resolved from `WITH` env var or `with` on PATH:
+The seed compiler is resolved from `WITH` env var, `with` on PATH, or
+a downloaded seed binary:
 
 ```sh
 make build                           # uses `with` on PATH
-WITH=./src/main make build           # uses checked-in binary seed
+make seed && make build              # downloads seed from GitHub releases
 WITH=~/other/with make build         # uses explicit binary
 ```
 
@@ -95,7 +96,7 @@ Fixpoint verification (stage2 == stage3):
 
 ```text
 src/                 self-hosted compiler (.w)
-src/main             binary seed (fixpoint-verified selfhost checkpoint)
+src/main             seed binary (not in git; download via `make seed`)
 src/compiler/        Compilation-first architecture port layer
 runtime/             C runtime source (.c, .h, .s)
 lib/std/             standard library (.w)

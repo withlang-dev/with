@@ -446,7 +446,7 @@ resolve_seed_compiler() {
 
   emit_workspace_seed_candidates
 
-  # Last resort: binary seed checked into the repo (fixpoint-verified checkpoint)
+  # Last resort: downloaded seed binary (not checked into git)
   if [ -x "${ROOT_DIR}/src/main" ]; then
     echo "${ROOT_DIR}/src/main"
   fi

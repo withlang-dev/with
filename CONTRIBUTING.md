@@ -18,8 +18,13 @@ cd with
 make
 ```
 
-This builds Stage 2 from the seed binary in `src/main`. The
-output is `out/bin/with-stage2`.
+If you don't have `with` on PATH, first download the seed:
+
+```bash
+make seed
+```
+
+Then `make` builds Stage 2. The output is `out/bin/with-stage2`.
 
 ### Verify It Works
 

@@ -74,19 +74,25 @@ The seed compiler is resolved in this order:
 
 1. `WITH=<path>`
 2. `with` on PATH
-3. `src/main`
+3. `src/main` (downloaded from GitHub releases via `make seed`)
 
-`src/main` is a **fixpoint-verified stage2 binary** committed to the repo.
+`src/main` is **not checked into git**. It is published as a GitHub
+release asset. Run `make seed` or `./scripts/download_seed.sh` to
+fetch it.
 
-After a successful fixpoint build, update the seed.
+After a successful fixpoint build, update the installed compiler:
+
+```
+cp out/bin/with-stage2 ~/.local/bin/with
+```
 
 Catastrophic loss scenario:
 
 If these are all broken:
 
-* `src/main`
 * installed compiler
 * external selfhost binaries
+* GitHub releases (seed download)
 
 then **the compiler cannot be recovered**.
 
