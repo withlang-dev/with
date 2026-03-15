@@ -233,7 +233,8 @@ Phase 0: Audit
   [x] Document root cause (method resolution / expr_type)
 
 Phase 1: Fix MirLower (target: 0 lowering failures)
-  Current: 3 fallback — closures only (was 23, was 883, was 1,218)
+  Self-host: 0 fallback. Tests: 252 lowering failures remaining.
+  (was 3 self-host, was 23, was 883, was 1,218)
   [x] Sema builtin method return types (check_method_call)
   [x] typed_expr_types key fix (node index vs byte offset)
   [x] Remove MIR dispatch count cap (376→uncapped, 537 through MIR)
@@ -247,7 +248,9 @@ Phase 1: Fix MirLower (target: 0 lowering failures)
   [x] Short-circuit evaluation for logical and/or operators
   [x] Remove intrinsic gate (WITH_MIR_INTRINSICS no longer needed)
   [x] PK_INDEX + PK_DEREF projections in mir_place_ptr/mir_place_is_supported
-  [ ] 3 remaining: unsupported-callee (closure/indirect calls)
+  [x] type_receiver_type helper for NK_INDEX type receivers (Vec[i32].new())
+  [x] call_return_type + resolve_method_callee_sym NK_INDEX handling
+  [ ] Test-only: closures, generic functions, defer/errdefer, async
 
 Phase 1b: Fix MIR codegen support (target: 0 codegen-unsupported)
   Current: 0 codegen-unsupported (was 205)
