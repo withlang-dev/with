@@ -4,11 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-# selfhost seed checkpoint — validate that src/main can build stage2
+# selfhost seed — validate that a seed compiler can build stage2
 SEED_BIN="${ROOT_DIR}/src/main"
 
 if [[ ! -x "$SEED_BIN" ]]; then
-  echo "[gate-stage0] error: missing selfhost seed binary: $SEED_BIN" >&2
+  SEED_BIN="$(command -v with 2>/dev/null || true)"
+fi
+
+if [[ -z "$SEED_BIN" || ! -x "$SEED_BIN" ]]; then
+  echo "[gate-stage0] error: no seed compiler — run 'make seed' or add with to PATH" >&2
   exit 1
 fi
 

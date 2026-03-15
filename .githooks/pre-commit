@@ -1,13 +1,13 @@
 #!/bin/sh
 # bootstrap/ is permanently frozen — it is a historical artifact.
-# The compiler is fully self-hosted. Recovery uses selfhost checkpoints
-# (src/main, out/bin/with-stage2), never the Zig bootstrap.
+# The compiler is fully self-hosted. Recovery uses the installed binary
+# (~/.local/bin/with) or seed downloads from GitHub releases.
 #
 # DO NOT override this freeze for any reason unless the selfhost binary
 # is catastrophically lost and no checkpoint exists anywhere.
 if git diff --cached --name-only | grep -q '^bootstrap/'; then
     echo "error: bootstrap/ is permanently frozen — the compiler is self-hosted"
-    echo "       recovery uses selfhost checkpoints (src/main), not the Zig bootstrap"
+    echo "       recovery uses installed binary or GitHub release seeds, not the Zig bootstrap"
     echo "       do not override this freeze unless the selfhost binary is catastrophically lost"
     exit 1
 fi

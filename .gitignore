@@ -1,6 +1,9 @@
 # Reference repos (large external clones)
 .reference/
 
+# Seed binary (downloaded from GitHub releases, not checked in)
+src/main
+
 # Build artifacts
 zig-out/
 zig-cache/
