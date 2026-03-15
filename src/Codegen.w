@@ -4724,7 +4724,9 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
             let fi = self.mir_resolve_field_index(cur_ty, pd)
             if fi < 0:
                 return 0
-            if fi < wl_count_struct_elem_types(cur_ty):
+            if wl_get_type_kind(cur_ty) == wl_array_type_kind():
+                cur_ty = wl_get_element_type(cur_ty)
+            else if fi < wl_count_struct_elem_types(cur_ty):
                 cur_ty = wl_struct_get_type_at(cur_ty, fi)
             else:
                 return 0

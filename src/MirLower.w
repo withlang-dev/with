@@ -1726,7 +1726,31 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
         return
 
-    // Other patterns (struct/slice) are conservatively accepted here.
+    // NK_PAT_SLICE: check array length against pattern count
+    if pk == NK_PAT_SLICE:
+        let sp_head = self.ast.get_data1(pat_node)
+        let sp_extra = self.ast.get_data0(pat_node)
+        let sp_has_rest = self.ast.get_extra(sp_extra)
+        // Get array length from scrutinee sema type
+        let sp_arr_ty = self.place_local_type(scrutinee_place)
+        let sp_arr_tk = self.sema.get_type_kind(sp_arr_ty)
+        if sp_arr_tk == TY_ARRAY:
+            let sp_arr_len = self.sema.get_type_d1(sp_arr_ty)
+            if sp_has_rest != 0:
+                // [a, b, ..rest] matches if arr_len >= head_count
+                if sp_arr_len >= sp_head:
+                    self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
+                else:
+                    self.terminate(TK_GOTO, fail_bb, 0, 0, 0)
+            else:
+                // [a, b, c] matches only if arr_len == head_count
+                if sp_arr_len == sp_head:
+                    self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
+                else:
+                    self.terminate(TK_GOTO, fail_bb, 0, 0, 0)
+            return
+
+    // Other patterns (struct) are conservatively accepted here.
     self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
 
 fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i32) -> Vec[i32]:
