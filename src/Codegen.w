@@ -6326,6 +6326,26 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let _ = wl_build_call(self.builder, ft7, f7, vec_data_i64(&a7), 3)
         result = 0
 
+    else if intrinsic == MIR_INTRINSIC_STR_REPEAT:
+        let sr_recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let sr_n = self.mir_intrinsic_arg(body, args_id, 1)
+        let sr_n64 = self.coerce_int(sr_n, i64_ty)
+        let sr_ty = wl_type_of(sr_recv)
+        let sr_fn = self.ensure_c_fn("with_str_repeat", sr_ty, 2)
+        let sr_args: Vec[i64] = Vec.new()
+        sr_args.push(sr_recv)
+        sr_args.push(sr_n64)
+        result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_repeat", sr_ty, 2), sr_fn, vec_data_i64(&sr_args), 2)
+
+    else if intrinsic == MIR_INTRINSIC_ARR_LEN:
+        // Array.len() returns the compile-time length of the array type
+        let al_recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let al_ty = wl_type_of(al_recv)
+        var al_len = 0
+        if wl_get_type_kind(al_ty) == wl_array_type_kind():
+            al_len = wl_get_array_length(al_ty) as i32
+        result = wl_const_int(wl_i32_type(self.context), al_len as i64, 0)
+
     else if intrinsic == MIR_INTRINSIC_VEC_MAP:
         result = self.mir_emit_vec_map(body, args_id)
     else if intrinsic == MIR_INTRINSIC_VEC_FILTER:

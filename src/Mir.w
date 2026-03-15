@@ -108,6 +108,8 @@ const MIR_INTRINSIC_VEC_MAP: i32 = 35
 const MIR_INTRINSIC_VEC_FILTER: i32 = 36
 const MIR_INTRINSIC_VEC_FOLD: i32 = 37
 const MIR_INTRINSIC_VEC_CONTAINS: i32 = 38
+const MIR_INTRINSIC_STR_REPEAT: i32 = 39
+const MIR_INTRINSIC_ARR_LEN: i32 = 40
 
 // ── Projection kinds ─────────────────────────────────────────────
 

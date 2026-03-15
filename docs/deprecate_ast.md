@@ -274,26 +274,33 @@ Phase 3: Assert no AST usage
   [x] 246/246 tests pass
 
 Phase 4: Delete AST codegen
-  BLOCKED by three remaining AST codegen dependencies:
+  Self-host: 0 fallbacks (all functions through MIR).
+  Tests: 72 functions across 53 test files still fall back to gen_function.
 
-  1. MIR lowering failures in test files — MirLower fails on NK_CALL
-     (kind=27) for Vec/HashMap/Option static constructors (Vec[i32].new(),
-     etc.) and other constructs in test files. Self-host has 0 failures
-     but test files still fall back to gen_function. ~100+ test functions
-     affected. Root cause: lower_call/lower_method_call can't resolve
-     static type constructors (NK_INDEX receivers like Vec[i32]).
+  Remaining MIR lowering gaps (test files only):
+  | Kind | AST node | Count | Examples |
+  |---|---|---|---|
+  | 27 | NK_CALL | 79 | Generic fn calls, builtin method calls |
+  | 24 | NK_IDENT | 68 | Some/None variants, global vars, generics |
+  | 34 | NK_ASSIGN | 17 | Assignments in closure-containing fns |
+  | 57 | NK_AWAIT | 4 | Async/await |
+  | 28 | NK_FIELD_ACCESS | 3 | Non-enum field on unknown type |
+  | 63 | NK_TUPLE_DESTRUCTURE | 2 | Tuple destructuring |
+  | 30 | NK_BLOCK | 2 | Block lowering failures |
+  | 58 | NK_ASYNC_BLOCK | 1 | Async block |
 
-  2. gen_closure depends on gen_expr — MIR delegates closures to AST
-     codegen via CK_CLOSURE constant kind (Codegen.w line ~5068).
-     Can't delete gen_expr until closure lowering goes through MIR.
-
-  3. gen_async_function depends on gen_expr — async function body
-     generation uses gen_expr (Codegen.w line ~12202). Can't delete
-     gen_expr until async lowering goes through MIR.
+  gen_function cannot be deleted until all test functions compile
+  through MIR. gen_expr cannot be deleted because gen_closure and
+  gen_async_function still depend on it.
 
   [x] Tag: pre-ast-removal
   [x] Generic monomorphization via MIR (was blocker, fixed)
-  [ ] Fix MIR lowering for test file patterns (NK_CALL kind=27)
+  [x] NK_INDEX generic receiver (Vec[i32].new()) — Sema.check_index
+  [x] Enum variant access lowering (Color.Red → discriminant constant)
+  [x] Remove mir_input_enabled field and dead code
+  [x] Simplify gen_function_dispatch (skip fn-level generics)
+  [ ] Fix remaining lowering gaps: Some/None constructors, global vars,
+      generic fn calls, builtin str methods, from_int, closures, async
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
   [ ] Route async function codegen through MIR
   [ ] Delete gen_function
