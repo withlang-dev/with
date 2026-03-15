@@ -5127,6 +5127,25 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
             return self.build_default_value(expected_ty)
         return wl_const_int(wl_i32_type(self.context), 0, 0)
 
+    if ck == CK_CLOSURE:
+        // Populate local_allocas/local_types from MIR locals so gen_closure
+        // can find captured variables via collect_captures.
+        let closure_node = cd
+        if closure_node <= 0 or closure_node >= self.pool.node_count():
+            with_eprintln("warning: [ck-closure] invalid node=" ++ int_to_string(closure_node))
+            return wl_get_undef(fallback_ty)
+        for li in 0..body.local_count():
+            let name_sym = body.local_names.get(li as i64)
+            if name_sym != 0:
+                let ptr_opt = self.mir_local_ptrs.get(li)
+                if ptr_opt.is_some():
+                    self.local_allocas.insert(name_sym, ptr_opt.unwrap())
+                    let ty_opt = self.mir_local_types.get(li)
+                    if ty_opt.is_some():
+                        self.local_types.insert(name_sym, ty_opt.unwrap())
+        let closure_result = self.gen_closure(closure_node)
+        return closure_result
+
     if ck == CK_FN:
         let fn_sym = cd
         // CK_FN sym from MirLower is in sema pool — must translate to codegen pool.
@@ -6459,9 +6478,20 @@ fn Codegen.mir_emit_vec_map(self: Codegen, body: MirBody, args_id: i32) -> i64:
         fn_ptr = wl_build_extract_value(self.builder, fn_val, 0)
         ctx_ptr = wl_build_extract_value(self.builder, fn_val, 1)
         is_fat = 1
-    let fn_ty = wl_global_get_value_type(fn_ptr)
-    let ret_ty = wl_get_return_type(fn_ty)
     var elem_ty = i32_ty
+    var fn_ty: i64 = 0
+    var ret_ty: i64 = 0
+    if is_fat != 0:
+        // Fat pointer closure: fn_ptr is extract_value, not a global.
+        // Build fn_ty from closure calling convention: fn(ptr, elem) -> i32
+        let fp: Vec[i64] = Vec.new()
+        fp.push(ptr_ty)
+        fp.push(elem_ty)
+        fn_ty = wl_function_type(i32_ty, vec_data_i64(&fp), 2, 0)
+        ret_ty = i32_ty
+    else:
+        fn_ty = wl_global_get_value_type(fn_ptr)
+        ret_ty = wl_get_return_type(fn_ty)
     let len = wl_build_extract_value(self.builder, recv, 1)
     let rvt = self.get_or_create_vec_type(ret_ty)
     let ra = self.create_entry_alloca(rvt)
@@ -6527,8 +6557,15 @@ fn Codegen.mir_emit_vec_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
         fn_ptr = wl_build_extract_value(self.builder, fn_val, 0)
         ctx_ptr = wl_build_extract_value(self.builder, fn_val, 1)
         is_fat = 1
-    let fn_ty = wl_global_get_value_type(fn_ptr)
     var elem_ty = i32_ty
+    var fn_ty: i64 = 0
+    if is_fat != 0:
+        let fp: Vec[i64] = Vec.new()
+        fp.push(ptr_ty)
+        fp.push(elem_ty)
+        fn_ty = wl_function_type(i32_ty, vec_data_i64(&fp), 2, 0)
+    else:
+        fn_ty = wl_global_get_value_type(fn_ptr)
     let len = wl_build_extract_value(self.builder, recv, 1)
     let vt = self.get_or_create_vec_type(elem_ty)
     let ra = self.create_entry_alloca(vt)
@@ -6597,7 +6634,16 @@ fn Codegen.mir_emit_vec_fold(self: Codegen, body: MirBody, args_id: i32) -> i64:
         fn_ptr = wl_build_extract_value(self.builder, fn_val, 0)
         ctx_ptr = wl_build_extract_value(self.builder, fn_val, 1)
         is_fat = 1
-    let fn_ty = wl_global_get_value_type(fn_ptr)
+    var fn_ty: i64 = 0
+    if is_fat != 0:
+        // Fat pointer closure: fn(ptr, acc, elem) -> i32
+        let fp: Vec[i64] = Vec.new()
+        fp.push(ptr_ty)
+        fp.push(i32_ty)
+        fp.push(i32_ty)
+        fn_ty = wl_function_type(i32_ty, vec_data_i64(&fp), 3, 0)
+    else:
+        fn_ty = wl_global_get_value_type(fn_ptr)
     let at = wl_type_of(init)
     var elem_ty = i32_ty
     let len = wl_build_extract_value(self.builder, recv, 1)
