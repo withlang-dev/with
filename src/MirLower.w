@@ -2050,7 +2050,21 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     // For generic struct methods (in generic_fn_nodes), emit MIR_INTRINSIC_GENERIC_CALL
     // so codegen can monomorphize via gen_call → gen_method_call.
     if callee_sym == method_sym:
-        if self.sema.generic_fn_nodes.contains(callee_sym):
+        // Check both bare sym and qualified Type.method in generic_fn_nodes
+        var is_generic_method = self.sema.generic_fn_nodes.contains(callee_sym)
+        if not is_generic_method:
+            // Try qualifying with receiver type name: build "Type.method" in intern pool
+            let gm_recv_type = self.expr_type(self_expr)
+            if gm_recv_type != 0:
+                let gm_name_sym = self.sema.get_type_name(gm_recv_type)
+                if gm_name_sym != 0:
+                    let gm_type_name = self.pool.resolve_symbol(gm_name_sym)
+                    let gm_method_name = self.pool.resolve_symbol(method_sym)
+                    let gm_qualified = gm_type_name ++ "." ++ gm_method_name
+                    let gm_key = self.pool.intern(gm_qualified)
+                    if self.sema.generic_fn_nodes.contains(gm_key):
+                        is_generic_method = true
+        if is_generic_method:
             let gc_fn_op = self.const_operand(CK_FN, callee_sym, 0)
             let gc_args: Vec[i32] = Vec.new()
             let gc_args_id = self.body.new_call_args(gc_args)
