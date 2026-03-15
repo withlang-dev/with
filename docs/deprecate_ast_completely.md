@@ -51,7 +51,7 @@ MIR codegen never checks `fn_ref_param_starts`.
 - [x] **B1.** Add `is_ref_param` helper
 - [x] **B2.** Add `mir_try_place_ptr_for_ref` helper
 - [x] **B3.** Modify `mir_emit_call_term` arg loop with ref-param handling
-- [ ] **B4.** Simplify `mir_eval_call_operand` (remove redundant `is_struct_val` block)
+- [x] **B4.** Simplify `mir_eval_call_operand` (redundant `is_struct_val` block already removed)
 
 ---
 
