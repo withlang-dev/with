@@ -306,9 +306,10 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     sema.check_module()
     compilation_debug_pool_flow("run_mir_lower:after_check", zcu.pool, active_pool, sema)
 
-    zcu.sync_from_sema(sema)
-    compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
-    if zcu.diagnostics.has_errors():
+    // Check for sema errors before lowering
+    if sema.diags.has_errors():
+        zcu.sync_from_sema(sema)
+        compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
         zcu.render_current_diagnostics()
         zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
         self.zcu = zcu
@@ -318,6 +319,11 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     let async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, zcu.pool, sema, zcu.diagnostics)
     zcu.diagnostics = async_artifacts.diags
     compilation_dump_type_names("post-mir-lower", active_pool, zcu.pool)
+
+    // Sync sema AFTER MIR lowering — MirLower may add types (add_type),
+    // which can reallocate sema's internal Vecs and invalidate earlier copies.
+    zcu.sync_from_sema(sema)
+    compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
     zcu.set_codegen_snapshot(mir_mod, "", async_artifacts.out_mod, "")
     self.zcu = zcu
     zcu.last_mir_module
