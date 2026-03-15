@@ -6626,6 +6626,18 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     if mir_intrinsic == MIR_INTRINSIC_GENERIC_CALL:
         let gc_node = body.call_ast_node(args_id)
         if gc_node > 0:
+            // Bridge MIR locals into local_allocas so gen_call can find them
+            let gc_local_count = body.local_names.len() as i32
+            for gli in 0..gc_local_count:
+                let gl_sym = body.local_names.get(gli as i64)
+                if gl_sym > 0:
+                    let gl_ptr_opt = self.mir_local_ptrs.get(gli)
+                    if gl_ptr_opt.is_some():
+                        let gl_ptr = gl_ptr_opt.unwrap() as i64
+                        self.local_allocas.insert(gl_sym, gl_ptr)
+                        let gl_ty_opt = self.mir_local_types.get(gli)
+                        if gl_ty_opt.is_some():
+                            self.local_types.insert(gl_sym, gl_ty_opt.unwrap() as i64)
             // Save MIR codegen's builder position — gen_call may reposition
             let gc_saved_bb = wl_get_insert_block(self.builder)
             let gc_result = self.gen_call(gc_node)
@@ -9087,6 +9099,50 @@ fn Codegen.find_result_idx_by_llvm(self: Codegen, res_ty: i64) -> i32:
             return i
     0 - 1
 
+fn Codegen.sema_type_mangle(self: Codegen, sema_ty: i32) -> str:
+    if sema_ty <= 0:
+        return "unknown"
+    let resolved = self.sema.resolve_alias(sema_ty)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TY_INT:
+        return "i32"
+    if tk == TY_FLOAT:
+        return "f64"
+    if tk == TY_BOOL:
+        return "bool"
+    if tk == TY_STR:
+        return "str"
+    if tk == TY_VOID:
+        return "void"
+    if tk == TY_STRUCT:
+        let name_sym = self.sema.get_type_d0(resolved)
+        if name_sym != 0:
+            return self.intern.resolve(name_sym)
+        return "struct"
+    if tk == TY_ENUM:
+        let name_sym = self.sema.get_type_d0(resolved)
+        if name_sym != 0:
+            return self.intern.resolve(name_sym)
+        return "enum"
+    if tk == TY_PTR or tk == TY_REF:
+        return "ptr"
+    if tk == TY_ARRAY:
+        return "array"
+    if tk == TY_SLICE:
+        return "slice"
+    if tk == TY_TUPLE:
+        return "tuple"
+    if tk == TY_RANGE:
+        return "range"
+    if tk == TY_GENERIC_INST:
+        let name_sym = self.sema.get_type_d0(resolved)
+        if name_sym != 0:
+            return self.intern.resolve(name_sym)
+        return "generic"
+    if tk == TY_NEVER:
+        return "never"
+    "unknown"
+
 fn Codegen.llvm_type_mangle(self: Codegen, ty: i64) -> str:
     if ty == 0:
         return "unknown"
@@ -9256,7 +9312,17 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
             with_eprintln("error: unknown type")
             self.had_error = 1
             return wl_get_undef(wl_i32_type(self.context))
-        mangled = mangled ++ "__" ++ self.llvm_type_mangle(bty)
+        // Use sema type for mangling when available (LLVM types lose struct identity)
+        var sema_mangle = "unknown"
+        for bi in 0..bind_syms.len() as i32:
+            if bind_syms.get(bi as i64) == tp_sym:
+                let sema_ty = bind_sema_tys.get(bi as i64)
+                if sema_ty > 0:
+                    sema_mangle = self.sema_type_mangle(sema_ty)
+                break
+        if sema_mangle == "unknown":
+            sema_mangle = self.llvm_type_mangle(bty)
+        mangled = mangled ++ "__" ++ sema_mangle
 
     let mono_sym = self.intern.intern(mangled)
     let mono_key = mono_sym as i64
@@ -9284,7 +9350,14 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
     self.type_bindings_len = 0
     for bi in 0..bind_syms.len() as i32:
         self.type_binding_syms.push(bind_syms.get(bi as i64))
-        self.type_binding_types.push(bind_tys.get(bi as i64))
+        // Use sema-derived LLVM type for correct struct identity (wl_type_of may flatten)
+        let sema_ty_for_bind = bind_sema_tys.get(bi as i64)
+        var llvm_ty_for_bind = bind_tys.get(bi as i64)
+        if sema_ty_for_bind > 0:
+            let sema_llvm = self.sema_type_to_llvm(sema_ty_for_bind)
+            if sema_llvm != 0:
+                llvm_ty_for_bind = sema_llvm
+        self.type_binding_types.push(llvm_ty_for_bind)
         self.type_bindings_len = self.type_bindings_len + 1
 
     let mono_param_types: Vec[i64] = Vec.new()
