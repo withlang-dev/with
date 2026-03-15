@@ -3773,10 +3773,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             if meta >= 0:
                 let tp_count = self.pool.fn_meta_tp_count(meta)
                 if tp_count == 0:
-                    if (flags / FN_FLAG_ASYNC) % 2 == 1:
-                        self.gen_async_function(decl)
-                    else:
-                        self.gen_function_dispatch(decl)
+                    self.gen_function_dispatch(decl)
 
     if self.had_error != 0:
         return 1
@@ -4588,12 +4585,17 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
 // ── gen_function_dispatch: MIR-first, AST fallback for unsupported patterns ──
 
 fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
+    // Async functions always use gen_async_function (not MIR-lowered yet)
+    let flags = self.pool.get_data2(fn_node)
+    if (flags / FN_FLAG_ASYNC) % 2 == 1:
+        self.gen_async_function(fn_node)
+        return
     if self.mir_input_enabled != 0:
         let fn_sym = self.pool.get_data0(fn_node)
         let body_idx = self.mir_input.find_body(fn_sym)
         if body_idx >= 0:
             let body = self.mir_input.bodies.get(body_idx as i64)
-            if self.mir_function_is_supported(body):
+            if body.lowering_failed == 0 and body.block_count() > 0:
                 if self.debug_mir_codegen_enabled():
                     let fn_name = self.intern.resolve(fn_sym)
                     with_eprintln("[mir-dispatch] using MIR for: " ++ fn_name)
@@ -4607,43 +4609,6 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
                 self.debug_clear_location()
                 return
     self.gen_function(fn_node)
-
-fn Codegen.mir_place_is_supported(self: Codegen, body: MirBody, place_id: i32) -> bool:
-    if place_id < 0 or place_id >= body.place_locals.len() as i32:
-        return false
-    let p_count = body.place_proj_counts.get(place_id as i64)
-    if p_count == 0:
-        return true
-    // Allow PK_FIELD (0), PK_INDEX (1), PK_DEREF (2), PK_DOWNCAST (3) projections
-    let p_start = body.place_proj_starts.get(place_id as i64)
-    for i in 0..p_count:
-        let pk = body.proj_kinds.get((p_start + i) as i64)
-        if pk != 0 and pk != 1 and pk != 2 and pk != 3:
-            return false
-    true
-
-fn Codegen.mir_operand_is_supported(self: Codegen, body: MirBody, operand_id: i32, for_call_callee: bool) -> bool:
-    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
-        return false
-    let ok = body.operand_kinds.get(operand_id as i64)
-    let od = body.operand_d0.get(operand_id as i64)
-    if ok == OK_COPY or ok == OK_MOVE:
-        return self.mir_place_is_supported(body, od)
-    if ok == OK_CONSTANT:
-        if od < 0 or od >= body.const_kinds.len() as i32:
-            return false
-        let ck = body.const_kinds.get(od as i64)
-        if for_call_callee:
-            return ck == CK_FN
-        return ck == CK_INT or ck == CK_BOOL or ck == CK_STR or ck == CK_UNIT or ck == CK_FLOAT or ck == CK_ZERO_SIZED
-    false
-
-fn Codegen.mir_function_is_supported(self: Codegen, body: MirBody) -> bool:
-    if body.lowering_failed != 0:
-        return false
-    if body.block_count() <= 0:
-        return false
-    true
 
 fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     // Use MIR module's snapshot of sema type tables — the original sema's
@@ -6943,12 +6908,12 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         return
     let fv = self.fn_values.get(name_sym)
     if not fv.is_some():
-        self.gen_function(fn_node)
+        with_eprintln("error: no fn_value for MIR function: " ++ name_str)
         return
     let function = fv.unwrap() as i64
     let ft = self.fn_fn_types.get(name_sym)
     if not ft.is_some():
-        self.gen_function(fn_node)
+        with_eprintln("error: no fn_type for MIR function: " ++ name_str)
         return
     let fn_type = ft.unwrap() as i64
     if self.debug_mir_codegen_enabled():
