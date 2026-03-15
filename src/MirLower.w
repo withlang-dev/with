@@ -711,6 +711,22 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
         let ty = if const_val < -2147483648 or const_val > 2147483647: self.sema.ty_i64 else: self.sema.ty_i32
         return self.int_const_operand(const_val, ty)
 
+    // Check for enum variant without payload (None, etc.)
+    if self.sema.variant_lookup.contains(sym):
+        let vl_enc = self.sema.variant_lookup.get(sym).unwrap()
+        let vl_variant_idx = vl_enc % 65536
+        var vl_result_ty = if self.expected_type != 0: self.expected_type else: type_id
+        if vl_result_ty == 0:
+            vl_result_ty = vl_enc / 65536
+        let vl_fields: Vec[i32] = Vec.new()
+        let vl_names: Vec[i32] = Vec.new()
+        let vl_fid = self.body.new_agg_fields(vl_fields, vl_names)
+        let vl_rv = self.body.new_rvalue(RK_AGGREGATE, 1, vl_fid, vl_variant_idx)
+        let vl_tmp = self.new_temp(vl_result_ty)
+        let vl_place = self.place_for_local(vl_tmp)
+        self.body.push_stmt(self.cur_bb, SK_ASSIGN, vl_place, vl_rv, 0)
+        return self.body.new_operand(OK_COPY, vl_place)
+
     if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
         let var_name = self.pool.resolve(sym)
         let fn_name = self.pool.resolve(self.body.fn_sym)
@@ -2480,6 +2496,31 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let callee = self.ast.get_data0(node)
         if self.ast.kind(callee) == NK_FIELD_ACCESS:
             return self.lower_method_call(self.ast.get_data0(callee), self.ast.get_data1(callee), self.ast.get_data1(node), self.ast.get_data2(node), node)
+        // Check for enum variant constructor call: Some(v), Ok(v), Err(e), etc.
+        if self.ast.kind(callee) == NK_IDENT:
+            let vc_sym = self.ast.get_data0(callee)
+            if self.sema.variant_lookup.contains(vc_sym):
+                let vc_enc = self.sema.variant_lookup.get(vc_sym).unwrap()
+                let vc_variant_idx = vc_enc % 65536
+                var vc_result_ty = self.expr_type(node)
+                if self.expected_type != 0:
+                    vc_result_ty = self.expected_type
+                if vc_result_ty == 0:
+                    vc_result_ty = vc_enc / 65536
+                let vc_args_start = self.ast.get_data1(node)
+                let vc_args_count = self.ast.get_data2(node)
+                let vc_fields: Vec[i32] = Vec.new()
+                let vc_names: Vec[i32] = Vec.new()
+                for vci in 0..vc_args_count:
+                    let vc_arg = self.ast.get_extra(vc_args_start + vci)
+                    vc_fields.push(self.lower_expr(vc_arg))
+                    vc_names.push(0)
+                let vc_fid = self.body.new_agg_fields(vc_fields, vc_names)
+                let vc_rv = self.body.new_rvalue(RK_AGGREGATE, 1, vc_fid, vc_variant_idx)
+                let vc_tmp = self.new_temp(vc_result_ty)
+                let vc_place = self.place_for_local(vc_tmp)
+                self.body.push_stmt(self.cur_bb, SK_ASSIGN, vc_place, vc_rv, self.ast.get_start(node))
+                return self.body.new_operand(OK_COPY, vc_place)
         return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), self.expr_type(node), node)
 
     if kind == NK_PIPELINE:
