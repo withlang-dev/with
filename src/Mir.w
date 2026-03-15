@@ -62,6 +62,7 @@ const CK_UNIT: i32 = 3
 const CK_FLOAT: i32 = 4
 const CK_ZERO_SIZED: i32 = 5
 const CK_FN: i32 = 6
+const CK_CLOSURE: i32 = 7
 
 // ── Call intrinsic kinds ─────────────────────────────────────────
 // Attached to TK_CALL terminators to mark known container/builtin
@@ -902,6 +903,9 @@ fn mir_const_text(body: MirBody, const_id: i32, pool: InternPool, sema: Sema) ->
             return "const fn sym" ++ int_to_string(d0)
         return "const fn <unknown>"
 
+    if k == CK_CLOSURE:
+        return "const closure(node" ++ int_to_string(d0) ++ ")"
+
     "const<" ++ int_to_string(k) ++ ">(" ++ int_to_string(d0) ++ ")"
 
 fn mir_agg_fields_text(body: MirBody, fields_id: i32, pool: InternPool, sema: Sema) -> str:
@@ -1261,7 +1265,7 @@ fn validate_mir_body(body: MirBody) -> str:
 
     for ci in 0..const_count:
         let ck = body.const_kinds.get(ci as i64)
-        if ck == CK_INT or ck == CK_BOOL or ck == CK_STR or ck == CK_UNIT or ck == CK_FLOAT or ck == CK_ZERO_SIZED or ck == CK_FN:
+        if ck == CK_INT or ck == CK_BOOL or ck == CK_STR or ck == CK_UNIT or ck == CK_FLOAT or ck == CK_ZERO_SIZED or ck == CK_FN or ck == CK_CLOSURE:
             continue
         return "const" ++ int_to_string(ci) ++ ": unknown const kind " ++ int_to_string(ck)
 

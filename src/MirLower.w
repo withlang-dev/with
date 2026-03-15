@@ -2228,17 +2228,15 @@ fn MirBuilder.lower_pipeline(self: MirBuilder, lhs_expr: i32, fn_expr: i32, args
     self.lower_call_with_arg_nodes(fn_op, arg_nodes, self.expr_type(node), node)
 
 fn MirBuilder.lower_closure(self: MirBuilder, _captured_start: i32, _captured_count: i32, _params_start: i32, _params_count: i32, node: i32) -> i32:
-    // Closures capture variables from the enclosing scope which requires AST codegen's
-    // local_allocas state. Mark as unsupported so enclosing function falls back to AST codegen.
-    // Closure bodies themselves are compiled as separate functions in later waves.
-    self.mark_unsupported()
+    // Emit CK_CLOSURE so MIR codegen can delegate to gen_closure.
+    // The closure body is compiled as a separate function by AST codegen.
     let ty = self.expr_type(node)
     if ty == 0:
         return self.unit_operand()
     let tmp = self.new_temp(ty)
     let place = self.place_for_local(tmp)
-    let zst = self.body.new_const(CK_ZERO_SIZED, ty, node, 0, ty)
-    let op = self.body.new_operand(OK_CONSTANT, zst)
+    let closure_const = self.body.new_const(CK_CLOSURE, node, 0, 0, ty)
+    let op = self.body.new_operand(OK_CONSTANT, closure_const)
     let rv = self.body.new_rvalue(RK_USE, op, 0, 0)
     self.body.push_stmt(self.cur_bb, SK_ASSIGN, place, rv, self.ast.get_start(node))
     self.body.new_operand(OK_COPY, place)
