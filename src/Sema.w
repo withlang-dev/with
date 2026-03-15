@@ -3114,6 +3114,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
             let exp_kind = self.get_type_kind(expected)
             if exp_kind == TY_ENUM:
                 if self.enum_has_variant(expected, name) != 0:
+                    self.typed_expr_types.insert(node, expected)
                     return expected
                 self.emit_error("enum variant shorthand does not match expected enum type", node)
                 return 0
@@ -3123,10 +3124,13 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
                     let base_tid = self.named_types.get(gi_base).unwrap()
                     if self.get_type_kind(base_tid) == TY_ENUM:
                         if self.enum_has_variant(base_tid, name) != 0:
+                            self.typed_expr_types.insert(node, expected)
                             return expected
         if self.variant_lookup.contains(name):
             let vi = self.variant_lookup.get(name).unwrap()
-            return vi / 65536
+            let vs_tid = vi / 65536
+            self.typed_expr_types.insert(node, vs_tid)
+            return vs_tid
         return 0
 
     if kind == NK_WITH_EXPR:
@@ -3687,6 +3691,9 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data0(node)
     let elem_count = self.ast.get_data1(node)
     if elem_count == 0:
+        if self.has_expected_type != 0 and self.expected_expr_type != 0:
+            self.typed_expr_types.insert(node, self.expected_expr_type)
+            return self.expected_expr_type
         return 0
 
     var elem_type = 0
@@ -3696,7 +3703,9 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
         if elem_type == 0:
             elem_type = et
 
-    self.add_type(TY_ARRAY, elem_type, elem_count, 0)
+    let result = self.add_type(TY_ARRAY, elem_type, elem_count, 0)
+    self.typed_expr_types.insert(node, result)
+    result
 
 fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
     let name = self.ast.get_data0(node)
@@ -4326,7 +4335,9 @@ fn Sema.check_tuple(self: Sema, node: i32) -> i32:
         let elem = self.ast.get_extra(extra_start + ei)
         let et = self.check_expr(elem)
         self.type_extra.push(et)
-    self.add_type(TY_TUPLE, te_start, elem_count, 0)
+    let result = self.add_type(TY_TUPLE, te_start, elem_count, 0)
+    self.typed_expr_types.insert(node, result)
+    result
 
 fn Sema.check_range(self: Sema, node: i32) -> i32:
     let start = self.ast.get_data0(node)

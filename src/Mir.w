@@ -95,6 +95,18 @@ const MIR_INTRINSIC_STR_FIND: i32 = 23
 const MIR_INTRINSIC_MAP_CLEAR: i32 = 24
 const MIR_INTRINSIC_VECITER_NEXT: i32 = 25
 const MIR_INTRINSIC_VEC_ITER: i32 = 26
+const MIR_INTRINSIC_OPT_IS_NONE: i32 = 27
+const MIR_INTRINSIC_STR_SPLIT: i32 = 28
+const MIR_INTRINSIC_STR_TRIM: i32 = 29
+const MIR_INTRINSIC_STR_TO_UPPER: i32 = 30
+const MIR_INTRINSIC_STR_TO_LOWER: i32 = 31
+const MIR_INTRINSIC_STR_REPLACE: i32 = 32
+const MIR_INTRINSIC_STR_INDEX_OF: i32 = 33
+const MIR_INTRINSIC_MAP_INCREMENT: i32 = 34
+const MIR_INTRINSIC_VEC_MAP: i32 = 35
+const MIR_INTRINSIC_VEC_FILTER: i32 = 36
+const MIR_INTRINSIC_VEC_FOLD: i32 = 37
+const MIR_INTRINSIC_VEC_CONTAINS: i32 = 38
 
 // ── Projection kinds ─────────────────────────────────────────────
 
@@ -194,6 +206,15 @@ type MirModule = {
     bodies: Vec[MirBody],
     body_fn_syms: Vec[i32],
     body_index_by_fn_sym: HashMap[i32, i32],
+    // Snapshot of sema type tables at lowering time.
+    // MirLower takes sema by value; its Vec reallocs can free
+    // the shared buffer that the caller's sema copy points to.
+    // Codegen reads these instead of sema.type_kinds/d0/d1.
+    sema_type_kinds: Vec[i32],
+    sema_type_d0: Vec[i32],
+    sema_type_d1: Vec[i32],
+    sema_type_d2: Vec[i32],
+    sema_type_extra: Vec[i32],
 }
 
 // ── MirModule helpers ────────────────────────────────────────────
@@ -203,7 +224,72 @@ fn MirModule.init -> MirModule:
         bodies: Vec.new(),
         body_fn_syms: Vec.new(),
         body_index_by_fn_sym: HashMap.new(),
+        sema_type_kinds: Vec.new(),
+        sema_type_d0: Vec.new(),
+        sema_type_d1: Vec.new(),
+        sema_type_d2: Vec.new(),
+        sema_type_extra: Vec.new(),
     }
+
+fn MirModule.snapshot_sema_types(self: MirModule, sema: Sema):
+    for i in 0..sema.type_kinds.len() as i32:
+        self.sema_type_kinds.push(sema.type_kinds.get(i as i64))
+    for i in 0..sema.type_d0.len() as i32:
+        self.sema_type_d0.push(sema.type_d0.get(i as i64))
+    for i in 0..sema.type_d1.len() as i32:
+        self.sema_type_d1.push(sema.type_d1.get(i as i64))
+    for i in 0..sema.type_d2.len() as i32:
+        self.sema_type_d2.push(sema.type_d2.get(i as i64))
+    for i in 0..sema.type_extra.len() as i32:
+        self.sema_type_extra.push(sema.type_extra.get(i as i64))
+
+fn MirModule.mir_get_type_kind(self: MirModule, tid: i32) -> i32:
+    if tid < 0 or tid >= self.sema_type_kinds.len() as i32:
+        return 0
+    self.sema_type_kinds.get(tid as i64)
+
+fn MirModule.mir_get_type_d0(self: MirModule, tid: i32) -> i32:
+    if tid < 0 or tid >= self.sema_type_d0.len() as i32:
+        return 0
+    self.sema_type_d0.get(tid as i64)
+
+fn MirModule.mir_get_type_d1(self: MirModule, tid: i32) -> i32:
+    if tid < 0 or tid >= self.sema_type_d1.len() as i32:
+        return 0
+    self.sema_type_d1.get(tid as i64)
+
+fn MirModule.mir_get_type_d2(self: MirModule, tid: i32) -> i32:
+    if tid < 0 or tid >= self.sema_type_d2.len() as i32:
+        return 0
+    self.sema_type_d2.get(tid as i64)
+
+fn MirModule.mir_get_type_extra(self: MirModule, idx: i32) -> i32:
+    if idx < 0 or idx >= self.sema_type_extra.len() as i32:
+        return 0
+    self.sema_type_extra.get(idx as i64)
+
+fn MirModule.mir_resolve_alias(self: MirModule, tid: i32) -> i32:
+    var cur = tid
+    var depth = 0
+    while depth < 20:
+        let k = self.mir_get_type_kind(cur)
+        if k != TY_ALIAS:
+            return cur
+        let target = self.mir_get_type_d0(cur)
+        if target <= 0 or target == cur:
+            return cur
+        cur = target
+        depth = depth + 1
+    cur
+
+fn MirModule.mir_get_type_name(self: MirModule, tid: i32) -> i32:
+    let resolved = self.mir_resolve_alias(tid)
+    let tk = self.mir_get_type_kind(resolved)
+    if tk == TY_PTR or tk == TY_REF:
+        return self.mir_get_type_name(self.mir_get_type_d0(resolved))
+    if tk == TY_STRUCT or tk == TY_ENUM or tk == TY_GENERIC_INST:
+        return self.mir_get_type_d0(resolved)
+    0
 
 // No-op: reserved for future manual memory management.
 fn MirModule.deinit(self: &mut MirModule):
