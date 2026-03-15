@@ -417,6 +417,13 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
         if method_name == "contains" or method_name == "starts_with" or method_name == "ends_with":
             return self.sema.ty_bool
         if method_name == "find": return self.sema.ty_i64
+        if method_name == "repeat": return self.sema.ty_str
+        if method_name == "trim" or method_name == "to_upper" or method_name == "to_lower" or method_name == "replace":
+            return self.sema.ty_str
+        if method_name == "index_of": return self.sema.ty_i64
+        return self.sema.ty_void
+    if tk == TY_ARRAY:
+        if method_name == "len": return self.sema.ty_i32
         return self.sema.ty_void
     self.sema.ty_void
 
@@ -1885,6 +1892,10 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "to_lower": return MIR_INTRINSIC_STR_TO_LOWER
         if method_name == "replace": return MIR_INTRINSIC_STR_REPLACE
         if method_name == "index_of": return MIR_INTRINSIC_STR_INDEX_OF
+        if method_name == "repeat": return MIR_INTRINSIC_STR_REPEAT
+        return MIR_INTRINSIC_NONE
+    if tk == TY_ARRAY:
+        if method_name == "len": return MIR_INTRINSIC_ARR_LEN
         return MIR_INTRINSIC_NONE
     let type_name_sym = self.sema.get_type_name(resolved)
     if type_name_sym == 0:
