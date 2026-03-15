@@ -274,7 +274,12 @@ Phase 3: Assert no AST usage
   [x] 246/246 tests pass
 
 Phase 4: Delete AST codegen
-  [ ] Tag: pre-ast-removal
+  BLOCKED: Generic function monomorphization (monomorphize_generic_call,
+  monomorphize_struct_method) calls gen_expr directly to generate
+  instantiated function bodies. 48/246 tests fail without AST fallback.
+  Need generic monomorphization to work through MIR before deletion.
+  [x] Tag: pre-ast-removal
+  [ ] Generic monomorphization via MIR (blocker)
   [ ] Delete gen_function
   [ ] Delete expression emitters
   [ ] Delete statement emitters
