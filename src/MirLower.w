@@ -235,6 +235,22 @@ fn MirBuilder.ident_type(self: MirBuilder, sym: i32) -> i32:
         return self.sema.variant_lookup.get(sym).unwrap() / 65536
     self.sema.ty_void
 
+fn MirBuilder.type_receiver_type(self: MirBuilder, node: i32) -> i32:
+    // Resolve a type-level receiver expression to its base sema type.
+    // Used for intrinsic classification (Vec, HashMap, etc.)
+    // Handles: Vec (NK_IDENT), Vec[i32] (NK_INDEX of NK_IDENT)
+    if self.ast.kind(node) == NK_IDENT:
+        let sym = self.ast.get_data0(node)
+        if self.sema.named_types.contains(sym):
+            return self.sema.named_types.get(sym).unwrap()
+    if self.ast.kind(node) == NK_INDEX:
+        let base = self.ast.get_data0(node)
+        if self.ast.kind(base) == NK_IDENT:
+            let sym = self.ast.get_data0(base)
+            if self.sema.named_types.contains(sym):
+                return self.sema.named_types.get(sym).unwrap()
+    0
+
 fn MirBuilder.call_return_type(self: MirBuilder, callee: i32) -> i32:
     if callee == 0:
         return self.sema.ty_void
@@ -257,7 +273,9 @@ fn MirBuilder.call_return_type(self: MirBuilder, callee: i32) -> i32:
             return self.sema.sig_return_type(bare_sig)
         // Intrinsic methods (Vec/HashMap/Option/str) have no sema sigs.
         // Resolve their return types from the receiver type + method name.
-        let base_ty = self.expr_type(base)
+        var base_ty = self.expr_type(base)
+        if base_ty == 0 or base_ty == self.sema.ty_void:
+            base_ty = self.type_receiver_type(base)
         if base_ty != 0 and base_ty != self.sema.ty_void:
             let method_name = self.pool.resolve_symbol(method_sym)
             let iret = self.intrinsic_return_type(base_ty, method_name)
@@ -1756,6 +1774,15 @@ fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method
         if self.sema.get_sig(method_key) >= 0:
             return method_key
 
+    // Handle Vec[i32].method() — receiver is NK_INDEX of a type name
+    if self.ast.kind(self_expr) == NK_INDEX:
+        let base = self.ast.get_data0(self_expr)
+        if self.ast.kind(base) == NK_IDENT:
+            let type_sym = self.ast.get_data0(base)
+            let method_key = self.sema.method_key(type_sym, method_sym)
+            if self.sema.get_sig(method_key) >= 0:
+                return method_key
+
     method_sym
 
 fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: str) -> i32:
@@ -1866,10 +1893,13 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     // look up the type name, and fall back to the call's return type.
     var recv_type = self.expr_type(self_expr)
     if recv_type == 0 or recv_type == self.sema.ty_void:
+        recv_type = self.type_receiver_type(self_expr)
+    if recv_type == 0 or recv_type == self.sema.ty_void:
+        // Fall back to call's return type for static constructors (Vec.new())
+        let ret_type = self.expr_type(node)
+        let ret_name_sym = self.sema.get_type_name(ret_type)
         if self.ast.kind(self_expr) == NK_IDENT:
             let type_sym = self.ast.get_data0(self_expr)
-            let ret_type = self.expr_type(node)
-            let ret_name_sym = self.sema.get_type_name(ret_type)
             if ret_name_sym == type_sym:
                 recv_type = ret_type
     let method_name = self.pool.resolve_symbol(method_sym)
@@ -1947,6 +1977,12 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
         let et_tk = self.sema.get_type_kind(self.expected_type)
         if et_tk == TY_GENERIC_INST:
             ret_type = self.expected_type
+    // If ret_type is still a base struct (not generic instance) for a static
+    // constructor, we can't determine the element type. Fall back to AST codegen.
+    if is_static:
+        let ret_tk = self.sema.get_type_kind(ret_type)
+        if ret_type == 0 or ret_type == self.sema.ty_void or ret_tk == TY_STRUCT:
+            self.mark_unsupported()
     let result_local = self.new_temp(ret_type)
     let result_place = self.place_for_local(result_local)
     let next_bb = self.new_block()
