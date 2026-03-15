@@ -279,7 +279,7 @@ Phase 4: Delete AST codegen
   instantiated function bodies. 48/246 tests fail without AST fallback.
   Need generic monomorphization to work through MIR before deletion.
   [x] Tag: pre-ast-removal
-  [ ] Generic monomorphization via MIR (blocker)
+  [x] Generic monomorphization via MIR (blocker)
   [ ] Delete gen_function
   [ ] Delete expression emitters
   [ ] Delete statement emitters

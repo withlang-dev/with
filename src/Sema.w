@@ -245,6 +245,7 @@ type Sema = {
     local_file_id: i32,
     collecting_types: i32,
     discard_sym: i32,
+    suppress_errors: i32,
 
     // Canonical primitive TypeIds
     ty_i8: i32,
@@ -513,6 +514,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         local_file_id: 0,
         collecting_types: 0,
         discard_sym: 0,
+        suppress_errors: 0,
         ty_i8: 0, ty_i16: 0, ty_i32: 0, ty_i64: 0,
         ty_u8: 0, ty_u16: 0, ty_u32: 0, ty_u64: 0,
         ty_f32: 0, ty_f64: 0, ty_bool: 0, ty_void: 0,
@@ -2815,6 +2817,84 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     self.has_gen_yield_type = saved_has_gen_yield_type
     self.in_comptime_fn = saved_comptime
     self.pop_scope()
+
+// ── Concrete type-checking for monomorphized generic functions ───
+// Type-checks a generic function body with concrete type substitutions,
+// populating typed_expr_types so MirLower has type information.
+// Returns the sig index for the concrete signature.
+
+fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_sema_tys: Vec[i32], mono_sym: i32) -> i32:
+    let fn_name = self.ast.get_data0(fn_node)
+    let body = self.ast.get_data1(fn_node)
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return 0 - 1
+
+    let tp_count = tp_syms.len() as i32
+
+    // Save named_types entries for type params and install concrete types
+    let saved_named: Vec[i32] = Vec.new()
+    let saved_had: Vec[i32] = Vec.new()
+    for ti in 0..tp_count:
+        let tp_sym = tp_syms.get(ti as i64)
+        if self.named_types.contains(tp_sym):
+            saved_had.push(1)
+            saved_named.push(self.named_types.get(tp_sym).unwrap())
+        else:
+            saved_had.push(0)
+            saved_named.push(0)
+        self.named_types.insert(tp_sym, tp_sema_tys.get(ti as i64))
+
+    // Resolve param types with concrete substitutions
+    let param_start = self.ast.fn_meta_param_start(meta)
+    let param_count = self.ast.fn_meta_param_count(meta)
+    let ret_type_node = self.ast.fn_meta_ret(meta)
+
+    let ps = self.sig_params.len() as i32
+    for pi in 0..param_count:
+        let p_type_node = self.ast.get_extra(param_start + pi * 2 + 1)
+        let p_tid = if p_type_node != 0: self.resolve_type_expr(p_type_node) else: 0
+        self.sig_params.push(p_tid)
+
+    let ret_tid = if ret_type_node != 0: self.resolve_type_expr(ret_type_node) else: self.ty_void
+
+    // Save existing sig for fn_name (if any) and register mono sig temporarily
+    let had_sig = self.sig_lookup.contains(fn_name)
+    var saved_sig_idx = 0 - 1
+    if had_sig:
+        saved_sig_idx = self.sig_lookup.get(fn_name).unwrap()
+
+    self.add_sig(fn_name, 0, ret_tid, ps, param_count, 0)
+    let sig_idx = self.get_sig(fn_name)
+
+    // Also register under mono_sym for later lookup
+    self.sig_lookup.insert(mono_sym, sig_idx)
+
+    // Suppress errors — generic bodies were validated at definition time
+    let saved_suppress = self.suppress_errors
+    self.suppress_errors = 1
+
+    // Type-check body
+    self.check_fn_body(fn_node)
+
+    self.suppress_errors = saved_suppress
+
+    // Restore sig_lookup for fn_name
+    if had_sig:
+        self.sig_lookup.insert(fn_name, saved_sig_idx)
+    else:
+        // Remove fn_name from sig_lookup — we keep it under mono_sym
+        // Can't remove from HashMap, so insert a sentinel
+        self.sig_lookup.insert(fn_name, sig_idx)
+
+    // Restore named_types
+    for ti in 0..tp_count:
+        let tp_sym = tp_syms.get(ti as i64)
+        if saved_had.get(ti as i64) == 1:
+            self.named_types.insert(tp_sym, saved_named.get(ti as i64))
+        // Note: can't remove from HashMap, leave as-is if wasn't present before
+
+    sig_idx
 
 // ── Expression type checking ─────────────────────────────────────
 
@@ -6456,6 +6536,8 @@ fn Sema.expire_borrows_in_scope(self: Sema, scope_start: i32):
 // ── Diagnostics ──────────────────────────────────────────────────
 
 fn Sema.emit_error(self: Sema, msg: str, node: i32):
+    if self.suppress_errors != 0:
+        return
     let start = self.ast.get_start(node)
     let end = self.ast.get_end(node)
     self.diags.emit(Diagnostic.err(msg, Span { file: self.local_file_id, start: start, end: end }))

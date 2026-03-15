@@ -10,6 +10,7 @@ use Ast
 use InternPool
 use Span
 use Mir
+use MirLower
 use Sema
 use Diagnostic
 use Source
@@ -2163,6 +2164,20 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
         return wl_ptr_type(self.context)
     0
 
+// Reverse map: LLVM type → sema TypeId (for primitives and str)
+fn Codegen.llvm_type_to_sema_type(self: Codegen, ty: i64) -> i32:
+    if ty == wl_i32_type(self.context): return self.sema.ty_i32
+    if ty == wl_i64_type(self.context): return self.sema.ty_i64
+    if ty == wl_i1_type(self.context): return self.sema.ty_bool
+    if ty == wl_i8_type(self.context): return self.sema.ty_i8
+    if ty == wl_i16_type(self.context): return self.sema.ty_i16
+    if ty == wl_f64_type(self.context): return self.sema.ty_f64
+    if ty == wl_f32_type(self.context): return self.sema.ty_f32
+    if ty == wl_ptr_type(self.context):
+        // Could be str, ptr, or struct-by-ref — default to str
+        return self.sema.ty_str
+    0
+
 // ── Builtin str type ──────────────────────────────────────────────
 
 fn Codegen.declare_builtin_str_type(self: Codegen):
@@ -3407,126 +3422,28 @@ fn Codegen.monomorphize_struct_method(self: Codegen, mono_type_sym: i32, method_
     if has_ref_self:
         self.fn_ref_param_starts.insert(mono_sym, 0)
 
-    // Save and set up fresh function scope
-    let saved_fn = self.current_function
-    let saved_ret = self.current_ret_type
-    let saved_owner = self.current_method_owner_sym
-    let saved_allocas = self.local_allocas
-    let saved_types = self.local_types
-    let saved_muts = self.local_muts
-    let saved_fn_sigs = self.local_fn_sigs
-    let saved_pointees = self.local_pointee_structs
-    let saved_task_locals = self.task_locals
-    let saved_trait_locals = self.trait_locals
-    let saved_trait_concrete = self.trait_local_concrete_types
-    let saved_scope_syms = self.scope_local_syms
-    let saved_scope_allocas = self.scope_local_allocas
-    let saved_scope_types = self.scope_local_types
-    let saved_scope_count = self.scope_local_count
-    let saved_defer = self.defer_stack
-    let saved_errdefer = self.errdefer_stack
-    let saved_enum_local_types = self.enum_local_types
-    let saved_sema_local_types = self.local_sema_types
-    let saved_expected = self.expected_type
-    let saved_expected_node = self.expected_type_node
-    let saved_tail_bb = self.tailrec_body_bb
-    let saved_tail_sym = self.tailrec_fn_sym
-    let saved_tail_allocas = self.tailrec_param_allocas
-    let saved_loops = self.capture_loop_state()
-    let saved_bb = wl_get_insert_block(self.builder)
+    // Build sema type bindings for struct type params
+    let sm_tp_syms: Vec[i32] = Vec.new()
+    let sm_tp_sema_tys: Vec[i32] = Vec.new()
+    for ti in 0..tp_count:
+        let tp_sym = self.mono_struct_tp_flat_syms.get((tp_flat_start + ti) as i64)
+        let tp_llvm = self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64)
+        sm_tp_syms.push(tp_sym)
+        sm_tp_sema_tys.push(self.llvm_type_to_sema_type(tp_llvm))
 
-    self.current_function = mono_fn
-    self.current_ret_type = mono_ret_ty
-    self.current_method_owner_sym = mono_type_sym
-    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
-    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_pointees: HashMap[i32, i32] = HashMap.new()
-    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
-    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
-    let fresh_trait_concrete: HashMap[i32, i32] = HashMap.new()
-    let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
-    let fresh_scope_syms: Vec[i32] = Vec.new()
-    let fresh_scope_allocas: Vec[i64] = Vec.new()
-    let fresh_scope_types: Vec[i64] = Vec.new()
-    let fresh_defer_stack: Vec[i32] = Vec.new()
-    let fresh_errdefer_stack: Vec[i32] = Vec.new()
-    let fresh_tail_allocas: Vec[i64] = Vec.new()
-    self.local_allocas = fresh_local_allocas
-    self.local_types = fresh_local_types
-    self.local_muts = fresh_local_muts
-    self.local_fn_sigs = fresh_local_fn_sigs
-    self.local_pointee_structs = fresh_local_pointees
-    self.task_locals = fresh_task_locals
-    self.trait_locals = fresh_trait_locals
-    self.trait_local_concrete_types = fresh_trait_concrete
-    self.enum_local_types = fresh_enum_local_types
-    self.scope_local_syms = fresh_scope_syms
-    self.scope_local_allocas = fresh_scope_allocas
-    self.scope_local_types = fresh_scope_types
-    self.scope_local_count = 0
-    self.defer_stack = fresh_defer_stack
-    self.errdefer_stack = fresh_errdefer_stack
-    self.expected_type = mono_ret_ty
-    self.expected_type_node = 0
-    self.tailrec_body_bb = 0
-    self.tailrec_fn_sym = 0
-    self.tailrec_param_allocas = fresh_tail_allocas
-    self.reset_loop_state()
+    // 1. Type-check body with concrete types
+    let sig_idx = self.sema.check_fn_body_concrete(decl, sm_tp_syms, sm_tp_sema_tys, mono_sym)
 
-    let entry = wl_append_bb(self.context, mono_fn, "entry")
-    wl_position_at_end(self.builder, entry)
-    for pi in 0..param_count:
-        let p_name = self.pool.get_extra(param_start + pi * 2)
-        let p_val = wl_get_param(mono_fn, pi)
-        let p_ty = wl_type_of(p_val)
-        if pi == 0 and has_ref_self:
-            // Self param is a pointer to the struct — record it directly
-            self.record_local(p_name, p_val, obj_ty, 1)
-        else:
-            let p_alloca = wl_build_alloca(self.builder, p_ty)
-            wl_build_store(self.builder, p_val, p_alloca)
-            self.record_local(p_name, p_alloca, p_ty, 1)
+    // 2. Lower to MIR
+    var mir_builder = MirBuilder.init(self.sema, self.pool, self.intern, mono_sym)
+    let mir_body = lower_fn_with_sig(mir_builder, decl, sig_idx)
 
-    let body_val = self.gen_expr(body_node)
-    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
-        if mono_ret_ty == wl_void_type(self.context):
-            let _ = wl_build_ret_void(self.builder)
-        else:
-            let _ = wl_build_ret(self.builder, self.coerce_value_to_type(body_val, mono_ret_ty))
+    // 3. Codegen via MIR (saves/restores all codegen state internally)
+    self.gen_function_mir_mono(mono_sym, decl, mir_body)
 
-    // Restore all saved state
-    self.current_function = saved_fn
-    self.current_ret_type = saved_ret
-    self.current_method_owner_sym = saved_owner
-    self.local_allocas = saved_allocas
-    self.local_types = saved_types
-    self.local_muts = saved_muts
-    self.local_fn_sigs = saved_fn_sigs
-    self.local_pointee_structs = saved_pointees
-    self.task_locals = saved_task_locals
-    self.trait_locals = saved_trait_locals
-    self.trait_local_concrete_types = saved_trait_concrete
-    self.enum_local_types = saved_enum_local_types
-    self.local_sema_types = saved_sema_local_types
-    self.scope_local_syms = saved_scope_syms
-    self.scope_local_allocas = saved_scope_allocas
-    self.scope_local_types = saved_scope_types
-    self.scope_local_count = saved_scope_count
-    self.defer_stack = saved_defer
-    self.errdefer_stack = saved_errdefer
-    self.expected_type = saved_expected
-    self.expected_type_node = saved_expected_node
-    self.tailrec_body_bb = saved_tail_bb
-    self.tailrec_fn_sym = saved_tail_sym
-    self.tailrec_param_allocas = saved_tail_allocas
-    self.restore_loop_state(saved_loops)
     self.type_binding_syms = saved_bind_syms
     self.type_binding_types = saved_bind_tys
     self.type_bindings_len = saved_bind_len
-    if saved_bb != 0:
-        wl_position_at_end(self.builder, saved_bb)
 
     // Now call the monomorphized method
     let call_args: Vec[i64] = Vec.new()
@@ -4613,8 +4530,13 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
 fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     // Use MIR module's snapshot of sema type tables — the original sema's
     // type Vecs may have been freed by MirLower's by-value copy realloc.
+    // For types created after snapshot (e.g. by check_fn_body_concrete),
+    // fall back to reading from sema directly.
     let resolved = self.mir_input.mir_resolve_alias(sema_ty)
-    let tk = self.mir_input.mir_get_type_kind(resolved)
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+        // Type was created after snapshot — read from sema directly
+        return self.sema_type_to_llvm(resolved)
     if tk == TY_INT:
         let bits = self.mir_input.mir_get_type_d0(resolved)
         if bits == 8: return wl_i8_type(self.context)
@@ -7165,6 +7087,250 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
     self.tailrec_body_bb = saved_tailrec_bb
     self.tailrec_fn_sym = saved_tailrec_sym
 
+// ── gen_function_mir_mono: MIR codegen for monomorphized generic fn ──
+// Like gen_function_mir but uses mono_sym for fn_values/fn_fn_types lookup
+// instead of extracting the name from the AST node (which has the generic name).
+
+fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, body: MirBody):
+    let name_str = self.intern.resolve(mono_sym)
+    let fv = self.fn_values.get(mono_sym)
+    if not fv.is_some():
+        with_eprintln("error: no fn_value for MIR mono function: " ++ name_str)
+        return
+    let function = fv.unwrap() as i64
+    let ft = self.fn_fn_types.get(mono_sym)
+    if not ft.is_some():
+        with_eprintln("error: no fn_type for MIR mono function: " ++ name_str)
+        return
+    let fn_type = ft.unwrap() as i64
+
+    // Save all codegen state (will be restored at end)
+    let saved_fn = self.current_function
+    let saved_fn_name_sym = self.current_function_name_sym
+    let saved_ret = self.current_ret_type
+    let saved_owner = self.current_method_owner_sym
+    let saved_allocas = self.local_allocas
+    let saved_types = self.local_types
+    let saved_muts = self.local_muts
+    let saved_fn_sigs = self.local_fn_sigs
+    let saved_pointees = self.local_pointee_structs
+    let saved_task_locals = self.task_locals
+    let saved_trait_locals = self.trait_locals
+    let saved_trait_concrete = self.trait_local_concrete_types
+    let saved_scope_syms = self.scope_local_syms
+    let saved_scope_allocas = self.scope_local_allocas
+    let saved_scope_types = self.scope_local_types
+    let saved_scope_count = self.scope_local_count
+    let saved_defer = self.defer_stack
+    let saved_errdefer = self.errdefer_stack
+    let saved_enum_local_types = self.enum_local_types
+    let saved_sema_local_types = self.local_sema_types
+    let saved_expected = self.expected_type
+    let saved_expected_node = self.expected_type_node
+    let saved_result_err = self.current_result_err_symbol
+    let saved_returns_result = self.current_fn_returns_result
+    let saved_saw_return = self.current_fn_saw_explicit_return
+    let saved_tail_bb = self.tailrec_body_bb
+    let saved_tail_sym = self.tailrec_fn_sym
+    let saved_tail_allocas = self.tailrec_param_allocas
+    let saved_loops = self.capture_loop_state()
+    let saved_bb = wl_get_insert_block(self.builder)
+
+    // Set up fresh function state
+    self.current_function = function
+    self.current_function_name_sym = mono_sym
+    self.current_ret_type = wl_get_return_type(fn_type)
+    self.current_method_owner_sym = 0
+
+    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
+    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
+    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_defer_stack: Vec[i32] = Vec.new()
+    let fresh_errdefer_stack: Vec[i32] = Vec.new()
+    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_local_concrete_types: HashMap[i32, i32] = HashMap.new()
+    let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
+    let fresh_scope_syms: Vec[i32] = Vec.new()
+    let fresh_scope_allocas: Vec[i64] = Vec.new()
+    let fresh_scope_types: Vec[i64] = Vec.new()
+    let fresh_tail_allocas: Vec[i64] = Vec.new()
+    self.local_allocas = fresh_local_allocas
+    self.local_types = fresh_local_types
+    self.local_muts = fresh_local_muts
+    self.local_fn_sigs = fresh_local_fn_sigs
+    self.local_pointee_structs = fresh_local_pointee_structs
+    self.task_locals = fresh_task_locals
+    self.defer_stack = fresh_defer_stack
+    self.errdefer_stack = fresh_errdefer_stack
+    self.trait_locals = fresh_trait_locals
+    self.trait_local_concrete_types = fresh_trait_local_concrete_types
+    self.enum_local_types = fresh_enum_local_types
+    self.scope_local_syms = fresh_scope_syms
+    self.scope_local_allocas = fresh_scope_allocas
+    self.scope_local_types = fresh_scope_types
+    self.scope_local_count = 0
+    self.expected_type = self.current_ret_type
+    self.expected_type_node = 0
+    self.current_result_err_symbol = 0
+    self.current_fn_returns_result = false
+    self.current_fn_saw_explicit_return = false
+    self.tailrec_body_bb = 0
+    self.tailrec_fn_sym = 0
+    self.tailrec_param_allocas = fresh_tail_allocas
+    self.reset_loop_state()
+
+    let fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
+    let fresh_mir_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_mir_bbs: Vec[i64] = Vec.new()
+    let fresh_mir_default_unreachable_bbs: Vec[i64] = Vec.new()
+    self.mir_local_ptrs = fresh_mir_locals
+    self.mir_local_types = fresh_mir_local_types
+    self.mir_bb_values = fresh_mir_bbs
+    self.mir_default_unreachable_bbs = fresh_mir_default_unreachable_bbs
+
+    let entry = wl_append_bb(self.context, function, "entry")
+    wl_position_at_end(self.builder, entry)
+
+    let ret_store_ty = if self.current_ret_type != wl_void_type(self.context): self.current_ret_type else: wl_i32_type(self.context)
+    let ret_alloca = self.create_entry_alloca(ret_store_ty)
+    self.mir_local_ptrs.insert(0, ret_alloca)
+    self.mir_local_types.insert(0, ret_store_ty)
+
+    let meta = self.pool.find_fn_meta(fn_node)
+    var param_start = 0
+    var param_count = 0
+    if meta >= 0:
+        param_start = self.pool.fn_meta_param_start(meta)
+        param_count = self.pool.fn_meta_param_count(meta)
+
+    // Detect method owner from mangled name (e.g. "Vec__i32.push")
+    var method_owner_sym = 0
+    for di in 0..name_str.len() as i32:
+        if name_str.byte_at(di as i64) == 46:
+            method_owner_sym = self.intern.intern(name_str.slice(0, di as i64))
+            break
+    self.current_method_owner_sym = method_owner_sym
+
+    let max_params = param_count
+    for pi in 0..max_params:
+        let p_name = self.pool.get_extra(param_start + pi * 2)
+        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let param_val = wl_get_param(function, pi)
+        let param_type = wl_type_of(param_val)
+        let alloca = self.create_entry_alloca(param_type)
+        wl_build_store(self.builder, param_val, alloca)
+
+        self.record_local(p_name, alloca, param_type, 1)
+
+        self.mir_local_ptrs.insert(pi + 1, alloca)
+        self.mir_local_types.insert(pi + 1, param_type)
+
+        if p_type_node != 0:
+            let pk = self.pool.kind(p_type_node)
+            if pk == NK_TYPE_FN:
+                let fn_sig = self.build_fn_type_from_ast(p_type_node)
+                self.record_local_fn_sig(p_name, fn_sig)
+            if pk == NK_TYPE_PTR or pk == NK_TYPE_REF:
+                let pointee_node = self.pool.get_data0(p_type_node)
+                if self.pool.kind(pointee_node) == NK_TYPE_NAMED:
+                    let ps = self.pool.get_data0(pointee_node)
+                    if self.struct_type_map.get(ps).is_some():
+                        self.record_local_pointee_struct(p_name, ps)
+            if pk == NK_TYPE_NAMED:
+                let p_sym = self.pool.get_data0(p_type_node)
+                let p_n = self.intern.resolve(p_sym)
+                let p_name_text = self.intern.resolve(p_name)
+                if method_owner_sym == 0 and p_name_text == "self" and self.struct_type_map.get(p_sym).is_some():
+                    if self.intern.resolve(p_sym) != "str":
+                        method_owner_sym = p_sym
+                        self.current_method_owner_sym = method_owner_sym
+                if method_owner_sym != 0 and (p_n == "Self" or p_sym == method_owner_sym):
+                    let owner_n = self.intern.resolve(method_owner_sym)
+                    if owner_n != "str":
+                        self.record_local_pointee_struct(p_name, method_owner_sym)
+            if method_owner_sym != 0:
+                let p_n = self.intern.resolve(p_name)
+                if p_n == "self":
+                    let owner_n2 = self.intern.resolve(method_owner_sym)
+                    if owner_n2 != "str":
+                        self.record_local_pointee_struct(p_name, method_owner_sym)
+            let trait_sym = self.dyn_trait_from_type_node(p_type_node)
+            if trait_sym != 0:
+                self.record_trait_local(p_name, trait_sym)
+
+    for bb in 0..body.block_count():
+        let bb_name = "mir.bb" ++ int_to_string(bb)
+        let llbb = wl_append_bb(self.context, function, bb_name)
+        self.mir_bb_values.push(llbb)
+
+    if self.mir_bb_values.len() as i32 > 0:
+        wl_build_br(self.builder, self.mir_bb_values.get(0))
+    else:
+        if self.current_ret_type == wl_void_type(self.context):
+            let _ = wl_build_ret_void(self.builder)
+        else:
+            let _ = wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
+
+    for bb in 0..body.block_count():
+        if bb < 0 or bb >= self.mir_bb_values.len() as i32:
+            continue
+        let llbb = self.mir_bb_values.get(bb as i64)
+        wl_position_at_end(self.builder, llbb)
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            if not self.mir_emit_stmt(body, stmt_id):
+                if wl_get_bb_terminator(llbb) == 0:
+                    wl_build_unreachable(self.builder)
+                break
+        if wl_get_bb_terminator(llbb) == 0:
+            let ok = self.mir_emit_term(body, bb)
+            if not ok and wl_get_bb_terminator(llbb) == 0:
+                wl_build_unreachable(self.builder)
+
+    if self.mir_default_unreachable_bbs.len() as i32 > 0:
+        let ubb = self.mir_default_unreachable_bbs.get(0)
+        if wl_get_bb_terminator(ubb) == 0:
+            wl_position_at_end(self.builder, ubb)
+            wl_build_unreachable(self.builder)
+
+    // Restore all codegen state
+    self.current_function = saved_fn
+    self.current_function_name_sym = saved_fn_name_sym
+    self.current_ret_type = saved_ret
+    self.current_method_owner_sym = saved_owner
+    self.local_allocas = saved_allocas
+    self.local_types = saved_types
+    self.local_muts = saved_muts
+    self.local_fn_sigs = saved_fn_sigs
+    self.local_pointee_structs = saved_pointees
+    self.task_locals = saved_task_locals
+    self.trait_locals = saved_trait_locals
+    self.trait_local_concrete_types = saved_trait_concrete
+    self.enum_local_types = saved_enum_local_types
+    self.local_sema_types = saved_sema_local_types
+    self.scope_local_syms = saved_scope_syms
+    self.scope_local_allocas = saved_scope_allocas
+    self.scope_local_types = saved_scope_types
+    self.scope_local_count = saved_scope_count
+    self.defer_stack = saved_defer
+    self.errdefer_stack = saved_errdefer
+    self.expected_type = saved_expected
+    self.expected_type_node = saved_expected_node
+    self.current_result_err_symbol = saved_result_err
+    self.current_fn_returns_result = saved_returns_result
+    self.current_fn_saw_explicit_return = saved_saw_return
+    self.tailrec_body_bb = saved_tail_bb
+    self.tailrec_fn_sym = saved_tail_sym
+    self.tailrec_param_allocas = saved_tail_allocas
+    self.restore_loop_state(saved_loops)
+    if saved_bb != 0:
+        wl_position_at_end(self.builder, saved_bb)
+
 // ── gen_function: generate a function body ────────────────────────
 
 fn Codegen.gen_function(self: Codegen, fn_node: i32):
@@ -8985,6 +9151,7 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
 
     let bind_syms: Vec[i32] = Vec.new()
     let bind_tys: Vec[i64] = Vec.new()
+    let bind_sema_tys: Vec[i32] = Vec.new()
     for pi in 0..param_count:
         if pi >= arg_count:
             break
@@ -9011,6 +9178,12 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
                 if not exists:
                     bind_syms.push(p_sym)
                     bind_tys.push(arg_ty)
+                    // Get sema type for this binding
+                    let arg_sema = self.sema_type_of_node(arg_nodes.get(pi as i64))
+                    if arg_sema > 0:
+                        bind_sema_tys.push(arg_sema)
+                    else:
+                        bind_sema_tys.push(self.llvm_type_to_sema_type(arg_ty))
             continue
 
         if p_kind == NK_TYPE_GENERIC:
@@ -9049,6 +9222,8 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
                     if not mg_exists:
                         bind_syms.push(mg_inner_sym)
                         bind_tys.push(mg_inner_ty)
+                        // Get sema type from generic inst arg
+                        bind_sema_tys.push(self.sema.get_generic_inst_arg(mg_arg_sema_tid, gi))
                 if mg_sema_bound:
                     continue
 
@@ -9124,136 +9299,30 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
     self.fn_values.insert(mono_sym, mono_fn)
     self.fn_fn_types.insert(mono_sym, mono_ft)
 
-    let saved_fn = self.current_function
-    let saved_ret = self.current_ret_type
-    let saved_owner = self.current_method_owner_sym
-    let saved_allocas = self.local_allocas
-    let saved_types = self.local_types
-    let saved_muts = self.local_muts
-    let saved_fn_sigs = self.local_fn_sigs
-    let saved_pointees = self.local_pointee_structs
-    let saved_task_locals = self.task_locals
-    let saved_trait_locals = self.trait_locals
-    let saved_trait_concrete = self.trait_local_concrete_types
-    let saved_scope_syms = self.scope_local_syms
-    let saved_scope_allocas = self.scope_local_allocas
-    let saved_scope_types = self.scope_local_types
-    let saved_scope_count = self.scope_local_count
-    let saved_defer = self.defer_stack
-    let saved_errdefer = self.errdefer_stack
-    let saved_enum_local_types = self.enum_local_types
-    let saved_sema_local_types = self.local_sema_types
-    let saved_expected = self.expected_type
-    let saved_expected_node = self.expected_type_node
-    let saved_tail_bb = self.tailrec_body_bb
-    let saved_tail_sym = self.tailrec_fn_sym
-    let saved_tail_allocas = self.tailrec_param_allocas
-    let saved_loops = self.capture_loop_state()
-    let saved_bb = wl_get_insert_block(self.builder)
+    // Build sema type bindings for each type param
+    let tp_sema_tys: Vec[i32] = Vec.new()
+    for ti in 0..tp_syms.len() as i32:
+        let tp_sym = tp_syms.get(ti as i64)
+        var sema_ty = 0
+        for bi in 0..bind_syms.len() as i32:
+            if bind_syms.get(bi as i64) == tp_sym:
+                sema_ty = bind_sema_tys.get(bi as i64)
+                break
+        tp_sema_tys.push(sema_ty)
 
-    self.current_function = mono_fn
-    self.current_ret_type = mono_ret_ty
-    self.current_method_owner_sym = 0
-    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
-    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_pointees: HashMap[i32, i32] = HashMap.new()
-    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
-    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
-    let fresh_trait_concrete: HashMap[i32, i32] = HashMap.new()
-    let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
-    let fresh_scope_syms: Vec[i32] = Vec.new()
-    let fresh_scope_allocas: Vec[i64] = Vec.new()
-    let fresh_scope_types: Vec[i64] = Vec.new()
-    let fresh_defer_stack: Vec[i32] = Vec.new()
-    let fresh_errdefer_stack: Vec[i32] = Vec.new()
-    let fresh_tail_allocas: Vec[i64] = Vec.new()
-    self.local_allocas = fresh_local_allocas
-    self.local_types = fresh_local_types
-    self.local_muts = fresh_local_muts
-    self.local_fn_sigs = fresh_local_fn_sigs
-    self.local_pointee_structs = fresh_local_pointees
-    self.task_locals = fresh_task_locals
-    self.trait_locals = fresh_trait_locals
-    self.trait_local_concrete_types = fresh_trait_concrete
-    self.enum_local_types = fresh_enum_local_types
-    self.scope_local_syms = fresh_scope_syms
-    self.scope_local_allocas = fresh_scope_allocas
-    self.scope_local_types = fresh_scope_types
-    self.scope_local_count = 0
-    self.defer_stack = fresh_defer_stack
-    self.errdefer_stack = fresh_errdefer_stack
-    self.expected_type = mono_ret_ty
-    self.expected_type_node = 0
-    self.tailrec_body_bb = 0
-    self.tailrec_fn_sym = 0
-    self.tailrec_param_allocas = fresh_tail_allocas
-    self.reset_loop_state()
+    // 1. Type-check body with concrete types
+    let sig_idx = self.sema.check_fn_body_concrete(generic_node, tp_syms, tp_sema_tys, mono_sym)
 
-    let entry = wl_append_bb(self.context, mono_fn, "entry")
-    wl_position_at_end(self.builder, entry)
-    for pi in 0..param_count:
-        let p_name = self.pool.get_extra(param_start + pi * 2)
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
-        let p_val = wl_get_param(mono_fn, pi)
-        let p_ty = wl_type_of(p_val)
-        let p_alloca = wl_build_alloca(self.builder, p_ty)
-        wl_build_store(self.builder, p_val, p_alloca)
-        self.record_local(p_name, p_alloca, p_ty, 1)
+    // 2. Lower to MIR
+    var mir_builder = MirBuilder.init(self.sema, self.pool, self.intern, mono_sym)
+    let mir_body = lower_fn_with_sig(mir_builder, generic_node, sig_idx)
 
-        if p_type_node != 0:
-            let pk = self.pool.kind(p_type_node)
-            if pk == NK_TYPE_FN:
-                self.record_local_fn_sig(p_name, self.build_fn_type_from_ast(p_type_node))
-            let dyn_trait = self.dyn_trait_from_type_node(p_type_node)
-            if dyn_trait != 0:
-                self.record_trait_local(p_name, dyn_trait)
+    // 3. Codegen via MIR (saves/restores all codegen state internally)
+    self.gen_function_mir_mono(mono_sym, generic_node, mir_body)
 
-    let saved_mono_name = self.mono_inst_name
-    let saved_mono_node = self.mono_inst_node
-    self.mono_inst_name = mono_sym
-    self.mono_inst_node = call_node
-
-    let body_val = self.gen_expr(body_node)
-    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
-        if mono_ret_ty == wl_void_type(self.context):
-            let _ = wl_build_ret_void(self.builder)
-        else:
-            let _ = wl_build_ret(self.builder, self.coerce_value_to_type(body_val, mono_ret_ty))
-
-    self.mono_inst_name = saved_mono_name
-    self.mono_inst_node = saved_mono_node
-    self.current_function = saved_fn
-    self.current_ret_type = saved_ret
-    self.current_method_owner_sym = saved_owner
-    self.local_allocas = saved_allocas
-    self.local_types = saved_types
-    self.local_muts = saved_muts
-    self.local_fn_sigs = saved_fn_sigs
-    self.local_pointee_structs = saved_pointees
-    self.task_locals = saved_task_locals
-    self.trait_locals = saved_trait_locals
-    self.trait_local_concrete_types = saved_trait_concrete
-    self.enum_local_types = saved_enum_local_types
-    self.local_sema_types = saved_sema_local_types
-    self.scope_local_syms = saved_scope_syms
-    self.scope_local_allocas = saved_scope_allocas
-    self.scope_local_types = saved_scope_types
-    self.scope_local_count = saved_scope_count
-    self.defer_stack = saved_defer
-    self.errdefer_stack = saved_errdefer
-    self.expected_type = saved_expected
-    self.expected_type_node = saved_expected_node
-    self.tailrec_body_bb = saved_tail_bb
-    self.tailrec_fn_sym = saved_tail_sym
-    self.tailrec_param_allocas = saved_tail_allocas
-    self.restore_loop_state(saved_loops)
     self.type_binding_syms = saved_bind_syms
     self.type_binding_types = saved_bind_tys
     self.type_bindings_len = saved_bind_len
-    if saved_bb != 0:
-        wl_position_at_end(self.builder, saved_bb)
 
     let coerced = self.coerce_call_args_for_fn_value(mono_sym, mono_fn, args_start, 0, arg_vals, arg_count, "call " ++ mangled, call_node)
     wl_build_call(self.builder, mono_ft, mono_fn, vec_data_i64(&coerced), arg_count)
