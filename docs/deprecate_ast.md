@@ -275,23 +275,18 @@ Phase 3: Assert no AST usage
 
 Phase 4: Delete AST codegen
   Self-host: 0 fallbacks (all functions through MIR).
-  Tests: 72 functions across 53 test files still fall back to gen_function.
+  Tests: 7 lowering failures across 4 test files (all in generic fn bodies).
 
   Remaining MIR lowering gaps (test files only):
   | Kind | AST node | Count | Examples |
   |---|---|---|---|
-  | 27 | NK_CALL | 79 | Generic fn calls, builtin method calls |
-  | 24 | NK_IDENT | 68 | Some/None variants, global vars, generics |
-  | 34 | NK_ASSIGN | 17 | Assignments in closure-containing fns |
-  | 57 | NK_AWAIT | 4 | Async/await |
-  | 28 | NK_FIELD_ACCESS | 3 | Non-enum field on unknown type |
-  | 63 | NK_TUPLE_DESTRUCTURE | 2 | Tuple destructuring |
-  | 30 | NK_BLOCK | 2 | Block lowering failures |
-  | 58 | NK_ASYNC_BLOCK | 1 | Async block |
+  | 27 | NK_CALL | 6 | Trait method calls in generic fns (where T: Show) |
+  | 24 | NK_IDENT | 1 | Generic fn call (apply_fn) |
 
-  gen_function cannot be deleted until all test functions compile
-  through MIR. gen_expr cannot be deleted because gen_closure and
-  gen_async_function still depend on it.
+  All remaining failures are in monomorphized generic functions
+  (where/duck-typed method calls). These go through AST codegen's
+  monomorphize_generic_call path. gen_function cannot be deleted
+  until generic monomorphization routes through MIR.
 
   [x] Tag: pre-ast-removal
   [x] Generic monomorphization via MIR (was blocker, fixed)
@@ -299,8 +294,7 @@ Phase 4: Delete AST codegen
   [x] Enum variant access lowering (Color.Red → discriminant constant)
   [x] Remove mir_input_enabled field and dead code
   [x] Simplify gen_function_dispatch (skip fn-level generics)
-  [ ] Fix remaining lowering gaps: Some/None constructors, global vars,
-      generic fn calls, builtin str methods, from_int, closures, async
+  [x] Enum variant constructor lowering (Some/None/Ok/Err via RK_AGGREGATE)
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
   [ ] Route async function codegen through MIR
   [ ] Delete gen_function
