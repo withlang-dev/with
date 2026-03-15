@@ -302,17 +302,16 @@ Phase 4: Delete AST codegen
   [x] Option.is_none() MIR intrinsic lowering + codegen fix
   [x] Generic struct method calls via MIR_INTRINSIC_GENERIC_CALL
 
+  [x] AST pool → sema pool symbol fix in resolve_method_callee_sym
+
   --- Milestone: self-host fully MIR, seed updated (2026-03-15) ---
   Self-host: 0 AST fallbacks. 243/246 tests pass.
-  28 test files still have lowering_failed=1 (fall back silently to AST).
-  Categories: async/await (3), closures (bridge via CK_CLOSURE),
-  generic struct methods (partially fixed), blanket impls, slice patterns,
-  trait impl methods, let-else, embed_file, option_shadow.
-  gen_function cannot be deleted until these are fixed.
+  0 lowering failures across all 246 test files (was 28 files / ~50 fns).
+  Root cause: method_key() expected sema pool symbols but received AST pool
+  symbols. Fixed by translating via sema.pool_intern(pool.resolve_symbol()).
 
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
   [ ] Route async function codegen through MIR
-  [ ] Fix remaining test lowering failures (28 files, ~50 functions)
   [ ] Delete gen_function
   [ ] Delete expression emitters
   [ ] Delete statement emitters
