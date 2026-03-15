@@ -3743,6 +3743,34 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
         return self.get_type_d0(resolved)
     if tk == TY_SLICE:
         return self.get_type_d0(resolved)
+
+    // Type-level NK_INDEX: Vec[i32], HashMap[str, i32], etc.
+    // Create TY_GENERIC_INST so MirLower can find it in the sema snapshot.
+    if tk == TY_STRUCT:
+        if self.ast.kind(expr) == NK_IDENT:
+            let ci_base_sym = self.ast.get_data0(expr)
+            if self.named_types.contains(ci_base_sym):
+                let arg_kind = self.ast.kind(index)
+                var ci_arg_type = 0
+                if arg_kind == NK_IDENT or arg_kind == NK_TYPE_NAMED:
+                    let arg_sym = self.ast.get_data0(index)
+                    let prim = self.primitive_type_by_sym(arg_sym)
+                    if prim != 0:
+                        ci_arg_type = prim
+                    else if self.named_types.contains(arg_sym):
+                        ci_arg_type = self.named_types.get(arg_sym).unwrap()
+                if ci_arg_type > 0:
+                    let ci_cache_key = int_to_string(ci_base_sym) ++ ":" ++ int_to_string(ci_arg_type)
+                    if self.generic_inst_cache.contains(ci_cache_key):
+                        let ci_result = self.generic_inst_cache.get(ci_cache_key).unwrap()
+                        self.typed_expr_types.insert(node, ci_result)
+                        return ci_result
+                    let ci_te_start = self.type_extra.len() as i32
+                    self.type_extra.push(ci_arg_type)
+                    let ci_tid = self.add_type(TY_GENERIC_INST, ci_base_sym, ci_te_start, 1)
+                    self.generic_inst_cache.insert(ci_cache_key, ci_tid)
+                    self.typed_expr_types.insert(node, ci_tid)
+                    return ci_tid
     0
 
 fn Sema.check_slice(self: Sema, node: i32) -> i32:
@@ -5443,6 +5471,11 @@ fn Sema.static_receiver_base_sym(self: Sema, expr: i32) -> i32:
     let kind = self.ast.kind(expr)
     if kind == NK_IDENT or kind == NK_TYPE_NAMED or kind == NK_TYPE_GENERIC:
         return self.ast.get_data0(expr)
+    // Handle Vec[i32].method() — NK_INDEX(NK_IDENT("Vec"), ...)
+    if kind == NK_INDEX:
+        let base = self.ast.get_data0(expr)
+        if self.ast.kind(base) == NK_IDENT:
+            return self.ast.get_data0(base)
     0
 
 fn Sema.static_receiver_type_is_known(self: Sema, expr: i32) -> i32:
