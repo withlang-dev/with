@@ -303,15 +303,21 @@ Phase 4: Delete AST codegen
   [x] Generic struct method calls via MIR_INTRINSIC_GENERIC_CALL
 
   [x] AST pool → sema pool symbol fix in resolve_method_callee_sym
+  [x] MIR fallback audit logging (WITH_MIR_AUDIT=1 [mir-fallback])
+  [x] str.split/Option.filter/map return types in intrinsic_return_type
+  [x] Generic struct methods through MIR (param type fallback from AST)
+  [x] Remove generic_fn_nodes skip in lower_module
 
   --- Milestone: self-host fully MIR, seed updated (2026-03-15) ---
   Self-host: 0 AST fallbacks. 243/246 tests pass.
-  0 lowering failures across all 246 test files (was 28 files / ~50 fns).
-  Root cause: method_key() expected sema pool symbols but received AST pool
-  symbols. Fixed by translating via sema.pool_intern(pool.resolve_symbol()).
+  20 test files still have non-Vec.iter fallbacks (~31 functions).
+  Categories: defer/assign (3 files/12 fns), unresolved calls (6/7),
+  unresolved idents (6/7), async (3/3), field_access (1/1), generic (1/1).
+  Vec.iter (generic impl method) falls back in ~212 test files.
 
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
   [ ] Route async function codegen through MIR
+  [ ] Fix remaining test lowering failures (20 files, ~31 functions)
   [ ] Delete gen_function
   [ ] Delete expression emitters
   [ ] Delete statement emitters
