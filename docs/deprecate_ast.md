@@ -300,9 +300,19 @@ Phase 4: Delete AST codegen
   [x] Sema-derived LLVM type bindings (wl_type_of flattens single-field structs)
   [x] MIR local bridging for generic call arg resolution
   [x] Option.is_none() MIR intrinsic lowering + codegen fix
+  [x] Generic struct method calls via MIR_INTRINSIC_GENERIC_CALL
+
+  --- Milestone: self-host fully MIR, seed updated (2026-03-15) ---
+  Self-host: 0 AST fallbacks. 243/246 tests pass.
+  28 test files still have lowering_failed=1 (fall back silently to AST).
+  Categories: async/await (3), closures (bridge via CK_CLOSURE),
+  generic struct methods (partially fixed), blanket impls, slice patterns,
+  trait impl methods, let-else, embed_file, option_shadow.
+  gen_function cannot be deleted until these are fixed.
+
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
   [ ] Route async function codegen through MIR
-  [ ] Fix 28 test functions with MIR lowering failures (fall back to AST)
+  [ ] Fix remaining test lowering failures (28 files, ~50 functions)
   [ ] Delete gen_function
   [ ] Delete expression emitters
   [ ] Delete statement emitters
