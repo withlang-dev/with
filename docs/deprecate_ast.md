@@ -257,9 +257,9 @@ Phase 1b: Fix MIR codegen support (target: 0 codegen-unsupported)
   [x] Projected type in mir_emit_stmt (store to correct type for field assignments)
 
 Phase 2: Remove support check
-  [ ] Remove mir_function_is_supported
-  [ ] Build succeeds with no fallbacks
-  [ ] Fixpoint holds
+  [x] Remove mir_function_is_supported
+  [x] Build succeeds with no fallbacks
+  [x] Fixpoint holds
 
 Phase 3: Assert no AST usage
   [x] WITH_MIR_STRICT=1 fatal assertion for unexpected fallback
