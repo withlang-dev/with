@@ -2744,26 +2744,62 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
 fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
     let fn_sym = builder.ast.get_data0(fn_node)
-    let sig_idx = builder.sema.get_sig(fn_sym)
+    var sig_idx = builder.sema.get_sig(fn_sym)
+    // If sig not found, try translating fn_sym from AST pool to sema pool.
+    // Sema registers sigs under sema pool symbols, not AST pool symbols.
+    if sig_idx < 0:
+        let sema_fn_sym = builder.sema.pool_intern(builder.pool.resolve_symbol(fn_sym))
+        sig_idx = builder.sema.get_sig(sema_fn_sym)
+    // Also try method_key for methods: "Type.method" → method_key(type_sym, method_sym)
+    if sig_idx < 0:
+        let fn_name = builder.pool.resolve_symbol(fn_sym)
+        // Split "Type.method" on the dot
+        var dot_pos = -1
+        for ci in 0..fn_name.len() as i32:
+            if fn_name.byte_at(ci as i64) == 46:
+                dot_pos = ci
+                break
+        if dot_pos > 0:
+            let type_part = fn_name.slice(0, dot_pos as i64)
+            let method_part = fn_name.slice((dot_pos + 1) as i64, fn_name.len())
+            let sema_type_sym = builder.sema.pool_intern(type_part)
+            let sema_method_sym = builder.sema.pool_intern(method_part)
+            let mk = builder.sema.method_key(sema_type_sym, sema_method_sym)
+            sig_idx = builder.sema.get_sig(mk)
     lower_fn_with_sig(builder, fn_node, sig_idx)
 
 fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody:
     if sig_idx >= 0:
         builder.body.local_type_ids.set_i32(0, builder.sema.sig_return_type(sig_idx))
     else:
-        builder.body.local_type_ids.set_i32(0, builder.sema.ty_void)
+        // No sig — try to get return type from typed_expr_types on body expression
+        let body_expr = builder.ast.get_data1(fn_node)
+        let ret_ty = builder.expr_type(body_expr)
+        if ret_ty != 0 and ret_ty != builder.sema.ty_void:
+            builder.body.local_type_ids.set_i32(0, ret_ty)
+        else:
+            builder.body.local_type_ids.set_i32(0, builder.sema.ty_void)
 
     builder.push_scope()
 
     // Parameters: locals 1..n
     let meta = builder.ast.find_fn_meta(fn_node)
-    if meta >= 0 and sig_idx >= 0:
+    if meta >= 0:
         let param_start = builder.ast.fn_meta_param_start(meta)
         let param_count = builder.ast.fn_meta_param_count(meta)
 
         for i in 0..param_count:
             let p_name = builder.ast.get_extra(param_start + i * 2)
-            let p_ty = builder.sema.sig_param_type(sig_idx, i)
+            var p_ty = 0
+            if sig_idx >= 0:
+                p_ty = builder.sema.sig_param_type(sig_idx, i)
+            else:
+                // No sig — resolve param type from type annotation AST node
+                let p_type_node = builder.ast.get_extra(param_start + i * 2 + 1)
+                if p_type_node > 0:
+                    p_ty = builder.expr_type(p_type_node)
+                if p_ty == 0:
+                    p_ty = builder.sema.ty_i32
             let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
             builder.bind_local(p_name, local_id)
             builder.body.push_stmt(builder.cur_bb, SK_STORAGE_LIVE, local_id, 0, builder.ast.get_start(fn_node))
@@ -2803,11 +2839,10 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
         if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
             // Skip generic fn bodies in this wave.
             continue
-        // Also skip functions registered as generic via impl-level type params
-        // (e.g. impl[T] Trait for Vec[T] methods have fn_meta_tp_count == 0
-        // but are still generic).
-        if sema.generic_fn_nodes.contains(fn_sym):
-            continue
+        // Don't skip generic_fn_nodes functions — let MirLower try them.
+        // Concrete methods on generic types (e.g. Wrapper.get(self: Wrapper[i32]))
+        // will lower successfully. Truly generic methods will fail naturally
+        // with lowering_failed=1 and fall back to AST codegen.
 
         var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
         let body = lower_fn(builder, decl)
