@@ -1002,6 +1002,7 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
     let tail_expr = self.ast.get_data2(node)
 
     self.push_scope()
+    let defer_start = self.defer_nodes.len() as i32
 
     for i in 0..stmt_count:
         let stmt = self.ast.get_extra(stmt_start + i)
@@ -1037,6 +1038,18 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
         let _ = self.lower_expr(stmt)
 
     let result = if tail_expr != 0: self.lower_expr(tail_expr) else: self.unit_operand()
+
+    // Emit defers added in this block scope (LIFO order), before popping scope
+    let defer_end = self.defer_nodes.len() as i32
+    if defer_end > defer_start:
+        var di = defer_end - 1
+        while di >= defer_start:
+            let defer_body = self.defer_nodes.get(di as i64)
+            let _ = self.lower_expr(defer_body)
+            di = di - 1
+        // Remove the block's defers from the stack
+        while self.defer_nodes.len() as i32 > defer_start:
+            self.defer_nodes.pop()
 
     self.pop_scope_inline()
     result
