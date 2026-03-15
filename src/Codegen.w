@@ -4502,29 +4502,34 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
 // ── gen_function_dispatch: MIR-first, AST fallback for unsupported patterns ──
 
 fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
-    // Async functions always use gen_async_function (not MIR-lowered yet)
     let flags = self.pool.get_data2(fn_node)
+    // Async functions use gen_async_function (not MIR-lowered yet)
     if (flags / FN_FLAG_ASYNC) % 2 == 1:
         self.gen_async_function(fn_node)
         return
-    if self.mir_input_enabled != 0:
-        let fn_sym = self.pool.get_data0(fn_node)
-        let body_idx = self.mir_input.find_body(fn_sym)
-        if body_idx >= 0:
-            let body = self.mir_input.bodies.get(body_idx as i64)
-            if body.lowering_failed == 0 and body.block_count() > 0:
-                if self.debug_mir_codegen_enabled():
-                    let fn_name = self.intern.resolve(fn_sym)
-                    with_eprintln("[mir-dispatch] using MIR for: " ++ fn_name)
-                let fv = self.fn_values.get(fn_sym)
-                if fv.is_some():
-                    self.current_function_name_sym = fn_sym
-                    self.debug_enter_function(fn_node, fn_sym, fv.unwrap() as i64)
-                    let fn_span = self.pool.get_start(fn_node)
-                    self.debug_set_location(fn_span)
-                self.gen_function_mir(fn_node, body)
-                self.debug_clear_location()
-                return
+    let fn_sym = self.pool.get_data0(fn_node)
+    // Skip functions with fn-level type params — compiled via monomorphization
+    let meta = self.pool.find_fn_meta(fn_node)
+    if meta >= 0 and self.pool.fn_meta_tp_count(meta) > 0:
+        return
+    let body_idx = self.mir_input.find_body(fn_sym)
+    if body_idx >= 0:
+        let body = self.mir_input.bodies.get(body_idx as i64)
+        if body.lowering_failed == 0 and body.block_count() > 0:
+            if self.debug_mir_codegen_enabled():
+                let fn_name = self.intern.resolve(fn_sym)
+                with_eprintln("[mir-dispatch] using MIR for: " ++ fn_name)
+            let fv = self.fn_values.get(fn_sym)
+            if fv.is_some():
+                self.current_function_name_sym = fn_sym
+                self.debug_enter_function(fn_node, fn_sym, fv.unwrap() as i64)
+                let fn_span = self.pool.get_start(fn_node)
+                self.debug_set_location(fn_span)
+            self.gen_function_mir(fn_node, body)
+            self.debug_clear_location()
+            return
+    // Fallback to AST codegen for functions with MIR lowering failures
+    // or generic impl functions not in MIR
     self.gen_function(fn_node)
 
 fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
