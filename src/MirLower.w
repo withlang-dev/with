@@ -2047,7 +2047,24 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
         return self.lower_intrinsic_call(intrinsic, self_expr, method_sym, arg_start, arg_count, node)
 
     // If resolution returned bare method_sym, the method is unresolved.
+    // For generic struct methods (in generic_fn_nodes), emit MIR_INTRINSIC_GENERIC_CALL
+    // so codegen can monomorphize via gen_call → gen_method_call.
     if callee_sym == method_sym:
+        if self.sema.generic_fn_nodes.contains(callee_sym):
+            let gc_fn_op = self.const_operand(CK_FN, callee_sym, 0)
+            let gc_args: Vec[i32] = Vec.new()
+            let gc_args_id = self.body.new_call_args(gc_args)
+            self.body.set_call_intrinsic(gc_args_id, MIR_INTRINSIC_GENERIC_CALL)
+            self.body.set_call_ast_node(gc_args_id, node)
+            var gc_ret_ty = self.expr_type(node)
+            if gc_ret_ty == 0:
+                gc_ret_ty = self.sema.ty_i32
+            let gc_result = self.new_temp(gc_ret_ty)
+            let gc_place = self.place_for_local(gc_result)
+            let gc_next = self.new_block()
+            self.terminate(TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
+            self.switch_to(gc_next)
+            return self.body.new_operand(OK_COPY, gc_place)
         self.mark_unsupported()
 
     let fn_op = self.lower_var(callee_sym, 0)
