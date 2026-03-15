@@ -275,9 +275,9 @@ Phase 3: Assert no AST usage
 
 Phase 4: Delete AST codegen
   Self-host: 0 fallbacks (all functions through MIR).
-  Tests: 243/246 pass (was 242). 3 remaining:
+  Tests: 244/246 pass. 2 remaining:
   - behav_hashmap: runtime assertion (HashMap codegen issue, pre-existing)
-  - duck_binop_fail/duck_method_fail: expected-failure tests (duck typing errors)
+  - duck_binop_fail: expected-failure test (duck typing error)
 
   Generic function calls now route through MIR via MIR_INTRINSIC_GENERIC_CALL.
   MirLower emits a placeholder call with the AST node; codegen intercepts and
@@ -309,15 +309,23 @@ Phase 4: Delete AST codegen
   [x] Remove generic_fn_nodes skip in lower_module
 
   --- Milestone: self-host fully MIR, seed updated (2026-03-15) ---
-  Self-host: 0 AST fallbacks. 243/246 tests pass.
-  20 test files still have non-Vec.iter fallbacks (~31 functions).
-  Categories: defer/assign (3 files/12 fns), unresolved calls (6/7),
-  unresolved idents (6/7), async (3/3), field_access (1/1), generic (1/1).
-  Vec.iter (generic impl method) falls back in ~212 test files.
+
+  [x] Let-else pattern fix (NK_PAT_IDENT vs raw sym in extras)
+  [x] Vec.join MIR intrinsic (MIR_INTRINSIC_VEC_JOIN)
+  [x] Global variable proxy locals (ensure_global_local + module_constants)
+  [x] Unresolved bare function calls through MIR_INTRINSIC_GENERIC_CALL
+  [x] Inverted guard: generic_fn_nodes → mark_unsupported, else → bridge
+  [x] Disc enum payload variant lowering (RK_AGGREGATE for disc_has_payload)
+  [x] MIR_INTRINSIC_OPT_IS_NONE fix (was checking ==0 instead of !=0)
+  [x] gen_function_dispatch: skip generic struct methods without fn_values
+  [x] Slice pattern lowering (NK_PAT_SLICE element binding + length check)
+  [x] Array GEP in mir_place_ptr and mir_place_projected_type
+
+  --- Milestone: 0 test fallbacks, seed updated (2026-03-15) ---
+  Self-host: 0 AST fallbacks. Tests: 0 AST fallbacks. 244/246 pass.
 
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
   [ ] Route async function codegen through MIR
-  [ ] Fix remaining test lowering failures (20 files, ~31 functions)
   [ ] Delete gen_function
   [ ] Delete expression emitters
   [ ] Delete statement emitters
