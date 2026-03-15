@@ -259,6 +259,37 @@ fn MirBuilder.ident_type(self: MirBuilder, sym: i32) -> i32:
         return self.sema.variant_lookup.get(sym).unwrap() / 65536
     self.sema.ty_void
 
+fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
+    // Resolve NK_INDEX(NK_IDENT("Vec"), type_arg) to a TY_GENERIC_INST.
+    // Used for Vec[i32].new() where we need the full generic instance type.
+    // Sema.check_index creates these during the check pass; we only look up here.
+    let base = self.ast.get_data0(node)
+    if self.ast.kind(base) != NK_IDENT:
+        return 0
+    let base_sym = self.ast.get_data0(base)
+    if not self.sema.named_types.contains(base_sym):
+        return 0
+    // Resolve the type argument (d1 of NK_INDEX)
+    let type_arg_node = self.ast.get_data1(node)
+    if type_arg_node == 0:
+        return 0
+    var arg_type = 0
+    let arg_kind = self.ast.kind(type_arg_node)
+    if arg_kind == NK_IDENT or arg_kind == NK_TYPE_NAMED:
+        let arg_sym = self.ast.get_data0(type_arg_node)
+        let prim = self.sema.primitive_type_by_sym(arg_sym)
+        if prim != 0:
+            arg_type = prim
+        else if self.sema.named_types.contains(arg_sym):
+            arg_type = self.sema.named_types.get(arg_sym).unwrap()
+    if arg_type == 0:
+        return 0
+    // Look up TY_GENERIC_INST from sema cache (created by Sema.check_index)
+    let cache_key = int_to_string(base_sym) ++ ":" ++ int_to_string(arg_type)
+    if self.sema.generic_inst_cache.contains(cache_key):
+        return self.sema.generic_inst_cache.get(cache_key).unwrap()
+    0
+
 fn MirBuilder.type_receiver_type(self: MirBuilder, node: i32) -> i32:
     // Resolve a type-level receiver expression to its base sema type.
     // Used for intrinsic classification (Vec, HashMap, etc.)
@@ -1995,6 +2026,13 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
         let recv_sym = self.ast.get_data0(self_expr)
         if self.sema.named_types.contains(recv_sym):
             is_static_call = true
+    // Also detect Vec[i32].method() as static
+    if self.ast.kind(self_expr) == NK_INDEX:
+        let idx_base = self.ast.get_data0(self_expr)
+        if self.ast.kind(idx_base) == NK_IDENT:
+            let recv_sym = self.ast.get_data0(idx_base)
+            if self.sema.named_types.contains(recv_sym):
+                is_static_call = true
     if not is_static_call:
         arg_nodes.push(self_expr)
     for i in 0..arg_count:
@@ -2027,10 +2065,18 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
         if et_tk == TY_GENERIC_INST:
             ret_type = self.expected_type
     // If ret_type is still a base struct (not generic instance) for a static
-    // constructor, we can't determine the element type. Fall back to AST codegen.
+    // constructor, try to resolve from the NK_INDEX receiver (Vec[i32]).
     if is_static:
         let ret_tk = self.sema.get_type_kind(ret_type)
         if ret_type == 0 or ret_type == self.sema.ty_void or ret_tk == TY_STRUCT:
+            // Try resolving generic instance from NK_INDEX receiver (e.g. Vec[i32])
+            if self.ast.kind(self_expr) == NK_INDEX:
+                let gi_type = self.resolve_index_generic_inst(self_expr)
+                if gi_type > 0:
+                    ret_type = gi_type
+        // Re-check after NK_INDEX resolution
+        let ret_tk2 = self.sema.get_type_kind(ret_type)
+        if ret_type == 0 or ret_type == self.sema.ty_void or ret_tk2 == TY_STRUCT:
             self.mark_unsupported()
     let result_local = self.new_temp(ret_type)
     let result_place = self.place_for_local(result_local)

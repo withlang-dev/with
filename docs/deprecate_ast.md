@@ -274,12 +274,28 @@ Phase 3: Assert no AST usage
   [x] 246/246 tests pass
 
 Phase 4: Delete AST codegen
-  BLOCKED: Generic function monomorphization (monomorphize_generic_call,
-  monomorphize_struct_method) calls gen_expr directly to generate
-  instantiated function bodies. 48/246 tests fail without AST fallback.
-  Need generic monomorphization to work through MIR before deletion.
+  BLOCKED by three remaining AST codegen dependencies:
+
+  1. MIR lowering failures in test files — MirLower fails on NK_CALL
+     (kind=27) for Vec/HashMap/Option static constructors (Vec[i32].new(),
+     etc.) and other constructs in test files. Self-host has 0 failures
+     but test files still fall back to gen_function. ~100+ test functions
+     affected. Root cause: lower_call/lower_method_call can't resolve
+     static type constructors (NK_INDEX receivers like Vec[i32]).
+
+  2. gen_closure depends on gen_expr — MIR delegates closures to AST
+     codegen via CK_CLOSURE constant kind (Codegen.w line ~5068).
+     Can't delete gen_expr until closure lowering goes through MIR.
+
+  3. gen_async_function depends on gen_expr — async function body
+     generation uses gen_expr (Codegen.w line ~12202). Can't delete
+     gen_expr until async lowering goes through MIR.
+
   [x] Tag: pre-ast-removal
-  [x] Generic monomorphization via MIR (blocker)
+  [x] Generic monomorphization via MIR (was blocker, fixed)
+  [ ] Fix MIR lowering for test file patterns (NK_CALL kind=27)
+  [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
+  [ ] Route async function codegen through MIR
   [ ] Delete gen_function
   [ ] Delete expression emitters
   [ ] Delete statement emitters
