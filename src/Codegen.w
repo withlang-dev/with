@@ -4492,6 +4492,10 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
     let meta = self.pool.find_fn_meta(fn_node)
     if meta >= 0 and self.pool.fn_meta_tp_count(meta) > 0:
         return
+    // Skip generic struct methods without fn_values — compiled via monomorphization
+    if self.sema.generic_fn_nodes.contains(fn_sym):
+        if not self.fn_values.get(fn_sym).is_some():
+            return
     let body_idx = self.mir_input.find_body(fn_sym)
     if body_idx >= 0:
         let body = self.mir_input.bodies.get(body_idx as i64)
@@ -4639,6 +4643,11 @@ fn Codegen.mir_get_or_create_local_ptr(self: Codegen, local_id: i32, ty: i64) ->
 
 
 fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32) -> i32:
+    // Arrays use direct numeric index
+    if wl_get_type_kind(agg_ty) == wl_array_type_kind():
+        if field_token >= 0 and field_token < wl_get_array_length(agg_ty) as i32:
+            return field_token
+        return 0 - 1
     if wl_get_type_kind(agg_ty) != wl_struct_type_kind():
         return 0 - 1
     let elem_count = wl_count_struct_elem_types(agg_ty)
@@ -4870,11 +4879,20 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
             let fi = self.mir_resolve_field_index(cur_ty, pd)
             if fi < 0:
                 return 0
-            cur_ptr = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, fi)
-            if fi < wl_count_struct_elem_types(cur_ty):
-                cur_ty = wl_struct_get_type_at(cur_ty, fi)
+            if wl_get_type_kind(cur_ty) == wl_array_type_kind():
+                // Array field access: GEP with [0, index]
+                let arr_elem_ty = wl_get_element_type(cur_ty)
+                let gep_indices: Vec[i64] = Vec.new()
+                gep_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
+                gep_indices.push(wl_const_int(wl_i32_type(self.context), fi as i64, 0))
+                cur_ptr = wl_build_gep(self.builder, cur_ty, cur_ptr, vec_data_i64(&gep_indices), 2)
+                cur_ty = arr_elem_ty
             else:
-                cur_ty = 0
+                cur_ptr = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, fi)
+                if fi < wl_count_struct_elem_types(cur_ty):
+                    cur_ty = wl_struct_get_type_at(cur_ty, fi)
+                else:
+                    cur_ty = 0
         else if pk == 2: // PK_DEREF
             // Load the pointer value, then use it as the new base
             cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
@@ -6269,9 +6287,10 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let tk = wl_get_type_kind(wl_type_of(recv))
         if tk == wl_struct_type_kind():
             let disc = wl_build_extract_value(self.builder, recv, 0)
-            result = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
+            // None = tag 1. is_none → tag != 0.
+            result = wl_build_icmp(self.builder, wl_int_ne(), disc, wl_const_int(wl_type_of(disc), 0, 0))
         else:
-            result = wl_const_int(wl_i1_type(self.context), 1, 0)
+            result = wl_const_int(wl_i1_type(self.context), 0, 0)
 
     else if intrinsic == MIR_INTRINSIC_STR_TRIM:
         let r1 = self.mir_intrinsic_arg(body, args_id, 0)
