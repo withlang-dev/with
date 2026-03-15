@@ -705,6 +705,10 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
         let fn_ty = if type_id != 0: type_id else: self.sema.sig_type_ids.get(sig_idx as i64)
         return self.const_operand(CK_FN, sym, fn_ty)
 
+    // Generic function reference (monomorphized at codegen time)
+    if self.sema.generic_fn_nodes.contains(sym):
+        return self.const_operand(CK_FN, sym, type_id)
+
     // Try module-level constant (const X = 42)
     let const_val = self.try_resolve_module_const_val(sym)
     if const_val != -9223372036854775807:
@@ -2521,6 +2525,26 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 let vc_place = self.place_for_local(vc_tmp)
                 self.body.push_stmt(self.cur_bb, SK_ASSIGN, vc_place, vc_rv, self.ast.get_start(node))
                 return self.body.new_operand(OK_COPY, vc_place)
+        // Generic function call — delegate to codegen's monomorphize_generic_call
+        if self.ast.kind(callee) == NK_IDENT:
+            let gc_sym = self.ast.get_data0(callee)
+            if self.sema.generic_fn_nodes.contains(gc_sym):
+                // Emit a placeholder call. Codegen will intercept via MIR_INTRINSIC_GENERIC_CALL
+                // and route to monomorphize_generic_call using the stored AST call node.
+                let gc_fn_op = self.const_operand(CK_FN, gc_sym, 0)
+                let gc_args: Vec[i32] = Vec.new()
+                let gc_args_id = self.body.new_call_args(gc_args)
+                self.body.set_call_intrinsic(gc_args_id, MIR_INTRINSIC_GENERIC_CALL)
+                self.body.set_call_ast_node(gc_args_id, node)
+                var gc_ret_ty = self.expr_type(node)
+                if gc_ret_ty == 0:
+                    gc_ret_ty = self.sema.ty_i32
+                let gc_result = self.new_temp(gc_ret_ty)
+                let gc_place = self.place_for_local(gc_result)
+                let gc_next = self.new_block()
+                self.terminate(TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
+                self.switch_to(gc_next)
+                return self.body.new_operand(OK_COPY, gc_place)
         return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), self.expr_type(node), node)
 
     if kind == NK_PIPELINE:

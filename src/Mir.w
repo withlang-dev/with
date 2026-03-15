@@ -110,6 +110,7 @@ const MIR_INTRINSIC_VEC_FOLD: i32 = 37
 const MIR_INTRINSIC_VEC_CONTAINS: i32 = 38
 const MIR_INTRINSIC_STR_REPEAT: i32 = 39
 const MIR_INTRINSIC_ARR_LEN: i32 = 40
+const MIR_INTRINSIC_GENERIC_CALL: i32 = 41
 
 // ── Projection kinds ─────────────────────────────────────────────
 
@@ -203,6 +204,8 @@ type MirBody = {
 
     // Call intrinsic markers (parallel to call_arg_starts)
     call_intrinsic_kinds: Vec[i32],
+    // AST call node for generic calls (parallel to call_arg_starts, 0 if N/A)
+    call_ast_nodes: Vec[i32],
 }
 
 type MirModule = {
@@ -368,6 +371,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         call_arg_counts: Vec.new(),
         call_arg_operands: Vec.new(),
         call_intrinsic_kinds: Vec.new(),
+        call_ast_nodes: Vec.new(),
     }
 
     // Local 0 is always the return place.
@@ -532,6 +536,7 @@ fn MirBody.new_call_args(self: &mut MirBody, operands: Vec[i32]) -> i32:
     self.call_arg_starts.push(start)
     self.call_arg_counts.push(count)
     self.call_intrinsic_kinds.push(MIR_INTRINSIC_NONE)
+    self.call_ast_nodes.push(0)
     for i in 0..count:
         self.call_arg_operands.push(operands.get(i as i64))
     id
@@ -544,6 +549,15 @@ fn MirBody.call_intrinsic(self: &MirBody, call_id: i32) -> i32:
     if call_id < 0 or call_id >= self.call_intrinsic_kinds.len() as i32:
         return MIR_INTRINSIC_NONE
     self.call_intrinsic_kinds.get(call_id as i64)
+
+fn MirBody.set_call_ast_node(self: &mut MirBody, call_id: i32, node: i32):
+    if call_id >= 0 and call_id < self.call_ast_nodes.len() as i32:
+        self.call_ast_nodes.set_i32(call_id, node)
+
+fn MirBody.call_ast_node(self: &MirBody, call_id: i32) -> i32:
+    if call_id < 0 or call_id >= self.call_ast_nodes.len() as i32:
+        return 0
+    self.call_ast_nodes.get(call_id as i64)
 
 // ── Query helpers ────────────────────────────────────────────────
 
