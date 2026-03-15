@@ -275,18 +275,15 @@ Phase 3: Assert no AST usage
 
 Phase 4: Delete AST codegen
   Self-host: 0 fallbacks (all functions through MIR).
-  Tests: 7 lowering failures across 4 test files (all in generic fn bodies).
+  Tests: 242/246 pass (was 241). 4 remaining:
+  - behav_hashmap: runtime assertion (HashMap codegen issue, pre-existing)
+  - behav_trait_generic: trait method in generic fn body (sema type binding)
+  - duck_binop_fail/duck_method_fail: expected-failure tests (duck typing errors)
 
-  Remaining MIR lowering gaps (test files only):
-  | Kind | AST node | Count | Examples |
-  |---|---|---|---|
-  | 27 | NK_CALL | 6 | Trait method calls in generic fns (where T: Show) |
-  | 24 | NK_IDENT | 1 | Generic fn call (apply_fn) |
-
-  All remaining failures are in monomorphized generic functions
-  (where/duck-typed method calls). These go through AST codegen's
-  monomorphize_generic_call path. gen_function cannot be deleted
-  until generic monomorphization routes through MIR.
+  Generic function calls now route through MIR via MIR_INTRINSIC_GENERIC_CALL.
+  MirLower emits a placeholder call with the AST node; codegen intercepts and
+  calls monomorphize_generic_call. Simple generics (identity, first_of_two,
+  apply_fn with fn params) all work.
 
   [x] Tag: pre-ast-removal
   [x] Generic monomorphization via MIR (was blocker, fixed)
@@ -295,6 +292,11 @@ Phase 4: Delete AST codegen
   [x] Remove mir_input_enabled field and dead code
   [x] Simplify gen_function_dispatch (skip fn-level generics)
   [x] Enum variant constructor lowering (Some/None/Ok/Err via RK_AGGREGATE)
+  [x] Generic call lowering (MIR_INTRINSIC_GENERIC_CALL → monomorphize)
+  [x] Sema check_ident → typed_expr_types for MIR type propagation
+  [x] sema_type_of_node literal type inference (str/int/float/bool)
+  [x] mir_build_closure_fn_type sema fallback for post-snapshot types
+  [x] gen_function_mir_mono: save/restore mir_bb_values + mir_local_ptrs
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
   [ ] Route async function codegen through MIR
   [ ] Delete gen_function
