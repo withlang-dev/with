@@ -2010,7 +2010,8 @@ fn Codegen.resolve_named_type(self: Codegen, sym: i32) -> i64:
 fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
     if node == 0:
         return 0
-    if self.pool.kind(node) == NK_IDENT:
+    let nk = self.pool.kind(node)
+    if nk == NK_IDENT:
         let sym = self.pool.get_data0(node)
         let opt = self.local_sema_types.get(sym)
         if opt.is_some():
@@ -2020,6 +2021,20 @@ fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
             let canon_opt = self.local_sema_types.get(canon)
             if canon_opt.is_some():
                 return canon_opt.unwrap()
+    // Literal types
+    if nk == NK_STRING_LIT:
+        return self.sema.ty_str
+    if nk == NK_INT_LIT:
+        return self.sema.ty_i32
+    if nk == NK_FLOAT_LIT:
+        return self.sema.ty_f64
+    if nk == NK_BOOL_LIT:
+        return self.sema.ty_bool
+    // Fall back to sema's typed_expr_types (populated by check_ident)
+    if self.sema.typed_expr_types.contains(node):
+        let typed = self.sema.typed_expr_types.get(node).unwrap()
+        if typed > 0:
+            return typed
     0
 
 // Extract LLVM type of the i'th generic arg from a sema TY_GENERIC_INST type.
@@ -4577,19 +4592,32 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     0
 
 fn Codegen.mir_build_closure_fn_type(self: Codegen, sema_ty: i32) -> i64:
-    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
-    let tk = self.mir_input.mir_get_type_kind(resolved)
+    var resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    // Type created after MIR snapshot — read from sema directly
+    if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+        resolved = self.sema.resolve_alias(resolved)
+        tk = self.sema.get_type_kind(resolved)
     if tk != TY_FN:
         return 0
-    let extra_start = self.mir_input.mir_get_type_d0(resolved)
-    let param_count = self.mir_input.mir_get_type_d1(resolved)
-    let ret_ty_id = self.mir_input.mir_get_type_d2(resolved)
+    var extra_start = self.mir_input.mir_get_type_d0(resolved)
+    var param_count = self.mir_input.mir_get_type_d1(resolved)
+    var ret_ty_id = self.mir_input.mir_get_type_d2(resolved)
+    // Fallback to sema for types beyond snapshot
+    if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        extra_start = self.sema.get_type_d0(resolved)
+        param_count = self.sema.get_type_d1(resolved)
+        ret_ty_id = self.sema.get_type_d2(resolved)
     let ret_ty = self.mir_sema_type_to_llvm(ret_ty_id)
     let llvm_ret = if ret_ty != 0: ret_ty else: wl_void_type(self.context)
     let param_types: Vec[i64] = Vec.new()
     param_types.push(wl_ptr_type(self.context))
     for pi in 0..param_count:
-        let p_sema_ty = self.mir_input.mir_get_type_extra(extra_start + pi)
+        var p_sema_ty = self.mir_input.mir_get_type_extra(extra_start + pi)
+        if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+            let te_idx = extra_start + pi
+            if te_idx >= 0 and te_idx < self.sema.type_extra.len() as i32:
+                p_sema_ty = self.sema.type_extra.get(te_idx as i64)
         let p_llvm_ty = self.mir_sema_type_to_llvm(p_sema_ty)
         if p_llvm_ty != 0:
             param_types.push(p_llvm_ty)
@@ -6595,6 +6623,29 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     let mir_intrinsic = body.call_intrinsic(args_id)
     if self.debug_mir_codegen_enabled():
         with_eprintln("[mir-call-pre] intrinsic=" ++ int_to_string(mir_intrinsic) ++ " callee_op=" ++ int_to_string(callee_operand) ++ " args_id=" ++ int_to_string(args_id) ++ " dest=" ++ int_to_string(dest_place))
+    if mir_intrinsic == MIR_INTRINSIC_GENERIC_CALL:
+        let gc_node = body.call_ast_node(args_id)
+        if gc_node > 0:
+            // Save MIR codegen's builder position — gen_call may reposition
+            let gc_saved_bb = wl_get_insert_block(self.builder)
+            let gc_result = self.gen_call(gc_node)
+            // Restore builder position to the caller's BB
+            wl_position_at_end(self.builder, gc_saved_bb)
+            // Store result in dest_place — use actual return type, not MIR placeholder type
+            if dest_place >= 0 and gc_result != 0:
+                let gc_ret_ty = wl_type_of(gc_result)
+                if gc_ret_ty != wl_void_type(self.context):
+                    // Update the local's alloca to match the actual return type
+                    let gc_local = body.place_locals.get(dest_place as i64)
+                    let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                    wl_build_store(self.builder, gc_result, gc_alloca)
+                    self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                    self.mir_local_types.insert(gc_local, gc_ret_ty)
+            // Branch to next BB
+            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                wl_build_br(self.builder, gc_next_val)
+            return true
     if mir_intrinsic != MIR_INTRINSIC_NONE:
         return self.mir_emit_intrinsic_call(body, mir_intrinsic, args_id, dest_place, next_bb)
     let callee = self.mir_eval_operand(body, callee_operand, 0)
@@ -7165,6 +7216,10 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     self.tailrec_param_allocas = fresh_tail_allocas
     self.reset_loop_state()
 
+    let saved_mir_locals = self.mir_local_ptrs
+    let saved_mir_local_types = self.mir_local_types
+    let saved_mir_bbs = self.mir_bb_values
+    let saved_mir_default_unreachable_bbs = self.mir_default_unreachable_bbs
     let fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_bbs: Vec[i64] = Vec.new()
@@ -7311,6 +7366,10 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     self.tailrec_fn_sym = saved_tail_sym
     self.tailrec_param_allocas = saved_tail_allocas
     self.restore_loop_state(saved_loops)
+    self.mir_local_ptrs = saved_mir_locals
+    self.mir_local_types = saved_mir_local_types
+    self.mir_bb_values = saved_mir_bbs
+    self.mir_default_unreachable_bbs = saved_mir_default_unreachable_bbs
     if saved_bb != 0:
         wl_position_at_end(self.builder, saved_bb)
 

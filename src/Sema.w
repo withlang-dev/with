@@ -2580,7 +2580,8 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
         if self.named_types.contains(sym):
             return self.named_types.get(sym).unwrap()
         // Self is resolved at codegen time
-        if self.pool_resolve(sym) == "Self":
+        let sym_name = self.pool_resolve(sym)
+        if sym_name == "Self":
             return 0
         if self.collecting_types != 0:
             return 0
@@ -2843,7 +2844,8 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
         else:
             saved_had.push(0)
             saved_named.push(0)
-        self.named_types.insert(tp_sym, tp_sema_tys.get(ti as i64))
+        let tp_sema_ty = tp_sema_tys.get(ti as i64)
+        self.named_types.insert(tp_sym, tp_sema_ty)
 
     // Resolve param types with concrete substitutions
     let param_start = self.ast.fn_meta_param_start(meta)
@@ -3334,6 +3336,7 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
                     " node_kind=" ++ int_to_string(self.ast.kind(node))
                 )
             self.emit_error("use of moved value", node)
+        self.typed_expr_types.insert(node, tid)
         return tid
 
     // Check function names
