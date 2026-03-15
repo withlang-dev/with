@@ -399,8 +399,18 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                 return self.sema.ty_void
             return self.sema.ty_void
         if type_name == "Option":
-            if method_name == "is_some": return self.sema.ty_bool
+            if method_name == "is_some" or method_name == "is_none": return self.sema.ty_bool
             if method_name == "unwrap":
+                if tk == TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 0)
+            if method_name == "filter":
+                return recv_type
+            if method_name == "map" or method_name == "and_then":
+                return recv_type
+            if method_name == "unwrap_or":
+                if tk == TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 0)
+            if method_name == "unwrap_or_else":
                 if tk == TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
             return self.sema.ty_void
@@ -421,6 +431,14 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
         if method_name == "trim" or method_name == "to_upper" or method_name == "to_lower" or method_name == "replace":
             return self.sema.ty_str
         if method_name == "index_of": return self.sema.ty_i64
+        if method_name == "split":
+            // str.split() returns Vec[str]
+            let vec_sym = self.sema.pool_intern("Vec")
+            if self.sema.named_types.contains(vec_sym):
+                let te_start = self.sema.type_extra.len() as i32
+                self.sema.type_extra.push(self.sema.ty_str)
+                return self.sema.add_type(TY_GENERIC_INST, vec_sym, te_start, 1)
+            return self.sema.ty_void
         return self.sema.ty_void
     if tk == TY_ARRAY:
         if method_name == "len": return self.sema.ty_i32

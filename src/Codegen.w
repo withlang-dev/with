@@ -4508,7 +4508,11 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
             self.gen_function_mir(fn_node, body)
             self.debug_clear_location()
             return
-    // Fallback to AST codegen
+    // Fallback to AST codegen for functions without MIR bodies
+    let mir_audit = with_getenv_str("WITH_MIR_AUDIT")
+    if mir_audit.len() > 0 and mir_audit != "0":
+        let fn_name = self.intern.resolve(fn_sym)
+        with_eprintln("[mir-fallback] " ++ fn_name)
     self.gen_function(fn_node)
 
 fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
@@ -6637,11 +6641,9 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let gl_ty_opt = self.mir_local_types.get(gli)
                         if gl_ty_opt.is_some():
                             self.local_types.insert(gl_sym, gl_ty_opt.unwrap() as i64)
-            // Save MIR codegen's builder position — gen_call may reposition
-            let gc_saved_bb = wl_get_insert_block(self.builder)
             let gc_result = self.gen_call(gc_node)
-            // Restore builder position to the caller's BB
-            wl_position_at_end(self.builder, gc_saved_bb)
+            // gen_call may have created basic blocks (e.g. Option.filter's if-else).
+            // Continue from wherever gen_call left the builder — do NOT restore.
             // Store result in dest_place — use actual return type, not MIR placeholder type
             if dest_place >= 0 and gc_result != 0:
                 let gc_ret_ty = wl_type_of(gc_result)
