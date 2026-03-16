@@ -7030,55 +7030,134 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                                 wl_build_br(self.builder, gc_next_val)
                             return true
 
-            // Option method calls (filter, map, etc.) — bridge through gen_method_call
-            // These methods create complex control flow (if-else for Some/None) that
-            // requires the full gen_method_call dispatch.
+            // Disc enum variant constructor with payload: Msg.Move(10, 20)
+            if self.pool.kind(gc_callee_field) == NK_FIELD_ACCESS:
+                let gc_vc_self = self.pool.get_data0(gc_callee_field)
+                let gc_vc_variant_sym = self.pool.get_data1(gc_callee_field)
+                if self.pool.kind(gc_vc_self) == NK_IDENT:
+                    let gc_vc_type_sym = self.pool.get_data0(gc_vc_self)
+                    var gc_vc_is_enum = false
+                    let gc_vc_de_opt = self.disc_enum_type_map.get(gc_vc_type_sym)
+                    if gc_vc_de_opt.is_some():
+                        let gc_vc_de_idx = gc_vc_de_opt.unwrap()
+                        let gc_vc_hp = self.disc_enum_has_payload.get(gc_vc_de_idx as i64)
+                        if gc_vc_hp != 0:
+                            gc_vc_is_enum = true
+                    if not gc_vc_is_enum:
+                        let gc_vc_e_opt = self.enum_type_map.get(gc_vc_type_sym)
+                        if gc_vc_e_opt.is_some():
+                            gc_vc_is_enum = true
+                    if gc_vc_is_enum:
+                        let gc_vc_mir_start = body.call_arg_starts.get(args_id as i64)
+                        let gc_vc_mir_count = body.call_arg_counts.get(args_id as i64)
+                        let gc_vc_args: Vec[i64] = Vec.new()
+                        for gc_vc_i in 0..gc_vc_mir_count:
+                            let gc_vc_op = body.call_arg_operands.get((gc_vc_mir_start + gc_vc_i) as i64)
+                            gc_vc_args.push(self.mir_eval_operand(body, gc_vc_op, 0))
+                        let gc_result = self.gen_enum_variant_call_val(gc_vc_variant_sym, gc_vc_args, gc_vc_mir_count)
+                        if dest_place >= 0 and gc_result != 0:
+                            let gc_ret_ty = wl_type_of(gc_result)
+                            if gc_ret_ty != wl_void_type(self.context):
+                                let gc_local = body.place_locals.get(dest_place as i64)
+                                let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                                wl_build_store(self.builder, gc_result, gc_alloca)
+                                self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                                self.mir_local_types.insert(gc_local, gc_ret_ty)
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                            wl_build_br(self.builder, gc_next_val)
+                        return true
+
+            // Method calls on Option/Result/other types — dispatch directly
             if self.pool.kind(gc_callee_field) == NK_FIELD_ACCESS:
                 let gc_om_mir_start = body.call_arg_starts.get(args_id as i64)
                 let gc_om_mir_count = body.call_arg_counts.get(args_id as i64)
-                let gc_om_self_expr = self.pool.get_data0(gc_callee_field)
+                let gc_om_method_sym = self.pool.get_data1(gc_callee_field)
+                let gc_om_method = self.intern.resolve(gc_om_method_sym)
                 let gc_om_as = self.pool.get_data1(gc_node)
                 let gc_om_ac = self.pool.get_data2(gc_node)
-                // Bridge MIR locals into local_allocas
-                let gc_om_lc = body.local_names.len() as i32
-                for gc_om_li in 0..gc_om_lc:
-                    let gc_om_sym = body.local_names.get(gc_om_li as i64)
-                    if gc_om_sym > 0:
-                        let gc_om_ptr = self.mir_local_ptrs.get(gc_om_li)
-                        if gc_om_ptr.is_some():
-                            self.local_allocas.insert(gc_om_sym, gc_om_ptr.unwrap() as i64)
-                            let gc_om_ty = self.mir_local_types.get(gc_om_li)
-                            if gc_om_ty.is_some():
-                                self.local_types.insert(gc_om_sym, gc_om_ty.unwrap() as i64)
-                // Cache non-closure MIR args for gen_expr interception
+                // Eval receiver from MIR
                 if gc_om_mir_count > 0:
-                    // Cache receiver
                     let gc_om_recv_op = body.call_arg_operands.get(gc_om_mir_start as i64)
                     let gc_om_recv_v = self.mir_eval_operand(body, gc_om_recv_op, 0)
-                    self.pre_eval_cache.insert(gc_om_self_expr, gc_om_recv_v)
-                    // Cache method args (skip closures)
-                    for gc_om_i in 0..gc_om_ac:
-                        let gc_om_arg_node = self.pool.get_extra(gc_om_as + gc_om_i)
-                        if self.pool.kind(gc_om_arg_node) != NK_CLOSURE:
-                            if gc_om_i + 1 < gc_om_mir_count:
-                                let gc_om_op = body.call_arg_operands.get((gc_om_mir_start + 1 + gc_om_i) as i64)
-                                let gc_om_val = self.mir_eval_operand(body, gc_om_op, 0)
-                                self.pre_eval_cache.insert(gc_om_arg_node, gc_om_val)
-                let gc_result = self.gen_call(gc_node)
-                let gc_om_fresh: HashMap[i32, i64] = HashMap.new()
-                self.pre_eval_cache = gc_om_fresh
-                if dest_place >= 0 and gc_result != 0:
-                    let gc_ret_ty = wl_type_of(gc_result)
-                    if gc_ret_ty != wl_void_type(self.context):
-                        let gc_local = body.place_locals.get(dest_place as i64)
-                        let gc_alloca = self.create_entry_alloca(gc_ret_ty)
-                        wl_build_store(self.builder, gc_result, gc_alloca)
-                        self.mir_local_ptrs.insert(gc_local, gc_alloca)
-                        self.mir_local_types.insert(gc_local, gc_ret_ty)
-                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
-                    let gc_next_val = self.mir_bb_values.get(next_bb as i64)
-                    wl_build_br(self.builder, gc_next_val)
-                return true
+                    let gc_om_recv_ty = wl_type_of(gc_om_recv_v)
+                    // Check if receiver is an Option type
+                    let gc_om_opt_payload = self.find_option_payload_type_by_llvm(gc_om_recv_ty)
+                    if gc_om_opt_payload != 0:
+                        // Eval first arg (closure or value) — gen_closure for closures
+                        var gc_om_arg_val: i64 = 0
+                        if gc_om_ac > 0:
+                            let gc_om_arg_node = self.pool.get_extra(gc_om_as)
+                            if self.pool.kind(gc_om_arg_node) == NK_CLOSURE:
+                                // Bridge locals for gen_closure
+                                let gc_om_lc = body.local_names.len() as i32
+                                for gc_om_li in 0..gc_om_lc:
+                                    let gc_om_sym = body.local_names.get(gc_om_li as i64)
+                                    if gc_om_sym > 0:
+                                        let gc_om_ptr = self.mir_local_ptrs.get(gc_om_li)
+                                        if gc_om_ptr.is_some():
+                                            self.local_allocas.insert(gc_om_sym, gc_om_ptr.unwrap() as i64)
+                                            let gc_om_ty = self.mir_local_types.get(gc_om_li)
+                                            if gc_om_ty.is_some():
+                                                self.local_types.insert(gc_om_sym, gc_om_ty.unwrap() as i64)
+                                gc_om_arg_val = self.gen_closure(gc_om_arg_node)
+                            else if gc_om_mir_count > 1:
+                                let gc_om_arg_op = body.call_arg_operands.get((gc_om_mir_start + 1) as i64)
+                                gc_om_arg_val = self.mir_eval_operand(body, gc_om_arg_op, 0)
+                        let gc_result = self.gen_option_method_val(gc_om_method, gc_om_recv_v, gc_om_arg_val, gc_om_ac)
+                        if dest_place >= 0 and gc_result != 0:
+                            let gc_ret_ty = wl_type_of(gc_result)
+                            if gc_ret_ty != wl_void_type(self.context):
+                                let gc_local = body.place_locals.get(dest_place as i64)
+                                let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                                wl_build_store(self.builder, gc_result, gc_alloca)
+                                self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                                self.mir_local_types.insert(gc_local, gc_ret_ty)
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                            wl_build_br(self.builder, gc_next_val)
+                        return true
+
+            // Fallback: trait method call on concrete type (e.g. self.show() in blanket impl)
+            if self.pool.kind(gc_callee_field) == NK_FIELD_ACCESS:
+                let gc_fb_method_sym = self.pool.get_data1(gc_callee_field)
+                let gc_fb_method = self.intern.resolve(gc_fb_method_sym)
+                let gc_fb_mir_start = body.call_arg_starts.get(args_id as i64)
+                let gc_fb_mir_count = body.call_arg_counts.get(args_id as i64)
+                // Try qualified name: OwnerType.method
+                if self.current_method_owner_sym != 0 and gc_fb_mir_count > 0:
+                    let gc_fb_owner = self.intern.resolve(self.current_method_owner_sym)
+                    let gc_fb_qualified = gc_fb_owner ++ "." ++ gc_fb_method
+                    let gc_fb_fn_sym = self.intern.intern(gc_fb_qualified)
+                    let gc_fb_fv = self.fn_values.get(gc_fb_fn_sym)
+                    let gc_fb_ft = self.fn_fn_types.get(gc_fb_fn_sym)
+                    if gc_fb_fv.is_some() and gc_fb_ft.is_some():
+                        let gc_fb_args: Vec[i64] = Vec.new()
+                        for gc_fb_i in 0..gc_fb_mir_count:
+                            let gc_fb_op = body.call_arg_operands.get((gc_fb_mir_start + gc_fb_i) as i64)
+                            gc_fb_args.push(self.mir_eval_operand(body, gc_fb_op, 0))
+                        // Check if first param is ref (pointer)
+                        let gc_fb_is_ref = self.fn_ref_param_starts.get(gc_fb_fn_sym).is_some()
+                        if gc_fb_is_ref and gc_fb_mir_count > 0:
+                            let gc_fb_recv = gc_fb_args.get(0)
+                            let gc_fb_recv_ty = wl_type_of(gc_fb_recv)
+                            if wl_get_type_kind(gc_fb_recv_ty) != wl_pointer_type_kind():
+                                let gc_fb_alloca = self.create_entry_alloca(gc_fb_recv_ty)
+                                wl_build_store(self.builder, gc_fb_recv, gc_fb_alloca)
+                                gc_fb_args.set_i64(0, gc_fb_alloca)
+                        let gc_result = wl_build_call(self.builder, gc_fb_ft.unwrap() as i64, gc_fb_fv.unwrap() as i64, vec_data_i64(&gc_fb_args), gc_fb_mir_count)
+                        if dest_place >= 0 and gc_result != 0:
+                            let gc_ret_ty = wl_type_of(gc_result)
+                            if gc_ret_ty != wl_void_type(self.context):
+                                let gc_local = body.place_locals.get(dest_place as i64)
+                                let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                                wl_build_store(self.builder, gc_result, gc_alloca)
+                                self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                                self.mir_local_types.insert(gc_local, gc_ret_ty)
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                            wl_build_br(self.builder, gc_next_val)
+                        return true
 
             // All patterns should be handled above. If we reach here, it's a MIR gap.
             let gc_name = if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: "?"
@@ -11470,6 +11549,66 @@ fn Codegen.gen_enum_variant_call(self: Codegen, variant_sym: i32, args_start: i3
             return wl_build_load(self.builder, enum_ty, alloca)
     0
 
+fn Codegen.build_variant_payload_val(self: Codegen, payload_ty: i64, args: Vec[i64], arg_count: i32) -> i64:
+    if arg_count <= 0:
+        return wl_get_undef(wl_i32_type(self.context))
+    if payload_ty == 0:
+        return args.get(0)
+    if arg_count == 1:
+        return self.coerce_value_to_type(args.get(0), payload_ty)
+    if wl_get_type_kind(payload_ty) == wl_struct_type_kind():
+        var payload = wl_get_undef(payload_ty)
+        let field_count = wl_count_struct_elem_types(payload_ty)
+        var ai = 0
+        while ai < arg_count and ai < field_count:
+            let field_ty = wl_struct_get_type_at(payload_ty, ai)
+            let coerced = self.coerce_value_to_type(args.get(ai as i64), field_ty)
+            payload = wl_build_insert_value(self.builder, payload, coerced, ai)
+            ai = ai + 1
+        return payload
+    self.coerce_value_to_type(args.get(0), payload_ty)
+
+fn Codegen.gen_enum_variant_call_val(self: Codegen, variant_sym: i32, args: Vec[i64], arg_count: i32) -> i64:
+    let variant_name = self.intern.resolve(variant_sym)
+    for ei in 0..self.enum_llvm_types.len() as i32:
+        let v_start = self.enum_variant_starts.get(ei as i64)
+        let v_count = self.enum_variant_counts.get(ei as i64)
+        for vi in 0..v_count:
+            let stored_sym = self.enum_variant_names.get((v_start + vi) as i64)
+            if stored_sym != variant_sym:
+                let stored_name = self.intern.resolve(stored_sym)
+                if stored_name != variant_name:
+                    continue
+            let enum_ty = self.enum_llvm_types.get(ei as i64)
+            let alloca = wl_build_alloca(self.builder, enum_ty)
+            wl_build_store(self.builder, self.build_default_value(enum_ty), alloca)
+            let tag_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 0)
+            var tag_val: i64 = 0
+            let enum_sym_opt = self.enum_by_llvm.get(enum_ty)
+            var is_disc = false
+            if enum_sym_opt.is_some():
+                let de_opt = self.disc_enum_type_map.get(enum_sym_opt.unwrap())
+                if de_opt.is_some():
+                    is_disc = true
+                    let de_idx = de_opt.unwrap()
+                    let dv_start = self.disc_enum_variant_starts.get(de_idx as i64)
+                    let disc_val = self.disc_enum_variant_values.get((dv_start + vi) as i64)
+                    let repr_ty = self.disc_enum_repr_types.get(de_idx as i64)
+                    tag_val = wl_const_int(repr_ty, disc_val as i64, 1)
+            if not is_disc:
+                tag_val = wl_const_int(wl_i32_type(self.context), vi as i64, 0)
+            wl_build_store(self.builder, tag_val, tag_ptr)
+            if arg_count > 0:
+                let payload_ty = self.enum_variant_payloads.get((v_start + vi) as i64)
+                let elem_count = wl_count_struct_elem_types(enum_ty)
+                if payload_ty != 0 and elem_count > 1:
+                    let payload = self.build_variant_payload_val(payload_ty, args, arg_count)
+                    let payload_ptr = wl_build_struct_gep(self.builder, enum_ty, alloca, 1)
+                    let cast_ptr = wl_build_bitcast(self.builder, payload_ptr, wl_ptr_type(self.context))
+                    wl_build_store(self.builder, payload, cast_ptr)
+            return wl_build_load(self.builder, enum_ty, alloca)
+    0
+
 // ── Struct literal ────────────────────────────────────────────────
 
 fn Codegen.gen_struct_lit(self: Codegen, node: i32) -> i64:
@@ -14018,6 +14157,12 @@ fn Codegen.make_ptr_vec(self: Codegen) -> Vec[i64]:
 // ── Option method dispatch ────────────────────────────────────────
 
 fn Codegen.gen_option_method(self: Codegen, method: str, obj: i64, args_start: i32, arg_count: i32) -> i64:
+    var pre_arg: i64 = 0
+    if arg_count > 0:
+        pre_arg = self.gen_expr(self.pool.get_extra(args_start))
+    self.gen_option_method_val(method, obj, pre_arg, arg_count)
+
+fn Codegen.gen_option_method_val(self: Codegen, method: str, obj: i64, arg_val: i64, arg_count: i32) -> i64:
     let i32_ty = wl_i32_type(self.context)
     let obj_ty = wl_type_of(obj)
 
@@ -14048,7 +14193,7 @@ fn Codegen.gen_option_method(self: Codegen, method: str, obj: i64, args_start: i
         wl_build_cond_br(self.builder, is_some, then_bb, panic_bb)
         wl_position_at_end(self.builder, panic_bb)
         // Print the error message first
-        let msg = self.gen_expr(self.pool.get_extra(args_start))
+        let msg = arg_val
         let printf_fn = self.ensure_printf_declared()
         let printf_ty = self.get_printf_fn_type()
         self.gen_print_value(msg, printf_fn, printf_ty)
@@ -14057,12 +14202,11 @@ fn Codegen.gen_option_method(self: Codegen, method: str, obj: i64, args_start: i
         wl_position_at_end(self.builder, then_bb)
         return wl_build_extract_value(self.builder, obj, 1)
     if method == "unwrap_or" and arg_count > 0:
-        let default_val = self.gen_expr(self.pool.get_extra(args_start))
         let payload = wl_build_extract_value(self.builder, obj, 1)
-        return wl_build_select(self.builder, is_some, payload, default_val)
+        return wl_build_select(self.builder, is_some, payload, arg_val)
     if method == "map" and arg_count > 0:
         // opt.map(fn) → if Some(x) then Some(fn(x)) else None
-        let fn_val = self.gen_expr(self.pool.get_extra(args_start))
+        let fn_val = arg_val
         let then_bb = wl_append_bb(self.context, self.current_function, "opt.some")
         let else_bb = wl_append_bb(self.context, self.current_function, "opt.none")
         let merge_bb = wl_append_bb(self.context, self.current_function, "opt.merge")
@@ -14096,7 +14240,7 @@ fn Codegen.gen_option_method(self: Codegen, method: str, obj: i64, args_start: i
         return phi
     if method == "and_then" and arg_count > 0:
         // opt.and_then(fn) → if Some(x) then fn(x) else None
-        let fn_val = self.gen_expr(self.pool.get_extra(args_start))
+        let fn_val = arg_val
         let then_bb = wl_append_bb(self.context, self.current_function, "at.some")
         let else_bb = wl_append_bb(self.context, self.current_function, "at.none")
         let merge_bb = wl_append_bb(self.context, self.current_function, "at.merge")
@@ -14127,7 +14271,7 @@ fn Codegen.gen_option_method(self: Codegen, method: str, obj: i64, args_start: i
         return phi
     if method == "filter" and arg_count > 0:
         // opt.filter(pred) → if Some(x) and pred(x) then Some(x) else None
-        let filt_closure_val = self.gen_expr(self.pool.get_extra(args_start))
+        let filt_closure_val = arg_val
         let filt_closure_ty = wl_type_of(filt_closure_val)
         var filt_fn_ptr = filt_closure_val
         var filt_ctx_ptr: i64 = 0
