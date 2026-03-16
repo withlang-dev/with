@@ -439,6 +439,7 @@ type Codegen = {
 
     // Trait info: sym → index into trait_* arrays
     trait_map: HashMap[i32, i32],
+    trait_idx_syms: Vec[i32],
     trait_vtable_types: Vec[i64],
     trait_method_starts: Vec[i32],
     trait_method_counts: Vec[i32],
@@ -680,6 +681,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         drop_fn_values: HashMap.new(),
         drop_fn_types: HashMap.new(),
         trait_map: HashMap.new(),
+        trait_idx_syms: Vec.new(),
         trait_vtable_types: Vec.new(),
         trait_method_starts: Vec.new(),
         trait_method_counts: Vec.new(),
@@ -3766,6 +3768,7 @@ fn Codegen.collect_trait_info(self: Codegen, trait_node: i32):
     self.trait_method_starts.push(method_start)
     self.trait_method_counts.push(method_count)
     self.trait_map.insert(name_sym, trait_idx)
+    self.trait_idx_syms.push(name_sym)
     self.trait_decl_nodes.insert(name_sym, trait_node)
 
 fn Codegen.find_trait_method_offset(self: Codegen, trait_idx: i32, method_sym: i32) -> i32:
@@ -7124,27 +7127,44 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 let gc_fb_method = self.intern.resolve(gc_fb_method_sym)
                 let gc_fb_mir_start = body.call_arg_starts.get(args_id as i64)
                 let gc_fb_mir_count = body.call_arg_counts.get(args_id as i64)
-                // Try qualified name: OwnerType.method
-                if self.current_method_owner_sym != 0 and gc_fb_mir_count > 0:
+                // Try qualified name lookups: OwnerType.method, then TraitName.method
+                var gc_fb_fn_sym = 0
+                if self.current_method_owner_sym != 0:
                     let gc_fb_owner = self.intern.resolve(self.current_method_owner_sym)
-                    let gc_fb_qualified = gc_fb_owner ++ "." ++ gc_fb_method
-                    let gc_fb_fn_sym = self.intern.intern(gc_fb_qualified)
+                    let gc_fb_q1 = gc_fb_owner ++ "." ++ gc_fb_method
+                    gc_fb_fn_sym = self.intern.intern(gc_fb_q1)
+                    if not self.fn_values.get(gc_fb_fn_sym).is_some():
+                        gc_fb_fn_sym = 0
+                // Search all traits for a method with this name
+                if gc_fb_fn_sym == 0:
+                    for gc_fb_ti in 0..self.trait_idx_syms.len() as i32:
+                        let gc_fb_t_sym = self.trait_idx_syms.get(gc_fb_ti as i64)
+                        let gc_fb_m_start = self.trait_method_starts.get(gc_fb_ti as i64)
+                        let gc_fb_m_count = self.trait_method_counts.get(gc_fb_ti as i64)
+                        for gc_fb_mi in 0..gc_fb_m_count:
+                            let gc_fb_m_name = self.trait_method_names.get((gc_fb_m_start + gc_fb_mi) as i64)
+                            if self.intern.resolve(gc_fb_m_name) == gc_fb_method:
+                                let gc_fb_t_name = self.intern.resolve(gc_fb_t_sym)
+                                let gc_fb_q2 = gc_fb_t_name ++ "." ++ gc_fb_method
+                                let gc_fb_try_sym = self.intern.intern(gc_fb_q2)
+                                if self.fn_values.get(gc_fb_try_sym).is_some():
+                                    gc_fb_fn_sym = gc_fb_try_sym
+                if gc_fb_fn_sym != 0 and gc_fb_mir_count > 0:
                     let gc_fb_fv = self.fn_values.get(gc_fb_fn_sym)
                     let gc_fb_ft = self.fn_fn_types.get(gc_fb_fn_sym)
                     if gc_fb_fv.is_some() and gc_fb_ft.is_some():
+                        let gc_fb_is_ref = self.fn_ref_param_starts.get(gc_fb_fn_sym).is_some()
                         let gc_fb_args: Vec[i64] = Vec.new()
                         for gc_fb_i in 0..gc_fb_mir_count:
                             let gc_fb_op = body.call_arg_operands.get((gc_fb_mir_start + gc_fb_i) as i64)
-                            gc_fb_args.push(self.mir_eval_operand(body, gc_fb_op, 0))
-                        // Check if first param is ref (pointer)
-                        let gc_fb_is_ref = self.fn_ref_param_starts.get(gc_fb_fn_sym).is_some()
-                        if gc_fb_is_ref and gc_fb_mir_count > 0:
-                            let gc_fb_recv = gc_fb_args.get(0)
-                            let gc_fb_recv_ty = wl_type_of(gc_fb_recv)
-                            if wl_get_type_kind(gc_fb_recv_ty) != wl_pointer_type_kind():
-                                let gc_fb_alloca = self.create_entry_alloca(gc_fb_recv_ty)
-                                wl_build_store(self.builder, gc_fb_recv, gc_fb_alloca)
-                                gc_fb_args.set_i64(0, gc_fb_alloca)
+                            let gc_fb_val = self.mir_eval_operand(body, gc_fb_op, 0)
+                            if gc_fb_i == 0 and gc_fb_is_ref:
+                                if wl_get_type_kind(wl_type_of(gc_fb_val)) != wl_pointer_type_kind():
+                                    let gc_fb_alloca = self.create_entry_alloca(wl_type_of(gc_fb_val))
+                                    wl_build_store(self.builder, gc_fb_val, gc_fb_alloca)
+                                    gc_fb_args.push(gc_fb_alloca)
+                                    continue
+                            gc_fb_args.push(gc_fb_val)
                         let gc_result = wl_build_call(self.builder, gc_fb_ft.unwrap() as i64, gc_fb_fv.unwrap() as i64, vec_data_i64(&gc_fb_args), gc_fb_mir_count)
                         if dest_place >= 0 and gc_result != 0:
                             let gc_ret_ty = wl_type_of(gc_result)
@@ -7159,9 +7179,20 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                             wl_build_br(self.builder, gc_next_val)
                         return true
 
-            // All patterns should be handled above. If we reach here, it's a MIR gap.
+            // All patterns should be handled above. If we reach here, it's a genuine error
+            // (unless we're in a blanket impl body where T-method calls can't be resolved).
             let gc_name = if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: "?"
-            with_eprintln("FATAL: unhandled MIR_INTRINSIC_GENERIC_CALL sym=" ++ gc_name ++ " node_kind=" ++ int_to_string(self.pool.kind(gc_node)))
+            var gc_is_blanket = false
+            if self.current_method_owner_sym != 0:
+                let gc_owner_name = self.intern.resolve(self.current_method_owner_sym)
+                if gc_owner_name.len() <= 2:
+                    // Single-letter type params (T, K, V) indicate blanket impl context
+                    if not self.struct_type_map.get(self.current_method_owner_sym).is_some():
+                        if not self.enum_type_map.get(self.current_method_owner_sym).is_some():
+                            gc_is_blanket = true
+            if not gc_is_blanket:
+                with_eprintln("FATAL: unhandled MIR_INTRINSIC_GENERIC_CALL sym=" ++ gc_name ++ " node_kind=" ++ int_to_string(self.pool.kind(gc_node)))
+                self.had_error = 1
             if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                 let gc_next_val = self.mir_bb_values.get(next_bb as i64)
                 wl_build_br(self.builder, gc_next_val)
