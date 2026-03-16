@@ -256,7 +256,7 @@ fn MirBuilder.ident_type(self: MirBuilder, sym: i32) -> i32:
     if self.sema.named_types.contains(sym):
         return self.sema.named_types.get(sym).unwrap()
     if self.sema.variant_lookup.contains(sym):
-        return self.sema.variant_lookup.get(sym).unwrap() / 65536
+        return self.sema.variant_type_ids.get(sym).unwrap()
     self.sema.ty_void
 
 fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
@@ -576,7 +576,7 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     if kind == NK_VARIANT_SHORTHAND:
         let vs_sym = self.ast.get_data0(node)
         if self.sema.variant_lookup.contains(vs_sym):
-            return self.sema.variant_lookup.get(vs_sym).unwrap() / 65536
+            return self.sema.variant_type_ids.get(vs_sym).unwrap()
     if kind == NK_RANGE:
         let range_start = self.ast.get_data0(node)
         let range_end = self.ast.get_data1(node)
@@ -601,8 +601,7 @@ fn MirBuilder.variant_index(self: MirBuilder, variant_sym: i32) -> i32:
     if variant_sym == 0:
         return 0
     if self.sema.variant_lookup.contains(variant_sym):
-        let enc = self.sema.variant_lookup.get(variant_sym).unwrap()
-        return enc % 65536
+        return self.sema.variant_lookup.get(variant_sym).unwrap()
     0
 
 fn MirBuilder.success_variant_index(self: MirBuilder) -> i32:
@@ -772,11 +771,10 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
 
     // Check for enum variant without payload (None, etc.)
     if self.sema.variant_lookup.contains(sym):
-        let vl_enc = self.sema.variant_lookup.get(sym).unwrap()
-        let vl_variant_idx = vl_enc % 65536
+        let vl_variant_idx = self.sema.variant_lookup.get(sym).unwrap()
         var vl_result_ty = if self.expected_type != 0: self.expected_type else: type_id
         if vl_result_ty == 0:
-            vl_result_ty = vl_enc / 65536
+            vl_result_ty = self.sema.variant_type_ids.get(sym).unwrap()
         let vl_fields: Vec[i32] = Vec.new()
         let vl_names: Vec[i32] = Vec.new()
         let vl_fid = self.body.new_agg_fields(vl_fields, vl_names)
@@ -2685,9 +2683,8 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                     let fa_qual_name = fa_type_name ++ "." ++ fa_field_name
                     let fa_qual_sym = self.pool.intern(fa_qual_name)
                     if self.sema.variant_lookup.contains(fa_qual_sym):
-                        let fa_enc = self.sema.variant_lookup.get(fa_qual_sym).unwrap()
-                        let fa_var_idx = fa_enc % 65536
-                        let fa_disc_tag = if self.sema.disc_values.contains(fa_enc): self.sema.disc_values.get(fa_enc).unwrap() else: fa_var_idx
+                        let fa_var_idx = self.sema.variant_lookup.get(fa_qual_sym).unwrap()
+                        let fa_disc_tag = if self.sema.disc_values.contains(fa_qual_sym): self.sema.disc_values.get(fa_qual_sym).unwrap() else: fa_var_idx
                         // Disc enums with payloads need RK_AGGREGATE so codegen
                         // builds the full struct {tag, [payload x i8]}
                         if self.sema.disc_has_payload.contains(fa_resolved):
@@ -2702,10 +2699,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                         return self.int_const_operand(fa_disc_tag as i64, fa_base_ty)
                     // Also try bare variant sym (some enums register just "Red")
                     if self.sema.variant_lookup.contains(fa_field):
-                        let fa_enc2 = self.sema.variant_lookup.get(fa_field).unwrap()
-                        let fa_var_tid = fa_enc2 / 65536
+                        let fa_var_tid = self.sema.variant_type_ids.get(fa_field).unwrap()
                         if fa_var_tid == fa_resolved:
-                            let fa_disc_tag2 = if self.sema.disc_values.contains(fa_enc2): self.sema.disc_values.get(fa_enc2).unwrap() else: fa_enc2 % 65536
+                            let fa_var_idx2 = self.sema.variant_lookup.get(fa_field).unwrap()
+                            let fa_disc_tag2 = if self.sema.disc_values.contains(fa_field): self.sema.disc_values.get(fa_field).unwrap() else: fa_var_idx2
                             if self.sema.disc_has_payload.contains(fa_resolved):
                                 let fa_fields2: Vec[i32] = Vec.new()
                                 let fa_names2: Vec[i32] = Vec.new()
@@ -2770,13 +2767,12 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         if self.ast.kind(callee) == NK_IDENT:
             let vc_sym = self.ast.get_data0(callee)
             if self.sema.variant_lookup.contains(vc_sym):
-                let vc_enc = self.sema.variant_lookup.get(vc_sym).unwrap()
-                let vc_variant_idx = vc_enc % 65536
+                let vc_variant_idx = self.sema.variant_lookup.get(vc_sym).unwrap()
                 var vc_result_ty = self.expr_type(node)
                 if self.expected_type != 0:
                     vc_result_ty = self.expected_type
                 if vc_result_ty == 0:
-                    vc_result_ty = vc_enc / 65536
+                    vc_result_ty = self.sema.variant_type_ids.get(vc_sym).unwrap()
                 let vc_args_start = self.ast.get_data1(node)
                 let vc_args_count = self.ast.get_data2(node)
                 let vc_fields: Vec[i32] = Vec.new()
