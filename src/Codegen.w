@@ -2432,11 +2432,14 @@ fn Codegen.declare_disc_enum_type(self: Codegen, name_sym: i32, type_node: i32):
         self.enum_variant_counts.set_i32(enum_idx as i64, variant_count)
 
 fn Codegen.gen_disc_enum_from_int(self: Codegen, de_idx: i32, args_start: i32, call_node: i32) -> i64:
+    let arg_node = self.pool.get_extra(args_start)
+    let arg_val = self.gen_expr(arg_node)
+    self.gen_disc_enum_from_int_val(de_idx, arg_val)
+
+fn Codegen.gen_disc_enum_from_int_val(self: Codegen, de_idx: i32, arg_val: i64) -> i64:
     let repr_ty = self.disc_enum_repr_types.get(de_idx as i64)
     let v_start = self.disc_enum_variant_starts.get(de_idx as i64)
     let v_count = self.disc_enum_variant_counts.get(de_idx as i64)
-    let arg_node = self.pool.get_extra(args_start)
-    let arg_val = self.gen_expr(arg_node)
     let input = self.coerce_int(arg_val, repr_ty)
     // Return Option[repr_type]: Some(disc_val) or None
     // Use insertvalue to build Option values directly (no allocas in case blocks)
@@ -6999,77 +7002,87 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                                 wl_build_br(self.builder, gc_next_val)
                             return true
 
-            // Remaining patterns — populate pre_eval_cache with MIR args, then gen_call
-            if self.debug_mir_codegen_enabled():
-                let gc_name = if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: "?"
-                with_eprintln("[mir-bridge-gencall] sym=" ++ gc_name ++ " node_kind=" ++ int_to_string(self.pool.kind(gc_node)))
-            // Bridge MIR locals into local_allocas
-            let gc_local_count = body.local_names.len() as i32
-            for gli in 0..gc_local_count:
-                let gl_sym = body.local_names.get(gli as i64)
-                if gl_sym > 0:
-                    let gl_ptr_opt = self.mir_local_ptrs.get(gli)
-                    if gl_ptr_opt.is_some():
-                        let gl_ptr = gl_ptr_opt.unwrap() as i64
-                        self.local_allocas.insert(gl_sym, gl_ptr)
-                        let gl_ty_opt = self.mir_local_types.get(gli)
-                        if gl_ty_opt.is_some():
-                            self.local_types.insert(gl_sym, gl_ty_opt.unwrap() as i64)
-            // Pre-evaluate MIR args into cache so gen_expr returns cached values
-            let gc_pec_mir_start = body.call_arg_starts.get(args_id as i64)
-            let gc_pec_mir_count = body.call_arg_counts.get(args_id as i64)
-            let gc_pec_callee_field = self.pool.get_data0(gc_node)
-            var gc_pec_self_node = 0
-            var gc_pec_arg_offset = 0
-            if self.pool.kind(gc_pec_callee_field) == NK_FIELD_ACCESS:
-                gc_pec_self_node = self.pool.get_data0(gc_pec_callee_field)
-                // MIR operand 0 is the receiver (if not static call)
-                if gc_pec_mir_count > 0:
-                    let gc_pec_as = self.pool.get_data1(gc_node)
-                    let gc_pec_ac = self.pool.get_data2(gc_node)
-                    if gc_pec_mir_count == gc_pec_ac + 1:
-                        // Has receiver + args: cache receiver at operand 0
-                        let gc_recv_op = body.call_arg_operands.get(gc_pec_mir_start as i64)
-                        let gc_recv_v = self.mir_eval_operand(body, gc_recv_op, 0)
-                        self.pre_eval_cache.insert(gc_pec_self_node, gc_recv_v)
-                        gc_pec_arg_offset = 1
-                        // Cache each method arg (skip closures — they need gen_expr)
-                        for gc_pec_i in 0..gc_pec_ac:
-                            let gc_pec_arg_node = self.pool.get_extra(gc_pec_as + gc_pec_i)
-                            if self.pool.kind(gc_pec_arg_node) != NK_CLOSURE:
-                                let gc_pec_op = body.call_arg_operands.get((gc_pec_mir_start + 1 + gc_pec_i) as i64)
-                                let gc_pec_val = self.mir_eval_operand(body, gc_pec_op, 0)
-                                self.pre_eval_cache.insert(gc_pec_arg_node, gc_pec_val)
-                    else if gc_pec_mir_count == gc_pec_ac:
-                        // Static call: no receiver, just args
-                        for gc_pec_i in 0..gc_pec_ac:
-                            let gc_pec_arg_node = self.pool.get_extra(gc_pec_as + gc_pec_i)
-                            if self.pool.kind(gc_pec_arg_node) != NK_CLOSURE:
-                                let gc_pec_op = body.call_arg_operands.get((gc_pec_mir_start + gc_pec_i) as i64)
-                                let gc_pec_val = self.mir_eval_operand(body, gc_pec_op, 0)
-                                self.pre_eval_cache.insert(gc_pec_arg_node, gc_pec_val)
-            else:
-                // Bare function call — cache args directly
-                let gc_pec_bas = self.pool.get_data1(gc_node)
-                let gc_pec_bac = self.pool.get_data2(gc_node)
-                for gc_pec_i in 0..gc_pec_bac:
-                    if gc_pec_i < gc_pec_mir_count:
-                        let gc_pec_arg_node = self.pool.get_extra(gc_pec_bas + gc_pec_i)
-                        let gc_pec_op = body.call_arg_operands.get((gc_pec_mir_start + gc_pec_i) as i64)
-                        let gc_pec_val = self.mir_eval_operand(body, gc_pec_op, 0)
-                        self.pre_eval_cache.insert(gc_pec_arg_node, gc_pec_val)
-            let gc_result = self.gen_call(gc_node)
-            // Clear pre_eval_cache
-            let gc_fresh_cache: HashMap[i32, i64] = HashMap.new()
-            self.pre_eval_cache = gc_fresh_cache
-            if dest_place >= 0 and gc_result != 0:
-                let gc_ret_ty = wl_type_of(gc_result)
-                if gc_ret_ty != wl_void_type(self.context):
-                    let gc_local = body.place_locals.get(dest_place as i64)
-                    let gc_alloca = self.create_entry_alloca(gc_ret_ty)
-                    wl_build_store(self.builder, gc_result, gc_alloca)
-                    self.mir_local_ptrs.insert(gc_local, gc_alloca)
-                    self.mir_local_types.insert(gc_local, gc_ret_ty)
+            // Disc enum static methods: Direction.from_int(n)
+            if self.pool.kind(gc_callee_field) == NK_FIELD_ACCESS:
+                let gc_de_self = self.pool.get_data0(gc_callee_field)
+                let gc_de_method_sym = self.pool.get_data1(gc_callee_field)
+                let gc_de_method = self.intern.resolve(gc_de_method_sym)
+                if gc_de_method == "from_int" and self.pool.kind(gc_de_self) == NK_IDENT:
+                    let gc_de_type_sym = self.pool.get_data0(gc_de_self)
+                    let gc_de_opt = self.disc_enum_type_map.get(gc_de_type_sym)
+                    if gc_de_opt.is_some():
+                        let gc_de_mir_start = body.call_arg_starts.get(args_id as i64)
+                        let gc_de_mir_count = body.call_arg_counts.get(args_id as i64)
+                        if gc_de_mir_count > 0:
+                            let gc_de_arg_op = body.call_arg_operands.get(gc_de_mir_start as i64)
+                            let gc_de_arg_val = self.mir_eval_operand(body, gc_de_arg_op, 0)
+                            let gc_result = self.gen_disc_enum_from_int_val(gc_de_opt.unwrap(), gc_de_arg_val)
+                            if dest_place >= 0 and gc_result != 0:
+                                let gc_ret_ty = wl_type_of(gc_result)
+                                if gc_ret_ty != wl_void_type(self.context):
+                                    let gc_local = body.place_locals.get(dest_place as i64)
+                                    let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                                    wl_build_store(self.builder, gc_result, gc_alloca)
+                                    self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                                    self.mir_local_types.insert(gc_local, gc_ret_ty)
+                            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                                wl_build_br(self.builder, gc_next_val)
+                            return true
+
+            // Option method calls (filter, map, etc.) — bridge through gen_method_call
+            // These methods create complex control flow (if-else for Some/None) that
+            // requires the full gen_method_call dispatch.
+            if self.pool.kind(gc_callee_field) == NK_FIELD_ACCESS:
+                let gc_om_mir_start = body.call_arg_starts.get(args_id as i64)
+                let gc_om_mir_count = body.call_arg_counts.get(args_id as i64)
+                let gc_om_self_expr = self.pool.get_data0(gc_callee_field)
+                let gc_om_as = self.pool.get_data1(gc_node)
+                let gc_om_ac = self.pool.get_data2(gc_node)
+                // Bridge MIR locals into local_allocas
+                let gc_om_lc = body.local_names.len() as i32
+                for gc_om_li in 0..gc_om_lc:
+                    let gc_om_sym = body.local_names.get(gc_om_li as i64)
+                    if gc_om_sym > 0:
+                        let gc_om_ptr = self.mir_local_ptrs.get(gc_om_li)
+                        if gc_om_ptr.is_some():
+                            self.local_allocas.insert(gc_om_sym, gc_om_ptr.unwrap() as i64)
+                            let gc_om_ty = self.mir_local_types.get(gc_om_li)
+                            if gc_om_ty.is_some():
+                                self.local_types.insert(gc_om_sym, gc_om_ty.unwrap() as i64)
+                // Cache non-closure MIR args for gen_expr interception
+                if gc_om_mir_count > 0:
+                    // Cache receiver
+                    let gc_om_recv_op = body.call_arg_operands.get(gc_om_mir_start as i64)
+                    let gc_om_recv_v = self.mir_eval_operand(body, gc_om_recv_op, 0)
+                    self.pre_eval_cache.insert(gc_om_self_expr, gc_om_recv_v)
+                    // Cache method args (skip closures)
+                    for gc_om_i in 0..gc_om_ac:
+                        let gc_om_arg_node = self.pool.get_extra(gc_om_as + gc_om_i)
+                        if self.pool.kind(gc_om_arg_node) != NK_CLOSURE:
+                            if gc_om_i + 1 < gc_om_mir_count:
+                                let gc_om_op = body.call_arg_operands.get((gc_om_mir_start + 1 + gc_om_i) as i64)
+                                let gc_om_val = self.mir_eval_operand(body, gc_om_op, 0)
+                                self.pre_eval_cache.insert(gc_om_arg_node, gc_om_val)
+                let gc_result = self.gen_call(gc_node)
+                let gc_om_fresh: HashMap[i32, i64] = HashMap.new()
+                self.pre_eval_cache = gc_om_fresh
+                if dest_place >= 0 and gc_result != 0:
+                    let gc_ret_ty = wl_type_of(gc_result)
+                    if gc_ret_ty != wl_void_type(self.context):
+                        let gc_local = body.place_locals.get(dest_place as i64)
+                        let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                        wl_build_store(self.builder, gc_result, gc_alloca)
+                        self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                        self.mir_local_types.insert(gc_local, gc_ret_ty)
+                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                    let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                    wl_build_br(self.builder, gc_next_val)
+                return true
+
+            // All patterns should be handled above. If we reach here, it's a MIR gap.
+            let gc_name = if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: "?"
+            with_eprintln("FATAL: unhandled MIR_INTRINSIC_GENERIC_CALL sym=" ++ gc_name ++ " node_kind=" ++ int_to_string(self.pool.kind(gc_node)))
             if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                 let gc_next_val = self.mir_bb_values.get(next_bb as i64)
                 wl_build_br(self.builder, gc_next_val)
