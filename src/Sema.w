@@ -96,8 +96,10 @@ type Sema = {
     generic_fn_nodes: HashMap[i32, i32],
 
     // Methods: hash(type_sym, method_sym) → sig index
-    // Variant lookup: variant_sym → (enum_tid * 65536 + variant_index)
+    // Variant lookup: variant_sym → variant_index
     variant_lookup: HashMap[i32, i32],
+    // Variant type IDs: variant_sym → enum_tid
+    variant_type_ids: HashMap[i32, i32],
     // Discriminant enum data
     disc_repr_types: HashMap[i32, i32],
     disc_values: HashMap[i32, i32],
@@ -347,6 +349,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let fn_decl_nodes = sema_new_map_i32_i32()
     let generic_fn_nodes = sema_new_map_i32_i32()
     let variant_lookup = sema_new_map_i32_i32()
+    let variant_type_ids = sema_new_map_i32_i32()
     let disc_repr_types = sema_new_map_i32_i32()
     let disc_values = sema_new_map_i32_i32()
     let disc_has_payload = sema_new_map_i32_i32()
@@ -403,6 +406,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         fn_decl_nodes,
         generic_fn_nodes,
         variant_lookup,
+        variant_type_ids,
         disc_repr_types,
         disc_values,
         disc_has_payload,
@@ -1353,7 +1357,8 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         var vpos = te_start
         for vi in 0..variant_count:
             let v_name = self.type_extra.get(vpos as i64)
-            self.variant_lookup.insert(v_name, tid * 65536 + vi)
+            self.variant_lookup.insert(v_name, vi)
+            self.variant_type_ids.insert(v_name, tid)
             let pc = self.type_extra.get((vpos + 1) as i64)
             vpos = vpos + 2 + pc
 
@@ -1409,8 +1414,9 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         var vpos = te_start
         for vi in 0..variant_count:
             let v_name = self.type_extra.get(vpos as i64)
-            self.variant_lookup.insert(v_name, tid * 65536 + vi)
-            self.disc_values.insert(tid * 65536 + vi, disc_vals.get(vi as i64))
+            self.variant_lookup.insert(v_name, vi)
+            self.variant_type_ids.insert(v_name, tid)
+            self.disc_values.insert(v_name, disc_vals.get(vi as i64))
             let pc = self.type_extra.get((vpos + 1) as i64)
             vpos = vpos + 2 + pc
 
@@ -3209,8 +3215,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
                             self.typed_expr_types.insert(node, expected)
                             return expected
         if self.variant_lookup.contains(name):
-            let vi = self.variant_lookup.get(name).unwrap()
-            let vs_tid = vi / 65536
+            let vs_tid = self.variant_type_ids.get(name).unwrap()
             self.typed_expr_types.insert(node, vs_tid)
             return vs_tid
         return 0
@@ -3357,8 +3362,7 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
 
     // Check enum variants
     if self.variant_lookup.contains(sym):
-        let vi = self.variant_lookup.get(sym).unwrap()
-        return vi / 65536
+        return self.variant_type_ids.get(sym).unwrap()
 
     // Unknown identifier
     self.emit_error("undefined variable", node)
@@ -4639,8 +4643,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // Enum variant constructor
     if self.variant_lookup.contains(fn_sym):
-        let vi = self.variant_lookup.get(fn_sym).unwrap()
-        return vi / 65536
+        return self.variant_type_ids.get(fn_sym).unwrap()
 
     // Intrinsic function
     if self.is_intrinsic_fn_sym(fn_sym) != 0:
