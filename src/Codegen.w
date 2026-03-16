@@ -4483,9 +4483,15 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
 
 fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
     let flags = self.pool.get_data2(fn_node)
-    // Async functions use gen_async_function (not MIR-lowered yet)
+    // Async functions: emit stub with unreachable (not MIR-lowered yet)
     if (flags / FN_FLAG_ASYNC) % 2 == 1:
-        self.gen_async_function(fn_node)
+        let async_sym = self.pool.get_data0(fn_node)
+        let async_fv = self.fn_values.get(async_sym)
+        if async_fv.is_some():
+            let async_fn = async_fv.unwrap() as i64
+            let async_entry = wl_append_bb(self.context, async_fn, "entry")
+            wl_position_at_end(self.builder, async_entry)
+            let _ = wl_build_unreachable(self.builder)
         return
     let fn_sym = self.pool.get_data0(fn_node)
     // Skip functions with fn-level type params — compiled via monomorphization
@@ -12030,206 +12036,6 @@ fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
     let spawn_fn = wl_add_function(self.llmod, effective_name, spawn_fn_type)
     self.fn_values.insert(name_sym, spawn_fn)
     self.fn_fn_types.insert(name_sym, spawn_fn_type)
-
-// ── Async function body generation ────────────────────────────────
-
-fn Codegen.gen_async_function(self: Codegen, fn_node: i32):
-    let name_sym = self.pool.get_data0(fn_node)
-    let name_str = self.intern.resolve(name_sym)
-    if name_sym == 0: return
-
-    let meta = self.pool.find_fn_meta(fn_node)
-    if meta < 0: return
-
-    let i32_ty = wl_i32_type(self.context)
-    let i64_ty = wl_i64_type(self.context)
-    let void_ty = wl_void_type(self.context)
-    let ptr_ty = wl_ptr_type(self.context)
-
-    let param_start = self.pool.fn_meta_param_start(meta)
-    let param_count = self.pool.fn_meta_param_count(meta)
-    let body_node = self.pool.get_data1(fn_node)
-
-    // Get return type
-    let ret_ty_opt = self.async_fn_ret_types.get(name_sym)
-    let ret_ty = if ret_ty_opt.is_some(): ret_ty_opt.unwrap() as i64 else: i32_ty
-
-    // Get param types
-    let param_types: Vec[i64] = Vec.new()
-    for pi in 0..param_count:
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
-        var p_ty = self.resolve_type(p_type_node)
-        if p_ty == 0:
-            p_ty = i32_ty
-        param_types.push(p_ty)
-
-    // Args struct type
-    let args_struct_opt = self.async_fn_args_struct_types.get(name_sym)
-    let args_struct_type = if args_struct_opt.is_some(): args_struct_opt.unwrap() as i64 else: wl_struct_type(self.context, vec_data_i64(&param_types), param_count, 0)
-
-    // ── 1. Generate the implementation function body ─────────────
-    let impl_name = name_str ++ "_async"
-    let impl_sym = self.intern.intern(impl_name)
-    let impl_fv = self.fn_values.get(impl_sym)
-    if not impl_fv.is_some(): return
-    let impl_fn = impl_fv.unwrap() as i64
-    let impl_ft = self.fn_fn_types.get(impl_sym)
-    if not impl_ft.is_some(): return
-    let impl_fn_type = impl_ft.unwrap() as i64
-
-    // Clear locals and generate body (reuse gen_function logic)
-    self.current_function = impl_fn
-    self.current_function_name_sym = name_sym
-    self.current_ret_type = ret_ty
-    self.current_method_owner_sym = 0
-
-    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
-    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
-    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
-    let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
-    self.local_allocas = fresh_local_allocas
-    self.local_types = fresh_local_types
-    self.local_muts = fresh_local_muts
-    self.local_fn_sigs = fresh_local_fn_sigs
-    self.local_pointee_structs = fresh_local_pointee_structs
-    self.task_locals = fresh_task_locals
-    self.enum_local_types = fresh_enum_local_types
-    self.scope_local_count = 0
-    let fresh_defer_stack: Vec[i32] = Vec.new()
-    let fresh_errdefer_stack: Vec[i32] = Vec.new()
-    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
-    let fresh_trait_local_concrete_types: HashMap[i32, i32] = HashMap.new()
-    self.defer_stack = fresh_defer_stack
-    self.errdefer_stack = fresh_errdefer_stack
-    self.trait_locals = fresh_trait_locals
-    self.trait_local_concrete_types = fresh_trait_local_concrete_types
-
-    let saved_expected = self.expected_type
-    let saved_expected_node = self.expected_type_node
-    self.expected_type = ret_ty
-    self.expected_type_node = 0
-
-    let saved_tailrec_bb = self.tailrec_body_bb
-    let saved_tailrec_sym = self.tailrec_fn_sym
-    let saved_loops = self.capture_loop_state()
-    self.tailrec_body_bb = 0
-    self.tailrec_fn_sym = 0
-    self.reset_loop_state()
-
-    let entry = wl_append_bb(self.context, impl_fn, "entry")
-    wl_position_at_end(self.builder, entry)
-
-    // Add params as locals
-    for pi in 0..param_count:
-        let p_name = self.pool.get_extra(param_start + pi * 2)
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
-        let param_val = wl_get_param(impl_fn, pi)
-        let param_type = wl_type_of(param_val)
-        let alloca = wl_build_alloca(self.builder, param_type)
-        wl_build_store(self.builder, param_val, alloca)
-        self.record_local(p_name, alloca, param_type, 1)
-
-
-    let body_val = self.gen_expr(body_node)
-
-    // Terminate if needed
-    let current_bb = wl_get_insert_block(self.builder)
-    if wl_get_bb_terminator(current_bb) == 0:
-        if ret_ty == void_ty:
-            wl_build_ret_void(self.builder)
-        else:
-            let body_type = wl_type_of(body_val)
-            if body_type == void_ty:
-                wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
-            else:
-                wl_build_ret(self.builder, body_val)
-
-    // Restore state
-    self.expected_type = saved_expected
-    self.expected_type_node = saved_expected_node
-    self.tailrec_body_bb = saved_tailrec_bb
-    self.tailrec_fn_sym = saved_tailrec_sym
-    self.restore_loop_state(saved_loops)
-
-    // ── 2. Generate the fiber trampoline ─────────────────────────
-    let tramp_name = name_str ++ "_fiber"
-    let tramp_fn = wl_get_named_function(self.llmod, tramp_name)
-    if tramp_fn == 0: return
-
-    self.current_function = tramp_fn
-    let tramp_entry = wl_append_bb(self.context, tramp_fn, "entry")
-    wl_position_at_end(self.builder, tramp_entry)
-
-    // Load args from void* parameter
-    let arg_ptr = wl_get_param(tramp_fn, 0)
-    let call_args: Vec[i64] = Vec.new()
-    for pi in 0..param_count:
-        let indices: Vec[i64] = Vec.new()
-        indices.push(wl_const_int(i32_ty, 0, 0))
-        indices.push(wl_const_int(i32_ty, pi as i64, 0))
-        let gep = wl_build_gep(self.builder, args_struct_type, arg_ptr, vec_data_i64(&indices), 2)
-        let loaded = wl_build_load(self.builder, param_types.get(pi as i64), gep)
-        call_args.push(loaded)
-
-    let result = wl_build_call(self.builder, impl_fn_type, impl_fn, vec_data_i64(&call_args), param_count)
-
-    // Store result via with_fiber_set_result
-    if ret_ty != void_ty:
-        let set_result_fn = wl_get_named_function(self.llmod, "with_fiber_set_result")
-        if set_result_fn != 0:
-            let set_params: Vec[i64] = Vec.new()
-            set_params.push(i64_ty)
-            let set_ft = wl_function_type(void_ty, vec_data_i64(&set_params), 1, 0)
-            let result_i64 = self.pack_result_to_i64(result, ret_ty)
-            let set_args: Vec[i64] = Vec.new()
-            set_args.push(result_i64)
-            wl_build_call(self.builder, set_ft, set_result_fn, vec_data_i64(&set_args), 1)
-    wl_build_ret_void(self.builder)
-
-    // ── 3. Generate the spawn wrapper ────────────────────────────
-    let spawn_fv = self.fn_values.get(name_sym)
-    if not spawn_fv.is_some(): return
-    let spawn_fn = spawn_fv.unwrap() as i64
-
-    self.current_function = spawn_fn
-    let spawn_entry = wl_append_bb(self.context, spawn_fn, "entry")
-    wl_position_at_end(self.builder, spawn_entry)
-
-    // Allocate args struct on heap
-    let args_size = wl_size_of(args_struct_type)
-    let malloc_fn = self.ensure_malloc_declared()
-    let malloc_params: Vec[i64] = Vec.new()
-    malloc_params.push(i64_ty)
-    let malloc_ft = wl_function_type(ptr_ty, vec_data_i64(&malloc_params), 1, 0)
-    let malloc_args: Vec[i64] = Vec.new()
-    malloc_args.push(args_size)
-    let args_alloc = wl_build_call(self.builder, malloc_ft, malloc_fn, vec_data_i64(&malloc_args), 1)
-
-    // Store each parameter into args struct
-    for pi in 0..param_count:
-        let param_val = wl_get_param(spawn_fn, pi)
-        let indices: Vec[i64] = Vec.new()
-        indices.push(wl_const_int(i32_ty, 0, 0))
-        indices.push(wl_const_int(i32_ty, pi as i64, 0))
-        let gep = wl_build_gep(self.builder, args_struct_type, args_alloc, vec_data_i64(&indices), 2)
-        wl_build_store(self.builder, param_val, gep)
-
-    // Call with_fiber_spawn(trampoline_fn, args_ptr)
-    let spawn_rt_fn = wl_get_named_function(self.llmod, "with_fiber_spawn")
-    if spawn_rt_fn == 0: return
-    let spawn_params: Vec[i64] = Vec.new()
-    spawn_params.push(ptr_ty)
-    spawn_params.push(ptr_ty)
-    let spawn_ft = wl_function_type(i32_ty, vec_data_i64(&spawn_params), 2, 0)
-    let spawn_args: Vec[i64] = Vec.new()
-    spawn_args.push(tramp_fn)
-    spawn_args.push(args_alloc)
-    let task_id = wl_build_call(self.builder, spawn_ft, spawn_rt_fn, vec_data_i64(&spawn_args), 2)
-
-    wl_build_ret(self.builder, task_id)
 
 // ── Async expressions ─────────────────────────────────────────────
 
