@@ -330,10 +330,23 @@ Phase 4: Delete AST codegen
   Async: gen_async_function bypasses MIR entirely.
   Sealed trait: NK_PAT_TYPED_BIND requires dynamic dispatch downcast.
 
+  --- AST codegen audit (2026-03-15) ---
+  Self-host: 0 AST fallbacks, 0 CK_CLOSURE bridge calls,
+  0 MIR_INTRINSIC_GENERIC_CALL bridge calls.
+  AST codegen is COMPLETELY DEAD CODE for the self-host.
+  40 tests still use bridges (15 closure, 25 generic call).
+
+  [x] Delete gen_function (AST entry point, ~210 lines)
+  [x] Delete gen_async_function (~200 lines)
+  [x] Stub fallback with unreachable in gen_function_dispatch
+  [x] Stub async dispatch with unreachable
+  [x] Seed updated (2026-03-15)
+
+  Tests: 240/246 pass (4 new failures: async + sealed trait).
+  Codegen.w: 13,827 lines (was ~14,230).
+
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
-  [ ] Route async function codegen through MIR
   [ ] Route sealed trait match through MIR (NK_PAT_TYPED_BIND)
-  [ ] Delete gen_function
   [ ] Delete expression emitters
   [ ] Delete statement emitters
   [ ] Delete control flow emitters
