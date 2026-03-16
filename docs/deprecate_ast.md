@@ -321,11 +321,18 @@ Phase 4: Delete AST codegen
   [x] Slice pattern lowering (NK_PAT_SLICE element binding + length check)
   [x] Array GEP in mir_place_ptr and mir_place_projected_type
 
-  --- Milestone: 0 test fallbacks, seed updated (2026-03-15) ---
-  Self-host: 0 AST fallbacks. Tests: 0 AST fallbacks. 244/246 pass.
+  [x] Remove generic_fn_nodes guard (all unresolved methods through bridge)
+  [x] Slice pattern tail variable binding ([first, ..rest, last])
+
+  --- Milestone: 4 build-mode fallbacks, seed updated (2026-03-15) ---
+  Self-host: 0 AST fallbacks. Tests: 244/246 pass.
+  Build-mode fallbacks: 4 (3 async, 1 sealed trait match).
+  Async: gen_async_function bypasses MIR entirely.
+  Sealed trait: NK_PAT_TYPED_BIND requires dynamic dispatch downcast.
 
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
   [ ] Route async function codegen through MIR
+  [ ] Route sealed trait match through MIR (NK_PAT_TYPED_BIND)
   [ ] Delete gen_function
   [ ] Delete expression emitters
   [ ] Delete statement emitters
