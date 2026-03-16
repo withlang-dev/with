@@ -113,6 +113,7 @@ const MIR_INTRINSIC_ARR_LEN: i32 = 40
 const MIR_INTRINSIC_GENERIC_CALL: i32 = 41
 const MIR_INTRINSIC_VEC_JOIN: i32 = 42
 const MIR_INTRINSIC_DYN_VTABLE_CMP: i32 = 43
+const MIR_INTRINSIC_DYN_DOWNCAST: i32 = 44
 
 // ── Projection kinds ─────────────────────────────────────────────
 

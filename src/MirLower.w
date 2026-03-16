@@ -1720,10 +1720,37 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
         return
 
-    // Dyn trait typed-bind pattern: fall back to AST codegen.
+    // Dyn trait typed-bind pattern: vtable comparison via intrinsic.
     if pk == NK_PAT_TYPED_BIND:
-        self.body.lowering_failed = 1
-        self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
+        let tb_type_sym = self.ast.get_data1(pat_node)
+        // Get trait_sym from scrutinee's sema type (TY_TRAIT_OBJ.d0)
+        let tb_scrutinee_ty = self.place_local_type(scrutinee_place)
+        var tb_trait_sym: i32 = 0
+        if self.sema.get_type_kind(tb_scrutinee_ty) == TY_TRAIT_OBJ:
+            tb_trait_sym = self.sema.get_type_d0(tb_scrutinee_ty)
+        // Emit MIR_INTRINSIC_DYN_VTABLE_CMP(scrutinee, type_sym, trait_sym) → bool
+        let tb_fn_op = self.const_operand(CK_FN, 0, self.sema.ty_void)
+        let tb_scrutinee_op = self.body.new_operand(OK_COPY, scrutinee_place)
+        let tb_type_const = self.int_const_operand(tb_type_sym as i64, self.sema.ty_i32)
+        let tb_trait_const = self.int_const_operand(tb_trait_sym as i64, self.sema.ty_i32)
+        let tb_args: Vec[i32] = Vec.new()
+        tb_args.push(tb_scrutinee_op)
+        tb_args.push(tb_type_const)
+        tb_args.push(tb_trait_const)
+        let tb_args_id = self.body.new_call_args(tb_args)
+        self.body.set_call_intrinsic(tb_args_id, MIR_INTRINSIC_DYN_VTABLE_CMP)
+        let tb_result = self.new_temp(self.sema.ty_bool)
+        let tb_result_place = self.place_for_local(tb_result)
+        let tb_switch_bb = self.new_block()
+        self.terminate(TK_CALL, tb_fn_op, tb_args_id, tb_result_place, tb_switch_bb)
+        self.switch_to(tb_switch_bb)
+        let tb_cmp_op = self.body.new_operand(OK_COPY, tb_result_place)
+        let tb_vals: Vec[i32] = Vec.new()
+        tb_vals.push(1)
+        let tb_targets: Vec[i32] = Vec.new()
+        tb_targets.push(arm_bb)
+        let tb_table = self.body.new_switch_table(tb_vals, tb_targets)
+        self.terminate(TK_SWITCH_INT, tb_cmp_op, tb_table, fail_bb, 0)
         return
 
     // NK_PAT_SLICE: check array length against pattern count
@@ -1854,6 +1881,33 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let p_start = self.ast.get_data0(pat_node)
         if self.ast.get_data1(pat_node) > 0:
             return self.lower_pattern(self.ast.get_extra(p_start), scrutinee_place)
+        return out
+
+    if pk == NK_PAT_TYPED_BIND:
+        let tb_bind_sym = self.ast.get_data0(pat_node)
+        let tb_type_sym = self.ast.get_data1(pat_node)
+        // Look up concrete sema type for the type symbol
+        let tb_sema_sym = self.sema.pool_intern(self.pool.resolve_symbol(tb_type_sym))
+        var tb_concrete_ty = self.sema.ty_i32
+        if self.sema.named_types.contains(tb_sema_sym):
+            tb_concrete_ty = self.sema.named_types.get(tb_sema_sym).unwrap()
+        // Emit MIR_INTRINSIC_DYN_DOWNCAST(scrutinee, type_sym) → concrete value
+        let dc_fn_op = self.const_operand(CK_FN, 0, self.sema.ty_void)
+        let dc_scrutinee_op = self.body.new_operand(OK_COPY, scrutinee_place)
+        let dc_type_const = self.int_const_operand(tb_type_sym as i64, self.sema.ty_i32)
+        let dc_args: Vec[i32] = Vec.new()
+        dc_args.push(dc_scrutinee_op)
+        dc_args.push(dc_type_const)
+        let dc_args_id = self.body.new_call_args(dc_args)
+        self.body.set_call_intrinsic(dc_args_id, MIR_INTRINSIC_DYN_DOWNCAST)
+        let local_id = self.body.new_local(tb_concrete_ty, 0, tb_bind_sym, 1)
+        self.bind_local(tb_bind_sym, local_id)
+        let dc_result_place = self.place_for_local(local_id)
+        let dc_next_bb = self.new_block()
+        self.terminate(TK_CALL, dc_fn_op, dc_args_id, dc_result_place, dc_next_bb)
+        self.switch_to(dc_next_bb)
+        out.push(local_id)
+        out.push(scrutinee_place)
         return out
 
     if pk == NK_PAT_SLICE:
