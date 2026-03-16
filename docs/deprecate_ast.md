@@ -275,9 +275,10 @@ Phase 3: Assert no AST usage
 
 Phase 4: Delete AST codegen
   Self-host: 0 fallbacks (all functions through MIR).
-  Tests: 244/246 pass. 2 remaining:
+  Tests: 241/246 pass. 5 remaining:
   - behav_hashmap: runtime assertion (HashMap codegen issue, pre-existing)
   - duck_binop_fail: expected-failure test (duck typing error)
+  - 3 async tests (async_basic, async_block_capture, async_tuple_await): stubbed with unreachable
 
   Generic function calls now route through MIR via MIR_INTRINSIC_GENERIC_CALL.
   MirLower emits a placeholder call with the AST node; codegen intercepts and
@@ -342,11 +343,11 @@ Phase 4: Delete AST codegen
   [x] Stub async dispatch with unreachable
   [x] Seed updated (2026-03-15)
 
-  Tests: 240/246 pass (4 new failures: async + sealed trait).
+  Tests: 241/246 pass (3 async failures, 2 pre-existing).
   Codegen.w: 13,827 lines (was ~14,230).
 
+  [x] Sealed trait match via MIR (MIR_INTRINSIC_DYN_VTABLE_CMP + DYN_DOWNCAST)
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
-  [ ] Route sealed trait match through MIR (NK_PAT_TYPED_BIND)
   [ ] Delete expression emitters
   [ ] Delete statement emitters
   [ ] Delete control flow emitters

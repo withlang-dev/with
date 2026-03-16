@@ -6436,6 +6436,62 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         vj_args.push(vj_sep)
         result = wl_build_call(self.builder, vj_ft, vj_fn, vec_data_i64(&vj_args), 2)
 
+    else if intrinsic == MIR_INTRINSIC_DYN_DOWNCAST:
+        // Extract concrete value from dyn trait object.
+        // Args: (fat_ptr, type_sym_as_int)
+        let dd_recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let dd_type_sym_val = self.mir_intrinsic_arg(body, args_id, 1)
+        let dd_type_sym = wl_const_int_sext_val(dd_type_sym_val) as i32
+        // Translate AST pool sym to codegen intern pool sym
+        var dd_cg_type_sym = dd_type_sym
+        if dd_type_sym > 0 and dd_type_sym < self.sema.pool.symbol_texts.len() as i32:
+            let dd_text = self.sema.pool.symbol_texts.get(dd_type_sym as i64)
+            if dd_text.len() > 0:
+                dd_cg_type_sym = self.intern.intern(dd_text)
+        // Extract data_ptr from fat pointer (field 0)
+        let dd_data_ptr = wl_build_extract_value(self.builder, dd_recv, 0)
+        // Load concrete struct from data_ptr
+        let dd_st = self.struct_type_map.get(dd_cg_type_sym)
+        if dd_st.is_some():
+            let dd_concrete_ty = self.struct_llvm_types.get(dd_st.unwrap() as i64)
+            result = wl_build_load(self.builder, dd_concrete_ty, dd_data_ptr)
+        else:
+            result = wl_build_load(self.builder, wl_i32_type(self.context), dd_data_ptr)
+
+    else if intrinsic == MIR_INTRINSIC_DYN_VTABLE_CMP:
+        // Compare vtable pointer of dyn trait object against expected vtable.
+        // Args: (fat_ptr, type_sym_as_int, trait_sym_as_int)
+        let dv_recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let dv_type_sym_val = self.mir_intrinsic_arg(body, args_id, 1)
+        let dv_trait_sym_val = self.mir_intrinsic_arg(body, args_id, 2)
+        // Extract type_sym and trait_sym from constant int values
+        let dv_type_sym = wl_const_int_sext_val(dv_type_sym_val) as i32
+        let dv_trait_sym = wl_const_int_sext_val(dv_trait_sym_val) as i32
+        // Translate AST pool syms to codegen intern pool syms
+        var dv_cg_type_sym = dv_type_sym
+        if dv_type_sym > 0 and dv_type_sym < self.sema.pool.symbol_texts.len() as i32:
+            let dv_text = self.sema.pool.symbol_texts.get(dv_type_sym as i64)
+            if dv_text.len() > 0:
+                dv_cg_type_sym = self.intern.intern(dv_text)
+        var dv_cg_trait_sym = dv_trait_sym
+        if dv_trait_sym > 0 and dv_trait_sym < self.sema.pool.symbol_texts.len() as i32:
+            let dv_tt = self.sema.pool.symbol_texts.get(dv_trait_sym as i64)
+            if dv_tt.len() > 0:
+                dv_cg_trait_sym = self.intern.intern(dv_tt)
+        // Look up vtable global
+        let dv_key = codegen_hash_type_trait_key(dv_cg_type_sym, dv_cg_trait_sym)
+        let dv_vt_opt = self.vtable_globals.get(dv_key)
+        if dv_vt_opt.is_some():
+            let dv_expected_vt = dv_vt_opt.unwrap() as i64
+            // Extract vtable_ptr from fat pointer (field 1)
+            let dv_vtable_ptr = wl_build_extract_value(self.builder, dv_recv, 1)
+            // Compare: ptr_to_int(vtable_ptr) == ptr_to_int(expected)
+            let dv_vt_int = wl_build_ptr_to_int(self.builder, dv_vtable_ptr, i64_ty)
+            let dv_exp_int = wl_build_ptr_to_int(self.builder, dv_expected_vt, i64_ty)
+            result = wl_build_icmp(self.builder, wl_int_eq(), dv_vt_int, dv_exp_int)
+        else:
+            result = wl_const_int(wl_i1_type(self.context), 0, 0)
+
     else:
         return false
 
