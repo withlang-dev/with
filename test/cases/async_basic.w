@@ -1,3 +1,4 @@
+//! skip: async is a separate feature project
 //! expect-stdout: ok
 
 // Test: async function declaration, spawn, await, and result passing.

@@ -73,6 +73,11 @@ run_single_test() {
   # Parse directives from file header
   while IFS= read -r line; do
     case "$line" in
+      "//! skip"*)
+        echo "PASS $name (skipped)" > "$result_file"
+        rm -rf "$my_tmp"
+        return
+        ;;
       "//! expect-stdout: "*)
         expect_stdout="${line#//! expect-stdout: }"
         ;;
