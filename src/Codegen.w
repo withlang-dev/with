@@ -4512,12 +4512,17 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
             self.gen_function_mir(fn_node, body)
             self.debug_clear_location()
             return
-    // AST fallback for functions without successful MIR lowering
-    let mir_audit = with_getenv_str("WITH_MIR_AUDIT")
-    if mir_audit.len() > 0 and mir_audit != "0":
-        let fn_name = self.intern.resolve(fn_sym)
+    // AST fallback: emit stub with unreachable. All functions should go through MIR.
+    let fn_name = self.intern.resolve(fn_sym)
+    let fv_fb = self.fn_values.get(fn_sym)
+    if fv_fb.is_some():
+        let fb_fn = fv_fb.unwrap() as i64
+        let fb_entry = wl_append_bb(self.context, fb_fn, "entry")
+        wl_position_at_end(self.builder, fb_entry)
+        let _ = wl_build_unreachable(self.builder)
+    let mir_audit_fb = with_getenv_str("WITH_MIR_AUDIT")
+    if mir_audit_fb.len() > 0 and mir_audit_fb != "0":
         with_eprintln("[mir-fallback] " ++ fn_name)
-    self.gen_function(fn_node)
 
 fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     // Use MIR module's snapshot of sema type tables — the original sema's
@@ -7432,218 +7437,6 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     self.mir_default_unreachable_bbs = saved_mir_default_unreachable_bbs
     if saved_bb != 0:
         wl_position_at_end(self.builder, saved_bb)
-
-// ── gen_function: generate a function body ────────────────────────
-
-fn Codegen.gen_function(self: Codegen, fn_node: i32):
-    let name_sym = self.pool.get_data0(fn_node)
-    let resolved_name = self.intern.resolve(name_sym)
-    let name_str = if resolved_name.len() > 0: resolved_name else: self.fn_decl_name_from_node(fn_node)
-    if name_sym == 0:
-        return
-    let body_node = self.pool.get_data1(fn_node)
-    let flags = self.pool.get_data2(fn_node)
-
-    let fv = self.fn_values.get(name_sym)
-    if not fv.is_some(): return
-    let function = fv.unwrap() as i64
-    let ft = self.fn_fn_types.get(name_sym)
-    if not ft.is_some(): return
-    let fn_type = ft.unwrap() as i64
-
-    self.current_function = function
-    self.current_function_name_sym = name_sym
-    self.current_ret_type = wl_get_return_type(fn_type)
-    self.current_method_owner_sym = 0
-
-    // Clear locals
-    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
-    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
-    let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
-    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
-    let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
-    self.local_allocas = fresh_local_allocas
-    self.local_types = fresh_local_types
-    self.local_muts = fresh_local_muts
-    self.local_fn_sigs = fresh_local_fn_sigs
-    self.local_pointee_structs = fresh_local_pointee_structs
-    self.task_locals = fresh_task_locals
-    self.enum_local_types = fresh_enum_local_types
-    self.scope_local_count = 0
-    let fresh_defer_stack: Vec[i32] = Vec.new()
-    let fresh_errdefer_stack: Vec[i32] = Vec.new()
-    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
-    let fresh_trait_local_concrete_types: HashMap[i32, i32] = HashMap.new()
-    self.defer_stack = fresh_defer_stack
-    self.errdefer_stack = fresh_errdefer_stack
-    self.trait_locals = fresh_trait_locals
-    self.trait_local_concrete_types = fresh_trait_local_concrete_types
-
-    // Save/set expected type
-    let saved_expected = self.expected_type
-    let saved_expected_node = self.expected_type_node
-    self.expected_type = self.current_ret_type
-    self.expected_type_node = 0
-    let saved_result_err = self.current_result_err_symbol
-    let saved_returns_result = self.current_fn_returns_result
-    let saved_saw_return = self.current_fn_saw_explicit_return
-    self.current_result_err_symbol = 0
-    let rerr = self.fn_result_err_symbols.get(name_sym)
-    if rerr.is_some(): self.current_result_err_symbol = rerr.unwrap()
-    self.current_fn_returns_result = self.fn_returns_result.get(name_sym).is_some()
-    self.current_fn_saw_explicit_return = false
-
-    // Save tailrec state
-    let saved_tailrec_bb = self.tailrec_body_bb
-    let saved_tailrec_sym = self.tailrec_fn_sym
-    let saved_loops = self.capture_loop_state()
-    self.tailrec_body_bb = 0
-    self.tailrec_fn_sym = 0
-    self.reset_loop_state()
-
-    // Create entry block
-    let entry = wl_append_bb(self.context, function, "entry")
-    wl_position_at_end(self.builder, entry)
-
-    // Add parameters as locals
-    let meta = self.pool.find_fn_meta(fn_node)
-    if meta < 0: return
-    let param_start = self.pool.fn_meta_param_start(meta)
-    let param_count = self.pool.fn_meta_param_count(meta)
-
-    // Detect method owner
-    var method_owner_sym = 0
-    for di in 0..name_str.len() as i32:
-        if name_str.byte_at(di as i64) == 46:
-            method_owner_sym = self.intern.intern(name_str.slice(0, di as i64))
-            break
-    self.current_method_owner_sym = method_owner_sym
-
-    for pi in 0..param_count:
-        let p_name = self.pool.get_extra(param_start + pi * 2)
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
-        let param_val = wl_get_param(function, pi)
-        let param_type = wl_type_of(param_val)
-        let alloca = wl_build_alloca(self.builder, param_type)
-        wl_build_store(self.builder, param_val, alloca)
-
-        self.record_local(p_name, alloca, param_type, 1)  // treat all as mutable for codegen
-
-        // Record sema type for generic type params
-        if p_type_node != 0 and self.pool.kind(p_type_node) == NK_TYPE_GENERIC:
-            let p_sema_tid = self.sema.resolve_type_expr(p_type_node)
-            if p_sema_tid > 0:
-                self.local_sema_types.insert(p_name, p_sema_tid)
-
-        // Track fn_sig for function pointer params
-        if p_type_node != 0:
-            let pk = self.pool.kind(p_type_node)
-            if pk == NK_TYPE_FN:
-                let fn_sig = self.build_fn_type_from_ast(p_type_node)
-                self.record_local_fn_sig(p_name, fn_sig)
-            // Track pointee struct for pointer/ref params
-            if pk == NK_TYPE_PTR or pk == NK_TYPE_REF:
-                let pointee_node = self.pool.get_data0(p_type_node)
-                if self.pool.kind(pointee_node) == NK_TYPE_NAMED:
-                    let ps = self.pool.get_data0(pointee_node)
-                    if self.struct_type_map.get(ps).is_some():
-                        self.record_local_pointee_struct(p_name, ps)
-            // Track method owner-type pointee (self and same-type params)
-            if pk == NK_TYPE_NAMED:
-                let p_sym = self.pool.get_data0(p_type_node)
-                let p_n = self.intern.resolve(p_sym)
-                let p_name_text = self.intern.resolve(p_name)
-                if method_owner_sym == 0 and p_name_text == "self" and self.struct_type_map.get(p_sym).is_some():
-                    // str is in struct_type_map but passes by value, not pointer
-                    if self.intern.resolve(p_sym) != "str":
-                        method_owner_sym = p_sym
-                        self.current_method_owner_sym = method_owner_sym
-                if method_owner_sym != 0 and (p_n == "Self" or p_sym == method_owner_sym):
-                    // Only record pointee struct for types that are actually passed as pointers
-                    let owner_n = self.intern.resolve(method_owner_sym)
-                    if owner_n != "str":
-                        self.record_local_pointee_struct(p_name, method_owner_sym)
-            if method_owner_sym != 0:
-                let p_n = self.intern.resolve(p_name)
-                if p_n == "self":
-                    let owner_n2 = self.intern.resolve(method_owner_sym)
-                    if owner_n2 != "str":
-                        self.record_local_pointee_struct(p_name, method_owner_sym)
-            // Track dyn trait params (plain/wrapped forms).
-            let trait_sym = self.dyn_trait_from_type_node(p_type_node)
-            if trait_sym != 0:
-                self.record_trait_local(p_name, trait_sym)
-
-    // @[tailrec]: create body BB
-    if (flags / FN_FLAG_TAILREC) % 2 == 1 and param_count > 0:
-        let body_bb = wl_append_bb(self.context, function, "tailrec.body")
-        wl_build_br(self.builder, body_bb)
-        wl_position_at_end(self.builder, body_bb)
-        self.tailrec_body_bb = body_bb
-        self.tailrec_fn_sym = name_sym
-        // Collect param allocas
-        let fresh_tailrec_param_allocas: Vec[i64] = Vec.new()
-        self.tailrec_param_allocas = fresh_tailrec_param_allocas
-        for ti in 0..param_count:
-            let tp_name = self.pool.get_extra(param_start + ti * 2)
-            let ta = self.local_allocas.get(tp_name)
-            if ta.is_some():
-                self.tailrec_param_allocas.push(ta.unwrap() as i64)
-            else:
-                self.tailrec_param_allocas.push(0)
-
-    // Generate body
-    let body_val = self.gen_expr(body_node)
-
-    // Emit implicit return if block has no terminator
-    let current_bb = wl_get_insert_block(self.builder)
-    if wl_get_bb_terminator(current_bb) == 0:
-        let ret_type = self.current_ret_type
-        let is_void = ret_type == wl_void_type(self.context)
-        self.emit_drops(0)
-        self.emit_defers()
-        if not is_void:
-            let body_type = wl_type_of(body_val)
-            if body_type == wl_void_type(self.context):
-                if self.current_fn_returns_result:
-                    if self.fn_result_unit_returns.get(name_sym).is_some():
-                        let unit_val = wl_const_int(wl_i32_type(self.context), 0, 0)
-                        let wrapped = self.build_result_ok(unit_val, ret_type)
-                        let _ = wl_build_ret(self.builder, wrapped)
-                    else:
-                        self.emit_implicit_unreachable(fn_node)
-                else:
-                    if self.current_fn_saw_explicit_return:
-                        self.emit_implicit_unreachable(fn_node)
-                    else:
-                        let default_val = self.build_default_value(ret_type)
-                        let _ = wl_build_ret(self.builder, default_val)
-            else if body_type != ret_type and self.current_fn_returns_result:
-                let wrapped = self.build_result_ok(body_val, ret_type)
-                let _ = wl_build_ret(self.builder, wrapped)
-            else:
-                if wl_get_type_kind(body_type) == wl_struct_type_kind() and wl_get_type_kind(ret_type) == wl_struct_type_kind() and body_type != ret_type:
-                    let bn = wl_get_struct_name(body_type)
-                    let rn = wl_get_struct_name(ret_type)
-                    let bf = wl_count_struct_elem_types(body_type)
-                    let rf = wl_count_struct_elem_types(ret_type)
-                    with_eprintln("[ret-coerce] fn=" ++ self.intern.resolve(name_sym) ++ " body_name=" ++ bn ++ " ret_name=" ++ rn ++ " body_fields=" ++ int_to_string(bf) ++ " ret_fields=" ++ int_to_string(rf))
-                let coerced = self.coerce_value_to_type(body_val, ret_type)
-                let _ = wl_build_ret(self.builder, coerced)
-        else:
-            let _ = wl_build_ret_void(self.builder)
-
-    // Restore state
-    self.expected_type = saved_expected
-    self.expected_type_node = saved_expected_node
-    self.current_result_err_symbol = saved_result_err
-    self.current_fn_returns_result = saved_returns_result
-    self.current_fn_saw_explicit_return = saved_saw_return
-    self.tailrec_body_bb = saved_tailrec_bb
-    self.tailrec_fn_sym = saved_tailrec_sym
-    self.restore_loop_state(saved_loops)
 
 // ── gen_expr: top-level expression dispatch ───────────────────────
 
