@@ -351,18 +351,31 @@ Phase 4: Delete AST codegen
   [x] Fix HashMap[K,V] 2-arg generic instance in Sema.check_index + MirLower
   [x] Route closure codegen through MIR (inline MirBuilder in gen_closure)
   [x] Eliminate MIR_INTRINSIC_GENERIC_CALL bridge (0 bridge calls in self-host + tests)
-  [ ] Delete expression emitters
-  [ ] Delete statement emitters
-  [ ] Delete control flow emitters
-  [ ] Delete sugar emitters
-  [ ] Delete support functions
-  [ ] Clean up Codegen struct
-  [ ] Delete gating infrastructure
+  [x] Route default trait method compilation through MIR
+  [x] Disc enum from_int via MIR (gen_disc_enum_from_int_val)
+  [x] Option method bridge with pre_eval_cache for filter/map/etc (test-only)
+
+  --- Phase 4 status: PAUSED (2026-03-15) ---
+  Self-host: 100% MIR. 0 AST fallbacks. 0 bridge calls.
+  Tests: 243/246 pass (3 async stubs).
+  Fixpoint verified. Seed updated.
+
+  AST codegen deletion is blocked by gen_call remaining live for
+  Option.filter/map/fold test cases (closure + inline control flow).
+  gen_call → gen_method_call → gen_option_method → gen_expr keeps
+  the entire AST dispatch chain reachable. Deleting AST lines is
+  cosmetic until these are natively MIR:
+  - Option.filter/map/fold (inline closure call + Some/None branching)
+  - Async (gen_async_function, spawn, select_await)
+  Each is a standalone feature project, not cleanup.
+
+  Codegen.w: 14,336 lines (was ~14,000 pre-MIR).
+  Net line growth from MIR handlers, but AST is fully dead for self-host.
 
 Phase 5: Validate
-  [ ] make build
-  [ ] make fixpoint
-  [ ] ./scripts/run_tests.sh — all pass
-  [ ] Update seed
-  [ ] Codegen.w line count: _____
+  [x] make build
+  [x] make fixpoint
+  [x] ./scripts/run_tests.sh — 243/246 pass
+  [x] Update seed
+  [x] Codegen.w line count: 14,336
 ```
