@@ -5075,8 +5075,8 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         return wl_const_int(wl_i32_type(self.context), 0, 0)
 
     if ck == CK_CLOSURE:
-        // Populate local_allocas/local_types from MIR locals so gen_closure
-        // can find captured variables via collect_captures.
+        // Populate local_allocas/local_types/local_sema_types from MIR locals
+        // so gen_closure can find captured variables and their types.
         let closure_node = cd
         if closure_node <= 0 or closure_node >= self.pool.node_count():
             with_eprintln("warning: [ck-closure] invalid node=" ++ int_to_string(closure_node))
@@ -5090,6 +5090,9 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
                     let ty_opt = self.mir_local_types.get(li)
                     if ty_opt.is_some():
                         self.local_types.insert(name_sym, ty_opt.unwrap())
+                let sema_ty = body.local_type_ids.get(li as i64)
+                if sema_ty != 0:
+                    self.local_sema_types.insert(name_sym, sema_ty)
         let closure_result = self.gen_closure(closure_node)
         return closure_result
 
@@ -11671,18 +11674,144 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         let alloca = self.create_entry_alloca(param_ty)
         wl_build_store(self.builder, param_val, alloca)
         self.record_local(p_name, alloca, param_ty, 1)
-    let body_val = self.gen_expr(body_node)
-    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
-        if body_val != 0:
-            let body_ty = wl_type_of(body_val)
-            if wl_get_type_kind(body_ty) != wl_void_type_kind():
-                let coerced = self.coerce_value_to_type(body_val, ret_ty)
-                let _ = wl_build_ret(self.builder, coerced)
-            else:
-                // Body is void but function returns i32 — return 0
-                let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
-        else:
-            let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
+    // ── MIR-based closure body compilation ──────────────────────
+    // Save outer MIR state (gen_closure is called from within MIR codegen)
+    let saved_mir_locals = self.mir_local_ptrs
+    let saved_mir_local_types = self.mir_local_types
+    let saved_mir_bbs = self.mir_bb_values
+    let saved_mir_unreachable = self.mir_default_unreachable_bbs
+    let fresh_cl_mir_locals: HashMap[i32, i64] = HashMap.new()
+    let fresh_cl_mir_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_cl_mir_bbs: Vec[i64] = Vec.new()
+    let fresh_cl_mir_unreachable: Vec[i64] = Vec.new()
+    self.mir_local_ptrs = fresh_cl_mir_locals
+    self.mir_local_types = fresh_cl_mir_local_types
+    self.mir_bb_values = fresh_cl_mir_bbs
+    self.mir_default_unreachable_bbs = fresh_cl_mir_unreachable
+
+    // Create MirBuilder for the closure body
+    var closure_builder = MirBuilder.init(self.sema, self.pool, self.intern, 0)
+    // Set return type (try sema inference, default to i32)
+    let ret_sema_ty = self.sema_type_of_node(body_node)
+    if ret_sema_ty != 0 and ret_sema_ty != self.sema.ty_void:
+        closure_builder.body.local_type_ids.set_i32(0, ret_sema_ty)
+    else:
+        closure_builder.body.local_type_ids.set_i32(0, self.sema.ty_i32)
+
+    closure_builder.push_scope()
+
+    // Register captures as MIR locals (locals 1..capture_count)
+    for cl_ci in 0..capture_count:
+        let cl_cap_sym = captures.get(cl_ci as i64)
+        var cl_cap_sema_ty = self.sema.ty_i32
+        let cl_cap_sema_opt = self.local_sema_types.get(cl_cap_sym)
+        if cl_cap_sema_opt.is_some():
+            cl_cap_sema_ty = cl_cap_sema_opt.unwrap()
+        let cl_cap_local = closure_builder.body.new_local(cl_cap_sema_ty, 0, cl_cap_sym, 1)
+        closure_builder.bind_local(cl_cap_sym, cl_cap_local)
+
+    // Register params as MIR locals (locals capture_count+1..)
+    for cl_pi in 0..param_count:
+        let cl_p_name = self.pool.get_extra(extra_start + cl_pi * 2)
+        let cl_p_type_node = self.pool.get_extra(extra_start + cl_pi * 2 + 1)
+        var cl_p_sema_ty = self.sema.ty_i32
+        if cl_p_type_node > 0:
+            if self.sema.typed_expr_types.contains(cl_p_type_node):
+                let cl_tt = self.sema.typed_expr_types.get(cl_p_type_node).unwrap()
+                if cl_tt > 0:
+                    cl_p_sema_ty = cl_tt
+            if cl_p_sema_ty == self.sema.ty_i32:
+                let cl_pk = self.pool.kind(cl_p_type_node)
+                if cl_pk == NK_TYPE_NAMED or cl_pk == NK_IDENT:
+                    let cl_type_sym = self.pool.get_data0(cl_p_type_node)
+                    let cl_prim = self.sema.primitive_type_by_sym(cl_type_sym)
+                    if cl_prim != 0:
+                        cl_p_sema_ty = cl_prim
+                    else if self.sema.named_types.contains(cl_type_sym):
+                        cl_p_sema_ty = self.sema.named_types.get(cl_type_sym).unwrap()
+        let cl_p_local = closure_builder.body.new_local(cl_p_sema_ty, 1, cl_p_name, 1)
+        closure_builder.bind_local(cl_p_name, cl_p_local)
+
+    closure_builder.expected_type = closure_builder.body.local_type_ids.get(0)
+
+    // Lower the closure body expression to MIR
+    let cl_result = closure_builder.lower_expr(body_node)
+    let cl_ret_place = closure_builder.place_for_local(0)
+    closure_builder.assign_operand_to_place(cl_ret_place, cl_result, self.pool.get_end(body_node))
+    closure_builder.pop_scope_inline()
+    closure_builder.terminate(TK_RETURN, 0, 0, 0, 0)
+    let closure_body = closure_builder.body
+
+    // Set up return alloca (MIR local 0)
+    let cl_ret_alloca = self.create_entry_alloca(ret_ty)
+    self.mir_local_ptrs.insert(0, cl_ret_alloca)
+    self.mir_local_types.insert(0, ret_ty)
+
+    // Map capture MIR locals to existing LLVM allocas
+    for cl_mi in 0..capture_count:
+        let cl_m_sym = captures.get(cl_mi as i64)
+        let cl_m_local_id = cl_mi + 1
+        let cl_m_alloca_opt = self.local_allocas.get(cl_m_sym)
+        if cl_m_alloca_opt.is_some():
+            self.mir_local_ptrs.insert(cl_m_local_id, cl_m_alloca_opt.unwrap())
+            let cl_m_ty_opt = self.local_types.get(cl_m_sym)
+            if cl_m_ty_opt.is_some():
+                self.mir_local_types.insert(cl_m_local_id, cl_m_ty_opt.unwrap())
+
+    // Map param MIR locals to existing LLVM allocas
+    for cl_pmi in 0..param_count:
+        let cl_pm_name = self.pool.get_extra(extra_start + cl_pmi * 2)
+        let cl_pm_local_id = capture_count + cl_pmi + 1
+        let cl_pm_alloca_opt = self.local_allocas.get(cl_pm_name)
+        if cl_pm_alloca_opt.is_some():
+            self.mir_local_ptrs.insert(cl_pm_local_id, cl_pm_alloca_opt.unwrap())
+            let cl_pm_ty_opt = self.local_types.get(cl_pm_name)
+            if cl_pm_ty_opt.is_some():
+                self.mir_local_types.insert(cl_pm_local_id, cl_pm_ty_opt.unwrap())
+
+    // Pre-populate globals
+    for cl_gli in 0..closure_body.local_names.len() as i32:
+        let cl_gl_name = closure_body.local_names.get(cl_gli as i64)
+        if cl_gl_name != 0:
+            let cl_gl_mc = self.module_constants.get(cl_gl_name)
+            if cl_gl_mc.is_some():
+                self.mir_local_ptrs.insert(cl_gli, cl_gl_mc.unwrap() as i64)
+
+    // Create LLVM basic blocks for MIR blocks
+    for cl_bb in 0..closure_body.block_count():
+        let cl_bb_name = "mir.bb" ++ int_to_string(cl_bb)
+        let cl_llbb = wl_append_bb(self.context, closure_fn, cl_bb_name)
+        self.mir_bb_values.push(cl_llbb)
+
+    // Branch from entry to first MIR BB
+    if self.mir_bb_values.len() as i32 > 0:
+        wl_build_br(self.builder, self.mir_bb_values.get(0))
+    else:
+        let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
+
+    // Emit MIR statements and terminators
+    for cl_bb in 0..closure_body.block_count():
+        if cl_bb < 0 or cl_bb >= self.mir_bb_values.len() as i32:
+            continue
+        let cl_llbb = self.mir_bb_values.get(cl_bb as i64)
+        wl_position_at_end(self.builder, cl_llbb)
+        let cl_stmt_start = closure_body.bb_stmt_starts.get(cl_bb as i64)
+        let cl_stmt_count = closure_body.bb_stmt_counts.get(cl_bb as i64)
+        for cl_si in 0..cl_stmt_count:
+            let cl_stmt_id = cl_stmt_start + cl_si
+            if not self.mir_emit_stmt(closure_body, cl_stmt_id):
+                if wl_get_bb_terminator(cl_llbb) == 0:
+                    wl_build_unreachable(self.builder)
+        if wl_get_bb_terminator(cl_llbb) == 0:
+            if not self.mir_emit_term(closure_body, cl_bb):
+                if wl_get_bb_terminator(cl_llbb) == 0:
+                    let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
+
+    // Restore outer MIR state
+    self.mir_local_ptrs = saved_mir_locals
+    self.mir_local_types = saved_mir_local_types
+    self.mir_bb_values = saved_mir_bbs
+    self.mir_default_unreachable_bbs = saved_mir_unreachable
     // Restore state
     self.current_function = saved_fn
     self.current_ret_type = saved_ret

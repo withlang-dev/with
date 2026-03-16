@@ -349,7 +349,7 @@ Phase 4: Delete AST codegen
 
   [x] Sealed trait match via MIR (MIR_INTRINSIC_DYN_VTABLE_CMP + DYN_DOWNCAST)
   [x] Fix HashMap[K,V] 2-arg generic instance in Sema.check_index + MirLower
-  [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
+  [x] Route closure codegen through MIR (inline MirBuilder in gen_closure)
   [ ] Delete expression emitters
   [ ] Delete statement emitters
   [ ] Delete control flow emitters
