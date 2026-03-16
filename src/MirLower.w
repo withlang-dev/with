@@ -1641,9 +1641,8 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         var idx = self.variant_index(variant_sym)
         // For disc enums, use the actual discriminant value
         if self.sema.variant_lookup.contains(variant_sym):
-            let disc_enc = self.sema.variant_lookup.get(variant_sym).unwrap()
-            if self.sema.disc_values.contains(disc_enc):
-                idx = self.sema.disc_values.get(disc_enc).unwrap()
+            if self.sema.disc_values.contains(variant_sym):
+                idx = self.sema.disc_values.get(variant_sym).unwrap()
         let disc = self.lower_enum_discriminant(scrutinee_place)
         let vals: Vec[i32] = Vec.new()
         vals.push(idx)
@@ -2919,9 +2918,8 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let vs_result_ty = self.expr_type(node)
         // Check for disc enum: return discriminant value
         if self.sema.variant_lookup.contains(vs_name_sym):
-            let vs_enc = self.sema.variant_lookup.get(vs_name_sym).unwrap()
-            if self.sema.disc_values.contains(vs_enc):
-                let vs_disc_val = self.sema.disc_values.get(vs_enc).unwrap()
+            if self.sema.disc_values.contains(vs_name_sym):
+                let vs_disc_val = self.sema.disc_values.get(vs_name_sym).unwrap()
                 if vs_arg_count == 0:
                     // Disc enums with payloads need full struct via RK_AGGREGATE
                     let vs_resolved = self.sema.resolve_alias(vs_result_ty)
