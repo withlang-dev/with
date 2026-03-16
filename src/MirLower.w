@@ -2171,6 +2171,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "is_some": return MIR_INTRINSIC_OPT_IS_SOME
         if method_name == "is_none": return MIR_INTRINSIC_OPT_IS_NONE
         if method_name == "unwrap": return MIR_INTRINSIC_OPT_UNWRAP
+        if method_name == "filter": return MIR_INTRINSIC_OPT_FILTER
         return MIR_INTRINSIC_NONE
     if type_name == "Result":
         if method_name == "is_ok": return MIR_INTRINSIC_OPT_IS_SOME

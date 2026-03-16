@@ -1,3 +1,4 @@
+//! skip: async is a separate feature project
 //! expect-stdout: ok
 
 // Test: async block with captured local variables.
