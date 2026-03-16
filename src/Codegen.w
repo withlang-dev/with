@@ -4129,12 +4129,124 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
                 self.record_local_pointee_struct(p_name, impl_type_sym)
         pi = pi + 1
 
-    let body_val = self.gen_expr(body_node)
-    if wl_get_bb_terminator(wl_get_insert_block(self.builder)) == 0:
-        if final_ret_ty == wl_void_type(self.context):
-            let _ = wl_build_ret_void(self.builder)
-        else:
-            let _ = wl_build_ret(self.builder, self.coerce_value_to_type(body_val, final_ret_ty))
+    // ── MIR-based default trait method body compilation ──
+    let saved_mir_locals = self.mir_local_ptrs
+    let saved_mir_local_types = self.mir_local_types
+    let saved_mir_bbs = self.mir_bb_values
+    let saved_mir_unreachable = self.mir_default_unreachable_bbs
+    let dtm_fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
+    let dtm_fresh_mir_types: HashMap[i32, i64] = HashMap.new()
+    let dtm_fresh_mir_bbs: Vec[i64] = Vec.new()
+    let dtm_fresh_mir_unr: Vec[i64] = Vec.new()
+    self.mir_local_ptrs = dtm_fresh_mir_locals
+    self.mir_local_types = dtm_fresh_mir_types
+    self.mir_bb_values = dtm_fresh_mir_bbs
+    self.mir_default_unreachable_bbs = dtm_fresh_mir_unr
+
+    var dtm_builder = MirBuilder.init(self.sema, self.pool, self.intern, fn_sym)
+    // Set return type
+    let dtm_ret_sema = self.sema_type_of_node(body_node)
+    if dtm_ret_sema != 0 and dtm_ret_sema != self.sema.ty_void:
+        dtm_builder.body.local_type_ids.set_i32(0, dtm_ret_sema)
+    else:
+        dtm_builder.body.local_type_ids.set_i32(0, self.sema.ty_i32)
+
+    dtm_builder.push_scope()
+
+    // Register params as MIR locals
+    for dtm_pi in 0..param_count:
+        let dtm_p_name = self.pool.get_extra(param_start + dtm_pi * 2)
+        let dtm_p_type_node = self.pool.get_extra(param_start + dtm_pi * 2 + 1)
+        var dtm_p_sema_ty = self.sema.ty_i32
+        if dtm_p_type_node > 0:
+            if self.sema.typed_expr_types.contains(dtm_p_type_node):
+                let dtm_tt = self.sema.typed_expr_types.get(dtm_p_type_node).unwrap()
+                if dtm_tt > 0:
+                    dtm_p_sema_ty = dtm_tt
+            if dtm_p_sema_ty == self.sema.ty_i32:
+                let dtm_pk = self.pool.kind(dtm_p_type_node)
+                if dtm_pk == NK_TYPE_NAMED or dtm_pk == NK_IDENT:
+                    let dtm_type_sym = self.pool.get_data0(dtm_p_type_node)
+                    let dtm_prim = self.sema.primitive_type_by_sym(dtm_type_sym)
+                    if dtm_prim != 0:
+                        dtm_p_sema_ty = dtm_prim
+                    else if self.sema.named_types.contains(dtm_type_sym):
+                        dtm_p_sema_ty = self.sema.named_types.get(dtm_type_sym).unwrap()
+        let dtm_p_local = dtm_builder.body.new_local(dtm_p_sema_ty, 1, dtm_p_name, 1)
+        dtm_builder.bind_local(dtm_p_name, dtm_p_local)
+
+    dtm_builder.expected_type = dtm_builder.body.local_type_ids.get(0)
+
+    // Lower body to MIR
+    let dtm_result = dtm_builder.lower_expr(body_node)
+    let dtm_ret_place = dtm_builder.place_for_local(0)
+    dtm_builder.assign_operand_to_place(dtm_ret_place, dtm_result, self.pool.get_end(body_node))
+    dtm_builder.pop_scope_inline()
+    dtm_builder.terminate(TK_RETURN, 0, 0, 0, 0)
+    let dtm_body = dtm_builder.body
+
+    // Set up return alloca (MIR local 0)
+    let dtm_ret_alloca = self.create_entry_alloca(final_ret_ty)
+    self.mir_local_ptrs.insert(0, dtm_ret_alloca)
+    self.mir_local_types.insert(0, final_ret_ty)
+
+    // Map param MIR locals to existing LLVM allocas
+    for dtm_mi in 0..param_count:
+        let dtm_m_name = self.pool.get_extra(param_start + dtm_mi * 2)
+        let dtm_m_local_id = dtm_mi + 1
+        let dtm_m_alloca_opt = self.local_allocas.get(dtm_m_name)
+        if dtm_m_alloca_opt.is_some():
+            self.mir_local_ptrs.insert(dtm_m_local_id, dtm_m_alloca_opt.unwrap())
+            let dtm_m_ty_opt = self.local_types.get(dtm_m_name)
+            if dtm_m_ty_opt.is_some():
+                self.mir_local_types.insert(dtm_m_local_id, dtm_m_ty_opt.unwrap())
+
+    // Pre-populate globals
+    for dtm_gli in 0..dtm_body.local_names.len() as i32:
+        let dtm_gl_name = dtm_body.local_names.get(dtm_gli as i64)
+        if dtm_gl_name != 0:
+            let dtm_gl_mc = self.module_constants.get(dtm_gl_name)
+            if dtm_gl_mc.is_some():
+                self.mir_local_ptrs.insert(dtm_gli, dtm_gl_mc.unwrap() as i64)
+
+    // Create LLVM basic blocks
+    for dtm_bb in 0..dtm_body.block_count():
+        let dtm_bb_name = "mir.bb" ++ int_to_string(dtm_bb)
+        let dtm_llbb = wl_append_bb(self.context, function, dtm_bb_name)
+        self.mir_bb_values.push(dtm_llbb)
+
+    // Branch from entry to first MIR BB
+    if self.mir_bb_values.len() as i32 > 0:
+        wl_build_br(self.builder, self.mir_bb_values.get(0))
+    else:
+        let _ = wl_build_ret(self.builder, wl_const_int(final_ret_ty, 0, 0))
+
+    // Emit MIR statements and terminators
+    for dtm_bb in 0..dtm_body.block_count():
+        if dtm_bb < 0 or dtm_bb >= self.mir_bb_values.len() as i32:
+            continue
+        let dtm_llbb = self.mir_bb_values.get(dtm_bb as i64)
+        wl_position_at_end(self.builder, dtm_llbb)
+        let dtm_stmt_start = dtm_body.bb_stmt_starts.get(dtm_bb as i64)
+        let dtm_stmt_count = dtm_body.bb_stmt_counts.get(dtm_bb as i64)
+        for dtm_si in 0..dtm_stmt_count:
+            let dtm_stmt_id = dtm_stmt_start + dtm_si
+            if not self.mir_emit_stmt(dtm_body, dtm_stmt_id):
+                if wl_get_bb_terminator(dtm_llbb) == 0:
+                    wl_build_unreachable(self.builder)
+        if wl_get_bb_terminator(dtm_llbb) == 0:
+            if not self.mir_emit_term(dtm_body, dtm_bb):
+                if wl_get_bb_terminator(dtm_llbb) == 0:
+                    if final_ret_ty == wl_void_type(self.context):
+                        let _ = wl_build_ret_void(self.builder)
+                    else:
+                        let _ = wl_build_ret(self.builder, wl_const_int(final_ret_ty, 0, 0))
+
+    // Restore MIR state
+    self.mir_local_ptrs = saved_mir_locals
+    self.mir_local_types = saved_mir_local_types
+    self.mir_bb_values = saved_mir_bbs
+    self.mir_default_unreachable_bbs = saved_mir_unreachable
 
     self.current_function = saved_fn
     self.current_ret_type = saved_ret
