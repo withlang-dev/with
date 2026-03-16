@@ -343,10 +343,12 @@ Phase 4: Delete AST codegen
   [x] Stub async dispatch with unreachable
   [x] Seed updated (2026-03-15)
 
-  Tests: 241/246 pass (3 async failures, 2 pre-existing).
-  Codegen.w: 13,827 lines (was ~14,230).
+  Tests: 243/246 pass (3 async failures).
+  behav_hashmap fixed (HashMap[K,V] 2-arg generic instance resolution).
+  duck_binop_fail updated (LLVM verify error replaces old AST error).
 
   [x] Sealed trait match via MIR (MIR_INTRINSIC_DYN_VTABLE_CMP + DYN_DOWNCAST)
+  [x] Fix HashMap[K,V] 2-arg generic instance in Sema.check_index + MirLower
   [ ] Route closure codegen through MIR (remove CK_CLOSURE bridge)
   [ ] Delete expression emitters
   [ ] Delete statement emitters
