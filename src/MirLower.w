@@ -261,7 +261,7 @@ fn MirBuilder.ident_type(self: MirBuilder, sym: i32) -> i32:
 
 fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
     // Resolve NK_INDEX(NK_IDENT("Vec"), type_arg) to a TY_GENERIC_INST.
-    // Used for Vec[i32].new() where we need the full generic instance type.
+    // Used for Vec[i32].new() and HashMap[str, i32].new().
     // Sema.check_index creates these during the check pass; we only look up here.
     let base = self.ast.get_data0(node)
     if self.ast.kind(base) != NK_IDENT:
@@ -269,25 +269,35 @@ fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
     let base_sym = self.ast.get_data0(base)
     if not self.sema.named_types.contains(base_sym):
         return 0
-    // Resolve the type argument (d1 of NK_INDEX)
+    // Resolve the first type argument (d1 of NK_INDEX)
     let type_arg_node = self.ast.get_data1(node)
     if type_arg_node == 0:
         return 0
-    var arg_type = 0
+    var arg_type = self.resolve_type_arg_node(type_arg_node)
+    if arg_type == 0:
+        return 0
+    // Check for second type argument (d2 of NK_INDEX) — HashMap[K, V]
+    let type_arg2_node = self.ast.get_data2(node)
+    var arg2_type = 0
+    if type_arg2_node != 0:
+        arg2_type = self.resolve_type_arg_node(type_arg2_node)
+    // Look up TY_GENERIC_INST from sema cache (created by Sema.check_index)
+    var cache_key = int_to_string(base_sym) ++ ":" ++ int_to_string(arg_type)
+    if arg2_type > 0:
+        cache_key = cache_key ++ ":" ++ int_to_string(arg2_type)
+    if self.sema.generic_inst_cache.contains(cache_key):
+        return self.sema.generic_inst_cache.get(cache_key).unwrap()
+    0
+
+fn MirBuilder.resolve_type_arg_node(self: MirBuilder, type_arg_node: i32) -> i32:
     let arg_kind = self.ast.kind(type_arg_node)
     if arg_kind == NK_IDENT or arg_kind == NK_TYPE_NAMED:
         let arg_sym = self.ast.get_data0(type_arg_node)
         let prim = self.sema.primitive_type_by_sym(arg_sym)
         if prim != 0:
-            arg_type = prim
-        else if self.sema.named_types.contains(arg_sym):
-            arg_type = self.sema.named_types.get(arg_sym).unwrap()
-    if arg_type == 0:
-        return 0
-    // Look up TY_GENERIC_INST from sema cache (created by Sema.check_index)
-    let cache_key = int_to_string(base_sym) ++ ":" ++ int_to_string(arg_type)
-    if self.sema.generic_inst_cache.contains(cache_key):
-        return self.sema.generic_inst_cache.get(cache_key).unwrap()
+            return prim
+        if self.sema.named_types.contains(arg_sym):
+            return self.sema.named_types.get(arg_sym).unwrap()
     0
 
 fn MirBuilder.type_receiver_type(self: MirBuilder, node: i32) -> i32:

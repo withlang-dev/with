@@ -3763,14 +3763,32 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
                     else if self.named_types.contains(arg_sym):
                         ci_arg_type = self.named_types.get(arg_sym).unwrap()
                 if ci_arg_type > 0:
-                    let ci_cache_key = int_to_string(ci_base_sym) ++ ":" ++ int_to_string(ci_arg_type)
+                    // Check for second type arg (d2 of NK_INDEX) — HashMap[K, V]
+                    let ci_index2 = self.ast.get_data2(node)
+                    var ci_arg2_type = 0
+                    if ci_index2 != 0:
+                        let a2_kind = self.ast.kind(ci_index2)
+                        if a2_kind == NK_IDENT or a2_kind == NK_TYPE_NAMED:
+                            let a2_sym = self.ast.get_data0(ci_index2)
+                            let a2_prim = self.primitive_type_by_sym(a2_sym)
+                            if a2_prim != 0:
+                                ci_arg2_type = a2_prim
+                            else if self.named_types.contains(a2_sym):
+                                ci_arg2_type = self.named_types.get(a2_sym).unwrap()
+                    var ci_cache_key = int_to_string(ci_base_sym) ++ ":" ++ int_to_string(ci_arg_type)
+                    var ci_arg_count = 1
+                    if ci_arg2_type > 0:
+                        ci_cache_key = ci_cache_key ++ ":" ++ int_to_string(ci_arg2_type)
+                        ci_arg_count = 2
                     if self.generic_inst_cache.contains(ci_cache_key):
                         let ci_result = self.generic_inst_cache.get(ci_cache_key).unwrap()
                         self.typed_expr_types.insert(node, ci_result)
                         return ci_result
                     let ci_te_start = self.type_extra.len() as i32
                     self.type_extra.push(ci_arg_type)
-                    let ci_tid = self.add_type(TY_GENERIC_INST, ci_base_sym, ci_te_start, 1)
+                    if ci_arg2_type > 0:
+                        self.type_extra.push(ci_arg2_type)
+                    let ci_tid = self.add_type(TY_GENERIC_INST, ci_base_sym, ci_te_start, ci_arg_count)
                     self.generic_inst_cache.insert(ci_cache_key, ci_tid)
                     self.typed_expr_types.insert(node, ci_tid)
                     return ci_tid
