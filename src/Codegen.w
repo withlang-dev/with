@@ -363,6 +363,9 @@ type Codegen = {
 
     // Generic functions/structs: sym → node
     generic_fns: HashMap[i32, i32],
+    // Pre-evaluated expression cache: AST node → LLVM value.
+    // Used by MIR bridge to pass pre-evaluated args to gen_call without gen_expr.
+    pre_eval_cache: HashMap[i32, i64],
     generic_structs: HashMap[i32, i32],
     generic_struct_methods: HashMap[i32, i32],
     mono_struct_base: HashMap[i32, i32],
@@ -634,6 +637,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         disc_enum_has_payload: Vec.new(),
         disc_enum_variant_payloads: Vec.new(),
         generic_fns: HashMap.new(),
+        pre_eval_cache: HashMap.new(),
         generic_structs: HashMap.new(),
         generic_struct_methods: HashMap.new(),
         mono_struct_base: HashMap.new(),
@@ -3315,6 +3319,13 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
 // Called lazily when the method is first invoked on a monomorphized struct.
 
 fn Codegen.monomorphize_struct_method(self: Codegen, mono_type_sym: i32, method_name: str, decl: i32, obj: i64, obj_node: i32, obj_ty: i64, args_start: i32, arg_count: i32, call_node: i32) -> i64:
+    let pre_args: Vec[i64] = Vec.new()
+    for ai in 0..arg_count:
+        let arg_node = self.pool.get_extra(args_start + ai)
+        pre_args.push(self.gen_expr(arg_node))
+    self.monomorphize_struct_method_core(mono_type_sym, method_name, decl, obj, obj_node, obj_ty, args_start, arg_count, call_node, pre_args)
+
+fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, method_name: str, decl: i32, obj: i64, obj_node: i32, obj_ty: i64, args_start: i32, arg_count: i32, call_node: i32, pre_args: Vec[i64]) -> i64:
     let tp_start_opt = self.mono_struct_tp_starts.get(mono_type_sym)
     if not tp_start_opt.is_some():
         with_eprintln("error: no type param bindings for monomorphized struct")
@@ -3338,8 +3349,7 @@ fn Codegen.monomorphize_struct_method(self: Codegen, mono_type_sym: i32, method_
         else:
             args.push(obj)
         for ai in 0..arg_count:
-            let arg_node = self.pool.get_extra(args_start + ai)
-            args.push(self.gen_expr(arg_node))
+            args.push(pre_args.get(ai as i64))
         let coerced = self.coerce_call_args_for_fn_value(mono_sym, cached_fv.unwrap() as i64, args_start, 1, args, arg_count + 1, "method " ++ mangled, call_node)
         return wl_build_call(self.builder, cached_ft.unwrap() as i64, cached_fv.unwrap() as i64, vec_data_i64(&coerced), arg_count + 1)
 
@@ -3432,8 +3442,7 @@ fn Codegen.monomorphize_struct_method(self: Codegen, mono_type_sym: i32, method_
     else:
         call_args.push(obj)
     for ai in 0..arg_count:
-        let arg_node = self.pool.get_extra(args_start + ai)
-        call_args.push(self.gen_expr(arg_node))
+        call_args.push(pre_args.get(ai as i64))
     let coerced = self.coerce_call_args_for_fn_value(mono_sym, mono_fn, args_start, 1, call_args, arg_count + 1, "method " ++ mangled, call_node)
     wl_build_call(self.builder, mono_ft, mono_fn, vec_data_i64(&coerced), arg_count + 1)
 
@@ -6738,7 +6747,151 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     if mir_intrinsic == MIR_INTRINSIC_GENERIC_CALL:
         let gc_node = body.call_ast_node(args_id)
         if gc_node > 0:
-            // Bridge MIR locals into local_allocas so gen_call can find them
+            // Extract callee sym from CK_FN constant
+            let gc_co_k = body.operand_kinds.get(callee_operand as i64)
+            let gc_co_d = body.operand_d0.get(callee_operand as i64)
+            var gc_callee_sym = 0
+            if gc_co_k == OK_CONSTANT and gc_co_d >= 0 and gc_co_d < body.const_kinds.len() as i32:
+                gc_callee_sym = body.const_d0.get(gc_co_d as i64)
+
+            // Generic function call — eval MIR args, call monomorphize directly
+            let gc_gf = self.generic_fns.get(gc_callee_sym)
+            if gc_gf.is_some() and gc_callee_sym > 0:
+                let gc_mir_start = body.call_arg_starts.get(args_id as i64)
+                let gc_mir_count = body.call_arg_counts.get(args_id as i64)
+                let gc_as = self.pool.get_data1(gc_node)
+                let gc_arg_vals: Vec[i64] = Vec.new()
+                let gc_arg_tys: Vec[i64] = Vec.new()
+                let gc_arg_nodes: Vec[i32] = Vec.new()
+                for gc_ai in 0..gc_mir_count:
+                    let gc_arg_nd = self.pool.get_extra(gc_as + gc_ai)
+                    gc_arg_nodes.push(gc_arg_nd)
+                    let gc_op = body.call_arg_operands.get((gc_mir_start + gc_ai) as i64)
+                    let gc_val = self.mir_eval_operand(body, gc_op, 0)
+                    gc_arg_vals.push(gc_val)
+                    gc_arg_tys.push(wl_type_of(gc_val))
+                let gc_result = self.monomorphize_generic_call_core(gc_callee_sym, gc_gf.unwrap(), gc_as, gc_mir_count, gc_node, gc_arg_vals, gc_arg_tys, gc_arg_nodes)
+                if dest_place >= 0 and gc_result != 0:
+                    let gc_ret_ty = wl_type_of(gc_result)
+                    if gc_ret_ty != wl_void_type(self.context):
+                        let gc_local = body.place_locals.get(dest_place as i64)
+                        let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                        wl_build_store(self.builder, gc_result, gc_alloca)
+                        self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                        self.mir_local_types.insert(gc_local, gc_ret_ty)
+                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                    let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                    wl_build_br(self.builder, gc_next_val)
+                return true
+
+            // Handle builtins directly (no gen_expr needed)
+            if gc_callee_sym > 0:
+                let gc_fn_name = self.intern.resolve(gc_callee_sym)
+                let gc_arg_count = self.pool.get_data2(gc_node)
+                if gc_fn_name == "src" and gc_arg_count == 0:
+                    let gc_result = self.gen_src_intrinsic(gc_node)
+                    if dest_place >= 0 and gc_result != 0:
+                        let gc_ret_ty = wl_type_of(gc_result)
+                        if gc_ret_ty != wl_void_type(self.context):
+                            let gc_local = body.place_locals.get(dest_place as i64)
+                            let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                            wl_build_store(self.builder, gc_result, gc_alloca)
+                            self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                            self.mir_local_types.insert(gc_local, gc_ret_ty)
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                        wl_build_br(self.builder, gc_next_val)
+                    return true
+                if gc_fn_name == "embed_file" and gc_arg_count == 1:
+                    let gc_result = self.gen_embed_file(gc_node)
+                    if dest_place >= 0 and gc_result != 0:
+                        let gc_ret_ty = wl_type_of(gc_result)
+                        if gc_ret_ty != wl_void_type(self.context):
+                            let gc_local = body.place_locals.get(dest_place as i64)
+                            let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                            wl_build_store(self.builder, gc_result, gc_alloca)
+                            self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                            self.mir_local_types.insert(gc_local, gc_ret_ty)
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                        wl_build_br(self.builder, gc_next_val)
+                    return true
+
+            // Try method call dispatch for generic struct methods
+            let gc_callee_field = self.pool.get_data0(gc_node)
+            if self.pool.kind(gc_callee_field) == NK_FIELD_ACCESS:
+                let gc_self_expr_node = self.pool.get_data0(gc_callee_field)
+                let gc_method_sym = self.pool.get_data1(gc_callee_field)
+                let gc_method_name = self.intern.resolve(gc_method_sym)
+                let gc_mir_start = body.call_arg_starts.get(args_id as i64)
+                let gc_mir_count = body.call_arg_counts.get(args_id as i64)
+                // Eval receiver from MIR operand 0
+                if gc_mir_count > 0:
+                    let gc_recv_op = body.call_arg_operands.get(gc_mir_start as i64)
+                    let gc_recv_val = self.mir_eval_operand(body, gc_recv_op, 0)
+                    let gc_recv_ty = wl_type_of(gc_recv_val)
+                    let gc_recv_type_sym = self.find_struct_type_by_llvm(gc_recv_ty)
+                    // Generic struct method: receiver is monomorphized generic struct
+                    let gc_base_opt = self.mono_struct_base.get(gc_recv_type_sym)
+                    if gc_base_opt.is_some():
+                        let gc_base_sym = gc_base_opt.unwrap()
+                        let gc_base_name = self.intern.resolve(gc_base_sym)
+                        let gc_qualified = gc_base_name ++ "." ++ gc_method_name
+                        let gc_fn_sym_early = self.intern.intern(gc_qualified)
+                        let gc_gsm = self.generic_struct_methods.get(gc_fn_sym_early)
+                        // Build pre-evaluated args (method args only, not self)
+                        let gc_call_args_start = self.pool.get_data1(gc_node)
+                        let gc_method_arg_count = gc_mir_count - 1
+                        let gc_pre_args: Vec[i64] = Vec.new()
+                        for gc_mai in 0..gc_method_arg_count:
+                            let gc_ma_op = body.call_arg_operands.get((gc_mir_start + 1 + gc_mai) as i64)
+                            gc_pre_args.push(self.mir_eval_operand(body, gc_ma_op, 0))
+                        if gc_gsm.is_some():
+                            let gc_result = self.monomorphize_struct_method_core(gc_recv_type_sym, gc_method_name, gc_gsm.unwrap(), gc_recv_val, gc_self_expr_node, gc_recv_ty, gc_call_args_start, gc_method_arg_count, gc_node, gc_pre_args)
+                            if dest_place >= 0 and gc_result != 0:
+                                let gc_ret_ty = wl_type_of(gc_result)
+                                if gc_ret_ty != wl_void_type(self.context):
+                                    let gc_local = body.place_locals.get(dest_place as i64)
+                                    let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                                    wl_build_store(self.builder, gc_result, gc_alloca)
+                                    self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                                    self.mir_local_types.insert(gc_local, gc_ret_ty)
+                            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                                wl_build_br(self.builder, gc_next_val)
+                            return true
+                        // Direct method on base struct (non-generic method on generic struct)
+                        let gc_direct_fv = self.fn_values.get(gc_fn_sym_early)
+                        let gc_direct_ft = self.fn_fn_types.get(gc_fn_sym_early)
+                        if gc_direct_fv.is_some() and gc_direct_ft.is_some():
+                            let gc_call_args: Vec[i64] = Vec.new()
+                            let gc_is_ref = self.fn_ref_param_starts.get(gc_fn_sym_early).is_some()
+                            if gc_is_ref:
+                                gc_call_args.push(self.get_mutable_receiver_ptr(gc_self_expr_node, gc_recv_val, gc_recv_ty))
+                            else:
+                                gc_call_args.push(gc_recv_val)
+                            for gc_dai in 0..gc_method_arg_count:
+                                gc_call_args.push(gc_pre_args.get(gc_dai as i64))
+                            let gc_coerced = self.coerce_call_args_for_fn_value(gc_fn_sym_early, gc_direct_fv.unwrap() as i64, gc_call_args_start, 1, gc_call_args, gc_method_arg_count + 1, "method " ++ gc_qualified, gc_node)
+                            let gc_result = wl_build_call(self.builder, gc_direct_ft.unwrap() as i64, gc_direct_fv.unwrap() as i64, vec_data_i64(&gc_coerced), gc_method_arg_count + 1)
+                            if dest_place >= 0 and gc_result != 0:
+                                let gc_ret_ty = wl_type_of(gc_result)
+                                if gc_ret_ty != wl_void_type(self.context):
+                                    let gc_local = body.place_locals.get(dest_place as i64)
+                                    let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                                    wl_build_store(self.builder, gc_result, gc_alloca)
+                                    self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                                    self.mir_local_types.insert(gc_local, gc_ret_ty)
+                            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                                wl_build_br(self.builder, gc_next_val)
+                            return true
+
+            // Remaining patterns — populate pre_eval_cache with MIR args, then gen_call
+            if self.debug_mir_codegen_enabled():
+                let gc_name = if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: "?"
+                with_eprintln("[mir-bridge-gencall] sym=" ++ gc_name ++ " node_kind=" ++ int_to_string(self.pool.kind(gc_node)))
+            // Bridge MIR locals into local_allocas
             let gc_local_count = body.local_names.len() as i32
             for gli in 0..gc_local_count:
                 let gl_sym = body.local_names.get(gli as i64)
@@ -6750,20 +6903,61 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let gl_ty_opt = self.mir_local_types.get(gli)
                         if gl_ty_opt.is_some():
                             self.local_types.insert(gl_sym, gl_ty_opt.unwrap() as i64)
+            // Pre-evaluate MIR args into cache so gen_expr returns cached values
+            let gc_pec_mir_start = body.call_arg_starts.get(args_id as i64)
+            let gc_pec_mir_count = body.call_arg_counts.get(args_id as i64)
+            let gc_pec_callee_field = self.pool.get_data0(gc_node)
+            var gc_pec_self_node = 0
+            var gc_pec_arg_offset = 0
+            if self.pool.kind(gc_pec_callee_field) == NK_FIELD_ACCESS:
+                gc_pec_self_node = self.pool.get_data0(gc_pec_callee_field)
+                // MIR operand 0 is the receiver (if not static call)
+                if gc_pec_mir_count > 0:
+                    let gc_pec_as = self.pool.get_data1(gc_node)
+                    let gc_pec_ac = self.pool.get_data2(gc_node)
+                    if gc_pec_mir_count == gc_pec_ac + 1:
+                        // Has receiver + args: cache receiver at operand 0
+                        let gc_recv_op = body.call_arg_operands.get(gc_pec_mir_start as i64)
+                        let gc_recv_v = self.mir_eval_operand(body, gc_recv_op, 0)
+                        self.pre_eval_cache.insert(gc_pec_self_node, gc_recv_v)
+                        gc_pec_arg_offset = 1
+                        // Cache each method arg (skip closures — they need gen_expr)
+                        for gc_pec_i in 0..gc_pec_ac:
+                            let gc_pec_arg_node = self.pool.get_extra(gc_pec_as + gc_pec_i)
+                            if self.pool.kind(gc_pec_arg_node) != NK_CLOSURE:
+                                let gc_pec_op = body.call_arg_operands.get((gc_pec_mir_start + 1 + gc_pec_i) as i64)
+                                let gc_pec_val = self.mir_eval_operand(body, gc_pec_op, 0)
+                                self.pre_eval_cache.insert(gc_pec_arg_node, gc_pec_val)
+                    else if gc_pec_mir_count == gc_pec_ac:
+                        // Static call: no receiver, just args
+                        for gc_pec_i in 0..gc_pec_ac:
+                            let gc_pec_arg_node = self.pool.get_extra(gc_pec_as + gc_pec_i)
+                            if self.pool.kind(gc_pec_arg_node) != NK_CLOSURE:
+                                let gc_pec_op = body.call_arg_operands.get((gc_pec_mir_start + gc_pec_i) as i64)
+                                let gc_pec_val = self.mir_eval_operand(body, gc_pec_op, 0)
+                                self.pre_eval_cache.insert(gc_pec_arg_node, gc_pec_val)
+            else:
+                // Bare function call — cache args directly
+                let gc_pec_bas = self.pool.get_data1(gc_node)
+                let gc_pec_bac = self.pool.get_data2(gc_node)
+                for gc_pec_i in 0..gc_pec_bac:
+                    if gc_pec_i < gc_pec_mir_count:
+                        let gc_pec_arg_node = self.pool.get_extra(gc_pec_bas + gc_pec_i)
+                        let gc_pec_op = body.call_arg_operands.get((gc_pec_mir_start + gc_pec_i) as i64)
+                        let gc_pec_val = self.mir_eval_operand(body, gc_pec_op, 0)
+                        self.pre_eval_cache.insert(gc_pec_arg_node, gc_pec_val)
             let gc_result = self.gen_call(gc_node)
-            // gen_call may have created basic blocks (e.g. Option.filter's if-else).
-            // Continue from wherever gen_call left the builder — do NOT restore.
-            // Store result in dest_place — use actual return type, not MIR placeholder type
+            // Clear pre_eval_cache
+            let gc_fresh_cache: HashMap[i32, i64] = HashMap.new()
+            self.pre_eval_cache = gc_fresh_cache
             if dest_place >= 0 and gc_result != 0:
                 let gc_ret_ty = wl_type_of(gc_result)
                 if gc_ret_ty != wl_void_type(self.context):
-                    // Update the local's alloca to match the actual return type
                     let gc_local = body.place_locals.get(dest_place as i64)
                     let gc_alloca = self.create_entry_alloca(gc_ret_ty)
                     wl_build_store(self.builder, gc_result, gc_alloca)
                     self.mir_local_ptrs.insert(gc_local, gc_alloca)
                     self.mir_local_types.insert(gc_local, gc_ret_ty)
-            // Branch to next BB
             if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                 let gc_next_val = self.mir_bb_values.get(next_bb as i64)
                 wl_build_br(self.builder, gc_next_val)
@@ -7507,6 +7701,9 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
 
 fn Codegen.gen_expr(self: Codegen, node: i32) -> i64:
     if node == 0: return wl_get_undef(wl_void_type(self.context))
+    let cached = self.pre_eval_cache.get(node)
+    if cached.is_some():
+        return cached.unwrap() as i64
     let kind = self.pool.kind(node)
 
     if kind == NK_INT_LIT: return self.gen_int_lit(node)
@@ -9084,6 +9281,18 @@ fn Codegen.llvm_type_mangle(self: Codegen, ty: i64) -> str:
     "unknown"
 
 fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, args_start: i32, arg_count: i32, call_node: i32) -> i64:
+    let arg_vals: Vec[i64] = Vec.new()
+    let arg_tys: Vec[i64] = Vec.new()
+    let arg_nodes: Vec[i32] = Vec.new()
+    for ai in 0..arg_count:
+        let arg_node = self.pool.get_extra(args_start + ai)
+        let arg_val = self.gen_expr(arg_node)
+        arg_vals.push(arg_val)
+        arg_tys.push(wl_type_of(arg_val))
+        arg_nodes.push(arg_node)
+    self.monomorphize_generic_call_core(fn_sym, fn_node, args_start, arg_count, call_node, arg_vals, arg_tys, arg_nodes)
+
+fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i32, args_start: i32, arg_count: i32, call_node: i32, arg_vals: Vec[i64], arg_tys: Vec[i64], arg_nodes: Vec[i32]) -> i64:
     var generic_node = fn_node
     var meta = self.pool.find_fn_meta(generic_node)
     if self.pool.kind(generic_node) != NK_FN_DECL or self.pool.get_data0(generic_node) != fn_sym or meta < 0 or self.pool.fn_meta_tp_count(meta) <= 0:
@@ -9112,16 +9321,6 @@ fn Codegen.monomorphize_generic_call(self: Codegen, fn_sym: i32, fn_node: i32, a
     if param_count < 0 or param_count > 64:
         with_eprintln("warning: [optional-chain] chain resolution failed")
         return wl_get_undef(wl_i32_type(self.context))
-
-    let arg_vals: Vec[i64] = Vec.new()
-    let arg_tys: Vec[i64] = Vec.new()
-    let arg_nodes: Vec[i32] = Vec.new()
-    for ai in 0..arg_count:
-        let arg_node = self.pool.get_extra(args_start + ai)
-        let arg_val = self.gen_expr(arg_node)
-        arg_vals.push(arg_val)
-        arg_tys.push(wl_type_of(arg_val))
-        arg_nodes.push(arg_node)
 
     let tp_syms: Vec[i32] = Vec.new()
     var tp_pos = tp_start

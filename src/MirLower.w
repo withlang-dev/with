@@ -2265,6 +2265,27 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     if callee_sym == method_sym:
             let gc_fn_op = self.const_operand(CK_FN, callee_sym, 0)
             let gc_args: Vec[i32] = Vec.new()
+            // Lower self + method args so the handler can eval them.
+            // Skip receiver for static calls (type name, not value expression).
+            var gc_is_static = false
+            if self.ast.kind(self_expr) == NK_IDENT:
+                let gc_id_sym = self.ast.get_data0(self_expr)
+                if self.sema.named_types.contains(gc_id_sym):
+                    gc_is_static = true
+            if self.ast.kind(self_expr) == NK_INDEX:
+                let gc_idx_base = self.ast.get_data0(self_expr)
+                if self.ast.kind(gc_idx_base) == NK_IDENT:
+                    let gc_idx_sym = self.ast.get_data0(gc_idx_base)
+                    if self.sema.named_types.contains(gc_idx_sym):
+                        gc_is_static = true
+            if not gc_is_static:
+                gc_args.push(self.lower_expr(self_expr))
+            for gc_mai in 0..arg_count:
+                let gc_ma_node = self.ast.get_extra(arg_start + gc_mai)
+                if self.ast.kind(gc_ma_node) != NK_CLOSURE:
+                    gc_args.push(self.lower_expr(gc_ma_node))
+                else:
+                    gc_args.push(self.const_operand(CK_INT, 0, self.sema.ty_i32))
             let gc_args_id = self.body.new_call_args(gc_args)
             self.body.set_call_intrinsic(gc_args_id, MIR_INTRINSIC_GENERIC_CALL)
             self.body.set_call_ast_node(gc_args_id, node)
@@ -2774,10 +2795,15 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         if self.ast.kind(callee) == NK_IDENT:
             let gc_sym = self.ast.get_data0(callee)
             if self.sema.generic_fn_nodes.contains(gc_sym):
-                // Emit a placeholder call. Codegen will intercept via MIR_INTRINSIC_GENERIC_CALL
-                // and route to monomorphize_generic_call using the stored AST call node.
+                // Lower args and emit call. Codegen intercepts via MIR_INTRINSIC_GENERIC_CALL
+                // and routes to monomorphize_generic_call_core with pre-evaluated MIR args.
                 let gc_fn_op = self.const_operand(CK_FN, gc_sym, 0)
                 let gc_args: Vec[i32] = Vec.new()
+                let gc_as = self.ast.get_data1(node)
+                let gc_ac = self.ast.get_data2(node)
+                for gc_ai in 0..gc_ac:
+                    let gc_arg_node = self.ast.get_extra(gc_as + gc_ai)
+                    gc_args.push(self.lower_expr(gc_arg_node))
                 let gc_args_id = self.body.new_call_args(gc_args)
                 self.body.set_call_intrinsic(gc_args_id, MIR_INTRINSIC_GENERIC_CALL)
                 self.body.set_call_ast_node(gc_args_id, node)
