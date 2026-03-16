@@ -1868,11 +1868,28 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             if ety != 0:
                 sp_elem_ty = ety
         // extras: [has_rest, head_sym0, head_sym1, ..., tail_count, tail_sym0, ...]
+        let sp_arr_len = if sp_arr_tk == TY_ARRAY: self.sema.get_type_d1(sp_arr_ty) else: 0
+        // Bind head variables
         for si in 0..sp_head_count:
             let sym = self.ast.get_extra(sp_extra + 1 + si)
             if sym == 0:
                 continue
             let field_place = self.body.new_field_place(scrutinee_place, si)
+            let local_id = self.body.new_local(sp_elem_ty, 0, sym, 1)
+            self.bind_local(sym, local_id)
+            self.body.push_stmt(self.cur_bb, SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(pat_node))
+            let src_op = self.body.new_operand(if self.sema.is_copy(sp_elem_ty) != 0: OK_COPY else: OK_MOVE, field_place)
+            self.assign_operand_to_place(self.place_for_local(local_id), src_op, self.ast.get_start(pat_node))
+            out.push(local_id)
+            out.push(field_place)
+        // Bind tail variables (from the end of the array)
+        let sp_tail_count = self.ast.get_extra(sp_extra + 1 + sp_head_count)
+        for ti in 0..sp_tail_count:
+            let sym = self.ast.get_extra(sp_extra + 2 + sp_head_count + ti)
+            if sym == 0:
+                continue
+            let field_idx = sp_arr_len - sp_tail_count + ti
+            let field_place = self.body.new_field_place(scrutinee_place, field_idx)
             let local_id = self.body.new_local(sp_elem_ty, 0, sym, 1)
             self.bind_local(sym, local_id)
             self.body.push_stmt(self.cur_bb, SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(pat_node))
@@ -2180,25 +2197,8 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
 
     // If resolution returned bare method_sym, the method is unresolved.
     // Route through MIR_INTRINSIC_GENERIC_CALL so codegen's gen_call handles it
-    // (disc enums, from_int, Option methods, concrete struct methods, etc.).
-    // Exception: generic_fn_nodes entries are monomorphized at call sites,
-    // not directly callable — mark_unsupported for those.
+    // (disc enums, from_int, Option methods, concrete/generic struct methods, etc.).
     if callee_sym == method_sym:
-        var is_generic_fn = self.sema.generic_fn_nodes.contains(callee_sym)
-        if not is_generic_fn:
-            let gm_recv_type = self.expr_type(self_expr)
-            if gm_recv_type != 0:
-                let gm_name_sym = self.sema.get_type_name(gm_recv_type)
-                if gm_name_sym != 0:
-                    let gm_type_name = self.pool.resolve_symbol(gm_name_sym)
-                    let gm_method_name = self.pool.resolve_symbol(method_sym)
-                    let gm_qualified = gm_type_name ++ "." ++ gm_method_name
-                    let gm_key = self.pool.intern(gm_qualified)
-                    if self.sema.generic_fn_nodes.contains(gm_key):
-                        is_generic_fn = true
-        if is_generic_fn:
-            self.mark_unsupported()
-        else:
             let gc_fn_op = self.const_operand(CK_FN, callee_sym, 0)
             let gc_args: Vec[i32] = Vec.new()
             let gc_args_id = self.body.new_call_args(gc_args)

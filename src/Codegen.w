@@ -4512,7 +4512,7 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
             self.gen_function_mir(fn_node, body)
             self.debug_clear_location()
             return
-    // Fallback to AST codegen for functions without MIR bodies
+    // AST fallback for functions without successful MIR lowering
     let mir_audit = with_getenv_str("WITH_MIR_AUDIT")
     if mir_audit.len() > 0 and mir_audit != "0":
         let fn_name = self.intern.resolve(fn_sym)
