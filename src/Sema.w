@@ -3506,6 +3506,11 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
     if op == OP_ADD or op == OP_SUB or op == OP_MUL or op == OP_DIV or op == OP_MOD:
         if op == OP_ADD and lhs == self.ty_str and rhs == self.ty_str:
             return self.ty_str
+        // Pointer arithmetic: ptr + int → ptr, ptr - int → ptr
+        let lhs_k = self.get_type_kind(self.resolve_alias(lhs))
+        let rhs_k = self.get_type_kind(self.resolve_alias(rhs))
+        if (op == OP_ADD or op == OP_SUB) and lhs_k == TY_PTR and (rhs_k == TY_INT or rhs == self.ty_i32 or rhs == self.ty_i64):
+            return lhs
         let result = self.arithmetic_result_type(lhs, rhs)
         if result != 0:
             return result
