@@ -70,18 +70,25 @@ fn process_c_import(header_spec: str) -> str:
     while i < count:
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_FUNCTION:
-            output = output ++ ci_translate_function(session, i)
+            output = output ++ ci_translate_function(session, i, translated_structs)
         else if kind == CK_STRUCT or kind == CK_UNION:
-            let struct_result = ci_translate_struct(session, i, kind == CK_UNION)
+            let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs)
             output = output ++ struct_result
-            // Track struct name for typedef resolution
-            let sname = with_cimport_decl_name(session, i)
-            if sname.len() > 0 and sname.byte_at(0) != 95:
-                translated_structs = translated_structs ++ "|" ++ sname ++ "|"
+            // Track struct name for typedef resolution (only if actually translated)
+            if struct_result.len() > 0:
+                let sname = with_cimport_decl_name(session, i)
+                if sname.len() > 0 and sname.byte_at(0) != 95:
+                    translated_structs = translated_structs ++ "|" ++ sname ++ "|"
         else if kind == CK_ENUM:
             output = output ++ ci_translate_enum(session, i)
         else if kind == CK_TYPEDEF:
-            output = output ++ ci_translate_typedef(session, i, translated_structs)
+            let td_result = ci_translate_typedef(session, i, translated_structs)
+            output = output ++ td_result
+            // Track typedef name if it aliases a translated struct
+            if td_result.len() > 0:
+                let td_name = with_cimport_decl_name(session, i)
+                if td_name.len() > 0 and td_name.byte_at(0) != 95:
+                    translated_structs = translated_structs ++ "|" ++ td_name ++ "|"
         i = i + 1
 
     with_cimport_dispose(session)
@@ -105,7 +112,7 @@ fn ci_build_include_text(header_spec: str) -> str:
 
 // ── Function translation ────────────────────────────────────
 
-fn ci_translate_function(session: i64, idx: i32) -> str:
+fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
         return ""
@@ -128,7 +135,7 @@ fn ci_translate_function(session: i64, idx: i32) -> str:
             params = params ++ ", "
         let pname = with_cimport_fn_param_name(session, idx, pi)
         let ptype_raw = with_cimport_fn_param_type(session, idx, pi)
-        let ptype = ci_map_c_type(ptype_raw)
+        let ptype = ci_map_c_type_ctx(ptype_raw, known_structs)
 
         if pname.len() > 0:
             params = params ++ ci_escape_reserved(pname) ++ ": " ++ ptype
@@ -142,14 +149,14 @@ fn ci_translate_function(session: i64, idx: i32) -> str:
             params = params ++ "..."
 
     let ret_raw = with_cimport_fn_return_type(session, idx)
-    let ret = ci_map_c_type(ret_raw)
+    let ret = ci_map_c_type_ctx(ret_raw, known_structs)
 
     with_cimport_mark_name_emitted(name)
     "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
 
 // ── Struct/Union translation ────────────────────────────────
 
-fn ci_translate_struct(session: i64, idx: i32, is_union: bool) -> str:
+fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: str) -> str:
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
         return ""
@@ -171,7 +178,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool) -> str:
 
     with_cimport_mark_name_emitted(name)
     let safe_name = ci_escape_reserved(name)
-    let field_str = ci_build_struct_fields(session, idx, field_count)
+    let field_str = ci_build_struct_fields(session, idx, field_count, known_structs)
     let part1 = "type " ++ safe_name
     let part2 = part1 ++ " = \{ "
     let part3 = part2 ++ field_str
@@ -180,23 +187,23 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool) -> str:
         return "// union\n" ++ decl
     decl
 
-fn ci_build_struct_fields(session: i64, idx: i32, field_count: i32) -> str:
+fn ci_build_struct_fields(session: i64, idx: i32, field_count: i32, known_structs: str) -> str:
     if field_count == 0:
         return ""
     if field_count == 1:
-        return ci_build_one_field(session, idx, 0)
+        return ci_build_one_field(session, idx, 0, known_structs)
     // Build fields iteratively using a helper to avoid mutable var in loop
-    var result = ci_build_one_field(session, idx, 0)
+    var result = ci_build_one_field(session, idx, 0, known_structs)
     var fi = 1
     while fi < field_count:
-        result = result ++ ", " ++ ci_build_one_field(session, idx, fi)
+        result = result ++ ", " ++ ci_build_one_field(session, idx, fi, known_structs)
         fi = fi + 1
     result
 
-fn ci_build_one_field(session: i64, idx: i32, fi: i32) -> str:
+fn ci_build_one_field(session: i64, idx: i32, fi: i32, known_structs: str) -> str:
     let fname = with_cimport_struct_field_name(session, idx, fi)
     let ftype_raw = with_cimport_struct_field_type(session, idx, fi)
-    let ftype = ci_map_c_type(ftype_raw)
+    let ftype = ci_map_c_type_ctx(ftype_raw, known_structs)
     let safe_fname = ci_escape_reserved(fname)
     safe_fname ++ ": " ++ ftype
 
@@ -291,6 +298,9 @@ fn ci_translate_macros(session: i64) -> str:
 // ── Type mapping ────────────────────────────────────────────
 
 fn ci_map_c_type(spelling: str) -> str:
+    ci_map_c_type_ctx(spelling, "")
+
+fn ci_map_c_type_ctx(spelling: str, known_structs: str) -> str:
     var s = ci_trim(spelling)
     if s.len() == 0:
         return "i32"
@@ -320,7 +330,7 @@ fn ci_map_c_type(spelling: str) -> str:
                 break
             bi = bi + 1
         let base = ci_trim(s.slice(0, bracket_pos as i64))
-        let mapped_base = ci_map_c_type(base)
+        let mapped_base = ci_map_c_type_ctx(base, known_structs)
         return "*" ++ mapped_base
 
     // Count and strip trailing pointer markers
@@ -339,11 +349,59 @@ fn ci_map_c_type(spelling: str) -> str:
     if ci_starts_with(base, "volatile "):
         base = ci_trim(base.slice(9, base.len()))
 
+    // Handle struct/union types — use name if translated, else opaque
+    if ci_starts_with(base, "struct "):
+        let sname = ci_escape_reserved(ci_trim(base.slice(7, base.len())))
+        if ci_str_contains(known_structs, "|" ++ sname ++ "|"):
+            if ptr_depth == 0:
+                return sname
+            var sr = sname
+            var spi = 0
+            while spi < ptr_depth:
+                sr = "*" ++ sr
+                spi = spi + 1
+            return sr
+        // Unknown struct → opaque
+        if ptr_depth > 0:
+            return "*const i8"
+        return "i32"
+    if ci_starts_with(base, "union "):
+        let uname = ci_escape_reserved(ci_trim(base.slice(6, base.len())))
+        if ci_str_contains(known_structs, "|" ++ uname ++ "|"):
+            if ptr_depth == 0:
+                return uname
+            var ur = uname
+            var upi = 0
+            while upi < ptr_depth:
+                ur = "*" ++ ur
+                upi = upi + 1
+            return ur
+        // Unknown union → opaque
+        if ptr_depth > 0:
+            return "*const i8"
+        return "i32"
+
+    // Check if the bare type name is a known translated struct/typedef
+    if known_structs.len() > 0:
+        let escaped_base = ci_escape_reserved(base)
+        if ci_str_contains(known_structs, "|" ++ escaped_base ++ "|"):
+            if ptr_depth == 0:
+                return escaped_base
+            var tr = escaped_base
+            var tpi = 0
+            while tpi < ptr_depth:
+                if is_const:
+                    tr = "*const " ++ tr
+                else:
+                    tr = "*" ++ tr
+                tpi = tpi + 1
+            return tr
+
     // Map base type
     let is_known = ci_is_known_base_type(base)
     var mapped = ci_map_base_type(base)
 
-    // For pointer to unknown type (struct, etc.), use opaque *const i8
+    // For pointer to unknown type (typedef, etc.), use opaque *const i8
     if ptr_depth > 0 and not is_known:
         return "*const i8"
 
