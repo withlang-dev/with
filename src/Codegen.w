@@ -5160,6 +5160,15 @@ fn Codegen.mir_operand_is_unsigned(self: Codegen, body: MirBody, operand_id: i32
 fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsigned: bool) -> i64:
     let lk = wl_get_type_kind(wl_type_of(lhs))
     let rk = wl_get_type_kind(wl_type_of(rhs))
+
+    // Pointer arithmetic: ptr +/- int → GEP
+    if lk == wl_pointer_type_kind() and rk == wl_integer_type_kind():
+        if op == OP_ADD or op == OP_SUB:
+            let idx_val = if op == OP_SUB: wl_build_neg(self.builder, rhs) else: rhs
+            let indices: Vec[i64] = Vec.new()
+            indices.push(idx_val)
+            return wl_build_gep(self.builder, wl_i8_type(self.context), lhs, vec_data_i64(&indices), 1)
+
     let is_float = lk == wl_float_type_kind() or lk == wl_double_type_kind() or rk == wl_float_type_kind() or rk == wl_double_type_kind()
     if is_float:
         if op == OP_ADD or op == OP_ADD_WRAP: return wl_build_fadd(self.builder, lhs, rhs)
