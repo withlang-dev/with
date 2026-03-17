@@ -60,6 +60,8 @@ typedef struct {
     char **strings;
     int32_t str_count;
     int32_t str_cap;
+    // Header file for filtering transitive includes
+    CXFile header_file;
 } CImportSession;
 
 typedef struct {
@@ -140,6 +142,15 @@ static enum CXChildVisitResult collect_decl(CXCursor cursor,
         kind != CXCursor_TypedefDecl &&
         kind != CXCursor_VarDecl)
         return CXChildVisit_Continue;
+
+    // Filter out declarations from transitive includes
+    if (s->header_file) {
+        CXSourceLocation loc = clang_getCursorLocation(cursor);
+        CXFile file = NULL;
+        clang_getFileLocation(loc, &file, NULL, NULL, NULL);
+        if (file && !clang_File_isEqual(file, s->header_file))
+            return CXChildVisit_Continue;
+    }
 
     if (s->decl_count >= s->decl_cap) {
         s->decl_cap = s->decl_cap ? s->decl_cap * 2 : 256;
@@ -413,6 +424,7 @@ int64_t with_cimport_parse(with_str header_code) {
 
     // Collect top-level declarations
     CXCursor root = clang_getTranslationUnitCursor(s->tu);
+    s->header_file = NULL;  // No filtering for now (transitive includes allowed)
     clang_visitChildren(root, collect_decl, s);
 
     return (int64_t)(intptr_t)s;
