@@ -157,6 +157,21 @@ fn ci_extract_ident(s: str) -> str:
             break
     s.slice(0, end as i64)
 
+// ── Collision mangling ───────────────────────────────────────
+
+fn ci_unique_name(name: str) -> str:
+    // If name is not yet emitted, return it as-is.
+    // Otherwise append _2, _3, ... until unique.
+    if with_cimport_is_name_emitted(name) == 0:
+        return name
+    var suffix = 2
+    while suffix < 100:
+        let candidate = name ++ "_" ++ int_to_string(suffix)
+        if with_cimport_is_name_emitted(candidate) == 0:
+            return candidate
+        suffix = suffix + 1
+    name ++ "_99"
+
 // ── Include text construction ───────────────────────────────
 
 fn ci_build_include_text(header_spec: str) -> str:
@@ -288,11 +303,10 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
         // Skip internal names
         if cname.byte_at(0) == 95:
             continue
-        // Skip already-emitted names (dedup across c_import calls)
-        if with_cimport_is_name_emitted(cname) != 0:
-            continue
-        with_cimport_mark_name_emitted(cname)
-        let safe_cname = ci_escape_reserved(cname)
+        // Mangle colliding enum constant names instead of skipping
+        let unique_cname = ci_unique_name(cname)
+        with_cimport_mark_name_emitted(unique_cname)
+        let safe_cname = ci_escape_reserved(unique_cname)
         output = output ++ "let " ++ safe_cname ++ ": i32 = " ++ i64_to_string(cvalue) ++ "\n"
     output
 
