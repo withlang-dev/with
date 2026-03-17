@@ -1692,8 +1692,8 @@ fn Parser.parse_comptime_error_expr(self: Parser) -> i32:
     self.advance()
     let ce_msg = self.intern_current()
     self.advance()
-    let ce_t = self.peek()
-    self.advance()
+    if self.peek() == TK_R_PAREN:
+        self.advance()
     self.pool.add_node(NK_COMPTIME_ERROR, ce_s, self.prev_end(), ce_msg, 0, 0)
 
 fn Parser.parse_string_literal(self: Parser) -> i32:
