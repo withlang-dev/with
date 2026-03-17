@@ -5528,8 +5528,38 @@ statement-expression macros) are never translated. The compiler
 emits a warning listing all untranslated macros. Users wrap these
 in a thin C shim file or write manual `extern "C"` bindings.
 
-Phase 2+ may add best-effort function-like macro translation for
-simple expression macros.
+**Function-like macro translation:** Simple expression macros are
+translated to generic functions:
+
+```c
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+// → fn MAX[T](a: T, b: T) -> T: if a > b: a else: b
+
+#define ABS(x) ((x) < 0 ? -(x) : (x))
+// → fn ABS[T](a: T) -> T: if a < 0: 0 - a else: a
+```
+
+Macros with bodies that cannot be pattern-matched to With expressions
+emit a stub with `comptime_error`:
+
+```
+fn COMPLEX_MACRO():
+    comptime_error("c_import: macro COMPLEX_MACRO not translatable")
+```
+
+**Constant expression evaluation:** `#define` macros with arithmetic
+expressions, bitwise operations, casts, and references to other macros
+are evaluated via the C compiler's constant evaluator:
+
+```c
+#define PAGE_SIZE 4096
+#define PAGE_MASK (~(PAGE_SIZE - 1))     // → const PAGE_MASK: i32 = -4096
+#define FLAGS (FLAG_A | FLAG_B | 0x10)   // → const FLAGS: i32 = evaluated_value
+```
+
+**Collision mangling:** When `c_import` encounters duplicate names
+from transitive includes, numeric suffixes are appended: `name_2`,
+`name_3`, etc.
 
 ### 16.3 Manual Declarations
 
@@ -5544,6 +5574,27 @@ extern "C" {
 ```
 
 All `extern "C"` calls require `unsafe`.
+
+### 16.3b External Variables
+
+Global variables defined in C libraries can be declared with
+`extern var` (mutable) or `extern let` (read-only):
+
+```
+extern var errno: i32
+extern var stdin: *mut c_void
+extern let sys_nerr: i32
+```
+
+**Semantics:**
+- No initializer — the symbol is resolved at link time.
+- `extern let` produces a compile error if assigned to.
+- `extern var` is mutable — assignment stores to the global.
+- The type must be concrete (no generics, no inference).
+- Access does not require `unsafe` (the declaration is the opt-in).
+
+`c_import` emits `extern var` for C globals with non-const types
+and `extern let` for const-qualified globals.
 
 **The `c_void` type:** C's `void*` maps to `*mut c_void` (or
 `*const c_void`) in With. `c_void` is an opaque, zero-sized type
@@ -5562,6 +5613,41 @@ type Point = { x: f64, y: f64 }
 Types imported via `c_import` automatically have `repr(C)` layout.
 Manually defined types intended for C interop must be explicitly
 annotated.
+
+**Packed layout:**
+
+```
+@[repr(packed)]
+type PackedHeader = {
+    magic: u8,
+    version: u16,
+    size: u32,
+}
+```
+
+`repr(packed)` implies `repr(C)` and sets alignment to 1 for all
+fields (no padding). The compiler emits unaligned loads/stores.
+Creating a reference to a packed field is a compile error (the
+reference would be unaligned).
+
+**Union types:**
+
+```
+@[repr(C)]
+type Value = union {
+    i: i32,
+    f: f32,
+    p: *mut c_void,
+}
+
+let v = Value { i: 42 }
+let as_float = unsafe: v.f    // reinterpret bits as f32
+```
+
+Unions have the size of their largest field. All fields share offset 0.
+Reading a field that wasn't last written requires `unsafe`. Writing any
+field is safe. Construction requires exactly one field initializer.
+`c_import` translates C union declarations directly.
 
 ### 16.5 Exporting to C
 
@@ -5609,6 +5695,74 @@ use c_import("sqlite3.h", link: "sqlite3")
 ```
 
 The `with build` command passes these to the linker.
+
+### 16.9 Opaque Types
+
+```
+type FILE = opaque
+type DIR = opaque
+```
+
+Opaque types have unknown size and layout. They can only appear as
+pointer targets (`*mut FILE`, `*const FILE`). Any attempt to create
+a value, copy, `sizeof`, or access fields of an opaque type is a
+compile error. `c_import` emits `type Name = opaque` for forward-
+declared C structs (no body) and structs with bitfields.
+
+### 16.10 Null Pointer Literal
+
+```
+let p: *mut i32 = null
+if p == null:
+    print("null pointer")
+```
+
+`null` is a typed null pointer constant. Its type is inferred from
+context — it requires a pointer type annotation. Using `null` without
+type context is a compile error. `null` is not the same as `0`.
+Dereferencing `null` is undefined behavior (caught by `unsafe`).
+
+### 16.11 Raw Pointer Arithmetic
+
+```
+unsafe:
+    let p: *mut i32 = alloc(10 * sizeof[i32]())
+    let third = p + 2          // points to 3rd element
+    let val = *(p + 2)         // dereference offset
+    let val2 = p[2]            // sugar for *(p + 2)
+    p[0] = 42                  // write through pointer
+    let diff = end - start     // element count between pointers
+```
+
+- `ptr + n` advances by `n * sizeof(T)` bytes.
+- `ptr - n` retreats by `n * sizeof(T)` bytes.
+- `ptr[n]` is sugar for `*(ptr + n)`.
+- `ptr1 - ptr2` returns the element count between pointers.
+- All pointer arithmetic requires `unsafe` context.
+- Result preserves mutability: `*mut T + n` → `*mut T`.
+
+### 16.12 Intrinsics
+
+**`sizeof` and `alignof`:**
+
+```
+let size = sizeof[i32]()      // 4
+let align = alignof[f64]()    // 8
+```
+
+Built-in generic functions that return the size (in bytes) and
+ABI alignment of a type at compile time. Required for allocator
+implementations, C interop buffer sizing, and packed struct
+calculations.
+
+**`transmute`:**
+
+```
+let bits: u32 = unsafe: transmute[u32](3.14f32)
+```
+
+Reinterprets the bits of one type as another. Both types must have
+the same size (compile error otherwise). Requires `unsafe` context.
 
 ---
 
@@ -5799,6 +5953,29 @@ fn serialize_value[T](val: &T, out: &mut Writer):
 `comptime_error` produces a compile error with a custom message.
 This is the mechanism for "concept checking" — enforcing constraints
 that can't be expressed as trait bounds.
+
+**`comptime_error` semantics:**
+
+`comptime_error(msg)` is an expression of type `never`. It does not
+fire when parsed — it fires only when the containing code is actually
+compiled (instantiated for a specific set of type arguments, or
+called). A function whose body is only `comptime_error(...)` is legal
+to declare and reference — the error fires on call.
+
+```
+fn legacy_api():
+    comptime_error("legacy_api has been removed; use new_api instead")
+
+// No error here — the function exists but is never called.
+// Calling legacy_api() anywhere → immediate compile error.
+```
+
+`c_import` uses `comptime_error` for untranslatable C constructs:
+
+```
+fn __builtin_complex():
+    comptime_error("c_import: __builtin_complex not translatable")
+```
 
 ### 17.6 Real-World Examples
 
