@@ -586,6 +586,22 @@ int64_t with_cimport_enum_const_value(int64_t session, int32_t idx, int32_t ci) 
     return s->caches[idx].enum_consts[ci].value;
 }
 
+// ── Variable queries ────────────────────────────────────────
+
+with_str with_cimport_var_type(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("i32");
+    CXType var_type = clang_getCursorType(s->decls[idx]);
+    return get_type_spelling(s, var_type);
+}
+
+int32_t with_cimport_var_is_const(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    CXType var_type = clang_getCursorType(s->decls[idx]);
+    return clang_isConstQualifiedType(var_type) ? 1 : 0;
+}
+
 // ── Typedef queries ─────────────────────────────────────────
 
 with_str with_cimport_typedef_underlying(int64_t session, int32_t idx) {

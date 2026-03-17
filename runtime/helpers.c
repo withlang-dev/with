@@ -1547,6 +1547,8 @@ __attribute__((weak)) int32_t  with_cimport_enum_const_count(int64_t s, int32_t 
 __attribute__((weak)) with_str with_cimport_enum_const_name(int64_t s, int32_t i, int32_t c) { (void)s;(void)i;(void)c; with_str e={"",0}; return e; }
 __attribute__((weak)) int64_t  with_cimport_enum_const_value(int64_t s, int32_t i, int32_t c) { (void)s;(void)i;(void)c; return 0; }
 __attribute__((weak)) with_str with_cimport_typedef_underlying(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"",0}; return e; }
+__attribute__((weak)) with_str with_cimport_var_type(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"",0}; return e; }
+__attribute__((weak)) int32_t  with_cimport_var_is_const(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
 __attribute__((weak)) int64_t  with_cimport_parse_macros(with_str h) { (void)h; return 0; }
 __attribute__((weak)) int32_t  with_cimport_macro_count(int64_t s) { (void)s; return 0; }
 __attribute__((weak)) with_str with_cimport_macro_name(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"",0}; return e; }

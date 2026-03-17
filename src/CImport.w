@@ -33,6 +33,8 @@ extern fn with_cimport_dispose_macros(session: i64) -> void
 extern fn with_cimport_is_name_emitted(name: str) -> i32
 extern fn with_cimport_mark_name_emitted(name: str) -> void
 extern fn with_cimport_reset_names() -> void
+extern fn with_cimport_var_type(session: i64, idx: i32) -> str
+extern fn with_cimport_var_is_const(session: i64, idx: i32) -> i32
 extern fn int_to_string(n: i32) -> str
 extern fn i64_to_string(n: i64) -> str
 extern fn with_eprintln(s: str) -> void
@@ -42,6 +44,7 @@ let CK_STRUCT: i32 = 2
 let CK_UNION: i32 = 3
 let CK_ENUM: i32 = 5
 let CK_FUNCTION: i32 = 8
+let CK_VAR: i32 = 9
 let CK_TYPEDEF: i32 = 20
 
 // Process a c_import header spec and return synthetic .w source text.
@@ -81,6 +84,8 @@ fn process_c_import(header_spec: str) -> str:
                     translated_structs = translated_structs ++ "|" ++ sname ++ "|"
         else if kind == CK_ENUM:
             output = output ++ ci_translate_enum(session, i)
+        else if kind == CK_VAR:
+            output = output ++ ci_translate_var(session, i, translated_structs)
         else if kind == CK_TYPEDEF:
             let td_result = ci_translate_typedef(session, i, translated_structs)
             output = output ++ td_result
@@ -279,6 +284,29 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
         output = output ++ "let " ++ safe_cname ++ ": i32 = " ++ i64_to_string(cvalue) ++ "\n"
     output
 
+// ── Variable translation ────────────────────────────────────
+
+fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
+    let name = with_cimport_decl_name(session, idx)
+    if name.len() == 0:
+        return ""
+
+    // Skip internal names
+    if name.byte_at(0) == 95:
+        return ""
+
+    // Skip already-emitted names
+    if with_cimport_is_name_emitted(name) != 0:
+        return ""
+
+    let var_type_raw = with_cimport_var_type(session, idx)
+    let var_type = ci_map_c_type_ctx(var_type_raw, known_structs)
+
+    // Emit as extern let (global C variable)
+    let safe_name = ci_escape_reserved(name)
+    with_cimport_mark_name_emitted(name)
+    "// global: " ++ safe_name ++ " : " ++ var_type ++ "\n"
+
 // ── Typedef translation ─────────────────────────────────────
 
 fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
@@ -340,13 +368,17 @@ fn ci_translate_macros(session: i64) -> str:
         // Strip outer parentheses for macro values like (-1)
         let stripped = ci_strip_parens(value)
 
-        // Only translate simple integer and string literals
-        // Float macros are skipped: module-level let f64 codegen doesn't work yet
         if ci_is_int_literal(stripped):
             let safe_name = ci_escape_reserved(name)
             let clean_value = ci_strip_int_suffix(stripped)
             with_cimport_mark_name_emitted(name)
             output = output ++ "let " ++ safe_name ++ ": i32 = " ++ clean_value ++ "\n"
+        else if ci_is_float_literal(stripped):
+            let safe_name = ci_escape_reserved(name)
+            let float_ty = ci_float_type_from_suffix(stripped)
+            let clean_value = ci_strip_float_suffix(stripped)
+            with_cimport_mark_name_emitted(name)
+            output = output ++ "let " ++ safe_name ++ ": " ++ float_ty ++ " = " ++ clean_value ++ "\n"
         else if ci_is_string_literal(stripped):
             let safe_name = ci_escape_reserved(name)
             with_cimport_mark_name_emitted(name)
@@ -656,6 +688,56 @@ fn ci_strip_parens(s: str) -> str:
     while result.len() >= 2 and result.byte_at(0) == 40 and result.byte_at(result.len() - 1) == 41:
         result = result.slice(1, result.len() - 1)
     result
+
+fn ci_is_float_literal(s: str) -> bool:
+    if s.len() == 0:
+        return false
+    var start = 0
+    if s.byte_at(0) == 45:
+        start = 1
+    if start as i64 >= s.len():
+        return false
+    // Must start with digit or decimal point
+    let first = s.byte_at(start as i64)
+    if not ((first >= 48 and first <= 57) or first == 46):
+        return false
+    // Scan for decimal point or exponent — if found, it's a float
+    var has_dot = false
+    var has_exp = false
+    for i in start..s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 46:
+            has_dot = true
+        else if c == 101 or c == 69:  // e, E
+            has_exp = true
+        else if c == 43 or c == 45:  // +, - in exponent
+            continue
+        else if c >= 48 and c <= 57:
+            continue
+        else if c == 102 or c == 70 or c == 108 or c == 76:  // f, F, l, L suffix
+            continue
+        else:
+            return false
+    has_dot or has_exp
+
+fn ci_float_type_from_suffix(s: str) -> str:
+    if s.len() == 0:
+        return "f64"
+    let last = s.byte_at(s.len() - 1)
+    if last == 102 or last == 70:  // f, F
+        return "f32"
+    // l, L → treat as f64 (With doesn't have long double)
+    "f64"
+
+fn ci_strip_float_suffix(s: str) -> str:
+    var end = s.len() as i32
+    while end > 0:
+        let c = s.byte_at((end - 1) as i64)
+        if c == 102 or c == 70 or c == 108 or c == 76:  // f, F, l, L
+            end = end - 1
+        else:
+            break
+    s.slice(0, end as i64)
 
 fn ci_is_string_literal(s: str) -> bool:
     if s.len() < 2:

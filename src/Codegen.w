@@ -4268,6 +4268,40 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             wl_set_global_constant(global, 1)
         wl_set_linkage(global, wl_internal_linkage())
         self.module_constants.insert(name_sym, global)
+        return
+
+    // Float constant: NK_FLOAT_LIT or unary negate of one
+    var float_node = value_node
+    var float_negate = false
+    if self.pool.kind(float_node) == NK_UNARY:
+        if self.pool.get_data0(float_node) == UOP_NEGATE:
+            float_node = self.pool.get_data1(float_node)
+            float_negate = true
+    if self.pool.kind(float_node) == NK_FLOAT_LIT:
+        let str_idx = self.pool.get_data0(float_node)
+        var fval: f64 = 0.0
+        if str_idx >= 0 and str_idx < self.pool.strings.len() as i32:
+            let float_text = self.pool.get_string(str_idx)
+            if float_text.len() > 0:
+                fval = with_parse_float(float_text)
+        if float_negate:
+            fval = -fval
+        // Determine f32 vs f64 from type annotation
+        var global_ty = wl_f64_type(self.context)
+        let type_extra_packed = flags / 4
+        if type_extra_packed > 0:
+            let type_ann_node = self.pool.get_extra(type_extra_packed - 1)
+            if self.pool.kind(type_ann_node) == NK_TYPE_NAMED:
+                let type_name = self.intern.resolve(self.pool.get_data0(type_ann_node))
+                if type_name == "f32":
+                    global_ty = wl_f32_type(self.context)
+        let name_str = self.intern.resolve(name_sym)
+        let global = wl_add_global(self.llmod, global_ty, name_str)
+        wl_set_initializer(global, wl_const_real(global_ty, fval))
+        if is_mut == 0:
+            wl_set_global_constant(global, 1)
+        wl_set_linkage(global, wl_internal_linkage())
+        self.module_constants.insert(name_sym, global)
 
 // ── Wrap main for exit ────────────────────────────────────────────
 

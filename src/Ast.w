@@ -9,6 +9,8 @@
 use Span
 use Token
 
+extern fn with_eprintln(s: str) -> void
+
 // ── Node kinds (integer constants) ────────────────────────────────
 
 // Declarations
@@ -280,6 +282,9 @@ type AstPool = {
     // Impl trait type args: [impl_node, args_start, args_count]* for impl Trait[T1, T2] for Type
     impl_trait_type_args: Vec[i32],
 
+    // Frozen flag: set to 1 after construction completes.
+    // When frozen, mutation methods (add_node, add_extra, etc.) will error.
+    frozen: i32,
 }
 
 fn AstPool.new -> AstPool:
@@ -308,6 +313,7 @@ fn AstPool.new -> AstPool:
         impl_type_params: Vec.new(),
         impl_target_type_nodes: Vec.new(),
         impl_trait_type_args: Vec.new(),
+        frozen: 0,
     }
     // Reserve node 0 as null sentinel
     pool.kinds.push(0)
@@ -318,8 +324,14 @@ fn AstPool.new -> AstPool:
     pool.data2.push(0)
     pool
 
+// Mark the pool as immutable. Any subsequent mutation will print an error.
+fn AstPool.freeze(self: &mut AstPool):
+    self.frozen = 1
+
 // Add a node to the pool, returns the node index.
 fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> i32:
+    if self.frozen != 0:
+        with_eprintln("BUG: AstPool.add_node called after freeze")
     let idx = self.kinds.len() as i32
     self.kinds.push(kind)
     self.starts.push(start)
@@ -331,12 +343,16 @@ fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32
 
 // Add extra data, returns the index in the extra array.
 fn AstPool.add_extra(self: &mut AstPool, value: i32) -> i32:
+    if self.frozen != 0:
+        with_eprintln("BUG: AstPool.add_extra called after freeze")
     let idx = self.extra.len() as i32
     self.extra.push(value)
     idx
 
 // Add a string to the string table, returns the string index.
 fn AstPool.add_string(self: &mut AstPool, s: str) -> i32:
+    if self.frozen != 0:
+        with_eprintln("BUG: AstPool.add_string called after freeze")
     let idx = self.strings.len() as i32
     self.strings.push(s)
     idx
@@ -389,6 +405,8 @@ fn AstPool.node_count(self: &AstPool) -> i32:
     self.kinds.len() as i32
 
 fn AstPool.add_decl(self: &mut AstPool, node_idx: i32):
+    if self.frozen != 0:
+        with_eprintln("BUG: AstPool.add_decl called after freeze")
     self.decls.push(node_idx)
 
 fn AstPool.decl_count(self: &AstPool) -> i32:

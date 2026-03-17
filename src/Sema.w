@@ -227,6 +227,10 @@ type Sema = {
     // Associated type bindings from current impl (for Self.Name resolution)
     assoc_type_bindings: HashMap[i32, i32],
 
+    // Frozen flag: set to 1 after check_module + preregister completes.
+    // When frozen, add_type will error.
+    types_frozen: i32,
+
     // Current state
     source_text: str,
     current_return_type: i32,
@@ -499,6 +503,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         generic_specialization_cache,
         generic_inst_cache,
         assoc_type_bindings: sema_new_map_i32_i32(),
+        types_frozen: 0,
         source_text: "",
         current_return_type: 0,
         current_gen_yield_type: 0,
@@ -810,12 +815,76 @@ fn Sema.extract_fn_param_name(self: Sema, node: i32, param_index: i32) -> str:
 // ── Type management ──────────────────────────────────────────────
 
 fn Sema.add_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
+    if self.types_frozen != 0:
+        with_eprintln("BUG: Sema.add_type called after freeze_types")
     let id = self.type_kinds.len() as i32
     self.type_kinds.push(kind)
     self.type_d0.push(d0)
     self.type_d1.push(d1)
     self.type_d2.push(d2)
     id
+
+// Mark type tables as immutable. Any subsequent add_type will error.
+fn Sema.freeze_types(self: Sema):
+    self.types_frozen = 1
+
+// Look up an existing TY_GENERIC_INST(base_sym, [arg_tid]) in the cache.
+// Returns the TypeId, or 0 if not found.
+fn Sema.find_generic_inst(self: Sema, base_sym: i32, arg_tid: i32) -> i32:
+    let cache_key = int_to_string(base_sym) ++ ":" ++ int_to_string(arg_tid)
+    if self.generic_inst_cache.contains(cache_key):
+        return self.generic_inst_cache.get(cache_key).unwrap()
+    0
+
+// Look up an existing TY_RANGE(elem_tid, inclusive) in the type tables.
+// Returns the TypeId, or 0 if not found.
+fn Sema.find_range_type(self: Sema, elem_tid: i32, inclusive: i32) -> i32:
+    let type_count = self.type_kinds.len() as i32
+    for ti in 0..type_count:
+        if self.type_kinds.get(ti as i64) == TY_RANGE:
+            if self.type_d0.get(ti as i64) == elem_tid:
+                if self.type_d1.get(ti as i64) == inclusive:
+                    return ti
+    0
+
+// Pre-register generic instantiation types needed by MirLower so that
+// downstream passes never need to mutate the type tables.
+// Must be called after check_module() and before freeze_types().
+fn Sema.preregister_mir_types(self: Sema):
+    let vec_sym = self.pool_intern("Vec")
+    let vi_sym = self.pool_intern("VecIter")
+
+    // For every Vec[T] type registered, also register VecIter[T].
+    let type_count = self.type_kinds.len() as i32
+    for ti in 0..type_count:
+        if self.type_kinds.get(ti as i64) == TY_GENERIC_INST:
+            if self.type_d0.get(ti as i64) == vec_sym:
+                let extra_start = self.type_d1.get(ti as i64)
+                let arg_count = self.type_d2.get(ti as i64)
+                if arg_count >= 1:
+                    let elem_ty = self.type_extra.get(extra_start as i64)
+                    let vi_key = int_to_string(vi_sym) ++ ":" ++ int_to_string(elem_ty)
+                    if not self.generic_inst_cache.contains(vi_key):
+                        let te_start = self.type_extra.len() as i32
+                        self.type_extra.push(elem_ty)
+                        let tid = self.add_type(TY_GENERIC_INST, vi_sym, te_start, 1)
+                        self.generic_inst_cache.insert(vi_key, tid)
+
+    // Register Vec[str] for str.split() return type.
+    let vec_str_key = int_to_string(vec_sym) ++ ":" ++ int_to_string(self.ty_str)
+    if not self.generic_inst_cache.contains(vec_str_key):
+        let te_start = self.type_extra.len() as i32
+        self.type_extra.push(self.ty_str)
+        let tid = self.add_type(TY_GENERIC_INST, vec_sym, te_start, 1)
+        self.generic_inst_cache.insert(vec_str_key, tid)
+
+    // Also register VecIter[str] in case Vec[str].iter() is called.
+    let vi_str_key = int_to_string(vi_sym) ++ ":" ++ int_to_string(self.ty_str)
+    if not self.generic_inst_cache.contains(vi_str_key):
+        let te_start = self.type_extra.len() as i32
+        self.type_extra.push(self.ty_str)
+        let tid = self.add_type(TY_GENERIC_INST, vi_sym, te_start, 1)
+        self.generic_inst_cache.insert(vi_str_key, tid)
 
 // TY_GENERIC_INST: d0=base_sym, d1=extra_start, d2=arg_count
 // Type args stored in type_extra[extra_start..extra_start+arg_count] as TypeIds.

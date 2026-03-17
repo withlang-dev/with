@@ -304,6 +304,8 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     if self.config.alloc_mode:
         sema.alloc = 1
     sema.check_module()
+    sema.preregister_mir_types()
+    sema.freeze_types()
     compilation_debug_pool_flow("run_mir_lower:after_check", zcu.pool, active_pool, sema)
 
     // Check for sema errors before lowering
@@ -320,8 +322,8 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     zcu.diagnostics = async_artifacts.diags
     compilation_dump_type_names("post-mir-lower", active_pool, zcu.pool)
 
-    // Sync sema AFTER MIR lowering — MirLower may add types (add_type),
-    // which can reallocate sema's internal Vecs and invalidate earlier copies.
+    // Sync sema AFTER MIR lowering — type tables are frozen but other
+    // sema state (e.g. diagnostics) may have been updated.
     zcu.sync_from_sema(sema)
     compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
     zcu.set_codegen_snapshot(mir_mod, "", async_artifacts.out_mod, "")

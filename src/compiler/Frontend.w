@@ -772,6 +772,9 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         self.set_typed_snapshot("", AstPool.new())
         return AstPool.new()
 
+    // AstPool construction is complete — freeze to catch any future mutations.
+    pool.freeze()
+
     if zcu_debug_init_enabled() != 0:
         with_eprintln("[frontend] compile_source:sema")
     // Phase 3: Semantic analysis.
