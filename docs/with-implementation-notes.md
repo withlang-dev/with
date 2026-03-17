@@ -2716,4 +2716,324 @@ any `Result` can be checked against, but no `From` impls are needed.
 
 ---
 
+## 43. `extern var` / `extern let` Implementation (spec §16.3b)
+
+### 43.1 Parser
+
+Add `NK_EXTERN_VAR_DECL` node kind. When the parser sees `extern var`
+or `extern let`, parse the name, colon, and type expression. Store:
+`data0 = name_sym`, `data1 = type_node`, `data2 = flags` (bit 0 =
+is_mutable).
+
+### 43.2 Sema
+
+In `collect_declarations`, register `NK_EXTERN_VAR_DECL` in
+`extern_var_types: HashMap[i32, i32]` (name_sym → sema_type_id).
+Resolve the type expression and reject generics/inference.
+
+### 43.3 Codegen
+
+Use `LLVMAddGlobal(module, llvm_type, name)` with
+`LLVMSetLinkage(global, LLVMExternalLinkage)`. Register in
+`module_constants` so MIR codegen accesses them like existing
+module-level variables.
+
+### 43.4 MirLower
+
+`ensure_global_local` already scans module declarations for
+`NK_LET_DECL`. Add a check for `NK_EXTERN_VAR_DECL`, creating
+a proxy local with the declared type.
+
+### 43.5 CImport
+
+`ci_translate_var` emits `extern var name: type` for non-const
+globals and `extern let name: type` for const-qualified globals.
+
+---
+
+## 44. Opaque Type Implementation (spec §16.9)
+
+### 44.1 Parser
+
+When parsing `type Name = opaque`, create `NK_TYPE_DECL` with a
+sub-kind flag `TDK_OPAQUE`. No extra data (no fields).
+
+### 44.2 Sema
+
+Register opaque types in `named_types` with type kind `TY_OPAQUE`.
+`get_type_size(TY_OPAQUE)` returns an error. Reject any non-pointer
+use: variable declaration, struct field, or by-value parameter.
+
+### 44.3 Codegen
+
+Map `TY_OPAQUE` to `LLVMStructCreateNamed(ctx, name)` without
+calling `LLVMStructSetBody`. This creates an identified struct type
+with no body — LLVM treats it as opaque. Pointers to it work
+normally (`ptr` in opaque pointer mode).
+
+### 44.4 CImport
+
+`ci_translate_struct` emits `type Name = opaque` when
+`with_cimport_struct_is_opaque` returns true (forward declarations,
+bitfield structs).
+
+---
+
+## 45. Union Type Compilation (spec §16.4)
+
+### 45.1 LLVM Representation
+
+Unions are represented as `{ [max_size x i8] }` — a single-field
+struct containing a byte array of the union's size. Field access
+uses pointer casts:
+
+```
+%Value = type { [8 x i8] }     ; 8 bytes = max(4, 4, 8)
+
+; Write i32 field:
+store i32 42, ptr %v
+
+; Read f32 field:
+%f = load float, ptr %v
+```
+
+### 45.2 Size and Alignment
+
+Size = `max(field_sizes)`, alignment = `max(field_alignments)`.
+The byte array is sized to the maximum field size.
+
+### 45.3 Sema
+
+Add `TY_UNION` type kind. Field access on a union requires `unsafe`
+context for reads. Writing is safe. Construction requires exactly
+one field initializer.
+
+### 45.4 CImport
+
+When the cursor kind is `CXCursor_UnionDecl`, emit
+`type Name = union { ... }` with `@[repr(C)]`.
+
+---
+
+## 46. Raw Pointer Arithmetic (spec §16.11)
+
+### 46.1 Sema
+
+In `check_binary_op`, when one operand is `TY_PTR` and the other
+is integer: verify `unsafe_depth > 0`, result type = same pointer
+type. For subtraction of two pointers: result type = `isize`.
+
+### 46.2 Codegen
+
+Use `LLVMBuildGEP2(builder, elem_type, ptr, &[offset], 1, "")`.
+For pointer indexing (`p[n]`), emit GEP then load. For pointer
+difference, emit `LLVMBuildPtrDiff2`.
+
+### 46.3 MirLower
+
+Lower `ptr + n` as `RK_PTR_OFFSET` (new rvalue kind) with the
+pointer operand and integer operand. Lower `ptr[n]` as `PK_INDEX`
+on a pointer place (extending existing array/slice infrastructure).
+
+---
+
+## 47. `null` Pointer Literal (spec §16.10)
+
+### 47.1 Lexer/Parser
+
+Add `null` keyword. Parse as `NK_NULL_LIT` expression node.
+
+### 47.2 Sema
+
+`NK_NULL_LIT` type determined by `expected_type`. If expected_type
+is `TY_PTR`, the null literal takes that type. Otherwise emit:
+"null requires pointer type context".
+
+### 47.3 Codegen/MirLower
+
+Emit `LLVMConstNull(ptr_type)`. In MIR, lower as `CK_NULL`
+constant kind.
+
+---
+
+## 48. `sizeof` / `alignof` / `transmute` (spec §16.12)
+
+### 48.1 `sizeof` / `alignof`
+
+Compiler built-ins. `sizeof[T]()` emits `LLVMSizeOf(llvm_type)` as
+a constant. `alignof[T]()` emits `LLVMABIAlignmentOf`. Both are
+evaluated at compile time and produce integer constants.
+
+### 48.2 `transmute`
+
+`LLVMBuildBitCast` for equal-sized types. Sema verifies
+`sizeof[From] == sizeof[To]` and requires `unsafe` context.
+
+---
+
+## 49. `@[repr(packed)]` Implementation (spec §16.4)
+
+### 49.1 Parser
+
+Extend `@[repr(...)]` parsing to accept `packed`. Store as a flag
+on the type declaration node.
+
+### 49.2 Sema
+
+Track packed types in `packed_types: HashSet[i32]`. In
+`check_ref_expr`, if the target is a field of a packed struct,
+emit: "cannot create reference to packed field".
+
+### 49.3 Codegen
+
+Use `LLVMStructSetBody(struct_type, fields, count, /*packed=*/1)`.
+The packed flag causes LLVM to use alignment 1 for all fields.
+
+### 49.4 CImport
+
+Detect `__attribute__((packed))` via `clang_Type_getAlignOf`. If
+alignment is 1 and fields are wider than 1 byte, emit
+`@[repr(packed)]`.
+
+---
+
+## 50. `errdefer` Verification (spec §12.3)
+
+### 50.1 Required Behaviors
+
+1. `errdefer` runs on `?` propagation (early return from error)
+2. `errdefer` runs on explicit `return Err(...)`
+3. `errdefer` does NOT run on normal return / `return Ok(...)`
+4. Multiple `errdefer` blocks run in LIFO order
+5. `errdefer` interacts correctly with `defer` (defer always runs,
+   errdefer only on error path)
+
+### 50.2 MirLower
+
+Already partially implemented in `emit_errdefers_for_return`. The
+MIR pass must emit errdefer cleanup blocks on every error-path
+exit from the function (explicit error returns and `?` propagation)
+but NOT on success-path exits.
+
+---
+
+## 51. C Expression Evaluator (c_import)
+
+### 51.1 Approach
+
+Use libclang's `clang_Cursor_Evaluate` for constant expression
+evaluation. For macro bodies, create a temporary translation unit:
+
+```c
+// Paste all #defines, then:
+enum { __eval = (MACRO_EXPRESSION) };
+```
+
+Parse with libclang, get the enum constant value.
+
+### 51.2 Bridge Function
+
+```c
+int64_t with_cimport_eval_macro_expr(int64_t session, const char* expr);
+```
+
+Returns the integer value, or a sentinel for non-constant expressions.
+
+### 51.3 CImport Integration
+
+In `ci_translate_macros`, before skipping unknown macros:
+1. Try `with_cimport_eval_macro_expr(session, value)`
+2. If valid integer, emit `const NAME: i32 = value`
+3. If it fails, skip or emit `comptime_error` stub
+
+---
+
+## 52. C Macro → Generic Function Translation (c_import)
+
+### 52.1 Pattern Recognizer
+
+For each function-like macro, tokenize the body and match against:
+- Ternary `(a) op (b) ? (a) : (b)` → binary if/else
+- Unary `-(a)` → negation
+- Binary `(a) op (b)` → binary op
+- Cast `(type)(expr)` → `expr as type`
+
+Each macro parameter becomes a type parameter `T`, `U`, etc.
+
+### 52.2 Fallback
+
+If the pattern doesn't match:
+```
+fn MACRO_NAME():
+    comptime_error("c_import: macro MACRO_NAME not translatable")
+```
+
+### 52.3 Body Parser
+
+A recursive-descent C expression parser supporting: integer/float
+literals, identifiers, unary (`-`, `~`, `!`), binary (`+`, `-`,
+`*`, `/`, `%`, `&`, `|`, `^`, `<<`, `>>`, `==`, `!=`, `<`, `>`,
+`<=`, `>=`, `&&`, `||`), ternary (`?:`), and parenthesized
+expressions. Covers ~80% of real-world function-like macros.
+
+---
+
+## 53. Collision Mangling (c_import)
+
+### 53.1 Algorithm
+
+Maintain `name_counts: HashMap[str, i32]` during translation. First
+occurrence uses the name as-is. Subsequent collisions append `_N`:
+
+```
+fn ci_mangle_collision(name: str, counts: HashMap[str, i32]) -> str:
+    if not counts.contains(name):
+        counts.insert(name, 1)
+        return name
+    let n = counts.get(name).unwrap() + 1
+    counts.insert(name, n)
+    name ++ "_" ++ int_to_string(n)
+```
+
+---
+
+## 54. Pool Immutability Enforcement
+
+### 54.1 Problem
+
+The compiler passes heap-owning aggregate types (AstPool, Sema) by
+value, creating shallow copies that alias Vec backing stores. If any
+copy mutates a Vec past its capacity, `realloc` moves the buffer and
+all other copies retain dangling pointers.
+
+### 54.2 Solution
+
+Enforce the invariant that AstPool is immutable after parsing and
+Sema type tables are immutable after type-checking:
+
+1. **AstPool.frozen flag:** Set to 1 after all AST construction
+   (parsing, import merging, c_import expansion) completes. Mutation
+   methods (`add_node`, `add_extra`, `add_string`, `add_decl`) print
+   a diagnostic if called after freeze.
+
+2. **Sema.types_frozen flag:** Set to 1 after `check_module()` and
+   `preregister_mir_types()` complete. `add_type()` prints a
+   diagnostic if called after freeze.
+
+3. **Pre-registration:** `Sema.preregister_mir_types()` creates all
+   generic instantiation types that MirLower needs (VecIter[T] for
+   every Vec[T], Vec[str] for str.split()) BEFORE freezing. MirLower
+   then uses read-only lookups (`find_generic_inst`, `find_range_type`)
+   instead of mutating the type tables.
+
+### 54.3 Pipeline Wiring
+
+- `Frontend.compile_source_frontend`: calls `pool.freeze()` after
+  import expansion, before sema phase.
+- `Compilation.run_mir_lower`: calls `sema.preregister_mir_types()`
+  then `sema.freeze_types()` after `check_module()`, before
+  `lower_module()`.
+
+---
+
 *The With Programming Language — End of implementation notes.*
