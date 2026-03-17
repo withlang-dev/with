@@ -269,6 +269,13 @@ void with_vec_set_i32(with_vec *v, int64_t index, int32_t val) {
     }
 }
 
+void with_vec_set_i64(with_vec *v, int64_t index, int64_t val) {
+    if (!v) return;
+    if (index >= 0 && index < v->len) {
+        ((int64_t *)v->ptr)[index] = val;
+    }
+}
+
 void with_vec_remove(with_vec *v, int64_t index) {
     if (!v) return;
     if (index < 0 || index >= v->len) return;
@@ -1467,6 +1474,14 @@ int32_t with_net_udp_bind(int32_t port) {
     return (int32_t)fd;
 }
 
+// ---- timing ----
+
+int64_t with_clock_nanos(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (int64_t)ts.tv_sec * 1000000000LL + (int64_t)ts.tv_nsec;
+}
+
 // Weak stub for embedded runtime object extraction.
 // The real implementation lives in embedded_objects.o (linked into the compiler).
 // This stub allows user programs (which link helpers.o but not embedded_objects.o)
@@ -1476,3 +1491,37 @@ int32_t with_extract_runtime_obj(with_str name, with_str path) {
     (void)name; (void)path;
     return 1; // not available
 }
+
+// Weak stubs for clang bridge (c_import via libclang).
+// The real implementation lives in clang_bridge.o (linked when LLVM is available).
+// These stubs allow the compiler to build without libclang — c_import falls back
+// to hardcoded header tables when with_cimport_available() returns 0.
+__attribute__((weak)) int32_t  with_cimport_available(void) { return 0; }
+__attribute__((weak)) int64_t  with_cimport_parse(with_str h) { (void)h; return 0; }
+__attribute__((weak)) void     with_cimport_dispose(int64_t s) { (void)s; }
+__attribute__((weak)) with_str with_cimport_error(int64_t s) { (void)s; with_str e={"",0}; return e; }
+__attribute__((weak)) int32_t  with_cimport_decl_count(int64_t s) { (void)s; return 0; }
+__attribute__((weak)) int32_t  with_cimport_decl_kind(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
+__attribute__((weak)) with_str with_cimport_decl_name(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"",0}; return e; }
+__attribute__((weak)) with_str with_cimport_fn_return_type(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"",0}; return e; }
+__attribute__((weak)) int32_t  with_cimport_fn_param_count(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
+__attribute__((weak)) with_str with_cimport_fn_param_name(int64_t s, int32_t i, int32_t p) { (void)s;(void)i;(void)p; with_str e={"",0}; return e; }
+__attribute__((weak)) with_str with_cimport_fn_param_type(int64_t s, int32_t i, int32_t p) { (void)s;(void)i;(void)p; with_str e={"",0}; return e; }
+__attribute__((weak)) int32_t  with_cimport_fn_is_variadic(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
+__attribute__((weak)) int32_t  with_cimport_struct_field_count(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
+__attribute__((weak)) with_str with_cimport_struct_field_name(int64_t s, int32_t i, int32_t f) { (void)s;(void)i;(void)f; with_str e={"",0}; return e; }
+__attribute__((weak)) with_str with_cimport_struct_field_type(int64_t s, int32_t i, int32_t f) { (void)s;(void)i;(void)f; with_str e={"",0}; return e; }
+__attribute__((weak)) int32_t  with_cimport_struct_is_opaque(int64_t s, int32_t i) { (void)s;(void)i; return 1; }
+__attribute__((weak)) int32_t  with_cimport_enum_const_count(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
+__attribute__((weak)) with_str with_cimport_enum_const_name(int64_t s, int32_t i, int32_t c) { (void)s;(void)i;(void)c; with_str e={"",0}; return e; }
+__attribute__((weak)) int64_t  with_cimport_enum_const_value(int64_t s, int32_t i, int32_t c) { (void)s;(void)i;(void)c; return 0; }
+__attribute__((weak)) with_str with_cimport_typedef_underlying(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"",0}; return e; }
+__attribute__((weak)) int64_t  with_cimport_parse_macros(with_str h) { (void)h; return 0; }
+__attribute__((weak)) int32_t  with_cimport_macro_count(int64_t s) { (void)s; return 0; }
+__attribute__((weak)) with_str with_cimport_macro_name(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"",0}; return e; }
+__attribute__((weak)) with_str with_cimport_macro_value(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"",0}; return e; }
+__attribute__((weak)) int32_t  with_cimport_macro_is_fn_like(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
+__attribute__((weak)) void     with_cimport_dispose_macros(int64_t s) { (void)s; }
+__attribute__((weak)) int32_t  with_cimport_is_name_emitted(with_str n) { (void)n; return 0; }
+__attribute__((weak)) void     with_cimport_mark_name_emitted(with_str n) { (void)n; }
+__attribute__((weak)) void     with_cimport_reset_names(void) { }

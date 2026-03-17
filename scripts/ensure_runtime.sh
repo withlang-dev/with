@@ -103,6 +103,22 @@ if [ -x "$LLVM_CC" ] && [ -x "$LLVM_CONFIG" ]; then
     echo "${LLVM_CC}" > "${OUT_LIB}/llvm_cc"
 
     echo "static LLVM bridge: ${OUT_LIB}/llvm_bridge.o ($(wc -l < "${OUT_LIB}/llvm_link.rsp") link entries)"
+
+    # Compile clang_bridge.c for c_import support (links against libclang).
+    if [ -f "${LLVM_PREFIX}/include/clang-c/Index.h" ]; then
+      if [ -n "${sdk_path}" ]; then
+        "$LLVM_CC" -isysroot "${sdk_path}" -I"${LLVM_PREFIX}/include" \
+          -c "${RUNTIME_SRC}/clang_bridge.c" -o "${OUT_LIB}/clang_bridge.o" 2>/dev/null || true
+      else
+        "$LLVM_CC" -I"${LLVM_PREFIX}/include" \
+          -c "${RUNTIME_SRC}/clang_bridge.c" -o "${OUT_LIB}/clang_bridge.o" 2>/dev/null || true
+      fi
+      if [ -f "${OUT_LIB}/clang_bridge.o" ]; then
+        echo "${LLVM_PREFIX}/lib/libclang.dylib" >> "${OUT_LIB}/llvm_link.rsp"
+        echo "-Wl,-rpath,${LLVM_PREFIX}/lib" >> "${OUT_LIB}/llvm_link.rsp"
+        echo "clang bridge: ${OUT_LIB}/clang_bridge.o (libclang c_import support)"
+      fi
+    fi
   fi
 else
   # No LLVM installation found — fall back to dylib from seed.

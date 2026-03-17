@@ -6,6 +6,7 @@ use Sema
 use Resolve
 use Span
 use Diagnostic
+use CImport
 use compiler.EmbeddedStdlib
 use compiler.Zcu
 
@@ -121,9 +122,16 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         else:
             if self.trace_c_import_cache != 0:
                 with_eprintln("c_import cache miss")
-            synthetic = self.c_import_expand_header_spec_frontend(header_spec, decl)
-            if self.diagnostics.has_errors():
-                continue
+            let libclang_result = process_c_import(header_spec)
+            if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
+                with_eprintln("c_import generated:")
+                with_eprintln(libclang_result)
+            if libclang_result.len() > 0:
+                synthetic = libclang_result
+            else:
+                synthetic = self.c_import_expand_header_spec_frontend(header_spec, decl)
+                if self.diagnostics.has_errors():
+                    continue
             self.c_import_cache_store(cache_key, synthetic)
 
         if synthetic.len() == 0:
