@@ -3293,6 +3293,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
     if kind == NK_UNSAFE_BLOCK:
         return self.check_expr(self.ast.get_data0(node))
 
+    if kind == NK_COMPTIME_ERROR:
+        return TY_NEVER
+
     if kind == NK_DEFER or kind == NK_ERRDEFER:
         let saved = self.in_defer
         self.in_defer = 1

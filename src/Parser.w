@@ -1584,6 +1584,9 @@ fn Parser.parse_primary(self: Parser) -> i32:
         self.advance()
         return self.pool.add_node(NK_NULL_LIT, ns, ne, 0, 0, 0)
     if t == TK_IDENT:
+        // comptime_error("msg") → NK_COMPTIME_ERROR
+        if self.is_ident_named("comptime_error"):
+            return self.parse_comptime_error_expr()
         if self.pos + 1 < self.tokens.len():
             if self.tokens.get_tag(self.pos + 1) == TK_FAT_ARROW:
                 return self.parse_fat_arrow_single()
@@ -1682,6 +1685,16 @@ fn Parser.parse_float_literal(self: Parser) -> i32:
     self.advance()
     let str_idx = self.pool.add_string(text)
     self.pool.add_node(NK_FLOAT_LIT, start, end, str_idx, 0, 0)
+
+fn Parser.parse_comptime_error_expr(self: Parser) -> i32:
+    let ce_s = self.current_start()
+    self.advance()
+    self.advance()
+    let ce_msg = self.intern_current()
+    self.advance()
+    let ce_t = self.peek()
+    self.advance()
+    self.pool.add_node(NK_COMPTIME_ERROR, ce_s, self.prev_end(), ce_msg, 0, 0)
 
 fn Parser.parse_string_literal(self: Parser) -> i32:
     let start = self.current_start()

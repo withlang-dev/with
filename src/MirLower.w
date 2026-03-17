@@ -2690,6 +2690,13 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         // Transparent pass-through: just lower the inner body
         return self.lower_expr(self.ast.get_data0(node))
 
+    if kind == NK_COMPTIME_ERROR:
+        // Emit unreachable — if this code is ever reached, it's a compile error
+        self.terminate(TK_UNREACHABLE, 0, 0, 0, 0)
+        let dead_bb = self.new_block()
+        self.switch_to(dead_bb)
+        return self.unit_operand()
+
     if kind == NK_IDENT:
         return self.lower_var(self.ast.get_data0(node), self.expr_type(node))
 
