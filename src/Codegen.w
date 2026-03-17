@@ -6831,6 +6831,20 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let gc_next_val = self.mir_bb_values.get(next_bb as i64)
                         wl_build_br(self.builder, gc_next_val)
                     return true
+                if gc_fn_name == "transmute":
+                    let gc_result = self.gen_transmute(gc_node, body, args_id)
+                    if dest_place >= 0 and gc_result != 0:
+                        let gc_ret_ty = wl_type_of(gc_result)
+                        if gc_ret_ty != wl_void_type(self.context):
+                            let gc_local = body.place_locals.get(dest_place as i64)
+                            let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                            wl_build_store(self.builder, gc_result, gc_alloca)
+                            self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                            self.mir_local_types.insert(gc_local, gc_ret_ty)
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                        wl_build_br(self.builder, gc_next_val)
+                    return true
                 if gc_fn_name == "sizeof" or gc_fn_name == "alignof":
                     let gc_result = self.gen_sizeof_alignof(gc_fn_name, gc_node)
                     if dest_place >= 0 and gc_result != 0:
@@ -9062,6 +9076,33 @@ fn Codegen.make_ptr_vec(self: Codegen) -> Vec[i64]:
     let v: Vec[i64] = Vec.new()
     v.push(wl_ptr_type(self.context))
     v
+
+// ── transmute intrinsic ───────────────────────────────────────────
+
+fn Codegen.gen_transmute(self: Codegen, node: i32, body: MirBody, args_id: i32) -> i64:
+    // transmute[T](value) — reinterpret bits as type T
+    let callee_node = self.pool.get_data0(node)
+    if self.pool.kind(callee_node) != NK_TYPE_GENERIC:
+        return wl_get_undef(wl_i32_type(self.context))
+    let tp_start = self.pool.get_data1(callee_node)
+    let tp_count = self.pool.get_data2(callee_node)
+    if tp_count == 0:
+        return wl_get_undef(wl_i32_type(self.context))
+    let tp_node = self.pool.get_extra(tp_start)
+    let target_ty = self.resolve_type(tp_node)
+    if target_ty == 0:
+        return wl_get_undef(wl_i32_type(self.context))
+    // Evaluate the argument
+    let mir_start = body.call_arg_starts.get(args_id as i64)
+    let mir_count = body.call_arg_counts.get(args_id as i64)
+    if mir_count == 0:
+        return wl_get_undef(target_ty)
+    let arg_op = body.call_arg_operands.get(mir_start as i64)
+    let arg_val = self.mir_eval_operand(body, arg_op, 0)
+    // Use alloca + store + load to reinterpret the bits
+    let src_alloca = self.create_entry_alloca(wl_type_of(arg_val))
+    wl_build_store(self.builder, arg_val, src_alloca)
+    wl_build_load(self.builder, target_ty, src_alloca)
 
 // ── sizeof/alignof intrinsics ─────────────────────────────────────
 
