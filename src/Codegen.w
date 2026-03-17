@@ -2296,8 +2296,10 @@ fn Codegen.declare_struct_type(self: Codegen, name_sym: i32, type_node: i32):
     if invalid_layout != 0:
         return
 
-    // Set struct body
-    wl_struct_set_body(st_type, vec_data_i64(&ft_vec), field_count, 0)
+    // Set struct body (check packed flag)
+    let packed_kind = self.pool.get_data2(type_node)
+    let is_packed = type_decl_is_packed(packed_kind)
+    wl_struct_set_body(st_type, vec_data_i64(&ft_vec), field_count, is_packed)
 
 // ── Declare union type ────────────────────────────────────────────
 
