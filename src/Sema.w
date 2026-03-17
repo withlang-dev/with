@@ -2728,7 +2728,6 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     let fn_name = self.ast.get_data0(node)
     let body = self.ast.get_data1(node)
     let flags = self.ast.get_data2(node)
-
     let sig_idx = self.get_sig(fn_name)
     if sig_idx < 0:
         return
@@ -4552,7 +4551,6 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     let callee = self.ast.get_data0(node)
     let extra_start = self.ast.get_data1(node)
     let arg_count = self.ast.get_data2(node)
-
     // Method call: callee is field_access
     if self.ast.kind(callee) == NK_FIELD_ACCESS:
         return self.check_method_call(callee, extra_start, arg_count, node)

@@ -66,6 +66,7 @@ with_str with_vec_get_str(with_vec *v, int64_t index);
 void with_vec_push_bool(with_vec *v, bool val);
 bool with_vec_get_bool(with_vec *v, int64_t index);
 void with_vec_set_i32(with_vec *v, int64_t index, int32_t val);
+void with_vec_set_i64(with_vec *v, int64_t index, int64_t val);
 void with_vec_remove(with_vec *v, int64_t index);
 void with_codegen_loop_set_break(int32_t idx, int64_t bb);
 void with_codegen_loop_set_continue(int32_t idx, int64_t bb);

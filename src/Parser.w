@@ -3307,7 +3307,8 @@ fn Parser.parse_block_or_expr(self: Parser) -> i32:
         self.pool.add_extra(stmts.get(i as i64))
 
     let stmt_count = stmts.len() as i32
-    self.pool.add_node(NK_BLOCK, self.pool.get_start(stmts.get(0)), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
+    let blk_node = self.pool.add_node(NK_BLOCK, self.pool.get_start(stmts.get(0)), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
+    blk_node
 
 // ── Type expression parsing ──────────────────────────────────────
 

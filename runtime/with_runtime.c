@@ -196,6 +196,12 @@ void with_vec_set_i32(with_vec *v, int64_t index, int32_t val) {
     }
 }
 
+void with_vec_set_i64(with_vec *v, int64_t index, int64_t val) {
+    if (index >= 0 && index < v->len) {
+        ((int64_t *)v->ptr)[index] = val;
+    }
+}
+
 void with_vec_remove(with_vec *v, int64_t index) {
     if (index < 0 || index >= v->len) return;
     char *base = (char *)v->ptr;

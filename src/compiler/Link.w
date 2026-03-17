@@ -261,6 +261,10 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
             let embedded_path = root ++ "/embedded_objects.o"
             if with_fs_read_file(embedded_path).len() > 0:
                 extras.push(embedded_path)
+            // Include clang bridge for c_import support
+            let clang_bridge_path = root ++ "/clang_bridge.o"
+            if with_fs_read_file(clang_bridge_path).len() > 0:
+                extras.push(clang_bridge_path)
             extras.push("@" ++ rsp_path)
             return link_stage_link_with_llvm(obj_path, bin_path, extras, link_libs, cc_path)
         let bridge_path = link_stage_find_llvm_bridge_path()

@@ -503,6 +503,16 @@ void wl_optimize(int64_t m, int64_t tm, int32_t level) {
     LLVMDisposePassBuilderOptions(opts);
 }
 
+void wl_run_always_inline(int64_t m, int64_t tm) {
+    LLVMPassBuilderOptionsRef opts = LLVMCreatePassBuilderOptions();
+    LLVMErrorRef err = LLVMRunPasses(M(m), "always-inline", TM(tm), opts);
+    if (err) {
+        char *msg = LLVMGetErrorMessage(err);
+        if (msg) LLVMDisposeErrorMessage(msg);
+    }
+    LLVMDisposePassBuilderOptions(opts);
+}
+
 void wl_promote_allocas(int64_t fn, int64_t tm) {
     LLVMPassBuilderOptionsRef opts = LLVMCreatePassBuilderOptions();
     LLVMErrorRef err = LLVMRunPassesOnFunction(
