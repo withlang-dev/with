@@ -73,6 +73,9 @@ const TK_KW_IT: i32 = 110
 const TK_KW_ERRDEFER: i32 = 111
 const TK_KW_MOVE: i32 = 112
 const TK_KW_WHERE: i32 = 113
+const TK_KW_OPAQUE: i32 = 114
+const TK_KW_NULL: i32 = 115
+const TK_KW_UNION: i32 = 116
 
 // -- Operators --
 const TK_PLUS: i32 = 54
@@ -189,6 +192,9 @@ fn tag_from_keyword(s: str) -> i32:
     if s == "errdefer": return TK_KW_ERRDEFER
     if s == "move": return TK_KW_MOVE
     if s == "where": return TK_KW_WHERE
+    if s == "opaque": return TK_KW_OPAQUE
+    if s == "null": return TK_KW_NULL
+    if s == "union": return TK_KW_UNION
     -1
 
 // Returns a human-readable name for a token tag (for diagnostics).
@@ -252,6 +258,9 @@ fn tag_name(tag: i32) -> str:
     if tag == TK_KW_ERRDEFER: return "'errdefer'"
     if tag == TK_KW_MOVE: return "'move'"
     if tag == TK_KW_WHERE: return "'where'"
+    if tag == TK_KW_OPAQUE: return "'opaque'"
+    if tag == TK_KW_NULL: return "'null'"
+    if tag == TK_KW_UNION: return "'union'"
     if tag == TK_PLUS: return "'+'"
     if tag == TK_MINUS: return "'-'"
     if tag == TK_STAR: return "'*'"

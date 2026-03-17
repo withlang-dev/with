@@ -1342,6 +1342,8 @@ fn Sema.collect_declarations(self: Sema):
                 self.collect_fn_decl(decl, is_local)
         if kind == NK_EXTERN_FN:
             self.collect_extern_fn(decl, is_local)
+        if kind == NK_EXTERN_VAR:
+            self.collect_extern_var(decl, is_local)
         if kind == NK_LET_DECL:
             self.collect_let_decl(decl, is_local)
 
@@ -1505,6 +1507,35 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         self.type_extra.push(inner)
         self.type_extra.push(0)
         let tid = self.add_type(TY_STRUCT, name, te_start, 1)
+        self.named_types.insert(name, tid)
+
+    if sub_kind == TDK_OPAQUE:
+        // Opaque type: register as struct with 0 fields
+        let te_start = self.type_extra.len() as i32
+        let tid = self.add_type(TY_STRUCT, name, te_start, 0)
+        self.named_types.insert(name, tid)
+
+    if sub_kind == TDK_UNION:
+        // Union type: register fields like a struct (codegen handles layout)
+        let field_count = self.ast.get_extra(extra_start)
+        let field_names: Vec[i32] = Vec.new()
+        let field_tids: Vec[i32] = Vec.new()
+        let field_defaults: Vec[i32] = Vec.new()
+        for fi in 0..field_count:
+            let base = extra_start + 1 + fi * 3
+            let f_name = self.ast.get_extra(base)
+            let f_type_node = self.ast.get_extra(base + 1)
+            let f_default = self.ast.get_extra(base + 2)
+            let f_tid = self.resolve_type_expr(f_type_node)
+            field_names.push(f_name)
+            field_tids.push(f_tid)
+            field_defaults.push(f_default)
+        let te_start = self.type_extra.len() as i32
+        for fi in 0..field_count:
+            self.type_extra.push(field_names.get(fi as i64))
+            self.type_extra.push(field_tids.get(fi as i64))
+            self.type_extra.push(field_defaults.get(fi as i64))
+        let tid = self.add_type(TY_STRUCT, name, te_start, field_count)
         self.named_types.insert(name, tid)
 
     if is_ephemeral != 0:
@@ -1904,6 +1935,12 @@ fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
 
     self.add_sig(name, fn_tid, ret_type, sig_param_start, param_count, is_variadic)
     self.extern_fn_names.insert(name, 1)
+
+fn Sema.collect_extern_var(self: Sema, node: i32, is_local: i32):
+    let name = self.ast.get_data0(node)
+    let type_node = self.ast.get_data1(node)
+    let tid = self.resolve_type_expr(type_node)
+    // Type is resolved; MirLower and Codegen access it via the AST node directly
 
 fn sema_str_find_char(text: str, needle: i32) -> i32:
     for i in 0..text.len() as i32:
@@ -3128,6 +3165,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
     if kind == NK_C_STRING_LIT:
         return self.add_type(TY_PTR, self.ty_i8, 0, 0)
 
+    if kind == NK_NULL_LIT:
+        return self.add_type(TY_PTR, self.ty_i8, 0, 0)
+
     if kind == NK_IDENT:
         return self.check_ident(self.ast.get_data0(node), node)
 
@@ -3249,6 +3289,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
 
     if kind == NK_PIPELINE:
         return self.check_pipeline(node)
+
+    if kind == NK_UNSAFE_BLOCK:
+        return self.check_expr(self.ast.get_data0(node))
 
     if kind == NK_DEFER or kind == NK_ERRDEFER:
         let saved = self.in_defer

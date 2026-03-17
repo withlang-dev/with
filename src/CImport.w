@@ -125,6 +125,16 @@ fn ci_mark_cached_names(text: str):
             let name = ci_extract_ident(rest)
             if name.len() > 0:
                 with_cimport_mark_name_emitted(name)
+        else if ci_starts_with(line, "extern let "):
+            let rest = line.slice(11, line.len())
+            let name = ci_extract_ident(rest)
+            if name.len() > 0:
+                with_cimport_mark_name_emitted(name)
+        else if ci_starts_with(line, "extern var "):
+            let rest = line.slice(11, line.len())
+            let name = ci_extract_ident(rest)
+            if name.len() > 0:
+                with_cimport_mark_name_emitted(name)
         else if ci_starts_with(line, "let "):
             let rest = line.slice(4, line.len())
             let name = ci_extract_ident(rest)
@@ -223,7 +233,9 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         return ""
 
     if with_cimport_struct_is_opaque(session, idx) != 0:
-        return ""
+        with_cimport_mark_name_emitted(name)
+        let safe_name = ci_escape_reserved(name)
+        return "// opaque: " ++ safe_name ++ "\n"
 
     let field_count = with_cimport_struct_field_count(session, idx)
     if field_count == 0:
@@ -302,10 +314,13 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
     let var_type_raw = with_cimport_var_type(session, idx)
     let var_type = ci_map_c_type_ctx(var_type_raw, known_structs)
 
-    // Emit as extern let (global C variable)
+    let is_const = with_cimport_var_is_const(session, idx)
     let safe_name = ci_escape_reserved(name)
     with_cimport_mark_name_emitted(name)
-    "// global: " ++ safe_name ++ " : " ++ var_type ++ "\n"
+    if is_const != 0:
+        "extern let " ++ safe_name ++ ": " ++ var_type ++ "\n"
+    else:
+        "extern var " ++ safe_name ++ ": " ++ var_type ++ "\n"
 
 // ── Typedef translation ─────────────────────────────────────
 
@@ -383,7 +398,198 @@ fn ci_translate_macros(session: i64) -> str:
             let safe_name = ci_escape_reserved(name)
             with_cimport_mark_name_emitted(name)
             output = output ++ "let " ++ safe_name ++ " = " ++ stripped ++ "\n"
+        else:
+            let eval_result = ci_eval_const_expr(stripped)
+            if eval_result.len() > 0:
+                let safe_name = ci_escape_reserved(name)
+                with_cimport_mark_name_emitted(name)
+                output = output ++ "let " ++ safe_name ++ ": i32 = " ++ eval_result ++ "\n"
     output
+
+// ── Constant expression evaluator ────────────────────────────
+
+fn ci_eval_const_expr(s: str) -> str:
+    let trimmed = ci_trim(ci_strip_parens(s))
+    if trimmed.len() == 0:
+        return ""
+    if ci_is_int_literal(trimmed):
+        return ci_strip_int_suffix(trimmed)
+    // Unary negation
+    if trimmed.byte_at(0) == 45:
+        let inner = ci_eval_const_expr(trimmed.slice(1, trimmed.len()))
+        if inner.len() > 0:
+            if inner.byte_at(0) == 45:
+                return inner.slice(1, inner.len())
+            return "-" ++ inner
+        return ""
+    // Binary: find lowest-precedence operator
+    let op_info = ci_find_binary_op(trimmed)
+    if op_info >= 0:
+        let op_pos = op_info / 256
+        let op_len = op_info % 256
+        let lhs_str = ci_eval_const_expr(trimmed.slice(0, op_pos as i64))
+        let rhs_str = ci_eval_const_expr(trimmed.slice((op_pos + op_len) as i64, trimmed.len()))
+        if lhs_str.len() > 0 and rhs_str.len() > 0:
+            let lhs = ci_parse_i64(lhs_str)
+            let rhs = ci_parse_i64(rhs_str)
+            let op = trimmed.slice(op_pos as i64, (op_pos + op_len) as i64)
+            return ci_apply_op(lhs, rhs, op)
+    ""
+
+fn ci_find_binary_op(s: str) -> i32:
+    var best_pos = 0 - 1
+    var best_prec = 100
+    var best_len = 0
+    var paren_depth = 0
+    var idx = 0
+    let slen = s.len() as i32
+    while idx < slen:
+        let c = s.byte_at(idx as i64)
+        if c == 40:
+            paren_depth = paren_depth + 1
+        else if c == 41:
+            paren_depth = paren_depth - 1
+        else if paren_depth == 0 and idx > 0:
+            let prec = ci_op_prec(s, idx, slen)
+            if prec >= 0 and prec <= best_prec:
+                best_pos = idx
+                best_prec = prec
+                best_len = ci_op_length(s, idx, slen)
+        idx = idx + 1
+    if best_pos > 0:
+        return best_pos * 256 + best_len
+    0 - 1
+
+fn ci_op_prec(s: str, idx: i32, slen: i32) -> i32:
+    let c = s.byte_at(idx as i64)
+    var nx = 0
+    if idx + 1 < slen:
+        nx = s.byte_at(idx as i64 + 1)
+    if c == 124 and nx != 124: return 0
+    if c == 94: return 1
+    if c == 38 and nx != 38: return 2
+    if c == 60 and nx == 60: return 3
+    if c == 62 and nx == 62: return 3
+    if c == 43: return 4
+    if c == 45: return 4
+    if c == 42: return 5
+    if c == 47: return 5
+    if c == 37: return 5
+    0 - 1
+
+fn ci_op_length(s: str, idx: i32, slen: i32) -> i32:
+    if idx + 1 < slen:
+        let c = s.byte_at(idx as i64)
+        let nx = s.byte_at(idx as i64 + 1)
+        if c == 60 and nx == 60: return 2
+        if c == 62 and nx == 62: return 2
+    1
+
+fn ci_apply_op(lhs: i64, rhs: i64, op: str) -> str:
+    if op == "+": return i64_to_string(lhs + rhs)
+    if op == "-": return i64_to_string(lhs - rhs)
+    if op == "*": return i64_to_string(lhs * rhs)
+    if op == "/":
+        if rhs == 0: return ""
+        return i64_to_string(lhs / rhs)
+    if op == "%":
+        if rhs == 0: return ""
+        return i64_to_string(lhs % rhs)
+    // For bitwise ops, work on i32 (C macros are typically 32-bit)
+    let li = lhs as i32
+    let ri = rhs as i32
+    if op == "<<": return int_to_string(ci_shl(li, ri))
+    if op == ">>": return int_to_string(ci_shr(li, ri))
+    if op == "|": return int_to_string(ci_bitor(li, ri))
+    if op == "&": return int_to_string(ci_bitand(li, ri))
+    if op == "^": return int_to_string(ci_bitxor(li, ri))
+    ""
+
+fn ci_parse_i64(s: str) -> i64:
+    if s.len() == 0: return 0
+    var is_neg = false
+    var si = 0
+    if s.byte_at(0) == 45:
+        is_neg = true
+        si = 1
+    var n: i64 = 0
+    var j = si
+    while j as i64 < s.len():
+        let c = s.byte_at(j as i64)
+        if c >= 48 and c <= 57:
+            n = n * 10 + (c - 48) as i64
+        else:
+            break
+        j = j + 1
+    if is_neg: 0 - n else: n
+
+fn ci_shl(a: i32, b: i32) -> i32:
+    var result = a
+    var count = b
+    while count > 0:
+        result = result * 2
+        count = count - 1
+    result
+
+fn ci_shr(a: i32, b: i32) -> i32:
+    var result = a
+    var count = b
+    while count > 0:
+        result = result / 2
+        count = count - 1
+    result
+
+fn ci_bitor(a: i32, b: i32) -> i32:
+    // Bit-by-bit OR using arithmetic
+    var result = 0
+    var aa = a
+    var bb = b
+    var bit = 1
+    var count = 0
+    while count < 32:
+        let ab = aa - (aa / 2) * 2
+        let bv = bb - (bb / 2) * 2
+        if ab != 0 or bv != 0:
+            result = result + bit
+        aa = aa / 2
+        bb = bb / 2
+        bit = bit * 2
+        count = count + 1
+    result
+
+fn ci_bitand(a: i32, b: i32) -> i32:
+    var result = 0
+    var aa = a
+    var bb = b
+    var bit = 1
+    var count = 0
+    while count < 32:
+        let ab = aa - (aa / 2) * 2
+        let bv = bb - (bb / 2) * 2
+        if ab != 0 and bv != 0:
+            result = result + bit
+        aa = aa / 2
+        bb = bb / 2
+        bit = bit * 2
+        count = count + 1
+    result
+
+fn ci_bitxor(a: i32, b: i32) -> i32:
+    var result = 0
+    var aa = a
+    var bb = b
+    var bit = 1
+    var count = 0
+    while count < 32:
+        let ab = aa - (aa / 2) * 2
+        let bv = bb - (bb / 2) * 2
+        if ab != bv:
+            result = result + bit
+        aa = aa / 2
+        bb = bb / 2
+        bit = bit * 2
+        count = count + 1
+    result
 
 // ── Type mapping ────────────────────────────────────────────
 

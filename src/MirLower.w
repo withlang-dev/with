@@ -517,6 +517,10 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         return self.sema.ty_bool
     if kind == NK_STRING_LIT or kind == NK_C_STRING_LIT:
         return self.sema.ty_str
+    if kind == NK_NULL_LIT:
+        return self.sema.ty_i32
+    if kind == NK_UNSAFE_BLOCK:
+        return self.expr_type(self.ast.get_data0(node))
     if kind == NK_CALL:
         return self.call_return_type(self.ast.get_data0(node))
     if kind == NK_STRUCT_LIT:
@@ -747,10 +751,23 @@ fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
     let existing = self.lookup_local(sym)
     if existing >= 0:
         return existing
-    // Scan module declarations for a mutable let (var)
+    // Scan module declarations for a mutable let (var) or extern var
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
-        if self.ast.kind(decl) != NK_LET_DECL:
+        let dk = self.ast.kind(decl)
+        if dk == NK_EXTERN_VAR:
+            if self.ast.get_data0(decl) != sym:
+                continue
+            let ev_flags = self.ast.get_data2(decl)
+            let ev_is_mut = ev_flags % 2
+            let ev_type_node = self.ast.get_data1(decl)
+            var ev_ty = self.sema.resolve_type_expr(ev_type_node)
+            if ev_ty <= 0:
+                ev_ty = self.sema.ty_i32
+            let local_id = self.body.new_local(ev_ty, ev_is_mut, sym, 1)
+            self.bind_local(sym, local_id)
+            return local_id
+        if dk != NK_LET_DECL:
             continue
         if self.ast.get_data0(decl) != sym:
             continue
@@ -2664,6 +2681,14 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
     if kind == NK_FLOAT_LIT:
         return self.lower_float_lit(self.ast.get_data0(node))
+
+    if kind == NK_NULL_LIT:
+        // Null pointer literal: lower as integer 0 (codegen emits wl_const_null for ptr targets)
+        return self.const_operand(CK_INT, 0, self.sema.ty_i32)
+
+    if kind == NK_UNSAFE_BLOCK:
+        // Transparent pass-through: just lower the inner body
+        return self.lower_expr(self.ast.get_data0(node))
 
     if kind == NK_IDENT:
         return self.lower_var(self.ast.get_data0(node), self.expr_type(node))

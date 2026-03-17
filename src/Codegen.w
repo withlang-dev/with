@@ -2299,6 +2299,46 @@ fn Codegen.declare_struct_type(self: Codegen, name_sym: i32, type_node: i32):
     // Set struct body
     wl_struct_set_body(st_type, vec_data_i64(&ft_vec), field_count, 0)
 
+// ── Declare union type ────────────────────────────────────────────
+
+fn Codegen.declare_union_type(self: Codegen, name_sym: i32, type_node: i32):
+    // Union layout: {[max_size x i8]} — all fields overlap at offset 0.
+    // Field access uses bitcast of pointer to field type.
+    let extra_start = self.pool.get_data1(type_node)
+    let field_count = self.pool.get_extra(extra_start)
+    let name_str = self.intern.resolve(name_sym)
+
+    if not self.struct_type_map.get(name_sym).is_some():
+        self.predeclare_struct_type(name_sym)
+    let idx = self.struct_type_map.get(name_sym).unwrap()
+    let st_type = self.struct_llvm_types.get(idx as i64)
+    self.struct_field_starts.set_i32(idx as i64, self.struct_field_names.len() as i32)
+    self.struct_field_counts.set_i32(idx as i64, field_count)
+
+    // Find max size among all fields
+    var max_size: i64 = 0
+    for fi in 0..field_count:
+        let offset = extra_start + 1 + fi * 3
+        let f_name = self.pool.get_extra(offset)
+        let f_type_node = self.pool.get_extra(offset + 1)
+        let f_default = self.pool.get_extra(offset + 2)
+        let f_ty = self.resolve_type(f_type_node)
+        self.struct_field_names.push(f_name)
+        self.struct_field_types.push(f_ty)
+        self.struct_field_type_nodes.push(f_type_node)
+        self.struct_field_defaults.push(f_default)
+        let f_size = wl_size_of(f_ty)
+        if f_size > max_size:
+            max_size = f_size
+
+    // Union body = single array of i8 with max field size
+    if max_size == 0:
+        max_size = 1
+    let arr_ty = wl_array_type(wl_i8_type(self.context), max_size)
+    let body: Vec[i64] = Vec.new()
+    body.push(arr_ty)
+    wl_struct_set_body(st_type, vec_data_i64(&body), 1, 0)
+
 // ── Declare enum type ─────────────────────────────────────────────
 
 fn Codegen.declare_enum_type(self: Codegen, name_sym: i32, type_node: i32):
@@ -2824,6 +2864,28 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
         if not self.fn_values.get(canonical_sym).is_some():
             self.fn_values.insert(canonical_sym, function)
             self.fn_fn_types.insert(canonical_sym, actual_fn_type)
+
+fn Codegen.declare_extern_var(self: Codegen, node: i32):
+    // NK_EXTERN_VAR: d0=name(sym), d1=type_node, d2=flags(bit0=mut)
+    let name_sym = self.pool.get_data0(node)
+    let type_node = self.pool.get_data1(node)
+    let flags = self.pool.get_data2(node)
+    let is_mut = flags % 2
+
+    let var_ty = self.resolve_type(type_node)
+    if var_ty == 0:
+        return
+    let name_str = self.intern.resolve(name_sym)
+    let link_name = self.canonical_extern_name(name_str)
+
+    let existing = wl_get_named_global(self.llmod, link_name)
+    var global = existing
+    if existing == 0:
+        global = wl_add_global(self.llmod, var_ty, link_name)
+    // External linkage is the default — no need to set it
+    if is_mut == 0:
+        wl_set_global_constant(global, 1)
+    self.module_constants.insert(name_sym, global)
 
 fn Codegen.canonical_extern_name(self: Codegen, name: str) -> str:
     // c_import may suffix C symbols as "name.<n>" — strip the suffix for linking.
@@ -3422,6 +3484,9 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
         if sub_kind == TDK_DISC_ENUM:
             continue
+        if sub_kind == TDK_OPAQUE:
+            self.predeclare_struct_type(name_sym)
+            continue
 
     // Pass 0b: define struct/enum bodies and type aliases.
     for i in 0..self.pool.decl_count():
@@ -3445,6 +3510,12 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             continue
         if sub_kind == TDK_DISC_ENUM:
             self.declare_disc_enum_type(name_sym, decl)
+            continue
+        if sub_kind == TDK_OPAQUE:
+            // Opaque type: predeclared in pass 0a, no body set (stays opaque)
+            continue
+        if sub_kind == TDK_UNION:
+            self.declare_union_type(name_sym, decl)
             continue
         if sub_kind == TDK_ALIAS:
             let extra_start = self.pool.get_data1(decl)
@@ -3473,6 +3544,9 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
         let kind = self.pool.kind(decl)
         if kind == NK_EXTERN_FN:
             self.declare_extern_fn(decl)
+            continue
+        if kind == NK_EXTERN_VAR:
+            self.declare_extern_var(decl)
             continue
         if kind != NK_FN_DECL:
             continue
@@ -4922,6 +4996,9 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
 
     if ck == CK_INT:
         let int_value = mir_const_int_value(body, const_id)
+        // Null pointer: CK_INT 0 with pointer expected type
+        if int_value == 0 and expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
+            return wl_const_null(expected_ty)
         var int_ty = expected_ty
         if int_ty == 0 or wl_get_type_kind(int_ty) != wl_integer_type_kind():
             int_ty = if int_value < -2147483648 or int_value > 2147483647: wl_i64_type(self.context) else: wl_i32_type(self.context)
