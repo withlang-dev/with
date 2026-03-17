@@ -380,9 +380,9 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                     if tk == TY_GENERIC_INST:
                         let elem_ty = self.sema.get_generic_inst_arg(resolved, 0)
                         if elem_ty > 0:
-                            let te_start = self.sema.type_extra.len() as i32
-                            self.sema.type_extra.push(elem_ty)
-                            return self.sema.add_type(TY_GENERIC_INST, vi_sym, te_start, 1)
+                            let found = self.sema.find_generic_inst(vi_sym, elem_ty)
+                            if found != 0:
+                                return found
                     return self.sema.named_types.get(vi_sym).unwrap()
                 return self.sema.ty_void
             return self.sema.ty_void
@@ -445,10 +445,9 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
         if method_name == "split":
             // str.split() returns Vec[str]
             let vec_sym = self.sema.pool_intern("Vec")
-            if self.sema.named_types.contains(vec_sym):
-                let te_start = self.sema.type_extra.len() as i32
-                self.sema.type_extra.push(self.sema.ty_str)
-                return self.sema.add_type(TY_GENERIC_INST, vec_sym, te_start, 1)
+            let found = self.sema.find_generic_inst(vec_sym, self.sema.ty_str)
+            if found != 0:
+                return found
             return self.sema.ty_void
         return self.sema.ty_void
     if tk == TY_ARRAY:
@@ -586,7 +585,10 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
             range_elem = self.expr_type(range_start)
         else if range_end != 0:
             range_elem = self.expr_type(range_end)
-        return self.sema.add_type(TY_RANGE, range_elem, range_inclusive, 0)
+        let range_found = self.sema.find_range_type(range_elem, range_inclusive)
+        if range_found != 0:
+            return range_found
+        return self.sema.ty_void
     self.sema.ty_void
 
 fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
@@ -695,6 +697,26 @@ fn MirBuilder.try_resolve_module_const_val(self: MirBuilder, sym: i32) -> i64:
         return self.try_eval_const(value_node)
     -9223372036854775807
 
+fn MirBuilder.try_resolve_module_float_const(self: MirBuilder, sym: i32) -> i32:
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NK_LET_DECL:
+            continue
+        if self.ast.get_data0(decl) != sym:
+            continue
+        let flags = self.ast.get_data2(decl)
+        let is_mut = flags % 2
+        if is_mut != 0:
+            continue
+        var value_node = self.ast.get_data1(decl)
+        if value_node == 0:
+            continue
+        if self.ast.kind(value_node) == NK_COMPTIME:
+            value_node = self.ast.get_data0(value_node)
+        if self.ast.kind(value_node) == NK_FLOAT_LIT:
+            return self.ast.get_data0(value_node)
+    -1
+
 fn MirBuilder.mark_unsupported(self: MirBuilder):
     if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
         let node_kind = if self.cur_node != 0: self.ast.kind(self.cur_node) else: 0
@@ -768,6 +790,11 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
     if const_val != -9223372036854775807:
         let ty = if const_val < -2147483648 or const_val > 2147483647: self.sema.ty_i64 else: self.sema.ty_i32
         return self.int_const_operand(const_val, ty)
+
+    // Try module-level float constant (let PI: f64 = 3.14)
+    let float_str_idx = self.try_resolve_module_float_const(sym)
+    if float_str_idx >= 0:
+        return self.const_operand(CK_FLOAT, float_str_idx, self.sema.ty_f64)
 
     // Check for enum variant without payload (None, etc.)
     if self.sema.variant_lookup.contains(sym):

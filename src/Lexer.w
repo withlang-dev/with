@@ -436,6 +436,21 @@ fn Lexer.lex_number(self: Lexer) -> i32:
             while self.pos < slen and (lex_is_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
                 self.pos = self.pos + 1
 
+    // Check for exponent (e/E followed by optional +/- and digits)
+    if self.pos < slen:
+        let exp_ch = src.byte_at((self.pos) as i64)
+        if exp_ch == 101 or exp_ch == 69:  // e, E
+            is_float = true
+            self.pos = self.pos + 1
+            // Optional sign
+            if self.pos < slen:
+                let sign_ch = src.byte_at((self.pos) as i64)
+                if sign_ch == 43 or sign_ch == 45:  // +, -
+                    self.pos = self.pos + 1
+            // Exponent digits
+            while self.pos < slen and (lex_is_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
+                self.pos = self.pos + 1
+
     // Check for type suffix: 100_i64, 3.14_f32, etc.
     if self.pos > start and self.pos < slen and src.byte_at((self.pos - 1) as i64) == 95:
         let ch2 = src.byte_at((self.pos) as i64)
