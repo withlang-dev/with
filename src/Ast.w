@@ -23,6 +23,7 @@ const NK_C_IMPORT: i32 = 6
 const NK_TRAIT_DECL: i32 = 7
 const NK_IMPL_DECL: i32 = 8
 const NK_POISONED_DECL: i32 = 9
+const NK_EXTERN_VAR: i32 = 10
 
 // Expressions
 const NK_INT_LIT: i32 = 20
@@ -73,7 +74,10 @@ const NK_ARRAY_COMPREHENSION: i32 = 64
 const NK_ASYNC_SCOPE: i32 = 65
 const NK_SELECT_AWAIT: i32 = 66
 const NK_ERRDEFER: i32 = 67
+const NK_NULL_LIT: i32 = 68
 const NK_POISONED_EXPR: i32 = 69
+const NK_UNSAFE_BLOCK: i32 = 70
+const NK_COMPTIME_ERROR: i32 = 71
 
 // With-expression binding encoding in d2:
 // - positive value: immutable binding symbol id
@@ -132,7 +136,10 @@ const TDK_STRUCT: i32 = 1
 const TDK_ENUM: i32 = 2
 const TDK_DISTINCT: i32 = 3
 const TDK_DISC_ENUM: i32 = 4
+const TDK_OPAQUE: i32 = 5
+const TDK_UNION: i32 = 6
 const TDK_FLAG_EPHEMERAL: i32 = 8
+const TDK_FLAG_PACKED: i32 = 16
 
 fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
     if is_ephemeral != 0:

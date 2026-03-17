@@ -497,6 +497,15 @@ fn Parser.parse_extern_decl(self: Parser, start: i32) -> i32:
     // Optional ABI string: extern "C" fn ...
     if self.peek() == TK_STRING_LIT:
         self.advance()
+    // extern let NAME: TYPE  or  extern var NAME: TYPE
+    if self.peek() == TK_KW_LET or self.peek() == TK_KW_VAR:
+        let is_mut = if self.peek() == TK_KW_VAR: 1 else: 0
+        self.advance()
+        let ev_name = self.expect_ident()
+        if ev_name == 0: return 0
+        if self.expect(TK_COLON) == 0: return 0
+        let ev_type = self.parse_type_expr()
+        return self.pool.add_node(NK_EXTERN_VAR, start, self.prev_end(), ev_name, ev_type, is_mut)
     if self.expect(TK_KW_FN) == 0:
         return 0
     let name = self.expect_ident()
@@ -597,6 +606,28 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
         let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_ENUM, is_ephemeral))
+        return self.finish_type_decl(node)
+
+    // Opaque type: type Name = opaque
+    if self.peek() == TK_KW_OPAQUE:
+        self.advance()
+        let extra_start = self.pool.extra_len()
+        self.pool.add_extra(0)  // placeholder for aliased type (none)
+        self.pool.add_extra(is_pub)
+        self.pool.add_extra(tp_start)
+        self.pool.add_extra(tp_count)
+        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_OPAQUE, is_ephemeral))
+        return self.finish_type_decl(node)
+
+    // Union: type Name = union { field: Type, ... }
+    if self.peek() == TK_KW_UNION:
+        self.advance()
+        self.skip_newlines()
+        let extra_start = self.parse_struct_body()
+        self.pool.add_extra(is_pub)
+        self.pool.add_extra(tp_start)
+        self.pool.add_extra(tp_count)
+        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_UNION, is_ephemeral))
         return self.finish_type_decl(node)
 
     // Distinct type
@@ -1547,6 +1578,11 @@ fn Parser.parse_primary(self: Parser) -> i32:
     if t == TK_C_STRING_LIT: return self.parse_c_string_literal()
     if t == TK_CHAR_LIT: return self.parse_char_literal()
     if t == TK_TRUE or t == TK_FALSE: return self.parse_bool_literal()
+    if t == TK_KW_NULL:
+        let ns = self.current_start()
+        let ne = self.current_end()
+        self.advance()
+        return self.pool.add_node(NK_NULL_LIT, ns, ne, 0, 0, 0)
     if t == TK_IDENT:
         if self.pos + 1 < self.tokens.len():
             if self.tokens.get_tag(self.pos + 1) == TK_FAT_ARROW:
@@ -2343,7 +2379,8 @@ fn Parser.parse_unsafe(self: Parser) -> i32:
     self.advance()
     if self.peek() == TK_COLON:
         self.advance()
-    self.parse_block_or_expr()
+    let body = self.parse_block_or_expr()
+    self.pool.add_node(NK_UNSAFE_BLOCK, start, self.prev_end(), body, 0, 0)
 
 fn Parser.parse_yield(self: Parser) -> i32:
     let start = self.current_start()
