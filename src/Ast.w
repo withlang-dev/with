@@ -152,6 +152,9 @@ fn type_decl_sub_kind(packed: i32) -> i32:
 fn type_decl_is_ephemeral(packed: i32) -> i32:
     (packed / TDK_FLAG_EPHEMERAL) % 2
 
+fn type_decl_is_packed(packed: i32) -> i32:
+    (packed / TDK_FLAG_PACKED) % 2
+
 // Fn decl flag bits (stored in data2 field)
 const FN_FLAG_PUB: i32 = 1
 const FN_FLAG_ASYNC: i32 = 2

@@ -36,6 +36,7 @@ type Parser = {
     pending_derive_count: i32,
     pending_sealed: i32,
     pending_flags: i32,
+    pending_packed: i32,
     saw_implicit_it: i32,
     implicit_it_depth: i32,
     last_param_pattern_start: i32,
@@ -72,6 +73,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_derive_count: 0,
         pending_sealed: 0,
         pending_flags: 0,
+        pending_packed: 0,
         saw_implicit_it: 0,
         implicit_it_depth: 0,
         last_param_pattern_start: 0,
@@ -193,6 +195,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_after = 0
     self.pending_sealed = 0
     self.pending_flags = 0
+    self.pending_packed = 0
     var derive_syms: Vec[i32] = Vec.new()
 
     while self.peek() == TK_AT:
@@ -214,6 +217,8 @@ fn Parser.skip_attributes(self: Parser):
                 self.pending_flags = 1
             if attr_text == "sealed":
                 self.pending_sealed = 1
+            if attr_text == "packed":
+                self.pending_packed = 1
 
         if self.is_ident_named("derive"):
             self.advance()
@@ -588,7 +593,10 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_STRUCT, is_ephemeral))
+        var struct_kind = pack_type_decl_kind(TDK_STRUCT, is_ephemeral)
+        if self.pending_packed != 0:
+            struct_kind = struct_kind + TDK_FLAG_PACKED
+        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
         return self.finish_type_decl(node)
 
     // Enum: starts with | or Identifier followed by |
