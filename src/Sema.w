@@ -4667,10 +4667,28 @@ fn Sema.check_tuple_destructure(self: Sema, node: i32) -> i32:
         self.scope_put(n_sym, bind_ty, 0)
     self.ty_void
 
+fn Sema.is_sizeof_or_alignof(self: Sema, callee: i32) -> i32:
+    if self.ast.kind(callee) != NK_TYPE_GENERIC:
+        return 0
+    let gi_base = self.ast.get_data0(callee)
+    if self.ast.kind(gi_base) != NK_IDENT:
+        return 0
+    let gi_name = self.pool_resolve(self.ast.get_data0(gi_base))
+    if gi_name == "sizeof":
+        return 1
+    if gi_name == "alignof":
+        return 1
+    0
+
 fn Sema.check_call(self: Sema, node: i32) -> i32:
     let callee = self.ast.get_data0(node)
     let extra_start = self.ast.get_data1(node)
     let arg_count = self.ast.get_data2(node)
+
+    // sizeof[T]() / alignof[T]() builtins
+    if self.is_sizeof_or_alignof(callee) != 0:
+        return self.ty_i64
+
     // Method call: callee is field_access
     if self.ast.kind(callee) == NK_FIELD_ACCESS:
         return self.check_method_call(callee, extra_start, arg_count, node)

@@ -6831,6 +6831,20 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let gc_next_val = self.mir_bb_values.get(next_bb as i64)
                         wl_build_br(self.builder, gc_next_val)
                     return true
+                if gc_fn_name == "sizeof" or gc_fn_name == "alignof":
+                    let gc_result = self.gen_sizeof_alignof(gc_fn_name, gc_node)
+                    if dest_place >= 0 and gc_result != 0:
+                        let gc_ret_ty = wl_type_of(gc_result)
+                        if gc_ret_ty != wl_void_type(self.context):
+                            let gc_local = body.place_locals.get(dest_place as i64)
+                            let gc_alloca = self.create_entry_alloca(gc_ret_ty)
+                            wl_build_store(self.builder, gc_result, gc_alloca)
+                            self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                            self.mir_local_types.insert(gc_local, gc_ret_ty)
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        let gc_next_val = self.mir_bb_values.get(next_bb as i64)
+                        wl_build_br(self.builder, gc_next_val)
+                    return true
                 if gc_fn_name == "embed_file" and gc_arg_count == 1:
                     let gc_result = self.gen_embed_file(gc_node)
                     if dest_place >= 0 and gc_result != 0:
@@ -9048,6 +9062,25 @@ fn Codegen.make_ptr_vec(self: Codegen) -> Vec[i64]:
     let v: Vec[i64] = Vec.new()
     v.push(wl_ptr_type(self.context))
     v
+
+// ── sizeof/alignof intrinsics ─────────────────────────────────────
+
+fn Codegen.gen_sizeof_alignof(self: Codegen, name: str, node: i32) -> i64:
+    let callee_node = self.pool.get_data0(node)
+    if self.pool.kind(callee_node) != NK_TYPE_GENERIC:
+        return wl_const_int(wl_i64_type(self.context), 0, 0)
+    let tp_start = self.pool.get_data1(callee_node)
+    let tp_count = self.pool.get_data2(callee_node)
+    if tp_count == 0:
+        return wl_const_int(wl_i64_type(self.context), 0, 0)
+    let tp_node = self.pool.get_extra(tp_start)
+    let type_val = self.resolve_type(tp_node)
+    if type_val == 0:
+        return wl_const_int(wl_i64_type(self.context), 0, 0)
+    let dl = wl_get_module_data_layout(self.llmod)
+    if name == "sizeof":
+        return wl_const_int(wl_i64_type(self.context), wl_abi_size_of(dl, type_val), 0)
+    wl_const_int(wl_i64_type(self.context), wl_abi_align_of(dl, type_val) as i64, 0)
 
 // ── Option method dispatch ────────────────────────────────────────
 
