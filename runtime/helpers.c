@@ -14,6 +14,8 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
+#include <errno.h>
 #ifdef __APPLE__
 #include <crt_externs.h>
 #endif
@@ -1240,6 +1242,35 @@ with_str with_fs_read_file(with_str path) {
     out.ptr = buf;
     out.len = (int64_t)size;
     return out;
+}
+
+// Create directories recursively (like mkdir -p). Returns 0 on success.
+int32_t with_fs_mkdir_p(with_str path) {
+    char *cpath = with_str_to_cstring(path);
+    if (!cpath) return -1;
+
+    // Walk the path and create each component
+    for (char *p = cpath + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            mkdir(cpath, 0755);
+            *p = '/';
+        }
+    }
+    int rc = mkdir(cpath, 0755);
+    free(cpath);
+    // EEXIST is fine
+    return (rc == 0 || errno == EEXIST) ? 0 : -1;
+}
+
+// FNV-1a hash of a string, returned as i64.
+int64_t with_str_hash(with_str s) {
+    uint64_t h = 14695981039346656037ULL;
+    for (int64_t i = 0; i < s.len; i++) {
+        h ^= (uint8_t)s.ptr[i];
+        h *= 1099511628211ULL;
+    }
+    return (int64_t)h;
 }
 
 // ---- std.net ----

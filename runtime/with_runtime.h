@@ -131,6 +131,8 @@ int32_t with_interrupt_requested(void);
 
 with_str with_fs_read_file(with_str path);
 int32_t with_fs_write_file(with_str path, with_str data);
+int32_t with_fs_mkdir_p(with_str path);
+int64_t with_str_hash(with_str s);
 void with_lines_out(with_vec *out, with_str s);
 with_str with_getenv_str(with_str name);
 int32_t with_setenv_str(with_str name, with_str value);

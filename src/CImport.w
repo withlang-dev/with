@@ -92,7 +92,55 @@ fn process_c_import(header_spec: str) -> str:
         i = i + 1
 
     with_cimport_dispose(session)
+
+    // Extract macros using a separate preprocessor pass
+    let macro_session = with_cimport_parse_macros(include_text)
+    if macro_session != 0:
+        output = output ++ ci_translate_macros(macro_session)
+        with_cimport_dispose_macros(macro_session)
+
     output
+
+// Mark all declaration names from cached text as emitted in the global dedup table.
+// This ensures that fs-cached c_import results don't conflict with subsequent c_imports.
+fn ci_mark_cached_names(text: str):
+    var pos = 0
+    let len = text.len() as i32
+    while pos < len:
+        // Find start of line
+        var line_start = pos
+        // Find end of line
+        var line_end = pos
+        while line_end < len and text.byte_at(line_end as i64) != 10:
+            line_end = line_end + 1
+        let line = text.slice(line_start as i64, line_end as i64)
+        // Extract name from "extern fn NAME(" or "let NAME:" or "let NAME =" or "type NAME "
+        if ci_starts_with(line, "extern fn "):
+            let rest = line.slice(10, line.len())
+            let name = ci_extract_ident(rest)
+            if name.len() > 0:
+                with_cimport_mark_name_emitted(name)
+        else if ci_starts_with(line, "let "):
+            let rest = line.slice(4, line.len())
+            let name = ci_extract_ident(rest)
+            if name.len() > 0:
+                with_cimport_mark_name_emitted(name)
+        else if ci_starts_with(line, "type "):
+            let rest = line.slice(5, line.len())
+            let name = ci_extract_ident(rest)
+            if name.len() > 0:
+                with_cimport_mark_name_emitted(name)
+        pos = line_end + 1
+
+fn ci_extract_ident(s: str) -> str:
+    var end = 0
+    while end as i64 < s.len():
+        let c = s.byte_at(end as i64)
+        if (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95 or (c >= 48 and c <= 57):
+            end = end + 1
+        else:
+            break
+    s.slice(0, end as i64)
 
 // ── Include text construction ───────────────────────────────
 
@@ -285,14 +333,24 @@ fn ci_translate_macros(session: i64) -> str:
         if name.byte_at(0) == 95:
             continue
 
+        // Skip already-emitted names (dedup across c_import calls)
+        if with_cimport_is_name_emitted(name) != 0:
+            continue
+
+        // Strip outer parentheses for macro values like (-1)
+        let stripped = ci_strip_parens(value)
+
         // Only translate simple integer and string literals
-        if ci_is_int_literal(value):
+        // Float macros are skipped: module-level let f64 codegen doesn't work yet
+        if ci_is_int_literal(stripped):
             let safe_name = ci_escape_reserved(name)
-            let clean_value = ci_strip_int_suffix(value)
+            let clean_value = ci_strip_int_suffix(stripped)
+            with_cimport_mark_name_emitted(name)
             output = output ++ "let " ++ safe_name ++ ": i32 = " ++ clean_value ++ "\n"
-        else if ci_is_string_literal(value):
+        else if ci_is_string_literal(stripped):
             let safe_name = ci_escape_reserved(name)
-            output = output ++ "let " ++ safe_name ++ " = " ++ value ++ "\n"
+            with_cimport_mark_name_emitted(name)
+            output = output ++ "let " ++ safe_name ++ " = " ++ stripped ++ "\n"
     output
 
 // ── Type mapping ────────────────────────────────────────────
@@ -592,6 +650,12 @@ fn ci_strip_int_suffix(s: str) -> str:
         else:
             break
     s.slice(0, end as i64)
+
+fn ci_strip_parens(s: str) -> str:
+    var result = s
+    while result.len() >= 2 and result.byte_at(0) == 40 and result.byte_at(result.len() - 1) == 41:
+        result = result.slice(1, result.len() - 1)
+    result
 
 fn ci_is_string_literal(s: str) -> bool:
     if s.len() < 2:

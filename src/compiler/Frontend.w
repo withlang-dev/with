@@ -11,8 +11,12 @@ use compiler.EmbeddedStdlib
 use compiler.Zcu
 
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_write_file(path: str, data: str) -> i32
+extern fn with_fs_mkdir_p(path: str) -> i32
+extern fn with_str_hash(s: str) -> i64
 extern fn with_eprintln(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
+extern fn i64_to_string(n: i64) -> str
 
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
@@ -116,23 +120,37 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         var synthetic = ""
         let cached = self.c_import_cache_lookup(cache_key)
         if cached.len() > 0:
+            // Already injected in this compilation — skip to avoid duplicate declarations
             if self.trace_c_import_cache != 0:
-                with_eprintln("c_import cache hit")
-            synthetic = cached
+                with_eprintln("c_import cache hit (memory) — skipping duplicate")
+            continue
         else:
-            if self.trace_c_import_cache != 0:
-                with_eprintln("c_import cache miss")
-            let libclang_result = process_c_import(header_spec)
-            if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
-                with_eprintln("c_import generated:")
-                with_eprintln(libclang_result)
-            if libclang_result.len() > 0:
-                synthetic = libclang_result
+            // Check file-system cache
+            let fs_cached = c_import_fs_cache_lookup(cache_key)
+            if fs_cached.len() > 0:
+                if self.trace_c_import_cache != 0:
+                    with_eprintln("c_import cache hit (fs)")
+                synthetic = fs_cached
+                self.c_import_cache_store(cache_key, synthetic)
+                // Populate dedup table so subsequent c_imports don't re-emit these names
+                ci_mark_cached_names(synthetic)
             else:
-                synthetic = self.c_import_expand_header_spec_frontend(header_spec, decl)
-                if self.diagnostics.has_errors():
-                    continue
-            self.c_import_cache_store(cache_key, synthetic)
+                if self.trace_c_import_cache != 0:
+                    with_eprintln("c_import cache miss")
+                let libclang_result = process_c_import(header_spec)
+                if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
+                    with_eprintln("c_import generated:")
+                    with_eprintln(libclang_result)
+                if libclang_result.len() > 0:
+                    synthetic = libclang_result
+                else:
+                    synthetic = self.c_import_expand_header_spec_frontend(header_spec, decl)
+                    if self.diagnostics.has_errors():
+                        continue
+                self.c_import_cache_store(cache_key, synthetic)
+                // Store to file-system cache
+                if synthetic.len() > 0:
+                    c_import_fs_cache_store(cache_key, synthetic)
 
         if synthetic.len() == 0:
             continue
@@ -168,6 +186,36 @@ fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_s
     if epoch.len() > 0:
         key = key ++ "\n#epoch:" ++ epoch
     key
+
+fn c_import_fs_cache_dir() -> str:
+    let home = with_getenv_str("HOME")
+    if home.len() == 0:
+        return ""
+    home ++ "/.cache/with/c_import"
+
+fn c_import_fs_cache_lookup(cache_key: str) -> str:
+    let dir = c_import_fs_cache_dir()
+    if dir.len() == 0:
+        return ""
+    let h = with_str_hash(cache_key)
+    // Make hash positive for filename
+    var hash_str = i64_to_string(h)
+    if h < 0:
+        hash_str = "n" ++ i64_to_string(0 - h)
+    let path = dir ++ "/" ++ hash_str ++ ".w"
+    with_fs_read_file(path)
+
+fn c_import_fs_cache_store(cache_key: str, value: str):
+    let dir = c_import_fs_cache_dir()
+    if dir.len() == 0:
+        return
+    with_fs_mkdir_p(dir)
+    let h = with_str_hash(cache_key)
+    var hash_str = i64_to_string(h)
+    if h < 0:
+        hash_str = "n" ++ i64_to_string(0 - h)
+    let path = dir ++ "/" ++ hash_str ++ ".w"
+    with_fs_write_file(path, value)
 
 fn Zcu.c_import_emit_header_error_frontend(self: Zcu, decl: i32, header_spec: str):
     let _ = decl
