@@ -34,8 +34,9 @@ fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, outpu
         with_eprintln("[backend] backend_pool decls=" ++ int_to_string(backend_pool.decl_count()) ++ " sema.ast.decls=" ++ int_to_string(self.last_sema.ast.decl_count()))
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or cg.intern.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
         with_eprintln("[backend] cg.intern symbols=" ++ int_to_string(cg.intern.symbol_texts.len() as i32))
-    with_eprintln("[backend-diag] pool.extra_len=" ++ int_to_string(backend_pool.extra_len()) ++ " pool.nodes=" ++ int_to_string(backend_pool.node_count()))
-    backend_dump_struct_extras(backend_pool, backend_intern)
+    if backend_debug_pool_flow_enabled() != 0:
+        with_eprintln("[backend-diag] pool.extra_len=" ++ int_to_string(backend_pool.extra_len()) ++ " pool.nodes=" ++ int_to_string(backend_pool.node_count()))
+        backend_dump_struct_extras(backend_pool, backend_intern)
     let result = cg.gen_module_from_mir(self.last_mir_module, backend_pool)
     if result != 0:
         with_eprintln("error: code generation failed")
