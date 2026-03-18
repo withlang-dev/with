@@ -1560,3 +1560,15 @@ __attribute__((weak)) void     with_cimport_mark_name_emitted(with_str n) { (voi
 __attribute__((weak)) void     with_cimport_reset_names(void) { }
 __attribute__((weak)) int32_t  with_cimport_struct_field_is_bitfield(int64_t s, int32_t i, int32_t f) { (void)s;(void)i;(void)f; return 0; }
 __attribute__((weak)) with_str with_cimport_enum_int_type(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"int",3}; return e; }
+__attribute__((weak)) with_str with_cimport_fn_param_type_translated(int64_t s, int32_t i, int32_t p) { (void)s;(void)i;(void)p; with_str e={"i32",3}; return e; }
+__attribute__((weak)) with_str with_cimport_fn_return_type_translated(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"void",4}; return e; }
+__attribute__((weak)) with_str with_cimport_struct_field_type_translated(int64_t s, int32_t i, int32_t f) { (void)s;(void)i;(void)f; with_str e={"i32",3}; return e; }
+__attribute__((weak)) with_str with_cimport_var_type_translated(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"i32",3}; return e; }
+__attribute__((weak)) with_str with_cimport_typedef_underlying_translated(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"i32",3}; return e; }
+__attribute__((weak)) int32_t  with_cimport_struct_field_is_anonymous_record(int64_t s, int32_t i, int32_t f) { (void)s;(void)i;(void)f; return 0; }
+__attribute__((weak)) int32_t  with_cimport_struct_field_anon_field_count(int64_t s, int32_t i, int32_t f) { (void)s;(void)i;(void)f; return 0; }
+__attribute__((weak)) with_str with_cimport_struct_field_anon_field_name(int64_t s, int32_t i, int32_t f, int32_t sf) { (void)s;(void)i;(void)f;(void)sf; with_str e={"",0}; return e; }
+__attribute__((weak)) with_str with_cimport_struct_field_anon_field_type(int64_t s, int32_t i, int32_t f, int32_t sf) { (void)s;(void)i;(void)f;(void)sf; with_str e={"i32",3}; return e; }
+__attribute__((weak)) int32_t  with_cimport_struct_is_packed(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
+__attribute__((weak)) int32_t  with_cimport_fn_storage_class(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
+__attribute__((weak)) int32_t  with_cimport_fn_is_inline(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
