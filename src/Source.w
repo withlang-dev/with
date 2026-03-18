@@ -3,7 +3,6 @@
 // Root `Source` now follows the foundation implementation shape.
 
 extern fn with_fs_read_file(path: str) -> str
-
 extern fn with_vec_push_i32(v: &Vec[i32], val: i32) -> void
 
 type Source = {

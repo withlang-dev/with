@@ -11,8 +11,8 @@ use InternPool
 use Diagnostic
 
 extern fn int_to_string(n: i32) -> str
-extern fn str_from_byte(b: i32) -> str
 extern fn with_parse_i64(s: str) -> i64
+extern fn str_from_byte(b: i32) -> str
 type Parser = {
     tokens: TokenList,
     pos: i32,
