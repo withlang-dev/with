@@ -1558,3 +1558,5 @@ __attribute__((weak)) void     with_cimport_dispose_macros(int64_t s) { (void)s;
 __attribute__((weak)) int32_t  with_cimport_is_name_emitted(with_str n) { (void)n; return 0; }
 __attribute__((weak)) void     with_cimport_mark_name_emitted(with_str n) { (void)n; }
 __attribute__((weak)) void     with_cimport_reset_names(void) { }
+__attribute__((weak)) int32_t  with_cimport_struct_field_is_bitfield(int64_t s, int32_t i, int32_t f) { (void)s;(void)i;(void)f; return 0; }
+__attribute__((weak)) with_str with_cimport_enum_int_type(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"int",3}; return e; }

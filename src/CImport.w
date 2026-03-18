@@ -20,9 +20,11 @@ extern fn with_cimport_struct_field_count(session: i64, idx: i32) -> i32
 extern fn with_cimport_struct_field_name(session: i64, idx: i32, field: i32) -> str
 extern fn with_cimport_struct_field_type(session: i64, idx: i32, field: i32) -> str
 extern fn with_cimport_struct_is_opaque(session: i64, idx: i32) -> i32
+extern fn with_cimport_struct_field_is_bitfield(session: i64, idx: i32, field: i32) -> i32
 extern fn with_cimport_enum_const_count(session: i64, idx: i32) -> i32
 extern fn with_cimport_enum_const_name(session: i64, idx: i32, ci: i32) -> str
 extern fn with_cimport_enum_const_value(session: i64, idx: i32, ci: i32) -> i64
+extern fn with_cimport_enum_int_type(session: i64, idx: i32) -> str
 extern fn with_cimport_typedef_underlying(session: i64, idx: i32) -> str
 extern fn with_cimport_parse_macros(header_code: str) -> i64
 extern fn with_cimport_macro_count(session: i64) -> i32
@@ -250,11 +252,24 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     if with_cimport_struct_is_opaque(session, idx) != 0:
         with_cimport_mark_name_emitted(name)
         let safe_name = ci_escape_reserved(name)
-        return "// opaque: " ++ safe_name ++ "\n"
+        return "type " ++ safe_name ++ " = opaque\n"
 
     let field_count = with_cimport_struct_field_count(session, idx)
     if field_count == 0:
         return ""
+
+    // Check for bitfields — demote to opaque since layout won't match
+    var has_bitfield = false
+    var bfi = 0
+    while bfi < field_count:
+        if with_cimport_struct_field_is_bitfield(session, idx, bfi) != 0:
+            has_bitfield = true
+            break
+        bfi = bfi + 1
+    if has_bitfield:
+        with_cimport_mark_name_emitted(name)
+        let safe_name = ci_escape_reserved(name)
+        return "type " ++ safe_name ++ " = opaque\n"
 
     with_cimport_mark_name_emitted(name)
     let safe_name = ci_escape_reserved(name)
@@ -284,7 +299,8 @@ fn ci_build_one_field(session: i64, idx: i32, fi: i32, known_structs: str) -> st
     let fname = with_cimport_struct_field_name(session, idx, fi)
     let ftype_raw = with_cimport_struct_field_type(session, idx, fi)
     let ftype = ci_map_c_type_ctx(ftype_raw, known_structs)
-    let safe_fname = ci_escape_reserved(fname)
+    let actual_name = if fname.len() == 0: "unnamed_" ++ int_to_string(fi) else: fname
+    let safe_fname = ci_escape_reserved(actual_name)
     safe_fname ++ ": " ++ ftype
 
 // ── Enum translation ────────────────────────────────────────
@@ -294,7 +310,20 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
     if const_count == 0:
         return ""
 
+    // Determine the integer type for this enum
+    let int_type_raw = with_cimport_enum_int_type(session, idx)
+    let int_type = ci_map_c_type(int_type_raw)
+
     var output = ""
+
+    // Emit type alias for named enums
+    let enum_name = with_cimport_decl_name(session, idx)
+    if enum_name.len() > 0 and enum_name.byte_at(0) != 95:
+        if with_cimport_is_name_emitted(enum_name) == 0:
+            let safe_enum_name = ci_escape_reserved(enum_name)
+            with_cimport_mark_name_emitted(enum_name)
+            output = output ++ "type " ++ safe_enum_name ++ " = " ++ int_type ++ "\n"
+
     for ci in 0..const_count:
         let cname = with_cimport_enum_const_name(session, idx, ci)
         let cvalue = with_cimport_enum_const_value(session, idx, ci)
@@ -307,7 +336,7 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
         let unique_cname = ci_unique_name(cname)
         with_cimport_mark_name_emitted(unique_cname)
         let safe_cname = ci_escape_reserved(unique_cname)
-        output = output ++ "let " ++ safe_cname ++ ": i32 = " ++ i64_to_string(cvalue) ++ "\n"
+        output = output ++ "let " ++ safe_cname ++ ": " ++ int_type ++ " = " ++ i64_to_string(cvalue) ++ "\n"
     output
 
 // ── Variable translation ────────────────────────────────────
@@ -338,6 +367,29 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
 
 // ── Typedef translation ─────────────────────────────────────
 
+fn ci_map_builtin_typedef(name: str) -> str:
+    if name == "uint8_t": return "u8"
+    if name == "int8_t": return "i8"
+    if name == "uint16_t": return "u16"
+    if name == "int16_t": return "i16"
+    if name == "uint32_t": return "u32"
+    if name == "int32_t": return "i32"
+    if name == "uint64_t": return "u64"
+    if name == "int64_t": return "i64"
+    if name == "size_t": return "u64"
+    if name == "ssize_t": return "i64"
+    if name == "uintptr_t": return "u64"
+    if name == "intptr_t": return "i64"
+    if name == "ptrdiff_t": return "i64"
+    if name == "pid_t": return "i32"
+    if name == "uid_t": return "u32"
+    if name == "gid_t": return "u32"
+    if name == "mode_t": return "u16"
+    if name == "off_t": return "i64"
+    if name == "time_t": return "i64"
+    if name == "wchar_t": return "i32"
+    ""
+
 fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
@@ -356,12 +408,42 @@ fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
     // Emit type alias for struct typedefs
     if ci_starts_with(underlying, "struct "):
         let struct_name = underlying.slice(7, underlying.len())
-        // Remove trailing space if any
         let clean_name = ci_trim(struct_name)
         if ci_str_contains(translated_structs, clean_name):
             let safe_name = ci_escape_reserved(name)
             let safe_struct = ci_escape_reserved(clean_name)
+            with_cimport_mark_name_emitted(name)
             return "type " ++ safe_name ++ " = " ++ safe_struct ++ "\n"
+
+    // Check builtin typedef map
+    let mapped = ci_map_builtin_typedef(name)
+    if mapped.len() > 0:
+        let safe_name = ci_escape_reserved(name)
+        with_cimport_mark_name_emitted(name)
+        return "type " ++ safe_name ++ " = " ++ mapped ++ "\n"
+
+    // Union typedef
+    if ci_starts_with(underlying, "union "):
+        let union_name = underlying.slice(6, underlying.len())
+        let clean_name = ci_trim(union_name)
+        if ci_str_contains(translated_structs, clean_name):
+            let safe_name = ci_escape_reserved(name)
+            let safe_union = ci_escape_reserved(clean_name)
+            with_cimport_mark_name_emitted(name)
+            return "type " ++ safe_name ++ " = " ++ safe_union ++ "\n"
+
+    // Enum typedef
+    if ci_starts_with(underlying, "enum "):
+        let safe_name = ci_escape_reserved(name)
+        with_cimport_mark_name_emitted(name)
+        return "type " ++ safe_name ++ " = i32\n"
+
+    // Fallback: try to map the underlying C type
+    let fallback = ci_map_c_type_ctx(underlying, translated_structs)
+    if fallback != "i32" or ci_is_known_base_type(underlying):
+        let safe_name = ci_escape_reserved(name)
+        with_cimport_mark_name_emitted(name)
+        return "type " ++ safe_name ++ " = " ++ fallback ++ "\n"
 
     // Transparent typedef — don't emit anything
     ""
@@ -455,6 +537,36 @@ fn ci_eval_const_expr_ctx(s: str, known: str) -> str:
             let nv = 0 - iv - 1
             return i64_to_string(nv)
         return ""
+    // Logical NOT (!)
+    if trimmed.byte_at(0) == 33:
+        let inner = ci_eval_const_expr_ctx(trimmed.slice(1, trimmed.len()), known)
+        if inner.len() > 0:
+            let iv = ci_parse_i64(inner)
+            if iv == 0: return "1"
+            return "0"
+        return ""
+    // C cast stripping: (type)expr — if parens contain a C type name, strip them
+    if trimmed.byte_at(0) == 40:
+        let cast_end = ci_find_matching_paren(trimmed, 0)
+        if cast_end > 0 and cast_end as i64 + 1 < trimmed.len():
+            let inside = trimmed.slice(1, cast_end as i64)
+            if ci_is_c_type_name(inside):
+                let after = ci_trim(trimmed.slice(cast_end as i64 + 1, trimmed.len()))
+                return ci_eval_const_expr_ctx(after, known)
+    // Ternary: find ? at paren depth 0
+    let ternary_pos = ci_find_ternary(trimmed)
+    if ternary_pos >= 0:
+        let cond_str = ci_eval_const_expr_ctx(trimmed.slice(0, ternary_pos as i64), known)
+        if cond_str.len() > 0:
+            let rest = trimmed.slice(ternary_pos as i64 + 1, trimmed.len())
+            let colon_pos = ci_find_ternary_colon(rest)
+            if colon_pos >= 0:
+                let then_str = rest.slice(0, colon_pos as i64)
+                let else_str = rest.slice(colon_pos as i64 + 1, rest.len())
+                let cv = ci_parse_i64(cond_str)
+                if cv != 0:
+                    return ci_eval_const_expr_ctx(then_str, known)
+                return ci_eval_const_expr_ctx(else_str, known)
     // Binary: find lowest-precedence operator
     let op_info = ci_find_binary_op(trimmed)
     if op_info >= 0:
@@ -471,6 +583,73 @@ fn ci_eval_const_expr_ctx(s: str, known: str) -> str:
     if ci_is_c_ident(trimmed):
         return ci_lookup_known(trimmed, known)
     ""
+
+fn ci_find_matching_paren(s: str, start: i32) -> i32:
+    var depth = 0
+    var i = start
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 40:
+            depth = depth + 1
+        else if c == 41:
+            depth = depth - 1
+            if depth == 0:
+                return i
+        i = i + 1
+    0 - 1
+
+fn ci_is_c_type_name(s: str) -> bool:
+    let t = ci_trim(s)
+    if t.len() == 0: return false
+    // Common C type keywords
+    if t == "int": return true
+    if t == "unsigned": return true
+    if t == "unsigned int": return true
+    if t == "long": return true
+    if t == "unsigned long": return true
+    if t == "long long": return true
+    if t == "unsigned long long": return true
+    if t == "short": return true
+    if t == "unsigned short": return true
+    if t == "char": return true
+    if t == "unsigned char": return true
+    if t == "signed char": return true
+    if t == "void": return true
+    if t == "float": return true
+    if t == "double": return true
+    if t == "long double": return true
+    if t == "_Bool": return true
+    // Common typedefs
+    if ci_map_builtin_typedef(t).len() > 0: return true
+    false
+
+fn ci_find_ternary(s: str) -> i32:
+    var depth = 0
+    var i = 0
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 40:
+            depth = depth + 1
+        else if c == 41:
+            depth = depth - 1
+        else if c == 63 and depth == 0:
+            return i
+        i = i + 1
+    0 - 1
+
+fn ci_find_ternary_colon(s: str) -> i32:
+    var depth = 0
+    var i = 0
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 40:
+            depth = depth + 1
+        else if c == 41:
+            depth = depth - 1
+        else if c == 58 and depth == 0:
+            return i
+        i = i + 1
+    0 - 1
 
 fn ci_is_c_ident(s: str) -> bool:
     if s.len() == 0:

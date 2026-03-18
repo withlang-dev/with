@@ -31,6 +31,7 @@ static with_str make_str(const char *p) {
 typedef struct {
     char *name;
     char *type_spelling;
+    int is_bitfield;
 } FieldInfo;
 
 typedef struct {
@@ -242,6 +243,7 @@ static enum CXChildVisitResult collect_field(CXCursor cursor,
 
     fc->fields[fc->count].name = strdup(clang_getCString(name));
     fc->fields[fc->count].type_spelling = strdup(clang_getCString(type_str));
+    fc->fields[fc->count].is_bitfield = clang_Cursor_isBitField(cursor) ? 1 : 0;
     fc->count++;
 
     clang_disposeString(name);
@@ -555,6 +557,14 @@ with_str with_cimport_struct_field_type(int64_t session, int32_t idx, int32_t fi
     return session_make_str(s, s->caches[idx].fields[field].type_spelling);
 }
 
+int32_t with_cimport_struct_field_is_bitfield(int64_t session, int32_t idx, int32_t field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    ensure_fields_cached(s, idx);
+    if (field < 0 || field >= s->caches[idx].field_count) return 0;
+    return s->caches[idx].fields[field].is_bitfield;
+}
+
 int32_t with_cimport_struct_is_opaque(int64_t session, int32_t idx) {
     CImportSession *s = (CImportSession *)(intptr_t)session;
     if (!s || idx < 0 || idx >= s->decl_count) return 1;
@@ -584,6 +594,18 @@ int64_t with_cimport_enum_const_value(int64_t session, int32_t idx, int32_t ci) 
     ensure_enum_consts_cached(s, idx);
     if (ci < 0 || ci >= s->caches[idx].enum_const_count) return 0;
     return s->caches[idx].enum_consts[ci].value;
+}
+
+// ── Enum integer type query ─────────────────────────────────
+
+with_str with_cimport_enum_int_type(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("int");
+    CXType int_type = clang_getEnumDeclIntegerType(s->decls[idx]);
+    CXString spelling = clang_getTypeSpelling(int_type);
+    with_str result = session_make_str(s, clang_getCString(spelling));
+    clang_disposeString(spelling);
+    return result;
 }
 
 // ── Variable queries ────────────────────────────────────────
