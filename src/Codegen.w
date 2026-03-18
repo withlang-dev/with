@@ -3570,6 +3570,9 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     // Pass 1.3: synthesize missing impl methods from trait defaults.
     self.generate_default_trait_methods()
 
+    // Pass 1.35: generate derive(Clone) methods.
+    self.generate_clone_derives()
+
     // Pass 1.25: synthesize trait vtables after all method declarations exist.
     self.generate_trait_vtables()
 
@@ -7070,6 +7073,41 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                             wl_build_br(self.builder, gc_next_val)
                         return true
 
+            // Try derive-generated method calls (e.g., clone)
+            if gc_callee_sym > 0 and gc_node > 0:
+                let dv_callee = self.pool.get_data0(gc_node)
+                if self.pool.kind(dv_callee) == NK_FIELD_ACCESS:
+                    let dv_method = self.pool.get_data1(dv_callee)
+                    let dv_ms = body.call_arg_starts.get(args_id as i64)
+                    let dv_mc = body.call_arg_counts.get(args_id as i64)
+                    if dv_mc > 0:
+                        let dv_rop = body.call_arg_operands.get(dv_ms as i64)
+                        let dv_rv = self.mir_eval_operand(body, dv_rop, 0)
+                        let dv_rt = wl_type_of(dv_rv)
+                        let dv_ts = self.find_struct_type_by_llvm(dv_rt)
+                        if dv_ts != 0:
+                            let dv_mn = self.intern.resolve(dv_method)
+                            let dv_qn = self.intern.resolve(dv_ts) ++ "." ++ dv_mn
+                            let dv_qs = self.intern.intern(dv_qn)
+                            let dv_fv = self.fn_values.get(dv_qs)
+                            let dv_ft = self.fn_fn_types.get(dv_qs)
+                            if dv_fv.is_some() and dv_ft.is_some():
+                                let dv_args: Vec[i64] = Vec.new()
+                                dv_args.push(self.get_mutable_receiver_ptr(self.pool.get_data0(dv_callee), dv_rv, dv_rt))
+                                let dv_result = wl_build_call(self.builder, dv_ft.unwrap() as i64, dv_fv.unwrap() as i64, vec_data_i64(&dv_args), 1)
+                                if dest_place >= 0 and dv_result != 0:
+                                    let dv_ret_ty = wl_type_of(dv_result)
+                                    if dv_ret_ty != wl_void_type(self.context):
+                                        let dv_local = body.place_locals.get(dest_place as i64)
+                                        let dv_alloca = self.create_entry_alloca(dv_ret_ty)
+                                        wl_build_store(self.builder, dv_result, dv_alloca)
+                                        self.mir_local_ptrs.insert(dv_local, dv_alloca)
+                                        self.mir_local_types.insert(dv_local, dv_ret_ty)
+                                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                    let dv_next = self.mir_bb_values.get(next_bb as i64)
+                                    wl_build_br(self.builder, dv_next)
+                                return true
+
             // All patterns should be handled above. If we reach here, it's a genuine error
             // (unless we're in a blanket impl body where T-method calls can't be resolved).
             let gc_name = if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: "?"
@@ -9078,6 +9116,56 @@ fn Codegen.make_ptr_vec(self: Codegen) -> Vec[i64]:
     let v: Vec[i64] = Vec.new()
     v.push(wl_ptr_type(self.context))
     v
+
+// ── derive(Clone) generation ──────────────────────────────────────
+
+fn Codegen.generate_clone_derives(self: Codegen):
+    let clone_sym = self.intern.intern("Clone")
+    for di in 0..self.pool.decl_count():
+        let decl = self.pool.get_decl(di)
+        if self.pool.kind(decl) != NK_TYPE_DECL:
+            continue
+        let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
+        if sub_kind != TDK_STRUCT:
+            continue
+        let meta = self.pool.find_type_meta(decl)
+        if meta < 0:
+            continue
+        let d_start = self.pool.type_meta_derive_start(meta)
+        let d_count = self.pool.type_meta_derive_count(meta)
+        var has_clone = 0
+        for ci in 0..d_count:
+            if self.pool.get_extra(d_start + ci) == clone_sym:
+                has_clone = 1
+        if has_clone == 0:
+            continue
+        let name_sym = self.pool.get_data0(decl)
+        let name_str = self.intern.resolve(name_sym)
+        // Only generate if not already declared
+        let clone_name = name_str ++ ".clone"
+        let clone_fn_sym = self.intern.intern(clone_name)
+        if self.fn_values.get(clone_fn_sym).is_some():
+            continue
+        // Get struct LLVM type
+        let st_idx_opt = self.struct_type_map.get(name_sym)
+        if not st_idx_opt.is_some():
+            continue
+        let st_idx = st_idx_opt.unwrap()
+        let st_type = self.struct_llvm_types.get(st_idx as i64)
+        // Create fn: clone(self: *Type) -> Type { return load(self) }
+        let params: Vec[i64] = Vec.new()
+        params.push(wl_ptr_type(self.context))
+        let fn_type = wl_function_type(st_type, vec_data_i64(&params), 1, 0)
+        let function = wl_add_function(self.llmod, clone_name, fn_type)
+        wl_set_linkage(function, wl_internal_linkage())
+        let entry = wl_append_bb(self.context, function, "entry")
+        wl_position_at_end(self.builder, entry)
+        let self_ptr = wl_get_param(function, 0)
+        let loaded = wl_build_load(self.builder, st_type, self_ptr)
+        wl_build_ret(self.builder, loaded)
+        self.fn_values.insert(clone_fn_sym, function)
+        self.fn_fn_types.insert(clone_fn_sym, fn_type)
+        self.record_ref_param(clone_fn_sym, 0, 1)
 
 // ── transmute intrinsic ───────────────────────────────────────────
 
