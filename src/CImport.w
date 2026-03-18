@@ -371,6 +371,7 @@ fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
 fn ci_translate_macros(session: i64) -> str:
     let count = with_cimport_macro_count(session)
     var output = ""
+    var known_values = ""
     for i in 0..count:
         let name = with_cimport_macro_name(session, i)
         let value = with_cimport_macro_value(session, i)
@@ -406,6 +407,7 @@ fn ci_translate_macros(session: i64) -> str:
             let safe_name = ci_escape_reserved(name)
             let clean_value = ci_strip_int_suffix(stripped)
             with_cimport_mark_name_emitted(name)
+            known_values = known_values ++ name ++ "=" ++ clean_value ++ "|"
             output = output ++ "let " ++ safe_name ++ ": i32 = " ++ clean_value ++ "\n"
         else if ci_is_float_literal(stripped):
             let safe_name = ci_escape_reserved(name)
@@ -418,16 +420,20 @@ fn ci_translate_macros(session: i64) -> str:
             with_cimport_mark_name_emitted(name)
             output = output ++ "let " ++ safe_name ++ " = " ++ stripped ++ "\n"
         else:
-            let eval_result = ci_eval_const_expr(stripped)
+            let eval_result = ci_eval_const_expr_ctx(stripped, known_values)
             if eval_result.len() > 0:
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
+                known_values = known_values ++ name ++ "=" ++ eval_result ++ "|"
                 output = output ++ "let " ++ safe_name ++ ": i32 = " ++ eval_result ++ "\n"
     output
 
 // ── Constant expression evaluator ────────────────────────────
 
 fn ci_eval_const_expr(s: str) -> str:
+    ci_eval_const_expr_ctx(s, "")
+
+fn ci_eval_const_expr_ctx(s: str, known: str) -> str:
     let trimmed = ci_trim(ci_strip_parens(s))
     if trimmed.len() == 0:
         return ""
@@ -435,24 +441,66 @@ fn ci_eval_const_expr(s: str) -> str:
         return ci_strip_int_suffix(trimmed)
     // Unary negation
     if trimmed.byte_at(0) == 45:
-        let inner = ci_eval_const_expr(trimmed.slice(1, trimmed.len()))
+        let inner = ci_eval_const_expr_ctx(trimmed.slice(1, trimmed.len()), known)
         if inner.len() > 0:
             if inner.byte_at(0) == 45:
                 return inner.slice(1, inner.len())
             return "-" ++ inner
+        return ""
+    // Unary bitwise NOT (~)
+    if trimmed.byte_at(0) == 126:
+        let inner = ci_eval_const_expr_ctx(trimmed.slice(1, trimmed.len()), known)
+        if inner.len() > 0:
+            let iv = ci_parse_i64(inner)
+            let nv = 0 - iv - 1
+            return i64_to_string(nv)
         return ""
     // Binary: find lowest-precedence operator
     let op_info = ci_find_binary_op(trimmed)
     if op_info >= 0:
         let op_pos = op_info / 256
         let op_len = op_info % 256
-        let lhs_str = ci_eval_const_expr(trimmed.slice(0, op_pos as i64))
-        let rhs_str = ci_eval_const_expr(trimmed.slice((op_pos + op_len) as i64, trimmed.len()))
+        let lhs_str = ci_eval_const_expr_ctx(trimmed.slice(0, op_pos as i64), known)
+        let rhs_str = ci_eval_const_expr_ctx(trimmed.slice((op_pos + op_len) as i64, trimmed.len()), known)
         if lhs_str.len() > 0 and rhs_str.len() > 0:
             let lhs = ci_parse_i64(lhs_str)
             let rhs = ci_parse_i64(rhs_str)
             let op = trimmed.slice(op_pos as i64, (op_pos + op_len) as i64)
             return ci_apply_op(lhs, rhs, op)
+    // Identifier: look up in known values
+    if ci_is_c_ident(trimmed):
+        return ci_lookup_known(trimmed, known)
+    ""
+
+fn ci_is_c_ident(s: str) -> bool:
+    if s.len() == 0:
+        return false
+    let c0 = s.byte_at(0)
+    if not ((c0 >= 65 and c0 <= 90) or (c0 >= 97 and c0 <= 122) or c0 == 95):
+        return false
+    var i = 1
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if not ((c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 95):
+            return false
+        i = i + 1
+    true
+
+fn ci_lookup_known(name: str, known: str) -> str:
+    // Search "name=value|name2=value2|..." for name
+    let key = name ++ "="
+    var pos = 0
+    while pos < known.len() as i32:
+        if ci_starts_with(known.slice(pos as i64, known.len()), key):
+            let val_start = pos + key.len() as i32
+            var val_end = val_start
+            while val_end < known.len() as i32 and known.byte_at(val_end as i64) != 124:
+                val_end = val_end + 1
+            return known.slice(val_start as i64, val_end as i64)
+        // Skip to next |
+        while pos < known.len() as i32 and known.byte_at(pos as i64) != 124:
+            pos = pos + 1
+        pos = pos + 1
     ""
 
 fn ci_find_binary_op(s: str) -> i32:
