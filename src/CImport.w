@@ -376,8 +376,13 @@ fn ci_translate_macros(session: i64) -> str:
         let value = with_cimport_macro_value(session, i)
         let fn_like = with_cimport_macro_is_fn_like(session, i)
 
-        // Skip function-like macros
+        // Emit function-like macros as comptime_error stubs
         if fn_like != 0:
+            if name.len() > 0 and name.byte_at(0) != 95:
+                if with_cimport_is_name_emitted(name) == 0:
+                    with_cimport_mark_name_emitted(name)
+                    let safe_name = ci_escape_reserved(name)
+                    output = output ++ "fn " ++ safe_name ++ "() -> i32:\n    comptime_error(\"untranslatable C macro: " ++ name ++ "\")\n"
             continue
 
         // Skip empty macros (flag defines)
