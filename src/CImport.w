@@ -88,6 +88,10 @@ fn process_c_import(header_spec: str) -> str:
         output = "type c_void = opaque\n"
         with_cimport_mark_name_emitted("c_void")
 
+    // Pre-scan: collect all opaque-demoted types (bitfield, forward decl, unsupported)
+    // then cascade through field references until fixpoint
+    let demoted_types = ci_collect_demoted_types(session, count)
+
     // Track translated struct names for typedef resolution
     var translated_structs = ""
 
@@ -97,7 +101,7 @@ fn process_c_import(header_spec: str) -> str:
         if kind == CK_FUNCTION:
             output = output ++ ci_translate_function(session, i, translated_structs)
         else if kind == CK_STRUCT or kind == CK_UNION:
-            let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs)
+            let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types)
             output = output ++ struct_result
             // Track struct name for typedef resolution (only if actually translated)
             if struct_result.len() > 0:
@@ -210,6 +214,93 @@ fn ci_build_include_text(header_spec: str) -> str:
     // Bare header name
     "#include <" ++ header_spec ++ ">"
 
+// ── Opaque demotion pre-scan ─────────────────────────────────
+// Two-pass analysis: first collect directly demoted types (bitfield, forward
+// decl, unsupported fields), then cascade through field references until
+// fixpoint. Follows Zig's approach where any struct embedding an opaque
+// type is itself demoted to opaque.
+
+fn ci_collect_demoted_types(session: i64, count: i32) -> str:
+    // Pass 1: collect directly demoted structs/unions
+    var demoted = ""
+    var i = 0
+    while i < count:
+        let kind = with_cimport_decl_kind(session, i)
+        if kind == CK_STRUCT or kind == CK_UNION:
+            let name = with_cimport_decl_name(session, i)
+            if name.len() > 0 and name.byte_at(0) != 95:
+                if ci_is_directly_demoted(session, i):
+                    demoted = demoted ++ "|" ++ name ++ "|"
+        i = i + 1
+
+    // Fixpoint: cascade demotions through field embedding
+    var changed = true
+    while changed:
+        changed = false
+        i = 0
+        while i < count:
+            let kind = with_cimport_decl_kind(session, i)
+            if kind == CK_STRUCT or kind == CK_UNION:
+                let name = with_cimport_decl_name(session, i)
+                if name.len() > 0 and name.byte_at(0) != 95:
+                    if not ci_str_contains(demoted, "|" ++ name ++ "|"):
+                        if ci_has_demoted_field(session, i, demoted):
+                            demoted = demoted ++ "|" ++ name ++ "|"
+                            changed = true
+            i = i + 1
+    demoted
+
+fn ci_is_directly_demoted(session: i64, idx: i32) -> bool:
+    // Forward declaration (no definition)
+    if with_cimport_struct_is_opaque(session, idx) != 0:
+        return true
+    let field_count = with_cimport_struct_field_count(session, idx)
+    // Bitfield in any field
+    var fi = 0
+    while fi < field_count:
+        if with_cimport_struct_field_is_bitfield(session, idx, fi) != 0:
+            return true
+        fi = fi + 1
+    // Unsupported field type
+    fi = 0
+    while fi < field_count:
+        let ft = with_cimport_struct_field_type_translated(session, idx, fi)
+        if ci_starts_with(ft, "__UNSUPPORTED:"):
+            return true
+        fi = fi + 1
+    false
+
+fn ci_has_demoted_field(session: i64, idx: i32, demoted: str) -> bool:
+    if with_cimport_struct_is_opaque(session, idx) != 0:
+        return false
+    let field_count = with_cimport_struct_field_count(session, idx)
+    var fi = 0
+    while fi < field_count:
+        let ft = with_cimport_struct_field_type_translated(session, idx, fi)
+        if ci_field_type_is_demoted(ft, demoted):
+            return true
+        fi = fi + 1
+    false
+
+fn ci_field_type_is_demoted(ftype: str, demoted: str) -> bool:
+    if ftype.len() == 0:
+        return false
+    // Direct embedding: field type exactly matches a demoted name
+    if ci_str_contains(demoted, "|" ++ ftype ++ "|"):
+        return true
+    // Array of demoted type: [N]DemotedName
+    if ftype.byte_at(0) == 91:
+        var i = 1
+        while i < ftype.len() as i32:
+            if ftype.byte_at(i as i64) == 93:
+                let elem = ftype.slice(i as i64 + 1, ftype.len())
+                if ci_str_contains(demoted, "|" ++ elem ++ "|"):
+                    return true
+                break
+            i = i + 1
+    // Pointer to demoted type is OK — pointers have fixed size
+    false
+
 // ── Function translation ────────────────────────────────────
 
 fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
@@ -280,7 +371,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
 
 // ── Struct/Union translation ────────────────────────────────
 
-fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: str) -> str:
+fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: str, demoted_types: str) -> str:
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
         return ""
@@ -293,7 +384,9 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     if with_cimport_is_name_emitted(name) != 0:
         return ""
 
-    if with_cimport_struct_is_opaque(session, idx) != 0:
+    // Check if pre-scan marked this type as demoted (bitfield, forward decl,
+    // unsupported field, or cascaded from a field whose type was demoted)
+    if ci_str_contains(demoted_types, "|" ++ name ++ "|"):
         with_cimport_mark_name_emitted(name)
         let safe_name = ci_escape_reserved(name)
         return "type " ++ safe_name ++ " = opaque\n"
@@ -301,33 +394,6 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     let field_count = with_cimport_struct_field_count(session, idx)
     if field_count == 0:
         return ""
-
-    // Check for bitfields — demote to opaque since layout won't match
-    var has_bitfield = false
-    var bfi = 0
-    while bfi < field_count:
-        if with_cimport_struct_field_is_bitfield(session, idx, bfi) != 0:
-            has_bitfield = true
-            break
-        bfi = bfi + 1
-    if has_bitfield:
-        with_cimport_mark_name_emitted(name)
-        let safe_name = ci_escape_reserved(name)
-        return "type " ++ safe_name ++ " = opaque\n"
-
-    // Check for unsupported field types — demote to opaque
-    var has_unsupported = false
-    var ufi = 0
-    while ufi < field_count:
-        let ft = with_cimport_struct_field_type_translated(session, idx, ufi)
-        if ci_starts_with(ft, "__UNSUPPORTED:"):
-            has_unsupported = true
-            break
-        ufi = ufi + 1
-    if has_unsupported:
-        with_cimport_mark_name_emitted(name)
-        let safe_name = ci_escape_reserved(name)
-        return "type " ++ safe_name ++ " = opaque\n"
 
     with_cimport_mark_name_emitted(name)
     let safe_name = ci_escape_reserved(name)
