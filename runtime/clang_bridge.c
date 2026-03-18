@@ -32,6 +32,7 @@ typedef struct {
     char *name;
     char *type_spelling;
     int is_bitfield;
+    CXType clang_type;
 } FieldInfo;
 
 typedef struct {
@@ -214,6 +215,211 @@ static with_str get_type_spelling(CImportSession *s, CXType type) {
     return result;
 }
 
+// ── Recursive type translation ──────────────────────────────
+
+#define MAX_TYPE_DEPTH 16
+
+static char* translate_fn_type(CImportSession *s, CXType fn_type, int depth);
+
+static char* translate_type_recursive(CImportSession *s, CXType type, int depth, int is_last_struct_field) {
+    if (depth > MAX_TYPE_DEPTH) {
+        return session_strdup(s, "__UNSUPPORTED:type too complex");
+    }
+
+    CXType canonical = clang_getCanonicalType(type);
+    enum CXTypeKind kind = canonical.kind;
+
+    switch (kind) {
+        case CXType_Void: return session_strdup(s, "void");
+        case CXType_Bool: return session_strdup(s, "bool");
+        case CXType_Char_S:
+        case CXType_SChar: return session_strdup(s, "i8");
+        case CXType_Char_U:
+        case CXType_UChar: return session_strdup(s, "u8");
+        case CXType_Short: return session_strdup(s, "i16");
+        case CXType_UShort: return session_strdup(s, "u16");
+        case CXType_Int: return session_strdup(s, "i32");
+        case CXType_UInt: return session_strdup(s, "u32");
+        case CXType_Long: {
+            long long sz = clang_Type_getSizeOf(canonical);
+            return session_strdup(s, sz <= 4 ? "i32" : "i64");
+        }
+        case CXType_LongLong: return session_strdup(s, "i64");
+        case CXType_ULong: {
+            long long sz = clang_Type_getSizeOf(canonical);
+            return session_strdup(s, sz <= 4 ? "u32" : "u64");
+        }
+        case CXType_ULongLong: return session_strdup(s, "u64");
+        case CXType_Float: return session_strdup(s, "f32");
+        case CXType_Double:
+        case CXType_LongDouble: return session_strdup(s, "f64");
+
+        case CXType_Pointer: {
+            CXType pointee = clang_getPointeeType(canonical);
+            CXType can_pointee = clang_getCanonicalType(pointee);
+
+            // Function pointer -> *const fn(...) -> Ret
+            if (can_pointee.kind == CXType_FunctionProto ||
+                can_pointee.kind == CXType_FunctionNoProto) {
+                char *fn_str = translate_fn_type(s, can_pointee, depth + 1);
+                if (!fn_str) return session_strdup(s, "*const i8");
+                char buf[2048];
+                snprintf(buf, sizeof(buf), "*const %s", fn_str);
+                return session_strdup(s, buf);
+            }
+
+            // void pointer -> *c_void
+            if (can_pointee.kind == CXType_Void) {
+                return session_strdup(s, "*c_void");
+            }
+
+            // char pointer -> *const i8
+            if (can_pointee.kind == CXType_Char_S ||
+                can_pointee.kind == CXType_SChar ||
+                can_pointee.kind == CXType_Char_U) {
+                return session_strdup(s, "*const i8");
+            }
+
+            // General pointer
+            int is_const = clang_isConstQualifiedType(pointee);
+            char *inner = translate_type_recursive(s, pointee, depth + 1, 0);
+            if (!inner || strncmp(inner, "__UNSUPPORTED:", 14) == 0 ||
+                strcmp(inner, "opaque") == 0) {
+                return session_strdup(s, "*const i8");
+            }
+
+            char buf[2048];
+            if (is_const) {
+                snprintf(buf, sizeof(buf), "*const %s", inner);
+            } else {
+                snprintf(buf, sizeof(buf), "*%s", inner);
+            }
+            return session_strdup(s, buf);
+        }
+
+        case CXType_ConstantArray: {
+            long long size = clang_getArraySize(canonical);
+            CXType elem = clang_getArrayElementType(canonical);
+            char *elem_str = translate_type_recursive(s, elem, depth + 1, 0);
+            if (!elem_str || strcmp(elem_str, "opaque") == 0) return session_strdup(s, "opaque");
+            if (strncmp(elem_str, "__UNSUPPORTED:", 14) == 0) {
+                return elem_str;
+            }
+            char buf[2048];
+            snprintf(buf, sizeof(buf), "[%lld]%s", size, elem_str);
+            return session_strdup(s, buf);
+        }
+
+        case CXType_IncompleteArray: {
+            CXType elem = clang_getArrayElementType(canonical);
+            char *elem_str = translate_type_recursive(s, elem, depth + 1, 0);
+            if (!elem_str || strncmp(elem_str, "__UNSUPPORTED:", 14) == 0) {
+                return session_strdup(s, "*const i8");
+            }
+            char buf[2048];
+            if (is_last_struct_field) {
+                // Flexible array member
+                snprintf(buf, sizeof(buf), "[0]%s", elem_str);
+            } else {
+                // Decay to pointer
+                snprintf(buf, sizeof(buf), "*%s", elem_str);
+            }
+            return session_strdup(s, buf);
+        }
+
+        case CXType_FunctionProto:
+        case CXType_FunctionNoProto: {
+            return translate_fn_type(s, canonical, depth + 1);
+        }
+
+        case CXType_Record: {
+            CXString spelling = clang_getTypeSpelling(canonical);
+            const char *name_str = clang_getCString(spelling);
+            // Strip "struct " / "union " prefix
+            const char *bare = name_str;
+            if (name_str && strncmp(name_str, "struct ", 7) == 0)
+                bare = name_str + 7;
+            else if (name_str && strncmp(name_str, "union ", 6) == 0)
+                bare = name_str + 6;
+            // Anonymous record or internal names (starting with _)
+            if (!bare || bare[0] == '\0' || bare[0] == '_' ||
+                strstr(name_str, "(anonymous") != NULL) {
+                clang_disposeString(spelling);
+                return session_strdup(s, "opaque");
+            }
+            char *result = session_strdup(s, bare);
+            clang_disposeString(spelling);
+            return result;
+        }
+
+        case CXType_Enum: {
+            return session_strdup(s, "i32");
+        }
+
+        // Phase 3: unsupported types
+        case CXType_Complex:
+            return session_strdup(s, "__UNSUPPORTED:_Complex type");
+        case CXType_Vector:
+            return session_strdup(s, "__UNSUPPORTED:vector type");
+        case CXType_VariableArray:
+            return session_strdup(s, "__UNSUPPORTED:variable-length array");
+
+        // Block pointer (Apple extension)
+        case CXType_BlockPointer:
+            return session_strdup(s, "*const i8");
+
+        default: {
+            CXString sp = clang_getTypeSpelling(canonical);
+            fprintf(stderr, "c_import: unsupported type kind %d: %s\n",
+                    kind, clang_getCString(sp));
+            clang_disposeString(sp);
+            return session_strdup(s, "opaque");
+        }
+    }
+}
+
+static char* translate_fn_type(CImportSession *s, CXType fn_type, int depth) {
+    if (depth > MAX_TYPE_DEPTH) {
+        return session_strdup(s, "__UNSUPPORTED:type too complex");
+    }
+
+    CXType ret_type = clang_getResultType(fn_type);
+    char *ret_str = translate_type_recursive(s, ret_type, depth + 1, 0);
+    if (!ret_str) ret_str = session_strdup(s, "void");
+
+    int num_args = clang_getNumArgTypes(fn_type);
+    int is_variadic = clang_isFunctionTypeVariadic(fn_type);
+
+    char params[4096] = {0};
+    int pos = 0;
+    for (int i = 0; i < num_args; i++) {
+        if (i > 0) {
+            pos += snprintf(params + pos, sizeof(params) - (size_t)pos, ", ");
+        }
+        CXType arg_type = clang_getArgType(fn_type, (unsigned)i);
+        char *arg_str = translate_type_recursive(s, arg_type, depth + 1, 0);
+        if (!arg_str || strncmp(arg_str, "__UNSUPPORTED:", 14) == 0) {
+            arg_str = session_strdup(s, "i32");
+        }
+        pos += snprintf(params + pos, sizeof(params) - (size_t)pos, "%s", arg_str);
+    }
+    if (is_variadic) {
+        if (num_args > 0) {
+            pos += snprintf(params + pos, sizeof(params) - (size_t)pos, ", ...");
+        } else {
+            pos += snprintf(params + pos, sizeof(params) - (size_t)pos, "...");
+        }
+    }
+
+    if (strncmp(ret_str, "__UNSUPPORTED:", 14) == 0) {
+        ret_str = session_strdup(s, "i32");
+    }
+
+    char buf[8192];
+    snprintf(buf, sizeof(buf), "fn(%s) -> %s", params, ret_str);
+    return session_strdup(s, buf);
+}
+
 // ── Field collection (cached per declaration) ───────────────
 
 typedef struct {
@@ -243,6 +449,7 @@ static enum CXChildVisitResult collect_field(CXCursor cursor,
 
     fc->fields[fc->count].name = strdup(clang_getCString(name));
     fc->fields[fc->count].type_spelling = strdup(clang_getCString(type_str));
+    fc->fields[fc->count].clang_type = type;
     fc->fields[fc->count].is_bitfield = clang_Cursor_isBitField(cursor) ? 1 : 0;
     fc->count++;
 
@@ -532,6 +739,18 @@ int32_t with_cimport_fn_is_variadic(int64_t session, int32_t idx) {
     return clang_isFunctionTypeVariadic(fn_type) ? 1 : 0;
 }
 
+int32_t with_cimport_fn_storage_class(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    return (int32_t)clang_Cursor_getStorageClass(s->decls[idx]);
+}
+
+int32_t with_cimport_fn_is_inline(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    return clang_Cursor_isFunctionInlined(s->decls[idx]) ? 1 : 0;
+}
+
 // ── Struct queries ──────────────────────────────────────────
 
 int32_t with_cimport_struct_field_count(int64_t session, int32_t idx) {
@@ -569,6 +788,14 @@ int32_t with_cimport_struct_is_opaque(int64_t session, int32_t idx) {
     CImportSession *s = (CImportSession *)(intptr_t)session;
     if (!s || idx < 0 || idx >= s->decl_count) return 1;
     return !clang_isCursorDefinition(s->decls[idx]);
+}
+
+int32_t with_cimport_struct_is_packed(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    CXType type = clang_getCursorType(s->decls[idx]);
+    long long align = clang_Type_getAlignOf(type);
+    return (align == 1) ? 1 : 0;
 }
 
 // ── Enum queries ────────────────────────────────────────────
@@ -632,6 +859,148 @@ with_str with_cimport_typedef_underlying(int64_t session, int32_t idx) {
     CXType underlying = clang_getTypedefDeclUnderlyingType(s->decls[idx]);
     CXType canonical = clang_getCanonicalType(underlying);
     return clang_str_to_with(s, clang_getTypeSpelling(canonical));
+}
+
+// ── Translated type queries (recursive translation) ─────────
+
+with_str with_cimport_fn_param_type_translated(int64_t session, int32_t idx, int32_t param) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("i32");
+    CXCursor arg = clang_Cursor_getArgument(s->decls[idx], (unsigned)param);
+    CXType type = clang_getCursorType(arg);
+    char *result = translate_type_recursive(s, type, 0, 0);
+    return session_make_str(s, result ? result : "i32");
+}
+
+with_str with_cimport_fn_return_type_translated(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("void");
+    CXType fn_type = clang_getCursorType(s->decls[idx]);
+    CXType ret_type = clang_getResultType(fn_type);
+    char *result = translate_type_recursive(s, ret_type, 0, 0);
+    return session_make_str(s, result ? result : "void");
+}
+
+with_str with_cimport_struct_field_type_translated(int64_t session, int32_t idx, int32_t field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("i32");
+    ensure_fields_cached(s, idx);
+    if (field < 0 || field >= s->caches[idx].field_count) return make_str("i32");
+    int is_last = (field == s->caches[idx].field_count - 1) ? 1 : 0;
+    char *result = translate_type_recursive(s, s->caches[idx].fields[field].clang_type, 0, is_last);
+    return session_make_str(s, result ? result : "i32");
+}
+
+with_str with_cimport_var_type_translated(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("i32");
+    CXType var_type = clang_getCursorType(s->decls[idx]);
+    char *result = translate_type_recursive(s, var_type, 0, 0);
+    return session_make_str(s, result ? result : "i32");
+}
+
+with_str with_cimport_typedef_underlying_translated(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("i32");
+    CXType underlying = clang_getTypedefDeclUnderlyingType(s->decls[idx]);
+    char *result = translate_type_recursive(s, underlying, 0, 0);
+    return session_make_str(s, result ? result : "i32");
+}
+
+// ── Anonymous struct/union field queries ─────────────────────
+
+// Returns 0 if not anonymous, 1 if anonymous struct, 2 if anonymous union
+int32_t with_cimport_struct_field_is_anonymous_record(int64_t session, int32_t idx, int32_t field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    ensure_fields_cached(s, idx);
+    if (field < 0 || field >= s->caches[idx].field_count) return 0;
+
+    CXType ftype = s->caches[idx].fields[field].clang_type;
+    CXType canonical = clang_getCanonicalType(ftype);
+    if (canonical.kind != CXType_Record) return 0;
+
+    CXCursor decl = clang_getTypeDeclaration(canonical);
+    if (!clang_Cursor_isAnonymous(decl)) return 0;
+    return (clang_getCursorKind(decl) == CXCursor_UnionDecl) ? 2 : 1;
+}
+
+int32_t with_cimport_struct_field_anon_field_count(int64_t session, int32_t idx, int32_t field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    ensure_fields_cached(s, idx);
+    if (field < 0 || field >= s->caches[idx].field_count) return 0;
+
+    CXType ftype = s->caches[idx].fields[field].clang_type;
+    CXType canonical = clang_getCanonicalType(ftype);
+    if (canonical.kind != CXType_Record) return 0;
+
+    CXCursor decl = clang_getTypeDeclaration(canonical);
+    FieldCollector fc = {NULL, 0, 0};
+    clang_visitChildren(decl, collect_field, &fc);
+    int count = fc.count;
+    for (int i = 0; i < fc.count; i++) {
+        free(fc.fields[i].name);
+        free(fc.fields[i].type_spelling);
+    }
+    free(fc.fields);
+    return count;
+}
+
+with_str with_cimport_struct_field_anon_field_name(int64_t session, int32_t idx, int32_t field, int32_t sub_field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("");
+    ensure_fields_cached(s, idx);
+    if (field < 0 || field >= s->caches[idx].field_count) return make_str("");
+
+    CXType ftype = s->caches[idx].fields[field].clang_type;
+    CXType canonical = clang_getCanonicalType(ftype);
+    if (canonical.kind != CXType_Record) return make_str("");
+
+    CXCursor decl = clang_getTypeDeclaration(canonical);
+    FieldCollector fc = {NULL, 0, 0};
+    clang_visitChildren(decl, collect_field, &fc);
+
+    with_str result = make_str("");
+    if (sub_field >= 0 && sub_field < fc.count) {
+        result = session_make_str(s, fc.fields[sub_field].name);
+    }
+
+    for (int i = 0; i < fc.count; i++) {
+        free(fc.fields[i].name);
+        free(fc.fields[i].type_spelling);
+    }
+    free(fc.fields);
+    return result;
+}
+
+with_str with_cimport_struct_field_anon_field_type(int64_t session, int32_t idx, int32_t field, int32_t sub_field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("i32");
+    ensure_fields_cached(s, idx);
+    if (field < 0 || field >= s->caches[idx].field_count) return make_str("i32");
+
+    CXType ftype = s->caches[idx].fields[field].clang_type;
+    CXType canonical = clang_getCanonicalType(ftype);
+    if (canonical.kind != CXType_Record) return make_str("i32");
+
+    CXCursor decl = clang_getTypeDeclaration(canonical);
+    FieldCollector fc = {NULL, 0, 0};
+    clang_visitChildren(decl, collect_field, &fc);
+
+    with_str result = make_str("i32");
+    if (sub_field >= 0 && sub_field < fc.count) {
+        int is_last = (sub_field == fc.count - 1) ? 1 : 0;
+        char *translated = translate_type_recursive(s, fc.fields[sub_field].clang_type, 0, is_last);
+        result = session_make_str(s, translated ? translated : "i32");
+    }
+
+    for (int i = 0; i < fc.count; i++) {
+        free(fc.fields[i].name);
+        free(fc.fields[i].type_spelling);
+    }
+    free(fc.fields);
+    return result;
 }
 
 // ═══════════════════════════════════════════════════════════

@@ -37,6 +37,18 @@ extern fn with_cimport_mark_name_emitted(name: str) -> void
 extern fn with_cimport_reset_names() -> void
 extern fn with_cimport_var_type(session: i64, idx: i32) -> str
 extern fn with_cimport_var_is_const(session: i64, idx: i32) -> i32
+extern fn with_cimport_fn_param_type_translated(session: i64, idx: i32, param: i32) -> str
+extern fn with_cimport_fn_return_type_translated(session: i64, idx: i32) -> str
+extern fn with_cimport_struct_field_type_translated(session: i64, idx: i32, field: i32) -> str
+extern fn with_cimport_var_type_translated(session: i64, idx: i32) -> str
+extern fn with_cimport_typedef_underlying_translated(session: i64, idx: i32) -> str
+extern fn with_cimport_struct_field_is_anonymous_record(session: i64, idx: i32, field: i32) -> i32
+extern fn with_cimport_struct_field_anon_field_count(session: i64, idx: i32, field: i32) -> i32
+extern fn with_cimport_struct_field_anon_field_name(session: i64, idx: i32, field: i32, sub_field: i32) -> str
+extern fn with_cimport_struct_field_anon_field_type(session: i64, idx: i32, field: i32, sub_field: i32) -> str
+extern fn with_cimport_struct_is_packed(session: i64, idx: i32) -> i32
+extern fn with_cimport_fn_storage_class(session: i64, idx: i32) -> i32
+extern fn with_cimport_fn_is_inline(session: i64, idx: i32) -> i32
 extern fn int_to_string(n: i32) -> str
 extern fn i64_to_string(n: i64) -> str
 extern fn with_eprintln(s: str) -> void
@@ -48,6 +60,9 @@ let CK_ENUM: i32 = 5
 let CK_FUNCTION: i32 = 8
 let CK_VAR: i32 = 9
 let CK_TYPEDEF: i32 = 20
+
+// CX_StorageClass constants
+let CX_SC_STATIC: i32 = 3
 
 // Process a c_import header spec and return synthetic .w source text.
 // Returns "" if the bridge is unavailable or parsing fails.
@@ -67,6 +82,11 @@ fn process_c_import(header_spec: str) -> str:
 
     var output = ""
     let count = with_cimport_decl_count(session)
+
+    // Emit c_void opaque type for void pointer translation
+    if with_cimport_is_name_emitted("c_void") == 0:
+        output = "type c_void = opaque\n"
+        with_cimport_mark_name_emitted("c_void")
 
     // Track translated struct names for typedef resolution
     var translated_structs = ""
@@ -205,17 +225,35 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     if with_cimport_is_name_emitted(name) != 0:
         return ""
 
+    // Skip static functions — no external linkage
+    let storage = with_cimport_fn_storage_class(session, idx)
+    let is_inline = with_cimport_fn_is_inline(session, idx)
+    if storage == CX_SC_STATIC:
+        if is_inline != 0:
+            // Static inline — emit comptime_error stub
+            let safe_name = ci_escape_reserved(name)
+            with_cimport_mark_name_emitted(name)
+            return "fn " ++ safe_name ++ "() -> i32:\n    comptime_error(\"static inline function — wrap in C shim\")\n"
+        return ""
+
     let safe_name = ci_escape_reserved(name)
     let param_count = with_cimport_fn_param_count(session, idx)
     let is_variadic = with_cimport_fn_is_variadic(session, idx)
+
+    // Check for unsupported types — emit comptime_error stub if found
+    var has_unsupported = false
+    var unsupported_reason = ""
 
     var params = ""
     for pi in 0..param_count:
         if pi > 0:
             params = params ++ ", "
         let pname = with_cimport_fn_param_name(session, idx, pi)
-        let ptype_raw = with_cimport_fn_param_type(session, idx, pi)
-        let ptype = ci_map_c_type_ctx(ptype_raw, known_structs)
+        let ptype = with_cimport_fn_param_type_translated(session, idx, pi)
+
+        if ci_starts_with(ptype, "__UNSUPPORTED:"):
+            has_unsupported = true
+            unsupported_reason = ptype.slice(14, ptype.len())
 
         if pname.len() > 0:
             params = params ++ ci_escape_reserved(pname) ++ ": " ++ ptype
@@ -228,10 +266,16 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
         else:
             params = params ++ "..."
 
-    let ret_raw = with_cimport_fn_return_type(session, idx)
-    let ret = ci_map_c_type_ctx(ret_raw, known_structs)
+    let ret = with_cimport_fn_return_type_translated(session, idx)
+    if ci_starts_with(ret, "__UNSUPPORTED:"):
+        has_unsupported = true
+        unsupported_reason = ret.slice(14, ret.len())
 
     with_cimport_mark_name_emitted(name)
+
+    if has_unsupported:
+        return "fn " ++ safe_name ++ "() -> i32:\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n"
+
     "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
 
 // ── Struct/Union translation ────────────────────────────────
@@ -271,16 +315,78 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         let safe_name = ci_escape_reserved(name)
         return "type " ++ safe_name ++ " = opaque\n"
 
+    // Check for unsupported field types — demote to opaque
+    var has_unsupported = false
+    var ufi = 0
+    while ufi < field_count:
+        let ft = with_cimport_struct_field_type_translated(session, idx, ufi)
+        if ci_starts_with(ft, "__UNSUPPORTED:"):
+            has_unsupported = true
+            break
+        ufi = ufi + 1
+    if has_unsupported:
+        with_cimport_mark_name_emitted(name)
+        let safe_name = ci_escape_reserved(name)
+        return "type " ++ safe_name ++ " = opaque\n"
+
     with_cimport_mark_name_emitted(name)
     let safe_name = ci_escape_reserved(name)
-    let field_str = ci_build_struct_fields(session, idx, field_count, known_structs)
+
+    // Phase 4: Emit anonymous sub-record types before the parent
+    var anon_decls = ""
+    var anon_idx = 0
+    var afi = 0
+    while afi < field_count:
+        let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, afi)
+        if anon_kind != 0:
+            let fname = with_cimport_struct_field_name(session, idx, afi)
+            let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: name ++ "_unnamed_" ++ int_to_string(anon_idx)
+            let sub_count = with_cimport_struct_field_anon_field_count(session, idx, afi)
+            if sub_count > 0:
+                var sub_fields = ""
+                var sfi = 0
+                while sfi < sub_count:
+                    if sfi > 0:
+                        sub_fields = sub_fields ++ ", "
+                    let sf_name = with_cimport_struct_field_anon_field_name(session, idx, afi, sfi)
+                    let sf_type = with_cimport_struct_field_anon_field_type(session, idx, afi, sfi)
+                    let actual_sf_name = if sf_name.len() == 0: "unnamed_" ++ int_to_string(sfi) else: sf_name
+                    sub_fields = sub_fields ++ ci_escape_reserved(actual_sf_name) ++ ": " ++ sf_type
+                    sfi = sfi + 1
+                if anon_kind == 2:
+                    anon_decls = anon_decls ++ "// union\n"
+                anon_decls = anon_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " = \{ " ++ sub_fields ++ " }\n"
+                with_cimport_mark_name_emitted(synth_name)
+            anon_idx = anon_idx + 1
+        afi = afi + 1
+
+    // Build field list, replacing anonymous record fields with synthesized names
+    var field_str = ""
+    var anon_idx2 = 0
+    var fi = 0
+    while fi < field_count:
+        if fi > 0:
+            field_str = field_str ++ ", "
+        let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, fi)
+        if anon_kind != 0:
+            let fname = with_cimport_struct_field_name(session, idx, fi)
+            let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: name ++ "_unnamed_" ++ int_to_string(anon_idx2)
+            let actual_name = if fname.len() > 0: fname else: "unnamed_" ++ int_to_string(anon_idx2)
+            field_str = field_str ++ ci_escape_reserved(actual_name) ++ ": " ++ ci_escape_reserved(synth_name)
+            anon_idx2 = anon_idx2 + 1
+        else:
+            field_str = field_str ++ ci_build_one_field(session, idx, fi, known_structs)
+        fi = fi + 1
+
+    let is_packed = with_cimport_struct_is_packed(session, idx) != 0
+    let packed_prefix = if is_packed: "@[packed]\n" else: ""
     let part1 = "type " ++ safe_name
     let part2 = part1 ++ " = \{ "
     let part3 = part2 ++ field_str
     let decl = part3 ++ " }\n"
     if is_union:
-        return "// union\n" ++ decl
-    decl
+        return anon_decls ++ "// union\n" ++ packed_prefix ++ decl
+    anon_decls ++ packed_prefix ++ decl
 
 fn ci_build_struct_fields(session: i64, idx: i32, field_count: i32, known_structs: str) -> str:
     if field_count == 0:
@@ -297,8 +403,7 @@ fn ci_build_struct_fields(session: i64, idx: i32, field_count: i32, known_struct
 
 fn ci_build_one_field(session: i64, idx: i32, fi: i32, known_structs: str) -> str:
     let fname = with_cimport_struct_field_name(session, idx, fi)
-    let ftype_raw = with_cimport_struct_field_type(session, idx, fi)
-    let ftype = ci_map_c_type_ctx(ftype_raw, known_structs)
+    let ftype = with_cimport_struct_field_type_translated(session, idx, fi)
     let actual_name = if fname.len() == 0: "unnamed_" ++ int_to_string(fi) else: fname
     let safe_fname = ci_escape_reserved(actual_name)
     safe_fname ++ ": " ++ ftype
@@ -354,8 +459,14 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
     if with_cimport_is_name_emitted(name) != 0:
         return ""
 
-    let var_type_raw = with_cimport_var_type(session, idx)
-    let var_type = ci_map_c_type_ctx(var_type_raw, known_structs)
+    let var_type = with_cimport_var_type_translated(session, idx)
+
+    // Unsupported type — emit comptime_error stub
+    if ci_starts_with(var_type, "__UNSUPPORTED:"):
+        let reason = var_type.slice(14, var_type.len())
+        let safe_name = ci_escape_reserved(name)
+        with_cimport_mark_name_emitted(name)
+        return "fn " ++ safe_name ++ "() -> i32:\n    comptime_error(\"untranslatable: " ++ reason ++ "\")\n"
 
     let is_const = with_cimport_var_is_const(session, idx)
     let safe_name = ci_escape_reserved(name)
@@ -403,50 +514,31 @@ fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
     if with_cimport_is_name_emitted(name) != 0:
         return ""
 
-    let underlying = with_cimport_typedef_underlying(session, idx)
-
-    // Emit type alias for struct typedefs
-    if ci_starts_with(underlying, "struct "):
-        let struct_name = underlying.slice(7, underlying.len())
-        let clean_name = ci_trim(struct_name)
-        if ci_str_contains(translated_structs, clean_name):
-            let safe_name = ci_escape_reserved(name)
-            let safe_struct = ci_escape_reserved(clean_name)
-            with_cimport_mark_name_emitted(name)
-            return "type " ++ safe_name ++ " = " ++ safe_struct ++ "\n"
-
-    // Check builtin typedef map
+    // Check builtin typedef map first (short-circuits common types)
     let mapped = ci_map_builtin_typedef(name)
     if mapped.len() > 0:
         let safe_name = ci_escape_reserved(name)
         with_cimport_mark_name_emitted(name)
         return "type " ++ safe_name ++ " = " ++ mapped ++ "\n"
 
-    // Union typedef
-    if ci_starts_with(underlying, "union "):
-        let union_name = underlying.slice(6, underlying.len())
-        let clean_name = ci_trim(union_name)
-        if ci_str_contains(translated_structs, clean_name):
-            let safe_name = ci_escape_reserved(name)
-            let safe_union = ci_escape_reserved(clean_name)
-            with_cimport_mark_name_emitted(name)
-            return "type " ++ safe_name ++ " = " ++ safe_union ++ "\n"
+    // Use the recursive type translator for the underlying type
+    let translated = with_cimport_typedef_underlying_translated(session, idx)
 
-    // Enum typedef
-    if ci_starts_with(underlying, "enum "):
-        let safe_name = ci_escape_reserved(name)
-        with_cimport_mark_name_emitted(name)
-        return "type " ++ safe_name ++ " = i32\n"
+    // Unsupported underlying type — skip the typedef
+    if ci_starts_with(translated, "__UNSUPPORTED:"):
+        return ""
 
-    // Fallback: try to map the underlying C type
-    let fallback = ci_map_c_type_ctx(underlying, translated_structs)
-    if fallback != "i32" or ci_is_known_base_type(underlying):
-        let safe_name = ci_escape_reserved(name)
-        with_cimport_mark_name_emitted(name)
-        return "type " ++ safe_name ++ " = " ++ fallback ++ "\n"
+    // Don't emit trivial identity typedefs (typedef int → i32, but name isn't special)
+    if translated == "i32":
+        // Only emit if we know the underlying is actually an interesting type
+        let underlying = with_cimport_typedef_underlying(session, idx)
+        if not ci_is_known_base_type(underlying):
+            if not ci_starts_with(underlying, "struct ") and not ci_starts_with(underlying, "union ") and not ci_starts_with(underlying, "enum "):
+                return ""
 
-    // Transparent typedef — don't emit anything
-    ""
+    let safe_name = ci_escape_reserved(name)
+    with_cimport_mark_name_emitted(name)
+    "type " ++ safe_name ++ " = " ++ translated ++ "\n"
 
 // ── Macro translation ───────────────────────────────────────
 
@@ -491,12 +583,24 @@ fn ci_translate_macros(session: i64) -> str:
             with_cimport_mark_name_emitted(name)
             known_values = known_values ++ name ++ "=" ++ clean_value ++ "|"
             output = output ++ "let " ++ safe_name ++ ": i32 = " ++ clean_value ++ "\n"
+        else if ci_is_char_literal(stripped):
+            let char_val = ci_char_to_int(stripped)
+            if char_val.len() > 0:
+                let safe_name = ci_escape_reserved(name)
+                with_cimport_mark_name_emitted(name)
+                known_values = known_values ++ name ++ "=" ++ char_val ++ "|"
+                output = output ++ "let " ++ safe_name ++ ": i32 = " ++ char_val ++ "\n"
         else if ci_is_float_literal(stripped):
             let safe_name = ci_escape_reserved(name)
             let float_ty = ci_float_type_from_suffix(stripped)
             let clean_value = ci_strip_float_suffix(stripped)
             with_cimport_mark_name_emitted(name)
             output = output ++ "let " ++ safe_name ++ ": " ++ float_ty ++ " = " ++ clean_value ++ "\n"
+        else if ci_is_concatenated_string(stripped):
+            let safe_name = ci_escape_reserved(name)
+            let concat_value = ci_concat_strings(stripped)
+            with_cimport_mark_name_emitted(name)
+            output = output ++ "let " ++ safe_name ++ " = " ++ concat_value ++ "\n"
         else if ci_is_string_literal(stripped):
             let safe_name = ci_escape_reserved(name)
             with_cimport_mark_name_emitted(name)
@@ -758,6 +862,26 @@ fn ci_parse_i64(s: str) -> i64:
     if s.byte_at(0) == 45:
         is_neg = true
         si = 1
+    // Check for hex prefix 0x/0X
+    if s.len() as i32 - si >= 2:
+        if s.byte_at(si as i64) == 48:
+            let nx = s.byte_at(si as i64 + 1)
+            if nx == 120 or nx == 88:
+                var n: i64 = 0
+                var j = si + 2
+                while j as i64 < s.len():
+                    let c = s.byte_at(j as i64)
+                    if c >= 48 and c <= 57:
+                        n = n * 16 + (c - 48) as i64
+                    else if c >= 97 and c <= 102:
+                        n = n * 16 + (c - 97 + 10) as i64
+                    else if c >= 65 and c <= 70:
+                        n = n * 16 + (c - 65 + 10) as i64
+                    else:
+                        break
+                    j = j + 1
+                if is_neg: return 0 - n
+                return n
     var n: i64 = 0
     var j = si
     while j as i64 < s.len():
@@ -949,10 +1073,10 @@ fn ci_map_c_type_ctx(spelling: str, known_structs: str) -> str:
 
     // Apply pointer wrapping
     if ptr_depth > 0:
-        // void * → *const i8
+        // void * → *c_void
         if mapped == "void":
-            mapped = "i8"
-            is_const = true
+            mapped = "c_void"
+            is_const = false
         // char * → *const i8 (C strings)
         if mapped == "i8":
             is_const = true
@@ -1195,3 +1319,90 @@ fn ci_is_string_literal(s: str) -> bool:
     if s.len() < 2:
         return false
     s.byte_at(0) == 34 and s.byte_at(s.len() - 1) == 34
+
+// ── Character literal support ───────────────────────────────
+
+fn ci_is_char_literal(s: str) -> bool:
+    if s.len() < 3:
+        return false
+    if s.byte_at(0) != 39 or s.byte_at(s.len() - 1) != 39:
+        return false
+    // 'X' or '\X'
+    true
+
+fn ci_char_to_int(s: str) -> str:
+    // Input is like 'X' or '\n' — extract the char value
+    if s.len() < 3:
+        return ""
+    if s.byte_at(1) == 92:
+        // Escape sequence
+        if s.len() < 4:
+            return ""
+        let esc = s.byte_at(2)
+        if esc == 110: return "10"    // \n
+        if esc == 116: return "9"     // \t
+        if esc == 48: return "0"      // \0
+        if esc == 92: return "92"     // \\
+        if esc == 39: return "39"     // \'
+        if esc == 114: return "13"    // \r
+        if esc == 97: return "7"      // \a
+        if esc == 98: return "8"      // \b
+        if esc == 102: return "12"    // \f
+        if esc == 118: return "11"    // \v
+        return ""
+    // Plain character
+    int_to_string(s.byte_at(1))
+
+// ── String concatenation support ────────────────────────────
+
+fn ci_is_concatenated_string(s: str) -> bool:
+    // Detect adjacent string literals: "foo" "bar"
+    if s.len() < 5:
+        return false
+    if s.byte_at(0) != 34:
+        return false
+    // Find closing quote of first string, then check for another opening quote
+    var i = 1
+    while i as i64 < s.len():
+        let c = s.byte_at(i as i64)
+        if c == 92:
+            i = i + 2
+            continue
+        if c == 34:
+            // Found end of first string — look for another
+            var j = i + 1
+            while j as i64 < s.len() and ci_is_space(s.byte_at(j as i64)):
+                j = j + 1
+            if j as i64 < s.len() and s.byte_at(j as i64) == 34:
+                return true
+            return false
+        i = i + 1
+    false
+
+fn ci_concat_strings(s: str) -> str:
+    // Concatenate adjacent string literals "foo" "bar" -> "foobar"
+    var result = "\""
+    var i = 0
+    let slen = s.len() as i32
+    while i < slen:
+        let c = s.byte_at(i as i64)
+        if c == 34:
+            // Start of a string literal — copy contents
+            i = i + 1
+            while i < slen:
+                let cc = s.byte_at(i as i64)
+                if cc == 92:
+                    // Escape sequence — copy both chars
+                    result = result ++ s.slice(i as i64, (i + 2) as i64)
+                    i = i + 2
+                    continue
+                if cc == 34:
+                    // End of this string segment
+                    i = i + 1
+                    break
+                result = result ++ s.slice(i as i64, (i + 1) as i64)
+                i = i + 1
+        else:
+            // Whitespace between string segments
+            i = i + 1
+    result ++ "\""
