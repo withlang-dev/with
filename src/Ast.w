@@ -174,6 +174,11 @@ const FN_FLAG_AFTER: i32 = 16384
 // Metadata packing unit used to encode required-parameter count into
 // fn_meta flags without affecting existing FN_FLAG_* parity checks.
 const FN_META_REQUIRED_UNIT: i32 = 32768
+const FN_PARAM_STRIDE: i32 = 3
+const FN_PARAM_FLAG_NOALIAS: i32 = 1
+
+fn fn_param_is_noalias(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_NOALIAS) % 2
 
 // Visibility flags
 const VIS_PRIVATE: i32 = 0
@@ -492,6 +497,15 @@ fn AstPool.fn_meta_tp_start(self: &AstPool, meta: i32) -> i32:
 fn AstPool.fn_meta_tp_count(self: &AstPool, meta: i32) -> i32:
     self.fn_meta.get((meta + 6) as i64)
 
+fn AstPool.fn_param_name(self: &AstPool, param_start: i32, param_idx: i32) -> i32:
+    self.get_extra(param_start + param_idx * FN_PARAM_STRIDE)
+
+fn AstPool.fn_param_type(self: &AstPool, param_start: i32, param_idx: i32) -> i32:
+    self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 1)
+
+fn AstPool.fn_param_flags(self: &AstPool, param_start: i32, param_idx: i32) -> i32:
+    self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 2)
+
 fn AstPool.add_type_meta(self: &mut AstPool, node: i32, derive_start: i32, derive_count: i32):
     self.type_meta.push(node)
     self.type_meta.push(derive_start)
@@ -656,7 +670,7 @@ fn AstPool.for_meta_label(self: &AstPool, meta: i32) -> i32:
 // ── Node Data Layout Reference ───────────────────────────────────
 //
 // NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
-//                   extra: [return_type(node), param_count, [param_name, param_type]*, type_param_count, [type_param_name, bound_count, bounds...]*]
+//                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*, type_param_count, [type_param_name, bound_count, bounds...]*]
 //
 // NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TDK_* + flags)
 //                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, tp_start, tp_count]
@@ -670,7 +684,7 @@ fn AstPool.for_meta_label(self: &AstPool, meta: i32) -> i32:
 //                   extra: [type_expr(node)] if type annotation present
 //
 // NK_EXTERN_FN:     d0=name(sym), d1=extra_start, d2=flags (bit0=variadic)
-//                   extra: [return_type(node), param_count, [param_name, param_type]*]
+//                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*]
 //
 // NK_C_IMPORT:      d0=header_str_idx, d1=extra_start, d2=link_lib_count
 //

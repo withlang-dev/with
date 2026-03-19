@@ -505,7 +505,11 @@ fn c_import_map_c_type(spec_raw: str) -> str:
             star_count = star_count + 1
 
     var base = "i32"
-    if c_import_str_contains(spec, "unsigned long long"):
+    if c_import_str_contains(spec, "unsigned __int128"):
+        base = "u128"
+    else if c_import_str_contains(spec, "__int128"):
+        base = "i128"
+    else if c_import_str_contains(spec, "unsigned long long"):
         base = "u64"
     else if c_import_str_contains(spec, "unsigned long"):
         base = "u64"

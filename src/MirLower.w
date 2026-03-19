@@ -3095,13 +3095,13 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
         let param_count = builder.ast.fn_meta_param_count(meta)
 
         for i in 0..param_count:
-            let p_name = builder.ast.get_extra(param_start + i * 2)
+            let p_name = builder.ast.fn_param_name(param_start, i)
             var p_ty = 0
             if sig_idx >= 0:
                 p_ty = builder.sema.sig_param_type(sig_idx, i)
             else:
                 // No sig — resolve param type from type annotation AST node
-                let p_type_node = builder.ast.get_extra(param_start + i * 2 + 1)
+                let p_type_node = builder.ast.fn_param_type(param_start, i)
                 if p_type_node > 0:
                     p_ty = builder.expr_type(p_type_node)
                 if p_ty == 0:

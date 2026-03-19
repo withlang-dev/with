@@ -668,6 +668,8 @@ fn CCodegen.c_type(self: CCodegen, tid: i32, as_return: i32) -> str:
             return if signed != 0: "int32_t" else: "uint32_t"
         if bits == 64:
             return if signed != 0: "int64_t" else: "uint64_t"
+        if bits == 128:
+            return if signed != 0: "__int128" else: "unsigned __int128"
         return "int64_t"
     if tk == TY_FLOAT:
         if self.sema.get_type_d0(resolved) == 32:

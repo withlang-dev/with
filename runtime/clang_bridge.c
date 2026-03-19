@@ -250,6 +250,8 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
             return session_strdup(s, sz <= 4 ? "u32" : "u64");
         }
         case CXType_ULongLong: return session_strdup(s, "u64");
+        case CXType_Int128: return session_strdup(s, "i128");
+        case CXType_UInt128: return session_strdup(s, "u128");
         case CXType_Float: return session_strdup(s, "f32");
         case CXType_Double:
         case CXType_LongDouble: return session_strdup(s, "f64");
@@ -257,6 +259,7 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
         case CXType_Pointer: {
             CXType pointee = clang_getPointeeType(canonical);
             CXType can_pointee = clang_getCanonicalType(pointee);
+            int is_const = clang_isConstQualifiedType(pointee);
 
             // Function pointer -> *const fn(...) -> Ret
             if (can_pointee.kind == CXType_FunctionProto ||
@@ -268,20 +271,19 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
                 return session_strdup(s, buf);
             }
 
-            // void pointer -> *c_void
+            // void pointer -> *mut c_void / *const c_void
             if (can_pointee.kind == CXType_Void) {
-                return session_strdup(s, "*c_void");
+                return session_strdup(s, is_const ? "*const c_void" : "*mut c_void");
             }
 
-            // char pointer -> *const i8
+            // char pointer -> *mut i8 / *const i8
             if (can_pointee.kind == CXType_Char_S ||
                 can_pointee.kind == CXType_SChar ||
                 can_pointee.kind == CXType_Char_U) {
-                return session_strdup(s, "*const i8");
+                return session_strdup(s, is_const ? "*const i8" : "*mut i8");
             }
 
             // General pointer
-            int is_const = clang_isConstQualifiedType(pointee);
             char *inner = translate_type_recursive(s, pointee, depth + 1, 0);
             if (!inner || strncmp(inner, "__UNSUPPORTED:", 14) == 0 ||
                 strcmp(inner, "opaque") == 0) {
@@ -292,7 +294,7 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
             if (is_const) {
                 snprintf(buf, sizeof(buf), "*const %s", inner);
             } else {
-                snprintf(buf, sizeof(buf), "*%s", inner);
+                snprintf(buf, sizeof(buf), "*mut %s", inner);
             }
             return session_strdup(s, buf);
         }
@@ -730,6 +732,19 @@ with_str with_cimport_fn_param_type(int64_t session, int32_t idx, int32_t param)
     CXCursor arg = clang_Cursor_getArgument(s->decls[idx], (unsigned)param);
     CXType type = clang_getCursorType(arg);
     return get_type_spelling(s, type);
+}
+
+int32_t with_cimport_param_is_restrict(int64_t session, int32_t idx, int32_t param) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    CXCursor arg = clang_Cursor_getArgument(s->decls[idx], (unsigned)param);
+    CXType type = clang_getCursorType(arg);
+    if (clang_isRestrictQualifiedType(type)) return 1;
+    CXString spelling = clang_getTypeSpelling(type);
+    const char *raw = clang_getCString(spelling);
+    int is_restrict = raw && strstr(raw, "restrict") != NULL;
+    clang_disposeString(spelling);
+    return is_restrict ? 1 : 0;
 }
 
 int32_t with_cimport_fn_is_variadic(int64_t session, int32_t idx) {

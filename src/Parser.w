@@ -430,7 +430,7 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
         param_count = self.parse_param_list()
         required_param_count = self.last_param_required_count
         if param_count > 0:
-            params_start = self.pool.extra_len() - param_count * 2
+            params_start = self.pool.extra_len() - param_count * FN_PARAM_STRIDE
         if self.expect(TK_R_PAREN) == 0:
             return 0
 
@@ -521,7 +521,7 @@ fn Parser.parse_extern_decl(self: Parser, start: i32) -> i32:
 
     let param_count = self.parse_param_list()
     let extra_start = if param_count > 0:
-        self.pool.extra_len() - param_count * 2
+        self.pool.extra_len() - param_count * FN_PARAM_STRIDE
     else:
         self.pool.extra_len()
 
@@ -539,7 +539,7 @@ fn Parser.parse_extern_decl(self: Parser, start: i32) -> i32:
         ret_type = self.parse_type_expr()
 
     // Store: d0=name, d1=extra_start, d2=flags(bit0=variadic)
-    // Extra already has [param_name, param_type]* from parse_param_list
+    // Extra already has [param_name, param_type, param_flags]* from parse_param_list
     let extern_node = self.pool.add_node(NK_EXTERN_FN, start, self.prev_end(), name, extra_start, is_variadic)
     // Add fn_meta so Codegen can access param_count and return_type
     let required_param_count = self.last_param_required_count
@@ -1190,7 +1190,7 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
             self.advance()
             param_count = self.parse_param_list()
             if param_count > 0:
-                params_start = self.pool.extra_len() - param_count * 2
+                params_start = self.pool.extra_len() - param_count * FN_PARAM_STRIDE
             self.expect(TK_R_PAREN)
 
         var ret_type = 0
@@ -1395,7 +1395,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
             param_count = self.parse_param_list()
             required_param_count = self.last_param_required_count
             if param_count > 0:
-                m_params_start = self.pool.extra_len() - param_count * 2
+                m_params_start = self.pool.extra_len() - param_count * FN_PARAM_STRIDE
             self.expect(TK_R_PAREN)
 
         var ret_type = 0
@@ -3523,6 +3523,30 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
 
 // ── Parameter list ───────────────────────────────────────────────
 
+fn Parser.parse_param_attrs(self: Parser) -> i32:
+    var flags = 0
+    while self.peek() == TK_AT:
+        self.advance()
+        if self.peek() != TK_L_BRACKET:
+            self.emit_error("expected '[' after '@' in parameter attribute")
+            break
+        self.advance()
+
+        if self.peek() == TK_IDENT:
+            let attr_start = self.current_start()
+            let attr_end = self.current_end()
+            let attr_text = self.source.slice(attr_start as i64, attr_end as i64)
+            if attr_text == "noalias":
+                flags = flags + FN_PARAM_FLAG_NOALIAS
+            else:
+                self.emit_error("unknown parameter attribute")
+            self.advance()
+        else:
+            self.emit_error("expected parameter attribute name")
+        self.expect(TK_R_BRACKET)
+        self.skip_newlines()
+    flags
+
 fn Parser.parse_param_list(self: Parser) -> i32:
     var params: Vec[i32] = Vec.new()
     let pattern_start = self.pool.fn_param_patterns_len()
@@ -3534,6 +3558,7 @@ fn Parser.parse_param_list(self: Parser) -> i32:
     if self.peek() == TK_R_PAREN or self.peek() == TK_DOT_DOT_DOT:
         return 0
     while true:
+        let param_flags = self.parse_param_attrs()
         var is_mut = 0
         if self.peek() == TK_KW_MUT:
             is_mut = 1
@@ -3547,7 +3572,7 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             let t = self.peek()
             if t == TK_L_PAREN or t == TK_L_BRACE or t == TK_L_BRACKET or t == TK_DOT_IDENT:
                 param_pattern = self.parse_pattern()
-                let synth = "__param_pat_" ++ int_to_string(self.pos) ++ "_" ++ int_to_string((params.len() / 2) as i32)
+                let synth = "__param_pat_" ++ int_to_string(self.pos) ++ "_" ++ int_to_string((params.len() / (FN_PARAM_STRIDE as i64)) as i32)
                 name = self.intern.intern(synth)
             else:
                 name = self.expect_ident()
@@ -3570,6 +3595,7 @@ fn Parser.parse_param_list(self: Parser) -> i32:
 
         params.push(name)
         params.push(type_node)
+        params.push(param_flags)
         self.pool.add_fn_param_pattern_value(param_pattern)
         pattern_count = pattern_count + 1
 
@@ -3580,7 +3606,7 @@ fn Parser.parse_param_list(self: Parser) -> i32:
         if self.peek() == TK_R_PAREN or self.peek() == TK_DOT_DOT_DOT:
             break
 
-    let count = (params.len() / 2) as i32
+    let count = (params.len() / (FN_PARAM_STRIDE as i64)) as i32
     for pi in 0..params.len() as i32:
         self.pool.add_extra(params.get(pi as i64))
     self.last_param_pattern_start = pattern_start
@@ -3589,6 +3615,7 @@ fn Parser.parse_param_list(self: Parser) -> i32:
     count
 
 fn Parser.parse_one_param(self: Parser) -> i32:
+    let param_flags = self.parse_param_attrs()
     var is_mut = 0
     if self.peek() == TK_KW_MUT:
         is_mut = 1
@@ -3606,6 +3633,7 @@ fn Parser.parse_one_param(self: Parser) -> i32:
         self.parse_expr()
     self.pool.add_extra(name)
     self.pool.add_extra(type_node)
+    self.pool.add_extra(param_flags)
     1
 
 // ── Type parameters ──────────────────────────────────────────────

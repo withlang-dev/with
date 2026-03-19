@@ -92,6 +92,7 @@ int64_t wl_i8_type(int64_t c)   { return P2I(LLVMInt8TypeInContext(C(c))); }
 int64_t wl_i16_type(int64_t c)  { return P2I(LLVMInt16TypeInContext(C(c))); }
 int64_t wl_i32_type(int64_t c)  { return P2I(LLVMInt32TypeInContext(C(c))); }
 int64_t wl_i64_type(int64_t c)  { return P2I(LLVMInt64TypeInContext(C(c))); }
+int64_t wl_i128_type(int64_t c) { return P2I(LLVMInt128TypeInContext(C(c))); }
 int64_t wl_f32_type(int64_t c)  { return P2I(LLVMFloatTypeInContext(C(c))); }
 int64_t wl_f64_type(int64_t c)  { return P2I(LLVMDoubleTypeInContext(C(c))); }
 int64_t wl_void_type(int64_t c) { return P2I(LLVMVoidTypeInContext(C(c))); }
@@ -226,6 +227,15 @@ void wl_add_fn_attr(int64_t ctx, int64_t fn, with_str attr_name) {
     if (kind) {
         LLVMAttributeRef attr = LLVMCreateEnumAttribute(C(ctx), kind, 0);
         LLVMAddAttributeAtIndex(V(fn), (LLVMAttributeIndex)-1, attr);
+    }
+}
+
+void wl_add_param_attr(int64_t ctx, int64_t fn, int32_t param_idx, with_str attr_name) {
+    const char *name = to_cstr(attr_name);
+    unsigned kind = LLVMGetEnumAttributeKindForName(name, strlen(name));
+    if (kind) {
+        LLVMAttributeRef attr = LLVMCreateEnumAttribute(C(ctx), kind, 0);
+        LLVMAddAttributeAtIndex(V(fn), (LLVMAttributeIndex)(param_idx + 1), attr);
     }
 }
 
@@ -791,4 +801,3 @@ int64_t wl_di_create_lexical_block(int64_t builder, int64_t scope,
         (LLVMDIBuilderRef)(intptr_t)builder,
         DI(scope), DI(file), (unsigned)line, (unsigned)col));
 }
-

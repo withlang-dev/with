@@ -51,6 +51,7 @@ extern fn wl_i8_type(c: i64) -> i64
 extern fn wl_i16_type(c: i64) -> i64
 extern fn wl_i32_type(c: i64) -> i64
 extern fn wl_i64_type(c: i64) -> i64
+extern fn wl_i128_type(c: i64) -> i64
 extern fn wl_f32_type(c: i64) -> i64
 extern fn wl_f64_type(c: i64) -> i64
 extern fn wl_void_type(c: i64) -> i64
@@ -132,6 +133,7 @@ extern fn wl_get_first_function(m: i64) -> i64
 extern fn wl_get_next_function(v: i64) -> i64
 extern fn wl_is_declaration(v: i64) -> i32
 extern fn wl_add_fn_attr(ctx: i64, f: i64, attr_name: str) -> void
+extern fn wl_add_param_attr(ctx: i64, f: i64, param_idx: i32, attr_name: str) -> void
 
 // Basic blocks
 extern fn wl_append_bb(ctx: i64, f: i64, name: str) -> i64
@@ -247,7 +249,6 @@ extern fn wl_verify_module(m: i64) -> i32
 extern fn wl_emit_object(tm: i64, m: i64, path: str) -> i32
 extern fn wl_optimize(m: i64, tm: i64, level: i32) -> void
 extern fn wl_promote_allocas(fn_val: i64, tm: i64) -> void
-extern fn wl_dump_value(v: i64) -> void
 extern fn wl_print_ir(m: i64) -> void
 
 // Vec data pointer
@@ -882,9 +883,14 @@ fn Codegen.debug_create_di_type(self: Codegen, sema_tid: i32) -> i64:
         // TY_BOOL
         return wl_di_create_basic_type(self.di_builder, "bool", 8, wl_dwarf_ate_boolean())
     if kind == 1:
-        // TY_INT: d0 = width, d1 = signed
+        // TY_INT: d0 = width, d1 = signed, d2 = ptr_width flag
         let width = self.sema.get_type_d0(sema_tid)
         let is_signed = self.sema.get_type_d1(sema_tid)
+        let is_ptr_width = self.sema.get_type_d2(sema_tid)
+        if is_ptr_width != 0:
+            let name = if is_signed == 1: "isize" else: "usize"
+            let encoding = if is_signed == 1: wl_dwarf_ate_signed() else: wl_dwarf_ate_unsigned()
+            return wl_di_create_basic_type(self.di_builder, name, width as i64, encoding)
         if is_signed == 1:
             return wl_di_create_basic_type(self.di_builder, "i" ++ int_to_string(width), width as i64, wl_dwarf_ate_signed())
         else:
@@ -1955,12 +1961,14 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
 fn Codegen.resolve_primitive_named_type(self: Codegen, name: str) -> i64:
     if name == "i32": return wl_i32_type(self.context)
     if name == "i64": return wl_i64_type(self.context)
+    if name == "i128": return wl_i128_type(self.context)
     if name == "i16": return wl_i16_type(self.context)
     if name == "i8": return wl_i8_type(self.context)
     if name == "u8": return wl_i8_type(self.context)
     if name == "u16": return wl_i16_type(self.context)
     if name == "u32": return wl_i32_type(self.context)
     if name == "u64": return wl_i64_type(self.context)
+    if name == "u128": return wl_i128_type(self.context)
     if name == "bool": return wl_i1_type(self.context)
     if name == "f64": return wl_f64_type(self.context)
     if name == "f32": return wl_f32_type(self.context)
@@ -2124,6 +2132,8 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             return wl_i32_type(self.context)
         if bits == 64:
             return wl_i64_type(self.context)
+        if bits == 128:
+            return wl_i128_type(self.context)
         return wl_i32_type(self.context)
     if tk == TY_BOOL:
         return wl_i1_type(self.context)
@@ -2143,6 +2153,7 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
 fn Codegen.llvm_type_to_sema_type(self: Codegen, ty: i64) -> i32:
     if ty == wl_i32_type(self.context): return self.sema.ty_i32
     if ty == wl_i64_type(self.context): return self.sema.ty_i64
+    if ty == wl_i128_type(self.context): return self.sema.ty_i128
     if ty == wl_i1_type(self.context): return self.sema.ty_bool
     if ty == wl_i8_type(self.context): return self.sema.ty_i8
     if ty == wl_i16_type(self.context): return self.sema.ty_i16
@@ -2646,7 +2657,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             let struct_decl = gs_decl_opt.unwrap()
             let stp_count = self.type_decl_tp_count(struct_decl)
             if stp_count > 0 and param_count > 0:
-                let p0_tn = self.pool.get_extra(param_start + 1)
+                let p0_tn = self.pool.fn_param_type(param_start, 0)
                 if p0_tn != 0 and self.pool.kind(p0_tn) == NK_TYPE_GENERIC:
                     let p0_extra = self.pool.get_data1(p0_tn)
                     let p0_count = self.pool.get_data2(p0_tn)
@@ -2684,8 +2695,8 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     var has_ref_param = false
     var pi = 0
     while pi < param_count:
-        let p_name = self.pool.get_extra(param_start + pi * 2)
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let p_name = self.pool.fn_param_name(param_start, pi)
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
         if p_type_node == 0:
             param_types.push(wl_i32_type(self.context))
             pi = pi + 1
@@ -2773,6 +2784,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         effective_name = "main"
 
     let function = wl_add_function(self.llmod, effective_name, fn_type)
+    self.apply_noalias_param_attrs(function, param_start, param_count)
 
     // Mark non-main functions internal so the linker can dead-strip them.
     if effective_name != "main":
@@ -2814,6 +2826,24 @@ fn Codegen.record_ref_param(self: Codegen, fn_sym: i32, idx: i32, count: i32):
     let base = self.fn_ref_param_starts.get(fn_sym).unwrap()
     self.fn_ref_param_data.set_i32((base + idx) as i64, 1)
 
+fn Codegen.apply_noalias_param_attrs(self: Codegen, function: i64, param_start: i32, param_count: i32):
+    if function == 0 or param_start < 0 or param_count <= 0:
+        return
+    let fn_type = wl_global_get_value_type(function)
+    for pi in 0..param_count:
+        let flags = self.pool.fn_param_flags(param_start, pi)
+        if fn_param_is_noalias(flags) == 0:
+            continue
+        var param_ty = if fn_type != 0: wl_get_fn_param_type(fn_type, pi) else: 0
+        if param_ty == 0:
+            let param = wl_get_param(function, pi)
+            if param == 0:
+                continue
+            param_ty = wl_type_of(param)
+        if wl_get_type_kind(param_ty) != wl_pointer_type_kind():
+            continue
+        wl_add_param_attr(self.context, function, pi, "noalias")
+
 fn Codegen.record_dyn_param(self: Codegen, fn_sym: i32, idx: i32, count: i32, trait_sym: i32):
     if not self.fn_dyn_param_starts.get(fn_sym).is_some():
         let start = self.fn_dyn_param_data.len() as i32
@@ -2842,7 +2872,7 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
 
     let param_types: Vec[i64] = Vec.new()
     for pi in 0..param_count:
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
         param_types.push(self.resolve_type(p_type_node))
 
     let fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, is_variadic)
@@ -2855,6 +2885,7 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
     var function = existing
     if existing == 0:
         function = wl_add_function(self.llmod, link_name, fn_type)
+    self.apply_noalias_param_attrs(function, param_start, param_count)
 
     let actual_fn_type = wl_global_get_value_type(function)
     self.fn_values.insert(name_sym, function)
@@ -2962,6 +2993,10 @@ fn Codegen.is_result_unit_return(self: Codegen, ret_node: i32) -> bool:
 // ── Option/Result type construction ───────────────────────────────
 
 fn Codegen.get_or_create_option_type(self: Codegen, payload_ty: i64) -> i64:
+    // Optional pointers are represented as the pointer itself: null = None.
+    if payload_ty != 0 and wl_get_type_kind(payload_ty) == wl_pointer_type_kind():
+        return payload_ty
+
     let cached = self.option_cache_map.get(payload_ty)
     if cached.is_some():
         let idx = cached.unwrap()
@@ -3291,7 +3326,7 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
     let mono_param_types: Vec[i64] = Vec.new()
     var has_ref_self = false
     for pi in 0..param_count:
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
         if p_type_node != 0:
             var p_ty = self.resolve_type(p_type_node)
             if p_ty == 0:
@@ -3321,6 +3356,7 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
 
     let mono_ft = wl_function_type(mono_ret_ty, vec_data_i64(&mono_param_types), param_count, 0)
     let mono_fn = wl_add_function(self.llmod, mangled, mono_ft)
+    self.apply_noalias_param_attrs(mono_fn, param_start, param_count)
     self.fn_values.insert(mono_sym, mono_fn)
     self.fn_fn_types.insert(mono_sym, mono_ft)
     if has_ref_self:
@@ -3363,6 +3399,8 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
 // ── Build Option Some/None ────────────────────────────────────────
 
 fn Codegen.build_option_some(self: Codegen, payload: i64, opt_type: i64) -> i64:
+    if wl_get_type_kind(opt_type) == wl_pointer_type_kind():
+        return self.coerce_value_to_type(payload, opt_type)
     let alloca = wl_build_alloca(self.builder, opt_type)
     // Fully initialize to avoid undef/poison in padding bytes.
     wl_build_store(self.builder, self.build_default_value(opt_type), alloca)
@@ -3379,6 +3417,8 @@ fn Codegen.build_option_some(self: Codegen, payload: i64, opt_type: i64) -> i64:
     wl_build_load(self.builder, opt_type, alloca)
 
 fn Codegen.build_option_none(self: Codegen, opt_type: i64) -> i64:
+    if wl_get_type_kind(opt_type) == wl_pointer_type_kind():
+        return wl_const_null(opt_type)
     let alloca = wl_build_alloca(self.builder, opt_type)
     wl_build_store(self.builder, self.build_default_value(opt_type), alloca)
     let tag_ptr = wl_build_struct_gep(self.builder, opt_type, alloca, 0)
@@ -3908,10 +3948,10 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     let param_types: Vec[i64] = Vec.new()
     var has_ref_param = false
     for pi in 0..param_count:
-        let type_slot = param_start + pi * 2 + 1
+        let type_slot = param_start + pi * FN_PARAM_STRIDE + 1
         if type_slot < 0 or type_slot >= self.pool.extra_len():
             return
-        let p_type_node = self.pool.get_extra(type_slot)
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
         if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NK_TYPE_NAMED:
             let p_sym = self.pool.get_data0(p_type_node)
             if p_sym == impl_type_sym or self.intern.resolve(p_sym) == "Self":
@@ -3933,6 +3973,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     if fn_ty == 0 or wl_get_type_kind(fn_ty) != wl_function_type_kind():
         return
     let function = wl_add_function(self.llmod, mangled, fn_ty)
+    self.apply_noalias_param_attrs(function, param_start, param_count)
     if function == 0 or wl_get_value_kind(function) != wl_function_value_kind():
         return
     self.fn_values.insert(fn_sym, function)
@@ -4023,12 +4064,12 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
         lowered_param_count = 0
     var pi = 0
     while pi < lowered_param_count:
-        let name_slot = param_start + pi * 2
-        let type_slot = param_start + pi * 2 + 1
+        let name_slot = param_start + pi * FN_PARAM_STRIDE
+        let type_slot = param_start + pi * FN_PARAM_STRIDE + 1
         if name_slot < 0 or type_slot < 0 or type_slot >= self.pool.extra_len():
             break
-        let p_name = self.pool.get_extra(name_slot)
-        let p_type_node = self.pool.get_extra(type_slot)
+        let p_name = self.pool.fn_param_name(param_start, pi)
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
         let p_val = wl_get_param(function, pi)
         let p_ty = wl_type_of(p_val)
         let p_alloca = wl_build_alloca(self.builder, p_ty)
@@ -4069,8 +4110,8 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
 
     // Register params as MIR locals
     for dtm_pi in 0..param_count:
-        let dtm_p_name = self.pool.get_extra(param_start + dtm_pi * 2)
-        let dtm_p_type_node = self.pool.get_extra(param_start + dtm_pi * 2 + 1)
+        let dtm_p_name = self.pool.fn_param_name(param_start, dtm_pi)
+        let dtm_p_type_node = self.pool.fn_param_type(param_start, dtm_pi)
         var dtm_p_sema_ty = self.sema.ty_i32
         if dtm_p_type_node > 0:
             if self.sema.typed_expr_types.contains(dtm_p_type_node):
@@ -4106,7 +4147,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
 
     // Map param MIR locals to existing LLVM allocas
     for dtm_mi in 0..param_count:
-        let dtm_m_name = self.pool.get_extra(param_start + dtm_mi * 2)
+        let dtm_m_name = self.pool.fn_param_name(param_start, dtm_mi)
         let dtm_m_local_id = dtm_mi + 1
         let dtm_m_alloca_opt = self.local_allocas.get(dtm_m_name)
         if dtm_m_alloca_opt.is_some():
@@ -4340,6 +4381,8 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
                 let type_name = self.intern.resolve(self.pool.get_data0(type_ann_node))
                 if type_name == "i64":
                     global_ty = wl_i64_type(self.context)
+                else if type_name == "i128" or type_name == "u128":
+                    global_ty = wl_i128_type(self.context)
         let name_str = self.intern.resolve(name_sym)
         let global = wl_add_global(self.llmod, global_ty, name_str)
         wl_set_initializer(global, wl_const_int(global_ty, val, 1))
@@ -4509,6 +4552,7 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
         if bits == 8: return wl_i8_type(self.context)
         if bits == 16: return wl_i16_type(self.context)
         if bits == 64: return wl_i64_type(self.context)
+        if bits == 128: return wl_i128_type(self.context)
         return wl_i32_type(self.context)
     if tk == TY_FLOAT:
         let bits = self.mir_input.mir_get_type_d0(resolved)
@@ -4750,6 +4794,11 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
         else if pk == 3: // PK_DOWNCAST
             // For projected_type, we need the variant's payload struct type.
             var dc_found = false
+            if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
+                let wrap: Vec[i64] = Vec.new()
+                wrap.push(cur_ty)
+                cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
+                dc_found = true
             // Check disc enums first
             let enum_sym_opt = self.enum_by_llvm.get(cur_ty)
             if enum_sym_opt.is_some():
@@ -4932,6 +4981,11 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
         else if pk == 3: // PK_DOWNCAST
             // GEP to field 1 of enum/option/result struct for payload access.
             var dc_handled = false
+            if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
+                let wrap: Vec[i64] = Vec.new()
+                wrap.push(cur_ty)
+                cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
+                dc_handled = true
             // Disc enums: { repr_type, [max_payload x i8] }
             let dc_enum_sym_opt = self.enum_by_llvm.get(cur_ty)
             if dc_enum_sym_opt.is_some():
@@ -5174,6 +5228,16 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
             indices.push(idx_val)
             return wl_build_gep(self.builder, wl_i8_type(self.context), lhs, vec_data_i64(&indices), 1)
 
+    if op == OP_EQ or op == OP_NEQ:
+        if lk == wl_pointer_type_kind() and rk == wl_integer_type_kind():
+            if wl_is_constant(rhs) != 0 and wl_const_int_sext_val(rhs) == 0:
+                let cmp_rhs = wl_const_null(wl_type_of(lhs))
+                return wl_build_icmp(self.builder, if op == OP_EQ: wl_int_eq() else: wl_int_ne(), lhs, cmp_rhs)
+        if rk == wl_pointer_type_kind() and lk == wl_integer_type_kind():
+            if wl_is_constant(lhs) != 0 and wl_const_int_sext_val(lhs) == 0:
+                let cmp_lhs = wl_const_null(wl_type_of(rhs))
+                return wl_build_icmp(self.builder, if op == OP_EQ: wl_int_eq() else: wl_int_ne(), cmp_lhs, rhs)
+
     let is_float = lk == wl_float_type_kind() or lk == wl_double_type_kind() or rk == wl_float_type_kind() or rk == wl_double_type_kind()
     if is_float:
         if op == OP_ADD or op == OP_ADD_WRAP: return wl_build_fadd(self.builder, lhs, rhs)
@@ -5330,6 +5394,10 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
         if wl_get_type_kind(place_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(place_ty) > 0:
             let loaded = wl_build_load(self.builder, place_ty, ptr)
             return wl_build_extract_value(self.builder, loaded, 0)
+        if wl_get_type_kind(place_ty) == wl_pointer_type_kind():
+            let loaded_ptr = wl_build_load(self.builder, place_ty, ptr)
+            let is_none = wl_build_icmp(self.builder, wl_int_eq(), loaded_ptr, wl_const_null(place_ty))
+            return self.coerce_int(is_none, wl_i32_type(self.context))
         // Disc enum without payload: the value IS the discriminant
         if wl_get_type_kind(place_ty) == wl_integer_type_kind():
             return wl_build_load(self.builder, place_ty, ptr)
@@ -5358,6 +5426,12 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                     let gep = wl_build_gep(self.builder, struct_ty, alloca, vec_data_i64(&indices), 2)
                     wl_build_store(self.builder, self.coerce_value_to_type(val, elem_ty), gep)
                 return wl_build_load(self.builder, struct_ty, alloca)
+            if d0 == 1 and struct_ty != 0 and wl_get_type_kind(struct_ty) == wl_pointer_type_kind():
+                if agg_count > 0:
+                    let first_op = body.agg_field_operands.get(agg_start as i64)
+                    let first_val = self.mir_eval_operand(body, first_op, struct_ty)
+                    return self.coerce_value_to_type(first_val, struct_ty)
+                return wl_const_null(struct_ty)
             // d0 == 1: enum variant construction; d2 = variant index
             if d0 == 1 and struct_ty != 0 and wl_get_type_kind(struct_ty) == wl_struct_type_kind():
                 let ev_tag = d2
@@ -6092,6 +6166,8 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             let disc = wl_build_extract_value(self.builder, recv, 0)
             // Some = tag 0, None = tag 1. is_some → tag == 0.
             result = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
+        else if recv_tk == wl_pointer_type_kind():
+            result = wl_build_icmp(self.builder, wl_int_ne(), recv, wl_const_null(wl_type_of(recv)))
         else:
             // Non-struct Option (e.g., raw value) — treat as always Some
             result = wl_const_int(wl_i1_type(self.context), 1, 0)
@@ -6101,6 +6177,8 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let recv_tk = wl_get_type_kind(wl_type_of(recv))
         if recv_tk == wl_struct_type_kind():
             result = wl_build_extract_value(self.builder, recv, 1)
+        else if recv_tk == wl_pointer_type_kind():
+            result = recv
         else:
             // Non-struct Option — return the raw value
             result = recv
@@ -6281,6 +6359,8 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
             let disc = wl_build_extract_value(self.builder, recv, 0)
             // None = tag 1. is_none → tag != 0.
             result = wl_build_icmp(self.builder, wl_int_ne(), disc, wl_const_int(wl_type_of(disc), 0, 0))
+        else if tk == wl_pointer_type_kind():
+            result = wl_build_icmp(self.builder, wl_int_eq(), recv, wl_const_null(wl_type_of(recv)))
         else:
             result = wl_const_int(wl_i1_type(self.context), 0, 0)
 
@@ -6493,12 +6573,15 @@ fn Codegen.mir_emit_opt_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
     let recv = self.mir_intrinsic_arg(body, args_id, 0)
     let obj_ty = wl_type_of(recv)
     let recv_tk = wl_get_type_kind(obj_ty)
-    if recv_tk != wl_struct_type_kind():
+    if recv_tk != wl_struct_type_kind() and recv_tk != wl_pointer_type_kind():
         return recv
-    let payload_ty = self.find_option_payload_type_by_llvm(obj_ty)
+    let payload_ty = if recv_tk == wl_pointer_type_kind(): obj_ty else: self.find_option_payload_type_by_llvm(obj_ty)
     let elem_ty = if payload_ty != 0: payload_ty else: wl_i32_type(self.context)
-    let disc = wl_build_extract_value(self.builder, recv, 0)
-    let is_some = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
+    let is_some = if recv_tk == wl_pointer_type_kind():
+        wl_build_icmp(self.builder, wl_int_ne(), recv, wl_const_null(obj_ty))
+    else:
+        let disc = wl_build_extract_value(self.builder, recv, 0)
+        wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
     let fn_val = self.mir_intrinsic_arg(body, args_id, 1)
     let cty = wl_type_of(fn_val)
     var fn_ptr = fn_val
@@ -6522,7 +6605,7 @@ fn Codegen.mir_emit_opt_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
     let filt_merge = wl_append_bb(self.context, self.current_function, "of.merge")
     wl_build_cond_br(self.builder, is_some, filt_then, filt_else)
     wl_position_at_end(self.builder, filt_then)
-    let payload = wl_build_extract_value(self.builder, recv, 1)
+    let payload = if recv_tk == wl_pointer_type_kind(): recv else: wl_build_extract_value(self.builder, recv, 1)
     let filt_args: Vec[i64] = Vec.new()
     if is_fat != 0:
         filt_args.push(ctx_ptr)
@@ -6537,7 +6620,7 @@ fn Codegen.mir_emit_opt_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
     wl_build_br(self.builder, filt_merge)
     let check_end = wl_get_insert_block(self.builder)
     wl_position_at_end(self.builder, filt_else)
-    let filt_none = self.build_option_none(obj_ty)
+    let filt_none = if recv_tk == wl_pointer_type_kind(): wl_const_null(obj_ty) else: self.build_option_none(obj_ty)
     wl_build_br(self.builder, filt_merge)
     let else_end = wl_get_insert_block(self.builder)
     wl_position_at_end(self.builder, filt_merge)
@@ -7486,8 +7569,8 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
 
     let max_params = param_count
     for pi in 0..max_params:
-        let p_name = self.pool.get_extra(param_start + pi * 2)
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let p_name = self.pool.fn_param_name(param_start, pi)
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
         let param_val = wl_get_param(function, pi)
         let param_type = wl_type_of(param_val)
         let alloca = self.create_entry_alloca(param_type)
@@ -7597,9 +7680,6 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
     // Run mem2reg to promote allocas to SSA, reducing stack frame sizes.
     // DISABLED: investigating whether mem2reg causes argument setup issues
     // wl_promote_allocas(function, self.target_machine)
-
-    if name_str == "Sema.collect_declarations":
-        wl_dump_value(function)
 
     self.expected_type = saved_expected
     self.expected_type_node = saved_expected_node
@@ -7742,8 +7822,8 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
 
     let max_params = param_count
     for pi in 0..max_params:
-        let p_name = self.pool.get_extra(param_start + pi * 2)
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let p_name = self.pool.fn_param_name(param_start, pi)
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
         let param_val = wl_get_param(function, pi)
         let param_type = wl_type_of(param_val)
         let alloca = self.create_entry_alloca(param_type)
@@ -8018,6 +8098,7 @@ fn Codegen.llvm_type_mangle(self: Codegen, ty: i64) -> str:
         if w == 16: return "i16"
         if w == 32: return "i32"
         if w == 64: return "i64"
+        if w == 128: return "i128"
         return "int"
     if tk == wl_float_type_kind():
         return "f32"
@@ -8083,7 +8164,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
     for pi in 0..param_count:
         if pi >= arg_count:
             break
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
         if p_type_node == 0:
             continue
 
@@ -8214,7 +8295,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
 
     let mono_param_types: Vec[i64] = Vec.new()
     for pi in 0..param_count:
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
         if p_type_node != 0:
             let p_ty = self.resolve_type(p_type_node)
             if p_ty == 0:
@@ -8239,6 +8320,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
         return wl_get_undef(wl_i32_type(self.context))
     let mono_ft = wl_function_type(mono_ret_ty, vec_data_i64(&mono_param_types), param_count, 0)
     let mono_fn = wl_add_function(self.llmod, mangled, mono_ft)
+    self.apply_noalias_param_attrs(mono_fn, param_start, param_count)
     self.mono_values.insert(mono_key, mono_fn)
     self.mono_types.insert(mono_key, mono_ft)
     self.fn_values.insert(mono_sym, mono_fn)
@@ -8806,7 +8888,7 @@ fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
     // Resolve param types
     let param_types: Vec[i64] = Vec.new()
     for pi in 0..param_count:
-        let p_type_node = self.pool.get_extra(param_start + pi * 2 + 1)
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
         var p_ty = self.resolve_type(p_type_node)
         if p_ty == 0:
             p_ty = i32_ty
@@ -8816,6 +8898,7 @@ fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
     let impl_fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
     let impl_name = name_str ++ "_async"
     let impl_fn = wl_add_function(self.llmod, impl_name, impl_fn_type)
+    self.apply_noalias_param_attrs(impl_fn, param_start, param_count)
     let impl_sym = self.intern.intern(impl_name)
     self.fn_values.insert(impl_sym, impl_fn)
     self.fn_fn_types.insert(impl_sym, impl_fn_type)
@@ -8835,6 +8918,7 @@ fn Codegen.declare_async_function(self: Codegen, fn_node: i32):
     let spawn_fn_type = wl_function_type(i32_ty, vec_data_i64(&param_types), param_count, 0)
     let effective_name = self.function_symbol_name(name_sym)
     let spawn_fn = wl_add_function(self.llmod, effective_name, spawn_fn_type)
+    self.apply_noalias_param_attrs(spawn_fn, param_start, param_count)
     self.fn_values.insert(name_sym, spawn_fn)
     self.fn_fn_types.insert(name_sym, spawn_fn_type)
 
@@ -9214,4 +9298,3 @@ fn Codegen.gen_sizeof_alignof(self: Codegen, name: str, node: i32) -> i64:
     wl_const_int(wl_i64_type(self.context), wl_abi_align_of(dl, type_val) as i64, 0)
 
 // ── Option method dispatch ────────────────────────────────────────
-

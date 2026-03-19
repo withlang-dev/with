@@ -419,13 +419,11 @@ fn ResolveState.resolve_fn_body(self: ResolveState, pool: AstPool, module_id: i3
         let param_start = pool.fn_meta_param_start(meta)
         let param_count = pool.fn_meta_param_count(meta)
         for pi in 0..param_count:
-            let name_idx = param_start + pi * 2
-            let name_sym = resolve_extra_or_zero(pool, name_idx)
+            let name_sym = pool.fn_param_name(param_start, pi)
             let pdef = self.add_def(module_id, fn_def, DEF_KIND_PARAM, name_sym, pool.get_start(fn_node), pool.get_end(fn_node))
             self.add_binding(fn_scope, name_sym, pdef)
 
-            let ty_idx = name_idx + 1
-            let ty_node = resolve_extra_or_zero(pool, ty_idx)
+            let ty_node = pool.fn_param_type(param_start, pi)
             if resolve_node_valid(pool, ty_node):
                 self.walk_type_expr(pool, module_id, fn_scope, ty_node)
 

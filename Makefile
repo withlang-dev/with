@@ -31,6 +31,7 @@ build:
 	@[ ! -d src/main.dSYM ] || mv src/main.dSYM $(OUT)/bin/with-stage1.dSYM
 	@rm -f $(STAGE_TMP) && rm -rf $(STAGE_TMP).dSYM
 	@rm -f $(OUT)/bin/with-stage2 && rm -rf $(OUT)/bin/with-stage2.dSYM
+	@rm -rf "$(HOME)/.cache/with/c_import"
 	$(OUT)/bin/with-stage1 build src/main.w -o $(STAGE_TMP)
 	@[ -x $(STAGE_TMP) ] || mv src/main $(STAGE_TMP)
 	@[ ! -d src/main.dSYM ] || mv src/main.dSYM $(STAGE_TMP).dSYM
@@ -46,6 +47,7 @@ test: build
 fixpoint: build
 	@rm -f $(STAGE_TMP) && rm -rf $(STAGE_TMP).dSYM
 	@rm -f $(OUT)/bin/with-stage3 && rm -rf $(OUT)/bin/with-stage3.dSYM
+	@rm -rf "$(HOME)/.cache/with/c_import"
 	$(OUT)/bin/with-stage2 build src/main.w -o $(STAGE_TMP)
 	@[ -x $(STAGE_TMP) ] || mv src/main $(STAGE_TMP)
 	@[ ! -d src/main.dSYM ] || mv src/main.dSYM $(STAGE_TMP).dSYM
