@@ -94,6 +94,13 @@ fn process_c_import(header_spec: str) -> str:
         output = "type c_void = opaque\n"
         with_cimport_mark_name_emitted("c_void")
 
+    // Emit Complex32/Complex64 for _Complex float/double
+    if with_cimport_is_name_emitted("Complex32") == 0:
+        output = output ++ "type Complex32 = \{ real: f32, imag: f32 }\n"
+        output = output ++ "type Complex64 = \{ real: f64, imag: f64 }\n"
+        with_cimport_mark_name_emitted("Complex32")
+        with_cimport_mark_name_emitted("Complex64")
+
     // Emit runtime wrappers for __builtin_* bit manipulation
     if with_cimport_is_name_emitted("with_clz") == 0:
         output = output ++ "extern fn with_clz(x: i32) -> i32\n"
@@ -123,8 +130,12 @@ fn process_c_import(header_spec: str) -> str:
     // then cascade through field references until fixpoint
     let demoted_types = ci_collect_demoted_types(session, count)
 
-    // Track translated struct names for typedef resolution
+    // Pass 1: Pre-populate name table (Zig-style two-pass).
+    // Strong names (functions, variables, typedefs) get priority.
+    // Weak names (structs, unions, enums) can be overridden by typedefs.
+    // This prevents collisions in the common C pattern: typedef struct Foo { ... } Foo;
     var translated_structs = ""
+    let typedef_shadowed = ci_prepopulate_names(session, count)
 
     var i = 0
     while i < count:
@@ -132,7 +143,7 @@ fn process_c_import(header_spec: str) -> str:
         if kind == CK_FUNCTION:
             output = output ++ ci_translate_function(session, i, translated_structs)
         else if kind == CK_STRUCT or kind == CK_UNION:
-            let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types)
+            let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types, typedef_shadowed)
             output = output ++ struct_result
             // Track struct name for typedef resolution (only if actually translated)
             if struct_result.len() > 0:
@@ -246,6 +257,35 @@ fn ci_build_include_text(header_spec: str) -> str:
     "#include <" ++ header_spec ++ ">"
 
 // ── Opaque demotion pre-scan ─────────────────────────────────
+// ── Name pre-population (Zig-style two-pass) ────────────────
+// Pre-register all declaration names before translating any.
+// Strong names (functions, variables, typedefs) take priority.
+// Weak names (structs, unions, enums) can be overridden by typedefs.
+// This prevents the common C collision: typedef struct Foo { ... } Foo;
+
+// Returns pipe-delimited string of struct/union names shadowed by typedefs.
+fn ci_prepopulate_names(session: i64, count: i32) -> str:
+    // For the common C pattern: typedef struct Foo { ... } Foo;
+    // The struct "Foo" should be skipped so the typedef "Foo" wins.
+    var shadowed = ""
+    var i = 0
+    while i < count:
+        let name = with_cimport_decl_name(session, i)
+        if name.len() > 0 and name.byte_at(0) != 95:
+            let kind = with_cimport_decl_kind(session, i)
+            if kind == CK_STRUCT or kind == CK_UNION:
+                var j = 0
+                while j < count:
+                    if j != i:
+                        let jname = with_cimport_decl_name(session, j)
+                        if jname == name and with_cimport_decl_kind(session, j) == CK_TYPEDEF:
+                            shadowed = shadowed ++ "|" ++ name ++ "|"
+                            break
+                    j = j + 1
+        i = i + 1
+    shadowed
+
+// ── Opaque demotion pre-scan ─────────────────────────────────
 // Two-pass analysis: first collect directly demoted types (bitfield, forward
 // decl, unsupported fields), then cascade through field references until
 // fixpoint. Follows Zig's approach where any struct embedding an opaque
@@ -292,11 +332,13 @@ fn ci_is_directly_demoted(session: i64, idx: i32) -> bool:
         if with_cimport_struct_field_is_bitfield(session, idx, fi) != 0:
             return true
         fi = fi + 1
-    // Unsupported field type
+    // Unsupported or opaque field type
     fi = 0
     while fi < field_count:
         let ft = with_cimport_struct_field_type_translated(session, idx, fi)
         if ci_starts_with(ft, "__UNSUPPORTED:"):
+            return true
+        if ft == "opaque":
             return true
         fi = fi + 1
     false
@@ -381,8 +423,6 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
             has_unsupported = true
             unsupported_reason = ptype.slice(14, ptype.len())
 
-        if is_restrict != 0:
-            params = params ++ "@[noalias] "
         if pname.len() > 0:
             params = params ++ ci_escape_reserved(pname) ++ ": " ++ ptype
         else:
@@ -433,7 +473,7 @@ fn ci_should_keep_raw_pointer_param(name: str, param_idx: i32) -> i32:
 
 // ── Struct/Union translation ────────────────────────────────
 
-fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: str, demoted_types: str) -> str:
+fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: str, demoted_types: str, typedef_shadowed: str) -> str:
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
         return ""
@@ -443,6 +483,8 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         return ""
 
     // Skip already-emitted names
+    // Note: structs shadowed by typedefs (typedef struct Foo {} Foo;) are NOT skipped.
+    // The struct emits normally; the typedef detects the self-reference and skips.
     if with_cimport_is_name_emitted(name) != 0:
         return ""
 
@@ -460,7 +502,8 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     with_cimport_mark_name_emitted(name)
     let safe_name = ci_escape_reserved(name)
 
-    // Phase 4: Emit anonymous sub-record types before the parent
+    // Emit anonymous sub-record types before the parent.
+    // Naming: Parent_anon_N for unnamed fields, Parent_fieldname for named fields.
     var anon_decls = ""
     var anon_idx = 0
     var afi = 0
@@ -468,7 +511,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, afi)
         if anon_kind != 0:
             let fname = with_cimport_struct_field_name(session, idx, afi)
-            let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: name ++ "_unnamed_" ++ int_to_string(anon_idx)
+            let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: name ++ "_anon_" ++ int_to_string(anon_idx)
             let sub_count = with_cimport_struct_field_anon_field_count(session, idx, afi)
             if sub_count > 0:
                 var sub_fields = ""
@@ -478,7 +521,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
                         sub_fields = sub_fields ++ ", "
                     let sf_name = with_cimport_struct_field_anon_field_name(session, idx, afi, sfi)
                     let sf_type = with_cimport_struct_field_anon_field_type(session, idx, afi, sfi)
-                    let actual_sf_name = if sf_name.len() == 0: "unnamed_" ++ int_to_string(sfi) else: sf_name
+                    let actual_sf_name = if sf_name.len() == 0: "field_" ++ int_to_string(sfi) else: sf_name
                     sub_fields = sub_fields ++ ci_escape_reserved(actual_sf_name) ++ ": " ++ sf_type
                     sfi = sfi + 1
                 if anon_kind == 2:
@@ -515,8 +558,8 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, fi)
         if anon_kind != 0:
             let fname = with_cimport_struct_field_name(session, idx, fi)
-            let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: name ++ "_unnamed_" ++ int_to_string(anon_idx2)
-            let actual_name = if fname.len() > 0: fname else: "unnamed_" ++ int_to_string(anon_idx2)
+            let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: name ++ "_anon_" ++ int_to_string(anon_idx2)
+            let actual_name = if fname.len() > 0: fname else: "anon_" ++ int_to_string(anon_idx2)
             field_str = field_str ++ ci_escape_reserved(actual_name) ++ ": " ++ ci_escape_reserved(synth_name)
             anon_idx2 = anon_idx2 + 1
         else:
@@ -734,6 +777,15 @@ fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
             if not ci_starts_with(underlying, "struct ") and not ci_starts_with(underlying, "union ") and not ci_starts_with(underlying, "enum "):
                 return ""
 
+    // If translated type name equals the typedef name (typedef struct Foo {} Foo;),
+    // the typedef is redundant — the struct body was already emitted or needs
+    // to be emitted under this name. Skip the self-referential alias.
+    if translated == name or translated == ci_escape_reserved(name):
+        // The struct was shadowed, so emit nothing — the typedef name IS the struct.
+        // Mark as emitted so nothing else claims it.
+        with_cimport_mark_name_emitted(name)
+        return ""
+
     let safe_name = ci_escape_reserved(name)
     with_cimport_mark_name_emitted(name)
     "type " ++ safe_name ++ " = " ++ translated ++ "\n"
@@ -762,7 +814,7 @@ fn ci_translate_macros(session: i64) -> str:
                     var type_params = ""
                     var pi = 0
                     while pi < param_count:
-                        let pname = with_cimport_macro_param_name(session, i, pi)
+                        let pname = ci_escape_reserved(with_cimport_macro_param_name(session, i, pi))
                         param_names = param_names ++ "|" ++ pname ++ "|"
                         if pi > 0:
                             param_decl = param_decl ++ ", "
