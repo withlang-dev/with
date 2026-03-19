@@ -166,6 +166,9 @@ Before writing code:
 * read relevant source files
 * confirm AST layouts
 * verify naming conventions
+* when you can't find something you expect (a keyword, builtin, syntax),
+  grep `examples/`, `src/`, and `docs/with-specification.md` before assuming it
+  doesn't exist
 
 Never rely on memory.
 

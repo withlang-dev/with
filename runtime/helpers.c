@@ -1513,6 +1513,20 @@ int64_t with_clock_nanos(void) {
     return (int64_t)ts.tv_sec * 1000000000LL + (int64_t)ts.tv_nsec;
 }
 
+// ---- Bit manipulation builtins (wrappers for c_import) ----
+
+int32_t with_clz(int32_t x) { return x == 0 ? 32 : __builtin_clz((unsigned)x); }
+int32_t with_ctz(int32_t x) { return x == 0 ? 32 : __builtin_ctz((unsigned)x); }
+int32_t with_popcount(int32_t x) { return __builtin_popcount((unsigned)x); }
+uint16_t with_bswap16(uint16_t x) { return __builtin_bswap16(x); }
+uint32_t with_bswap32(uint32_t x) { return __builtin_bswap32(x); }
+uint64_t with_bswap64(uint64_t x) { return __builtin_bswap64(x); }
+int32_t with_clzl(int64_t x) { return x == 0 ? 64 : __builtin_clzll((unsigned long long)x); }
+int32_t with_clzll(int64_t x) { return x == 0 ? 64 : __builtin_clzll((unsigned long long)x); }
+int32_t with_ctzl(int64_t x) { return x == 0 ? 64 : __builtin_ctzll((unsigned long long)x); }
+int32_t with_ctzll(int64_t x) { return x == 0 ? 64 : __builtin_ctzll((unsigned long long)x); }
+int32_t with_abs(int32_t x) { return x < 0 ? -x : x; }
+
 // Weak stub for embedded runtime object extraction.
 // The real implementation lives in embedded_objects.o (linked into the compiler).
 // This stub allows user programs (which link helpers.o but not embedded_objects.o)
