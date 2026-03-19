@@ -339,12 +339,14 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
         case CXType_Record: {
             CXString spelling = clang_getTypeSpelling(canonical);
             const char *name_str = clang_getCString(spelling);
-            // Strip "struct " / "union " prefix
+            // Strip qualifiers and "struct " / "union " prefix
             const char *bare = name_str;
-            if (name_str && strncmp(name_str, "struct ", 7) == 0)
-                bare = name_str + 7;
-            else if (name_str && strncmp(name_str, "union ", 6) == 0)
-                bare = name_str + 6;
+            if (bare && strncmp(bare, "const ", 6) == 0) bare += 6;
+            if (bare && strncmp(bare, "volatile ", 9) == 0) bare += 9;
+            if (bare && strncmp(bare, "struct ", 7) == 0)
+                bare += 7;
+            else if (bare && strncmp(bare, "union ", 6) == 0)
+                bare += 6;
             // Anonymous record or internal names (starting with _)
             if (!bare || bare[0] == '\0' || bare[0] == '_' ||
                 strstr(name_str, "(anonymous") != NULL) {
@@ -360,9 +362,12 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
             return session_strdup(s, "i32");
         }
 
-        // Phase 3: unsupported types
-        case CXType_Complex:
-            return session_strdup(s, "__UNSUPPORTED:_Complex type");
+        case CXType_Complex: {
+            CXType elem = clang_getElementType(canonical);
+            long long sz = clang_Type_getSizeOf(elem);
+            if (sz <= 4) return session_strdup(s, "Complex32");
+            return session_strdup(s, "Complex64");
+        }
         case CXType_Vector:
             return session_strdup(s, "__UNSUPPORTED:vector type");
         case CXType_VariableArray:
