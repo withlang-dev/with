@@ -332,6 +332,14 @@ int64_t wl_add_global(int64_t m, int64_t ty, with_str name) {
 void wl_set_initializer(int64_t g, int64_t v)          { LLVMSetInitializer(V(g), V(v)); }
 void wl_set_global_constant(int64_t g, int32_t c)      { LLVMSetGlobalConstant(V(g), c); }
 void wl_set_linkage(int64_t g, int32_t link)            { LLVMSetLinkage(V(g), (LLVMLinkage)link); }
+void wl_set_call_conv(int64_t fn, int32_t cc)           { LLVMSetFunctionCallConv(V(fn), (unsigned)cc); }
+int32_t wl_cc_c(void)         { return LLVMCCallConv; }
+int32_t wl_cc_fast(void)      { return LLVMFastCallConv; }
+int32_t wl_cc_x86_stdcall(void)  { return LLVMX86StdcallCallConv; }
+int32_t wl_cc_x86_fastcall(void) { return LLVMX86FastcallCallConv; }
+int32_t wl_cc_x86_thiscall(void) { return 33; /* X86_ThisCall */ }
+int32_t wl_cc_win64(void)     { return LLVMWin64CallConv; }
+int32_t wl_cc_aarch64_vfabi(void) { return 97; /* AArch64_VectorCall */ }
 int32_t wl_internal_linkage(void) { return LLVMInternalLinkage; }
 int32_t wl_private_linkage(void)  { return LLVMPrivateLinkage; }
 

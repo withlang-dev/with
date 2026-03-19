@@ -48,8 +48,11 @@ extern fn with_cimport_struct_field_anon_field_count(session: i64, idx: i32, fie
 extern fn with_cimport_struct_field_anon_field_name(session: i64, idx: i32, field: i32, sub_field: i32) -> str
 extern fn with_cimport_struct_field_anon_field_type(session: i64, idx: i32, field: i32, sub_field: i32) -> str
 extern fn with_cimport_struct_is_packed(session: i64, idx: i32) -> i32
+extern fn with_cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64
+extern fn with_cimport_struct_size(session: i64, idx: i32) -> i64
 extern fn with_cimport_fn_storage_class(session: i64, idx: i32) -> i32
 extern fn with_cimport_fn_is_inline(session: i64, idx: i32) -> i32
+extern fn with_cimport_fn_calling_conv(session: i64, idx: i32) -> str
 extern fn with_cimport_macro_param_count(session: i64, idx: i32) -> i32
 extern fn with_cimport_macro_param_name(session: i64, idx: i32, param: i32) -> str
 extern fn int_to_string(n: i32) -> str
@@ -376,7 +379,9 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     if has_unsupported:
         return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n"
 
-    "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
+    let cc = with_cimport_fn_calling_conv(session, idx)
+    let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
+    cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
 
 fn ci_pointer_type_explicit_mut(ty: str) -> str:
     if ci_starts_with(ty, "*const "):
@@ -458,12 +463,29 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             anon_idx = anon_idx + 1
         afi = afi + 1
 
-    // Build field list, replacing anonymous record fields with synthesized names
+    // Build field list with layout-aware padding.
+    // Check if C layout requires non-natural alignment (packed, aligned attributes).
+    // If so, emit as @[packed] with explicit padding byte arrays.
+    let needs_layout = ci_struct_needs_explicit_layout(session, idx, field_count, is_union)
     var field_str = ""
     var anon_idx2 = 0
+    var cur_offset: i64 = 0
+    var pad_idx = 0
     var fi = 0
     while fi < field_count:
-        if fi > 0:
+        // Insert padding if layout requires it
+        if needs_layout and not is_union:
+            let field_offset = with_cimport_struct_field_offset(session, idx, fi)
+            if field_offset >= 0 and field_offset > cur_offset:
+                let pad_size = field_offset - cur_offset
+                if pad_size > 0:
+                    if field_str.len() > 0:
+                        field_str = field_str ++ ", "
+                    field_str = field_str ++ "__pad" ++ int_to_string(pad_idx) ++ ": [" ++ i64_to_string(pad_size) ++ "]u8"
+                    pad_idx = pad_idx + 1
+                cur_offset = field_offset
+
+        if field_str.len() > 0:
             field_str = field_str ++ ", "
         let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, fi)
         if anon_kind != 0:
@@ -474,9 +496,23 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             anon_idx2 = anon_idx2 + 1
         else:
             field_str = field_str ++ ci_build_one_field(session, idx, fi, known_structs)
+
+        // Advance offset past this field by its size
+        if needs_layout and not is_union:
+            let field_offset = with_cimport_struct_field_offset(session, idx, fi)
+            let ftype = with_cimport_struct_field_type_translated(session, idx, fi)
+            cur_offset = field_offset + ci_estimate_type_size(ftype)
         fi = fi + 1
 
-    let is_packed = with_cimport_struct_is_packed(session, idx) != 0
+    // Tail padding to match struct size
+    if needs_layout and not is_union:
+        let struct_size = with_cimport_struct_size(session, idx)
+        if struct_size > cur_offset:
+            let tail_pad = struct_size - cur_offset
+            if tail_pad > 0:
+                field_str = field_str ++ ", __pad" ++ int_to_string(pad_idx) ++ ": [" ++ i64_to_string(tail_pad) ++ "]u8"
+
+    let is_packed = needs_layout or with_cimport_struct_is_packed(session, idx) != 0
     let packed_prefix = if is_packed: "@[packed]\n" else: ""
     let part1 = "type " ++ safe_name
     let part2 = part1 ++ " = \{ "
@@ -485,6 +521,42 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     if is_union:
         return anon_decls ++ "// union\n" ++ packed_prefix ++ decl
     anon_decls ++ packed_prefix ++ decl
+
+fn ci_struct_needs_explicit_layout(session: i64, idx: i32, field_count: i32, is_union: bool) -> bool:
+    if is_union:
+        return false
+    if with_cimport_struct_is_packed(session, idx) != 0:
+        return true
+    // Compare actual C layout offsets against LLVM's default (non-packed) layout.
+    // If any field's actual offset differs from what LLVM would naturally place,
+    // we need explicit padding (via @[packed] + padding byte arrays).
+    var natural_offset: i64 = 0
+    var fi = 0
+    while fi < field_count:
+        let actual_offset = with_cimport_struct_field_offset(session, idx, fi)
+        if actual_offset < 0:
+            return false  // can't determine layout
+        let ftype = with_cimport_struct_field_type_translated(session, idx, fi)
+        let field_size = ci_estimate_type_size(ftype)
+        let field_align = if field_size > 0: field_size else: 1
+        // Natural alignment: round up to field's natural alignment
+        let align_mask = field_align - 1
+        natural_offset = (natural_offset + align_mask) / field_align * field_align
+        if actual_offset != natural_offset:
+            return true
+        natural_offset = natural_offset + field_size
+        fi = fi + 1
+    false
+
+fn ci_estimate_type_size(ty: str) -> i64:
+    if ty == "i8" or ty == "u8" or ty == "bool": return 1
+    if ty == "i16" or ty == "u16": return 2
+    if ty == "i32" or ty == "u32" or ty == "f32": return 4
+    if ty == "i64" or ty == "u64" or ty == "f64" or ty == "isize" or ty == "usize": return 8
+    if ty == "i128" or ty == "u128": return 16
+    if ci_starts_with(ty, "*"): return 8
+    if ci_starts_with(ty, "Option["): return 8
+    8  // default assumption
 
 fn ci_build_struct_fields(session: i64, idx: i32, field_count: i32, known_structs: str) -> str:
     if field_count == 0:
@@ -661,17 +733,21 @@ fn ci_translate_macros(session: i64) -> str:
                     // Build pipe-delimited param string: "|a|b|c|"
                     var param_names = ""
                     var param_decl = ""
+                    var type_params = ""
                     var pi = 0
                     while pi < param_count:
                         let pname = with_cimport_macro_param_name(session, i, pi)
                         param_names = param_names ++ "|" ++ pname ++ "|"
                         if pi > 0:
                             param_decl = param_decl ++ ", "
-                        param_decl = param_decl ++ pname ++ ": i32"
+                        param_decl = param_decl ++ pname ++ ": T"
                         pi = pi + 1
+                    if param_count > 0:
+                        type_params = "[T]"
+                    let ret_type = "T"
                     let translated = ci_translate_c_expr(value, param_names, known_values)
                     if translated.len() > 0:
-                        output = output ++ "fn " ++ safe_name ++ "(" ++ param_decl ++ ") -> i32:\n    " ++ translated ++ "\n"
+                        output = output ++ "fn " ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ ret_type ++ ":\n    " ++ translated ++ "\n"
                     else:
                         output = output ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable C macro: " ++ name ++ "\")\n"
             continue

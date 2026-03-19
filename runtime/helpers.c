@@ -1575,3 +1575,6 @@ __attribute__((weak)) int32_t  with_cimport_fn_storage_class(int64_t s, int32_t 
 __attribute__((weak)) int32_t  with_cimport_fn_is_inline(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
 __attribute__((weak)) int32_t  with_cimport_macro_param_count(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
 __attribute__((weak)) with_str with_cimport_macro_param_name(int64_t s, int32_t i, int32_t p) { (void)s;(void)i;(void)p; with_str e={"",0}; return e; }
+__attribute__((weak)) int64_t  with_cimport_struct_field_offset(int64_t s, int32_t i, int32_t f) { (void)s;(void)i;(void)f; return -1; }
+__attribute__((weak)) int64_t  with_cimport_struct_size(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
+__attribute__((weak)) with_str with_cimport_fn_calling_conv(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"c",1}; return e; }

@@ -191,6 +191,14 @@ extern fn wl_add_global(m: i64, ty: i64, name: str) -> i64
 extern fn wl_set_initializer(g: i64, v: i64) -> void
 extern fn wl_set_global_constant(g: i64, c: i32) -> void
 extern fn wl_set_linkage(g: i64, link: i32) -> void
+extern fn wl_set_call_conv(f: i64, cc: i32) -> void
+extern fn wl_cc_c() -> i32
+extern fn wl_cc_fast() -> i32
+extern fn wl_cc_x86_stdcall() -> i32
+extern fn wl_cc_x86_fastcall() -> i32
+extern fn wl_cc_x86_thiscall() -> i32
+extern fn wl_cc_win64() -> i32
+extern fn wl_cc_aarch64_vfabi() -> i32
 extern fn wl_internal_linkage() -> i32
 extern fn wl_private_linkage() -> i32
 
@@ -2894,6 +2902,14 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
         function = wl_add_function(self.llmod, link_name, fn_type)
     self.apply_noalias_param_attrs(function, param_start, param_count)
 
+    // Apply calling convention if specified
+    let cc_sym = self.pool.fn_meta_tp_start(meta)
+    if cc_sym != 0:
+        let cc_name = self.intern.resolve(cc_sym)
+        let cc_id = self.resolve_callconv(cc_name)
+        if cc_id >= 0:
+            wl_set_call_conv(function, cc_id)
+
     let actual_fn_type = wl_global_get_value_type(function)
     self.fn_values.insert(name_sym, function)
     self.fn_fn_types.insert(name_sym, actual_fn_type)
@@ -2904,6 +2920,17 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
         if not self.fn_values.get(canonical_sym).is_some():
             self.fn_values.insert(canonical_sym, function)
             self.fn_fn_types.insert(canonical_sym, actual_fn_type)
+
+fn Codegen.resolve_callconv(self: Codegen, name: str) -> i32:
+    if name == "c": return wl_cc_c()
+    if name == "stdcall": return wl_cc_x86_stdcall()
+    if name == "fastcall": return wl_cc_x86_fastcall()
+    if name == "thiscall": return wl_cc_x86_thiscall()
+    if name == "win64": return wl_cc_win64()
+    if name == "vectorcall": return wl_cc_x86_fastcall()
+    if name == "aarch64_vfabi": return wl_cc_aarch64_vfabi()
+    if name == "fast": return wl_cc_fast()
+    -1
 
 fn Codegen.declare_extern_var(self: Codegen, node: i32):
     // NK_EXTERN_VAR: d0=name(sym), d1=type_node, d2=flags(bit0=mut)

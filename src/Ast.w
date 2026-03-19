@@ -110,6 +110,7 @@ const NK_TYPE_SLICE: i32 = 88
 const NK_TYPE_TRAIT_OBJ: i32 = 89
 const NK_TYPE_INFERRED: i32 = 90
 const NK_TYPE_ASSOC: i32 = 91  // d0=base_sym (e.g. Self), d1=assoc_sym (e.g. Output), d2=0
+const NK_TYPE_TYPEOF: i32 = 92 // d0=expr(node), d1=0, d2=0
 
 // Patterns (for match arms)
 const NK_PAT_WILDCARD: i32 = 100
