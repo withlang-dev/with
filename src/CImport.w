@@ -150,6 +150,12 @@ fn process_c_import(header_spec: str) -> str:
                 let sname = with_cimport_decl_name(session, i)
                 if sname.len() > 0 and sname.byte_at(0) != 95:
                     translated_structs = translated_structs ++ "|" ++ sname ++ "|"
+                    // Emit struct_Foo alias when Foo has a typedef twin
+                    if ci_str_contains(typedef_shadowed, "|" ++ sname ++ "|"):
+                        let alias_name = "struct_" ++ sname
+                        if with_cimport_is_name_emitted(alias_name) == 0:
+                            with_cimport_mark_name_emitted(alias_name)
+                            output = output ++ "type " ++ alias_name ++ " = " ++ ci_escape_reserved(sname) ++ "\n"
         else if kind == CK_ENUM:
             output = output ++ ci_translate_enum(session, i)
         else if kind == CK_VAR:
@@ -497,7 +503,12 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
 
     let field_count = with_cimport_struct_field_count(session, idx)
     if field_count == 0:
-        return ""
+        // Empty struct definition → emit with padding byte for ABI compatibility
+        with_cimport_mark_name_emitted(name)
+        let safe_name = ci_escape_reserved(name)
+        if is_union:
+            return "// union\ntype " ++ safe_name ++ " = \{ __pad0: u8 = 0 }\n"
+        return "type " ++ safe_name ++ " = \{ __pad0: u8 = 0 }\n"
 
     with_cimport_mark_name_emitted(name)
     let safe_name = ci_escape_reserved(name)
@@ -644,13 +655,31 @@ fn ci_build_one_field(session: i64, idx: i32, fi: i32, known_structs: str) -> st
     let ftype = with_cimport_struct_field_type_translated(session, idx, fi)
     let actual_name = if fname.len() == 0: "unnamed_" ++ int_to_string(fi) else: fname
     let safe_fname = ci_escape_reserved(actual_name)
-    safe_fname ++ ": " ++ ftype
+    let default_val = ci_default_for_type(ftype)
+    if default_val.len() > 0:
+        safe_fname ++ ": " ++ ftype ++ " = " ++ default_val
+    else:
+        safe_fname ++ ": " ++ ftype
+
+fn ci_default_for_type(ty: str) -> str:
+    if ty == "i8" or ty == "u8" or ty == "i16" or ty == "u16": return "0"
+    if ty == "i32" or ty == "u32" or ty == "i64" or ty == "u64": return "0"
+    if ty == "i128" or ty == "u128" or ty == "isize" or ty == "usize": return "0"
+    if ty == "f32" or ty == "f64": return "0.0"
+    if ty == "bool": return "false"
+    ""
 
 // ── Enum translation ────────────────────────────────────────
 
 fn ci_translate_enum(session: i64, idx: i32) -> str:
     let const_count = with_cimport_enum_const_count(session, idx)
     if const_count == 0:
+        // Forward-declared enum with no constants → emit as opaque
+        let fwd_name = with_cimport_decl_name(session, idx)
+        if fwd_name.len() > 0 and fwd_name.byte_at(0) != 95:
+            if with_cimport_is_name_emitted(fwd_name) == 0:
+                with_cimport_mark_name_emitted(fwd_name)
+                return "type " ++ ci_escape_reserved(fwd_name) ++ " = opaque\n"
         return ""
 
     // Determine the integer type for this enum
@@ -808,6 +837,17 @@ fn ci_translate_macros(session: i64) -> str:
                     with_cimport_mark_name_emitted(name)
                     let safe_name = ci_escape_reserved(name)
                     let param_count = with_cimport_macro_param_count(session, i)
+                    // Detect variadic macros (... params or __VA_ARGS__ in body)
+                    var is_variadic_macro = ci_str_contains(value, "__VA_ARGS__")
+                    var vpi = 0
+                    while vpi < param_count:
+                        let vpname = with_cimport_macro_param_name(session, i, vpi)
+                        if vpname == "..." or vpname == "__VA_ARGS__":
+                            is_variadic_macro = true
+                        vpi = vpi + 1
+                    if is_variadic_macro:
+                        output = output ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"variadic macro — use direct call\")\n"
+                        continue
                     // Build pipe-delimited param string: "|a|b|c|"
                     var param_names = ""
                     var param_decl = ""
@@ -936,21 +976,22 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
             return "(0 - " ++ inner ++ " - 1)"
         return ""
 
-    // sizeof(T) — only translatable for type names, not expressions
+    // sizeof(T) — translatable for type names and parameter names
     if ci_starts_with(trimmed, "sizeof"):
         let rest = ci_trim(trimmed.slice(6, trimmed.len()))
         if rest.len() > 0 and rest.byte_at(0) == 40:
             let close = ci_find_matching_paren(rest, 0)
             if close > 0:
                 let inner = ci_trim(rest.slice(1, close as i64))
-                // Reject parameter names — sizeof(param) is an expression, not a type
-                if not ci_str_contains(params, "|" ++ inner ++ "|"):
-                    let mapped = ci_map_sizeof_type(inner)
-                    if mapped.len() > 0:
-                        return "sizeof[" ++ mapped ++ "]()"
+                // Parameter names in generic macros: sizeof(param) → sizeof[T]()
+                if ci_str_contains(params, "|" ++ inner ++ "|"):
+                    return "sizeof[T]()"
+                let mapped = ci_map_sizeof_type(inner)
+                if mapped.len() > 0:
+                    return "sizeof[" ++ mapped ++ "]()"
         return ""
 
-    // Cast: (type)expr
+    // Cast: (type)expr  OR  comma operator: (expr1, expr2) → expr2
     if trimmed.byte_at(0) == 40:
         let cast_end = ci_find_matching_paren(trimmed, 0)
         if cast_end > 0 and cast_end as i64 + 1 < trimmed.len():
@@ -961,6 +1002,13 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
                     let mapped = ci_map_base_type(ci_trim(inside))
                     return "(" ++ after ++ " as " ++ mapped ++ ")"
                 return ""
+        // Comma operator: (a, b) at top level — translate last expression
+        if cast_end == trimmed.len() as i32 - 1:
+            let inside = trimmed.slice(1, cast_end as i64)
+            let comma_pos = ci_find_last_comma_at_depth0(inside)
+            if comma_pos >= 0:
+                let last_expr = ci_trim(inside.slice(comma_pos as i64 + 1, inside.len()))
+                return ci_translate_c_expr(last_expr, params, known)
 
     // Ternary: cond ? then : else
     let ternary_pos = ci_find_ternary(trimmed)
@@ -1133,7 +1181,29 @@ fn ci_translate_builtin_call(name: str, args: str, params: str, known: str) -> s
         // __builtin_offsetof(type, field) — type argument, not translatable generically
         return ""
 
-    // Tier 3: Variadic helpers — not translatable inline
+    // Tier 3: Math builtins — strip __builtin_ prefix, emit stdlib name
+    if name == "__builtin_ceil" or name == "__builtin_floor" or name == "__builtin_sqrt" or name == "__builtin_fabs" or name == "__builtin_sin" or name == "__builtin_cos" or name == "__builtin_log" or name == "__builtin_exp" or name == "__builtin_round" or name == "__builtin_trunc" or name == "__builtin_log2" or name == "__builtin_log10" or name == "__builtin_pow" or name == "__builtin_fmin" or name == "__builtin_fmax":
+        let stdlib_name = name.slice(10, name.len())
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return stdlib_name ++ "(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin_ceilf" or name == "__builtin_floorf" or name == "__builtin_sqrtf" or name == "__builtin_fabsf" or name == "__builtin_sinf" or name == "__builtin_cosf" or name == "__builtin_logf" or name == "__builtin_expf" or name == "__builtin_roundf" or name == "__builtin_truncf" or name == "__builtin_log2f" or name == "__builtin_log10f" or name == "__builtin_powf" or name == "__builtin_fminf" or name == "__builtin_fmaxf":
+        let stdlib_name = name.slice(10, name.len())
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return stdlib_name ++ "(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin_isnan" or name == "__builtin_isinf":
+        let stdlib_name = name.slice(10, name.len())
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return stdlib_name ++ "(" ++ translated_args ++ ")"
+        return ""
+
+    // Tier 4: Variadic helpers — not translatable inline
     if name == "__builtin_va_start" or name == "__builtin_va_end" or name == "__builtin_va_copy" or name == "__builtin_va_arg":
         return ""
 
@@ -1386,6 +1456,19 @@ fn ci_is_c_type_name(s: str) -> bool:
     // Common typedefs
     if ci_map_builtin_typedef(t).len() > 0: return true
     false
+
+fn ci_find_last_comma_at_depth0(s: str) -> i32:
+    var depth = 0
+    var last_comma = 0 - 1
+    var i = 0
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        else if c == 41: depth = depth - 1
+        else if c == 44 and depth == 0:
+            last_comma = i
+        i = i + 1
+    last_comma
 
 fn ci_find_ternary(s: str) -> i32:
     var depth = 0

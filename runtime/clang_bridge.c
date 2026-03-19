@@ -377,6 +377,11 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
         case CXType_BlockPointer:
             return session_strdup(s, "*const i8");
 
+        // Atomic type — unwrap but mark as unsupported for struct demotion
+        case CXType_Atomic: {
+            return session_strdup(s, "__UNSUPPORTED:_Atomic type");
+        }
+
         default: {
             CXString sp = clang_getTypeSpelling(canonical);
             fprintf(stderr, "c_import: unsupported type kind %d: %s\n",
