@@ -2916,6 +2916,11 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
     if kind == NK_TYPE_INFERRED:
         return 0
 
+    // @TypeOf(expr) — in generic functions, resolved at monomorphization time
+    // via resolve_generic_return_type_node. Return a placeholder here.
+    if kind == NK_TYPE_TYPEOF:
+        return self.ty_i32
+
     0
 
 // ── Pass 2: Check function bodies ────────────────────────────────
@@ -5260,6 +5265,22 @@ fn Sema.resolve_generic_return_type_node(self: Sema, ret_node: i32, tp_start: i3
         let opt_args: Vec[i32] = Vec.new()
         opt_args.push(inner)
         return self.ensure_generic_inst_type(self.pool_intern("Option"), opt_args, 1)
+
+    // @TypeOf(expr) — resolve the inner expression's type.
+    // In generic context, if the inner expr is an identifier matching a type param,
+    // resolve to the substituted type.
+    if kind == NK_TYPE_TYPEOF:
+        let inner_node = self.ast.get_data0(ret_node)
+        let inner_kind = self.ast.kind(inner_node)
+        if inner_kind == NK_IDENT:
+            let sym = self.ast.get_data0(inner_node)
+            if self.type_param_exists(tp_start, tp_count, sym) != 0:
+                return self.lookup_generic_subst(sym)
+        // Fall through: try to type-check the expression in current scope
+        let expr_type = self.check_expr(inner_node)
+        if expr_type > 0:
+            return expr_type
+        return 0
 
     self.resolve_type_expr(ret_node)
 

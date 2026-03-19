@@ -768,6 +768,24 @@ int32_t with_cimport_fn_is_inline(int64_t session, int32_t idx) {
     return clang_Cursor_isFunctionInlined(s->decls[idx]) ? 1 : 0;
 }
 
+with_str with_cimport_fn_calling_conv(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("c");
+    CXType fn_type = clang_getCursorType(s->decls[idx]);
+    enum CXCallingConv cc = clang_getFunctionTypeCallingConv(fn_type);
+    switch (cc) {
+        case CXCallingConv_Default:
+        case CXCallingConv_C: return make_str("c");
+        case CXCallingConv_X86StdCall: return make_str("stdcall");
+        case CXCallingConv_X86FastCall: return make_str("fastcall");
+        case CXCallingConv_X86ThisCall: return make_str("thiscall");
+        case CXCallingConv_Win64: return make_str("win64");
+        case CXCallingConv_X86VectorCall: return make_str("vectorcall");
+        case CXCallingConv_AArch64VectorCall: return make_str("aarch64_vfabi");
+        default: return make_str("c");
+    }
+}
+
 // ── Struct queries ──────────────────────────────────────────
 
 int32_t with_cimport_struct_field_count(int64_t session, int32_t idx) {
@@ -799,6 +817,25 @@ int32_t with_cimport_struct_field_is_bitfield(int64_t session, int32_t idx, int3
     ensure_fields_cached(s, idx);
     if (field < 0 || field >= s->caches[idx].field_count) return 0;
     return s->caches[idx].fields[field].is_bitfield;
+}
+
+int64_t with_cimport_struct_field_offset(int64_t session, int32_t idx, int32_t field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return -1;
+    CXType struct_type = clang_getCursorType(s->decls[idx]);
+    ensure_fields_cached(s, idx);
+    if (field < 0 || field >= s->caches[idx].field_count) return -1;
+    // Get field cursor by visiting children
+    CXCursor struct_cursor = s->decls[idx];
+    CXType canonical = clang_getCanonicalType(struct_type);
+    return clang_Type_getOffsetOf(canonical, s->caches[idx].fields[field].name) / 8;
+}
+
+int64_t with_cimport_struct_size(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    CXType type = clang_getCursorType(s->decls[idx]);
+    return clang_Type_getSizeOf(type);
 }
 
 int32_t with_cimport_struct_is_opaque(int64_t session, int32_t idx) {

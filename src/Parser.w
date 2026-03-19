@@ -37,6 +37,7 @@ type Parser = {
     pending_sealed: i32,
     pending_flags: i32,
     pending_packed: i32,
+    pending_callconv: i32,
     saw_implicit_it: i32,
     implicit_it_depth: i32,
     last_param_pattern_start: i32,
@@ -74,6 +75,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_sealed: 0,
         pending_flags: 0,
         pending_packed: 0,
+        pending_callconv: 0,
         saw_implicit_it: 0,
         implicit_it_depth: 0,
         last_param_pattern_start: 0,
@@ -196,6 +198,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_sealed = 0
     self.pending_flags = 0
     self.pending_packed = 0
+    self.pending_callconv = 0
     var derive_syms: Vec[i32] = Vec.new()
 
     while self.peek() == TK_AT:
@@ -272,6 +275,15 @@ fn Parser.skip_attributes(self: Parser):
         else if self.is_ident_named("flags"):
             // Already handled by standalone check above
             self.advance()
+        else if self.is_ident_named("callconv"):
+            self.advance()
+            if self.peek() == TK_L_PAREN:
+                self.advance()
+                if self.peek() == TK_STRING_LIT:
+                    self.pending_callconv = self.intern_current()
+                    self.advance()
+                if self.peek() == TK_R_PAREN:
+                    self.advance()
 
         // consume until matching ]
         var depth = 1
@@ -542,9 +554,11 @@ fn Parser.parse_extern_decl(self: Parser, start: i32) -> i32:
     // Extra already has [param_name, param_type, param_flags]* from parse_param_list
     let extern_node = self.pool.add_node(NK_EXTERN_FN, start, self.prev_end(), name, extra_start, is_variadic)
     // Add fn_meta so Codegen can access param_count and return_type
+    // Store callconv sym in ts field (unused for extern fns)
     let required_param_count = self.last_param_required_count
     let meta_flags = is_variadic + required_param_count * FN_META_REQUIRED_UNIT
-    self.pool.add_fn_meta(extern_node, meta_flags, ret_type, extra_start, param_count, 0, 0)
+    self.pool.add_fn_meta(extern_node, meta_flags, ret_type, extra_start, param_count, self.pending_callconv, 0)
+    self.pending_callconv = 0
     extern_node
 
 // ── type decl ────────────────────────────────────────────────────
@@ -3373,6 +3387,20 @@ fn Parser.parse_block_or_expr(self: Parser) -> i32:
 fn Parser.parse_type_expr(self: Parser) -> i32:
     let t = self.peek()
     let start = self.current_start()
+
+    // @TypeOf(expr) — compile-time type of expression
+    if t == TK_AT:
+        self.advance()
+        if self.is_ident_named("TypeOf"):
+            self.advance()
+            if self.expect(TK_L_PAREN) == 0:
+                return 0
+            let inner = self.parse_expr()
+            if self.expect(TK_R_PAREN) == 0:
+                return 0
+            return self.pool.add_node(NK_TYPE_TYPEOF, start, self.prev_end(), inner, 0, 0)
+        self.emit_error("expected 'TypeOf' after '@' in type position")
+        return 0
 
     if t == TK_AMPERSAND:
         self.advance()
