@@ -50,6 +50,8 @@ extern fn with_cimport_struct_field_anon_field_type(session: i64, idx: i32, fiel
 extern fn with_cimport_struct_is_packed(session: i64, idx: i32) -> i32
 extern fn with_cimport_fn_storage_class(session: i64, idx: i32) -> i32
 extern fn with_cimport_fn_is_inline(session: i64, idx: i32) -> i32
+extern fn with_cimport_macro_param_count(session: i64, idx: i32) -> i32
+extern fn with_cimport_macro_param_name(session: i64, idx: i32, param: i32) -> str
 extern fn int_to_string(n: i32) -> str
 extern fn i64_to_string(n: i64) -> str
 extern fn with_eprintln(s: str) -> void
@@ -649,13 +651,29 @@ fn ci_translate_macros(session: i64) -> str:
         let value = with_cimport_macro_value(session, i)
         let fn_like = with_cimport_macro_is_fn_like(session, i)
 
-        // Emit function-like macros as comptime_error stubs
+        // Try to translate function-like macros; fall back to comptime_error
         if fn_like != 0:
             if name.len() > 0 and name.byte_at(0) != 95:
                 if with_cimport_is_name_emitted(name) == 0:
                     with_cimport_mark_name_emitted(name)
                     let safe_name = ci_escape_reserved(name)
-                    output = output ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable C macro: " ++ name ++ "\")\n"
+                    let param_count = with_cimport_macro_param_count(session, i)
+                    // Build pipe-delimited param string: "|a|b|c|"
+                    var param_names = ""
+                    var param_decl = ""
+                    var pi = 0
+                    while pi < param_count:
+                        let pname = with_cimport_macro_param_name(session, i, pi)
+                        param_names = param_names ++ "|" ++ pname ++ "|"
+                        if pi > 0:
+                            param_decl = param_decl ++ ", "
+                        param_decl = param_decl ++ pname ++ ": i32"
+                        pi = pi + 1
+                    let translated = ci_translate_c_expr(value, param_names, known_values)
+                    if translated.len() > 0:
+                        output = output ++ "fn " ++ safe_name ++ "(" ++ param_decl ++ ") -> i32:\n    " ++ translated ++ "\n"
+                    else:
+                        output = output ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable C macro: " ++ name ++ "\")\n"
             continue
 
         // Skip empty macros (flag defines)
@@ -711,6 +729,258 @@ fn ci_translate_macros(session: i64) -> str:
                 known_values = known_values ++ name ++ "=" ++ eval_result ++ "|"
                 output = output ++ "let " ++ safe_name ++ ": i32 = " ++ eval_result ++ "\n"
     output
+
+// ── C expression → With source translator ────────────────────
+// Translates a C macro body to With source code.
+// params: pipe-delimited parameter names "|a|b|"
+// known: pipe-delimited known constant values "NAME=val|"
+// Returns "" on failure (triggers comptime_error fallback).
+
+fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
+    let trimmed = ci_strip_parens(ci_trim(s))
+    if trimmed.len() == 0:
+        return ""
+
+    // Integer literal
+    if ci_is_int_literal(trimmed):
+        return ci_strip_int_suffix(trimmed)
+
+    // Float literal
+    if ci_is_float_literal(trimmed):
+        return ci_strip_float_suffix(trimmed)
+
+    // String literal
+    if ci_is_string_literal(trimmed):
+        return trimmed
+
+    // Char literal
+    if ci_is_char_literal(trimmed):
+        let cv = ci_char_to_int(trimmed)
+        if cv.len() > 0:
+            return cv
+        return ""
+
+    // Unary negation: -expr
+    if trimmed.byte_at(0) == 45:
+        let inner = ci_translate_c_expr(trimmed.slice(1, trimmed.len()), params, known)
+        if inner.len() > 0:
+            return "(0 - " ++ inner ++ ")"
+        return ""
+
+    // Logical NOT: !expr
+    if trimmed.byte_at(0) == 33:
+        let inner = ci_translate_c_expr(trimmed.slice(1, trimmed.len()), params, known)
+        if inner.len() > 0:
+            return "(if " ++ inner ++ " != 0: 0 else: 1)"
+        return ""
+
+    // Bitwise NOT: ~expr
+    if trimmed.byte_at(0) == 126:
+        let inner = ci_translate_c_expr(trimmed.slice(1, trimmed.len()), params, known)
+        if inner.len() > 0:
+            return "(0 - " ++ inner ++ " - 1)"
+        return ""
+
+    // sizeof(T) — only translatable for type names, not expressions
+    if ci_starts_with(trimmed, "sizeof"):
+        let rest = ci_trim(trimmed.slice(6, trimmed.len()))
+        if rest.len() > 0 and rest.byte_at(0) == 40:
+            let close = ci_find_matching_paren(rest, 0)
+            if close > 0:
+                let inner = ci_trim(rest.slice(1, close as i64))
+                // Reject parameter names — sizeof(param) is an expression, not a type
+                if not ci_str_contains(params, "|" ++ inner ++ "|"):
+                    let mapped = ci_map_sizeof_type(inner)
+                    if mapped.len() > 0:
+                        return "sizeof[" ++ mapped ++ "]()"
+        return ""
+
+    // Cast: (type)expr
+    if trimmed.byte_at(0) == 40:
+        let cast_end = ci_find_matching_paren(trimmed, 0)
+        if cast_end > 0 and cast_end as i64 + 1 < trimmed.len():
+            let inside = trimmed.slice(1, cast_end as i64)
+            if ci_is_c_type_name(inside):
+                let after = ci_translate_c_expr(trimmed.slice(cast_end as i64 + 1, trimmed.len()), params, known)
+                if after.len() > 0:
+                    let mapped = ci_map_base_type(ci_trim(inside))
+                    return "(" ++ after ++ " as " ++ mapped ++ ")"
+                return ""
+
+    // Ternary: cond ? then : else
+    let ternary_pos = ci_find_ternary(trimmed)
+    if ternary_pos >= 0:
+        let cond = ci_translate_c_expr(trimmed.slice(0, ternary_pos as i64), params, known)
+        if cond.len() > 0:
+            let rest = trimmed.slice(ternary_pos as i64 + 1, trimmed.len())
+            let colon_pos = ci_find_ternary_colon(rest)
+            if colon_pos >= 0:
+                let then_e = ci_translate_c_expr(rest.slice(0, colon_pos as i64), params, known)
+                let else_e = ci_translate_c_expr(rest.slice(colon_pos as i64 + 1, rest.len()), params, known)
+                if then_e.len() > 0 and else_e.len() > 0:
+                    // C ternary condition is truthy (nonzero), wrap non-comparison
+                    let cond_expr = if ci_str_contains(cond, " == ") or ci_str_contains(cond, " != ") or ci_str_contains(cond, " < ") or ci_str_contains(cond, " > ") or ci_str_contains(cond, " and ") or ci_str_contains(cond, " or "): cond else: cond ++ " != 0"
+                    return "(if " ++ cond_expr ++ ": " ++ then_e ++ " else: " ++ else_e ++ ")"
+        return ""
+
+    // Binary operator
+    let op_info = ci_find_binary_op_ext(trimmed)
+    if op_info >= 0:
+        let op_pos = op_info / 256
+        let op_len = op_info % 256
+        let lhs = ci_translate_c_expr(trimmed.slice(0, op_pos as i64), params, known)
+        let rhs = ci_translate_c_expr(trimmed.slice((op_pos + op_len) as i64, trimmed.len()), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            let c_op = trimmed.slice(op_pos as i64, (op_pos + op_len) as i64)
+            let w_op = ci_map_c_op(c_op)
+            if w_op.len() > 0:
+                if ci_is_comparison_op(w_op):
+                    return "(if " ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ": 1 else: 0)"
+                return "(" ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ")"
+        return ""
+
+    // Identifier: parameter reference or known constant
+    if ci_is_c_ident(trimmed):
+        // Reject compiler builtins (__builtin_*, __inline_*, etc.)
+        if trimmed.len() >= 2 and trimmed.byte_at(0) == 95 and trimmed.byte_at(1) == 95:
+            return ""
+        if ci_str_contains(params, "|" ++ trimmed ++ "|"):
+            return trimmed
+        // Known constant from earlier macro definitions
+        let kv = ci_lookup_known(trimmed, known)
+        if kv.len() > 0:
+            return trimmed
+        // Accept only if already emitted as a With declaration
+        if with_cimport_is_name_emitted(trimmed) != 0:
+            return trimmed
+        return ""
+
+    // Function call: ident(args) — not translatable
+    if ci_is_c_ident_prefix(trimmed) and ci_str_contains(trimmed, "("):
+        return ""
+
+    ""
+
+fn ci_find_binary_op_ext(s: str) -> i32:
+    // Like ci_find_binary_op but also handles comparison and logical ops
+    var best_pos = 0 - 1
+    var best_prec = 100
+    var best_len = 0
+    var paren_depth = 0
+    var idx = 0
+    let slen = s.len() as i32
+    while idx < slen:
+        let c = s.byte_at(idx as i64)
+        if c == 40:
+            paren_depth = paren_depth + 1
+        else if c == 41:
+            paren_depth = paren_depth - 1
+        else if paren_depth == 0 and idx > 0:
+            let prec = ci_op_prec_ext(s, idx, slen)
+            if prec >= 0 and prec <= best_prec:
+                best_pos = idx
+                best_prec = prec
+                best_len = ci_op_length_ext(s, idx, slen)
+        idx = idx + 1
+    if best_pos > 0:
+        return best_pos * 256 + best_len
+    0 - 1
+
+fn ci_is_c_ident_prefix(s: str) -> bool:
+    if s.len() == 0:
+        return false
+    let c0 = s.byte_at(0)
+    (c0 >= 65 and c0 <= 90) or (c0 >= 97 and c0 <= 122) or c0 == 95
+
+fn ci_op_prec_ext(s: str, idx: i32, slen: i32) -> i32:
+    let c = s.byte_at(idx as i64)
+    var nx = 0
+    if idx + 1 < slen:
+        nx = s.byte_at(idx as i64 + 1)
+    // Logical OR
+    if c == 124 and nx == 124: return 0
+    // Logical AND
+    if c == 38 and nx == 38: return 1
+    // Bitwise OR
+    if c == 124 and nx != 124: return 2
+    // Bitwise XOR
+    if c == 94: return 3
+    // Bitwise AND
+    if c == 38 and nx != 38: return 4
+    // Equality
+    if c == 61 and nx == 61: return 5
+    if c == 33 and nx == 61: return 5
+    // Relational
+    if c == 60 and nx == 61: return 6
+    if c == 62 and nx == 61: return 6
+    if c == 60 and nx != 60: return 6
+    if c == 62 and nx != 62: return 6
+    // Shift
+    if c == 60 and nx == 60: return 7
+    if c == 62 and nx == 62: return 7
+    // Additive
+    if c == 43: return 8
+    if c == 45: return 8
+    // Multiplicative
+    if c == 42: return 9
+    if c == 47: return 9
+    if c == 37: return 9
+    0 - 1
+
+fn ci_op_length_ext(s: str, idx: i32, slen: i32) -> i32:
+    if idx + 1 < slen:
+        let c = s.byte_at(idx as i64)
+        let nx = s.byte_at(idx as i64 + 1)
+        if c == 124 and nx == 124: return 2
+        if c == 38 and nx == 38: return 2
+        if c == 60 and nx == 60: return 2
+        if c == 62 and nx == 62: return 2
+        if c == 61 and nx == 61: return 2
+        if c == 33 and nx == 61: return 2
+        if c == 60 and nx == 61: return 2
+        if c == 62 and nx == 61: return 2
+    1
+
+fn ci_map_c_op(op: str) -> str:
+    if op == "+": return "+"
+    if op == "-": return "-"
+    if op == "*": return "*"
+    if op == "/": return "/"
+    if op == "%": return "%"
+    if op == "==": return "=="
+    if op == "!=": return "!="
+    if op == "<": return "<"
+    if op == ">": return ">"
+    if op == "<=": return "<="
+    if op == ">=": return ">="
+    if op == "&&": return "and"
+    if op == "||": return "or"
+    if op == "&": return "&"
+    if op == "|": return "|"
+    if op == "^": return "^"
+    if op == "<<": return "<<"
+    if op == ">>": return ">>"
+    ""
+
+fn ci_is_comparison_op(op: str) -> bool:
+    op == "==" or op == "!=" or op == "<" or op == ">" or op == "<=" or op == ">=" or op == "and" or op == "or"
+
+fn ci_map_sizeof_type(c_type: str) -> str:
+    let t = ci_trim(c_type)
+    // Try builtin typedef first
+    let mapped = ci_map_builtin_typedef(t)
+    if mapped.len() > 0:
+        return mapped
+    // Try base type
+    if ci_is_known_base_type(t):
+        return ci_map_base_type(t)
+    // Pointer types
+    if t.len() > 0 and t.byte_at(t.len() - 1) == 42:
+        return "*const i8"
+    // Struct/type name — pass through
+    if ci_is_c_ident(t):
+        return t
+    ""
 
 // ── Constant expression evaluator ────────────────────────────
 
@@ -1362,6 +1632,10 @@ fn ci_strip_int_suffix(s: str) -> str:
 fn ci_strip_parens(s: str) -> str:
     var result = s
     while result.len() >= 2 and result.byte_at(0) == 40 and result.byte_at(result.len() - 1) == 41:
+        // Verify the outer parens actually match (not just first/last chars)
+        let match_pos = ci_find_matching_paren(result, 0)
+        if match_pos != result.len() as i32 - 1:
+            break
         result = result.slice(1, result.len() - 1)
     result
 

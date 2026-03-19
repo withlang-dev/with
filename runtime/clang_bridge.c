@@ -70,6 +70,8 @@ typedef struct {
     char **names;
     char **values;
     int *fn_like;
+    char ***params;        // params[i] = NULL-terminated array of param names
+    int32_t *param_counts; // number of params for macro i
     int32_t count;
     int32_t cap;
 } MacroSession;
@@ -1075,10 +1077,39 @@ int64_t with_cimport_parse_macros(with_str header_code) {
         memcpy(name, name_start, name_len);
         name[name_len] = 0;
 
-        // Skip past args for function-like macros
+        // Extract parameter names for function-like macros
+        char **macro_params = NULL;
+        int32_t macro_param_count = 0;
         char *value_start = name_end;
         if (is_fn_like) {
-            while (*value_start && *value_start != ')') value_start++;
+            char *pstart = name_end + 1; // skip '('
+            char *pend = pstart;
+            while (*pend && *pend != ')') pend++;
+            // Parse comma-separated params between pstart and pend
+            if (pend > pstart) {
+                // Count commas to estimate param count
+                int cap = 8;
+                macro_params = (char **)malloc(sizeof(char*) * (size_t)cap);
+                char *p = pstart;
+                while (p < pend) {
+                    while (p < pend && *p == ' ') p++;
+                    char *tok = p;
+                    while (p < pend && *p != ',' && *p != ' ') p++;
+                    if (p > tok) {
+                        if (macro_param_count >= cap) {
+                            cap *= 2;
+                            macro_params = (char **)realloc(macro_params, sizeof(char*) * (size_t)cap);
+                        }
+                        size_t tlen = (size_t)(p - tok);
+                        char *pname = (char *)malloc(tlen + 1);
+                        memcpy(pname, tok, tlen);
+                        pname[tlen] = 0;
+                        macro_params[macro_param_count++] = pname;
+                    }
+                    while (p < pend && (*p == ',' || *p == ' ')) p++;
+                }
+            }
+            value_start = pend;
             if (*value_start == ')') value_start++;
         }
         while (*value_start == ' ') value_start++;
@@ -1098,10 +1129,14 @@ int64_t with_cimport_parse_macros(with_str header_code) {
             ms->names  = (char **)realloc(ms->names,  sizeof(char*) * (size_t)ms->cap);
             ms->values = (char **)realloc(ms->values, sizeof(char*) * (size_t)ms->cap);
             ms->fn_like = (int *)realloc(ms->fn_like, sizeof(int) * (size_t)ms->cap);
+            ms->params = (char ***)realloc(ms->params, sizeof(char**) * (size_t)ms->cap);
+            ms->param_counts = (int32_t *)realloc(ms->param_counts, sizeof(int32_t) * (size_t)ms->cap);
         }
         ms->names[ms->count]   = name;
         ms->values[ms->count]  = value;
         ms->fn_like[ms->count] = is_fn_like;
+        ms->params[ms->count]  = macro_params;
+        ms->param_counts[ms->count] = macro_param_count;
         ms->count++;
     }
 
@@ -1139,9 +1174,30 @@ void with_cimport_dispose_macros(int64_t session) {
     for (int32_t i = 0; i < ms->count; i++) {
         free(ms->names[i]);
         free(ms->values[i]);
+        if (ms->params && ms->params[i]) {
+            for (int32_t j = 0; j < ms->param_counts[i]; j++)
+                free(ms->params[i][j]);
+            free(ms->params[i]);
+        }
     }
     free(ms->names);
     free(ms->values);
     free(ms->fn_like);
+    free(ms->params);
+    free(ms->param_counts);
     free(ms);
+}
+
+int32_t with_cimport_macro_param_count(int64_t session, int32_t idx) {
+    MacroSession *ms = (MacroSession *)(intptr_t)session;
+    if (!ms || idx < 0 || idx >= ms->count) return 0;
+    return ms->param_counts ? ms->param_counts[idx] : 0;
+}
+
+with_str with_cimport_macro_param_name(int64_t session, int32_t idx, int32_t param) {
+    MacroSession *ms = (MacroSession *)(intptr_t)session;
+    if (!ms || idx < 0 || idx >= ms->count) return make_str("");
+    if (!ms->params || !ms->params[idx]) return make_str("");
+    if (param < 0 || param >= ms->param_counts[idx]) return make_str("");
+    return make_str(ms->params[idx][param]);
 }
