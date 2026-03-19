@@ -15,6 +15,7 @@ extern fn with_cimport_fn_return_type(session: i64, idx: i32) -> str
 extern fn with_cimport_fn_param_count(session: i64, idx: i32) -> i32
 extern fn with_cimport_fn_param_name(session: i64, idx: i32, param: i32) -> str
 extern fn with_cimport_fn_param_type(session: i64, idx: i32, param: i32) -> str
+extern fn with_cimport_param_is_restrict(session: i64, idx: i32, param: i32) -> i32
 extern fn with_cimport_fn_is_variadic(session: i64, idx: i32) -> i32
 extern fn with_cimport_struct_field_count(session: i64, idx: i32) -> i32
 extern fn with_cimport_struct_field_name(session: i64, idx: i32, field: i32) -> str
@@ -324,7 +325,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
             // Static inline — emit comptime_error stub
             let safe_name = ci_escape_reserved(name)
             with_cimport_mark_name_emitted(name)
-            return "fn " ++ safe_name ++ "() -> i32:\n    comptime_error(\"static inline function — wrap in C shim\")\n"
+            return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"static inline function — wrap in C shim\")\n"
         return ""
 
     let safe_name = ci_escape_reserved(name)
@@ -340,12 +341,18 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
         if pi > 0:
             params = params ++ ", "
         let pname = with_cimport_fn_param_name(session, idx, pi)
-        let ptype = with_cimport_fn_param_type_translated(session, idx, pi)
+        let raw_ptype = with_cimport_fn_param_type_translated(session, idx, pi)
+        let is_restrict = with_cimport_param_is_restrict(session, idx, pi)
+        var ptype = ci_pointer_type_explicit_mut(raw_ptype)
+        if ci_should_keep_raw_pointer_param(pname, pi) == 0:
+            ptype = ci_wrap_nullable_pointer_type(ptype)
 
         if ci_starts_with(ptype, "__UNSUPPORTED:"):
             has_unsupported = true
             unsupported_reason = ptype.slice(14, ptype.len())
 
+        if is_restrict != 0:
+            params = params ++ "@[noalias] "
         if pname.len() > 0:
             params = params ++ ci_escape_reserved(pname) ++ ": " ++ ptype
         else:
@@ -357,7 +364,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
         else:
             params = params ++ "..."
 
-    let ret = with_cimport_fn_return_type_translated(session, idx)
+    let ret = ci_wrap_nullable_pointer_type(ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx)))
     if ci_starts_with(ret, "__UNSUPPORTED:"):
         has_unsupported = true
         unsupported_reason = ret.slice(14, ret.len())
@@ -365,9 +372,32 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     with_cimport_mark_name_emitted(name)
 
     if has_unsupported:
-        return "fn " ++ safe_name ++ "() -> i32:\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n"
+        return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n"
 
     "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
+
+fn ci_pointer_type_explicit_mut(ty: str) -> str:
+    if ci_starts_with(ty, "*const "):
+        return ty
+    if ci_starts_with(ty, "*mut "):
+        return ty
+    if ci_starts_with(ty, "*"):
+        return "*mut " ++ ci_trim(ty.slice(1, ty.len()))
+    ty
+
+fn ci_wrap_nullable_pointer_type(ty: str) -> str:
+    if ci_starts_with(ty, "__UNSUPPORTED:"):
+        return ty
+    if not ci_starts_with(ty, "*"):
+        return ty
+    "Option[" ++ ty ++ "]"
+
+fn ci_should_keep_raw_pointer_param(name: str, param_idx: i32) -> i32:
+    if param_idx != 0:
+        return 0
+    if name == "self" or name == "self_" or name == "this":
+        return 1
+    0
 
 // ── Struct/Union translation ────────────────────────────────
 
@@ -532,7 +562,7 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
         let reason = var_type.slice(14, var_type.len())
         let safe_name = ci_escape_reserved(name)
         with_cimport_mark_name_emitted(name)
-        return "fn " ++ safe_name ++ "() -> i32:\n    comptime_error(\"untranslatable: " ++ reason ++ "\")\n"
+        return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ reason ++ "\")\n"
 
     let is_const = with_cimport_var_is_const(session, idx)
     let safe_name = ci_escape_reserved(name)
@@ -553,11 +583,13 @@ fn ci_map_builtin_typedef(name: str) -> str:
     if name == "int32_t": return "i32"
     if name == "uint64_t": return "u64"
     if name == "int64_t": return "i64"
-    if name == "size_t": return "u64"
-    if name == "ssize_t": return "i64"
-    if name == "uintptr_t": return "u64"
-    if name == "intptr_t": return "i64"
-    if name == "ptrdiff_t": return "i64"
+    if name == "__uint128_t": return "u128"
+    if name == "__int128_t": return "i128"
+    if name == "size_t": return "usize"
+    if name == "ssize_t": return "isize"
+    if name == "uintptr_t": return "usize"
+    if name == "intptr_t": return "isize"
+    if name == "ptrdiff_t": return "isize"
     if name == "pid_t": return "i32"
     if name == "uid_t": return "u32"
     if name == "gid_t": return "u32"
@@ -623,7 +655,7 @@ fn ci_translate_macros(session: i64) -> str:
                 if with_cimport_is_name_emitted(name) == 0:
                     with_cimport_mark_name_emitted(name)
                     let safe_name = ci_escape_reserved(name)
-                    output = output ++ "fn " ++ safe_name ++ "() -> i32:\n    comptime_error(\"untranslatable C macro: " ++ name ++ "\")\n"
+                    output = output ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable C macro: " ++ name ++ "\")\n"
             continue
 
         // Skip empty macros (flag defines)
@@ -779,6 +811,8 @@ fn ci_is_c_type_name(s: str) -> bool:
     if t == "unsigned long": return true
     if t == "long long": return true
     if t == "unsigned long long": return true
+    if t == "__int128": return true
+    if t == "unsigned __int128": return true
     if t == "short": return true
     if t == "unsigned short": return true
     if t == "char": return true
@@ -1063,7 +1097,7 @@ fn ci_map_c_type_ctx(spelling: str, known_structs: str) -> str:
             bi = bi + 1
         let base = ci_trim(s.slice(0, bracket_pos as i64))
         let mapped_base = ci_map_c_type_ctx(base, known_structs)
-        return "*" ++ mapped_base
+        return "*mut " ++ mapped_base
 
     // Count and strip trailing pointer markers
     var ptr_depth = 0
@@ -1090,7 +1124,7 @@ fn ci_map_c_type_ctx(spelling: str, known_structs: str) -> str:
             var sr = sname
             var spi = 0
             while spi < ptr_depth:
-                sr = "*" ++ sr
+                sr = "*mut " ++ sr
                 spi = spi + 1
             return sr
         // Unknown struct → opaque
@@ -1105,7 +1139,7 @@ fn ci_map_c_type_ctx(spelling: str, known_structs: str) -> str:
             var ur = uname
             var upi = 0
             while upi < ptr_depth:
-                ur = "*" ++ ur
+                ur = "*mut " ++ ur
                 upi = upi + 1
             return ur
         // Unknown union → opaque
@@ -1125,7 +1159,7 @@ fn ci_map_c_type_ctx(spelling: str, known_structs: str) -> str:
                 if is_const:
                     tr = "*const " ++ tr
                 else:
-                    tr = "*" ++ tr
+                    tr = "*mut " ++ tr
                 tpi = tpi + 1
             return tr
 
@@ -1139,13 +1173,9 @@ fn ci_map_c_type_ctx(spelling: str, known_structs: str) -> str:
 
     // Apply pointer wrapping
     if ptr_depth > 0:
-        // void * → *c_void
+        // void * → *mut c_void / *const c_void
         if mapped == "void":
             mapped = "c_void"
-            is_const = false
-        // char * → *const i8 (C strings)
-        if mapped == "i8":
-            is_const = true
 
     if ptr_depth == 0:
         return mapped
@@ -1156,7 +1186,7 @@ fn ci_map_c_type_ctx(spelling: str, known_structs: str) -> str:
         if is_const:
             result = "*const " ++ result
         else:
-            result = "*" ++ result
+            result = "*mut " ++ result
         pi = pi + 1
     result
 
@@ -1174,6 +1204,8 @@ fn ci_is_known_base_type(name: str) -> bool:
     if name == "unsigned long": return true
     if name == "long long": return true
     if name == "unsigned long long": return true
+    if name == "__int128": return true
+    if name == "unsigned __int128": return true
     if name == "float": return true
     if name == "double": return true
     if name == "long double": return true
@@ -1194,6 +1226,8 @@ fn ci_map_base_type(name: str) -> str:
     if name == "unsigned long": return "u64"
     if name == "long long": return "i64"
     if name == "unsigned long long": return "u64"
+    if name == "__int128": return "i128"
+    if name == "unsigned __int128": return "u128"
     if name == "float": return "f32"
     if name == "double": return "f64"
     if name == "long double": return "f64"

@@ -917,8 +917,11 @@ fn render_params(pool: AstPool, intern: InternPool, param_start: i32, param_coun
     for i in 0..param_count:
         if i > 0:
             out = out ++ ", "
-        let name_sym = pool.get_extra(param_start + i * 2)
-        let type_node = pool.get_extra(param_start + i * 2 + 1)
+        let flags = pool.fn_param_flags(param_start, i)
+        let name_sym = pool.fn_param_name(param_start, i)
+        let type_node = pool.fn_param_type(param_start, i)
+        if fn_param_is_noalias(flags) != 0:
+            out = out ++ "@[noalias] "
         out = out ++ intern.resolve(name_sym)
         if type_node != 0:
             out = out ++ ": " ++ render_type_expr(pool, intern, type_node)

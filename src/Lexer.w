@@ -461,16 +461,24 @@ fn Lexer.lex_number(self: Lexer) -> i32:
                 self.pos = self.pos + 3
             else if suffix_accept(src, self.pos, slen, "i32", 3):
                 self.pos = self.pos + 3
+            else if suffix_accept(src, self.pos, slen, "isize", 5):
+                self.pos = self.pos + 5
             else if suffix_accept(src, self.pos, slen, "i64", 3):
                 self.pos = self.pos + 3
+            else if suffix_accept(src, self.pos, slen, "i128", 4):
+                self.pos = self.pos + 4
             else if suffix_accept(src, self.pos, slen, "u8", 2):
                 self.pos = self.pos + 2
             else if suffix_accept(src, self.pos, slen, "u16", 3):
                 self.pos = self.pos + 3
             else if suffix_accept(src, self.pos, slen, "u32", 3):
                 self.pos = self.pos + 3
+            else if suffix_accept(src, self.pos, slen, "usize", 5):
+                self.pos = self.pos + 5
             else if suffix_accept(src, self.pos, slen, "u64", 3):
                 self.pos = self.pos + 3
+            else if suffix_accept(src, self.pos, slen, "u128", 4):
+                self.pos = self.pos + 4
             else if suffix_accept(src, self.pos, slen, "f32", 3):
                 self.pos = self.pos + 3
                 is_float = true
