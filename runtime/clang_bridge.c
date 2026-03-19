@@ -262,6 +262,7 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
             CXType pointee = clang_getPointeeType(canonical);
             CXType can_pointee = clang_getCanonicalType(pointee);
             int is_const = clang_isConstQualifiedType(pointee);
+            int is_volatile = clang_isVolatileQualifiedType(pointee);
 
             // Function pointer -> *const fn(...) -> Ret
             if (can_pointee.kind == CXType_FunctionProto ||
@@ -273,16 +274,23 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
                 return session_strdup(s, buf);
             }
 
-            // void pointer -> *mut c_void / *const c_void
+            // Determine pointer qualifier: volatile > const > mut
+            const char *qual = is_volatile ? "volatile" : (is_const ? "const" : "mut");
+
+            // void pointer -> *qual c_void
             if (can_pointee.kind == CXType_Void) {
-                return session_strdup(s, is_const ? "*const c_void" : "*mut c_void");
+                char buf[64];
+                snprintf(buf, sizeof(buf), "*%s c_void", qual);
+                return session_strdup(s, buf);
             }
 
-            // char pointer -> *mut i8 / *const i8
+            // char pointer -> *qual i8
             if (can_pointee.kind == CXType_Char_S ||
                 can_pointee.kind == CXType_SChar ||
                 can_pointee.kind == CXType_Char_U) {
-                return session_strdup(s, is_const ? "*const i8" : "*mut i8");
+                char buf[64];
+                snprintf(buf, sizeof(buf), "*%s i8", qual);
+                return session_strdup(s, buf);
             }
 
             // General pointer
@@ -293,11 +301,7 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
             }
 
             char buf[2048];
-            if (is_const) {
-                snprintf(buf, sizeof(buf), "*const %s", inner);
-            } else {
-                snprintf(buf, sizeof(buf), "*mut %s", inner);
-            }
+            snprintf(buf, sizeof(buf), "*%s %s", qual, inner);
             return session_strdup(s, buf);
         }
 

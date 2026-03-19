@@ -2861,7 +2861,8 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
     if kind == NK_TYPE_PTR:
         let pointee = self.resolve_type_expr(self.ast.get_data0(node))
         let is_mut = self.ast.get_data1(node)
-        return self.ensure_exact_type(TY_PTR, pointee, is_mut, 0)
+        let is_volatile = self.ast.get_data2(node)
+        return self.ensure_exact_type(TY_PTR, pointee, is_mut, is_volatile)
 
     if kind == NK_TYPE_REF:
         let pointee = self.resolve_type_expr(self.ast.get_data0(node))

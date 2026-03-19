@@ -3456,13 +3456,18 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
     if t == TK_STAR:
         self.advance()
         var is_mut = 0
+        var is_volatile = 0
         if self.peek() == TK_KW_MUT:
             is_mut = 1
             self.advance()
         else if self.peek() == TK_KW_CONST:
             self.advance()
+        else if self.is_ident_named("volatile"):
+            is_mut = 1
+            is_volatile = 1
+            self.advance()
         let pointee = self.parse_type_expr()
-        return self.pool.add_node(NK_TYPE_PTR, start, self.prev_end(), pointee, is_mut, 0)
+        return self.pool.add_node(NK_TYPE_PTR, start, self.prev_end(), pointee, is_mut, is_volatile)
 
     if t == TK_L_BRACKET:
         self.advance()
