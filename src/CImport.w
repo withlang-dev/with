@@ -459,6 +459,8 @@ fn ci_pointer_type_explicit_mut(ty: str) -> str:
         return ty
     if ci_starts_with(ty, "*mut "):
         return ty
+    if ci_starts_with(ty, "*volatile "):
+        return ty
     if ci_starts_with(ty, "*"):
         return "*mut " ++ ci_trim(ty.slice(1, ty.len()))
     ty
@@ -848,6 +850,10 @@ fn ci_translate_macros(session: i64) -> str:
                     if is_variadic_macro:
                         output = output ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"variadic macro — use direct call\")\n"
                         continue
+                    // Detect cleanup attribute macros
+                    if ci_str_contains(value, "__attribute__((cleanup"):
+                        output = output ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"cleanup attribute — use defer\")\n"
+                        continue
                     // Build pipe-delimited param string: "|a|b|c|"
                     var param_names = ""
                     var param_decl = ""
@@ -864,7 +870,12 @@ fn ci_translate_macros(session: i64) -> str:
                     if param_count > 0:
                         type_params = "[T]"
                         ret_type = "T"
-                    let translated = ci_translate_c_expr(value, param_names, known_values)
+                    // Try token paste (##) translation before general expression translation
+                    var translated = ""
+                    if ci_str_contains(value, "##"):
+                        translated = ci_try_translate_token_paste(value, param_names)
+                    if translated.len() == 0:
+                        translated = ci_translate_c_expr(value, param_names, known_values)
                     if translated.len() > 0:
                         output = output ++ "fn " ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ ret_type ++ ":\n    " ++ translated ++ "\n"
                     else:
@@ -1220,6 +1231,43 @@ fn ci_extract_first_arg(args: str) -> str:
             return ci_trim(args.slice(0, i as i64))
         i = i + 1
     ci_trim(args)
+
+// ── Token pasting (##) translation ───────────────────────────
+// Handles macros like: (v ## ULL), (v ## U), (v ## L)
+// Translates param##SUFFIX → (param as target_type)
+
+fn ci_try_translate_token_paste(body: str, params: str) -> str:
+    let stripped = ci_strip_parens(ci_trim(body))
+    let paste_pos = ci_find_str(stripped, "##")
+    if paste_pos < 0:
+        return ""
+    let before = ci_trim(stripped.slice(0, paste_pos as i64))
+    let after = ci_trim(stripped.slice(paste_pos as i64 + 2, stripped.len()))
+    // Case: param##SUFFIX (e.g., v##U, v##ULL)
+    if ci_str_contains(params, "|" ++ before ++ "|"):
+        let target_type = ci_token_paste_suffix(after)
+        if target_type.len() > 0:
+            return "(" ++ before ++ " as " ++ target_type ++ ")"
+    // Case: SUFFIX##param — rare, not translatable
+    ""
+
+fn ci_token_paste_suffix(suffix: str) -> str:
+    if suffix == "U" or suffix == "u": return "u32"
+    if suffix == "UL" or suffix == "ul" or suffix == "Ul" or suffix == "uL": return "u64"
+    if suffix == "ULL" or suffix == "ull" or suffix == "Ull" or suffix == "uLL": return "u64"
+    if suffix == "L" or suffix == "l": return "i64"
+    if suffix == "LL" or suffix == "ll": return "i64"
+    if suffix == "F" or suffix == "f": return "f32"
+    ""
+
+fn ci_find_str(text: str, needle: str) -> i32:
+    if needle.len() > text.len():
+        return 0 - 1
+    let limit = text.len() - needle.len()
+    for i in 0..limit as i32 + 1:
+        if text.slice(i as i64, i as i64 + needle.len()) == needle:
+            return i
+    0 - 1
 
 fn ci_find_binary_op_ext(s: str) -> i32:
     // Like ci_find_binary_op but also handles comparison and logical ops
