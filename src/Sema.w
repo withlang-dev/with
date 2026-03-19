@@ -1060,6 +1060,12 @@ fn Sema.get_generic_inst_arg(self: Sema, tid: i32, index: i32) -> i32:
     let extra_start = self.get_type_d1(tid)
     self.type_extra.get((extra_start + index) as i64)
 
+fn Sema.is_unsigned_int_type(self: Sema, tid: i32) -> bool:
+    let resolved = self.resolve_alias(tid)
+    if self.get_type_kind(resolved) != TY_INT:
+        return false
+    self.get_type_d1(resolved) == 0
+
 fn Sema.is_option_pointer_type(self: Sema, tid: i32) -> i32:
     if tid <= 0:
         return 0
@@ -3631,7 +3637,12 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
             self.emit_error("right operand of logical operator must be bool", node)
         return self.ty_bool
 
-    // Arithmetic
+    // Arithmetic — unsigned types wrap by default (rewrite to wrapping ops)
+    if (op == OP_ADD or op == OP_SUB or op == OP_MUL) and self.is_unsigned_int_type(lhs) and self.is_unsigned_int_type(rhs):
+        let wrap_op = if op == OP_ADD: OP_ADD_WRAP else: if op == OP_SUB: OP_SUB_WRAP else: OP_MUL_WRAP
+        self.ast.set_data0(node, wrap_op)
+        return self.arithmetic_result_type(lhs, rhs)
+
     if op == OP_ADD or op == OP_SUB or op == OP_MUL or op == OP_DIV or op == OP_MOD:
         if op == OP_ADD and lhs == self.ty_str and rhs == self.ty_str:
             return self.ty_str

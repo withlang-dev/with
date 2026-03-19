@@ -149,6 +149,9 @@ extern fn wl_bb_as_value(bb: i64) -> i64
 extern fn wl_build_add(b: i64, l: i64, r: i64) -> i64
 extern fn wl_build_sub(b: i64, l: i64, r: i64) -> i64
 extern fn wl_build_mul(b: i64, l: i64, r: i64) -> i64
+extern fn wl_build_nsw_add(b: i64, l: i64, r: i64) -> i64
+extern fn wl_build_nsw_sub(b: i64, l: i64, r: i64) -> i64
+extern fn wl_build_nsw_mul(b: i64, l: i64, r: i64) -> i64
 extern fn wl_build_sdiv(b: i64, l: i64, r: i64) -> i64
 extern fn wl_build_srem(b: i64, l: i64, r: i64) -> i64
 extern fn wl_build_udiv(b: i64, l: i64, r: i64) -> i64
@@ -205,7 +208,9 @@ extern fn wl_build_zext(b: i64, v: i64, ty: i64) -> i64
 extern fn wl_build_sext(b: i64, v: i64, ty: i64) -> i64
 extern fn wl_build_trunc(b: i64, v: i64, ty: i64) -> i64
 extern fn wl_build_si_to_fp(b: i64, v: i64, ty: i64) -> i64
+extern fn wl_build_ui_to_fp(b: i64, v: i64, ty: i64) -> i64
 extern fn wl_build_fp_to_si(b: i64, v: i64, ty: i64) -> i64
+extern fn wl_build_fp_to_ui(b: i64, v: i64, ty: i64) -> i64
 extern fn wl_build_bitcast(b: i64, v: i64, ty: i64) -> i64
 extern fn wl_build_int_to_ptr(b: i64, v: i64, ty: i64) -> i64
 extern fn wl_build_ptr_to_int(b: i64, v: i64, ty: i64) -> i64
@@ -1658,6 +1663,9 @@ fn Codegen.span_to_line(self: Codegen, node: i32) -> i32:
 // ── Helper: coerce integer widths ─────────────────────────────────
 
 fn Codegen.coerce_int(self: Codegen, val: i64, target_ty: i64) -> i64:
+    self.coerce_int_ext(val, target_ty, false)
+
+fn Codegen.coerce_int_ext(self: Codegen, val: i64, target_ty: i64, is_unsigned: bool) -> i64:
     if val == 0: return val
     let val_ty = wl_type_of(val)
     if val_ty == target_ty: return val
@@ -1667,8 +1675,7 @@ fn Codegen.coerce_int(self: Codegen, val: i64, target_ty: i64) -> i64:
         let vw = wl_get_int_type_width(val_ty)
         let tw = wl_get_int_type_width(target_ty)
         if vw < tw:
-            // i1 (bool) → larger: zero-extend (true=1, not -1)
-            if vw == 1:
+            if vw == 1 or is_unsigned:
                 return wl_build_zext(self.builder, val, target_ty)
             return wl_build_sext(self.builder, val, target_ty)
         if vw > tw:
@@ -5268,11 +5275,20 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
     if wl_get_type_kind(lty) == wl_integer_type_kind() and wl_get_type_kind(rty) == wl_integer_type_kind():
         if wl_get_int_type_width(rty) > wl_get_int_type_width(lty):
             wider_ty = rty
-    let l = self.coerce_int(lhs, wider_ty)
-    let r = self.coerce_int(rhs, wider_ty)
-    if op == OP_ADD or op == OP_ADD_WRAP: return wl_build_add(self.builder, l, r)
-    if op == OP_SUB or op == OP_SUB_WRAP: return wl_build_sub(self.builder, l, r)
-    if op == OP_MUL or op == OP_MUL_WRAP: return wl_build_mul(self.builder, l, r)
+    let l = self.coerce_int_ext(lhs, wider_ty, is_unsigned)
+    let r = self.coerce_int_ext(rhs, wider_ty, is_unsigned)
+    if op == OP_ADD_WRAP: return wl_build_add(self.builder, l, r)
+    if op == OP_SUB_WRAP: return wl_build_sub(self.builder, l, r)
+    if op == OP_MUL_WRAP: return wl_build_mul(self.builder, l, r)
+    if op == OP_ADD:
+        if is_unsigned: return wl_build_add(self.builder, l, r)
+        return wl_build_nsw_add(self.builder, l, r)
+    if op == OP_SUB:
+        if is_unsigned: return wl_build_sub(self.builder, l, r)
+        return wl_build_nsw_sub(self.builder, l, r)
+    if op == OP_MUL:
+        if is_unsigned: return wl_build_mul(self.builder, l, r)
+        return wl_build_nsw_mul(self.builder, l, r)
     if op == OP_DIV:
         if is_unsigned: return wl_build_udiv(self.builder, l, r)
         return wl_build_sdiv(self.builder, l, r)
@@ -5506,6 +5522,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
 
     if rk == RK_CAST:
         let val = self.mir_eval_operand(body, d0, 0)
+        let src_unsigned = self.mir_operand_is_unsigned(body, d0)
         // d1 = sema target type id
         var cast_ty = dest_ty
         if d1 > 0:
@@ -5517,9 +5534,13 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             let ck = wl_get_type_kind(cast_ty)
             // Float → Int
             if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and ck == wl_integer_type_kind():
+                if src_unsigned:
+                    return wl_build_fp_to_ui(self.builder, val, cast_ty)
                 return wl_build_fp_to_si(self.builder, val, cast_ty)
             // Int → Float
             if vk == wl_integer_type_kind() and (ck == wl_float_type_kind() or ck == wl_double_type_kind()):
+                if src_unsigned:
+                    return wl_build_ui_to_fp(self.builder, val, cast_ty)
                 return wl_build_si_to_fp(self.builder, val, cast_ty)
             // Float → Float
             if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and (ck == wl_float_type_kind() or ck == wl_double_type_kind()):
@@ -5530,6 +5551,9 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             // Int → Ptr
             if vk == wl_integer_type_kind() and ck == wl_pointer_type_kind():
                 return wl_build_int_to_ptr(self.builder, val, cast_ty)
+            // Int → Int: use zext for unsigned source
+            if vk == wl_integer_type_kind() and ck == wl_integer_type_kind():
+                return self.coerce_int_ext(val, cast_ty, src_unsigned)
             return self.coerce_value_to_type(val, cast_ty)
         return val
 
