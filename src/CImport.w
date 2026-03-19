@@ -94,6 +94,31 @@ fn process_c_import(header_spec: str) -> str:
         output = "type c_void = opaque\n"
         with_cimport_mark_name_emitted("c_void")
 
+    // Emit runtime wrappers for __builtin_* bit manipulation
+    if with_cimport_is_name_emitted("with_clz") == 0:
+        output = output ++ "extern fn with_clz(x: i32) -> i32\n"
+        output = output ++ "extern fn with_ctz(x: i32) -> i32\n"
+        output = output ++ "extern fn with_popcount(x: i32) -> i32\n"
+        output = output ++ "extern fn with_bswap16(x: u16) -> u16\n"
+        output = output ++ "extern fn with_bswap32(x: u32) -> u32\n"
+        output = output ++ "extern fn with_bswap64(x: u64) -> u64\n"
+        output = output ++ "extern fn with_clzl(x: i64) -> i32\n"
+        output = output ++ "extern fn with_clzll(x: i64) -> i32\n"
+        output = output ++ "extern fn with_ctzl(x: i64) -> i32\n"
+        output = output ++ "extern fn with_ctzll(x: i64) -> i32\n"
+        output = output ++ "extern fn with_abs(x: i32) -> i32\n"
+        with_cimport_mark_name_emitted("with_clz")
+        with_cimport_mark_name_emitted("with_ctz")
+        with_cimport_mark_name_emitted("with_popcount")
+        with_cimport_mark_name_emitted("with_bswap16")
+        with_cimport_mark_name_emitted("with_bswap32")
+        with_cimport_mark_name_emitted("with_bswap64")
+        with_cimport_mark_name_emitted("with_clzl")
+        with_cimport_mark_name_emitted("with_clzll")
+        with_cimport_mark_name_emitted("with_ctzl")
+        with_cimport_mark_name_emitted("with_ctzll")
+        with_cimport_mark_name_emitted("with_abs")
+
     // Pre-scan: collect all opaque-demoted types (bitfield, forward decl, unsupported)
     // then cascade through field references until fixpoint
     let demoted_types = ci_collect_demoted_types(session, count)
@@ -671,6 +696,7 @@ fn ci_map_builtin_typedef(name: str) -> str:
     if name == "off_t": return "i64"
     if name == "time_t": return "i64"
     if name == "wchar_t": return "i32"
+    if name == "va_list": return "opaque"
     ""
 
 fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
@@ -742,9 +768,10 @@ fn ci_translate_macros(session: i64) -> str:
                             param_decl = param_decl ++ ", "
                         param_decl = param_decl ++ pname ++ ": T"
                         pi = pi + 1
+                    var ret_type = "i32"
                     if param_count > 0:
                         type_params = "[T]"
-                    let ret_type = "T"
+                        ret_type = "T"
                     let translated = ci_translate_c_expr(value, param_names, known_values)
                     if translated.len() > 0:
                         output = output ++ "fn " ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ ret_type ++ ":\n    " ++ translated ++ "\n"
@@ -899,6 +926,22 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
                     return "(if " ++ cond_expr ++ ": " ++ then_e ++ " else: " ++ else_e ++ ")"
         return ""
 
+    // Function call: ident(args) — check for known builtins
+    if ci_is_c_ident_prefix(trimmed):
+        let call_paren = ci_find_call_paren(trimmed)
+        if call_paren > 0:
+            let fn_name = trimmed.slice(0, call_paren as i64)
+            let args_str = trimmed.slice(call_paren as i64 + 1, trimmed.len() - 1)
+            let builtin_result = ci_translate_builtin_call(fn_name, args_str, params, known)
+            if builtin_result.len() > 0:
+                return builtin_result
+            // Non-builtin function call with known name — emit as-is if name is a param or known
+            if ci_str_contains(params, "|" ++ fn_name ++ "|") or with_cimport_is_name_emitted(fn_name) != 0:
+                let translated_args = ci_translate_call_args(args_str, params, known)
+                if translated_args.len() > 0:
+                    return fn_name ++ "(" ++ translated_args ++ ")"
+            return ""
+
     // Binary operator
     let op_info = ci_find_binary_op_ext(trimmed)
     if op_info >= 0:
@@ -931,11 +974,130 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
             return trimmed
         return ""
 
-    // Function call: ident(args) — not translatable
-    if ci_is_c_ident_prefix(trimmed) and ci_str_contains(trimmed, "("):
+    ""
+
+// Find the opening paren of a function call: ident(...)
+// Returns position of '(' or -1.
+fn ci_find_call_paren(s: str) -> i32:
+    var i = 0
+    // Skip identifier chars
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 95:
+            i = i + 1
+        else:
+            break
+    if i > 0 and i < s.len() as i32 and s.byte_at(i as i64) == 40:
+        // Verify closing paren matches at end
+        let close = ci_find_matching_paren(s, i)
+        if close == s.len() as i32 - 1:
+            return i
+    -1
+
+// Translate comma-separated call arguments
+fn ci_translate_call_args(args: str, params: str, known: str) -> str:
+    var result = ""
+    var depth = 0
+    var start = 0
+    var i = 0
+    let slen = args.len() as i32
+    while i <= slen:
+        let at_end = i == slen
+        var c = 0
+        if not at_end:
+            c = args.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        if c == 41: depth = depth - 1
+        if (c == 44 and depth == 0) or at_end:
+            let arg = ci_trim(args.slice(start as i64, i as i64))
+            let translated = ci_translate_c_expr(arg, params, known)
+            if translated.len() == 0:
+                return ""
+            if result.len() > 0:
+                result = result ++ ", "
+            result = result ++ translated
+            start = i + 1
+        i = i + 1
+    result
+
+// Translate known __builtin_* function calls
+fn ci_translate_builtin_call(name: str, args: str, params: str, known: str) -> str:
+    // Tier 1: Essential builtins
+    if name == "__builtin_expect":
+        // __builtin_expect(x, v) → x (hint only)
+        let first_arg = ci_extract_first_arg(args)
+        return ci_translate_c_expr(first_arg, params, known)
+
+    if name == "__builtin_unreachable":
+        return "unreachable()"
+
+    if name == "__builtin_trap":
+        return "abort()"
+
+    if name == "__builtin_memcpy" or name == "__builtin_memmove" or name == "__builtin_memset" or name == "__builtin_strlen":
+        let stdlib_name = name.slice(10, name.len())  // strip "__builtin_"
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return stdlib_name ++ "(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin_abs":
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return "abs(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin_constant_p":
+        // Compile-time constant check — always false at runtime
+        return "0"
+
+    if name == "__builtin_types_compatible_p":
+        // Type compatibility check — can't translate
+        return ""
+
+    // Tier 2: Bit manipulation — map to runtime wrappers
+    if name == "__builtin_clz" or name == "__builtin_ctz" or name == "__builtin_popcount":
+        let wrapper = "with_" ++ name.slice(10, name.len())  // "__builtin_clz" → "with_clz"
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return wrapper ++ "(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin_bswap16" or name == "__builtin_bswap32" or name == "__builtin_bswap64":
+        let wrapper = "with_" ++ name.slice(10, name.len())  // "__builtin_bswap32" → "with_bswap32"
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return wrapper ++ "(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin_clzl" or name == "__builtin_clzll" or name == "__builtin_ctzl" or name == "__builtin_ctzll":
+        let wrapper = "with_" ++ name.slice(10, name.len())
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return wrapper ++ "(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin_offsetof":
+        // __builtin_offsetof(type, field) — type argument, not translatable generically
+        return ""
+
+    // Tier 3: Variadic helpers — not translatable inline
+    if name == "__builtin_va_start" or name == "__builtin_va_end" or name == "__builtin_va_copy" or name == "__builtin_va_arg":
         return ""
 
     ""
+
+fn ci_extract_first_arg(args: str) -> str:
+    var depth = 0
+    var i = 0
+    while i < args.len() as i32:
+        let c = args.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        if c == 41: depth = depth - 1
+        if c == 44 and depth == 0:
+            return ci_trim(args.slice(0, i as i64))
+        i = i + 1
+    ci_trim(args)
 
 fn ci_find_binary_op_ext(s: str) -> i32:
     // Like ci_find_binary_op but also handles comparison and logical ops
