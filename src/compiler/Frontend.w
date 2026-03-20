@@ -8,6 +8,7 @@ use Span
 use Diagnostic
 use CImport
 use compiler.EmbeddedStdlib
+use compiler.ProjectConfig
 use compiler.Zcu
 
 extern fn with_fs_read_file(path: str) -> str
@@ -115,7 +116,9 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
 
         let header_sym = out.get_data0(decl)
         let header_spec = self.pool.resolve(header_sym)
-        let cache_key = self.c_import_cache_key_frontend(out, decl, header_spec)
+        let decl_dir = self.decl_source_dir_frontend(i)
+        let resolved_header_spec = project_config_resolve_c_import_header(self.project_config, decl_dir, header_spec)
+        let cache_key = self.c_import_cache_key_frontend(out, decl, resolved_header_spec)
 
         var synthetic = ""
         let cached = self.c_import_cache_lookup(cache_key)
@@ -137,7 +140,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             else:
                 if self.trace_c_import_cache != 0:
                     with_eprintln("c_import cache miss")
-                let libclang_result = process_c_import(header_spec)
+                let libclang_result = process_c_import(resolved_header_spec)
                 if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
                     with_eprintln("c_import generated:")
                     with_eprintln(libclang_result)
@@ -699,6 +702,7 @@ fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
         with_eprintln("[frontend] compile_file:start " ++ path)
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
+    self.project_config = project_config_load_for_source(path)
 
     let text = with_fs_read_file(path)
     if text.len() == 0:
