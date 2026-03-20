@@ -181,7 +181,7 @@ fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_pat
         compilation_cleanup_build_products(obj_path, "")
         return ""
     compilation_debug_init("build_binary_to_path:linking")
-    if not link_stage_link_object_to_binary(obj_path, bin_path, self.zcu.last_link_lib_names, requires_async_runtime):
+    if not link_stage_link_object_to_binary(obj_path, bin_path, self.zcu.last_link_lib_names, self.zcu.project_config.link_search_paths, requires_async_runtime):
         compilation_debug_init("build_binary_to_path:link FAILED")
         compilation_cleanup_build_products(obj_path, bin_path)
         return ""

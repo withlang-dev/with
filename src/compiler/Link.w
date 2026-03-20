@@ -221,8 +221,10 @@ fn link_stage_output_dir_for_source(source_path: str) -> str:
 fn link_stage_output_path_for_source(source_path: str) -> str:
     link_stage_output_dir_for_source(source_path) ++ "/" ++ link_stage_source_stem(source_path)
 
-fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec[str], needs_async_runtime: bool) -> bool:
+fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec[str], link_search_paths: Vec[str], needs_async_runtime: bool) -> bool:
     let extras: Vec[str] = Vec.new()
+    for i in 0..link_search_paths.len() as i32:
+        extras.push("-L" ++ link_search_paths.get(i as i64))
     let needs_fiber_runtime = if needs_async_runtime: 1 else: link_stage_object_needs_fiber_runtime(obj_path)
     if needs_fiber_runtime != 0:
         let fiber_path = link_stage_find_runtime_object_path("fiber.o")
