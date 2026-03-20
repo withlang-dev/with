@@ -2555,11 +2555,62 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
                     return "while " ++ cond ++ " != 0:\n" ++ body
         return ""
 
-    // For statement — translate to init + while
+    // For statement — translate to init + while + inc
     if kind == CXK_FOR_STMT:
-        // libclang ForStmt children vary: [init?, cond?, inc?, body]
-        let src = with_ci_cursor_source_text(session, cursor)
-        // For now, fall through to expression-as-statement
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 1:
+            // libclang ForStmt children: the last child is always the body.
+            // Preceding children are init, cond, inc — but any can be missing.
+            // We identify them by cursor kind:
+            //   - DeclStmt or expression = init
+            //   - Last before body = inc (if not the cond)
+            //   - The body is always CompoundStmt (or another stmt)
+            let body_idx = nc - 1
+            let body_cursor = with_ci_child(session, cursor, body_idx)
+            let body = ci_trans_stmt(session, body_cursor, indent + 1)
+            if body.len() == 0:
+                return ""
+
+            // Simple approach: try to translate each child before body
+            var init_str = ""
+            var cond_str = "true"
+            var inc_str = ""
+            if nc == 4:
+                // All parts present: [init, cond, inc, body]
+                init_str = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent)
+                let cond_e = ci_trans_expr(session, with_ci_child(session, cursor, 1))
+                if cond_e.len() > 0:
+                    cond_str = cond_e ++ " != 0"
+                inc_str = ci_trans_expr(session, with_ci_child(session, cursor, 2))
+            else if nc == 3:
+                // Two of init/cond/inc present + body
+                // Heuristic: if first child is DeclStmt, it's init + (cond or inc)
+                let first = with_ci_child(session, cursor, 0)
+                let second = with_ci_child(session, cursor, 1)
+                let first_kind = with_ci_cursor_kind(session, first)
+                if first_kind == CXK_DECL_STMT:
+                    init_str = ci_trans_stmt(session, first, indent)
+                    let cond_e = ci_trans_expr(session, second)
+                    if cond_e.len() > 0:
+                        cond_str = cond_e ++ " != 0"
+                else:
+                    let cond_e = ci_trans_expr(session, first)
+                    if cond_e.len() > 0:
+                        cond_str = cond_e ++ " != 0"
+                    inc_str = ci_trans_expr(session, second)
+            else if nc == 2:
+                // Only one of init/cond/inc + body — treat as cond
+                let cond_e = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+                if cond_e.len() > 0:
+                    cond_str = cond_e ++ " != 0"
+
+            var result = ""
+            if init_str.len() > 0:
+                result = result ++ init_str ++ "\n" ++ ci_indent_str(indent)
+            result = result ++ "while " ++ cond_str ++ ":\n" ++ body
+            if inc_str.len() > 0:
+                result = result ++ ci_indent_str(indent + 1) ++ inc_str ++ "\n"
+            return result
         return ""
 
     // Do-while

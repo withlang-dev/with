@@ -314,6 +314,19 @@ int64_t wl_build_load(int64_t b, int64_t ty, int64_t ptr) {
 int64_t wl_build_store(int64_t b, int64_t val, int64_t ptr) {
     return P2I(LLVMBuildStore(B(b), V(val), V(ptr)));
 }
+void wl_set_volatile(int64_t inst, int32_t is_volatile) {
+    LLVMSetVolatile(V(inst), is_volatile ? 1 : 0);
+}
+int64_t wl_build_load_volatile(int64_t b, int64_t ty, int64_t ptr) {
+    LLVMValueRef load = LLVMBuildLoad2(B(b), T(ty), V(ptr), "");
+    LLVMSetVolatile(load, 1);
+    return P2I(load);
+}
+int64_t wl_build_store_volatile(int64_t b, int64_t val, int64_t ptr) {
+    LLVMValueRef store = LLVMBuildStore(B(b), V(val), V(ptr));
+    LLVMSetVolatile(store, 1);
+    return P2I(store);
+}
 int64_t wl_build_gep(int64_t b, int64_t ty, int64_t ptr, int64_t idx_ptr, int32_t cnt) {
     return P2I(LLVMBuildGEP2(B(b), T(ty), V(ptr),
         (LLVMValueRef*)(intptr_t)idx_ptr, (unsigned)cnt, ""));
