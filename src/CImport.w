@@ -852,7 +852,12 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
     let is_const = with_cimport_var_is_const(session, idx)
     let safe_name = ci_escape_reserved(name)
     with_cimport_mark_name_emitted(name)
+
+    // For const variables, try to evaluate the initializer
     if is_const != 0:
+        let init_val = ci_try_eval_var_init(session, idx)
+        if init_val.len() > 0:
+            return "let " ++ safe_name ++ ": " ++ var_type ++ " = " ++ init_val ++ "\n"
         "extern let " ++ safe_name ++ ": " ++ var_type ++ "\n"
     else:
         "extern var " ++ safe_name ++ ": " ++ var_type ++ "\n"
@@ -2635,6 +2640,30 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
     if kind == CXK_NULL_STMT:
         return "pass"
 
+    // Switch statement — translate to if/else chain
+    if kind == CXK_SWITCH_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            if cond.len() > 0:
+                // Walk the compound body and extract case/default arms
+                let body_cursor = with_ci_child(session, cursor, 1)
+                return ci_trans_switch_body(session, body_cursor, cond, indent)
+        return ""
+
+    // Goto — untranslatable, emit comptime_error
+    if kind == 232:  // CXCursor_GotoStmt
+        return "comptime_error(\"goto not supported\")"
+
+    // Label — emit as comment
+    if kind == 233:  // CXCursor_LabelStmt
+        let lbl = with_ci_cursor_spelling(session, cursor)
+        let nc = with_ci_num_children(session, cursor)
+        var body = ""
+        if nc > 0:
+            body = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent)
+        return "// label: " ++ lbl ++ "\n" ++ body
+
     // Declaration statement (local variable)
     if kind == CXK_DECL_STMT:
         let nc = with_ci_num_children(session, cursor)
@@ -2671,6 +2700,67 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
     if expr.len() > 0:
         return expr
     ""
+
+fn ci_try_eval_var_init(session: i64, idx: i32) -> str:
+    // Try to evaluate a variable's initializer using libclang's cursor eval API
+    let root = with_ci_root_cursor(session)
+    let n = with_ci_num_children(session, root)
+    // Find the variable declaration cursor by matching name
+    let target_name = with_cimport_decl_name(session, idx)
+    var i = 0
+    while i < n:
+        let child = with_ci_child(session, root, i)
+        let ck = with_ci_cursor_kind(session, child)
+        if ck == CXK_VAR_DECL:
+            let cname = with_ci_cursor_spelling(session, child)
+            if cname == target_name:
+                // Found the variable — check for initializer child
+                let child_nc = with_ci_num_children(session, child)
+                if child_nc > 0:
+                    let init_cursor = with_ci_child(session, child, 0)
+                    // Try integer evaluation
+                    if with_ci_eval_int_valid(session, init_cursor) != 0:
+                        return i64_to_string(with_ci_eval_int_value(session, init_cursor))
+                    // Try expression translation
+                    let expr = ci_trans_expr(session, init_cursor)
+                    if expr.len() > 0:
+                        return expr
+                return ""
+        i = i + 1
+    ""
+
+fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32) -> str:
+    // Walk compound stmt children, collect case/default arms
+    // Translate to if/else chain (since With match doesn't have fallthrough)
+    let nc = with_ci_num_children(session, body_cursor)
+    var result = ""
+    var first_arm = true
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, body_cursor, i)
+        let ck = with_ci_cursor_kind(session, child)
+        if ck == CXK_CASE_STMT:
+            // case VALUE: ...
+            let case_nc = with_ci_num_children(session, child)
+            if case_nc >= 2:
+                let case_val = ci_trans_expr(session, with_ci_child(session, child, 0))
+                let case_body = ci_trans_stmt(session, with_ci_child(session, child, 1), indent + 1)
+                if case_val.len() > 0 and case_body.len() > 0:
+                    let prefix = if first_arm: "if " else: ci_indent_str(indent) ++ "else if "
+                    result = result ++ prefix ++ cond ++ " == " ++ case_val ++ ":\n" ++ case_body
+                    first_arm = false
+        else if ck == CXK_DEFAULT_STMT:
+            let case_nc = with_ci_num_children(session, child)
+            if case_nc >= 1:
+                let case_body = ci_trans_stmt(session, with_ci_child(session, child, 0), indent + 1)
+                if case_body.len() > 0:
+                    if first_arm:
+                        result = result ++ "// default\n" ++ case_body
+                    else:
+                        result = result ++ ci_indent_str(indent) ++ "else:\n" ++ case_body
+                    first_arm = false
+        i = i + 1
+    result
 
 fn ci_indent_str(level: i32) -> str:
     if level <= 0: return ""
