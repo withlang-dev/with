@@ -7383,7 +7383,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let gc_next_val = self.mir_bb_values.get(next_bb as i64)
                         wl_build_br(self.builder, gc_next_val)
                     return true
-                if gc_fn_name == "sizeof" or gc_fn_name == "alignof":
+                if gc_fn_name == "sizeof" or gc_fn_name == "size_of" or gc_fn_name == "alignof" or gc_fn_name == "align_of":
                     let gc_result = self.gen_sizeof_alignof(gc_fn_name, gc_node)
                     if dest_place >= 0 and gc_result != 0:
                         let gc_ret_ty = wl_type_of(gc_result)
@@ -9744,7 +9744,7 @@ fn Codegen.gen_sizeof_alignof(self: Codegen, name: str, node: i32) -> i64:
     if type_val == 0:
         return wl_const_int(wl_i64_type(self.context), 0, 0)
     let dl = wl_get_module_data_layout(self.llmod)
-    if name == "sizeof":
+    if name == "sizeof" or name == "size_of":
         return wl_const_int(wl_i64_type(self.context), wl_abi_size_of(dl, type_val), 0)
     wl_const_int(wl_i64_type(self.context), wl_abi_align_of(dl, type_val) as i64, 0)
 
