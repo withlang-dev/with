@@ -44,6 +44,9 @@ fn main():
     test_string_operations()
     test_memory_operations()
     test_errno_constants()
+    test_file_operations()
+    test_time_operations()
+    test_pointer_types()
     with_eprintln(int_to_string(pass_count) ++ "/" ++ int_to_string(test_count) ++ " tests passed")
 
 // ── All headers compile ─────────────────────────────────────
@@ -152,3 +155,37 @@ fn test_errno_constants():
     assert_true(EINVAL > 0, "EINVAL > 0")
     assert_true(ENOMEM > 0, "ENOMEM > 0")
     with_eprintln("  OK: errno constants")
+
+// ── File operations ─────────────────────────────────────────
+fn test_file_operations():
+    // fcntl.h — open flags
+    assert_true(O_CREAT > 0, "O_CREAT > 0")
+    assert_true(O_TRUNC > 0, "O_TRUNC > 0")
+    assert_true(O_APPEND > 0, "O_APPEND > 0")
+
+    // sys/stat.h — stat struct exists (verified by import compiling)
+    // mode constants
+    assert_true(S_IRUSR > 0, "S_IRUSR > 0")
+    assert_true(S_IWUSR > 0, "S_IWUSR > 0")
+
+    with_eprintln("  OK: file operations")
+
+// ── Time operations ─────────────────────────────────────────
+fn test_time_operations():
+    let t = time(0 as *mut i64)
+    assert_true(t > 1000000000, "time > 1 billion (year 2001+)")
+
+    with_eprintln("  OK: time operations")
+
+// ── Pointer types ───────────────────────────────────────────
+fn test_pointer_types():
+    // c_void type should exist (from c_import)
+    let p = malloc(8)
+    assert_true(p != 0 as *mut c_void, "c_void pointer")
+    free(p)
+
+    // NULL-like behavior
+    let null_ptr = 0 as *mut c_void
+    assert_true(null_ptr == 0 as *mut c_void, "null pointer comparison")
+
+    with_eprintln("  OK: pointer types")
