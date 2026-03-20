@@ -596,6 +596,24 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
             let tk = self.sema.get_type_kind(resolved)
             if tk == TY_ARRAY or tk == TY_SLICE:
                 return self.sema.get_type_d0(resolved)
+    if kind == NK_BINARY:
+        let op = self.ast.get_data0(node)
+        let lhs_ty = self.expr_type(self.ast.get_data1(node))
+        let rhs_ty = self.expr_type(self.ast.get_data2(node))
+        if op == OP_EQ or op == OP_NEQ or op == OP_LT or op == OP_GT or op == OP_LTE or op == OP_GTE or op == OP_AND or op == OP_OR:
+            return self.sema.ty_bool
+        if lhs_ty != 0 and lhs_ty != self.sema.ty_void:
+            let lhs_resolved = self.sema.resolve_alias(lhs_ty)
+            let lhs_tk = self.sema.get_type_kind(lhs_resolved)
+            if (op == OP_ADD or op == OP_SUB) and (lhs_tk == TY_PTR or lhs_tk == TY_REF):
+                return lhs_ty
+        if rhs_ty != 0 and rhs_ty != self.sema.ty_void:
+            let rhs_resolved = self.sema.resolve_alias(rhs_ty)
+            let rhs_tk = self.sema.get_type_kind(rhs_resolved)
+            if op == OP_ADD and (rhs_tk == TY_PTR or rhs_tk == TY_REF):
+                return rhs_ty
+        if lhs_ty != 0 and lhs_ty == rhs_ty:
+            return lhs_ty
     if kind == NK_UNARY:
         let uop = self.ast.get_data0(node)
         if uop == UOP_DEREF:
