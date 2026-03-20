@@ -312,7 +312,7 @@ else builds on. Without this, nothing else works.
 
 ### Session 14: Full test suite + Zig comparison
 
-- [ ] 20-header test suite (stdio, stdlib, string, math, unistd, fcntl, sys/stat, errno, signal, pthread, dirent, sys/socket, netinet/in, arpa/inet, stdint, stdbool, float, limits, time, sys/mman)
+- [x] 20-header test suite: 19/20 pass (stdio, stdlib, string, math, unistd, fcntl, sys/stat, errno, signal, pthread, dirent, sys/socket, netinet/in, arpa/inet, stdint, float, limits, time, sys/mman). stdbool.h skipped — empty on modern macOS/C23.
 - [ ] Functional tests: call at least one function from each header
 - [ ] Zig comparison: compare output with `zig translate-c` for each header
 - [ ] Static inline coverage: >90% translated (not stubbed)
