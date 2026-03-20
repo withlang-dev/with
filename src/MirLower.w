@@ -928,7 +928,7 @@ fn MirBuilder.lower_method_bin_op(self: MirBuilder, lhs_expr: i32, rhs_expr: i32
     let arg_nodes: Vec[i32] = Vec.new()
     arg_nodes.push(lhs_expr)
     arg_nodes.push(rhs_expr)
-    self.lower_call_with_arg_nodes(fn_op, arg_nodes, self.expr_type(node), node)
+    self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, self.expr_type(node), node)
 
 fn MirBuilder.lower_un_op(self: MirBuilder, op: i32, expr: i32, node: i32) -> i32:
     if op == UOP_REF or op == UOP_MUT_REF:
@@ -2059,11 +2059,12 @@ fn MirBuilder.lower_match(self: MirBuilder, scrutinee_expr: i32, arms_start: i32
 
 fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
     let fn_op = self.lower_expr(fn_expr)
+    let sig_idx = self.call_sig_for_expr(fn_expr)
 
     let args: Vec[i32] = Vec.new()
     for i in 0..arg_exprs_count:
         let arg_node = self.ast.get_extra(arg_exprs_start + i)
-        args.push(self.lower_expr(arg_node))
+        args.push(self.lower_call_arg(arg_node, sig_idx, i))
 
     let args_id = self.body.new_call_args(args)
     let result_local = self.new_temp(ret_type_id)
@@ -2080,10 +2081,11 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
 // Like lower_call but takes arg node indices in a Vec instead of reading from
 // pool.extra. This avoids mutating the shared AstPool (which would trigger
 // Vec realloc and invalidate other copies' pointers — use-after-free).
-fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, arg_node_vec: Vec[i32], ret_type_id: i32, node: i32) -> i32:
+fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, callee_sym: i32, arg_node_vec: Vec[i32], ret_type_id: i32, node: i32) -> i32:
+    let sig_idx = self.call_sig_for_sym(callee_sym)
     let args: Vec[i32] = Vec.new()
     for i in 0..arg_node_vec.len() as i32:
-        args.push(self.lower_expr(arg_node_vec.get(i as i64)))
+        args.push(self.lower_call_arg(arg_node_vec.get(i as i64), sig_idx, i))
     let args_id = self.body.new_call_args(args)
     let result_local = self.new_temp(ret_type_id)
     let result_place = self.place_for_local(result_local)
@@ -2093,6 +2095,35 @@ fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, arg_node_v
     if self.sema.is_copy(ret_type_id) != 0:
         return self.body.new_operand(OK_COPY, result_place)
     self.body.new_operand(OK_MOVE, result_place)
+
+fn MirBuilder.call_sig_for_sym(self: MirBuilder, sym: i32) -> i32:
+    if sym == 0:
+        return -1
+    let direct = self.sema.get_sig(sym)
+    if direct >= 0:
+        return direct
+    let name = self.pool.resolve_symbol(sym)
+    if name.len() == 0:
+        return -1
+    let sema_sym = self.sema.pool_intern(name)
+    self.sema.get_sig(sema_sym)
+
+fn MirBuilder.call_sig_for_expr(self: MirBuilder, fn_expr: i32) -> i32:
+    if fn_expr == 0:
+        return -1
+    if self.ast.kind(fn_expr) != NK_IDENT:
+        return -1
+    self.call_sig_for_sym(self.ast.get_data0(fn_expr))
+
+fn MirBuilder.lower_call_arg(self: MirBuilder, arg_node: i32, sig_idx: i32, arg_i: i32) -> i32:
+    let saved_expected = self.expected_type
+    if sig_idx >= 0 and arg_i >= 0 and arg_i < self.sema.sig_get_param_count(sig_idx):
+        let expected_ty = self.sema.sig_param_type(sig_idx, arg_i)
+        if expected_ty != 0 and expected_ty != self.sema.ty_void:
+            self.expected_type = expected_ty
+    let lowered = self.lower_expr(arg_node)
+    self.expected_type = saved_expected
+    lowered
 
 fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method_sym: i32) -> i32:
     // Translate method_sym from AST pool to sema pool for method_key lookups
@@ -2362,7 +2393,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     for i in 0..arg_count:
         arg_nodes.push(self.ast.get_extra(arg_start + i))
 
-    self.lower_call_with_arg_nodes(fn_op, arg_nodes, self.expr_type(node), node)
+    self.lower_call_with_arg_nodes(fn_op, callee_sym, arg_nodes, self.expr_type(node), node)
 
 fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
     // Emit a call terminator with a CK_FN operand and intrinsic tag.
@@ -2591,11 +2622,16 @@ fn MirBuilder.lower_implicit_default_return(self: MirBuilder, type_id: i32) -> i
 
 fn MirBuilder.lower_pipeline(self: MirBuilder, lhs_expr: i32, fn_expr: i32, args_start: i32, args_count: i32, node: i32) -> i32:
     let fn_op = self.lower_expr(fn_expr)
+    let callee_sym =
+        if fn_expr != 0 and self.ast.kind(fn_expr) == NK_IDENT:
+            self.ast.get_data0(fn_expr)
+        else:
+            0
     let arg_nodes: Vec[i32] = Vec.new()
     arg_nodes.push(lhs_expr)
     for i in 0..args_count:
         arg_nodes.push(self.ast.get_extra(args_start + i))
-    self.lower_call_with_arg_nodes(fn_op, arg_nodes, self.expr_type(node), node)
+    self.lower_call_with_arg_nodes(fn_op, callee_sym, arg_nodes, self.expr_type(node), node)
 
 fn MirBuilder.lower_closure(self: MirBuilder, _captured_start: i32, _captured_count: i32, _params_start: i32, _params_count: i32, node: i32) -> i32:
     // Emit CK_CLOSURE so MIR codegen can delegate to gen_closure.
