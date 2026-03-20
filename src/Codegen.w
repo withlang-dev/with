@@ -352,6 +352,7 @@ type Codegen = {
     struct_field_types: Vec[i64],
     struct_field_type_nodes: Vec[i32],
     struct_field_defaults: Vec[i32],
+    struct_llvm_field_indices: Vec[i32],
 
     // Enum types: sym → index into enum_* arrays
     enum_type_map: HashMap[i32, i32],
@@ -397,6 +398,8 @@ type Codegen = {
     // Constant integer values: parallel arrays for sym → i64 value lookup
     const_int_syms: Vec[i32],
     const_int_vals: Vec[i64],
+    decl_source_paths: Vec[str],
+    current_decl_source_file: str,
 
     // Loop stack (fixed-size arrays via Vec)
     loop_break_bbs: Vec[i64],
@@ -632,6 +635,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         struct_field_types: Vec.new(),
         struct_field_type_nodes: Vec.new(),
         struct_field_defaults: Vec.new(),
+        struct_llvm_field_indices: Vec.new(),
         enum_type_map: HashMap.new(),
         enum_llvm_types: Vec.new(),
         enum_variant_starts: Vec.new(),
@@ -662,6 +666,8 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         module_constants: HashMap.new(),
         const_int_syms: Vec.new(),
         const_int_vals: Vec.new(),
+        decl_source_paths: Vec.new(),
+        current_decl_source_file: "<unknown>",
         loop_break_bbs: Vec.new(),
         loop_continue_bbs: Vec.new(),
         loop_result_allocas: Vec.new(),
@@ -1626,6 +1632,21 @@ fn Codegen.find_struct_index_by_type(self: Codegen, llvm_ty: i64) -> i32:
             return i
     0 - 1
 
+// Map source field index to LLVM struct field index (accounting for padding).
+// Returns source_fi unchanged if no alignment padding exists for this struct.
+fn Codegen.get_llvm_field_index(self: Codegen, llvm_ty: i64, source_fi: i32) -> i32:
+    let struct_idx = self.find_struct_index_by_type(llvm_ty)
+    if struct_idx < 0:
+        return source_fi
+    let f_start = self.struct_field_starts.get(struct_idx as i64)
+    let f_count = self.struct_field_counts.get(struct_idx as i64)
+    if source_fi < 0 or source_fi >= f_count:
+        return source_fi
+    let map_idx = (f_start + source_fi) as i64
+    if map_idx >= self.struct_llvm_field_indices.len() as i64:
+        return source_fi
+    self.struct_llvm_field_indices.get(map_idx)
+
 fn Codegen.vec_contains_i32(self: Codegen, values: Vec[i32], needle: i32) -> bool:
     for i in 0..values.len() as i32:
         if values.get(i as i64) == needle:
@@ -2203,6 +2224,8 @@ fn Codegen.declare_builtin_str_type(self: Codegen):
     self.struct_field_type_nodes.push(0)
     self.struct_field_defaults.push(0)
     self.struct_field_defaults.push(0)
+    self.struct_llvm_field_indices.push(0)
+    self.struct_llvm_field_indices.push(1)
 
     self.struct_type_map.insert(str_sym, idx)
 
@@ -2320,12 +2343,73 @@ fn Codegen.declare_struct_type(self: Codegen, name_sym: i32, type_node: i32):
         ft_vec.push(f_ty)
 
     if invalid_layout != 0:
+        // Push identity mapping for error case
+        for fi in 0..field_count:
+            self.struct_llvm_field_indices.push(fi)
         return
 
-    // Set struct body (check packed flag)
+    // Read alignment array from AST extras
+    let align_base = extra_start + 1 + field_count * 3
+    var has_alignment = false
+    for fi in 0..field_count:
+        if self.pool.get_extra(align_base + fi) != 0:
+            has_alignment = true
+            break
+
     let packed_kind = self.pool.get_data2(type_node)
     let is_packed = type_decl_is_packed(packed_kind)
-    wl_struct_set_body(st_type, vec_data_i64(&ft_vec), field_count, is_packed)
+
+    if has_alignment and not is_packed:
+        // Build padded LLVM struct type (Zig-style approach).
+        // Walk fields, insert [N x i8] padding arrays between fields
+        // to match the C ABI layout specified by @[align(N)] annotations.
+        let dl = wl_get_module_data_layout(self.llmod)
+        let padded_types: Vec[i64] = Vec.new()
+        var byte_offset: i64 = 0
+        var use_packed = false
+        var max_align: i64 = 1
+
+        for fi in 0..field_count:
+            let f_ty = ft_vec.get(fi as i64)
+            let explicit_align = self.pool.get_extra(align_base + fi) as i64
+            let natural_align = if dl != 0: wl_abi_align_of(dl, f_ty) as i64 else: 1
+            let field_align = if explicit_align > 0: explicit_align else: natural_align
+            if field_align > max_align:
+                max_align = field_align
+
+            // If explicit alignment is less than natural, LLVM struct must be packed
+            if explicit_align > 0 and explicit_align < natural_align:
+                use_packed = true
+
+            // Insert padding to reach aligned offset
+            if field_align > 1 and byte_offset > 0:
+                let remainder = byte_offset % field_align
+                if remainder != 0:
+                    let pad_size = field_align - remainder
+                    padded_types.push(wl_array_type(wl_i8_type(self.context), pad_size))
+                    byte_offset = byte_offset + pad_size
+
+            // Record LLVM field index for this source field
+            self.struct_llvm_field_indices.push(padded_types.len() as i32)
+
+            padded_types.push(f_ty)
+            let f_size = if dl != 0: wl_abi_size_of(dl, f_ty) else: wl_size_of(f_ty)
+            byte_offset = byte_offset + f_size
+
+        // Tail padding to align struct size to max alignment
+        if max_align > 1:
+            let remainder = byte_offset % max_align
+            if remainder != 0:
+                let pad_size = max_align - remainder
+                padded_types.push(wl_array_type(wl_i8_type(self.context), pad_size))
+
+        let packed_flag = if use_packed: 1 else: 0
+        wl_struct_set_body(st_type, vec_data_i64(&padded_types), padded_types.len() as i32, packed_flag)
+    else:
+        // No alignment annotations — identity mapping, direct field types
+        for fi in 0..field_count:
+            self.struct_llvm_field_indices.push(fi)
+        wl_struct_set_body(st_type, vec_data_i64(&ft_vec), field_count, is_packed)
 
 // ── Declare union type ────────────────────────────────────────────
 
@@ -2355,6 +2439,7 @@ fn Codegen.declare_union_type(self: Codegen, name_sym: i32, type_node: i32):
         self.struct_field_types.push(f_ty)
         self.struct_field_type_nodes.push(f_type_node)
         self.struct_field_defaults.push(f_default)
+        self.struct_llvm_field_indices.push(fi)
         let f_size = wl_size_of(f_ty)
         if f_size > max_size:
             max_size = f_size
@@ -3295,6 +3380,10 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
         self.struct_field_defaults.push(f_default)
         ft_vec.push(f_ty)
 
+    // Push identity field index mapping (generic structs don't have alignment)
+    for fi in 0..field_count:
+        self.struct_llvm_field_indices.push(fi)
+
     if invalid_layout == 0:
         wl_struct_set_body(mono_ty, vec_data_i64(&ft_vec), field_count, 0)
 
@@ -3612,6 +3701,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         if self.pool.kind(decl) == NK_LET_DECL:
+            self.current_decl_source_file = self.decl_source_path(i)
             self.gen_module_constant(decl)
 
     // Pass 1: declare all functions and externs (forward declarations)
@@ -3666,6 +3756,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             if meta >= 0:
                 let tp_count = self.pool.fn_meta_tp_count(meta)
                 if tp_count == 0:
+                    self.current_decl_source_file = self.decl_source_path(i)
                     self.gen_function_dispatch(decl)
 
     if self.had_error != 0:
@@ -4345,6 +4436,119 @@ fn Codegen.generate_trait_vtables(self: Codegen):
 
 fn CONST_EVAL_FAIL -> i64: -9223372036854775807
 
+type ConstStringEval = {
+    ok: bool,
+    text: str,
+}
+
+fn const_string_eval_fail -> ConstStringEval:
+    ConstStringEval {
+        ok: false,
+        text: "",
+    }
+
+fn const_string_eval_ok(text: str) -> ConstStringEval:
+    ConstStringEval {
+        ok: true,
+        text,
+    }
+
+fn Codegen.decl_source_path(self: Codegen, decl_index: i32) -> str:
+    if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
+        let path = self.decl_source_paths.get(decl_index as i64)
+        if path.len() > 0:
+            return path
+    if self.current_decl_source_file.len() > 0 and self.current_decl_source_file != "<unknown>":
+        return self.current_decl_source_file
+    self.source_file
+
+fn Codegen.find_module_let_decl_index(self: Codegen, sym: i32) -> i32:
+    for di in 0..self.pool.decl_count():
+        let decl = self.pool.get_decl(di)
+        if self.pool.kind(decl) != NK_LET_DECL:
+            continue
+        if self.pool.get_data0(decl) == sym:
+            return di
+    0 - 1
+
+fn codegen_dirname(path: str) -> str:
+    var last_slash = 0 - 1
+    for di in 0..path.len() as i32:
+        if path.byte_at(di as i64) == 47:
+            last_slash = di
+    if last_slash < 0:
+        return ""
+    path.slice(0, last_slash as i64)
+
+fn Codegen.resolve_embed_file_path(self: Codegen, source_path: str, raw_path: str) -> str:
+    let _ = self
+    if raw_path.len() > 0 and raw_path.byte_at(0) == 47:
+        return raw_path
+    let dir = codegen_dirname(source_path)
+    if dir.len() == 0:
+        return raw_path
+    dir ++ "/" ++ raw_path
+
+fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, depth: i32) -> ConstStringEval:
+    if node == 0 or depth > 32:
+        return const_string_eval_fail()
+
+    let kind = self.pool.kind(node)
+    if kind == NK_STRING_LIT or kind == NK_C_STRING_LIT:
+        let sym = self.pool.get_data0(node)
+        return const_string_eval_ok(self.decode_string_escapes(self.intern.resolve(sym)))
+
+    if kind == NK_COMPTIME or kind == NK_GROUPED:
+        return self.try_eval_const_string(self.pool.get_data0(node), source_path, depth + 1)
+
+    if kind == NK_BINARY:
+        let op = self.pool.get_data0(node)
+        if op == OP_CONCAT or op == OP_ADD:
+            let lhs = self.try_eval_const_string(self.pool.get_data1(node), source_path, depth + 1)
+            if not lhs.ok:
+                return lhs
+            let rhs = self.try_eval_const_string(self.pool.get_data2(node), source_path, depth + 1)
+            if not rhs.ok:
+                return rhs
+            return const_string_eval_ok(lhs.text ++ rhs.text)
+
+    if kind == NK_IDENT:
+        let sym = self.pool.get_data0(node)
+        let decl_index = self.find_module_let_decl_index(sym)
+        if decl_index < 0:
+            return const_string_eval_fail()
+        let decl = self.pool.get_decl(decl_index)
+        let flags = self.pool.get_data2(decl)
+        if flags % 2 != 0:
+            return const_string_eval_fail()
+        var value_node = self.pool.get_data1(decl)
+        if value_node == 0:
+            return const_string_eval_fail()
+        if self.pool.kind(value_node) == NK_COMPTIME:
+            value_node = self.pool.get_data0(value_node)
+        return self.try_eval_const_string(value_node, self.decl_source_path(decl_index), depth + 1)
+
+    if kind == NK_CALL:
+        let callee = self.pool.get_data0(node)
+        if self.pool.kind(callee) != NK_IDENT:
+            return const_string_eval_fail()
+        let callee_sym = self.pool.get_data0(callee)
+        if callee_sym != self.sema.sym_embed_file or self.pool.get_data2(node) != 1:
+            return const_string_eval_fail()
+        let args_start = self.pool.get_data1(node)
+        let path_value = self.try_eval_const_string(self.pool.get_extra(args_start), source_path, depth + 1)
+        if not path_value.ok:
+            return path_value
+        let path = self.resolve_embed_file_path(source_path, path_value.text)
+        let content = with_fs_read_file(path)
+        if content.len() == 0:
+            with_eprintln("error: embed_file: could not read '" ++ path ++ "'")
+            self.had_error = 1
+            return const_string_eval_fail()
+        return const_string_eval_ok(content)
+
+    const_string_eval_fail()
+
 fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
     let kind = self.pool.kind(node)
     if kind == NK_INT_LIT:
@@ -4420,6 +4624,35 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         let name_str = self.intern.resolve(name_sym)
         let global = wl_add_global(self.llmod, global_ty, name_str)
         wl_set_initializer(global, wl_const_int(global_ty, val, 1))
+        if is_mut == 0:
+            wl_set_global_constant(global, 1)
+        wl_set_linkage(global, wl_internal_linkage())
+        self.module_constants.insert(name_sym, global)
+        return
+
+    let str_value = self.try_eval_const_string(value_node, self.current_decl_source_file, 0)
+    if str_value.ok:
+        let str_sym = self.intern.intern("str")
+        let st_opt = self.struct_type_map.get(str_sym)
+        if not st_opt.is_some():
+            with_eprintln("warning: [string-global] str struct type not found")
+            return
+        let str_ty = self.struct_llvm_types.get(st_opt.unwrap() as i64)
+        let name_str = self.intern.resolve(name_sym)
+        let bytes_name = name_str ++ ".__bytes"
+        let bytes_ty = wl_array_type(wl_i8_type(self.context), str_value.text.len() + 1)
+        let bytes_global = wl_add_global(self.llmod, bytes_ty, bytes_name)
+        wl_set_initializer(bytes_global, wl_const_string(self.context, str_value.text, 0))
+        wl_set_global_constant(bytes_global, 1)
+        wl_set_linkage(bytes_global, wl_private_linkage())
+
+        let fields: Vec[i64] = Vec.new()
+        fields.push(wl_const_bitcast(bytes_global, wl_ptr_type(self.context)))
+        fields.push(wl_const_int(wl_i64_type(self.context), str_value.text.len(), 1))
+        let str_init = wl_const_named_struct(str_ty, vec_data_i64(&fields), 2)
+
+        let global = wl_add_global(self.llmod, str_ty, name_str)
+        wl_set_initializer(global, str_init)
         if is_mut == 0:
             wl_set_global_constant(global, 1)
         wl_set_linkage(global, wl_internal_linkage())
@@ -4694,6 +4927,37 @@ fn Codegen.mir_get_or_create_local_ptr(self: Codegen, local_id: i32, ty: i64) ->
     self.mir_local_ptrs.insert(local_id, ptr)
     ptr
 
+fn Codegen.mir_try_init_const_local(self: Codegen, body: MirBody, local_id: i32, ptr: i64, llvm_ty: i64) -> bool:
+    if local_id < 0 or local_id >= body.local_names.len() as i32:
+        return false
+    let sym = body.local_names.get(local_id as i64)
+    if sym == 0:
+        return false
+    let decl_index = self.find_module_let_decl_index(sym)
+    if decl_index < 0:
+        return false
+    let decl = self.pool.get_decl(decl_index)
+    let flags = self.pool.get_data2(decl)
+    if flags % 2 != 0:
+        return false
+    var value_node = self.pool.get_data1(decl)
+    if value_node == 0:
+        return false
+    if self.pool.kind(value_node) == NK_COMPTIME:
+        value_node = self.pool.get_data0(value_node)
+    let value = self.try_eval_const_string(value_node, self.decl_source_path(decl_index), 0)
+    if not value.ok:
+        return false
+    let str_sym = self.intern.intern("str")
+    let st_opt = self.struct_type_map.get(str_sym)
+    if not st_opt.is_some():
+        return false
+    let str_ty = self.struct_llvm_types.get(st_opt.unwrap() as i64)
+    if llvm_ty != str_ty:
+        return false
+    wl_build_store(self.builder, self.gen_string_literal_raw(value.text), ptr)
+    true
+
 
 fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32) -> i32:
     // Arrays use direct numeric index
@@ -4875,6 +5139,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
             cur_ptr = self.mir_get_or_create_local_ptr(base_local, create_type)
             let alloc_ty = if create_type != 0: create_type else: wl_i32_type(self.context)
             self.mir_local_types.insert(base_local, alloc_ty)
+            let _ = self.mir_try_init_const_local(body, base_local, cur_ptr, alloc_ty)
         else:
             return 0
 
@@ -4936,9 +5201,10 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 cur_ptr = wl_build_gep(self.builder, cur_ty, cur_ptr, vec_data_i64(&gep_indices), 2)
                 cur_ty = arr_elem_ty
             else:
-                cur_ptr = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, fi)
-                if fi < wl_count_struct_elem_types(cur_ty):
-                    cur_ty = wl_struct_get_type_at(cur_ty, fi)
+                let llvm_fi = self.get_llvm_field_index(cur_ty, fi)
+                cur_ptr = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, llvm_fi)
+                if llvm_fi < wl_count_struct_elem_types(cur_ty):
+                    cur_ty = wl_struct_get_type_at(cur_ty, llvm_fi)
                 else:
                     cur_ty = 0
         else if pk == 2: // PK_DEREF
@@ -5513,11 +5779,12 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                         let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym)
                         if resolved_fi >= 0:
                             fi = resolved_fi
-                if fi >= struct_field_count:
+                let llvm_fi = self.get_llvm_field_index(struct_ty, fi)
+                if llvm_fi >= struct_field_count:
                     continue
-                let field_ty = wl_struct_get_type_at(struct_ty, fi)
+                let field_ty = wl_struct_get_type_at(struct_ty, llvm_fi)
                 let val = self.mir_eval_operand(body, op_id, field_ty)
-                let gep = wl_build_struct_gep(self.builder, struct_ty, alloca, fi)
+                let gep = wl_build_struct_gep(self.builder, struct_ty, alloca, llvm_fi)
                 wl_build_store(self.builder, self.coerce_value_to_type(val, field_ty), gep)
             return wl_build_load(self.builder, struct_ty, alloca)
         return wl_get_undef(fallback_ty)
@@ -9138,23 +9405,16 @@ fn Codegen.gen_src_intrinsic(self: Codegen, node: i32) -> i64:
 fn Codegen.gen_embed_file(self: Codegen, node: i32) -> i64:
     let args_start = self.pool.get_data1(node)
     let arg_node = self.pool.get_extra(args_start)
-    // Extract string literal path
-    if self.pool.kind(arg_node) != NK_STRING_LIT:
-        with_eprintln("error: embed_file() argument must be a string literal")
+    let path_value = self.try_eval_const_string(arg_node, self.current_decl_source_file, 0)
+    if not path_value.ok:
+        with_eprintln("error: embed_file() argument must be a compile-time string")
         self.had_error = 1
         return wl_get_undef(wl_i32_type(self.context))
-    let sym = self.pool.get_data0(arg_node)
-    let raw_path = self.intern.resolve(sym)
-    // Resolve relative to source file directory
-    var dir = self.source_file
-    var last_slash = 0 - 1
-    for di in 0..dir.len() as i32:
-        if dir.byte_at(di as i64) == 47:
-            last_slash = di
-    let path = if last_slash >= 0:
-        dir.slice(0, (last_slash + 1) as i64) ++ raw_path
+    let base_path = if self.current_decl_source_file.len() > 0 and self.current_decl_source_file != "<unknown>":
+        self.current_decl_source_file
     else:
-        raw_path
+        self.source_file
+    let path = self.resolve_embed_file_path(base_path, path_value.text)
     let content = with_fs_read_file(path)
     if content.len() == 0:
         with_eprintln("error: embed_file: could not read '" ++ path ++ "'")

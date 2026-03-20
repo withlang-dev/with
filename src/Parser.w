@@ -724,9 +724,35 @@ fn Parser.parse_struct_body(self: Parser) -> i32:
     self.advance()  // consume {
     self.skip_newlines()
     var fields: Vec[i32] = Vec.new()
+    var aligns: Vec[i32] = Vec.new()
     var field_count = 0
 
     while self.peek() != TK_R_BRACE and self.peek() != TK_EOF:
+        // Check for per-field @[align(N)] attribute
+        var field_align = 0
+        if self.peek() == TK_AT:
+            let saved = self.pos
+            self.advance()
+            if self.peek() == TK_L_BRACKET:
+                self.advance()
+                if self.is_ident_named("align"):
+                    self.advance()
+                    if self.peek() == TK_L_PAREN:
+                        self.advance()
+                        if self.peek() == TK_INT_LIT:
+                            let atext = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                            field_align = parse_i64(atext) as i32
+                            self.advance()
+                            if self.peek() == TK_R_PAREN:
+                                self.advance()
+                    if self.peek() == TK_R_BRACKET:
+                        self.advance()
+                        self.skip_newlines()
+                else:
+                    self.pos = saved
+            else:
+                self.pos = saved
+
         let field_name = self.expect_ident()
         if field_name == 0:
             break
@@ -744,6 +770,7 @@ fn Parser.parse_struct_body(self: Parser) -> i32:
         fields.push(field_name)
         fields.push(field_type)
         fields.push(field_default)
+        aligns.push(field_align)
         field_count = field_count + 1
 
         self.skip_newlines()
@@ -758,7 +785,7 @@ fn Parser.parse_struct_body(self: Parser) -> i32:
         self.pool.add_extra(fields.get(fi as i64))
     // Alignment array: one entry per field (0 = natural)
     for fi in 0..field_count:
-        self.pool.add_extra(0)
+        self.pool.add_extra(aligns.get(fi as i64))
     extra_start
 
 fn Parser.is_enum_def(self: Parser) -> bool:

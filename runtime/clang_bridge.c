@@ -2254,3 +2254,27 @@ int32_t with_ci_type_is_bool(int64_t session, int32_t cursor_idx) {
     CXType canon = clang_getCanonicalType(ty);
     return (canon.kind == CXType_Bool) ? 1 : 0;
 }
+
+// Get translated pointee type string for a cursor whose type is a pointer
+with_str with_ci_cursor_pointee_type(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count)
+        return make_str("");
+    CXType ty = clang_getCursorType(s->cursors[cursor_idx]);
+    CXType canon = clang_getCanonicalType(ty);
+    if (canon.kind != CXType_Pointer) return make_str("");
+    CXType pointee = clang_getPointeeType(canon);
+    if (pointee.kind == CXType_Invalid) return make_str("");
+    char *result = translate_type_recursive(s, pointee, 0, 0);
+    return session_make_str(s, result ? result : "c_void");
+}
+
+// Get natural alignment of a struct field's type
+int64_t with_cimport_struct_field_align(int64_t session, int32_t idx, int32_t field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return -1;
+    ensure_fields_cached(s, idx);
+    if (field < 0 || field >= s->caches[idx].field_count) return -1;
+    long long align = clang_Type_getAlignOf(s->caches[idx].fields[field].clang_type);
+    return (align < 0) ? -1 : align;
+}

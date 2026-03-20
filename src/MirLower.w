@@ -803,13 +803,28 @@ fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
             continue
         let flags = self.ast.get_data2(decl)
         let is_mut = flags % 2
-        // Determine type from the value node
-        var gty = self.sema.ty_i32
+        // Prefer an explicit type annotation. Otherwise infer from the
+        // unwrapped initializer expression instead of the raw comptime wrapper.
+        var gty = 0
+        let type_extra_packed = flags / 4
+        if type_extra_packed > 0:
+            let type_node = self.ast.get_extra(type_extra_packed - 1)
+            let annotated = self.sema.resolve_type_expr(type_node)
+            if annotated > 0:
+                gty = annotated
         let val_node = self.ast.get_data1(decl)
-        if val_node != 0:
-            let inferred = self.expr_type(val_node)
+        var typed_value = val_node
+        while typed_value != 0:
+            let typed_kind = self.ast.kind(typed_value)
+            if typed_kind != NK_COMPTIME and typed_kind != NK_GROUPED:
+                break
+            typed_value = self.ast.get_data0(typed_value)
+        if gty == 0 and typed_value != 0:
+            let inferred = self.expr_type(typed_value)
             if inferred != 0:
                 gty = inferred
+        if gty == 0:
+            gty = self.sema.ty_i32
         let local_id = self.body.new_local(gty, is_mut, sym, 1)
         self.bind_local(sym, local_id)
         return local_id
