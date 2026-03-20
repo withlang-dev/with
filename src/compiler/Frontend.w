@@ -833,7 +833,6 @@ fn Zcu.merge_resolved_modules_frontend(self: Zcu, root_pool: AstPool, root_path:
     self.strip_use_decls_frontend(merged_pool)
 
 fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
-    let _ = self
     var out = pool
     var has_use = 0
     for i in 0..out.decl_count():
@@ -845,15 +844,18 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
         return out
 
     let ordered: Vec[i32] = Vec.new()
+    let ordered_paths: Vec[str] = Vec.new()
     for i in 0..out.decl_count():
         let decl = out.get_decl(i)
         if out.kind(decl) != NK_USE_DECL:
             ordered.push(decl)
+            ordered_paths.push(self.decl_source_path_frontend(i))
 
     while out.decl_count() > 0:
         out.decls.pop()
     for oi in 0..ordered.len() as i32:
         out.add_decl(ordered.get(oi as i64))
+    self.decl_source_paths = ordered_paths
     out
 
 fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
@@ -866,8 +868,11 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var merged_pool = pool
     let initial_count = merged_pool.decl_count()
     var prelude_ordered: Vec[i32] = Vec.new()
+    var prelude_paths: Vec[str] = Vec.new()
     var user_import_ordered: Vec[i32] = Vec.new()
+    var user_import_paths: Vec[str] = Vec.new()
     var root_ordered: Vec[i32] = Vec.new()
+    var root_paths: Vec[str] = Vec.new()
 
     // Phase 1: Expand prelude USE (position 0) and its transitive imports.
     let has_prelude = self.prelude_mode != PRELUDE_NONE() and initial_count > 0 and merged_pool.kind(merged_pool.get_decl(0)) == NK_USE_DECL
@@ -891,6 +896,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             let kind = merged_pool.kind(decl)
             if kind != NK_USE_DECL:
                 prelude_ordered.push(decl)
+                prelude_paths.push(self.decl_source_path_frontend(pi))
                 pi = pi + 1
                 continue
             let pps = merged_pool.get_data0(decl)
@@ -914,6 +920,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let kind = merged_pool.kind(decl)
         if kind != NK_USE_DECL:
             root_ordered.push(decl)
+            root_paths.push(self.decl_source_path_frontend(ui))
             continue
         let ups = merged_pool.get_data0(decl)
         let upc = merged_pool.get_data1(decl)
@@ -933,6 +940,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let kind = merged_pool.kind(decl)
         if kind != NK_USE_DECL:
             user_import_ordered.push(decl)
+            user_import_paths.push(self.decl_source_path_frontend(ui2))
             ui2 = ui2 + 1
             continue
         let ups = merged_pool.get_data0(decl)
@@ -966,6 +974,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     // Drop fn/extern_fn decls shadowed by a higher-priority tier.
     while merged_pool.decl_count() > 0:
         merged_pool.decls.pop()
+    let rebuilt_paths: Vec[str] = Vec.new()
     // Combine user + root fn names for prelude cross-tier shadowing.
     var higher_fn_names: Vec[i32] = Vec.new()
     for hi in 0..root_fn_names.len() as i32:
@@ -978,14 +987,18 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         if (ik == NK_FN_DECL or ik == NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, merged_pool, oi, higher_fn_names):
             continue
         merged_pool.add_decl(id)
+        rebuilt_paths.push(prelude_paths.get(oi as i64))
     for oi in 0..user_import_ordered.len() as i32:
         let id = user_import_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
         if (ik == NK_FN_DECL or ik == NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(user_import_ordered, merged_pool, oi, root_fn_names):
             continue
         merged_pool.add_decl(id)
+        rebuilt_paths.push(user_import_paths.get(oi as i64))
     for oi in 0..root_ordered.len() as i32:
         merged_pool.add_decl(root_ordered.get(oi as i64))
+        rebuilt_paths.push(root_paths.get(oi as i64))
+    self.decl_source_paths = rebuilt_paths
     merged_pool
 
 fn frontend_fn_shadowed_in_tier(tier: Vec[i32], pool: AstPool, idx: i32, higher_names: Vec[i32]) -> bool:

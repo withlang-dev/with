@@ -84,6 +84,8 @@ extern fn with_ci_type_is_unsigned(session: i64, cursor: i32) -> i32
 extern fn with_ci_type_is_pointer(session: i64, cursor: i32) -> i32
 extern fn with_ci_type_is_float(session: i64, cursor: i32) -> i32
 extern fn with_ci_type_is_bool(session: i64, cursor: i32) -> i32
+extern fn with_ci_cursor_pointee_type(session: i64, cursor: i32) -> str
+extern fn with_cimport_struct_field_align(session: i64, idx: i32, field: i32) -> i64
 
 extern fn int_to_string(n: i32) -> str
 extern fn i64_to_string(n: i64) -> str
@@ -711,30 +713,24 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             anon_idx = anon_idx + 1
         afi = afi + 1
 
-    // Build field list with layout-aware padding.
-    // Check if C layout requires non-natural alignment (packed, aligned attributes).
-    // If so, emit as @[packed] with explicit padding byte arrays.
-    let needs_layout = ci_struct_needs_explicit_layout(session, idx, field_count, is_union)
+    // Build field list with per-field @[align(N)] annotations.
+    // Compare each field's actual C offset against its natural alignment.
+    // If a field is not naturally aligned, emit @[align(N)] before it.
+    // Only fall back to @[packed]+padding for truly packed structs (align==1).
+    let is_really_packed = with_cimport_struct_is_packed(session, idx) != 0
     var field_str = ""
     var anon_idx2 = 0
-    var cur_offset: i64 = 0
-    var pad_idx = 0
     var fi = 0
     while fi < field_count:
-        // Insert padding if layout requires it
-        if needs_layout and not is_union:
-            let field_offset = with_cimport_struct_field_offset(session, idx, fi)
-            if field_offset >= 0 and field_offset > cur_offset:
-                let pad_size = field_offset - cur_offset
-                if pad_size > 0:
-                    if field_str.len() > 0:
-                        field_str = field_str ++ ", "
-                    field_str = field_str ++ "__pad" ++ int_to_string(pad_idx) ++ ": [" ++ i64_to_string(pad_size) ++ "]u8"
-                    pad_idx = pad_idx + 1
-                cur_offset = field_offset
-
         if field_str.len() > 0:
             field_str = field_str ++ ", "
+
+        // Compute per-field alignment annotation (non-packed non-union only)
+        if not is_really_packed and not is_union:
+            let align_n = ci_compute_field_alignment(session, idx, fi, field_count)
+            if align_n > 0:
+                field_str = field_str ++ "@[align(" ++ i64_to_string(align_n) ++ ")] "
+
         let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, fi)
         if anon_kind != 0:
             let fname = with_cimport_struct_field_name(session, idx, fi)
@@ -744,25 +740,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             anon_idx2 = anon_idx2 + 1
         else:
             field_str = field_str ++ ci_build_one_field(session, idx, fi, known_structs)
-
-        // Advance offset past this field by its size
-        if needs_layout and not is_union:
-            let field_offset = with_cimport_struct_field_offset(session, idx, fi)
-            let exact_size = with_cimport_struct_field_size(session, idx, fi)
-            if exact_size > 0:
-                cur_offset = field_offset + exact_size
-            else:
-                let ftype = with_cimport_struct_field_type_translated(session, idx, fi)
-                cur_offset = field_offset + ci_estimate_type_size(ftype)
         fi = fi + 1
-
-    // Tail padding to match struct size
-    if needs_layout and not is_union:
-        let struct_size = with_cimport_struct_size(session, idx)
-        if struct_size > cur_offset:
-            let tail_pad = struct_size - cur_offset
-            if tail_pad > 0:
-                field_str = field_str ++ ", __pad" ++ int_to_string(pad_idx) ++ ": [" ++ i64_to_string(tail_pad) ++ "]u8"
 
     // Detect flexible array member: last field is [0]T
     var flex_accessor = ""
@@ -777,8 +755,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             // Emit accessor method
             flex_accessor = "fn " ++ ci_escape_reserved(accessor_name) ++ "(self: *" ++ safe_name ++ ") -> *" ++ elem_type ++ ":\n    unsafe: (&self._" ++ ci_escape_reserved(accessor_name) ++ " as *" ++ elem_type ++ ")\n"
 
-    let is_packed = needs_layout or with_cimport_struct_is_packed(session, idx) != 0
-    let packed_prefix = if is_packed: "@[packed]\n" else: ""
+    let packed_prefix = if is_really_packed: "@[packed]\n" else: ""
     let part1 = "type " ++ safe_name
     let part2 = part1 ++ " = \{ "
     let part3 = part2 ++ field_str
@@ -787,31 +764,33 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         return anon_decls ++ "// union\n" ++ packed_prefix ++ decl ++ flex_accessor
     anon_decls ++ packed_prefix ++ decl ++ flex_accessor
 
-fn ci_struct_needs_explicit_layout(session: i64, idx: i32, field_count: i32, is_union: bool) -> bool:
-    if is_union:
-        return false
-    if with_cimport_struct_is_packed(session, idx) != 0:
-        return true
-    // Compare actual C layout offsets against LLVM's default (non-packed) layout.
-    // If any field's actual offset differs from what LLVM would naturally place,
-    // we need explicit padding (via @[packed] + padding byte arrays).
-    var natural_offset: i64 = 0
-    var fi = 0
-    while fi < field_count:
-        let actual_offset = with_cimport_struct_field_offset(session, idx, fi)
-        if actual_offset < 0:
-            return false  // can't determine layout
-        let exact_size = with_cimport_struct_field_size(session, idx, fi)
-        let field_size = if exact_size > 0: exact_size else: ci_estimate_type_size(with_cimport_struct_field_type_translated(session, idx, fi))
-        let field_align = if field_size > 0: field_size else: 1
-        // Natural alignment: round up to field's natural alignment
-        let align_mask = field_align - 1
-        natural_offset = (natural_offset + align_mask) / field_align * field_align
-        if actual_offset != natural_offset:
-            return true
-        natural_offset = natural_offset + field_size
-        fi = fi + 1
-    false
+// Compute per-field alignment annotation for C struct layout.
+// Returns 0 if naturally aligned, N if @[align(N)] needed.
+fn ci_compute_field_alignment(session: i64, idx: i32, fi: i32, field_count: i32) -> i64:
+    let field_offset = with_cimport_struct_field_offset(session, idx, fi)
+    if field_offset < 0:
+        return 0
+    let natural_align = with_cimport_struct_field_align(session, idx, fi)
+    if natural_align <= 0:
+        return 0
+    if field_offset == 0:
+        // First field: check if struct has different max alignment
+        return 0
+    // Check if field offset is naturally aligned
+    let remainder = field_offset % natural_align
+    if remainder == 0:
+        return 0
+    // Field is not naturally aligned — compute effective alignment
+    // Find the largest power-of-2 that divides field_offset
+    var effective: i64 = 1
+    var test: i64 = 2
+    while test <= field_offset and test <= 4096:
+        if field_offset % test == 0:
+            effective = test
+        test = test * 2
+    if effective >= natural_align:
+        return 0
+    effective
 
 fn ci_estimate_type_size(ty: str) -> i64:
     if ty == "i8" or ty == "u8" or ty == "bool" or ty == "c_char": return 1
@@ -1269,6 +1248,17 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
                 let mapped = ci_map_sizeof_type(inner)
                 if mapped.len() > 0:
                     return "sizeof[" ++ mapped ++ "]()"
+        return ""
+
+    // Designated initializer: { .field = val, .field2 = val2 }
+    if trimmed.byte_at(0) == 123:  // '{'
+        let close_brace = ci_find_matching_brace(trimmed, 0)
+        if close_brace > 0:
+            let inner = ci_trim(trimmed.slice(1, close_brace as i64))
+            if inner.len() > 0 and inner.byte_at(0) == 46:  // starts with '.'
+                let fields_result = ci_translate_designated_init(inner, params, known)
+                if fields_result.len() > 0:
+                    return ".{ " ++ fields_result ++ " }"
         return ""
 
     // Cast: (type)expr  OR  CAST_OR_CALL: (X)(Y)  OR  comma operator: (expr1, expr2) → expr2
@@ -2002,6 +1992,73 @@ fn ci_find_matching_paren(s: str, start: i32) -> i32:
         i = i + 1
     0 - 1
 
+fn ci_find_matching_brace(s: str, start: i32) -> i32:
+    var depth = 0
+    var i = start
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 123: depth = depth + 1
+        if c == 125:
+            depth = depth - 1
+            if depth == 0:
+                return i
+        i = i + 1
+    0 - 1
+
+// Translate C designated initializer: .field = val, .field2 = val2
+fn ci_translate_designated_init(s: str, params: str, known: str) -> str:
+    var result = ""
+    var pos = 0
+    let slen = s.len() as i32
+    while pos < slen:
+        // Skip whitespace
+        while pos < slen and (s.byte_at(pos as i64) == 32 or s.byte_at(pos as i64) == 9):
+            pos = pos + 1
+        if pos >= slen:
+            break
+        // Expect '.'
+        if s.byte_at(pos as i64) != 46:
+            return ""
+        pos = pos + 1
+        // Read field name
+        let field_start = pos
+        while pos < slen:
+            let c = s.byte_at(pos as i64)
+            if not ((c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95 or (pos > field_start and c >= 48 and c <= 57)):
+                break
+            pos = pos + 1
+        if pos == field_start:
+            return ""
+        let field_name = s.slice(field_start as i64, pos as i64)
+        // Skip whitespace
+        while pos < slen and (s.byte_at(pos as i64) == 32 or s.byte_at(pos as i64) == 9):
+            pos = pos + 1
+        // Expect '='
+        if pos >= slen or s.byte_at(pos as i64) != 61:
+            return ""
+        pos = pos + 1
+        // Find value (until next comma at depth 0 or end)
+        let val_start = pos
+        var depth = 0
+        while pos < slen:
+            let c = s.byte_at(pos as i64)
+            if c == 40 or c == 91 or c == 123: depth = depth + 1
+            if c == 41 or c == 93 or c == 125: depth = depth - 1
+            if c == 44 and depth == 0:
+                break
+            pos = pos + 1
+        let val_str = ci_trim(s.slice(val_start as i64, pos as i64))
+        let val = ci_translate_c_expr(val_str, params, known)
+        if val.len() == 0:
+            return ""
+        if result.len() > 0:
+            result = result ++ ", "
+        result = result ++ "." ++ ci_escape_reserved(field_name) ++ " = " ++ val
+        // Skip comma
+        if pos < slen and s.byte_at(pos as i64) == 44:
+            pos = pos + 1
+    result
+
 fn ci_is_c_type_name(s: str) -> bool:
     let t = ci_trim(s)
     if t.len() == 0: return false
@@ -2683,10 +2740,35 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     if kind == CXK_BINARY_OP:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let lhs = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
-            let rhs = ci_trans_expr(session, with_ci_child(session, cursor, 1), scope)
+            let lhs_cursor = with_ci_child(session, cursor, 0)
+            let rhs_cursor = with_ci_child(session, cursor, 1)
+            let lhs = ci_trans_expr(session, lhs_cursor, scope)
+            let rhs = ci_trans_expr(session, rhs_cursor, scope)
             if lhs.len() > 0 and rhs.len() > 0:
                 let op = with_ci_binary_op(session, cursor)
+                let lhs_is_ptr = with_ci_type_is_pointer(session, lhs_cursor) != 0
+                let rhs_is_ptr = with_ci_type_is_pointer(session, rhs_cursor) != 0
+
+                // Pointer arithmetic: ptr + idx, idx + ptr
+                if op == BO_ADD and (lhs_is_ptr or rhs_is_ptr):
+                    let ptr_e = if lhs_is_ptr: lhs else: rhs
+                    let idx_cursor = if lhs_is_ptr: rhs_cursor else: lhs_cursor
+                    let idx_e = if lhs_is_ptr: rhs else: lhs
+                    if with_ci_type_is_unsigned(session, idx_cursor) == 0:
+                        return "(" ++ ptr_e ++ " + (" ++ idx_e ++ " as isize as usize))"
+                    return "(" ++ ptr_e ++ " + " ++ idx_e ++ ")"
+
+                // Pointer difference: ptr - ptr
+                if op == BO_SUB and lhs_is_ptr and rhs_is_ptr:
+                    let elem_ty = with_ci_cursor_pointee_type(session, lhs_cursor)
+                    return "((" ++ lhs ++ " as usize -% " ++ rhs ++ " as usize) / sizeof[" ++ elem_ty ++ "]())"
+
+                // Pointer - signed index
+                if op == BO_SUB and lhs_is_ptr and not rhs_is_ptr:
+                    if with_ci_type_is_unsigned(session, rhs_cursor) == 0:
+                        return "(" ++ lhs ++ " - (" ++ rhs ++ " as isize as usize))"
+                    return "(" ++ lhs ++ " - " ++ rhs ++ ")"
+
                 let is_unsigned = with_ci_type_is_unsigned(session, cursor)
                 let op_str = ci_bo_to_str_typed(op, is_unsigned)
                 if op_str.len() > 0:
@@ -2810,11 +2892,23 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     if kind == 138:  // CXCursor_PredefinedExpr
         return "\"__func__\""
 
-    // Compound literal — try to translate the inner init list
+    // Compound literal — get the type and translate the inner init list
     if kind == CXK_COMPOUND_LITERAL:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
-            return ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+            let child = with_ci_child(session, cursor, 0)
+            let child_kind = with_ci_cursor_kind(session, child)
+            if child_kind == CXK_INIT_LIST:
+                // Struct/array compound literal: (Type){...}
+                let lit_ty = with_ci_cursor_type(session, cursor)
+                let ty_str = with_ci_type_translated(session, lit_ty)
+                let inner = ci_trans_expr(session, child, scope)
+                if inner.len() > 0 and ty_str.len() > 0 and not ci_starts_with(ty_str, "__UNSUPPORTED"):
+                    // inner already has TypeName { ... } form from init list handler
+                    // but use the compound literal's type which may be more specific
+                    return inner
+                return ci_trans_expr(session, child, scope)
+            return ci_trans_expr(session, child, scope)
         return ""
 
     // Initializer list — { expr1, expr2, ... }

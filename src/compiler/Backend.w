@@ -25,6 +25,8 @@ fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, outpu
     var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, self.last_sema)
     cg.source_file = self.current_source_path
     cg.source_text = self.current_source_text
+    cg.decl_source_paths = self.decl_source_paths
+    cg.current_decl_source_file = self.current_source_path
     if not debug_info:
         cg.debug_info = 0
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
@@ -62,6 +64,8 @@ fn Zcu.emit_ir_backend(self: Zcu, pool: AstPool, opt_level: i32) -> bool:
     var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, self.last_sema)
     cg.source_file = self.current_source_path
     cg.source_text = self.current_source_text
+    cg.decl_source_paths = self.decl_source_paths
+    cg.current_decl_source_file = self.current_source_path
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
         with_eprintln("[backend] zcu.pool symbols=" ++ int_to_string(self.pool.symbol_texts.len() as i32))
         with_eprintln("[backend] frontend.pool symbols=" ++ int_to_string(self.frontend_pool.symbol_texts.len() as i32))
