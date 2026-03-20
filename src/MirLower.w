@@ -794,6 +794,11 @@ fn MirBuilder.lower_float_lit(self: MirBuilder, sym: i32) -> i32:
 fn MirBuilder.lower_unit(self: MirBuilder) -> i32:
     self.unit_operand()
 
+fn MirBuilder.is_bare_none(self: MirBuilder, node: i32) -> bool:
+    if node == 0 or self.ast.kind(node) != NK_IDENT:
+        return false
+    self.pool.resolve(self.ast.get_data0(node)) == "None"
+
 fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
     // Check if we already created a proxy local for this global
     let existing = self.lookup_local(sym)
@@ -849,6 +854,13 @@ fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
     0 - 1
 
 fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
+    let hinted_ty = if self.expected_type != 0: self.expected_type else: type_id
+    if self.pool.resolve(sym) == "None" and hinted_ty != 0:
+        let hinted_resolved = self.sema.resolve_alias(hinted_ty)
+        let hinted_tk = self.sema.get_type_kind(hinted_resolved)
+        if hinted_tk == TY_PTR or hinted_tk == TY_REF:
+            return self.const_operand(CK_INT, 0, self.sema.ty_i32)
+
     let local = self.lookup_local(sym)
     if local >= 0:
         let place = self.body.new_place(local)
@@ -914,9 +926,12 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
         return self.lower_short_circuit(op, lhs_expr, rhs_expr, node)
     // Check for operator overloading: if LHS is a struct with an operator method, lower as call
     let lhs_ty = self.expr_type(lhs_expr)
+    let rhs_ty = self.expr_type(rhs_expr)
+    let lhs_resolved = if lhs_ty != 0: self.sema.resolve_alias(lhs_ty) else: 0
+    let rhs_resolved = if rhs_ty != 0: self.sema.resolve_alias(rhs_ty) else: 0
+    let lhs_tk = if lhs_resolved != 0: self.sema.get_type_kind(lhs_resolved) else: 0
+    let rhs_tk = if rhs_resolved != 0: self.sema.get_type_kind(rhs_resolved) else: 0
     if lhs_ty != 0:
-        let lhs_resolved = self.sema.resolve_alias(lhs_ty)
-        let lhs_tk = self.sema.get_type_kind(lhs_resolved)
         if lhs_tk == TY_STRUCT:
             let method_name = mir_op_method_name(op)
             if method_name.len() > 0:
@@ -926,8 +941,18 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
                     let sig = self.sema.get_sig(method_sym)
                     if sig >= 0:
                         return self.lower_method_bin_op(lhs_expr, rhs_expr, method_sym, node)
+    let saved_expected = self.expected_type
+    if self.is_bare_none(lhs_expr) and (rhs_tk == TY_PTR or rhs_tk == TY_REF):
+        self.expected_type = rhs_ty
+    else:
+        self.expected_type = saved_expected
     let lhs = self.lower_expr(lhs_expr)
+    if self.is_bare_none(rhs_expr) and (lhs_tk == TY_PTR or lhs_tk == TY_REF):
+        self.expected_type = lhs_ty
+    else:
+        self.expected_type = saved_expected
     let rhs = self.lower_expr(rhs_expr)
+    self.expected_type = saved_expected
     let rv = self.body.new_rvalue(RK_BIN_OP, op, lhs, rhs)
     let ty = self.expr_type(node)
     let temp = self.new_temp(ty)
@@ -2693,7 +2718,6 @@ fn MirBuilder.lower_record_update(self: MirBuilder, base_expr: i32, field_update
     for i in 0..field_updates_count:
         let f_name_sym = self.ast.get_extra(field_updates_start + i * 2)
         let f_val_node = self.ast.get_extra(field_updates_start + i * 2 + 1)
-        let f_val = self.lower_expr(f_val_node)
         // Find field index by name
         var fi = -1
         for j in 0..struct_fc:
@@ -2702,7 +2726,13 @@ fn MirBuilder.lower_record_update(self: MirBuilder, base_expr: i32, field_update
                 fi = j
                 break
         if fi >= 0:
-            let field_place = self.body.new_place_with_projection(base_place, 0, fi)  // PK_FIELD=0
+            let field_ty = self.struct_field_type(ty, f_name_sym)
+            let saved_expected = self.expected_type
+            if field_ty != 0:
+                self.expected_type = field_ty
+            let f_val = self.lower_expr(f_val_node)
+            self.expected_type = saved_expected
+            let field_place = self.body.new_field_place(base_place, f_name_sym)
             let field_rv = self.body.new_rvalue(RK_USE, f_val, 0, 0)
             self.body.push_stmt(self.cur_bb, SK_ASSIGN, field_place, field_rv, self.ast.get_start(node))
     self.body.new_operand(OK_COPY, base_place)
