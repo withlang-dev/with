@@ -1232,7 +1232,11 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
 
     // Identifier: parameter reference or known constant
     if ci_is_c_ident(trimmed):
-        // Reject compiler builtins (__builtin_*, __inline_*, etc.)
+        // Map well-known compiler builtins to their values
+        let builtin_val = ci_map_compiler_builtin(trimmed)
+        if builtin_val.len() > 0:
+            return builtin_val
+        // Reject other compiler builtins (__builtin_*, __inline_*, etc.)
         if trimmed.len() >= 2 and trimmed.byte_at(0) == 95 and trimmed.byte_at(1) == 95:
             return ""
         if ci_str_contains(params, "|" ++ trimmed ++ "|"):
@@ -1743,8 +1747,11 @@ fn ci_eval_const_expr_ctx(s: str, known: str) -> str:
             let rhs = ci_parse_i64(rhs_str)
             let op = trimmed.slice(op_pos as i64, (op_pos + op_len) as i64)
             return ci_apply_op(lhs, rhs, op)
-    // Identifier: look up in known values
+    // Identifier: look up in known values or compiler builtins
     if ci_is_c_ident(trimmed):
+        let builtin_val = ci_map_compiler_builtin(trimmed)
+        if builtin_val.len() > 0:
+            return builtin_val
         return ci_lookup_known(trimmed, known)
     ""
 
@@ -1788,6 +1795,41 @@ fn ci_is_c_type_name(s: str) -> bool:
     // Common typedefs
     if ci_map_builtin_typedef(t).len() > 0: return true
     false
+
+fn ci_map_compiler_builtin(name: str) -> str:
+    // Common GCC/Clang predefined macros with known constant values
+    if name == "__INT_MAX__": return "2147483647"
+    if name == "__INT8_MAX__": return "127"
+    if name == "__INT16_MAX__": return "32767"
+    if name == "__INT32_MAX__": return "2147483647"
+    if name == "__INT64_MAX__": return "9223372036854775807"
+    if name == "__UINT8_MAX__": return "255"
+    if name == "__UINT16_MAX__": return "65535"
+    if name == "__UINT32_MAX__": return "4294967295"
+    if name == "__LONG_MAX__": return "9223372036854775807"
+    if name == "__LONG_LONG_MAX__": return "9223372036854775807"
+    if name == "__SHRT_MAX__": return "32767"
+    if name == "__SCHAR_MAX__": return "127"
+    if name == "__CHAR_BIT__": return "8"
+    if name == "__SIZEOF_INT__": return "4"
+    if name == "__SIZEOF_LONG__": return "8"
+    if name == "__SIZEOF_POINTER__": return "8"
+    if name == "__SIZEOF_LONG_LONG__": return "8"
+    if name == "__SIZEOF_SHORT__": return "2"
+    if name == "__SIZEOF_FLOAT__": return "4"
+    if name == "__SIZEOF_DOUBLE__": return "8"
+    if name == "__INTPTR_MAX__": return "9223372036854775807"
+    if name == "__UINTPTR_MAX__": return "18446744073709551615"
+    if name == "__INTMAX_MAX__": return "9223372036854775807"
+    if name == "__SIZE_MAX__": return "18446744073709551615"
+    if name == "__PTRDIFF_MAX__": return "9223372036854775807"
+    if name == "__FLT_MAX__": return "3.40282347e+38"
+    if name == "__DBL_MAX__": return "1.7976931348623157e+308"
+    if name == "__FLT_MIN__": return "1.17549435e-38"
+    if name == "__DBL_MIN__": return "2.2250738585072014e-308"
+    if name == "__FLT_EPSILON__": return "1.19209290e-7"
+    if name == "__DBL_EPSILON__": return "2.2204460492503131e-16"
+    ""
 
 fn ci_find_last_comma_at_depth0(s: str) -> i32:
     var depth = 0
