@@ -2527,6 +2527,30 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
             return ""
         return ""
 
+    // _Generic selection — libclang resolves to the chosen association
+    // CXCursor_GenericSelectionExpr = 122
+    if kind == 122:
+        let nc = with_ci_num_children(session, cursor)
+        // The last child is the selected expression (after controlling expr + associations)
+        if nc > 0:
+            // Try to translate the result expression (last child)
+            let result = ci_trans_expr(session, with_ci_child(session, cursor, nc - 1))
+            if result.len() > 0:
+                return result
+        return ""
+
+    // VA_ARG expression — not directly translatable
+    // CXCursor_UnexposedExpr can contain va_arg
+    if kind == 100:  // CXCursor_UnexposedExpr
+        // Try to evaluate as constant
+        if with_ci_eval_int_valid(session, cursor) != 0:
+            return i64_to_string(with_ci_eval_int_value(session, cursor))
+        // Try to translate first child (implicit unwrap)
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_trans_expr(session, with_ci_child(session, cursor, 0))
+        return ""
+
     // Fallback: try to use source text for simple expressions
     ""
 
