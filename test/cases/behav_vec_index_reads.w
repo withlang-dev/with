@@ -1,5 +1,9 @@
 //! expect-stdout: ok
 
+type Kind = A | B
+type TaggedNode = { kind: Kind, x: i32 }
+type PlainNode = { op: i32, a: i32, b: i32 }
+
 fn first_nonzero_i32(xs: Vec[i32]) -> bool:
     if xs.len() == 0 as i64:
         return false
@@ -29,4 +33,17 @@ fn main:
     assert(first_nonzero_i64(xs64_nonzero))
     assert(not first_nonzero_i64(Vec[i64][0, 2]))
     assert(first_nonzero_i64(Vec[i64][7, 0]))
+
+    let tagged: Vec[TaggedNode] = Vec.new()
+    tagged.push(TaggedNode { kind: .A, x: 1 })
+    let first_tagged = tagged[0]
+    assert(first_tagged.kind == .A)
+
+    let plain: Vec[PlainNode] = Vec.new()
+    plain.push(PlainNode { op: 3, a: -1, b: 0 })
+    let first_plain = plain[0]
+    assert(first_plain.op == 3)
+    assert(first_plain.a == -1)
+    assert(first_plain.b == 0)
+
     println("ok")
