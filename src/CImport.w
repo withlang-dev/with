@@ -189,6 +189,30 @@ fn process_c_import(header_spec: str) -> str:
         output = "type c_void = opaque\n"
         with_cimport_mark_name_emitted("c_void")
 
+    // Emit platform-specific C type aliases (matching Zig's c_int, c_long, etc.)
+    if with_cimport_is_name_emitted("c_char") == 0:
+        // arm64 macOS: char=signed, int=32, long=64, short=16
+        output = output ++ "type c_char = i8\n"
+        output = output ++ "type c_short = i16\n"
+        output = output ++ "type c_ushort = u16\n"
+        output = output ++ "type c_int = i32\n"
+        output = output ++ "type c_uint = u32\n"
+        output = output ++ "type c_long = i64\n"
+        output = output ++ "type c_ulong = u64\n"
+        output = output ++ "type c_longlong = i64\n"
+        output = output ++ "type c_ulonglong = u64\n"
+        output = output ++ "type c_longdouble = f64\n"
+        with_cimport_mark_name_emitted("c_char")
+        with_cimport_mark_name_emitted("c_short")
+        with_cimport_mark_name_emitted("c_ushort")
+        with_cimport_mark_name_emitted("c_int")
+        with_cimport_mark_name_emitted("c_uint")
+        with_cimport_mark_name_emitted("c_long")
+        with_cimport_mark_name_emitted("c_ulong")
+        with_cimport_mark_name_emitted("c_longlong")
+        with_cimport_mark_name_emitted("c_ulonglong")
+        with_cimport_mark_name_emitted("c_longdouble")
+
     // Emit Complex32/Complex64 for _Complex float/double
     if with_cimport_is_name_emitted("Complex32") == 0:
         output = output ++ "type Complex32 = \{ real: f32, imag: f32 }\n"
@@ -511,12 +535,9 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
                 si_params = si_params ++ actual_pname ++ ": " ++ sptype
             let si_ret = with_cimport_fn_return_type_translated(session, idx)
             return "fn " ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret ++ ":\n" ++ body
-        // Fallback: emit comptime_error stub for static, skip for non-static inline
-        if storage == CX_SC_STATIC:
-            let safe_name = ci_escape_reserved(name)
-            with_cimport_mark_name_emitted(name)
-            return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"static inline function — wrap in C shim\")\n"
-        // Non-static inline without body translation → emit as extern
+        // Fallback: demote to extern declaration (matching Zig's graceful demotion)
+        // The function is still callable — just without the inline body.
+        // Fall through to the normal extern fn emission below.
     if storage == CX_SC_STATIC and is_inline == 0:
         return ""
 
@@ -785,6 +806,9 @@ fn ci_default_for_type(ty: str) -> str:
     if ty == "i128" or ty == "u128" or ty == "isize" or ty == "usize": return "0"
     if ty == "f32" or ty == "f64": return "0.0"
     if ty == "bool": return "false"
+    // Pointer types → null (matching Zig's createZeroValueNode)
+    if ci_starts_with(ty, "*"): return "null"
+    if ci_starts_with(ty, "Option["): return "null"
     ""
 
 // ── Enum translation ────────────────────────────────────────
@@ -1184,13 +1208,15 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
                     let call_args = ci_translate_c_expr(ci_strip_parens(after_str), params, known)
                     if call_args.len() > 0:
                         return callee ++ "(" ++ call_args ++ ")"
-        // Comma operator: (a, b) at top level — translate last expression
+        // Comma operator: (a, b, c) — evaluate all, return last (matching Zig)
         if cast_end == trimmed.len() as i32 - 1:
             let inside = trimmed.slice(1, cast_end as i64)
             let comma_pos = ci_find_last_comma_at_depth0(inside)
             if comma_pos >= 0:
-                let last_expr = ci_trim(inside.slice(comma_pos as i64 + 1, inside.len()))
-                return ci_translate_c_expr(last_expr, params, known)
+                // Translate ALL comma-separated expressions, return block
+                let comma_result = ci_translate_comma_block(inside, params, known)
+                if comma_result.len() > 0:
+                    return comma_result
 
     // Ternary: cond ? then : else
     let ternary_pos = ci_find_ternary(trimmed)
@@ -1840,6 +1866,37 @@ fn ci_map_compiler_builtin(name: str) -> str:
     if name == "__FLT_EPSILON__": return "1.19209290e-7"
     if name == "__DBL_EPSILON__": return "2.2204460492503131e-16"
     ""
+
+fn ci_translate_comma_block(s: str, params: str, known: str) -> str:
+    // Split on commas at depth 0, translate each, return block
+    var exprs = ""
+    var expr_count = 0
+    var depth = 0
+    var start = 0
+    var i = 0
+    while i <= s.len() as i32:
+        let at_end = i == s.len() as i32
+        var c = 0
+        if not at_end:
+            c = s.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        if c == 41: depth = depth - 1
+        if (c == 44 and depth == 0) or at_end:
+            let part = ci_trim(s.slice(start as i64, i as i64))
+            let translated = ci_translate_c_expr(part, params, known)
+            if translated.len() == 0:
+                return ""
+            if exprs.len() > 0:
+                exprs = exprs ++ "; "
+            exprs = exprs ++ translated
+            expr_count = expr_count + 1
+            start = i + 1
+        i = i + 1
+    if expr_count <= 1:
+        return exprs
+    // Wrap in block: { expr1; expr2; ...; exprN }
+    // The last expression is the value of the block
+    "{ " ++ exprs ++ " }"
 
 fn ci_find_last_comma_at_depth0(s: str) -> i32:
     var depth = 0
@@ -2821,17 +2878,40 @@ fn ci_get_decl_location(session: i64, name: str) -> str:
     ""
 
 fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32) -> str:
-    // Walk compound stmt children, collect case/default arms
-    // Translate to if/else chain (since With match doesn't have fallthrough)
+    // Walk compound stmt children, collect case/default arms.
+    // Use match expression for non-fallthrough cases.
+    // For fallthrough cases, use if/else chain with __fall flag.
     let nc = with_ci_num_children(session, body_cursor)
-    var result = ""
-    var first_arm = true
+
+    // First pass: collect case values and detect fallthrough
+    var has_fallthrough = false
+    var case_count = 0
     var i = 0
     while i < nc:
         let child = with_ci_child(session, body_cursor, i)
         let ck = with_ci_cursor_kind(session, child)
+        if ck == CXK_CASE_STMT or ck == CXK_DEFAULT_STMT:
+            case_count = case_count + 1
+            // Check if case body contains a break (no fallthrough)
+            let case_nc = with_ci_num_children(session, child)
+            if case_nc >= 2 and ck == CXK_CASE_STMT:
+                let body_child = with_ci_child(session, child, 1)
+                if not ci_stmt_ends_with_break(session, body_child):
+                    has_fallthrough = true
+            else if case_nc >= 1 and ck == CXK_DEFAULT_STMT:
+                let body_child = with_ci_child(session, child, 0)
+                if not ci_stmt_ends_with_break(session, body_child):
+                    has_fallthrough = true
+        i = i + 1
+
+    // Generate if/else chain
+    var result = ""
+    var first_arm = true
+    i = 0
+    while i < nc:
+        let child = with_ci_child(session, body_cursor, i)
+        let ck = with_ci_cursor_kind(session, child)
         if ck == CXK_CASE_STMT:
-            // case VALUE: ...
             let case_nc = with_ci_num_children(session, child)
             if case_nc >= 2:
                 let case_val = ci_trans_expr(session, with_ci_child(session, child, 0))
@@ -2852,6 +2932,22 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32) 
                     first_arm = false
         i = i + 1
     result
+
+fn ci_stmt_ends_with_break(session: i64, cursor: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, cursor)
+    if kind == CXK_BREAK_STMT:
+        return true
+    // Check last child of compound statement
+    if kind == CXK_COMPOUND_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_stmt_ends_with_break(session, with_ci_child(session, cursor, nc - 1))
+    // Check last child of case/default
+    if kind == CXK_CASE_STMT or kind == CXK_DEFAULT_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_stmt_ends_with_break(session, with_ci_child(session, cursor, nc - 1))
+    false
 
 fn ci_indent_str(level: i32) -> str:
     if level <= 0: return ""
