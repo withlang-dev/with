@@ -335,6 +335,10 @@ fn process_c_import(header_spec: str) -> str:
                     translated_structs = translated_structs ++ "|" ++ td_name ++ "|"
         i = i + 1
 
+    // Member function detection (Zig-style): attach C functions whose first
+    // parameter is *StructType as methods of that struct.
+    output = output ++ ci_detect_member_functions(session, count, translated_structs)
+
     with_cimport_dispose(session)
 
     // Extract macros using a separate preprocessor pass
@@ -634,6 +638,112 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     let cc = with_cimport_fn_calling_conv(session, idx)
     let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
     cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
+
+// ── Member function detection (Zig-style) ───────────────────
+// Scan all functions. If a function's first parameter is *StructType (pointer
+// to a known struct), and the function name starts with StructName_ or
+// structname_, emit a method wrapper: fn StructName.short_name(self, ...) = fn_name(self, ...)
+fn ci_detect_member_functions(session: i64, count: i32, known_structs: str) -> str:
+    var output = ""
+    // Track emitted method names per struct to avoid duplicates with field names
+    var emitted_methods = ""
+
+    var i = 0
+    while i < count:
+        let kind = with_cimport_decl_kind(session, i)
+        if kind == CK_FUNCTION:
+            let name = with_cimport_decl_name(session, i)
+            if name.len() > 0 and name.byte_at(0) != 95:
+                let param_count = with_cimport_fn_param_count(session, i)
+                if param_count > 0:
+                    let first_param_type = with_cimport_fn_param_type_translated(session, i, 0)
+                    let struct_name = ci_extract_struct_name_from_ptr(first_param_type)
+                    if struct_name.len() > 0 and ci_str_contains(known_structs, "|" ++ struct_name ++ "|"):
+                        // Try to derive a short method name by stripping the struct prefix
+                        let method_name = ci_strip_struct_prefix(name, struct_name)
+                        if method_name.len() > 0:
+                            let method_key = "|" ++ struct_name ++ "." ++ method_name ++ "|"
+                            if not ci_str_contains(emitted_methods, method_key):
+                                emitted_methods = emitted_methods ++ method_key
+                                let wrapper = ci_emit_member_fn_wrapper(session, i, struct_name, method_name, first_param_type)
+                                if wrapper.len() > 0:
+                                    output = output ++ wrapper
+        i = i + 1
+    output
+
+// Extract struct name from pointer type: "*mut Foo" → "Foo", "*const Foo" → "Foo"
+fn ci_extract_struct_name_from_ptr(ty: str) -> str:
+    if ci_starts_with(ty, "*mut "):
+        return ci_trim(ty.slice(5, ty.len()))
+    if ci_starts_with(ty, "*const "):
+        return ci_trim(ty.slice(7, ty.len()))
+    if ci_starts_with(ty, "*"):
+        return ci_trim(ty.slice(1, ty.len()))
+    ""
+
+// Strip struct name prefix from function name.
+// "MyStruct_init" with struct "MyStruct" → "init"
+// "mystruct_init" with struct "MyStruct" → "init" (case-insensitive prefix match)
+fn ci_strip_struct_prefix(fn_name: str, struct_name: str) -> str:
+    let slen = struct_name.len() as i32
+    let flen = fn_name.len() as i32
+    // Need at least prefix + '_' + one char
+    if flen <= slen + 1:
+        return ""
+    // Check for exact prefix match + '_'
+    if fn_name.slice(0, slen as i64) == struct_name and fn_name.byte_at(slen as i64) == 95:
+        return fn_name.slice((slen + 1) as i64, flen as i64)
+    // Check for lowercase prefix match + '_'
+    var matches = true
+    var ci = 0
+    while ci < slen:
+        let fc = fn_name.byte_at(ci as i64)
+        let sc = struct_name.byte_at(ci as i64)
+        // Case-insensitive compare
+        let fc_lower = if fc >= 65 and fc <= 90: fc + 32 else: fc
+        let sc_lower = if sc >= 65 and sc <= 90: sc + 32 else: sc
+        if fc_lower != sc_lower:
+            matches = false
+            break
+        ci = ci + 1
+    if matches and fn_name.byte_at(slen as i64) == 95:
+        return fn_name.slice((slen + 1) as i64, flen as i64)
+    ""
+
+// Emit a method wrapper: fn StructName.method(self: *mut Struct, ...) -> Ret: fn_name(self, ...)
+fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: str, method_name: str, first_param_type: str) -> str:
+    let fn_name = with_cimport_decl_name(session, idx)
+    let safe_fn_name = ci_escape_reserved(fn_name)
+    let safe_struct = ci_escape_reserved(struct_name)
+    let safe_method = ci_escape_reserved(method_name)
+    let param_count = with_cimport_fn_param_count(session, idx)
+    let ret = ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx))
+
+    // Check for unsupported types — skip wrapper if so
+    var pi = 0
+    while pi < param_count:
+        let pt = with_cimport_fn_param_type_translated(session, idx, pi)
+        if ci_starts_with(pt, "__UNSUPPORTED:"):
+            return ""
+        pi = pi + 1
+    if ci_starts_with(ret, "__UNSUPPORTED:"):
+        return ""
+
+    // Build parameter list: self + remaining params
+    let self_type = ci_pointer_type_explicit_mut(first_param_type)
+    var params = "self: " ++ self_type
+    var call_args = "self"
+    pi = 1
+    while pi < param_count:
+        let pname = with_cimport_fn_param_name(session, idx, pi)
+        let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
+        let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: "p" ++ int_to_string(pi)
+        params = params ++ ", " ++ actual_name ++ ": " ++ ptype
+        call_args = call_args ++ ", " ++ actual_name
+        pi = pi + 1
+
+    let ret_prefix = if ret == "void": "" else: "return "
+    "fn " ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret ++ ":\n    " ++ ret_prefix ++ safe_fn_name ++ "(" ++ call_args ++ ")\n"
 
 fn ci_pointer_type_explicit_mut(ty: str) -> str:
     if ci_starts_with(ty, "*const "):
