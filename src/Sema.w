@@ -1528,6 +1528,10 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             self.type_extra.push(field_names.get(fi as i64))
             self.type_extra.push(field_tids.get(fi as i64))
             self.type_extra.push(field_defaults.get(fi as i64))
+        // Alignment array: stored after field triples in AST
+        let align_base = extra_start + 1 + field_count * 3
+        for fi in 0..field_count:
+            self.type_extra.push(self.ast.get_extra(align_base + fi))
         let tid = self.add_type(TY_STRUCT, name, te_start, field_count)
         self.named_types.insert(name, tid)
 
@@ -1662,6 +1666,10 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             self.type_extra.push(field_names.get(fi as i64))
             self.type_extra.push(field_tids.get(fi as i64))
             self.type_extra.push(field_defaults.get(fi as i64))
+        // Alignment array for unions
+        let align_base = extra_start + 1 + field_count * 3
+        for fi in 0..field_count:
+            self.type_extra.push(self.ast.get_extra(align_base + fi))
         let tid = self.add_type(TY_STRUCT, name, te_start, field_count)
         self.named_types.insert(name, tid)
 
@@ -2608,7 +2616,7 @@ fn Sema.type_decl_tp_start(self: Sema, node: i32) -> i32:
     let sub_kind = type_decl_sub_kind(self.ast.get_data2(node))
     if sub_kind == TDK_STRUCT:
         let field_count = self.ast.get_extra(extra_start)
-        return self.ast.get_extra(extra_start + 1 + field_count * 3 + 1)
+        return self.ast.get_extra(extra_start + 1 + field_count * 4 + 1)
     if sub_kind == TDK_ENUM:
         let tail = self.type_decl_enum_tail_index(extra_start)
         return self.ast.get_extra(tail + 1)
@@ -2624,7 +2632,7 @@ fn Sema.type_decl_tp_count(self: Sema, node: i32) -> i32:
     let sub_kind = type_decl_sub_kind(self.ast.get_data2(node))
     if sub_kind == TDK_STRUCT:
         let field_count = self.ast.get_extra(extra_start)
-        return self.ast.get_extra(extra_start + 1 + field_count * 3 + 2)
+        return self.ast.get_extra(extra_start + 1 + field_count * 4 + 2)
     if sub_kind == TDK_ENUM:
         let tail = self.type_decl_enum_tail_index(extra_start)
         return self.ast.get_extra(tail + 2)
@@ -3948,7 +3956,7 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
             let td_packed = self.ast.get_data2(td_node)
             if type_decl_sub_kind(td_packed) == TDK_STRUCT:
                 let fc = self.ast.get_extra(td_extra)
-                let after = td_extra + 1 + fc * 3
+                let after = td_extra + 1 + fc * 4
                 let tp_start = self.ast.get_extra(after + 1)
                 let tp_count = self.ast.get_extra(after + 2)
                 if self.setup_generic_inst_substitution(field_base, gi_base_sym) != 0:
@@ -4166,7 +4174,7 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                 let td_packed = self.ast.get_data2(td_node)
                 if type_decl_sub_kind(td_packed) == TDK_STRUCT:
                     let fc = self.ast.get_extra(td_extra)
-                    let after = td_extra + 1 + fc * 3
+                    let after = td_extra + 1 + fc * 4
                     let tp_start = self.ast.get_extra(after + 1)
                     let tp_count = self.ast.get_extra(after + 2)
                     if tp_count > 0:
@@ -5492,7 +5500,7 @@ fn Sema.setup_generic_inst_substitution(self: Sema, gi_tid: i32, type_sym: i32) 
     var td_tp_count = 0
     if td_sub_kind == TDK_STRUCT:
         let fc = self.ast.get_extra(td_extra_start)
-        let after = td_extra_start + 1 + fc * 3
+        let after = td_extra_start + 1 + fc * 4
         td_tp_start = self.ast.get_extra(after + 1)
         td_tp_count = self.ast.get_extra(after + 2)
     else if td_sub_kind == TDK_ALIAS or td_sub_kind == TDK_DISTINCT:
@@ -5555,7 +5563,7 @@ fn Sema.substitute_method_return_for_generic_inst(self: Sema, gi_tid: i32, type_
     var td_tp_count = 0
     if td_sub_kind == TDK_STRUCT:
         let fc = self.ast.get_extra(td_extra_start)
-        let after = td_extra_start + 1 + fc * 3
+        let after = td_extra_start + 1 + fc * 4
         td_tp_start = self.ast.get_extra(after + 1)
         td_tp_count = self.ast.get_extra(after + 2)
     else if td_sub_kind == TDK_ALIAS or td_sub_kind == TDK_DISTINCT:

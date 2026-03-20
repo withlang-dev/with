@@ -933,7 +933,7 @@ fn has_flag(flags: i32, bit: i32) -> bool:
 fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
     if sub_kind == TDK_STRUCT:
         let field_count = pool.get_extra(extra_start)
-        let vis_idx = extra_start + 1 + field_count * 3
+        let vis_idx = extra_start + 1 + field_count * 4
         return pool.get_extra(vis_idx) == VIS_PUBLIC
     if sub_kind == TDK_ENUM:
         var ep = extra_start + 1

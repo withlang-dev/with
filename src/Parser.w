@@ -756,6 +756,9 @@ fn Parser.parse_struct_body(self: Parser) -> i32:
     self.pool.add_extra(field_count)
     for fi in 0..fields.len() as i32:
         self.pool.add_extra(fields.get(fi as i64))
+    // Alignment array: one entry per field (0 = natural)
+    for fi in 0..field_count:
+        self.pool.add_extra(0)
     extra_start
 
 fn Parser.is_enum_def(self: Parser) -> bool:
