@@ -642,7 +642,7 @@ int64_t with_cimport_parse(with_str header_code) {
         s->index, c_path,
         args, nargs,
         NULL, 0,
-        CXTranslationUnit_DetailedPreprocessingRecord);
+        0);  // No flags — includes function bodies
 
     if (!s->tu) {
         s->error = strdup("failed to parse translation unit");
