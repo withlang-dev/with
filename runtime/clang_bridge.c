@@ -158,8 +158,7 @@ static enum CXChildVisitResult collect_decl(CXCursor cursor,
         kind != CXCursor_UnionDecl &&
         kind != CXCursor_EnumDecl &&
         kind != CXCursor_TypedefDecl &&
-        kind != CXCursor_VarDecl &&
-        kind != CXCursor_StaticAssert)
+        kind != CXCursor_VarDecl)
         return CXChildVisit_Continue;
 
     // Filter out declarations from transitive includes
@@ -382,19 +381,7 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
             return session_strdup(s, "Complex64");
         }
         case CXType_Vector:
-        case CXType_ExtVector: {
-            CXType elem = clang_getElementType(canonical);
-            long long num_elements = clang_getNumElements(canonical);
-            char *elem_str = translate_type_recursive(s, elem, depth + 1, 0);
-            if (elem_str && num_elements > 0) {
-                char buf[256];
-                snprintf(buf, sizeof(buf), "Vector(%lld, %s)", num_elements, elem_str);
-                free(elem_str);
-                return session_strdup(s, buf);
-            }
-            if (elem_str) free(elem_str);
             return session_strdup(s, "__UNSUPPORTED:vector type");
-        }
         case CXType_VariableArray:
             return session_strdup(s, "__UNSUPPORTED:variable-length array");
 
@@ -901,15 +888,6 @@ int32_t with_cimport_struct_is_packed(int64_t session, int32_t idx) {
     CXType type = clang_getCursorType(s->decls[idx]);
     long long align = clang_Type_getAlignOf(type);
     return (align == 1) ? 1 : 0;
-}
-
-// Get the struct's overall alignment (pointer alignment)
-int64_t with_cimport_struct_align(int64_t session, int32_t idx) {
-    CImportSession *s = (CImportSession *)(intptr_t)session;
-    if (!s || idx < 0 || idx >= s->decl_count) return 0;
-    CXType type = clang_getCursorType(s->decls[idx]);
-    long long align = clang_Type_getAlignOf(type);
-    return (align < 0) ? 0 : align;
 }
 
 // ── Enum queries ────────────────────────────────────────────
