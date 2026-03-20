@@ -1967,6 +1967,15 @@ with_str with_ci_member_field_name(int64_t session, int32_t cursor_idx) {
 #define CI_CAST_TO_VOID      15
 #define CI_CAST_INT_TRUNC    16
 #define CI_CAST_INT_WIDEN    17
+#define CI_CAST_ARRAY_TO_PTR    20
+#define CI_CAST_INT_TO_PTR      21
+#define CI_CAST_PTR_TO_INT      22
+#define CI_CAST_PTR_CAST        23
+#define CI_CAST_FLOAT_CAST      24
+#define CI_CAST_FLOAT_TO_BOOL   25
+#define CI_CAST_BOOL_TO_FLOAT   26
+#define CI_CAST_BITCAST         28
+#define CI_CAST_INT_WIDEN_SIGN  29
 
 int32_t with_ci_implicit_cast_kind(int64_t session, int32_t cursor_idx) {
     CImportSession *s = (CImportSession *)(intptr_t)session;
@@ -2025,12 +2034,47 @@ int32_t with_ci_implicit_cast_kind(int64_t session, int32_t cursor_idx) {
                       (dk >= CXType_Char_S && dk <= CXType_Int128);
     if (src_is_float && dest_is_int) return CI_CAST_FLOAT_TO_INT;
 
+    // Float → bool
+    if (dk == CXType_Bool && src_is_float) return CI_CAST_FLOAT_TO_BOOL;
+
+    // Bool → float
+    if (sk == CXType_Bool && dest_is_float) return CI_CAST_BOOL_TO_FLOAT;
+
+    // Float → float (width change)
+    if (src_is_float && dest_is_float && sk != dk) return CI_CAST_FLOAT_CAST;
+
+    // Array → pointer decay
+    if (dk == CXType_Pointer && sk == CXType_ConstantArray) return CI_CAST_ARRAY_TO_PTR;
+    if (dk == CXType_Pointer && sk == CXType_IncompleteArray) return CI_CAST_ARRAY_TO_PTR;
+
+    // Integer → pointer
+    if (dk == CXType_Pointer && src_is_int && !src_is_float) return CI_CAST_INT_TO_PTR;
+
+    // Pointer → integer
+    if (sk == CXType_Pointer && dest_is_int && !dest_is_float) return CI_CAST_PTR_TO_INT;
+
+    // Pointer → pointer (type change)
+    if (sk == CXType_Pointer && dk == CXType_Pointer) return CI_CAST_PTR_CAST;
+
     // Integer widening/truncation
     if (src_is_int && dest_is_int) {
         long long src_sz = clang_Type_getSizeOf(src_canon);
         long long dest_sz = clang_Type_getSizeOf(dest_canon);
         if (dest_sz < src_sz) return CI_CAST_INT_TRUNC;
-        if (dest_sz > src_sz) return CI_CAST_INT_WIDEN;
+        if (dest_sz > src_sz) {
+            // Check for sign change during widening
+            int src_unsigned = (sk >= CXType_Char_U && sk <= CXType_UInt128);
+            int dest_unsigned = (dk >= CXType_Char_U && dk <= CXType_UInt128);
+            if (src_unsigned != dest_unsigned) return CI_CAST_INT_WIDEN_SIGN;
+            return CI_CAST_INT_WIDEN;
+        }
+    }
+
+    // Bitcast (same size, different type — e.g. int ↔ enum)
+    if (sk != dk) {
+        long long src_sz = clang_Type_getSizeOf(src_canon);
+        long long dest_sz = clang_Type_getSizeOf(dest_canon);
+        if (src_sz > 0 && src_sz == dest_sz) return CI_CAST_BITCAST;
     }
 
     return CI_CAST_NOOP;
@@ -2151,4 +2195,62 @@ int32_t with_ci_enum_int_type(int64_t session, int32_t cursor_idx) {
     CXType int_type = clang_getEnumDeclIntegerType(s->cursors[cursor_idx]);
     if (int_type.kind == CXType_Invalid) return -1;
     return store_type(s, int_type);
+}
+
+// ── Type query helpers for c_import gaps ─────────────────────
+
+// Check if cursor's result type is unsigned integer
+int32_t with_ci_type_is_unsigned(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    CXType ty = clang_getCursorType(s->cursors[cursor_idx]);
+    CXType canon = clang_getCanonicalType(ty);
+    switch (canon.kind) {
+        case CXType_Bool:
+        case CXType_Char_U:
+        case CXType_UChar:
+        case CXType_UShort:
+        case CXType_UInt:
+        case CXType_ULong:
+        case CXType_ULongLong:
+        case CXType_UInt128:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+// Check if cursor's type is a pointer
+int32_t with_ci_type_is_pointer(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    CXType ty = clang_getCursorType(s->cursors[cursor_idx]);
+    CXType canon = clang_getCanonicalType(ty);
+    return (canon.kind == CXType_Pointer) ? 1 : 0;
+}
+
+// Check if cursor's type is a float/double
+int32_t with_ci_type_is_float(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    CXType ty = clang_getCursorType(s->cursors[cursor_idx]);
+    CXType canon = clang_getCanonicalType(ty);
+    return (canon.kind == CXType_Float || canon.kind == CXType_Double ||
+            canon.kind == CXType_LongDouble) ? 1 : 0;
+}
+
+// Check if a variable declaration is thread-local
+int32_t with_cimport_var_is_threadlocal(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    return (clang_getCursorTLSKind(s->decls[idx]) != CXTLS_None) ? 1 : 0;
+}
+
+// Check if cursor's type is bool
+int32_t with_ci_type_is_bool(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    CXType ty = clang_getCursorType(s->cursors[cursor_idx]);
+    CXType canon = clang_getCanonicalType(ty);
+    return (canon.kind == CXType_Bool) ? 1 : 0;
 }
