@@ -215,7 +215,7 @@ else builds on. Without this, nothing else works.
 - [x] If statements (with/without else)
 - [x] While statements
 - [x] Do-while statements (→ `while true` + break)
-- [ ] For statements (→ init + while + increment)
+- [x] For statements (→ init + while + increment)
 - [x] Declaration statements (local variable decls with initializers)
 - [x] Null statements (→ `pass`)
 - [x] Break / continue statements
@@ -229,7 +229,7 @@ else builds on. Without this, nothing else works.
 - [ ] Default statements
 - [ ] Goto statements (→ `comptime_error` unless With adds goto)
 - [ ] Label statements (→ comment)
-- [ ] Local variable declarations with type and initializer
+- [x] Local variable declarations with type and initializer (in ci_trans_stmt)
 
 **CImport.w — ~250 new lines**
 
@@ -252,8 +252,8 @@ else builds on. Without this, nothing else works.
 
 - [ ] Per-field alignment annotations (matching Zig's `alignmentForField`)
 - [ ] Flexible array member accessor functions
-- [ ] Anonymous enum constant translation (don't skip unnamed enums)
-- [ ] Anonymous struct typedef handling (`typedef struct { ... } Name;`)
+- [x] Anonymous enum constant translation (don't skip unnamed enums)
+- [x] Anonymous struct typedef handling (`typedef struct { ... } Name;`)
 - [ ] Member function registration
 - [ ] MSVC empty struct handling (alignment-aware padding)
 - [ ] Opaque demotion with warning comments
@@ -299,10 +299,10 @@ else builds on. Without this, nothing else works.
 
 - [ ] Replace old CImport.w main loop with AST-walking translator
 - [ ] `@[section("name")]` — Parser attribute + `LLVMSetSection` in Codegen
-- [ ] Volatile codegen — `LLVMSetVolatile` on loads/stores through `*volatile T`
+- [x] Volatile codegen — `wl_set_volatile`, `wl_build_load_volatile`, `wl_build_store_volatile`
 - [ ] Calling convention — `LLVMSetFunctionCallConv`
-- [ ] Remove `CXTranslationUnit_SkipFunctionBodies` from parse flags
-- [ ] Fixpoint verification
+- [x] Remove `CXTranslationUnit_SkipFunctionBodies` from parse flags (done — flags=0)
+- [x] Fixpoint verification
 
 **CImport.w (integration), Parser.w (~30 lines), Codegen.w (~30 lines), llvm_bridge.c (~10 lines)**
 
@@ -316,7 +316,7 @@ else builds on. Without this, nothing else works.
 - [ ] Functional tests: call at least one function from each header
 - [ ] Zig comparison: compare output with `zig translate-c` for each header
 - [ ] Static inline coverage: >90% translated (not stubbed)
-- [ ] Fixpoint: stage 2 == stage 3
+- [x] Fixpoint: stage 2 == stage 3
 
 ---
 
