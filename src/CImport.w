@@ -38,6 +38,7 @@ extern fn with_cimport_mark_name_emitted(name: str) -> void
 extern fn with_cimport_reset_names() -> void
 extern fn with_cimport_var_type(session: i64, idx: i32) -> str
 extern fn with_cimport_var_is_const(session: i64, idx: i32) -> i32
+extern fn with_cimport_var_is_threadlocal(session: i64, idx: i32) -> i32
 extern fn with_cimport_fn_param_type_translated(session: i64, idx: i32, param: i32) -> str
 extern fn with_cimport_fn_return_type_translated(session: i64, idx: i32) -> str
 extern fn with_cimport_struct_field_type_translated(session: i64, idx: i32, field: i32) -> str
@@ -79,6 +80,10 @@ extern fn with_ci_eval_int_value(session: i64, cursor: i32) -> i64
 extern fn with_ci_eval_int_valid(session: i64, cursor: i32) -> i32
 extern fn with_ci_member_field_name(session: i64, cursor: i32) -> str
 extern fn with_ci_implicit_cast_kind(session: i64, cursor: i32) -> i32
+extern fn with_ci_type_is_unsigned(session: i64, cursor: i32) -> i32
+extern fn with_ci_type_is_pointer(session: i64, cursor: i32) -> i32
+extern fn with_ci_type_is_float(session: i64, cursor: i32) -> i32
+extern fn with_ci_type_is_bool(session: i64, cursor: i32) -> i32
 
 extern fn int_to_string(n: i32) -> str
 extern fn i64_to_string(n: i64) -> str
@@ -154,6 +159,12 @@ let BO_ADD_ASSIGN: i32 = 20
 let BO_SUB_ASSIGN: i32 = 21
 let BO_MUL_ASSIGN: i32 = 22
 let BO_DIV_ASSIGN: i32 = 23
+let BO_REM_ASSIGN: i32 = 24
+let BO_AND_ASSIGN: i32 = 25
+let BO_OR_ASSIGN: i32 = 26
+let BO_XOR_ASSIGN: i32 = 27
+let BO_SHL_ASSIGN: i32 = 28
+let BO_SHR_ASSIGN: i32 = 29
 
 // Implicit cast kind constants
 let CI_CAST_NOOP: i32 = 0
@@ -166,6 +177,15 @@ let CI_CAST_FLOAT_TO_INT: i32 = 10
 let CI_CAST_TO_VOID: i32 = 15
 let CI_CAST_INT_TRUNC: i32 = 16
 let CI_CAST_INT_WIDEN: i32 = 17
+let CI_CAST_ARRAY_TO_PTR: i32 = 20
+let CI_CAST_INT_TO_PTR: i32 = 21
+let CI_CAST_PTR_TO_INT: i32 = 22
+let CI_CAST_PTR_CAST: i32 = 23
+let CI_CAST_FLOAT_CAST: i32 = 24
+let CI_CAST_FLOAT_TO_BOOL: i32 = 25
+let CI_CAST_BOOL_TO_FLOAT: i32 = 26
+let CI_CAST_BITCAST: i32 = 28
+let CI_CAST_INT_WIDEN_SIGN: i32 = 29
 
 // Unary operator constants
 let UO_MINUS: i32 = 0
@@ -581,8 +601,6 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
         let raw_ptype = with_cimport_fn_param_type_translated(session, idx, pi)
         let is_restrict = with_cimport_param_is_restrict(session, idx, pi)
         var ptype = ci_pointer_type_explicit_mut(raw_ptype)
-        if ci_should_keep_raw_pointer_param(pname, pi) == 0:
-            ptype = ci_wrap_nullable_pointer_type(ptype)
 
         if ci_starts_with(ptype, "__UNSUPPORTED:"):
             has_unsupported = true
@@ -599,7 +617,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
         else:
             params = params ++ "..."
 
-    let ret = ci_wrap_nullable_pointer_type(ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx)))
+    let ret = ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx))
     if ci_starts_with(ret, "__UNSUPPORTED:"):
         has_unsupported = true
         unsupported_reason = ret.slice(14, ret.len())
@@ -625,20 +643,6 @@ fn ci_pointer_type_explicit_mut(ty: str) -> str:
     if ci_starts_with(ty, "*"):
         return "*mut " ++ ci_trim(ty.slice(1, ty.len()))
     ty
-
-fn ci_wrap_nullable_pointer_type(ty: str) -> str:
-    if ci_starts_with(ty, "__UNSUPPORTED:"):
-        return ty
-    if not ci_starts_with(ty, "*"):
-        return ty
-    "Option[" ++ ty ++ "]"
-
-fn ci_should_keep_raw_pointer_param(name: str, param_idx: i32) -> i32:
-    if param_idx != 0:
-        return 0
-    if name == "self" or name == "self_" or name == "this":
-        return 1
-    0
 
 // ── Struct/Union translation ────────────────────────────────
 
@@ -937,17 +941,25 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
         return var_loc_comment ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ reason ++ "\")\n"
 
     let is_const = with_cimport_var_is_const(session, idx)
+    let is_threadlocal = with_cimport_var_is_threadlocal(session, idx)
     let safe_name = ci_escape_reserved(name)
     with_cimport_mark_name_emitted(name)
+
+    // Convert incomplete arrays ([0]T) to pointer types
+    var actual_type = var_type
+    if ci_starts_with(var_type, "[0]"):
+        actual_type = "*mut " ++ var_type.slice(3, var_type.len())
+
+    let tl_attr = if is_threadlocal != 0: "@[threadlocal]\n" else: ""
 
     // For const variables, try to evaluate the initializer
     if is_const != 0:
         let init_val = ci_try_eval_var_init(session, idx)
         if init_val.len() > 0:
-            return "let " ++ safe_name ++ ": " ++ var_type ++ " = " ++ init_val ++ "\n"
-        "extern let " ++ safe_name ++ ": " ++ var_type ++ "\n"
+            return tl_attr ++ "let " ++ safe_name ++ ": " ++ actual_type ++ " = " ++ init_val ++ "\n"
+        tl_attr ++ "extern let " ++ safe_name ++ ": " ++ actual_type ++ "\n"
     else:
-        "extern var " ++ safe_name ++ ": " ++ var_type ++ "\n"
+        tl_attr ++ "extern var " ++ safe_name ++ ": " ++ actual_type ++ "\n"
 
 // ── Typedef translation ─────────────────────────────────────
 
@@ -1146,17 +1158,18 @@ fn ci_translate_macros(session: i64, extern_vars: str) -> str:
 
         if ci_is_int_literal(stripped):
             let safe_name = ci_escape_reserved(name)
+            let int_ty = ci_int_type_from_suffix(stripped)
             let clean_value = ci_strip_int_suffix(stripped)
             with_cimport_mark_name_emitted(name)
             known_values = known_values ++ name ++ "=" ++ clean_value ++ "|"
-            output = output ++ "let " ++ safe_name ++ ": i32 = " ++ clean_value ++ "\n"
+            output = output ++ "let " ++ safe_name ++ ": " ++ int_ty ++ " = " ++ clean_value ++ "\n"
         else if ci_is_char_literal(stripped):
             let char_val = ci_char_to_int(stripped)
             if char_val.len() > 0:
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
                 known_values = known_values ++ name ++ "=" ++ char_val ++ "|"
-                output = output ++ "let " ++ safe_name ++ ": i32 = " ++ char_val ++ "\n"
+                output = output ++ "let " ++ safe_name ++ ": c_int = " ++ char_val ++ "\n"
         else if ci_is_float_literal(stripped):
             let safe_name = ci_escape_reserved(name)
             let float_ty = ci_float_type_from_suffix(stripped)
@@ -1178,7 +1191,7 @@ fn ci_translate_macros(session: i64, extern_vars: str) -> str:
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
                 known_values = known_values ++ name ++ "=" ++ eval_result ++ "|"
-                output = output ++ "let " ++ safe_name ++ ": i32 = " ++ eval_result ++ "\n"
+                output = output ++ "let " ++ safe_name ++ ": c_int = " ++ eval_result ++ "\n"
             else:
                 // Try expression translation — may reference extern vars
                 let expr_result = ci_translate_c_expr(stripped, "", known_values)
@@ -2012,6 +2025,16 @@ fn ci_is_c_type_name(s: str) -> bool:
     if t == "double": return true
     if t == "long double": return true
     if t == "_Bool": return true
+    // With C type aliases
+    if t == "c_int": return true
+    if t == "c_uint": return true
+    if t == "c_long": return true
+    if t == "c_ulong": return true
+    if t == "c_longlong": return true
+    if t == "c_ulonglong": return true
+    if t == "c_short": return true
+    if t == "c_ushort": return true
+    if t == "c_char": return true
     // Common typedefs
     if ci_map_builtin_typedef(t).len() > 0: return true
     false
@@ -2614,6 +2637,34 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                 return "(" ++ inner ++ " as " ++ dest_str ++ ")"
             if cast_kind == CI_CAST_TO_VOID:
                 return inner
+            if cast_kind == CI_CAST_ARRAY_TO_PTR:
+                return "&" ++ inner
+            if cast_kind == CI_CAST_INT_TO_PTR:
+                return "(" ++ inner ++ " as usize as *mut c_void)"
+            if cast_kind == CI_CAST_PTR_TO_INT:
+                let dest_ty = with_ci_cursor_type(session, cursor)
+                let dest_str = with_ci_type_translated(session, dest_ty)
+                return "(" ++ inner ++ " as usize as " ++ dest_str ++ ")"
+            if cast_kind == CI_CAST_PTR_CAST:
+                let dest_ty = with_ci_cursor_type(session, cursor)
+                let dest_str = with_ci_type_translated(session, dest_ty)
+                return "(" ++ inner ++ " as " ++ dest_str ++ ")"
+            if cast_kind == CI_CAST_FLOAT_CAST:
+                let dest_ty = with_ci_cursor_type(session, cursor)
+                let dest_str = with_ci_type_translated(session, dest_ty)
+                return "(" ++ inner ++ " as " ++ dest_str ++ ")"
+            if cast_kind == CI_CAST_FLOAT_TO_BOOL:
+                return "(" ++ inner ++ " != 0.0)"
+            if cast_kind == CI_CAST_BOOL_TO_FLOAT:
+                return "(if " ++ inner ++ ": 1.0 else: 0.0)"
+            if cast_kind == CI_CAST_BITCAST:
+                let dest_ty = with_ci_cursor_type(session, cursor)
+                let dest_str = with_ci_type_translated(session, dest_ty)
+                return "(" ++ inner ++ " as " ++ dest_str ++ ")"
+            if cast_kind == CI_CAST_INT_WIDEN_SIGN:
+                let dest_ty = with_ci_cursor_type(session, cursor)
+                let dest_str = with_ci_type_translated(session, dest_ty)
+                return "(" ++ inner ++ " as " ++ dest_str ++ ")"
             // NOOP, INT_WIDEN, etc. — unwrap
             return inner
         return ""
@@ -2636,7 +2687,8 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
             let rhs = ci_trans_expr(session, with_ci_child(session, cursor, 1), scope)
             if lhs.len() > 0 and rhs.len() > 0:
                 let op = with_ci_binary_op(session, cursor)
-                let op_str = ci_bo_to_str(op)
+                let is_unsigned = with_ci_type_is_unsigned(session, cursor)
+                let op_str = ci_bo_to_str_typed(op, is_unsigned)
                 if op_str.len() > 0:
                     return "(" ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ")"
         return ""
@@ -2661,7 +2713,10 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
             let operand = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
             if operand.len() > 0:
                 let op = with_ci_unary_op(session, cursor)
-                if op == UO_MINUS: return "(0 - " ++ operand ++ ")"
+                if op == UO_MINUS:
+                    if with_ci_type_is_unsigned(session, cursor) != 0:
+                        return "(0 -% " ++ operand ++ ")"
+                    return "(0 - " ++ operand ++ ")"
                 if op == UO_LNOT: return "(not " ++ operand ++ ")"
                 if op == UO_NOT: return "(0 - " ++ operand ++ " - 1)"
                 if op == UO_PLUS: return operand
@@ -2849,12 +2904,41 @@ fn ci_bo_to_str(op: i32) -> str:
     if op == BO_ASSIGN: return "="
     ""
 
+fn ci_bo_to_str_typed(op: i32, is_unsigned: i32) -> str:
+    if is_unsigned != 0:
+        if op == BO_ADD: return "+%"
+        if op == BO_SUB: return "-%"
+        if op == BO_MUL: return "*%"
+    ci_bo_to_str(op)
+
 fn ci_compound_to_base_op(op: i32) -> str:
     if op == BO_ADD_ASSIGN: return "+"
     if op == BO_SUB_ASSIGN: return "-"
     if op == BO_MUL_ASSIGN: return "*"
     if op == BO_DIV_ASSIGN: return "/"
+    if op == BO_REM_ASSIGN: return "%"
+    if op == BO_AND_ASSIGN: return "&"
+    if op == BO_OR_ASSIGN: return "|"
+    if op == BO_XOR_ASSIGN: return "^"
+    if op == BO_SHL_ASSIGN: return "<<"
+    if op == BO_SHR_ASSIGN: return ">>"
     "+"
+
+// ── Bool coercion — type-aware condition translation ────────
+
+fn ci_trans_bool_expr(session: i64, cursor: i32, scope: str) -> str:
+    let expr = ci_trans_expr(session, cursor, scope)
+    if expr.len() == 0:
+        return ""
+    // Check the type of the condition expression
+    if with_ci_type_is_bool(session, cursor) != 0:
+        return expr
+    if with_ci_type_is_pointer(session, cursor) != 0:
+        return expr ++ " != null"
+    if with_ci_type_is_float(session, cursor) != 0:
+        return expr ++ " != 0.0"
+    // Default: integer comparison
+    expr ++ " != 0"
 
 // ── Statement translator ────────────────────────────────────
 
@@ -2904,11 +2988,11 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     if kind == CXK_IF_STMT:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+            let cond = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), scope)
             if cond.len() > 0:
                 let then_body = ci_trans_stmt(session, with_ci_child(session, cursor, 1), indent + 1, scope)
                 if then_body.len() > 0:
-                    var result = "if " ++ cond ++ " != 0:\n" ++ then_body
+                    var result = "if " ++ cond ++ ":\n" ++ then_body
                     if nc > 2:
                         let else_body = ci_trans_stmt(session, with_ci_child(session, cursor, 2), indent + 1, scope)
                         if else_body.len() > 0:
@@ -2920,11 +3004,11 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     if kind == CXK_WHILE_STMT:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+            let cond = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), scope)
             if cond.len() > 0:
                 let body = ci_trans_stmt(session, with_ci_child(session, cursor, 1), indent + 1, scope)
                 if body.len() > 0:
-                    return "while " ++ cond ++ " != 0:\n" ++ body
+                    return "while " ++ cond ++ ":\n" ++ body
         return ""
 
     // For statement — translate to init + while + inc
@@ -2950,9 +3034,9 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
             if nc == 4:
                 // All parts present: [init, cond, inc, body]
                 init_str = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent, scope)
-                let cond_e = ci_trans_expr(session, with_ci_child(session, cursor, 1), scope)
+                let cond_e = ci_trans_bool_expr(session, with_ci_child(session, cursor, 1), scope)
                 if cond_e.len() > 0:
-                    cond_str = cond_e ++ " != 0"
+                    cond_str = cond_e
                 inc_str = ci_trans_expr(session, with_ci_child(session, cursor, 2), scope)
             else if nc == 3:
                 // Two of init/cond/inc present + body
@@ -2962,19 +3046,19 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
                 let first_kind = with_ci_cursor_kind(session, first)
                 if first_kind == CXK_DECL_STMT:
                     init_str = ci_trans_stmt(session, first, indent, scope)
-                    let cond_e = ci_trans_expr(session, second, scope)
+                    let cond_e = ci_trans_bool_expr(session, second, scope)
                     if cond_e.len() > 0:
-                        cond_str = cond_e ++ " != 0"
+                        cond_str = cond_e
                 else:
-                    let cond_e = ci_trans_expr(session, first, scope)
+                    let cond_e = ci_trans_bool_expr(session, first, scope)
                     if cond_e.len() > 0:
-                        cond_str = cond_e ++ " != 0"
+                        cond_str = cond_e
                     inc_str = ci_trans_expr(session, second, scope)
             else if nc == 2:
                 // Only one of init/cond/inc + body — treat as cond
-                let cond_e = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+                let cond_e = ci_trans_bool_expr(session, with_ci_child(session, cursor, 0), scope)
                 if cond_e.len() > 0:
-                    cond_str = cond_e ++ " != 0"
+                    cond_str = cond_e
 
             var result = ""
             if init_str.len() > 0:
@@ -2990,9 +3074,9 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
             let body = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent + 1, scope)
-            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 1), scope)
+            let cond = ci_trans_bool_expr(session, with_ci_child(session, cursor, 1), scope)
             if body.len() > 0 and cond.len() > 0:
-                return "while true:\n" ++ body ++ ci_indent_str(indent + 1) ++ "if " ++ cond ++ " == 0:\n" ++ ci_indent_str(indent + 2) ++ "break\n"
+                return "while true:\n" ++ body ++ ci_indent_str(indent + 1) ++ "if not (" ++ cond ++ "):\n" ++ ci_indent_str(indent + 2) ++ "break\n"
         return ""
 
     // Break
@@ -3144,7 +3228,30 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, 
                     has_fallthrough = true
         i = i + 1
 
-    // Generate if/else chain
+    // Generate match expression when no fallthrough
+    if not has_fallthrough and case_count > 0:
+        var result = "match " ++ cond ++ ":\n"
+        i = 0
+        while i < nc:
+            let child = with_ci_child(session, body_cursor, i)
+            let ck = with_ci_cursor_kind(session, child)
+            if ck == CXK_CASE_STMT:
+                let case_nc = with_ci_num_children(session, child)
+                if case_nc >= 2:
+                    let case_val = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
+                    let case_body = ci_trans_stmt_strip_break(session, with_ci_child(session, child, 1), indent + 2, scope)
+                    if case_val.len() > 0 and case_body.len() > 0:
+                        result = result ++ ci_indent_str(indent + 1) ++ case_val ++ " =>\n" ++ case_body
+            else if ck == CXK_DEFAULT_STMT:
+                let case_nc = with_ci_num_children(session, child)
+                if case_nc >= 1:
+                    let case_body = ci_trans_stmt_strip_break(session, with_ci_child(session, child, 0), indent + 2, scope)
+                    if case_body.len() > 0:
+                        result = result ++ ci_indent_str(indent + 1) ++ "_ =>\n" ++ case_body
+            i = i + 1
+        return result
+
+    // Fallback: if/else chain for fallthrough cases
     var result = ""
     var first_arm = true
     i = 0
@@ -3173,6 +3280,22 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, 
         i = i + 1
     result
 
+fn ci_trans_stmt_strip_break(session: i64, cursor: i32, indent: i32, scope: str) -> str:
+    // Translate stmt, then remove trailing "break\n" line
+    let result = ci_trans_stmt(session, cursor, indent, scope)
+    if result.len() == 0:
+        return ""
+    // Find last non-empty line; if it's "break", strip it
+    let break_needle = ci_indent_str(indent) ++ "break\n"
+    if ci_ends_with(result, break_needle):
+        return result.slice(0, result.len() - break_needle.len())
+    result
+
+fn ci_ends_with(s: str, suffix: str) -> bool:
+    if suffix.len() > s.len():
+        return false
+    s.slice(s.len() - suffix.len(), s.len()) == suffix
+
 fn ci_stmt_ends_with_break(session: i64, cursor: i32) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)
     if kind == CXK_BREAK_STMT:
@@ -3191,6 +3314,13 @@ fn ci_stmt_ends_with_break(session: i64, cursor: i32) -> bool:
 
 // ── Scope helpers ───────────────────────────────────────────
 // Scope is a pipe-delimited string: "|name|" or "|name=mangled|"
+
+fn ci_scope_get_return_type(scope: str) -> str:
+    if ci_starts_with(scope, "RET:"):
+        let end = ci_find_char(scope, 124)  // '|'
+        if end > 4:
+            return scope.slice(4, end as i64)
+    ""
 
 fn ci_scope_contains(scope: str, name: str) -> bool:
     ci_str_contains(scope, "|" ++ name ++ "|") or ci_str_contains(scope, "|" ++ name ++ "=")
@@ -3346,8 +3476,9 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
     if body_cursor < 0:
         return ""
 
-    // Build initial scope from parameter names
-    var init_scope = ""
+    // Build initial scope from parameter names + return type
+    let ret_type = with_cimport_fn_return_type_translated(session, decl_idx)
+    var init_scope = "RET:" ++ ret_type ++ "|"
     let param_count = with_cimport_fn_param_count(session, decl_idx)
     var pi = 0
     while pi < param_count:
@@ -3508,13 +3639,39 @@ fn ci_is_float_literal(s: str) -> bool:
             return false
     has_dot or has_exp
 
+fn ci_int_type_from_suffix(s: str) -> str:
+    // Detect integer literal suffix to determine C type
+    var end = s.len() as i32
+    // Collect suffix chars (backwards)
+    var has_u = false
+    var l_count = 0
+    var i = end - 1
+    while i >= 0:
+        let c = s.byte_at(i as i64)
+        if c == 85 or c == 117:  // U, u
+            has_u = true
+            i = i - 1
+        else if c == 76 or c == 108:  // L, l
+            l_count = l_count + 1
+            i = i - 1
+        else:
+            break
+    if has_u:
+        if l_count >= 2: return "c_ulonglong"
+        if l_count == 1: return "c_ulong"
+        return "c_uint"
+    if l_count >= 2: return "c_longlong"
+    if l_count == 1: return "c_long"
+    "c_int"
+
 fn ci_float_type_from_suffix(s: str) -> str:
     if s.len() == 0:
         return "f64"
     let last = s.byte_at(s.len() - 1)
     if last == 102 or last == 70:  // f, F
         return "f32"
-    // l, L → treat as f64 (With doesn't have long double)
+    if last == 108 or last == 76:  // l, L
+        return "c_longdouble"
     "f64"
 
 fn ci_strip_float_suffix(s: str) -> str:
