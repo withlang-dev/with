@@ -4553,6 +4553,75 @@ fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, dep
 
     const_string_eval_fail()
 
+fn Codegen.try_resolve_vec_new_global_type(self: Codegen, value_node: i32, flags: i32) -> i32:
+    if value_node == 0 or self.pool.kind(value_node) != NK_CALL:
+        return 0
+    if self.pool.get_data2(value_node) != 0:
+        return 0
+    let callee = self.pool.get_data0(value_node)
+    if self.pool.kind(callee) != NK_FIELD_ACCESS:
+        return 0
+    let recv = self.pool.get_data0(callee)
+    let method_sym = self.pool.get_data1(callee)
+    if self.intern.resolve(method_sym) != "new":
+        return 0
+
+    var recv_is_vec = false
+    if self.pool.kind(recv) == NK_IDENT:
+        recv_is_vec = self.intern.resolve(self.pool.get_data0(recv)) == "Vec"
+    else if self.pool.kind(recv) == NK_INDEX:
+        let recv_base = self.pool.get_data0(recv)
+        if self.pool.kind(recv_base) == NK_IDENT:
+            recv_is_vec = self.intern.resolve(self.pool.get_data0(recv_base)) == "Vec"
+    if not recv_is_vec:
+        return 0
+
+    let type_extra_packed = flags / 4
+    if type_extra_packed > 0:
+        let type_ann_node = self.pool.get_extra(type_extra_packed - 1)
+        let annotated = self.sema.resolve_type_expr(type_ann_node)
+        if annotated > 0:
+            return annotated
+    if self.sema.typed_expr_types.contains(value_node):
+        let inferred = self.sema.typed_expr_types.get(value_node).unwrap()
+        if inferred > 0:
+            return inferred
+    0
+
+fn Codegen.emit_vec_new_global(self: Codegen, name_sym: i32, vec_tid: i32, is_mut: i32) -> bool:
+    let resolved = self.sema.resolve_alias(vec_tid)
+    if self.sema.get_type_kind(resolved) != TY_GENERIC_INST:
+        return false
+    let base_sym = self.sema.get_type_d0(resolved)
+    if self.intern.resolve(base_sym) != "Vec":
+        return false
+    if self.sema.get_type_d2(resolved) != 1:
+        return false
+
+    let elem_tid = self.sema.get_generic_inst_arg(resolved, 0)
+    let elem_llvm = self.sema_type_to_llvm(elem_tid)
+    let vec_llvm = self.sema_type_to_llvm(resolved)
+    if elem_llvm == 0 or vec_llvm == 0:
+        return false
+
+    let i64_ty = wl_i64_type(self.context)
+    let fields: Vec[i64] = Vec.new()
+    fields.push(wl_const_null(wl_ptr_type(self.context)))
+    fields.push(wl_const_int(i64_ty, 0, 0))
+    fields.push(wl_const_int(i64_ty, 0, 0))
+    // Vec.new() is logically { null, 0, 0, sizeof(T) } for globals.
+    fields.push(wl_const_int(i64_ty, self.abi_size_of(elem_llvm), 0))
+    let init = wl_const_named_struct(vec_llvm, vec_data_i64(&fields), 4)
+
+    let name_str = self.intern.resolve(name_sym)
+    let global = wl_add_global(self.llmod, vec_llvm, name_str)
+    wl_set_initializer(global, init)
+    if is_mut == 0:
+        wl_set_global_constant(global, 1)
+    wl_set_linkage(global, wl_internal_linkage())
+    self.module_constants.insert(name_sym, global)
+    true
+
 fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
     let kind = self.pool.kind(node)
     if kind == NK_INT_LIT:
@@ -4662,6 +4731,11 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         wl_set_linkage(global, wl_internal_linkage())
         self.module_constants.insert(name_sym, global)
         return
+
+    let vec_tid = self.try_resolve_vec_new_global_type(value_node, flags)
+    if vec_tid > 0:
+        if self.emit_vec_new_global(name_sym, vec_tid, is_mut):
+            return
 
     // Float constant: NK_FLOAT_LIT or unary negate of one
     var float_node = value_node
@@ -5495,6 +5569,16 @@ fn Codegen.mir_operand_is_unsigned(self: Codegen, body: MirBody, operand_id: i32
                         return self.mir_input.mir_get_type_d1(resolved) == 0
     false
 
+fn Codegen.coerce_float_operand_to(self: Codegen, val: i64, target_ty: i64) -> i64:
+    let val_ty = wl_type_of(val)
+    if val_ty == target_ty or target_ty == 0:
+        return val
+    let vk = wl_get_type_kind(val_ty)
+    let tk = wl_get_type_kind(target_ty)
+    if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and (tk == wl_float_type_kind() or tk == wl_double_type_kind()):
+        return wl_build_fp_cast(self.builder, val, target_ty)
+    val
+
 fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsigned: bool) -> i64:
     let lk = wl_get_type_kind(wl_type_of(lhs))
     let rk = wl_get_type_kind(wl_type_of(rhs))
@@ -5519,17 +5603,24 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
 
     let is_float = lk == wl_float_type_kind() or lk == wl_double_type_kind() or rk == wl_float_type_kind() or rk == wl_double_type_kind()
     if is_float:
-        if op == OP_ADD or op == OP_ADD_WRAP: return wl_build_fadd(self.builder, lhs, rhs)
-        if op == OP_SUB or op == OP_SUB_WRAP: return wl_build_fsub(self.builder, lhs, rhs)
-        if op == OP_MUL or op == OP_MUL_WRAP: return wl_build_fmul(self.builder, lhs, rhs)
-        if op == OP_DIV: return wl_build_fdiv(self.builder, lhs, rhs)
-        if op == OP_MOD: return wl_build_frem(self.builder, lhs, rhs)
-        if op == OP_EQ: return wl_build_fcmp(self.builder, wl_real_oeq(), lhs, rhs)
-        if op == OP_NEQ: return wl_build_fcmp(self.builder, wl_real_one(), lhs, rhs)
-        if op == OP_LT: return wl_build_fcmp(self.builder, wl_real_olt(), lhs, rhs)
-        if op == OP_GT: return wl_build_fcmp(self.builder, wl_real_ogt(), lhs, rhs)
-        if op == OP_LTE: return wl_build_fcmp(self.builder, wl_real_ole(), lhs, rhs)
-        if op == OP_GTE: return wl_build_fcmp(self.builder, wl_real_oge(), lhs, rhs)
+        let common_float_ty =
+            if lk == wl_double_type_kind() or rk == wl_double_type_kind():
+                wl_f64_type(self.context)
+            else:
+                wl_f32_type(self.context)
+        let lhs_float = self.coerce_float_operand_to(lhs, common_float_ty)
+        let rhs_float = self.coerce_float_operand_to(rhs, common_float_ty)
+        if op == OP_ADD or op == OP_ADD_WRAP: return wl_build_fadd(self.builder, lhs_float, rhs_float)
+        if op == OP_SUB or op == OP_SUB_WRAP: return wl_build_fsub(self.builder, lhs_float, rhs_float)
+        if op == OP_MUL or op == OP_MUL_WRAP: return wl_build_fmul(self.builder, lhs_float, rhs_float)
+        if op == OP_DIV: return wl_build_fdiv(self.builder, lhs_float, rhs_float)
+        if op == OP_MOD: return wl_build_frem(self.builder, lhs_float, rhs_float)
+        if op == OP_EQ: return wl_build_fcmp(self.builder, wl_real_oeq(), lhs_float, rhs_float)
+        if op == OP_NEQ: return wl_build_fcmp(self.builder, wl_real_one(), lhs_float, rhs_float)
+        if op == OP_LT: return wl_build_fcmp(self.builder, wl_real_olt(), lhs_float, rhs_float)
+        if op == OP_GT: return wl_build_fcmp(self.builder, wl_real_ogt(), lhs_float, rhs_float)
+        if op == OP_LTE: return wl_build_fcmp(self.builder, wl_real_ole(), lhs_float, rhs_float)
+        if op == OP_GTE: return wl_build_fcmp(self.builder, wl_real_oge(), lhs_float, rhs_float)
         return wl_get_undef(wl_i32_type(self.context))
 
     if op == OP_EQ or op == OP_NEQ:
