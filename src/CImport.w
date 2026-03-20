@@ -493,28 +493,31 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     // Skip static functions — no external linkage
     let storage = with_cimport_fn_storage_class(session, idx)
     let is_inline = with_cimport_fn_is_inline(session, idx)
-    if storage == CX_SC_STATIC:
-        if is_inline != 0:
-            // Static inline — try to translate the body first
-            let body = ci_try_translate_fn_body(session, idx)
-            if body.len() > 0:
-                let safe_name = ci_escape_reserved(name)
-                with_cimport_mark_name_emitted(name)
-                let si_param_count = with_cimport_fn_param_count(session, idx)
-                var si_params = ""
-                for spi in 0..si_param_count:
-                    if spi > 0:
-                        si_params = si_params ++ ", "
-                    let spname = with_cimport_fn_param_name(session, idx, spi)
-                    let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
-                    let actual_pname = if spname.len() > 0: ci_escape_reserved(spname) else: "p" ++ int_to_string(spi)
-                    si_params = si_params ++ actual_pname ++ ": " ++ sptype
-                let si_ret = with_cimport_fn_return_type_translated(session, idx)
-                return "fn " ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret ++ ":\n" ++ body
-            // Fallback: emit comptime_error stub
+    let needs_body_translation = (storage == CX_SC_STATIC and is_inline != 0) or (is_inline != 0 and storage != CX_SC_STATIC)
+    if needs_body_translation:
+        // Static inline or always-inline — try to translate the body
+        let body = ci_try_translate_fn_body(session, idx)
+        if body.len() > 0:
+            let safe_name = ci_escape_reserved(name)
+            with_cimport_mark_name_emitted(name)
+            let si_param_count = with_cimport_fn_param_count(session, idx)
+            var si_params = ""
+            for spi in 0..si_param_count:
+                if spi > 0:
+                    si_params = si_params ++ ", "
+                let spname = with_cimport_fn_param_name(session, idx, spi)
+                let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
+                let actual_pname = if spname.len() > 0: ci_escape_reserved(spname) else: "p" ++ int_to_string(spi)
+                si_params = si_params ++ actual_pname ++ ": " ++ sptype
+            let si_ret = with_cimport_fn_return_type_translated(session, idx)
+            return "fn " ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret ++ ":\n" ++ body
+        // Fallback: emit comptime_error stub for static, skip for non-static inline
+        if storage == CX_SC_STATIC:
             let safe_name = ci_escape_reserved(name)
             with_cimport_mark_name_emitted(name)
             return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"static inline function — wrap in C shim\")\n"
+        // Non-static inline without body translation → emit as extern
+    if storage == CX_SC_STATIC and is_inline == 0:
         return ""
 
     let safe_name = ci_escape_reserved(name)
@@ -612,7 +615,9 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     if ci_str_contains(demoted_types, "|" ++ name ++ "|"):
         with_cimport_mark_name_emitted(name)
         let safe_name = ci_escape_reserved(name)
-        return "type " ++ safe_name ++ " = opaque\n"
+        let loc = ci_get_decl_location(session, name)
+        let loc_comment = if loc.len() > 0: "// " ++ loc ++ ": demoted to opaque\n" else: ""
+        return loc_comment ++ "type " ++ safe_name ++ " = opaque\n"
 
     let field_count = with_cimport_struct_field_count(session, idx)
     if field_count == 0:
@@ -2473,6 +2478,17 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
                 return "sizeof[" ++ ty_str ++ "]()"
         return ""
 
+    // Predefined expressions (__func__, __FUNCTION__, __PRETTY_FUNCTION__)
+    if kind == 138:  // CXCursor_PredefinedExpr
+        return "\"__func__\""
+
+    // Compound literal — try to translate the inner init list
+    if kind == CXK_COMPOUND_LITERAL:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_trans_expr(session, with_ci_child(session, cursor, 0))
+        return ""
+
     // Fallback: try to use source text for simple expressions
     ""
 
@@ -2726,6 +2742,19 @@ fn ci_try_eval_var_init(session: i64, idx: i32) -> str:
                     if expr.len() > 0:
                         return expr
                 return ""
+        i = i + 1
+    ""
+
+// Get source location for a declaration by matching name in AST
+fn ci_get_decl_location(session: i64, name: str) -> str:
+    let root = with_ci_root_cursor(session)
+    let n = with_ci_num_children(session, root)
+    var i = 0
+    while i < n:
+        let child = with_ci_child(session, root, i)
+        let cname = with_ci_cursor_spelling(session, child)
+        if cname == name:
+            return with_ci_cursor_location(session, child)
         i = i + 1
     ""
 
