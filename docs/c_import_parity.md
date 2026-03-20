@@ -40,7 +40,17 @@ we need to build on top of libclang.
 - [x] struct_Foo = Foo alias for typedef twins
 - [x] sizeof(param) in macros → sizeof[T]()
 - [x] Comma operator in macros → last expression
-- [x] 32+ builtin function mappings
+- [x] 50 builtin function mappings (all Zig builtins matched)
+- [x] 30+ compiler predefined macro mappings (__INT_MAX__, __CHAR_BIT__, etc.)
+- [x] Anonymous enum constants (detect synthetic names, emit constants)
+- [x] Anonymous struct typedefs (typedef struct { ... } Name;)
+- [x] CAST_OR_CALL pattern in macros — (X)(Y)
+- [x] DISCARD pattern in macros — (void)(X)
+- [x] Removed CXTranslationUnit_SkipFunctionBodies
+- [x] AST-based expression translator (15+ expression types)
+- [x] AST-based statement translator (10+ statement types)
+- [x] Static inline function body translation (try AST, fallback to stub)
+- [x] Test suite: tests/test_cimport.w (build + run, all pass)
 - [x] 13 system headers pass (stdio, stdlib, string, unistd, math, errno, signal, sys/types, sys/stat, fcntl, time, limits, stddef)
 
 ---
@@ -103,7 +113,7 @@ else builds on. Without this, nothing else works.
 - [x] Source text extraction (`with_ci_cursor_source_text`)
 - [x] Struct/union/enum specifics (anonymous, bitfield, offset, definition check)
 - [x] Target info (pointer width, target triple, sizeof(long), char signedness)
-- [ ] Remove `CXTranslationUnit_SkipFunctionBodies` from parse flags
+- [x] Remove `CXTranslationUnit_SkipFunctionBodies` from parse flags
 
 **clang_bridge.c — ~400 new lines**
 
@@ -112,7 +122,7 @@ else builds on. Without this, nothing else works.
 - [x] Binary operator kind extraction (`with_ci_binary_op`)
 - [x] Unary operator kind extraction (`with_ci_unary_op`)
 - [ ] Cast kind extraction (`with_ci_cast_kind`)
-- [x] Constant evaluation (`with_ci_eval_as_int`, `_float`, `_str`)
+- [x] Constant evaluation (`with_ci_eval_int_valid`, `with_ci_eval_int_value`)
 - [x] Calling convention query (`with_ci_calling_conv`)
 - [x] Typedef underlying type (`with_ci_typedef_underlying`)
 - [x] Member expression queries (`is_arrow`, `field_name`)
@@ -162,27 +172,27 @@ else builds on. Without this, nothing else works.
 
 ### Session 5: Literal + binary + unary + cast expressions
 
-- [ ] Integer literals (with constant evaluation)
-- [ ] Float literals
-- [ ] String literals
-- [ ] Character literals
-- [ ] Binary operators (all arithmetic, bitwise, logical, comparison, assignment)
-- [ ] Unary operators (negate, not, bitwise not, address-of, deref, pre/post inc/dec)
-- [ ] Conditional (ternary) operator
-- [ ] C-style cast expressions
-- [ ] Implicit cast expressions (unwrap)
-- [ ] Parenthesized expressions
-- [ ] Declaration reference expressions (identifier resolution)
-- [ ] Compound assignment operators
+- [x] Integer literals (with constant evaluation)
+- [x] Float literals
+- [x] String literals
+- [x] Character literals
+- [x] Binary operators (all arithmetic, bitwise, logical, comparison, assignment)
+- [x] Unary operators (negate, not, bitwise not, address-of, deref, pre/post inc/dec)
+- [x] Conditional (ternary) operator
+- [x] C-style cast expressions
+- [x] Implicit cast expressions (unwrap)
+- [x] Parenthesized expressions
+- [x] Declaration reference expressions (identifier resolution)
+- [x] Compound assignment operators
 
 **CImport.w — ~300 new lines**
 
 ### Session 6: Member access, subscript, call, sizeof, compound literals
 
-- [ ] Member access (`.field` and `->field`)
-- [ ] Array subscript (`a[i]`)
-- [ ] Function call expressions (with builtin remapping)
-- [ ] sizeof / alignof expressions
+- [x] Member access (`.field` and `->field`)
+- [x] Array subscript (`a[i]`)
+- [x] Function call expressions (with builtin remapping)
+- [x] sizeof / alignof expressions
 - [ ] Initializer list expressions (struct/array init)
 - [ ] Compound literal expressions
 - [ ] Statement expressions (GNU extension `({...})`)
@@ -190,7 +200,7 @@ else builds on. Without this, nothing else works.
 - [ ] Generic selection expressions (`_Generic`)
 - [ ] Offsetof expressions
 - [ ] VA_ARG expressions
-- [ ] All ~50 builtin function remappings
+- [x] All ~50 builtin function remappings
 
 **CImport.w — ~300 new lines**
 
@@ -200,15 +210,15 @@ else builds on. Without this, nothing else works.
 
 ### Session 7: Compound, return, if, while, for, do-while
 
-- [ ] Compound statements (block scope push/pop)
-- [ ] Return statements (with/without value)
-- [ ] If statements (with/without else)
-- [ ] While statements
-- [ ] Do-while statements (→ `while true` + break)
+- [x] Compound statements (block scope)
+- [x] Return statements (with/without value)
+- [x] If statements (with/without else)
+- [x] While statements
+- [x] Do-while statements (→ `while true` + break)
 - [ ] For statements (→ init + while + increment)
-- [ ] Declaration statements (local variable decls with initializers)
-- [ ] Null statements (→ `pass`)
-- [ ] Break / continue statements
+- [x] Declaration statements (local variable decls with initializers)
+- [x] Null statements (→ `pass`)
+- [x] Break / continue statements
 
 **CImport.w — ~250 new lines**
 
@@ -229,8 +239,8 @@ else builds on. Without this, nothing else works.
 
 ### Session 9: Functions, variables, typedefs
 
-- [ ] Function declarations with full body translation
-- [ ] Static inline → translated inline function (not comptime_error stub)
+- [x] Function declarations with full body translation
+- [x] Static inline → translated inline function (try AST, fallback to stub)
 - [ ] Always-inline functions
 - [ ] Variable declarations with initializer expression translation
 - [ ] Constant evaluation for variable initializers
@@ -316,18 +326,18 @@ else builds on. Without this, nothing else works.
 |---------|-------|---------|-------|--------|
 | 1 | 1 | AST bridge: cursor traversal, type queries, linkage | ~400 clang_bridge.c | ✓ |
 | 2 | 1 | AST bridge: operator kinds, eval, calling conv | ~400 clang_bridge.c | ✓ |
-| 3 | 2 | Name resolution: two-pass, scope hierarchy | ~200 CImport.w | ☐ |
-| 4 | 3 | Type translator: all CXTypeKind | ~300 CImport.w | ☐ |
-| 5 | 4 | Expr translator part 1: literals, binary, unary, cast | ~300 CImport.w | ☐ |
-| 6 | 4 | Expr translator part 2: member, subscript, call, sizeof, init | ~300 CImport.w | ☐ |
-| 7 | 5 | Stmt translator part 1: compound, return, if, while, for | ~250 CImport.w | ☐ |
-| 8 | 5 | Stmt translator part 2: switch, goto, local decls | ~250 CImport.w | ☐ |
-| 9 | 6 | Decl translator: functions with bodies, variables with init | ~300 CImport.w | ☐ |
-| 10 | 6 | Decl translator: structs (align, FAM, member fns), enums (anon) | ~300 CImport.w | ☐ |
-| 11 | 7 | Macro tokenizer + PatternList (all 34 patterns) | ~350 CImport.w | ☐ |
-| 12 | 7 | Macro recursive descent parser (13 precedence levels) | ~500 CImport.w | ☐ |
-| 13 | 8 | Integration, @[section], volatile codegen, callconv | ~100 across files | ☐ |
-| 14 | 9 | 20-header verification, Zig comparison, fixpoint | tests only | ☐ |
+| 3 | 2 | Name resolution: two-pass, scope hierarchy | ~200 CImport.w | partial |
+| 4 | 3 | Type translator: all CXTypeKind | ~300 CImport.w | existing works |
+| 5 | 4 | Expr translator part 1: literals, binary, unary, cast | ~300 CImport.w | ✓ |
+| 6 | 4 | Expr translator part 2: member, subscript, call, sizeof, init | ~300 CImport.w | partial |
+| 7 | 5 | Stmt translator part 1: compound, return, if, while, for | ~250 CImport.w | partial |
+| 8 | 5 | Stmt translator part 2: switch, goto, local decls | ~250 CImport.w | partial |
+| 9 | 6 | Decl translator: functions with bodies, variables with init | ~300 CImport.w | partial |
+| 10 | 6 | Decl translator: structs (align, FAM, member fns), enums (anon) | ~300 CImport.w | partial |
+| 11 | 7 | Macro tokenizer + PatternList (all 34 patterns) | ~350 CImport.w | partial |
+| 12 | 7 | Macro recursive descent parser (13 precedence levels) | ~500 CImport.w | existing works |
+| 13 | 8 | Integration, @[section], volatile codegen, callconv | ~100 across files | partial |
+| 14 | 9 | 20-header verification, Zig comparison, fixpoint | tests only | partial |
 
 **Total: 14 sessions.**
 **New code: ~800 lines clang_bridge.c + ~3500 lines CImport.w = ~4300 lines.**
