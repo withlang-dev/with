@@ -2235,7 +2235,7 @@ fn Codegen.type_decl_tp_meta_start(self: Codegen, type_node: i32) -> i32:
     let sub_kind = type_decl_sub_kind(self.pool.get_data2(type_node))
     if sub_kind == TDK_STRUCT:
         let field_count = self.pool.get_extra(extra_start)
-        return extra_start + 1 + field_count * 3 + 1
+        return extra_start + 1 + field_count * 4 + 1
     if sub_kind == TDK_ENUM:
         let variant_count = self.pool.get_extra(extra_start)
         var pos = extra_start + 1
