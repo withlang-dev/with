@@ -86,6 +86,7 @@ extern fn with_ci_type_is_float(session: i64, cursor: i32) -> i32
 extern fn with_ci_type_is_bool(session: i64, cursor: i32) -> i32
 extern fn with_ci_cursor_pointee_type(session: i64, cursor: i32) -> str
 extern fn with_cimport_struct_field_align(session: i64, idx: i32, field: i32) -> i64
+extern fn with_cimport_struct_align(session: i64, idx: i32) -> i64
 
 extern fn int_to_string(n: i32) -> str
 extern fn i64_to_string(n: i64) -> str
@@ -98,6 +99,7 @@ let CK_ENUM: i32 = 5
 let CK_FUNCTION: i32 = 8
 let CK_VAR: i32 = 9
 let CK_TYPEDEF: i32 = 20
+let CK_STATIC_ASSERT: i32 = 602
 
 // CX_StorageClass constants
 let CX_SC_STATIC: i32 = 3
@@ -333,6 +335,10 @@ fn process_c_import(header_spec: str) -> str:
                 let td_name = with_cimport_decl_name(session, i)
                 if td_name.len() > 0 and td_name.byte_at(0) != 95:
                     translated_structs = translated_structs ++ "|" ++ td_name ++ "|"
+        else if kind == CK_STATIC_ASSERT:
+            let sa_name = with_cimport_decl_name(session, i)
+            if sa_name.len() > 0:
+                output = output ++ "// static_assert: " ++ sa_name ++ "\n"
         i = i + 1
 
     // Member function detection (Zig-style): attach C functions whose first
@@ -874,33 +880,67 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         return anon_decls ++ "// union\n" ++ packed_prefix ++ decl ++ flex_accessor
     anon_decls ++ packed_prefix ++ decl ++ flex_accessor
 
-// Compute per-field alignment annotation for C struct layout.
-// Returns 0 if naturally aligned, N if @[align(N)] needed.
+// Compute per-field alignment, ported from Zig's alignmentForField.
+// Returns 0 if naturally aligned (no annotation needed), N if @[align(N)] needed.
 fn ci_compute_field_alignment(session: i64, idx: i32, fi: i32, field_count: i32) -> i64:
     let field_offset = with_cimport_struct_field_offset(session, idx, fi)
     if field_offset < 0:
         return 0
+    let field_size = with_cimport_struct_field_size(session, idx, fi)
     let natural_align = with_cimport_struct_field_align(session, idx, fi)
     if natural_align <= 0:
         return 0
+    let parent_align = with_cimport_struct_align(session, idx)
+    if parent_align <= 0:
+        return 0
+    // Zero-width fields always have alignment 1
+    if field_size == 0:
+        return 1
+    // Fields at offset 0: check if struct pointer alignment differs from
+    // max field natural alignment (headFieldAlignment from Zig)
     if field_offset == 0:
-        // First field: check if struct has different max alignment
-        return 0
-    // Check if field offset is naturally aligned
+        return ci_head_field_alignment(session, idx, field_count, parent_align)
+    // Check remainder: offset % natural_align
     let remainder = field_offset % natural_align
-    if remainder == 0:
+    if remainder > 0:
+        if ci_is_power_of_two(remainder):
+            let actual = if remainder < parent_align: remainder else: parent_align
+            return actual
+        return 1
+    // Field is positioned at a naturally-aligned offset, but parent's pointer
+    // alignment determines the actual alignment
+    let possible = if parent_align < field_offset: parent_align else: field_offset
+    if possible == natural_align:
         return 0
-    // Field is not naturally aligned — compute effective alignment
-    // Find the largest power-of-2 that divides field_offset
-    var effective: i64 = 1
-    var test: i64 = 2
-    while test <= field_offset and test <= 4096:
-        if field_offset % test == 0:
-            effective = test
-        test = test * 2
-    if effective >= natural_align:
-        return 0
-    effective
+    if possible < natural_align:
+        if ci_is_power_of_two(possible):
+            return possible
+        return 1
+    // possible > natural_align — check padding from previous field
+    if fi > 0:
+        let prev_offset = with_cimport_struct_field_offset(session, idx, fi - 1)
+        let prev_size = with_cimport_struct_field_size(session, idx, fi - 1)
+        if prev_offset >= 0 and prev_size >= 0:
+            let padding = (field_offset - prev_offset) - prev_size
+            if padding < natural_align:
+                return 0
+            return possible
+    0
+
+fn ci_head_field_alignment(session: i64, idx: i32, field_count: i32, parent_align: i64) -> i64:
+    var max_field_align: i64 = 0
+    var fi = 0
+    while fi < field_count:
+        let fa = with_cimport_struct_field_align(session, idx, fi)
+        if fa > max_field_align:
+            max_field_align = fa
+        fi = fi + 1
+    if max_field_align != parent_align:
+        return parent_align
+    0
+
+fn ci_is_power_of_two(n: i64) -> bool:
+    n > 0 and (n & (n - 1)) == 0
 
 fn ci_estimate_type_size(ty: str) -> i64:
     if ty == "i8" or ty == "u8" or ty == "bool" or ty == "c_char": return 1
@@ -954,6 +994,7 @@ fn ci_default_for_type(ty: str) -> str:
     if ci_starts_with(ty, "Option["): return "null"
     // Enum type aliases (emitted by c_import as `type Foo = c_int`) → 0
     if with_cimport_is_name_emitted(ty) != 0: return "0"
+    if ci_starts_with(ty, "Vector("): return ""
     // Array types [N]T → require explicit init
     if ty.len() > 0 and ty.byte_at(0) == 91: return ""
     ""
@@ -1174,6 +1215,10 @@ fn ci_translate_macros(session: i64, extern_vars: str) -> str:
         let name = with_cimport_macro_name(session, i)
         let value = with_cimport_macro_value(session, i)
         let fn_like = with_cimport_macro_is_fn_like(session, i)
+
+        // Skip self-defined macros: #define FOO FOO (common feature-test pattern)
+        if fn_like == 0 and value == name:
+            continue
 
         // Try to translate function-like macros; fall back to comptime_error
         if fn_like != 0:
@@ -1912,15 +1957,27 @@ fn ci_find_binary_op_ext(s: str) -> i32:
         else if c == 41:
             paren_depth = paren_depth - 1
         else if paren_depth == 0 and idx > 0:
-            let prec = ci_op_prec_ext(s, idx, slen)
-            if prec >= 0 and prec <= best_prec:
-                best_pos = idx
-                best_prec = prec
-                best_len = ci_op_length_ext(s, idx, slen)
+            // Skip operators preceded by another operator (handles unary after binary like a * -b)
+            let prev = ci_last_nonspace_char(s, idx)
+            if prev != 43 and prev != 45 and prev != 42 and prev != 47 and prev != 37 and prev != 40 and prev != 44 and prev != 124 and prev != 38 and prev != 94 and prev != 60 and prev != 62 and prev != 33 and prev != 126:
+                let prec = ci_op_prec_ext(s, idx, slen)
+                if prec >= 0 and prec <= best_prec:
+                    best_pos = idx
+                    best_prec = prec
+                    best_len = ci_op_length_ext(s, idx, slen)
         idx = idx + 1
     if best_pos > 0:
         return best_pos * 256 + best_len
     0 - 1
+
+fn ci_last_nonspace_char(s: str, idx: i32) -> i32:
+    var i = idx - 1
+    while i >= 0:
+        let c = s.byte_at(i as i64)
+        if c != 32 and c != 9:
+            return c
+        i = i - 1
+    0
 
 fn ci_is_c_ident_prefix(s: str) -> bool:
     if s.len() == 0:
@@ -3770,14 +3827,32 @@ fn ci_str_replace(text: str, needle: str, replacement: str) -> str:
     result
 
 // Check if a macro value only references other blank macros.
+// Check if a macro value only references other blank macros (multi-token aware).
 fn ci_is_blank_macro_ref(value: str, blank_macros: str) -> bool:
     let trimmed = ci_trim(value)
     if trimmed.len() == 0:
         return true
-    // Single identifier that is a known blank macro
-    if ci_is_c_ident(trimmed):
-        return ci_str_contains(blank_macros, "|" ++ trimmed ++ "|")
-    false
+    var pos = 0
+    let slen = trimmed.len() as i32
+    var found_any = false
+    while pos < slen:
+        while pos < slen and (trimmed.byte_at(pos as i64) == 32 or trimmed.byte_at(pos as i64) == 9):
+            pos = pos + 1
+        if pos >= slen:
+            break
+        let tok_start = pos
+        while pos < slen:
+            let c = trimmed.byte_at(pos as i64)
+            if not ((c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95 or (pos > tok_start and c >= 48 and c <= 57)):
+                break
+            pos = pos + 1
+        if pos == tok_start:
+            return false
+        let tok = trimmed.slice(tok_start as i64, pos as i64)
+        if not ci_str_contains(blank_macros, "|" ++ tok ++ "|"):
+            return false
+        found_any = true
+    found_any
 
 fn ci_is_int_literal(s: str) -> bool:
     if s.len() == 0:
