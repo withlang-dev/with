@@ -64,6 +64,20 @@ typedef struct {
     int32_t str_cap;
     // Header file for filtering transitive includes
     CXFile header_file;
+    // ── AST traversal (Phase 1) ────────────────────────
+    CXCursor *cursors;      // general cursor array (index-based handles)
+    int32_t cursor_count;
+    int32_t cursor_cap;
+    CXType *types;          // general type array (index-based handles)
+    int32_t type_count;
+    int32_t type_cap;
+    // Children cache: for each cursor, store [start, count] into a flat child array
+    int32_t *child_starts;  // child_starts[cursor_idx] = start index in child_indices
+    int32_t *child_counts;  // child_counts[cursor_idx] = number of children
+    int32_t *child_indices; // flat array of cursor indices for all children
+    int32_t child_indices_count;
+    int32_t child_indices_cap;
+    int32_t children_cache_cap; // capacity of child_starts/child_counts arrays
 } CImportSession;
 
 typedef struct {
@@ -682,6 +696,13 @@ void with_cimport_dispose(int64_t session) {
         free(s->strings[i]);
     free(s->strings);
 
+    // Free AST traversal arrays
+    free(s->cursors);
+    free(s->types);
+    free(s->child_starts);
+    free(s->child_counts);
+    free(s->child_indices);
+
     if (s->tmp_path) {
         unlink(s->tmp_path);
         free(s->tmp_path);
@@ -1251,4 +1272,666 @@ with_str with_cimport_macro_param_name(int64_t session, int32_t idx, int32_t par
     if (!ms->params || !ms->params[idx]) return make_str("");
     if (param < 0 || param >= ms->param_counts[idx]) return make_str("");
     return make_str(ms->params[idx][param]);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Phase 1: Full AST traversal API
+// ═══════════════════════════════════════════════════════════
+
+// ── Cursor/Type storage helpers ─────────────────────────────
+
+static int32_t store_cursor(CImportSession *s, CXCursor cursor) {
+    if (!s->cursors) {
+        s->cursor_cap = 256;
+        s->cursors = (CXCursor *)malloc(sizeof(CXCursor) * (size_t)s->cursor_cap);
+        s->cursor_count = 0;
+    }
+    if (s->cursor_count >= s->cursor_cap) {
+        s->cursor_cap *= 2;
+        s->cursors = (CXCursor *)realloc(s->cursors, sizeof(CXCursor) * (size_t)s->cursor_cap);
+    }
+    s->cursors[s->cursor_count] = cursor;
+    return s->cursor_count++;
+}
+
+static int32_t store_type(CImportSession *s, CXType type) {
+    if (!s->types) {
+        s->type_cap = 256;
+        s->types = (CXType *)malloc(sizeof(CXType) * (size_t)s->type_cap);
+        s->type_count = 0;
+    }
+    if (s->type_count >= s->type_cap) {
+        s->type_cap *= 2;
+        s->types = (CXType *)realloc(s->types, sizeof(CXType) * (size_t)s->type_cap);
+    }
+    s->types[s->type_count] = type;
+    return s->type_count++;
+}
+
+// ── Children collection ─────────────────────────────────────
+
+typedef struct {
+    CImportSession *session;
+    int32_t *indices;
+    int32_t count;
+    int32_t cap;
+} ChildCollector;
+
+static enum CXChildVisitResult collect_child_cursor(CXCursor cursor,
+                                                      CXCursor parent,
+                                                      CXClientData data) {
+    (void)parent;
+    ChildCollector *cc = (ChildCollector *)data;
+    int32_t idx = store_cursor(cc->session, cursor);
+    if (cc->count >= cc->cap) {
+        cc->cap = cc->cap ? cc->cap * 2 : 16;
+        cc->indices = (int32_t *)realloc(cc->indices, sizeof(int32_t) * (size_t)cc->cap);
+    }
+    cc->indices[cc->count++] = idx;
+    return CXChildVisit_Continue;
+}
+
+static void ensure_children_cached(CImportSession *s, int32_t cursor_idx) {
+    if (!s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return;
+
+    // Ensure cache arrays are allocated
+    if (!s->child_starts) {
+        s->children_cache_cap = s->cursor_cap > 0 ? s->cursor_cap : 256;
+        s->child_starts = (int32_t *)calloc((size_t)s->children_cache_cap, sizeof(int32_t));
+        s->child_counts = (int32_t *)calloc((size_t)s->children_cache_cap, sizeof(int32_t));
+        // Initialize with -1 to indicate uncached
+        for (int32_t i = 0; i < s->children_cache_cap; i++)
+            s->child_starts[i] = -1;
+    }
+
+    // Grow cache arrays if needed
+    if (cursor_idx >= s->children_cache_cap) {
+        int32_t old_cap = s->children_cache_cap;
+        s->children_cache_cap = cursor_idx + 256;
+        s->child_starts = (int32_t *)realloc(s->child_starts, sizeof(int32_t) * (size_t)s->children_cache_cap);
+        s->child_counts = (int32_t *)realloc(s->child_counts, sizeof(int32_t) * (size_t)s->children_cache_cap);
+        for (int32_t i = old_cap; i < s->children_cache_cap; i++)
+            s->child_starts[i] = -1;
+    }
+
+    // Already cached?
+    if (s->child_starts[cursor_idx] != -1) return;
+
+    // Collect children
+    ChildCollector cc = { s, NULL, 0, 0 };
+    clang_visitChildren(s->cursors[cursor_idx], collect_child_cursor, &cc);
+
+    // Store in flat child_indices array
+    int32_t start = s->child_indices_count;
+    if (!s->child_indices) {
+        s->child_indices_cap = 256;
+        s->child_indices = (int32_t *)malloc(sizeof(int32_t) * (size_t)s->child_indices_cap);
+    }
+    while (s->child_indices_count + cc.count > s->child_indices_cap) {
+        s->child_indices_cap *= 2;
+        s->child_indices = (int32_t *)realloc(s->child_indices, sizeof(int32_t) * (size_t)s->child_indices_cap);
+    }
+    for (int32_t i = 0; i < cc.count; i++) {
+        s->child_indices[s->child_indices_count++] = cc.indices[i];
+    }
+    free(cc.indices);
+
+    s->child_starts[cursor_idx] = start;
+    s->child_counts[cursor_idx] = cc.count;
+}
+
+// ── Root cursor ─────────────────────────────────────────────
+
+int32_t with_ci_root_cursor(int64_t session) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->tu) return -1;
+    CXCursor root = clang_getTranslationUnitCursor(s->tu);
+    return store_cursor(s, root);
+}
+
+// ── Tree traversal ──────────────────────────────────────────
+
+int32_t with_ci_num_children(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    ensure_children_cached(s, cursor_idx);
+    return s->child_counts[cursor_idx];
+}
+
+int32_t with_ci_child(int64_t session, int32_t cursor_idx, int32_t child_index) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return -1;
+    ensure_children_cached(s, cursor_idx);
+    if (child_index < 0 || child_index >= s->child_counts[cursor_idx]) return -1;
+    int32_t start = s->child_starts[cursor_idx];
+    return s->child_indices[start + child_index];
+}
+
+// ── Cursor introspection ────────────────────────────────────
+
+int32_t with_ci_cursor_kind(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    return (int32_t)clang_getCursorKind(s->cursors[cursor_idx]);
+}
+
+with_str with_ci_cursor_spelling(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return make_str("");
+    return clang_str_to_with(s, clang_getCursorSpelling(s->cursors[cursor_idx]));
+}
+
+with_str with_ci_cursor_kind_name(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return make_str("");
+    enum CXCursorKind kind = clang_getCursorKind(s->cursors[cursor_idx]);
+    return clang_str_to_with(s, clang_getCursorKindSpelling(kind));
+}
+
+// ── Type queries ────────────────────────────────────────────
+
+int32_t with_ci_cursor_type(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return -1;
+    CXType ty = clang_getCursorType(s->cursors[cursor_idx]);
+    return store_type(s, ty);
+}
+
+int32_t with_ci_type_kind(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return 0;
+    return (int32_t)s->types[type_idx].kind;
+}
+
+with_str with_ci_type_spelling(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return make_str("");
+    return clang_str_to_with(s, clang_getTypeSpelling(s->types[type_idx]));
+}
+
+int64_t with_ci_type_sizeof(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return -1;
+    return clang_Type_getSizeOf(s->types[type_idx]);
+}
+
+int64_t with_ci_type_alignof(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return -1;
+    return clang_Type_getAlignOf(s->types[type_idx]);
+}
+
+int32_t with_ci_type_is_const(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return 0;
+    return clang_isConstQualifiedType(s->types[type_idx]) ? 1 : 0;
+}
+
+int32_t with_ci_type_is_volatile(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return 0;
+    return clang_isVolatileQualifiedType(s->types[type_idx]) ? 1 : 0;
+}
+
+int32_t with_ci_type_pointee(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return -1;
+    CXType pointee = clang_getPointeeType(s->types[type_idx]);
+    if (pointee.kind == CXType_Invalid) return -1;
+    return store_type(s, pointee);
+}
+
+int32_t with_ci_type_canonical(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return -1;
+    CXType canonical = clang_getCanonicalType(s->types[type_idx]);
+    return store_type(s, canonical);
+}
+
+int32_t with_ci_type_result(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return -1;
+    CXType result = clang_getResultType(s->types[type_idx]);
+    if (result.kind == CXType_Invalid) return -1;
+    return store_type(s, result);
+}
+
+int32_t with_ci_type_arg_count(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return 0;
+    return clang_getNumArgTypes(s->types[type_idx]);
+}
+
+int32_t with_ci_type_arg(int64_t session, int32_t type_idx, int32_t index) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return -1;
+    CXType arg = clang_getArgType(s->types[type_idx], (unsigned)index);
+    if (arg.kind == CXType_Invalid) return -1;
+    return store_type(s, arg);
+}
+
+int32_t with_ci_type_is_variadic(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return 0;
+    return clang_isFunctionTypeVariadic(s->types[type_idx]) ? 1 : 0;
+}
+
+int64_t with_ci_type_array_size(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return -1;
+    return clang_getArraySize(s->types[type_idx]);
+}
+
+int32_t with_ci_type_array_element(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return -1;
+    CXType elem = clang_getArrayElementType(s->types[type_idx]);
+    if (elem.kind == CXType_Invalid) return -1;
+    return store_type(s, elem);
+}
+
+int32_t with_ci_type_named(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return -1;
+    CXType named = clang_Type_getNamedType(s->types[type_idx]);
+    if (named.kind == CXType_Invalid) return -1;
+    return store_type(s, named);
+}
+
+int32_t with_ci_type_declaration(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return -1;
+    CXCursor decl = clang_getTypeDeclaration(s->types[type_idx]);
+    if (clang_Cursor_isNull(decl)) return -1;
+    return store_cursor(s, decl);
+}
+
+// ── Translated type (reuse existing recursive translator) ───
+
+with_str with_ci_type_translated(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return make_str("i32");
+    char *result = translate_type_recursive(s, s->types[type_idx], 0, 0);
+    return session_make_str(s, result ? result : "i32");
+}
+
+// ── Linkage / storage / inline ──────────────────────────────
+
+int32_t with_ci_cursor_linkage(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    return (int32_t)clang_getCursorLinkage(s->cursors[cursor_idx]);
+}
+
+int32_t with_ci_cursor_storage_class(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    return (int32_t)clang_Cursor_getStorageClass(s->cursors[cursor_idx]);
+}
+
+int32_t with_ci_cursor_is_inline(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    return clang_Cursor_isFunctionInlined(s->cursors[cursor_idx]) ? 1 : 0;
+}
+
+// ── Source location ─────────────────────────────────────────
+
+with_str with_ci_cursor_location(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return make_str("");
+    CXSourceLocation loc = clang_getCursorLocation(s->cursors[cursor_idx]);
+    CXFile file = NULL;
+    unsigned line = 0, col = 0;
+    clang_getFileLocation(loc, &file, &line, &col, NULL);
+    if (!file) return make_str("");
+    CXString fname = clang_getFileName(file);
+    const char *fname_str = clang_getCString(fname);
+    char buf[1024];
+    snprintf(buf, sizeof(buf), "%s:%u:%u", fname_str ? fname_str : "?", line, col);
+    clang_disposeString(fname);
+    return session_make_str(s, buf);
+}
+
+with_str with_ci_cursor_source_text(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return make_str("");
+    CXSourceRange range = clang_getCursorExtent(s->cursors[cursor_idx]);
+    CXSourceLocation start_loc = clang_getRangeStart(range);
+    CXSourceLocation end_loc = clang_getRangeEnd(range);
+    CXFile file = NULL;
+    unsigned start_off = 0, end_off = 0;
+    clang_getFileLocation(start_loc, &file, NULL, NULL, &start_off);
+    clang_getFileLocation(end_loc, NULL, NULL, NULL, &end_off);
+    if (!file || end_off <= start_off) return make_str("");
+
+    // Get file contents via the TU's source buffer
+    size_t buf_size = 0;
+    const char *buf = clang_getFileContents(s->tu, file, &buf_size);
+    if (!buf || end_off > buf_size) return make_str("");
+
+    size_t len = end_off - start_off;
+    char *text = (char *)malloc(len + 1);
+    memcpy(text, buf + start_off, len);
+    text[len] = 0;
+
+    with_str result = session_make_str(s, text);
+    free(text);
+    return result;
+}
+
+// ── Struct/Union/Enum specifics ─────────────────────────────
+
+int32_t with_ci_cursor_is_anonymous(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    return clang_Cursor_isAnonymous(s->cursors[cursor_idx]) ? 1 : 0;
+}
+
+int32_t with_ci_cursor_is_bitfield(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    return clang_Cursor_isBitField(s->cursors[cursor_idx]) ? 1 : 0;
+}
+
+int64_t with_ci_field_offset_bits(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return -1;
+    CXType parent_type = clang_getCursorType(clang_getCursorSemanticParent(s->cursors[cursor_idx]));
+    CXString name = clang_getCursorSpelling(s->cursors[cursor_idx]);
+    long long offset = clang_Type_getOffsetOf(parent_type, clang_getCString(name));
+    clang_disposeString(name);
+    return offset;
+}
+
+int64_t with_ci_enum_const_value_new(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    return clang_getEnumConstantDeclValue(s->cursors[cursor_idx]);
+}
+
+int32_t with_ci_cursor_is_definition(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    return clang_isCursorDefinition(s->cursors[cursor_idx]) ? 1 : 0;
+}
+
+// ── Target info ─────────────────────────────────────────────
+
+int32_t with_ci_pointer_width(int64_t session) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->tu) return 8;
+    CXType void_ptr = clang_getCanonicalType(
+        clang_getResultType(clang_getCursorType(clang_getTranslationUnitCursor(s->tu))));
+    // Fallback: just return platform pointer size
+    return (int32_t)sizeof(void *);
+}
+
+with_str with_ci_target_triple(int64_t session) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->tu) return make_str("");
+    CXTargetInfo ti = clang_getTranslationUnitTargetInfo(s->tu);
+    if (!ti) return make_str("");
+    CXString triple = clang_TargetInfo_getTriple(ti);
+    with_str result = session_make_str(s, clang_getCString(triple));
+    clang_disposeString(triple);
+    clang_TargetInfo_dispose(ti);
+    return result;
+}
+
+int32_t with_ci_sizeof_long(int64_t session) {
+    // On arm64 macOS, long is 8 bytes. On 32-bit, it's 4.
+    return (int32_t)sizeof(long);
+}
+
+int32_t with_ci_char_is_signed(int64_t session) {
+    // On arm64 macOS/Linux, char is signed. On ARM, char may be unsigned.
+    (void)session;
+    #ifdef __CHAR_UNSIGNED__
+    return 0;
+    #else
+    return 1;
+    #endif
+}
+
+// ── Operator introspection (Session 2) ──────────────────────
+
+int32_t with_ci_binary_op(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return -1;
+    // Try source text extraction approach
+    // Get the source text between first and second child
+    ensure_children_cached(s, cursor_idx);
+    if (s->child_counts[cursor_idx] < 2) return -1;
+
+    int32_t start = s->child_starts[cursor_idx];
+    int32_t lhs_idx = s->child_indices[start];
+    int32_t rhs_idx = s->child_indices[start + 1];
+
+    CXSourceRange lhs_range = clang_getCursorExtent(s->cursors[lhs_idx]);
+    CXSourceRange rhs_range = clang_getCursorExtent(s->cursors[rhs_idx]);
+    CXSourceLocation lhs_end = clang_getRangeEnd(lhs_range);
+    CXSourceLocation rhs_start = clang_getRangeStart(rhs_range);
+
+    unsigned lhs_end_off = 0, rhs_start_off = 0;
+    CXFile file = NULL;
+    clang_getFileLocation(lhs_end, &file, NULL, NULL, &lhs_end_off);
+    clang_getFileLocation(rhs_start, NULL, NULL, NULL, &rhs_start_off);
+    if (!file || rhs_start_off <= lhs_end_off) return -1;
+
+    size_t buf_size = 0;
+    const char *buf = clang_getFileContents(s->tu, file, &buf_size);
+    if (!buf || rhs_start_off > buf_size) return -1;
+
+    // Extract and trim whitespace to find the operator
+    const char *op_start = buf + lhs_end_off;
+    const char *op_end = buf + rhs_start_off;
+    while (op_start < op_end && (*op_start == ' ' || *op_start == '\t' || *op_start == '\n'))
+        op_start++;
+    while (op_end > op_start && (*(op_end-1) == ' ' || *(op_end-1) == '\t' || *(op_end-1) == '\n'))
+        op_end--;
+
+    size_t op_len = (size_t)(op_end - op_start);
+    // Map to operator constants
+    // BO_* constants matching C's BinaryOperatorKind
+    if (op_len == 1) {
+        switch (op_start[0]) {
+            case '+': return 0;   // BO_Add
+            case '-': return 1;   // BO_Sub
+            case '*': return 2;   // BO_Mul
+            case '/': return 3;   // BO_Div
+            case '%': return 4;   // BO_Rem
+            case '&': return 5;   // BO_And
+            case '|': return 6;   // BO_Or
+            case '^': return 7;   // BO_Xor
+            case '<': return 12;  // BO_LT
+            case '>': return 13;  // BO_GT
+            case '=': return 18;  // BO_Assign
+            case ',': return 19;  // BO_Comma
+        }
+    } else if (op_len == 2) {
+        if (op_start[0] == '<' && op_start[1] == '<') return 8;   // BO_Shl
+        if (op_start[0] == '>' && op_start[1] == '>') return 9;   // BO_Shr
+        if (op_start[0] == '&' && op_start[1] == '&') return 10;  // BO_LAnd
+        if (op_start[0] == '|' && op_start[1] == '|') return 11;  // BO_LOr
+        if (op_start[0] == '<' && op_start[1] == '=') return 14;  // BO_LE
+        if (op_start[0] == '>' && op_start[1] == '=') return 15;  // BO_GE
+        if (op_start[0] == '=' && op_start[1] == '=') return 16;  // BO_EQ
+        if (op_start[0] == '!' && op_start[1] == '=') return 17;  // BO_NE
+        if (op_start[0] == '+' && op_start[1] == '=') return 20;  // BO_AddAssign
+        if (op_start[0] == '-' && op_start[1] == '=') return 21;  // BO_SubAssign
+        if (op_start[0] == '*' && op_start[1] == '=') return 22;  // BO_MulAssign
+        if (op_start[0] == '/' && op_start[1] == '=') return 23;  // BO_DivAssign
+        if (op_start[0] == '%' && op_start[1] == '=') return 24;  // BO_RemAssign
+        if (op_start[0] == '&' && op_start[1] == '=') return 25;  // BO_AndAssign
+        if (op_start[0] == '|' && op_start[1] == '=') return 26;  // BO_OrAssign
+        if (op_start[0] == '^' && op_start[1] == '=') return 27;  // BO_XorAssign
+    } else if (op_len == 3) {
+        if (op_start[0] == '<' && op_start[1] == '<' && op_start[2] == '=') return 28; // BO_ShlAssign
+        if (op_start[0] == '>' && op_start[1] == '>' && op_start[2] == '=') return 29; // BO_ShrAssign
+    }
+    return -1;
+}
+
+int32_t with_ci_unary_op(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return -1;
+    // Get source text of the unary operator cursor
+    CXSourceRange range = clang_getCursorExtent(s->cursors[cursor_idx]);
+    ensure_children_cached(s, cursor_idx);
+    if (s->child_counts[cursor_idx] < 1) return -1;
+
+    int32_t child_idx = s->child_indices[s->child_starts[cursor_idx]];
+    CXSourceRange child_range = clang_getCursorExtent(s->cursors[child_idx]);
+
+    CXSourceLocation op_loc = clang_getRangeStart(range);
+    CXSourceLocation child_start = clang_getRangeStart(child_range);
+    CXSourceLocation child_end = clang_getRangeEnd(child_range);
+
+    unsigned op_off = 0, child_start_off = 0, child_end_off = 0;
+    CXFile file = NULL;
+    clang_getFileLocation(op_loc, &file, NULL, NULL, &op_off);
+    clang_getFileLocation(child_start, NULL, NULL, NULL, &child_start_off);
+    clang_getFileLocation(child_end, NULL, NULL, NULL, &child_end_off);
+
+    if (!file) return -1;
+
+    size_t buf_size = 0;
+    const char *buf = clang_getFileContents(s->tu, file, &buf_size);
+    if (!buf) return -1;
+
+    // Prefix operator: op appears before child
+    if (op_off < child_start_off) {
+        size_t len = child_start_off - op_off;
+        const char *op = buf + op_off;
+        while (len > 0 && (op[len-1] == ' ' || op[len-1] == '\t')) len--;
+        if (len == 1 && op[0] == '-') return 0;  // UO_Minus
+        if (len == 1 && op[0] == '~') return 1;  // UO_Not (bitwise)
+        if (len == 1 && op[0] == '!') return 2;  // UO_LNot (logical)
+        if (len == 1 && op[0] == '&') return 3;  // UO_AddrOf
+        if (len == 1 && op[0] == '*') return 4;  // UO_Deref
+        if (len == 1 && op[0] == '+') return 5;  // UO_Plus
+        if (len == 2 && op[0] == '+' && op[1] == '+') return 6; // UO_PreInc
+        if (len == 2 && op[0] == '-' && op[1] == '-') return 7; // UO_PreDec
+    }
+    // Postfix operator: op appears after child
+    if (op_off >= child_end_off || child_end_off > op_off) {
+        unsigned range_end_off = 0;
+        clang_getFileLocation(clang_getRangeEnd(range), NULL, NULL, NULL, &range_end_off);
+        if (range_end_off > child_end_off) {
+            const char *op = buf + child_end_off;
+            size_t len = range_end_off - child_end_off;
+            while (len > 0 && (op[0] == ' ' || op[0] == '\t')) { op++; len--; }
+            if (len >= 2 && op[0] == '+' && op[1] == '+') return 8; // UO_PostInc
+            if (len >= 2 && op[0] == '-' && op[1] == '-') return 9; // UO_PostDec
+        }
+    }
+    return -1;
+}
+
+// ── Constant evaluation ─────────────────────────────────────
+
+int32_t with_ci_eval_as_int(int64_t session, int32_t cursor_idx, int64_t *out) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count || !out) return 0;
+    CXEvalResult eval = clang_Cursor_Evaluate(s->cursors[cursor_idx]);
+    if (!eval) return 0;
+    CXEvalResultKind kind = clang_EvalResult_getKind(eval);
+    if (kind == CXEval_Int) {
+        *out = clang_EvalResult_getAsLongLong(eval);
+        clang_EvalResult_dispose(eval);
+        return 1;
+    }
+    clang_EvalResult_dispose(eval);
+    return 0;
+}
+
+int32_t with_ci_eval_as_float(int64_t session, int32_t cursor_idx, double *out) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count || !out) return 0;
+    CXEvalResult eval = clang_Cursor_Evaluate(s->cursors[cursor_idx]);
+    if (!eval) return 0;
+    CXEvalResultKind kind = clang_EvalResult_getKind(eval);
+    if (kind == CXEval_Float) {
+        *out = clang_EvalResult_getAsDouble(eval);
+        clang_EvalResult_dispose(eval);
+        return 1;
+    }
+    clang_EvalResult_dispose(eval);
+    return 0;
+}
+
+with_str with_ci_eval_as_str(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return make_str("");
+    CXEvalResult eval = clang_Cursor_Evaluate(s->cursors[cursor_idx]);
+    if (!eval) return make_str("");
+    CXEvalResultKind kind = clang_EvalResult_getKind(eval);
+    if (kind == CXEval_StrLiteral || kind == CXEval_CFStr || kind == CXEval_ObjCStrLiteral) {
+        const char *str = clang_EvalResult_getAsStr(eval);
+        with_str result = session_make_str(s, str ? str : "");
+        clang_EvalResult_dispose(eval);
+        return result;
+    }
+    clang_EvalResult_dispose(eval);
+    return make_str("");
+}
+
+// ── Calling convention ──────────────────────────────────────
+
+int32_t with_ci_calling_conv(int64_t session, int32_t type_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->types || type_idx < 0 || type_idx >= s->type_count) return 0;
+    return (int32_t)clang_getFunctionTypeCallingConv(s->types[type_idx]);
+}
+
+// ── Typedef ─────────────────────────────────────────────────
+
+int32_t with_ci_typedef_underlying_type(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return -1;
+    CXType underlying = clang_getTypedefDeclUnderlyingType(s->cursors[cursor_idx]);
+    if (underlying.kind == CXType_Invalid) return -1;
+    return store_type(s, underlying);
+}
+
+// ── Member expression ───────────────────────────────────────
+
+int32_t with_ci_member_is_arrow(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    // Check if the operator between base and member is "->"
+    // MemberRefExpr children: [base]. The member name comes from cursor spelling.
+    // Arrow vs dot is determined by source text.
+    CXSourceRange range = clang_getCursorExtent(s->cursors[cursor_idx]);
+    CXSourceLocation start = clang_getRangeStart(range);
+    CXSourceLocation end = clang_getRangeEnd(range);
+    unsigned start_off = 0, end_off = 0;
+    CXFile file = NULL;
+    clang_getFileLocation(start, &file, NULL, NULL, &start_off);
+    clang_getFileLocation(end, NULL, NULL, NULL, &end_off);
+    if (!file || end_off <= start_off) return 0;
+    size_t buf_size = 0;
+    const char *buf = clang_getFileContents(s->tu, file, &buf_size);
+    if (!buf) return 0;
+    // Search for "->" in the source text
+    for (unsigned i = start_off; i + 1 < end_off && i < buf_size - 1; i++) {
+        if (buf[i] == '-' && buf[i+1] == '>') return 1;
+    }
+    return 0;
+}
+
+with_str with_ci_member_field_name(int64_t session, int32_t cursor_idx) {
+    // For MemberRefExpr, the cursor spelling IS the field name
+    return with_ci_cursor_spelling(session, cursor_idx);
+}
+
+// ── Enum integer type ───────────────────────────────────────
+
+int32_t with_ci_enum_int_type(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return -1;
+    CXType int_type = clang_getEnumDeclIntegerType(s->cursors[cursor_idx]);
+    if (int_type.kind == CXType_Invalid) return -1;
+    return store_type(s, int_type);
 }
