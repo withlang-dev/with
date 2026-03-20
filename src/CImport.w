@@ -678,7 +678,7 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
     if const_count == 0:
         // Forward-declared enum with no constants → emit as opaque
         let fwd_name = with_cimport_decl_name(session, idx)
-        if fwd_name.len() > 0 and fwd_name.byte_at(0) != 95:
+        if fwd_name.len() > 0 and fwd_name.byte_at(0) != 95 and not ci_str_contains(fwd_name, "(unnamed") and not ci_str_contains(fwd_name, "(anonymous"):
             if with_cimport_is_name_emitted(fwd_name) == 0:
                 with_cimport_mark_name_emitted(fwd_name)
                 return "type " ++ ci_escape_reserved(fwd_name) ++ " = opaque\n"
@@ -690,9 +690,10 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
 
     var output = ""
 
-    // Emit type alias for named enums
+    // Emit type alias for named enums (skip anonymous enums with synthetic names)
     let enum_name = with_cimport_decl_name(session, idx)
-    if enum_name.len() > 0 and enum_name.byte_at(0) != 95:
+    let is_anonymous = enum_name.len() == 0 or enum_name.byte_at(0) == 95 or ci_str_contains(enum_name, "(unnamed") or ci_str_contains(enum_name, "(anonymous")
+    if not is_anonymous:
         if with_cimport_is_name_emitted(enum_name) == 0:
             let safe_enum_name = ci_escape_reserved(enum_name)
             with_cimport_mark_name_emitted(enum_name)
@@ -870,9 +871,13 @@ fn ci_translate_macros(session: i64) -> str:
                     if param_count > 0:
                         type_params = "[T]"
                         ret_type = "T"
-                    // Try token paste (##) translation before general expression translation
+                    // Try pattern matching before expression translation
                     var translated = ""
-                    if ci_str_contains(value, "##"):
+                    // DISCARD pattern: (void)(X) or ((void)(X)) — discard value
+                    if ci_is_discard_pattern(value, param_names):
+                        translated = ci_translate_discard_pattern(value, param_names, known_values)
+                    // Token paste (##) translation
+                    if translated.len() == 0 and ci_str_contains(value, "##"):
                         translated = ci_try_translate_token_paste(value, param_names)
                     if translated.len() == 0:
                         translated = ci_translate_c_expr(value, param_names, known_values)
@@ -1002,17 +1007,25 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
                     return "sizeof[" ++ mapped ++ "]()"
         return ""
 
-    // Cast: (type)expr  OR  comma operator: (expr1, expr2) → expr2
+    // Cast: (type)expr  OR  CAST_OR_CALL: (X)(Y)  OR  comma operator: (expr1, expr2) → expr2
     if trimmed.byte_at(0) == 40:
         let cast_end = ci_find_matching_paren(trimmed, 0)
         if cast_end > 0 and cast_end as i64 + 1 < trimmed.len():
             let inside = trimmed.slice(1, cast_end as i64)
+            let after_str = trimmed.slice(cast_end as i64 + 1, trimmed.len())
             if ci_is_c_type_name(inside):
-                let after = ci_translate_c_expr(trimmed.slice(cast_end as i64 + 1, trimmed.len()), params, known)
+                let after = ci_translate_c_expr(after_str, params, known)
                 if after.len() > 0:
                     let mapped = ci_map_base_type(ci_trim(inside))
                     return "(" ++ after ++ " as " ++ mapped ++ ")"
                 return ""
+            // CAST_OR_CALL: (X)(Y) where X is a param or known identifier
+            if ci_is_c_ident(ci_trim(inside)):
+                let callee = ci_translate_c_expr(ci_trim(inside), params, known)
+                if callee.len() > 0:
+                    let call_args = ci_translate_c_expr(ci_strip_parens(after_str), params, known)
+                    if call_args.len() > 0:
+                        return callee ++ "(" ++ call_args ++ ")"
         // Comma operator: (a, b) at top level — translate last expression
         if cast_end == trimmed.len() as i32 - 1:
             let inside = trimmed.slice(1, cast_end as i64)
@@ -1207,18 +1220,106 @@ fn ci_translate_builtin_call(name: str, args: str, params: str, known: str) -> s
             return stdlib_name ++ "(" ++ translated_args ++ ")"
         return ""
 
-    if name == "__builtin_isnan" or name == "__builtin_isinf":
+    if name == "__builtin_isnan" or name == "__builtin_isinf" or name == "__builtin_isinf_sign":
         let stdlib_name = name.slice(10, name.len())
         let translated_args = ci_translate_call_args(args, params, known)
         if translated_args.len() > 0:
             return stdlib_name ++ "(" ++ translated_args ++ ")"
         return ""
 
-    // Tier 4: Variadic helpers — not translatable inline
+    // Tier 4: Additional builtins
+    if name == "__builtin_exp2" or name == "__builtin_exp2f":
+        let stdlib_name = name.slice(10, name.len())
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return stdlib_name ++ "(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin_signbit" or name == "__builtin_signbitf":
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return "signbit(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin_labs":
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return "labs(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin_llabs":
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return "llabs(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin_strcmp":
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return "strcmp(" ++ translated_args ++ ")"
+        return ""
+
+    if name == "__builtin___memcpy_chk":
+        // __builtin___memcpy_chk(dst, src, n, objsize) → memcpy(dst, src, n)
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return "memcpy(" ++ ci_first_n_args(translated_args, 3) ++ ")"
+        return ""
+
+    if name == "__builtin___memset_chk":
+        // __builtin___memset_chk(dst, val, n, objsize) → memset(dst, val, n)
+        let translated_args = ci_translate_call_args(args, params, known)
+        if translated_args.len() > 0:
+            return "memset(" ++ ci_first_n_args(translated_args, 3) ++ ")"
+        return ""
+
+    if name == "__builtin_huge_valf":
+        return "HUGE_VALF"
+
+    if name == "__builtin_inff":
+        return "INFINITY"
+
+    if name == "__builtin_nanf":
+        // __builtin_nanf("") → NAN
+        return "NAN"
+
+    if name == "__builtin_object_size":
+        // __builtin_object_size(ptr, type) → (0 - 1) as usize  (unknown size)
+        return "0 - 1"
+
+    if name == "__builtin_mul_overflow":
+        // __builtin_mul_overflow(a, b, result) — can't translate inline
+        return ""
+
+    if name == "__builtin_assume":
+        // __builtin_assume(cond) — hint only, no effect at runtime
+        return ""
+
+    if name == "__has_builtin":
+        // __has_builtin(x) → always true at compile time
+        return "1"
+
+    // Tier 5: Variadic helpers — not translatable inline
     if name == "__builtin_va_start" or name == "__builtin_va_end" or name == "__builtin_va_copy" or name == "__builtin_va_arg":
         return ""
 
     ""
+
+fn ci_first_n_args(args: str, n: i32) -> str:
+    // Extract first N comma-separated arguments from a translated arg string
+    var depth = 0
+    var count = 0
+    var i = 0
+    while i < args.len() as i32:
+        let c = args.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        if c == 41: depth = depth - 1
+        if c == 44 and depth == 0:
+            count = count + 1
+            if count >= n:
+                return args.slice(0, i as i64)
+        i = i + 1
+    args
 
 fn ci_extract_first_arg(args: str) -> str:
     var depth = 0
@@ -1231,6 +1332,41 @@ fn ci_extract_first_arg(args: str) -> str:
             return ci_trim(args.slice(0, i as i64))
         i = i + 1
     ci_trim(args)
+
+// ── DISCARD pattern: (void)(X) ───────────────────────────────
+// Matches: (void)(X), ((void)(X)), (const void)(X), (volatile void)(X), etc.
+// Translates to just evaluating X (discarding the result)
+
+fn ci_is_discard_pattern(body: str, params: str) -> bool:
+    let stripped = ci_strip_parens(ci_trim(body))
+    // Must be (void)(X) or (const void)(X) etc.
+    if stripped.len() < 8:
+        return false
+    if stripped.byte_at(0) != 40:  // '('
+        return false
+    let close = ci_find_matching_paren(stripped, 0)
+    if close < 0:
+        return false
+    let cast_type = ci_trim(stripped.slice(1, close as i64))
+    // Check if cast type is void, const void, volatile void, etc.
+    let is_void_cast = cast_type == "void" or cast_type == "const void" or cast_type == "volatile void" or cast_type == "const volatile void" or cast_type == "volatile const void"
+    if not is_void_cast:
+        return false
+    // Rest must be (X) where X is a param
+    let rest = ci_trim(stripped.slice(close as i64 + 1, stripped.len()))
+    if rest.len() < 3 or rest.byte_at(0) != 40:
+        return false
+    true
+
+fn ci_translate_discard_pattern(body: str, params: str, known: str) -> str:
+    let stripped = ci_strip_parens(ci_trim(body))
+    let close = ci_find_matching_paren(stripped, 0)
+    if close < 0:
+        return ""
+    let rest = ci_trim(stripped.slice(close as i64 + 1, stripped.len()))
+    // rest is (X) — extract X
+    let inner = ci_strip_parens(rest)
+    ci_translate_c_expr(inner, params, known)
 
 // ── Token pasting (##) translation ───────────────────────────
 // Handles macros like: (v ## ULL), (v ## U), (v ## L)
