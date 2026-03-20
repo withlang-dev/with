@@ -1928,6 +1928,113 @@ with_str with_ci_member_field_name(int64_t session, int32_t cursor_idx) {
 
 // ── Enum integer type ───────────────────────────────────────
 
+// ── Typedef → anonymous record detection ────────────────────
+
+// For typedef idx, check if underlying type is an anonymous record with fields.
+// Returns field count if yes (> 0), 0 if not an anonymous record.
+int32_t with_cimport_typedef_anon_record_field_count(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    CXType underlying = clang_getTypedefDeclUnderlyingType(s->decls[idx]);
+    CXType canonical = clang_getCanonicalType(underlying);
+    if (canonical.kind != CXType_Record) return 0;
+    CXCursor decl = clang_getTypeDeclaration(canonical);
+    if (clang_Cursor_isNull(decl)) return 0;
+    // Check if the record is anonymous/unnamed
+    CXString name = clang_getCursorSpelling(decl);
+    const char *n = clang_getCString(name);
+    int is_anon = (!n || !n[0] || strstr(n, "(unnamed") || strstr(n, "(anonymous"));
+    clang_disposeString(name);
+    if (!is_anon) return 0;
+    // Check if it has a definition
+    if (!clang_isCursorDefinition(decl)) return 0;
+    // Count fields
+    FieldCollector fc = {NULL, 0, 0};
+    clang_visitChildren(decl, collect_field, &fc);
+    int count = fc.count;
+    for (int i = 0; i < fc.count; i++) {
+        free(fc.fields[i].name);
+        free(fc.fields[i].type_spelling);
+    }
+    free(fc.fields);
+    return count;
+}
+
+// Get field name/type for a typedef's anonymous record underlying type
+with_str with_cimport_typedef_anon_field_name(int64_t session, int32_t idx, int32_t field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("");
+    CXType underlying = clang_getTypedefDeclUnderlyingType(s->decls[idx]);
+    CXType canonical = clang_getCanonicalType(underlying);
+    if (canonical.kind != CXType_Record) return make_str("");
+    CXCursor decl = clang_getTypeDeclaration(canonical);
+    FieldCollector fc = {NULL, 0, 0};
+    clang_visitChildren(decl, collect_field, &fc);
+    with_str result = make_str("");
+    if (field >= 0 && field < fc.count) {
+        result = session_make_str(s, fc.fields[field].name);
+    }
+    for (int i = 0; i < fc.count; i++) {
+        free(fc.fields[i].name);
+        free(fc.fields[i].type_spelling);
+    }
+    free(fc.fields);
+    return result;
+}
+
+with_str with_cimport_typedef_anon_field_type(int64_t session, int32_t idx, int32_t field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return make_str("i32");
+    CXType underlying = clang_getTypedefDeclUnderlyingType(s->decls[idx]);
+    CXType canonical = clang_getCanonicalType(underlying);
+    if (canonical.kind != CXType_Record) return make_str("i32");
+    CXCursor decl = clang_getTypeDeclaration(canonical);
+    FieldCollector fc = {NULL, 0, 0};
+    clang_visitChildren(decl, collect_field, &fc);
+    with_str result = make_str("i32");
+    if (field >= 0 && field < fc.count) {
+        int is_last = (field == fc.count - 1) ? 1 : 0;
+        char *translated = translate_type_recursive(s, fc.fields[field].clang_type, 0, is_last);
+        result = session_make_str(s, translated ? translated : "i32");
+    }
+    for (int i = 0; i < fc.count; i++) {
+        free(fc.fields[i].name);
+        free(fc.fields[i].type_spelling);
+    }
+    free(fc.fields);
+    return result;
+}
+
+int32_t with_cimport_typedef_anon_field_is_bitfield(int64_t session, int32_t idx, int32_t field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    CXType underlying = clang_getTypedefDeclUnderlyingType(s->decls[idx]);
+    CXType canonical = clang_getCanonicalType(underlying);
+    if (canonical.kind != CXType_Record) return 0;
+    CXCursor decl = clang_getTypeDeclaration(canonical);
+    FieldCollector fc = {NULL, 0, 0};
+    clang_visitChildren(decl, collect_field, &fc);
+    int result = 0;
+    if (field >= 0 && field < fc.count) result = fc.fields[field].is_bitfield;
+    for (int i = 0; i < fc.count; i++) {
+        free(fc.fields[i].name);
+        free(fc.fields[i].type_spelling);
+    }
+    free(fc.fields);
+    return result;
+}
+
+// Check if typedef's underlying type is a union (not struct)
+int32_t with_cimport_typedef_anon_is_union(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    CXType underlying = clang_getTypedefDeclUnderlyingType(s->decls[idx]);
+    CXType canonical = clang_getCanonicalType(underlying);
+    if (canonical.kind != CXType_Record) return 0;
+    CXCursor decl = clang_getTypeDeclaration(canonical);
+    return (clang_getCursorKind(decl) == CXCursor_UnionDecl) ? 1 : 0;
+}
+
 int32_t with_ci_enum_int_type(int64_t session, int32_t cursor_idx) {
     CImportSession *s = (CImportSession *)(intptr_t)session;
     if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return -1;

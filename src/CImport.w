@@ -55,6 +55,11 @@ extern fn with_cimport_fn_is_inline(session: i64, idx: i32) -> i32
 extern fn with_cimport_fn_calling_conv(session: i64, idx: i32) -> str
 extern fn with_cimport_macro_param_count(session: i64, idx: i32) -> i32
 extern fn with_cimport_macro_param_name(session: i64, idx: i32, param: i32) -> str
+extern fn with_cimport_typedef_anon_record_field_count(session: i64, idx: i32) -> i32
+extern fn with_cimport_typedef_anon_field_name(session: i64, idx: i32, field: i32) -> str
+extern fn with_cimport_typedef_anon_field_type(session: i64, idx: i32, field: i32) -> str
+extern fn with_cimport_typedef_anon_field_is_bitfield(session: i64, idx: i32, field: i32) -> i32
+extern fn with_cimport_typedef_anon_is_union(session: i64, idx: i32) -> i32
 extern fn int_to_string(n: i32) -> str
 extern fn i64_to_string(n: i64) -> str
 extern fn with_eprintln(s: str) -> void
@@ -793,6 +798,43 @@ fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
         let safe_name = ci_escape_reserved(name)
         with_cimport_mark_name_emitted(name)
         return "type " ++ safe_name ++ " = " ++ mapped ++ "\n"
+
+    // Check if typedef aliases an anonymous struct/union — inline its fields
+    let anon_field_count = with_cimport_typedef_anon_record_field_count(session, idx)
+    if anon_field_count > 0:
+        let anon_safe_name = ci_escape_reserved(name)
+        // Check for bitfields or unsupported field types → demote to opaque
+        var anon_has_bitfield = false
+        var anon_has_unsupported = false
+        var afi = 0
+        while afi < anon_field_count:
+            if with_cimport_typedef_anon_field_is_bitfield(session, idx, afi) != 0:
+                anon_has_bitfield = true
+            let ft = with_cimport_typedef_anon_field_type(session, idx, afi)
+            if ci_starts_with(ft, "__UNSUPPORTED:") or ft == "opaque":
+                anon_has_unsupported = true
+            afi = afi + 1
+        if anon_has_bitfield or anon_has_unsupported:
+            with_cimport_mark_name_emitted(name)
+            return "type " ++ anon_safe_name ++ " = opaque\n"
+        // Build field list
+        var fields = ""
+        afi = 0
+        while afi < anon_field_count:
+            if afi > 0:
+                fields = fields ++ ", "
+            let fname = with_cimport_typedef_anon_field_name(session, idx, afi)
+            let ftype = with_cimport_typedef_anon_field_type(session, idx, afi)
+            let actual_fname = if fname.len() == 0: "unnamed_" ++ int_to_string(afi) else: fname
+            let default_val = ci_default_for_type(ftype)
+            if default_val.len() > 0:
+                fields = fields ++ ci_escape_reserved(actual_fname) ++ ": " ++ ftype ++ " = " ++ default_val
+            else:
+                fields = fields ++ ci_escape_reserved(actual_fname) ++ ": " ++ ftype
+            afi = afi + 1
+        with_cimport_mark_name_emitted(name)
+        let union_prefix = if with_cimport_typedef_anon_is_union(session, idx) != 0: "// union\n" else: ""
+        return union_prefix ++ "type " ++ anon_safe_name ++ " = \{ " ++ fields ++ " }\n"
 
     // Use the recursive type translator for the underlying type
     let translated = with_cimport_typedef_underlying_translated(session, idx)
