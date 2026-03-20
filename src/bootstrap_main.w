@@ -19,7 +19,7 @@ fn main -> void:
 
     let command = with_arg_at(1)
     if command == "version" or command == "--version":
-        print("with 0.0.1\n")
+        print("with WITH_VERSION_PLACEHOLDER\n")
         return
     if command == "help" or command == "--help" or command == "-h":
         print_usage()

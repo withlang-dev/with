@@ -9,6 +9,7 @@ SELFHOST_BIN="${ROOT_DIR}/out/bin/with-stage2"
 CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 RUN_TIMEOUT_SECS="${PARITY_RUN_TIMEOUT_SECS:-25}"
 CLI_TIMEOUT_SECS="${PARITY_CLI_TIMEOUT_SECS:-25}"
+EXPECTED_VERSION="with $("${ROOT_DIR}/scripts/resolve_version.sh")"
 
 echo "rebuilding self-host compiler for Wave 11 unit tests..."
 ./scripts/rebuild_selfhost.sh stage2 >/dev/null
@@ -168,6 +169,28 @@ expect_cli_pass() {
   fi
 }
 
+expect_cli_stdout() {
+  local key="$1"
+  local expected="$2"
+  if ! run_cli_key "$key" "$tmpdir/out" "$tmpdir/err"; then
+    echo "FAIL(wave11-unit-cli-stdout-run) $key"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  local actual=""
+  actual="$(tr -d '\r' < "$tmpdir/out")"
+  actual="${actual%$'\n'}"
+  if [[ "$actual" != "$expected" ]]; then
+    echo "FAIL(wave11-unit-cli-stdout) $key"
+    echo "expected: $expected"
+    echo "actual: $actual"
+    failures=$((failures + 1))
+    return
+  fi
+  echo "PASS(wave11-unit-cli-stdout) $key"
+}
+
 expect_cli_fail() {
   local key="$1"
   if run_cli_key "$key" "$tmpdir/out" "$tmpdir/err"; then
@@ -302,7 +325,7 @@ expect_mode_fail_msg test "test/wave11/cases/c_import_bad_header_fail.w" "test"
 expect_mode_fail_msg test "test/wave11/cases/does_not_exist.w" "error:"
 
 expect_cli_pass help
-expect_cli_pass version
+expect_cli_stdout version "$EXPECTED_VERSION"
 expect_cli_pass clean
 expect_cli_fail unknown_command
 expect_cli_fail build_missing_arg

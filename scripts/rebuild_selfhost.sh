@@ -14,6 +14,8 @@ OUT_LIB_DIR="${OUT_DIR}/lib"
 OUT_LOG_DIR="${OUT_DIR}/log"
 OUT_TMP_DIR="${OUT_DIR}/tmp"
 OUT_RUNTIME_LINK="${OUT_BIN_DIR}/runtime"
+OUT_GEN_DIR="${OUT_DIR}/gen"
+GEN_MAIN_ENTRY="${OUT_GEN_DIR}/main.w"
 STAGE1_BIN="${OUT_BIN_DIR}/with-stage1"
 STAGE2_BIN="${OUT_BIN_DIR}/with-stage2"
 STAGE3_BIN="${OUT_BIN_DIR}/with-stage3"
@@ -214,10 +216,12 @@ emit_workspace_seed_candidates() {
 emit_stage_entry_candidates() {
   local stage_name="$1"
   local compiler_bin="$2"
-  local main_entry="${ROOT_DIR}/src/main.w"
+  local main_entry="${GEN_MAIN_ENTRY}"
 
   if [ -f "${main_entry}" ]; then
     printf '%s\n' "${main_entry}"
+  elif [ -f "${ROOT_DIR}/src/main.w" ]; then
+    printf '%s\n' "${ROOT_DIR}/src/main.w"
   fi
 }
 
@@ -257,14 +261,6 @@ run_local_build() {
   ln -s "${lib_dir}" "${tmp_dir}/out/lib"
   ln -s "${ROOT_DIR}/lib" "${tmp_dir}/lib"
   ln -s "${ROOT_DIR}/src" "${tmp_dir}/src"
-  if [ -d "${ROOT_DIR}/src/compiler" ]; then
-    ln -s "${ROOT_DIR}/src/compiler" "${tmp_dir}/compiler"
-  fi
-  local src_file=""
-  for src_file in "${ROOT_DIR}"/src/*.w; do
-    [ -e "${src_file}" ] || continue
-    ln -s "${src_file}" "${tmp_dir}/$(basename "${src_file}")"
-  done
   rm -f "${tmp_dir}/main.w"
   ln -s "${source_entry}" "${tmp_dir}/main.w"
   build_entry="${tmp_dir}/main.w"
@@ -349,7 +345,7 @@ EOF
   echo "[${stage_name}] timeout: ${TIMEOUT_SECS}s"
 
   local rc=0
-  run_cmd "$log_file" "$exec_dir" env PATH="${wrapped_path}" "$tmp_bin" build "${build_entry}" || rc=$?
+  run_cmd "$log_file" "$exec_dir" env PATH="${wrapped_path}" "$tmp_bin" build "${build_entry}" -o "${tmp_dir}/main" || rc=$?
   if [ "$rc" -ne 0 ]; then
     if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
       echo "[${stage_name}] build timed out after ${TIMEOUT_SECS}s" >&2
@@ -455,6 +451,7 @@ resolve_seed_compiler() {
 ensure_out_layout() {
   ensure_lib_seeded
   mkdir -p "${OUT_BIN_DIR}" "${OUT_LIB_DIR}" "${OUT_LOG_DIR}"
+  "${ROOT_DIR}/scripts/generate_versioned_sources.sh" "${OUT_DIR}" >/dev/null
   if [ -L "${OUT_RUNTIME_LINK}" ]; then
     rm -f "${OUT_RUNTIME_LINK}"
   elif [ -e "${OUT_RUNTIME_LINK}" ]; then
@@ -539,7 +536,7 @@ stage1() {
 stage2() {
   stage1
   ensure_out_layout
-  run_local_build "${STAGE1_BIN}" "stage2" "${ROOT_DIR}/src/main.w"
+  run_local_build "${STAGE1_BIN}" "stage2" "${GEN_MAIN_ENTRY}"
   sync_lib_artifacts "stage2"
   install_stage_binary "${LAST_STAGE_BIN}" "${STAGE2_BIN}"
   install_stage_binary "${LAST_STAGE_BIN}" "${CANONICAL_BIN}"
@@ -551,7 +548,7 @@ stage2() {
 stage3() {
   stage2
   ensure_out_layout
-  run_local_build "${STAGE2_BIN}" "stage3" "${ROOT_DIR}/src/main.w"
+  run_local_build "${STAGE2_BIN}" "stage3" "${GEN_MAIN_ENTRY}"
   sync_lib_artifacts "stage3"
   install_stage_binary "${LAST_STAGE_BIN}" "${STAGE3_BIN}"
   rm -f "${LAST_STAGE_BIN}"

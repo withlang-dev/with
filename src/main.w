@@ -237,7 +237,7 @@ fn run_cli(argc: i32) -> i32:
     if cli_command(argc) == "test":
         return run_test_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
     if cli_command(argc) == "version" or cli_command(argc) == "--version":
-        print("with 0.0.1\n")
+        print("with WITH_VERSION_PLACEHOLDER\n")
         return 0
     if cli_command(argc) == "help" or cli_command(argc) == "--help" or cli_command(argc) == "-h":
         print_usage()
