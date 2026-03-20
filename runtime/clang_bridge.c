@@ -642,7 +642,7 @@ int64_t with_cimport_parse(with_str header_code) {
         s->index, c_path,
         args, nargs,
         NULL, 0,
-        CXTranslationUnit_SkipFunctionBodies);
+        CXTranslationUnit_DetailedPreprocessingRecord);
 
     if (!s->tu) {
         s->error = strdup("failed to parse translation unit");
@@ -1830,6 +1830,31 @@ int32_t with_ci_unary_op(int64_t session, int32_t cursor_idx) {
 }
 
 // ── Constant evaluation ─────────────────────────────────────
+
+// Simplified eval: returns 1 if the cursor evaluates to an integer
+int32_t with_ci_eval_int_valid(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    CXEvalResult eval = clang_Cursor_Evaluate(s->cursors[cursor_idx]);
+    if (!eval) return 0;
+    int valid = (clang_EvalResult_getKind(eval) == CXEval_Int) ? 1 : 0;
+    clang_EvalResult_dispose(eval);
+    return valid;
+}
+
+// Simplified eval: returns the integer value (0 if not evaluatable)
+int64_t with_ci_eval_int_value(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count) return 0;
+    CXEvalResult eval = clang_Cursor_Evaluate(s->cursors[cursor_idx]);
+    if (!eval) return 0;
+    int64_t val = 0;
+    if (clang_EvalResult_getKind(eval) == CXEval_Int) {
+        val = clang_EvalResult_getAsLongLong(eval);
+    }
+    clang_EvalResult_dispose(eval);
+    return val;
+}
 
 int32_t with_ci_eval_as_int(int64_t session, int32_t cursor_idx, int64_t *out) {
     CImportSession *s = (CImportSession *)(intptr_t)session;

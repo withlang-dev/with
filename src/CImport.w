@@ -60,11 +60,29 @@ extern fn with_cimport_typedef_anon_field_name(session: i64, idx: i32, field: i3
 extern fn with_cimport_typedef_anon_field_type(session: i64, idx: i32, field: i32) -> str
 extern fn with_cimport_typedef_anon_field_is_bitfield(session: i64, idx: i32, field: i32) -> i32
 extern fn with_cimport_typedef_anon_is_union(session: i64, idx: i32) -> i32
+// ── AST traversal API (Phase 1) ─────────────────────────────
+extern fn with_ci_root_cursor(session: i64) -> i32
+extern fn with_ci_num_children(session: i64, cursor: i32) -> i32
+extern fn with_ci_child(session: i64, cursor: i32, index: i32) -> i32
+extern fn with_ci_cursor_kind(session: i64, cursor: i32) -> i32
+extern fn with_ci_cursor_spelling(session: i64, cursor: i32) -> str
+extern fn with_ci_cursor_type(session: i64, cursor: i32) -> i32
+extern fn with_ci_type_kind(session: i64, ty: i32) -> i32
+extern fn with_ci_type_translated(session: i64, ty: i32) -> str
+extern fn with_ci_cursor_is_definition(session: i64, cursor: i32) -> i32
+extern fn with_ci_cursor_location(session: i64, cursor: i32) -> str
+extern fn with_ci_cursor_source_text(session: i64, cursor: i32) -> str
+extern fn with_ci_binary_op(session: i64, cursor: i32) -> i32
+extern fn with_ci_unary_op(session: i64, cursor: i32) -> i32
+extern fn with_ci_eval_int_value(session: i64, cursor: i32) -> i64
+extern fn with_ci_eval_int_valid(session: i64, cursor: i32) -> i32
+extern fn with_ci_member_field_name(session: i64, cursor: i32) -> str
+
 extern fn int_to_string(n: i32) -> str
 extern fn i64_to_string(n: i64) -> str
 extern fn with_eprintln(s: str) -> void
 
-// CXCursorKind constants
+// CXCursorKind constants (old API — decl-level)
 let CK_STRUCT: i32 = 2
 let CK_UNION: i32 = 3
 let CK_ENUM: i32 = 5
@@ -74,6 +92,78 @@ let CK_TYPEDEF: i32 = 20
 
 // CX_StorageClass constants
 let CX_SC_STATIC: i32 = 3
+
+// CXCursorKind constants (new API — cursor-level)
+let CXK_COMPOUND_STMT: i32 = 202
+let CXK_RETURN_STMT: i32 = 214
+let CXK_DECL_STMT: i32 = 231
+let CXK_IF_STMT: i32 = 206
+let CXK_WHILE_STMT: i32 = 213
+let CXK_FOR_STMT: i32 = 209
+let CXK_DO_STMT: i32 = 204
+let CXK_BREAK_STMT: i32 = 203
+let CXK_CONTINUE_STMT: i32 = 222
+let CXK_NULL_STMT: i32 = 230
+let CXK_SWITCH_STMT: i32 = 207
+let CXK_CASE_STMT: i32 = 208
+let CXK_DEFAULT_STMT: i32 = 210
+let CXK_INT_LITERAL: i32 = 106
+let CXK_FLOAT_LITERAL: i32 = 107
+let CXK_STRING_LITERAL: i32 = 109
+let CXK_CHAR_LITERAL: i32 = 110
+let CXK_PAREN_EXPR: i32 = 111
+let CXK_UNARY_OP: i32 = 112
+let CXK_BINARY_OP: i32 = 114
+let CXK_COMPOUND_ASSIGN_OP: i32 = 115
+let CXK_COND_OP: i32 = 116
+let CXK_CSTYLE_CAST: i32 = 117
+let CXK_IMPLICIT_CAST: i32 = 124
+let CXK_DECL_REF: i32 = 101
+let CXK_MEMBER_REF: i32 = 102
+let CXK_CALL_EXPR: i32 = 103
+let CXK_ARRAY_SUBSCRIPT: i32 = 113
+let CXK_INIT_LIST: i32 = 119
+let CXK_UNARY_EXPR: i32 = 136
+let CXK_COMPOUND_LITERAL: i32 = 121
+let CXK_VAR_DECL: i32 = 9
+
+// Binary operator constants
+let BO_ADD: i32 = 0
+let BO_SUB: i32 = 1
+let BO_MUL: i32 = 2
+let BO_DIV: i32 = 3
+let BO_REM: i32 = 4
+let BO_AND: i32 = 5
+let BO_OR: i32 = 6
+let BO_XOR: i32 = 7
+let BO_SHL: i32 = 8
+let BO_SHR: i32 = 9
+let BO_LAND: i32 = 10
+let BO_LOR: i32 = 11
+let BO_LT: i32 = 12
+let BO_GT: i32 = 13
+let BO_LE: i32 = 14
+let BO_GE: i32 = 15
+let BO_EQ: i32 = 16
+let BO_NE: i32 = 17
+let BO_ASSIGN: i32 = 18
+let BO_COMMA: i32 = 19
+let BO_ADD_ASSIGN: i32 = 20
+let BO_SUB_ASSIGN: i32 = 21
+let BO_MUL_ASSIGN: i32 = 22
+let BO_DIV_ASSIGN: i32 = 23
+
+// Unary operator constants
+let UO_MINUS: i32 = 0
+let UO_NOT: i32 = 1
+let UO_LNOT: i32 = 2
+let UO_ADDR: i32 = 3
+let UO_DEREF: i32 = 4
+let UO_PLUS: i32 = 5
+let UO_PRE_INC: i32 = 6
+let UO_PRE_DEC: i32 = 7
+let UO_POST_INC: i32 = 8
+let UO_POST_DEC: i32 = 9
 
 // Process a c_import header spec and return synthetic .w source text.
 // Returns "" if the bridge is unavailable or parsing fails.
@@ -405,7 +495,23 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     let is_inline = with_cimport_fn_is_inline(session, idx)
     if storage == CX_SC_STATIC:
         if is_inline != 0:
-            // Static inline — emit comptime_error stub
+            // Static inline — try to translate the body first
+            let body = ci_try_translate_fn_body(session, idx)
+            if body.len() > 0:
+                let safe_name = ci_escape_reserved(name)
+                with_cimport_mark_name_emitted(name)
+                let si_param_count = with_cimport_fn_param_count(session, idx)
+                var si_params = ""
+                for spi in 0..si_param_count:
+                    if spi > 0:
+                        si_params = si_params ++ ", "
+                    let spname = with_cimport_fn_param_name(session, idx, spi)
+                    let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
+                    let actual_pname = if spname.len() > 0: ci_escape_reserved(spname) else: "p" ++ int_to_string(spi)
+                    si_params = si_params ++ actual_pname ++ ": " ++ sptype
+                let si_ret = with_cimport_fn_return_type_translated(session, idx)
+                return "fn " ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret ++ ":\n" ++ body
+            // Fallback: emit comptime_error stub
             let safe_name = ci_escape_reserved(name)
             with_cimport_mark_name_emitted(name)
             return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"static inline function — wrap in C shim\")\n"
@@ -2139,6 +2245,418 @@ fn ci_escape_reserved(name: str) -> str:
     if name == "var": return "var_"
     if name == "comptime": return "comptime_"
     name
+
+// ── String helpers ──────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════
+// AST-based expression and statement translators (Phase 4-5)
+// These use the with_ci_* cursor-based API for full AST walking.
+// ═══════════════════════════════════════════════════════════
+
+fn ci_trans_expr(session: i64, cursor: i32) -> str:
+    let kind = with_ci_cursor_kind(session, cursor)
+
+    // Integer literal
+    if kind == CXK_INT_LITERAL:
+        if with_ci_eval_int_valid(session, cursor) != 0:
+            return i64_to_string(with_ci_eval_int_value(session, cursor))
+        return with_ci_cursor_source_text(session, cursor)
+
+    // Float literal
+    if kind == CXK_FLOAT_LITERAL:
+        let src = with_ci_cursor_source_text(session, cursor)
+        // Strip C float suffixes (f, F, l, L)
+        if src.len() > 0:
+            let last = src.byte_at(src.len() - 1)
+            if last == 102 or last == 70 or last == 108 or last == 76:
+                return src.slice(0, src.len() - 1)
+        return src
+
+    // String literal
+    if kind == CXK_STRING_LITERAL:
+        return with_ci_cursor_source_text(session, cursor)
+
+    // Character literal
+    if kind == CXK_CHAR_LITERAL:
+        if with_ci_eval_int_valid(session, cursor) != 0:
+            return i64_to_string(with_ci_eval_int_value(session, cursor))
+        return with_ci_cursor_source_text(session, cursor)
+
+    // Parenthesized expression
+    if kind == CXK_PAREN_EXPR:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            let inner = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            if inner.len() > 0:
+                return "(" ++ inner ++ ")"
+        return ""
+
+    // Implicit cast — unwrap to inner expression
+    if kind == CXK_IMPLICIT_CAST:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            return ci_trans_expr(session, with_ci_child(session, cursor, 0))
+        return ""
+
+    // Declaration reference (identifier)
+    if kind == CXK_DECL_REF:
+        let name = with_ci_cursor_spelling(session, cursor)
+        return ci_escape_reserved(name)
+
+    // Binary operator
+    if kind == CXK_BINARY_OP:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let lhs = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let rhs = ci_trans_expr(session, with_ci_child(session, cursor, 1))
+            if lhs.len() > 0 and rhs.len() > 0:
+                let op = with_ci_binary_op(session, cursor)
+                let op_str = ci_bo_to_str(op)
+                if op_str.len() > 0:
+                    return "(" ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ")"
+        return ""
+
+    // Compound assignment
+    if kind == CXK_COMPOUND_ASSIGN_OP:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let lhs = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let rhs = ci_trans_expr(session, with_ci_child(session, cursor, 1))
+            if lhs.len() > 0 and rhs.len() > 0:
+                let op = with_ci_binary_op(session, cursor)
+                let base_op = ci_compound_to_base_op(op)
+                if base_op.len() > 0:
+                    return lhs ++ " = " ++ lhs ++ " " ++ base_op ++ " " ++ rhs
+        return ""
+
+    // Unary operator
+    if kind == CXK_UNARY_OP:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            let operand = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            if operand.len() > 0:
+                let op = with_ci_unary_op(session, cursor)
+                if op == UO_MINUS: return "(0 - " ++ operand ++ ")"
+                if op == UO_LNOT: return "(not " ++ operand ++ ")"
+                if op == UO_NOT: return "(0 - " ++ operand ++ " - 1)"
+                if op == UO_PLUS: return operand
+                if op == UO_DEREF: return "unsafe: *" ++ operand
+                if op == UO_ADDR: return "&" ++ operand
+                if op == UO_PRE_INC:
+                    return "{ " ++ operand ++ " = " ++ operand ++ " + 1; " ++ operand ++ " }"
+                if op == UO_PRE_DEC:
+                    return "{ " ++ operand ++ " = " ++ operand ++ " - 1; " ++ operand ++ " }"
+                if op == UO_POST_INC:
+                    return "{ let __tmp = " ++ operand ++ "; " ++ operand ++ " = " ++ operand ++ " + 1; __tmp }"
+                if op == UO_POST_DEC:
+                    return "{ let __tmp = " ++ operand ++ "; " ++ operand ++ " = " ++ operand ++ " - 1; __tmp }"
+        return ""
+
+    // Conditional (ternary) operator
+    if kind == CXK_COND_OP:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 3:
+            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let then_e = ci_trans_expr(session, with_ci_child(session, cursor, 1))
+            let else_e = ci_trans_expr(session, with_ci_child(session, cursor, 2))
+            if cond.len() > 0 and then_e.len() > 0 and else_e.len() > 0:
+                return "(if " ++ cond ++ " != 0: " ++ then_e ++ " else: " ++ else_e ++ ")"
+        return ""
+
+    // C-style cast
+    if kind == CXK_CSTYLE_CAST:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            let inner = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            if inner.len() > 0:
+                let target_ty = with_ci_cursor_type(session, cursor)
+                let target_str = with_ci_type_translated(session, target_ty)
+                if target_str == "void":
+                    return inner  // (void)expr → expr (discard)
+                return "(" ++ inner ++ " as " ++ target_str ++ ")"
+        return ""
+
+    // Call expression
+    if kind == CXK_CALL_EXPR:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            let callee = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            if callee.len() > 0:
+                var args = ""
+                var ai = 1
+                while ai < nc:
+                    if ai > 1:
+                        args = args ++ ", "
+                    let arg = ci_trans_expr(session, with_ci_child(session, cursor, ai))
+                    if arg.len() == 0:
+                        return ""
+                    args = args ++ arg
+                    ai = ai + 1
+                return callee ++ "(" ++ args ++ ")"
+        return ""
+
+    // Member reference (. or ->)
+    if kind == CXK_MEMBER_REF:
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            let base = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let field = with_ci_member_field_name(session, cursor)
+            if base.len() > 0 and field.len() > 0:
+                return base ++ "." ++ ci_escape_reserved(field)
+        return ""
+
+    // Array subscript
+    if kind == CXK_ARRAY_SUBSCRIPT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let arr = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let idx = ci_trans_expr(session, with_ci_child(session, cursor, 1))
+            if arr.len() > 0 and idx.len() > 0:
+                return arr ++ "[" ++ idx ++ "]"
+        return ""
+
+    // sizeof expression (CXK_UNARY_EXPR = 136 covers sizeof)
+    if kind == CXK_UNARY_EXPR:
+        let src = with_ci_cursor_source_text(session, cursor)
+        if ci_starts_with(src, "sizeof"):
+            let nc = with_ci_num_children(session, cursor)
+            if nc > 0:
+                let arg_ty = with_ci_cursor_type(session, with_ci_child(session, cursor, 0))
+                let ty_str = with_ci_type_translated(session, arg_ty)
+                return "sizeof[" ++ ty_str ++ "]()"
+        return ""
+
+    // Fallback: try to use source text for simple expressions
+    ""
+
+fn ci_bo_to_str(op: i32) -> str:
+    if op == BO_ADD: return "+"
+    if op == BO_SUB: return "-"
+    if op == BO_MUL: return "*"
+    if op == BO_DIV: return "/"
+    if op == BO_REM: return "%"
+    if op == BO_AND: return "&"
+    if op == BO_OR: return "|"
+    if op == BO_XOR: return "^"
+    if op == BO_SHL: return "<<"
+    if op == BO_SHR: return ">>"
+    if op == BO_LAND: return "and"
+    if op == BO_LOR: return "or"
+    if op == BO_LT: return "<"
+    if op == BO_GT: return ">"
+    if op == BO_LE: return "<="
+    if op == BO_GE: return ">="
+    if op == BO_EQ: return "=="
+    if op == BO_NE: return "!="
+    if op == BO_ASSIGN: return "="
+    ""
+
+fn ci_compound_to_base_op(op: i32) -> str:
+    if op == BO_ADD_ASSIGN: return "+"
+    if op == BO_SUB_ASSIGN: return "-"
+    if op == BO_MUL_ASSIGN: return "*"
+    if op == BO_DIV_ASSIGN: return "/"
+    "+"
+
+// ── Statement translator ────────────────────────────────────
+
+fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
+    let kind = with_ci_cursor_kind(session, cursor)
+
+    // Compound statement (block)
+    if kind == CXK_COMPOUND_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        var body = ""
+        var i = 0
+        while i < nc:
+            let child = with_ci_child(session, cursor, i)
+            let s = ci_trans_stmt(session, child, indent)
+            if s.len() > 0:
+                body = body ++ ci_indent_str(indent) ++ s ++ "\n"
+            i = i + 1
+        return body
+
+    // Return statement
+    if kind == CXK_RETURN_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc == 0:
+            return "return"
+        let expr = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+        if expr.len() > 0:
+            return "return " ++ expr
+        return ""
+
+    // If statement
+    if kind == CXK_IF_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            if cond.len() > 0:
+                let then_body = ci_trans_stmt(session, with_ci_child(session, cursor, 1), indent + 1)
+                if then_body.len() > 0:
+                    var result = "if " ++ cond ++ " != 0:\n" ++ then_body
+                    if nc > 2:
+                        let else_body = ci_trans_stmt(session, with_ci_child(session, cursor, 2), indent + 1)
+                        if else_body.len() > 0:
+                            result = result ++ ci_indent_str(indent) ++ "else:\n" ++ else_body
+                    return result
+        return ""
+
+    // While statement
+    if kind == CXK_WHILE_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            if cond.len() > 0:
+                let body = ci_trans_stmt(session, with_ci_child(session, cursor, 1), indent + 1)
+                if body.len() > 0:
+                    return "while " ++ cond ++ " != 0:\n" ++ body
+        return ""
+
+    // For statement — translate to init + while
+    if kind == CXK_FOR_STMT:
+        // libclang ForStmt children vary: [init?, cond?, inc?, body]
+        let src = with_ci_cursor_source_text(session, cursor)
+        // For now, fall through to expression-as-statement
+        return ""
+
+    // Do-while
+    if kind == CXK_DO_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        if nc >= 2:
+            let body = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent + 1)
+            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 1))
+            if body.len() > 0 and cond.len() > 0:
+                return "while true:\n" ++ body ++ ci_indent_str(indent + 1) ++ "if " ++ cond ++ " == 0:\n" ++ ci_indent_str(indent + 2) ++ "break\n"
+        return ""
+
+    // Break
+    if kind == CXK_BREAK_STMT:
+        return "break"
+
+    // Continue
+    if kind == CXK_CONTINUE_STMT:
+        return "continue"
+
+    // Null statement
+    if kind == CXK_NULL_STMT:
+        return "pass"
+
+    // Declaration statement (local variable)
+    if kind == CXK_DECL_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        var result = ""
+        var i = 0
+        while i < nc:
+            let child = with_ci_child(session, cursor, i)
+            if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
+                let vname = ci_escape_reserved(with_ci_cursor_spelling(session, child))
+                let vty = with_ci_cursor_type(session, child)
+                let vty_str = with_ci_type_translated(session, vty)
+                let child_nc = with_ci_num_children(session, child)
+                if child_nc > 0:
+                    let init = ci_trans_expr(session, with_ci_child(session, child, 0))
+                    if init.len() > 0:
+                        if result.len() > 0:
+                            result = result ++ "\n" ++ ci_indent_str(indent)
+                        result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ init
+                    else:
+                        return ""  // Can't translate init → bail
+                else:
+                    if result.len() > 0:
+                        result = result ++ "\n" ++ ci_indent_str(indent)
+                    let default_val = ci_default_for_type(vty_str)
+                    if default_val.len() > 0:
+                        result = result ++ "var " ++ vname ++ ": " ++ vty_str ++ " = " ++ default_val
+                    else:
+                        return ""  // Can't zero-init complex type → bail
+            i = i + 1
+        return result
+
+    // Expression statement — translate as expression
+    let expr = ci_trans_expr(session, cursor)
+    if expr.len() > 0:
+        return expr
+    ""
+
+fn ci_indent_str(level: i32) -> str:
+    if level <= 0: return ""
+    if level == 1: return "    "
+    if level == 2: return "        "
+    if level == 3: return "            "
+    if level == 4: return "                "
+    var result = ""
+    var i = 0
+    while i < level:
+        result = result ++ "    "
+        i = i + 1
+    result
+
+// ── Function body translator ────────────────────────────────
+// Tries to translate a static inline function body using AST walking.
+// Returns "" on failure (caller falls back to comptime_error stub).
+
+fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
+    // Use the new cursor-based API to find the function body
+    let root = with_ci_root_cursor(session)
+    let n = with_ci_num_children(session, root)
+    // Find the matching function declaration cursor by index
+    // The decl_idx corresponds to our old-API index — we need to find the same
+    // declaration in the new cursor tree. They're in the same order.
+    var found_cursor = -1
+    var fn_count = 0
+    var i = 0
+    while i < n:
+        let child = with_ci_child(session, root, i)
+        let ck = with_ci_cursor_kind(session, child)
+        if ck == CK_FUNCTION:
+            if fn_count == decl_idx:
+                found_cursor = child
+                break
+            fn_count = fn_count + 1
+        i = i + 1
+
+    // Try to find by matching name instead
+    if found_cursor < 0:
+        let target_name = with_cimport_decl_name(session, decl_idx)
+        i = 0
+        while i < n:
+            let child = with_ci_child(session, root, i)
+            let ck = with_ci_cursor_kind(session, child)
+            if ck == CK_FUNCTION:
+                let cname = with_ci_cursor_spelling(session, child)
+                if cname == target_name:
+                    found_cursor = child
+                    break
+            i = i + 1
+
+    if found_cursor < 0:
+        return ""
+
+    // Check if this cursor is a definition (has a body)
+    if with_ci_cursor_is_definition(session, found_cursor) == 0:
+        return ""
+
+    // Find the CompoundStmt child (the function body)
+    let nc = with_ci_num_children(session, found_cursor)
+    var body_cursor = -1
+    i = 0
+    while i < nc:
+        let child = with_ci_child(session, found_cursor, i)
+        if with_ci_cursor_kind(session, child) == CXK_COMPOUND_STMT:
+            body_cursor = child
+            break
+        i = i + 1
+
+    if body_cursor < 0:
+        return ""
+
+    // Translate the body
+    let body = ci_trans_stmt(session, body_cursor, 1)
+    if body.len() == 0:
+        return ""
+
+    body
 
 // ── String helpers ──────────────────────────────────────────
 
