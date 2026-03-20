@@ -277,6 +277,72 @@ EOF
   fi
 }
 
+expect_local_cimport_project_pass() {
+  local project_dir="$ROOT_DIR/out/test_tmp/wave11_local_cimport"
+  rm -rf "$project_dir"
+  mkdir -p "$project_dir"
+
+  cat >"$project_dir/probe.h" <<'EOF'
+int probe_add(int a, int b);
+EOF
+
+  cat >"$project_dir/probe.c" <<'EOF'
+int probe_add(int a, int b) { return a + b; }
+EOF
+
+  cc -c "$project_dir/probe.c" -o "$project_dir/probe.o"
+  ar rcs "$project_dir/libprobe.a" "$project_dir/probe.o"
+
+  cat >"$project_dir/with.toml" <<'EOF'
+[package]
+name = "wave11-local-cimport"
+
+[c_import]
+include_paths = ["."]
+
+[link]
+search_paths = ["."]
+EOF
+
+  cat >"$project_dir/main_rel.w" <<'EOF'
+use c_import("probe.h", link: "probe")
+
+fn main:
+    assert(probe_add(2, 3) == 5)
+EOF
+
+  cat >"$project_dir/main_abs.w" <<EOF
+use c_import("${project_dir}/probe.h", link: "probe")
+
+fn main:
+    assert(probe_add(2, 3) == 5)
+EOF
+
+  if (
+    cd "$project_dir"
+    run_with_optional_timeout "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$SELFHOST_BIN" run main_rel.w
+  ); then
+    echo "PASS(wave11-unit-local-cimport-rel)"
+  else
+    echo "FAIL(wave11-unit-local-cimport-rel)"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+  fi
+
+  if (
+    cd "$project_dir"
+    run_with_optional_timeout "$RUN_TIMEOUT_SECS" "$tmpdir/out" "$tmpdir/err" "$SELFHOST_BIN" run main_abs.w
+  ); then
+    echo "PASS(wave11-unit-local-cimport-abs)"
+  else
+    echo "FAIL(wave11-unit-local-cimport-abs)"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+  fi
+
+  rm -rf "$project_dir"
+}
+
 expect_mode_pass check "test/wave11/cases/driver_simple.w"
 expect_mode_pass check "test/wave11/cases/imports/relative_root.w"
 expect_mode_pass check "test/wave11/cases/imports/qualified_root.w"
@@ -320,6 +386,7 @@ expect_mode_pass run "test/wave11/cases/c_import_stdio_ok.w"
 expect_mode_pass run "test/wave11/cases/c_import_link_ok.w"
 expect_mode_pass run "test/wave9/cases/runtime_linkage_sync_ok.w"
 expect_mode_pass run "test/wave9/cases/runtime_linkage_async_ok.w"
+expect_local_cimport_project_pass
 
 expect_mode_fail_msg test "test/wave11/cases/c_import_bad_header_fail.w" "test"
 expect_mode_fail_msg test "test/wave11/cases/does_not_exist.w" "error:"
