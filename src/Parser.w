@@ -140,6 +140,32 @@ fn Parser.expect_ident_or_keyword(self: Parser) -> i32:
     self.emit_error("expected identifier")
     0
 
+fn parser_is_keyword_tag(tag: i32) -> bool:
+    if tag >= TK_KW_FN and tag <= TK_KW_OR:
+        return true
+    if tag == TK_KW_CONST or tag == TK_KW_IT or tag == TK_KW_ERRDEFER or tag == TK_KW_MOVE:
+        return true
+    if tag == TK_KW_WHERE or tag == TK_KW_OPAQUE or tag == TK_KW_NULL or tag == TK_KW_UNION:
+        return true
+    false
+
+fn Parser.expect_use_path_segment(self: Parser) -> i32:
+    let t = self.peek()
+    if t == TK_IDENT:
+        let sym = self.intern_current()
+        self.advance()
+        return sym
+    if parser_is_keyword_tag(t):
+        let sym = self.intern_current()
+        let keyword = self.intern.resolve(sym)
+        let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
+        var diag = Diagnostic.err("'" ++ keyword ++ "' is a reserved keyword and cannot be used as a module name", span)
+        diag.add_help("rename the module to avoid the keyword, e.g. '" ++ keyword ++ "s'")
+        self.diags.emit(diag)
+        return 0
+    self.emit_error("expected identifier")
+    0
+
 fn Parser.intern_current(self: Parser) -> i32:
     let s = self.current_start()
     let e = self.current_end()
@@ -909,8 +935,10 @@ fn Parser.parse_use_decl(self: Parser, start: i32) -> i32:
     var path_count = 0
 
     let first = self.peek()
-    if first == TK_IDENT or (first >= TK_KW_FN and first <= TK_KW_OR):
-        let sym = self.expect_ident_or_keyword()
+    if first == TK_IDENT or parser_is_keyword_tag(first):
+        let sym = self.expect_use_path_segment()
+        if sym == 0:
+            return 0
         self.pool.add_extra(sym)
         path_count = path_count + 1
 
@@ -918,8 +946,10 @@ fn Parser.parse_use_decl(self: Parser, start: i32) -> i32:
         if self.peek() == TK_DOT:
             self.advance()
             let next = self.peek()
-            if next == TK_IDENT or (next >= TK_KW_FN and next <= TK_KW_OR):
-                let sym = self.expect_ident_or_keyword()
+            if next == TK_IDENT or parser_is_keyword_tag(next):
+                let sym = self.expect_use_path_segment()
+                if sym == 0:
+                    return 0
                 self.pool.add_extra(sym)
                 path_count = path_count + 1
             else if self.peek() == TK_STAR:
