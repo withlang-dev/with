@@ -169,7 +169,7 @@ fn main -> void:
         exit(run_test_command(argc, opt_level, no_std, alloc_mode))
         return
     if command == "version" or command == "--version":
-        print("with 0.0.1\n")
+        print("with WITH_VERSION_PLACEHOLDER\n")
         return
     if command == "help" or command == "--help" or command == "-h":
         print_usage()
