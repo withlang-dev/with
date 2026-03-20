@@ -316,6 +316,36 @@ fn MirBuilder.type_receiver_type(self: MirBuilder, node: i32) -> i32:
                 return self.sema.named_types.get(sym).unwrap()
     0
 
+fn MirBuilder.index_expr_is_type_level(self: MirBuilder, expr: i32) -> bool:
+    if expr == 0:
+        return false
+    let kind = self.ast.kind(expr)
+    if kind == NK_IDENT:
+        let sym = self.ast.get_data0(expr)
+        return self.sema.named_types.contains(sym)
+    if kind == NK_INDEX or kind == NK_GROUPED:
+        return self.index_expr_is_type_level(self.ast.get_data0(expr))
+    false
+
+fn MirBuilder.vec_literal_type(self: MirBuilder, node: i32) -> i32:
+    if node == 0 or self.ast.kind(node) != NK_INDEX:
+        return 0
+    let base_expr = self.ast.get_data0(node)
+    if not self.index_expr_is_type_level(base_expr):
+        return 0
+    let vec_ty = self.expr_type(node)
+    if vec_ty == 0 or vec_ty == self.sema.ty_void:
+        return 0
+    let resolved = self.sema.resolve_alias(vec_ty)
+    if self.sema.get_type_kind(resolved) != TY_GENERIC_INST:
+        return 0
+    let base_sym = self.sema.get_type_d0(resolved)
+    if base_sym == 0:
+        return 0
+    if self.pool.resolve_symbol(base_sym) != "Vec":
+        return 0
+    resolved
+
 fn MirBuilder.call_return_type(self: MirBuilder, callee: i32) -> i32:
     if callee == 0:
         return self.sema.ty_void
@@ -974,6 +1004,43 @@ fn MirBuilder.lower_index(self: MirBuilder, base_expr: i32, index_expr: i32) -> 
     self.assign_operand_to_place(idx_place, idx_op, self.ast.get_start(index_expr))
     self.body.new_index_place(base, idx_local)
 
+fn MirBuilder.lower_vec_literal_push(self: MirBuilder, vec_place: i32, elem_node: i32, elem_ty: i32):
+    if elem_node == 0:
+        return
+    let push_sym = self.pool.intern("push")
+    let fn_op = self.const_operand(CK_FN, push_sym, self.sema.ty_void)
+    let saved_expected = self.expected_type
+    if elem_ty > 0 and elem_ty != self.sema.ty_void:
+        self.expected_type = elem_ty
+    let elem_op = self.lower_expr(elem_node)
+    self.expected_type = saved_expected
+    let args: Vec[i32] = Vec.new()
+    args.push(self.body.new_operand(OK_COPY, vec_place))
+    args.push(elem_op)
+    let args_id = self.body.new_call_args(args)
+    let result_local = self.new_temp(self.sema.ty_void)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.set_call_intrinsic(args_id, MIR_INTRINSIC_VEC_PUSH)
+
+fn MirBuilder.lower_vec_literal(self: MirBuilder, node: i32, vec_ty: i32) -> i32:
+    let base_expr = self.ast.get_data0(node)
+    let first_elem = self.ast.get_data1(node)
+    let second_elem = self.ast.get_data2(node)
+    let new_sym = self.pool.intern("new")
+    let new_op = self.lower_intrinsic_call(MIR_INTRINSIC_VEC_NEW, base_expr, new_sym, 0, 0, node)
+    let vec_place = self.materialize_operand(new_op, vec_ty, self.ast.get_start(node))
+    let resolved = self.sema.resolve_alias(vec_ty)
+    let elem_ty = if self.sema.get_type_kind(resolved) == TY_GENERIC_INST: self.sema.get_generic_inst_arg(resolved, 0) else: 0
+    self.lower_vec_literal_push(vec_place, first_elem, elem_ty)
+    if second_elem != 0:
+        self.lower_vec_literal_push(vec_place, second_elem, elem_ty)
+    if self.sema.is_copy(vec_ty) != 0:
+        return self.body.new_operand(OK_COPY, vec_place)
+    self.body.new_operand(OK_MOVE, vec_place)
+
 fn MirBuilder.lower_deref(self: MirBuilder, expr: i32) -> i32:
     let base = self.lower_expr_place(expr)
     self.body.new_deref_place(base)
@@ -1022,6 +1089,13 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         return self.body.new_field_place(base, field_sym)
 
     if kind == NK_INDEX:
+        if self.vec_literal_type(node) != 0:
+            let op = self.lower_expr(node)
+            let ty = self.expr_type(node)
+            let tmp = self.new_temp(ty)
+            let p = self.place_for_local(tmp)
+            self.assign_operand_to_place(p, op, self.ast.get_start(node))
+            return p
         return self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
 
     if kind == NK_UNARY and self.ast.get_data0(node) == UOP_DEREF:
@@ -2812,6 +2886,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.body.new_operand(OK_COPY, place)
 
     if kind == NK_INDEX:
+        let vec_ty = self.vec_literal_type(node)
+        if vec_ty != 0:
+            return self.lower_vec_literal(node, vec_ty)
         let place = self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
         return self.body.new_operand(OK_COPY, place)
 

@@ -4746,15 +4746,19 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
     if p_count == 0:
         return 0
     var cur_ty: i64 = 0
+    var cur_sema_ty: i32 = 0
     let cur_ty_opt = self.mir_local_types.get(base_local)
     if cur_ty_opt.is_some():
         cur_ty = cur_ty_opt.unwrap() as i64
+    if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+        cur_sema_ty = body.local_type_ids.get(base_local as i64)
     if cur_ty == 0 and base_local >= 0 and base_local < body.local_type_ids.len() as i32:
-        let sema_ty = body.local_type_ids.get(base_local as i64)
-        if sema_ty > 0:
-            let type_name_sym = self.mir_input.mir_get_type_name(sema_ty)
+        if cur_sema_ty > 0:
+            let type_name_sym = self.mir_input.mir_get_type_name(cur_sema_ty)
             if type_name_sym != 0:
                 cur_ty = self.resolve_named_type(type_name_sym)
+            if cur_ty == 0:
+                cur_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
     if cur_ty == 0:
         return 0
     let p_start = body.place_proj_starts.get(place_id as i64)
@@ -4786,45 +4790,27 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
         else if pk == 2: // PK_DEREF
             // Resolve pointee type from base local's sema type (via MIR snapshot)
             var deref_ty: i64 = 0
-            if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
-                let deref_base_sema = body.local_type_ids.get(base_local as i64)
-                if deref_base_sema > 0:
-                    let deref_resolved = self.mir_input.mir_resolve_alias(deref_base_sema)
-                    let deref_tk = self.mir_input.mir_get_type_kind(deref_resolved)
-                    if deref_tk == TY_PTR or deref_tk == TY_REF:
-                        let pointee_sema = self.mir_input.mir_get_type_d0(deref_resolved)
-                        if pointee_sema > 0:
-                            deref_ty = self.mir_sema_type_to_llvm(pointee_sema)
+            if cur_sema_ty > 0:
+                let deref_resolved = self.mir_input.mir_resolve_alias(cur_sema_ty)
+                let deref_tk = self.mir_input.mir_get_type_kind(deref_resolved)
+                if deref_tk == TY_PTR or deref_tk == TY_REF:
+                    let pointee_sema = self.mir_input.mir_get_type_d0(deref_resolved)
+                    if pointee_sema > 0:
+                        cur_sema_ty = pointee_sema
+                        deref_ty = self.mir_sema_type_to_llvm(pointee_sema)
             if deref_ty != 0:
                 cur_ty = deref_ty
             else:
                 return 0
         else if pk == 1: // PK_INDEX
-            if wl_get_type_kind(cur_ty) == wl_array_type_kind():
-                cur_ty = wl_get_element_type(cur_ty)
+            let idx_elem_ty = self.mir_index_elem_llvm_type(cur_sema_ty, cur_ty)
+            let idx_elem_sema = self.mir_index_elem_sema_type(cur_sema_ty)
+            if idx_elem_sema > 0:
+                cur_sema_ty = idx_elem_sema
+            if idx_elem_ty != 0:
+                cur_ty = idx_elem_ty
             else:
-                // Struct-like types (str, slices): resolve element type from sema
-                // Both str and slices have LLVM type {ptr, i64}, so we must use sema
-                // to distinguish them and get the correct element type.
-                var idx_elem_ty: i64 = 0
-                if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
-                    let base_sema = body.local_type_ids.get(base_local as i64)
-                    if base_sema > 0:
-                        let idx_resolved = self.mir_input.mir_resolve_alias(base_sema)
-                        let idx_tk = self.mir_input.mir_get_type_kind(idx_resolved)
-                        if idx_tk == TY_SLICE or idx_tk == TY_ARRAY:
-                            let elem_sema = self.mir_input.mir_get_type_d0(idx_resolved)
-                            if elem_sema > 0:
-                                idx_elem_ty = self.mir_sema_type_to_llvm(elem_sema)
-                        else if idx_tk == TY_STR:
-                            idx_elem_ty = wl_i8_type(self.context)
-                // Fall back to i8 for str types when sema is unavailable
-                if idx_elem_ty == 0 and self.is_str_type(cur_ty):
-                    idx_elem_ty = wl_i8_type(self.context)
-                if idx_elem_ty != 0:
-                    cur_ty = idx_elem_ty
-                else:
-                    return 0
+                return 0
         else if pk == 3: // PK_DOWNCAST
             // For projected_type, we need the variant's payload struct type.
             var dc_found = false
@@ -4898,18 +4884,20 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
     // Walk projections: field access, index, deref
     let p_start = body.place_proj_starts.get(place_id as i64)
     var cur_ty: i64 = 0
+    var cur_sema_ty: i32 = 0
     let cur_ty_opt = self.mir_local_types.get(base_local)
     if cur_ty_opt.is_some():
         cur_ty = cur_ty_opt.unwrap() as i64
+    if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
+        cur_sema_ty = body.local_type_ids.get(base_local as i64)
     // Resolve type via sema snapshot if LLVM type not yet known
     if cur_ty == 0 and base_local >= 0 and base_local < body.local_type_ids.len() as i32:
-        let sema_ty = body.local_type_ids.get(base_local as i64)
-        if sema_ty > 0:
-            let type_name_sym = self.mir_input.mir_get_type_name(sema_ty)
+        if cur_sema_ty > 0:
+            let type_name_sym = self.mir_input.mir_get_type_name(cur_sema_ty)
             if type_name_sym != 0:
                 cur_ty = self.resolve_named_type(type_name_sym)
             if cur_ty == 0:
-                cur_ty = self.mir_sema_type_to_llvm(sema_ty)
+                cur_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
             if cur_ty != 0:
                 self.mir_local_types.insert(base_local, cur_ty)
     for i in 0..p_count:
@@ -4958,15 +4946,14 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
             cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
             // Resolve pointee type from base local's sema type (via snapshot)
             var deref_ptr_ty: i64 = 0
-            if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
-                let deref_base_sema = body.local_type_ids.get(base_local as i64)
-                if deref_base_sema > 0:
-                    let deref_resolved = self.mir_input.mir_resolve_alias(deref_base_sema)
-                    let deref_tk = self.mir_input.mir_get_type_kind(deref_resolved)
-                    if deref_tk == TY_PTR or deref_tk == TY_REF:
-                        let pointee_sema = self.mir_input.mir_get_type_d0(deref_resolved)
-                        if pointee_sema > 0:
-                            deref_ptr_ty = self.mir_sema_type_to_llvm(pointee_sema)
+            if cur_sema_ty > 0:
+                let deref_resolved = self.mir_input.mir_resolve_alias(cur_sema_ty)
+                let deref_tk = self.mir_input.mir_get_type_kind(deref_resolved)
+                if deref_tk == TY_PTR or deref_tk == TY_REF:
+                    let pointee_sema = self.mir_input.mir_get_type_d0(deref_resolved)
+                    if pointee_sema > 0:
+                        cur_sema_ty = pointee_sema
+                        deref_ptr_ty = self.mir_sema_type_to_llvm(pointee_sema)
             if deref_ptr_ty != 0:
                 cur_ty = deref_ptr_ty
             else:
@@ -4981,33 +4968,21 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 if idx_ty_opt.is_some():
                     idx_ty = idx_ty_opt.unwrap() as i64
                 idx_val = wl_build_load(self.builder, idx_ty, idx_ptr_opt.unwrap() as i64)
+            let elem_llvm = self.mir_index_elem_llvm_type(cur_sema_ty, cur_ty)
+            let elem_sema = self.mir_index_elem_sema_type(cur_sema_ty)
+            if elem_sema > 0:
+                cur_sema_ty = elem_sema
             if wl_get_type_kind(cur_ty) == wl_array_type_kind():
-                let elem_ty = wl_get_element_type(cur_ty)
                 let indices: Vec[i64] = Vec.new()
                 indices.push(idx_val)
-                cur_ptr = wl_build_gep(self.builder, elem_ty, cur_ptr, vec_data_i64(&indices), 1)
-                cur_ty = elem_ty
+                cur_ptr = wl_build_gep(self.builder, elem_llvm, cur_ptr, vec_data_i64(&indices), 1)
+                cur_ty = elem_llvm
             else:
-                // Struct-like {ptr, len}: str or slice. Use sema snapshot to determine element type.
+                // Vec, str, and slices all store their data pointer in field 0.
+                if elem_llvm == 0:
+                    return 0
                 let data_gep = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 0)
                 let raw_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), data_gep)
-                var elem_llvm: i64 = 0
-                if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
-                    let idx_base_sema = body.local_type_ids.get(base_local as i64)
-                    if idx_base_sema > 0:
-                        let idx_resolved = self.mir_input.mir_resolve_alias(idx_base_sema)
-                        let idx_tk = self.mir_input.mir_get_type_kind(idx_resolved)
-                        if idx_tk == TY_SLICE or idx_tk == TY_ARRAY:
-                            let idx_elem_sema = self.mir_input.mir_get_type_d0(idx_resolved)
-                            if idx_elem_sema > 0:
-                                let resolved_elem = self.mir_sema_type_to_llvm(idx_elem_sema)
-                                if resolved_elem != 0:
-                                    elem_llvm = resolved_elem
-                        else if idx_tk == TY_STR:
-                            elem_llvm = wl_i8_type(self.context)
-                // Fall back to i8 for str when sema snapshot unavailable
-                if elem_llvm == 0:
-                    elem_llvm = wl_i8_type(self.context)
                 let indices: Vec[i64] = Vec.new()
                 indices.push(idx_val)
                 cur_ptr = wl_build_gep(self.builder, elem_llvm, raw_ptr, vec_data_i64(&indices), 1)
@@ -5797,6 +5772,45 @@ fn Codegen.mir_vec_elem_size(self: Codegen, body: MirBody, dest_place: i32) -> i
                         return self.abi_size_of(elem_llvm)
     8 // default — safe for pointers, i64, str
 
+fn Codegen.mir_index_elem_sema_type(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    let tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == TY_ARRAY or tk == TY_SLICE:
+        return self.mir_input.mir_get_type_d0(resolved)
+    if tk == TY_STR:
+        return self.sema.ty_i32
+    if tk == TY_GENERIC_INST:
+        let base_sym = self.mir_input.mir_get_type_d0(resolved)
+        let arg_count = self.mir_input.mir_get_type_d2(resolved)
+        if base_sym > 0 and arg_count > 0 and base_sym < self.sema.pool.symbol_texts.len() as i32:
+            let base_name = self.sema.pool.symbol_texts.get(base_sym as i64)
+            if base_name == "Vec":
+                let te_start = self.mir_input.mir_get_type_d1(resolved)
+                return self.mir_input.mir_get_type_extra(te_start)
+    0
+
+fn Codegen.mir_index_elem_llvm_type(self: Codegen, sema_ty: i32, cur_ty: i64) -> i64:
+    if cur_ty != 0 and wl_get_type_kind(cur_ty) == wl_array_type_kind():
+        return wl_get_element_type(cur_ty)
+    if sema_ty > 0:
+        let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+        if self.mir_input.mir_get_type_kind(resolved) == TY_STR:
+            return wl_i8_type(self.context)
+        let elem_sema = self.mir_index_elem_sema_type(sema_ty)
+        if elem_sema > 0:
+            let elem_llvm = self.mir_sema_type_to_llvm(elem_sema)
+            if elem_llvm != 0:
+                return elem_llvm
+    if cur_ty != 0:
+        let vec_elem = self.find_vec_elem_type_by_llvm(cur_ty)
+        if vec_elem != 0:
+            return vec_elem
+        if self.is_str_type(cur_ty):
+            return wl_i8_type(self.context)
+    0
+
 fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) -> i32:
     // Get the sema type for a MIR operand, handling projected places.
     let ok = body.operand_kinds.get(operand_id as i64)
@@ -5839,12 +5853,9 @@ fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) 
                 if d_tk == TY_PTR or d_tk == TY_REF:
                     ty = self.mir_input.mir_get_type_d0(d_resolved)
             else if pk == PK_INDEX:
-                let i_resolved = self.mir_input.mir_resolve_alias(ty)
-                let i_tk = self.mir_input.mir_get_type_kind(i_resolved)
-                if i_tk == TY_STR:
-                    ty = self.sema.ty_i32
-                else if i_tk == TY_ARRAY or i_tk == TY_SLICE:
-                    ty = self.mir_input.mir_get_type_d0(i_resolved)
+                let elem_ty = self.mir_index_elem_sema_type(ty)
+                if elem_ty > 0:
+                    ty = elem_ty
             else if pk == PK_DOWNCAST:
                 continue
     ty
@@ -5886,12 +5897,9 @@ fn Codegen.mir_place_sema_type(self: Codegen, body: MirBody, place_id: i32) -> i
                 if d_tk == TY_PTR or d_tk == TY_REF:
                     ty = self.mir_input.mir_get_type_d0(d_resolved)
             else if pk == PK_INDEX:
-                let i_resolved = self.mir_input.mir_resolve_alias(ty)
-                let i_tk = self.mir_input.mir_get_type_kind(i_resolved)
-                if i_tk == TY_STR:
-                    ty = self.sema.ty_i32
-                else if i_tk == TY_ARRAY or i_tk == TY_SLICE:
-                    ty = self.mir_input.mir_get_type_d0(i_resolved)
+                let elem_ty = self.mir_index_elem_sema_type(ty)
+                if elem_ty > 0:
+                    ty = elem_ty
             else if pk == PK_DOWNCAST:
                 continue
     ty

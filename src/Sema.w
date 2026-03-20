@@ -4001,21 +4001,59 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
 
     0
 
+fn Sema.index_expr_is_type_level(self: Sema, expr: i32) -> bool:
+    if expr == 0:
+        return false
+    let kind = self.ast.kind(expr)
+    if kind == NK_IDENT:
+        let sym = self.ast.get_data0(expr)
+        return self.named_types.contains(sym)
+    if kind == NK_INDEX or kind == NK_GROUPED:
+        return self.index_expr_is_type_level(self.ast.get_data0(expr))
+    false
+
+fn Sema.check_vec_literal_elem(self: Sema, elem_ty: i32, elem_node: i32, arg_index: i32):
+    if elem_node == 0:
+        return
+    let actual_ty = self.check_expr_with_expected(elem_node, elem_ty)
+    if elem_ty != 0 and actual_ty != 0:
+        if self.types_compatible(elem_ty, actual_ty) == 0:
+            if self.arithmetic_result_type(elem_ty, actual_ty) == 0:
+                self.emit_argument_type_mismatch("Vec.literal", 0, arg_index, arg_index, elem_ty, actual_ty, elem_node)
+
 fn Sema.check_index(self: Sema, node: i32) -> i32:
     let expr = self.ast.get_data0(node)
     let index = self.ast.get_data1(node)
+    let index2 = self.ast.get_data2(node)
     let arr_type = self.check_expr(expr)
-    self.check_expr(index)
 
     if arr_type == 0:
+        self.check_expr(index)
+        if index2 != 0:
+            self.check_expr(index2)
         return 0
 
     let resolved = self.resolve_alias(arr_type)
     let tk = self.get_type_kind(resolved)
     if tk == TY_ARRAY:
+        self.check_expr(index)
         return self.get_type_d0(resolved)
     if tk == TY_SLICE:
+        self.check_expr(index)
         return self.get_type_d0(resolved)
+    if tk == TY_GENERIC_INST:
+        let base_name = self.pool_resolve(self.get_type_d0(resolved))
+        let is_type_level_index = self.index_expr_is_type_level(expr)
+        if is_type_level_index and base_name == "Vec" and self.get_generic_inst_arg_count(resolved) > 0:
+            let elem_ty = self.get_generic_inst_arg(resolved, 0)
+            self.check_vec_literal_elem(elem_ty, index, 0)
+            if index2 != 0:
+                self.check_vec_literal_elem(elem_ty, index2, 1)
+            self.typed_expr_types.insert(node, resolved)
+            return resolved
+        if not is_type_level_index and base_name == "Vec" and self.get_generic_inst_arg_count(resolved) > 0:
+            self.check_expr(index)
+            return self.get_generic_inst_arg(resolved, 0)
 
     // Type-level NK_INDEX: Vec[i32], HashMap[str, i32], etc.
     // Create TY_GENERIC_INST so MirLower can find it in the sema snapshot.
