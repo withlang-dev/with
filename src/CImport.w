@@ -1242,6 +1242,18 @@ fn ci_translate_macros(session: i64, extern_vars: str) -> str:
                     if ci_str_contains(value, "__attribute__((cleanup"):
                         output = output ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"cleanup attribute — use defer\")\n"
                         continue
+                    // Empty function-like macro: #define FOO(x) → void function
+                    if ci_trim(value).len() == 0:
+                        var empty_params = ""
+                        var epi = 0
+                        while epi < param_count:
+                            if epi > 0:
+                                empty_params = empty_params ++ ", "
+                            let epname = ci_escape_reserved(with_cimport_macro_param_name(session, i, epi))
+                            empty_params = empty_params ++ epname ++ ": i32"
+                            epi = epi + 1
+                        output = output ++ "fn " ++ safe_name ++ "(" ++ empty_params ++ ") -> void:\n    return\n"
+                        continue
                     // Build pipe-delimited param string: "|a|b|c|"
                     var param_names = ""
                     var param_decl = ""
@@ -1397,6 +1409,20 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
             return "(0 - " ++ inner ++ " - 1)"
         return ""
 
+    // Address-of: &expr
+    if trimmed.byte_at(0) == 38 and trimmed.len() > 1 and trimmed.byte_at(1) != 38:
+        let inner = ci_translate_c_expr(trimmed.slice(1, trimmed.len()), params, known)
+        if inner.len() > 0:
+            return "&" ++ inner
+        return ""
+
+    // Dereference: *expr
+    if trimmed.byte_at(0) == 42:
+        let inner = ci_translate_c_expr(trimmed.slice(1, trimmed.len()), params, known)
+        if inner.len() > 0:
+            return inner ++ ".*"
+        return ""
+
     // sizeof(T) — translatable for type names and parameter names
     if ci_starts_with(trimmed, "sizeof"):
         let rest = ci_trim(trimmed.slice(6, trimmed.len()))
@@ -1410,6 +1436,19 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
                 let mapped = ci_map_sizeof_type(inner)
                 if mapped.len() > 0:
                     return "sizeof[" ++ mapped ++ "]()"
+        return ""
+
+    // alignof / _Alignof
+    if ci_starts_with(trimmed, "alignof") or ci_starts_with(trimmed, "_Alignof") or ci_starts_with(trimmed, "__alignof__") or ci_starts_with(trimmed, "__alignof"):
+        let prefix_len = if ci_starts_with(trimmed, "__alignof__"): 11 else if ci_starts_with(trimmed, "_Alignof"): 8 else if ci_starts_with(trimmed, "__alignof"): 9 else: 7
+        let rest = ci_trim(trimmed.slice(prefix_len as i64, trimmed.len()))
+        if rest.len() > 0 and rest.byte_at(0) == 40:
+            let close = ci_find_matching_paren(rest, 0)
+            if close > 0:
+                let inner = ci_trim(rest.slice(1, close as i64))
+                let mapped = ci_map_sizeof_type(inner)
+                if mapped.len() > 0:
+                    return "alignof[" ++ mapped ++ "]()"
         return ""
 
     // Designated initializer: { .field = val, .field2 = val2 }
@@ -1430,9 +1469,16 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
             let inside = trimmed.slice(1, cast_end as i64)
             let after_str = trimmed.slice(cast_end as i64 + 1, trimmed.len())
             if ci_is_c_type_name(inside):
+                let mapped = ci_map_base_type(ci_trim(inside))
+                // Cast-with-initializer: (type){ .field=val, ... }
+                let after_trimmed = ci_trim(after_str)
+                if after_trimmed.len() > 0 and after_trimmed.byte_at(0) == 123:
+                    let init_result = ci_translate_c_expr(after_trimmed, params, known)
+                    if init_result.len() > 0:
+                        return mapped ++ " " ++ init_result
+                    return ""
                 let after = ci_translate_c_expr(after_str, params, known)
                 if after.len() > 0:
-                    let mapped = ci_map_base_type(ci_trim(inside))
                     return "(" ++ after ++ " as " ++ mapped ++ ")"
                 return ""
             // CAST_OR_CALL: (X)(Y) where X is a param or known identifier

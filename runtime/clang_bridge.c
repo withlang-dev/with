@@ -263,9 +263,12 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
         case CXType_ULongLong: return session_strdup(s, "c_ulonglong");
         case CXType_Int128: return session_strdup(s, "i128");
         case CXType_UInt128: return session_strdup(s, "u128");
+        case CXType_Half:
+        case CXType_Float16: return session_strdup(s, "f16");
         case CXType_Float: return session_strdup(s, "f32");
         case CXType_Double: return session_strdup(s, "f64");
         case CXType_LongDouble: return session_strdup(s, "c_longdouble");
+        case CXType_Float128: return session_strdup(s, "f128");
 
         case CXType_Pointer: {
             CXType pointee = clang_getPointeeType(canonical);
