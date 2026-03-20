@@ -4861,7 +4861,8 @@ fn Sema.check_tuple_destructure(self: Sema, node: i32) -> i32:
     self.ty_void
 
 fn Sema.is_sizeof_or_alignof(self: Sema, callee: i32) -> i32:
-    if self.ast.kind(callee) != NK_TYPE_GENERIC:
+    let kind = self.ast.kind(callee)
+    if kind != NK_TYPE_GENERIC and kind != NK_INDEX:
         return 0
     let gi_base = self.ast.get_data0(callee)
     if self.ast.kind(gi_base) != NK_IDENT:
@@ -4874,7 +4875,8 @@ fn Sema.is_sizeof_or_alignof(self: Sema, callee: i32) -> i32:
     0
 
 fn Sema.is_transmute_call(self: Sema, callee: i32) -> i32:
-    if self.ast.kind(callee) != NK_TYPE_GENERIC:
+    let kind = self.ast.kind(callee)
+    if kind != NK_TYPE_GENERIC and kind != NK_INDEX:
         return 0
     let gi_base = self.ast.get_data0(callee)
     if self.ast.kind(gi_base) != NK_IDENT:
@@ -4885,11 +4887,14 @@ fn Sema.is_transmute_call(self: Sema, callee: i32) -> i32:
     0
 
 fn Sema.transmute_target_type(self: Sema, callee: i32) -> i32:
-    let tp_start = self.ast.get_data1(callee)
-    let tp_count = self.ast.get_data2(callee)
-    if tp_count == 0:
-        return 0
-    let tp_node = self.ast.get_extra(tp_start)
+    let tp_node = if self.ast.kind(callee) == NK_TYPE_GENERIC:
+        let tp_start = self.ast.get_data1(callee)
+        let tp_count = self.ast.get_data2(callee)
+        if tp_count == 0:
+            return 0
+        self.ast.get_extra(tp_start)
+    else:
+        self.ast.get_data1(callee)
     self.resolve_type_expr(tp_node)
 
 fn Sema.check_call(self: Sema, node: i32) -> i32:
