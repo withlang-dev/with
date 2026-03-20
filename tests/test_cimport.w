@@ -1,6 +1,6 @@
 // c_import comprehensive test suite
 // Tests all features of the c_import translation pipeline.
-// Covers: function decls, macros, typedefs, enums, token paste, builtins
+// 15 system headers, functional tests for each.
 
 use c_import("<stdlib.h>")
 use c_import("<stdio.h>")
@@ -12,6 +12,11 @@ use c_import("<time.h>")
 use c_import("<unistd.h>")
 use c_import("<sys/stat.h>")
 use c_import("<errno.h>")
+use c_import("<sys/mman.h>")
+use c_import("<dirent.h>")
+use c_import("<math.h>")
+use c_import("<float.h>")
+use c_import("<stddef.h>")
 
 extern fn with_eprintln(s: str) -> void
 extern fn int_to_string(n: i32) -> str
@@ -36,156 +41,141 @@ fn assert_eq_i32(a: i32, b: i32, msg: str):
 
 fn main():
     test_headers_compile()
-    test_function_calls()
-    test_macro_constants()
+    test_stdlib_functions()
+    test_stdio_functions()
+    test_string_functions()
+    test_signal_constants()
+    test_fcntl_constants()
     test_limits_constants()
-    test_enum_constants()
-    test_typedef_types()
-    test_string_operations()
-    test_memory_operations()
+    test_time_functions()
+    test_unistd_functions()
+    test_stat_constants()
     test_errno_constants()
-    test_file_operations()
-    test_time_operations()
-    test_pointer_types()
+    test_mman_constants()
+    test_dirent_functions()
+    test_math_constants()
+    test_float_constants()
+    test_stddef_types()
     with_eprintln(int_to_string(pass_count) ++ "/" ++ int_to_string(test_count) ++ " tests passed")
 
-// ── All headers compile ─────────────────────────────────────
+// ── 15 system headers compile ───────────────────────────────
 fn test_headers_compile():
-    // If we got here, all 10 headers compiled successfully
-    with_eprintln("  OK: 10 system headers compile")
+    with_eprintln("  OK: 15 system headers compile")
 
-// ── Function calls ──────────────────────────────────────────
-fn test_function_calls():
-    // puts (stdio.h)
-    let _ = puts("  c_import: puts works" as *const i8)
-
-    // malloc/free (stdlib.h)
+// ── stdlib.h ────────────────────────────────────────────────
+fn test_stdlib_functions():
     let p = malloc(128)
     assert_true(p != 0 as *mut c_void, "malloc non-null")
     free(p)
-
-    // strlen (string.h)
-    let len = strlen("test" as *const i8)
-    assert_true(len == 4, "strlen(\"test\") == 4")
-
-    // time (time.h)
-    let t = time(0 as *mut i64)
-    assert_true(t > 0, "time() > 0")
-
-    // getpid (unistd.h)
-    let pid = getpid()
-    assert_true(pid > 0, "getpid() > 0")
-
-    with_eprintln("  OK: function calls")
-
-// ── Macro constants ─────────────────────────────────────────
-fn test_macro_constants():
-    // stdio.h
-    assert_true(BUFSIZ > 0, "BUFSIZ > 0")
-    assert_eq_i32(EOF, 0 - 1, "EOF == -1")
-    assert_true(SEEK_SET == 0, "SEEK_SET == 0")
-
-    // fcntl.h
-    assert_true(O_RDONLY >= 0, "O_RDONLY >= 0")
-    assert_true(O_WRONLY > 0, "O_WRONLY > 0")
-    assert_true(O_RDWR > 0, "O_RDWR > 0")
-
-    with_eprintln("  OK: macro constants")
-
-// ── limits.h constants ──────────────────────────────────────
-fn test_limits_constants():
-    assert_true(INT_MAX > 0, "INT_MAX > 0")
-    assert_true(INT_MIN < 0, "INT_MIN < 0")
-    assert_eq_i32(CHAR_BIT, 8, "CHAR_BIT == 8")
-    assert_true(SHRT_MAX > 0, "SHRT_MAX > 0")
-    assert_true(LONG_MAX > 0, "LONG_MAX > 0")
-    with_eprintln("  OK: limits.h constants")
-
-// ── Enum constants ──────────────────────────────────────────
-fn test_enum_constants():
-    // signal.h
-    assert_true(SIGINT > 0, "SIGINT > 0")
-    assert_true(SIGTERM > 0, "SIGTERM > 0")
-    assert_true(SIGKILL > 0, "SIGKILL > 0")
-    assert_true(SIGHUP > 0, "SIGHUP > 0")
-    with_eprintln("  OK: enum constants")
-
-// ── Typedef types ───────────────────────────────────────────
-fn test_typedef_types():
-    // These should compile — verifies typedef mappings
-    let sz: usize = 42
-    let off: i64 = 0
-    let p: i32 = 1
-    assert_true(sz == 42, "usize typedef")
-    with_eprintln("  OK: typedef types")
-
-// ── String operations ───────────────────────────────────────
-fn test_string_operations():
-    let a = "hello" as *const i8
-    let b = "hello" as *const i8
-
-    // strcmp
-    let cmp = strcmp(a, b)
-    assert_eq_i32(cmp, 0, "strcmp equal strings")
-
-    // strlen
-    let len = strlen(a)
-    assert_true(len == 5, "strlen(\"hello\") == 5")
-
-    with_eprintln("  OK: string operations")
-
-// ── Memory operations ───────────────────────────────────────
-fn test_memory_operations():
-    let p = calloc(10, 4)
-    assert_true(p != 0 as *mut c_void, "calloc non-null")
-    free(p)
-
-    let q = malloc(64)
-    assert_true(q != 0 as *mut c_void, "malloc non-null")
+    let q = calloc(10, 4)
+    assert_true(q != 0 as *mut c_void, "calloc non-null")
     let r = realloc(q, 128)
     assert_true(r != 0 as *mut c_void, "realloc non-null")
     free(r)
+    assert_eq_i32(abs(0 - 42), 42, "abs(-42)")
+    with_eprintln("  OK: stdlib.h")
 
-    with_eprintln("  OK: memory operations")
+// ── stdio.h ─────────────────────────────────────────────────
+fn test_stdio_functions():
+    let _ = puts("  c_import: puts works" as *const i8)
+    assert_true(BUFSIZ > 0, "BUFSIZ > 0")
+    assert_eq_i32(EOF, 0 - 1, "EOF")
+    assert_eq_i32(SEEK_SET, 0, "SEEK_SET")
+    with_eprintln("  OK: stdio.h")
 
-// ── errno constants ─────────────────────────────────────────
-fn test_errno_constants():
-    assert_true(ENOENT > 0, "ENOENT > 0")
-    assert_true(EACCES > 0, "EACCES > 0")
-    assert_true(EINVAL > 0, "EINVAL > 0")
-    assert_true(ENOMEM > 0, "ENOMEM > 0")
-    with_eprintln("  OK: errno constants")
+// ── string.h ────────────────────────────────────────────────
+fn test_string_functions():
+    let len = strlen("hello" as *const i8)
+    assert_true(len == 5, "strlen")
+    let cmp = strcmp("abc" as *const i8, "abc" as *const i8)
+    assert_eq_i32(cmp, 0, "strcmp equal")
+    with_eprintln("  OK: string.h")
 
-// ── File operations ─────────────────────────────────────────
-fn test_file_operations():
-    // fcntl.h — open flags
-    assert_true(O_CREAT > 0, "O_CREAT > 0")
-    assert_true(O_TRUNC > 0, "O_TRUNC > 0")
-    assert_true(O_APPEND > 0, "O_APPEND > 0")
+// ── signal.h ────────────────────────────────────────────────
+fn test_signal_constants():
+    assert_true(SIGINT > 0, "SIGINT")
+    assert_true(SIGTERM > 0, "SIGTERM")
+    assert_true(SIGKILL > 0, "SIGKILL")
+    assert_true(SIGHUP > 0, "SIGHUP")
+    with_eprintln("  OK: signal.h")
 
-    // sys/stat.h — stat struct exists (verified by import compiling)
-    // mode constants
-    assert_true(S_IRUSR > 0, "S_IRUSR > 0")
-    assert_true(S_IWUSR > 0, "S_IWUSR > 0")
+// ── fcntl.h ─────────────────────────────────────────────────
+fn test_fcntl_constants():
+    assert_true(O_RDONLY >= 0, "O_RDONLY")
+    assert_true(O_WRONLY > 0, "O_WRONLY")
+    assert_true(O_RDWR > 0, "O_RDWR")
+    assert_true(O_CREAT > 0, "O_CREAT")
+    assert_true(O_TRUNC > 0, "O_TRUNC")
+    assert_true(O_APPEND > 0, "O_APPEND")
+    with_eprintln("  OK: fcntl.h")
 
-    with_eprintln("  OK: file operations")
+// ── limits.h ────────────────────────────────────────────────
+fn test_limits_constants():
+    assert_true(INT_MAX > 0, "INT_MAX")
+    assert_true(INT_MIN < 0, "INT_MIN")
+    assert_eq_i32(CHAR_BIT, 8, "CHAR_BIT")
+    assert_true(SHRT_MAX > 0, "SHRT_MAX")
+    assert_true(LONG_MAX > 0, "LONG_MAX")
+    with_eprintln("  OK: limits.h")
 
-// ── Time operations ─────────────────────────────────────────
-fn test_time_operations():
+// ── time.h ──────────────────────────────────────────────────
+fn test_time_functions():
     let t = time(0 as *mut i64)
-    assert_true(t > 1000000000, "time > 1 billion (year 2001+)")
+    assert_true(t > 1000000000, "time() > 2001")
+    with_eprintln("  OK: time.h")
 
-    with_eprintln("  OK: time operations")
+// ── unistd.h ────────────────────────────────────────────────
+fn test_unistd_functions():
+    let pid = getpid()
+    assert_true(pid > 0, "getpid")
+    with_eprintln("  OK: unistd.h")
 
-// ── Pointer types ───────────────────────────────────────────
-fn test_pointer_types():
-    // c_void type should exist (from c_import)
-    let p = malloc(8)
-    assert_true(p != 0 as *mut c_void, "c_void pointer")
-    free(p)
+// ── sys/stat.h ──────────────────────────────────────────────
+fn test_stat_constants():
+    assert_true(S_IRUSR > 0, "S_IRUSR")
+    assert_true(S_IWUSR > 0, "S_IWUSR")
+    with_eprintln("  OK: sys/stat.h")
 
-    // NULL-like behavior
-    let null_ptr = 0 as *mut c_void
-    assert_true(null_ptr == 0 as *mut c_void, "null pointer comparison")
+// ── errno.h ─────────────────────────────────────────────────
+fn test_errno_constants():
+    assert_true(ENOENT > 0, "ENOENT")
+    assert_true(EACCES > 0, "EACCES")
+    assert_true(EINVAL > 0, "EINVAL")
+    assert_true(ENOMEM > 0, "ENOMEM")
+    with_eprintln("  OK: errno.h")
 
-    with_eprintln("  OK: pointer types")
+// ── sys/mman.h ──────────────────────────────────────────────
+fn test_mman_constants():
+    assert_true(PROT_READ > 0, "PROT_READ")
+    assert_true(PROT_WRITE > 0, "PROT_WRITE")
+    assert_true(MAP_PRIVATE > 0, "MAP_PRIVATE")
+    with_eprintln("  OK: sys/mman.h")
+
+// ── dirent.h ────────────────────────────────────────────────
+fn test_dirent_functions():
+    // opendir/closedir — test that the types exist
+    assert_true(DT_REG > 0, "DT_REG")
+    assert_true(DT_DIR > 0, "DT_DIR")
+    with_eprintln("  OK: dirent.h")
+
+// ── math.h ──────────────────────────────────────────────────
+fn test_math_constants():
+    assert_true(M_PI > 3.0, "M_PI > 3")
+    assert_true(M_E > 2.0, "M_E > 2")
+    assert_true(FP_NAN > 0, "FP_NAN")
+    assert_true(FP_INFINITE > 0, "FP_INFINITE")
+    with_eprintln("  OK: math.h")
+
+// ── float.h ─────────────────────────────────────────────────
+fn test_float_constants():
+    assert_true(FLT_MAX > 0.0, "FLT_MAX > 0")
+    assert_true(DBL_MAX > 0.0, "DBL_MAX > 0")
+    assert_true(FLT_EPSILON > 0.0, "FLT_EPSILON > 0")
+    with_eprintln("  OK: float.h")
+
+// ── stddef.h ────────────────────────────────────────────────
+fn test_stddef_types():
+    // size_t, ptrdiff_t should be available
+    let sz: usize = 42
+    assert_true(sz == 42, "size_t works")
+    with_eprintln("  OK: stddef.h")
