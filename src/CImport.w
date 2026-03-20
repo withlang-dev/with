@@ -2489,6 +2489,44 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
             return ci_trans_expr(session, with_ci_child(session, cursor, 0))
         return ""
 
+    // Initializer list — { expr1, expr2, ... }
+    if kind == CXK_INIT_LIST:
+        let nc = with_ci_num_children(session, cursor)
+        var items = ""
+        var ii = 0
+        while ii < nc:
+            if ii > 0:
+                items = items ++ ", "
+            let item = ci_trans_expr(session, with_ci_child(session, cursor, ii))
+            if item.len() == 0:
+                return ""
+            items = items ++ item
+            ii = ii + 1
+        // Get the target type for struct init
+        let init_ty = with_ci_cursor_type(session, cursor)
+        let ty_str = with_ci_type_translated(session, init_ty)
+        if ty_str != "i32" and not ci_starts_with(ty_str, "__UNSUPPORTED"):
+            return ty_str ++ " { " ++ items ++ " }"
+        return "{ " ++ items ++ " }"
+
+    // Statement expression (GNU extension: ({...}))
+    if kind == 135:  // CXCursor_StmtExpr
+        let nc = with_ci_num_children(session, cursor)
+        if nc > 0:
+            // Translate the compound statement as a block
+            let body = ci_trans_stmt(session, with_ci_child(session, cursor, 0), 1)
+            if body.len() > 0:
+                return "{\n" ++ body ++ "}"
+        return ""
+
+    // Offsetof expression
+    if kind == 152:  // CXCursor_OffsetOfExpr  (approximate cursor kind)
+        let src = with_ci_cursor_source_text(session, cursor)
+        if ci_starts_with(src, "offsetof") or ci_starts_with(src, "__builtin_offsetof"):
+            // Can't translate generically — return source text as fallback
+            return ""
+        return ""
+
     // Fallback: try to use source text for simple expressions
     ""
 
