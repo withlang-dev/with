@@ -277,14 +277,14 @@ We actually have **more** builtin typedef mappings than Zig (pid_t, uid_t, gid_t
 
 ## Priority Gaps to Close (ordered by impact)
 
-### P0 — Would unblock significant use cases
-1. **Anonymous enum constants** — constants defined in `enum { FOO = 1, BAR = 2 }` are silently lost
-2. **Missing builtins** — `__builtin_object_size`, `__builtin_mul_overflow`, `__builtin_huge_valf`, `__builtin_inff`, `__builtin_signbit`, `__builtin_exp2/f`, `__builtin_assume`, `__has_builtin`, `__builtin_labs/llabs`, `__builtin___memcpy_chk`, `__builtin___memset_chk`
-3. **CAST_OR_CALL pattern** — `(X)(Y)` in macros (common in system headers)
-4. **DISCARD pattern** — `(void)(X)` in macros
+### P0 — Would unblock significant use cases (ALL DONE)
+1. ~~**Anonymous enum constants**~~ — DONE: detect `(unnamed`/`(anonymous` synthetic names, skip type alias but emit constants
+2. ~~**Missing builtins**~~ — DONE: 18 new builtins added (exp2, signbit, labs, llabs, strcmp, __memcpy_chk, __memset_chk, huge_valf, inff, nanf, object_size, mul_overflow, assume, has_builtin, isinf_sign)
+3. ~~**CAST_OR_CALL pattern**~~ — DONE: `(X)(Y)` where X is an identifier → function call
+4. ~~**DISCARD pattern**~~ — DONE: `(void)(X)` and const/volatile variants → evaluate X
 
 ### P1 — Correctness improvements
-5. **Anonymous struct typedef** — `typedef struct { int x; } Point;` (unnamed struct with typedef)
+5. ~~**Anonymous struct typedef**~~ — DONE: `typedef struct { int x; } Point;` inlined as `type Point = { x: i32 = 0 }`
 6. **Flexible array member accessor** — generate accessor function
 7. **Source location comments** — `// file:line:col` for debugging
 8. **Platform-specific integer types** — `c_int` vs hardcoded `i32`
