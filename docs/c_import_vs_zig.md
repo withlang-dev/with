@@ -234,23 +234,23 @@ Our c_import: ~5.2K lines across 2 files (CImport.w + clang_bridge.c).
 
 ## 9. Summary: What Matters
 
-### Differences that affect real-world usage (HIGH impact)
+### Differences that affect real-world usage (HIGH impact) — ALL FIXED
 
-1. **Graceful function demotion** — Zig demotes untranslatable bodies to extern. We emit comptime_error stubs. Fix: change fallback from stub to extern declaration.
+1. ~~**Graceful function demotion**~~ — FIXED: static inline functions now fall through to extern declaration when body translation fails.
 
-2. **Wrapping arithmetic** — Zig emits `+%`/`-%`/`*%` for unsigned. We use plain operators. Could cause overflow UB.
+2. ~~**Wrapping arithmetic**~~ — NOT A GAP: With's LLVM codegen uses wrapping semantics for unsigned integers, matching C.
 
-3. **Pointer default values** — Zig zeros pointers to null in struct defaults. We don't emit defaults for pointer fields. Fix: add `= null` for pointer types in `ci_default_for_type`.
+3. ~~**Pointer default values**~~ — FIXED: `ci_default_for_type` returns `"null"` for pointer and Option pointer types.
 
-4. **Macro comma operator** — Zig preserves all side effects in a block. We only keep the last expression. Could lose side effects.
+4. ~~**Macro comma operator**~~ — FIXED: `ci_translate_comma_block` wraps all expressions in a block `{ expr1; expr2; exprN }`.
 
-### Differences that affect edge cases (MEDIUM impact)
+### Differences that affect edge cases (MEDIUM impact) — MOSTLY FIXED
 
-5. **Switch fallthrough** — Our if/else chain doesn't support fallthrough.
-6. **Per-field alignment vs packed+padding** — Different struct layout approach.
-7. **Platform-specific integer types** — `i32` vs `c_int` for cross-compilation.
-8. **String-based macro parser** — Fragile for complex expressions.
-9. **Signed division/remainder** — May differ from C semantics.
+5. ~~**Switch fallthrough**~~ — IMPROVED: `ci_stmt_ends_with_break` detects break presence. If/else chain still used (With lacks labeled blocks for full fallthrough).
+6. **Per-field alignment vs packed+padding** — Different approach, both correct. Our packed+padding is slightly less optimal for LLVM codegen.
+7. ~~**Platform-specific integer types**~~ — FIXED: emit `c_int`/`c_long`/etc. type aliases. Cross-compilation only needs to change these aliases.
+8. **String-based macro parser** — Architectural difference. Handles common cases correctly.
+9. ~~**Signed division/remainder**~~ — NOT A GAP: With's LLVM `sdiv` truncates toward zero, matching C semantics.
 
 ### Differences that are architectural (LOW impact on correctness)
 
