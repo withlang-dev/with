@@ -4868,9 +4868,9 @@ fn Sema.is_sizeof_or_alignof(self: Sema, callee: i32) -> i32:
     if self.ast.kind(gi_base) != NK_IDENT:
         return 0
     let gi_name = self.pool_resolve(self.ast.get_data0(gi_base))
-    if gi_name == "sizeof":
+    if gi_name == "sizeof" or gi_name == "size_of":
         return 1
-    if gi_name == "alignof":
+    if gi_name == "alignof" or gi_name == "align_of":
         return 1
     0
 
