@@ -7,6 +7,7 @@ use Sema
 use Mir
 use AsyncMir
 use compiler.Compilation.Config
+use compiler.ProjectConfig
 
 extern fn with_eprintln(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
@@ -61,6 +62,7 @@ type Zcu = {
     last_async_mir_module: AsyncMirModule,
     last_async_mir_dump: str,
     last_link_lib_names: Vec[str],
+    project_config: ProjectConfig,
     trace_c_import_cache: i32,
     prelude_mode: i32,
 }
@@ -100,6 +102,7 @@ fn Zcu.init -> Zcu:
         last_async_mir_module: AsyncMirModule.init(),
         last_async_mir_dump: "",
         last_link_lib_names: Vec.new(),
+        project_config: project_config_default(),
         trace_c_import_cache: 0,
         prelude_mode: PRELUDE_FULL(),
     }
@@ -190,6 +193,7 @@ fn Zcu.reset_for_new_invocation(self: Zcu, source_dir: str, path: str, text: str
     self.reset_import_state()
     self.reset_pending_warnings()
     self.clear_stage_outputs()
+    self.project_config = project_config_default()
 
 fn Zcu.set_pending_warnings(self: Zcu, warnings: Vec[str]):
     self.pending_warnings = warnings
