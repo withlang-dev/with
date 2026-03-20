@@ -224,11 +224,11 @@ else builds on. Without this, nothing else works.
 
 ### Session 8: Switch, goto/label, local var decls
 
-- [ ] Switch statements (→ match or if/else chain for fallthrough)
-- [ ] Case statements
-- [ ] Default statements
-- [ ] Goto statements (→ `comptime_error` unless With adds goto)
-- [ ] Label statements (→ comment)
+- [x] Switch statements (→ if/else chain)
+- [x] Case statements
+- [x] Default statements
+- [x] Goto statements (→ comptime_error)
+- [x] Label statements (→ comment)
 - [x] Local variable declarations with type and initializer (in ci_trans_stmt)
 
 **CImport.w — ~250 new lines**
@@ -242,8 +242,8 @@ else builds on. Without this, nothing else works.
 - [x] Function declarations with full body translation
 - [x] Static inline → translated inline function (try AST, fallback to stub)
 - [ ] Always-inline functions
-- [ ] Variable declarations with initializer expression translation
-- [ ] Constant evaluation for variable initializers
+- [x] Variable declarations with initializer expression translation
+- [x] Constant evaluation for variable initializers
 - [ ] Source location comments (`// file:line:col`)
 
 **CImport.w — ~300 lines replacing existing**
