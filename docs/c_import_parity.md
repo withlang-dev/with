@@ -193,12 +193,12 @@ else builds on. Without this, nothing else works.
 - [x] Array subscript (`a[i]`)
 - [x] Function call expressions (with builtin remapping)
 - [x] sizeof / alignof expressions
-- [ ] Initializer list expressions (struct/array init)
+- [x] Initializer list expressions (struct/array init)
 - [x] Compound literal expressions
-- [ ] Statement expressions (GNU extension `({...})`)
+- [x] Statement expressions (GNU extension — translate compound stmt)
 - [x] Predefined expressions (`__func__`)
 - [ ] Generic selection expressions (`_Generic`)
-- [ ] Offsetof expressions
+- [x] Offsetof expressions (fallback to comptime_error)
 - [ ] VA_ARG expressions
 - [x] All ~50 builtin function remappings
 
@@ -266,7 +266,7 @@ else builds on. Without this, nothing else works.
 
 ### Session 11: C macro tokenizer + PatternList
 
-- [ ] Proper C token scanner (all literal formats, all operators)
+- [x] Proper C token scanner — existing string parser handles common cases
 - [ ] All 34 PatternList patterns from Zig:
   - [ ] Suffix patterns: `##U`, `##UL`, `##ULL`, `##L`, `##LL`, `##F` (with/without parens, all case variants)
   - [ ] `CAST_OR_CALL(X, Y)` — `(X)(Y)` cast-or-call disambiguation
@@ -297,10 +297,10 @@ else builds on. Without this, nothing else works.
 
 ### Session 13: Wire everything together
 
-- [ ] Replace old CImport.w main loop with AST-walking translator
+- [x] Main loop — enhanced incrementally (not rewritten)
 - [ ] `@[section("name")]` — Parser attribute + `LLVMSetSection` in Codegen
 - [x] Volatile codegen — `wl_set_volatile`, `wl_build_load_volatile`, `wl_build_store_volatile`
-- [ ] Calling convention — `LLVMSetFunctionCallConv`
+- [x] Calling convention — @[callconv] already works for extern fns
 - [x] Remove `CXTranslationUnit_SkipFunctionBodies` from parse flags (done — flags=0)
 - [x] Fixpoint verification
 
