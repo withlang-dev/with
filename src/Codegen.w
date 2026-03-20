@@ -5610,6 +5610,18 @@ fn Codegen.mir_str_concat(self: Codegen, lhs: i64, rhs: i64) -> i64:
     args.push(rhs)
     wl_build_call(self.builder, fn_type, func, vec_data_i64(&args), 2)
 
+fn Codegen.mir_pointer_elem_llvm_type(self: Codegen, sema_ty: i32) -> i64:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    let tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk != TY_PTR and tk != TY_REF:
+        return 0
+    let pointee = self.mir_input.mir_get_type_d0(resolved)
+    if pointee <= 0:
+        return 0
+    self.mir_sema_type_to_llvm(pointee)
+
 fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: i64) -> i64:
     let fallback_ty = if dest_ty != 0: dest_ty else: wl_i32_type(self.context)
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
@@ -5628,6 +5640,23 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
     if rk == RK_BIN_OP:
         let lhs = self.mir_eval_operand(body, d1, 0)
         let rhs = self.mir_eval_operand(body, d2, 0)
+        let lhs_sema = self.mir_operand_sema_type(body, d1)
+        let rhs_sema = self.mir_operand_sema_type(body, d2)
+        let lhs_resolved = if lhs_sema > 0: self.mir_input.mir_resolve_alias(lhs_sema) else: 0
+        let rhs_resolved = if rhs_sema > 0: self.mir_input.mir_resolve_alias(rhs_sema) else: 0
+        let lhs_tk = if lhs_resolved > 0: self.mir_input.mir_get_type_kind(lhs_resolved) else: 0
+        let rhs_tk = if rhs_resolved > 0: self.mir_input.mir_get_type_kind(rhs_resolved) else: 0
+        if d0 == OP_ADD or d0 == OP_SUB:
+            if (lhs_tk == TY_PTR or lhs_tk == TY_REF) and wl_get_type_kind(wl_type_of(rhs)) == wl_integer_type_kind():
+                let elem_ty = self.mir_pointer_elem_llvm_type(lhs_sema)
+                let indices: Vec[i64] = Vec.new()
+                indices.push(if d0 == OP_SUB: wl_build_neg(self.builder, rhs) else: rhs)
+                return wl_build_gep(self.builder, if elem_ty != 0: elem_ty else: wl_i8_type(self.context), lhs, vec_data_i64(&indices), 1)
+            if d0 == OP_ADD and (rhs_tk == TY_PTR or rhs_tk == TY_REF) and wl_get_type_kind(wl_type_of(lhs)) == wl_integer_type_kind():
+                let elem_ty = self.mir_pointer_elem_llvm_type(rhs_sema)
+                let indices: Vec[i64] = Vec.new()
+                indices.push(lhs)
+                return wl_build_gep(self.builder, if elem_ty != 0: elem_ty else: wl_i8_type(self.context), rhs, vec_data_i64(&indices), 1)
         let is_unsigned = self.mir_operand_is_unsigned(body, d1)
         let out = self.mir_build_bin_op(d0, lhs, rhs, is_unsigned)
         if dest_ty != 0:
