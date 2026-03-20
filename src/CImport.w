@@ -1059,6 +1059,7 @@ fn ci_translate_macros(session: i64, extern_vars: str) -> str:
     let count = with_cimport_macro_count(session)
     var output = ""
     var known_values = ""
+    var blank_macros = ""
     for i in 0..count:
         let name = with_cimport_macro_name(session, i)
         let value = with_cimport_macro_value(session, i)
@@ -1118,14 +1119,20 @@ fn ci_translate_macros(session: i64, extern_vars: str) -> str:
                         output = output ++ "// untranslatable fn-like macro\nfn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable C macro: " ++ name ++ "\")\n"
             continue
 
-        // Skip empty macros (flag defines)
+        // Skip empty macros (flag defines) and track as blank
         if value.len() == 0:
+            blank_macros = blank_macros ++ "|" ++ name ++ "|"
             continue
 
         // Skip internal names
         if name.len() == 0:
             continue
         if name.byte_at(0) == 95:
+            continue
+
+        // Detect macros whose value only references other blank macros
+        if ci_is_blank_macro_ref(value, blank_macros):
+            blank_macros = blank_macros ++ "|" ++ name ++ "|"
             continue
 
         // Skip already-emitted names (dedup across c_import calls)
@@ -3651,6 +3658,16 @@ fn ci_str_replace(text: str, needle: str, replacement: str) -> str:
         result = result ++ text.slice(i as i64, i as i64 + 1)
         i = i + 1
     result
+
+// Check if a macro value only references other blank macros.
+fn ci_is_blank_macro_ref(value: str, blank_macros: str) -> bool:
+    let trimmed = ci_trim(value)
+    if trimmed.len() == 0:
+        return true
+    // Single identifier that is a known blank macro
+    if ci_is_c_ident(trimmed):
+        return ci_str_contains(blank_macros, "|" ++ trimmed ++ "|")
+    false
 
 fn ci_is_int_literal(s: str) -> bool:
     if s.len() == 0:
