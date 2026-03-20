@@ -10,6 +10,7 @@ use BorrowCfg
 use Span
 use Diagnostic
 use InternPool
+use render
 
 extern fn print(s: str) -> void
 extern fn with_eprintln(s: str) -> void
@@ -4922,7 +4923,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 if self.type_is_dyn_object(exp_resolved) == 0:
                     if self.types_compatible(expected_ty, arg_ty) == 0:
                         if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
-                            self.emit_error("wrong argument type", self.ast.get_extra(extra_start + ai))
+                            self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, self.ast.get_extra(extra_start + ai))
             let arg_node = self.ast.get_extra(extra_start + ai)
             if self.expr_is_ephemeral_task(arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
                 self.emit_warning("ephemeral Task passed by value may escape", arg_node)
@@ -5611,7 +5612,7 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                             if self.type_is_dyn_object(exp_r) == 0:
                                 if self.types_compatible(exp_ty, arg_ty) == 0:
                                     if self.arithmetic_result_type(exp_ty, arg_ty) == 0:
-                                        self.emit_error("wrong argument type", self.ast.get_extra(extra_start + mc_ai))
+                                        self.emit_argument_type_mismatch(mc_method_name, mc_method_fn_sym, mc_ai, mc_sig_pi, exp_ty, arg_ty, self.ast.get_extra(extra_start + mc_ai))
                 let mc_subst_ret = self.substitute_method_return_for_generic_inst(resolved, type_name_sym, field, mc_ret)
                 if mc_subst_ret != 0:
                     return mc_subst_ret
@@ -5622,6 +5623,7 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     if self.get_type_kind(resolved) == TY_GENERIC_INST:
         let mc_base_name = self.pool_resolve(type_name_sym)
         let mc_method = self.pool_resolve(field)
+        let mc_call_name = mc_base_name ++ "." ++ mc_method
         let mc_push_sym = self.pool_intern("push")
         let mc_insert_sym = self.pool_intern("insert")
         if field == mc_push_sym:
@@ -5632,7 +5634,7 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 if elem_ty != 0 and a0_ty != 0:
                     if self.types_compatible(elem_ty, a0_ty) == 0:
                         if self.arithmetic_result_type(elem_ty, a0_ty) == 0:
-                            self.emit_error("wrong argument type", self.ast.get_extra(extra_start))
+                            self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, elem_ty, a0_ty, self.ast.get_extra(extra_start))
         else if field == mc_insert_sym:
             // HashMap.insert(key: K, value: V) — arg[0] must be K, arg[1] must be V
             let gi_argc = self.get_generic_inst_arg_count(resolved)
@@ -5644,11 +5646,11 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 if key_ty != 0 and a0_ty != 0:
                     if self.types_compatible(key_ty, a0_ty) == 0:
                         if self.arithmetic_result_type(key_ty, a0_ty) == 0:
-                            self.emit_error("wrong argument type", self.ast.get_extra(extra_start))
+                            self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, key_ty, a0_ty, self.ast.get_extra(extra_start))
                 if val_ty != 0 and a1_ty != 0:
                     if self.types_compatible(val_ty, a1_ty) == 0:
                         if self.arithmetic_result_type(val_ty, a1_ty) == 0:
-                            self.emit_error("wrong argument type", self.ast.get_extra(extra_start + 1))
+                            self.emit_argument_type_mismatch(mc_call_name, 0, 1, 1, val_ty, a1_ty, self.ast.get_extra(extra_start + 1))
         // Return types for builtin generic methods
         if mc_base_name == "Vec":
             if mc_method == "push" or mc_method == "set_i32" or mc_method == "clear":
@@ -6913,6 +6915,65 @@ fn Sema.expire_borrows_in_scope(self: Sema, scope_start: i32):
 
 // ── Diagnostics ──────────────────────────────────────────────────
 
+fn Sema.call_param_name(self: Sema, fn_sym: i32, param_i: i32) -> str:
+    if fn_sym <= 0 or param_i < 0:
+        return ""
+    if not self.fn_decl_nodes.contains(fn_sym):
+        return ""
+    let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return ""
+    let param_start = self.ast.fn_meta_param_start(meta)
+    let param_count = self.ast.fn_meta_param_count(meta)
+    if param_i >= param_count:
+        return ""
+    let param_sym = self.ast.fn_param_name(param_start, param_i)
+    self.safe_symbol_text(param_sym)
+
+fn Sema.argument_literal_default_help(self: Sema, arg_node: i32, expr_text: str, expected_ty: i32, actual_ty: i32) -> str:
+    if arg_node == 0 or expr_text.len() == 0:
+        return ""
+    let kind = self.ast.kind(arg_node)
+    let expected_name = self.type_name(expected_ty)
+    if kind == NK_INT_LIT and actual_ty == self.ty_i32 and expected_ty != 0 and expected_ty != actual_ty:
+        return "integer literal '" ++ expr_text ++ "' defaults to i32; cast with '" ++ expr_text ++ " as " ++ expected_name ++ "'"
+    if kind == NK_FLOAT_LIT and actual_ty == self.ty_f64 and expected_ty != 0 and expected_ty != actual_ty:
+        return "float literal '" ++ expr_text ++ "' defaults to f64; cast with '" ++ expr_text ++ " as " ++ expected_name ++ "'"
+    ""
+
+fn Sema.emit_argument_type_mismatch(self: Sema, call_name: str, fn_sym: i32, arg_index: i32, param_i: i32, expected_ty: i32, actual_ty: i32, arg_node: i32):
+    if self.suppress_errors != 0:
+        return
+    let start = self.ast.get_start(arg_node)
+    let end = self.ast.get_end(arg_node)
+    let primary = Span { file: self.local_file_id, start: start, end: end }
+    let expected_name = self.type_name(expected_ty)
+    let actual_name = self.type_name(actual_ty)
+    let expr_text = render_expr(self.ast, self.pool, arg_node, 0)
+    var msg = "wrong argument type"
+    if call_name.len() > 0:
+        msg = msg ++ " in call to '" ++ call_name ++ "'"
+    var diag = Diagnostic.err(msg, primary)
+    if expr_text.len() > 0 and sema_str_contains_char(expr_text, 10) == 0:
+        diag.add_label(primary, "argument expression '" ++ expr_text ++ "' has type " ++ actual_name)
+    else:
+        diag.add_label(primary, "argument has type " ++ actual_name)
+
+    let param_name = self.call_param_name(fn_sym, param_i)
+    if param_name.len() > 0:
+        diag.add_note("parameter '" ++ param_name ++ "' expects " ++ expected_name)
+    else if arg_index >= 0:
+        diag.add_note("argument " ++ int_to_string(arg_index + 1) ++ " expects " ++ expected_name)
+    else:
+        diag.add_note("expected type: " ++ expected_name)
+    diag.add_note("actual type: " ++ actual_name)
+
+    let help = self.argument_literal_default_help(arg_node, expr_text, expected_ty, actual_ty)
+    if help.len() > 0:
+        diag.add_help(help)
+    self.diags.emit(diag)
+
 fn Sema.emit_error(self: Sema, msg: str, node: i32):
     if self.suppress_errors != 0:
         return
@@ -7895,26 +7956,59 @@ fn Sema.type_name(self: Sema, tid: i32) -> str:
     if tk == TY_ENUM:
         return self.safe_symbol_text(self.get_type_d0(resolved))
     if tk == TY_ARRAY:
-        return "[_]T"
+        let size = self.get_type_d1(resolved)
+        return "[" ++ int_to_string(size) ++ "]" ++ self.type_name(self.get_type_d0(resolved))
     if tk == TY_SLICE:
-        return "[]T"
+        return "[]" ++ self.type_name(self.get_type_d0(resolved))
     if tk == TY_TUPLE:
-        return "(_, _)"
+        let te_start = self.get_type_d0(resolved)
+        let elem_count = self.get_type_d1(resolved)
+        var out = "("
+        for ei in 0..elem_count:
+            if ei > 0:
+                out = out ++ ", "
+            out = out ++ self.type_name(self.type_extra.get((te_start + ei) as i64))
+        if elem_count == 1:
+            out = out ++ ","
+        return out ++ ")"
     if tk == TY_RANGE:
+        let elem_name = self.type_name(self.get_type_d0(resolved))
         if self.get_type_d1(resolved) != 0:
-            return "RangeInclusive[T]"
-        return "Range[T]"
+            return "RangeInclusive[" ++ elem_name ++ "]"
+        return "Range[" ++ elem_name ++ "]"
     if tk == TY_FN:
-        return "fn"
+        let te_start = self.get_type_d0(resolved)
+        let param_count = self.get_type_d1(resolved)
+        var out = "fn("
+        for pi in 0..param_count:
+            if pi > 0:
+                out = out ++ ", "
+            out = out ++ self.type_name(self.type_extra.get((te_start + pi) as i64))
+        return out ++ ") -> " ++ self.type_name(self.get_type_d2(resolved))
     if tk == TY_PTR:
-        return "*T"
+        let pointee = self.type_name(self.get_type_d0(resolved))
+        if self.get_type_d1(resolved) != 0:
+            return "*mut " ++ pointee
+        return "*const " ++ pointee
     if tk == TY_REF:
-        return "&T"
+        let pointee = self.type_name(self.get_type_d0(resolved))
+        if self.get_type_d1(resolved) != 0:
+            return "&mut " ++ pointee
+        return "&" ++ pointee
     if tk == TY_ALIAS:
         return "<alias>"
     if tk == TY_GENERIC_FN:
         return "<generic>"
     if tk == TY_TRAIT_OBJ:
-        // Stage0 parity: dyn trait-object type expressions currently print as <error>.
-        return "<error>"
+        return "dyn " ++ self.safe_symbol_text(self.get_type_d0(resolved))
+    if tk == TY_GENERIC_INST:
+        let base_name = self.safe_symbol_text(self.get_type_d0(resolved))
+        let arg_count = self.get_type_d2(resolved)
+        let extra_start = self.get_type_d1(resolved)
+        var out = base_name ++ "["
+        for ai in 0..arg_count:
+            if ai > 0:
+                out = out ++ ", "
+            out = out ++ self.type_name(self.type_extra.get((extra_start + ai) as i64))
+        return out ++ "]"
     "<unknown>"
