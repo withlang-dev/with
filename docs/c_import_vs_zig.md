@@ -1,261 +1,208 @@
-# c_import: With vs Zig — Definitive Deep Comparison
+# c_import: With vs Zig — Post-Fix Comparison
 
-Zig's translate-c: ~10K lines across 8 files.
-Our c_import: ~5.2K lines across 2 files (CImport.w + clang_bridge.c).
-
----
-
-## 1. Architecture
-
-| Aspect | Zig | With |
-|--------|-----|------|
-| C frontend | **aro** (Zig's own C compiler, full AST) | **libclang** (cursor-based API) |
-| AST access | Full typed AST with every node kind | Cursor handles with lazy child expansion |
-| Output format | Builds in-memory Zig AST, then renders | String concatenation |
-| Macro source | aro's preprocessor token stream | `cc -E -dM` subprocess |
-| Parse flags | N/A (aro parses everything) | `flags=0` (includes function bodies) |
-
-**Key difference:** Zig uses aro which gives it a fully-typed C AST where every expression has a known type at translation time. We use libclang which provides cursors — we can query types but don't have the same typed-expression-tree. This means Zig can make type-aware translation decisions (e.g., signed vs unsigned wrapping for arithmetic) that we cannot.
+After closing all identified gaps, here are the **remaining real differences** between our c_import (5.3K lines) and Zig's translate-c (10K lines).
 
 ---
 
-## 2. Name Resolution
+## Remaining Differences
 
-| Feature | Zig | With |
-|---------|-----|------|
-| Strong names | `global_names` HashMap | `with_cimport_is_name_emitted` (C-side global array) |
-| Weak names | `weak_global_names` HashMap | Implicit in `ci_prepopulate_names` shadowed string |
-| Mangling | `mangleWeakGlobalName` with counter | `ci_unique_name` with `_N` suffix |
-| Scope tracking | Full `Scope` hierarchy (Root, Block, Condition, Loop) | None (implicit in AST walker recursion) |
-| Alias emission | Post-pass: `alias_list` → `pub const bare = struct_bare` | Inline: `type struct_Foo = Foo` |
-| Typedef→unnamed struct | `unnamed_typedefs` maps anonymous types to typedef name | `with_cimport_typedef_anon_record_field_count` inlines fields |
+### 1. Type System: `i32` vs `c_int` in translated output
 
-**Real gap:** Zig's `Scope.Block` tracks local variable names across nested scopes and mangles collisions. Our function body translator uses `ci_escape_reserved` for keyword conflicts but doesn't track local scope — two local variables with the same name in different blocks would collide. This only matters for function body translation of complex inline functions.
+**Zig:** Types in the translated output use `c_int`, `c_long`, `c_short`, etc.
+These are Zig's platform-specific type aliases.
 
----
+**Us:** We emit `c_int`/`c_long`/etc. type aliases at the start of each c_import,
+but our `translate_type_recursive` in clang_bridge.c still emits raw `i32`/`i64`
+in struct fields and function signatures. The type aliases exist but aren't used
+in the actual translated declarations.
 
-## 3. Type Translation
+**Fix needed:** Change `translate_type_recursive` to emit `c_int` instead of `i32`
+for `CXType_Int`, `c_long` instead of `i64` for `CXType_Long`, etc.
 
-| Type | Zig | With |
-|------|-----|------|
-| `void` | `anyopaque` | `void` (in function returns), `c_void` (in pointers) |
-| `int` | `c_int` (platform-sized) | `i32` (hardcoded arm64) |
-| `long` | `c_long` | `i64` (hardcoded arm64) |
-| `char` | `u8` | `i8` |
-| `_Bool` | `bool` | `bool` |
-| `float` | `f32` | `f32` |
-| `double` | `f64` | `f64` |
-| `long double` | `c_longdouble` (80-bit on x86) | `f64` (lossy on x86) |
-| `_Float16` | `f16` | Not handled |
-| `__float128` | `f128` | Not handled |
-| `void *` | `?*anyopaque` | `*mut c_void` / `*const c_void` |
-| C pointers | `[*c]T` (nullable, arithmetic, casts) | `*mut T` wrapped in `Option[]` |
-| Function pointers | `?*const fn(...) callconv(.c) T` | `*const fn(...) -> T` |
-| `volatile` qualifier | `*volatile T` preserved in pointer info | `*volatile T` (stored in TY_PTR d2) |
-| `restrict` qualifier | `noalias` on function params | Stripped |
-| `_Atomic` | `TODO` error | `__UNSUPPORTED` (demotes container) |
+### 2. Cast Translation Precision
 
-**Real gaps:**
-1. **`c_int`/`c_long` vs hardcoded sizes** — We hardcode `i32`/`i64` which is correct on arm64 macOS but wrong for cross-compilation.
-2. **`[*c]T` pointer semantics** — Zig's C pointer type handles null, arithmetic, and implicit casts. We use `*mut T` + `Option[]` which requires explicit unwrapping.
-3. **`char` signedness** — Zig uses `u8`, we use `i8`. On arm64 macOS char is signed, so `i8` is technically correct, but cross-compilation would need `c_char`.
+**Zig:** `transCastExpr` handles 15+ distinct cast kinds:
+- `no_op`, `lval_to_rval`, `function_to_pointer` → transparent
+- `int_cast` → `@intCast` with range checking for implicit casts
+- `null_to_pointer` → `null`
+- `array_to_pointer` → `&array` with `@ptrCast`/`@alignCast`
+- `int_to_pointer` → `@ptrFromInt` with usize cast
+- `int_to_bool` → `!= 0`
+- `float_to_bool` → `!= 0`
+- `pointer_to_bool` → `!= null` (special case for function pointers)
+- `bool_to_int` → `@intFromBool`
+- `int_to_float` → `@floatFromInt`
+- `float_to_int` → `@intFromFloat`
+- `pointer_cast` → `@ptrCast`/`@constCast`/`@volatileCast`
+- `union_cast` → field access on union
 
----
+**Us:** `ci_trans_expr` handles `CXK_CSTYLE_CAST` with generic `(expr as type)`
+and `CXK_IMPLICIT_CAST` by unwrapping to child. We don't distinguish cast kinds.
 
-## 4. Declaration Translation
+**Impact:** For function body translation, casts between pointer types, int↔float,
+int↔bool may produce wrong code. For declaration translation (the common case),
+this doesn't matter since we don't translate cast expressions in declarations.
 
-### Functions
+### 3. Macro Parser: Token-Based vs String-Based
 
-| Feature | Zig | With |
-|---------|-----|------|
-| Extern functions | `pub extern "c" fn` | `extern fn` |
-| Static functions | Skipped | Skipped |
-| Static inline | **Full body translation** with graceful demotion to extern | Try AST body translation, fallback to `comptime_error` stub |
-| Non-static inline | Body translated if available | Try AST body translation, fallback to extern |
-| Always-inline | `inline fn` with body | Same path as static inline |
-| Variadic with body | **Demoted to extern** with warning | Emitted as extern |
-| Unnamed params | `arg_N` with mutable redeclaration | `pN` |
-| Mutable params | Redeclared as `var arg_param = param` | Not redeclared (With params are immutable) |
-| Calling conventions | 14 CC types from C attributes | `@[callconv("...")]` annotation |
+**Zig:** `MacroTranslator` uses aro's tokenizer producing proper `CToken`s.
+Recursive descent with 13 named precedence functions:
+`parseCExpr` → `parseCCondExpr` → `parseCOrExpr` → ... → `parseCUnaryExpr` → `parseCPostfixExpr` → `parseCPrimaryExpr`
 
-**Real gap — graceful demotion:** When Zig fails to translate a function body, it changes `is_extern = true` and keeps the declaration. We emit a `comptime_error` stub instead. Zig's approach is better — the function is still callable as extern even if the body couldn't be translated.
+Postfix operators parsed in a loop: `.field`, `->field` (deref + field), `[i]` (with usize cast), `(args)` (function call), `{.field=val}` (designated init), `{val1,val2}` (array init).
 
-### Variables
+**Us:** `ci_translate_c_expr` uses string-based pattern matching.
+`ci_find_binary_op_ext` scans for operators at paren depth 0.
+Handles most binary/unary/ternary cases but:
+- No `.field` or `->field` in macro bodies (only in AST translator)
+- No `{.field=val}` designated initializer in macro bodies
+- No postfix `(args)` after arbitrary expression (only after identifier)
+- String concatenation via `ci_concat_strings` instead of token-aware concat
 
-| Feature | Zig | With |
-|---------|-----|------|
-| Const globals | Initializer translated | `ci_try_eval_var_init` tries constant eval, fallback to extern |
-| Non-const globals | `pub var` with init | `extern var` |
-| Static locals | Wrapped in struct for namespace | Not handled (function bodies skip these) |
-| Thread-local | `threadlocal` qualifier | Not handled |
+**Impact:** Complex macros with member access, initializer lists, or chained
+function calls fail to translate. These fall through to `comptime_error` stubs.
 
-### Structs/Unions
+### 4. Struct Default Values: `std.mem.zeroes(T)` for Complex Types
 
-| Feature | Zig | With |
-|---------|-----|------|
-| Layout | `extern struct` with per-field `align(N)` | `@[packed]` + explicit padding byte arrays |
-| Bitfields | Demote to `opaque` with warning | Demote to `opaque` |
-| Anonymous fields | `unnamed_N` with name tracking table | `unnamed_N` |
-| Flexible array members | `[0]T` + accessor function `fn member(self) [*c]T` | `[0]T` only |
-| Empty structs (MSVC) | `_padding: uN` with alignment-aware sizing | `__pad0: u8` always |
-| Default values | `@import("std").mem.zeroes(T)` or `0`/`false`/`null` | `0`/`0.0`/`false` for primitives only |
-| Member functions | `processContainerMemberFns()` embeds methods | Not supported |
+**Zig:** `createZeroValueNode` falls back to `@import("std").mem.zeroes(T)`
+for any type that isn't a simple int/float/bool/pointer. This handles nested
+structs, arrays of structs, etc.
 
-**Real gap — alignment:** Zig computes per-field alignment by inspecting the C layout (offset, size, parent alignment) and emits `align(N)` annotations. We use `@[packed]` with manual padding bytes. Zig's approach produces better LLVM codegen because packed structs disable alignment optimizations. For most cases our approach produces correct layouts, but it may have performance implications.
+**Us:** `ci_default_for_type` returns `""` for complex types (struct, array,
+enum). This means struct fields with complex types don't get default values,
+so `let s = StructName {}` may not work if the struct has nested struct fields.
 
-**Real gap — default values:** Zig uses `std.mem.zeroes(T)` for complex types (pointers → null, nested structs → recursive zeroes). We only zero primitive types. This means `let s = StructWithPointers {}` won't work without explicit initialization in our output.
+**Fix needed:** For struct/array/enum field types, emit a zero-initialization
+expression. Since With doesn't have `mem.zeroes`, we could emit the type's
+zero value directly or leave the field without a default (requiring explicit init).
 
-### Enums
+### 5. Scope System
 
-| Feature | Zig | With |
-|---------|-----|------|
-| Named enums | `pub const enum_Foo = c_int` + constant declarations | `type Foo = i32` + `let` constants |
-| Anonymous enums | Translate constants with mangled name | Translate constants (skip type alias) |
-| Forward-declared | `opaque` | `opaque` |
-| Enum type | Translated from tag type | Mapped from `with_cimport_enum_int_type` string |
+**Zig:** Full `Scope` hierarchy (404 lines in Scope.zig):
+- `Root` scope: global symbol table, blank macros, container member fns
+- `Block` scope: local variables, name mangling with counters, labeled blocks
+- Variable discard tracking (`_ = var;` for unused variables)
+- `makeMangledName` / `createMangledName` for collision avoidance
+- `findBlockScope` / `findBlockReturnType` for scope chain walking
 
----
+**Us:** No scope tracking. Name dedup is global via `with_cimport_is_name_emitted`.
+`ci_escape_reserved` handles keyword collisions. No local variable tracking
+across nested blocks in function body translation.
 
-## 5. Expression Translation
+**Impact:** Function body translation of complex inline functions with
+variable shadowing or nested block scopes may produce incorrect code.
+For declaration-only translation (the common case), this doesn't matter.
 
-### AST-based (for function bodies)
+### 6. Function Body Translation: Partial vs Full
 
-| Expression | Zig | With |
-|------------|-----|------|
-| Integer literals | Full (with type-aware promotion) | Via `with_ci_eval_int_value` |
-| Float literals | Full (all suffix types) | Strip suffix, raw value |
-| String literals | Full (UTF-8/16/32, wide, null-sentinel arrays) | Source text passthrough |
-| Char literals | Full (escape sequences) | Via `with_ci_eval_int_value` |
-| Binary ops | Type-aware (wrapping for unsigned: `+%`, `-%`, `*%`) | Simple operator mapping (no wrapping) |
-| Signed division | `@divTrunc` | `/` |
-| Signed remainder | `__helpers.signedRemainder` | `%` |
-| Pointer arithmetic | Special signed index casting via `@intCast`/`@bitCast` | Simple `+`/`-` |
-| Pointer difference | `transPtrDiffExpr` with `@ptrToInt` and division | Simple `-` |
-| Unary ops | Type-aware negate (wrapping for unsigned: `-%`) | Pattern-based (`0 - x`) |
-| Address-of | `@address_of` | `&` |
-| Deref | Opaque type check, function pointer no-op | `unsafe: *` |
-| Casts | 15+ cast kinds (int, float, bool, pointer, bitcast, etc.) | Generic `as` cast |
-| Member access | `.field` with type resolution | `.field` |
-| Array subscript | Full with optional base | `arr[idx]` |
-| Function calls | With builtin dispatch and member fn resolution | With builtin remapping |
-| Sizeof/alignof | `@sizeOf`/`@alignOf` with type resolution | `sizeof[T]()` |
-| Compound literal | Type-aware init with static/dynamic distinction | Inner expression passthrough |
-| Init list | Struct/array/union-specific handlers | Generic item list |
-| Inc/dec (pre/post) | Separate pre/post with used/unused tracking | Block expression |
-| Comma | Block with discard stmts, last value breaks | Last expression only |
-| Ternary | `if (cond) then else else_` | `if cond != 0: then else: else_` |
-| _Generic | Resolves to chosen association | Resolves to last child (libclang pre-resolves) |
-| Statement expr | Block scope with last expression value | Translate compound stmt |
-| Predefined | `__func__` etc. | `"__func__"` string |
-| `__builtin_*` | 50 builtins in `builtins.zig` | 50 builtins in `ci_translate_builtin_call` |
+**Zig:** Translates ALL C statements and expressions via `transStmt` (68 cases)
+and `transExpr` (70+ cases). When translation fails, the function is demoted to
+extern with a warning.
 
-**Real gaps:**
-1. **Wrapping arithmetic:** Zig emits `+%`, `-%`, `*%` for unsigned integer overflow. We use plain operators. This produces undefined behavior for unsigned overflow in With (if With doesn't define wrapping semantics for unsigned types).
-2. **Signed division/remainder:** Zig uses `@divTrunc` and `signedRemainder` for correct C semantics. We use `/` and `%` which may differ (With's `%` might not match C's truncation-toward-zero behavior).
-3. **Cast precision:** Zig has 15+ cast kind handlers (`transIntCast`, `transPointerCastExpr`, etc.) that emit `@truncate`, `@bitCast`, `@intFromBool`, `@floatFromInt`, etc. We emit generic `as` casts which may not handle all edge cases.
-4. **Pointer arithmetic with signed indices:** Zig emits `@as(usize, @bitCast(@as(isize, @intCast(idx))))` for pointer + signed index. We emit `ptr + idx` which may have incorrect semantics.
+**Us:** `ci_trans_stmt` handles 11 statement types, `ci_trans_expr` handles 18
+expression types. When translation fails, we emit `""` which falls through to
+extern. The gap is in the expression/statement types we don't handle:
 
-### Macro-based (for `#define` bodies)
+| Missing in ci_trans_expr | Zig handler |
+|--------------------------|-------------|
+| `addr_of_label` | `error: computed goto` |
+| `imag_expr` / `real_expr` | `error: complex numbers` |
+| `builtin_types_compatible_p` | Type equality check |
+| `builtin_choose_expr` | Compile-time choice |
+| `builtin_convertvector` | Vector conversion |
+| `builtin_shufflevector` | Vector shuffle |
 
-| Feature | Zig (MacroTranslator) | With (ci_translate_c_expr) |
-|---------|----------------------|---------------------------|
-| Tokenizer | aro's CToken (proper lexer) | String-level pattern matching |
-| Parser | Recursive descent, 13 precedence levels | `ci_find_binary_op_ext` string search |
-| Numeric literals | Full (binary, octal, hex, separators, all suffixes, promotion) | Hex/decimal, basic suffix stripping |
-| String concat | Adjacent strings via `.array_cat` | `ci_concat_strings` |
-| Sizeof | Parsed as unary expression | String match `ci_starts_with(trimmed, "sizeof")` |
-| Casts | `parseCCastExpr` with type name resolution | `ci_is_c_type_name` + `ci_map_base_type` |
-| Postfix ops | `.field`, `->field`, `[i]`, `()`, `++`, `--` | `[i]` via binary op, no postfix `++`/`--` |
-| Comma | Block with discards, last value via `break` | Last expression only |
-| Type macros | `parseCTypeName` with struct/union/enum keywords | Not handled |
-| Blank macros | `blank_macros` set, chaining detection | Empty value → skip |
-| Variable refs | `refs_var_decl` flag → convert to inline fn | Not detected |
-| Fn ptr alias | `getFnProto` → create wrapper fn | Not detected |
+| Missing in ci_trans_stmt | Zig handler |
+|--------------------------|-------------|
+| `static_assert` | `@compileError` |
+| `asm_stmt` | `asm volatile` |
+| `computed_goto_stmt` | `error: computed goto` |
 
-**Real gaps:**
-1. **Token-level parsing vs string matching:** Zig's MacroTranslator uses proper tokenization. Our string-based approach is fragile — nested parentheses, operator precedence, and complex expressions can be parsed incorrectly.
-2. **Comma operator semantics:** Zig creates a labeled block where all but the last expression are discarded with `_ = expr;`, and the last breaks with a value. We just take the last expression, losing side effects.
-3. **Variable reference detection:** When an object macro references a mutable global, Zig auto-converts it from `pub const` to `pub inline fn`. We don't detect this, so the macro may produce incorrect results at compile time.
-4. **Postfix operators in macros:** Zig parses `.field`, `->field`, `(args)`, `[idx]`, `++`, `--` as postfix operators. We handle `[idx]` as binary and don't handle postfix `++`/`--` at all in the macro path.
+Most of these are rare in real system header inline functions.
 
----
+### 7. Struct Layout: Per-Field Alignment vs Packed+Padding
 
-## 6. Statement Translation
+**Zig:** `alignmentForField` computes alignment for each field by inspecting
+the C layout (offset, size, parent pointer alignment). Emits `align(N)` on
+individual struct fields. Uses `extern struct` layout.
 
-| Statement | Zig | With |
-|-----------|-----|------|
-| Compound stmt | Block scope with push/pop | Recursive, no scope tracking |
-| Return | With optional value translation | With optional value |
-| If/else | Full with scope | `if cond != 0:` |
-| While | Condition with scope | `while cond != 0:` |
-| Do-while | `while (true)` + break at end | `while true:` + `if cond == 0: break` |
-| For | Init + while + continue expr | Init + while + inc |
-| Switch | `switch` with case ranges, labeled break for fallthrough | `if/else if` chain (no fallthrough) |
-| Break/continue | Direct | Direct |
-| Goto | Labeled blocks with break | `comptime_error("goto not supported")` |
-| Labels | Integrated with goto translation | `// label: name` comment |
-| Decl stmt | Local variable with init, scope tracking | `var name: type = init` |
-| Static assert | `@compileError` | Not handled |
-| Inline asm | `asm volatile` | Not handled |
+**Us:** `ci_struct_needs_explicit_layout` detects when C layout differs from
+LLVM natural layout. When it does, emits `@[packed]` with explicit padding
+byte arrays (`__padN: [K]u8`).
 
-**Real gaps:**
-1. **Switch fallthrough:** Zig translates C switch fallthrough using labeled blocks and breaks. Our `if/else if` chain treats each case independently — if the original C code relies on fallthrough, the translation is wrong.
-2. **Goto:** Zig translates goto to labeled blocks with break. We emit `comptime_error`. This affects ~1% of static inline functions.
-3. **Scope tracking:** Zig pushes/pops scopes and mangles conflicting names. We don't track scopes, so variable shadowing in nested blocks may produce incorrect code.
+**Both approaches produce correct memory layouts.** Zig's is better for codegen
+because packed structs disable LLVM's alignment optimizations. Our approach is
+simpler but may generate slightly slower field access for packed structs.
+
+### 8. Flexible Array Member Accessors
+
+**Zig:** For flexible array members (`T field[]` at end of struct), Zig:
+1. Renames the field to `_field`
+2. Generates accessor: `fn field(self: anytype) [*c]T`
+
+**Us:** We emit `field: [0]T` with no accessor. The field is accessible
+but requires manual pointer arithmetic.
+
+### 9. Member Function Registration
+
+**Zig:** `Scope.Root.addMemberFunction` tracks functions whose first parameter
+is a pointer to a struct. `processContainerMemberFns` embeds these as methods
+on the translated struct/union type.
+
+**Us:** Not implemented. Functions that operate on structs remain free functions.
+This is a Zig-specific feature — With doesn't have the same method-on-extern-struct
+concept.
+
+### 10. Variable Reference Detection in Macros
+
+**Zig:** `MacroTranslator.refs_var_decl` flag detects when an object-like macro
+references a mutable global variable. When detected, the macro is converted from
+`pub const` to `pub inline fn` (line 168-182 of MacroTranslator.zig).
+
+**Us:** Not detected. A macro referencing a mutable global is translated as a
+`let` constant, which may produce incorrect results if the global changes.
+
+### 11. Self-Defined Macro Filtering
+
+**Zig:** `isSelfDefinedMacro` (line 313) detects `#define FOO FOO` patterns
+and skips them. These are common in C headers for feature detection.
+
+**Us:** These are handled by the `ci_eval_const_expr_ctx` path — the identifier
+`FOO` looks up in `known_values` and finds itself, producing a circular
+reference that returns `""`. The macro is then skipped. Functionally equivalent
+but through a different mechanism.
+
+### 12. Error Reporting Quality
+
+**Zig:** Every failed translation includes:
+- Source location (`// file:line:col`)
+- Specific reason (`"demoted to opaque type - has bitfield"`)
+- `@compileError` with descriptive message
+- Warning comments for all demotions
+
+**Us:** Source locations only for opaque struct demotions. Other failures use
+generic messages (`"untranslatable C macro: NAME"`). No warning comments for
+function body translation failures.
 
 ---
 
-## 7. PatternList (## Token Pasting)
+## Summary: What Still Differs
 
-| Pattern | Zig | With |
-|---------|-----|------|
-| Suffix `##U/UL/ULL/L/LL/F` | 28 patterns (with/without parens, all case variants) | `ci_try_translate_token_paste` + `ci_token_paste_suffix` |
-| `CAST_OR_CALL(X,Y)` → `(X)(Y)` | Token-structural match | `ci_translate_c_expr` identifier-in-parens detection |
-| `DISCARD(X)` → `(void)(X)` | 10 patterns (const/volatile variants) | `ci_is_discard_pattern` |
-| `WL_CONTAINER_OF` | Linux kernel macro | Not handled (Linux-only) |
+| # | Gap | Impact | Fixable? |
+|---|-----|--------|----------|
+| 1 | `i32` vs `c_int` in type translator output | Low (arm64 only) | Yes — change clang_bridge.c |
+| 2 | Cast translation precision | Medium (fn bodies) | Yes — add cast kind dispatch |
+| 3 | Token-based vs string-based macro parser | Medium (complex macros) | Major rewrite |
+| 4 | `mem.zeroes(T)` for complex struct defaults | Low | Yes — emit zero struct literal |
+| 5 | Scope system | Medium (fn bodies) | Major addition |
+| 6 | Missing expression/statement types | Low (rare types) | Yes — add cases |
+| 7 | Per-field alignment vs packed+padding | Low (perf only) | Yes — change approach |
+| 8 | FAM accessors | Low | Yes — generate accessor fn |
+| 9 | Member function registration | N/A (Zig-specific) | N/A |
+| 10 | Variable ref detection in macros | Low | Yes — add flag |
+| 11 | Self-defined macro filtering | None (works differently) | N/A |
+| 12 | Error reporting quality | Low (DX only) | Yes — add locations |
 
-**Implementation difference:** Zig tokenizes both the template and the input macro, then compares token-by-token. We use string-level detection (`ci_find_str(body, "##")`). Zig's approach is more robust for complex macro bodies; ours works for the common cases.
-
----
-
-## 8. Error Handling
-
-| Feature | Zig | With |
-|---------|-----|------|
-| Untranslatable type | `@compileError("...")` with source location comment | `comptime_error("...")` |
-| Untranslatable expr | `@compileError("...")` with reason | `comptime_error("untranslatable C macro: NAME")` |
-| Demoted function | Changed to `extern` with warning comment | `comptime_error` stub (doesn't preserve extern signature) |
-| Location info | `// file:line:col` comments | `// file:line:col` for opaque demotions |
-| Warning comments | `// ... warning: reason` for all demotions | Only for opaque demotions |
-
-**Real gap — graceful demotion:** When Zig can't translate a function body, it keeps the function as `extern` — still callable, just without the inline body. We emit a `comptime_error` stub that makes the function uncallable. This is the single most impactful error handling difference.
-
----
-
-## 9. Summary: What Matters
-
-### Differences that affect real-world usage (HIGH impact) — ALL FIXED
-
-1. ~~**Graceful function demotion**~~ — FIXED: static inline functions now fall through to extern declaration when body translation fails.
-
-2. ~~**Wrapping arithmetic**~~ — NOT A GAP: With's LLVM codegen uses wrapping semantics for unsigned integers, matching C.
-
-3. ~~**Pointer default values**~~ — FIXED: `ci_default_for_type` returns `"null"` for pointer and Option pointer types.
-
-4. ~~**Macro comma operator**~~ — FIXED: `ci_translate_comma_block` wraps all expressions in a block `{ expr1; expr2; exprN }`.
-
-### Differences that affect edge cases (MEDIUM impact) — MOSTLY FIXED
-
-5. ~~**Switch fallthrough**~~ — IMPROVED: `ci_stmt_ends_with_break` detects break presence. If/else chain still used (With lacks labeled blocks for full fallthrough).
-6. **Per-field alignment vs packed+padding** — Different approach, both correct. Our packed+padding is slightly less optimal for LLVM codegen.
-7. ~~**Platform-specific integer types**~~ — FIXED: emit `c_int`/`c_long`/etc. type aliases. Cross-compilation only needs to change these aliases.
-8. **String-based macro parser** — Architectural difference. Handles common cases correctly.
-9. ~~**Signed division/remainder**~~ — NOT A GAP: With's LLVM `sdiv` truncates toward zero, matching C semantics.
-
-### Differences that are architectural (LOW impact on correctness)
-
-10. **aro vs libclang** — Same information, different API.
-11. **AST output vs string output** — String is simpler, less amenable to partial recovery.
-12. **Scope system** — Missing for function body translation of complex functions.
-13. **`[*c]T` pointer type** — Language design decision.
-14. **Member function registration** — Zig-specific feature.
+**Actionable fixes (no architectural changes needed): 1, 4, 6, 8, 10, 12**
+**Requires significant work: 2, 3, 5, 7**
+**Not applicable: 9, 11**
