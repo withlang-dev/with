@@ -1855,6 +1855,10 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
 
     // with_eprintln("[codegen] resolve_type node=" ++ int_to_string(type_node) ++ " kind=" ++ int_to_string(kind))
 
+    if kind == NK_IDENT:
+        let sym = self.pool.get_data0(type_node)
+        return self.resolve_named_type(sym)
+
     if kind == NK_TYPE_NAMED:
         let sym = self.pool.get_data0(type_node)
         return self.resolve_named_type(sym)
@@ -9604,13 +9608,17 @@ fn Codegen.generate_clone_derives(self: Codegen):
 fn Codegen.gen_transmute(self: Codegen, node: i32, body: MirBody, args_id: i32) -> i64:
     // transmute[T](value) — reinterpret bits as type T
     let callee_node = self.pool.get_data0(node)
-    if self.pool.kind(callee_node) != NK_TYPE_GENERIC:
+    let callee_kind = self.pool.kind(callee_node)
+    if callee_kind != NK_TYPE_GENERIC and callee_kind != NK_INDEX:
         return wl_get_undef(wl_i32_type(self.context))
-    let tp_start = self.pool.get_data1(callee_node)
-    let tp_count = self.pool.get_data2(callee_node)
-    if tp_count == 0:
-        return wl_get_undef(wl_i32_type(self.context))
-    let tp_node = self.pool.get_extra(tp_start)
+    let tp_node = if callee_kind == NK_TYPE_GENERIC:
+        let tp_start = self.pool.get_data1(callee_node)
+        let tp_count = self.pool.get_data2(callee_node)
+        if tp_count == 0:
+            return wl_get_undef(wl_i32_type(self.context))
+        self.pool.get_extra(tp_start)
+    else:
+        self.pool.get_data1(callee_node)
     let target_ty = self.resolve_type(tp_node)
     if target_ty == 0:
         return wl_get_undef(wl_i32_type(self.context))
@@ -9630,13 +9638,17 @@ fn Codegen.gen_transmute(self: Codegen, node: i32, body: MirBody, args_id: i32) 
 
 fn Codegen.gen_sizeof_alignof(self: Codegen, name: str, node: i32) -> i64:
     let callee_node = self.pool.get_data0(node)
-    if self.pool.kind(callee_node) != NK_TYPE_GENERIC:
+    let callee_kind = self.pool.kind(callee_node)
+    if callee_kind != NK_TYPE_GENERIC and callee_kind != NK_INDEX:
         return wl_const_int(wl_i64_type(self.context), 0, 0)
-    let tp_start = self.pool.get_data1(callee_node)
-    let tp_count = self.pool.get_data2(callee_node)
-    if tp_count == 0:
-        return wl_const_int(wl_i64_type(self.context), 0, 0)
-    let tp_node = self.pool.get_extra(tp_start)
+    let tp_node = if callee_kind == NK_TYPE_GENERIC:
+        let tp_start = self.pool.get_data1(callee_node)
+        let tp_count = self.pool.get_data2(callee_node)
+        if tp_count == 0:
+            return wl_const_int(wl_i64_type(self.context), 0, 0)
+        self.pool.get_extra(tp_start)
+    else:
+        self.pool.get_data1(callee_node)
     let type_val = self.resolve_type(tp_node)
     if type_val == 0:
         return wl_const_int(wl_i64_type(self.context), 0, 0)

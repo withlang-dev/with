@@ -2968,6 +2968,34 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let callee = self.ast.get_data0(node)
         if self.ast.kind(callee) == NK_FIELD_ACCESS:
             return self.lower_method_call(self.ast.get_data0(callee), self.ast.get_data1(callee), self.ast.get_data1(node), self.ast.get_data2(node), node)
+        var generic_builtin_sym = 0
+        if self.ast.kind(callee) == NK_INDEX or self.ast.kind(callee) == NK_TYPE_GENERIC:
+            let gb_base = self.ast.get_data0(callee)
+            if self.ast.kind(gb_base) == NK_IDENT:
+                let gb_sym = self.ast.get_data0(gb_base)
+                let gb_name = self.pool.resolve(gb_sym)
+                if gb_name == "transmute" or gb_name == "sizeof" or gb_name == "alignof":
+                    generic_builtin_sym = gb_sym
+        if generic_builtin_sym > 0:
+            let gc_fn_op = self.const_operand(CK_FN, generic_builtin_sym, 0)
+            let gc_args: Vec[i32] = Vec.new()
+            let gc_as = self.ast.get_data1(node)
+            let gc_ac = self.ast.get_data2(node)
+            for gc_ai in 0..gc_ac:
+                let gc_arg_node = self.ast.get_extra(gc_as + gc_ai)
+                gc_args.push(self.lower_expr(gc_arg_node))
+            let gc_args_id = self.body.new_call_args(gc_args)
+            self.body.set_call_intrinsic(gc_args_id, MIR_INTRINSIC_GENERIC_CALL)
+            self.body.set_call_ast_node(gc_args_id, node)
+            var gc_ret_ty = self.expr_type(node)
+            if gc_ret_ty == 0:
+                gc_ret_ty = self.sema.ty_i32
+            let gc_result = self.new_temp(gc_ret_ty)
+            let gc_place = self.place_for_local(gc_result)
+            let gc_next = self.new_block()
+            self.terminate(TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
+            self.switch_to(gc_next)
+            return self.body.new_operand(OK_COPY, gc_place)
         // Check for enum variant constructor call: Some(v), Ok(v), Err(e), etc.
         if self.ast.kind(callee) == NK_IDENT:
             let vc_sym = self.ast.get_data0(callee)
