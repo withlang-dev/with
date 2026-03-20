@@ -50,6 +50,7 @@ extern fn with_cimport_struct_field_anon_field_type(session: i64, idx: i32, fiel
 extern fn with_cimport_struct_is_packed(session: i64, idx: i32) -> i32
 extern fn with_cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64
 extern fn with_cimport_struct_size(session: i64, idx: i32) -> i64
+extern fn with_cimport_struct_field_size(session: i64, idx: i32, field: i32) -> i64
 extern fn with_cimport_fn_storage_class(session: i64, idx: i32) -> i32
 extern fn with_cimport_fn_is_inline(session: i64, idx: i32) -> i32
 extern fn with_cimport_fn_calling_conv(session: i64, idx: i32) -> str
@@ -77,6 +78,7 @@ extern fn with_ci_unary_op(session: i64, cursor: i32) -> i32
 extern fn with_ci_eval_int_value(session: i64, cursor: i32) -> i64
 extern fn with_ci_eval_int_valid(session: i64, cursor: i32) -> i32
 extern fn with_ci_member_field_name(session: i64, cursor: i32) -> str
+extern fn with_ci_implicit_cast_kind(session: i64, cursor: i32) -> i32
 
 extern fn int_to_string(n: i32) -> str
 extern fn i64_to_string(n: i64) -> str
@@ -152,6 +154,18 @@ let BO_ADD_ASSIGN: i32 = 20
 let BO_SUB_ASSIGN: i32 = 21
 let BO_MUL_ASSIGN: i32 = 22
 let BO_DIV_ASSIGN: i32 = 23
+
+// Implicit cast kind constants
+let CI_CAST_NOOP: i32 = 0
+let CI_CAST_NULL_TO_PTR: i32 = 2
+let CI_CAST_BOOL_TO_INT: i32 = 3
+let CI_CAST_INT_TO_BOOL: i32 = 5
+let CI_CAST_PTR_TO_BOOL: i32 = 7
+let CI_CAST_INT_TO_FLOAT: i32 = 9
+let CI_CAST_FLOAT_TO_INT: i32 = 10
+let CI_CAST_TO_VOID: i32 = 15
+let CI_CAST_INT_TRUNC: i32 = 16
+let CI_CAST_INT_WIDEN: i32 = 17
 
 // Unary operator constants
 let UO_MINUS: i32 = 0
@@ -245,6 +259,16 @@ fn process_c_import(header_spec: str) -> str:
         with_cimport_mark_name_emitted("with_ctzll")
         with_cimport_mark_name_emitted("with_abs")
 
+    // Pre-scan: collect extern var names for macro reference detection
+    var extern_vars = ""
+    var evi = 0
+    while evi < count:
+        if with_cimport_decl_kind(session, evi) == CK_VAR:
+            let evname = with_cimport_decl_name(session, evi)
+            if evname.len() > 0 and evname.byte_at(0) != 95:
+                extern_vars = extern_vars ++ "|" ++ evname ++ "|"
+        evi = evi + 1
+
     // Pre-scan: collect all opaque-demoted types (bitfield, forward decl, unsupported)
     // then cascade through field references until fixpoint
     let demoted_types = ci_collect_demoted_types(session, count)
@@ -294,7 +318,7 @@ fn process_c_import(header_spec: str) -> str:
     // Extract macros using a separate preprocessor pass
     let macro_session = with_cimport_parse_macros(include_text)
     if macro_session != 0:
-        output = output ++ ci_translate_macros(macro_session)
+        output = output ++ ci_translate_macros(macro_session, extern_vars)
         with_cimport_dispose_macros(macro_session)
 
     output
@@ -583,7 +607,9 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     with_cimport_mark_name_emitted(name)
 
     if has_unsupported:
-        return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n"
+        let fn_loc = ci_get_decl_location(session, name)
+        let fn_loc_comment = if fn_loc.len() > 0: "// " ++ fn_loc ++ "\n" else: ""
+        return fn_loc_comment ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")\n"
 
     let cc = with_cimport_fn_calling_conv(session, idx)
     let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
@@ -718,8 +744,12 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         // Advance offset past this field by its size
         if needs_layout and not is_union:
             let field_offset = with_cimport_struct_field_offset(session, idx, fi)
-            let ftype = with_cimport_struct_field_type_translated(session, idx, fi)
-            cur_offset = field_offset + ci_estimate_type_size(ftype)
+            let exact_size = with_cimport_struct_field_size(session, idx, fi)
+            if exact_size > 0:
+                cur_offset = field_offset + exact_size
+            else:
+                let ftype = with_cimport_struct_field_type_translated(session, idx, fi)
+                cur_offset = field_offset + ci_estimate_type_size(ftype)
         fi = fi + 1
 
     // Tail padding to match struct size
@@ -730,6 +760,19 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             if tail_pad > 0:
                 field_str = field_str ++ ", __pad" ++ int_to_string(pad_idx) ++ ": [" ++ i64_to_string(tail_pad) ++ "]u8"
 
+    // Detect flexible array member: last field is [0]T
+    var flex_accessor = ""
+    if field_count > 0 and not is_union:
+        let last_ftype = with_cimport_struct_field_type_translated(session, idx, field_count - 1)
+        if ci_starts_with(last_ftype, "[0]"):
+            let elem_type = last_ftype.slice(3, last_ftype.len())
+            let last_fname = with_cimport_struct_field_name(session, idx, field_count - 1)
+            let accessor_name = if last_fname.len() > 0: last_fname else: "data"
+            // Rename the field to _name in field_str by replacing the last occurrence
+            field_str = ci_str_replace_last_field(field_str, ci_escape_reserved(accessor_name), "_" ++ ci_escape_reserved(accessor_name))
+            // Emit accessor method
+            flex_accessor = "fn " ++ ci_escape_reserved(accessor_name) ++ "(self: *" ++ safe_name ++ ") -> *" ++ elem_type ++ ":\n    unsafe: (&self._" ++ ci_escape_reserved(accessor_name) ++ " as *" ++ elem_type ++ ")\n"
+
     let is_packed = needs_layout or with_cimport_struct_is_packed(session, idx) != 0
     let packed_prefix = if is_packed: "@[packed]\n" else: ""
     let part1 = "type " ++ safe_name
@@ -737,8 +780,8 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     let part3 = part2 ++ field_str
     let decl = part3 ++ " }\n"
     if is_union:
-        return anon_decls ++ "// union\n" ++ packed_prefix ++ decl
-    anon_decls ++ packed_prefix ++ decl
+        return anon_decls ++ "// union\n" ++ packed_prefix ++ decl ++ flex_accessor
+    anon_decls ++ packed_prefix ++ decl ++ flex_accessor
 
 fn ci_struct_needs_explicit_layout(session: i64, idx: i32, field_count: i32, is_union: bool) -> bool:
     if is_union:
@@ -754,8 +797,8 @@ fn ci_struct_needs_explicit_layout(session: i64, idx: i32, field_count: i32, is_
         let actual_offset = with_cimport_struct_field_offset(session, idx, fi)
         if actual_offset < 0:
             return false  // can't determine layout
-        let ftype = with_cimport_struct_field_type_translated(session, idx, fi)
-        let field_size = ci_estimate_type_size(ftype)
+        let exact_size = with_cimport_struct_field_size(session, idx, fi)
+        let field_size = if exact_size > 0: exact_size else: ci_estimate_type_size(with_cimport_struct_field_type_translated(session, idx, fi))
         let field_align = if field_size > 0: field_size else: 1
         // Natural alignment: round up to field's natural alignment
         let align_mask = field_align - 1
@@ -767,10 +810,12 @@ fn ci_struct_needs_explicit_layout(session: i64, idx: i32, field_count: i32, is_
     false
 
 fn ci_estimate_type_size(ty: str) -> i64:
-    if ty == "i8" or ty == "u8" or ty == "bool": return 1
-    if ty == "i16" or ty == "u16": return 2
-    if ty == "i32" or ty == "u32" or ty == "f32": return 4
+    if ty == "i8" or ty == "u8" or ty == "bool" or ty == "c_char": return 1
+    if ty == "i16" or ty == "u16" or ty == "c_short" or ty == "c_ushort": return 2
+    if ty == "i32" or ty == "u32" or ty == "f32" or ty == "c_int" or ty == "c_uint": return 4
     if ty == "i64" or ty == "u64" or ty == "f64" or ty == "isize" or ty == "usize": return 8
+    if ty == "c_long" or ty == "c_ulong" or ty == "c_longlong" or ty == "c_ulonglong": return 8
+    if ty == "c_longdouble": return 8
     if ty == "i128" or ty == "u128": return 16
     if ci_starts_with(ty, "*"): return 8
     if ci_starts_with(ty, "Option["): return 8
@@ -804,11 +849,20 @@ fn ci_default_for_type(ty: str) -> str:
     if ty == "i8" or ty == "u8" or ty == "i16" or ty == "u16": return "0"
     if ty == "i32" or ty == "u32" or ty == "i64" or ty == "u64": return "0"
     if ty == "i128" or ty == "u128" or ty == "isize" or ty == "usize": return "0"
+    if ty == "c_char" or ty == "c_short" or ty == "c_ushort": return "0"
+    if ty == "c_int" or ty == "c_uint": return "0"
+    if ty == "c_long" or ty == "c_ulong": return "0"
+    if ty == "c_longlong" or ty == "c_ulonglong": return "0"
     if ty == "f32" or ty == "f64": return "0.0"
+    if ty == "c_longdouble": return "0.0"
     if ty == "bool": return "false"
     // Pointer types → null (matching Zig's createZeroValueNode)
     if ci_starts_with(ty, "*"): return "null"
     if ci_starts_with(ty, "Option["): return "null"
+    // Enum type aliases (emitted by c_import as `type Foo = c_int`) → 0
+    if with_cimport_is_name_emitted(ty) != 0: return "0"
+    // Array types [N]T → require explicit init
+    if ty.len() > 0 and ty.byte_at(0) == 91: return ""
     ""
 
 // ── Enum translation ────────────────────────────────────────
@@ -821,7 +875,9 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
         if fwd_name.len() > 0 and fwd_name.byte_at(0) != 95 and not ci_str_contains(fwd_name, "(unnamed") and not ci_str_contains(fwd_name, "(anonymous"):
             if with_cimport_is_name_emitted(fwd_name) == 0:
                 with_cimport_mark_name_emitted(fwd_name)
-                return "type " ++ ci_escape_reserved(fwd_name) ++ " = opaque\n"
+                let enum_loc = ci_get_decl_location(session, fwd_name)
+                let enum_loc_comment = if enum_loc.len() > 0: "// " ++ enum_loc ++ ": forward-declared enum\n" else: ""
+                return enum_loc_comment ++ "type " ++ ci_escape_reserved(fwd_name) ++ " = opaque\n"
         return ""
 
     // Determine the integer type for this enum
@@ -876,7 +932,9 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
         let reason = var_type.slice(14, var_type.len())
         let safe_name = ci_escape_reserved(name)
         with_cimport_mark_name_emitted(name)
-        return "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ reason ++ "\")\n"
+        let var_loc = ci_get_decl_location(session, name)
+        let var_loc_comment = if var_loc.len() > 0: "// " ++ var_loc ++ "\n" else: ""
+        return var_loc_comment ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable: " ++ reason ++ "\")\n"
 
     let is_const = with_cimport_var_is_const(session, idx)
     let safe_name = ci_escape_reserved(name)
@@ -1006,7 +1064,7 @@ fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
 
 // ── Macro translation ───────────────────────────────────────
 
-fn ci_translate_macros(session: i64) -> str:
+fn ci_translate_macros(session: i64, extern_vars: str) -> str:
     let count = with_cimport_macro_count(session)
     var output = ""
     var known_values = ""
@@ -1066,7 +1124,7 @@ fn ci_translate_macros(session: i64) -> str:
                     if translated.len() > 0:
                         output = output ++ "fn " ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ ret_type ++ ":\n    " ++ translated ++ "\n"
                     else:
-                        output = output ++ "fn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable C macro: " ++ name ++ "\")\n"
+                        output = output ++ "// untranslatable fn-like macro\nfn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable C macro: " ++ name ++ "\")\n"
             continue
 
         // Skip empty macros (flag defines)
@@ -1121,6 +1179,17 @@ fn ci_translate_macros(session: i64) -> str:
                 with_cimport_mark_name_emitted(name)
                 known_values = known_values ++ name ++ "=" ++ eval_result ++ "|"
                 output = output ++ "let " ++ safe_name ++ ": i32 = " ++ eval_result ++ "\n"
+            else:
+                // Try expression translation — may reference extern vars
+                let expr_result = ci_translate_c_expr(stripped, "", known_values)
+                if expr_result.len() > 0:
+                    let safe_name = ci_escape_reserved(name)
+                    with_cimport_mark_name_emitted(name)
+                    if ci_expr_references_var(expr_result, extern_vars):
+                        // References a mutable extern var — emit as function
+                        output = output ++ "fn " ++ safe_name ++ "() -> c_int:\n    " ++ expr_result ++ "\n"
+                    else:
+                        output = output ++ "let " ++ safe_name ++ ": c_int = " ++ expr_result ++ "\n"
     output
 
 // ── C expression → With source translator ────────────────────
@@ -1263,30 +1332,137 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
             if w_op.len() > 0:
                 if ci_is_comparison_op(w_op):
                     return "(if " ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ": 1 else: 0)"
+                // Logical AND/OR: wrap operands in != 0 for C truthiness
+                if w_op == "and" or w_op == "or":
+                    let l = if ci_is_bool_expr(lhs): lhs else: lhs ++ " != 0"
+                    let r = if ci_is_bool_expr(rhs): rhs else: rhs ++ " != 0"
+                    return "(if " ++ l ++ " " ++ w_op ++ " " ++ r ++ ": 1 else: 0)"
                 return "(" ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ")"
         return ""
 
-    // Identifier: parameter reference or known constant
-    if ci_is_c_ident(trimmed):
-        // Map well-known compiler builtins to their values
-        let builtin_val = ci_map_compiler_builtin(trimmed)
+    // Identifier with optional postfix (.field, ->field, [expr])
+    let ident_end = ci_scan_ident(trimmed)
+    if ident_end > 0:
+        let base_ident = trimmed.slice(0, ident_end as i64)
+        let postfix = trimmed.slice(ident_end as i64, trimmed.len())
+        // Resolve base identifier
+        var base_resolved = ""
+        let builtin_val = ci_map_compiler_builtin(base_ident)
         if builtin_val.len() > 0:
-            return builtin_val
-        // Reject other compiler builtins (__builtin_*, __inline_*, etc.)
-        if trimmed.len() >= 2 and trimmed.byte_at(0) == 95 and trimmed.byte_at(1) == 95:
-            return ""
-        if ci_str_contains(params, "|" ++ trimmed ++ "|"):
-            return trimmed
-        // Known constant from earlier macro definitions
-        let kv = ci_lookup_known(trimmed, known)
-        if kv.len() > 0:
-            return trimmed
-        // Accept only if already emitted as a With declaration
-        if with_cimport_is_name_emitted(trimmed) != 0:
-            return trimmed
+            base_resolved = builtin_val
+        else if base_ident.len() >= 2 and base_ident.byte_at(0) == 95 and base_ident.byte_at(1) == 95:
+            base_resolved = ""
+        else if ci_str_contains(params, "|" ++ base_ident ++ "|"):
+            base_resolved = base_ident
+        else:
+            let kv = ci_lookup_known(base_ident, known)
+            if kv.len() > 0:
+                base_resolved = base_ident
+            else if with_cimport_is_name_emitted(base_ident) != 0:
+                base_resolved = base_ident
+        if base_resolved.len() > 0:
+            if postfix.len() == 0:
+                return base_resolved
+            // Translate postfix chain
+            let result = ci_translate_postfix(base_resolved, postfix, params, known)
+            if result.len() > 0:
+                return result
         return ""
 
     ""
+
+// Scan identifier length at start of string. Returns 0 if no ident.
+fn ci_scan_ident(s: str) -> i32:
+    var i = 0
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95 or (i > 0 and c >= 48 and c <= 57):
+            i = i + 1
+        else:
+            break
+    i
+
+// Translate postfix chain: .field, ->field, [expr]
+fn ci_translate_postfix(base: str, rest: str, params: str, known: str) -> str:
+    var result = base
+    var pos = 0
+    let slen = rest.len() as i32
+    while pos < slen:
+        let c = rest.byte_at(pos as i64)
+        // Arrow ->field → .field
+        if c == 45 and pos + 1 < slen and rest.byte_at((pos + 1) as i64) == 62:
+            pos = pos + 2
+            let field_len = ci_scan_ident(rest.slice(pos as i64, rest.len()))
+            if field_len == 0:
+                return ""
+            let field = rest.slice(pos as i64, (pos + field_len) as i64)
+            result = result ++ "." ++ ci_escape_reserved(field)
+            pos = pos + field_len
+        // Dot .field
+        else if c == 46:
+            pos = pos + 1
+            let field_len = ci_scan_ident(rest.slice(pos as i64, rest.len()))
+            if field_len == 0:
+                return ""
+            let field = rest.slice(pos as i64, (pos + field_len) as i64)
+            result = result ++ "." ++ ci_escape_reserved(field)
+            pos = pos + field_len
+        // Subscript [expr]
+        else if c == 91:
+            let close = ci_find_matching_bracket(rest, pos)
+            if close < 0:
+                return ""
+            let idx_expr = ci_translate_c_expr(rest.slice((pos + 1) as i64, close as i64), params, known)
+            if idx_expr.len() == 0:
+                return ""
+            result = result ++ "[" ++ idx_expr ++ "]"
+            pos = close + 1
+        else:
+            return ""
+    result
+
+// Check if expression references any extern var from the pipe-delimited list
+fn ci_expr_references_var(expr: str, extern_vars: str) -> bool:
+    if extern_vars.len() == 0:
+        return false
+    // Scan extern_vars for |name| patterns and check if expr contains each name
+    var pos = 0
+    let vlen = extern_vars.len() as i32
+    while pos < vlen:
+        if extern_vars.byte_at(pos as i64) == 124:  // '|'
+            let name_start = pos + 1
+            var name_end = name_start
+            while name_end < vlen and extern_vars.byte_at(name_end as i64) != 124:
+                name_end = name_end + 1
+            if name_end > name_start:
+                let var_name = extern_vars.slice(name_start as i64, name_end as i64)
+                if ci_str_contains(expr, var_name):
+                    return true
+            pos = name_end
+        else:
+            pos = pos + 1
+    false
+
+// Check if expression is already boolean (comparison, logical, or != 0)
+fn ci_is_bool_expr(s: str) -> bool:
+    if ci_str_contains(s, " == ") or ci_str_contains(s, " != "): return true
+    if ci_str_contains(s, " < ") or ci_str_contains(s, " > "): return true
+    if ci_str_contains(s, " <= ") or ci_str_contains(s, " >= "): return true
+    if ci_str_contains(s, " and ") or ci_str_contains(s, " or "): return true
+    false
+
+fn ci_find_matching_bracket(s: str, start: i32) -> i32:
+    var depth = 0
+    var i = start
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 91: depth = depth + 1
+        if c == 93:
+            depth = depth - 1
+            if depth == 0:
+                return i
+        i = i + 1
+    0 - 1
 
 // Find the opening paren of a function call: ident(...)
 // Returns position of '(' or -1.
@@ -1364,8 +1540,16 @@ fn ci_translate_builtin_call(name: str, args: str, params: str, known: str) -> s
         return "0"
 
     if name == "__builtin_types_compatible_p":
-        // Type compatibility check — can't translate
-        return ""
+        return "comptime_error(\"__builtin_types_compatible_p\")"
+
+    if name == "__builtin_choose_expr":
+        return "comptime_error(\"__builtin_choose_expr\")"
+
+    if name == "__builtin_convertvector":
+        return "comptime_error(\"__builtin_convertvector\")"
+
+    if name == "__builtin_shufflevector":
+        return "comptime_error(\"__builtin_shufflevector\")"
 
     // Tier 2: Bit manipulation — map to runtime wrappers
     if name == "__builtin_clz" or name == "__builtin_ctz" or name == "__builtin_popcount":
@@ -2299,27 +2483,27 @@ fn ci_is_known_base_type(name: str) -> bool:
 fn ci_map_base_type(name: str) -> str:
     if name == "void": return "void"
     if name == "_Bool": return "bool"
-    if name == "char": return "i8"
-    if name == "signed char": return "i8"
+    if name == "char": return "c_char"
+    if name == "signed char": return "c_char"
     if name == "unsigned char": return "u8"
-    if name == "short": return "i16"
-    if name == "unsigned short": return "u16"
-    if name == "int": return "i32"
-    if name == "unsigned int": return "u32"
-    if name == "long": return "i64"
-    if name == "unsigned long": return "u64"
-    if name == "long long": return "i64"
-    if name == "unsigned long long": return "u64"
+    if name == "short": return "c_short"
+    if name == "unsigned short": return "c_ushort"
+    if name == "int": return "c_int"
+    if name == "unsigned int": return "c_uint"
+    if name == "long": return "c_long"
+    if name == "unsigned long": return "c_ulong"
+    if name == "long long": return "c_longlong"
+    if name == "unsigned long long": return "c_ulonglong"
     if name == "__int128": return "i128"
     if name == "unsigned __int128": return "u128"
     if name == "float": return "f32"
     if name == "double": return "f64"
-    if name == "long double": return "f64"
-    // enum E → i32 (C enums are integers)
+    if name == "long double": return "c_longdouble"
+    // enum E → c_int (C enums are integers)
     if ci_starts_with(name, "enum "):
-        return "i32"
-    // Unknown type → i32 (best we can do without struct support)
-    "i32"
+        return "c_int"
+    // Unknown type → c_int (best we can do without struct support)
+    "c_int"
 
 // ── Reserved word escaping ──────────────────────────────────
 
@@ -2362,7 +2546,7 @@ fn ci_escape_reserved(name: str) -> str:
 // These use the with_ci_* cursor-based API for full AST walking.
 // ═══════════════════════════════════════════════════════════
 
-fn ci_trans_expr(session: i64, cursor: i32) -> str:
+fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     let kind = with_ci_cursor_kind(session, cursor)
 
     // Integer literal
@@ -2395,29 +2579,61 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
     if kind == CXK_PAREN_EXPR:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
-            let inner = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let inner = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
             if inner.len() > 0:
                 return "(" ++ inner ++ ")"
         return ""
 
-    // Implicit cast — unwrap to inner expression
+    // Implicit cast — dispatch by cast kind
     if kind == CXK_IMPLICIT_CAST:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
-            return ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let cast_kind = with_ci_implicit_cast_kind(session, cursor)
+            let inner = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+            if inner.len() == 0:
+                return ""
+            if cast_kind == CI_CAST_INT_TO_BOOL:
+                return "(" ++ inner ++ " != 0)"
+            if cast_kind == CI_CAST_BOOL_TO_INT:
+                return "(if " ++ inner ++ ": 1 else: 0)"
+            if cast_kind == CI_CAST_PTR_TO_BOOL:
+                return "(" ++ inner ++ " != null)"
+            if cast_kind == CI_CAST_NULL_TO_PTR:
+                return "null"
+            if cast_kind == CI_CAST_INT_TO_FLOAT:
+                let dest_ty = with_ci_cursor_type(session, cursor)
+                let dest_str = with_ci_type_translated(session, dest_ty)
+                return "(" ++ inner ++ " as " ++ dest_str ++ ")"
+            if cast_kind == CI_CAST_FLOAT_TO_INT:
+                let dest_ty = with_ci_cursor_type(session, cursor)
+                let dest_str = with_ci_type_translated(session, dest_ty)
+                return "(" ++ inner ++ " as " ++ dest_str ++ ")"
+            if cast_kind == CI_CAST_INT_TRUNC:
+                let dest_ty = with_ci_cursor_type(session, cursor)
+                let dest_str = with_ci_type_translated(session, dest_ty)
+                return "(" ++ inner ++ " as " ++ dest_str ++ ")"
+            if cast_kind == CI_CAST_TO_VOID:
+                return inner
+            // NOOP, INT_WIDEN, etc. — unwrap
+            return inner
         return ""
 
     // Declaration reference (identifier)
     if kind == CXK_DECL_REF:
         let name = with_ci_cursor_spelling(session, cursor)
-        return ci_escape_reserved(name)
+        let escaped = ci_escape_reserved(name)
+        // Check scope for mangled name
+        let mangled = ci_scope_lookup(scope, escaped)
+        if mangled.len() > 0:
+            return mangled
+        return escaped
 
     // Binary operator
     if kind == CXK_BINARY_OP:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let lhs = ci_trans_expr(session, with_ci_child(session, cursor, 0))
-            let rhs = ci_trans_expr(session, with_ci_child(session, cursor, 1))
+            let lhs = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+            let rhs = ci_trans_expr(session, with_ci_child(session, cursor, 1), scope)
             if lhs.len() > 0 and rhs.len() > 0:
                 let op = with_ci_binary_op(session, cursor)
                 let op_str = ci_bo_to_str(op)
@@ -2429,8 +2645,8 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
     if kind == CXK_COMPOUND_ASSIGN_OP:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let lhs = ci_trans_expr(session, with_ci_child(session, cursor, 0))
-            let rhs = ci_trans_expr(session, with_ci_child(session, cursor, 1))
+            let lhs = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+            let rhs = ci_trans_expr(session, with_ci_child(session, cursor, 1), scope)
             if lhs.len() > 0 and rhs.len() > 0:
                 let op = with_ci_binary_op(session, cursor)
                 let base_op = ci_compound_to_base_op(op)
@@ -2442,7 +2658,7 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
     if kind == CXK_UNARY_OP:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
-            let operand = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let operand = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
             if operand.len() > 0:
                 let op = with_ci_unary_op(session, cursor)
                 if op == UO_MINUS: return "(0 - " ++ operand ++ ")"
@@ -2465,9 +2681,9 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
     if kind == CXK_COND_OP:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 3:
-            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0))
-            let then_e = ci_trans_expr(session, with_ci_child(session, cursor, 1))
-            let else_e = ci_trans_expr(session, with_ci_child(session, cursor, 2))
+            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+            let then_e = ci_trans_expr(session, with_ci_child(session, cursor, 1), scope)
+            let else_e = ci_trans_expr(session, with_ci_child(session, cursor, 2), scope)
             if cond.len() > 0 and then_e.len() > 0 and else_e.len() > 0:
                 return "(if " ++ cond ++ " != 0: " ++ then_e ++ " else: " ++ else_e ++ ")"
         return ""
@@ -2476,7 +2692,7 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
     if kind == CXK_CSTYLE_CAST:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
-            let inner = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let inner = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
             if inner.len() > 0:
                 let target_ty = with_ci_cursor_type(session, cursor)
                 let target_str = with_ci_type_translated(session, target_ty)
@@ -2489,14 +2705,14 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
     if kind == CXK_CALL_EXPR:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
-            let callee = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let callee = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
             if callee.len() > 0:
                 var args = ""
                 var ai = 1
                 while ai < nc:
                     if ai > 1:
                         args = args ++ ", "
-                    let arg = ci_trans_expr(session, with_ci_child(session, cursor, ai))
+                    let arg = ci_trans_expr(session, with_ci_child(session, cursor, ai), scope)
                     if arg.len() == 0:
                         return ""
                     args = args ++ arg
@@ -2508,7 +2724,7 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
     if kind == CXK_MEMBER_REF:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
-            let base = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let base = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
             let field = with_ci_member_field_name(session, cursor)
             if base.len() > 0 and field.len() > 0:
                 return base ++ "." ++ ci_escape_reserved(field)
@@ -2518,8 +2734,8 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
     if kind == CXK_ARRAY_SUBSCRIPT:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let arr = ci_trans_expr(session, with_ci_child(session, cursor, 0))
-            let idx = ci_trans_expr(session, with_ci_child(session, cursor, 1))
+            let arr = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
+            let idx = ci_trans_expr(session, with_ci_child(session, cursor, 1), scope)
             if arr.len() > 0 and idx.len() > 0:
                 return arr ++ "[" ++ idx ++ "]"
         return ""
@@ -2543,7 +2759,7 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
     if kind == CXK_COMPOUND_LITERAL:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
-            return ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            return ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
         return ""
 
     // Initializer list — { expr1, expr2, ... }
@@ -2554,7 +2770,7 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
         while ii < nc:
             if ii > 0:
                 items = items ++ ", "
-            let item = ci_trans_expr(session, with_ci_child(session, cursor, ii))
+            let item = ci_trans_expr(session, with_ci_child(session, cursor, ii), scope)
             if item.len() == 0:
                 return ""
             items = items ++ item
@@ -2571,7 +2787,7 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
             // Translate the compound statement as a block
-            let body = ci_trans_stmt(session, with_ci_child(session, cursor, 0), 1)
+            let body = ci_trans_stmt(session, with_ci_child(session, cursor, 0), 1, scope)
             if body.len() > 0:
                 return "{\n" ++ body ++ "}"
         return ""
@@ -2591,7 +2807,7 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
         // The last child is the selected expression (after controlling expr + associations)
         if nc > 0:
             // Try to translate the result expression (last child)
-            let result = ci_trans_expr(session, with_ci_child(session, cursor, nc - 1))
+            let result = ci_trans_expr(session, with_ci_child(session, cursor, nc - 1), scope)
             if result.len() > 0:
                 return result
         return ""
@@ -2605,7 +2821,7 @@ fn ci_trans_expr(session: i64, cursor: i32) -> str:
         // Try to translate first child (implicit unwrap)
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
-            return ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            return ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
         return ""
 
     // Fallback: try to use source text for simple expressions
@@ -2642,19 +2858,35 @@ fn ci_compound_to_base_op(op: i32) -> str:
 
 // ── Statement translator ────────────────────────────────────
 
-fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
+fn ci_trans_stmt(session: i64, cursor: i32, indent: i32, scope: str) -> str:
     let kind = with_ci_cursor_kind(session, cursor)
 
-    // Compound statement (block)
+    // Compound statement (block) — new scope level
     if kind == CXK_COMPOUND_STMT:
         let nc = with_ci_num_children(session, cursor)
         var body = ""
+        var block_scope = scope
         var i = 0
         while i < nc:
             let child = with_ci_child(session, cursor, i)
-            let s = ci_trans_stmt(session, child, indent)
-            if s.len() > 0:
-                body = body ++ ci_indent_str(indent) ++ s ++ "\n"
+            // For decl stmts, register names and get updated scope
+            if with_ci_cursor_kind(session, child) == CXK_DECL_STMT:
+                let decl_result = ci_trans_decl_stmt_scoped(session, child, indent, block_scope)
+                if decl_result.len() > 0:
+                    // Extract scope update (first line is scope update prefixed with "SCOPE:")
+                    if ci_starts_with(decl_result, "SCOPE:"):
+                        let sep = ci_find_char(decl_result, 10)
+                        if sep > 0:
+                            block_scope = decl_result.slice(6, sep as i64)
+                            let stmt_text = decl_result.slice((sep + 1) as i64, decl_result.len())
+                            if stmt_text.len() > 0:
+                                body = body ++ ci_indent_str(indent) ++ stmt_text ++ "\n"
+                    else:
+                        body = body ++ ci_indent_str(indent) ++ decl_result ++ "\n"
+            else:
+                let s = ci_trans_stmt(session, child, indent, block_scope)
+                if s.len() > 0:
+                    body = body ++ ci_indent_str(indent) ++ s ++ "\n"
             i = i + 1
         return body
 
@@ -2663,7 +2895,7 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
         let nc = with_ci_num_children(session, cursor)
         if nc == 0:
             return "return"
-        let expr = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+        let expr = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
         if expr.len() > 0:
             return "return " ++ expr
         return ""
@@ -2672,13 +2904,13 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
     if kind == CXK_IF_STMT:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
             if cond.len() > 0:
-                let then_body = ci_trans_stmt(session, with_ci_child(session, cursor, 1), indent + 1)
+                let then_body = ci_trans_stmt(session, with_ci_child(session, cursor, 1), indent + 1, scope)
                 if then_body.len() > 0:
                     var result = "if " ++ cond ++ " != 0:\n" ++ then_body
                     if nc > 2:
-                        let else_body = ci_trans_stmt(session, with_ci_child(session, cursor, 2), indent + 1)
+                        let else_body = ci_trans_stmt(session, with_ci_child(session, cursor, 2), indent + 1, scope)
                         if else_body.len() > 0:
                             result = result ++ ci_indent_str(indent) ++ "else:\n" ++ else_body
                     return result
@@ -2688,9 +2920,9 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
     if kind == CXK_WHILE_STMT:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
             if cond.len() > 0:
-                let body = ci_trans_stmt(session, with_ci_child(session, cursor, 1), indent + 1)
+                let body = ci_trans_stmt(session, with_ci_child(session, cursor, 1), indent + 1, scope)
                 if body.len() > 0:
                     return "while " ++ cond ++ " != 0:\n" ++ body
         return ""
@@ -2707,7 +2939,7 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
             //   - The body is always CompoundStmt (or another stmt)
             let body_idx = nc - 1
             let body_cursor = with_ci_child(session, cursor, body_idx)
-            let body = ci_trans_stmt(session, body_cursor, indent + 1)
+            let body = ci_trans_stmt(session, body_cursor, indent + 1, scope)
             if body.len() == 0:
                 return ""
 
@@ -2717,11 +2949,11 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
             var inc_str = ""
             if nc == 4:
                 // All parts present: [init, cond, inc, body]
-                init_str = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent)
-                let cond_e = ci_trans_expr(session, with_ci_child(session, cursor, 1))
+                init_str = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent, scope)
+                let cond_e = ci_trans_expr(session, with_ci_child(session, cursor, 1), scope)
                 if cond_e.len() > 0:
                     cond_str = cond_e ++ " != 0"
-                inc_str = ci_trans_expr(session, with_ci_child(session, cursor, 2))
+                inc_str = ci_trans_expr(session, with_ci_child(session, cursor, 2), scope)
             else if nc == 3:
                 // Two of init/cond/inc present + body
                 // Heuristic: if first child is DeclStmt, it's init + (cond or inc)
@@ -2729,18 +2961,18 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
                 let second = with_ci_child(session, cursor, 1)
                 let first_kind = with_ci_cursor_kind(session, first)
                 if first_kind == CXK_DECL_STMT:
-                    init_str = ci_trans_stmt(session, first, indent)
-                    let cond_e = ci_trans_expr(session, second)
+                    init_str = ci_trans_stmt(session, first, indent, scope)
+                    let cond_e = ci_trans_expr(session, second, scope)
                     if cond_e.len() > 0:
                         cond_str = cond_e ++ " != 0"
                 else:
-                    let cond_e = ci_trans_expr(session, first)
+                    let cond_e = ci_trans_expr(session, first, scope)
                     if cond_e.len() > 0:
                         cond_str = cond_e ++ " != 0"
-                    inc_str = ci_trans_expr(session, second)
+                    inc_str = ci_trans_expr(session, second, scope)
             else if nc == 2:
                 // Only one of init/cond/inc + body — treat as cond
-                let cond_e = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+                let cond_e = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
                 if cond_e.len() > 0:
                     cond_str = cond_e ++ " != 0"
 
@@ -2757,8 +2989,8 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
     if kind == CXK_DO_STMT:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let body = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent + 1)
-            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 1))
+            let body = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent + 1, scope)
+            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 1), scope)
             if body.len() > 0 and cond.len() > 0:
                 return "while true:\n" ++ body ++ ci_indent_str(indent + 1) ++ "if " ++ cond ++ " == 0:\n" ++ ci_indent_str(indent + 2) ++ "break\n"
         return ""
@@ -2779,12 +3011,20 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
     if kind == CXK_SWITCH_STMT:
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
-            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0))
+            let cond = ci_trans_expr(session, with_ci_child(session, cursor, 0), scope)
             if cond.len() > 0:
                 // Walk the compound body and extract case/default arms
                 let body_cursor = with_ci_child(session, cursor, 1)
-                return ci_trans_switch_body(session, body_cursor, cond, indent)
+                return ci_trans_switch_body(session, body_cursor, cond, indent, scope)
         return ""
+
+    // Static assert — untranslatable
+    if kind == 234:  // CXCursor_StaticAssert
+        return "comptime_error(\"static_assert\")"
+
+    // GCC asm statement — untranslatable
+    if kind == 228:  // CXCursor_GCCAsmStmt
+        return "comptime_error(\"inline asm\")"
 
     // Goto — untranslatable, emit comptime_error
     if kind == 232:  // CXCursor_GotoStmt
@@ -2796,7 +3036,7 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
         let nc = with_ci_num_children(session, cursor)
         var body = ""
         if nc > 0:
-            body = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent)
+            body = ci_trans_stmt(session, with_ci_child(session, cursor, 0), indent, scope)
         return "// label: " ++ lbl ++ "\n" ++ body
 
     // Declaration statement (local variable)
@@ -2812,7 +3052,7 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
                 let vty_str = with_ci_type_translated(session, vty)
                 let child_nc = with_ci_num_children(session, child)
                 if child_nc > 0:
-                    let init = ci_trans_expr(session, with_ci_child(session, child, 0))
+                    let init = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
                     if init.len() > 0:
                         if result.len() > 0:
                             result = result ++ "\n" ++ ci_indent_str(indent)
@@ -2831,7 +3071,7 @@ fn ci_trans_stmt(session: i64, cursor: i32, indent: i32) -> str:
         return result
 
     // Expression statement — translate as expression
-    let expr = ci_trans_expr(session, cursor)
+    let expr = ci_trans_expr(session, cursor, scope)
     if expr.len() > 0:
         return expr
     ""
@@ -2857,7 +3097,7 @@ fn ci_try_eval_var_init(session: i64, idx: i32) -> str:
                     if with_ci_eval_int_valid(session, init_cursor) != 0:
                         return i64_to_string(with_ci_eval_int_value(session, init_cursor))
                     // Try expression translation
-                    let expr = ci_trans_expr(session, init_cursor)
+                    let expr = ci_trans_expr(session, init_cursor, "")
                     if expr.len() > 0:
                         return expr
                 return ""
@@ -2877,7 +3117,7 @@ fn ci_get_decl_location(session: i64, name: str) -> str:
         i = i + 1
     ""
 
-fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32) -> str:
+fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32, scope: str) -> str:
     // Walk compound stmt children, collect case/default arms.
     // Use match expression for non-fallthrough cases.
     // For fallthrough cases, use if/else chain with __fall flag.
@@ -2914,8 +3154,8 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32) 
         if ck == CXK_CASE_STMT:
             let case_nc = with_ci_num_children(session, child)
             if case_nc >= 2:
-                let case_val = ci_trans_expr(session, with_ci_child(session, child, 0))
-                let case_body = ci_trans_stmt(session, with_ci_child(session, child, 1), indent + 1)
+                let case_val = ci_trans_expr(session, with_ci_child(session, child, 0), scope)
+                let case_body = ci_trans_stmt(session, with_ci_child(session, child, 1), indent + 1, scope)
                 if case_val.len() > 0 and case_body.len() > 0:
                     let prefix = if first_arm: "if " else: ci_indent_str(indent) ++ "else if "
                     result = result ++ prefix ++ cond ++ " == " ++ case_val ++ ":\n" ++ case_body
@@ -2923,7 +3163,7 @@ fn ci_trans_switch_body(session: i64, body_cursor: i32, cond: str, indent: i32) 
         else if ck == CXK_DEFAULT_STMT:
             let case_nc = with_ci_num_children(session, child)
             if case_nc >= 1:
-                let case_body = ci_trans_stmt(session, with_ci_child(session, child, 0), indent + 1)
+                let case_body = ci_trans_stmt(session, with_ci_child(session, child, 0), indent + 1, scope)
                 if case_body.len() > 0:
                     if first_arm:
                         result = result ++ "// default\n" ++ case_body
@@ -2948,6 +3188,91 @@ fn ci_stmt_ends_with_break(session: i64, cursor: i32) -> bool:
         if nc > 0:
             return ci_stmt_ends_with_break(session, with_ci_child(session, cursor, nc - 1))
     false
+
+// ── Scope helpers ───────────────────────────────────────────
+// Scope is a pipe-delimited string: "|name|" or "|name=mangled|"
+
+fn ci_scope_contains(scope: str, name: str) -> bool:
+    ci_str_contains(scope, "|" ++ name ++ "|") or ci_str_contains(scope, "|" ++ name ++ "=")
+
+fn ci_scope_lookup(scope: str, name: str) -> str:
+    // Look for "|name=mangled|" pattern
+    let needle = "|" ++ name ++ "="
+    let pos = ci_find_str(scope, needle)
+    if pos >= 0:
+        let start = pos + needle.len() as i32
+        var end = start
+        while end < scope.len() as i32 and scope.byte_at(end as i64) != 124:
+            end = end + 1
+        return scope.slice(start as i64, end as i64)
+    // If just "|name|" exists, return the name unchanged
+    ""
+
+fn ci_scope_mangle(scope: str, name: str) -> str:
+    if not ci_scope_contains(scope, name):
+        return name
+    var suffix = 1
+    while suffix < 100:
+        let candidate = name ++ "_" ++ int_to_string(suffix)
+        if not ci_scope_contains(scope, candidate):
+            return candidate
+        suffix = suffix + 1
+    name ++ "_99"
+
+fn ci_scope_add(scope: str, name: str) -> str:
+    scope ++ "|" ++ name ++ "|"
+
+fn ci_scope_add_mangled(scope: str, original: str, mangled: str) -> str:
+    scope ++ "|" ++ original ++ "=" ++ mangled ++ "|"
+
+fn ci_find_char(s: str, c: i32) -> i32:
+    var i = 0
+    while i < s.len() as i32:
+        if s.byte_at(i as i64) == c:
+            return i
+        i = i + 1
+    0 - 1
+
+// Translate a DECL_STMT with scope tracking.
+// Returns "SCOPE:<updated_scope>\n<stmt_text>" or just "<stmt_text>".
+fn ci_trans_decl_stmt_scoped(session: i64, cursor: i32, indent: i32, scope: str) -> str:
+    let nc = with_ci_num_children(session, cursor)
+    var result = ""
+    var new_scope = scope
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, cursor, i)
+        if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
+            let raw_name = with_ci_cursor_spelling(session, child)
+            let escaped = ci_escape_reserved(raw_name)
+            let mangled = ci_scope_mangle(new_scope, escaped)
+            let vty = with_ci_cursor_type(session, child)
+            let vty_str = with_ci_type_translated(session, vty)
+            let child_nc = with_ci_num_children(session, child)
+            if mangled != escaped:
+                new_scope = ci_scope_add_mangled(new_scope, escaped, mangled)
+            else:
+                new_scope = ci_scope_add(new_scope, escaped)
+            if child_nc > 0:
+                let init = ci_trans_expr(session, with_ci_child(session, child, 0), new_scope)
+                if init.len() > 0:
+                    if result.len() > 0:
+                        result = result ++ "\n" ++ ci_indent_str(indent)
+                    result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ init
+                else:
+                    return ""
+            else:
+                if result.len() > 0:
+                    result = result ++ "\n" ++ ci_indent_str(indent)
+                let default_val = ci_default_for_type(vty_str)
+                if default_val.len() > 0:
+                    result = result ++ "var " ++ mangled ++ ": " ++ vty_str ++ " = " ++ default_val
+                else:
+                    return ""
+        i = i + 1
+    if new_scope != scope:
+        return "SCOPE:" ++ new_scope ++ "\n" ++ result
+    result
 
 fn ci_indent_str(level: i32) -> str:
     if level <= 0: return ""
@@ -3021,8 +3346,18 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
     if body_cursor < 0:
         return ""
 
+    // Build initial scope from parameter names
+    var init_scope = ""
+    let param_count = with_cimport_fn_param_count(session, decl_idx)
+    var pi = 0
+    while pi < param_count:
+        let pname = with_cimport_fn_param_name(session, decl_idx, pi)
+        if pname.len() > 0:
+            init_scope = init_scope ++ "|" ++ ci_escape_reserved(pname) ++ "|"
+        pi = pi + 1
+
     // Translate the body
-    let body = ci_trans_stmt(session, body_cursor, 1)
+    let body = ci_trans_stmt(session, body_cursor, 1, init_scope)
     if body.len() == 0:
         return ""
 
@@ -3057,6 +3392,22 @@ fn ci_str_contains(text: str, needle: str) -> bool:
         if text.slice(i as i64, i as i64 + needle.len()) == needle:
             return true
     false
+
+// Replace field name `old_name` with `new_name` in last comma-separated field of a field_str
+fn ci_str_replace_last_field(field_str: str, old_name: str, new_name: str) -> str:
+    // Find last comma at depth 0
+    var last_comma = 0 - 1
+    var i = 0
+    while i < field_str.len() as i32:
+        if field_str.byte_at(i as i64) == 44:
+            last_comma = i
+        i = i + 1
+    let start = if last_comma >= 0: last_comma + 1 else: 0
+    let prefix = field_str.slice(0, start as i64)
+    let last_field = field_str.slice(start as i64, field_str.len())
+    // Replace old_name with new_name in last field segment
+    let replaced = ci_str_replace(last_field, old_name, new_name)
+    prefix ++ replaced
 
 fn ci_str_replace(text: str, needle: str, replacement: str) -> str:
     if needle.len() == 0:

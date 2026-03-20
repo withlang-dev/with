@@ -249,28 +249,22 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
         case CXType_Void: return session_strdup(s, "void");
         case CXType_Bool: return session_strdup(s, "bool");
         case CXType_Char_S:
-        case CXType_SChar: return session_strdup(s, "i8");
+        case CXType_SChar: return session_strdup(s, "c_char");
         case CXType_Char_U:
         case CXType_UChar: return session_strdup(s, "u8");
-        case CXType_Short: return session_strdup(s, "i16");
-        case CXType_UShort: return session_strdup(s, "u16");
-        case CXType_Int: return session_strdup(s, "i32");
-        case CXType_UInt: return session_strdup(s, "u32");
-        case CXType_Long: {
-            long long sz = clang_Type_getSizeOf(canonical);
-            return session_strdup(s, sz <= 4 ? "i32" : "i64");
-        }
-        case CXType_LongLong: return session_strdup(s, "i64");
-        case CXType_ULong: {
-            long long sz = clang_Type_getSizeOf(canonical);
-            return session_strdup(s, sz <= 4 ? "u32" : "u64");
-        }
-        case CXType_ULongLong: return session_strdup(s, "u64");
+        case CXType_Short: return session_strdup(s, "c_short");
+        case CXType_UShort: return session_strdup(s, "c_ushort");
+        case CXType_Int: return session_strdup(s, "c_int");
+        case CXType_UInt: return session_strdup(s, "c_uint");
+        case CXType_Long: return session_strdup(s, "c_long");
+        case CXType_LongLong: return session_strdup(s, "c_longlong");
+        case CXType_ULong: return session_strdup(s, "c_ulong");
+        case CXType_ULongLong: return session_strdup(s, "c_ulonglong");
         case CXType_Int128: return session_strdup(s, "i128");
         case CXType_UInt128: return session_strdup(s, "u128");
         case CXType_Float: return session_strdup(s, "f32");
-        case CXType_Double:
-        case CXType_LongDouble: return session_strdup(s, "f64");
+        case CXType_Double: return session_strdup(s, "f64");
+        case CXType_LongDouble: return session_strdup(s, "c_longdouble");
 
         case CXType_Pointer: {
             CXType pointee = clang_getPointeeType(canonical);
@@ -871,6 +865,15 @@ int64_t with_cimport_struct_size(int64_t session, int32_t idx) {
     if (!s || idx < 0 || idx >= s->decl_count) return 0;
     CXType type = clang_getCursorType(s->decls[idx]);
     return clang_Type_getSizeOf(type);
+}
+
+int64_t with_cimport_struct_field_size(int64_t session, int32_t idx, int32_t field) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return -1;
+    ensure_fields_cached(s, idx);
+    if (field < 0 || field >= s->caches[idx].field_count) return -1;
+    long long sz = clang_Type_getSizeOf(s->caches[idx].fields[field].clang_type);
+    return (sz < 0) ? -1 : sz;
 }
 
 int32_t with_cimport_struct_is_opaque(int64_t session, int32_t idx) {
@@ -1949,6 +1952,88 @@ int32_t with_ci_member_is_arrow(int64_t session, int32_t cursor_idx) {
 with_str with_ci_member_field_name(int64_t session, int32_t cursor_idx) {
     // For MemberRefExpr, the cursor spelling IS the field name
     return with_ci_cursor_spelling(session, cursor_idx);
+}
+
+// ── Implicit cast kind classification ────────────────────────
+
+// Cast kind constants (matching CImport.w CI_CAST_* constants)
+#define CI_CAST_NOOP         0
+#define CI_CAST_NULL_TO_PTR  2
+#define CI_CAST_BOOL_TO_INT  3
+#define CI_CAST_INT_TO_BOOL  5
+#define CI_CAST_PTR_TO_BOOL  7
+#define CI_CAST_INT_TO_FLOAT 9
+#define CI_CAST_FLOAT_TO_INT 10
+#define CI_CAST_TO_VOID      15
+#define CI_CAST_INT_TRUNC    16
+#define CI_CAST_INT_WIDEN    17
+
+int32_t with_ci_implicit_cast_kind(int64_t session, int32_t cursor_idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || !s->cursors || cursor_idx < 0 || cursor_idx >= s->cursor_count)
+        return CI_CAST_NOOP;
+
+    CXType dest_type = clang_getCursorType(s->cursors[cursor_idx]);
+    CXType dest_canon = clang_getCanonicalType(dest_type);
+
+    // Get source type from first child
+    ensure_children_cached(s, cursor_idx);
+    if (s->child_counts[cursor_idx] < 1) return CI_CAST_NOOP;
+    int32_t child_idx = s->child_indices[s->child_starts[cursor_idx]];
+    CXType src_type = clang_getCursorType(s->cursors[child_idx]);
+    CXType src_canon = clang_getCanonicalType(src_type);
+
+    enum CXTypeKind dk = dest_canon.kind;
+    enum CXTypeKind sk = src_canon.kind;
+
+    // void destination → discard
+    if (dk == CXType_Void) return CI_CAST_TO_VOID;
+
+    // Null pointer constant → pointer
+    if (dk == CXType_Pointer && sk == CXType_Int) {
+        // Check if the source is a null literal (evaluates to 0)
+        if (clang_getCursorKind(s->cursors[child_idx]) == CXCursor_IntegerLiteral)
+            return CI_CAST_NULL_TO_PTR;
+    }
+
+    // Bool → integer
+    if (sk == CXType_Bool) {
+        if (dk >= CXType_Char_U && dk <= CXType_UInt128) return CI_CAST_BOOL_TO_INT;
+        if (dk >= CXType_Char_S && dk <= CXType_Int128) return CI_CAST_BOOL_TO_INT;
+    }
+
+    // Integer/enum → bool
+    if (dk == CXType_Bool) {
+        if (sk >= CXType_Char_U && sk <= CXType_UInt128) return CI_CAST_INT_TO_BOOL;
+        if (sk >= CXType_Char_S && sk <= CXType_Int128) return CI_CAST_INT_TO_BOOL;
+        if (sk == CXType_Enum) return CI_CAST_INT_TO_BOOL;
+        if (sk == CXType_Pointer) return CI_CAST_PTR_TO_BOOL;
+    }
+
+    // Pointer → bool
+    if (dk == CXType_Bool && sk == CXType_Pointer) return CI_CAST_PTR_TO_BOOL;
+
+    // Integer → float
+    int src_is_int = (sk >= CXType_Char_U && sk <= CXType_UInt128) ||
+                     (sk >= CXType_Char_S && sk <= CXType_Int128);
+    int dest_is_float = (dk == CXType_Float || dk == CXType_Double || dk == CXType_LongDouble);
+    if (src_is_int && dest_is_float) return CI_CAST_INT_TO_FLOAT;
+
+    // Float → integer
+    int src_is_float = (sk == CXType_Float || sk == CXType_Double || sk == CXType_LongDouble);
+    int dest_is_int = (dk >= CXType_Char_U && dk <= CXType_UInt128) ||
+                      (dk >= CXType_Char_S && dk <= CXType_Int128);
+    if (src_is_float && dest_is_int) return CI_CAST_FLOAT_TO_INT;
+
+    // Integer widening/truncation
+    if (src_is_int && dest_is_int) {
+        long long src_sz = clang_Type_getSizeOf(src_canon);
+        long long dest_sz = clang_Type_getSizeOf(dest_canon);
+        if (dest_sz < src_sz) return CI_CAST_INT_TRUNC;
+        if (dest_sz > src_sz) return CI_CAST_INT_WIDEN;
+    }
+
+    return CI_CAST_NOOP;
 }
 
 // ── Enum integer type ───────────────────────────────────────
