@@ -18,7 +18,7 @@ category. Parenthetical references point to the specification section.
 - [x] **for-else** (§9.10) — `for x in iter: ... else: ...` desugars to flag-based check in parser. Works for range-based for loops.
 - [x] **Named/labeled breaks** (§9.4) — `'label:` syntax works for labeled loops and `break 'label`. `@label` parse hang fixed with error message.
 - [x] **in pattern in match arms** (§9.9) — `in expr` parsed as match arm pattern (desugars to binding + guard). Runtime depends on MIR `in` operator codegen.
-- [ ] **let-else** (§9.6) — `let Some(x) = expr else return` is not parsed.
+- [x] **let-else** (§9.6) — `let Some(x) = expr else return` and `let Some(x) = expr else: return` both work. Colon after `else` now accepted in all let-else paths.
 
 ## Pattern Matching
 

@@ -3109,8 +3109,9 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
             self.skip_newlines()
             let value = self.parse_expr()
             self.expect(TK_KW_ELSE)
+            if self.peek() == TK_COLON: self.advance()
             self.skip_newlines()
-            let else_body = self.parse_expr()
+            let else_body = self.parse_block_or_expr()
             let pat = self.pool.add_node(NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, extra_start, binding_count)
             return self.pool.add_node(NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
         if self.peek() == TK_EQ:
@@ -3119,8 +3120,9 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
             let value = self.parse_expr()
             if self.peek() == TK_KW_ELSE:
                 self.advance()
+                if self.peek() == TK_COLON: self.advance()
                 self.skip_newlines()
-                let else_body = self.parse_expr()
+                let else_body = self.parse_block_or_expr()
                 let pat = self.pool.add_node(NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, 0, 0)
                 return self.pool.add_node(NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
 
@@ -3149,8 +3151,9 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         self.skip_newlines()
         let value = self.parse_expr()
         self.expect(TK_KW_ELSE)
+        if self.peek() == TK_COLON: self.advance()
         self.skip_newlines()
-        let else_body = self.parse_expr()
+        let else_body = self.parse_block_or_expr()
         let pat = self.pool.add_node(NK_PAT_VARIANT, start, self.prev_end(), name_sym, extra_start, binding_count)
         return self.pool.add_node(NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
 
@@ -3160,8 +3163,9 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         let value = self.parse_expr()
         if self.peek() == TK_KW_ELSE:
             self.advance()
+            if self.peek() == TK_COLON: self.advance()
             self.skip_newlines()
-            let else_body = self.parse_expr()
+            let else_body = self.parse_block_or_expr()
             let pat = self.pool.add_node(NK_PAT_VARIANT, start, self.prev_end(), name_sym, 0, 0)
             return self.pool.add_node(NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
         // Normal let binding
