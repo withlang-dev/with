@@ -73,9 +73,9 @@ category. Parenthetical references point to the specification section.
 
 ## FFI
 
-- [ ] **extern var / extern let** (§16.3b) — External variable declarations for C globals not implemented.
+- [x] **extern var / extern let** (§16.3b) — Extern variables now registered in scope for type-checking. Codegen accesses via AST node.
 - [ ] **@[c_export("name")]** — C linkage export attribute not implemented.
-- [ ] **@[repr(packed)]** (§16.4) — Packed struct layout attribute not implemented.
+- [x] **@[repr(packed)]** (§16.4) — `@[packed]` attribute works. Struct fields packed without padding.
 - [ ] **String auto-promotion** (§15.3) — Automatic `.to_owned()` insertion on string literals in owned contexts not implemented.
 
 ## Other
