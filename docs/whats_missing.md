@@ -31,8 +31,8 @@ category. Parenthetical references point to the specification section.
 
 ## Traits & Generics
 
-- [ ] **Contains trait** (§11.7) — Not defined as a built-in syntax trait. `in` operator works but through a different mechanism.
-- [ ] **Index/IndexMut traits** (§11.7) — Not defined as built-in syntax traits for user types. Subscript works on built-in collections.
+- [x] **Contains trait** (§11.7) — Recognized as builtin syntax trait. `impl Contains[T] for MyType` accepted. `in` operator dispatch uses built-in codegen.
+- [x] **Index/IndexMut traits** (§11.7) — Recognized as builtin syntax traits. `impl Index[I, O] for MyType` accepted. Subscript dispatch uses built-in codegen.
 - [ ] **Object safety checking** (§11.3) — Trait objects work but object safety rules (by-value self exclusion, generic method exclusion) are not enforced.
 - [ ] **Associated type bound checking** (§11.6) — `type Item: Eq` bounds on associated types not implemented (deferred in v1.0 spec).
 - [ ] **Implicit trait object coercion** (§3.9) — `&T` → `&dyn Trait` automatic vtable construction not fully implemented.

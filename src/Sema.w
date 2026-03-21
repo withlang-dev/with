@@ -2232,7 +2232,10 @@ fn sema_is_builtin_trait_name(name: str) -> bool:
     name == "IntoIter" or
     name == "Eq" or
     name == "Hash" or
-    name == "Ord"
+    name == "Ord" or
+    name == "Contains" or
+    name == "Index" or
+    name == "IndexMut"
 
 // Check if a new direct impl overlaps with any existing blanket impl
 fn Sema.check_direct_overlap(self: Sema, type_name: i32, trait_sym: i32, node: i32):
