@@ -521,6 +521,73 @@ fn MirBuilder.struct_field_type(self: MirBuilder, struct_tid: i32, field_sym: i3
             return 0
     0
 
+fn MirBuilder.tuple_elem_type(self: MirBuilder, tuple_tid: i32, field_idx: i32) -> i32:
+    let resolved = self.sema.resolve_alias(tuple_tid)
+    if self.sema.get_type_kind(resolved) != TY_TUPLE:
+        return 0
+    let elem_start = self.sema.get_type_d0(resolved)
+    let elem_count = self.sema.get_type_d1(resolved)
+    if field_idx < 0 or field_idx >= elem_count:
+        return 0
+    self.sema.type_extra.get((elem_start + field_idx) as i64)
+
+fn MirBuilder.indexed_element_type(self: MirBuilder, collection_tid: i32) -> i32:
+    let resolved = self.sema.resolve_alias(collection_tid)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TY_ARRAY or tk == TY_SLICE:
+        return self.sema.get_type_d0(resolved)
+    if tk == TY_STR:
+        return self.sema.ty_i32
+    if tk == TY_GENERIC_INST:
+        let base_sym = self.sema.get_generic_inst_base(resolved)
+        if self.pool.resolve_symbol(base_sym) == "Vec" and self.sema.get_generic_inst_arg_count(resolved) > 0:
+            return self.sema.get_generic_inst_arg(resolved, 0)
+    0
+
+fn MirBuilder.enum_payload_type(self: MirBuilder, enum_tid: i32, variant_idx: i32, field_idx: i32) -> i32:
+    let resolved = self.sema.resolve_alias(enum_tid)
+    let tk = self.sema.get_type_kind(resolved)
+    if variant_idx < 0 or field_idx < 0:
+        return 0
+
+    if tk == TY_ENUM:
+        let te_start = self.sema.get_type_d1(resolved)
+        let variant_count = self.sema.get_type_d2(resolved)
+        var pos = te_start
+        for vi in 0..variant_count:
+            let payload_count = self.sema.type_extra.get((pos + 1) as i64)
+            if vi == variant_idx:
+                if field_idx < payload_count:
+                    return self.sema.type_extra.get((pos + 2 + field_idx) as i64)
+                return 0
+            pos = pos + 2 + payload_count
+        return 0
+
+    if tk == TY_GENERIC_INST:
+        let base_sym = self.sema.get_generic_inst_base(resolved)
+        if not self.sema.named_types.contains(base_sym):
+            return 0
+        let base_tid = self.sema.named_types.get(base_sym).unwrap()
+        if self.sema.get_type_kind(base_tid) != TY_ENUM:
+            return 0
+        let te_start = self.sema.get_type_d1(base_tid)
+        let variant_count = self.sema.get_type_d2(base_tid)
+        var pos = te_start
+        for vi in 0..variant_count:
+            let variant_name = self.sema.type_extra.get(pos as i64)
+            let payload_count = self.sema.type_extra.get((pos + 1) as i64)
+            if vi == variant_idx:
+                let payload_types = self.sema.resolve_generic_enum_payload(resolved, base_sym, variant_name, payload_count)
+                if field_idx < payload_types.len() as i32:
+                    let payload_ty = payload_types.get(field_idx as i64)
+                    if payload_ty != 0:
+                        return payload_ty
+                if field_idx < payload_count:
+                    return self.sema.type_extra.get((pos + 2 + field_idx) as i64)
+                return 0
+            pos = pos + 2 + payload_count
+    0
+
 fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     if node == 0:
         return self.sema.ty_void
@@ -649,7 +716,55 @@ fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
     let local_id = self.body.place_locals.get(place_id as i64)
     if local_id < 0 or local_id >= self.body.local_type_ids.len() as i32:
         return self.sema.ty_void
-    self.body.local_type_ids.get(local_id as i64)
+    var current_ty = self.body.local_type_ids.get(local_id as i64)
+    let proj_start = self.body.place_proj_starts.get(place_id as i64)
+    let proj_count = self.body.place_proj_counts.get(place_id as i64)
+    var active_variant_idx = -1
+
+    for pi in 0..proj_count:
+        let proj_kind = self.body.proj_kinds.get((proj_start + pi) as i64)
+        let proj_d0 = self.body.proj_d0.get((proj_start + pi) as i64)
+        let resolved = self.sema.resolve_alias(current_ty)
+        let tk = self.sema.get_type_kind(resolved)
+
+        if proj_kind == PK_DOWNCAST:
+            if tk == TY_ENUM or tk == TY_GENERIC_INST:
+                active_variant_idx = proj_d0
+                continue
+            return self.sema.ty_void
+
+        if proj_kind == PK_FIELD:
+            var field_ty = 0
+            if active_variant_idx >= 0:
+                field_ty = self.enum_payload_type(current_ty, active_variant_idx, proj_d0)
+            else if tk == TY_TUPLE:
+                field_ty = self.tuple_elem_type(current_ty, proj_d0)
+            else:
+                field_ty = self.struct_field_type(current_ty, proj_d0)
+            if field_ty == 0:
+                return self.sema.ty_void
+            current_ty = field_ty
+            active_variant_idx = -1
+            continue
+
+        if proj_kind == PK_INDEX:
+            let elem_ty = self.indexed_element_type(current_ty)
+            if elem_ty == 0:
+                return self.sema.ty_void
+            current_ty = elem_ty
+            active_variant_idx = -1
+            continue
+
+        if proj_kind == PK_DEREF:
+            if tk == TY_PTR or tk == TY_REF:
+                current_ty = self.sema.get_type_d0(resolved)
+                active_variant_idx = -1
+                continue
+            return self.sema.ty_void
+
+        return self.sema.ty_void
+
+    current_ty
 
 fn MirBuilder.variant_index(self: MirBuilder, variant_sym: i32) -> i32:
     if variant_sym == 0:
@@ -2012,13 +2127,13 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             let raw = self.ast.get_extra(bind_start + bi)
             // Let-else parser stores NK_PAT_IDENT nodes; match parser stores raw symbols
             let sym = if self.ast.kind(raw) == NK_PAT_IDENT: self.ast.get_data0(raw) else: raw
-            let bind_ty = self.place_local_type(scrutinee_place)
+            let field_place = self.body.new_field_place(variant_place, bi)
+            let bind_ty = self.place_local_type(field_place)
             let local_id = self.body.new_local(bind_ty, 0, sym, 1)
             self.bind_local(sym, local_id)
             self.body.push_stmt(self.cur_bb, SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(pat_node))
             if self.sema.is_copy(bind_ty) == 0:
                 self.schedule_drop(local_id, DK_VALUE)
-            let field_place = self.body.new_field_place(variant_place, bi)
             let src_op = self.body.new_operand(if self.sema.is_copy(bind_ty) != 0: OK_COPY else: OK_MOVE, field_place)
             self.assign_operand_to_place(self.place_for_local(local_id), src_op, self.ast.get_start(pat_node))
             out.push(local_id)
