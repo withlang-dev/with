@@ -55,6 +55,9 @@ type TestDiscovery = {
     test_names: Vec[str],
 }
 
+fn empty_test_discovery -> TestDiscovery:
+    TestDiscovery { parse_ok: false, has_main: false, test_names: Vec.new() }
+
 fn cli_options_default -> CliOptions:
     CliOptions {
         command: "",
@@ -116,6 +119,12 @@ fn cli_opt_level(argc: i32) -> i32:
                 level = 2
         i = i + 1
     level
+
+fn cli_test_verbose(argc: i32) -> bool:
+    cli_has_flag(argc, "-v") or cli_has_flag(argc, "--verbose")
+
+fn cli_test_quiet(argc: i32) -> bool:
+    cli_has_flag(argc, "-q") or cli_has_flag(argc, "--quiet")
 
 fn cli_prelude_mode(argc: i32) -> i32:
     var mode = CLI_PRELUDE_FULL_MODE
@@ -566,19 +575,41 @@ fn synthesize_test_main_source(text: str, test_names: Vec[str]) -> str:
     var out = text
     if out.len() > 0 and with_str_byte_at(out, with_str_len(out) - 1) != 10:
         out = out ++ "\n"
+    out = out ++ "\nextern fn with_getenv_str(name: str) -> str\n"
+    out = out ++ "extern fn with_str_eq(a: str, b: str) -> i32\n"
+    out = out ++ "extern fn exit(code: i32) -> void\n"
+    out = out ++ "\nfn __with_test_eq(a: str, b: str) -> bool:\n"
+    out = out ++ "    with_str_eq(a, b) != 0\n"
     out = out ++ "\nfn main:\n"
+    out = out ++ "    let __with_test_filter = with_getenv_str(\"WITH_TEST_FILTER\")\n"
+    out = out ++ "    if __with_test_filter.len() > 0:\n"
+    for ti in 0..test_names.len() as i32:
+        let test_name = test_names.get(ti as i64)
+        let prefix = if ti == 0: "        if " else: "        else if "
+        out = out ++ prefix ++ "__with_test_eq(__with_test_filter, \"" ++ test_name ++ "\"):\n"
+        out = out ++ "            " ++ test_name ++ "()\n"
+        out = out ++ "            return\n"
+    out = out ++ "        else:\n"
+    out = out ++ "            exit(1)\n"
+    out = out ++ "            return\n"
     for ti in 0..test_names.len() as i32:
         out = out ++ "    " ++ test_names.get(ti as i64) ++ "()\n"
     out
 
-fn maybe_synthesize_test_source(target: str) -> str:
+fn discover_tests_for_target(target: str) -> TestDiscovery:
     if not target.ends_with(".w"):
+        return empty_test_discovery()
+    let text = with_fs_read_file(target)
+    if text.len() == 0:
+        return empty_test_discovery()
+    discover_test_functions(text)
+
+fn maybe_synthesize_test_source(target: str) -> str:
+    let discovery = discover_tests_for_target(target)
+    if not discovery.parse_ok:
         return ""
     let text = with_fs_read_file(target)
     if text.len() == 0:
-        return ""
-    let discovery = discover_test_functions(text)
-    if not discovery.parse_ok:
         return ""
     if discovery.has_main or discovery.test_names.len() == 0:
         return ""
@@ -630,7 +661,40 @@ fn collect_test_files(target_dir: str) -> Vec[str]:
         return files
     split_nonempty_lines(listing)
 
-fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+fn test_count_label(count: i32) -> str:
+    if count == 1:
+        return "test"
+    "tests"
+
+fn emit_test_stage_error(message: str, target: str, stage: str, test_name: str):
+    with_eprintln("error: " ++ message)
+    with_eprintln(" = file: " ++ target)
+    with_eprintln(" = stage: " ++ stage)
+    if test_name.len() > 0:
+        with_eprintln(" = test: " ++ test_name)
+
+fn print_test_summary(target: str, passed: i32, failed: i32, quiet: bool):
+    if quiet:
+        return
+    if failed == 0:
+        print("ok: " ++ int_to_string(passed) ++ " " ++ test_count_label(passed) ++ " passed in " ++ target ++ "\n")
+        return
+    with_eprintln("error: " ++ int_to_string(failed) ++ " of " ++ int_to_string(passed + failed) ++ " tests failed in " ++ target)
+
+fn run_test_binary(bin_path: str, quiet: bool) -> i32:
+    var cmd = test_shell_quote(bin_path)
+    if quiet:
+        cmd = "WITH_TEST_SHORT=1 " ++ cmd
+    with_system(cmd)
+
+fn run_named_test_binary(bin_path: str, test_name: str, quiet: bool) -> i32:
+    var cmd = "WITH_TEST_FILTER=" ++ test_shell_quote(test_name) ++ " " ++ test_shell_quote(bin_path)
+    if quiet:
+        cmd = "WITH_TEST_SHORT=1 " ++ cmd
+    with_system(cmd)
+
+fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool) -> i32:
+    let discovery = discover_tests_for_target(target)
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
@@ -638,13 +702,40 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
     let synthetic_source = maybe_synthesize_test_source(target)
     let bin_path = if synthetic_source.len() > 0: comp.build_binary_from_source(target, synthetic_source) else: comp.build_binary(target)
     if bin_path == "":
-        with_eprintln("error: test build failed")
+        emit_test_stage_error("test build failed", target, "build", "")
         return 1
-    let run_rc = with_system(bin_path)
+    if discovery.parse_ok and not discovery.has_main and discovery.test_names.len() > 0:
+        var passed = 0
+        var failed = 0
+        for ti in 0..discovery.test_names.len() as i32:
+            let test_name = discovery.test_names.get(ti as i64)
+            let rc = run_named_test_binary(bin_path, test_name, quiet and not verbose)
+            if rc == 0:
+                passed = passed + 1
+                if verbose:
+                    print("PASS " ++ test_name ++ "\n")
+            else:
+                failed = failed + 1
+                if verbose:
+                    with_eprintln("FAIL " ++ test_name)
+                emit_test_stage_error("test failed", target, "run", test_name)
+        cleanup_binary_artifacts(bin_path)
+        print_test_summary(target, passed, failed, quiet and not verbose)
+        if failed == 0:
+            return 0
+        return 1
+    let run_rc = run_test_binary(bin_path, quiet and not verbose)
     cleanup_binary_artifacts(bin_path)
+    if run_rc == 0:
+        print_test_summary(target, 1, 0, quiet and not verbose)
+        return 0
+    emit_test_stage_error("test failed", target, "run", "")
+    print_test_summary(target, 0, 1, quiet and not verbose)
     run_rc
 
 fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+    let verbose = cli_test_verbose(argc)
+    let quiet = if verbose: false else: cli_test_quiet(argc)
     // Find test file/dir argument
     let target = find_source_arg(argc)
     if target == "":
@@ -657,12 +748,12 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
             return 1
         for ti in 0..test_files.len() as i32:
             let test_file = test_files.get(ti as i64)
-            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet)
             if run_rc != 0:
                 with_eprintln("error: test failed in '" ++ test_file ++ "'")
                 return run_rc
         return 0
-    run_test_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+    run_test_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet)
 
 fn run_clean_command -> i32:
     let result = with_system("rm -rf out .with")
@@ -691,6 +782,8 @@ fn print_usage:
     print("  --no-prelude          Disable implicit std prelude import\n")
     print("  --prelude=full|core|none  Select implicit prelude mode\n")
     print("  --freestanding        Alias for --no-std --no-prelude\n")
+    print("  -v, --verbose         Verbose per-test output for 'with test'\n")
+    print("  -q, --quiet           Suppress success summaries for 'with test'\n")
     print("\n")
     print("Language quick reference:\n")
     print("  with help use         Import syntax and module resolution\n")
