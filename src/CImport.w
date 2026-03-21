@@ -1400,84 +1400,290 @@ fn ci_translate_macros(session: i64, extern_vars: str) -> str:
 // known: pipe-delimited known constant values "NAME=val|"
 // Returns "" on failure (triggers comptime_error fallback).
 
+// ── Recursive descent C expression parser ──────────────────────────
+// Follows Zig's MacroTranslator precedence structure exactly:
+//   cond_expr → or → and → bit_or → bit_xor → bit_and →
+//   eq → rel → shift → add → mul → cast → unary → postfix → primary
+//
+// Each level finds its own operators at paren depth 0,
+// splitting into LHS (already parsed at this level) and
+// RHS (parsed at the next higher precedence level).
+
 fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
     let trimmed = ci_strip_parens(ci_trim(s))
     if trimmed.len() == 0:
         return ""
+    ci_parse_cond_expr(trimmed, params, known)
 
-    // Integer literal
-    if ci_is_int_literal(trimmed):
-        return ci_strip_int_suffix(trimmed)
-
-    // Float literal
-    if ci_is_float_literal(trimmed):
-        return ci_strip_float_suffix(trimmed)
-
-    // String literal
-    if ci_is_string_literal(trimmed):
-        return trimmed
-
-    // Char literal
-    if ci_is_char_literal(trimmed):
-        let cv = ci_char_to_int(trimmed)
-        if cv.len() > 0:
-            return cv
+// Level 0: Ternary conditional  cond ? then : else
+fn ci_parse_cond_expr(s: str, params: str, known: str) -> str:
+    let t0 = ci_strip_parens(ci_trim(s))
+    if t0.len() == 0:
         return ""
+    let ternary_pos = ci_find_ternary(t0)
+    if ternary_pos >= 0:
+        let cond = ci_parse_or_expr(t0.slice(0, ternary_pos as i64), params, known)
+        if cond.len() > 0:
+            let rest = t0.slice(ternary_pos as i64 + 1, t0.len())
+            let colon_pos = ci_find_ternary_colon(rest)
+            if colon_pos >= 0:
+                let then_e = ci_parse_cond_expr(ci_trim(rest.slice(0, colon_pos as i64)), params, known)
+                let else_e = ci_parse_cond_expr(ci_trim(rest.slice(colon_pos as i64 + 1, rest.len())), params, known)
+                if then_e.len() > 0 and else_e.len() > 0:
+                    let cond_expr = ci_ensure_bool(cond)
+                    return "(if " ++ cond_expr ++ ": " ++ then_e ++ " else: " ++ else_e ++ ")"
+        return ""
+    ci_parse_or_expr(t0, params, known)
 
-    // Unary negation: -expr
-    if trimmed.byte_at(0) == 45:
-        let inner = ci_translate_c_expr(trimmed.slice(1, trimmed.len()), params, known)
+// Level 1: Logical OR  ||
+fn ci_parse_or_expr(s: str, params: str, known: str) -> str:
+    let pos = ci_find_op_at_depth0(s, "||")
+    if pos >= 0:
+        let lhs = ci_parse_or_expr(s.slice(0, pos as i64), params, known)
+        let rhs = ci_parse_and_expr(ci_trim(s.slice((pos + 2) as i64, s.len())), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            return "(if " ++ ci_ensure_bool(lhs) ++ " or " ++ ci_ensure_bool(rhs) ++ ": 1 else: 0)"
+        return ""
+    ci_parse_and_expr(s, params, known)
+
+// Level 2: Logical AND  &&
+fn ci_parse_and_expr(s: str, params: str, known: str) -> str:
+    let pos = ci_find_op_at_depth0(s, "&&")
+    if pos >= 0:
+        let lhs = ci_parse_and_expr(s.slice(0, pos as i64), params, known)
+        let rhs = ci_parse_bitor_expr(ci_trim(s.slice((pos + 2) as i64, s.len())), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            return "(if " ++ ci_ensure_bool(lhs) ++ " and " ++ ci_ensure_bool(rhs) ++ ": 1 else: 0)"
+        return ""
+    ci_parse_bitor_expr(s, params, known)
+
+// Level 3: Bitwise OR  |  (not ||)
+fn ci_parse_bitor_expr(s: str, params: str, known: str) -> str:
+    let pos = ci_find_single_op_at_depth0(s, 124, 124)  // '|' but not '||'
+    if pos >= 0:
+        let lhs = ci_parse_bitor_expr(s.slice(0, pos as i64), params, known)
+        let rhs = ci_parse_bitxor_expr(ci_trim(s.slice((pos + 1) as i64, s.len())), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            return "(" ++ lhs ++ " | " ++ rhs ++ ")"
+        return ""
+    ci_parse_bitxor_expr(s, params, known)
+
+// Level 4: Bitwise XOR  ^
+fn ci_parse_bitxor_expr(s: str, params: str, known: str) -> str:
+    let pos = ci_find_char_op_at_depth0(s, 94)  // '^'
+    if pos >= 0:
+        let lhs = ci_parse_bitxor_expr(s.slice(0, pos as i64), params, known)
+        let rhs = ci_parse_bitand_expr(ci_trim(s.slice((pos + 1) as i64, s.len())), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            return "(" ++ lhs ++ " ^ " ++ rhs ++ ")"
+        return ""
+    ci_parse_bitand_expr(s, params, known)
+
+// Level 5: Bitwise AND  &  (not &&)
+fn ci_parse_bitand_expr(s: str, params: str, known: str) -> str:
+    let pos = ci_find_single_op_at_depth0(s, 38, 38)  // '&' but not '&&'
+    if pos >= 0:
+        let lhs = ci_parse_bitand_expr(s.slice(0, pos as i64), params, known)
+        let rhs = ci_parse_eq_expr(ci_trim(s.slice((pos + 1) as i64, s.len())), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            return "(" ++ lhs ++ " & " ++ rhs ++ ")"
+        return ""
+    ci_parse_eq_expr(s, params, known)
+
+// Level 6: Equality  == !=
+fn ci_parse_eq_expr(s: str, params: str, known: str) -> str:
+    let pos_eq = ci_find_op_at_depth0(s, "==")
+    let pos_neq = ci_find_op_at_depth0(s, "!=")
+    let pos = if pos_eq >= 0 and (pos_neq < 0 or pos_eq < pos_neq): pos_eq else: pos_neq
+    if pos >= 0:
+        let op_str = s.slice(pos as i64, (pos + 2) as i64)
+        let lhs = ci_parse_eq_expr(s.slice(0, pos as i64), params, known)
+        let rhs = ci_parse_rel_expr(ci_trim(s.slice((pos + 2) as i64, s.len())), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            let w_op = if op_str == "==": "==" else: "!="
+            return "(if " ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ": 1 else: 0)"
+        return ""
+    ci_parse_rel_expr(s, params, known)
+
+// Level 7: Relational  < > <= >=
+fn ci_parse_rel_expr(s: str, params: str, known: str) -> str:
+    // Find rightmost relational op at depth 0 (to get left-to-right assoc)
+    var best_pos = 0 - 1
+    var best_len = 0
+    var depth = 0
+    var i = 0
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        if c == 41: depth = depth - 1
+        if depth == 0 and i > 0:
+            let prev = s.byte_at((i - 1) as i64)
+            if c == 60 and i + 1 < s.len() as i32 and s.byte_at((i + 1) as i64) == 61 and prev != 60:  // <=
+                best_pos = i
+                best_len = 2
+            else if c == 62 and i + 1 < s.len() as i32 and s.byte_at((i + 1) as i64) == 61 and prev != 62:  // >=
+                best_pos = i
+                best_len = 2
+            else if c == 60 and (i + 1 >= s.len() as i32 or s.byte_at((i + 1) as i64) != 60) and prev != 60 and (i < 1 or prev != 60):  // < but not <<
+                if i + 1 < s.len() as i32 and s.byte_at((i + 1) as i64) != 61:
+                    best_pos = i
+                    best_len = 1
+            else if c == 62 and (i + 1 >= s.len() as i32 or s.byte_at((i + 1) as i64) != 62) and prev != 62:  // > but not >>
+                if i + 1 < s.len() as i32 and s.byte_at((i + 1) as i64) != 61:
+                    best_pos = i
+                    best_len = 1
+        i = i + 1
+    if best_pos >= 0:
+        let op_str = s.slice(best_pos as i64, (best_pos + best_len) as i64)
+        let lhs = ci_parse_rel_expr(s.slice(0, best_pos as i64), params, known)
+        let rhs = ci_parse_shift_expr(ci_trim(s.slice((best_pos + best_len) as i64, s.len())), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            return "(if " ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ": 1 else: 0)"
+        return ""
+    ci_parse_shift_expr(s, params, known)
+
+// Level 8: Shift  << >>
+fn ci_parse_shift_expr(s: str, params: str, known: str) -> str:
+    let pos_shl = ci_find_op_at_depth0(s, "<<")
+    let pos_shr = ci_find_op_at_depth0(s, ">>")
+    let pos = if pos_shl >= 0 and (pos_shr < 0 or pos_shl < pos_shr): pos_shl else: pos_shr
+    if pos >= 0:
+        let op_str = s.slice(pos as i64, (pos + 2) as i64)
+        let lhs = ci_parse_shift_expr(s.slice(0, pos as i64), params, known)
+        let rhs = ci_parse_add_expr(ci_trim(s.slice((pos + 2) as i64, s.len())), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            let w_op = ci_map_c_op(op_str)
+            return "(" ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ")"
+        return ""
+    ci_parse_add_expr(s, params, known)
+
+// Level 9: Additive  + -
+fn ci_parse_add_expr(s: str, params: str, known: str) -> str:
+    // Find rightmost + or - at depth 0, but not after another operator (unary)
+    var best_pos = 0 - 1
+    var depth = 0
+    var i = 0
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        if c == 41: depth = depth - 1
+        if depth == 0 and i > 0 and (c == 43 or c == 45):
+            // Skip if preceded by another operator (unary context)
+            let prev = ci_last_nonspace_char(s, i)
+            if prev != 43 and prev != 45 and prev != 42 and prev != 47 and prev != 37 and prev != 40 and prev != 44 and prev != 124 and prev != 38 and prev != 94 and prev != 60 and prev != 62 and prev != 33 and prev != 126 and prev != 63:
+                best_pos = i
+        i = i + 1
+    if best_pos >= 0:
+        let op_char = s.byte_at(best_pos as i64)
+        let lhs = ci_parse_add_expr(s.slice(0, best_pos as i64), params, known)
+        let rhs = ci_parse_mul_expr(ci_trim(s.slice((best_pos + 1) as i64, s.len())), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            let op = if op_char == 43: "+" else: "-"
+            return "(" ++ lhs ++ " " ++ op ++ " " ++ rhs ++ ")"
+        return ""
+    ci_parse_mul_expr(s, params, known)
+
+// Level 10: Multiplicative  * / %
+fn ci_parse_mul_expr(s: str, params: str, known: str) -> str:
+    // Find rightmost * / % at depth 0
+    var best_pos = 0 - 1
+    var depth = 0
+    var i = 0
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        if c == 41: depth = depth - 1
+        if depth == 0 and i > 0 and (c == 42 or c == 47 or c == 37):
+            let prev = ci_last_nonspace_char(s, i)
+            if prev != 40 and prev != 44 and prev != 42 and prev != 47 and prev != 37:
+                best_pos = i
+        i = i + 1
+    if best_pos >= 0:
+        let op_char = s.byte_at(best_pos as i64)
+        let lhs = ci_parse_mul_expr(s.slice(0, best_pos as i64), params, known)
+        let rhs = ci_parse_cast_expr(ci_trim(s.slice((best_pos + 1) as i64, s.len())), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            let op = if op_char == 42: "*" else if op_char == 47: "/" else: "%"
+            return "(" ++ lhs ++ " " ++ op ++ " " ++ rhs ++ ")"
+        return ""
+    ci_parse_cast_expr(s, params, known)
+
+// Level 11: Cast  (type)expr
+fn ci_parse_cast_expr(s: str, params: str, known: str) -> str:
+    let t = ci_trim(s)
+    if t.len() > 0 and t.byte_at(0) == 40:
+        let cast_end = ci_find_matching_paren(t, 0)
+        if cast_end > 0 and cast_end as i64 + 1 < t.len():
+            let inside = t.slice(1, cast_end as i64)
+            let after_str = t.slice(cast_end as i64 + 1, t.len())
+            if ci_is_c_type_name(inside):
+                let mapped = ci_map_base_type(ci_trim(inside))
+                let after_trimmed = ci_trim(after_str)
+                // Cast-with-initializer: (type){ .field=val, ... }
+                if after_trimmed.len() > 0 and after_trimmed.byte_at(0) == 123:
+                    let init_result = ci_translate_c_expr(after_trimmed, params, known)
+                    if init_result.len() > 0:
+                        return mapped ++ " " ++ init_result
+                    return ""
+                let after = ci_parse_cast_expr(after_str, params, known)
+                if after.len() > 0:
+                    return "(" ++ after ++ " as " ++ mapped ++ ")"
+                return ""
+    ci_parse_unary_expr(s, params, known)
+
+// Level 12: Unary  ! ~ - & * sizeof alignof
+fn ci_parse_unary_expr(s: str, params: str, known: str) -> str:
+    let t = ci_trim(s)
+    if t.len() == 0:
+        return ""
+    let c0 = t.byte_at(0)
+    // Negation: -expr
+    if c0 == 45:
+        let inner = ci_parse_cast_expr(t.slice(1, t.len()), params, known)
         if inner.len() > 0:
             return "(0 - " ++ inner ++ ")"
         return ""
-
-    // Logical NOT: !expr
-    if trimmed.byte_at(0) == 33:
-        let inner = ci_translate_c_expr(trimmed.slice(1, trimmed.len()), params, known)
+    // Logical NOT: !expr (but not !=)
+    if c0 == 33 and (t.len() < 2 or t.byte_at(1) != 61):
+        let inner = ci_parse_cast_expr(t.slice(1, t.len()), params, known)
         if inner.len() > 0:
             return "(if " ++ inner ++ " != 0: 0 else: 1)"
         return ""
-
     // Bitwise NOT: ~expr
-    if trimmed.byte_at(0) == 126:
-        let inner = ci_translate_c_expr(trimmed.slice(1, trimmed.len()), params, known)
+    if c0 == 126:
+        let inner = ci_parse_cast_expr(t.slice(1, t.len()), params, known)
         if inner.len() > 0:
             return "(0 - " ++ inner ++ " - 1)"
         return ""
-
-    // Address-of: &expr
-    if trimmed.byte_at(0) == 38 and trimmed.len() > 1 and trimmed.byte_at(1) != 38:
-        let inner = ci_translate_c_expr(trimmed.slice(1, trimmed.len()), params, known)
+    // Address-of: &expr (but not &&)
+    if c0 == 38 and t.len() > 1 and t.byte_at(1) != 38:
+        let inner = ci_parse_cast_expr(t.slice(1, t.len()), params, known)
         if inner.len() > 0:
             return "&" ++ inner
         return ""
-
     // Dereference: *expr
-    if trimmed.byte_at(0) == 42:
-        let inner = ci_translate_c_expr(trimmed.slice(1, trimmed.len()), params, known)
+    if c0 == 42:
+        let inner = ci_parse_cast_expr(t.slice(1, t.len()), params, known)
         if inner.len() > 0:
             return inner ++ ".*"
         return ""
-
-    // sizeof(T) — translatable for type names and parameter names
-    if ci_starts_with(trimmed, "sizeof"):
-        let rest = ci_trim(trimmed.slice(6, trimmed.len()))
+    // sizeof(T)
+    if ci_starts_with(t, "sizeof"):
+        let rest = ci_trim(t.slice(6, t.len()))
         if rest.len() > 0 and rest.byte_at(0) == 40:
             let close = ci_find_matching_paren(rest, 0)
             if close > 0:
                 let inner = ci_trim(rest.slice(1, close as i64))
-                // Parameter names in generic macros: sizeof(param) → sizeof[T]()
                 if ci_str_contains(params, "|" ++ inner ++ "|"):
                     return "sizeof[T]()"
                 let mapped = ci_map_sizeof_type(inner)
                 if mapped.len() > 0:
                     return "sizeof[" ++ mapped ++ "]()"
         return ""
-
     // alignof / _Alignof
-    if ci_starts_with(trimmed, "alignof") or ci_starts_with(trimmed, "_Alignof") or ci_starts_with(trimmed, "__alignof__") or ci_starts_with(trimmed, "__alignof"):
-        let prefix_len = if ci_starts_with(trimmed, "__alignof__"): 11 else if ci_starts_with(trimmed, "_Alignof"): 8 else if ci_starts_with(trimmed, "__alignof"): 9 else: 7
-        let rest = ci_trim(trimmed.slice(prefix_len as i64, trimmed.len()))
+    if ci_starts_with(t, "alignof") or ci_starts_with(t, "_Alignof") or ci_starts_with(t, "__alignof__") or ci_starts_with(t, "__alignof"):
+        let prefix_len = if ci_starts_with(t, "__alignof__"): 11 else if ci_starts_with(t, "_Alignof"): 8 else if ci_starts_with(t, "__alignof"): 9 else: 7
+        let rest = ci_trim(t.slice(prefix_len as i64, t.len()))
         if rest.len() > 0 and rest.byte_at(0) == 40:
             let close = ci_find_matching_paren(rest, 0)
             if close > 0:
@@ -1486,115 +1692,55 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
                 if mapped.len() > 0:
                     return "alignof[" ++ mapped ++ "]()"
         return ""
+    ci_parse_postfix_expr(s, params, known)
 
-    // Designated initializer: { .field = val, .field2 = val2 }
-    if trimmed.byte_at(0) == 123:  // '{'
-        let close_brace = ci_find_matching_brace(trimmed, 0)
+// Level 13: Postfix  .field ->field [idx] (args)  and primary
+fn ci_parse_postfix_expr(s: str, params: str, known: str) -> str:
+    let t = ci_strip_parens(ci_trim(s))
+    if t.len() == 0:
+        return ""
+    // Designated initializer: { .field = val }
+    if t.byte_at(0) == 123:
+        let close_brace = ci_find_matching_brace(t, 0)
         if close_brace > 0:
-            let inner = ci_trim(trimmed.slice(1, close_brace as i64))
-            if inner.len() > 0 and inner.byte_at(0) == 46:  // starts with '.'
+            let inner = ci_trim(t.slice(1, close_brace as i64))
+            if inner.len() > 0 and inner.byte_at(0) == 46:
                 let fields_result = ci_translate_designated_init(inner, params, known)
                 if fields_result.len() > 0:
                     return ".{ " ++ fields_result ++ " }"
         return ""
-
-    // Ternary: cond ? then : else (lowest precedence, check first)
-    let ternary_pos = ci_find_ternary(trimmed)
-    if ternary_pos >= 0:
-        let cond = ci_translate_c_expr(trimmed.slice(0, ternary_pos as i64), params, known)
-        if cond.len() > 0:
-            let rest = trimmed.slice(ternary_pos as i64 + 1, trimmed.len())
-            let colon_pos = ci_find_ternary_colon(rest)
-            if colon_pos >= 0:
-                let then_e = ci_translate_c_expr(rest.slice(0, colon_pos as i64), params, known)
-                let else_e = ci_translate_c_expr(rest.slice(colon_pos as i64 + 1, rest.len()), params, known)
-                if then_e.len() > 0 and else_e.len() > 0:
-                    let cond_expr = if ci_str_contains(cond, " == ") or ci_str_contains(cond, " != ") or ci_str_contains(cond, " < ") or ci_str_contains(cond, " > ") or ci_str_contains(cond, " and ") or ci_str_contains(cond, " or "): cond else: cond ++ " != 0"
-                    return "(if " ++ cond_expr ++ ": " ++ then_e ++ " else: " ++ else_e ++ ")"
-        return ""
-
-    // Binary operator (check before cast/call to handle `(a) * (b)` correctly)
-    let op_info = ci_find_binary_op_ext(trimmed)
-    if op_info >= 0:
-        let op_pos = op_info / 256
-        let op_len = op_info % 256
-        let lhs = ci_translate_c_expr(trimmed.slice(0, op_pos as i64), params, known)
-        let rhs = ci_translate_c_expr(trimmed.slice((op_pos + op_len) as i64, trimmed.len()), params, known)
-        if lhs.len() > 0 and rhs.len() > 0:
-            let c_op = trimmed.slice(op_pos as i64, (op_pos + op_len) as i64)
-            let w_op = ci_map_c_op(c_op)
-            if w_op.len() > 0:
-                if ci_is_comparison_op(w_op):
-                    return "(if " ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ": 1 else: 0)"
-                if w_op == "and" or w_op == "or":
-                    let l = if ci_is_bool_expr(lhs): lhs else: lhs ++ " != 0"
-                    let r = if ci_is_bool_expr(rhs): rhs else: rhs ++ " != 0"
-                    return "(if " ++ l ++ " " ++ w_op ++ " " ++ r ++ ": 1 else: 0)"
-                return "(" ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ")"
-        return ""
-
-    // Cast: (type)expr  OR  CAST_OR_CALL: (X)(Y)  OR  comma operator: (expr1, expr2) → expr2
-    if trimmed.byte_at(0) == 40:
-        let cast_end = ci_find_matching_paren(trimmed, 0)
-        if cast_end > 0 and cast_end as i64 + 1 < trimmed.len():
-            let inside = trimmed.slice(1, cast_end as i64)
-            let after_str = trimmed.slice(cast_end as i64 + 1, trimmed.len())
-            if ci_is_c_type_name(inside):
-                let mapped = ci_map_base_type(ci_trim(inside))
-                // Cast-with-initializer: (type){ .field=val, ... }
-                let after_trimmed = ci_trim(after_str)
-                if after_trimmed.len() > 0 and after_trimmed.byte_at(0) == 123:
-                    let init_result = ci_translate_c_expr(after_trimmed, params, known)
-                    if init_result.len() > 0:
-                        return mapped ++ " " ++ init_result
-                    return ""
-                let after = ci_translate_c_expr(after_str, params, known)
-                if after.len() > 0:
-                    return "(" ++ after ++ " as " ++ mapped ++ ")"
-                return ""
-            // CAST_OR_CALL: (X)(Y) where X is a param or known identifier
-            if ci_is_c_ident(ci_trim(inside)):
-                let callee = ci_translate_c_expr(ci_trim(inside), params, known)
-                if callee.len() > 0:
-                    let call_args = ci_translate_c_expr(ci_strip_parens(after_str), params, known)
-                    if call_args.len() > 0:
-                        return callee ++ "(" ++ call_args ++ ")"
-        // Comma operator: (a, b, c) — evaluate all, return last (matching Zig)
-        if cast_end == trimmed.len() as i32 - 1:
-            let inside = trimmed.slice(1, cast_end as i64)
-            let comma_pos = ci_find_last_comma_at_depth0(inside)
-            if comma_pos >= 0:
-                // Translate ALL comma-separated expressions, return block
-                let comma_result = ci_translate_comma_block(inside, params, known)
-                if comma_result.len() > 0:
-                    return comma_result
-
-    // (ternary moved above binary operator check for correct precedence)
-
-    // Function call: ident(args) — check for known builtins
-    if ci_is_c_ident_prefix(trimmed):
-        let call_paren = ci_find_call_paren(trimmed)
+    // Function call: ident(args)
+    if ci_is_c_ident_prefix(t):
+        let call_paren = ci_find_call_paren(t)
         if call_paren > 0:
-            let fn_name = trimmed.slice(0, call_paren as i64)
-            let args_str = trimmed.slice(call_paren as i64 + 1, trimmed.len() - 1)
+            let fn_name = t.slice(0, call_paren as i64)
+            let args_str = t.slice(call_paren as i64 + 1, t.len() - 1)
             let builtin_result = ci_translate_builtin_call(fn_name, args_str, params, known)
             if builtin_result.len() > 0:
                 return builtin_result
-            // Non-builtin function call with known name — emit as-is if name is a param or known
             if ci_str_contains(params, "|" ++ fn_name ++ "|") or with_cimport_is_name_emitted(fn_name) != 0:
                 let translated_args = ci_translate_call_args(args_str, params, known)
                 if translated_args.len() > 0:
                     return fn_name ++ "(" ++ translated_args ++ ")"
             return ""
-
-    // (binary operator was moved above cast/call parsing)
-
-    // Identifier with optional postfix (.field, ->field, [expr])
-    let ident_end = ci_scan_ident(trimmed)
+    // Comma operator in parens: (a, b, c) — handled by strip_parens + recursion
+    // Literal values
+    if ci_is_int_literal(t):
+        return ci_strip_int_suffix(t)
+    if ci_is_float_literal(t):
+        return ci_strip_float_suffix(t)
+    if ci_is_string_literal(t):
+        return t
+    if ci_is_char_literal(t):
+        let cv = ci_char_to_int(t)
+        if cv.len() > 0:
+            return cv
+        return ""
+    // Identifier with optional postfix
+    let ident_end = ci_scan_ident(t)
     if ident_end > 0:
-        let base_ident = trimmed.slice(0, ident_end as i64)
-        let postfix = trimmed.slice(ident_end as i64, trimmed.len())
-        // Resolve base identifier
+        let base_ident = t.slice(0, ident_end as i64)
+        let postfix = t.slice(ident_end as i64, t.len())
         var base_resolved = ""
         let builtin_val = ci_map_compiler_builtin(base_ident)
         if builtin_val.len() > 0:
@@ -1612,13 +1758,76 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
         if base_resolved.len() > 0:
             if postfix.len() == 0:
                 return base_resolved
-            // Translate postfix chain
             let result = ci_translate_postfix(base_resolved, postfix, params, known)
             if result.len() > 0:
                 return result
         return ""
-
     ""
+
+// Helper: ensure expression is boolean (add != 0 if not already a comparison)
+fn ci_ensure_bool(expr: str) -> str:
+    if ci_is_bool_expr(expr):
+        return expr
+    expr ++ " != 0"
+
+// Helper: find a two-char operator at paren depth 0 (leftmost occurrence)
+fn ci_find_op_at_depth0(s: str, op: str) -> i32:
+    if op.len() != 2:
+        return 0 - 1
+    let c0 = op.byte_at(0)
+    let c1 = op.byte_at(1)
+    var depth = 0
+    var i = 0
+    while i < s.len() as i32 - 1:
+        let c = s.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        if c == 41: depth = depth - 1
+        if depth == 0 and c == c0 and s.byte_at((i + 1) as i64) == c1:
+            // For << and >>, make sure we don't match <=, >=
+            if c0 == 60 and c1 == 60:  // <<
+                if i > 0 and s.byte_at((i - 1) as i64) == 60: // <<<
+                    i = i + 1
+                    continue
+                return i
+            if c0 == 62 and c1 == 62:  // >>
+                return i
+            return i
+        i = i + 1
+    0 - 1
+
+// Helper: find single-char operator at depth 0, excluding doubled version
+fn ci_find_single_op_at_depth0(s: str, ch: i32, doubled: i32) -> i32:
+    var depth = 0
+    var i = 0
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        if c == 41: depth = depth - 1
+        if depth == 0 and c == ch:
+            // Skip doubled operator (|| or &&)
+            if i + 1 < s.len() as i32 and s.byte_at((i + 1) as i64) == doubled:
+                i = i + 2
+                continue
+            // Skip if preceded by same char (already part of double)
+            if i > 0 and s.byte_at((i - 1) as i64) == ch:
+                i = i + 1
+                continue
+            return i
+        i = i + 1
+    0 - 1
+
+// Helper: find single char at depth 0
+fn ci_find_char_op_at_depth0(s: str, ch: i32) -> i32:
+    var depth = 0
+    var i = 0
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        if c == 41: depth = depth - 1
+        if depth == 0 and c == ch:
+            return i
+        i = i + 1
+    0 - 1
 
 // Scan identifier length at start of string. Returns 0 if no ident.
 fn ci_scan_ident(s: str) -> i32:
