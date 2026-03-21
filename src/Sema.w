@@ -2084,7 +2084,9 @@ fn Sema.collect_extern_var(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
     let type_node = self.ast.get_data1(node)
     let tid = self.resolve_type_expr(type_node)
-    // Type is resolved; MirLower and Codegen access it via the AST node directly
+    // Register the extern var for scope lookup
+    let is_mut = if self.ast.get_data2(node) != 0: 1 else: 0
+    self.scope_put_at(name, tid, is_mut, node)
 
 fn sema_str_find_char(text: str, needle: i32) -> i32:
     for i in 0..text.len() as i32:
