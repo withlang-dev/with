@@ -7445,6 +7445,75 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         wl_build_br(self.builder, gc_next_val)
                     return true
 
+                // Channel builtins: Channel(cap), send(ch, val), recv(ch), close(ch)
+                if gc_fn_name == "Channel":
+                    self.ensure_async_runtime_declared()
+                    let ch_fn = wl_get_named_function(self.llmod, "with_channel_create")
+                    if ch_fn != 0 and gc_arg_count >= 1:
+                        let gc_mir_s = body.call_arg_starts.get(args_id as i64)
+                        let cap_op = body.call_arg_operands.get(gc_mir_s as i64)
+                        let cap_val = self.mir_eval_operand(body, cap_op, wl_i32_type(self.context))
+                        let ch_args: Vec[i64] = Vec.new()
+                        ch_args.push(self.coerce_int(cap_val, wl_i32_type(self.context)))
+                        let ch_result = wl_build_call(self.builder, wl_global_get_value_type(ch_fn), ch_fn, vec_data_i64(&ch_args), 1)
+                        if dest_place >= 0:
+                            let gc_local = body.place_locals.get(dest_place as i64)
+                            let gc_alloca = self.create_entry_alloca(wl_type_of(ch_result))
+                            wl_build_store(self.builder, ch_result, gc_alloca)
+                            self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                            self.mir_local_types.insert(gc_local, wl_type_of(ch_result))
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                    return true
+                if gc_fn_name == "send" and gc_arg_count >= 2:
+                    self.ensure_async_runtime_declared()
+                    let send_fn = wl_get_named_function(self.llmod, "with_channel_send")
+                    if send_fn != 0:
+                        let gc_mir_s = body.call_arg_starts.get(args_id as i64)
+                        let ch_op = body.call_arg_operands.get(gc_mir_s as i64)
+                        let val_op = body.call_arg_operands.get((gc_mir_s + 1) as i64)
+                        let ch_val = self.mir_eval_operand(body, ch_op, wl_ptr_type(self.context))
+                        let send_val = self.mir_eval_operand(body, val_op, wl_i64_type(self.context))
+                        let send_args: Vec[i64] = Vec.new()
+                        send_args.push(ch_val)
+                        send_args.push(self.coerce_int(send_val, wl_i64_type(self.context)))
+                        let _ = wl_build_call(self.builder, wl_global_get_value_type(send_fn), send_fn, vec_data_i64(&send_args), 2)
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                    return true
+                if gc_fn_name == "recv" and gc_arg_count >= 1:
+                    self.ensure_async_runtime_declared()
+                    let recv_fn = wl_get_named_function(self.llmod, "with_channel_recv")
+                    if recv_fn != 0:
+                        let gc_mir_s = body.call_arg_starts.get(args_id as i64)
+                        let ch_op = body.call_arg_operands.get(gc_mir_s as i64)
+                        let ch_val = self.mir_eval_operand(body, ch_op, wl_ptr_type(self.context))
+                        let recv_args: Vec[i64] = Vec.new()
+                        recv_args.push(ch_val)
+                        let gc_result = wl_build_call(self.builder, wl_global_get_value_type(recv_fn), recv_fn, vec_data_i64(&recv_args), 1)
+                        if dest_place >= 0:
+                            let gc_local = body.place_locals.get(dest_place as i64)
+                            let gc_alloca = self.create_entry_alloca(wl_i64_type(self.context))
+                            wl_build_store(self.builder, gc_result, gc_alloca)
+                            self.mir_local_ptrs.insert(gc_local, gc_alloca)
+                            self.mir_local_types.insert(gc_local, wl_i64_type(self.context))
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                    return true
+                if gc_fn_name == "close" and gc_arg_count >= 1:
+                    self.ensure_async_runtime_declared()
+                    let close_fn = wl_get_named_function(self.llmod, "with_channel_close")
+                    if close_fn != 0:
+                        let gc_mir_s = body.call_arg_starts.get(args_id as i64)
+                        let ch_op = body.call_arg_operands.get(gc_mir_s as i64)
+                        let ch_val = self.mir_eval_operand(body, ch_op, wl_ptr_type(self.context))
+                        let close_args: Vec[i64] = Vec.new()
+                        close_args.push(ch_val)
+                        let _ = wl_build_call(self.builder, wl_global_get_value_type(close_fn), close_fn, vec_data_i64(&close_args), 1)
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                    return true
+
             // Try method call dispatch for generic struct methods
             let gc_callee_field = self.pool.get_data0(gc_node)
             if self.pool.kind(gc_callee_field) == NK_FIELD_ACCESS:
