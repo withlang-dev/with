@@ -221,6 +221,94 @@ typedef struct {
 
 #define TC_COMMA_TEST(x) (0, (x))
 
+// ── Integer suffix variants (from Zig: l/ll/u/ul/ull suffix tests) ──
+
+#define TC_ZERO_L 0L
+#define TC_ZERO_LL 0LL
+#define TC_ZERO_U 0U
+#define TC_ZERO_UL 0UL
+#define TC_ZERO_ULL 0ULL
+#define TC_HEX_UPPER 0XFF
+#define TC_HEX_MIXED 0xDeAdBeEf
+#define TC_LARGE_HEX 0x7FFFFFFFUL
+
+// ── Bitwise NOT on unsigned (from Zig: bitwise_not_on_u-suffixed_0) ──
+
+#define TC_NOT_ZERO_U (~0U)
+#define TC_NOT_ZERO_UL (~0UL)
+
+// ── Define referencing define (from Zig: #define_referencing_another_#define) ──
+
+#define TC_THING1 1234
+#define TC_THING2 TC_THING1
+
+// ── Shift macros (testing new shift operators) ────────────────────
+
+#define TC_FLAG_READ   (1 << 0)
+#define TC_FLAG_WRITE  (1 << 1)
+#define TC_FLAG_EXEC   (1 << 2)
+#define TC_ALL_FLAGS   (TC_FLAG_READ | TC_FLAG_WRITE | TC_FLAG_EXEC)
+#define TC_BYTE_MASK(n) (0xFF << ((n) * 8))
+#define TC_EXTRACT_BYTE(val, n) (((val) >> ((n) * 8)) & 0xFF)
+
+// ── Enum auto-increment (from Zig: enums) ────────────────────────
+
+typedef enum {
+    TC_AUTO_A = 2,
+    TC_AUTO_B = 5,
+    TC_AUTO_C,       // should be 6
+    TC_AUTO_D,       // should be 7
+} tc_auto_enum_t;
+
+// ── Enum with large values (from Zig: big_negative_enum_init_values) ──
+
+typedef enum {
+    TC_BIG_A = 0x7FFFFFFF,
+    TC_BIG_B = -0x7FFFFFFF,
+} tc_big_enum_t;
+
+// ── Struct with array fields ─────────────────────────────────────
+
+typedef struct {
+    int values[4];
+    char name[32];
+    float matrix[3][3];
+} tc_array_struct_t;
+
+// ── Self-referential struct (linked list) ────────────────────────
+
+typedef struct tc_list_node {
+    int value;
+    struct tc_list_node *next;
+} tc_list_node_t;
+
+// ── Deeply nested struct ─────────────────────────────────────────
+
+typedef struct {
+    struct { int x; int y; } position;
+    struct { int w; int h; } size;
+} tc_widget_t;
+
+// ── Macro with division/remainder ────────────────────────────────
+
+#define TC_DIV(a, b) ((a) / (b))
+#define TC_MOD(a, b) ((a) % (b))
+
+// ── Macro with address-of and dereference ────────────────────────
+
+#define TC_ADDR_OF(x) (&(x))
+#define TC_DEREF(p) (*(p))
+
+// ── Multiple typedef names ───────────────────────────────────────
+
+typedef int tc_int_alias;
+typedef tc_int_alias tc_int_alias2;
+
+// ── Void return function ─────────────────────────────────────────
+
+static inline void tc_noop(void) { }
+static inline void tc_set_val(int *p, int v) { *p = v; }
+
 // ── Pointer-to-bool and bool-to-int patterns ─────────────────────
 
 static inline int tc_ptr_is_null(const void *p) { return p == NULL; }

@@ -1665,7 +1665,7 @@ fn ci_parse_unary_expr(s: str, params: str, known: str) -> str:
     if c0 == 42:
         let inner = ci_parse_cast_expr(t.slice(1, t.len()), params, known)
         if inner.len() > 0:
-            return inner ++ ".*"
+            return "(unsafe: *" ++ inner ++ ")"
         return ""
     // sizeof(T)
     if ci_starts_with(t, "sizeof"):
