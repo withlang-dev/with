@@ -27,7 +27,7 @@ category. Parenthetical references point to the specification section.
 ## Functions
 
 - [x] **Named arguments at call site** (§9.1) — `f(x: 1, y: 2)` works. Name labels are parsed and skipped (positional ordering). Mixed named/positional supported.
-- [ ] **Partial application** (§9.4) — Placeholder `_` syntax for partial application (`add(5, _)`) not implemented.
+- [x] **Partial application** (§9.4) — `add(5, _)` works. Parser desugars to closure.
 
 ## Traits & Generics
 
