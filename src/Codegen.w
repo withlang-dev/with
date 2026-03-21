@@ -3640,7 +3640,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
         if name_sym == 0 or name_str.len() == 0:
             continue
         let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
-        if sub_kind == TDK_STRUCT:
+        if sub_kind == TDK_STRUCT or sub_kind == TDK_DISTINCT:
             if self.type_decl_tp_count(decl) > 0:
                 self.generic_structs.insert(name_sym, decl)
             else:
@@ -3685,6 +3685,27 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             continue
         if sub_kind == TDK_UNION:
             self.declare_union_type(name_sym, decl)
+            continue
+        if sub_kind == TDK_DISTINCT:
+            // Distinct type: single-field struct wrapping the inner type
+            let dt_extra_start = self.pool.get_data1(decl)
+            let dt_inner_node = self.pool.get_extra(dt_extra_start)
+            let dt_inner_ty = self.resolve_type(dt_inner_node)
+            if not self.struct_type_map.get(name_sym).is_some():
+                self.predeclare_struct_type(name_sym)
+            let dt_idx = self.struct_type_map.get(name_sym).unwrap()
+            let dt_st_type = self.struct_llvm_types.get(dt_idx as i64)
+            self.struct_field_starts.set_i32(dt_idx as i64, self.struct_field_names.len() as i32)
+            self.struct_field_counts.set_i32(dt_idx as i64, 1)
+            let dt_val_sym = self.intern.intern("value")
+            self.struct_field_names.push(dt_val_sym)
+            self.struct_field_types.push(dt_inner_ty)
+            self.struct_field_type_nodes.push(dt_inner_node)
+            self.struct_field_defaults.push(0)
+            self.struct_llvm_field_indices.push(0)
+            let dt_ft: Vec[i64] = Vec.new()
+            dt_ft.push(dt_inner_ty)
+            wl_struct_set_body(dt_st_type, vec_data_i64(&dt_ft), 1, 0)
             continue
         if sub_kind == TDK_ALIAS:
             let extra_start = self.pool.get_data1(decl)

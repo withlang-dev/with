@@ -3050,6 +3050,27 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 let vc_place = self.place_for_local(vc_tmp)
                 self.body.push_stmt(self.cur_bb, SK_ASSIGN, vc_place, vc_rv, self.ast.get_start(node))
                 return self.body.new_operand(OK_COPY, vc_place)
+        // Distinct type constructor: Meters(42) → single-field struct aggregate
+        if self.ast.kind(callee) == NK_IDENT:
+            let dt_sym = self.ast.get_data0(callee)
+            if self.sema.distinct_type_names.contains(dt_sym):
+                let dt_tid = self.sema.distinct_type_names.get(dt_sym).unwrap()
+                let dt_args_start = self.ast.get_data1(node)
+                let dt_args_count = self.ast.get_data2(node)
+                if dt_args_count == 1:
+                    let dt_arg = self.ast.get_extra(dt_args_start)
+                    let dt_val = self.lower_expr(dt_arg)
+                    let dt_fields: Vec[i32] = Vec.new()
+                    let dt_names: Vec[i32] = Vec.new()
+                    dt_fields.push(dt_val)
+                    let val_sym = self.sema.pool_intern("value")
+                    dt_names.push(val_sym)
+                    let dt_fid = self.body.new_agg_fields(dt_fields, dt_names)
+                    let dt_rv = self.body.new_rvalue(RK_AGGREGATE, 0, dt_fid, 0)
+                    let dt_tmp = self.new_temp(dt_tid)
+                    let dt_place = self.place_for_local(dt_tmp)
+                    self.body.push_stmt(self.cur_bb, SK_ASSIGN, dt_place, dt_rv, self.ast.get_start(node))
+                    return self.body.new_operand(OK_COPY, dt_place)
         // Generic function call — delegate to codegen's monomorphize_generic_call
         if self.ast.kind(callee) == NK_IDENT:
             let gc_sym = self.ast.get_data0(callee)
