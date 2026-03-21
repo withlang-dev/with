@@ -403,6 +403,8 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                 if tk == TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
             if method_name == "join": return self.sema.ty_str
+            if method_name == "filter": return recv_type
+            if method_name == "map": return self.expr_type(self.cur_node)
             if method_name == "iter":
                 // Vec.iter() returns VecIter[T] with same T as Vec[T].
                 let vi_sym = self.sema.pool_intern("VecIter")
@@ -418,9 +420,14 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
             return self.sema.ty_void
         if type_name == "VecIter":
             if method_name == "next":
-                // VecIter[T].next() returns Option[T] — sema reports as T
+                // VecIter[T].next() returns Option[T].
                 if tk == TY_GENERIC_INST:
-                    return self.sema.get_generic_inst_arg(resolved, 0)
+                    let elem_ty = self.sema.get_generic_inst_arg(resolved, 0)
+                    let opt_sym = self.sema.pool_intern("Option")
+                    let opt_tid = self.sema.find_generic_inst(opt_sym, elem_ty)
+                    if opt_tid != 0:
+                        return opt_tid
+                    return elem_ty
             return self.sema.ty_void
         if type_name == "HashMap":
             if method_name == "len": return self.sema.ty_i64
@@ -1165,8 +1172,20 @@ fn MirBuilder.lower_cast(self: MirBuilder, expr: i32, target_type_id: i32, node:
     self.body.new_operand(OK_COPY, place)
 
 fn MirBuilder.lower_field_access(self: MirBuilder, base_expr: i32, field_idx: i32) -> i32:
-    let base = self.lower_expr_place(base_expr)
+    let base = self.lower_field_base_place(base_expr)
     self.body.new_field_place(base, field_idx)
+
+fn MirBuilder.lower_field_base_place(self: MirBuilder, base_expr: i32) -> i32:
+    var base = self.lower_expr_place(base_expr)
+    var base_ty = self.expr_type(base_expr)
+    while base_ty > 0:
+        let resolved = self.sema.resolve_alias(base_ty)
+        let tk = self.sema.get_type_kind(resolved)
+        if tk != TY_PTR and tk != TY_REF:
+            break
+        base = self.body.new_deref_place(base)
+        base_ty = self.sema.get_type_d0(resolved)
+    base
 
 fn MirBuilder.lower_index(self: MirBuilder, base_expr: i32, index_expr: i32) -> i32:
     let base = self.lower_expr_place(base_expr)
@@ -1256,7 +1275,7 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         return self.place_for_local(0)
 
     if kind == NK_FIELD_ACCESS:
-        let base = self.lower_expr_place(self.ast.get_data0(node))
+        let base = self.lower_field_base_place(self.ast.get_data0(node))
         let field_sym = self.ast.get_data1(node)
         // Field symbol is mapped deterministically to a projection index by symbol value.
         return self.body.new_field_place(base, field_sym)

@@ -1,4 +1,6 @@
 //! expect-stdout: 60
+use std.iter
+
 fn main:
     let v: Vec[i32] = Vec.new()
     v.push(10)

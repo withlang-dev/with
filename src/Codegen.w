@@ -1721,6 +1721,8 @@ fn Codegen.build_default_value(self: Codegen, ty: i64) -> i64:
         return wl_const_real(ty, 0.0)
     if kind == wl_pointer_type_kind():
         return wl_const_null(ty)
+    if kind == wl_array_type_kind():
+        return wl_const_null(ty)
     if kind == wl_struct_type_kind():
         return wl_const_null(ty)
     wl_const_int(wl_i32_type(self.context), 0, 0)
@@ -5817,13 +5819,15 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
         let rhs_resolved = if rhs_sema > 0: self.mir_input.mir_resolve_alias(rhs_sema) else: 0
         let lhs_tk = if lhs_resolved > 0: self.mir_input.mir_get_type_kind(lhs_resolved) else: 0
         let rhs_tk = if rhs_resolved > 0: self.mir_input.mir_get_type_kind(rhs_resolved) else: 0
+        let lhs_llvm_tk = wl_get_type_kind(wl_type_of(lhs))
+        let rhs_llvm_tk = wl_get_type_kind(wl_type_of(rhs))
         if d0 == OP_ADD or d0 == OP_SUB:
-            if (lhs_tk == TY_PTR or lhs_tk == TY_REF) and wl_get_type_kind(wl_type_of(rhs)) == wl_integer_type_kind():
+            if (lhs_tk == TY_PTR or lhs_tk == TY_REF) and lhs_llvm_tk == wl_pointer_type_kind() and rhs_llvm_tk == wl_integer_type_kind():
                 let elem_ty = self.mir_pointer_elem_llvm_type(lhs_sema)
                 let indices: Vec[i64] = Vec.new()
                 indices.push(if d0 == OP_SUB: wl_build_neg(self.builder, rhs) else: rhs)
                 return wl_build_gep(self.builder, if elem_ty != 0: elem_ty else: wl_i8_type(self.context), lhs, vec_data_i64(&indices), 1)
-            if d0 == OP_ADD and (rhs_tk == TY_PTR or rhs_tk == TY_REF) and wl_get_type_kind(wl_type_of(lhs)) == wl_integer_type_kind():
+            if d0 == OP_ADD and (rhs_tk == TY_PTR or rhs_tk == TY_REF) and rhs_llvm_tk == wl_pointer_type_kind() and lhs_llvm_tk == wl_integer_type_kind():
                 let elem_ty = self.mir_pointer_elem_llvm_type(rhs_sema)
                 let indices: Vec[i64] = Vec.new()
                 indices.push(lhs)
@@ -6281,6 +6285,27 @@ fn Codegen.mir_index_elem_llvm_type(self: Codegen, sema_ty: i32, cur_ty: i64) ->
             return wl_i8_type(self.context)
     0
 
+fn Codegen.mir_project_field_sema_type(self: Codegen, agg_ty: i32, field_token: i32) -> i32:
+    if agg_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(agg_ty)
+    let tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == TY_STRUCT:
+        let extra = self.mir_input.mir_get_type_d1(resolved)
+        let count = self.mir_input.mir_get_type_d2(resolved)
+        if field_token >= 0 and field_token < count:
+            return self.mir_input.mir_get_type_extra(extra + field_token * 3 + 1)
+        for fi in 0..count:
+            let name_sym = self.mir_input.mir_get_type_extra(extra + fi * 3)
+            if name_sym == field_token:
+                return self.mir_input.mir_get_type_extra(extra + fi * 3 + 1)
+    if tk == TY_GENERIC_INST:
+        let base_sym = self.mir_input.mir_get_type_name(resolved)
+        if base_sym != 0 and self.sema.named_types.contains(base_sym):
+            let base_tid = self.sema.named_types.get(base_sym).unwrap()
+            return self.mir_project_field_sema_type(base_tid, field_token)
+    0
+
 fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) -> i32:
     // Get the sema type for a MIR operand, handling projected places.
     let ok = body.operand_kinds.get(operand_id as i64)
@@ -6301,22 +6326,9 @@ fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) 
             let pk = body.proj_kinds.get((p_start + pi) as i64)
             let pd = body.proj_d0.get((p_start + pi) as i64)
             if pk == PK_FIELD:
-                let f_resolved = self.mir_input.mir_resolve_alias(ty)
-                let f_tk = self.mir_input.mir_get_type_kind(f_resolved)
-                if f_tk == TY_STRUCT:
-                    let f_extra = self.mir_input.mir_get_type_d1(f_resolved)
-                    let f_count = self.mir_input.mir_get_type_d2(f_resolved)
-                    if pd >= 0 and pd < f_count:
-                        ty = self.mir_input.mir_get_type_extra(f_extra + pd * 3 + 1)
-                else if f_tk == TY_GENERIC_INST:
-                    let base_sym = self.mir_input.mir_get_type_name(f_resolved)
-                    if base_sym != 0 and self.sema.named_types.contains(base_sym):
-                        let base_tid = self.sema.named_types.get(base_sym).unwrap()
-                        let b_resolved = self.mir_input.mir_resolve_alias(base_tid)
-                        let b_extra = self.mir_input.mir_get_type_d1(b_resolved)
-                        let b_count = self.mir_input.mir_get_type_d2(b_resolved)
-                        if pd >= 0 and pd < b_count:
-                            ty = self.mir_input.mir_get_type_extra(b_extra + pd * 3 + 1)
+                let field_ty = self.mir_project_field_sema_type(ty, pd)
+                if field_ty > 0:
+                    ty = field_ty
             else if pk == PK_DEREF:
                 let d_resolved = self.mir_input.mir_resolve_alias(ty)
                 let d_tk = self.mir_input.mir_get_type_kind(d_resolved)
@@ -6345,22 +6357,9 @@ fn Codegen.mir_place_sema_type(self: Codegen, body: MirBody, place_id: i32) -> i
             let pk = body.proj_kinds.get((p_start + pi) as i64)
             let pd = body.proj_d0.get((p_start + pi) as i64)
             if pk == PK_FIELD:
-                let f_resolved = self.mir_input.mir_resolve_alias(ty)
-                let f_tk = self.mir_input.mir_get_type_kind(f_resolved)
-                if f_tk == TY_STRUCT:
-                    let f_extra = self.mir_input.mir_get_type_d1(f_resolved)
-                    let f_count = self.mir_input.mir_get_type_d2(f_resolved)
-                    if pd >= 0 and pd < f_count:
-                        ty = self.mir_input.mir_get_type_extra(f_extra + pd * 3 + 1)
-                else if f_tk == TY_GENERIC_INST:
-                    let base_sym = self.mir_input.mir_get_type_name(f_resolved)
-                    if base_sym != 0 and self.sema.named_types.contains(base_sym):
-                        let base_tid = self.sema.named_types.get(base_sym).unwrap()
-                        let b_resolved = self.mir_input.mir_resolve_alias(base_tid)
-                        let b_extra = self.mir_input.mir_get_type_d1(b_resolved)
-                        let b_count = self.mir_input.mir_get_type_d2(b_resolved)
-                        if pd >= 0 and pd < b_count:
-                            ty = self.mir_input.mir_get_type_extra(b_extra + pd * 3 + 1)
+                let field_ty = self.mir_project_field_sema_type(ty, pd)
+                if field_ty > 0:
+                    ty = field_ty
             else if pk == PK_DEREF:
                 let d_resolved = self.mir_input.mir_resolve_alias(ty)
                 let d_tk = self.mir_input.mir_get_type_kind(d_resolved)
@@ -6786,12 +6785,25 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         // VecIter = { data_ptr: i64, len: i64, idx: i64 }
         let iter_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let recv_op = body.call_arg_operands.get(arg_start as i64)
-        // Determine element type from dest place (sema returns T, not Option[T]).
+        // Determine element type from the destination type.
+        // Newer sema correctly types next() as Option[T], but older MIR/seed
+        // paths may still surface the raw payload type T here.
         let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
         var elem_ty: i64 = 0
         if dest_sema > 0:
             let resolved_dest = self.mir_input.mir_resolve_alias(dest_sema)
-            elem_ty = self.sema_type_to_llvm(resolved_dest)
+            let dest_tk = self.mir_input.mir_get_type_kind(resolved_dest)
+            if dest_tk == TY_GENERIC_INST:
+                let dest_name_sym = self.mir_input.mir_get_type_name(resolved_dest)
+                if dest_name_sym != 0:
+                    let dest_name = self.intern.resolve(dest_name_sym)
+                    if dest_name == "Option" and self.mir_input.mir_get_type_d2(resolved_dest) > 0:
+                        let te_start = self.mir_input.mir_get_type_d1(resolved_dest)
+                        let payload_tid = self.mir_input.mir_get_type_extra(te_start)
+                        if payload_tid > 0:
+                            elem_ty = self.mir_sema_type_to_llvm(payload_tid)
+            if elem_ty == 0:
+                elem_ty = self.mir_sema_type_to_llvm(resolved_dest)
         // Fall back to receiver's generic type argument.
         if elem_ty == 0:
             elem_ty = self.mir_vec_elem_type(body, recv_op)
