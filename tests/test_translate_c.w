@@ -4,6 +4,7 @@
 // flexible arrays, and more.
 
 use c_import("translate_c_tests.h")
+use c_import("<stdlib.h>")
 
 extern fn with_eprintln(s: str) -> void
 extern fn int_to_string(n: i32) -> str
@@ -76,16 +77,26 @@ fn test_macro_comparisons:
 // Macro ternary / conditional
 
 fn test_macro_conditional:
-    assert_eq(TC_TERNARY(1, 10, 20), 10, "TC_TERNARY true")
-    assert_eq(TC_TERNARY(0, 10, 20), 20, "TC_TERNARY false")
-    assert_eq(TC_MAX(3, 7), 7, "TC_MAX(3,7)")
-    assert_eq(TC_MAX(7, 3), 7, "TC_MAX(7,3)")
-    assert_eq(TC_MIN(3, 7), 3, "TC_MIN(3,7)")
-    assert_eq(TC_CLAMP(5, 0, 10), 5, "TC_CLAMP mid")
-    assert_eq(TC_CLAMP(0 - 1, 0, 10), 0, "TC_CLAMP low")
-    assert_eq(TC_CLAMP(15, 0, 10), 10, "TC_CLAMP high")
-    assert_eq(TC_ABS(0 - 5), 5, "TC_ABS(-5)")
-    assert_eq(TC_ABS(5), 5, "TC_ABS(5)")
+    let v1: i32 = TC_TERNARY(1, 10, 20)
+    assert_eq(v1, 10, "TC_TERNARY true")
+    let v2: i32 = TC_TERNARY(0, 10, 20)
+    assert_eq(v2, 20, "TC_TERNARY false")
+    let v3: i32 = TC_MAX(3, 7)
+    assert_eq(v3, 7, "TC_MAX(3,7)")
+    let v4: i32 = TC_MAX(7, 3)
+    assert_eq(v4, 7, "TC_MAX(7,3)")
+    let v5: i32 = TC_MIN(3, 7)
+    assert_eq(v5, 3, "TC_MIN(3,7)")
+    let v6: i32 = TC_CLAMP(5, 0, 10)
+    assert_eq(v6, 5, "TC_CLAMP mid")
+    let v7: i32 = TC_CLAMP(0 - 1, 0, 10)
+    assert_eq(v7, 0, "TC_CLAMP low")
+    let v8: i32 = TC_CLAMP(15, 0, 10)
+    assert_eq(v8, 10, "TC_CLAMP high")
+    let v9: i32 = TC_ABS(0 - 5)
+    assert_eq(v9, 5, "TC_ABS(-5)")
+    let v10: i32 = TC_ABS(5)
+    assert_eq(v10, 5, "TC_ABS(5)")
 
 // Macro casts
 
