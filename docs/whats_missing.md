@@ -46,7 +46,7 @@ category. Parenthetical references point to the specification section.
 
 ## Async & Concurrency
 
-- [ ] **Fiber runtime** (§14) — async/await syntax is parsed and lowered but the fiber runtime is not operational.
+- [x] **Fiber runtime** (§14) — async functions compile to real code (no longer stubs). spawn/await execute inline. Fiber C runtime linked. True M:N fiber scheduling is future work.
 - [ ] **Generators** (§14.13) — `gen fn` keyword is reserved but generators are not implemented.
 - [ ] **Channels** (§14.14) — `channel[T](cap)` is not available.
 - [x] **Structured concurrency scope** (§14.7) — `async scope |s|: body` syntax parsed. Runtime execution requires fiber runtime.
