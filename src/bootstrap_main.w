@@ -8,6 +8,11 @@ extern fn exit(code: i32) -> void
 extern fn with_raise_stack_limit() -> void
 extern fn with_install_interrupt_handlers() -> void
 
+fn cli_help_topic(argc: i32) -> str:
+    if argc >= 3:
+        return with_arg_at(2)
+    ""
+
 fn main -> void:
     with_raise_stack_limit()
     with_install_interrupt_handlers()
@@ -22,7 +27,7 @@ fn main -> void:
         print("with WITH_VERSION_PLACEHOLDER\n")
         return
     if command == "help" or command == "--help" or command == "-h":
-        print_usage()
+        exit(run_help(argc))
         return
     if command == "build":
         exit(run_build(argc))
@@ -124,5 +129,122 @@ fn print_usage:
         "  build <file.w> [--emit-c] [-o <path>|--output=<path>]\n" ++
         "  check <file.w>\n" ++
         "  version\n" ++
-        "  help\n"
+        "  help [topic]\n" ++
+        "\n" ++
+        "Language quick reference:\n" ++
+        "  with help use\n" ++
+        "  with help fn\n" ++
+        "  with help type\n" ++
+        "  with help let\n" ++
+        "  with help extern\n" ++
+        "  with help keywords\n" ++
+        "  with help operators\n" ++
+        "  with help attributes\n"
     )
+
+fn run_help(argc: i32) -> i32:
+    let topic = cli_help_topic(argc)
+    if topic == "":
+        print_usage()
+        return 0
+    if topic == "use":
+        print_help_use()
+        return 0
+    if topic == "fn":
+        print_help_fn()
+        return 0
+    if topic == "type":
+        print_help_type()
+        return 0
+    if topic == "let":
+        print_help_let()
+        return 0
+    if topic == "extern":
+        print_help_extern()
+        return 0
+    if topic == "keywords":
+        print_help_keywords()
+        return 0
+    if topic == "operators":
+        print_help_operators()
+        return 0
+    if topic == "attributes":
+        print_help_attributes()
+        return 0
+    with_eprintln("error: unknown help topic '" ++ topic ++ "'")
+    with_eprintln("available help topics: use, fn, type, let, extern, keywords, operators, attributes")
+    1
+
+fn print_help_use:
+    print(r#"Import syntax:
+
+  use foo.bar
+  use foo.bar.*
+  use c_import("sqlite3.h", link: "sqlite3")
+"#)
+
+fn print_help_fn:
+    print(r#"Function declarations:
+
+  fn greet(name: str) -> str:
+      "hello {name}"
+"#)
+
+fn print_help_type:
+    print(r#"Type declarations:
+
+  type Point = { x: i32, y: i32 }
+  type Handle = opaque
+  type Alias = i32
+"#)
+
+fn print_help_let:
+    print(r#"Bindings and constants:
+
+  let value = 42
+  let mut total = 0
+  const NAME: str = "with"
+"#)
+
+fn print_help_extern:
+    print(r#"FFI declarations:
+
+  extern fn puts(text: *const i8) -> i32
+  use c_import("sqlite3.h", link: "sqlite3")
+"#)
+
+fn print_help_keywords:
+    print(
+        "Reserved words:\n\n" ++
+        "  fn let var if else then match for in while loop return break continue\n" ++
+        "  with as mut type trait impl extend dyn use module pub async await spawn\n" ++
+        "  unsafe comptime gen yield defer error extern c_import ephemeral select\n" ++
+        "  true false not and or const it errdefer move where opaque null union\n"
+    )
+
+fn print_help_operators:
+    print(
+        "Operator precedence (low to high):\n\n" ++
+        "  or\n" ++
+        "  and\n" ++
+        "  == != in not in\n" ++
+        "  < > <= >=\n" ++
+        "  |>\n" ++
+        "  |\n" ++
+        "  ^\n" ++
+        "  &\n" ++
+        "  << >>\n" ++
+        "  + - ++ ??\n" ++
+        "  * / %\n" ++
+        "  unary: not - & &mut\n" ++
+        "  postfix: .await ? .field [i] ()\n"
+    )
+
+fn print_help_attributes:
+    print(r#"Common attributes:
+
+  @[packed]
+  @[inline]
+  @[noinline]
+  @[align(N)]
+"#)
