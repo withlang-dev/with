@@ -3343,7 +3343,29 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
     builder.expected_type = ret_ty
 
     let body_expr = builder.ast.get_data1(fn_node)
-    let result = builder.lower_expr(body_expr)
+    var result = builder.lower_expr(body_expr)
+
+    // Implicit Ok wrapping: if return type is Result[T, E] and body type is T,
+    // wrap the result in Ok(value) — an enum variant construction with tag 0.
+    let ret_resolved = builder.sema.resolve_alias(ret_ty)
+    if builder.sema.get_type_kind(ret_resolved) == TY_GENERIC_INST:
+        let ret_base = builder.sema.get_generic_inst_base(ret_resolved)
+        if builder.sema.pool_resolve(ret_base) == "Result" and builder.sema.get_generic_inst_arg_count(ret_resolved) == 2:
+            let body_ty = builder.expr_type(body_expr)
+            let ok_type = builder.sema.get_generic_inst_arg(ret_resolved, 0)
+            if body_ty != 0 and body_ty != ret_ty:
+                if builder.sema.types_compatible(ok_type, body_ty) != 0 or builder.sema.arithmetic_result_type(ok_type, body_ty) != 0:
+                    // Wrap in Ok variant (tag=0)
+                    let ok_fields: Vec[i32] = Vec.new()
+                    let ok_names: Vec[i32] = Vec.new()
+                    ok_fields.push(result)
+                    ok_names.push(0)
+                    let ok_fid = builder.body.new_agg_fields(ok_fields, ok_names)
+                    let ok_rv = builder.body.new_rvalue(RK_AGGREGATE, 1, ok_fid, 0)
+                    let ok_tmp = builder.new_temp(ret_ty)
+                    let ok_place = builder.place_for_local(ok_tmp)
+                    builder.body.push_stmt(builder.cur_bb, SK_ASSIGN, ok_place, ok_rv, builder.ast.get_end(fn_node))
+                    result = builder.body.new_operand(OK_COPY, ok_place)
 
     // Implicit return value assignment for non-diverging tail expressions.
     let ret_place = builder.place_for_local(0)

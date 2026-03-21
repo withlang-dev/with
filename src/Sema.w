@@ -3103,7 +3103,17 @@ fn Sema.check_fn_body(self: Sema, node: i32):
         if compat == 0:
             let arith = self.arithmetic_result_type(ret_type, body_ty)
             if arith == 0:
-                self.emit_error("return type mismatch", body)
+                // Implicit Ok wrapping: if ret_type is Result[T, E] and body_ty is compatible with T
+                var ok_wrapped = false
+                let ret_resolved = self.resolve_alias(ret_type)
+                if self.get_type_kind(ret_resolved) == TY_GENERIC_INST:
+                    let base_sym = self.get_generic_inst_base(ret_resolved)
+                    if self.pool_resolve(base_sym) == "Result" and self.get_generic_inst_arg_count(ret_resolved) == 2:
+                        let ok_type = self.get_generic_inst_arg(ret_resolved, 0)
+                        if self.types_compatible(ok_type, body_ty) != 0 or self.arithmetic_result_type(ok_type, body_ty) != 0:
+                            ok_wrapped = true
+                if not ok_wrapped:
+                    self.emit_error("return type mismatch", body)
 
     // Restore state
     self.current_return_type = saved_ret
