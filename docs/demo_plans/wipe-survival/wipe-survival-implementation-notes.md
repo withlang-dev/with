@@ -1,323 +1,422 @@
-# 🎮 WIPE: SURVIVAL — Implementation Notes (With + C libs)
-
-## 🎯 Goals (translated into engineering decisions)
-
-* **Minimal code in With**
-* **Max performance showcase**
-* **Steam Deck ready**
-* **Few dependencies, easy Conan install**
-
-👉 Strategy:
-
-> Use a *thin game loop + rendering library* in C
-> Write **game logic, ECS-ish systems, and upgrades in With**
+# 🎮 WIPE: SURVIVAL — Implementation Notes
 
 ---
 
-# 🧱 1. Library Stack (Conan-friendly)
+# 🧭 1. Core Philosophy
 
-## 🥇 Primary Choice (Best Balance)
+## Hard constraints
+
+1. **All control flow is written in With**
+2. **All game state and logic live in With**
+3. **C libraries are used only for platform capabilities**
+4. **No platform-specific APIs (e.g., Win32) are used directly**
+
+---
+
+## Architectural statement
+
+> With = the game
+> C libraries = the machine
+
+---
+
+# 🧱 2. Dependencies
+
+## 🎮 Graphics / Input / Audio
 
 ### **raylib**
 
-* Simple, immediate-mode style
-* Built-in:
+Used for:
 
-  * windowing
-  * input (gamepad!)
-  * rendering
-  * audio (optional)
-* Very easy `c_import`
-* Available on Conan (`raylib/x.x.x`)
-
-👉 This is **by far the best choice** for your goal.
+* window creation
+* rendering (2D primitives)
+* input (keyboard + controller → Steam Deck)
+* audio playback (sound + music)
+* frame timing
 
 ---
 
-## 🧠 Supporting Libraries
+## 🧩 Platform / Distribution
 
-### Math (optional but nice)
+### **Steamworks SDK**
 
-* **cglm**
-* Or just write your own minimal vec2 (probably easier)
+Used for:
 
-### Random
-
-* Use raylib’s `GetRandomValue` OR roll simple PRNG in With
-
----
-
-## ❌ Avoid
-
-* SDL2 (too low-level → more work)
-* bgfx (too complex for demo)
-* OpenGL directly (waste of time)
+* achievements
+* stats / progression tracking
+* Steam overlay
+* Steam Deck integration
+* application lifecycle (running under Steam)
 
 ---
 
-# ⚙️ 2. FFI Strategy in With
+## ❌ No other dependencies
 
-Your spec makes this very clean:
+* no SDL (raylib already uses it internally)
+* no Box2D (physics not needed)
+* no Win32 / POSIX APIs directly
+* no additional audio or rendering libraries
 
-```with
+---
+
+# ⚙️ 3. FFI Model (With Design Showcase)
+
+Both libraries are imported via:
+
+```with id="ff4g9e"
 use c_import("raylib.h", link: "raylib")
+use c_import("steam/steam_api.h", link: "steam_api")
 ```
 
-👉 No `unsafe` for calls — perfect for demo polish 
+---
+
+## Design goal
+
+> C functions should feel like native With functions
+
+This directly demonstrates your language principle:
+
+* no boilerplate FFI layers
+* no unsafe noise
+* no wrapper explosion
 
 ---
 
-## Minimal bindings you’ll actually use
+# 🧱 4. Responsibility Split
 
-* `InitWindow`
-* `WindowShouldClose`
-* `BeginDrawing`, `EndDrawing`
-* `ClearBackground`
-* `DrawCircle`, `DrawRectangle`
-* `GetFrameTime`
-* `GetGamepadAxisMovement`
-* `IsGamepadAvailable`
+## raylib handles
 
----
-
-# 🧠 3. Core Architecture (Keep It Tiny)
-
-## Data Layout (very With-idiomatic)
-
-```with
-type Enemy = {
-    pos: Vec2,
-    vel: Vec2,
-    kind: EnemyKind,
-}
-
-type Player = {
-    pos: Vec2,
-    dir: Vec2,
-}
-
-type World = {
-    enemies: Vec[Enemy],
-    bullets: Vec[Bullet],
-    player: Player,
-}
-```
-
-👉 No ECS needed — keep it simple
-👉 But still **data-oriented** (fits With philosophy)
+* window lifecycle
+* drawing primitives
+* input polling
+* audio playback
+* frame timing
 
 ---
 
-# 🎮 4. Game Loop
+## Steamworks handles
 
-```with
+* achievements & stats
+* overlay
+* Steam Deck runtime environment
+* platform integration
+
+---
+
+## With handles
+
+* game loop
+* world state
+* gameplay systems
+* spawning / difficulty scaling
+* upgrades
+* rendering orchestration
+
+---
+
+# 🎮 5. Game Loop (Owned by With)
+
+```with id="p5x6hz"
 fn main:
     InitWindow(1280, 720, c"Wipe: Survival".ptr)
+    InitAudioDevice()
+    SteamAPI_Init()
 
     var world = init_world()
 
     while not WindowShouldClose():
+        SteamAPI_RunCallbacks()
+
         let dt = GetFrameTime()
+        let input = read_input()
 
-        update(world, dt)
+        update(world, input, dt)
+
+        BeginDrawing()
+        ClearBackground(BLACK)
         render(world)
+        EndDrawing()
 ```
 
 ---
 
-# 🕹️ 5. Twin-Stick Input (Steam Deck)
+## Key point
 
-```with
-fn read_input() -> (Vec2, Vec2):
-    let move = Vec2 {
-        x: GetGamepadAxisMovement(0, LEFT_X),
-        y: GetGamepadAxisMovement(0, LEFT_Y),
+> The game loop is pure With
+> No control flow delegated to C
+
+---
+
+# 🕹️ 6. Input System (raylib → With)
+
+## Immediate translation
+
+```with id="uvd6s5"
+type Input = {
+    move: Vec2,
+    aim: Vec2,
+}
+
+fn read_input() -> Input:
+    Input {
+        move: Vec2 {
+            x: GetGamepadAxisMovement(0, LEFT_X),
+            y: GetGamepadAxisMovement(0, LEFT_Y),
+        },
+        aim: Vec2 {
+            x: GetGamepadAxisMovement(0, RIGHT_X),
+            y: GetGamepadAxisMovement(0, RIGHT_Y),
+        }
     }
-
-    let aim = Vec2 {
-        x: GetGamepadAxisMovement(0, RIGHT_X),
-        y: GetGamepadAxisMovement(0, RIGHT_Y),
-    }
-
-    (move, aim)
-```
-
-👉 Normalize aim vector
-👉 If aim is zero → don’t shoot
-
----
-
-# 🔫 6. Shooting System
-
-```with
-fn update_player(world: &mut World, dt: f32):
-    let (move, aim) = read_input()
-
-    world.player.pos += move * speed * dt
-
-    if aim.length() > 0.1:
-        spawn_bullet(world, world.player.pos, aim)
 ```
 
 ---
 
-# 👾 7. Enemy System
+## Rule
 
-Keep it stupid simple:
+> Input becomes a With value immediately
 
-```with
+---
+
+# 🔫 7. Gameplay Systems (Pure With)
+
+## Player
+
+```with id="8xw9wz"
+fn update_player(world: &mut World, input: &Input, dt: f32):
+    world.player.pos += input.move * SPEED * dt
+
+    if input.aim.length() > 0.1:
+        spawn_bullet(world, world.player.pos, input.aim)
+```
+
+---
+
+## Enemies
+
+```with id="tq3x3k"
 fn update_enemies(world: &mut World, dt: f32):
     for e in world.enemies:
         let dir = (world.player.pos - e.pos).normalize()
-        e.pos += dir * speed * dt
+        e.pos += dir * e.speed * dt
 ```
 
 ---
 
-# 💥 8. Rendering (raylib = easy win)
+## Collision (no physics engine)
 
-```with
+```with id="0mrbk2"
+fn collide(a: Vec2, b: Vec2, r: f32) -> bool:
+    (a - b).length_sq() < r * r
+```
+
+---
+
+# 💥 8. Rendering (raylib primitives, With control)
+
+```with id="4kpprh"
 fn render(world: &World):
-    BeginDrawing()
-    ClearBackground(BLACK)
-
     DrawCircle(world.player.pos.x, world.player.pos.y, 5, WHITE)
 
     for e in world.enemies:
         DrawCircle(e.pos.x, e.pos.y, 4, RED)
-
-    EndDrawing()
-```
-
-👉 That’s literally enough for a working game
-
----
-
-# 🪙 9. Upgrade System (Minimal)
-
-No UI framework — just overlay text:
-
-```with
-type Upgrade =
-    | FireRate
-    | MultiShot
-    | Speed
-
-fn apply_upgrade(player: &mut Player, up: Upgrade):
-    match up
-        .FireRate => player.fire_rate *= 1.2
-        .MultiShot => player.projectiles += 1
-        .Speed => player.speed *= 1.1
 ```
 
 ---
 
-# ⚡ 10. Performance Showcase Hooks
+## Rule
 
-## Entity Stress
-
-```with
-if world.time > 60:
-    spawn 10 enemies per second
-```
-
-👉 Aim for:
-
-* 200+ enemies
-* 500+ bullets
+> Rendering decisions are With logic
+> Drawing is delegated to raylib
 
 ---
 
-## Debug Overlay
+# 🔊 9. Audio (raylib)
 
-```with
-DrawText("Entities: {world.enemies.len32()}", 10, 10, 20, GREEN)
-```
+## Initialization
 
-👉 This subtly shows:
-
-* performance
-* your language handling scale
-
----
-
-# 🔁 11. Instant Restart (Important)
-
-```with
-fn reset(world: &mut World):
-    *world = init_world()
-```
-
-No scene reload, no allocations beyond Vec reuse.
-
----
-
-# 🧩 12. Conan Setup
-
-Example `conanfile.txt`:
-
-```
-[requires]
-raylib/4.5.0
-
-[generators]
-CMakeDeps
-CMakeToolchain
-```
-
-Then:
-
-```bash
-conan install . --build=missing
+```with id="q4g3s1"
+InitAudioDevice()
 ```
 
 ---
 
-# 🧠 13. What This Shows About With
+## Usage
 
-Your implementation should highlight:
+```with id="6onrpn"
+let shoot = LoadSound(c"shoot.wav".ptr)
 
-### ✔ Clean FFI
+fn fire():
+    PlaySound(shoot)
+```
 
-```with
-InitWindow(...)
+---
+
+## Music
+
+```with id="j6yyq0"
+let music = LoadMusicStream(c"music.ogg".ptr)
+PlayMusicStream(music)
+
+fn update_audio():
+    UpdateMusicStream(music)
+```
+
+---
+
+## Design goal
+
+> Audio logic stays trivial and event-driven
+
+---
+
+# 🏆 10. Steam Integration (Steamworks)
+
+## Initialization
+
+```with id="r3t7m2"
+fn init_steam():
+    if not SteamAPI_Init():
+        println("Steam not running")
+```
+
+---
+
+## Per-frame
+
+```with id="q3z0e1"
+fn update_steam():
+    SteamAPI_RunCallbacks()
+```
+
+---
+
+## Achievements
+
+```with id="q23o2i"
+fn unlock(name: &str):
+    let stats = SteamUserStats()
+    stats.SetAchievement(name)
+    stats.StoreStats()
+```
+
+---
+
+## Usage example
+
+```with id="8q1eow"
+if world.kills > 100:
+    unlock("KILL_100")
+```
+
+---
+
+## Design goal
+
+> Steam integration is minimal, explicit, and unobtrusive
+
+---
+
+# ⚡ 11. What This Demonstrates About With
+
+This architecture intentionally showcases:
+
+---
+
+## ✔ FFI simplicity
+
+```with id="7c7z6k"
 DrawCircle(...)
+PlaySound(...)
+SteamAPI_RunCallbacks()
 ```
 
-### ✔ No lifetime pain
-
-* All gameplay code is clean
-* No borrow hell
-
-### ✔ Performance
-
-* High entity count
-* Smooth frame time
-
-### ✔ Expressiveness
-
-* `with` blocks for setup
-* pattern matching for upgrades
-* pipelines for processing
+No wrappers required.
 
 ---
 
-# 🏁 Final Architecture Summary
+## ✔ Real-time control
 
-```
-With code:
-- game loop
-- gameplay systems
-- upgrades
-- state
-
-C (raylib):
-- window
-- input
-- rendering
+```with id="v7ifwn"
+while not WindowShouldClose():
 ```
 
-👉 Result:
+No runtime or framework dependency.
 
-> ~90% of the interesting code is in With
-> ~10% is C plumbing (already done for you)
+---
+
+## ✔ Data-oriented design
+
+```with id="q9c6hf"
+for e in world.enemies:
+    e.pos += e.vel * dt
+```
+
+---
+
+## ✔ Clear boundaries
+
+* With = logic
+* C = capabilities
+
+---
+
+# 🚨 12. Failure Signals (Design Bugs)
+
+If you encounter:
+
+---
+
+## ❌ C types in game state
+
+```with id="8v9n55"
+Vector2   // from raylib
+```
+
+👉 should be:
+
+```with id="slf6bq"
+Vec2
+```
+
+---
+
+## ❌ Game logic tied to C calls
+
+👉 indicates poor boundary
+
+---
+
+## ❌ Need to move logic into C
+
+👉 critical failure for language design
+
+---
+
+## ❌ Excessive wrappers
+
+👉 FFI is not ergonomic enough
+
+---
+
+# 🏁 13. Final Summary
+
+## Dependencies
+
+* raylib → platform (graphics/input/audio)
+* Steamworks → platform (Steam features)
+
+---
+
+## Ownership
+
+* With owns **everything that matters**
+* C libraries provide **only capabilities**
+
+---
+
+## Outcome
+
+> A complete, real-time, Steam-ready game
+> written almost entirely in With
+> with minimal, seamless C interop
