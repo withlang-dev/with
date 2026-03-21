@@ -3515,23 +3515,13 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
 
     if kind == NK_VARIANT_SHORTHAND:
         let name = self.ast.get_data0(node)
+        let expected_variant_ty = self.expected_variant_constructor_type(name)
+        if expected_variant_ty != 0:
+            self.typed_expr_types.insert(node, expected_variant_ty)
+            return expected_variant_ty
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
-            let expected = self.resolve_alias(self.expected_expr_type)
-            let exp_kind = self.get_type_kind(expected)
-            if exp_kind == TY_ENUM:
-                if self.enum_has_variant(expected, name) != 0:
-                    self.typed_expr_types.insert(node, expected)
-                    return expected
-                self.emit_error("enum variant shorthand does not match expected enum type", node)
-                return 0
-            if exp_kind == TY_GENERIC_INST:
-                let gi_base = self.get_type_d0(expected)
-                if self.named_types.contains(gi_base):
-                    let base_tid = self.named_types.get(gi_base).unwrap()
-                    if self.get_type_kind(base_tid) == TY_ENUM:
-                        if self.enum_has_variant(base_tid, name) != 0:
-                            self.typed_expr_types.insert(node, expected)
-                            return expected
+            self.emit_error("enum variant shorthand does not match expected enum type", node)
+            return 0
         if self.variant_lookup.contains(name):
             let vs_tid = self.variant_type_ids.get(name).unwrap()
             self.typed_expr_types.insert(node, vs_tid)
@@ -4294,6 +4284,7 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
 
     let subject_type = self.check_expr(subject)
     var result_type = 0
+    let match_expected = if self.has_expected_type != 0: self.expected_expr_type else: 0
 
     for ai in 0..arm_count:
         let arm_node = self.ast.get_extra(extra_start + ai)
@@ -4305,7 +4296,8 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
         self.check_pattern(pat, subject_type)
         if guard != 0:
             self.check_expr(guard)
-        let arm_type = self.check_expr(arm_body)
+        let arm_expected = if result_type != 0: result_type else: match_expected
+        let arm_type = if arm_expected != 0: self.check_expr_with_expected(arm_body, arm_expected) else: self.check_expr(arm_body)
         self.pop_scope()
 
         if result_type == 0:
@@ -4497,6 +4489,64 @@ fn Sema.resolve_generic_enum_payload(self: Sema, gi_tid: i32, base_sym: i32, var
             return result
         epos = epos + pc
     result
+
+fn Sema.enum_variant_payload_types(self: Sema, enum_tid: i32, variant_name: i32) -> Vec[i32]:
+    var result: Vec[i32] = Vec.new()
+    let resolved = self.resolve_alias(enum_tid)
+    let kind = self.get_type_kind(resolved)
+    if kind == TY_ENUM:
+        let te_start = self.get_type_d1(resolved)
+        let variant_count = self.get_type_d2(resolved)
+        var pos = te_start
+        for vi in 0..variant_count:
+            let name_sym = self.type_extra.get(pos as i64)
+            let payload_count = self.type_extra.get((pos + 1) as i64)
+            if name_sym == variant_name:
+                for pi in 0..payload_count:
+                    result.push(self.type_extra.get((pos + 2 + pi) as i64))
+                return result
+            pos = pos + 2 + payload_count
+        return result
+    if kind == TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved)
+        if not self.named_types.contains(base_sym):
+            return result
+        let base_tid = self.named_types.get(base_sym).unwrap()
+        if self.get_type_kind(base_tid) != TY_ENUM:
+            return result
+        let te_start = self.get_type_d1(base_tid)
+        let variant_count = self.get_type_d2(base_tid)
+        var pos = te_start
+        for vi in 0..variant_count:
+            let name_sym = self.type_extra.get(pos as i64)
+            let payload_count = self.type_extra.get((pos + 1) as i64)
+            if name_sym == variant_name:
+                let generic_payloads = self.resolve_generic_enum_payload(resolved, base_sym, variant_name, payload_count)
+                if generic_payloads.len() as i32 > 0:
+                    return generic_payloads
+                for pi in 0..payload_count:
+                    result.push(self.type_extra.get((pos + 2 + pi) as i64))
+                return result
+            pos = pos + 2 + payload_count
+    result
+
+fn Sema.expected_variant_constructor_type(self: Sema, variant_name: i32) -> i32:
+    if self.has_expected_type == 0 or self.expected_expr_type == 0:
+        return 0
+    let expected = self.resolve_alias(self.expected_expr_type)
+    let exp_kind = self.get_type_kind(expected)
+    if exp_kind == TY_ENUM:
+        if self.enum_has_variant(expected, variant_name) != 0:
+            return expected
+        return 0
+    if exp_kind == TY_GENERIC_INST:
+        let gi_base = self.get_type_d0(expected)
+        if self.named_types.contains(gi_base):
+            let base_tid = self.named_types.get(gi_base).unwrap()
+            if self.get_type_kind(base_tid) == TY_ENUM:
+                if self.enum_has_variant(base_tid, variant_name) != 0:
+                    return expected
+    0
 
 fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
     if node == 0:
@@ -5048,6 +5098,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     let param_offset = if self.in_pipeline_rhs != 0: 1 else: 0
     let sig_idx = self.get_sig(fn_sym)
+    let variant_expected_ty = if self.variant_lookup.contains(fn_sym): self.expected_variant_constructor_type(fn_sym) else: 0
+    let variant_payload_tys = if variant_expected_ty != 0: self.enum_variant_payload_types(variant_expected_ty, fn_sym) else: Vec.new()
 
     // Check all arguments (with contextual expected-type propagation when
     // calling a known function signature).
@@ -5059,6 +5111,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             let param_i = ai + param_offset
             if param_i < self.sig_get_param_count(sig_idx):
                 expected_ty = self.sig_param_type(sig_idx, param_i)
+        else if ai < variant_payload_tys.len() as i32:
+            expected_ty = variant_payload_tys.get(ai as i64)
         let is_closure_arg = self.ast.kind(arg_node) == NK_CLOSURE
         if is_closure_arg:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
@@ -5122,6 +5176,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // Enum variant constructor
     if self.variant_lookup.contains(fn_sym):
+        if variant_expected_ty != 0:
+            return variant_expected_ty
         return self.variant_type_ids.get(fn_sym).unwrap()
 
     // Distinct type constructor: Meters(42) → Meters { value: 42 }
