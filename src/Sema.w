@@ -2212,6 +2212,7 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
         self.local_trait_names.insert(name, 1)
 
 fn sema_is_builtin_trait_name(name: str) -> bool:
+    name == "Copy" or
     name == "Drop" or
     name == "Scoped" or
     name == "ScopedMut" or
@@ -2284,6 +2285,33 @@ fn Sema.collect_impl_decl(self: Sema, node: i32):
     if self.sealed_traits.contains(trait_sym) and not trait_is_local:
         self.emit_error("cannot implement sealed trait '" ++ self.pool_resolve(trait_sym) ++ "' outside its defining module", node)
         return
+
+    // Copy trait validation: all fields must be Copy, type must not implement Drop
+    if trait_name == "Copy":
+        // Check if this type already has a Drop impl (via impl_extra, since
+        // Drop methods aren't collected yet at this point in Pass 2)
+        let drop_sym = self.pool_intern("Drop")
+        if self.impl_lookup.contains(type_name):
+            let drop_idx = self.impl_lookup.get(type_name).unwrap()
+            let drop_start = self.impl_starts.get(drop_idx as i64)
+            let drop_count = self.impl_counts.get(drop_idx as i64)
+            for di in 0..drop_count:
+                if self.impl_extra.get((drop_start + di) as i64) == drop_sym:
+                    self.emit_error("type '" ++ self.pool_resolve(type_name) ++ "' cannot implement Copy because it implements Drop", node)
+                    return
+        let type_tid = if self.named_types.contains(type_name): self.named_types.get(type_name).unwrap() else: 0
+        if type_tid > 0:
+            let tk = self.get_type_kind(self.resolve_alias(type_tid))
+            if tk == TY_STRUCT:
+                let resolved = self.resolve_alias(type_tid)
+                let te_start = self.get_type_d1(resolved)
+                let field_count = self.get_type_d2(resolved)
+                for fi in 0..field_count:
+                    let ft = self.type_extra.get((te_start + fi * 3 + 1) as i64)
+                    if self.is_copy(ft) == 0:
+                        let field_name = self.type_extra.get((te_start + fi * 3) as i64)
+                        self.emit_error("type '" ++ self.pool_resolve(type_name) ++ "' cannot implement Copy: field '" ++ self.pool_resolve(field_name) ++ "' is not Copy", node)
+                        return
 
     // Validate associated types: impl must provide all required (no-default) associated types
     if not is_builtin_trait and self.trait_lookup.contains(trait_sym):
