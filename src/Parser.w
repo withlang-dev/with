@@ -2752,7 +2752,21 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
             arm_col = cur_col
 
         let arm_start = self.current_start()
-        var pattern = self.parse_pattern()
+        var pattern = 0
+        var in_guard_expr = 0
+
+        // `in expr` pattern: desugar to `__v if __v in expr`
+        if self.peek() == TK_KW_IN:
+            self.advance()
+            let collection_expr = self.parse_expr()
+            // Create binding pattern `__v`
+            let bind_sym = self.intern.intern("__v")
+            pattern = self.pool.add_node(NK_PAT_IDENT, arm_start, arm_start, bind_sym, 0, 0)
+            // Build guard: `__v in collection`
+            let bind_ref = self.pool.add_node(NK_IDENT, arm_start, arm_start, bind_sym, 0, 0)
+            in_guard_expr = self.pool.add_node(NK_BINARY, arm_start, self.prev_end(), OP_IN, bind_ref, collection_expr)
+        else:
+            pattern = self.parse_pattern()
 
         // Or-pattern: A | B | C
         if self.peek() == TK_PIPE:
@@ -2769,7 +2783,9 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
 
         // Guard clause
         var guard = 0
-        if self.peek() == TK_KW_IF:
+        if in_guard_expr != 0:
+            guard = in_guard_expr
+        else if self.peek() == TK_KW_IF:
             self.advance()
             guard = self.parse_expr()
 
@@ -2799,7 +2815,7 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
     arm_count
 
 fn Parser.is_arm_token(self: Parser, t: i32) -> bool:
-    t == TK_IDENT or t == TK_INT_LIT or t == TK_DOT_IDENT or t == TK_TRUE or t == TK_FALSE or t == TK_STRING_LIT or t == TK_MINUS or t == TK_L_BRACKET or t == TK_L_PAREN or t == TK_L_BRACE
+    t == TK_IDENT or t == TK_INT_LIT or t == TK_DOT_IDENT or t == TK_TRUE or t == TK_FALSE or t == TK_STRING_LIT or t == TK_MINUS or t == TK_L_BRACKET or t == TK_L_PAREN or t == TK_L_BRACE or t == TK_KW_IN
 
 // ── Pattern parsing ──────────────────────────────────────────────
 
