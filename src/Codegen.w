@@ -3603,6 +3603,22 @@ fn Codegen.build_result_err(self: Codegen, val: i64, res_type: i64) -> i64:
         wl_build_store(self.builder, val, cast_ptr)
     wl_build_load(self.builder, res_type, alloca)
 
+fn Codegen.extract_result_payload(self: Codegen, recv: i64, payload_ty: i64) -> i64:
+    if payload_ty == 0:
+        return wl_get_undef(wl_i32_type(self.context))
+    if self.abi_size_of(payload_ty) == 0:
+        return self.build_default_value(payload_ty)
+    let recv_ty = wl_type_of(recv)
+    if recv_ty == 0 or wl_get_type_kind(recv_ty) != wl_struct_type_kind():
+        return self.build_default_value(payload_ty)
+    if wl_count_struct_elem_types(recv_ty) <= 1:
+        return self.build_default_value(payload_ty)
+    let alloca = wl_build_alloca(self.builder, recv_ty)
+    wl_build_store(self.builder, recv, alloca)
+    let payload_ptr = wl_build_struct_gep(self.builder, recv_ty, alloca, 1)
+    let cast_ptr = wl_build_bitcast(self.builder, payload_ptr, wl_ptr_type(self.context))
+    wl_build_load(self.builder, payload_ty, cast_ptr)
+
 // ── Emit drops / defers ───────────────────────────────────────────
 
 fn Codegen.emit_drops(self: Codegen, watermark: i32):
@@ -6702,9 +6718,19 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
 
     else if intrinsic == MIR_INTRINSIC_OPT_UNWRAP:
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
-        let recv_tk = wl_get_type_kind(wl_type_of(recv))
+        let recv_ty = wl_type_of(recv)
+        let recv_tk = wl_get_type_kind(recv_ty)
         if recv_tk == wl_struct_type_kind():
-            result = wl_build_extract_value(self.builder, recv, 1)
+            let res_idx = self.find_result_idx_by_llvm(recv_ty)
+            if res_idx >= 0:
+                var payload_ty: i64 = self.result_ok_types.get(res_idx as i64)
+                if payload_ty == 0:
+                    let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+                    if dest_sema > 0:
+                        payload_ty = self.mir_sema_type_to_llvm(dest_sema)
+                result = self.extract_result_payload(recv, payload_ty)
+            else:
+                result = wl_build_extract_value(self.builder, recv, 1)
         else if recv_tk == wl_pointer_type_kind():
             result = recv
         else:
