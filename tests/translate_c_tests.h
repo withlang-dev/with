@@ -316,4 +316,35 @@ static inline int tc_ptr_is_nonnull(const void *p) { return p != NULL; }
 static inline int tc_bool_to_int(int cond) { return cond != 0; }
 static inline int tc_sign(int v) { return -(v < 0); }
 
+// ── Noreturn functions (Gap 1) ────────────────────────────────────
+
+void tc_abort_noreturn(void) __attribute__((noreturn));
+_Noreturn void tc_die_noreturn(void);
+
+// ── Hex float literals (Gap 4) ───────────────────────────────────
+
+#define TC_HEX_FLOAT_A 0x1.0p10
+#define TC_HEX_FLOAT_B 0x1.0p5f
+#define TC_HEX_FLOAT_C 0xAp0
+
+// ── __builtin_choose_expr (Gap 5) ────────────────────────────────
+
+#define TC_CHOOSE_TRUE(a, b) __builtin_choose_expr(1, a, b)
+#define TC_CHOOSE_FALSE(a, b) __builtin_choose_expr(0, a, b)
+
+// ── Circular struct forward declarations (Gap 6) ─────────────────
+
+struct tc_node_a;
+struct tc_node_b { struct tc_node_a *peer; int value; };
+struct tc_node_a { struct tc_node_b *peer; int value; };
+
+// ── _Atomic types (Gap 3) ────────────────────────────────────────
+
+typedef _Atomic(int) tc_atomic_int;
+typedef _Atomic(unsigned long) tc_atomic_ulong;
+
+// ── Old-style function pointers (Gap 2) ──────────────────────────
+
+typedef int (*tc_fn_old_style)();
+
 #endif // TRANSLATE_C_TESTS_H

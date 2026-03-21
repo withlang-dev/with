@@ -17,6 +17,10 @@ extern fn with_cimport_fn_param_name(session: i64, idx: i32, param: i32) -> str
 extern fn with_cimport_fn_param_type(session: i64, idx: i32, param: i32) -> str
 extern fn with_cimport_param_is_restrict(session: i64, idx: i32, param: i32) -> i32
 extern fn with_cimport_fn_is_variadic(session: i64, idx: i32) -> i32
+extern fn with_cimport_fn_is_noreturn(session: i64, idx: i32) -> i32
+extern fn with_cimport_struct_has_definition(session: i64, idx: i32) -> i32
+extern fn with_cimport_var_alignment(session: i64, idx: i32) -> i32
+extern fn with_cimport_hex_float_to_decimal(hex_str: str) -> str
 extern fn with_cimport_struct_field_count(session: i64, idx: i32) -> i32
 extern fn with_cimport_struct_field_name(session: i64, idx: i32, field: i32) -> str
 extern fn with_cimport_struct_field_type(session: i64, idx: i32, field: i32) -> str
@@ -508,8 +512,10 @@ fn ci_collect_demoted_types(session: i64, count: i32) -> str:
     demoted
 
 fn ci_is_directly_demoted(session: i64, idx: i32) -> bool:
-    // Forward declaration (no definition)
+    // Forward declaration — don't demote if a definition exists elsewhere in the TU
     if with_cimport_struct_is_opaque(session, idx) != 0:
+        if with_cimport_struct_has_definition(session, idx) != 0:
+            return false
         return true
     let field_count = with_cimport_struct_field_count(session, idx)
     // Bitfield in any field
@@ -634,7 +640,9 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
         else:
             params = params ++ "..."
 
-    let ret = ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx))
+    var ret = ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx))
+    if with_cimport_fn_is_noreturn(session, idx) != 0:
+        ret = "Never"
     if ci_starts_with(ret, "__UNSUPPORTED:"):
         has_unsupported = true
         unsupported_reason = ret.slice(14, ret.len())
@@ -782,6 +790,11 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     // Note: structs shadowed by typedefs (typedef struct Foo {} Foo;) are NOT skipped.
     // The struct emits normally; the typedef detects the self-reference and skips.
     if with_cimport_is_name_emitted(name) != 0:
+        return ""
+
+    // Skip forward declarations that have a definition elsewhere in the TU —
+    // the definition cursor will be processed later with the actual fields.
+    if with_cimport_struct_is_opaque(session, idx) != 0 and with_cimport_struct_has_definition(session, idx) != 0:
         return ""
 
     // Check if pre-scan marked this type as demoted (bitfield, forward decl,
@@ -2006,6 +2019,21 @@ fn ci_translate_builtin_call(name: str, args: str, params: str, known: str) -> s
         return "comptime_error(\"__builtin_types_compatible_p\")"
 
     if name == "__builtin_choose_expr":
+        // __builtin_choose_expr(const_cond, true_val, false_val)
+        let ce_cond = ci_trim(ci_extract_first_arg(args))
+        let ce_rest1 = ci_after_first_arg(args)
+        let ce_true_val = ci_trim(ci_extract_first_arg(ce_rest1))
+        let ce_rest2 = ci_after_first_arg(ce_rest1)
+        let ce_false_val = ci_trim(ci_extract_first_arg(ce_rest2))
+        if ce_cond == "1" or ce_cond == "true":
+            return ci_translate_c_expr(ce_true_val, params, known)
+        if ce_cond == "0" or ce_cond == "false":
+            return ci_translate_c_expr(ce_false_val, params, known)
+        let c = ci_translate_c_expr(ce_cond, params, known)
+        let t = ci_translate_c_expr(ce_true_val, params, known)
+        let f = ci_translate_c_expr(ce_false_val, params, known)
+        if c.len() > 0 and t.len() > 0 and f.len() > 0:
+            return "(if " ++ c ++ " != 0: " ++ t ++ " else: " ++ f ++ ")"
         return "comptime_error(\"__builtin_choose_expr\")"
 
     if name == "__builtin_convertvector":
@@ -2155,6 +2183,18 @@ fn ci_first_n_args(args: str, n: i32) -> str:
                 return args.slice(0, i as i64)
         i = i + 1
     args
+
+fn ci_after_first_arg(args: str) -> str:
+    var depth = 0
+    var i = 0
+    while i < args.len() as i32:
+        let c = args.byte_at(i as i64)
+        if c == 40: depth = depth + 1
+        if c == 41: depth = depth - 1
+        if c == 44 and depth == 0:
+            return ci_trim(args.slice((i + 1) as i64, args.len()))
+        i = i + 1
+    ""
 
 fn ci_extract_first_arg(args: str) -> str:
     var depth = 0
@@ -4265,11 +4305,19 @@ fn ci_is_float_literal(s: str) -> bool:
         start = 1
     if start as i64 >= s.len():
         return false
-    // Must start with digit or decimal point
     let first = s.byte_at(start as i64)
     if not ((first >= 48 and first <= 57) or first == 46):
         return false
-    // Scan for decimal point or exponent — if found, it's a float
+    // Hex float: 0x...p... (C99)
+    if start as i64 + 1 < s.len() and first == 48:
+        let second = s.byte_at((start + 1) as i64)
+        if second == 120 or second == 88:
+            for hi in (start + 2)..s.len() as i32:
+                let hc = s.byte_at(hi as i64)
+                if hc == 112 or hc == 80:
+                    return true
+            return false
+    // Decimal float: scan for decimal point or e/E exponent
     var has_dot = false
     var has_exp = false
     for i in start..s.len() as i32:
@@ -4324,6 +4372,11 @@ fn ci_float_type_from_suffix(s: str) -> str:
     "f64"
 
 fn ci_strip_float_suffix(s: str) -> str:
+    // Hex float (0x...p...) — convert to decimal
+    if s.len() > 2 and s.byte_at(0) == 48 and (s.byte_at(1) == 120 or s.byte_at(1) == 88):
+        return with_cimport_hex_float_to_decimal(s)
+    if s.len() > 3 and s.byte_at(0) == 45 and s.byte_at(1) == 48 and (s.byte_at(2) == 120 or s.byte_at(2) == 88):
+        return with_cimport_hex_float_to_decimal(s)
     var end = s.len() as i32
     while end > 0:
         let c = s.byte_at((end - 1) as i64)
