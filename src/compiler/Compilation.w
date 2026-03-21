@@ -150,20 +150,25 @@ fn compilation_cleanup_build_products(obj_path: str, bin_path: str):
 fn Compilation.build_binary(self: Compilation, source_path: str) -> str:
     self.build_binary_to_path(source_path, link_stage_output_path_for_source(source_path))
 
+fn Compilation.build_binary_from_source(self: Compilation, source_path: str, source_text: str) -> str:
+    self.build_binary_from_source_to_path(source_path, source_text, link_stage_output_path_for_source(source_path))
+
 fn Compilation.build_binary_at(self: Compilation, source_path: str, output_dir: str) -> str:
     let stem = link_stage_source_stem(source_path)
     self.build_binary_to_path(source_path, output_dir ++ "/" ++ stem)
 
-fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_path: str) -> str:
-    if bin_path.len() == 0:
-        return self.build_binary(source_path)
-    let obj_path = bin_path ++ ".o"
-    let output_dir = link_stage_dirname(bin_path)
-    let _ = ("mkdir -p " ++ output_dir) |> with_system
-    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+fn Compilation.compile_source_text(self: Compilation, source_path: str, source_text: str) -> AstPool:
+    var zcu = self.zcu
+    let source_dir = frontend_dirname(source_path)
+    zcu.reset_for_new_invocation(source_dir, source_path, "")
+    zcu.project_config = project_config_load_for_source(source_path)
+    zcu.set_current_source(source_dir, source_path, source_text)
+    let pool = zcu.compile_source_frontend(source_text, source_path, 0)
+    self.zcu = zcu
+    pool
 
-    let pool = self.compile_file(source_path)
-    compilation_debug_init("build_binary_to_path:compile_file done decls=" ++ int_to_string(pool.decl_count()))
+fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_path: str, obj_path: str, bin_path: str) -> str:
+    compilation_debug_init("build_binary_to_path:compiled " ++ source_path ++ " decls=" ++ int_to_string(pool.decl_count()))
     if pool.decl_count() == 0:
         return ""
     if not self.ensure_codegen_mir(pool):
@@ -185,11 +190,32 @@ fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_pat
         compilation_debug_init("build_binary_to_path:link FAILED")
         compilation_cleanup_build_products(obj_path, bin_path)
         return ""
-    // Generate .dSYM bundle for macOS debug info (DWARF stays in .o until dsymutil runs)
     if self.config.debug_info:
         let _ = ("dsymutil " ++ bin_path ++ " 2>/dev/null") |> with_system
     let _ = ("rm -f " ++ obj_path) |> with_system
     bin_path
+
+fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_path: str) -> str:
+    if bin_path.len() == 0:
+        return self.build_binary(source_path)
+    let obj_path = bin_path ++ ".o"
+    let output_dir = link_stage_dirname(bin_path)
+    let _ = ("mkdir -p " ++ output_dir) |> with_system
+    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+
+    let pool = self.compile_file(source_path)
+    self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
+
+fn Compilation.build_binary_from_source_to_path(self: Compilation, source_path: str, source_text: str, bin_path: str) -> str:
+    if bin_path.len() == 0:
+        return self.build_binary_from_source(source_path, source_text)
+    let obj_path = bin_path ++ ".o"
+    let output_dir = link_stage_dirname(bin_path)
+    let _ = ("mkdir -p " ++ output_dir) |> with_system
+    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+
+    let pool = self.compile_source_text(source_path, source_text)
+    self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
 fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> str:
     let pool = self.compile_file(source_path)

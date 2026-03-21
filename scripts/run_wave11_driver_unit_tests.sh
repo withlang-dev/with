@@ -114,6 +114,14 @@ run_cli_key() {
         run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test --unknown-flag
       )
       ;;
+    test_function_discovery)
+      local test_src="$tmpdir/test_function_discovery.w"
+      cat >"$test_src" <<'EOF'
+fn test_addition:
+    assert(1 + 1 == 2)
+EOF
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test "$test_src"
+      ;;
     clean)
       local clean_dir="$tmpdir/clean_case"
       mkdir -p "$clean_dir/.with"
@@ -425,6 +433,7 @@ expect_cli_stdout_contains help_keywords "Reserved words that cannot be used as 
 expect_cli_stdout_contains help_keywords "fn let var if else then"
 expect_cli_stdout version "$EXPECTED_VERSION"
 expect_cli_pass clean
+expect_cli_pass test_function_discovery
 expect_cli_fail unknown_command
 expect_cli_fail build_missing_arg
 expect_cli_fail run_missing_arg

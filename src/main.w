@@ -49,6 +49,12 @@ type CliOptions = {
     prelude_mode: i32,
 }
 
+type TestDiscovery = {
+    parse_ok: bool,
+    has_main: bool,
+    test_names: Vec[str],
+}
+
 fn cli_options_default -> CliOptions:
     CliOptions {
         command: "",
@@ -530,6 +536,54 @@ fn dump_tag_name(tag: i32, lexeme: str) -> str:
         return "'" ++ lexeme ++ "'"
     return tag_name(tag)
 
+fn discover_test_functions(text: str) -> TestDiscovery:
+    var lexer = Lexer.init(text, 0)
+    let tokens = lexer.tokenize()
+    var intern = InternPool.init()
+    var diags = DiagnosticList.init()
+    var parser = Parser.init(tokens, text, 0, intern, diags)
+    let pool = parser.parse_module()
+    intern = parser.intern
+    diags = parser.diags
+
+    let test_names: Vec[str] = Vec.new()
+    if diags.has_errors():
+        return TestDiscovery { parse_ok: false, has_main: false, test_names }
+
+    var has_main = false
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NK_FN_DECL:
+            continue
+        let fn_name = intern.resolve(pool.get_data0(decl))
+        if fn_name == "main":
+            has_main = true
+        if with_str_starts_with(fn_name, "test_") != 0:
+            test_names.push(fn_name)
+    TestDiscovery { parse_ok: true, has_main, test_names }
+
+fn synthesize_test_main_source(text: str, test_names: Vec[str]) -> str:
+    var out = text
+    if out.len() > 0 and with_str_byte_at(out, with_str_len(out) - 1) != 10:
+        out = out ++ "\n"
+    out = out ++ "\nfn main:\n"
+    for ti in 0..test_names.len() as i32:
+        out = out ++ "    " ++ test_names.get(ti as i64) ++ "()\n"
+    out
+
+fn maybe_synthesize_test_source(target: str) -> str:
+    if not target.ends_with(".w"):
+        return ""
+    let text = with_fs_read_file(target)
+    if text.len() == 0:
+        return ""
+    let discovery = discover_test_functions(text)
+    if not discovery.parse_ok:
+        return ""
+    if discovery.has_main or discovery.test_names.len() == 0:
+        return ""
+    synthesize_test_main_source(text, discovery.test_names)
+
 fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
     // Find test file/dir argument
     let target = find_source_arg(argc)
@@ -541,7 +595,8 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
-    let bin_path = comp.build_binary(target)
+    let synthetic_source = maybe_synthesize_test_source(target)
+    let bin_path = if synthetic_source.len() > 0: comp.build_binary_from_source(target, synthetic_source) else: comp.build_binary(target)
     if bin_path == "":
         with_eprintln("error: test build failed")
         return 1
