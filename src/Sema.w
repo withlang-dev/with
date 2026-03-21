@@ -4984,6 +4984,18 @@ fn Sema.is_sizeof_or_alignof(self: Sema, callee: i32) -> i32:
         return 1
     0
 
+fn Sema.is_nameof_call(self: Sema, callee: i32) -> i32:
+    let kind = self.ast.kind(callee)
+    if kind != NK_TYPE_GENERIC and kind != NK_INDEX:
+        return 0
+    let gi_base = self.ast.get_data0(callee)
+    if self.ast.kind(gi_base) != NK_IDENT:
+        return 0
+    let gi_name = self.pool_resolve(self.ast.get_data0(gi_base))
+    if gi_name == "nameof" or gi_name == "type_name":
+        return 1
+    0
+
 fn Sema.is_transmute_call(self: Sema, callee: i32) -> i32:
     let kind = self.ast.kind(callee)
     if kind != NK_TYPE_GENERIC and kind != NK_INDEX:
@@ -5012,9 +5024,11 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data1(node)
     let arg_count = self.ast.get_data2(node)
 
-    // sizeof[T]() / alignof[T]() / transmute[T]() builtins
+    // sizeof[T]() / alignof[T]() / transmute[T]() / nameof[T]() builtins
     if self.is_sizeof_or_alignof(callee) != 0:
         return self.ty_i64
+    if self.is_nameof_call(callee) != 0:
+        return self.ty_str
     if self.is_transmute_call(callee) != 0:
         return self.transmute_target_type(callee)
 

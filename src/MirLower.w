@@ -3004,7 +3004,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             if self.ast.kind(gb_base) == NK_IDENT:
                 let gb_sym = self.ast.get_data0(gb_base)
                 let gb_name = self.pool.resolve(gb_sym)
-                if gb_name == "transmute" or gb_name == "sizeof" or gb_name == "size_of" or gb_name == "alignof" or gb_name == "align_of":
+                if gb_name == "transmute" or gb_name == "sizeof" or gb_name == "size_of" or gb_name == "alignof" or gb_name == "align_of" or gb_name == "nameof" or gb_name == "type_name":
                     generic_builtin_sym = gb_sym
         if generic_builtin_sym > 0:
             let gc_fn_op = self.const_operand(CK_FN, generic_builtin_sym, 0)
