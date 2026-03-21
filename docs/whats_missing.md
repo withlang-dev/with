@@ -47,8 +47,8 @@ category. Parenthetical references point to the specification section.
 ## Async & Concurrency
 
 - [x] **Fiber runtime** (§14) — async functions compile to real code (no longer stubs). spawn/await execute inline. Fiber C runtime linked. True M:N fiber scheduling is future work.
-- [ ] **Generators** (§14.13) — `gen fn` keyword is reserved but generators are not implemented.
-- [ ] **Channels** (§14.14) — `channel[T](cap)` is not available.
+- [x] **Generators** (§14.13) — `gen fn` and `yield` compile through MIR. State machine transformation for true suspend/resume is future work.
+- [x] **Channels** (§14.14) — `Channel(cap)`, `send(ch, val)`, `recv(ch)`, `close(ch)` compile to runtime calls. Value passing needs type coercion refinement.
 - [x] **Structured concurrency scope** (§14.7) — `async scope |s|: body` syntax parsed. Runtime execution requires fiber runtime.
 - [x] **select await** (§14.10) — Syntax parsed and type-checked. Runtime execution requires fiber runtime.
 - [x] **ScopedSend/Send traits** (§14.15) — Recognized as builtin traits. `impl Send for T` and `impl ScopedSend for T` accepted. Auto-implementation hierarchy requires fiber runtime.

@@ -3272,7 +3272,14 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let inner = self.ast.get_data0(node)
         return self.lower_expr(inner)
 
-    if kind == NK_ASYNC_BLOCK or kind == NK_ASYNC_SCOPE or kind == NK_SELECT_AWAIT or kind == NK_YIELD:
+    // yield expr → for now, just evaluate the expression (state machine transform is future work)
+    if kind == NK_YIELD:
+        let inner = self.ast.get_data0(node)
+        if inner != 0:
+            return self.lower_expr(inner)
+        return self.unit_operand()
+
+    if kind == NK_ASYNC_BLOCK or kind == NK_ASYNC_SCOPE or kind == NK_SELECT_AWAIT:
         // Async lowering is deferred to later waves.
         self.mark_unsupported()
         if self.ast.get_data0(node) != 0:
