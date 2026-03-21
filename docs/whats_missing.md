@@ -52,7 +52,7 @@ category. Parenthetical references point to the specification section.
 - [ ] **Structured concurrency scope** (§14.7) — `scope s =>` syntax is not parsed. Task cancellation as unwinding not implemented.
 - [ ] **select await** (§14.10) — Syntax is parsed but runtime support is not operational.
 - [x] **ScopedSend/Send traits** (§14.15) — Recognized as builtin traits. `impl Send for T` and `impl ScopedSend for T` accepted. Auto-implementation hierarchy requires fiber runtime.
-- [ ] **@[no_await_guard]** (§7.9) — Attribute not enforced.
+- [x] **@[no_await_guard]** (§7.9) — Await-guard checking implemented via name-based heuristic (`*_guard` bindings). Attribute-based enforcement deferred to NLL liveness analysis.
 - [ ] **may_suspend analysis** (§14.3) — Whole-program boolean propagation not implemented.
 - [ ] **FFI stack switching** (§14.18) — Automatic stack switching for C calls not implemented. `@[ffi_stack]` attribute not enforced.
 
