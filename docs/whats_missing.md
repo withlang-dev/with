@@ -77,6 +77,7 @@ category. Parenthetical references point to the specification section.
 - [x] **@[c_export("name")]** — Attribute parsed and stored. Sets external linkage on the function in codegen.
 - [x] **@[repr(packed)]** (§16.4) — `@[packed]` attribute works. Struct fields packed without padding.
 - [x] **String auto-promotion** (§15.3) — `str` is the primary string type; string literals pass directly to `str` parameters. No separate owned/borrowed distinction needed.
+- [ ] **Per-module `c_import` scoping** (§16.1) — `c_import` symbols currently leak transitively through imported With modules because the frontend flattens imported declarations into one AST. Workaround: keep C-heavy modules out of the prelude and use `c_import` directly in the module that needs the bindings. A real fix requires per-module sema scopes and explicit export boundaries.
 
 ## Other
 

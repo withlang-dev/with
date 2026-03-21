@@ -3678,8 +3678,25 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
 
 fn Sema.check_binary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)
-    let lhs = self.check_expr(self.ast.get_data1(node))
-    let rhs = self.check_expr(self.ast.get_data2(node))
+    let lhs_node = self.ast.get_data1(node)
+    let rhs_node = self.ast.get_data2(node)
+    var lhs = 0
+    var rhs = 0
+    // Variant shorthand in comparisons must be typed against the opposite side,
+    // not whatever outer expected type is active (for example `bool` from assert()).
+    if op == OP_EQ or op == OP_NEQ or op == OP_LT or op == OP_GT or op == OP_LTE or op == OP_GTE:
+        if self.ast.kind(lhs_node) == NK_VARIANT_SHORTHAND:
+            rhs = self.check_expr(rhs_node)
+            lhs = self.check_expr_with_expected(lhs_node, rhs)
+        else:
+            lhs = self.check_expr(lhs_node)
+            if self.ast.kind(rhs_node) == NK_VARIANT_SHORTHAND:
+                rhs = self.check_expr_with_expected(rhs_node, lhs)
+            else:
+                rhs = self.check_expr(rhs_node)
+    else:
+        lhs = self.check_expr(lhs_node)
+        rhs = self.check_expr(rhs_node)
 
     if lhs == 0 or rhs == 0:
         return 0
@@ -5865,6 +5882,9 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
         let mc_call_name = mc_base_name ++ "." ++ mc_method
         let mc_push_sym = self.pool_intern("push")
         let mc_insert_sym = self.pool_intern("insert")
+        let mc_vec_sym = self.pool_intern("Vec")
+        let mc_veciter_sym = self.pool_intern("VecIter")
+        let mc_option_sym = self.pool_intern("Option")
         if field == mc_push_sym:
             // Vec.push(value: T) / HashSet.insert(value: T) — arg[0] must be T
             if arg_count >= 1:
@@ -5897,7 +5917,46 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
             if mc_method == "get" or mc_method == "pop" or mc_method == "remove":
                 return self.get_generic_inst_arg(resolved, 0)
             if mc_method == "len":
-                return self.ty_i32
+                return self.ty_i64
+            if mc_method == "contains":
+                return self.ty_bool
+            if mc_method == "join":
+                return self.ty_str
+            if mc_method == "iter":
+                let iter_elem_ty = self.get_generic_inst_arg(resolved, 0)
+                let iter_tid = self.find_generic_inst(mc_veciter_sym, iter_elem_ty)
+                if iter_tid != 0:
+                    return iter_tid
+                let iter_args: Vec[i32] = Vec.new()
+                iter_args.push(iter_elem_ty)
+                return self.ensure_generic_inst_type(mc_veciter_sym, iter_args, 1)
+            if mc_method == "filter":
+                return resolved
+            if mc_method == "map":
+                if arg_count >= 1:
+                    let mapper_ty = self.resolve_alias(arg_types.get(0))
+                    if self.get_type_kind(mapper_ty) == TY_FN:
+                        let mapped_elem_ty = self.get_type_d2(mapper_ty)
+                        let mapped_tid = self.find_generic_inst(mc_vec_sym, mapped_elem_ty)
+                        if mapped_tid != 0:
+                            return mapped_tid
+                        let mapped_args: Vec[i32] = Vec.new()
+                        mapped_args.push(mapped_elem_ty)
+                        return self.ensure_generic_inst_type(mc_vec_sym, mapped_args, 1)
+                return resolved
+            if mc_method == "fold":
+                if arg_count >= 1:
+                    return arg_types.get(0)
+                return self.get_generic_inst_arg(resolved, 0)
+        if mc_base_name == "VecIter":
+            if mc_method == "next":
+                let next_elem_ty = self.get_generic_inst_arg(resolved, 0)
+                let next_tid = self.find_generic_inst(mc_option_sym, next_elem_ty)
+                if next_tid != 0:
+                    return next_tid
+                let next_args: Vec[i32] = Vec.new()
+                next_args.push(next_elem_ty)
+                return self.ensure_generic_inst_type(mc_option_sym, next_args, 1)
         if mc_base_name == "HashMap":
             if mc_method == "insert" or mc_method == "clear":
                 return self.ty_void
@@ -5908,14 +5967,14 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
             if mc_method == "remove":
                 return self.get_generic_inst_arg(resolved, 1)
             if mc_method == "len":
-                return self.ty_i32
+                return self.ty_i64
         if mc_base_name == "HashSet":
             if mc_method == "insert" or mc_method == "clear":
                 return self.ty_void
             if mc_method == "contains" or mc_method == "remove":
                 return self.ty_bool
             if mc_method == "len":
-                return self.ty_i32
+                return self.ty_i64
         if mc_base_name == "Option":
             if mc_method == "unwrap":
                 return self.get_generic_inst_arg(resolved, 0)

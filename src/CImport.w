@@ -374,6 +374,11 @@ fn ci_mark_cached_names(text: str):
             let name = ci_extract_ident(rest)
             if name.len() > 0:
                 with_cimport_mark_name_emitted(name)
+        else if ci_starts_with(line, "fn "):
+            let rest = line.slice(3, line.len())
+            let name = ci_extract_ident(rest)
+            if name.len() > 0:
+                with_cimport_mark_name_emitted(name)
         else if ci_starts_with(line, "extern let "):
             let rest = line.slice(11, line.len())
             let name = ci_extract_ident(rest)
