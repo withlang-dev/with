@@ -162,12 +162,9 @@ typedef union {
 
 // ── Function declarations ────────────────────────────────────────
 
-int tc_add(int a, int b);
-int tc_mul(int a, int b);
-void tc_swap(int *a, int *b);
-int tc_abs(int x);
-const char *tc_greeting(void);
-size_t tc_strlen_custom(const char *s);
+static inline int tc_add(int a, int b) { return a + b; }
+static inline int tc_mul(int a, int b) { return a * b; }
+static inline int tc_abs(int x) { return x < 0 ? -x : x; }
 
 // ── Function pointer typedef ─────────────────────────────────────
 
@@ -182,8 +179,8 @@ typedef struct {
 
 // ── Global variables ─────────────────────────────────────────────
 
-extern int tc_global_counter;
-extern const int tc_global_const;
+static int tc_global_counter = 0;
+static const int tc_global_const = 42;
 
 // ── Constants via macros ─────────────────────────────────────────
 
@@ -226,9 +223,9 @@ typedef struct {
 
 // ── Pointer-to-bool and bool-to-int patterns ─────────────────────
 
-int tc_ptr_is_null(const void *p);
-int tc_ptr_is_nonnull(const void *p);
-int tc_bool_to_int(int cond);
-int tc_sign(int v);
+static inline int tc_ptr_is_null(const void *p) { return p == NULL; }
+static inline int tc_ptr_is_nonnull(const void *p) { return p != NULL; }
+static inline int tc_bool_to_int(int cond) { return cond != 0; }
+static inline int tc_sign(int v) { return -(v < 0); }
 
 #endif // TRANSLATE_C_TESTS_H

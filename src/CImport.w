@@ -869,7 +869,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             // Rename the field to _name in field_str by replacing the last occurrence
             field_str = ci_str_replace_last_field(field_str, ci_escape_reserved(accessor_name), "_" ++ ci_escape_reserved(accessor_name))
             // Emit accessor method
-            flex_accessor = "fn " ++ ci_escape_reserved(accessor_name) ++ "(self: *" ++ safe_name ++ ") -> *" ++ elem_type ++ ":\n    unsafe: (&self._" ++ ci_escape_reserved(accessor_name) ++ " as *" ++ elem_type ++ ")\n"
+            flex_accessor = "fn " ++ ci_escape_reserved(accessor_name) ++ "(self: *" ++ safe_name ++ ") -> *" ++ elem_type ++ ":\n    unsafe: ((&self._" ++ ci_escape_reserved(accessor_name) ++ ") as *" ++ elem_type ++ ")\n"
 
     let packed_prefix = if is_really_packed: "@[packed]\n" else: ""
     let part1 = "type " ++ safe_name
@@ -1442,7 +1442,7 @@ fn ci_parse_or_expr(s: str, params: str, known: str) -> str:
         let lhs = ci_parse_or_expr(s.slice(0, pos as i64), params, known)
         let rhs = ci_parse_and_expr(ci_trim(s.slice((pos + 2) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
-            return "(if " ++ ci_ensure_bool(lhs) ++ " or " ++ ci_ensure_bool(rhs) ++ ": 1 else: 0)"
+            return "(" ++ ci_ensure_bool(lhs) ++ " or " ++ ci_ensure_bool(rhs) ++ ")"
         return ""
     ci_parse_and_expr(s, params, known)
 
@@ -1453,7 +1453,7 @@ fn ci_parse_and_expr(s: str, params: str, known: str) -> str:
         let lhs = ci_parse_and_expr(s.slice(0, pos as i64), params, known)
         let rhs = ci_parse_bitor_expr(ci_trim(s.slice((pos + 2) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
-            return "(if " ++ ci_ensure_bool(lhs) ++ " and " ++ ci_ensure_bool(rhs) ++ ": 1 else: 0)"
+            return "(" ++ ci_ensure_bool(lhs) ++ " and " ++ ci_ensure_bool(rhs) ++ ")"
         return ""
     ci_parse_bitor_expr(s, params, known)
 
@@ -1501,7 +1501,7 @@ fn ci_parse_eq_expr(s: str, params: str, known: str) -> str:
         let rhs = ci_parse_rel_expr(ci_trim(s.slice((pos + 2) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
             let w_op = if op_str == "==": "==" else: "!="
-            return "(if " ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ": 1 else: 0)"
+            return "(" ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ")"
         return ""
     ci_parse_rel_expr(s, params, known)
 
@@ -1538,7 +1538,7 @@ fn ci_parse_rel_expr(s: str, params: str, known: str) -> str:
         let lhs = ci_parse_rel_expr(s.slice(0, best_pos as i64), params, known)
         let rhs = ci_parse_shift_expr(ci_trim(s.slice((best_pos + best_len) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
-            return "(if " ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ": 1 else: 0)"
+            return "(" ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ")"
         return ""
     ci_parse_shift_expr(s, params, known)
 
@@ -3288,6 +3288,12 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
                 let is_unsigned = with_ci_type_is_unsigned(session, cursor)
                 let op_str = ci_bo_to_str_typed(op, is_unsigned)
                 if op_str.len() > 0:
+                    // C comparisons and logical ops return int, not bool.
+                    // Wrap in (if cond: 1 else: 0) to match C semantics.
+                    if op == BO_EQ or op == BO_NE or op == BO_LT or op == BO_GT or op == BO_LE or op == BO_GE:
+                        return "(if " ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ": 1 else: 0)"
+                    if op == BO_LAND or op == BO_LOR:
+                        return "(if " ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ": 1 else: 0)"
                     return "(" ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ")"
         return ""
 
