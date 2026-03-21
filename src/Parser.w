@@ -2000,6 +2000,15 @@ fn Parser.parse_call(self: Parser, callee: i32) -> i32:
     var args: Vec[i32] = Vec.new()
     if self.peek() != TK_R_PAREN:
         while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+            // Named argument: name: value → skip the name label
+            if self.peek() == TK_IDENT:
+                let save = self.pos
+                self.advance()
+                if self.peek() == TK_COLON:
+                    self.advance()
+                    self.skip_newlines()
+                else:
+                    self.pos = save
             let outer_it = self.saw_implicit_it
             let outer_depth = self.implicit_it_depth
             self.saw_implicit_it = 0
