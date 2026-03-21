@@ -122,6 +122,19 @@ fn test_addition:
 EOF
       run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test "$test_src"
       ;;
+    test_unit_match)
+      local test_src="$tmpdir/test_unit_match.w"
+      cat >"$test_src" <<'EOF'
+fn fail() -> Result[i32, str]:
+    Err("boom")
+
+fn test_unit_match:
+    match fail()
+        Err(_) => ()
+        _ => assert(false)
+EOF
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test "$test_src"
+      ;;
     test_directory_argument)
       local test_dir="$tmpdir/test_directory_argument"
       mkdir -p "$test_dir/nested"
@@ -443,6 +456,7 @@ expect_cli_stdout_contains help_keywords "fn let var if else then"
 expect_cli_stdout version "$EXPECTED_VERSION"
 expect_cli_pass clean
 expect_cli_pass test_function_discovery
+expect_cli_pass test_unit_match
 expect_cli_pass test_directory_argument
 expect_cli_fail unknown_command
 expect_cli_fail build_missing_arg
