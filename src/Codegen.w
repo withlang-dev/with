@@ -4868,16 +4868,6 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
 
 fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
     let flags = self.pool.get_data2(fn_node)
-    // Async functions: emit stub with unreachable (not MIR-lowered yet)
-    if (flags / FN_FLAG_ASYNC) % 2 == 1:
-        let async_sym = self.pool.get_data0(fn_node)
-        let async_fv = self.fn_values.get(async_sym)
-        if async_fv.is_some():
-            let async_fn = async_fv.unwrap() as i64
-            let async_entry = wl_append_bb(self.context, async_fn, "entry")
-            wl_position_at_end(self.builder, async_entry)
-            let _ = wl_build_unreachable(self.builder)
-        return
     let fn_sym = self.pool.get_data0(fn_node)
     // Skip functions with fn-level type params — compiled via monomorphization
     let meta = self.pool.find_fn_meta(fn_node)

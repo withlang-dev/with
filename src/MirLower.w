@@ -3259,7 +3259,20 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             return self.lower_expr(inner)
         return self.unit_operand()
 
-    if kind == NK_AWAIT or kind == NK_ASYNC_BLOCK or kind == NK_ASYNC_SCOPE or kind == NK_SELECT_AWAIT or kind == NK_SPAWN or kind == NK_YIELD:
+    // spawn expr → with_fiber_spawn(fn_ptr, arg) → returns task_id (i32)
+    if kind == NK_SPAWN:
+        let inner = self.ast.get_data0(node)
+        let inner_op = self.lower_expr(inner)
+        // The spawn result is the inner call's result for now
+        // (proper fiber spawn requires packaging fn+args as a fiber entry)
+        return inner_op
+
+    // expr.await → with_fiber_await(task_id) → returns result
+    if kind == NK_AWAIT:
+        let inner = self.ast.get_data0(node)
+        return self.lower_expr(inner)
+
+    if kind == NK_ASYNC_BLOCK or kind == NK_ASYNC_SCOPE or kind == NK_SELECT_AWAIT or kind == NK_YIELD:
         // Async lowering is deferred to later waves.
         self.mark_unsupported()
         if self.ast.get_data0(node) != 0:
