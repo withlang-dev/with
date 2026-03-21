@@ -1517,10 +1517,16 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             let f_name = self.ast.get_extra(base)
             let f_type_node = self.ast.get_extra(base + 1)
             let f_default = self.ast.get_extra(base + 2)
-            if self.type_expr_contains_ref(f_type_node) != 0:
-                self.emit_error("ephemeral references cannot be stored in structs", f_type_node)
-            if self.type_expr_is_collection_with_ref(f_type_node) != 0:
-                self.emit_error("ephemeral references cannot be stored in generic containers", f_type_node)
+            if not is_ephemeral:
+                if self.type_expr_contains_ref(f_type_node) != 0:
+                    self.emit_error("ephemeral references cannot be stored in structs", f_type_node)
+                if self.type_expr_is_collection_with_ref(f_type_node) != 0:
+                    self.emit_error("ephemeral references cannot be stored in generic containers", f_type_node)
+                // Check if field type is a user-defined ephemeral type
+                if self.ast.kind(f_type_node) == NK_IDENT or self.ast.kind(f_type_node) == NK_TYPE_NAMED:
+                    let f_type_sym = self.ast.get_data0(f_type_node)
+                    if self.ephemeral_types.contains(f_type_sym):
+                        self.emit_error("ephemeral type '" ++ self.pool_resolve(f_type_sym) ++ "' cannot be stored in non-ephemeral struct", f_type_node)
             let f_tid = self.resolve_type_expr(f_type_node)
             field_names.push(f_name)
             field_tids.push(f_tid)
