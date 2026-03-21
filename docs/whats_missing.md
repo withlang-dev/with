@@ -74,7 +74,7 @@ category. Parenthetical references point to the specification section.
 ## FFI
 
 - [x] **extern var / extern let** (§16.3b) — Extern variables now registered in scope for type-checking. Codegen accesses via AST node.
-- [ ] **@[c_export("name")]** — C linkage export attribute not implemented.
+- [x] **@[c_export("name")]** — Attribute parsed and stored. Sets external linkage on the function in codegen.
 - [x] **@[repr(packed)]** (§16.4) — `@[packed]` attribute works. Struct fields packed without padding.
 - [ ] **String auto-promotion** (§15.3) — Automatic `.to_owned()` insertion on string literals in owned contexts not implemented.
 
