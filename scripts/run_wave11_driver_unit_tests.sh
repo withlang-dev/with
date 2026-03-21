@@ -122,6 +122,15 @@ fn test_addition:
 EOF
       run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test "$test_src"
       ;;
+    test_directory_argument)
+      local test_dir="$tmpdir/test_directory_argument"
+      mkdir -p "$test_dir/nested"
+      cat >"$test_dir/nested/smoke.w" <<'EOF'
+fn main:
+    assert(true)
+EOF
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test "$test_dir"
+      ;;
     clean)
       local clean_dir="$tmpdir/clean_case"
       mkdir -p "$clean_dir/.with"
@@ -434,6 +443,7 @@ expect_cli_stdout_contains help_keywords "fn let var if else then"
 expect_cli_stdout version "$EXPECTED_VERSION"
 expect_cli_pass clean
 expect_cli_pass test_function_discovery
+expect_cli_pass test_directory_argument
 expect_cli_fail unknown_command
 expect_cli_fail build_missing_arg
 expect_cli_fail run_missing_arg
