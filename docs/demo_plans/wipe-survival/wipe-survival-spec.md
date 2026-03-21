@@ -1,12 +1,4 @@
-Alright—here’s a **clean, focused, no-BS spec** tailored to your real goal:
-
-> ⚙️ *Show off With*
-> 🎮 *Deliver a tight 2–5 minute twin-stick experience*
-> 🧠 *Impress devs + feel great on Steam Deck*
-
----
-
-# 🎮 **WIPE: SURVIVAL — SPEC v2 (Demo-Focused)**
+# 🎮 **WIPE: SURVIVAL — SPEC**
 
 ---
 
@@ -32,6 +24,12 @@ Alright—here’s a **clean, focused, no-BS spec** tailored to your real goal:
 * 2–5 minutes per run
 * Immediate retry loop
 
+### 5. Addictive Loop (NEW)
+
+* Clear short-term goals
+* “Almost succeeded” tension
+* Immediate retry motivation
+
 ---
 
 # 🎮 2. Controls (Steam Deck First)
@@ -54,16 +52,45 @@ Alright—here’s a **clean, focused, no-BS spec** tailored to your real goal:
 1. Spawn in arena instantly
 2. Enemies spawn from edges
 3. Player shoots continuously
-4. Survive → gain upgrade choices
-5. Difficulty ramps quickly
-6. Player dies
-7. Instant restart
+4. **Run goal appears (NEW)**
+5. Survive → gain upgrade choices
+6. Difficulty ramps quickly
+7. Player dies
+8. **Goal + achievement progress shown (NEW)**
+9. Instant restart
 
 👉 Total loop downtime: **<2 seconds**
 
 ---
 
-# 🧱 4. Arena
+# 🎯 4. Run Goals (NEW — Critical for Addiction)
+
+Each run includes **1 dynamic goal**:
+
+### Types:
+
+* Kill X enemies (e.g. 50)
+* Survive X seconds (e.g. 60s)
+* No damage for X seconds
+* Reach X upgrades
+
+---
+
+### Requirements:
+
+* Visible at all times
+* Progress updates in real-time
+* Achievable within a run
+
+---
+
+### Purpose:
+
+> Creates tension: “I was so close…”
+
+---
+
+# 🧱 5. Arena
 
 * Single screen (no scrolling)
 * Player starts center
@@ -72,23 +99,22 @@ Alright—here’s a **clean, focused, no-BS spec** tailored to your real goal:
 
 ---
 
-# 👾 5. Enemies (MVP: 3 Types)
+# 👾 6. Enemies (MVP: 3 Types)
 
 ### 1. Chaser
 
 * Moves toward player
 * Slow → medium speed
-* Core pressure unit
 
 ### 2. Dasher
 
-* Charges toward player periodically
+* Charges periodically
 * Telegraph before dash
 
 ### 3. Shooter
 
 * Keeps distance
-* Fires slow projectiles
+* Fires slow bullets
 
 ### Scaling:
 
@@ -97,21 +123,21 @@ Alright—here’s a **clean, focused, no-BS spec** tailored to your real goal:
 
 ---
 
-# 🔫 6. Player Combat
+# 🔫 7. Player Combat
 
 * Constant fire (no input needed)
-* Bullets go exactly where you aim
+* Bullets follow aim exactly
 * No recoil, no delay
 
 ### Base stats:
 
 * Moderate fire rate
 * Single projectile
-* Low spread (0° initially)
+* Low spread
 
 ---
 
-# ⚡ 7. Upgrades (Run-Based)
+# ⚡ 8. Upgrades (Run-Based)
 
 ### Trigger:
 
@@ -120,7 +146,7 @@ Alright—here’s a **clean, focused, no-BS spec** tailored to your real goal:
 
 ---
 
-## Core Upgrade Pool (MVP)
+## Core Upgrade Pool
 
 ### Damage Path
 
@@ -130,42 +156,121 @@ Alright—here’s a **clean, focused, no-BS spec** tailored to your real goal:
 
 ### Multi-shot Path
 
-* +Projectiles (spread)
-* Slight spread increase
+* +Projectiles
+* Slight spread
 
 ### Utility Path
 
-* Piercing bullets
-* Ricochet (bounce once)
-* Slow nearby enemies
+* Piercing
+* Ricochet
+* Slow field
 
 ### Defensive Path
 
 * Orbiting shield
-* +Movement speed
+* Movement speed
 
-👉 Keep total pool: **8–12 upgrades max**
+👉 Total: **8–12 upgrades max**
 
 ---
 
-# 🪙 8. Meta Progression (Minimal)
+# 🧬 9. Build Variance (NEW)
 
-Since this is a demo:
+Upgrades are designed to **stack into emergent builds**
 
-* Earn points during run
-* Spend after death
+Examples:
 
-### Permanent upgrades (small boosts):
+* Multi-shot + piercing → chaos build
+* Shield + slow → defensive build
+* Speed + fire rate → glass cannon
+
+👉 No explicit combo system needed
+
+---
+
+# 🪙 10. Meta Progression (Minimal + Meaningful)
+
+### Earn:
+
+* Points per run
+
+### Spend:
+
+* Small stat boosts
+* **Unlock new upgrades (NEW priority)**
+
+---
+
+### Permanent upgrades:
 
 * +5% damage
 * +5% fire rate
 * +5% movement speed
 
-👉 Cap progression quickly (no grind)
+---
+
+### Unlocks:
+
+* New upgrade types
+* New effects
+
+👉 Unlocks > stat boosts (more exciting)
 
 ---
 
-# 📈 9. Difficulty Scaling
+# 🏆 11. Steam Achievements Integration (NEW)
+
+All progression systems are tied to **Steamworks SDK**.
+
+---
+
+## Achievement Categories
+
+### 1. First-time Events
+
+* First kill
+* First upgrade
+* First run
+
+---
+
+### 2. Run Goals (direct mapping)
+
+* Kill 50 enemies → `KILL_50`
+* Survive 60s → `SURVIVE_60`
+* No damage → `PERFECT_RUN`
+
+---
+
+### 3. Progress Milestones
+
+* Total kills (100, 500, 1000)
+* Total runs (5, 10, 25)
+
+---
+
+### 4. Unlocks
+
+* Unlock ricochet → achievement
+* Unlock shield → achievement
+
+---
+
+## Requirements
+
+* Achievements trigger immediately
+* No UI needed (Steam overlay handles display)
+* Minimal integration code
+
+---
+
+## Design Principle
+
+> Achievements reinforce the “one more run” loop
+
+---
+
+# 📈 12. Difficulty Scaling
 
 ### Over Time:
 
@@ -179,109 +284,114 @@ Since this is a demo:
 
 ---
 
-# 💥 10. Juice / Feedback (CRITICAL)
+# 💥 13. Juice / Feedback (CRITICAL)
 
 ### Visual:
 
-* Bright hit flashes
+* Hit flashes
 * Particle explosions
 * Bullet trails
-* Screen shake on kill bursts
+* Screen shake
 
 ### UX:
 
-* Score ticks up rapidly
-* Combo multiplier (optional)
-
-### Death:
-
-* Screen **hard wipe / flash**
-* Everything disappears instantly
-
-👉 Reinforce the *“wipe”* identity
+* Score ticks rapidly
+* Combo counter (optional but recommended)
 
 ---
 
-# ⚙️ 11. Performance Showcase
+## Death Feedback (UPDATED)
 
-This is your hidden “feature”:
+```text
+YOU DIED
+
+Time: 1:42
+Kills: 47 / 50
+Goal: KILL_50
+
+→ Almost unlocked!
+```
+
+---
+
+👉 This is the **core addiction trigger**
+
+---
+
+# ⚡ 14. Performance Showcase
 
 ### Target:
 
 * 150–300 enemies + bullets + particles
 * Stable FPS on Steam Deck
 
-### Optional Debug Overlay:
+---
 
-(toggleable)
+### Optional Debug Overlay:
 
 * FPS
 * Entity count
 * Frame time
 
-Example:
-
-> 120 FPS | 284 entities | 0.5ms
-
 ---
 
-# 🔁 12. Restart Flow (IMPORTANT)
+# 🔁 15. Restart Flow
 
 On death:
 
-* Instant screen clear
-* Press button → restart immediately
-* No loading, no fade delays
+* Screen wipes instantly
+* Restart input available immediately
+* No delay, no menus
 
 👉 Feels like:
 
-> die → blink → back in game
+> die → blink → retry
 
 ---
 
-# 🖥️ 13. UI (Minimal)
+# 🖥️ 16. UI (Minimal)
 
-* Score (top center)
+* Score
 * Time survived
-* Upgrade choices (large, readable)
-* No clutter
+* Goal progress
+* Upgrade choices
 
 ---
 
-# 🎯 14. First 60 Seconds (Scripted Feel)
+# 🎯 17. First 60 Seconds (Updated)
 
 ### 0–10s:
 
-* Few enemies, easy kills
+* Easy kills
+* Immediate feedback
 
 ### 10–30s:
 
-* Player surrounded lightly
-* First upgrade choice
+* First goal appears
+* First upgrade
 
 ### 30–60s:
 
-* Noticeable chaos
-* Player feels stronger
+* Chaos increases
+* Player builds power
 
-👉 Player should think:
+👉 Player feels:
 
-> “this feels really smooth”
+> “I almost completed the goal”
 
 ---
 
-# 🧠 15. What This Demonstrates About “With”
+# 🧠 18. What This Demonstrates About With
 
-Without saying it explicitly, the game shows:
-
-* Fast iteration loop
-* Clean system design
+* Clean real-time loop
 * High-performance entity handling
-* Tight input responsiveness
+* Data-oriented mutation
+* Minimal FFI friction
+* Seamless platform integration (Steam + raylib)
 
 ---
 
-# 🏁 16. Scope Guardrails
+# 🏁 19. Scope Guardrails
 
 ### DO NOT ADD:
 
@@ -290,24 +400,22 @@ Without saying it explicitly, the game shows:
 * Complex UI
 * Inventory systems
 
+---
+
 ### ONLY ADD IF CORE IS PERFECT:
 
 * Dash
 * Boss
-* More enemy types
+* Extra enemy types
 
 ---
 
-# 🧪 17. Success Criteria
+# 🧪 20. Success Criteria
 
-If a dev plays for 3 minutes, they should think:
+After ~3 minutes, a developer should think:
 
-> “This handles a lot of stuff really cleanly… what is this built in?”
+> “This feels smooth… and I almost hit that goal… one more run.”
 
----
+AND:
 
-If you want next, I can:
-
-* Turn this into a **code architecture (ECS vs simple structs in With)**
-* Or design the **exact upgrade math + balance curves**
-* Or help you build a **“wow benchmark moment” at 2 minutes**
+> “This is built in With??”
