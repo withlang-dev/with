@@ -5856,6 +5856,9 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             var struct_ty = dest_ty
             if self.debug_mir_codegen_enabled():
                 with_eprintln("[mir-agg] fn=" ++ self.intern.resolve(self.current_function_name_sym) ++ " count=" ++ int_to_string(agg_count) ++ " dest_ty_kind=" ++ int_to_string(if dest_ty != 0: wl_get_type_kind(dest_ty) else: -1) ++ " dest_ty_fields=" ++ int_to_string(if dest_ty != 0 and wl_get_type_kind(dest_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(dest_ty) else: -1))
+            if agg_count == 0 and d0 != 1:
+                let zero_ty = if struct_ty != 0: struct_ty else: fallback_ty
+                return self.build_default_value(zero_ty)
             if struct_ty != 0 and wl_get_type_kind(struct_ty) == wl_array_type_kind():
                 // Array aggregate: [N x T]
                 let alloca = self.create_entry_alloca(struct_ty)
