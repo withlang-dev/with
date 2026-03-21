@@ -98,6 +98,8 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
 fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var out = pool
     let ordered: Vec[i32] = Vec.new()
+    let ordered_paths: Vec[str] = Vec.new()
+    let ordered_ci: Vec[i32] = Vec.new()
     let base_count = out.decl_count()
     var has_c_import = 0
     for i in 0..base_count:
@@ -112,6 +114,9 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let decl = out.get_decl(i)
         if out.kind(decl) != NK_C_IMPORT:
             ordered.push(decl)
+            ordered_paths.push(self.decl_source_path_frontend(i))
+            let ci_f = if i < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(i as i64) else: 0
+            ordered_ci.push(ci_f)
             continue
 
         let header_sym = out.get_data0(decl)
@@ -167,15 +172,21 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         self.diagnostics = parser.diags
 
         let after = out.decl_count()
+        // Mark all c_import-synthesized declarations
+        let ci_owner_path = self.decl_source_path_frontend(i)
         var di = before
         while di < after:
             ordered.push(out.get_decl(di))
+            ordered_paths.push(ci_owner_path)
+            ordered_ci.push(1)  // c_import origin
             di = di + 1
 
     while out.decl_count() > 0:
         out.decls.pop()
     for oi in 0..ordered.len() as i32:
         out.add_decl(ordered.get(oi as i64))
+    self.decl_source_paths = ordered_paths
+    self.decl_is_c_import = ordered_ci
     out
 
 fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_spec: str) -> str:
@@ -788,6 +799,8 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     // Phase 3: Semantic analysis.
     var sema = Sema.init(self.pool, self.diagnostics, pool)
     sema.source_text = text
+    sema.decl_source_paths = self.decl_source_paths
+    sema.decl_is_c_import = self.decl_is_c_import
     sema.check_module()
     self.sync_from_sema(sema)
     frontend_dump_type_decl_names("post-sema", self.last_sema.ast, self.last_sema.pool)
@@ -849,17 +862,21 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
 
     let ordered: Vec[i32] = Vec.new()
     let ordered_paths: Vec[str] = Vec.new()
+    let ordered_c_import: Vec[i32] = Vec.new()
     for i in 0..out.decl_count():
         let decl = out.get_decl(i)
         if out.kind(decl) != NK_USE_DECL:
             ordered.push(decl)
             ordered_paths.push(self.decl_source_path_frontend(i))
+            let ci_flag = if i < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(i as i64) else: 0
+            ordered_c_import.push(ci_flag)
 
     while out.decl_count() > 0:
         out.decls.pop()
     for oi in 0..ordered.len() as i32:
         out.add_decl(ordered.get(oi as i64))
     self.decl_source_paths = ordered_paths
+    self.decl_is_c_import = ordered_c_import
     out
 
 fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
