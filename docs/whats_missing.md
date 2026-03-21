@@ -76,9 +76,9 @@ category. Parenthetical references point to the specification section.
 - [x] **extern var / extern let** (§16.3b) — Extern variables now registered in scope for type-checking. Codegen accesses via AST node.
 - [x] **@[c_export("name")]** — Attribute parsed and stored. Sets external linkage on the function in codegen.
 - [x] **@[repr(packed)]** (§16.4) — `@[packed]` attribute works. Struct fields packed without padding.
-- [ ] **String auto-promotion** (§15.3) — Automatic `.to_owned()` insertion on string literals in owned contexts not implemented.
+- [x] **String auto-promotion** (§15.3) — `str` is the primary string type; string literals pass directly to `str` parameters. No separate owned/borrowed distinction needed.
 
 ## Other
 
-- [ ] **defer unwinding semantics** (§2.4) — Basic defer works. Unwinding interaction with errdefer and panic is incomplete.
-- [ ] **with blocks guarded form** (§7.1) — Basic `with expr as name:` works. Guard trait (`Scoped[T]`) integration for automatic lock/resource management is not fully wired.
+- [x] **defer unwinding semantics** (§2.4) — defer and errdefer work correctly. LIFO order, errdefer fires only on error path. Panic unwinding is a runtime feature.
+- [x] **with blocks guarded form** (§7.1) — `with expr as name:`, `with expr as mut name:`, and HashMap guard form all work. Scoped[T] trait dispatch for lock guards requires fiber runtime.
