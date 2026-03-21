@@ -282,7 +282,11 @@ type Sema = {
     decl_source_paths: Vec[str],     // one path per decl index (from Frontend)
     decl_is_c_import: Vec[i32],      // 1 if decl came from c_import, 0 otherwise
     current_module_path: str,        // module path being checked right now
-    module_paths: Vec[str],          // unique module paths in declaration order
+    // c_import scoping: tracks which symbols are c_import-origin
+    ci_syms: HashMap[i32, i32],      // sym → 1 for c_import-origin symbols
+    ci_modules: HashMap[i32, i32],   // module-path-sym → 1 for modules that have c_import
+    scoping_active: i32,             // 1 when multi-module c_import scoping is active
+    current_module_has_ci: i32,      // 1 if current module has c_import declarations
 }
 
 fn sema_debug_stage1_enabled -> i32:
@@ -547,7 +551,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         decl_source_paths: Vec.new(),
         decl_is_c_import: Vec.new(),
         current_module_path: "",
-        module_paths: Vec.new(),
+        ci_syms: sema_new_map_i32_i32(),
+        ci_modules: sema_new_map_i32_i32(),
+        scoping_active: 0,
+        current_module_has_ci: 0,
     }
     return s
 
@@ -1387,6 +1394,7 @@ fn Sema.set_sig_return_type(self: Sema, idx: i32, ret: i32):
 fn Sema.check_module(self: Sema):
     self.compute_method_origins()
     self.collect_declarations()
+    self.build_ci_scoping()
     self.validate_copy_derives()
     self.validate_generic_type_decls()
     self.check_bodies()
@@ -1503,6 +1511,65 @@ fn Sema.is_local_decl(self: Sema, decl_index: i32) -> i32:
     // Root (local) decls are the last `limit` entries in the merged pool.
     let total = self.ast.decl_count()
     if decl_index >= total - limit:
+        return 1
+    0
+
+fn Sema.build_ci_scoping(self: Sema):
+    // Build c_import scoping data. Scoping is active when there are multiple
+    // distinct module paths AND at least one c_import-origin declaration exists.
+    if self.decl_source_paths.len() == 0 or self.decl_is_c_import.len() == 0:
+        return
+    var has_ci = 0
+    var module_count = 0
+    var prev_path_sym = 0 - 1
+    for di in 0..self.ast.decl_count():
+        if di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import.get(di as i64) != 0:
+            has_ci = 1
+            // Record which module owns this c_import declaration
+            if di < self.decl_source_paths.len() as i32:
+                let mp = self.pool_intern(self.decl_source_paths.get(di as i64))
+                self.ci_modules.insert(mp, 1)
+        if di < self.decl_source_paths.len() as i32:
+            let ps = self.pool_intern(self.decl_source_paths.get(di as i64))
+            if ps != prev_path_sym:
+                module_count = module_count + 1
+                prev_path_sym = ps
+    if has_ci == 0 or module_count < 2:
+        return
+    self.scoping_active = 1
+    // Record all c_import-origin symbol names.
+    for di in 0..self.ast.decl_count():
+        if di >= self.decl_is_c_import.len() as i32:
+            break
+        if self.decl_is_c_import.get(di as i64) == 0:
+            continue
+        let decl = self.ast.get_decl(di)
+        let kind = self.ast.kind(decl)
+        if kind == NK_TYPE_DECL or kind == NK_TRAIT_DECL or kind == NK_FN_DECL or kind == NK_EXTERN_FN or kind == NK_EXTERN_VAR or kind == NK_LET_DECL:
+            let sym = self.ast.get_data0(decl)
+            self.ci_syms.insert(sym, 1)
+        // For enum types, also record variant symbols
+        if kind == NK_TYPE_DECL:
+            let packed_kind = self.ast.get_data2(decl)
+            let sub_kind = type_decl_sub_kind(packed_kind)
+            if sub_kind == TDK_DISC_ENUM:
+                let extra_start = self.ast.get_data1(decl)
+                let variant_count = self.ast.get_extra(extra_start)
+                for vi in 0..variant_count:
+                    let base = extra_start + 1 + vi * 3
+                    let v_sym = self.ast.get_extra(base)
+                    self.ci_syms.insert(v_sym, 1)
+
+fn Sema.is_ci_visible(self: Sema, sym: i32) -> i32:
+    // Check if a symbol is visible from the current module context.
+    // Returns 1 if visible, 0 if hidden by c_import scoping.
+    if self.scoping_active == 0:
+        return 1
+    if not self.ci_syms.contains(sym):
+        return 1
+    // Symbol is c_import-origin. It's visible only if the current module
+    // itself has c_import declarations (meaning it directly uses c_import).
+    if self.current_module_has_ci != 0:
         return 1
     0
 
@@ -2883,7 +2950,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
         let prim = self.primitive_type_by_sym(sym)
         if prim != 0:
             return prim
-        if self.named_types.contains(sym):
+        if self.named_types.contains(sym) and (self.collecting_types != 0 or self.is_ci_visible(sym) != 0):
             return self.named_types.get(sym).unwrap()
         // Self is resolved at codegen time
         let sym_name = self.pool_resolve(sym)
@@ -2990,6 +3057,16 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
 
 // ── Pass 2: Check function bodies ────────────────────────────────
 
+fn Sema.update_module_context(self: Sema, di: i32):
+    if self.scoping_active == 0:
+        return
+    if di < self.decl_source_paths.len() as i32:
+        let path = self.decl_source_paths.get(di as i64)
+        if path != self.current_module_path:
+            self.current_module_path = path
+            let path_sym = self.pool_intern(path)
+            self.current_module_has_ci = if self.ci_modules.contains(path_sym): 1 else: 0
+
 fn Sema.check_bodies(self: Sema):
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
@@ -3028,6 +3105,7 @@ fn Sema.check_bodies(self: Sema):
                                             is_generic_struct_method = true
                             break
                     if not is_generic_struct_method:
+                        self.update_module_context(di)
                         self.check_fn_body(decl)
 
 fn Sema.check_fn_body(self: Sema, node: i32):
@@ -3647,7 +3725,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
 // ── Expression checking helpers ──────────────────────────────────
 
 fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
-    // Check local/param scope
+    // Check local/param scope (always visible — local bindings are never c_import)
     let tid = self.scope_lookup(sym)
     if tid >= 0:
         let state = self.scope_lookup_state(sym)
@@ -3665,22 +3743,22 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
 
     // Check function names
     let sig_idx = self.get_sig(sym)
-    if sig_idx >= 0:
+    if sig_idx >= 0 and self.is_ci_visible(sym) != 0:
         return self.sig_type_ids.get(sig_idx as i64)
 
     // Check generic functions
-    if self.generic_fn_nodes.contains(sym):
+    if self.generic_fn_nodes.contains(sym) and self.is_ci_visible(sym) != 0:
         return 0
 
     // Check type names
     let prim = self.primitive_type_by_sym(sym)
     if prim != 0:
         return prim
-    if self.named_types.contains(sym):
+    if self.named_types.contains(sym) and self.is_ci_visible(sym) != 0:
         return self.named_types.get(sym).unwrap()
 
     // Check enum variants
-    if self.variant_lookup.contains(sym):
+    if self.variant_lookup.contains(sym) and self.is_ci_visible(sym) != 0:
         return self.variant_type_ids.get(sym).unwrap()
 
     // Unknown identifier
@@ -5125,8 +5203,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         return 0
 
     let param_offset = if self.in_pipeline_rhs != 0: 1 else: 0
-    let sig_idx = self.get_sig(fn_sym)
-    let variant_expected_ty = if self.variant_lookup.contains(fn_sym): self.expected_variant_constructor_type(fn_sym) else: 0
+    let sig_idx_raw = self.get_sig(fn_sym)
+    let sig_idx = if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == 0: 0 - 1 else: sig_idx_raw
+    let variant_expected_ty = if self.variant_lookup.contains(fn_sym) and self.is_ci_visible(fn_sym) != 0: self.expected_variant_constructor_type(fn_sym) else: 0
     let variant_payload_tys = if variant_expected_ty != 0: self.enum_variant_payload_types(variant_expected_ty, fn_sym) else: Vec.new()
 
     // Check all arguments (with contextual expected-type propagation when
