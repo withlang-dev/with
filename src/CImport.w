@@ -992,8 +992,10 @@ fn ci_default_for_type(ty: str) -> str:
     // Pointer types → null (matching Zig's createZeroValueNode)
     if ci_starts_with(ty, "*"): return "null"
     if ci_starts_with(ty, "Option["): return "null"
-    // Enum type aliases (emitted by c_import as `type Foo = c_int`) → 0
-    if with_cimport_is_name_emitted(ty) != 0: return "0"
+    // Enum type aliases (emitted by c_import as `type Foo = c_int/c_uint`) → 0
+    // But NOT struct types — those need struct-literal defaults, not integer 0.
+    // Check: if the type resolves to a primitive int alias, use 0.
+    // Otherwise leave empty (no default) for struct/union/opaque types.
     if ci_starts_with(ty, "Vector("): return ""
     // Array types [N]T → require explicit init
     if ty.len() > 0 and ty.byte_at(0) == 91: return ""
@@ -1305,7 +1307,13 @@ fn ci_translate_macros(session: i64, extern_vars: str) -> str:
                     if translated.len() == 0:
                         translated = ci_translate_c_expr(work_value, param_names, known_values)
                     if translated.len() > 0:
-                        output = output ++ "fn " ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ ret_type ++ ":\n    " ++ translated ++ "\n"
+                        // Infer return type from cast expression: (x as c_int) → return c_int
+                        var inferred_ret = ret_type
+                        if param_count > 0:
+                            let cast_type = ci_infer_cast_return_type(translated)
+                            if cast_type.len() > 0:
+                                inferred_ret = cast_type
+                        output = output ++ "fn " ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ inferred_ret ++ ":\n    " ++ translated ++ "\n"
                     else:
                         output = output ++ "// untranslatable fn-like macro\nfn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"untranslatable C macro: " ++ name ++ "\")\n"
             continue
@@ -1490,6 +1498,41 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
                     return ".{ " ++ fields_result ++ " }"
         return ""
 
+    // Ternary: cond ? then : else (lowest precedence, check first)
+    let ternary_pos = ci_find_ternary(trimmed)
+    if ternary_pos >= 0:
+        let cond = ci_translate_c_expr(trimmed.slice(0, ternary_pos as i64), params, known)
+        if cond.len() > 0:
+            let rest = trimmed.slice(ternary_pos as i64 + 1, trimmed.len())
+            let colon_pos = ci_find_ternary_colon(rest)
+            if colon_pos >= 0:
+                let then_e = ci_translate_c_expr(rest.slice(0, colon_pos as i64), params, known)
+                let else_e = ci_translate_c_expr(rest.slice(colon_pos as i64 + 1, rest.len()), params, known)
+                if then_e.len() > 0 and else_e.len() > 0:
+                    let cond_expr = if ci_str_contains(cond, " == ") or ci_str_contains(cond, " != ") or ci_str_contains(cond, " < ") or ci_str_contains(cond, " > ") or ci_str_contains(cond, " and ") or ci_str_contains(cond, " or "): cond else: cond ++ " != 0"
+                    return "(if " ++ cond_expr ++ ": " ++ then_e ++ " else: " ++ else_e ++ ")"
+        return ""
+
+    // Binary operator (check before cast/call to handle `(a) * (b)` correctly)
+    let op_info = ci_find_binary_op_ext(trimmed)
+    if op_info >= 0:
+        let op_pos = op_info / 256
+        let op_len = op_info % 256
+        let lhs = ci_translate_c_expr(trimmed.slice(0, op_pos as i64), params, known)
+        let rhs = ci_translate_c_expr(trimmed.slice((op_pos + op_len) as i64, trimmed.len()), params, known)
+        if lhs.len() > 0 and rhs.len() > 0:
+            let c_op = trimmed.slice(op_pos as i64, (op_pos + op_len) as i64)
+            let w_op = ci_map_c_op(c_op)
+            if w_op.len() > 0:
+                if ci_is_comparison_op(w_op):
+                    return "(if " ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ": 1 else: 0)"
+                if w_op == "and" or w_op == "or":
+                    let l = if ci_is_bool_expr(lhs): lhs else: lhs ++ " != 0"
+                    let r = if ci_is_bool_expr(rhs): rhs else: rhs ++ " != 0"
+                    return "(if " ++ l ++ " " ++ w_op ++ " " ++ r ++ ": 1 else: 0)"
+                return "(" ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ")"
+        return ""
+
     // Cast: (type)expr  OR  CAST_OR_CALL: (X)(Y)  OR  comma operator: (expr1, expr2) → expr2
     if trimmed.byte_at(0) == 40:
         let cast_end = ci_find_matching_paren(trimmed, 0)
@@ -1526,21 +1569,7 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
                 if comma_result.len() > 0:
                     return comma_result
 
-    // Ternary: cond ? then : else
-    let ternary_pos = ci_find_ternary(trimmed)
-    if ternary_pos >= 0:
-        let cond = ci_translate_c_expr(trimmed.slice(0, ternary_pos as i64), params, known)
-        if cond.len() > 0:
-            let rest = trimmed.slice(ternary_pos as i64 + 1, trimmed.len())
-            let colon_pos = ci_find_ternary_colon(rest)
-            if colon_pos >= 0:
-                let then_e = ci_translate_c_expr(rest.slice(0, colon_pos as i64), params, known)
-                let else_e = ci_translate_c_expr(rest.slice(colon_pos as i64 + 1, rest.len()), params, known)
-                if then_e.len() > 0 and else_e.len() > 0:
-                    // C ternary condition is truthy (nonzero), wrap non-comparison
-                    let cond_expr = if ci_str_contains(cond, " == ") or ci_str_contains(cond, " != ") or ci_str_contains(cond, " < ") or ci_str_contains(cond, " > ") or ci_str_contains(cond, " and ") or ci_str_contains(cond, " or "): cond else: cond ++ " != 0"
-                    return "(if " ++ cond_expr ++ ": " ++ then_e ++ " else: " ++ else_e ++ ")"
-        return ""
+    // (ternary moved above binary operator check for correct precedence)
 
     // Function call: ident(args) — check for known builtins
     if ci_is_c_ident_prefix(trimmed):
@@ -1558,26 +1587,7 @@ fn ci_translate_c_expr(s: str, params: str, known: str) -> str:
                     return fn_name ++ "(" ++ translated_args ++ ")"
             return ""
 
-    // Binary operator
-    let op_info = ci_find_binary_op_ext(trimmed)
-    if op_info >= 0:
-        let op_pos = op_info / 256
-        let op_len = op_info % 256
-        let lhs = ci_translate_c_expr(trimmed.slice(0, op_pos as i64), params, known)
-        let rhs = ci_translate_c_expr(trimmed.slice((op_pos + op_len) as i64, trimmed.len()), params, known)
-        if lhs.len() > 0 and rhs.len() > 0:
-            let c_op = trimmed.slice(op_pos as i64, (op_pos + op_len) as i64)
-            let w_op = ci_map_c_op(c_op)
-            if w_op.len() > 0:
-                if ci_is_comparison_op(w_op):
-                    return "(if " ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ": 1 else: 0)"
-                // Logical AND/OR: wrap operands in != 0 for C truthiness
-                if w_op == "and" or w_op == "or":
-                    let l = if ci_is_bool_expr(lhs): lhs else: lhs ++ " != 0"
-                    let r = if ci_is_bool_expr(rhs): rhs else: rhs ++ " != 0"
-                    return "(if " ++ l ++ " " ++ w_op ++ " " ++ r ++ ": 1 else: 0)"
-                return "(" ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ")"
-        return ""
+    // (binary operator was moved above cast/call parsing)
 
     // Identifier with optional postfix (.field, ->field, [expr])
     let ident_end = ci_scan_ident(trimmed)
@@ -1946,6 +1956,30 @@ fn ci_extract_first_arg(args: str) -> str:
 
 // ── DISCARD pattern: (void)(X) ───────────────────────────────
 // Matches: (void)(X), ((void)(X)), (const void)(X), (volatile void)(X), etc.
+// Infer return type from a macro translation that's a cast expression.
+// If translated is "(x as c_int)" or similar, extract "c_int".
+fn ci_infer_cast_return_type(translated: str) -> str:
+    // Look for pattern: "(...) as TYPE)" at outermost level
+    // The translated expression for a cast macro is "(param as TYPE)"
+    let t = ci_trim(translated)
+    if t.len() < 5:
+        return ""
+    // Check for trailing " as TYPE)" pattern
+    var i = t.len() as i32 - 2
+    // Find last " as " in the string
+    while i >= 4:
+        if t.byte_at((i - 3) as i64) == 32 and t.byte_at((i - 2) as i64) == 97 and t.byte_at((i - 1) as i64) == 115 and t.byte_at(i as i64) == 32:
+            // Found " as " at position i-3
+            let type_start = (i + 1) as i64
+            let type_end = if t.byte_at(t.len() - 1) == 41: t.len() - 1 else: t.len()
+            let cast_type = ci_trim(t.slice(type_start, type_end))
+            // Verify it's a known type name
+            if cast_type == "c_int" or cast_type == "c_uint" or cast_type == "c_long" or cast_type == "c_ulong" or cast_type == "c_longlong" or cast_type == "c_ulonglong" or cast_type == "c_short" or cast_type == "c_ushort" or cast_type == "c_char" or cast_type == "i8" or cast_type == "i16" or cast_type == "i32" or cast_type == "i64" or cast_type == "u8" or cast_type == "u16" or cast_type == "u32" or cast_type == "u64" or cast_type == "f32" or cast_type == "f64" or cast_type == "isize" or cast_type == "usize" or cast_type == "bool":
+                return cast_type
+            return ""
+        i = i - 1
+    ""
+
 // Check if a macro body contains # (stringification) of a parameter.
 // # followed by a param name (not ##) indicates stringification.
 fn ci_has_stringify(body: str, params: str) -> bool:
@@ -2166,9 +2200,9 @@ fn ci_map_sizeof_type(c_type: str) -> str:
     // Try base type
     if ci_is_known_base_type(t):
         return ci_map_base_type(t)
-    // Pointer types
+    // Pointer types — sizeof(void*) etc. → all pointers are same size as usize
     if t.len() > 0 and t.byte_at(t.len() - 1) == 42:
-        return "*const i8"
+        return "usize"
     // Struct/type name — pass through
     if ci_is_c_ident(t):
         return t
