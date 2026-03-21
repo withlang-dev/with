@@ -2994,13 +2994,18 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
         function = wl_add_function(self.llmod, link_name, fn_type)
     self.apply_noalias_param_attrs(function, param_start, param_count)
 
-    // Apply calling convention if specified
+    // Apply calling convention or c_export if specified
     let cc_sym = self.pool.fn_meta_tp_start(meta)
     if cc_sym != 0:
         let cc_name = self.intern.resolve(cc_sym)
-        let cc_id = self.resolve_callconv(cc_name)
-        if cc_id >= 0:
-            wl_set_call_conv(function, cc_id)
+        if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
+            // @[c_export("name")] — set external linkage for C visibility
+            // External linkage = 0 in LLVM (default for non-internal functions)
+            wl_set_linkage(function, 0)
+        else:
+            let cc_id = self.resolve_callconv(cc_name)
+            if cc_id >= 0:
+                wl_set_call_conv(function, cc_id)
 
     let actual_fn_type = wl_global_get_value_type(function)
     self.fn_values.insert(name_sym, function)

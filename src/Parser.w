@@ -301,6 +301,18 @@ fn Parser.skip_attributes(self: Parser):
         else if self.is_ident_named("flags"):
             // Already handled by standalone check above
             self.advance()
+        else if self.is_ident_named("c_export"):
+            // @[c_export("name")] — parse and store the export name as callconv
+            // with "c_export:" prefix so codegen can detect it
+            self.advance()
+            if self.peek() == TK_L_PAREN:
+                self.advance()
+                if self.peek() == TK_STRING_LIT:
+                    let export_name = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
+                    self.pending_callconv = self.intern.intern("c_export:" ++ export_name)
+                    self.advance()
+                if self.peek() == TK_R_PAREN:
+                    self.advance()
         else if self.is_ident_named("callconv"):
             self.advance()
             if self.peek() == TK_L_PAREN:
