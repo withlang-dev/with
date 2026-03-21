@@ -4894,17 +4894,62 @@ fn Sema.check_tuple_destructure(self: Sema, node: i32) -> i32:
         self.emit_error("tuple destructuring requires tuple type", node)
     let elem_start = if is_tuple != 0: self.get_type_d0(resolved) else: 0
     let elem_count = if is_tuple != 0: self.get_type_d1(resolved) else: 0
-    var emitted_arity_error = 0
+    // Check for rest pattern (negative sym value)
+    var has_rest = false
+    var rest_pos = -1
     for ni in 0..name_count:
         let n_sym = self.ast.get_extra(extra_start + ni)
-        var bind_ty = 0
-        if ni < elem_count:
-            bind_ty = self.type_extra.get((elem_start + ni) as i64)
-        else:
-            if emitted_arity_error == 0 and is_tuple != 0:
-                self.emit_error("tuple destructuring arity mismatch", node)
-                emitted_arity_error = 1
-        self.scope_put(n_sym, bind_ty, 0)
+        if n_sym < 0:
+            has_rest = true
+            rest_pos = ni
+    if has_rest:
+        // Bind elements before rest
+        for ni in 0..rest_pos:
+            let n_sym = self.ast.get_extra(extra_start + ni)
+            var bind_ty = 0
+            if ni < elem_count:
+                bind_ty = self.type_extra.get((elem_start + ni) as i64)
+            if n_sym > 0:
+                self.scope_put(n_sym, bind_ty, 0)
+        // Rest binding: bind to sub-tuple of remaining elements
+        let rest_sym = 0 - self.ast.get_extra(extra_start + rest_pos)
+        let after_rest = name_count - rest_pos - 1
+        let rest_elem_count = elem_count - rest_pos - after_rest
+        if rest_sym > 0 and rest_elem_count > 0:
+            // Build sub-tuple type
+            let te_start = self.type_extra.len() as i32
+            for ri in 0..rest_elem_count:
+                let idx = rest_pos + ri
+                if idx < elem_count:
+                    self.type_extra.push(self.type_extra.get((elem_start + idx) as i64))
+                else:
+                    self.type_extra.push(0)
+            let rest_ty = self.add_type(TY_TUPLE, 0, te_start, rest_elem_count)
+            self.scope_put(rest_sym, rest_ty, 0)
+        else if rest_sym > 0:
+            self.scope_put(rest_sym, self.ty_void, 0)
+        // Bind elements after rest
+        for ni in 0..after_rest:
+            let n_sym = self.ast.get_extra(extra_start + rest_pos + 1 + ni)
+            let elem_idx = elem_count - after_rest + ni
+            var bind_ty = 0
+            if elem_idx >= 0 and elem_idx < elem_count:
+                bind_ty = self.type_extra.get((elem_start + elem_idx) as i64)
+            if n_sym > 0:
+                self.scope_put(n_sym, bind_ty, 0)
+    else:
+        var emitted_arity_error = 0
+        for ni in 0..name_count:
+            let n_sym = self.ast.get_extra(extra_start + ni)
+            var bind_ty = 0
+            if ni < elem_count:
+                bind_ty = self.type_extra.get((elem_start + ni) as i64)
+            else:
+                if emitted_arity_error == 0 and is_tuple != 0:
+                    self.emit_error("tuple destructuring arity mismatch", node)
+                    emitted_arity_error = 1
+            if n_sym > 0:
+                self.scope_put(n_sym, bind_ty, 0)
     self.ty_void
 
 fn Sema.is_sizeof_or_alignof(self: Sema, callee: i32) -> i32:
