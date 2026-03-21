@@ -307,5 +307,17 @@ void with_panic(with_str msg, with_str file, int32_t line) {
     abort();
 }
 
+// ── C Builtins ─────────────────────────────────────────────────────
+// Runtime implementations for __builtin_* functions translated by c_import.
+
+int32_t with_clz(int32_t x)       { return x ? __builtin_clz((unsigned)x) : 32; }
+int32_t with_ctz(int32_t x)       { return x ? __builtin_ctz((unsigned)x) : 32; }
+int32_t with_popcount(int32_t x)   { return __builtin_popcount((unsigned)x); }
+int32_t with_clzl(int64_t x)      { return x ? __builtin_clzll((unsigned long long)x) : 64; }
+int32_t with_ctzl(int64_t x)      { return x ? __builtin_ctzll((unsigned long long)x) : 64; }
+uint16_t with_bswap16(uint16_t x)  { return __builtin_bswap16(x); }
+uint32_t with_bswap32(uint32_t x)  { return __builtin_bswap32(x); }
+uint64_t with_bswap64(uint64_t x)  { return __builtin_bswap64(x); }
+
 // ── System ─────────────────────────────────────────────────────────
 // Implemented in runtime/helpers.c.
