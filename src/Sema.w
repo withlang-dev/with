@@ -3973,6 +3973,17 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
 fn Sema.check_field_access(self: Sema, node: i32) -> i32:
     let expr = self.ast.get_data0(node)
     let field = self.ast.get_data1(node)
+
+    // comptime cfg.field → resolve to compile-time constant type
+    // Only apply when 'cfg' is not a local variable
+    if self.ast.kind(expr) == NK_IDENT:
+        let cfg_sym = self.ast.get_data0(expr)
+        if self.pool_resolve(cfg_sym) == "cfg" and self.scope_lookup(cfg_sym) < 0:
+            let field_name = self.pool_resolve(field)
+            if field_name == "is_debug" or field_name == "is_release":
+                return self.ty_bool
+            return self.ty_str
+
     let obj_type = self.check_expr(expr)
 
     if obj_type == 0:
