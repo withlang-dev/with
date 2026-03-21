@@ -2635,8 +2635,47 @@ fn Parser.parse_for(self: Parser, label: i32) -> i32:
         self.advance()
     let body = self.parse_block_or_expr()
 
-    let for_node = self.pool.add_node(NK_FOR, start, self.prev_end(), binding, iterable, body)
+    var for_node = self.pool.add_node(NK_FOR, start, self.prev_end(), binding, iterable, body)
     self.pool.add_for_meta(for_node, index_binding, label)
+
+    // Parse optional else clause: for x in iter: ... else: ...
+    // Only match else at the same column as the for keyword.
+    // Desugar to: { var __for_ran = false; for x in iter: { __for_ran = true; body }; if not __for_ran: else_body }
+    let for_col = column_of(self.source, start)
+    let save_pos = self.pos
+    self.skip_newlines()
+    let else_col = column_of(self.source, self.current_start())
+    if self.peek() == TK_KW_ELSE and else_col == for_col:
+        self.advance()
+        if self.peek() == TK_COLON:
+            self.advance()
+        let else_body = self.parse_block_or_expr()
+        // Build: var __for_ran: bool = false
+        let flag_sym = self.intern.intern("__for_ran")
+        let false_lit = self.pool.add_node(NK_BOOL_LIT, start, start, 0, 0, 0)
+        let flag_decl = self.pool.add_node(NK_LET_BINDING, start, start, flag_sym, false_lit, 1)
+        // Wrap original for body in: { __for_ran = true; original_body }
+        let flag_ident = self.pool.add_node(NK_IDENT, start, start, flag_sym, 0, 0)
+        let true_lit = self.pool.add_node(NK_BOOL_LIT, start, start, 1, 0, 0)
+        let flag_set = self.pool.add_node(NK_ASSIGN, start, start, flag_ident, true_lit, 0)
+        let wrapped_extra = self.pool.extra_len()
+        self.pool.add_extra(flag_set)
+        let wrapped_body = self.pool.add_node(NK_BLOCK, start, start, wrapped_extra, 1, body)
+        // Rebuild for node with wrapped body
+        for_node = self.pool.add_node(NK_FOR, start, self.prev_end(), binding, iterable, wrapped_body)
+        self.pool.add_for_meta(for_node, index_binding, label)
+        // Build: if not __for_ran: else_body
+        let flag_read = self.pool.add_node(NK_IDENT, start, start, flag_sym, 0, 0)
+        let not_flag = self.pool.add_node(NK_UNARY, start, start, 1, flag_read, 0)
+        let if_else = self.pool.add_node(NK_IF_EXPR, start, self.prev_end(), not_flag, else_body, 0)
+        // Build block: { flag_decl; for_node; if_else }
+        let block_extra = self.pool.extra_len()
+        self.pool.add_extra(flag_decl)
+        self.pool.add_extra(for_node)
+        for_node = self.pool.add_node(NK_BLOCK, start, self.prev_end(), block_extra, 2, if_else)
+    else:
+        self.pos = save_pos
+
     for_node
 
 fn Parser.parse_labeled_loop(self: Parser) -> i32:
