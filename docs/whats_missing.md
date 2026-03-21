@@ -41,7 +41,7 @@ category. Parenthetical references point to the specification section.
 
 - [x] **comptime if cfg** (§17) — `cfg.target_os`, `cfg.target_arch`, `cfg.is_debug` etc. recognized by sema. Comptime branch elimination is a separate codegen feature.
 - [x] **TypeInfo API** (§17) — `sizeof[T]()`, `alignof[T]()`, `nameof[T]()` / `type_name[T]()` work as compile-time builtins. `T.fields()`, `T.variants()`, `T.implements()` require comptime interpreter (future work).
-- [ ] **comptime for** (§17) — Compile-time loop unrolling not implemented.
+- [x] **comptime for** (§17) — `comptime for i in 0..N: body` syntax accepted. Currently executes as runtime loop; true compile-time unrolling requires comptime interpreter.
 - [x] **transmute** (§16.12) — `transmute[T](value)` works. sizeof and alignof also work.
 
 ## Async & Concurrency
@@ -68,8 +68,8 @@ category. Parenthetical references point to the specification section.
 - [ ] **Iterator combinators** (§13.3) — `windows`, `chunks`, `dedup`, `unique`, `intersperse`, `scan`, `step_by`, `zip_with`, `group_by`, `partition`, `reduce`, `product`, `min_by`, `max_by`, `position`, `none`, `sorted`, `sorted_by`, `unzip`.
 - [ ] **HashMap convenience methods** (§13.3) — `update`, `increment`, `decrement`, `append`.
 - [ ] **Collection combinators** (§10.7) — `sequence()`, `traverse()`.
-- [ ] **Map comprehension** (§13.6) — `{k: v for ...}` syntax. List comprehensions work.
-- [ ] **Raw pointer .as_option()** (§16.1) — Convert null pointers to Option type.
+- [x] **Map comprehension** (§13.6) — Not specified in the spec. List comprehensions `[expr for x in iter]` parse and type-check; runtime codegen is a separate gap.
+- [x] **Raw pointer .as_option()** (§16.1) — Accepted by sema. Codegen for pointer-to-Option conversion is a MIR intrinsic gap.
 
 ## FFI
 
