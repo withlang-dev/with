@@ -4702,7 +4702,47 @@ fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
         if op == OP_MOD:
             if rv == 0: return CONST_EVAL_FAIL()
             return lv % rv
-        // Bitwise ops: handled when the compiler can parse them in this context
+        if op == OP_SHL:
+            // Implement shift via multiplication to bootstrap (seed doesn't have << operator yet)
+            var shift_result: i64 = lv
+            var shift_i: i64 = 0
+            while shift_i < rv:
+                shift_result = shift_result * 2
+                shift_i = shift_i + 1
+            return shift_result
+        if op == OP_SHR:
+            var shift_result: i64 = lv
+            var shift_i: i64 = 0
+            while shift_i < rv:
+                shift_result = shift_result / 2
+                shift_i = shift_i + 1
+            return shift_result
+        if op == OP_BIT_AND: return lv & rv
+        if op == OP_BIT_OR: return lv | rv
+        if op == OP_BIT_XOR: return lv ^ rv
+        return CONST_EVAL_FAIL()
+    // sizeof[T]() / alignof[T]() as module-level constants
+    if kind == NK_CALL:
+        let callee = self.pool.get_data0(node)
+        let callee_kind = self.pool.kind(callee)
+        if callee_kind == NK_TYPE_GENERIC or callee_kind == NK_INDEX:
+            let base = self.pool.get_data0(callee)
+            if self.pool.kind(base) == NK_IDENT:
+                let name = self.intern.resolve(self.pool.get_data0(base))
+                if name == "sizeof" or name == "size_of" or name == "alignof" or name == "align_of":
+                    let tp_node = if callee_kind == NK_TYPE_GENERIC:
+                        let tp_start = self.pool.get_data1(callee)
+                        let tp_count = self.pool.get_data2(callee)
+                        if tp_count == 0: return CONST_EVAL_FAIL()
+                        self.pool.get_extra(tp_start)
+                    else:
+                        self.pool.get_data1(callee)
+                    let type_val = self.resolve_type(tp_node)
+                    if type_val != 0:
+                        let dl = wl_get_module_data_layout(self.llmod)
+                        if name == "sizeof" or name == "size_of":
+                            return wl_abi_size_of(dl, type_val)
+                        return wl_abi_align_of(dl, type_val) as i64
         return CONST_EVAL_FAIL()
     if kind == NK_IDENT:
         let sym = self.pool.get_data0(node)

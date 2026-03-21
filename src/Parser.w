@@ -1645,8 +1645,8 @@ fn Parser.infix_op(self: Parser) -> i32:
     if t == TK_DOT_DOT_EQ: return 5 * 1000 + 503
     if t == TK_PIPE_GT: return 6 * 1000 + 500
     if t == TK_LT_PIPE: return 6 * 1000 + 501
-    if t == TK_LT_LT: return 6 * 1000 + 504
-    if t == TK_GT_GT: return 6 * 1000 + 505
+    if t == TK_LT_LT: return 10 * 1000 + OP_SHL
+    if t == TK_GT_GT: return 10 * 1000 + OP_SHR
     if t == TK_AMPERSAND: return 7 * 1000 + OP_BIT_AND
     if t == TK_CARET: return 8 * 1000 + OP_BIT_XOR
     if t == TK_PIPE: return 9 * 1000 + OP_BIT_OR

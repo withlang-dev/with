@@ -2209,21 +2209,26 @@ assert(is_valid(parse(input)))
 assert <| is_valid <| parse(input)
 ```
 
-**Function composition:**
-```
-let process = parse >> validate >> transform
-let prepare = transform << validate << parse
-```
+**Bitwise shift operators:**
 
-`f >> g` produces a function `x => g(f(x))` (left-to-right).
-`f << g` produces a function `x => f(g(x))` (right-to-left).
-
-Composition creates a closure. It has zero runtime cost beyond what
-the closure itself has. Useful when building functions to pass to
-`map`, `filter`, or store for later use:
+`<<` (left shift) and `>>` (right shift) are binary operators at
+precedence level 9, between bitwise operators and additive operators.
+They follow C/Rust/Zig semantics:
 
 ```
-let normalize = trim >> lowercase >> strip_accents
+let flags = 1 << 4          // 16
+let high = value >> 8        // extract high byte
+let mask = 0xFF << (n * 8)   // position-dependent mask
+```
+
+Right shift is arithmetic (sign-extending) for signed types and
+logical (zero-filling) for unsigned types.
+
+**Function composition** uses the pipeline operator or explicit
+closures:
+
+```
+let normalize = x => strip_accents(lowercase(trim(x)))
 names |> map(normalize) |> collect[Vec]()
 ```
 
