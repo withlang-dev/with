@@ -231,7 +231,7 @@ fn Parser.skip_attributes(self: Parser):
         let saved = self.pos
         self.advance()
         if self.peek() != TK_L_BRACKET:
-            self.pos = saved
+            self.emit_error("expected '[' after '@' for attribute (use 'label for loop labels)")
             return
         self.advance()
 

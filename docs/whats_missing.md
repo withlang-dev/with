@@ -16,7 +16,7 @@ category. Parenthetical references point to the specification section.
 ## Control Flow
 
 - [x] **for-else** (§9.10) — `for x in iter: ... else: ...` desugars to flag-based check in parser. Works for range-based for loops.
-- [ ] **Named/labeled breaks** (§9.4) — `@label` syntax on loops causes compiler hang.
+- [x] **Named/labeled breaks** (§9.4) — `'label:` syntax works for labeled loops and `break 'label`. `@label` parse hang fixed with error message.
 - [ ] **in pattern in match arms** (§9.9) — `in expr` as a match arm pattern is not parsed. The `in`/`not in` operators work in expressions.
 - [ ] **let-else** (§9.6) — `let Some(x) = expr else return` is not parsed.
 
