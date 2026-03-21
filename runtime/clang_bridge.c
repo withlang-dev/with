@@ -405,9 +405,17 @@ static char* translate_type_recursive(CImportSession *s, CXType type, int depth,
         case CXType_BlockPointer:
             return session_strdup(s, "*const i8");
 
-        // Atomic type — unwrap but mark as unsupported for struct demotion
+        // Atomic type — strip _Atomic wrapper, translate inner type
         case CXType_Atomic: {
-            return session_strdup(s, "__UNSUPPORTED:_Atomic type");
+            CXType inner = clang_Type_getModifiedType(canonical);
+            if (inner.kind == CXType_Invalid) {
+                // Fallback: try canonical's value type
+                inner = clang_Type_getValueType(canonical);
+            }
+            if (inner.kind != CXType_Invalid) {
+                return translate_type_recursive(s, inner, depth + 1, is_last_struct_field);
+            }
+            return session_strdup(s, "c_int"); // fallback for _Atomic(int)
         }
 
         default: {
@@ -430,7 +438,8 @@ static char* translate_fn_type(CImportSession *s, CXType fn_type, int depth) {
     if (!ret_str) ret_str = session_strdup(s, "void");
 
     int num_args = clang_getNumArgTypes(fn_type);
-    int is_variadic = clang_isFunctionTypeVariadic(fn_type);
+    // Only mark as variadic for FunctionProto with explicit ..., not FunctionNoProto (K&R style)
+    int is_variadic = clang_isFunctionTypeVariadic(fn_type) && fn_type.kind != CXType_FunctionNoProto;
 
     char params[4096] = {0};
     int pos = 0;
@@ -829,6 +838,123 @@ with_str with_cimport_fn_calling_conv(int64_t session, int32_t idx) {
         case CXCallingConv_AArch64VectorCall: return make_str("aarch64_vfabi");
         default: return make_str("c");
     }
+}
+
+// noreturn attribute detection: visit cursor children for noreturn attrs
+struct NoreturnVisitorData { int found; };
+static enum CXChildVisitResult noreturn_visitor(CXCursor cursor, CXCursor parent, CXClientData client_data) {
+    (void)parent;
+    struct NoreturnVisitorData *data = (struct NoreturnVisitorData *)client_data;
+    enum CXCursorKind kind = clang_getCursorKind(cursor);
+    if (kind == CXCursor_UnexposedAttr) {
+        CXString spelling = clang_getCursorSpelling(cursor);
+        const char *s = clang_getCString(spelling);
+        if (s && (strstr(s, "noreturn") != NULL || strstr(s, "_Noreturn") != NULL)) {
+            data->found = 1;
+        }
+        clang_disposeString(spelling);
+        // Also check the extent text
+        if (!data->found) {
+            CXSourceRange range = clang_getCursorExtent(cursor);
+            CXToken *tokens = NULL;
+            unsigned num_tokens = 0;
+            CXTranslationUnit tu = clang_Cursor_getTranslationUnit(cursor);
+            clang_tokenize(tu, range, &tokens, &num_tokens);
+            for (unsigned i = 0; i < num_tokens && !data->found; i++) {
+                CXString tok_str = clang_getTokenSpelling(tu, tokens[i]);
+                const char *tok = clang_getCString(tok_str);
+                if (tok && (strcmp(tok, "noreturn") == 0 || strcmp(tok, "_Noreturn") == 0)) {
+                    data->found = 1;
+                }
+                clang_disposeString(tok_str);
+            }
+            if (tokens) clang_disposeTokens(tu, tokens, num_tokens);
+        }
+    }
+    if (data->found) return CXChildVisit_Break;
+    return CXChildVisit_Continue;
+}
+
+int32_t with_cimport_fn_is_noreturn(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    CXCursor cursor = s->decls[idx];
+
+    // Method 1: Check cursor children for noreturn attribute nodes
+    if (clang_Cursor_hasAttrs(cursor)) {
+        struct NoreturnVisitorData data = { .found = 0 };
+        clang_visitChildren(cursor, noreturn_visitor, &data);
+        if (data.found) return 1;
+    }
+
+    // Method 2: Check the raw source tokens for __attribute__((noreturn))
+    // This catches cases where the attribute is in the type but not as a child cursor
+    CXSourceRange range = clang_getCursorExtent(cursor);
+    CXTranslationUnit tu = clang_Cursor_getTranslationUnit(cursor);
+    CXToken *tokens = NULL;
+    unsigned num_tokens = 0;
+    clang_tokenize(tu, range, &tokens, &num_tokens);
+    int found = 0;
+    for (unsigned i = 0; i < num_tokens && !found; i++) {
+        CXString tok_str = clang_getTokenSpelling(tu, tokens[i]);
+        const char *tok = clang_getCString(tok_str);
+        if (tok && (strcmp(tok, "noreturn") == 0 || strcmp(tok, "_Noreturn") == 0)) {
+            found = 1;
+        }
+        clang_disposeString(tok_str);
+    }
+    if (tokens) clang_disposeTokens(tu, tokens, num_tokens);
+    return found;
+}
+
+// Struct forward declaration: check if there's a definition for this struct elsewhere
+int32_t with_cimport_struct_has_definition(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    CXCursor cursor = s->decls[idx];
+    CXCursor defn = clang_getCursorDefinition(cursor);
+    if (clang_Cursor_isNull(defn)) return 0;
+    // If the definition cursor exists, the struct has a real definition
+    return 1;
+}
+
+// Variable alignment: check if variable has explicit alignment attribute
+int32_t with_cimport_var_alignment(int64_t session, int32_t idx) {
+    CImportSession *s = (CImportSession *)(intptr_t)session;
+    if (!s || idx < 0 || idx >= s->decl_count) return 0;
+    CXCursor cursor = s->decls[idx];
+    CXType type = clang_getCursorType(cursor);
+    long long type_align = clang_Type_getAlignOf(type);
+    // Check for aligned attribute by comparing cursor alignment vs type natural alignment
+    // If cursor has attributes, the alignment might differ
+    if (!clang_Cursor_hasAttrs(cursor)) return 0;
+    // Use type alignment as the explicit alignment (it reflects __attribute__((aligned(N))))
+    if (type_align > 0 && type_align > 16) {
+        // Only report non-default alignments (> 16 is unusual and likely explicit)
+        return (int32_t)type_align;
+    }
+    return 0;
+}
+
+// Convert hex float string to decimal float string
+with_str with_cimport_hex_float_to_decimal(with_str hex_str) {
+    char buf[128];
+    int len = hex_str.len < 127 ? (int)hex_str.len : 127;
+    memcpy(buf, hex_str.ptr, len);
+    buf[len] = '\0';
+    // Strip suffix (f, F, l, L)
+    while (len > 0 && (buf[len-1] == 'f' || buf[len-1] == 'F' ||
+                       buf[len-1] == 'l' || buf[len-1] == 'L')) {
+        buf[--len] = '\0';
+    }
+    double val = strtod(buf, NULL);
+    char result[64];
+    snprintf(result, sizeof(result), "%.17g", val);
+    // Ensure it has a decimal point (so it's parsed as float)
+    if (!strchr(result, '.') && !strchr(result, 'e') && !strchr(result, 'E')) {
+        strcat(result, ".0");
+    }
+    return make_str(strdup(result));
 }
 
 // ── Struct queries ──────────────────────────────────────────

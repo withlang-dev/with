@@ -271,6 +271,34 @@ fn test_inline_functions:
     assert_eq(tc_mul(11, 11), 121, "inline tc_mul")
     assert_eq(tc_abs(0 - 42), 42, "inline tc_abs")
 
+// Hex float literals (Gap 4)
+
+fn test_hex_floats:
+    // 0x1.0p10 = 1.0 * 2^10 = 1024.0
+    assert_eq(TC_HEX_FLOAT_A as i32, 1024, "hex float 0x1.0p10")
+    // 0x1.0p5f = 1.0 * 2^5 = 32.0
+    assert_eq(TC_HEX_FLOAT_B as i32, 32, "hex float 0x1.0p5f")
+    // 0xAp0 = 10.0 * 2^0 = 10.0
+    assert_eq(TC_HEX_FLOAT_C as i32, 10, "hex float 0xAp0")
+
+// __builtin_choose_expr (Gap 5)
+
+fn test_choose_expr:
+    let v1: i32 = TC_CHOOSE_TRUE(42, 99)
+    assert_eq(v1, 42, "choose_expr true")
+    let v2: i32 = TC_CHOOSE_FALSE(42, 99)
+    assert_eq(v2, 99, "choose_expr false")
+
+// Circular struct forward declarations (Gap 6)
+
+fn test_circular_structs:
+    let a = tc_node_a { peer: null, value: 10 }
+    let b = tc_node_b { peer: null, value: 20 }
+    assert_eq(a.value, 10, "circular struct a.value")
+    assert_eq(b.value, 20, "circular struct b.value")
+    assert_true(a.peer == null, "circular struct a.peer null")
+    assert_true(b.peer == null, "circular struct b.peer null")
+
 // Main
 
 fn main:
@@ -299,6 +327,9 @@ fn main:
     test_macro_divmod()
     test_new_structs()
     test_inline_functions()
+    test_hex_floats()
+    test_choose_expr()
+    test_circular_structs()
 
     with_eprintln(int_to_string(pass_count) ++ "/" ++ int_to_string(test_count) ++ " tests passed")
     if fail_count > 0:
