@@ -2229,6 +2229,16 @@ fn Parser.parse_variant_shorthand(self: Parser) -> i32:
         self.advance()
         self.skip_newlines()
         while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+            // Keep shorthand construction aligned with normal call parsing:
+            // `.Fatal(code: 99)` should behave like `Fatal(code: 99)`.
+            if self.peek() == TK_IDENT:
+                let save = self.pos
+                self.advance()
+                if self.peek() == TK_COLON:
+                    self.advance()
+                    self.skip_newlines()
+                else:
+                    self.pos = save
             args.push(self.parse_expr())
             if self.peek() == TK_COMMA:
                 self.advance()
