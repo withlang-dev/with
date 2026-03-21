@@ -3091,9 +3091,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                     if self.sema.variant_lookup.contains(fa_qual_sym):
                         let fa_var_idx = self.sema.variant_lookup.get(fa_qual_sym).unwrap()
                         let fa_disc_tag = if self.sema.disc_values.contains(fa_qual_sym): self.sema.disc_values.get(fa_qual_sym).unwrap() else: fa_var_idx
-                        // Disc enums with payloads need RK_AGGREGATE so codegen
-                        // builds the full struct {tag, [payload x i8]}
-                        if self.sema.disc_has_payload.contains(fa_resolved):
+                        // Plain enums are always lowered as full aggregate values.
+                        // Only payloadless discriminant enums lower to their repr integer.
+                        let fa_is_disc_enum = self.sema.disc_repr_types.contains(fa_resolved)
+                        if not fa_is_disc_enum or self.sema.disc_has_payload.contains(fa_resolved):
                             let fa_fields: Vec[i32] = Vec.new()
                             let fa_names: Vec[i32] = Vec.new()
                             let fa_fid = self.body.new_agg_fields(fa_fields, fa_names)
@@ -3109,7 +3110,8 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                         if fa_var_tid == fa_resolved:
                             let fa_var_idx2 = self.sema.variant_lookup.get(fa_field).unwrap()
                             let fa_disc_tag2 = if self.sema.disc_values.contains(fa_field): self.sema.disc_values.get(fa_field).unwrap() else: fa_var_idx2
-                            if self.sema.disc_has_payload.contains(fa_resolved):
+                            let fa_is_disc_enum2 = self.sema.disc_repr_types.contains(fa_resolved)
+                            if not fa_is_disc_enum2 or self.sema.disc_has_payload.contains(fa_resolved):
                                 let fa_fields2: Vec[i32] = Vec.new()
                                 let fa_names2: Vec[i32] = Vec.new()
                                 let fa_fid2 = self.body.new_agg_fields(fa_fields2, fa_names2)
@@ -3379,14 +3381,15 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let vs_arg_count = self.ast.get_data2(node)
         let vs_variant_idx = self.variant_index(vs_name_sym)
         let vs_result_ty = self.expr_type(node)
-        // Check for disc enum: return discriminant value
+        // Plain enums are always lowered as full aggregate values.
+        // Only payloadless discriminant enums lower to their repr integer.
         if self.sema.variant_lookup.contains(vs_name_sym):
             if self.sema.disc_values.contains(vs_name_sym):
                 let vs_disc_val = self.sema.disc_values.get(vs_name_sym).unwrap()
                 if vs_arg_count == 0:
-                    // Disc enums with payloads need full struct via RK_AGGREGATE
                     let vs_resolved = self.sema.resolve_alias(vs_result_ty)
-                    if self.sema.disc_has_payload.contains(vs_resolved):
+                    let vs_is_disc_enum = self.sema.disc_repr_types.contains(vs_resolved)
+                    if not vs_is_disc_enum or self.sema.disc_has_payload.contains(vs_resolved):
                         let vs_de_fields: Vec[i32] = Vec.new()
                         let vs_de_names: Vec[i32] = Vec.new()
                         let vs_de_fid = self.body.new_agg_fields(vs_de_fields, vs_de_names)

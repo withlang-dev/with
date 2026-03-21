@@ -30,6 +30,16 @@ fn test_enum_equality:
     let c: Direction = .East
     assert(a == b)
     assert(a != c)
+    assert(a == .West)
+    assert(c != .West)
+
+fn accept_direction(d: Direction) -> bool:
+    let _ = d
+    true
+
+fn test_enum_call_arg:
+    assert(accept_direction(Direction.North))
+    assert(accept_direction(.South))
 
 fn test_discriminant_enum:
     let c = Color.Green
@@ -59,6 +69,7 @@ fn main:
     test_enum_shorthand()
     test_enum_match_wildcard()
     test_enum_equality()
+    test_enum_call_arg()
     test_discriminant_enum()
     test_discriminant_cast()
     test_discriminant_shorthand()

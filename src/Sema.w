@@ -1523,6 +1523,11 @@ fn Sema.build_ci_scoping(self: Sema):
     var module_count = 0
     var prev_path_sym = 0 - 1
     for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) == NK_C_IMPORT and di < self.decl_source_paths.len() as i32:
+            let mp_direct = self.pool_intern(self.decl_source_paths.get(di as i64))
+            self.ci_modules.insert(mp_direct, 1)
+            has_ci = 1
         if di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import.get(di as i64) != 0:
             has_ci = 1
             // Record which module owns this c_import declaration
