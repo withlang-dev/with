@@ -8,7 +8,7 @@ category. Parenthetical references point to the specification section.
 ## Type System
 
 - [x] **Copy trait** (§2.3) — `impl Copy for T` recognized. Copy+Drop mutual exclusion enforced. Field-level Copy checking for concrete types works. Copy-size warning deferred.
-- [ ] **Distinct type methods** (§4.5) — `type Meters = distinct i32` parses, but calling `Meters(value)` as a constructor fails ("value is not callable"). Methods on distinct types don't work.
+- [x] **Distinct type methods** (§4.5) — `Meters(42)` constructor works, `.value` field access works, methods on distinct types work.
 - [ ] **Ephemeral type system** (§5) — Second-class reference enforcement (cannot store refs in structs, closures, containers) is not checked.
 - [ ] **Named enum variant fields** (§4.4) — `Circle(radius: f64)` in type declarations fails to parse. Positional variant fields work.
 - [ ] **Implicit Ok wrapping** (§4.9) — Functions returning `Result[T, E]` cannot just return `T`; must explicitly wrap in `Ok(...)`. Also `Result[Unit, E]` doesn't recognize `Unit` type.
