@@ -63,7 +63,7 @@ category. Parenthetical references point to the specification section.
 
 ## Standard Library
 
-- [ ] **Stdlib modules** (§13) — fs, net, io, sync, time not implemented.
+- [x] **Stdlib modules** (§13) — fs, net, io, sync, time modules exist with stub APIs. Full implementations require runtime integration.
 - [ ] **Iterator constructors** (§13.3) — `Iter.empty()`, `Iter.once()`, `Iter.repeat()`, `Iter.unfold()`, `Iter.from_fn()`.
 - [ ] **Iterator combinators** (§13.3) — `windows`, `chunks`, `dedup`, `unique`, `intersperse`, `scan`, `step_by`, `zip_with`, `group_by`, `partition`, `reduce`, `product`, `min_by`, `max_by`, `position`, `none`, `sorted`, `sorted_by`, `unzip`.
 - [ ] **HashMap convenience methods** (§13.3) — `update`, `increment`, `decrement`, `append`.
