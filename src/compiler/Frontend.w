@@ -119,6 +119,13 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             ordered_ci.push(ci_f)
             continue
 
+        // Preserve the original c_import declaration as an ownership marker so
+        // later sema passes can still tell which modules directly use c_import,
+        // even if header expansion is deduplicated elsewhere in the merged AST.
+        ordered.push(decl)
+        ordered_paths.push(self.decl_source_path_frontend(i))
+        ordered_ci.push(0)
+
         let header_sym = out.get_data0(decl)
         let header_spec = self.pool.resolve(header_sym)
         let decl_dir = self.decl_source_dir_frontend(i)
