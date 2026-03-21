@@ -1325,6 +1325,30 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
     let place = self.place_for_local(local_id)
     self.assign_operand_to_place(place, rhs_op, self.ast.get_start(node))
 
+fn MirBuilder.lower_tuple_destructure(self: MirBuilder, node: i32):
+    let extra_start = self.ast.get_data0(node)
+    let name_count = self.ast.get_data1(node)
+    let rhs_expr = self.ast.get_data2(node)
+    let rhs_ty = self.expr_type(rhs_expr)
+    let rhs_op = self.lower_expr(rhs_expr)
+    let rhs_place = self.materialize_operand(rhs_op, rhs_ty, self.ast.get_start(node))
+    // Bind each name to the corresponding tuple field
+    for ni in 0..name_count:
+        let n_sym = self.ast.get_extra(extra_start + ni)
+        if n_sym == 0:
+            continue
+        // Negative sym means ..rest pattern — skip for now
+        if n_sym < 0:
+            continue
+        let elem_ty = self.tuple_elem_type(rhs_ty, ni)
+        let local_id = self.body.new_local(elem_ty, 0, n_sym, 1)
+        self.bind_local(n_sym, local_id)
+        self.body.push_stmt(self.cur_bb, SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(node))
+        let field_place = self.body.new_field_place(rhs_place, ni)
+        let field_op = self.body.new_operand(OK_COPY, field_place)
+        let dst_place = self.place_for_local(local_id)
+        self.assign_operand_to_place(dst_place, field_op, self.ast.get_start(node))
+
 fn MirBuilder.lower_let_else(self: MirBuilder, node: i32):
     let pat = self.ast.get_data0(node)
     let rhs = self.ast.get_data1(node)
@@ -1388,6 +1412,9 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
             let errdefer_body = self.ast.get_data0(stmt)
             if errdefer_body != 0:
                 self.errdefer_nodes.push(errdefer_body)
+            continue
+        if sk == NK_TUPLE_DESTRUCTURE:
+            self.lower_tuple_destructure(stmt)
             continue
         let _ = self.lower_expr(stmt)
 
@@ -2805,9 +2832,16 @@ fn MirBuilder.lower_with_form1(self: MirBuilder, guard_expr: i32, body_expr: i32
     result
 
 fn MirBuilder.lower_with_binding(self: MirBuilder, sym: i32, rhs_expr: i32, body_expr: i32, span: i32) -> i32:
+    // Recover mutability from the encoded d2 value passed via the caller.
+    // The caller extracts sym via decode_with_binding_sym, but we need
+    // the original encoded value to check is_mut. Re-derive from the
+    // with-expr node being lowered.
+    let with_node = self.cur_node
+    let encoded = self.ast.get_data2(with_node)
+    let is_mut = decode_with_binding_is_mut(encoded)
     self.push_scope()
     let ty = self.expr_type(rhs_expr)
-    let local = self.body.new_local(ty, 0, sym, 1)
+    let local = self.body.new_local(ty, is_mut, sym, 1)
     self.bind_local(sym, local)
     self.body.push_stmt(self.cur_bb, SK_STORAGE_LIVE, local, 0, span)
     if self.sema.is_copy(ty) == 0:
@@ -2815,6 +2849,12 @@ fn MirBuilder.lower_with_binding(self: MirBuilder, sym: i32, rhs_expr: i32, body
     let rhs = self.lower_expr(rhs_expr)
     self.assign_operand_to_place(self.place_for_local(local), rhs, self.ast.get_start(rhs_expr))
     let result = self.lower_expr(body_expr)
+    // Form 2 builder rule: when mut and body is unit, return the binding
+    let body_ty = self.expr_type(body_expr)
+    if is_mut != 0 and (body_ty == 0 or body_ty == self.sema.ty_void):
+        let local_place = self.place_for_local(local)
+        self.pop_scope_inline()
+        return self.body.new_operand(OK_COPY, local_place)
     self.pop_scope_inline()
     result
 
@@ -3098,6 +3138,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
     if kind == NK_LET_ELSE:
         self.lower_let_else(node)
+        return self.unit_operand()
+
+    if kind == NK_TUPLE_DESTRUCTURE:
+        self.lower_tuple_destructure(node)
         return self.unit_operand()
 
     if kind == NK_ASSIGN:
