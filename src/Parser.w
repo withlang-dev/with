@@ -3049,13 +3049,24 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         is_mut = true
         self.advance()
 
-    // Tuple destructuring (currently supports flat identifier/wildcard bindings).
+    // Tuple destructuring (supports identifier, wildcard, and ..rest bindings).
     if self.peek() == TK_L_PAREN:
         self.advance()
         self.skip_newlines()
         let names: Vec[i32] = Vec.new()
         while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
-            if self.peek() == TK_IDENT:
+            // Rest pattern: ..name or ..
+            if self.peek() == TK_DOT_DOT:
+                self.advance()
+                if self.peek() == TK_IDENT:
+                    let rest_sym = self.intern_current()
+                    self.advance()
+                    // Use negative sym to mark rest binding
+                    names.push(0 - rest_sym)
+                else:
+                    // .. without name: just discard remaining
+                    names.push(0)
+            else if self.peek() == TK_IDENT:
                 let n_sym = self.intern_current()
                 self.advance()
                 if self.intern.resolve(n_sym) == "_":

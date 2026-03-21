@@ -22,7 +22,7 @@ category. Parenthetical references point to the specification section.
 
 ## Pattern Matching
 
-- [ ] **Tuple rest pattern** (§9.8) — `let (first, ..rest) = tuple` not supported ("tuple destructuring requires identifier bindings").
+- [x] **Tuple rest pattern** (§9.8) — `let (first, ..rest) = tuple` now parses and type-checks. Sema binds rest to sub-tuple type. Runtime depends on tuple destructuring codegen.
 
 ## Functions
 
