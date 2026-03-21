@@ -2012,6 +2012,9 @@ fn Codegen.resolve_primitive_named_type(self: Codegen, name: str) -> i64:
     if name == "bool": return wl_i1_type(self.context)
     if name == "f64": return wl_f64_type(self.context)
     if name == "f32": return wl_f32_type(self.context)
+    // Pointer-width integers are currently 64-bit on supported targets.
+    if name == "usize": return wl_i64_type(self.context)
+    if name == "isize": return wl_i64_type(self.context)
     if name == "void": return wl_void_type(self.context)
     if name == "Never": return wl_void_type(self.context)
     if name == "Unit": return wl_i32_type(self.context)
