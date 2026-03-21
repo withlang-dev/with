@@ -276,6 +276,13 @@ type Sema = {
     ty_usize: i32,
     ty_isize: i32,
     ty_const_i8_ptr: i32,
+
+    // Per-module scoping: tracks which module each declaration belongs to
+    // and which symbols are visible in each module context.
+    decl_source_paths: Vec[str],     // one path per decl index (from Frontend)
+    decl_is_c_import: Vec[i32],      // 1 if decl came from c_import, 0 otherwise
+    current_module_path: str,        // module path being checked right now
+    module_paths: Vec[str],          // unique module paths in declaration order
 }
 
 fn sema_debug_stage1_enabled -> i32:
@@ -537,6 +544,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ty_f32: 0, ty_f64: 0, ty_bool: 0, ty_void: 0,
         ty_never: 0, ty_str: 0, ty_str_view: 0,
         ty_usize: 0, ty_isize: 0, ty_const_i8_ptr: 0,
+        decl_source_paths: Vec.new(),
+        decl_is_c_import: Vec.new(),
+        current_module_path: "",
+        module_paths: Vec.new(),
     }
     return s
 
