@@ -584,13 +584,53 @@ fn maybe_synthesize_test_source(target: str) -> str:
         return ""
     synthesize_test_main_source(text, discovery.test_names)
 
-fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
-    // Find test file/dir argument
-    let target = find_source_arg(argc)
-    if target == "":
-        with_eprintln("error: 'test' requires a source file or directory argument")
-        return 1
-    // Compile and run as test
+fn test_shell_quote(text: str) -> str:
+    var out = "'"
+    var run_start = 0
+    for i in 0..text.len():
+        if text.byte_at(i as i64) != 39:
+            continue
+        if i > run_start:
+            out = out ++ text.slice(run_start as i64, i as i64)
+        out = out ++ "'\\''"
+        run_start = i + 1
+    if run_start < text.len():
+        out = out ++ text.slice(run_start as i64, text.len())
+    out ++ "'"
+
+fn split_nonempty_lines(text: str) -> Vec[str]:
+    let lines: Vec[str] = Vec.new()
+    var start = 0
+    var i = 0
+    while i <= text.len() as i32:
+        let at_end = i == text.len() as i32
+        let ch = if at_end: 10 else: text.byte_at(i as i64)
+        if ch == 10:
+            var line = text.slice(start as i64, i as i64)
+            if line.len() > 0 and line.byte_at(line.len() as i64 - 1) == 13:
+                line = line.slice(0, line.len() - 1)
+            if line.len() > 0:
+                lines.push(line)
+            start = i + 1
+        i = i + 1
+    lines
+
+fn test_target_is_directory(target: str) -> bool:
+    with_system("[ -d " ++ test_shell_quote(target) ++ " ]") == 0
+
+fn collect_test_files(target_dir: str) -> Vec[str]:
+    let files: Vec[str] = Vec.new()
+    let _ = with_system("mkdir -p out/tmp")
+    let manifest_path = "out/tmp/test-files.txt"
+    let cmd = "find " ++ test_shell_quote(target_dir) ++ " -type f -name '*.w' | sort > " ++ test_shell_quote(manifest_path)
+    if with_system(cmd) != 0:
+        return files
+    let listing = with_fs_read_file(manifest_path)
+    if listing.len() == 0:
+        return files
+    split_nonempty_lines(listing)
+
+fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
@@ -603,6 +643,26 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
     let run_rc = with_system(bin_path)
     cleanup_binary_artifacts(bin_path)
     run_rc
+
+fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+    // Find test file/dir argument
+    let target = find_source_arg(argc)
+    if target == "":
+        with_eprintln("error: 'test' requires a source file or directory argument")
+        return 1
+    if test_target_is_directory(target):
+        let test_files = collect_test_files(target)
+        if test_files.len() == 0:
+            with_eprintln("error: no test sources found in '" ++ target ++ "'")
+            return 1
+        for ti in 0..test_files.len() as i32:
+            let test_file = test_files.get(ti as i64)
+            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+            if run_rc != 0:
+                with_eprintln("error: test failed in '" ++ test_file ++ "'")
+                return run_rc
+        return 0
+    run_test_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
 
 fn run_clean_command -> i32:
     let result = with_system("rm -rf out .with")
@@ -619,7 +679,7 @@ fn print_usage:
     print("  build [file.w]    Build a source file (use --emit-c to emit C)\n")
     print("  run [file.w]      Build + run a source file\n")
     print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir/--dump-async-mir)\n")
-    print("  test [file.w]     Run tests\n")
+    print("  test <file.w|dir> Run tests from a source file or directory\n")
     print("  clean             Delete out/ and legacy .with/ artifacts\n")
     print("  ir <file.w>       Dump LLVM IR (debug)\n")
     print("  ast <file.w>      Parse and dump the AST (debug)\n")
