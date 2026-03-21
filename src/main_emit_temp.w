@@ -22,6 +22,11 @@ extern fn exit(code: i32) -> void
 extern fn with_install_interrupt_handlers() -> void
 extern fn with_raise_stack_limit() -> void
 
+fn cli_help_topic(argc: i32) -> str:
+    if argc >= 3:
+        return with_arg_at(2)
+    ""
+
 fn main -> void:
     with_raise_stack_limit()
     with_install_interrupt_handlers()
@@ -172,7 +177,7 @@ fn main -> void:
         print("with WITH_VERSION_PLACEHOLDER\n")
         return
     if command == "help" or command == "--help" or command == "-h":
-        print_usage()
+        exit(run_help_command(argc))
         return
     if command == "clean":
         exit(run_clean_command())
@@ -462,4 +467,167 @@ fn print_usage:
     print("  ast <file.w>      Parse and dump the AST (debug)\n")
     print("  tokens <file.w>   Lex and dump tokens (debug)\n")
     print("  version           Print compiler version\n")
-    print("  help              Show this message\n")
+    print("  help [topic]      Show CLI help or language quick reference\n")
+    print("\n")
+    print("Language quick reference:\n")
+    print("  with help use         Import syntax and module resolution\n")
+    print("  with help fn          Function declarations and signatures\n")
+    print("  with help type        Type declarations and aliases\n")
+    print("  with help let         Local bindings, mutability, and const\n")
+    print("  with help extern      FFI declarations and c_import\n")
+    print("  with help keywords    Reserved words\n")
+    print("  with help operators   Operator precedence\n")
+    print("  with help attributes  Common attributes and parser support\n")
+
+fn run_help_command(argc: i32) -> i32:
+    let topic = cli_help_topic(argc)
+    if topic == "":
+        print_usage()
+        return 0
+    if topic == "use":
+        print_help_use()
+        return 0
+    if topic == "fn":
+        print_help_fn()
+        return 0
+    if topic == "type":
+        print_help_type()
+        return 0
+    if topic == "let":
+        print_help_let()
+        return 0
+    if topic == "extern":
+        print_help_extern()
+        return 0
+    if topic == "keywords":
+        print_help_keywords()
+        return 0
+    if topic == "operators":
+        print_help_operators()
+        return 0
+    if topic == "attributes":
+        print_help_attributes()
+        return 0
+    with_eprintln("error: unknown help topic '" ++ topic ++ "'")
+    with_eprintln("available help topics: use, fn, type, let, extern, keywords, operators, attributes")
+    1
+
+fn print_help_use:
+    print(r#"Import syntax:
+
+  use foo.bar
+  use foo.bar.*
+  use c_import("sqlite3.h", link: "sqlite3")
+
+Module resolution:
+
+  use demo.core      -> lib/demo/core.w relative to the project root
+  use foo.bar.*      -> import all public symbols from the module
+
+Not supported:
+
+  use foo.{a, b}     Grouped imports are not implemented
+  use foo as bar     Aliased imports are not implemented
+"#)
+
+fn print_help_fn:
+    print(r#"Function declarations:
+
+  fn greet(name: str) -> str:
+      "hello {name}"
+
+  pub fn add(x: i32, y: i32) -> i32:
+      x + y
+
+Notes:
+
+  - Indentation starts the function body.
+  - Omit '-> T' for unit-returning functions.
+  - Methods are declared inside 'extend Type:' blocks.
+"#)
+
+fn print_help_type:
+    print(r#"Type declarations:
+
+  type Point = { x: i32, y: i32 }
+  type Color = Red | Green | Blue
+  type Value = Int(i32) | Float(f64)
+  type Handle = opaque
+  type Meters = i32
+  type Scalar = union { i: i32, f: f32 }
+
+Related syntax:
+
+  extend Point:
+      fn norm(self: Point) -> i32:
+          self.x + self.y
+"#)
+
+fn print_help_let:
+    print(r#"Bindings and constants:
+
+  let answer = 42
+  let mut total = 0
+  const VERSION: str = "1.0.0"
+
+Notes:
+
+  - 'let' introduces locals.
+  - Mutability is written as 'let mut'. There is no 'var' declaration form.
+  - 'const' values are compile-time constants and inline at use sites.
+"#)
+
+fn print_help_extern:
+    print(r#"FFI declarations:
+
+  extern fn puts(text: *const i8) -> i32
+  use c_import("sqlite3.h", link: "sqlite3")
+
+Notes:
+
+  - 'extern fn' declares a foreign symbol directly.
+  - 'c_import' parses C headers and can attach link libraries.
+  - Imported C types use C-compatible layout.
+"#)
+
+fn print_help_keywords:
+    print(
+        "Reserved words that cannot be used as identifiers:\n\n" ++
+        "  fn let var if else then match for in while loop return break continue\n" ++
+        "  with as mut type trait impl extend dyn use module pub async await spawn\n" ++
+        "  unsafe comptime gen yield defer error extern c_import ephemeral select\n" ++
+        "  true false not and or const it errdefer move where opaque null union\n"
+    )
+
+fn print_help_operators:
+    print(
+        "Operator precedence (low to high):\n\n" ++
+        "  1. or\n" ++
+        "  2. and\n" ++
+        "  3. == != in not in\n" ++
+        "  4. < > <= >=\n" ++
+        "  5. |>\n" ++
+        "  6. |\n" ++
+        "  7. ^\n" ++
+        "  8. &\n" ++
+        "  9. << >>\n" ++
+        " 10. + - ++ ??\n" ++
+        " 11. * / %\n" ++
+        " 12. unary: not - & &mut\n" ++
+        " 13. postfix: .await ? .field [i] ()\n"
+    )
+
+fn print_help_attributes:
+    print(r#"Common attributes:
+
+  @[packed]          Packed struct layout
+  @[inline]          Inline hint for functions
+  @[noinline]        Disable inlining for a function
+  @[align(N)]        Per-field alignment inside struct declarations
+
+Notes:
+
+  - Attributes use the syntax '@[name]' or '@[name(args)]'.
+  - The parser currently recognizes packed, inline, noinline, and align.
+  - Other attributes may be documented in the spec but are not all implemented yet.
+"#)

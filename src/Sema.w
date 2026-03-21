@@ -152,6 +152,7 @@ type Sema = {
     // Local trait/type names
     local_trait_names: HashMap[i32, i32],
     local_type_names: HashMap[i32, i32],
+    distinct_type_names: HashMap[i32, i32],
     ephemeral_types: HashMap[i32, i32],
     sealed_traits: HashMap[i32, i32],
     // Sealed trait implementors: flat vec of type syms, with start/count per trait
@@ -453,6 +454,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         blanket_guard: Vec.new(),
         local_trait_names,
         local_type_names,
+        distinct_type_names: sema_new_map_i32_i32(),
         ephemeral_types,
         sealed_traits,
         sealed_impl_types,
@@ -1639,6 +1641,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         self.type_extra.push(0)
         let tid = self.add_type(TY_STRUCT, name, te_start, 1)
         self.named_types.insert(name, tid)
+        self.distinct_type_names.insert(name, tid)
 
     if sub_kind == TDK_OPAQUE:
         // Opaque type: register as struct with 0 fields
@@ -5027,6 +5030,14 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     // Enum variant constructor
     if self.variant_lookup.contains(fn_sym):
         return self.variant_type_ids.get(fn_sym).unwrap()
+
+    // Distinct type constructor: Meters(42) → Meters { value: 42 }
+    if self.distinct_type_names.contains(fn_sym):
+        let dt_tid = self.distinct_type_names.get(fn_sym).unwrap()
+        if arg_count != 1:
+            self.emit_error("distinct type constructor requires exactly 1 argument", node)
+            return 0
+        return dt_tid
 
     // Intrinsic function
     if self.is_intrinsic_fn_sym(fn_sym) != 0:
