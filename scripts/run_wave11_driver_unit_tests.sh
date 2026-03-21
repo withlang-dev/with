@@ -122,6 +122,17 @@ fn test_addition:
 EOF
       run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test "$test_src"
       ;;
+    test_function_verbose)
+      local test_src="$tmpdir/test_function_verbose.w"
+      cat >"$test_src" <<'EOF'
+fn test_addition:
+    assert(1 + 1 == 2)
+
+fn test_subtraction:
+    assert(4 - 1 == 3)
+EOF
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test -v "$test_src"
+      ;;
     test_unit_match)
       local test_src="$tmpdir/test_unit_match.w"
       cat >"$test_src" <<'EOF'
@@ -134,6 +145,17 @@ fn test_unit_match:
         _ => assert(false)
 EOF
       run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test "$test_src"
+      ;;
+    test_failure_framing)
+      local test_src="$tmpdir/test_failure_framing.w"
+      cat >"$test_src" <<'EOF'
+fn test_boom:
+    assert(false)
+EOF
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test "$test_src"
+      ;;
+    test_build_failure_framing)
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" test "test/wave11/cases/c_import_bad_header_fail.w"
       ;;
     test_directory_argument)
       local test_dir="$tmpdir/test_directory_argument"
@@ -254,6 +276,24 @@ expect_cli_fail() {
   else
     echo "PASS(wave11-unit-cli-fail) $key"
   fi
+}
+
+expect_cli_fail_stderr_contains() {
+  local key="$1"
+  local needle="$2"
+  if run_cli_key "$key" "$tmpdir/out" "$tmpdir/err"; then
+    echo "FAIL(wave11-unit-cli-fail-stderr-run) $key"
+    failures=$((failures + 1))
+    return
+  fi
+  if ! grep -Fq "$needle" "$tmpdir/err"; then
+    echo "FAIL(wave11-unit-cli-fail-stderr) $key"
+    echo "expected stderr to contain: $needle"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  echo "PASS(wave11-unit-cli-fail-stderr) $key"
 }
 
 expect_check_dump_contains() {
@@ -413,9 +453,9 @@ expect_mode_fail_msg check "test/wave11/cases/imports/missing_root.w" "import mo
 expect_mode_fail_msg check "test/wave11/cases/c_import_bad_header_fail.w" "failed to compile C header snippet"
 
 expect_check_dump_contains "full" "path=<embedded-std>/std/prelude.w" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_contains "full-iter" "path=<embedded-std>/std/iter.w" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_contains "full-fs" "path=<embedded-std>/std/fs.w" "test/wave11/cases/prelude/simple_root.w"
-expect_check_dump_contains "full-process" "path=<embedded-std>/std/process.w" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "full-iter" "path=<embedded-std>/std/iter.w" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "full-fs" "path=<embedded-std>/std/fs.w" "test/wave11/cases/prelude/simple_root.w"
+expect_check_dump_not_contains "full-process" "path=<embedded-std>/std/process.w" "test/wave11/cases/prelude/simple_root.w"
 expect_check_dump_contains "core" "path=<embedded-std>/std/prelude_core.w" "--prelude=core" "test/wave11/cases/prelude/simple_root.w"
 expect_check_dump_not_contains "core-iter" "path=<embedded-std>/std/iter.w" "--prelude=core" "test/wave11/cases/prelude/simple_root.w"
 expect_check_dump_not_contains "core-fs" "path=<embedded-std>/std/fs.w" "--prelude=core" "test/wave11/cases/prelude/simple_root.w"
@@ -432,7 +472,7 @@ expect_mode_pass build "test/wave11/cases/driver_simple.w"
 expect_mode_pass build "test/wave11/cases/c_import_link_ok.w"
 expect_mode_pass build "test/wave9/cases/runtime_linkage_sync_ok.w"
 expect_mode_pass build "test/wave9/cases/runtime_linkage_async_ok.w"
-expect_mode_fail_msg build "test/wave11/cases/c_import_link_missing_fail.w" "linking failed"
+expect_mode_fail_msg build "test/wave11/cases/c_import_link_missing_fail.w" "error: build failed"
 
 expect_mode_pass run "test/wave11/cases/driver_simple.w"
 expect_mode_pass run "test/wave11/cases/imports/relative_root.w"
@@ -456,8 +496,18 @@ expect_cli_stdout_contains help_keywords "fn let var if else then"
 expect_cli_stdout version "$EXPECTED_VERSION"
 expect_cli_pass clean
 expect_cli_pass test_function_discovery
+expect_cli_stdout_contains test_function_discovery "ok: 1 test passed in "
+expect_cli_pass test_function_verbose
+expect_cli_stdout_contains test_function_verbose "PASS test_addition"
+expect_cli_stdout_contains test_function_verbose "PASS test_subtraction"
+expect_cli_stdout_contains test_function_verbose "ok: 2 tests passed in "
 expect_cli_pass test_unit_match
 expect_cli_pass test_directory_argument
+expect_cli_fail_stderr_contains test_failure_framing "error: test failed"
+expect_cli_fail_stderr_contains test_failure_framing " = stage: run"
+expect_cli_fail_stderr_contains test_failure_framing " = test: test_boom"
+expect_cli_fail_stderr_contains test_build_failure_framing "error: test build failed"
+expect_cli_fail_stderr_contains test_build_failure_framing " = stage: build"
 expect_cli_fail unknown_command
 expect_cli_fail build_missing_arg
 expect_cli_fail run_missing_arg
