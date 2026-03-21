@@ -858,11 +858,11 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             field_str = field_str ++ ci_build_one_field(session, idx, fi, known_structs)
         fi = fi + 1
 
-    // Detect flexible array member: last field is [0]T
+    // Detect flexible array member: last field is [0]T or [1]T (strict-flex-arrays=1)
     var flex_accessor = ""
     if field_count > 0 and not is_union:
         let last_ftype = with_cimport_struct_field_type_translated(session, idx, field_count - 1)
-        if ci_starts_with(last_ftype, "[0]"):
+        if ci_starts_with(last_ftype, "[0]") or ci_starts_with(last_ftype, "[1]"):
             let elem_type = last_ftype.slice(3, last_ftype.len())
             let last_fname = with_cimport_struct_field_name(session, idx, field_count - 1)
             let accessor_name = if last_fname.len() > 0: last_fname else: "data"
@@ -1272,14 +1272,38 @@ fn ci_translate_macros(session: i64, extern_vars: str) -> str:
                         ret_type = "T"
                     // Try pattern matching before expression translation
                     var translated = ""
+
+                    // Strip __extension__ wrapper (glibc uses this)
+                    var work_value = value
+                    if ci_starts_with(work_value, "__extension__"):
+                        work_value = ci_trim(work_value.slice(13, work_value.len()))
+                    if ci_starts_with(work_value, "(__extension__"):
+                        work_value = "(" ++ ci_trim(work_value.slice(14, work_value.len()))
+
                     // DISCARD pattern: (void)(X) or ((void)(X)) — discard value
-                    if ci_is_discard_pattern(value, param_names):
-                        translated = ci_translate_discard_pattern(value, param_names, known_values)
-                    // Token paste (##) translation
-                    if translated.len() == 0 and ci_str_contains(value, "##"):
-                        translated = ci_try_translate_token_paste(value, param_names)
+                    if ci_is_discard_pattern(work_value, param_names):
+                        translated = ci_translate_discard_pattern(work_value, param_names, known_values)
+                    // (void)0 sentinel pattern (assert/NDEBUG)
                     if translated.len() == 0:
-                        translated = ci_translate_c_expr(value, param_names, known_values)
+                        let stripped_v = ci_strip_parens(ci_trim(work_value))
+                        if stripped_v == "(void)0" or stripped_v == "((void)0)":
+                            translated = "0"
+                    // Stringification: #param in body
+                    if translated.len() == 0 and ci_has_stringify(work_value, param_names):
+                        // Simple #x → identity function (returns the string of the expression)
+                        if param_count == 1:
+                            let p0 = ci_escape_reserved(with_cimport_macro_param_name(session, i, 0))
+                            let body_trimmed = ci_trim(work_value)
+                            if body_trimmed == "#" ++ p0 or body_trimmed == "(#" ++ p0 ++ ")":
+                                output = output ++ "fn " ++ safe_name ++ "(x: str) -> str:\n    x\n"
+                                continue
+                        output = output ++ "// stringify macro\nfn " ++ safe_name ++ "() -> Never:\n    comptime_error(\"stringify macro: " ++ name ++ "\")\n"
+                        continue
+                    // Token paste (##) translation
+                    if translated.len() == 0 and ci_str_contains(work_value, "##"):
+                        translated = ci_try_translate_token_paste(work_value, param_names)
+                    if translated.len() == 0:
+                        translated = ci_translate_c_expr(work_value, param_names, known_values)
                     if translated.len() > 0:
                         output = output ++ "fn " ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ ret_type ++ ":\n    " ++ translated ++ "\n"
                     else:
@@ -1306,8 +1330,12 @@ fn ci_translate_macros(session: i64, extern_vars: str) -> str:
         if with_cimport_is_name_emitted(name) != 0:
             continue
 
+        // Strip __extension__ wrapper (glibc)
+        var obj_value = value
+        if ci_starts_with(obj_value, "__extension__"):
+            obj_value = ci_trim(obj_value.slice(13, obj_value.len()))
         // Strip outer parentheses for macro values like (-1)
-        let stripped = ci_strip_parens(value)
+        let stripped = ci_strip_parens(obj_value)
 
         if ci_is_int_literal(stripped):
             let safe_name = ci_escape_reserved(name)
@@ -1722,7 +1750,7 @@ fn ci_translate_call_args(args: str, params: str, known: str) -> str:
 // Translate known __builtin_* function calls
 fn ci_translate_builtin_call(name: str, args: str, params: str, known: str) -> str:
     // Tier 1: Essential builtins
-    if name == "__builtin_expect":
+    if name == "__builtin_expect" or name == "__builtin_expect_with_probability":
         // __builtin_expect(x, v) → x (hint only)
         let first_arg = ci_extract_first_arg(args)
         return ci_translate_c_expr(first_arg, params, known)
@@ -1918,6 +1946,31 @@ fn ci_extract_first_arg(args: str) -> str:
 
 // ── DISCARD pattern: (void)(X) ───────────────────────────────
 // Matches: (void)(X), ((void)(X)), (const void)(X), (volatile void)(X), etc.
+// Check if a macro body contains # (stringification) of a parameter.
+// # followed by a param name (not ##) indicates stringification.
+fn ci_has_stringify(body: str, params: str) -> bool:
+    var i = 0
+    while i < body.len() as i32 - 1:
+        if body.byte_at(i as i64) == 35:  // '#'
+            // Skip ## (token paste)
+            if i + 1 < body.len() as i32 and body.byte_at((i + 1) as i64) == 35:
+                i = i + 2
+                continue
+            // Check if followed by a parameter name
+            let rest = ci_trim(body.slice((i + 1) as i64, body.len()))
+            var end = 0
+            while end < rest.len() as i32 and ci_is_ident_char(rest.byte_at(end as i64)):
+                end = end + 1
+            if end > 0:
+                let tok = rest.slice(0, end as i64)
+                if ci_str_contains(params, "|" ++ tok ++ "|"):
+                    return true
+        i = i + 1
+    false
+
+fn ci_is_ident_char(c: i32) -> bool:
+    (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 95
+
 // Translates to just evaluating X (discarding the result)
 
 fn ci_is_discard_pattern(body: str, params: str) -> bool:

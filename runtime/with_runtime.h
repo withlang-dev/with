@@ -173,6 +173,17 @@ int32_t with_channel_try_recv(void *ch_ptr, int64_t *out);
 void with_channel_close(void *ch_ptr);
 void with_channel_destroy(void *ch_ptr);
 
+// ── C Builtins ─────────────────────────────────────────────────────
+
+int32_t with_clz(int32_t x);
+int32_t with_ctz(int32_t x);
+int32_t with_popcount(int32_t x);
+int32_t with_clzl(int64_t x);
+int32_t with_ctzl(int64_t x);
+uint16_t with_bswap16(uint16_t x);
+uint32_t with_bswap32(uint32_t x);
+uint64_t with_bswap64(uint64_t x);
+
 // ── System ─────────────────────────────────────────────────────────
 
 int32_t with_system(with_str cmd);
