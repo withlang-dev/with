@@ -42,7 +42,7 @@ category. Parenthetical references point to the specification section.
 - [x] **comptime if cfg** (§17) — `cfg.target_os`, `cfg.target_arch`, `cfg.is_debug` etc. recognized by sema. Comptime branch elimination is a separate codegen feature.
 - [ ] **TypeInfo API** (§17) — `T.fields()` / `T.variants()` / `T.size()` / `T.name()` / `T.implements()` type reflection not implemented.
 - [ ] **comptime for** (§17) — Compile-time loop unrolling not implemented.
-- [ ] **transmute** (§16.12) — Not available as a built-in. sizeof and alignof work.
+- [x] **transmute** (§16.12) — `transmute[T](value)` works. sizeof and alignof also work.
 
 ## Async & Concurrency
 
