@@ -5608,6 +5608,83 @@ to be pointed at. `void` is not a keyword or built-in type in With
 (the unit type is `Unit`). `c_import` automatically translates C's
 `void*` parameters to `*mut c_void`.
 
+### 16.3c Auto-Coercion at `c_import` Boundaries
+
+C APIs use `void*` as an opaque data type. glib, CoreFoundation,
+Win32, POSIX — every major C library passes data through opaque
+pointers. Requiring explicit casts on every call defeats With's
+"C interop should feel native" promise.
+
+The compiler auto-coerces at `c_import` function call boundaries
+when the conversion is unambiguous. The user writes normal With
+types. The compiler inserts the ABI translation.
+
+```
+// Without auto-coercion (explicit casts):
+g_hash_table_insert(table, "name" as *mut c_void, "Eric" as *mut c_void)
+let val = g_hash_table_lookup(table, "name" as *mut c_void) as *const u8
+
+// With auto-coercion (compiler inserts conversions):
+table.insert("name", "Eric")
+let val: str = table.lookup("name")
+```
+
+**Parameter coercions (With → C).** When calling a function
+imported via `c_import`, if an argument type doesn't match the
+parameter type, the compiler attempts auto-coercion:
+
+| Argument type   | Parameter type    | Coercion                                  |
+|-----------------|-------------------|-------------------------------------------|
+| `str`           | `*mut c_void`     | pointer to string data                    |
+| `str`           | `*const c_void`   | pointer to string data                    |
+| `str`           | `*const u8`       | pointer to string data                    |
+| `str`           | `*const c_char`   | pointer to string data (null-terminated)  |
+| `str`           | `*mut c_char`     | pointer to copy (caller must free — warn) |
+| `i32`           | `c_int`           | identity (same repr)                      |
+| `bool`          | `c_int`           | 1 or 0                                    |
+| `*mut T`        | `*mut c_void`     | pointer cast                              |
+| `*const T`      | `*const c_void`   | pointer cast                              |
+
+These coercions ONLY apply at `c_import` function call sites.
+They do not apply to user-defined functions, assignments, or
+any other context.
+
+**Return coercions (C → With).** When the return type of a
+`c_import` function is `*mut c_void` or `*const c_void`, the
+compiler coerces based on the receiving context:
+
+| Return type     | Receiving context   | Coercion                       |
+|-----------------|---------------------|--------------------------------|
+| `*mut c_void`   | `let x: str = ...`   | null-check + strlen → str view |
+| `*mut c_void`   | `let x: *mut T = ...`| pointer cast                   |
+| `*const c_void` | `let x: str = ...`   | null-check + strlen → str view |
+| `*const c_void` | `let x: *mut T = ...`| pointer cast                   |
+| `*mut c_void`   | no annotation        | stays `*mut c_void` (no guess) |
+
+Without a type annotation, no return coercion happens — the value
+stays as the C return type.
+
+**Null safety.** The `*mut c_void` → `str` coercion always inserts
+a runtime null check. If the pointer is null, the result is `""`
+(empty string, not a crash).
+
+```
+// Option form for explicit null handling:
+let name: Option[str] = table.lookup("name")
+// None if null, Some(str) if non-null
+```
+
+**What does NOT auto-coerce:**
+
+- `str` → `*mut i32` (not a void pointer)
+- `i32` → `*mut c_void` (integer to pointer — never implicit)
+- `f64` → `c_int` (lossy — never implicit)
+- `Vec[T]` → `*mut c_void` (complex type — never implicit)
+- `str` → `*mut c_void` in non-`c_import` functions
+
+The rule: coercions are only between types where the conversion is
+unambiguous and lossless at the representation level.
+
 ### 16.4 Layout Control
 
 ```

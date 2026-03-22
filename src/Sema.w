@@ -1539,10 +1539,12 @@ fn Sema.build_ci_scoping(self: Sema):
             if ps != prev_path_sym:
                 module_count = module_count + 1
                 prev_path_sym = ps
-    if has_ci == 0 or module_count < 2:
+    if has_ci == 0:
         return
-    self.scoping_active = 1
-    // Record all c_import-origin symbol names.
+    // Scoping (visibility filtering) only activates with multiple modules.
+    if module_count >= 2:
+        self.scoping_active = 1
+    // Always record c_import-origin symbols (needed for auto-coercion).
     for di in 0..self.ast.decl_count():
         if di >= self.decl_is_c_import.len() as i32:
             break
@@ -5292,7 +5294,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 if self.type_is_dyn_object(exp_resolved) == 0:
                     if self.types_compatible(expected_ty, arg_ty) == 0:
                         if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
-                            self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, self.ast.get_extra(extra_start + ai))
+                            if not (self.ci_syms.contains(fn_sym) and self.try_ci_coercion(arg_ty, expected_ty) != 0):
+                                self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, self.ast.get_extra(extra_start + ai))
             let arg_node = self.ast.get_extra(extra_start + ai)
             if self.expr_is_ephemeral_task(arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
                 self.emit_warning("ephemeral Task passed by value may escape", arg_node)
@@ -7362,6 +7365,14 @@ fn Sema.argument_literal_default_help(self: Sema, arg_node: i32, expr_text: str,
     if kind == NK_FLOAT_LIT and actual_ty == self.ty_f64 and expected_ty != 0 and expected_ty != actual_ty:
         return "float literal '" ++ expr_text ++ "' defaults to f64; cast with '" ++ expr_text ++ " as " ++ expected_name ++ "'"
     ""
+
+fn Sema.try_ci_coercion(self: Sema, arg_ty: i32, param_ty: i32) -> i32:
+    // c_import auto-coercion: allow bool → integer at ABI boundary
+    let arg_k = self.get_type_kind(self.resolve_alias(arg_ty))
+    let par_k = self.get_type_kind(self.resolve_alias(param_ty))
+    if arg_k == TY_BOOL and par_k == TY_INT:
+        return 1
+    0
 
 fn Sema.emit_argument_type_mismatch(self: Sema, call_name: str, fn_sym: i32, arg_index: i32, param_i: i32, expected_ty: i32, actual_ty: i32, arg_node: i32):
     if self.suppress_errors != 0:
