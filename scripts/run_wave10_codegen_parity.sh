@@ -16,7 +16,7 @@ RUN_TIMEOUT_SECS="${PARITY_RUN_TIMEOUT_SECS:-25}"
 
 build_toolchains() {
   echo "rebuilding self-host compiler for Wave 10 codegen parity..."
-  ./scripts/rebuild_selfhost.sh stage2 >/dev/null
+  make stage2 >/dev/null
 }
 
 extract_first_nonempty_line() {

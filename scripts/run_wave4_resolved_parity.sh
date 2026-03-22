@@ -14,7 +14,7 @@ VERIFY_COVERAGE_SCRIPT="scripts/verify_wave4_coverage.sh"
 CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "rebuilding self-host compiler for Wave 4 resolved parity..."
-./scripts/rebuild_selfhost.sh stage2 >/dev/null
+make stage2 >/dev/null
 
 if [[ ! -x "$STAGE0_BIN" ]]; then
   echo "error: missing Stage0 compiler: $STAGE0_BIN"

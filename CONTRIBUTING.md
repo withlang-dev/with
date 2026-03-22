@@ -110,7 +110,7 @@ test/
 
 scripts/
     run_tests.sh        unified test runner
-    rebuild_selfhost.sh self-host chain builder
+    rebuild_selfhost.sh compatibility wrapper for make stage targets
 ```
 
 ### Key Concepts

@@ -16,7 +16,7 @@ if [[ ! -x "$SELFHOST_BIN" ]]; then
     SELFHOST_BIN="./out/bin/with-stage1"
   else
     echo "rebuilding self-host compiler for fix_more_annoyances async parity..."
-    ./scripts/rebuild_selfhost.sh stage2 >/dev/null
+    make stage2 >/dev/null
     if [[ ! -x "$SELFHOST_BIN" ]]; then
       SELFHOST_BIN="./out/bin/with-stage1"
     fi

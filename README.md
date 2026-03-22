@@ -114,5 +114,5 @@ bootstrap/           historical Zig bootstrap compiler (frozen, unused)
   use `PREFIX=$HOME/.local` or run `sudo make install`.
 - `no LLVM bridge available`: install LLVM at `/usr/local/llvm` or set `LLVM_PREFIX`.
   The compiler statically links LLVM — no dynamic library needed at runtime.
-- Stuck/hanging staged rebuilds on macOS external volumes:
-  use `./scripts/rebuild_selfhost.sh stage2` (runs via `/tmp`).
+- Need only the staged compiler rebuild:
+  use `make stage2` for stage2 only, or `make fixpoint` for stage2 plus stage3 verification.

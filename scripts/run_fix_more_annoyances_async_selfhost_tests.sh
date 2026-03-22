@@ -11,7 +11,7 @@ if [[ ! -x "$SELFHOST_BIN" ]]; then
   if [[ -x "./out/bin/with-stage1" ]]; then
     SELFHOST_BIN="./out/bin/with-stage1"
   else
-    ./scripts/rebuild_selfhost.sh stage2 >/dev/null
+    make stage2 >/dev/null
     if [[ -x "./out/bin/with-stage2" ]]; then
       SELFHOST_BIN="./out/bin/with-stage2"
     else

@@ -83,7 +83,7 @@ fetch it.
 After a successful fixpoint build, update the installed compiler:
 
 ```
-cp out/bin/with-stage2 ~/.local/bin/with
+make install-user
 ```
 
 Catastrophic loss scenario:

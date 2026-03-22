@@ -12,7 +12,7 @@ CLI_TIMEOUT_SECS="${PARITY_CLI_TIMEOUT_SECS:-25}"
 EXPECTED_VERSION="with $("${ROOT_DIR}/scripts/resolve_version.sh")"
 
 echo "rebuilding self-host compiler for Wave 11 unit tests..."
-./scripts/rebuild_selfhost.sh stage2 >/dev/null
+make stage2 >/dev/null
 
 if [[ ! -x "$SELFHOST_BIN" ]]; then
   echo "error: missing self-host compiler: $SELFHOST_BIN"
