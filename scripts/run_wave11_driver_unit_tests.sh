@@ -9,7 +9,7 @@ SELFHOST_BIN="${ROOT_DIR}/out/bin/with-stage2"
 CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 RUN_TIMEOUT_SECS="${PARITY_RUN_TIMEOUT_SECS:-25}"
 CLI_TIMEOUT_SECS="${PARITY_CLI_TIMEOUT_SECS:-25}"
-EXPECTED_VERSION="with $("${ROOT_DIR}/scripts/resolve_version.sh")"
+EXPECTED_VERSION="with $(make --no-print-directory -s print-version)"
 
 echo "rebuilding self-host compiler for Wave 11 unit tests..."
 make stage2 >/dev/null
@@ -378,16 +378,6 @@ expect_embedded_std_standalone_check_pass() {
 
   cp "$SELFHOST_BIN" "$standalone_dir/with"
   chmod +x "$standalone_dir/with"
-
-  local runner_runtime=""
-  runner_runtime="$(cd "$(dirname "$SELFHOST_BIN")" && pwd)/runtime/libwith_llvm_bridge.dylib"
-  if [[ -f "$runner_runtime" ]]; then
-    mkdir -p "$standalone_dir/runtime"
-    cp "$runner_runtime" "$standalone_dir/runtime/libwith_llvm_bridge.dylib"
-  elif [[ -f "$ROOT_DIR/out/lib/libwith_llvm_bridge.dylib" ]]; then
-    mkdir -p "$standalone_dir/runtime"
-    cp "$ROOT_DIR/out/lib/libwith_llvm_bridge.dylib" "$standalone_dir/runtime/libwith_llvm_bridge.dylib"
-  fi
 
   cat >"$foreign_src" <<'EOF'
 fn main:

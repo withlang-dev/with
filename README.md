@@ -14,13 +14,25 @@ no longer used in the build pipeline.
 
 ## Build
 
-The compiler compiles itself in two stages:
+The Makefile is the primary build interface. Normal development should go
+through `make`, not through ad hoc shell scripts.
+
+The self-host chain is:
+
+```text
+seed → stage1 → stage2 → stage3
+```
+
+Common targets:
 
 ```sh
-make build         # seed → stage1 → stage2
+make stage1        # build stage1 only
+make stage2        # build stage2 only
+make build         # alias for stage2, also refreshes out/bin/with
+make stage3        # build stage3 only
 make fixpoint      # verify stage2 == stage3
-make test          # run test suite
-make install       # install to ~/.local/bin (or /usr/local/bin)
+make test          # run test suite with stage2
+make smoke         # quick compiler smoke check
 ```
 
 The seed compiler is resolved from `WITH` env var, `with` on PATH, or
@@ -32,16 +44,22 @@ make seed && make build              # downloads seed from GitHub releases
 WITH=~/other/with make build         # uses explicit binary
 ```
 
-**How it works:** The seed compiles `src/main.w` → stage1, then stage1
-compiles `src/main.w` → stage2. Stage2 is the canonical compiler.
-Stage2 and stage3 produce byte-identical binaries (fixpoint).
+`src/main` is a local downloaded seed binary. It is gitignored and must never
+be committed or pushed.
+
+`out/bin/with-stage2` is the canonical built compiler in the workspace, and
+`out/bin/with` is a copy of it for convenience. `make fixpoint` builds stage3
+from stage2 and verifies they are byte-identical.
 
 ## Install
 
 ```sh
-make install PREFIX=$HOME/.local     # installs to ~/.local/bin/with
+make install-user                    # installs to ~/.local/bin/with
+make install PREFIX=$HOME/.local     # explicit local prefix install
 sudo make install                    # installs to /usr/local/bin/with
 ```
+
+`make build` does not install to your PATH. Installing is a separate step.
 
 For fish shell:
 
@@ -89,14 +107,14 @@ Wave11 driver/unit regression suite:
 Fixpoint verification (stage2 == stage3):
 
 ```sh
-./scripts/run_wave12_selfhost_fixpoint.sh
+make fixpoint
 ```
 
 ## Repo Layout
 
 ```text
 src/                 self-hosted compiler (.w)
-src/main             seed binary (not in git; download via `make seed`)
+src/main             local seed binary (gitignored; download via `make seed`)
 src/compiler/        Compilation-first architecture port layer
 runtime/             C runtime source (.c, .h, .s)
 lib/std/             standard library (.w)
@@ -111,8 +129,10 @@ bootstrap/           historical Zig bootstrap compiler (frozen, unused)
 ## Troubleshooting
 
 - `install: ... Operation not permitted` under `/usr/local`:
-  use `PREFIX=$HOME/.local` or run `sudo make install`.
+  use `make install-user`, `PREFIX=$HOME/.local`, or run `sudo make install`.
 - `no LLVM bridge available`: install LLVM at `/usr/local/llvm` or set `LLVM_PREFIX`.
   The compiler statically links LLVM — no dynamic library needed at runtime.
 - Need only the staged compiler rebuild:
   use `make stage2` for stage2 only, or `make fixpoint` for stage2 plus stage3 verification.
+- Legacy scripts that say `./scripts/rebuild_selfhost.sh ...`:
+  that script is now only a compatibility wrapper around `make stage1|stage2|stage3`.

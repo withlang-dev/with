@@ -119,13 +119,6 @@ fn link_stage_resolve_runtime_root() -> str:
     // Fall back to compiler-relative runtime dir.
     compiler_dir ++ "/runtime"
 
-fn link_stage_find_llvm_bridge_path() -> str:
-    let root = link_stage_resolve_runtime_root()
-    let p = root ++ "/libwith_llvm_bridge.dylib"
-    if with_fs_read_file(p).len() > 0:
-        return p
-    ""
-
 fn link_stage_find_llvm_static_bridge() -> str:
     let root = link_stage_resolve_runtime_root()
     let bridge_o = root ++ "/llvm_bridge.o"
@@ -269,11 +262,8 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 extras.push(clang_bridge_path)
             extras.push("@" ++ rsp_path)
             return link_stage_link_with_llvm(obj_path, bin_path, extras, link_libs, cc_path)
-        let bridge_path = link_stage_find_llvm_bridge_path()
-        if bridge_path.len() == 0:
-            with_eprintln("error: missing LLVM bridge (need llvm_bridge.o + llvm_link.rsp + llvm_cc, or libwith_llvm_bridge.dylib)")
-            return false
-        extras.push(bridge_path)
+        with_eprintln("error: missing LLVM static bridge (need llvm_bridge.o + llvm_link.rsp + llvm_cc)")
+        return false
 
     if extras.len() == 0 and link_libs.len() == 0:
         return link_stage_link(obj_path, bin_path)
