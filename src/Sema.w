@@ -287,6 +287,9 @@ type Sema = {
     ci_modules: HashMap[i32, i32],   // module-path-sym → 1 for modules that have c_import
     scoping_active: i32,             // 1 when multi-module c_import scoping is active
     current_module_has_ci: i32,      // 1 if current module has c_import declarations
+    // Auto-defer: c_import constructor/destructor pairs
+    ci_type_destructors: HashMap[i32, i32],   // type_name_sym → destructor_fn_sym
+    ci_auto_defer_bindings: HashMap[i32, i32], // binding_sym → destructor_fn_sym
 }
 
 fn sema_debug_stage1_enabled -> i32:
@@ -555,6 +558,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ci_modules: sema_new_map_i32_i32(),
         scoping_active: 0,
         current_module_has_ci: 0,
+        ci_type_destructors: sema_new_map_i32_i32(),
+        ci_auto_defer_bindings: sema_new_map_i32_i32(),
     }
     return s
 
@@ -1395,6 +1400,7 @@ fn Sema.check_module(self: Sema):
     self.compute_method_origins()
     self.collect_declarations()
     self.build_ci_scoping()
+    self.build_ci_destructor_map()
     self.validate_copy_derives()
     self.validate_generic_type_decls()
     self.check_bodies()
@@ -1579,6 +1585,31 @@ fn Sema.is_ci_visible(self: Sema, sym: i32) -> i32:
     if self.current_module_has_ci != 0:
         return 1
     0
+
+fn Sema.build_ci_destructor_map(self: Sema):
+    // Scan function signatures for c_import destructor patterns.
+    // A destructor is a method "Type.free" / "Type.destroy" / etc.
+    // where the function is c_import-origin.
+    for si in 0..self.sig_names.len() as i32:
+        let fn_sym = self.sig_names.get(si as i64)
+        if not self.ci_syms.contains(fn_sym):
+            continue
+        let fn_name = self.pool_resolve_symbol(fn_sym)
+        // Find dot position
+        var dot_pos = -1
+        for ci in 0..fn_name.len() as i32:
+            if fn_name.byte_at(ci as i64) == 46:
+                dot_pos = ci
+                break
+        if dot_pos <= 0:
+            continue
+        let method = fn_name.slice((dot_pos + 1) as i64, fn_name.len())
+        if method == "free" or method == "destroy" or method == "close" or method == "unref" or method == "release":
+            let type_name = fn_name.slice(0, dot_pos as i64)
+            let type_sym = self.pool_intern(type_name)
+            if self.type_decl_nodes.contains(type_sym):
+                if not self.ci_type_destructors.contains(type_sym):
+                    self.ci_type_destructors.insert(type_sym, fn_sym)
 
 fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
@@ -3974,6 +4005,24 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     self.scope_set_is_task(name, self.expr_is_task_value(value))
     self.scope_set_is_scoped_task(name, self.expr_is_scoped_task_value(value))
     self.scope_set_is_ephemeral_task(name, self.expr_is_ephemeral_task(value))
+
+    // Auto-defer: if this is an immutable let binding of a c_import type with a
+    // destructor (e.g. let v = MyVec.new(...)), record it for auto-defer at scope exit.
+    if is_mut == 0 and self.ci_type_destructors.len() > 0:
+        let resolved_bt = self.resolve_alias(bind_type)
+        let bt_kind = self.get_type_kind(resolved_bt)
+        // For pointer types (*mut T), check the pointee type name
+        var type_name_sym = 0
+        if bt_kind == TY_PTR or bt_kind == TY_REF:
+            let pointee = self.get_type_d0(resolved_bt)
+            if pointee > 0:
+                let pt_resolved = self.resolve_alias(pointee)
+                type_name_sym = self.get_type_d0(pt_resolved)
+        else if bt_kind == TY_STRUCT:
+            type_name_sym = self.get_type_d0(resolved_bt)
+        if type_name_sym != 0 and self.ci_type_destructors.contains(type_name_sym):
+            let dtor_sym = self.ci_type_destructors.get(type_name_sym).unwrap()
+            self.ci_auto_defer_bindings.insert(name, dtor_sym)
 
     // If this let binds a borrow, tie the newest active borrow to this binding.
     if self.ast.kind(value) == NK_UNARY:
