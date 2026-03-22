@@ -630,82 +630,69 @@ fn run_help_command(argc: i32) -> i32:
     1
 
 fn print_help_use:
-    print(r#"Import syntax:
-
-  use foo.bar
-  use foo.bar.*
-  use c_import("sqlite3.h", link: "sqlite3")
-
-Module resolution:
-
-  use demo.core      -> lib/demo/core.w relative to the project root
-  use foo.bar.*      -> import all public symbols from the module
-
-Not supported:
-
-  use foo.{a, b}     Grouped imports are not implemented
-  use foo as bar     Aliased imports are not implemented
-"#)
+    print(
+        "Import syntax:\n\n" ++
+        "  use foo.bar\n" ++
+        "  use foo.bar.*\n" ++
+        "  use c_import(\"sqlite3.h\", link: \"sqlite3\")\n\n" ++
+        "Module resolution:\n\n" ++
+        "  use demo.core      -> lib/demo/core.w relative to the project root\n" ++
+        "  use foo.bar.*      -> import all public symbols from the module\n\n" ++
+        "Not supported:\n\n" ++
+        "  use foo.{a, b}     Grouped imports are not implemented\n" ++
+        "  use foo as bar     Aliased imports are not implemented\n"
+    )
 
 fn print_help_fn:
-    print(r#"Function declarations:
-
-  fn greet(name: str) -> str:
-      "hello {name}"
-
-  pub fn add(x: i32, y: i32) -> i32:
-      x + y
-
-Notes:
-
-  - Indentation starts the function body.
-  - Omit '-> T' for unit-returning functions.
-  - Methods are declared inside 'extend Type:' blocks.
-"#)
+    print(
+        "Function declarations:\n\n" ++
+        "  fn greet(name: str) -> str:\n" ++
+        "      \"hello {name}\"\n\n" ++
+        "  pub fn add(x: i32, y: i32) -> i32:\n" ++
+        "      x + y\n\n" ++
+        "Notes:\n\n" ++
+        "  - Indentation starts the function body.\n" ++
+        "  - Omit '-> T' for unit-returning functions.\n" ++
+        "  - Methods are declared inside 'extend Type:' blocks.\n"
+    )
 
 fn print_help_type:
-    print(r#"Type declarations:
-
-  type Point = { x: i32, y: i32 }
-  type Color = Red | Green | Blue
-  type Value = Int(i32) | Float(f64)
-  type Handle = opaque
-  type Meters = i32
-  type Scalar = union { i: i32, f: f32 }
-
-Related syntax:
-
-  extend Point:
-      fn norm(self: Point) -> i32:
-          self.x + self.y
-"#)
+    print(
+        "Type declarations:\n\n" ++
+        "  type Point = { x: i32, y: i32 }\n" ++
+        "  type Color = Red | Green | Blue\n" ++
+        "  type Value = Int(i32) | Float(f64)\n" ++
+        "  type Handle = opaque\n" ++
+        "  type Meters = i32\n" ++
+        "  type Scalar = union { i: i32, f: f32 }\n\n" ++
+        "Related syntax:\n\n" ++
+        "  extend Point:\n" ++
+        "      fn norm(self: Point) -> i32:\n" ++
+        "          self.x + self.y\n"
+    )
 
 fn print_help_let:
-    print(r#"Bindings and constants:
-
-  let answer = 42
-  let mut total = 0
-  const VERSION: str = "1.0.0"
-
-Notes:
-
-  - 'let' introduces locals.
-  - Mutability is written as 'let mut'. There is no 'var' declaration form.
-  - 'const' values are compile-time constants and inline at use sites.
-"#)
+    print(
+        "Bindings and constants:\n\n" ++
+        "  let answer = 42\n" ++
+        "  let mut total = 0\n" ++
+        "  const VERSION: str = \"1.0.0\"\n\n" ++
+        "Notes:\n\n" ++
+        "  - 'let' introduces locals.\n" ++
+        "  - Mutability is written as 'let mut'. There is no 'var' declaration form.\n" ++
+        "  - 'const' values are compile-time constants and inline at use sites.\n"
+    )
 
 fn print_help_extern:
-    print(r#"FFI declarations:
-
-  extern fn puts(text: *const i8) -> i32
-  use c_import("sqlite3.h", link: "sqlite3")
-
-Notes:
-
-  - 'extern fn' declares a foreign symbol directly.
-  - 'c_import' parses C headers and can attach link libraries.
-  - Imported C types use C-compatible layout.
-"#)
+    print(
+        "FFI declarations:\n\n" ++
+        "  extern fn puts(text: *const i8) -> i32\n" ++
+        "  use c_import(\"sqlite3.h\", link: \"sqlite3\")\n\n" ++
+        "Notes:\n\n" ++
+        "  - 'extern fn' declares a foreign symbol directly.\n" ++
+        "  - 'c_import' parses C headers and can attach link libraries.\n" ++
+        "  - Imported C types use C-compatible layout.\n"
+    )
 
 fn print_help_keywords:
     print(
@@ -735,16 +722,14 @@ fn print_help_operators:
     )
 
 fn print_help_attributes:
-    print(r#"Common attributes:
-
-  @[packed]          Packed struct layout
-  @[inline]          Inline hint for functions
-  @[noinline]        Disable inlining for a function
-  @[align(N)]        Per-field alignment inside struct declarations
-
-Notes:
-
-  - Attributes use the syntax '@[name]' or '@[name(args)]'.
-  - The parser currently recognizes packed, inline, noinline, and align.
-  - Other attributes may be documented in the spec but are not all implemented yet.
-"#)
+    print(
+        "Common attributes:\n\n" ++
+        "  @[packed]          Packed struct layout\n" ++
+        "  @[inline]          Inline hint for functions\n" ++
+        "  @[noinline]        Disable inlining for a function\n" ++
+        "  @[align(N)]        Per-field alignment inside struct declarations\n\n" ++
+        "Notes:\n\n" ++
+        "  - Attributes use the syntax '@[name]' or '@[name(args)]'.\n" ++
+        "  - The parser currently recognizes packed, inline, noinline, and align.\n" ++
+        "  - Other attributes may be documented in the spec but are not all implemented yet.\n"
+    )

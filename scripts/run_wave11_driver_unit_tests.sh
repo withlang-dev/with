@@ -81,8 +81,23 @@ run_cli_key() {
     help_use)
       run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" help use
       ;;
+    help_fn)
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" help fn
+      ;;
+    help_type)
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" help type
+      ;;
+    help_let)
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" help let
+      ;;
+    help_extern)
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" help extern
+      ;;
     help_keywords)
       run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" help keywords
+      ;;
+    help_attributes)
+      run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" help attributes
       ;;
     version)
       run_with_optional_timeout "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" version
@@ -266,6 +281,25 @@ expect_cli_stdout_contains() {
     return
   fi
   echo "PASS(wave11-unit-cli-contains) $key"
+}
+
+expect_cli_stdout_not_contains() {
+  local key="$1"
+  local needle="$2"
+  if ! run_cli_key "$key" "$tmpdir/out" "$tmpdir/err"; then
+    echo "FAIL(wave11-unit-cli-not-contains-run) $key"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if grep -Fq "$needle" "$tmpdir/out"; then
+    echo "FAIL(wave11-unit-cli-not-contains) $key"
+    echo "unexpected stdout match: $needle"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+  echo "PASS(wave11-unit-cli-not-contains) $key"
 }
 
 expect_cli_fail() {
@@ -489,10 +523,19 @@ expect_mode_fail_msg test "test/wave11/cases/does_not_exist.w" "error:"
 expect_cli_pass help
 expect_cli_stdout_contains help "Language quick reference:"
 expect_cli_stdout_contains help "with help use"
+expect_cli_stdout_contains help "with help let"
+expect_cli_stdout_contains help "with help extern"
+expect_cli_stdout_contains help "with help attributes"
 expect_cli_stdout_contains help_use "Import syntax:"
 expect_cli_stdout_contains help_use "use c_import(\"sqlite3.h\", link: \"sqlite3\")"
+expect_cli_stdout_not_contains help_use "raw"
+expect_cli_stdout_contains help_fn "Function declarations:"
+expect_cli_stdout_contains help_type "type Scalar = union { i: i32, f: f32 }"
+expect_cli_stdout_contains help_let "let mut total = 0"
+expect_cli_stdout_contains help_extern "extern fn puts(text: *const i8) -> i32"
 expect_cli_stdout_contains help_keywords "Reserved words that cannot be used as identifiers:"
 expect_cli_stdout_contains help_keywords "fn let var if else then"
+expect_cli_stdout_contains help_attributes "@[packed]"
 expect_cli_stdout version "$EXPECTED_VERSION"
 expect_cli_pass clean
 expect_cli_pass test_function_discovery

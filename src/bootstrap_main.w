@@ -176,42 +176,42 @@ fn run_help(argc: i32) -> i32:
     1
 
 fn print_help_use:
-    print(r#"Import syntax:
-
-  use foo.bar
-  use foo.bar.*
-  use c_import("sqlite3.h", link: "sqlite3")
-"#)
+    print(
+        "Import syntax:\n\n" ++
+        "  use foo.bar\n" ++
+        "  use foo.bar.*\n" ++
+        "  use c_import(\"sqlite3.h\", link: \"sqlite3\")\n"
+    )
 
 fn print_help_fn:
-    print(r#"Function declarations:
-
-  fn greet(name: str) -> str:
-      "hello {name}"
-"#)
+    print(
+        "Function declarations:\n\n" ++
+        "  fn greet(name: str) -> str:\n" ++
+        "      \"hello {name}\"\n"
+    )
 
 fn print_help_type:
-    print(r#"Type declarations:
-
-  type Point = { x: i32, y: i32 }
-  type Handle = opaque
-  type Alias = i32
-"#)
+    print(
+        "Type declarations:\n\n" ++
+        "  type Point = { x: i32, y: i32 }\n" ++
+        "  type Handle = opaque\n" ++
+        "  type Alias = i32\n"
+    )
 
 fn print_help_let:
-    print(r#"Bindings and constants:
-
-  let value = 42
-  let mut total = 0
-  const NAME: str = "with"
-"#)
+    print(
+        "Bindings and constants:\n\n" ++
+        "  let value = 42\n" ++
+        "  let mut total = 0\n" ++
+        "  const NAME: str = \"with\"\n"
+    )
 
 fn print_help_extern:
-    print(r#"FFI declarations:
-
-  extern fn puts(text: *const i8) -> i32
-  use c_import("sqlite3.h", link: "sqlite3")
-"#)
+    print(
+        "FFI declarations:\n\n" ++
+        "  extern fn puts(text: *const i8) -> i32\n" ++
+        "  use c_import(\"sqlite3.h\", link: \"sqlite3\")\n"
+    )
 
 fn print_help_keywords:
     print(
@@ -241,10 +241,10 @@ fn print_help_operators:
     )
 
 fn print_help_attributes:
-    print(r#"Common attributes:
-
-  @[packed]
-  @[inline]
-  @[noinline]
-  @[align(N)]
-"#)
+    print(
+        "Common attributes:\n\n" ++
+        "  @[packed]\n" ++
+        "  @[inline]\n" ++
+        "  @[noinline]\n" ++
+        "  @[align(N)]\n"
+    )
