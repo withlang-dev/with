@@ -28,7 +28,7 @@ level3_status="SKIP"
 # ─── Step 1: Build Stage1 → Stage2 → Stage3 ───
 
 echo "=== wave12: building stage3 ==="
-if ! bash scripts/rebuild_selfhost.sh stage3; then
+if ! make stage3; then
   echo "FAIL(wave12-build) stage3 build failed"
   echo ""
   echo "validation-level-1: SKIP"

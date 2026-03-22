@@ -9,7 +9,7 @@ SELFHOST_BIN="./out/bin/with-stage2"
 CHECK_TIMEOUT_SECS="${PARITY_CHECK_TIMEOUT_SECS:-60}"
 
 echo "rebuilding self-host compiler for Wave 7 MIR unit tests..."
-./scripts/rebuild_selfhost.sh stage2 >/dev/null
+make stage2 >/dev/null
 
 if [[ ! -x "$SELFHOST_BIN" ]]; then
   echo "error: missing self-host compiler: $SELFHOST_BIN"

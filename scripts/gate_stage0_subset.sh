@@ -17,7 +17,7 @@ if [[ -z "$SEED_BIN" || ! -x "$SEED_BIN" ]]; then
 fi
 
 echo "[gate-stage0] rebuilding stage2 from selfhost seed"
-./scripts/rebuild_selfhost.sh stage2
+make stage2
 
 if [[ ! -x "./out/bin/with-stage2" ]]; then
   echo "[gate-stage0] missing out/bin/with-stage2 after rebuild" >&2

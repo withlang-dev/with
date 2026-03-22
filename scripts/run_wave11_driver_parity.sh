@@ -17,7 +17,7 @@ CLI_TIMEOUT_SECS="${PARITY_CLI_TIMEOUT_SECS:-25}"
 MODE_TIMEOUT_SECS="${PARITY_MODE_TIMEOUT_SECS:-40}"
 
 echo "rebuilding self-host compiler for Wave 11 driver parity..."
-./scripts/rebuild_selfhost.sh stage2 >/dev/null
+make stage2 >/dev/null
 
 if [[ ! -x "$STAGE0_BIN" ]]; then
   echo "error: missing Stage0 compiler: $STAGE0_BIN"
