@@ -186,6 +186,32 @@ fn MirBuilder.emit_errdefers_for_return(self: MirBuilder):
         let _ = self.lower_expr(errdefer_body)
         i = i - 1
 
+fn MirBuilder.emit_auto_defers(self: MirBuilder):
+    // For each binding in the current scope that has a registered auto-defer
+    // destructor, emit a destructor call if the binding is still live (not moved).
+    if self.sema.ci_auto_defer_bindings.len() == 0:
+        return
+    let scope_start = if self.bind_scope_starts.len() > 0: self.bind_scope_starts.get(self.bind_scope_starts.len() - 1) else: 0
+    var bi = scope_start
+    while bi < self.bind_syms.len() as i32:
+        let bind_sym = self.bind_syms.get(bi as i64)
+        if self.sema.ci_auto_defer_bindings.contains(bind_sym):
+            let local = self.bind_local_ids.get(bi as i64)
+            if local >= 0:
+                let dtor_sym = self.sema.ci_auto_defer_bindings.get(bind_sym).unwrap()
+                let fn_op = self.const_operand(CK_FN, dtor_sym, 0)
+                let self_place = self.place_for_local(local)
+                let self_op = self.body.new_operand(OK_COPY, self_place)
+                var args: Vec[i32] = Vec.new()
+                args.push(self_op)
+                let args_id = self.body.new_call_args(args)
+                let void_local = self.new_temp(self.sema.ty_void)
+                let void_place = self.place_for_local(void_local)
+                let next_bb = self.new_block()
+                self.terminate(TK_CALL, fn_op, args_id, void_place, next_bb)
+                self.switch_to(next_bb)
+        bi = bi + 1
+
 fn MirBuilder.push_loop(self: MirBuilder, continue_bb: i32, break_bb: i32):
     self.loop_continue_bbs.push(continue_bb)
     self.loop_break_bbs.push(break_bb)
@@ -1431,6 +1457,10 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
         // Remove the block's defers from the stack
         while self.defer_nodes.len() as i32 > defer_start:
             self.defer_nodes.pop()
+
+    // Auto-defer: emit destructor calls for c_import bindings that are still
+    // live (not moved) and have registered destructors. Runs after user defers.
+    self.emit_auto_defers()
 
     self.pop_scope_inline()
     result
