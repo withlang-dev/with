@@ -4075,6 +4075,52 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
     self.pop_scope()
     self.ty_void
 
+fn Sema.struct_field_type(self: Sema, struct_type: i32, field: i32) -> i32:
+    if struct_type == 0:
+        return 0
+
+    let resolved = self.resolve_alias(struct_type)
+    let tk = self.get_type_kind(resolved)
+
+    if tk == TY_STRUCT:
+        let te_start = self.get_type_d1(resolved)
+        let field_count = self.get_type_d2(resolved)
+        for fi in 0..field_count:
+            let f_name = self.type_extra.get((te_start + fi * 3) as i64)
+            if f_name == field:
+                return self.type_extra.get((te_start + fi * 3 + 1) as i64)
+        return 0
+
+    if tk == TY_GENERIC_INST:
+        let gi_base_sym = self.get_type_d0(resolved)
+        if self.type_decl_nodes.contains(gi_base_sym):
+            let td_node = self.type_decl_nodes.get(gi_base_sym).unwrap()
+            let td_extra = self.ast.get_data1(td_node)
+            let td_packed = self.ast.get_data2(td_node)
+            if type_decl_sub_kind(td_packed) == TDK_STRUCT:
+                let fc = self.ast.get_extra(td_extra)
+                let after = td_extra + 1 + fc * 4
+                let tp_start = self.ast.get_extra(after + 1)
+                let tp_count = self.ast.get_extra(after + 2)
+                if self.setup_generic_inst_substitution(resolved, gi_base_sym) != 0:
+                    for gi_fi in 0..fc:
+                        let base = td_extra + 1 + gi_fi * 3
+                        let f_name = self.ast.get_extra(base)
+                        if f_name == field:
+                            let f_type_node = self.ast.get_extra(base + 1)
+                            return self.resolve_generic_return_type_node(f_type_node, tp_start, tp_count)
+                else:
+                    if self.named_types.contains(gi_base_sym):
+                        let gi_struct_tid = self.named_types.get(gi_base_sym).unwrap()
+                        let gi_te_start = self.get_type_d1(gi_struct_tid)
+                        for gi_fi in 0..fc:
+                            let gi_f_name = self.type_extra.get((gi_te_start + gi_fi * 3) as i64)
+                            if gi_f_name == field:
+                                return self.type_extra.get((gi_te_start + gi_fi * 3 + 1) as i64)
+        return 0
+
+    0
+
 fn Sema.check_field_access(self: Sema, node: i32) -> i32:
     let expr = self.ast.get_data0(node)
     let field = self.ast.get_data1(node)
@@ -4105,43 +4151,11 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
     let ftk = self.get_type_kind(field_base)
 
     if ftk == TY_STRUCT:
-        let st_name = self.get_type_d0(field_base)
-        let te_start = self.get_type_d1(field_base)
-        let field_count = self.get_type_d2(field_base)
-        for fi in 0..field_count:
-            let f_name = self.type_extra.get((te_start + fi * 3) as i64)
-            if f_name == field:
-                return self.type_extra.get((te_start + fi * 3 + 1) as i64)
-        return 0
+        let _ = self.get_type_d0(field_base)
+        return self.struct_field_type(field_base, field)
 
     if ftk == TY_GENERIC_INST:
-        let gi_base_sym = self.get_type_d0(field_base)
-        if self.type_decl_nodes.contains(gi_base_sym):
-            let td_node = self.type_decl_nodes.get(gi_base_sym).unwrap()
-            let td_extra = self.ast.get_data1(td_node)
-            let td_packed = self.ast.get_data2(td_node)
-            if type_decl_sub_kind(td_packed) == TDK_STRUCT:
-                let fc = self.ast.get_extra(td_extra)
-                let after = td_extra + 1 + fc * 4
-                let tp_start = self.ast.get_extra(after + 1)
-                let tp_count = self.ast.get_extra(after + 2)
-                if self.setup_generic_inst_substitution(field_base, gi_base_sym) != 0:
-                    for gi_fi in 0..fc:
-                        let base = td_extra + 1 + gi_fi * 3
-                        let f_name = self.ast.get_extra(base)
-                        if f_name == field:
-                            let f_type_node = self.ast.get_extra(base + 1)
-                            return self.resolve_generic_return_type_node(f_type_node, tp_start, tp_count)
-                else:
-                    // No type params — use stored type table directly
-                    if self.named_types.contains(gi_base_sym):
-                        let gi_struct_tid = self.named_types.get(gi_base_sym).unwrap()
-                        let gi_te_start = self.get_type_d1(gi_struct_tid)
-                        for gi_fi in 0..fc:
-                            let gi_f_name = self.type_extra.get((gi_te_start + gi_fi * 3) as i64)
-                            if gi_f_name == field:
-                                return self.type_extra.get((gi_te_start + gi_fi * 3 + 1) as i64)
-        return 0
+        return self.struct_field_type(field_base, field)
 
     if ftk == TY_TUPLE:
         let te_start = self.get_type_d0(field_base)
@@ -4327,12 +4341,26 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
         let tid = self.named_types.get(name).unwrap()
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) == TY_STRUCT:
+            var expected_struct_ty = 0
+            if self.has_expected_type != 0 and self.expected_expr_type != 0:
+                let expected_resolved = self.resolve_alias(self.expected_expr_type)
+                let expected_tk = self.get_type_kind(expected_resolved)
+                if expected_tk == TY_STRUCT and self.get_type_d0(expected_resolved) == name:
+                    expected_struct_ty = expected_resolved
+                else if expected_tk == TY_GENERIC_INST and self.get_type_d0(expected_resolved) == name:
+                    expected_struct_ty = expected_resolved
+            if expected_struct_ty == 0 and self.type_decl_nodes.contains(name):
+                let td_node = self.type_decl_nodes.get(name).unwrap()
+                if self.type_decl_tp_count(td_node) == 0:
+                    expected_struct_ty = resolved
             // Check field initializers and collect value types
             let val_types: Vec[i32] = Vec.new()
             for fi in 0..field_count:
                 let f_name = self.ast.get_extra(extra_start + fi * 2)
                 let f_value = self.ast.get_extra(extra_start + fi * 2 + 1)
-                val_types.push(self.check_expr(f_value))
+                let field_expected = if expected_struct_ty != 0: self.struct_field_type(expected_struct_ty, f_name) else: 0
+                let val_ty = if field_expected != 0: self.check_expr_with_expected(f_value, field_expected) else: self.check_expr(f_value)
+                val_types.push(val_ty)
             // Check if struct has type params — infer GenericInst
             if self.type_decl_nodes.contains(name):
                 let td_node = self.type_decl_nodes.get(name).unwrap()
