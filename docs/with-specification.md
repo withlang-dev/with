@@ -6834,6 +6834,78 @@ Everything With gives you — ownership, borrow checking, `c_import`,
 `match`, `comptime`, type inference — works in freestanding mode.
 You're just writing With without a heap or an OS.
 
+### 18.7 Package Management
+
+With has two dependency sources managed through the same CLI and
+`with.toml`:
+
+- **With packages** — `with get json`, `with get http`
+- **C packages** — `with get c.glib`, `with get c.sqlite3`
+
+The `c.` prefix routes through Conan Center (conan.io/center).
+With packages come from the With package registry (future). Both
+produce entries in `with.toml`:
+
+```toml
+[project]
+name = "myapp"
+version = "0.1.0"
+
+[deps]
+c.glib = "2.78"
+c.sqlite3 = "3.45"
+```
+
+**`with get c.X`** resolves the package from Conan Center, downloads
+headers, prebuilt libraries, and transitive deps into
+`.with/deps/c/<name>/<version>/`, and updates `with.toml`. Each
+package includes a `metadata.json` with include paths, library
+paths, library names, and transitive dependencies.
+
+**Build integration.** When `with build` encounters
+`use c_import("<glib.h>")`, the compiler reads `with.toml`, finds
+all `c.*` deps, reads their `metadata.json`, and constructs include
+and link paths automatically. The user never writes `-I` or `-l`
+flags. `c_import` headers are found by searching each dep's include
+paths, and the matching package's libraries are linked automatically.
+
+**Explicit override.** If auto-resolution picks the wrong library:
+
+```
+use c_import("<glib.h>", link: "glib-2.0", "gio-2.0")
+```
+
+**Manual C deps** work without Conan by specifying paths directly:
+
+```toml
+[deps.c.custom_lib]
+include = "/opt/custom/include"
+lib = "/opt/custom/lib"
+link = ["custom"]
+```
+
+**CLI commands:**
+
+| Command | Action |
+|---------|--------|
+| `with init` | Create new project with `with.toml` and `src/main.w` |
+| `with get c.X` | Add C dependency via Conan |
+| `with get c.X@2.78` | Pin specific version |
+| `with remove c.X` | Remove dependency |
+| `with update` | Update all deps to latest compatible |
+| `with get` (no args) | Restore deps from lock file |
+
+**Directory structure:**
+
+```
+.with/
+├── deps/c/<name>/<version>/   # headers + libraries
+├── cache/c_import/            # c_import translation cache
+└── lock.json                  # exact version pins
+```
+
+`.with/` is gitignored. `with.toml` and `lock.json` are committed.
+
 ---
 
 ## 19. Safety Boundaries

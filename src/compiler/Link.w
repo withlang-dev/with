@@ -244,6 +244,11 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
             return false
         extras.push(helpers_path)
 
+    // Link libcurl when HTTP functions are used (package management)
+    let undef_syms = link_stage_undefined_symbols_for_object(obj_path)
+    if link_stage_str_contains(undef_syms, "_with_http_") or link_stage_str_contains(undef_syms, "_curl_"):
+        link_libs.push("curl")
+
     if link_stage_object_needs_llvm_bridge(obj_path):
         let static_bridge = link_stage_find_llvm_static_bridge()
         if static_bridge.len() > 0:

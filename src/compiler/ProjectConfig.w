@@ -8,6 +8,7 @@ type ProjectConfig = {
     manifest_path: str,
     c_import_include_paths: Vec[str],
     link_search_paths: Vec[str],
+    dep_link_libs: Vec[str],
 }
 
 fn project_config_default -> ProjectConfig:
@@ -16,6 +17,7 @@ fn project_config_default -> ProjectConfig:
         manifest_path: "",
         c_import_include_paths: Vec.new(),
         link_search_paths: Vec.new(),
+        dep_link_libs: Vec.new(),
     }
 
 fn project_config_file_exists(path: str) -> bool:
@@ -95,17 +97,97 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
         out.c_import_include_paths = project_config_parse_path_array(value, out.root_dir)
     else if section == "link" and key == "search_paths":
         out.link_search_paths = project_config_parse_path_array(value, out.root_dir)
+    else if section == "deps" and key.starts_with("c."):
+        // C package dependency: c.sqlite3 = "3.45"
+        let pkg_name = key.slice(2, key.len())
+        let version = project_config_strip_quotes(value)
+        if pkg_name.len() > 0 and version.len() > 0:
+            out = project_config_load_dep_metadata(out, pkg_name, version)
     out
+
+fn project_config_strip_quotes(value: str) -> str:
+    let len = value.len() as i32
+    if len >= 2 and value.byte_at(0) == 34 and value.byte_at((len - 1) as i64) == 34:
+        return value.slice(1, (len - 1) as i64)
+    value
+
+fn project_config_load_dep_metadata(cfg: ProjectConfig, name: str, version: str) -> ProjectConfig:
+    var out = cfg
+    // Read metadata.json from .with/deps/c/<name>/<version>/
+    let dep_dir = out.root_dir ++ "/.with/deps/c/" ++ name ++ "/" ++ version
+    let meta_path = dep_dir ++ "/metadata.json"
+    let meta = with_fs_read_file(meta_path)
+    if meta.len() == 0:
+        return out
+    // Extract include_paths, lib_paths, libs from JSON
+    let includes = project_config_json_str_array(meta, "include_paths")
+    for i in 0..includes.len() as i32:
+        let inc = includes.get(i as i64)
+        out.c_import_include_paths.push(dep_dir ++ "/" ++ inc)
+    let lib_paths = project_config_json_str_array(meta, "lib_paths")
+    for i in 0..lib_paths.len() as i32:
+        let lp = lib_paths.get(i as i64)
+        out.link_search_paths.push(dep_dir ++ "/" ++ lp)
+    let libs = project_config_json_str_array(meta, "libs")
+    for i in 0..libs.len() as i32:
+        out.dep_link_libs.push(libs.get(i as i64))
+    out
+
+fn project_config_json_str_array(json: str, key: str) -> Vec[str]:
+    // Simple JSON array extractor: find "key": [...] and extract string values.
+    var result: Vec[str] = Vec.new()
+    let needle = "\"" ++ key ++ "\""
+    let json_len = json.len() as i32
+    var pos = 0
+    while pos < json_len - needle.len() as i32:
+        var found = true
+        for ni in 0..needle.len() as i32:
+            if json.byte_at((pos + ni) as i64) != needle.byte_at(ni as i64):
+                found = false
+                break
+        if found:
+            // Find the '[' after the key
+            var ai = pos + needle.len() as i32
+            while ai < json_len and json.byte_at(ai as i64) != 91:
+                ai = ai + 1
+            if ai >= json_len:
+                return result
+            ai = ai + 1
+            // Extract strings between '[' and ']'
+            while ai < json_len and json.byte_at(ai as i64) != 93:
+                if json.byte_at(ai as i64) == 34:
+                    // Start of quoted string
+                    let start = ai + 1
+                    var end = start
+                    while end < json_len and json.byte_at(end as i64) != 34:
+                        end = end + 1
+                    if end > start:
+                        result.push(json.slice(start as i64, end as i64))
+                    ai = end + 1
+                else:
+                    ai = ai + 1
+            return result
+        pos = pos + 1
+    result
 
 fn project_config_wants_key(section: str, key: str) -> bool:
     if section == "c_import" and key == "include_paths":
         return true
     if section == "link" and key == "search_paths":
         return true
+    if section == "deps" and key.starts_with("c."):
+        return true
     false
 
 fn project_config_value_complete(value: str) -> bool:
-    project_config_find_char(value, 93) >= 0
+    // Array values need closing bracket
+    if project_config_find_char(value, 91) >= 0:
+        return project_config_find_char(value, 93) >= 0
+    // Quoted string values are complete as-is
+    if value.len() >= 2 and value.byte_at(0) == 34:
+        return true
+    // Bare values are complete
+    true
 
 fn project_config_parse_path_array(value: str, root_dir: str) -> Vec[str]:
     let out: Vec[str] = Vec.new()

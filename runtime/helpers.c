@@ -1592,3 +1592,87 @@ __attribute__((weak)) with_str with_cimport_macro_param_name(int64_t s, int32_t 
 __attribute__((weak)) int64_t  with_cimport_struct_field_offset(int64_t s, int32_t i, int32_t f) { (void)s;(void)i;(void)f; return -1; }
 __attribute__((weak)) int64_t  with_cimport_struct_size(int64_t s, int32_t i) { (void)s;(void)i; return 0; }
 __attribute__((weak)) with_str with_cimport_fn_calling_conv(int64_t s, int32_t i) { (void)s;(void)i; with_str e={"c",1}; return e; }
+__attribute__((weak)) void with_cimport_add_include_path(with_str path) { (void)path; }
+__attribute__((weak)) void with_cimport_clear_include_paths(void) { }
+
+// ── HTTP (libcurl) ──────────────────────────────────────────────────
+
+#ifdef WITH_HAS_CURL
+#include <curl/curl.h>
+
+typedef struct { char *data; size_t size; } http_buf;
+
+static size_t http_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
+    size_t total = size * nmemb;
+    http_buf *buf = (http_buf *)userdata;
+    char *nd = realloc(buf->data, buf->size + total + 1);
+    if (!nd) return 0;
+    buf->data = nd;
+    memcpy(buf->data + buf->size, ptr, total);
+    buf->size += total;
+    buf->data[buf->size] = 0;
+    return total;
+}
+
+with_str with_http_get(with_str url) {
+    with_str empty = { "", 0 };
+    char url_buf[4096];
+    size_t n = (size_t)url.len;
+    if (n >= sizeof(url_buf)) return empty;
+    memcpy(url_buf, url.ptr, n); url_buf[n] = 0;
+    CURL *curl = curl_easy_init();
+    if (!curl) return empty;
+    http_buf buf = { malloc(1), 0 }; buf.data[0] = 0;
+    curl_easy_setopt(curl, CURLOPT_URL, url_buf);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, http_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    if (res != CURLE_OK) { free(buf.data); return empty; }
+    with_str result; result.ptr = buf.data; result.len = (int64_t)buf.size;
+    return result;
+}
+
+int32_t with_http_download(with_str url, with_str path) {
+    char url_buf[4096], path_buf[4096];
+    size_t un = (size_t)url.len, pn = (size_t)path.len;
+    if (un >= sizeof(url_buf) || pn >= sizeof(path_buf)) return -1;
+    memcpy(url_buf, url.ptr, un); url_buf[un] = 0;
+    memcpy(path_buf, path.ptr, pn); path_buf[pn] = 0;
+    FILE *fp = fopen(path_buf, "wb");
+    if (!fp) return -1;
+    CURL *curl = curl_easy_init();
+    if (!curl) { fclose(fp); return -1; }
+    curl_easy_setopt(curl, CURLOPT_URL, url_buf);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    fclose(fp);
+    return (res == CURLE_OK) ? 0 : -1;
+}
+#else
+with_str with_http_get(with_str url) {
+    (void)url;
+    fprintf(stderr, "error: HTTP requires libcurl (compile with -DWITH_HAS_CURL)\n");
+    with_str empty = { "", 0 }; return empty;
+}
+int32_t with_http_download(with_str url, with_str path) {
+    (void)url; (void)path;
+    fprintf(stderr, "error: HTTP requires libcurl (compile with -DWITH_HAS_CURL)\n");
+    return -1;
+}
+#endif
+
+int32_t with_extract_tgz(with_str archive, with_str dest) {
+    char cmd[8192], ab[4096], db[4096];
+    size_t an = (size_t)archive.len, dn = (size_t)dest.len;
+    if (an >= sizeof(ab) || dn >= sizeof(db)) return -1;
+    memcpy(ab, archive.ptr, an); ab[an] = 0;
+    memcpy(db, dest.ptr, dn); db[dn] = 0;
+    snprintf(cmd, sizeof(cmd), "tar xzf '%s' -C '%s'", ab, db);
+    return system(cmd) == 0 ? 0 : -1;
+}

@@ -110,6 +110,10 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     if has_c_import == 0:
         return out
 
+    // Pass project config include paths to clang bridge
+    if self.project_config.c_import_include_paths.len() > 0:
+        ci_set_include_paths(self.project_config.c_import_include_paths)
+
     for i in 0..base_count:
         let decl = out.get_decl(i)
         if out.kind(decl) != NK_C_IMPORT:
