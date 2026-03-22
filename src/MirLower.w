@@ -2371,6 +2371,23 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
         return self.body.new_operand(OK_COPY, result_place)
     self.body.new_operand(OK_MOVE, result_place)
 
+// Callable type redirect: like lower_call but uses a pre-resolved fn operand and symbol.
+fn MirBuilder.lower_call_redirected(self: MirBuilder, fn_op: i32, fn_sym: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
+    let sig_idx = self.call_sig_for_sym(fn_sym)
+    let args: Vec[i32] = Vec.new()
+    for i in 0..arg_exprs_count:
+        let arg_node = self.ast.get_extra(arg_exprs_start + i)
+        args.push(self.lower_call_arg(arg_node, sig_idx, i))
+    let args_id = self.body.new_call_args(args)
+    let result_local = self.new_temp(ret_type_id)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    if self.sema.is_copy(ret_type_id) != 0:
+        return self.body.new_operand(OK_COPY, result_place)
+    self.body.new_operand(OK_MOVE, result_place)
+
 // Like lower_call but takes arg node indices in a Vec instead of reading from
 // pool.extra. This avoids mutating the shared AstPool (which would trigger
 // Vec realloc and invalidate other copies' pointers — use-after-free).
@@ -3251,6 +3268,17 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                     let dt_place = self.place_for_local(dt_tmp)
                     self.body.push_stmt(self.cur_bb, SK_ASSIGN, dt_place, dt_rv, self.ast.get_start(node))
                     return self.body.new_operand(OK_COPY, dt_place)
+        // Callable type syntax: TypeName(args) → TypeName.new(args)
+        if self.ast.kind(callee) == NK_IDENT:
+            let ct_sym = self.ast.get_data0(callee)
+            if self.sema.type_decl_nodes.contains(ct_sym):
+                let ct_new_name = self.pool.resolve(ct_sym) ++ ".new"
+                let ct_new_sym = self.pool.intern(ct_new_name)
+                let ct_new_sig = self.sema.get_sig(ct_new_sym)
+                if ct_new_sig >= 0:
+                    let ct_fn_op = self.const_operand(CK_FN, ct_new_sym, 0)
+                    let ct_ret_ty = self.expr_type(node)
+                    return self.lower_call_redirected(ct_fn_op, ct_new_sym, self.ast.get_data1(node), self.ast.get_data2(node), ct_ret_ty, node)
         // Generic function call — delegate to codegen's monomorphize_generic_call
         if self.ast.kind(callee) == NK_IDENT:
             let gc_sym = self.ast.get_data0(callee)

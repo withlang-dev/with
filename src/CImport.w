@@ -664,8 +664,24 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
 // structname_, emit a method wrapper: fn StructName.short_name(self, ...) = fn_name(self, ...)
 fn ci_detect_member_functions(session: i64, count: i32, known_structs: str) -> str:
     var output = ""
-    // Track emitted method names per struct to avoid duplicates with field names
     var emitted_methods = ""
+    // Pre-compute snake_case prefixes for all known structs.
+    // known_structs is pipe-delimited: "|Foo||Bar||Baz|"
+    var struct_names: Vec[str] = Vec.new()
+    var struct_prefixes: Vec[str] = Vec.new()
+    var si = 0
+    while si < known_structs.len() as i32:
+        if known_structs.byte_at(si as i64) == 124:
+            var se = si + 1
+            while se < known_structs.len() as i32 and known_structs.byte_at(se as i64) != 124:
+                se = se + 1
+            if se > si + 1:
+                let sname = known_structs.slice((si + 1) as i64, se as i64)
+                struct_names.push(sname)
+                struct_prefixes.push(ci_compute_snake_prefix(sname))
+            si = se
+        else:
+            si = si + 1
 
     var i = 0
     while i < count:
@@ -674,17 +690,49 @@ fn ci_detect_member_functions(session: i64, count: i32, known_structs: str) -> s
             let name = with_cimport_decl_name(session, i)
             if name.len() > 0 and name.byte_at(0) != 95:
                 let param_count = with_cimport_fn_param_count(session, i)
+                let ret_type = with_cimport_fn_return_type_translated(session, i)
+                // Try first-param-based matching (existing logic)
+                var matched = false
                 if param_count > 0:
                     let first_param_type = with_cimport_fn_param_type_translated(session, i, 0)
                     let struct_name = ci_extract_struct_name_from_ptr(first_param_type)
                     if struct_name.len() > 0 and ci_str_contains(known_structs, "|" ++ struct_name ++ "|"):
-                        // Try to derive a short method name by stripping the struct prefix
-                        let method_name = ci_strip_struct_prefix(name, struct_name)
+                        // Try snake_case prefix first, fall back to case-insensitive
+                        var method_name = ""
+                        var sj = 0
+                        while sj < struct_names.len() as i32:
+                            if struct_names.get(sj as i64) == struct_name:
+                                method_name = ci_strip_snake_prefix(name, struct_prefixes.get(sj as i64))
+                                break
+                            sj = sj + 1
+                        if method_name.len() == 0:
+                            method_name = ci_strip_struct_prefix(name, struct_name)
                         if method_name.len() > 0:
                             let method_key = "|" ++ struct_name ++ "." ++ method_name ++ "|"
                             if not ci_str_contains(emitted_methods, method_key):
                                 emitted_methods = emitted_methods ++ method_key
                                 let wrapper = ci_emit_member_fn_wrapper(session, i, struct_name, method_name, first_param_type)
+                                if wrapper.len() > 0:
+                                    output = output ++ wrapper
+                                    matched = true
+                // Constructor detection: returns *S without self param
+                if not matched:
+                    let ret_struct = ci_extract_struct_name_from_ptr(ret_type)
+                    if ret_struct.len() > 0 and ci_str_contains(known_structs, "|" ++ ret_struct ++ "|"):
+                        var method_name = ""
+                        var sj = 0
+                        while sj < struct_names.len() as i32:
+                            if struct_names.get(sj as i64) == ret_struct:
+                                method_name = ci_strip_snake_prefix(name, struct_prefixes.get(sj as i64))
+                                break
+                            sj = sj + 1
+                        if method_name.len() == 0:
+                            method_name = ci_strip_struct_prefix(name, ret_struct)
+                        if method_name.len() > 0:
+                            let method_key = "|" ++ ret_struct ++ "." ++ method_name ++ "|"
+                            if not ci_str_contains(emitted_methods, method_key):
+                                emitted_methods = emitted_methods ++ method_key
+                                let wrapper = ci_emit_constructor_wrapper(session, i, ret_struct, method_name)
                                 if wrapper.len() > 0:
                                     output = output ++ wrapper
         i = i + 1
@@ -698,6 +746,67 @@ fn ci_extract_struct_name_from_ptr(ty: str) -> str:
         return ci_trim(ty.slice(7, ty.len()))
     if ci_starts_with(ty, "*"):
         return ci_trim(ty.slice(1, ty.len()))
+    ""
+
+// Compute snake_case prefix from a CamelCase struct name.
+// GHashTable → "g_hash_table_", sqlite3 → "sqlite3_", SDL_Window → "sdl_window_"
+fn ci_compute_snake_prefix(name: str) -> str:
+    let len = name.len() as i32
+    if len == 0:
+        return ""
+    var result = ""
+    var prev_lower = false
+    var prev_upper = false
+    var i = 0
+    while i < len:
+        let ch = name.byte_at(i as i64)
+        let is_upper = ch >= 65 and ch <= 90
+        let is_lower_ch = ch >= 97 and ch <= 122
+        let is_digit = ch >= 48 and ch <= 57
+        if is_upper:
+            if prev_lower:
+                result = result ++ "_"
+            else if prev_upper and i + 1 < len:
+                let next = name.byte_at((i + 1) as i64)
+                if next >= 97 and next <= 122:
+                    if result.len() > 0:
+                        result = result ++ "_"
+            result = result ++ ci_char_lower(ch)
+            prev_upper = true
+            prev_lower = false
+        else if is_lower_ch:
+            result = result ++ name.slice(i as i64, (i + 1) as i64)
+            prev_upper = false
+            prev_lower = true
+        else if is_digit:
+            result = result ++ name.slice(i as i64, (i + 1) as i64)
+            prev_upper = false
+            prev_lower = false
+        else if ch == 95:
+            result = result ++ "_"
+            prev_upper = false
+            prev_lower = false
+        else:
+            result = result ++ name.slice(i as i64, (i + 1) as i64)
+            prev_upper = false
+            prev_lower = false
+        i = i + 1
+    result ++ "_"
+
+fn ci_char_lower(ch: i32) -> str:
+    if ch >= 65 and ch <= 90:
+        return str_from_byte(ch + 32)
+    str_from_byte(ch)
+
+// Check if fn_name starts with the given snake_case prefix.
+// Returns the method name (suffix after prefix) or "" if no match.
+fn ci_strip_snake_prefix(fn_name: str, prefix: str) -> str:
+    let plen = prefix.len() as i32
+    let flen = fn_name.len() as i32
+    if flen <= plen:
+        return ""
+    if fn_name.slice(0, plen as i64) == prefix:
+        return fn_name.slice(plen as i64, flen as i64)
     ""
 
 // Strip struct name prefix from function name.
@@ -763,6 +872,39 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: str, method_na
 
     let ret_prefix = if ret == "void": "" else: "return "
     "fn " ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret ++ ":\n    " ++ ret_prefix ++ safe_fn_name ++ "(" ++ call_args ++ ")\n"
+
+// Emit a constructor wrapper: fn StructName.new(params...) -> Ret: fn_name(params...)
+fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: str, method_name: str) -> str:
+    let fn_name = with_cimport_decl_name(session, idx)
+    let safe_fn_name = ci_escape_reserved(fn_name)
+    let safe_struct = ci_escape_reserved(struct_name)
+    let safe_method = ci_escape_reserved(method_name)
+    let param_count = with_cimport_fn_param_count(session, idx)
+    let ret = ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx))
+    // Check for unsupported types
+    var pi = 0
+    while pi < param_count:
+        let pt = with_cimport_fn_param_type_translated(session, idx, pi)
+        if ci_starts_with(pt, "__UNSUPPORTED:"):
+            return ""
+        pi = pi + 1
+    if ci_starts_with(ret, "__UNSUPPORTED:"):
+        return ""
+    // Build parameter list (no self — this is a static constructor)
+    var params = ""
+    var call_args = ""
+    pi = 0
+    while pi < param_count:
+        let pname = with_cimport_fn_param_name(session, idx, pi)
+        let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
+        let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: "p" ++ int_to_string(pi)
+        if pi > 0:
+            params = params ++ ", "
+            call_args = call_args ++ ", "
+        params = params ++ actual_name ++ ": " ++ ptype
+        call_args = call_args ++ actual_name
+        pi = pi + 1
+    "fn " ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret ++ ":\n    " ++ safe_fn_name ++ "(" ++ call_args ++ ")\n"
 
 fn ci_pointer_type_explicit_mut(ty: str) -> str:
     if ci_starts_with(ty, "*const "):

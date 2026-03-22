@@ -5331,6 +5331,18 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             return 0
         return dt_tid
 
+    // Callable type syntax: TypeName(args) → TypeName.new(args)
+    if self.type_decl_nodes.contains(fn_sym):
+        let new_name = self.pool_resolve(fn_sym) ++ ".new"
+        let new_sym = self.pool_intern(new_name)
+        let new_sig = self.get_sig(new_sym)
+        if new_sig >= 0:
+            let new_ret = self.sig_return_type(new_sig)
+            let new_expected = self.sig_get_param_count(new_sig)
+            if arg_count > new_expected:
+                self.emit_error("too many arguments for " ++ self.pool_resolve(fn_sym) ++ "()", node)
+            return new_ret
+
     // Intrinsic function
     if self.is_intrinsic_fn_sym(fn_sym) != 0:
         return self.check_intrinsic_call(fn_sym, node, arg_types, arg_count)
