@@ -186,7 +186,11 @@ fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_
         compilation_cleanup_build_products(obj_path, "")
         return ""
     compilation_debug_init("build_binary_to_path:linking")
-    if not link_stage_link_object_to_binary(obj_path, bin_path, self.zcu.last_link_lib_names, self.zcu.project_config.link_search_paths, requires_async_runtime):
+    // Merge dep_link_libs from project config into link libs
+    var all_link_libs = self.zcu.last_link_lib_names
+    for dli in 0..self.zcu.project_config.dep_link_libs.len() as i32:
+        all_link_libs.push(self.zcu.project_config.dep_link_libs.get(dli as i64))
+    if not link_stage_link_object_to_binary(obj_path, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, requires_async_runtime):
         compilation_debug_init("build_binary_to_path:link FAILED")
         compilation_cleanup_build_products(obj_path, bin_path)
         return ""

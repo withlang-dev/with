@@ -4,6 +4,8 @@
 // synthetic extern fn / type declarations as .w source text.
 // Falls back gracefully when libclang is unavailable.
 
+extern fn with_cimport_add_include_path(path: str) -> void
+extern fn with_cimport_clear_include_paths() -> void
 extern fn with_cimport_available() -> i32
 extern fn with_cimport_parse(header_code: str) -> i64
 extern fn with_cimport_dispose(session: i64) -> void
@@ -209,6 +211,11 @@ let UO_POST_DEC: i32 = 9
 
 // Process a c_import header spec and return synthetic .w source text.
 // Returns "" if the bridge is unavailable or parsing fails.
+fn ci_set_include_paths(paths: Vec[str]):
+    with_cimport_clear_include_paths()
+    for i in 0..paths.len() as i32:
+        with_cimport_add_include_path(paths.get(i as i64))
+
 fn process_c_import(header_spec: str) -> str:
     if with_cimport_available() == 0:
         return ""

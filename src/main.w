@@ -10,9 +10,13 @@ use InternPool
 use Diagnostic
 use Source
 use Compilation
+use ConanClient
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
+extern fn with_fs_write_file(path: str, data: str) -> i32
+extern fn with_fs_mkdir_p(path: str) -> i32
+extern fn with_fs_read_file(path: str) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_str_len(s: str) -> i64
 extern fn with_str_byte_at(s: str, index: i64) -> i32
@@ -263,6 +267,12 @@ fn run_cli(argc: i32) -> i32:
         return run_help_command(argc)
     if cli_command(argc) == "clean":
         return run_clean_command()
+    if cli_command(argc) == "init":
+        return run_init_command(argc)
+    if cli_command(argc) == "get":
+        return run_get_command(argc)
+    if cli_command(argc) == "remove":
+        return run_remove_command(argc)
     if cli_command(argc) == "lsp":
         with_eprintln("error: LSP not yet available in self-hosted compiler")
         return 1
@@ -932,3 +942,113 @@ fn print_help_attributes:
         "  - The parser currently recognizes packed, inline, noinline, and align.\n" ++
         "  - Other attributes may be documented in the spec but are not all implemented yet.\n"
     )
+
+// ── Package management commands ─────────────────────────────────
+
+fn cli_flag_value(argc: i32, flag: str) -> str:
+    var i = 2
+    while i < argc - 1:
+        if with_arg_at(i) == flag:
+            return with_arg_at(i + 1)
+        i = i + 1
+    ""
+
+fn run_init_command(argc: i32) -> i32:
+    // Determine project name
+    var name = cli_flag_value(argc, "--name")
+    if name.len() == 0:
+        // Use current directory name
+        name = "myproject"
+    let is_lib = cli_has_flag(argc, "--lib")
+
+    // Check if with.toml already exists
+    let existing = with_fs_read_file("with.toml")
+    if existing.len() > 0:
+        with_eprintln("error: with.toml already exists in current directory")
+        return 1
+
+    // Create with.toml
+    let toml = "[project]\nname = \"" ++ name ++ "\"\nversion = \"0.1.0\"\n"
+    if with_fs_write_file("with.toml", toml) != 0:
+        with_eprintln("error: failed to write with.toml")
+        return 1
+
+    // Create src/ directory
+    if with_fs_mkdir_p("src") != 0:
+        with_eprintln("error: failed to create src/ directory")
+        return 1
+
+    // Create source file
+    if is_lib:
+        let lib_src = "// " ++ name ++ " library\n\npub fn hello -> str:\n    \"Hello from " ++ name ++ "!\"\n"
+        if with_fs_write_file("src/lib.w", lib_src) != 0:
+            with_eprintln("error: failed to write src/lib.w")
+            return 1
+        with_eprintln("created " ++ name ++ " (library)")
+    else:
+        let main_src = "fn main:\n    println(\"Hello, World!\")\n"
+        if with_fs_write_file("src/main.w", main_src) != 0:
+            with_eprintln("error: failed to write src/main.w")
+            return 1
+        with_eprintln("created " ++ name)
+
+    with_eprintln("  with.toml")
+    if is_lib:
+        with_eprintln("  src/lib.w")
+    else:
+        with_eprintln("  src/main.w")
+    0
+
+fn run_get_command(argc: i32) -> i32:
+    if argc < 3:
+        with_eprintln("usage: with get c.<package>[@version]")
+        return 1
+    let spec = with_arg_at(2)
+    if not spec.starts_with("c."):
+        with_eprintln("error: only C packages supported. Use c.<name> (e.g. c.sqlite3)")
+        return 1
+    // Parse name and version from spec
+    let pkg_part = spec.slice(2, spec.len())
+    var pkg_name = pkg_part
+    var pkg_version = ""
+    for i in 0..pkg_part.len() as i32:
+        if pkg_part.byte_at(i as i64) == 64:
+            pkg_name = pkg_part.slice(0, i as i64)
+            pkg_version = pkg_part.slice((i + 1) as i64, pkg_part.len())
+            break
+    if pkg_name.len() == 0:
+        with_eprintln("error: empty package name")
+        return 1
+
+    let root = project_config_find_root(".")
+    if root.len() == 0:
+        with_eprintln("error: no with.toml found. Run 'with init' first.")
+        return 1
+    let rc = conan_install(pkg_name, pkg_version, root)
+    if rc != 0:
+        return 1
+    let version_for_toml = if pkg_version.len() > 0: pkg_version else: "latest"
+    let manifest_path = root ++ "/with.toml"
+    let toml = with_fs_read_file(manifest_path)
+    if toml.len() > 0:
+        var updated = toml
+        if not updated.contains("[deps]"):
+            updated = updated ++ "\n[deps]\n"
+        let dep_line = "c." ++ pkg_name ++ " = \"" ++ version_for_toml ++ "\"\n"
+        if not updated.contains("c." ++ pkg_name):
+            updated = updated ++ dep_line
+        with_fs_write_file(manifest_path, updated)
+    with_eprintln("added c." ++ pkg_name)
+    0
+
+fn run_remove_command(argc: i32) -> i32:
+    if argc < 3:
+        with_eprintln("usage: with remove c.<package>")
+        return 1
+    let spec = with_arg_at(2)
+    if not spec.starts_with("c."):
+        with_eprintln("error: only C packages supported. Use c.<name>")
+        return 1
+    // TODO: remove dep from with.toml and clean .with/deps/c/<name>/
+    with_eprintln("error: remove not yet implemented")
+    1

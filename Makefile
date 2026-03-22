@@ -211,7 +211,7 @@ $(EMBEDDED_STDLIB_INC): scripts/generate_embedded_stdlib.py | $(OUT_LIB_DIR)
 	@python3 "$(ROOT_DIR)/scripts/generate_embedded_stdlib.py" "$(ROOT_DIR)" "$@"
 
 $(HELPERS_OBJ): runtime/helpers.c $(EMBEDDED_STDLIB_INC) | $(OUT_LIB_DIR)
-	$(call HOST_COMPILE,)
+	$(call HOST_COMPILE,-DWITH_HAS_CURL)
 
 $(SUPPORT_RUNTIME_OBJ): runtime/support_runtime.c | $(OUT_LIB_DIR)
 	$(call HOST_COMPILE,)

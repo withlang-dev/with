@@ -623,6 +623,25 @@ void with_cimport_reset_names(void) {
     g_emitted_cap = 0;
 }
 
+// ── Include paths for c_import ───────────────────────────────
+
+static char *g_cimport_include_paths[32];
+static int g_cimport_include_count = 0;
+
+void with_cimport_add_include_path(with_str path) {
+    if (g_cimport_include_count >= 32 || path.len <= 0) return;
+    char *buf = (char *)malloc((size_t)path.len + 1);
+    memcpy(buf, path.ptr, (size_t)path.len);
+    buf[path.len] = 0;
+    g_cimport_include_paths[g_cimport_include_count++] = buf;
+}
+
+void with_cimport_clear_include_paths(void) {
+    for (int i = 0; i < g_cimport_include_count; i++)
+        free(g_cimport_include_paths[i]);
+    g_cimport_include_count = 0;
+}
+
 // ── Parse ───────────────────────────────────────────────────
 
 int64_t with_cimport_parse(with_str header_code) {
@@ -647,13 +666,18 @@ int64_t with_cimport_parse(with_str header_code) {
     rename(tmp_template, c_path);
     s->tmp_path = c_path;
 
-    // Build compiler arguments
-    const char *args[4];
+    // Build compiler arguments (sysroot + extra include paths)
+    const char *args[64];
     int nargs = 0;
     const char *sysroot = get_sdk_path();
     if (sysroot) {
         args[nargs++] = "-isysroot";
         args[nargs++] = sysroot;
+    }
+    // Add extra include paths set via with_cimport_add_include_path
+    for (int ip = 0; ip < g_cimport_include_count && nargs < 62; ip++) {
+        args[nargs++] = "-I";
+        args[nargs++] = g_cimport_include_paths[ip];
     }
 
     s->index = clang_createIndex(0, 0);
