@@ -1031,6 +1031,10 @@ fn Codegen.coerce_value_to_type(self: Codegen, val: i64, target_ty: i64) -> i64:
     if vk == wl_integer_type_kind() and tk == wl_integer_type_kind():
         return self.coerce_int(val, target_ty)
 
+    // c_import return coercion: pointer → str (null-safe)
+    if vk == wl_pointer_type_kind() and self.is_str_type(target_ty):
+        return self.coerce_ptr_to_str(val)
+
     // Function pointer → fat pointer coercion: create thunk wrapper
     // Regular fn(params...) → closure fn(ctx, params...) with ctx ignored
     if vk == wl_pointer_type_kind() and tk == wl_struct_type_kind():
@@ -6135,8 +6139,11 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
             if has_projections:
                 return false
             let value_ty = wl_type_of(value)
-            dst_ptr = self.mir_get_or_create_local_ptr(dst_local, value_ty)
-            self.mir_local_types.insert(dst_local, value_ty)
+            // When sema type is str but value is a pointer (c_import coercion),
+            // use the str type for the alloca so the coerced struct fits.
+            let alloca_ty = if dst_ty != 0 and self.is_str_type(dst_ty) and wl_get_type_kind(value_ty) == wl_pointer_type_kind(): dst_ty else: value_ty
+            dst_ptr = self.mir_get_or_create_local_ptr(dst_local, alloca_ty)
+            self.mir_local_types.insert(dst_local, alloca_ty)
         var final_ty = dst_ty
         if final_ty == 0:
             let final_ty_opt = self.mir_local_types.get(dst_local)
@@ -8009,15 +8016,25 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
             return false
         let dst_local = body.place_locals.get(dest_place as i64)
-        let dst_ptr = self.mir_place_ptr(body, dest_place, true, ret_ty)
-        if dst_ptr == 0:
-            return false
+        // Resolve destination type before creating the place alloca.
+        // The sema type may differ from the C return type (e.g. void* → str).
         var dst_ty = ret_ty
         let dst_ty_opt = self.mir_local_types.get(dst_local)
         if dst_ty_opt.is_some():
             dst_ty = dst_ty_opt.unwrap() as i64
         else:
-            self.mir_local_types.insert(dst_local, ret_ty)
+            if dst_local >= 0 and dst_local < body.local_type_ids.len() as i32:
+                let sema_ty = body.local_type_ids.get(dst_local as i64)
+                if sema_ty > 0:
+                    let resolved_llvm = self.mir_sema_type_to_llvm(sema_ty)
+                    if resolved_llvm != 0:
+                        dst_ty = resolved_llvm
+            self.mir_local_types.insert(dst_local, dst_ty)
+        if self.debug_mir_codegen_enabled():
+            with_eprintln("[mir-call-ret] dst_local=" ++ int_to_string(dst_local) ++ " ret_ty_kind=" ++ int_to_string(wl_get_type_kind(ret_ty)) ++ " dst_ty_kind=" ++ int_to_string(wl_get_type_kind(dst_ty)) ++ " is_str=" ++ (if self.is_str_type(dst_ty): "1" else: "0"))
+        let dst_ptr = self.mir_place_ptr(body, dest_place, true, dst_ty)
+        if dst_ptr == 0:
+            return false
         if dst_ty == 0:
             return false
         let stored = self.enforce_coerced_type(call_val, dst_ty, "return type mismatch at call site")
@@ -9769,6 +9786,29 @@ fn Codegen.build_str_value(self: Codegen, ptr: i64, len: i64) -> i64:
     result = wl_build_insert_value(self.builder, result, ptr, 0)
     result = wl_build_insert_value(self.builder, result, len, 1)
     result
+
+fn Codegen.coerce_ptr_to_str(self: Codegen, ptr_val: i64) -> i64:
+    // c_import return coercion: *void / *u8 → str with null safety.
+    // Calls with_str_from_cstr which handles null internally (returns {null,0}).
+    let str_sym = self.intern.intern("str")
+    let st_opt = self.struct_type_map.get(str_sym)
+    if not st_opt.is_some():
+        return self.build_str_value(ptr_val, wl_const_int(wl_i64_type(self.context), 0, 0))
+    let str_type = self.struct_llvm_types.get(st_opt.unwrap() as i64)
+    var fn_val = wl_get_named_function(self.llmod, "with_str_from_cstr")
+    if fn_val == 0:
+        // Declare with_str_from_cstr if not already in the module
+        let ptr_ty = wl_ptr_type(self.context)
+        var param_types: Vec[i64] = Vec.new()
+        param_types.push(ptr_ty)
+        let fn_ty = wl_function_type(str_type, vec_data_i64(&param_types), 1, 0)
+        fn_val = wl_add_function(self.llmod, "with_str_from_cstr", fn_ty)
+    if fn_val == 0:
+        return self.build_str_value(ptr_val, wl_const_int(wl_i64_type(self.context), 0, 0))
+    let fn_type = wl_global_get_value_type(fn_val)
+    var args: Vec[i64] = Vec.new()
+    args.push(ptr_val)
+    wl_build_call(self.builder, fn_type, fn_val, vec_data_i64(&args), 1)
 
 fn Codegen.ensure_c_fn(self: Codegen, name: str, ret_ty: i64, param_count: i32) -> i64:
     let existing = wl_get_named_function(self.llmod, name)

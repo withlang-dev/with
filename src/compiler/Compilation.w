@@ -325,6 +325,8 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     var sema = Sema.init(zcu.pool, zcu.diagnostics, active_pool)
     compilation_debug_pool_flow("run_mir_lower:after_init", zcu.pool, active_pool, sema)
     sema.source_text = zcu.current_source_text
+    sema.decl_source_paths = zcu.decl_source_paths
+    sema.decl_is_c_import = zcu.decl_is_c_import
     if self.config.no_std:
         sema.no_std = 1
     if self.config.alloc_mode:
