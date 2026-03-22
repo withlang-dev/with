@@ -79,21 +79,8 @@ STAGE2_RUNNER="$(prepare_selfhost_runner "$ROOT_DIR" "$STAGE2_BIN")"
 # Save first runner dir so we can clean it up
 STAGE2_RUNNER_DIR="$SELFHOST_RUNNER_DIR"
 
-# Prepare stage3 runner in a separate temp dir
 STAGE3_RUNNER_DIR=""
-mkdir -p "${ROOT_DIR}/out/tmp"
-stage3_tmp="$(mktemp -d "${ROOT_DIR}/out/tmp/with-selfhost-runner.XXXXXX")"
-if [[ -f "${ROOT_DIR}/out/lib/libwith_llvm_bridge.dylib" ]]; then
-  mkdir -p "${stage3_tmp}/runtime"
-  cp "$STAGE3_BIN" "${stage3_tmp}/with-stage2"
-  chmod +x "${stage3_tmp}/with-stage2"
-  cp "${ROOT_DIR}/out/lib/libwith_llvm_bridge.dylib" "${stage3_tmp}/runtime/libwith_llvm_bridge.dylib"
-  STAGE3_RUNNER="${stage3_tmp}/with-stage2"
-  STAGE3_RUNNER_DIR="$stage3_tmp"
-else
-  STAGE3_RUNNER="$STAGE3_BIN"
-  rm -rf "$stage3_tmp"
-fi
+STAGE3_RUNNER="$STAGE3_BIN"
 
 cleanup_runners() {
   if [[ -n "$STAGE2_RUNNER_DIR" && -d "$STAGE2_RUNNER_DIR" ]]; then

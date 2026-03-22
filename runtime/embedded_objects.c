@@ -8,7 +8,7 @@
 
 typedef struct { const char *ptr; int64_t len; } with_str;
 
-#include "embedded_objects.inc.h"
+#include "../out/lib/embedded_objects.inc.h"
 
 #define MATCH(s, lit) (s.len == sizeof(lit)-1 && memcmp(s.ptr, lit, sizeof(lit)-1) == 0)
 

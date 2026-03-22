@@ -38,16 +38,21 @@ Always **root-cause the issue**.
 
 The compiler compiles itself.
 
-Build:
+The Makefile is the canonical build interface.
+
+Normal targets:
 
 ```
+make stage1
+make stage2
 make build
+make stage3
 ```
 
 Stages:
 
 ```
-seed → stage1 → stage2
+seed → stage1 → stage2 → stage3
 ```
 
 Verify determinism:
@@ -64,6 +69,21 @@ stage2 == stage3
 
 (byte-identical)
 
+Install targets:
+
+```
+make install-user
+make install PREFIX=$HOME/.local
+make install
+```
+
+`make build` builds `out/bin/with-stage2` and `out/bin/with`.
+It does **not** install to the user's PATH.
+
+Use `scripts/rebuild_selfhost.sh` only as a compatibility shim.
+New automation should call `make stage1`, `make stage2`, `make stage3`,
+or `make fixpoint` directly.
+
 If the build breaks, **fixing the build is the top priority**.
 
 ---
@@ -77,8 +97,9 @@ The seed compiler is resolved in this order:
 3. `src/main` (downloaded from GitHub releases via `make seed`)
 
 `src/main` is **not checked into git**. It is published as a GitHub
-release asset. Run `make seed` or `./scripts/download_seed.sh` to
-fetch it.
+release asset. Run `make seed` to fetch it.
+
+It is gitignored local state. Never commit or push `src/main`.
 
 After a successful fixpoint build, update the installed compiler:
 
@@ -116,18 +137,21 @@ Source directories must **never contain build artifacts**.
 
 # LLVM Linking
 
-LLVM is **statically linked** into the compiler binary. No dynamic `libwith_llvm_bridge.dylib` dependency.
+LLVM is **statically linked** into the compiler binary. There is no dynamic
+`libwith_llvm_bridge.dylib` fallback in the normal build.
 
-Build-time setup (`scripts/ensure_runtime.sh`):
+Build-time setup is owned by the Makefile:
 
-1. Compiles `runtime/llvm_bridge.c` → `out/lib/llvm_bridge.o` using LLVM's clang
-2. Generates `out/lib/llvm_link.rsp` with LLVM static lib paths + system deps
-3. Writes `out/lib/llvm_cc` with path to LLVM's clang
+1. Generates versioned entry sources under `out/gen/`
+2. Compiles runtime objects under `out/lib/`
+3. Compiles `runtime/llvm_bridge.c` → `out/lib/llvm_bridge.o` using LLVM's clang
+4. Generates `out/lib/llvm_link.rsp` and `out/lib/llvm_cc`
+5. Compiles `runtime/clang_bridge.c` → `out/lib/clang_bridge.o`
 
 At link time (`src/compiler/Link.w`):
 
-* Detects `llvm_bridge.o` + `llvm_link.rsp` + `llvm_cc` → static linking via LLVM's clang with `-fuse-ld=lld`
-* Falls back to `libwith_llvm_bridge.dylib` if static bridge not available
+* Requires `llvm_bridge.o` + `llvm_link.rsp` + `llvm_cc`
+* Uses LLVM's clang with `-fuse-ld=lld`
 
 LLVM location: `/usr/local/llvm` (override with `LLVM_PREFIX` env var).
 
@@ -193,7 +217,13 @@ make build
 Smoke test:
 
 ```
-./out/bin/with-stage2 check src/main.w
+make smoke
+```
+
+When stage determinism matters:
+
+```
+make fixpoint
 ```
 
 ---
