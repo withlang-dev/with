@@ -5566,6 +5566,63 @@ are evaluated via the C compiler's constant evaluator:
 from transitive includes, numeric suffixes are appended: `name_2`,
 `name_3`, etc.
 
+### 16.2a Auto-Method Generation
+
+When `c_import` translates a C header, the compiler detects naming
+patterns like `structname_method(self, ...)` and auto-generates
+method syntax so C APIs feel like native With APIs. This is sugar —
+`table.insert("key", "val")` compiles to exactly
+`g_hash_table_insert(table, "key", "val")`. Zero runtime cost.
+
+```
+// Raw c_import calls:
+let table = g_hash_table_new(g_str_hash, g_str_equal)
+g_hash_table_insert(table, "name", "Eric")
+g_hash_table_destroy(table)
+
+// With auto-methods:
+let table = GHashTable()
+table.insert("name", "Eric")
+// table.destroy() called automatically at scope exit
+```
+
+**Detection rules.** For each struct `S` from `c_import`, the
+compiler converts the name to snake_case (`GHashTable` →
+`g_hash_table_`) and checks if imported functions start with that
+prefix. A function is a **method candidate** if its first parameter
+is `*S`, `*mut S`, `*const S`, or `S`. A function is a
+**constructor candidate** if it returns `*S` / `*mut S` without
+taking self. The method name is the function name with the prefix
+stripped:
+
+```
+g_hash_table_new       → GHashTable.new(...)      // constructor
+g_hash_table_insert    → .insert(...)              // method
+g_hash_table_lookup    → .lookup(...)              // method
+g_hash_table_destroy   → .destroy()                // destructor
+```
+
+**Constructor syntax.** If a type has a `.new` method, the type
+name itself becomes callable: `GHashTable(args)` is sugar for
+`GHashTable.new(args)`.
+
+**Destructor detection and auto-defer.** Functions matching
+`prefix_destroy`, `prefix_free`, `prefix_close`, `prefix_unref`,
+or `prefix_release` are tagged as destructors. When a constructor
+result is bound to a non-escaping `let`, the compiler inserts
+`defer obj.destructor()` automatically. Auto-defer does NOT apply
+when the value is returned, stored in a collection, bound to `var`,
+or passed to an ownership-transferring function.
+
+**Opt-out.** Per-type: `use c_import("lib.h", no_methods: "Type")`.
+Global: `use c_import("lib.h", no_methods: true)`. Flat C functions
+are always available regardless.
+
+**Ambiguity.** If multiple structs could claim the same function,
+the longest prefix wins. If equal length, neither claims it.
+User-written `impl` methods always take priority over auto-generated
+ones.
+
 ### 16.3 Manual Declarations
 
 For cases where `c_import` is insufficient or when fine-grained
