@@ -40,6 +40,7 @@ type Zcu = {
     diagnostics: DiagnosticList,
     imported_paths: Vec[str],
     decl_source_paths: Vec[str],
+    decl_source_file_ids: Vec[i32],
     decl_is_c_import: Vec[i32],
     c_import_cache_keys: Vec[str],
     c_import_cache_values: Vec[str],
@@ -82,6 +83,7 @@ fn Zcu.init -> Zcu:
         diagnostics: diagnostics,
         imported_paths: Vec.new(),
         decl_source_paths: Vec.new(),
+        decl_source_file_ids: Vec.new(),
         decl_is_c_import: Vec.new(),
         c_import_cache_keys: Vec.new(),
         c_import_cache_values: Vec.new(),
@@ -113,6 +115,7 @@ fn Zcu.reset_import_state(self: Zcu):
     let empty: Vec[str] = Vec.new()
     self.imported_paths = empty
     self.decl_source_paths = Vec.new()
+    self.decl_source_file_ids = Vec.new()
     self.next_file_id = 1
 
 fn Zcu.has_imported_path(self: Zcu, path: str) -> i32:
@@ -124,27 +127,36 @@ fn Zcu.has_imported_path(self: Zcu, path: str) -> i32:
 fn Zcu.add_imported_path(self: Zcu, path: str):
     self.imported_paths.push(path)
 
-fn Zcu.seed_decl_source_paths(self: Zcu, pool: AstPool, path: str):
+fn Zcu.seed_decl_source_paths(self: Zcu, pool: AstPool, path: str, file_id: i32):
     self.decl_source_paths = Vec.new()
+    self.decl_source_file_ids = Vec.new()
     self.decl_is_c_import = Vec.new()
     for _ in 0..pool.decl_count():
         self.decl_source_paths.push(path)
+        self.decl_source_file_ids.push(file_id)
         self.decl_is_c_import.push(0)
 
-fn Zcu.append_decl_source_paths(self: Zcu, count: i32, path: str):
+fn Zcu.append_decl_source_paths(self: Zcu, count: i32, path: str, file_id: i32):
     for _ in 0..count:
         self.decl_source_paths.push(path)
+        self.decl_source_file_ids.push(file_id)
         self.decl_is_c_import.push(0)
 
-fn Zcu.append_c_import_decl_paths(self: Zcu, count: i32, path: str):
+fn Zcu.append_c_import_decl_paths(self: Zcu, count: i32, path: str, file_id: i32):
     for _ in 0..count:
         self.decl_source_paths.push(path)
+        self.decl_source_file_ids.push(file_id)
         self.decl_is_c_import.push(1)
 
 fn Zcu.decl_source_path_frontend(self: Zcu, decl_index: i32) -> str:
     if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
         return self.decl_source_paths.get(decl_index as i64)
     self.current_source_path
+
+fn Zcu.decl_source_file_id_frontend(self: Zcu, decl_index: i32) -> i32:
+    if decl_index >= 0 and decl_index < self.decl_source_file_ids.len() as i32:
+        return self.decl_source_file_ids.get(decl_index as i64)
+    0
 
 fn Zcu.decl_source_dir_frontend(self: Zcu, decl_index: i32) -> str:
     let path = self.decl_source_path_frontend(decl_index)
@@ -165,9 +177,40 @@ fn Zcu.c_import_cache_store(self: Zcu, key: str, value: str):
 fn Zcu.set_prelude_mode(self: Zcu, mode: i32):
     self.prelude_mode = compilation_normalize_prelude_mode(mode)
 
+fn Zcu.source_for_file_id_frontend(self: Zcu, file_id: i32) -> Source:
+    if file_id == 0:
+        return Source.from_string(self.current_source_path, self.current_source_text, 0)
+    for i in 0..self.decl_source_file_ids.len() as i32:
+        if self.decl_source_file_ids.get(i as i64) != file_id:
+            continue
+        let path = self.decl_source_path_frontend(i)
+        let embedded_rel = embedded_std_rel_path(path)
+        let text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel) else: with_fs_read_file(path)
+        return Source.from_string(path, text, file_id)
+    Source.from_string(self.current_source_path, self.current_source_text, 0)
+
+fn Zcu.render_all_diagnostics_frontend(self: Zcu):
+    for i in 0..self.diagnostics.items.len() as i32:
+        let diag = self.diagnostics.items.get(i as i64)
+        let source = self.source_for_file_id_frontend(diag.primary.file)
+        diag.render(source)
+        if i + 1 < self.diagnostics.items.len() as i32:
+            with_eprintln("")
+
+fn Zcu.render_warnings_frontend(self: Zcu):
+    var printed = 0
+    for i in 0..self.diagnostics.items.len() as i32:
+        let diag = self.diagnostics.items.get(i as i64)
+        if diag.severity != DIAG_SEVERITY_WARNING:
+            continue
+        if printed != 0:
+            with_eprintln("")
+        let source = self.source_for_file_id_frontend(diag.primary.file)
+        diag.render(source)
+        printed = printed + 1
+
 fn Zcu.print_warnings(self: Zcu):
-    let source = Source.from_string(self.current_source_path, self.current_source_text, 0)
-    self.diagnostics.render_warnings(source)
+    self.render_warnings_frontend()
 
 fn Zcu.reset_pending_warnings(self: Zcu):
     let empty: Vec[str] = Vec.new()

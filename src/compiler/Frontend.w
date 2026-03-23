@@ -99,6 +99,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var out = pool
     let ordered: Vec[i32] = Vec.new()
     let ordered_paths: Vec[str] = Vec.new()
+    let ordered_file_ids: Vec[i32] = Vec.new()
     let ordered_ci: Vec[i32] = Vec.new()
     let base_count = out.decl_count()
     var has_c_import = 0
@@ -119,6 +120,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         if out.kind(decl) != NK_C_IMPORT:
             ordered.push(decl)
             ordered_paths.push(self.decl_source_path_frontend(i))
+            ordered_file_ids.push(self.decl_source_file_id_frontend(i))
             let ci_f = if i < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(i as i64) else: 0
             ordered_ci.push(ci_f)
             continue
@@ -128,6 +130,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         // even if header expansion is deduplicated elsewhere in the merged AST.
         ordered.push(decl)
         ordered_paths.push(self.decl_source_path_frontend(i))
+        ordered_file_ids.push(self.decl_source_file_id_frontend(i))
         ordered_ci.push(0)
 
         let header_sym = out.get_data0(decl)
@@ -185,10 +188,12 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let after = out.decl_count()
         // Mark all c_import-synthesized declarations
         let ci_owner_path = self.decl_source_path_frontend(i)
+        let ci_owner_file_id = self.decl_source_file_id_frontend(i)
         var di = before
         while di < after:
             ordered.push(out.get_decl(di))
             ordered_paths.push(ci_owner_path)
+            ordered_file_ids.push(ci_owner_file_id)
             ordered_ci.push(1)  // c_import origin
             di = di + 1
 
@@ -197,6 +202,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for oi in 0..ordered.len() as i32:
         out.add_decl(ordered.get(oi as i64))
     self.decl_source_paths = ordered_paths
+    self.decl_source_file_ids = ordered_file_ids
     self.decl_is_c_import = ordered_ci
     out
 
@@ -758,7 +764,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         self.pool = parser.intern
         self.diagnostics = parser.diags
 
-    self.seed_decl_source_paths(pool, name)
+    self.seed_decl_source_paths(pool, name, file_id)
 
     let root_local_decl_count = count_non_use_decls_frontend(pool)
 
@@ -797,8 +803,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     frontend_dump_type_decl_names("post-imports", pool, self.pool)
 
     if self.diagnostics.has_errors():
-        let source = Source.from_string(name, text, file_id)
-        self.diagnostics.render_all(source)
+        self.render_all_diagnostics_frontend()
         self.set_typed_snapshot("", AstPool.new())
         return AstPool.new()
 
@@ -811,6 +816,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     var sema = Sema.init(self.pool, self.diagnostics, pool)
     sema.source_text = text
     sema.decl_source_paths = self.decl_source_paths
+    sema.decl_source_file_ids = self.decl_source_file_ids
     sema.decl_is_c_import = self.decl_is_c_import
     sema.check_module()
     self.sync_from_sema(sema)
@@ -820,8 +826,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     self.last_typed_dump = ""
 
     if self.diagnostics.has_errors():
-        let source = Source.from_string(name, text, file_id)
-        self.diagnostics.render_all(source)
+        self.render_all_diagnostics_frontend()
         self.set_typed_snapshot("", AstPool.new())
         return AstPool.new()
 
@@ -856,7 +861,7 @@ fn Zcu.merge_resolved_modules_frontend(self: Zcu, root_pool: AstPool, root_path:
         merged_pool = parser.parse_module()
         self.pool = parser.intern
         self.diagnostics = parser.diags
-        self.append_decl_source_paths(merged_pool.decl_count() - before, path)
+        self.append_decl_source_paths(merged_pool.decl_count() - before, path, mod.file_id)
 
     self.strip_use_decls_frontend(merged_pool)
 
@@ -873,12 +878,14 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
 
     let ordered: Vec[i32] = Vec.new()
     let ordered_paths: Vec[str] = Vec.new()
+    let ordered_file_ids: Vec[i32] = Vec.new()
     let ordered_c_import: Vec[i32] = Vec.new()
     for i in 0..out.decl_count():
         let decl = out.get_decl(i)
         if out.kind(decl) != NK_USE_DECL:
             ordered.push(decl)
             ordered_paths.push(self.decl_source_path_frontend(i))
+            ordered_file_ids.push(self.decl_source_file_id_frontend(i))
             let ci_flag = if i < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(i as i64) else: 0
             ordered_c_import.push(ci_flag)
 
@@ -887,6 +894,7 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for oi in 0..ordered.len() as i32:
         out.add_decl(ordered.get(oi as i64))
     self.decl_source_paths = ordered_paths
+    self.decl_source_file_ids = ordered_file_ids
     self.decl_is_c_import = ordered_c_import
     out
 
@@ -901,10 +909,13 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     let initial_count = merged_pool.decl_count()
     var prelude_ordered: Vec[i32] = Vec.new()
     var prelude_paths: Vec[str] = Vec.new()
+    var prelude_file_ids: Vec[i32] = Vec.new()
     var user_import_ordered: Vec[i32] = Vec.new()
     var user_import_paths: Vec[str] = Vec.new()
+    var user_import_file_ids: Vec[i32] = Vec.new()
     var root_ordered: Vec[i32] = Vec.new()
     var root_paths: Vec[str] = Vec.new()
+    var root_file_ids: Vec[i32] = Vec.new()
 
     // Phase 1: Expand prelude USE (position 0) and its transitive imports.
     let has_prelude = self.prelude_mode != PRELUDE_NONE() and initial_count > 0 and merged_pool.kind(merged_pool.get_decl(0)) == NK_USE_DECL
@@ -929,6 +940,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             if kind != NK_USE_DECL:
                 prelude_ordered.push(decl)
                 prelude_paths.push(self.decl_source_path_frontend(pi))
+                prelude_file_ids.push(self.decl_source_file_id_frontend(pi))
                 pi = pi + 1
                 continue
             let pps = merged_pool.get_data0(decl)
@@ -953,6 +965,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         if kind != NK_USE_DECL:
             root_ordered.push(decl)
             root_paths.push(self.decl_source_path_frontend(ui))
+            root_file_ids.push(self.decl_source_file_id_frontend(ui))
             continue
         let ups = merged_pool.get_data0(decl)
         let upc = merged_pool.get_data1(decl)
@@ -973,6 +986,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         if kind != NK_USE_DECL:
             user_import_ordered.push(decl)
             user_import_paths.push(self.decl_source_path_frontend(ui2))
+            user_import_file_ids.push(self.decl_source_file_id_frontend(ui2))
             ui2 = ui2 + 1
             continue
         let ups = merged_pool.get_data0(decl)
@@ -1007,6 +1021,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     while merged_pool.decl_count() > 0:
         merged_pool.decls.pop()
     let rebuilt_paths: Vec[str] = Vec.new()
+    let rebuilt_file_ids: Vec[i32] = Vec.new()
     // Combine user + root fn names for prelude cross-tier shadowing.
     var higher_fn_names: Vec[i32] = Vec.new()
     for hi in 0..root_fn_names.len() as i32:
@@ -1020,6 +1035,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             continue
         merged_pool.add_decl(id)
         rebuilt_paths.push(prelude_paths.get(oi as i64))
+        rebuilt_file_ids.push(prelude_file_ids.get(oi as i64))
     for oi in 0..user_import_ordered.len() as i32:
         let id = user_import_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
@@ -1027,10 +1043,13 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             continue
         merged_pool.add_decl(id)
         rebuilt_paths.push(user_import_paths.get(oi as i64))
+        rebuilt_file_ids.push(user_import_file_ids.get(oi as i64))
     for oi in 0..root_ordered.len() as i32:
         merged_pool.add_decl(root_ordered.get(oi as i64))
         rebuilt_paths.push(root_paths.get(oi as i64))
+        rebuilt_file_ids.push(root_file_ids.get(oi as i64))
     self.decl_source_paths = rebuilt_paths
+    self.decl_source_file_ids = rebuilt_file_ids
     merged_pool
 
 fn frontend_fn_shadowed_in_tier(tier: Vec[i32], pool: AstPool, idx: i32, higher_names: Vec[i32]) -> bool:
@@ -1145,7 +1164,7 @@ fn Zcu.parse_imported_file_frontend(self: Zcu, path: str, target_pool: AstPool) 
     let merged_pool = parser.parse_module()
     self.pool = parser.intern
     self.diagnostics = parser.diags
-    self.append_decl_source_paths(merged_pool.decl_count() - before, path)
+    self.append_decl_source_paths(merged_pool.decl_count() - before, path, file_id)
     merged_pool
 
 fn frontend_normalize_module_path(module_name: str) -> str:
