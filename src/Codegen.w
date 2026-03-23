@@ -4804,6 +4804,24 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     else:
         0
     let resolved_binding_ty = if binding_ty != 0: self.sema.resolve_alias(binding_ty) else: 0
+    if self.pool.kind(value_node) == NK_NULL_LIT:
+        var null_ty = resolved_binding_ty
+        if null_ty == 0 and self.sema.typed_expr_types.contains(value_node):
+            let inferred_null_ty = self.sema.typed_expr_types.get(value_node).unwrap()
+            if inferred_null_ty != 0:
+                null_ty = self.sema.resolve_alias(inferred_null_ty)
+        let null_tk = if null_ty != 0: self.sema.get_type_kind(null_ty) else: 0
+        if null_tk == TY_PTR or null_tk == TY_REF:
+            let global_ty = self.sema_type_to_llvm(null_ty)
+            if global_ty != 0:
+                let name_str = self.intern.resolve(name_sym)
+                let global = wl_add_global(self.llmod, global_ty, name_str)
+                wl_set_initializer(global, wl_const_null(global_ty))
+                if is_mut == 0:
+                    wl_set_global_constant(global, 1)
+                wl_set_linkage(global, wl_internal_linkage())
+                self.module_constants.insert(name_sym, global)
+                return
     let val = self.try_eval_const_int(value_node)
     if val != CONST_EVAL_FAIL():
         if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TY_FLOAT:
@@ -7697,6 +7715,9 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
             if gc_callee_sym > 0:
                 let gc_fn_name = self.intern.resolve(gc_callee_sym)
                 let gc_arg_count = self.pool.get_data2(gc_node)
+                if gc_fn_name == "todo" or gc_fn_name == "unreachable":
+                    let _ = wl_build_unreachable(self.builder)
+                    return true
                 if gc_fn_name == "src" and gc_arg_count == 0:
                     let gc_result = self.gen_src_intrinsic(gc_node)
                     if dest_place >= 0 and gc_result != 0:
