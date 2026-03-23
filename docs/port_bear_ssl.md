@@ -1,6 +1,6 @@
 # Plan: Port BearSSL to With Standard Library
 
-**Status:** Active — Phases 0-12 complete, ready for Phase 13 (HTTP client).
+**Status:** Complete — Phases 0-14 done. HTTPS works. ConanClient wire-up deferred (bootstrap issue).
 
 ## Context
 
@@ -78,8 +78,8 @@ lib/std/
 | 10 | X.509 | 400 | **Done** — DER parser, cert parsing, chain verification |
 | 11 | TLS record layer | 300 | **Done** — record I/O, AES-GCM encrypt/decrypt, PRF |
 | 12 | TLS handshake | 500 | **Done** — completes handshake with example.com, HTTPS 200 OK |
-| 13 | HTTP client | 150 | |
-| 14 | ConanClient wire-up | 20 | |
+| 13 | HTTP client | 150 | **Done** — `https_get`, chunked decoding, fetches example.com |
+| 14 | ConanClient wire-up | 20 | **Deferred** — transitive c_import conflicts in compiler source |
 
 **Total: ~3,920 lines of With**
 
