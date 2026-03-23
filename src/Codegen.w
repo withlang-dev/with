@@ -5512,7 +5512,12 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
     cur_ptr
 
 fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected_ty: i64) -> i64:
-    let fallback_ty = if expected_ty != 0: expected_ty else: wl_i32_type(self.context)
+    var materialize_ty = expected_ty
+    if materialize_ty == 0 and const_id >= 0 and const_id < body.const_types.len() as i32:
+        let const_sema_ty = body.const_types.get(const_id as i64)
+        if const_sema_ty > 0:
+            materialize_ty = self.mir_sema_type_to_llvm(const_sema_ty)
+    let fallback_ty = if materialize_ty != 0: materialize_ty else: wl_i32_type(self.context)
     if const_id < 0 or const_id >= body.const_kinds.len() as i32:
         if self.debug_fallback_enabled():
             with_eprintln("warning: [fallback] mir_const_value: invalid const_id=" ++ int_to_string(const_id))
@@ -5524,13 +5529,13 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
     if ck == CK_INT:
         let int_value = mir_const_int_value(body, const_id)
         // Null pointer: CK_INT 0 with pointer expected type
-        if int_value == 0 and expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
-            return wl_const_null(expected_ty)
-        if expected_ty != 0:
-            let ek = wl_get_type_kind(expected_ty)
+        if int_value == 0 and materialize_ty != 0 and wl_get_type_kind(materialize_ty) == wl_pointer_type_kind():
+            return wl_const_null(materialize_ty)
+        if materialize_ty != 0:
+            let ek = wl_get_type_kind(materialize_ty)
             if ek == wl_float_type_kind() or ek == wl_double_type_kind():
-                return wl_const_real(expected_ty, int_value as f64)
-        var int_ty = expected_ty
+                return wl_const_real(materialize_ty, int_value as f64)
+        var int_ty = materialize_ty
         if int_ty == 0 or wl_get_type_kind(int_ty) != wl_integer_type_kind():
             int_ty = if int_value < -2147483648 or int_value > 2147483647: wl_i64_type(self.context) else: wl_i32_type(self.context)
         return wl_const_int(int_ty, int_value, 1)
@@ -5543,12 +5548,12 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         return self.gen_string_literal_raw(text)
 
     if ck == CK_UNIT:
-        if expected_ty != 0 and expected_ty != wl_void_type(self.context):
-            return self.build_default_value(expected_ty)
+        if materialize_ty != 0 and materialize_ty != wl_void_type(self.context):
+            return self.build_default_value(materialize_ty)
         return wl_const_int(wl_i32_type(self.context), 0, 0)
 
     if ck == CK_FLOAT:
-        var float_ty = expected_ty
+        var float_ty = materialize_ty
         if float_ty == 0:
             float_ty = wl_f64_type(self.context)
         let fk = wl_get_type_kind(float_ty)
@@ -5563,8 +5568,8 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         return wl_const_real(float_ty, fval)
 
     if ck == CK_ZERO_SIZED:
-        if expected_ty != 0:
-            return self.build_default_value(expected_ty)
+        if materialize_ty != 0:
+            return self.build_default_value(materialize_ty)
         return wl_const_int(wl_i32_type(self.context), 0, 0)
 
     if ck == CK_CLOSURE:
@@ -6094,7 +6099,13 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
 
     if rk == RK_CAST:
         let val = self.mir_eval_operand(body, d0, 0)
-        let src_unsigned = self.mir_operand_is_unsigned(body, d0)
+        var src_unsigned = self.mir_operand_is_unsigned(body, d0)
+        // Fallback: if operand lookup failed, check the sema type stored in d2
+        // (MirLower stores the source sema type in rval_d2 for casts)
+        if not src_unsigned and d2 > 0:
+            let cast_src_resolved = self.mir_input.mir_resolve_alias(d2)
+            if self.mir_input.mir_get_type_kind(cast_src_resolved) == TY_INT:
+                src_unsigned = self.mir_input.mir_get_type_d1(cast_src_resolved) == 0
         // d1 = sema target type id
         var cast_ty = dest_ty
         if d1 > 0:
@@ -6416,6 +6427,10 @@ fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) 
     // Get the sema type for a MIR operand, handling projected places.
     let ok = body.operand_kinds.get(operand_id as i64)
     let od = body.operand_d0.get(operand_id as i64)
+    if ok == OK_CONSTANT:
+        if od >= 0 and od < body.const_types.len() as i32:
+            return body.const_types.get(od as i64)
+        return 0
     if ok != OK_COPY and ok != OK_MOVE:
         return 0
     if od < 0 or od >= body.place_locals.len() as i32:
@@ -6516,7 +6531,6 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
     var result: i64 = 0
 
     if intrinsic == MIR_INTRINSIC_VEC_NEW:
-        let elem_size = self.mir_vec_elem_size(body, dest_place)
         var vec_elem_ty = wl_i64_type(self.context)
         let dest_sema_new = self.mir_intrinsic_dest_sema_type(body, dest_place)
         if dest_sema_new > 0:
@@ -6530,6 +6544,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
                         let elem_llvm_new = self.mir_sema_type_to_llvm(elem_tid_new)
                         if elem_llvm_new != 0:
                             vec_elem_ty = elem_llvm_new
+        let elem_size = self.abi_size_of(vec_elem_ty)
         let vec_ty = self.get_or_create_vec_type(vec_elem_ty)
         let alloca = wl_build_alloca(self.builder, vec_ty)
         wl_build_store(self.builder, self.build_default_value(vec_ty), alloca)
@@ -6572,7 +6587,14 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
 
     else if intrinsic == MIR_INTRINSIC_VEC_PUSH:
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-        let elem = self.mir_intrinsic_arg(body, args_id, 1)
+        let elem_raw = self.mir_intrinsic_arg(body, args_id, 1)
+        // Coerce element to match Vec's element type (e.g. f64 literal → f32 for Vec[f32])
+        var elem = elem_raw
+        let push_arg_start = body.call_arg_starts.get(args_id as i64)
+        let push_recv_op = body.call_arg_operands.get(push_arg_start as i64)
+        let push_elem_ty = self.mir_vec_elem_type(body, push_recv_op)
+        if push_elem_ty != 0 and wl_type_of(elem_raw) != push_elem_ty:
+            elem = self.coerce_value_to_type(elem_raw, push_elem_ty)
         let elem_alloca = wl_build_alloca(self.builder, wl_type_of(elem))
         wl_build_store(self.builder, elem, elem_alloca)
         let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
