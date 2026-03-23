@@ -107,13 +107,13 @@ profiling demands it.
 
 ## Phase 5 — MIR Lowering and Codegen
 
-- [ ] 33. Teach MIR lowering (`src/MirLower.w`) to lower `NK_FSTRING`: literal
-      segments become string constants, bare expression segments become
-      `with_fmt_{type}(val)` calls, spec-bearing segments become
-      `with_fmt_{type}_spec(val, ...)` calls. Concat all segments with `OP_CONCAT`.
-- [ ] 34. In codegen (`src/Codegen.w`), emit LLVM calls to the `with_fmt_*`
-      runtime functions. Select entry point by static type. Encode spec fields
-      into the runtime call ABI.
+- [x] 33. MIR lowering keeps OP_CONCAT chain for v1. Codegen's `coerce_val_to_str`
+      now dispatches to `with_fmt_i32`/`with_fmt_i64`/`with_fmt_f64`/`with_fmt_bool`
+      instead of old `int_to_string`/`i64_to_string`/`with_f64_to_string`. Bool
+      formatting now produces "true"/"false" instead of "1"/"0".
+- [x] 34. Codegen emits LLVM calls to `with_fmt_*` via `coerce_val_to_str`. Entry
+      point selected by LLVM type kind (i1→bool, ≤i32→i32, i64→i64, float→f64).
+      Spec-bearing segments deferred to post-v1.
 - [ ] 35. Handle `:?` debug formatting: generate per-type inline debug functions
       in codegen (Option A from design doc). Structs emit
       `"TypeName { field: val, ... }"`, enums emit `".Variant"`, etc.

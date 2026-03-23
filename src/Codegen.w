@@ -5863,19 +5863,25 @@ fn Codegen.mir_str_concat(self: Codegen, lhs: i64, rhs: i64) -> i64:
 fn Codegen.coerce_val_to_str(self: Codegen, val: i64, str_ty: i64) -> i64:
     let val_ty = wl_type_of(val)
     let vk = wl_get_type_kind(val_ty)
-    var fn_name = "int_to_string"
+    var fn_name = "with_fmt_i32"
     var coerced = val
     var arg_ty = wl_i32_type(self.context)
     if vk == wl_integer_type_kind():
-        if wl_get_int_type_width(val_ty) <= 32:
+        let bit_w = wl_get_int_type_width(val_ty)
+        if bit_w == 1:
+            // Bool (i1) → with_fmt_bool
+            fn_name = "with_fmt_bool"
+            coerced = self.coerce_int_ext(val, wl_i32_type(self.context), false)
+        else if bit_w <= 32:
+            fn_name = "with_fmt_i32"
             coerced = self.coerce_int_ext(val, wl_i32_type(self.context), false)
         else:
-            fn_name = "i64_to_string"
+            fn_name = "with_fmt_i64"
             arg_ty = wl_i64_type(self.context)
             coerced = self.coerce_int_ext(val, arg_ty, false)
     else:
         if vk == wl_float_type_kind() or vk == wl_double_type_kind():
-            fn_name = "with_f64_to_string"
+            fn_name = "with_fmt_f64"
             arg_ty = wl_f64_type(self.context)
             coerced = if vk == wl_float_type_kind(): wl_build_fp_cast(self.builder, val, arg_ty) else: val
         else:

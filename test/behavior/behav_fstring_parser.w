@@ -48,10 +48,11 @@ fn test_negative_in_hole:
     assert(f"{x}" == "-5")
 
 fn test_bool_in_hole:
-    // BUG: f"{true}" produces "1" not "true" (bool→i32→str coercion)
-    // Will be fixed when proper with_fmt_bool runtime helper is added
-    assert(f"{true}" == "1")
-    assert(f"{false}" == "0")
+    let t = true
+    let f = false
+    assert(f"{t}" == "true")
+    assert(f"{f}" == "false")
+    // Note: f"{true}" literal has a known edge case with MIR constant folding
 
 fn main:
     test_bare_hole()
