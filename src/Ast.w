@@ -78,6 +78,12 @@ const NK_NULL_LIT: i32 = 68
 const NK_POISONED_EXPR: i32 = 69
 const NK_UNSAFE_BLOCK: i32 = 70
 const NK_COMPTIME_ERROR: i32 = 71
+const NK_FSTRING: i32 = 72       // d0=segment_count, d1=0, extra=[seg_kind, seg_data...]
+const NK_FSTRING_SPEC: i32 = 73  // d0=packed_flags, d1=width, d2=precision
+
+// F-string segment kinds (stored in extra_data)
+const FSTR_SEG_LITERAL: i32 = 0  // +1 word: string token index (interned symbol)
+const FSTR_SEG_EXPR: i32 = 1     // +1 word: expression node, +1 word: spec node (0 if none)
 
 // With-expression binding encoding in d2:
 // - positive value: immutable binding symbol id
