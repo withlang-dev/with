@@ -12,17 +12,14 @@ extern fn int_to_string(n: i32) -> str
 
 fn CONAN_CENTER_URL -> str: "https://center.conan.io"
 
-// Shell out to curl CLI for HTTP (avoids libcurl bootstrap issue)
+use std.http
+
+// Native HTTPS via With's TLS stack (no curl dependency)
 fn conan_http_get(url: str) -> str:
-    let tmp = "/tmp/.with_http_response"
-    let cmd = "curl -sL -o " ++ tmp ++ " '" ++ url ++ "' 2>/dev/null"
-    if with_system(cmd) != 0:
-        return ""
-    with_fs_read_file(tmp)
+    https_get(url)
 
 fn conan_http_download(url: str, path: str) -> i32:
-    let cmd = "curl -sL -o '" ++ path ++ "' '" ++ url ++ "' 2>/dev/null"
-    with_system(cmd)
+    https_download(url, path)
 
 fn conan_extract_tgz(archive: str, dest: str) -> i32:
     let cmd = "tar xzf '" ++ archive ++ "' -C '" ++ dest ++ "' 2>/dev/null"

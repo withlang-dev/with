@@ -1183,6 +1183,26 @@ static char *with_str_to_cstring(with_str s) {
 }
 
 // Write text to a file. Returns 0 on success, non-zero on failure.
+// Cryptographically secure random bytes (platform-independent).
+#ifdef __APPLE__
+// arc4random_buf is in <stdlib.h> but needs BSD visibility (not just POSIX)
+extern void arc4random_buf(void *, size_t);
+void with_fill_random(uint8_t *buf, int32_t len) {
+    arc4random_buf(buf, (size_t)len);
+}
+#elif defined(__linux__)
+#include <sys/random.h>
+void with_fill_random(uint8_t *buf, int32_t len) {
+    getrandom(buf, (size_t)len, 0);
+}
+#else
+#include <fcntl.h>
+void with_fill_random(uint8_t *buf, int32_t len) {
+    int fd = open("/dev/urandom", O_RDONLY);
+    if (fd >= 0) { read(fd, buf, (size_t)len); close(fd); }
+}
+#endif
+
 int32_t with_fs_write_file(with_str path, with_str data) {
     char *cpath = with_str_to_cstring(path);
     if (!cpath) return -1;
