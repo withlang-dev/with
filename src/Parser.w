@@ -1920,8 +1920,11 @@ fn Parser.parse_string_literal(self: Parser) -> i32:
     return self.parse_postfix(node)
 
 fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, end: i32) -> i32:
+    // Emit NK_FSTRING with segments in extra_data.
+    // d0 = segment_count, d1 = extra_start, d2 = 0
     let clen = content.len() as i32
-    var result = 0
+    let extra_start = self.pool.extra_len()
+    var seg_count = 0
     var seg_start = 0
     var i = 0
     while i < clen:
@@ -1937,23 +1940,40 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
                 continue
             // Emit text segment before the {
             if i > seg_start:
-                let seg = self.interp_extract_segment(content, seg_start, i)
-                result = self.interp_concat(result, seg, start, end)
-            // Find matching }
+                let seg_text = self.interp_clean_segment(content, seg_start, i)
+                let sym = self.intern.intern(seg_text)
+                self.pool.add_extra(FSTR_SEG_LITERAL)
+                self.pool.add_extra(sym)
+                seg_count = seg_count + 1
+            // Find matching } while tracking colon for format spec
             var depth = 1
-            var expr_start = i + 1
-            var j = expr_start
+            var expr_start_pos = i + 1
+            var j = expr_start_pos
+            var colon_pos = -1
             while j < clen and depth > 0:
-                if content.byte_at(j as i64) == 123: depth = depth + 1
-                if content.byte_at(j as i64) == 125: depth = depth - 1
+                let jch = content.byte_at(j as i64)
+                if jch == 123: depth = depth + 1
+                if jch == 125: depth = depth - 1
+                // Track top-level colon (only at depth==1, before closing })
+                if depth == 1 and jch == 58 and colon_pos == -1:
+                    colon_pos = j
                 if depth > 0: j = j + 1
-            // Extract expression text and parse it
-            let expr_text = content.slice(expr_start as i64, j as i64)
+            // Extract expression text (up to colon or closing brace)
+            var expr_end_pos = j
+            if colon_pos > 0:
+                expr_end_pos = colon_pos
+            let expr_text = content.slice(expr_start_pos as i64, expr_end_pos as i64)
             let expr_node = self.parse_interpolated_expr(expr_text, start)
-            // Wrap in to_string call
-            let ts_sym = self.intern.intern("int_to_string")
-            let str_node = self.interp_to_string(expr_node, start, end)
-            result = self.interp_concat(result, str_node, start, end)
+            // Parse format spec if colon present
+            var spec_node = 0
+            if colon_pos > 0:
+                let spec_text = content.slice((colon_pos + 1) as i64, j as i64)
+                spec_node = self.parse_format_spec_text(spec_text, start, end)
+            // Emit FSTR_SEG_EXPR: kind, expr_node, spec_node
+            self.pool.add_extra(FSTR_SEG_EXPR)
+            self.pool.add_extra(expr_node)
+            self.pool.add_extra(spec_node)
+            seg_count = seg_count + 1
             i = j + 1  // skip past }
             seg_start = i
         else if ch == 125 and i + 1 < clen and content.byte_at((i + 1) as i64) == 125:
@@ -1964,35 +1984,101 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
             i = i + 1
     // Emit trailing text segment
     if seg_start < clen:
-        let seg = self.interp_extract_segment(content, seg_start, clen)
-        result = self.interp_concat(result, seg, start, end)
-    if result == 0:
+        let seg_text = self.interp_clean_segment(content, seg_start, clen)
+        let sym = self.intern.intern(seg_text)
+        self.pool.add_extra(FSTR_SEG_LITERAL)
+        self.pool.add_extra(sym)
+        seg_count = seg_count + 1
+    // Handle empty f-string
+    if seg_count == 0:
         let sym = self.intern.intern("")
-        result = self.pool.add_node(NK_STRING_LIT, start, end, sym, 0, 0)
-    self.parse_postfix(result)
+        self.pool.add_extra(FSTR_SEG_LITERAL)
+        self.pool.add_extra(sym)
+        seg_count = 1
+    let node = self.pool.add_node(NK_FSTRING, start, end, seg_count, extra_start, 0)
+    self.parse_postfix(node)
 
-fn Parser.interp_extract_segment(self: Parser, content: str, from: i32, to: i32) -> i32:
-    // Handle {{ and }} in the segment by replacing them
-    var seg = content.slice(from as i64, to as i64)
-    // Replace {{ with { and }} with }
-    // For now, just use the raw segment — {{ and }} stay as-is in text
-    // (the lexer already handles brace depth, so {{ produces two { bytes)
-    let sym = self.intern.intern(seg)
-    let start = 0
-    let end = 0
-    self.pool.add_node(NK_STRING_LIT, start, end, sym, 0, 0)
+fn Parser.interp_clean_segment(self: Parser, content: str, from: i32, to: i32) -> str:
+    // Extract raw segment. Escaped {{ and }} stay as-is for now — the lexer
+    // already consumed them. The desugar loop skips over {{ and }} pairs,
+    // so they don't appear in segments adjacent to holes.
+    content.slice(from as i64, to as i64)
 
-fn Parser.interp_concat(self: Parser, left: i32, right: i32, start: i32, end: i32) -> i32:
-    if left == 0:
-        return right
-    self.pool.add_node(NK_BINARY, start, end, OP_CONCAT, left, right)
-
-fn Parser.interp_to_string(self: Parser, expr: i32, start: i32, end: i32) -> i32:
-    // For string expressions, return as-is. For others, wrap in int_to_string/i64_to_string.
-    // Since we don't know the type at parse time, emit a call to a generic to_string.
-    // For now, just return the expression — if it's already str, concat works.
-    // The Sema will handle type coercion for ++ operator.
-    expr
+fn Parser.parse_format_spec_text(self: Parser, spec_text: str, start: i32, end: i32) -> i32:
+    // Parse format spec grammar: [[fill]align][sign]['#']['0'][width]['.' precision][mode]
+    // Returns NK_FSTRING_SPEC node, or 0 if empty
+    let slen = spec_text.len() as i32
+    if slen == 0:
+        return 0
+    var fill: i32 = 32  // space
+    var align: i32 = 0  // 0=default, 1=left, 2=right, 3=center
+    var sign_plus: i32 = 0
+    var alternate: i32 = 0
+    var zero_pad: i32 = 0
+    var width: i32 = 0
+    var precision: i32 = -1
+    var mode: i32 = 0
+    var pos = 0
+    // Check for [fill]align: if pos+1 < slen and char[pos+1] is <, >, ^
+    if pos + 1 < slen:
+        let next_ch = spec_text.byte_at((pos + 1) as i64)
+        if next_ch == 60 or next_ch == 62 or next_ch == 94:  // <, >, ^
+            fill = spec_text.byte_at(pos as i64) as i32
+            if next_ch == 60: align = 1
+            else if next_ch == 62: align = 2
+            else: align = 3
+            pos = pos + 2
+    // Check for bare align: <, >, ^
+    if align == 0 and pos < slen:
+        let ch = spec_text.byte_at(pos as i64)
+        if ch == 60:
+            align = 1
+            pos = pos + 1
+        else if ch == 62:
+            align = 2
+            pos = pos + 1
+        else if ch == 94:
+            align = 3
+            pos = pos + 1
+    // Sign: + or -
+    if pos < slen:
+        let ch = spec_text.byte_at(pos as i64)
+        if ch == 43:
+            sign_plus = 1
+            pos = pos + 1
+        else if ch == 45:
+            pos = pos + 1
+    // Alternate: #
+    if pos < slen and spec_text.byte_at(pos as i64) == 35:
+        alternate = 1
+        pos = pos + 1
+    // Zero-pad: 0 (only if followed by digit for width, or is the only remaining char)
+    if pos < slen and spec_text.byte_at(pos as i64) == 48:
+        // 0 is zero-pad if next char is a digit or end of spec or mode letter
+        if pos + 1 >= slen or (spec_text.byte_at((pos + 1) as i64) >= 48 and spec_text.byte_at((pos + 1) as i64) <= 57) or spec_text.byte_at((pos + 1) as i64) == 46:
+            zero_pad = 1
+            pos = pos + 1
+    // Width: digits
+    while pos < slen and spec_text.byte_at(pos as i64) >= 48 and spec_text.byte_at(pos as i64) <= 57:
+        width = width * 10 + (spec_text.byte_at(pos as i64) as i32 - 48)
+        pos = pos + 1
+    // Precision: . then digits
+    if pos < slen and spec_text.byte_at(pos as i64) == 46:
+        pos = pos + 1
+        precision = 0
+        while pos < slen and spec_text.byte_at(pos as i64) >= 48 and spec_text.byte_at(pos as i64) <= 57:
+            precision = precision * 10 + (spec_text.byte_at(pos as i64) as i32 - 48)
+            pos = pos + 1
+    // Mode: single letter at end
+    if pos < slen:
+        let ch = spec_text.byte_at(pos as i64) as i32
+        // Valid modes: d, x, X, b, o, f, e, g, s, ?
+        if ch == 100 or ch == 120 or ch == 88 or ch == 98 or ch == 111 or ch == 102 or ch == 101 or ch == 103 or ch == 115 or ch == 63:
+            mode = ch
+            pos = pos + 1
+    // Pack flags into d0: mode(0-7), fill(8-15), align(16-17), sign_plus(18), alternate(19), zero_pad(20)
+    let flags = mode | ((fill & 255) << 8) | ((align & 3) << 16) | ((sign_plus & 1) << 18) | ((alternate & 1) << 19) | ((zero_pad & 1) << 20)
+    self.pool.add_node(NK_FSTRING_SPEC, start, end, flags, width, precision)
 
 fn Parser.parse_interpolated_expr(self: Parser, expr_text: str, base_start: i32) -> i32:
     // Re-lex and parse the expression text

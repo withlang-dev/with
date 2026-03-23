@@ -2102,6 +2102,8 @@ fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
     // Literal types
     if nk == NK_STRING_LIT:
         return self.sema.ty_str
+    if nk == NK_FSTRING:
+        return self.sema.ty_str
     if nk == NK_INT_LIT:
         return self.sema.ty_i32
     if nk == NK_FLOAT_LIT:
