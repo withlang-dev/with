@@ -45,8 +45,9 @@ profiling demands it.
 
 - [x] 7. Add `NK_FSTRING` (72) and `NK_FSTRING_SPEC` (73) node kind constants to
       `src/Ast.w`. Add `FSTR_SEG_LITERAL = 0` and `FSTR_SEG_EXPR = 1`.
-- [ ] 8. Update AST name tables, dump/debug utilities, and structural validation to
-      handle the new node kinds.
+- [x] 8. Update AST name tables: added NK_FSTRING/NK_FSTRING_SPEC to
+      `typed_expr_kind_name` in Sema.w. No dump/debug utilities switch on
+      expression node kinds — only the Sema name table needed updating.
 - [ ] 9. In `src/Parser.w`, replace `desugar_interpolated_string` / `interp_concat`
       with structured `NK_FSTRING` emission. Emit `FSTR_SEG_LITERAL` for text
       segments and `FSTR_SEG_EXPR` for interpolation holes. Preserve source spans.

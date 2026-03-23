@@ -1297,6 +1297,22 @@ fn Sema.resolve_alias(self: Sema, tid: i32) -> i32:
             return current
     current
 
+fn Sema.is_opaque_value_type(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid)
+    if self.get_type_kind(resolved) != TY_STRUCT:
+        return 0
+    let name_sym = self.get_type_d0(resolved)
+    if name_sym == 0 or not self.type_decl_nodes.contains(name_sym):
+        return 0
+    let decl = self.type_decl_nodes.get(name_sym).unwrap()
+    if self.ast.kind(decl) != NK_TYPE_DECL:
+        return 0
+    if type_decl_sub_kind(self.ast.get_data2(decl)) == TDK_OPAQUE:
+        return 1
+    0
+
 // ── Scope management ─────────────────────────────────────────────
 
 fn Sema.push_scope(self: Sema):
@@ -1638,6 +1654,8 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
             let field_type_node = self.ast.get_extra(field_base + 1)
             let field_tid = self.resolve_type_expr(field_type_node)
             if field_tid != 0:
+                if self.is_opaque_value_type(field_tid) != 0:
+                    self.emit_error("opaque types cannot be stored in struct fields; use a pointer or reference", field_type_node)
                 self.type_extra.set_i32(field_slot as i64, field_tid)
         return
 
@@ -1659,6 +1677,8 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
                     let payload_type_node = self.ast.get_extra(ast_pos + pi)
                     let payload_tid = self.resolve_type_expr(payload_type_node)
                     if payload_tid != 0:
+                        if self.is_opaque_value_type(payload_tid) != 0:
+                            self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", payload_type_node)
                         self.type_extra.set_i32(payload_slot as i64, payload_tid)
             ast_pos = ast_pos + payload_count
             type_pos = type_pos + payload_count
@@ -1688,6 +1708,8 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
                     let payload_type_node = self.ast.get_extra(ast_pos + pi)
                     let payload_tid = self.resolve_type_expr(payload_type_node)
                     if payload_tid != 0:
+                        if self.is_opaque_value_type(payload_tid) != 0:
+                            self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", payload_type_node)
                         self.type_extra.set_i32(payload_slot as i64, payload_tid)
             ast_pos = ast_pos + payload_count
             type_pos = type_pos + payload_count
@@ -1712,6 +1734,8 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
         let inner_node = self.ast.get_extra(extra_start)
         let inner_tid = self.resolve_type_expr(inner_node)
         if inner_tid != 0:
+            if self.is_opaque_value_type(inner_tid) != 0:
+                self.emit_error("opaque types cannot be wrapped by value in distinct types; use a pointer or reference", inner_node)
             self.type_extra.set_i32(value_slot as i64, inner_tid)
 
 fn Sema.is_local_decl(self: Sema, decl_index: i32) -> i32:
@@ -1863,6 +1887,8 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
                     if self.ephemeral_types.contains(f_type_sym):
                         self.emit_error("ephemeral type '" ++ self.pool_resolve(f_type_sym) ++ "' cannot be stored in non-ephemeral struct", f_type_node)
             let f_tid = self.resolve_type_expr(f_type_node)
+            if self.is_opaque_value_type(f_tid) != 0:
+                self.emit_error("opaque types cannot be stored in struct fields; use a pointer or reference", f_type_node)
             field_names.push(f_name)
             field_tids.push(f_tid)
             field_defaults.push(f_default)
@@ -1893,6 +1919,8 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
                 let pt_node = self.ast.get_extra(epos)
                 epos = epos + 1
                 let pt_tid = self.resolve_type_expr(pt_node)
+                if self.is_opaque_value_type(pt_tid) != 0:
+                    self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", pt_node)
                 self.type_extra.push(pt_tid)
             // Register variant lookup
             self.variant_lookup.insert(v_name, vi)
@@ -1939,6 +1967,8 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
                 let pt_node = self.ast.get_extra(epos)
                 epos = epos + 1
                 let pt_tid = self.resolve_type_expr(pt_node)
+                if self.is_opaque_value_type(pt_tid) != 0:
+                    self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", pt_node)
                 self.type_extra.push(pt_tid)
             self.variant_lookup.insert(v_name, vi)
         let tid = self.add_type(TY_ENUM, name, te_start, variant_count)
@@ -1974,6 +2004,8 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
     if sub_kind == TDK_DISTINCT:
         let inner_node = self.ast.get_extra(extra_start)
         let inner = self.resolve_type_expr(inner_node)
+        if self.is_opaque_value_type(inner) != 0:
+            self.emit_error("opaque types cannot be wrapped by value in distinct types; use a pointer or reference", inner_node)
         // Distinct type: treat as single-field struct
         let te_start = self.type_extra.len() as i32
         let val_sym = self.pool_intern("value")
@@ -2002,6 +2034,8 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             let f_type_node = self.ast.get_extra(base + 1)
             let f_default = self.ast.get_extra(base + 2)
             let f_tid = self.resolve_type_expr(f_type_node)
+            if self.is_opaque_value_type(f_tid) != 0:
+                self.emit_error("opaque types cannot be stored in union fields; use a pointer or reference", f_type_node)
             field_names.push(f_name)
             field_tids.push(f_tid)
             field_defaults.push(f_default)
@@ -2341,9 +2375,13 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
             self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
         let p_type_node = self.ast.fn_param_type(param_start, pi)
         let p_tid = self.resolve_type_expr(p_type_node)
+        if self.is_opaque_value_type(p_tid) != 0:
+            self.emit_error("opaque types cannot be passed by value; use a pointer or reference", p_type_node)
         self.sig_params.push(p_tid)
 
     let ret_type = self.resolve_type_expr(ret_node)
+    if self.is_opaque_value_type(ret_type) != 0:
+        self.emit_error("opaque types cannot be returned by value; use a pointer or reference", ret_node)
     if ret_node != 0:
         if self.type_expr_contains_ref(ret_node) != 0:
             self.emit_error("ephemeral references cannot be returned from functions", ret_node)
@@ -2403,9 +2441,13 @@ fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
         if is_local != 0:
             self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
         let p_tid = self.resolve_type_expr(p_type_node)
+        if self.is_opaque_value_type(p_tid) != 0:
+            self.emit_error("opaque types cannot be passed by value; use a pointer or reference", p_type_node)
         self.sig_params.push(p_tid)
 
     let ret_type = self.resolve_type_expr(ret_node)
+    if self.is_opaque_value_type(ret_type) != 0:
+        self.emit_error("opaque types cannot be returned by value; use a pointer or reference", ret_node)
 
     let fn_extra_start = self.type_extra.len() as i32
     for pi in 0..param_count:
@@ -2419,6 +2461,8 @@ fn Sema.collect_extern_var(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
     let type_node = self.ast.get_data1(node)
     let tid = self.resolve_type_expr(type_node)
+    if self.is_opaque_value_type(tid) != 0:
+        self.emit_error("opaque types cannot be declared as extern values; use a pointer or reference", type_node)
     // Register the extern var for scope lookup
     let is_mut = if self.ast.get_data2(node) != 0: 1 else: 0
     self.scope_put_at(name, tid, is_mut, node)
@@ -2494,6 +2538,8 @@ fn Sema.collect_let_decl(self: Sema, node: i32, is_local: i32):
     if type_extra >= 0:
         let type_node = self.ast.get_extra(type_extra)
         bind_ty = self.resolve_type_expr(type_node)
+        if self.is_opaque_value_type(bind_ty) != 0:
+            self.emit_error("opaque values cannot be stored by value; use a pointer or reference", type_node)
         if self.type_expr_is_collection_with_ref(type_node) != 0:
             self.emit_error("ephemeral references cannot be stored in generic containers", node)
     self.scope_put_at(name, bind_ty, is_mut, node)
@@ -4297,6 +4343,9 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
 
     if ann_type_node != 0 and self.type_expr_is_collection_with_ref(ann_type_node) != 0:
         self.emit_error("ephemeral references cannot be stored in generic containers", node)
+    if self.is_opaque_value_type(bind_type) != 0:
+        let opaque_node = if ann_type_node != 0: ann_type_node else: value
+        self.emit_error("opaque values cannot be stored by value; use a pointer or reference", opaque_node)
 
     self.scope_put_at(name, bind_type, is_mut, node)
     self.typed_binding_types.insert(node, bind_type)
@@ -7879,6 +7928,8 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NK_SELECT_AWAIT: return "select_await"
     if kind == NK_OPTIONAL_CHAIN: return "optional_chain"
     if kind == NK_POISONED_EXPR: return "poisoned"
+    if kind == NK_FSTRING: return "fstring"
+    if kind == NK_FSTRING_SPEC: return "fstring_spec"
     "unknown"
 
 fn typed_indent(indent: i32) -> str:
