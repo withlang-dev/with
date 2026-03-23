@@ -161,8 +161,9 @@ profiling demands it.
       `:.2` checksum.
 - [ ] 52. Add locale-sensitivity regression (decimal rendering stays `.`).
 - [ ] 53. Update or remove tests asserting old `%g` concat coercion behavior.
-- [ ] 54. Verify: `./out/bin/with-stage2 run tests/test_operators.w &&
-      ./out/bin/with-stage2 run tests/test_types.w` and the new formatting suite.
+- [x] 54. Verify: test_operators 23/23 ✓, test_types 77/77 ✓, formatting suite
+      (behav_fstring_parser + behav_fstring_codegen + behav_fstring_format) ✓.
+      Full suite 317/317.
 
 ## Phase 9 — Migrate Demos and Docs
 
@@ -176,11 +177,11 @@ profiling demands it.
 
 ## Phase 10 — Final Verification
 
-- [ ] 60. `make build`
-- [ ] 61. `./out/bin/with-stage2 check src/main.w`
-- [ ] 62. `make smoke`
-- [ ] 63. `make fixpoint`
-- [ ] 64. Confirm all formatting test suites pass.
+- [x] 60. `make build` ✓
+- [x] 61. `./out/bin/with-stage2 check src/main.w` ✓
+- [x] 62. `make smoke` ✓
+- [ ] 63. `make fixpoint` (deferred until Phase 6 migration is complete)
+- [x] 64. Confirm all formatting test suites pass. 317/317 ✓
 - [ ] 65. Confirm benchmark output is correct.
 - [ ] 66. Confirm compiler source has zero `str ++ non-str` sites.
 - [ ] 67. Confirm `++` is str-only and f-strings are the formatting surface.
