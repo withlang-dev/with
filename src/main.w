@@ -25,7 +25,6 @@ extern fn with_str_slice(s: str, start: i64, end: i64) -> str
 extern fn with_eprintln(s: str) -> void
 extern fn with_system(cmd: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
-extern fn int_to_string(n: i32) -> str
 extern fn print(s: str) -> void
 extern fn exit(code: i32) -> void
 extern fn with_install_interrupt_handlers() -> void
@@ -420,11 +419,11 @@ fn dump_ast(source_file: str, no_std: bool, alloc_mode: bool, include_header: bo
             let last_decl = pool.get_decl(pool.decl_count() - 1)
             module_start = pool.get_start(first_decl)
             module_end = pool.get_end(last_decl)
-        print("module span=" ++ int_to_string(module_start) ++ ".." ++ int_to_string(module_end) ++ " decls=" ++ int_to_string(pool.decl_count()) ++ "\n")
+        print(f"module span={module_start}..{module_end} decls={pool.decl_count()}\n")
         for i in 0..pool.decl_count():
             let decl = pool.get_decl(i)
             let kind_name = ast_decl_kind_name(pool.kind(decl))
-            print("decl[" ++ int_to_string(i) ++ "] kind=" ++ kind_name ++ " span=" ++ int_to_string(pool.get_start(decl)) ++ ".." ++ int_to_string(pool.get_end(decl)) ++ "\n")
+            print(f"decl[{i}] kind={kind_name} span={pool.get_start(decl)}..{pool.get_end(decl)}\n")
         print("---\n")
 
     let rendered = render_module(pool, intern)
@@ -454,7 +453,7 @@ fn dump_tokens(source_file: str, deterministic: bool) -> i32:
     var lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
     if deterministic:
-        print("tokens file=" ++ source_file ++ " count=" ++ int_to_string(tokens.len()) ++ "\n")
+        print(f"tokens file={source_file} count={tokens.len()}\n")
         for i in 0..tokens.len():
             let tk = tokens.get_tag(i)
             let start = tokens.get_start(i)
@@ -462,7 +461,7 @@ fn dump_tokens(source_file: str, deterministic: bool) -> i32:
             let text_slice = text.slice(start as i64, end as i64)
             let escaped = text_slice |> escape_dump_lexeme
             let tag_text = dump_tag_name(tk, text_slice)
-            print("tok[" ++ int_to_string(i) ++ "] tag=" ++ tag_text ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ " lex=\"" ++ escaped ++ "\"\n")
+            print(f"tok[{i}] tag={tag_text} span={start}..{end} lex=\"{escaped}\"\n")
         return 0
 
     // Compatibility debug output, similar to stage0 `tokens` command.
@@ -687,9 +686,9 @@ fn print_test_summary(target: str, passed: i32, failed: i32, quiet: bool):
     if quiet:
         return
     if failed == 0:
-        print("ok: " ++ int_to_string(passed) ++ " " ++ test_count_label(passed) ++ " passed in " ++ target ++ "\n")
+        print(f"ok: {passed} {test_count_label(passed)} passed in {target}\n")
         return
-    with_eprintln("error: " ++ int_to_string(failed) ++ " of " ++ int_to_string(passed + failed) ++ " tests failed in " ++ target)
+    with_eprintln(f"error: {failed} of {passed + failed} tests failed in {target}")
 
 fn run_test_binary(bin_path: str, quiet: bool) -> i32:
     var cmd = test_shell_quote(bin_path)

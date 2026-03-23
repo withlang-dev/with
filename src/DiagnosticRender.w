@@ -1,7 +1,5 @@
 // Wave 1 foundations: deterministic diagnostic rendering helpers.
 
-extern fn int_to_string(n: i32) -> str
-
 fn render_diag_header(severity: i32, code: str, message: str) -> str:
     var out = render_severity(severity) ++ ": " ++ message
     if code.len() > 0:
@@ -9,16 +7,16 @@ fn render_diag_header(severity: i32, code: str, message: str) -> str:
     out
 
 fn render_diag_location(path: str, line: i32, col: i32) -> str:
-    " --> " ++ path ++ ":" ++ int_to_string(line + 1) ++ ":" ++ int_to_string(col + 1)
+    f" --> {path}:{line + 1}:{col + 1}"
 
 fn render_diag_source_line(line: i32, text: str) -> str:
-    int_to_string(line + 1) ++ " | " ++ text
+    f"{line + 1} | {text}"
 
 fn render_diag_marker_line(col: i32, n: i32) -> str:
     "  | " ++ render_caret_line(col, n)
 
 fn render_diag_label_line(line: i32, col: i32, message: str) -> str:
-    "  = label @" ++ int_to_string(line + 1) ++ ":" ++ int_to_string(col + 1) ++ " " ++ message
+    f"  = label @{line + 1}:{col + 1} {message}"
 
 fn render_diag_note_line(message: str) -> str:
     "  = note: " ++ message

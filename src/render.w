@@ -6,8 +6,7 @@ use Ast
 use Token
 use InternPool
 
-extern fn int_to_string(n: i32) -> str
-extern fn with_i64_to_str(n: i64) -> str
+
 extern fn str_from_byte(b: i32) -> str
 
 fn render_module(pool: AstPool, intern: InternPool) -> str:
@@ -134,7 +133,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
                 ep = ep + 1
                 let payload_count = pool.get_extra(ep)
                 ep = ep + 1
-                out = out ++ vname ++ " = " ++ int_to_string(disc_val)
+                out = out ++ f"{vname} = {disc_val}"
                 if payload_count > 0:
                     out = out ++ "("
                     for pi in 0..payload_count:
@@ -291,7 +290,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
     let prefix = if kind == NK_BLOCK: "" else: make_indent(indent)
 
     if kind == NK_INT_LIT:
-        return prefix ++ with_i64_to_str(pool.int_lit_value(node))
+        return f"{prefix}{pool.int_lit_value(node)}"
 
     if kind == NK_FLOAT_LIT:
         let float_idx = pool.get_data0(node)
@@ -686,7 +685,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
     if kind == NK_POISONED_EXPR:
         return prefix ++ "<poisoned>"
 
-    prefix ++ "<expr:" ++ int_to_string(kind) ++ ">"
+    f"{prefix}<expr:{kind}>"
 
 fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
     if node == 0:
@@ -700,7 +699,7 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
         return intern.resolve(pool.get_data0(node))
 
     if kind == NK_PAT_INT:
-        return int_to_string(pool.get_data0(node))
+        return f"{pool.get_data0(node)}"
 
     if kind == NK_PAT_BOOL:
         if pool.get_data0(node) != 0:
@@ -753,11 +752,11 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
         return out ++ ")"
 
     if kind == NK_PAT_RANGE:
-        let start_val = int_to_string(pool.get_data0(node))
-        let end_val = int_to_string(pool.get_data1(node))
+        let start_val = pool.get_data0(node)
+        let end_val = pool.get_data1(node)
         if pool.get_data2(node) != 0:
-            return start_val ++ "..=" ++ end_val
-        return start_val ++ ".." ++ end_val
+            return f"{start_val}..={end_val}"
+        return f"{start_val}..{end_val}"
 
     if kind == NK_PAT_OR:
         let extra_start = pool.get_data0(node)
@@ -815,7 +814,7 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
             out = out ++ ".."
         return out ++ " " ++ render_rbrace()
 
-    "<pat:" ++ int_to_string(kind) ++ ">"
+    f"<pat:{kind}>"
 
 fn render_type_expr(pool: AstPool, intern: InternPool, node: i32) -> str:
     if node == 0:
@@ -879,7 +878,7 @@ fn render_type_expr(pool: AstPool, intern: InternPool, node: i32) -> str:
     if kind == NK_TYPE_ARRAY:
         let elem = pool.get_data0(node)
         let size = pool.get_data1(node)
-        return "[" ++ int_to_string(size) ++ "]" ++ render_type_expr(pool, intern, elem)
+        return f"[{size}]{render_type_expr(pool, intern, elem)}"
 
     if kind == NK_TYPE_SLICE:
         let elem = pool.get_data0(node)
@@ -891,7 +890,7 @@ fn render_type_expr(pool: AstPool, intern: InternPool, node: i32) -> str:
     if kind == NK_TYPE_INFERRED:
         return "_"
 
-    "<type:" ++ int_to_string(kind) ++ ">"
+    f"<type:{kind}>"
 
 fn render_type_params(pool: AstPool, intern: InternPool, tp_start: i32, tp_count: i32) -> str:
     var out = "["
