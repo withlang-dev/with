@@ -4121,13 +4121,66 @@ fn Sema.check_fstring(self: Sema, node: i32) -> i32:
             let expr_node = self.ast.get_extra(pos + 1)
             let spec_node = self.ast.get_extra(pos + 2)
             // Type-check the expression
-            self.check_expr(expr_node)
-            // TODO: validate spec against expression type (task 16-17)
+            let expr_ty = self.check_expr(expr_node)
+            // Validate format spec against expression type
+            if spec_node != 0:
+                self.validate_fstring_spec(spec_node, expr_ty, expr_node)
             pos = pos + 3  // kind + expr + spec
         else:
             pos = pos + 1
         i = i + 1
     self.ty_str
+
+fn Sema.validate_fstring_spec(self: Sema, spec_node: i32, expr_ty: i32, expr_node: i32):
+    // Unpack NK_FSTRING_SPEC fields
+    let flags = self.ast.get_data0(spec_node)
+    let width = self.ast.get_data1(spec_node)
+    let precision = self.ast.get_data2(spec_node)
+    let mode = flags & 255
+    let fill = (flags >> 8) & 255
+    let align = (flags >> 16) & 3
+    let sign_plus = (flags >> 18) & 1
+    let alternate = (flags >> 19) & 1
+    let zero_pad = (flags >> 20) & 1
+    // Resolve expression type kind
+    let resolved = if expr_ty != 0: self.resolve_alias(expr_ty) else: 0
+    let tk = if resolved != 0: self.get_type_kind(resolved) else: 0
+    let is_int = tk == TY_INT
+    let is_float = tk == TY_FLOAT
+    let is_str = tk == TY_STR
+    let is_bool = tk == TY_BOOL
+    let is_struct = tk == TY_STRUCT
+    let is_enum = tk == TY_ENUM
+    let is_numeric = is_int or is_float
+    // Mode/type compatibility (format-design.md §4.1)
+    // d, x, X, b, o → integers only
+    if mode == 100 or mode == 120 or mode == 88 or mode == 98 or mode == 111:
+        if not is_int:
+            self.emit_error("format mode requires integer type", spec_node)
+    // f, e, g → floats only
+    if mode == 102 or mode == 101 or mode == 103:
+        if not is_float:
+            self.emit_error("format mode requires float type", spec_node)
+    // s → strings only
+    if mode == 115:
+        if not is_str:
+            self.emit_error("format mode requires string type", spec_node)
+    // ? → any type (always valid)
+    // Field/type compatibility (format-design.md §4.2)
+    // precision → floats and strings only
+    if precision >= 0:
+        if not is_float and not is_str:
+            self.emit_error("precision requires float or string type", spec_node)
+    // # → integers with hex/bin/oct mode only
+    if alternate != 0:
+        if not is_int:
+            self.emit_error("alternate form '#' requires integer type", spec_node)
+        else if mode != 120 and mode != 88 and mode != 98 and mode != 111 and mode != 0:
+            self.emit_error("alternate form '#' requires hex, binary, or octal mode", spec_node)
+    // sign → numbers only
+    if sign_plus != 0:
+        if not is_numeric:
+            self.emit_error("sign '+' requires numeric type", spec_node)
 
 fn Sema.check_binary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)
