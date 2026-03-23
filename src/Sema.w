@@ -280,6 +280,7 @@ type Sema = {
     // Per-module scoping: tracks which module each declaration belongs to
     // and which symbols are visible in each module context.
     decl_source_paths: Vec[str],     // one path per decl index (from Frontend)
+    decl_source_file_ids: Vec[i32],  // one file id per decl index (from Frontend)
     decl_is_c_import: Vec[i32],      // 1 if decl came from c_import, 0 otherwise
     current_module_path: str,        // module path being checked right now
     // c_import scoping: tracks which symbols are c_import-origin
@@ -552,6 +553,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ty_never: 0, ty_str: 0, ty_str_view: 0,
         ty_usize: 0, ty_isize: 0, ty_const_i8_ptr: 0,
         decl_source_paths: Vec.new(),
+        decl_source_file_ids: Vec.new(),
         decl_is_c_import: Vec.new(),
         current_module_path: "",
         ci_syms: sema_new_map_i32_i32(),
@@ -1543,6 +1545,7 @@ fn Sema.collect_declarations(self: Sema):
     // Pass 1: collect named types and traits first so functions can refer
     // to imported or forward-declared types regardless of declaration order.
     for di in 0..self.ast.decl_count():
+        self.update_decl_source_context(di)
         let decl = self.ast.get_decl(di)
         let kind = self.ast.kind(decl)
         let is_local = self.is_local_decl(di)
@@ -1556,6 +1559,7 @@ fn Sema.collect_declarations(self: Sema):
 
     // Pass 2: collect impl declarations once trait/type tables exist.
     for di in 0..self.ast.decl_count():
+        self.update_decl_source_context(di)
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NK_IMPL_DECL:
             self.collect_impl_decl(decl)
@@ -1565,6 +1569,7 @@ fn Sema.collect_declarations(self: Sema):
 
     // Pass 3: collect function signatures and top-level let decls.
     for di in 0..self.ast.decl_count():
+        self.update_decl_source_context(di)
         let decl = self.ast.get_decl(di)
         let kind = self.ast.kind(decl)
         let is_local = self.is_local_decl(di)
@@ -1589,6 +1594,7 @@ fn Sema.collect_declarations(self: Sema):
 
 fn Sema.resolve_deferred_non_generic_type_decls(self: Sema):
     for di in 0..self.ast.decl_count():
+        self.update_decl_source_context(di)
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) != NK_TYPE_DECL:
             continue
@@ -2880,7 +2886,7 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
         if self.pool_resolve(sym) == "Self":
             return
         self.debug_unknown_type(sym, node, "validate_type_expr")
-        self.emit_error("unknown type", node)
+        self.emit_unknown_type_error(sym, node)
         return
 
     if kind == NK_TYPE_PTR or kind == NK_TYPE_REF or kind == NK_TYPE_OPTIONAL or kind == NK_TYPE_SLICE or kind == NK_TYPE_ARRAY:
@@ -2908,7 +2914,7 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
         let base_prim = self.primitive_type_by_sym(base_sym)
         if base_prim == 0 and not self.named_types.contains(base_sym) and self.type_param_exists(tp_start, tp_count, base_sym) == 0:
             self.debug_unknown_type(base_sym, node, "validate_type_generic")
-            self.emit_error("unknown type", node)
+            self.emit_unknown_type_error(base_sym, node)
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
         for ai in 0..arg_count:
@@ -3197,7 +3203,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
         if self.collecting_types != 0:
             return 0
         self.debug_unknown_type(sym, node, "resolve_type_expr")
-        self.emit_error("unknown type", node)
+        self.emit_unknown_type_error(sym, node)
         return 0
 
     if kind == NK_TYPE_ASSOC:
@@ -3305,8 +3311,15 @@ fn Sema.update_module_context(self: Sema, di: i32):
             let path_sym = self.pool_intern(path)
             self.current_module_has_ci = if self.ci_modules.contains(path_sym): 1 else: 0
 
+fn Sema.update_decl_source_context(self: Sema, di: i32):
+    self.local_file_id = 0
+    if di >= 0 and di < self.decl_source_file_ids.len() as i32:
+        self.local_file_id = self.decl_source_file_ids.get(di as i64)
+    self.update_module_context(di)
+
 fn Sema.check_bodies(self: Sema):
     for di in 0..self.ast.decl_count():
+        self.update_decl_source_context(di)
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NK_FN_DECL:
             let fn_name = self.ast.get_data0(decl)
@@ -7759,6 +7772,17 @@ fn Sema.emit_argument_type_mismatch(self: Sema, call_name: str, fn_sym: i32, arg
     if help.len() > 0:
         diag.add_help(help)
     self.diags.emit(diag)
+
+fn Sema.unknown_type_message(self: Sema, sym: i32) -> str:
+    let name = self.pool_resolve(sym)
+    if name.len() == 0:
+        return "unknown type"
+    if name == "string":
+        return "unknown type 'string'; use 'str' or 'String'"
+    "unknown type '" ++ name ++ "'"
+
+fn Sema.emit_unknown_type_error(self: Sema, sym: i32, node: i32):
+    self.emit_error(self.unknown_type_message(sym), node)
 
 fn Sema.emit_error(self: Sema, msg: str, node: i32):
     if self.suppress_errors != 0:
