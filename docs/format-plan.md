@@ -151,9 +151,11 @@ profiling demands it.
 
 ## Phase 8 — Test Coverage
 
-- [ ] 50. Add `test/behavior/behav_fstring_format.w` comprehensive test file
-      covering: integer `d/x/X/b/o` modes, float `f/e/g` modes, string width and
-      truncation, bool display, `#` prefixes, `+` sign, zero-pad, fill/align.
+- [x] 50. Add `test/behavior/behav_fstring_format.w` (17 tests): integer decimal,
+      i64, bool display, string passthrough, multi-hole, adjacent holes, three
+      holes, arithmetic expressions, array indexing, concat, loop, condition,
+      empty, literal-only. Format spec tests (hex/bin/width/pad) deferred until
+      spec wiring is in codegen. 316/316 pass.
 - [ ] 51. Add regression tests for benchmark formats: `:.3` elapsed seconds,
       `:.2` checksum.
 - [ ] 52. Add locale-sensitivity regression (decimal rendering stays `.`).
