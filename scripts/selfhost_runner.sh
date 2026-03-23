@@ -56,31 +56,13 @@ release_selfhost_runner_lock() {
 prepare_selfhost_runner() {
   local root_dir="$1"
   local bin_path="$2"
-  local dylib_path=""
-  local cand=""
 
   acquire_selfhost_runner_lock "$root_dir"
 
-  for cand in \
-    "${root_dir}/out/lib/libwith_llvm_bridge.dylib" \
-    "${root_dir}/runtime/libwith_llvm_bridge.dylib"; do
-    if [[ -f "$cand" ]]; then
-      dylib_path="$cand"
-      break
-    fi
-  done
-
-  if [[ -z "$dylib_path" ]]; then
-    echo "$bin_path"
-    return 0
-  fi
-
   local tmp_dir
   tmp_dir="$(mktemp -d "${root_dir}/out/tmp/with-selfhost-runner.XXXXXX")"
-  mkdir -p "${tmp_dir}/runtime"
   cp "$bin_path" "${tmp_dir}/with-stage2"
   chmod +x "${tmp_dir}/with-stage2"
-  cp "$dylib_path" "${tmp_dir}/runtime/libwith_llvm_bridge.dylib"
   SELFHOST_RUNNER_DIR="$tmp_dir"
   echo "${tmp_dir}/with-stage2"
 }

@@ -1,6 +1,6 @@
 # Plan: Port BearSSL to With Standard Library
 
-**Status:** Paused — fixing Poly1305 partial-block handling and borrow checker false positives on array element references.
+**Status:** Active — Phases 0-5 complete, ready for Phase 6 (big integer).
 
 ## Context
 
@@ -13,7 +13,7 @@ The With package manager needs HTTPS to download packages from Conan Center. We'
 - **Phase 2 complete:** HMAC-SHA256 — `lib/std/crypto/hmac.w`, passes RFC 4231 test cases 1 and 2
 - **Phase 3 complete:** AES-128 — `lib/std/crypto/aes.w`, passes NIST ECB test vector
 - **Phase 4 complete:** AES-128-GCM — `lib/std/crypto/gcm.w`, passes NIST SP 800-38D test case 2
-- **Phase 5 in progress:** ChaCha20-Poly1305 — ChaCha20 passes RFC 8439 §2.3.2, Poly1305 has partial-block bug
+- **Phase 5 complete:** ChaCha20-Poly1305 — `lib/std/crypto/chacha20.w`, `lib/std/crypto/poly1305.w`, `lib/std/crypto/chacha20poly1305.w`, all pass RFC 8439 test vectors
 
 ## Compiler bugs found and fixed during this work
 
@@ -22,10 +22,11 @@ The With package manager needs HTTPS to download packages from Conan Center. We'
 3. **`defer` in non-main functions** — `NK_DEFER` not handled in `lower_expr`, only in block statement loop. Fixed: added handler.
 4. **`&mut (unsafe: (*ptr).field)` temporary address** — takes address of a loaded COPY, not the field in the struct. Workaround: copy struct fields to stack locals, operate on locals, copy back.
 
-## Known issues blocking Phase 5 completion
+## Compiler bugs found and fixed during Phase 5
 
-- **Poly1305 partial-block handling:** The `final_block` flag controls the hibit (0x01 appended after message bytes). For partial blocks, the hibit position depends on message length, not fixed at bit 128. Current implementation doesn't handle this correctly.
-- **Borrow checker false positives on `&mut arr[i]`:** Taking `&mut arr[0] as *mut T` creates a mutable borrow that the checker thinks persists after function calls return. Workaround: grab pointer once into a `let` binding early in the function. This is verbose but functional.
+5. **Poly1305 limb reassembly carry corruption** — 26-bit limb→32-bit word reassembly produced overlapping u64 values. When pad addition used `f0 >> 32` as carry, it double-counted the overlap bits. Fixed: truncate each word to u32 before the carry-chain addition.
+6. **Borrow checker: temporary borrows never expire** — `&mut x as *mut T` borrows were registered with `ref_sym = 0` and the expiry logic skipped all ref_sym==0 entries. Temporary borrows persisted for the entire function. Fixed: expire ref_sym==0 borrows at statement boundaries.
+7. **Embedded stdlib not rebuilt** — Makefile dependency for `embedded_stdlib.inc.h` only listed the generator script, not the `.w` source files. Fixed: added `$(shell find lib/std -name '*.w')` dependency.
 
 ## Blocker (resolved)
 
@@ -69,7 +70,7 @@ lib/std/
 | 2 | HMAC-SHA256 | 100 | **Done** — passes RFC 4231 |
 | 3 | AES-128 | 300 | **Done** — passes NIST ECB vector |
 | 4 | AES-GCM | 200 | **Done** — passes NIST SP 800-38D |
-| 5 | ChaCha20-Poly1305 | 250 | **In progress** — ChaCha20 ✓, Poly1305 partial-block bug |
+| 5 | ChaCha20-Poly1305 | 250 | **Done** — passes RFC 8439 test vectors |
 | 6 | Big integer | 500 | |
 | 7 | RSA verify | 300 | |
 | 8 | EC P-256 | 400 | |

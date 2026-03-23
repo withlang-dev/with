@@ -207,7 +207,8 @@ $(GEN_STAMP): FORCE | $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR
 	printf '%s\n' "$$version" > "$(GEN_VERSION_FILE)"; \
 	touch "$@"
 
-$(EMBEDDED_STDLIB_INC): scripts/generate_embedded_stdlib.py | $(OUT_LIB_DIR)
+STD_SOURCES := $(shell find lib/std -name '*.w' 2>/dev/null)
+$(EMBEDDED_STDLIB_INC): scripts/generate_embedded_stdlib.py $(STD_SOURCES) | $(OUT_LIB_DIR)
 	@python3 "$(ROOT_DIR)/scripts/generate_embedded_stdlib.py" "$(ROOT_DIR)" "$@"
 
 $(HELPERS_OBJ): runtime/helpers.c $(EMBEDDED_STDLIB_INC) | $(OUT_LIB_DIR)

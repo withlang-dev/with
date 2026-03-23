@@ -4787,22 +4787,32 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
 
     let flags = self.pool.get_data2(let_node)
     let is_mut = flags % 2
+    let binding_ty = if self.sema.typed_binding_types.contains(let_node):
+        self.sema.typed_binding_types.get(let_node).unwrap()
+    else:
+        0
+    let resolved_binding_ty = if binding_ty != 0: self.sema.resolve_alias(binding_ty) else: 0
     let val = self.try_eval_const_int(value_node)
     if val != CONST_EVAL_FAIL():
+        if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TY_FLOAT:
+            let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
+            let name_str = self.intern.resolve(name_sym)
+            let global = wl_add_global(self.llmod, global_ty, name_str)
+            wl_set_initializer(global, wl_const_real(global_ty, val as f64))
+            if is_mut == 0:
+                wl_set_global_constant(global, 1)
+            wl_set_linkage(global, wl_internal_linkage())
+            self.module_constants.insert(name_sym, global)
+            return
         if is_mut == 0:
             self.const_int_syms.push(name_sym)
             self.const_int_vals.push(val)
-        // Respect type annotation: if declared as i64, always use i64
+        // Respect the sema-resolved binding type when available.
         var global_ty = if val < -2147483648 or val > 2147483647: wl_i64_type(self.context) else: wl_i32_type(self.context)
-        let type_extra_packed = flags / 4
-        if type_extra_packed > 0:
-            let type_ann_node = self.pool.get_extra(type_extra_packed - 1)
-            if self.pool.kind(type_ann_node) == NK_TYPE_NAMED:
-                let type_name = self.intern.resolve(self.pool.get_data0(type_ann_node))
-                if type_name == "i64":
-                    global_ty = wl_i64_type(self.context)
-                else if type_name == "i128" or type_name == "u128":
-                    global_ty = wl_i128_type(self.context)
+        if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TY_INT:
+            let inferred_llvm = self.sema_type_to_llvm(resolved_binding_ty)
+            if inferred_llvm != 0:
+                global_ty = inferred_llvm
         let name_str = self.intern.resolve(name_sym)
         let global = wl_add_global(self.llmod, global_ty, name_str)
         wl_set_initializer(global, wl_const_int(global_ty, val, 1))
@@ -4862,15 +4872,11 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
                 fval = with_parse_float(float_text)
         if float_negate:
             fval = -fval
-        // Determine f32 vs f64 from type annotation
         var global_ty = wl_f64_type(self.context)
-        let type_extra_packed = flags / 4
-        if type_extra_packed > 0:
-            let type_ann_node = self.pool.get_extra(type_extra_packed - 1)
-            if self.pool.kind(type_ann_node) == NK_TYPE_NAMED:
-                let type_name = self.intern.resolve(self.pool.get_data0(type_ann_node))
-                if type_name == "f32":
-                    global_ty = wl_f32_type(self.context)
+        if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TY_FLOAT:
+            let inferred_llvm = self.sema_type_to_llvm(resolved_binding_ty)
+            if inferred_llvm != 0:
+                global_ty = inferred_llvm
         let name_str = self.intern.resolve(name_sym)
         let global = wl_add_global(self.llmod, global_ty, name_str)
         wl_set_initializer(global, wl_const_real(global_ty, fval))
@@ -5510,6 +5516,10 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         // Null pointer: CK_INT 0 with pointer expected type
         if int_value == 0 and expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
             return wl_const_null(expected_ty)
+        if expected_ty != 0:
+            let ek = wl_get_type_kind(expected_ty)
+            if ek == wl_float_type_kind() or ek == wl_double_type_kind():
+                return wl_const_real(expected_ty, int_value as f64)
         var int_ty = expected_ty
         if int_ty == 0 or wl_get_type_kind(int_ty) != wl_integer_type_kind():
             int_ty = if int_value < -2147483648 or int_value > 2147483647: wl_i64_type(self.context) else: wl_i32_type(self.context)

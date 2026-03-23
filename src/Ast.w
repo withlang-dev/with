@@ -221,6 +221,23 @@ const UOP_DEREF: i32 = 4
 const UOP_TRY: i32 = 5
 const UOP_BIT_NOT: i32 = 6
 
+// Literal suffix metadata (stored out-of-line in AstPool.literal_suffixes)
+const LIT_SUFFIX_NONE: i32 = 0
+const LIT_SUFFIX_I8: i32 = 1
+const LIT_SUFFIX_I16: i32 = 2
+const LIT_SUFFIX_I32: i32 = 3
+const LIT_SUFFIX_I64: i32 = 4
+const LIT_SUFFIX_I128: i32 = 5
+const LIT_SUFFIX_ISIZE: i32 = 6
+const LIT_SUFFIX_U8: i32 = 7
+const LIT_SUFFIX_U16: i32 = 8
+const LIT_SUFFIX_U32: i32 = 9
+const LIT_SUFFIX_U64: i32 = 10
+const LIT_SUFFIX_U128: i32 = 11
+const LIT_SUFFIX_USIZE: i32 = 12
+const LIT_SUFFIX_F32: i32 = 13
+const LIT_SUFFIX_F64: i32 = 14
+
 // ── AST Pool ──────────────────────────────────────────────────────
 
 // The AstPool stores all AST nodes in parallel arrays (SoA layout).
@@ -240,6 +257,7 @@ type AstPool = {
     data0: Vec[i32],
     data1: Vec[i32],
     data2: Vec[i32],
+    literal_suffixes: Vec[i32],
 
     // Extra data for variable-length lists (params, fields, arms, etc.)
     extra: Vec[i32],
@@ -312,6 +330,7 @@ fn AstPool.new -> AstPool:
         data0: Vec.new(),
         data1: Vec.new(),
         data2: Vec.new(),
+        literal_suffixes: Vec.new(),
         extra: Vec.new(),
         decls: Vec.new(),
         local_decl_count: 0 - 1,
@@ -339,6 +358,7 @@ fn AstPool.new -> AstPool:
     pool.data0.push(0)
     pool.data1.push(0)
     pool.data2.push(0)
+    pool.literal_suffixes.push(LIT_SUFFIX_NONE)
     pool
 
 // Mark the pool as immutable. Any subsequent mutation will print an error.
@@ -356,6 +376,7 @@ fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32
     self.data0.push(d0)
     self.data1.push(d1)
     self.data2.push(d2)
+    self.literal_suffixes.push(LIT_SUFFIX_NONE)
     idx
 
 // Add extra data, returns the index in the extra array.
@@ -387,6 +408,12 @@ fn AstPool.get_data1(self: &AstPool, idx: i32) -> i32:
 
 fn AstPool.get_data2(self: &AstPool, idx: i32) -> i32:
     self.data2.get(idx as i64)
+
+fn AstPool.literal_suffix(self: &AstPool, idx: i32) -> i32:
+    self.literal_suffixes.get(idx as i64)
+
+fn AstPool.set_literal_suffix(self: &mut AstPool, idx: i32, suffix: i32):
+    self.literal_suffixes.set_i32(idx as i64, suffix)
 
 const AST_INT_PART_BASE: i64 = 2097152
 const AST_INT_PART_BASE2: i64 = 4398046511104

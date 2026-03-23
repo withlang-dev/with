@@ -1092,6 +1092,83 @@ fn Sema.is_unsigned_int_type(self: Sema, tid: i32) -> bool:
         return false
     self.get_type_d1(resolved) == 0
 
+fn Sema.is_numeric_type(self: Sema, tid: i32) -> bool:
+    let resolved = self.resolve_alias(tid)
+    let kind = self.get_type_kind(resolved)
+    kind == TY_INT or kind == TY_FLOAT
+
+fn Sema.literal_suffix_type(self: Sema, suffix: i32) -> i32:
+    if suffix == LIT_SUFFIX_I8: return self.ty_i8
+    if suffix == LIT_SUFFIX_I16: return self.ty_i16
+    if suffix == LIT_SUFFIX_I32: return self.ty_i32
+    if suffix == LIT_SUFFIX_I64: return self.ty_i64
+    if suffix == LIT_SUFFIX_I128: return self.ty_i128
+    if suffix == LIT_SUFFIX_ISIZE: return self.ty_isize
+    if suffix == LIT_SUFFIX_U8: return self.ty_u8
+    if suffix == LIT_SUFFIX_U16: return self.ty_u16
+    if suffix == LIT_SUFFIX_U32: return self.ty_u32
+    if suffix == LIT_SUFFIX_U64: return self.ty_u64
+    if suffix == LIT_SUFFIX_U128: return self.ty_u128
+    if suffix == LIT_SUFFIX_USIZE: return self.ty_usize
+    if suffix == LIT_SUFFIX_F32: return self.ty_f32
+    if suffix == LIT_SUFFIX_F64: return self.ty_f64
+    0
+
+fn Sema.int_literal_fits_type(self: Sema, value: i64, tid: i32) -> bool:
+    let resolved = self.resolve_alias(tid)
+    let kind = self.get_type_kind(resolved)
+    if kind == TY_FLOAT:
+        return true
+    if kind != TY_INT:
+        return false
+    let bits = self.get_type_d0(resolved)
+    let signed = self.get_type_d1(resolved)
+    if bits >= 64:
+        if signed != 0:
+            return true
+        return value >= 0
+    if signed != 0:
+        if bits == 8:
+            return value >= -128 and value <= 127
+        if bits == 16:
+            return value >= -32768 and value <= 32767
+        if bits == 32:
+            return value >= -2147483648 and value <= 2147483647
+        return true
+    if value < 0:
+        return false
+    if bits == 8:
+        return value <= 255
+    if bits == 16:
+        return value <= 65535
+    if bits == 32:
+        return value <= 4294967295
+    true
+
+fn Sema.numeric_literal_expected_type(self: Sema, node: i32, value: i64) -> i32:
+    if self.has_expected_type == 0 or self.expected_expr_type == 0:
+        return 0
+    let expected = self.resolve_alias(self.expected_expr_type)
+    if self.is_numeric_type(expected) == false:
+        return 0
+    if self.int_literal_fits_type(value, expected) == false:
+        self.emit_error("integer literal does not fit expected type", node)
+    expected
+
+fn Sema.float_literal_expected_type(self: Sema) -> i32:
+    if self.has_expected_type == 0 or self.expected_expr_type == 0:
+        return 0
+    let expected = self.resolve_alias(self.expected_expr_type)
+    if self.get_type_kind(expected) == TY_FLOAT:
+        return expected
+    0
+
+fn sema_node_is_numeric_literal(ast: AstPool, node: i32) -> bool:
+    if node == 0:
+        return false
+    let kind = ast.kind(node)
+    kind == NK_INT_LIT or kind == NK_FLOAT_LIT
+
 fn Sema.is_option_pointer_type(self: Sema, tid: i32) -> i32:
     if tid <= 0:
         return 0
@@ -3475,11 +3552,34 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
 
     if kind == NK_INT_LIT:
         let value = self.ast.int_lit_value(node)
-        if value < -2147483648 or value > 2147483647:
-            return self.ty_i64
-        return self.ty_i32
+        let suffix_ty = self.literal_suffix_type(self.ast.literal_suffix(node))
+        if suffix_ty != 0:
+            if self.int_literal_fits_type(value, suffix_ty) == false:
+                self.emit_error("integer literal does not fit suffix type", node)
+            self.typed_expr_types.insert(node, suffix_ty)
+            return suffix_ty
+        let expected_ty = self.numeric_literal_expected_type(node, value)
+        if expected_ty != 0:
+            self.typed_expr_types.insert(node, expected_ty)
+            return expected_ty
+        let ty = if value < -2147483648 or value > 2147483647: self.ty_i64 else: self.ty_i32
+        self.typed_expr_types.insert(node, ty)
+        return ty
 
     if kind == NK_FLOAT_LIT:
+        let suffix = self.ast.literal_suffix(node)
+        let suffix_ty = self.literal_suffix_type(suffix)
+        if suffix_ty != 0:
+            let resolved_suffix = self.resolve_alias(suffix_ty)
+            if self.get_type_kind(resolved_suffix) != TY_FLOAT:
+                self.emit_error("float literal requires an f32 or f64 suffix", node)
+            self.typed_expr_types.insert(node, suffix_ty)
+            return suffix_ty
+        let expected_ty = self.float_literal_expected_type()
+        if expected_ty != 0:
+            self.typed_expr_types.insert(node, expected_ty)
+            return expected_ty
+        self.typed_expr_types.insert(node, self.ty_f64)
         return self.ty_f64
 
     if kind == NK_BOOL_LIT:
@@ -3611,7 +3711,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
         return self.check_closure(node)
 
     if kind == NK_CAST:
-        self.check_expr(self.ast.get_data0(node))
+        self.check_expr_with_expected(self.ast.get_data0(node), 0)
         let cast_tid = self.resolve_type_expr(self.ast.get_data1(node))
         // Store resolved cast type so MIR lowering can read it without
         // calling resolve_type_expr (which would add_type on a shallow-copied Sema).
@@ -3807,6 +3907,8 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)
     let lhs_node = self.ast.get_data1(node)
     let rhs_node = self.ast.get_data2(node)
+    let lhs_is_num_lit = sema_node_is_numeric_literal(self.ast, lhs_node)
+    let rhs_is_num_lit = sema_node_is_numeric_literal(self.ast, rhs_node)
     var lhs = 0
     var rhs = 0
     // Variant shorthand in comparisons must be typed against the opposite side,
@@ -3816,11 +3918,44 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
             rhs = self.check_expr(rhs_node)
             lhs = self.check_expr_with_expected(lhs_node, rhs)
         else:
-            lhs = self.check_expr(lhs_node)
+            if lhs_is_num_lit and rhs_is_num_lit:
+                lhs = self.check_expr(lhs_node)
+                rhs = self.check_expr(rhs_node)
+            else if lhs_is_num_lit and self.ast.kind(rhs_node) != NK_VARIANT_SHORTHAND:
+                rhs = self.check_expr(rhs_node)
+                lhs = self.check_expr_with_expected(lhs_node, rhs)
+            else:
+                lhs = self.check_expr(lhs_node)
             if self.ast.kind(rhs_node) == NK_VARIANT_SHORTHAND:
                 rhs = self.check_expr_with_expected(rhs_node, lhs)
+            else if rhs == 0 and rhs_is_num_lit and lhs_is_num_lit == false:
+                rhs = self.check_expr_with_expected(rhs_node, lhs)
             else:
+                if rhs == 0:
+                    rhs = self.check_expr(rhs_node)
+    else if op == OP_ADD or op == OP_SUB or op == OP_MUL or op == OP_DIV or op == OP_MOD or
+       op == OP_ADD_WRAP or op == OP_SUB_WRAP or op == OP_MUL_WRAP or
+       op == OP_BIT_AND or op == OP_BIT_OR or op == OP_BIT_XOR or
+       op == OP_SHL or op == OP_SHR:
+        if lhs_is_num_lit and rhs_is_num_lit:
+            lhs = self.check_expr(lhs_node)
+            rhs = self.check_expr(rhs_node)
+        else:
+            if lhs_is_num_lit:
                 rhs = self.check_expr(rhs_node)
+                if self.is_numeric_type(rhs):
+                    lhs = self.check_expr_with_expected(lhs_node, rhs)
+                else:
+                    lhs = self.check_expr(lhs_node)
+            else:
+                lhs = self.check_expr(lhs_node)
+            if rhs == 0:
+                if rhs_is_num_lit and self.is_numeric_type(lhs):
+                    rhs = self.check_expr_with_expected(rhs_node, lhs)
+                else:
+                    rhs = self.check_expr(rhs_node)
+            if lhs == 0:
+                lhs = self.check_expr(lhs_node)
     else:
         lhs = self.check_expr(lhs_node)
         rhs = self.check_expr(rhs_node)
@@ -3899,6 +4034,8 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         return 0
 
     if op == UOP_NEGATE:
+        if self.is_unsigned_int_type(operand):
+            self.emit_error("cannot negate an unsigned value", node)
         return operand
     if op == UOP_BIT_NOT:
         return operand
@@ -4368,6 +4505,12 @@ fn Sema.check_slice(self: Sema, node: i32) -> i32:
 fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data0(node)
     let elem_count = self.ast.get_data1(node)
+    var expected_elem = 0
+    if self.has_expected_type != 0 and self.expected_expr_type != 0:
+        let expected = self.resolve_alias(self.expected_expr_type)
+        let expected_kind = self.get_type_kind(expected)
+        if expected_kind == TY_ARRAY or expected_kind == TY_SLICE:
+            expected_elem = self.get_type_d0(expected)
     if elem_count == 0:
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
             self.typed_expr_types.insert(node, self.expected_expr_type)
@@ -4377,11 +4520,21 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
     var elem_type = 0
     for i in 0..elem_count:
         let elem = self.ast.get_extra(extra_start + i)
-        let et = self.check_expr(elem)
+        let et = if expected_elem != 0:
+            self.check_expr_with_expected(elem, expected_elem)
+        else if elem_type != 0 and sema_node_is_numeric_literal(self.ast, elem):
+            self.check_expr_with_expected(elem, elem_type)
+        else:
+            self.check_expr(elem)
         if elem_type == 0:
             elem_type = et
 
-    let result = self.add_type(TY_ARRAY, elem_type, elem_count, 0)
+    if expected_elem != 0:
+        elem_type = expected_elem
+    let result = if self.has_expected_type != 0 and self.expected_expr_type != 0 and expected_elem != 0:
+        self.expected_expr_type
+    else:
+        self.add_type(TY_ARRAY, elem_type, elem_count, 0)
     self.typed_expr_types.insert(node, result)
     result
 
@@ -6966,7 +7119,10 @@ fn Sema.expire_dead_borrows_in_block(self: Sema, block_extra_start: i32, stmt_co
     while bi < self.borrow_refs.len() as i32:
         let ref_sym = self.borrow_refs.get(bi as i64)
         if ref_sym == 0:
-            bi = bi + 1
+            // Unnamed temporary borrows (e.g. &mut x as *mut T passed to a call)
+            // have no named reference holding them, so they expire at statement
+            // boundaries — the borrow is consumed by the enclosing expression.
+            self.remove_borrow_at(bi)
             continue
 
         var live = 0

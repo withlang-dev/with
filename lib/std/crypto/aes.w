@@ -1,12 +1,10 @@
-// AES-128 implementation
-// Uses standard byte-oriented algorithm with precomputed S-box.
-// The S-box is a fixed permutation — no key-dependent table access.
+// AES-128 block cipher
+// Standard byte-oriented with precomputed S-box.
 
 type Aes128 = {
-    round_keys: [u8; 176],  // 11 round keys × 16 bytes
+    round_keys: [u8; 176],  // 11 round keys x 16 bytes
 }
 
-// AES S-box
 fn aes_sbox(i: i32) -> u8:
     let sbox = [
         0x63 as u8, 0x7c as u8, 0x77 as u8, 0x7b as u8, 0xf2 as u8, 0x6b as u8, 0x6f as u8, 0xc5 as u8,
@@ -44,118 +42,105 @@ fn aes_sbox(i: i32) -> u8:
     ]
     sbox[i]
 
-// Round constants
 fn aes_rcon(i: i32) -> u8:
     let rc = [0x01 as u8, 0x02 as u8, 0x04 as u8, 0x08 as u8, 0x10 as u8,
               0x20 as u8, 0x40 as u8, 0x80 as u8, 0x1b as u8, 0x36 as u8]
     rc[i]
 
-// GF(2^8) multiplication by 2 (xtime)
 fn xtime(x: u8) -> u8:
-    let xu = x as u32
-    let shifted = (xu << 1 as u32) as u8
-    // If high bit was set, XOR with 0x1b (reduction polynomial)
+    let shifted = ((x as u32) << 1 as u32) as u8
     let mask = if (x & (0x80 as u8)) != (0 as u8): 0x1b as u8 else: 0x00 as u8
     shifted ^ mask
 
-// ── Key schedule ────────────────────────────────────────────────
+// Key schedule
+unsafe fn aes128_init(ctx: *mut Aes128, key: *const u8):
+    let rk = &mut ctx.round_keys[0] as *mut u8
+    for i in 0..16:
+        *(rk + i as u64) = *(key + i as u64)
+    for i in 1..11:
+        let prev_off = (i - 1) * 16
+        let cur_off = i * 16
+        let r0 = aes_sbox((*(rk + (prev_off + 13) as u64)) as i32) ^ aes_rcon(i - 1)
+        let r1 = aes_sbox((*(rk + (prev_off + 14) as u64)) as i32)
+        let r2 = aes_sbox((*(rk + (prev_off + 15) as u64)) as i32)
+        let r3 = aes_sbox((*(rk + (prev_off + 12) as u64)) as i32)
+        *(rk + (cur_off + 0) as u64) = *(rk + (prev_off + 0) as u64) ^ r0
+        *(rk + (cur_off + 1) as u64) = *(rk + (prev_off + 1) as u64) ^ r1
+        *(rk + (cur_off + 2) as u64) = *(rk + (prev_off + 2) as u64) ^ r2
+        *(rk + (cur_off + 3) as u64) = *(rk + (prev_off + 3) as u64) ^ r3
+        for j in 4..16:
+            *(rk + (cur_off + j) as u64) = *(rk + (prev_off + j) as u64) ^ *(rk + (cur_off + j - 4) as u64)
 
 fn Aes128.new(key: *const u8) -> Aes128:
     var ctx = Aes128 { round_keys: [0 as u8; 176] }
-    let rk = &mut ctx.round_keys[0] as *mut u8
-    // Copy key into first round key
-    for i in 0..16:
-        unsafe: *(rk + i as u64) = unsafe: *(key + i as u64)
-    // Expand
-    for i in 1..11:
-        let prev = rk as *const u8
-        let prev_off = (i - 1) * 16
-        let cur_off = i * 16
-        // RotWord + SubBytes + Rcon on last word of previous round key
-        let r0 = aes_sbox((unsafe: *(prev + (prev_off + 13) as u64)) as i32) ^ aes_rcon(i - 1)
-        let r1 = aes_sbox((unsafe: *(prev + (prev_off + 14) as u64)) as i32)
-        let r2 = aes_sbox((unsafe: *(prev + (prev_off + 15) as u64)) as i32)
-        let r3 = aes_sbox((unsafe: *(prev + (prev_off + 12) as u64)) as i32)
-        unsafe: *(rk + (cur_off + 0) as u64) = (unsafe: *(prev + (prev_off + 0) as u64)) ^ r0
-        unsafe: *(rk + (cur_off + 1) as u64) = (unsafe: *(prev + (prev_off + 1) as u64)) ^ r1
-        unsafe: *(rk + (cur_off + 2) as u64) = (unsafe: *(prev + (prev_off + 2) as u64)) ^ r2
-        unsafe: *(rk + (cur_off + 3) as u64) = (unsafe: *(prev + (prev_off + 3) as u64)) ^ r3
-        for j in 4..16:
-            unsafe: *(rk + (cur_off + j) as u64) = (unsafe: *(prev + (prev_off + j) as u64)) ^ (unsafe: *(rk + (cur_off + j - 4) as u64))
+    unsafe: aes128_init(&mut ctx as *mut Aes128, key)
     ctx
 
-// ── Block cipher ────────────────────────────────────────────────
+// Block cipher operations
+unsafe fn aes_add_round_key(s: *mut u8, rk: *const u8, off: i32):
+    for i in 0..16:
+        *(s + i as u64) = *(s + i as u64) ^ *(rk + (off + i) as u64)
 
-fn Aes128.encrypt_block(self: *const Aes128, block: *mut u8):
-    // Copy state
+unsafe fn aes_sub_bytes(s: *mut u8):
+    for i in 0..16:
+        *(s + i as u64) = aes_sbox((*(s + i as u64)) as i32)
+
+unsafe fn aes_shift_rows(s: *mut u8):
+    let t = *(s + 1 as u64)
+    *(s + 1 as u64) = *(s + 5 as u64)
+    *(s + 5 as u64) = *(s + 9 as u64)
+    *(s + 9 as u64) = *(s + 13 as u64)
+    *(s + 13 as u64) = t
+    let t0 = *(s + 2 as u64)
+    let t1 = *(s + 6 as u64)
+    *(s + 2 as u64) = *(s + 10 as u64)
+    *(s + 6 as u64) = *(s + 14 as u64)
+    *(s + 10 as u64) = t0
+    *(s + 14 as u64) = t1
+    let t2 = *(s + 15 as u64)
+    *(s + 15 as u64) = *(s + 11 as u64)
+    *(s + 11 as u64) = *(s + 7 as u64)
+    *(s + 7 as u64) = *(s + 3 as u64)
+    *(s + 3 as u64) = t2
+
+unsafe fn aes_mix_columns(s: *mut u8):
+    for c in 0..4:
+        let off = c * 4
+        let a0 = *(s + (off + 0) as u64)
+        let a1 = *(s + (off + 1) as u64)
+        let a2 = *(s + (off + 2) as u64)
+        let a3 = *(s + (off + 3) as u64)
+        let r = a0 ^ a1 ^ a2 ^ a3
+        *(s + (off + 0) as u64) = a0 ^ r ^ xtime(a0 ^ a1)
+        *(s + (off + 1) as u64) = a1 ^ r ^ xtime(a1 ^ a2)
+        *(s + (off + 2) as u64) = a2 ^ r ^ xtime(a2 ^ a3)
+        *(s + (off + 3) as u64) = a3 ^ r ^ xtime(a3 ^ a0)
+
+// Encrypt a single 16-byte block in-place
+unsafe fn aes128_encrypt_block(ctx: *const Aes128, block: *mut u8):
     var s: [u8; 16] = [0 as u8; 16]
     let sp = &mut s[0] as *mut u8
     for i in 0..16:
-        unsafe: *(sp + i as u64) = unsafe: *(block + i as u64)
+        *(sp + i as u64) = *(block + i as u64)
 
-    // Copy round keys to stack
     var rk: [u8; 176] = [0 as u8; 176]
     let rkp = &mut rk[0] as *mut u8
     for i in 0..176:
-        unsafe: *(rkp + i as u64) = unsafe: (*self).round_keys[i]
+        *(rkp + i as u64) = ctx.round_keys[i]
 
-    // Initial AddRoundKey
-    aes_add_round_key(sp, rkp, 0)
-
-    // 9 main rounds
+    aes_add_round_key(sp, rkp as *const u8, 0)
     for r in 1..10:
         aes_sub_bytes(sp)
         aes_shift_rows(sp)
         aes_mix_columns(sp)
-        aes_add_round_key(sp, rkp, r * 16)
-
-    // Final round (no MixColumns)
+        aes_add_round_key(sp, rkp as *const u8, r * 16)
     aes_sub_bytes(sp)
     aes_shift_rows(sp)
-    aes_add_round_key(sp, rkp, 160)
+    aes_add_round_key(sp, rkp as *const u8, 160)
 
-    // Copy back
     for i in 0..16:
-        unsafe: *(block + i as u64) = unsafe: *(sp + i as u64)
+        *(block + i as u64) = *(sp + i as u64)
 
-fn aes_add_round_key(s: *mut u8, rk: *const u8, off: i32):
-    for i in 0..16:
-        unsafe: *(s + i as u64) = (unsafe: *(s + i as u64)) ^ (unsafe: *(rk + (off + i) as u64))
-
-fn aes_sub_bytes(s: *mut u8):
-    for i in 0..16:
-        unsafe: *(s + i as u64) = aes_sbox((unsafe: *(s + i as u64)) as i32)
-
-fn aes_shift_rows(s: *mut u8):
-    // Row 1: shift left 1
-    let t = unsafe: *(s + 1 as u64)
-    unsafe: *(s + 1 as u64) = unsafe: *(s + 5 as u64)
-    unsafe: *(s + 5 as u64) = unsafe: *(s + 9 as u64)
-    unsafe: *(s + 9 as u64) = unsafe: *(s + 13 as u64)
-    unsafe: *(s + 13 as u64) = t
-    // Row 2: shift left 2
-    let t0 = unsafe: *(s + 2 as u64)
-    let t1 = unsafe: *(s + 6 as u64)
-    unsafe: *(s + 2 as u64) = unsafe: *(s + 10 as u64)
-    unsafe: *(s + 6 as u64) = unsafe: *(s + 14 as u64)
-    unsafe: *(s + 10 as u64) = t0
-    unsafe: *(s + 14 as u64) = t1
-    // Row 3: shift left 3
-    let t2 = unsafe: *(s + 15 as u64)
-    unsafe: *(s + 15 as u64) = unsafe: *(s + 11 as u64)
-    unsafe: *(s + 11 as u64) = unsafe: *(s + 7 as u64)
-    unsafe: *(s + 7 as u64) = unsafe: *(s + 3 as u64)
-    unsafe: *(s + 3 as u64) = t2
-
-fn aes_mix_columns(s: *mut u8):
-    for c in 0..4:
-        let off = c * 4
-        let a0 = unsafe: *(s + (off + 0) as u64)
-        let a1 = unsafe: *(s + (off + 1) as u64)
-        let a2 = unsafe: *(s + (off + 2) as u64)
-        let a3 = unsafe: *(s + (off + 3) as u64)
-        let r = a0 ^ a1 ^ a2 ^ a3
-        unsafe: *(s + (off + 0) as u64) = a0 ^ r ^ xtime(a0 ^ a1)
-        unsafe: *(s + (off + 1) as u64) = a1 ^ r ^ xtime(a1 ^ a2)
-        unsafe: *(s + (off + 2) as u64) = a2 ^ r ^ xtime(a2 ^ a3)
-        unsafe: *(s + (off + 3) as u64) = a3 ^ r ^ xtime(a3 ^ a0)
+// Public wrapper
+fn Aes128.encrypt_block(self: *const Aes128, block: *mut u8):
+    unsafe: aes128_encrypt_block(self, block)

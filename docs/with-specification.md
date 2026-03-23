@@ -694,16 +694,70 @@ before code generation.
 0xFF            // hexadecimal (prefix 0x or 0X)
 0b1010          // binary (prefix 0b or 0B)
 0o77            // octal (prefix 0o or 0O)
+0u8             // suffixed integer literal
+0x7FFF_FFFFu32  // suffixed hexadecimal integer literal
 3.14            // floating point
 1.0e-5          // scientific notation
+1.0f32          // suffixed float literal
 0x1.0p10        // hex float (value: 1024.0)
 ```
 
 Underscores may appear between digits in any literal for
 readability: `1_000_000`, `0xFF_FF`, `0b1111_0000`.
 
-Integer literals default to `i32`. Use a type annotation or `as`
-for other types: `let x: i64 = 0xFF_FF_FF_FF`.
+Integer and float literals may carry a type suffix directly on the
+literal token:
+
+- Integer suffixes: `u8`, `u16`, `u32`, `u64`, `i8`, `i16`, `i32`, `i64`
+- Float suffixes: `f32`, `f64`
+
+Examples:
+
+```
+255u8
+0xDEAD_BEEFu32
+42i64
+3.14f32
+```
+
+The suffix is part of the literal. It is written without whitespace and
+without a separator underscore. `0u64` is valid; `0_u64` is not part of
+the language surface syntax.
+
+**Default literal types:** if no suffix and no surrounding context forces
+another numeric type:
+
+- Unsuffixed integer literals default to `i32`
+- Unsuffixed float literals default to `f64`
+
+**Contextual numeric inference:** unsuffixed numeric literals are resolved
+from surrounding type context before falling back to the defaults above.
+The compiler may infer an unsuffixed literal's type from:
+
+1. The target type of a typed binding or assignment
+2. A function parameter type at the call site
+3. The peer operand in a numeric binary operator
+4. The enclosing function's declared return type for tail expressions
+5. A known array element type
+6. A known struct field type
+
+Examples:
+
+```
+var acc: u64 = 0          // 0 is inferred as u64
+take_u32(42)              // 42 is inferred as u32
+let y = x + 1             // if x is u64, 1 is inferred as u64
+let z = x >> 31           // shift amount inherits x's integer type
+fn zero() -> u64: 0       // tail literal is inferred as u64
+let p = Point { x: 0, y: 0 } // field literals infer from field types
+```
+
+Suffixed literals are explicit and do not participate in contextual
+retyping. If a context expects `u32` and the literal is `42u8`, the
+program is ill-typed unless an explicit conversion is written.
+
+**Range checking:** a suffixed literal must fit in its declared type. For
+example, `256u8` is invalid.
 
 #### 4.2.2 Arithmetic Operators
 
@@ -10724,6 +10778,15 @@ Numeric literals permit `_` separators for readability:
 
 Separators are ignored for numeric value parsing.
 
+Type suffixes, when present, begin after the numeric portion of the
+literal ends. The suffix itself does not contain separators:
+
+- Valid: `1_000u64`, `0xFF_FFu32`, `3.25f32`
+- Invalid: `1_000_u64`, `0xFF_FF_u32`
+
+The suffix is matched greedily from the closed set of numeric suffixes
+defined in §4.2.1.
+
 ### 29.2 Trailing commas
 
 Trailing commas are **permitted but never required** in list-like grammar positions, including:
@@ -10733,6 +10796,14 @@ Trailing commas are **permitted but never required** in list-like grammar positi
 - Record/struct field lists
 - Tuple/array literal element lists
 - Match arms and import/use lists
+
+Inside matched `()`, `[]`, and `{}`, list-like grammar positions treat optional
+newlines like separator whitespace. This means multiline parameter lists,
+argument lists, tuple literals, array literals, struct literals, indexing, and
+type/generic lists are legal as long as the delimiters are balanced.
+
+This rule applies to the delimited list itself, not to nested block bodies.
+Newlines that start a block after `:` or `=>` retain their normal significance.
 
 ### 29.3 Raw string literals
 
