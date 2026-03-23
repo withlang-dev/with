@@ -2015,6 +2015,22 @@ fn MirBuilder.lower_enum_discriminant(self: MirBuilder, place: i32) -> i32:
     self.body.push_stmt(self.cur_bb, SK_ASSIGN, disc_place, rv, 0)
     self.body.new_operand(OK_COPY, disc_place)
 
+fn MirBuilder.pattern_payload_node(self: MirBuilder, owner_pat: i32, payload_entry: i32) -> i32:
+    if payload_entry <= 0 or payload_entry >= self.ast.node_count():
+        return 0
+    let pk = self.ast.kind(payload_entry)
+    if pk < NK_PAT_WILDCARD or pk > NK_PAT_SLICE:
+        return 0
+    if payload_entry == owner_pat:
+        return 0
+    let owner_start = self.ast.get_start(owner_pat)
+    let owner_end = self.ast.get_end(owner_pat)
+    let payload_start = self.ast.get_start(payload_entry)
+    let payload_end = self.ast.get_end(payload_entry)
+    if payload_start < owner_start or payload_end > owner_end:
+        return 0
+    payload_entry
+
 fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_node: i32, arm_bb: i32, fail_bb: i32):
     if pat_node == 0:
         self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
@@ -2050,18 +2066,52 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
 
     if pk == NK_PAT_VARIANT or pk == NK_PAT_ENUM_SHORTHAND:
         let variant_sym = self.ast.get_data0(pat_node)
-        var idx = self.variant_index(variant_sym)
+        let payload_start = self.ast.get_data1(pat_node)
+        let payload_count = self.ast.get_data2(pat_node)
+        let variant_idx = self.variant_index(variant_sym)
+        var disc_idx = variant_idx
         // For disc enums, use the actual discriminant value
         if self.sema.variant_lookup.contains(variant_sym):
             if self.sema.disc_values.contains(variant_sym):
-                idx = self.sema.disc_values.get(variant_sym).unwrap()
+                disc_idx = self.sema.disc_values.get(variant_sym).unwrap()
+        var success_bb = arm_bb
+        var needs_payload_checks = false
+        let variant_place = self.body.new_downcast_place(scrutinee_place, variant_idx)
+        for bi in 0..payload_count:
+            let inner_pat = self.pattern_payload_node(pat_node, self.ast.get_extra(payload_start + bi))
+            if inner_pat == 0:
+                continue
+            let inner_pk = self.ast.kind(inner_pat)
+            if inner_pk == NK_PAT_WILDCARD or inner_pk == NK_PAT_IDENT:
+                continue
+            needs_payload_checks = true
+            break
+        if needs_payload_checks:
+            success_bb = self.new_block()
         let disc = self.lower_enum_discriminant(scrutinee_place)
         let vals: Vec[i32] = Vec.new()
-        vals.push(idx)
+        vals.push(disc_idx)
         let targets: Vec[i32] = Vec.new()
-        targets.push(arm_bb)
+        targets.push(success_bb)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TK_SWITCH_INT, disc, table, fail_bb, 0)
+        if not needs_payload_checks:
+            return
+        var cur_test_bb = success_bb
+        for bi in 0..payload_count:
+            let inner_pat = self.pattern_payload_node(pat_node, self.ast.get_extra(payload_start + bi))
+            if inner_pat == 0:
+                continue
+            let inner_pk = self.ast.kind(inner_pat)
+            if inner_pk == NK_PAT_WILDCARD or inner_pk == NK_PAT_IDENT:
+                continue
+            let field_place = self.body.new_field_place(variant_place, bi)
+            let next_test_bb = self.new_block()
+            self.switch_to(cur_test_bb)
+            self.lower_pattern_match(field_place, inner_pat, next_test_bb, fail_bb)
+            cur_test_bb = next_test_bb
+        self.switch_to(cur_test_bb)
+        self.terminate(TK_GOTO, arm_bb, 0, 0, 0)
         return
 
     let scrutinee_op = self.body.new_operand(OK_COPY, scrutinee_place)
@@ -2246,12 +2296,16 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let variant_place = self.body.new_downcast_place(scrutinee_place, self.variant_index(variant_sym))
         for bi in 0..bind_count:
             let raw = self.ast.get_extra(bind_start + bi)
-            // Let-else parser stores NK_PAT_IDENT nodes; match parser stores raw symbols
-            let sym = if self.ast.kind(raw) == NK_PAT_IDENT: self.ast.get_data0(raw) else: raw
             let field_place = self.body.new_field_place(variant_place, bi)
+            let inner_pat = self.pattern_payload_node(pat_node, raw)
+            if inner_pat != 0:
+                let inner = self.lower_pattern(inner_pat, field_place)
+                for i in 0..inner.len() as i32:
+                    out.push(inner.get(i as i64))
+                continue
             let bind_ty = self.place_local_type(field_place)
-            let local_id = self.body.new_local(bind_ty, 0, sym, 1)
-            self.bind_local(sym, local_id)
+            let local_id = self.body.new_local(bind_ty, 0, raw, 1)
+            self.bind_local(raw, local_id)
             self.body.push_stmt(self.cur_bb, SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(pat_node))
             if self.sema.is_copy(bind_ty) == 0:
                 self.schedule_drop(local_id, DK_VALUE)
