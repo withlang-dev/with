@@ -5,8 +5,6 @@ use compiler.foundation.Span
 use compiler.foundation.SourceMap
 use compiler.foundation.Diagnostic
 
-extern fn int_to_string(n: i32) -> str
-
 fn render_diagnostic(diag: Diagnostic, sm: SourceMap) -> str:
     let sev = render_severity(diag.severity)
     var out = sev
@@ -21,17 +19,10 @@ fn render_diagnostic(diag: Diagnostic, sm: SourceMap) -> str:
     let file_id = diag.primary.file
     let src = sm.get_source(file_id)
     let loc = sm.offset_to_location(file_id, diag.primary.start)
-    out = out ++ " --> "
-    out = out ++ src.path
-    out = out ++ ":"
-    out = out ++ int_to_string(loc.line + 1)
-    out = out ++ ":"
-    out = out ++ int_to_string(loc.col + 1)
-    out = out ++ "\n"
+    out = out ++ f" --> {src.path}:{loc.line + 1}:{loc.col + 1}\n"
 
     let line_text = sm.line_text(file_id, loc.line)
-    out = out ++ int_to_string(loc.line + 1)
-    out = out ++ " | "
+    out = out ++ f"{loc.line + 1} | "
     out = out ++ line_text
     out = out ++ "\n"
     out = out ++ "  | "
@@ -41,11 +32,7 @@ fn render_diagnostic(diag: Diagnostic, sm: SourceMap) -> str:
     for i in 0..diag.labels.len() as i32:
         let lab = diag.labels.get(i as i64)
         let lloc = sm.offset_to_location(lab.span.file, lab.span.start)
-        out = out ++ "  = label @"
-        out = out ++ int_to_string(lloc.line + 1)
-        out = out ++ ":"
-        out = out ++ int_to_string(lloc.col + 1)
-        out = out ++ " "
+        out = out ++ f"  = label @{lloc.line + 1}:{lloc.col + 1} "
         out = out ++ lab.message
         out = out ++ "\n"
 

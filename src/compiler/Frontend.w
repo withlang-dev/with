@@ -17,8 +17,6 @@ extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_str_hash(s: str) -> i64
 extern fn with_eprintln(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
-extern fn i64_to_string(n: i64) -> str
-
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
 fn count_non_use_decls_frontend(pool: AstPool) -> i32:
@@ -70,7 +68,7 @@ fn frontend_debug_type_names_enabled() -> i32:
 fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
     if frontend_debug_type_names_enabled() == 0:
         return
-    with_eprintln("[type-names] stage=" ++ stage ++ " decls=" ++ int_to_string(pool.decl_count()))
+    with_eprintln(f"[type-names] stage={stage} decls={pool.decl_count()}")
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NK_TYPE_DECL:
@@ -87,12 +85,7 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
             kind_name = "distinct"
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)
-        let msg = "[type-names] " ++ stage ++
-            " decl=" ++ int_to_string(di) ++
-            " node=" ++ int_to_string(decl) ++
-            " kind=" ++ kind_name ++
-            " name_sym=" ++ int_to_string(name_sym) ++
-            " name=" ++ name
+        let msg = f"[type-names] {stage} decl={di} node={decl} kind={kind_name} name_sym={name_sym} name={name}"
         with_eprintln(msg)
 
 fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
@@ -230,10 +223,10 @@ fn c_import_fs_cache_lookup(cache_key: str) -> str:
         return ""
     let h = with_str_hash(cache_key)
     // Make hash positive for filename
-    var hash_str = i64_to_string(h)
+    var hash_str = f"{h}"
     if h < 0:
-        hash_str = "n" ++ i64_to_string(0 - h)
-    let path = dir ++ "/" ++ hash_str ++ ".w"
+        hash_str = f"n{0 - h}"
+    let path = f"{dir}/{hash_str}.w"
     with_fs_read_file(path)
 
 fn c_import_fs_cache_store(cache_key: str, value: str):
@@ -242,10 +235,10 @@ fn c_import_fs_cache_store(cache_key: str, value: str):
         return
     with_fs_mkdir_p(dir)
     let h = with_str_hash(cache_key)
-    var hash_str = i64_to_string(h)
+    var hash_str = f"{h}"
     if h < 0:
-        hash_str = "n" ++ i64_to_string(0 - h)
-    let path = dir ++ "/" ++ hash_str ++ ".w"
+        hash_str = f"n{0 - h}"
+    let path = f"{dir}/{hash_str}.w"
     with_fs_write_file(path, value)
 
 fn Zcu.c_import_emit_header_error_frontend(self: Zcu, decl: i32, header_spec: str):
@@ -489,7 +482,7 @@ fn c_import_function_decl(stmt_raw: str) -> str:
                             return ""
                         if params_out.len() > 0:
                             params_out = params_out ++ ", "
-                        params_out = params_out ++ "p" ++ int_to_string(param_index) ++ ": " ++ pty
+                        params_out = params_out ++ f"p{param_index}: " ++ pty
                         param_index = param_index + 1
                 seg_start = i + 1
             i = i + 1
@@ -740,7 +733,7 @@ fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
 
     self.set_current_source(source_dir, path, text)
     if zcu_debug_init_enabled() != 0:
-        with_eprintln("[frontend] compile_file:source_ready bytes=" ++ int_to_string(text.len() as i32))
+        with_eprintln(f"[frontend] compile_file:source_ready bytes={text.len() as i32}")
     let pool = self.compile_source_frontend(text, path, 0)
     if pool.decl_count() == 0 and not self.diagnostics.has_errors():
         with_eprintln("error: compiler produced an empty module for '" ++ path ++ "'")

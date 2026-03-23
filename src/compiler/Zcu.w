@@ -11,8 +11,6 @@ use compiler.ProjectConfig
 
 extern fn with_eprintln(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
-extern fn int_to_string(n: i32) -> str
-
 fn zcu_debug_init_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
@@ -259,9 +257,7 @@ fn Zcu.set_frontend_pool(self: Zcu, pool: InternPool):
 
 fn Zcu.sync_from_sema(self: Zcu, sema: Sema):
     if zcu_debug_pool_flow_enabled() != 0:
-        with_eprintln("[zcu] sync_from_sema:before zcu.pool=" ++ int_to_string(self.pool.symbol_texts.len() as i32) ++
-            " sema.pool=" ++ int_to_string(sema.pool.symbol_texts.len() as i32) ++
-            " sema.ast.decls=" ++ int_to_string(sema.ast.decl_count()))
+        with_eprintln(f"[zcu] sync_from_sema:before zcu.pool={self.pool.symbol_texts.len() as i32} sema.pool={sema.pool.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
     self.pool = sema.pool
     self.diagnostics = sema.diags
     self.typed_expr_types = sema.typed_expr_types
@@ -270,9 +266,7 @@ fn Zcu.sync_from_sema(self: Zcu, sema: Sema):
     self.typed_binding_muts = sema.typed_binding_muts
     self.last_sema = sema
     if zcu_debug_pool_flow_enabled() != 0:
-        with_eprintln("[zcu] sync_from_sema:after zcu.pool=" ++ int_to_string(self.pool.symbol_texts.len() as i32) ++
-            " last_sema.pool=" ++ int_to_string(self.last_sema.pool.symbol_texts.len() as i32) ++
-            " last_sema.ast.decls=" ++ int_to_string(self.last_sema.ast.decl_count()))
+        with_eprintln(f"[zcu] sync_from_sema:after zcu.pool={self.pool.symbol_texts.len() as i32} last_sema.pool={self.last_sema.pool.symbol_texts.len() as i32} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
 
 fn Zcu.set_resolve_snapshot(self: Zcu, result: ResolveResult, root_path: str):
     self.last_resolved = result

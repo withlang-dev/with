@@ -2,8 +2,6 @@
 
 use compiler.foundation.Ids
 
-extern fn int_to_string(n: i32) -> str
-
 fn VALUE_KEY_INVALID -> i32: 0
 fn VALUE_KEY_INT -> i32: 1
 fn VALUE_KEY_BOOL -> i32: 2
@@ -59,19 +57,13 @@ fn value_key_type_marker(ty: TypeId) -> ValueKey:
 
 fn value_key_to_string(key: ValueKey) -> str:
     if key.tag == VALUE_KEY_INT():
-        var out = "int:"
-        out = out ++ int_to_string(key.int_value)
-        return out
+        return f"int:{key.int_value}"
     if key.tag == VALUE_KEY_BOOL():
-        var out = "bool:"
-        out = out ++ int_to_string(key.int_value)
-        return out
+        return f"bool:{key.int_value}"
     if key.tag == VALUE_KEY_STRING():
         var out = "str:"
         out = out ++ key.text_value
         return out
     if key.tag == VALUE_KEY_TYPE_MARKER():
-        var out = "ty:"
-        out = out ++ int_to_string(key.type_ref)
-        return out
+        return f"ty:{key.type_ref}"
     "invalid"
