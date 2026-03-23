@@ -1661,6 +1661,20 @@ fn Sema.is_ci_visible(self: Sema, sym: i32) -> i32:
     // itself has c_import declarations (meaning it directly uses c_import).
     if self.current_module_has_ci != 0:
         return 1
+    // Also visible if the user explicitly declared it (extern fn, fn, type, etc.)
+    // in a non-c_import context. User declarations override c_import scoping.
+    var di = 0
+    while di < self.ast.decl_count():
+        if di < self.decl_is_c_import.len() as i32:
+            if self.decl_is_c_import.get(di as i64) != 0:
+                di = di + 1
+                continue
+        let decl = self.ast.get_decl(di)
+        let kind = self.ast.kind(decl)
+        if kind == NK_FN_DECL or kind == NK_EXTERN_FN or kind == NK_EXTERN_VAR or kind == NK_LET_DECL or kind == NK_TYPE_DECL:
+            if self.ast.get_data0(decl) == sym:
+                return 1
+        di = di + 1
     0
 
 fn Sema.build_ci_destructor_map(self: Sema):

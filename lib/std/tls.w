@@ -355,12 +355,10 @@ unsafe fn tls_recv(conn: *mut TlsConn, buf: *mut u8, buf_cap: i32) -> i32:
 // ── Random bytes ───────────────────────────────────────────────────
 
 extern fn with_fs_read_file(path: str) -> str
-
-use c_import("<stdlib.h>")
+extern fn with_fill_random(buf: *mut u8, len: i32)
 
 unsafe fn fill_random(buf: *mut u8, len: i32):
-    // arc4random_buf is available on macOS and modern BSDs
-    arc4random_buf(buf as *mut c_void, len as u64)
+    with_fill_random(buf, len)
 
 // ── TLS 1.2 Handshake ─────────────────────────────────────────────
 
