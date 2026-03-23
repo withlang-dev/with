@@ -131,9 +131,11 @@ profiling demands it.
 - [ ] 38. Remove `coerce_val_to_str` auto-coercion from `mir_str_concat` / `++`
       in `src/Codegen.w`. Make `++` str-only.
 - [ ] 39. Add sema/codegen error for `str ++ non-str` operands.
-- [ ] 40. Convert all ~367 compiler-source `int_to_string(x) ++ str` sites to
-      f-strings: `f"{x}"`. Includes `src/compiler/Backend.w`, diagnostic messages
-      in `src/Sema.w`, `src/Codegen.w`, etc.
+- [ ] 40. Convert compiler-source `int_to_string(x) ++ str` sites to f-strings.
+      Progress: compiler/ subdir (42 sites), MirLower (3), Parser (3),
+      DiagnosticRender (4), render (1), main (7), main_emit_temp (5) = 65 done.
+      Remaining ~308 in: Mir.w (93), CCodegen.w (62), Codegen.w (55), Sema.w (39),
+      CImport.w (19), Resolve.w (15), AsyncMir.w (14).
 - [ ] 41. Update tests that assert string concat coercion behavior.
 - [ ] 42. Verify: `make build && ./out/bin/with-stage2 check src/main.w && make smoke`.
 - [ ] 43. Add migration regression tests: f-strings cover intended use cases,
