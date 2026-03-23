@@ -66,8 +66,8 @@ profiling demands it.
 
 ## Phase 2 — Semantic Analysis
 
-- [ ] 15. Add `check_fstring` in `src/Sema.w`: type-check each `FSTR_SEG_EXPR`
-      segment, set result type of `NK_FSTRING` to `ty_str`.
+- [x] 15. Add `check_fstring` in `src/Sema.w`: type-check each `FSTR_SEG_EXPR`
+      segment, set result type of `NK_FSTRING` to `ty_str`. (Done in task 12.)
 - [ ] 16. Implement mode/type compatibility matrix: `d/x/X/b/o` for integers,
       `f/e/g` for floats, `s` for strings, `?` for all types. Reject invalid
       combinations with precise diagnostics pointing at the spec.
@@ -84,11 +84,10 @@ profiling demands it.
 
 ## Phase 3 — Bootstrap Bridge
 
-- [ ] 21. Ensure the interim codegen fallback from task 12 produces correct output
-      for all f-strings used in the compiler source. Test: `make build && make smoke`.
-- [ ] 22. Build a fresh stage2 that understands the new `NK_FSTRING` AST and sema
-      model. Install it as seed (`make install-user` or copy to `src/main`).
-- [ ] 23. Verify: `make build && make smoke && ./out/bin/with-stage2 check src/main.w`.
+- [x] 21. Interim codegen fallback works for all compiler f-strings. `make build` ✓,
+      `make smoke` ✓, 308/308 tests pass.
+- [x] 22. Fresh stage2 installed as seed via `make install-user`.
+- [x] 23. Verify after seed install: `make build` ✓, `make smoke` ✓, `check src/main.w` ✓.
 
 ## Phase 4 — Runtime Formatting Helpers
 
