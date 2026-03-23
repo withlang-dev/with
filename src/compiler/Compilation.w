@@ -16,7 +16,6 @@ use compiler.Zcu
 extern fn with_eprintln(s: str) -> void
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_getenv_str(name: str) -> str
-extern fn int_to_string(n: i32) -> str
 extern fn with_system(cmd: str) -> i32
 
 fn compilation_debug_init_enabled() -> i32:
@@ -39,10 +38,7 @@ fn compilation_debug_pool_flow_enabled() -> i32:
 fn compilation_debug_pool_flow(label: str, pool: InternPool, typed_pool: AstPool, sema: Sema):
     if compilation_debug_pool_flow_enabled() == 0:
         return
-    with_eprintln("[comp] " ++ label ++ " pool.symbols=" ++ int_to_string(pool.symbol_texts.len() as i32) ++
-        " typed.decls=" ++ int_to_string(typed_pool.decl_count()) ++
-        " sema.pool.symbols=" ++ int_to_string(sema.pool.symbol_texts.len() as i32) ++
-        " sema.ast.decls=" ++ int_to_string(sema.ast.decl_count()))
+    with_eprintln(f"[comp] {label} pool.symbols={pool.symbol_texts.len() as i32} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
 
 fn compilation_debug_type_names_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_TYPE_NAMES")
@@ -55,7 +51,7 @@ fn compilation_debug_type_names_enabled() -> i32:
 fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
     if compilation_debug_type_names_enabled() == 0:
         return
-    with_eprintln("[type-names] stage=" ++ stage ++ " decls=" ++ int_to_string(pool.decl_count()))
+    with_eprintln(f"[type-names] stage={stage} decls={pool.decl_count()}")
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NK_TYPE_DECL:
@@ -72,12 +68,7 @@ fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
             kind_name = "distinct"
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)
-        let msg = "[type-names] " ++ stage ++
-            " decl=" ++ int_to_string(di) ++
-            " node=" ++ int_to_string(decl) ++
-            " kind=" ++ kind_name ++
-            " name_sym=" ++ int_to_string(name_sym) ++
-            " name=" ++ name
+        let msg = f"[type-names] {stage} decl={di} node={decl} kind={kind_name} name_sym={name_sym} name={name}"
         with_eprintln(msg)
 
 // Transitional orchestration root:
@@ -121,7 +112,7 @@ fn Compilation.compile_file(self: Compilation, path: str) -> AstPool:
     var zcu = self.zcu
     let pool = zcu.compile_file_frontend(path)
     self.zcu = zcu
-    compilation_debug_init("Compilation.compile_file:done decls=" ++ int_to_string(pool.decl_count()))
+    compilation_debug_init(f"Compilation.compile_file:done decls={pool.decl_count()}")
     pool
 
 fn Compilation.resolve_file(self: Compilation, path: str, emit_resolve_diags: bool) -> ResolveResult:
@@ -168,7 +159,7 @@ fn Compilation.compile_source_text(self: Compilation, source_path: str, source_t
     pool
 
 fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_path: str, obj_path: str, bin_path: str) -> str:
-    compilation_debug_init("build_binary_to_path:compiled " ++ source_path ++ " decls=" ++ int_to_string(pool.decl_count()))
+    compilation_debug_init(f"build_binary_to_path:compiled {source_path} decls={pool.decl_count()}")
     if pool.decl_count() == 0:
         return ""
     if not self.ensure_codegen_mir(pool):
@@ -182,7 +173,7 @@ fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_
     compilation_debug_init("build_binary_to_path:compile_to_object_backend")
     let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info)
     if backend_rc != 0:
-        compilation_debug_init("build_binary_to_path:backend FAILED rc=" ++ int_to_string(backend_rc))
+        compilation_debug_init(f"build_binary_to_path:backend FAILED rc={backend_rc}")
         compilation_cleanup_build_products(obj_path, "")
         return ""
     compilation_debug_init("build_binary_to_path:linking")

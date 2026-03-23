@@ -8,8 +8,6 @@ extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_system(cmd: str) -> i32
 extern fn with_eprintln(s: str) -> void
-extern fn int_to_string(n: i32) -> str
-
 fn CONAN_CENTER_URL -> str: "https://center.conan.io"
 
 use std.http
