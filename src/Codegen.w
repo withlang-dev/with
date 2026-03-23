@@ -1031,6 +1031,9 @@ fn Codegen.coerce_value_to_type(self: Codegen, val: i64, target_ty: i64) -> i64:
     if vk == wl_integer_type_kind() and tk == wl_integer_type_kind():
         return self.coerce_int(val, target_ty)
 
+    if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and (tk == wl_float_type_kind() or tk == wl_double_type_kind()):
+        return wl_build_fp_cast(self.builder, val, target_ty)
+
     // c_import return coercion: pointer → str (null-safe)
     if vk == wl_pointer_type_kind() and self.is_str_type(target_ty):
         return self.coerce_ptr_to_str(val)
@@ -6083,8 +6086,9 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                     continue
                 let field_ty = wl_struct_get_type_at(struct_ty, llvm_fi)
                 let val = self.mir_eval_operand(body, op_id, field_ty)
+                let coerced_val = self.coerce_value_to_type(val, field_ty)
                 let gep = wl_build_struct_gep(self.builder, struct_ty, alloca, llvm_fi)
-                wl_build_store(self.builder, self.coerce_value_to_type(val, field_ty), gep)
+                wl_build_store(self.builder, coerced_val, gep)
             return wl_build_load(self.builder, struct_ty, alloca)
         return wl_get_undef(fallback_ty)
 
