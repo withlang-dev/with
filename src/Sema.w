@@ -3760,9 +3760,15 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
         if expected_variant_ty != 0:
             self.typed_expr_types.insert(node, expected_variant_ty)
             return expected_variant_ty
+        // Fall through to variant_lookup if expected type is not an enum
+        // (e.g., function return type leaking through). Only error if the
+        // expected type IS an enum that doesn't have this variant.
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
-            self.emit_error("enum variant shorthand does not match expected enum type", node)
-            return 0
+            let exp_resolved = self.resolve_alias(self.expected_expr_type)
+            let exp_kind = self.get_type_kind(exp_resolved)
+            if exp_kind == TY_ENUM:
+                self.emit_error("enum variant shorthand does not match expected enum type", node)
+                return 0
         if self.variant_lookup.contains(name):
             let vs_tid = self.variant_type_ids.get(name).unwrap()
             self.typed_expr_types.insert(node, vs_tid)
