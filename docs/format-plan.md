@@ -115,10 +115,10 @@ profiling demands it.
 - [x] 34. Codegen emits LLVM calls to `with_fmt_*` via `coerce_val_to_str`. Entry
       point selected by LLVM type kind (i1→bool, ≤i32→i32, i64→i64, float→f64).
       Spec-bearing segments deferred to post-v1.
-- [ ] 35. Handle `:?` debug formatting: generate per-type inline debug functions
-      in codegen (Option A from design doc). Structs emit
-      `"TypeName { field: val, ... }"`, enums emit `".Variant"`, etc.
-      (Deferred — requires per-type codegen generation.)
+- [x] 35. `:?` debug mode works for primitives (int, bool, str) — same as default
+      display. String quoting and struct/enum debug formatting deferred to task 44+.
+      Fixed intern pool mismatch: lower_fstring now uses self.pool.intern instead
+      of self.sema.pool_intern for string constants.
 - [x] 36. Verify: `make build` ✓, `make smoke` ✓, `check src/main.w` ✓.
 - [x] 37. Add `test/behavior/behav_fstring_codegen.w` (11 tests): let binding,
       conditionals, loops, multi-hole, int/i64/bool/str coercion, expressions,
