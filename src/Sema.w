@@ -4196,6 +4196,21 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
     let rhs_is_num_lit = sema_node_is_numeric_literal(self.ast, rhs_node)
     var lhs = 0
     var rhs = 0
+    if op == OP_DEFAULT:
+        lhs = self.check_expr(lhs_node)
+        if lhs == 0:
+            return 0
+        let unwrapped = self.try_unwrapped_type(lhs)
+        if unwrapped == 0:
+            self.emit_error("?? operator requires an Option or Result with a single success payload", node)
+            return 0
+        rhs = self.check_expr_with_expected(rhs_node, unwrapped)
+        if rhs == 0:
+            return 0
+        if self.types_compatible(unwrapped, rhs) == 0:
+            self.emit_error("?? default value must match the unwrapped payload type", rhs_node)
+            return 0
+        return unwrapped
     // Variant shorthand in comparisons must be typed against the opposite side,
     // not whatever outer expected type is active (for example `bool` from assert()).
     if op == OP_EQ or op == OP_NEQ or op == OP_LT or op == OP_GT or op == OP_LTE or op == OP_GTE:
@@ -4299,10 +4314,6 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
 
     // Wrapping arithmetic
     if op == OP_ADD_WRAP or op == OP_SUB_WRAP or op == OP_MUL_WRAP:
-        return lhs
-
-    // Default (??)
-    if op == OP_DEFAULT:
         return lhs
 
     // Concat (++)
