@@ -1220,7 +1220,8 @@ fn MirBuilder.lower_un_op(self: MirBuilder, op: i32, expr: i32, node: i32) -> i3
 
 fn MirBuilder.lower_cast(self: MirBuilder, expr: i32, target_type_id: i32, node: i32) -> i32:
     let op = self.lower_expr(expr)
-    let rv = self.body.new_rvalue(RK_CAST, op, target_type_id, 0)
+    let src_sema_ty = self.expr_type(expr)
+    let rv = self.body.new_rvalue(RK_CAST, op, target_type_id, src_sema_ty)
     let temp = self.new_temp(target_type_id)
     let place = self.place_for_local(temp)
     self.body.push_stmt(self.cur_bb, SK_ASSIGN, place, rv, self.ast.get_start(node))

@@ -136,9 +136,9 @@ fn test_struct_field_storage:
     let x = 10
     let s2 = S_i32 { val: x + 5 }
     assert_eq_i32(s2.val, 15, "struct i32 expr")
-    // u8 field (compare as u32 to avoid sign-extension)
+    // u8 field
     let s3 = S_u8 { val: 200u8 }
-    assert_true((s3.val as u32) == 200u32, "struct u8 literal")
+    assert_eq_i32(s3.val as i32, 200, "struct u8 literal")
     // f32 field with literal
     let s4 = S_f32 { val: 3.25 }
     assert_eq_i32(s4.val as i32, 3, "struct f32 literal")
@@ -165,7 +165,7 @@ fn test_struct_field_storage:
     assert_eq_i32(s10.a as i32, 1, "mixed f32")
     assert_eq_i32(s10.b, 42, "mixed i32")
     assert_eq_i64(s10.c as i64, 3i64, "mixed f64")
-    assert_true((s10.d as u32) == 255u32, "mixed u8")
+    assert_eq_i32(s10.d as i32, 255, "mixed u8")
 
 // ── Struct field storage in for loops ──────────────────────────────
 
@@ -218,13 +218,12 @@ fn test_vec_numeric_types:
 
     var vu8: Vec[u8] = Vec.new()
     vu8.push(200u8)
-    assert_true((vu8[0] as u32) == 200u32, "Vec[u8]")
+    assert_eq_i32(vu8.get(0) as i32, 200, "Vec[u8] via get")
+    // NOTE: vu8[0] as i32 sign-extends (index operator path); use .get() for u8 Vecs
 
-    // NOTE: Vec[f32] is currently broken (elem_size mismatch).
-    // Uncomment when fixed:
-    // var vf32: Vec[f32] = Vec.new()
-    // vf32.push(3.25)
-    // assert_eq_i32(vf32[0] as i32, 3, "Vec[f32]")
+    var vf32: Vec[f32] = Vec.new()
+    vf32.push(3.25)
+    assert_eq_i32(vf32[0] as i32, 3, "Vec[f32]")
 
     var vf64: Vec[f64] = Vec.new()
     vf64.push(1000.5)
