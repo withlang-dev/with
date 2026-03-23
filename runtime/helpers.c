@@ -394,6 +394,17 @@ with_str i64_to_string(int64_t n) {
     return out;
 }
 
+with_str with_f64_to_string(double n) {
+    char tmp[64];
+    int wrote = snprintf(tmp, sizeof(tmp), "%g", n);
+    if (wrote <= 0) { with_str out = { "", 0 }; return out; }
+    char *buf = (char *)malloc((size_t)wrote + 1);
+    if (!buf) { with_str out = { "", 0 }; return out; }
+    memcpy(buf, tmp, (size_t)wrote + 1);
+    with_str out = { buf, (int64_t)wrote };
+    return out;
+}
+
 // Print a string to stderr with trailing newline.
 void with_eprintln(with_str s) {
     if (s.ptr && s.len > 0) {
