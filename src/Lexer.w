@@ -120,9 +120,15 @@ fn Lexer.next_token(self: Lexer) -> i32:
         return TK_AT
     if ch == 94:  // ^
         self.pos = self.pos + 1
+        if self.pos < slen and src.byte_at((self.pos) as i64) == 61:  // ^=
+            self.pos = self.pos + 1
+            return TK_CARET_EQ
         return TK_CARET
     if ch == 38:  // &
         self.pos = self.pos + 1
+        if self.pos < slen and src.byte_at((self.pos) as i64) == 61:  // &=
+            self.pos = self.pos + 1
+            return TK_AMP_EQ
         return TK_AMPERSAND
 
     // + compound operators
@@ -133,8 +139,11 @@ fn Lexer.next_token(self: Lexer) -> i32:
             if c2 == 43:  // ++
                 self.pos = self.pos + 1
                 return TK_PLUS_PLUS
-            if c2 == 37:  // +%
+            if c2 == 37:  // +% or +%=
                 self.pos = self.pos + 1
+                if self.pos < slen and src.byte_at((self.pos) as i64) == 61:
+                    self.pos = self.pos + 1
+                    return TK_PLUS_WRAP_EQ
                 return TK_PLUS_WRAP
             if c2 == 61:  // +=
                 self.pos = self.pos + 1
@@ -149,8 +158,11 @@ fn Lexer.next_token(self: Lexer) -> i32:
             if c2 == 62:  // ->
                 self.pos = self.pos + 1
                 return TK_ARROW
-            if c2 == 37:  // -%
+            if c2 == 37:  // -% or -%=
                 self.pos = self.pos + 1
+                if self.pos < slen and src.byte_at((self.pos) as i64) == 61:
+                    self.pos = self.pos + 1
+                    return TK_MINUS_WRAP_EQ
                 return TK_MINUS_WRAP
             if c2 == 61:  // -=
                 self.pos = self.pos + 1
@@ -162,8 +174,11 @@ fn Lexer.next_token(self: Lexer) -> i32:
         self.pos = self.pos + 1
         if self.pos < slen:
             let c2 = src.byte_at((self.pos) as i64)
-            if c2 == 37:  // *%
+            if c2 == 37:  // *% or *%=
                 self.pos = self.pos + 1
+                if self.pos < slen and src.byte_at((self.pos) as i64) == 61:
+                    self.pos = self.pos + 1
+                    return TK_STAR_WRAP_EQ
                 return TK_STAR_WRAP
             if c2 == 61:  // *=
                 self.pos = self.pos + 1
@@ -223,6 +238,9 @@ fn Lexer.next_token(self: Lexer) -> i32:
                 return TK_LT_EQ
             if c2 == 60:  // <<
                 self.pos = self.pos + 1
+                if self.pos < slen and src.byte_at((self.pos) as i64) == 61:  // <<=
+                    self.pos = self.pos + 1
+                    return TK_LT_LT_EQ
                 return TK_LT_LT
             if c2 == 124:  // <|
                 self.pos = self.pos + 1
@@ -239,15 +257,23 @@ fn Lexer.next_token(self: Lexer) -> i32:
                 return TK_GT_EQ
             if c2 == 62:  // >>
                 self.pos = self.pos + 1
+                if self.pos < slen and src.byte_at((self.pos) as i64) == 61:  // >>=
+                    self.pos = self.pos + 1
+                    return TK_GT_GT_EQ
                 return TK_GT_GT
         return TK_GT
 
     // | compound
     if ch == 124:  // |
         self.pos = self.pos + 1
-        if self.pos < slen and src.byte_at((self.pos) as i64) == 62:  // |>
-            self.pos = self.pos + 1
-            return TK_PIPE_GT
+        if self.pos < slen:
+            let c2 = src.byte_at((self.pos) as i64)
+            if c2 == 62:  // |>
+                self.pos = self.pos + 1
+                return TK_PIPE_GT
+            if c2 == 61:  // |=
+                self.pos = self.pos + 1
+                return TK_PIPE_EQ
         return TK_PIPE
 
     // / and //
@@ -525,6 +551,37 @@ fn Lexer.lex_ident(self: Lexer) -> i32:
         let raw_tok = self.lex_raw_string_prefixed()
         if raw_tok != -1:
             return raw_tok
+
+    // f"..." -> interpolated string literal (f prefix + normal string lexing)
+    if text == "f" and self.pos < slen and src.byte_at((self.pos) as i64) == 34:
+        self.pos = self.pos + 1  // skip opening "
+        // Lex string body with brace-depth tracking (same as normal strings)
+        var f_brace_depth = 0
+        while self.pos < slen:
+            let fch = src.byte_at((self.pos) as i64)
+            if fch == 123 and f_brace_depth == 0:
+                var fbs = 0
+                while fbs < self.pos and src.byte_at((self.pos - 1 - fbs) as i64) == 92:
+                    fbs = fbs + 1
+                if fbs % 2 == 0:
+                    f_brace_depth = f_brace_depth + 1
+                    self.pos = self.pos + 1
+                    continue
+            if fch == 123 and f_brace_depth > 0:
+                f_brace_depth = f_brace_depth + 1
+                self.pos = self.pos + 1
+                continue
+            if fch == 125 and f_brace_depth > 0:
+                f_brace_depth = f_brace_depth - 1
+                self.pos = self.pos + 1
+                continue
+            if fch == 34 and f_brace_depth == 0:
+                self.pos = self.pos + 1
+                return TK_STRING_LIT
+            if fch == 92:
+                self.pos = self.pos + 1
+            self.pos = self.pos + 1
+        return TK_STRING_LIT
 
     // b'...' -> byte literal (tokenized as char literal).
     if text == "b" and self.pos < slen and src.byte_at((self.pos) as i64) == 39:

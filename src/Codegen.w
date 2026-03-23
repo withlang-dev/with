@@ -4705,6 +4705,7 @@ fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
         let inner_val = self.try_eval_const_int(self.pool.get_data1(node))
         if inner_val == CONST_EVAL_FAIL(): return CONST_EVAL_FAIL()
         if op == UOP_NEGATE: return -inner_val
+        if op == UOP_BIT_NOT: return 0 - inner_val - 1
         if op == UOP_NOT:
             if inner_val == 0: return 1
             return 0
@@ -5667,6 +5668,13 @@ fn Codegen.mir_operand_is_unsigned(self: Codegen, body: MirBody, operand_id: i32
                         return self.mir_input.mir_get_type_d1(resolved) == 0
     false
 
+fn Codegen.mir_sema_type_is_unsigned(self: Codegen, sema_ty: i32) -> bool:
+    if sema_ty <= 0: return false
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    if self.mir_input.mir_get_type_kind(resolved) == TY_INT:
+        return self.mir_input.mir_get_type_d1(resolved) == 0
+    false
+
 fn Codegen.coerce_float_operand_to(self: Codegen, val: i64, target_ty: i64) -> i64:
     let val_ty = wl_type_of(val)
     if val_ty == target_ty or target_ty == 0:
@@ -5865,6 +5873,8 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             if ak == wl_float_type_kind() or ak == wl_double_type_kind():
                 return wl_build_fneg(self.builder, arg)
             return wl_build_neg(self.builder, arg)
+        if d0 == UOP_BIT_NOT:
+            return wl_build_not(self.builder, arg)
         if d0 == UOP_NOT:
             let ak = wl_get_type_kind(wl_type_of(arg))
             if ak == wl_integer_type_kind() and wl_get_int_type_width(wl_type_of(arg)) == 1:
@@ -6047,9 +6057,10 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             // Int → Ptr
             if vk == wl_integer_type_kind() and ck == wl_pointer_type_kind():
                 return wl_build_int_to_ptr(self.builder, val, cast_ty)
-            // Int → Int: use zext for unsigned source
+            // Int → Int: use zext for unsigned source OR unsigned target
             if vk == wl_integer_type_kind() and ck == wl_integer_type_kind():
-                return self.coerce_int_ext(val, cast_ty, src_unsigned)
+                let dst_unsigned = if d1 > 0: self.mir_sema_type_is_unsigned(d1) else: false
+                return self.coerce_int_ext(val, cast_ty, src_unsigned or dst_unsigned)
             return self.coerce_value_to_type(val, cast_ty)
         return val
 
@@ -6090,10 +6101,16 @@ fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> void:
     if not dfv.is_some() or not dft.is_some():
         return
 
-    let value = wl_build_load(self.builder, ty, ptr)
+    // Drop methods take self by value in the spec, but the compiler lowers
+    // struct self params as pointers. Pass pointer for struct types.
+    let drop_fn_ty = dft.unwrap() as i64
     let args: Vec[i64] = Vec.new()
-    args.push(value)
-    let _ = wl_build_call(self.builder, dft.unwrap() as i64, dfv.unwrap() as i64, vec_data_i64(&args), 1)
+    if wl_get_type_kind(ty) == wl_struct_type_kind():
+        args.push(ptr)
+    else:
+        let value = wl_build_load(self.builder, ty, ptr)
+        args.push(value)
+    let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
 
 fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
     if stmt_id < 0 or stmt_id >= body.stmt_kinds.len() as i32:
@@ -7041,6 +7058,27 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         if wl_get_type_kind(al_ty) == wl_array_type_kind():
             al_len = wl_get_array_length(al_ty) as i32
         result = wl_const_int(wl_i32_type(self.context), al_len as i64, 0)
+
+    else if intrinsic == MIR_INTRINSIC_ROTATE_LEFT or intrinsic == MIR_INTRINSIC_ROTATE_RIGHT:
+        let rot_val = self.mir_intrinsic_arg(body, args_id, 0)
+        let rot_amt = self.mir_intrinsic_arg(body, args_id, 1)
+        let rot_ty = wl_type_of(rot_val)
+        let rot_width = wl_get_int_type_width(rot_ty)
+        let rot_w_const = wl_const_int(rot_ty, rot_width as i64, 0)
+        // Coerce shift amount to same type as value
+        let rot_n = self.coerce_value_to_type(rot_amt, rot_ty)
+        if intrinsic == MIR_INTRINSIC_ROTATE_LEFT:
+            // (x << n) | (x >> (W - n))
+            let shl = wl_build_shl(self.builder, rot_val, rot_n)
+            let sub = wl_build_sub(self.builder, rot_w_const, rot_n)
+            let shr = wl_build_lshr(self.builder, rot_val, sub)
+            result = wl_build_or(self.builder, shl, shr)
+        else:
+            // (x >> n) | (x << (W - n))
+            let shr = wl_build_lshr(self.builder, rot_val, rot_n)
+            let sub = wl_build_sub(self.builder, rot_w_const, rot_n)
+            let shl = wl_build_shl(self.builder, rot_val, sub)
+            result = wl_build_or(self.builder, shr, shl)
 
     else if intrinsic == MIR_INTRINSIC_OPT_FILTER:
         result = self.mir_emit_opt_filter(body, args_id)

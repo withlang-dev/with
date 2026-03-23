@@ -117,6 +117,14 @@ const TK_MINUS_EQ: i32 = 89
 const TK_STAR_EQ: i32 = 90
 const TK_SLASH_EQ: i32 = 91
 const TK_PERCENT_EQ: i32 = 92
+const TK_AMP_EQ: i32 = 117
+const TK_PIPE_EQ: i32 = 118
+const TK_CARET_EQ: i32 = 119
+const TK_LT_LT_EQ: i32 = 120
+const TK_GT_GT_EQ: i32 = 121
+const TK_PLUS_WRAP_EQ: i32 = 122
+const TK_MINUS_WRAP_EQ: i32 = 123
+const TK_STAR_WRAP_EQ: i32 = 124
 
 // -- Delimiters --
 const TK_L_PAREN: i32 = 93

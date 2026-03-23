@@ -516,6 +516,9 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
     if tk == TY_ARRAY:
         if method_name == "len": return self.sema.ty_i32
         return self.sema.ty_void
+    if tk == TY_INT:
+        if method_name == "rotate_left" or method_name == "rotate_right":
+            return recv_type
     self.sema.ty_void
 
 fn MirBuilder.struct_field_type(self: MirBuilder, struct_tid: i32, field_sym: i32) -> i32:
@@ -854,6 +857,7 @@ fn MirBuilder.try_eval_const(self: MirBuilder, node: i32) -> i64:
         let inner = self.try_eval_const(self.ast.get_data1(node))
         if inner == -9223372036854775807: return -9223372036854775807
         if op == UOP_NEGATE: return -inner
+        if op == UOP_BIT_NOT: return 0 - inner - 1
         if op == UOP_NOT:
             if inner == 0: return 1
             return 0
@@ -1280,6 +1284,14 @@ fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
         self.expected_type = dest_ty
     let rhs = self.lower_expr(rhs_expr)
     self.expected_type = saved_expected
+    // Drop the old value before reassignment if the type implements Drop.
+    if dest_ty != 0 and self.sema.is_copy(dest_ty) == 0:
+        let resolved_ty = self.sema.resolve_alias(dest_ty)
+        let tk = self.sema.get_type_kind(resolved_ty)
+        if tk == TY_STRUCT:
+            let type_name = self.sema.get_type_d0(resolved_ty)
+            if self.sema.has_drop_method(type_name) != 0:
+                self.body.push_stmt(self.cur_bb, SK_DROP, place, 0, self.ast.get_start(place_expr))
     self.assign_operand_to_place(place, rhs, self.ast.get_start(place_expr))
 
 fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
@@ -2541,6 +2553,9 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
     if tk == TY_ARRAY:
         if method_name == "len": return MIR_INTRINSIC_ARR_LEN
         return MIR_INTRINSIC_NONE
+    if tk == TY_INT:
+        if method_name == "rotate_left": return MIR_INTRINSIC_ROTATE_LEFT
+        if method_name == "rotate_right": return MIR_INTRINSIC_ROTATE_RIGHT
     let type_name_sym = self.sema.get_type_name(resolved)
     if type_name_sym == 0:
         return MIR_INTRINSIC_NONE
@@ -3191,6 +3206,18 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
     if kind == NK_TUPLE_DESTRUCTURE:
         self.lower_tuple_destructure(node)
+        return self.unit_operand()
+
+    if kind == NK_DEFER:
+        let defer_body = self.ast.get_data0(node)
+        if defer_body != 0:
+            self.defer_nodes.push(defer_body)
+        return self.unit_operand()
+
+    if kind == NK_ERRDEFER:
+        let errdefer_body = self.ast.get_data0(node)
+        if errdefer_body != 0:
+            self.errdefer_nodes.push(errdefer_body)
         return self.unit_operand()
 
     if kind == NK_ASSIGN:

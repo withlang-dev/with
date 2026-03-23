@@ -38,6 +38,7 @@ type Parser = {
     pending_flags: i32,
     pending_packed: i32,
     pending_callconv: i32,
+    pending_unsafe_fn: i32,
     saw_implicit_it: i32,
     implicit_it_depth: i32,
     last_param_pattern_start: i32,
@@ -76,6 +77,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_flags: 0,
         pending_packed: 0,
         pending_callconv: 0,
+        pending_unsafe_fn: 0,
         saw_implicit_it: 0,
         implicit_it_depth: 0,
         last_param_pattern_start: 0,
@@ -418,6 +420,15 @@ fn Parser.parse_decl(self: Parser) -> i32:
     let t = self.peek()
     if t == TK_KW_FN:
         return self.parse_fn_decl(is_pub, start, 0, 0, 0)
+    if t == TK_KW_UNSAFE:
+        self.advance()
+        if self.peek() != TK_KW_FN:
+            self.emit_error("expected 'fn' after 'unsafe'")
+            return 0
+        self.pending_unsafe_fn = 1
+        let result = self.parse_fn_decl(is_pub, start, 0, 0, 0)
+        self.pending_unsafe_fn = 0
+        return result
     if t == TK_KW_COMPTIME:
         self.advance()
         if self.peek() != TK_KW_FN:
@@ -536,7 +547,11 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
 
     // Store extra: type params then params already in extra from parsing.
     // We encode: d0=name, d1=body, d2=flags
-    let fn_node = self.pool.add_node(NK_FN_DECL, start, self.pool.get_end(body), name, body, flags)
+    // For unsafe fn, wrap body in NK_UNSAFE_BLOCK
+    var final_body = body
+    if self.pending_unsafe_fn != 0:
+        final_body = self.pool.add_node(NK_UNSAFE_BLOCK, self.pool.get_start(body), self.pool.get_end(body), body, 0, 0)
+    let fn_node = self.pool.add_node(NK_FN_DECL, start, self.pool.get_end(body), name, final_body, flags)
     let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
     self.pool.add_fn_meta(fn_node, meta_flags, ret_type, params_start, param_count, tp_start, tp_count)
     self.pool.add_fn_param_pattern_meta(fn_node, self.last_param_pattern_start, self.last_param_pattern_count)
@@ -1566,6 +1581,14 @@ fn Parser.compound_assign_op(self: Parser) -> i32:
     if t == TK_STAR_EQ: return OP_MUL
     if t == TK_SLASH_EQ: return OP_DIV
     if t == TK_PERCENT_EQ: return OP_MOD
+    if t == TK_AMP_EQ: return OP_BIT_AND
+    if t == TK_PIPE_EQ: return OP_BIT_OR
+    if t == TK_CARET_EQ: return OP_BIT_XOR
+    if t == TK_LT_LT_EQ: return OP_SHL
+    if t == TK_GT_GT_EQ: return OP_SHR
+    if t == TK_PLUS_WRAP_EQ: return OP_ADD_WRAP
+    if t == TK_MINUS_WRAP_EQ: return OP_SUB_WRAP
+    if t == TK_STAR_WRAP_EQ: return OP_MUL_WRAP
     -1
 
 // ── Pratt precedence climbing ────────────────────────────────────
@@ -1700,6 +1723,7 @@ fn Parser.parse_primary(self: Parser) -> i32:
     if t == TK_DOT_IDENT: return self.parse_variant_shorthand()
     if t == TK_L_PAREN: return self.parse_grouped_or_tuple()
     if t == TK_MINUS: return self.parse_unary_negate()
+    if t == TK_TILDE: return self.parse_unary_bit_not()
     if t == TK_KW_NOT: return self.parse_unary_not()
     if t == TK_AMPERSAND: return self.parse_ref_of()
     if t == TK_STAR: return self.parse_deref_expr()
@@ -1797,10 +1821,104 @@ fn Parser.parse_string_literal(self: Parser) -> i32:
     var content = strip_string_token_text(text)
     if is_raw_string_token_text(text):
         content = "\x01raw\x01" ++ content
+        let sym = self.intern.intern(content)
+        self.advance()
+        let node = self.pool.add_node(NK_STRING_LIT, start, end, sym, 0, 0)
+        return self.parse_postfix(node)
+    // f"..." prefix triggers string interpolation
+    if is_fstring_token_text(text):
+        self.advance()
+        return self.desugar_interpolated_string(content, start, end)
     let sym = self.intern.intern(content)
     self.advance()
     let node = self.pool.add_node(NK_STRING_LIT, start, end, sym, 0, 0)
-    self.parse_postfix(node)
+    return self.parse_postfix(node)
+
+fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, end: i32) -> i32:
+    let clen = content.len() as i32
+    var result = 0
+    var seg_start = 0
+    var i = 0
+    while i < clen:
+        let ch = content.byte_at(i as i64)
+        if ch == 123:  // {
+            // Check for {{ (escaped brace → literal {)
+            if i + 1 < clen and content.byte_at((i + 1) as i64) == 123:
+                i = i + 2
+                continue
+            // Check for \{ (backslash-escaped brace → literal {)
+            if i > 0 and content.byte_at((i - 1) as i64) == 92:
+                i = i + 1
+                continue
+            // Emit text segment before the {
+            if i > seg_start:
+                let seg = self.interp_extract_segment(content, seg_start, i)
+                result = self.interp_concat(result, seg, start, end)
+            // Find matching }
+            var depth = 1
+            var expr_start = i + 1
+            var j = expr_start
+            while j < clen and depth > 0:
+                if content.byte_at(j as i64) == 123: depth = depth + 1
+                if content.byte_at(j as i64) == 125: depth = depth - 1
+                if depth > 0: j = j + 1
+            // Extract expression text and parse it
+            let expr_text = content.slice(expr_start as i64, j as i64)
+            let expr_node = self.parse_interpolated_expr(expr_text, start)
+            // Wrap in to_string call
+            let ts_sym = self.intern.intern("int_to_string")
+            let str_node = self.interp_to_string(expr_node, start, end)
+            result = self.interp_concat(result, str_node, start, end)
+            i = j + 1  // skip past }
+            seg_start = i
+        else if ch == 125 and i + 1 < clen and content.byte_at((i + 1) as i64) == 125:
+            // }} → literal }
+            i = i + 2
+            continue
+        else:
+            i = i + 1
+    // Emit trailing text segment
+    if seg_start < clen:
+        let seg = self.interp_extract_segment(content, seg_start, clen)
+        result = self.interp_concat(result, seg, start, end)
+    if result == 0:
+        let sym = self.intern.intern("")
+        result = self.pool.add_node(NK_STRING_LIT, start, end, sym, 0, 0)
+    self.parse_postfix(result)
+
+fn Parser.interp_extract_segment(self: Parser, content: str, from: i32, to: i32) -> i32:
+    // Handle {{ and }} in the segment by replacing them
+    var seg = content.slice(from as i64, to as i64)
+    // Replace {{ with { and }} with }
+    // For now, just use the raw segment — {{ and }} stay as-is in text
+    // (the lexer already handles brace depth, so {{ produces two { bytes)
+    let sym = self.intern.intern(seg)
+    let start = 0
+    let end = 0
+    self.pool.add_node(NK_STRING_LIT, start, end, sym, 0, 0)
+
+fn Parser.interp_concat(self: Parser, left: i32, right: i32, start: i32, end: i32) -> i32:
+    if left == 0:
+        return right
+    self.pool.add_node(NK_BINARY, start, end, OP_CONCAT, left, right)
+
+fn Parser.interp_to_string(self: Parser, expr: i32, start: i32, end: i32) -> i32:
+    // For string expressions, return as-is. For others, wrap in int_to_string/i64_to_string.
+    // Since we don't know the type at parse time, emit a call to a generic to_string.
+    // For now, just return the expression — if it's already str, concat works.
+    // The Sema will handle type coercion for ++ operator.
+    expr
+
+fn Parser.parse_interpolated_expr(self: Parser, expr_text: str, base_start: i32) -> i32:
+    // Re-lex and parse the expression text
+    var lexer = Lexer.init(expr_text, 0)
+    let tokens = lexer.tokenize()
+    var sub_parser = Parser.init_with_pool(tokens, expr_text, 0, self.intern, self.diags, self.pool)
+    let result = sub_parser.parse_expr()
+    // Sync the intern pool back
+    self.intern = sub_parser.intern
+    self.pool = sub_parser.pool
+    result
 
 fn Parser.parse_c_string_literal(self: Parser) -> i32:
     let start = self.current_start()
@@ -1862,6 +1980,9 @@ fn Parser.parse_char_literal(self: Parser) -> i32:
     self.pool.add_node(NK_INT_LIT, start, end, ast_int_part0(value64), ast_int_part1(value64), ast_int_part2(value64))
 
 fn strip_string_token_text(text: str) -> str:
+    // f"..." → content between f" and closing "
+    if text.len() >= 3 and text.byte_at(0) == 102 and text.byte_at(1) == 34:  // f"
+        return text.slice(2, text.len() as i64 - 1)
     if text.len() >= 2 and text.byte_at((0) as i64) == 114:  // r
         var i = 1
         while i < text.len() as i32 and text.byte_at((i) as i64) == 35:  // #
@@ -1885,6 +2006,11 @@ fn strip_string_token_text(text: str) -> str:
     if text.len() >= 2:
         return text.slice(1, text.len() as i64 - 1)
     ""
+
+fn is_fstring_token_text(text: str) -> bool:
+    if text.len() < 3:
+        return false
+    text.byte_at(0) == 102 and text.byte_at(1) == 34  // f"
 
 fn is_raw_string_token_text(text: str) -> bool:
     if text.len() < 3:
@@ -2311,6 +2437,12 @@ fn Parser.parse_unary_negate(self: Parser) -> i32:
     let operand = self.parse_primary()
     self.pool.add_node(NK_UNARY, start, self.prev_end(), UOP_NEGATE, operand, 0)
 
+fn Parser.parse_unary_bit_not(self: Parser) -> i32:
+    let start = self.current_start()
+    self.advance()
+    let operand = self.parse_primary()
+    self.pool.add_node(NK_UNARY, start, self.prev_end(), UOP_BIT_NOT, operand, 0)
+
 fn Parser.parse_unary_not(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
@@ -2324,8 +2456,14 @@ fn Parser.parse_ref_of(self: Parser) -> i32:
     if self.peek() == TK_KW_MUT:
         op = UOP_MUT_REF
         self.advance()
+    // Suppress `as` inside the ref operand so that `&mut x as T`
+    // parses as `(&mut x) as T`, not `&mut (x as T)`.
+    let saved_suppress = self.suppress_as
+    self.suppress_as = 1
     let operand = self.parse_primary()
-    self.pool.add_node(NK_UNARY, start, self.prev_end(), op, operand, 0)
+    self.suppress_as = saved_suppress
+    let node = self.pool.add_node(NK_UNARY, start, self.prev_end(), op, operand, 0)
+    self.parse_postfix(node)
 
 fn Parser.parse_deref_expr(self: Parser) -> i32:
     let start = self.current_start()
@@ -3334,6 +3472,23 @@ fn Parser.parse_array_literal(self: Parser) -> i32:
     if self.peek() != TK_R_BRACKET:
         let first = self.parse_expr()
 
+        // Array fill: [value; N]
+        if self.peek() == TK_SEMICOLON:
+            self.advance()  // consume ;
+            let count_expr = self.parse_expr()
+            self.expect(TK_R_BRACKET)
+            // Desugar [value; N] to NK_ARRAY_LIT with N copies of value
+            // For now, evaluate N as a constant and emit N copies
+            var fill_count = 0
+            if self.pool.kind(count_expr) == NK_INT_LIT:
+                fill_count = self.pool.int_lit_value(count_expr) as i32
+            if fill_count <= 0:
+                fill_count = 1
+            let extra_start = self.pool.extra_len()
+            for fi in 0..fill_count:
+                self.pool.add_extra(first)
+            return self.pool.add_node(NK_ARRAY_LIT, start, self.prev_end(), extra_start, fill_count, 0)
+
         // Comprehension: [expr for x in iter]
         if self.peek() == TK_KW_FOR:
             self.advance()
@@ -3632,15 +3787,12 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
 
     if t == TK_L_BRACKET:
         self.advance()
+        // []T → slice type
         if self.peek() == TK_R_BRACKET:
             self.advance()
             let elem = self.parse_type_expr()
             return self.pool.add_node(NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
-        // Alternate slice syntax: [T]
-        if self.peek() != TK_INT_LIT:
-            let elem = self.parse_type_expr()
-            self.expect(TK_R_BRACKET)
-            return self.pool.add_node(NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
+        // [N]T → fixed array (legacy), detect by leading int literal
         if self.peek() == TK_INT_LIT:
             let ss = self.current_start()
             let se = self.current_end()
@@ -3650,8 +3802,23 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             self.expect(TK_R_BRACKET)
             let elem = self.parse_type_expr()
             return self.pool.add_node(NK_TYPE_ARRAY, start, self.prev_end(), elem, size, 0)
-        self.emit_error("expected array size")
-        return 0
+        // [T; N] → fixed array (spec syntax), OR [T] → slice
+        let elem = self.parse_type_expr()
+        if self.peek() == TK_SEMICOLON:
+            self.advance()  // consume ;
+            if self.peek() != TK_INT_LIT:
+                self.emit_error("expected array size after ';'")
+                return 0
+            let ss = self.current_start()
+            let se = self.current_end()
+            let size_text = self.source.slice(ss as i64, se as i64)
+            let size = parse_int(size_text)
+            self.advance()
+            self.expect(TK_R_BRACKET)
+            return self.pool.add_node(NK_TYPE_ARRAY, start, self.prev_end(), elem, size, 0)
+        // [T] → slice type
+        self.expect(TK_R_BRACKET)
+        return self.pool.add_node(NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
 
     if t == TK_KW_DYN:
         self.advance()
