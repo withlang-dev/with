@@ -73,8 +73,9 @@ profiling demands it.
 - [x] 17. Implement field/type compatibility: precision → floats/strings only,
       `#` → integer hex/bin/oct only, sign → numbers only. Width/fill/align
       allowed for all types.
-- [ ] 18. Enforce bare-display rules: `{struct_expr}` without `:?` is a
-      compile-time error with hint. (Deferred — struct formatting not yet impl.)
+- [x] 18. Enforce bare-display rules: `{struct_expr}` without `:?` is a
+      compile-time error with hint "use :? for debug". Test:
+      `err_fstring_struct_bare.w`. 317/317 pass.
 - [x] 19. Verify: `make build` ✓, `check src/main.w` ✓, 314/314 tests pass.
 - [x] 20. Add 6 sema error tests in `test/compile_errors/err_fstring_spec_*.w`:
       int mode on float, float mode on int, str mode on int, precision on int,

@@ -4125,6 +4125,12 @@ fn Sema.check_fstring(self: Sema, node: i32) -> i32:
             // Validate format spec against expression type
             if spec_node != 0:
                 self.validate_fstring_spec(spec_node, expr_ty, expr_node)
+            else:
+                // Bare {expr} without spec: reject structs (no default display)
+                let resolved = if expr_ty != 0: self.resolve_alias(expr_ty) else: 0
+                let tk = if resolved != 0: self.get_type_kind(resolved) else: 0
+                if tk == TY_STRUCT:
+                    self.emit_error("struct type has no default display; use :? for debug", expr_node)
             pos = pos + 3  // kind + expr + spec
         else:
             pos = pos + 1
