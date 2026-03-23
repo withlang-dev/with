@@ -2353,7 +2353,7 @@ fn Parser.parse_call(self: Parser, callee: i32) -> i32:
         if self.pool.kind(arg) == NK_IDENT:
             let sym = self.pool.get_data0(arg)
             if self.intern.resolve(sym) == "_":
-                let pname = "__partial_arg_" ++ int_to_string(self.pos) ++ "_" ++ int_to_string(partial_param_syms.len() as i32)
+                let pname = f"__partial_arg_{self.pos}_{partial_param_syms.len() as i32}"
                 let psym = self.intern.intern(pname)
                 partial_param_syms.push(psym)
                 let pnode = self.pool.add_node(NK_IDENT, self.pool.get_start(arg), self.pool.get_end(arg), psym, 0, 0)
@@ -2387,7 +2387,7 @@ fn Parser.parse_dot(self: Parser, lhs: i32) -> i32:
     self.pool.add_node(NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
 
 fn Parser.build_composed_closure(self: Parser, lhs_fn: i32, rhs_fn: i32, is_forward: i32) -> i32:
-    let param_name = "__pipe_arg_" ++ int_to_string(self.pos)
+    let param_name = f"__pipe_arg_{self.pos}"
     let param_sym = self.intern.intern(param_name)
     let param_expr = self.pool.add_node(
         NK_IDENT,
@@ -4161,7 +4161,7 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             let t = self.peek()
             if t == TK_L_PAREN or t == TK_L_BRACE or t == TK_L_BRACKET or t == TK_DOT_IDENT:
                 param_pattern = self.parse_pattern()
-                let synth = "__param_pat_" ++ int_to_string(self.pos) ++ "_" ++ int_to_string((params.len() / (FN_PARAM_STRIDE as i64)) as i32)
+                let synth = f"__param_pat_{self.pos}_{(params.len() / (FN_PARAM_STRIDE as i64)) as i32}"
                 name = self.intern.intern(synth)
             else:
                 name = self.expect_ident()
