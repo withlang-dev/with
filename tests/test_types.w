@@ -219,7 +219,7 @@ fn test_vec_numeric_types:
     var vu8: Vec[u8] = Vec.new()
     vu8.push(200u8)
     assert_eq_i32(vu8.get(0) as i32, 200, "Vec[u8] via get")
-    // NOTE: vu8[0] as i32 sign-extends (index operator path); use .get() for u8 Vecs
+    assert_eq_i32(vu8[0] as i32, 200, "Vec[u8] via index")
 
     var vf32: Vec[f32] = Vec.new()
     vf32.push(3.25)
