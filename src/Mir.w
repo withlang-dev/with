@@ -117,6 +117,7 @@ const MIR_INTRINSIC_DYN_DOWNCAST: i32 = 44
 const MIR_INTRINSIC_OPT_FILTER: i32 = 45
 const MIR_INTRINSIC_ROTATE_LEFT: i32 = 46
 const MIR_INTRINSIC_ROTATE_RIGHT: i32 = 47
+const MIR_INTRINSIC_VEC_WITH_CAPACITY: i32 = 48
 
 // ── Projection kinds ─────────────────────────────────────────────
 

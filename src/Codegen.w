@@ -6485,6 +6485,35 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let _ = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&args), 2)
         result = wl_build_load(self.builder, vec_ty, alloca)
 
+    else if intrinsic == MIR_INTRINSIC_VEC_WITH_CAPACITY:
+        let wc_cap = self.mir_intrinsic_arg(body, args_id, 0)
+        let wc_cap64 = self.coerce_int_ext(wc_cap, i64_ty, false)
+        var wc_elem_ty = i64_ty
+        let wc_dst_ty = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        if wc_dst_ty > 0:
+            let wc_res = self.mir_input.mir_resolve_alias(wc_dst_ty)
+            if self.mir_input.mir_get_type_kind(wc_res) == TY_GENERIC_INST:
+                let wc_ac = self.mir_input.mir_get_type_d2(wc_res)
+                if wc_ac > 0:
+                    let wc_te = self.mir_input.mir_get_type_d1(wc_res)
+                    let wc_et = self.mir_input.mir_get_type_extra(wc_te)
+                    if wc_et > 0:
+                        let wc_ll = self.mir_sema_type_to_llvm(wc_et)
+                        if wc_ll != 0:
+                            wc_elem_ty = wc_ll
+        let wc_esz = self.abi_size_of(wc_elem_ty)
+        let wc_vty = self.get_or_create_vec_type(wc_elem_ty)
+        let wc_al = wl_build_alloca(self.builder, wc_vty)
+        wl_build_store(self.builder, self.build_default_value(wc_vty), wc_al)
+        let wc_fn = self.ensure_vec_runtime_fn("with_vec_new_with_capacity_out", void_ty, 3)
+        let wc_ft = self.get_vec_fn_type("with_vec_new_with_capacity_out", void_ty, 3)
+        let wc_args: Vec[i64] = Vec.new()
+        wc_args.push(wc_al)
+        wc_args.push(wl_const_int(i64_ty, wc_esz, 0))
+        wc_args.push(wc_cap64)
+        let _ = wl_build_call(self.builder, wc_ft, wc_fn, vec_data_i64(&wc_args), 3)
+        result = wl_build_load(self.builder, wc_vty, wc_al)
+
     else if intrinsic == MIR_INTRINSIC_VEC_PUSH:
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let elem = self.mir_intrinsic_arg(body, args_id, 1)
