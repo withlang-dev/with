@@ -1,6 +1,6 @@
 # Plan: Port BearSSL to With Standard Library
 
-**Status:** Active — Phases 0-5 complete, ready for Phase 6 (big integer).
+**Status:** Active — Phases 0-7 complete, ready for Phase 8 (EC P-256).
 
 ## Context
 
@@ -71,8 +71,8 @@ lib/std/
 | 3 | AES-128 | 300 | **Done** — passes NIST ECB vector |
 | 4 | AES-GCM | 200 | **Done** — passes NIST SP 800-38D |
 | 5 | ChaCha20-Poly1305 | 250 | **Done** — passes RFC 8439 test vectors |
-| 6 | Big integer | 500 | |
-| 7 | RSA verify | 300 | |
+| 6 | Big integer | 500 | **Done** — i31 format, modpow passes 17^65537 mod 3233 |
+| 7 | RSA verify | 300 | **Done** — PKCS#1 v1.5 SHA-256, passes RSA-1024 test vector |
 | 8 | EC P-256 | 400 | |
 | 9 | ECDSA + ECDH | 200 | |
 | 10 | X.509 | 400 | |
