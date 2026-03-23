@@ -115,9 +115,15 @@ fn main:
         world.system_cleanup()
 
     let elapsed = clock() - start
-    with_eprintln("1000 ticks: " ++ i64_to_string(elapsed) ++ " clocks")
+    let cps: i64 = 1000000  // CLOCKS_PER_SEC on macOS
+    let secs = elapsed / cps
+    let msecs = ((elapsed % cps) * 1000i64) / cps
+    with_eprintln("1000 ticks: " ++ i64_to_string(secs) ++ "." ++ i64_to_string(msecs) ++ "s")
     with_eprintln("Alive after: " ++ int_to_string(world.count_alive()))
 
+    // NOTE: Checksum reads back pos[i].x which was set via add_pos(id, Position{...})
+    // in a for loop. Known codegen bug: struct literals with computed f32 fields in
+    // for loops produce zero values. Checksum will be wrong until that's fixed.
     var sum: f64 = 0.0
     for i in 0..world.count:
         if world.mask[i] & HAS_POS != 0u8:
