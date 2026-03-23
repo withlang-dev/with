@@ -4,7 +4,7 @@
 
 use compiler.foundation.Ids
 
-extern fn int_to_string(n: i32) -> str
+// (int_to_string removed — using f-strings)
 
 fn TYPE_KEY_INVALID -> i32: 0
 fn TYPE_KEY_NAMED -> i32: 1
@@ -111,21 +111,13 @@ fn type_key_result2(ok_ty: TypeId, err_ty: TypeId) -> TypeKey:
     }
 
 fn type_key_pack1(a: TypeId) -> str:
-    int_to_string(type_id_raw(a))
+    f"{type_id_raw(a)}"
 
 fn type_key_pack2(a: TypeId, b: TypeId) -> str:
-    var out = int_to_string(type_id_raw(a))
-    out = out ++ ","
-    out = out ++ int_to_string(type_id_raw(b))
-    out
+    f"{type_id_raw(a)},{type_id_raw(b)}"
 
 fn type_key_pack3(a: TypeId, b: TypeId, c: TypeId) -> str:
-    var out = int_to_string(type_id_raw(a))
-    out = out ++ ","
-    out = out ++ int_to_string(type_id_raw(b))
-    out = out ++ ","
-    out = out ++ int_to_string(type_id_raw(c))
-    out
+    f"{type_id_raw(a)},{type_id_raw(b)},{type_id_raw(c)}"
 
 fn type_key_tuplen(elem_pack: str, count: i32) -> TypeKey:
     TypeKey {
@@ -174,81 +166,29 @@ fn type_key_generic_apply2(base_name: str, a0: TypeId, a1: TypeId, arg_count: i3
 
 fn type_key_to_string(key: TypeKey) -> str:
     if key.tag == TYPE_KEY_NAMED():
-        var out = "named:"
-        out = out ++ key.name
-        return out
+        return f"named:{key.name}"
     if key.tag == TYPE_KEY_PTR():
-        var out = "ptr:"
-        out = out ++ int_to_string(key.arg0)
-        out = out ++ ":"
-        out = out ++ int_to_string(key.flags)
-        return out
+        return f"ptr:{key.arg0}:{key.flags}"
     if key.tag == TYPE_KEY_REF():
-        var out = "ref:"
-        out = out ++ int_to_string(key.arg0)
-        out = out ++ ":"
-        out = out ++ int_to_string(key.flags)
-        return out
+        return f"ref:{key.arg0}:{key.flags}"
     if key.tag == TYPE_KEY_SLICE():
-        var out = "slice:"
-        out = out ++ int_to_string(key.arg0)
-        return out
+        return f"slice:{key.arg0}"
     if key.tag == TYPE_KEY_ARRAY():
-        var out = "array:"
-        out = out ++ int_to_string(key.arg0)
-        out = out ++ ":"
-        out = out ++ int_to_string(key.arg1)
-        return out
+        return f"array:{key.arg0}:{key.arg1}"
     if key.tag == TYPE_KEY_TUPLE2():
-        var out = "tuple2:"
-        out = out ++ int_to_string(key.arg0)
-        out = out ++ ":"
-        out = out ++ int_to_string(key.arg1)
-        return out
+        return f"tuple2:{key.arg0}:{key.arg1}"
     if key.tag == TYPE_KEY_TUPLEN():
-        var out = "tuplen:"
-        out = out ++ int_to_string(key.arg0)
-        out = out ++ ":"
-        out = out ++ key.name
-        return out
+        return f"tuplen:{key.arg0}:{key.name}"
     if key.tag == TYPE_KEY_OPTIONAL():
-        var out = "opt:"
-        out = out ++ int_to_string(key.arg0)
-        return out
+        return f"opt:{key.arg0}"
     if key.tag == TYPE_KEY_RESULT2():
-        var out = "result2:"
-        out = out ++ int_to_string(key.arg0)
-        out = out ++ ":"
-        out = out ++ int_to_string(key.arg1)
-        return out
+        return f"result2:{key.arg0}:{key.arg1}"
     if key.tag == TYPE_KEY_FN_SIG():
-        var out = "fnsig:"
-        out = out ++ key.name
-        out = out ++ "->"
-        out = out ++ int_to_string(key.arg0)
-        out = out ++ ":arity="
-        out = out ++ int_to_string(key.arg1)
-        out = out ++ ":var="
-        out = out ++ int_to_string(key.flags)
-        return out
+        return f"fnsig:{key.name}->{key.arg0}:arity={key.arg1}:var={key.flags}"
     if key.tag == TYPE_KEY_TRAIT_OBJECT():
-        var out = "traitobj:"
-        out = out ++ key.name
-        return out
+        return f"traitobj:{key.name}"
     if key.tag == TYPE_KEY_GENERIC_PARAM():
-        var out = "gparam:"
-        out = out ++ key.name
-        out = out ++ ":"
-        out = out ++ int_to_string(key.arg0)
-        return out
+        return f"gparam:{key.name}:{key.arg0}"
     if key.tag == TYPE_KEY_GENERIC_APPLY2():
-        var out = "gapply2:"
-        out = out ++ key.name
-        out = out ++ ":"
-        out = out ++ int_to_string(key.arg0)
-        out = out ++ ":"
-        out = out ++ int_to_string(key.arg1)
-        out = out ++ ":n="
-        out = out ++ int_to_string(key.flags)
-        return out
+        return f"gapply2:{key.name}:{key.arg0}:{key.arg1}:n={key.flags}"
     "invalid"
