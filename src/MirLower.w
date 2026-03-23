@@ -988,8 +988,20 @@ fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
             pos = pos + 2
         else if seg_kind == FSTR_SEG_EXPR:
             let expr_node = self.ast.get_extra(pos + 1)
-            // spec_node at pos+2 is ignored in interim fallback
+            let spec_node = self.ast.get_extra(pos + 2)
             seg_operand = self.lower_expr(expr_node)
+            // Check for :? debug mode — wrap strings in quotes
+            if spec_node != 0:
+                let spec_flags = self.ast.get_data0(spec_node)
+                let spec_mode = spec_flags & 255
+                if spec_mode == 63:  // '?' = debug mode
+                    let expr_ty = self.expr_type(expr_node)
+                    let resolved = if expr_ty != 0: self.sema.resolve_alias(expr_ty) else: 0
+                    let tk = if resolved != 0: self.sema.get_type_kind(resolved) else: 0
+                    // For primitives, :? output is same as default except:
+                    // - strings get quoted: "hello" → "\"hello\""
+                    // For now, skip quoting — just pass through as default
+                    // (struct/enum debug formatting deferred to later task)
             pos = pos + 3
         else:
             pos = pos + 1
@@ -1006,10 +1018,10 @@ fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
             result = self.body.new_operand(OK_COPY, place)
         i = i + 1
     if result == 0:
-        return self.lower_str_lit(self.sema.pool_intern(""))
+        return self.lower_str_lit(self.pool.intern(""))
     // If only expression segments (no literals), concat with "" to force str coercion
     if not has_literal and seg_count == 1:
-        let empty = self.lower_str_lit(self.sema.pool_intern(""))
+        let empty = self.lower_str_lit(self.pool.intern(""))
         let rv = self.body.new_rvalue(RK_BIN_OP, OP_CONCAT, empty, result)
         let temp = self.new_temp(self.sema.ty_str)
         let place = self.place_for_local(temp)
