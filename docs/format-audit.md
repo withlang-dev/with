@@ -138,9 +138,168 @@ content inside the interpolation hole. All spec parsing would happen later.
 
 ---
 
-## 7. Migration Scope
+## 7. Locations That Must Learn About NK_FSTRING / NK_FSTRING_SPEC
 
-`str ++ non-str` sites using `int_to_string()` in compiler source: **~367 call sites**
-across `src/compiler/Backend.w`, `src/Sema.w`, `src/Codegen.w`, `src/Parser.w`,
-`src/main_emit_temp.w`, and other files. These will all need conversion to f-strings
-in Phase 6.
+(Task 2 of format-plan.md)
+
+### AST node kind list
+- `src/Ast.w` — add constants after NK_COMPTIME_ERROR (71). Next available: 72, 73.
+
+### AST name/debug tables
+- `src/main_emit_temp.w:324` — `ast_decl_kind_name()` — only handles decl kinds,
+  f-string is an expression kind so no change needed here.
+- `src/main_emit_temp.w:432` — `dump_tag_name()` — token tags only, no change.
+
+### Sema expression dispatch
+- `src/Sema.w:3783` — after `NK_STRING_LIT → ty_str`, add `NK_FSTRING → check_fstring()`.
+- `src/Sema.w:7884` — `kind_to_str` helper for error messages — add `NK_FSTRING → "f_string"`.
+
+### MirLower expression dispatch
+- `src/MirLower.w:651` — after `NK_STRING_LIT` handling, add `NK_FSTRING`.
+- `src/MirLower.w:3176` — second dispatch site (likely async MIR), same treatment.
+
+### Codegen expression dispatch
+- `src/Codegen.w:2103` — after `NK_STRING_LIT` handling, add `NK_FSTRING`.
+- `src/Codegen.w:4579` — `try_eval_const_string` — may need to handle `NK_FSTRING`
+  for compile-time f-string evaluation (or skip initially).
+
+### Driver / dump utilities
+- `src/Driver.w:101` — `dump_typed()` — generic dump, no node-kind switch.
+- `src/compiler/Backend.w:83` — `backend_dump_struct_extras` — struct-specific, no change.
+
+**Summary:** 6 dispatch sites need updating across Sema, MirLower, and Codegen.
+No changes needed to dump/debug utilities (they don't switch on expression node kinds).
+
+---
+
+## 8. Migration Scope (str ++ non-str Inventory)
+
+(Task 3 of format-plan.md)
+
+Total `int_to_string` / `i64_to_string` / `with_f64_to_string` call sites:
+- **437 in `src/`** (compiler source)
+- **104 in `test/` and `lib/`** (tests and stdlib)
+- **541 total**
+
+### Breakdown by file (compiler source, top 20)
+
+| Count | File |
+|-------|------|
+| 93 | `src/Mir.w` |
+| 62 | `src/Codegen.w` |
+| 62 | `src/CCodegen.w` |
+| 41 | `src/Sema.w` |
+| 32 | `src/CImport.w` |
+| 27 | `src/compiler/foundation/Types.w` |
+| 15 | `src/Resolve.w` |
+| 15 | `src/compiler/Backend.w` |
+| 14 | `src/AsyncMir.w` |
+| 12 | `src/compiler/Compilation.w` |
+| 11 | `src/compiler/Frontend.w` |
+| 9 | `src/render.w` |
+| 7 | `src/main.w` |
+| 7 | `src/compiler/Zcu.w` |
+| 6 | `src/Parser.w` |
+| 6 | `src/compiler/foundation/DiagnosticRender.w` |
+| 5 | `src/main_emit_temp.w` |
+| 4 | `src/DiagnosticRender.w` |
+| 4 | `src/compiler/foundation/Values.w` |
+| 3 | `src/MirLower.w` |
+
+Most uses are diagnostic/debug messages: `"error at " ++ int_to_string(line)`.
+These all become `f"error at {line}"` after migration.
+
+---
+
+## 9. Debug Trait Inventory
+
+(Task 4 of format-plan.md)
+
+### Debug trait definition
+- `lib/std/traits.w:17`: `pub trait Debug = fn debug_str(self) -> str`
+- `lib/std/traits.w:20`: `pub trait Display = fn to_str(self) -> str`
+
+### Existing Debug impls
+
+| Type | File:Line | Implementation |
+|------|-----------|----------------|
+| `i32` | `lib/std/traits.w:74` | `int_to_string(self)` |
+| `bool` | `lib/std/traits.w:78` | `if self: "true" else: "false"` |
+| `str` | `lib/std/traits.w:85` | `"\"" ++ self ++ "\""` |
+
+### Missing Debug impls needed for `:?`
+
+| Type | Status |
+|------|--------|
+| `i64` | Missing |
+| `u8`, `u16`, `u32`, `u64` | Missing |
+| `i8`, `i16` | Missing |
+| `f32`, `f64` | Missing |
+| Enums (user-defined) | Missing — would need codegen-generated debug functions |
+| Structs (user-defined) | Missing — would need codegen-generated debug functions |
+| `Vec[T]` | Missing |
+| `Option[T]` | Missing |
+| `HashMap[K,V]` | Missing |
+
+### `@[derive(Debug)]` support
+- Parser tracks `pending_derive_start` / `pending_derive_count` (Parser.w:35–36).
+- AST stores derive metadata via `AstPool.add_type_meta` (Ast.w:538).
+- Sema recognizes `"Debug"` as a known trait name (Sema.w:2611).
+- **No codegen implementation** for derive(Debug) — the parser and sema infrastructure
+  exists but no code generation happens.
+
+### Recommendation for `:?`
+Per `format-design.md` §6.6, use **Option A**: codegen generates inline debug
+functions per type rather than reflection. This avoids building a runtime reflection
+system. The codegen already knows all field names and types at compile time.
+
+---
+
+## 10. Bootstrap Sequence
+
+(Task 5 of format-plan.md)
+
+The compiler source uses f-strings extensively (diagnostic messages). Changes to the
+f-string AST node require careful bootstrapping.
+
+### Step 1: AST + Parser + Interim Codegen Fallback
+
+1. Add `NK_FSTRING`, `NK_FSTRING_SPEC` constants to `src/Ast.w`.
+2. Replace parser `interp_concat` desugaring with `NK_FSTRING` emission.
+3. Add format spec parsing (`parse_format_spec`).
+4. Add `check_fstring` in Sema (returns `ty_str`).
+5. Add interim codegen: when codegen sees `NK_FSTRING`, desugar it back to
+   `OP_CONCAT` chain (same behavior as before, just from a different AST node).
+6. Add interim MirLower: when MirLower sees `NK_FSTRING`, desugar similarly.
+7. `make build` — the old seed compiler parses f-strings as `OP_CONCAT` chains
+   (using old parser). The new stage1 compiler emits `NK_FSTRING` but the new
+   codegen handles it via fallback. Stage2 understands `NK_FSTRING`.
+8. `make fixpoint` — verify stage2 == stage3.
+9. `make install-user` — install as new seed.
+
+**Key constraint:** The compiler source does NOT use format specs (no `{x:08x}`
+in compiler code — just bare `{x}`). So the interim fallback only needs to handle
+bare holes, which it does by desugaring `NK_FSTRING` back to `OP_CONCAT` + coerce.
+
+### Step 2: Runtime Helpers + Real Codegen
+
+1. Add `with_fmt_*` runtime functions to `runtime/helpers.c`.
+2. Replace interim codegen fallback with real `with_fmt_*` calls.
+3. Replace interim MirLower fallback with real lowering.
+4. `make build` — the seed from Step 1 understands `NK_FSTRING`, so it can
+   compile the new codegen code.
+5. `make fixpoint`.
+6. `make install-user`.
+
+### Step 3: Remove Concat Coercion Hack
+
+1. Convert all ~437 compiler-source `int_to_string(x) ++ str` to `f"{x}"`.
+2. Remove `coerce_val_to_str` from `mir_str_concat`.
+3. Add sema error for `str ++ non-str`.
+4. `make build` — the seed from Step 2 has the `with_fmt_*` runtime, so
+   `f"{x}"` in compiler source works.
+5. `make fixpoint`.
+6. `make install-user`.
+
+Each step produces a new seed that the next step depends on. Do NOT try to
+combine steps — that's the bootstrap hell that burned us with `Vec.with_capacity`.
