@@ -43,8 +43,8 @@ profiling demands it.
 
 ## Phase 1 — AST and Parser
 
-- [ ] 7. Add `NK_FSTRING` and `NK_FSTRING_SPEC` node kind constants to `src/Ast.w`.
-      Add `FSTR_SEG_LITERAL = 0` and `FSTR_SEG_EXPR = 1` segment-kind constants.
+- [x] 7. Add `NK_FSTRING` (72) and `NK_FSTRING_SPEC` (73) node kind constants to
+      `src/Ast.w`. Add `FSTR_SEG_LITERAL = 0` and `FSTR_SEG_EXPR = 1`.
 - [ ] 8. Update AST name tables, dump/debug utilities, and structural validation to
       handle the new node kinds.
 - [ ] 9. In `src/Parser.w`, replace `desugar_interpolated_string` / `interp_concat`
