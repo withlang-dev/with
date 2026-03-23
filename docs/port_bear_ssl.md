@@ -1,6 +1,6 @@
 # Plan: Port BearSSL to With Standard Library
 
-**Status:** Active — Phases 0-8 complete, ready for Phase 9 (ECDSA + ECDH).
+**Status:** Active — Phases 0-9 complete, ready for Phase 10 (X.509).
 
 ## Context
 
@@ -74,7 +74,7 @@ lib/std/
 | 6 | Big integer | 500 | **Done** — i31 format, modpow passes 17^65537 mod 3233 |
 | 7 | RSA verify | 300 | **Done** — PKCS#1 v1.5 SHA-256, passes RSA-1024 test vector |
 | 8 | EC P-256 | 400 | **Done** — Jacobian coords, passes RFC 6979 d*G test vector |
-| 9 | ECDSA + ECDH | 200 | |
+| 9 | ECDSA + ECDH | 200 | **Done** — passes RFC 6979 A.2.5 test vector |
 | 10 | X.509 | 400 | |
 | 11 | TLS record layer | 300 | |
 | 12 | TLS handshake | 500 | |
