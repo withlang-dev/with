@@ -144,6 +144,51 @@ unsafe fn aesgcm_encrypt(ctx: *mut AesGcm, pt: *const u8, ct: *mut u8, len: i32)
 fn AesGcm.encrypt(self: *mut AesGcm, pt: *const u8, ct: *mut u8, len: i32):
     unsafe: aesgcm_encrypt(self, pt, ct, len)
 
+// Decrypt: XOR with keystream (same as encrypt) but GHASH the INPUT (ciphertext)
+unsafe fn aesgcm_decrypt(ctx: *mut AesGcm, ct_in: *const u8, pt_out: *mut u8, len: i32):
+    ctx.ct_len = ctx.ct_len + len as u64
+    var ctr: [u8; 16] = [0 as u8; 16]
+    var gs: [u8; 16] = [0 as u8; 16]
+    var hh: [u8; 16] = [0 as u8; 16]
+    for i in 0..16:
+        ctr[i] = ctx.counter[i]
+        gs[i] = ctx.ghash_state[i]
+        hh[i] = ctx.h[i]
+    let ctrp = &mut ctr[0] as *mut u8
+    let gsp = &mut gs[0] as *mut u8
+    let hhp = &hh[0] as *const u8
+    var aes_copy = ctx.aes
+
+    var off = 0
+    while off < len:
+        // GHASH the ciphertext BEFORE decryption
+        var ct_block: [u8; 16] = [0 as u8; 16]
+        let remaining = len - off
+        let chunk = if remaining < 16: remaining else: 16
+        for i in 0..chunk:
+            let cv = *(ct_in + (off + i) as u64)
+            ct_block[i] = cv
+        ghash_update(gsp, hhp, &ct_block[0] as *const u8)
+
+        // XOR with keystream to decrypt
+        var ks: [u8; 16] = [0 as u8; 16]
+        let ksp = &mut ks[0] as *mut u8
+        for i in 0..16:
+            *(ksp + i as u64) = ctr[i]
+        Aes128.encrypt_block(&aes_copy as *const Aes128, ksp)
+        increment_counter(ctrp)
+        for i in 0..chunk:
+            let cv = *(ct_in + (off + i) as u64)
+            *(pt_out + (off + i) as u64) = cv ^ ks[i]
+        off = off + 16
+
+    for i in 0..16:
+        ctx.counter[i] = ctr[i]
+        ctx.ghash_state[i] = gs[i]
+
+fn AesGcm.decrypt(self: *mut AesGcm, ct_in: *const u8, pt_out: *mut u8, len: i32):
+    unsafe: aesgcm_decrypt(self, ct_in, pt_out, len)
+
 unsafe fn aesgcm_tag(ctx: *mut AesGcm, out: *mut u8):
     var gs: [u8; 16] = [0 as u8; 16]
     var hh: [u8; 16] = [0 as u8; 16]
