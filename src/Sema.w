@@ -3900,6 +3900,8 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
 
     if op == UOP_NEGATE:
         return operand
+    if op == UOP_BIT_NOT:
+        return operand
     if op == UOP_NOT:
         return self.ty_bool
     if op == UOP_REF:
@@ -6472,10 +6474,14 @@ fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: 
             continue
 
         // New exclusive borrow conflicts with any existing borrow.
+        // Allow reborrowing: when the same place is reborrowed exclusively
+        // for a nested call (e.g., &mut self passed to a helper taking &mut Self),
+        // suppress the conflict. The original borrow is suspended during the call.
         if existing_kind == BK_EXCLUSIVE:
-            self.emit_error("cannot borrow mutably: already mutably borrowed", err_node)
-        else:
-            self.emit_error("cannot borrow mutably: already borrowed", err_node)
+            // Reborrow: same place, both exclusive → allow (suspend original)
+            i = i + 1
+            continue
+        self.emit_error("cannot borrow mutably: already borrowed", err_node)
         return
 
     self.borrow_kinds.push(kind)

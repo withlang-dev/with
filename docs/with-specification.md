@@ -352,6 +352,27 @@ impl Drop for Database:
 
 Drop order within a scope is reverse declaration order.
 
+**Drop on reassignment:** When a `var` binding of a Drop type is
+reassigned, the compiler drops the old value before storing the new
+one. This prevents resource leaks in loops:
+
+```
+var h = create_resource()
+for i in 0..n:
+    h = transform(h)
+    // old h dropped here — resource released before new value stored
+```
+
+**Drop on expression temporaries:** Temporaries created within an
+expression are dropped at the end of the enclosing statement. This
+frees intermediate resources automatically:
+
+```
+let c = process(combine(a, b))
+// combine's result is a temporary — dropped after process reads it
+// only c survives
+```
+
 **Partial moves from Drop types are forbidden** in normal code.
 Inside `drop` itself, you can access and consume fields freely.
 Outside of `drop`, moving a field out of a Drop type is a compile
@@ -570,6 +591,17 @@ Auto-deref applies to `&T`, `&mut T`, `Box[T]`, `Arc[T]`, `Rc[T]`,
 and any type implementing the `Deref` trait. The compiler inserts as
 many dereferences as needed to reach the target field or method.
 
+**Raw pointers:** Auto-deref also applies to `*const T` and
+`*mut T`. When `p` has type `*mut Sha256`, `p.state[0]` is
+equivalent to `(*p).state[0]`. The dereference is still unsafe —
+the access must be inside an `unsafe` block or `unsafe fn`.
+
+```
+unsafe fn compress(ctx: *mut Sha256):
+    let a = ctx.state[0]        // auto-deref: (*ctx).state[0]
+    ctx.buf[3] = 0x80           // auto-deref: (*ctx).buf[3] = 0x80
+```
+
 **The vibe:** "I don't care how many layers of indirection there
 are, just give me the `.name` field."
 
@@ -652,15 +684,179 @@ parameter, enabling type-generic metaprogramming. `type` is not a
 runtime value — it exists only during compilation and is erased
 before code generation.
 
-### 4.2 Arithmetic
+### 4.2 Arithmetic and Operators
 
-Arithmetic is checked in safe code by default. Integer overflow causes
-a panic in debug builds. Release builds may be configured for panic,
-wrap, or saturation; the default is panic.
+#### 4.2.1 Numeric Literals
 
-Explicit wrapping operators: `+%`, `-%`, `*%`.
+```
+42              // decimal integer
+1_000_000       // underscores for readability (ignored)
+0xFF            // hexadecimal (prefix 0x or 0X)
+0b1010          // binary (prefix 0b or 0B)
+0o77            // octal (prefix 0o or 0O)
+3.14            // floating point
+1.0e-5          // scientific notation
+0x1.0p10        // hex float (value: 1024.0)
+```
 
-**Implicit widening** is only allowed for lossless numeric conversions:
+Underscores may appear between digits in any literal for
+readability: `1_000_000`, `0xFF_FF`, `0b1111_0000`.
+
+Integer literals default to `i32`. Use a type annotation or `as`
+for other types: `let x: i64 = 0xFF_FF_FF_FF`.
+
+#### 4.2.2 Arithmetic Operators
+
+```
+a + b       // addition
+a - b       // subtraction
+a * b       // multiplication
+a / b       // division (integer: truncates toward zero)
+a % b       // remainder (sign follows dividend, like C)
+-a          // unary negation
+```
+
+All arithmetic operators work on all integer types (`i8`–`i64`,
+`u8`–`u64`) and floating point types (`f32`, `f64`).
+
+#### 4.2.3 Integer Overflow
+
+Arithmetic is checked in safe code by default. Integer overflow
+causes a panic in debug builds. Release builds may be configured
+for panic, wrap, or saturation; the default is panic.
+
+```toml
+# with.toml
+[build]
+overflow = "panic"      # default: panic on overflow
+overflow = "wrap"       # two's complement wrapping
+overflow = "saturate"   # clamp to min/max
+```
+
+**Explicit wrapping operators** bypass the overflow check:
+
+```
+a +% b      // wrapping addition
+a -% b      // wrapping subtraction
+a *% b      // wrapping multiplication
+```
+
+These always produce the two's complement result, regardless of
+build mode. Use them for hash functions, checksums, and
+cryptographic code.
+
+#### 4.2.4 Bitwise Operators
+
+```
+a & b       // bitwise AND
+a | b       // bitwise OR
+a ^ b       // bitwise XOR
+~a          // bitwise NOT (one's complement)
+a << n      // left shift
+a >> n      // right shift
+```
+
+All bitwise operators work on all integer types (`i8`–`i64`,
+`u8`–`u64`). Mixed-width operands are promoted to the wider type.
+
+**Right shift semantics:**
+
+- **Signed types** (`i8`–`i64`): arithmetic right shift
+  (sign-extending — the sign bit is replicated into vacated bits).
+- **Unsigned types** (`u8`–`u64`): logical right shift
+  (zero-filling — vacated bits are filled with zeros).
+
+```
+let x: i32 = -8
+x >> 1          // -4 (arithmetic: sign preserved)
+
+let y: u32 = 0x80000000
+y >> 1          // 0x40000000 (logical: zero-filled)
+```
+
+**Shift amount:** The right operand must be non-negative and less
+than the bit width of the left operand. Shifting by ≥ bit width is
+undefined behavior in release mode and a panic in debug mode.
+
+**Rotation:**
+
+```
+x.rotate_left(n)    // bitwise left rotation
+x.rotate_right(n)   // bitwise right rotation
+```
+
+Rotation is available as a method on all integer types. It wraps
+bits that shift off one end back onto the other end. Compiles to
+a single `ror`/`rol` instruction on all modern architectures
+(via LLVM's `fshl`/`fshr` intrinsics).
+
+```
+let x: u32 = 0x12345678
+x.rotate_right(8)       // 0x78123456
+x.rotate_left(4)        // 0x23456781
+```
+
+**Byte-order methods:**
+
+Integer types provide methods for big-endian and little-endian
+encoding/decoding from byte buffers. These are essential for
+cryptography, network protocols, and binary file formats.
+
+```
+// Decode from byte buffer at offset
+u16.from_be(buf: *const u8, offset: i32) -> u16
+u16.from_le(buf: *const u8, offset: i32) -> u16
+u32.from_be(buf: *const u8, offset: i32) -> u32
+u32.from_le(buf: *const u8, offset: i32) -> u32
+u64.from_be(buf: *const u8, offset: i32) -> u64
+u64.from_le(buf: *const u8, offset: i32) -> u64
+
+// Encode to byte buffer at offset
+u16.to_be(buf: *mut u8, offset: i32, val: u16)
+u16.to_le(buf: *mut u8, offset: i32, val: u16)
+u32.to_be(buf: *mut u8, offset: i32, val: u32)
+u32.to_le(buf: *mut u8, offset: i32, val: u32)
+u64.to_be(buf: *mut u8, offset: i32, val: u64)
+u64.to_le(buf: *mut u8, offset: i32, val: u64)
+```
+
+These compile to optimized load/store + byte-swap instructions.
+Usage:
+
+```
+let word = u32.from_be(buf, 0)      // read big-endian u32
+u32.to_le(out, 4, value)            // write little-endian u32
+```
+
+#### 4.2.5 Compound Assignment Operators
+
+```
+a += b      // a = a + b
+a -= b      // a = a - b
+a *= b      // a = a * b
+a /= b      // a = a / b
+a %= b      // a = a % b
+a &= b      // a = a & b
+a |= b      // a = a | b
+a ^= b      // a = a ^ b
+a <<= n     // a = a << n
+a >>= n     // a = a >> n
+a +%= b     // a = a +% b (wrapping addition)
+a -%= b     // a = a -% b (wrapping subtraction)
+a *%= b     // a = a *% b (wrapping multiplication)
+```
+
+Compound assignment requires `a` to be a mutable binding (`var`)
+or a mutable reference. The operation and assignment are atomic
+from the language's perspective (no intermediate observable state).
+
+For Drop types, compound assignment is equivalent to: evaluate
+`a op b`, drop the old value of `a`, store the result. This
+ensures resources are properly released.
+
+#### 4.2.6 Implicit Widening
+
+Implicit widening is only allowed for lossless numeric conversions:
 - Signed integers: `i8 -> i16 -> i32 -> i64`
 - Unsigned integers: `u8 -> u16 -> u32 -> u64`
 - Floats: `f32 -> f64`
@@ -825,6 +1021,59 @@ let pool = connect("postgres://localhost/mydb", PoolConfig {})?
 let pool = connect("postgres://localhost/mydb", PoolConfig {
     max_conns: 50,
 })?
+```
+
+### 4.3a Fixed-Size Arrays
+
+Fixed-size arrays have a compile-time-known length and are
+stack-allocated value types:
+
+```
+let a: [i32; 4] = [1, 2, 3, 4]
+let x = a[0]                    // 1
+let y = a[3]                    // 4
+
+var b: [f32; 8] = [0.0; 8]     // fill with 0.0
+b[2] = 3.14
+```
+
+**Syntax:**
+
+```
+[T; N]           // type: array of N elements of type T
+[v0, v1, ..., vN] // literal: array from elements
+[value; N]       // repeat: array of N copies of value
+arr[i]           // index: access element i
+arr.len()        // length: returns N (compile-time constant)
+```
+
+**Semantics:**
+
+- Length `N` must be a compile-time constant (integer literal or `const`).
+- `[T; N]` has size `N * sizeof(T)` and alignment `alignof(T)`.
+- Passed by value (copied on assignment). For large arrays, pass
+  by reference.
+- Bounds checking in debug mode, unchecked in release.
+- `Copy` if the element type is `Copy`.
+
+```
+fn sum(arr: [i32; 4]) -> i32:
+    var total = 0
+    for i in 0..4:
+        total = total + arr[i]
+    total
+
+// Fixed arrays in structs (inline, no pointer indirection):
+type Shape = { dims: [usize; 8], rank: i32 }
+```
+
+**Interaction with pattern matching:**
+
+```
+match items
+    []              => "empty"
+    [only]          => "single"
+    [first, ..rest] => "head: {first}, {rest.len()} more"
 ```
 
 ### 4.4 Enums (Algebraic Data Types)
@@ -1164,6 +1413,35 @@ fn run_migrations -> Result[Unit, DbError]:
 // unwrap_or with Unit still uses elision
 let _ = cache.set(key, value).await.unwrap_or()   // instead of .unwrap_or(())
 ```
+
+### 4.8a Slices
+
+Slices are borrowed views into contiguous memory (arrays, Vecs):
+
+```
+[]T         shared (immutable) slice
+[]mut T     exclusive (mutable) slice
+```
+
+A slice is a fat pointer: `(ptr: *const T, len: usize)`. It does
+not own the data — it borrows from an array, Vec, or other
+contiguous storage.
+
+```
+fn sum(data: []f32) -> f32:
+    var total: f32 = 0.0
+    for i in 0..data.len():
+        total = total + data[i]
+    total
+
+let arr: [f32; 4] = [1.0, 2.0, 3.0, 4.0]
+let s = sum(arr[..])      // slice of entire array
+let s2 = sum(arr[1..3])   // slice of elements 1, 2
+```
+
+Slices are ephemeral (§5) — they cannot be stored in structs or
+returned from functions (they borrow the underlying storage).
+Bounds-checked in debug mode.
 
 ### 4.9 Implicit `Ok` Wrapping
 
@@ -2621,7 +2899,7 @@ operators (`==`, `!=`). Like comparisons, it is non-associative —
 | 9 | `<<`, `>>` | Left |
 | 10 | `+`, `-`, `++`, `??` | Left |
 | 11 | `*`, `/`, `%` | Left |
-| 12 | Unary prefix (`not`, `-`, `&`, `&mut`) | — |
+| 12 | Unary prefix (`not`, `-`, `~`, `&`, `&mut`) | — |
 | 13 | Postfix (`.await`, `?`, `.field`, `[i]`, `()`) | Left |
 
 This means:
@@ -3555,10 +3833,33 @@ if user.name in whitelist:
     grant_access()
 ```
 
-**Optional operator traits:** The prelude operator traits are
-ordinary traits. Use them for explicit bounds, blanket impls, and
-documentation. Operator syntax itself still resolves through the
-matching concrete method (`add`, `mul`, `eq`, `lt`, and so on).
+**Operator desugaring:** When the compiler encounters `a + b` and
+both operands are struct types, it looks up `Add.add` on the left
+operand's type. The expression desugars to a method call with
+auto-referencing:
+
+```
+a + b      →  Add.add(&a, &b)    // both operands auto-ref'd
+a * b      →  Mul.mul(&a, &b)
+-a         →  Neg.neg(&a)
+a == b     →  Eq.eq(&a, &b)
+```
+
+**Operator traits should take `&Self`, not `Self`.** If `add` takes
+`Self` by value, then `a + b` moves both operands and `a + b + c`
+fails because `a` was consumed. With auto-referencing, the pattern
+is:
+
+```
+impl Add for Vector:
+    fn add(self: &Self, rhs: &Self) -> Self:
+        Vector { x: self.x + rhs.x, y: self.y + rhs.y }
+
+let d = a + b + c   // works: a, b, c are borrowed, not moved
+```
+
+For primitive types (`i32`, `f64`, etc.), operators are built-in
+and do not go through trait dispatch.
 
 ### 11.8 Derive
 
@@ -5399,6 +5700,39 @@ puts(name.as_cstr().ptr)
 `c"..."` does not support string interpolation. For dynamic C
 strings, construct a `CString` from an owned `str`.
 
+### 15.4 String Interpolation
+
+Expressions inside `{...}` in string literals are evaluated and
+converted to strings:
+
+```
+let name = "world"
+let s = "hello {name}"           // "hello world"
+let n = 42
+let s2 = "answer = {n}"          // "answer = 42"
+let s3 = "sum = {a + b}"         // "sum = 7" (expressions work)
+```
+
+**Semantics:**
+
+- `{expr}` evaluates `expr` and calls `to_string()` on the result.
+- `{{` produces a literal `{`, `}}` produces a literal `}`.
+- Interpolated strings always produce owned `str` (they allocate).
+- Works with any type that implements `Display` (primitives are
+  built-in).
+
+**Desugaring:** The parser splits the string into segments and
+desugars to concatenation:
+
+```
+"hello {name}, age {age}"
+// → "hello " ++ to_string(name) ++ ", age " ++ to_string(age)
+```
+
+**Format specifiers** (future): `{expr:format}` where format
+controls precision, padding, base, etc. For v1, only bare `{expr}`
+is supported.
+
 ---
 
 ## 16. FFI and C Interoperability
@@ -6922,6 +7256,33 @@ All code is safe unless explicitly `unsafe`.
 - Manual memory management beyond allocators
 - Calling functions marked `unsafe`
 
+### 19.2a `unsafe fn` — Function-Level Unsafe Context
+
+Functions that pervasively perform unsafe operations (raw pointer
+dereference, pointer arithmetic) may be declared `unsafe fn`:
+
+```
+unsafe fn sha256_compress(ctx: &mut Sha256):
+    ctx.state[0] +%= a          // pointer deref permitted — no wrapper
+    let b = ctx.buf[off]        // auto-deref through pointer — no wrapper
+```
+
+Inside an `unsafe fn` body, all operations that would normally
+require `unsafe:` or `unsafe {}` are permitted without a wrapper.
+The `unsafe` keyword on the function signature is the declaration
+of intent — every line in the body is implicitly unsafe.
+
+**Callers must acknowledge the unsafety:** Calling an `unsafe fn`
+from safe code requires `unsafe:` at the call site (or being
+inside another `unsafe fn`):
+
+```
+unsafe: sha256_compress(&mut ctx)    // caller acknowledges
+```
+
+This preserves the audit trail — `grep unsafe` finds every
+boundary where safe code transitions to unsafe code.
+
 ### 19.3 `unsafe` Constraints Across Suspension Points
 
 **Language rule:** Unsafe code must not retain raw pointers (`*const T`,
@@ -7189,6 +7550,24 @@ At every program point, the following must hold:
    reverse declaration order. Each drop point is a "use" of the
    variable being dropped, extending the borrow lifetime through
    the destructor.
+
+8. **Reborrowing.** When a function holds `&mut T` and calls
+   another function that also takes `&mut T`, the original borrow
+   is **reborrowed** for the duration of the call. This is not a
+   violation of the aliasing rule — only one `&mut` is active at
+   any point. The original borrow is suspended during the call
+   and resumes after it returns.
+
+   ```
+   fn update(self: &mut Sha256, data: *const u8, len: i32):
+       // self is &mut Sha256
+       compress(&mut self)    // OK: reborrow of self for call duration
+       // self is usable again after compress returns
+   ```
+
+   Without reborrowing, methods that delegate to helper functions
+   taking `&mut Self` would require raw pointers. Reborrowing
+   makes `&mut` method chains composable.
 
 ---
 

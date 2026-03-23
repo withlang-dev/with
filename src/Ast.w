@@ -219,6 +219,7 @@ const UOP_REF: i32 = 2
 const UOP_MUT_REF: i32 = 3
 const UOP_DEREF: i32 = 4
 const UOP_TRY: i32 = 5
+const UOP_BIT_NOT: i32 = 6
 
 // ── AST Pool ──────────────────────────────────────────────────────
 

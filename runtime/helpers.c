@@ -1676,3 +1676,42 @@ int32_t with_extract_tgz(with_str archive, with_str dest) {
     snprintf(cmd, sizeof(cmd), "tar xzf '%s' -C '%s'", ab, db);
     return system(cmd) == 0 ? 0 : -1;
 }
+
+// ── System info ─────────────────────────────────────────────────────
+
+#include <sys/utsname.h>
+
+with_str with_sysinfo_os(void) {
+    struct utsname u;
+    if (uname(&u) != 0) { with_str e = {"unknown", 7}; return e; }
+    // Normalize: "Darwin" → "Macos", "Linux" → "Linux"
+    if (strcmp(u.sysname, "Darwin") == 0) { with_str r = {"Macos", 5}; return r; }
+    size_t len = strlen(u.sysname);
+    char *buf = (char *)malloc(len + 1);
+    memcpy(buf, u.sysname, len + 1);
+    with_str r; r.ptr = buf; r.len = (int64_t)len;
+    return r;
+}
+
+with_str with_sysinfo_arch(void) {
+    struct utsname u;
+    if (uname(&u) != 0) { with_str e = {"unknown", 7}; return e; }
+    // Normalize: "arm64" → "armv8", "x86_64" stays
+    if (strcmp(u.machine, "arm64") == 0) { with_str r = {"armv8", 5}; return r; }
+    size_t len = strlen(u.machine);
+    char *buf = (char *)malloc(len + 1);
+    memcpy(buf, u.machine, len + 1);
+    with_str r; r.ptr = buf; r.len = (int64_t)len;
+    return r;
+}
+
+with_str with_sysinfo_hostname(void) {
+    char buf[256];
+    if (gethostname(buf, sizeof(buf)) != 0) { with_str e = {"unknown", 7}; return e; }
+    buf[sizeof(buf) - 1] = 0;
+    size_t len = strlen(buf);
+    char *out = (char *)malloc(len + 1);
+    memcpy(out, buf, len + 1);
+    with_str r; r.ptr = out; r.len = (int64_t)len;
+    return r;
+}

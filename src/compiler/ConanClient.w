@@ -99,11 +99,14 @@ fn conan_get_latest_recipe_rev(name: str, version: str) -> str:
         return ""
     json_extract_string(response, "revision")
 
+extern fn with_sysinfo_os() -> str
+extern fn with_sysinfo_arch() -> str
+
 fn conan_detect_os -> str:
-    "Macos"  // TODO: detect Linux, Windows at runtime
+    with_sysinfo_os()
 
 fn conan_detect_arch -> str:
-    "armv8"  // TODO: detect x86_64, armv7 at runtime
+    with_sysinfo_arch()
 
 fn conan_find_matching_package(name: str, version: str, rev: str) -> str:
     // Use /search endpoint which returns all packages with inline settings
