@@ -1,6 +1,6 @@
 # Plan: Port BearSSL to With Standard Library
 
-**Status:** Active — Phases 0-10 complete, ready for Phase 11 (TLS record layer).
+**Status:** Active — Phases 0-11 complete, ready for Phase 12 (TLS handshake).
 
 ## Context
 
@@ -76,7 +76,7 @@ lib/std/
 | 8 | EC P-256 | 400 | **Done** — Jacobian coords, passes RFC 6979 d*G test vector |
 | 9 | ECDSA + ECDH | 200 | **Done** — passes RFC 6979 A.2.5 test vector |
 | 10 | X.509 | 400 | **Done** — DER parser, cert parsing, chain verification |
-| 11 | TLS record layer | 300 | |
+| 11 | TLS record layer | 300 | **Done** — record I/O, AES-GCM encrypt/decrypt, PRF |
 | 12 | TLS handshake | 500 | |
 | 13 | HTTP client | 150 | |
 | 14 | ConanClient wire-up | 20 | |
