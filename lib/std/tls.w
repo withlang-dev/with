@@ -304,10 +304,10 @@ unsafe fn tls_decrypt_record(conn: *mut TlsConn, content_type: u8, enc_data: *co
     aad[11] = (ct_len >> 8) as u8
     aad[12] = (ct_len & 0xFF) as u8
 
-    // Decrypt (GCM decrypt = encrypt with same keystream)
+    // Decrypt: GHASH the ciphertext, then XOR with keystream
     var aes_ctx = AesGcm.new(&conn.server_write_key[0] as *const u8, &nonce[0] as *const u8, 12)
     AesGcm.aad(&mut aes_ctx as *mut AesGcm, &aad[0] as *const u8, 13)
-    AesGcm.encrypt(&mut aes_ctx as *mut AesGcm, ct_start, plain, ct_len)
+    AesGcm.decrypt(&mut aes_ctx as *mut AesGcm, ct_start, plain, ct_len)
 
     // Verify tag
     var computed_tag: [u8; 16] = [0u8; 16]
