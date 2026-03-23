@@ -18,7 +18,7 @@ let users: Vec[User] = Vec.new()
 let name: String = "alice"
 
 fn render[T](value: T):
-    println("{value}")
+    println(f"{value}")
 ```
 
 No `use` is needed for `Vec`, `String`, `Option`, `Result`,
@@ -608,13 +608,13 @@ match event
 ```
 // ✗ match then access
 match result
-    Ok(val) => println("{val.name}: {val.score}")
-    Err(e)  => println("error: {e}")
+    Ok(val) => println(f"{val.name}: {val.score}")
+    Err(e)  => println(f"error: {e}")
 
 // ✓ idiomatic — destructure deeper if it helps
 match result
-    Ok({ name, score }) => println("{name}: {score}")
-    Err(e)              => println("error: {e}")
+    Ok({ name, score }) => println(f"{name}: {score}")
+    Err(e)              => println(f"error: {e}")
 ```
 
 ---
@@ -627,8 +627,8 @@ Don't concatenate. Interpolate.
 // ✗ concatenation
 let msg = "Hello, " ++ name ++ "! You have " ++ count.to_str() ++ " items."
 
-// ✓ idiomatic
-let msg = "Hello, {name}! You have {count} items."
+// ✓ idiomatic — f-strings interpolate {expressions}
+let msg = f"Hello, {name}! You have {count} items."
 ```
 
 ---
@@ -726,7 +726,7 @@ if not valid then return Err(.Invalid)
 // ✓ one-line traits and impls
 trait Add[Rhs, Output]: fn add(self: Self, rhs: Rhs) -> Output
 trait Sub[Rhs, Output]: fn sub(self: Self, rhs: Rhs) -> Output
-impl Show for Point: fn show(self: &Point) -> String: "({self.x}, {self.y})"
+impl Show for Point: fn show(self: &Point) -> String: f"({self.x}, {self.y})"
 
 // ✓ multi-line when it doesn't fit
 trait DataSource:
@@ -778,7 +778,7 @@ let enemies = vec![world.spawn("e1"), world.spawn("e2")]
 
 // Safe access — None if entity was despawned
 if let Some(tf) = world.transforms.get(player):
-    println("pos: {tf.position}")
+    println(f"pos: {tf.position}")
 ```
 
 Handles compose naturally with the ECS pattern:
@@ -961,7 +961,7 @@ Especially useful for extracting nested optional data:
 if let Some(user) = find_user(id),
    let Some(addr) = user.address,
    let Some(city) = addr.city:
-    println("User lives in {city}")
+    println(f"User lives in {city}")
 else:
     println("Address unknown")
 ```
@@ -1032,7 +1032,7 @@ Debug-only instrumentation:
 ```
 fn process(x: i32) -> i32:
     comptime if cfg.is_debug:
-        println("debug: processing {x}")
+        println(f"debug: processing {x}")
     x * x + 1
 ```
 
@@ -1127,6 +1127,29 @@ With follows Rust's naming conventions:
 ---
 
 ## Additional Language Rules
+
+### Prefer Contextual Inference Over Numeric Suffixes
+
+The compiler infers literal types from context (bindings, parameters,
+binary peers, return types). Use suffixes only when context is absent:
+
+```
+// ✓ idiomatic — type inferred from binding
+let x: u32 = 0xFF
+
+// ✓ idiomatic — type inferred from parameter
+fn process(val: u8):
+    ()
+process(42)
+
+// ✓ suffix needed — no context to infer from
+let raw = 0xFFu32
+
+// ✗ over-specified — context already says u8
+let b: u8 = 0x00u8
+```
+
+Available suffixes: `u8`, `u16`, `u32`, `u64`, `i32`, `i64`, `f32`, `f64`.
 
 ### Use Numeric Separators for Readability
 
@@ -1263,7 +1286,7 @@ Before submitting code, check:
 10. **No mutable-then-freeze** — use `with ... as mut`
 11. **No nested function calls** — use `|>` for pipelines
 12. **No manual lock/guard management** — use `with`
-13. **No string concatenation** — use interpolation `"hello {name}"`
+13. **No string concatenation** — use f-string interpolation `f"hello {name}"`
 14. **No C-style loops** — use ranges and iterators
 15. **No `if/else if` chains on enums** — use `match`
 16. **No manual cleanup at every exit** — use `defer`
