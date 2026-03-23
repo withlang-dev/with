@@ -26,17 +26,20 @@ profiling demands it.
       `runtime/helpers.c` (lines 352–406: `int_to_string`, `i64_to_string`,
       `with_f64_to_string`; lines 661–673: `with_str_concat`).
       Results: `docs/format-audit.md`.
-- [ ] 2. Identify every AST enum, node-name table, debug printer, and dump path that
+- [x] 2. Identify every AST enum, node-name table, debug printer, and dump path that
       must learn about `NK_FSTRING` and `NK_FSTRING_SPEC` (check `src/Ast.w` node
-      kind list and name arrays).
-- [ ] 3. Inventory all `str ++ non-str` usages in the repo (~367 `int_to_string`
-      concat sites in `src/`) so migration scope is known.
-- [ ] 4. Inventory existing `Debug` trait / `@[derive(Debug)]` support and standard
-      library types that must render under `:?`.
-- [ ] 5. Write down the bootstrap sequence: Step 1 adds AST + parser + interim
-      codegen fallback. Step 2 adds new codegen with runtime helpers. Each step
-      builds, installs seed, fixpoints.
-- [ ] 6. Confirm tree is green: `make build && ./out/bin/with-stage2 check src/main.w && make fixpoint`.
+      kind list and name arrays). Results: `docs/format-audit.md` §7.
+- [x] 3. Inventory all `str ++ non-str` usages in the repo (437 in `src/`, 104 in
+      `test/`+`lib/`, 541 total). Results: `docs/format-audit.md` §8.
+- [x] 4. Inventory existing `Debug` trait / `@[derive(Debug)]` support and standard
+      library types that must render under `:?`. Results: `docs/format-audit.md` §9.
+      Only i32/bool/str have Debug impls. derive(Debug) has parser/sema infra but
+      no codegen. Will use codegen-generated inline debug functions per type.
+- [x] 5. Write down the bootstrap sequence: Step 1 adds AST + parser + interim
+      codegen fallback. Step 2 adds new codegen with runtime helpers. Step 3
+      migrates compiler source to f-strings and removes coercion hack. Each step
+      builds, installs seed, fixpoints. Details: `docs/format-audit.md` §10.
+- [x] 6. Confirm tree is green: `make build` ✓, `check src/main.w` ✓, `make fixpoint` ✓.
 
 ## Phase 1 — AST and Parser
 
