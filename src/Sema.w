@@ -1561,6 +1561,7 @@ fn Sema.collect_declarations(self: Sema):
             self.collect_impl_decl(decl)
 
     self.collecting_types = 0
+    self.resolve_deferred_non_generic_type_decls()
 
     // Pass 3: collect function signatures and top-level let decls.
     for di in 0..self.ast.decl_count():
@@ -1585,6 +1586,114 @@ fn Sema.collect_declarations(self: Sema):
         self.must_use_types.insert(sym_result, 1)
     if sym_task != 0:
         self.must_use_types.insert(sym_task, 1)
+
+fn Sema.resolve_deferred_non_generic_type_decls(self: Sema):
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NK_TYPE_DECL:
+            continue
+        if self.type_decl_tp_count(decl) != 0:
+            continue
+        self.resolve_deferred_non_generic_type_decl(decl)
+
+fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
+    let name = self.ast.get_data0(decl)
+    if not self.named_types.contains(name):
+        return
+
+    let tid = self.named_types.get(name).unwrap()
+    let extra_start = self.ast.get_data1(decl)
+    let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
+    let resolved = self.resolve_alias(tid)
+
+    if sub_kind == TDK_STRUCT or sub_kind == TDK_UNION:
+        if self.get_type_kind(resolved) != TY_STRUCT:
+            return
+        let te_start = self.get_type_d1(resolved)
+        let field_count = self.ast.get_extra(extra_start)
+        for fi in 0..field_count:
+            let field_slot = te_start + fi * 3 + 1
+            if self.type_extra.get(field_slot as i64) != 0:
+                continue
+            let field_base = extra_start + 1 + fi * 3
+            let field_type_node = self.ast.get_extra(field_base + 1)
+            let field_tid = self.resolve_type_expr(field_type_node)
+            if field_tid != 0:
+                self.type_extra.set_i32(field_slot as i64, field_tid)
+        return
+
+    if sub_kind == TDK_ENUM:
+        if self.get_type_kind(resolved) != TY_ENUM:
+            return
+        let te_start = self.get_type_d1(resolved)
+        let variant_count = self.ast.get_extra(extra_start)
+        var ast_pos = extra_start + 1
+        var type_pos = te_start
+        for _ in 0..variant_count:
+            ast_pos = ast_pos + 1
+            let payload_count = self.ast.get_extra(ast_pos)
+            ast_pos = ast_pos + 1
+            type_pos = type_pos + 2
+            for pi in 0..payload_count:
+                let payload_slot = type_pos + pi
+                if self.type_extra.get(payload_slot as i64) == 0:
+                    let payload_type_node = self.ast.get_extra(ast_pos + pi)
+                    let payload_tid = self.resolve_type_expr(payload_type_node)
+                    if payload_tid != 0:
+                        self.type_extra.set_i32(payload_slot as i64, payload_tid)
+            ast_pos = ast_pos + payload_count
+            type_pos = type_pos + payload_count
+        return
+
+    if sub_kind == TDK_DISC_ENUM:
+        if self.get_type_kind(resolved) != TY_ENUM:
+            return
+        let repr_type_node = self.ast.get_extra(extra_start)
+        let repr_opt = self.disc_repr_types.get(tid)
+        if not repr_opt.is_some() or repr_opt.unwrap() == 0:
+            let repr_tid = self.resolve_type_expr(repr_type_node)
+            if repr_tid != 0:
+                self.disc_repr_types.insert(tid, repr_tid)
+        let te_start = self.get_type_d1(resolved)
+        let variant_count = self.ast.get_extra(extra_start + 1)
+        var ast_pos = extra_start + 2
+        var type_pos = te_start
+        for _ in 0..variant_count:
+            ast_pos = ast_pos + 2
+            let payload_count = self.ast.get_extra(ast_pos)
+            ast_pos = ast_pos + 1
+            type_pos = type_pos + 2
+            for pi in 0..payload_count:
+                let payload_slot = type_pos + pi
+                if self.type_extra.get(payload_slot as i64) == 0:
+                    let payload_type_node = self.ast.get_extra(ast_pos + pi)
+                    let payload_tid = self.resolve_type_expr(payload_type_node)
+                    if payload_tid != 0:
+                        self.type_extra.set_i32(payload_slot as i64, payload_tid)
+            ast_pos = ast_pos + payload_count
+            type_pos = type_pos + payload_count
+        return
+
+    if sub_kind == TDK_ALIAS:
+        if self.get_type_d0(tid) != 0:
+            return
+        let aliased_node = self.ast.get_extra(extra_start)
+        let target_tid = self.resolve_type_expr(aliased_node)
+        if target_tid != 0:
+            self.type_d0.set_i32(tid as i64, target_tid)
+        return
+
+    if sub_kind == TDK_DISTINCT:
+        if self.get_type_kind(resolved) != TY_STRUCT:
+            return
+        let te_start = self.get_type_d1(resolved)
+        let value_slot = te_start + 1
+        if self.type_extra.get(value_slot as i64) != 0:
+            return
+        let inner_node = self.ast.get_extra(extra_start)
+        let inner_tid = self.resolve_type_expr(inner_node)
+        if inner_tid != 0:
+            self.type_extra.set_i32(value_slot as i64, inner_tid)
 
 fn Sema.is_local_decl(self: Sema, decl_index: i32) -> i32:
     let limit = self.ast.local_decl_count()
@@ -4451,7 +4560,9 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
             return resolved
         if not is_type_level_index and base_name == "Vec" and self.get_generic_inst_arg_count(resolved) > 0:
             self.check_expr(index)
-            return self.get_generic_inst_arg(resolved, 0)
+            let elem_ty = self.get_generic_inst_arg(resolved, 0)
+            self.typed_expr_types.insert(node, elem_ty)
+            return elem_ty
 
     // Type-level NK_INDEX: Vec[i32], HashMap[str, i32], etc.
     // Create TY_GENERIC_INST so MirLower can find it in the sema snapshot.
