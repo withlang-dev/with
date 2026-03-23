@@ -1361,13 +1361,19 @@ fn Parser.parse_optional_impl_target_args(self: Parser, type_name: i32) -> i32:
         return 0
     let start = self.current_start()
     self.advance()
+    self.skip_newlines()
     var args: Vec[i32] = Vec.new()
     while self.peek() != TK_R_BRACKET and self.peek() != TK_EOF:
         let ty = self.parse_type_expr()
         args.push(ty)
+        self.skip_newlines()
         if self.peek() != TK_COMMA:
             break
         self.advance()
+        self.skip_newlines()
+        if self.peek() == TK_R_BRACKET:
+            break
+    self.skip_newlines()
     self.expect(TK_R_BRACKET)
     let extra_start = self.pool.extra_len()
     for ai in 0..args.len() as i32:
@@ -1403,13 +1409,19 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     var trait_arg_count = 0
     if self.peek() == TK_L_BRACKET:
         self.advance()
+        self.skip_newlines()
         trait_arg_extra_start = self.pool.extra_len()
         while self.peek() != TK_R_BRACKET and self.peek() != TK_EOF:
             let arg = self.parse_type_expr()
             self.pool.add_extra(arg)
             trait_arg_count = trait_arg_count + 1
+            self.skip_newlines()
             if self.peek() == TK_COMMA:
                 self.advance()
+                self.skip_newlines()
+                if self.peek() == TK_R_BRACKET:
+                    break
+        self.skip_newlines()
         self.expect(TK_R_BRACKET)
         if self.peek() != TK_KW_FOR:
             self.emit_error("expected 'for' after trait generic arguments in impl")
@@ -1788,21 +1800,94 @@ fn Parser.parse_primary(self: Parser) -> i32:
 
 // ── Literal parsing ─────────────────────────────────────────────
 
+fn numeric_literal_suffix_start(text: str, suffix: str) -> i32:
+    let len = text.len() as i32
+    let slen = suffix.len() as i32
+    if len <= slen:
+        return 0 - 1
+    let direct_start = len - slen
+    if text.slice(direct_start as i64, len as i64) == suffix:
+        return direct_start
+    if len > slen + 1 and text.byte_at((len - slen - 1) as i64) == 95:
+        let legacy_start = len - slen - 1
+        if text.slice((legacy_start + 1) as i64, len as i64) == suffix:
+            return legacy_start
+    0 - 1
+
+fn numeric_literal_suffix_code(text: str) -> i32:
+    if numeric_literal_suffix_start(text, "usize") >= 0: return LIT_SUFFIX_USIZE
+    if numeric_literal_suffix_start(text, "isize") >= 0: return LIT_SUFFIX_ISIZE
+    if numeric_literal_suffix_start(text, "u128") >= 0: return LIT_SUFFIX_U128
+    if numeric_literal_suffix_start(text, "i128") >= 0: return LIT_SUFFIX_I128
+    if numeric_literal_suffix_start(text, "u64") >= 0: return LIT_SUFFIX_U64
+    if numeric_literal_suffix_start(text, "i64") >= 0: return LIT_SUFFIX_I64
+    if numeric_literal_suffix_start(text, "u32") >= 0: return LIT_SUFFIX_U32
+    if numeric_literal_suffix_start(text, "i32") >= 0: return LIT_SUFFIX_I32
+    if numeric_literal_suffix_start(text, "u16") >= 0: return LIT_SUFFIX_U16
+    if numeric_literal_suffix_start(text, "i16") >= 0: return LIT_SUFFIX_I16
+    if numeric_literal_suffix_start(text, "u8") >= 0: return LIT_SUFFIX_U8
+    if numeric_literal_suffix_start(text, "i8") >= 0: return LIT_SUFFIX_I8
+    if numeric_literal_suffix_start(text, "f64") >= 0: return LIT_SUFFIX_F64
+    if numeric_literal_suffix_start(text, "f32") >= 0: return LIT_SUFFIX_F32
+    LIT_SUFFIX_NONE
+
+fn numeric_literal_core(text: str) -> str:
+    let suffix = numeric_literal_suffix_code(text)
+    if suffix == LIT_SUFFIX_NONE:
+        return text
+    if suffix == LIT_SUFFIX_USIZE:
+        return text.slice(0, numeric_literal_suffix_start(text, "usize") as i64)
+    if suffix == LIT_SUFFIX_ISIZE:
+        return text.slice(0, numeric_literal_suffix_start(text, "isize") as i64)
+    if suffix == LIT_SUFFIX_U128:
+        return text.slice(0, numeric_literal_suffix_start(text, "u128") as i64)
+    if suffix == LIT_SUFFIX_I128:
+        return text.slice(0, numeric_literal_suffix_start(text, "i128") as i64)
+    if suffix == LIT_SUFFIX_U64:
+        return text.slice(0, numeric_literal_suffix_start(text, "u64") as i64)
+    if suffix == LIT_SUFFIX_I64:
+        return text.slice(0, numeric_literal_suffix_start(text, "i64") as i64)
+    if suffix == LIT_SUFFIX_U32:
+        return text.slice(0, numeric_literal_suffix_start(text, "u32") as i64)
+    if suffix == LIT_SUFFIX_I32:
+        return text.slice(0, numeric_literal_suffix_start(text, "i32") as i64)
+    if suffix == LIT_SUFFIX_U16:
+        return text.slice(0, numeric_literal_suffix_start(text, "u16") as i64)
+    if suffix == LIT_SUFFIX_I16:
+        return text.slice(0, numeric_literal_suffix_start(text, "i16") as i64)
+    if suffix == LIT_SUFFIX_U8:
+        return text.slice(0, numeric_literal_suffix_start(text, "u8") as i64)
+    if suffix == LIT_SUFFIX_I8:
+        return text.slice(0, numeric_literal_suffix_start(text, "i8") as i64)
+    if suffix == LIT_SUFFIX_F64:
+        return text.slice(0, numeric_literal_suffix_start(text, "f64") as i64)
+    if suffix == LIT_SUFFIX_F32:
+        return text.slice(0, numeric_literal_suffix_start(text, "f32") as i64)
+    text
+
 fn Parser.parse_int_literal(self: Parser) -> i32:
     let start = self.current_start()
     let end = self.current_end()
     let text = self.source.slice(start as i64, end as i64)
+    let suffix = numeric_literal_suffix_code(text)
+    let core = numeric_literal_core(text)
     self.advance()
-    let val = parse_i64(text)
-    self.pool.add_node(NK_INT_LIT, start, end, ast_int_part0(val), ast_int_part1(val), ast_int_part2(val))
+    let val = parse_i64(core)
+    let node = self.pool.add_node(NK_INT_LIT, start, end, ast_int_part0(val), ast_int_part1(val), ast_int_part2(val))
+    self.pool.set_literal_suffix(node, suffix)
+    node
 
 fn Parser.parse_float_literal(self: Parser) -> i32:
     let start = self.current_start()
     let end = self.current_end()
     let text = self.source.slice(start as i64, end as i64)
+    let suffix = numeric_literal_suffix_code(text)
+    let core = numeric_literal_core(text)
     self.advance()
-    let str_idx = self.pool.add_string(text)
-    self.pool.add_node(NK_FLOAT_LIT, start, end, str_idx, 0, 0)
+    let str_idx = self.pool.add_string(core)
+    let node = self.pool.add_node(NK_FLOAT_LIT, start, end, str_idx, 0, 0)
+    self.pool.set_literal_suffix(node, suffix)
+    node
 
 fn Parser.parse_comptime_error_expr(self: Parser) -> i32:
     let ce_s = self.current_start()
@@ -2297,19 +2382,25 @@ fn Parser.parse_struct_literal(self: Parser, lhs: i32) -> i32:
 
 fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> i32:
     self.advance()  // consume [
+    self.skip_newlines()
     let index = self.parse_index_expr()
+    self.skip_newlines()
     if self.peek() == TK_DOT_DOT:
         self.advance()
+        self.skip_newlines()
         var end_expr = 0
         if self.peek() != TK_R_BRACKET:
             end_expr = self.parse_expr()
+            self.skip_newlines()
         self.expect(TK_R_BRACKET)
         return self.pool.add_node(NK_SLICE, self.pool.get_start(lhs), self.prev_end(), lhs, index, end_expr)
     // Support two-arg subscript for HashMap[K, V].new() syntax
     var second = 0
     if self.peek() == TK_COMMA:
         self.advance()
+        self.skip_newlines()
         second = self.parse_index_expr()
+        self.skip_newlines()
     self.expect(TK_R_BRACKET)
     self.pool.add_node(NK_INDEX, self.pool.get_start(lhs), self.prev_end(), lhs, index, second)
 
@@ -2431,9 +2522,10 @@ fn Parser.parse_unary_negate(self: Parser) -> i32:
     if self.peek() == TK_INT_LIT:
         let end = self.current_end()
         let text = self.source.slice(start as i64 + 1, end as i64)
-        let value = 0 - parse_i64(text)
-        self.advance()
-        return self.pool.add_node(NK_INT_LIT, start, end, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value))
+        if numeric_literal_suffix_code(text) == LIT_SUFFIX_NONE:
+            let value = 0 - parse_i64(text)
+            self.advance()
+            return self.pool.add_node(NK_INT_LIT, start, end, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value))
     let operand = self.parse_primary()
     self.pool.add_node(NK_UNARY, start, self.prev_end(), UOP_NEGATE, operand, 0)
 
@@ -2449,6 +2541,14 @@ fn Parser.parse_unary_not(self: Parser) -> i32:
     let operand = self.parse_primary()
     self.pool.add_node(NK_UNARY, start, self.prev_end(), UOP_NOT, operand, 0)
 
+fn Parser.build_unary_with_outer_cast(self: Parser, start: i32, op: i32, operand: i32) -> i32:
+    if operand != 0 and self.pool.kind(operand) == NK_CAST:
+        let inner = self.pool.get_data0(operand)
+        let target_type = self.pool.get_data1(operand)
+        let unary = self.pool.add_node(NK_UNARY, start, self.pool.get_end(inner), op, inner, 0)
+        return self.pool.add_node(NK_CAST, start, self.pool.get_end(operand), unary, target_type, 0)
+    self.pool.add_node(NK_UNARY, start, self.pool.get_end(operand), op, operand, 0)
+
 fn Parser.parse_ref_of(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
@@ -2456,20 +2556,14 @@ fn Parser.parse_ref_of(self: Parser) -> i32:
     if self.peek() == TK_KW_MUT:
         op = UOP_MUT_REF
         self.advance()
-    // Suppress `as` inside the ref operand so that `&mut x as T`
-    // parses as `(&mut x) as T`, not `&mut (x as T)`.
-    let saved_suppress = self.suppress_as
-    self.suppress_as = 1
     let operand = self.parse_primary()
-    self.suppress_as = saved_suppress
-    let node = self.pool.add_node(NK_UNARY, start, self.prev_end(), op, operand, 0)
-    self.parse_postfix(node)
+    self.build_unary_with_outer_cast(start, op, operand)
 
 fn Parser.parse_deref_expr(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
     let operand = self.parse_primary()
-    self.pool.add_node(NK_UNARY, start, self.prev_end(), UOP_DEREF, operand, 0)
+    self.build_unary_with_outer_cast(start, UOP_DEREF, operand)
 
 // ── Control flow expressions ─────────────────────────────────────
 
@@ -3057,15 +3151,18 @@ fn Parser.parse_pattern(self: Parser) -> i32:
         // Variant with payload
         if self.peek() == TK_L_PAREN:
             self.advance()
+            self.skip_newlines()
             let extra_start = self.pool.extra_len()
             var binding_count = 0
             while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
                 let inner = self.parse_pattern()
                 self.pool.add_extra(inner)
                 binding_count = binding_count + 1
+                self.skip_newlines()
                 if self.peek() == TK_COMMA:
                     self.advance()
                     self.skip_newlines()
+            self.skip_newlines()
             self.expect(TK_R_PAREN)
             return self.pool.add_node(NK_PAT_VARIANT, start, self.prev_end(), name, extra_start, binding_count)
         // Uppercase = unit variant
@@ -3092,27 +3189,32 @@ fn Parser.parse_pattern(self: Parser) -> i32:
         self.advance()
         if self.peek() == TK_L_PAREN:
             self.advance()
+            self.skip_newlines()
             let extra_start = self.pool.extra_len()
             var binding_count = 0
             while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
                 let b = self.expect_ident()
                 self.pool.add_extra(b)
                 binding_count = binding_count + 1
+                self.skip_newlines()
                 if self.peek() == TK_COMMA:
                     self.advance()
                     self.skip_newlines()
+            self.skip_newlines()
             self.expect(TK_R_PAREN)
             return self.pool.add_node(NK_PAT_ENUM_SHORTHAND, start, self.prev_end(), name, extra_start, binding_count)
         return self.pool.add_node(NK_PAT_ENUM_SHORTHAND, start, self.prev_end(), name, 0, 0)
 
     if t == TK_L_PAREN:
         self.advance()
+        self.skip_newlines()
         let extra_start = self.pool.extra_len()
         var count = 0
         if self.peek() != TK_R_PAREN:
             let p = self.parse_pattern()
             self.pool.add_extra(p)
             count = count + 1
+            self.skip_newlines()
             while self.peek() == TK_COMMA:
                 self.advance()
                 self.skip_newlines()
@@ -3121,6 +3223,8 @@ fn Parser.parse_pattern(self: Parser) -> i32:
                 let p2 = self.parse_pattern()
                 self.pool.add_extra(p2)
                 count = count + 1
+                self.skip_newlines()
+        self.skip_newlines()
         self.expect(TK_R_PAREN)
         return self.pool.add_node(NK_PAT_TUPLE, start, self.prev_end(), extra_start, count, 0)
 
@@ -3169,6 +3273,7 @@ fn Parser.parse_struct_pattern(self: Parser, type_name: i32, start: i32) -> i32:
 
 fn Parser.parse_slice_pattern(self: Parser, start: i32) -> i32:
     self.advance()  // consume [
+    self.skip_newlines()
     let extra_start = self.pool.extra_len()
     var head_count = 0
     var rest_sym = 0
@@ -3200,6 +3305,7 @@ fn Parser.parse_slice_pattern(self: Parser, start: i32) -> i32:
             self.advance()
             self.skip_newlines()
 
+    self.skip_newlines()
     self.expect(TK_R_BRACKET)
     self.pool.extra.set_i32(has_rest_idx as i64, has_rest)
     self.pool.add_extra(tail_syms.len() as i32)
@@ -3273,6 +3379,7 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         self.advance()
         if self.peek() == TK_L_PAREN:
             self.advance()
+            self.skip_newlines()
             let extra_start = self.pool.extra_len()
             var binding_count = 0
             while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
@@ -3280,9 +3387,11 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
                 let pat_node = self.pool.add_node(NK_PAT_IDENT, self.prev_start(), self.prev_end(), b, 0, 0)
                 self.pool.add_extra(pat_node)
                 binding_count = binding_count + 1
+                self.skip_newlines()
                 if self.peek() == TK_COMMA:
                     self.advance()
                     self.skip_newlines()
+            self.skip_newlines()
             self.expect(TK_R_PAREN)
             if self.expect(TK_EQ) == 0:
                 return 0
@@ -3315,6 +3424,7 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
     // Let-else variant: let Some(x) = expr else body
     if is_upper and self.peek() == TK_L_PAREN:
         self.advance()
+        self.skip_newlines()
         let extra_start = self.pool.extra_len()
         var binding_count = 0
         while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
@@ -3322,9 +3432,11 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
             let pat_node = self.pool.add_node(NK_PAT_IDENT, self.prev_start(), self.prev_end(), b, 0, 0)
             self.pool.add_extra(pat_node)
             binding_count = binding_count + 1
+            self.skip_newlines()
             if self.peek() == TK_COMMA:
                 self.advance()
                 self.skip_newlines()
+        self.skip_newlines()
         self.expect(TK_R_PAREN)
         if self.expect(TK_EQ) == 0:
             return 0
@@ -3711,7 +3823,9 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             self.advance()
             if self.expect(TK_L_PAREN) == 0:
                 return 0
+            self.skip_newlines()
             let inner = self.parse_expr()
+            self.skip_newlines()
             if self.expect(TK_R_PAREN) == 0:
                 return 0
             return self.pool.add_node(NK_TYPE_TYPEOF, start, self.prev_end(), inner, 0, 0)
@@ -3734,14 +3848,21 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
 
     if t == TK_L_PAREN:
         self.advance()
+        self.skip_newlines()
         var elems: Vec[i32] = Vec.new()
         if self.peek() != TK_R_PAREN:
             let ty = self.parse_type_expr()
             elems.push(ty)
+            self.skip_newlines()
             while self.peek() == TK_COMMA:
                 self.advance()
+                self.skip_newlines()
+                if self.peek() == TK_R_PAREN:
+                    break
                 let ty2 = self.parse_type_expr()
                 elems.push(ty2)
+                self.skip_newlines()
+        self.skip_newlines()
         self.expect(TK_R_PAREN)
         let extra_start = self.pool.extra_len()
         for ei in 0..elems.len() as i32:
@@ -3752,14 +3873,21 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
     if t == TK_KW_FN:
         self.advance()
         self.expect(TK_L_PAREN)
+        self.skip_newlines()
         var params: Vec[i32] = Vec.new()
         if self.peek() != TK_R_PAREN:
             let ty = self.parse_type_expr()
             params.push(ty)
+            self.skip_newlines()
             while self.peek() == TK_COMMA:
                 self.advance()
+                self.skip_newlines()
+                if self.peek() == TK_R_PAREN:
+                    break
                 let ty2 = self.parse_type_expr()
                 params.push(ty2)
+                self.skip_newlines()
+        self.skip_newlines()
         self.expect(TK_R_PAREN)
         self.expect(TK_ARROW)
         let ret = self.parse_type_expr()
@@ -3787,9 +3915,11 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
 
     if t == TK_L_BRACKET:
         self.advance()
+        self.skip_newlines()
         // []T → slice type
         if self.peek() == TK_R_BRACKET:
             self.advance()
+            self.skip_newlines()
             let elem = self.parse_type_expr()
             return self.pool.add_node(NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
         // [N]T → fixed array (legacy), detect by leading int literal
@@ -3799,13 +3929,17 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             let size_text = self.source.slice(ss as i64, se as i64)
             let size = parse_int(size_text)
             self.advance()
+            self.skip_newlines()
             self.expect(TK_R_BRACKET)
+            self.skip_newlines()
             let elem = self.parse_type_expr()
             return self.pool.add_node(NK_TYPE_ARRAY, start, self.prev_end(), elem, size, 0)
         // [T; N] → fixed array (spec syntax), OR [T] → slice
         let elem = self.parse_type_expr()
+        self.skip_newlines()
         if self.peek() == TK_SEMICOLON:
             self.advance()  // consume ;
+            self.skip_newlines()
             if self.peek() != TK_INT_LIT:
                 self.emit_error("expected array size after ';'")
                 return 0
@@ -3814,9 +3948,11 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             let size_text = self.source.slice(ss as i64, se as i64)
             let size = parse_int(size_text)
             self.advance()
+            self.skip_newlines()
             self.expect(TK_R_BRACKET)
             return self.pool.add_node(NK_TYPE_ARRAY, start, self.prev_end(), elem, size, 0)
         // [T] → slice type
+        self.skip_newlines()
         self.expect(TK_R_BRACKET)
         return self.pool.add_node(NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
 
@@ -3861,16 +3997,20 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             return self.pool.add_node(NK_TYPE_ASSOC, start, self.prev_end(), sym, assoc_sym, 0)
         if self.peek() == TK_L_BRACKET:
             self.advance()
+            self.skip_newlines()
             var args: Vec[i32] = Vec.new()
             if self.peek() != TK_R_BRACKET:
                 while self.peek() != TK_R_BRACKET and self.peek() != TK_EOF:
                     let ty = self.parse_type_expr()
                     args.push(ty)
+                    self.skip_newlines()
                     if self.peek() != TK_COMMA:
                         break
                     self.advance()
+                    self.skip_newlines()
                     if self.peek() == TK_R_BRACKET:
                         break
+            self.skip_newlines()
             self.expect(TK_R_BRACKET)
             let extra_start = self.pool.extra_len()
             for ai in 0..args.len() as i32:
@@ -3916,9 +4056,11 @@ fn Parser.parse_param_list(self: Parser) -> i32:
     self.last_param_pattern_start = pattern_start
     self.last_param_pattern_count = 0
     self.last_param_required_count = 0
+    self.skip_newlines()
     if self.peek() == TK_R_PAREN or self.peek() == TK_DOT_DOT_DOT:
         return 0
     while true:
+        self.skip_newlines()
         let param_flags = self.parse_param_attrs()
         var is_mut = 0
         if self.peek() == TK_KW_MUT:
@@ -3943,12 +4085,14 @@ fn Parser.parse_param_list(self: Parser) -> i32:
         var type_node = 0
         if self.peek() == TK_COLON:
             self.advance()
+            self.skip_newlines()
             type_node = self.parse_type_expr()
 
         // Default value
         var has_default = 0
         if self.peek() == TK_EQ:
             self.advance()
+            self.skip_newlines()
             self.parse_expr()
             has_default = 1
         if has_default == 0:
@@ -4003,14 +4147,17 @@ fn Parser.parse_type_params(self: Parser) -> i32:
     if self.peek() != TK_L_BRACKET:
         return 0
     self.advance()
+    self.skip_newlines()
     var count = 0
     if self.peek() != TK_R_BRACKET:
         count = count + self.parse_one_type_param()
         while self.peek() == TK_COMMA:
             self.advance()
+            self.skip_newlines()
             if self.peek() == TK_R_BRACKET:
                 break
             count = count + self.parse_one_type_param()
+    self.skip_newlines()
     self.expect(TK_R_BRACKET)
     count
 
@@ -4024,11 +4171,13 @@ fn Parser.parse_one_type_param(self: Parser) -> i32:
     var bound_count = 0
     if self.peek() == TK_COLON:
         self.advance()
+        self.skip_newlines()
         let b = self.parse_type_bound_symbol()
         self.pool.add_extra(b)
         bound_count = bound_count + 1
         while self.peek() == TK_PLUS:
             self.advance()
+            self.skip_newlines()
             let b2 = self.parse_type_bound_symbol()
             self.pool.add_extra(b2)
             bound_count = bound_count + 1
@@ -4112,14 +4261,15 @@ fn parse_int(text: str) -> i32:
     value as i32
 
 fn parse_i64(text: str) -> i64:
-    let len = text.len() as i32
+    let base_text = numeric_literal_core(text)
+    let len = base_text.len() as i32
     if len == 0:
         return 0
-    if len > 2 and text.byte_at(0) == 48 and (text.byte_at(1) == 120 or text.byte_at(1) == 88):
+    if len > 2 and base_text.byte_at(0) == 48 and (base_text.byte_at(1) == 120 or base_text.byte_at(1) == 88):
         var val: i64 = 0
         var i = 2
         while i < len:
-            let ch = text.byte_at(i as i64)
+            let ch = base_text.byte_at(i as i64)
             if ch == 95:
                 i = i + 1
                 continue
@@ -4133,11 +4283,11 @@ fn parse_i64(text: str) -> i64:
             val = val * 16 + digit
             i = i + 1
         return val
-    if len > 2 and text.byte_at(0) == 48 and (text.byte_at(1) == 98 or text.byte_at(1) == 66):
+    if len > 2 and base_text.byte_at(0) == 48 and (base_text.byte_at(1) == 98 or base_text.byte_at(1) == 66):
         var val: i64 = 0
         var i = 2
         while i < len:
-            let ch = text.byte_at(i as i64)
+            let ch = base_text.byte_at(i as i64)
             if ch == 95:
                 i = i + 1
                 continue
@@ -4145,11 +4295,11 @@ fn parse_i64(text: str) -> i64:
             val = val * 2 + digit
             i = i + 1
         return val
-    if len > 2 and text.byte_at(0) == 48 and (text.byte_at(1) == 111 or text.byte_at(1) == 79):
+    if len > 2 and base_text.byte_at(0) == 48 and (base_text.byte_at(1) == 111 or base_text.byte_at(1) == 79):
         var val: i64 = 0
         var i = 2
         while i < len:
-            let ch = text.byte_at(i as i64)
+            let ch = base_text.byte_at(i as i64)
             if ch == 95:
                 i = i + 1
                 continue
@@ -4157,21 +4307,10 @@ fn parse_i64(text: str) -> i64:
             val = val * 8 + digit
             i = i + 1
         return val
-    var end_pos = len
-    var si = 0
-    while si < len:
-        if text.byte_at(si as i64) == 95:
-            let remain = len - si
-            if remain >= 4:
-                let c1 = text.byte_at((si + 1) as i64)
-                if c1 == 105 or c1 == 117:
-                    end_pos = si
-                    break
-        si = si + 1
     var clean = ""
     var i = 0
-    while i < end_pos:
-        let ch = text.byte_at(i as i64)
+    while i < len:
+        let ch = base_text.byte_at(i as i64)
         if ch != 95:
             clean = clean ++ str_from_byte(ch)
         i = i + 1

@@ -144,7 +144,7 @@ Source directories must **never contain build artifacts**.
 # LLVM Linking
 
 LLVM is **statically linked** into the compiler binary. There is no dynamic
-`libwith_llvm_bridge.dylib` fallback in the normal build.
+LLVM bridge fallback in the normal build.
 
 Build-time setup is owned by the Makefile:
 

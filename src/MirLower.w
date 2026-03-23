@@ -921,6 +921,24 @@ fn MirBuilder.try_resolve_module_float_const(self: MirBuilder, sym: i32) -> i32:
             return self.ast.get_data0(value_node)
     -1
 
+fn MirBuilder.try_resolve_module_const_type(self: MirBuilder, sym: i32) -> i32:
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NK_LET_DECL:
+            continue
+        if self.ast.get_data0(decl) != sym:
+            continue
+        if self.sema.typed_binding_types.contains(decl):
+            return self.sema.typed_binding_types.get(decl).unwrap()
+        let flags = self.ast.get_data2(decl)
+        let type_extra_packed = flags / 4
+        if type_extra_packed > 0:
+            let type_ann_node = self.ast.get_extra(type_extra_packed - 1)
+            let resolved = self.sema.resolve_type_expr(type_ann_node)
+            if resolved != 0:
+                return resolved
+    0
+
 fn MirBuilder.mark_unsupported(self: MirBuilder):
     if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
         let node_kind = if self.cur_node != 0: self.ast.kind(self.cur_node) else: 0
@@ -940,8 +958,9 @@ fn MirBuilder.lower_bool_lit(self: MirBuilder, value: i32) -> i32:
 fn MirBuilder.lower_str_lit(self: MirBuilder, sym: i32) -> i32:
     self.const_operand(CK_STR, sym, self.sema.ty_str)
 
-fn MirBuilder.lower_float_lit(self: MirBuilder, sym: i32) -> i32:
-    self.const_operand(CK_FLOAT, sym, self.sema.ty_f64)
+fn MirBuilder.lower_float_lit(self: MirBuilder, sym: i32, type_id: i32) -> i32:
+    let ty = if type_id == 0 or self.sema.get_type_kind(type_id) == TY_VOID: self.sema.ty_f64 else: type_id
+    self.const_operand(CK_FLOAT, sym, ty)
 
 fn MirBuilder.lower_unit(self: MirBuilder) -> i32:
     self.unit_operand()
@@ -1032,13 +1051,19 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
     // Try module-level constant (const X = 42)
     let const_val = self.try_resolve_module_const_val(sym)
     if const_val != -9223372036854775807:
-        let ty = if const_val < -2147483648 or const_val > 2147483647: self.sema.ty_i64 else: self.sema.ty_i32
+        let inferred_ty = self.try_resolve_module_const_type(sym)
+        let ty = if inferred_ty != 0:
+            inferred_ty
+        else:
+            if const_val < -2147483648 or const_val > 2147483647: self.sema.ty_i64 else: self.sema.ty_i32
         return self.int_const_operand(const_val, ty)
 
     // Try module-level float constant (let PI: f64 = 3.14)
     let float_str_idx = self.try_resolve_module_float_const(sym)
     if float_str_idx >= 0:
-        return self.const_operand(CK_FLOAT, float_str_idx, self.sema.ty_f64)
+        let inferred_ty = self.try_resolve_module_const_type(sym)
+        let ty = if inferred_ty != 0: inferred_ty else: self.sema.ty_f64
+        return self.const_operand(CK_FLOAT, float_str_idx, ty)
 
     // Check for enum variant without payload (None, etc.)
     if self.sema.variant_lookup.contains(sym):
@@ -3089,7 +3114,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.lower_str_lit(self.ast.get_data0(node))
 
     if kind == NK_FLOAT_LIT:
-        return self.lower_float_lit(self.ast.get_data0(node))
+        return self.lower_float_lit(self.ast.get_data0(node), self.expr_type(node))
 
     if kind == NK_NULL_LIT:
         // Null pointer literal: lower as integer 0 (codegen emits wl_const_null for ptr targets)

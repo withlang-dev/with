@@ -428,93 +428,106 @@ fn Lexer.lex_string(self: Lexer) -> i32:
 fn Lexer.lex_number(self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
-    let start = self.token_start
     var is_float = false
+    var scanned_prefixed = false
 
     // Check for 0x, 0b, 0o prefixes
     if src.byte_at((self.pos) as i64) == 48 and self.pos + 1 < slen:
         let prefix = src.byte_at((self.pos + 1) as i64)
         if prefix == 120 or prefix == 88:  // x, X
+            scanned_prefixed = true
             self.pos = self.pos + 2
             while self.pos < slen and (is_hex_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
                 self.pos = self.pos + 1
-            return TK_INT_LIT
-        if prefix == 98 or prefix == 66:  // b, B
+        else if prefix == 98 or prefix == 66:  // b, B
+            scanned_prefixed = true
             self.pos = self.pos + 2
             while self.pos < slen and (src.byte_at((self.pos) as i64) == 48 or src.byte_at((self.pos) as i64) == 49 or src.byte_at((self.pos) as i64) == 95):
                 self.pos = self.pos + 1
-            return TK_INT_LIT
-        if prefix == 111 or prefix == 79:  // o, O
+        else if prefix == 111 or prefix == 79:  // o, O
+            scanned_prefixed = true
             self.pos = self.pos + 2
             while self.pos < slen and ((src.byte_at((self.pos) as i64) >= 48 and src.byte_at((self.pos) as i64) <= 55) or src.byte_at((self.pos) as i64) == 95):
                 self.pos = self.pos + 1
-            return TK_INT_LIT
 
-    // Decimal digits
-    while self.pos < slen and (lex_is_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
-        self.pos = self.pos + 1
-
-    // Check for decimal point (but not .. range)
-    if self.pos < slen and src.byte_at((self.pos) as i64) == 46:
-        if self.pos + 1 < slen and src.byte_at((self.pos + 1) as i64) != 46:
-            is_float = true
+    if scanned_prefixed == false:
+        // Decimal digits
+        while self.pos < slen and (lex_is_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
             self.pos = self.pos + 1
-            while self.pos < slen and (lex_is_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
+
+        // Check for decimal point (but not .. range)
+        if self.pos < slen and src.byte_at((self.pos) as i64) == 46:
+            if self.pos + 1 < slen and src.byte_at((self.pos + 1) as i64) != 46:
+                is_float = true
                 self.pos = self.pos + 1
-
-    // Check for exponent (e/E followed by optional +/- and digits)
-    if self.pos < slen:
-        let exp_ch = src.byte_at((self.pos) as i64)
-        if exp_ch == 101 or exp_ch == 69:  // e, E
-            is_float = true
-            self.pos = self.pos + 1
-            // Optional sign
-            if self.pos < slen:
-                let sign_ch = src.byte_at((self.pos) as i64)
-                if sign_ch == 43 or sign_ch == 45:  // +, -
+                while self.pos < slen and (lex_is_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
                     self.pos = self.pos + 1
-            // Exponent digits
-            while self.pos < slen and (lex_is_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
-                self.pos = self.pos + 1
 
-    // Check for type suffix: 100_i64, 3.14_f32, etc.
-    if self.pos > start and self.pos < slen and src.byte_at((self.pos - 1) as i64) == 95:
-        let ch2 = src.byte_at((self.pos) as i64)
-        if ch2 == 105 or ch2 == 117 or ch2 == 102:  // i, u, f
-            if suffix_accept(src, self.pos, slen, "i8", 2):
-                self.pos = self.pos + 2
-            else if suffix_accept(src, self.pos, slen, "i16", 3):
-                self.pos = self.pos + 3
-            else if suffix_accept(src, self.pos, slen, "i32", 3):
-                self.pos = self.pos + 3
-            else if suffix_accept(src, self.pos, slen, "isize", 5):
-                self.pos = self.pos + 5
-            else if suffix_accept(src, self.pos, slen, "i64", 3):
-                self.pos = self.pos + 3
-            else if suffix_accept(src, self.pos, slen, "i128", 4):
-                self.pos = self.pos + 4
-            else if suffix_accept(src, self.pos, slen, "u8", 2):
-                self.pos = self.pos + 2
-            else if suffix_accept(src, self.pos, slen, "u16", 3):
-                self.pos = self.pos + 3
-            else if suffix_accept(src, self.pos, slen, "u32", 3):
-                self.pos = self.pos + 3
-            else if suffix_accept(src, self.pos, slen, "usize", 5):
-                self.pos = self.pos + 5
-            else if suffix_accept(src, self.pos, slen, "u64", 3):
-                self.pos = self.pos + 3
-            else if suffix_accept(src, self.pos, slen, "u128", 4):
-                self.pos = self.pos + 4
-            else if suffix_accept(src, self.pos, slen, "f32", 3):
-                self.pos = self.pos + 3
+        // Check for exponent (e/E followed by optional +/- and digits)
+        if self.pos < slen:
+            let exp_ch = src.byte_at((self.pos) as i64)
+            if exp_ch == 101 or exp_ch == 69:  // e, E
                 is_float = true
-            else if suffix_accept(src, self.pos, slen, "f64", 3):
-                self.pos = self.pos + 3
-                is_float = true
+                self.pos = self.pos + 1
+                // Optional sign
+                if self.pos < slen:
+                    let sign_ch = src.byte_at((self.pos) as i64)
+                    if sign_ch == 43 or sign_ch == 45:  // +, -
+                        self.pos = self.pos + 1
+                // Exponent digits
+                while self.pos < slen and (lex_is_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == 95):
+                    self.pos = self.pos + 1
+
+    // Check for type suffix: 100i64, 3.14f32, 0xFFu32.
+    var suffix_pos = self.pos
+    if suffix_pos < slen and src.byte_at((suffix_pos) as i64) == 95:
+        suffix_pos = suffix_pos + 1
+    let suffix_len = numeric_suffix_len(src, suffix_pos, slen)
+    if suffix_len > 0:
+        let suffix_head = src.byte_at((suffix_pos) as i64)
+        self.pos = suffix_pos + suffix_len
+        if suffix_head == 102:  // f
+            is_float = true
 
     if is_float:
         return TK_FLOAT_LIT
     TK_INT_LIT
+
+fn numeric_suffix_len(src: str, pos: i32, slen: i32) -> i32:
+    if pos >= slen:
+        return 0
+    let ch = src.byte_at((pos) as i64)
+    if ch != 105 and ch != 117 and ch != 102:  // i, u, f
+        return 0
+    if suffix_accept(src, pos, slen, "usize", 5):
+        return 5
+    if suffix_accept(src, pos, slen, "isize", 5):
+        return 5
+    if suffix_accept(src, pos, slen, "u128", 4):
+        return 4
+    if suffix_accept(src, pos, slen, "i128", 4):
+        return 4
+    if suffix_accept(src, pos, slen, "u64", 3):
+        return 3
+    if suffix_accept(src, pos, slen, "i64", 3):
+        return 3
+    if suffix_accept(src, pos, slen, "u32", 3):
+        return 3
+    if suffix_accept(src, pos, slen, "i32", 3):
+        return 3
+    if suffix_accept(src, pos, slen, "u16", 3):
+        return 3
+    if suffix_accept(src, pos, slen, "i16", 3):
+        return 3
+    if suffix_accept(src, pos, slen, "f32", 3):
+        return 3
+    if suffix_accept(src, pos, slen, "f64", 3):
+        return 3
+    if suffix_accept(src, pos, slen, "u8", 2):
+        return 2
+    if suffix_accept(src, pos, slen, "i8", 2):
+        return 2
+    0
 
 fn suffix_accept(src: str, pos: i32, slen: i32, suffix: str, suf_len: i32) -> bool:
     if pos + suf_len > slen:
