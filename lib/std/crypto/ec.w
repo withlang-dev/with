@@ -189,19 +189,6 @@ unsafe fn point_is_zero(pt: *const u32) -> u32:
 // Point doubling: R = 2*P (Jacobian coordinates)
 // Algorithm from "Guide to ECC" Algorithm 3.21
 unsafe fn point_double(r: *mut u32, pt: *const u32, p: *const u32, p0i: u32):
-    // Copy inputs to locals (inline — no helper calls)
-    var lpt: [u32; 36] = [0u32; 36]
-    var lp: [u32; 12] = [0u32; 12]
-    var ci = 0
-    while ci < 36:
-        let v = *(pt + ci as u64)
-        lpt[ci] = v
-        if ci < 12:
-            let vp = *(p + ci as u64)
-            lp[ci] = vp
-        ci = ci + 1
-    let lpp = &lp[0] as *const u32
-
     var a: [u32; 12] = [0u32; 12]
     var b: [u32; 12] = [0u32; 12]
     var c: [u32; 12] = [0u32; 12]
@@ -213,69 +200,49 @@ unsafe fn point_double(r: *mut u32, pt: *const u32, p: *const u32, p0i: u32):
     let dp = &mut d[0] as *mut u32
     let tp = &mut t[0] as *mut u32
 
-    let px = &lpt[0] as *const u32
-    let py = &lpt[12] as *const u32
-    let pz = &lpt[24] as *const u32
+    let px = point_x_const(pt)
+    let py = point_y_const(pt)
+    let pz = point_z_const(pt)
     let rx = point_x(r)
     let ry = point_y(r)
     let rz = point_z(r)
 
-    // a = 3*(X - Z²)*(X + Z²) [using a=-3 optimization]
-    fe_sqr(tp, pz, lpp, p0i)           // t = Z²
-    fe_sub(ap, px, tp as *const u32, lpp)  // a = X - Z²
-    fe_add(bp, px, tp as *const u32, lpp)  // b = X + Z²
-    fe_mul(cp, ap as *const u32, bp as *const u32, lpp, p0i) // c = (X-Z²)(X+Z²)
-    fe_add(ap, cp as *const u32, cp as *const u32, lpp)
-    fe_add(ap, ap as *const u32, cp as *const u32, lpp) // a = 3*(X²-Z⁴)
+    fe_sqr(tp, pz, p, p0i)
+    fe_sub(ap, px, tp as *const u32, p)
+    fe_add(bp, px, tp as *const u32, p)
+    fe_mul(cp, ap as *const u32, bp as *const u32, p, p0i)
+    fe_add(ap, cp as *const u32, cp as *const u32, p)
+    fe_add(ap, ap as *const u32, cp as *const u32, p)
 
-    fe_sqr(bp, py, lpp, p0i) // b = Y²
+    fe_sqr(bp, py, p, p0i)
 
-    fe_mul(dp, px, bp as *const u32, lpp, p0i)  // d = X*Y²
-    fe_add(dp, dp as *const u32, dp as *const u32, lpp) // d = 2*X*Y²
-    fe_add(dp, dp as *const u32, dp as *const u32, lpp) // d = 4*X*Y²
+    fe_mul(dp, px, bp as *const u32, p, p0i)
+    fe_add(dp, dp as *const u32, dp as *const u32, p)
+    fe_add(dp, dp as *const u32, dp as *const u32, p)
 
-    fe_sqr(rx, ap as *const u32, lpp, p0i)        // X' = a²
-    fe_sub(rx, rx as *const u32, dp as *const u32, lpp) // X' = a² - d
-    fe_sub(rx, rx as *const u32, dp as *const u32, lpp) // X' = a² - 2d
+    fe_sqr(rx, ap as *const u32, p, p0i)
+    fe_sub(rx, rx as *const u32, dp as *const u32, p)
+    fe_sub(rx, rx as *const u32, dp as *const u32, p)
 
-    fe_mul(rz, py, pz, lpp, p0i)                 // Z' = Y*Z
-    fe_add(rz, rz as *const u32, rz as *const u32, lpp) // Z' = 2*Y*Z
+    fe_mul(rz, py, pz, p, p0i)
+    fe_add(rz, rz as *const u32, rz as *const u32, p)
 
-    fe_sub(tp, dp as *const u32, rx as *const u32, lpp) // t = d - X'
-    fe_mul(ry, ap as *const u32, tp as *const u32, lpp, p0i) // Y' = a*(d-X')
-    fe_sqr(tp, bp as *const u32, lpp, p0i)       // t = Y⁴
-    fe_add(tp, tp as *const u32, tp as *const u32, lpp)
-    fe_add(tp, tp as *const u32, tp as *const u32, lpp)
-    fe_add(tp, tp as *const u32, tp as *const u32, lpp) // t = 8*Y⁴
-    fe_sub(ry, ry as *const u32, tp as *const u32, lpp) // Y' = a*(d-X') - 8*Y⁴
+    fe_sub(tp, dp as *const u32, rx as *const u32, p)
+    fe_mul(ry, ap as *const u32, tp as *const u32, p, p0i)
+    fe_sqr(tp, bp as *const u32, p, p0i)
+    fe_add(tp, tp as *const u32, tp as *const u32, p)
+    fe_add(tp, tp as *const u32, tp as *const u32, p)
+    fe_add(tp, tp as *const u32, tp as *const u32, p)
+    fe_sub(ry, ry as *const u32, tp as *const u32, p)
 
 // Point addition: R = P + Q (Jacobian, both inputs Jacobian)
 // Uses Algorithm 3.22 from "Guide to ECC" (modified for a=-3)
 unsafe fn point_add(r: *mut u32, pt1: *const u32, pt2: *const u32, p: *const u32, p0i: u32):
-    // Copy inputs to locals (inline copy — helper calls also trigger codegen bug)
-    var lp1: [u32; 36] = [0u32; 36]
-    var lp2: [u32; 36] = [0u32; 36]
-    var lp: [u32; 12] = [0u32; 12]
-    var ci = 0
-    while ci < 36:
-        let v1 = *(pt1 + ci as u64)
-        lp1[ci] = v1
-        let v2 = *(pt2 + ci as u64)
-        lp2[ci] = v2
-        if ci < 12:
-            let vp = *(p + ci as u64)
-            lp[ci] = vp
-        ci = ci + 1
-
-    let lpp = &lp[0] as *const u32
-
-    // If P is identity, return Q
-    if point_is_zero(&lp1[0] as *const u32) != 0u32:
-        point_copy(r, &lp2[0] as *const u32)
+    if point_is_zero(pt1) != 0u32:
+        point_copy(r, pt2)
         return
-    // If Q is identity, return P
-    if point_is_zero(&lp2[0] as *const u32) != 0u32:
-        point_copy(r, &lp1[0] as *const u32)
+    if point_is_zero(pt2) != 0u32:
+        point_copy(r, pt1)
         return
 
     var u1: [u32; 12] = [0u32; 12]
@@ -295,81 +262,66 @@ unsafe fn point_add(r: *mut u32, pt1: *const u32, pt2: *const u32, p: *const u32
     let tp = &mut t[0] as *mut u32
     let t2p = &mut t2v[0] as *mut u32
 
-    let p1x = &lp1[0] as *const u32
-    let p1y = &lp1[12] as *const u32
-    let p1z = &lp1[24] as *const u32
-    let p2x = &lp2[0] as *const u32
-    let p2y = &lp2[12] as *const u32
-    let p2z = &lp2[24] as *const u32
+    let p1x = point_x_const(pt1)
+    let p1y = point_y_const(pt1)
+    let p1z = point_z_const(pt1)
+    let p2x = point_x_const(pt2)
+    let p2y = point_y_const(pt2)
+    let p2z = point_z_const(pt2)
 
     // U1 = X1*Z2², U2 = X2*Z1²
-    fe_sqr(tp, p2z, lpp, p0i)                    // t = Z2²
-    fe_mul(u1p, p1x, tp as *const u32, lpp, p0i) // U1 = X1*Z2²
-    fe_sqr(t2p, p1z, lpp, p0i)                   // t2 = Z1²
-    fe_mul(u2p, p2x, t2p as *const u32, lpp, p0i) // U2 = X2*Z1²
+    fe_sqr(tp, p2z, p, p0i)
+    fe_mul(u1p, p1x, tp as *const u32, p, p0i)
+    fe_sqr(t2p, p1z, p, p0i)
+    fe_mul(u2p, p2x, t2p as *const u32, p, p0i)
 
-    // S1 = Y1*Z2³, S2 = Y2*Z1³
-    // Use tmp buffers to avoid montmul aliasing (d clears before reading x/y)
+    // S1 = Y1*Z2³, S2 = Y2*Z1³ (separate buffers to avoid montmul aliasing)
     var z2_cubed: [u32; 12] = [0u32; 12]
     var z1_cubed: [u32; 12] = [0u32; 12]
-    fe_mul(&mut z2_cubed[0] as *mut u32, tp as *const u32, p2z, lpp, p0i)  // z2³
-    fe_mul(s1p, p1y, &z2_cubed[0] as *const u32, lpp, p0i)                // S1 = Y1*Z2³
-    fe_mul(&mut z1_cubed[0] as *mut u32, t2p as *const u32, p1z, lpp, p0i) // z1³
-    fe_mul(s2p, p2y, &z1_cubed[0] as *const u32, lpp, p0i)                // S2 = Y2*Z1³
+    fe_mul(&mut z2_cubed[0] as *mut u32, tp as *const u32, p2z, p, p0i)
+    fe_mul(s1p, p1y, &z2_cubed[0] as *const u32, p, p0i)
+    fe_mul(&mut z1_cubed[0] as *mut u32, t2p as *const u32, p1z, p, p0i)
+    fe_mul(s2p, p2y, &z1_cubed[0] as *const u32, p, p0i)
 
-    // H = U2 - U1
-    fe_sub(hp, u2p as *const u32, u1p as *const u32, lpp)
-    // R = S2 - S1
-    fe_sub(rrp, s2p as *const u32, s1p as *const u32, lpp)
+    fe_sub(hp, u2p as *const u32, u1p as *const u32, p)
+    fe_sub(rrp, s2p as *const u32, s1p as *const u32, p)
 
-    // If H == 0, points have same X
     if i31_is_zero(hp as *const u32) != 0u32:
         if i31_is_zero(rrp as *const u32) != 0u32:
-            point_double(r, &lp1[0] as *const u32, lpp, p0i)
+            point_double(r, pt1, p, p0i)
             return
         else:
-            point_zero(r, lpp)
+            point_zero(r, p)
             return
 
     let rx = point_x(r)
     let ry = point_y(r)
     let rz = point_z(r)
 
-    // H² and H³
-    fe_sqr(tp, hp as *const u32, lpp, p0i)       // t = H²
-    fe_mul(t2p, tp as *const u32, hp as *const u32, lpp, p0i) // t2 = H³
+    fe_sqr(tp, hp as *const u32, p, p0i)
+    fe_mul(t2p, tp as *const u32, hp as *const u32, p, p0i)
 
-    // X3 = R² - H³ - 2*U1*H²
+    // u1h2 = U1*H² (separate buffer to avoid aliasing u1p as both dst and src)
     var u1h2: [u32; 12] = [0u32; 12]
-    fe_mul(&mut u1h2[0] as *mut u32, u1p as *const u32, tp as *const u32, lpp, p0i) // u1h2 = U1*H²
-    fe_sqr(rx, rrp as *const u32, lpp, p0i)      // X3 = R²
-    fe_sub(rx, rx as *const u32, t2p as *const u32, lpp) // X3 = R² - H³
-    fe_sub(rx, rx as *const u32, &u1h2[0] as *const u32, lpp)
-    fe_sub(rx, rx as *const u32, &u1h2[0] as *const u32, lpp) // X3 = R² - H³ - 2*U1*H²
+    fe_mul(&mut u1h2[0] as *mut u32, u1p as *const u32, tp as *const u32, p, p0i)
+    fe_sqr(rx, rrp as *const u32, p, p0i)
+    fe_sub(rx, rx as *const u32, t2p as *const u32, p)
+    fe_sub(rx, rx as *const u32, &u1h2[0] as *const u32, p)
+    fe_sub(rx, rx as *const u32, &u1h2[0] as *const u32, p)
 
-    // Y3 = R*(U1*H² - X3) - S1*H³
-    fe_sub(tp, &u1h2[0] as *const u32, rx as *const u32, lpp) // t = U1*H² - X3
-    fe_mul(ry, rrp as *const u32, tp as *const u32, lpp, p0i) // Y3 = R*(U1*H²-X3)
-    fe_mul(tp, s1p as *const u32, t2p as *const u32, lpp, p0i) // t = S1*H³
-    fe_sub(ry, ry as *const u32, tp as *const u32, lpp) // Y3 = R*(U1*H²-X3) - S1*H³
+    fe_sub(tp, &u1h2[0] as *const u32, rx as *const u32, p)
+    fe_mul(ry, rrp as *const u32, tp as *const u32, p, p0i)
+    fe_mul(tp, s1p as *const u32, t2p as *const u32, p, p0i)
+    fe_sub(ry, ry as *const u32, tp as *const u32, p)
 
-    // Z3 = Z1*Z2*H
+    // z1z2 = Z1*Z2 (separate buffer to avoid aliasing rz as both dst and src in next mul)
     var z1z2: [u32; 12] = [0u32; 12]
-    fe_mul(&mut z1z2[0] as *mut u32, p1z, p2z, lpp, p0i) // z1z2 = Z1*Z2
-    fe_mul(rz, &z1z2[0] as *const u32, hp as *const u32, lpp, p0i) // Z3 = Z1*Z2*H
+    fe_mul(&mut z1z2[0] as *mut u32, p1z, p2z, p, p0i)
+    fe_mul(rz, &z1z2[0] as *const u32, hp as *const u32, p, p0i)
 
 // Scalar multiplication: R = k * P
 // k is a 32-byte big-endian scalar.
 unsafe fn point_mul(r: *mut u32, k: *const u8, pt: *const u32, p: *const u32, p0i: u32):
-    // Copy scalar to local buffer (workaround: pointer params corrupted in loops)
-    var k_buf: [u8; 32] = [0u8; 32]
-    var ki = 0
-    while ki < 32:
-        let raw = *(k + ki as u64)
-        k_buf[ki] = raw
-        ki = ki + 1
-
-    // R = identity
     point_zero(r, p)
 
     var tmp: [u32; 36] = [0u32; 36]
@@ -378,7 +330,8 @@ unsafe fn point_mul(r: *mut u32, k: *const u8, pt: *const u32, p: *const u32, p0
     // Double-and-add, MSB first
     var bi = 0
     while bi < 32:
-        let byte = k_buf[bi] as u32
+        let raw = *(k + bi as u64)
+        let byte = raw as u32
         var bj = 0
         while bj < 8:
             let bit = (byte >> (7 - bj) as u32) & 1u32
