@@ -2587,6 +2587,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
     let type_name = self.pool.resolve_symbol(type_name_sym)
     if type_name == "Vec":
         if method_name == "new": return MIR_INTRINSIC_VEC_NEW
+        if method_name == "with_capacity": return MIR_INTRINSIC_VEC_WITH_CAPACITY
         if method_name == "push": return MIR_INTRINSIC_VEC_PUSH
         if method_name == "get": return MIR_INTRINSIC_VEC_GET
         if method_name == "len": return MIR_INTRINSIC_VEC_LEN
@@ -2782,7 +2783,7 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
 
     // Build argument operands. For static calls (Vec.new, HashMap.new),
     // the receiver is a type ident — skip it. For instance methods, include it.
-    let is_static = intrinsic == MIR_INTRINSIC_VEC_NEW or intrinsic == MIR_INTRINSIC_MAP_NEW
+    let is_static = intrinsic == MIR_INTRINSIC_VEC_NEW or intrinsic == MIR_INTRINSIC_VEC_WITH_CAPACITY or intrinsic == MIR_INTRINSIC_MAP_NEW
     let call_args: Vec[i32] = Vec.new()
     if not is_static:
         call_args.push(self.lower_expr(self_expr))

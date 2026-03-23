@@ -193,6 +193,19 @@ void with_vec_new_out(with_vec *out, int64_t elem_size) {
     out->elem_size = elem_size;
 }
 
+void with_vec_new_with_capacity_out(with_vec *out, int64_t elem_size, int64_t capacity) {
+    if (!out) return;
+    out->len = 0;
+    out->cap = capacity;
+    out->elem_size = elem_size;
+    if (capacity > 0) {
+        out->ptr = malloc((size_t)(capacity * elem_size));
+        if (!out->ptr) { fprintf(stderr, "with: out of memory in vec with_capacity\n"); abort(); }
+    } else {
+        out->ptr = NULL;
+    }
+}
+
 static void with_vec_grow(with_vec *v) {
     int64_t new_cap = v->cap == 0 ? 8 : v->cap * 2;
     void *new_ptr = realloc(v->ptr, (size_t)(new_cap * v->elem_size));
