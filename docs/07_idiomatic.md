@@ -9,9 +9,9 @@ compiler does the same thing, but the code is clean.
 Rule: One file at a time. Verify fixpoint after each file.
 Never batch multiple files.
 
-**Codebase stats:** 36,387 total lines across 33+ source files.
-Largest files: Codegen.w (10,821), Sema.w (5,820), CCodegen.w
-(3,749), Parser.w (3,538).
+**Codebase stats:** 47,204 total lines across 42 source files.
+Largest files: Codegen.w (10,062), Sema.w (8,683), CImport.w
+(4,628), Parser.w (4,317), CCodegen.w (3,775).
 
 ---
 
@@ -23,11 +23,11 @@ each file.
 
 ### 1.1 src/Ast.w — Node Kinds (60 constants, 690 if-chain uses)
 
-**Current:** `const NK_FN_DECL: i32 = 1` through `const NK_PAT_SLICE: i32 = 113`
+**Current:** `const NK_FN_DECL: i32 = 1` through ~90 NK_* constants
 **Target:** `type NodeKind = disc i32 { FN_DECL = 1, TYPE_DECL = 2, ... }`
 
-- [ ] Read src/Ast.w lines 15-123 to catalog all 60 NK_* constants
-- [ ] Define `type NodeKind` discriminant enum with all 60 variants
+- [ ] Read src/Ast.w to catalog all ~90 NK_* constants
+- [ ] Define `type NodeKind` discriminant enum with all variants
       preserving existing integer values
 - [ ] Delete all 60 `const NK_*` definitions
 - [ ] Update `fn NK_*() -> i32` accessor pattern if used (check callers)
@@ -76,12 +76,12 @@ VIS_* (2 visibility levels)
 - [ ] Update all consumers
 - [ ] `make build && make fixpoint`
 
-### 1.4 src/Token.w — Token Kinds (141 constants)
+### 1.4 src/Token.w — Token Kinds (~125 constants)
 
-**Current:** `const TK_INT_LIT: i32 = 0` through `const TK_WHERE: i32 = 113`
+**Current:** `const TK_INT_LIT: i32 = 0` through ~125 TK_* constants
 **Target:** `type TokenKind` discriminant enum
 
-- [ ] Read src/Token.w lines 13-140 to catalog all 141 TK_* constants
+- [ ] Read src/Token.w to catalog all ~125 TK_* constants
 - [ ] Define `type TokenKind` discriminant enum preserving integer values
 - [ ] Delete all `const TK_*` definitions
 - [ ] Update src/Token.w internal uses (114 occurrences in `tag_name`)
@@ -91,9 +91,9 @@ VIS_* (2 visibility levels)
 - [ ] Update src/main.w and src/main_emit_temp.w TK_* references
 - [ ] `make build && make fixpoint`
 
-### 1.5 src/Sema.w — Type Kinds (19 constants)
+### 1.5 src/Sema.w — Type Kinds (20 constants)
 
-**Current:** `const TY_ERR: i32 = 0` through `const TY_NEVER: i32 = 18`
+**Current:** `const TY_ERR: i32 = 0` through 20 TY_* constants
 **Target:** `type TypeKind` discriminant enum
 
 - [ ] Define `type TypeKind` discriminant enum with 19 TY_* variants
@@ -113,10 +113,10 @@ VIS_* (2 visibility levels)
 - [ ] Update all consumers
 - [ ] `make build && make fixpoint`
 
-### 1.7 src/Mir.w — All MIR Constant Groups (36+ constants)
+### 1.7 src/Mir.w — All MIR Constant Groups (50+ constants)
 
 **Current:** SK_* (5), TK_* (6), RK_* (9), OK_* (3), CK_* (7),
-PK_* (4), DK_* (2), MIR_INTRINSIC_* (17)
+PK_* (4), DK_* (2), MIR_INTRINSIC_* (~50)
 
 - [ ] Define `type StmtKind` discriminant enum (5 SK_* variants)
 - [ ] Define `type TermKind` discriminant enum (6 TK_* variants)
@@ -199,9 +199,12 @@ mechanical transformations that preserve semantics.
 
 ### 3.1 Replace verbose closures with `it`
 
-- [ ] Search all src/*.w files for `|x|` single-parameter closure patterns
+`it` implicit closures are implemented (TK_KW_IT, token 110).
+Closure syntax uses fat arrow: `x => x * 2` (not `|x| x * 2`).
+
+- [ ] Search all src/*.w files for `x =>` single-parameter closure patterns
 - [ ] Replace eligible closures with `it` shorthand
-      (e.g., `v.filter(|x| x > 0)` → `v.filter(it > 0)`)
+      (e.g., `v.filter(x => x > 0)` → `v.filter(it > 0)`)
 - [ ] Verify no nested `it` usage (parser rejects this)
 - [ ] `make build && make fixpoint`
 
@@ -247,16 +250,13 @@ mechanical transformations that preserve semantics.
 
 ### 4.1 AstPool Metadata: Add HashMaps for O(1) Lookup
 
-**File:** src/Ast.w (lines 427-570)
+**File:** src/Ast.w
 
 **Current:** 9 functions do O(n) linear scans on metadata arrays:
-`find_fn_meta` (line 427), `find_type_meta` (line 458),
-`find_where_meta` (line 510), `find_for_meta` (line 564),
-`find_fn_param_pattern_meta` (line 545),
-`find_impl_type_params` (line 523),
-`is_must_use_type_node` (line 475),
-`is_sealed_trait_node` (line 486),
-`is_move_closure` (line 497)
+`find_fn_meta` (line ~503), `find_type_meta` (line ~543),
+`find_where_meta` (line ~606), `find_for_meta` (line ~685),
+`find_fn_param_pattern_meta`, `find_impl_type_params`,
+`is_must_use_type_node`, `is_sealed_trait_node`, `is_move_closure`
 
 - [ ] Read src/Ast.w lines 427-570 to understand each metadata lookup
 - [ ] Add `fn_meta_map: HashMap[i32, i32]` to AstPool struct
@@ -291,10 +291,11 @@ mechanical transformations that preserve semantics.
 
 ### 4.2 Sema Scope Lookup: Add HashMap Overlay
 
-**File:** src/Sema.w (lines 781-921)
+**File:** src/Sema.w
 
 **Current:** 13 scope lookup functions do reverse linear scans of
 `bind_names` Vec. Scope uses watermark stack (`scope_starts`).
+`scope_lookup` at line ~1333.
 
 - [ ] Read src/Sema.w lines 781-921 to understand scope architecture
 - [ ] Design HashMap overlay: `scope_name_map: HashMap[i32, i32]`
@@ -314,10 +315,10 @@ mechanical transformations that preserve semantics.
 
 ### 4.3 Lexer: Replace Remaining Magic Numbers
 
-**File:** src/Lexer.w (lines 83-234)
+**File:** src/Lexer.w
 
-**Current:** 6 remaining numeric character comparisons despite
-36 CH_* constants already defined (lines 11-46).
+**Current:** ~112 numeric character comparisons despite
+36 CH_* constants already defined.
 
 - [ ] Read src/Lexer.w lines 83-234 to find remaining magic numbers
 - [ ] Replace `== 10` with `== CH_NEWLINE` (line 83)
@@ -328,10 +329,10 @@ mechanical transformations that preserve semantics.
 
 ### 4.4 Document find_source_arg Assumptions
 
-**File:** src/main.w (lines 275-291)
+**File:** src/main.w
 
 **Current:** `find_source_arg` does linear scan of CLI args,
-called 16+ times redundantly.
+called redundantly from multiple subcommand handlers.
 
 - [ ] Read src/main.w lines 275-291 and all callers
 - [ ] Add comment documenting assumptions:
@@ -353,8 +354,8 @@ compiler.Compilation. Delete or reduce Driver.
 
 ### 5.1 Audit Current State Distribution
 
-**Files:** src/Driver.w (204 lines), src/compiler/Zcu.w (256 lines),
-src/compiler/Compilation.w (317 lines), src/main.w (550 lines)
+**Files:** src/Driver.w (204 lines), src/compiler/Zcu.w (270 lines),
+src/compiler/Compilation.w (379 lines), src/main.w (1,054 lines)
 
 - [ ] Read src/Driver.w in full — catalog all state fields
       (comp, mode, source_path, output_path, opt_level, no_std,
@@ -409,7 +410,7 @@ codegen. The prelude is the sole source of ambient names.
       — lists 11 hardcoded trait names: Drop, Scoped, ScopedMut,
       Debug, Display, Default, Iter, IntoIter, Eq, Hash, Ord
 - [ ] Audit src/Codegen.w for string-based dispatch — estimated
-      133+ string comparisons for method/type names
+      88+ string comparisons for method/type names
 - [ ] Categorize each hardcoded name:
       - **Language primitive** (must stay): primitive types (i32, bool, str, etc.),
         `c_import`, `comptime`, `it`, operator desugaring
