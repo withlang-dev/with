@@ -3783,6 +3783,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
     if kind == NK_STRING_LIT:
         return self.ty_str
 
+    if kind == NK_FSTRING:
+        return self.check_fstring(node)
+
     if kind == NK_C_STRING_LIT:
         return self.ty_const_i8_ptr
 
@@ -4103,6 +4106,28 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     // Unknown identifier
     self.emit_error("undefined variable", node)
     0
+
+fn Sema.check_fstring(self: Sema, node: i32) -> i32:
+    // Type-check each expression segment. Result type is always str.
+    let seg_count = self.ast.get_data0(node)
+    let extra_start = self.ast.get_data1(node)
+    var pos = extra_start
+    var i = 0
+    while i < seg_count:
+        let seg_kind = self.ast.get_extra(pos)
+        if seg_kind == FSTR_SEG_LITERAL:
+            pos = pos + 2  // kind + symbol
+        else if seg_kind == FSTR_SEG_EXPR:
+            let expr_node = self.ast.get_extra(pos + 1)
+            let spec_node = self.ast.get_extra(pos + 2)
+            // Type-check the expression
+            self.check_expr(expr_node)
+            // TODO: validate spec against expression type (task 16-17)
+            pos = pos + 3  // kind + expr + spec
+        else:
+            pos = pos + 1
+        i = i + 1
+    self.ty_str
 
 fn Sema.check_binary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)

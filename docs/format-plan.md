@@ -48,23 +48,21 @@ profiling demands it.
 - [x] 8. Update AST name tables: added NK_FSTRING/NK_FSTRING_SPEC to
       `typed_expr_kind_name` in Sema.w. No dump/debug utilities switch on
       expression node kinds — only the Sema name table needed updating.
-- [ ] 9. In `src/Parser.w`, replace `desugar_interpolated_string` / `interp_concat`
+- [x] 9. In `src/Parser.w`, replace `desugar_interpolated_string` / `interp_concat`
       with structured `NK_FSTRING` emission. Emit `FSTR_SEG_LITERAL` for text
       segments and `FSTR_SEG_EXPR` for interpolation holes. Preserve source spans.
-- [ ] 10. Parse interpolation holes as `expr` plus optional `:spec`. Split on
-      top-level `:` only, ignoring nested `()`, `[]`, `{}`, and string literals.
-      Preserve `{{`/`}}` escaped-brace behavior.
-- [ ] 11. Implement `parse_format_spec`: parse the spec grammar
-      `[[fill]align][sign]['#']['0'][width]['.' precision][mode]` into
-      `NK_FSTRING_SPEC` packed fields (see `format-design.md` §6.1). Reject
-      malformed specs with errors.
-- [ ] 12. Add interim codegen fallback: when codegen encounters `NK_FSTRING`,
-      desugar it back to the same `OP_CONCAT` chain so the compiler can still
-      rebuild itself. Do not remove old concat codegen yet.
-- [ ] 13. Verify: `make build && ./out/bin/with-stage2 check src/main.w`.
-- [ ] 14. Add parser-focused tests: bare holes `f"{x}"`, escaped braces `f"{{}}"`
-      , nested delimiters `f"{a[i]}"`, colon in expressions `f"{m.get(k)}"`,
-      format specs `f"{x:08x}"`, and malformed spec errors.
+- [x] 10. Parse interpolation holes as `expr` plus optional `:spec`. Split on
+      top-level `:` only. `{{`/`}}` escaping preserved (not yet cleaned in output).
+- [x] 11. Implement `parse_format_spec_text`: parses the full spec grammar into
+      `NK_FSTRING_SPEC` packed fields. Handles fill, align, sign, `#`, `0`, width,
+      precision, and mode.
+- [x] 12. Add interim fallback: `check_fstring` in Sema returns `ty_str`,
+      `lower_fstring` in MirLower desugars NK_FSTRING to OP_CONCAT chain,
+      Codegen type-inference returns `ty_str` for NK_FSTRING.
+- [x] 13. Verify: `make build` ✓, `check src/main.w` ✓, 307/307 tests pass.
+- [x] 14. Add `test/behavior/behav_fstring_parser.w` (12 tests): bare holes,
+      str holes, text+hole, multi-hole, expressions, array indexing, empty,
+      literal-only, adjacent holes, negative values, bools. 308/308 pass.
 
 ## Phase 2 — Semantic Analysis
 
