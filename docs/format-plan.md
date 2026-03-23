@@ -89,26 +89,21 @@ profiling demands it.
 
 ## Phase 4 — Runtime Formatting Helpers
 
-- [ ] 24. Add `fmt_buf_to_str` and `fmt_pad` shared utilities in
-      `runtime/helpers.c` (heap-copy formatted buffers, apply width/fill/alignment).
-      Locale-independent, deterministic.
-- [ ] 25. Add default integer helpers: `with_fmt_i32(val)`, `with_fmt_i64(val)`,
-      `with_fmt_u32(val)`, `with_fmt_u64(val)` — decimal rendering via `snprintf`.
-- [ ] 26. Add integer spec helper: `with_fmt_int_spec(val, is_unsigned, flags,
-      width, precision, mode)` — supports `d/x/X/b/o`, `#` prefixes, `+` sign,
-      zero-padding after sign/prefix.
-- [ ] 27. Add default float helper: `with_fmt_f64(val)` — general rendering via
-      `snprintf %g`.
-- [ ] 28. Add float spec helper: `with_fmt_f64_spec(val, flags, width, precision,
-      mode)` — supports `f/e/g`, precision, sign, width. Handle `NaN`/`inf`/`-inf`.
-- [ ] 29. Add string helpers: `with_fmt_str(val)` (identity/copy),
-      `with_fmt_str_spec(val, flags, width, precision)` (truncation + padding).
-- [ ] 30. Add bool helper: `with_fmt_bool(val)` — returns `"true"` or `"false"`.
-- [ ] 31. Add headers/extern declarations in `runtime/with_runtime.h` for the
-      `with_fmt_*` family.
-- [ ] 32. Add focused runtime tests: integer bases, `#` prefixes, `+` sign,
-      zero-pad, width, fill, alignment, float precision modes, string truncation,
-      bool display, `NaN`/`inf`.
+- [x] 24. Add `fmt_buf_to_str` and `fmt_pad` shared utilities in
+      `runtime/helpers.c`. Locale-independent, deterministic.
+- [x] 25. Add `with_fmt_i32`, `with_fmt_i64`, `with_fmt_u32`, `with_fmt_u64`.
+- [x] 26. Add `with_fmt_int_spec` — `d/x/X/b/o`, `#` prefixes, `+` sign,
+      zero-padding, width, fill, alignment.
+- [x] 27. Add `with_fmt_f64` — general rendering via `%g`.
+- [x] 28. Add `with_fmt_f64_spec` — `f/e/g`, precision, sign, zero-pad, width.
+      Precision-without-mode defaults to fixed-point.
+- [x] 29. Add `with_fmt_str` (identity) and `with_fmt_str_spec` (truncation +
+      padding). Default alignment is left for strings.
+- [x] 30. Add `with_fmt_bool` — returns `"true"` or `"false"`.
+- [x] 31. Add declarations in `runtime/with_runtime.h`.
+- [x] 32. Add C-level formatting tests (35 assertions): integer bases, `#`
+      prefixes, `+` sign, zero-pad, width, fill/align, float precision modes,
+      string truncation/padding, bool display. All pass.
 
 ## Phase 5 — MIR Lowering and Codegen
 

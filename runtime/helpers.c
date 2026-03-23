@@ -405,6 +405,245 @@ with_str with_f64_to_string(double n) {
     return out;
 }
 
+// ── F-string formatting helpers ──────────────────────────────────────
+
+// Shared: heap-copy a stack buffer into a with_str.
+static with_str fmt_buf_to_str(const char *buf, int len) {
+    char *heap = (char *)malloc((size_t)len + 1);
+    if (!heap) { with_str out = { "", 0 }; return out; }
+    memcpy(heap, buf, (size_t)len);
+    heap[len] = '\0';
+    with_str out = { heap, (int64_t)len };
+    return out;
+}
+
+// Shared: apply width, fill, and alignment to formatted content.
+// align: 0=default(right for numbers, left for strings), 1=left, 2=right, 3=center
+static with_str fmt_pad(const char *content, int content_len,
+                        int width, char fill, int align_mode) {
+    if (content_len >= width)
+        return fmt_buf_to_str(content, content_len);
+    int pad = width - content_len;
+    char *buf = (char *)malloc((size_t)width + 1);
+    if (!buf) return fmt_buf_to_str(content, content_len);
+    if (align_mode == 1) {
+        // left-align: content then padding
+        memcpy(buf, content, (size_t)content_len);
+        memset(buf + content_len, fill, (size_t)pad);
+    } else if (align_mode == 3) {
+        // center: split padding
+        int left_pad = pad / 2;
+        int right_pad = pad - left_pad;
+        memset(buf, fill, (size_t)left_pad);
+        memcpy(buf + left_pad, content, (size_t)content_len);
+        memset(buf + left_pad + content_len, fill, (size_t)right_pad);
+    } else {
+        // right-align (default for numbers, also explicit align_mode==2)
+        memset(buf, fill, (size_t)pad);
+        memcpy(buf + pad, content, (size_t)content_len);
+    }
+    buf[width] = '\0';
+    with_str out = { buf, (int64_t)width };
+    return out;
+}
+
+// Default integer formatting (decimal, no spec)
+with_str with_fmt_i32(int32_t n) {
+    char tmp[16];
+    int len = snprintf(tmp, sizeof(tmp), "%d", n);
+    return fmt_buf_to_str(tmp, len);
+}
+
+with_str with_fmt_i64(int64_t n) {
+    char tmp[24];
+    int len = snprintf(tmp, sizeof(tmp), "%lld", (long long)n);
+    return fmt_buf_to_str(tmp, len);
+}
+
+with_str with_fmt_u32(uint32_t n) {
+    char tmp[16];
+    int len = snprintf(tmp, sizeof(tmp), "%u", n);
+    return fmt_buf_to_str(tmp, len);
+}
+
+with_str with_fmt_u64(uint64_t n) {
+    char tmp[24];
+    int len = snprintf(tmp, sizeof(tmp), "%llu", (unsigned long long)n);
+    return fmt_buf_to_str(tmp, len);
+}
+
+// Integer formatting with spec
+with_str with_fmt_int_spec(int64_t val, int32_t is_unsigned,
+                           int64_t flags, int32_t width,
+                           int32_t precision, int32_t mode) {
+    (void)precision; // precision not used for integers
+    int fill_char = (int)((flags >> 8) & 255);
+    int align_mode = (int)((flags >> 16) & 3);
+    int sign_plus = (int)((flags >> 18) & 1);
+    int alternate = (int)((flags >> 19) & 1);
+    int zero_pad = (int)((flags >> 20) & 1);
+    if (fill_char == 0) fill_char = ' ';
+
+    char tmp[80];
+    int len = 0;
+    char prefix[4] = {0};
+    int prefix_len = 0;
+
+    // Sign / prefix
+    if (val < 0 && !is_unsigned) {
+        prefix[prefix_len++] = '-';
+        val = -val;
+    } else if (sign_plus && !is_unsigned) {
+        prefix[prefix_len++] = '+';
+    }
+
+    uint64_t uval = (uint64_t)val;
+
+    // Format the digits based on mode
+    char m = (char)(mode ? mode : 'd');
+    if (m == 'd') {
+        if (is_unsigned)
+            len = snprintf(tmp, sizeof(tmp), "%llu", (unsigned long long)uval);
+        else
+            len = snprintf(tmp, sizeof(tmp), "%llu", (unsigned long long)uval);
+    } else if (m == 'x') {
+        if (alternate) { prefix[prefix_len++] = '0'; prefix[prefix_len++] = 'x'; }
+        len = snprintf(tmp, sizeof(tmp), "%llx", (unsigned long long)uval);
+    } else if (m == 'X') {
+        if (alternate) { prefix[prefix_len++] = '0'; prefix[prefix_len++] = 'X'; }
+        len = snprintf(tmp, sizeof(tmp), "%llX", (unsigned long long)uval);
+    } else if (m == 'o') {
+        if (alternate) { prefix[prefix_len++] = '0'; prefix[prefix_len++] = 'o'; }
+        len = snprintf(tmp, sizeof(tmp), "%llo", (unsigned long long)uval);
+    } else if (m == 'b') {
+        // Binary: manual bit extraction
+        if (alternate) { prefix[prefix_len++] = '0'; prefix[prefix_len++] = 'b'; }
+        if (uval == 0) {
+            tmp[0] = '0'; len = 1;
+        } else {
+            char bits[65];
+            int bi = 0;
+            uint64_t v = uval;
+            while (v > 0) { bits[bi++] = '0' + (char)(v & 1); v >>= 1; }
+            // Reverse
+            for (int k = 0; k < bi; k++) tmp[k] = bits[bi - 1 - k];
+            len = bi;
+        }
+        tmp[len] = '\0';
+    }
+
+    // Combine prefix + digits
+    int total = prefix_len + len;
+    char combined[96];
+    if (zero_pad && width > total && align_mode != 1) {
+        // Zero-pad: prefix, then zeros, then digits
+        int zeros = width - total;
+        memcpy(combined, prefix, (size_t)prefix_len);
+        memset(combined + prefix_len, '0', (size_t)zeros);
+        memcpy(combined + prefix_len + zeros, tmp, (size_t)len);
+        total = width;
+        combined[total] = '\0';
+        return fmt_buf_to_str(combined, total);
+    }
+
+    memcpy(combined, prefix, (size_t)prefix_len);
+    memcpy(combined + prefix_len, tmp, (size_t)len);
+    combined[total] = '\0';
+
+    if (width > 0)
+        return fmt_pad(combined, total, width, (char)fill_char, align_mode ? align_mode : 2);
+    return fmt_buf_to_str(combined, total);
+}
+
+// Default float formatting (general, no spec)
+with_str with_fmt_f64(double n) {
+    char tmp[64];
+    int len = snprintf(tmp, sizeof(tmp), "%g", n);
+    return fmt_buf_to_str(tmp, len);
+}
+
+// Float formatting with spec
+with_str with_fmt_f64_spec(double val, int64_t flags, int32_t width,
+                           int32_t precision, int32_t mode) {
+    int fill_char = (int)((flags >> 8) & 255);
+    int align_mode = (int)((flags >> 16) & 3);
+    int sign_plus = (int)((flags >> 18) & 1);
+    int zero_pad = (int)((flags >> 20) & 1);
+    if (fill_char == 0) fill_char = ' ';
+
+    char fmt[32];
+    char m = (char)(mode ? mode : 'g');
+    // Precision without mode → fixed-point (format-design.md §3.2)
+    if (!mode && precision >= 0) m = 'f';
+
+    if (sign_plus) {
+        if (precision >= 0)
+            snprintf(fmt, sizeof(fmt), "%%+.%d%c", precision, m);
+        else
+            snprintf(fmt, sizeof(fmt), "%%+%c", m);
+    } else {
+        if (precision >= 0)
+            snprintf(fmt, sizeof(fmt), "%%.%d%c", precision, m);
+        else
+            snprintf(fmt, sizeof(fmt), "%%%c", m);
+    }
+
+    char tmp[128];
+    int len = snprintf(tmp, sizeof(tmp), fmt, val);
+
+    if (zero_pad && width > len && align_mode != 1) {
+        char combined[160];
+        int offset = 0;
+        // Preserve sign before zero padding
+        if (len > 0 && (tmp[0] == '-' || tmp[0] == '+')) {
+            combined[0] = tmp[0];
+            offset = 1;
+        }
+        int zeros = width - len;
+        memset(combined + offset, '0', (size_t)zeros);
+        memcpy(combined + offset + zeros, tmp + offset, (size_t)(len - offset));
+        int total = width;
+        combined[total] = '\0';
+        return fmt_buf_to_str(combined, total);
+    }
+
+    if (width > 0)
+        return fmt_pad(tmp, len, width, (char)fill_char, align_mode ? align_mode : 2);
+    return fmt_buf_to_str(tmp, len);
+}
+
+// Default string formatting (identity)
+with_str with_fmt_str(with_str s) {
+    return fmt_buf_to_str(s.ptr, (int)s.len);
+}
+
+// String formatting with spec (truncation + padding)
+with_str with_fmt_str_spec(with_str val, int64_t flags, int32_t width,
+                           int32_t precision) {
+    int fill_char = (int)((flags >> 8) & 255);
+    int align_mode = (int)((flags >> 16) & 3);
+    if (fill_char == 0) fill_char = ' ';
+
+    const char *s = val.ptr;
+    int slen = (int)val.len;
+
+    // Precision: truncate
+    if (precision >= 0 && slen > precision)
+        slen = precision;
+
+    if (width > 0)
+        return fmt_pad(s, slen, width, (char)fill_char, align_mode ? align_mode : 1);
+    return fmt_buf_to_str(s, slen);
+}
+
+// Bool formatting
+with_str with_fmt_bool(int32_t b) {
+    if (b) return fmt_buf_to_str("true", 4);
+    return fmt_buf_to_str("false", 5);
+}
+
+// ── End f-string formatting helpers ─────────────────────────────────
+
 // Print a string to stderr with trailing newline.
 void with_eprintln(with_str s) {
     if (s.ptr && s.len > 0) {

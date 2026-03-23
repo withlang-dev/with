@@ -107,6 +107,23 @@ int64_t with_hashmap_len(void *handle);
 void with_hashmap_clear(void *handle);
 void with_hashmap_free(void *handle);
 
+// ── F-string formatting ─────────────────────────────────────────────
+
+with_str with_fmt_i32(int32_t n);
+with_str with_fmt_i64(int64_t n);
+with_str with_fmt_u32(uint32_t n);
+with_str with_fmt_u64(uint64_t n);
+with_str with_fmt_int_spec(int64_t val, int32_t is_unsigned,
+                           int64_t flags, int32_t width,
+                           int32_t precision, int32_t mode);
+with_str with_fmt_f64(double n);
+with_str with_fmt_f64_spec(double val, int64_t flags, int32_t width,
+                           int32_t precision, int32_t mode);
+with_str with_fmt_str(with_str s);
+with_str with_fmt_str_spec(with_str val, int64_t flags, int32_t width,
+                           int32_t precision);
+with_str with_fmt_bool(int32_t b);
+
 // ── I/O ────────────────────────────────────────────────────────────
 
 void with_println_str(with_str s);
