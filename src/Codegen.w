@@ -1268,6 +1268,13 @@ fn Codegen.enforce_coerced_type(self: Codegen, value: i64, expected_ty: i64, con
         if wl_type_of(out) == expected_ty:
             return out
 
+    // Auto-coerce numeric to str (for f-string interpolation)
+    let str_ty = self.resolve_named_type(self.intern.intern("str"))
+    if expected_ty == str_ty and out != 0:
+        let coerced_str = self.coerce_val_to_str(out, str_ty)
+        if wl_type_of(coerced_str) == str_ty:
+            return coerced_str
+
     self.had_error = 1
     with_eprintln("error: " ++ context)
     self.build_default_value(expected_ty)
@@ -5800,15 +5807,21 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.mir_str_concat(self: Codegen, lhs: i64, rhs: i64) -> i64:
+    let str_ty = self.resolve_named_type(self.intern.intern("str"))
+    var lhs_v = lhs
+    var rhs_v = rhs
+    if wl_type_of(lhs) != str_ty:
+        lhs_v = self.coerce_val_to_str(lhs, str_ty)
+    if wl_type_of(rhs) != str_ty:
+        rhs_v = self.coerce_val_to_str(rhs, str_ty)
     let concat_sym = self.intern.intern("with_str_concat")
     let fv = self.fn_values.get(concat_sym)
     let ft = self.fn_fn_types.get(concat_sym)
     if fv.is_some() and ft.is_some():
         let args: Vec[i64] = Vec.new()
-        args.push(lhs)
-        args.push(rhs)
+        args.push(lhs_v)
+        args.push(rhs_v)
         return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(&args), 2)
-    let str_ty = self.resolve_named_type(self.intern.intern("str"))
     let param_types: Vec[i64] = Vec.new()
     param_types.push(str_ty)
     param_types.push(str_ty)
@@ -5817,9 +5830,46 @@ fn Codegen.mir_str_concat(self: Codegen, lhs: i64, rhs: i64) -> i64:
     self.fn_values.insert(concat_sym, func)
     self.fn_fn_types.insert(concat_sym, fn_type)
     let args: Vec[i64] = Vec.new()
-    args.push(lhs)
-    args.push(rhs)
+    args.push(lhs_v)
+    args.push(rhs_v)
     wl_build_call(self.builder, fn_type, func, vec_data_i64(&args), 2)
+
+fn Codegen.coerce_val_to_str(self: Codegen, val: i64, str_ty: i64) -> i64:
+    let val_ty = wl_type_of(val)
+    let vk = wl_get_type_kind(val_ty)
+    var fn_name = "int_to_string"
+    var coerced = val
+    var arg_ty = wl_i32_type(self.context)
+    if vk == wl_integer_type_kind():
+        if wl_get_int_type_width(val_ty) <= 32:
+            coerced = self.coerce_int_ext(val, wl_i32_type(self.context), false)
+        else:
+            fn_name = "i64_to_string"
+            arg_ty = wl_i64_type(self.context)
+            coerced = self.coerce_int_ext(val, arg_ty, false)
+    else:
+        if vk == wl_float_type_kind() or vk == wl_double_type_kind():
+            fn_name = "with_f64_to_string"
+            arg_ty = wl_f64_type(self.context)
+            coerced = if vk == wl_float_type_kind(): wl_build_fp_cast(self.builder, val, arg_ty) else: val
+        else:
+            return val
+    let sym = self.intern.intern(fn_name)
+    let fv = self.fn_values.get(sym)
+    let ft = self.fn_fn_types.get(sym)
+    if fv.is_some() and ft.is_some():
+        let a: Vec[i64] = Vec.new()
+        a.push(coerced)
+        return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(&a), 1)
+    let pts: Vec[i64] = Vec.new()
+    pts.push(arg_ty)
+    let fnt = wl_function_type(str_ty, vec_data_i64(&pts), 1, 0)
+    let func = wl_add_function(self.llmod, fn_name, fnt)
+    self.fn_values.insert(sym, func)
+    self.fn_fn_types.insert(sym, fnt)
+    let a: Vec[i64] = Vec.new()
+    a.push(coerced)
+    wl_build_call(self.builder, fnt, func, vec_data_i64(&a), 1)
 
 fn Codegen.mir_pointer_elem_llvm_type(self: Codegen, sema_ty: i32) -> i64:
     if sema_ty <= 0:
@@ -5872,6 +5922,8 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                 return wl_build_gep(self.builder, if elem_ty != 0: elem_ty else: wl_i8_type(self.context), rhs, vec_data_i64(&indices), 1)
         let is_unsigned = self.mir_operand_is_unsigned(body, d1)
         let out = self.mir_build_bin_op(d0, lhs, rhs, is_unsigned)
+        if d0 == OP_CONCAT:
+            return out
         if dest_ty != 0:
             return self.coerce_value_to_type(out, dest_ty)
         return out
