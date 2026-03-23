@@ -434,8 +434,8 @@ type Codegen = {
     option_err_types: Vec[i64],
     option_enum_syms: Vec[i32],
 
-    // Result type cache: hash → index
-    result_cache_map: HashMap[i64, i32],
+    // Result type cache: "ok_ty:err_ty" → index
+    result_cache_map: HashMap[str, i32],
     result_llvm_types: Vec[i64],
     result_ok_types: Vec[i64],
     result_err_types: Vec[i64],
@@ -3183,8 +3183,8 @@ fn Codegen.get_or_create_option_type(self: Codegen, payload_ty: i64) -> i64:
     opt_type
 
 fn Codegen.get_or_create_result_type(self: Codegen, ok_ty: i64, err_ty: i64) -> i64:
-    let hash = ok_ty * 65537 + err_ty
-    let cached = self.result_cache_map.get(hash)
+    let cache_key = i64_to_string(ok_ty) ++ ":" ++ i64_to_string(err_ty)
+    let cached = self.result_cache_map.get(cache_key)
     if cached.is_some():
         let idx = cached.unwrap()
         return self.result_llvm_types.get(idx as i64)
@@ -3206,7 +3206,7 @@ fn Codegen.get_or_create_result_type(self: Codegen, ok_ty: i64, err_ty: i64) -> 
     self.result_err_types.push(err_ty)
     let res_sym = self.intern.intern("Result")
     self.result_enum_syms.push(res_sym)
-    self.result_cache_map.insert(hash, idx)
+    self.result_cache_map.insert(cache_key, idx)
     res_type
 
 fn Codegen.get_or_create_context_error_type(self: Codegen, source_ty: i64) -> i64:
@@ -5276,6 +5276,13 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                 wrap.push(cur_ty)
                 cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
                 dc_found = true
+            if not dc_found:
+                let builtin_payload = self.mir_builtin_variant_payload_llvm_type(cur_sema_ty, pd)
+                if builtin_payload != 0:
+                    let wrap: Vec[i64] = Vec.new()
+                    wrap.push(builtin_payload)
+                    cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
+                    dc_found = true
             // Check disc enums first
             let enum_sym_opt = self.enum_by_llvm.get(cur_ty)
             if enum_sym_opt.is_some():
@@ -5454,6 +5461,15 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 wrap.push(cur_ty)
                 cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
                 dc_handled = true
+            if not dc_handled:
+                let builtin_payload = self.mir_builtin_variant_payload_llvm_type(cur_sema_ty, pd)
+                if builtin_payload != 0:
+                    if wl_count_struct_elem_types(cur_ty) > 1:
+                        cur_ptr = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 1)
+                    let wrap: Vec[i64] = Vec.new()
+                    wrap.push(builtin_payload)
+                    cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
+                    dc_handled = true
             // Disc enums: { repr_type, [max_payload x i8] }
             let dc_enum_sym_opt = self.enum_by_llvm.get(cur_ty)
             if dc_enum_sym_opt.is_some():
@@ -6402,6 +6418,35 @@ fn Codegen.mir_index_elem_llvm_type(self: Codegen, sema_ty: i32, cur_ty: i64) ->
             return wl_i8_type(self.context)
     0
 
+fn Codegen.mir_builtin_variant_payload_sema_type(self: Codegen, sema_ty: i32, variant_idx: i32) -> i32:
+    if sema_ty <= 0 or variant_idx < 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    if self.mir_input.mir_get_type_kind(resolved) != TY_GENERIC_INST:
+        return 0
+    let base_sym = self.mir_input.mir_get_type_d0(resolved)
+    if base_sym <= 0 or base_sym >= self.sema.pool.symbol_texts.len() as i32:
+        return 0
+    let base_name = self.sema.pool.symbol_texts.get(base_sym as i64)
+    let arg_count = self.mir_input.mir_get_type_d2(resolved)
+    let args_start = self.mir_input.mir_get_type_d1(resolved)
+    if base_name == "Option":
+        if variant_idx == 0 and arg_count > 0:
+            return self.mir_input.mir_get_type_extra(args_start)
+        return 0
+    if base_name == "Result":
+        if variant_idx == 0 and arg_count > 0:
+            return self.mir_input.mir_get_type_extra(args_start)
+        if variant_idx == 1 and arg_count > 1:
+            return self.mir_input.mir_get_type_extra(args_start + 1)
+    0
+
+fn Codegen.mir_builtin_variant_payload_llvm_type(self: Codegen, sema_ty: i32, variant_idx: i32) -> i64:
+    let payload_sema = self.mir_builtin_variant_payload_sema_type(sema_ty, variant_idx)
+    if payload_sema <= 0:
+        return 0
+    self.mir_sema_type_to_llvm(payload_sema)
+
 fn Codegen.mir_project_field_sema_type(self: Codegen, agg_ty: i32, field_token: i32) -> i32:
     if agg_ty <= 0:
         return 0
@@ -6858,17 +6903,27 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             result = wl_const_int(wl_i1_type(self.context), 1, 0)
 
     else if intrinsic == MIR_INTRINSIC_OPT_UNWRAP:
+        let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let recv_sema = self.mir_operand_sema_type(body, recv_op)
+        let recv_resolved = if recv_sema > 0: self.mir_input.mir_resolve_alias(recv_sema) else: 0
+        var recv_is_result = false
+        if recv_resolved > 0 and self.mir_input.mir_get_type_kind(recv_resolved) == TY_GENERIC_INST:
+            let recv_name_sym = self.mir_input.mir_get_type_d0(recv_resolved)
+            if recv_name_sym > 0 and recv_name_sym < self.sema.pool.symbol_texts.len() as i32:
+                recv_is_result = self.sema.pool.symbol_texts.get(recv_name_sym as i64) == "Result"
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
         let recv_ty = wl_type_of(recv)
         let recv_tk = wl_get_type_kind(recv_ty)
         if recv_tk == wl_struct_type_kind():
-            let res_idx = self.find_result_idx_by_llvm(recv_ty)
-            if res_idx >= 0:
-                var payload_ty: i64 = self.result_ok_types.get(res_idx as i64)
+            if recv_is_result:
+                let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+                var payload_ty = self.mir_sema_type_to_llvm(dest_sema)
                 if payload_ty == 0:
-                    let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
-                    if dest_sema > 0:
-                        payload_ty = self.mir_sema_type_to_llvm(dest_sema)
+                    payload_ty = self.mir_builtin_variant_payload_llvm_type(recv_sema, 0)
+                if payload_ty == 0:
+                    let res_idx = self.find_result_idx_by_llvm(recv_ty)
+                    if res_idx >= 0:
+                        payload_ty = self.result_ok_types.get(res_idx as i64)
                 result = self.extract_result_payload(recv, payload_ty)
             else:
                 result = wl_build_extract_value(self.builder, recv, 1)

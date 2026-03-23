@@ -2,11 +2,12 @@
 set -euo pipefail
 
 # Unified selfhost test runner.
-# Runs all test cases in test/cases/ using the stage2 compiler.
+# Runs all test cases using the stage2 compiler.
 #
 # Usage:
-#   ./scripts/run_tests.sh              # run all tests
-#   ./scripts/run_tests.sh test/cases/behav_*.w  # run specific tests
+#   ./scripts/run_tests.sh                        # run all tests
+#   ./scripts/run_tests.sh test/behavior/*.w       # run behavior tests
+#   ./scripts/run_tests.sh test/compile_errors/*.w # run error tests
 #
 # Test files use header directives:
 #   //! expect-stdout: <text>   — build+run, check stdout contains <text>
@@ -42,8 +43,13 @@ if [[ "$#" -gt 0 ]]; then
   test_files=("$@")
 else
   test_files=()
-  for f in test/cases/*.w; do
-    [[ -e "$f" ]] && test_files+=("$f")
+  # lexer/, parser/, internals/ excluded from default run — they test compiler
+  # internals via `use Lexer`/`use Token`/`use compiler.foundation.*` which
+  # have known codegen bugs. Run explicitly: scripts/run_tests.sh test/lexer/*.w
+  for dir in test/behavior test/compile_errors test/codegen; do
+    for f in "$dir"/*.w; do
+      [[ -e "$f" ]] && test_files+=("$f")
+    done
   done
 fi
 

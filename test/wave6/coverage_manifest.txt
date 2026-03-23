@@ -1,6 +1,0 @@
-# Wave 6 coverage manifest
-# Format: <stage0_script>|<status>|<evidence_csv>|<note>
-
-run_phase2_chained_if_let_tests.sh|known_divergence|bootstrap/test/cases/chained_if_let.w,test/wave6/cases/chained_if_let_typed_pass.w|chained-if-let typing coverage is present but dump-span parity is tracked as known divergence.
-run_phase5_method_resolution_order_tests.sh|covered|test/wave6/cases/method_resolution_order_pass.w,test/wave6/cases/method_resolution_multi_trait_order_pass.w|method resolution order/ambiguity surfaces are covered.
-run_phase5_bounds_enforcement_tests.sh|covered|bootstrap/test/cases/generic_pair_ops.w,bootstrap/test/cases/trait.w|generic bounds/type-check enforcement surface is covered.

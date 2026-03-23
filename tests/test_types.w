@@ -34,6 +34,12 @@ fn assert_true(cond: bool, msg: str):
         fail_count = fail_count + 1
         with_eprintln("  FAIL: " ++ msg)
 
+fn scale_f32(v: f32) -> i64:
+    ((v as f64) * 1000000.0) as i64
+
+fn scale_f64(v: f64) -> i64:
+    (v * 1000000.0) as i64
+
 // ── Integer widening casts ─────────────────────────────────────────
 
 fn test_int_widening:
@@ -142,7 +148,7 @@ fn test_struct_field_storage:
     // f32 field with literal
     let s4 = S_f32 { val: 3.25 }
     assert_eq_i32(s4.val as i32, 3, "struct f32 literal")
-    // f32 field with expression (THE BUG: f64 expr → f32 field)
+    // f32 field with expression
     let i = 5
     let fi = i as f32
     let s5 = S_f32 { val: fi + 1.0 }
@@ -262,6 +268,49 @@ fn test_float_arithmetic:
     // 0.5+1.5+2.5+...+9.5 = 50
     assert_eq_i64(sum as i64, 50i64, "f32 accumulation into f64")
 
+// ── Typed float literal precision through MIR/LLVM codegen ────────
+
+fn test_typed_float_literal_precision:
+    with_eprintln("  typed float literal precision...")
+
+    let fi: f32 = 123456.0f32
+    let local_mul: f32 = fi * 0.1f32
+    assert_eq_i64(scale_f32(local_mul), 12345600585i64, "local f32 mul keeps f32 precision")
+
+    let rem_mul: f32 = (99.0f32 % 100.0f32) * 0.01f32
+    assert_eq_i64(scale_f32(rem_mul), 989999i64, "local f32 rem+mul keeps f32 precision")
+
+    let p = Position { x: fi * 0.1f32, y: (10.0f32 % 100.0f32) * 0.01f32 }
+    assert_eq_i64(scale_f32(p.x), 12345600585i64, "struct f32 field keeps precision")
+    assert_eq_i64(scale_f32(p.y), 99999i64, "struct f32 field rem+mul keeps precision")
+
+    var pos_precise: Vec[Position] = Vec.new()
+    pos_precise.push(Position { x: 99.0f32 * 0.1f32, y: 0.0f32 })
+    let zero = 0
+    assert_eq_i64(scale_f32(pos_precise[zero].x), 9900000i64, "Vec[struct] push from typed expr keeps precision")
+
+    var loop_sum: f64 = 0.0
+    for i in 0..1000:
+        if i % 10 < 7:
+            let fi2 = i as f32
+            let x = fi2 * 0.1f32
+            loop_sum = loop_sum + x as f64
+    assert_eq_i64(scale_f64(loop_sum), 34860000464i64, "loop sum from typed f32 expr keeps precision")
+
+    var moved_sum: f64 = 0.0
+    let dt: f32 = 1.0f32 / 60.0f32
+    for i in 0..1000:
+        if i % 10 < 7:
+            let fi3 = i as f32
+            let x = fi3 * 0.1f32
+            let vx = (fi3 % 100.0f32) * 0.01f32
+            let moved = x + vx * dt * 10.0f32
+            moved_sum = moved_sum + moved as f64
+    assert_eq_i64(scale_f64(moved_sum), 34916000507i64, "chained f32 binops keep precision")
+
+    let wide: f64 = 123456.0f64 * 0.1f64
+    assert_eq_i64(scale_f64(wide), 12345600000i64, "f64 mul keeps f64 precision")
+
 // ── Bool type ──────────────────────────────────────────────────────
 
 fn test_bool:
@@ -310,6 +359,7 @@ fn main:
     test_vec_struct()
     test_vec_numeric_types()
     test_float_arithmetic()
+    test_typed_float_literal_precision()
     test_bool()
     test_suffixed_literals()
     test_str_concat_coercion()

@@ -72,7 +72,7 @@ fn World.system_damage(self: &mut World, dt: f32):
 
 fn World.system_cleanup(self: &mut World):
     for i in 0..self.count:
-        if self.mask[i] & HAS_HP != 0u8 and self.hp[i].hp <= 0.0:
+        if self.mask[i] & HAS_HP != 0u8 and self.hp[i].hp <= 0.0f32:
             self.mask[i] = 0u8
 
 fn World.count_alive(self: &World) -> i32:
@@ -94,21 +94,21 @@ fn main:
         let fi = i as f32
 
         if i % 10 < 7:
-            world.add_pos(id, Position { x: fi * 0.1, y: fi * 0.2 })
+            world.add_pos(id, Position { x: fi * 0.1f32, y: fi * 0.2f32 })
             world.add_vel(id, Velocity {
-                x: (fi % 100.0) * 0.01,
-                y: ((fi + 50.0) % 100.0) * 0.01,
+                x: (fi % 100.0f32) * 0.01f32,
+                y: ((fi + 50.0f32) % 100.0f32) * 0.01f32,
             })
         if i % 10 < 5:
-            world.add_health(id, Health { hp: 100.0, max_hp: 100.0 })
+            world.add_health(id, Health { hp: 100.0f32, max_hp: 100.0f32 })
         if i % 10 < 3:
-            world.add_damage(id, Damage { dps: 0.5 + (fi % 10.0) * 0.1 })
+            world.add_damage(id, Damage { dps: 0.5f32 + (fi % 10.0f32) * 0.1f32 })
 
     with_eprintln("Entities: " ++ int_to_string(world.count))
     with_eprintln("Alive: " ++ int_to_string(world.count_alive()))
 
     let start = clock()
-    let dt: f32 = 0.016667
+    let dt: f32 = 1.0f32 / 60.0f32
     for _ in 0..1000:
         world.system_movement(dt)
         world.system_damage(dt)
@@ -121,9 +121,6 @@ fn main:
     with_eprintln("1000 ticks: " ++ i64_to_string(secs) ++ "." ++ i64_to_string(msecs) ++ "s")
     with_eprintln("Alive after: " ++ int_to_string(world.count_alive()))
 
-    // NOTE: Checksum reads back pos[i].x which was set via add_pos(id, Position{...})
-    // in a for loop. Known codegen bug: struct literals with computed f32 fields in
-    // for loops produce zero values. Checksum will be wrong until that's fixed.
     var sum: f64 = 0.0
     for i in 0..world.count:
         if world.mask[i] & HAS_POS != 0u8:
