@@ -1193,6 +1193,19 @@ fn Sema.option_pointer_payload_type(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)
     self.get_generic_inst_arg(resolved, 0)
 
+fn Sema.try_unwrapped_type(self: Sema, tid: i32) -> i32:
+    if tid <= 0:
+        return 0
+    let ok_sym = self.pool_intern("Ok")
+    let ok_payloads = self.enum_variant_payload_types(tid, ok_sym)
+    if ok_payloads.len() as i32 == 1:
+        return ok_payloads.get(0)
+    let some_sym = self.pool_intern("Some")
+    let some_payloads = self.enum_variant_payload_types(tid, some_sym)
+    if some_payloads.len() as i32 == 1:
+        return some_payloads.get(0)
+    0
+
 // substitute_type: walk a TypeId, replacing type parameters with concrete types.
 // subst_syms/subst_tids/count define the mapping: subst_syms[i] → subst_tids[i].
 // Returns the substituted TypeId, or the original if no substitution applies.
@@ -4200,7 +4213,13 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
     if op == UOP_TRY:
         if self.in_defer != 0:
             self.emit_error("? operator not allowed in defer", node)
-        return 0
+            return 0
+        let unwrapped = self.try_unwrapped_type(operand)
+        if unwrapped == 0:
+            self.emit_error("? operator requires an Option or Result with a single success payload", node)
+            return 0
+        self.typed_expr_types.insert(node, unwrapped)
+        return unwrapped
 
     0
 

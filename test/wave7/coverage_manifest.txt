@@ -1,6 +1,0 @@
-# Wave 7 coverage manifest
-# Format: <stage0_script>|<status>|<evidence_csv>|<note>
-
-run_phase6_mir_optimizations_tests.sh|covered|test/wave7/cases/storage_live_dead_complex.w,bootstrap/test/cases/defer_complex.w|MIR CFG/storage surfaces used by optimization passes are covered.
-run_phase1_drop_order_tests.sh|covered|test/wave7/cases/drop_scope_exit.w,test/wave7/cases/loop_drop_interaction.w|drop ordering and loop-drop interactions are covered.
-run_phase2_let_else_tests.sh|covered|bootstrap/test/cases/let_else.w,test/wave7/cases/cleanup_edge_shape.w|let-else/cleanup control-flow MIR shape coverage is present.

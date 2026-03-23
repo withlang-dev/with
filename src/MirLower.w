@@ -719,6 +719,13 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
             return lhs_ty
     if kind == NK_UNARY:
         let uop = self.ast.get_data0(node)
+        if uop == UOP_TRY:
+            let inner_node = self.ast.get_data1(node)
+            let inner_ty = self.expr_type(inner_node)
+            let unwrapped = self.sema.try_unwrapped_type(inner_ty)
+            if unwrapped != 0:
+                return unwrapped
+            return inner_ty
         if uop == UOP_DEREF:
             let inner_node = self.ast.get_data1(node)
             let inner_ty = self.expr_type(inner_node)
