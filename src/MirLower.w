@@ -308,9 +308,9 @@ fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
     if type_arg2_node != 0:
         arg2_type = self.resolve_type_arg_node(type_arg2_node)
     // Look up TY_GENERIC_INST from sema cache (created by Sema.check_index)
-    var cache_key = int_to_string(base_sym) ++ ":" ++ int_to_string(arg_type)
+    var cache_key = f"{base_sym}:{arg_type}"
     if arg2_type > 0:
-        cache_key = cache_key ++ ":" ++ int_to_string(arg2_type)
+        cache_key = f"{cache_key}:{arg2_type}"
     if self.sema.generic_inst_cache.contains(cache_key):
         return self.sema.generic_inst_cache.get(cache_key).unwrap()
     0
@@ -952,7 +952,7 @@ fn MirBuilder.mark_unsupported(self: MirBuilder):
     if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
         let node_kind = if self.cur_node != 0: self.ast.kind(self.cur_node) else: 0
         let fn_name = self.pool.resolve(self.body.fn_sym)
-        with_eprintln("[mir-lower-fail] kind=" ++ int_to_string(node_kind) ++ " fn=" ++ fn_name)
+        with_eprintln(f"[mir-lower-fail] kind={node_kind} fn={fn_name}")
     var b = self.body
     b.lowering_failed = 1
     self.body = b
@@ -3003,7 +3003,7 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
         return self.body.new_operand(OK_COPY, result_place)
     self.body.new_operand(OK_MOVE, result_place)
 
-fn MirBuilder.lower_double_question(self: MirBuilder, expr: i32, default_expr: i32) -> i32:
+fn MirBuilder.lower_double_question(self: MirBuilder, expr: i32, default_expr: i32, node: i32) -> i32:
     let value_op = self.lower_expr(expr)
     let value_ty = self.expr_type(expr)
     let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(expr))
@@ -3020,11 +3020,18 @@ fn MirBuilder.lower_double_question(self: MirBuilder, expr: i32, default_expr: i
     let table = self.body.new_switch_table(vals, targets)
     self.terminate(TK_SWITCH_INT, disc, table, none_bb, 0)
 
-    let result_local = self.new_temp(value_ty)
+    var result_ty = self.expr_type(node)
+    if result_ty == 0 or result_ty == self.sema.ty_void:
+        result_ty = self.sema.try_unwrapped_type(value_ty)
+    if result_ty == 0 or result_ty == self.sema.ty_void:
+        result_ty = value_ty
+    let result_local = self.new_temp(result_ty)
     let result_place = self.place_for_local(result_local)
 
     self.switch_to(some_bb)
-    let some_op = self.body.new_operand(if self.sema.is_copy(value_ty) != 0: OK_COPY else: OK_MOVE, value_place)
+    let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index())
+    let payload_place = self.body.new_field_place(downcast_place, 0)
+    let some_op = self.body.new_operand(if self.sema.is_copy(result_ty) != 0: OK_COPY else: OK_MOVE, payload_place)
     self.assign_operand_to_place(result_place, some_op, self.ast.get_start(expr))
     self.terminate(TK_GOTO, join_bb, 0, 0, 0)
 
@@ -3034,7 +3041,7 @@ fn MirBuilder.lower_double_question(self: MirBuilder, expr: i32, default_expr: i
     self.terminate(TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
-    if self.sema.is_copy(value_ty) != 0:
+    if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OK_COPY, result_place)
     self.body.new_operand(OK_MOVE, result_place)
 
@@ -3269,7 +3276,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let lhs = self.ast.get_data1(node)
         let rhs = self.ast.get_data2(node)
         if op == OP_DEFAULT:
-            return self.lower_double_question(lhs, rhs)
+            return self.lower_double_question(lhs, rhs, node)
         return self.lower_bin_op(op, lhs, rhs, node)
 
     if kind == NK_UNARY:
