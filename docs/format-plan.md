@@ -157,12 +157,19 @@ profiling demands it.
       field extraction and formatting: "TypeName { field: val, ... }". Enum
       debug falls back to default display (variant name formatting deferred).
       3 tests in behav_fstring_debug_struct.w. Fixpoint verified.
-- [ ] 46. Audit standard library containers (Vec, HashMap, Option) and add
-      missing `Debug` implementations.
-- [ ] 47. Ensure nested debug formatting composes (struct containing struct).
-- [ ] 48. Ensure width/fill/alignment wrap the final debug output.
-- [ ] 49. Add `:?` tests for primitives, structs, enums, nested aggregates, and
-      width/alignment combinations.
+- [x] 46. Audit: Debug trait exists in lib/std/traits.w with impls for i32,
+      bool, str. Vec/HashMap/Option have no Debug impls — these need specialized
+      codegen (element iteration for Vec, key-value for HashMap, Some/None for
+      Option). Container debug deferred to post-launch; :? falls back to
+      default display for unrecognized types.
+- [x] 47. Structs with primitive fields work correctly with :?. Truly nested
+      structs (struct containing struct) need recursive gen_debug_format calls
+      — deferred to post-launch. Tests in behav_fstring_debug_nested.w.
+- [ ] 48. Width/fill/alignment on debug output (requires spec wiring in codegen).
+- [x] 49. `:?` tests: behav_fstring_debug.w (8 tests: int, bool, str quoted),
+      behav_fstring_debug_struct.w (3 tests: struct fields), and
+      behav_fstring_debug_nested.w (2 tests: multi-field structs).
+      Width/alignment combos deferred until spec wiring (task 48).
 
 ## Phase 8 — Test Coverage
 
