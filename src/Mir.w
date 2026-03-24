@@ -291,7 +291,7 @@ fn MirModule.mir_resolve_alias(self: MirModule, tid: i32) -> i32:
     var depth = 0
     while depth < 20:
         let k = self.mir_get_type_kind(cur)
-        if k != TY_ALIAS:
+        if k != TypeKind.TY_ALIAS:
             return cur
         let target = self.mir_get_type_d0(cur)
         if target <= 0 or target == cur:
@@ -303,9 +303,9 @@ fn MirModule.mir_resolve_alias(self: MirModule, tid: i32) -> i32:
 fn MirModule.mir_get_type_name(self: MirModule, tid: i32) -> i32:
     let resolved = self.mir_resolve_alias(tid)
     let tk = self.mir_get_type_kind(resolved)
-    if tk == TY_PTR or tk == TY_REF:
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
         return self.mir_get_type_name(self.mir_get_type_d0(resolved))
-    if tk == TY_STRUCT or tk == TY_ENUM or tk == TY_GENERIC_INST:
+    if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
         return self.mir_get_type_d0(resolved)
     0
 
