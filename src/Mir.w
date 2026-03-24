@@ -122,6 +122,7 @@ const MIR_INTRINSIC_FMT_TO_STR: i32 = 49
 const MIR_INTRINSIC_FMT_DEBUG_STR: i32 = 50
 const MIR_INTRINSIC_FMT_DEBUG: i32 = 51
 const MIR_INTRINSIC_FMT_SPEC: i32 = 52
+const MIR_INTRINSIC_INT_SWAP_BYTES: i32 = 53
 
 // ── Projection kinds ─────────────────────────────────────────────
 

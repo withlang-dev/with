@@ -7460,6 +7460,34 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
             let shl = wl_build_shl(self.builder, rot_val, sub)
             result = wl_build_or(self.builder, shr, shl)
 
+    else if intrinsic == MIR_INTRINSIC_INT_SWAP_BYTES:
+        let sb_val = self.mir_intrinsic_arg(body, args_id, 0)
+        let sb_ty = wl_type_of(sb_val)
+        let sb_width = wl_get_int_type_width(sb_ty)
+        if sb_width <= 8:
+            // Byte swap on i8/u8 is identity
+            result = sb_val
+        else:
+            // Call @llvm.bswap.i{16,32,64}
+            let sb_fn_name = if sb_width == 16: "llvm.bswap.i16" else: if sb_width == 32: "llvm.bswap.i32" else: "llvm.bswap.i64"
+            let sb_sym = self.intern.intern(sb_fn_name)
+            let sb_fv = self.fn_values.get(sb_sym)
+            let sb_ft = self.fn_fn_types.get(sb_sym)
+            if sb_fv.is_some() and sb_ft.is_some():
+                let sb_args: Vec[i64] = Vec.new()
+                sb_args.push(sb_val)
+                result = wl_build_call(self.builder, sb_ft.unwrap() as i64, sb_fv.unwrap() as i64, vec_data_i64(&sb_args), 1)
+            else:
+                let sb_pts: Vec[i64] = Vec.new()
+                sb_pts.push(sb_ty)
+                let sb_fnt = wl_function_type(sb_ty, vec_data_i64(&sb_pts), 1, 0)
+                let sb_func = wl_add_function(self.llmod, sb_fn_name, sb_fnt)
+                self.fn_values.insert(sb_sym, sb_func)
+                self.fn_fn_types.insert(sb_sym, sb_fnt)
+                let sb_args: Vec[i64] = Vec.new()
+                sb_args.push(sb_val)
+                result = wl_build_call(self.builder, sb_fnt, sb_func, vec_data_i64(&sb_args), 1)
+
     else if intrinsic == MIR_INTRINSIC_OPT_FILTER:
         result = self.mir_emit_opt_filter(body, args_id)
 
