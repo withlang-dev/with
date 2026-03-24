@@ -1145,9 +1145,9 @@ fn Sema.numeric_literal_expected_type(self: Sema, node: i32, value: i64) -> i32:
     if self.has_expected_type == 0 or self.expected_expr_type == 0:
         return 0
     let expected = self.resolve_alias(self.expected_expr_type)
-    if self.is_numeric_type(expected) == false:
+    if not self.is_numeric_type(expected):
         return 0
-    if self.int_literal_fits_type(value, expected) == false:
+    if not self.int_literal_fits_type(value, expected):
         self.emit_error("integer literal does not fit expected type", node)
     expected
 
@@ -3719,7 +3719,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> i32:
         let value = self.ast.int_lit_value(node)
         let suffix_ty = self.literal_suffix_type(self.ast.literal_suffix(node))
         if suffix_ty != 0:
-            if self.int_literal_fits_type(value, suffix_ty) == false:
+            if not self.int_literal_fits_type(value, suffix_ty):
                 self.emit_error("integer literal does not fit suffix type", node)
             self.typed_expr_types.insert(node, suffix_ty)
             return suffix_ty
@@ -4196,7 +4196,7 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
                 lhs = self.check_expr(lhs_node)
             if self.ast.kind(rhs_node) == NK_VARIANT_SHORTHAND:
                 rhs = self.check_expr_with_expected(rhs_node, lhs)
-            else if rhs == 0 and rhs_is_num_lit and lhs_is_num_lit == false:
+            else if rhs == 0 and rhs_is_num_lit and not lhs_is_num_lit:
                 rhs = self.check_expr_with_expected(rhs_node, lhs)
             else:
                 if rhs == 0:
