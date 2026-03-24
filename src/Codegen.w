@@ -1610,10 +1610,10 @@ fn Codegen.mir_call_context(self: Codegen, body: MirBody, callee_operand: i32) -
         return out ++ "<callee?>"
     let ok = body.operand_kinds.get(callee_operand as i64)
     let od = body.operand_d0.get(callee_operand as i64)
-    if ok == OK_CONSTANT and od >= 0 and od < body.const_kinds.len() as i32:
-        if body.const_kinds.get(od as i64) == CK_FN:
+    if ok == OperandKind.OK_CONSTANT and od >= 0 and od < body.const_kinds.len() as i32:
+        if body.const_kinds.get(od as i64) == ConstKind.CK_FN:
             return out ++ self.function_symbol_name(body.const_d0.get(od as i64))
-    if (ok == OK_COPY or ok == OK_MOVE) and od >= 0 and od < body.place_locals.len() as i32:
+    if (ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE) and od >= 0 and od < body.place_locals.len() as i32:
         return out ++ f"place_{body.place_locals.get(od as i64)}"
     out ++ "indirect"
 
@@ -4333,7 +4333,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     let dtm_ret_place = dtm_builder.place_for_local(0)
     dtm_builder.assign_operand_to_place(dtm_ret_place, dtm_result, self.pool.get_end(body_node))
     dtm_builder.pop_scope_inline()
-    dtm_builder.terminate(TK_RETURN, 0, 0, 0, 0)
+    dtm_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     let dtm_body = dtm_builder.body
 
     // Set up return alloca (MIR local 0)
@@ -5229,7 +5229,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
     for i in 0..p_count:
         let pk = body.proj_kinds.get((p_start + i) as i64)
         let pd = body.proj_d0.get((p_start + i) as i64)
-        if pk == 0: // PK_FIELD
+        if pk == 0: // ProjKind.PK_FIELD
             if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
                 if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
                     let sema_ty = body.local_type_ids.get(base_local as i64)
@@ -5251,7 +5251,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                 cur_ty = wl_struct_get_type_at(cur_ty, fi)
             else:
                 return 0
-        else if pk == 2: // PK_DEREF
+        else if pk == 2: // ProjKind.PK_DEREF
             // Resolve pointee type from base local's sema type (via MIR snapshot)
             var deref_ty: i64 = 0
             if cur_sema_ty > 0:
@@ -5266,7 +5266,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                 cur_ty = deref_ty
             else:
                 return 0
-        else if pk == 1: // PK_INDEX
+        else if pk == 1: // ProjKind.PK_INDEX
             let idx_elem_ty = self.mir_index_elem_llvm_type(cur_sema_ty, cur_ty)
             let idx_elem_sema = self.mir_index_elem_sema_type(cur_sema_ty)
             if idx_elem_sema > 0:
@@ -5275,7 +5275,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                 cur_ty = idx_elem_ty
             else:
                 return 0
-        else if pk == 3: // PK_DOWNCAST
+        else if pk == 3: // ProjKind.PK_DOWNCAST
             // For projected_type, we need the variant's payload struct type.
             var dc_found = false
             if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
@@ -5303,7 +5303,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                         if payload_ty != 0:
                             cur_ty = payload_ty
                             dc_found = true
-            // Check Option types: {i32, T} → wrap payload in {T} for PK_FIELD access
+            // Check Option types: {i32, T} → wrap payload in {T} for ProjKind.PK_FIELD access
             if not dc_found:
                 let opt_idx = self.find_option_idx_by_llvm(cur_ty)
                 if opt_idx >= 0:
@@ -5313,7 +5313,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                         wrap.push(opt_payload)
                         cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
                         dc_found = true
-            // Check Result types: {i32, [N x i8]} → wrap ok/err payload in {T} for PK_FIELD
+            // Check Result types: {i32, [N x i8]} → wrap ok/err payload in {T} for ProjKind.PK_FIELD
             if not dc_found:
                 let res_idx = self.find_result_idx_by_llvm(cur_ty)
                 if res_idx >= 0:
@@ -5375,7 +5375,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
     for i in 0..p_count:
         let pk = body.proj_kinds.get((p_start + i) as i64)
         let pd = body.proj_d0.get((p_start + i) as i64)
-        if pk == 0: // PK_FIELD
+        if pk == 0: // ProjKind.PK_FIELD
             if cur_ty == 0 or wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
                 // Base is a pointer (e.g., self param) — load the pointer first
                 if cur_ty == 0:
@@ -5414,7 +5414,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                     cur_ty = wl_struct_get_type_at(cur_ty, llvm_fi)
                 else:
                     cur_ty = 0
-        else if pk == 2: // PK_DEREF
+        else if pk == 2: // ProjKind.PK_DEREF
             // Load the pointer value, then use it as the new base
             cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
             // Resolve pointee type from base local's sema type (via snapshot)
@@ -5431,7 +5431,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 cur_ty = deref_ptr_ty
             else:
                 cur_ty = 0
-        else if pk == 1: // PK_INDEX
+        else if pk == 1: // ProjKind.PK_INDEX
             // pd is a local_id holding the index value
             let idx_ptr_opt = self.mir_local_ptrs.get(pd)
             var idx_val: i64 = wl_const_int(wl_i64_type(self.context), 0, 0)
@@ -5460,7 +5460,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 indices.push(idx_val)
                 cur_ptr = wl_build_gep(self.builder, elem_llvm, raw_ptr, vec_data_i64(&indices), 1)
                 cur_ty = elem_llvm
-        else if pk == 3: // PK_DOWNCAST
+        else if pk == 3: // ProjKind.PK_DOWNCAST
             // GEP to field 1 of enum/option/result struct for payload access.
             var dc_handled = false
             if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
@@ -5549,9 +5549,9 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
     let ck = body.const_kinds.get(const_id as i64)
     let cd = body.const_d0.get(const_id as i64)
 
-    if ck == CK_INT:
+    if ck == ConstKind.CK_INT:
         let int_value = mir_const_int_value(body, const_id)
-        // Null pointer: CK_INT 0 with pointer expected type
+        // Null pointer: ConstKind.CK_INT 0 with pointer expected type
         if int_value == 0 and materialize_ty != 0 and wl_get_type_kind(materialize_ty) == wl_pointer_type_kind():
             return wl_const_null(materialize_ty)
         if materialize_ty != 0:
@@ -5563,19 +5563,19 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
             int_ty = if int_value < -2147483648 or int_value > 2147483647: wl_i64_type(self.context) else: wl_i32_type(self.context)
         return wl_const_int(int_ty, int_value, 1)
 
-    if ck == CK_BOOL:
+    if ck == ConstKind.CK_BOOL:
         return wl_const_int(wl_i1_type(self.context), cd as i64, 0)
 
-    if ck == CK_STR:
+    if ck == ConstKind.CK_STR:
         let text = if cd != 0: self.decode_string_escapes(self.intern.resolve(cd)) else: ""
         return self.gen_string_literal_raw(text)
 
-    if ck == CK_UNIT:
+    if ck == ConstKind.CK_UNIT:
         if materialize_ty != 0 and materialize_ty != wl_void_type(self.context):
             return self.build_default_value(materialize_ty)
         return wl_const_int(wl_i32_type(self.context), 0, 0)
 
-    if ck == CK_FLOAT:
+    if ck == ConstKind.CK_FLOAT:
         var float_ty = materialize_ty
         if float_ty == 0:
             float_ty = wl_f64_type(self.context)
@@ -5583,19 +5583,19 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         if fk != wl_float_type_kind() and fk != wl_double_type_kind():
             float_ty = wl_f64_type(self.context)
         var fval: f64 = 0.0
-        // CK_FLOAT d0 is an AstPool string table index (from Parser.add_string)
+        // ConstKind.CK_FLOAT d0 is an AstPool string table index (from Parser.add_string)
         if cd >= 0 and cd < self.pool.strings.len() as i32:
             let float_text = self.pool.get_string(cd)
             if float_text.len() > 0:
                 fval = with_parse_float(float_text)
         return wl_const_real(float_ty, fval)
 
-    if ck == CK_ZERO_SIZED:
+    if ck == ConstKind.CK_ZERO_SIZED:
         if materialize_ty != 0:
             return self.build_default_value(materialize_ty)
         return wl_const_int(wl_i32_type(self.context), 0, 0)
 
-    if ck == CK_CLOSURE:
+    if ck == ConstKind.CK_CLOSURE:
         // Populate local_allocas/local_types/local_sema_types from MIR locals
         // so gen_closure can find captured variables and their types.
         let closure_node = cd
@@ -5617,9 +5617,9 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         let closure_result = self.gen_closure(closure_node)
         return closure_result
 
-    if ck == CK_FN:
+    if ck == ConstKind.CK_FN:
         let fn_sym = cd
-        // CK_FN sym from MirLower is in sema pool — must translate to codegen pool.
+        // ConstKind.CK_FN sym from MirLower is in sema pool — must translate to codegen pool.
         // Direct fn_values lookup would return wrong function (pool ID collision).
         var translated_sym = fn_sym
         if fn_sym > 0 and fn_sym < self.sema.pool.symbol_texts.len() as i32:
@@ -5652,7 +5652,7 @@ fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expec
 
     let ok = body.operand_kinds.get(operand_id as i64)
     let od = body.operand_d0.get(operand_id as i64)
-    if ok == OK_COPY or ok == OK_MOVE:
+    if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
         if od < 0 or od >= body.place_locals.len() as i32:
             return wl_get_undef(fallback_ty)
         let local_id = body.place_locals.get(od as i64)
@@ -5695,7 +5695,7 @@ fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expec
             return self.coerce_value_to_type(loaded, expected_ty)
         return loaded
 
-    if ok == OK_CONSTANT:
+    if ok == OperandKind.OK_CONSTANT:
         return self.mir_const_value(body, od, expected_ty)
 
     wl_get_undef(fallback_ty)
@@ -5705,7 +5705,7 @@ fn Codegen.mir_operand_is_unsigned(self: Codegen, body: MirBody, operand_id: i32
         return false
     let ok = body.operand_kinds.get(operand_id as i64)
     let od = body.operand_d0.get(operand_id as i64)
-    if ok == OK_COPY or ok == OK_MOVE:
+    if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
         if od >= 0 and od < body.place_locals.len() as i32:
             let local_id = body.place_locals.get(od as i64)
             if local_id >= 0 and local_id < body.local_type_ids.len() as i32:
@@ -6127,10 +6127,10 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
     let d1 = body.rval_d1.get(rval_id as i64)
     let d2 = body.rval_d2.get(rval_id as i64)
 
-    if rk == RK_USE:
+    if rk == RvalueKind.RK_USE:
         return self.mir_eval_operand(body, d0, dest_ty)
 
-    if rk == RK_BIN_OP:
+    if rk == RvalueKind.RK_BIN_OP:
         let lhs = self.mir_eval_operand(body, d1, 0)
         let rhs = self.mir_eval_operand(body, d2, 0)
         let lhs_sema = self.mir_operand_sema_type(body, d1)
@@ -6160,7 +6160,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             return self.coerce_value_to_type(out, dest_ty)
         return out
 
-    if rk == RK_UN_OP:
+    if rk == RvalueKind.RK_UN_OP:
         let arg = self.mir_eval_operand(body, d1, dest_ty)
         if d0 == UOP_NEGATE:
             let ak = wl_get_type_kind(wl_type_of(arg))
@@ -6176,7 +6176,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             return wl_build_icmp(self.builder, wl_int_eq(), arg, wl_const_int(wl_type_of(arg), 0, 0))
         return arg
 
-    if rk == RK_REF:
+    if rk == RvalueKind.RK_REF:
         let ptr = self.mir_place_ptr(body, d1, false, 0)
         if ptr == 0:
             return wl_get_undef(fallback_ty)
@@ -6184,7 +6184,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             return wl_build_bitcast(self.builder, ptr, dest_ty)
         return ptr
 
-    if rk == RK_ADDR_OF:
+    if rk == RvalueKind.RK_ADDR_OF:
         let ptr = self.mir_place_ptr(body, d0, false, 0)
         if ptr == 0:
             return wl_get_undef(fallback_ty)
@@ -6192,7 +6192,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             return wl_build_bitcast(self.builder, ptr, dest_ty)
         return ptr
 
-    if rk == RK_DISCRIMINANT:
+    if rk == RvalueKind.RK_DISCRIMINANT:
         let ptr = self.mir_place_ptr(body, d0, false, 0)
         if ptr == 0:
             return wl_get_undef(wl_i32_type(self.context))
@@ -6215,7 +6215,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             return wl_build_load(self.builder, place_ty, ptr)
         return wl_const_int(wl_i32_type(self.context), 0, 0)
 
-    if rk == RK_AGGREGATE:
+    if rk == RvalueKind.RK_AGGREGATE:
         // d1 = fields_id — index into agg_field_starts/counts/operands
         let agg_fields_id = d1
         if agg_fields_id >= 0 and agg_fields_id < body.agg_field_starts.len() as i32:
@@ -6295,7 +6295,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                         let gepi = wl_build_struct_gep(self.builder, struct_ty, alloca, i)
                         wl_build_store(self.builder, vi, gepi)
                     return wl_build_load(self.builder, struct_ty, alloca)
-                with_eprintln(f"error: RK_AGGREGATE with unknown dest type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
+                with_eprintln(f"error: RvalueKind.RK_AGGREGATE with unknown dest type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
                 return wl_get_undef(fallback_ty)
             let alloca = self.create_entry_alloca(struct_ty)
             wl_build_store(self.builder, self.build_default_value(struct_ty), alloca)
@@ -6321,7 +6321,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             return wl_build_load(self.builder, struct_ty, alloca)
         return wl_get_undef(fallback_ty)
 
-    if rk == RK_CAST:
+    if rk == RvalueKind.RK_CAST:
         let val = self.mir_eval_operand(body, d0, 0)
         var src_unsigned = self.mir_operand_is_unsigned(body, d0)
         // Fallback: if operand lookup failed, check the sema type stored in d2
@@ -6365,7 +6365,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             return self.coerce_value_to_type(val, cast_ty)
         return val
 
-    if rk == RK_LEN:
+    if rk == RvalueKind.RK_LEN:
         let ptr = self.mir_place_ptr(body, d0, false, 0)
         if ptr == 0:
             return wl_const_int(wl_i64_type(self.context), 0, 0)
@@ -6420,7 +6420,7 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
     let d0 = body.stmt_d0.get(stmt_id as i64)
     let d1 = body.stmt_d1.get(stmt_id as i64)
 
-    if sk == SK_ASSIGN:
+    if sk == StmtKind.SK_ASSIGN:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return false
         let dst_local = body.place_locals.get(d0 as i64)
@@ -6443,10 +6443,10 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
             let sema_ty = body.local_type_ids.get(dst_local as i64)
             if sema_ty > 0:
                 dst_ty = self.mir_sema_type_to_llvm(sema_ty)
-            // For RK_AGGREGATE (struct construction), if sema type didn't resolve,
+            // For RvalueKind.RK_AGGREGATE (struct construction), if sema type didn't resolve,
             // fall back to the function's return type (local 0).
             if dst_ty == 0 and d1 >= 0 and d1 < body.rval_kinds.len() as i32:
-                if body.rval_kinds.get(d1 as i64) == RK_AGGREGATE:
+                if body.rval_kinds.get(d1 as i64) == RvalueKind.RK_AGGREGATE:
                     let ret_ty_opt = self.mir_local_types.get(0)
                     if ret_ty_opt.is_some():
                         let ret_ty = ret_ty_opt.unwrap() as i64
@@ -6474,14 +6474,14 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
         wl_build_store(self.builder, coerced, dst_ptr)
         return true
 
-    if sk == SK_STORAGE_LIVE:
+    if sk == StmtKind.SK_STORAGE_LIVE:
         // Storage markers do not require dedicated IR in this backend.
         return true
 
-    if sk == SK_STORAGE_DEAD:
+    if sk == StmtKind.SK_STORAGE_DEAD:
         return true
 
-    if sk == SK_DROP:
+    if sk == StmtKind.SK_DROP:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return false
         let local_id = body.place_locals.get(d0 as i64)
@@ -6492,7 +6492,7 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
                 self.mir_emit_drop_ptr(ptr, ty_opt.unwrap() as i64)
         return true
 
-    if sk == SK_NOP:
+    if sk == StmtKind.SK_NOP:
         return true
 
     false
@@ -6509,7 +6509,7 @@ fn Codegen.mir_try_place_ptr_for_ref(self: Codegen, body: MirBody, operand_id: i
         return 0
     let ok = body.operand_kinds.get(operand_id as i64)
     let od = body.operand_d0.get(operand_id as i64)
-    if (ok == OK_COPY or ok == OK_MOVE) and od >= 0 and od < body.place_locals.len() as i32:
+    if (ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE) and od >= 0 and od < body.place_locals.len() as i32:
         return self.mir_place_ptr(body, od, false, 0)
     0
 
@@ -6528,7 +6528,7 @@ fn Codegen.mir_intrinsic_recv_ptr(self: Codegen, body: MirBody, args_id: i32) ->
     let ok = body.operand_kinds.get(recv_op as i64)
     let od = body.operand_d0.get(recv_op as i64)
     // If operand is a place (Copy/Move), try to get its pointer directly.
-    if ok == OK_COPY or ok == OK_MOVE:
+    if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
         let ptr = self.mir_place_ptr(body, od, false, 0)
         if ptr != 0:
             return ptr
@@ -6680,11 +6680,11 @@ fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) 
     // Get the sema type for a MIR operand, handling projected places.
     let ok = body.operand_kinds.get(operand_id as i64)
     let od = body.operand_d0.get(operand_id as i64)
-    if ok == OK_CONSTANT:
+    if ok == OperandKind.OK_CONSTANT:
         if od >= 0 and od < body.const_types.len() as i32:
             return body.const_types.get(od as i64)
         return 0
-    if ok != OK_COPY and ok != OK_MOVE:
+    if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
         return 0
     if od < 0 or od >= body.place_locals.len() as i32:
         return 0
@@ -6699,20 +6699,20 @@ fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) 
         for pi in 0..p_count:
             let pk = body.proj_kinds.get((p_start + pi) as i64)
             let pd = body.proj_d0.get((p_start + pi) as i64)
-            if pk == PK_FIELD:
+            if pk == ProjKind.PK_FIELD:
                 let field_ty = self.mir_project_field_sema_type(ty, pd)
                 if field_ty > 0:
                     ty = field_ty
-            else if pk == PK_DEREF:
+            else if pk == ProjKind.PK_DEREF:
                 let d_resolved = self.mir_input.mir_resolve_alias(ty)
                 let d_tk = self.mir_input.mir_get_type_kind(d_resolved)
                 if d_tk == TypeKind.TY_PTR or d_tk == TypeKind.TY_REF:
                     ty = self.mir_input.mir_get_type_d0(d_resolved)
-            else if pk == PK_INDEX:
+            else if pk == ProjKind.PK_INDEX:
                 let elem_ty = self.mir_index_elem_sema_type(ty)
                 if elem_ty > 0:
                     ty = elem_ty
-            else if pk == PK_DOWNCAST:
+            else if pk == ProjKind.PK_DOWNCAST:
                 continue
     ty
 
@@ -6730,20 +6730,20 @@ fn Codegen.mir_place_sema_type(self: Codegen, body: MirBody, place_id: i32) -> i
         for pi in 0..p_count:
             let pk = body.proj_kinds.get((p_start + pi) as i64)
             let pd = body.proj_d0.get((p_start + pi) as i64)
-            if pk == PK_FIELD:
+            if pk == ProjKind.PK_FIELD:
                 let field_ty = self.mir_project_field_sema_type(ty, pd)
                 if field_ty > 0:
                     ty = field_ty
-            else if pk == PK_DEREF:
+            else if pk == ProjKind.PK_DEREF:
                 let d_resolved = self.mir_input.mir_resolve_alias(ty)
                 let d_tk = self.mir_input.mir_get_type_kind(d_resolved)
                 if d_tk == TypeKind.TY_PTR or d_tk == TypeKind.TY_REF:
                     ty = self.mir_input.mir_get_type_d0(d_resolved)
-            else if pk == PK_INDEX:
+            else if pk == ProjKind.PK_INDEX:
                 let elem_ty = self.mir_index_elem_sema_type(ty)
                 if elem_ty > 0:
                     ty = elem_ty
-            else if pk == PK_DOWNCAST:
+            else if pk == ProjKind.PK_DOWNCAST:
                 continue
     ty
 
@@ -7908,18 +7908,18 @@ fn Codegen.mir_emit_vec_fold(self: Codegen, body: MirBody, args_id: i32) -> i64:
 
 fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
     // Check for intrinsic-tagged calls (Vec/HashMap/Option builtins).
-    // These have meaningless CK_FN syms — dispatch by intrinsic kind instead.
+    // These have meaningless ConstKind.CK_FN syms — dispatch by intrinsic kind instead.
     let mir_intrinsic = body.call_intrinsic(args_id)
     if self.debug_mir_codegen_enabled():
         with_eprintln(f"[mir-call-pre] intrinsic={mir_intrinsic} callee_op={callee_operand} args_id={args_id} dest={dest_place}")
     if mir_intrinsic == MIR_INTRINSIC_GENERIC_CALL:
         let gc_node = body.call_ast_node(args_id)
         if gc_node > 0:
-            // Extract callee sym from CK_FN constant
+            // Extract callee sym from ConstKind.CK_FN constant
             let gc_co_k = body.operand_kinds.get(callee_operand as i64)
             let gc_co_d = body.operand_d0.get(callee_operand as i64)
             var gc_callee_sym = 0
-            if gc_co_k == OK_CONSTANT and gc_co_d >= 0 and gc_co_d < body.const_kinds.len() as i32:
+            if gc_co_k == OperandKind.OK_CONSTANT and gc_co_d >= 0 and gc_co_d < body.const_kinds.len() as i32:
                 gc_callee_sym = body.const_d0.get(gc_co_d as i64)
 
             // Generic function call — eval MIR args, call monomorphize directly
@@ -8354,8 +8354,8 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         let co_k = body.operand_kinds.get(callee_operand as i64)
         let co_d = body.operand_d0.get(callee_operand as i64)
         var dbg_name = "?"
-        if co_k == OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
-            if body.const_kinds.get(co_d as i64) == CK_FN:
+        if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
+            if body.const_kinds.get(co_d as i64) == ConstKind.CK_FN:
                 let raw_sym = body.const_d0.get(co_d as i64)
                 if raw_sym > 0 and raw_sym < self.sema.pool.symbol_texts.len() as i32:
                     dbg_name = self.sema.pool.symbol_texts.get(raw_sym as i64)
@@ -8387,7 +8387,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 ctx_ptr_val = wl_build_extract_value(self.builder, callee, 1)
                 let co_ok = body.operand_kinds.get(callee_operand as i64)
                 let co_od = body.operand_d0.get(callee_operand as i64)
-                if (co_ok == OK_COPY or co_ok == OK_MOVE) and co_od >= 0 and co_od < body.place_locals.len() as i32:
+                if (co_ok == OperandKind.OK_COPY or co_ok == OperandKind.OK_MOVE) and co_od >= 0 and co_od < body.place_locals.len() as i32:
                     let co_local = body.place_locals.get(co_od as i64)
                     if co_local >= 0 and co_local < body.local_type_ids.len() as i32:
                         let co_sema_ty = body.local_type_ids.get(co_local as i64)
@@ -8414,13 +8414,13 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         wl_get_param_types(call_ft, vec_data_i64(&param_types))
 
     // Resolve callee fn_sym for dyn trait parameter lookup.
-    // CK_FN syms are from sema pool — translate to codegen intern pool.
+    // ConstKind.CK_FN syms are from sema pool — translate to codegen intern pool.
     var callee_fn_sym: i32 = 0
     if callee_operand >= 0 and callee_operand < body.operand_kinds.len() as i32:
         let co_k = body.operand_kinds.get(callee_operand as i64)
         let co_d = body.operand_d0.get(callee_operand as i64)
-        if co_k == OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
-            if body.const_kinds.get(co_d as i64) == CK_FN:
+        if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
+            if body.const_kinds.get(co_d as i64) == ConstKind.CK_FN:
                 let raw_sym = body.const_d0.get(co_d as i64)
                 // Translate sema pool sym to codegen intern pool sym
                 if raw_sym > 0 and raw_sym < self.sema.pool.symbol_texts.len() as i32:
@@ -8537,14 +8537,14 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
     if self.debug_mir_codegen_enabled():
         with_eprintln(f"[mir-term] bb={bb} tk={tk}")
 
-    if tk == TK_GOTO:
+    if tk == TermKind.TK_GOTO:
         if d0 < 0 or d0 >= self.mir_bb_values.len() as i32:
             return false
         let target_bb = self.mir_bb_values.get(d0 as i64)
         wl_build_br(self.builder, target_bb)
         return true
 
-    if tk == TK_RETURN:
+    if tk == TermKind.TK_RETURN:
         if self.current_ret_type == wl_void_type(self.context):
             let _ = wl_build_ret_void(self.builder)
             return true
@@ -8564,11 +8564,11 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
         let _ = wl_build_ret(self.builder, self.enforce_coerced_type(ret_val, self.current_ret_type, "return type mismatch"))
         return true
 
-    if tk == TK_UNREACHABLE:
+    if tk == TermKind.TK_UNREACHABLE:
         wl_build_unreachable(self.builder)
         return true
 
-    if tk == TK_SWITCH_INT:
+    if tk == TermKind.TK_SWITCH_INT:
         let cond = self.mir_eval_operand(body, d0, 0)
         var default_bb = self.mir_default_unreachable_bb_value()
         if d2 >= 0:
@@ -8592,10 +8592,10 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
                 wl_add_case(sw, wl_const_int(int_ty, val as i64, 1), case_target)
         return true
 
-    if tk == TK_CALL:
+    if tk == TermKind.TK_CALL:
         return self.mir_emit_call_term(body, d0, d1, d2, d3)
 
-    if tk == TK_DROP_AND_GOTO:
+    if tk == TermKind.TK_DROP_AND_GOTO:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return false
         let local_id = body.place_locals.get(d0 as i64)
@@ -9776,7 +9776,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     let cl_ret_place = closure_builder.place_for_local(0)
     closure_builder.assign_operand_to_place(cl_ret_place, cl_result, self.pool.get_end(body_node))
     closure_builder.pop_scope_inline()
-    closure_builder.terminate(TK_RETURN, 0, 0, 0, 0)
+    closure_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     let closure_body = closure_builder.body
 
     // Set up return alloca (MIR local 0)
