@@ -130,13 +130,16 @@ fn decode_with_binding_is_mut(encoded: i32) -> i32:
     0
 
 // Type decl sub-kinds (stored in data2 field)
-const TDK_ALIAS: i32 = 0
-const TDK_STRUCT: i32 = 1
-const TDK_ENUM: i32 = 2
-const TDK_DISTINCT: i32 = 3
-const TDK_DISC_ENUM: i32 = 4
-const TDK_OPAQUE: i32 = 5
-const TDK_UNION: i32 = 6
+enum TypeDeclKind: i32:
+    TDK_ALIAS = 0
+    TDK_STRUCT = 1
+    TDK_ENUM = 2
+    TDK_DISTINCT = 3
+    TDK_DISC_ENUM = 4
+    TDK_OPAQUE = 5
+    TDK_UNION = 6
+
+// Type decl flag bits (combined with TypeDeclKind via arithmetic)
 const TDK_FLAG_EPHEMERAL: i32 = 8
 const TDK_FLAG_PACKED: i32 = 16
 
@@ -155,23 +158,25 @@ fn type_decl_is_packed(packed: i32) -> i32:
     (packed / TDK_FLAG_PACKED) % 2
 
 // Fn decl flag bits (stored in data2 field)
-const FN_FLAG_PUB: i32 = 1
-const FN_FLAG_ASYNC: i32 = 2
-const FN_FLAG_GEN: i32 = 4
-const FN_FLAG_COMPTIME: i32 = 8
-const FN_FLAG_TAILREC: i32 = 16
-const FN_FLAG_MUST_USE: i32 = 32
-const FN_FLAG_VARIADIC: i32 = 64
-const FN_FLAG_INLINE: i32 = 128
-const FN_FLAG_NOINLINE: i32 = 256
-const FN_FLAG_PANIC_HANDLER: i32 = 512
-const FN_FLAG_ENTRY: i32 = 1024
-const FN_FLAG_NO_MAIN: i32 = 2048
-const FN_FLAG_TEST: i32 = 4096
-const FN_FLAG_BEFORE: i32 = 8192
-const FN_FLAG_AFTER: i32 = 16384
+@[flags]
+enum FnFlags: i32:
+    FN_FLAG_PUB = 1
+    FN_FLAG_ASYNC = 2
+    FN_FLAG_GEN = 4
+    FN_FLAG_COMPTIME = 8
+    FN_FLAG_TAILREC = 16
+    FN_FLAG_MUST_USE = 32
+    FN_FLAG_VARIADIC = 64
+    FN_FLAG_INLINE = 128
+    FN_FLAG_NOINLINE = 256
+    FN_FLAG_PANIC_HANDLER = 512
+    FN_FLAG_ENTRY = 1024
+    FN_FLAG_NO_MAIN = 2048
+    FN_FLAG_TEST = 4096
+    FN_FLAG_BEFORE = 8192
+    FN_FLAG_AFTER = 16384
 // Metadata packing unit used to encode required-parameter count into
-// fn_meta flags without affecting existing FN_FLAG_* parity checks.
+// fn_meta flags without affecting existing FnFlags.FN_FLAG_* parity checks.
 const FN_META_REQUIRED_UNIT: i32 = 32768
 const FN_PARAM_STRIDE: i32 = 3
 const FN_PARAM_FLAG_NOALIAS: i32 = 1
@@ -744,7 +749,7 @@ fn AstPool.for_meta_label(self: &AstPool, meta: i32) -> i32:
 // NodeKind.NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
 //                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*, type_param_count, [type_param_name, bound_count, bounds...]*]
 //
-// NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TDK_* + flags)
+// NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TypeDeclKind.TDK_* + flags)
 //                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, tp_start, tp_count]
 //                   For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis, tp_start, tp_count]
 //                   For alias/distinct: extra=[aliased_or_inner_type, vis, tp_start, tp_count]

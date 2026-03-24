@@ -2287,10 +2287,10 @@ fn Codegen.predeclare_enum_type(self: Codegen, name_sym: i32):
 fn Codegen.type_decl_tp_meta_start(self: Codegen, type_node: i32) -> i32:
     let extra_start = self.pool.get_data1(type_node)
     let sub_kind = type_decl_sub_kind(self.pool.get_data2(type_node))
-    if sub_kind == TDK_STRUCT:
+    if sub_kind == TypeDeclKind.TDK_STRUCT:
         let field_count = self.pool.get_extra(extra_start)
         return extra_start + 1 + field_count * 4 + 1
-    if sub_kind == TDK_ENUM:
+    if sub_kind == TypeDeclKind.TDK_ENUM:
         let variant_count = self.pool.get_extra(extra_start)
         var pos = extra_start + 1
         for vi in 0..variant_count:
@@ -2298,7 +2298,7 @@ fn Codegen.type_decl_tp_meta_start(self: Codegen, type_node: i32) -> i32:
             let payload_count = self.pool.get_extra(pos)
             pos = pos + 1 + payload_count
         return pos + 1
-    if sub_kind == TDK_DISC_ENUM:
+    if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
         let variant_count = self.pool.get_extra(extra_start + 1)
         var pos = extra_start + 2
         for vi in 0..variant_count:
@@ -2307,7 +2307,7 @@ fn Codegen.type_decl_tp_meta_start(self: Codegen, type_node: i32) -> i32:
             let payload_count = self.pool.get_extra(pos)
             pos = pos + 1 + payload_count
         return pos + 1
-    if sub_kind == TDK_ALIAS or sub_kind == TDK_DISTINCT:
+    if sub_kind == TypeDeclKind.TDK_ALIAS or sub_kind == TypeDeclKind.TDK_DISTINCT:
         return extra_start + 2
     0 - 1
 
@@ -2911,7 +2911,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     var effective_name = self.function_symbol_name(name_sym)
     if parsed_name.len() > 0:
         effective_name = parsed_name
-    if (flags / FN_FLAG_ENTRY) % 2 == 1:
+    if (flags / FnFlags.FN_FLAG_ENTRY) % 2 == 1:
         effective_name = "main"
 
     let function = wl_add_function(self.llmod, effective_name, fn_type)
@@ -2922,9 +2922,9 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         wl_set_linkage(function, wl_internal_linkage())
 
     // Apply attributes
-    if (flags / FN_FLAG_INLINE) % 2 == 1:
+    if (flags / FnFlags.FN_FLAG_INLINE) % 2 == 1:
         wl_add_fn_attr(self.context, function, "alwaysinline")
-    if (flags / FN_FLAG_NOINLINE) % 2 == 1:
+    if (flags / FnFlags.FN_FLAG_NOINLINE) % 2 == 1:
         wl_add_fn_attr(self.context, function, "noinline")
 
     self.fn_values.insert(name_sym, function)
@@ -3686,20 +3686,20 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
         if name_sym == 0 or name_str.len() == 0:
             continue
         let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
-        if sub_kind == TDK_STRUCT or sub_kind == TDK_DISTINCT:
+        if sub_kind == TypeDeclKind.TDK_STRUCT or sub_kind == TypeDeclKind.TDK_DISTINCT:
             if self.type_decl_tp_count(decl) > 0:
                 self.generic_structs.insert(name_sym, decl)
             else:
                 self.predeclare_struct_type(name_sym)
             continue
-        if sub_kind == TDK_ENUM:
+        if sub_kind == TypeDeclKind.TDK_ENUM:
             if self.type_decl_tp_count(decl) > 0:
                 continue
             self.predeclare_enum_type(name_sym)
 
-        if sub_kind == TDK_DISC_ENUM:
+        if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
             continue
-        if sub_kind == TDK_OPAQUE:
+        if sub_kind == TypeDeclKind.TDK_OPAQUE:
             self.predeclare_struct_type(name_sym)
             continue
 
@@ -3714,25 +3714,25 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
         if name_sym == 0 or name_str.len() == 0:
             continue
         let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
-        if sub_kind == TDK_STRUCT:
+        if sub_kind == TypeDeclKind.TDK_STRUCT:
             if self.type_decl_tp_count(decl) == 0:
                 self.declare_struct_type(name_sym, decl)
             continue
-        if sub_kind == TDK_ENUM:
+        if sub_kind == TypeDeclKind.TDK_ENUM:
             if self.type_decl_tp_count(decl) > 0:
                 continue
             self.declare_enum_type(name_sym, decl)
             continue
-        if sub_kind == TDK_DISC_ENUM:
+        if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
             self.declare_disc_enum_type(name_sym, decl)
             continue
-        if sub_kind == TDK_OPAQUE:
+        if sub_kind == TypeDeclKind.TDK_OPAQUE:
             // Opaque type: predeclared in pass 0a, no body set (stays opaque)
             continue
-        if sub_kind == TDK_UNION:
+        if sub_kind == TypeDeclKind.TDK_UNION:
             self.declare_union_type(name_sym, decl)
             continue
-        if sub_kind == TDK_DISTINCT:
+        if sub_kind == TypeDeclKind.TDK_DISTINCT:
             // Distinct type: single-field struct wrapping the inner type
             let dt_extra_start = self.pool.get_data1(decl)
             let dt_inner_node = self.pool.get_extra(dt_extra_start)
@@ -3753,7 +3753,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             dt_ft.push(dt_inner_ty)
             wl_struct_set_body(dt_st_type, vec_data_i64(&dt_ft), 1, 0)
             continue
-        if sub_kind == TDK_ALIAS:
+        if sub_kind == TypeDeclKind.TDK_ALIAS:
             let extra_start = self.pool.get_data1(decl)
             let aliased_node = self.pool.get_extra(extra_start)
             let resolved = self.resolve_type(aliased_node)
@@ -3797,7 +3797,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             let tp_count = self.pool.fn_meta_tp_count(meta)
             if tp_count > 0:
                 self.generic_fns.insert(name_sym, decl)
-            else if (flags / FN_FLAG_ASYNC) % 2 == 1:
+            else if (flags / FnFlags.FN_FLAG_ASYNC) % 2 == 1:
                 self.declare_async_function(decl)
             else:
                 self.declare_function(decl)
@@ -9120,7 +9120,7 @@ fn Codegen.find_struct_decl_node(self: Codegen, type_sym: i32) -> i32:
         if self.pool.get_data0(decl) != type_sym:
             continue
         let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
-        if sub_kind == TDK_STRUCT:
+        if sub_kind == TypeDeclKind.TDK_STRUCT:
             return decl
     0
 
@@ -10373,7 +10373,7 @@ fn Codegen.generate_clone_derives(self: Codegen):
         if self.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
             continue
         let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
-        if sub_kind != TDK_STRUCT:
+        if sub_kind != TypeDeclKind.TDK_STRUCT:
             continue
         let meta = self.pool.find_type_meta(decl)
         if meta < 0:
