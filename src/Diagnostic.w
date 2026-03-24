@@ -7,13 +7,13 @@ use DiagnosticRender
 extern fn with_eprintln(s: str) -> void
 
 enum DiagSeverity: i32:
-    DIAG_SEVERITY_ERROR = 1
-    DIAG_SEVERITY_WARNING = 2
-    DIAG_SEVERITY_NOTE = 3
+    Error = 1
+    Warning = 2
+    Note = 3
 
 // Legacy aliases kept for existing callers.
-const SEV_ERROR: i32 = DiagSeverity.DIAG_SEVERITY_ERROR
-const SEV_WARNING: i32 = DiagSeverity.DIAG_SEVERITY_WARNING
+const SEV_ERROR: i32 = DiagSeverity.Error
+const SEV_WARNING: i32 = DiagSeverity.Warning
 
 type DiagnosticLabel {
     span: Span,
@@ -35,7 +35,7 @@ type Diagnostic {
 
 fn diagnostic_error(message: str, primary: Span) -> Diagnostic:
     Diagnostic {
-        severity: DiagSeverity.DIAG_SEVERITY_ERROR,
+        severity: DiagSeverity.Error,
         code: "",
         message,
         primary,
@@ -46,7 +46,7 @@ fn diagnostic_error(message: str, primary: Span) -> Diagnostic:
 
 fn diagnostic_warning(message: str, primary: Span) -> Diagnostic:
     Diagnostic {
-        severity: DiagSeverity.DIAG_SEVERITY_WARNING,
+        severity: DiagSeverity.Warning,
         code: "",
         message,
         primary,
@@ -126,7 +126,7 @@ fn DiagnosticList.count_by_severity(self: DiagnosticList, severity: i32) -> i32:
     n
 
 fn DiagnosticList.has_errors(self: DiagnosticList) -> bool:
-    self.count_by_severity(DiagSeverity.DIAG_SEVERITY_ERROR) > 0
+    self.count_by_severity(DiagSeverity.Error) > 0
 
 fn DiagnosticList.render_all(self: DiagnosticList, source: Source):
     for i in 0..self.items.len() as i32:
@@ -137,7 +137,7 @@ fn DiagnosticList.render_all(self: DiagnosticList, source: Source):
 fn DiagnosticList.render_warnings(self: DiagnosticList, source: Source):
     var printed = 0
     for i in 0..self.items.len() as i32:
-        if self.items.get(i as i64).severity != DiagSeverity.DIAG_SEVERITY_WARNING:
+        if self.items.get(i as i64).severity != DiagSeverity.Warning:
             continue
         if printed != 0:
             with_eprintln("")

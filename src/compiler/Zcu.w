@@ -199,7 +199,7 @@ fn Zcu.render_warnings_frontend(self: Zcu):
     var printed = 0
     for i in 0..self.diagnostics.items.len() as i32:
         let diag = self.diagnostics.items.get(i as i64)
-        if diag.severity != DIAG_SEVERITY_WARNING:
+        if diag.severity != DiagSeverity.Warning:
             continue
         if printed != 0:
             with_eprintln("")

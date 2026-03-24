@@ -2,9 +2,9 @@
 
 use compiler.foundation.Span
 
-fn DIAG_SEVERITY_ERROR -> i32: 1
-fn DIAG_SEVERITY_WARNING -> i32: 2
-fn DIAG_SEVERITY_NOTE -> i32: 3
+fn DiagSeverity.Error -> i32: 1
+fn DiagSeverity.Warning -> i32: 2
+fn DiagSeverity.Note -> i32: 3
 
 type DiagnosticLabel {
     span: Span,
@@ -27,7 +27,7 @@ type DiagnosticStore {
 
 fn diagnostic_error(message: str, primary: Span) -> Diagnostic:
     Diagnostic {
-        severity: DIAG_SEVERITY_ERROR,
+        severity: DiagSeverity.Error,
         code: "",
         message,
         primary,
@@ -38,7 +38,7 @@ fn diagnostic_error(message: str, primary: Span) -> Diagnostic:
 
 fn diagnostic_warning(message: str, primary: Span) -> Diagnostic:
     Diagnostic {
-        severity: DIAG_SEVERITY_WARNING,
+        severity: DiagSeverity.Warning,
         code: "",
         message,
         primary,
@@ -78,4 +78,4 @@ fn DiagnosticStore.count_by_severity(self: DiagnosticStore, severity: i32) -> i3
     n
 
 fn DiagnosticStore.has_errors(self: DiagnosticStore) -> bool:
-    self.count_by_severity(DIAG_SEVERITY_ERROR) > 0
+    self.count_by_severity(DiagSeverity.Error) > 0
