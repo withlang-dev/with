@@ -283,7 +283,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
         let start = pool.get_start(decl)
         let end = pool.get_end(decl)
 
-        if kind == NK_USE_DECL:
+        if kind == NodeKind.NK_USE_DECL:
             let path_start = pool.get_data0(decl)
             let path_count = pool.get_data1(decl)
             let dotted = self.use_path_dotted(pool, path_start, path_count)
@@ -305,7 +305,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
             import_index = import_index + 1
             continue
 
-        if kind == NK_C_IMPORT:
+        if kind == NodeKind.NK_C_IMPORT:
             let header_sym = pool.get_data0(decl)
             let header = self.pool.resolve(header_sym)
             self.result.imports.push(ResolvedImport {
@@ -338,7 +338,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
         if name_sym > 0:
             self.add_binding(module_scope, name_sym, did)
 
-        if kind == NK_FN_DECL:
+        if kind == NodeKind.NK_FN_DECL:
             pending_fn_nodes.push(decl)
             pending_fn_defs.push(did)
 
@@ -360,23 +360,23 @@ fn ResolveState.record_link_lib(self: ResolveState, lib_sym: i32):
     self.result.link_libs.push(lib_sym)
 
 fn resolve_decl_def_kind(kind: i32) -> i32:
-    if kind == NK_FN_DECL: return DefKind.DK_FN
-    if kind == NK_TYPE_DECL: return DefKind.DK_TYPE
-    if kind == NK_LET_DECL: return DefKind.DK_LET
-    if kind == NK_EXTERN_FN: return DefKind.DK_EXTERN_FN
-    if kind == NK_TRAIT_DECL: return DefKind.DK_TRAIT
-    if kind == NK_IMPL_DECL: return DefKind.DK_IMPL
+    if kind == NodeKind.NK_FN_DECL: return DefKind.DK_FN
+    if kind == NodeKind.NK_TYPE_DECL: return DefKind.DK_TYPE
+    if kind == NodeKind.NK_LET_DECL: return DefKind.DK_LET
+    if kind == NodeKind.NK_EXTERN_FN: return DefKind.DK_EXTERN_FN
+    if kind == NodeKind.NK_TRAIT_DECL: return DefKind.DK_TRAIT
+    if kind == NodeKind.NK_IMPL_DECL: return DefKind.DK_IMPL
     -1
 
 fn resolve_decl_name(pool: AstPool, decl: i32) -> i32:
     let kind = pool.kind(decl)
-    if kind == NK_FN_DECL: return pool.get_data0(decl)
-    if kind == NK_TYPE_DECL: return pool.get_data0(decl)
-    if kind == NK_LET_DECL: return pool.get_data0(decl)
-    if kind == NK_EXTERN_FN: return pool.get_data0(decl)
-    if kind == NK_TRAIT_DECL: return pool.get_data0(decl)
-    if kind == NK_IMPL_DECL: return pool.get_data0(decl)
-    if kind == NK_C_IMPORT: return pool.get_data0(decl)
+    if kind == NodeKind.NK_FN_DECL: return pool.get_data0(decl)
+    if kind == NodeKind.NK_TYPE_DECL: return pool.get_data0(decl)
+    if kind == NodeKind.NK_LET_DECL: return pool.get_data0(decl)
+    if kind == NodeKind.NK_EXTERN_FN: return pool.get_data0(decl)
+    if kind == NodeKind.NK_TRAIT_DECL: return pool.get_data0(decl)
+    if kind == NodeKind.NK_IMPL_DECL: return pool.get_data0(decl)
+    if kind == NodeKind.NK_C_IMPORT: return pool.get_data0(decl)
     0
 
 fn ResolveState.add_def(self: ResolveState, module_id: i32, parent_def: i32, kind: i32, name_sym: i32, span_start: i32, span_end: i32) -> i32:
@@ -443,12 +443,12 @@ fn ResolveState.walk_type_expr(self: ResolveState, pool: AstPool, module_id: i32
         return
     let kind = pool.kind(node)
 
-    if kind == NK_TYPE_NAMED or kind == NK_TYPE_TRAIT_OBJ:
+    if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
         let sym = pool.get_data0(node)
         self.record_identifier_use(pool, module_id, current_scope, node, sym)
         return
 
-    if kind == NK_TYPE_GENERIC:
+    if kind == NodeKind.NK_TYPE_GENERIC:
         let sym = pool.get_data0(node)
         self.record_identifier_use(pool, module_id, current_scope, node, sym)
         let start = pool.get_data1(node)
@@ -458,15 +458,15 @@ fn ResolveState.walk_type_expr(self: ResolveState, pool: AstPool, module_id: i32
             self.walk_type_expr(pool, module_id, current_scope, arg)
         return
 
-    if kind == NK_TYPE_REF or kind == NK_TYPE_PTR or kind == NK_TYPE_OPTIONAL or kind == NK_TYPE_SLICE:
+    if kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_SLICE:
         self.walk_type_expr(pool, module_id, current_scope, pool.get_data0(node))
         return
 
-    if kind == NK_TYPE_ARRAY:
+    if kind == NodeKind.NK_TYPE_ARRAY:
         self.walk_type_expr(pool, module_id, current_scope, pool.get_data0(node))
         return
 
-    if kind == NK_TYPE_TUPLE:
+    if kind == NodeKind.NK_TYPE_TUPLE:
         let start = pool.get_data0(node)
         let count = pool.get_data1(node)
         for i in 0..count:
@@ -474,7 +474,7 @@ fn ResolveState.walk_type_expr(self: ResolveState, pool: AstPool, module_id: i32
             self.walk_type_expr(pool, module_id, current_scope, child)
         return
 
-    if kind == NK_TYPE_FN:
+    if kind == NodeKind.NK_TYPE_FN:
         let start = pool.get_data0(node)
         let count = pool.get_data1(node)
         for i in 0..count:
@@ -489,33 +489,33 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
 
     let kind = pool.kind(node)
 
-    if kind == NK_IDENT:
+    if kind == NodeKind.NK_IDENT:
         let sym = pool.get_data0(node)
         self.record_identifier_use(pool, module_id, current_scope, node, sym)
         return
 
-    if kind == NK_INT_LIT or kind == NK_FLOAT_LIT or kind == NK_STRING_LIT or kind == NK_BOOL_LIT or kind == NK_C_STRING_LIT:
+    if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT or kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_BOOL_LIT or kind == NodeKind.NK_C_STRING_LIT:
         return
 
-    if kind == NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         return
 
-    if kind == NK_UNARY:
+    if kind == NodeKind.NK_UNARY:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
         return
 
-    if kind == NK_BINARY:
+    if kind == NodeKind.NK_BINARY:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data2(node))
         return
 
-    if kind == NK_ASSIGN:
+    if kind == NodeKind.NK_ASSIGN:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
         return
 
-    if kind == NK_CALL:
+    if kind == NodeKind.NK_CALL:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         let arg_start = pool.get_data1(node)
         let arg_count = pool.get_data2(node)
@@ -523,37 +523,37 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
             self.walk_expr(pool, module_id, parent_def, current_scope, resolve_extra_or_zero(pool, arg_start + ai))
         return
 
-    if kind == NK_FIELD_ACCESS:
+    if kind == NodeKind.NK_FIELD_ACCESS:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         return
 
-    if kind == NK_INDEX:
+    if kind == NodeKind.NK_INDEX:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
         return
 
-    if kind == NK_SLICE:
+    if kind == NodeKind.NK_SLICE:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data2(node))
         return
 
-    if kind == NK_CAST:
+    if kind == NodeKind.NK_CAST:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         self.walk_type_expr(pool, module_id, current_scope, pool.get_data1(node))
         return
 
-    if kind == NK_RETURN or kind == NK_DEFER or kind == NK_ERRDEFER or kind == NK_AWAIT or kind == NK_SPAWN or kind == NK_YIELD or kind == NK_COMPTIME:
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         return
 
-    if kind == NK_IF_EXPR:
+    if kind == NodeKind.NK_IF_EXPR:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data2(node))
         return
 
-    if kind == NK_BLOCK:
+    if kind == NodeKind.NK_BLOCK:
         let block_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_BLOCK)
         let stmt_start = pool.get_data0(node)
         let stmt_count = pool.get_data1(node)
@@ -563,7 +563,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, block_scope, pool.get_data2(node))
         return
 
-    if kind == NK_LET_BINDING:
+    if kind == NodeKind.NK_LET_BINDING:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
 
         let name_sym = pool.get_data0(node)
@@ -577,14 +577,14 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
             self.walk_type_expr(pool, module_id, current_scope, ty_node)
         return
 
-    if kind == NK_LET_ELSE:
+    if kind == NodeKind.NK_LET_ELSE:
         // let-else: walk value, bind pattern into current scope (visible after).
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
         self.bind_pattern(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data2(node))
         return
 
-    if kind == NK_TUPLE_DESTRUCTURE:
+    if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
         let names_start = pool.get_data0(node)
         let names_count = pool.get_data1(node)
         for ni in 0..names_count:
@@ -595,25 +595,25 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data2(node))
         return
 
-    if kind == NK_WHILE:
+    if kind == NodeKind.NK_WHILE:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         let loop_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_LOOP)
         self.walk_expr(pool, module_id, parent_def, loop_scope, pool.get_data1(node))
         return
 
-    if kind == NK_LOOP:
+    if kind == NodeKind.NK_LOOP:
         let loop_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_LOOP)
         self.walk_expr(pool, module_id, parent_def, loop_scope, pool.get_data0(node))
         return
 
-    if kind == NK_FOR:
+    if kind == NodeKind.NK_FOR:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
         let loop_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_LOOP)
 
         let binding = pool.get_data0(node)
         let for_start = pool.get_start(node)
         let for_end = pool.get_end(node)
-        if binding > 0 and binding < pool.node_count() and pool.kind(binding) >= NK_PAT_WILDCARD and pool.kind(binding) <= NK_PAT_SLICE and pool.get_start(binding) >= for_start and pool.get_end(binding) <= for_end:
+        if binding > 0 and binding < pool.node_count() and pool.kind(binding) >= NodeKind.NK_PAT_WILDCARD and pool.kind(binding) <= NodeKind.NK_PAT_SLICE and pool.get_start(binding) >= for_start and pool.get_end(binding) <= for_end:
             self.bind_pattern(pool, module_id, parent_def, loop_scope, binding)
         else if binding > 0:
             let did = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, binding, pool.get_start(node), pool.get_end(node))
@@ -622,7 +622,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, loop_scope, pool.get_data2(node))
         return
 
-    if kind == NK_MATCH:
+    if kind == NodeKind.NK_MATCH:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         let arm_start = pool.get_data1(node)
         let arm_count = pool.get_data2(node)
@@ -630,21 +630,21 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
             self.walk_expr(pool, module_id, parent_def, current_scope, resolve_extra_or_zero(pool, arm_start + ai))
         return
 
-    if kind == NK_MATCH_ARM:
+    if kind == NodeKind.NK_MATCH_ARM:
         let arm_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_MATCH_ARM)
         self.bind_pattern(pool, module_id, parent_def, arm_scope, pool.get_data0(node))
         self.walk_expr(pool, module_id, parent_def, arm_scope, pool.get_data2(node))
         self.walk_expr(pool, module_id, parent_def, arm_scope, pool.get_data1(node))
         return
 
-    if kind == NK_TUPLE or kind == NK_ARRAY_LIT:
+    if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
         let start = pool.get_data0(node)
         let count = pool.get_data1(node)
         for i in 0..count:
             self.walk_expr(pool, module_id, parent_def, current_scope, resolve_extra_or_zero(pool, start + i))
         return
 
-    if kind == NK_ARRAY_COMPREHENSION:
+    if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data2(node))
         let comp_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_COMPREHENSION)
         let binding = pool.get_data1(node)
@@ -653,7 +653,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, comp_scope, pool.get_data0(node))
         return
 
-    if kind == NK_STRUCT_LIT:
+    if kind == NodeKind.NK_STRUCT_LIT:
         let field_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
         for fi in 0..field_count:
@@ -661,7 +661,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
             self.walk_expr(pool, module_id, parent_def, current_scope, val)
         return
 
-    if kind == NK_RECORD_UPDATE:
+    if kind == NodeKind.NK_RECORD_UPDATE:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         let field_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
@@ -670,7 +670,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
             self.walk_expr(pool, module_id, parent_def, current_scope, val)
         return
 
-    if kind == NK_CLOSURE:
+    if kind == NodeKind.NK_CLOSURE:
         let closure_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_CLOSURE)
         let param_start = pool.get_data1(node)
         let param_count = pool.get_data2(node)
@@ -683,7 +683,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, closure_scope, pool.get_data0(node))
         return
 
-    if kind == NK_OPTIONAL_CHAIN:
+    if kind == NodeKind.NK_OPTIONAL_CHAIN:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         let extra_start = pool.get_data2(node)
         let arg_count = resolve_extra_or_zero(pool, extra_start)
@@ -691,31 +691,31 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
             self.walk_expr(pool, module_id, parent_def, current_scope, resolve_extra_or_zero(pool, extra_start + 1 + ai))
         return
 
-    if kind == NK_PIPELINE:
+    if kind == NodeKind.NK_PIPELINE:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
         return
 
-    if kind == NK_RANGE:
+    if kind == NodeKind.NK_RANGE:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
         return
 
-    if kind == NK_VARIANT_SHORTHAND:
+    if kind == NodeKind.NK_VARIANT_SHORTHAND:
         let start = pool.get_data1(node)
         let count = pool.get_data2(node)
         for i in 0..count:
             self.walk_expr(pool, module_id, parent_def, current_scope, resolve_extra_or_zero(pool, start + i))
         return
 
-    if kind == NK_ENUM_VARIANT:
+    if kind == NodeKind.NK_ENUM_VARIANT:
         let extra_start = pool.get_data2(node)
         let count = resolve_extra_or_zero(pool, extra_start)
         for i in 0..count:
             self.walk_expr(pool, module_id, parent_def, current_scope, resolve_extra_or_zero(pool, extra_start + 1 + i))
         return
 
-    if kind == NK_WITH_EXPR:
+    if kind == NodeKind.NK_WITH_EXPR:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         let with_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_BLOCK)
         let name_sym = decode_with_binding_sym(pool.get_data2(node))
@@ -724,11 +724,11 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, with_scope, pool.get_data1(node))
         return
 
-    if kind == NK_ASYNC_BLOCK:
+    if kind == NodeKind.NK_ASYNC_BLOCK:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         return
 
-    if kind == NK_ASYNC_SCOPE:
+    if kind == NodeKind.NK_ASYNC_SCOPE:
         let async_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_BLOCK)
         let name_sym = pool.get_data0(node)
         let sdef = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, name_sym, pool.get_start(node), pool.get_end(node))
@@ -736,7 +736,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, async_scope, pool.get_data1(node))
         return
 
-    if kind == NK_SELECT_AWAIT:
+    if kind == NodeKind.NK_SELECT_AWAIT:
         let arm_start = pool.get_data0(node)
         let arm_count = pool.get_data1(node)
         for ai in 0..arm_count:
@@ -756,41 +756,41 @@ fn ResolveState.bind_pattern(self: ResolveState, pool: AstPool, module_id: i32, 
 
     let kind = pool.kind(pat)
 
-    if kind == NK_PAT_IDENT:
+    if kind == NodeKind.NK_PAT_IDENT:
         let name_sym = pool.get_data0(pat)
         let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, name_sym, pool.get_start(pat), pool.get_end(pat))
         self.add_binding(current_scope, name_sym, d)
         return
 
-    if kind == NK_PAT_AT_BINDING:
+    if kind == NodeKind.NK_PAT_AT_BINDING:
         let name_sym = pool.get_data0(pat)
         let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, name_sym, pool.get_start(pat), pool.get_end(pat))
         self.add_binding(current_scope, name_sym, d)
         self.bind_pattern(pool, module_id, parent_def, current_scope, pool.get_data1(pat))
         return
 
-    if kind == NK_PAT_VARIANT or kind == NK_PAT_ENUM_SHORTHAND:
+    if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
         let start = pool.get_data1(pat)
         let count = pool.get_data2(pat)
         let pat_start = pool.get_start(pat)
         let pat_end = pool.get_end(pat)
         for i in 0..count:
             let inner = resolve_extra_or_zero(pool, start + i)
-            if inner != pat and resolve_node_valid(pool, inner) and pool.kind(inner) >= NK_PAT_WILDCARD and pool.kind(inner) <= NK_PAT_SLICE and pool.get_start(inner) >= pat_start and pool.get_end(inner) <= pat_end:
+            if inner != pat and resolve_node_valid(pool, inner) and pool.kind(inner) >= NodeKind.NK_PAT_WILDCARD and pool.kind(inner) <= NodeKind.NK_PAT_SLICE and pool.get_start(inner) >= pat_start and pool.get_end(inner) <= pat_end:
                 self.bind_pattern(pool, module_id, parent_def, current_scope, inner)
             else if inner > 0:
                 let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, inner, pool.get_start(pat), pool.get_end(pat))
                 self.add_binding(current_scope, inner, d)
         return
 
-    if kind == NK_PAT_TUPLE or kind == NK_PAT_OR:
+    if kind == NodeKind.NK_PAT_TUPLE or kind == NodeKind.NK_PAT_OR:
         let start = pool.get_data0(pat)
         let count = pool.get_data1(pat)
         for i in 0..count:
             self.bind_pattern(pool, module_id, parent_def, current_scope, resolve_extra_or_zero(pool, start + i))
         return
 
-    if kind == NK_PAT_STRUCT:
+    if kind == NodeKind.NK_PAT_STRUCT:
         let start = pool.get_data1(pat)
         let count = pool.get_data2(pat)
         for i in 0..count:
@@ -803,7 +803,7 @@ fn ResolveState.bind_pattern(self: ResolveState, pool: AstPool, module_id: i32, 
                 self.add_binding(current_scope, fname, d)
         return
 
-    if kind == NK_PAT_SLICE:
+    if kind == NodeKind.NK_PAT_SLICE:
         let start = pool.get_data0(pat)
         let head_count = pool.get_data1(pat)
         for i in 0..head_count:

@@ -54,7 +54,7 @@ fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
     with_eprintln(f"[type-names] stage={stage} decls={pool.decl_count()}")
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
-        if pool.kind(decl) != NK_TYPE_DECL:
+        if pool.kind(decl) != NodeKind.NK_TYPE_DECL:
             continue
         let sub_kind = type_decl_sub_kind(pool.get_data2(decl))
         var kind_name = "alias"

@@ -23,7 +23,7 @@ fn count_non_use_decls_frontend(pool: AstPool) -> i32:
     var count = 0
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
-        if pool.kind(decl) != NK_USE_DECL:
+        if pool.kind(decl) != NodeKind.NK_USE_DECL:
             count = count + 1
     count
 
@@ -71,7 +71,7 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
     with_eprintln(f"[type-names] stage={stage} decls={pool.decl_count()}")
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
-        if pool.kind(decl) != NK_TYPE_DECL:
+        if pool.kind(decl) != NodeKind.NK_TYPE_DECL:
             continue
         let sub_kind = type_decl_sub_kind(pool.get_data2(decl))
         var kind_name = "alias"
@@ -98,7 +98,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var has_c_import = 0
     for i in 0..base_count:
         let decl = out.get_decl(i)
-        if out.kind(decl) == NK_C_IMPORT:
+        if out.kind(decl) == NodeKind.NK_C_IMPORT:
             has_c_import = 1
             break
     if has_c_import == 0:
@@ -110,7 +110,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
 
     for i in 0..base_count:
         let decl = out.get_decl(i)
-        if out.kind(decl) != NK_C_IMPORT:
+        if out.kind(decl) != NodeKind.NK_C_IMPORT:
             ordered.push(decl)
             ordered_paths.push(self.decl_source_path_frontend(i))
             ordered_file_ids.push(self.decl_source_file_id_frontend(i))
@@ -863,7 +863,7 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var has_use = 0
     for i in 0..out.decl_count():
         let decl = out.get_decl(i)
-        if out.kind(decl) == NK_USE_DECL:
+        if out.kind(decl) == NodeKind.NK_USE_DECL:
             has_use = 1
             break
     if has_use == 0:
@@ -875,7 +875,7 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
     let ordered_c_import: Vec[i32] = Vec.new()
     for i in 0..out.decl_count():
         let decl = out.get_decl(i)
-        if out.kind(decl) != NK_USE_DECL:
+        if out.kind(decl) != NodeKind.NK_USE_DECL:
             ordered.push(decl)
             ordered_paths.push(self.decl_source_path_frontend(i))
             ordered_file_ids.push(self.decl_source_file_id_frontend(i))
@@ -911,7 +911,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var root_file_ids: Vec[i32] = Vec.new()
 
     // Phase 1: Expand prelude USE (position 0) and its transitive imports.
-    let has_prelude = self.prelude_mode != PRELUDE_NONE() and initial_count > 0 and merged_pool.kind(merged_pool.get_decl(0)) == NK_USE_DECL
+    let has_prelude = self.prelude_mode != PRELUDE_NONE() and initial_count > 0 and merged_pool.kind(merged_pool.get_decl(0)) == NodeKind.NK_USE_DECL
     if has_prelude:
         let first = merged_pool.get_decl(0)
         let ps = merged_pool.get_data0(first)
@@ -930,7 +930,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         while pi < merged_pool.decl_count():
             let decl = merged_pool.get_decl(pi)
             let kind = merged_pool.kind(decl)
-            if kind != NK_USE_DECL:
+            if kind != NodeKind.NK_USE_DECL:
                 prelude_ordered.push(decl)
                 prelude_paths.push(self.decl_source_path_frontend(pi))
                 prelude_file_ids.push(self.decl_source_file_id_frontend(pi))
@@ -955,7 +955,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for ui in user_start..initial_count:
         let decl = merged_pool.get_decl(ui)
         let kind = merged_pool.kind(decl)
-        if kind != NK_USE_DECL:
+        if kind != NodeKind.NK_USE_DECL:
             root_ordered.push(decl)
             root_paths.push(self.decl_source_path_frontend(ui))
             root_file_ids.push(self.decl_source_file_id_frontend(ui))
@@ -976,7 +976,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     while ui2 < merged_pool.decl_count():
         let decl = merged_pool.get_decl(ui2)
         let kind = merged_pool.kind(decl)
-        if kind != NK_USE_DECL:
+        if kind != NodeKind.NK_USE_DECL:
             user_import_ordered.push(decl)
             user_import_paths.push(self.decl_source_path_frontend(ui2))
             user_import_file_ids.push(self.decl_source_file_id_frontend(ui2))
@@ -999,14 +999,14 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for ri in 0..root_ordered.len() as i32:
         let rd = root_ordered.get(ri as i64)
         let rk = merged_pool.kind(rd)
-        if rk == NK_FN_DECL or rk == NK_EXTERN_FN:
+        if rk == NodeKind.NK_FN_DECL or rk == NodeKind.NK_EXTERN_FN:
             root_fn_names.push(merged_pool.get_data0(rd))
 
     var user_fn_names: Vec[i32] = Vec.new()
     for ui in 0..user_import_ordered.len() as i32:
         let ud = user_import_ordered.get(ui as i64)
         let uk = merged_pool.kind(ud)
-        if uk == NK_FN_DECL or uk == NK_EXTERN_FN:
+        if uk == NodeKind.NK_FN_DECL or uk == NodeKind.NK_EXTERN_FN:
             user_fn_names.push(merged_pool.get_data0(ud))
 
     // Rebuild decl list: prelude → user imports → root.
@@ -1024,7 +1024,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for oi in 0..prelude_ordered.len() as i32:
         let id = prelude_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
-        if (ik == NK_FN_DECL or ik == NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, merged_pool, oi, higher_fn_names):
+        if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, merged_pool, oi, higher_fn_names):
             continue
         merged_pool.add_decl(id)
         rebuilt_paths.push(prelude_paths.get(oi as i64))
@@ -1032,7 +1032,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for oi in 0..user_import_ordered.len() as i32:
         let id = user_import_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
-        if (ik == NK_FN_DECL or ik == NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(user_import_ordered, merged_pool, oi, root_fn_names):
+        if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(user_import_ordered, merged_pool, oi, root_fn_names):
             continue
         merged_pool.add_decl(id)
         rebuilt_paths.push(user_import_paths.get(oi as i64))
@@ -1055,7 +1055,7 @@ fn frontend_fn_shadowed_in_tier(tier: Vec[i32], pool: AstPool, idx: i32, higher_
     while j < tier.len() as i32:
         let jd = tier.get(j as i64)
         let jk = pool.kind(jd)
-        if (jk == NK_FN_DECL or jk == NK_EXTERN_FN) and pool.get_data0(jd) == iname:
+        if (jk == NodeKind.NK_FN_DECL or jk == NodeKind.NK_EXTERN_FN) and pool.get_data0(jd) == iname:
             return true
         j = j + 1
     false

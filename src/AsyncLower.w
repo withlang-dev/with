@@ -132,12 +132,12 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
 
     let kind = async_ast_kind(self.ast, node)
 
-    if kind == NK_AWAIT:
+    if kind == NodeKind.NK_AWAIT:
         self.record_suspend(node, AM_SUSPEND_AWAIT)
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 
-    if kind == NK_SELECT_AWAIT:
+    if kind == NodeKind.NK_SELECT_AWAIT:
         self.record_suspend(node, AM_SUSPEND_SELECT_AWAIT)
         let arm_start = async_ast_get_data0(self.ast, node)
         let arm_count = async_ast_get_data1(self.ast, node)
@@ -148,33 +148,33 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
             self.walk_expr(arm_body)
         return
 
-    if kind == NK_YIELD:
+    if kind == NodeKind.NK_YIELD:
         self.record_suspend(node, AM_SUSPEND_YIELD)
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 
-    if kind == NK_IDENT or kind == NK_INT_LIT or kind == NK_FLOAT_LIT or kind == NK_STRING_LIT or kind == NK_BOOL_LIT or kind == NK_C_STRING_LIT:
+    if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT or kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_BOOL_LIT or kind == NodeKind.NK_C_STRING_LIT:
         return
 
-    if kind == NK_GROUPED or kind == NK_RETURN or kind == NK_DEFER or kind == NK_ERRDEFER or kind == NK_SPAWN or kind == NK_COMPTIME:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_COMPTIME:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 
-    if kind == NK_UNARY:
+    if kind == NodeKind.NK_UNARY:
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return
 
-    if kind == NK_BINARY:
+    if kind == NodeKind.NK_BINARY:
         self.walk_expr(async_ast_get_data1(self.ast, node))
         self.walk_expr(async_ast_get_data2(self.ast, node))
         return
 
-    if kind == NK_ASSIGN or kind == NK_PIPELINE or kind == NK_RANGE or kind == NK_INDEX:
+    if kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_INDEX:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return
 
-    if kind == NK_CALL:
+    if kind == NodeKind.NK_CALL:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         let arg_start = async_ast_get_data1(self.ast, node)
         let arg_count = async_ast_get_data2(self.ast, node)
@@ -182,27 +182,27 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
             self.walk_expr(async_extra_or_zero(self.ast, arg_start + ai))
         return
 
-    if kind == NK_FIELD_ACCESS:
+    if kind == NodeKind.NK_FIELD_ACCESS:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 
-    if kind == NK_SLICE:
-        self.walk_expr(async_ast_get_data0(self.ast, node))
-        self.walk_expr(async_ast_get_data1(self.ast, node))
-        self.walk_expr(async_ast_get_data2(self.ast, node))
-        return
-
-    if kind == NK_CAST:
-        self.walk_expr(async_ast_get_data0(self.ast, node))
-        return
-
-    if kind == NK_IF_EXPR:
+    if kind == NodeKind.NK_SLICE:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         self.walk_expr(async_ast_get_data1(self.ast, node))
         self.walk_expr(async_ast_get_data2(self.ast, node))
         return
 
-    if kind == NK_BLOCK:
+    if kind == NodeKind.NK_CAST:
+        self.walk_expr(async_ast_get_data0(self.ast, node))
+        return
+
+    if kind == NodeKind.NK_IF_EXPR:
+        self.walk_expr(async_ast_get_data0(self.ast, node))
+        self.walk_expr(async_ast_get_data1(self.ast, node))
+        self.walk_expr(async_ast_get_data2(self.ast, node))
+        return
+
+    if kind == NodeKind.NK_BLOCK:
         let stmt_start = async_ast_get_data0(self.ast, node)
         let stmt_count = async_ast_get_data1(self.ast, node)
         for si in 0..stmt_count:
@@ -210,34 +210,34 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
         self.walk_expr(async_ast_get_data2(self.ast, node))
         return
 
-    if kind == NK_LET_BINDING:
+    if kind == NodeKind.NK_LET_BINDING:
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return
 
-    if kind == NK_LET_ELSE:
+    if kind == NodeKind.NK_LET_ELSE:
         self.walk_expr(async_ast_get_data1(self.ast, node))
         self.walk_expr(async_ast_get_data2(self.ast, node))
         return
 
-    if kind == NK_TUPLE_DESTRUCTURE:
+    if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
         self.walk_expr(async_ast_get_data2(self.ast, node))
         return
 
-    if kind == NK_WHILE:
+    if kind == NodeKind.NK_WHILE:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return
 
-    if kind == NK_LOOP:
+    if kind == NodeKind.NK_LOOP:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 
-    if kind == NK_FOR:
+    if kind == NodeKind.NK_FOR:
         self.walk_expr(async_ast_get_data1(self.ast, node))
         self.walk_expr(async_ast_get_data2(self.ast, node))
         return
 
-    if kind == NK_MATCH:
+    if kind == NodeKind.NK_MATCH:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         let arm_start = async_ast_get_data1(self.ast, node)
         let arm_count = async_ast_get_data2(self.ast, node)
@@ -245,24 +245,24 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
             self.walk_expr(async_extra_or_zero(self.ast, arm_start + ai))
         return
 
-    if kind == NK_MATCH_ARM:
+    if kind == NodeKind.NK_MATCH_ARM:
         self.walk_expr(async_ast_get_data2(self.ast, node))
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return
 
-    if kind == NK_TUPLE or kind == NK_ARRAY_LIT:
+    if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
         let start = async_ast_get_data0(self.ast, node)
         let count = async_ast_get_data1(self.ast, node)
         for i in 0..count:
             self.walk_expr(async_extra_or_zero(self.ast, start + i))
         return
 
-    if kind == NK_ARRAY_COMPREHENSION:
+    if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         self.walk_expr(async_ast_get_data2(self.ast, node))
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 
-    if kind == NK_STRUCT_LIT:
+    if kind == NodeKind.NK_STRUCT_LIT:
         // d0 is a symbol, not a node — don't walk it
         let field_start = async_ast_get_data1(self.ast, node)
         let field_count = async_ast_get_data2(self.ast, node)
@@ -271,7 +271,7 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
             self.walk_expr(val)
         return
 
-    if kind == NK_RECORD_UPDATE:
+    if kind == NodeKind.NK_RECORD_UPDATE:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         let field_start = async_ast_get_data1(self.ast, node)
         let field_count = async_ast_get_data2(self.ast, node)
@@ -280,11 +280,11 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
             self.walk_expr(val)
         return
 
-    if kind == NK_CLOSURE or kind == NK_ASYNC_BLOCK:
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 
-    if kind == NK_OPTIONAL_CHAIN:
+    if kind == NodeKind.NK_OPTIONAL_CHAIN:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         let extra_start = async_ast_get_data2(self.ast, node)
         let arg_count = async_extra_or_zero(self.ast, extra_start)
@@ -292,26 +292,26 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
             self.walk_expr(async_extra_or_zero(self.ast, extra_start + 1 + ai))
         return
 
-    if kind == NK_VARIANT_SHORTHAND:
+    if kind == NodeKind.NK_VARIANT_SHORTHAND:
         let start = async_ast_get_data1(self.ast, node)
         let count = async_ast_get_data2(self.ast, node)
         for i in 0..count:
             self.walk_expr(async_extra_or_zero(self.ast, start + i))
         return
 
-    if kind == NK_ENUM_VARIANT:
+    if kind == NodeKind.NK_ENUM_VARIANT:
         let extra_start = async_ast_get_data2(self.ast, node)
         let count = async_extra_or_zero(self.ast, extra_start)
         for i in 0..count:
             self.walk_expr(async_extra_or_zero(self.ast, extra_start + 1 + i))
         return
 
-    if kind == NK_WITH_EXPR:
+    if kind == NodeKind.NK_WITH_EXPR:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return
 
-    if kind == NK_ASYNC_SCOPE:
+    if kind == NodeKind.NK_ASYNC_SCOPE:
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return
 
@@ -326,7 +326,7 @@ fn async_extra_or_zero(ast: AstPool, idx: i32) -> i32:
 fn async_find_fn_decl(ast: AstPool, fn_sym: i32) -> i32:
     for di in 0..ast.decl_count():
         let decl = ast.get_decl(di)
-        if ast.kind(decl) == NK_FN_DECL and ast.get_data0(decl) == fn_sym:
+        if ast.kind(decl) == NodeKind.NK_FN_DECL and ast.get_data0(decl) == fn_sym:
             return decl
     0
 

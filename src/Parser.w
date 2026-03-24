@@ -555,11 +555,11 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
 
     // Store extra: type params then params already in extra from parsing.
     // We encode: d0=name, d1=body, d2=flags
-    // For unsafe fn, wrap body in NK_UNSAFE_BLOCK
+    // For unsafe fn, wrap body in NodeKind.NK_UNSAFE_BLOCK
     var final_body = body
     if self.pending_unsafe_fn != 0:
-        final_body = self.pool.add_node(NK_UNSAFE_BLOCK, self.pool.get_start(body), self.pool.get_end(body), body, 0, 0)
-    let fn_node = self.pool.add_node(NK_FN_DECL, start, self.pool.get_end(body), name, final_body, flags)
+        final_body = self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, self.pool.get_start(body), self.pool.get_end(body), body, 0, 0)
+    let fn_node = self.pool.add_node(NodeKind.NK_FN_DECL, start, self.pool.get_end(body), name, final_body, flags)
     let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
     self.pool.add_fn_meta(fn_node, meta_flags, ret_type, params_start, param_count, tp_start, tp_count)
     self.pool.add_fn_param_pattern_meta(fn_node, self.last_param_pattern_start, self.last_param_pattern_count)
@@ -583,7 +583,7 @@ fn Parser.parse_extern_decl(self: Parser, start: i32) -> i32:
         if ev_name == 0: return 0
         if self.expect(TK_COLON) == 0: return 0
         let ev_type = self.parse_type_expr()
-        return self.pool.add_node(NK_EXTERN_VAR, start, self.prev_end(), ev_name, ev_type, is_mut)
+        return self.pool.add_node(NodeKind.NK_EXTERN_VAR, start, self.prev_end(), ev_name, ev_type, is_mut)
     if self.expect(TK_KW_FN) == 0:
         return 0
     let name = self.expect_ident()
@@ -613,7 +613,7 @@ fn Parser.parse_extern_decl(self: Parser, start: i32) -> i32:
 
     // Store: d0=name, d1=extra_start, d2=flags(bit0=variadic)
     // Extra already has [param_name, param_type, param_flags]* from parse_param_list
-    let extern_node = self.pool.add_node(NK_EXTERN_FN, start, self.prev_end(), name, extra_start, is_variadic)
+    let extern_node = self.pool.add_node(NodeKind.NK_EXTERN_FN, start, self.prev_end(), name, extra_start, is_variadic)
     // Add fn_meta so Codegen can access param_count and return_type
     // Store callconv sym in ts field (unused for extern fns)
     let required_param_count = self.last_param_required_count
@@ -653,7 +653,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
             var struct_kind = pack_type_decl_kind(TDK_STRUCT, is_ephemeral)
             if self.pending_packed != 0:
                 struct_kind = struct_kind + TDK_FLAG_PACKED
-            let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
+            let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
             return self.finish_type_decl(node)
         repr_type_node = self.parse_type_expr()
 
@@ -665,7 +665,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         var struct_kind = pack_type_decl_kind(TDK_STRUCT, is_ephemeral)
         if self.pending_packed != 0:
             struct_kind = struct_kind + TDK_FLAG_PACKED
-        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
         return self.finish_type_decl(node)
 
     if self.peek() != TK_EQ:
@@ -686,7 +686,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_DISC_ENUM, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_DISC_ENUM, is_ephemeral))
         return self.finish_type_decl(node)
 
     if self.peek() == TK_L_BRACE:
@@ -698,7 +698,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         var struct_kind = pack_type_decl_kind(TDK_STRUCT, is_ephemeral)
         if self.pending_packed != 0:
             struct_kind = struct_kind + TDK_FLAG_PACKED
-        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
         return self.finish_type_decl(node)
 
     if self.peek() == TK_PIPE or (self.peek() == TK_IDENT and self.is_enum_def()):
@@ -707,7 +707,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_ENUM, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_ENUM, is_ephemeral))
         return self.finish_type_decl(node)
 
     if self.peek() == TK_KW_OPAQUE:
@@ -717,7 +717,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_OPAQUE, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_OPAQUE, is_ephemeral))
         return self.finish_type_decl(node)
 
     if self.peek() == TK_KW_UNION:
@@ -735,7 +735,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_UNION, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_UNION, is_ephemeral))
         return self.finish_type_decl(node)
 
     if self.peek() == TK_IDENT and self.is_ident_named("distinct"):
@@ -746,7 +746,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_DISTINCT, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_DISTINCT, is_ephemeral))
         return self.finish_type_decl(node)
 
     if self.peek() == TK_KW_FN or
@@ -763,7 +763,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_ALIAS, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_ALIAS, is_ephemeral))
         return self.finish_type_decl(node)
 
     self.emit_error("expected type body")
@@ -840,7 +840,7 @@ fn Parser.parse_enum_named_decl(self: Parser, start: i32, name: i32, is_pub: i32
     self.pool.add_extra(is_pub)
     self.pool.add_extra(tp_start)
     self.pool.add_extra(tp_count)
-    let node = self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(sub_kind, is_ephemeral))
+    let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(sub_kind, is_ephemeral))
     return self.finish_type_decl(node)
 
 fn Parser.finish_type_decl(self: Parser, node: i32) -> i32:
@@ -1493,7 +1493,7 @@ fn Parser.parse_use_decl(self: Parser, start: i32) -> i32:
                 depth = depth - 1
             self.advance()
 
-    self.pool.add_node(NK_USE_DECL, start, self.prev_end(), extra_start, path_count, 0)
+    self.pool.add_node(NodeKind.NK_USE_DECL, start, self.prev_end(), extra_start, path_count, 0)
 
 fn Parser.parse_c_import(self: Parser, start: i32) -> i32:
     self.advance()  // consume c_import
@@ -1538,7 +1538,7 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> i32:
             break
 
     self.expect(TK_R_PAREN)
-    self.pool.add_node(NK_C_IMPORT, start, self.prev_end(), header_sym, extra_start, link_count)
+    self.pool.add_node(NodeKind.NK_C_IMPORT, start, self.prev_end(), header_sym, extra_start, link_count)
 
 // ── let decl ─────────────────────────────────────────────────────
 
@@ -1576,7 +1576,7 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> i32:
         // Keep lower 2 bits for mut/pub; encode optional type at bit 2+.
         flags = flags + (type_extra + 1) * 4
 
-    self.pool.add_node(NK_LET_DECL, start, self.prev_end(), name, value, flags)
+    self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, value, flags)
 
 fn Parser.parse_const_decl(self: Parser, is_pub: i32, start: i32) -> i32:
     self.advance()  // consume 'const'
@@ -1597,7 +1597,7 @@ fn Parser.parse_const_decl(self: Parser, is_pub: i32, start: i32) -> i32:
     if raw_value == 0:
         return 0
     // const desugars to comptime-wrapped immutable let
-    let value = self.pool.add_node(NK_COMPTIME, start, self.prev_end(), raw_value, 0, 0)
+    let value = self.pool.add_node(NodeKind.NK_COMPTIME, start, self.prev_end(), raw_value, 0, 0)
 
     var flags = 0
     if is_pub == Visibility.VIS_PUBLIC:
@@ -1607,7 +1607,7 @@ fn Parser.parse_const_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(type_ann)
         flags = flags + (type_extra + 1) * 4
 
-    self.pool.add_node(NK_LET_DECL, start, self.prev_end(), name, value, flags)
+    self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, value, flags)
 
 // ── error decl (desugars to enum) ────────────────────────────────
 
@@ -1638,7 +1638,7 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(0)
         self.pool.add_extra(0)
-        return self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TDK_ENUM, 0))
+        return self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TDK_ENUM, 0))
 
     // error Name = Variant1, Variant2(payload), ...
     if self.expect(TK_EQ) == 0:
@@ -1649,7 +1649,7 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> i32:
     self.pool.add_extra(is_pub)
     self.pool.add_extra(0)
     self.pool.add_extra(0)
-    self.pool.add_node(NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TDK_ENUM, 0))
+    self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TDK_ENUM, 0))
 
 // ── trait decl ───────────────────────────────────────────────────
 
@@ -1792,7 +1792,7 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
         self.pool.add_extra(method_ret_types.get(mi as i64))
         self.pool.add_extra(method_bodies.get(mi as i64))
 
-    let node = self.pool.add_node(NK_TRAIT_DECL, start, self.prev_end(), name, extra_start, vis)
+    let node = self.pool.add_node(NodeKind.NK_TRAIT_DECL, start, self.prev_end(), name, extra_start, vis)
     if self.pending_sealed != 0:
         self.pool.mark_sealed_trait(node)
     self.pool.add_decl(node)
@@ -1801,7 +1801,7 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
 
 // Parse optional generic type args after an impl target type name.
 // e.g., for `impl Trait for Vec[i32]`, parses `[i32]` after "Vec".
-// Returns NK_TYPE_GENERIC node if args present, 0 otherwise.
+// Returns NodeKind.NK_TYPE_GENERIC node if args present, 0 otherwise.
 fn Parser.parse_optional_impl_target_args(self: Parser, type_name: i32) -> i32:
     if self.peek() != TK_L_BRACKET:
         return 0
@@ -1824,7 +1824,7 @@ fn Parser.parse_optional_impl_target_args(self: Parser, type_name: i32) -> i32:
     let extra_start = self.pool.extra_len()
     for ai in 0..args.len() as i32:
         self.pool.add_extra(args.get(ai as i64))
-    self.pool.add_node(NK_TYPE_GENERIC, start, self.prev_end(), type_name, extra_start, args.len() as i32)
+    self.pool.add_node(NodeKind.NK_TYPE_GENERIC, start, self.prev_end(), type_name, extra_start, args.len() as i32)
 
 fn Parser.parse_impl_block(self: Parser, vis: i32):
     let start = self.current_start()
@@ -1977,7 +1977,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
         if m_async != 0:
             flags = flags + FN_FLAG_ASYNC
 
-        let fn_node = self.pool.add_node(NK_FN_DECL, method_start, self.prev_end(), mangled, body, flags)
+        let fn_node = self.pool.add_node(NodeKind.NK_FN_DECL, method_start, self.prev_end(), mangled, body, flags)
         let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
         self.pool.add_fn_meta(fn_node, meta_flags, ret_type, m_params_start, param_count, m_tp_start, m_tp_count)
         self.pool.add_decl(fn_node)
@@ -1992,7 +1992,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
         self.pool.add_extra(impl_assoc_names.get(iai as i64))
         self.pool.add_extra(impl_assoc_types.get(iai as i64))
     self.pool.add_extra(method_count)
-    let impl_node = self.pool.add_node(NK_IMPL_DECL, start, self.prev_end(), type_name, impl_extra, trait_name)
+    let impl_node = self.pool.add_node(NodeKind.NK_IMPL_DECL, start, self.prev_end(), type_name, impl_extra, trait_name)
     self.pool.add_decl(impl_node)
 
     // Store impl type params if present (blanket impl)
@@ -2019,7 +2019,7 @@ fn Parser.parse_expr(self: Parser) -> i32:
         self.advance()
         self.skip_newlines()
         let rhs = self.parse_expr()
-        return self.pool.add_node(NK_ASSIGN, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
+        return self.pool.add_node(NodeKind.NK_ASSIGN, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
 
     // Compound assignment: += -= *= /= %=
     let cop = self.compound_assign_op()
@@ -2027,8 +2027,8 @@ fn Parser.parse_expr(self: Parser) -> i32:
         self.advance()
         self.skip_newlines()
         let rhs = self.parse_expr()
-        let bin = self.pool.add_node(NK_BINARY, self.pool.get_start(lhs), self.prev_end(), cop, lhs, rhs)
-        return self.pool.add_node(NK_ASSIGN, self.pool.get_start(lhs), self.prev_end(), lhs, bin, 0)
+        let bin = self.pool.add_node(NodeKind.NK_BINARY, self.pool.get_start(lhs), self.prev_end(), cop, lhs, rhs)
+        return self.pool.add_node(NodeKind.NK_ASSIGN, self.pool.get_start(lhs), self.prev_end(), lhs, bin, 0)
 
     lhs
 
@@ -2083,26 +2083,26 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> i32:
             self.skip_newlines()
             let arm_count = self.parse_match_arms()
             let arms_start = if arm_count > 0: self.pool.extra_len() - arm_count else: self.pool.extra_len()
-            lhs = self.pool.add_node(NK_MATCH, self.pool.get_start(lhs), self.prev_end(), lhs, arms_start, arm_count)
+            lhs = self.pool.add_node(NodeKind.NK_MATCH, self.pool.get_start(lhs), self.prev_end(), lhs, arms_start, arm_count)
             continue
 
         let next_prec = if op_code == BinaryOp.OP_DEFAULT or op_code == 501: prec else: prec + 1
         let rhs = self.parse_precedence(next_prec)
 
         if op_code == 500:  // pipeline
-            lhs = self.pool.add_node(NK_PIPELINE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
+            lhs = self.pool.add_node(NodeKind.NK_PIPELINE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
         else if op_code == 501:  // reverse pipeline
-            lhs = self.pool.add_node(NK_PIPELINE, self.pool.get_start(lhs), self.prev_end(), rhs, lhs, 0)
+            lhs = self.pool.add_node(NodeKind.NK_PIPELINE, self.pool.get_start(lhs), self.prev_end(), rhs, lhs, 0)
         else if op_code == 504:  // backward compose <<
             lhs = self.build_composed_closure(lhs, rhs, 0)
         else if op_code == 505:  // forward compose >>
             lhs = self.build_composed_closure(lhs, rhs, 1)
         else if op_code == 502:  // range ..
-            lhs = self.pool.add_node(NK_RANGE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
+            lhs = self.pool.add_node(NodeKind.NK_RANGE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
         else if op_code == 503:  // range ..=
-            lhs = self.pool.add_node(NK_RANGE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 1)
+            lhs = self.pool.add_node(NodeKind.NK_RANGE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 1)
         else:
-            lhs = self.pool.add_node(NK_BINARY, self.pool.get_start(lhs), self.prev_end(), op_code, lhs, rhs)
+            lhs = self.pool.add_node(NodeKind.NK_BINARY, self.pool.get_start(lhs), self.prev_end(), op_code, lhs, rhs)
 
     lhs
 
@@ -2157,9 +2157,9 @@ fn Parser.parse_primary(self: Parser) -> i32:
         let ns = self.current_start()
         let ne = self.current_end()
         self.advance()
-        return self.pool.add_node(NK_NULL_LIT, ns, ne, 0, 0, 0)
+        return self.pool.add_node(NodeKind.NK_NULL_LIT, ns, ne, 0, 0, 0)
     if t == TK_IDENT:
-        // comptime_error("msg") → NK_COMPTIME_ERROR
+        // comptime_error("msg") → NodeKind.NK_COMPTIME_ERROR
         if self.is_ident_named("comptime_error"):
             return self.parse_comptime_error_expr()
         if self.pos + 1 < self.tokens.len():
@@ -2176,7 +2176,7 @@ fn Parser.parse_primary(self: Parser) -> i32:
         self.saw_implicit_it = 1
         self.implicit_it_depth = self.implicit_it_depth + 1
         let sym = self.intern.intern("__it")
-        let node = self.pool.add_node(NK_IDENT, start, end_pos, sym, 0, 0)
+        let node = self.pool.add_node(NodeKind.NK_IDENT, start, end_pos, sym, 0, 0)
         return self.parse_postfix(node)
     if t == TK_DOT_IDENT: return self.parse_variant_shorthand()
     if t == TK_L_PAREN: return self.parse_grouped_or_tuple()
@@ -2319,7 +2319,7 @@ fn Parser.parse_int_literal(self: Parser) -> i32:
     let core = numeric_literal_core(text)
     self.advance()
     let val = parse_i64(core)
-    let node = self.pool.add_node(NK_INT_LIT, start, end, ast_int_part0(val), ast_int_part1(val), ast_int_part2(val))
+    let node = self.pool.add_node(NodeKind.NK_INT_LIT, start, end, ast_int_part0(val), ast_int_part1(val), ast_int_part2(val))
     self.pool.set_literal_suffix(node, suffix)
     node
 
@@ -2331,7 +2331,7 @@ fn Parser.parse_float_literal(self: Parser) -> i32:
     let core = numeric_literal_core(text)
     self.advance()
     let str_idx = self.pool.add_string(core)
-    let node = self.pool.add_node(NK_FLOAT_LIT, start, end, str_idx, 0, 0)
+    let node = self.pool.add_node(NodeKind.NK_FLOAT_LIT, start, end, str_idx, 0, 0)
     self.pool.set_literal_suffix(node, suffix)
     node
 
@@ -2343,7 +2343,7 @@ fn Parser.parse_comptime_error_expr(self: Parser) -> i32:
     self.advance()
     if self.peek() == TK_R_PAREN:
         self.advance()
-    self.pool.add_node(NK_COMPTIME_ERROR, ce_s, self.prev_end(), ce_msg, 0, 0)
+    self.pool.add_node(NodeKind.NK_COMPTIME_ERROR, ce_s, self.prev_end(), ce_msg, 0, 0)
 
 fn Parser.parse_string_literal(self: Parser) -> i32:
     let start = self.current_start()
@@ -2354,7 +2354,7 @@ fn Parser.parse_string_literal(self: Parser) -> i32:
         content = "\x01raw\x01" ++ content
         let sym = self.intern.intern(content)
         self.advance()
-        let node = self.pool.add_node(NK_STRING_LIT, start, end, sym, 0, 0)
+        let node = self.pool.add_node(NodeKind.NK_STRING_LIT, start, end, sym, 0, 0)
         return self.parse_postfix(node)
     // f"..." prefix triggers string interpolation
     if is_fstring_token_text(text):
@@ -2362,11 +2362,11 @@ fn Parser.parse_string_literal(self: Parser) -> i32:
         return self.desugar_interpolated_string(content, start, end)
     let sym = self.intern.intern(content)
     self.advance()
-    let node = self.pool.add_node(NK_STRING_LIT, start, end, sym, 0, 0)
+    let node = self.pool.add_node(NodeKind.NK_STRING_LIT, start, end, sym, 0, 0)
     return self.parse_postfix(node)
 
 fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, end: i32) -> i32:
-    // Emit NK_FSTRING with segments in extra_data.
+    // Emit NodeKind.NK_FSTRING with segments in extra_data.
     // d0 = segment_count, d1 = extra_start, d2 = 0
     let clen = content.len() as i32
     let extra_start = self.pool.extra_len()
@@ -2441,7 +2441,7 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
         self.pool.add_extra(FSTR_SEG_LITERAL)
         self.pool.add_extra(sym)
         seg_count = 1
-    let node = self.pool.add_node(NK_FSTRING, start, end, seg_count, extra_start, 0)
+    let node = self.pool.add_node(NodeKind.NK_FSTRING, start, end, seg_count, extra_start, 0)
     self.parse_postfix(node)
 
 fn Parser.interp_clean_segment(self: Parser, content: str, from: i32, to: i32) -> str:
@@ -2452,7 +2452,7 @@ fn Parser.interp_clean_segment(self: Parser, content: str, from: i32, to: i32) -
 
 fn Parser.parse_format_spec_text(self: Parser, spec_text: str, start: i32, end: i32) -> i32:
     // Parse format spec grammar: [[fill]align][sign]['#']['0'][width]['.' precision][mode]
-    // Returns NK_FSTRING_SPEC node, or 0 if empty
+    // Returns NodeKind.NK_FSTRING_SPEC node, or 0 if empty
     let slen = spec_text.len() as i32
     if slen == 0:
         return 0
@@ -2524,7 +2524,7 @@ fn Parser.parse_format_spec_text(self: Parser, spec_text: str, start: i32, end: 
             pos = pos + 1
     // Pack flags into d0: mode(0-7), fill(8-15), align(16-17), sign_plus(18), alternate(19), zero_pad(20)
     let flags = mode | ((fill & 255) << 8) | ((align & 3) << 16) | ((sign_plus & 1) << 18) | ((alternate & 1) << 19) | ((zero_pad & 1) << 20)
-    self.pool.add_node(NK_FSTRING_SPEC, start, end, flags, width, precision)
+    self.pool.add_node(NodeKind.NK_FSTRING_SPEC, start, end, flags, width, precision)
 
 fn Parser.parse_interpolated_expr(self: Parser, expr_text: str, base_start: i32) -> i32:
     // Re-lex and parse the expression text
@@ -2546,7 +2546,7 @@ fn Parser.parse_c_string_literal(self: Parser) -> i32:
         raw = text.slice(2, text.len() as i64 - 1)
     let sym = self.intern.intern(raw)
     self.advance()
-    let node = self.pool.add_node(NK_C_STRING_LIT, start, end, sym, 0, 0)
+    let node = self.pool.add_node(NodeKind.NK_C_STRING_LIT, start, end, sym, 0, 0)
     self.parse_postfix(node)
 
 fn Parser.parse_bool_literal(self: Parser) -> i32:
@@ -2554,7 +2554,7 @@ fn Parser.parse_bool_literal(self: Parser) -> i32:
     let end = self.current_end()
     let val = if self.peek() == TK_TRUE: 1 else: 0
     self.advance()
-    self.pool.add_node(NK_BOOL_LIT, start, end, val, 0, 0)
+    self.pool.add_node(NodeKind.NK_BOOL_LIT, start, end, val, 0, 0)
 
 fn Parser.parse_char_literal(self: Parser) -> i32:
     let start = self.current_start()
@@ -2594,7 +2594,7 @@ fn Parser.parse_char_literal(self: Parser) -> i32:
     else if text.len() >= base + 2:
         value = text.byte_at((base) as i64) as i32
     let value64 = value as i64
-    self.pool.add_node(NK_INT_LIT, start, end, ast_int_part0(value64), ast_int_part1(value64), ast_int_part2(value64))
+    self.pool.add_node(NodeKind.NK_INT_LIT, start, end, ast_int_part0(value64), ast_int_part1(value64), ast_int_part2(value64))
 
 fn strip_string_token_text(text: str) -> str:
     // f"..." → content between f" and closing "
@@ -2698,7 +2698,7 @@ fn Parser.parse_ident_or_call(self: Parser) -> i32:
     let end = self.current_end()
     let sym = self.intern_current()
     self.advance()
-    let node = self.pool.add_node(NK_IDENT, start, end, sym, 0, 0)
+    let node = self.pool.add_node(NodeKind.NK_IDENT, start, end, sym, 0, 0)
     self.parse_postfix(node)
 
 // ── Postfix parsing ──────────────────────────────────────────────
@@ -2718,10 +2718,10 @@ fn Parser.parse_postfix(self: Parser, lhs_in: i32) -> i32:
             let text = self.source.slice((start + 1) as i64, end as i64)
             let field = self.intern.intern(text)
             self.advance()
-            lhs = self.pool.add_node(NK_FIELD_ACCESS, self.pool.get_start(lhs), end, lhs, field, 0)
+            lhs = self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), end, lhs, field, 0)
         else if t == TK_L_BRACE:
             // Struct literal only when lhs is an identifier
-            if self.pool.kind(lhs) != NK_IDENT:
+            if self.pool.kind(lhs) != NodeKind.NK_IDENT:
                 return lhs
             lhs = self.parse_struct_literal(lhs)
         else if t == TK_L_BRACKET:
@@ -2731,11 +2731,11 @@ fn Parser.parse_postfix(self: Parser, lhs_in: i32) -> i32:
                 return lhs
             self.advance()
             let target_type = self.parse_type_expr()
-            lhs = self.pool.add_node(NK_CAST, self.pool.get_start(lhs), self.prev_end(), lhs, target_type, 0)
+            lhs = self.pool.add_node(NodeKind.NK_CAST, self.pool.get_start(lhs), self.prev_end(), lhs, target_type, 0)
         else if t == TK_QUESTION:
             let qend = self.current_end()
             self.advance()
-            lhs = self.pool.add_node(NK_UNARY, self.pool.get_start(lhs), qend, UnaryOp.UOP_TRY, lhs, 0)
+            lhs = self.pool.add_node(NodeKind.NK_UNARY, self.pool.get_start(lhs), qend, UnaryOp.UOP_TRY, lhs, 0)
         else if t == TK_QUESTION_DOT:
             lhs = self.parse_optional_chain(lhs)
         else:
@@ -2747,7 +2747,7 @@ fn Parser.maybe_wrap_implicit_it(self: Parser, expr: i32) -> i32:
     let param_start = self.pool.extra_len()
     self.pool.add_extra(it_sym)
     self.pool.add_extra(0)
-    self.pool.add_node(NK_CLOSURE, self.pool.get_start(expr), self.pool.get_end(expr), expr, param_start, 1)
+    self.pool.add_node(NodeKind.NK_CLOSURE, self.pool.get_start(expr), self.pool.get_end(expr), expr, param_start, 1)
 
 fn Parser.parse_call(self: Parser, callee: i32) -> i32:
     self.advance()  // consume (
@@ -2787,7 +2787,7 @@ fn Parser.parse_call(self: Parser, callee: i32) -> i32:
     var placeholder_count = 0
     for ai in 0..arg_count:
         let arg = args.get(ai as i64)
-        if self.pool.kind(arg) == NK_IDENT:
+        if self.pool.kind(arg) == NodeKind.NK_IDENT:
             let sym = self.pool.get_data0(arg)
             if self.intern.resolve(sym) == "_":
                 placeholder_count = placeholder_count + 1
@@ -2796,17 +2796,17 @@ fn Parser.parse_call(self: Parser, callee: i32) -> i32:
     var partial_param_syms: Vec[i32] = Vec.new()
     for ai in 0..arg_count:
         let arg = args.get(ai as i64)
-        if self.pool.kind(arg) == NK_IDENT:
+        if self.pool.kind(arg) == NodeKind.NK_IDENT:
             let sym = self.pool.get_data0(arg)
             if self.intern.resolve(sym) == "_":
                 let pname = f"__partial_arg_{self.pos}_{partial_param_syms.len() as i32}"
                 let psym = self.intern.intern(pname)
                 partial_param_syms.push(psym)
-                let pnode = self.pool.add_node(NK_IDENT, self.pool.get_start(arg), self.pool.get_end(arg), psym, 0, 0)
+                let pnode = self.pool.add_node(NodeKind.NK_IDENT, self.pool.get_start(arg), self.pool.get_end(arg), psym, 0, 0)
                 self.pool.add_extra(pnode)
                 continue
         self.pool.add_extra(arg)
-    let call_node = self.pool.add_node(NK_CALL, self.pool.get_start(callee), self.prev_end(), callee, extra_start, arg_count)
+    let call_node = self.pool.add_node(NodeKind.NK_CALL, self.pool.get_start(callee), self.prev_end(), callee, extra_start, arg_count)
 
     if placeholder_count == 0:
         return call_node
@@ -2816,27 +2816,27 @@ fn Parser.parse_call(self: Parser, callee: i32) -> i32:
     for pi in 0..param_count:
         self.pool.add_extra(partial_param_syms.get(pi as i64))
         self.pool.add_extra(0)
-    self.pool.add_node(NK_CLOSURE, self.pool.get_start(callee), self.prev_end(), call_node, param_start, param_count)
+    self.pool.add_node(NodeKind.NK_CLOSURE, self.pool.get_start(callee), self.prev_end(), call_node, param_start, param_count)
 
 fn Parser.parse_dot(self: Parser, lhs: i32) -> i32:
     self.advance()  // consume .
     // .await
     if self.peek() == TK_KW_AWAIT:
         self.advance()
-        return self.pool.add_node(NK_AWAIT, self.pool.get_start(lhs), self.prev_end(), lhs, 0, 0)
+        return self.pool.add_node(NodeKind.NK_AWAIT, self.pool.get_start(lhs), self.prev_end(), lhs, 0, 0)
     // Tuple field .0 .1
     if self.peek() == TK_INT_LIT:
         let field = self.intern_current()
         self.advance()
-        return self.pool.add_node(NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
+        return self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
     let field = self.expect_ident_or_keyword()
-    self.pool.add_node(NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
+    self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
 
 fn Parser.build_composed_closure(self: Parser, lhs_fn: i32, rhs_fn: i32, is_forward: i32) -> i32:
     let param_name = f"__pipe_arg_{self.pos}"
     let param_sym = self.intern.intern(param_name)
     let param_expr = self.pool.add_node(
-        NK_IDENT,
+        NodeKind.NK_IDENT,
         self.pool.get_start(lhs_fn),
         self.pool.get_end(lhs_fn),
         param_sym,
@@ -2850,7 +2850,7 @@ fn Parser.build_composed_closure(self: Parser, lhs_fn: i32, rhs_fn: i32, is_forw
     let first_args = self.pool.extra_len()
     self.pool.add_extra(param_expr)
     let first_call = self.pool.add_node(
-        NK_CALL,
+        NodeKind.NK_CALL,
         self.pool.get_start(lhs_fn),
         self.pool.get_end(rhs_fn),
         first_callee,
@@ -2861,7 +2861,7 @@ fn Parser.build_composed_closure(self: Parser, lhs_fn: i32, rhs_fn: i32, is_forw
     let second_args = self.pool.extra_len()
     self.pool.add_extra(first_call)
     let second_call = self.pool.add_node(
-        NK_CALL,
+        NodeKind.NK_CALL,
         self.pool.get_start(lhs_fn),
         self.pool.get_end(rhs_fn),
         second_callee,
@@ -2869,12 +2869,12 @@ fn Parser.build_composed_closure(self: Parser, lhs_fn: i32, rhs_fn: i32, is_forw
         1,
     )
 
-    // NK_CLOSURE expects [name, type] pairs.
+    // NodeKind.NK_CLOSURE expects [name, type] pairs.
     let params_start = self.pool.extra_len()
     self.pool.add_extra(param_sym)
     self.pool.add_extra(0)
     self.pool.add_node(
-        NK_CLOSURE,
+        NodeKind.NK_CLOSURE,
         self.pool.get_start(lhs_fn),
         self.pool.get_end(second_call),
         second_call,
@@ -2898,7 +2898,7 @@ fn Parser.parse_struct_literal(self: Parser, lhs: i32) -> i32:
             fields.push(val)
         else:
             // Shorthand: name means name: name
-            let ident_node = self.pool.add_node(NK_IDENT, self.pool.get_start(lhs), self.prev_end(), fname, 0, 0)
+            let ident_node = self.pool.add_node(NodeKind.NK_IDENT, self.pool.get_start(lhs), self.prev_end(), fname, 0, 0)
             fields.push(fname)
             fields.push(ident_node)
         field_count = field_count + 1
@@ -2910,7 +2910,7 @@ fn Parser.parse_struct_literal(self: Parser, lhs: i32) -> i32:
     let extra_start = self.pool.extra_len()
     for fi in 0..fields.len() as i32:
         self.pool.add_extra(fields.get(fi as i64))
-    self.pool.add_node(NK_STRUCT_LIT, self.pool.get_start(lhs), self.prev_end(), struct_name, extra_start, field_count)
+    self.pool.add_node(NodeKind.NK_STRUCT_LIT, self.pool.get_start(lhs), self.prev_end(), struct_name, extra_start, field_count)
 
 fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> i32:
     self.advance()  // consume [
@@ -2925,7 +2925,7 @@ fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> i32:
             end_expr = self.parse_expr()
             self.skip_newlines()
         self.expect(TK_R_BRACKET)
-        return self.pool.add_node(NK_SLICE, self.pool.get_start(lhs), self.prev_end(), lhs, index, end_expr)
+        return self.pool.add_node(NodeKind.NK_SLICE, self.pool.get_start(lhs), self.prev_end(), lhs, index, end_expr)
     // Support two-arg subscript for HashMap[K, V].new() syntax
     var second = 0
     if self.peek() == TK_COMMA:
@@ -2934,7 +2934,7 @@ fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> i32:
         second = self.parse_index_expr()
         self.skip_newlines()
     self.expect(TK_R_BRACKET)
-    self.pool.add_node(NK_INDEX, self.pool.get_start(lhs), self.prev_end(), lhs, index, second)
+    self.pool.add_node(NodeKind.NK_INDEX, self.pool.get_start(lhs), self.prev_end(), lhs, index, second)
 
 fn Parser.parse_index_expr(self: Parser) -> i32:
     self.parse_precedence(6)
@@ -2963,7 +2963,7 @@ fn Parser.parse_optional_chain(self: Parser, lhs: i32) -> i32:
     self.pool.add_extra(arg_count)
     for ai in 0..arg_count:
         self.pool.add_extra(args.get(ai as i64))
-    self.pool.add_node(NK_OPTIONAL_CHAIN, self.pool.get_start(lhs), self.prev_end(), lhs, member, extra_start)
+    self.pool.add_node(NodeKind.NK_OPTIONAL_CHAIN, self.pool.get_start(lhs), self.prev_end(), lhs, member, extra_start)
 
 // ── Variant shorthand ────────────────────────────────────────────
 
@@ -2998,7 +2998,7 @@ fn Parser.parse_variant_shorthand(self: Parser) -> i32:
     let arg_count = args.len() as i32
     for ai in 0..arg_count:
         self.pool.add_extra(args.get(ai as i64))
-    self.pool.add_node(NK_VARIANT_SHORTHAND, start, self.prev_end(), sym, extra_start, arg_count)
+    self.pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, start, self.prev_end(), sym, extra_start, arg_count)
 
 // ── Grouped / tuple ──────────────────────────────────────────────
 
@@ -3015,7 +3015,7 @@ fn Parser.parse_grouped_or_tuple(self: Parser) -> i32:
         if self.peek() == TK_FAT_ARROW or self.peek() == TK_ARROW:
             self.pos = open_paren_pos
             return self.parse_fat_arrow_paren_closure()
-        let node = self.pool.add_node(NK_TUPLE, start, end, self.pool.extra_len(), 0, 0)
+        let node = self.pool.add_node(NodeKind.NK_TUPLE, start, end, self.pool.extra_len(), 0, 0)
         return self.parse_postfix(node)
 
     // Check if (params) => closure
@@ -3039,11 +3039,11 @@ fn Parser.parse_grouped_or_tuple(self: Parser) -> i32:
         for ei in 0..elems.len() as i32:
             self.pool.add_extra(elems.get(ei as i64))
         let count = elems.len() as i32
-        let node = self.pool.add_node(NK_TUPLE, start, self.prev_end(), extra_start, count, 0)
+        let node = self.pool.add_node(NodeKind.NK_TUPLE, start, self.prev_end(), extra_start, count, 0)
         return self.parse_postfix(node)
 
     self.expect(TK_R_PAREN)
-    let node = self.pool.add_node(NK_GROUPED, start, self.prev_end(), first, 0, 0)
+    let node = self.pool.add_node(NodeKind.NK_GROUPED, start, self.prev_end(), first, 0, 0)
     self.parse_postfix(node)
 
 // ── Unary expressions ────────────────────────────────────────────
@@ -3057,29 +3057,29 @@ fn Parser.parse_unary_negate(self: Parser) -> i32:
         if numeric_literal_suffix_code(text) == LiteralSuffix.LIT_SUFFIX_NONE:
             let value = 0 - parse_i64(text)
             self.advance()
-            return self.pool.add_node(NK_INT_LIT, start, end, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value))
+            return self.pool.add_node(NodeKind.NK_INT_LIT, start, end, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value))
     let operand = self.parse_primary()
-    self.pool.add_node(NK_UNARY, start, self.prev_end(), UnaryOp.UOP_NEGATE, operand, 0)
+    self.pool.add_node(NodeKind.NK_UNARY, start, self.prev_end(), UnaryOp.UOP_NEGATE, operand, 0)
 
 fn Parser.parse_unary_bit_not(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
     let operand = self.parse_primary()
-    self.pool.add_node(NK_UNARY, start, self.prev_end(), UnaryOp.UOP_BIT_NOT, operand, 0)
+    self.pool.add_node(NodeKind.NK_UNARY, start, self.prev_end(), UnaryOp.UOP_BIT_NOT, operand, 0)
 
 fn Parser.parse_unary_not(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
     let operand = self.parse_primary()
-    self.pool.add_node(NK_UNARY, start, self.prev_end(), UnaryOp.UOP_NOT, operand, 0)
+    self.pool.add_node(NodeKind.NK_UNARY, start, self.prev_end(), UnaryOp.UOP_NOT, operand, 0)
 
 fn Parser.build_unary_with_outer_cast(self: Parser, start: i32, op: i32, operand: i32) -> i32:
-    if operand != 0 and self.pool.kind(operand) == NK_CAST:
+    if operand != 0 and self.pool.kind(operand) == NodeKind.NK_CAST:
         let inner = self.pool.get_data0(operand)
         let target_type = self.pool.get_data1(operand)
-        let unary = self.pool.add_node(NK_UNARY, start, self.pool.get_end(inner), op, inner, 0)
-        return self.pool.add_node(NK_CAST, start, self.pool.get_end(operand), unary, target_type, 0)
-    self.pool.add_node(NK_UNARY, start, self.pool.get_end(operand), op, operand, 0)
+        let unary = self.pool.add_node(NodeKind.NK_UNARY, start, self.pool.get_end(inner), op, inner, 0)
+        return self.pool.add_node(NodeKind.NK_CAST, start, self.pool.get_end(operand), unary, target_type, 0)
+    self.pool.add_node(NodeKind.NK_UNARY, start, self.pool.get_end(operand), op, operand, 0)
 
 fn Parser.parse_ref_of(self: Parser) -> i32:
     let start = self.current_start()
@@ -3152,7 +3152,7 @@ fn Parser.parse_if_expr(self: Parser) -> i32:
     else:
         self.pos = save
 
-    self.pool.add_node(NK_IF_EXPR, start, self.prev_end(), cond, then_body, else_body)
+    self.pool.add_node(NodeKind.NK_IF_EXPR, start, self.prev_end(), cond, then_body, else_body)
 
 fn Parser.parse_if_let(self: Parser, start: i32) -> i32:
     self.advance()  // consume first 'let'
@@ -3218,7 +3218,7 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> i32:
     else:
         self.pos = save
     if else_body == 0:
-        else_body = self.pool.add_node(NK_INT_LIT, start, start, 0, 0, 0)
+        else_body = self.pool.add_node(NodeKind.NK_INT_LIT, start, start, 0, 0, 0)
 
     // Desugar chained if-let into nested match/if expressions from right to left.
     var acc = then_body
@@ -3231,15 +3231,15 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> i32:
         if kind == 0:
             // Let clause → match d1 { d0 -> acc, _ -> else_body }
             let extra_start = self.pool.extra_len()
-            let arm1 = self.pool.add_node(NK_MATCH_ARM, start, self.prev_end(), d0, acc, 0)
+            let arm1 = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), d0, acc, 0)
             self.pool.add_extra(arm1)
-            let wildcard = self.pool.add_node(NK_PAT_WILDCARD, start, start, 0, 0, 0)
-            let arm2 = self.pool.add_node(NK_MATCH_ARM, start, self.prev_end(), wildcard, else_body, 0)
+            let wildcard = self.pool.add_node(NodeKind.NK_PAT_WILDCARD, start, start, 0, 0, 0)
+            let arm2 = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), wildcard, else_body, 0)
             self.pool.add_extra(arm2)
-            acc = self.pool.add_node(NK_MATCH, start, self.prev_end(), d1, extra_start, 2)
+            acc = self.pool.add_node(NodeKind.NK_MATCH, start, self.prev_end(), d1, extra_start, 2)
         else:
             // Cond clause → if d0 then acc else else_body
-            acc = self.pool.add_node(NK_IF_EXPR, start, self.prev_end(), d0, acc, else_body)
+            acc = self.pool.add_node(NodeKind.NK_IF_EXPR, start, self.prev_end(), d0, acc, else_body)
         ci = ci - 1
     acc
 
@@ -3250,19 +3250,19 @@ fn Parser.parse_return(self: Parser) -> i32:
     let t = self.peek()
     if t != TK_NEWLINE and t != TK_EOF and t != TK_R_PAREN and t != TK_R_BRACE:
         value = self.parse_expr()
-    self.pool.add_node(NK_RETURN, start, self.prev_end(), value, 0, 0)
+    self.pool.add_node(NodeKind.NK_RETURN, start, self.prev_end(), value, 0, 0)
 
 fn Parser.parse_defer(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
     let body = self.parse_expr()
-    self.pool.add_node(NK_DEFER, start, self.prev_end(), body, 0, 0)
+    self.pool.add_node(NodeKind.NK_DEFER, start, self.prev_end(), body, 0, 0)
 
 fn Parser.parse_errdefer(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
     let body = self.parse_expr()
-    self.pool.add_node(NK_ERRDEFER, start, self.prev_end(), body, 0, 0)
+    self.pool.add_node(NodeKind.NK_ERRDEFER, start, self.prev_end(), body, 0, 0)
 
 fn Parser.parse_unsafe(self: Parser) -> i32:
     let start = self.current_start()
@@ -3270,25 +3270,25 @@ fn Parser.parse_unsafe(self: Parser) -> i32:
     if self.peek() == TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
-    self.pool.add_node(NK_UNSAFE_BLOCK, start, self.prev_end(), body, 0, 0)
+    self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, start, self.prev_end(), body, 0, 0)
 
 fn Parser.parse_yield(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
     let value = self.parse_expr()
-    self.pool.add_node(NK_YIELD, start, self.prev_end(), value, 0, 0)
+    self.pool.add_node(NodeKind.NK_YIELD, start, self.prev_end(), value, 0, 0)
 
 fn Parser.parse_comptime_expr(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
     let inner = self.parse_expr()
-    self.pool.add_node(NK_COMPTIME, start, self.prev_end(), inner, 0, 0)
+    self.pool.add_node(NodeKind.NK_COMPTIME, start, self.prev_end(), inner, 0, 0)
 
 fn Parser.parse_spawn(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
     let value = self.parse_expr()
-    self.pool.add_node(NK_SPAWN, start, self.prev_end(), value, 0, 0)
+    self.pool.add_node(NodeKind.NK_SPAWN, start, self.prev_end(), value, 0, 0)
 
 fn Parser.parse_async_expr(self: Parser) -> i32:
     let start = self.current_start()
@@ -3304,12 +3304,12 @@ fn Parser.parse_async_expr(self: Parser) -> i32:
         if self.peek() == TK_COLON:
             self.advance()
         let body = self.parse_block_or_expr()
-        return self.pool.add_node(NK_ASYNC_SCOPE, start, self.prev_end(), scope_name, body, 0)
+        return self.pool.add_node(NodeKind.NK_ASYNC_SCOPE, start, self.prev_end(), scope_name, body, 0)
 
     if self.peek() == TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
-    self.pool.add_node(NK_ASYNC_BLOCK, start, self.prev_end(), body, 0, 0)
+    self.pool.add_node(NodeKind.NK_ASYNC_BLOCK, start, self.prev_end(), body, 0, 0)
 
 fn Parser.parse_select_await(self: Parser) -> i32:
     let start = self.current_start()
@@ -3358,7 +3358,7 @@ fn Parser.parse_select_await(self: Parser) -> i32:
     let extra_start = self.pool.extra_len()
     for ei in 0..arm_entries.len() as i32:
         self.pool.add_extra(arm_entries.get(ei as i64))
-    self.pool.add_node(NK_SELECT_AWAIT, start, self.prev_end(), extra_start, arm_count, 0)
+    self.pool.add_node(NodeKind.NK_SELECT_AWAIT, start, self.prev_end(), extra_start, arm_count, 0)
 
 // ── Loop expressions ─────────────────────────────────────────────
 
@@ -3374,7 +3374,7 @@ fn Parser.parse_while(self: Parser, label: i32) -> i32:
     if self.peek() == TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
-    self.pool.add_node(NK_WHILE, start, self.prev_end(), cond, body, label)
+    self.pool.add_node(NodeKind.NK_WHILE, start, self.prev_end(), cond, body, label)
 
 fn Parser.parse_while_let(self: Parser, start: i32) -> i32:
     self.advance()  // consume let
@@ -3387,15 +3387,15 @@ fn Parser.parse_while_let(self: Parser, start: i32) -> i32:
     let body = self.parse_block_or_expr()
 
     // Desugar to: loop: match subject { pat -> body, _ -> break }
-    let break_node = self.pool.add_node(NK_BREAK, start, start, 0, 0, 0)
+    let break_node = self.pool.add_node(NodeKind.NK_BREAK, start, start, 0, 0, 0)
     let extra_start = self.pool.extra_len()
-    let arm1 = self.pool.add_node(NK_MATCH_ARM, start, self.prev_end(), pat, body, 0)
+    let arm1 = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), pat, body, 0)
     self.pool.add_extra(arm1)
-    let wildcard = self.pool.add_node(NK_PAT_WILDCARD, start, start, 0, 0, 0)
-    let arm2 = self.pool.add_node(NK_MATCH_ARM, start, self.prev_end(), wildcard, break_node, 0)
+    let wildcard = self.pool.add_node(NodeKind.NK_PAT_WILDCARD, start, start, 0, 0, 0)
+    let arm2 = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), wildcard, break_node, 0)
     self.pool.add_extra(arm2)
-    let match_node = self.pool.add_node(NK_MATCH, start, self.prev_end(), subject, extra_start, 2)
-    self.pool.add_node(NK_LOOP, start, self.prev_end(), match_node, 0, 0)
+    let match_node = self.pool.add_node(NodeKind.NK_MATCH, start, self.prev_end(), subject, extra_start, 2)
+    self.pool.add_node(NodeKind.NK_LOOP, start, self.prev_end(), match_node, 0, 0)
 
 fn Parser.parse_loop(self: Parser, label: i32) -> i32:
     let start = self.current_start()
@@ -3403,7 +3403,7 @@ fn Parser.parse_loop(self: Parser, label: i32) -> i32:
     if self.peek() == TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
-    self.pool.add_node(NK_LOOP, start, self.prev_end(), body, label, 0)
+    self.pool.add_node(NodeKind.NK_LOOP, start, self.prev_end(), body, label, 0)
 
 fn Parser.parse_for(self: Parser, label: i32) -> i32:
     let start = self.current_start()
@@ -3430,7 +3430,7 @@ fn Parser.parse_for(self: Parser, label: i32) -> i32:
         self.advance()
     let body = self.parse_block_or_expr()
 
-    var for_node = self.pool.add_node(NK_FOR, start, self.prev_end(), binding, iterable, body)
+    var for_node = self.pool.add_node(NodeKind.NK_FOR, start, self.prev_end(), binding, iterable, body)
     self.pool.add_for_meta(for_node, index_binding, label)
 
     // Parse optional else clause: for x in iter: ... else: ...
@@ -3447,27 +3447,27 @@ fn Parser.parse_for(self: Parser, label: i32) -> i32:
         let else_body = self.parse_block_or_expr()
         // Build: var __for_ran: bool = false
         let flag_sym = self.intern.intern("__for_ran")
-        let false_lit = self.pool.add_node(NK_BOOL_LIT, start, start, 0, 0, 0)
-        let flag_decl = self.pool.add_node(NK_LET_BINDING, start, start, flag_sym, false_lit, 1)
+        let false_lit = self.pool.add_node(NodeKind.NK_BOOL_LIT, start, start, 0, 0, 0)
+        let flag_decl = self.pool.add_node(NodeKind.NK_LET_BINDING, start, start, flag_sym, false_lit, 1)
         // Wrap original for body in: { __for_ran = true; original_body }
-        let flag_ident = self.pool.add_node(NK_IDENT, start, start, flag_sym, 0, 0)
-        let true_lit = self.pool.add_node(NK_BOOL_LIT, start, start, 1, 0, 0)
-        let flag_set = self.pool.add_node(NK_ASSIGN, start, start, flag_ident, true_lit, 0)
+        let flag_ident = self.pool.add_node(NodeKind.NK_IDENT, start, start, flag_sym, 0, 0)
+        let true_lit = self.pool.add_node(NodeKind.NK_BOOL_LIT, start, start, 1, 0, 0)
+        let flag_set = self.pool.add_node(NodeKind.NK_ASSIGN, start, start, flag_ident, true_lit, 0)
         let wrapped_extra = self.pool.extra_len()
         self.pool.add_extra(flag_set)
-        let wrapped_body = self.pool.add_node(NK_BLOCK, start, start, wrapped_extra, 1, body)
+        let wrapped_body = self.pool.add_node(NodeKind.NK_BLOCK, start, start, wrapped_extra, 1, body)
         // Rebuild for node with wrapped body
-        for_node = self.pool.add_node(NK_FOR, start, self.prev_end(), binding, iterable, wrapped_body)
+        for_node = self.pool.add_node(NodeKind.NK_FOR, start, self.prev_end(), binding, iterable, wrapped_body)
         self.pool.add_for_meta(for_node, index_binding, label)
         // Build: if not __for_ran: else_body
-        let flag_read = self.pool.add_node(NK_IDENT, start, start, flag_sym, 0, 0)
-        let not_flag = self.pool.add_node(NK_UNARY, start, start, 1, flag_read, 0)
-        let if_else = self.pool.add_node(NK_IF_EXPR, start, self.prev_end(), not_flag, else_body, 0)
+        let flag_read = self.pool.add_node(NodeKind.NK_IDENT, start, start, flag_sym, 0, 0)
+        let not_flag = self.pool.add_node(NodeKind.NK_UNARY, start, start, 1, flag_read, 0)
+        let if_else = self.pool.add_node(NodeKind.NK_IF_EXPR, start, self.prev_end(), not_flag, else_body, 0)
         // Build block: { flag_decl; for_node; if_else }
         let block_extra = self.pool.extra_len()
         self.pool.add_extra(flag_decl)
         self.pool.add_extra(for_node)
-        for_node = self.pool.add_node(NK_BLOCK, start, self.prev_end(), block_extra, 2, if_else)
+        for_node = self.pool.add_node(NodeKind.NK_BLOCK, start, self.prev_end(), block_extra, 2, if_else)
     else:
         self.pos = save_pos
 
@@ -3506,7 +3506,7 @@ fn Parser.parse_break(self: Parser) -> i32:
     let t = self.peek()
     if t != TK_NEWLINE and t != TK_EOF and t != TK_R_BRACE and t != TK_R_PAREN and t != TK_R_BRACKET:
         value = self.parse_expr()
-    self.pool.add_node(NK_BREAK, start, self.prev_end(), value, label, 0)
+    self.pool.add_node(NodeKind.NK_BREAK, start, self.prev_end(), value, label, 0)
 
 fn Parser.parse_continue(self: Parser) -> i32:
     let start = self.current_start()
@@ -3517,7 +3517,7 @@ fn Parser.parse_continue(self: Parser) -> i32:
         let le = self.current_end()
         label = self.intern.intern(self.source.slice((ls + 1) as i64, le as i64))
         self.advance()
-    self.pool.add_node(NK_CONTINUE, start, self.prev_end(), label, 0, 0)
+    self.pool.add_node(NodeKind.NK_CONTINUE, start, self.prev_end(), label, 0, 0)
 
 // ── Match expression ─────────────────────────────────────────────
 
@@ -3529,7 +3529,7 @@ fn Parser.parse_match_expr(self: Parser) -> i32:
     self.skip_newlines()
     let arm_count = self.parse_match_arms()
     let extra_start = if arm_count > 0: self.pool.extra_len() - arm_count else: self.pool.extra_len()
-    self.pool.add_node(NK_MATCH, start, self.prev_end(), subject, extra_start, arm_count)
+    self.pool.add_node(NodeKind.NK_MATCH, start, self.prev_end(), subject, extra_start, arm_count)
 
 fn Parser.parse_match_arms(self: Parser) -> i32:
     var arms: Vec[i32] = Vec.new()
@@ -3556,10 +3556,10 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
             let collection_expr = self.parse_expr()
             // Create binding pattern `__v`
             let bind_sym = self.intern.intern("__v")
-            pattern = self.pool.add_node(NK_PAT_IDENT, arm_start, arm_start, bind_sym, 0, 0)
+            pattern = self.pool.add_node(NodeKind.NK_PAT_IDENT, arm_start, arm_start, bind_sym, 0, 0)
             // Build guard: `__v in collection`
-            let bind_ref = self.pool.add_node(NK_IDENT, arm_start, arm_start, bind_sym, 0, 0)
-            in_guard_expr = self.pool.add_node(NK_BINARY, arm_start, self.prev_end(), BinaryOp.OP_IN, bind_ref, collection_expr)
+            let bind_ref = self.pool.add_node(NodeKind.NK_IDENT, arm_start, arm_start, bind_sym, 0, 0)
+            in_guard_expr = self.pool.add_node(NodeKind.NK_BINARY, arm_start, self.prev_end(), BinaryOp.OP_IN, bind_ref, collection_expr)
         else:
             pattern = self.parse_pattern()
 
@@ -3574,7 +3574,7 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
                 let alt = self.parse_pattern()
                 self.pool.add_extra(alt)
                 or_count = or_count + 1
-            pattern = self.pool.add_node(NK_PAT_OR, arm_start, self.prev_end(), or_start, or_count, 0)
+            pattern = self.pool.add_node(NodeKind.NK_PAT_OR, arm_start, self.prev_end(), or_start, or_count, 0)
 
         // Guard clause
         var guard = 0
@@ -3589,7 +3589,7 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
         self.skip_newlines()
         let body = self.parse_block_or_expr()
 
-        let arm = self.pool.add_node(NK_MATCH_ARM, arm_start, self.prev_end(), pattern, body, guard)
+        let arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, arm_start, self.prev_end(), pattern, body, guard)
         arms.push(arm)
 
         let save = self.pos
@@ -3632,20 +3632,20 @@ fn Parser.parse_pattern(self: Parser) -> i32:
             let etext = self.source.slice(es as i64, ee as i64)
             self.expect(TK_INT_LIT)
             let eval = parse_int(etext)
-            return self.pool.add_node(NK_PAT_RANGE, start, self.prev_end(), val, eval, inclusive)
-        return self.pool.add_node(NK_PAT_INT, start, end, val, 0, 0)
+            return self.pool.add_node(NodeKind.NK_PAT_RANGE, start, self.prev_end(), val, eval, inclusive)
+        return self.pool.add_node(NodeKind.NK_PAT_INT, start, end, val, 0, 0)
 
     if t == TK_TRUE:
         self.advance()
-        return self.pool.add_node(NK_PAT_BOOL, start, end, 1, 0, 0)
+        return self.pool.add_node(NodeKind.NK_PAT_BOOL, start, end, 1, 0, 0)
     if t == TK_FALSE:
         self.advance()
-        return self.pool.add_node(NK_PAT_BOOL, start, end, 0, 0, 0)
+        return self.pool.add_node(NodeKind.NK_PAT_BOOL, start, end, 0, 0, 0)
     if t == TK_STRING_LIT:
         let raw = self.source.slice((start + 1) as i64, (end - 1) as i64)
         let sym = self.intern.intern(raw)
         self.advance()
-        return self.pool.add_node(NK_PAT_STRING, start, end, sym, 0, 0)
+        return self.pool.add_node(NodeKind.NK_PAT_STRING, start, end, sym, 0, 0)
     if t == TK_MINUS:
         self.advance()
         let ns = self.current_start()
@@ -3672,14 +3672,14 @@ fn Parser.parse_pattern(self: Parser) -> i32:
                 let etext = self.source.slice(es as i64, ee as i64)
                 self.expect(TK_INT_LIT)
                 eval = parse_int(etext)
-            return self.pool.add_node(NK_PAT_RANGE, start, self.prev_end(), val, eval, inclusive)
-        return self.pool.add_node(NK_PAT_INT, start, self.prev_end(), val, 0, 0)
+            return self.pool.add_node(NodeKind.NK_PAT_RANGE, start, self.prev_end(), val, eval, inclusive)
+        return self.pool.add_node(NodeKind.NK_PAT_INT, start, self.prev_end(), val, 0, 0)
 
     if t == TK_IDENT:
         let name = self.expect_ident()
         let name_str = self.intern.resolve(name)
         if name_str == "_":
-            return self.pool.add_node(NK_PAT_WILDCARD, start, self.prev_end(), 0, 0, 0)
+            return self.pool.add_node(NodeKind.NK_PAT_WILDCARD, start, self.prev_end(), 0, 0, 0)
         if self.peek() == TK_DOT or self.peek() == TK_DOT_IDENT:
             var variant_name = 0
             if self.peek() == TK_DOT:
@@ -3708,10 +3708,10 @@ fn Parser.parse_pattern(self: Parser) -> i32:
                         self.skip_newlines()
                 self.skip_newlines()
                 self.expect(TK_R_PAREN)
-                let pat = self.pool.add_node(NK_PAT_VARIANT, start, self.prev_end(), variant_name, extra_start, binding_count)
+                let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), variant_name, extra_start, binding_count)
                 self.pool.add_pattern_qualifier(pat, name)
                 return pat
-            let pat = self.pool.add_node(NK_PAT_VARIANT, start, self.prev_end(), variant_name, 0, 0)
+            let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), variant_name, 0, 0)
             self.pool.add_pattern_qualifier(pat, name)
             return pat
         // Variant with payload
@@ -3730,24 +3730,24 @@ fn Parser.parse_pattern(self: Parser) -> i32:
                     self.skip_newlines()
             self.skip_newlines()
             self.expect(TK_R_PAREN)
-            return self.pool.add_node(NK_PAT_VARIANT, start, self.prev_end(), name, extra_start, binding_count)
+            return self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name, extra_start, binding_count)
         // Uppercase = unit variant
         if name_str.len() > 0 and name_str.byte_at((0) as i64) >= 65 and name_str.byte_at((0) as i64) <= 90:
             if self.peek() == TK_L_BRACE:
                 return self.parse_struct_pattern(name, start)
-            return self.pool.add_node(NK_PAT_VARIANT, start, self.prev_end(), name, 0, 0)
+            return self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name, 0, 0)
         // At-binding
         if self.peek() == TK_AT:
             self.advance()
             let inner = self.parse_pattern()
-            return self.pool.add_node(NK_PAT_AT_BINDING, start, self.prev_end(), name, inner, 0)
+            return self.pool.add_node(NodeKind.NK_PAT_AT_BINDING, start, self.prev_end(), name, inner, 0)
         // Typed binding: ident: Type (for dyn trait matching)
         if self.peek() == TK_COLON:
             self.advance()
             let type_sym = self.expect_ident()
-            return self.pool.add_node(NK_PAT_TYPED_BIND, start, self.prev_end(), name, type_sym, 0)
+            return self.pool.add_node(NodeKind.NK_PAT_TYPED_BIND, start, self.prev_end(), name, type_sym, 0)
         // Variable binding
-        return self.pool.add_node(NK_PAT_IDENT, start, self.prev_end(), name, 0, 0)
+        return self.pool.add_node(NodeKind.NK_PAT_IDENT, start, self.prev_end(), name, 0, 0)
 
     if t == TK_DOT_IDENT:
         let text = self.source.slice((start + 1) as i64, end as i64)
@@ -3768,8 +3768,8 @@ fn Parser.parse_pattern(self: Parser) -> i32:
                     self.skip_newlines()
             self.skip_newlines()
             self.expect(TK_R_PAREN)
-            return self.pool.add_node(NK_PAT_ENUM_SHORTHAND, start, self.prev_end(), name, extra_start, binding_count)
-        return self.pool.add_node(NK_PAT_ENUM_SHORTHAND, start, self.prev_end(), name, 0, 0)
+            return self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, start, self.prev_end(), name, extra_start, binding_count)
+        return self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, start, self.prev_end(), name, 0, 0)
 
     if t == TK_L_PAREN:
         self.advance()
@@ -3792,7 +3792,7 @@ fn Parser.parse_pattern(self: Parser) -> i32:
                 self.skip_newlines()
         self.skip_newlines()
         self.expect(TK_R_PAREN)
-        return self.pool.add_node(NK_PAT_TUPLE, start, self.prev_end(), extra_start, count, 0)
+        return self.pool.add_node(NodeKind.NK_PAT_TUPLE, start, self.prev_end(), extra_start, count, 0)
 
     if t == TK_L_BRACE:
         return self.parse_struct_pattern(0, start)
@@ -3835,7 +3835,7 @@ fn Parser.parse_struct_pattern(self: Parser, type_name: i32, start: i32) -> i32:
 
     self.expect(TK_R_BRACE)
     self.pool.extra.set_i32(has_rest_idx as i64, has_rest)
-    self.pool.add_node(NK_PAT_STRUCT, start, self.prev_end(), type_name, extra_start, field_count)
+    self.pool.add_node(NodeKind.NK_PAT_STRUCT, start, self.prev_end(), type_name, extra_start, field_count)
 
 fn Parser.parse_slice_pattern(self: Parser, start: i32) -> i32:
     self.advance()  // consume [
@@ -3877,7 +3877,7 @@ fn Parser.parse_slice_pattern(self: Parser, start: i32) -> i32:
     self.pool.add_extra(tail_syms.len() as i32)
     for ti in 0..tail_syms.len() as i32:
         self.pool.add_extra(tail_syms.get(ti as i64))
-    self.pool.add_node(NK_PAT_SLICE, start, self.prev_end(), extra_start, head_count, rest_sym)
+    self.pool.add_node(NodeKind.NK_PAT_SLICE, start, self.prev_end(), extra_start, head_count, rest_sym)
 
 // ── Let binding expression ───────────────────────────────────────
 
@@ -3934,7 +3934,7 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         let extra_start = self.pool.extra_len()
         for ni in 0..names.len() as i32:
             self.pool.add_extra(names.get(ni as i64))
-        return self.pool.add_node(NK_TUPLE_DESTRUCTURE, start, self.prev_end(), extra_start, names.len() as i32, value)
+        return self.pool.add_node(NodeKind.NK_TUPLE_DESTRUCTURE, start, self.prev_end(), extra_start, names.len() as i32, value)
 
     // Let-else with variant shorthand: let .Some(v) = expr else body
     if self.peek() == TK_DOT_IDENT:
@@ -3950,7 +3950,7 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
             var binding_count = 0
             while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
                 let b = self.expect_ident()
-                let pat_node = self.pool.add_node(NK_PAT_IDENT, self.prev_start(), self.prev_end(), b, 0, 0)
+                let pat_node = self.pool.add_node(NodeKind.NK_PAT_IDENT, self.prev_start(), self.prev_end(), b, 0, 0)
                 self.pool.add_extra(pat_node)
                 binding_count = binding_count + 1
                 self.skip_newlines()
@@ -3967,8 +3967,8 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
             if self.peek() == TK_COLON: self.advance()
             self.skip_newlines()
             let else_body = self.parse_block_or_expr()
-            let pat = self.pool.add_node(NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, extra_start, binding_count)
-            return self.pool.add_node(NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
+            let pat = self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, extra_start, binding_count)
+            return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
         if self.peek() == TK_EQ:
             self.advance()
             self.skip_newlines()
@@ -3978,8 +3978,8 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
                 if self.peek() == TK_COLON: self.advance()
                 self.skip_newlines()
                 let else_body = self.parse_block_or_expr()
-                let pat = self.pool.add_node(NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, 0, 0)
-                return self.pool.add_node(NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
+                let pat = self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, 0, 0)
+                return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
 
     let name_sym = self.expect_ident()
     if name_sym == 0:
@@ -3995,7 +3995,7 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         var binding_count = 0
         while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
             let b = self.expect_ident()
-            let pat_node = self.pool.add_node(NK_PAT_IDENT, self.prev_start(), self.prev_end(), b, 0, 0)
+            let pat_node = self.pool.add_node(NodeKind.NK_PAT_IDENT, self.prev_start(), self.prev_end(), b, 0, 0)
             self.pool.add_extra(pat_node)
             binding_count = binding_count + 1
             self.skip_newlines()
@@ -4012,8 +4012,8 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         if self.peek() == TK_COLON: self.advance()
         self.skip_newlines()
         let else_body = self.parse_block_or_expr()
-        let pat = self.pool.add_node(NK_PAT_VARIANT, start, self.prev_end(), name_sym, extra_start, binding_count)
-        return self.pool.add_node(NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
+        let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name_sym, extra_start, binding_count)
+        return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
 
     if is_upper and self.peek() == TK_EQ:
         self.advance()
@@ -4024,13 +4024,13 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
             if self.peek() == TK_COLON: self.advance()
             self.skip_newlines()
             let else_body = self.parse_block_or_expr()
-            let pat = self.pool.add_node(NK_PAT_VARIANT, start, self.prev_end(), name_sym, 0, 0)
-            return self.pool.add_node(NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
+            let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name_sym, 0, 0)
+            return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
         // Normal let binding
         var flags = 0
         if is_mut:
             flags = 1
-        return self.pool.add_node(NK_LET_BINDING, start, self.prev_end(), name_sym, value, flags)
+        return self.pool.add_node(NodeKind.NK_LET_BINDING, start, self.prev_end(), name_sym, value, flags)
 
     var type_ann = 0
     if self.peek() == TK_COLON:
@@ -4049,7 +4049,7 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         self.pool.add_extra(type_ann)
         // Keep bit 0 for mut; encode optional type at bit 1+.
         flags = flags + (type_extra + 1) * 2
-    self.pool.add_node(NK_LET_BINDING, start, self.prev_end(), name_sym, value, flags)
+    self.pool.add_node(NodeKind.NK_LET_BINDING, start, self.prev_end(), name_sym, value, flags)
 
 fn Parser.parse_const_binding(self: Parser) -> i32:
     let start = self.current_start()
@@ -4069,14 +4069,14 @@ fn Parser.parse_const_binding(self: Parser) -> i32:
     self.skip_newlines()
     let raw_value = self.parse_expr()
     // const desugars to comptime-wrapped immutable let
-    let value = self.pool.add_node(NK_COMPTIME, start, self.prev_end(), raw_value, 0, 0)
+    let value = self.pool.add_node(NodeKind.NK_COMPTIME, start, self.prev_end(), raw_value, 0, 0)
 
     var flags = 0
     if type_ann != 0:
         let type_extra = self.pool.extra_len()
         self.pool.add_extra(type_ann)
         flags = flags + (type_extra + 1) * 2
-    self.pool.add_node(NK_LET_BINDING, start, self.prev_end(), name_sym, value, flags)
+    self.pool.add_node(NodeKind.NK_LET_BINDING, start, self.prev_end(), name_sym, value, flags)
 
 // ── With expression ──────────────────────────────────────────────
 
@@ -4100,7 +4100,7 @@ fn Parser.parse_with_expr(self: Parser) -> i32:
         self.advance()
     let body = self.parse_block_or_expr()
     let encoded_name = encode_with_binding(name, is_mut)
-    self.pool.add_node(NK_WITH_EXPR, start, self.prev_end(), source, body, encoded_name)
+    self.pool.add_node(NodeKind.NK_WITH_EXPR, start, self.prev_end(), source, body, encoded_name)
 
 // ── Record update ────────────────────────────────────────────────
 
@@ -4125,7 +4125,7 @@ fn Parser.parse_record_update(self: Parser) -> i32:
             self.skip_newlines()
             val = self.parse_expr()
         else:
-            val = self.pool.add_node(NK_IDENT, start, self.prev_end(), fname, 0, 0)
+            val = self.pool.add_node(NodeKind.NK_IDENT, start, self.prev_end(), fname, 0, 0)
         fields.push(fname)
         fields.push(val)
         field_count = field_count + 1
@@ -4137,7 +4137,7 @@ fn Parser.parse_record_update(self: Parser) -> i32:
     let extra_start = self.pool.extra_len()
     for fi in 0..fields.len() as i32:
         self.pool.add_extra(fields.get(fi as i64))
-    self.pool.add_node(NK_RECORD_UPDATE, start, self.prev_end(), source, extra_start, field_count)
+    self.pool.add_node(NodeKind.NK_RECORD_UPDATE, start, self.prev_end(), source, extra_start, field_count)
 
 // ── Array literal / comprehension ────────────────────────────────
 
@@ -4155,17 +4155,17 @@ fn Parser.parse_array_literal(self: Parser) -> i32:
             self.advance()  // consume ;
             let count_expr = self.parse_expr()
             self.expect(TK_R_BRACKET)
-            // Desugar [value; N] to NK_ARRAY_LIT with N copies of value
+            // Desugar [value; N] to NodeKind.NK_ARRAY_LIT with N copies of value
             // For now, evaluate N as a constant and emit N copies
             var fill_count = 0
-            if self.pool.kind(count_expr) == NK_INT_LIT:
+            if self.pool.kind(count_expr) == NodeKind.NK_INT_LIT:
                 fill_count = self.pool.int_lit_value(count_expr) as i32
             if fill_count <= 0:
                 fill_count = 1
             let extra_start = self.pool.extra_len()
             for fi in 0..fill_count:
                 self.pool.add_extra(first)
-            return self.pool.add_node(NK_ARRAY_LIT, start, self.prev_end(), extra_start, fill_count, 0)
+            return self.pool.add_node(NodeKind.NK_ARRAY_LIT, start, self.prev_end(), extra_start, fill_count, 0)
 
         // Comprehension: [expr for x in iter]
         if self.peek() == TK_KW_FOR:
@@ -4178,7 +4178,7 @@ fn Parser.parse_array_literal(self: Parser) -> i32:
                 self.advance()
                 filter = self.parse_expr()
             self.expect(TK_R_BRACKET)
-            return self.pool.add_node(NK_ARRAY_COMPREHENSION, start, self.prev_end(), first, binding, iterable)
+            return self.pool.add_node(NodeKind.NK_ARRAY_COMPREHENSION, start, self.prev_end(), first, binding, iterable)
 
         elems.push(first)
 
@@ -4194,7 +4194,7 @@ fn Parser.parse_array_literal(self: Parser) -> i32:
     let count = elems.len() as i32
     for ei in 0..count:
         self.pool.add_extra(elems.get(ei as i64))
-    self.pool.add_node(NK_ARRAY_LIT, start, self.prev_end(), extra_start, count, 0)
+    self.pool.add_node(NodeKind.NK_ARRAY_LIT, start, self.prev_end(), extra_start, count, 0)
 
 // ── Closure ──────────────────────────────────────────────────────
 
@@ -4231,7 +4231,7 @@ fn Parser.parse_fat_arrow_single(self: Parser) -> i32:
     self.pool.add_extra(param_sym)
     self.pool.add_extra(0)
     let body = self.parse_block_or_expr()
-    self.pool.add_node(NK_CLOSURE, start, self.prev_end(), body, extra_start, 1)
+    self.pool.add_node(NodeKind.NK_CLOSURE, start, self.prev_end(), body, extra_start, 1)
 
 // Parse: (params) [-> RetType] => expr (paren fat-arrow closure)
 // Starts at '(' token.
@@ -4276,7 +4276,7 @@ fn Parser.parse_fat_arrow_paren_closure(self: Parser) -> i32:
         self.skip_newlines()
     self.expect(TK_FAT_ARROW)
     let body = self.parse_block_or_expr()
-    self.pool.add_node(NK_CLOSURE, start, self.prev_end(), body, extra_start, param_count)
+    self.pool.add_node(NodeKind.NK_CLOSURE, start, self.prev_end(), body, extra_start, param_count)
 
 fn Parser.parse_closure(self: Parser) -> i32:
     let start = self.current_start()
@@ -4324,7 +4324,7 @@ fn Parser.parse_closure(self: Parser) -> i32:
         self.parse_block_or_expr()
     else:
         self.parse_expr()
-    self.pool.add_node(NK_CLOSURE, start, self.prev_end(), body, extra_start, param_count)
+    self.pool.add_node(NodeKind.NK_CLOSURE, start, self.prev_end(), body, extra_start, param_count)
 
 fn Parser.parse_move_closure(self: Parser) -> i32:
     let node = self.parse_closure()
@@ -4373,7 +4373,7 @@ fn Parser.parse_block_or_expr(self: Parser) -> i32:
         self.pool.add_extra(stmts.get(i as i64))
 
     let stmt_count = stmts.len() as i32
-    let blk_node = self.pool.add_node(NK_BLOCK, self.pool.get_start(stmts.get(0)), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
+    let blk_node = self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(stmts.get(0)), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
     blk_node
 
 // ── Type expression parsing ──────────────────────────────────────
@@ -4394,7 +4394,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             self.skip_newlines()
             if self.expect(TK_R_PAREN) == 0:
                 return 0
-            return self.pool.add_node(NK_TYPE_TYPEOF, start, self.prev_end(), inner, 0, 0)
+            return self.pool.add_node(NodeKind.NK_TYPE_TYPEOF, start, self.prev_end(), inner, 0, 0)
         self.emit_error("expected 'TypeOf' after '@' in type position")
         return 0
 
@@ -4405,12 +4405,12 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             is_mut = 1
             self.advance()
         let pointee = self.parse_type_expr()
-        return self.pool.add_node(NK_TYPE_REF, start, self.prev_end(), pointee, is_mut, 0)
+        return self.pool.add_node(NodeKind.NK_TYPE_REF, start, self.prev_end(), pointee, is_mut, 0)
 
     if t == TK_QUESTION:
         self.advance()
         let inner = self.parse_type_expr()
-        return self.pool.add_node(NK_TYPE_OPTIONAL, start, self.prev_end(), inner, 0, 0)
+        return self.pool.add_node(NodeKind.NK_TYPE_OPTIONAL, start, self.prev_end(), inner, 0, 0)
 
     if t == TK_L_PAREN:
         self.advance()
@@ -4434,7 +4434,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
         for ei in 0..elems.len() as i32:
             self.pool.add_extra(elems.get(ei as i64))
         let count = elems.len() as i32
-        return self.pool.add_node(NK_TYPE_TUPLE, start, self.prev_end(), extra_start, count, 0)
+        return self.pool.add_node(NodeKind.NK_TYPE_TUPLE, start, self.prev_end(), extra_start, count, 0)
 
     if t == TK_KW_FN:
         self.advance()
@@ -4461,7 +4461,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
         for pi in 0..params.len() as i32:
             self.pool.add_extra(params.get(pi as i64))
         let count = params.len() as i32
-        return self.pool.add_node(NK_TYPE_FN, start, self.prev_end(), extra_start, count, ret)
+        return self.pool.add_node(NodeKind.NK_TYPE_FN, start, self.prev_end(), extra_start, count, ret)
 
     if t == TK_STAR:
         self.advance()
@@ -4477,7 +4477,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             is_volatile = 1
             self.advance()
         let pointee = self.parse_type_expr()
-        return self.pool.add_node(NK_TYPE_PTR, start, self.prev_end(), pointee, is_mut, is_volatile)
+        return self.pool.add_node(NodeKind.NK_TYPE_PTR, start, self.prev_end(), pointee, is_mut, is_volatile)
 
     if t == TK_L_BRACKET:
         self.advance()
@@ -4487,7 +4487,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             self.advance()
             self.skip_newlines()
             let elem = self.parse_type_expr()
-            return self.pool.add_node(NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
+            return self.pool.add_node(NodeKind.NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
         // [N]T → fixed array (legacy), detect by leading int literal
         if self.peek() == TK_INT_LIT:
             let ss = self.current_start()
@@ -4499,7 +4499,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             self.expect(TK_R_BRACKET)
             self.skip_newlines()
             let elem = self.parse_type_expr()
-            return self.pool.add_node(NK_TYPE_ARRAY, start, self.prev_end(), elem, size, 0)
+            return self.pool.add_node(NodeKind.NK_TYPE_ARRAY, start, self.prev_end(), elem, size, 0)
         // [T; N] → fixed array (spec syntax), OR [T] → slice
         let elem = self.parse_type_expr()
         self.skip_newlines()
@@ -4516,11 +4516,11 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             self.advance()
             self.skip_newlines()
             self.expect(TK_R_BRACKET)
-            return self.pool.add_node(NK_TYPE_ARRAY, start, self.prev_end(), elem, size, 0)
+            return self.pool.add_node(NodeKind.NK_TYPE_ARRAY, start, self.prev_end(), elem, size, 0)
         // [T] → slice type
         self.skip_newlines()
         self.expect(TK_R_BRACKET)
-        return self.pool.add_node(NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
+        return self.pool.add_node(NodeKind.NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
 
     if t == TK_KW_DYN:
         self.advance()
@@ -4529,7 +4529,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             return 0
         let sym = self.intern_current()
         self.advance()
-        return self.pool.add_node(NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, 0, 0)
+        return self.pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, 0, 0)
 
     if t == TK_KW_IMPL:
         self.advance()
@@ -4543,7 +4543,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
         let target = self.parse_type_expr()
         if target == 0:
             return 0
-        return self.pool.add_node(NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, 0, 0)
+        return self.pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, 0, 0)
 
     if t == TK_IDENT:
         let sym = self.intern_current()
@@ -4555,12 +4555,12 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             let assoc_text = self.source.slice((dot_s + 1) as i64, dot_e as i64)
             let assoc_sym = self.intern.intern(assoc_text)
             self.advance()
-            return self.pool.add_node(NK_TYPE_ASSOC, start, self.prev_end(), sym, assoc_sym, 0)
+            return self.pool.add_node(NodeKind.NK_TYPE_ASSOC, start, self.prev_end(), sym, assoc_sym, 0)
         if self.peek() == TK_DOT:
             // Self.output — dot + lowercase ident are separate tokens
             self.advance()
             let assoc_sym = self.expect_ident()
-            return self.pool.add_node(NK_TYPE_ASSOC, start, self.prev_end(), sym, assoc_sym, 0)
+            return self.pool.add_node(NodeKind.NK_TYPE_ASSOC, start, self.prev_end(), sym, assoc_sym, 0)
         if self.peek() == TK_L_BRACKET:
             self.advance()
             self.skip_newlines()
@@ -4582,8 +4582,8 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             for ai in 0..args.len() as i32:
                 self.pool.add_extra(args.get(ai as i64))
             let count = args.len() as i32
-            return self.pool.add_node(NK_TYPE_GENERIC, start, self.prev_end(), sym, extra_start, count)
-        return self.pool.add_node(NK_TYPE_NAMED, start, self.prev_end(), sym, 0, 0)
+            return self.pool.add_node(NodeKind.NK_TYPE_GENERIC, start, self.prev_end(), sym, extra_start, count)
+        return self.pool.add_node(NodeKind.NK_TYPE_NAMED, start, self.prev_end(), sym, 0, 0)
 
     self.emit_error("expected type")
     0

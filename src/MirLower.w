@@ -286,23 +286,23 @@ fn MirBuilder.ident_type(self: MirBuilder, sym: i32) -> i32:
     self.sema.ty_void
 
 fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
-    // Resolve NK_INDEX(NK_IDENT("Vec"), type_arg) to a TypeKind.TY_GENERIC_INST.
+    // Resolve NodeKind.NK_INDEX(NodeKind.NK_IDENT("Vec"), type_arg) to a TypeKind.TY_GENERIC_INST.
     // Used for Vec[i32].new() and HashMap[str, i32].new().
     // Sema.check_index creates these during the check pass; we only look up here.
     let base = self.ast.get_data0(node)
-    if self.ast.kind(base) != NK_IDENT:
+    if self.ast.kind(base) != NodeKind.NK_IDENT:
         return 0
     let base_sym = self.ast.get_data0(base)
     if not self.sema.named_types.contains(base_sym):
         return 0
-    // Resolve the first type argument (d1 of NK_INDEX)
+    // Resolve the first type argument (d1 of NodeKind.NK_INDEX)
     let type_arg_node = self.ast.get_data1(node)
     if type_arg_node == 0:
         return 0
     var arg_type = self.resolve_type_arg_node(type_arg_node)
     if arg_type == 0:
         return 0
-    // Check for second type argument (d2 of NK_INDEX) — HashMap[K, V]
+    // Check for second type argument (d2 of NodeKind.NK_INDEX) — HashMap[K, V]
     let type_arg2_node = self.ast.get_data2(node)
     var arg2_type = 0
     if type_arg2_node != 0:
@@ -317,7 +317,7 @@ fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
 
 fn MirBuilder.resolve_type_arg_node(self: MirBuilder, type_arg_node: i32) -> i32:
     let arg_kind = self.ast.kind(type_arg_node)
-    if arg_kind == NK_IDENT or arg_kind == NK_TYPE_NAMED:
+    if arg_kind == NodeKind.NK_IDENT or arg_kind == NodeKind.NK_TYPE_NAMED:
         let arg_sym = self.ast.get_data0(type_arg_node)
         let prim = self.sema.primitive_type_by_sym(arg_sym)
         if prim != 0:
@@ -329,14 +329,14 @@ fn MirBuilder.resolve_type_arg_node(self: MirBuilder, type_arg_node: i32) -> i32
 fn MirBuilder.type_receiver_type(self: MirBuilder, node: i32) -> i32:
     // Resolve a type-level receiver expression to its base sema type.
     // Used for intrinsic classification (Vec, HashMap, etc.)
-    // Handles: Vec (NK_IDENT), Vec[i32] (NK_INDEX of NK_IDENT)
-    if self.ast.kind(node) == NK_IDENT:
+    // Handles: Vec (NodeKind.NK_IDENT), Vec[i32] (NodeKind.NK_INDEX of NodeKind.NK_IDENT)
+    if self.ast.kind(node) == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
         if self.sema.named_types.contains(sym):
             return self.sema.named_types.get(sym).unwrap()
-    if self.ast.kind(node) == NK_INDEX:
+    if self.ast.kind(node) == NodeKind.NK_INDEX:
         let base = self.ast.get_data0(node)
-        if self.ast.kind(base) == NK_IDENT:
+        if self.ast.kind(base) == NodeKind.NK_IDENT:
             let sym = self.ast.get_data0(base)
             if self.sema.named_types.contains(sym):
                 return self.sema.named_types.get(sym).unwrap()
@@ -346,15 +346,15 @@ fn MirBuilder.index_expr_is_type_level(self: MirBuilder, expr: i32) -> bool:
     if expr == 0:
         return false
     let kind = self.ast.kind(expr)
-    if kind == NK_IDENT:
+    if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(expr)
         return self.sema.named_types.contains(sym)
-    if kind == NK_INDEX or kind == NK_GROUPED:
+    if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED:
         return self.index_expr_is_type_level(self.ast.get_data0(expr))
     false
 
 fn MirBuilder.vec_literal_type(self: MirBuilder, node: i32) -> i32:
-    if node == 0 or self.ast.kind(node) != NK_INDEX:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_INDEX:
         return 0
     let base_expr = self.ast.get_data0(node)
     if not self.index_expr_is_type_level(base_expr):
@@ -376,13 +376,13 @@ fn MirBuilder.call_return_type(self: MirBuilder, callee: i32) -> i32:
     if callee == 0:
         return self.sema.ty_void
     let kind = self.ast.kind(callee)
-    if kind == NK_IDENT:
+    if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(callee)
         let sig_idx = self.sema.get_sig(sym)
         if sig_idx >= 0:
             return self.sema.sig_return_type(sig_idx)
         return self.sema.ty_void
-    if kind == NK_FIELD_ACCESS:
+    if kind == NodeKind.NK_FIELD_ACCESS:
         let base = self.ast.get_data0(callee)
         let method_sym = self.ast.get_data1(callee)
         let resolved = self.resolve_method_callee_sym(base, method_sym)
@@ -628,11 +628,11 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     if node == 0:
         return self.sema.ty_void
     let kind = self.ast.kind(node)
-    if kind == NK_IDENT:
+    if kind == NodeKind.NK_IDENT:
         return self.ident_type(self.ast.get_data0(node))
-    if kind == NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED:
         return self.expr_type(self.ast.get_data0(node))
-    if kind == NK_FIELD_ACCESS:
+    if kind == NodeKind.NK_FIELD_ACCESS:
         let base_node = self.ast.get_data0(node)
         let field_sym = self.ast.get_data1(node)
         let base_ty = self.expr_type(base_node)
@@ -641,24 +641,24 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
             if ft != 0:
                 return ft
         return self.sema.ty_void
-    if kind == NK_INT_LIT:
+    if kind == NodeKind.NK_INT_LIT:
         let value = self.ast.int_lit_value(node)
         if value < -2147483648 or value > 2147483647:
             return self.sema.ty_i64
         return self.sema.ty_i32
-    if kind == NK_BOOL_LIT:
+    if kind == NodeKind.NK_BOOL_LIT:
         return self.sema.ty_bool
-    if kind == NK_STRING_LIT or kind == NK_C_STRING_LIT:
+    if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT:
         return self.sema.ty_str
-    if kind == NK_FSTRING:
+    if kind == NodeKind.NK_FSTRING:
         return self.sema.ty_str
-    if kind == NK_NULL_LIT:
+    if kind == NodeKind.NK_NULL_LIT:
         return self.sema.ty_i32
-    if kind == NK_UNSAFE_BLOCK:
+    if kind == NodeKind.NK_UNSAFE_BLOCK:
         return self.expr_type(self.ast.get_data0(node))
-    if kind == NK_CALL:
+    if kind == NodeKind.NK_CALL:
         return self.call_return_type(self.ast.get_data0(node))
-    if kind == NK_STRUCT_LIT:
+    if kind == NodeKind.NK_STRUCT_LIT:
         let st_name = self.ast.get_data0(node)
         if self.sema.named_types.contains(st_name):
             return self.sema.named_types.get(st_name).unwrap()
@@ -674,7 +674,7 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
                     if self.sema.named_types.contains(owner_sym):
                         return self.sema.named_types.get(owner_sym).unwrap()
                     break
-    if kind == NK_MATCH:
+    if kind == NodeKind.NK_MATCH:
         // Infer match type from first arm body
         let m_arms_start = self.ast.get_data1(node)
         let m_arms_count = self.ast.get_data2(node)
@@ -683,17 +683,17 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
             let arm_body = self.ast.get_data1(first_arm)
             if arm_body != 0:
                 return self.expr_type(arm_body)
-    if kind == NK_IF_EXPR:
+    if kind == NodeKind.NK_IF_EXPR:
         // Infer if-expression type from then branch
         let then_expr = self.ast.get_data1(node)
         if then_expr != 0:
             return self.expr_type(then_expr)
-    if kind == NK_BLOCK:
+    if kind == NodeKind.NK_BLOCK:
         // Infer block type from tail expression
         let tail = self.ast.get_data2(node)
         if tail != 0:
             return self.expr_type(tail)
-    if kind == NK_INDEX:
+    if kind == NodeKind.NK_INDEX:
         let base_node = self.ast.get_data0(node)
         let base_ty = self.expr_type(base_node)
         if base_ty != 0 and base_ty != self.sema.ty_void:
@@ -701,7 +701,7 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
             let tk = self.sema.get_type_kind(resolved)
             if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
                 return self.sema.get_type_d0(resolved)
-    if kind == NK_BINARY:
+    if kind == NodeKind.NK_BINARY:
         let op = self.ast.get_data0(node)
         let lhs_ty = self.expr_type(self.ast.get_data1(node))
         let rhs_ty = self.expr_type(self.ast.get_data2(node))
@@ -719,7 +719,7 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
                 return rhs_ty
         if lhs_ty != 0 and lhs_ty == rhs_ty:
             return lhs_ty
-    if kind == NK_UNARY:
+    if kind == NodeKind.NK_UNARY:
         let uop = self.ast.get_data0(node)
         if uop == UnaryOp.UOP_TRY:
             let inner_node = self.ast.get_data1(node)
@@ -736,11 +736,11 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
                 let tk = self.sema.get_type_kind(resolved)
                 if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
                     return self.sema.get_type_d0(resolved)
-    if kind == NK_VARIANT_SHORTHAND:
+    if kind == NodeKind.NK_VARIANT_SHORTHAND:
         let vs_sym = self.ast.get_data0(node)
         if self.sema.variant_lookup.contains(vs_sym):
             return self.sema.variant_type_ids.get(vs_sym).unwrap()
-    if kind == NK_RANGE:
+    if kind == NodeKind.NK_RANGE:
         let range_start = self.ast.get_data0(node)
         let range_end = self.ast.get_data1(node)
         let range_inclusive = self.ast.get_data2(node)
@@ -853,15 +853,15 @@ fn MirBuilder.unit_operand(self: MirBuilder) -> i32:
 
 fn MirBuilder.try_eval_const(self: MirBuilder, node: i32) -> i64:
     let kind = self.ast.kind(node)
-    if kind == NK_INT_LIT:
+    if kind == NodeKind.NK_INT_LIT:
         return self.ast.int_lit_value(node)
-    if kind == NK_COMPTIME:
+    if kind == NodeKind.NK_COMPTIME:
         return self.try_eval_const(self.ast.get_data0(node))
-    if kind == NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED:
         return self.try_eval_const(self.ast.get_data0(node))
-    if kind == NK_BOOL_LIT:
+    if kind == NodeKind.NK_BOOL_LIT:
         return self.ast.get_data0(node) as i64
-    if kind == NK_UNARY:
+    if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(node)
         let inner = self.try_eval_const(self.ast.get_data1(node))
         if inner == -9223372036854775807: return -9223372036854775807
@@ -871,7 +871,7 @@ fn MirBuilder.try_eval_const(self: MirBuilder, node: i32) -> i64:
             if inner == 0: return 1
             return 0
         return -9223372036854775807
-    if kind == NK_BINARY:
+    if kind == NodeKind.NK_BINARY:
         let op = self.ast.get_data0(node)
         let lv = self.try_eval_const(self.ast.get_data1(node))
         if lv == -9223372036854775807: return -9223372036854775807
@@ -887,7 +887,7 @@ fn MirBuilder.try_eval_const(self: MirBuilder, node: i32) -> i64:
             if rv == 0: return -9223372036854775807
             return lv % rv
         return -9223372036854775807
-    if kind == NK_IDENT:
+    if kind == NodeKind.NK_IDENT:
         // Cross-reference to another constant
         let ref_sym = self.ast.get_data0(node)
         return self.try_resolve_module_const_val(ref_sym)
@@ -896,7 +896,7 @@ fn MirBuilder.try_eval_const(self: MirBuilder, node: i32) -> i64:
 fn MirBuilder.try_resolve_module_const_val(self: MirBuilder, sym: i32) -> i64:
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
-        if self.ast.kind(decl) != NK_LET_DECL:
+        if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
             continue
         if self.ast.get_data0(decl) != sym:
             continue
@@ -913,7 +913,7 @@ fn MirBuilder.try_resolve_module_const_val(self: MirBuilder, sym: i32) -> i64:
 fn MirBuilder.try_resolve_module_float_const(self: MirBuilder, sym: i32) -> i32:
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
-        if self.ast.kind(decl) != NK_LET_DECL:
+        if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
             continue
         if self.ast.get_data0(decl) != sym:
             continue
@@ -924,16 +924,16 @@ fn MirBuilder.try_resolve_module_float_const(self: MirBuilder, sym: i32) -> i32:
         var value_node = self.ast.get_data1(decl)
         if value_node == 0:
             continue
-        if self.ast.kind(value_node) == NK_COMPTIME:
+        if self.ast.kind(value_node) == NodeKind.NK_COMPTIME:
             value_node = self.ast.get_data0(value_node)
-        if self.ast.kind(value_node) == NK_FLOAT_LIT:
+        if self.ast.kind(value_node) == NodeKind.NK_FLOAT_LIT:
             return self.ast.get_data0(value_node)
     -1
 
 fn MirBuilder.try_resolve_module_const_type(self: MirBuilder, sym: i32) -> i32:
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
-        if self.ast.kind(decl) != NK_LET_DECL:
+        if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
             continue
         if self.ast.get_data0(decl) != sym:
             continue
@@ -1036,7 +1036,7 @@ fn MirBuilder.lower_fmt_with_spec(self: MirBuilder, operand: i32, flags: i32, wi
     self.body.new_operand(OperandKind.OK_COPY, result_place)
 
 fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
-    // Desugar NK_FSTRING to BinaryOp.OP_CONCAT chain with explicit formatting.
+    // Desugar NodeKind.NK_FSTRING to BinaryOp.OP_CONCAT chain with explicit formatting.
     // Each expression segment is converted to str via MirIntrinsic.MIR_INTRINSIC_FMT_TO_STR
     // before concatenation, so BinaryOp.OP_CONCAT only operates on str operands.
     let seg_count = self.ast.get_data0(node)
@@ -1102,7 +1102,7 @@ fn MirBuilder.lower_unit(self: MirBuilder) -> i32:
     self.unit_operand()
 
 fn MirBuilder.is_bare_none(self: MirBuilder, node: i32) -> bool:
-    if node == 0 or self.ast.kind(node) != NK_IDENT:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_IDENT:
         return false
     self.pool.resolve(self.ast.get_data0(node)) == "None"
 
@@ -1115,7 +1115,7 @@ fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         let dk = self.ast.kind(decl)
-        if dk == NK_EXTERN_VAR:
+        if dk == NodeKind.NK_EXTERN_VAR:
             if self.ast.get_data0(decl) != sym:
                 continue
             let ev_flags = self.ast.get_data2(decl)
@@ -1127,7 +1127,7 @@ fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
             let local_id = self.body.new_local(ev_ty, ev_is_mut, sym, 1)
             self.bind_local(sym, local_id)
             return local_id
-        if dk != NK_LET_DECL:
+        if dk != NodeKind.NK_LET_DECL:
             continue
         if self.ast.get_data0(decl) != sym:
             continue
@@ -1146,7 +1146,7 @@ fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
         var typed_value = val_node
         while typed_value != 0:
             let typed_kind = self.ast.kind(typed_value)
-            if typed_kind != NK_COMPTIME and typed_kind != NK_GROUPED:
+            if typed_kind != NodeKind.NK_COMPTIME and typed_kind != NodeKind.NK_GROUPED:
                 break
             typed_value = self.ast.get_data0(typed_value)
         if gty == 0 and typed_value != 0:
@@ -1470,7 +1470,7 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
 
     let kind = self.ast.kind(node)
 
-    if kind == NK_IDENT:
+    if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
         let local = self.lookup_local(sym)
         if local >= 0:
@@ -1482,13 +1482,13 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         self.mark_unsupported()
         return self.place_for_local(0)
 
-    if kind == NK_FIELD_ACCESS:
+    if kind == NodeKind.NK_FIELD_ACCESS:
         let base = self.lower_field_base_place(self.ast.get_data0(node))
         let field_sym = self.ast.get_data1(node)
         // Field symbol is mapped deterministically to a projection index by symbol value.
         return self.body.new_field_place(base, field_sym)
 
-    if kind == NK_INDEX:
+    if kind == NodeKind.NK_INDEX:
         if self.vec_literal_type(node) != 0:
             let op = self.lower_expr(node)
             let ty = self.expr_type(node)
@@ -1498,10 +1498,10 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
             return p
         return self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
 
-    if kind == NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF:
+    if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF:
         return self.lower_deref(self.ast.get_data1(node))
 
-    if kind == NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED:
         return self.lower_expr_place(self.ast.get_data0(node))
 
     // Fallback: materialize value into temp local and return its place.
@@ -1593,35 +1593,35 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
     for i in 0..stmt_count:
         let stmt = self.ast.get_extra(stmt_start + i)
         let sk = self.ast.kind(stmt)
-        if sk == NK_LET_BINDING:
+        if sk == NodeKind.NK_LET_BINDING:
             self.lower_let_binding(stmt)
             continue
-        if sk == NK_LET_ELSE:
+        if sk == NodeKind.NK_LET_ELSE:
             self.lower_let_else(stmt)
             continue
-        if sk == NK_ASSIGN:
+        if sk == NodeKind.NK_ASSIGN:
             self.lower_assign(self.ast.get_data0(stmt), self.ast.get_data1(stmt))
             continue
-        if sk == NK_RETURN:
+        if sk == NodeKind.NK_RETURN:
             let _ = self.lower_return(stmt)
             continue
-        if sk == NK_BREAK:
+        if sk == NodeKind.NK_BREAK:
             let _ = self.lower_break(stmt)
             continue
-        if sk == NK_CONTINUE:
+        if sk == NodeKind.NK_CONTINUE:
             let _ = self.lower_continue(stmt)
             continue
-        if sk == NK_DEFER:
+        if sk == NodeKind.NK_DEFER:
             let defer_body = self.ast.get_data0(stmt)
             if defer_body != 0:
                 self.defer_nodes.push(defer_body)
             continue
-        if sk == NK_ERRDEFER:
+        if sk == NodeKind.NK_ERRDEFER:
             let errdefer_body = self.ast.get_data0(stmt)
             if errdefer_body != 0:
                 self.errdefer_nodes.push(errdefer_body)
             continue
-        if sk == NK_TUPLE_DESTRUCTURE:
+        if sk == NodeKind.NK_TUPLE_DESTRUCTURE:
             self.lower_tuple_destructure(stmt)
             continue
         let _ = self.lower_expr(stmt)
@@ -1760,7 +1760,7 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32) -> i
 
 fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
     // Check for range-based for: for i in start..end
-    if self.ast.kind(iter_expr) == NK_RANGE:
+    if self.ast.kind(iter_expr) == NodeKind.NK_RANGE:
         return self.lower_for_range(pat_or_sym, iter_expr, body_expr)
 
     // Check for slice/vec-based for
@@ -1779,9 +1779,9 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
                     return self.lower_for_vec(pat_or_sym, iter_expr, body_expr)
 
     // Handle for x in vec.iter() — redirect to lower_for_vec with the Vec receiver.
-    if self.ast.kind(iter_expr) == NK_CALL:
+    if self.ast.kind(iter_expr) == NodeKind.NK_CALL:
         let call_callee = self.ast.get_data0(iter_expr)
-        if self.ast.kind(call_callee) == NK_FIELD_ACCESS:
+        if self.ast.kind(call_callee) == NodeKind.NK_FIELD_ACCESS:
             let recv = self.ast.get_data0(call_callee)
             let msym = self.ast.get_data1(call_callee)
             let mname = self.pool.resolve(msym)
@@ -1837,7 +1837,7 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
 
     if pat_or_sym > 0 and pat_or_sym < self.ast.node_count():
         let pk = self.ast.kind(pat_or_sym)
-        if pk >= NK_PAT_WILDCARD and pk <= NK_PAT_SLICE:
+        if pk >= NodeKind.NK_PAT_WILDCARD and pk <= NodeKind.NK_PAT_SLICE:
             let _ = self.lower_pattern(pat_or_sym, item_place)
         else:
             let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
@@ -2156,7 +2156,7 @@ fn MirBuilder.pattern_payload_node(self: MirBuilder, owner_pat: i32, payload_ent
     if payload_entry <= 0 or payload_entry >= self.ast.node_count():
         return 0
     let pk = self.ast.kind(payload_entry)
-    if pk < NK_PAT_WILDCARD or pk > NK_PAT_SLICE:
+    if pk < NodeKind.NK_PAT_WILDCARD or pk > NodeKind.NK_PAT_SLICE:
         return 0
     if payload_entry == owner_pat:
         return 0
@@ -2174,11 +2174,11 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         return
 
     let pk = self.ast.kind(pat_node)
-    if pk == NK_PAT_WILDCARD or pk == NK_PAT_IDENT:
+    if pk == NodeKind.NK_PAT_WILDCARD or pk == NodeKind.NK_PAT_IDENT:
         self.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
         return
 
-    if pk == NK_PAT_AT_BINDING:
+    if pk == NodeKind.NK_PAT_AT_BINDING:
         let inner_pat = self.ast.get_data1(pat_node)
         if inner_pat != 0:
             self.lower_pattern_match(scrutinee_place, inner_pat, arm_bb, fail_bb)
@@ -2186,7 +2186,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             self.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
         return
 
-    if pk == NK_PAT_OR:
+    if pk == NodeKind.NK_PAT_OR:
         let p_start = self.ast.get_data0(pat_node)
         let p_count = self.ast.get_data1(pat_node)
         if p_count <= 0:
@@ -2201,7 +2201,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             next_test_bb = alt_fail
         return
 
-    if pk == NK_PAT_VARIANT or pk == NK_PAT_ENUM_SHORTHAND:
+    if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
         let variant_sym = self.ast.get_data0(pat_node)
         let payload_start = self.ast.get_data1(pat_node)
         let payload_count = self.ast.get_data2(pat_node)
@@ -2219,7 +2219,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             if inner_pat == 0:
                 continue
             let inner_pk = self.ast.kind(inner_pat)
-            if inner_pk == NK_PAT_WILDCARD or inner_pk == NK_PAT_IDENT:
+            if inner_pk == NodeKind.NK_PAT_WILDCARD or inner_pk == NodeKind.NK_PAT_IDENT:
                 continue
             needs_payload_checks = true
             break
@@ -2240,7 +2240,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             if inner_pat == 0:
                 continue
             let inner_pk = self.ast.kind(inner_pat)
-            if inner_pk == NK_PAT_WILDCARD or inner_pk == NK_PAT_IDENT:
+            if inner_pk == NodeKind.NK_PAT_WILDCARD or inner_pk == NodeKind.NK_PAT_IDENT:
                 continue
             let field_place = self.body.new_field_place(variant_place, bi)
             let next_test_bb = self.new_block()
@@ -2252,10 +2252,10 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         return
 
     let scrutinee_op = self.body.new_operand(OperandKind.OK_COPY, scrutinee_place)
-    if pk == NK_PAT_INT or pk == NK_PAT_BOOL or pk == NK_PAT_STRING:
-        let lit = if pk == NK_PAT_INT:
+    if pk == NodeKind.NK_PAT_INT or pk == NodeKind.NK_PAT_BOOL or pk == NodeKind.NK_PAT_STRING:
+        let lit = if pk == NodeKind.NK_PAT_INT:
             self.lower_int_lit(self.ast.int_lit_value(pat_node), self.sema.ty_i32)
-        else if pk == NK_PAT_BOOL:
+        else if pk == NodeKind.NK_PAT_BOOL:
             self.lower_bool_lit(self.ast.get_data0(pat_node))
         else:
             self.lower_str_lit(self.ast.get_data0(pat_node))
@@ -2272,7 +2272,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         self.terminate(TermKind.TK_SWITCH_INT, cmp_op, table, fail_bb, 0)
         return
 
-    if pk == NK_PAT_RANGE:
+    if pk == NodeKind.NK_PAT_RANGE:
         let range_lo = self.ast.get_data0(pat_node)
         let range_hi = self.ast.get_data1(pat_node)
         let inclusive = self.ast.get_data2(pat_node)
@@ -2306,14 +2306,14 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         self.terminate(TermKind.TK_SWITCH_INT, le_op, le_table, fail_bb, 0)
         return
 
-    if pk == NK_PAT_TUPLE:
+    if pk == NodeKind.NK_PAT_TUPLE:
         let tup_start = self.ast.get_data0(pat_node)
         let tup_count = self.ast.get_data1(pat_node)
         var cur_test_bb = self.cur_bb
         for ti in 0..tup_count:
             let elem_pat = self.ast.get_extra(tup_start + ti)
             let elem_pk = self.ast.kind(elem_pat)
-            if elem_pk == NK_PAT_WILDCARD or elem_pk == NK_PAT_IDENT:
+            if elem_pk == NodeKind.NK_PAT_WILDCARD or elem_pk == NodeKind.NK_PAT_IDENT:
                 continue
             let elem_place = self.body.new_field_place(scrutinee_place, ti)
             let next_test = self.new_block()
@@ -2327,7 +2327,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         return
 
     // Dyn trait typed-bind pattern: vtable comparison via intrinsic.
-    if pk == NK_PAT_TYPED_BIND:
+    if pk == NodeKind.NK_PAT_TYPED_BIND:
         let tb_type_sym = self.ast.get_data1(pat_node)
         // Get trait_sym from scrutinee's sema type (TypeKind.TY_TRAIT_OBJ.d0)
         let tb_scrutinee_ty = self.place_local_type(scrutinee_place)
@@ -2359,8 +2359,8 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         self.terminate(TermKind.TK_SWITCH_INT, tb_cmp_op, tb_table, fail_bb, 0)
         return
 
-    // NK_PAT_SLICE: check array length against pattern count
-    if pk == NK_PAT_SLICE:
+    // NodeKind.NK_PAT_SLICE: check array length against pattern count
+    if pk == NodeKind.NK_PAT_SLICE:
         let sp_head = self.ast.get_data1(pat_node)
         let sp_extra = self.ast.get_data0(pat_node)
         let sp_has_rest = self.ast.get_extra(sp_extra)
@@ -2392,10 +2392,10 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         return out
 
     let pk = self.ast.kind(pat_node)
-    if pk == NK_PAT_WILDCARD:
+    if pk == NodeKind.NK_PAT_WILDCARD:
         return out
 
-    if pk == NK_PAT_IDENT:
+    if pk == NodeKind.NK_PAT_IDENT:
         let sym = self.ast.get_data0(pat_node)
         let bind_ty = self.place_local_type(scrutinee_place)
         let local_id = self.body.new_local(bind_ty, 0, sym, 1)
@@ -2409,7 +2409,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         out.push(scrutinee_place)
         return out
 
-    if pk == NK_PAT_AT_BINDING:
+    if pk == NodeKind.NK_PAT_AT_BINDING:
         let outer_sym = self.ast.get_data0(pat_node)
         let outer_ty = self.place_local_type(scrutinee_place)
         let outer_local = self.body.new_local(outer_ty, 0, outer_sym, 1)
@@ -2426,7 +2426,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             out.push(inner.get(i as i64))
         return out
 
-    if pk == NK_PAT_VARIANT or pk == NK_PAT_ENUM_SHORTHAND:
+    if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
         let variant_sym = self.ast.get_data0(pat_node)
         let bind_start = self.ast.get_data1(pat_node)
         let bind_count = self.ast.get_data2(pat_node)
@@ -2452,7 +2452,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             out.push(field_place)
         return out
 
-    if pk == NK_PAT_TUPLE:
+    if pk == NodeKind.NK_PAT_TUPLE:
         let t_start = self.ast.get_data0(pat_node)
         let t_count = self.ast.get_data1(pat_node)
         for ti in 0..t_count:
@@ -2463,7 +2463,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
                 out.push(inner.get(i as i64))
         return out
 
-    if pk == NK_PAT_STRUCT:
+    if pk == NodeKind.NK_PAT_STRUCT:
         let s_start = self.ast.get_data1(pat_node)
         let s_count = self.ast.get_data2(pat_node)
         for si in 0..s_count:
@@ -2487,13 +2487,13 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
                 out.push(field_place)
         return out
 
-    if pk == NK_PAT_OR:
+    if pk == NodeKind.NK_PAT_OR:
         let p_start = self.ast.get_data0(pat_node)
         if self.ast.get_data1(pat_node) > 0:
             return self.lower_pattern(self.ast.get_extra(p_start), scrutinee_place)
         return out
 
-    if pk == NK_PAT_TYPED_BIND:
+    if pk == NodeKind.NK_PAT_TYPED_BIND:
         let tb_bind_sym = self.ast.get_data0(pat_node)
         let tb_type_sym = self.ast.get_data1(pat_node)
         // Look up concrete sema type for the type symbol
@@ -2520,7 +2520,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         out.push(scrutinee_place)
         return out
 
-    if pk == NK_PAT_SLICE:
+    if pk == NodeKind.NK_PAT_SLICE:
         let sp_extra = self.ast.get_data0(pat_node)
         let sp_head_count = self.ast.get_data1(pat_node)
         // Get element type from scrutinee's array type
@@ -2687,7 +2687,7 @@ fn MirBuilder.call_sig_for_sym(self: MirBuilder, sym: i32) -> i32:
 fn MirBuilder.call_sig_for_expr(self: MirBuilder, fn_expr: i32) -> i32:
     if fn_expr == 0:
         return -1
-    if self.ast.kind(fn_expr) != NK_IDENT:
+    if self.ast.kind(fn_expr) != NodeKind.NK_IDENT:
         return -1
     self.call_sig_for_sym(self.ast.get_data0(fn_expr))
 
@@ -2735,16 +2735,16 @@ fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method
             if self.sema.get_sig(method_key) >= 0:
                 return method_key
 
-    if self.ast.kind(self_expr) == NK_IDENT:
+    if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
         let type_sym = self.ast.get_data0(self_expr)
         let method_key = self.sema.method_key(type_sym, method_sym)
         if self.sema.get_sig(method_key) >= 0:
             return method_key
 
-    // Handle Vec[i32].method() — receiver is NK_INDEX of a type name
-    if self.ast.kind(self_expr) == NK_INDEX:
+    // Handle Vec[i32].method() — receiver is NodeKind.NK_INDEX of a type name
+    if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
         let base = self.ast.get_data0(self_expr)
-        if self.ast.kind(base) == NK_IDENT:
+        if self.ast.kind(base) == NodeKind.NK_IDENT:
             let type_sym = self.ast.get_data0(base)
             let method_key = self.sema.method_key(type_sym, method_sym)
             if self.sema.get_sig(method_key) >= 0:
@@ -2838,10 +2838,10 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
 fn MirBuilder.receiver_option_intrinsic(self: MirBuilder, recv_expr: i32) -> i32:
     // Check if recv_expr is a call to an intrinsic method that returns Option.
     // Used to classify chained .unwrap()/.is_some() when the receiver type is void.
-    if self.ast.kind(recv_expr) != NK_CALL:
+    if self.ast.kind(recv_expr) != NodeKind.NK_CALL:
         return MirIntrinsic.MIR_INTRINSIC_NONE
     let callee = self.ast.get_data0(recv_expr)
-    if self.ast.kind(callee) != NK_FIELD_ACCESS:
+    if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS:
         return MirIntrinsic.MIR_INTRINSIC_NONE
     let base = self.ast.get_data0(callee)
     let method_sym = self.ast.get_data1(callee)
@@ -2876,7 +2876,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
         // Fall back to call's return type for static constructors (Vec.new())
         let ret_type = self.expr_type(node)
         let ret_name_sym = self.sema.get_type_name(ret_type)
-        if self.ast.kind(self_expr) == NK_IDENT:
+        if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
             let type_sym = self.ast.get_data0(self_expr)
             if ret_name_sym == type_sym:
                 recv_type = ret_type
@@ -2922,13 +2922,13 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
             // Lower self + method args so the handler can eval them.
             // Skip receiver for static calls (type name, not value expression).
             var gc_is_static = false
-            if self.ast.kind(self_expr) == NK_IDENT:
+            if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
                 let gc_id_sym = self.ast.get_data0(self_expr)
                 if self.sema.named_types.contains(gc_id_sym):
                     gc_is_static = true
-            if self.ast.kind(self_expr) == NK_INDEX:
+            if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
                 let gc_idx_base = self.ast.get_data0(self_expr)
-                if self.ast.kind(gc_idx_base) == NK_IDENT:
+                if self.ast.kind(gc_idx_base) == NodeKind.NK_IDENT:
                     let gc_idx_sym = self.ast.get_data0(gc_idx_base)
                     if self.sema.named_types.contains(gc_idx_sym):
                         gc_is_static = true
@@ -2936,7 +2936,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
                 gc_args.push(self.lower_expr(self_expr))
             for gc_mai in 0..arg_count:
                 let gc_ma_node = self.ast.get_extra(arg_start + gc_mai)
-                if self.ast.kind(gc_ma_node) != NK_CLOSURE:
+                if self.ast.kind(gc_ma_node) != NodeKind.NK_CLOSURE:
                     gc_args.push(self.lower_expr(gc_ma_node))
                 else:
                     gc_args.push(self.const_operand(ConstKind.CK_INT, 0, self.sema.ty_i32))
@@ -2958,14 +2958,14 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     // For static method calls (receiver is a type name, not a value),
     // don't pass the receiver as an argument.
     var is_static_call = false
-    if self.ast.kind(self_expr) == NK_IDENT:
+    if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
         let recv_sym = self.ast.get_data0(self_expr)
         if self.sema.named_types.contains(recv_sym):
             is_static_call = true
     // Also detect Vec[i32].method() as static
-    if self.ast.kind(self_expr) == NK_INDEX:
+    if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
         let idx_base = self.ast.get_data0(self_expr)
-        if self.ast.kind(idx_base) == NK_IDENT:
+        if self.ast.kind(idx_base) == NodeKind.NK_IDENT:
             let recv_sym = self.ast.get_data0(idx_base)
             if self.sema.named_types.contains(recv_sym):
                 is_static_call = true
@@ -3001,16 +3001,16 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
         if et_tk == TypeKind.TY_GENERIC_INST:
             ret_type = self.expected_type
     // If ret_type is still a base struct (not generic instance) for a static
-    // constructor, try to resolve from the NK_INDEX receiver (Vec[i32]).
+    // constructor, try to resolve from the NodeKind.NK_INDEX receiver (Vec[i32]).
     if is_static:
         let ret_tk = self.sema.get_type_kind(ret_type)
         if ret_type == 0 or ret_type == self.sema.ty_void or ret_tk == TypeKind.TY_STRUCT:
-            // Try resolving generic instance from NK_INDEX receiver (e.g. Vec[i32])
-            if self.ast.kind(self_expr) == NK_INDEX:
+            // Try resolving generic instance from NodeKind.NK_INDEX receiver (e.g. Vec[i32])
+            if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
                 let gi_type = self.resolve_index_generic_inst(self_expr)
                 if gi_type > 0:
                     ret_type = gi_type
-        // Re-check after NK_INDEX resolution
+        // Re-check after NodeKind.NK_INDEX resolution
         let ret_tk2 = self.sema.get_type_kind(ret_type)
         if ret_type == 0 or ret_type == self.sema.ty_void or ret_tk2 == TypeKind.TY_STRUCT:
             self.mark_unsupported()
@@ -3155,7 +3155,7 @@ fn MirBuilder.lower_with_binding(self: MirBuilder, sym: i32, rhs_expr: i32, body
 
 fn MirBuilder.lower_with_form2_3(self: MirBuilder, pat_or_name: i32, rhs_expr: i32, body_expr: i32) -> i32:
     self.push_scope()
-    if self.ast.kind(pat_or_name) == NK_IDENT:
+    if self.ast.kind(pat_or_name) == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(pat_or_name)
         let ty = self.expr_type(rhs_expr)
         let local = self.body.new_local(ty, 0, sym, 1)
@@ -3229,7 +3229,7 @@ fn MirBuilder.lower_implicit_default_return(self: MirBuilder, type_id: i32) -> i
 fn MirBuilder.lower_pipeline(self: MirBuilder, lhs_expr: i32, fn_expr: i32, args_start: i32, args_count: i32, node: i32) -> i32:
     let fn_op = self.lower_expr(fn_expr)
     let callee_sym =
-        if fn_expr != 0 and self.ast.kind(fn_expr) == NK_IDENT:
+        if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT:
             self.ast.get_data0(fn_expr)
         else:
             0
@@ -3312,40 +3312,40 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     self.cur_node = node
     let kind = self.ast.kind(node)
 
-    if kind == NK_INT_LIT:
+    if kind == NodeKind.NK_INT_LIT:
         return self.lower_int_lit(self.ast.int_lit_value(node), self.expr_type(node))
 
-    if kind == NK_BOOL_LIT:
+    if kind == NodeKind.NK_BOOL_LIT:
         return self.lower_bool_lit(self.ast.get_data0(node))
 
-    if kind == NK_STRING_LIT or kind == NK_C_STRING_LIT:
+    if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT:
         return self.lower_str_lit(self.ast.get_data0(node))
 
-    if kind == NK_FSTRING:
+    if kind == NodeKind.NK_FSTRING:
         return self.lower_fstring(node)
 
-    if kind == NK_FLOAT_LIT:
+    if kind == NodeKind.NK_FLOAT_LIT:
         return self.lower_float_lit(self.ast.get_data0(node), self.expr_type(node))
 
-    if kind == NK_NULL_LIT:
+    if kind == NodeKind.NK_NULL_LIT:
         // Null pointer literal: lower as integer 0 (codegen emits wl_const_null for ptr targets)
         return self.const_operand(ConstKind.CK_INT, 0, self.sema.ty_i32)
 
-    if kind == NK_UNSAFE_BLOCK:
+    if kind == NodeKind.NK_UNSAFE_BLOCK:
         // Transparent pass-through: just lower the inner body
         return self.lower_expr(self.ast.get_data0(node))
 
-    if kind == NK_COMPTIME_ERROR:
+    if kind == NodeKind.NK_COMPTIME_ERROR:
         // Emit unreachable — if this code is ever reached, it's a compile error
         self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
         let dead_bb = self.new_block()
         self.switch_to(dead_bb)
         return self.unit_operand()
 
-    if kind == NK_IDENT:
+    if kind == NodeKind.NK_IDENT:
         return self.lower_var(self.ast.get_data0(node), self.expr_type(node))
 
-    if kind == NK_BINARY:
+    if kind == NodeKind.NK_BINARY:
         let op = self.ast.get_data0(node)
         let lhs = self.ast.get_data1(node)
         let rhs = self.ast.get_data2(node)
@@ -3353,14 +3353,14 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             return self.lower_double_question(lhs, rhs, node)
         return self.lower_bin_op(op, lhs, rhs, node)
 
-    if kind == NK_UNARY:
+    if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(node)
         let operand = self.ast.get_data1(node)
         if op == UnaryOp.UOP_TRY:
             return self.lower_question_mark(operand, node)
         return self.lower_un_op(op, operand, node)
 
-    if kind == NK_CAST:
+    if kind == NodeKind.NK_CAST:
         // Read pre-resolved cast type from sema sidecar (avoids add_type on
         // shallow-copied Sema — see resolve_type_expr aliasing bug).
         var cast_tid = 0
@@ -3370,11 +3370,11 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             cast_tid = self.sema.resolve_type_expr(self.ast.get_data1(node))
         return self.lower_cast(self.ast.get_data0(node), cast_tid, node)
 
-    if kind == NK_FIELD_ACCESS:
+    if kind == NodeKind.NK_FIELD_ACCESS:
         let fa_base = self.ast.get_data0(node)
         let fa_field = self.ast.get_data1(node)
         // Enum variant access: Color.Red → discriminant value constant
-        if self.ast.kind(fa_base) == NK_IDENT:
+        if self.ast.kind(fa_base) == NodeKind.NK_IDENT:
             let fa_base_sym = self.ast.get_data0(fa_base)
             if self.sema.named_types.contains(fa_base_sym):
                 let fa_base_ty = self.sema.named_types.get(fa_base_sym).unwrap()
@@ -3422,76 +3422,76 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let place = self.lower_field_access(fa_base, fa_field)
         return self.body.new_operand(OperandKind.OK_COPY, place)
 
-    if kind == NK_INDEX:
+    if kind == NodeKind.NK_INDEX:
         let vec_ty = self.vec_literal_type(node)
         if vec_ty != 0:
             return self.lower_vec_literal(node, vec_ty)
         let place = self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
         return self.body.new_operand(OperandKind.OK_COPY, place)
 
-    if kind == NK_BLOCK:
+    if kind == NodeKind.NK_BLOCK:
         return self.lower_block(node)
 
-    if kind == NK_LET_BINDING:
+    if kind == NodeKind.NK_LET_BINDING:
         self.lower_let_binding(node)
         return self.unit_operand()
 
-    if kind == NK_LET_ELSE:
+    if kind == NodeKind.NK_LET_ELSE:
         self.lower_let_else(node)
         return self.unit_operand()
 
-    if kind == NK_TUPLE_DESTRUCTURE:
+    if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
         self.lower_tuple_destructure(node)
         return self.unit_operand()
 
-    if kind == NK_DEFER:
+    if kind == NodeKind.NK_DEFER:
         let defer_body = self.ast.get_data0(node)
         if defer_body != 0:
             self.defer_nodes.push(defer_body)
         return self.unit_operand()
 
-    if kind == NK_ERRDEFER:
+    if kind == NodeKind.NK_ERRDEFER:
         let errdefer_body = self.ast.get_data0(node)
         if errdefer_body != 0:
             self.errdefer_nodes.push(errdefer_body)
         return self.unit_operand()
 
-    if kind == NK_ASSIGN:
+    if kind == NodeKind.NK_ASSIGN:
         self.lower_assign(self.ast.get_data0(node), self.ast.get_data1(node))
         return self.unit_operand()
 
-    if kind == NK_IF_EXPR:
+    if kind == NodeKind.NK_IF_EXPR:
         return self.lower_if(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node)
 
-    if kind == NK_WHILE:
+    if kind == NodeKind.NK_WHILE:
         return self.lower_while(self.ast.get_data0(node), self.ast.get_data1(node))
 
-    if kind == NK_LOOP:
+    if kind == NodeKind.NK_LOOP:
         return self.lower_loop(self.ast.get_data0(node), node)
 
-    if kind == NK_FOR:
+    if kind == NodeKind.NK_FOR:
         return self.lower_for(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node))
 
-    if kind == NK_BREAK:
+    if kind == NodeKind.NK_BREAK:
         return self.lower_break(node)
 
-    if kind == NK_CONTINUE:
+    if kind == NodeKind.NK_CONTINUE:
         return self.lower_continue(node)
 
-    if kind == NK_RETURN:
+    if kind == NodeKind.NK_RETURN:
         return self.lower_return(node)
 
-    if kind == NK_MATCH:
+    if kind == NodeKind.NK_MATCH:
         return self.lower_match(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node)
 
-    if kind == NK_CALL:
+    if kind == NodeKind.NK_CALL:
         let callee = self.ast.get_data0(node)
-        if self.ast.kind(callee) == NK_FIELD_ACCESS:
+        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
             return self.lower_method_call(self.ast.get_data0(callee), self.ast.get_data1(callee), self.ast.get_data1(node), self.ast.get_data2(node), node)
         var generic_builtin_sym = 0
-        if self.ast.kind(callee) == NK_INDEX or self.ast.kind(callee) == NK_TYPE_GENERIC:
+        if self.ast.kind(callee) == NodeKind.NK_INDEX or self.ast.kind(callee) == NodeKind.NK_TYPE_GENERIC:
             let gb_base = self.ast.get_data0(callee)
-            if self.ast.kind(gb_base) == NK_IDENT:
+            if self.ast.kind(gb_base) == NodeKind.NK_IDENT:
                 let gb_sym = self.ast.get_data0(gb_base)
                 let gb_name = self.pool.resolve(gb_sym)
                 if gb_name == "transmute" or gb_name == "sizeof" or gb_name == "size_of" or gb_name == "alignof" or gb_name == "align_of" or gb_name == "nameof" or gb_name == "type_name":
@@ -3517,7 +3517,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             self.switch_to(gc_next)
             return self.body.new_operand(OperandKind.OK_COPY, gc_place)
         // Check for enum variant constructor call: Some(v), Ok(v), Err(e), etc.
-        if self.ast.kind(callee) == NK_IDENT:
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let vc_sym = self.ast.get_data0(callee)
             if self.sema.variant_lookup.contains(vc_sym):
                 let vc_variant_idx = self.sema.variant_lookup.get(vc_sym).unwrap()
@@ -3541,7 +3541,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, vc_place, vc_rv, self.ast.get_start(node))
                 return self.body.new_operand(OperandKind.OK_COPY, vc_place)
         // Distinct type constructor: Meters(42) → single-field struct aggregate
-        if self.ast.kind(callee) == NK_IDENT:
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let dt_sym = self.ast.get_data0(callee)
             if self.sema.distinct_type_names.contains(dt_sym):
                 let dt_tid = self.sema.distinct_type_names.get(dt_sym).unwrap()
@@ -3562,7 +3562,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                     self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, dt_place, dt_rv, self.ast.get_start(node))
                     return self.body.new_operand(OperandKind.OK_COPY, dt_place)
         // Callable type syntax: TypeName(args) → TypeName.new(args)
-        if self.ast.kind(callee) == NK_IDENT:
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let ct_sym = self.ast.get_data0(callee)
             if self.sema.type_decl_nodes.contains(ct_sym):
                 let ct_new_name = self.pool.resolve(ct_sym) ++ ".new"
@@ -3573,7 +3573,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                     let ct_ret_ty = self.expr_type(node)
                     return self.lower_call_redirected(ct_fn_op, ct_new_sym, self.ast.get_data1(node), self.ast.get_data2(node), ct_ret_ty, node)
         // Generic function call — delegate to codegen's monomorphize_generic_call
-        if self.ast.kind(callee) == NK_IDENT:
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let gc_sym = self.ast.get_data0(callee)
             if self.sema.generic_fn_nodes.contains(gc_sym):
                 // Lower args and emit call. Codegen intercepts via MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL
@@ -3598,7 +3598,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 self.switch_to(gc_next)
                 return self.body.new_operand(OperandKind.OK_COPY, gc_place)
         // Check for builtin calls (embed_file, src, etc.) — no sig, not a local
-        if self.ast.kind(callee) == NK_IDENT:
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let bu_sym = self.ast.get_data0(callee)
             let bu_sig = self.sema.get_sig(bu_sym)
             let bu_local = self.lookup_local(bu_sym)
@@ -3620,13 +3620,13 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 return self.body.new_operand(OperandKind.OK_COPY, bu_place)
         return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), self.expr_type(node), node)
 
-    if kind == NK_PIPELINE:
+    if kind == NodeKind.NK_PIPELINE:
         let rhs = self.ast.get_data1(node)
-        if self.ast.kind(rhs) == NK_CALL:
+        if self.ast.kind(rhs) == NodeKind.NK_CALL:
             return self.lower_pipeline(self.ast.get_data0(node), self.ast.get_data0(rhs), self.ast.get_data1(rhs), self.ast.get_data2(rhs), node)
         return self.lower_pipeline(self.ast.get_data0(node), rhs, 0, 0, node)
 
-    if kind == NK_WITH_EXPR:
+    if kind == NodeKind.NK_WITH_EXPR:
         let source = self.ast.get_data0(node)
         let body = self.ast.get_data1(node)
         let name = decode_with_binding_sym(self.ast.get_data2(node))
@@ -3634,7 +3634,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             return self.lower_with_binding(name, source, body, self.ast.get_start(node))
         return self.lower_with_form1(source, body)
 
-    if kind == NK_STRUCT_LIT:
+    if kind == NodeKind.NK_STRUCT_LIT:
         let sl_fields_start = self.ast.get_data1(node)
         let sl_field_count = self.ast.get_data2(node)
         let sl_name_sym = self.ast.get_data0(node)
@@ -3659,10 +3659,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, sl_place, sl_rv, self.ast.get_start(node))
         return self.body.new_operand(OperandKind.OK_COPY, sl_place)
 
-    if kind == NK_RECORD_UPDATE:
+    if kind == NodeKind.NK_RECORD_UPDATE:
         return self.lower_record_update(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node)
 
-    if kind == NK_TUPLE:
+    if kind == NodeKind.NK_TUPLE:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         let tup_fields: Vec[i32] = Vec.new()
@@ -3679,7 +3679,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, tup_place, tup_rv, self.ast.get_start(node))
         return self.body.new_operand(OperandKind.OK_COPY, tup_place)
 
-    if kind == NK_ARRAY_LIT:
+    if kind == NodeKind.NK_ARRAY_LIT:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         let arr_fields: Vec[i32] = Vec.new()
@@ -3696,7 +3696,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, arr_place, arr_rv, self.ast.get_start(node))
         return self.body.new_operand(OperandKind.OK_COPY, arr_place)
 
-    if kind == NK_VARIANT_SHORTHAND:
+    if kind == NodeKind.NK_VARIANT_SHORTHAND:
         let vs_name_sym = self.ast.get_data0(node)
         let vs_args_start = self.ast.get_data1(node)
         let vs_arg_count = self.ast.get_data2(node)
@@ -3733,21 +3733,21 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, vs_place, vs_rv, self.ast.get_start(node))
         return self.body.new_operand(OperandKind.OK_COPY, vs_place)
 
-    if kind == NK_CLOSURE:
+    if kind == NodeKind.NK_CLOSURE:
         return self.lower_closure(0, 0, self.ast.get_data1(node), self.ast.get_data2(node), node)
 
-    if kind == NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED:
         return self.lower_expr(self.ast.get_data0(node))
 
-    if kind == NK_OPTIONAL_CHAIN:
+    if kind == NodeKind.NK_OPTIONAL_CHAIN:
         return self.lower_optional_chain(node)
 
-    if kind == NK_COMPTIME:
+    if kind == NodeKind.NK_COMPTIME:
         // Comptime: unwrap and lower the inner expression.
         let inner = self.ast.get_data0(node)
         if inner != 0:
             // comptime if: evaluate condition at compile time, only lower taken branch
-            if self.ast.kind(inner) == NK_IF_EXPR:
+            if self.ast.kind(inner) == NodeKind.NK_IF_EXPR:
                 let ct_cond = self.ast.get_data0(inner)
                 let ct_then = self.ast.get_data1(inner)
                 let ct_else = self.ast.get_data2(inner)
@@ -3762,7 +3762,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.unit_operand()
 
     // spawn expr → with_fiber_spawn(fn_ptr, arg) → returns task_id (i32)
-    if kind == NK_SPAWN:
+    if kind == NodeKind.NK_SPAWN:
         let inner = self.ast.get_data0(node)
         let inner_op = self.lower_expr(inner)
         // The spawn result is the inner call's result for now
@@ -3770,18 +3770,18 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return inner_op
 
     // expr.await → with_fiber_await(task_id) → returns result
-    if kind == NK_AWAIT:
+    if kind == NodeKind.NK_AWAIT:
         let inner = self.ast.get_data0(node)
         return self.lower_expr(inner)
 
     // yield expr → for now, just evaluate the expression (state machine transform is future work)
-    if kind == NK_YIELD:
+    if kind == NodeKind.NK_YIELD:
         let inner = self.ast.get_data0(node)
         if inner != 0:
             return self.lower_expr(inner)
         return self.unit_operand()
 
-    if kind == NK_ASYNC_BLOCK or kind == NK_ASYNC_SCOPE or kind == NK_SELECT_AWAIT:
+    if kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE or kind == NodeKind.NK_SELECT_AWAIT:
         // Async lowering is deferred to later waves.
         self.mark_unsupported()
         if self.ast.get_data0(node) != 0:
@@ -3906,7 +3906,7 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
 
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)
-        if ast_pool.kind(decl) != NK_FN_DECL:
+        if ast_pool.kind(decl) != NodeKind.NK_FN_DECL:
             continue
 
         let fn_sym = ast_pool.get_data0(decl)
