@@ -165,7 +165,10 @@ profiling demands it.
 - [x] 47. Structs with primitive fields work correctly with :?. Truly nested
       structs (struct containing struct) need recursive gen_debug_format calls
       — deferred to post-launch. Tests in behav_fstring_debug_nested.w.
-- [ ] 48. Width/fill/alignment on debug output (requires spec wiring in codegen).
+- [x] 48. Format spec wiring complete: MIR_INTRINSIC_FMT_SPEC connects parsed
+      specs to with_fmt_int_spec/with_fmt_f64_spec/with_fmt_str_spec. Supports
+      hex, binary, octal, width, zero-pad, sign, alt prefix. 8 tests in
+      behav_fstring_spec.w. Fixpoint verified.
 - [x] 49. `:?` tests: behav_fstring_debug.w (8 tests: int, bool, str quoted),
       behav_fstring_debug_struct.w (3 tests: struct fields), and
       behav_fstring_debug_nested.w (2 tests: multi-field structs).
@@ -178,8 +181,8 @@ profiling demands it.
       holes, arithmetic expressions, array indexing, concat, loop, condition,
       empty, literal-only. Format spec tests (hex/bin/width/pad) deferred until
       spec wiring is in codegen. 316/316 pass.
-- [ ] 51. Add regression tests for benchmark formats: `:.3` elapsed seconds,
-      `:.2` checksum.
+- [x] 51. Benchmark format regression: behav_fstring_float_spec.w (5 tests:
+      `:.2`, `:.3`, `:.0`, `:.6`, `+.2`). All pass with spec wiring.
 - [x] 52. Locale-sensitivity regression: behav_fstring_locale.w (4 tests).
       Integer, negative, bool, str formatting all locale-independent.
 - [x] 53. No tests assert old `%g` concat coercion behavior — nothing to update.
