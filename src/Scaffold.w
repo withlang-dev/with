@@ -48,11 +48,11 @@ fn canonical_file_path(idx: i32) -> str:
 
 // Validate error codes
 enum ValidateError: i32:
-    VE_OK = 0
-    VE_MISSING_MODULE = 1
-    VE_DUPLICATE_MODULE = 2
+    Ok = 0
+    MissingModule = 1
+    DuplicateModule = 2
 
-// Validate project scaffold. Returns ValidateError.VE_OK on success.
+// Validate project scaffold. Returns ValidateError.Ok on success.
 fn validate_scaffold(spec_names: Vec[str], spec_paths: Vec[str]) -> i32:
     for ri in 0..required_module_count():
         let req = required_module(ri)
@@ -61,7 +61,7 @@ fn validate_scaffold(spec_names: Vec[str], spec_paths: Vec[str]) -> i32:
             if spec_names.get(si as i64) == req:
                 count = count + 1
         if count == 0:
-            return ValidateError.VE_MISSING_MODULE
+            return ValidateError.MissingModule
         if count > 1:
-            return ValidateError.VE_DUPLICATE_MODULE
-    ValidateError.VE_OK
+            return ValidateError.DuplicateModule
+    ValidateError.Ok
