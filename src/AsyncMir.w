@@ -130,8 +130,8 @@ fn async_suspend_kind_name(kind: i32) -> str:
 
 fn dump_async_mir_module(mod: AsyncMirModule, pool: InternPool) -> str:
     var out = ""
-    out = out ++ "async-mir module bodies=" ++ int_to_string(mod.body_count())
-    out = out ++ " suspend_points=" ++ int_to_string(mod.total_suspend_points()) ++ "\n"
+    out = out ++ f"async-mir module bodies={mod.body_count()}"
+    out = out ++ f" suspend_points={mod.total_suspend_points()}\n"
 
     for bi in 0..mod.bodies.len() as i32:
         let body = mod.bodies.get(bi as i64)
@@ -141,20 +141,20 @@ fn dump_async_mir_module(mod: AsyncMirModule, pool: InternPool) -> str:
         let fn_name = if body.fn_sym != 0: pool.resolve(body.fn_sym) else: "<anon>"
         out = out ++ "fn " ++ fn_name
         out = out ++ " flavor=" ++ async_body_flavor_name(body.flavor)
-        out = out ++ " states=" ++ int_to_string(body.state_count)
-        out = out ++ " suspend_points=" ++ int_to_string(body.suspend_count()) ++ "\n"
+        out = out ++ f" states={body.state_count}"
+        out = out ++ f" suspend_points={body.suspend_count()}\n"
 
         for si in 0..body.suspend_count():
-            out = out ++ "  suspend[" ++ int_to_string(si) ++ "] "
+            out = out ++ f"  suspend[{si}] "
             out = out ++ async_suspend_kind_name(body.suspend_kinds.get(si as i64))
-            out = out ++ " span=" ++ int_to_string(body.suspend_span_starts.get(si as i64))
-            out = out ++ ".." ++ int_to_string(body.suspend_span_ends.get(si as i64))
-            out = out ++ " state=" ++ int_to_string(body.suspend_state_from.get(si as i64))
-            out = out ++ "->" ++ int_to_string(body.suspend_state_to.get(si as i64))
-            out = out ++ " resume_bb=" ++ int_to_string(body.suspend_resume_bbs.get(si as i64))
-            out = out ++ " live=" ++ int_to_string(body.suspend_live_locals.get(si as i64))
-            out = out ++ " dead=" ++ int_to_string(body.suspend_storage_dead.get(si as i64))
-            out = out ++ " drops=" ++ int_to_string(body.suspend_drop_counts.get(si as i64))
+            out = out ++ f" span={body.suspend_span_starts.get(si as i64)}"
+            out = out ++ f"..{body.suspend_span_ends.get(si as i64)}"
+            out = out ++ f" state={body.suspend_state_from.get(si as i64)}"
+            out = out ++ f"->{body.suspend_state_to.get(si as i64)}"
+            out = out ++ f" resume_bb={body.suspend_resume_bbs.get(si as i64)}"
+            out = out ++ f" live={body.suspend_live_locals.get(si as i64)}"
+            out = out ++ f" dead={body.suspend_storage_dead.get(si as i64)}"
+            out = out ++ f" drops={body.suspend_drop_counts.get(si as i64)}"
             out = out ++ "\n"
 
     out

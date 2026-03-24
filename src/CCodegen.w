@@ -260,7 +260,7 @@ fn cc_is_ident_char(ch: i32) -> i32:
 
 fn cc_hex_digit(v: i32) -> str:
     if v >= 0 and v <= 9:
-        return int_to_string(v)
+        return f"{v}"
     if v == 10: return "A"
     if v == 11: return "B"
     if v == 12: return "C"
@@ -393,8 +393,8 @@ fn CCodegen.fn_c_name(self: CCodegen, fn_sym: i32) -> str:
     let raw = cc_intern_resolve(self.intern, fn_sym)
     let id = cc_sanitize_ident(raw)
     if id == "main":
-        return "__with_main__" ++ int_to_string(fn_sym)
-    id ++ "__" ++ int_to_string(fn_sym)
+        return f"__with_main__{fn_sym}"
+    f"{id}__{fn_sym}"
 
 fn CCodegen.extern_sym_c_name(self: CCodegen, fn_sym: i32) -> str:
     if fn_sym == 0:
@@ -470,7 +470,7 @@ fn CCodegen.struct_c_name(self: CCodegen, tid: i32) -> str:
     let name_sym = self.sema.get_type_d0(resolved)
     let raw = cc_intern_resolve(self.intern, name_sym)
     if raw.len() == 0:
-        return "with_struct_" ++ int_to_string(resolved)
+        return f"with_struct_{resolved}"
     let out = cc_sanitize_ident(raw)
     if self.check_interrupted() != 0:
         return "with_interrupted"
@@ -781,10 +781,10 @@ fn CCodegen.operand_tid_no_infer(self: CCodegen, body: MirBody, operand_id: i32)
 
 fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
-        self.fail("invalid place id " ++ int_to_string(place_id))
+        self.fail(f"invalid place id {place_id}")
         return "_0"
     let base_local = body.place_locals.get(place_id as i64)
-    var out = "_" ++ int_to_string(base_local)
+    var out = f"_{base_local}"
     var current_tid = self.local_effective_tid(body, base_local)
     if self.is_void_tid(current_tid) != 0:
         current_tid = self.place_local_tid(body, place_id)
@@ -796,7 +796,7 @@ fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
         let resolved = self.sema.resolve_alias(current_tid)
         let tk = self.sema.get_type_kind(resolved)
         if pk == PK_FIELD:
-            out = out ++ ".f" ++ int_to_string(pd)
+            out = f"{out}.f{pd}"
             if tk == TY_STRUCT:
                 let ft_raw = self.struct_field_tid(resolved, pd)
                 let ft = self.effective_field_tid(resolved, pd, ft_raw)
@@ -812,10 +812,10 @@ fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
             continue
         if pk == PK_INDEX:
             if tk == TY_STR:
-                out = out ++ ".ptr[_" ++ int_to_string(pd) ++ "]"
+                out = f"{out}.ptr[_{pd}]"
                 current_tid = self.sema.ty_i32
                 continue
-            out = out ++ "[_" ++ int_to_string(pd) ++ "]"
+            out = f"{out}[_{pd}]"
             if tk == TY_ARRAY or tk == TY_SLICE:
                 current_tid = self.sema.get_type_d0(resolved)
             else:
@@ -829,15 +829,15 @@ fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
                 current_tid = 0
             continue
         if pk == PK_DOWNCAST:
-            out = out ++ "/*downcast" ++ int_to_string(pd) ++ "*/"
+            out = f"{out}/*downcast{pd}*/"
             current_tid = 0
             continue
-        self.fail("unsupported place projection kind " ++ int_to_string(pk))
+        self.fail(f"unsupported place projection kind {pk}")
     out
 
 fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
     if const_id < 0 or const_id >= body.const_kinds.len() as i32:
-        self.fail("invalid const id " ++ int_to_string(const_id))
+        self.fail(f"invalid const id {const_id}")
         return "0"
     let ck = body.const_kinds.get(const_id as i64)
     let cd = body.const_d0.get(const_id as i64)
@@ -866,12 +866,12 @@ fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
         if body_sym != 0:
             return self.fn_c_name(body_sym)
         return self.extern_sym_c_name(cd)
-    self.fail("unsupported const kind " ++ int_to_string(ck))
+    self.fail(f"unsupported const kind {ck}")
     "0"
 
 fn CCodegen.operand_text(self: CCodegen, body: MirBody, operand_id: i32) -> str:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
-        self.fail("invalid operand id " ++ int_to_string(operand_id))
+        self.fail(f"invalid operand id {operand_id}")
         return "0"
     let ok = body.operand_kinds.get(operand_id as i64)
     let od = body.operand_d0.get(operand_id as i64)
@@ -879,7 +879,7 @@ fn CCodegen.operand_text(self: CCodegen, body: MirBody, operand_id: i32) -> str:
         return self.place_text(body, od)
     if ok == OK_CONSTANT:
         return self.const_text(body, od)
-    self.fail("unsupported operand kind " ++ int_to_string(ok))
+    self.fail(f"unsupported operand kind {ok}")
     "0"
 
 fn CCodegen.binop_token(self: CCodegen, op: i32) -> str:
@@ -905,7 +905,7 @@ fn CCodegen.binop_token(self: CCodegen, op: i32) -> str:
 
 fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
-        self.fail("invalid rvalue id " ++ int_to_string(rval_id))
+        self.fail(f"invalid rvalue id {rval_id}")
         return "0"
     let rk = body.rval_kinds.get(rval_id as i64)
     let d0 = body.rval_d0.get(rval_id as i64)
@@ -928,7 +928,7 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
                 return "(!(" ++ eq_expr ++ "))"
         let tok = self.binop_token(d0)
         if tok.len() == 0:
-            self.fail("unsupported binop " ++ int_to_string(d0))
+            self.fail(f"unsupported binop {d0}")
             return "0"
         return "(" ++ lhs ++ " " ++ tok ++ " " ++ rhs ++ ")"
     if rk == RK_UN_OP:
@@ -937,7 +937,7 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
             return "(-(" ++ inner ++ "))"
         if d0 == UOP_NOT:
             return "(!(" ++ inner ++ "))"
-        self.fail("unsupported unary op " ++ int_to_string(d0))
+        self.fail(f"unsupported unary op {d0}")
         return inner
     if rk == RK_REF:
         return "(&" ++ self.place_text(body, d1) ++ ")"
@@ -964,7 +964,7 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
         // preserve payload/shape in operand 0 for this bootstrap path.
         let first = body.agg_field_operands.get(start as i64)
         return self.operand_text(body, first)
-    self.fail("unknown MIR rvalue kind " ++ int_to_string(rk))
+    self.fail(f"unknown MIR rvalue kind {rk}")
     "0"
 
 fn CCodegen.call_arg_count(self: CCodegen, body: MirBody, args_id: i32) -> i32:
@@ -1504,7 +1504,7 @@ fn CCodegen.describe_call_candidates(self: CCodegen, body: MirBody, args_id: i32
             continue
         if kept > 0:
             out = out ++ ","
-        out = out ++ cc_intern_resolve(self.intern, sym) ++ "#" ++ int_to_string(sym)
+        out = out ++ cc_intern_resolve(self.intern, sym) ++ f"#{sym}"
         kept = kept + 1
         if kept >= 12:
             out = out ++ ",..."
@@ -1541,7 +1541,7 @@ fn CCodegen.call_arg_tids_text(self: CCodegen, body: MirBody, args_id: i32) -> s
         if ai > 0:
             out = out ++ ","
         let arg_operand = self.call_arg_operand(body, args_id, ai)
-        out = out ++ int_to_string(self.operand_tid(body, arg_operand))
+        out = out ++ f"{self.operand_tid(body, arg_operand)}"
     out
 
 fn CCodegen.call_first_arg_hint_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
@@ -1550,7 +1550,7 @@ fn CCodegen.call_first_arg_hint_text(self: CCodegen, body: MirBody, args_id: i32
     let first_arg = self.call_arg_operand(body, args_id, 0)
     let first_arg_tid = self.operand_tid(body, first_arg)
     let owner_text = self.type_owner_text(first_arg_tid)
-    "tid=" ++ int_to_string(first_arg_tid) ++ " type=" ++ self.sema.type_name(first_arg_tid) ++ " owner=" ++ owner_text
+    f"tid={first_arg_tid} type={self.sema.type_name(first_arg_tid)} owner={owner_text}"
 
 fn CCodegen.call_first_arg_resolved_tid(self: CCodegen, body: MirBody, args_id: i32) -> i32:
     if self.call_arg_count(body, args_id) <= 0:
@@ -2453,7 +2453,7 @@ fn CCodegen.call_return_tid_for_fn_sym(self: CCodegen, body: MirBody, fn_sym: i3
 
 fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> str:
     if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
-        self.fail("invalid call callee operand id " ++ int_to_string(callee_operand))
+        self.fail(f"invalid call callee operand id {callee_operand}")
         return "/*invalid_callee*/"
 
     let ok = body.operand_kinds.get(callee_operand as i64)
@@ -2481,7 +2481,7 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
 
     if ok == OK_CONSTANT:
         if od < 0 or od >= body.const_kinds.len() as i32:
-            self.fail("invalid call callee constant id " ++ int_to_string(od))
+            self.fail(f"invalid call callee constant id {od}")
             return "/*invalid_call_const*/"
         let ck = body.const_kinds.get(od as i64)
         if ck == CK_FN:
@@ -2502,7 +2502,7 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
             return self.extern_call_name(inferred, body, args_id, dest_place)
         return "/*unresolved_call*/"
 
-    self.fail("unsupported call callee operand kind " ++ int_to_string(ok))
+    self.fail(f"unsupported call callee operand kind {ok}")
     "/*unsupported_callee*/"
 
 fn CCodegen.call_return_tid(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
@@ -2757,7 +2757,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";\n"
         else:
             out = out ++ "    (void)0;\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_vec_push():
@@ -2772,7 +2772,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             elem_tid = self.sema.ty_i64
         let elem_ty = self.c_type(elem_tid, 0)
         var out = "    " ++ cc_lbrace() ++ " " ++ elem_ty ++ " __with_tmp = " ++ elem_text ++ "; with_vec_push(&(" ++ recv ++ "), &__with_tmp); " ++ cc_rbrace() ++ "\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_vec_get():
@@ -2784,7 +2784,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         let dst = self.place_text(body, dest_place)
         var out = "    memset(&(" ++ dst ++ "), 0, sizeof(" ++ dst ++ "));\n"
         out = out ++ "    if ((int64_t)(" ++ idx ++ ") >= 0 && (int64_t)(" ++ idx ++ ") < with_vec_len(&(" ++ recv ++ "))) " ++ cc_lbrace() ++ " memcpy(&(" ++ dst ++ "), with_vec_get_ptr(&(" ++ recv ++ "), (int64_t)(" ++ idx ++ ")), sizeof(" ++ dst ++ ")); " ++ cc_rbrace() ++ "\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_vec_len():
@@ -2797,7 +2797,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_vec_len(&(" ++ recv ++ "));\n"
         else:
             out = out ++ "    (void)with_vec_len(&(" ++ recv ++ "));\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_vec_set_i32():
@@ -2808,7 +2808,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
         let val = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
         var out = "    with_vec_set_i32(&(" ++ recv ++ "), (int64_t)(" ++ idx ++ "), (int32_t)(" ++ val ++ "));\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_vec_remove():
@@ -2818,7 +2818,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
         let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
         var out = "    with_vec_remove(&(" ++ recv ++ "), (int64_t)(" ++ idx ++ "));\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_vec_clear():
@@ -2827,7 +2827,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             return "    abort();"
         let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
         var out = "    with_vec_clear(&(" ++ recv ++ "));\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_vec_pop():
@@ -2843,7 +2843,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         else:
             out = out ++ "        if (__with_n > 0) " ++ cc_lbrace() ++ " with_vec_remove(&(" ++ recv ++ "), __with_n - 1); " ++ cc_rbrace() ++ "\n"
         out = out ++ "    " ++ cc_rbrace() ++ "\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_map_new():
@@ -2852,7 +2852,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = 0;\n"
         else:
             out = out ++ "    (void)0;\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_map_insert():
@@ -2876,7 +2876,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; " ++ val_ty ++ " __with_v = " ++ val_text ++ ";"
         out = out ++ " if ((" ++ recv ++ ") == 0) " ++ cc_lbrace() ++ " " ++ recv ++ " = (int64_t)(intptr_t)with_hashmap_new(sizeof(__with_k), sizeof(__with_v)); " ++ cc_rbrace()
         out = out ++ " with_hashmap_insert((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_v, " ++ is_str_key ++ "); " ++ cc_rbrace() ++ "\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_map_contains():
@@ -2895,7 +2895,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         if has_ret != 0:
             out = out ++ self.place_text(body, dest_place) ++ " = "
         out = out ++ "(((" ++ recv ++ ") != 0) && (with_hashmap_contains((void*)(intptr_t)(" ++ recv ++ "), &__with_k, " ++ is_str_key ++ ") != 0)); " ++ cc_rbrace() ++ "\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_map_len():
@@ -2908,7 +2908,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (((" ++ recv ++ ") != 0) ? with_hashmap_len((void*)(intptr_t)(" ++ recv ++ ")) : 0);\n"
         else:
             out = out ++ "    (void)(((" ++ recv ++ ") != 0) ? with_hashmap_len((void*)(intptr_t)(" ++ recv ++ ")) : 0);\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_map_remove():
@@ -2927,7 +2927,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         if has_ret != 0:
             out = out ++ self.place_text(body, dest_place) ++ " = "
         out = out ++ "(((" ++ recv ++ ") != 0) && (with_hashmap_remove((void*)(intptr_t)(" ++ recv ++ "), &__with_k, " ++ is_str_key ++ ") != 0)); " ++ cc_rbrace() ++ "\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_map_get():
@@ -2947,7 +2947,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         out = out ++ " if ((" ++ recv ++ ") != 0 && with_hashmap_get((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_v, " ++ is_str_key ++ ") != 0) "
         out = out ++ cc_lbrace() ++ " " ++ dst ++ " = (__with_v + 1); " ++ cc_rbrace() ++ " else " ++ cc_lbrace() ++ " " ++ dst ++ " = 0; " ++ cc_rbrace()
         out = out ++ " " ++ cc_rbrace() ++ "\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_opt_is_some():
@@ -2960,7 +2960,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = ((" ++ opt_text ++ ") != 0);\n"
         else:
             out = out ++ "    (void)((" ++ opt_text ++ ") != 0);\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     if kind == cc_builtin_opt_unwrap():
@@ -2970,7 +2970,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         let opt_text = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
         let dst = self.place_text(body, dest_place)
         var out = "    " ++ dst ++ " = ((" ++ opt_text ++ ") - 1);\n"
-        out = out ++ "    goto bb" ++ int_to_string(next_bb) ++ ";"
+        out = out ++ f"    goto bb{next_bb};"
         return out
 
     ""
@@ -3371,11 +3371,11 @@ fn CCodegen.line_directive(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
     if line == self.last_line_directive:
         return ""
     self.last_line_directive = line
-    "#line " ++ int_to_string(line) ++ " \"" ++ self.source_path ++ "\"\n"
+    f"#line {line} \"{self.source_path}\"\n"
 
 fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
     if stmt_id < 0 or stmt_id >= body.stmt_kinds.len() as i32:
-        self.fail("invalid statement id " ++ int_to_string(stmt_id))
+        self.fail(f"invalid statement id {stmt_id}")
         return "    /* invalid statement */"
     let sk = body.stmt_kinds.get(stmt_id as i64)
     let d0 = body.stmt_d0.get(stmt_id as i64)
@@ -3386,9 +3386,9 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
             return "    " ++ self.place_text(body, d0) ++ " = " ++ self.zero_value_text(dst_tid) ++ ";"
         return "    " ++ self.place_text(body, d0) ++ " = " ++ self.rvalue_text(body, d1) ++ ";"
     if sk == SK_STORAGE_LIVE:
-        return "    /* StorageLive(_" ++ int_to_string(d0) ++ "); */"
+        return f"    /* StorageLive(_{d0}); */"
     if sk == SK_STORAGE_DEAD:
-        return "    /* StorageDead(_" ++ int_to_string(d0) ++ "); */"
+        return f"    /* StorageDead(_{d0}); */"
     if sk == SK_DROP:
         let p = self.place_text(body, d0)
         let pt = self.place_tid(body, d0)
@@ -3397,15 +3397,15 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
         return "    /* drop(" ++ p ++ "); */"
     if sk == SK_NOP:
         return "    /* nop */"
-    self.fail("unsupported statement kind " ++ int_to_string(sk))
+    self.fail(f"unsupported statement kind {sk}")
     "    /* unsupported statement */"
 
 fn CCodegen.emit_switch_term(self: CCodegen, body: MirBody, d0: i32, d1: i32, d2: i32) -> str:
     let cond = self.operand_text(body, d0)
     if d1 < 0 or d1 >= body.switch_table_starts.len() as i32:
-        self.fail("invalid switch table id " ++ int_to_string(d1))
+        self.fail(f"invalid switch table id {d1}")
         if d2 != 0:
-            return "    goto bb" ++ int_to_string(d2) ++ ";"
+            return f"    goto bb{d2};"
         return "    abort();"
 
     let start = body.switch_table_starts.get(d1 as i64)
@@ -3415,12 +3415,12 @@ fn CCodegen.emit_switch_term(self: CCodegen, body: MirBody, d0: i32, d1: i32, d2
         let val = body.switch_table_vals.get((start + i) as i64)
         let tgt = body.switch_table_targets.get((start + i) as i64)
         let head = if i == 0: "if" else: "else if"
-        out = out ++ "    " ++ head ++ " (" ++ cond ++ " == " ++ int_to_string(val) ++ ") " ++ cc_lbrace() ++ "\n"
-        out = out ++ "        goto bb" ++ int_to_string(tgt) ++ ";\n"
+        out = out ++ "    " ++ head ++ f" ({cond} == {val}) " ++ cc_lbrace() ++ "\n"
+        out = out ++ f"        goto bb{tgt};\n"
         out = out ++ "    " ++ cc_rbrace() ++ "\n"
     out = out ++ "    else " ++ cc_lbrace() ++ "\n"
     if d2 != 0:
-        out = out ++ "        goto bb" ++ int_to_string(d2) ++ ";\n"
+        out = out ++ f"        goto bb{d2};\n"
     else:
         out = out ++ "        abort();\n"
     out = out ++ "    " ++ cc_rbrace()
@@ -3433,7 +3433,7 @@ fn CCodegen.emit_term(self: CCodegen, body: MirBody, bb: i32) -> str:
     let d2 = body.term_data2(bb)
     let d3 = body.term_data3(bb)
     if tk == TK_GOTO:
-        return "    goto bb" ++ int_to_string(d0) ++ ";"
+        return f"    goto bb{d0};"
     if tk == TK_RETURN:
         let sig_idx = self.body_sig_index(body.fn_sym)
         let ret_tid = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else:
@@ -3457,7 +3457,7 @@ fn CCodegen.emit_term(self: CCodegen, body: MirBody, bb: i32) -> str:
                 out = out ++ "    " ++ self.place_text(body, d2) ++ " = " ++ self.zero_value_text(ret_tid) ++ ";\n"
             else:
                 out = out ++ "    /* unresolved call elided */\n"
-            out = out ++ "    goto bb" ++ int_to_string(d3) ++ ";"
+            out = out ++ f"    goto bb{d3};"
             return out
         let args = self.call_args_text(body, d1)
         var out = ""
@@ -3465,7 +3465,7 @@ fn CCodegen.emit_term(self: CCodegen, body: MirBody, bb: i32) -> str:
             out = out ++ "    " ++ callee ++ "(" ++ args ++ ");\n"
         else:
             out = out ++ "    " ++ self.place_text(body, d2) ++ " = " ++ callee ++ "(" ++ args ++ ");\n"
-        out = out ++ "    goto bb" ++ int_to_string(d3) ++ ";"
+        out = out ++ f"    goto bb{d3};"
         return out
     if tk == TK_DROP_AND_GOTO:
         let p = self.place_text(body, d0)
@@ -3475,9 +3475,9 @@ fn CCodegen.emit_term(self: CCodegen, body: MirBody, bb: i32) -> str:
             out = out ++ "    with_vec_clear(&(" ++ p ++ "));\n"
         else:
             out = out ++ "    /* drop(" ++ p ++ "); */\n"
-        out = out ++ "    goto bb" ++ int_to_string(d1) ++ ";"
+        out = out ++ f"    goto bb{d1};"
         return out
-    self.fail("unsupported terminator kind " ++ int_to_string(tk))
+    self.fail(f"unsupported terminator kind {tk}")
     "    abort();"
 
 fn CCodegen.collect_struct_types_from_tid(self: CCodegen, out: Vec[i32], seen_names: HashMap[i32, i32], tid: i32):
@@ -3608,7 +3608,7 @@ fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
             let field_sym = self.sema.type_extra.get((start + fi * 3) as i64)
             let raw_field_tid = self.sema.type_extra.get((start + fi * 3 + 1) as i64)
             let field_tid = self.effective_field_tid(resolved, field_sym, raw_field_tid)
-            out = out ++ "    " ++ self.c_type(field_tid, 0) ++ " f" ++ int_to_string(field_sym) ++ ";\n"
+            out = out ++ "    " ++ self.c_type(field_tid, 0) ++ f" f{field_sym};\n"
         out = out ++ cc_rbrace() ++ ";\n\n"
     out
 
@@ -3624,7 +3624,7 @@ fn CCodegen.emit_fn_decl(self: CCodegen, body: MirBody) -> str:
         if i > 0:
             out = out ++ ", "
         let p_tid = self.sema.sig_param_type(sig_idx, i)
-        out = out ++ self.c_type(p_tid, 0) ++ " _" ++ int_to_string(i + 1)
+        out = out ++ self.c_type(p_tid, 0) ++ f" _{i + 1}"
     out = out ++ ")"
     out
 
@@ -3690,7 +3690,7 @@ fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
             if self.is_void_tid(use_tid) != 0 or use_kind != inferred_kind or self.strict_type_match(use_tid, inferred_tid) == 0:
                 use_tid = inferred_tid
         let local_ty = if li == 0 and self.is_void_tid(use_tid) != 0: "int32_t" else: self.c_type(use_tid, 0)
-        out = out ++ "    " ++ local_ty ++ " _" ++ int_to_string(li) ++ " __attribute__((unused)) = " ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";\n"
+        out = out ++ "    " ++ local_ty ++ f" _{li} __attribute__((unused)) = " ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";\n"
     if body.block_count() == 0:
         self.fail("function has no basic blocks: " ++ cc_intern_resolve(self.intern, fn_sym))
         out = out ++ "    abort();\n"
@@ -3700,7 +3700,7 @@ fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
     for bb in 0..body.block_count():
         if self.check_interrupted() != 0:
             return ""
-        out = out ++ "bb" ++ int_to_string(bb) ++ ":\n"
+        out = out ++ f"bb{bb}:\n"
         let start = body.bb_stmt_starts.get(bb as i64)
         let count = body.bb_stmt_counts.get(bb as i64)
         for si in 0..count:

@@ -321,15 +321,7 @@ fn Sema.debug_unknown_type(self: Sema, sym: i32, node: i32, context: str):
     let name = self.pool_resolve_symbol(sym)
     let prim = self.primitive_type_by_sym(sym)
     let named = if self.named_types.contains(sym): 1 else: 0
-    with_eprintln(
-        "[unknown-type] " ++ context ++
-        " sym=" ++ int_to_string(sym) ++
-        " name=" ++ name ++
-        " prim=" ++ int_to_string(prim) ++
-        " named=" ++ int_to_string(named) ++
-        " collecting=" ++ int_to_string(self.collecting_types) ++
-        " node_kind=" ++ int_to_string(self.ast.kind(node))
-    )
+    with_eprintln(f"[unknown-type] {context} sym={sym} name={name} prim={prim} named={named} collecting={self.collecting_types} node_kind={self.ast.kind(node)}")
 
 fn Sema.pool_resolve_symbol(self: Sema, sym: i32) -> str:
     if sym <= 0 or sym >= self.pool.symbol_texts.len() as i32:
@@ -1958,10 +1950,10 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             // Check discriminant fits in repr type range
             if repr_type_tid == self.ty_i8:
                 if disc_value < (0 - 128) or disc_value > 127:
-                    self.emit_error("discriminant value " ++ int_to_string(disc_value) ++ " out of range for i8", node)
+                    self.emit_error(f"discriminant value {disc_value} out of range for i8", node)
             if repr_type_tid == self.ty_i16:
                 if disc_value < (0 - 32768) or disc_value > 32767:
-                    self.emit_error("discriminant value " ++ int_to_string(disc_value) ++ " out of range for i16", node)
+                    self.emit_error(f"discriminant value {disc_value} out of range for i16", node)
             disc_vals.push(disc_value)
             for pi in 0..payload_count:
                 let pt_node = self.ast.get_extra(epos)
@@ -2267,7 +2259,7 @@ fn Sema.emit_type_cycle_error(self: Sema, cycle_start: i32, cycle_end: i32, clos
     let first_node = if self.type_decl_nodes.contains(first_sym): self.type_decl_nodes.get(first_sym).unwrap() else: 0
     let primary_start = self.ast.get_start(first_node)
     let primary_end = self.ast.get_end(first_node)
-    var diag = Diagnostic.err("dependency loop with length " ++ int_to_string(loop_len), Span { file: self.local_file_id, start: primary_start, end: primary_end })
+    var diag = Diagnostic.err(f"dependency loop with length {loop_len}", Span { file: self.local_file_id, start: primary_start, end: primary_end })
 
     // Add a label for each edge in the loop.
     for i in 0..loop_len:
@@ -4075,9 +4067,7 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
             if sema_debug_move_enabled() != 0:
                 let name = self.pool_resolve(sym)
                 with_eprintln(
-                    "[moved-use] sym=" ++ name ++
-                    " tid=" ++ int_to_string(tid) ++
-                    " node_kind=" ++ int_to_string(self.ast.kind(node))
+                    f"[moved-use] sym={name} tid={tid} node_kind={self.ast.kind(node)}"
                 )
             self.emit_error("use of moved value", node)
         self.typed_expr_types.insert(node, tid)
@@ -4317,12 +4307,16 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         return lhs
 
     // Concat (++) — both operands must be str
+    // Only reject known non-str types; allow unresolved/generic types
+    // that may be str after monomorphization (Vec[str].get() etc.)
     if op == OP_CONCAT:
         let lhs_resolved = self.resolve_alias(lhs)
         let rhs_resolved = self.resolve_alias(rhs)
-        if lhs_resolved != self.ty_str:
+        let lhs_k = self.get_type_kind(lhs_resolved)
+        let rhs_k = self.get_type_kind(rhs_resolved)
+        if lhs_resolved != self.ty_str and (lhs_k == TY_INT or lhs_k == TY_FLOAT or lhs_k == TY_BOOL or lhs_k == TY_STRUCT or lhs_k == TY_ENUM or lhs_k == TY_ARRAY or lhs_k == TY_TUPLE):
             self.emit_error("left operand of ++ must be str", lhs_node)
-        if rhs_resolved != self.ty_str:
+        if rhs_resolved != self.ty_str and (rhs_k == TY_INT or rhs_k == TY_FLOAT or rhs_k == TY_BOOL or rhs_k == TY_STRUCT or rhs_k == TY_ENUM or rhs_k == TY_ARRAY or rhs_k == TY_TUPLE):
             self.emit_error("right operand of ++ must be str", rhs_node)
         return self.ty_str
 
@@ -5447,7 +5441,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
             if self.get_type_kind(expected) == TY_FN:
                 let expected_params = self.get_type_d1(expected)
                 if expected_params != 1:
-                    self.emit_error("`it` used in context expecting " ++ int_to_string(expected_params) ++ " parameter(s)", node)
+                    self.emit_error(f"`it` used in context expecting {expected_params} parameter(s)", node)
 
     // Save borrow state — closure body borrows are local to the closure.
     let saved_borrow_len = self.borrow_kinds.len() as i32
@@ -5796,9 +5790,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             if actual < min_expected or actual > expected:
                 let fn_name = self.pool_resolve(fn_sym)
                 if min_expected == expected:
-                    self.emit_error("function '" ++ fn_name ++ "' expects " ++ int_to_string(expected) ++ " argument(s), found " ++ int_to_string(actual), node)
+                    self.emit_error(f"function '{fn_name}' expects {expected} argument(s), found {actual}", node)
                 else:
-                    self.emit_error("function '" ++ fn_name ++ "' expects " ++ int_to_string(min_expected) ++ "-" ++ int_to_string(expected) ++ " argument(s), found " ++ int_to_string(actual), node)
+                    self.emit_error(f"function '{fn_name}' expects {min_expected}-{expected} argument(s), found {actual}", node)
 
         for ai in 0..arg_count:
             let param_i = ai + param_offset
@@ -7516,10 +7510,7 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
                     let resolved = self.resolve_alias(tid)
                     let name = self.pool_resolve(sym)
                     with_eprintln(
-                        "[move] sym=" ++ name ++
-                        " tid=" ++ int_to_string(tid) ++
-                        " resolved=" ++ int_to_string(resolved) ++
-                        " kind=" ++ int_to_string(self.get_type_kind(resolved))
+                        f"[move] sym={name} tid={tid} resolved={resolved} kind={self.get_type_kind(resolved)}"
                     )
                 self.scope_set_state(sym, VS_MOVED)
     if kind == NK_GROUPED:
@@ -7932,7 +7923,7 @@ fn Sema.emit_argument_type_mismatch(self: Sema, call_name: str, fn_sym: i32, arg
     if param_name.len() > 0:
         diag.add_note("parameter '" ++ param_name ++ "' expects " ++ expected_name)
     else if arg_index >= 0:
-        diag.add_note("argument " ++ int_to_string(arg_index + 1) ++ " expects " ++ expected_name)
+        diag.add_note(f"argument {arg_index + 1} expects {expected_name}")
     else:
         diag.add_note("expected type: " ++ expected_name)
     diag.add_note("actual type: " ++ actual_name)
@@ -8059,7 +8050,7 @@ fn Sema.safe_symbol_text(self: Sema, sym: i32) -> str:
     let pooled = self.pool_resolve(sym)
     if pooled.len() > 0:
         return pooled
-    "sym" ++ int_to_string(sym)
+    f"sym{sym}"
 
 fn Sema.impl_owner_type_name_for_decl(self: Sema, decl: i32) -> str:
     let start = self.ast.get_start(decl)
@@ -8129,7 +8120,7 @@ fn Sema.dump_typed_module(self: Sema) -> str:
     var out = ""
     let total_decl_count = self.ast.decl_count()
     let dump_decl_count = total_decl_count
-    out = out ++ "typed module decls=" ++ int_to_string(dump_decl_count) ++ "\n"
+    out = out ++ f"typed module decls={dump_decl_count}\n"
 
     for di in 0..dump_decl_count:
         let decl = self.ast.get_decl(di)
@@ -8137,7 +8128,7 @@ fn Sema.dump_typed_module(self: Sema) -> str:
         let start = self.ast.get_start(decl)
         let end = self.ast.get_end(decl)
 
-        out = out ++ "decl[" ++ int_to_string(di) ++ "] kind=" ++ typed_decl_kind_name(kind) ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ "\n"
+        out = out ++ f"decl[{di}] kind={typed_decl_kind_name(kind)} span={start}..{end}\n"
 
         if kind == NK_FN_DECL:
             let fn_name_sym = self.ast.get_data0(decl)
@@ -8258,7 +8249,7 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
     var dump_decl_count = total_decl_count
     if requested_limit > 0 and requested_limit <= total_decl_count:
         dump_decl_count = requested_limit
-    print("typed module decls=" ++ int_to_string(dump_decl_count) ++ "\n")
+    print(f"typed module decls={dump_decl_count}\n")
 
     for di in 0..dump_decl_count:
         let decl = self.ast.get_decl(di)
@@ -8266,7 +8257,7 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
         let start = self.ast.get_start(decl)
         let end = self.ast.get_end(decl)
 
-        print("decl[" ++ int_to_string(di) ++ "] kind=" ++ typed_decl_kind_name(kind) ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ "\n")
+        print(f"decl[{di}] kind={typed_decl_kind_name(kind)} span={start}..{end}\n")
 
         if kind == NK_FN_DECL:
             let fn_name_sym = self.ast.get_data0(decl)
@@ -8426,7 +8417,7 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
 
     if has_typed_expr:
         let tid = self.typed_expr_types.get(node).unwrap()
-        out = out ++ typed_indent(indent) ++ "expr " ++ typed_expr_kind_name(kind) ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end) ++ " : " ++ self.type_name(tid) ++ "\n"
+        out = out ++ f"{typed_indent(indent)}expr {typed_expr_kind_name(kind)} span={start}..{end} : {self.type_name(tid)}\n"
 
     if kind == NK_LET_BINDING:
         if self.typed_binding_types.contains(node):
@@ -8666,11 +8657,7 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
         emit_typed_indent(indent)
         print("expr ")
         print(typed_expr_kind_name(kind))
-        print(" span=")
-        print(int_to_string(start))
-        print("..")
-        print(int_to_string(end))
-        print(" : ")
+        print(f" span={start}..{end} : ")
         print(self.type_name(tid))
         print("\n")
 
@@ -8938,7 +8925,7 @@ fn Sema.type_name(self: Sema, tid: i32) -> str:
         return self.safe_symbol_text(self.get_type_d0(resolved))
     if tk == TY_ARRAY:
         let size = self.get_type_d1(resolved)
-        return "[" ++ int_to_string(size) ++ "]" ++ self.type_name(self.get_type_d0(resolved))
+        return f"[{size}]" ++ self.type_name(self.get_type_d0(resolved))
     if tk == TY_SLICE:
         return "[]" ++ self.type_name(self.get_type_d0(resolved))
     if tk == TY_TUPLE:

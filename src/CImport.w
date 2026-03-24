@@ -431,7 +431,7 @@ fn ci_unique_name(name: str) -> str:
         return name
     var suffix = 2
     while suffix < 100:
-        let candidate = name ++ "_" ++ int_to_string(suffix)
+        let candidate = f"{name}_{suffix}"
         if with_cimport_is_name_emitted(candidate) == 0:
             return candidate
         suffix = suffix + 1
@@ -605,7 +605,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
                     si_params = si_params ++ ", "
                 let spname = with_cimport_fn_param_name(session, idx, spi)
                 let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
-                let actual_pname = if spname.len() > 0: ci_escape_reserved(spname) else: "p" ++ int_to_string(spi)
+                let actual_pname = if spname.len() > 0: ci_escape_reserved(spname) else: f"p{spi}"
                 si_params = si_params ++ actual_pname ++ ": " ++ sptype
             let si_ret = with_cimport_fn_return_type_translated(session, idx)
             return "fn " ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret ++ ":\n" ++ body
@@ -639,7 +639,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
         if pname.len() > 0:
             params = params ++ ci_escape_reserved(pname) ++ ": " ++ ptype
         else:
-            params = params ++ "p" ++ int_to_string(pi) ++ ": " ++ ptype
+            params = params ++ f"p{pi}" ++ ": " ++ ptype
 
     if is_variadic != 0:
         if param_count > 0:
@@ -872,7 +872,7 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: str, method_na
     while pi < param_count:
         let pname = with_cimport_fn_param_name(session, idx, pi)
         let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
-        let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: "p" ++ int_to_string(pi)
+        let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: f"p{pi}"
         params = params ++ ", " ++ actual_name ++ ": " ++ ptype
         call_args = call_args ++ ", " ++ actual_name
         pi = pi + 1
@@ -904,7 +904,7 @@ fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: str, method_
     while pi < param_count:
         let pname = with_cimport_fn_param_name(session, idx, pi)
         let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
-        let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: "p" ++ int_to_string(pi)
+        let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: f"p{pi}"
         if pi > 0:
             params = params ++ ", "
             call_args = call_args ++ ", "
@@ -976,7 +976,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, afi)
         if anon_kind != 0:
             let fname = with_cimport_struct_field_name(session, idx, afi)
-            let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: name ++ "_anon_" ++ int_to_string(anon_idx)
+            let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: f"{name}_anon_{anon_idx}"
             let sub_count = with_cimport_struct_field_anon_field_count(session, idx, afi)
             if sub_count > 0:
                 var sub_fields = ""
@@ -986,7 +986,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
                         sub_fields = sub_fields ++ ", "
                     let sf_name = with_cimport_struct_field_anon_field_name(session, idx, afi, sfi)
                     let sf_type = with_cimport_struct_field_anon_field_type(session, idx, afi, sfi)
-                    let actual_sf_name = if sf_name.len() == 0: "field_" ++ int_to_string(sfi) else: sf_name
+                    let actual_sf_name = if sf_name.len() == 0: f"field_{sfi}" else: sf_name
                     sub_fields = sub_fields ++ ci_escape_reserved(actual_sf_name) ++ ": " ++ sf_type
                     sfi = sfi + 1
                 if anon_kind == 2:
@@ -1012,13 +1012,13 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         if not is_really_packed and not is_union:
             let align_n = ci_compute_field_alignment(session, idx, fi, field_count)
             if align_n > 0:
-                field_str = field_str ++ "@[align(" ++ i64_to_string(align_n) ++ ")] "
+                field_str = field_str ++ f"@[align({align_n})] "
 
         let anon_kind = with_cimport_struct_field_is_anonymous_record(session, idx, fi)
         if anon_kind != 0:
             let fname = with_cimport_struct_field_name(session, idx, fi)
-            let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: name ++ "_anon_" ++ int_to_string(anon_idx2)
-            let actual_name = if fname.len() > 0: fname else: "anon_" ++ int_to_string(anon_idx2)
+            let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: f"{name}_anon_{anon_idx2}"
+            let actual_name = if fname.len() > 0: fname else: f"anon_{anon_idx2}"
             field_str = field_str ++ ci_escape_reserved(actual_name) ++ ": " ++ ci_escape_reserved(synth_name)
             anon_idx2 = anon_idx2 + 1
         else:
@@ -1137,7 +1137,7 @@ fn ci_build_struct_fields(session: i64, idx: i32, field_count: i32, known_struct
 fn ci_build_one_field(session: i64, idx: i32, fi: i32, known_structs: str) -> str:
     let fname = with_cimport_struct_field_name(session, idx, fi)
     let ftype = with_cimport_struct_field_type_translated(session, idx, fi)
-    let actual_name = if fname.len() == 0: "unnamed_" ++ int_to_string(fi) else: fname
+    let actual_name = if fname.len() == 0: f"unnamed_{fi}" else: fname
     let safe_fname = ci_escape_reserved(actual_name)
     let default_val = ci_default_for_type(ftype)
     if default_val.len() > 0:
@@ -1210,7 +1210,7 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
         let unique_cname = ci_unique_name(cname)
         with_cimport_mark_name_emitted(unique_cname)
         let safe_cname = ci_escape_reserved(unique_cname)
-        output = output ++ "let " ++ safe_cname ++ ": " ++ int_type ++ " = " ++ i64_to_string(cvalue) ++ "\n"
+        output = output ++ f"let {safe_cname}: {int_type} = {cvalue}\n"
     output
 
 // ── Variable translation ────────────────────────────────────
@@ -1334,7 +1334,7 @@ fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
                 fields = fields ++ ", "
             let fname = with_cimport_typedef_anon_field_name(session, idx, afi)
             let ftype = with_cimport_typedef_anon_field_type(session, idx, afi)
-            let actual_fname = if fname.len() == 0: "unnamed_" ++ int_to_string(afi) else: fname
+            let actual_fname = if fname.len() == 0: f"unnamed_{afi}" else: fname
             let default_val = ci_default_for_type(ftype)
             if default_val.len() > 0:
                 fields = fields ++ ci_escape_reserved(actual_fname) ++ ": " ++ ftype ++ " = " ++ default_val
@@ -2636,7 +2636,7 @@ fn ci_eval_const_expr_ctx(s: str, known: str) -> str:
         if inner.len() > 0:
             let iv = ci_parse_i64(inner)
             let nv = 0 - iv - 1
-            return i64_to_string(nv)
+            return f"{nv}"
         return ""
     // Logical NOT (!)
     if trimmed.byte_at(0) == 33:
@@ -2994,23 +2994,23 @@ fn ci_op_length(s: str, idx: i32, slen: i32) -> i32:
     1
 
 fn ci_apply_op(lhs: i64, rhs: i64, op: str) -> str:
-    if op == "+": return i64_to_string(lhs + rhs)
-    if op == "-": return i64_to_string(lhs - rhs)
-    if op == "*": return i64_to_string(lhs * rhs)
+    if op == "+": return f"{lhs + rhs}"
+    if op == "-": return f"{lhs - rhs}"
+    if op == "*": return f"{lhs * rhs}"
     if op == "/":
         if rhs == 0: return ""
-        return i64_to_string(lhs / rhs)
+        return f"{lhs / rhs}"
     if op == "%":
         if rhs == 0: return ""
-        return i64_to_string(lhs % rhs)
+        return f"{lhs % rhs}"
     // For bitwise ops, work on i32 (C macros are typically 32-bit)
     let li = lhs as i32
     let ri = rhs as i32
-    if op == "<<": return int_to_string(ci_shl(li, ri))
-    if op == ">>": return int_to_string(ci_shr(li, ri))
-    if op == "|": return int_to_string(ci_bitor(li, ri))
-    if op == "&": return int_to_string(ci_bitand(li, ri))
-    if op == "^": return int_to_string(ci_bitxor(li, ri))
+    if op == "<<": return f"{ci_shl(li, ri)}"
+    if op == ">>": return f"{ci_shr(li, ri)}"
+    if op == "|": return f"{ci_bitor(li, ri)}"
+    if op == "&": return f"{ci_bitand(li, ri)}"
+    if op == "^": return f"{ci_bitxor(li, ri)}"
     ""
 
 fn ci_parse_i64(s: str) -> i64:
@@ -3342,7 +3342,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     // Integer literal
     if kind == CXK_INT_LITERAL:
         if with_ci_eval_int_valid(session, cursor) != 0:
-            return i64_to_string(with_ci_eval_int_value(session, cursor))
+            return f"{with_ci_eval_int_value(session, cursor)}"
         return with_ci_cursor_source_text(session, cursor)
 
     // Float literal
@@ -3362,7 +3362,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     // Character literal
     if kind == CXK_CHAR_LITERAL:
         if with_ci_eval_int_valid(session, cursor) != 0:
-            return i64_to_string(with_ci_eval_int_value(session, cursor))
+            return f"{with_ci_eval_int_value(session, cursor)}"
         return with_ci_cursor_source_text(session, cursor)
 
     // Parenthesized expression
@@ -3682,7 +3682,7 @@ fn ci_trans_expr(session: i64, cursor: i32, scope: str) -> str:
     if kind == 100:  // CXCursor_UnexposedExpr
         // Try to evaluate as constant
         if with_ci_eval_int_valid(session, cursor) != 0:
-            return i64_to_string(with_ci_eval_int_value(session, cursor))
+            return f"{with_ci_eval_int_value(session, cursor)}"
         // Try to translate first child (implicit unwrap)
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
@@ -3989,7 +3989,7 @@ fn ci_try_eval_var_init(session: i64, idx: i32) -> str:
                     let init_cursor = with_ci_child(session, child, 0)
                     // Try integer evaluation
                     if with_ci_eval_int_valid(session, init_cursor) != 0:
-                        return i64_to_string(with_ci_eval_int_value(session, init_cursor))
+                        return f"{with_ci_eval_int_value(session, init_cursor)}"
                     // Try expression translation
                     let expr = ci_trans_expr(session, init_cursor, "")
                     if expr.len() > 0:
@@ -4153,7 +4153,7 @@ fn ci_scope_mangle(scope: str, name: str) -> str:
         return name
     var suffix = 1
     while suffix < 100:
-        let candidate = name ++ "_" ++ int_to_string(suffix)
+        let candidate = f"{name}_{suffix}"
         if not ci_scope_contains(scope, candidate):
             return candidate
         suffix = suffix + 1
@@ -4571,7 +4571,7 @@ fn ci_char_to_int(s: str) -> str:
         if esc == 118: return "11"    // \v
         return ""
     // Plain character
-    int_to_string(s.byte_at(1))
+    f"{s.byte_at(1)}"
 
 // ── String concatenation support ────────────────────────────
 
