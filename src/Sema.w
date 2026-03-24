@@ -197,6 +197,7 @@ type Sema = {
     bind_is_scoped_task: Vec[i32],
     bind_is_ephemeral_task: Vec[i32],
     scope_starts: Vec[i32],
+    scope_name_map: HashMap[i32, i32],
     async_scope_names: Vec[i32],
 
     // Borrow tracking
@@ -497,6 +498,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         bind_is_scoped_task: Vec.new(),
         bind_is_ephemeral_task: Vec.new(),
         scope_starts: Vec.new(),
+        scope_name_map: HashMap.new(),
         async_scope_names: Vec.new(),
         borrow_kinds: Vec.new(),
         borrow_places: Vec.new(),
@@ -1317,8 +1319,10 @@ fn Sema.pop_scope(self: Sema):
     let start = self.scope_starts.get((len - 1) as i64)
     // Expire borrows for bindings leaving scope
     self.expire_borrows_in_scope(start)
-    // Remove bindings
+    // Remove bindings from map and parallel arrays
     while self.bind_names.len() as i32 > start:
+        let removed_sym = self.bind_names.get(self.bind_names.len() - 1)
+        self.scope_name_map.remove(removed_sym)
         self.bind_names.pop()
         self.bind_types.pop()
         self.bind_muts.pop()
@@ -1345,6 +1349,7 @@ fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
         let name = self.pool_resolve(sym)
         self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
         return
+    let idx = self.bind_names.len() as i32
     self.bind_names.push(sym)
     self.bind_types.push(tid)
     self.bind_muts.push(is_mut)
@@ -1352,93 +1357,66 @@ fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
     self.bind_is_task.push(0)
     self.bind_is_scoped_task.push(0)
     self.bind_is_ephemeral_task.push(0)
+    self.scope_name_map.insert(sym, idx)
 
 fn Sema.scope_lookup(self: Sema, sym: i32) -> i32:
-    var i = self.bind_names.len() as i32 - 1
-    while i >= 0:
-        if self.bind_names.get(i as i64) == sym:
-            return self.bind_types.get(i as i64)
-        i = i - 1
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_types.get(opt.unwrap() as i64)
     0 - 1
 
 fn Sema.scope_lookup_mut(self: Sema, sym: i32) -> i32:
-    var i = self.bind_names.len() as i32 - 1
-    while i >= 0:
-        if self.bind_names.get(i as i64) == sym:
-            return self.bind_muts.get(i as i64)
-        i = i - 1
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_muts.get(opt.unwrap() as i64)
     0
 
 fn Sema.scope_lookup_state(self: Sema, sym: i32) -> i32:
-    var i = self.bind_names.len() as i32 - 1
-    while i >= 0:
-        if self.bind_names.get(i as i64) == sym:
-            return self.bind_states.get(i as i64)
-        i = i - 1
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_states.get(opt.unwrap() as i64)
     VS_LIVE
 
 fn Sema.scope_lookup_is_task(self: Sema, sym: i32) -> i32:
-    var i = self.bind_names.len() as i32 - 1
-    while i >= 0:
-        if self.bind_names.get(i as i64) == sym:
-            return self.bind_is_task.get(i as i64)
-        i = i - 1
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_is_task.get(opt.unwrap() as i64)
     0
 
 fn Sema.scope_set_is_task(self: Sema, sym: i32, is_task: i32):
-    var i = self.bind_names.len() as i32 - 1
-    while i >= 0:
-        if self.bind_names.get(i as i64) == sym:
-            self.bind_is_task.set_i32(i as i64, is_task)
-            return
-        i = i - 1
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        self.bind_is_task.set_i32(opt.unwrap() as i64, is_task)
 
 fn Sema.scope_lookup_is_scoped_task(self: Sema, sym: i32) -> i32:
-    var i = self.bind_names.len() as i32 - 1
-    while i >= 0:
-        if self.bind_names.get(i as i64) == sym:
-            return self.bind_is_scoped_task.get(i as i64)
-        i = i - 1
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_is_scoped_task.get(opt.unwrap() as i64)
     0
 
 fn Sema.scope_set_is_scoped_task(self: Sema, sym: i32, is_scoped_task: i32):
-    var i = self.bind_names.len() as i32 - 1
-    while i >= 0:
-        if self.bind_names.get(i as i64) == sym:
-            self.bind_is_scoped_task.set_i32(i as i64, is_scoped_task)
-            return
-        i = i - 1
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        self.bind_is_scoped_task.set_i32(opt.unwrap() as i64, is_scoped_task)
 
 fn Sema.scope_lookup_is_ephemeral_task(self: Sema, sym: i32) -> i32:
-    var i = self.bind_names.len() as i32 - 1
-    while i >= 0:
-        if self.bind_names.get(i as i64) == sym:
-            return self.bind_is_ephemeral_task.get(i as i64)
-        i = i - 1
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_is_ephemeral_task.get(opt.unwrap() as i64)
     0
 
 fn Sema.scope_set_is_ephemeral_task(self: Sema, sym: i32, is_ephemeral_task: i32):
-    var i = self.bind_names.len() as i32 - 1
-    while i >= 0:
-        if self.bind_names.get(i as i64) == sym:
-            self.bind_is_ephemeral_task.set_i32(i as i64, is_ephemeral_task)
-            return
-        i = i - 1
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        self.bind_is_ephemeral_task.set_i32(opt.unwrap() as i64, is_ephemeral_task)
 
 fn Sema.scope_set_state(self: Sema, sym: i32, state: i32):
-    var i = self.bind_names.len() as i32 - 1
-    while i >= 0:
-        if self.bind_names.get(i as i64) == sym:
-            self.bind_states.set_i32(i as i64, state)
-            return
-        i = i - 1
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        self.bind_states.set_i32(opt.unwrap() as i64, state)
 
 fn Sema.scope_has(self: Sema, sym: i32) -> i32:
-    var i = self.bind_names.len() as i32 - 1
-    while i >= 0:
-        if self.bind_names.get(i as i64) == sym:
-            return 1
-        i = i - 1
+    if self.scope_name_map.contains(sym): return 1
     0
 
 fn Sema.is_active_async_scope_symbol(self: Sema, sym: i32) -> i32:
