@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <errno.h>
 #ifdef __APPLE__
 #include <crt_externs.h>
@@ -65,6 +66,7 @@ static int32_t with_saved_argc = 0;
 static char **with_saved_argv = NULL;
 static volatile sig_atomic_t with_interrupt_flag = 0;
 static volatile sig_atomic_t with_interrupt_count = 0;
+static volatile sig_atomic_t with_active_child_pgid = 0;
 static int64_t with_hashmap_trace_count = 0;
 
 static int with_trace_hashmap_enabled(void) {
@@ -79,9 +81,10 @@ static void with_interrupt_signal_handler(int signo) {
     (void)signo;
     with_interrupt_flag = 1;
     with_interrupt_count = with_interrupt_count + 1;
-    if (with_interrupt_count >= 2) {
-        _exit(130);
+    if (with_active_child_pgid > 0) {
+        (void)kill(-(pid_t)with_active_child_pgid, signo);
     }
+    _exit(128 + signo);
 }
 
 void with_runtime_set_argv(int32_t argc, char **argv) {
@@ -97,6 +100,9 @@ void with_install_interrupt_handlers(void) {
     sa.sa_flags = 0;
     (void)sigaction(SIGINT, &sa, NULL);
     (void)sigaction(SIGTERM, &sa, NULL);
+#ifdef SIGHUP
+    (void)sigaction(SIGHUP, &sa, NULL);
+#endif
 }
 
 void with_raise_stack_limit(void) {
@@ -119,6 +125,83 @@ void with_raise_stack_limit(void) {
 
 int32_t with_interrupt_requested(void) {
     return with_interrupt_flag ? 1 : 0;
+}
+
+static void with_restore_default_signal_handler(int signo) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = SIG_DFL;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    (void)sigaction(signo, &sa, NULL);
+}
+
+static int with_block_interrupt_signals(sigset_t *prev_mask) {
+    sigset_t blocked;
+    sigemptyset(&blocked);
+    sigaddset(&blocked, SIGINT);
+    sigaddset(&blocked, SIGTERM);
+#ifdef SIGHUP
+    sigaddset(&blocked, SIGHUP);
+#endif
+    return sigprocmask(SIG_BLOCK, &blocked, prev_mask);
+}
+
+static void with_restore_signal_mask(const sigset_t *prev_mask) {
+    if (!prev_mask) return;
+    (void)sigprocmask(SIG_SETMASK, prev_mask, NULL);
+}
+
+static int with_wait_for_child_process(pid_t pid) {
+    int status = -1;
+    for (;;) {
+        pid_t waited = waitpid(pid, &status, 0);
+        if (waited == pid) {
+            return status;
+        }
+        if (waited < 0 && errno == EINTR) {
+            continue;
+        }
+        return -1;
+    }
+}
+
+static int with_run_shell_command(const char *cmd) {
+    sigset_t prev_mask;
+    int mask_rc = with_block_interrupt_signals(&prev_mask);
+    pid_t pid = fork();
+    if (pid == 0) {
+        if (mask_rc == 0) {
+            with_restore_signal_mask(&prev_mask);
+        }
+        (void)setpgid(0, 0);
+        with_restore_default_signal_handler(SIGINT);
+        with_restore_default_signal_handler(SIGTERM);
+#ifdef SIGHUP
+        with_restore_default_signal_handler(SIGHUP);
+#endif
+#ifdef SIGQUIT
+        with_restore_default_signal_handler(SIGQUIT);
+#endif
+        execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
+        _exit(127);
+    }
+    if (pid < 0) {
+        if (mask_rc == 0) {
+            with_restore_signal_mask(&prev_mask);
+        }
+        return -1;
+    }
+
+    with_active_child_pgid = (sig_atomic_t)pid;
+    (void)setpgid(pid, pid);
+    if (mask_rc == 0) {
+        with_restore_signal_mask(&prev_mask);
+    }
+
+    int rc = with_wait_for_child_process(pid);
+    with_active_child_pgid = 0;
+    return rc;
 }
 
 static void with_sb_reserve(with_str_builder *sb, int64_t need) {
@@ -774,13 +857,18 @@ int32_t with_setenv_str(with_str name, with_str value) {
     return (int32_t)rc;
 }
 
-// system() wrapper for with_str command input.
+// Shell-command wrapper for with_str command input.
 int32_t with_system(with_str cmd) {
     char *buf = (char *)malloc((size_t)cmd.len + 1);
     if (!buf) return -1;
     memcpy(buf, cmd.ptr, (size_t)cmd.len);
     buf[cmd.len] = '\0';
-    int rc = system(buf);
+    if (with_interrupt_flag) {
+        free(buf);
+        errno = EINTR;
+        return -1;
+    }
+    int rc = with_run_shell_command(buf);
     free(buf);
     return (int32_t)rc;
 }
@@ -1269,6 +1357,15 @@ void with_hashmap_insert(void *handle, const void *key, const void *val, int64_t
             }
         }
     }
+    if (first_tombstone >= 0) {
+        memcpy(m->keys + first_tombstone * m->key_size, key, m->key_size);
+        memcpy(m->values + first_tombstone * m->val_size, val, m->val_size);
+        m->states[first_tombstone] = 1;
+        m->len++;
+        return;
+    }
+    hashmap_grow(m, is_str_key);
+    with_hashmap_insert(handle, key, val, is_str_key);
 }
 
 // Returns 1 if found (writes value to out_val), 0 if not found.
@@ -1970,7 +2067,7 @@ int32_t with_extract_tgz(with_str archive, with_str dest) {
     memcpy(ab, archive.ptr, an); ab[an] = 0;
     memcpy(db, dest.ptr, dn); db[dn] = 0;
     snprintf(cmd, sizeof(cmd), "tar xzf '%s' -C '%s'", ab, db);
-    return system(cmd) == 0 ? 0 : -1;
+    return with_run_shell_command(cmd) == 0 ? 0 : -1;
 }
 
 // ── System info ─────────────────────────────────────────────────────
