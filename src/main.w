@@ -33,6 +33,8 @@ extern fn with_raise_stack_limit() -> void
 const CLI_PRELUDE_FULL_MODE: i32 = 0
 const CLI_PRELUDE_CORE_MODE: i32 = 1
 const CLI_PRELUDE_NONE_MODE: i32 = 2
+const CLI_DEFAULT_DEBUG_OPT_LEVEL: i32 = 0
+const CLI_DEFAULT_BUILD_OPT_LEVEL: i32 = 2
 
 type CliOptions = {
     command: str,
@@ -104,8 +106,17 @@ fn cli_has_flag(argc: i32, flag: str) -> bool:
         i = i + 1
     false
 
+fn cli_default_opt_level(argc: i32) -> i32:
+    if argc >= 2:
+        let command = with_arg_at(1)
+        if command == "build" or command == "run" or command == "test":
+            return CLI_DEFAULT_BUILD_OPT_LEVEL
+        if command.ends_with(".w"):
+            return CLI_DEFAULT_BUILD_OPT_LEVEL
+    CLI_DEFAULT_DEBUG_OPT_LEVEL
+
 fn cli_opt_level(argc: i32) -> i32:
-    var level = 0
+    var level = cli_default_opt_level(argc)
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -191,25 +202,29 @@ fn run_cli(argc: i32) -> i32:
     let dump_async_mir_flag = cli_has_flag(argc, "--dump-async-mir")
     let debug_info = not cli_has_flag(argc, "-g0") and not cli_has_flag(argc, "--release")
 
+    // Cache source and output paths — scanned once, used by all subcommands.
+    let source = find_source_arg(argc)
+    let output = find_output_arg(argc)
+
     // `with hello.w` is shorthand for `with run hello.w`
     if cli_is_implicit_run(argc):
         return run_run_command(cli_command(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
 
     if cli_command(argc) == "build":
-        return run_build_command(find_source_arg(argc), opt_level, no_std, alloc_mode, emit_c_mode, find_output_arg(argc), prelude_mode, debug_info)
+        return run_build_command(source, opt_level, no_std, alloc_mode, emit_c_mode, output, prelude_mode, debug_info)
     if cli_command(argc) == "run":
         if emit_c_mode:
             with_eprintln("error: '--emit-c' is only supported with 'build'")
             return 1
-        return run_run_command(find_source_arg(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_run_command(source, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
     if cli_command(argc) == "ir":
-        if find_source_arg(argc) == "":
+        if source == "":
             with_eprintln("error: 'ir' requires a source file argument")
             return 1
         var comp = Compilation.init()
         comp.configure(opt_level, no_std, alloc_mode)
         comp.set_prelude_mode(prelude_mode)
-        let pool = comp.compile_file(find_source_arg(argc))
+        let pool = comp.compile_file(source)
         if pool.decl_count() == 0:
             with_eprintln("error: IR generation failed during compilation")
             return 1
@@ -218,34 +233,34 @@ fn run_cli(argc: i32) -> i32:
             return 1
         return 0
     if cli_command(argc) == "ast":
-        if find_source_arg(argc) == "":
+        if source == "":
             with_eprintln("error: 'ast' requires a source file argument")
             return 1
-        return dump_ast(find_source_arg(argc), no_std, alloc_mode, deterministic_mode)
+        return dump_ast(source, no_std, alloc_mode, deterministic_mode)
     if cli_command(argc) == "check":
-        if find_source_arg(argc) == "":
+        if source == "":
             with_eprintln("error: 'check' requires a source file argument")
             return 1
         if dump_tokens_flag:
-            let rc_tokens = dump_tokens(find_source_arg(argc), true)
+            let rc_tokens = dump_tokens(source, true)
             if rc_tokens != 0:
                 return rc_tokens
             if not dump_ast_flag:
                 return 0
         if dump_ast_flag:
-            return dump_ast(find_source_arg(argc), no_std, alloc_mode, true)
+            return dump_ast(source, no_std, alloc_mode, true)
         if dump_resolved_flag:
-            return dump_resolved_artifact(find_source_arg(argc), no_std, alloc_mode, prelude_mode)
+            return dump_resolved_artifact(source, no_std, alloc_mode, prelude_mode)
         if dump_typed_flag:
-            return dump_typed_artifact(find_source_arg(argc), no_std, alloc_mode, prelude_mode)
+            return dump_typed_artifact(source, no_std, alloc_mode, prelude_mode)
         if dump_mir_flag:
-            return dump_mir_artifact(find_source_arg(argc), no_std, alloc_mode, prelude_mode)
+            return dump_mir_artifact(source, no_std, alloc_mode, prelude_mode)
         if dump_async_mir_flag:
-            return dump_async_mir_artifact(find_source_arg(argc), no_std, alloc_mode, prelude_mode)
+            return dump_async_mir_artifact(source, no_std, alloc_mode, prelude_mode)
         var comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode)
         comp.set_prelude_mode(prelude_mode)
-        let pool = comp.compile_file(find_source_arg(argc))
+        let pool = comp.compile_file(source)
         if pool.decl_count() == 0:
             with_eprintln("error: check failed during compilation")
             return 1
@@ -253,10 +268,10 @@ fn run_cli(argc: i32) -> i32:
         comp.print_warnings()
         return 0
     if cli_command(argc) == "tokens":
-        if find_source_arg(argc) == "":
+        if source == "":
             with_eprintln("error: 'tokens' requires a source file argument")
             return 1
-        return dump_tokens(find_source_arg(argc), deterministic_mode)
+        return dump_tokens(source, deterministic_mode)
     if cli_command(argc) == "test":
         return run_test_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
     if cli_command(argc) == "version" or cli_command(argc) == "--version":
@@ -312,6 +327,9 @@ fn has_output_prefix(arg: str) -> bool:
         return false
     with_str_starts_with(arg, "--output=") != 0
 
+// Find the first positional (non-flag) argument starting from argv[2].
+// Skips `-o <path>` pairs and `--output=...` prefixed options.
+// Returns "" if no source file found.
 fn find_source_arg(argc: i32) -> str:
     var i = 2
     while i < argc:
@@ -788,6 +806,8 @@ fn print_usage:
     print("  help [topic]      Show CLI help or language quick reference\n")
     print("\n")
     print("Common options:\n")
+    print("  -O0|-O1|-O2|-O3      Override optimization level (build/run/test default to -O2)\n")
+    print("  --release            Alias for -O2 and disable debug info\n")
     print("  --no-prelude          Disable implicit std prelude import\n")
     print("  --prelude=full|core|none  Select implicit prelude mode\n")
     print("  --freestanding        Alias for --no-std --no-prelude\n")
