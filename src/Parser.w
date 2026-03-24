@@ -91,7 +91,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
 
 fn Parser.peek(self: Parser) -> i32:
     if self.pos >= self.tokens.len():
-        return TK_EOF
+        return TokenKind.TK_EOF
     self.tokens.get_tag(self.pos)
 
 fn Parser.advance(self: Parser):
@@ -126,7 +126,7 @@ fn Parser.expect(self: Parser, expected: i32) -> i32:
     1
 
 fn Parser.expect_ident(self: Parser) -> i32:
-    if self.peek() != TK_IDENT:
+    if self.peek() != TokenKind.TK_IDENT:
         self.emit_error("expected identifier")
         return 0
     let sym = self.intern_current()
@@ -135,7 +135,7 @@ fn Parser.expect_ident(self: Parser) -> i32:
 
 fn Parser.expect_ident_or_keyword(self: Parser) -> i32:
     let t = self.peek()
-    if t == TK_IDENT or parser_is_keyword_tag(t):
+    if t == TokenKind.TK_IDENT or parser_is_keyword_tag(t):
         let sym = self.intern_current()
         self.advance()
         return sym
@@ -143,11 +143,11 @@ fn Parser.expect_ident_or_keyword(self: Parser) -> i32:
     0
 
 fn parser_is_keyword_tag(tag: i32) -> bool:
-    if tag >= TK_KW_FN and tag <= TK_KW_OR:
+    if tag >= TokenKind.TK_KW_FN and tag <= TokenKind.TK_KW_OR:
         return true
-    if tag == TK_KW_CONST or tag == TK_KW_IT or tag == TK_KW_ERRDEFER or tag == TK_KW_MOVE:
+    if tag == TokenKind.TK_KW_CONST or tag == TokenKind.TK_KW_IT or tag == TokenKind.TK_KW_ERRDEFER or tag == TokenKind.TK_KW_MOVE:
         return true
-    if tag == TK_KW_WHERE or tag == TK_KW_OPAQUE or tag == TK_KW_NULL or tag == TK_KW_UNION or tag == TK_KW_ENUM:
+    if tag == TokenKind.TK_KW_WHERE or tag == TokenKind.TK_KW_OPAQUE or tag == TokenKind.TK_KW_NULL or tag == TokenKind.TK_KW_UNION or tag == TokenKind.TK_KW_ENUM:
         return true
     false
 
@@ -159,7 +159,7 @@ fn Parser.emit_help_error(self: Parser, msg: str, help: str):
 
 fn Parser.expect_use_path_segment(self: Parser) -> i32:
     let t = self.peek()
-    if t == TK_IDENT:
+    if t == TokenKind.TK_IDENT:
         let sym = self.intern_current()
         self.advance()
         return sym
@@ -181,36 +181,36 @@ fn Parser.intern_current(self: Parser) -> i32:
     self.intern.intern(text)
 
 fn Parser.is_ident_named(self: Parser, name: str) -> bool:
-    if self.peek() != TK_IDENT:
+    if self.peek() != TokenKind.TK_IDENT:
         return false
     let s = self.current_start()
     let e = self.current_end()
     self.source.slice(s as i64, e as i64) == name
 
 fn Parser.skip_newlines(self: Parser):
-    while self.peek() == TK_NEWLINE:
+    while self.peek() == TokenKind.TK_NEWLINE:
         self.advance()
 
 fn Parser.peek_past_newlines(self: Parser) -> i32:
     var p = self.pos
-    while p < self.tokens.len() and self.tokens.get_tag(p) == TK_NEWLINE:
+    while p < self.tokens.len() and self.tokens.get_tag(p) == TokenKind.TK_NEWLINE:
         p = p + 1
     if p < self.tokens.len():
         return self.tokens.get_tag(p)
-    TK_EOF
+    TokenKind.TK_EOF
 
 fn Parser.emit_error(self: Parser, msg: str):
     let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
     self.diags.emit(Diagnostic.err(msg, span))
 
 fn Parser.recover_to_top_level(self: Parser):
-    while self.peek() != TK_EOF:
+    while self.peek() != TokenKind.TK_EOF:
         let t = self.peek()
-        if t == TK_AT or
-           t == TK_KW_FN or t == TK_KW_TYPE or t == TK_KW_ENUM or t == TK_KW_USE or t == TK_KW_LET or
-           t == TK_KW_VAR or t == TK_KW_PUB or t == TK_KW_EXTERN or t == TK_KW_ERROR or
-           t == TK_KW_TRAIT or t == TK_KW_IMPL or t == TK_KW_EXTEND or t == TK_KW_ASYNC or
-           t == TK_KW_GEN or t == TK_KW_COMPTIME:
+        if t == TokenKind.TK_AT or
+           t == TokenKind.TK_KW_FN or t == TokenKind.TK_KW_TYPE or t == TokenKind.TK_KW_ENUM or t == TokenKind.TK_KW_USE or t == TokenKind.TK_KW_LET or
+           t == TokenKind.TK_KW_VAR or t == TokenKind.TK_KW_PUB or t == TokenKind.TK_KW_EXTERN or t == TokenKind.TK_KW_ERROR or
+           t == TokenKind.TK_KW_TRAIT or t == TokenKind.TK_KW_IMPL or t == TokenKind.TK_KW_EXTEND or t == TokenKind.TK_KW_ASYNC or
+           t == TokenKind.TK_KW_GEN or t == TokenKind.TK_KW_COMPTIME:
             return
         self.advance()
 
@@ -235,16 +235,16 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_callconv = 0
     var derive_syms: Vec[i32] = Vec.new()
 
-    while self.peek() == TK_AT:
+    while self.peek() == TokenKind.TK_AT:
         let saved = self.pos
         self.advance()
-        if self.peek() != TK_L_BRACKET:
+        if self.peek() != TokenKind.TK_L_BRACKET:
             self.emit_error("expected '[' after '@' for attribute (use 'label for loop labels)")
             return
         self.advance()
 
         // Check for must_use and flags BEFORE the else-if chain
-        if self.peek() == TK_IDENT:
+        if self.peek() == TokenKind.TK_IDENT:
             let attr_s = self.current_start()
             let attr_e = self.current_end()
             let attr_text = self.source.slice(attr_s as i64, attr_e as i64)
@@ -259,19 +259,19 @@ fn Parser.skip_attributes(self: Parser):
 
         if self.is_ident_named("derive"):
             self.advance()
-            if self.peek() == TK_L_PAREN:
+            if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
-                while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
-                    if self.peek() == TK_IDENT:
+                while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+                    if self.peek() == TokenKind.TK_IDENT:
                         let sym = self.intern_current()
                         self.advance()
                         derive_syms.push(sym)
                     else:
                         self.advance()
-                    if self.peek() == TK_COMMA:
+                    if self.peek() == TokenKind.TK_COMMA:
                         self.advance()
                         self.skip_newlines()
-                if self.peek() == TK_R_PAREN:
+                if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
         else if self.is_ident_named("tailrec"):
             self.pending_tailrec = 1
@@ -313,30 +313,30 @@ fn Parser.skip_attributes(self: Parser):
             // @[c_export("name")] — parse and store the export name as callconv
             // with "c_export:" prefix so codegen can detect it
             self.advance()
-            if self.peek() == TK_L_PAREN:
+            if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
-                if self.peek() == TK_STRING_LIT:
+                if self.peek() == TokenKind.TK_STRING_LIT:
                     let export_name = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
                     self.pending_callconv = self.intern.intern("c_export:" ++ export_name)
                     self.advance()
-                if self.peek() == TK_R_PAREN:
+                if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
         else if self.is_ident_named("callconv"):
             self.advance()
-            if self.peek() == TK_L_PAREN:
+            if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
-                if self.peek() == TK_STRING_LIT:
+                if self.peek() == TokenKind.TK_STRING_LIT:
                     self.pending_callconv = self.intern_current()
                     self.advance()
-                if self.peek() == TK_R_PAREN:
+                if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
 
         // consume until matching ]
         var depth = 1
-        while depth > 0 and self.peek() != TK_EOF:
-            if self.peek() == TK_L_BRACKET:
+        while depth > 0 and self.peek() != TokenKind.TK_EOF:
+            if self.peek() == TokenKind.TK_L_BRACKET:
                 depth = depth + 1
-            if self.peek() == TK_R_BRACKET:
+            if self.peek() == TokenKind.TK_R_BRACKET:
                 depth = depth - 1
             self.advance()
         self.skip_newlines()
@@ -354,48 +354,48 @@ fn Parser.parse_module(self: Parser) -> AstPool:
     self.skip_newlines()
 
     // Skip optional module declaration
-    if self.peek() == TK_KW_MODULE:
+    if self.peek() == TokenKind.TK_KW_MODULE:
         self.advance()
-        if self.peek() == TK_IDENT or self.peek() == TK_DOT_IDENT:
+        if self.peek() == TokenKind.TK_IDENT or self.peek() == TokenKind.TK_DOT_IDENT:
             self.advance()
         while true:
-            if self.peek() == TK_DOT:
+            if self.peek() == TokenKind.TK_DOT:
                 self.advance()
-                if self.peek() == TK_IDENT:
+                if self.peek() == TokenKind.TK_IDENT:
                     self.advance()
                 else:
                     break
-            else if self.peek() == TK_DOT_IDENT:
+            else if self.peek() == TokenKind.TK_DOT_IDENT:
                 // .Uppercase segments are lexed as dot-identifiers.
                 self.advance()
             else:
                 break
         self.skip_newlines()
 
-    while self.peek() != TK_EOF:
+    while self.peek() != TokenKind.TK_EOF:
         self.skip_newlines()
         self.skip_attributes()
         self.skip_newlines()
-        if self.peek() == TK_EOF:
+        if self.peek() == TokenKind.TK_EOF:
             break
 
-        if self.peek() == TK_KW_PUB:
+        if self.peek() == TokenKind.TK_KW_PUB:
             let saved_pos = self.pos
             self.advance()
-            if self.peek() == TK_KW_IMPL or self.peek() == TK_KW_EXTEND:
+            if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
                 self.parse_impl_block(Visibility.VIS_PUBLIC)
                 self.skip_newlines()
                 continue
-            if self.peek() == TK_KW_TRAIT:
+            if self.peek() == TokenKind.TK_KW_TRAIT:
                 self.parse_trait_decl(Visibility.VIS_PUBLIC)
                 self.skip_newlines()
                 continue
             self.pos = saved_pos
-        else if self.peek() == TK_KW_IMPL or self.peek() == TK_KW_EXTEND:
+        else if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
             self.parse_impl_block(Visibility.VIS_PRIVATE)
             self.skip_newlines()
             continue
-        else if self.peek() == TK_KW_TRAIT:
+        else if self.peek() == TokenKind.TK_KW_TRAIT:
             self.parse_trait_decl(Visibility.VIS_PRIVATE)
             self.skip_newlines()
             continue
@@ -415,51 +415,51 @@ fn Parser.parse_decl(self: Parser) -> i32:
     var is_pub = Visibility.VIS_PRIVATE
     let start = self.current_start()
 
-    if self.peek() == TK_KW_PUB:
+    if self.peek() == TokenKind.TK_KW_PUB:
         is_pub = Visibility.VIS_PUBLIC
         self.advance()
 
-    if self.peek() != TK_KW_TYPE and self.peek() != TK_KW_ENUM:
+    if self.peek() != TokenKind.TK_KW_TYPE and self.peek() != TokenKind.TK_KW_ENUM:
         self.pending_derive_start = 0
         self.pending_derive_count = 0
 
     let t = self.peek()
-    if t == TK_KW_FN:
+    if t == TokenKind.TK_KW_FN:
         return self.parse_fn_decl(is_pub, start, 0, 0, 0)
-    if t == TK_KW_UNSAFE:
+    if t == TokenKind.TK_KW_UNSAFE:
         self.advance()
-        if self.peek() != TK_KW_FN:
+        if self.peek() != TokenKind.TK_KW_FN:
             self.emit_error("expected 'fn' after 'unsafe'")
             return 0
         self.pending_unsafe_fn = 1
         let result = self.parse_fn_decl(is_pub, start, 0, 0, 0)
         self.pending_unsafe_fn = 0
         return result
-    if t == TK_KW_COMPTIME:
+    if t == TokenKind.TK_KW_COMPTIME:
         self.advance()
-        if self.peek() != TK_KW_FN:
+        if self.peek() != TokenKind.TK_KW_FN:
             self.emit_error("expected 'fn' after 'comptime'")
             return 0
         return self.parse_fn_decl(is_pub, start, 0, 0, 1)
-    if t == TK_KW_ASYNC:
+    if t == TokenKind.TK_KW_ASYNC:
         self.advance()
         return self.parse_fn_decl(is_pub, start, 1, 0, 0)
-    if t == TK_KW_GEN:
+    if t == TokenKind.TK_KW_GEN:
         self.advance()
         return self.parse_fn_decl(is_pub, start, 0, 1, 0)
-    if t == TK_KW_TYPE:
+    if t == TokenKind.TK_KW_TYPE:
         return self.parse_type_decl(is_pub, start)
-    if t == TK_KW_ENUM:
+    if t == TokenKind.TK_KW_ENUM:
         return self.parse_enum_decl(is_pub, start)
-    if t == TK_KW_USE:
+    if t == TokenKind.TK_KW_USE:
         return self.parse_use_decl(start)
-    if t == TK_KW_LET or t == TK_KW_VAR:
+    if t == TokenKind.TK_KW_LET or t == TokenKind.TK_KW_VAR:
         return self.parse_top_level_let(is_pub, start)
-    if t == TK_KW_EXTERN:
+    if t == TokenKind.TK_KW_EXTERN:
         return self.parse_extern_decl(start)
-    if t == TK_KW_ERROR:
+    if t == TokenKind.TK_KW_ERROR:
         return self.parse_error_decl(is_pub, start)
-    if t == TK_KW_CONST:
+    if t == TokenKind.TK_KW_CONST:
         return self.parse_const_decl(is_pub, start)
 
     self.emit_error("expected declaration (fn, type, enum, let, use, extern)")
@@ -468,14 +468,14 @@ fn Parser.parse_decl(self: Parser) -> i32:
 // ── fn decl ──────────────────────────────────────────────────────
 
 fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is_gen: i32, is_comptime: i32) -> i32:
-    if self.expect(TK_KW_FN) == 0:
+    if self.expect(TokenKind.TK_KW_FN) == 0:
         return 0
     var name = self.expect_ident_or_keyword()
     if name == 0:
         return 0
 
     // Method syntax: fn Type.method(...)
-    if self.peek() == TK_DOT:
+    if self.peek() == TokenKind.TK_DOT:
         self.advance()
         let method_name = self.expect_ident_or_keyword()
         if method_name == 0:
@@ -494,18 +494,18 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     var required_param_count = 0
     self.last_param_pattern_start = self.pool.fn_param_patterns_len()
     self.last_param_pattern_count = 0
-    if self.peek() == TK_L_PAREN:
+    if self.peek() == TokenKind.TK_L_PAREN:
         self.advance()
         param_count = self.parse_param_list()
         required_param_count = self.last_param_required_count
         if param_count > 0:
             params_start = self.pool.extra_len() - param_count * FN_PARAM_STRIDE
-        if self.expect(TK_R_PAREN) == 0:
+        if self.expect(TokenKind.TK_R_PAREN) == 0:
             return 0
 
     // Return type
     var ret_type = 0
-    if self.peek() == TK_ARROW:
+    if self.peek() == TokenKind.TK_ARROW:
         self.advance()
         ret_type = self.parse_type_expr()
 
@@ -513,7 +513,7 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     self.parse_optional_where_clause()
 
     // Body
-    if self.peek() == TK_EQ or self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
         self.advance()
     else:
         self.emit_error("expected '=' or ':'")
@@ -570,26 +570,26 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
 // ── extern fn ────────────────────────────────────────────────────
 
 fn Parser.parse_extern_decl(self: Parser, start: i32) -> i32:
-    if self.expect(TK_KW_EXTERN) == 0:
+    if self.expect(TokenKind.TK_KW_EXTERN) == 0:
         return 0
     // Optional ABI string: extern "C" fn ...
-    if self.peek() == TK_STRING_LIT:
+    if self.peek() == TokenKind.TK_STRING_LIT:
         self.advance()
     // extern let NAME: TYPE  or  extern var NAME: TYPE
-    if self.peek() == TK_KW_LET or self.peek() == TK_KW_VAR:
-        let is_mut = if self.peek() == TK_KW_VAR: 1 else: 0
+    if self.peek() == TokenKind.TK_KW_LET or self.peek() == TokenKind.TK_KW_VAR:
+        let is_mut = if self.peek() == TokenKind.TK_KW_VAR: 1 else: 0
         self.advance()
         let ev_name = self.expect_ident()
         if ev_name == 0: return 0
-        if self.expect(TK_COLON) == 0: return 0
+        if self.expect(TokenKind.TK_COLON) == 0: return 0
         let ev_type = self.parse_type_expr()
         return self.pool.add_node(NodeKind.NK_EXTERN_VAR, start, self.prev_end(), ev_name, ev_type, is_mut)
-    if self.expect(TK_KW_FN) == 0:
+    if self.expect(TokenKind.TK_KW_FN) == 0:
         return 0
     let name = self.expect_ident()
     if name == 0:
         return 0
-    if self.expect(TK_L_PAREN) == 0:
+    if self.expect(TokenKind.TK_L_PAREN) == 0:
         return 0
 
     let param_count = self.parse_param_list()
@@ -599,15 +599,15 @@ fn Parser.parse_extern_decl(self: Parser, start: i32) -> i32:
         self.pool.extra_len()
 
     var is_variadic = 0
-    if self.peek() == TK_DOT_DOT_DOT:
+    if self.peek() == TokenKind.TK_DOT_DOT_DOT:
         is_variadic = 1
         self.advance()
 
-    if self.expect(TK_R_PAREN) == 0:
+    if self.expect(TokenKind.TK_R_PAREN) == 0:
         return 0
 
     var ret_type = 0
-    if self.peek() == TK_ARROW:
+    if self.peek() == TokenKind.TK_ARROW:
         self.advance()
         ret_type = self.parse_type_expr()
 
@@ -625,7 +625,7 @@ fn Parser.parse_extern_decl(self: Parser, start: i32) -> i32:
 // ── type decl ────────────────────────────────────────────────────
 
 fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
-    if self.expect(TK_KW_TYPE) == 0:
+    if self.expect(TokenKind.TK_KW_TYPE) == 0:
         return 0
     let name = self.expect_ident()
     if name == 0:
@@ -637,14 +637,14 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
 
     var repr_type_node = 0
     var is_ephemeral = 0
-    if self.peek() == TK_KW_EPHEMERAL:
+    if self.peek() == TokenKind.TK_KW_EPHEMERAL:
         is_ephemeral = 1
         self.advance()
     self.skip_newlines()
 
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
-        if self.peek() == TK_NEWLINE:
+        if self.peek() == TokenKind.TK_NEWLINE:
             self.skip_newlines()
             let extra_start = self.parse_struct_body_block()
             self.pool.add_extra(is_pub)
@@ -657,7 +657,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
             return self.finish_type_decl(node)
         repr_type_node = self.parse_type_expr()
 
-    if self.peek() == TK_L_BRACE:
+    if self.peek() == TokenKind.TK_L_BRACE:
         let extra_start = self.parse_struct_body()
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
@@ -668,14 +668,14 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
         return self.finish_type_decl(node)
 
-    if self.peek() != TK_EQ:
+    if self.peek() != TokenKind.TK_EQ:
         self.emit_error("expected type body")
         return 0
 
     self.advance()
     self.skip_newlines()
 
-    if self.peek() == TK_KW_EPHEMERAL:
+    if self.peek() == TokenKind.TK_KW_EPHEMERAL:
         is_ephemeral = 1
         self.advance()
         self.skip_newlines()
@@ -689,7 +689,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_DISC_ENUM, is_ephemeral))
         return self.finish_type_decl(node)
 
-    if self.peek() == TK_L_BRACE:
+    if self.peek() == TokenKind.TK_L_BRACE:
         self.emit_legacy_struct_decl_error()
         let extra_start = self.parse_struct_body()
         self.pool.add_extra(is_pub)
@@ -701,7 +701,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
         return self.finish_type_decl(node)
 
-    if self.peek() == TK_PIPE or (self.peek() == TK_IDENT and self.is_enum_def()):
+    if self.peek() == TokenKind.TK_PIPE or (self.peek() == TokenKind.TK_IDENT and self.is_enum_def()):
         self.emit_legacy_enum_decl_error()
         let extra_start = self.parse_enum_variants()
         self.pool.add_extra(is_pub)
@@ -710,7 +710,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_ENUM, is_ephemeral))
         return self.finish_type_decl(node)
 
-    if self.peek() == TK_KW_OPAQUE:
+    if self.peek() == TokenKind.TK_KW_OPAQUE:
         self.advance()
         let extra_start = self.pool.extra_len()
         self.pool.add_extra(0)
@@ -720,13 +720,13 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_OPAQUE, is_ephemeral))
         return self.finish_type_decl(node)
 
-    if self.peek() == TK_KW_UNION:
+    if self.peek() == TokenKind.TK_KW_UNION:
         self.advance()
         self.skip_newlines()
         var extra_start = 0
-        if self.peek() == TK_L_BRACE:
+        if self.peek() == TokenKind.TK_L_BRACE:
             extra_start = self.parse_struct_body()
-        else if self.peek() == TK_NEWLINE:
+        else if self.peek() == TokenKind.TK_NEWLINE:
             self.skip_newlines()
             extra_start = self.parse_struct_body_block()
         else:
@@ -738,7 +738,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_UNION, is_ephemeral))
         return self.finish_type_decl(node)
 
-    if self.peek() == TK_IDENT and self.is_ident_named("distinct"):
+    if self.peek() == TokenKind.TK_IDENT and self.is_ident_named("distinct"):
         self.advance()
         let aliased = self.parse_type_expr()
         let extra_start = self.pool.extra_len()
@@ -749,14 +749,14 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TDK_DISTINCT, is_ephemeral))
         return self.finish_type_decl(node)
 
-    if self.peek() == TK_KW_FN or
-       self.peek() == TK_IDENT or
-       self.peek() == TK_AMPERSAND or
-       self.peek() == TK_L_PAREN or
-       self.peek() == TK_QUESTION or
-       self.peek() == TK_STAR or
-       self.peek() == TK_L_BRACKET or
-       self.peek() == TK_KW_DYN:
+    if self.peek() == TokenKind.TK_KW_FN or
+       self.peek() == TokenKind.TK_IDENT or
+       self.peek() == TokenKind.TK_AMPERSAND or
+       self.peek() == TokenKind.TK_L_PAREN or
+       self.peek() == TokenKind.TK_QUESTION or
+       self.peek() == TokenKind.TK_STAR or
+       self.peek() == TokenKind.TK_L_BRACKET or
+       self.peek() == TokenKind.TK_KW_DYN:
         let aliased = self.parse_type_expr()
         let extra_start = self.pool.extra_len()
         self.pool.add_extra(aliased)
@@ -770,7 +770,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
     0
 
 fn Parser.parse_enum_decl(self: Parser, is_pub: i32, start: i32) -> i32:
-    if self.expect(TK_KW_ENUM) == 0:
+    if self.expect(TokenKind.TK_KW_ENUM) == 0:
         return 0
     let name = self.expect_ident()
     if name == 0:
@@ -781,7 +781,7 @@ fn Parser.parse_enum_decl(self: Parser, is_pub: i32, start: i32) -> i32:
     self.parse_optional_where_clause()
 
     var is_ephemeral = 0
-    if self.peek() == TK_KW_EPHEMERAL:
+    if self.peek() == TokenKind.TK_KW_EPHEMERAL:
         is_ephemeral = 1
         self.advance()
     self.skip_newlines()
@@ -799,25 +799,25 @@ fn Parser.parse_enum_named_decl(self: Parser, start: i32, name: i32, is_pub: i32
     var use_block_body = 0
     var use_braced_body = 0
 
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
-        if self.peek() == TK_NEWLINE:
+        if self.peek() == TokenKind.TK_NEWLINE:
             use_block_body = 1
             self.skip_newlines()
         else:
             repr_type_node = self.parse_type_expr()
-            if self.peek() == TK_COLON:
+            if self.peek() == TokenKind.TK_COLON:
                 self.advance()
                 use_block_body = 1
                 self.skip_newlines()
             else:
-                if self.peek() == TK_L_BRACE:
+                if self.peek() == TokenKind.TK_L_BRACE:
                     use_braced_body = 1
                 else:
                     self.emit_error("expected enum body after backing type")
                     return 0
     else:
-        if self.peek() == TK_L_BRACE:
+        if self.peek() == TokenKind.TK_L_BRACE:
             use_braced_body = 1
         else:
             self.emit_error("expected enum body")
@@ -859,25 +859,25 @@ fn Parser.parse_struct_body(self: Parser) -> i32:
     var aligns: Vec[i32] = Vec.new()
     var field_count = 0
 
-    while self.peek() != TK_R_BRACE and self.peek() != TK_EOF:
+    while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
         // Check for per-field @[align(N)] attribute
         var field_align = 0
-        if self.peek() == TK_AT:
+        if self.peek() == TokenKind.TK_AT:
             let saved = self.pos
             self.advance()
-            if self.peek() == TK_L_BRACKET:
+            if self.peek() == TokenKind.TK_L_BRACKET:
                 self.advance()
                 if self.is_ident_named("align"):
                     self.advance()
-                    if self.peek() == TK_L_PAREN:
+                    if self.peek() == TokenKind.TK_L_PAREN:
                         self.advance()
-                        if self.peek() == TK_INT_LIT:
+                        if self.peek() == TokenKind.TK_INT_LIT:
                             let atext = self.source.slice(self.current_start() as i64, self.current_end() as i64)
                             field_align = parse_i64(atext) as i32
                             self.advance()
-                            if self.peek() == TK_R_PAREN:
+                            if self.peek() == TokenKind.TK_R_PAREN:
                                 self.advance()
-                    if self.peek() == TK_R_BRACKET:
+                    if self.peek() == TokenKind.TK_R_BRACKET:
                         self.advance()
                         self.skip_newlines()
                 else:
@@ -888,13 +888,13 @@ fn Parser.parse_struct_body(self: Parser) -> i32:
         let field_name = self.expect_ident()
         if field_name == 0:
             break
-        if self.expect(TK_COLON) == 0:
+        if self.expect(TokenKind.TK_COLON) == 0:
             break
         let field_type = self.parse_type_expr()
 
         // Optional default value
         var field_default = 0
-        if self.peek() == TK_EQ:
+        if self.peek() == TokenKind.TK_EQ:
             self.advance()
             self.skip_newlines()
             field_default = self.parse_expr()
@@ -906,11 +906,11 @@ fn Parser.parse_struct_body(self: Parser) -> i32:
         field_count = field_count + 1
 
         self.skip_newlines()
-        if self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
 
-    self.expect(TK_R_BRACE)
+    self.expect(TokenKind.TK_R_BRACE)
     let extra_start = self.pool.extra_len()
     self.pool.add_extra(field_count)
     for fi in 0..fields.len() as i32:
@@ -926,7 +926,7 @@ fn Parser.parse_struct_body_block(self: Parser) -> i32:
     var field_count = 0
     var field_col = -1
 
-    while self.peek() != TK_EOF:
+    while self.peek() != TokenKind.TK_EOF:
         let cur_col = column_of(self.source, self.current_start())
         if field_col < 0:
             field_col = cur_col
@@ -934,36 +934,36 @@ fn Parser.parse_struct_body_block(self: Parser) -> i32:
             break
 
         var field_align = 0
-        if self.peek() == TK_AT:
+        if self.peek() == TokenKind.TK_AT:
             let saved = self.pos
             self.advance()
-            if self.peek() == TK_L_BRACKET:
+            if self.peek() == TokenKind.TK_L_BRACKET:
                 self.advance()
                 if self.is_ident_named("align"):
                     self.advance()
-                    if self.peek() == TK_L_PAREN:
+                    if self.peek() == TokenKind.TK_L_PAREN:
                         self.advance()
-                        if self.peek() == TK_INT_LIT:
+                        if self.peek() == TokenKind.TK_INT_LIT:
                             let atext = self.source.slice(self.current_start() as i64, self.current_end() as i64)
                             field_align = parse_i64(atext) as i32
                             self.advance()
-                            if self.peek() == TK_R_PAREN:
+                            if self.peek() == TokenKind.TK_R_PAREN:
                                 self.advance()
-                    if self.peek() == TK_R_BRACKET:
+                    if self.peek() == TokenKind.TK_R_BRACKET:
                         self.advance()
                         self.skip_newlines()
                 else:
                     self.pos = saved
             else:
                 self.pos = saved
-        if self.peek() != TK_IDENT:
+        if self.peek() != TokenKind.TK_IDENT:
             break
         let field_name = self.expect_ident()
-        if self.expect(TK_COLON) == 0:
+        if self.expect(TokenKind.TK_COLON) == 0:
             break
         let field_type = self.parse_type_expr()
         var field_default = 0
-        if self.peek() == TK_EQ:
+        if self.peek() == TokenKind.TK_EQ:
             self.advance()
             self.skip_newlines()
             field_default = self.parse_expr()
@@ -975,10 +975,10 @@ fn Parser.parse_struct_body_block(self: Parser) -> i32:
         field_count = field_count + 1
 
         self.skip_newlines()
-        if self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-        if self.peek() == TK_EOF:
+        if self.peek() == TokenKind.TK_EOF:
             break
         let next_col = column_of(self.source, self.current_start())
         if next_col != field_col:
@@ -996,20 +996,20 @@ fn Parser.is_enum_def(self: Parser) -> bool:
     let saved = self.pos
     self.advance()  // skip identifier
     self.skip_newlines()
-    if self.peek() == TK_PIPE:
+    if self.peek() == TokenKind.TK_PIPE:
         self.pos = saved
         return true
-    if self.peek() == TK_L_PAREN:
+    if self.peek() == TokenKind.TK_L_PAREN:
         self.advance()
         var depth = 1
-        while depth > 0 and self.peek() != TK_EOF:
-            if self.peek() == TK_L_PAREN:
+        while depth > 0 and self.peek() != TokenKind.TK_EOF:
+            if self.peek() == TokenKind.TK_L_PAREN:
                 depth = depth + 1
-            if self.peek() == TK_R_PAREN:
+            if self.peek() == TokenKind.TK_R_PAREN:
                 depth = depth - 1
             self.advance()
         self.skip_newlines()
-        if self.peek() == TK_PIPE:
+        if self.peek() == TokenKind.TK_PIPE:
             self.pos = saved
             return true
     self.pos = saved
@@ -1019,21 +1019,21 @@ fn Parser.parse_enum_variants(self: Parser) -> i32:
     var variants: Vec[i32] = Vec.new()
     var variant_count = 0
 
-    if self.peek() == TK_PIPE:
+    if self.peek() == TokenKind.TK_PIPE:
         self.advance()
         self.skip_newlines()
 
-    while self.peek() == TK_IDENT:
+    while self.peek() == TokenKind.TK_IDENT:
         let vname = self.expect_ident()
         var payloads: Vec[i32] = Vec.new()
 
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
-            while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+            while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                 // Support named payload fields: Variant(name: Type, ...)
-                if self.peek() == TK_IDENT and
+                if self.peek() == TokenKind.TK_IDENT and
                    self.pos + 1 < self.tokens.len() and
-                   self.tokens.get_tag(self.pos + 1) == TK_COLON:
+                   self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON:
                     self.advance()
                     self.advance()
                     self.skip_newlines()
@@ -1041,14 +1041,14 @@ fn Parser.parse_enum_variants(self: Parser) -> i32:
                 let before_payload = self.pos
                 let pty = self.parse_type_expr()
                 payloads.push(pty)
-                if self.peek() == TK_COMMA:
+                if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
-                else if self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+                else if self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     self.emit_error("expected ',' or ')' in enum payload")
                     if self.pos == before_payload:
                         self.advance()
-            self.expect(TK_R_PAREN)
+            self.expect(TokenKind.TK_R_PAREN)
 
         variants.push(vname)
         variants.push(payloads.len() as i32)
@@ -1057,11 +1057,11 @@ fn Parser.parse_enum_variants(self: Parser) -> i32:
         variant_count = variant_count + 1
 
         self.skip_newlines()
-        if self.peek() == TK_PIPE:
+        if self.peek() == TokenKind.TK_PIPE:
             self.advance()
             self.skip_newlines()
             continue
-        if self.peek() == TK_IDENT:
+        if self.peek() == TokenKind.TK_IDENT:
             continue
         break
 
@@ -1077,8 +1077,8 @@ fn Parser.parse_enum_variants_braced(self: Parser) -> i32:
     var variants: Vec[i32] = Vec.new()
     var variant_count = 0
 
-    while self.peek() != TK_R_BRACE and self.peek() != TK_EOF:
-        if self.peek() == TK_PIPE or self.peek() == TK_COMMA:
+    while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
+        if self.peek() == TokenKind.TK_PIPE or self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
             continue
@@ -1086,26 +1086,26 @@ fn Parser.parse_enum_variants_braced(self: Parser) -> i32:
         if vname == 0:
             break
         var payloads: Vec[i32] = Vec.new()
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
-            while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
-                if self.peek() == TK_IDENT and
+            while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+                if self.peek() == TokenKind.TK_IDENT and
                    self.pos + 1 < self.tokens.len() and
-                   self.tokens.get_tag(self.pos + 1) == TK_COLON:
+                   self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON:
                     self.advance()
                     self.advance()
                     self.skip_newlines()
                 let before_payload = self.pos
                 let pty = self.parse_type_expr()
                 payloads.push(pty)
-                if self.peek() == TK_COMMA:
+                if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
-                else if self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+                else if self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     self.emit_error("expected ',' or ')' in enum payload")
                     if self.pos == before_payload:
                         self.advance()
-            self.expect(TK_R_PAREN)
+            self.expect(TokenKind.TK_R_PAREN)
         variants.push(vname)
         variants.push(payloads.len() as i32)
         for pi in 0..payloads.len() as i32:
@@ -1113,12 +1113,12 @@ fn Parser.parse_enum_variants_braced(self: Parser) -> i32:
         variant_count = variant_count + 1
 
         self.skip_newlines()
-        if self.peek() == TK_PIPE or self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_PIPE or self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-        else if self.peek() == TK_IDENT:
+        else if self.peek() == TokenKind.TK_IDENT:
             continue
-    self.expect(TK_R_BRACE)
+    self.expect(TokenKind.TK_R_BRACE)
     let extra_start = self.pool.extra_len()
     self.pool.add_extra(variant_count)
     for vi in 0..variants.len() as i32:
@@ -1130,48 +1130,48 @@ fn Parser.parse_enum_variants_block(self: Parser) -> i32:
     var variant_count = 0
     var variant_col = -1
 
-    while self.peek() != TK_EOF:
+    while self.peek() != TokenKind.TK_EOF:
         let cur_col = column_of(self.source, self.current_start())
         if variant_col < 0:
             variant_col = cur_col
         else if cur_col != variant_col:
             break
-        if self.peek() == TK_PIPE:
+        if self.peek() == TokenKind.TK_PIPE:
             self.advance()
         let vname = self.expect_ident()
         if vname == 0:
             break
         var payloads: Vec[i32] = Vec.new()
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
-            while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
-                if self.peek() == TK_IDENT and
+            while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+                if self.peek() == TokenKind.TK_IDENT and
                    self.pos + 1 < self.tokens.len() and
-                   self.tokens.get_tag(self.pos + 1) == TK_COLON:
+                   self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON:
                     self.advance()
                     self.advance()
                     self.skip_newlines()
                 let before_payload = self.pos
                 let pty = self.parse_type_expr()
                 payloads.push(pty)
-                if self.peek() == TK_COMMA:
+                if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
-                else if self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+                else if self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     self.emit_error("expected ',' or ')' in enum payload")
                     if self.pos == before_payload:
                         self.advance()
-            self.expect(TK_R_PAREN)
+            self.expect(TokenKind.TK_R_PAREN)
         variants.push(vname)
         variants.push(payloads.len() as i32)
         for pi in 0..payloads.len() as i32:
             variants.push(payloads.get(pi as i64))
         variant_count = variant_count + 1
         self.skip_newlines()
-        if self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-        if self.peek() == TK_EOF:
+        if self.peek() == TokenKind.TK_EOF:
             break
         let next_col = column_of(self.source, self.current_start())
         if next_col != variant_col:
@@ -1190,43 +1190,43 @@ fn Parser.parse_disc_enum_variants(self: Parser, repr_type_node: i32) -> i32:
     if self.pending_flags != 0:
         current_disc = 1
 
-    if self.peek() == TK_PIPE:
+    if self.peek() == TokenKind.TK_PIPE:
         self.advance()
         self.skip_newlines()
 
-    while self.peek() == TK_IDENT:
+    while self.peek() == TokenKind.TK_IDENT:
         let vname = self.expect_ident()
 
         // Optional payload
         var payloads: Vec[i32] = Vec.new()
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
-            while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
-                if self.peek() == TK_IDENT and
+            while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+                if self.peek() == TokenKind.TK_IDENT and
                    self.pos + 1 < self.tokens.len() and
-                   self.tokens.get_tag(self.pos + 1) == TK_COLON:
+                   self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON:
                     self.advance()
                     self.advance()
                     self.skip_newlines()
                 let pty = self.parse_type_expr()
                 payloads.push(pty)
-                if self.peek() == TK_COMMA:
+                if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
-                else if self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+                else if self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     self.emit_error("expected ',' or ')' in enum payload")
                     self.advance()
-            self.expect(TK_R_PAREN)
+            self.expect(TokenKind.TK_R_PAREN)
 
         // Optional explicit discriminant: = value
-        if self.peek() == TK_EQ:
+        if self.peek() == TokenKind.TK_EQ:
             self.advance()
             self.skip_newlines()
             var negate = 0
-            if self.peek() == TK_MINUS:
+            if self.peek() == TokenKind.TK_MINUS:
                 negate = 1
                 self.advance()
-            if self.peek() == TK_INT_LIT:
+            if self.peek() == TokenKind.TK_INT_LIT:
                 let text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
                 let val = parse_i64(text) as i32
                 if negate != 0:
@@ -1251,11 +1251,11 @@ fn Parser.parse_disc_enum_variants(self: Parser, repr_type_node: i32) -> i32:
             current_disc = current_disc + 1
 
         self.skip_newlines()
-        if self.peek() == TK_PIPE:
+        if self.peek() == TokenKind.TK_PIPE:
             self.advance()
             self.skip_newlines()
             continue
-        if self.peek() == TK_IDENT:
+        if self.peek() == TokenKind.TK_IDENT:
             continue
         break
 
@@ -1275,8 +1275,8 @@ fn Parser.parse_disc_enum_variants_braced(self: Parser, repr_type_node: i32) -> 
     if self.pending_flags != 0:
         current_disc = 1
 
-    while self.peek() != TK_R_BRACE and self.peek() != TK_EOF:
-        if self.peek() == TK_PIPE or self.peek() == TK_COMMA:
+    while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
+        if self.peek() == TokenKind.TK_PIPE or self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
             continue
@@ -1284,32 +1284,32 @@ fn Parser.parse_disc_enum_variants_braced(self: Parser, repr_type_node: i32) -> 
         if vname == 0:
             break
         var payloads: Vec[i32] = Vec.new()
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
-            while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
-                if self.peek() == TK_IDENT and
+            while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+                if self.peek() == TokenKind.TK_IDENT and
                    self.pos + 1 < self.tokens.len() and
-                   self.tokens.get_tag(self.pos + 1) == TK_COLON:
+                   self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON:
                     self.advance()
                     self.advance()
                     self.skip_newlines()
                 let pty = self.parse_type_expr()
                 payloads.push(pty)
-                if self.peek() == TK_COMMA:
+                if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
-                else if self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+                else if self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     self.emit_error("expected ',' or ')' in enum payload")
                     self.advance()
-            self.expect(TK_R_PAREN)
-        if self.peek() == TK_EQ:
+            self.expect(TokenKind.TK_R_PAREN)
+        if self.peek() == TokenKind.TK_EQ:
             self.advance()
             self.skip_newlines()
             var negate = 0
-            if self.peek() == TK_MINUS:
+            if self.peek() == TokenKind.TK_MINUS:
                 negate = 1
                 self.advance()
-            if self.peek() == TK_INT_LIT:
+            if self.peek() == TokenKind.TK_INT_LIT:
                 let text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
                 let val = parse_i64(text) as i32
                 if negate != 0:
@@ -1330,12 +1330,12 @@ fn Parser.parse_disc_enum_variants_braced(self: Parser, repr_type_node: i32) -> 
         else:
             current_disc = current_disc + 1
         self.skip_newlines()
-        if self.peek() == TK_PIPE or self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_PIPE or self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-        else if self.peek() == TK_IDENT:
+        else if self.peek() == TokenKind.TK_IDENT:
             continue
-    self.expect(TK_R_BRACE)
+    self.expect(TokenKind.TK_R_BRACE)
     let extra_start = self.pool.extra_len()
     self.pool.add_extra(repr_type_node)
     self.pool.add_extra(variant_count)
@@ -1351,44 +1351,44 @@ fn Parser.parse_disc_enum_variants_block(self: Parser, repr_type_node: i32) -> i
     if self.pending_flags != 0:
         current_disc = 1
 
-    while self.peek() != TK_EOF:
+    while self.peek() != TokenKind.TK_EOF:
         let cur_col = column_of(self.source, self.current_start())
         if variant_col < 0:
             variant_col = cur_col
         else if cur_col != variant_col:
             break
-        if self.peek() == TK_PIPE:
+        if self.peek() == TokenKind.TK_PIPE:
             self.advance()
         let vname = self.expect_ident()
         if vname == 0:
             break
         var payloads: Vec[i32] = Vec.new()
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
-            while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
-                if self.peek() == TK_IDENT and
+            while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+                if self.peek() == TokenKind.TK_IDENT and
                    self.pos + 1 < self.tokens.len() and
-                   self.tokens.get_tag(self.pos + 1) == TK_COLON:
+                   self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON:
                     self.advance()
                     self.advance()
                     self.skip_newlines()
                 let pty = self.parse_type_expr()
                 payloads.push(pty)
-                if self.peek() == TK_COMMA:
+                if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
-                else if self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+                else if self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     self.emit_error("expected ',' or ')' in enum payload")
                     self.advance()
-            self.expect(TK_R_PAREN)
-        if self.peek() == TK_EQ:
+            self.expect(TokenKind.TK_R_PAREN)
+        if self.peek() == TokenKind.TK_EQ:
             self.advance()
             self.skip_newlines()
             var negate = 0
-            if self.peek() == TK_MINUS:
+            if self.peek() == TokenKind.TK_MINUS:
                 negate = 1
                 self.advance()
-            if self.peek() == TK_INT_LIT:
+            if self.peek() == TokenKind.TK_INT_LIT:
                 let text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
                 let val = parse_i64(text) as i32
                 if negate != 0:
@@ -1409,10 +1409,10 @@ fn Parser.parse_disc_enum_variants_block(self: Parser, repr_type_node: i32) -> i
         else:
             current_disc = current_disc + 1
         self.skip_newlines()
-        if self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-        if self.peek() == TK_EOF:
+        if self.peek() == TokenKind.TK_EOF:
             break
         let next_col = column_of(self.source, self.current_start())
         if next_col != variant_col:
@@ -1427,18 +1427,18 @@ fn Parser.parse_disc_enum_variants_block(self: Parser, repr_type_node: i32) -> i
 // ── use decl ─────────────────────────────────────────────────────
 
 fn Parser.parse_use_decl(self: Parser, start: i32) -> i32:
-    if self.expect(TK_KW_USE) == 0:
+    if self.expect(TokenKind.TK_KW_USE) == 0:
         return 0
 
     // use c_import("header.h")
-    if self.peek() == TK_KW_C_IMPORT:
+    if self.peek() == TokenKind.TK_KW_C_IMPORT:
         return self.parse_c_import(start)
 
     let extra_start = self.pool.extra_len()
     var path_count = 0
 
     let first = self.peek()
-    if first == TK_IDENT or parser_is_keyword_tag(first):
+    if first == TokenKind.TK_IDENT or parser_is_keyword_tag(first):
         let sym = self.expect_use_path_segment()
         if sym == 0:
             return 0
@@ -1446,28 +1446,28 @@ fn Parser.parse_use_decl(self: Parser, start: i32) -> i32:
         path_count = path_count + 1
 
     while true:
-        if self.peek() == TK_DOT:
+        if self.peek() == TokenKind.TK_DOT:
             self.advance()
             let next = self.peek()
-            if next == TK_IDENT or parser_is_keyword_tag(next):
+            if next == TokenKind.TK_IDENT or parser_is_keyword_tag(next):
                 let sym = self.expect_use_path_segment()
                 if sym == 0:
                     return 0
                 self.pool.add_extra(sym)
                 path_count = path_count + 1
-            else if self.peek() == TK_STAR:
+            else if self.peek() == TokenKind.TK_STAR:
                 self.advance()
                 break
-            else if self.peek() == TK_L_BRACE:
+            else if self.peek() == TokenKind.TK_L_BRACE:
                 self.advance()
-                while self.peek() != TK_R_BRACE and self.peek() != TK_EOF and self.peek() != TK_NEWLINE:
+                while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF and self.peek() != TokenKind.TK_NEWLINE:
                     self.advance()
-                if self.peek() == TK_R_BRACE:
+                if self.peek() == TokenKind.TK_R_BRACE:
                     self.advance()
                 break
             else:
                 break
-        else if self.peek() == TK_DOT_IDENT:
+        else if self.peek() == TokenKind.TK_DOT_IDENT:
             let span_s = self.current_start()
             let span_e = self.current_end()
             let text = self.source.slice((span_s + 1) as i64, span_e as i64)
@@ -1483,13 +1483,13 @@ fn Parser.parse_use_decl(self: Parser, start: i32) -> i32:
         return 0
 
     // Skip any trailing paren groups
-    if self.peek() == TK_L_PAREN:
+    if self.peek() == TokenKind.TK_L_PAREN:
         var depth = 1
         self.advance()
-        while depth > 0 and self.peek() != TK_EOF:
-            if self.peek() == TK_L_PAREN:
+        while depth > 0 and self.peek() != TokenKind.TK_EOF:
+            if self.peek() == TokenKind.TK_L_PAREN:
                 depth = depth + 1
-            if self.peek() == TK_R_PAREN:
+            if self.peek() == TokenKind.TK_R_PAREN:
                 depth = depth - 1
             self.advance()
 
@@ -1497,9 +1497,9 @@ fn Parser.parse_use_decl(self: Parser, start: i32) -> i32:
 
 fn Parser.parse_c_import(self: Parser, start: i32) -> i32:
     self.advance()  // consume c_import
-    if self.expect(TK_L_PAREN) == 0:
+    if self.expect(TokenKind.TK_L_PAREN) == 0:
         return 0
-    if self.peek() != TK_STRING_LIT:
+    if self.peek() != TokenKind.TK_STRING_LIT:
         self.emit_error("expected string literal after c_import(")
         return 0
     let str_s = self.current_start()
@@ -1511,15 +1511,15 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> i32:
     let extra_start = self.pool.extra_len()
     var link_count = 0
 
-    if self.peek() == TK_COMMA:
+    if self.peek() == TokenKind.TK_COMMA:
         self.advance()
         self.skip_newlines()
-        if self.peek() == TK_IDENT:
+        if self.peek() == TokenKind.TK_IDENT:
             self.advance()  // skip 'link'
-        if self.expect(TK_COLON) == 0:
+        if self.expect(TokenKind.TK_COLON) == 0:
             return 0
         self.skip_newlines()
-        while self.peek() == TK_STRING_LIT:
+        while self.peek() == TokenKind.TK_STRING_LIT:
             let ls = self.current_start()
             let le = self.current_end()
             let lib = self.source.slice((ls + 1) as i64, (le - 1) as i64)
@@ -1528,25 +1528,25 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> i32:
             link_count = link_count + 1
             self.advance()
             self.skip_newlines()
-            if self.peek() == TK_COMMA:
+            if self.peek() == TokenKind.TK_COMMA:
                 let cp = self.pos
                 self.advance()
                 self.skip_newlines()
-                if self.peek() == TK_STRING_LIT:
+                if self.peek() == TokenKind.TK_STRING_LIT:
                     continue
                 self.pos = cp
             break
 
-    self.expect(TK_R_PAREN)
+    self.expect(TokenKind.TK_R_PAREN)
     self.pool.add_node(NodeKind.NK_C_IMPORT, start, self.prev_end(), header_sym, extra_start, link_count)
 
 // ── let decl ─────────────────────────────────────────────────────
 
 fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> i32:
-    let is_var = self.peek() == TK_KW_VAR
+    let is_var = self.peek() == TokenKind.TK_KW_VAR
     self.advance()
     var is_mut = is_var
-    if not is_var and self.peek() == TK_KW_MUT:
+    if not is_var and self.peek() == TokenKind.TK_KW_MUT:
         is_mut = true
         self.advance()
     let name = self.expect_ident()
@@ -1554,11 +1554,11 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> i32:
         return 0
 
     var type_ann = 0
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
         type_ann = self.parse_type_expr()
 
-    if self.expect(TK_EQ) == 0:
+    if self.expect(TokenKind.TK_EQ) == 0:
         return 0
     self.skip_newlines()
     let value = self.parse_expr()
@@ -1584,13 +1584,13 @@ fn Parser.parse_const_decl(self: Parser, is_pub: i32, start: i32) -> i32:
     if name == 0:
         return 0
 
-    if self.peek() != TK_COLON:
+    if self.peek() != TokenKind.TK_COLON:
         self.emit_error("const declaration requires a type annotation")
         return 0
     self.advance()
     let type_ann = self.parse_type_expr()
 
-    if self.expect(TK_EQ) == 0:
+    if self.expect(TokenKind.TK_EQ) == 0:
         return 0
     self.skip_newlines()
     let raw_value = self.parse_expr()
@@ -1630,7 +1630,7 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> i32:
             self.pool.add_extra(src_sym)
             self.pool.add_extra(0)  // payload count = 0
             variant_count = variant_count + 1
-            if self.peek() != TK_COMMA:
+            if self.peek() != TokenKind.TK_COMMA:
                 break
             self.advance()
             self.skip_newlines()
@@ -1641,7 +1641,7 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         return self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TDK_ENUM, 0))
 
     // error Name = Variant1, Variant2(payload), ...
-    if self.expect(TK_EQ) == 0:
+    if self.expect(TokenKind.TK_EQ) == 0:
         return 0
     self.skip_newlines()
 
@@ -1655,9 +1655,9 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> i32:
 
 fn Parser.parse_trait_decl(self: Parser, vis: i32):
     let start = self.current_start()
-    if self.peek() == TK_KW_PUB:
+    if self.peek() == TokenKind.TK_KW_PUB:
         self.advance()
-    if self.expect(TK_KW_TRAIT) == 0:
+    if self.expect(TokenKind.TK_KW_TRAIT) == 0:
         return
     let name = self.expect_ident()
     if name == 0:
@@ -1665,7 +1665,7 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
     // Parse optional type parameters: trait Iter[T] = ...
     let trait_tp_start = self.pool.extra_len()
     let trait_tp_count = self.parse_type_params()
-    if self.peek() == TK_EQ or self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
         self.advance()
     else:
         self.emit_error("expected '=' or ':'")
@@ -1685,30 +1685,30 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
     var assoc_default_types: Vec[i32] = Vec.new()
     var assoc_bounds_flat: Vec[i32] = Vec.new()
 
-    while self.peek() == TK_KW_FN or self.peek() == TK_KW_PUB or self.peek() == TK_KW_TYPE or self.peek() == TK_KW_ASYNC:
+    while self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_TYPE or self.peek() == TokenKind.TK_KW_ASYNC:
         let fn_col = column_of(self.source, self.current_start())
         if fn_col == 0:
             break
 
-        if self.peek() == TK_KW_TYPE:
+        if self.peek() == TokenKind.TK_KW_TYPE:
             self.advance()
             let at_name = self.expect_ident()
             let bound_start = assoc_bounds_flat.len() as i32
             var bound_count = 0
-            if self.peek() == TK_COLON:
+            if self.peek() == TokenKind.TK_COLON:
                 self.advance()
                 let b = self.parse_type_bound_symbol()
                 if b != 0:
                     assoc_bounds_flat.push(b)
                     bound_count = bound_count + 1
-                while self.peek() == TK_PLUS:
+                while self.peek() == TokenKind.TK_PLUS:
                     self.advance()
                     let b2 = self.parse_type_bound_symbol()
                     if b2 != 0:
                         assoc_bounds_flat.push(b2)
                         bound_count = bound_count + 1
             var default_ty = 0
-            if self.peek() == TK_EQ:
+            if self.peek() == TokenKind.TK_EQ:
                 self.advance()
                 default_ty = self.parse_type_expr()
             assoc_names.push(at_name)
@@ -1719,36 +1719,36 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
             continue
 
         var is_pub_method = 0
-        if self.peek() == TK_KW_PUB:
+        if self.peek() == TokenKind.TK_KW_PUB:
             is_pub_method = 1
             self.advance()
         var is_async_method = 0
-        if self.peek() == TK_KW_ASYNC:
+        if self.peek() == TokenKind.TK_KW_ASYNC:
             is_async_method = 1
             self.advance()
-        if self.expect(TK_KW_FN) == 0:
+        if self.expect(TokenKind.TK_KW_FN) == 0:
             break
         let mname = self.expect_ident_or_keyword()
         let m_tp_count = self.parse_type_params()
 
         var params_start = 0
         var param_count = 0
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
             param_count = self.parse_param_list()
             if param_count > 0:
                 params_start = self.pool.extra_len() - param_count * FN_PARAM_STRIDE
-            self.expect(TK_R_PAREN)
+            self.expect(TokenKind.TK_R_PAREN)
 
         var ret_type = 0
-        if self.peek() == TK_ARROW:
+        if self.peek() == TokenKind.TK_ARROW:
             self.advance()
             ret_type = self.parse_type_expr()
 
         self.parse_optional_where_clause()
 
         var method_body = 0
-        if self.peek() == TK_EQ or self.peek() == TK_COLON:
+        if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
             self.advance()
             method_body = self.parse_block_or_expr()
 
@@ -1803,24 +1803,24 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
 // e.g., for `impl Trait for Vec[i32]`, parses `[i32]` after "Vec".
 // Returns NodeKind.NK_TYPE_GENERIC node if args present, 0 otherwise.
 fn Parser.parse_optional_impl_target_args(self: Parser, type_name: i32) -> i32:
-    if self.peek() != TK_L_BRACKET:
+    if self.peek() != TokenKind.TK_L_BRACKET:
         return 0
     let start = self.current_start()
     self.advance()
     self.skip_newlines()
     var args: Vec[i32] = Vec.new()
-    while self.peek() != TK_R_BRACKET and self.peek() != TK_EOF:
+    while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
         let ty = self.parse_type_expr()
         args.push(ty)
         self.skip_newlines()
-        if self.peek() != TK_COMMA:
+        if self.peek() != TokenKind.TK_COMMA:
             break
         self.advance()
         self.skip_newlines()
-        if self.peek() == TK_R_BRACKET:
+        if self.peek() == TokenKind.TK_R_BRACKET:
             break
     self.skip_newlines()
-    self.expect(TK_R_BRACKET)
+    self.expect(TokenKind.TK_R_BRACKET)
     let extra_start = self.pool.extra_len()
     for ai in 0..args.len() as i32:
         self.pool.add_extra(args.get(ai as i64))
@@ -1828,11 +1828,11 @@ fn Parser.parse_optional_impl_target_args(self: Parser, type_name: i32) -> i32:
 
 fn Parser.parse_impl_block(self: Parser, vis: i32):
     let start = self.current_start()
-    if self.peek() == TK_KW_PUB:
+    if self.peek() == TokenKind.TK_KW_PUB:
         self.advance()
-    if self.peek() == TK_KW_IMPL:
+    if self.peek() == TokenKind.TK_KW_IMPL:
         self.advance()
-    else if self.peek() == TK_KW_EXTEND:
+    else if self.peek() == TokenKind.TK_KW_EXTEND:
         self.advance()
     else:
         return
@@ -1840,7 +1840,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     // Check for impl-level type parameters: impl[T: Bound] Trait for T
     var impl_tp_start = 0
     var impl_tp_count = 0
-    if self.peek() == TK_L_BRACKET:
+    if self.peek() == TokenKind.TK_L_BRACKET:
         impl_tp_start = self.pool.extra_len()
         impl_tp_count = self.parse_type_params()
 
@@ -1853,23 +1853,23 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     var target_type_node = 0
     var trait_arg_extra_start = 0
     var trait_arg_count = 0
-    if self.peek() == TK_L_BRACKET:
+    if self.peek() == TokenKind.TK_L_BRACKET:
         self.advance()
         self.skip_newlines()
         trait_arg_extra_start = self.pool.extra_len()
-        while self.peek() != TK_R_BRACKET and self.peek() != TK_EOF:
+        while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
             let arg = self.parse_type_expr()
             self.pool.add_extra(arg)
             trait_arg_count = trait_arg_count + 1
             self.skip_newlines()
-            if self.peek() == TK_COMMA:
+            if self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
-                if self.peek() == TK_R_BRACKET:
+                if self.peek() == TokenKind.TK_R_BRACKET:
                     break
         self.skip_newlines()
-        self.expect(TK_R_BRACKET)
-        if self.peek() != TK_KW_FOR:
+        self.expect(TokenKind.TK_R_BRACKET)
+        if self.peek() != TokenKind.TK_KW_FOR:
             self.emit_error("expected 'for' after trait generic arguments in impl")
             return
         self.advance()
@@ -1878,7 +1878,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
         if type_name == 0:
             return
         target_type_node = self.parse_optional_impl_target_args(type_name)
-    else if self.peek() == TK_KW_FOR:
+    else if self.peek() == TokenKind.TK_KW_FOR:
         self.advance()
         trait_name = first_name
         type_name = self.expect_ident()
@@ -1887,7 +1887,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
         target_type_node = self.parse_optional_impl_target_args(type_name)
 
     // Defensive fallback: if `for` was not consumed above, consume it now.
-    if trait_name == 0 and (self.peek() == TK_KW_FOR or self.is_ident_named("for")):
+    if trait_name == 0 and (self.peek() == TokenKind.TK_KW_FOR or self.is_ident_named("for")):
         self.advance()
         trait_name = first_name
         type_name = self.expect_ident()
@@ -1897,7 +1897,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
 
     self.parse_optional_where_clause()
 
-    if self.peek() == TK_EQ or self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
         self.advance()
     self.skip_newlines()
 
@@ -1906,16 +1906,16 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     let extra_start = self.pool.extra_len()
     var method_count = 0
 
-    while self.peek() == TK_KW_FN or self.peek() == TK_KW_PUB or self.peek() == TK_KW_ASYNC or self.peek() == TK_KW_TYPE:
+    while self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_TYPE:
         let fn_col = column_of(self.source, self.current_start())
         if fn_col == 0:
             break
 
         // Associated type binding: type Name = ConcreteType
-        if self.peek() == TK_KW_TYPE:
+        if self.peek() == TokenKind.TK_KW_TYPE:
             self.advance()
             let at_name = self.expect_ident()
-            if self.expect(TK_EQ) == 0:
+            if self.expect(TokenKind.TK_EQ) == 0:
                 break
             let at_type = self.parse_type_expr()
             impl_assoc_names.push(at_name)
@@ -1925,14 +1925,14 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
 
         var method_vis = vis
         let method_start = self.current_start()
-        if self.peek() == TK_KW_PUB:
+        if self.peek() == TokenKind.TK_KW_PUB:
             method_vis = Visibility.VIS_PUBLIC
             self.advance()
         var m_async = 0
-        if self.peek() == TK_KW_ASYNC:
+        if self.peek() == TokenKind.TK_KW_ASYNC:
             m_async = 1
             self.advance()
-        if self.expect(TK_KW_FN) == 0:
+        if self.expect(TokenKind.TK_KW_FN) == 0:
             break
         let method_name_sym = self.expect_ident_or_keyword()
         if method_name_sym == 0:
@@ -1949,22 +1949,22 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
         var m_params_start = 0
         var param_count = 0
         var required_param_count = 0
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
             param_count = self.parse_param_list()
             required_param_count = self.last_param_required_count
             if param_count > 0:
                 m_params_start = self.pool.extra_len() - param_count * FN_PARAM_STRIDE
-            self.expect(TK_R_PAREN)
+            self.expect(TokenKind.TK_R_PAREN)
 
         var ret_type = 0
-        if self.peek() == TK_ARROW:
+        if self.peek() == TokenKind.TK_ARROW:
             self.advance()
             ret_type = self.parse_type_expr()
 
         self.parse_optional_where_clause()
 
-        if self.peek() == TK_EQ or self.peek() == TK_COLON:
+        if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
             self.advance()
         else:
             self.emit_error("expected '=' or ':'")
@@ -2015,7 +2015,7 @@ fn Parser.parse_expr(self: Parser) -> i32:
         return 0
 
     // Assignment: lhs = rhs
-    if self.peek() == TK_EQ:
+    if self.peek() == TokenKind.TK_EQ:
         self.advance()
         self.skip_newlines()
         let rhs = self.parse_expr()
@@ -2034,19 +2034,19 @@ fn Parser.parse_expr(self: Parser) -> i32:
 
 fn Parser.compound_assign_op(self: Parser) -> i32:
     let t = self.peek()
-    if t == TK_PLUS_EQ: return BinaryOp.OP_ADD
-    if t == TK_MINUS_EQ: return BinaryOp.OP_SUB
-    if t == TK_STAR_EQ: return BinaryOp.OP_MUL
-    if t == TK_SLASH_EQ: return BinaryOp.OP_DIV
-    if t == TK_PERCENT_EQ: return BinaryOp.OP_MOD
-    if t == TK_AMP_EQ: return BinaryOp.OP_BIT_AND
-    if t == TK_PIPE_EQ: return BinaryOp.OP_BIT_OR
-    if t == TK_CARET_EQ: return BinaryOp.OP_BIT_XOR
-    if t == TK_LT_LT_EQ: return BinaryOp.OP_SHL
-    if t == TK_GT_GT_EQ: return BinaryOp.OP_SHR
-    if t == TK_PLUS_WRAP_EQ: return BinaryOp.OP_ADD_WRAP
-    if t == TK_MINUS_WRAP_EQ: return BinaryOp.OP_SUB_WRAP
-    if t == TK_STAR_WRAP_EQ: return BinaryOp.OP_MUL_WRAP
+    if t == TokenKind.TK_PLUS_EQ: return BinaryOp.OP_ADD
+    if t == TokenKind.TK_MINUS_EQ: return BinaryOp.OP_SUB
+    if t == TokenKind.TK_STAR_EQ: return BinaryOp.OP_MUL
+    if t == TokenKind.TK_SLASH_EQ: return BinaryOp.OP_DIV
+    if t == TokenKind.TK_PERCENT_EQ: return BinaryOp.OP_MOD
+    if t == TokenKind.TK_AMP_EQ: return BinaryOp.OP_BIT_AND
+    if t == TokenKind.TK_PIPE_EQ: return BinaryOp.OP_BIT_OR
+    if t == TokenKind.TK_CARET_EQ: return BinaryOp.OP_BIT_XOR
+    if t == TokenKind.TK_LT_LT_EQ: return BinaryOp.OP_SHL
+    if t == TokenKind.TK_GT_GT_EQ: return BinaryOp.OP_SHR
+    if t == TokenKind.TK_PLUS_WRAP_EQ: return BinaryOp.OP_ADD_WRAP
+    if t == TokenKind.TK_MINUS_WRAP_EQ: return BinaryOp.OP_SUB_WRAP
+    if t == TokenKind.TK_STAR_WRAP_EQ: return BinaryOp.OP_MUL_WRAP
     -1
 
 // ── Pratt precedence climbing ────────────────────────────────────
@@ -2058,9 +2058,9 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> i32:
     lhs = self.parse_postfix(lhs)
 
     while true:
-        if self.peek() == TK_NEWLINE:
+        if self.peek() == TokenKind.TK_NEWLINE:
             let next = self.peek_past_newlines()
-            if next == TK_PIPE_GT or next == TK_LT_PIPE or next == TK_QUESTION_QUESTION:
+            if next == TokenKind.TK_PIPE_GT or next == TokenKind.TK_LT_PIPE or next == TokenKind.TK_QUESTION_QUESTION:
                 self.skip_newlines()
 
         let info = self.infix_op()
@@ -2078,7 +2078,7 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> i32:
         self.skip_newlines()
 
         // Pipeline into match
-        if op_code == 500 and self.peek() == TK_KW_MATCH:
+        if op_code == 500 and self.peek() == TokenKind.TK_KW_MATCH:
             self.advance()
             self.skip_newlines()
             let arm_count = self.parse_match_arms()
@@ -2109,64 +2109,64 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> i32:
 // Returns encoded info: prec * 1000 + op_code, or 0 if not infix
 fn Parser.infix_op(self: Parser) -> i32:
     let t = self.peek()
-    if t == TK_KW_OR: return 1 * 1000 + BinaryOp.OP_OR
-    if t == TK_KW_AND: return 2 * 1000 + BinaryOp.OP_AND
-    if t == TK_EQ_EQ: return 3 * 1000 + BinaryOp.OP_EQ
-    if t == TK_BANG_EQ: return 3 * 1000 + BinaryOp.OP_NEQ
-    if t == TK_KW_IN: return 3 * 1000 + BinaryOp.OP_IN
-    if t == TK_KW_NOT:
-        if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TK_KW_IN:
+    if t == TokenKind.TK_KW_OR: return 1 * 1000 + BinaryOp.OP_OR
+    if t == TokenKind.TK_KW_AND: return 2 * 1000 + BinaryOp.OP_AND
+    if t == TokenKind.TK_EQ_EQ: return 3 * 1000 + BinaryOp.OP_EQ
+    if t == TokenKind.TK_BANG_EQ: return 3 * 1000 + BinaryOp.OP_NEQ
+    if t == TokenKind.TK_KW_IN: return 3 * 1000 + BinaryOp.OP_IN
+    if t == TokenKind.TK_KW_NOT:
+        if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_KW_IN:
             return 3 * 1000 + BinaryOp.OP_NOT_IN
         return 0
-    if t == TK_LT: return 4 * 1000 + BinaryOp.OP_LT
-    if t == TK_GT: return 4 * 1000 + BinaryOp.OP_GT
-    if t == TK_LT_EQ: return 4 * 1000 + BinaryOp.OP_LTE
-    if t == TK_GT_EQ: return 4 * 1000 + BinaryOp.OP_GTE
-    if t == TK_DOT_DOT: return 5 * 1000 + 502
-    if t == TK_DOT_DOT_EQ: return 5 * 1000 + 503
-    if t == TK_PIPE_GT: return 6 * 1000 + 500
-    if t == TK_LT_PIPE: return 6 * 1000 + 501
-    if t == TK_LT_LT: return 10 * 1000 + BinaryOp.OP_SHL
-    if t == TK_GT_GT: return 10 * 1000 + BinaryOp.OP_SHR
-    if t == TK_AMPERSAND: return 7 * 1000 + BinaryOp.OP_BIT_AND
-    if t == TK_CARET: return 8 * 1000 + BinaryOp.OP_BIT_XOR
-    if t == TK_PIPE: return 9 * 1000 + BinaryOp.OP_BIT_OR
-    if t == TK_QUESTION_QUESTION: return 10 * 1000 + BinaryOp.OP_DEFAULT
-    if t == TK_PLUS: return 11 * 1000 + BinaryOp.OP_ADD
-    if t == TK_PLUS_PLUS: return 11 * 1000 + BinaryOp.OP_CONCAT
-    if t == TK_MINUS: return 11 * 1000 + BinaryOp.OP_SUB
-    if t == TK_PLUS_WRAP: return 11 * 1000 + BinaryOp.OP_ADD_WRAP
-    if t == TK_MINUS_WRAP: return 11 * 1000 + BinaryOp.OP_SUB_WRAP
-    if t == TK_STAR: return 12 * 1000 + BinaryOp.OP_MUL
-    if t == TK_SLASH: return 12 * 1000 + BinaryOp.OP_DIV
-    if t == TK_PERCENT: return 12 * 1000 + BinaryOp.OP_MOD
-    if t == TK_STAR_WRAP: return 12 * 1000 + BinaryOp.OP_MUL_WRAP
+    if t == TokenKind.TK_LT: return 4 * 1000 + BinaryOp.OP_LT
+    if t == TokenKind.TK_GT: return 4 * 1000 + BinaryOp.OP_GT
+    if t == TokenKind.TK_LT_EQ: return 4 * 1000 + BinaryOp.OP_LTE
+    if t == TokenKind.TK_GT_EQ: return 4 * 1000 + BinaryOp.OP_GTE
+    if t == TokenKind.TK_DOT_DOT: return 5 * 1000 + 502
+    if t == TokenKind.TK_DOT_DOT_EQ: return 5 * 1000 + 503
+    if t == TokenKind.TK_PIPE_GT: return 6 * 1000 + 500
+    if t == TokenKind.TK_LT_PIPE: return 6 * 1000 + 501
+    if t == TokenKind.TK_LT_LT: return 10 * 1000 + BinaryOp.OP_SHL
+    if t == TokenKind.TK_GT_GT: return 10 * 1000 + BinaryOp.OP_SHR
+    if t == TokenKind.TK_AMPERSAND: return 7 * 1000 + BinaryOp.OP_BIT_AND
+    if t == TokenKind.TK_CARET: return 8 * 1000 + BinaryOp.OP_BIT_XOR
+    if t == TokenKind.TK_PIPE: return 9 * 1000 + BinaryOp.OP_BIT_OR
+    if t == TokenKind.TK_QUESTION_QUESTION: return 10 * 1000 + BinaryOp.OP_DEFAULT
+    if t == TokenKind.TK_PLUS: return 11 * 1000 + BinaryOp.OP_ADD
+    if t == TokenKind.TK_PLUS_PLUS: return 11 * 1000 + BinaryOp.OP_CONCAT
+    if t == TokenKind.TK_MINUS: return 11 * 1000 + BinaryOp.OP_SUB
+    if t == TokenKind.TK_PLUS_WRAP: return 11 * 1000 + BinaryOp.OP_ADD_WRAP
+    if t == TokenKind.TK_MINUS_WRAP: return 11 * 1000 + BinaryOp.OP_SUB_WRAP
+    if t == TokenKind.TK_STAR: return 12 * 1000 + BinaryOp.OP_MUL
+    if t == TokenKind.TK_SLASH: return 12 * 1000 + BinaryOp.OP_DIV
+    if t == TokenKind.TK_PERCENT: return 12 * 1000 + BinaryOp.OP_MOD
+    if t == TokenKind.TK_STAR_WRAP: return 12 * 1000 + BinaryOp.OP_MUL_WRAP
     0
 
 // ── Primary expression ──────────────────────────────────────────
 
 fn Parser.parse_primary(self: Parser) -> i32:
     let t = self.peek()
-    if t == TK_INT_LIT: return self.parse_int_literal()
-    if t == TK_FLOAT_LIT: return self.parse_float_literal()
-    if t == TK_STRING_LIT: return self.parse_string_literal()
-    if t == TK_C_STRING_LIT: return self.parse_c_string_literal()
-    if t == TK_CHAR_LIT: return self.parse_char_literal()
-    if t == TK_TRUE or t == TK_FALSE: return self.parse_bool_literal()
-    if t == TK_KW_NULL:
+    if t == TokenKind.TK_INT_LIT: return self.parse_int_literal()
+    if t == TokenKind.TK_FLOAT_LIT: return self.parse_float_literal()
+    if t == TokenKind.TK_STRING_LIT: return self.parse_string_literal()
+    if t == TokenKind.TK_C_STRING_LIT: return self.parse_c_string_literal()
+    if t == TokenKind.TK_CHAR_LIT: return self.parse_char_literal()
+    if t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE: return self.parse_bool_literal()
+    if t == TokenKind.TK_KW_NULL:
         let ns = self.current_start()
         let ne = self.current_end()
         self.advance()
         return self.pool.add_node(NodeKind.NK_NULL_LIT, ns, ne, 0, 0, 0)
-    if t == TK_IDENT:
+    if t == TokenKind.TK_IDENT:
         // comptime_error("msg") → NodeKind.NK_COMPTIME_ERROR
         if self.is_ident_named("comptime_error"):
             return self.parse_comptime_error_expr()
         if self.pos + 1 < self.tokens.len():
-            if self.tokens.get_tag(self.pos + 1) == TK_FAT_ARROW:
+            if self.tokens.get_tag(self.pos + 1) == TokenKind.TK_FAT_ARROW:
                 return self.parse_fat_arrow_single()
         return self.parse_ident_or_call()
-    if t == TK_KW_IT:
+    if t == TokenKind.TK_KW_IT:
         let start = self.current_start()
         let end_pos = self.current_end()
         self.advance()
@@ -2178,58 +2178,58 @@ fn Parser.parse_primary(self: Parser) -> i32:
         let sym = self.intern.intern("__it")
         let node = self.pool.add_node(NodeKind.NK_IDENT, start, end_pos, sym, 0, 0)
         return self.parse_postfix(node)
-    if t == TK_DOT_IDENT: return self.parse_variant_shorthand()
-    if t == TK_L_PAREN: return self.parse_grouped_or_tuple()
-    if t == TK_MINUS: return self.parse_unary_negate()
-    if t == TK_TILDE: return self.parse_unary_bit_not()
-    if t == TK_KW_NOT: return self.parse_unary_not()
-    if t == TK_AMPERSAND: return self.parse_ref_of()
-    if t == TK_STAR: return self.parse_deref_expr()
-    if t == TK_KW_IF: return self.parse_if_expr()
-    if t == TK_KW_WHILE: return self.parse_while(0)
-    if t == TK_KW_LOOP: return self.parse_loop(0)
-    if t == TK_KW_FOR: return self.parse_for(0)
-    if t == TK_KW_RETURN: return self.parse_return()
-    if t == TK_KW_BREAK: return self.parse_break()
-    if t == TK_KW_CONTINUE: return self.parse_continue()
-    if t == TK_LABEL: return self.parse_labeled_loop()
-    if t == TK_KW_UNSAFE: return self.parse_unsafe()
-    if t == TK_KW_DEFER: return self.parse_defer()
-    if t == TK_KW_ERRDEFER: return self.parse_errdefer()
-    if t == TK_KW_SPAWN: return self.parse_spawn()
-    if t == TK_KW_ASYNC: return self.parse_async_expr()
-    if t == TK_KW_YIELD: return self.parse_yield()
-    if t == TK_KW_COMPTIME: return self.parse_comptime_expr()
-    if t == TK_KW_SELECT: return self.parse_select_await()
-    if t == TK_L_BRACKET:
+    if t == TokenKind.TK_DOT_IDENT: return self.parse_variant_shorthand()
+    if t == TokenKind.TK_L_PAREN: return self.parse_grouped_or_tuple()
+    if t == TokenKind.TK_MINUS: return self.parse_unary_negate()
+    if t == TokenKind.TK_TILDE: return self.parse_unary_bit_not()
+    if t == TokenKind.TK_KW_NOT: return self.parse_unary_not()
+    if t == TokenKind.TK_AMPERSAND: return self.parse_ref_of()
+    if t == TokenKind.TK_STAR: return self.parse_deref_expr()
+    if t == TokenKind.TK_KW_IF: return self.parse_if_expr()
+    if t == TokenKind.TK_KW_WHILE: return self.parse_while(0)
+    if t == TokenKind.TK_KW_LOOP: return self.parse_loop(0)
+    if t == TokenKind.TK_KW_FOR: return self.parse_for(0)
+    if t == TokenKind.TK_KW_RETURN: return self.parse_return()
+    if t == TokenKind.TK_KW_BREAK: return self.parse_break()
+    if t == TokenKind.TK_KW_CONTINUE: return self.parse_continue()
+    if t == TokenKind.TK_LABEL: return self.parse_labeled_loop()
+    if t == TokenKind.TK_KW_UNSAFE: return self.parse_unsafe()
+    if t == TokenKind.TK_KW_DEFER: return self.parse_defer()
+    if t == TokenKind.TK_KW_ERRDEFER: return self.parse_errdefer()
+    if t == TokenKind.TK_KW_SPAWN: return self.parse_spawn()
+    if t == TokenKind.TK_KW_ASYNC: return self.parse_async_expr()
+    if t == TokenKind.TK_KW_YIELD: return self.parse_yield()
+    if t == TokenKind.TK_KW_COMPTIME: return self.parse_comptime_expr()
+    if t == TokenKind.TK_KW_SELECT: return self.parse_select_await()
+    if t == TokenKind.TK_L_BRACKET:
         let arr = self.parse_array_literal()
         return self.parse_postfix(arr)
-    if t == TK_KW_LET or t == TK_KW_VAR: return self.parse_let_binding()
-    if t == TK_KW_CONST: return self.parse_const_binding()
-    if t == TK_KW_MATCH: return self.parse_match_expr()
-    if t == TK_KW_WITH: return self.parse_with_expr()
-    if t == TK_L_BRACE: return self.parse_record_update()
-    if t == TK_PIPE:
+    if t == TokenKind.TK_KW_LET or t == TokenKind.TK_KW_VAR: return self.parse_let_binding()
+    if t == TokenKind.TK_KW_CONST: return self.parse_const_binding()
+    if t == TokenKind.TK_KW_MATCH: return self.parse_match_expr()
+    if t == TokenKind.TK_KW_WITH: return self.parse_with_expr()
+    if t == TokenKind.TK_L_BRACE: return self.parse_record_update()
+    if t == TokenKind.TK_PIPE:
         self.emit_error("use 'x => body' instead of '|x| body'")
         return 0
-    if t == TK_KW_MOVE:
+    if t == TokenKind.TK_KW_MOVE:
         self.advance()
         // move IDENT => expr
-        if self.peek() == TK_IDENT:
+        if self.peek() == TokenKind.TK_IDENT:
             if self.pos + 1 < self.tokens.len():
-                if self.tokens.get_tag(self.pos + 1) == TK_FAT_ARROW:
+                if self.tokens.get_tag(self.pos + 1) == TokenKind.TK_FAT_ARROW:
                     let node = self.parse_fat_arrow_single()
                     if node != 0: self.pool.mark_move_closure(node)
                     return node
         // move (params) => expr
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             let save = self.pos
             self.advance()
             self.skip_newlines()
             var is_closure = 0
-            if self.peek() == TK_R_PAREN:
+            if self.peek() == TokenKind.TK_R_PAREN:
                 self.advance()
-                if self.peek() == TK_FAT_ARROW or self.peek() == TK_ARROW:
+                if self.peek() == TokenKind.TK_FAT_ARROW or self.peek() == TokenKind.TK_ARROW:
                     is_closure = 1
             else:
                 is_closure = self.scan_is_paren_closure()
@@ -2341,7 +2341,7 @@ fn Parser.parse_comptime_error_expr(self: Parser) -> i32:
     self.advance()
     let ce_msg = self.intern_current()
     self.advance()
-    if self.peek() == TK_R_PAREN:
+    if self.peek() == TokenKind.TK_R_PAREN:
         self.advance()
     self.pool.add_node(NodeKind.NK_COMPTIME_ERROR, ce_s, self.prev_end(), ce_msg, 0, 0)
 
@@ -2552,7 +2552,7 @@ fn Parser.parse_c_string_literal(self: Parser) -> i32:
 fn Parser.parse_bool_literal(self: Parser) -> i32:
     let start = self.current_start()
     let end = self.current_end()
-    let val = if self.peek() == TK_TRUE: 1 else: 0
+    let val = if self.peek() == TokenKind.TK_TRUE: 1 else: 0
     self.advance()
     self.pool.add_node(NodeKind.NK_BOOL_LIT, start, end, val, 0, 0)
 
@@ -2707,11 +2707,11 @@ fn Parser.parse_postfix(self: Parser, lhs_in: i32) -> i32:
     var lhs = lhs_in
     while true:
         let t = self.peek()
-        if t == TK_L_PAREN:
+        if t == TokenKind.TK_L_PAREN:
             lhs = self.parse_call(lhs)
-        else if t == TK_DOT:
+        else if t == TokenKind.TK_DOT:
             lhs = self.parse_dot(lhs)
-        else if t == TK_DOT_IDENT:
+        else if t == TokenKind.TK_DOT_IDENT:
             // Type.Variant — treat dot-ident as field access when postfix
             let start = self.current_start()
             let end = self.current_end()
@@ -2719,24 +2719,24 @@ fn Parser.parse_postfix(self: Parser, lhs_in: i32) -> i32:
             let field = self.intern.intern(text)
             self.advance()
             lhs = self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), end, lhs, field, 0)
-        else if t == TK_L_BRACE:
+        else if t == TokenKind.TK_L_BRACE:
             // Struct literal only when lhs is an identifier
             if self.pool.kind(lhs) != NodeKind.NK_IDENT:
                 return lhs
             lhs = self.parse_struct_literal(lhs)
-        else if t == TK_L_BRACKET:
+        else if t == TokenKind.TK_L_BRACKET:
             lhs = self.parse_index_or_slice(lhs)
-        else if t == TK_KW_AS:
+        else if t == TokenKind.TK_KW_AS:
             if self.suppress_as != 0:
                 return lhs
             self.advance()
             let target_type = self.parse_type_expr()
             lhs = self.pool.add_node(NodeKind.NK_CAST, self.pool.get_start(lhs), self.prev_end(), lhs, target_type, 0)
-        else if t == TK_QUESTION:
+        else if t == TokenKind.TK_QUESTION:
             let qend = self.current_end()
             self.advance()
             lhs = self.pool.add_node(NodeKind.NK_UNARY, self.pool.get_start(lhs), qend, UnaryOp.UOP_TRY, lhs, 0)
-        else if t == TK_QUESTION_DOT:
+        else if t == TokenKind.TK_QUESTION_DOT:
             lhs = self.parse_optional_chain(lhs)
         else:
             return lhs
@@ -2753,13 +2753,13 @@ fn Parser.parse_call(self: Parser, callee: i32) -> i32:
     self.advance()  // consume (
     self.skip_newlines()
     var args: Vec[i32] = Vec.new()
-    if self.peek() != TK_R_PAREN:
-        while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+    if self.peek() != TokenKind.TK_R_PAREN:
+        while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
             // Named argument: name: value → skip the name label
-            if self.peek() == TK_IDENT:
+            if self.peek() == TokenKind.TK_IDENT:
                 let save = self.pos
                 self.advance()
-                if self.peek() == TK_COLON:
+                if self.peek() == TokenKind.TK_COLON:
                     self.advance()
                     self.skip_newlines()
                 else:
@@ -2775,14 +2775,14 @@ fn Parser.parse_call(self: Parser, callee: i32) -> i32:
             self.implicit_it_depth = outer_depth
             args.push(arg)
             self.skip_newlines()
-            if self.peek() != TK_COMMA:
+            if self.peek() != TokenKind.TK_COMMA:
                 break
             self.advance()
             self.skip_newlines()
-            if self.peek() == TK_R_PAREN:
+            if self.peek() == TokenKind.TK_R_PAREN:
                 break
     self.skip_newlines()
-    self.expect(TK_R_PAREN)
+    self.expect(TokenKind.TK_R_PAREN)
     let arg_count = args.len() as i32
     var placeholder_count = 0
     for ai in 0..arg_count:
@@ -2821,11 +2821,11 @@ fn Parser.parse_call(self: Parser, callee: i32) -> i32:
 fn Parser.parse_dot(self: Parser, lhs: i32) -> i32:
     self.advance()  // consume .
     // .await
-    if self.peek() == TK_KW_AWAIT:
+    if self.peek() == TokenKind.TK_KW_AWAIT:
         self.advance()
         return self.pool.add_node(NodeKind.NK_AWAIT, self.pool.get_start(lhs), self.prev_end(), lhs, 0, 0)
     // Tuple field .0 .1
-    if self.peek() == TK_INT_LIT:
+    if self.peek() == TokenKind.TK_INT_LIT:
         let field = self.intern_current()
         self.advance()
         return self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
@@ -2888,9 +2888,9 @@ fn Parser.parse_struct_literal(self: Parser, lhs: i32) -> i32:
     self.skip_newlines()
     var fields: Vec[i32] = Vec.new()
     var field_count = 0
-    while self.peek() != TK_R_BRACE and self.peek() != TK_EOF:
+    while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
         let fname = self.expect_ident()
-        if self.peek() == TK_COLON:
+        if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
             let val = self.parse_expr()
@@ -2903,10 +2903,10 @@ fn Parser.parse_struct_literal(self: Parser, lhs: i32) -> i32:
             fields.push(ident_node)
         field_count = field_count + 1
         self.skip_newlines()
-        if self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-    self.expect(TK_R_BRACE)
+    self.expect(TokenKind.TK_R_BRACE)
     let extra_start = self.pool.extra_len()
     for fi in 0..fields.len() as i32:
         self.pool.add_extra(fields.get(fi as i64))
@@ -2917,23 +2917,23 @@ fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> i32:
     self.skip_newlines()
     let index = self.parse_index_expr()
     self.skip_newlines()
-    if self.peek() == TK_DOT_DOT:
+    if self.peek() == TokenKind.TK_DOT_DOT:
         self.advance()
         self.skip_newlines()
         var end_expr = 0
-        if self.peek() != TK_R_BRACKET:
+        if self.peek() != TokenKind.TK_R_BRACKET:
             end_expr = self.parse_expr()
             self.skip_newlines()
-        self.expect(TK_R_BRACKET)
+        self.expect(TokenKind.TK_R_BRACKET)
         return self.pool.add_node(NodeKind.NK_SLICE, self.pool.get_start(lhs), self.prev_end(), lhs, index, end_expr)
     // Support two-arg subscript for HashMap[K, V].new() syntax
     var second = 0
-    if self.peek() == TK_COMMA:
+    if self.peek() == TokenKind.TK_COMMA:
         self.advance()
         self.skip_newlines()
         second = self.parse_index_expr()
         self.skip_newlines()
-    self.expect(TK_R_BRACKET)
+    self.expect(TokenKind.TK_R_BRACKET)
     self.pool.add_node(NodeKind.NK_INDEX, self.pool.get_start(lhs), self.prev_end(), lhs, index, second)
 
 fn Parser.parse_index_expr(self: Parser) -> i32:
@@ -2942,22 +2942,22 @@ fn Parser.parse_index_expr(self: Parser) -> i32:
 fn Parser.parse_optional_chain(self: Parser, lhs: i32) -> i32:
     self.advance()  // consume ?.
     var member = 0
-    if self.peek() == TK_INT_LIT:
+    if self.peek() == TokenKind.TK_INT_LIT:
         member = self.intern_current()
         self.advance()
     else:
         member = self.expect_ident()
     var args: Vec[i32] = Vec.new()
-    if self.peek() == TK_L_PAREN:
+    if self.peek() == TokenKind.TK_L_PAREN:
         self.advance()
         self.skip_newlines()
-        while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+        while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
             args.push(self.parse_expr())
             self.skip_newlines()
-            if self.peek() == TK_COMMA:
+            if self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
-        self.expect(TK_R_PAREN)
+        self.expect(TokenKind.TK_R_PAREN)
     let extra_start = self.pool.extra_len()
     let arg_count = args.len() as i32
     self.pool.add_extra(arg_count)
@@ -2974,26 +2974,26 @@ fn Parser.parse_variant_shorthand(self: Parser) -> i32:
     let sym = self.intern.intern(text)
     self.advance()
     var args: Vec[i32] = Vec.new()
-    if self.peek() == TK_L_PAREN:
+    if self.peek() == TokenKind.TK_L_PAREN:
         self.advance()
         self.skip_newlines()
-        while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+        while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
             // Keep shorthand construction aligned with normal call parsing:
             // `.Fatal(code: 99)` should behave like `Fatal(code: 99)`.
-            if self.peek() == TK_IDENT:
+            if self.peek() == TokenKind.TK_IDENT:
                 let save = self.pos
                 self.advance()
-                if self.peek() == TK_COLON:
+                if self.peek() == TokenKind.TK_COLON:
                     self.advance()
                     self.skip_newlines()
                 else:
                     self.pos = save
             args.push(self.parse_expr())
-            if self.peek() == TK_COMMA:
+            if self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
         self.skip_newlines()
-        self.expect(TK_R_PAREN)
+        self.expect(TokenKind.TK_R_PAREN)
     let extra_start = self.pool.extra_len()
     let arg_count = args.len() as i32
     for ai in 0..arg_count:
@@ -3008,11 +3008,11 @@ fn Parser.parse_grouped_or_tuple(self: Parser) -> i32:
     self.advance()  // consume (
     self.skip_newlines()
 
-    if self.peek() == TK_R_PAREN:
+    if self.peek() == TokenKind.TK_R_PAREN:
         let end = self.current_end()
         self.advance()
         // () => expr or () -> Type => expr is a zero-param closure
-        if self.peek() == TK_FAT_ARROW or self.peek() == TK_ARROW:
+        if self.peek() == TokenKind.TK_FAT_ARROW or self.peek() == TokenKind.TK_ARROW:
             self.pos = open_paren_pos
             return self.parse_fat_arrow_paren_closure()
         let node = self.pool.add_node(NodeKind.NK_TUPLE, start, end, self.pool.extra_len(), 0, 0)
@@ -3024,17 +3024,17 @@ fn Parser.parse_grouped_or_tuple(self: Parser) -> i32:
         return self.parse_fat_arrow_paren_closure()
 
     let first = self.parse_expr()
-    if self.peek() == TK_COMMA:
+    if self.peek() == TokenKind.TK_COMMA:
         var elems: Vec[i32] = Vec.new()
         elems.push(first)
-        while self.peek() == TK_COMMA:
+        while self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-            if self.peek() == TK_R_PAREN:
+            if self.peek() == TokenKind.TK_R_PAREN:
                 break
             let elem = self.parse_expr()
             elems.push(elem)
-        self.expect(TK_R_PAREN)
+        self.expect(TokenKind.TK_R_PAREN)
         let extra_start = self.pool.extra_len()
         for ei in 0..elems.len() as i32:
             self.pool.add_extra(elems.get(ei as i64))
@@ -3042,7 +3042,7 @@ fn Parser.parse_grouped_or_tuple(self: Parser) -> i32:
         let node = self.pool.add_node(NodeKind.NK_TUPLE, start, self.prev_end(), extra_start, count, 0)
         return self.parse_postfix(node)
 
-    self.expect(TK_R_PAREN)
+    self.expect(TokenKind.TK_R_PAREN)
     let node = self.pool.add_node(NodeKind.NK_GROUPED, start, self.prev_end(), first, 0, 0)
     self.parse_postfix(node)
 
@@ -3051,7 +3051,7 @@ fn Parser.parse_grouped_or_tuple(self: Parser) -> i32:
 fn Parser.parse_unary_negate(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
-    if self.peek() == TK_INT_LIT:
+    if self.peek() == TokenKind.TK_INT_LIT:
         let end = self.current_end()
         let text = self.source.slice(start as i64 + 1, end as i64)
         if numeric_literal_suffix_code(text) == LiteralSuffix.LIT_SUFFIX_NONE:
@@ -3085,7 +3085,7 @@ fn Parser.parse_ref_of(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
     var op = UnaryOp.UOP_REF
-    if self.peek() == TK_KW_MUT:
+    if self.peek() == TokenKind.TK_KW_MUT:
         op = UnaryOp.UOP_MUT_REF
         self.advance()
     let operand = self.parse_primary()
@@ -3116,15 +3116,15 @@ fn Parser.parse_if_expr(self: Parser) -> i32:
     self.advance()  // consume if
     self.skip_newlines()
 
-    if self.peek() == TK_KW_LET:
+    if self.peek() == TokenKind.TK_KW_LET:
         return self.parse_if_let(start)
 
     let cond = self.parse_expr()
     var use_block = false
-    if self.peek() == TK_KW_THEN:
+    if self.peek() == TokenKind.TK_KW_THEN:
         self.advance()
         self.skip_newlines()
-    else if self.peek() == TK_COLON:
+    else if self.peek() == TokenKind.TK_COLON:
         self.advance()
         use_block = true
     else:
@@ -3140,13 +3140,13 @@ fn Parser.parse_if_expr(self: Parser) -> i32:
     let save = self.pos
     self.skip_newlines()
     let crossed_newline = self.pos != save
-    if self.peek() == TK_KW_ELSE:
+    if self.peek() == TokenKind.TK_KW_ELSE:
         let else_col = column_of(self.source, self.current_start())
         if crossed_newline and is_stmt_if and else_col != if_col:
             self.pos = save
         else:
             self.advance()
-            if self.peek() == TK_COLON:
+            if self.peek() == TokenKind.TK_COLON:
                 self.advance()
             else_body = self.parse_block_or_expr()
     else:
@@ -3157,7 +3157,7 @@ fn Parser.parse_if_expr(self: Parser) -> i32:
 fn Parser.parse_if_let(self: Parser, start: i32) -> i32:
     self.advance()  // consume first 'let'
     let pat = self.parse_pattern()
-    if self.expect(TK_EQ) == 0:
+    if self.expect(TokenKind.TK_EQ) == 0:
         return 0
     let subject = self.parse_expr()
 
@@ -3170,13 +3170,13 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> i32:
     clauses.push(subject)
 
     // Chained form: `if let A = x, let B = y, cond, ...`
-    while self.peek() == TK_COMMA:
+    while self.peek() == TokenKind.TK_COMMA:
         self.advance()
         self.skip_newlines()
-        if self.peek() == TK_KW_LET:
+        if self.peek() == TokenKind.TK_KW_LET:
             self.advance()  // consume 'let'
             let p = self.parse_pattern()
-            if self.expect(TK_EQ) == 0:
+            if self.expect(TokenKind.TK_EQ) == 0:
                 return 0
             let s = self.parse_expr()
             clauses.push(0)
@@ -3189,10 +3189,10 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> i32:
             clauses.push(0)
 
     var use_block = false
-    if self.peek() == TK_KW_THEN:
+    if self.peek() == TokenKind.TK_KW_THEN:
         self.advance()
         self.skip_newlines()
-    else if self.peek() == TK_COLON:
+    else if self.peek() == TokenKind.TK_COLON:
         self.advance()
         use_block = true
     else:
@@ -3206,13 +3206,13 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> i32:
     let save = self.pos
     self.skip_newlines()
     let crossed_newline = self.pos != save
-    if self.peek() == TK_KW_ELSE:
+    if self.peek() == TokenKind.TK_KW_ELSE:
         let else_col = column_of(self.source, self.current_start())
         if crossed_newline and is_stmt_if and else_col != if_col:
             self.pos = save
         else:
             self.advance()
-            if self.peek() == TK_COLON:
+            if self.peek() == TokenKind.TK_COLON:
                 self.advance()
             else_body = self.parse_block_or_expr()
     else:
@@ -3248,7 +3248,7 @@ fn Parser.parse_return(self: Parser) -> i32:
     self.advance()
     var value = 0
     let t = self.peek()
-    if t != TK_NEWLINE and t != TK_EOF and t != TK_R_PAREN and t != TK_R_BRACE:
+    if t != TokenKind.TK_NEWLINE and t != TokenKind.TK_EOF and t != TokenKind.TK_R_PAREN and t != TokenKind.TK_R_BRACE:
         value = self.parse_expr()
     self.pool.add_node(NodeKind.NK_RETURN, start, self.prev_end(), value, 0, 0)
 
@@ -3267,7 +3267,7 @@ fn Parser.parse_errdefer(self: Parser) -> i32:
 fn Parser.parse_unsafe(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
     self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, start, self.prev_end(), body, 0, 0)
@@ -3296,17 +3296,17 @@ fn Parser.parse_async_expr(self: Parser) -> i32:
     if self.is_ident_named("scope"):
         self.advance()
         var scope_name = self.intern.intern("s")
-        if self.peek() == TK_PIPE:
+        if self.peek() == TokenKind.TK_PIPE:
             self.advance()
-            if self.peek() == TK_IDENT:
+            if self.peek() == TokenKind.TK_IDENT:
                 scope_name = self.expect_ident()
-            self.expect(TK_PIPE)
-        if self.peek() == TK_COLON:
+            self.expect(TokenKind.TK_PIPE)
+        if self.peek() == TokenKind.TK_COLON:
             self.advance()
         let body = self.parse_block_or_expr()
         return self.pool.add_node(NodeKind.NK_ASYNC_SCOPE, start, self.prev_end(), scope_name, body, 0)
 
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
     self.pool.add_node(NodeKind.NK_ASYNC_BLOCK, start, self.prev_end(), body, 0, 0)
@@ -3314,8 +3314,8 @@ fn Parser.parse_async_expr(self: Parser) -> i32:
 fn Parser.parse_select_await(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()  // consume select
-    self.expect(TK_KW_AWAIT)
-    if self.peek() == TK_COLON:
+    self.expect(TokenKind.TK_KW_AWAIT)
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
     self.skip_newlines()
 
@@ -3323,23 +3323,23 @@ fn Parser.parse_select_await(self: Parser) -> i32:
     var arm_count = 0
     var arm_col = -1
 
-    while self.peek() != TK_EOF:
-        if self.peek() != TK_IDENT:
+    while self.peek() != TokenKind.TK_EOF:
+        if self.peek() != TokenKind.TK_IDENT:
             break
         let cur_col = column_of(self.source, self.current_start())
         if arm_col >= 0 and cur_col != arm_col:
             break
         if arm_col < 0:
             arm_col = cur_col
-        if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) != TK_EQ:
+        if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) != TokenKind.TK_EQ:
             break
         let name_sym = self.expect_ident()
-        if self.peek() != TK_EQ:
+        if self.peek() != TokenKind.TK_EQ:
             break
         self.advance()
         self.skip_newlines()
         let task_expr = self.parse_expr()
-        self.expect(TK_FAT_ARROW)
+        self.expect(TokenKind.TK_FAT_ARROW)
         let body = self.parse_block_or_expr()
         arm_entries.push(name_sym)
         arm_entries.push(task_expr)
@@ -3348,7 +3348,7 @@ fn Parser.parse_select_await(self: Parser) -> i32:
 
         let save = self.pos
         self.skip_newlines()
-        if self.peek() == TK_IDENT and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TK_EQ:
+        if self.peek() == TokenKind.TK_IDENT and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_EQ:
             let next_col = column_of(self.source, self.current_start())
             if arm_col >= 0 and next_col == arm_col:
                 continue
@@ -3367,11 +3367,11 @@ fn Parser.parse_while(self: Parser, label: i32) -> i32:
     self.advance()
     self.skip_newlines()
 
-    if self.peek() == TK_KW_LET:
+    if self.peek() == TokenKind.TK_KW_LET:
         return self.parse_while_let(start)
 
     let cond = self.parse_expr()
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
     self.pool.add_node(NodeKind.NK_WHILE, start, self.prev_end(), cond, body, label)
@@ -3379,10 +3379,10 @@ fn Parser.parse_while(self: Parser, label: i32) -> i32:
 fn Parser.parse_while_let(self: Parser, start: i32) -> i32:
     self.advance()  // consume let
     let pat = self.parse_pattern()
-    if self.expect(TK_EQ) == 0:
+    if self.expect(TokenKind.TK_EQ) == 0:
         return 0
     let subject = self.parse_expr()
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
 
@@ -3400,7 +3400,7 @@ fn Parser.parse_while_let(self: Parser, start: i32) -> i32:
 fn Parser.parse_loop(self: Parser, label: i32) -> i32:
     let start = self.current_start()
     self.advance()
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
     self.pool.add_node(NodeKind.NK_LOOP, start, self.prev_end(), body, label, 0)
@@ -3412,21 +3412,21 @@ fn Parser.parse_for(self: Parser, label: i32) -> i32:
     var binding = 0
     var index_binding = 0
 
-    if self.peek() == TK_L_PAREN:
+    if self.peek() == TokenKind.TK_L_PAREN:
         // Tuple destructuring - simplified: parse as pattern
         let pat = self.parse_pattern()
         binding = pat
     else:
         binding = self.expect_ident()
-        if self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             index_binding = self.expect_ident()
 
-    if self.expect(TK_KW_IN) == 0:
+    if self.expect(TokenKind.TK_KW_IN) == 0:
         return 0
     self.skip_newlines()
     let iterable = self.parse_expr()
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
 
@@ -3440,9 +3440,9 @@ fn Parser.parse_for(self: Parser, label: i32) -> i32:
     let save_pos = self.pos
     self.skip_newlines()
     let else_col = column_of(self.source, self.current_start())
-    if self.peek() == TK_KW_ELSE and else_col == for_col:
+    if self.peek() == TokenKind.TK_KW_ELSE and else_col == for_col:
         self.advance()
-        if self.peek() == TK_COLON:
+        if self.peek() == TokenKind.TK_COLON:
             self.advance()
         let else_body = self.parse_block_or_expr()
         // Build: var __for_ran: bool = false
@@ -3480,16 +3480,16 @@ fn Parser.parse_labeled_loop(self: Parser) -> i32:
     let label_sym = self.intern.intern(label_text)
     self.advance()
 
-    if self.peek() != TK_COLON:
+    if self.peek() != TokenKind.TK_COLON:
         self.emit_error("expected ':' after loop label")
         return 0
     self.advance()
     self.skip_newlines()
 
     let t = self.peek()
-    if t == TK_KW_FOR: return self.parse_for(label_sym)
-    if t == TK_KW_WHILE: return self.parse_while(label_sym)
-    if t == TK_KW_LOOP: return self.parse_loop(label_sym)
+    if t == TokenKind.TK_KW_FOR: return self.parse_for(label_sym)
+    if t == TokenKind.TK_KW_WHILE: return self.parse_while(label_sym)
+    if t == TokenKind.TK_KW_LOOP: return self.parse_loop(label_sym)
     self.emit_error("expected 'for', 'while', or 'loop' after label")
     0
 
@@ -3497,14 +3497,14 @@ fn Parser.parse_break(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
     var label = 0
-    if self.peek() == TK_LABEL:
+    if self.peek() == TokenKind.TK_LABEL:
         let ls = self.current_start()
         let le = self.current_end()
         label = self.intern.intern(self.source.slice((ls + 1) as i64, le as i64))
         self.advance()
     var value = 0
     let t = self.peek()
-    if t != TK_NEWLINE and t != TK_EOF and t != TK_R_BRACE and t != TK_R_PAREN and t != TK_R_BRACKET:
+    if t != TokenKind.TK_NEWLINE and t != TokenKind.TK_EOF and t != TokenKind.TK_R_BRACE and t != TokenKind.TK_R_PAREN and t != TokenKind.TK_R_BRACKET:
         value = self.parse_expr()
     self.pool.add_node(NodeKind.NK_BREAK, start, self.prev_end(), value, label, 0)
 
@@ -3512,7 +3512,7 @@ fn Parser.parse_continue(self: Parser) -> i32:
     let start = self.current_start()
     self.advance()
     var label = 0
-    if self.peek() == TK_LABEL:
+    if self.peek() == TokenKind.TK_LABEL:
         let ls = self.current_start()
         let le = self.current_end()
         label = self.intern.intern(self.source.slice((ls + 1) as i64, le as i64))
@@ -3535,7 +3535,7 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
     var arms: Vec[i32] = Vec.new()
     var arm_col = -1
 
-    while self.peek() != TK_EOF:
+    while self.peek() != TokenKind.TK_EOF:
         let t = self.peek()
         if not self.is_arm_token(t):
             break
@@ -3551,7 +3551,7 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
         var in_guard_expr = 0
 
         // `in expr` pattern: desugar to `__v if __v in expr`
-        if self.peek() == TK_KW_IN:
+        if self.peek() == TokenKind.TK_KW_IN:
             self.advance()
             let collection_expr = self.parse_expr()
             // Create binding pattern `__v`
@@ -3564,11 +3564,11 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
             pattern = self.parse_pattern()
 
         // Or-pattern: A | B | C
-        if self.peek() == TK_PIPE:
+        if self.peek() == TokenKind.TK_PIPE:
             let or_start = self.pool.extra_len()
             self.pool.add_extra(pattern)
             var or_count = 1
-            while self.peek() == TK_PIPE:
+            while self.peek() == TokenKind.TK_PIPE:
                 self.advance()
                 self.skip_newlines()
                 let alt = self.parse_pattern()
@@ -3580,11 +3580,11 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
         var guard = 0
         if in_guard_expr != 0:
             guard = in_guard_expr
-        else if self.peek() == TK_KW_IF:
+        else if self.peek() == TokenKind.TK_KW_IF:
             self.advance()
             guard = self.parse_expr()
 
-        if self.expect(TK_FAT_ARROW) == 0:
+        if self.expect(TokenKind.TK_FAT_ARROW) == 0:
             break
         self.skip_newlines()
         let body = self.parse_block_or_expr()
@@ -3594,7 +3594,7 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
 
         let save = self.pos
         self.skip_newlines()
-        if self.peek() == TK_EOF:
+        if self.peek() == TokenKind.TK_EOF:
             break
         if not self.is_arm_token(self.peek()):
             self.pos = save
@@ -3610,7 +3610,7 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
     arm_count
 
 fn Parser.is_arm_token(self: Parser, t: i32) -> bool:
-    t == TK_IDENT or t == TK_INT_LIT or t == TK_DOT_IDENT or t == TK_TRUE or t == TK_FALSE or t == TK_STRING_LIT or t == TK_MINUS or t == TK_L_BRACKET or t == TK_L_PAREN or t == TK_L_BRACE or t == TK_KW_IN
+    t == TokenKind.TK_IDENT or t == TokenKind.TK_INT_LIT or t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE or t == TokenKind.TK_STRING_LIT or t == TokenKind.TK_MINUS or t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_KW_IN
 
 // ── Pattern parsing ──────────────────────────────────────────────
 
@@ -3619,70 +3619,70 @@ fn Parser.parse_pattern(self: Parser) -> i32:
     let end = self.current_end()
     let t = self.peek()
 
-    if t == TK_INT_LIT:
+    if t == TokenKind.TK_INT_LIT:
         let text = self.source.slice(start as i64, end as i64)
         self.advance()
         let val = parse_int(text)
         // Range pattern
-        if self.peek() == TK_DOT_DOT or self.peek() == TK_DOT_DOT_EQ:
-            let inclusive = if self.peek() == TK_DOT_DOT_EQ: 1 else: 0
+        if self.peek() == TokenKind.TK_DOT_DOT or self.peek() == TokenKind.TK_DOT_DOT_EQ:
+            let inclusive = if self.peek() == TokenKind.TK_DOT_DOT_EQ: 1 else: 0
             self.advance()
             let es = self.current_start()
             let ee = self.current_end()
             let etext = self.source.slice(es as i64, ee as i64)
-            self.expect(TK_INT_LIT)
+            self.expect(TokenKind.TK_INT_LIT)
             let eval = parse_int(etext)
             return self.pool.add_node(NodeKind.NK_PAT_RANGE, start, self.prev_end(), val, eval, inclusive)
         return self.pool.add_node(NodeKind.NK_PAT_INT, start, end, val, 0, 0)
 
-    if t == TK_TRUE:
+    if t == TokenKind.TK_TRUE:
         self.advance()
         return self.pool.add_node(NodeKind.NK_PAT_BOOL, start, end, 1, 0, 0)
-    if t == TK_FALSE:
+    if t == TokenKind.TK_FALSE:
         self.advance()
         return self.pool.add_node(NodeKind.NK_PAT_BOOL, start, end, 0, 0, 0)
-    if t == TK_STRING_LIT:
+    if t == TokenKind.TK_STRING_LIT:
         let raw = self.source.slice((start + 1) as i64, (end - 1) as i64)
         let sym = self.intern.intern(raw)
         self.advance()
         return self.pool.add_node(NodeKind.NK_PAT_STRING, start, end, sym, 0, 0)
-    if t == TK_MINUS:
+    if t == TokenKind.TK_MINUS:
         self.advance()
         let ns = self.current_start()
         let ne = self.current_end()
         let text = self.source.slice(ns as i64, ne as i64)
-        self.expect(TK_INT_LIT)
+        self.expect(TokenKind.TK_INT_LIT)
         let val = 0 - parse_int(text)
         // Check for range pattern after negative number
-        if self.peek() == TK_DOT_DOT or self.peek() == TK_DOT_DOT_EQ:
-            let inclusive = if self.peek() == TK_DOT_DOT_EQ: 1 else: 0
+        if self.peek() == TokenKind.TK_DOT_DOT or self.peek() == TokenKind.TK_DOT_DOT_EQ:
+            let inclusive = if self.peek() == TokenKind.TK_DOT_DOT_EQ: 1 else: 0
             self.advance()
             // Parse range end (may also be negative)
             var eval = 0
-            if self.peek() == TK_MINUS:
+            if self.peek() == TokenKind.TK_MINUS:
                 self.advance()
                 let es = self.current_start()
                 let ee = self.current_end()
                 let etext = self.source.slice(es as i64, ee as i64)
-                self.expect(TK_INT_LIT)
+                self.expect(TokenKind.TK_INT_LIT)
                 eval = 0 - parse_int(etext)
             else:
                 let es = self.current_start()
                 let ee = self.current_end()
                 let etext = self.source.slice(es as i64, ee as i64)
-                self.expect(TK_INT_LIT)
+                self.expect(TokenKind.TK_INT_LIT)
                 eval = parse_int(etext)
             return self.pool.add_node(NodeKind.NK_PAT_RANGE, start, self.prev_end(), val, eval, inclusive)
         return self.pool.add_node(NodeKind.NK_PAT_INT, start, self.prev_end(), val, 0, 0)
 
-    if t == TK_IDENT:
+    if t == TokenKind.TK_IDENT:
         let name = self.expect_ident()
         let name_str = self.intern.resolve(name)
         if name_str == "_":
             return self.pool.add_node(NodeKind.NK_PAT_WILDCARD, start, self.prev_end(), 0, 0, 0)
-        if self.peek() == TK_DOT or self.peek() == TK_DOT_IDENT:
+        if self.peek() == TokenKind.TK_DOT or self.peek() == TokenKind.TK_DOT_IDENT:
             var variant_name = 0
-            if self.peek() == TK_DOT:
+            if self.peek() == TokenKind.TK_DOT:
                 self.advance()
                 variant_name = self.expect_ident()
                 if variant_name == 0:
@@ -3693,21 +3693,21 @@ fn Parser.parse_pattern(self: Parser) -> i32:
                 let dot_text = self.source.slice((dot_start + 1) as i64, dot_end as i64)
                 variant_name = self.intern.intern(dot_text)
                 self.advance()
-            if self.peek() == TK_L_PAREN:
+            if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 self.skip_newlines()
                 let extra_start = self.pool.extra_len()
                 var binding_count = 0
-                while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+                while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     let inner = self.parse_pattern()
                     self.pool.add_extra(inner)
                     binding_count = binding_count + 1
                     self.skip_newlines()
-                    if self.peek() == TK_COMMA:
+                    if self.peek() == TokenKind.TK_COMMA:
                         self.advance()
                         self.skip_newlines()
                 self.skip_newlines()
-                self.expect(TK_R_PAREN)
+                self.expect(TokenKind.TK_R_PAREN)
                 let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), variant_name, extra_start, binding_count)
                 self.pool.add_pattern_qualifier(pat, name)
                 return pat
@@ -3715,89 +3715,89 @@ fn Parser.parse_pattern(self: Parser) -> i32:
             self.pool.add_pattern_qualifier(pat, name)
             return pat
         // Variant with payload
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
             self.skip_newlines()
             let extra_start = self.pool.extra_len()
             var binding_count = 0
-            while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+            while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                 let inner = self.parse_pattern()
                 self.pool.add_extra(inner)
                 binding_count = binding_count + 1
                 self.skip_newlines()
-                if self.peek() == TK_COMMA:
+                if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
             self.skip_newlines()
-            self.expect(TK_R_PAREN)
+            self.expect(TokenKind.TK_R_PAREN)
             return self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name, extra_start, binding_count)
         // Uppercase = unit variant
         if name_str.len() > 0 and name_str.byte_at((0) as i64) >= 65 and name_str.byte_at((0) as i64) <= 90:
-            if self.peek() == TK_L_BRACE:
+            if self.peek() == TokenKind.TK_L_BRACE:
                 return self.parse_struct_pattern(name, start)
             return self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name, 0, 0)
         // At-binding
-        if self.peek() == TK_AT:
+        if self.peek() == TokenKind.TK_AT:
             self.advance()
             let inner = self.parse_pattern()
             return self.pool.add_node(NodeKind.NK_PAT_AT_BINDING, start, self.prev_end(), name, inner, 0)
         // Typed binding: ident: Type (for dyn trait matching)
-        if self.peek() == TK_COLON:
+        if self.peek() == TokenKind.TK_COLON:
             self.advance()
             let type_sym = self.expect_ident()
             return self.pool.add_node(NodeKind.NK_PAT_TYPED_BIND, start, self.prev_end(), name, type_sym, 0)
         // Variable binding
         return self.pool.add_node(NodeKind.NK_PAT_IDENT, start, self.prev_end(), name, 0, 0)
 
-    if t == TK_DOT_IDENT:
+    if t == TokenKind.TK_DOT_IDENT:
         let text = self.source.slice((start + 1) as i64, end as i64)
         let name = self.intern.intern(text)
         self.advance()
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
             self.skip_newlines()
             let extra_start = self.pool.extra_len()
             var binding_count = 0
-            while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+            while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                 let b = self.expect_ident()
                 self.pool.add_extra(b)
                 binding_count = binding_count + 1
                 self.skip_newlines()
-                if self.peek() == TK_COMMA:
+                if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
             self.skip_newlines()
-            self.expect(TK_R_PAREN)
+            self.expect(TokenKind.TK_R_PAREN)
             return self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, start, self.prev_end(), name, extra_start, binding_count)
         return self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, start, self.prev_end(), name, 0, 0)
 
-    if t == TK_L_PAREN:
+    if t == TokenKind.TK_L_PAREN:
         self.advance()
         self.skip_newlines()
         let extra_start = self.pool.extra_len()
         var count = 0
-        if self.peek() != TK_R_PAREN:
+        if self.peek() != TokenKind.TK_R_PAREN:
             let p = self.parse_pattern()
             self.pool.add_extra(p)
             count = count + 1
             self.skip_newlines()
-            while self.peek() == TK_COMMA:
+            while self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
-                if self.peek() == TK_R_PAREN:
+                if self.peek() == TokenKind.TK_R_PAREN:
                     break
                 let p2 = self.parse_pattern()
                 self.pool.add_extra(p2)
                 count = count + 1
                 self.skip_newlines()
         self.skip_newlines()
-        self.expect(TK_R_PAREN)
+        self.expect(TokenKind.TK_R_PAREN)
         return self.pool.add_node(NodeKind.NK_PAT_TUPLE, start, self.prev_end(), extra_start, count, 0)
 
-    if t == TK_L_BRACE:
+    if t == TokenKind.TK_L_BRACE:
         return self.parse_struct_pattern(0, start)
 
-    if t == TK_L_BRACKET:
+    if t == TokenKind.TK_L_BRACKET:
         return self.parse_slice_pattern(start)
 
     self.emit_error("expected pattern")
@@ -3811,29 +3811,29 @@ fn Parser.parse_struct_pattern(self: Parser, type_name: i32, start: i32) -> i32:
     var field_count = 0
     var has_rest = 0
 
-    while self.peek() != TK_R_BRACE and self.peek() != TK_EOF:
+    while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
         self.skip_newlines()
-        if self.peek() == TK_DOT_DOT:
+        if self.peek() == TokenKind.TK_DOT_DOT:
             has_rest = 1
             self.advance()
-            if self.peek() == TK_COMMA:
+            if self.peek() == TokenKind.TK_COMMA:
                 self.advance()
             self.skip_newlines()
             continue
         let fname = self.expect_ident()
         var fpat = 0
-        if self.peek() == TK_COLON:
+        if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
             fpat = self.parse_pattern()
         self.pool.add_extra(fname)
         self.pool.add_extra(fpat)
         field_count = field_count + 1
-        if self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
 
-    self.expect(TK_R_BRACE)
+    self.expect(TokenKind.TK_R_BRACE)
     self.pool.extra.set_i32(has_rest_idx as i64, has_rest)
     self.pool.add_node(NodeKind.NK_PAT_STRUCT, start, self.prev_end(), type_name, extra_start, field_count)
 
@@ -3848,17 +3848,17 @@ fn Parser.parse_slice_pattern(self: Parser, start: i32) -> i32:
     // Placeholder slots: has_rest, head_count will be set after
     let has_rest_idx = self.pool.add_extra(0)
 
-    while self.peek() != TK_R_BRACKET and self.peek() != TK_EOF:
-        if self.peek() == TK_DOT_DOT:
+    while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
+        if self.peek() == TokenKind.TK_DOT_DOT:
             has_rest = 1
             self.advance()
-            if self.peek() == TK_IDENT:
+            if self.peek() == TokenKind.TK_IDENT:
                 rest_sym = self.expect_ident()
-            if self.peek() == TK_COMMA:
+            if self.peek() == TokenKind.TK_COMMA:
                 self.advance()
             self.skip_newlines()
             continue
-        if self.peek() == TK_IDENT:
+        if self.peek() == TokenKind.TK_IDENT:
             let name = self.expect_ident()
             if has_rest != 0:
                 tail_syms.push(name)
@@ -3867,12 +3867,12 @@ fn Parser.parse_slice_pattern(self: Parser, start: i32) -> i32:
                 head_count = head_count + 1
         else:
             break
-        if self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
 
     self.skip_newlines()
-    self.expect(TK_R_BRACKET)
+    self.expect(TokenKind.TK_R_BRACKET)
     self.pool.extra.set_i32(has_rest_idx as i64, has_rest)
     self.pool.add_extra(tail_syms.len() as i32)
     for ti in 0..tail_syms.len() as i32:
@@ -3883,23 +3883,23 @@ fn Parser.parse_slice_pattern(self: Parser, start: i32) -> i32:
 
 fn Parser.parse_let_binding(self: Parser) -> i32:
     let start = self.current_start()
-    let is_var = self.peek() == TK_KW_VAR
+    let is_var = self.peek() == TokenKind.TK_KW_VAR
     self.advance()
     var is_mut = is_var
-    if not is_var and self.peek() == TK_KW_MUT:
+    if not is_var and self.peek() == TokenKind.TK_KW_MUT:
         is_mut = true
         self.advance()
 
     // Tuple destructuring (supports identifier, wildcard, and ..rest bindings).
-    if self.peek() == TK_L_PAREN:
+    if self.peek() == TokenKind.TK_L_PAREN:
         self.advance()
         self.skip_newlines()
         let names: Vec[i32] = Vec.new()
-        while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+        while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
             // Rest pattern: ..name or ..
-            if self.peek() == TK_DOT_DOT:
+            if self.peek() == TokenKind.TK_DOT_DOT:
                 self.advance()
-                if self.peek() == TK_IDENT:
+                if self.peek() == TokenKind.TK_IDENT:
                     let rest_sym = self.intern_current()
                     self.advance()
                     // Use negative sym to mark rest binding
@@ -3907,7 +3907,7 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
                 else:
                     // .. without name: just discard remaining
                     names.push(0)
-            else if self.peek() == TK_IDENT:
+            else if self.peek() == TokenKind.TK_IDENT:
                 let n_sym = self.intern_current()
                 self.advance()
                 if self.intern.resolve(n_sym) == "_":
@@ -3916,18 +3916,18 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
                     names.push(n_sym)
             else:
                 self.emit_error("tuple destructuring requires identifier bindings")
-                while self.peek() != TK_COMMA and self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+                while self.peek() != TokenKind.TK_COMMA and self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     self.advance()
 
             self.skip_newlines()
-            if self.peek() == TK_COMMA:
+            if self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
             else:
                 break
 
-        self.expect(TK_R_PAREN)
-        if self.expect(TK_EQ) == 0:
+        self.expect(TokenKind.TK_R_PAREN)
+        if self.expect(TokenKind.TK_EQ) == 0:
             return 0
         self.skip_newlines()
         let value = self.parse_expr()
@@ -3937,45 +3937,45 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         return self.pool.add_node(NodeKind.NK_TUPLE_DESTRUCTURE, start, self.prev_end(), extra_start, names.len() as i32, value)
 
     // Let-else with variant shorthand: let .Some(v) = expr else body
-    if self.peek() == TK_DOT_IDENT:
+    if self.peek() == TokenKind.TK_DOT_IDENT:
         let dot_start = self.current_start()
         let dot_end = self.current_end()
         let dot_text = self.source.slice((dot_start + 1) as i64, dot_end as i64)
         let dot_sym = self.intern.intern(dot_text)
         self.advance()
-        if self.peek() == TK_L_PAREN:
+        if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
             self.skip_newlines()
             let extra_start = self.pool.extra_len()
             var binding_count = 0
-            while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+            while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                 let b = self.expect_ident()
                 let pat_node = self.pool.add_node(NodeKind.NK_PAT_IDENT, self.prev_start(), self.prev_end(), b, 0, 0)
                 self.pool.add_extra(pat_node)
                 binding_count = binding_count + 1
                 self.skip_newlines()
-                if self.peek() == TK_COMMA:
+                if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
             self.skip_newlines()
-            self.expect(TK_R_PAREN)
-            if self.expect(TK_EQ) == 0:
+            self.expect(TokenKind.TK_R_PAREN)
+            if self.expect(TokenKind.TK_EQ) == 0:
                 return 0
             self.skip_newlines()
             let value = self.parse_expr()
-            self.expect(TK_KW_ELSE)
-            if self.peek() == TK_COLON: self.advance()
+            self.expect(TokenKind.TK_KW_ELSE)
+            if self.peek() == TokenKind.TK_COLON: self.advance()
             self.skip_newlines()
             let else_body = self.parse_block_or_expr()
             let pat = self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, extra_start, binding_count)
             return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
-        if self.peek() == TK_EQ:
+        if self.peek() == TokenKind.TK_EQ:
             self.advance()
             self.skip_newlines()
             let value = self.parse_expr()
-            if self.peek() == TK_KW_ELSE:
+            if self.peek() == TokenKind.TK_KW_ELSE:
                 self.advance()
-                if self.peek() == TK_COLON: self.advance()
+                if self.peek() == TokenKind.TK_COLON: self.advance()
                 self.skip_newlines()
                 let else_body = self.parse_block_or_expr()
                 let pat = self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, 0, 0)
@@ -3988,40 +3988,40 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
     let is_upper = name_str.len() > 0 and name_str.byte_at((0) as i64) >= 65 and name_str.byte_at((0) as i64) <= 90
 
     // Let-else variant: let Some(x) = expr else body
-    if is_upper and self.peek() == TK_L_PAREN:
+    if is_upper and self.peek() == TokenKind.TK_L_PAREN:
         self.advance()
         self.skip_newlines()
         let extra_start = self.pool.extra_len()
         var binding_count = 0
-        while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
+        while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
             let b = self.expect_ident()
             let pat_node = self.pool.add_node(NodeKind.NK_PAT_IDENT, self.prev_start(), self.prev_end(), b, 0, 0)
             self.pool.add_extra(pat_node)
             binding_count = binding_count + 1
             self.skip_newlines()
-            if self.peek() == TK_COMMA:
+            if self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
         self.skip_newlines()
-        self.expect(TK_R_PAREN)
-        if self.expect(TK_EQ) == 0:
+        self.expect(TokenKind.TK_R_PAREN)
+        if self.expect(TokenKind.TK_EQ) == 0:
             return 0
         self.skip_newlines()
         let value = self.parse_expr()
-        self.expect(TK_KW_ELSE)
-        if self.peek() == TK_COLON: self.advance()
+        self.expect(TokenKind.TK_KW_ELSE)
+        if self.peek() == TokenKind.TK_COLON: self.advance()
         self.skip_newlines()
         let else_body = self.parse_block_or_expr()
         let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name_sym, extra_start, binding_count)
         return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
 
-    if is_upper and self.peek() == TK_EQ:
+    if is_upper and self.peek() == TokenKind.TK_EQ:
         self.advance()
         self.skip_newlines()
         let value = self.parse_expr()
-        if self.peek() == TK_KW_ELSE:
+        if self.peek() == TokenKind.TK_KW_ELSE:
             self.advance()
-            if self.peek() == TK_COLON: self.advance()
+            if self.peek() == TokenKind.TK_COLON: self.advance()
             self.skip_newlines()
             let else_body = self.parse_block_or_expr()
             let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name_sym, 0, 0)
@@ -4033,11 +4033,11 @@ fn Parser.parse_let_binding(self: Parser) -> i32:
         return self.pool.add_node(NodeKind.NK_LET_BINDING, start, self.prev_end(), name_sym, value, flags)
 
     var type_ann = 0
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
         type_ann = self.parse_type_expr()
 
-    if self.expect(TK_EQ) == 0:
+    if self.expect(TokenKind.TK_EQ) == 0:
         return 0
     self.skip_newlines()
     let value = self.parse_expr()
@@ -4058,13 +4058,13 @@ fn Parser.parse_const_binding(self: Parser) -> i32:
     if name_sym == 0:
         return 0
 
-    if self.peek() != TK_COLON:
+    if self.peek() != TokenKind.TK_COLON:
         self.emit_error("const declaration requires a type annotation")
         return 0
     self.advance()
     let type_ann = self.parse_type_expr()
 
-    if self.expect(TK_EQ) == 0:
+    if self.expect(TokenKind.TK_EQ) == 0:
         return 0
     self.skip_newlines()
     let raw_value = self.parse_expr()
@@ -4087,16 +4087,16 @@ fn Parser.parse_with_expr(self: Parser) -> i32:
     self.suppress_as = 1
     let source = self.parse_expr()
     self.suppress_as = 0
-    if self.peek() != TK_KW_AS:
+    if self.peek() != TokenKind.TK_KW_AS:
         self.emit_error("expected 'as' in with expression")
         return 0
     self.advance()
     var is_mut = 0
-    if self.peek() == TK_KW_MUT:
+    if self.peek() == TokenKind.TK_KW_MUT:
         is_mut = 1
         self.advance()
     let name = self.expect_ident()
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
     let body = self.parse_block_or_expr()
     let encoded_name = encode_with_binding(name, is_mut)
@@ -4109,7 +4109,7 @@ fn Parser.parse_record_update(self: Parser) -> i32:
     self.advance()  // consume {
     self.skip_newlines()
     let source = self.parse_expr()
-    if self.peek() != TK_KW_WITH:
+    if self.peek() != TokenKind.TK_KW_WITH:
         self.emit_error("expected 'with' in record update")
         return 0
     self.advance()
@@ -4117,10 +4117,10 @@ fn Parser.parse_record_update(self: Parser) -> i32:
 
     var fields: Vec[i32] = Vec.new()
     var field_count = 0
-    while self.peek() != TK_R_BRACE and self.peek() != TK_EOF:
+    while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
         let fname = self.expect_ident()
         var val = 0
-        if self.peek() == TK_COLON:
+        if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
             val = self.parse_expr()
@@ -4130,10 +4130,10 @@ fn Parser.parse_record_update(self: Parser) -> i32:
         fields.push(val)
         field_count = field_count + 1
         self.skip_newlines()
-        if self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-    self.expect(TK_R_BRACE)
+    self.expect(TokenKind.TK_R_BRACE)
     let extra_start = self.pool.extra_len()
     for fi in 0..fields.len() as i32:
         self.pool.add_extra(fields.get(fi as i64))
@@ -4147,14 +4147,14 @@ fn Parser.parse_array_literal(self: Parser) -> i32:
     self.skip_newlines()
     var elems: Vec[i32] = Vec.new()
 
-    if self.peek() != TK_R_BRACKET:
+    if self.peek() != TokenKind.TK_R_BRACKET:
         let first = self.parse_expr()
 
         // Array fill: [value; N]
-        if self.peek() == TK_SEMICOLON:
+        if self.peek() == TokenKind.TK_SEMICOLON:
             self.advance()  // consume ;
             let count_expr = self.parse_expr()
-            self.expect(TK_R_BRACKET)
+            self.expect(TokenKind.TK_R_BRACKET)
             // Desugar [value; N] to NodeKind.NK_ARRAY_LIT with N copies of value
             // For now, evaluate N as a constant and emit N copies
             var fill_count = 0
@@ -4168,28 +4168,28 @@ fn Parser.parse_array_literal(self: Parser) -> i32:
             return self.pool.add_node(NodeKind.NK_ARRAY_LIT, start, self.prev_end(), extra_start, fill_count, 0)
 
         // Comprehension: [expr for x in iter]
-        if self.peek() == TK_KW_FOR:
+        if self.peek() == TokenKind.TK_KW_FOR:
             self.advance()
             let binding = self.expect_ident()
-            self.expect(TK_KW_IN)
+            self.expect(TokenKind.TK_KW_IN)
             let iterable = self.parse_expr()
             var filter = 0
-            if self.peek() == TK_KW_IF:
+            if self.peek() == TokenKind.TK_KW_IF:
                 self.advance()
                 filter = self.parse_expr()
-            self.expect(TK_R_BRACKET)
+            self.expect(TokenKind.TK_R_BRACKET)
             return self.pool.add_node(NodeKind.NK_ARRAY_COMPREHENSION, start, self.prev_end(), first, binding, iterable)
 
         elems.push(first)
 
-        while self.peek() == TK_COMMA:
+        while self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-            if self.peek() == TK_R_BRACKET:
+            if self.peek() == TokenKind.TK_R_BRACKET:
                 break
             elems.push(self.parse_expr())
 
-    self.expect(TK_R_BRACKET)
+    self.expect(TokenKind.TK_R_BRACKET)
     let extra_start = self.pool.extra_len()
     let count = elems.len() as i32
     for ei in 0..count:
@@ -4206,18 +4206,18 @@ fn Parser.scan_is_paren_closure(self: Parser) -> i32:
     var depth = 1
     while scan < self.tokens.len():
         let tag = self.tokens.get_tag(scan)
-        if tag == TK_L_PAREN:
+        if tag == TokenKind.TK_L_PAREN:
             depth = depth + 1
-        else if tag == TK_R_PAREN:
+        else if tag == TokenKind.TK_R_PAREN:
             depth = depth - 1
             if depth == 0:
                 let next = scan + 1
                 if next < self.tokens.len():
                     let nt = self.tokens.get_tag(next)
-                    if nt == TK_FAT_ARROW: return 1
-                    if nt == TK_ARROW: return 1
+                    if nt == TokenKind.TK_FAT_ARROW: return 1
+                    if nt == TokenKind.TK_ARROW: return 1
                 return 0
-        else if tag == TK_EOF:
+        else if tag == TokenKind.TK_EOF:
             return 0
         scan = scan + 1
     0
@@ -4226,7 +4226,7 @@ fn Parser.scan_is_paren_closure(self: Parser) -> i32:
 fn Parser.parse_fat_arrow_single(self: Parser) -> i32:
     let start = self.current_start()
     let param_sym = self.expect_ident()
-    self.expect(TK_FAT_ARROW)
+    self.expect(TokenKind.TK_FAT_ARROW)
     let extra_start = self.pool.extra_len()
     self.pool.add_extra(param_sym)
     self.pool.add_extra(0)
@@ -4241,14 +4241,14 @@ fn Parser.parse_fat_arrow_paren_closure(self: Parser) -> i32:
     self.skip_newlines()
     let extra_start = self.pool.extra_len()
     var param_count = 0
-    while self.peek() != TK_R_PAREN and self.peek() != TK_EOF:
-        if self.peek() == TK_KW_IT:
+    while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+        if self.peek() == TokenKind.TK_KW_IT:
             self.emit_error("'it' is a reserved keyword and cannot be used as a parameter name")
             self.advance()
             self.pool.add_extra(0)
             self.pool.add_extra(0)
             param_count = param_count + 1
-            if self.peek() == TK_COMMA:
+            if self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
             continue
@@ -4257,40 +4257,40 @@ fn Parser.parse_fat_arrow_paren_closure(self: Parser) -> i32:
             self.advance()
             continue
         self.pool.add_extra(p)
-        if self.peek() == TK_COLON:
+        if self.peek() == TokenKind.TK_COLON:
             self.advance()
             let ty = self.parse_type_expr()
             self.pool.add_extra(ty)
         else:
             self.pool.add_extra(0)
         param_count = param_count + 1
-        if self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-    self.expect(TK_R_PAREN)
+    self.expect(TokenKind.TK_R_PAREN)
     self.skip_newlines()
     // Optional return type
-    if self.peek() == TK_ARROW:
+    if self.peek() == TokenKind.TK_ARROW:
         self.advance()
         self.parse_type_expr()
         self.skip_newlines()
-    self.expect(TK_FAT_ARROW)
+    self.expect(TokenKind.TK_FAT_ARROW)
     let body = self.parse_block_or_expr()
     self.pool.add_node(NodeKind.NK_CLOSURE, start, self.prev_end(), body, extra_start, param_count)
 
 fn Parser.parse_closure(self: Parser) -> i32:
     let start = self.current_start()
-    self.expect(TK_PIPE)
+    self.expect(TokenKind.TK_PIPE)
     let extra_start = self.pool.extra_len()
     var param_count = 0
-    while self.peek() != TK_PIPE and self.peek() != TK_EOF:
-        if self.peek() == TK_KW_IT:
+    while self.peek() != TokenKind.TK_PIPE and self.peek() != TokenKind.TK_EOF:
+        if self.peek() == TokenKind.TK_KW_IT:
             self.emit_error("'it' is a reserved keyword and cannot be used as a parameter name")
             self.advance()
             self.pool.add_extra(0)
             self.pool.add_extra(0)
             param_count = param_count + 1
-            if self.peek() == TK_COMMA:
+            if self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
             continue
@@ -4300,26 +4300,26 @@ fn Parser.parse_closure(self: Parser) -> i32:
             continue
         self.pool.add_extra(p)
         // Optional type
-        if self.peek() == TK_COLON:
+        if self.peek() == TokenKind.TK_COLON:
             self.advance()
             let ty = self.parse_type_expr()
             self.pool.add_extra(ty)
         else:
             self.pool.add_extra(0)
         param_count = param_count + 1
-        if self.peek() == TK_COMMA:
+        if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-    self.expect(TK_PIPE)
+    self.expect(TokenKind.TK_PIPE)
     self.skip_newlines()
 
     // Optional return type
-    if self.peek() == TK_ARROW:
+    if self.peek() == TokenKind.TK_ARROW:
         self.advance()
         self.parse_type_expr()
         self.skip_newlines()
 
-    let body = if self.peek() == TK_COLON:
+    let body = if self.peek() == TokenKind.TK_COLON:
         self.advance()
         self.parse_block_or_expr()
     else:
@@ -4335,11 +4335,11 @@ fn Parser.parse_move_closure(self: Parser) -> i32:
 // ── Block / indentation parsing ──────────────────────────────────
 
 fn Parser.parse_block_or_expr(self: Parser) -> i32:
-    if self.peek() != TK_NEWLINE:
+    if self.peek() != TokenKind.TK_NEWLINE:
         return self.parse_expr()
 
     self.skip_newlines()
-    if self.peek() == TK_EOF:
+    if self.peek() == TokenKind.TK_EOF:
         self.emit_error("expected expression")
         return 0
 
@@ -4348,14 +4348,14 @@ fn Parser.parse_block_or_expr(self: Parser) -> i32:
     var last_expr = self.parse_expr()
 
     while true:
-        if self.peek() != TK_NEWLINE and self.peek() != TK_EOF:
+        if self.peek() != TokenKind.TK_NEWLINE and self.peek() != TokenKind.TK_EOF:
             break
-        if self.peek() == TK_EOF:
+        if self.peek() == TokenKind.TK_EOF:
             break
 
         let save = self.pos
         self.skip_newlines()
-        if self.peek() == TK_EOF:
+        if self.peek() == TokenKind.TK_EOF:
             break
         let next_col = column_of(self.source, self.current_start())
         if next_col < block_col:
@@ -4383,79 +4383,79 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
     let start = self.current_start()
 
     // @TypeOf(expr) — compile-time type of expression
-    if t == TK_AT:
+    if t == TokenKind.TK_AT:
         self.advance()
         if self.is_ident_named("TypeOf"):
             self.advance()
-            if self.expect(TK_L_PAREN) == 0:
+            if self.expect(TokenKind.TK_L_PAREN) == 0:
                 return 0
             self.skip_newlines()
             let inner = self.parse_expr()
             self.skip_newlines()
-            if self.expect(TK_R_PAREN) == 0:
+            if self.expect(TokenKind.TK_R_PAREN) == 0:
                 return 0
             return self.pool.add_node(NodeKind.NK_TYPE_TYPEOF, start, self.prev_end(), inner, 0, 0)
         self.emit_error("expected 'TypeOf' after '@' in type position")
         return 0
 
-    if t == TK_AMPERSAND:
+    if t == TokenKind.TK_AMPERSAND:
         self.advance()
         var is_mut = 0
-        if self.peek() == TK_KW_MUT:
+        if self.peek() == TokenKind.TK_KW_MUT:
             is_mut = 1
             self.advance()
         let pointee = self.parse_type_expr()
         return self.pool.add_node(NodeKind.NK_TYPE_REF, start, self.prev_end(), pointee, is_mut, 0)
 
-    if t == TK_QUESTION:
+    if t == TokenKind.TK_QUESTION:
         self.advance()
         let inner = self.parse_type_expr()
         return self.pool.add_node(NodeKind.NK_TYPE_OPTIONAL, start, self.prev_end(), inner, 0, 0)
 
-    if t == TK_L_PAREN:
+    if t == TokenKind.TK_L_PAREN:
         self.advance()
         self.skip_newlines()
         var elems: Vec[i32] = Vec.new()
-        if self.peek() != TK_R_PAREN:
+        if self.peek() != TokenKind.TK_R_PAREN:
             let ty = self.parse_type_expr()
             elems.push(ty)
             self.skip_newlines()
-            while self.peek() == TK_COMMA:
+            while self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
-                if self.peek() == TK_R_PAREN:
+                if self.peek() == TokenKind.TK_R_PAREN:
                     break
                 let ty2 = self.parse_type_expr()
                 elems.push(ty2)
                 self.skip_newlines()
         self.skip_newlines()
-        self.expect(TK_R_PAREN)
+        self.expect(TokenKind.TK_R_PAREN)
         let extra_start = self.pool.extra_len()
         for ei in 0..elems.len() as i32:
             self.pool.add_extra(elems.get(ei as i64))
         let count = elems.len() as i32
         return self.pool.add_node(NodeKind.NK_TYPE_TUPLE, start, self.prev_end(), extra_start, count, 0)
 
-    if t == TK_KW_FN:
+    if t == TokenKind.TK_KW_FN:
         self.advance()
-        self.expect(TK_L_PAREN)
+        self.expect(TokenKind.TK_L_PAREN)
         self.skip_newlines()
         var params: Vec[i32] = Vec.new()
-        if self.peek() != TK_R_PAREN:
+        if self.peek() != TokenKind.TK_R_PAREN:
             let ty = self.parse_type_expr()
             params.push(ty)
             self.skip_newlines()
-            while self.peek() == TK_COMMA:
+            while self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
-                if self.peek() == TK_R_PAREN:
+                if self.peek() == TokenKind.TK_R_PAREN:
                     break
                 let ty2 = self.parse_type_expr()
                 params.push(ty2)
                 self.skip_newlines()
         self.skip_newlines()
-        self.expect(TK_R_PAREN)
-        self.expect(TK_ARROW)
+        self.expect(TokenKind.TK_R_PAREN)
+        self.expect(TokenKind.TK_ARROW)
         let ret = self.parse_type_expr()
         let extra_start = self.pool.extra_len()
         for pi in 0..params.len() as i32:
@@ -4463,14 +4463,14 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
         let count = params.len() as i32
         return self.pool.add_node(NodeKind.NK_TYPE_FN, start, self.prev_end(), extra_start, count, ret)
 
-    if t == TK_STAR:
+    if t == TokenKind.TK_STAR:
         self.advance()
         var is_mut = 0
         var is_volatile = 0
-        if self.peek() == TK_KW_MUT:
+        if self.peek() == TokenKind.TK_KW_MUT:
             is_mut = 1
             self.advance()
-        else if self.peek() == TK_KW_CONST:
+        else if self.peek() == TokenKind.TK_KW_CONST:
             self.advance()
         else if self.is_ident_named("volatile"):
             is_mut = 1
@@ -4479,34 +4479,34 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
         let pointee = self.parse_type_expr()
         return self.pool.add_node(NodeKind.NK_TYPE_PTR, start, self.prev_end(), pointee, is_mut, is_volatile)
 
-    if t == TK_L_BRACKET:
+    if t == TokenKind.TK_L_BRACKET:
         self.advance()
         self.skip_newlines()
         // []T → slice type
-        if self.peek() == TK_R_BRACKET:
+        if self.peek() == TokenKind.TK_R_BRACKET:
             self.advance()
             self.skip_newlines()
             let elem = self.parse_type_expr()
             return self.pool.add_node(NodeKind.NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
         // [N]T → fixed array (legacy), detect by leading int literal
-        if self.peek() == TK_INT_LIT:
+        if self.peek() == TokenKind.TK_INT_LIT:
             let ss = self.current_start()
             let se = self.current_end()
             let size_text = self.source.slice(ss as i64, se as i64)
             let size = parse_int(size_text)
             self.advance()
             self.skip_newlines()
-            self.expect(TK_R_BRACKET)
+            self.expect(TokenKind.TK_R_BRACKET)
             self.skip_newlines()
             let elem = self.parse_type_expr()
             return self.pool.add_node(NodeKind.NK_TYPE_ARRAY, start, self.prev_end(), elem, size, 0)
         // [T; N] → fixed array (spec syntax), OR [T] → slice
         let elem = self.parse_type_expr()
         self.skip_newlines()
-        if self.peek() == TK_SEMICOLON:
+        if self.peek() == TokenKind.TK_SEMICOLON:
             self.advance()  // consume ;
             self.skip_newlines()
-            if self.peek() != TK_INT_LIT:
+            if self.peek() != TokenKind.TK_INT_LIT:
                 self.emit_error("expected array size after ';'")
                 return 0
             let ss = self.current_start()
@@ -4515,40 +4515,40 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             let size = parse_int(size_text)
             self.advance()
             self.skip_newlines()
-            self.expect(TK_R_BRACKET)
+            self.expect(TokenKind.TK_R_BRACKET)
             return self.pool.add_node(NodeKind.NK_TYPE_ARRAY, start, self.prev_end(), elem, size, 0)
         // [T] → slice type
         self.skip_newlines()
-        self.expect(TK_R_BRACKET)
+        self.expect(TokenKind.TK_R_BRACKET)
         return self.pool.add_node(NodeKind.NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
 
-    if t == TK_KW_DYN:
+    if t == TokenKind.TK_KW_DYN:
         self.advance()
-        if self.peek() != TK_IDENT:
+        if self.peek() != TokenKind.TK_IDENT:
             self.emit_error("expected trait name after 'dyn'")
             return 0
         let sym = self.intern_current()
         self.advance()
         return self.pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, 0, 0)
 
-    if t == TK_KW_IMPL:
+    if t == TokenKind.TK_KW_IMPL:
         self.advance()
-        if self.peek() != TK_IDENT:
+        if self.peek() != TokenKind.TK_IDENT:
             self.emit_error("expected trait name after 'impl'")
             return 0
         let sym = self.intern_current()
         self.advance()
-        if self.peek() == TK_KW_FOR:
+        if self.peek() == TokenKind.TK_KW_FOR:
             self.advance()
         let target = self.parse_type_expr()
         if target == 0:
             return 0
         return self.pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, 0, 0)
 
-    if t == TK_IDENT:
+    if t == TokenKind.TK_IDENT:
         let sym = self.intern_current()
         self.advance()
-        if self.peek() == TK_DOT_IDENT:
+        if self.peek() == TokenKind.TK_DOT_IDENT:
             // Self.Output — dot + uppercase ident combined by lexer
             let dot_s = self.current_start()
             let dot_e = self.current_end()
@@ -4556,28 +4556,28 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             let assoc_sym = self.intern.intern(assoc_text)
             self.advance()
             return self.pool.add_node(NodeKind.NK_TYPE_ASSOC, start, self.prev_end(), sym, assoc_sym, 0)
-        if self.peek() == TK_DOT:
+        if self.peek() == TokenKind.TK_DOT:
             // Self.output — dot + lowercase ident are separate tokens
             self.advance()
             let assoc_sym = self.expect_ident()
             return self.pool.add_node(NodeKind.NK_TYPE_ASSOC, start, self.prev_end(), sym, assoc_sym, 0)
-        if self.peek() == TK_L_BRACKET:
+        if self.peek() == TokenKind.TK_L_BRACKET:
             self.advance()
             self.skip_newlines()
             var args: Vec[i32] = Vec.new()
-            if self.peek() != TK_R_BRACKET:
-                while self.peek() != TK_R_BRACKET and self.peek() != TK_EOF:
+            if self.peek() != TokenKind.TK_R_BRACKET:
+                while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
                     let ty = self.parse_type_expr()
                     args.push(ty)
                     self.skip_newlines()
-                    if self.peek() != TK_COMMA:
+                    if self.peek() != TokenKind.TK_COMMA:
                         break
                     self.advance()
                     self.skip_newlines()
-                    if self.peek() == TK_R_BRACKET:
+                    if self.peek() == TokenKind.TK_R_BRACKET:
                         break
             self.skip_newlines()
-            self.expect(TK_R_BRACKET)
+            self.expect(TokenKind.TK_R_BRACKET)
             let extra_start = self.pool.extra_len()
             for ai in 0..args.len() as i32:
                 self.pool.add_extra(args.get(ai as i64))
@@ -4592,14 +4592,14 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
 
 fn Parser.parse_param_attrs(self: Parser) -> i32:
     var flags = 0
-    while self.peek() == TK_AT:
+    while self.peek() == TokenKind.TK_AT:
         self.advance()
-        if self.peek() != TK_L_BRACKET:
+        if self.peek() != TokenKind.TK_L_BRACKET:
             self.emit_error("expected '[' after '@' in parameter attribute")
             break
         self.advance()
 
-        if self.peek() == TK_IDENT:
+        if self.peek() == TokenKind.TK_IDENT:
             let attr_start = self.current_start()
             let attr_end = self.current_end()
             let attr_text = self.source.slice(attr_start as i64, attr_end as i64)
@@ -4610,7 +4610,7 @@ fn Parser.parse_param_attrs(self: Parser) -> i32:
             self.advance()
         else:
             self.emit_error("expected parameter attribute name")
-        self.expect(TK_R_BRACKET)
+        self.expect(TokenKind.TK_R_BRACKET)
         self.skip_newlines()
     flags
 
@@ -4623,23 +4623,23 @@ fn Parser.parse_param_list(self: Parser) -> i32:
     self.last_param_pattern_count = 0
     self.last_param_required_count = 0
     self.skip_newlines()
-    if self.peek() == TK_R_PAREN or self.peek() == TK_DOT_DOT_DOT:
+    if self.peek() == TokenKind.TK_R_PAREN or self.peek() == TokenKind.TK_DOT_DOT_DOT:
         return 0
     while true:
         self.skip_newlines()
         let param_flags = self.parse_param_attrs()
         var is_mut = 0
-        if self.peek() == TK_KW_MUT:
+        if self.peek() == TokenKind.TK_KW_MUT:
             is_mut = 1
             self.advance()
 
         var name = 0
         var param_pattern = 0
-        if self.peek() == TK_IDENT:
+        if self.peek() == TokenKind.TK_IDENT:
             name = self.expect_ident()
         else:
             let t = self.peek()
-            if t == TK_L_PAREN or t == TK_L_BRACE or t == TK_L_BRACKET or t == TK_DOT_IDENT:
+            if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_DOT_IDENT:
                 param_pattern = self.parse_pattern()
                 let synth = f"__param_pat_{self.pos}_{(params.len() / (FN_PARAM_STRIDE as i64)) as i32}"
                 name = self.intern.intern(synth)
@@ -4649,14 +4649,14 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             break
 
         var type_node = 0
-        if self.peek() == TK_COLON:
+        if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
             type_node = self.parse_type_expr()
 
         // Default value
         var has_default = 0
-        if self.peek() == TK_EQ:
+        if self.peek() == TokenKind.TK_EQ:
             self.advance()
             self.skip_newlines()
             self.parse_expr()
@@ -4670,11 +4670,11 @@ fn Parser.parse_param_list(self: Parser) -> i32:
         self.pool.add_fn_param_pattern_value(param_pattern)
         pattern_count = pattern_count + 1
 
-        if self.peek() != TK_COMMA:
+        if self.peek() != TokenKind.TK_COMMA:
             break
         self.advance()
         self.skip_newlines()
-        if self.peek() == TK_R_PAREN or self.peek() == TK_DOT_DOT_DOT:
+        if self.peek() == TokenKind.TK_R_PAREN or self.peek() == TokenKind.TK_DOT_DOT_DOT:
             break
 
     let count = (params.len() / (FN_PARAM_STRIDE as i64)) as i32
@@ -4688,18 +4688,18 @@ fn Parser.parse_param_list(self: Parser) -> i32:
 fn Parser.parse_one_param(self: Parser) -> i32:
     let param_flags = self.parse_param_attrs()
     var is_mut = 0
-    if self.peek() == TK_KW_MUT:
+    if self.peek() == TokenKind.TK_KW_MUT:
         is_mut = 1
         self.advance()
     let name = self.expect_ident()
     if name == 0:
         return 0
     var type_node = 0
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
         type_node = self.parse_type_expr()
     // Default value
-    if self.peek() == TK_EQ:
+    if self.peek() == TokenKind.TK_EQ:
         self.advance()
         self.parse_expr()
     self.pool.add_extra(name)
@@ -4710,38 +4710,38 @@ fn Parser.parse_one_param(self: Parser) -> i32:
 // ── Type parameters ──────────────────────────────────────────────
 
 fn Parser.parse_type_params(self: Parser) -> i32:
-    if self.peek() != TK_L_BRACKET:
+    if self.peek() != TokenKind.TK_L_BRACKET:
         return 0
     self.advance()
     self.skip_newlines()
     var count = 0
-    if self.peek() != TK_R_BRACKET:
+    if self.peek() != TokenKind.TK_R_BRACKET:
         count = count + self.parse_one_type_param()
-        while self.peek() == TK_COMMA:
+        while self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
-            if self.peek() == TK_R_BRACKET:
+            if self.peek() == TokenKind.TK_R_BRACKET:
                 break
             count = count + self.parse_one_type_param()
     self.skip_newlines()
-    self.expect(TK_R_BRACKET)
+    self.expect(TokenKind.TK_R_BRACKET)
     count
 
 fn Parser.parse_one_type_param(self: Parser) -> i32:
-    if self.peek() == TK_KW_CONST:
+    if self.peek() == TokenKind.TK_KW_CONST:
         self.emit_error("const generics are reserved for future use")
         self.advance()
     let name = self.expect_ident()
     self.pool.add_extra(name)
     let count_idx = self.pool.add_extra(0)
     var bound_count = 0
-    if self.peek() == TK_COLON:
+    if self.peek() == TokenKind.TK_COLON:
         self.advance()
         self.skip_newlines()
         let b = self.parse_type_bound_symbol()
         self.pool.add_extra(b)
         bound_count = bound_count + 1
-        while self.peek() == TK_PLUS:
+        while self.peek() == TokenKind.TK_PLUS:
             self.advance()
             self.skip_newlines()
             let b2 = self.parse_type_bound_symbol()
@@ -4751,23 +4751,23 @@ fn Parser.parse_one_type_param(self: Parser) -> i32:
     1
 
 fn Parser.parse_type_bound_symbol(self: Parser) -> i32:
-    if self.peek() == TK_IDENT:
+    if self.peek() == TokenKind.TK_IDENT:
         let sym = self.expect_ident()
         // Consume optional parameterized bound: Trait[Item=Type, ...] or Trait[T]
-        if self.peek() == TK_L_BRACKET:
+        if self.peek() == TokenKind.TK_L_BRACKET:
             self.advance()
             var depth = 1
-            while depth > 0 and self.peek() != TK_EOF:
-                if self.peek() == TK_L_BRACKET:
+            while depth > 0 and self.peek() != TokenKind.TK_EOF:
+                if self.peek() == TokenKind.TK_L_BRACKET:
                     depth = depth + 1
-                if self.peek() == TK_R_BRACKET:
+                if self.peek() == TokenKind.TK_R_BRACKET:
                     depth = depth - 1
                     if depth == 0:
                         self.advance()
                         break
                 self.advance()
         return sym
-    if self.peek() == TK_KW_TYPE:
+    if self.peek() == TokenKind.TK_KW_TYPE:
         self.advance()
         return self.intern.intern("type")
     self.emit_error("expected type bound name")
@@ -4776,7 +4776,7 @@ fn Parser.parse_type_bound_symbol(self: Parser) -> i32:
 fn Parser.parse_optional_where_clause(self: Parser):
     self.last_where_start = 0
     self.last_where_count = 0
-    if self.peek() != TK_KW_WHERE and not self.is_ident_named("where"):
+    if self.peek() != TokenKind.TK_KW_WHERE and not self.is_ident_named("where"):
         return
     self.advance()
     // Collect all where clause entries into local vecs first
@@ -4784,10 +4784,10 @@ fn Parser.parse_optional_where_clause(self: Parser):
     var wp_bound_starts: Vec[i32] = Vec.new()
     var wp_bound_counts: Vec[i32] = Vec.new()
     var wp_bounds_flat: Vec[i32] = Vec.new()
-    while self.peek() == TK_IDENT:
+    while self.peek() == TokenKind.TK_IDENT:
         let type_param = self.intern_current()
         self.advance()
-        self.expect(TK_COLON)
+        self.expect(TokenKind.TK_COLON)
         wp_syms.push(type_param)
         wp_bound_starts.push(wp_bounds_flat.len() as i32)
         var bound_count = 0
@@ -4795,14 +4795,14 @@ fn Parser.parse_optional_where_clause(self: Parser):
         if b != 0:
             wp_bounds_flat.push(b)
             bound_count = bound_count + 1
-        while self.peek() == TK_PLUS:
+        while self.peek() == TokenKind.TK_PLUS:
             self.advance()
             let b2 = self.parse_type_bound_symbol()
             if b2 != 0:
                 wp_bounds_flat.push(b2)
                 bound_count = bound_count + 1
         wp_bound_counts.push(bound_count)
-        if self.peek() != TK_COMMA:
+        if self.peek() != TokenKind.TK_COMMA:
             break
         self.advance()
     // Now write to extra pool: [type_param, bound_count, bounds...]*
