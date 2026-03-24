@@ -471,7 +471,7 @@ fn Lexer.lex_number(self: Lexer) -> i32:
             while self.pos < slen and ((src.byte_at((self.pos) as i64) >= CH_0 and src.byte_at((self.pos) as i64) <= CH_7) or src.byte_at((self.pos) as i64) == CH_UNDERSCORE):
                 self.pos = self.pos + 1
 
-    if scanned_prefixed == false:
+    if not scanned_prefixed:
         // Decimal digits
         while self.pos < slen and (lex_is_digit(src.byte_at((self.pos) as i64)) or src.byte_at((self.pos) as i64) == CH_UNDERSCORE):
             self.pos = self.pos + 1
