@@ -855,7 +855,7 @@ fn mir_rvalue_text(body: MirBody, rval_id: i32, pool: InternPool, sema: Sema) ->
         return "unop(" ++ mir_unop_name(d0) ++ ", " ++ mir_operand_text(body, d1, pool, sema) ++ ")"
 
     if k == RK_REF:
-        let borrow = if d0 == BK_EXCLUSIVE: "mut" else: "shared"
+        let borrow = if d0 == BorrowKind.EXCLUSIVE: "mut" else: "shared"
         return "ref(" ++ borrow ++ ", " ++ mir_place_text(body, d1) ++ ")"
 
     if k == RK_ADDR_OF:
@@ -1258,7 +1258,7 @@ fn validate_mir_body(body: MirBody) -> str:
                 return f"rvalue{ri}: unop operand out of range"
             continue
         if rv_kind == RK_REF:
-            if d0 != BK_SHARED and d0 != BK_EXCLUSIVE:
+            if d0 != BorrowKind.SHARED and d0 != BorrowKind.EXCLUSIVE:
                 return f"rvalue{ri}: invalid borrow kind"
             if not mir_index_in_range(d1, place_count):
                 return f"rvalue{ri}: ref place out of range"

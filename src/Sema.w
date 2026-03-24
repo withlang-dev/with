@@ -42,18 +42,18 @@ const TY_TRAIT_OBJ: i32 = 17
 const TY_NEVER: i32 = 18
 const TY_GENERIC_INST: i32 = 19
 
-// Var state constants
-const VS_LIVE: i32 = 0
-const VS_MOVED: i32 = 1
+type VarState: i32 =
+    LIVE = 0
+    MOVED = 1
 
-// Borrow kind constants
-const BK_SHARED: i32 = 0
-const BK_EXCLUSIVE: i32 = 1
+type BorrowKind: i32 =
+    SHARED = 0
+    EXCLUSIVE = 1
 
-// Derive requirement constants
-const DR_COPY: i32 = 0
-const DR_CLONE: i32 = 1
-const DR_EQ: i32 = 2
+type DeriveReq: i32 =
+    COPY = 0
+    CLONE = 1
+    EQ = 2
 
 // ── Sema state ───────────────────────────────────────────────────
 
@@ -1353,7 +1353,7 @@ fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
     self.bind_names.push(sym)
     self.bind_types.push(tid)
     self.bind_muts.push(is_mut)
-    self.bind_states.push(VS_LIVE)
+    self.bind_states.push(VarState.LIVE)
     self.bind_is_task.push(0)
     self.bind_is_scoped_task.push(0)
     self.bind_is_ephemeral_task.push(0)
@@ -1375,7 +1375,7 @@ fn Sema.scope_lookup_state(self: Sema, sym: i32) -> i32:
     let opt = self.scope_name_map.get(sym)
     if opt.is_some():
         return self.bind_states.get(opt.unwrap() as i64)
-    VS_LIVE
+    VarState.LIVE
 
 fn Sema.scope_lookup_is_task(self: Sema, sym: i32) -> i32:
     let opt = self.scope_name_map.get(sym)
@@ -3645,7 +3645,7 @@ fn Sema.expr_is_scoped_task_value(self: Sema, node: i32) -> i32:
 fn Sema.has_live_await_guard(self: Sema) -> i32:
     var i = self.bind_names.len() as i32 - 1
     while i >= 0:
-        if self.bind_states.get(i as i64) == VS_LIVE:
+        if self.bind_states.get(i as i64) == VarState.LIVE:
             let name = self.pool_resolve(self.bind_names.get(i as i64))
             if name.ends_with("_guard"):
                 return 1
@@ -4041,7 +4041,7 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     let tid = self.scope_lookup(sym)
     if tid >= 0:
         let state = self.scope_lookup_state(sym)
-        if state == VS_MOVED:
+        if state == VarState.MOVED:
             if sema_debug_move_enabled() != 0:
                 let name = self.pool_resolve(sym)
                 with_eprintln(
@@ -4316,10 +4316,10 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
     if op == UOP_NOT:
         return self.ty_bool
     if op == UOP_REF:
-        self.check_borrow_create(operand_node, BK_SHARED, node)
+        self.check_borrow_create(operand_node, BorrowKind.SHARED, node)
         return self.add_type(TY_REF, operand, 0, 0)
     if op == UOP_MUT_REF:
-        self.check_borrow_create(operand_node, BK_EXCLUSIVE, node)
+        self.check_borrow_create(operand_node, BorrowKind.EXCLUSIVE, node)
         return self.add_type(TY_REF, operand, 1, 0)
     if op == UOP_DEREF:
         let resolved = self.resolve_alias(operand)
@@ -4520,7 +4520,7 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
     // Reinitialize target
     if self.ast.kind(target) == NK_IDENT:
         let target_sym = self.ast.get_data0(target)
-        self.scope_set_state(target_sym, VS_LIVE)
+        self.scope_set_state(target_sym, VarState.LIVE)
         self.scope_set_is_task(target_sym, self.expr_is_task_value(value))
         self.scope_set_is_scoped_task(target_sym, self.expr_is_scoped_task_value(value))
         self.scope_set_is_ephemeral_task(target_sym, self.expr_is_ephemeral_task(value))
@@ -5483,7 +5483,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
                         fi = fi + 1
                 else:
                     // Whole-variable capture
-                    let bk = if self.expr_mutates_place(body, cap_sym) != 0: BK_EXCLUSIVE else: BK_SHARED
+                    let bk = if self.expr_mutates_place(body, cap_sym) != 0: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
                     let path_start = self.borrow_path_data.len() as i32
                     self.check_borrow_create_direct(cap_sym, bk, 0, path_start, 0, node)
             ci = ci + 1
@@ -5498,7 +5498,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
             if self.expr_uses_symbol(body, cap_sym) != 0:
                 let cap_ty = self.bind_types.get(ci as i64)
                 if not self.is_copy(cap_ty):
-                    self.scope_set_state(cap_sym, VS_MOVED)
+                    self.scope_set_state(cap_sym, VarState.MOVED)
             ci = ci + 1
 
     self.add_type(TY_FN, te_start, param_count, self.ty_i32)
@@ -6904,8 +6904,8 @@ fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: 
             continue
 
         let existing_kind = self.borrow_kinds.get(i as i64)
-        if kind == BK_SHARED:
-            if existing_kind == BK_EXCLUSIVE:
+        if kind == BorrowKind.SHARED:
+            if existing_kind == BorrowKind.EXCLUSIVE:
                 self.emit_error("cannot borrow: already mutably borrowed", err_node)
                 return
             i = i + 1
@@ -6915,7 +6915,7 @@ fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: 
         // Allow reborrowing: when the same place is reborrowed exclusively
         // for a nested call (e.g., &mut self passed to a helper taking &mut Self),
         // suppress the conflict. The original borrow is suspended during the call.
-        if existing_kind == BK_EXCLUSIVE:
+        if existing_kind == BorrowKind.EXCLUSIVE:
             // Reborrow: same place, both exclusive → allow (suspend original)
             i = i + 1
             continue
@@ -6944,13 +6944,13 @@ fn Sema.check_borrow_create_direct(self: Sema, place: i32, kind: i32, field: i32
             i = i + 1
             continue
         let existing_kind = self.borrow_kinds.get(i as i64)
-        if kind == BK_SHARED:
-            if existing_kind == BK_EXCLUSIVE:
+        if kind == BorrowKind.SHARED:
+            if existing_kind == BorrowKind.EXCLUSIVE:
                 self.emit_error("cannot borrow: already mutably borrowed", err_node)
                 return
             i = i + 1
             continue
-        if existing_kind == BK_EXCLUSIVE:
+        if existing_kind == BorrowKind.EXCLUSIVE:
             self.emit_error("cannot borrow mutably: already mutably borrowed", err_node)
         else:
             self.emit_error("cannot borrow mutably: already borrowed", err_node)
@@ -7313,7 +7313,7 @@ fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
                 fi = fi + 1
             if found == 0:
                 self.capture_field_syms.push(field_sym)
-                self.capture_field_kinds.push(BK_SHARED)
+                self.capture_field_kinds.push(BorrowKind.SHARED)
             return
         self.collect_capture_fields(base, sym)
         return
@@ -7329,12 +7329,12 @@ fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
                 while fi < self.capture_field_syms.len() as i32:
                     if self.capture_field_syms.get(fi as i64) == field_sym:
                         found = 1
-                        self.capture_field_kinds.set_i32(fi as i64, BK_EXCLUSIVE)
+                        self.capture_field_kinds.set_i32(fi as i64, BorrowKind.EXCLUSIVE)
                         break
                     fi = fi + 1
                 if found == 0:
                     self.capture_field_syms.push(field_sym)
-                    self.capture_field_kinds.push(BK_EXCLUSIVE)
+                    self.capture_field_kinds.push(BorrowKind.EXCLUSIVE)
         self.collect_capture_fields(self.ast.get_data0(node), sym)
         self.collect_capture_fields(self.ast.get_data1(node), sym)
         return
@@ -7352,12 +7352,12 @@ fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
                     while fi < self.capture_field_syms.len() as i32:
                         if self.capture_field_syms.get(fi as i64) == field_sym:
                             found = 1
-                            self.capture_field_kinds.set_i32(fi as i64, BK_EXCLUSIVE)
+                            self.capture_field_kinds.set_i32(fi as i64, BorrowKind.EXCLUSIVE)
                             break
                         fi = fi + 1
                     if found == 0:
                         self.capture_field_syms.push(field_sym)
-                        self.capture_field_kinds.push(BK_EXCLUSIVE)
+                        self.capture_field_kinds.push(BorrowKind.EXCLUSIVE)
                     return
         self.collect_capture_fields(operand, sym)
         return
@@ -7490,7 +7490,7 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
                     with_eprintln(
                         f"[move] sym={name} tid={tid} resolved={resolved} kind={self.get_type_kind(resolved)}"
                     )
-                self.scope_set_state(sym, VS_MOVED)
+                self.scope_set_state(sym, VarState.MOVED)
     if kind == NK_GROUPED:
         self.mark_moved_if_consumed(self.ast.get_data0(node))
 
