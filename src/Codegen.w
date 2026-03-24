@@ -896,10 +896,10 @@ fn Codegen.debug_get_di_type(self: Codegen, sema_tid: i32) -> i64:
 fn Codegen.debug_create_di_type(self: Codegen, sema_tid: i32) -> i64:
     let kind = self.sema.get_type_kind(sema_tid)
     if kind == 3:
-        // TY_BOOL
+        // TypeKind.TY_BOOL
         return wl_di_create_basic_type(self.di_builder, "bool", 8, wl_dwarf_ate_boolean())
     if kind == 1:
-        // TY_INT: d0 = width, d1 = signed, d2 = ptr_width flag
+        // TypeKind.TY_INT: d0 = width, d1 = signed, d2 = ptr_width flag
         let width = self.sema.get_type_d0(sema_tid)
         let is_signed = self.sema.get_type_d1(sema_tid)
         let is_ptr_width = self.sema.get_type_d2(sema_tid)
@@ -912,22 +912,22 @@ fn Codegen.debug_create_di_type(self: Codegen, sema_tid: i32) -> i64:
         else:
             return wl_di_create_basic_type(self.di_builder, f"u{width}", width as i64, wl_dwarf_ate_unsigned())
     if kind == 2:
-        // TY_FLOAT: d0 = width
+        // TypeKind.TY_FLOAT: d0 = width
         let width = self.sema.get_type_d0(sema_tid)
         return wl_di_create_basic_type(self.di_builder, f"f{width}", width as i64, wl_dwarf_ate_float())
     if kind == 5:
-        // TY_STR
+        // TypeKind.TY_STR
         return wl_di_create_unspecified_type(self.di_builder, "str")
     if kind == 4:
-        // TY_VOID
+        // TypeKind.TY_VOID
         return wl_di_create_unspecified_type(self.di_builder, "void")
     if kind == 13 or kind == 14:
-        // TY_PTR / TY_REF: d0 = pointee tid
+        // TypeKind.TY_PTR / TypeKind.TY_REF: d0 = pointee tid
         let pointee_tid = self.sema.get_type_d0(sema_tid)
         let pointee_di = self.debug_get_di_type(pointee_tid)
         return wl_di_create_pointer_type(self.di_builder, pointee_di, 64)
     if kind == 6 or kind == 7:
-        // TY_STRUCT / TY_ENUM: d0 = name sym
+        // TypeKind.TY_STRUCT / TypeKind.TY_ENUM: d0 = name sym
         let name_sym = self.sema.get_type_d0(sema_tid)
         let name = self.intern.resolve(name_sym)
         return wl_di_create_unspecified_type(self.di_builder, name)
@@ -2106,11 +2106,11 @@ fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
             return typed
     0
 
-// Extract LLVM type of the i'th generic arg from a sema TY_GENERIC_INST type.
+// Extract LLVM type of the i'th generic arg from a sema TypeKind.TY_GENERIC_INST type.
 fn Codegen.sema_generic_arg_llvm(self: Codegen, sema_tid: i32, arg_idx: i32) -> i64:
     if sema_tid <= 0:
         return 0
-    if self.sema.get_type_kind(sema_tid) != TY_GENERIC_INST:
+    if self.sema.get_type_kind(sema_tid) != TypeKind.TY_GENERIC_INST:
         return 0
     let ac = self.sema.get_generic_inst_arg_count(sema_tid)
     if arg_idx >= ac:
@@ -2118,13 +2118,13 @@ fn Codegen.sema_generic_arg_llvm(self: Codegen, sema_tid: i32, arg_idx: i32) -> 
     let inner_tid = self.sema.get_generic_inst_arg(sema_tid, arg_idx)
     self.sema_type_to_llvm(inner_tid)
 
-// Map sema TypeId to LLVM type. Handles TY_GENERIC_INST for builtin containers.
+// Map sema TypeId to LLVM type. Handles TypeKind.TY_GENERIC_INST for builtin containers.
 fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
     if tid <= 0:
         return 0
     let resolved_tid = self.sema.resolve_alias(tid)
     let tk = self.sema.get_type_kind(resolved_tid)
-    if tk == TY_GENERIC_INST:
+    if tk == TypeKind.TY_GENERIC_INST:
         let base_name = self.intern.resolve(self.sema.get_type_d0(resolved_tid))
         let arg_count = self.sema.get_generic_inst_arg_count(resolved_tid)
         if base_name == "Vec" and arg_count > 0:
@@ -2187,7 +2187,7 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             self.type_binding_types = saved_types
             return mono_ty
         return 0
-    if tk == TY_INT:
+    if tk == TypeKind.TY_INT:
         let bits = self.sema.get_type_d0(resolved_tid)
         if bits == 1:
             return wl_i1_type(self.context)
@@ -2202,17 +2202,17 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
         if bits == 128:
             return wl_i128_type(self.context)
         return wl_i32_type(self.context)
-    if tk == TY_BOOL:
+    if tk == TypeKind.TY_BOOL:
         return wl_i1_type(self.context)
-    if tk == TY_STR:
+    if tk == TypeKind.TY_STR:
         let str_sym = self.intern.intern("str")
         return self.resolve_named_type(str_sym)
-    if tk == TY_VOID:
+    if tk == TypeKind.TY_VOID:
         return wl_void_type(self.context)
-    if tk == TY_STRUCT or tk == TY_ENUM:
+    if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
         let sym = self.sema.get_type_d0(resolved_tid)
         return self.resolve_named_type(sym)
-    if tk == TY_PTR or tk == TY_REF:
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
         return wl_ptr_type(self.context)
     0
 
@@ -4657,7 +4657,7 @@ fn Codegen.try_resolve_vec_new_global_type(self: Codegen, value_node: i32, flags
 
 fn Codegen.emit_vec_new_global(self: Codegen, name_sym: i32, vec_tid: i32, is_mut: i32) -> bool:
     let resolved = self.sema.resolve_alias(vec_tid)
-    if self.sema.get_type_kind(resolved) != TY_GENERIC_INST:
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
         return false
     let base_sym = self.sema.get_type_d0(resolved)
     if self.intern.resolve(base_sym) != "Vec":
@@ -4798,7 +4798,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             if inferred_null_ty != 0:
                 null_ty = self.sema.resolve_alias(inferred_null_ty)
         let null_tk = if null_ty != 0: self.sema.get_type_kind(null_ty) else: 0
-        if null_tk == TY_PTR or null_tk == TY_REF:
+        if null_tk == TypeKind.TY_PTR or null_tk == TypeKind.TY_REF:
             let global_ty = self.sema_type_to_llvm(null_ty)
             if global_ty != 0:
                 let name_str = self.intern.resolve(name_sym)
@@ -4811,7 +4811,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
                 return
     let val = self.try_eval_const_int(value_node)
     if val != CONST_EVAL_FAIL():
-        if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TY_FLOAT:
+        if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TypeKind.TY_FLOAT:
             let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
             let name_str = self.intern.resolve(name_sym)
             let global = wl_add_global(self.llmod, global_ty, name_str)
@@ -4826,7 +4826,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             self.const_int_vals.push(val)
         // Respect the sema-resolved binding type when available.
         var global_ty = if val < -2147483648 or val > 2147483647: wl_i64_type(self.context) else: wl_i32_type(self.context)
-        if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TY_INT:
+        if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TypeKind.TY_INT:
             let inferred_llvm = self.sema_type_to_llvm(resolved_binding_ty)
             if inferred_llvm != 0:
                 global_ty = inferred_llvm
@@ -4890,7 +4890,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         if float_negate:
             fval = -fval
         var global_ty = wl_f64_type(self.context)
-        if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TY_FLOAT:
+        if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TypeKind.TY_FLOAT:
             let inferred_llvm = self.sema_type_to_llvm(resolved_binding_ty)
             if inferred_llvm != 0:
                 global_ty = inferred_llvm
@@ -5014,23 +5014,23 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
         // Type was created after snapshot — read from sema directly
         return self.sema_type_to_llvm(resolved)
-    if tk == TY_INT:
+    if tk == TypeKind.TY_INT:
         let bits = self.mir_input.mir_get_type_d0(resolved)
         if bits == 8: return wl_i8_type(self.context)
         if bits == 16: return wl_i16_type(self.context)
         if bits == 64: return wl_i64_type(self.context)
         if bits == 128: return wl_i128_type(self.context)
         return wl_i32_type(self.context)
-    if tk == TY_FLOAT:
+    if tk == TypeKind.TY_FLOAT:
         let bits = self.mir_input.mir_get_type_d0(resolved)
         if bits == 32: return wl_f32_type(self.context)
         return wl_f64_type(self.context)
-    if tk == TY_BOOL:
+    if tk == TypeKind.TY_BOOL:
         return wl_i1_type(self.context)
-    if tk == TY_STR:
+    if tk == TypeKind.TY_STR:
         let str_sym = self.intern.intern("str")
         return self.resolve_named_type(str_sym)
-    if tk == TY_STRUCT or tk == TY_ENUM:
+    if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
         let name_sym = self.mir_input.mir_get_type_d0(resolved)
         if name_sym != 0:
             // Translate sema pool sym to codegen intern pool sym
@@ -5043,13 +5043,13 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
             if named_ty != 0:
                 return named_ty
             // Disc enum without payloads: return repr type
-            if tk == TY_ENUM:
+            if tk == TypeKind.TY_ENUM:
                 let de_opt = self.disc_enum_type_map.get(cg_sym)
                 if de_opt.is_some():
                     return self.disc_enum_repr_types.get(de_opt.unwrap() as i64)
-    if tk == TY_GENERIC_INST:
+    if tk == TypeKind.TY_GENERIC_INST:
         return self.sema_type_to_llvm(resolved)
-    if tk == TY_TUPLE:
+    if tk == TypeKind.TY_TUPLE:
         let te_start = self.mir_input.mir_get_type_d0(resolved)
         let te_count = self.mir_input.mir_get_type_d1(resolved)
         let elem_types: Vec[i64] = Vec.new()
@@ -5062,22 +5062,22 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
         if te_count > 0:
             return wl_struct_type(self.context, vec_data_i64(&elem_types), te_count, 0)
         return wl_i32_type(self.context)
-    if tk == TY_ARRAY:
+    if tk == TypeKind.TY_ARRAY:
         let arr_elem_tid = self.mir_input.mir_get_type_d0(resolved)
         let arr_len = self.mir_input.mir_get_type_d1(resolved)
         var arr_elem_llvm = self.mir_sema_type_to_llvm(arr_elem_tid)
         if arr_elem_llvm == 0:
             arr_elem_llvm = wl_i32_type(self.context)
         return wl_array_type(arr_elem_llvm, arr_len as i64)
-    if tk == TY_PTR or tk == TY_REF:
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
         return wl_ptr_type(self.context)
-    if tk == TY_FN:
+    if tk == TypeKind.TY_FN:
         let ptr_ty = wl_ptr_type(self.context)
         let fat_types: Vec[i64] = Vec.new()
         fat_types.push(ptr_ty)
         fat_types.push(ptr_ty)
         return wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
-    if tk == TY_SLICE:
+    if tk == TypeKind.TY_SLICE:
         let body_types: Vec[i64] = Vec.new()
         body_types.push(wl_ptr_type(self.context))
         body_types.push(wl_i64_type(self.context))
@@ -5091,7 +5091,7 @@ fn Codegen.mir_build_closure_fn_type(self: Codegen, sema_ty: i32) -> i64:
     if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
         resolved = self.sema.resolve_alias(resolved)
         tk = self.sema.get_type_kind(resolved)
-    if tk != TY_FN:
+    if tk != TypeKind.TY_FN:
         return 0
     var extra_start = self.mir_input.mir_get_type_d0(resolved)
     var param_count = self.mir_input.mir_get_type_d1(resolved)
@@ -5257,7 +5257,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
             if cur_sema_ty > 0:
                 let deref_resolved = self.mir_input.mir_resolve_alias(cur_sema_ty)
                 let deref_tk = self.mir_input.mir_get_type_kind(deref_resolved)
-                if deref_tk == TY_PTR or deref_tk == TY_REF:
+                if deref_tk == TypeKind.TY_PTR or deref_tk == TypeKind.TY_REF:
                     let pointee_sema = self.mir_input.mir_get_type_d0(deref_resolved)
                     if pointee_sema > 0:
                         cur_sema_ty = pointee_sema
@@ -5422,7 +5422,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
             if cur_sema_ty > 0:
                 let deref_resolved = self.mir_input.mir_resolve_alias(cur_sema_ty)
                 let deref_tk = self.mir_input.mir_get_type_kind(deref_resolved)
-                if deref_tk == TY_PTR or deref_tk == TY_REF:
+                if deref_tk == TypeKind.TY_PTR or deref_tk == TypeKind.TY_REF:
                     let pointee_sema = self.mir_input.mir_get_type_d0(deref_resolved)
                     if pointee_sema > 0:
                         cur_sema_ty = pointee_sema
@@ -5712,14 +5712,14 @@ fn Codegen.mir_operand_is_unsigned(self: Codegen, body: MirBody, operand_id: i32
                 let sema_ty = body.local_type_ids.get(local_id as i64)
                 if sema_ty > 0:
                     let resolved = self.mir_input.mir_resolve_alias(sema_ty)
-                    if self.mir_input.mir_get_type_kind(resolved) == TY_INT:
+                    if self.mir_input.mir_get_type_kind(resolved) == TypeKind.TY_INT:
                         return self.mir_input.mir_get_type_d1(resolved) == 0
     false
 
 fn Codegen.mir_sema_type_is_unsigned(self: Codegen, sema_ty: i32) -> bool:
     if sema_ty <= 0: return false
     let resolved = self.mir_input.mir_resolve_alias(sema_ty)
-    if self.mir_input.mir_get_type_kind(resolved) == TY_INT:
+    if self.mir_input.mir_get_type_kind(resolved) == TypeKind.TY_INT:
         return self.mir_input.mir_get_type_d1(resolved) == 0
     false
 
@@ -5928,15 +5928,15 @@ fn Codegen.gen_debug_format(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) 
     let tk = if resolved > 0: self.mir_input.mir_get_type_kind(resolved) else: 0
 
     // str → quoted
-    if resolved == self.sema.ty_str or tk == TY_STR:
+    if resolved == self.sema.ty_str or tk == TypeKind.TY_STR:
         return self.call_runtime_str_fn("with_fmt_str_debug", val, str_ty)
 
     // Struct → "TypeName { field: val, field: val }"
-    if tk == TY_STRUCT:
+    if tk == TypeKind.TY_STRUCT:
         return self.gen_debug_struct(val, resolved, str_ty)
 
     // Enum → ".VariantName"
-    if tk == TY_ENUM:
+    if tk == TypeKind.TY_ENUM:
         return self.gen_debug_enum(val, resolved, str_ty)
 
     // Primitives (int, float, bool) → same as default display
@@ -6108,7 +6108,7 @@ fn Codegen.mir_pointer_elem_llvm_type(self: Codegen, sema_ty: i32) -> i64:
         return 0
     let resolved = self.mir_input.mir_resolve_alias(sema_ty)
     let tk = self.mir_input.mir_get_type_kind(resolved)
-    if tk != TY_PTR and tk != TY_REF:
+    if tk != TypeKind.TY_PTR and tk != TypeKind.TY_REF:
         return 0
     let pointee = self.mir_input.mir_get_type_d0(resolved)
     if pointee <= 0:
@@ -6142,12 +6142,12 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
         let lhs_llvm_tk = wl_get_type_kind(wl_type_of(lhs))
         let rhs_llvm_tk = wl_get_type_kind(wl_type_of(rhs))
         if d0 == OP_ADD or d0 == OP_SUB:
-            if (lhs_tk == TY_PTR or lhs_tk == TY_REF) and lhs_llvm_tk == wl_pointer_type_kind() and rhs_llvm_tk == wl_integer_type_kind():
+            if (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF) and lhs_llvm_tk == wl_pointer_type_kind() and rhs_llvm_tk == wl_integer_type_kind():
                 let elem_ty = self.mir_pointer_elem_llvm_type(lhs_sema)
                 let indices: Vec[i64] = Vec.new()
                 indices.push(if d0 == OP_SUB: wl_build_neg(self.builder, rhs) else: rhs)
                 return wl_build_gep(self.builder, if elem_ty != 0: elem_ty else: wl_i8_type(self.context), lhs, vec_data_i64(&indices), 1)
-            if d0 == OP_ADD and (rhs_tk == TY_PTR or rhs_tk == TY_REF) and rhs_llvm_tk == wl_pointer_type_kind() and lhs_llvm_tk == wl_integer_type_kind():
+            if d0 == OP_ADD and (rhs_tk == TypeKind.TY_PTR or rhs_tk == TypeKind.TY_REF) and rhs_llvm_tk == wl_pointer_type_kind() and lhs_llvm_tk == wl_integer_type_kind():
                 let elem_ty = self.mir_pointer_elem_llvm_type(rhs_sema)
                 let indices: Vec[i64] = Vec.new()
                 indices.push(lhs)
@@ -6328,7 +6328,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
         // (MirLower stores the source sema type in rval_d2 for casts)
         if not src_unsigned and d2 > 0:
             let cast_src_resolved = self.mir_input.mir_resolve_alias(d2)
-            if self.mir_input.mir_get_type_kind(cast_src_resolved) == TY_INT:
+            if self.mir_input.mir_get_type_kind(cast_src_resolved) == TypeKind.TY_INT:
                 src_unsigned = self.mir_input.mir_get_type_d1(cast_src_resolved) == 0
         // d1 = sema target type id
         var cast_ty = dest_ty
@@ -6571,12 +6571,12 @@ fn Codegen.mir_intrinsic_dest_sema_type(self: Codegen, body: MirBody, dest_place
     body.local_type_ids.get(local_id as i64)
 
 fn Codegen.mir_vec_elem_size(self: Codegen, body: MirBody, dest_place: i32) -> i64:
-    // Determine Vec element size from dest place sema type (TY_GENERIC_INST).
+    // Determine Vec element size from dest place sema type (TypeKind.TY_GENERIC_INST).
     let sema_ty = self.mir_intrinsic_dest_sema_type(body, dest_place)
     if sema_ty > 0:
         let resolved = self.mir_input.mir_resolve_alias(sema_ty)
         let tk = self.mir_input.mir_get_type_kind(resolved)
-        if tk == TY_GENERIC_INST:
+        if tk == TypeKind.TY_GENERIC_INST:
             let arg_count = self.mir_input.mir_get_type_d2(resolved)
             if arg_count > 0:
                 let te_start = self.mir_input.mir_get_type_d1(resolved)
@@ -6592,11 +6592,11 @@ fn Codegen.mir_index_elem_sema_type(self: Codegen, sema_ty: i32) -> i32:
         return 0
     let resolved = self.mir_input.mir_resolve_alias(sema_ty)
     let tk = self.mir_input.mir_get_type_kind(resolved)
-    if tk == TY_ARRAY or tk == TY_SLICE:
+    if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
         return self.mir_input.mir_get_type_d0(resolved)
-    if tk == TY_STR:
+    if tk == TypeKind.TY_STR:
         return self.sema.ty_i32
-    if tk == TY_GENERIC_INST:
+    if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.mir_input.mir_get_type_d0(resolved)
         let arg_count = self.mir_input.mir_get_type_d2(resolved)
         if base_sym > 0 and arg_count > 0 and base_sym < self.sema.pool.symbol_texts.len() as i32:
@@ -6611,7 +6611,7 @@ fn Codegen.mir_index_elem_llvm_type(self: Codegen, sema_ty: i32, cur_ty: i64) ->
         return wl_get_element_type(cur_ty)
     if sema_ty > 0:
         let resolved = self.mir_input.mir_resolve_alias(sema_ty)
-        if self.mir_input.mir_get_type_kind(resolved) == TY_STR:
+        if self.mir_input.mir_get_type_kind(resolved) == TypeKind.TY_STR:
             return wl_i8_type(self.context)
         let elem_sema = self.mir_index_elem_sema_type(sema_ty)
         if elem_sema > 0:
@@ -6630,7 +6630,7 @@ fn Codegen.mir_builtin_variant_payload_sema_type(self: Codegen, sema_ty: i32, va
     if sema_ty <= 0 or variant_idx < 0:
         return 0
     let resolved = self.mir_input.mir_resolve_alias(sema_ty)
-    if self.mir_input.mir_get_type_kind(resolved) != TY_GENERIC_INST:
+    if self.mir_input.mir_get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
         return 0
     let base_sym = self.mir_input.mir_get_type_d0(resolved)
     if base_sym <= 0 or base_sym >= self.sema.pool.symbol_texts.len() as i32:
@@ -6660,7 +6660,7 @@ fn Codegen.mir_project_field_sema_type(self: Codegen, agg_ty: i32, field_token: 
         return 0
     let resolved = self.mir_input.mir_resolve_alias(agg_ty)
     let tk = self.mir_input.mir_get_type_kind(resolved)
-    if tk == TY_STRUCT:
+    if tk == TypeKind.TY_STRUCT:
         let extra = self.mir_input.mir_get_type_d1(resolved)
         let count = self.mir_input.mir_get_type_d2(resolved)
         if field_token >= 0 and field_token < count:
@@ -6669,7 +6669,7 @@ fn Codegen.mir_project_field_sema_type(self: Codegen, agg_ty: i32, field_token: 
             let name_sym = self.mir_input.mir_get_type_extra(extra + fi * 3)
             if name_sym == field_token:
                 return self.mir_input.mir_get_type_extra(extra + fi * 3 + 1)
-    if tk == TY_GENERIC_INST:
+    if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.mir_input.mir_get_type_name(resolved)
         if base_sym != 0 and self.sema.named_types.contains(base_sym):
             let base_tid = self.sema.named_types.get(base_sym).unwrap()
@@ -6706,7 +6706,7 @@ fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) 
             else if pk == PK_DEREF:
                 let d_resolved = self.mir_input.mir_resolve_alias(ty)
                 let d_tk = self.mir_input.mir_get_type_kind(d_resolved)
-                if d_tk == TY_PTR or d_tk == TY_REF:
+                if d_tk == TypeKind.TY_PTR or d_tk == TypeKind.TY_REF:
                     ty = self.mir_input.mir_get_type_d0(d_resolved)
             else if pk == PK_INDEX:
                 let elem_ty = self.mir_index_elem_sema_type(ty)
@@ -6737,7 +6737,7 @@ fn Codegen.mir_place_sema_type(self: Codegen, body: MirBody, place_id: i32) -> i
             else if pk == PK_DEREF:
                 let d_resolved = self.mir_input.mir_resolve_alias(ty)
                 let d_tk = self.mir_input.mir_get_type_kind(d_resolved)
-                if d_tk == TY_PTR or d_tk == TY_REF:
+                if d_tk == TypeKind.TY_PTR or d_tk == TypeKind.TY_REF:
                     ty = self.mir_input.mir_get_type_d0(d_resolved)
             else if pk == PK_INDEX:
                 let elem_ty = self.mir_index_elem_sema_type(ty)
@@ -6765,7 +6765,7 @@ fn Codegen.mir_vec_elem_type(self: Codegen, body: MirBody, recv_op_id: i32) -> i
     if sema_ty > 0:
         let resolved = self.mir_input.mir_resolve_alias(sema_ty)
         let tk = self.mir_input.mir_get_type_kind(resolved)
-        if tk == TY_GENERIC_INST:
+        if tk == TypeKind.TY_GENERIC_INST:
             let arg_count = self.mir_input.mir_get_type_d2(resolved)
             if arg_count > 0:
                 let te_start = self.mir_input.mir_get_type_d1(resolved)
@@ -6788,7 +6788,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let dest_sema_new = self.mir_intrinsic_dest_sema_type(body, dest_place)
         if dest_sema_new > 0:
             let resolved_new = self.mir_input.mir_resolve_alias(dest_sema_new)
-            if self.mir_input.mir_get_type_kind(resolved_new) == TY_GENERIC_INST:
+            if self.mir_input.mir_get_type_kind(resolved_new) == TypeKind.TY_GENERIC_INST:
                 let arg_count_new = self.mir_input.mir_get_type_d2(resolved_new)
                 if arg_count_new > 0:
                     let te_start_new = self.mir_input.mir_get_type_d1(resolved_new)
@@ -6816,7 +6816,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let wc_dst_ty = self.mir_intrinsic_dest_sema_type(body, dest_place)
         if wc_dst_ty > 0:
             let wc_res = self.mir_input.mir_resolve_alias(wc_dst_ty)
-            if self.mir_input.mir_get_type_kind(wc_res) == TY_GENERIC_INST:
+            if self.mir_input.mir_get_type_kind(wc_res) == TypeKind.TY_GENERIC_INST:
                 let wc_ac = self.mir_input.mir_get_type_d2(wc_res)
                 if wc_ac > 0:
                     let wc_te = self.mir_input.mir_get_type_d1(wc_res)
@@ -6946,7 +6946,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let _ = wl_build_call(self.builder, remove_ty, remove_fn, vec_data_i64(&rm_args), 2)
 
     else if intrinsic == MIR_INTRINSIC_MAP_NEW:
-        // Determine key/val sizes from dest sema type (TY_GENERIC_INST).
+        // Determine key/val sizes from dest sema type (TypeKind.TY_GENERIC_INST).
         var hm_key_size: i64 = 8
         var hm_val_size: i64 = 8
         var hm_ty: i64 = 0
@@ -6954,7 +6954,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         if dest_sema > 0:
             let resolved = self.mir_input.mir_resolve_alias(dest_sema)
             let tk = self.mir_input.mir_get_type_kind(resolved)
-            if tk == TY_GENERIC_INST:
+            if tk == TypeKind.TY_GENERIC_INST:
                 let gi_arg_count = self.mir_input.mir_get_type_d2(resolved)
                 if gi_arg_count == 2:
                     let args_start = self.mir_input.mir_get_type_d1(resolved)
@@ -7115,7 +7115,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let recv_sema = self.mir_operand_sema_type(body, recv_op)
         let recv_resolved = if recv_sema > 0: self.mir_input.mir_resolve_alias(recv_sema) else: 0
         var recv_is_result = false
-        if recv_resolved > 0 and self.mir_input.mir_get_type_kind(recv_resolved) == TY_GENERIC_INST:
+        if recv_resolved > 0 and self.mir_input.mir_get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
             let recv_name_sym = self.mir_input.mir_get_type_d0(recv_resolved)
             if recv_name_sym > 0 and recv_name_sym < self.sema.pool.symbol_texts.len() as i32:
                 recv_is_result = self.sema.pool.symbol_texts.get(recv_name_sym as i64) == "Result"
@@ -7223,7 +7223,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         if dest_sema > 0:
             let resolved_dest = self.mir_input.mir_resolve_alias(dest_sema)
             let dest_tk = self.mir_input.mir_get_type_kind(resolved_dest)
-            if dest_tk == TY_GENERIC_INST:
+            if dest_tk == TypeKind.TY_GENERIC_INST:
                 let dest_name_sym = self.mir_input.mir_get_type_name(resolved_dest)
                 if dest_name_sym != 0:
                     let dest_name = self.intern.resolve(dest_name_sym)
@@ -9193,42 +9193,42 @@ fn Codegen.sema_type_mangle(self: Codegen, sema_ty: i32) -> str:
         return "unknown"
     let resolved = self.sema.resolve_alias(sema_ty)
     let tk = self.sema.get_type_kind(resolved)
-    if tk == TY_INT:
+    if tk == TypeKind.TY_INT:
         return "i32"
-    if tk == TY_FLOAT:
+    if tk == TypeKind.TY_FLOAT:
         return "f64"
-    if tk == TY_BOOL:
+    if tk == TypeKind.TY_BOOL:
         return "bool"
-    if tk == TY_STR:
+    if tk == TypeKind.TY_STR:
         return "str"
-    if tk == TY_VOID:
+    if tk == TypeKind.TY_VOID:
         return "void"
-    if tk == TY_STRUCT:
+    if tk == TypeKind.TY_STRUCT:
         let name_sym = self.sema.get_type_d0(resolved)
         if name_sym != 0:
             return self.intern.resolve(name_sym)
         return "struct"
-    if tk == TY_ENUM:
+    if tk == TypeKind.TY_ENUM:
         let name_sym = self.sema.get_type_d0(resolved)
         if name_sym != 0:
             return self.intern.resolve(name_sym)
         return "enum"
-    if tk == TY_PTR or tk == TY_REF:
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
         return "ptr"
-    if tk == TY_ARRAY:
+    if tk == TypeKind.TY_ARRAY:
         return "array"
-    if tk == TY_SLICE:
+    if tk == TypeKind.TY_SLICE:
         return "slice"
-    if tk == TY_TUPLE:
+    if tk == TypeKind.TY_TUPLE:
         return "tuple"
-    if tk == TY_RANGE:
+    if tk == TypeKind.TY_RANGE:
         return "range"
-    if tk == TY_GENERIC_INST:
+    if tk == TypeKind.TY_GENERIC_INST:
         let name_sym = self.sema.get_type_d0(resolved)
         if name_sym != 0:
             return self.intern.resolve(name_sym)
         return "generic"
-    if tk == TY_NEVER:
+    if tk == TypeKind.TY_NEVER:
         return "never"
     "unknown"
 
@@ -9350,7 +9350,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
 
             // Sema-based generic type param binding: infer from sema types first
             let mg_arg_sema_tid = self.sema_type_of_node(arg_nodes.get(pi as i64))
-            if mg_arg_sema_tid > 0 and self.sema.get_type_kind(mg_arg_sema_tid) == TY_GENERIC_INST:
+            if mg_arg_sema_tid > 0 and self.sema.get_type_kind(mg_arg_sema_tid) == TypeKind.TY_GENERIC_INST:
                 var mg_sema_bound = true
                 for gi in 0..g_count:
                     let mg_inner_node = self.pool.get_extra(g_extra + gi)
