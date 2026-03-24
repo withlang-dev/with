@@ -3,7 +3,7 @@ use c_import("<time.h>")
 
 type Position = { x: f32, y: f32 }
 type Velocity = { x: f32, y: f32 }
-type Health = { hp: f32, max_hp: f32 }
+type Health = { hp: f32 }
 type Damage = { dps: f32 }
 
 let HAS_POS: u8 = 1u8
@@ -36,7 +36,7 @@ fn World.spawn(self: &mut World) -> i32:
     self.mask.push(0u8)
     self.pos.push(Position { x: 0.0, y: 0.0 })
     self.vel.push(Velocity { x: 0.0, y: 0.0 })
-    self.hp.push(Health { hp: 0.0, max_hp: 0.0 })
+    self.hp.push(Health { hp: 0.0 })
     self.dmg.push(Damage { dps: 0.0 })
     self.count = self.count + 1
     id
@@ -100,7 +100,7 @@ fn main:
                 y: ((fi + 50.0f32) % 100.0f32) * 0.01f32,
             })
         if i % 10 < 5:
-            world.add_health(id, Health { hp: 100.0f32, max_hp: 100.0f32 })
+            world.add_health(id, Health { hp: 100.0f32 })
         if i % 10 < 3:
             world.add_damage(id, Damage { dps: 0.5f32 + (fi % 10.0f32) * 0.1f32 })
 
@@ -116,13 +116,12 @@ fn main:
 
     let elapsed = clock() - start
     let cps: i64 = 1000000  // CLOCKS_PER_SEC on macOS
-    let secs = elapsed / cps
-    let msecs = ((elapsed % cps) * 1000i64) / cps
-    with_eprintln(f"1000 ticks: {secs}.{msecs}s")
+    let secs: f64 = elapsed as f64 / cps as f64
+    with_eprintln(f"1000 ticks: {secs:.3}s")
     with_eprintln(f"Alive after: {world.count_alive()}")
 
     var sum: f64 = 0.0
     for i in 0..world.count:
         if world.mask[i] & HAS_POS != 0u8:
             sum = sum + world.pos[i].x as f64
-    with_eprintln(f"Checksum: {sum as i64}")
+    with_eprintln(f"Checksum: {sum:.2}")

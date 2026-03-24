@@ -330,6 +330,7 @@ $(CANONICAL_BIN): $(STAGE2_BIN) | $(OUT_BIN_DIR)
 
 test: $(STAGE2_BIN)
 	./scripts/run_tests.sh
+	WITH=$(STAGE2_BIN) ./scripts/run_cli_selfhost_tests.sh
 
 fixpoint: $(STAGE3_BIN)
 	@diff "$(STAGE2_BIN)" "$(STAGE3_BIN)" && echo "FIXPOINT"

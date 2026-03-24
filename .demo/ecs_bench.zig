@@ -9,7 +9,7 @@ const MAX_ENTITIES: usize = 1_048_576;
 
 const Position = struct { x: f32 = 0, y: f32 = 0 };
 const Velocity = struct { x: f32 = 0, y: f32 = 0 };
-const Health = struct { hp: f32 = 0, max_hp: f32 = 0 };
+const Health = struct { hp: f32 = 0 };
 const Damage = struct { dps: f32 = 0 };
 
 const HAS_POS: u8 = 1;
@@ -127,7 +127,7 @@ pub fn main() !void {
             world.addVel(id, .{ .x = @mod(fi, 100.0) * 0.01, .y = @mod(fi + 50.0, 100.0) * 0.01 });
         }
         if (i % 10 < 5) {
-            world.addHealth(id, .{ .hp = 100.0, .max_hp = 100.0 });
+            world.addHealth(id, .{ .hp = 100.0 });
         }
         if (i % 10 < 3) {
             world.addDamage(id, .{ .dps = 0.5 + @mod(fi, 10.0) * 0.1 });
