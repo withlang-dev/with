@@ -981,6 +981,20 @@ fn MirBuilder.lower_fmt_to_str(self: MirBuilder, operand: i32, node: i32) -> i32
     self.body.set_call_intrinsic(args_id, MIR_INTRINSIC_FMT_TO_STR)
     self.body.new_operand(OK_COPY, result_place)
 
+fn MirBuilder.lower_fmt_debug_str(self: MirBuilder, operand: i32, node: i32) -> i32:
+    // Emit MIR_INTRINSIC_FMT_DEBUG_STR call to wrap a str value in quotes.
+    let fn_op = self.const_operand(CK_FN, self.pool.intern("fmt_debug_str"), self.sema.ty_str)
+    let call_args: Vec[i32] = Vec.new()
+    call_args.push(operand)
+    let args_id = self.body.new_call_args(call_args)
+    let result_local = self.new_temp(self.sema.ty_str)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.set_call_intrinsic(args_id, MIR_INTRINSIC_FMT_DEBUG_STR)
+    self.body.new_operand(OK_COPY, result_place)
+
 fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
     // Desugar NK_FSTRING to OP_CONCAT chain with explicit formatting.
     // Each expression segment is converted to str via MIR_INTRINSIC_FMT_TO_STR
@@ -1001,10 +1015,20 @@ fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
             let expr_node = self.ast.get_extra(pos + 1)
             let spec_node = self.ast.get_extra(pos + 2)
             seg_operand = self.lower_expr(expr_node)
-            // Convert non-str expressions to str via formatting intrinsic
             let expr_ty = self.expr_type(expr_node)
             let resolved_ty = if expr_ty > 0: self.sema.resolve_alias(expr_ty) else: 0
-            if resolved_ty != self.sema.ty_str:
+            // Check for :? debug mode
+            var is_debug = false
+            if spec_node != 0:
+                let spec_flags = self.ast.get_data0(spec_node)
+                let spec_mode = spec_flags & 255
+                if spec_mode == 63:
+                    is_debug = true
+            if is_debug and resolved_ty == self.sema.ty_str:
+                // Debug mode for strings: wrap in quotes
+                seg_operand = self.lower_fmt_debug_str(seg_operand, node)
+            else if resolved_ty != self.sema.ty_str:
+                // Convert non-str expressions to str via formatting intrinsic
                 seg_operand = self.lower_fmt_to_str(seg_operand, node)
             pos = pos + 3
         else:

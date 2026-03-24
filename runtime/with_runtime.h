@@ -123,6 +123,7 @@ with_str with_fmt_str(with_str s);
 with_str with_fmt_str_spec(with_str val, int64_t flags, int32_t width,
                            int32_t precision);
 with_str with_fmt_bool(int32_t b);
+with_str with_fmt_str_debug(with_str s);
 
 // ── I/O ────────────────────────────────────────────────────────────
 
