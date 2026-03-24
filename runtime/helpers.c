@@ -642,6 +642,19 @@ with_str with_fmt_bool(int32_t b) {
     return fmt_buf_to_str("false", 5);
 }
 
+// Debug formatting: wrap string in quotes
+with_str with_fmt_str_debug(with_str s) {
+    int total = (int)s.len + 2; // quotes
+    char *buf = (char *)malloc((size_t)total + 1);
+    if (!buf) { with_str out = { "", 0 }; return out; }
+    buf[0] = '"';
+    if (s.len > 0) memcpy(buf + 1, s.ptr, (size_t)s.len);
+    buf[total - 1] = '"';
+    buf[total] = '\0';
+    with_str out = { buf, (int64_t)total };
+    return out;
+}
+
 // ── End f-string formatting helpers ─────────────────────────────────
 
 // Print a string to stderr with trailing newline.

@@ -7352,6 +7352,27 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let fmt_str_ty = self.resolve_named_type(self.intern.intern("str"))
         result = self.coerce_val_to_str(fmt_val, fmt_str_ty)
 
+    else if intrinsic == MIR_INTRINSIC_FMT_DEBUG_STR:
+        let dbg_val = self.mir_intrinsic_arg(body, args_id, 0)
+        let dbg_str_ty = self.resolve_named_type(self.intern.intern("str"))
+        let dbg_sym = self.intern.intern("with_fmt_str_debug")
+        let dbg_fv = self.fn_values.get(dbg_sym)
+        let dbg_ft = self.fn_fn_types.get(dbg_sym)
+        if dbg_fv.is_some() and dbg_ft.is_some():
+            let dbg_args: Vec[i64] = Vec.new()
+            dbg_args.push(dbg_val)
+            result = wl_build_call(self.builder, dbg_ft.unwrap() as i64, dbg_fv.unwrap() as i64, vec_data_i64(&dbg_args), 1)
+        else:
+            let dbg_pts: Vec[i64] = Vec.new()
+            dbg_pts.push(dbg_str_ty)
+            let dbg_fnt = wl_function_type(dbg_str_ty, vec_data_i64(&dbg_pts), 1, 0)
+            let dbg_func = wl_add_function(self.llmod, "with_fmt_str_debug", dbg_fnt)
+            self.fn_values.insert(dbg_sym, dbg_func)
+            self.fn_fn_types.insert(dbg_sym, dbg_fnt)
+            let dbg_args: Vec[i64] = Vec.new()
+            dbg_args.push(dbg_val)
+            result = wl_build_call(self.builder, dbg_fnt, dbg_func, vec_data_i64(&dbg_args), 1)
+
     else:
         return false
 
