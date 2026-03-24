@@ -25,6 +25,7 @@ extern fn with_str_slice(s: str, start: i64, end: i64) -> str
 extern fn with_eprintln(s: str) -> void
 extern fn with_system(cmd: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_getenv_str(name: str) -> str
 extern fn print(s: str) -> void
 extern fn exit(code: i32) -> void
 extern fn with_install_interrupt_handlers() -> void
@@ -972,50 +973,98 @@ fn cli_flag_value(argc: i32, flag: str) -> str:
         i = i + 1
     ""
 
+fn cli_init_target_dir(argc: i32) -> str:
+    let target = find_source_arg(argc)
+    if target.len() > 0:
+        return target
+    "."
+
+fn cli_path_basename(path_raw: str) -> str:
+    if path_raw.len() == 0:
+        return ""
+    let path = resolve_normalize_path(path_raw)
+    if path == "/":
+        return path
+
+    var end = path.len() as i32
+    while end > 1 and path.byte_at((end - 1) as i64) == 47:
+        end = end - 1
+
+    var start = 0
+    var i = 0
+    while i < end:
+        if path.byte_at(i as i64) == 47:
+            start = i + 1
+        i = i + 1
+
+    if start >= end:
+        return path.slice(0, end as i64)
+    path.slice(start as i64, end as i64)
+
+fn cli_init_default_name(target_dir: str) -> str:
+    if target_dir != ".":
+        let target_name = cli_path_basename(target_dir)
+        if target_name.len() > 0 and target_name != ".":
+            return target_name
+
+    let cwd = with_getenv_str("PWD")
+    if cwd.len() > 0:
+        let cwd_name = cli_path_basename(cwd)
+        if cwd_name.len() > 0 and cwd_name != ".":
+            return cwd_name
+
+    let fallback = cli_path_basename(target_dir)
+    if fallback.len() > 0 and fallback != ".":
+        return fallback
+    "project"
+
 fn run_init_command(argc: i32) -> i32:
-    // Determine project name
+    let target_dir = cli_init_target_dir(argc)
     var name = cli_flag_value(argc, "--name")
     if name.len() == 0:
-        // Use current directory name
-        name = "myproject"
+        name = cli_init_default_name(target_dir)
     let is_lib = cli_has_flag(argc, "--lib")
+    let manifest_path = resolve_join(target_dir, "with.toml")
+    let src_dir = resolve_join(target_dir, "src")
+    let lib_path = resolve_join(src_dir, "lib.w")
+    let main_path = resolve_join(src_dir, "main.w")
+    let created_path = if target_dir == ".": name else: target_dir
 
     // Check if with.toml already exists
-    let existing = with_fs_read_file("with.toml")
+    let existing = with_fs_read_file(manifest_path)
     if existing.len() > 0:
-        with_eprintln("error: with.toml already exists in current directory")
+        with_eprintln("error: with.toml already exists in " ++ target_dir)
         return 1
 
-    // Create with.toml
+    // Create target directory tree first so named projects can be scaffolded.
+    if with_fs_mkdir_p(src_dir) != 0:
+        with_eprintln("error: failed to create " ++ src_dir ++ " directory")
+        return 1
+
     let toml = "[project]\nname = \"" ++ name ++ "\"\nversion = \"0.1.0\"\n"
-    if with_fs_write_file("with.toml", toml) != 0:
-        with_eprintln("error: failed to write with.toml")
-        return 1
-
-    // Create src/ directory
-    if with_fs_mkdir_p("src") != 0:
-        with_eprintln("error: failed to create src/ directory")
+    if with_fs_write_file(manifest_path, toml) != 0:
+        with_eprintln("error: failed to write " ++ manifest_path)
         return 1
 
     // Create source file
     if is_lib:
         let lib_src = "// " ++ name ++ " library\n\npub fn hello -> str:\n    \"Hello from " ++ name ++ "!\"\n"
-        if with_fs_write_file("src/lib.w", lib_src) != 0:
-            with_eprintln("error: failed to write src/lib.w")
+        if with_fs_write_file(lib_path, lib_src) != 0:
+            with_eprintln("error: failed to write " ++ lib_path)
             return 1
-        with_eprintln("created " ++ name ++ " (library)")
+        with_eprintln("created " ++ created_path ++ " (library)")
     else:
         let main_src = "fn main:\n    println(\"Hello, World!\")\n"
-        if with_fs_write_file("src/main.w", main_src) != 0:
-            with_eprintln("error: failed to write src/main.w")
+        if with_fs_write_file(main_path, main_src) != 0:
+            with_eprintln("error: failed to write " ++ main_path)
             return 1
-        with_eprintln("created " ++ name)
+        with_eprintln("created " ++ created_path)
 
-    with_eprintln("  with.toml")
+    with_eprintln("  " ++ manifest_path)
     if is_lib:
-        with_eprintln("  src/lib.w")
+        with_eprintln("  " ++ lib_path)
     else:
-        with_eprintln("  src/main.w")
+        with_eprintln("  " ++ main_path)
     0
 
 fn run_get_command(argc: i32) -> i32:

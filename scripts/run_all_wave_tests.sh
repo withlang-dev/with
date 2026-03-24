@@ -86,8 +86,8 @@ scripts=(
   "scripts/run_wave10_codegen_parity.sh"
 )
 
-if [[ -x "scripts/run_wave11_driver_unit_tests.sh" ]]; then
-  scripts+=("scripts/run_wave11_driver_unit_tests.sh")
+if [[ -x "scripts/run_cli_selfhost_tests.sh" ]]; then
+  scripts+=("scripts/run_cli_selfhost_tests.sh")
 fi
 if [[ -x "scripts/run_wave11_driver_parity.sh" ]]; then
   scripts+=("scripts/run_wave11_driver_parity.sh")

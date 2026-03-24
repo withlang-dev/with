@@ -10,7 +10,7 @@ struct Position { x: f32, y: f32 }
 struct Velocity { x: f32, y: f32 }
 
 #[derive(Clone, Copy, Default)]
-struct Health { hp: f32, max_hp: f32 }
+struct Health { hp: f32 }
 
 #[derive(Clone, Copy, Default)]
 struct Damage { dps: f32 }
@@ -118,7 +118,7 @@ fn main() {
             world.add_vel(id, Velocity { x: (fi % 100.0) * 0.01, y: ((fi + 50.0) % 100.0) * 0.01 });
         }
         if i % 10 < 5 {
-            world.add_health(id, Health { hp: 100.0, max_hp: 100.0 });
+            world.add_health(id, Health { hp: 100.0 });
         }
         if i % 10 < 3 {
             world.add_damage(id, Damage { dps: 0.5 + (fi % 10.0) * 0.1 });

@@ -31,7 +31,7 @@ make stage2        # build stage2 only
 make build         # alias for stage2, also refreshes out/bin/with
 make stage3        # build stage3 only
 make fixpoint      # verify stage2 == stage3
-make test          # run test suite with stage2
+make test          # run selfhost suite and CLI regressions with stage2
 make smoke         # quick compiler smoke check
 ```
 
@@ -98,10 +98,10 @@ cc -I runtime hello.c runtime/with_runtime.c runtime/helpers.c runtime/fiber.c r
 
 ## Test
 
-Wave11 driver/unit regression suite:
+Selfhost test suite and CLI regressions:
 
 ```sh
-./scripts/run_wave11_driver_unit_tests.sh
+make test
 ```
 
 Fixpoint verification (stage2 == stage3):
