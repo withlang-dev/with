@@ -1413,7 +1413,7 @@ fn swap[A, B](pair: (A, B)) -> (B, A):
 
 // HashMap iteration yields (K, V) tuples
 for (key, value) in map:
-    println("{key}: {value}")
+    println(f"{key}: {value}")
 
 // Functions can return multiple values naturally
 fn divmod(a: i32, b: i32) -> (i32, i32):
@@ -1559,14 +1559,14 @@ compiler implicitly returns `T.default()`.
 fn demo_strings -> i32:
     let hello = "Hello, C interop!"
     puts(hello)
-    println("strlen = {strlen(hello)}")
+    println(f"strlen = {strlen(hello)}")
     0                                      // annoying boilerplate
 
 // After: implicit default return
 fn demo_strings -> i32:
     let hello = "Hello, C interop!"
     puts(hello)
-    println("strlen = {strlen(hello)}")
+    println(f"strlen = {strlen(hello)}")
     // implicitly returns 0 (i32.default())
 ```
 
@@ -2335,7 +2335,7 @@ Parameters may have default values, specified with `= expr` after the type annot
 
 ```
 fn greet(name: str, greeting: str = "Hello"):
-    println("{greeting}, {name}!")
+    println(f"{greeting}, {name}!")
 
 greet("Alice")              // greeting defaults to "Hello"
 greet("Bob", "Hey")         // explicit override
@@ -2350,7 +2350,7 @@ greet("Bob", "Hey")         // explicit override
 ```
 fn assert_eq(left: i32, right: i32, file: str = __FILE__, line: u32 = __LINE__):
     if left != right:
-        println("assertion failed at {file}:{line}")
+        println(f"assertion failed at {file}:{line}")
         abort()
 ```
 
@@ -2529,7 +2529,7 @@ data |> parse |> validate? |> transform |> summarize
 
 **Backward application:**
 ```
-println <| format("{}: {}", key, value)
+println <| f"{key}: {value}"
 ```
 
 `f <| x` desugars to `f(x)`. Right-associative. Useful for avoiding
@@ -2730,7 +2730,7 @@ let [first, ..rest] = items else return Err(.Empty)
 **`if let`:**
 ```
 if let Some(user) = find_user(id):
-    println("found: {user.name}")
+    println(f"found: {user.name}")
 ```
 
 **Chained `if let`:** Multiple conditional bindings in a single `if`,
@@ -2809,7 +2809,7 @@ for (id, entity) in world.entities():
     process(id, entity)
 
 for { name, age, .. } in users:
-    println("{name}: {age}")
+    println(f"{name}: {age}")
 ```
 
 Exhaustiveness depends on position:
@@ -2855,11 +2855,11 @@ let items: Vec[(str, i32)] = vec![("alice", 1), ("bob", 2)]
 // .iter() yields &(str, i32)
 // Destructuring binds key: &str, val: &i32 automatically
 for (key, val) in items:
-    println("{key}: {val}")
+    println(f"{key}: {val}")
 
 // Equivalent explicit form (also valid but unnecessary):
 for &(key, val) in items:
-    println("{key}: {val}")
+    println(f"{key}: {val}")
 
 // Works with match on borrowed enums:
 fn describe(opt: &Option[String]) -> &str:
@@ -3524,7 +3524,7 @@ Explicit bounds remain available as optional contracts:
 
 ```
 fn debug[T: Show + Hash](x: &T):
-    println("{x.show()} (hash: {x.hash()})")
+    println(f"{x.show()} (hash: {x.hash()})")
 ```
 
 Use bounds when they improve the public API contract or produce
@@ -3541,7 +3541,7 @@ fn display[T](x: T) where T: Printable:
     print(x.to_string())
 
 fn multi[T](x: T) where T: Show, T: Hash:
-    println("{x.show()} (hash: {x.hash()})")
+    println(f"{x.show()} (hash: {x.hash()})")
 ```
 
 `where` clauses are equivalent to inline bounds (`T: Trait` in the generic
@@ -4007,33 +4007,27 @@ without defaults are required — `.build()` returns an error if they
 aren't set. This is checked at compile time when all `.field()`
 calls are visible.
 
-### 11.9 Debug Trait and `:?` Format Specifier
+### 11.9 Debug Formatting (`:?`)
 
-The `Debug` trait provides a programmer-facing string representation of a value:
-
-```
-trait Debug:
-    fn debug(&self) -> str
-```
-
-Types can implement `Debug` manually or via `@[derive(Debug)]`. Derived
-implementations produce `"TypeName { field1: value1, field2: value2 }"` for
-structs and variant names for enums.
-
-The `:?` format specifier in string interpolation calls the `debug()` method:
+The `:?` format specifier in f-strings produces a programmer-facing
+structural representation of a value. See §15.4.7 for full details.
 
 ```
-@[derive(Debug)]
-type Point = { x: f64, y: f64 }
+type Point = { x: i32, y: i32 }
 
-let p = Point { x: 1.0, y: 2.0 }
-println("{p:?}")    // prints "Point { x: 1.0, y: 2.0 }"
+let p = Point { x: 1, y: 2 }
+println(f"{p:?}")    // prints "Point { x: 1, y: 2 }"
 ```
 
-If no `debug()` method is found, the value falls through to default formatting.
+Debug formatting is generated inline by the compiler at compile time
+— each struct field is extracted and formatted without trait dispatch
+or runtime reflection. For primitives, `:?` produces the same output
+as default display, except strings are quoted (`"hello"` instead of
+`hello`).
 
-The `Display` trait (§11.7) is used for user-facing output via `println("{value}")`.
-The `Debug` trait is used for programmer-facing output via `println("{value:?}")`.
+A `Debug` trait exists in the standard library for manual
+implementations, but the `:?` f-string specifier does not dispatch
+through it. The compiler generates the formatting directly.
 
 ---
 
@@ -4410,7 +4404,7 @@ for item in collection:
     process(item)
 
 for (i, item) in collection.enumerate():
-    println("{i}: {item}")
+    println(f"{i}: {item}")
 ```
 
 **Implicit iteration:** When the expression after `in` implements
@@ -4973,8 +4967,8 @@ branch of the first to complete. Remaining expressions are cancelled.
 
 ```
 select await
-    msg = rx_fast.recv() => println("fast: {msg}")
-    msg = rx_slow.recv() => println("slow: {msg}")
+    msg = rx_fast.recv() => println(f"fast: {msg}")
+    msg = rx_slow.recv() => println(f"slow: {msg}")
     _ = timeout(1.secs()) => println("timeout")
 ```
 
@@ -5651,7 +5645,7 @@ is an implementation detail or FFI-specific.
 
 ```
 type User = { name: str, email: str }    // owned strings in structs
-fn greet(name: &str): println("Hello, {name}")  // borrowed for reading
+fn greet(name: &str): println(f"Hello, {name}")  // borrowed for reading
 fn get_name -> str: "Alice"            // return owned string
 ```
 
@@ -5710,7 +5704,7 @@ fn register(name: str): ...
 register("Alice")                                          // just works
 
 // Passing to fn(&str) auto-borrows (no allocation):
-fn greet(name: &str): println("hello {name}")
+fn greet(name: &str): println(f"hello {name}")
 greet("world")                               // OK: str auto-borrows to &str
 
 // Explicit &str for zero-cost static reference:
@@ -5734,8 +5728,9 @@ let s = "hello"        // s: str (owned — the default)
 let s: &str = "hello"  // s: &str (static reference, no allocation)
 ```
 
-**Interpolated literals** (`"user {id}"`) always produce `str`
-(owned) because they must allocate to build the result.
+**F-string literals** (`f"user {id}"`) always produce `str`
+(owned) because they must allocate to build the result. Plain
+string literals (`"hello"`) do not support interpolation.
 
 **C-string literals:** `c"hello"` produces a `&CStr` — a compile-
 time reference to a NUL-terminated string in static memory. The NUL
@@ -5754,38 +5749,221 @@ puts(name.as_cstr().ptr)
 `c"..."` does not support string interpolation. For dynamic C
 strings, construct a `CString` from an owned `str`.
 
-### 15.4 String Interpolation
+### 15.4 Formatted String Interpolation (F-Strings)
 
-Expressions inside `{...}` in string literals are evaluated and
-converted to strings:
+F-strings are the sole formatting mechanism in With. There is no
+`printf`, no `format()` function, no format-string varargs. `print`
+takes `str`. `f"..."` returns `str`. One way to format.
 
 ```
-let name = "world"
-let s = "hello {name}"           // "hello world"
-let n = 42
-let s2 = "answer = {n}"          // "answer = 42"
-let s3 = "sum = {a + b}"         // "sum = 7" (expressions work)
+let s = f"elapsed: {secs:.3}s"
+print(s)
+print(f"count: {n}, flag: {flag}")
 ```
+
+An f-string is a string literal prefixed with `f` containing
+interpolation holes delimited by `{}`. Each hole contains an
+expression and an optional format specification separated by `:`.
+An f-string evaluates to `str`.
+
+```
+f"literal {expr} literal {expr:spec} literal"
+```
+
+The expression may be any With expression: variable, field access,
+method call, arithmetic, index, function call. The format spec
+controls how the value is rendered as text.
+
+Literal `{` and `}` characters are written as `{{` and `}}`:
+
+```
+f"set = {{{val}}}"    // "set = {42}"
+```
+
+Plain string literals (`"hello"`) do not support interpolation.
+F-strings may not be nested.
 
 **Semantics:**
 
-- `{expr}` evaluates `expr` and calls `to_string()` on the result.
-- `{{` produces a literal `{`, `}}` produces a literal `}`.
-- Interpolated strings always produce owned `str` (they allocate).
-- Works with any type that implements `Display` (primitives are
-  built-in).
+- Each `{expr}` is type-checked at compile time.
+- Non-`str` expressions are converted to `str` via built-in
+  formatting functions (no trait dispatch).
+- The `++` operator is `str`-only. Non-`str` operands are a
+  compile-time error. Use f-strings to format values into strings.
+- F-strings always produce owned `str` (they allocate).
 
-**Desugaring:** The parser splits the string into segments and
-desugars to concatenation:
+#### 15.4.1 Format Specification Grammar
 
 ```
-"hello {name}, age {age}"
-// → "hello " ++ to_string(name) ++ ", age " ++ to_string(age)
+spec := [[fill]align][sign]['#']['0'][width]['.' precision][mode]
 ```
 
-**Format specifiers** (future): `{expr:format}` where format
-controls precision, padding, base, etc. For v1, only bare `{expr}`
-is supported.
+All fields are optional. Omitting the entire spec (`{expr}` with
+no colon) uses the type's default display.
+
+| Field | Syntax | Description |
+|-------|--------|-------------|
+| fill | any single byte except `{` `}` | Padding character (default: space) |
+| align | `<` left, `>` right, `^` center | Alignment within width |
+| sign | `+` always show sign, `-` negative only (default) | Sign display for numbers |
+| `#` | literal `#` | Alternate form: `0x`/`0b`/`0o` prefix |
+| `0` | literal `0` | Zero-pad shorthand (equivalent to `0>` fill+align) |
+| width | positive integer | Minimum field width |
+| precision | `.` followed by non-negative integer | Decimal places (floats) or max chars (strings) |
+| mode | single letter | Rendering mode (see below) |
+
+The fill character is only recognized when followed immediately by
+an align character (`<`, `>`, `^`). Otherwise the character is
+parsed as a later field. This matches Python's rule.
+
+#### 15.4.2 Modes
+
+| Mode | Valid types | Meaning | Example |
+|------|------------|---------|---------|
+| `d` | integers | Decimal (default for integers) | `42` |
+| `x` | integers | Lowercase hexadecimal | `2a` |
+| `X` | integers | Uppercase hexadecimal | `2A` |
+| `b` | integers | Binary | `101010` |
+| `o` | integers | Octal | `52` |
+| `f` | floats | Fixed-point | `3.140000` |
+| `e` | floats | Scientific notation | `3.14e+00` |
+| `g` | floats | General: shortest of fixed/scientific (default) | `3.14` |
+| `s` | strings | String (default for strings) | `hello` |
+| `?` | any type | Debug representation | `Point { x: 1, y: 2 }` |
+
+#### 15.4.3 Integer Formatting
+
+Default (no spec): decimal with no padding.
+
+```
+f"{42}"          // "42"
+f"{-7}"          // "-7"
+```
+
+Hex, binary, octal:
+
+```
+f"{255:x}"       // "ff"
+f"{255:X}"       // "FF"
+f"{255:#x}"      // "0xff"
+f"{7:b}"         // "111"
+f"{7:#b}"        // "0b111"
+f"{63:o}"        // "77"
+```
+
+Width and zero-padding:
+
+```
+f"{42:8}"        // "      42"  (right-aligned by default)
+f"{42:08}"       // "00000042"  (zero-pad)
+f"{42:<8}"       // "42      "  (left-aligned)
+f"{42:^8}"       // "   42   "  (centered)
+f"{42:_>8}"      // "______42"  (custom fill)
+```
+
+Sign:
+
+```
+f"{42:+}"        // "+42"
+f"{-42:+}"       // "-42"
+```
+
+Precision on integers is a compile-time error.
+
+#### 15.4.4 Float Formatting
+
+Default (no spec): general format. When precision is specified
+without a mode letter, the mode defaults to `f` (fixed-point).
+
+```
+f"{3.14}"          // "3.14"
+f"{3.14159:.2}"    // "3.14"       (precision → fixed-point)
+f"{3.14159:.2f}"   // "3.14"       (explicit fixed)
+f"{3.14159:.2e}"   // "3.14e+00"   (scientific)
+f"{3.14:+.2}"      // "+3.14"
+```
+
+Integer modes on floats are compile-time errors.
+
+#### 15.4.5 String Formatting
+
+Default (no spec): the string itself, unmodified.
+
+```
+f"{'hello'}"           // "hello"
+f"{'hi':>10}"          // "        hi"  (right-align)
+f"{'hi':<10}"          // "hi        "  (left-align, default)
+f"{'hello world':.5}"  // "hello"       (truncation)
+```
+
+Numeric modes on strings are compile-time errors.
+
+#### 15.4.6 Boolean Formatting
+
+Default: `true` or `false`. Only `?` mode and width/alignment
+are valid. All other modes are compile-time errors.
+
+#### 15.4.7 Debug Mode `:?`
+
+Available for all types. Prints a structural representation:
+
+| Type | Debug output |
+|------|-------------|
+| integer | Same as default: `42` |
+| float | Same as default: `3.14` |
+| str | Quoted: `"hello"` |
+| bool | `true` / `false` |
+| struct | `TypeName { field: value, field: value }` |
+
+```
+f"{42:?}"        // "42"
+f"{'hi':?}"      // "\"hi\""
+f"{point:?}"     // "Point { x: 1, y: 2 }"
+```
+
+Debug mode for structs generates inline formatting code at compile
+time — each field is extracted and formatted. No runtime reflection
+or trait dispatch is used.
+
+#### 15.4.8 Compile-Time Validation
+
+All invalid type/mode combinations produce clear compile-time
+errors:
+
+| | `d` | `x/X/b/o` | `f/e/g` | `s` | `?` |
+|---|---|---|---|---|---|
+| **integer** | ✓ | ✓ | error | error | ✓ |
+| **float** | error | error | ✓ | error | ✓ |
+| **str** | error | error | error | ✓ | ✓ |
+| **bool** | error | error | error | error | ✓ |
+| **struct** | error | error | error | error | ✓ |
+
+Using `{some_struct}` without `:?` is a compile-time error:
+
+```
+f"{player}"      // error: struct type Player has no default
+                 //   display; use :? for debug
+```
+
+#### 15.4.9 String Concatenation (`++`)
+
+The `++` operator concatenates two `str` values. Both operands
+must be `str` — non-`str` operands are a compile-time error.
+
+```
+let greeting = "hello" ++ " " ++ "world"  // "hello world"
+let msg = f"count: {n}" ++ "!"            // f-string ++ str
+```
+
+To include non-string values in a string, use f-strings:
+
+```
+// Correct:
+let s = f"value: {x}"
+
+// Error:
+let s = "value: " ++ x    // error if x is not str
+```
 
 ---
 
@@ -6321,7 +6499,7 @@ and logging functions:
 
 ```
 fn log(msg: str, file: str = __FILE__, line: u32 = __LINE__):
-    println("[{file}:{line}] {msg}")
+    println(f"[{file}:{line}] {msg}")
 
 log("hello")  // prints "[src/main.w:5] hello"
 ```
@@ -6368,7 +6546,7 @@ parameters directly. Inside comptime context, types are objects:
 ```
 comptime fn print_fields[T: type]:
     for field in T.fields():           // T is a type object
-        println("field: {field.name}, size: {field.size}")
+        println(f"field: {field.name}, size: {field.size}")
 ```
 
 The `TypeInfo` module provides the same API for non-generic contexts:
@@ -6941,14 +7119,14 @@ Replaces: no C equivalent
 
 **`std.fmt`** — Formatting and display.
 
-| Trait | Description |
-|-------|-------------|
-| `Display` | Human-readable formatting |
-| `Debug` | Developer-readable formatting |
-| `format(template, args...) -> String` | String formatting |
+| Item | Description |
+|------|-------------|
+| `Debug` trait | Developer-readable formatting |
+| f-strings | `f"value: {x:.2}"` — sole formatting surface (§15.4) |
 
-String interpolation (`"hello {name}"`) desugars to `Display::fmt`
-calls.
+F-strings (`f"..."`) are the sole formatting mechanism. There is no
+`format()` function or `printf` equivalent. The `:?` specifier in
+f-strings generates debug output for any type (§15.4.7).
 
 Replaces: `stdio.h` (sprintf, snprintf, fprintf)
 
@@ -7803,7 +7981,7 @@ fn test:
 fn test:
     let x = 42
     let r = &x
-    vec![1, 2, 3].for_each(item => println("{item} {r}"))
+    vec![1, 2, 3].for_each(item => println(f"{item} {r}"))
 
 // FAIL: escaping closure captures ref
 fn test:
@@ -8046,8 +8224,8 @@ fn load(path: &str) -> Result[Ast, AppError]:
 // PASS: match converted error
 fn handle(e: AppError):
     match e
-        AppError.Io(io)    => println("io: {io}")
-        AppError.Parse(pe) => println("parse: {pe}")
+        AppError.Io(io)    => println(f"io: {io}")
+        AppError.Parse(pe) => println(f"parse: {pe}")
 
 // FAIL: non-exhaustive
 fn bad(e: AppError):
@@ -8524,7 +8702,7 @@ fn test:
 fn test:
     let pairs = vec![(1, "a"), (2, "b")]
     for (num, letter) in pairs:
-        println("{num}: {letter}")
+        println(f"{num}: {letter}")
 ```
 
 ### 25.26 Enum Constructor Imports (Section 4.4, 18.2)
@@ -9733,7 +9911,7 @@ impl Drop for Handle:
 type Wrapper = { name: String, handle: Handle }
 impl Drop for Wrapper:
     fn drop(self: Self):
-        println("dropping {self.name}")
+        println(f"dropping {self.name}")
         // after this returns, Handle::drop runs for self.handle
         // then String::drop runs for self.name
 
