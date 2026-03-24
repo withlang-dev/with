@@ -1,10 +1,10 @@
 // ecs_bench.w — ECS benchmark: SoA storage, bitset queries, 1M entities
 use c_import("<time.h>")
 
-type Position = { x: f32, y: f32 }
-type Velocity = { x: f32, y: f32 }
-type Health = { hp: f32 }
-type Damage = { dps: f32 }
+type Position { x: f32, y: f32 }
+type Velocity { x: f32, y: f32 }
+type Health { hp: f32 }
+type Damage { dps: f32 }
 
 let HAS_POS: u8 = 1u8
 let HAS_VEL: u8 = 2u8
@@ -12,7 +12,7 @@ let HAS_HP: u8 = 4u8
 let HAS_DMG: u8 = 8u8
 let MAX_ENTITIES = 1048576
 
-type World = {
+type World {
     mask: Vec[u8],
     pos: Vec[Position],
     vel: Vec[Velocity],

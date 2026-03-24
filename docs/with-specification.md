@@ -300,16 +300,16 @@ let b = a            // copy; both a and b are valid
    `Drop`. This is enforced by rule 1 (their fields are not `Copy`).
 
 ```
-type Point = { x: f64, y: f64 }         // OK: f64 is Copy
+type Point { x: f64, y: f64 }         // OK: f64 is Copy
 impl Copy for Point                       // OK
 
-type Handle = { id: u32, gen: u32 }      // OK: u32 is Copy
+type Handle { id: u32, gen: u32 }      // OK: u32 is Copy
 impl Copy for Handle                      // OK
 
-type Buffer = { data: Vec[u8] }          // Vec is NOT Copy (has Drop)
+type Buffer { data: Vec[u8] }          // Vec is NOT Copy (has Drop)
 impl Copy for Buffer                      // ERROR: field `data` is not Copy
 
-type File = { fd: i32 }
+type File { fd: i32 }
 impl Drop for File:
     fn drop(self): ...
 impl Copy for File                        // ERROR: Copy + Drop is forbidden
@@ -379,7 +379,7 @@ Outside of `drop`, moving a field out of a Drop type is a compile
 error:
 
 ```
-type FileWrapper = { fd: File, name: String }
+type FileWrapper { fd: File, name: String }
 impl Drop for FileWrapper:
     fn drop(self: Self): close_file(self.fd)
 
@@ -644,7 +644,7 @@ needed — if it implements the trait, just pass it:
 ```
 trait Logger:
     fn log(self: &Self, msg: &str)
-type ConsoleLog = {}
+type ConsoleLog {}
 impl Logger for ConsoleLog:
     fn log(self: &Self, msg: &str): println(msg)
 
@@ -958,8 +958,15 @@ conversions also require `as`, even at the same width.
 
 ### 4.3 Structs
 
+Structs are declared with `type` using either inline braces or an
+indented block:
+
 ```
-type Point = { x: f64, y: f64 }
+type Point { x: f64, y: f64 }
+
+type Config:
+    host: str
+    port: i32
 ```
 
 No methods, no constructors, no inheritance. Functions are associated
@@ -1028,7 +1035,7 @@ Struct fields may declare default values. Fields with defaults may
 be omitted at construction sites:
 
 ```
-type ServerConfig = {
+type ServerConfig {
     host: str = "127.0.0.1",
     port: u16 = 8080,
     max_conns: usize = 1000,
@@ -1049,11 +1056,21 @@ let config = ServerConfig {
 let default_config = ServerConfig {}
 ```
 
+The block form also supports defaults:
+
+```
+type ServerConfig:
+    host: str = "127.0.0.1"
+    port: u16 = 8080
+    max_conns: usize = 1000
+    timeout: Duration = Duration.seconds(30)
+```
+
 Default expressions are evaluated at the construction site, not at
 type definition time. Each construction gets a fresh evaluation:
 
 ```
-type Request = {
+type Request {
     id: RequestId = RequestId.generate(),   // unique per construction
     created_at: Instant = Instant.now(),    // evaluated when constructed
     headers: Vec[Header] = Vec.new(),       // fresh Vec each time
@@ -1074,7 +1091,7 @@ type Request = {
 **Common pattern — config structs:**
 
 ```
-type PoolConfig = {
+type PoolConfig {
     min_conns: usize = 5,
     max_conns: usize = 20,
     idle_timeout: Duration = Duration.seconds(300),
@@ -1134,7 +1151,7 @@ fn sum(arr: [i32; 4]) -> i32:
     total
 
 // Fixed arrays in structs (inline, no pointer indirection):
-type Shape = { dims: [usize; 8], rank: i32 }
+type Shape { dims: [usize; 8], rank: i32 }
 ```
 
 **Interaction with pattern matching:**
@@ -1148,8 +1165,22 @@ match items
 
 ### 4.4 Enums (Algebraic Data Types)
 
+Enums are declared with the `enum` keyword using either an indented
+block or inline braces:
+
 ```
-type Shape =
+enum Shape:
+    Circle(radius: f64)
+    Rectangle(w: f64, h: f64)
+    Triangle(a: f64, b: f64, c: f64)
+
+enum Direction { North | South | East | West }
+```
+
+An optional leading `|` is allowed in block form:
+
+```
+enum Shape:
     | Circle(radius: f64)
     | Rectangle(w: f64, h: f64)
     | Triangle(a: f64, b: f64, c: f64)
@@ -1176,7 +1207,7 @@ When the expected type is statically known from context, variant
 names may be prefixed with `.` instead of the full type path:
 
 ```
-type Role = Admin | Member | Guest
+enum Role { Admin | Member | Guest }
 
 // Return type is known → .Member is unambiguous
 fn default_role -> Role: .Member
@@ -1207,6 +1238,31 @@ let x = .Member
 //      ^^^^^^^ help: specify the type: `Role.Member`
 ```
 
+**Qualified patterns in `match`:**
+
+Match patterns may use qualified `Type.Variant` syntax:
+
+```
+fn describe(c: Color) -> str:
+    match c
+        Color.Red   => "red"
+        Color.Green => "green"
+        _           => "other"
+```
+
+Qualified patterns also work with payloads:
+
+```
+fn area(s: Shape) -> f64:
+    match s
+        Shape.Circle(r)       => 3.14159 * r * r
+        Shape.Rectangle(w, h) => w * h
+        _                     => 0.0
+```
+
+The compiler validates that the qualifying type matches the match
+subject type, producing a compile error for mismatches.
+
 **Auto-generated accessor methods:**
 
 Every enum variant with data automatically generates accessor methods.
@@ -1222,7 +1278,7 @@ fn as_foo_mut(self: &mut MyEnum) -> Option[&mut T]  // by mutable ref
 Method names are the variant name converted to `snake_case`.
 
 ```
-type Token =
+enum Token:
     | TInt(i64)
     | TStr(str)
     | TBool(bool)
@@ -1240,7 +1296,7 @@ The `_ref` variants are essential for navigating tree structures
 without cloning:
 
 ```
-type JsonValue =
+enum JsonValue:
     | Null | Bool(bool) | Number(f64) | Str(str)
     | Array(Vec[JsonValue]) | Object(HashMap[str, JsonValue])
 
@@ -1274,7 +1330,7 @@ For variants with multiple fields, `.as_variant()` returns
 `Option[(A, B)]` (a tuple):
 
 ```
-type Shape =
+enum Shape:
     | Circle(radius: f64)
     | Rectangle(w: f64, h: f64)
 
@@ -1290,24 +1346,32 @@ These methods are generated unconditionally for all enums — no
 ### 4.4a Discriminant Enums
 
 Enums can specify an integer representation type and explicit discriminant
-values for each variant:
+values for each variant. Discriminant enums use the `enum` keyword with a
+representation type:
 
 ```
-type Color: i32 =
+enum Color: i32:
     Red = 1
     Green = 2
     Blue = 4
 ```
 
-The type after the colon (`:`) is the **representation type** — an integer type
-(`i8`, `i16`, `i32`, `i64`) that determines the underlying storage. Each variant
+Inline form is also supported:
+
+```
+enum Color: i32 { Red = 1, Green = 2, Blue = 4 }
+```
+
+The type after the first colon is the **representation type** — an integer type
+(`i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`) that determines the
+underlying storage. Each variant
 is assigned an explicit integer value with `= N`.
 
 **Auto-incrementing:** If a variant omits the `= N`, it defaults to the previous
 variant's value plus one (or zero for the first variant):
 
 ```
-type Status: i32 =
+enum Status: i32:
     Pending = 0
     Active          // 1 (auto)
     Suspended = 10
@@ -1318,7 +1382,7 @@ type Status: i32 =
 like regular enums, combined with explicit discriminant values:
 
 ```
-type Msg: i32 =
+enum Msg: i32:
     Quit = 0
     Move(i32, i32) = 1
     Write(str) = 2
@@ -1334,7 +1398,7 @@ to power-of-two doubling:
 
 ```
 @[flags]
-type Perms: i32 =
+enum Perms: i32:
     Read         // 1 (default first)
     Write        // 2
     Execute      // 4
@@ -1613,7 +1677,7 @@ User types can implement `Default` manually or via `@[derive(Default)]`
 
 ```
 @[derive(Default)]
-type Config = {
+type Config {
     port: i32,          // defaults to 0
     debug: bool,        // defaults to false
     name: str,          // defaults to ""
@@ -1692,14 +1756,14 @@ not own. They are ephemeral to prevent dangling.
 For long-lived references into owned buffers, use offset-based types:
 
 ```
-type BufSlice = { offset: usize, len: usize } with Copy
+type BufSlice { offset: usize, len: usize } with Copy
 ```
 
 Pattern: structs store `BufSlice` (storable offsets); accessor methods
 compute ephemeral `&str`/`&[u8]` on demand from an owned buffer.
 
 ```
-type Request = {
+type Request {
     buf:     Bytes,
     path:    BufSlice,
     headers: Vec[Header],
@@ -1756,7 +1820,7 @@ while let Some(tok) = next_token(&mut parser):
 // Token prevents calling next_token() again.
 //
 // To collect, use owned tokens with offset indices:
-type OwnedToken = { start: u32, end: u32, kind: TokenKind, span: Span }
+type OwnedToken { start: u32, end: u32, kind: TokenKind, span: Span }
 
 fn next_owned_token(parser: &mut Parser) -> Option[OwnedToken]:
     let tok = next_raw_token(parser)?
@@ -1768,7 +1832,7 @@ let tokens = with Vec.new() as mut toks:
 // tokens: Vec[OwnedToken] is storable
 
 // ERROR: cannot store in a non-ephemeral struct
-type Module = { tokens: Vec[Token] }   // REJECTED: ephemeral field
+type Module { tokens: Vec[Token] }   // REJECTED: ephemeral field
 ```
 
 **When to use ephemeral structs vs tuples:**
@@ -1791,7 +1855,7 @@ allocation, just like the references they contain.
 A handle is a typed index with a generation counter.
 
 ```
-type Handle[T] = { index: u32, generation: u32 }
+type Handle[T] { index: u32, generation: u32 }
     with Copy, Eq, Hash
 ```
 
@@ -2152,13 +2216,13 @@ other fibers waiting for that lock. These types are annotated
 
 ```
 @[no_await_guard]
-type MutexGuard[T] = { ... }
+type MutexGuard[T] { ... }
 
 @[no_await_guard]
-type ReadGuard[T] = { ... }
+type ReadGuard[T] { ... }
 
 @[no_await_guard]
-type WriteGuard[T] = { ... }
+type WriteGuard[T] { ... }
 ```
 
 The compiler rejects `.await` **or any `may_suspend` function call**
@@ -2504,7 +2568,7 @@ extend Vec[T]:
 **By-value `self` enables consuming method chains:**
 
 ```
-type Builder = { host: str, port: u16 }
+type Builder { host: str, port: u16 }
 
 extend Builder:
     fn host(self: Builder, h: str) -> Builder: { self with host: h }
@@ -3123,7 +3187,7 @@ if '@' in email:
     validate_email(email)
 
 // Enum variant sets
-type Color = Red | Green | Blue | Yellow | Cyan | Magenta
+enum Color { Red | Green | Blue | Yellow | Cyan | Magenta }
 
 fn is_primary(c: Color) -> bool:
     c in [.Red, .Green, .Blue]
@@ -3251,8 +3315,8 @@ let zip = user.address?.city?.zip_code
 - `expr?.method(args)` → `expr.and_then(v => v.method(args))` when the method returns `Option`/`Result`.
 
 ```
-type Address = { city: Option[str], zip: str }
-type Profile = { address: Option[Address] }
+type Address { city: Option[str], zip: str }
+type Profile { address: Option[Address] }
 
 let zip = profile.address?.zip     // map: Option[str]
 let city = profile.address?.city   // and_then: Option[str] (not Option[Option[str]])
@@ -3417,7 +3481,7 @@ let user = db.find_user(id)
 error chain is traversable via the `source` field:
 
 ```
-type ContextError[E] = {
+type ContextError[E] {
     message: str,
     source: E,
 }
@@ -3779,7 +3843,7 @@ them.
 
 ```
 // A matrix type that supports m[row, col] syntax
-type Matrix = { data: Vec[f64], rows: usize, cols: usize }
+type Matrix { data: Vec[f64], rows: usize, cols: usize }
 
 impl Index[(usize, usize), f64] for Matrix:
     fn index(self: &Self, (r, c): (usize, usize)) -> &f64:
@@ -3893,7 +3957,7 @@ Maps test **key** containment, not value. This is consistent with
 User types can implement `Contains`:
 
 ```
-type Whitelist = { allowed: HashSet[str] }
+type Whitelist { allowed: HashSet[str] }
 
 impl Contains[str] for Whitelist:
     fn contains(self: &Self, value: &str) -> bool:
@@ -3949,10 +4013,10 @@ structure. The following **structural traits** may be derived:
 
 ```
 @[derive(Eq, Hash, Debug, Clone)]
-type Point = { x: f64, y: f64 }
+type Point { x: f64, y: f64 }
 
 @[derive(Eq, Debug)]
-type Role = Admin | Member | Guest
+enum Role { Admin | Member | Guest }
 ```
 
 **`@[derive(all)]`** derives every structural trait the type
@@ -3960,12 +4024,12 @@ qualifies for:
 
 ```
 @[derive(all)]
-type Color = { r: u8, g: u8, b: u8, a: u8 }
+type Color { r: u8, g: u8, b: u8, a: u8 }
 // Derives: Copy, Clone, Default, Eq, Hash, Ord, Debug
 // (all fields are u8, which implements all of these)
 
 @[derive(all)]
-type User = { name: str, email: str, age: i32 }
+type User { name: str, email: str, age: i32 }
 // Derives: Clone, Default, Eq, Hash, Debug
 // (NOT Copy — String is not Copy)
 // (NOT Ord — not all fields implement Ord by default)
@@ -3991,7 +4055,7 @@ builder boilerplate:
 
 ```
 @[derive(Builder)]
-type DatabaseConfig = {
+type DatabaseConfig {
     host: str,
     port: i32 = 5432,
     max_connections: i32 = 10,
@@ -4000,7 +4064,7 @@ type DatabaseConfig = {
 }
 
 // Generates:
-// type DatabaseConfigBuilder = {
+// type DatabaseConfigBuilder {
 //     host: Option[str], port: Option[i32], ...
 // }
 // impl DatabaseConfigBuilder:
@@ -4029,7 +4093,7 @@ The `:?` format specifier in f-strings produces a programmer-facing
 structural representation of a value. See §15.4.7 for full details.
 
 ```
-type Point = { x: i32, y: i32 }
+type Point { x: i32, y: i32 }
 
 let p = Point { x: 1, y: 2 }
 println(f"{p:?}")    // prints "Point { x: 1, y: 2 }"
@@ -5660,7 +5724,7 @@ That's it. `str` for owning, `&str` for borrowing. Everything else
 is an implementation detail or FFI-specific.
 
 ```
-type User = { name: str, email: str }    // owned strings in structs
+type User { name: str, email: str }    // owned strings in structs
 fn greet(name: &str): println(f"Hello, {name}")  // borrowed for reading
 fn get_name -> str: "Alice"            // return owned string
 ```
@@ -6328,7 +6392,7 @@ unambiguous and lossless at the representation level.
 
 ```
 @[repr(C)]
-type Point = { x: f64, y: f64 }
+type Point { x: f64, y: f64 }
 ```
 
 Types imported via `c_import` automatically have `repr(C)` layout.
@@ -6339,7 +6403,7 @@ annotated.
 
 ```
 @[repr(packed)]
-type PackedHeader = {
+type PackedHeader {
     magic: u8,
     version: u16,
     size: u32,
@@ -6389,7 +6453,7 @@ Only non-capturing closures coerce to `extern "C" fn` pointers.
 
 ```
 @[repr(C)]
-type Callback = {
+type Callback {
     func:    extern "C" fn(ctx: *mut c_void, arg: i32) -> i32,
     ctx:     *mut c_void,
     destroy: extern "C" fn(ctx: *mut c_void),
@@ -6573,7 +6637,7 @@ reads like natural reflection.
 `FieldInfo` contains:
 
 ```
-type FieldInfo = {
+type FieldInfo {
     name: str,
     type_name: str,
     offset: usize,
@@ -6601,7 +6665,7 @@ comptime fn derive_serialize[T: type] -> impl Serialize for T:
 
 // Usage: just annotate the type
 @[derive(Serialize)]
-type User = { name: String, age: i32, email: String }
+type User { name: String, age: i32, email: String }
 
 // The compiler generates (conceptually):
 // impl Serialize for User:
@@ -6704,7 +6768,7 @@ fn __builtin_complex():
 
 ```
 @[component]
-type Transform = { position: Vec3, rotation: Quat, scale: f32 }
+type Transform { position: Vec3, rotation: Quat, scale: f32 }
 
 // @[component] is a comptime annotation that generates:
 // - Storage type (SoA layout via TypeInfo.fields)
@@ -7985,7 +8049,7 @@ fn test:
     println(r)
 
 // FAIL: reference in struct
-type Bad = { data: &i32 }        // ERROR
+type Bad { data: &i32 }        // ERROR
 
 // FAIL: reference in container
 fn test:
@@ -8053,7 +8117,7 @@ fn test:
 ### 25.5 Disjoint Field Borrowing (Section 3.6)
 
 ```
-type Pair = { a: Vec[i32], b: Vec[i32] }
+type Pair { a: Vec[i32], b: Vec[i32] }
 
 // PASS: distinct fields
 fn test(p: &mut Pair):
@@ -8067,7 +8131,7 @@ fn test(p: &mut Pair):
     let a2 = &mut p.a     // ERROR
 
 // PASS: nested disjoint
-type Deep = { inner: Pair }
+type Deep { inner: Pair }
 fn test(d: &mut Deep):
     let a = &mut d.inner.a
     let b = &mut d.inner.b
@@ -8088,7 +8152,7 @@ fn test:
     println(v)
 
 // FAIL: ephemeral in struct
-type Bad = { view: StrView }      // ERROR
+type Bad { view: StrView }      // ERROR
 
 // PASS: explicit ephemeral struct
 type Ok = ephemeral { view: StrView }
@@ -8157,7 +8221,7 @@ fn process(lock: &Mutex[Vec[Item]]):
 // --- Form 2: Builder pattern (scoped mutation) ---
 
 // PASS: basic builder
-type Config = { timeout: i32, retries: i32, verbose: bool }
+type Config { timeout: i32, retries: i32, verbose: bool }
 fn test:
     let c = with Config { timeout: 0, retries: 0, verbose: false } as mut c:
         c.timeout = 30
@@ -8260,7 +8324,7 @@ impl Show for Vec[i32]:             // ERROR
     fn show(self: &Vec[i32]) -> String: "vec"
 
 // PASS: own type
-type MyType = { x: i32 }
+type MyType { x: i32 }
 impl Show for MyType:
     fn show(self: &MyType) -> String: "MyType"
 ```
@@ -8340,7 +8404,7 @@ fn test:
 
 ```
 // PASS: nested
-type Expr = Lit(i32) | Add(Expr, Expr) | Mul(Expr, Expr)
+enum Expr { Lit(i32) | Add(Expr, Expr) | Mul(Expr, Expr) }
 fn simplify(e: Expr) -> Expr:
     match e
         Add(Lit(0), rhs) => rhs
@@ -8570,7 +8634,7 @@ fn test:
 ### 25.20 Exhaustiveness (Section 9.7)
 
 ```
-type Color = Red | Green | Blue
+enum Color { Red | Green | Blue }
 
 // PASS
 fn name(c: Color) -> str:
@@ -8591,7 +8655,7 @@ fn name(c: Color) -> str:
 ### 25.21 Record Update Syntax (Section 4.3)
 
 ```
-type Point = { x: f64, y: f64 } with Copy
+type Point { x: f64, y: f64 } with Copy
 
 // PASS: basic update
 fn test:
@@ -8602,7 +8666,7 @@ fn test:
     assert(p1.x == 1.0)        // p1 still valid (Copy)
 
 // PASS: update non-Copy (moves base)
-type Entity = { name: String, hp: i32, pos: Point }
+type Entity { name: String, hp: i32, pos: Point }
 fn test:
     let e = Entity { name: "hero", hp: 100, pos: Point { x: 0.0, y: 0.0 } }
     let e2 = { e with hp: 90 }
@@ -8724,7 +8788,7 @@ fn test:
 ### 25.26 Enum Constructor Imports (Section 4.4, 18.2)
 
 ```
-type Color = Red | Green | Blue
+enum Color { Red | Green | Blue }
 
 // PASS: unqualified after import
 use Color.{Red, Green, Blue}
@@ -8823,7 +8887,7 @@ fn bad -> SomeTypeWithoutDefault:
 
 // PASS: derive Default on user type
 @[derive(Default)]
-type Config = { port: i32, debug: bool }
+type Config { port: i32, debug: bool }
 
 fn make_config -> Config:
     println("creating config...")
@@ -8979,21 +9043,21 @@ fn test(flag: bool) -> i32:
 
 ```
 // PASS: Copy on all-Copy struct
-type Point = { x: f64, y: f64 }
+type Point { x: f64, y: f64 }
 impl Copy for Point
 
 // FAIL: Copy on struct with non-Copy field
-type Buffer = { data: Vec[u8] }
+type Buffer { data: Vec[u8] }
 impl Copy for Buffer              // ERROR: field `data` is not Copy
 
 // FAIL: Copy + Drop on same type
-type Handle = { fd: i32 }
+type Handle { fd: i32 }
 impl Drop for Handle:
     fn drop(self): close(self.fd)
 impl Copy for Handle              // ERROR: Copy + Drop is forbidden
 
 // PASS: Copy on struct with only primitives
-type Color = { r: u8, g: u8, b: u8, a: u8 }
+type Color { r: u8, g: u8, b: u8, a: u8 }
 impl Copy for Color               // OK: all fields are Copy
 ```
 
@@ -9051,7 +9115,7 @@ async fn test:
 
 ```
 // PASS: field shorthand in construction
-type Point = { x: f64, y: f64 }
+type Point { x: f64, y: f64 }
 fn test:
     let x = 1.0
     let y = 2.0
@@ -9060,7 +9124,7 @@ fn test:
     assert(p.y == 2.0)
 
 // PASS: mixed shorthand and explicit
-type User = { name: str, email: str, active: bool }
+type User { name: str, email: str, active: bool }
 fn test:
     let name = "Alice"
     let email = "alice@example.com"
@@ -9078,7 +9142,7 @@ fn test:
 ### 25.35 Enum Variant Shorthand (Section 4.4)
 
 ```
-type Color = Red | Green | Blue
+enum Color { Red | Green | Blue }
 
 // PASS: shorthand in return position
 fn default_color -> Color: .Blue
@@ -9096,7 +9160,7 @@ fn test:
     paint(.Red)
 
 // PASS: shorthand in struct field
-type Config = { theme: Color }
+type Config { theme: Color }
 fn test:
     let cfg = Config { theme: .Green }
     assert(describe(cfg.theme) == "green")
@@ -9150,8 +9214,8 @@ fn test:
 ### 25.37 Optional Chaining (Section 10.3)
 
 ```
-type Address = { city: Option[str], zip: Option[str] }
-type Profile = { address: Option[Address] }
+type Address { city: Option[str], zip: Option[str] }
+type Profile { address: Option[Address] }
 
 // PASS: optional chaining on Option
 fn test:
@@ -9208,14 +9272,14 @@ fn test:
     assert(a + b + c == 6)
 
 // PASS: struct destructuring
-type Point = { x: f64, y: f64 }
+type Point { x: f64, y: f64 }
 fn test:
     let p = Point { x: 3.0, y: 4.0 }
     let { x, y } = p
     assert(x == 3.0)
 
 // PASS: rest pattern in struct
-type User = { name: str, email: str, age: i32 }
+type User { name: str, email: str, age: i32 }
 fn test:
     let u = User { name: "A", email: "a@b", age: 30 }
     let { name, .. } = u
@@ -9239,7 +9303,7 @@ fn test:
 ```
 // PASS: explicit derive
 @[derive(Eq, Hash, Debug, Clone)]
-type Color = { r: u8, g: u8, b: u8 }
+type Color { r: u8, g: u8, b: u8 }
 fn test:
     let a = Color { r: 255, g: 0, b: 0 }
     let b = Color { r: 255, g: 0, b: 0 }
@@ -9247,7 +9311,7 @@ fn test:
 
 // PASS: derive(all) on Copy-eligible type
 @[derive(all)]
-type Vec2 = { x: f64, y: f64 }
+type Vec2 { x: f64, y: f64 }
 fn test:
     let a = Vec2 { x: 1.0, y: 2.0 }
     let b = a              // Copy (derived)
@@ -9255,7 +9319,7 @@ fn test:
 
 // PASS: derive(all) on non-Copy type
 @[derive(all)]
-type Name = { first: str, last: str }
+type Name { first: str, last: str }
 fn test:
     let a = Name { first: "A", last: "B" }
     let b = a.clone()     // Clone (derived), not Copy
@@ -9263,13 +9327,13 @@ fn test:
 
 // FAIL: explicit derive on ineligible type
 @[derive(Copy)]
-type Buffer = { data: Vec[u8] }   // ERROR: field `data` is not Copy
+type Buffer { data: Vec[u8] }   // ERROR: field `data` is not Copy
 ```
 
 ### 25.41 Ephemeral Structs (Section 5.5)
 
 ```
-type TokenKind = Ident | Number | String | LParen | RParen
+enum TokenKind { Ident | Number | String | LParen | RParen }
 
 // PASS: ephemeral struct with view fields
 type Token = ephemeral {
@@ -9300,13 +9364,13 @@ fn tokenize(src: StrView) -> Vec[Token]:
     Vec.new()
 
 // FAIL: non-ephemeral struct with ephemeral field
-type BadToken = {
+type BadToken {
     text: StrView,     // ERROR: ephemeral field in non-ephemeral struct
     kind: TokenKind,
 }
 
 // FAIL: store ephemeral struct in long-lived container
-type Module = {
+type Module {
     tokens: Vec[Token]  // ERROR: ephemeral field in non-ephemeral struct
 }
 ```
@@ -9314,7 +9378,7 @@ type Module = {
 ### 25.42 Default Field Values (Section 4.3)
 
 ```
-type Config = {
+type Config {
     host: str = "localhost",
     port: u16 = 8080,
     debug: bool = false,
@@ -9345,14 +9409,14 @@ fn test_shorthand:
     assert(c.port == 8080)
 
 // PASS: fresh evaluation per construction
-type Counter = { id: usize = next_id() }
+type Counter { id: usize = next_id() }
 fn test_fresh:
     let a = Counter {}
     let b = Counter {}
     assert(a.id != b.id)
 
 // FAIL: omit field without default
-type Required = {
+type Required {
     name: str,              // no default
     age: i32 = 0,
 }
@@ -9405,7 +9469,7 @@ fn test:
 
 // PASS: str in struct fields — no annotation on the literal
 fn test:
-    type Config = { host: str, port: i32 }
+    type Config { host: str, port: i32 }
     let c = Config { host: "localhost", port: 8080 }
     assert(c.host == "localhost")
 
@@ -9549,7 +9613,7 @@ fn test_panics:
 
 ```
 // PASS: unreachable() has type Never
-type Direction = North | South | East | West
+enum Direction { North | South | East | West }
 fn go(d: Direction) -> i32:
     match d
         .North => 1
@@ -9568,8 +9632,8 @@ fn test:
     assert_matches(r, Err(_))
 
 // PASS: assert_matches with nested pattern
-type AppError = Db(DbError) | Auth(str)
-type DbError = NotFound(str, str) | Timeout
+enum AppError { Db(DbError) | Auth(str) }
+enum DbError { NotFound(str, str) | Timeout }
 fn test:
     let e = AppError.Db(DbError.NotFound("users", "42"))
     assert_matches(e, .Db(.NotFound(..)))
@@ -9658,7 +9722,7 @@ async fn do_work(rx: Receiver[str], cancel: CancelToken) -> Result[str, AppError
 
 ```
 // PASS: .is_variant() on data variants
-type Token = TInt(i64) | TStr(str) | TBool(bool) | TNull
+enum Token { TInt(i64) | TStr(str) | TBool(bool) | TNull }
 fn test:
     let t = Token.TInt(42)
     assert(t.is_tint())
@@ -9678,7 +9742,7 @@ fn test:
     assert(n == 42)
 
 // PASS: multi-field variant returns tuple
-type Shape = Circle(f64) | Rect(f64, f64)
+enum Shape { Circle(f64) | Rect(f64, f64) }
 fn test:
     let s = Shape.Rect(3.0, 4.0)
     let (w, h) = s.as_rect() ?? unreachable()
@@ -9686,14 +9750,14 @@ fn test:
     assert(h == 4.0)
 
 // PASS: unit variants only get .is_variant()
-type Color = Red | Green | Blue
+enum Color { Red | Green | Blue }
 fn test:
     let c = Color.Red
     assert(c.is_red())
     assert(!c.is_green())
 
 // PASS: works with enum variant shorthand
-type Result2 = Success(i32) | Failure(str)
+enum Result2 { Success(i32) | Failure(str) }
 fn test:
     let r: Result2 = .Success(10)
     assert(r.as_success() == Some(10))
@@ -9745,7 +9809,7 @@ async fn test_fail:
 
 ```
 // PASS: consuming self with dot-notation
-type Builder = { host: str, port: u16 }
+type Builder { host: str, port: u16 }
 extend Builder:
     fn new -> Builder: Builder { host: "", port: 0 }
     fn host(self: Builder, h: str) -> Builder: { self with host: h }
@@ -9780,7 +9844,7 @@ fn test_fail:
 ### 25.55 Disjoint Closure Captures (Section 3.6)
 
 ```
-type World = { positions: Vec[Vec2], velocities: Vec[Vec2], sprites: Vec[Sprite] }
+type World { positions: Vec[Vec2], velocities: Vec[Vec2], sprites: Vec[Sprite] }
 
 // PASS: closures capture disjoint fields
 fn test:
@@ -9917,14 +9981,14 @@ fn test:
 
 ```
 // PASS: drop takes self by value — no double-free risk
-type Handle = { fd: i32 }
+type Handle { fd: i32 }
 impl Drop for Handle:
     fn drop(self: Self):
         close(self.fd)
         // self is consumed — no need to null out fd
 
 // PASS: field destructors run after user drop body
-type Wrapper = { name: String, handle: Handle }
+type Wrapper { name: String, handle: Handle }
 impl Drop for Wrapper:
     fn drop(self: Self):
         println(f"dropping {self.name}")
@@ -9932,7 +9996,7 @@ impl Drop for Wrapper:
         // then String::drop runs for self.name
 
 // FAIL: Copy + Drop is still forbidden
-type Bad = { x: i32 } with Copy
+type Bad { x: i32 } with Copy
 impl Drop for Bad:
     fn drop(self: Self): ()  // ERROR: Copy + Drop conflict
 ```
@@ -9978,7 +10042,7 @@ fn test_fail:
 ### 25.64 Partial Move from Drop Types (Section 2.4)
 
 ```
-type Wrapper = { fd: File, name: String }
+type Wrapper { fd: File, name: String }
 impl Drop for Wrapper:
     fn drop(self: Self): close(self.fd)
 
@@ -10084,12 +10148,12 @@ fn test:
 
 ```
 // FAIL: conflicting Iter implementations
-type MyBuffer = { data: Vec[u8] }
+type MyBuffer { data: Vec[u8] }
 impl Iter[u8] for MyBuffer: ...
 impl Iter[String] for MyBuffer: ...  // ERROR: MyBuffer already implements Iter[u8]
 
 // PASS: named methods for alternate iteration
-type MyBuffer = { data: Vec[u8] }
+type MyBuffer { data: Vec[u8] }
 impl Iter[u8] for MyBuffer: ...
 extend MyBuffer:
     fn lines(self: &Self) -> LineIter: ...   // separate iterator type
@@ -10231,8 +10295,8 @@ fn test:
 ### 25.79 Optional Chaining Type-Aware Desugaring (Section 10.3)
 
 ```
-type Address = { city: Option[str], zip: str }
-type Profile = { address: Option[Address] }
+type Address { city: Option[str], zip: str }
+type Profile { address: Option[Address] }
 
 // PASS: field is non-Option → map
 fn test:
@@ -10254,7 +10318,7 @@ fn test:
 
 ```
 // PASS: field moves allowed INSIDE drop
-type FileWrapper = { fd: File, name: String }
+type FileWrapper { fd: File, name: String }
 impl Drop for FileWrapper:
     fn drop(self: Self):
         close_file(self.fd)   // OK: field move inside drop
@@ -10363,7 +10427,7 @@ fn test:
 
 // PASS: str in struct field — no annotation on literal
 fn test:
-    type Config = { host: str, port: i32 }
+    type Config { host: str, port: i32 }
     let c = Config { host: "localhost", port: 8080 }
     assert(c.host == "localhost")
 
@@ -10418,7 +10482,7 @@ fn test:
 ```
 // PASS: auto-deref through Box
 fn test:
-    type User = { name: str }
+    type User { name: str }
     let u: Box[User] = Box.new(User { name: "Alice" })
     assert(u.name == "Alice")             // auto-deref Box → User → .name
 
@@ -10446,7 +10510,7 @@ fn test:
 
 // PASS: auto-ref for method receiver
 fn test:
-    type Point = { x: f64, y: f64 }
+    type Point { x: f64, y: f64 }
     impl Point
         fn magnitude(self: &Self) -> f64: (self.x * self.x + self.y * self.y).sqrt()
     let p = Point { x: 3.0, y: 4.0 }
@@ -10466,7 +10530,7 @@ fn test_fail:
 // PASS: &T → &dyn Trait
 trait Greet:
     fn hello(self: &Self) -> str
-type English = {}
+type English {}
 impl Greet for English:
     fn hello(self: &Self) -> str: "Hello"
 
@@ -10490,7 +10554,7 @@ fn test:
 
 ```
 // PASS: as_variant_ref returns Option[&T]
-type Value = Str(str) | Num(f64) | Null
+enum Value { Str(str) | Num(f64) | Null }
 
 fn test:
     let v = Value.Str("hello")
@@ -10505,7 +10569,7 @@ fn test:
     assert(v.as_num_ref() == Some(&99.0))
 
 // PASS: navigating tree structures by reference
-type Json = Null | Bool(bool) | Num(f64) | Str(str)
+enum Json { Null | Bool(bool) | Num(f64) | Str(str) }
          | Array(Vec[Json]) | Object(HashMap[str, Json])
 
 fn test:
@@ -10569,7 +10633,7 @@ fn test:
 ```
 // PASS: generated builder with required and optional fields
 @[derive(Builder)]
-type Config = {
+type Config {
     host: str,
     port: i32 = 8080,
 }
@@ -10653,7 +10717,7 @@ fn test:
 // PASS: match and ownership work in no_std
 // @[cfg(no_std)]
 fn test:
-    type Command = Reset | Set(u8) | Get
+    enum Command { Reset | Set(u8) | Get }
     let cmd = Command.Set(42)
     match cmd
         .Set(val) => assert(val == 42)
@@ -10745,7 +10809,7 @@ fn test:
 
 // PASS: enum variant shorthand in array
 fn test:
-    type Color = Red | Green | Blue | Yellow
+    enum Color { Red | Green | Blue | Yellow }
     let c = Color.Red
     assert(c in [.Red, .Green, .Blue])
     assert(c not in [.Yellow])
@@ -10778,7 +10842,7 @@ fn test:
 
 // PASS: user type implementing Contains
 fn test:
-    type Whitelist = { allowed: HashSet[i32] }
+    type Whitelist { allowed: HashSet[i32] }
     impl Contains[i32] for Whitelist =
         fn contains(self: &Self, value: &i32) -> bool:
             *value in self.allowed
@@ -10803,8 +10867,8 @@ fn test:
 
 // FAIL: in requires Contains implementation
 fn test:
-    type Foo = { x: i32 }
-    type Bar = { y: i32 }
+    type Foo { x: i32 }
+    type Bar { y: i32 }
     let f = Foo { x: 1 }
     let b = Bar { y: 2 }
     f in b              // ERROR: `Bar` does not implement `Contains[Foo]`

@@ -1,4 +1,4 @@
-omptime §
+comptime §
 Zig places importance on the concept of whether an expression is known at compile-time. There are a few different places this concept is used, and these building blocks are used to keep the language small, readable, and powerful.
 
 Introducing the Compile-Time Concept 

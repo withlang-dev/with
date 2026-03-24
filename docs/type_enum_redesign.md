@@ -77,7 +77,7 @@
 - [x] **P4-2.** Remove `type Name: i32 = Variant = N` parsing.
 - [x] **P4-3.** Remove `type Name = { }` with `=`.
 - [x] **P4-4.** Old syntax produces compile error with migration hint.
-- [x] **P4-5.** Spec update deferred (separate follow-up).
+- [x] **P4-5.** Spec §4.3, §4.4, §4.4a updated to new syntax.
 - [x] **P4-6.** All tests pass. Build, fixpoint.
 
 ## Phase 5: Tests
@@ -97,7 +97,7 @@
 
 - [ ] Removing `TK_` / `NK_` / `OP_` / `SK_` style prefixes from variant names.
 - [ ] Changing unrelated alias-style declarations (`type FileId = i32`, etc.).
-- [ ] Updating spec document §4.3, §4.4, §4.4a.
+- [x] Updating spec document §4.3, §4.4, §4.4a.
 
 ---
 
