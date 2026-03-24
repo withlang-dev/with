@@ -128,10 +128,18 @@ These are not open bugs; they were staging tactics or optional cleanup items in 
 
 These are separate refactors, not remaining blockers for the enum/type syntax redesign itself.
 
-- [ ] Converting the remaining token/AST constant groups such as `TK_*`, `NK_*`, `SK_*`, and other small flat tag sets into enum declarations.
-- [ ] Root-cause the imported-enum regression exposed by additional `src/Ast.w` enumification slices.
-  Attempted conversions of `FSTR_SEG_*` and `TDK_*` both made `src/main.w` fail under a known-good selfhost compiler with widespread bogus `undefined variable` errors in importing modules, while `src/Ast.w` itself still checked cleanly. Those slices were reverted and should not be retried until the import/merge failure is understood.
+- [x] Converting the remaining token/AST constant groups such as `TK_*`, `NK_*`, `SK_*`, and other small flat tag sets into enum declarations.
+  All constant groups are now converted:
+  - `NodeKind` (NK_*), `TokenKind` (TK_*), `TypeDeclKind` (TDK_*), `FnFlags` (FN_FLAG_*)
+  - `CharCode` (CH_*), `DriverMode`/`CompileResult`, `DiagSeverity`, `ValidateError`
+  - `CfgNodeKind`, `AsyncBodyKind`/`AsyncSuspendKind`, `CallKind`/`AllocKind`
+  - `PreludeMode`, `MigrateLang`/`MigrateMode`
+- [x] Root-cause the imported-enum regression exposed by additional `src/Ast.w` enumification slices.
+  Root cause was a HashMap tombstone reuse bug in `runtime/helpers.c` (`with_hashmap_insert`).
+  After enough insert/remove churn, the function could fail to insert because it only checked
+  state==0 slots and ignored tombstone slots (state==2). Fixed and all previously-failing
+  conversions (`FSTR_SEG_*`, `TDK_*`) now work.
 - [ ] Removing `TK_` / `NK_` / `OP_` / `SK_` style prefixes from variant names.
 - [ ] Changing unrelated alias-style declarations such as `type FileId = i32`, `type Handle = opaque`, or `type Name = distinct(...)`.
 
-Those items can be done later. The strict enum/type syntax redesign itself is already complete and validated, and `MirIntrinsic`, `BinaryOp`, `UnaryOp`, `Visibility`, and `LiteralSuffix` have now been moved out of the remaining constant-group work.
+The prefix removal and alias-style changes can be done later. All constant-group enumification is now complete and fixpoint-verified.
