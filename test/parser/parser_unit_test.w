@@ -30,7 +30,7 @@ fn test_char_literal_lowering:
     assert(pool.decl_count() == 1)
     let decl = pool.get_decl(0)
     let body = pool.get_data1(decl)
-    assert(pool.kind(body) == NK_INT_LIT())
+    assert(pool.kind(body) == NodeKind.NK_INT_LIT())
     assert(pool.get_data0(body) == 10)
 
 fn test_byte_char_literal_lowering:
@@ -39,7 +39,7 @@ fn test_byte_char_literal_lowering:
     assert(pool.decl_count() == 1)
     let decl = pool.get_decl(0)
     let body = pool.get_data1(decl)
-    assert(pool.kind(body) == NK_INT_LIT())
+    assert(pool.kind(body) == NodeKind.NK_INT_LIT())
     assert(pool.get_data0(body) == 65)
 
 fn test_precedence:
@@ -47,10 +47,10 @@ fn test_precedence:
     let pool = parse_module(src)
     let decl = pool.get_decl(0)
     let body = pool.get_data1(decl)
-    assert(pool.kind(body) == NK_BINARY())
+    assert(pool.kind(body) == NodeKind.NK_BINARY())
     assert(pool.get_data0(body) == BinaryOp.OP_ADD)
     let rhs = pool.get_data2(body)
-    assert(pool.kind(rhs) == NK_BINARY())
+    assert(pool.kind(rhs) == NodeKind.NK_BINARY())
     assert(pool.get_data0(rhs) == BinaryOp.OP_MUL)
 
 fn test_fn_metadata:
@@ -61,7 +61,7 @@ fn test_fn_metadata:
     assert(meta >= 0)
     assert(pool.fn_meta_param_count(meta) == 2)
     let ret_ty = pool.fn_meta_ret(meta)
-    assert(pool.kind(ret_ty) == NK_TYPE_NAMED())
+    assert(pool.kind(ret_ty) == NodeKind.NK_TYPE_NAMED())
 
 fn test_type_param_layout:
     let src = "fn id[T: Show + Hash](x: T) -> T:\n    x\n"
@@ -79,24 +79,24 @@ fn test_local_let_type_annotation_storage:
     let pool = parse_module(src)
     let decl = pool.get_decl(0)
     let body = pool.get_data1(decl)
-    assert(pool.kind(body) == NK_BLOCK())
+    assert(pool.kind(body) == NodeKind.NK_BLOCK())
     let stmt_start = pool.get_data0(body)
     let let_stmt = pool.get_extra(stmt_start)
-    assert(pool.kind(let_stmt) == NK_LET_BINDING())
+    assert(pool.kind(let_stmt) == NodeKind.NK_LET_BINDING())
     let flags = pool.get_data2(let_stmt)
     let encoded = flags / 2
     assert(encoded > 0)
     let ty_node = pool.get_extra(encoded - 1)
-    assert(pool.kind(ty_node) == NK_TYPE_NAMED())
+    assert(pool.kind(ty_node) == NodeKind.NK_TYPE_NAMED())
 
 fn test_compose_lowering:
     let src = "fn f:\n    let add_one = |x| x + 1\n    let double = |x| x * 2\n    add_one >> double\n"
     let pool = parse_module(src)
     let decl = pool.get_decl(0)
     let body = pool.get_data1(decl)
-    assert(pool.kind(body) == NK_BLOCK())
+    assert(pool.kind(body) == NodeKind.NK_BLOCK())
     let tail = pool.get_data2(body)
-    assert(pool.kind(tail) == NK_CLOSURE())
+    assert(pool.kind(tail) == NodeKind.NK_CLOSURE())
 
 fn test_type_expr_impl_for:
     let src = "fn f(x: impl Show for i32) -> dyn Show:\n    x\n"
@@ -106,7 +106,7 @@ fn test_type_expr_impl_for:
     assert(meta >= 0)
     let param_start = pool.fn_meta_param_start(meta)
     let param_type = pool.get_extra(param_start + 1)
-    assert(pool.kind(param_type) == NK_TYPE_TRAIT_OBJ())
+    assert(pool.kind(param_type) == NodeKind.NK_TYPE_TRAIT_OBJ())
 
 fn test_type_expr_slice_alt:
     let src = "fn f(x: [i32]) -> []i32:\n    x\n"
@@ -116,16 +116,16 @@ fn test_type_expr_slice_alt:
     assert(meta >= 0)
     let param_start = pool.fn_meta_param_start(meta)
     let param_type = pool.get_extra(param_start + 1)
-    assert(pool.kind(param_type) == NK_TYPE_SLICE())
+    assert(pool.kind(param_type) == NodeKind.NK_TYPE_SLICE())
     let ret_type = pool.fn_meta_ret(meta)
-    assert(pool.kind(ret_type) == NK_TYPE_SLICE())
+    assert(pool.kind(ret_type) == NodeKind.NK_TYPE_SLICE())
 
 fn test_trait_layout_contains_assoc_and_methods:
     let src = "trait Maker =\n    type Item: Show = i32\n    fn make(x: i32) -> i32\n"
     let pool = parse_module(src)
     assert(pool.decl_count() == 1)
     let decl = pool.get_decl(0)
-    assert(pool.kind(decl) == NK_TRAIT_DECL())
+    assert(pool.kind(decl) == NodeKind.NK_TRAIT_DECL())
     let extra_start = pool.get_data1(decl)
     let assoc_count = pool.get_extra(extra_start)
     assert(assoc_count == 1)
@@ -151,9 +151,9 @@ fn test_trailing_commas_call_and_type_params:
     assert(pool.fn_meta_param_count(meta) == 1)
     let param_start = pool.fn_meta_param_start(meta)
     let param_type = pool.get_extra(param_start + 1)
-    assert(pool.kind(param_type) == NK_TYPE_GENERIC())
+    assert(pool.kind(param_type) == NodeKind.NK_TYPE_GENERIC())
     let body = pool.get_data1(decl)
-    assert(pool.kind(body) == NK_CALL())
+    assert(pool.kind(body) == NodeKind.NK_CALL())
     assert(pool.get_data2(body) == 2)
 
 fn test_use_path_allows_keyword_segments:
@@ -161,7 +161,7 @@ fn test_use_path_allows_keyword_segments:
     let pool = parse_module(src)
     assert(pool.decl_count() == 2)
     let use_decl = pool.get_decl(0)
-    assert(pool.kind(use_decl) == NK_USE_DECL())
+    assert(pool.kind(use_decl) == NodeKind.NK_USE_DECL())
     assert(pool.get_data1(use_decl) == 2)
 
 fn test_c_import_requires_string_literal:
@@ -179,10 +179,10 @@ fn test_multi_error_recovery_golden:
     assert(pool.decl_count() == 2)
     let d0 = pool.get_decl(0)
     let d1 = pool.get_decl(1)
-    assert(pool.kind(d0) == NK_FN_DECL())
-    assert(pool.kind(d1) == NK_FN_DECL())
-    assert(pool.kind(pool.get_data1(d0)) == NK_INT_LIT())
-    assert(pool.kind(pool.get_data1(d1)) == NK_INT_LIT())
+    assert(pool.kind(d0) == NodeKind.NK_FN_DECL())
+    assert(pool.kind(d1) == NodeKind.NK_FN_DECL())
+    assert(pool.kind(pool.get_data1(d0)) == NodeKind.NK_INT_LIT())
+    assert(pool.kind(pool.get_data1(d1)) == NodeKind.NK_INT_LIT())
 
 fn test_c_import_malformed_syntax_matrix:
     let bad1 = parse_module_allow_errors("use c_import()\nfn main -> i32:\n    0\n")
@@ -208,33 +208,33 @@ fn test_chained_sugar_precedence_and_associativity:
     let pipe_pool = parse_module(pipe_src)
     let pipe_decl = pipe_pool.get_decl(0)
     let pipe_body = pipe_pool.get_data1(pipe_decl)
-    assert(pipe_pool.kind(pipe_body) == NK_PIPELINE())
+    assert(pipe_pool.kind(pipe_body) == NodeKind.NK_PIPELINE())
     let pipe_lhs = pipe_pool.get_data0(pipe_body)
     let pipe_rhs = pipe_pool.get_data1(pipe_body)
-    assert(pipe_pool.kind(pipe_rhs) == NK_IDENT())
-    assert(pipe_pool.kind(pipe_lhs) == NK_PIPELINE())
-    assert(pipe_pool.kind(pipe_pool.get_data0(pipe_lhs)) == NK_IDENT())
-    assert(pipe_pool.kind(pipe_pool.get_data1(pipe_lhs)) == NK_IDENT())
+    assert(pipe_pool.kind(pipe_rhs) == NodeKind.NK_IDENT())
+    assert(pipe_pool.kind(pipe_lhs) == NodeKind.NK_PIPELINE())
+    assert(pipe_pool.kind(pipe_pool.get_data0(pipe_lhs)) == NodeKind.NK_IDENT())
+    assert(pipe_pool.kind(pipe_pool.get_data1(pipe_lhs)) == NodeKind.NK_IDENT())
 
     let compose_src = "fn g:\n    a >> b >> c\n"
     let compose_pool = parse_module(compose_src)
     let compose_decl = compose_pool.get_decl(0)
     let compose_body = compose_pool.get_data1(compose_decl)
-    assert(compose_pool.kind(compose_body) == NK_CLOSURE())
+    assert(compose_pool.kind(compose_body) == NodeKind.NK_CLOSURE())
 
     let rev_compose_src = "fn h:\n    a << b << c\n"
     let rev_pool = parse_module(rev_compose_src)
     let rev_decl = rev_pool.get_decl(0)
     let rev_body = rev_pool.get_data1(rev_decl)
-    assert(rev_pool.kind(rev_body) == NK_CLOSURE())
+    assert(rev_pool.kind(rev_body) == NodeKind.NK_CLOSURE())
 
     // ?? has higher precedence than pipeline.
     let mixed_src = "fn p:\n    a ?? b |> c\n"
     let mixed_pool = parse_module(mixed_src)
     let mixed_decl = mixed_pool.get_decl(0)
     let mixed_body = mixed_pool.get_data1(mixed_decl)
-    assert(mixed_pool.kind(mixed_body) == NK_PIPELINE())
-    assert(mixed_pool.kind(mixed_pool.get_data0(mixed_body)) == NK_BINARY())
+    assert(mixed_pool.kind(mixed_body) == NodeKind.NK_PIPELINE())
+    assert(mixed_pool.kind(mixed_pool.get_data0(mixed_body)) == NodeKind.NK_BINARY())
     assert(mixed_pool.get_data0(mixed_pool.get_data0(mixed_body)) == BinaryOp.OP_DEFAULT)
 
 fn main:

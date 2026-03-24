@@ -965,11 +965,11 @@ fn Codegen.dyn_trait_from_type_node(self: Codegen, type_node: i32) -> i32:
     if type_node == 0:
         return 0
     let tk = self.pool.kind(type_node)
-    if tk == NK_TYPE_TRAIT_OBJ:
+    if tk == NodeKind.NK_TYPE_TRAIT_OBJ:
         return self.pool.get_data0(type_node)
-    if tk == NK_TYPE_REF or tk == NK_TYPE_PTR:
+    if tk == NodeKind.NK_TYPE_REF or tk == NodeKind.NK_TYPE_PTR:
         return self.dyn_trait_from_type_node(self.pool.get_data0(type_node))
-    if tk == NK_TYPE_GENERIC:
+    if tk == NodeKind.NK_TYPE_GENERIC:
         let name_sym = self.pool.get_data0(type_node)
         let name = self.intern.resolve(name_sym)
         let g_extra = self.pool.get_data1(type_node)
@@ -1163,10 +1163,10 @@ fn Codegen.debug_type_layout_field(self: Codegen, owner_name: str, field_index: 
         let start = self.pool.get_start(type_node)
         let end = self.pool.get_end(type_node)
         msg = msg ++ f" span={start}..{end}"
-        if node_kind == NK_TYPE_NAMED or node_kind == NK_TYPE_GENERIC:
+        if node_kind == NodeKind.NK_TYPE_NAMED or node_kind == NodeKind.NK_TYPE_GENERIC:
             let type_name_sym = self.pool.get_data0(type_node)
             msg = msg ++ f" type_name={self.intern.resolve(type_name_sym)}"
-        if node_kind == NK_TYPE_GENERIC:
+        if node_kind == NodeKind.NK_TYPE_GENERIC:
             msg = msg ++ f" arg_count={self.pool.get_data2(type_node)}"
     msg = msg ++ f" resolved={self.llvm_type_mangle(resolved_ty)}"
     if resolved_ty != 0:
@@ -1371,7 +1371,7 @@ fn Codegen.lookup_trait_local_concrete(self: Codegen, sym: i32) -> i32:
     0
 
 fn Codegen.arg_lvalue_ptr_for_autoref(self: Codegen, arg_node: i32, arg_ty: i64, arg_val: i64) -> i64:
-    if arg_node != 0 and self.pool.kind(arg_node) == NK_IDENT:
+    if arg_node != 0 and self.pool.kind(arg_node) == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(arg_node)
         let alloca = self.lookup_local_alloca(sym)
         if alloca != 0:
@@ -1408,11 +1408,11 @@ fn Codegen.find_dyn_concrete_arg(self: Codegen, arg_node: i32, arg_ty: i64) -> D
     if wl_get_type_kind(arg_ty) != wl_pointer_type_kind():
         return DynArgInfo { type_sym: 0, use_ptr: 0 }
 
-    if arg_node != 0 and self.pool.kind(arg_node) == NK_UNARY:
+    if arg_node != 0 and self.pool.kind(arg_node) == NodeKind.NK_UNARY:
         let uop = self.pool.get_data0(arg_node)
         if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF:
             let inner = self.pool.get_data1(arg_node)
-            if self.pool.kind(inner) == NK_IDENT:
+            if self.pool.kind(inner) == NodeKind.NK_IDENT:
                 let base_sym = self.pool.get_data0(inner)
                 let known = self.lookup_trait_local_concrete(base_sym)
                 if known != 0:
@@ -1437,7 +1437,7 @@ fn Codegen.find_dyn_concrete_arg(self: Codegen, arg_node: i32, arg_ty: i64) -> D
                         if st_sym != 0:
                             return DynArgInfo { type_sym: st_sym, use_ptr: 1 }
 
-    if arg_node != 0 and self.pool.kind(arg_node) == NK_IDENT:
+    if arg_node != 0 and self.pool.kind(arg_node) == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(arg_node)
         let known = self.lookup_trait_local_concrete(sym)
         if known != 0:
@@ -1510,20 +1510,20 @@ fn Codegen.infer_local_pointee_struct(self: Codegen, value_node: i32, declared_t
 
     if declared_type_node != 0:
         let dk = self.pool.kind(declared_type_node)
-        if dk == NK_TYPE_REF or dk == NK_TYPE_PTR:
+        if dk == NodeKind.NK_TYPE_REF or dk == NodeKind.NK_TYPE_PTR:
             let pointee = self.pool.get_data0(declared_type_node)
-            if self.pool.kind(pointee) == NK_TYPE_NAMED:
+            if self.pool.kind(pointee) == NodeKind.NK_TYPE_NAMED:
                 let sym = self.pool.get_data0(pointee)
                 if self.intern.resolve(sym) == "Self" and self.current_method_owner_sym != 0:
                     return self.current_method_owner_sym
                 if self.struct_type_map.get(sym).is_some():
                     return sym
 
-    if value_node != 0 and self.pool.kind(value_node) == NK_UNARY:
+    if value_node != 0 and self.pool.kind(value_node) == NodeKind.NK_UNARY:
         let uop = self.pool.get_data0(value_node)
         if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF:
             let inner = self.pool.get_data1(value_node)
-            if self.pool.kind(inner) == NK_IDENT:
+            if self.pool.kind(inner) == NodeKind.NK_IDENT:
                 let base_sym = self.pool.get_data0(inner)
                 let ps = self.lookup_local_pointee_struct(base_sym)
                 if ps != 0:
@@ -1534,7 +1534,7 @@ fn Codegen.infer_local_pointee_struct(self: Codegen, value_node: i32, declared_t
                     if st_sym != 0:
                         return st_sym
 
-    if value_node != 0 and self.pool.kind(value_node) == NK_IDENT:
+    if value_node != 0 and self.pool.kind(value_node) == NodeKind.NK_IDENT:
         let src_sym = self.pool.get_data0(value_node)
         let ps = self.lookup_local_pointee_struct(src_sym)
         if ps != 0:
@@ -1549,11 +1549,11 @@ fn Codegen.infer_local_concrete_struct(self: Codegen, value_node: i32, storage_t
     if value_node == 0:
         return 0
     let vk = self.pool.kind(value_node)
-    if vk == NK_STRUCT_LIT:
+    if vk == NodeKind.NK_STRUCT_LIT:
         let lit_sym = self.pool.get_data0(value_node)
         if lit_sym != 0:
             return lit_sym
-    if vk == NK_IDENT:
+    if vk == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(value_node)
         let known = self.lookup_trait_local_concrete(sym)
         if known != 0:
@@ -1564,11 +1564,11 @@ fn Codegen.infer_local_concrete_struct(self: Codegen, value_node: i32, storage_t
             let alias_known = self.lookup_trait_local_concrete(alias_sym)
             if alias_known != 0:
                 return alias_known
-    if vk == NK_UNARY:
+    if vk == NodeKind.NK_UNARY:
         let uop = self.pool.get_data0(value_node)
         if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF:
             let inner = self.pool.get_data1(value_node)
-            if self.pool.kind(inner) == NK_IDENT:
+            if self.pool.kind(inner) == NodeKind.NK_IDENT:
                 let sym = self.pool.get_data0(inner)
                 let known = self.lookup_trait_local_concrete(sym)
                 if known != 0:
@@ -1863,7 +1863,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
 
     // with_eprintln(f"[codegen] resolve_type node={type_node} kind={kind}")
 
-    if kind == NK_IDENT:
+    if kind == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(type_node)
         let named = self.resolve_named_type(sym)
         if named != 0:
@@ -1875,7 +1875,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
                 return sema_ty
         return 0
 
-    if kind == NK_TYPE_NAMED:
+    if kind == NodeKind.NK_TYPE_NAMED:
         let sym = self.pool.get_data0(type_node)
         let named = self.resolve_named_type(sym)
         if named != 0:
@@ -1887,21 +1887,21 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
                 return sema_ty
         return 0
 
-    if kind == NK_TYPE_PTR:
+    if kind == NodeKind.NK_TYPE_PTR:
         // Check for dyn trait pointer
         let pointee = self.pool.get_data0(type_node)
-        if self.pool.kind(pointee) == NK_TYPE_TRAIT_OBJ:
+        if self.pool.kind(pointee) == NodeKind.NK_TYPE_TRAIT_OBJ:
             // Fat pointer {data_ptr, vtable_ptr}
             return self.get_dyn_fat_ptr_type()
         return wl_ptr_type(self.context)
 
-    if kind == NK_TYPE_REF:
+    if kind == NodeKind.NK_TYPE_REF:
         let pointee = self.pool.get_data0(type_node)
-        if self.pool.kind(pointee) == NK_TYPE_TRAIT_OBJ:
+        if self.pool.kind(pointee) == NodeKind.NK_TYPE_TRAIT_OBJ:
             return self.get_dyn_fat_ptr_type()
         return wl_ptr_type(self.context)
 
-    if kind == NK_TYPE_FN:
+    if kind == NodeKind.NK_TYPE_FN:
         // Function type → fat pointer {fn_ptr, ctx_ptr}
         let ptr_ty = wl_ptr_type(self.context)
         let fat_types: Vec[i64] = Vec.new()
@@ -1909,13 +1909,13 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         fat_types.push(ptr_ty)
         return wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
 
-    if kind == NK_TYPE_ARRAY:
+    if kind == NodeKind.NK_TYPE_ARRAY:
         let elem_node = self.pool.get_data0(type_node)
         let size_lo = self.pool.get_data1(type_node)
         let elem_ty = self.resolve_type(elem_node)
         return wl_array_type(elem_ty, size_lo as i64)
 
-    if kind == NK_TYPE_SLICE:
+    if kind == NodeKind.NK_TYPE_SLICE:
         let elem_node = self.pool.get_data0(type_node)
         self.resolve_type(elem_node)
         // Slice is {ptr, i64} like str
@@ -1924,13 +1924,13 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         body_types.push(wl_i64_type(self.context))
         return wl_struct_type(self.context, vec_data_i64(&body_types), 2, 0)
 
-    if kind == NK_TYPE_OPTIONAL:
+    if kind == NodeKind.NK_TYPE_OPTIONAL:
         let inner_node = self.pool.get_data0(type_node)
         let payload_ty = self.resolve_type(inner_node)
         let opt = self.get_or_create_option_type(payload_ty)
         return opt
 
-    if kind == NK_TYPE_TUPLE:
+    if kind == NodeKind.NK_TYPE_TUPLE:
         let extra_start = self.pool.get_data0(type_node)
         let elem_count = self.pool.get_data1(type_node)
         let elem_types: Vec[i64] = Vec.new()
@@ -1939,7 +1939,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
             elem_types.push(self.resolve_type(et_node))
         return wl_struct_type(self.context, vec_data_i64(&elem_types), elem_count, 0)
 
-    if kind == NK_TYPE_GENERIC:
+    if kind == NodeKind.NK_TYPE_GENERIC:
         let name_sym = self.pool.get_data0(type_node)
         let g_extra = self.pool.get_data1(type_node)
         let g_count = self.pool.get_data2(type_node)
@@ -1947,7 +1947,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         // Box[T] is always a pointer (fat pointer for Box[dyn Trait])
         if name == "Box" and g_count == 1:
             let inner_node = self.pool.get_extra(g_extra)
-            if self.pool.kind(inner_node) == NK_TYPE_TRAIT_OBJ:
+            if self.pool.kind(inner_node) == NodeKind.NK_TYPE_TRAIT_OBJ:
                 return self.get_dyn_fat_ptr_type()
             return wl_ptr_type(self.context)
         // ContextError[E] = { str, E }
@@ -1981,14 +1981,14 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
             return self.monomorphize_struct(name_sym, g_extra, g_count)
         return 0
 
-    if kind == NK_TYPE_TRAIT_OBJ:
+    if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
         // dyn Trait → fat pointer {data_ptr, vtable_ptr}
         return self.get_dyn_fat_ptr_type()
 
-    if kind == NK_TYPE_INFERRED:
+    if kind == NodeKind.NK_TYPE_INFERRED:
         return 0  // Cannot resolve inferred types
 
-    if kind == NK_TYPE_ASSOC:
+    if kind == NodeKind.NK_TYPE_ASSOC:
         // Self.Name — resolve associated type from current impl
         let base_sym = self.pool.get_data0(type_node)
         let assoc_sym = self.pool.get_data1(type_node)
@@ -2078,7 +2078,7 @@ fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
     if node == 0:
         return 0
     let nk = self.pool.kind(node)
-    if nk == NK_IDENT:
+    if nk == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(node)
         let opt = self.local_sema_types.get(sym)
         if opt.is_some():
@@ -2089,15 +2089,15 @@ fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
             if canon_opt.is_some():
                 return canon_opt.unwrap()
     // Literal types
-    if nk == NK_STRING_LIT:
+    if nk == NodeKind.NK_STRING_LIT:
         return self.sema.ty_str
-    if nk == NK_FSTRING:
+    if nk == NodeKind.NK_FSTRING:
         return self.sema.ty_str
-    if nk == NK_INT_LIT:
+    if nk == NodeKind.NK_INT_LIT:
         return self.sema.ty_i32
-    if nk == NK_FLOAT_LIT:
+    if nk == NodeKind.NK_FLOAT_LIT:
         return self.sema.ty_f64
-    if nk == NK_BOOL_LIT:
+    if nk == NodeKind.NK_BOOL_LIT:
         return self.sema.ty_bool
     // Fall back to sema's typed_expr_types (populated by check_ident)
     if self.sema.typed_expr_types.contains(node):
@@ -2330,7 +2330,7 @@ fn Codegen.type_decl_tp_count(self: Codegen, type_node: i32) -> i32:
 // ── Declare struct type ───────────────────────────────────────────
 
 fn Codegen.declare_struct_type(self: Codegen, name_sym: i32, type_node: i32):
-    // type_node is the NK_TYPE_DECL node with TypeDeclSubKind.TDK_STRUCT
+    // type_node is the NodeKind.NK_TYPE_DECL node with TypeDeclSubKind.TDK_STRUCT
     let extra_start = self.pool.get_data1(type_node)
     let field_count = self.pool.get_extra(extra_start)
 
@@ -2665,7 +2665,7 @@ fn Codegen.ident_text_from_node(self: Codegen, node: i32) -> str:
     self.source_text.slice(start as i64, end as i64)
 
 fn Codegen.method_text_from_field_access(self: Codegen, node: i32) -> str:
-    if node == 0 or self.pool.kind(node) != NK_FIELD_ACCESS:
+    if node == 0 or self.pool.kind(node) != NodeKind.NK_FIELD_ACCESS:
         return ""
     let text = self.ident_text_from_node(node)
     if text.len() == 0:
@@ -2789,7 +2789,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             let stp_count = self.type_decl_tp_count(struct_decl)
             if stp_count > 0 and param_count > 0:
                 let p0_tn = self.pool.fn_param_type(param_start, 0)
-                if p0_tn != 0 and self.pool.kind(p0_tn) == NK_TYPE_GENERIC:
+                if p0_tn != 0 and self.pool.kind(p0_tn) == NodeKind.NK_TYPE_GENERIC:
                     let p0_extra = self.pool.get_data1(p0_tn)
                     let p0_count = self.pool.get_data2(p0_tn)
                     var stp_pos = self.type_decl_tp_start(struct_decl)
@@ -2798,7 +2798,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
                         let stp_sym = self.pool.get_extra(stp_pos)
                         for gi in 0..p0_count:
                             let arg_nd = self.pool.get_extra(p0_extra + gi)
-                            if self.pool.kind(arg_nd) == NK_TYPE_NAMED and self.pool.get_data0(arg_nd) == stp_sym:
+                            if self.pool.kind(arg_nd) == NodeKind.NK_TYPE_NAMED and self.pool.get_data0(arg_nd) == stp_sym:
                                 has_struct_tp = true
                         let bc = self.pool.get_extra(stp_pos + 1)
                         stp_pos = stp_pos + 2 + bc
@@ -2837,7 +2837,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
 
         // Method owner-type parameter: lower as pointer for struct types.
         // Applies to self (pi==0) AND any other param of the same owner type.
-        if p_kind == NK_TYPE_NAMED:
+        if p_kind == NodeKind.NK_TYPE_NAMED:
             let p_sym = self.pool.get_data0(p_type_node)
             let p_type_name = self.intern.resolve(p_sym)
             let p_name_text = self.intern.resolve(p_name)
@@ -2860,7 +2860,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
                     continue
 
         // fn type params → fat pointer
-        if p_kind == NK_TYPE_FN:
+        if p_kind == NodeKind.NK_TYPE_FN:
             let ptr_ty = wl_ptr_type(self.context)
             let fat: Vec[i64] = Vec.new()
             fat.push(ptr_ty)
@@ -2885,7 +2885,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             continue
 
         // Reference params
-        if p_kind == NK_TYPE_REF:
+        if p_kind == NodeKind.NK_TYPE_REF:
             var ref_ty = self.resolve_type(p_type_node)
             if ref_ty == 0:
                 ref_ty = wl_ptr_type(self.context)
@@ -3054,7 +3054,7 @@ fn Codegen.resolve_callconv(self: Codegen, name: str) -> i32:
     -1
 
 fn Codegen.declare_extern_var(self: Codegen, node: i32):
-    // NK_EXTERN_VAR: d0=name(sym), d1=type_node, d2=flags(bit0=mut)
+    // NodeKind.NK_EXTERN_VAR: d0=name(sym), d1=type_node, d2=flags(bit0=mut)
     let name_sym = self.pool.get_data0(node)
     let type_node = self.pool.get_data1(node)
     let flags = self.pool.get_data2(node)
@@ -3101,7 +3101,7 @@ fn Codegen.detect_drop_functions(self: Codegen):
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
-        if kind == NK_FN_DECL:
+        if kind == NodeKind.NK_FN_DECL:
             let sym = self.pool.get_data0(decl)
             let name = self.intern.resolve(sym)
             if name.len() > 5:
@@ -3121,7 +3121,7 @@ fn Codegen.detect_drop_functions(self: Codegen):
 
 fn Codegen.is_result_return_type(self: Codegen, ret_node: i32) -> bool:
     if ret_node == 0: return false
-    if self.pool.kind(ret_node) != NK_TYPE_GENERIC: return false
+    if self.pool.kind(ret_node) != NodeKind.NK_TYPE_GENERIC: return false
     let name_sym = self.pool.get_data0(ret_node)
     let arg_count = self.pool.get_data2(ret_node)
     if arg_count != 2: return false
@@ -3132,7 +3132,7 @@ fn Codegen.result_err_symbol_from_return(self: Codegen, ret_node: i32) -> i32:
     if not self.is_result_return_type(ret_node): return 0
     let extra_start = self.pool.get_data1(ret_node)
     let err_node = self.pool.get_extra(extra_start + 1)
-    if self.pool.kind(err_node) == NK_TYPE_NAMED:
+    if self.pool.kind(err_node) == NodeKind.NK_TYPE_NAMED:
         return self.pool.get_data0(err_node)
     0
 
@@ -3140,7 +3140,7 @@ fn Codegen.is_result_unit_return(self: Codegen, ret_node: i32) -> bool:
     if not self.is_result_return_type(ret_node): return false
     let extra_start = self.pool.get_data1(ret_node)
     let ok_node = self.pool.get_extra(extra_start)
-    if self.pool.kind(ok_node) == NK_TYPE_NAMED:
+    if self.pool.kind(ok_node) == NodeKind.NK_TYPE_NAMED:
         let ok_name = self.intern.resolve(self.pool.get_data0(ok_node))
         return ok_name == "Unit"
     false
@@ -3493,7 +3493,7 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
             // Methods pass struct self as pointer
             if pi == 0:
                 let p_kind = self.pool.kind(p_type_node)
-                if p_kind == NK_TYPE_GENERIC or p_kind == NK_TYPE_NAMED:
+                if p_kind == NodeKind.NK_TYPE_GENERIC or p_kind == NodeKind.NK_TYPE_NAMED:
                     let p_name_sym = self.pool.get_data0(p_type_node)
                     let st_opt = self.struct_type_map.get(p_name_sym)
                     if not st_opt.is_some():
@@ -3647,7 +3647,7 @@ fn Codegen.emit_drops(self: Codegen, watermark: i32):
     self.scope_local_count = watermark
 
 fn Codegen.build_fn_type_from_ast(self: Codegen, fn_type_node: i32) -> i64:
-    // NK_TYPE_FN: d0=extra_start, d1=param_count, d2=return_type(node)
+    // NodeKind.NK_TYPE_FN: d0=extra_start, d1=param_count, d2=return_type(node)
     let extra_start = self.pool.get_data0(fn_type_node)
     let param_count = self.pool.get_data1(fn_type_node)
     let ret_node = self.pool.get_data2(fn_type_node)
@@ -3679,7 +3679,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
-        if kind != NK_TYPE_DECL:
+        if kind != NodeKind.NK_TYPE_DECL:
             continue
         let name_sym = self.pool.get_data0(decl)
         let name_str = self.intern.resolve(name_sym)
@@ -3707,7 +3707,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
-        if kind != NK_TYPE_DECL:
+        if kind != NodeKind.NK_TYPE_DECL:
             continue
         let name_sym = self.pool.get_data0(decl)
         let name_str = self.intern.resolve(name_sym)
@@ -3765,13 +3765,13 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     // Pass 0.5: collect trait declarations
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
-        if self.pool.kind(decl) == NK_TRAIT_DECL:
+        if self.pool.kind(decl) == NodeKind.NK_TRAIT_DECL:
             self.collect_trait_info(decl)
 
     // Pass 0.6: process top-level let declarations as module constants
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
-        if self.pool.kind(decl) == NK_LET_DECL:
+        if self.pool.kind(decl) == NodeKind.NK_LET_DECL:
             self.current_decl_source_file = self.decl_source_path(i)
             self.gen_module_constant(decl)
 
@@ -3779,13 +3779,13 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
-        if kind == NK_EXTERN_FN:
+        if kind == NodeKind.NK_EXTERN_FN:
             self.declare_extern_fn(decl)
             continue
-        if kind == NK_EXTERN_VAR:
+        if kind == NodeKind.NK_EXTERN_VAR:
             self.declare_extern_var(decl)
             continue
-        if kind != NK_FN_DECL:
+        if kind != NodeKind.NK_FN_DECL:
             continue
         let name_sym = self.pool.get_data0(decl)
         if name_sym == 0:
@@ -3818,7 +3818,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
-        if kind == NK_FN_DECL:
+        if kind == NodeKind.NK_FN_DECL:
             let name_sym = self.pool.get_data0(decl)
             if name_sym == 0:
                 continue
@@ -3947,7 +3947,7 @@ fn Codegen.lookup_impl_method_symbol_by_slot(self: Codegen, impl_node: i32, slot
     var di = decl_idx - 1
     while di >= 0 and rev_syms.len() as i32 < method_count:
         let decl = self.pool.get_decl(di)
-        if self.pool.kind(decl) == NK_FN_DECL:
+        if self.pool.kind(decl) == NodeKind.NK_FN_DECL:
             rev_syms.push(self.pool.get_data0(decl))
         di = di - 1
     if rev_syms.len() as i32 != method_count:
@@ -4148,7 +4148,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
         if type_slot < 0 or type_slot >= self.pool.extra_len():
             return
         let p_type_node = self.pool.fn_param_type(param_start, pi)
-        if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NK_TYPE_NAMED:
+        if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_NAMED:
             let p_sym = self.pool.get_data0(p_type_node)
             if p_sym == impl_type_sym or self.intern.resolve(p_sym) == "Self":
                 let p_ty = wl_ptr_type(self.context)
@@ -4274,7 +4274,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
 
         if pi == 0 and wl_get_type_kind(p_ty) == wl_pointer_type_kind():
             self.record_local_pointee_struct(p_name, impl_type_sym)
-        if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NK_TYPE_NAMED:
+        if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_NAMED:
             let psym = self.pool.get_data0(p_type_node)
             if self.intern.resolve(psym) == "Self" and wl_get_type_kind(p_ty) == wl_pointer_type_kind():
                 self.record_local_pointee_struct(p_name, impl_type_sym)
@@ -4316,7 +4316,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
                     dtm_p_sema_ty = dtm_tt
             if dtm_p_sema_ty == self.sema.ty_i32:
                 let dtm_pk = self.pool.kind(dtm_p_type_node)
-                if dtm_pk == NK_TYPE_NAMED or dtm_pk == NK_IDENT:
+                if dtm_pk == NodeKind.NK_TYPE_NAMED or dtm_pk == NodeKind.NK_IDENT:
                     let dtm_type_sym = self.pool.get_data0(dtm_p_type_node)
                     let dtm_prim = self.sema.primitive_type_by_sym(dtm_type_sym)
                     if dtm_prim != 0:
@@ -4447,7 +4447,7 @@ fn Codegen.generate_default_trait_methods_for_impl(self: Codegen, impl_node: i32
 fn Codegen.generate_default_trait_methods(self: Codegen):
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
-        if self.pool.kind(decl) == NK_IMPL_DECL:
+        if self.pool.kind(decl) == NodeKind.NK_IMPL_DECL:
             self.generate_default_trait_methods_for_impl(decl)
 
 fn Codegen.generate_trait_vtable_for_impl(self: Codegen, impl_node: i32):
@@ -4502,7 +4502,7 @@ fn Codegen.generate_trait_vtable_for_impl(self: Codegen, impl_node: i32):
 fn Codegen.generate_trait_vtables(self: Codegen):
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
-        if self.pool.kind(decl) == NK_IMPL_DECL:
+        if self.pool.kind(decl) == NodeKind.NK_IMPL_DECL:
             self.generate_trait_vtable_for_impl(decl)
 
 fn CONST_EVAL_FAIL -> i64: -9223372036854775807
@@ -4536,7 +4536,7 @@ fn Codegen.decl_source_path(self: Codegen, decl_index: i32) -> str:
 fn Codegen.find_module_let_decl_index(self: Codegen, sym: i32) -> i32:
     for di in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(di)
-        if self.pool.kind(decl) != NK_LET_DECL:
+        if self.pool.kind(decl) != NodeKind.NK_LET_DECL:
             continue
         if self.pool.get_data0(decl) == sym:
             return di
@@ -4565,14 +4565,14 @@ fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, dep
         return const_string_eval_fail()
 
     let kind = self.pool.kind(node)
-    if kind == NK_STRING_LIT or kind == NK_C_STRING_LIT:
+    if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT:
         let sym = self.pool.get_data0(node)
         return const_string_eval_ok(self.decode_string_escapes(self.intern.resolve(sym)))
 
-    if kind == NK_COMPTIME or kind == NK_GROUPED:
+    if kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_GROUPED:
         return self.try_eval_const_string(self.pool.get_data0(node), source_path, depth + 1)
 
-    if kind == NK_BINARY:
+    if kind == NodeKind.NK_BINARY:
         let op = self.pool.get_data0(node)
         if op == BinaryOp.OP_CONCAT or op == BinaryOp.OP_ADD:
             let lhs = self.try_eval_const_string(self.pool.get_data1(node), source_path, depth + 1)
@@ -4583,7 +4583,7 @@ fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, dep
                 return rhs
             return const_string_eval_ok(lhs.text ++ rhs.text)
 
-    if kind == NK_IDENT:
+    if kind == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(node)
         let decl_index = self.find_module_let_decl_index(sym)
         if decl_index < 0:
@@ -4595,13 +4595,13 @@ fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, dep
         var value_node = self.pool.get_data1(decl)
         if value_node == 0:
             return const_string_eval_fail()
-        if self.pool.kind(value_node) == NK_COMPTIME:
+        if self.pool.kind(value_node) == NodeKind.NK_COMPTIME:
             value_node = self.pool.get_data0(value_node)
         return self.try_eval_const_string(value_node, self.decl_source_path(decl_index), depth + 1)
 
-    if kind == NK_CALL:
+    if kind == NodeKind.NK_CALL:
         let callee = self.pool.get_data0(node)
-        if self.pool.kind(callee) != NK_IDENT:
+        if self.pool.kind(callee) != NodeKind.NK_IDENT:
             return const_string_eval_fail()
         let callee_sym = self.pool.get_data0(callee)
         if callee_sym != self.sema.sym_embed_file or self.pool.get_data2(node) != 1:
@@ -4621,12 +4621,12 @@ fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, dep
     const_string_eval_fail()
 
 fn Codegen.try_resolve_vec_new_global_type(self: Codegen, value_node: i32, flags: i32) -> i32:
-    if value_node == 0 or self.pool.kind(value_node) != NK_CALL:
+    if value_node == 0 or self.pool.kind(value_node) != NodeKind.NK_CALL:
         return 0
     if self.pool.get_data2(value_node) != 0:
         return 0
     let callee = self.pool.get_data0(value_node)
-    if self.pool.kind(callee) != NK_FIELD_ACCESS:
+    if self.pool.kind(callee) != NodeKind.NK_FIELD_ACCESS:
         return 0
     let recv = self.pool.get_data0(callee)
     let method_sym = self.pool.get_data1(callee)
@@ -4634,11 +4634,11 @@ fn Codegen.try_resolve_vec_new_global_type(self: Codegen, value_node: i32, flags
         return 0
 
     var recv_is_vec = false
-    if self.pool.kind(recv) == NK_IDENT:
+    if self.pool.kind(recv) == NodeKind.NK_IDENT:
         recv_is_vec = self.intern.resolve(self.pool.get_data0(recv)) == "Vec"
-    else if self.pool.kind(recv) == NK_INDEX:
+    else if self.pool.kind(recv) == NodeKind.NK_INDEX:
         let recv_base = self.pool.get_data0(recv)
-        if self.pool.kind(recv_base) == NK_IDENT:
+        if self.pool.kind(recv_base) == NodeKind.NK_IDENT:
             recv_is_vec = self.intern.resolve(self.pool.get_data0(recv_base)) == "Vec"
     if not recv_is_vec:
         return 0
@@ -4691,15 +4691,15 @@ fn Codegen.emit_vec_new_global(self: Codegen, name_sym: i32, vec_tid: i32, is_mu
 
 fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
     let kind = self.pool.kind(node)
-    if kind == NK_INT_LIT:
+    if kind == NodeKind.NK_INT_LIT:
         return self.pool.int_lit_value(node)
-    if kind == NK_COMPTIME:
+    if kind == NodeKind.NK_COMPTIME:
         return self.try_eval_const_int(self.pool.get_data0(node))
-    if kind == NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED:
         return self.try_eval_const_int(self.pool.get_data0(node))
-    if kind == NK_BOOL_LIT:
+    if kind == NodeKind.NK_BOOL_LIT:
         return self.pool.get_data0(node) as i64
-    if kind == NK_UNARY:
+    if kind == NodeKind.NK_UNARY:
         let op = self.pool.get_data0(node)
         let inner_val = self.try_eval_const_int(self.pool.get_data1(node))
         if inner_val == CONST_EVAL_FAIL(): return CONST_EVAL_FAIL()
@@ -4709,7 +4709,7 @@ fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
             if inner_val == 0: return 1
             return 0
         return CONST_EVAL_FAIL()
-    if kind == NK_BINARY:
+    if kind == NodeKind.NK_BINARY:
         let op = self.pool.get_data0(node)
         let lv = self.try_eval_const_int(self.pool.get_data1(node))
         if lv == CONST_EVAL_FAIL(): return CONST_EVAL_FAIL()
@@ -4744,15 +4744,15 @@ fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
         if op == BinaryOp.OP_BIT_XOR: return lv ^ rv
         return CONST_EVAL_FAIL()
     // sizeof[T]() / alignof[T]() as module-level constants
-    if kind == NK_CALL:
+    if kind == NodeKind.NK_CALL:
         let callee = self.pool.get_data0(node)
         let callee_kind = self.pool.kind(callee)
-        if callee_kind == NK_TYPE_GENERIC or callee_kind == NK_INDEX:
+        if callee_kind == NodeKind.NK_TYPE_GENERIC or callee_kind == NodeKind.NK_INDEX:
             let base = self.pool.get_data0(callee)
-            if self.pool.kind(base) == NK_IDENT:
+            if self.pool.kind(base) == NodeKind.NK_IDENT:
                 let name = self.intern.resolve(self.pool.get_data0(base))
                 if name == "sizeof" or name == "size_of" or name == "alignof" or name == "align_of":
-                    let tp_node = if callee_kind == NK_TYPE_GENERIC:
+                    let tp_node = if callee_kind == NodeKind.NK_TYPE_GENERIC:
                         let tp_start = self.pool.get_data1(callee)
                         let tp_count = self.pool.get_data2(callee)
                         if tp_count == 0: return CONST_EVAL_FAIL()
@@ -4766,7 +4766,7 @@ fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
                             return wl_abi_size_of(dl, type_val)
                         return wl_abi_align_of(dl, type_val) as i64
         return CONST_EVAL_FAIL()
-    if kind == NK_IDENT:
+    if kind == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(node)
         // Linear search for known constant
         for ci in 0..self.const_int_syms.len() as i32:
@@ -4781,7 +4781,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     if value_node == 0: return
 
     // Unwrap comptime wrapper (const desugars to comptime)
-    if self.pool.kind(value_node) == NK_COMPTIME:
+    if self.pool.kind(value_node) == NodeKind.NK_COMPTIME:
         value_node = self.pool.get_data0(value_node)
 
     let flags = self.pool.get_data2(let_node)
@@ -4791,7 +4791,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     else:
         0
     let resolved_binding_ty = if binding_ty != 0: self.sema.resolve_alias(binding_ty) else: 0
-    if self.pool.kind(value_node) == NK_NULL_LIT:
+    if self.pool.kind(value_node) == NodeKind.NK_NULL_LIT:
         var null_ty = resolved_binding_ty
         if null_ty == 0 and self.sema.typed_expr_types.contains(value_node):
             let inferred_null_ty = self.sema.typed_expr_types.get(value_node).unwrap()
@@ -4873,14 +4873,14 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         if self.emit_vec_new_global(name_sym, vec_tid, is_mut):
             return
 
-    // Float constant: NK_FLOAT_LIT or unary negate of one
+    // Float constant: NodeKind.NK_FLOAT_LIT or unary negate of one
     var float_node = value_node
     var float_negate = false
-    if self.pool.kind(float_node) == NK_UNARY:
+    if self.pool.kind(float_node) == NodeKind.NK_UNARY:
         if self.pool.get_data0(float_node) == UnaryOp.UOP_NEGATE:
             float_node = self.pool.get_data1(float_node)
             float_negate = true
-    if self.pool.kind(float_node) == NK_FLOAT_LIT:
+    if self.pool.kind(float_node) == NodeKind.NK_FLOAT_LIT:
         let str_idx = self.pool.get_data0(float_node)
         var fval: f64 = 0.0
         if str_idx >= 0 and str_idx < self.pool.strings.len() as i32:
@@ -5143,7 +5143,7 @@ fn Codegen.mir_try_init_const_local(self: Codegen, body: MirBody, local_id: i32,
     var value_node = self.pool.get_data1(decl)
     if value_node == 0:
         return false
-    if self.pool.kind(value_node) == NK_COMPTIME:
+    if self.pool.kind(value_node) == NodeKind.NK_COMPTIME:
         value_node = self.pool.get_data0(value_node)
     let value = self.try_eval_const_string(value_node, self.decl_source_path(decl_index), 0)
     if not value.ok:
@@ -8101,7 +8101,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
 
             // Try method call dispatch for generic struct methods
             let gc_callee_field = self.pool.get_data0(gc_node)
-            if self.pool.kind(gc_callee_field) == NK_FIELD_ACCESS:
+            if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
                 let gc_self_expr_node = self.pool.get_data0(gc_callee_field)
                 let gc_method_sym = self.pool.get_data1(gc_callee_field)
                 let gc_method_name = self.intern.resolve(gc_method_sym)
@@ -8170,11 +8170,11 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                             return true
 
             // Disc enum static methods: Direction.from_int(n)
-            if self.pool.kind(gc_callee_field) == NK_FIELD_ACCESS:
+            if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
                 let gc_de_self = self.pool.get_data0(gc_callee_field)
                 let gc_de_method_sym = self.pool.get_data1(gc_callee_field)
                 let gc_de_method = self.intern.resolve(gc_de_method_sym)
-                if gc_de_method == "from_int" and self.pool.kind(gc_de_self) == NK_IDENT:
+                if gc_de_method == "from_int" and self.pool.kind(gc_de_self) == NodeKind.NK_IDENT:
                     let gc_de_type_sym = self.pool.get_data0(gc_de_self)
                     let gc_de_opt = self.disc_enum_type_map.get(gc_de_type_sym)
                     if gc_de_opt.is_some():
@@ -8198,10 +8198,10 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                             return true
 
             // Disc enum variant constructor with payload: Msg.Move(10, 20)
-            if self.pool.kind(gc_callee_field) == NK_FIELD_ACCESS:
+            if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
                 let gc_vc_self = self.pool.get_data0(gc_callee_field)
                 let gc_vc_variant_sym = self.pool.get_data1(gc_callee_field)
-                if self.pool.kind(gc_vc_self) == NK_IDENT:
+                if self.pool.kind(gc_vc_self) == NodeKind.NK_IDENT:
                     let gc_vc_type_sym = self.pool.get_data0(gc_vc_self)
                     var gc_vc_is_enum = false
                     let gc_vc_de_opt = self.disc_enum_type_map.get(gc_vc_type_sym)
@@ -8236,7 +8236,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         return true
 
             // Fallback: trait method call on concrete type (e.g. self.show() in blanket impl)
-            if self.pool.kind(gc_callee_field) == NK_FIELD_ACCESS:
+            if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
                 let gc_fb_method_sym = self.pool.get_data1(gc_callee_field)
                 let gc_fb_method = self.intern.resolve(gc_fb_method_sym)
                 let gc_fb_mir_start = body.call_arg_starts.get(args_id as i64)
@@ -8296,7 +8296,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
             // Try derive-generated method calls (e.g., clone)
             if gc_callee_sym > 0 and gc_node > 0:
                 let dv_callee = self.pool.get_data0(gc_node)
-                if self.pool.kind(dv_callee) == NK_FIELD_ACCESS:
+                if self.pool.kind(dv_callee) == NodeKind.NK_FIELD_ACCESS:
                     let dv_method = self.pool.get_data1(dv_callee)
                     let dv_ms = body.call_arg_starts.get(args_id as i64)
                     let dv_mc = body.call_arg_counts.get(args_id as i64)
@@ -8730,16 +8730,16 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
 
         if p_type_node != 0:
             let pk = self.pool.kind(p_type_node)
-            if pk == NK_TYPE_FN:
+            if pk == NodeKind.NK_TYPE_FN:
                 let fn_sig = self.build_fn_type_from_ast(p_type_node)
                 self.record_local_fn_sig(p_name, fn_sig)
-            if pk == NK_TYPE_PTR or pk == NK_TYPE_REF:
+            if pk == NodeKind.NK_TYPE_PTR or pk == NodeKind.NK_TYPE_REF:
                 let pointee_node = self.pool.get_data0(p_type_node)
-                if self.pool.kind(pointee_node) == NK_TYPE_NAMED:
+                if self.pool.kind(pointee_node) == NodeKind.NK_TYPE_NAMED:
                     let ps = self.pool.get_data0(pointee_node)
                     if self.struct_type_map.get(ps).is_some():
                         self.record_local_pointee_struct(p_name, ps)
-            if pk == NK_TYPE_NAMED:
+            if pk == NodeKind.NK_TYPE_NAMED:
                 let p_sym = self.pool.get_data0(p_type_node)
                 let p_n = self.intern.resolve(p_sym)
                 let p_name_text = self.intern.resolve(p_name)
@@ -8983,16 +8983,16 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
 
         if p_type_node != 0:
             let pk = self.pool.kind(p_type_node)
-            if pk == NK_TYPE_FN:
+            if pk == NodeKind.NK_TYPE_FN:
                 let fn_sig = self.build_fn_type_from_ast(p_type_node)
                 self.record_local_fn_sig(p_name, fn_sig)
-            if pk == NK_TYPE_PTR or pk == NK_TYPE_REF:
+            if pk == NodeKind.NK_TYPE_PTR or pk == NodeKind.NK_TYPE_REF:
                 let pointee_node = self.pool.get_data0(p_type_node)
-                if self.pool.kind(pointee_node) == NK_TYPE_NAMED:
+                if self.pool.kind(pointee_node) == NodeKind.NK_TYPE_NAMED:
                     let ps = self.pool.get_data0(pointee_node)
                     if self.struct_type_map.get(ps).is_some():
                         self.record_local_pointee_struct(p_name, ps)
-            if pk == NK_TYPE_NAMED:
+            if pk == NodeKind.NK_TYPE_NAMED:
                 let p_sym = self.pool.get_data0(p_type_node)
                 let p_n = self.intern.resolve(p_sym)
                 let p_name_text = self.intern.resolve(p_name)
@@ -9101,7 +9101,7 @@ fn Codegen.reverse_struct_lookup(self: Codegen, idx: i32) -> i32:
     // This is O(n) but only called for field access
     for i in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(i)
-        if self.pool.kind(decl) == NK_TYPE_DECL:
+        if self.pool.kind(decl) == NodeKind.NK_TYPE_DECL:
             let sym = self.pool.get_data0(decl)
             let st = self.struct_type_map.get(sym)
             if st.is_some() and st.unwrap() == idx:
@@ -9115,7 +9115,7 @@ fn Codegen.reverse_struct_lookup(self: Codegen, idx: i32) -> i32:
 fn Codegen.find_struct_decl_node(self: Codegen, type_sym: i32) -> i32:
     for di in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(di)
-        if self.pool.kind(decl) != NK_TYPE_DECL:
+        if self.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
             continue
         if self.pool.get_data0(decl) != type_sym:
             continue
@@ -9270,10 +9270,10 @@ fn Codegen.llvm_type_mangle(self: Codegen, ty: i64) -> str:
 fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i32, args_start: i32, arg_count: i32, call_node: i32, arg_vals: Vec[i64], arg_tys: Vec[i64], arg_nodes: Vec[i32]) -> i64:
     var generic_node = fn_node
     var meta = self.pool.find_fn_meta(generic_node)
-    if self.pool.kind(generic_node) != NK_FN_DECL or self.pool.get_data0(generic_node) != fn_sym or meta < 0 or self.pool.fn_meta_tp_count(meta) <= 0:
+    if self.pool.kind(generic_node) != NodeKind.NK_FN_DECL or self.pool.get_data0(generic_node) != fn_sym or meta < 0 or self.pool.fn_meta_tp_count(meta) <= 0:
         for di in 0..self.pool.decl_count():
             let decl = self.pool.get_decl(di)
-            if self.pool.kind(decl) != NK_FN_DECL:
+            if self.pool.kind(decl) != NodeKind.NK_FN_DECL:
                 continue
             if self.pool.get_data0(decl) != fn_sym:
                 continue
@@ -9318,7 +9318,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
         let arg_ty = arg_tys.get(pi as i64)
         let p_kind = self.pool.kind(p_type_node)
 
-        if p_kind == NK_TYPE_NAMED:
+        if p_kind == NodeKind.NK_TYPE_NAMED:
             let p_sym = self.pool.get_data0(p_type_node)
             var is_tp = false
             for ti in 0..tp_syms.len() as i32:
@@ -9342,7 +9342,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
                         bind_sema_tys.push(self.llvm_type_to_sema_type(arg_ty))
             continue
 
-        if p_kind == NK_TYPE_GENERIC:
+        if p_kind == NodeKind.NK_TYPE_GENERIC:
             let g_name_sym = self.pool.get_data0(p_type_node)
             let g_name = self.intern.resolve(g_name_sym)
             let g_extra = self.pool.get_data1(p_type_node)
@@ -9354,7 +9354,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
                 var mg_sema_bound = true
                 for gi in 0..g_count:
                     let mg_inner_node = self.pool.get_extra(g_extra + gi)
-                    if self.pool.kind(mg_inner_node) != NK_TYPE_NAMED:
+                    if self.pool.kind(mg_inner_node) != NodeKind.NK_TYPE_NAMED:
                         mg_sema_bound = false
                         break
                     let mg_inner_sym = self.pool.get_data0(mg_inner_node)
@@ -9505,7 +9505,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
 
 fn Codegen.get_mutable_receiver_ptr(self: Codegen, recv_node: i32, recv_val: i64, recv_ty: i64) -> i64:
     let rk = self.pool.kind(recv_node)
-    if rk == NK_IDENT:
+    if rk == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(recv_node)
         let alloca = self.lookup_local_alloca(sym)
         if alloca != 0:
@@ -9588,7 +9588,7 @@ fn Codegen.gen_enum_variant_call_val(self: Codegen, variant_sym: i32, args: Vec[
 fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     // Closure: create an anonymous function and return fat pointer {fn_ptr, ctx_ptr}
     // Calling convention: fn(ctx_ptr, params...) -> ret_ty
-    // NK_CLOSURE layout: d0=body, d1=extra_start, d2=param_count
+    // NodeKind.NK_CLOSURE layout: d0=body, d1=extra_start, d2=param_count
     let body_node = self.pool.get_data0(node)
     let extra_start = self.pool.get_data1(node)
     let param_count = self.pool.get_data2(node)
@@ -9759,7 +9759,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
                     cl_p_sema_ty = cl_tt
             if cl_p_sema_ty == self.sema.ty_i32:
                 let cl_pk = self.pool.kind(cl_p_type_node)
-                if cl_pk == NK_TYPE_NAMED or cl_pk == NK_IDENT:
+                if cl_pk == NodeKind.NK_TYPE_NAMED or cl_pk == NodeKind.NK_IDENT:
                     let cl_type_sym = self.pool.get_data0(cl_p_type_node)
                     let cl_prim = self.sema.primitive_type_by_sym(cl_type_sym)
                     if cl_prim != 0:
@@ -10075,7 +10075,7 @@ fn Codegen.collect_captures(self: Codegen, node: i32):
     // Walk the AST and collect captured locals into self.async_block_captures.
     if node == 0: return
     let kind = self.pool.kind(node)
-    if kind == NK_IDENT:
+    if kind == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(node)
         if self.local_allocas.get(sym).is_some():
             for ci in 0..self.async_block_captures.len() as i32:
@@ -10083,66 +10083,66 @@ fn Codegen.collect_captures(self: Codegen, node: i32):
                     return
             self.async_block_captures.push(sym)
         return
-    if kind == NK_BINARY:
+    if kind == NodeKind.NK_BINARY:
         self.collect_captures(self.pool.get_data1(node))
         self.collect_captures(self.pool.get_data2(node))
         return
-    if kind == NK_UNARY:
+    if kind == NodeKind.NK_UNARY:
         self.collect_captures(self.pool.get_data1(node))
         return
-    if kind == NK_CALL:
+    if kind == NodeKind.NK_CALL:
         self.collect_captures(self.pool.get_data0(node))
         let args_start = self.pool.get_data1(node)
         let arg_count = self.pool.get_data2(node)
         for ai in 0..arg_count:
             self.collect_captures(self.pool.get_extra(args_start + ai))
         return
-    if kind == NK_BLOCK:
+    if kind == NodeKind.NK_BLOCK:
         let extra_start = self.pool.get_data0(node)
         let stmt_count = self.pool.get_data1(node)
         for si in 0..stmt_count:
             self.collect_captures(self.pool.get_extra(extra_start + si))
         self.collect_captures(self.pool.get_data2(node))
         return
-    if kind == NK_IF_EXPR:
+    if kind == NodeKind.NK_IF_EXPR:
         self.collect_captures(self.pool.get_data0(node))
         self.collect_captures(self.pool.get_data1(node))
         self.collect_captures(self.pool.get_data2(node))
         return
-    if kind == NK_LET_BINDING:
+    if kind == NodeKind.NK_LET_BINDING:
         self.collect_captures(self.pool.get_data1(node))
         return
-    if kind == NK_RETURN:
+    if kind == NodeKind.NK_RETURN:
         self.collect_captures(self.pool.get_data0(node))
         return
-    if kind == NK_GROUPED or kind == NK_AWAIT or kind == NK_SPAWN:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN:
         self.collect_captures(self.pool.get_data0(node))
         return
-    if kind == NK_FIELD_ACCESS:
+    if kind == NodeKind.NK_FIELD_ACCESS:
         self.collect_captures(self.pool.get_data0(node))
         return
-    if kind == NK_CAST:
+    if kind == NodeKind.NK_CAST:
         self.collect_captures(self.pool.get_data0(node))
         return
-    if kind == NK_WHILE:
+    if kind == NodeKind.NK_WHILE:
         self.collect_captures(self.pool.get_data0(node))
         self.collect_captures(self.pool.get_data1(node))
         return
-    if kind == NK_FOR:
+    if kind == NodeKind.NK_FOR:
         self.collect_captures(self.pool.get_data1(node))
         self.collect_captures(self.pool.get_data2(node))
         return
-    if kind == NK_ASSIGN:
+    if kind == NodeKind.NK_ASSIGN:
         self.collect_captures(self.pool.get_data0(node))
         self.collect_captures(self.pool.get_data1(node))
         return
-    if kind == NK_TUPLE:
+    if kind == NodeKind.NK_TUPLE:
         let extra_start = self.pool.get_data0(node)
         let count = self.pool.get_data1(node)
         for ti in 0..count:
             self.collect_captures(self.pool.get_extra(extra_start + ti))
         return
-    if kind == NK_INDEX:
+    if kind == NodeKind.NK_INDEX:
         self.collect_captures(self.pool.get_data0(node))
         self.collect_captures(self.pool.get_data1(node))
         return
@@ -10370,7 +10370,7 @@ fn Codegen.generate_clone_derives(self: Codegen):
     let clone_sym = self.intern.intern("Clone")
     for di in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(di)
-        if self.pool.kind(decl) != NK_TYPE_DECL:
+        if self.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
             continue
         let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
         if sub_kind != TDK_STRUCT:
@@ -10420,9 +10420,9 @@ fn Codegen.gen_transmute(self: Codegen, node: i32, body: MirBody, args_id: i32) 
     // transmute[T](value) — reinterpret bits as type T
     let callee_node = self.pool.get_data0(node)
     let callee_kind = self.pool.kind(callee_node)
-    if callee_kind != NK_TYPE_GENERIC and callee_kind != NK_INDEX:
+    if callee_kind != NodeKind.NK_TYPE_GENERIC and callee_kind != NodeKind.NK_INDEX:
         return wl_get_undef(wl_i32_type(self.context))
-    let tp_node = if callee_kind == NK_TYPE_GENERIC:
+    let tp_node = if callee_kind == NodeKind.NK_TYPE_GENERIC:
         let tp_start = self.pool.get_data1(callee_node)
         let tp_count = self.pool.get_data2(callee_node)
         if tp_count == 0:
@@ -10450,9 +10450,9 @@ fn Codegen.gen_transmute(self: Codegen, node: i32, body: MirBody, args_id: i32) 
 fn Codegen.gen_sizeof_alignof(self: Codegen, name: str, node: i32) -> i64:
     let callee_node = self.pool.get_data0(node)
     let callee_kind = self.pool.kind(callee_node)
-    if callee_kind != NK_TYPE_GENERIC and callee_kind != NK_INDEX:
+    if callee_kind != NodeKind.NK_TYPE_GENERIC and callee_kind != NodeKind.NK_INDEX:
         return wl_const_int(wl_i64_type(self.context), 0, 0)
-    let tp_node = if callee_kind == NK_TYPE_GENERIC:
+    let tp_node = if callee_kind == NodeKind.NK_TYPE_GENERIC:
         let tp_start = self.pool.get_data1(callee_node)
         let tp_count = self.pool.get_data2(callee_node)
         if tp_count == 0:
@@ -10473,9 +10473,9 @@ fn Codegen.gen_sizeof_alignof(self: Codegen, name: str, node: i32) -> i64:
 fn Codegen.gen_nameof(self: Codegen, node: i32) -> i64:
     let callee_node = self.pool.get_data0(node)
     let callee_kind = self.pool.kind(callee_node)
-    if callee_kind != NK_TYPE_GENERIC and callee_kind != NK_INDEX:
+    if callee_kind != NodeKind.NK_TYPE_GENERIC and callee_kind != NodeKind.NK_INDEX:
         return self.gen_string_literal_raw("")
-    let tp_node = if callee_kind == NK_TYPE_GENERIC:
+    let tp_node = if callee_kind == NodeKind.NK_TYPE_GENERIC:
         let tp_start = self.pool.get_data1(callee_node)
         let tp_count = self.pool.get_data2(callee_node)
         if tp_count == 0:
@@ -10485,7 +10485,7 @@ fn Codegen.gen_nameof(self: Codegen, node: i32) -> i64:
         self.pool.get_data1(callee_node)
     // Get the type name from the AST node
     var type_name = ""
-    if self.pool.kind(tp_node) == NK_IDENT or self.pool.kind(tp_node) == NK_TYPE_NAMED:
+    if self.pool.kind(tp_node) == NodeKind.NK_IDENT or self.pool.kind(tp_node) == NodeKind.NK_TYPE_NAMED:
         type_name = self.intern.resolve(self.pool.get_data0(tp_node))
     else:
         type_name = "unknown"

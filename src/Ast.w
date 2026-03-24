@@ -11,75 +11,105 @@ use Token
 
 extern fn with_eprintln(s: str) -> void
 
-// ── Node kinds (integer constants) ────────────────────────────────
+// ── Node kinds ───────────────────────────────────────────────────
 
-// Declarations
-const NK_FN_DECL: i32 = 1
-const NK_TYPE_DECL: i32 = 2
-const NK_USE_DECL: i32 = 3
-const NK_LET_DECL: i32 = 4
-const NK_EXTERN_FN: i32 = 5
-const NK_C_IMPORT: i32 = 6
-const NK_TRAIT_DECL: i32 = 7
-const NK_IMPL_DECL: i32 = 8
-const NK_POISONED_DECL: i32 = 9
-const NK_EXTERN_VAR: i32 = 10
-
-// Expressions
-const NK_INT_LIT: i32 = 20
-const NK_FLOAT_LIT: i32 = 21
-const NK_STRING_LIT: i32 = 22
-const NK_BOOL_LIT: i32 = 23
-const NK_IDENT: i32 = 24
-const NK_BINARY: i32 = 25
-const NK_UNARY: i32 = 26
-const NK_CALL: i32 = 27
-const NK_FIELD_ACCESS: i32 = 28
-const NK_INDEX: i32 = 29
-const NK_BLOCK: i32 = 30
-const NK_IF_EXPR: i32 = 31
-const NK_RETURN: i32 = 32
-const NK_LET_BINDING: i32 = 33
-const NK_ASSIGN: i32 = 34
-const NK_WHILE: i32 = 35
-const NK_LOOP: i32 = 36
-const NK_FOR: i32 = 37
-const NK_BREAK: i32 = 38
-const NK_CONTINUE: i32 = 39
-const NK_MATCH: i32 = 40
-const NK_TUPLE: i32 = 41
-const NK_ARRAY_LIT: i32 = 42
-const NK_STRUCT_LIT: i32 = 43
-const NK_CLOSURE: i32 = 44
-const NK_CAST: i32 = 45
-const NK_DEFER: i32 = 46
-const NK_PIPELINE: i32 = 47
-const NK_RANGE: i32 = 48
-const NK_GROUPED: i32 = 49
-const NK_C_STRING_LIT: i32 = 50
-const NK_VARIANT_SHORTHAND: i32 = 51
-const NK_WITH_EXPR: i32 = 52
-const NK_RECORD_UPDATE: i32 = 53
-const NK_ENUM_VARIANT: i32 = 54
-const NK_SLICE: i32 = 55
-const NK_OPTIONAL_CHAIN: i32 = 56
-const NK_AWAIT: i32 = 57
-const NK_ASYNC_BLOCK: i32 = 58
-const NK_SPAWN: i32 = 59
-const NK_YIELD: i32 = 60
-const NK_COMPTIME: i32 = 61
-const NK_LET_ELSE: i32 = 62
-const NK_TUPLE_DESTRUCTURE: i32 = 63
-const NK_ARRAY_COMPREHENSION: i32 = 64
-const NK_ASYNC_SCOPE: i32 = 65
-const NK_SELECT_AWAIT: i32 = 66
-const NK_ERRDEFER: i32 = 67
-const NK_NULL_LIT: i32 = 68
-const NK_POISONED_EXPR: i32 = 69
-const NK_UNSAFE_BLOCK: i32 = 70
-const NK_COMPTIME_ERROR: i32 = 71
-const NK_FSTRING: i32 = 72       // d0=segment_count, d1=0, extra=[seg_kind, seg_data...]
-const NK_FSTRING_SPEC: i32 = 73  // d0=packed_flags, d1=width, d2=precision
+enum NodeKind: i32:
+    // Declarations
+    NK_FN_DECL = 1
+    NK_TYPE_DECL = 2
+    NK_USE_DECL = 3
+    NK_LET_DECL = 4
+    NK_EXTERN_FN = 5
+    NK_C_IMPORT = 6
+    NK_TRAIT_DECL = 7
+    NK_IMPL_DECL = 8
+    NK_POISONED_DECL = 9
+    NK_EXTERN_VAR = 10
+    // Expressions
+    NK_INT_LIT = 20
+    NK_FLOAT_LIT = 21
+    NK_STRING_LIT = 22
+    NK_BOOL_LIT = 23
+    NK_IDENT = 24
+    NK_BINARY = 25
+    NK_UNARY = 26
+    NK_CALL = 27
+    NK_FIELD_ACCESS = 28
+    NK_INDEX = 29
+    NK_BLOCK = 30
+    NK_IF_EXPR = 31
+    NK_RETURN = 32
+    NK_LET_BINDING = 33
+    NK_ASSIGN = 34
+    NK_WHILE = 35
+    NK_LOOP = 36
+    NK_FOR = 37
+    NK_BREAK = 38
+    NK_CONTINUE = 39
+    NK_MATCH = 40
+    NK_TUPLE = 41
+    NK_ARRAY_LIT = 42
+    NK_STRUCT_LIT = 43
+    NK_CLOSURE = 44
+    NK_CAST = 45
+    NK_DEFER = 46
+    NK_PIPELINE = 47
+    NK_RANGE = 48
+    NK_GROUPED = 49
+    NK_C_STRING_LIT = 50
+    NK_VARIANT_SHORTHAND = 51
+    NK_WITH_EXPR = 52
+    NK_RECORD_UPDATE = 53
+    NK_ENUM_VARIANT = 54
+    NK_SLICE = 55
+    NK_OPTIONAL_CHAIN = 56
+    NK_AWAIT = 57
+    NK_ASYNC_BLOCK = 58
+    NK_SPAWN = 59
+    NK_YIELD = 60
+    NK_COMPTIME = 61
+    NK_LET_ELSE = 62
+    NK_TUPLE_DESTRUCTURE = 63
+    NK_ARRAY_COMPREHENSION = 64
+    NK_ASYNC_SCOPE = 65
+    NK_SELECT_AWAIT = 66
+    NK_ERRDEFER = 67
+    NK_NULL_LIT = 68
+    NK_POISONED_EXPR = 69
+    NK_UNSAFE_BLOCK = 70
+    NK_COMPTIME_ERROR = 71
+    NK_FSTRING = 72       // d0=segment_count, d1=0, extra=[seg_kind, seg_data...]
+    NK_FSTRING_SPEC = 73  // d0=packed_flags, d1=width, d2=precision
+    // Type expressions
+    NK_TYPE_NAMED = 80
+    NK_TYPE_GENERIC = 81
+    NK_TYPE_REF = 82
+    NK_TYPE_PTR = 83
+    NK_TYPE_FN = 84
+    NK_TYPE_TUPLE = 85
+    NK_TYPE_OPTIONAL = 86
+    NK_TYPE_ARRAY = 87
+    NK_TYPE_SLICE = 88
+    NK_TYPE_TRAIT_OBJ = 89
+    NK_TYPE_INFERRED = 90
+    NK_TYPE_ASSOC = 91  // d0=base_sym (e.g. Self), d1=assoc_sym (e.g. Output), d2=0
+    NK_TYPE_TYPEOF = 92 // d0=expr(node), d1=0, d2=0
+    // Patterns (for match arms)
+    NK_PAT_WILDCARD = 100
+    NK_PAT_IDENT = 101
+    NK_PAT_INT = 102
+    NK_PAT_BOOL = 103
+    NK_PAT_STRING = 104
+    NK_PAT_VARIANT = 105
+    NK_PAT_TUPLE = 106
+    NK_PAT_STRUCT = 107
+    NK_PAT_RANGE = 108
+    NK_PAT_OR = 109
+    NK_MATCH_ARM = 110
+    NK_PAT_ENUM_SHORTHAND = 111
+    NK_PAT_AT_BINDING = 112
+    NK_PAT_SLICE = 113
+    NK_PAT_TYPED_BIND = 114
 
 // With-expression binding encoding in d2:
 // - positive value: immutable binding symbol id
@@ -98,40 +128,6 @@ fn decode_with_binding_is_mut(encoded: i32) -> i32:
     if encoded < 0:
         return 1
     0
-
-// Type expressions
-const NK_TYPE_NAMED: i32 = 80
-const NK_TYPE_GENERIC: i32 = 81
-const NK_TYPE_REF: i32 = 82
-const NK_TYPE_PTR: i32 = 83
-const NK_TYPE_FN: i32 = 84
-const NK_TYPE_TUPLE: i32 = 85
-const NK_TYPE_OPTIONAL: i32 = 86
-const NK_TYPE_ARRAY: i32 = 87
-const NK_TYPE_SLICE: i32 = 88
-const NK_TYPE_TRAIT_OBJ: i32 = 89
-const NK_TYPE_INFERRED: i32 = 90
-const NK_TYPE_ASSOC: i32 = 91  // d0=base_sym (e.g. Self), d1=assoc_sym (e.g. Output), d2=0
-const NK_TYPE_TYPEOF: i32 = 92 // d0=expr(node), d1=0, d2=0
-
-// Patterns (for match arms)
-const NK_PAT_WILDCARD: i32 = 100
-const NK_PAT_IDENT: i32 = 101
-const NK_PAT_INT: i32 = 102
-const NK_PAT_BOOL: i32 = 103
-const NK_PAT_STRING: i32 = 104
-const NK_PAT_VARIANT: i32 = 105
-const NK_PAT_TUPLE: i32 = 106
-const NK_PAT_STRUCT: i32 = 107
-const NK_PAT_RANGE: i32 = 108
-const NK_PAT_OR: i32 = 109
-const NK_PAT_ENUM_SHORTHAND: i32 = 111
-const NK_PAT_AT_BINDING: i32 = 112
-const NK_PAT_SLICE: i32 = 113
-const NK_PAT_TYPED_BIND: i32 = 114
-
-// Match arm
-const NK_MATCH_ARM: i32 = 110
 
 // Type decl sub-kinds (stored in data2 field)
 const TDK_ALIAS: i32 = 0
@@ -253,7 +249,7 @@ enum FStringSegmentKind: i32:
 
 // The AstPool stores all AST nodes in parallel arrays (SoA layout).
 // Each node has:
-// - A kind tag (NK_*)
+// - A kind tag (NodeKind.NK_*)
 // - Start/end span positions (byte offsets into source)
 // - Up to 3 integer data fields (meaning depends on kind)
 // - An optional extra data range for variable-length data
@@ -745,111 +741,111 @@ fn AstPool.for_meta_label(self: &AstPool, meta: i32) -> i32:
 
 // ── Node Data Layout Reference ───────────────────────────────────
 //
-// NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
+// NodeKind.NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
 //                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*, type_param_count, [type_param_name, bound_count, bounds...]*]
 //
-// NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TDK_* + flags)
+// NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TDK_* + flags)
 //                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, tp_start, tp_count]
 //                   For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis, tp_start, tp_count]
 //                   For alias/distinct: extra=[aliased_or_inner_type, vis, tp_start, tp_count]
 //
-// NK_USE_DECL:      d0=extra_start, d1=path_count, d2=0
+// NodeKind.NK_USE_DECL:      d0=extra_start, d1=path_count, d2=0
 //                   extra: [sym, sym, ...]
 //
-// NK_LET_DECL:      d0=name(sym), d1=value(node), d2=flags (bit0=mut, bit1=pub)
+// NodeKind.NK_LET_DECL:      d0=name(sym), d1=value(node), d2=flags (bit0=mut, bit1=pub)
 //                   extra: [type_expr(node)] if type annotation present
 //
-// NK_EXTERN_FN:     d0=name(sym), d1=extra_start, d2=flags (bit0=variadic)
+// NodeKind.NK_EXTERN_FN:     d0=name(sym), d1=extra_start, d2=flags (bit0=variadic)
 //                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*]
 //
-// NK_C_IMPORT:      d0=header_str_idx, d1=extra_start, d2=link_lib_count
+// NodeKind.NK_C_IMPORT:      d0=header_str_idx, d1=extra_start, d2=link_lib_count
 //
-// NK_TRAIT_DECL:    d0=name(sym), d1=extra_start, d2=vis
+// NodeKind.NK_TRAIT_DECL:    d0=name(sym), d1=extra_start, d2=vis
 //
-// NK_IMPL_DECL:     d0=type_name(sym), d1=extra_start, d2=trait_name(sym, 0=none)
+// NodeKind.NK_IMPL_DECL:     d0=type_name(sym), d1=extra_start, d2=trait_name(sym, 0=none)
 //
-// NK_INT_LIT:       d0=value_low, d1=value_high, d2=0
-// NK_FLOAT_LIT:     d0=string_idx, d1=0, d2=0
-// NK_STRING_LIT:    d0=sym, d1=0, d2=0
-// NK_C_STRING_LIT:  d0=sym, d1=0, d2=0
-// NK_BOOL_LIT:      d0=value(0/1), d1=0, d2=0
-// NK_IDENT:         d0=sym, d1=0, d2=0
-// NK_BINARY:        d0=op(OP_*), d1=lhs(node), d2=rhs(node)
-// NK_UNARY:         d0=op(UOP_*), d1=operand(node), d2=0
-// NK_CALL:          d0=callee(node), d1=extra_start, d2=arg_count
-// NK_FIELD_ACCESS:  d0=expr(node), d1=field(sym), d2=0
-// NK_INDEX:         d0=expr(node), d1=index(node), d2=0
-// NK_SLICE:         d0=expr(node), d1=start(node,0=none), d2=end(node,0=none)
-// NK_BLOCK:         d0=extra_start, d1=stmt_count, d2=tail(node,0=none)
-// NK_IF_EXPR:       d0=cond(node), d1=then(node), d2=else(node,0=none)
-// NK_RETURN:        d0=value(node,0=none), d1=0, d2=0
-// NK_LET_BINDING:   d0=name(sym), d1=value(node), d2=flags (bit0=mut)
+// NodeKind.NK_INT_LIT:       d0=value_low, d1=value_high, d2=0
+// NodeKind.NK_FLOAT_LIT:     d0=string_idx, d1=0, d2=0
+// NodeKind.NK_STRING_LIT:    d0=sym, d1=0, d2=0
+// NodeKind.NK_C_STRING_LIT:  d0=sym, d1=0, d2=0
+// NodeKind.NK_BOOL_LIT:      d0=value(0/1), d1=0, d2=0
+// NodeKind.NK_IDENT:         d0=sym, d1=0, d2=0
+// NodeKind.NK_BINARY:        d0=op(OP_*), d1=lhs(node), d2=rhs(node)
+// NodeKind.NK_UNARY:         d0=op(UOP_*), d1=operand(node), d2=0
+// NodeKind.NK_CALL:          d0=callee(node), d1=extra_start, d2=arg_count
+// NodeKind.NK_FIELD_ACCESS:  d0=expr(node), d1=field(sym), d2=0
+// NodeKind.NK_INDEX:         d0=expr(node), d1=index(node), d2=0
+// NodeKind.NK_SLICE:         d0=expr(node), d1=start(node,0=none), d2=end(node,0=none)
+// NodeKind.NK_BLOCK:         d0=extra_start, d1=stmt_count, d2=tail(node,0=none)
+// NodeKind.NK_IF_EXPR:       d0=cond(node), d1=then(node), d2=else(node,0=none)
+// NodeKind.NK_RETURN:        d0=value(node,0=none), d1=0, d2=0
+// NodeKind.NK_LET_BINDING:   d0=name(sym), d1=value(node), d2=flags (bit0=mut)
 //                   If has type: extra=[type_node]
-// NK_LET_ELSE:      d0=pattern(node), d1=value(node), d2=else_body(node)
-// NK_TUPLE_DESTRUCTURE: d0=extra_start, d1=name_count, d2=value(node)
-// NK_ASSIGN:        d0=target(node), d1=value(node), d2=0
-// NK_WHILE:         d0=cond(node), d1=body(node), d2=label(sym,0=none)
-// NK_LOOP:          d0=body(node), d1=label(sym,0=none), d2=0
-// NK_FOR:           d0=binding(sym), d1=iterable(node), d2=body(node)
+// NodeKind.NK_LET_ELSE:      d0=pattern(node), d1=value(node), d2=else_body(node)
+// NodeKind.NK_TUPLE_DESTRUCTURE: d0=extra_start, d1=name_count, d2=value(node)
+// NodeKind.NK_ASSIGN:        d0=target(node), d1=value(node), d2=0
+// NodeKind.NK_WHILE:         d0=cond(node), d1=body(node), d2=label(sym,0=none)
+// NodeKind.NK_LOOP:          d0=body(node), d1=label(sym,0=none), d2=0
+// NodeKind.NK_FOR:           d0=binding(sym), d1=iterable(node), d2=body(node)
 //                   extra: [index_binding(sym,0=none), label(sym,0=none)]
-// NK_BREAK:         d0=value(node,0=none), d1=label(sym,0=none), d2=0
-// NK_CONTINUE:      d0=label(sym,0=none), d1=0, d2=0
-// NK_MATCH:         d0=subject(node), d1=extra_start, d2=arm_count
-// NK_MATCH_ARM:     d0=pattern(node), d1=body(node), d2=guard(node,0=none)
-// NK_TUPLE:         d0=extra_start, d1=elem_count, d2=0
-// NK_ARRAY_LIT:     d0=extra_start, d1=elem_count, d2=0
-// NK_ARRAY_COMPREHENSION: d0=expr(node), d1=binding(sym), d2=iterable(node)
+// NodeKind.NK_BREAK:         d0=value(node,0=none), d1=label(sym,0=none), d2=0
+// NodeKind.NK_CONTINUE:      d0=label(sym,0=none), d1=0, d2=0
+// NodeKind.NK_MATCH:         d0=subject(node), d1=extra_start, d2=arm_count
+// NodeKind.NK_MATCH_ARM:     d0=pattern(node), d1=body(node), d2=guard(node,0=none)
+// NodeKind.NK_TUPLE:         d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_ARRAY_LIT:     d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_ARRAY_COMPREHENSION: d0=expr(node), d1=binding(sym), d2=iterable(node)
 //                   extra: [filter(node,0=none)]
-// NK_STRUCT_LIT:    d0=name(sym), d1=extra_start, d2=field_count
-// NK_CLOSURE:       d0=body(node), d1=extra_start, d2=param_count
-// NK_CAST:          d0=expr(node), d1=target_type(node), d2=0
-// NK_DEFER:         d0=body(node), d1=0, d2=0
-// NK_ERRDEFER:      d0=body(node), d1=0, d2=0
-// NK_PIPELINE:      d0=lhs(node), d1=rhs(node), d2=0
-// NK_RANGE:         d0=start(node,0=none), d1=end(node,0=none), d2=inclusive(0/1)
-// NK_GROUPED:       d0=inner(node), d1=0, d2=0
-// NK_VARIANT_SHORTHAND: d0=name(sym), d1=extra_start, d2=arg_count
-// NK_WITH_EXPR:     d0=source(node), d1=body(node), d2=encoded_binding(sym+mut)
-// NK_RECORD_UPDATE: d0=source(node), d1=extra_start, d2=field_count
-// NK_ENUM_VARIANT:  d0=type_name(sym), d1=variant_name(sym), d2=extra_start
+// NodeKind.NK_STRUCT_LIT:    d0=name(sym), d1=extra_start, d2=field_count
+// NodeKind.NK_CLOSURE:       d0=body(node), d1=extra_start, d2=param_count
+// NodeKind.NK_CAST:          d0=expr(node), d1=target_type(node), d2=0
+// NodeKind.NK_DEFER:         d0=body(node), d1=0, d2=0
+// NodeKind.NK_ERRDEFER:      d0=body(node), d1=0, d2=0
+// NodeKind.NK_PIPELINE:      d0=lhs(node), d1=rhs(node), d2=0
+// NodeKind.NK_RANGE:         d0=start(node,0=none), d1=end(node,0=none), d2=inclusive(0/1)
+// NodeKind.NK_GROUPED:       d0=inner(node), d1=0, d2=0
+// NodeKind.NK_VARIANT_SHORTHAND: d0=name(sym), d1=extra_start, d2=arg_count
+// NodeKind.NK_WITH_EXPR:     d0=source(node), d1=body(node), d2=encoded_binding(sym+mut)
+// NodeKind.NK_RECORD_UPDATE: d0=source(node), d1=extra_start, d2=field_count
+// NodeKind.NK_ENUM_VARIANT:  d0=type_name(sym), d1=variant_name(sym), d2=extra_start
 //                   extra: [arg_count, args...]
-// NK_OPTIONAL_CHAIN: d0=expr(node), d1=member(sym), d2=extra_start
+// NodeKind.NK_OPTIONAL_CHAIN: d0=expr(node), d1=member(sym), d2=extra_start
 //                    extra: [has_args(0/1), arg_count, args...]
-// NK_AWAIT:         d0=expr(node), d1=0, d2=0
-// NK_ASYNC_BLOCK:   d0=body(node), d1=0, d2=0
-// NK_SPAWN:         d0=expr(node), d1=0, d2=0
-// NK_YIELD:         d0=expr(node), d1=0, d2=0
-// NK_COMPTIME:      d0=expr(node), d1=0, d2=0
-// NK_ASYNC_SCOPE:   d0=name(sym), d1=body(node), d2=0
-// NK_SELECT_AWAIT:  d0=extra_start, d1=arm_count, d2=0
+// NodeKind.NK_AWAIT:         d0=expr(node), d1=0, d2=0
+// NodeKind.NK_ASYNC_BLOCK:   d0=body(node), d1=0, d2=0
+// NodeKind.NK_SPAWN:         d0=expr(node), d1=0, d2=0
+// NodeKind.NK_YIELD:         d0=expr(node), d1=0, d2=0
+// NodeKind.NK_COMPTIME:      d0=expr(node), d1=0, d2=0
+// NodeKind.NK_ASYNC_SCOPE:   d0=name(sym), d1=body(node), d2=0
+// NodeKind.NK_SELECT_AWAIT:  d0=extra_start, d1=arm_count, d2=0
 //
 // Type expression nodes:
-// NK_TYPE_NAMED:    d0=sym, d1=0, d2=0
-// NK_TYPE_GENERIC:  d0=name(sym), d1=extra_start, d2=arg_count
-// NK_TYPE_REF:      d0=pointee(node), d1=is_mut(0/1), d2=0
-// NK_TYPE_PTR:      d0=pointee(node), d1=is_mut(0/1), d2=0
-// NK_TYPE_FN:       d0=extra_start, d1=param_count, d2=return_type(node)
-// NK_TYPE_TUPLE:    d0=extra_start, d1=elem_count, d2=0
-// NK_TYPE_OPTIONAL: d0=inner(node), d1=0, d2=0
-// NK_TYPE_ARRAY:    d0=element(node), d1=size_low, d2=size_high
-// NK_TYPE_SLICE:    d0=element(node), d1=0, d2=0
-// NK_TYPE_TRAIT_OBJ: d0=sym, d1=0, d2=0
-// NK_TYPE_INFERRED: d0=0, d1=0, d2=0
+// NodeKind.NK_TYPE_NAMED:    d0=sym, d1=0, d2=0
+// NodeKind.NK_TYPE_GENERIC:  d0=name(sym), d1=extra_start, d2=arg_count
+// NodeKind.NK_TYPE_REF:      d0=pointee(node), d1=is_mut(0/1), d2=0
+// NodeKind.NK_TYPE_PTR:      d0=pointee(node), d1=is_mut(0/1), d2=0
+// NodeKind.NK_TYPE_FN:       d0=extra_start, d1=param_count, d2=return_type(node)
+// NodeKind.NK_TYPE_TUPLE:    d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_TYPE_OPTIONAL: d0=inner(node), d1=0, d2=0
+// NodeKind.NK_TYPE_ARRAY:    d0=element(node), d1=size_low, d2=size_high
+// NodeKind.NK_TYPE_SLICE:    d0=element(node), d1=0, d2=0
+// NodeKind.NK_TYPE_TRAIT_OBJ: d0=sym, d1=0, d2=0
+// NodeKind.NK_TYPE_INFERRED: d0=0, d1=0, d2=0
 //
 // Pattern nodes:
-// NK_PAT_WILDCARD:  d0=0, d1=0, d2=0
-// NK_PAT_IDENT:     d0=sym, d1=0, d2=0
-// NK_PAT_INT:       d0=value_low, d1=value_high, d2=0
-// NK_PAT_BOOL:      d0=value(0/1), d1=0, d2=0
-// NK_PAT_STRING:    d0=sym, d1=0, d2=0
-// NK_PAT_VARIANT:   d0=name(sym), d1=extra_start, d2=binding_count
-// NK_PAT_TUPLE:     d0=extra_start, d1=elem_count, d2=0
-// NK_PAT_STRUCT:    d0=type_name(sym,0=none), d1=extra_start, d2=field_count
+// NodeKind.NK_PAT_WILDCARD:  d0=0, d1=0, d2=0
+// NodeKind.NK_PAT_IDENT:     d0=sym, d1=0, d2=0
+// NodeKind.NK_PAT_INT:       d0=value_low, d1=value_high, d2=0
+// NodeKind.NK_PAT_BOOL:      d0=value(0/1), d1=0, d2=0
+// NodeKind.NK_PAT_STRING:    d0=sym, d1=0, d2=0
+// NodeKind.NK_PAT_VARIANT:   d0=name(sym), d1=extra_start, d2=binding_count
+// NodeKind.NK_PAT_TUPLE:     d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_PAT_STRUCT:    d0=type_name(sym,0=none), d1=extra_start, d2=field_count
 //                   extra: [has_rest(0/1), [field_name, field_pattern(node,0=shorthand)]...]
-// NK_PAT_RANGE:     d0=start_low, d1=end_low, d2=inclusive(0/1)
-// NK_PAT_OR:        d0=extra_start, d1=pattern_count, d2=0
-// NK_PAT_AT_BINDING: d0=name(sym), d1=pattern(node), d2=0
-// NK_PAT_SLICE:     d0=extra_start, d1=head_count, d2=rest(sym,0=none)
+// NodeKind.NK_PAT_RANGE:     d0=start_low, d1=end_low, d2=inclusive(0/1)
+// NodeKind.NK_PAT_OR:        d0=extra_start, d1=pattern_count, d2=0
+// NodeKind.NK_PAT_AT_BINDING: d0=name(sym), d1=pattern(node), d2=0
+// NodeKind.NK_PAT_SLICE:     d0=extra_start, d1=head_count, d2=rest(sym,0=none)
 //                   extra: [has_rest(0/1), head_syms..., tail_count, tail_syms...]
-// NK_PAT_TYPED_BIND:  d0=binding(sym), d1=type(sym), d2=0
-// NK_PAT_ENUM_SHORTHAND: d0=name(sym), d1=extra_start, d2=binding_count
+// NodeKind.NK_PAT_TYPED_BIND:  d0=binding(sym), d1=type(sym), d2=0
+// NodeKind.NK_PAT_ENUM_SHORTHAND: d0=name(sym), d1=extra_start, d2=binding_count
