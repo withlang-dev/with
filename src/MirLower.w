@@ -1334,7 +1334,7 @@ fn MirBuilder.lower_method_bin_op(self: MirBuilder, lhs_expr: i32, rhs_expr: i32
 fn MirBuilder.lower_un_op(self: MirBuilder, op: i32, expr: i32, node: i32) -> i32:
     if op == UOP_REF or op == UOP_MUT_REF:
         let place = self.lower_expr_place(expr)
-        let rv = self.body.new_rvalue(RK_REF, if op == UOP_MUT_REF: BK_EXCLUSIVE else: BK_SHARED, place, 0)
+        let rv = self.body.new_rvalue(RK_REF, if op == UOP_MUT_REF: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED, place, 0)
         let ty = self.expr_type(node)
         let temp = self.new_temp(ty)
         let temp_place = self.place_for_local(temp)
