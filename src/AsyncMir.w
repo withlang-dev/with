@@ -8,14 +8,16 @@ use InternPool
 extern fn int_to_string(n: i32) -> str
 
 // Async body flavors.
-const AM_BODY_SYNC: i32 = 0
-const AM_BODY_ASYNC: i32 = 1
-const AM_BODY_GENERATOR: i32 = 2
+enum AsyncBodyKind: i32:
+    AM_BODY_SYNC = 0
+    AM_BODY_ASYNC = 1
+    AM_BODY_GENERATOR = 2
 
 // Suspension/event kinds.
-const AM_SUSPEND_AWAIT: i32 = 1
-const AM_SUSPEND_SELECT_AWAIT: i32 = 2
-const AM_SUSPEND_YIELD: i32 = 3
+enum AsyncSuspendKind: i32:
+    AM_SUSPEND_AWAIT = 1
+    AM_SUSPEND_SELECT_AWAIT = 2
+    AM_SUSPEND_YIELD = 3
 
 type AsyncMirBody {
     fn_sym: i32,
@@ -106,25 +108,25 @@ fn AsyncMirModule.total_suspend_points(self: AsyncMirModule) -> i32:
 fn AsyncMirModule.requires_async_runtime(self: AsyncMirModule) -> bool:
     for i in 0..self.bodies.len() as i32:
         let body = self.bodies.get(i as i64)
-        if body.flavor == AM_BODY_ASYNC:
+        if body.flavor == AsyncBodyKind.AM_BODY_ASYNC:
             return true
-        if body.has_kind(AM_SUSPEND_AWAIT) or body.has_kind(AM_SUSPEND_SELECT_AWAIT):
+        if body.has_kind(AsyncSuspendKind.AM_SUSPEND_AWAIT) or body.has_kind(AsyncSuspendKind.AM_SUSPEND_SELECT_AWAIT):
             return true
     false
 
 fn async_body_flavor_name(flavor: i32) -> str:
-    if flavor == AM_BODY_ASYNC:
+    if flavor == AsyncBodyKind.AM_BODY_ASYNC:
         return "async"
-    if flavor == AM_BODY_GENERATOR:
+    if flavor == AsyncBodyKind.AM_BODY_GENERATOR:
         return "generator"
     "sync"
 
 fn async_suspend_kind_name(kind: i32) -> str:
-    if kind == AM_SUSPEND_AWAIT:
+    if kind == AsyncSuspendKind.AM_SUSPEND_AWAIT:
         return "await"
-    if kind == AM_SUSPEND_SELECT_AWAIT:
+    if kind == AsyncSuspendKind.AM_SUSPEND_SELECT_AWAIT:
         return "select_await"
-    if kind == AM_SUSPEND_YIELD:
+    if kind == AsyncSuspendKind.AM_SUSPEND_YIELD:
         return "yield"
     "unknown"
 

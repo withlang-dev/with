@@ -6,13 +6,15 @@
 
 extern fn with_eprintln(s: str) -> void
 
-const LANG_RUST: i32 = 0
-const LANG_ZIG: i32 = 1
-const LANG_SWIFT: i32 = 2
+enum MigrateLang: i32:
+    LANG_RUST = 0
+    LANG_ZIG = 1
+    LANG_SWIFT = 2
 
-const MODE_WRITE: i32 = 0
-const MODE_CHECK: i32 = 1
-const MODE_DIFF: i32 = 2
+enum MigrateMode: i32:
+    MODE_WRITE = 0
+    MODE_CHECK = 1
+    MODE_DIFF = 2
 
 fn run(lang: str, path: str, mode: i32) -> i32:
     with_eprintln("migrate: not yet implemented in self-hosted compiler")

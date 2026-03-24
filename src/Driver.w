@@ -12,17 +12,19 @@ use compiler.Link
 
 extern fn with_system(cmd: str) -> i32
 
-const MODE_CHECK: i32 = 1
-const MODE_BUILD: i32 = 2
-const MODE_RUN: i32 = 3
+enum DriverMode: i32:
+    MODE_CHECK = 1
+    MODE_BUILD = 2
+    MODE_RUN = 3
 
-const CR_OK: i32 = 0
-const CR_LEX_ERROR: i32 = 1
-const CR_PARSE_ERROR: i32 = 2
-const CR_SEMA_ERROR: i32 = 3
-const CR_BORROW_ERROR: i32 = 4
-const CR_CODEGEN_ERROR: i32 = 5
-const CR_LINK_ERROR: i32 = 6
+enum CompileResult: i32:
+    CR_OK = 0
+    CR_LEX_ERROR = 1
+    CR_PARSE_ERROR = 2
+    CR_SEMA_ERROR = 3
+    CR_BORROW_ERROR = 4
+    CR_CODEGEN_ERROR = 5
+    CR_LINK_ERROR = 6
 
 type Driver {
     comp: Compilation,
@@ -38,7 +40,7 @@ type Driver {
 fn Driver.init -> Driver:
     Driver {
         comp: Compilation.init(),
-        mode: MODE_CHECK,
+        mode: DriverMode.MODE_CHECK,
         source_path: "",
         output_path: "",
         opt_level: 0,
@@ -160,8 +162,8 @@ fn Driver.print_warnings(self: Driver):
 
 fn Driver.failure_result(self: Driver) -> i32:
     if self.last_error_count > 0:
-        return CR_SEMA_ERROR
-    CR_LINK_ERROR
+        return CompileResult.CR_SEMA_ERROR
+    CompileResult.CR_LINK_ERROR
 
 fn Driver.rename_binary(self: Driver, built_path: str, output_path: str) -> i32:
     let _ = self
@@ -173,16 +175,16 @@ fn Driver.rename_binary(self: Driver, built_path: str, output_path: str) -> i32:
     0
 
 fn Driver.run_pipeline(self: Driver) -> i32:
-    if self.mode == MODE_CHECK:
+    if self.mode == DriverMode.MODE_CHECK:
         let pool = self.compile_file(self.source_path)
         if pool.decl_count() == 0 or self.last_error_count > 0:
             return self.failure_result()
-        return CR_OK
-    if self.mode == MODE_BUILD:
+        return CompileResult.CR_OK
+    if self.mode == DriverMode.MODE_BUILD:
         return self.compile_to_c(self.output_path)
-    if self.mode == MODE_RUN:
+    if self.mode == DriverMode.MODE_RUN:
         return self.compile_and_run()
-    CR_CODEGEN_ERROR
+    CompileResult.CR_CODEGEN_ERROR
 
 fn Driver.compile_to_c(self: Driver, output_path: str) -> i32:
     self.output_path = output_path
@@ -191,8 +193,8 @@ fn Driver.compile_to_c(self: Driver, output_path: str) -> i32:
     if built.len() == 0:
         return self.failure_result()
     if self.rename_binary(built, output_path) != 0:
-        return CR_LINK_ERROR
-    CR_OK
+        return CompileResult.CR_LINK_ERROR
+    CompileResult.CR_OK
 
 fn Driver.compile_and_run(self: Driver) -> i32:
     let built = self.build_binary(self.source_path)
@@ -200,5 +202,5 @@ fn Driver.compile_and_run(self: Driver) -> i32:
         return self.failure_result()
     let rc = built |> with_system
     if rc == 0:
-        return CR_OK
-    CR_CODEGEN_ERROR
+        return CompileResult.CR_OK
+    CompileResult.CR_CODEGEN_ERROR

@@ -12,11 +12,12 @@ use Ast
 use Span
 
 // Node kinds for CFG nodes
-const CFG_ENTRY: i32 = 0
-const CFG_EXIT: i32 = 1
-const CFG_EXPR: i32 = 2
-const CFG_BRANCH: i32 = 3
-const CFG_LOOP_COND: i32 = 4
+enum CfgNodeKind: i32:
+    CFG_ENTRY = 0
+    CFG_EXIT = 1
+    CFG_EXPR = 2
+    CFG_BRANCH = 3
+    CFG_LOOP_COND = 4
 
 type CfgNode {
     kind: i32,
@@ -79,8 +80,8 @@ fn build_cfg(pool: AstPool, expr_node: i32) -> CfgGraph:
     let start = pool.get_start(expr_node)
     let end = pool.get_end(expr_node)
 
-    graph.entry = graph.add_node(CFG_ENTRY, start, end)
-    graph.exit = graph.add_node(CFG_EXIT, start, end)
+    graph.entry = graph.add_node(CfgNodeKind.CFG_ENTRY, start, end)
+    graph.exit = graph.add_node(CfgNodeKind.CFG_EXIT, start, end)
 
     let result = build_expr(graph, pool, expr_node)
     graph.add_edge(graph.entry, result)
@@ -110,12 +111,12 @@ fn build_expr(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
         return build_loop(graph, pool, node)
 
     if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_BREAK:
-        let n = graph.add_node(CFG_EXPR, start, end)
+        let n = graph.add_node(CfgNodeKind.CFG_EXPR, start, end)
         graph.add_edge(n, graph.exit)
         return n
 
     // Default: simple expression node
-    graph.add_node(CFG_EXPR, start, end)
+    graph.add_node(CfgNodeKind.CFG_EXPR, start, end)
 
 fn build_block(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     let extra_start = pool.get_data0(node)
@@ -125,7 +126,7 @@ fn build_block(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     let end = pool.get_end(node)
 
     if stmt_count == 0 and tail == 0:
-        return graph.add_node(CFG_EXPR, start, end)
+        return graph.add_node(CfgNodeKind.CFG_EXPR, start, end)
 
     var prev = -1
     var first = -1
@@ -147,7 +148,7 @@ fn build_block(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
         prev = tail_n
 
     if first == -1:
-        return graph.add_node(CFG_EXPR, start, end)
+        return graph.add_node(CfgNodeKind.CFG_EXPR, start, end)
     first
 
 fn build_if(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
@@ -157,7 +158,7 @@ fn build_if(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     let start = pool.get_start(node)
     let end = pool.get_end(node)
 
-    let branch = graph.add_node(CFG_BRANCH, start, end)
+    let branch = graph.add_node(CfgNodeKind.CFG_BRANCH, start, end)
 
     let then_n = build_expr(graph, pool, then_node_idx)
     graph.add_edge(branch, then_n)
@@ -166,7 +167,7 @@ fn build_if(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
         let else_n = build_expr(graph, pool, else_node_idx)
         graph.add_edge(branch, else_n)
     else:
-        let else_empty = graph.add_node(CFG_EXPR, start, end)
+        let else_empty = graph.add_node(CfgNodeKind.CFG_EXPR, start, end)
         graph.add_edge(branch, else_empty)
 
     branch
@@ -177,9 +178,9 @@ fn build_while(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     let start = pool.get_start(node)
     let end = pool.get_end(node)
 
-    let cond = graph.add_node(CFG_LOOP_COND, start, end)
+    let cond = graph.add_node(CfgNodeKind.CFG_LOOP_COND, start, end)
     let body_n = build_expr(graph, pool, body_node_idx)
-    let after = graph.add_node(CFG_EXPR, start, end)
+    let after = graph.add_node(CfgNodeKind.CFG_EXPR, start, end)
 
     graph.add_edge(cond, body_n)
     graph.add_edge(cond, after)
@@ -192,9 +193,9 @@ fn build_loop(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     let start = pool.get_start(node)
     let end = pool.get_end(node)
 
-    let cond = graph.add_node(CFG_LOOP_COND, start, end)
+    let cond = graph.add_node(CfgNodeKind.CFG_LOOP_COND, start, end)
     let body_n = build_expr(graph, pool, body_node_idx)
-    let after = graph.add_node(CFG_EXPR, start, end)
+    let after = graph.add_node(CfgNodeKind.CFG_EXPR, start, end)
 
     graph.add_edge(cond, body_n)
     graph.add_edge(cond, after)

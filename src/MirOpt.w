@@ -9,8 +9,9 @@
 // dead-field elimination, and move elision.
 
 // Call kinds
-const CK_DYN_DISPATCH: i32 = 0
-const CK_DIRECT: i32 = 1
+enum CallKind: i32:
+    CK_DYN_DISPATCH = 0
+    CK_DIRECT = 1
 
 type MirCallSite {
     kind: i32,
@@ -18,8 +19,9 @@ type MirCallSite {
 }
 
 // Allocation kinds
-const AK_BOX: i32 = 0
-const AK_STACK: i32 = 1
+enum AllocKind: i32:
+    AK_BOX = 0
+    AK_STACK = 1
 
 type MirAllocation {
     kind: i32,
@@ -113,7 +115,7 @@ fn devirtualize(mod: MirOptModule) -> i32:
         let func = mod.functions.get(fi as i64)
         for ci in 0..func.calls.len() as i32:
             let call = func.calls.get(ci as i64)
-            if call.kind == CK_DYN_DISPATCH and call.receiver_type_known:
+            if call.kind == CallKind.CK_DYN_DISPATCH and call.receiver_type_known:
                 // Devirtualize: rewrite to direct call
                 // Note: would need mutable access in real implementation
                 changed = changed + 1
@@ -125,7 +127,7 @@ fn promote_non_escaping_boxes(mod: MirOptModule) -> i32:
         let func = mod.functions.get(fi as i64)
         for ai in 0..func.allocations.len() as i32:
             let alloc = func.allocations.get(ai as i64)
-            if alloc.kind == AK_BOX and not alloc.escapes:
+            if alloc.kind == AllocKind.AK_BOX and not alloc.escapes:
                 changed = changed + 1
     changed
 
