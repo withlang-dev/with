@@ -850,36 +850,52 @@ x.rotate_right(8)       // 0x78123456
 x.rotate_left(4)        // 0x23456781
 ```
 
-**Byte-order methods:**
-
-Integer types provide methods for big-endian and little-endian
-encoding/decoding from byte buffers. These are essential for
-cryptography, network protocols, and binary file formats.
+**Byte swap:**
 
 ```
+x.swap_bytes()      // reverse byte order of integer value
+```
+
+Available on all integer types ≥16 bits. Identity for `i8`/`u8`.
+Compiles to LLVM's `@llvm.bswap` intrinsic (single `bswap`
+instruction on x86/ARM).
+
+```
+let x: u32 = 0x12345678
+x.swap_bytes()              // 0x78563412
+x.swap_bytes().swap_bytes() // roundtrip: 0x12345678
+```
+
+**Byte-order encoding/decoding:**
+
+The `std.crypto.endian` module provides functions for big-endian
+and little-endian encoding/decoding from byte buffers:
+
+```
+use std.crypto.endian
+
 // Decode from byte buffer at offset
-u16.from_be(buf: *const u8, offset: i32) -> u16
-u16.from_le(buf: *const u8, offset: i32) -> u16
-u32.from_be(buf: *const u8, offset: i32) -> u32
-u32.from_le(buf: *const u8, offset: i32) -> u32
-u64.from_be(buf: *const u8, offset: i32) -> u64
-u64.from_le(buf: *const u8, offset: i32) -> u64
+u16_from_be(buf: *const u8, offset: i32) -> u16
+u32_from_be(buf: *const u8, offset: i32) -> u32
+u64_from_be(buf: *const u8, offset: i32) -> u64
+u16_from_le(buf: *const u8, offset: i32) -> u16
+u32_from_le(buf: *const u8, offset: i32) -> u32
+u64_from_le(buf: *const u8, offset: i32) -> u64
 
 // Encode to byte buffer at offset
-u16.to_be(buf: *mut u8, offset: i32, val: u16)
-u16.to_le(buf: *mut u8, offset: i32, val: u16)
-u32.to_be(buf: *mut u8, offset: i32, val: u32)
-u32.to_le(buf: *mut u8, offset: i32, val: u32)
-u64.to_be(buf: *mut u8, offset: i32, val: u64)
-u64.to_le(buf: *mut u8, offset: i32, val: u64)
+u16_to_be(buf: *mut u8, offset: i32, val: u16)
+u32_to_be(buf: *mut u8, offset: i32, val: u32)
+u64_to_be(buf: *mut u8, offset: i32, val: u64)
+u16_to_le(buf: *mut u8, offset: i32, val: u16)
+u32_to_le(buf: *mut u8, offset: i32, val: u32)
+u64_to_le(buf: *mut u8, offset: i32, val: u64)
 ```
 
-These compile to optimized load/store + byte-swap instructions.
 Usage:
 
 ```
-let word = u32.from_be(buf, 0)      // read big-endian u32
-u32.to_le(out, 4, value)            // write little-endian u32
+let word = u32_from_be(buf, 0)      // read big-endian u32
+u32_to_le(out, 4, value)            // write little-endian u32
 ```
 
 #### 4.2.5 Compound Assignment Operators
