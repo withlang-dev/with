@@ -1,7 +1,7 @@
 //! expect-stdout: errdefer-2errdefer-1defer-2defer-1done
 extern fn print(s: str) -> void
 
-type MyResult = Ok(i32) | Err(str)
+enum MyResult { Ok(i32) | Err(str) }
 
 fn fail() -> MyResult:
     .Err("oops")

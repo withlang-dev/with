@@ -3,9 +3,9 @@
 // Behavior test: enums
 // Tests: simple enums, discriminant enums, match on enums, variant shorthand
 
-type Direction = North | South | East | West
+enum Direction { North | South | East | West }
 
-type Color: i32 = Red = 1 | Green = 2 | Blue = 4
+enum Color: i32 { Red = 1 | Green = 2 | Blue = 4 }
 
 fn test_enum_shorthand:
     // Use shorthand syntax with type annotation for simple enums

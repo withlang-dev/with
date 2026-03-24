@@ -25,7 +25,7 @@ type Symbol = i32
 type TypeId = i32
 type ValueId = i32
 
-type InternPool = {
+type InternPool {
     // Symbols
     symbol_texts: Vec[str],
     symbol_map: HashMap[str, i32],

@@ -3,7 +3,7 @@
 // End-to-end test: struct definition, construction, field access
 // Tests: struct type, construction, field access, methods
 
-type Point = {
+type Point {
     x: i32,
     y: i32,
 }
@@ -26,7 +26,7 @@ fn test_struct_field_arithmetic:
     let sum = p.x + p.y
     assert(sum == 12)
 
-type Rect = {
+type Rect {
     width: i32,
     height: i32,
 }

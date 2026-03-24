@@ -33,7 +33,7 @@ fn classify_age(age: i32) -> str:
         20..=64 => "adult"
         _ => "senior"
 
-type Color = Red | Green | Blue
+enum Color { Red | Green | Blue }
 
 fn test_match_enum:
     assert(color_name(Color.Red) == "red")

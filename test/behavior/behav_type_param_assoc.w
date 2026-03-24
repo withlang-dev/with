@@ -4,7 +4,7 @@ trait Container =
     type Item
     fn get(self: Self) -> Self.Item
 
-type Box32 = { value: i32 }
+type Box32 { value: i32 }
 
 impl Container for Box32 =
     type Item = i32

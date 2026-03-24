@@ -48,10 +48,10 @@ fn test_precedence:
     let decl = pool.get_decl(0)
     let body = pool.get_data1(decl)
     assert(pool.kind(body) == NK_BINARY())
-    assert(pool.get_data0(body) == OP_ADD())
+    assert(pool.get_data0(body) == BinaryOp.OP_ADD)
     let rhs = pool.get_data2(body)
     assert(pool.kind(rhs) == NK_BINARY())
-    assert(pool.get_data0(rhs) == OP_MUL())
+    assert(pool.get_data0(rhs) == BinaryOp.OP_MUL)
 
 fn test_fn_metadata:
     let src = "fn add(a: i32, b: i32) -> i32:\n    a + b\n"
@@ -235,7 +235,7 @@ fn test_chained_sugar_precedence_and_associativity:
     let mixed_body = mixed_pool.get_data1(mixed_decl)
     assert(mixed_pool.kind(mixed_body) == NK_PIPELINE())
     assert(mixed_pool.kind(mixed_pool.get_data0(mixed_body)) == NK_BINARY())
-    assert(mixed_pool.get_data0(mixed_pool.get_data0(mixed_body)) == OP_DEFAULT())
+    assert(mixed_pool.get_data0(mixed_pool.get_data0(mixed_body)) == BinaryOp.OP_DEFAULT)
 
 fn main:
     test_char_literal_lowering()

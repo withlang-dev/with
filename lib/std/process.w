@@ -47,7 +47,7 @@ pub fn set_env(name: str, value: str) -> i32:
     with_setenv_str(name, value)
 
 // Minimal command runner wrapper.
-type Command = {
+type Command  {
     cmd: str,
 }
 

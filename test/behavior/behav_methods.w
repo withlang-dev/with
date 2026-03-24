@@ -3,7 +3,7 @@
 // Tests: method definition on structs, self parameter, static methods,
 //        method chaining, methods returning Self
 
-type Point = { x: i32, y: i32 }
+type Point { x: i32, y: i32 }
 
 fn Point.new(x: i32, y: i32) -> Point:
     Point { x: x, y: y }
@@ -45,7 +45,7 @@ fn test_method_chain:
     assert(p.x == 6)
     assert(p.y == 8)
 
-type Counter = { value: i32 }
+type Counter { value: i32 }
 
 fn Counter.new() -> Counter:
     Counter { value: 0 }
@@ -57,7 +57,7 @@ fn test_counter_methods:
     let c = Counter.new()
     assert(c.get() == 0)
 
-type Rect = { w: i32, h: i32 }
+type Rect { w: i32, h: i32 }
 
 fn Rect.area(self: Rect) -> i32:
     self.w * self.h

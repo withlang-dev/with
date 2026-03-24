@@ -3,7 +3,7 @@
 // Test: statement-position match allows partial patterns.
 // Expression-position match with all variants covered works.
 
-type Color = Red | Green | Blue
+enum Color { Red | Green | Blue }
 
 fn test_stmt_match_partial_int:
     let x = 1

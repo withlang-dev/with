@@ -3,7 +3,7 @@
 fn take_u64(v: u64) -> u64:
     v
 
-type Pair = {
+type Pair {
     x: f64,
     y: f64,
 }

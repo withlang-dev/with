@@ -116,13 +116,13 @@ fn cc_callee_hint_map_new -> i32:
 fn cc_callee_hint_opt_new -> i32:
     6
 
-type CEmitResult = {
+type CEmitResult {
     ok: i32,
     source: str,
     err_msg: str,
 }
 
-type CCodegen = {
+type CCodegen {
     mir_mod: MirModule,
     ast: AstPool,
     intern: InternPool,
@@ -883,24 +883,24 @@ fn CCodegen.operand_text(self: CCodegen, body: MirBody, operand_id: i32) -> str:
     "0"
 
 fn CCodegen.binop_token(self: CCodegen, op: i32) -> str:
-    if op == OP_ADD or op == OP_ADD_WRAP: return "+"
-    if op == OP_SUB or op == OP_SUB_WRAP: return "-"
-    if op == OP_MUL or op == OP_MUL_WRAP: return "*"
-    if op == OP_DIV: return "/"
-    if op == OP_MOD: return "%"
-    if op == OP_EQ: return "=="
-    if op == OP_NEQ: return "!="
-    if op == OP_LT: return "<"
-    if op == OP_GT: return ">"
-    if op == OP_LTE: return "<="
-    if op == OP_GTE: return ">="
-    if op == OP_AND: return "&&"
-    if op == OP_OR: return "||"
-    if op == OP_BIT_AND: return "&"
-    if op == OP_BIT_OR: return "|"
-    if op == OP_BIT_XOR: return "^"
-    if op == OP_SHL: return "<<"
-    if op == OP_SHR: return ">>"
+    if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP: return "+"
+    if op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_WRAP: return "-"
+    if op == BinaryOp.OP_MUL or op == BinaryOp.OP_MUL_WRAP: return "*"
+    if op == BinaryOp.OP_DIV: return "/"
+    if op == BinaryOp.OP_MOD: return "%"
+    if op == BinaryOp.OP_EQ: return "=="
+    if op == BinaryOp.OP_NEQ: return "!="
+    if op == BinaryOp.OP_LT: return "<"
+    if op == BinaryOp.OP_GT: return ">"
+    if op == BinaryOp.OP_LTE: return "<="
+    if op == BinaryOp.OP_GTE: return ">="
+    if op == BinaryOp.OP_AND: return "&&"
+    if op == BinaryOp.OP_OR: return "||"
+    if op == BinaryOp.OP_BIT_AND: return "&"
+    if op == BinaryOp.OP_BIT_OR: return "|"
+    if op == BinaryOp.OP_BIT_XOR: return "^"
+    if op == BinaryOp.OP_SHL: return "<<"
+    if op == BinaryOp.OP_SHR: return ">>"
     ""
 
 fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
@@ -916,14 +916,14 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
     if rk == RvalueKind.RK_BIN_OP:
         let lhs = self.operand_text(body, d1)
         let rhs = self.operand_text(body, d2)
-        if d0 == OP_CONCAT:
+        if d0 == BinaryOp.OP_CONCAT:
             return "with_str_concat(" ++ lhs ++ ", " ++ rhs ++ ")"
-        if d0 == OP_EQ or d0 == OP_NEQ:
+        if d0 == BinaryOp.OP_EQ or d0 == BinaryOp.OP_NEQ:
             let lhs_tid = self.sema.resolve_alias(self.operand_tid(body, d1))
             let rhs_tid = self.sema.resolve_alias(self.operand_tid(body, d2))
             if self.sema.get_type_kind(lhs_tid) == TypeKind.TY_STR and self.sema.get_type_kind(rhs_tid) == TypeKind.TY_STR:
                 let eq_expr = "with_str_eq(" ++ lhs ++ ", " ++ rhs ++ ")"
-                if d0 == OP_EQ:
+                if d0 == BinaryOp.OP_EQ:
                     return eq_expr
                 return "(!(" ++ eq_expr ++ "))"
         let tok = self.binop_token(d0)
@@ -933,9 +933,9 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
         return "(" ++ lhs ++ " " ++ tok ++ " " ++ rhs ++ ")"
     if rk == RvalueKind.RK_UN_OP:
         let inner = self.operand_text(body, d1)
-        if d0 == UOP_NEGATE:
+        if d0 == UnaryOp.UOP_NEGATE:
             return "(-(" ++ inner ++ "))"
-        if d0 == UOP_NOT:
+        if d0 == UnaryOp.UOP_NOT:
             return "(!(" ++ inner ++ "))"
         self.fail(f"unsupported unary op {d0}")
         return inner
@@ -2623,9 +2623,9 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
                     return t
                 continue
             if rk == RvalueKind.RK_BIN_OP:
-                if d0 == OP_EQ or d0 == OP_NEQ or d0 == OP_LT or d0 == OP_GT or d0 == OP_LTE or d0 == OP_GTE or d0 == OP_AND or d0 == OP_OR:
+                if d0 == BinaryOp.OP_EQ or d0 == BinaryOp.OP_NEQ or d0 == BinaryOp.OP_LT or d0 == BinaryOp.OP_GT or d0 == BinaryOp.OP_LTE or d0 == BinaryOp.OP_GTE or d0 == BinaryOp.OP_AND or d0 == BinaryOp.OP_OR:
                     return self.sema.ty_bool
-                if d0 == OP_CONCAT:
+                if d0 == BinaryOp.OP_CONCAT:
                     return self.sema.ty_str
                 let lt = self.operand_tid(body, d1)
                 if lt != 0 and self.is_void_tid(lt) == 0:
@@ -2635,7 +2635,7 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
                     return rt
                 continue
             if rk == RvalueKind.RK_UN_OP:
-                if d0 == UOP_NOT:
+                if d0 == UnaryOp.UOP_NOT:
                     return self.sema.ty_bool
                 let t = self.operand_tid(body, d1)
                 if t != 0 and self.is_void_tid(t) == 0:
@@ -2719,22 +2719,22 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
     out
 
 fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
-    if intrinsic == MIR_INTRINSIC_VEC_NEW: return cc_builtin_vec_new()
-    if intrinsic == MIR_INTRINSIC_VEC_PUSH: return cc_builtin_vec_push()
-    if intrinsic == MIR_INTRINSIC_VEC_GET: return cc_builtin_vec_get()
-    if intrinsic == MIR_INTRINSIC_VEC_LEN: return cc_builtin_vec_len()
-    if intrinsic == MIR_INTRINSIC_VEC_SET: return cc_builtin_vec_set_i32()
-    if intrinsic == MIR_INTRINSIC_VEC_REMOVE: return cc_builtin_vec_remove()
-    if intrinsic == MIR_INTRINSIC_VEC_CLEAR: return cc_builtin_vec_clear()
-    if intrinsic == MIR_INTRINSIC_VEC_POP: return cc_builtin_vec_pop()
-    if intrinsic == MIR_INTRINSIC_MAP_NEW: return cc_builtin_map_new()
-    if intrinsic == MIR_INTRINSIC_MAP_INSERT: return cc_builtin_map_insert()
-    if intrinsic == MIR_INTRINSIC_MAP_GET: return cc_builtin_map_get()
-    if intrinsic == MIR_INTRINSIC_MAP_CONTAINS: return cc_builtin_map_contains()
-    if intrinsic == MIR_INTRINSIC_MAP_LEN: return cc_builtin_map_len()
-    if intrinsic == MIR_INTRINSIC_MAP_REMOVE: return cc_builtin_map_remove()
-    if intrinsic == MIR_INTRINSIC_OPT_IS_SOME: return cc_builtin_opt_is_some()
-    if intrinsic == MIR_INTRINSIC_OPT_UNWRAP: return cc_builtin_opt_unwrap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_NEW: return cc_builtin_vec_new()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_PUSH: return cc_builtin_vec_push()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_GET: return cc_builtin_vec_get()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_LEN: return cc_builtin_vec_len()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_SET: return cc_builtin_vec_set_i32()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_REMOVE: return cc_builtin_vec_remove()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_CLEAR: return cc_builtin_vec_clear()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_POP: return cc_builtin_vec_pop()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_NEW: return cc_builtin_map_new()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_INSERT: return cc_builtin_map_insert()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_GET: return cc_builtin_map_get()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CONTAINS: return cc_builtin_map_contains()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_LEN: return cc_builtin_map_len()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE: return cc_builtin_map_remove()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME: return cc_builtin_opt_is_some()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP: return cc_builtin_opt_unwrap()
     cc_builtin_none()
 
 fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> str:
@@ -3019,9 +3019,9 @@ fn CCodegen.rvalue_infer_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32
             return self.operand_tid_no_infer(body, d0)
         return self.operand_tid(body, d0)
     if rk == RvalueKind.RK_BIN_OP:
-        if d0 == OP_EQ or d0 == OP_NEQ or d0 == OP_LT or d0 == OP_GT or d0 == OP_LTE or d0 == OP_GTE or d0 == OP_AND or d0 == OP_OR:
+        if d0 == BinaryOp.OP_EQ or d0 == BinaryOp.OP_NEQ or d0 == BinaryOp.OP_LT or d0 == BinaryOp.OP_GT or d0 == BinaryOp.OP_LTE or d0 == BinaryOp.OP_GTE or d0 == BinaryOp.OP_AND or d0 == BinaryOp.OP_OR:
             return self.sema.ty_bool
-        if d0 == OP_CONCAT:
+        if d0 == BinaryOp.OP_CONCAT:
             return self.sema.ty_str
         let lt = if no_infer != 0: self.operand_tid_no_infer(body, d1) else: self.operand_tid(body, d1)
         if lt != 0 and self.is_void_tid(lt) == 0:
@@ -3030,7 +3030,7 @@ fn CCodegen.rvalue_infer_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32
             return self.operand_tid_no_infer(body, d2)
         return self.operand_tid(body, d2)
     if rk == RvalueKind.RK_UN_OP:
-        if d0 == UOP_NOT:
+        if d0 == UnaryOp.UOP_NOT:
             return self.sema.ty_bool
         if no_infer != 0:
             return self.operand_tid_no_infer(body, d1)
@@ -3231,12 +3231,12 @@ fn CCodegen.infer_struct_field_tid_from_usage(self: CCodegen, struct_tid: i32, f
                                     if od >= 0 and od < body.const_types.len() as i32:
                                         rv_tid = body.const_types.get(od as i64)
                         else if rk == RvalueKind.RK_BIN_OP:
-                            if rd0 == OP_EQ or rd0 == OP_NEQ or rd0 == OP_LT or rd0 == OP_GT or rd0 == OP_LTE or rd0 == OP_GTE or rd0 == OP_AND or rd0 == OP_OR:
+                            if rd0 == BinaryOp.OP_EQ or rd0 == BinaryOp.OP_NEQ or rd0 == BinaryOp.OP_LT or rd0 == BinaryOp.OP_GT or rd0 == BinaryOp.OP_LTE or rd0 == BinaryOp.OP_GTE or rd0 == BinaryOp.OP_AND or rd0 == BinaryOp.OP_OR:
                                 rv_tid = self.sema.ty_bool
-                            else if rd0 == OP_CONCAT:
+                            else if rd0 == BinaryOp.OP_CONCAT:
                                 rv_tid = self.sema.ty_str
                         else if rk == RvalueKind.RK_UN_OP:
-                            if rd0 == UOP_NOT:
+                            if rd0 == UnaryOp.UOP_NOT:
                                 rv_tid = self.sema.ty_bool
                         else if rk == RvalueKind.RK_CAST:
                             rv_tid = rd1

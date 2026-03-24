@@ -5,10 +5,10 @@
 // TODO: @[derive(Eq)], @[repr(C)] not yet implemented.
 
 @[sealed]
-type Shape = Circle | Square | Triangle
+enum Shape { Circle | Square | Triangle }
 
 @[flags]
-type Perms: i32 = Read = 1 | Write = 2 | Execute = 4
+enum Perms: i32 { Read = 1 | Write = 2 | Execute = 4 }
 
 fn main:
     let s: Shape = .Circle

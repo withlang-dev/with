@@ -37,7 +37,7 @@ const CLI_PRELUDE_NONE_MODE: i32 = 2
 const CLI_DEFAULT_DEBUG_OPT_LEVEL: i32 = 0
 const CLI_DEFAULT_BUILD_OPT_LEVEL: i32 = 2
 
-type CliOptions = {
+type CliOptions {
     command: str,
     source_file: str,
     output_path: str,
@@ -55,7 +55,7 @@ type CliOptions = {
     prelude_mode: i32,
 }
 
-type TestDiscovery = {
+type TestDiscovery {
     parse_ok: bool,
     has_main: bool,
     test_names: Vec[str],
@@ -887,10 +887,10 @@ fn print_help_fn:
 
 fn print_help_type:
     print(
-        "Type declarations:\n\n" ++
-        "  type Point = { x: i32, y: i32 }\n" ++
-        "  type Color = Red | Green | Blue\n" ++
-        "  type Value = Int(i32) | Float(f64)\n" ++
+        "Type and enum declarations:\n\n" ++
+        "  type Point { x: i32, y: i32 }\n" ++
+        "  enum Color { Red | Green | Blue }\n" ++
+        "  enum Value { Int(i32) | Float(f64) }\n" ++
         "  type Handle = opaque\n" ++
         "  type Meters = i32\n" ++
         "  type Scalar = union { i: i32, f: f32 }\n\n" ++
@@ -928,7 +928,7 @@ fn print_help_keywords:
         "Reserved words that cannot be used as identifiers:\n\n" ++
         "  fn let var if else then match for in while loop return break continue\n" ++
         "  with as mut type trait impl extend dyn use module pub async await spawn\n" ++
-        "  unsafe comptime gen yield defer error extern c_import ephemeral select\n" ++
+        "  unsafe comptime gen yield defer error extern c_import ephemeral select enum\n" ++
         "  true false not and or const it errdefer move where opaque null union\n"
     )
 

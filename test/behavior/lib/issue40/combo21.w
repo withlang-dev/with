@@ -1,7 +1,7 @@
 error E =
     | Bad(msg: str)
 
-type Value = {
+type Value {
     raw: u64,
     ok: bool,
 }

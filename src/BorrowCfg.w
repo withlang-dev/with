@@ -18,18 +18,18 @@ const CFG_EXPR: i32 = 2
 const CFG_BRANCH: i32 = 3
 const CFG_LOOP_COND: i32 = 4
 
-type CfgNode = {
+type CfgNode {
     kind: i32,
     span_start: i32,
     span_end: i32,
 }
 
-type CfgEdge = {
+type CfgEdge {
     from: i32,
     to: i32,
 }
 
-type CfgGraph = {
+type CfgGraph {
     nodes: Vec[CfgNode],
     edges: Vec[CfgEdge],
     entry: i32,

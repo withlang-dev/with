@@ -4,7 +4,7 @@ trait Mapper =
     type Output = i32
     fn map(self: Self, x: Self.Input) -> Self.Output
 
-type Tripler = {}
+type Tripler {}
 impl Mapper for Tripler =
     type Input = i32
     type Output = i32

@@ -12,7 +12,7 @@
 const CK_DYN_DISPATCH: i32 = 0
 const CK_DIRECT: i32 = 1
 
-type MirCallSite = {
+type MirCallSite {
     kind: i32,
     receiver_type_known: bool,
 }
@@ -21,23 +21,23 @@ type MirCallSite = {
 const AK_BOX: i32 = 0
 const AK_STACK: i32 = 1
 
-type MirAllocation = {
+type MirAllocation {
     kind: i32,
     escapes: bool,
 }
 
-type MirField = {
+type MirField {
     name: str,
     read_count: i32,
     removed: bool,
 }
 
-type MirMove = {
+type MirMove {
     source_consumed_immediately: bool,
     elided: bool,
 }
 
-type MirOptFunction = {
+type MirOptFunction {
     name: str,
     calls: Vec[MirCallSite],
     allocations: Vec[MirAllocation],
@@ -52,7 +52,7 @@ fn MirOptFunction.init(name: str) -> MirOptFunction:
         moves: Vec.new(),
     }
 
-type MirOptTypeDecl = {
+type MirOptTypeDecl {
     name: str,
     fields: Vec[MirField],
 }
@@ -63,7 +63,7 @@ fn MirOptTypeDecl.init(name: str) -> MirOptTypeDecl:
         fields: Vec.new(),
     }
 
-type MirOptModule = {
+type MirOptModule {
     functions: Vec[MirOptFunction],
     types: Vec[MirOptTypeDecl],
 }
@@ -88,7 +88,7 @@ fn MirOptModule.add_type(self: MirOptModule, name: str) -> i32:
     self.types.push(MirOptTypeDecl.init(name))
     idx
 
-type OptSummary = {
+type OptSummary {
     devirtualized_calls: i32,
     stack_promoted_boxes: i32,
     removed_fields: i32,

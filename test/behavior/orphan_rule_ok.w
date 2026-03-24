@@ -10,7 +10,7 @@ impl Describable for i32 =
         "an integer"
 
 // Foreign trait (Debug), local type — OK
-type Point = { x: i32, y: i32 }
+type Point { x: i32, y: i32 }
 
 impl Debug for Point =
     fn debug(self: Point) -> str:

@@ -9,7 +9,7 @@ use compiler.foundation.Values
 
 extern fn with_hashmap_new_at(base: &T, offset: i64, key_size: i64, val_size: i64) -> void
 
-type InternPool = {
+type InternPool {
     // Symbols
     symbol_texts: Vec[str],
     symbol_map: HashMap[str, i32],

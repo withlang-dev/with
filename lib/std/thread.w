@@ -2,7 +2,7 @@
 //
 // Current bootstrap implementation runs work eagerly and returns a join handle.
 
-type JoinHandle = {
+type JoinHandle  {
     result: i32
 }
 

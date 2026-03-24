@@ -4,7 +4,7 @@
 
 extern fn with_fs_read_file(path: str) -> str
 
-type ModuleSpec = {
+type ModuleSpec {
     logical_name: str,
     file_path: str,
 }

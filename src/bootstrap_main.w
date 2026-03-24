@@ -193,7 +193,7 @@ fn print_help_fn:
 fn print_help_type:
     print(
         "Type declarations:\n\n" ++
-        "  type Point = { x: i32, y: i32 }\n" ++
+        "  type Point { x: i32, y: i32 }\n" ++
         "  type Handle = opaque\n" ++
         "  type Alias = i32\n"
     )
@@ -218,7 +218,7 @@ fn print_help_keywords:
         "Reserved words:\n\n" ++
         "  fn let var if else then match for in while loop return break continue\n" ++
         "  with as mut type trait impl extend dyn use module pub async await spawn\n" ++
-        "  unsafe comptime gen yield defer error extern c_import ephemeral select\n" ++
+        "  unsafe comptime gen yield defer error extern c_import ephemeral select enum\n" ++
         "  true false not and or const it errdefer move where opaque null union\n"
     )
 

@@ -3,31 +3,31 @@
 // Type declarations in the current bootstrap parser are non-generic.
 // This module provides a stable i64-focused API surface.
 
-type Mutex = {
+type Mutex  {
     value: i64
 }
 
-type MutexGuard = {
+type MutexGuard  {
     value: i64
 }
 
-type MutexGuardMut = {
+type MutexGuardMut  {
     value: i64
 }
 
-type RwLock = {
+type RwLock  {
     value: i64
 }
 
-type RwReadGuard = {
+type RwReadGuard  {
     value: i64
 }
 
-type RwWriteGuard = {
+type RwWriteGuard  {
     value: i64
 }
 
-type AtomicI64 = {
+type AtomicI64  {
     value: i64
 }
 

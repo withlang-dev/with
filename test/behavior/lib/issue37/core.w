@@ -1,3 +1,3 @@
-pub type Value = {
+pub type Value {
     raw: u64,
 }

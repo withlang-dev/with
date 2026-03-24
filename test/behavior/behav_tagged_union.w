@@ -3,8 +3,7 @@
 // Tests: tagged unions (enums with payloads), nested payloads,
 //        multiple payload types, match destructuring
 
-type Value =
-    | IntVal(i32)
+enum Value {  | IntVal(i32) }
     | FloatVal(f64)
     | BoolVal(bool)
     | NoneVal
@@ -44,8 +43,7 @@ fn test_tagged_union_discriminant:
     assert(not is_int_val(Value.FloatVal(0.0)))
     assert(not is_int_val(Value.NoneVal))
 
-type Message =
-    | Quit
+enum Message {  | Quit }
     | Echo(str)
     | Move(x: i32, y: i32)
 
@@ -60,7 +58,7 @@ fn test_message_variants:
     assert(handle_message(Message.Echo("hello")) == "hello")
     assert(handle_message(Message.Move(1, 2)) == "move")
 
-type Tree = Leaf(i32) | Node(i32)
+enum Tree { Leaf(i32) | Node(i32) }
 
 fn tree_value(t: Tree) -> i32:
     match t

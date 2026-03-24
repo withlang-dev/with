@@ -1,5 +1,5 @@
 //! expect-stdout: ok
-type Wrapper[T] = { value: T }
+type Wrapper[T] { value: T }
 
 fn Wrapper.get(self: Wrapper[i32]) -> i32: self.value
 

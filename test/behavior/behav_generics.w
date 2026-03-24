@@ -25,7 +25,7 @@ fn test_generic_comparison:
     assert(min_of(3, 7) == 3)
     assert(max_of(100, 50) == 100)
 
-type Box[T] = { value: T }
+type Box[T] { value: T }
 
 fn Box.get(self: Box[T]) -> T:
     self.value
@@ -36,7 +36,7 @@ fn test_generic_struct:
     let s: Box[str] = Box { value: "hello" }
     assert(s.get() == "hello")
 
-type Pair[T] = { first: T, second: T }
+type Pair[T] { first: T, second: T }
 
 fn Pair.sum(self: Pair[i32]) -> i32:
     self.first + self.second

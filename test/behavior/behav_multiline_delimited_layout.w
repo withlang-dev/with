@@ -1,4 +1,4 @@
-type Point = { x: i32, y: i32 }
+type Point { x: i32, y: i32 }
 
 fn add(
     x: i32,

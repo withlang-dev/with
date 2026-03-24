@@ -66,7 +66,7 @@ const CH_u: i32 = 117
 const CH_x: i32 = 120
 const CH_z: i32 = 122
 
-type Lexer = {
+type Lexer {
     source: str,
     pos: i32,
     file_id: i32,

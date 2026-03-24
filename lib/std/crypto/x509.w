@@ -152,7 +152,7 @@ let KEY_TYPE_EC: i32 = 2
 // ── Certificate parsing ────────────────────────────────────────────
 
 // Parsed certificate info (offsets into the original DER buffer)
-type X509Cert = {
+type X509Cert  {
     // tbsCertificate: the signed portion
     tbs_start: i32,
     tbs_len: i32,

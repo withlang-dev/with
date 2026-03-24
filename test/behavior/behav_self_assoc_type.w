@@ -3,12 +3,12 @@ trait Transform =
     type Output
     fn apply(self: Self, x: i32) -> Self.Output
 
-type Doubler = {}
+type Doubler {}
 impl Transform for Doubler =
     type Output = i32
     fn apply(self: Doubler, x: i32) -> Self.Output: x * 2
 
-type Stringer = {}
+type Stringer {}
 impl Transform for Stringer =
     type Output = str
     fn apply(self: Stringer, x: i32) -> Self.Output: "done"

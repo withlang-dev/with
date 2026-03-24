@@ -21,7 +21,7 @@ fn TYPE_KEY_GENERIC_PARAM -> i32: 11
 fn TYPE_KEY_GENERIC_APPLY2 -> i32: 12
 fn TYPE_KEY_TUPLEN -> i32: 13
 
-type TypeKey = {
+type TypeKey {
     tag: i32,
     name: str,
     arg0: i32,

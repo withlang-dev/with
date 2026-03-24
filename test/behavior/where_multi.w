@@ -7,7 +7,7 @@ trait Showable =
 trait Sized =
     fn size(self: Self) -> i32
 
-type Box = { value: i32 }
+type Box { value: i32 }
 
 impl Showable for Box =
     fn show(self: Box) -> str:

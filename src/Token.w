@@ -76,6 +76,7 @@ const TK_KW_WHERE: i32 = 113
 const TK_KW_OPAQUE: i32 = 114
 const TK_KW_NULL: i32 = 115
 const TK_KW_UNION: i32 = 116
+const TK_KW_ENUM: i32 = 125
 
 // -- Operators --
 const TK_PLUS: i32 = 54
@@ -203,6 +204,7 @@ fn tag_from_keyword(s: str) -> i32:
     if s == "opaque": return TK_KW_OPAQUE
     if s == "null": return TK_KW_NULL
     if s == "union": return TK_KW_UNION
+    if s == "enum": return TK_KW_ENUM
     -1
 
 // Returns a human-readable name for a token tag (for diagnostics).
@@ -269,6 +271,7 @@ fn tag_name(tag: i32) -> str:
     if tag == TK_KW_OPAQUE: return "'opaque'"
     if tag == TK_KW_NULL: return "'null'"
     if tag == TK_KW_UNION: return "'union'"
+    if tag == TK_KW_ENUM: return "'enum'"
     if tag == TK_PLUS: return "'+'"
     if tag == TK_MINUS: return "'-'"
     if tag == TK_STAR: return "'*'"
@@ -328,7 +331,7 @@ fn tag_name(tag: i32) -> str:
 
 // A growable list of tokens stored as parallel arrays for
 // cache-friendly iteration over tags alone.
-type TokenList = {
+type TokenList {
     tags: Vec[i32],
     starts: Vec[i32],
     ends: Vec[i32],

@@ -4,8 +4,8 @@
 // Note: impl for primitive types (i32, str) has a codegen limitation
 // (sext ptr-to-i32); only struct/enum types work for now.
 
-type MyInt = { val: i32 }
-type MyStr = { val: str }
+type MyInt { val: i32 }
+type MyStr { val: str }
 
 impl Eq for MyInt =
     fn eq(self: MyInt, other: MyInt) -> bool:

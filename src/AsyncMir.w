@@ -17,7 +17,7 @@ const AM_SUSPEND_AWAIT: i32 = 1
 const AM_SUSPEND_SELECT_AWAIT: i32 = 2
 const AM_SUSPEND_YIELD: i32 = 3
 
-type AsyncMirBody = {
+type AsyncMirBody {
     fn_sym: i32,
     flavor: i32,
     state_count: i32,
@@ -35,7 +35,7 @@ type AsyncMirBody = {
     suspend_drop_counts: Vec[i32],
 }
 
-type AsyncMirModule = {
+type AsyncMirModule {
     bodies: Vec[AsyncMirBody],
     body_fn_syms: Vec[i32],
 }

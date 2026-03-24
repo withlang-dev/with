@@ -81,10 +81,6 @@ const NK_COMPTIME_ERROR: i32 = 71
 const NK_FSTRING: i32 = 72       // d0=segment_count, d1=0, extra=[seg_kind, seg_data...]
 const NK_FSTRING_SPEC: i32 = 73  // d0=packed_flags, d1=width, d2=precision
 
-// F-string segment kinds (stored in extra_data)
-const FSTR_SEG_LITERAL: i32 = 0  // +1 word: string token index (interned symbol)
-const FSTR_SEG_EXPR: i32 = 1     // +1 word: expression node, +1 word: spec node (0 if none)
-
 // With-expression binding encoding in d2:
 // - positive value: immutable binding symbol id
 // - negative value: mutable binding symbol id
@@ -188,61 +184,70 @@ fn fn_param_is_noalias(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_NOALIAS) % 2
 
 // Visibility flags
-const VIS_PRIVATE: i32 = 0
-const VIS_PUBLIC: i32 = 1
+enum Visibility: i32:
+    VIS_PRIVATE = 0
+    VIS_PUBLIC = 1
 
 // Binary operators
-const OP_ADD: i32 = 0
-const OP_SUB: i32 = 1
-const OP_MUL: i32 = 2
-const OP_DIV: i32 = 3
-const OP_MOD: i32 = 4
-const OP_EQ: i32 = 5
-const OP_NEQ: i32 = 6
-const OP_LT: i32 = 7
-const OP_GT: i32 = 8
-const OP_LTE: i32 = 9
-const OP_GTE: i32 = 10
-const OP_AND: i32 = 11
-const OP_OR: i32 = 12
-const OP_BIT_AND: i32 = 13
-const OP_BIT_OR: i32 = 14
-const OP_BIT_XOR: i32 = 15
-const OP_SHL: i32 = 16
-const OP_SHR: i32 = 17
-const OP_DEFAULT: i32 = 18
-const OP_CONCAT: i32 = 19
-const OP_ADD_WRAP: i32 = 20
-const OP_SUB_WRAP: i32 = 21
-const OP_MUL_WRAP: i32 = 22
-const OP_IN: i32 = 23
-const OP_NOT_IN: i32 = 24
+enum BinaryOp: i32:
+    OP_ADD = 0
+    OP_SUB = 1
+    OP_MUL = 2
+    OP_DIV = 3
+    OP_MOD = 4
+    OP_EQ = 5
+    OP_NEQ = 6
+    OP_LT = 7
+    OP_GT = 8
+    OP_LTE = 9
+    OP_GTE = 10
+    OP_AND = 11
+    OP_OR = 12
+    OP_BIT_AND = 13
+    OP_BIT_OR = 14
+    OP_BIT_XOR = 15
+    OP_SHL = 16
+    OP_SHR = 17
+    OP_DEFAULT = 18
+    OP_CONCAT = 19
+    OP_ADD_WRAP = 20
+    OP_SUB_WRAP = 21
+    OP_MUL_WRAP = 22
+    OP_IN = 23
+    OP_NOT_IN = 24
 
 // Unary operators
-const UOP_NEGATE: i32 = 0
-const UOP_NOT: i32 = 1
-const UOP_REF: i32 = 2
-const UOP_MUT_REF: i32 = 3
-const UOP_DEREF: i32 = 4
-const UOP_TRY: i32 = 5
-const UOP_BIT_NOT: i32 = 6
+enum UnaryOp: i32:
+    UOP_NEGATE = 0
+    UOP_NOT = 1
+    UOP_REF = 2
+    UOP_MUT_REF = 3
+    UOP_DEREF = 4
+    UOP_TRY = 5
+    UOP_BIT_NOT = 6
 
 // Literal suffix metadata (stored out-of-line in AstPool.literal_suffixes)
-const LIT_SUFFIX_NONE: i32 = 0
-const LIT_SUFFIX_I8: i32 = 1
-const LIT_SUFFIX_I16: i32 = 2
-const LIT_SUFFIX_I32: i32 = 3
-const LIT_SUFFIX_I64: i32 = 4
-const LIT_SUFFIX_I128: i32 = 5
-const LIT_SUFFIX_ISIZE: i32 = 6
-const LIT_SUFFIX_U8: i32 = 7
-const LIT_SUFFIX_U16: i32 = 8
-const LIT_SUFFIX_U32: i32 = 9
-const LIT_SUFFIX_U64: i32 = 10
-const LIT_SUFFIX_U128: i32 = 11
-const LIT_SUFFIX_USIZE: i32 = 12
-const LIT_SUFFIX_F32: i32 = 13
-const LIT_SUFFIX_F64: i32 = 14
+enum LiteralSuffix: i32:
+    LIT_SUFFIX_NONE = 0
+    LIT_SUFFIX_I8 = 1
+    LIT_SUFFIX_I16 = 2
+    LIT_SUFFIX_I32 = 3
+    LIT_SUFFIX_I64 = 4
+    LIT_SUFFIX_I128 = 5
+    LIT_SUFFIX_ISIZE = 6
+    LIT_SUFFIX_U8 = 7
+    LIT_SUFFIX_U16 = 8
+    LIT_SUFFIX_U32 = 9
+    LIT_SUFFIX_U64 = 10
+    LIT_SUFFIX_U128 = 11
+    LIT_SUFFIX_USIZE = 12
+    LIT_SUFFIX_F32 = 13
+    LIT_SUFFIX_F64 = 14
+
+// F-string segment kinds (stored in extra_data)
+enum FStringSegmentKind: i32:
+    FSTR_SEG_LITERAL = 0  // +1 word: string token index (interned symbol)
+    FSTR_SEG_EXPR = 1     // +1 word: expression node, +1 word: spec node (0 if none)
 
 // ── AST Pool ──────────────────────────────────────────────────────
 
@@ -255,7 +260,7 @@ const LIT_SUFFIX_F64: i32 = 14
 //
 // Node 0 is reserved as a null sentinel.
 
-type AstPool = {
+type AstPool {
     // Core node data (parallel arrays, one entry per node)
     kinds: Vec[i32],
     starts: Vec[i32],
@@ -289,6 +294,9 @@ type AstPool = {
     // Auxiliary type decl metadata: [node, derive_start, derive_count]*
     // derive_start/derive_count reference AstPool.extra symbols.
     type_meta: Vec[i32],
+
+    // Qualified enum pattern metadata: [node, type_sym]*
+    pattern_qualifiers: Vec[i32],
 
     // Auxiliary fn parameter-pattern metadata:
     // - fn_param_patterns stores flat pattern nodes (0 for plain identifier param)
@@ -326,6 +334,7 @@ type AstPool = {
     // O(1) lookup maps for metadata (populated on add, queried on find)
     fn_meta_map: HashMap[i32, i32],
     type_meta_map: HashMap[i32, i32],
+    pattern_qualifier_map: HashMap[i32, i32],
     where_meta_map: HashMap[i32, i32],
     impl_type_params_map: HashMap[i32, i32],
     impl_target_type_nodes_map: HashMap[i32, i32],
@@ -358,6 +367,7 @@ fn AstPool.new -> AstPool:
         strings: Vec.new(),
         fn_meta: Vec.new(),
         type_meta: Vec.new(),
+        pattern_qualifiers: Vec.new(),
         fn_param_patterns: Vec.new(),
         fn_param_pattern_meta: Vec.new(),
         for_meta: Vec.new(),
@@ -371,6 +381,7 @@ fn AstPool.new -> AstPool:
         impl_trait_type_args: Vec.new(),
         fn_meta_map: HashMap.new(),
         type_meta_map: HashMap.new(),
+        pattern_qualifier_map: HashMap.new(),
         where_meta_map: HashMap.new(),
         impl_type_params_map: HashMap.new(),
         impl_target_type_nodes_map: HashMap.new(),
@@ -390,7 +401,7 @@ fn AstPool.new -> AstPool:
     pool.data0.push(0)
     pool.data1.push(0)
     pool.data2.push(0)
-    pool.literal_suffixes.push(LIT_SUFFIX_NONE)
+    pool.literal_suffixes.push(LiteralSuffix.LIT_SUFFIX_NONE)
     pool
 
 // Mark the pool as immutable. Any subsequent mutation will print an error.
@@ -408,7 +419,7 @@ fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32
     self.data0.push(d0)
     self.data1.push(d1)
     self.data2.push(d2)
-    self.literal_suffixes.push(LIT_SUFFIX_NONE)
+    self.literal_suffixes.push(LiteralSuffix.LIT_SUFFIX_NONE)
     idx
 
 // Add extra data, returns the index in the extra array.
@@ -585,6 +596,18 @@ fn AstPool.type_meta_derive_start(self: &AstPool, meta: i32) -> i32:
 
 fn AstPool.type_meta_derive_count(self: &AstPool, meta: i32) -> i32:
     self.type_meta.get((meta + 2) as i64)
+
+fn AstPool.add_pattern_qualifier(self: &mut AstPool, node: i32, type_sym: i32):
+    let idx = self.pattern_qualifiers.len() as i32
+    self.pattern_qualifiers.push(node)
+    self.pattern_qualifiers.push(type_sym)
+    self.pattern_qualifier_map.insert(node, idx)
+
+fn AstPool.pattern_qualifier(self: &AstPool, node: i32) -> i32:
+    let opt = self.pattern_qualifier_map.get(node)
+    if opt.is_some():
+        return self.pattern_qualifiers.get((opt.unwrap() + 1) as i64)
+    0
 
 fn AstPool.mark_must_use_type(self: &mut AstPool, node: i32):
     self.must_use_type_nodes.push(node)

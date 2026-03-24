@@ -7,7 +7,7 @@ trait Describable =
 trait Showable =
     fn show(self: Self) -> str
 
-type Pair = { a: i32, b: i32 }
+type Pair { a: i32, b: i32 }
 
 impl Describable for Pair =
     fn describe(self: Pair) -> str:

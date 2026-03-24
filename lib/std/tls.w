@@ -174,7 +174,7 @@ unsafe fn tls_prf_sha256(
 
 // ── TLS connection state ───────────────────────────────────────────
 
-type TlsConn = {
+type TlsConn  {
     fd: i32,
     // Handshake state
     client_random: [u8; 32],

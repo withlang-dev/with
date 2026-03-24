@@ -1,10 +1,10 @@
 //! expect-stdout: ok
 
-type BindEntry = {
+type BindEntry {
     x: i32,
 }
 
-type Bindings = {
+type Bindings {
     entries: Vec[BindEntry],
 }
 

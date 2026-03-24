@@ -2,7 +2,7 @@
 
 // Tests: unsafe fn — function-level unsafe context
 
-type Data = {
+type Data {
     val: i32,
     flag: bool,
 }

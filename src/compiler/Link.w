@@ -105,12 +105,15 @@ fn link_stage_resolve_runtime_root() -> str:
     let argv0 = with_arg_at(0)
     let compiler_dir = if argv0.len() > 0: link_stage_dirname(argv0) else: "."
     let candidates: Vec[str] = Vec.new()
+    // Prefer the current workspace artifact root during bootstrap. This lets
+    // external seed compilers link against the runtime objects generated for
+    // the active tree instead of whatever stdlib/runtime payload the seed
+    // binary happens to carry.
+    candidates.push(link_stage_artifact_root() ++ "/lib")
     // <compiler_dir>/runtime/ (symlink to ../lib in out/bin/)
     candidates.push(compiler_dir ++ "/runtime")
     // <compiler_dir>/../lib/ (direct FHS-style path)
     candidates.push(compiler_dir ++ "/../lib")
-    // out/lib/ (from repo root)
-    candidates.push("out/lib")
     for i in 0..candidates.len() as i32:
         let dir = candidates.get(i as i64)
         let probe = dir ++ "/helpers.o"

@@ -1,6 +1,6 @@
 //! expect-error: does not satisfy bound
 
-type NoEqType = { x: i32 }
+type NoEqType { x: i32 }
 
 trait Container =
     type Item: Eq

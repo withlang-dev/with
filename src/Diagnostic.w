@@ -14,7 +14,7 @@ const DIAG_SEVERITY_NOTE: i32 = 3
 const SEV_ERROR: i32 = DIAG_SEVERITY_ERROR
 const SEV_WARNING: i32 = DIAG_SEVERITY_WARNING
 
-type DiagnosticLabel = {
+type DiagnosticLabel {
     span: Span,
     message: str,
 }
@@ -22,7 +22,7 @@ type DiagnosticLabel = {
 // Legacy alias kept for existing callers.
 type Label = DiagnosticLabel
 
-type Diagnostic = {
+type Diagnostic {
     severity: i32,
     code: str,
     message: str,
@@ -98,7 +98,7 @@ fn Diagnostic.render(self: Diagnostic, source: Source):
         let help: str = self.helps.get(i as i64)
         with_eprintln(render_diag_help_line(help))
 
-type DiagnosticList = {
+type DiagnosticList {
     items: Vec[Diagnostic],
 }
 

@@ -2,12 +2,12 @@
 
 // Tests: auto-deref for pointer field access (*mut T → T.field)
 
-type Point = {
+type Point {
     x: i32,
     y: i32,
 }
 
-type Node = {
+type Node {
     value: i32,
     label: str,
 }

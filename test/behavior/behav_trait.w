@@ -6,8 +6,8 @@ extern fn print(s: str) -> void
 trait Describable =
     fn describe(self: Self) -> str
 
-type Circle = { radius: i32 }
-type Square = { side: i32 }
+type Circle { radius: i32 }
+type Square { side: i32 }
 
 impl Describable for Circle =
     fn describe(self: Circle) -> str:

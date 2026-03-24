@@ -4,9 +4,9 @@
 // the lowering/runtime behavior for result methods and constructors; this
 // module provides the user-facing type names so they resolve by import.
 
-type Result[T, E] = | Ok(T) | Err(E)
+enum Result[T, E] { Ok(T) | Err(E) }
 
-type ContextError[E] = {
+type ContextError[E]  {
     msg: str
     source: E
 }

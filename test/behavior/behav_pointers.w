@@ -53,7 +53,7 @@ fn test_pointer_accumulate:
     add_to(&mut sum, 30)
     assert(sum == 60)
 
-type Counter = { value: i32 }
+type Counter { value: i32 }
 
 fn counter_inc(c: *mut Counter):
     unsafe: (*c).value = (*c).value + 1

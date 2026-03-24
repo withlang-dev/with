@@ -2,7 +2,7 @@ extern fn print(s: str) -> void
 extern fn int_to_string(n: i32) -> str
 
 @[flags]
-type Perms: i32 = Read | Write | Execute
+enum Perms: i32 { Read | Write | Execute }
 
 fn main:
     let rw = Perms.Read + Perms.Write

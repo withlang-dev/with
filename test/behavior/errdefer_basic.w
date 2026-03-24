@@ -1,7 +1,7 @@
 //! expect-stdout: cleanup-on-error
 extern fn print(s: str) -> void
 
-type MyResult = Ok(i32) | Err(str)
+enum MyResult { Ok(i32) | Err(str) }
 
 fn might_fail(x: i32) -> MyResult:
     if x < 0:

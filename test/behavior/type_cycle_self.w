@@ -1,6 +1,6 @@
 //! expect-error: dependency loop
 
-type Node = {
+type Node {
     child: Node,
 }
 

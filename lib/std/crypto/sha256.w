@@ -3,7 +3,7 @@
 
 use std.crypto.endian
 
-type Sha256 = {
+type Sha256  {
     state: [u32; 8],
     buf: [u8; 64],
     count: u64,

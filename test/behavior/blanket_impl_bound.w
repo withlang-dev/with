@@ -11,7 +11,7 @@ impl[T: Readable] Parseable for T:
     fn parse(self: T) -> str:
         self.read()
 
-type Opaque = { value: i32 }
+type Opaque { value: i32 }
 
 // Opaque does NOT implement Readable, so blanket impl doesn't apply
 fn try_parse[T: Parseable](x: T) -> i32:

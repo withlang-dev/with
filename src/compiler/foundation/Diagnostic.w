@@ -6,12 +6,12 @@ fn DIAG_SEVERITY_ERROR -> i32: 1
 fn DIAG_SEVERITY_WARNING -> i32: 2
 fn DIAG_SEVERITY_NOTE -> i32: 3
 
-type DiagnosticLabel = {
+type DiagnosticLabel {
     span: Span,
     message: str,
 }
 
-type Diagnostic = {
+type Diagnostic {
     severity: i32,
     code: str,
     message: str,
@@ -21,7 +21,7 @@ type Diagnostic = {
     helps: Vec[str],
 }
 
-type DiagnosticStore = {
+type DiagnosticStore {
     items: Vec[Diagnostic],
 }
 

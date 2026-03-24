@@ -2,7 +2,7 @@
 
 use compiler.foundation.Ids
 
-type Span = {
+type Span {
     file: FileId,
     start: i32,
     end: i32,

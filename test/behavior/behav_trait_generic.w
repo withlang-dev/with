@@ -7,8 +7,8 @@ extern fn int_to_string(n: i32) -> str
 trait Showable =
     fn show(self: Self) -> str
 
-type Wrapper = { value: i32 }
-type Tag = { label: str }
+type Wrapper { value: i32 }
+type Tag { label: str }
 
 impl Showable for Wrapper =
     fn show(self: Wrapper) -> str:

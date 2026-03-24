@@ -63,14 +63,17 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
 
         if type_decl_is_pub(pool, extra_start, sub_kind):
             out = out ++ "pub "
-        out = out ++ "type " ++ name ++ " = "
         if is_ephemeral != 0:
-            out = out ++ "ephemeral "
+            out = out ++ "type " ++ name ++ " ephemeral "
+        else if sub_kind == TDK_ENUM or sub_kind == TDK_DISC_ENUM:
+            out = out ++ "enum " ++ name
+        else:
+            out = out ++ "type " ++ name
 
         if sub_kind == TDK_STRUCT:
             let field_count = pool.get_extra(extra_start)
             var ep = extra_start + 1
-            out = out ++ render_lbrace() ++ " "
+            out = out ++ " " ++ render_lbrace() ++ " "
             for fi in 0..field_count:
                 if fi > 0:
                     out = out ++ ", "
@@ -86,22 +89,20 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
 
         if sub_kind == TDK_ALIAS:
             let aliased = pool.get_extra(extra_start)
-            out = out ++ render_type_expr(pool, intern, aliased)
+            out = out ++ " = " ++ render_type_expr(pool, intern, aliased)
             return out
 
         if sub_kind == TDK_DISTINCT:
             let aliased = pool.get_extra(extra_start)
-            out = out ++ "distinct " ++ render_type_expr(pool, intern, aliased)
+            out = out ++ " = distinct " ++ render_type_expr(pool, intern, aliased)
             return out
 
         if sub_kind == TDK_ENUM:
             let variant_count = pool.get_extra(extra_start)
             var ep = extra_start + 1
-            out = out ++ "\n"
+            out = out ++ ":\n"
             for vi in 0..variant_count:
                 out = out ++ make_indent(indent + 2)
-                if vi > 0:
-                    out = out ++ "| "
                 let vname = intern.resolve(pool.get_extra(ep))
                 ep = ep + 1
                 let payload_count = pool.get_extra(ep)
@@ -122,11 +123,9 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             let repr_node = pool.get_extra(extra_start)
             let variant_count = pool.get_extra(extra_start + 1)
             var ep = extra_start + 2
-            out = out ++ ": " ++ render_type_expr(pool, intern, repr_node) ++ "\n"
+            out = out ++ ": " ++ render_type_expr(pool, intern, repr_node) ++ ":\n"
             for vi in 0..variant_count:
                 out = out ++ make_indent(indent + 2)
-                if vi > 0:
-                    out = out ++ "| "
                 let vname = intern.resolve(pool.get_extra(ep))
                 ep = ep + 1
                 let disc_val = pool.get_extra(ep)
@@ -216,7 +215,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         let vis = pool.get_data2(node)
         let extra_start = pool.get_data1(node)
         var out = prefix
-        if vis == VIS_PUBLIC:
+        if vis == Visibility.VIS_PUBLIC:
             out = out ++ "pub "
         out = out ++ "trait " ++ name ++ " =\n"
 
@@ -711,9 +710,10 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: i32) -> str:
 
     if kind == NK_PAT_VARIANT:
         let name = intern.resolve(pool.get_data0(node))
+        let qualifier = pool.pattern_qualifier(node)
         let extra_start = pool.get_data1(node)
         let binding_count = pool.get_data2(node)
-        var out = name
+        var out = if qualifier != 0: intern.resolve(qualifier) ++ "." ++ name else: name
         if binding_count > 0:
             out = out ++ "("
             for bi in 0..binding_count:
@@ -933,7 +933,7 @@ fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
     if sub_kind == TDK_STRUCT:
         let field_count = pool.get_extra(extra_start)
         let vis_idx = extra_start + 1 + field_count * 4
-        return pool.get_extra(vis_idx) == VIS_PUBLIC
+        return pool.get_extra(vis_idx) == Visibility.VIS_PUBLIC
     if sub_kind == TDK_ENUM:
         var ep = extra_start + 1
         let variant_count = pool.get_extra(extra_start)
@@ -941,7 +941,7 @@ fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
             ep = ep + 1  // name
             let payload_count = pool.get_extra(ep)
             ep = ep + 1 + payload_count
-        return pool.get_extra(ep) == VIS_PUBLIC
+        return pool.get_extra(ep) == Visibility.VIS_PUBLIC
     if sub_kind == TDK_DISC_ENUM:
         var ep = extra_start + 2 // skip repr_type_node, get variant_count
         let variant_count = pool.get_extra(extra_start + 1)
@@ -950,9 +950,9 @@ fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
             ep = ep + 1  // disc value
             let payload_count = pool.get_extra(ep)
             ep = ep + 1 + payload_count
-        return pool.get_extra(ep) == VIS_PUBLIC
+        return pool.get_extra(ep) == Visibility.VIS_PUBLIC
     // Alias / distinct: [aliased_type, vis]
-    return pool.get_extra(extra_start + 1) == VIS_PUBLIC
+    return pool.get_extra(extra_start + 1) == Visibility.VIS_PUBLIC
 
 fn top_level_let_type_ann(pool: AstPool, flags: i32) -> i32:
     let encoded = flags / 4
@@ -989,40 +989,40 @@ fn is_pattern_kind(kind: i32) -> bool:
     kind == NK_PAT_SLICE
 
 fn bin_op_str(op: i32) -> str:
-    if op == OP_ADD: return "+"
-    if op == OP_SUB: return "-"
-    if op == OP_MUL: return "*"
-    if op == OP_DIV: return "/"
-    if op == OP_MOD: return "%"
-    if op == OP_EQ: return "=="
-    if op == OP_NEQ: return "!="
-    if op == OP_LT: return "<"
-    if op == OP_GT: return ">"
-    if op == OP_LTE: return "<="
-    if op == OP_GTE: return ">="
-    if op == OP_AND: return "and"
-    if op == OP_OR: return "or"
-    if op == OP_BIT_AND: return "&"
-    if op == OP_BIT_OR: return "|"
-    if op == OP_BIT_XOR: return "^"
-    if op == OP_SHL: return "<<"
-    if op == OP_SHR: return ">>"
-    if op == OP_DEFAULT: return "??"
-    if op == OP_CONCAT: return "++"
-    if op == OP_ADD_WRAP: return "+%"
-    if op == OP_SUB_WRAP: return "-%"
-    if op == OP_MUL_WRAP: return "*%"
-    if op == OP_IN: return "in"
-    if op == OP_NOT_IN: return "not in"
+    if op == BinaryOp.OP_ADD: return "+"
+    if op == BinaryOp.OP_SUB: return "-"
+    if op == BinaryOp.OP_MUL: return "*"
+    if op == BinaryOp.OP_DIV: return "/"
+    if op == BinaryOp.OP_MOD: return "%"
+    if op == BinaryOp.OP_EQ: return "=="
+    if op == BinaryOp.OP_NEQ: return "!="
+    if op == BinaryOp.OP_LT: return "<"
+    if op == BinaryOp.OP_GT: return ">"
+    if op == BinaryOp.OP_LTE: return "<="
+    if op == BinaryOp.OP_GTE: return ">="
+    if op == BinaryOp.OP_AND: return "and"
+    if op == BinaryOp.OP_OR: return "or"
+    if op == BinaryOp.OP_BIT_AND: return "&"
+    if op == BinaryOp.OP_BIT_OR: return "|"
+    if op == BinaryOp.OP_BIT_XOR: return "^"
+    if op == BinaryOp.OP_SHL: return "<<"
+    if op == BinaryOp.OP_SHR: return ">>"
+    if op == BinaryOp.OP_DEFAULT: return "??"
+    if op == BinaryOp.OP_CONCAT: return "++"
+    if op == BinaryOp.OP_ADD_WRAP: return "+%"
+    if op == BinaryOp.OP_SUB_WRAP: return "-%"
+    if op == BinaryOp.OP_MUL_WRAP: return "*%"
+    if op == BinaryOp.OP_IN: return "in"
+    if op == BinaryOp.OP_NOT_IN: return "not in"
     "?op?"
 
 fn unary_op_str(op: i32) -> str:
-    if op == UOP_NEGATE: return "-"
-    if op == UOP_NOT: return "not "
-    if op == UOP_REF: return "&"
-    if op == UOP_MUT_REF: return "&mut "
-    if op == UOP_DEREF: return "*"
-    if op == UOP_TRY: return "?"
+    if op == UnaryOp.UOP_NEGATE: return "-"
+    if op == UnaryOp.UOP_NOT: return "not "
+    if op == UnaryOp.UOP_REF: return "&"
+    if op == UnaryOp.UOP_MUT_REF: return "&mut "
+    if op == UnaryOp.UOP_DEREF: return "*"
+    if op == UnaryOp.UOP_TRY: return "?"
     "?uop?"
 
 fn make_indent(n: i32) -> str:

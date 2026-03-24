@@ -59,8 +59,19 @@ VERSION_PLACEHOLDER := WITH_VERSION_PLACEHOLDER
 SEED_PATH := src/main
 SEED_VERSION ?=
 
-# Seed compiler: WITH env var, `with` on PATH, or src/main (downloaded).
-WITH ?= $(shell command -v with 2>/dev/null || ([ -x $(SEED_PATH) ] && echo $(SEED_PATH)))
+# Seed compiler: WITH env var, local build outputs, `with` on PATH, or
+# src/main (downloaded). Preferring local stage outputs keeps smoke/fixpoint
+# on the freshly built compiler instead of a potentially stale installed one.
+WITH ?= $(shell \
+	if [ -x "$(CANONICAL_BIN)" ]; then \
+		printf '%s\n' "$(CANONICAL_BIN)"; \
+	elif [ -x "$(STAGE2_BIN)" ]; then \
+		printf '%s\n' "$(STAGE2_BIN)"; \
+	elif command -v with >/dev/null 2>&1; then \
+		command -v with; \
+	elif [ -x "$(SEED_PATH)" ]; then \
+		printf '%s\n' "$(SEED_PATH)"; \
+	fi)
 
 INSTALL_BINDIR := $(DESTDIR)$(BINDIR)
 INSTALL_LIBDIR := $(INSTALL_BINDIR)/runtime
@@ -298,9 +309,33 @@ define build_stage
 	dsym="$$tmp.dSYM"; \
 	gen_bin="$(OUT_GEN_DIR)/main"; \
 	gen_dsym="$(OUT_GEN_DIR)/main.dSYM"; \
+	child_pid=""; \
+	cleanup_build_stage() { \
+		status="$$1"; \
+		sig="$$2"; \
+		trap - EXIT INT TERM HUP; \
+		if [ -n "$$child_pid" ] && kill -0 "$$child_pid" 2>/dev/null; then \
+			if [ -n "$$sig" ]; then \
+				kill -s "$$sig" "$$child_pid" 2>/dev/null || true; \
+			else \
+				kill "$$child_pid" 2>/dev/null || true; \
+			fi; \
+			wait "$$child_pid" 2>/dev/null || true; \
+		fi; \
+		rm -f "$$tmp" "$$gen_bin"; \
+		rm -rf "$$dsym" "$$gen_dsym"; \
+		exit "$$status"; \
+	}; \
+	trap 'cleanup_build_stage $$? ""' EXIT; \
+	trap 'cleanup_build_stage 130 INT' INT; \
+	trap 'cleanup_build_stage 143 TERM' TERM; \
+	trap 'cleanup_build_stage 129 HUP' HUP; \
 	rm -f "$$tmp" "$$gen_bin" "$@"; \
 	rm -rf "$$dsym" "$$gen_dsym" "$@.dSYM"; \
-	$(1) build $(GEN_MAIN_ENTRY) -o "$$tmp"; \
+	$(1) build $(GEN_MAIN_ENTRY) -o "$$tmp" & \
+	child_pid="$$!"; \
+	wait "$$child_pid"; \
+	child_pid=""; \
 	if [ ! -x "$$tmp" ]; then mv "$$gen_bin" "$$tmp"; fi; \
 	if [ -d "$$gen_dsym" ]; then mv "$$gen_dsym" "$$dsym"; fi; \
 	cp "$$tmp" "$@"; \

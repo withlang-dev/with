@@ -1,5 +1,5 @@
 //! expect-stdout: ok
-type Pair[T] = { first: T, second: T }
+type Pair[T] { first: T, second: T }
 
 fn Pair.sum(self: Pair[T]) -> T: self.first + self.second
 fn Pair.get_first(self: Pair[T]) -> T: self.first

@@ -1,7 +1,7 @@
 // Compilation config mirrors Zig's `Compilation.Config` role:
 // a normalized, concrete set of driver options owned by `Compilation`.
 
-type CompilationConfig = {
+type CompilationConfig {
     opt_level: i32,
     no_std: bool,
     alloc_mode: bool,

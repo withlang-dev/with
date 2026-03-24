@@ -16,7 +16,7 @@ use Parser
 
 extern fn with_eprintln(s: str) -> void
 
-type Lsp = {
+type Lsp {
     documents: HashMap[str, str],
 }
 

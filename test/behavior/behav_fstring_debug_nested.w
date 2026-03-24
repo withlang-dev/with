@@ -2,12 +2,12 @@
 
 // Tests: nested struct debug formatting
 
-type Vec2 = {
+type Vec2 {
     x: i32,
     y: i32,
 }
 
-type Player = {
+type Player {
     name: str,
     score: i32,
 }

@@ -1,6 +1,6 @@
 //! expect-stdout: val=42
 
-type Val = Num(i32) | Empty
+enum Val { Num(i32) | Empty }
 
 fn extract(v: Val) -> i32:
     match v

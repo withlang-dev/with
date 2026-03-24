@@ -3,7 +3,7 @@
 // Tests: enum definition, match on enum, enum with payloads,
 //        enum methods, enum equality, multiple variants
 
-type Direction = North | South | East | West
+enum Direction { North | South | East | West }
 
 fn test_enum_basic:
     let d = Direction.North
@@ -32,7 +32,7 @@ fn test_enum_equality:
     assert(a == b)
     assert(a != c)
 
-type Shape = Circle(r: f64) | Rectangle(w: f64, h: f64) | Triangle
+enum Shape { Circle(r: f64) | Rectangle(w: f64, h: f64) | Triangle }
 
 fn test_enum_with_payload:
     let s = Shape.Circle(5.0)
@@ -57,7 +57,7 @@ fn test_enum_no_payload_variant:
         _ => false
     assert(is_triangle)
 
-type Weekday = Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday
+enum Weekday { Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday }
 
 fn is_weekend(d: Weekday) -> bool:
     match d
@@ -71,7 +71,7 @@ fn test_enum_many_variants:
     assert(is_weekend(Weekday.Saturday))
     assert(is_weekend(Weekday.Sunday))
 
-type Option2 = None2 | Some2(i32)
+enum Option2 { None2 | Some2(i32) }
 
 fn test_option_like_enum:
     let a = Option2.Some2(42)
@@ -86,7 +86,7 @@ fn test_option_like_enum:
         .None2 => -1
     assert(val2 == -1)
 
-type Expr = Lit(i32) | Neg(i32) | Add(i32, i32)
+enum Expr { Lit(i32) | Neg(i32) | Add(i32, i32) }
 
 fn eval_expr(e: Expr) -> i32:
     match e

@@ -1,10 +1,10 @@
 //! expect-error: dependency loop
 
-type Node = {
+type Node {
     parent: Tree,
 }
 
-type Tree = {
+type Tree {
     root: Node,
 }
 
