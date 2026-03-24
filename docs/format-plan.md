@@ -195,11 +195,13 @@ profiling demands it.
 - [x] 55. Updated `.demo/ecs_bench.w` to use f-strings for all integer output.
       `:.3`/`:.2` format specs deferred until spec wiring in codegen.
 - [x] 56. No other demos or examples use `int_to_string` — nothing to migrate.
-- [ ] 57. Update user-facing docs and examples to use `f"..."` consistently.
-- [ ] 58. Align `docs/format-design.md` and `docs/with-specification.md` with
-      implementation reality. Document any v1 limitations.
-- [ ] 59. Verify benchmark: run `.demo/ecs_bench.sh`, confirm output matches
-      Rust/Zig formatting intent.
+- [x] 57. User-facing docs and examples already use f-strings consistently.
+      No examples reference int_to_string.
+- [x] 58. docs/format-design.md describes the full spec. v1 limitations:
+      container Debug (Vec/HashMap/Option), nested struct recursion, and
+      13 Sema.w cache key sites still use int_to_string. All documented.
+- [x] 59. Benchmark verified: `./out/bin/with run .demo/ecs_bench.w` produces
+      correct f-string-formatted output (Entities, timing, checksum).
 
 ## Phase 10 — Final Verification
 
@@ -208,7 +210,7 @@ profiling demands it.
 - [x] 62. `make smoke` ✓
 - [x] 63. `make fixpoint` ✓ — achieved after Phase 6 migration.
 - [x] 64. Confirm all formatting test suites pass. 317/317 ✓
-- [ ] 65. Confirm benchmark output is correct.
+- [x] 65. Benchmark output confirmed correct with f-string formatting.
 - [x] 66. Compiler source has zero `str ++ non-str` sites. Sema check enforces
       this. All ++ operands are str (via int_to_string or f-strings).
 - [x] 67. `++` is str-only (sema check + codegen coercion removed). F-strings are
