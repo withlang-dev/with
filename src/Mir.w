@@ -120,6 +120,7 @@ const MIR_INTRINSIC_ROTATE_RIGHT: i32 = 47
 const MIR_INTRINSIC_VEC_WITH_CAPACITY: i32 = 48
 const MIR_INTRINSIC_FMT_TO_STR: i32 = 49
 const MIR_INTRINSIC_FMT_DEBUG_STR: i32 = 50
+const MIR_INTRINSIC_FMT_DEBUG: i32 = 51
 
 // ── Projection kinds ─────────────────────────────────────────────
 
