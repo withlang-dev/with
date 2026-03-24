@@ -128,19 +128,25 @@ profiling demands it.
 
 ## Phase 6 — Remove Concat Coercion Hack
 
-- [ ] 38. Remove `coerce_val_to_str` auto-coercion from `mir_str_concat` / `++`
-      in `src/Codegen.w`. Make `++` str-only.
-- [ ] 39. Add sema/codegen error for `str ++ non-str` operands.
-- [ ] 40. Convert compiler-source `int_to_string(x) ++ str` sites to f-strings.
-      Done: compiler/ subdir, MirLower, Parser, DiagnosticRender, render, main,
-      main_emit_temp, Codegen.w, Sema.w (partial). ~159 sites migrated.
-      Remaining ~244 in: Mir.w (93), CCodegen.w (62), Sema.w (38), CImport.w (19),
-      Resolve.w (15), AsyncMir.w (14). Not a launch blocker — compiler works
-      fine with int_to_string. Migrate incrementally.
-- [ ] 41. Update tests that assert string concat coercion behavior.
-- [ ] 42. Verify: `make build && ./out/bin/with-stage2 check src/main.w && make smoke`.
-- [ ] 43. Add migration regression tests: f-strings cover intended use cases,
-      `++` rejects non-string operands.
+- [x] 38. Remove `coerce_val_to_str` auto-coercion from `mir_str_concat` / `++`
+      in `src/Codegen.w`. Make `++` str-only. Added MIR_INTRINSIC_FMT_TO_STR
+      intrinsic so lower_fstring explicitly formats non-str expressions before
+      concatenation. Fixpoint verified.
+- [x] 39. Add sema error for `str ++ non-str` operands. Both operands validated
+      in `check_binary`. Two compile error tests added. Fixpoint verified.
+- [x] 40. Convert compiler-source `int_to_string(x) ++ str` sites to f-strings.
+      ~374 of ~403 sites migrated across all .w files. Remaining 13 sites are
+      cache key construction in Sema.w — cannot convert without seed update due
+      to bootstrap cache key format interaction. Also relaxed ++ sema check to
+      allow unresolved generic types. Fixpoint verified.
+- [x] 41. Update tests that assert string concat coercion behavior. No existing
+      tests used raw non-str ++ str coercion — all used int_to_string explicitly.
+      Compile error tests for non-str ++ added in task 39.
+- [x] 42. Verify: `make build` ✓, `check src/main.w` ✓, `make smoke` ✓,
+      `make fixpoint` ✓. All f-string tests pass.
+- [x] 43. Migration regression tests: `behav_str_concat_only.w` (10 tests for
+      str-only ++ and f-string formatting), `err_concat_non_str.w` and
+      `err_concat_non_str_lhs.w` (compile errors for non-str ++). All pass.
 
 ## Phase 7 — Debug Formatting Completion
 
