@@ -1081,33 +1081,33 @@ fn resolved_scope_kind_name(kind: i32) -> str:
     "unknown"
 
 fn print_resolved(result: ResolveResult, pool: InternPool, root_path: str):
-    print("resolved root=" ++ root_path ++ " modules=" ++ int_to_string(result.modules.len() as i32) ++ " defs=" ++ int_to_string(result.defs.len() as i32) ++ "\n")
+    print(f"resolved root={root_path} modules={result.modules.len() as i32} defs={result.defs.len() as i32}\n")
 
     for mi in 0..result.modules.len() as i32:
         let m = result.modules.get(mi as i64)
-        print("module[" ++ int_to_string(m.module_id) ++ "] file=" ++ int_to_string(m.file_id) ++ " path=" ++ m.path ++ " imports=" ++ int_to_string(m.import_count) ++ " decls=" ++ int_to_string(m.decl_count) ++ "\n")
+        print(f"module[{m.module_id}] file={m.file_id} path={m.path} imports={m.import_count} decls={m.decl_count}\n")
 
         for ii in 0..m.import_count:
             let imp = result.imports.get((m.import_start + ii) as i64)
             if imp.kind == IMPORT_KIND_USE:
-                print("import[" ++ int_to_string(m.module_id) ++ ":" ++ int_to_string(ii) ++ "] kind=use path=" ++ imp.path_text ++ " target=" ++ int_to_string(imp.target_module) ++ "\n")
+                print(f"import[{m.module_id}:{ii}] kind=use path={imp.path_text} target={imp.target_module}\n")
             else:
-                print("import[" ++ int_to_string(m.module_id) ++ ":" ++ int_to_string(ii) ++ "] kind=c_import header=\"" ++ imp.path_text ++ "\" target=" ++ int_to_string(imp.target_module) ++ "\n")
+                print(f"import[{m.module_id}:{ii}] kind=c_import header=\"{imp.path_text}\" target={imp.target_module}\n")
 
     for di in 0..result.defs.len() as i32:
         let d = result.defs.get(di as i64)
         let name = if d.name_sym > 0: pool.resolve(d.name_sym) else: ""
-        print("def[" ++ int_to_string(d.def_id) ++ "] module=" ++ int_to_string(d.module_id) ++ " parent=" ++ int_to_string(d.parent_def) ++ " kind=" ++ resolved_def_kind_name(d.kind) ++ " name=" ++ name ++ " span=" ++ int_to_string(d.span_start) ++ ".." ++ int_to_string(d.span_end) ++ "\n")
+        print(f"def[{d.def_id}] module={d.module_id} parent={d.parent_def} kind={resolved_def_kind_name(d.kind)} name={name} span={d.span_start}..{d.span_end}\n")
 
     for bi in 0..result.bindings.len() as i32:
         let b = result.bindings.get(bi as i64)
         let sym = pool.resolve(b.symbol)
-        print("bind[" ++ int_to_string(b.scope_id) ++ ":" ++ sym ++ "] def=" ++ int_to_string(b.def_id) ++ "\n")
+        print(f"bind[{b.scope_id}:{sym}] def={b.def_id}\n")
 
     for ui in 0..result.uses.len() as i32:
         let u = result.uses.get(ui as i64)
         let sym = pool.resolve(u.symbol)
-        print("use[" ++ int_to_string(ui) ++ "] module=" ++ int_to_string(u.module_id) ++ " node=" ++ int_to_string(u.node_id) ++ " sym=" ++ sym ++ " def=" ++ int_to_string(u.def_id) ++ " span=" ++ int_to_string(u.span_start) ++ ".." ++ int_to_string(u.span_end) ++ "\n")
+        print(f"use[{ui}] module={u.module_id} node={u.node_id} sym={sym} def={u.def_id} span={u.span_start}..{u.span_end}\n")
 
     if result.link_libs.len() > 0:
         var line = "link_libs="
@@ -1119,33 +1119,33 @@ fn print_resolved(result: ResolveResult, pool: InternPool, root_path: str):
 
 fn dump_resolved(result: ResolveResult, pool: InternPool, root_path: str) -> str:
     var out = ""
-    out = out ++ "resolved root=" ++ root_path ++ " modules=" ++ int_to_string(result.modules.len() as i32) ++ " defs=" ++ int_to_string(result.defs.len() as i32) ++ "\n"
+    out = out ++ f"resolved root={root_path} modules={result.modules.len() as i32} defs={result.defs.len() as i32}\n"
 
     for mi in 0..result.modules.len() as i32:
         let m = result.modules.get(mi as i64)
-        out = out ++ "module[" ++ int_to_string(m.module_id) ++ "] file=" ++ int_to_string(m.file_id) ++ " path=" ++ m.path ++ " imports=" ++ int_to_string(m.import_count) ++ " decls=" ++ int_to_string(m.decl_count) ++ "\n"
+        out = out ++ f"module[{m.module_id}] file={m.file_id} path={m.path} imports={m.import_count} decls={m.decl_count}\n"
 
         for ii in 0..m.import_count:
             let imp = result.imports.get((m.import_start + ii) as i64)
             if imp.kind == IMPORT_KIND_USE:
-                out = out ++ "import[" ++ int_to_string(m.module_id) ++ ":" ++ int_to_string(ii) ++ "] kind=use path=" ++ imp.path_text ++ " target=" ++ int_to_string(imp.target_module) ++ "\n"
+                out = out ++ f"import[{m.module_id}:{ii}] kind=use path={imp.path_text} target={imp.target_module}\n"
             else:
-                out = out ++ "import[" ++ int_to_string(m.module_id) ++ ":" ++ int_to_string(ii) ++ "] kind=c_import header=\"" ++ imp.path_text ++ "\" target=" ++ int_to_string(imp.target_module) ++ "\n"
+                out = out ++ f"import[{m.module_id}:{ii}] kind=c_import header=\"{imp.path_text}\" target={imp.target_module}\n"
 
     for di in 0..result.defs.len() as i32:
         let d = result.defs.get(di as i64)
         let name = if d.name_sym > 0: pool.resolve(d.name_sym) else: ""
-        out = out ++ "def[" ++ int_to_string(d.def_id) ++ "] module=" ++ int_to_string(d.module_id) ++ " parent=" ++ int_to_string(d.parent_def) ++ " kind=" ++ resolved_def_kind_name(d.kind) ++ " name=" ++ name ++ " span=" ++ int_to_string(d.span_start) ++ ".." ++ int_to_string(d.span_end) ++ "\n"
+        out = out ++ f"def[{d.def_id}] module={d.module_id} parent={d.parent_def} kind={resolved_def_kind_name(d.kind)} name={name} span={d.span_start}..{d.span_end}\n"
 
     for bi in 0..result.bindings.len() as i32:
         let b = result.bindings.get(bi as i64)
         let sym = pool.resolve(b.symbol)
-        out = out ++ "bind[" ++ int_to_string(b.scope_id) ++ ":" ++ sym ++ "] def=" ++ int_to_string(b.def_id) ++ "\n"
+        out = out ++ f"bind[{b.scope_id}:{sym}] def={b.def_id}\n"
 
     for ui in 0..result.uses.len() as i32:
         let u = result.uses.get(ui as i64)
         let sym = pool.resolve(u.symbol)
-        out = out ++ "use[" ++ int_to_string(ui) ++ "] module=" ++ int_to_string(u.module_id) ++ " node=" ++ int_to_string(u.node_id) ++ " sym=" ++ sym ++ " def=" ++ int_to_string(u.def_id) ++ " span=" ++ int_to_string(u.span_start) ++ ".." ++ int_to_string(u.span_end) ++ "\n"
+        out = out ++ f"use[{ui}] module={u.module_id} node={u.node_id} sym={sym} def={u.def_id} span={u.span_start}..{u.span_end}\n"
 
     if result.link_libs.len() > 0:
         out = out ++ "link_libs="
