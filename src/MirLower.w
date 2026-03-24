@@ -967,15 +967,27 @@ fn MirBuilder.lower_bool_lit(self: MirBuilder, value: i32) -> i32:
 fn MirBuilder.lower_str_lit(self: MirBuilder, sym: i32) -> i32:
     self.const_operand(CK_STR, sym, self.sema.ty_str)
 
+fn MirBuilder.lower_fmt_to_str(self: MirBuilder, operand: i32, node: i32) -> i32:
+    // Emit MIR_INTRINSIC_FMT_TO_STR call to format a non-str value to str.
+    let fn_op = self.const_operand(CK_FN, self.pool.intern("fmt_to_str"), self.sema.ty_str)
+    let call_args: Vec[i32] = Vec.new()
+    call_args.push(operand)
+    let args_id = self.body.new_call_args(call_args)
+    let result_local = self.new_temp(self.sema.ty_str)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.set_call_intrinsic(args_id, MIR_INTRINSIC_FMT_TO_STR)
+    self.body.new_operand(OK_COPY, result_place)
+
 fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
-    // Interim fallback: desugar NK_FSTRING to OP_CONCAT chain.
-    // Each segment becomes either a string literal or an expression,
-    // concatenated left-to-right. When only one segment exists and it's
-    // an expression, we still concat with "" to force str coercion.
+    // Desugar NK_FSTRING to OP_CONCAT chain with explicit formatting.
+    // Each expression segment is converted to str via MIR_INTRINSIC_FMT_TO_STR
+    // before concatenation, so OP_CONCAT only operates on str operands.
     let seg_count = self.ast.get_data0(node)
     let extra_start = self.ast.get_data1(node)
     var result = 0
-    var has_literal = false
     var pos = extra_start
     var i = 0
     while i < seg_count:
@@ -984,24 +996,16 @@ fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
         if seg_kind == FSTR_SEG_LITERAL:
             let sym = self.ast.get_extra(pos + 1)
             seg_operand = self.lower_str_lit(sym)
-            has_literal = true
             pos = pos + 2
         else if seg_kind == FSTR_SEG_EXPR:
             let expr_node = self.ast.get_extra(pos + 1)
             let spec_node = self.ast.get_extra(pos + 2)
             seg_operand = self.lower_expr(expr_node)
-            // Check for :? debug mode — wrap strings in quotes
-            if spec_node != 0:
-                let spec_flags = self.ast.get_data0(spec_node)
-                let spec_mode = spec_flags & 255
-                if spec_mode == 63:  // '?' = debug mode
-                    let expr_ty = self.expr_type(expr_node)
-                    let resolved = if expr_ty != 0: self.sema.resolve_alias(expr_ty) else: 0
-                    let tk = if resolved != 0: self.sema.get_type_kind(resolved) else: 0
-                    // For primitives, :? output is same as default except:
-                    // - strings get quoted: "hello" → "\"hello\""
-                    // For now, skip quoting — just pass through as default
-                    // (struct/enum debug formatting deferred to later task)
+            // Convert non-str expressions to str via formatting intrinsic
+            let expr_ty = self.expr_type(expr_node)
+            let resolved_ty = if expr_ty > 0: self.sema.resolve_alias(expr_ty) else: 0
+            if resolved_ty != self.sema.ty_str:
+                seg_operand = self.lower_fmt_to_str(seg_operand, node)
             pos = pos + 3
         else:
             pos = pos + 1
@@ -1010,7 +1014,7 @@ fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
         if result == 0:
             result = seg_operand
         else:
-            // Emit OP_CONCAT binary: result ++ seg_operand
+            // Emit OP_CONCAT binary: result ++ seg_operand (both are str)
             let rv = self.body.new_rvalue(RK_BIN_OP, OP_CONCAT, result, seg_operand)
             let temp = self.new_temp(self.sema.ty_str)
             let place = self.place_for_local(temp)
@@ -1019,14 +1023,6 @@ fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
         i = i + 1
     if result == 0:
         return self.lower_str_lit(self.pool.intern(""))
-    // If only expression segments (no literals), concat with "" to force str coercion
-    if not has_literal and seg_count == 1:
-        let empty = self.lower_str_lit(self.pool.intern(""))
-        let rv = self.body.new_rvalue(RK_BIN_OP, OP_CONCAT, empty, result)
-        let temp = self.new_temp(self.sema.ty_str)
-        let place = self.place_for_local(temp)
-        self.body.push_stmt(self.cur_bb, SK_ASSIGN, place, rv, self.ast.get_start(node))
-        result = self.body.new_operand(OK_COPY, place)
     result
 
 fn MirBuilder.lower_float_lit(self: MirBuilder, sym: i32, type_id: i32) -> i32:
