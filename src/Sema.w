@@ -1954,7 +1954,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             // Check for duplicate discriminant values
             for prev in 0..disc_vals.len() as i32:
                 if disc_vals.get(prev as i64) == disc_value:
-                    self.emit_error("duplicate discriminant value " ++ int_to_string(disc_value), node)
+                    self.emit_error(f"duplicate discriminant value {disc_value}", node)
             // Check discriminant fits in repr type range
             if repr_type_tid == self.ty_i8:
                 if disc_value < (0 - 128) or disc_value > 127:
