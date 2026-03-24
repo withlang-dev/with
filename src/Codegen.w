@@ -20,7 +20,6 @@ extern fn with_fs_read_file(path: str) -> str
 extern fn with_parse_float(s: str) -> f64
 extern fn with_eprintln(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
-extern fn int_to_string(n: i32) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn with_codegen_loop_set_break(idx: i32, bb: i64) -> void
 extern fn with_codegen_loop_set_continue(idx: i32, bb: i64) -> void
@@ -303,8 +302,6 @@ extern fn wl_di_create_lexical_block(b: i64, scope: i64, file: i64, line: i32, c
 // Runtime helpers
 extern fn with_str_concat(a: str, b: str) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
-extern fn int_to_string(n: i32) -> str
-extern fn i64_to_string(n: i64) -> str
 extern fn print(s: str) -> void
 extern fn eprintln(s: str) -> void
 
@@ -911,13 +908,13 @@ fn Codegen.debug_create_di_type(self: Codegen, sema_tid: i32) -> i64:
             let encoding = if is_signed == 1: wl_dwarf_ate_signed() else: wl_dwarf_ate_unsigned()
             return wl_di_create_basic_type(self.di_builder, name, width as i64, encoding)
         if is_signed == 1:
-            return wl_di_create_basic_type(self.di_builder, "i" ++ int_to_string(width), width as i64, wl_dwarf_ate_signed())
+            return wl_di_create_basic_type(self.di_builder, f"i{width}", width as i64, wl_dwarf_ate_signed())
         else:
-            return wl_di_create_basic_type(self.di_builder, "u" ++ int_to_string(width), width as i64, wl_dwarf_ate_unsigned())
+            return wl_di_create_basic_type(self.di_builder, f"u{width}", width as i64, wl_dwarf_ate_unsigned())
     if kind == 2:
         // TY_FLOAT: d0 = width
         let width = self.sema.get_type_d0(sema_tid)
-        return wl_di_create_basic_type(self.di_builder, "f" ++ int_to_string(width), width as i64, wl_dwarf_ate_float())
+        return wl_di_create_basic_type(self.di_builder, f"f{width}", width as i64, wl_dwarf_ate_float())
     if kind == 5:
         // TY_STR
         return wl_di_create_unspecified_type(self.di_builder, "str")
@@ -1072,7 +1069,7 @@ fn Codegen.gen_fn_to_fat_ptr_thunk(self: Codegen, fn_val: i64, fat_ty: i64) -> i
     let thunk_fn_ty = wl_function_type(orig_ret_ty, vec_data_i64(&thunk_params), orig_param_count + 1, 0)
     let thunk_id = self.closure_counter
     self.closure_counter = thunk_id + 1
-    let thunk_name = "__fn_thunk_" ++ int_to_string(thunk_id)
+    let thunk_name = f"__fn_thunk_{thunk_id}"
     let thunk_fn = wl_add_function(self.llmod, thunk_name, thunk_fn_ty)
     // Generate thunk body
     let saved_bb = wl_get_insert_block(self.builder)
@@ -1161,27 +1158,22 @@ fn Codegen.debug_type_layout_field(self: Codegen, owner_name: str, field_index: 
     if not self.debug_type_layout_enabled():
         return
     let node_kind = if type_node != 0: self.pool.kind(type_node) else: 0 - 1
-    var msg = "[type-layout] owner=" ++ owner_name
-    msg = msg ++ " field=" ++ int_to_string(field_index)
-    msg = msg ++ " name=" ++ self.intern.resolve(field_name)
-    msg = msg ++ " type_node=" ++ int_to_string(type_node)
-    msg = msg ++ " node_kind=" ++ int_to_string(node_kind)
+    var msg = f"[type-layout] owner={owner_name} field={field_index} name={self.intern.resolve(field_name)} type_node={type_node} node_kind={node_kind}"
     if type_node != 0:
         let start = self.pool.get_start(type_node)
         let end = self.pool.get_end(type_node)
-        msg = msg ++ " span=" ++ int_to_string(start) ++ ".." ++ int_to_string(end)
+        msg = msg ++ f" span={start}..{end}"
         if node_kind == NK_TYPE_NAMED or node_kind == NK_TYPE_GENERIC:
             let type_name_sym = self.pool.get_data0(type_node)
-            msg = msg ++ " type_name=" ++ self.intern.resolve(type_name_sym)
+            msg = msg ++ f" type_name={self.intern.resolve(type_name_sym)}"
         if node_kind == NK_TYPE_GENERIC:
-            msg = msg ++ " arg_count=" ++ int_to_string(self.pool.get_data2(type_node))
-    msg = msg ++ " resolved=" ++ self.llvm_type_mangle(resolved_ty)
+            msg = msg ++ f" arg_count={self.pool.get_data2(type_node)}"
+    msg = msg ++ f" resolved={self.llvm_type_mangle(resolved_ty)}"
     if resolved_ty != 0:
-        msg = msg ++ " llvm_kind=" ++ int_to_string(wl_get_type_kind(resolved_ty))
-        msg = msg ++ " size=" ++ i64_to_string(wl_size_of(resolved_ty))
+        msg = msg ++ f" llvm_kind={wl_get_type_kind(resolved_ty)} size={wl_size_of(resolved_ty)}"
         let struct_name = wl_get_struct_name(resolved_ty)
         if struct_name.len() > 0:
-            msg = msg ++ " llvm_name=" ++ struct_name
+            msg = msg ++ f" llvm_name={struct_name}"
     with_eprintln(msg)
 
 fn Codegen.capture_loop_state(self: Codegen) -> LoopState:
@@ -1238,24 +1230,24 @@ fn Codegen.debug_call_coerce_failure(self: Codegen, context: str, call_node: i32
     var msg = "[call-coerce] " ++ context
     if self.current_function_name_sym != 0:
         msg = msg ++ " fn=" ++ self.function_symbol_name(self.current_function_name_sym)
-    msg = msg ++ " arg=" ++ int_to_string(arg_index)
+    msg = msg ++ f" arg={arg_index}"
     var line = 0 - 1
     if arg_node != 0:
         line = self.span_to_line(arg_node)
     else if call_node != 0:
         line = self.span_to_line(call_node)
     if line >= 0:
-        msg = msg ++ " line=" ++ int_to_string(line)
+        msg = msg ++ f" line={line}"
     var actual_ty: i64 = 0
     if actual_val != 0:
         actual_ty = wl_type_of(actual_val)
-    msg = msg ++ " actual=" ++ self.llvm_type_mangle(actual_ty)
-    msg = msg ++ " expected=" ++ self.llvm_type_mangle(expected_ty)
+    msg = msg ++ f" actual={self.llvm_type_mangle(actual_ty)}"
+    msg = msg ++ f" expected={self.llvm_type_mangle(expected_ty)}"
     if arg_node != 0:
-        msg = msg ++ " node_kind=" ++ int_to_string(self.pool.kind(arg_node))
+        msg = msg ++ f" node_kind={self.pool.kind(arg_node)}"
         let arg_text = self.ident_text_from_node(arg_node)
         if arg_text.len() > 0:
-            msg = msg ++ " arg_text=" ++ arg_text
+            msg = msg ++ f" arg_text={arg_text}"
     with_eprintln(msg)
 
 fn Codegen.enforce_coerced_type(self: Codegen, value: i64, expected_ty: i64, context: str) -> i64:
@@ -1304,10 +1296,10 @@ fn Codegen.record_local(self: Codegen, sym: i32, local_ptr: i64, ty: i64, is_mut
         var msg = "[local-bind]"
         if self.current_function_name_sym != 0:
             msg = msg ++ " fn=" ++ self.function_symbol_name(self.current_function_name_sym)
-        msg = msg ++ " sym=" ++ int_to_string(sym)
+        msg = msg ++ f" sym={sym}"
         if sym_text.len() > 0:
-            msg = msg ++ " name=" ++ sym_text
-        msg = msg ++ " ty=" ++ self.llvm_type_mangle(ty)
+            msg = msg ++ f" name={sym_text}"
+        msg = msg ++ f" ty={self.llvm_type_mangle(ty)}"
         with_eprintln(msg)
 
 fn Codegen.record_local_fn_sig(self: Codegen, sym: i32, fn_sig: i64):
@@ -1622,7 +1614,7 @@ fn Codegen.mir_call_context(self: Codegen, body: MirBody, callee_operand: i32) -
         if body.const_kinds.get(od as i64) == CK_FN:
             return out ++ self.function_symbol_name(body.const_d0.get(od as i64))
     if (ok == OK_COPY or ok == OK_MOVE) and od >= 0 and od < body.place_locals.len() as i32:
-        return out ++ "place_" ++ int_to_string(body.place_locals.get(od as i64))
+        return out ++ f"place_{body.place_locals.get(od as i64)}"
     out ++ "indirect"
 
 // ── Helper: find struct/enum type symbol from LLVM type ───────────
@@ -1869,7 +1861,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
     if type_node == 0: return wl_void_type(self.context)
     let kind = self.pool.kind(type_node)
 
-    // with_eprintln("[codegen] resolve_type node=" ++ int_to_string(type_node) ++ " kind=" ++ int_to_string(kind))
+    // with_eprintln(f"[codegen] resolve_type node={type_node} kind={kind}")
 
     if kind == NK_IDENT:
         let sym = self.pool.get_data0(type_node)
@@ -2024,10 +2016,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         return wl_i32_type(self.context)
 
     // Fallback — always warn so silent miscompilation is visible
-    var msg = "warning: [type-resolve] unhandled type node kind=" ++ int_to_string(kind)
-    msg = msg ++ " node=" ++ int_to_string(type_node)
-    msg = msg ++ " span=" ++ int_to_string(self.pool.get_start(type_node)) ++ ".." ++ int_to_string(self.pool.get_end(type_node))
-    with_eprintln(msg)
+    with_eprintln(f"warning: [type-resolve] unhandled type node kind={kind} node={type_node} span={self.pool.get_start(type_node)}..{self.pool.get_end(type_node)}")
     wl_i32_type(self.context)
 
 fn Codegen.resolve_primitive_named_type(self: Codegen, name: str) -> i64:
@@ -2662,7 +2651,7 @@ fn Codegen.function_symbol_name(self: Codegen, sym: i32) -> str:
     let name = self.intern.resolve(sym)
     if name.len() > 0:
         return name
-    "__fn_" ++ int_to_string(sym)
+    f"__fn_{sym}"
 
 fn Codegen.ident_text_from_node(self: Codegen, node: i32) -> str:
     if node == 0:
@@ -2788,7 +2777,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             let short_method_name = name_str.slice((di + 1) as i64, name_str.len() as i64)
             if short_method_name.len() > 0:
                 let short_method_sym = self.intern.intern(short_method_name)
-                let mk_str = "$m$" ++ int_to_string(method_owner_sym) ++ "|" ++ int_to_string(short_method_sym)
+                let mk_str = f"$m${method_owner_sym}|{short_method_sym}"
                 method_key_sym = self.intern.intern(mk_str)
             break
 
@@ -3185,7 +3174,7 @@ fn Codegen.get_or_create_option_type(self: Codegen, payload_ty: i64) -> i64:
     opt_type
 
 fn Codegen.get_or_create_result_type(self: Codegen, ok_ty: i64, err_ty: i64) -> i64:
-    let cache_key = i64_to_string(ok_ty) ++ ":" ++ i64_to_string(err_ty)
+    let cache_key = f"{ok_ty}:{err_ty}"
     let cached = self.result_cache_map.get(cache_key)
     if cached.is_some():
         let idx = cached.unwrap()
@@ -3229,7 +3218,7 @@ fn Codegen.get_or_create_context_error_type(self: Codegen, source_ty: i64) -> i6
 fn Codegen.deterministic_type_tag(self: Codegen, ty: i64) -> str:
     let kind = wl_get_type_kind(ty)
     if kind == wl_integer_type_kind():
-        return "i" ++ int_to_string(wl_get_int_type_width(ty))
+        return f"i{wl_get_int_type_width(ty)}"
     if kind == wl_float_type_kind() or kind == wl_double_type_kind():
         return "f64"
     if kind == wl_pointer_type_kind():
@@ -3238,8 +3227,8 @@ fn Codegen.deterministic_type_tag(self: Codegen, ty: i64) -> str:
         let sn = wl_get_struct_name(ty)
         if sn.len() > 0:
             return sn
-        return "s" ++ int_to_string(wl_count_struct_elem_types(ty))
-    "t" ++ i64_to_string(ty)
+        return f"s{wl_count_struct_elem_types(ty)}"
+    f"t{ty}"
 
 fn Codegen.collection_wrapper_name_1(self: Codegen, prefix: str, t0: i64) -> str:
     prefix ++ "." ++ self.deterministic_type_tag(t0)
@@ -3676,12 +3665,10 @@ fn Codegen.build_fn_type_from_ast(self: Codegen, fn_type_node: i32) -> i64:
 
 fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     if self.debug_pool_flow_enabled():
-        with_eprintln("[llvm-cg] gen_module input.decls=" ++ int_to_string(pool.decl_count()) ++
-            " input.nodes=" ++ int_to_string(pool.node_count()))
+        with_eprintln(f"[llvm-cg] gen_module input.decls={pool.decl_count()} input.nodes={pool.node_count()}")
     self.pool = pool
     if self.debug_pool_flow_enabled():
-        with_eprintln("[llvm-cg] gen_module self.decls=" ++ int_to_string(self.pool.decl_count()) ++
-            " self.nodes=" ++ int_to_string(self.pool.node_count()))
+        with_eprintln(f"[llvm-cg] gen_module self.decls={self.pool.decl_count()} self.nodes={self.pool.node_count()}")
 
     self.debug_init_module()
 
@@ -4375,7 +4362,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
 
     // Create LLVM basic blocks
     for dtm_bb in 0..dtm_body.block_count():
-        let dtm_bb_name = "mir.bb" ++ int_to_string(dtm_bb)
+        let dtm_bb_name = f"mir.bb{dtm_bb}"
         let dtm_llbb = wl_append_bb(self.context, function, dtm_bb_name)
         self.mir_bb_values.push(dtm_llbb)
 
@@ -5556,7 +5543,7 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
     let fallback_ty = if materialize_ty != 0: materialize_ty else: wl_i32_type(self.context)
     if const_id < 0 or const_id >= body.const_kinds.len() as i32:
         if self.debug_fallback_enabled():
-            with_eprintln("warning: [fallback] mir_const_value: invalid const_id=" ++ int_to_string(const_id))
+            with_eprintln(f"warning: [fallback] mir_const_value: invalid const_id={const_id}")
         return wl_get_undef(fallback_ty)
 
     let ck = body.const_kinds.get(const_id as i64)
@@ -5613,7 +5600,7 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         // so gen_closure can find captured variables and their types.
         let closure_node = cd
         if closure_node <= 0 or closure_node >= self.pool.node_count():
-            with_eprintln("warning: [ck-closure] invalid node=" ++ int_to_string(closure_node))
+            with_eprintln(f"warning: [ck-closure] invalid node={closure_node}")
             return wl_get_undef(fallback_ty)
         for li in 0..body.local_count():
             let name_sym = body.local_names.get(li as i64)
@@ -5643,15 +5630,15 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         if fv_opt.is_some():
             if self.debug_mir_codegen_enabled():
                 let fn_name = self.function_symbol_name(translated_sym)
-                with_eprintln("[ck-fn] sym=" ++ int_to_string(fn_sym) ++ " -> " ++ fn_name)
+                with_eprintln(f"[ck-fn] sym={fn_sym} -> {fn_name}")
             return fv_opt.unwrap() as i64
         let fn_name = self.function_symbol_name(translated_sym)
         let found = wl_get_named_function(self.llmod, fn_name)
         if found != 0:
             if self.debug_mir_codegen_enabled():
-                with_eprintln("[ck-fn] sym=" ++ int_to_string(fn_sym) ++ " -> " ++ fn_name ++ " (llmod)")
+                with_eprintln(f"[ck-fn] sym={fn_sym} -> {fn_name} (llmod)")
             return found
-        with_eprintln("warning: [ck-fn] NOT FOUND sym=" ++ int_to_string(fn_sym) ++ " name=" ++ fn_name)
+        with_eprintln(f"warning: [ck-fn] NOT FOUND sym={fn_sym} name={fn_name}")
         return wl_get_undef(fallback_ty)
 
     wl_get_undef(fallback_ty)
@@ -5660,7 +5647,7 @@ fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expec
     let fallback_ty = if expected_ty != 0: expected_ty else: wl_i32_type(self.context)
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         if self.debug_fallback_enabled():
-            with_eprintln("warning: [fallback] mir_eval_operand: invalid operand_id=" ++ int_to_string(operand_id))
+            with_eprintln(f"warning: [fallback] mir_eval_operand: invalid operand_id={operand_id}")
         return wl_get_undef(fallback_ty)
 
     let ok = body.operand_kinds.get(operand_id as i64)
@@ -5937,7 +5924,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
     let fallback_ty = if dest_ty != 0: dest_ty else: wl_i32_type(self.context)
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         if self.debug_fallback_enabled():
-            with_eprintln("warning: [fallback] mir_eval_rvalue: invalid rval_id=" ++ int_to_string(rval_id))
+            with_eprintln(f"warning: [fallback] mir_eval_rvalue: invalid rval_id={rval_id}")
         return wl_get_undef(fallback_ty)
 
     let rk = body.rval_kinds.get(rval_id as i64)
@@ -6041,7 +6028,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             let agg_count = body.agg_field_counts.get(agg_fields_id as i64)
             var struct_ty = dest_ty
             if self.debug_mir_codegen_enabled():
-                with_eprintln("[mir-agg] fn=" ++ self.intern.resolve(self.current_function_name_sym) ++ " count=" ++ int_to_string(agg_count) ++ " dest_ty_kind=" ++ int_to_string(if dest_ty != 0: wl_get_type_kind(dest_ty) else: -1) ++ " dest_ty_fields=" ++ int_to_string(if dest_ty != 0 and wl_get_type_kind(dest_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(dest_ty) else: -1))
+                with_eprintln(f"[mir-agg] fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count} dest_ty_kind={if dest_ty != 0: wl_get_type_kind(dest_ty) else: -1} dest_ty_fields={if dest_ty != 0 and wl_get_type_kind(dest_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(dest_ty) else: -1}")
             if agg_count == 0 and d0 != 1:
                 let zero_ty = if struct_ty != 0: struct_ty else: fallback_ty
                 return self.build_default_value(zero_ty)
@@ -6113,7 +6100,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                         let gepi = wl_build_struct_gep(self.builder, struct_ty, alloca, i)
                         wl_build_store(self.builder, vi, gepi)
                     return wl_build_load(self.builder, struct_ty, alloca)
-                with_eprintln("error: RK_AGGREGATE with unknown dest type fn=" ++ self.intern.resolve(self.current_function_name_sym) ++ " count=" ++ int_to_string(agg_count))
+                with_eprintln(f"error: RK_AGGREGATE with unknown dest type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
                 return wl_get_undef(fallback_ty)
             let alloca = self.create_entry_alloca(struct_ty)
             wl_build_store(self.builder, self.build_default_value(struct_ty), alloca)
@@ -6962,7 +6949,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
     else if intrinsic == MIR_INTRINSIC_STR_LEN:
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
         if self.debug_mir_codegen_enabled():
-            with_eprintln("[mir-str-len] recv_ty_kind=" ++ int_to_string(wl_get_type_kind(wl_type_of(recv))))
+            with_eprintln(f"[mir-str-len] recv_ty_kind={wl_get_type_kind(wl_type_of(recv))}")
         result = wl_build_extract_value(self.builder, recv, 1)
 
     else if intrinsic == MIR_INTRINSIC_STR_BYTE_AT:
@@ -7670,7 +7657,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     // These have meaningless CK_FN syms — dispatch by intrinsic kind instead.
     let mir_intrinsic = body.call_intrinsic(args_id)
     if self.debug_mir_codegen_enabled():
-        with_eprintln("[mir-call-pre] intrinsic=" ++ int_to_string(mir_intrinsic) ++ " callee_op=" ++ int_to_string(callee_operand) ++ " args_id=" ++ int_to_string(args_id) ++ " dest=" ++ int_to_string(dest_place))
+        with_eprintln(f"[mir-call-pre] intrinsic={mir_intrinsic} callee_op={callee_operand} args_id={args_id} dest={dest_place}")
     if mir_intrinsic == MIR_INTRINSIC_GENERIC_CALL:
         let gc_node = body.call_ast_node(args_id)
         if gc_node > 0:
@@ -8099,7 +8086,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         if not self.enum_type_map.get(self.current_method_owner_sym).is_some():
                             gc_is_blanket = true
             if not gc_is_blanket:
-                with_eprintln("FATAL: unhandled MIR_INTRINSIC_GENERIC_CALL sym=" ++ gc_name ++ " node_kind=" ++ int_to_string(self.pool.kind(gc_node)))
+                with_eprintln(f"FATAL: unhandled MIR_INTRINSIC_GENERIC_CALL sym={gc_name} node_kind={self.pool.kind(gc_node)}")
                 self.had_error = 1
             if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                 let gc_next_val = self.mir_bb_values.get(next_bb as i64)
@@ -8118,7 +8105,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 let raw_sym = body.const_d0.get(co_d as i64)
                 if raw_sym > 0 and raw_sym < self.sema.pool.symbol_texts.len() as i32:
                     dbg_name = self.sema.pool.symbol_texts.get(raw_sym as i64)
-        with_eprintln("[mir-call] callee=" ++ dbg_name ++ " callee_ty_kind=" ++ int_to_string(wl_get_type_kind(wl_type_of(callee))))
+        with_eprintln(f"[mir-call] callee={dbg_name} callee_ty_kind={wl_get_type_kind(wl_type_of(callee))}")
     let call_context = self.mir_call_context(body, callee_operand)
     var call_ft: i64 = 0
     var is_indirect = false
@@ -8245,10 +8232,10 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     let actual_callee = if is_indirect: fn_ptr_val else: callee
     let actual_arg_count = if is_indirect: arg_count + 1 else: arg_count
     if self.debug_mir_codegen_enabled():
-        with_eprintln("[mir-call] building call arg_count=" ++ int_to_string(actual_arg_count) ++ " ft_params=" ++ int_to_string(wl_count_param_types(call_ft)))
+        with_eprintln(f"[mir-call] building call arg_count={actual_arg_count} ft_params={wl_count_param_types(call_ft)}")
         for di in 0..args.len() as i32:
             let a = args.get(di as i64)
-            with_eprintln("[mir-call]   arg[" ++ int_to_string(di) ++ "] ty_kind=" ++ int_to_string(wl_get_type_kind(wl_type_of(a))))
+            with_eprintln(f"[mir-call]   arg[{di}] ty_kind={wl_get_type_kind(wl_type_of(a))}")
     let call_val = wl_build_call(self.builder, call_ft, actual_callee, vec_data_i64(&args), actual_arg_count)
     let ret_ty = wl_get_return_type(call_ft)
     if ret_ty != wl_void_type(self.context):
@@ -8270,7 +8257,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         dst_ty = resolved_llvm
             self.mir_local_types.insert(dst_local, dst_ty)
         if self.debug_mir_codegen_enabled():
-            with_eprintln("[mir-call-ret] dst_local=" ++ int_to_string(dst_local) ++ " ret_ty_kind=" ++ int_to_string(wl_get_type_kind(ret_ty)) ++ " dst_ty_kind=" ++ int_to_string(wl_get_type_kind(dst_ty)) ++ " is_str=" ++ (if self.is_str_type(dst_ty): "1" else: "0"))
+            with_eprintln(f"[mir-call-ret] dst_local={dst_local} ret_ty_kind={wl_get_type_kind(ret_ty)} dst_ty_kind={wl_get_type_kind(dst_ty)} is_str={if self.is_str_type(dst_ty): 1 else: 0}")
         let dst_ptr = self.mir_place_ptr(body, dest_place, true, dst_ty)
         if dst_ptr == 0:
             return false
@@ -8294,7 +8281,7 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
     let d2 = body.bb_term_d2.get(bb as i64)
     let d3 = body.bb_term_d3.get(bb as i64)
     if self.debug_mir_codegen_enabled():
-        with_eprintln("[mir-term] bb=" ++ int_to_string(bb) ++ " tk=" ++ int_to_string(tk))
+        with_eprintln(f"[mir-term] bb={bb} tk={tk}")
 
     if tk == TK_GOTO:
         if d0 < 0 or d0 >= self.mir_bb_values.len() as i32:
@@ -8388,7 +8375,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         return
     let fn_type = ft.unwrap() as i64
     if self.debug_mir_codegen_enabled():
-        with_eprintln("[mir-cg] fn=" ++ name_str ++ " blocks=" ++ int_to_string(body.block_count()))
+        with_eprintln(f"[mir-cg] fn={name_str} blocks={body.block_count()}")
 
     self.current_function = function
     self.current_function_name_sym = name_sym
@@ -8522,7 +8509,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
                 self.record_trait_local(p_name, trait_sym)
 
     for bb in 0..body.block_count():
-        let bb_name = "mir.bb" ++ int_to_string(bb)
+        let bb_name = f"mir.bb{bb}"
         let llbb = wl_append_bb(self.context, function, bb_name)
         self.mir_bb_values.push(llbb)
 
@@ -8540,7 +8527,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
             continue
         let llbb = self.mir_bb_values.get(bb as i64)
         if self.debug_mir_codegen_enabled():
-            with_eprintln("[mir-cg] fn=" ++ name_str ++ " bb=" ++ int_to_string(bb) ++ " llbb=" ++ i64_to_string(llbb))
+            with_eprintln(f"[mir-cg] fn={name_str} bb={bb} llbb={llbb}")
         wl_position_at_end(self.builder, llbb)
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
         let stmt_count = body.bb_stmt_counts.get(bb as i64)
@@ -8557,7 +8544,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
                 self.debug_set_location(stmt_span)
             if not self.mir_emit_stmt(body, stmt_id):
                 if self.debug_mir_codegen_enabled():
-                    with_eprintln("[mir-cg] fn=" ++ name_str ++ " bb=" ++ int_to_string(bb) ++ " stmt_fail=" ++ int_to_string(stmt_id))
+                    with_eprintln(f"[mir-cg] fn={name_str} bb={bb} stmt_fail={stmt_id}")
                 if wl_get_bb_terminator(llbb) == 0:
                     wl_build_unreachable(self.builder)
                 break
@@ -8570,7 +8557,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
                 var ok_i = 0
                 if ok:
                     ok_i = 1
-                with_eprintln("[mir-cg] fn=" ++ name_str ++ " bb=" ++ int_to_string(bb) ++ " term_ok=" ++ int_to_string(ok_i))
+                with_eprintln(f"[mir-cg] fn={name_str} bb={bb} term_ok={ok_i}")
             if not ok and wl_get_bb_terminator(llbb) == 0:
                 wl_build_unreachable(self.builder)
 
@@ -8774,7 +8761,7 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
                 self.record_trait_local(p_name, trait_sym)
 
     for bb in 0..body.block_count():
-        let bb_name = "mir.bb" ++ int_to_string(bb)
+        let bb_name = f"mir.bb{bb}"
         let llbb = wl_append_bb(self.context, function, bb_name)
         self.mir_bb_values.push(llbb)
 
@@ -9575,7 +9562,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
 
     // Create LLVM basic blocks for MIR blocks
     for cl_bb in 0..closure_body.block_count():
-        let cl_bb_name = "mir.bb" ++ int_to_string(cl_bb)
+        let cl_bb_name = f"mir.bb{cl_bb}"
         let cl_llbb = wl_append_bb(self.context, closure_fn, cl_bb_name)
         self.mir_bb_values.push(cl_llbb)
 
@@ -9979,7 +9966,7 @@ fn Codegen.gen_src_intrinsic(self: Codegen, node: i32) -> i64:
         else:
             col = col + 1
         i = i + 1
-    let loc_str = self.source_file ++ ":" ++ int_to_string(line) ++ ":" ++ int_to_string(col)
+    let loc_str = f"{self.source_file}:{line}:{col}"
     self.gen_string_literal_raw(loc_str)
 
 fn Codegen.gen_embed_file(self: Codegen, node: i32) -> i64:
