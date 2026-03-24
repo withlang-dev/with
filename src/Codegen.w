@@ -5839,12 +5839,8 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
 
 fn Codegen.mir_str_concat(self: Codegen, lhs: i64, rhs: i64) -> i64:
     let str_ty = self.resolve_named_type(self.intern.intern("str"))
-    var lhs_v = lhs
-    var rhs_v = rhs
-    if wl_type_of(lhs) != str_ty:
-        lhs_v = self.coerce_val_to_str(lhs, str_ty)
-    if wl_type_of(rhs) != str_ty:
-        rhs_v = self.coerce_val_to_str(rhs, str_ty)
+    let lhs_v = lhs
+    let rhs_v = rhs
     let concat_sym = self.intern.intern("with_str_concat")
     let fv = self.fn_values.get(concat_sym)
     let ft = self.fn_fn_types.get(concat_sym)
@@ -7350,6 +7346,11 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
             result = wl_build_icmp(self.builder, wl_int_eq(), dv_vt_int, dv_exp_int)
         else:
             result = wl_const_int(wl_i1_type(self.context), 0, 0)
+
+    else if intrinsic == MIR_INTRINSIC_FMT_TO_STR:
+        let fmt_val = self.mir_intrinsic_arg(body, args_id, 0)
+        let fmt_str_ty = self.resolve_named_type(self.intern.intern("str"))
+        result = self.coerce_val_to_str(fmt_val, fmt_str_ty)
 
     else:
         return false
