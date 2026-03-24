@@ -186,8 +186,8 @@ fn fn_param_is_noalias(flags: i32) -> i32:
 
 // Visibility flags
 enum Visibility: i32:
-    VIS_PRIVATE = 0
-    VIS_PUBLIC = 1
+    Private = 0
+    Public = 1
 
 // Binary operators
 enum BinaryOp: i32:
