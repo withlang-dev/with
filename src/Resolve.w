@@ -15,11 +15,11 @@ extern fn with_fs_read_file(path: str) -> str
 extern fn int_to_string(n: i32) -> str
 extern fn print(s: str) -> void
 
-type ImportKind: i32 =
+enum ImportKind: i32:
     IK_USE = 1
     IK_C_IMPORT = 2
 
-type DefKind: i32 =
+enum DefKind: i32:
     DK_FN = 1
     DK_TYPE = 2
     DK_LET = 3
@@ -30,7 +30,7 @@ type DefKind: i32 =
     DK_PARAM = 8
     DK_LOCAL = 9
 
-type ScopeKind: i32 =
+enum ScopeKind: i32:
     SK_MODULE = 1
     SK_FN = 2
     SK_BLOCK = 3
@@ -40,7 +40,7 @@ type ScopeKind: i32 =
     SK_COMPREHENSION = 7
 
 // Module metadata used by --dump-resolved.
-type ResolvedModule = {
+type ResolvedModule {
     module_id: i32,
     file_id: i32,
     path: str,
@@ -49,7 +49,7 @@ type ResolvedModule = {
     decl_count: i32,
 }
 
-type ResolvedImport = {
+type ResolvedImport {
     module_id: i32,
     index_in_module: i32,
     kind: i32,
@@ -59,7 +59,7 @@ type ResolvedImport = {
     span_end: i32,
 }
 
-type ResolvedDef = {
+type ResolvedDef {
     def_id: i32,
     module_id: i32,
     parent_def: i32,
@@ -69,7 +69,7 @@ type ResolvedDef = {
     span_end: i32,
 }
 
-type ResolvedScope = {
+type ResolvedScope {
     scope_id: i32,
     module_id: i32,
     parent_scope: i32,
@@ -77,13 +77,13 @@ type ResolvedScope = {
     kind: i32,
 }
 
-type ResolvedBinding = {
+type ResolvedBinding {
     scope_id: i32,
     symbol: i32,
     def_id: i32,
 }
 
-type ResolvedUse = {
+type ResolvedUse {
     module_id: i32,
     node_id: i32,
     symbol: i32,
@@ -92,7 +92,7 @@ type ResolvedUse = {
     span_end: i32,
 }
 
-type ResolveResult = {
+type ResolveResult {
     modules: Vec[ResolvedModule],
     imports: Vec[ResolvedImport],
     defs: Vec[ResolvedDef],
@@ -113,13 +113,13 @@ fn ResolveResult.init -> ResolveResult:
         link_libs: Vec.new(),
     }
 
-type ResolveArtifacts = {
+type ResolveArtifacts {
     pool: InternPool,
     diags: DiagnosticList,
     result: ResolveResult,
 }
 
-type ResolveState = {
+type ResolveState {
     pool: InternPool,
     diags: DiagnosticList,
     result: ResolveResult,

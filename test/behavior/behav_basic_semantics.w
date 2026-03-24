@@ -128,7 +128,7 @@ fn test_for_loop:
         sum = sum + v
     assert(sum == 15)
 
-type Point = { x: i32, y: i32 }
+type Point { x: i32, y: i32 }
 
 fn make_point(x: i32, y: i32) -> Point:
     Point { x: x, y: y }

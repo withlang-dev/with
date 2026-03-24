@@ -3,12 +3,12 @@
 // Behavior test: type system
 // Tests: struct types, enum types, arrays, function types
 
-type Point = {
+type Point {
     x: i32,
     y: i32,
 }
 
-type Color = Red | Green | Blue
+enum Color { Red | Green | Blue }
 
 fn make_point(x: i32, y: i32) -> Point:
     Point { x: x, y: y }

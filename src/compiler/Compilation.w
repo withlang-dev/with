@@ -74,7 +74,7 @@ fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
 // Transitional orchestration root:
 // owns compiler-facing config/Zcu state while reusing Driver execution per call.
 // This removes long-lived Driver field ownership from Compilation.
-type Compilation = {
+type Compilation {
     zcu: Zcu,
     config: CompilationConfig,
 }

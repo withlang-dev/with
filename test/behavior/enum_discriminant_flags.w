@@ -2,10 +2,10 @@
 extern fn print(s: str) -> void
 extern fn int_to_string(n: i32) -> str
 
-type NotFlags: i32 = A | B | C
+enum NotFlags: i32 { A | B | C }
 
 @[flags]
-type Flags: i32 = X | Y | Z
+enum Flags: i32 { X | Y | Z }
 
 fn main:
     // Without flags: 0, 1, 2

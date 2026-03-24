@@ -2,7 +2,7 @@
 
 // Tests: :? debug mode for structs
 
-type Point = {
+type Point {
     x: i32,
     y: i32,
 }
@@ -12,7 +12,7 @@ fn test_debug_struct_basic:
     let s = f"{p:?}"
     assert(s == "Point { x: 10, y: 20 }")
 
-type Named = {
+type Named {
     name: str,
     value: i32,
 }

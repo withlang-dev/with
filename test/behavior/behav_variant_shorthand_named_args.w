@@ -1,7 +1,6 @@
 //! expect-stdout: ok
 
-type Status =
-    | Ok
+enum Status {  | Ok }
     | Warning(str)
     | Fatal(code: i32)
 

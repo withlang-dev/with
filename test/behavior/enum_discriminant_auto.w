@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 extern fn print(s: str) -> void
 
-type Status: i32 =
+enum Status: i32:
     Ready
     | Running
     | Done

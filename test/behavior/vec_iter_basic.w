@@ -2,7 +2,7 @@
 
 // Test: VecIter_i32 — manual iterator over Vec[i32] using raw data pointer.
 
-type VecIter_i32 = { data_ptr: i64, len: i64, idx: i64 }
+type VecIter_i32 { data_ptr: i64, len: i64, idx: i64 }
 
 extern fn with_ptr_get_i32(ptr: i64, index: i64) -> i32
 

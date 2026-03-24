@@ -1,5 +1,5 @@
 //! expect-stdout: 30
-type Vec2 = { x: i32, y: i32 }
+type Vec2 { x: i32, y: i32 }
 
 fn add_refs(a: &i32, b: &i32) -> i32: *a + *b
 

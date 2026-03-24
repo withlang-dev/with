@@ -1,5 +1,5 @@
 //! expect-stdout: ok
-type Pair = { a: i32, b: i64 }
+type Pair { a: i32, b: i64 }
 
 fn main:
     let x = Pair { a: 1, b: 100 }

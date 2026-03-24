@@ -2,7 +2,7 @@
 //
 // Provides deterministic 64-bit hash utilities for common scalar inputs.
 
-type Hasher = {
+type Hasher  {
     state: i64,
 }
 

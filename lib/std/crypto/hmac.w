@@ -3,7 +3,7 @@
 
 use std.crypto.sha256
 
-type HmacSha256 = {
+type HmacSha256  {
     inner: Sha256,
     outer_key: [u8; 64],
 }

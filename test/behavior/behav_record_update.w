@@ -2,7 +2,7 @@
 
 // Behavior test: record update syntax { expr with field: val }
 
-type Config = {
+type Config {
     width: i32,
     height: i32,
     depth: i32,

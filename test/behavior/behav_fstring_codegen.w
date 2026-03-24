@@ -36,7 +36,7 @@ fn test_fstring_int_coercion:
     assert(f"{y}" == "100")
 
 // BUG: test_fstring_float_coercion removed — float→str coercion through
-// MIR OP_CONCAT segfaults (pre-existing bug in mir_str_concat for floats).
+// MIR BinaryOp.OP_CONCAT segfaults (pre-existing bug in mir_str_concat for floats).
 // Direct extern fn with_fmt_f64(x) calls work fine.
 
 fn test_fstring_bool_coercion:

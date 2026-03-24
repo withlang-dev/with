@@ -3,7 +3,7 @@
 // Behavior test: references and borrowing
 // Tests: pass by reference, dereferencing, &x syntax
 
-type Point = { x: i32, y: i32 }
+type Point { x: i32, y: i32 }
 
 fn read_x(p: &Point) -> i32:
     p.x

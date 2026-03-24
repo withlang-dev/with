@@ -3,7 +3,7 @@ use Resolve
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_getenv_str(name: str) -> str
 
-type ProjectConfig = {
+type ProjectConfig {
     root_dir: str,
     manifest_path: str,
     c_import_include_paths: Vec[str],

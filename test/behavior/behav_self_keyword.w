@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-type Point = { x: i32, y: i32 }
+type Point { x: i32, y: i32 }
 
 fn Point.new(x: i32, y: i32) -> Self:
     Self { x: x, y: y }

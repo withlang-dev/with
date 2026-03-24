@@ -11,19 +11,19 @@ use AsyncMir
 use Diagnostic
 use Span
 
-type AsyncSnapshot = {
+type AsyncSnapshot {
     live_locals: i32,
     storage_dead: i32,
     drop_count: i32,
     resume_bb: i32,
 }
 
-type AsyncLowerResult = {
+type AsyncLowerResult {
     out_mod: AsyncMirModule,
     diags: DiagnosticList,
 }
 
-type AsyncLower = {
+type AsyncLower {
     mir_mod: MirModule,
     ast: AstPool,
     pool: InternPool,

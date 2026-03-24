@@ -3,7 +3,7 @@
 use compiler.foundation.Ids
 use compiler.foundation.Source
 
-type SourceMap = {
+type SourceMap {
     sources: Vec[Source],
     path_index: HashMap[str, i32],
     next_file_raw: i32,

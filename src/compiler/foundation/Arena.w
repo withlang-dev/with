@@ -9,13 +9,13 @@ fn ARENA_SLOT_EMPTY -> i32: 0
 fn ARENA_SLOT_I32 -> i32: 1
 fn ARENA_SLOT_STR -> i32: 2
 
-type ArenaSlot = {
+type ArenaSlot {
     kind: i32,
     int_value: i32,
     str_value: str,
 }
 
-type Arena = {
+type Arena {
     slots: Vec[ArenaSlot],
 }
 

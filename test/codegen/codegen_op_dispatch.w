@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-type Vec2 = { x: i32, y: i32 }
+type Vec2 { x: i32, y: i32 }
 
 fn Vec2.add(self: Vec2, other: Vec2) -> Vec2:
     Vec2 { x: self.x + other.x, y: self.y + other.y }

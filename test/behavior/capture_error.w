@@ -1,5 +1,5 @@
 //! expect-error: use of moved value
-type Resource = { id: i32 }
+type Resource { id: i32 }
 
 fn Resource.drop(self: Resource):
     0

@@ -7,9 +7,9 @@
 // - Result (hardcoded must_use) requires exhaustive match
 
 @[must_use]
-type Status = Ok | Err
+enum Status { Ok | Err }
 
-type Color = Red | Green | Blue
+enum Color { Red | Green | Blue }
 
 fn test_must_use_exhaustive_match:
     // Must-use type with exhaustive match (all variants covered) — ok

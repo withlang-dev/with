@@ -2,7 +2,7 @@
 
 // Behavior test: struct construction, field access, and record update
 
-type Point = {
+type Point {
     x: i32,
     y: i32,
 }

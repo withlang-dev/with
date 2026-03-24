@@ -1,10 +1,9 @@
 //! expect-stdout: ok
 
-type D =
-    | X
+enum D {  | X }
     | Y
 
-type S = {
+type S {
     d: D,
 }
 

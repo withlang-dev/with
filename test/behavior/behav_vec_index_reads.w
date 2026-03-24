@@ -1,8 +1,8 @@
 //! expect-stdout: ok
 
-type Kind = A | B
-type TaggedNode = { kind: Kind, x: i32 }
-type PlainNode = { op: i32, a: i32, b: i32 }
+enum Kind { A | B }
+type TaggedNode { kind: Kind, x: i32 }
+type PlainNode { op: i32, a: i32, b: i32 }
 
 fn first_nonzero_i32(xs: Vec[i32]) -> bool:
     if xs.len() == 0 as i64:

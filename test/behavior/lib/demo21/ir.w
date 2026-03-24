@@ -1,4 +1,4 @@
-pub type IRProgram = {
+pub type IRProgram {
     insts: Vec[i32],
     num_params: i32,
 }

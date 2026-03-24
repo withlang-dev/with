@@ -5,7 +5,7 @@
 // - Implementing Debug should work
 // - Generic function with trait bound should work
 
-type Point = { x: i32, y: i32 }
+type Point { x: i32, y: i32 }
 
 impl Eq for Point =
     fn eq(self: Point, other: Point) -> bool:

@@ -5,14 +5,14 @@
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_vec_push_i32(v: &Vec[i32], val: i32) -> void
 
-type Source = {
+type Source {
     path: str,
     text: str,
     line_offsets: Vec[i32],
     file_id: i32,
 }
 
-type SourceLocation = {
+type SourceLocation {
     line: i32, // 0-based
     col: i32, // 0-based byte column
 }

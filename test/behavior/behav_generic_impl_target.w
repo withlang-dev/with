@@ -4,7 +4,7 @@
 trait Describable =
     fn describe(self: Self) -> i32
 
-type Box = { value: i32 }
+type Box { value: i32 }
 
 impl Describable for Box =
     fn describe(self: Box) -> i32: self.value

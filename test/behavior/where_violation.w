@@ -4,7 +4,7 @@ extern fn print(s: str) -> void
 trait Printable =
     fn show(self: Self) -> str
 
-type Wrapper = { value: i32 }
+type Wrapper { value: i32 }
 
 // Wrapper does NOT impl Printable
 

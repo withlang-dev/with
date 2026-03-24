@@ -1,7 +1,7 @@
 //! expect-stdout: cleanupdone
 extern fn print(s: str) -> void
 
-type MyResult = Ok(i32) | Err(str)
+enum MyResult { Ok(i32) | Err(str) }
 
 fn step1() -> MyResult:
     .Ok(10)

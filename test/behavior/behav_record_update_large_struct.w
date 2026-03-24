@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-type LoopVars = {
+type LoopVars {
     v0: i32,
     v1: i32,
     v2: i32,

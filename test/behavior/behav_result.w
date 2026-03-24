@@ -3,7 +3,7 @@
 // Behavior test: Result type — Ok, Err, unwrap, is_ok, is_err
 // Exercises Result as a sum type with Ok/Err variants and the ?? default operator.
 
-type MyResult = Ok(i32) | Err(str)
+enum MyResult { Ok(i32) | Err(str) }
 
 fn divide(a: i32, b: i32) -> MyResult:
     if b == 0:

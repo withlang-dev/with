@@ -1,5 +1,5 @@
 //! expect-stdout: ok
-type Pair[T] = { first: T, second: T }
+type Pair[T] { first: T, second: T }
 
 fn sum_pair(p: Pair[i32]) -> i32: p.first + p.second
 

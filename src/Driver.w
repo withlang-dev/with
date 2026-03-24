@@ -24,7 +24,7 @@ const CR_BORROW_ERROR: i32 = 4
 const CR_CODEGEN_ERROR: i32 = 5
 const CR_LINK_ERROR: i32 = 6
 
-type Driver = {
+type Driver {
     comp: Compilation,
     mode: i32,
     source_path: str,

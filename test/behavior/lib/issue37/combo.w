@@ -1,6 +1,6 @@
 use issue37.core
 
-type State = {
+type State {
     values: Vec[Value],
 }
 

@@ -1,7 +1,7 @@
 // AES-128 block cipher
 // Standard byte-oriented with precomputed S-box.
 
-type Aes128 = {
+type Aes128  {
     round_keys: [u8; 176],  // 11 round keys x 16 bytes
 }
 

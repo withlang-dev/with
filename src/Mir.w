@@ -20,7 +20,7 @@ fn rbrace -> str:
 
 // ── Statement kinds ──────────────────────────────────────────────
 
-type StmtKind: i32 =
+enum StmtKind: i32:
     SK_ASSIGN = 0
     SK_STORAGE_LIVE = 1
     SK_STORAGE_DEAD = 2
@@ -29,7 +29,7 @@ type StmtKind: i32 =
 
 // ── Terminator kinds ─────────────────────────────────────────────
 
-type TermKind: i32 =
+enum TermKind: i32:
     TK_GOTO = 0
     TK_RETURN = 1
     TK_UNREACHABLE = 2
@@ -39,7 +39,7 @@ type TermKind: i32 =
 
 // ── Rvalue kinds ─────────────────────────────────────────────────
 
-type RvalueKind: i32 =
+enum RvalueKind: i32:
     RK_USE = 0
     RK_BIN_OP = 1
     RK_UN_OP = 2
@@ -52,14 +52,14 @@ type RvalueKind: i32 =
 
 // ── Operand kinds ────────────────────────────────────────────────
 
-type OperandKind: i32 =
+enum OperandKind: i32:
     OK_COPY = 0
     OK_MOVE = 1
     OK_CONSTANT = 2
 
 // ── Constant kinds ───────────────────────────────────────────────
 
-type ConstKind: i32 =
+enum ConstKind: i32:
     CK_INT = 0
     CK_BOOL = 1
     CK_STR = 2
@@ -74,64 +74,65 @@ type ConstKind: i32 =
 // operations. Both LLVM and C backends read these instead of
 // inferring builtin kind from method names at codegen time.
 
-const MIR_INTRINSIC_NONE: i32 = 0
-const MIR_INTRINSIC_VEC_NEW: i32 = 1
-const MIR_INTRINSIC_VEC_PUSH: i32 = 2
-const MIR_INTRINSIC_VEC_GET: i32 = 3
-const MIR_INTRINSIC_VEC_LEN: i32 = 4
-const MIR_INTRINSIC_VEC_SET: i32 = 5
-const MIR_INTRINSIC_VEC_REMOVE: i32 = 6
-const MIR_INTRINSIC_VEC_CLEAR: i32 = 7
-const MIR_INTRINSIC_VEC_POP: i32 = 8
-const MIR_INTRINSIC_MAP_NEW: i32 = 9
-const MIR_INTRINSIC_MAP_INSERT: i32 = 10
-const MIR_INTRINSIC_MAP_GET: i32 = 11
-const MIR_INTRINSIC_MAP_CONTAINS: i32 = 12
-const MIR_INTRINSIC_MAP_LEN: i32 = 13
-const MIR_INTRINSIC_MAP_REMOVE: i32 = 14
-const MIR_INTRINSIC_OPT_IS_SOME: i32 = 15
-const MIR_INTRINSIC_OPT_UNWRAP: i32 = 16
-const MIR_INTRINSIC_STR_LEN: i32 = 17
-const MIR_INTRINSIC_STR_BYTE_AT: i32 = 18
-const MIR_INTRINSIC_STR_SLICE: i32 = 19
-const MIR_INTRINSIC_STR_CONTAINS: i32 = 20
-const MIR_INTRINSIC_STR_STARTS_WITH: i32 = 21
-const MIR_INTRINSIC_STR_ENDS_WITH: i32 = 22
-const MIR_INTRINSIC_STR_FIND: i32 = 23
-const MIR_INTRINSIC_MAP_CLEAR: i32 = 24
-const MIR_INTRINSIC_VECITER_NEXT: i32 = 25
-const MIR_INTRINSIC_VEC_ITER: i32 = 26
-const MIR_INTRINSIC_OPT_IS_NONE: i32 = 27
-const MIR_INTRINSIC_STR_SPLIT: i32 = 28
-const MIR_INTRINSIC_STR_TRIM: i32 = 29
-const MIR_INTRINSIC_STR_TO_UPPER: i32 = 30
-const MIR_INTRINSIC_STR_TO_LOWER: i32 = 31
-const MIR_INTRINSIC_STR_REPLACE: i32 = 32
-const MIR_INTRINSIC_STR_INDEX_OF: i32 = 33
-const MIR_INTRINSIC_MAP_INCREMENT: i32 = 34
-const MIR_INTRINSIC_VEC_MAP: i32 = 35
-const MIR_INTRINSIC_VEC_FILTER: i32 = 36
-const MIR_INTRINSIC_VEC_FOLD: i32 = 37
-const MIR_INTRINSIC_VEC_CONTAINS: i32 = 38
-const MIR_INTRINSIC_STR_REPEAT: i32 = 39
-const MIR_INTRINSIC_ARR_LEN: i32 = 40
-const MIR_INTRINSIC_GENERIC_CALL: i32 = 41
-const MIR_INTRINSIC_VEC_JOIN: i32 = 42
-const MIR_INTRINSIC_DYN_VTABLE_CMP: i32 = 43
-const MIR_INTRINSIC_DYN_DOWNCAST: i32 = 44
-const MIR_INTRINSIC_OPT_FILTER: i32 = 45
-const MIR_INTRINSIC_ROTATE_LEFT: i32 = 46
-const MIR_INTRINSIC_ROTATE_RIGHT: i32 = 47
-const MIR_INTRINSIC_VEC_WITH_CAPACITY: i32 = 48
-const MIR_INTRINSIC_FMT_TO_STR: i32 = 49
-const MIR_INTRINSIC_FMT_DEBUG_STR: i32 = 50
-const MIR_INTRINSIC_FMT_DEBUG: i32 = 51
-const MIR_INTRINSIC_FMT_SPEC: i32 = 52
-const MIR_INTRINSIC_INT_SWAP_BYTES: i32 = 53
+enum MirIntrinsic: i32:
+    MIR_INTRINSIC_NONE = 0
+    MIR_INTRINSIC_VEC_NEW = 1
+    MIR_INTRINSIC_VEC_PUSH = 2
+    MIR_INTRINSIC_VEC_GET = 3
+    MIR_INTRINSIC_VEC_LEN = 4
+    MIR_INTRINSIC_VEC_SET = 5
+    MIR_INTRINSIC_VEC_REMOVE = 6
+    MIR_INTRINSIC_VEC_CLEAR = 7
+    MIR_INTRINSIC_VEC_POP = 8
+    MIR_INTRINSIC_MAP_NEW = 9
+    MIR_INTRINSIC_MAP_INSERT = 10
+    MIR_INTRINSIC_MAP_GET = 11
+    MIR_INTRINSIC_MAP_CONTAINS = 12
+    MIR_INTRINSIC_MAP_LEN = 13
+    MIR_INTRINSIC_MAP_REMOVE = 14
+    MIR_INTRINSIC_OPT_IS_SOME = 15
+    MIR_INTRINSIC_OPT_UNWRAP = 16
+    MIR_INTRINSIC_STR_LEN = 17
+    MIR_INTRINSIC_STR_BYTE_AT = 18
+    MIR_INTRINSIC_STR_SLICE = 19
+    MIR_INTRINSIC_STR_CONTAINS = 20
+    MIR_INTRINSIC_STR_STARTS_WITH = 21
+    MIR_INTRINSIC_STR_ENDS_WITH = 22
+    MIR_INTRINSIC_STR_FIND = 23
+    MIR_INTRINSIC_MAP_CLEAR = 24
+    MIR_INTRINSIC_VECITER_NEXT = 25
+    MIR_INTRINSIC_VEC_ITER = 26
+    MIR_INTRINSIC_OPT_IS_NONE = 27
+    MIR_INTRINSIC_STR_SPLIT = 28
+    MIR_INTRINSIC_STR_TRIM = 29
+    MIR_INTRINSIC_STR_TO_UPPER = 30
+    MIR_INTRINSIC_STR_TO_LOWER = 31
+    MIR_INTRINSIC_STR_REPLACE = 32
+    MIR_INTRINSIC_STR_INDEX_OF = 33
+    MIR_INTRINSIC_MAP_INCREMENT = 34
+    MIR_INTRINSIC_VEC_MAP = 35
+    MIR_INTRINSIC_VEC_FILTER = 36
+    MIR_INTRINSIC_VEC_FOLD = 37
+    MIR_INTRINSIC_VEC_CONTAINS = 38
+    MIR_INTRINSIC_STR_REPEAT = 39
+    MIR_INTRINSIC_ARR_LEN = 40
+    MIR_INTRINSIC_GENERIC_CALL = 41
+    MIR_INTRINSIC_VEC_JOIN = 42
+    MIR_INTRINSIC_DYN_VTABLE_CMP = 43
+    MIR_INTRINSIC_DYN_DOWNCAST = 44
+    MIR_INTRINSIC_OPT_FILTER = 45
+    MIR_INTRINSIC_ROTATE_LEFT = 46
+    MIR_INTRINSIC_ROTATE_RIGHT = 47
+    MIR_INTRINSIC_VEC_WITH_CAPACITY = 48
+    MIR_INTRINSIC_FMT_TO_STR = 49
+    MIR_INTRINSIC_FMT_DEBUG_STR = 50
+    MIR_INTRINSIC_FMT_DEBUG = 51
+    MIR_INTRINSIC_FMT_SPEC = 52
+    MIR_INTRINSIC_INT_SWAP_BYTES = 53
 
 // ── Projection kinds ─────────────────────────────────────────────
 
-type ProjKind: i32 =
+enum ProjKind: i32:
     PK_FIELD = 0
     PK_INDEX = 1
     PK_DEREF = 2
@@ -139,20 +140,20 @@ type ProjKind: i32 =
 
 // ── Drop kind tags for scope scheduling ──────────────────────────
 
-type DropKind: i32 =
+enum DropKind: i32:
     DK_VALUE = 0
     DK_STORAGE = 1
 
 // ── Data records ─────────────────────────────────────────────────
 
-type MirLocalInfo = {
+type MirLocalInfo {
     type_id: i32,
     is_mutable: i32,
     name_sym: i32,
     is_user_var: i32,
 }
 
-type MirBody = {
+type MirBody {
     fn_sym: i32,
     lowering_failed: i32,
 
@@ -227,7 +228,7 @@ type MirBody = {
     call_ast_nodes: Vec[i32],
 }
 
-type MirModule = {
+type MirModule {
     bodies: Vec[MirBody],
     body_fn_syms: Vec[i32],
     body_index_by_fn_sym: HashMap[i32, i32],
@@ -554,7 +555,7 @@ fn MirBody.new_call_args(self: &mut MirBody, operands: Vec[i32]) -> i32:
     let count = operands.len() as i32
     self.call_arg_starts.push(start)
     self.call_arg_counts.push(count)
-    self.call_intrinsic_kinds.push(MIR_INTRINSIC_NONE)
+    self.call_intrinsic_kinds.push(MirIntrinsic.MIR_INTRINSIC_NONE)
     self.call_ast_nodes.push(0)
     for i in 0..count:
         self.call_arg_operands.push(operands.get(i as i64))
@@ -566,7 +567,7 @@ fn MirBody.set_call_intrinsic(self: &mut MirBody, call_id: i32, kind: i32):
 
 fn MirBody.call_intrinsic(self: &MirBody, call_id: i32) -> i32:
     if call_id < 0 or call_id >= self.call_intrinsic_kinds.len() as i32:
-        return MIR_INTRINSIC_NONE
+        return MirIntrinsic.MIR_INTRINSIC_NONE
     self.call_intrinsic_kinds.get(call_id as i64)
 
 fn MirBody.set_call_ast_node(self: &mut MirBody, call_id: i32, node: i32):
@@ -986,40 +987,40 @@ fn mir_call_args_text(body: MirBody, args_id: i32, pool: InternPool, sema: Sema)
     out
 
 fn mir_binop_name(op: i32) -> str:
-    if op == OP_ADD: return "add"
-    if op == OP_SUB: return "sub"
-    if op == OP_MUL: return "mul"
-    if op == OP_DIV: return "div"
-    if op == OP_MOD: return "mod"
-    if op == OP_EQ: return "eq"
-    if op == OP_NEQ: return "neq"
-    if op == OP_LT: return "lt"
-    if op == OP_GT: return "gt"
-    if op == OP_LTE: return "lte"
-    if op == OP_GTE: return "gte"
-    if op == OP_AND: return "and"
-    if op == OP_OR: return "or"
-    if op == OP_BIT_AND: return "bit_and"
-    if op == OP_BIT_OR: return "bit_or"
-    if op == OP_BIT_XOR: return "bit_xor"
-    if op == OP_SHL: return "shl"
-    if op == OP_SHR: return "shr"
-    if op == OP_DEFAULT: return "default"
-    if op == OP_CONCAT: return "concat"
-    if op == OP_ADD_WRAP: return "add_wrap"
-    if op == OP_SUB_WRAP: return "sub_wrap"
-    if op == OP_MUL_WRAP: return "mul_wrap"
-    if op == OP_IN: return "in"
-    if op == OP_NOT_IN: return "not_in"
+    if op == BinaryOp.OP_ADD: return "add"
+    if op == BinaryOp.OP_SUB: return "sub"
+    if op == BinaryOp.OP_MUL: return "mul"
+    if op == BinaryOp.OP_DIV: return "div"
+    if op == BinaryOp.OP_MOD: return "mod"
+    if op == BinaryOp.OP_EQ: return "eq"
+    if op == BinaryOp.OP_NEQ: return "neq"
+    if op == BinaryOp.OP_LT: return "lt"
+    if op == BinaryOp.OP_GT: return "gt"
+    if op == BinaryOp.OP_LTE: return "lte"
+    if op == BinaryOp.OP_GTE: return "gte"
+    if op == BinaryOp.OP_AND: return "and"
+    if op == BinaryOp.OP_OR: return "or"
+    if op == BinaryOp.OP_BIT_AND: return "bit_and"
+    if op == BinaryOp.OP_BIT_OR: return "bit_or"
+    if op == BinaryOp.OP_BIT_XOR: return "bit_xor"
+    if op == BinaryOp.OP_SHL: return "shl"
+    if op == BinaryOp.OP_SHR: return "shr"
+    if op == BinaryOp.OP_DEFAULT: return "default"
+    if op == BinaryOp.OP_CONCAT: return "concat"
+    if op == BinaryOp.OP_ADD_WRAP: return "add_wrap"
+    if op == BinaryOp.OP_SUB_WRAP: return "sub_wrap"
+    if op == BinaryOp.OP_MUL_WRAP: return "mul_wrap"
+    if op == BinaryOp.OP_IN: return "in"
+    if op == BinaryOp.OP_NOT_IN: return "not_in"
     f"op{op}"
 
 fn mir_unop_name(op: i32) -> str:
-    if op == UOP_NEGATE: return "neg"
-    if op == UOP_NOT: return "not"
-    if op == UOP_REF: return "ref"
-    if op == UOP_MUT_REF: return "mut_ref"
-    if op == UOP_DEREF: return "deref"
-    if op == UOP_TRY: return "try"
+    if op == UnaryOp.UOP_NEGATE: return "neg"
+    if op == UnaryOp.UOP_NOT: return "not"
+    if op == UnaryOp.UOP_REF: return "ref"
+    if op == UnaryOp.UOP_MUT_REF: return "mut_ref"
+    if op == UnaryOp.UOP_DEREF: return "deref"
+    if op == UnaryOp.UOP_TRY: return "try"
     f"uop{op}"
 
 // ── MIR validation (Wave 10 backend contract) ───────────────────

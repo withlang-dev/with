@@ -4,7 +4,7 @@ use Lexer
 use Token
 
 fn main:
-    var lexer1 = Lexer.init("fn let with match for if else return break continue async await unsafe type trait impl use module pub extend var comptime gen in as mut then loop while ephemeral spawn defer error extern", 0)
+    var lexer1 = Lexer.init("fn let with match for if else return break continue async await unsafe type trait impl use module pub extend var comptime gen in as mut then loop while ephemeral spawn defer error extern enum", 0)
     let tokens1 = lexer1.tokenize()
     assert(tokens1.get_tag(0) == TK_KW_FN())
     assert(tokens1.get_tag(1) == TK_KW_LET())

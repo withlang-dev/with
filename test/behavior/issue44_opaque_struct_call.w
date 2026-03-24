@@ -2,13 +2,13 @@ use c_import("stdlib.h")
 
 type Handle = opaque
 
-type Holder = {
+type Holder {
     h: *mut Handle,
 }
 
 var G: *mut Handle = null
 
-type Raw = {
+type Raw {
     base: *mut c_void,
 }
 

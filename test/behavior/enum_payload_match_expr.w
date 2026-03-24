@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-type Val = Num(i32) | Empty
+enum Val { Num(i32) | Empty }
 
 fn main:
     // Match on enum with payload in expression position (was crashing due to

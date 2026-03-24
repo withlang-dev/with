@@ -32,7 +32,7 @@ fn zcu_debug_pool_flow_enabled() -> i32:
 //
 // This is the canonical per-compilation owner of interned semantic state,
 // diagnostics, and source/import context.
-type Zcu = {
+type Zcu {
     pool: InternPool,
     frontend_pool: InternPool,
     diagnostics: DiagnosticList,

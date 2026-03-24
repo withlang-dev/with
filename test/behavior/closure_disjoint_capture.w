@@ -1,5 +1,5 @@
 //! expect-stdout: 31
-type World = { x: i32, y: i32 }
+type World { x: i32, y: i32 }
 
 fn run_both(f: fn(i32) -> i32, g: fn(i32) -> i32) -> i32: f(0) + g(0)
 

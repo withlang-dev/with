@@ -8,7 +8,7 @@ fn VALUE_KEY_BOOL -> i32: 2
 fn VALUE_KEY_STRING -> i32: 3
 fn VALUE_KEY_TYPE_MARKER -> i32: 4
 
-type ValueKey = {
+type ValueKey {
     tag: i32,
     int_value: i32,
     text_value: str,

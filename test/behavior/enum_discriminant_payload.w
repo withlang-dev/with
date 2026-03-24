@@ -5,7 +5,7 @@
 extern fn print(s: str) -> void
 extern fn int_to_string(n: i32) -> str
 
-type Msg: i32 =
+enum Msg: i32:
     Quit = 0
     Move(i32, i32) = 1
     Write(str) = 2

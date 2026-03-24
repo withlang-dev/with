@@ -3,11 +3,11 @@
 // Tests: struct creation, field access, field mutation, nested structs,
 //        struct methods, struct as argument, struct return, default-like patterns
 
-type Point = { x: i32, y: i32 }
+type Point { x: i32, y: i32 }
 
-type Rect = { origin: Point, size: Point }
+type Rect { origin: Point, size: Point }
 
-type Color3 = { r: f32, g: f32, b: f32 }
+type Color3 { r: f32, g: f32, b: f32 }
 
 fn test_struct_create_and_access:
     let p = Point { x: 10, y: 20 }
@@ -79,7 +79,7 @@ fn test_struct_with_floats:
     assert(c.r as i32 == 1)
     assert(c.b as i32 == 0)
 
-type Counter = { value: i32 }
+type Counter { value: i32 }
 
 fn counter_inc(c: *mut Counter):
     unsafe: (*c).value = (*c).value + 1
@@ -91,7 +91,7 @@ fn test_struct_pointer:
     counter_inc(&mut c)
     assert(c.value == 3)
 
-type Pair = { first: i32, second: i32 }
+type Pair { first: i32, second: i32 }
 
 fn swap_pair(p: Pair) -> Pair:
     Pair { first: p.second, second: p.first }
@@ -102,7 +102,7 @@ fn test_struct_swap:
     assert(q.first == 20)
     assert(q.second == 10)
 
-type Mixed = { a: i32, b: f64, c: bool }
+type Mixed { a: i32, b: f64, c: bool }
 
 fn test_struct_mixed_types:
     let m = Mixed { a: 42, b: 3.14, c: true }

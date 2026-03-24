@@ -4,4 +4,4 @@
 // the lowering/runtime behavior for option methods and constructors; this
 // module provides the user-facing type name so it resolves by import.
 
-type Option[T] = | Some(T) | None
+enum Option[T] { Some(T) | None }

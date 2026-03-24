@@ -9,7 +9,7 @@ use InternPool
 use Parser
 use Diagnostic
 
-type ParseResult = {
+type ParseResult {
     pool: AstPool,
     intern: InternPool,
     diagnostics: DiagnosticList,

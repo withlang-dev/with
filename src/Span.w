@@ -4,7 +4,7 @@
 
 type FileId = i32
 
-type Span = {
+type Span {
     file: FileId,
     start: i32,
     end: i32,

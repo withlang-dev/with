@@ -3,7 +3,7 @@
 
 use std.crypto.endian
 
-type Poly1305 = {
+type Poly1305  {
     r: [u32; 5],
     h: [u32; 5],
     pad: [u32; 4],

@@ -4,11 +4,11 @@
 
 use std.mem
 
-type Arena = {
+type Arena  {
     block_size: i32
 }
 
-type Pool = {
+type Pool  {
     item_size: i32,
     capacity: i32
 }

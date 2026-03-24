@@ -5,7 +5,7 @@ extern fn print(s: str) -> void
 trait Shape =
     fn area(self: Self) -> i32
 
-type Circle = { radius: i32 }
+type Circle { radius: i32 }
 
 impl Shape for Circle =
     fn area(self: Circle) -> i32:

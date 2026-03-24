@@ -1,5 +1,5 @@
 //! expect-stdout: blue=other yellow=other
-type Color = Red | Green | Blue | Yellow
+enum Color { Red | Green | Blue | Yellow }
 
 fn describe(c: Color) -> str:
     match c

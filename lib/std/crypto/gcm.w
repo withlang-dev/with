@@ -4,7 +4,7 @@
 use std.crypto.aes
 use std.crypto.endian
 
-type AesGcm = {
+type AesGcm  {
     aes: Aes128,
     h: [u8; 16],
     j0: [u8; 16],

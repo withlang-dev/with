@@ -1,6 +1,6 @@
 use demo.core
 
-type Pair = {
+type Pair {
     device: Device,
 }
 

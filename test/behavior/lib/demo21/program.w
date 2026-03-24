@@ -1,10 +1,10 @@
 use demo21.ir
 
-pub type ConstantDesc = {
+pub type ConstantDesc {
     name: str,
 }
 
-pub type ProgramSource = {
+pub type ProgramSource {
     ir: IRProgram,
     ir_text: str,
     entry: str,

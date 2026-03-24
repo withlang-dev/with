@@ -1,4 +1,4 @@
-type Shape = {
+type Shape {
     width: usize,
     offset: isize,
 }

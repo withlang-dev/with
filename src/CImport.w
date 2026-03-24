@@ -264,8 +264,8 @@ fn process_c_import(header_spec: str) -> str:
 
     // Emit Complex32/Complex64 for _Complex float/double
     if with_cimport_is_name_emitted("Complex32") == 0:
-        output = output ++ "type Complex32 = \{ real: f32, imag: f32 }\n"
-        output = output ++ "type Complex64 = \{ real: f64, imag: f64 }\n"
+        output = output ++ "type Complex32 \{ real: f32, imag: f32 }\n"
+        output = output ++ "type Complex64 \{ real: f64, imag: f64 }\n"
         with_cimport_mark_name_emitted("Complex32")
         with_cimport_mark_name_emitted("Complex64")
 
@@ -961,8 +961,8 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         with_cimport_mark_name_emitted(name)
         let safe_name = ci_escape_reserved(name)
         if is_union:
-            return "// union\ntype " ++ safe_name ++ " = \{ __pad0: u8 = 0 }\n"
-        return "type " ++ safe_name ++ " = \{ __pad0: u8 = 0 }\n"
+            return "// union\ntype " ++ safe_name ++ " \{ __pad0: u8 = 0 }\n"
+        return "type " ++ safe_name ++ " \{ __pad0: u8 = 0 }\n"
 
     with_cimport_mark_name_emitted(name)
     let safe_name = ci_escape_reserved(name)
@@ -991,7 +991,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
                     sfi = sfi + 1
                 if anon_kind == 2:
                     anon_decls = anon_decls ++ "// union\n"
-                anon_decls = anon_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " = \{ " ++ sub_fields ++ " }\n"
+                anon_decls = anon_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " \{ " ++ sub_fields ++ " }\n"
                 with_cimport_mark_name_emitted(synth_name)
             anon_idx = anon_idx + 1
         afi = afi + 1
@@ -1040,7 +1040,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
 
     let packed_prefix = if is_really_packed: "@[packed]\n" else: ""
     let part1 = "type " ++ safe_name
-    let part2 = part1 ++ " = \{ "
+    let part2 = part1 ++ " \{ "
     let part3 = part2 ++ field_str
     let decl = part3 ++ " }\n"
     if is_union:
@@ -1343,7 +1343,7 @@ fn ci_translate_typedef(session: i64, idx: i32, translated_structs: str) -> str:
             afi = afi + 1
         with_cimport_mark_name_emitted(name)
         let union_prefix = if with_cimport_typedef_anon_is_union(session, idx) != 0: "// union\n" else: ""
-        return union_prefix ++ "type " ++ anon_safe_name ++ " = \{ " ++ fields ++ " }\n"
+        return union_prefix ++ "type " ++ anon_safe_name ++ " \{ " ++ fields ++ " }\n"
 
     // Use the recursive type translator for the underlying type
     let translated = with_cimport_typedef_underlying_translated(session, idx)

@@ -5,8 +5,8 @@
 trait HasValue =
     fn value(self: Self) -> i32
 
-type Box = { val: i32 }
-type Pair = { a: i32, b: i32 }
+type Box { val: i32 }
+type Pair { a: i32, b: i32 }
 
 impl HasValue for Box =
     fn value(self: Box) -> i32:

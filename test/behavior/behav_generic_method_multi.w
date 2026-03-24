@@ -1,5 +1,5 @@
 //! expect-stdout: ok
-type Cell[T] = { value: T }
+type Cell[T] { value: T }
 
 fn Cell.get(self: Cell[T]) -> T: self.value
 

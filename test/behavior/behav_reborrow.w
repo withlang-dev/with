@@ -2,7 +2,7 @@
 
 // Tests: exclusive-to-exclusive reborrowing (&mut self → helper taking &mut Self)
 
-type State = {
+type State {
     val: i32,
     count: i32,
 }
