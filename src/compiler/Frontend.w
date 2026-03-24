@@ -75,13 +75,13 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
             continue
         let sub_kind = type_decl_sub_kind(pool.get_data2(decl))
         var kind_name = "alias"
-        if sub_kind == TDK_STRUCT:
+        if sub_kind == TypeDeclKind.TDK_STRUCT:
             kind_name = "struct"
-        else if sub_kind == TDK_ENUM:
+        else if sub_kind == TypeDeclKind.TDK_ENUM:
             kind_name = "enum"
-        else if sub_kind == TDK_DISC_ENUM:
+        else if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
             kind_name = "disc_enum"
-        else if sub_kind == TDK_DISTINCT:
+        else if sub_kind == TypeDeclKind.TDK_DISTINCT:
             kind_name = "distinct"
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)
