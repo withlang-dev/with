@@ -323,6 +323,20 @@ type AstPool = {
     // Impl trait type args: [impl_node, args_start, args_count]* for impl Trait[T1, T2] for Type
     impl_trait_type_args: Vec[i32],
 
+    // O(1) lookup maps for metadata (populated on add, queried on find)
+    fn_meta_map: HashMap[i32, i32],
+    type_meta_map: HashMap[i32, i32],
+    where_meta_map: HashMap[i32, i32],
+    impl_type_params_map: HashMap[i32, i32],
+    impl_target_type_nodes_map: HashMap[i32, i32],
+    impl_trait_type_args_map: HashMap[i32, i32],
+    fn_param_pattern_meta_map: HashMap[i32, i32],
+    for_meta_map: HashMap[i32, i32],
+    must_use_type_set: HashMap[i32, i32],
+    sealed_trait_set: HashMap[i32, i32],
+    move_closure_set: HashMap[i32, i32],
+    non_escaping_closure_set: HashMap[i32, i32],
+
     // Frozen flag: set to 1 after construction completes.
     // When frozen, mutation methods (add_node, add_extra, etc.) will error.
     frozen: i32,
@@ -355,6 +369,18 @@ fn AstPool.new -> AstPool:
         impl_type_params: Vec.new(),
         impl_target_type_nodes: Vec.new(),
         impl_trait_type_args: Vec.new(),
+        fn_meta_map: HashMap.new(),
+        type_meta_map: HashMap.new(),
+        where_meta_map: HashMap.new(),
+        impl_type_params_map: HashMap.new(),
+        impl_target_type_nodes_map: HashMap.new(),
+        impl_trait_type_args_map: HashMap.new(),
+        fn_param_pattern_meta_map: HashMap.new(),
+        for_meta_map: HashMap.new(),
+        must_use_type_set: HashMap.new(),
+        sealed_trait_set: HashMap.new(),
+        move_closure_set: HashMap.new(),
+        non_escaping_closure_set: HashMap.new(),
         frozen: 0,
     }
     // Reserve node 0 as null sentinel
@@ -497,6 +523,7 @@ fn AstPool.set_end(self: &mut AstPool, idx: i32, val: i32):
 
 // Store fn decl metadata: [node, flags, ret_type, param_start, param_count, tp_start, tp_count]
 fn AstPool.add_fn_meta(self: &mut AstPool, node: i32, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):
+    let idx = self.fn_meta.len() as i32
     self.fn_meta.push(node)
     self.fn_meta.push(flags)
     self.fn_meta.push(ret)
@@ -504,14 +531,13 @@ fn AstPool.add_fn_meta(self: &mut AstPool, node: i32, flags: i32, ret: i32, ps: 
     self.fn_meta.push(pc)
     self.fn_meta.push(ts)
     self.fn_meta.push(tc)
+    self.fn_meta_map.insert(node, idx)
 
 // Get fn metadata for a given fn decl node. Returns 7-int record start or -1.
 fn AstPool.find_fn_meta(self: &AstPool, node: i32) -> i32:
-    var i = 0
-    while i < self.fn_meta.len() as i32:
-        if self.fn_meta.get(i as i64) == node:
-            return i
-        i = i + 7
+    let opt = self.fn_meta_map.get(node)
+    if opt.is_some():
+        return opt.unwrap()
     0 - 1
 
 fn AstPool.fn_meta_flags(self: &AstPool, meta: i32) -> i32:
@@ -542,16 +568,16 @@ fn AstPool.fn_param_flags(self: &AstPool, param_start: i32, param_idx: i32) -> i
     self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 2)
 
 fn AstPool.add_type_meta(self: &mut AstPool, node: i32, derive_start: i32, derive_count: i32):
+    let idx = self.type_meta.len() as i32
     self.type_meta.push(node)
     self.type_meta.push(derive_start)
     self.type_meta.push(derive_count)
+    self.type_meta_map.insert(node, idx)
 
 fn AstPool.find_type_meta(self: &AstPool, node: i32) -> i32:
-    var i = 0
-    while i < self.type_meta.len() as i32:
-        if self.type_meta.get(i as i64) == node:
-            return i
-        i = i + 3
+    let opt = self.type_meta_map.get(node)
+    if opt.is_some():
+        return opt.unwrap()
     0 - 1
 
 fn AstPool.type_meta_derive_start(self: &AstPool, meta: i32) -> i32:
@@ -562,79 +588,71 @@ fn AstPool.type_meta_derive_count(self: &AstPool, meta: i32) -> i32:
 
 fn AstPool.mark_must_use_type(self: &mut AstPool, node: i32):
     self.must_use_type_nodes.push(node)
+    self.must_use_type_set.insert(node, 1)
 
 fn AstPool.is_must_use_type_node(self: &AstPool, node: i32) -> i32:
-    var i = 0
-    while i < self.must_use_type_nodes.len() as i32:
-        if self.must_use_type_nodes.get(i as i64) == node:
-            return 1
-        i = i + 1
+    if self.must_use_type_set.contains(node): return 1
     0
 
 fn AstPool.mark_sealed_trait(self: &mut AstPool, node: i32):
     self.sealed_trait_nodes.push(node)
+    self.sealed_trait_set.insert(node, 1)
 
 fn AstPool.is_sealed_trait_node(self: &AstPool, node: i32) -> i32:
-    var i = 0
-    while i < self.sealed_trait_nodes.len() as i32:
-        if self.sealed_trait_nodes.get(i as i64) == node:
-            return 1
-        i = i + 1
+    if self.sealed_trait_set.contains(node): return 1
     0
 
 fn AstPool.mark_move_closure(self: &mut AstPool, node: i32):
     self.move_closure_nodes.push(node)
+    self.move_closure_set.insert(node, 1)
 
 fn AstPool.is_move_closure(self: &AstPool, node: i32) -> i32:
-    var i = 0
-    while i < self.move_closure_nodes.len() as i32:
-        if self.move_closure_nodes.get(i as i64) == node:
-            return 1
-        i = i + 1
+    if self.move_closure_set.contains(node): return 1
     0
 
 fn AstPool.mark_non_escaping_closure(self: &mut AstPool, node: i32):
     self.non_escaping_closure_nodes.push(node)
+    self.non_escaping_closure_set.insert(node, 1)
 
 fn AstPool.is_non_escaping_closure(self: &AstPool, node: i32) -> i32:
-    var i = 0
-    while i < self.non_escaping_closure_nodes.len() as i32:
-        if self.non_escaping_closure_nodes.get(i as i64) == node:
-            return 1
-        i = i + 1
+    if self.non_escaping_closure_set.contains(node): return 1
     0
 
 fn AstPool.add_where_meta(self: &mut AstPool, fn_node: i32, extra_start: i32, clause_count: i32):
+    let idx = self.where_meta.len() as i32
     self.where_meta.push(fn_node)
     self.where_meta.push(extra_start)
     self.where_meta.push(clause_count)
+    self.where_meta_map.insert(fn_node, idx)
 
 fn AstPool.find_where_meta(self: &AstPool, fn_node: i32) -> i32:
-    var i = 0
-    while i < self.where_meta.len() as i32:
-        if self.where_meta.get(i as i64) == fn_node:
-            return i
-        i = i + 3
+    let opt = self.where_meta_map.get(fn_node)
+    if opt.is_some():
+        return opt.unwrap()
     0 - 1
 
 fn AstPool.add_impl_type_params(self: &mut AstPool, impl_node: i32, tp_start: i32, tp_count: i32):
+    let idx = self.impl_type_params.len() as i32
     self.impl_type_params.push(impl_node)
     self.impl_type_params.push(tp_start)
     self.impl_type_params.push(tp_count)
+    self.impl_type_params_map.insert(impl_node, idx)
 
 fn AstPool.find_impl_type_params(self: &AstPool, impl_node: i32) -> i32:
-    var i = 0
-    while i < self.impl_type_params.len() as i32:
-        if self.impl_type_params.get(i as i64) == impl_node:
-            return i
-        i = i + 3
+    let opt = self.impl_type_params_map.get(impl_node)
+    if opt.is_some():
+        return opt.unwrap()
     0 - 1
 
 fn AstPool.add_impl_target_type_node(self: &mut AstPool, impl_node: i32, type_node: i32):
     self.impl_target_type_nodes.push(impl_node)
     self.impl_target_type_nodes.push(type_node)
+    self.impl_target_type_nodes_map.insert(impl_node, type_node)
 
 fn AstPool.find_impl_target_type_node(self: &AstPool, impl_node: i32) -> i32:
+    let opt = self.impl_target_type_nodes_map.get(impl_node)
+    if opt.is_some():
+        return opt.unwrap()
     var i = 0
     while i < self.impl_target_type_nodes.len() as i32:
         if self.impl_target_type_nodes.get(i as i64) == impl_node:
@@ -643,16 +661,16 @@ fn AstPool.find_impl_target_type_node(self: &AstPool, impl_node: i32) -> i32:
     0
 
 fn AstPool.add_impl_trait_type_args(self: &mut AstPool, impl_node: i32, args_start: i32, args_count: i32):
+    let idx = self.impl_trait_type_args.len() as i32
     self.impl_trait_type_args.push(impl_node)
     self.impl_trait_type_args.push(args_start)
     self.impl_trait_type_args.push(args_count)
+    self.impl_trait_type_args_map.insert(impl_node, idx)
 
 fn AstPool.find_impl_trait_type_args(self: &AstPool, impl_node: i32) -> i32:
-    var i = 0
-    while i < self.impl_trait_type_args.len() as i32:
-        if self.impl_trait_type_args.get(i as i64) == impl_node:
-            return i
-        i = i + 3
+    let opt = self.impl_trait_type_args_map.get(impl_node)
+    if opt.is_some():
+        return opt.unwrap()
     0 - 1
 
 fn AstPool.fn_param_patterns_len(self: &AstPool) -> i32:
@@ -665,16 +683,16 @@ fn AstPool.fn_param_pattern_value(self: &AstPool, idx: i32) -> i32:
     self.fn_param_patterns.get(idx as i64)
 
 fn AstPool.add_fn_param_pattern_meta(self: &mut AstPool, node: i32, start: i32, count: i32):
+    let idx = self.fn_param_pattern_meta.len() as i32
     self.fn_param_pattern_meta.push(node)
     self.fn_param_pattern_meta.push(start)
     self.fn_param_pattern_meta.push(count)
+    self.fn_param_pattern_meta_map.insert(node, idx)
 
 fn AstPool.find_fn_param_pattern_meta(self: &AstPool, node: i32) -> i32:
-    var i = 0
-    while i < self.fn_param_pattern_meta.len() as i32:
-        if self.fn_param_pattern_meta.get(i as i64) == node:
-            return i
-        i = i + 3
+    let opt = self.fn_param_pattern_meta_map.get(node)
+    if opt.is_some():
+        return opt.unwrap()
     0 - 1
 
 fn AstPool.fn_param_pattern_meta_start(self: &AstPool, meta: i32) -> i32:
@@ -684,16 +702,16 @@ fn AstPool.fn_param_pattern_meta_count(self: &AstPool, meta: i32) -> i32:
     self.fn_param_pattern_meta.get((meta + 2) as i64)
 
 fn AstPool.add_for_meta(self: &mut AstPool, node: i32, index_binding: i32, label: i32):
+    let idx = self.for_meta.len() as i32
     self.for_meta.push(node)
     self.for_meta.push(index_binding)
     self.for_meta.push(label)
+    self.for_meta_map.insert(node, idx)
 
 fn AstPool.find_for_meta(self: &AstPool, node: i32) -> i32:
-    var i = 0
-    while i < self.for_meta.len() as i32:
-        if self.for_meta.get(i as i64) == node:
-            return i
-        i = i + 3
+    let opt = self.for_meta_map.get(node)
+    if opt.is_some():
+        return opt.unwrap()
     0 - 1
 
 fn AstPool.for_meta_index_binding(self: &AstPool, meta: i32) -> i32:
