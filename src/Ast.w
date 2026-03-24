@@ -229,21 +229,21 @@ enum UnaryOp: i32:
 
 // Literal suffix metadata (stored out-of-line in AstPool.literal_suffixes)
 enum LiteralSuffix: i32:
-    LIT_SUFFIX_NONE = 0
-    LIT_SUFFIX_I8 = 1
-    LIT_SUFFIX_I16 = 2
-    LIT_SUFFIX_I32 = 3
-    LIT_SUFFIX_I64 = 4
-    LIT_SUFFIX_I128 = 5
-    LIT_SUFFIX_ISIZE = 6
-    LIT_SUFFIX_U8 = 7
-    LIT_SUFFIX_U16 = 8
-    LIT_SUFFIX_U32 = 9
-    LIT_SUFFIX_U64 = 10
-    LIT_SUFFIX_U128 = 11
-    LIT_SUFFIX_USIZE = 12
-    LIT_SUFFIX_F32 = 13
-    LIT_SUFFIX_F64 = 14
+    None = 0
+    I8 = 1
+    I16 = 2
+    I32 = 3
+    I64 = 4
+    I128 = 5
+    Isize = 6
+    U8 = 7
+    U16 = 8
+    U32 = 9
+    U64 = 10
+    U128 = 11
+    Usize = 12
+    F32 = 13
+    F64 = 14
 
 // F-string segment kinds (stored in extra_data)
 enum FStringSegmentKind: i32:
@@ -402,7 +402,7 @@ fn AstPool.new -> AstPool:
     pool.data0.push(0)
     pool.data1.push(0)
     pool.data2.push(0)
-    pool.literal_suffixes.push(LiteralSuffix.LIT_SUFFIX_NONE)
+    pool.literal_suffixes.push(LiteralSuffix.None)
     pool
 
 // Mark the pool as immutable. Any subsequent mutation will print an error.
@@ -420,7 +420,7 @@ fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32
     self.data0.push(d0)
     self.data1.push(d1)
     self.data2.push(d2)
-    self.literal_suffixes.push(LiteralSuffix.LIT_SUFFIX_NONE)
+    self.literal_suffixes.push(LiteralSuffix.None)
     idx
 
 // Add extra data, returns the index in the extra array.
