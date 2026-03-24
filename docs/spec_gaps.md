@@ -192,20 +192,20 @@ rotate instructions on all modern architectures.
 **Spec change:** §4.1 add rotate methods on integer types.
 ~5 lines of spec, ~20 lines of codegen (emit llvm.fshl/fshr).
 
-## Summary — Priority Order
+## Summary — Implementation Status
 
-| # | Feature | Impact | Effort |
-|---|---------|--------|--------|
-| 1 | `unsafe fn` | Every systems function | 20 lines |
-| 2 | Compound wrapping assign | Every crypto function | 15 lines |
-| 3 | Auto-deref pointer fields | Every pointer-heavy function | 15 lines |
-| 4 | Byte-order builtins | Every crypto + network module | 60 lines |
-| 5 | Borrow checker reborrowing | Correct &mut method patterns | 50 lines |
-| 6 | Rotate intrinsic | Crypto performance | 20 lines |
+| # | Feature | Status |
+|---|---------|--------|
+| 1 | `unsafe fn` | **Done** — Parser wraps body in NK_UNSAFE_BLOCK |
+| 2 | Compound wrapping assign (`+%=`) | **Done** — Lexer, Parser, Codegen |
+| 3 | Auto-deref pointer fields | **Done** — Sema auto-derefs TY_PTR/TY_REF in check_field_access |
+| 4 | Byte-order builtins | **Done** — `lib/std/crypto/endian.w` has all functions; `swap_bytes()` intrinsic on integer types emits `@llvm.bswap` |
+| 5 | Borrow checker reborrowing | **Done** — Exclusive-to-exclusive reborrowing works (Sema check_borrow_create) |
+| 6 | Rotate intrinsic | **Done** — `rotate_left`/`rotate_right` methods with MIR intrinsics |
 
-Items 1-3 are the highest priority. They affect every line of
-systems code. Items 4 and 6 are crypto-specific but trivial to
-add. Item 5 is the most architecturally significant change.
+All 6 gaps are resolved. Static method syntax for byte-order
+(`u32.from_be(buf, off)`) is deferred — free functions
+(`u32_from_be(buf, off)`) are used instead.
 
 ## What SHA-256 Should Look Like
 
