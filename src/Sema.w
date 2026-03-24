@@ -1312,7 +1312,7 @@ fn Sema.is_opaque_value_type(self: Sema, tid: i32) -> i32:
     let decl = self.type_decl_nodes.get(name_sym).unwrap()
     if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
         return 0
-    if type_decl_sub_kind(self.ast.get_data2(decl)) == TypeDeclKind.TDK_OPAQUE:
+    if type_decl_sub_kind(self.ast.get_data2(decl)) == TypeDeclKind.Opaque:
         return 1
     0
 
@@ -1620,7 +1620,7 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
     let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
     let resolved = self.resolve_alias(tid)
 
-    if sub_kind == TypeDeclKind.TDK_STRUCT or sub_kind == TypeDeclKind.TDK_UNION:
+    if sub_kind == TypeDeclKind.Struct or sub_kind == TypeDeclKind.Union:
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return
         let te_start = self.get_type_d1(resolved)
@@ -1638,7 +1638,7 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
                 self.type_extra.set_i32(field_slot as i64, field_tid)
         return
 
-    if sub_kind == TypeDeclKind.TDK_ENUM:
+    if sub_kind == TypeDeclKind.Enum:
         if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
             return
         let te_start = self.get_type_d1(resolved)
@@ -1663,7 +1663,7 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
             type_pos = type_pos + payload_count
         return
 
-    if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
+    if sub_kind == TypeDeclKind.DiscEnum:
         if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
             return
         let repr_type_node = self.ast.get_extra(extra_start)
@@ -1694,7 +1694,7 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
             type_pos = type_pos + payload_count
         return
 
-    if sub_kind == TypeDeclKind.TDK_ALIAS:
+    if sub_kind == TypeDeclKind.Alias:
         if self.get_type_d0(tid) != 0:
             return
         let aliased_node = self.ast.get_extra(extra_start)
@@ -1703,7 +1703,7 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
             self.type_d0.set_i32(tid as i64, target_tid)
         return
 
-    if sub_kind == TypeDeclKind.TDK_DISTINCT:
+    if sub_kind == TypeDeclKind.Distinct:
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return
         let te_start = self.get_type_d1(resolved)
@@ -1776,16 +1776,16 @@ fn Sema.build_ci_scoping(self: Sema):
         if kind == NodeKind.NK_TYPE_DECL:
             let packed_kind = self.ast.get_data2(decl)
             let sub_kind = type_decl_sub_kind(packed_kind)
-            if sub_kind == TypeDeclKind.TDK_ENUM or sub_kind == TypeDeclKind.TDK_DISC_ENUM:
+            if sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum:
                 let extra_start = self.ast.get_data1(decl)
-                var pos = if sub_kind == TypeDeclKind.TDK_DISC_ENUM: extra_start + 1 else: extra_start
+                var pos = if sub_kind == TypeDeclKind.DiscEnum: extra_start + 1 else: extra_start
                 let variant_count = self.ast.get_extra(pos)
                 pos = pos + 1
                 for vi in 0..variant_count:
                     let v_sym = self.ast.get_extra(pos)
                     self.ci_syms.insert(v_sym, 1)
                     pos = pos + 1
-                    if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
+                    if sub_kind == TypeDeclKind.DiscEnum:
                         pos = pos + 1
                     let payload_count = self.ast.get_extra(pos)
                     pos = pos + 1 + payload_count
@@ -1852,7 +1852,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
     let sub_kind = type_decl_sub_kind(packed_kind)
     let is_ephemeral = type_decl_is_ephemeral(packed_kind)
 
-    if sub_kind == TypeDeclKind.TDK_STRUCT:
+    if sub_kind == TypeDeclKind.Struct:
         let field_count = self.ast.get_extra(extra_start)
         // Resolve all field types first — resolve_type_expr can push to type_extra
         // (e.g. for generic instances), so we must capture te_start AFTER resolving.
@@ -1892,7 +1892,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
         self.named_types.insert(name, tid)
 
-    if sub_kind == TypeDeclKind.TDK_ENUM:
+    if sub_kind == TypeDeclKind.Enum:
         let variant_count = self.ast.get_extra(extra_start)
         let te_start = self.type_extra.len() as i32
         var epos = extra_start + 1
@@ -1923,7 +1923,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             let pc = self.type_extra.get((vpos + 1) as i64)
             vpos = vpos + 2 + pc
 
-    if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
+    if sub_kind == TypeDeclKind.DiscEnum:
         let repr_type_node = self.ast.get_extra(extra_start)
         let repr_type_tid = self.resolve_type_expr(repr_type_node)
         let variant_count = self.ast.get_extra(extra_start + 1)
@@ -1983,13 +1983,13 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             let pc = self.type_extra.get((vpos + 1) as i64)
             vpos = vpos + 2 + pc
 
-    if sub_kind == TypeDeclKind.TDK_ALIAS:
+    if sub_kind == TypeDeclKind.Alias:
         let aliased_node = self.ast.get_extra(extra_start)
         let target = self.resolve_type_expr(aliased_node)
         let tid = self.add_type(TypeKind.TY_ALIAS, target, 0, 0)
         self.named_types.insert(name, tid)
 
-    if sub_kind == TypeDeclKind.TDK_DISTINCT:
+    if sub_kind == TypeDeclKind.Distinct:
         let inner_node = self.ast.get_extra(extra_start)
         let inner = self.resolve_type_expr(inner_node)
         if self.is_opaque_value_type(inner) != 0:
@@ -2004,13 +2004,13 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         self.named_types.insert(name, tid)
         self.distinct_type_names.insert(name, tid)
 
-    if sub_kind == TypeDeclKind.TDK_OPAQUE:
+    if sub_kind == TypeDeclKind.Opaque:
         // Opaque type: register as struct with 0 fields
         let te_start = self.type_extra.len() as i32
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, 0)
         self.named_types.insert(name, tid)
 
-    if sub_kind == TypeDeclKind.TDK_UNION:
+    if sub_kind == TypeDeclKind.Union:
         // Union type: register fields like a struct (codegen handles layout)
         let field_count = self.ast.get_extra(extra_start)
         let field_names: Vec[i32] = Vec.new()
@@ -2121,7 +2121,7 @@ fn Sema.check_type_cycles(self: Sema):
         let packed_kind = self.ast.get_data2(decl)
         let sub_kind = type_decl_sub_kind(packed_kind)
 
-        if sub_kind == TypeDeclKind.TDK_STRUCT:
+        if sub_kind == TypeDeclKind.Struct:
             let field_count = self.ast.get_extra(extra_start)
             for fi in 0..field_count:
                 let base = extra_start + 1 + fi * 3
@@ -2134,13 +2134,13 @@ fn Sema.check_type_cycles(self: Sema):
                     edge_to.push(self.cycle_dep_syms.get(di2 as i64))
                     edge_node.push(self.cycle_dep_nodes.get(di2 as i64))
 
-        if sub_kind == TypeDeclKind.TDK_ENUM or sub_kind == TypeDeclKind.TDK_DISC_ENUM:
-            let variant_start = if sub_kind == TypeDeclKind.TDK_DISC_ENUM: extra_start + 2 else: extra_start + 1
-            let variant_count = if sub_kind == TypeDeclKind.TDK_DISC_ENUM: self.ast.get_extra(extra_start + 1) else: self.ast.get_extra(extra_start)
+        if sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum:
+            let variant_start = if sub_kind == TypeDeclKind.DiscEnum: extra_start + 2 else: extra_start + 1
+            let variant_count = if sub_kind == TypeDeclKind.DiscEnum: self.ast.get_extra(extra_start + 1) else: self.ast.get_extra(extra_start)
             var epos = variant_start
             for vi in 0..variant_count:
                 epos = epos + 1  // v_name
-                if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
+                if sub_kind == TypeDeclKind.DiscEnum:
                     epos = epos + 1  // disc_value
                 let payload_count = self.ast.get_extra(epos)
                 epos = epos + 1
@@ -2155,7 +2155,7 @@ fn Sema.check_type_cycles(self: Sema):
                         edge_to.push(self.cycle_dep_syms.get(di2 as i64))
                         edge_node.push(self.cycle_dep_nodes.get(di2 as i64))
 
-        if sub_kind == TypeDeclKind.TDK_ALIAS:
+        if sub_kind == TypeDeclKind.Alias:
             let aliased_node = self.ast.get_extra(extra_start)
             let before = self.cycle_dep_syms.len() as i32
             self.collect_value_type_deps(aliased_node)
@@ -2165,7 +2165,7 @@ fn Sema.check_type_cycles(self: Sema):
                 edge_to.push(self.cycle_dep_syms.get(di2 as i64))
                 edge_node.push(self.cycle_dep_nodes.get(di2 as i64))
 
-        if sub_kind == TypeDeclKind.TDK_DISTINCT:
+        if sub_kind == TypeDeclKind.Distinct:
             let inner_node = self.ast.get_extra(extra_start)
             let before = self.cycle_dep_syms.len() as i32
             self.collect_value_type_deps(inner_node)
@@ -3027,32 +3027,32 @@ fn Sema.type_decl_disc_enum_tail_index(self: Sema, extra_start: i32) -> i32:
 fn Sema.type_decl_tp_start(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data1(node)
     let sub_kind = type_decl_sub_kind(self.ast.get_data2(node))
-    if sub_kind == TypeDeclKind.TDK_STRUCT:
+    if sub_kind == TypeDeclKind.Struct:
         let field_count = self.ast.get_extra(extra_start)
         return self.ast.get_extra(extra_start + 1 + field_count * 4 + 1)
-    if sub_kind == TypeDeclKind.TDK_ENUM:
+    if sub_kind == TypeDeclKind.Enum:
         let tail = self.type_decl_enum_tail_index(extra_start)
         return self.ast.get_extra(tail + 1)
-    if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
+    if sub_kind == TypeDeclKind.DiscEnum:
         let tail = self.type_decl_disc_enum_tail_index(extra_start)
         return self.ast.get_extra(tail + 1)
-    if sub_kind == TypeDeclKind.TDK_ALIAS or sub_kind == TypeDeclKind.TDK_DISTINCT:
+    if sub_kind == TypeDeclKind.Alias or sub_kind == TypeDeclKind.Distinct:
         return self.ast.get_extra(extra_start + 2)
     0
 
 fn Sema.type_decl_tp_count(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data1(node)
     let sub_kind = type_decl_sub_kind(self.ast.get_data2(node))
-    if sub_kind == TypeDeclKind.TDK_STRUCT:
+    if sub_kind == TypeDeclKind.Struct:
         let field_count = self.ast.get_extra(extra_start)
         return self.ast.get_extra(extra_start + 1 + field_count * 4 + 2)
-    if sub_kind == TypeDeclKind.TDK_ENUM:
+    if sub_kind == TypeDeclKind.Enum:
         let tail = self.type_decl_enum_tail_index(extra_start)
         return self.ast.get_extra(tail + 2)
-    if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
+    if sub_kind == TypeDeclKind.DiscEnum:
         let tail = self.type_decl_disc_enum_tail_index(extra_start)
         return self.ast.get_extra(tail + 2)
-    if sub_kind == TypeDeclKind.TDK_ALIAS or sub_kind == TypeDeclKind.TDK_DISTINCT:
+    if sub_kind == TypeDeclKind.Alias or sub_kind == TypeDeclKind.Distinct:
         return self.ast.get_extra(extra_start + 3)
     0
 
@@ -3112,14 +3112,14 @@ fn Sema.validate_generic_type_decls(self: Sema):
         let extra_start = self.ast.get_data1(decl)
         let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
 
-        if sub_kind == TypeDeclKind.TDK_STRUCT:
+        if sub_kind == TypeDeclKind.Struct:
             let field_count = self.ast.get_extra(extra_start)
             for fi in 0..field_count:
                 let field_type = self.ast.get_extra(extra_start + 1 + fi * 3 + 1)
                 self.validate_type_expr_with_type_params(field_type, tp_start, tp_count)
             continue
 
-        if sub_kind == TypeDeclKind.TDK_ENUM:
+        if sub_kind == TypeDeclKind.Enum:
             var pos = extra_start
             let variant_count = self.ast.get_extra(pos)
             pos = pos + 1
@@ -3133,7 +3133,7 @@ fn Sema.validate_generic_type_decls(self: Sema):
                 pos = pos + payload_count
             continue
 
-        if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
+        if sub_kind == TypeDeclKind.DiscEnum:
             var pos = extra_start + 1 // skip repr_type_node
             let variant_count = self.ast.get_extra(pos)
             pos = pos + 1
@@ -3148,7 +3148,7 @@ fn Sema.validate_generic_type_decls(self: Sema):
                 pos = pos + payload_count
             continue
 
-        if sub_kind == TypeDeclKind.TDK_ALIAS or sub_kind == TypeDeclKind.TDK_DISTINCT:
+        if sub_kind == TypeDeclKind.Alias or sub_kind == TypeDeclKind.Distinct:
             self.validate_type_expr_with_type_params(self.ast.get_extra(extra_start), tp_start, tp_count)
 
 fn Sema.type_expr_mentions_type_param(self: Sema, type_node: i32, tp_sym: i32) -> i32:
@@ -4595,7 +4595,7 @@ fn Sema.struct_field_type(self: Sema, struct_type: i32, field: i32) -> i32:
             let td_node = self.type_decl_nodes.get(gi_base_sym).unwrap()
             let td_extra = self.ast.get_data1(td_node)
             let td_packed = self.ast.get_data2(td_node)
-            if type_decl_sub_kind(td_packed) == TypeDeclKind.TDK_STRUCT:
+            if type_decl_sub_kind(td_packed) == TypeDeclKind.Struct:
                 let fc = self.ast.get_extra(td_extra)
                 let after = td_extra + 1 + fc * 4
                 let tp_start = self.ast.get_extra(after + 1)
@@ -4877,7 +4877,7 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                 let td_node = self.type_decl_nodes.get(name).unwrap()
                 let td_extra = self.ast.get_data1(td_node)
                 let td_packed = self.ast.get_data2(td_node)
-                if type_decl_sub_kind(td_packed) == TypeDeclKind.TDK_STRUCT:
+                if type_decl_sub_kind(td_packed) == TypeDeclKind.Struct:
                     let fc = self.ast.get_extra(td_extra)
                     let after = td_extra + 1 + fc * 4
                     let tp_start = self.ast.get_extra(after + 1)
@@ -5112,7 +5112,7 @@ fn Sema.resolve_generic_enum_payload(self: Sema, gi_tid: i32, base_sym: i32, var
     let td_extra_start = self.ast.get_data1(td_node)
     let td_packed = self.ast.get_data2(td_node)
     let td_sub_kind = type_decl_sub_kind(td_packed)
-    if td_sub_kind != TypeDeclKind.TDK_ENUM:
+    if td_sub_kind != TypeDeclKind.Enum:
         return result
     // Get type param info for resolve_generic_return_type_node
     let vc = self.ast.get_extra(td_extra_start)
@@ -6418,15 +6418,15 @@ fn Sema.setup_generic_inst_substitution(self: Sema, gi_tid: i32, type_sym: i32) 
     let td_sub_kind = type_decl_sub_kind(td_packed)
     var td_tp_start = 0
     var td_tp_count = 0
-    if td_sub_kind == TypeDeclKind.TDK_STRUCT:
+    if td_sub_kind == TypeDeclKind.Struct:
         let fc = self.ast.get_extra(td_extra_start)
         let after = td_extra_start + 1 + fc * 4
         td_tp_start = self.ast.get_extra(after + 1)
         td_tp_count = self.ast.get_extra(after + 2)
-    else if td_sub_kind == TypeDeclKind.TDK_ALIAS or td_sub_kind == TypeDeclKind.TDK_DISTINCT:
+    else if td_sub_kind == TypeDeclKind.Alias or td_sub_kind == TypeDeclKind.Distinct:
         td_tp_start = self.ast.get_extra(td_extra_start + 2)
         td_tp_count = self.ast.get_extra(td_extra_start + 3)
-    else if td_sub_kind == TypeDeclKind.TDK_ENUM:
+    else if td_sub_kind == TypeDeclKind.Enum:
         // For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis, tp_start, tp_count]
         let vc = self.ast.get_extra(td_extra_start)
         var epos = td_extra_start + 1
@@ -6481,15 +6481,15 @@ fn Sema.substitute_method_return_for_generic_inst(self: Sema, gi_tid: i32, type_
     let td_sub_kind = type_decl_sub_kind(td_packed)
     var td_tp_start = 0
     var td_tp_count = 0
-    if td_sub_kind == TypeDeclKind.TDK_STRUCT:
+    if td_sub_kind == TypeDeclKind.Struct:
         let fc = self.ast.get_extra(td_extra_start)
         let after = td_extra_start + 1 + fc * 4
         td_tp_start = self.ast.get_extra(after + 1)
         td_tp_count = self.ast.get_extra(after + 2)
-    else if td_sub_kind == TypeDeclKind.TDK_ALIAS or td_sub_kind == TypeDeclKind.TDK_DISTINCT:
+    else if td_sub_kind == TypeDeclKind.Alias or td_sub_kind == TypeDeclKind.Distinct:
         td_tp_start = self.ast.get_extra(td_extra_start + 2)
         td_tp_count = self.ast.get_extra(td_extra_start + 3)
-    else if td_sub_kind == TypeDeclKind.TDK_ENUM:
+    else if td_sub_kind == TypeDeclKind.Enum:
         let vc = self.ast.get_extra(td_extra_start)
         var epos = td_extra_start + 1
         for vi in 0..vc:
