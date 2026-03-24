@@ -517,7 +517,7 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
         if method_name == "len": return self.sema.ty_i32
         return self.sema.ty_void
     if tk == TY_INT:
-        if method_name == "rotate_left" or method_name == "rotate_right":
+        if method_name == "rotate_left" or method_name == "rotate_right" or method_name == "swap_bytes":
             return recv_type
     self.sema.ty_void
 
@@ -2772,6 +2772,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
     if tk == TY_INT:
         if method_name == "rotate_left": return MIR_INTRINSIC_ROTATE_LEFT
         if method_name == "rotate_right": return MIR_INTRINSIC_ROTATE_RIGHT
+        if method_name == "swap_bytes": return MIR_INTRINSIC_INT_SWAP_BYTES
     let type_name_sym = self.sema.get_type_name(resolved)
     if type_name_sym == 0:
         return MIR_INTRINSIC_NONE
