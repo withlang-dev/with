@@ -5992,6 +5992,117 @@ fn Codegen.gen_debug_enum(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) ->
     // Full enum variant names deferred to later task
     self.coerce_val_to_str(val, str_ty)
 
+fn Codegen.gen_fmt_with_spec(self: Codegen, val: i64, flags: i32, width: i32, precision: i32, mode: i32, str_ty: i64) -> i64:
+    // Dispatch to runtime with_fmt_*_spec based on LLVM value type.
+    let val_ty = wl_type_of(val)
+    let vk = wl_get_type_kind(val_ty)
+    let i32_ty = wl_i32_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+
+    if vk == wl_integer_type_kind():
+        let bit_w = wl_get_int_type_width(val_ty)
+        // Integer spec: with_fmt_int_spec(val, is_unsigned, flags, width, precision, mode)
+        var coerced_val = self.coerce_int_ext(val, i64_ty, false)
+        let is_unsigned = 0
+        let fn_name = "with_fmt_int_spec"
+        let sym = self.intern.intern(fn_name)
+        let fv = self.fn_values.get(sym)
+        let ft = self.fn_fn_types.get(sym)
+        if fv.is_some() and ft.is_some():
+            let a: Vec[i64] = Vec.new()
+            a.push(coerced_val)
+            a.push(wl_const_int(i32_ty, is_unsigned as i64, 0))
+            a.push(wl_const_int(i64_ty, flags as i64, 0))
+            a.push(wl_const_int(i32_ty, width as i64, 0))
+            a.push(wl_const_int(i32_ty, precision as i64, 0))
+            a.push(wl_const_int(i32_ty, mode as i64, 0))
+            return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(&a), 6)
+        let pts: Vec[i64] = Vec.new()
+        pts.push(i64_ty)
+        pts.push(i32_ty)
+        pts.push(i64_ty)
+        pts.push(i32_ty)
+        pts.push(i32_ty)
+        pts.push(i32_ty)
+        let fnt = wl_function_type(str_ty, vec_data_i64(&pts), 6, 0)
+        let func = wl_add_function(self.llmod, fn_name, fnt)
+        self.fn_values.insert(sym, func)
+        self.fn_fn_types.insert(sym, fnt)
+        let a: Vec[i64] = Vec.new()
+        a.push(coerced_val)
+        a.push(wl_const_int(i32_ty, is_unsigned as i64, 0))
+        a.push(wl_const_int(i64_ty, flags as i64, 0))
+        a.push(wl_const_int(i32_ty, width as i64, 0))
+        a.push(wl_const_int(i32_ty, precision as i64, 0))
+        a.push(wl_const_int(i32_ty, mode as i64, 0))
+        return wl_build_call(self.builder, fnt, func, vec_data_i64(&a), 6)
+
+    if vk == wl_float_type_kind() or vk == wl_double_type_kind():
+        // Float spec: with_fmt_f64_spec(val, flags, width, precision, mode)
+        let f64_ty = wl_f64_type(self.context)
+        var coerced_val = if vk == wl_float_type_kind(): wl_build_fp_cast(self.builder, val, f64_ty) else: val
+        let fn_name = "with_fmt_f64_spec"
+        let sym = self.intern.intern(fn_name)
+        let fv = self.fn_values.get(sym)
+        let ft = self.fn_fn_types.get(sym)
+        if fv.is_some() and ft.is_some():
+            let a: Vec[i64] = Vec.new()
+            a.push(coerced_val)
+            a.push(wl_const_int(i64_ty, flags as i64, 0))
+            a.push(wl_const_int(i32_ty, width as i64, 0))
+            a.push(wl_const_int(i32_ty, precision as i64, 0))
+            a.push(wl_const_int(i32_ty, mode as i64, 0))
+            return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(&a), 5)
+        let pts: Vec[i64] = Vec.new()
+        pts.push(f64_ty)
+        pts.push(i64_ty)
+        pts.push(i32_ty)
+        pts.push(i32_ty)
+        pts.push(i32_ty)
+        let fnt = wl_function_type(str_ty, vec_data_i64(&pts), 5, 0)
+        let func = wl_add_function(self.llmod, fn_name, fnt)
+        self.fn_values.insert(sym, func)
+        self.fn_fn_types.insert(sym, fnt)
+        let a: Vec[i64] = Vec.new()
+        a.push(coerced_val)
+        a.push(wl_const_int(i64_ty, flags as i64, 0))
+        a.push(wl_const_int(i32_ty, width as i64, 0))
+        a.push(wl_const_int(i32_ty, precision as i64, 0))
+        a.push(wl_const_int(i32_ty, mode as i64, 0))
+        return wl_build_call(self.builder, fnt, func, vec_data_i64(&a), 5)
+
+    // String spec: with_fmt_str_spec(val, flags, width, precision)
+    if val_ty == str_ty:
+        let fn_name = "with_fmt_str_spec"
+        let sym = self.intern.intern(fn_name)
+        let fv = self.fn_values.get(sym)
+        let ft = self.fn_fn_types.get(sym)
+        if fv.is_some() and ft.is_some():
+            let a: Vec[i64] = Vec.new()
+            a.push(val)
+            a.push(wl_const_int(i64_ty, flags as i64, 0))
+            a.push(wl_const_int(i32_ty, width as i64, 0))
+            a.push(wl_const_int(i32_ty, precision as i64, 0))
+            return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(&a), 4)
+        let pts: Vec[i64] = Vec.new()
+        pts.push(str_ty)
+        pts.push(i64_ty)
+        pts.push(i32_ty)
+        pts.push(i32_ty)
+        let fnt = wl_function_type(str_ty, vec_data_i64(&pts), 4, 0)
+        let func = wl_add_function(self.llmod, fn_name, fnt)
+        self.fn_values.insert(sym, func)
+        self.fn_fn_types.insert(sym, fnt)
+        let a: Vec[i64] = Vec.new()
+        a.push(val)
+        a.push(wl_const_int(i64_ty, flags as i64, 0))
+        a.push(wl_const_int(i32_ty, width as i64, 0))
+        a.push(wl_const_int(i32_ty, precision as i64, 0))
+        return wl_build_call(self.builder, fnt, func, vec_data_i64(&a), 4)
+
+    // Fallback: default format
+    self.coerce_val_to_str(val, str_ty)
+
 fn Codegen.mir_pointer_elem_llvm_type(self: Codegen, sema_ty: i32) -> i64:
     if sema_ty <= 0:
         return 0
@@ -7451,6 +7562,20 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let dbg_sema_ty = wl_const_int_sext_val(dbg_type_val) as i32
         let dbg_str_ty = self.resolve_named_type(self.intern.intern("str"))
         result = self.gen_debug_format(dbg_val, dbg_sema_ty, dbg_str_ty)
+
+    else if intrinsic == MIR_INTRINSIC_FMT_SPEC:
+        // args: [value, flags, width, precision, sema_type_id]
+        let sp_val = self.mir_intrinsic_arg(body, args_id, 0)
+        let sp_flags_v = self.mir_intrinsic_arg(body, args_id, 1)
+        let sp_width_v = self.mir_intrinsic_arg(body, args_id, 2)
+        let sp_prec_v = self.mir_intrinsic_arg(body, args_id, 3)
+        let sp_type_v = self.mir_intrinsic_arg(body, args_id, 4)
+        let sp_str_ty = self.resolve_named_type(self.intern.intern("str"))
+        let sp_flags = wl_const_int_sext_val(sp_flags_v) as i32
+        let sp_width = wl_const_int_sext_val(sp_width_v) as i32
+        let sp_prec = wl_const_int_sext_val(sp_prec_v) as i32
+        let sp_mode = sp_flags & 255
+        result = self.gen_fmt_with_spec(sp_val, sp_flags, sp_width, sp_prec, sp_mode, sp_str_ty)
 
     else:
         return false
