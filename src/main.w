@@ -567,9 +567,9 @@ fn escape_dump_lexeme(text: str) -> str:
 
 fn dump_tag_name(tag: i32, lexeme: str) -> str:
     // Keep deterministic dump names identical to Stage0 for brace delimiters.
-    if tag == TK_L_BRACE:
+    if tag == TokenKind.TK_L_BRACE:
         return "'" ++ lexeme ++ "'"
-    if tag == TK_R_BRACE:
+    if tag == TokenKind.TK_R_BRACE:
         return "'" ++ lexeme ++ "'"
     return tag_name(tag)
 

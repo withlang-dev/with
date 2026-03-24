@@ -82,7 +82,7 @@ fn Lexer.tokenize(self: Lexer) -> TokenList:
     loop:
         let tag = self.next_token()
         tokens.append(tag, self.token_start, self.pos)
-        if tag == TK_EOF:
+        if tag == TokenKind.TK_EOF:
             break
     tokens
 
@@ -96,61 +96,61 @@ fn Lexer.next_token(self: Lexer) -> i32:
     self.token_start = self.pos
 
     if self.pos >= slen:
-        return TK_EOF
+        return TokenKind.TK_EOF
 
     let ch = src.byte_at((self.pos) as i64)
 
     // Newline
     if ch == CH_NEWLINE:
         self.pos = self.pos + 1
-        return TK_NEWLINE
+        return TokenKind.TK_NEWLINE
 
     // Single-character delimiters and punctuation
     if ch == CH_LPAREN:
         self.pos = self.pos + 1
-        return TK_L_PAREN
+        return TokenKind.TK_L_PAREN
     if ch == CH_RPAREN:
         self.pos = self.pos + 1
-        return TK_R_PAREN
+        return TokenKind.TK_R_PAREN
     if ch == CH_LBRACKET:
         self.pos = self.pos + 1
-        return TK_L_BRACKET
+        return TokenKind.TK_L_BRACKET
     if ch == CH_RBRACKET:
         self.pos = self.pos + 1
-        return TK_R_BRACKET
+        return TokenKind.TK_R_BRACKET
     if ch == CH_LBRACE:
         self.pos = self.pos + 1
-        return TK_L_BRACE
+        return TokenKind.TK_L_BRACE
     if ch == CH_RBRACE:
         self.pos = self.pos + 1
-        return TK_R_BRACE
+        return TokenKind.TK_R_BRACE
     if ch == CH_COMMA:
         self.pos = self.pos + 1
-        return TK_COMMA
+        return TokenKind.TK_COMMA
     if ch == CH_SEMICOLON:
         self.pos = self.pos + 1
-        return TK_SEMICOLON
+        return TokenKind.TK_SEMICOLON
     if ch == CH_COLON:
         self.pos = self.pos + 1
-        return TK_COLON
+        return TokenKind.TK_COLON
     if ch == CH_TILDE:
         self.pos = self.pos + 1
-        return TK_TILDE
+        return TokenKind.TK_TILDE
     if ch == CH_AT:
         self.pos = self.pos + 1
-        return TK_AT
+        return TokenKind.TK_AT
     if ch == CH_CARET:
         self.pos = self.pos + 1
         if self.pos < slen and src.byte_at((self.pos) as i64) == CH_EQ:  // ^=
             self.pos = self.pos + 1
-            return TK_CARET_EQ
-        return TK_CARET
+            return TokenKind.TK_CARET_EQ
+        return TokenKind.TK_CARET
     if ch == CH_AMPERSAND:
         self.pos = self.pos + 1
         if self.pos < slen and src.byte_at((self.pos) as i64) == CH_EQ:  // &=
             self.pos = self.pos + 1
-            return TK_AMP_EQ
-        return TK_AMPERSAND
+            return TokenKind.TK_AMP_EQ
+        return TokenKind.TK_AMPERSAND
 
     // + compound operators
     if ch == CH_PLUS:
@@ -159,17 +159,17 @@ fn Lexer.next_token(self: Lexer) -> i32:
             let c2 = src.byte_at((self.pos) as i64)
             if c2 == CH_PLUS:  // ++
                 self.pos = self.pos + 1
-                return TK_PLUS_PLUS
+                return TokenKind.TK_PLUS_PLUS
             if c2 == CH_PERCENT:  // +% or +%=
                 self.pos = self.pos + 1
                 if self.pos < slen and src.byte_at((self.pos) as i64) == CH_EQ:
                     self.pos = self.pos + 1
-                    return TK_PLUS_WRAP_EQ
-                return TK_PLUS_WRAP
+                    return TokenKind.TK_PLUS_WRAP_EQ
+                return TokenKind.TK_PLUS_WRAP
             if c2 == CH_EQ:  // +=
                 self.pos = self.pos + 1
-                return TK_PLUS_EQ
-        return TK_PLUS
+                return TokenKind.TK_PLUS_EQ
+        return TokenKind.TK_PLUS
 
     // - compound operators
     if ch == CH_MINUS:
@@ -178,17 +178,17 @@ fn Lexer.next_token(self: Lexer) -> i32:
             let c2 = src.byte_at((self.pos) as i64)
             if c2 == CH_GT:  // ->
                 self.pos = self.pos + 1
-                return TK_ARROW
+                return TokenKind.TK_ARROW
             if c2 == CH_PERCENT:  // -% or -%=
                 self.pos = self.pos + 1
                 if self.pos < slen and src.byte_at((self.pos) as i64) == CH_EQ:
                     self.pos = self.pos + 1
-                    return TK_MINUS_WRAP_EQ
-                return TK_MINUS_WRAP
+                    return TokenKind.TK_MINUS_WRAP_EQ
+                return TokenKind.TK_MINUS_WRAP
             if c2 == CH_EQ:  // -=
                 self.pos = self.pos + 1
-                return TK_MINUS_EQ
-        return TK_MINUS
+                return TokenKind.TK_MINUS_EQ
+        return TokenKind.TK_MINUS
 
     // * compound operators
     if ch == CH_STAR:
@@ -199,12 +199,12 @@ fn Lexer.next_token(self: Lexer) -> i32:
                 self.pos = self.pos + 1
                 if self.pos < slen and src.byte_at((self.pos) as i64) == CH_EQ:
                     self.pos = self.pos + 1
-                    return TK_STAR_WRAP_EQ
-                return TK_STAR_WRAP
+                    return TokenKind.TK_STAR_WRAP_EQ
+                return TokenKind.TK_STAR_WRAP
             if c2 == CH_EQ:  // *=
                 self.pos = self.pos + 1
-                return TK_STAR_EQ
-        return TK_STAR
+                return TokenKind.TK_STAR_EQ
+        return TokenKind.TK_STAR
 
     // % compound
     if ch == CH_PERCENT:
@@ -212,8 +212,8 @@ fn Lexer.next_token(self: Lexer) -> i32:
         if self.pos < slen:
             if src.byte_at((self.pos) as i64) == CH_EQ:  // %=
                 self.pos = self.pos + 1
-                return TK_PERCENT_EQ
-        return TK_PERCENT
+                return TokenKind.TK_PERCENT_EQ
+        return TokenKind.TK_PERCENT
 
     // = compound
     if ch == CH_EQ:
@@ -222,19 +222,19 @@ fn Lexer.next_token(self: Lexer) -> i32:
             let c2 = src.byte_at((self.pos) as i64)
             if c2 == CH_EQ:  // ==
                 self.pos = self.pos + 1
-                return TK_EQ_EQ
+                return TokenKind.TK_EQ_EQ
             if c2 == CH_GT:  // =>
                 self.pos = self.pos + 1
-                return TK_FAT_ARROW
-        return TK_EQ
+                return TokenKind.TK_FAT_ARROW
+        return TokenKind.TK_EQ
 
     // ! compound
     if ch == CH_BANG:
         self.pos = self.pos + 1
         if self.pos < slen and src.byte_at((self.pos) as i64) == CH_EQ:  // !=
             self.pos = self.pos + 1
-            return TK_BANG_EQ
-        return TK_BANG
+            return TokenKind.TK_BANG_EQ
+        return TokenKind.TK_BANG
 
     // ? compound
     if ch == CH_QUESTION:
@@ -243,11 +243,11 @@ fn Lexer.next_token(self: Lexer) -> i32:
             let c2 = src.byte_at((self.pos) as i64)
             if c2 == CH_DOT:  // ?.
                 self.pos = self.pos + 1
-                return TK_QUESTION_DOT
+                return TokenKind.TK_QUESTION_DOT
             if c2 == CH_QUESTION:  // ??
                 self.pos = self.pos + 1
-                return TK_QUESTION_QUESTION
-        return TK_QUESTION
+                return TokenKind.TK_QUESTION_QUESTION
+        return TokenKind.TK_QUESTION
 
     // < compound
     if ch == CH_LT:
@@ -256,17 +256,17 @@ fn Lexer.next_token(self: Lexer) -> i32:
             let c2 = src.byte_at((self.pos) as i64)
             if c2 == CH_EQ:  // <=
                 self.pos = self.pos + 1
-                return TK_LT_EQ
+                return TokenKind.TK_LT_EQ
             if c2 == CH_LT:  // <<
                 self.pos = self.pos + 1
                 if self.pos < slen and src.byte_at((self.pos) as i64) == CH_EQ:  // <<=
                     self.pos = self.pos + 1
-                    return TK_LT_LT_EQ
-                return TK_LT_LT
+                    return TokenKind.TK_LT_LT_EQ
+                return TokenKind.TK_LT_LT
             if c2 == CH_PIPE:  // <|
                 self.pos = self.pos + 1
-                return TK_LT_PIPE
-        return TK_LT
+                return TokenKind.TK_LT_PIPE
+        return TokenKind.TK_LT
 
     // > compound
     if ch == CH_GT:
@@ -275,14 +275,14 @@ fn Lexer.next_token(self: Lexer) -> i32:
             let c2 = src.byte_at((self.pos) as i64)
             if c2 == CH_EQ:  // >=
                 self.pos = self.pos + 1
-                return TK_GT_EQ
+                return TokenKind.TK_GT_EQ
             if c2 == CH_GT:  // >>
                 self.pos = self.pos + 1
                 if self.pos < slen and src.byte_at((self.pos) as i64) == CH_EQ:  // >>=
                     self.pos = self.pos + 1
-                    return TK_GT_GT_EQ
-                return TK_GT_GT
-        return TK_GT
+                    return TokenKind.TK_GT_GT_EQ
+                return TokenKind.TK_GT_GT
+        return TokenKind.TK_GT
 
     // | compound
     if ch == CH_PIPE:
@@ -291,11 +291,11 @@ fn Lexer.next_token(self: Lexer) -> i32:
             let c2 = src.byte_at((self.pos) as i64)
             if c2 == CH_GT:  // |>
                 self.pos = self.pos + 1
-                return TK_PIPE_GT
+                return TokenKind.TK_PIPE_GT
             if c2 == CH_EQ:  // |=
                 self.pos = self.pos + 1
-                return TK_PIPE_EQ
-        return TK_PIPE
+                return TokenKind.TK_PIPE_EQ
+        return TokenKind.TK_PIPE
 
     // / and //
     if ch == CH_SLASH:
@@ -310,8 +310,8 @@ fn Lexer.next_token(self: Lexer) -> i32:
                 return self.next_token()
             if c2 == CH_EQ:  // /=
                 self.pos = self.pos + 1
-                return TK_SLASH_EQ
-        return TK_SLASH
+                return TokenKind.TK_SLASH_EQ
+        return TokenKind.TK_SLASH
 
     // . compound
     if ch == CH_DOT:
@@ -322,15 +322,15 @@ fn Lexer.next_token(self: Lexer) -> i32:
                 self.pos = self.pos + 1
                 if self.pos < slen and src.byte_at((self.pos) as i64) == CH_EQ:  // ..=
                     self.pos = self.pos + 1
-                    return TK_DOT_DOT_EQ
+                    return TokenKind.TK_DOT_DOT_EQ
                 if self.pos < slen and src.byte_at((self.pos) as i64) == CH_DOT:  // ...
                     self.pos = self.pos + 1
-                    return TK_DOT_DOT_DOT
-                return TK_DOT_DOT
+                    return TokenKind.TK_DOT_DOT_DOT
+                return TokenKind.TK_DOT_DOT
             // .Uppercase = dot identifier
             if c2 >= CH_A and c2 <= CH_Z:
                 return self.lex_dot_ident()
-        return TK_DOT
+        return TokenKind.TK_DOT
 
     // String literal
     if ch == CH_DQUOTE:
@@ -355,21 +355,21 @@ fn Lexer.next_token(self: Lexer) -> i32:
                     p = p + 2
                 if p + 1 < slen and src.byte_at((p + 1) as i64) == CH_SQUOTE:
                     self.pos = p + 2
-                    return TK_CHAR_LIT
+                    return TokenKind.TK_CHAR_LIT
         if self.pos + 1 < slen and src.byte_at((self.pos + 1) as i64) == CH_SQUOTE:
             // Single char: 'a'
             self.pos = self.pos + 2
-            return TK_CHAR_LIT
+            return TokenKind.TK_CHAR_LIT
         // Label: 'name
         if self.pos < slen and is_ident_start(src.byte_at((self.pos) as i64)):
             while self.pos < slen and is_ident_continue(src.byte_at((self.pos) as i64)):
                 self.pos = self.pos + 1
-            return TK_LABEL
-        return TK_INVALID
+            return TokenKind.TK_LABEL
+        return TokenKind.TK_INVALID
 
     // Unknown character
     self.pos = self.pos + 1
-    TK_INVALID
+    TokenKind.TK_INVALID
 
 
 // --- Internal helpers ---
@@ -397,12 +397,12 @@ fn Lexer.lex_string(self: Lexer) -> i32:
         while self.pos + 2 < slen:
             if src.byte_at((self.pos) as i64) == CH_DQUOTE and src.byte_at((self.pos + 1) as i64) == CH_DQUOTE and src.byte_at((self.pos + 2) as i64) == CH_DQUOTE:
                 self.pos = self.pos + 3
-                return TK_STRING_LIT
+                return TokenKind.TK_STRING_LIT
             if src.byte_at((self.pos) as i64) == CH_BACKSLASH:
                 self.pos = self.pos + 1
             self.pos = self.pos + 1
         // Unterminated multi-line string — return STRING_LIT for parser recovery.
-        return TK_STRING_LIT
+        return TokenKind.TK_STRING_LIT
 
     // Track brace depth so that `"` inside interpolation holes `{...}` is not
     // treated as the end of the string.
@@ -429,7 +429,7 @@ fn Lexer.lex_string(self: Lexer) -> i32:
             continue
         if ch == CH_DQUOTE and brace_depth == 0:  // closing "
             self.pos = self.pos + 1
-            return TK_STRING_LIT
+            return TokenKind.TK_STRING_LIT
         if ch == CH_DQUOTE and brace_depth > 0:
             // Inside an interpolation hole: skip nested string literal.
             self.pos = self.pos + 1
@@ -444,7 +444,7 @@ fn Lexer.lex_string(self: Lexer) -> i32:
             self.pos = self.pos + 1
         self.pos = self.pos + 1
     // Unterminated — return STRING_LIT for parser recovery.
-    TK_STRING_LIT
+    TokenKind.TK_STRING_LIT
 
 fn Lexer.lex_number(self: Lexer) -> i32:
     let src = self.source
@@ -511,8 +511,8 @@ fn Lexer.lex_number(self: Lexer) -> i32:
             is_float = true
 
     if is_float:
-        return TK_FLOAT_LIT
-    TK_INT_LIT
+        return TokenKind.TK_FLOAT_LIT
+    TokenKind.TK_INT_LIT
 
 fn numeric_suffix_len(src: str, pos: i32, slen: i32) -> i32:
     if pos >= slen:
@@ -578,7 +578,7 @@ fn Lexer.lex_ident(self: Lexer) -> i32:
             self.pos = self.pos + 1
         if self.pos < slen:
             self.pos = self.pos + 1  // skip closing "
-        return TK_C_STRING_LIT
+        return TokenKind.TK_C_STRING_LIT
 
     // r"..." / r#"..."# -> raw string literal (no escapes/interpolation)
     if text == "r":
@@ -611,11 +611,11 @@ fn Lexer.lex_ident(self: Lexer) -> i32:
                 continue
             if fch == CH_DQUOTE and f_brace_depth == 0:
                 self.pos = self.pos + 1
-                return TK_STRING_LIT
+                return TokenKind.TK_STRING_LIT
             if fch == CH_BACKSLASH:
                 self.pos = self.pos + 1
             self.pos = self.pos + 1
-        return TK_STRING_LIT
+        return TokenKind.TK_STRING_LIT
 
     // b'...' -> byte literal (tokenized as char literal).
     if text == "b" and self.pos < slen and src.byte_at((self.pos) as i64) == CH_SQUOTE:
@@ -626,14 +626,14 @@ fn Lexer.lex_ident(self: Lexer) -> i32:
     let kw = tag_from_keyword(text)
     if kw != -1:
         return kw
-    TK_IDENT
+    TokenKind.TK_IDENT
 
 fn Lexer.lex_dot_ident(self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
     while self.pos < slen and is_ident_continue(src.byte_at((self.pos) as i64)):
         self.pos = self.pos + 1
-    TK_DOT_IDENT
+    TokenKind.TK_DOT_IDENT
 
 fn Lexer.lex_raw_string_prefixed(self: Lexer) -> i32:
     let src = self.source
@@ -656,10 +656,10 @@ fn Lexer.lex_raw_string_prefixed(self: Lexer) -> i32:
                     ok = false
             if ok:
                 self.pos = self.pos + 1 + hash_count
-                return TK_STRING_LIT
+                return TokenKind.TK_STRING_LIT
         self.pos = self.pos + 1
     // Unterminated raw string: still emit string token for recovery.
-    TK_STRING_LIT
+    TokenKind.TK_STRING_LIT
 
 fn Lexer.lex_byte_char_prefixed(self: Lexer) -> i32:
     let src = self.source
@@ -673,7 +673,7 @@ fn Lexer.lex_byte_char_prefixed(self: Lexer) -> i32:
         self.pos = self.pos + 1
     if self.pos < slen and src.byte_at((self.pos) as i64) == CH_SQUOTE:
         self.pos = self.pos + 1
-    TK_CHAR_LIT
+    TokenKind.TK_CHAR_LIT
 
 
 // --- Character classification ---
