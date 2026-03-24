@@ -354,13 +354,13 @@ fn async_snapshot_for_span(body: MirBody, span_start: i32) -> AsyncSnapshot:
             if stmt_span > span_start:
                 continue
             let kind = body.stmt_kind(stmt_id)
-            if kind == SK_STORAGE_LIVE:
+            if kind == StmtKind.SK_STORAGE_LIVE:
                 storage_live = storage_live + 1
                 continue
-            if kind == SK_STORAGE_DEAD:
+            if kind == StmtKind.SK_STORAGE_DEAD:
                 storage_dead = storage_dead + 1
                 continue
-            if kind == SK_DROP:
+            if kind == StmtKind.SK_DROP:
                 drop_count = drop_count + 1
 
     var live_locals = storage_live - storage_dead
