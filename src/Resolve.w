@@ -15,26 +15,29 @@ extern fn with_fs_read_file(path: str) -> str
 extern fn int_to_string(n: i32) -> str
 extern fn print(s: str) -> void
 
-const IMPORT_KIND_USE: i32 = 1
-const IMPORT_KIND_C_IMPORT: i32 = 2
+type ImportKind: i32 =
+    IK_USE = 1
+    IK_C_IMPORT = 2
 
-const DEF_KIND_FN: i32 = 1
-const DEF_KIND_TYPE: i32 = 2
-const DEF_KIND_LET: i32 = 3
-const DEF_KIND_EXTERN_FN: i32 = 4
-const DEF_KIND_TRAIT: i32 = 5
-const DEF_KIND_IMPL: i32 = 6
-const DEF_KIND_C_IMPORT: i32 = 7
-const DEF_KIND_PARAM: i32 = 8
-const DEF_KIND_LOCAL: i32 = 9
+type DefKind: i32 =
+    DK_FN = 1
+    DK_TYPE = 2
+    DK_LET = 3
+    DK_EXTERN_FN = 4
+    DK_TRAIT = 5
+    DK_IMPL = 6
+    DK_C_IMPORT = 7
+    DK_PARAM = 8
+    DK_LOCAL = 9
 
-const SCOPE_KIND_MODULE: i32 = 1
-const SCOPE_KIND_FN: i32 = 2
-const SCOPE_KIND_BLOCK: i32 = 3
-const SCOPE_KIND_MATCH_ARM: i32 = 4
-const SCOPE_KIND_LOOP: i32 = 5
-const SCOPE_KIND_CLOSURE: i32 = 6
-const SCOPE_KIND_COMPREHENSION: i32 = 7
+type ScopeKind: i32 =
+    SK_MODULE = 1
+    SK_FN = 2
+    SK_BLOCK = 3
+    SK_MATCH_ARM = 4
+    SK_LOOP = 5
+    SK_CLOSURE = 6
+    SK_COMPREHENSION = 7
 
 // Module metadata used by --dump-resolved.
 type ResolvedModule = {
@@ -265,7 +268,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
     self.module_decl_counts.set_i32(module_id as i64, pool.decl_count())
     self.module_import_starts.set_i32(module_id as i64, self.result.imports.len() as i32)
 
-    let module_scope = self.add_scope(module_id, -1, -1, SCOPE_KIND_MODULE)
+    let module_scope = self.add_scope(module_id, -1, -1, ScopeKind.SK_MODULE)
     self.module_scope_ids.set_i32(module_id as i64, module_scope)
 
     var pending_fn_nodes: Vec[i32] = Vec.new()
@@ -293,7 +296,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
             self.result.imports.push(ResolvedImport {
                 module_id,
                 index_in_module: import_index,
-                kind: IMPORT_KIND_USE,
+                kind: ImportKind.IK_USE,
                 path_text: dotted,
                 target_module,
                 span_start: start,
@@ -308,7 +311,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
             self.result.imports.push(ResolvedImport {
                 module_id,
                 index_in_module: import_index,
-                kind: IMPORT_KIND_C_IMPORT,
+                kind: ImportKind.IK_C_IMPORT,
                 path_text: header,
                 target_module: -1,
                 span_start: start,
@@ -322,7 +325,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
                 let lib_sym = resolve_extra_or_zero(pool, link_start + li)
                 self.record_link_lib(lib_sym)
 
-            let cdef = self.add_def(module_id, -1, DEF_KIND_C_IMPORT, header_sym, start, end)
+            let cdef = self.add_def(module_id, -1, DefKind.DK_C_IMPORT, header_sym, start, end)
             self.add_binding(module_scope, header_sym, cdef)
             continue
 
@@ -357,12 +360,12 @@ fn ResolveState.record_link_lib(self: ResolveState, lib_sym: i32):
     self.result.link_libs.push(lib_sym)
 
 fn resolve_decl_def_kind(kind: i32) -> i32:
-    if kind == NK_FN_DECL: return DEF_KIND_FN
-    if kind == NK_TYPE_DECL: return DEF_KIND_TYPE
-    if kind == NK_LET_DECL: return DEF_KIND_LET
-    if kind == NK_EXTERN_FN: return DEF_KIND_EXTERN_FN
-    if kind == NK_TRAIT_DECL: return DEF_KIND_TRAIT
-    if kind == NK_IMPL_DECL: return DEF_KIND_IMPL
+    if kind == NK_FN_DECL: return DefKind.DK_FN
+    if kind == NK_TYPE_DECL: return DefKind.DK_TYPE
+    if kind == NK_LET_DECL: return DefKind.DK_LET
+    if kind == NK_EXTERN_FN: return DefKind.DK_EXTERN_FN
+    if kind == NK_TRAIT_DECL: return DefKind.DK_TRAIT
+    if kind == NK_IMPL_DECL: return DefKind.DK_IMPL
     -1
 
 fn resolve_decl_name(pool: AstPool, decl: i32) -> i32:
@@ -411,7 +414,7 @@ fn ResolveState.add_binding(self: ResolveState, scope_id: i32, symbol: i32, def_
     self.binding_map.insert(resolve_binding_key(scope_id, symbol), def_id)
 
 fn ResolveState.resolve_fn_body(self: ResolveState, pool: AstPool, module_id: i32, module_scope: i32, fn_node: i32, fn_def: i32, walk_body: bool):
-    let fn_scope = self.add_scope(module_id, module_scope, fn_def, SCOPE_KIND_FN)
+    let fn_scope = self.add_scope(module_id, module_scope, fn_def, ScopeKind.SK_FN)
 
     // Register parameters as defs/bindings in function scope.
     let meta = pool.find_fn_meta(fn_node)
@@ -420,7 +423,7 @@ fn ResolveState.resolve_fn_body(self: ResolveState, pool: AstPool, module_id: i3
         let param_count = pool.fn_meta_param_count(meta)
         for pi in 0..param_count:
             let name_sym = pool.fn_param_name(param_start, pi)
-            let pdef = self.add_def(module_id, fn_def, DEF_KIND_PARAM, name_sym, pool.get_start(fn_node), pool.get_end(fn_node))
+            let pdef = self.add_def(module_id, fn_def, DefKind.DK_PARAM, name_sym, pool.get_start(fn_node), pool.get_end(fn_node))
             self.add_binding(fn_scope, name_sym, pdef)
 
             let ty_node = pool.fn_param_type(param_start, pi)
@@ -551,7 +554,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         return
 
     if kind == NK_BLOCK:
-        let block_scope = self.add_scope(module_id, current_scope, parent_def, SCOPE_KIND_BLOCK)
+        let block_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_BLOCK)
         let stmt_start = pool.get_data0(node)
         let stmt_count = pool.get_data1(node)
         for si in 0..stmt_count:
@@ -564,7 +567,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
 
         let name_sym = pool.get_data0(node)
-        let did = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, name_sym, pool.get_start(node), pool.get_end(node))
+        let did = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, name_sym, pool.get_start(node), pool.get_end(node))
         self.add_binding(current_scope, name_sym, did)
 
         let flags = pool.get_data2(node)
@@ -587,25 +590,25 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         for ni in 0..names_count:
             let sym = resolve_extra_or_zero(pool, names_start + ni)
             if sym > 0:
-                let d = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, sym, pool.get_start(node), pool.get_end(node))
+                let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, sym, pool.get_start(node), pool.get_end(node))
                 self.add_binding(current_scope, sym, d)
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data2(node))
         return
 
     if kind == NK_WHILE:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
-        let loop_scope = self.add_scope(module_id, current_scope, parent_def, SCOPE_KIND_LOOP)
+        let loop_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_LOOP)
         self.walk_expr(pool, module_id, parent_def, loop_scope, pool.get_data1(node))
         return
 
     if kind == NK_LOOP:
-        let loop_scope = self.add_scope(module_id, current_scope, parent_def, SCOPE_KIND_LOOP)
+        let loop_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_LOOP)
         self.walk_expr(pool, module_id, parent_def, loop_scope, pool.get_data0(node))
         return
 
     if kind == NK_FOR:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
-        let loop_scope = self.add_scope(module_id, current_scope, parent_def, SCOPE_KIND_LOOP)
+        let loop_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_LOOP)
 
         let binding = pool.get_data0(node)
         let for_start = pool.get_start(node)
@@ -613,7 +616,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         if binding > 0 and binding < pool.node_count() and pool.kind(binding) >= NK_PAT_WILDCARD and pool.kind(binding) <= NK_PAT_SLICE and pool.get_start(binding) >= for_start and pool.get_end(binding) <= for_end:
             self.bind_pattern(pool, module_id, parent_def, loop_scope, binding)
         else if binding > 0:
-            let did = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, binding, pool.get_start(node), pool.get_end(node))
+            let did = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, binding, pool.get_start(node), pool.get_end(node))
             self.add_binding(loop_scope, binding, did)
 
         self.walk_expr(pool, module_id, parent_def, loop_scope, pool.get_data2(node))
@@ -628,7 +631,7 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         return
 
     if kind == NK_MATCH_ARM:
-        let arm_scope = self.add_scope(module_id, current_scope, parent_def, SCOPE_KIND_MATCH_ARM)
+        let arm_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_MATCH_ARM)
         self.bind_pattern(pool, module_id, parent_def, arm_scope, pool.get_data0(node))
         self.walk_expr(pool, module_id, parent_def, arm_scope, pool.get_data2(node))
         self.walk_expr(pool, module_id, parent_def, arm_scope, pool.get_data1(node))
@@ -643,9 +646,9 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
 
     if kind == NK_ARRAY_COMPREHENSION:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data2(node))
-        let comp_scope = self.add_scope(module_id, current_scope, parent_def, SCOPE_KIND_COMPREHENSION)
+        let comp_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_COMPREHENSION)
         let binding = pool.get_data1(node)
-        let bdef = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, binding, pool.get_start(node), pool.get_end(node))
+        let bdef = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, binding, pool.get_start(node), pool.get_end(node))
         self.add_binding(comp_scope, binding, bdef)
         self.walk_expr(pool, module_id, parent_def, comp_scope, pool.get_data0(node))
         return
@@ -668,12 +671,12 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         return
 
     if kind == NK_CLOSURE:
-        let closure_scope = self.add_scope(module_id, current_scope, parent_def, SCOPE_KIND_CLOSURE)
+        let closure_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_CLOSURE)
         let param_start = pool.get_data1(node)
         let param_count = pool.get_data2(node)
         for pi in 0..param_count:
             let name_sym = resolve_extra_or_zero(pool, param_start + pi * 2)
-            let pdef = self.add_def(module_id, parent_def, DEF_KIND_PARAM, name_sym, pool.get_start(node), pool.get_end(node))
+            let pdef = self.add_def(module_id, parent_def, DefKind.DK_PARAM, name_sym, pool.get_start(node), pool.get_end(node))
             self.add_binding(closure_scope, name_sym, pdef)
             let ty = resolve_extra_or_zero(pool, param_start + pi * 2 + 1)
             self.walk_type_expr(pool, module_id, closure_scope, ty)
@@ -714,9 +717,9 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
 
     if kind == NK_WITH_EXPR:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
-        let with_scope = self.add_scope(module_id, current_scope, parent_def, SCOPE_KIND_BLOCK)
+        let with_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_BLOCK)
         let name_sym = decode_with_binding_sym(pool.get_data2(node))
-        let bdef = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, name_sym, pool.get_start(node), pool.get_end(node))
+        let bdef = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, name_sym, pool.get_start(node), pool.get_end(node))
         self.add_binding(with_scope, name_sym, bdef)
         self.walk_expr(pool, module_id, parent_def, with_scope, pool.get_data1(node))
         return
@@ -726,9 +729,9 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         return
 
     if kind == NK_ASYNC_SCOPE:
-        let async_scope = self.add_scope(module_id, current_scope, parent_def, SCOPE_KIND_BLOCK)
+        let async_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_BLOCK)
         let name_sym = pool.get_data0(node)
-        let sdef = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, name_sym, pool.get_start(node), pool.get_end(node))
+        let sdef = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, name_sym, pool.get_start(node), pool.get_end(node))
         self.add_binding(async_scope, name_sym, sdef)
         self.walk_expr(pool, module_id, parent_def, async_scope, pool.get_data1(node))
         return
@@ -741,8 +744,8 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
             let task_expr = resolve_extra_or_zero(pool, arm_start + ai * 3 + 1)
             let arm_body = resolve_extra_or_zero(pool, arm_start + ai * 3 + 2)
             self.walk_expr(pool, module_id, parent_def, current_scope, task_expr)
-            let arm_scope = self.add_scope(module_id, current_scope, parent_def, SCOPE_KIND_MATCH_ARM)
-            let d = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, name_sym, pool.get_start(node), pool.get_end(node))
+            let arm_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_MATCH_ARM)
+            let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, name_sym, pool.get_start(node), pool.get_end(node))
             self.add_binding(arm_scope, name_sym, d)
             self.walk_expr(pool, module_id, parent_def, arm_scope, arm_body)
         return
@@ -755,13 +758,13 @@ fn ResolveState.bind_pattern(self: ResolveState, pool: AstPool, module_id: i32, 
 
     if kind == NK_PAT_IDENT:
         let name_sym = pool.get_data0(pat)
-        let d = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, name_sym, pool.get_start(pat), pool.get_end(pat))
+        let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, name_sym, pool.get_start(pat), pool.get_end(pat))
         self.add_binding(current_scope, name_sym, d)
         return
 
     if kind == NK_PAT_AT_BINDING:
         let name_sym = pool.get_data0(pat)
-        let d = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, name_sym, pool.get_start(pat), pool.get_end(pat))
+        let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, name_sym, pool.get_start(pat), pool.get_end(pat))
         self.add_binding(current_scope, name_sym, d)
         self.bind_pattern(pool, module_id, parent_def, current_scope, pool.get_data1(pat))
         return
@@ -776,7 +779,7 @@ fn ResolveState.bind_pattern(self: ResolveState, pool: AstPool, module_id: i32, 
             if inner != pat and resolve_node_valid(pool, inner) and pool.kind(inner) >= NK_PAT_WILDCARD and pool.kind(inner) <= NK_PAT_SLICE and pool.get_start(inner) >= pat_start and pool.get_end(inner) <= pat_end:
                 self.bind_pattern(pool, module_id, parent_def, current_scope, inner)
             else if inner > 0:
-                let d = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, inner, pool.get_start(pat), pool.get_end(pat))
+                let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, inner, pool.get_start(pat), pool.get_end(pat))
                 self.add_binding(current_scope, inner, d)
         return
 
@@ -796,7 +799,7 @@ fn ResolveState.bind_pattern(self: ResolveState, pool: AstPool, module_id: i32, 
                 self.bind_pattern(pool, module_id, parent_def, current_scope, fpat)
             else:
                 let fname = resolve_extra_or_zero(pool, start + i * 2)
-                let d = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, fname, pool.get_start(pat), pool.get_end(pat))
+                let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, fname, pool.get_start(pat), pool.get_end(pat))
                 self.add_binding(current_scope, fname, d)
         return
 
@@ -805,12 +808,12 @@ fn ResolveState.bind_pattern(self: ResolveState, pool: AstPool, module_id: i32, 
         let head_count = pool.get_data1(pat)
         for i in 0..head_count:
             let sym = resolve_extra_or_zero(pool, start + 1 + i)
-            let d = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, sym, pool.get_start(pat), pool.get_end(pat))
+            let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, sym, pool.get_start(pat), pool.get_end(pat))
             self.add_binding(current_scope, sym, d)
 
         let rest_sym = pool.get_data2(pat)
         if rest_sym != 0:
-            let d = self.add_def(module_id, parent_def, DEF_KIND_LOCAL, rest_sym, pool.get_start(pat), pool.get_end(pat))
+            let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, rest_sym, pool.get_start(pat), pool.get_end(pat))
             self.add_binding(current_scope, rest_sym, d)
         return
 
@@ -1052,32 +1055,32 @@ fn ResolveState.emit_import_decl_error(self: ResolveState, module_id: i32, start
     self.diags.emit(Diagnostic.err(message, span))
 
 fn resolved_import_kind_name(kind: i32) -> str:
-    if kind == IMPORT_KIND_USE:
+    if kind == ImportKind.IK_USE:
         return "use"
-    if kind == IMPORT_KIND_C_IMPORT:
+    if kind == ImportKind.IK_C_IMPORT:
         return "c_import"
     "unknown"
 
 fn resolved_def_kind_name(kind: i32) -> str:
-    if kind == DEF_KIND_FN: return "fn"
-    if kind == DEF_KIND_TYPE: return "type"
-    if kind == DEF_KIND_LET: return "let"
-    if kind == DEF_KIND_EXTERN_FN: return "extern_fn"
-    if kind == DEF_KIND_TRAIT: return "trait"
-    if kind == DEF_KIND_IMPL: return "impl"
-    if kind == DEF_KIND_C_IMPORT: return "c_import"
-    if kind == DEF_KIND_PARAM: return "param"
-    if kind == DEF_KIND_LOCAL: return "local"
+    if kind == DefKind.DK_FN: return "fn"
+    if kind == DefKind.DK_TYPE: return "type"
+    if kind == DefKind.DK_LET: return "let"
+    if kind == DefKind.DK_EXTERN_FN: return "extern_fn"
+    if kind == DefKind.DK_TRAIT: return "trait"
+    if kind == DefKind.DK_IMPL: return "impl"
+    if kind == DefKind.DK_C_IMPORT: return "c_import"
+    if kind == DefKind.DK_PARAM: return "param"
+    if kind == DefKind.DK_LOCAL: return "local"
     "unknown"
 
 fn resolved_scope_kind_name(kind: i32) -> str:
-    if kind == SCOPE_KIND_MODULE: return "module"
-    if kind == SCOPE_KIND_FN: return "fn"
-    if kind == SCOPE_KIND_BLOCK: return "block"
-    if kind == SCOPE_KIND_MATCH_ARM: return "match_arm"
-    if kind == SCOPE_KIND_LOOP: return "loop"
-    if kind == SCOPE_KIND_CLOSURE: return "closure"
-    if kind == SCOPE_KIND_COMPREHENSION: return "comprehension"
+    if kind == ScopeKind.SK_MODULE: return "module"
+    if kind == ScopeKind.SK_FN: return "fn"
+    if kind == ScopeKind.SK_BLOCK: return "block"
+    if kind == ScopeKind.SK_MATCH_ARM: return "match_arm"
+    if kind == ScopeKind.SK_LOOP: return "loop"
+    if kind == ScopeKind.SK_CLOSURE: return "closure"
+    if kind == ScopeKind.SK_COMPREHENSION: return "comprehension"
     "unknown"
 
 fn print_resolved(result: ResolveResult, pool: InternPool, root_path: str):
@@ -1089,7 +1092,7 @@ fn print_resolved(result: ResolveResult, pool: InternPool, root_path: str):
 
         for ii in 0..m.import_count:
             let imp = result.imports.get((m.import_start + ii) as i64)
-            if imp.kind == IMPORT_KIND_USE:
+            if imp.kind == ImportKind.IK_USE:
                 print(f"import[{m.module_id}:{ii}] kind=use path={imp.path_text} target={imp.target_module}\n")
             else:
                 print(f"import[{m.module_id}:{ii}] kind=c_import header=\"{imp.path_text}\" target={imp.target_module}\n")
@@ -1127,7 +1130,7 @@ fn dump_resolved(result: ResolveResult, pool: InternPool, root_path: str) -> str
 
         for ii in 0..m.import_count:
             let imp = result.imports.get((m.import_start + ii) as i64)
-            if imp.kind == IMPORT_KIND_USE:
+            if imp.kind == ImportKind.IK_USE:
                 out = out ++ f"import[{m.module_id}:{ii}] kind=use path={imp.path_text} target={imp.target_module}\n"
             else:
                 out = out ++ f"import[{m.module_id}:{ii}] kind=c_import header=\"{imp.path_text}\" target={imp.target_module}\n"
