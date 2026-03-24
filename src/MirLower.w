@@ -1012,6 +1012,29 @@ fn MirBuilder.lower_fmt_debug(self: MirBuilder, operand: i32, sema_ty: i32, node
     self.body.set_call_intrinsic(args_id, MIR_INTRINSIC_FMT_DEBUG)
     self.body.new_operand(OK_COPY, result_place)
 
+fn MirBuilder.lower_fmt_with_spec(self: MirBuilder, operand: i32, flags: i32, width: i32, precision: i32, sema_ty: i32, node: i32) -> i32:
+    // Emit MIR_INTRINSIC_FMT_SPEC with value + spec parameters.
+    // args: [value, flags, width, precision, sema_type_id]
+    let fn_op = self.const_operand(CK_FN, self.pool.intern("fmt_spec"), self.sema.ty_str)
+    let flags_const = self.const_operand(CK_INT, flags, self.sema.ty_i32)
+    let width_const = self.const_operand(CK_INT, width, self.sema.ty_i32)
+    let prec_const = self.const_operand(CK_INT, precision, self.sema.ty_i32)
+    let type_const = self.const_operand(CK_INT, sema_ty, self.sema.ty_i32)
+    let call_args: Vec[i32] = Vec.new()
+    call_args.push(operand)
+    call_args.push(flags_const)
+    call_args.push(width_const)
+    call_args.push(prec_const)
+    call_args.push(type_const)
+    let args_id = self.body.new_call_args(call_args)
+    let result_local = self.new_temp(self.sema.ty_str)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.set_call_intrinsic(args_id, MIR_INTRINSIC_FMT_SPEC)
+    self.body.new_operand(OK_COPY, result_place)
+
 fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
     // Desugar NK_FSTRING to OP_CONCAT chain with explicit formatting.
     // Each expression segment is converted to str via MIR_INTRINSIC_FMT_TO_STR
@@ -1034,17 +1057,22 @@ fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
             seg_operand = self.lower_expr(expr_node)
             let expr_ty = self.expr_type(expr_node)
             let resolved_ty = if expr_ty > 0: self.sema.resolve_alias(expr_ty) else: 0
-            // Check for :? debug mode
-            var is_debug = false
+            // Handle format spec
+            var handled = false
             if spec_node != 0:
                 let spec_flags = self.ast.get_data0(spec_node)
                 let spec_mode = spec_flags & 255
+                let spec_width = self.ast.get_data1(spec_node)
+                let spec_precision = self.ast.get_data2(spec_node)
                 if spec_mode == 63:
-                    is_debug = true
-            if is_debug:
-                // Debug mode: dispatch to FMT_DEBUG with type info
-                seg_operand = self.lower_fmt_debug(seg_operand, resolved_ty, node)
-            else if resolved_ty != self.sema.ty_str:
+                    // Debug mode
+                    seg_operand = self.lower_fmt_debug(seg_operand, resolved_ty, node)
+                    handled = true
+                else if spec_mode != 0 or spec_width > 0 or spec_precision >= 0 or (spec_flags & 0x1C0000) != 0:
+                    // Has format spec (mode, width, precision, or sign/alt/zero flags)
+                    seg_operand = self.lower_fmt_with_spec(seg_operand, spec_flags, spec_width, spec_precision, resolved_ty, node)
+                    handled = true
+            if not handled and resolved_ty != self.sema.ty_str:
                 // Convert non-str expressions to str via formatting intrinsic
                 seg_operand = self.lower_fmt_to_str(seg_operand, node)
             pos = pos + 3
