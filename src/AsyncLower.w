@@ -76,7 +76,7 @@ fn lower_async_module(mir_mod: MirModule, ast: AstPool, pool: InternPool, sema: 
         diags,
         out_mod: AsyncMirModule.init(),
         cur_mir_body: MirBody.init_for_fn(0),
-        cur_body: AsyncMirBody.init(0, AM_BODY_SYNC),
+        cur_body: AsyncMirBody.init(0, AsyncBodyKind.AM_BODY_SYNC),
     }
     lower.run()
     AsyncLowerResult {
@@ -99,9 +99,9 @@ fn AsyncLower.lower_body(self: AsyncLower, mir_body: MirBody):
         let fn_body_node = async_ast_get_data1(self.ast, fn_decl)
         self.walk_expr(fn_body_node)
 
-    if flavor != AM_BODY_GENERATOR:
+    if flavor != AsyncBodyKind.AM_BODY_GENERATOR:
         for si in 0..async_body_suspend_count(self.cur_body):
-            if self.cur_body.suspend_kinds.get(si as i64) == AM_SUSPEND_YIELD:
+            if self.cur_body.suspend_kinds.get(si as i64) == AsyncSuspendKind.AM_SUSPEND_YIELD:
                 self.emit_error_at_span("yield used outside generator function", self.cur_body.suspend_span_starts.get(si as i64), self.cur_body.suspend_span_ends.get(si as i64))
                 break
 
@@ -133,12 +133,12 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
     let kind = async_ast_kind(self.ast, node)
 
     if kind == NodeKind.NK_AWAIT:
-        self.record_suspend(node, AM_SUSPEND_AWAIT)
+        self.record_suspend(node, AsyncSuspendKind.AM_SUSPEND_AWAIT)
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 
     if kind == NodeKind.NK_SELECT_AWAIT:
-        self.record_suspend(node, AM_SUSPEND_SELECT_AWAIT)
+        self.record_suspend(node, AsyncSuspendKind.AM_SUSPEND_SELECT_AWAIT)
         let arm_start = async_ast_get_data0(self.ast, node)
         let arm_count = async_ast_get_data1(self.ast, node)
         for ai in 0..arm_count:
@@ -149,7 +149,7 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
         return
 
     if kind == NodeKind.NK_YIELD:
-        self.record_suspend(node, AM_SUSPEND_YIELD)
+        self.record_suspend(node, AsyncSuspendKind.AM_SUSPEND_YIELD)
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 
@@ -332,13 +332,13 @@ fn async_find_fn_decl(ast: AstPool, fn_sym: i32) -> i32:
 
 fn async_fn_flavor(ast: AstPool, fn_decl: i32) -> i32:
     if fn_decl == 0:
-        return AM_BODY_SYNC
+        return AsyncBodyKind.AM_BODY_SYNC
     let flags = ast.get_data2(fn_decl)
     if (flags / FnFlags.FN_FLAG_GEN) % 2 == 1:
-        return AM_BODY_GENERATOR
+        return AsyncBodyKind.AM_BODY_GENERATOR
     if (flags / FnFlags.FN_FLAG_ASYNC) % 2 == 1:
-        return AM_BODY_ASYNC
-    AM_BODY_SYNC
+        return AsyncBodyKind.AM_BODY_ASYNC
+    AsyncBodyKind.AM_BODY_SYNC
 
 fn async_snapshot_for_span(body: MirBody, span_start: i32) -> AsyncSnapshot:
     var storage_live = 0
