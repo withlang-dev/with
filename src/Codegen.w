@@ -5904,6 +5904,94 @@ fn Codegen.coerce_val_to_str(self: Codegen, val: i64, str_ty: i64) -> i64:
     a.push(coerced)
     wl_build_call(self.builder, fnt, func, vec_data_i64(&a), 1)
 
+fn Codegen.call_runtime_str_fn(self: Codegen, fn_name: str, arg: i64, str_ty: i64) -> i64:
+    let sym = self.intern.intern(fn_name)
+    let fv = self.fn_values.get(sym)
+    let ft = self.fn_fn_types.get(sym)
+    if fv.is_some() and ft.is_some():
+        let a: Vec[i64] = Vec.new()
+        a.push(arg)
+        return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(&a), 1)
+    let pts: Vec[i64] = Vec.new()
+    pts.push(wl_type_of(arg))
+    let fnt = wl_function_type(str_ty, vec_data_i64(&pts), 1, 0)
+    let func = wl_add_function(self.llmod, fn_name, fnt)
+    self.fn_values.insert(sym, func)
+    self.fn_fn_types.insert(sym, fnt)
+    let a: Vec[i64] = Vec.new()
+    a.push(arg)
+    wl_build_call(self.builder, fnt, func, vec_data_i64(&a), 1)
+
+fn Codegen.gen_debug_format(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) -> i64:
+    // Generate debug formatting based on sema type.
+    let resolved = if sema_ty > 0: self.mir_input.mir_resolve_alias(sema_ty) else: 0
+    let tk = if resolved > 0: self.mir_input.mir_get_type_kind(resolved) else: 0
+
+    // str → quoted
+    if resolved == self.sema.ty_str or tk == TY_STR:
+        return self.call_runtime_str_fn("with_fmt_str_debug", val, str_ty)
+
+    // Struct → "TypeName { field: val, field: val }"
+    if tk == TY_STRUCT:
+        return self.gen_debug_struct(val, resolved, str_ty)
+
+    // Enum → ".VariantName"
+    if tk == TY_ENUM:
+        return self.gen_debug_enum(val, resolved, str_ty)
+
+    // Primitives (int, float, bool) → same as default display
+    self.coerce_val_to_str(val, str_ty)
+
+fn Codegen.gen_debug_struct(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) -> i64:
+    // Generate "TypeName { field1: val1, field2: val2 }"
+    let type_name_sym = self.mir_input.mir_get_type_d0(sema_ty)
+    var type_name = ""
+    if type_name_sym > 0:
+        type_name = self.sema.pool_resolve(type_name_sym)
+        if type_name.len() == 0 and type_name_sym < self.sema.pool.symbol_texts.len() as i32:
+            type_name = self.sema.pool.symbol_texts.get(type_name_sym as i64)
+
+    // Find struct index in codegen tables
+    let cg_sym = self.intern.intern(type_name)
+    let st_opt = self.struct_type_map.get(cg_sym)
+    if not st_opt.is_some():
+        // Unknown struct — return type name only
+        return self.gen_string_literal_raw(type_name ++ " " ++ lbrace() ++ " ... " ++ rbrace())
+
+    let struct_idx = st_opt.unwrap()
+    let f_start = self.struct_field_starts.get(struct_idx as i64)
+    let f_count = self.struct_field_counts.get(struct_idx as i64)
+
+    // Build: "TypeName { "
+    var result = self.gen_string_literal_raw(type_name ++ " " ++ lbrace() ++ " ")
+
+    var fi = 0
+    while fi < f_count:
+        let f_name_sym = self.struct_field_names.get((f_start + fi) as i64)
+        let f_name = self.intern.resolve(f_name_sym)
+
+        // Separator
+        if fi > 0:
+            result = self.mir_str_concat(result, self.gen_string_literal_raw(", "))
+
+        // "field_name: "
+        result = self.mir_str_concat(result, self.gen_string_literal_raw(f_name ++ ": "))
+
+        // Extract field value and format it
+        let field_val = wl_build_extract_value(self.builder, val, fi)
+        let field_str = self.coerce_val_to_str(field_val, str_ty)
+        result = self.mir_str_concat(result, field_str)
+        fi = fi + 1
+
+    // Close " }"
+    result = self.mir_str_concat(result, self.gen_string_literal_raw(" " ++ rbrace()))
+    result
+
+fn Codegen.gen_debug_enum(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) -> i64:
+    // Simple enum debug: just format the value as default
+    // Full enum variant names deferred to later task
+    self.coerce_val_to_str(val, str_ty)
+
 fn Codegen.mir_pointer_elem_llvm_type(self: Codegen, sema_ty: i32) -> i64:
     if sema_ty <= 0:
         return 0
@@ -7355,23 +7443,14 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
     else if intrinsic == MIR_INTRINSIC_FMT_DEBUG_STR:
         let dbg_val = self.mir_intrinsic_arg(body, args_id, 0)
         let dbg_str_ty = self.resolve_named_type(self.intern.intern("str"))
-        let dbg_sym = self.intern.intern("with_fmt_str_debug")
-        let dbg_fv = self.fn_values.get(dbg_sym)
-        let dbg_ft = self.fn_fn_types.get(dbg_sym)
-        if dbg_fv.is_some() and dbg_ft.is_some():
-            let dbg_args: Vec[i64] = Vec.new()
-            dbg_args.push(dbg_val)
-            result = wl_build_call(self.builder, dbg_ft.unwrap() as i64, dbg_fv.unwrap() as i64, vec_data_i64(&dbg_args), 1)
-        else:
-            let dbg_pts: Vec[i64] = Vec.new()
-            dbg_pts.push(dbg_str_ty)
-            let dbg_fnt = wl_function_type(dbg_str_ty, vec_data_i64(&dbg_pts), 1, 0)
-            let dbg_func = wl_add_function(self.llmod, "with_fmt_str_debug", dbg_fnt)
-            self.fn_values.insert(dbg_sym, dbg_func)
-            self.fn_fn_types.insert(dbg_sym, dbg_fnt)
-            let dbg_args: Vec[i64] = Vec.new()
-            dbg_args.push(dbg_val)
-            result = wl_build_call(self.builder, dbg_fnt, dbg_func, vec_data_i64(&dbg_args), 1)
+        result = self.call_runtime_str_fn("with_fmt_str_debug", dbg_val, dbg_str_ty)
+
+    else if intrinsic == MIR_INTRINSIC_FMT_DEBUG:
+        let dbg_val = self.mir_intrinsic_arg(body, args_id, 0)
+        let dbg_type_val = self.mir_intrinsic_arg(body, args_id, 1)
+        let dbg_sema_ty = wl_const_int_sext_val(dbg_type_val) as i32
+        let dbg_str_ty = self.resolve_named_type(self.intern.intern("str"))
+        result = self.gen_debug_format(dbg_val, dbg_sema_ty, dbg_str_ty)
 
     else:
         return false
