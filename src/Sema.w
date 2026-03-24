@@ -21,7 +21,7 @@ extern fn with_hashmap_new(key_size: i64, val_size: i64) -> *i8
 
 // ── Type kind constants ──────────────────────────────────────────
 
-type TypeKind: i32 =
+enum TypeKind: i32:
     TY_ERR = 0
     TY_INT = 1
     TY_FLOAT = 2
@@ -43,22 +43,22 @@ type TypeKind: i32 =
     TY_NEVER = 18
     TY_GENERIC_INST = 19
 
-type VarState: i32 =
+enum VarState: i32:
     LIVE = 0
     MOVED = 1
 
-type BorrowKind: i32 =
+enum BorrowKind: i32:
     SHARED = 0
     EXCLUSIVE = 1
 
-type DeriveReq: i32 =
+enum DeriveReq: i32:
     COPY = 0
     CLONE = 1
     EQ = 2
 
 // ── Sema state ───────────────────────────────────────────────────
 
-type Sema = {
+type Sema {
     pool: InternPool,
     diags: DiagnosticList,
     ast: AstPool,
@@ -1083,32 +1083,40 @@ fn Sema.get_generic_inst_arg(self: Sema, tid: i32, index: i32) -> i32:
     let extra_start = self.get_type_d1(tid)
     self.type_extra.get((extra_start + index) as i64)
 
-fn Sema.is_unsigned_int_type(self: Sema, tid: i32) -> bool:
+fn Sema.numeric_operand_type(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)
+    if self.get_type_kind(resolved) == TypeKind.TY_ENUM:
+        let repr = self.enum_repr_type(resolved)
+        if repr != 0:
+            return self.resolve_alias(repr)
+    resolved
+
+fn Sema.is_unsigned_int_type(self: Sema, tid: i32) -> bool:
+    let resolved = self.numeric_operand_type(tid)
     if self.get_type_kind(resolved) != TypeKind.TY_INT:
         return false
     self.get_type_d1(resolved) == 0
 
 fn Sema.is_numeric_type(self: Sema, tid: i32) -> bool:
-    let resolved = self.resolve_alias(tid)
+    let resolved = self.numeric_operand_type(tid)
     let kind = self.get_type_kind(resolved)
     kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT
 
 fn Sema.literal_suffix_type(self: Sema, suffix: i32) -> i32:
-    if suffix == LIT_SUFFIX_I8: return self.ty_i8
-    if suffix == LIT_SUFFIX_I16: return self.ty_i16
-    if suffix == LIT_SUFFIX_I32: return self.ty_i32
-    if suffix == LIT_SUFFIX_I64: return self.ty_i64
-    if suffix == LIT_SUFFIX_I128: return self.ty_i128
-    if suffix == LIT_SUFFIX_ISIZE: return self.ty_isize
-    if suffix == LIT_SUFFIX_U8: return self.ty_u8
-    if suffix == LIT_SUFFIX_U16: return self.ty_u16
-    if suffix == LIT_SUFFIX_U32: return self.ty_u32
-    if suffix == LIT_SUFFIX_U64: return self.ty_u64
-    if suffix == LIT_SUFFIX_U128: return self.ty_u128
-    if suffix == LIT_SUFFIX_USIZE: return self.ty_usize
-    if suffix == LIT_SUFFIX_F32: return self.ty_f32
-    if suffix == LIT_SUFFIX_F64: return self.ty_f64
+    if suffix == LiteralSuffix.LIT_SUFFIX_I8: return self.ty_i8
+    if suffix == LiteralSuffix.LIT_SUFFIX_I16: return self.ty_i16
+    if suffix == LiteralSuffix.LIT_SUFFIX_I32: return self.ty_i32
+    if suffix == LiteralSuffix.LIT_SUFFIX_I64: return self.ty_i64
+    if suffix == LiteralSuffix.LIT_SUFFIX_I128: return self.ty_i128
+    if suffix == LiteralSuffix.LIT_SUFFIX_ISIZE: return self.ty_isize
+    if suffix == LiteralSuffix.LIT_SUFFIX_U8: return self.ty_u8
+    if suffix == LiteralSuffix.LIT_SUFFIX_U16: return self.ty_u16
+    if suffix == LiteralSuffix.LIT_SUFFIX_U32: return self.ty_u32
+    if suffix == LiteralSuffix.LIT_SUFFIX_U64: return self.ty_u64
+    if suffix == LiteralSuffix.LIT_SUFFIX_U128: return self.ty_u128
+    if suffix == LiteralSuffix.LIT_SUFFIX_USIZE: return self.ty_usize
+    if suffix == LiteralSuffix.LIT_SUFFIX_F32: return self.ty_f32
+    if suffix == LiteralSuffix.LIT_SUFFIX_F64: return self.ty_f64
     0
 
 fn Sema.int_literal_fits_type(self: Sema, value: i64, tid: i32) -> bool:
@@ -1145,7 +1153,7 @@ fn Sema.int_literal_fits_type(self: Sema, value: i64, tid: i32) -> bool:
 fn Sema.numeric_literal_expected_type(self: Sema, node: i32, value: i64) -> i32:
     if self.has_expected_type == 0 or self.expected_expr_type == 0:
         return 0
-    let expected = self.resolve_alias(self.expected_expr_type)
+    let expected = self.numeric_operand_type(self.expected_expr_type)
     if not self.is_numeric_type(expected):
         return 0
     if not self.int_literal_fits_type(value, expected):
@@ -1761,17 +1769,26 @@ fn Sema.build_ci_scoping(self: Sema):
         if kind == NK_TYPE_DECL or kind == NK_TRAIT_DECL or kind == NK_FN_DECL or kind == NK_EXTERN_FN or kind == NK_EXTERN_VAR or kind == NK_LET_DECL:
             let sym = self.ast.get_data0(decl)
             self.ci_syms.insert(sym, 1)
-        // For enum types, also record variant symbols
+        // For enum types, also record variant symbols.
+        // Disc enums store [repr_type_node, variant_count, ...variants...],
+        // so the variant walk must skip the repr node and respect variable
+        // payload lengths instead of assuming a fixed stride.
         if kind == NK_TYPE_DECL:
             let packed_kind = self.ast.get_data2(decl)
             let sub_kind = type_decl_sub_kind(packed_kind)
-            if sub_kind == TDK_DISC_ENUM:
+            if sub_kind == TDK_ENUM or sub_kind == TDK_DISC_ENUM:
                 let extra_start = self.ast.get_data1(decl)
-                let variant_count = self.ast.get_extra(extra_start)
+                var pos = if sub_kind == TDK_DISC_ENUM: extra_start + 1 else: extra_start
+                let variant_count = self.ast.get_extra(pos)
+                pos = pos + 1
                 for vi in 0..variant_count:
-                    let base = extra_start + 1 + vi * 3
-                    let v_sym = self.ast.get_extra(base)
+                    let v_sym = self.ast.get_extra(pos)
                     self.ci_syms.insert(v_sym, 1)
+                    pos = pos + 1
+                    if sub_kind == TDK_DISC_ENUM:
+                        pos = pos + 1
+                    let payload_count = self.ast.get_extra(pos)
+                    pos = pos + 1 + payload_count
 
 fn Sema.is_ci_visible(self: Sema, sym: i32) -> i32:
     // Check if a symbol is visible from the current module context.
@@ -3701,7 +3718,7 @@ fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
         return 0
     if kind == NK_UNARY:
         let op = self.ast.get_data0(node)
-        if op == UOP_REF or op == UOP_MUT_REF:
+        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF:
             return 1
         return self.expr_is_ephemeral_value(self.ast.get_data1(node))
     if kind == NK_SLICE:
@@ -4055,7 +4072,9 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     // Check function names
     let sig_idx = self.get_sig(sym)
     if sig_idx >= 0 and self.is_ci_visible(sym) != 0:
-        return self.sig_type_ids.get(sig_idx as i64)
+        let fn_tid = self.sig_type_ids.get(sig_idx as i64)
+        self.typed_expr_types.insert(node, fn_tid)
+        return fn_tid
 
     // Check generic functions
     if self.generic_fn_nodes.contains(sym) and self.is_ci_visible(sym) != 0:
@@ -4064,13 +4083,18 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     // Check type names
     let prim = self.primitive_type_by_sym(sym)
     if prim != 0:
+        self.typed_expr_types.insert(node, prim)
         return prim
     if self.named_types.contains(sym) and self.is_ci_visible(sym) != 0:
-        return self.named_types.get(sym).unwrap()
+        let named_tid = self.named_types.get(sym).unwrap()
+        self.typed_expr_types.insert(node, named_tid)
+        return named_tid
 
     // Check enum variants
     if self.variant_lookup.contains(sym) and self.is_ci_visible(sym) != 0:
-        return self.variant_type_ids.get(sym).unwrap()
+        let variant_tid = self.variant_type_ids.get(sym).unwrap()
+        self.typed_expr_types.insert(node, variant_tid)
+        return variant_tid
 
     // Unknown identifier
     self.emit_error("undefined variable", node)
@@ -4165,7 +4189,7 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
     let rhs_is_num_lit = sema_node_is_numeric_literal(self.ast, rhs_node)
     var lhs = 0
     var rhs = 0
-    if op == OP_DEFAULT:
+    if op == BinaryOp.OP_DEFAULT:
         lhs = self.check_expr(lhs_node)
         if lhs == 0:
             return 0
@@ -4182,7 +4206,7 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         return unwrapped
     // Variant shorthand in comparisons must be typed against the opposite side,
     // not whatever outer expected type is active (for example `bool` from assert()).
-    if op == OP_EQ or op == OP_NEQ or op == OP_LT or op == OP_GT or op == OP_LTE or op == OP_GTE:
+    if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE:
         if self.ast.kind(lhs_node) == NK_VARIANT_SHORTHAND:
             rhs = self.check_expr(rhs_node)
             lhs = self.check_expr_with_expected(lhs_node, rhs)
@@ -4202,10 +4226,10 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
             else:
                 if rhs == 0:
                     rhs = self.check_expr(rhs_node)
-    else if op == OP_ADD or op == OP_SUB or op == OP_MUL or op == OP_DIV or op == OP_MOD or
-       op == OP_ADD_WRAP or op == OP_SUB_WRAP or op == OP_MUL_WRAP or
-       op == OP_BIT_AND or op == OP_BIT_OR or op == OP_BIT_XOR or
-       op == OP_SHL or op == OP_SHR:
+    else if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD or
+       op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP or
+       op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR or
+       op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
         if lhs_is_num_lit and rhs_is_num_lit:
             lhs = self.check_expr(lhs_node)
             rhs = self.check_expr(rhs_node)
@@ -4233,11 +4257,11 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         return 0
 
     // Comparison operators return bool
-    if op == OP_EQ or op == OP_NEQ or op == OP_LT or op == OP_GT or op == OP_LTE or op == OP_GTE or op == OP_IN or op == OP_NOT_IN:
+    if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE or op == BinaryOp.OP_IN or op == BinaryOp.OP_NOT_IN:
         return self.ty_bool
 
     // Logical operators
-    if op == OP_AND or op == OP_OR:
+    if op == BinaryOp.OP_AND or op == BinaryOp.OP_OR:
         if lhs != self.ty_bool:
             self.emit_error("left operand of logical operator must be bool", node)
         if rhs != self.ty_bool:
@@ -4245,18 +4269,18 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         return self.ty_bool
 
     // Arithmetic — unsigned types wrap by default (rewrite to wrapping ops)
-    if (op == OP_ADD or op == OP_SUB or op == OP_MUL) and self.is_unsigned_int_type(lhs) and self.is_unsigned_int_type(rhs):
-        let wrap_op = if op == OP_ADD: OP_ADD_WRAP else: if op == OP_SUB: OP_SUB_WRAP else: OP_MUL_WRAP
+    if (op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL) and self.is_unsigned_int_type(lhs) and self.is_unsigned_int_type(rhs):
+        let wrap_op = if op == BinaryOp.OP_ADD: BinaryOp.OP_ADD_WRAP else: if op == BinaryOp.OP_SUB: BinaryOp.OP_SUB_WRAP else: BinaryOp.OP_MUL_WRAP
         self.ast.set_data0(node, wrap_op)
         return self.arithmetic_result_type(lhs, rhs)
 
-    if op == OP_ADD or op == OP_SUB or op == OP_MUL or op == OP_DIV or op == OP_MOD:
-        if op == OP_ADD and lhs == self.ty_str and rhs == self.ty_str:
+    if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD:
+        if op == BinaryOp.OP_ADD and lhs == self.ty_str and rhs == self.ty_str:
             return self.ty_str
         // Pointer arithmetic: ptr + int → ptr, ptr - int → ptr
         let lhs_k = self.get_type_kind(self.resolve_alias(lhs))
         let rhs_k = self.get_type_kind(self.resolve_alias(rhs))
-        if (op == OP_ADD or op == OP_SUB) and lhs_k == TypeKind.TY_PTR and (rhs_k == TypeKind.TY_INT or rhs == self.ty_i32 or rhs == self.ty_i64 or rhs == self.ty_usize or rhs == self.ty_isize):
+        if (op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB) and lhs_k == TypeKind.TY_PTR and (rhs_k == TypeKind.TY_INT or rhs == self.ty_i32 or rhs == self.ty_i64 or rhs == self.ty_usize or rhs == self.ty_isize):
             return lhs
         let result = self.arithmetic_result_type(lhs, rhs)
         if result != 0:
@@ -4264,10 +4288,10 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         let lhs_resolved = self.resolve_alias(lhs)
         let lhs_name = self.get_type_name(lhs_resolved)
         if lhs_name != 0:
-            let method_name = if op == OP_ADD: "add" else:
-                if op == OP_SUB: "sub" else:
-                if op == OP_MUL: "mul" else:
-                if op == OP_DIV: "div" else:
+            let method_name = if op == BinaryOp.OP_ADD: "add" else:
+                if op == BinaryOp.OP_SUB: "sub" else:
+                if op == BinaryOp.OP_MUL: "mul" else:
+                if op == BinaryOp.OP_DIV: "div" else:
                 "mod"
             let method_sym = self.pool_intern(method_name)
             let method_key = self.method_key(lhs_name, method_sym)
@@ -4278,17 +4302,17 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         return 0
 
     // Bitwise
-    if op == OP_BIT_AND or op == OP_BIT_OR or op == OP_BIT_XOR or op == OP_SHL or op == OP_SHR:
+    if op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR or op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
         return lhs
 
     // Wrapping arithmetic
-    if op == OP_ADD_WRAP or op == OP_SUB_WRAP or op == OP_MUL_WRAP:
+    if op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP:
         return lhs
 
     // Concat (++) — both operands must be str
     // Only reject known non-str types; allow unresolved/generic types
     // that may be str after monomorphization (Vec[str].get() etc.)
-    if op == OP_CONCAT:
+    if op == BinaryOp.OP_CONCAT:
         let lhs_resolved = self.resolve_alias(lhs)
         let rhs_resolved = self.resolve_alias(rhs)
         let lhs_k = self.get_type_kind(lhs_resolved)
@@ -4308,21 +4332,21 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
     if operand == 0:
         return 0
 
-    if op == UOP_NEGATE:
+    if op == UnaryOp.UOP_NEGATE:
         if self.is_unsigned_int_type(operand):
             self.emit_error("cannot negate an unsigned value", node)
         return operand
-    if op == UOP_BIT_NOT:
+    if op == UnaryOp.UOP_BIT_NOT:
         return operand
-    if op == UOP_NOT:
+    if op == UnaryOp.UOP_NOT:
         return self.ty_bool
-    if op == UOP_REF:
+    if op == UnaryOp.UOP_REF:
         self.check_borrow_create(operand_node, BorrowKind.SHARED, node)
         return self.add_type(TypeKind.TY_REF, operand, 0, 0)
-    if op == UOP_MUT_REF:
+    if op == UnaryOp.UOP_MUT_REF:
         self.check_borrow_create(operand_node, BorrowKind.EXCLUSIVE, node)
         return self.add_type(TypeKind.TY_REF, operand, 1, 0)
-    if op == UOP_DEREF:
+    if op == UnaryOp.UOP_DEREF:
         let resolved = self.resolve_alias(operand)
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_REF:
@@ -4330,7 +4354,7 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         if tk == TypeKind.TY_PTR:
             return self.get_type_d0(resolved)
         return 0
-    if op == UOP_TRY:
+    if op == UnaryOp.UOP_TRY:
         if self.in_defer != 0:
             self.emit_error("? operator not allowed in defer", node)
             return 0
@@ -4450,7 +4474,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     // If this let binds a borrow, tie the newest active borrow to this binding.
     if self.ast.kind(value) == NK_UNARY:
         let uop = self.ast.get_data0(value)
-        if uop == UOP_REF or uop == UOP_MUT_REF:
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF:
             let blen = self.borrow_refs.len() as i32
             if blen > 0:
                 self.borrow_refs.set_i32((blen - 1) as i64, name)
@@ -4652,14 +4676,9 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
         return 0
 
     if ftk == TypeKind.TY_ENUM:
-        // Discriminant enums: with payloads return enum type, without return repr type
-        let repr_opt = self.disc_repr_types.get(field_base)
-        if repr_opt.is_some():
-            let hp = self.disc_has_payload.get(field_base)
-            if hp.is_some() and hp.unwrap() != 0:
-                return field_base
-            return repr_opt.unwrap()
-        return field_base
+        if self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
+            return field_base
+        return 0
 
     0
 
@@ -5210,10 +5229,13 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
 
     if kind == NK_PAT_VARIANT:
         let v_name = self.ast.get_data0(node)
+        if self.validate_variant_pattern_subject(node, subject_type, v_name) == 0:
+            return
         let v_extra = self.ast.get_data1(node)
         let bind_count = self.ast.get_data2(node)
         var payload_start = 0
         var payload_count = 0
+        var found_variant = 0
         let resolved = self.resolve_alias(subject_type)
         let resolved_kind = self.get_type_kind(resolved)
         if resolved_kind == TypeKind.TY_ENUM:
@@ -5224,6 +5246,7 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                 let name_sym = self.type_extra.get(pos as i64)
                 let pc = self.type_extra.get((pos + 1) as i64)
                 if name_sym == v_name:
+                    found_variant = 1
                     payload_start = pos + 2
                     payload_count = pc
                     break
@@ -5240,10 +5263,13 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                         let name_sym = self.type_extra.get(pos as i64)
                         let pc = self.type_extra.get((pos + 1) as i64)
                         if name_sym == v_name:
+                            found_variant = 1
                             payload_start = pos + 2
                             payload_count = pc
                             break
                         pos = pos + 2 + pc
+        if found_variant == 0:
+            return
         // Recursively check each payload pattern (extra stores pattern nodes).
         // For TypeKind.TY_GENERIC_INST, re-resolve payload types from AST with substitution.
         var gi_payload_types: Vec[i32] = Vec.new()
@@ -5262,10 +5288,13 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
 
     if kind == NK_PAT_ENUM_SHORTHAND:
         let v_name = self.ast.get_data0(node)
+        if self.validate_variant_pattern_subject(node, subject_type, v_name) == 0:
+            return
         let v_extra = self.ast.get_data1(node)
         let bind_count = self.ast.get_data2(node)
         var payload_start = 0
         var payload_count = 0
+        var found_variant = 0
         let resolved = self.resolve_alias(subject_type)
         let resolved_kind = self.get_type_kind(resolved)
         if resolved_kind == TypeKind.TY_ENUM:
@@ -5276,6 +5305,7 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                 let name_sym = self.type_extra.get(pos as i64)
                 let pc = self.type_extra.get((pos + 1) as i64)
                 if name_sym == v_name:
+                    found_variant = 1
                     payload_start = pos + 2
                     payload_count = pc
                     break
@@ -5292,10 +5322,13 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                         let name_sym = self.type_extra.get(pos as i64)
                         let pc = self.type_extra.get((pos + 1) as i64)
                         if name_sym == v_name:
+                            found_variant = 1
                             payload_start = pos + 2
                             payload_count = pc
                             break
                         pos = pos + 2 + pc
+        if found_variant == 0:
+            return
         // For TypeKind.TY_GENERIC_INST, re-resolve payload types from AST with substitution.
         var gi_payload_types_sh: Vec[i32] = Vec.new()
         if resolved_kind == TypeKind.TY_GENERIC_INST and payload_count > 0:
@@ -5871,7 +5904,13 @@ fn Sema.check_expr_with_expected(self: Sema, node: i32, expected: i32) -> i32:
 
 fn Sema.enum_has_variant(self: Sema, enum_tid: i32, variant_sym: i32) -> i32:
     let resolved = self.resolve_alias(enum_tid)
-    if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
+    let resolved_kind = self.get_type_kind(resolved)
+    if resolved_kind == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved)
+        if self.named_types.contains(base_sym):
+            return self.enum_has_variant(self.named_types.get(base_sym).unwrap(), variant_sym)
+        return 0
+    if resolved_kind != TypeKind.TY_ENUM:
         return 0
     let te_start = self.get_type_d1(resolved)
     let variant_count = self.get_type_d2(resolved)
@@ -5883,6 +5922,49 @@ fn Sema.enum_has_variant(self: Sema, enum_tid: i32, variant_sym: i32) -> i32:
             return 1
         pos = pos + 2 + payload_count
     0
+
+fn Sema.enum_pattern_owner_sym(self: Sema, type_id: i32) -> i32:
+    if type_id == 0:
+        return 0
+    let resolved = self.resolve_alias(type_id)
+    let resolved_kind = self.get_type_kind(resolved)
+    if resolved_kind == TypeKind.TY_ENUM:
+        return self.get_type_d0(resolved)
+    if resolved_kind == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved)
+        if self.named_types.contains(base_sym):
+            let base_tid = self.named_types.get(base_sym).unwrap()
+            if self.get_type_kind(self.resolve_alias(base_tid)) == TypeKind.TY_ENUM:
+                return base_sym
+    0
+
+fn Sema.validate_variant_pattern_subject(self: Sema, node: i32, subject_type: i32, variant_name: i32) -> i32:
+    if subject_type == 0:
+        return 0
+    let subject_enum_sym = self.enum_pattern_owner_sym(subject_type)
+    let qualifier_sym = self.ast.pattern_qualifier(node)
+    if qualifier_sym != 0:
+        if not self.named_types.contains(qualifier_sym):
+            self.emit_error("unknown type '" ++ self.pool_resolve(qualifier_sym) ++ "' in qualified enum pattern", node)
+            return 0
+        let qualifier_tid = self.named_types.get(qualifier_sym).unwrap()
+        let qualifier_enum_sym = self.enum_pattern_owner_sym(qualifier_tid)
+        if qualifier_enum_sym == 0:
+            self.emit_error("qualified enum pattern type '" ++ self.pool_resolve(qualifier_sym) ++ "' is not an enum", node)
+            return 0
+        if subject_enum_sym == 0:
+            self.emit_error("qualified enum pattern requires an enum subject", node)
+            return 0
+        if qualifier_enum_sym != subject_enum_sym:
+            self.emit_error("qualified enum pattern type '" ++ self.pool_resolve(qualifier_sym) ++ "' does not match subject type '" ++ self.pool_resolve(subject_enum_sym) ++ "'", node)
+            return 0
+    else if subject_enum_sym == 0:
+        self.emit_error("variant pattern requires an enum subject", node)
+        return 0
+    if subject_enum_sym != 0 and self.enum_has_variant(subject_type, variant_name) == 0:
+        self.emit_error("variant '" ++ self.pool_resolve(variant_name) ++ "' does not belong to enum '" ++ self.pool_resolve(subject_enum_sym) ++ "'", node)
+        return 0
+    1
 
 fn Sema.check_dyn_trait_call_compat(self: Sema, fn_sym: i32, call_extra_start: i32, arg_types: Vec[i32], arg_count: i32, param_offset: i32):
     if not self.fn_decl_nodes.contains(fn_sym):
@@ -6464,6 +6546,27 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
 
     let resolved = self.resolve_alias(obj_type)
     let type_name_sym = self.get_type_name(resolved)
+
+    // Static enum variant constructor: Shape.Rect(1, 2), Option[i32].Some(1)
+    if self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
+        let payload_tys = self.enum_variant_payload_types(obj_type, field)
+        let expected = payload_tys.len() as i32
+        if arg_count != expected:
+            let owner_name = self.type_name(obj_type)
+            let variant_name = self.pool_resolve(field)
+            self.emit_error(f"enum variant constructor '{owner_name}.{variant_name}' expects {expected} argument(s), found {arg_count}", node)
+        for ai in 0..arg_count:
+            if ai >= expected:
+                break
+            let expected_ty = payload_tys.get(ai as i64)
+            let arg_ty = arg_types.get(ai as i64)
+            if expected_ty != 0 and arg_ty != 0:
+                if self.types_compatible(expected_ty, arg_ty) == 0:
+                    if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
+                        let owner_name = self.type_name(obj_type)
+                        let variant_name = self.pool_resolve(field)
+                        self.emit_argument_type_mismatch(owner_name ++ "." ++ variant_name, field, ai, ai, expected_ty, arg_ty, self.ast.get_extra(extra_start + ai))
+        return obj_type
 
     if type_name_sym != 0:
         let method_key = self.method_key(type_name_sym, field)
@@ -7162,7 +7265,7 @@ fn Sema.expr_mutates_place(self: Sema, node: i32, sym: i32) -> i32:
     // &mut borrow of sym
     if kind == NK_UNARY:
         let op = self.ast.get_data0(node)
-        if op == UOP_MUT_REF:
+        if op == UnaryOp.UOP_MUT_REF:
             let operand = self.ast.get_data1(node)
             if self.place_root_sym(operand) == sym:
                 return 1
@@ -7342,7 +7445,7 @@ fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
     if kind == NK_UNARY:
         let op = self.ast.get_data0(node)
         let operand = self.ast.get_data1(node)
-        if op == UOP_MUT_REF:
+        if op == UnaryOp.UOP_MUT_REF:
             // &mut sym.field — mark field as exclusive
             if self.ast.kind(operand) == NK_FIELD_ACCESS:
                 let fbase = self.ast.get_data0(operand)
@@ -7520,6 +7623,15 @@ fn Sema.get_type_name(self: Sema, tid: i32) -> i32:
         return self.get_type_d0(resolved)
     0
 
+fn Sema.enum_repr_type(self: Sema, tid: i32) -> i32:
+    let resolved = self.resolve_alias(tid)
+    if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
+        return 0
+    let opt = self.disc_repr_types.get(resolved)
+    if opt.is_some():
+        return opt.unwrap()
+    0
+
 // ── Type compatibility ───────────────────────────────────────────
 
 fn Sema.types_compatible_fast(self: Sema, expected: i32, actual: i32) -> i32:
@@ -7546,6 +7658,10 @@ fn Sema.types_compatible_fast(self: Sema, expected: i32, actual: i32) -> i32:
         return 1
     if exp_k == TypeKind.TY_INT and act_k == TypeKind.TY_INT:
         return 1
+    if exp_k == TypeKind.TY_INT and act_k == TypeKind.TY_ENUM:
+        let act_repr = self.enum_repr_type(act_r)
+        if act_repr != 0:
+            return self.types_compatible_fast(expected, act_repr)
     if exp_k == TypeKind.TY_FLOAT and act_k == TypeKind.TY_FLOAT:
         return 1
     if exp_k == TypeKind.TY_FLOAT and act_k == TypeKind.TY_INT:
@@ -7695,30 +7811,36 @@ fn Sema.arithmetic_result_type(self: Sema, lhs: i32, rhs: i32) -> i32:
         return rhs
     if rhs == 0:
         return lhs
-    let lk = self.get_type_kind(self.resolve_alias(lhs))
-    let rk = self.get_type_kind(self.resolve_alias(rhs))
+    let lhs_numeric = self.numeric_operand_type(lhs)
+    let rhs_numeric = self.numeric_operand_type(rhs)
+    let lk = self.get_type_kind(self.resolve_alias(lhs_numeric))
+    let rk = self.get_type_kind(self.resolve_alias(rhs_numeric))
     if lk == TypeKind.TY_NEVER:
+        if rhs_numeric != 0:
+            return rhs_numeric
         return rhs
     if rk == TypeKind.TY_NEVER:
+        if lhs_numeric != 0:
+            return lhs_numeric
         return lhs
     // Float wins over int
     if lk == TypeKind.TY_FLOAT and rk == TypeKind.TY_FLOAT:
-        let lb = self.get_type_d0(self.resolve_alias(lhs))
-        let rb = self.get_type_d0(self.resolve_alias(rhs))
+        let lb = self.get_type_d0(self.resolve_alias(lhs_numeric))
+        let rb = self.get_type_d0(self.resolve_alias(rhs_numeric))
         if lb >= rb:
-            return lhs
-        return rhs
+            return lhs_numeric
+        return rhs_numeric
     if lk == TypeKind.TY_FLOAT:
-        return lhs
+        return lhs_numeric
     if rk == TypeKind.TY_FLOAT:
-        return rhs
+        return rhs_numeric
     // Wider int wins
     if lk == TypeKind.TY_INT and rk == TypeKind.TY_INT:
-        let lb = self.get_type_d0(self.resolve_alias(lhs))
-        let rb = self.get_type_d0(self.resolve_alias(rhs))
+        let lb = self.get_type_d0(self.resolve_alias(lhs_numeric))
+        let rb = self.get_type_d0(self.resolve_alias(rhs_numeric))
         if lb >= rb:
-            return lhs
-        return rhs
+            return lhs_numeric
+        return rhs_numeric
     0
 
 fn Sema.is_copy(self: Sema, tid: i32) -> i32:
