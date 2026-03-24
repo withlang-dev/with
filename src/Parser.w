@@ -2261,53 +2261,53 @@ fn numeric_literal_suffix_start(text: str, suffix: str) -> i32:
     0 - 1
 
 fn numeric_literal_suffix_code(text: str) -> i32:
-    if numeric_literal_suffix_start(text, "usize") >= 0: return LiteralSuffix.LIT_SUFFIX_USIZE
-    if numeric_literal_suffix_start(text, "isize") >= 0: return LiteralSuffix.LIT_SUFFIX_ISIZE
-    if numeric_literal_suffix_start(text, "u128") >= 0: return LiteralSuffix.LIT_SUFFIX_U128
-    if numeric_literal_suffix_start(text, "i128") >= 0: return LiteralSuffix.LIT_SUFFIX_I128
-    if numeric_literal_suffix_start(text, "u64") >= 0: return LiteralSuffix.LIT_SUFFIX_U64
-    if numeric_literal_suffix_start(text, "i64") >= 0: return LiteralSuffix.LIT_SUFFIX_I64
-    if numeric_literal_suffix_start(text, "u32") >= 0: return LiteralSuffix.LIT_SUFFIX_U32
-    if numeric_literal_suffix_start(text, "i32") >= 0: return LiteralSuffix.LIT_SUFFIX_I32
-    if numeric_literal_suffix_start(text, "u16") >= 0: return LiteralSuffix.LIT_SUFFIX_U16
-    if numeric_literal_suffix_start(text, "i16") >= 0: return LiteralSuffix.LIT_SUFFIX_I16
-    if numeric_literal_suffix_start(text, "u8") >= 0: return LiteralSuffix.LIT_SUFFIX_U8
-    if numeric_literal_suffix_start(text, "i8") >= 0: return LiteralSuffix.LIT_SUFFIX_I8
-    if numeric_literal_suffix_start(text, "f64") >= 0: return LiteralSuffix.LIT_SUFFIX_F64
-    if numeric_literal_suffix_start(text, "f32") >= 0: return LiteralSuffix.LIT_SUFFIX_F32
-    LiteralSuffix.LIT_SUFFIX_NONE
+    if numeric_literal_suffix_start(text, "usize") >= 0: return LiteralSuffix.Usize
+    if numeric_literal_suffix_start(text, "isize") >= 0: return LiteralSuffix.Isize
+    if numeric_literal_suffix_start(text, "u128") >= 0: return LiteralSuffix.U128
+    if numeric_literal_suffix_start(text, "i128") >= 0: return LiteralSuffix.I128
+    if numeric_literal_suffix_start(text, "u64") >= 0: return LiteralSuffix.U64
+    if numeric_literal_suffix_start(text, "i64") >= 0: return LiteralSuffix.I64
+    if numeric_literal_suffix_start(text, "u32") >= 0: return LiteralSuffix.U32
+    if numeric_literal_suffix_start(text, "i32") >= 0: return LiteralSuffix.I32
+    if numeric_literal_suffix_start(text, "u16") >= 0: return LiteralSuffix.U16
+    if numeric_literal_suffix_start(text, "i16") >= 0: return LiteralSuffix.I16
+    if numeric_literal_suffix_start(text, "u8") >= 0: return LiteralSuffix.U8
+    if numeric_literal_suffix_start(text, "i8") >= 0: return LiteralSuffix.I8
+    if numeric_literal_suffix_start(text, "f64") >= 0: return LiteralSuffix.F64
+    if numeric_literal_suffix_start(text, "f32") >= 0: return LiteralSuffix.F32
+    LiteralSuffix.None
 
 fn numeric_literal_core(text: str) -> str:
     let suffix = numeric_literal_suffix_code(text)
-    if suffix == LiteralSuffix.LIT_SUFFIX_NONE:
+    if suffix == LiteralSuffix.None:
         return text
-    if suffix == LiteralSuffix.LIT_SUFFIX_USIZE:
+    if suffix == LiteralSuffix.Usize:
         return text.slice(0, numeric_literal_suffix_start(text, "usize") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_ISIZE:
+    if suffix == LiteralSuffix.Isize:
         return text.slice(0, numeric_literal_suffix_start(text, "isize") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_U128:
+    if suffix == LiteralSuffix.U128:
         return text.slice(0, numeric_literal_suffix_start(text, "u128") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_I128:
+    if suffix == LiteralSuffix.I128:
         return text.slice(0, numeric_literal_suffix_start(text, "i128") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_U64:
+    if suffix == LiteralSuffix.U64:
         return text.slice(0, numeric_literal_suffix_start(text, "u64") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_I64:
+    if suffix == LiteralSuffix.I64:
         return text.slice(0, numeric_literal_suffix_start(text, "i64") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_U32:
+    if suffix == LiteralSuffix.U32:
         return text.slice(0, numeric_literal_suffix_start(text, "u32") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_I32:
+    if suffix == LiteralSuffix.I32:
         return text.slice(0, numeric_literal_suffix_start(text, "i32") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_U16:
+    if suffix == LiteralSuffix.U16:
         return text.slice(0, numeric_literal_suffix_start(text, "u16") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_I16:
+    if suffix == LiteralSuffix.I16:
         return text.slice(0, numeric_literal_suffix_start(text, "i16") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_U8:
+    if suffix == LiteralSuffix.U8:
         return text.slice(0, numeric_literal_suffix_start(text, "u8") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_I8:
+    if suffix == LiteralSuffix.I8:
         return text.slice(0, numeric_literal_suffix_start(text, "i8") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_F64:
+    if suffix == LiteralSuffix.F64:
         return text.slice(0, numeric_literal_suffix_start(text, "f64") as i64)
-    if suffix == LiteralSuffix.LIT_SUFFIX_F32:
+    if suffix == LiteralSuffix.F32:
         return text.slice(0, numeric_literal_suffix_start(text, "f32") as i64)
     text
 
@@ -3054,7 +3054,7 @@ fn Parser.parse_unary_negate(self: Parser) -> i32:
     if self.peek() == TokenKind.TK_INT_LIT:
         let end = self.current_end()
         let text = self.source.slice(start as i64 + 1, end as i64)
-        if numeric_literal_suffix_code(text) == LiteralSuffix.LIT_SUFFIX_NONE:
+        if numeric_literal_suffix_code(text) == LiteralSuffix.None:
             let value = 0 - parse_i64(text)
             self.advance()
             return self.pool.add_node(NodeKind.NK_INT_LIT, start, end, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value))

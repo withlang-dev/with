@@ -1103,20 +1103,20 @@ fn Sema.is_numeric_type(self: Sema, tid: i32) -> bool:
     kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT
 
 fn Sema.literal_suffix_type(self: Sema, suffix: i32) -> i32:
-    if suffix == LiteralSuffix.LIT_SUFFIX_I8: return self.ty_i8
-    if suffix == LiteralSuffix.LIT_SUFFIX_I16: return self.ty_i16
-    if suffix == LiteralSuffix.LIT_SUFFIX_I32: return self.ty_i32
-    if suffix == LiteralSuffix.LIT_SUFFIX_I64: return self.ty_i64
-    if suffix == LiteralSuffix.LIT_SUFFIX_I128: return self.ty_i128
-    if suffix == LiteralSuffix.LIT_SUFFIX_ISIZE: return self.ty_isize
-    if suffix == LiteralSuffix.LIT_SUFFIX_U8: return self.ty_u8
-    if suffix == LiteralSuffix.LIT_SUFFIX_U16: return self.ty_u16
-    if suffix == LiteralSuffix.LIT_SUFFIX_U32: return self.ty_u32
-    if suffix == LiteralSuffix.LIT_SUFFIX_U64: return self.ty_u64
-    if suffix == LiteralSuffix.LIT_SUFFIX_U128: return self.ty_u128
-    if suffix == LiteralSuffix.LIT_SUFFIX_USIZE: return self.ty_usize
-    if suffix == LiteralSuffix.LIT_SUFFIX_F32: return self.ty_f32
-    if suffix == LiteralSuffix.LIT_SUFFIX_F64: return self.ty_f64
+    if suffix == LiteralSuffix.I8: return self.ty_i8
+    if suffix == LiteralSuffix.I16: return self.ty_i16
+    if suffix == LiteralSuffix.I32: return self.ty_i32
+    if suffix == LiteralSuffix.I64: return self.ty_i64
+    if suffix == LiteralSuffix.I128: return self.ty_i128
+    if suffix == LiteralSuffix.Isize: return self.ty_isize
+    if suffix == LiteralSuffix.U8: return self.ty_u8
+    if suffix == LiteralSuffix.U16: return self.ty_u16
+    if suffix == LiteralSuffix.U32: return self.ty_u32
+    if suffix == LiteralSuffix.U64: return self.ty_u64
+    if suffix == LiteralSuffix.U128: return self.ty_u128
+    if suffix == LiteralSuffix.Usize: return self.ty_usize
+    if suffix == LiteralSuffix.F32: return self.ty_f32
+    if suffix == LiteralSuffix.F64: return self.ty_f64
     0
 
 fn Sema.int_literal_fits_type(self: Sema, value: i64, tid: i32) -> bool:
