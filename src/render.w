@@ -215,7 +215,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
         let vis = pool.get_data2(node)
         let extra_start = pool.get_data1(node)
         var out = prefix
-        if vis == Visibility.VIS_PUBLIC:
+        if vis == Visibility.Public:
             out = out ++ "pub "
         out = out ++ "trait " ++ name ++ " =\n"
 
@@ -933,7 +933,7 @@ fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
     if sub_kind == TypeDeclKind.TDK_STRUCT:
         let field_count = pool.get_extra(extra_start)
         let vis_idx = extra_start + 1 + field_count * 4
-        return pool.get_extra(vis_idx) == Visibility.VIS_PUBLIC
+        return pool.get_extra(vis_idx) == Visibility.Public
     if sub_kind == TypeDeclKind.TDK_ENUM:
         var ep = extra_start + 1
         let variant_count = pool.get_extra(extra_start)
@@ -941,7 +941,7 @@ fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
             ep = ep + 1  // name
             let payload_count = pool.get_extra(ep)
             ep = ep + 1 + payload_count
-        return pool.get_extra(ep) == Visibility.VIS_PUBLIC
+        return pool.get_extra(ep) == Visibility.Public
     if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
         var ep = extra_start + 2 // skip repr_type_node, get variant_count
         let variant_count = pool.get_extra(extra_start + 1)
@@ -950,9 +950,9 @@ fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
             ep = ep + 1  // disc value
             let payload_count = pool.get_extra(ep)
             ep = ep + 1 + payload_count
-        return pool.get_extra(ep) == Visibility.VIS_PUBLIC
+        return pool.get_extra(ep) == Visibility.Public
     // Alias / distinct: [aliased_type, vis]
-    return pool.get_extra(extra_start + 1) == Visibility.VIS_PUBLIC
+    return pool.get_extra(extra_start + 1) == Visibility.Public
 
 fn top_level_let_type_ann(pool: AstPool, flags: i32) -> i32:
     let encoded = flags / 4

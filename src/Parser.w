@@ -383,20 +383,20 @@ fn Parser.parse_module(self: Parser) -> AstPool:
             let saved_pos = self.pos
             self.advance()
             if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
-                self.parse_impl_block(Visibility.VIS_PUBLIC)
+                self.parse_impl_block(Visibility.Public)
                 self.skip_newlines()
                 continue
             if self.peek() == TokenKind.TK_KW_TRAIT:
-                self.parse_trait_decl(Visibility.VIS_PUBLIC)
+                self.parse_trait_decl(Visibility.Public)
                 self.skip_newlines()
                 continue
             self.pos = saved_pos
         else if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
-            self.parse_impl_block(Visibility.VIS_PRIVATE)
+            self.parse_impl_block(Visibility.Private)
             self.skip_newlines()
             continue
         else if self.peek() == TokenKind.TK_KW_TRAIT:
-            self.parse_trait_decl(Visibility.VIS_PRIVATE)
+            self.parse_trait_decl(Visibility.Private)
             self.skip_newlines()
             continue
 
@@ -412,11 +412,11 @@ fn Parser.parse_module(self: Parser) -> AstPool:
 // ── Declaration parsing ──────────────────────────────────────────
 
 fn Parser.parse_decl(self: Parser) -> i32:
-    var is_pub = Visibility.VIS_PRIVATE
+    var is_pub = Visibility.Private
     let start = self.current_start()
 
     if self.peek() == TokenKind.TK_KW_PUB:
-        is_pub = Visibility.VIS_PUBLIC
+        is_pub = Visibility.Public
         self.advance()
 
     if self.peek() != TokenKind.TK_KW_TYPE and self.peek() != TokenKind.TK_KW_ENUM:
@@ -524,7 +524,7 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
 
     // Build flags
     var flags = 0
-    if is_pub == Visibility.VIS_PUBLIC:
+    if is_pub == Visibility.Public:
         flags = flags + FnFlags.FN_FLAG_PUB
     if is_async != 0:
         flags = flags + FnFlags.FN_FLAG_ASYNC
@@ -1568,7 +1568,7 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> i32:
     var flags = 0
     if is_mut:
         flags = flags + 1
-    if is_pub == Visibility.VIS_PUBLIC:
+    if is_pub == Visibility.Public:
         flags = flags + 2
     if type_ann != 0:
         let type_extra = self.pool.extra_len()
@@ -1600,7 +1600,7 @@ fn Parser.parse_const_decl(self: Parser, is_pub: i32, start: i32) -> i32:
     let value = self.pool.add_node(NodeKind.NK_COMPTIME, start, self.prev_end(), raw_value, 0, 0)
 
     var flags = 0
-    if is_pub == Visibility.VIS_PUBLIC:
+    if is_pub == Visibility.Public:
         flags = flags + 2
     if type_ann != 0:
         let type_extra = self.pool.extra_len()
@@ -1926,7 +1926,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
         var method_vis = vis
         let method_start = self.current_start()
         if self.peek() == TokenKind.TK_KW_PUB:
-            method_vis = Visibility.VIS_PUBLIC
+            method_vis = Visibility.Public
             self.advance()
         var m_async = 0
         if self.peek() == TokenKind.TK_KW_ASYNC:
@@ -1972,7 +1972,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
         let body = self.parse_block_or_expr()
 
         var flags = 0
-        if method_vis == Visibility.VIS_PUBLIC:
+        if method_vis == Visibility.Public:
             flags = flags + FnFlags.FN_FLAG_PUB
         if m_async != 0:
             flags = flags + FnFlags.FN_FLAG_ASYNC
