@@ -4316,8 +4316,14 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
     if op == OP_ADD_WRAP or op == OP_SUB_WRAP or op == OP_MUL_WRAP:
         return lhs
 
-    // Concat (++)
+    // Concat (++) — both operands must be str
     if op == OP_CONCAT:
+        let lhs_resolved = self.resolve_alias(lhs)
+        let rhs_resolved = self.resolve_alias(rhs)
+        if lhs_resolved != self.ty_str:
+            self.emit_error("left operand of ++ must be str", lhs_node)
+        if rhs_resolved != self.ty_str:
+            self.emit_error("right operand of ++ must be str", rhs_node)
         return self.ty_str
 
     0
