@@ -104,8 +104,8 @@ fn main:
         if i % 10 < 3:
             world.add_damage(id, Damage { dps: 0.5f32 + (fi % 10.0f32) * 0.1f32 })
 
-    with_eprintln("Entities: " ++ int_to_string(world.count))
-    with_eprintln("Alive: " ++ int_to_string(world.count_alive()))
+    with_eprintln(f"Entities: {world.count}")
+    with_eprintln(f"Alive: {world.count_alive()}")
 
     let start = clock()
     let dt: f32 = 1.0f32 / 60.0f32
@@ -118,11 +118,11 @@ fn main:
     let cps: i64 = 1000000  // CLOCKS_PER_SEC on macOS
     let secs = elapsed / cps
     let msecs = ((elapsed % cps) * 1000i64) / cps
-    with_eprintln("1000 ticks: " ++ i64_to_string(secs) ++ "." ++ i64_to_string(msecs) ++ "s")
-    with_eprintln("Alive after: " ++ int_to_string(world.count_alive()))
+    with_eprintln(f"1000 ticks: {secs}.{msecs}s")
+    with_eprintln(f"Alive after: {world.count_alive()}")
 
     var sum: f64 = 0.0
     for i in 0..world.count:
         if world.mask[i] & HAS_POS != 0u8:
             sum = sum + world.pos[i].x as f64
-    with_eprintln("Checksum: " ++ i64_to_string(sum as i64))
+    with_eprintln(f"Checksum: {sum as i64}")
