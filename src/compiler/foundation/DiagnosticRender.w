@@ -56,11 +56,11 @@ fn render_all_diagnostics(store: DiagnosticStore, sm: SourceMap) -> str:
     out
 
 fn render_severity(severity: i32) -> str:
-    if severity == DIAG_SEVERITY_ERROR:
+    if severity == DiagSeverity.Error:
         return "error"
-    if severity == DIAG_SEVERITY_WARNING:
+    if severity == DiagSeverity.Warning:
         return "warning"
-    if severity == DIAG_SEVERITY_NOTE:
+    if severity == DiagSeverity.Note:
         return "note"
     "diag"
 

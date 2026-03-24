@@ -32,9 +32,9 @@ extern fn with_install_interrupt_handlers() -> void
 extern fn with_raise_stack_limit() -> void
 
 enum PreludeMode: i32:
-    CLI_PRELUDE_FULL_MODE = 0
-    CLI_PRELUDE_CORE_MODE = 1
-    CLI_PRELUDE_NONE_MODE = 2
+    FullMode = 0
+    CoreMode = 1
+    NoneMode = 2
 
 const CLI_DEFAULT_DEBUG_OPT_LEVEL: i32 = 0
 const CLI_DEFAULT_BUILD_OPT_LEVEL: i32 = 2
@@ -82,7 +82,7 @@ fn cli_options_default -> CliOptions:
         dump_async_mir_flag: false,
         deterministic_mode: false,
         emit_c_mode: false,
-        prelude_mode: PreludeMode.CLI_PRELUDE_FULL_MODE,
+        prelude_mode: PreludeMode.FullMode,
     }
 
 fn cli_command(argc: i32) -> str:
@@ -144,26 +144,26 @@ fn cli_test_quiet(argc: i32) -> bool:
     cli_has_flag(argc, "-q") or cli_has_flag(argc, "--quiet")
 
 fn cli_prelude_mode(argc: i32) -> i32:
-    var mode = PreludeMode.CLI_PRELUDE_FULL_MODE
+    var mode = PreludeMode.FullMode
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
         if arg == "--no-prelude":
-            mode = PreludeMode.CLI_PRELUDE_NONE_MODE
+            mode = PreludeMode.NoneMode
         else if arg == "--freestanding":
-            mode = PreludeMode.CLI_PRELUDE_NONE_MODE
+            mode = PreludeMode.NoneMode
         else if with_str_starts_with(arg, "--prelude=") != 0:
             let value = with_str_slice(arg, 10, with_str_len(arg))
             if value == "core":
-                mode = PreludeMode.CLI_PRELUDE_CORE_MODE
+                mode = PreludeMode.CoreMode
             else if value == "full":
-                mode = PreludeMode.CLI_PRELUDE_FULL_MODE
+                mode = PreludeMode.FullMode
             else if value == "none":
-                mode = PreludeMode.CLI_PRELUDE_NONE_MODE
+                mode = PreludeMode.NoneMode
             else:
                 with_eprintln("error: invalid --prelude value '" ++ value ++ "' (expected full|core|none)")
                 exit(1)
-                return PreludeMode.CLI_PRELUDE_FULL_MODE
+                return PreludeMode.FullMode
         i = i + 1
     mode
 
