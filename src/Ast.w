@@ -131,13 +131,13 @@ fn decode_with_binding_is_mut(encoded: i32) -> i32:
 
 // Type decl sub-kinds (stored in data2 field)
 enum TypeDeclKind: i32:
-    TDK_ALIAS = 0
-    TDK_STRUCT = 1
-    TDK_ENUM = 2
-    TDK_DISTINCT = 3
-    TDK_DISC_ENUM = 4
-    TDK_OPAQUE = 5
-    TDK_UNION = 6
+    Alias = 0
+    Struct = 1
+    Enum = 2
+    Distinct = 3
+    DiscEnum = 4
+    Opaque = 5
+    Union = 6
 
 // Type decl flag bits (combined with TypeDeclKind via arithmetic)
 const TDK_FLAG_EPHEMERAL: i32 = 8
@@ -749,7 +749,7 @@ fn AstPool.for_meta_label(self: &AstPool, meta: i32) -> i32:
 // NodeKind.NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
 //                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*, type_param_count, [type_param_name, bound_count, bounds...]*]
 //
-// NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TypeDeclKind.TDK_* + flags)
+// NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TypeDeclKind.* + flags)
 //                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, tp_start, tp_count]
 //                   For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis, tp_start, tp_count]
 //                   For alias/distinct: extra=[aliased_or_inner_type, vis, tp_start, tp_count]

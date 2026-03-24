@@ -650,7 +650,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
             self.pool.add_extra(is_pub)
             self.pool.add_extra(tp_start)
             self.pool.add_extra(tp_count)
-            var struct_kind = pack_type_decl_kind(TypeDeclKind.TDK_STRUCT, is_ephemeral)
+            var struct_kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
             if self.pending_packed != 0:
                 struct_kind = struct_kind + TDK_FLAG_PACKED
             let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
@@ -662,7 +662,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        var struct_kind = pack_type_decl_kind(TypeDeclKind.TDK_STRUCT, is_ephemeral)
+        var struct_kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
         if self.pending_packed != 0:
             struct_kind = struct_kind + TDK_FLAG_PACKED
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
@@ -686,7 +686,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.TDK_DISC_ENUM, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.DiscEnum, is_ephemeral))
         return self.finish_type_decl(node)
 
     if self.peek() == TokenKind.TK_L_BRACE:
@@ -695,7 +695,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        var struct_kind = pack_type_decl_kind(TypeDeclKind.TDK_STRUCT, is_ephemeral)
+        var struct_kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
         if self.pending_packed != 0:
             struct_kind = struct_kind + TDK_FLAG_PACKED
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
@@ -707,7 +707,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.TDK_ENUM, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.Enum, is_ephemeral))
         return self.finish_type_decl(node)
 
     if self.peek() == TokenKind.TK_KW_OPAQUE:
@@ -717,7 +717,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.TDK_OPAQUE, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.Opaque, is_ephemeral))
         return self.finish_type_decl(node)
 
     if self.peek() == TokenKind.TK_KW_UNION:
@@ -735,7 +735,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.TDK_UNION, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.Union, is_ephemeral))
         return self.finish_type_decl(node)
 
     if self.peek() == TokenKind.TK_IDENT and self.is_ident_named("distinct"):
@@ -746,7 +746,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.TDK_DISTINCT, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.Distinct, is_ephemeral))
         return self.finish_type_decl(node)
 
     if self.peek() == TokenKind.TK_KW_FN or
@@ -763,7 +763,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.TDK_ALIAS, is_ephemeral))
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.Alias, is_ephemeral))
         return self.finish_type_decl(node)
 
     self.emit_error("expected type body")
@@ -824,9 +824,9 @@ fn Parser.parse_enum_named_decl(self: Parser, start: i32, name: i32, is_pub: i32
             return 0
 
     var extra_start = 0
-    var sub_kind = TypeDeclKind.TDK_ENUM
+    var sub_kind = TypeDeclKind.Enum
     if repr_type_node != 0:
-        sub_kind = TypeDeclKind.TDK_DISC_ENUM
+        sub_kind = TypeDeclKind.DiscEnum
         if use_block_body != 0:
             extra_start = self.parse_disc_enum_variants_block(repr_type_node)
         else:
@@ -1638,7 +1638,7 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> i32:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(0)
         self.pool.add_extra(0)
-        return self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TypeDeclKind.TDK_ENUM, 0))
+        return self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TypeDeclKind.Enum, 0))
 
     // error Name = Variant1, Variant2(payload), ...
     if self.expect(TokenKind.TK_EQ) == 0:
@@ -1649,7 +1649,7 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> i32:
     self.pool.add_extra(is_pub)
     self.pool.add_extra(0)
     self.pool.add_extra(0)
-    self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TypeDeclKind.TDK_ENUM, 0))
+    self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TypeDeclKind.Enum, 0))
 
 // ── trait decl ───────────────────────────────────────────────────
 

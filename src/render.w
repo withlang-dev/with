@@ -65,12 +65,12 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ "pub "
         if is_ephemeral != 0:
             out = out ++ "type " ++ name ++ " ephemeral "
-        else if sub_kind == TypeDeclKind.TDK_ENUM or sub_kind == TypeDeclKind.TDK_DISC_ENUM:
+        else if sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum:
             out = out ++ "enum " ++ name
         else:
             out = out ++ "type " ++ name
 
-        if sub_kind == TypeDeclKind.TDK_STRUCT:
+        if sub_kind == TypeDeclKind.Struct:
             let field_count = pool.get_extra(extra_start)
             var ep = extra_start + 1
             out = out ++ " " ++ render_lbrace() ++ " "
@@ -87,17 +87,17 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
             out = out ++ " " ++ render_rbrace()
             return out
 
-        if sub_kind == TypeDeclKind.TDK_ALIAS:
+        if sub_kind == TypeDeclKind.Alias:
             let aliased = pool.get_extra(extra_start)
             out = out ++ " = " ++ render_type_expr(pool, intern, aliased)
             return out
 
-        if sub_kind == TypeDeclKind.TDK_DISTINCT:
+        if sub_kind == TypeDeclKind.Distinct:
             let aliased = pool.get_extra(extra_start)
             out = out ++ " = distinct " ++ render_type_expr(pool, intern, aliased)
             return out
 
-        if sub_kind == TypeDeclKind.TDK_ENUM:
+        if sub_kind == TypeDeclKind.Enum:
             let variant_count = pool.get_extra(extra_start)
             var ep = extra_start + 1
             out = out ++ ":\n"
@@ -119,7 +119,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: i32, indent: i32) -> str
                 out = out ++ "\n"
             return out
 
-        if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
+        if sub_kind == TypeDeclKind.DiscEnum:
             let repr_node = pool.get_extra(extra_start)
             let variant_count = pool.get_extra(extra_start + 1)
             var ep = extra_start + 2
@@ -930,11 +930,11 @@ fn has_flag(flags: i32, bit: i32) -> bool:
     (flags / bit) % 2 == 1
 
 fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
-    if sub_kind == TypeDeclKind.TDK_STRUCT:
+    if sub_kind == TypeDeclKind.Struct:
         let field_count = pool.get_extra(extra_start)
         let vis_idx = extra_start + 1 + field_count * 4
         return pool.get_extra(vis_idx) == Visibility.Public
-    if sub_kind == TypeDeclKind.TDK_ENUM:
+    if sub_kind == TypeDeclKind.Enum:
         var ep = extra_start + 1
         let variant_count = pool.get_extra(extra_start)
         for vi in 0..variant_count:
@@ -942,7 +942,7 @@ fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
             let payload_count = pool.get_extra(ep)
             ep = ep + 1 + payload_count
         return pool.get_extra(ep) == Visibility.Public
-    if sub_kind == TypeDeclKind.TDK_DISC_ENUM:
+    if sub_kind == TypeDeclKind.DiscEnum:
         var ep = extra_start + 2 // skip repr_type_node, get variant_count
         let variant_count = pool.get_extra(extra_start + 1)
         for vi in 0..variant_count:

@@ -85,7 +85,7 @@ fn backend_dump_struct_extras(pool: AstPool, intern: InternPool):
         if pool.kind(decl) != NodeKind.NK_TYPE_DECL:
             continue
         let sub_kind = type_decl_sub_kind(pool.get_data2(decl))
-        if sub_kind != TypeDeclKind.TDK_STRUCT:
+        if sub_kind != TypeDeclKind.Struct:
             continue
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)
