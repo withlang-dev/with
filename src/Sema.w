@@ -1915,12 +1915,18 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             self.variant_lookup.insert(v_name, vi)
         let tid = self.add_type(TypeKind.TY_ENUM, name, te_start, variant_count)
         self.named_types.insert(name, tid)
-        // Re-register variants with actual enum TypeId
+        // Re-register variants with actual enum TypeId (bare + qualified names)
+        let plain_type_name_str = self.pool_resolve(name)
         var vpos = te_start
         for vi in 0..variant_count:
             let v_name = self.type_extra.get(vpos as i64)
             self.variant_lookup.insert(v_name, vi)
             self.variant_type_ids.insert(v_name, tid)
+            let v_name_str = self.pool_resolve(v_name)
+            let qual_name = plain_type_name_str ++ "." ++ v_name_str
+            let qual_sym = self.pool_intern(qual_name)
+            self.variant_lookup.insert(qual_sym, vi)
+            self.variant_type_ids.insert(qual_sym, tid)
             let pc = self.type_extra.get((vpos + 1) as i64)
             vpos = vpos + 2 + pc
 
@@ -1974,13 +1980,24 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
                 any_payload = 1
         if any_payload != 0:
             self.disc_has_payload.insert(tid, 1)
-        // Re-register variants with actual enum TypeId and store disc values
+        // Re-register variants with actual enum TypeId and store disc values.
+        // Register BOTH bare name (for unqualified pattern matching) and
+        // qualified name "TypeName.Variant" (for explicit EnumType.Variant access).
+        let type_name_str = self.pool_resolve(name)
         var vpos = te_start
         for vi in 0..variant_count:
             let v_name = self.type_extra.get(vpos as i64)
+            let disc_val = disc_vals.get(vi as i64)
             self.variant_lookup.insert(v_name, vi)
             self.variant_type_ids.insert(v_name, tid)
-            self.disc_values.insert(v_name, disc_vals.get(vi as i64))
+            self.disc_values.insert(v_name, disc_val)
+            // Also register qualified name for EnumType.Variant lookup
+            let v_name_str = self.pool_resolve(v_name)
+            let qual_name = type_name_str ++ "." ++ v_name_str
+            let qual_sym = self.pool_intern(qual_name)
+            self.variant_lookup.insert(qual_sym, vi)
+            self.variant_type_ids.insert(qual_sym, tid)
+            self.disc_values.insert(qual_sym, disc_val)
             let pc = self.type_extra.get((vpos + 1) as i64)
             vpos = vpos + 2 + pc
 
