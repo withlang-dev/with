@@ -139,7 +139,18 @@ These are separate refactors, not remaining blockers for the enum/type syntax re
   After enough insert/remove churn, the function could fail to insert because it only checked
   state==0 slots and ignored tombstone slots (state==2). Fixed and all previously-failing
   conversions (`FSTR_SEG_*`, `TDK_*`) now work.
-- [ ] Removing `TK_` / `NK_` / `OP_` / `SK_` style prefixes from variant names.
-- [ ] Changing unrelated alias-style declarations such as `type FileId = i32`, `type Handle = opaque`, or `type Name = distinct(...)`.
+- [~] Removing `TK_` / `NK_` / `OP_` / `SK_` style prefixes from variant names.
+  Partial: prefixes stripped from 15 small/medium enums (ValidateError, DiagSeverity,
+  CompileResult, DriverMode, CfgNodeKind, AsyncBodyKind, AsyncSuspendKind, CallKind,
+  AllocKind, PreludeMode, MigrateLang, MigrateMode, Visibility, TypeDeclKind,
+  LiteralSuffix, FStringSegmentKind, CharCode, FnFlags, StmtKind).
+  Blocked: renaming MIR-path enums (RvalueKind, TermKind, ConstKind, MirIntrinsic)
+  triggers an infinite loop in `run_mir_lower` during self-compilation. Renaming
+  large enums (NodeKind, TokenKind, BinaryOp, UnaryOp, TypeKind) triggers LLVM
+  `InstCombine::visitAllocSite` going quadratic at O2. Both are codegen bugs that
+  need investigation before these renames can proceed.
+- [x] Changing unrelated alias-style declarations such as `type FileId = i32`, `type Handle = opaque`, or `type Name = distinct(...)`.
+  No change needed — these are type aliases and distinct types, not struct/enum
+  declarations. The `=` syntax is correct for aliases.
 
-The prefix removal and alias-style changes can be done later. All constant-group enumification is now complete and fixpoint-verified.
+All constant-group enumification is complete and fixpoint-verified. Prefix removal is partially done; the remaining large enums are blocked by codegen bugs.
