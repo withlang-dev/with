@@ -1927,7 +1927,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
     if kind == NodeKind.NK_TYPE_OPTIONAL:
         let inner_node = self.pool.get_data0(type_node)
         let payload_ty = self.resolve_type(inner_node)
-        let opt = self.get_or_create_option_type(payload_ty)
+        let opt = self.get_or_create_option_type(0, payload_ty)
         return opt
 
     if kind == NodeKind.NK_TYPE_TUPLE:
@@ -1965,16 +1965,16 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         if name == "Option" and g_count == 1:
             let opt_arg = self.resolve_type(self.pool.get_extra(g_extra))
             if opt_arg != 0:
-                return self.get_or_create_option_type(opt_arg)
+                return self.get_or_create_option_type(0, opt_arg)
         if name == "Vec" and g_count == 1:
             let vec_arg = self.resolve_type(self.pool.get_extra(g_extra))
             if vec_arg != 0:
-                return self.get_or_create_vec_type(vec_arg)
+                return self.get_or_create_vec_type(0, vec_arg)
         if name == "Result" and g_count == 2:
             let res_ok = self.resolve_type(self.pool.get_extra(g_extra))
             let res_err = self.resolve_type(self.pool.get_extra(g_extra + 1))
             if res_ok != 0 and res_err != 0:
-                return self.get_or_create_result_type(res_ok, res_err)
+                return self.get_or_create_result_type(0, res_ok, res_err)
         // Monomorphize user-defined generic structs
         let gs_opt = self.generic_structs.get(name_sym)
         if gs_opt.is_some():
@@ -2131,31 +2131,31 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let elem_ty = self.sema_type_to_llvm(elem_tid)
             if elem_ty != 0:
-                return self.get_or_create_vec_type(elem_ty)
+                return self.get_or_create_vec_type(resolved_tid, elem_ty)
         if base_name == "HashMap" and arg_count > 1:
             let key_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let val_tid = self.sema.get_generic_inst_arg(resolved_tid, 1)
             let key_ty = self.sema_type_to_llvm(key_tid)
             let val_ty = self.sema_type_to_llvm(val_tid)
             if key_ty != 0 and val_ty != 0:
-                return self.get_or_create_hashmap_type(key_ty, val_ty)
+                return self.get_or_create_hashmap_type(resolved_tid, key_ty, val_ty)
         if base_name == "HashSet" and arg_count > 0:
             let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let elem_ty = self.sema_type_to_llvm(elem_tid)
             if elem_ty != 0:
-                return self.get_or_create_hashset_type(elem_ty)
+                return self.get_or_create_hashset_type(resolved_tid, elem_ty)
         if base_name == "Option" and arg_count > 0:
             let payload_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let payload_ty = self.sema_type_to_llvm(payload_tid)
             if payload_ty != 0:
-                return self.get_or_create_option_type(payload_ty)
+                return self.get_or_create_option_type(resolved_tid, payload_ty)
         if base_name == "Result" and arg_count > 1:
             let ok_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let err_tid = self.sema.get_generic_inst_arg(resolved_tid, 1)
             let ok_ty = self.sema_type_to_llvm(ok_tid)
             let err_ty = self.sema_type_to_llvm(err_tid)
             if ok_ty != 0 and err_ty != 0:
-                return self.get_or_create_result_type(ok_ty, err_ty)
+                return self.get_or_create_result_type(resolved_tid, ok_ty, err_ty)
         // User-defined generic structs: monomorphize via type bindings
         let base_sym = self.sema.get_type_d0(resolved_tid)
         if base_sym != 0 and self.generic_structs.contains(base_sym):
@@ -2614,7 +2614,7 @@ fn Codegen.gen_disc_enum_from_int_val(self: Codegen, de_idx: i32, arg_val: i64) 
     // Return Option[repr_type]: Some(disc_val) or None
     // Use insertvalue to build Option values directly (no allocas in case blocks)
     let i32_ty = wl_i32_type(self.context)
-    let opt_ty = self.get_or_create_option_type(repr_ty)
+    let opt_ty = self.get_or_create_option_type(0, repr_ty)
     // None = { tag=1, payload=0 }
     var none_val = wl_get_undef(opt_ty)
     none_val = wl_build_insert_value(self.builder, none_val, wl_const_int(i32_ty, 1, 0), 0)
@@ -3147,12 +3147,13 @@ fn Codegen.is_result_unit_return(self: Codegen, ret_node: i32) -> bool:
 
 // ── Option/Result type construction ───────────────────────────────
 
-fn Codegen.get_or_create_option_type(self: Codegen, payload_ty: i64) -> i64:
+fn Codegen.get_or_create_option_type(self: Codegen, sema_tid: i32, payload_ty: i64) -> i64:
     // Optional pointers are represented as the pointer itself: null = None.
     if payload_ty != 0 and wl_get_type_kind(payload_ty) == wl_pointer_type_kind():
         return payload_ty
 
-    let cached = self.option_cache_map.get(payload_ty)
+    let cache_key = if sema_tid > 0: sema_tid as i64 else: payload_ty
+    let cached = self.option_cache_map.get(cache_key)
     if cached.is_some():
         let idx = cached.unwrap()
         return self.option_llvm_types.get(idx as i64)
@@ -3170,11 +3171,11 @@ fn Codegen.get_or_create_option_type(self: Codegen, payload_ty: i64) -> i64:
     self.option_err_types.push(0)
     let opt_sym = self.intern.intern("Option")
     self.option_enum_syms.push(opt_sym)
-    self.option_cache_map.insert(payload_ty, idx)
+    self.option_cache_map.insert(cache_key, idx)
     opt_type
 
-fn Codegen.get_or_create_result_type(self: Codegen, ok_ty: i64, err_ty: i64) -> i64:
-    let cache_key = f"{ok_ty}:{err_ty}"
+fn Codegen.get_or_create_result_type(self: Codegen, sema_tid: i32, ok_ty: i64, err_ty: i64) -> i64:
+    let cache_key = if sema_tid > 0: f"{sema_tid}" else: f"{ok_ty}:{err_ty}"
     let cached = self.result_cache_map.get(cache_key)
     if cached.is_some():
         let idx = cached.unwrap()
@@ -3236,8 +3237,12 @@ fn Codegen.collection_wrapper_name_1(self: Codegen, prefix: str, t0: i64) -> str
 fn Codegen.collection_wrapper_name_2(self: Codegen, prefix: str, t0: i64, t1: i64) -> str:
     prefix ++ "." ++ self.deterministic_type_tag(t0) ++ "." ++ self.deterministic_type_tag(t1)
 
-fn Codegen.get_or_create_vec_type(self: Codegen, elem_ty: i64) -> i64:
-    let cached = self.vec_cache_map.get(elem_ty)
+fn Codegen.get_or_create_vec_type(self: Codegen, sema_tid: i32, elem_ty: i64) -> i64:
+    // Use sema type ID as cache key when available (preserves generic identity).
+    // Fall back to LLVM element type pointer for MIR intrinsic contexts where
+    // sema type is not available (sema_tid == 0).
+    let cache_key = if sema_tid > 0: sema_tid as i64 else: elem_ty
+    let cached = self.vec_cache_map.get(cache_key)
     if cached.is_some():
         return cached.unwrap()
     // Vec[T] = { ptr, i64, i64 } — ptr, len, cap (elem_size at runtime)
@@ -3249,19 +3254,20 @@ fn Codegen.get_or_create_vec_type(self: Codegen, elem_ty: i64) -> i64:
     let name = self.collection_wrapper_name_1("__with.Vec", elem_ty)
     let vec_ty = wl_struct_create_named(self.context, name)
     wl_struct_set_body(vec_ty, vec_data_i64(&body), 4, 0)
-    self.cache_vec_type(elem_ty, vec_ty)
+    self.cache_vec_type(sema_tid, elem_ty, vec_ty)
     vec_ty
 
-fn Codegen.cache_vec_type(self: Codegen, elem_ty: i64, vec_ty: i64) -> i64:
-    let cached = self.vec_cache_map.get(elem_ty)
+fn Codegen.cache_vec_type(self: Codegen, sema_tid: i32, elem_ty: i64, vec_ty: i64) -> i64:
+    let cache_key = if sema_tid > 0: sema_tid as i64 else: elem_ty
+    let cached = self.vec_cache_map.get(cache_key)
     if cached.is_some():
         return cached.unwrap()
-    self.vec_cache_map.insert(elem_ty, vec_ty)
+    self.vec_cache_map.insert(cache_key, vec_ty)
     self.vec_type_to_elem.insert(vec_ty, elem_ty)
     vec_ty
 
-fn Codegen.get_or_create_hashmap_type(self: Codegen, key_ty: i64, val_ty: i64) -> i64:
-    let hash = key_ty * 65537 + val_ty
+fn Codegen.get_or_create_hashmap_type(self: Codegen, sema_tid: i32, key_ty: i64, val_ty: i64) -> i64:
+    let hash = if sema_tid > 0: sema_tid as i64 else: key_ty * 65537 + val_ty
     let cached = self.hm_cache_map.get(hash)
     if cached.is_some():
         let existing = cached.unwrap() as i64
@@ -3273,11 +3279,11 @@ fn Codegen.get_or_create_hashmap_type(self: Codegen, key_ty: i64, val_ty: i64) -
     let name = self.collection_wrapper_name_2("__with.HashMap", key_ty, val_ty)
     let hm_ty = wl_struct_create_named(self.context, name)
     wl_struct_set_body(hm_ty, vec_data_i64(&body), 1, 0)
-    self.cache_hashmap_type(key_ty, val_ty, hm_ty)
+    self.cache_hashmap_type(sema_tid, key_ty, val_ty, hm_ty)
     hm_ty
 
-fn Codegen.cache_hashmap_type(self: Codegen, key_ty: i64, val_ty: i64, hm_ty: i64) -> i64:
-    let hash = key_ty * 65537 + val_ty
+fn Codegen.cache_hashmap_type(self: Codegen, sema_tid: i32, key_ty: i64, val_ty: i64, hm_ty: i64) -> i64:
+    let hash = if sema_tid > 0: sema_tid as i64 else: key_ty * 65537 + val_ty
     let cached = self.hm_cache_map.get(hash)
     if cached.is_some():
         let existing = cached.unwrap()
@@ -3299,8 +3305,9 @@ fn Codegen.cache_hashmap_type(self: Codegen, key_ty: i64, val_ty: i64, hm_ty: i6
     self.hm_cache_map.insert(hash, hm_ty)
     hm_ty
 
-fn Codegen.get_or_create_hashset_type(self: Codegen, elem_ty: i64) -> i64:
-    let cached = self.hs_cache_map.get(elem_ty)
+fn Codegen.get_or_create_hashset_type(self: Codegen, sema_tid: i32, elem_ty: i64) -> i64:
+    let cache_key = if sema_tid > 0: sema_tid as i64 else: elem_ty
+    let cached = self.hs_cache_map.get(cache_key)
     if cached.is_some():
         return cached.unwrap()
     let body: Vec[i64] = Vec.new()
@@ -3308,7 +3315,7 @@ fn Codegen.get_or_create_hashset_type(self: Codegen, elem_ty: i64) -> i64:
     let name = self.collection_wrapper_name_1("__with.HashSet", elem_ty)
     let hs_ty = wl_struct_create_named(self.context, name)
     wl_struct_set_body(hs_ty, vec_data_i64(&body), 1, 0)
-    self.hs_cache_map.insert(elem_ty, hs_ty)
+    self.hs_cache_map.insert(cache_key, hs_ty)
     hs_ty
 
 // ── Monomorphize struct (stub) ────────────────────────────────────
@@ -6798,7 +6805,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
                         if elem_llvm_new != 0:
                             vec_elem_ty = elem_llvm_new
         let elem_size = self.abi_size_of(vec_elem_ty)
-        let vec_ty = self.get_or_create_vec_type(vec_elem_ty)
+        let vec_ty = self.get_or_create_vec_type(0, vec_elem_ty)
         let alloca = wl_build_alloca(self.builder, vec_ty)
         wl_build_store(self.builder, self.build_default_value(vec_ty), alloca)
         let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
@@ -6826,7 +6833,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
                         if wc_ll != 0:
                             wc_elem_ty = wc_ll
         let wc_esz = self.abi_size_of(wc_elem_ty)
-        let wc_vty = self.get_or_create_vec_type(wc_elem_ty)
+        let wc_vty = self.get_or_create_vec_type(0, wc_elem_ty)
         let wc_al = wl_build_alloca(self.builder, wc_vty)
         wl_build_store(self.builder, self.build_default_value(wc_vty), wc_al)
         let wc_fn = self.ensure_vec_runtime_fn("with_vec_new_with_capacity_out", void_ty, 3)
@@ -6965,7 +6972,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
                     if key_llvm != 0 and val_llvm != 0:
                         hm_key_size = self.abi_size_of(key_llvm)
                         hm_val_size = self.abi_size_of(val_llvm)
-                        hm_ty = self.get_or_create_hashmap_type(key_llvm, val_llvm)
+                        hm_ty = self.get_or_create_hashmap_type(0, key_llvm, val_llvm)
         let new_fn = self.ensure_hashmap_new_declared()
         let fn_ty = self.get_hashmap_new_fn_type()
         let new_args: Vec[i64] = Vec.new()
@@ -6974,7 +6981,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let handle = wl_build_call(self.builder, fn_ty, new_fn, vec_data_i64(&new_args), 2)
         // Wrap handle in HashMap struct { ptr }.
         if hm_ty == 0:
-            hm_ty = self.get_or_create_hashmap_type(i64_ty, i64_ty)
+            hm_ty = self.get_or_create_hashmap_type(0, i64_ty, i64_ty)
         let empty = self.build_default_value(hm_ty)
         result = wl_build_insert_value(self.builder, empty, handle, 0)
 
@@ -7031,7 +7038,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let found = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&get_args), 4)
         let val = wl_build_load(self.builder, val_ty, out_alloca)
         // Always wrap in Option[V].
-        var dest_llvm = self.get_or_create_option_type(val_ty)
+        var dest_llvm = self.get_or_create_option_type(0, val_ty)
         if dest_llvm != 0:
             let is_found = wl_build_icmp(self.builder, wl_int_ne(), found, wl_const_int(i64_ty, 0, 0))
             let some_val = self.build_option_some(val, dest_llvm)
@@ -7251,7 +7258,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let idx_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 2)
         let idx = wl_build_load(self.builder, i64_ty, idx_ptr)
         let cond = wl_build_icmp(self.builder, wl_int_slt(), idx, len)
-        let opt_type = self.get_or_create_option_type(elem_ty)
+        let opt_type = self.get_or_create_option_type(0, elem_ty)
         let some_bb = wl_append_bb(self.context, self.current_function, "veciter.some")
         let none_bb = wl_append_bb(self.context, self.current_function, "veciter.none")
         let merge_bb = wl_append_bb(self.context, self.current_function, "veciter.merge")
@@ -7375,7 +7382,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let r6 = self.mir_intrinsic_arg(body, args_id, 0)
         let t6 = wl_type_of(r6)
         let d6 = self.mir_intrinsic_arg(body, args_id, 1)
-        let vt6 = self.get_or_create_vec_type(t6)
+        let vt6 = self.get_or_create_vec_type(0, t6)
         let out6 = self.create_entry_alloca(vt6)
         let f6 = self.ensure_c_fn("with_str_split_vec", wl_void_type(self.context), 3)
         let p6: Vec[i64] = Vec.new()
@@ -7715,7 +7722,7 @@ fn Codegen.mir_emit_vec_map(self: Codegen, body: MirBody, args_id: i32) -> i64:
         fn_ty = wl_global_get_value_type(fn_ptr)
         ret_ty = wl_get_return_type(fn_ty)
     let len = wl_build_extract_value(self.builder, recv, 1)
-    let rvt = self.get_or_create_vec_type(ret_ty)
+    let rvt = self.get_or_create_vec_type(0, ret_ty)
     let ra = self.create_entry_alloca(rvt)
     wl_build_store(self.builder, self.build_default_value(rvt), ra)
     let nf = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
@@ -7789,7 +7796,7 @@ fn Codegen.mir_emit_vec_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
     else:
         fn_ty = wl_global_get_value_type(fn_ptr)
     let len = wl_build_extract_value(self.builder, recv, 1)
-    let vt = self.get_or_create_vec_type(elem_ty)
+    let vt = self.get_or_create_vec_type(0, elem_ty)
     let ra = self.create_entry_alloca(vt)
     wl_build_store(self.builder, self.build_default_value(vt), ra)
     let nf = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
