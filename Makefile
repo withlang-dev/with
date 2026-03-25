@@ -335,9 +335,12 @@ define build_stage
 	$(1) build $(GEN_MAIN_ENTRY) -o "$$tmp" & \
 	child_pid="$$!"; \
 	wait "$$child_pid"; \
+	rc=$$?; \
 	child_pid=""; \
-	if [ ! -x "$$tmp" ]; then mv "$$gen_bin" "$$tmp"; fi; \
-	if [ -d "$$gen_dsym" ]; then mv "$$gen_dsym" "$$dsym"; fi; \
+	if [ $$rc -ne 0 ]; then echo "error: build failed" >&2; exit $$rc; fi; \
+	if [ ! -x "$$tmp" ]; then mv "$$gen_bin" "$$tmp" 2>/dev/null || true; fi; \
+	if [ -d "$$gen_dsym" ]; then mv "$$gen_dsym" "$$dsym" 2>/dev/null || true; fi; \
+	if [ ! -x "$$tmp" ]; then echo "error: no output binary produced" >&2; exit 1; fi; \
 	cp "$$tmp" "$@"; \
 	if [ -d "$$dsym" ]; then cp -R "$$dsym" "$@.dSYM"; fi; \
 	rm -f "$$tmp"; \
