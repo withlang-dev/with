@@ -995,7 +995,7 @@ fn CCodegen.local_assigned_fn_sym_depth(self: CCodegen, body: MirBody, local_id:
         let count = body.bb_stmt_counts.get(bb as i64)
         for si in 0..count:
             let stmt_id = start + si
-            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.SK_ASSIGN:
+            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.Assign:
                 continue
             let dst_place = body.stmt_d0.get(stmt_id as i64)
             if self.place_is_direct_local(body, dst_place, local_id) == 0:
@@ -1255,7 +1255,7 @@ fn CCodegen.local_place_kind_depth(self: CCodegen, body: MirBody, local_id: i32,
         let count = body.bb_stmt_counts.get(bb as i64)
         for si in 0..count:
             let stmt_id = start + si
-            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.SK_ASSIGN:
+            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.Assign:
                 continue
             let rval_id = body.stmt_d1.get(stmt_id as i64)
             if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
@@ -1767,7 +1767,7 @@ fn CCodegen.local_usage_hint_tid(self: CCodegen, body: MirBody, local_id: i32) -
         let count = body.bb_stmt_counts.get(bb as i64)
         for si in 0..count:
             let stmt_id = start + si
-            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.SK_ASSIGN:
+            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.Assign:
                 continue
             let rval_id = body.stmt_d1.get(stmt_id as i64)
             if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
@@ -1870,7 +1870,7 @@ fn CCodegen.local_owner_hint_depth(self: CCodegen, body: MirBody, local_id: i32,
         let count = body.bb_stmt_counts.get(bb as i64)
         for si in 0..count:
             let stmt_id = start + si
-            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.SK_ASSIGN:
+            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.Assign:
                 continue
             let dst_place = body.stmt_d0.get(stmt_id as i64)
             if self.place_is_direct_local(body, dst_place, local_id) == 0:
@@ -2605,7 +2605,7 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
         let count = body.bb_stmt_counts.get(bb as i64)
         for si in 0..count:
             let stmt_id = start + si
-            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.SK_ASSIGN:
+            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.Assign:
                 continue
             let dst_place = body.stmt_d0.get(stmt_id as i64)
             if self.place_is_direct_local(body, dst_place, local_id) == 0:
@@ -3208,7 +3208,7 @@ fn CCodegen.infer_struct_field_tid_from_usage(self: CCodegen, struct_tid: i32, f
             let count = body.bb_stmt_counts.get(bb as i64)
             for si in 0..count:
                 let stmt_id = start + si
-                if body.stmt_kinds.get(stmt_id as i64) != StmtKind.SK_ASSIGN:
+                if body.stmt_kinds.get(stmt_id as i64) != StmtKind.Assign:
                     continue
                 let dst_place = body.stmt_d0.get(stmt_id as i64)
                 let rval_id = body.stmt_d1.get(stmt_id as i64)
@@ -3380,22 +3380,22 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
     let sk = body.stmt_kinds.get(stmt_id as i64)
     let d0 = body.stmt_d0.get(stmt_id as i64)
     let d1 = body.stmt_d1.get(stmt_id as i64)
-    if sk == StmtKind.SK_ASSIGN:
+    if sk == StmtKind.Assign:
         if self.is_unit_rvalue(body, d1) != 0:
             let dst_tid = self.place_tid(body, d0)
             return "    " ++ self.place_text(body, d0) ++ " = " ++ self.zero_value_text(dst_tid) ++ ";"
         return "    " ++ self.place_text(body, d0) ++ " = " ++ self.rvalue_text(body, d1) ++ ";"
-    if sk == StmtKind.SK_STORAGE_LIVE:
+    if sk == StmtKind.StorageLive:
         return f"    /* StorageLive(_{d0}); */"
-    if sk == StmtKind.SK_STORAGE_DEAD:
+    if sk == StmtKind.StorageDead:
         return f"    /* StorageDead(_{d0}); */"
-    if sk == StmtKind.SK_DROP:
+    if sk == StmtKind.Drop:
         let p = self.place_text(body, d0)
         let pt = self.place_tid(body, d0)
         if pt == cc_pseudo_tid_vec():
             return "    with_vec_clear(&(" ++ p ++ "));"
         return "    /* drop(" ++ p ++ "); */"
-    if sk == StmtKind.SK_NOP:
+    if sk == StmtKind.Nop:
         return "    /* nop */"
     self.fail(f"unsupported statement kind {sk}")
     "    /* unsupported statement */"

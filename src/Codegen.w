@@ -6420,7 +6420,7 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
     let d0 = body.stmt_d0.get(stmt_id as i64)
     let d1 = body.stmt_d1.get(stmt_id as i64)
 
-    if sk == StmtKind.SK_ASSIGN:
+    if sk == StmtKind.Assign:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return false
         let dst_local = body.place_locals.get(d0 as i64)
@@ -6474,14 +6474,14 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
         wl_build_store(self.builder, coerced, dst_ptr)
         return true
 
-    if sk == StmtKind.SK_STORAGE_LIVE:
+    if sk == StmtKind.StorageLive:
         // Storage markers do not require dedicated IR in this backend.
         return true
 
-    if sk == StmtKind.SK_STORAGE_DEAD:
+    if sk == StmtKind.StorageDead:
         return true
 
-    if sk == StmtKind.SK_DROP:
+    if sk == StmtKind.Drop:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return false
         let local_id = body.place_locals.get(d0 as i64)
@@ -6492,7 +6492,7 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
                 self.mir_emit_drop_ptr(ptr, ty_opt.unwrap() as i64)
         return true
 
-    if sk == StmtKind.SK_NOP:
+    if sk == StmtKind.Nop:
         return true
 
     false

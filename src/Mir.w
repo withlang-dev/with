@@ -21,11 +21,11 @@ fn rbrace -> str:
 // ── Statement kinds ──────────────────────────────────────────────
 
 enum StmtKind: i32:
-    SK_ASSIGN = 0
-    SK_STORAGE_LIVE = 1
-    SK_STORAGE_DEAD = 2
-    SK_DROP = 3
-    SK_NOP = 4
+    Assign = 0
+    StorageLive = 1
+    StorageDead = 2
+    Drop = 3
+    Nop = 4
 
 // ── Terminator kinds ─────────────────────────────────────────────
 
@@ -602,7 +602,7 @@ fn MirBody.get_local(self: &MirBody, idx: i32) -> MirLocalInfo:
 
 fn MirBody.stmt_kind(self: &MirBody, idx: i32) -> i32:
     if idx < 0 or idx >= self.stmt_kinds.len() as i32:
-        return StmtKind.SK_NOP
+        return StmtKind.Nop
     self.stmt_kinds.get(idx as i64)
 
 fn MirBody.stmt_data0(self: &MirBody, idx: i32) -> i32:
@@ -742,15 +742,15 @@ fn mir_stmt_text(body: MirBody, stmt_id: i32, pool: InternPool, sema: Sema) -> s
     let d0 = body.stmt_data0(stmt_id)
     let d1 = body.stmt_data1(stmt_id)
 
-    if kind == StmtKind.SK_ASSIGN:
+    if kind == StmtKind.Assign:
         return mir_place_text(body, d0) ++ " = " ++ mir_rvalue_text(body, d1, pool, sema) ++ ";"
-    if kind == StmtKind.SK_STORAGE_LIVE:
+    if kind == StmtKind.StorageLive:
         return f"StorageLive(_{d0});"
-    if kind == StmtKind.SK_STORAGE_DEAD:
+    if kind == StmtKind.StorageDead:
         return f"StorageDead(_{d0});"
-    if kind == StmtKind.SK_DROP:
+    if kind == StmtKind.Drop:
         return "drop(" ++ mir_place_text(body, d0) ++ ");"
-    if kind == StmtKind.SK_NOP:
+    if kind == StmtKind.Nop:
         return "nop;"
 
     f"stmt<{kind}>({d0}, {d1});"
@@ -1184,21 +1184,21 @@ fn validate_mir_body(body: MirBody) -> str:
         let d0 = body.stmt_d0.get(si as i64)
         let d1 = body.stmt_d1.get(si as i64)
 
-        if stmt_kind == StmtKind.SK_ASSIGN:
+        if stmt_kind == StmtKind.Assign:
             if not mir_index_in_range(d0, place_count):
                 return f"stmt{si}: assign destination out of range"
             if not mir_index_in_range(d1, rval_count):
                 return f"stmt{si}: assign rvalue out of range"
             continue
-        if stmt_kind == StmtKind.SK_STORAGE_LIVE or stmt_kind == StmtKind.SK_STORAGE_DEAD:
+        if stmt_kind == StmtKind.StorageLive or stmt_kind == StmtKind.StorageDead:
             if not mir_index_in_range(d0, local_count):
                 return f"stmt{si}: storage local out of range"
             continue
-        if stmt_kind == StmtKind.SK_DROP:
+        if stmt_kind == StmtKind.Drop:
             if not mir_index_in_range(d0, place_count):
                 return f"stmt{si}: drop place out of range"
             continue
-        if stmt_kind == StmtKind.SK_NOP:
+        if stmt_kind == StmtKind.Nop:
             continue
         return f"stmt{si}: unknown statement kind {stmt_kind}"
 

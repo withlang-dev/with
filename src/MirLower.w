@@ -108,10 +108,10 @@ fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32):
 
 fn MirBuilder.emit_drop_entry(self: MirBuilder, local_id: i32, drop_kind: i32):
     if drop_kind == DropKind.DK_STORAGE:
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_DEAD, local_id, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
         return
     let place = self.body.new_place(local_id)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_DROP, place, 0, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Drop, place, 0, 0)
 
 fn MirBuilder.pop_scope_with_goto(self: MirBuilder, target_bb: i32):
     if self.drop_scope_starts.len() as i32 == 0:
@@ -1087,7 +1087,7 @@ fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
             let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_CONCAT, result, seg_operand)
             let temp = self.new_temp(self.sema.ty_str)
             let place = self.place_for_local(temp)
-            self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, place, rv, self.ast.get_start(node))
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
             result = self.body.new_operand(OperandKind.OK_COPY, place)
         i = i + 1
     if result == 0:
@@ -1221,7 +1221,7 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
         let vl_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, vl_fid, vl_variant_idx)
         let vl_tmp = self.new_temp(vl_result_ty)
         let vl_place = self.place_for_local(vl_tmp)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, vl_place, vl_rv, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, vl_place, vl_rv, 0)
         return self.body.new_operand(OperandKind.OK_COPY, vl_place)
 
     // Try module-level mutable variable (var X = ...)
@@ -1239,7 +1239,7 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
 
 fn MirBuilder.assign_operand_to_place(self: MirBuilder, place: i32, operand_id: i32, span: i32):
     let rval = self.body.new_rvalue(RvalueKind.RK_USE, operand_id, 0, 0)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, place, rval, span)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rval, span)
 
 fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
     // Short-circuit evaluation for logical and/or
@@ -1278,7 +1278,7 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
     let ty = self.expr_type(node)
     let temp = self.new_temp(ty)
     let place = self.place_for_local(temp)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, place, rv, self.ast.get_start(node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
     if self.sema.is_copy(ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, place)
     self.body.new_operand(OperandKind.OK_MOVE, place)
@@ -1290,7 +1290,7 @@ fn MirBuilder.lower_short_circuit(self: MirBuilder, op: i32, lhs_expr: i32, rhs_
     let result_place = self.place_for_local(result)
     let lhs = self.lower_expr(lhs_expr)
     let lhs_rv = self.body.new_rvalue(RvalueKind.RK_USE, lhs, 0, 0)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, result_place, lhs_rv, self.ast.get_start(node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, lhs_rv, self.ast.get_start(node))
     let rhs_bb = self.new_block()
     let end_bb = self.new_block()
     let lhs_read = self.body.new_operand(OperandKind.OK_COPY, result_place)
@@ -1312,7 +1312,7 @@ fn MirBuilder.lower_short_circuit(self: MirBuilder, op: i32, lhs_expr: i32, rhs_
     let rhs = self.lower_expr(rhs_expr)
     let rhs_rv = self.body.new_rvalue(RvalueKind.RK_USE, rhs, 0, 0)
     let result_place2 = self.place_for_local(result)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, result_place2, rhs_rv, self.ast.get_start(node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place2, rhs_rv, self.ast.get_start(node))
     self.terminate(TermKind.TK_GOTO, end_bb, 0, 0, 0)
     self.switch_to(end_bb)
     self.body.new_operand(OperandKind.OK_COPY, self.place_for_local(result))
@@ -1346,7 +1346,7 @@ fn MirBuilder.lower_un_op(self: MirBuilder, op: i32, expr: i32, node: i32) -> i3
         let ty = self.expr_type(node)
         let temp = self.new_temp(ty)
         let temp_place = self.place_for_local(temp)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, temp_place, rv, self.ast.get_start(node))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, self.ast.get_start(node))
         return self.body.new_operand(OperandKind.OK_COPY, temp_place)
 
     if op == UnaryOp.UOP_DEREF:
@@ -1359,7 +1359,7 @@ fn MirBuilder.lower_un_op(self: MirBuilder, op: i32, expr: i32, node: i32) -> i3
     let ty = self.expr_type(node)
     let temp = self.new_temp(ty)
     let place = self.place_for_local(temp)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, place, rv, self.ast.get_start(node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
     self.body.new_operand(OperandKind.OK_COPY, place)
 
 fn MirBuilder.lower_cast(self: MirBuilder, expr: i32, target_type_id: i32, node: i32) -> i32:
@@ -1368,7 +1368,7 @@ fn MirBuilder.lower_cast(self: MirBuilder, expr: i32, target_type_id: i32, node:
     let rv = self.body.new_rvalue(RvalueKind.RK_CAST, op, target_type_id, src_sema_ty)
     let temp = self.new_temp(target_type_id)
     let place = self.place_for_local(temp)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, place, rv, self.ast.get_start(node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
     self.body.new_operand(OperandKind.OK_COPY, place)
 
 fn MirBuilder.lower_field_access(self: MirBuilder, base_expr: i32, field_idx: i32) -> i32:
@@ -1443,7 +1443,7 @@ fn MirBuilder.lower_ref(self: MirBuilder, expr: i32, borrow_kind: i32, node: i32
     let ty = self.expr_type(node)
     let temp = self.new_temp(ty)
     let temp_place = self.place_for_local(temp)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, temp_place, rv, self.ast.get_start(node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, self.ast.get_start(node))
     self.body.new_operand(OperandKind.OK_COPY, temp_place)
 
 fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
@@ -1461,7 +1461,7 @@ fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
         if tk == TypeKind.TY_STRUCT:
             let type_name = self.sema.get_type_d0(resolved_ty)
             if self.sema.has_drop_method(type_name) != 0:
-                self.body.push_stmt(self.cur_bb, StmtKind.SK_DROP, place, 0, self.ast.get_start(place_expr))
+                self.body.push_stmt(self.cur_bb, StmtKind.Drop, place, 0, self.ast.get_start(place_expr))
     self.assign_operand_to_place(place, rhs, self.ast.get_start(place_expr))
 
 fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
@@ -1522,7 +1522,7 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
     let local_id = self.body.new_local(bind_ty, mutable, name_sym, 1)
     self.bind_local(name_sym, local_id)
 
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(node))
+    self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(node))
     if self.sema.is_copy(bind_ty) == 0:
         self.schedule_drop(local_id, DropKind.DK_VALUE)
 
@@ -1551,7 +1551,7 @@ fn MirBuilder.lower_tuple_destructure(self: MirBuilder, node: i32):
         let elem_ty = self.tuple_elem_type(rhs_ty, ni)
         let local_id = self.body.new_local(elem_ty, 0, n_sym, 1)
         self.bind_local(n_sym, local_id)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(node))
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(node))
         let field_place = self.body.new_field_place(rhs_place, ni)
         let field_op = self.body.new_operand(OperandKind.OK_COPY, field_place)
         let dst_place = self.place_for_local(local_id)
@@ -1842,7 +1842,7 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
         else:
             let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
             self.bind_local(pat_or_sym, bind_local)
-            self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, bind_local, 0, self.ast.get_start(body_expr))
+            self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
             if self.sema.is_copy(elem_ty) == 0:
                 self.schedule_drop(bind_local, DropKind.DK_VALUE)
             let bind_place = self.place_for_local(bind_local)
@@ -1852,7 +1852,7 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
         if pat_or_sym != 0:
             let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
             self.bind_local(pat_or_sym, bind_local)
-            self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, bind_local, 0, self.ast.get_start(body_expr))
+            self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
             if self.sema.is_copy(elem_ty) == 0:
                 self.schedule_drop(bind_local, DropKind.DK_VALUE)
             let bind_place = self.place_for_local(bind_local)
@@ -1881,13 +1881,13 @@ fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32
     let counter_local = self.new_temp(elem_ty)
     let counter_place = self.place_for_local(counter_local)
     let start_rv = self.body.new_rvalue(RvalueKind.RK_USE, start_op, 0, 0)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, counter_place, start_rv, self.ast.get_start(range_node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, start_rv, self.ast.get_start(range_node))
 
     // Store end value in a temp
     let end_local = self.new_temp(elem_ty)
     let end_place = self.place_for_local(end_local)
     let end_rv = self.body.new_rvalue(RvalueKind.RK_USE, end_op, 0, 0)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, end_place, end_rv, self.ast.get_start(range_node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, end_place, end_rv, self.ast.get_start(range_node))
 
     let header_bb = self.new_block()
     let body_bb = self.new_block()
@@ -1905,7 +1905,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32
     let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, cmp_op, counter_op, end_read_op)
     let cmp_local = self.new_temp(self.sema.ty_bool)
     let cmp_place = self.place_for_local(cmp_local)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, cmp_place, cmp_rv, self.ast.get_start(range_node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(range_node))
     let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
@@ -1919,7 +1919,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32
     if pat_or_sym != 0:
         let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
         self.bind_local(pat_or_sym, bind_local)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, bind_local, 0, self.ast.get_start(body_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
         let bind_place = self.place_for_local(bind_local)
         let cur_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
         self.assign_operand_to_place(bind_place, cur_op, self.ast.get_start(body_expr))
@@ -1932,7 +1932,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32
     let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
     let one_op = self.int_const_operand(1, elem_ty)
     let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, counter_place, add_rv, self.ast.get_start(range_node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(range_node))
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
     self.pop_loop()
@@ -1952,14 +1952,14 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, pat_or_sym: i32, iter_expr: i32,
     let len_local = self.new_temp(self.sema.ty_i64)
     let len_place = self.place_for_local(len_local)
     let len_rv = self.body.new_rvalue(RvalueKind.RK_LEN, slice_place, 0, 0)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, len_place, len_rv, self.ast.get_start(iter_expr))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, self.ast.get_start(iter_expr))
 
     // Counter: i64 starting at 0
     let counter_local = self.new_temp(self.sema.ty_i64)
     let counter_place = self.place_for_local(counter_local)
     let zero_op = self.int_const_operand(0, self.sema.ty_i64)
     let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_op, 0, 0)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, counter_place, zero_rv, self.ast.get_start(iter_expr))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, self.ast.get_start(iter_expr))
 
     let header_bb = self.new_block()
     let body_bb = self.new_block()
@@ -1976,7 +1976,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, pat_or_sym: i32, iter_expr: i32,
     let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, counter_op, len_op)
     let cmp_local = self.new_temp(self.sema.ty_bool)
     let cmp_place = self.place_for_local(cmp_local)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
     let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
@@ -1993,7 +1993,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, pat_or_sym: i32, iter_expr: i32,
     if pat_or_sym != 0:
         let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
         self.bind_local(pat_or_sym, bind_local)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, bind_local, 0, self.ast.get_start(body_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
         let bind_place = self.place_for_local(bind_local)
         self.assign_operand_to_place(bind_place, elem_op, self.ast.get_start(body_expr))
 
@@ -2005,7 +2005,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, pat_or_sym: i32, iter_expr: i32,
     let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
     let one_op = self.int_const_operand(1, self.sema.ty_i64)
     let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, counter_place, add_rv, self.ast.get_start(iter_expr))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
     self.pop_loop()
@@ -2037,7 +2037,7 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, b
     let counter_place = self.place_for_local(counter_local)
     let zero_op = self.int_const_operand(0, self.sema.ty_i64)
     let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_op, 0, 0)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, counter_place, zero_rv, self.ast.get_start(iter_expr))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, self.ast.get_start(iter_expr))
 
     let header_bb = self.new_block()
     let body_bb = self.new_block()
@@ -2054,7 +2054,7 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, b
     let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, counter_op, len_op)
     let cmp_local = self.new_temp(self.sema.ty_bool)
     let cmp_place = self.place_for_local(cmp_local)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
     let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
@@ -2080,7 +2080,7 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, b
     if pat_or_sym != 0:
         let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
         self.bind_local(pat_or_sym, bind_local)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, bind_local, 0, self.ast.get_start(body_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
         let bind_place = self.place_for_local(bind_local)
         let elem_op = self.body.new_operand(OperandKind.OK_COPY, elem_place)
         self.assign_operand_to_place(bind_place, elem_op, self.ast.get_start(body_expr))
@@ -2093,7 +2093,7 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, b
     let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
     let one_op = self.int_const_operand(1, self.sema.ty_i64)
     let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, counter_place, add_rv, self.ast.get_start(iter_expr))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
     self.pop_loop()
@@ -2149,7 +2149,7 @@ fn MirBuilder.lower_enum_discriminant(self: MirBuilder, place: i32) -> i32:
     let rv = self.body.new_rvalue(RvalueKind.RK_DISCRIMINANT, place, 0, 0)
     let disc_local = self.new_temp(self.sema.ty_i32)
     let disc_place = self.place_for_local(disc_local)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, disc_place, rv, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, disc_place, rv, 0)
     self.body.new_operand(OperandKind.OK_COPY, disc_place)
 
 fn MirBuilder.pattern_payload_node(self: MirBuilder, owner_pat: i32, payload_entry: i32) -> i32:
@@ -2262,7 +2262,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_EQ, scrutinee_op, lit)
         let cmp_tmp = self.new_temp(self.sema.ty_bool)
         let cmp_place = self.place_for_local(cmp_tmp)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, cmp_place, cmp_rv, self.ast.get_start(pat_node))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(pat_node))
         let cmp_op = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
         let vals: Vec[i32] = Vec.new()
         vals.push(1)
@@ -2281,7 +2281,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         let ge_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_GTE, scrutinee_op, lo_lit)
         let ge_tmp = self.new_temp(self.sema.ty_bool)
         let ge_place = self.place_for_local(ge_tmp)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, ge_place, ge_rv, self.ast.get_start(pat_node))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, ge_place, ge_rv, self.ast.get_start(pat_node))
         let ge_op = self.body.new_operand(OperandKind.OK_COPY, ge_place)
         let range_hi_bb = self.new_block()
         let ge_vals: Vec[i32] = Vec.new()
@@ -2296,7 +2296,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         let le_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, hi_cmp_op, scrutinee_op2, hi_lit)
         let le_tmp = self.new_temp(self.sema.ty_bool)
         let le_place = self.place_for_local(le_tmp)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, le_place, le_rv, self.ast.get_start(pat_node))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, le_place, le_rv, self.ast.get_start(pat_node))
         let le_op = self.body.new_operand(OperandKind.OK_COPY, le_place)
         let le_vals: Vec[i32] = Vec.new()
         le_vals.push(1)
@@ -2400,7 +2400,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let bind_ty = self.place_local_type(scrutinee_place)
         let local_id = self.body.new_local(bind_ty, 0, sym, 1)
         self.bind_local(sym, local_id)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(pat_node))
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
         if self.sema.is_copy(bind_ty) == 0:
             self.schedule_drop(local_id, DropKind.DK_VALUE)
         let src_op = self.body.new_operand(if self.sema.is_copy(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, scrutinee_place)
@@ -2414,7 +2414,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let outer_ty = self.place_local_type(scrutinee_place)
         let outer_local = self.body.new_local(outer_ty, 0, outer_sym, 1)
         self.bind_local(outer_sym, outer_local)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, outer_local, 0, self.ast.get_start(pat_node))
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, outer_local, 0, self.ast.get_start(pat_node))
         if self.sema.is_copy(outer_ty) == 0:
             self.schedule_drop(outer_local, DropKind.DK_VALUE)
         let outer_op = self.body.new_operand(if self.sema.is_copy(outer_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, scrutinee_place)
@@ -2443,7 +2443,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             let bind_ty = self.place_local_type(field_place)
             let local_id = self.body.new_local(bind_ty, 0, raw, 1)
             self.bind_local(raw, local_id)
-            self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(pat_node))
+            self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
             if self.sema.is_copy(bind_ty) == 0:
                 self.schedule_drop(local_id, DropKind.DK_VALUE)
             let src_op = self.body.new_operand(if self.sema.is_copy(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
@@ -2478,7 +2478,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
                 let bind_ty = self.place_local_type(field_place)
                 let local_id = self.body.new_local(bind_ty, 0, field_name, 1)
                 self.bind_local(field_name, local_id)
-                self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(pat_node))
+                self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
                 if self.sema.is_copy(bind_ty) == 0:
                     self.schedule_drop(local_id, DropKind.DK_VALUE)
                 let src_op = self.body.new_operand(if self.sema.is_copy(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
@@ -2541,7 +2541,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             let field_place = self.body.new_field_place(scrutinee_place, si)
             let local_id = self.body.new_local(sp_elem_ty, 0, sym, 1)
             self.bind_local(sym, local_id)
-            self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(pat_node))
+            self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
             let src_op = self.body.new_operand(if self.sema.is_copy(sp_elem_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
             self.assign_operand_to_place(self.place_for_local(local_id), src_op, self.ast.get_start(pat_node))
             out.push(local_id)
@@ -2556,7 +2556,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             let field_place = self.body.new_field_place(scrutinee_place, field_idx)
             let local_id = self.body.new_local(sp_elem_ty, 0, sym, 1)
             self.bind_local(sym, local_id)
-            self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, local_id, 0, self.ast.get_start(pat_node))
+            self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
             let src_op = self.body.new_operand(if self.sema.is_copy(sp_elem_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
             self.assign_operand_to_place(self.place_for_local(local_id), src_op, self.ast.get_start(pat_node))
             out.push(local_id)
@@ -3138,7 +3138,7 @@ fn MirBuilder.lower_with_binding(self: MirBuilder, sym: i32, rhs_expr: i32, body
     let ty = self.expr_type(rhs_expr)
     let local = self.body.new_local(ty, is_mut, sym, 1)
     self.bind_local(sym, local)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, local, 0, span)
+    self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local, 0, span)
     if self.sema.is_copy(ty) == 0:
         self.schedule_drop(local, DropKind.DK_VALUE)
     let rhs = self.lower_expr(rhs_expr)
@@ -3160,7 +3160,7 @@ fn MirBuilder.lower_with_form2_3(self: MirBuilder, pat_or_name: i32, rhs_expr: i
         let ty = self.expr_type(rhs_expr)
         let local = self.body.new_local(ty, 0, sym, 1)
         self.bind_local(sym, local)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_STORAGE_LIVE, local, 0, self.ast.get_start(pat_or_name))
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local, 0, self.ast.get_start(pat_or_name))
         if self.sema.is_copy(ty) == 0:
             self.schedule_drop(local, DropKind.DK_VALUE)
         let rhs = self.lower_expr(rhs_expr)
@@ -3179,7 +3179,7 @@ fn MirBuilder.lower_record_update(self: MirBuilder, base_expr: i32, field_update
     let base_place = self.place_for_local(tmp)
     // Assign base to temp
     let use_rv = self.body.new_rvalue(RvalueKind.RK_USE, base, 0, 0)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, base_place, use_rv, self.ast.get_start(node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, base_place, use_rv, self.ast.get_start(node))
     // Overwrite each updated field
     let resolved_ty = self.sema.resolve_alias(ty)
     let struct_extra = self.sema.get_type_d1(resolved_ty)
@@ -3203,7 +3203,7 @@ fn MirBuilder.lower_record_update(self: MirBuilder, base_expr: i32, field_update
             self.expected_type = saved_expected
             let field_place = self.body.new_field_place(base_place, f_name_sym)
             let field_rv = self.body.new_rvalue(RvalueKind.RK_USE, f_val, 0, 0)
-            self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, field_place, field_rv, self.ast.get_start(node))
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, field_place, field_rv, self.ast.get_start(node))
     self.body.new_operand(OperandKind.OK_COPY, base_place)
 
 fn MirBuilder.lower_implicit_ok(self: MirBuilder, expr: i32, ok_type_id: i32) -> i32:
@@ -3216,7 +3216,7 @@ fn MirBuilder.lower_implicit_ok(self: MirBuilder, expr: i32, ok_type_id: i32) ->
     let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, 0)
     let tmp = self.new_temp(ok_type_id)
     let place = self.place_for_local(tmp)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, place, rv, self.ast.get_start(expr))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(expr))
     self.body.new_operand(OperandKind.OK_COPY, place)
 
 fn MirBuilder.lower_implicit_default_return(self: MirBuilder, type_id: i32) -> i32:
@@ -3250,7 +3250,7 @@ fn MirBuilder.lower_closure(self: MirBuilder, _captured_start: i32, _captured_co
     let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, node, 0, 0, ty)
     let op = self.body.new_operand(OperandKind.OK_CONSTANT, closure_const)
     let rv = self.body.new_rvalue(RvalueKind.RK_USE, op, 0, 0)
-    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, place, rv, self.ast.get_start(node))
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
     self.body.new_operand(OperandKind.OK_COPY, place)
 
 fn MirBuilder.lower_optional_chain(self: MirBuilder, node: i32) -> i32:
@@ -3399,7 +3399,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                             let fa_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fa_fid, fa_disc_tag)
                             let fa_tmp = self.new_temp(fa_base_ty)
                             let fa_place = self.place_for_local(fa_tmp)
-                            self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, fa_place, fa_rv, self.ast.get_start(node))
+                            self.body.push_stmt(self.cur_bb, StmtKind.Assign, fa_place, fa_rv, self.ast.get_start(node))
                             return self.body.new_operand(OperandKind.OK_COPY, fa_place)
                         return self.int_const_operand(fa_disc_tag as i64, fa_base_ty)
                     // Also try bare variant sym (some enums register just "Red")
@@ -3416,7 +3416,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                                 let fa_rv2 = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fa_fid2, fa_disc_tag2)
                                 let fa_tmp2 = self.new_temp(fa_base_ty)
                                 let fa_place2 = self.place_for_local(fa_tmp2)
-                                self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, fa_place2, fa_rv2, self.ast.get_start(node))
+                                self.body.push_stmt(self.cur_bb, StmtKind.Assign, fa_place2, fa_rv2, self.ast.get_start(node))
                                 return self.body.new_operand(OperandKind.OK_COPY, fa_place2)
                             return self.int_const_operand(fa_disc_tag2 as i64, fa_base_ty)
         let place = self.lower_field_access(fa_base, fa_field)
@@ -3538,7 +3538,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 let vc_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, vc_fid, vc_variant_idx)
                 let vc_tmp = self.new_temp(vc_result_ty)
                 let vc_place = self.place_for_local(vc_tmp)
-                self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, vc_place, vc_rv, self.ast.get_start(node))
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, vc_place, vc_rv, self.ast.get_start(node))
                 return self.body.new_operand(OperandKind.OK_COPY, vc_place)
         // Distinct type constructor: Meters(42) → single-field struct aggregate
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
@@ -3559,7 +3559,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                     let dt_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, dt_fid, 0)
                     let dt_tmp = self.new_temp(dt_tid)
                     let dt_place = self.place_for_local(dt_tmp)
-                    self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, dt_place, dt_rv, self.ast.get_start(node))
+                    self.body.push_stmt(self.cur_bb, StmtKind.Assign, dt_place, dt_rv, self.ast.get_start(node))
                     return self.body.new_operand(OperandKind.OK_COPY, dt_place)
         // Callable type syntax: TypeName(args) → TypeName.new(args)
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
@@ -3656,7 +3656,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let sl_ty = self.expr_type(node)
         let sl_tmp = self.new_temp(sl_ty)
         let sl_place = self.place_for_local(sl_tmp)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, sl_place, sl_rv, self.ast.get_start(node))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, sl_place, sl_rv, self.ast.get_start(node))
         return self.body.new_operand(OperandKind.OK_COPY, sl_place)
 
     if kind == NodeKind.NK_RECORD_UPDATE:
@@ -3676,7 +3676,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let tup_ty = self.expr_type(node)
         let tup_tmp = self.new_temp(tup_ty)
         let tup_place = self.place_for_local(tup_tmp)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, tup_place, tup_rv, self.ast.get_start(node))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, tup_place, tup_rv, self.ast.get_start(node))
         return self.body.new_operand(OperandKind.OK_COPY, tup_place)
 
     if kind == NodeKind.NK_ARRAY_LIT:
@@ -3693,7 +3693,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let arr_ty = self.expr_type(node)
         let arr_tmp = self.new_temp(arr_ty)
         let arr_place = self.place_for_local(arr_tmp)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, arr_place, arr_rv, self.ast.get_start(node))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, arr_place, arr_rv, self.ast.get_start(node))
         return self.body.new_operand(OperandKind.OK_COPY, arr_place)
 
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
@@ -3717,7 +3717,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                         let vs_de_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, vs_de_fid, vs_disc_val)
                         let vs_de_tmp = self.new_temp(vs_result_ty)
                         let vs_de_place = self.place_for_local(vs_de_tmp)
-                        self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, vs_de_place, vs_de_rv, self.ast.get_start(node))
+                        self.body.push_stmt(self.cur_bb, StmtKind.Assign, vs_de_place, vs_de_rv, self.ast.get_start(node))
                         return self.body.new_operand(OperandKind.OK_COPY, vs_de_place)
                     return self.int_const_operand(vs_disc_val, vs_result_ty)
         let vs_fields: Vec[i32] = Vec.new()
@@ -3730,7 +3730,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let vs_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, vs_fid, vs_variant_idx)
         let vs_tmp = self.new_temp(vs_result_ty)
         let vs_place = self.place_for_local(vs_tmp)
-        self.body.push_stmt(self.cur_bb, StmtKind.SK_ASSIGN, vs_place, vs_rv, self.ast.get_start(node))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, vs_place, vs_rv, self.ast.get_start(node))
         return self.body.new_operand(OperandKind.OK_COPY, vs_place)
 
     if kind == NodeKind.NK_CLOSURE:
@@ -3855,7 +3855,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
                     p_ty = builder.sema.ty_i32
             let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
             builder.bind_local(p_name, local_id)
-            builder.body.push_stmt(builder.cur_bb, StmtKind.SK_STORAGE_LIVE, local_id, 0, builder.ast.get_start(fn_node))
+            builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, local_id, 0, builder.ast.get_start(fn_node))
             if builder.sema.is_copy(p_ty) == 0:
                 builder.schedule_drop(local_id, DropKind.DK_VALUE)
 
@@ -3886,7 +3886,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
                     let ok_rv = builder.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, ok_fid, 0)
                     let ok_tmp = builder.new_temp(ret_ty)
                     let ok_place = builder.place_for_local(ok_tmp)
-                    builder.body.push_stmt(builder.cur_bb, StmtKind.SK_ASSIGN, ok_place, ok_rv, builder.ast.get_end(fn_node))
+                    builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, ok_place, ok_rv, builder.ast.get_end(fn_node))
                     result = builder.body.new_operand(OperandKind.OK_COPY, ok_place)
 
     // Implicit return value assignment for non-diverging tail expressions.
