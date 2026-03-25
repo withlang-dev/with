@@ -22,9 +22,9 @@ echo ""
 times=()
 for i in $(seq 1 $RUNS); do
     rm -f "$TMP_OUT"
-    start=$(date +%s%N 2>/dev/null || python3 -c "import time; print(int(time.time()*1e9))")
+    start=$(python3 -c "import time; print(int(time.time()*1e9))")
     "$COMPILER" build "$SOURCE" -o "$TMP_OUT" 2>/dev/null
-    end=$(date +%s%N 2>/dev/null || python3 -c "import time; print(int(time.time()*1e9))")
+    end=$(python3 -c "import time; print(int(time.time()*1e9))")
     elapsed_ms=$(( (end - start) / 1000000 ))
     times+=($elapsed_ms)
     echo "  run $i: ${elapsed_ms}ms"
