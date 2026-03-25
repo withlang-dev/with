@@ -525,33 +525,33 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     // Build flags
     var flags = 0
     if is_pub == Visibility.Public:
-        flags = flags + FnFlags.FN_FLAG_PUB
+        flags = flags + FnFlags.PUB
     if is_async != 0:
-        flags = flags + FnFlags.FN_FLAG_ASYNC
+        flags = flags + FnFlags.ASYNC
     if is_gen != 0:
-        flags = flags + FnFlags.FN_FLAG_GEN
+        flags = flags + FnFlags.GEN
     if is_comptime != 0:
-        flags = flags + FnFlags.FN_FLAG_COMPTIME
+        flags = flags + FnFlags.COMPTIME
     if self.pending_tailrec != 0:
-        flags = flags + FnFlags.FN_FLAG_TAILREC
+        flags = flags + FnFlags.TAILREC
     if self.pending_must_use != 0:
-        flags = flags + FnFlags.FN_FLAG_MUST_USE
+        flags = flags + FnFlags.MUST_USE
     if self.pending_inline != 0:
-        flags = flags + FnFlags.FN_FLAG_INLINE
+        flags = flags + FnFlags.INLINE
     if self.pending_noinline != 0:
-        flags = flags + FnFlags.FN_FLAG_NOINLINE
+        flags = flags + FnFlags.NOINLINE
     if self.pending_panic_handler != 0:
-        flags = flags + FnFlags.FN_FLAG_PANIC_HANDLER
+        flags = flags + FnFlags.PANIC_HANDLER
     if self.pending_entry != 0:
-        flags = flags + FnFlags.FN_FLAG_ENTRY
+        flags = flags + FnFlags.ENTRY
     if self.pending_no_main != 0:
-        flags = flags + FnFlags.FN_FLAG_NO_MAIN
+        flags = flags + FnFlags.NO_MAIN
     if self.pending_test != 0:
-        flags = flags + FnFlags.FN_FLAG_TEST
+        flags = flags + FnFlags.TEST
     if self.pending_before != 0:
-        flags = flags + FnFlags.FN_FLAG_BEFORE
+        flags = flags + FnFlags.BEFORE
     if self.pending_after != 0:
-        flags = flags + FnFlags.FN_FLAG_AFTER
+        flags = flags + FnFlags.AFTER
 
     // Store extra: type params then params already in extra from parsing.
     // We encode: d0=name, d1=body, d2=flags
@@ -1973,9 +1973,9 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
 
         var flags = 0
         if method_vis == Visibility.Public:
-            flags = flags + FnFlags.FN_FLAG_PUB
+            flags = flags + FnFlags.PUB
         if m_async != 0:
-            flags = flags + FnFlags.FN_FLAG_ASYNC
+            flags = flags + FnFlags.ASYNC
 
         let fn_node = self.pool.add_node(NodeKind.NK_FN_DECL, method_start, self.prev_end(), mangled, body, flags)
         let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT

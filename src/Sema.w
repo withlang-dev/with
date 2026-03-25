@@ -2394,10 +2394,10 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     self.register_method_sig_alias(node, fn_name, fn_sig_idx)
 
     // Track must_use
-    if (flags / FnFlags.FN_FLAG_MUST_USE) % 2 == 1:
+    if (flags / FnFlags.MUST_USE) % 2 == 1:
         self.must_use_fns.insert(fn_name, 1)
     // Track async fns
-    if (flags / FnFlags.FN_FLAG_ASYNC) % 2 == 1:
+    if (flags / FnFlags.ASYNC) % 2 == 1:
         self.task_fns.insert(fn_name, 1)
 
     // Unbind Self
@@ -3464,7 +3464,7 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     let saved_ret = self.current_return_type
     let saved_gen_yield_type = self.current_gen_yield_type
     let saved_has_gen_yield_type = self.has_gen_yield_type
-    let is_gen = (flags / FnFlags.FN_FLAG_GEN) % 2
+    let is_gen = (flags / FnFlags.GEN) % 2
     if is_gen == 1:
         self.current_return_type = self.ty_void
         self.current_gen_yield_type = ret_type
@@ -3474,7 +3474,7 @@ fn Sema.check_fn_body(self: Sema, node: i32):
         self.current_gen_yield_type = 0
         self.has_gen_yield_type = 0
     let saved_comptime = self.in_comptime_fn
-    if (flags / FnFlags.FN_FLAG_COMPTIME) % 2 == 1:
+    if (flags / FnFlags.COMPTIME) % 2 == 1:
         self.in_comptime_fn = 1
 
     // Check body — set expected type to return type for tail expression resolution

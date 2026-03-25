@@ -160,23 +160,23 @@ fn type_decl_is_packed(packed: i32) -> i32:
 // Fn decl flag bits (stored in data2 field)
 @[flags]
 enum FnFlags: i32:
-    FN_FLAG_PUB = 1
-    FN_FLAG_ASYNC = 2
-    FN_FLAG_GEN = 4
-    FN_FLAG_COMPTIME = 8
-    FN_FLAG_TAILREC = 16
-    FN_FLAG_MUST_USE = 32
-    FN_FLAG_VARIADIC = 64
-    FN_FLAG_INLINE = 128
-    FN_FLAG_NOINLINE = 256
-    FN_FLAG_PANIC_HANDLER = 512
-    FN_FLAG_ENTRY = 1024
-    FN_FLAG_NO_MAIN = 2048
-    FN_FLAG_TEST = 4096
-    FN_FLAG_BEFORE = 8192
-    FN_FLAG_AFTER = 16384
+    PUB = 1
+    ASYNC = 2
+    GEN = 4
+    COMPTIME = 8
+    TAILREC = 16
+    MUST_USE = 32
+    VARIADIC = 64
+    INLINE = 128
+    NOINLINE = 256
+    PANIC_HANDLER = 512
+    ENTRY = 1024
+    NO_MAIN = 2048
+    TEST = 4096
+    BEFORE = 8192
+    AFTER = 16384
 // Metadata packing unit used to encode required-parameter count into
-// fn_meta flags without affecting existing FnFlags.FN_FLAG_* parity checks.
+// fn_meta flags without affecting existing FnFlags.* parity checks.
 const FN_META_REQUIRED_UNIT: i32 = 32768
 const FN_PARAM_STRIDE: i32 = 3
 const FN_PARAM_FLAG_NOALIAS: i32 = 1

@@ -2911,7 +2911,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     var effective_name = self.function_symbol_name(name_sym)
     if parsed_name.len() > 0:
         effective_name = parsed_name
-    if (flags / FnFlags.FN_FLAG_ENTRY) % 2 == 1:
+    if (flags / FnFlags.ENTRY) % 2 == 1:
         effective_name = "main"
 
     let function = wl_add_function(self.llmod, effective_name, fn_type)
@@ -2922,9 +2922,9 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         wl_set_linkage(function, wl_internal_linkage())
 
     // Apply attributes
-    if (flags / FnFlags.FN_FLAG_INLINE) % 2 == 1:
+    if (flags / FnFlags.INLINE) % 2 == 1:
         wl_add_fn_attr(self.context, function, "alwaysinline")
-    if (flags / FnFlags.FN_FLAG_NOINLINE) % 2 == 1:
+    if (flags / FnFlags.NOINLINE) % 2 == 1:
         wl_add_fn_attr(self.context, function, "noinline")
 
     self.fn_values.insert(name_sym, function)
@@ -3797,7 +3797,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             let tp_count = self.pool.fn_meta_tp_count(meta)
             if tp_count > 0:
                 self.generic_fns.insert(name_sym, decl)
-            else if (flags / FnFlags.FN_FLAG_ASYNC) % 2 == 1:
+            else if (flags / FnFlags.ASYNC) % 2 == 1:
                 self.declare_async_function(decl)
             else:
                 self.declare_function(decl)
