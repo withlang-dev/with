@@ -959,9 +959,10 @@ fn Sema.ensure_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: i32)
     self.add_type(TypeKind.TY_FN, te_start, param_count, ret)
 
 fn Sema.generic_inst_cache_key(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> str:
-    var key = int_to_string(base_sym)
+    var key = f"{base_sym}"
     for ai in 0..arg_count:
-        key = key ++ ":" ++ int_to_string(args.get(ai as i64))
+        let arg_val = args.get(ai as i64)
+        key = key ++ f":{arg_val}"
     key
 
 fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> i32:
@@ -1030,7 +1031,7 @@ fn Sema.preregister_mir_types(self: Sema):
                 let arg_count = self.type_d2.get(ti as i64)
                 if arg_count >= 1:
                     let elem_ty = self.type_extra.get(extra_start as i64)
-                    let vi_key = int_to_string(vi_sym) ++ ":" ++ int_to_string(elem_ty)
+                    let vi_key = f"{vi_sym}:{elem_ty}"
                     if not self.generic_inst_cache.contains(vi_key):
                         let te_start = self.type_extra.len() as i32
                         self.type_extra.push(elem_ty)
@@ -1038,7 +1039,7 @@ fn Sema.preregister_mir_types(self: Sema):
                         self.generic_inst_cache.insert(vi_key, tid)
 
     // Register Vec[str] for str.split() return type.
-    let vec_str_key = int_to_string(vec_sym) ++ ":" ++ int_to_string(self.ty_str)
+    let vec_str_key = f"{vec_sym}:{self.ty_str}"
     if not self.generic_inst_cache.contains(vec_str_key):
         let te_start = self.type_extra.len() as i32
         self.type_extra.push(self.ty_str)
@@ -1046,7 +1047,7 @@ fn Sema.preregister_mir_types(self: Sema):
         self.generic_inst_cache.insert(vec_str_key, tid)
 
     // Also register VecIter[str] in case Vec[str].iter() is called.
-    let vi_str_key = int_to_string(vi_sym) ++ ":" ++ int_to_string(self.ty_str)
+    let vi_str_key = f"{vi_sym}:{self.ty_str}"
     if not self.generic_inst_cache.contains(vi_str_key):
         let te_start = self.type_extra.len() as i32
         self.type_extra.push(self.ty_str)
@@ -4766,10 +4767,10 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
                                 ci_arg2_type = a2_prim
                             else if self.named_types.contains(a2_sym):
                                 ci_arg2_type = self.named_types.get(a2_sym).unwrap()
-                    var ci_cache_key = int_to_string(ci_base_sym) ++ ":" ++ int_to_string(ci_arg_type)
+                    var ci_cache_key = f"{ci_base_sym}:{ci_arg_type}"
                     var ci_arg_count = 1
                     if ci_arg2_type > 0:
-                        ci_cache_key = ci_cache_key ++ ":" ++ int_to_string(ci_arg2_type)
+                        ci_cache_key = ci_cache_key ++ f":{ci_arg2_type}"
                         ci_arg_count = 2
                     if self.generic_inst_cache.contains(ci_cache_key):
                         let ci_result = self.generic_inst_cache.get(ci_cache_key).unwrap()
@@ -6141,12 +6142,13 @@ fn Sema.bind_type_params_from_type_expr(self: Sema, type_node: i32, arg_tid: i32
         return
 
 fn Sema.generic_specialization_key(self: Sema, fn_sym: i32, tp_start: i32, tp_count: i32) -> str:
-    var key = int_to_string(fn_sym)
+    var key = f"{fn_sym}"
     var pos = tp_start
     for ti in 0..tp_count:
         let tp_name = self.ast.get_extra(pos)
         let bound_count = self.ast.get_extra(pos + 1)
-        key = key ++ ":" ++ int_to_string(tp_name) ++ "=" ++ int_to_string(self.lookup_generic_subst(tp_name))
+        let tp_subst = self.lookup_generic_subst(tp_name)
+        key = key ++ f":{tp_name}={tp_subst}"
         pos = pos + 2 + bound_count
     key
 
@@ -6253,7 +6255,7 @@ fn Sema.resolve_generic_return_type_node(self: Sema, ret_node: i32, tp_start: i3
     self.resolve_type_expr(ret_node)
 
 fn Sema.selection_cache_key(self: Sema, type_sym: i32, trait_sym: i32) -> str:
-    int_to_string(type_sym) ++ ":" ++ int_to_string(trait_sym)
+    f"{type_sym}:{trait_sym}"
 
 fn Sema.blanket_guard_contains(self: Sema, key: str) -> i32:
     var i = 0
@@ -7601,7 +7603,7 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
 fn Sema.method_key(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     if type_sym <= 0 or method_sym <= 0:
         return 0
-    let cache_key = int_to_string(type_sym) ++ "|" ++ int_to_string(method_sym)
+    let cache_key = f"{type_sym}|{method_sym}"
     let cached = self.method_key_cache.get(cache_key)
     if cached.is_some():
         return cached.unwrap()
