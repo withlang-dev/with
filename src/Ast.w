@@ -247,8 +247,8 @@ enum LiteralSuffix: i32:
 
 // F-string segment kinds (stored in extra_data)
 enum FStringSegmentKind: i32:
-    FSTR_SEG_LITERAL = 0  // +1 word: string token index (interned symbol)
-    FSTR_SEG_EXPR = 1     // +1 word: expression node, +1 word: spec node (0 if none)
+    LITERAL = 0  // +1 word: string token index (interned symbol)
+    EXPR = 1     // +1 word: expression node, +1 word: spec node (0 if none)
 
 // ── AST Pool ──────────────────────────────────────────────────────
 
