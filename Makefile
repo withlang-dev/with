@@ -382,6 +382,10 @@ install-user: $(STAGE2_BIN)
 	install -m 0755 "$(STAGE2_BIN)" "$(USER_BINDIR)/with"
 	cp -R "$(OUT_LIB_DIR)/." "$(USER_LIBDIR)/"
 
+update-seed: fixpoint
+	@cp "$(STAGE2_BIN)" "$(SEED_PATH)"
+	@echo "seed updated: $(SEED_PATH)"
+
 clean:
 	rm -rf "$(OUT)/"
 	rm -f runtime/embedded_objects.inc.h
