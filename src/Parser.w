@@ -2388,7 +2388,7 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
             if i > seg_start:
                 let seg_text = self.interp_clean_segment(content, seg_start, i)
                 let sym = self.intern.intern(seg_text)
-                self.pool.add_extra(FSTR_SEG_LITERAL)
+                self.pool.add_extra(FStringSegmentKind.LITERAL)
                 self.pool.add_extra(sym)
                 seg_count = seg_count + 1
             // Find matching } while tracking colon for format spec
@@ -2415,8 +2415,8 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
             if colon_pos > 0:
                 let spec_text = content.slice((colon_pos + 1) as i64, j as i64)
                 spec_node = self.parse_format_spec_text(spec_text, start, end)
-            // Emit FSTR_SEG_EXPR: kind, expr_node, spec_node
-            self.pool.add_extra(FSTR_SEG_EXPR)
+            // Emit FStringSegmentKind.EXPR: kind, expr_node, spec_node
+            self.pool.add_extra(FStringSegmentKind.EXPR)
             self.pool.add_extra(expr_node)
             self.pool.add_extra(spec_node)
             seg_count = seg_count + 1
@@ -2432,13 +2432,13 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
     if seg_start < clen:
         let seg_text = self.interp_clean_segment(content, seg_start, clen)
         let sym = self.intern.intern(seg_text)
-        self.pool.add_extra(FSTR_SEG_LITERAL)
+        self.pool.add_extra(FStringSegmentKind.LITERAL)
         self.pool.add_extra(sym)
         seg_count = seg_count + 1
     // Handle empty f-string
     if seg_count == 0:
         let sym = self.intern.intern("")
-        self.pool.add_extra(FSTR_SEG_LITERAL)
+        self.pool.add_extra(FStringSegmentKind.LITERAL)
         self.pool.add_extra(sym)
         seg_count = 1
     let node = self.pool.add_node(NodeKind.NK_FSTRING, start, end, seg_count, extra_start, 0)

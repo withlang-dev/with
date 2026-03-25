@@ -4108,9 +4108,9 @@ fn Sema.check_fstring(self: Sema, node: i32) -> i32:
     var i = 0
     while i < seg_count:
         let seg_kind = self.ast.get_extra(pos)
-        if seg_kind == FSTR_SEG_LITERAL:
+        if seg_kind == FStringSegmentKind.LITERAL:
             pos = pos + 2  // kind + symbol
-        else if seg_kind == FSTR_SEG_EXPR:
+        else if seg_kind == FStringSegmentKind.EXPR:
             let expr_node = self.ast.get_extra(pos + 1)
             let spec_node = self.ast.get_extra(pos + 2)
             // Type-check the expression

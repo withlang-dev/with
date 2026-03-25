@@ -1047,11 +1047,11 @@ fn MirBuilder.lower_fstring(self: MirBuilder, node: i32) -> i32:
     while i < seg_count:
         let seg_kind = self.ast.get_extra(pos)
         var seg_operand = 0
-        if seg_kind == FSTR_SEG_LITERAL:
+        if seg_kind == FStringSegmentKind.LITERAL:
             let sym = self.ast.get_extra(pos + 1)
             seg_operand = self.lower_str_lit(sym)
             pos = pos + 2
-        else if seg_kind == FSTR_SEG_EXPR:
+        else if seg_kind == FStringSegmentKind.EXPR:
             let expr_node = self.ast.get_extra(pos + 1)
             let spec_node = self.ast.get_extra(pos + 2)
             seg_operand = self.lower_expr(expr_node)
