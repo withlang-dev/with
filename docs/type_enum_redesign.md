@@ -95,8 +95,11 @@
 
 ## Remaining Follow-Ups
 
-- [ ] Removing `TK_` / `NK_` / `OP_` / `SK_` style prefixes from variant names.
-- [ ] Changing unrelated alias-style declarations (`type FileId = i32`, etc.).
+- [~] Removing `TK_` / `NK_` / `OP_` / `SK_` style prefixes from variant names.
+  Done for 19 enums. Blocked for MIR-path and large enums by codegen bugs
+  (infinite loop in `run_mir_lower`, LLVM `InstCombine` O2 pathology).
+- [x] Changing unrelated alias-style declarations (`type FileId = i32`, etc.).
+  No change needed — type aliases use `=` correctly.
 - [x] Updating spec document §4.3, §4.4, §4.4a.
 
 ---
