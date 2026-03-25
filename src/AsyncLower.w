@@ -334,9 +334,9 @@ fn async_fn_flavor(ast: AstPool, fn_decl: i32) -> i32:
     if fn_decl == 0:
         return AsyncBodyKind.Sync
     let flags = ast.get_data2(fn_decl)
-    if (flags / FnFlags.FN_FLAG_GEN) % 2 == 1:
+    if (flags / FnFlags.GEN) % 2 == 1:
         return AsyncBodyKind.Generator
-    if (flags / FnFlags.FN_FLAG_ASYNC) % 2 == 1:
+    if (flags / FnFlags.ASYNC) % 2 == 1:
         return AsyncBodyKind.Async
     AsyncBodyKind.Sync
 
