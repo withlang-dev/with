@@ -1665,6 +1665,10 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
     let result_local = self.new_temp(result_ty)
     let result_place = self.place_for_local(result_local)
 
+    let saved_expected = self.expected_type
+    if result_ty != 0:
+        self.expected_type = result_ty
+
     self.switch_to(then_bb)
     let then_op = self.lower_expr(then_expr)
     self.assign_operand_to_place(result_place, then_op, self.ast.get_start(then_expr))
@@ -1674,6 +1678,8 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
     let else_op = if else_expr_opt != 0: self.lower_expr(else_expr_opt) else: self.unit_operand()
     self.assign_operand_to_place(result_place, else_op, self.ast.get_start(node))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.expected_type = saved_expected
 
     self.switch_to(join_bb)
     if self.sema.is_copy(result_ty) != 0:
