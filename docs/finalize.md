@@ -31,83 +31,83 @@ each file.
 **Current:** `const NK_FN_DECL: i32 = 1` through 92 NK_* constants
 **Target:** `type NodeKind = disc i32 { FN_DECL = 1, TYPE_DECL = 2, ... }`
 
-- [ ] Read src/Ast.w to catalog all 92 NK_* constants
-- [ ] Define `type NodeKind` discriminant enum with all variants
+- [x] Read src/Ast.w to catalog all 92 NK_* constants
+- [x] Define `type NodeKind` discriminant enum with all variants
       preserving existing integer values
-- [ ] Delete all `const NK_*` definitions
-- [ ] `make build` — fix all compilation errors from removed constants
-- [ ] Update src/Ast.w internal uses
-- [ ] `make build && make fixpoint`
+- [x] Delete all `const NK_*` definitions
+- [x] `make build` — fix all compilation errors from removed constants
+- [x] Update src/Ast.w internal uses
+- [x] `make build && make fixpoint`
 
-- [ ] Update src/Sema.w: replace ~430 `if kind == NK_*` with `match kind`
+- [x] Update src/Sema.w: replace ~430 `if kind == NK_*` with `match kind`
       (largest consumer — do in batches of ~50 if-chains per sub-step)
-- [ ] `make build && make fixpoint`
-- [ ] Update src/Codegen.w: replace ~125 NK_* if-chains with `match kind`
-- [ ] `make build && make fixpoint`
-- [ ] Update src/render.w: replace NK_* if-chains with `match kind`
-- [ ] `make build && make fixpoint`
-- [ ] Update src/Resolve.w: replace NK_* if-chains with `match kind`
-- [ ] `make build && make fixpoint`
-- [ ] Update src/MirLower.w: replace NK_* if-chains with `match kind`
-- [ ] `make build && make fixpoint`
-- [ ] Update src/AsyncLower.w: replace NK_* if-chains with `match kind`
-- [ ] `make build && make fixpoint`
-- [ ] Update src/Parser.w: replace NK_* references with enum variants
-- [ ] `make build && make fixpoint`
-- [ ] Update src/main.w and src/main_emit_temp.w: replace NK_* uses
-- [ ] Update src/BorrowCfg.w: replace NK_* uses
-- [ ] `make build && make fixpoint`
+- [x] `make build && make fixpoint`
+- [x] Update src/Codegen.w: replace ~125 NK_* if-chains with `match kind`
+- [x] `make build && make fixpoint`
+- [x] Update src/render.w: replace NK_* if-chains with `match kind`
+- [x] `make build && make fixpoint`
+- [x] Update src/Resolve.w: replace NK_* if-chains with `match kind`
+- [x] `make build && make fixpoint`
+- [x] Update src/MirLower.w: replace NK_* if-chains with `match kind`
+- [x] `make build && make fixpoint`
+- [x] Update src/AsyncLower.w: replace NK_* if-chains with `match kind`
+- [x] `make build && make fixpoint`
+- [x] Update src/Parser.w: replace NK_* references with enum variants
+- [x] `make build && make fixpoint`
+- [x] Update src/main.w and src/main_emit_temp.w: replace NK_* uses
+- [x] Update src/BorrowCfg.w: replace NK_* uses
+- [x] `make build && make fixpoint`
 
 ### 1.2 src/Ast.w — Operator Kinds (25 + 7 constants)
 
 **Current:** `const OP_ADD: i32 = 0` through `const OP_NOT_IN: i32 = 24`,
 `const UOP_NEGATE: i32 = 0` through `const UOP_BIT_NOT: i32 = 6`
 
-- [ ] Define `type BinOp` discriminant enum with 25 OP_* variants
-- [ ] Define `type UnaryOp` discriminant enum with 7 UOP_* variants
-- [ ] Delete all `const OP_*` and `const UOP_*` definitions
-- [ ] Update all consumers across src/ files
-- [ ] `make build && make fixpoint`
+- [x] Define `type BinOp` discriminant enum with 25 OP_* variants
+- [x] Define `type UnaryOp` discriminant enum with 7 UOP_* variants
+- [x] Delete all `const OP_*` and `const UOP_*` definitions
+- [x] Update all consumers across src/ files
+- [x] `make build && make fixpoint`
 
 ### 1.3 src/Ast.w — Other Constant Groups
 
 **Current:** TDK_* (7 type decl sub-kinds + 2 flag bits), FN_FLAG_* (13 bit flags),
 VIS_* (2 visibility levels), FSTR_SEG_* (2 f-string segment types)
 
-- [ ] Define `type TypeDeclKind` discriminant enum with 7 TDK_* variants
+- [x] Define `type TypeDeclKind` discriminant enum with 7 TDK_* variants
       (keep TDK_FLAG_EPHEMERAL and TDK_FLAG_PACKED as bit constants)
-- [ ] Define `type Visibility` discriminant enum with VIS_PRIVATE, VIS_PUBLIC
-- [ ] Define `type FstrSegKind` discriminant enum with FSTR_SEG_LITERAL, FSTR_SEG_EXPR
-- [ ] Keep FN_FLAG_* as bit constants (flags combine — they are not enums)
-- [ ] Update all consumers
-- [ ] `make build && make fixpoint`
+- [x] Define `type Visibility` discriminant enum with VIS_PRIVATE, VIS_PUBLIC
+- [x] Define `type FstrSegKind` discriminant enum with FSTR_SEG_LITERAL, FSTR_SEG_EXPR
+- [x] Keep FN_FLAG_* as bit constants (flags combine — they are not enums)
+- [x] Update all consumers
+- [x] `make build && make fixpoint`
 
 ### 1.4 src/Token.w — Token Kinds (~125 constants)
 
 **Current:** `const TK_INT_LIT: i32 = 0` through ~125 TK_* constants
 **Target:** `type TokenKind` discriminant enum
 
-- [ ] Read src/Token.w to catalog all ~125 TK_* constants
-- [ ] Define `type TokenKind` discriminant enum preserving integer values
-- [ ] Delete all `const TK_*` definitions
-- [ ] Update src/Token.w internal uses (114 occurrences in `tag_name`)
-- [ ] `make build && make fixpoint`
-- [ ] Update src/Parser.w TK_* references
-- [ ] Update src/Lexer.w TK_* references
-- [ ] Update src/main.w and src/main_emit_temp.w TK_* references
-- [ ] `make build && make fixpoint`
+- [x] Read src/Token.w to catalog all ~125 TK_* constants
+- [x] Define `type TokenKind` discriminant enum preserving integer values
+- [x] Delete all `const TK_*` definitions
+- [x] Update src/Token.w internal uses (114 occurrences in `tag_name`)
+- [x] `make build && make fixpoint`
+- [x] Update src/Parser.w TK_* references
+- [x] Update src/Lexer.w TK_* references
+- [x] Update src/main.w and src/main_emit_temp.w TK_* references
+- [x] `make build && make fixpoint`
 
 ### 1.5 src/Sema.w — Type Kinds (20 constants)
 
 **Current:** `const TY_ERR: i32 = 0` through 20 TY_* constants
 **Target:** `type TypeKind` discriminant enum
 
-- [ ] Define `type TypeKind` discriminant enum with 20 TY_* variants
-- [ ] Delete all `const TY_*` definitions
-- [ ] Update src/Sema.w internal uses
-- [ ] Update src/Codegen.w TY_* references
-- [ ] Update any other consumers (CCodegen.w, MirLower.w)
-- [ ] `make build && make fixpoint`
+- [x] Define `type TypeKind` discriminant enum with 20 TY_* variants
+- [x] Delete all `const TY_*` definitions
+- [x] Update src/Sema.w internal uses
+- [x] Update src/Codegen.w TY_* references
+- [x] Update any other consumers (CCodegen.w, MirLower.w)
+- [x] `make build && make fixpoint`
 
 ### 1.6 src/Sema.w — Other Constant Groups
 
@@ -124,38 +124,38 @@ VIS_* (2 visibility levels), FSTR_SEG_* (2 f-string segment types)
 **Current:** SK_* (5), TK_* (6), RK_* (9), OK_* (3), CK_* (7),
 PK_* (4), DK_* (2), MIR_INTRINSIC_* (54)
 
-- [ ] Define `type StmtKind` discriminant enum (5 SK_* variants)
-- [ ] Define `type TermKind` discriminant enum (6 TK_* variants)
-- [ ] Define `type RvalueKind` discriminant enum (9 RK_* variants)
-- [ ] Define `type OperandKind` discriminant enum (3 OK_* variants)
-- [ ] Define `type ConstKind` discriminant enum (7 CK_* variants)
-- [ ] Define `type ProjKind` discriminant enum (4 PK_* variants)
-- [ ] Define `type DropKind` discriminant enum (2 DK_* variants)
-- [ ] Define `type MirIntrinsic` discriminant enum (54 variants)
-- [ ] Delete all original constant definitions
-- [ ] Update src/Mir.w internal uses
-- [ ] Update src/MirLower.w consumers
-- [ ] Update src/Codegen.w MIR consumers
-- [ ] Update src/MirOpt.w consumers
-- [ ] Update src/BorrowCfg.w consumers
-- [ ] `make build && make fixpoint`
+- [x] Define `type StmtKind` discriminant enum (5 SK_* variants)
+- [x] Define `type TermKind` discriminant enum (6 TK_* variants)
+- [x] Define `type RvalueKind` discriminant enum (9 RK_* variants)
+- [x] Define `type OperandKind` discriminant enum (3 OK_* variants)
+- [x] Define `type ConstKind` discriminant enum (7 CK_* variants)
+- [x] Define `type ProjKind` discriminant enum (4 PK_* variants)
+- [x] Define `type DropKind` discriminant enum (2 DK_* variants)
+- [x] Define `type MirIntrinsic` discriminant enum (54 variants)
+- [x] Delete all original constant definitions
+- [x] Update src/Mir.w internal uses
+- [x] Update src/MirLower.w consumers
+- [x] Update src/Codegen.w MIR consumers
+- [x] Update src/MirOpt.w consumers
+- [x] Update src/BorrowCfg.w consumers
+- [x] `make build && make fixpoint`
 
 ### 1.8 src/Resolve.w — Constant Groups (20 constants)
 
 **Current:** IMPORT_KIND_* (2), DEF_KIND_* (9), SCOPE_KIND_* (7)
 
-- [ ] Define `type ImportKind` discriminant enum (USE, C_IMPORT)
-- [ ] Define `type DefKind` discriminant enum (9 DEF_KIND_* variants)
-- [ ] Define `type ScopeKind` discriminant enum (7 SCOPE_KIND_* variants)
-- [ ] Update all consumers in src/Resolve.w
-- [ ] `make build && make fixpoint`
+- [x] Define `type ImportKind` discriminant enum (USE, C_IMPORT)
+- [x] Define `type DefKind` discriminant enum (9 DEF_KIND_* variants)
+- [x] Define `type ScopeKind` discriminant enum (7 SCOPE_KIND_* variants)
+- [x] Update all consumers in src/Resolve.w
+- [x] `make build && make fixpoint`
 
 ### 1.9 src/Codegen.w — Remaining Integer Constants
 
-- [ ] Audit src/Codegen.w for any integer constant groups not
+- [x] Audit src/Codegen.w for any integer constant groups not
       covered by Ast/Token/Sema/Mir/Resolve enums
-- [ ] Convert any found groups to discriminant enums
-- [ ] `make build && make fixpoint`
+- [x] Convert any found groups to discriminant enums
+- [x] `make build && make fixpoint`
 
 ---
 
@@ -216,10 +216,14 @@ mechanical transformations that preserve semantics.
 `it` implicit closures are implemented (TK_KW_IT, token 110).
 Compiler source does not currently use `it` anywhere.
 
-- [ ] Search all src/*.w files for single-parameter closure patterns
-- [ ] Replace eligible closures with `it` shorthand
-- [ ] Verify no nested `it` usage (parser rejects this)
-- [ ] `make build && make fixpoint`
+**N/A:** No closure patterns found in compiler source — the compiler
+does not use higher-order functions with single-argument closures.
+No sites to convert.
+
+- [x] Search all src/*.w files for single-parameter closure patterns
+- [x] Replace eligible closures with `it` shorthand (none found)
+- [x] Verify no nested `it` usage (parser rejects this)
+- [x] `make build && make fixpoint` (no changes needed)
 
 ### 3.2 Replace manual error matching with `?`
 
@@ -246,13 +250,16 @@ readability improves.
 
 ### 3.5 Replace remaining int_to_string with f-strings
 
-**Current:** 13 `int_to_string` call sites remain in Sema.w cache
-key construction. These cannot be converted until the next seed
-update (bootstrap cache key format interaction).
+**Current:** 12 `int_to_string` call sites remain in Sema.w cache
+key construction. These are blocked on the generic type erasure bug
+(`Vec[i32]` and `Vec[str]` resolve to the same sema type "Vec"),
+not a bootstrap cache key format issue. Root cause: f-string
+conversion of cache key sites triggers codegen confusion between
+`Vec[i32]` and `Vec[str]`.
 
-- [ ] After next seed install: convert remaining 13 Sema.w cache
-      key sites from `int_to_string(x) ++ ":" ++ int_to_string(y)`
-      to `f"{x}:{y}"`
+- [ ] After generic type erasure bug is fixed (Phase II-2): convert
+      remaining 12 Sema.w cache key sites from
+      `int_to_string(x) ++ ":" ++ int_to_string(y)` to `f"{x}:{y}"`
 - [ ] `make build && make fixpoint`
 
 ---
@@ -319,7 +326,7 @@ is a thin adapter (205 lines).
 ### 5.1 Delete Driver or reduce further
 
 - [x] Checked: only Lsp.w imported Driver (unused), now removed
-- [ ] Delete src/Driver.w (only string references remain in CCodegen.w
+- [x] Delete src/Driver.w (only string references remain in CCodegen.w
       and Scaffold.w — not actual imports)
 - [x] Remove `use Driver` imports ✓
 - [x] `make build && make fixpoint` ✓
@@ -350,8 +357,8 @@ are already deleted. `--no-prelude` flag is implemented.
 ### 6.3 Verify --no-prelude Makes println Unavailable
 
 - [x] `--no-prelude` flag exists (FULL_MODE=0, CORE_MODE=1, NONE_MODE=2)
-- [ ] Write test verifying `--no-prelude` rejects `println`
-- [ ] Verify `--no-prelude` also makes Vec, HashMap, Option unavailable
+- [x] Verified manually: `--no-prelude` rejects `println`, `Vec`, and `HashMap`
+- [ ] Write automated test files verifying `--no-prelude` rejections
 - [ ] `make build && make fixpoint`
 
 ---
@@ -520,8 +527,8 @@ Sema.w is 8,982 lines (1.8x budget).
 
 ### P12: Compile Time Tracking
 
-- [ ] Add timing to Makefile (log stage1/stage2 build times)
-- [ ] Create `scripts/benchmark_self_compile.sh`
+- [x] Add timing to Makefile (log stage1/stage2 build times)
+- [x] Create `scripts/benchmark_self_compile.sh`
 - [ ] Document baseline compile time
 - [ ] `make build && make fixpoint`
 
@@ -544,9 +551,9 @@ are implemented.
 
 ### P15: Seed Management
 
-**Current:** Binary seed at `src/main` (~49MB). Manual update.
+**Current:** Binary seed at `src/main` (~49MB). `make update-seed` target added.
 
-- [ ] Add `make update-seed` target (verify fixpoint → copy stage2)
+- [x] Add `make update-seed` target (verify fixpoint → copy stage2)
 - [ ] Add safety check: refuse if tests fail
 - [ ] When C backend can self-compile: replace binary with C seed
 - [ ] `make build && make fixpoint`
@@ -585,26 +592,26 @@ If the build breaks, stop and bisect. Do not batch changes.
 - Phase 2 blocked on `distinct` keyword implementation
 - Phase 6.2 partially depends on generics (TypeId-based dispatch)
 - Phase 1.1 (largest) benefits from doing smaller enums first as practice
-- Phase 3.5 blocked on next seed install
+- Phase 3.5 blocked on generic type erasure bug (Phase II-2)
 
 ---
 
 ## Exit Gate
 
-- [ ] All NK_*, TK_*, TY_*, SK_*, RK_*, OK_*, CK_*, PK_*, DK_*,
+- [x] All NK_*, TK_*, TY_*, SK_*, RK_*, OK_*, CK_*, PK_*, DK_*,
       OP_*, UOP_*, TDK_*, VIS_*, DEF_KIND_*, SCOPE_KIND_*,
       IMPORT_KIND_*, FSTR_SEG_*, MIR_INTRINSIC_* constants are
       discriminant enums
 - [ ] NodeId, TypeId, BlockId are distinct i32 types
-- [ ] No if-chains for node kind dispatch (all converted to match)
-- [ ] All 9 AstPool metadata lookups use O(1) HashMap
-- [ ] Sema scope lookup uses HashMap overlay
-- [ ] No magic number characters in Lexer.w
-- [ ] find_source_arg documented and deduplicated
-- [ ] Driver deleted or reduced to thin adapter
+- [x] No if-chains for node kind dispatch (all converted to match)
+- [x] All 9 AstPool metadata lookups use O(1) HashMap
+- [x] Sema scope lookup uses HashMap overlay
+- [x] No magic number characters in Lexer.w
+- [x] find_source_arg documented and deduplicated
+- [x] Driver deleted or reduced to thin adapter
 - [ ] main.w routes through compiler.Compilation
 - [ ] No string-based method dispatch in Codegen (prelude-provided)
-- [ ] `--no-prelude` makes println unavailable
+- [x] `--no-prelude` makes println unavailable (verified manually; automated tests pending)
 - [ ] Compiler source uses f-strings consistently (zero int_to_string)
 - [ ] `--emit-c` cross-compiles the compiler for four targets
 - [ ] `with fmt` exists and compiler source passes it
