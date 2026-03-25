@@ -2368,9 +2368,20 @@ fn Parser.parse_string_literal(self: Parser) -> i32:
 fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, end: i32) -> i32:
     // Emit NodeKind.NK_FSTRING with segments in extra_data.
     // d0 = segment_count, d1 = extra_start, d2 = 0
+    //
+    // IMPORTANT: Parse all expression sub-parsers FIRST, collecting their
+    // node indices. Then write all segment data contiguously to the extra
+    // pool. This avoids interleaving sub-parser extra data with segment
+    // records (sub-parsers may add to the extra pool during parse_expr).
     let clen = content.len() as i32
-    let extra_start = self.pool.extra_len()
-    var seg_count = 0
+
+    // Phase 1: Scan content, parse expressions, collect segment info.
+    // seg_kinds: 0=literal, 1=expr
+    // seg_data1: sym (literal) or expr_node (expr)
+    // seg_data2: 0 (literal) or spec_node (expr)
+    let seg_kinds: Vec[i32] = Vec.new()
+    let seg_data1: Vec[i32] = Vec.new()
+    let seg_data2: Vec[i32] = Vec.new()
     var seg_start = 0
     var i = 0
     while i < clen:
@@ -2384,13 +2395,13 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
             if i > 0 and content.byte_at((i - 1) as i64) == 92:
                 i = i + 1
                 continue
-            // Emit text segment before the {
+            // Collect text segment before the {
             if i > seg_start:
                 let seg_text = self.interp_clean_segment(content, seg_start, i)
                 let sym = self.intern.intern(seg_text)
-                self.pool.add_extra(FStringSegmentKind.LITERAL)
-                self.pool.add_extra(sym)
-                seg_count = seg_count + 1
+                seg_kinds.push(FStringSegmentKind.LITERAL)
+                seg_data1.push(sym)
+                seg_data2.push(0)
             // Find matching } while tracking colon for format spec
             var depth = 1
             var expr_start_pos = i + 1
@@ -2400,47 +2411,56 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
                 let jch = content.byte_at(j as i64)
                 if jch == 123: depth = depth + 1
                 if jch == 125: depth = depth - 1
-                // Track top-level colon (only at depth==1, before closing })
                 if depth == 1 and jch == 58 and colon_pos == -1:
                     colon_pos = j
                 if depth > 0: j = j + 1
-            // Extract expression text (up to colon or closing brace)
+            // Extract expression text and parse it (may add to extra pool)
             var expr_end_pos = j
             if colon_pos > 0:
                 expr_end_pos = colon_pos
             let expr_text = content.slice(expr_start_pos as i64, expr_end_pos as i64)
             let expr_node = self.parse_interpolated_expr(expr_text, start)
-            // Parse format spec if colon present
             var spec_node = 0
             if colon_pos > 0:
                 let spec_text = content.slice((colon_pos + 1) as i64, j as i64)
                 spec_node = self.parse_format_spec_text(spec_text, start, end)
-            // Emit FStringSegmentKind.EXPR: kind, expr_node, spec_node
-            self.pool.add_extra(FStringSegmentKind.EXPR)
-            self.pool.add_extra(expr_node)
-            self.pool.add_extra(spec_node)
-            seg_count = seg_count + 1
-            i = j + 1  // skip past }
+            seg_kinds.push(FStringSegmentKind.EXPR)
+            seg_data1.push(expr_node)
+            seg_data2.push(spec_node)
+            i = j + 1
             seg_start = i
         else if ch == 125 and i + 1 < clen and content.byte_at((i + 1) as i64) == 125:
-            // }} → literal }
             i = i + 2
             continue
         else:
             i = i + 1
-    // Emit trailing text segment
+    // Collect trailing text segment
     if seg_start < clen:
         let seg_text = self.interp_clean_segment(content, seg_start, clen)
         let sym = self.intern.intern(seg_text)
-        self.pool.add_extra(FStringSegmentKind.LITERAL)
-        self.pool.add_extra(sym)
-        seg_count = seg_count + 1
+        seg_kinds.push(FStringSegmentKind.LITERAL)
+        seg_data1.push(sym)
+        seg_data2.push(0)
     // Handle empty f-string
-    if seg_count == 0:
+    if seg_kinds.len() == 0:
         let sym = self.intern.intern("")
-        self.pool.add_extra(FStringSegmentKind.LITERAL)
-        self.pool.add_extra(sym)
-        seg_count = 1
+        seg_kinds.push(FStringSegmentKind.LITERAL)
+        seg_data1.push(sym)
+        seg_data2.push(0)
+
+    // Phase 2: Write all segment records contiguously to extra pool.
+    let extra_start = self.pool.extra_len()
+    let seg_count = seg_kinds.len() as i32
+    for si in 0..seg_count:
+        let kind = seg_kinds.get(si as i64)
+        if kind == FStringSegmentKind.LITERAL:
+            self.pool.add_extra(FStringSegmentKind.LITERAL)
+            self.pool.add_extra(seg_data1.get(si as i64))
+        else:
+            self.pool.add_extra(FStringSegmentKind.EXPR)
+            self.pool.add_extra(seg_data1.get(si as i64))
+            self.pool.add_extra(seg_data2.get(si as i64))
+
     let node = self.pool.add_node(NodeKind.NK_FSTRING, start, end, seg_count, extra_start, 0)
     self.parse_postfix(node)
 
