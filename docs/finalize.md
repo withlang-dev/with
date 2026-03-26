@@ -225,19 +225,23 @@ No sites to convert.
 
 ### 3.2 Replace manual error matching with `?`
 
-- [ ] Search for `match result` / `match option` patterns that
-      propagate errors manually
-- [ ] Replace with `?` operator where applicable
-- [ ] `make build && make fixpoint`
+**N/A:** The compiler source does not use `Result` or `Option` return
+types. All error handling uses sentinel values (`0`, `-1`). No manual
+error matching patterns exist to convert.
+
+- [x] Search all src/*.w files for match result/option patterns (none found)
+- [x] No sites to convert — compiler uses sentinel returns, not Result/Option
 
 ### 3.3 Replace nested calls with `|>` pipelines
 
-Pipeline operator is used in ~11 places currently. Extend where
-readability improves.
+**N/A:** Already 27 uses of `|>` in Compilation.w, Link.w, main.w
+(shell commands). Core compiler files use `let` chains and LLVM builder
+nesting (`wl_const_int(wl_i64_type(ctx), ...)`) where `|>` would not
+improve readability. No further conversion sites identified.
 
-- [ ] Identify deeply nested function calls where data flows linearly
-- [ ] Replace where readability improves (judgment call)
-- [ ] `make build && make fixpoint`
+- [x] Audit all src/*.w for deeply nested function call chains
+- [x] Existing 27 `|>` uses already cover natural pipeline sites
+- [x] No additional sites where `|>` improves readability
 
 ### 3.4 Replace `== false` with `not`
 
