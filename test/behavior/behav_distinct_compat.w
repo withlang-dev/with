@@ -84,9 +84,9 @@ fn main:
     check("struct field", item.id == NodeId(100))
 
     // 15. Negative values
-    let neg = NodeId(0 - 1)
-    check("negative", neg == NodeId(0 - 1))
-    check("negative as i32", neg as i32 == 0 - 1)
+    let neg = NodeId(-1)
+    check("negative", neg == NodeId(-1))
+    check("negative as i32", neg as i32 == -1)
 
     println(f"Passed: {pass_count}/{pass_count + fail_count}")
     if fail_count == 0:
