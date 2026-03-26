@@ -203,6 +203,11 @@ fn Parser.emit_error(self: Parser, msg: str):
     let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
     self.diags.emit(Diagnostic.err(msg, span))
 
+fn Parser.poisoned_expr(self: Parser) -> i32:
+    let start = self.current_start()
+    let end = self.current_end()
+    self.pool.add_node(NodeKind.NK_POISONED_EXPR, start, end, 0, 0, 0)
+
 fn Parser.recover_to_top_level(self: Parser):
     while self.peek() != TokenKind.TK_EOF:
         let t = self.peek()
@@ -2211,7 +2216,8 @@ fn Parser.parse_primary(self: Parser) -> i32:
     if t == TokenKind.TK_L_BRACE: return self.parse_record_update()
     if t == TokenKind.TK_PIPE:
         self.emit_error("use 'x => body' instead of '|x| body'")
-        return 0
+        self.advance()
+        return self.poisoned_expr()
     if t == TokenKind.TK_KW_MOVE:
         self.advance()
         // move IDENT => expr
@@ -2239,10 +2245,12 @@ fn Parser.parse_primary(self: Parser) -> i32:
                 if node != 0: self.pool.mark_move_closure(node)
                 return node
         self.emit_error("'move' must be followed by a closure")
-        return 0
+        return self.poisoned_expr()
 
     self.emit_error("expected expression")
-    0
+    if self.peek() != TokenKind.TK_EOF:
+        self.advance()
+    self.poisoned_expr()
 
 // ── Literal parsing ─────────────────────────────────────────────
 
@@ -3502,7 +3510,7 @@ fn Parser.parse_labeled_loop(self: Parser) -> i32:
 
     if self.peek() != TokenKind.TK_COLON:
         self.emit_error("expected ':' after loop label")
-        return 0
+        return self.poisoned_expr()
     self.advance()
     self.skip_newlines()
 
@@ -3511,7 +3519,7 @@ fn Parser.parse_labeled_loop(self: Parser) -> i32:
     if t == TokenKind.TK_KW_WHILE: return self.parse_while(label_sym)
     if t == TokenKind.TK_KW_LOOP: return self.parse_loop(label_sym)
     self.emit_error("expected 'for', 'while', or 'loop' after label")
-    0
+    self.poisoned_expr()
 
 fn Parser.parse_break(self: Parser) -> i32:
     let start = self.current_start()
@@ -3821,7 +3829,9 @@ fn Parser.parse_pattern(self: Parser) -> i32:
         return self.parse_slice_pattern(start)
 
     self.emit_error("expected pattern")
-    0
+    if self.peek() != TokenKind.TK_EOF:
+        self.advance()
+    self.poisoned_expr()
 
 fn Parser.parse_struct_pattern(self: Parser, type_name: i32, start: i32) -> i32:
     self.advance()  // consume {
@@ -4080,12 +4090,12 @@ fn Parser.parse_const_binding(self: Parser) -> i32:
 
     if self.peek() != TokenKind.TK_COLON:
         self.emit_error("const declaration requires a type annotation")
-        return 0
+        return self.poisoned_expr()
     self.advance()
     let type_ann = self.parse_type_expr()
 
     if self.expect(TokenKind.TK_EQ) == 0:
-        return 0
+        return self.poisoned_expr()
     self.skip_newlines()
     let raw_value = self.parse_expr()
     // const desugars to comptime-wrapped immutable let
@@ -4109,7 +4119,7 @@ fn Parser.parse_with_expr(self: Parser) -> i32:
     self.suppress_as = 0
     if self.peek() != TokenKind.TK_KW_AS:
         self.emit_error("expected 'as' in with expression")
-        return 0
+        return self.poisoned_expr()
     self.advance()
     var is_mut = 0
     if self.peek() == TokenKind.TK_KW_MUT:
@@ -4131,7 +4141,7 @@ fn Parser.parse_record_update(self: Parser) -> i32:
     let source = self.parse_expr()
     if self.peek() != TokenKind.TK_KW_WITH:
         self.emit_error("expected 'with' in record update")
-        return 0
+        return self.poisoned_expr()
     self.advance()
     self.skip_newlines()
 
@@ -4361,7 +4371,7 @@ fn Parser.parse_block_or_expr(self: Parser) -> i32:
     self.skip_newlines()
     if self.peek() == TokenKind.TK_EOF:
         self.emit_error("expected expression")
-        return 0
+        return self.poisoned_expr()
 
     let block_col = column_of(self.source, self.current_start())
     var stmts: Vec[i32] = Vec.new()
@@ -4416,7 +4426,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
                 return 0
             return self.pool.add_node(NodeKind.NK_TYPE_TYPEOF, start, self.prev_end(), inner, 0, 0)
         self.emit_error("expected 'TypeOf' after '@' in type position")
-        return 0
+        return self.poisoned_expr()
 
     if t == TokenKind.TK_AMPERSAND:
         self.advance()
@@ -4528,7 +4538,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
             self.skip_newlines()
             if self.peek() != TokenKind.TK_INT_LIT:
                 self.emit_error("expected array size after ';'")
-                return 0
+                return self.poisoned_expr()
             let ss = self.current_start()
             let se = self.current_end()
             let size_text = self.source.slice(ss as i64, se as i64)
@@ -4546,7 +4556,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
         self.advance()
         if self.peek() != TokenKind.TK_IDENT:
             self.emit_error("expected trait name after 'dyn'")
-            return 0
+            return self.poisoned_expr()
         let sym = self.intern_current()
         self.advance()
         return self.pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, 0, 0)
@@ -4555,7 +4565,7 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
         self.advance()
         if self.peek() != TokenKind.TK_IDENT:
             self.emit_error("expected trait name after 'impl'")
-            return 0
+            return self.poisoned_expr()
         let sym = self.intern_current()
         self.advance()
         if self.peek() == TokenKind.TK_KW_FOR:
@@ -4606,7 +4616,9 @@ fn Parser.parse_type_expr(self: Parser) -> i32:
         return self.pool.add_node(NodeKind.NK_TYPE_NAMED, start, self.prev_end(), sym, 0, 0)
 
     self.emit_error("expected type")
-    0
+    if self.peek() != TokenKind.TK_EOF:
+        self.advance()
+    self.poisoned_expr()
 
 // ── Parameter list ───────────────────────────────────────────────
 
