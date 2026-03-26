@@ -152,6 +152,7 @@ type Sema {
 
     // Local trait/type names
     local_trait_names: HashMap[i32, i32],
+    lang_trait_syms: HashMap[i32, i32],
     local_type_names: HashMap[i32, i32],
     distinct_type_names: HashMap[i32, i32],
     ephemeral_types: HashMap[i32, i32],
@@ -377,6 +378,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let impl_lookup = sema_new_map_i32_i32()
     let selection_cache = sema_new_map_str_i32()
     let local_trait_names = sema_new_map_i32_i32()
+    let lang_trait_syms = sema_new_map_i32_i32()
     let local_type_names = sema_new_map_i32_i32()
     let ephemeral_types = sema_new_map_i32_i32()
     let sealed_traits = sema_new_map_i32_i32()
@@ -462,6 +464,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         selection_cache,
         blanket_guard: Vec.new(),
         local_trait_names,
+        lang_trait_syms,
         local_type_names,
         distinct_type_names: sema_new_map_i32_i32(),
         ephemeral_types,
@@ -637,6 +640,12 @@ fn Sema.init_intrinsic_symbols(self: &mut Sema):
     self.sym_track = self.pool_intern("track")
     self.sym_src = self.pool_intern("src")
     self.sym_embed_file = self.pool_intern("embed_file")
+    // Language-level traits: these affect codegen semantics (copy vs move,
+    // destruction, thread safety). Always recognized regardless of prelude.
+    self.lang_trait_syms.insert(self.pool_intern("Copy"), 1)
+    self.lang_trait_syms.insert(self.pool_intern("Drop"), 1)
+    self.lang_trait_syms.insert(self.pool_intern("Send"), 1)
+    self.lang_trait_syms.insert(self.pool_intern("ScopedSend"), 1)
 
 fn sema_is_name_char(ch: i32) -> i32:
     if ch >= 48 and ch <= 57:
@@ -1571,7 +1580,8 @@ fn Sema.collect_declarations(self: Sema):
         self.update_decl_source_context(di)
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NodeKind.NK_IMPL_DECL:
-            self.collect_impl_decl(decl)
+            let impl_is_local = self.is_local_decl(di)
+            self.collect_impl_decl(decl, impl_is_local)
 
     self.collecting_types = 0
     self.resolve_deferred_non_generic_type_decls()
@@ -1726,6 +1736,18 @@ fn Sema.is_local_decl(self: Sema, decl_index: i32) -> i32:
     // Root (local) decls are the last `limit` entries in the merged pool.
     let total = self.ast.decl_count()
     if decl_index >= total - limit:
+        return 1
+    0
+
+fn Sema.is_local_or_prelude_decl(self: Sema, decl_index: i32) -> i32:
+    if self.is_local_decl(decl_index) != 0:
+        return 1
+    // Prelude decls are also "ours" for orphan rule purposes
+    let prelude_limit = self.ast.prelude_decl_count()
+    if prelude_limit < 0:
+        return 0
+    let total = self.ast.decl_count()
+    if decl_index >= total - prelude_limit:
         return 1
     0
 
@@ -2609,25 +2631,6 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
     if is_local != 0:
         self.local_trait_names.insert(name, 1)
 
-fn sema_is_builtin_trait_name(name: str) -> bool:
-    name == "Copy" or
-    name == "Drop" or
-    name == "Scoped" or
-    name == "ScopedMut" or
-    name == "Debug" or
-    name == "Display" or
-    name == "Default" or
-    name == "Iter" or
-    name == "IntoIter" or
-    name == "Eq" or
-    name == "Hash" or
-    name == "Ord" or
-    name == "Contains" or
-    name == "Index" or
-    name == "IndexMut" or
-    name == "Send" or
-    name == "ScopedSend"
-
 // Check if a new direct impl overlaps with any existing blanket impl
 fn Sema.check_direct_overlap(self: Sema, type_name: i32, trait_sym: i32, node: i32):
     for bi in 0..self.blanket_trait_syms.len() as i32:
@@ -2666,26 +2669,29 @@ fn Sema.check_blanket_overlap(self: Sema, trait_sym: i32, bound_start: i32, boun
             let tn = self.pool_resolve(trait_sym)
             self.emit_error("overlapping implementations of '" ++ tn ++ "'", node)
 
-fn Sema.collect_impl_decl(self: Sema, node: i32):
+fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32):
     let type_name = self.ast.get_data0(node)
     let trait_sym = self.ast.get_data2(node)
     if trait_sym == 0:
         return
 
     let trait_name = self.pool_resolve(trait_sym)
-    let is_builtin_trait = sema_is_builtin_trait_name(trait_name)
-    if not is_builtin_trait and not self.trait_lookup.contains(trait_sym):
+    let is_lang_trait = self.lang_trait_syms.contains(trait_sym)
+    if not is_lang_trait and not self.trait_lookup.contains(trait_sym):
         self.emit_error("unknown trait", node)
         return
 
-    let trait_is_local = self.local_trait_names.contains(trait_sym) or is_builtin_trait
-    let type_is_local = self.local_type_names.contains(type_name)
-    if not trait_is_local and not type_is_local:
-        self.emit_error("orphan rule violation: impl requires a local trait or local type", node)
-        return
+    // Orphan rule: only enforced for local (user) impls, not prelude/imported
+    if is_local_impl != 0:
+        let trait_is_local = self.local_trait_names.contains(trait_sym) or is_lang_trait
+        let type_is_local = self.local_type_names.contains(type_name)
+        if not trait_is_local and not type_is_local:
+            self.emit_error("orphan rule violation: impl requires a local trait or local type", node)
+            return
 
     // Sealed trait check: only the defining module can impl
-    if self.sealed_traits.contains(trait_sym) and not trait_is_local:
+    let trait_is_local_for_sealed = self.local_trait_names.contains(trait_sym) or is_lang_trait
+    if self.sealed_traits.contains(trait_sym) and not trait_is_local_for_sealed:
         self.emit_error("cannot implement sealed trait '" ++ self.pool_resolve(trait_sym) ++ "' outside its defining module", node)
         return
 
@@ -2717,7 +2723,7 @@ fn Sema.collect_impl_decl(self: Sema, node: i32):
                         return
 
     // Validate associated types: impl must provide all required (no-default) associated types
-    if not is_builtin_trait and self.trait_lookup.contains(trait_sym):
+    if not is_lang_trait and self.trait_lookup.contains(trait_sym):
         let trait_idx = self.trait_lookup.get(trait_sym).unwrap()
         let at_start = self.trait_assoc_starts.get(trait_idx as i64)
         let at_count = self.trait_assoc_counts.get(trait_idx as i64)
@@ -2988,9 +2994,7 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
 
     if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
         let trait_sym = self.ast.get_data0(node)
-        let trait_name = self.pool_resolve(trait_sym)
-        let is_builtin_trait = sema_is_builtin_trait_name(trait_name)
-        if not is_builtin_trait and not self.trait_lookup.contains(trait_sym):
+        if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
             self.emit_error("unknown trait", node)
             return
         let _ok = self.ensure_trait_object_safe(trait_sym, node)
@@ -3016,8 +3020,7 @@ fn Sema.validate_where_clause(self: Sema, fn_node: i32, tp_start: i32, tp_count:
             let trait_name = self.pool_resolve(trait_sym)
             if trait_name == "type":
                 continue
-            let is_builtin = sema_is_builtin_trait_name(trait_name)
-            if not is_builtin and not self.trait_lookup.contains(trait_sym):
+            if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
                 self.emit_error("where clause references unknown trait '" ++ trait_name ++ "'", fn_node)
         pos = pos + 2 + bound_count
 
@@ -3345,9 +3348,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
 
     if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
         let trait_sym = self.ast.get_data0(node)
-        let trait_name = self.pool_resolve(trait_sym)
-        let is_builtin_trait = sema_is_builtin_trait_name(trait_name)
-        if not is_builtin_trait and not self.trait_lookup.contains(trait_sym):
+        if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
             self.emit_error("unknown trait", node)
             return 0
         if self.ensure_trait_object_safe(trait_sym, node) == 0:
