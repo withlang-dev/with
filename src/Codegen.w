@@ -325,6 +325,45 @@ type Codegen {
     current_function_name_sym: i32,
     current_method_owner_sym: i32,
 
+    // Pre-interned symbols for O(1) dispatch (avoid string comparisons)
+    sym_vec: i32,
+    sym_option: i32,
+    sym_result: i32,
+    sym_hashmap: i32,
+    sym_hashset: i32,
+    sym_box: i32,
+    sym_context_error: i32,
+    sym_Self: i32,
+    sym_self: i32,
+    sym_unit: i32,
+    sym_bool: i32,
+    sym_usize: i32,
+    sym_isize: i32,
+    sym_void: i32,
+    sym_never: i32,
+    sym_str: i32,
+    sym_sizeof: i32,
+    sym_size_of: i32,
+    sym_alignof: i32,
+    sym_align_of: i32,
+    sym_todo: i32,
+    sym_unreachable: i32,
+    sym_src: i32,
+    sym_transmute: i32,
+    sym_nameof: i32,
+    sym_type_name: i32,
+    sym_embed_file: i32,
+    sym_channel: i32,
+    sym_send: i32,
+    sym_recv: i32,
+    sym_close: i32,
+    sym_from_int: i32,
+    sym_ptr: i32,
+    sym_len: i32,
+    sym_cap: i32,
+    sym_elem_size: i32,
+    sym_new: i32,
+
     // Local variables: sym → alloca/type/flags
     local_allocas: HashMap[i32, i64],
     local_types: HashMap[i32, i64],
@@ -594,6 +633,44 @@ fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: In
     var cg = Codegen.init_with_opt(module_name, opt_level)
     cg.intern = intern
     cg.sema = sema
+    // Pre-intern dispatch symbols for O(1) comparisons
+    cg.sym_vec = cg.intern.intern("Vec")
+    cg.sym_option = cg.intern.intern("Option")
+    cg.sym_result = cg.intern.intern("Result")
+    cg.sym_hashmap = cg.intern.intern("HashMap")
+    cg.sym_hashset = cg.intern.intern("HashSet")
+    cg.sym_box = cg.intern.intern("Box")
+    cg.sym_context_error = cg.intern.intern("ContextError")
+    cg.sym_Self = cg.intern.intern("Self")
+    cg.sym_self = cg.intern.intern("self")
+    cg.sym_unit = cg.intern.intern("Unit")
+    cg.sym_bool = cg.intern.intern("bool")
+    cg.sym_usize = cg.intern.intern("usize")
+    cg.sym_isize = cg.intern.intern("isize")
+    cg.sym_void = cg.intern.intern("void")
+    cg.sym_never = cg.intern.intern("Never")
+    cg.sym_str = cg.intern.intern("str")
+    cg.sym_sizeof = cg.intern.intern("sizeof")
+    cg.sym_size_of = cg.intern.intern("size_of")
+    cg.sym_alignof = cg.intern.intern("alignof")
+    cg.sym_align_of = cg.intern.intern("align_of")
+    cg.sym_todo = cg.intern.intern("todo")
+    cg.sym_unreachable = cg.intern.intern("unreachable")
+    cg.sym_src = cg.intern.intern("src")
+    cg.sym_transmute = cg.intern.intern("transmute")
+    cg.sym_nameof = cg.intern.intern("nameof")
+    cg.sym_type_name = cg.intern.intern("type_name")
+    cg.sym_embed_file = cg.intern.intern("embed_file")
+    cg.sym_channel = cg.intern.intern("Channel")
+    cg.sym_send = cg.intern.intern("send")
+    cg.sym_recv = cg.intern.intern("recv")
+    cg.sym_close = cg.intern.intern("close")
+    cg.sym_from_int = cg.intern.intern("from_int")
+    cg.sym_ptr = cg.intern.intern("ptr")
+    cg.sym_len = cg.intern.intern("len")
+    cg.sym_cap = cg.intern.intern("cap")
+    cg.sym_elem_size = cg.intern.intern("elem_size")
+    cg.sym_new = cg.intern.intern("new")
     cg
 
 fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
@@ -615,6 +692,18 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         current_function: 0,
         current_function_name_sym: 0,
         current_method_owner_sym: 0,
+        sym_vec: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
+        sym_hashset: 0, sym_box: 0, sym_context_error: 0,
+        sym_Self: 0, sym_self: 0, sym_unit: 0,
+        sym_bool: 0, sym_usize: 0, sym_isize: 0, sym_void: 0,
+        sym_never: 0, sym_str: 0,
+        sym_sizeof: 0, sym_size_of: 0, sym_alignof: 0, sym_align_of: 0,
+        sym_todo: 0, sym_unreachable: 0, sym_src: 0, sym_transmute: 0,
+        sym_nameof: 0, sym_type_name: 0, sym_embed_file: 0,
+        sym_channel: 0, sym_send: 0, sym_recv: 0, sym_close: 0,
+        sym_from_int: 0,
+        sym_ptr: 0, sym_len: 0, sym_cap: 0, sym_elem_size: 0,
+        sym_new: 0,
         local_allocas: HashMap.new(),
         local_types: HashMap.new(),
         local_muts: HashMap.new(),
@@ -971,10 +1060,9 @@ fn Codegen.dyn_trait_from_type_node(self: Codegen, type_node: i32) -> i32:
         return self.dyn_trait_from_type_node(self.pool.get_data0(type_node))
     if tk == NodeKind.NK_TYPE_GENERIC:
         let name_sym = self.pool.get_data0(type_node)
-        let name = self.intern.resolve(name_sym)
         let g_extra = self.pool.get_data1(type_node)
         let g_count = self.pool.get_data2(type_node)
-        if name == "Box" and g_count == 1:
+        if name_sym == self.sym_box and g_count == 1:
             return self.dyn_trait_from_type_node(self.pool.get_extra(g_extra))
     0
 
@@ -1514,7 +1602,7 @@ fn Codegen.infer_local_pointee_struct(self: Codegen, value_node: i32, declared_t
             let pointee = self.pool.get_data0(declared_type_node)
             if self.pool.kind(pointee) == NodeKind.NK_TYPE_NAMED:
                 let sym = self.pool.get_data0(pointee)
-                if self.intern.resolve(sym) == "Self" and self.current_method_owner_sym != 0:
+                if sym == self.sym_Self and self.current_method_owner_sym != 0:
                     return self.current_method_owner_sym
                 if self.struct_type_map.get(sym).is_some():
                     return sym
@@ -1943,15 +2031,14 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         let name_sym = self.pool.get_data0(type_node)
         let g_extra = self.pool.get_data1(type_node)
         let g_count = self.pool.get_data2(type_node)
-        let name = self.intern.resolve(name_sym)
         // Box[T] is always a pointer (fat pointer for Box[dyn Trait])
-        if name == "Box" and g_count == 1:
+        if name_sym == self.sym_box and g_count == 1:
             let inner_node = self.pool.get_extra(g_extra)
             if self.pool.kind(inner_node) == NodeKind.NK_TYPE_TRAIT_OBJ:
                 return self.get_dyn_fat_ptr_type()
             return wl_ptr_type(self.context)
         // ContextError[E] = { str, E }
-        if name == "ContextError" and g_count == 1:
+        if name_sym == self.sym_context_error and g_count == 1:
             let src_node = self.pool.get_extra(g_extra)
             let src_ty = self.resolve_type(src_node)
             return self.get_or_create_context_error_type(src_ty)
@@ -1962,15 +2049,15 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
             if llvm_ty != 0:
                 return llvm_ty
         // Codegen-level resolution when sema fails (e.g. type bindings active)
-        if name == "Option" and g_count == 1:
+        if name_sym == self.sym_option and g_count == 1:
             let opt_arg = self.resolve_type(self.pool.get_extra(g_extra))
             if opt_arg != 0:
                 return self.get_or_create_option_type(0, opt_arg)
-        if name == "Vec" and g_count == 1:
+        if name_sym == self.sym_vec and g_count == 1:
             let vec_arg = self.resolve_type(self.pool.get_extra(g_extra))
             if vec_arg != 0:
                 return self.get_or_create_vec_type(0, vec_arg)
-        if name == "Result" and g_count == 2:
+        if name_sym == self.sym_result and g_count == 2:
             let res_ok = self.resolve_type(self.pool.get_extra(g_extra))
             let res_err = self.resolve_type(self.pool.get_extra(g_extra + 1))
             if res_ok != 0 and res_err != 0:
@@ -1992,7 +2079,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         // Self.Name — resolve associated type from current impl
         let base_sym = self.pool.get_data0(type_node)
         let assoc_sym = self.pool.get_data1(type_node)
-        if self.intern.resolve(base_sym) == "Self" and self.current_function_name_sym != 0:
+        if base_sym == self.sym_Self and self.current_function_name_sym != 0:
             let impl_opt = self.sema.method_impl_nodes.get(self.current_function_name_sym)
             if impl_opt.is_some():
                 let impl_nd = impl_opt.unwrap()
@@ -2019,7 +2106,14 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
     with_eprintln(f"warning: [type-resolve] unhandled type node kind={kind} node={type_node} span={self.pool.get_start(type_node)}..{self.pool.get_end(type_node)}")
     wl_i32_type(self.context)
 
-fn Codegen.resolve_primitive_named_type(self: Codegen, name: str) -> i64:
+fn Codegen.resolve_primitive_named_type(self: Codegen, sym: i32) -> i64:
+    if sym == self.sym_bool: return wl_i1_type(self.context)
+    if sym == self.sym_usize: return wl_i64_type(self.context)
+    if sym == self.sym_isize: return wl_i64_type(self.context)
+    if sym == self.sym_void: return wl_void_type(self.context)
+    if sym == self.sym_never: return wl_void_type(self.context)
+    if sym == self.sym_unit: return wl_i32_type(self.context)
+    let name = self.intern.resolve(sym)
     if name == "i32": return wl_i32_type(self.context)
     if name == "i64": return wl_i64_type(self.context)
     if name == "i128": return wl_i128_type(self.context)
@@ -2030,15 +2124,8 @@ fn Codegen.resolve_primitive_named_type(self: Codegen, name: str) -> i64:
     if name == "u32": return wl_i32_type(self.context)
     if name == "u64": return wl_i64_type(self.context)
     if name == "u128": return wl_i128_type(self.context)
-    if name == "bool": return wl_i1_type(self.context)
     if name == "f64": return wl_f64_type(self.context)
     if name == "f32": return wl_f32_type(self.context)
-    // Pointer-width integers are currently 64-bit on supported targets.
-    if name == "usize": return wl_i64_type(self.context)
-    if name == "isize": return wl_i64_type(self.context)
-    if name == "void": return wl_void_type(self.context)
-    if name == "Never": return wl_void_type(self.context)
-    if name == "Unit": return wl_i32_type(self.context)
     0
 
 fn Codegen.resolve_user_named_type(self: Codegen, sym: i32) -> i64:
@@ -2064,11 +2151,10 @@ fn Codegen.resolve_user_named_type(self: Codegen, sym: i32) -> i64:
     0
 
 fn Codegen.resolve_named_type(self: Codegen, sym: i32) -> i64:
-    let name = self.intern.resolve(sym)
     // Resolve Self to current method owner type
-    if name == "Self" and self.current_method_owner_sym != 0:
+    if sym == self.sym_Self and self.current_method_owner_sym != 0:
         return self.resolve_user_named_type(self.current_method_owner_sym)
-    let prim = self.resolve_primitive_named_type(name)
+    let prim = self.resolve_primitive_named_type(sym)
     if prim != 0:
         return prim
     self.resolve_user_named_type(sym)
@@ -2125,31 +2211,31 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
     let resolved_tid = self.sema.resolve_alias(tid)
     let tk = self.sema.get_type_kind(resolved_tid)
     if tk == TypeKind.TY_GENERIC_INST:
-        let base_name = self.intern.resolve(self.sema.get_type_d0(resolved_tid))
+        let base_sym = self.sema.get_type_d0(resolved_tid)
         let arg_count = self.sema.get_generic_inst_arg_count(resolved_tid)
-        if base_name == "Vec" and arg_count > 0:
+        if base_sym == self.sym_vec and arg_count > 0:
             let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let elem_ty = self.sema_type_to_llvm(elem_tid)
             if elem_ty != 0:
                 return self.get_or_create_vec_type(resolved_tid, elem_ty)
-        if base_name == "HashMap" and arg_count > 1:
+        if base_sym == self.sym_hashmap and arg_count > 1:
             let key_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let val_tid = self.sema.get_generic_inst_arg(resolved_tid, 1)
             let key_ty = self.sema_type_to_llvm(key_tid)
             let val_ty = self.sema_type_to_llvm(val_tid)
             if key_ty != 0 and val_ty != 0:
                 return self.get_or_create_hashmap_type(resolved_tid, key_ty, val_ty)
-        if base_name == "HashSet" and arg_count > 0:
+        if base_sym == self.sym_hashset and arg_count > 0:
             let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let elem_ty = self.sema_type_to_llvm(elem_tid)
             if elem_ty != 0:
                 return self.get_or_create_hashset_type(resolved_tid, elem_ty)
-        if base_name == "Option" and arg_count > 0:
+        if base_sym == self.sym_option and arg_count > 0:
             let payload_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let payload_ty = self.sema_type_to_llvm(payload_tid)
             if payload_ty != 0:
                 return self.get_or_create_option_type(resolved_tid, payload_ty)
-        if base_name == "Result" and arg_count > 1:
+        if base_sym == self.sym_result and arg_count > 1:
             let ok_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let err_tid = self.sema.get_generic_inst_arg(resolved_tid, 1)
             let ok_ty = self.sema_type_to_llvm(ok_tid)
@@ -2157,7 +2243,6 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             if ok_ty != 0 and err_ty != 0:
                 return self.get_or_create_result_type(resolved_tid, ok_ty, err_ty)
         // User-defined generic structs: monomorphize via type bindings
-        let base_sym = self.sema.get_type_d0(resolved_tid)
         if base_sym != 0 and self.generic_structs.contains(base_sym):
             let saved_len = self.type_bindings_len
             let saved_syms = self.type_binding_syms
@@ -2843,15 +2928,12 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         // Applies to self (pi==0) AND any other param of the same owner type.
         if p_kind == NodeKind.NK_TYPE_NAMED:
             let p_sym = self.pool.get_data0(p_type_node)
-            let p_type_name = self.intern.resolve(p_sym)
-            let p_name_text = self.intern.resolve(p_name)
-            if method_owner_sym == 0 and p_name_text == "self" and self.struct_type_map.get(p_sym).is_some():
+            if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
                 method_owner_sym = p_sym
-            if method_owner_sym != 0 and (p_type_name == "Self" or p_sym == method_owner_sym):
+            if method_owner_sym != 0 and (p_sym == self.sym_Self or p_sym == method_owner_sym):
                 // Only lower as pointer for struct/enum types; primitives and str pass by value.
                 // str is in struct_type_map but has special value semantics (==, compare_str_eq).
-                let owner_name = self.intern.resolve(method_owner_sym)
-                let is_str_owner = owner_name == "str"
+                let is_str_owner = method_owner_sym == self.sym_str
                 if not is_str_owner and (self.struct_type_map.get(method_owner_sym).is_some() or self.enum_type_map.get(method_owner_sym).is_some()):
                     param_types.push(wl_ptr_type(self.context))
                     has_ref_param = true
@@ -3129,8 +3211,7 @@ fn Codegen.is_result_return_type(self: Codegen, ret_node: i32) -> bool:
     let name_sym = self.pool.get_data0(ret_node)
     let arg_count = self.pool.get_data2(ret_node)
     if arg_count != 2: return false
-    let name = self.intern.resolve(name_sym)
-    name == "Result"
+    name_sym == self.sym_result
 
 fn Codegen.result_err_symbol_from_return(self: Codegen, ret_node: i32) -> i32:
     if not self.is_result_return_type(ret_node): return 0
@@ -3145,8 +3226,7 @@ fn Codegen.is_result_unit_return(self: Codegen, ret_node: i32) -> bool:
     let extra_start = self.pool.get_data1(ret_node)
     let ok_node = self.pool.get_extra(extra_start)
     if self.pool.kind(ok_node) == NodeKind.NK_TYPE_NAMED:
-        let ok_name = self.intern.resolve(self.pool.get_data0(ok_node))
-        return ok_name == "Unit"
+        return self.pool.get_data0(ok_node) == self.sym_unit
     false
 
 // ── Option/Result type construction ───────────────────────────────
@@ -3173,8 +3253,7 @@ fn Codegen.get_or_create_option_type(self: Codegen, sema_tid: i32, payload_ty: i
     self.option_llvm_types.push(opt_type)
     self.option_payload_types.push(payload_ty)
     self.option_err_types.push(0)
-    let opt_sym = self.intern.intern("Option")
-    self.option_enum_syms.push(opt_sym)
+    self.option_enum_syms.push(self.sym_option)
     self.option_cache_map.insert(cache_key, idx)
     opt_type
 
@@ -3200,8 +3279,7 @@ fn Codegen.get_or_create_result_type(self: Codegen, sema_tid: i32, ok_ty: i64, e
     self.result_llvm_types.push(res_type)
     self.result_ok_types.push(ok_ty)
     self.result_err_types.push(err_ty)
-    let res_sym = self.intern.intern("Result")
-    self.result_enum_syms.push(res_sym)
+    self.result_enum_syms.push(self.sym_result)
     self.result_cache_map.insert(cache_key, idx)
     res_type
 
@@ -4041,19 +4119,18 @@ fn Codegen.resolve_trait_method_type_for_impl_with_trait(self: Codegen, type_nod
     self.type_binding_syms = fresh_syms
     self.type_binding_types = fresh_tys
     self.type_bindings_len = 0
-    let self_sym = self.intern.intern("Self")
     var found_self = false
     for i in 0..saved_len:
         let sym = saved_syms.get(i as i64)
         var ty = saved_tys.get(i as i64)
-        if sym == self_sym:
+        if sym == self.sym_Self:
             ty = concrete_ty
             found_self = true
         self.type_binding_syms.push(sym)
         self.type_binding_types.push(ty)
         self.type_bindings_len = self.type_bindings_len + 1
     if not found_self:
-        self.type_binding_syms.push(self_sym)
+        self.type_binding_syms.push(self.sym_Self)
         self.type_binding_types.push(concrete_ty)
         self.type_bindings_len = self.type_bindings_len + 1
 
@@ -4147,7 +4224,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
         let p_type_node = self.pool.fn_param_type(param_start, pi)
         if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_NAMED:
             let p_sym = self.pool.get_data0(p_type_node)
-            if p_sym == impl_type_sym or self.intern.resolve(p_sym) == "Self":
+            if p_sym == impl_type_sym or p_sym == self.sym_Self:
                 let p_ty = wl_ptr_type(self.context)
                 has_ref_param = true
                 param_types.push(p_ty)
@@ -4273,7 +4350,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
             self.record_local_pointee_struct(p_name, impl_type_sym)
         if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_NAMED:
             let psym = self.pool.get_data0(p_type_node)
-            if self.intern.resolve(psym) == "Self" and wl_get_type_kind(p_ty) == wl_pointer_type_kind():
+            if psym == self.sym_Self and wl_get_type_kind(p_ty) == wl_pointer_type_kind():
                 self.record_local_pointee_struct(p_name, impl_type_sym)
         pi = pi + 1
 
@@ -4627,16 +4704,16 @@ fn Codegen.try_resolve_vec_new_global_type(self: Codegen, value_node: i32, flags
         return 0
     let recv = self.pool.get_data0(callee)
     let method_sym = self.pool.get_data1(callee)
-    if self.intern.resolve(method_sym) != "new":
+    if method_sym != self.sym_new:
         return 0
 
     var recv_is_vec = false
     if self.pool.kind(recv) == NodeKind.NK_IDENT:
-        recv_is_vec = self.intern.resolve(self.pool.get_data0(recv)) == "Vec"
+        recv_is_vec = self.pool.get_data0(recv) == self.sym_vec
     else if self.pool.kind(recv) == NodeKind.NK_INDEX:
         let recv_base = self.pool.get_data0(recv)
         if self.pool.kind(recv_base) == NodeKind.NK_IDENT:
-            recv_is_vec = self.intern.resolve(self.pool.get_data0(recv_base)) == "Vec"
+            recv_is_vec = self.pool.get_data0(recv_base) == self.sym_vec
     if not recv_is_vec:
         return 0
 
@@ -4657,7 +4734,7 @@ fn Codegen.emit_vec_new_global(self: Codegen, name_sym: i32, vec_tid: i32, is_mu
     if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
         return false
     let base_sym = self.sema.get_type_d0(resolved)
-    if self.intern.resolve(base_sym) != "Vec":
+    if base_sym != self.sym_vec:
         return false
     if self.sema.get_type_d2(resolved) != 1:
         return false
@@ -4747,8 +4824,8 @@ fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
         if callee_kind == NodeKind.NK_TYPE_GENERIC or callee_kind == NodeKind.NK_INDEX:
             let base = self.pool.get_data0(callee)
             if self.pool.kind(base) == NodeKind.NK_IDENT:
-                let name = self.intern.resolve(self.pool.get_data0(base))
-                if name == "sizeof" or name == "size_of" or name == "alignof" or name == "align_of":
+                let name_sym = self.pool.get_data0(base)
+                if name_sym == self.sym_sizeof or name_sym == self.sym_size_of or name_sym == self.sym_alignof or name_sym == self.sym_align_of:
                     let tp_node = if callee_kind == NodeKind.NK_TYPE_GENERIC:
                         let tp_start = self.pool.get_data1(callee)
                         let tp_count = self.pool.get_data2(callee)
@@ -4759,7 +4836,7 @@ fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
                     let type_val = self.resolve_type(tp_node)
                     if type_val != 0:
                         let dl = wl_get_module_data_layout(self.llmod)
-                        if name == "sizeof" or name == "size_of":
+                        if name_sym == self.sym_sizeof or name_sym == self.sym_size_of:
                             return wl_abi_size_of(dl, type_val)
                         return wl_abi_align_of(dl, type_val) as i64
         return CONST_EVAL_FAIL()
@@ -4838,8 +4915,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
 
     let str_value = self.try_eval_const_string(value_node, self.current_decl_source_file, 0)
     if str_value.ok:
-        let str_sym = self.intern.intern("str")
-        let st_opt = self.struct_type_map.get(str_sym)
+        let st_opt = self.struct_type_map.get(self.sym_str)
         if not st_opt.is_some():
             with_eprintln("warning: [string-global] str struct type not found")
             return
@@ -5179,11 +5255,10 @@ fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32)
     // Vec types are created dynamically and not registered in the struct field
     // registry. Resolve their field names by layout: {ptr, len, cap, elem_size}.
     if self.vec_type_to_elem.contains(agg_ty):
-        let field_name = self.intern.resolve(field_token)
-        if field_name == "ptr": return 0
-        if field_name == "len": return 1
-        if field_name == "cap": return 2
-        if field_name == "elem_size": return 3
+        if field_token == self.sym_ptr: return 0
+        if field_token == self.sym_len: return 1
+        if field_token == self.sym_cap: return 2
+        if field_token == self.sym_elem_size: return 3
 
     // Fall back to direct numeric index (for tuple fields, match bindings)
     if field_token >= 0 and field_token < elem_count:
@@ -6596,11 +6671,9 @@ fn Codegen.mir_index_elem_sema_type(self: Codegen, sema_ty: i32) -> i32:
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.mir_input.mir_get_type_d0(resolved)
         let arg_count = self.mir_input.mir_get_type_d2(resolved)
-        if base_sym > 0 and arg_count > 0 and base_sym < self.sema.pool.symbol_texts.len() as i32:
-            let base_name = self.sema.pool.symbol_texts.get(base_sym as i64)
-            if base_name == "Vec":
-                let te_start = self.mir_input.mir_get_type_d1(resolved)
-                return self.mir_input.mir_get_type_extra(te_start)
+        if base_sym == self.sym_vec and arg_count > 0:
+            let te_start = self.mir_input.mir_get_type_d1(resolved)
+            return self.mir_input.mir_get_type_extra(te_start)
     0
 
 fn Codegen.mir_index_elem_llvm_type(self: Codegen, sema_ty: i32, cur_ty: i64) -> i64:
@@ -6630,16 +6703,15 @@ fn Codegen.mir_builtin_variant_payload_sema_type(self: Codegen, sema_ty: i32, va
     if self.mir_input.mir_get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
         return 0
     let base_sym = self.mir_input.mir_get_type_d0(resolved)
-    if base_sym <= 0 or base_sym >= self.sema.pool.symbol_texts.len() as i32:
+    if base_sym <= 0:
         return 0
-    let base_name = self.sema.pool.symbol_texts.get(base_sym as i64)
     let arg_count = self.mir_input.mir_get_type_d2(resolved)
     let args_start = self.mir_input.mir_get_type_d1(resolved)
-    if base_name == "Option":
+    if base_sym == self.sym_option:
         if variant_idx == 0 and arg_count > 0:
             return self.mir_input.mir_get_type_extra(args_start)
         return 0
-    if base_name == "Result":
+    if base_sym == self.sym_result:
         if variant_idx == 0 and arg_count > 0:
             return self.mir_input.mir_get_type_extra(args_start)
         if variant_idx == 1 and arg_count > 1:
@@ -7114,8 +7186,8 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         var recv_is_result = false
         if recv_resolved > 0 and self.mir_input.mir_get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
             let recv_name_sym = self.mir_input.mir_get_type_d0(recv_resolved)
-            if recv_name_sym > 0 and recv_name_sym < self.sema.pool.symbol_texts.len() as i32:
-                recv_is_result = self.sema.pool.symbol_texts.get(recv_name_sym as i64) == "Result"
+            if recv_name_sym > 0:
+                recv_is_result = recv_name_sym == self.sym_result
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
         let recv_ty = wl_type_of(recv)
         let recv_tk = wl_get_type_kind(recv_ty)
@@ -7223,8 +7295,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             if dest_tk == TypeKind.TY_GENERIC_INST:
                 let dest_name_sym = self.mir_input.mir_get_type_name(resolved_dest)
                 if dest_name_sym != 0:
-                    let dest_name = self.intern.resolve(dest_name_sym)
-                    if dest_name == "Option" and self.mir_input.mir_get_type_d2(resolved_dest) > 0:
+                    if dest_name_sym == self.sym_option and self.mir_input.mir_get_type_d2(resolved_dest) > 0:
                         let te_start = self.mir_input.mir_get_type_d1(resolved_dest)
                         let payload_tid = self.mir_input.mir_get_type_extra(te_start)
                         if payload_tid > 0:
@@ -7951,12 +8022,11 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
 
             // Handle builtins directly (no gen_expr needed)
             if gc_callee_sym > 0:
-                let gc_fn_name = self.intern.resolve(gc_callee_sym)
                 let gc_arg_count = self.pool.get_data2(gc_node)
-                if gc_fn_name == "todo" or gc_fn_name == "unreachable":
+                if gc_callee_sym == self.sym_todo or gc_callee_sym == self.sym_unreachable:
                     let _ = wl_build_unreachable(self.builder)
                     return true
-                if gc_fn_name == "src" and gc_arg_count == 0:
+                if gc_callee_sym == self.sym_src and gc_arg_count == 0:
                     let gc_result = self.gen_src_intrinsic(gc_node)
                     if dest_place >= 0 and gc_result != 0:
                         let gc_ret_ty = wl_type_of(gc_result)
@@ -7970,7 +8040,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let gc_next_val = self.mir_bb_values.get(next_bb as i64)
                         wl_build_br(self.builder, gc_next_val)
                     return true
-                if gc_fn_name == "transmute":
+                if gc_callee_sym == self.sym_transmute:
                     let gc_result = self.gen_transmute(gc_node, body, args_id)
                     if dest_place >= 0 and gc_result != 0:
                         let gc_ret_ty = wl_type_of(gc_result)
@@ -7984,8 +8054,8 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let gc_next_val = self.mir_bb_values.get(next_bb as i64)
                         wl_build_br(self.builder, gc_next_val)
                     return true
-                if gc_fn_name == "sizeof" or gc_fn_name == "size_of" or gc_fn_name == "alignof" or gc_fn_name == "align_of":
-                    let gc_result = self.gen_sizeof_alignof(gc_fn_name, gc_node)
+                if gc_callee_sym == self.sym_sizeof or gc_callee_sym == self.sym_size_of or gc_callee_sym == self.sym_alignof or gc_callee_sym == self.sym_align_of:
+                    let gc_result = self.gen_sizeof_alignof(gc_callee_sym, gc_node)
                     if dest_place >= 0 and gc_result != 0:
                         let gc_ret_ty = wl_type_of(gc_result)
                         if gc_ret_ty != wl_void_type(self.context):
@@ -7998,7 +8068,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let gc_next_val = self.mir_bb_values.get(next_bb as i64)
                         wl_build_br(self.builder, gc_next_val)
                     return true
-                if gc_fn_name == "nameof" or gc_fn_name == "type_name":
+                if gc_callee_sym == self.sym_nameof or gc_callee_sym == self.sym_type_name:
                     let gc_result = self.gen_nameof(gc_node)
                     if dest_place >= 0 and gc_result != 0:
                         let gc_ret_ty = wl_type_of(gc_result)
@@ -8012,7 +8082,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let gc_next_val = self.mir_bb_values.get(next_bb as i64)
                         wl_build_br(self.builder, gc_next_val)
                     return true
-                if gc_fn_name == "embed_file" and gc_arg_count == 1:
+                if gc_callee_sym == self.sym_embed_file and gc_arg_count == 1:
                     let gc_result = self.gen_embed_file(gc_node)
                     if dest_place >= 0 and gc_result != 0:
                         let gc_ret_ty = wl_type_of(gc_result)
@@ -8028,7 +8098,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                     return true
 
                 // Channel builtins: Channel(cap), send(ch, val), recv(ch), close(ch)
-                if gc_fn_name == "Channel":
+                if gc_callee_sym == self.sym_channel:
                     self.ensure_async_runtime_declared()
                     let ch_fn = wl_get_named_function(self.llmod, "with_channel_create")
                     if ch_fn != 0 and gc_arg_count >= 1:
@@ -8047,7 +8117,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                     if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                         wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
                     return true
-                if gc_fn_name == "send" and gc_arg_count >= 2:
+                if gc_callee_sym == self.sym_send and gc_arg_count >= 2:
                     self.ensure_async_runtime_declared()
                     let send_fn = wl_get_named_function(self.llmod, "with_channel_send")
                     if send_fn != 0:
@@ -8063,7 +8133,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                     if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                         wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
                     return true
-                if gc_fn_name == "recv" and gc_arg_count >= 1:
+                if gc_callee_sym == self.sym_recv and gc_arg_count >= 1:
                     self.ensure_async_runtime_declared()
                     let recv_fn = wl_get_named_function(self.llmod, "with_channel_recv")
                     if recv_fn != 0:
@@ -8082,7 +8152,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                     if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                         wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
                     return true
-                if gc_fn_name == "close" and gc_arg_count >= 1:
+                if gc_callee_sym == self.sym_close and gc_arg_count >= 1:
                     self.ensure_async_runtime_declared()
                     let close_fn = wl_get_named_function(self.llmod, "with_channel_close")
                     if close_fn != 0:
@@ -8170,8 +8240,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
             if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
                 let gc_de_self = self.pool.get_data0(gc_callee_field)
                 let gc_de_method_sym = self.pool.get_data1(gc_callee_field)
-                let gc_de_method = self.intern.resolve(gc_de_method_sym)
-                if gc_de_method == "from_int" and self.pool.kind(gc_de_self) == NodeKind.NK_IDENT:
+                if gc_de_method_sym == self.sym_from_int and self.pool.kind(gc_de_self) == NodeKind.NK_IDENT:
                     let gc_de_type_sym = self.pool.get_data0(gc_de_self)
                     let gc_de_opt = self.disc_enum_type_map.get(gc_de_type_sym)
                     if gc_de_opt.is_some():
@@ -8254,7 +8323,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let gc_fb_m_count = self.trait_method_counts.get(gc_fb_ti as i64)
                         for gc_fb_mi in 0..gc_fb_m_count:
                             let gc_fb_m_name = self.trait_method_names.get((gc_fb_m_start + gc_fb_mi) as i64)
-                            if self.intern.resolve(gc_fb_m_name) == gc_fb_method:
+                            if gc_fb_m_name == gc_fb_method_sym:
                                 let gc_fb_t_name = self.intern.resolve(gc_fb_t_sym)
                                 let gc_fb_q2 = gc_fb_t_name ++ "." ++ gc_fb_method
                                 let gc_fb_try_sym = self.intern.intern(gc_fb_q2)
@@ -8738,22 +8807,17 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
                         self.record_local_pointee_struct(p_name, ps)
             if pk == NodeKind.NK_TYPE_NAMED:
                 let p_sym = self.pool.get_data0(p_type_node)
-                let p_n = self.intern.resolve(p_sym)
-                let p_name_text = self.intern.resolve(p_name)
-                if method_owner_sym == 0 and p_name_text == "self" and self.struct_type_map.get(p_sym).is_some():
+                if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
                     // str is in struct_type_map but passes by value, not pointer
-                    if self.intern.resolve(p_sym) != "str":
+                    if p_sym != self.sym_str:
                         method_owner_sym = p_sym
                         self.current_method_owner_sym = method_owner_sym
-                if method_owner_sym != 0 and (p_n == "Self" or p_sym == method_owner_sym):
-                    let owner_n = self.intern.resolve(method_owner_sym)
-                    if owner_n != "str":
+                if method_owner_sym != 0 and (p_sym == self.sym_Self or p_sym == method_owner_sym):
+                    if method_owner_sym != self.sym_str:
                         self.record_local_pointee_struct(p_name, method_owner_sym)
             if method_owner_sym != 0:
-                let p_n = self.intern.resolve(p_name)
-                if p_n == "self":
-                    let owner_n2 = self.intern.resolve(method_owner_sym)
-                    if owner_n2 != "str":
+                if p_name == self.sym_self:
+                    if method_owner_sym != self.sym_str:
                         self.record_local_pointee_struct(p_name, method_owner_sym)
             let trait_sym = self.dyn_trait_from_type_node(p_type_node)
             if trait_sym != 0:
@@ -8991,21 +9055,16 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
                         self.record_local_pointee_struct(p_name, ps)
             if pk == NodeKind.NK_TYPE_NAMED:
                 let p_sym = self.pool.get_data0(p_type_node)
-                let p_n = self.intern.resolve(p_sym)
-                let p_name_text = self.intern.resolve(p_name)
-                if method_owner_sym == 0 and p_name_text == "self" and self.struct_type_map.get(p_sym).is_some():
-                    if self.intern.resolve(p_sym) != "str":
+                if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
+                    if p_sym != self.sym_str:
                         method_owner_sym = p_sym
                         self.current_method_owner_sym = method_owner_sym
-                if method_owner_sym != 0 and (p_n == "Self" or p_sym == method_owner_sym):
-                    let owner_n = self.intern.resolve(method_owner_sym)
-                    if owner_n != "str":
+                if method_owner_sym != 0 and (p_sym == self.sym_Self or p_sym == method_owner_sym):
+                    if method_owner_sym != self.sym_str:
                         self.record_local_pointee_struct(p_name, method_owner_sym)
             if method_owner_sym != 0:
-                let p_n = self.intern.resolve(p_name)
-                if p_n == "self":
-                    let owner_n2 = self.intern.resolve(method_owner_sym)
-                    if owner_n2 != "str":
+                if p_name == self.sym_self:
+                    if method_owner_sym != self.sym_str:
                         self.record_local_pointee_struct(p_name, method_owner_sym)
             let trait_sym = self.dyn_trait_from_type_node(p_type_node)
             if trait_sym != 0:
@@ -10444,7 +10503,7 @@ fn Codegen.gen_transmute(self: Codegen, node: i32, body: MirBody, args_id: i32) 
 
 // ── sizeof/alignof intrinsics ─────────────────────────────────────
 
-fn Codegen.gen_sizeof_alignof(self: Codegen, name: str, node: i32) -> i64:
+fn Codegen.gen_sizeof_alignof(self: Codegen, name_sym: i32, node: i32) -> i64:
     let callee_node = self.pool.get_data0(node)
     let callee_kind = self.pool.kind(callee_node)
     if callee_kind != NodeKind.NK_TYPE_GENERIC and callee_kind != NodeKind.NK_INDEX:
@@ -10461,7 +10520,7 @@ fn Codegen.gen_sizeof_alignof(self: Codegen, name: str, node: i32) -> i64:
     if type_val == 0:
         return wl_const_int(wl_i64_type(self.context), 0, 0)
     let dl = wl_get_module_data_layout(self.llmod)
-    if name == "sizeof" or name == "size_of":
+    if name_sym == self.sym_sizeof or name_sym == self.sym_size_of:
         return wl_const_int(wl_i64_type(self.context), wl_abi_size_of(dl, type_val), 0)
     wl_const_int(wl_i64_type(self.context), wl_abi_align_of(dl, type_val) as i64, 0)
 
