@@ -3379,6 +3379,13 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_FIELD_ACCESS:
         let fa_base = self.ast.get_data0(node)
         let fa_field = self.ast.get_data1(node)
+        // Distinct type .value access: transparent (no-op)
+        let fa_base_type = self.expr_type(fa_base)
+        if fa_base_type > 0:
+            let fa_base_resolved = self.sema.resolve_alias(fa_base_type)
+            let fa_base_sym = self.sema.get_type_d0(fa_base_resolved)
+            if fa_base_sym > 0 and self.sema.distinct_type_names.contains(fa_base_sym):
+                return self.lower_expr(fa_base)
         // Enum variant access: Color.Red → discriminant value constant
         if self.ast.kind(fa_base) == NodeKind.NK_IDENT:
             let fa_base_sym = self.ast.get_data0(fa_base)
@@ -3546,7 +3553,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 let vc_place = self.place_for_local(vc_tmp)
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, vc_place, vc_rv, self.ast.get_start(node))
                 return self.body.new_operand(OperandKind.OK_COPY, vc_place)
-        // Distinct type constructor: Meters(42) → single-field struct aggregate
+        // Distinct type constructor: Meters(42) → transparent (just the inner value)
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let dt_sym = self.ast.get_data0(callee)
             if self.sema.distinct_type_names.contains(dt_sym):
@@ -3556,17 +3563,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 if dt_args_count == 1:
                     let dt_arg = self.ast.get_extra(dt_args_start)
                     let dt_val = self.lower_expr(dt_arg)
-                    let dt_fields: Vec[i32] = Vec.new()
-                    let dt_names: Vec[i32] = Vec.new()
-                    dt_fields.push(dt_val)
-                    let val_sym = self.sema.pool_intern("value")
-                    dt_names.push(val_sym)
-                    let dt_fid = self.body.new_agg_fields(dt_fields, dt_names)
-                    let dt_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, dt_fid, 0)
-                    let dt_tmp = self.new_temp(dt_tid)
-                    let dt_place = self.place_for_local(dt_tmp)
-                    self.body.push_stmt(self.cur_bb, StmtKind.Assign, dt_place, dt_rv, self.ast.get_start(node))
-                    return self.body.new_operand(OperandKind.OK_COPY, dt_place)
+                    // Transparent: distinct types have same LLVM type as inner,
+                    // so the constructor is just the inner value itself
+                    return dt_val
         // Callable type syntax: TypeName(args) → TypeName.new(args)
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let ct_sym = self.ast.get_data0(callee)
