@@ -2211,6 +2211,10 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
         return wl_void_type(self.context)
     if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
         let sym = self.sema.get_type_d0(resolved_tid)
+        // Distinct types are transparent: same LLVM type as inner type
+        if self.sema.distinct_type_names.contains(sym):
+            let inner_tid = self.sema.type_extra.get((self.sema.get_type_d1(resolved_tid) + 1) as i64)
+            return self.sema_type_to_llvm(inner_tid)
         return self.resolve_named_type(sym)
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
         return wl_ptr_type(self.context)
@@ -3693,7 +3697,9 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
         if name_sym == 0 or name_str.len() == 0:
             continue
         let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
-        if sub_kind == TypeDeclKind.Struct or sub_kind == TypeDeclKind.Distinct:
+        if sub_kind == TypeDeclKind.Distinct:
+            continue
+        if sub_kind == TypeDeclKind.Struct:
             if self.type_decl_tp_count(decl) > 0:
                 self.generic_structs.insert(name_sym, decl)
             else:
@@ -3740,25 +3746,9 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             self.declare_union_type(name_sym, decl)
             continue
         if sub_kind == TypeDeclKind.Distinct:
-            // Distinct type: single-field struct wrapping the inner type
-            let dt_extra_start = self.pool.get_data1(decl)
-            let dt_inner_node = self.pool.get_extra(dt_extra_start)
-            let dt_inner_ty = self.resolve_type(dt_inner_node)
-            if not self.struct_type_map.get(name_sym).is_some():
-                self.predeclare_struct_type(name_sym)
-            let dt_idx = self.struct_type_map.get(name_sym).unwrap()
-            let dt_st_type = self.struct_llvm_types.get(dt_idx as i64)
-            self.struct_field_starts.set_i32(dt_idx as i64, self.struct_field_names.len() as i32)
-            self.struct_field_counts.set_i32(dt_idx as i64, 1)
-            let dt_val_sym = self.intern.intern("value")
-            self.struct_field_names.push(dt_val_sym)
-            self.struct_field_types.push(dt_inner_ty)
-            self.struct_field_type_nodes.push(dt_inner_node)
-            self.struct_field_defaults.push(0)
-            self.struct_llvm_field_indices.push(0)
-            let dt_ft: Vec[i64] = Vec.new()
-            dt_ft.push(dt_inner_ty)
-            wl_struct_set_body(dt_st_type, vec_data_i64(&dt_ft), 1, 0)
+            // Distinct type: transparent — same LLVM type as inner type.
+            // Type safety enforced by sema, not by LLVM types.
+            continue
             continue
         if sub_kind == TypeDeclKind.Alias:
             let extra_start = self.pool.get_data1(decl)
@@ -5740,19 +5730,7 @@ fn Codegen.coerce_float_operand_to(self: Codegen, val: i64, target_ty: i64) -> i
         return wl_build_fp_cast(self.builder, val, target_ty)
     val
 
-fn Codegen.unwrap_distinct(self: Codegen, val: i64) -> i64:
-    // If val is a single-field struct (distinct type wrapper), extract the inner value.
-    let ty = wl_type_of(val)
-    if wl_get_type_kind(ty) == wl_struct_type_kind():
-        let field_count = wl_count_struct_elem_types(ty)
-        if field_count == 1:
-            return wl_build_extract_value(self.builder, val, 0)
-    val
-
-fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs_raw: i64, rhs_raw: i64, is_unsigned: bool) -> i64:
-    // Unwrap distinct types (single-field struct wrappers) before operations
-    let lhs = self.unwrap_distinct(lhs_raw)
-    let rhs = self.unwrap_distinct(rhs_raw)
+fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsigned: bool) -> i64:
     let lk = wl_get_type_kind(wl_type_of(lhs))
     let rk = wl_get_type_kind(wl_type_of(rhs))
 
@@ -6341,7 +6319,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
         return wl_get_undef(fallback_ty)
 
     if rk == RvalueKind.RK_CAST:
-        let val = self.unwrap_distinct(self.mir_eval_operand(body, d0, 0))
+        let val = self.mir_eval_operand(body, d0, 0)
         var src_unsigned = self.mir_operand_is_unsigned(body, d0)
         // Fallback: if operand lookup failed, check the sema type stored in d2
         // (MirLower stores the source sema type in rval_d2 for casts)
