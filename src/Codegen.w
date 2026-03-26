@@ -5740,7 +5740,19 @@ fn Codegen.coerce_float_operand_to(self: Codegen, val: i64, target_ty: i64) -> i
         return wl_build_fp_cast(self.builder, val, target_ty)
     val
 
-fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsigned: bool) -> i64:
+fn Codegen.unwrap_distinct(self: Codegen, val: i64) -> i64:
+    // If val is a single-field struct (distinct type wrapper), extract the inner value.
+    let ty = wl_type_of(val)
+    if wl_get_type_kind(ty) == wl_struct_type_kind():
+        let field_count = wl_count_struct_elem_types(ty)
+        if field_count == 1:
+            return wl_build_extract_value(self.builder, val, 0)
+    val
+
+fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs_raw: i64, rhs_raw: i64, is_unsigned: bool) -> i64:
+    // Unwrap distinct types (single-field struct wrappers) before operations
+    let lhs = self.unwrap_distinct(lhs_raw)
+    let rhs = self.unwrap_distinct(rhs_raw)
     let lk = wl_get_type_kind(wl_type_of(lhs))
     let rk = wl_get_type_kind(wl_type_of(rhs))
 
@@ -6329,7 +6341,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
         return wl_get_undef(fallback_ty)
 
     if rk == RvalueKind.RK_CAST:
-        let val = self.mir_eval_operand(body, d0, 0)
+        let val = self.unwrap_distinct(self.mir_eval_operand(body, d0, 0))
         var src_unsigned = self.mir_operand_is_unsigned(body, d0)
         // Fallback: if operand lookup failed, check the sema type stored in d2
         // (MirLower stores the source sema type in rval_d2 for casts)
