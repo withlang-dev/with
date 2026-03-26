@@ -7,6 +7,8 @@ use Ast
 use InternPool
 use Sema
 
+type BlockId = distinct i32
+
 extern fn int_to_string(n: i32) -> str
 extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
@@ -404,7 +406,7 @@ fn MirBody.init(fn_sym: i32, sema: Sema) -> MirBody:
         body.local_type_ids.set_i32(0, sema.ty_void)
     body
 
-fn MirBody.new_block(self: &mut MirBody) -> i32:
+fn MirBody.new_block(self: &mut MirBody) -> BlockId:
     let id = self.bb_stmt_starts.len() as i32
     self.bb_stmt_starts.push(self.stmt_kinds.len() as i32)
     self.bb_stmt_counts.push(0)
@@ -415,7 +417,7 @@ fn MirBody.new_block(self: &mut MirBody) -> i32:
     self.bb_term_d3.push(0)
     self.bb_is_cleanup.push(0)
     self.bb_term_spans.push(0)
-    id
+    BlockId(id)
 
 fn MirBody.push_stmt(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i32, span: i32):
     let stmt_id = self.stmt_kinds.len() as i32

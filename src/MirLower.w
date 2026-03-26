@@ -26,7 +26,7 @@ type LoopInfo {
 
 type MirBuilder {
     body: MirBody,
-    cur_bb: i32,
+    cur_bb: BlockId,
 
     // Drop scope stack (flat storage + per-scope start offsets).
     drop_local_ids: Vec[i32],
@@ -85,10 +85,10 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         pool,
     }
 
-fn MirBuilder.new_block(self: MirBuilder) -> i32:
+fn MirBuilder.new_block(self: MirBuilder) -> BlockId:
     self.body.new_block()
 
-fn MirBuilder.switch_to(self: MirBuilder, bb: i32):
+fn MirBuilder.switch_to(self: MirBuilder, bb: BlockId):
     self.cur_bb = bb
 
 fn MirBuilder.terminate(self: MirBuilder, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32):
@@ -1300,12 +1300,12 @@ fn MirBuilder.lower_short_circuit(self: MirBuilder, op: i32, lhs_expr: i32, rhs_
     let targets: Vec[i32] = Vec.new()
     if op == 12:
         // or: if lhs is true (1), skip to end; default (false) → evaluate rhs
-        targets.push(end_bb)
+        targets.push(end_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, lhs_read, table, rhs_bb, 0)
     else:
         // and: if lhs is true (1), evaluate rhs; default (false) → skip to end
-        targets.push(rhs_bb)
+        targets.push(rhs_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, lhs_read, table, end_bb, 0)
     self.switch_to(rhs_bb)
@@ -1657,7 +1657,7 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
     let targets: Vec[i32] = Vec.new()
-    targets.push(then_bb)
+    targets.push(then_bb as i32)
     let table = self.body.new_switch_table(vals, targets)
     self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, else_bb, 0)
 
@@ -1752,7 +1752,7 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32) -> i
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
     let targets: Vec[i32] = Vec.new()
-    targets.push(body_bb)
+    targets.push(body_bb as i32)
     let table = self.body.new_switch_table(vals, targets)
     self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, exit_bb, 0)
 
@@ -1831,7 +1831,7 @@ fn MirBuilder.lower_for(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, body_
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
     let targets: Vec[i32] = Vec.new()
-    targets.push(body_bb)
+    targets.push(body_bb as i32)
     let table = self.body.new_switch_table(vals, targets)
     self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
 
@@ -1916,7 +1916,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, pat_or_sym: i32, range_node: i32
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
     let targets: Vec[i32] = Vec.new()
-    targets.push(body_bb)
+    targets.push(body_bb as i32)
     let table = self.body.new_switch_table(vals, targets)
     self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
 
@@ -1987,7 +1987,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, pat_or_sym: i32, iter_expr: i32,
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
     let targets: Vec[i32] = Vec.new()
-    targets.push(body_bb)
+    targets.push(body_bb as i32)
     let table = self.body.new_switch_table(vals, targets)
     self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
 
@@ -2065,7 +2065,7 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, pat_or_sym: i32, iter_expr: i32, b
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
     let targets: Vec[i32] = Vec.new()
-    targets.push(body_bb)
+    targets.push(body_bb as i32)
     let table = self.body.new_switch_table(vals, targets)
     self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
 
@@ -2230,7 +2230,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             needs_payload_checks = true
             break
         if needs_payload_checks:
-            success_bb = self.new_block()
+            success_bb = self.new_block() as i32
         let disc = self.lower_enum_discriminant(scrutinee_place)
         let vals: Vec[i32] = Vec.new()
         vals.push(disc_idx)
@@ -2252,7 +2252,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             let next_test_bb = self.new_block()
             self.switch_to(cur_test_bb)
             self.lower_pattern_match(field_place, inner_pat, next_test_bb, fail_bb)
-            cur_test_bb = next_test_bb
+            cur_test_bb = next_test_bb as i32
         self.switch_to(cur_test_bb)
         self.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
         return
@@ -2293,7 +2293,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         let ge_vals: Vec[i32] = Vec.new()
         ge_vals.push(1)
         let ge_targets: Vec[i32] = Vec.new()
-        ge_targets.push(range_hi_bb)
+        ge_targets.push(range_hi_bb as i32)
         let ge_table = self.body.new_switch_table(ge_vals, ge_targets)
         self.terminate(TermKind.TK_SWITCH_INT, ge_op, ge_table, fail_bb, 0)
         self.switch_to(range_hi_bb)
@@ -2606,7 +2606,7 @@ fn MirBuilder.lower_match(self: MirBuilder, scrutinee_expr: i32, arms_start: i32
             let vals: Vec[i32] = Vec.new()
             vals.push(1)
             let targets: Vec[i32] = Vec.new()
-            targets.push(guard_pass_bb)
+            targets.push(guard_pass_bb as i32)
             let table = self.body.new_switch_table(vals, targets)
             self.terminate(TermKind.TK_SWITCH_INT, guard_op, table, fail_bb, 0)
             self.switch_to(guard_pass_bb)
@@ -3052,7 +3052,7 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
     let vals: Vec[i32] = Vec.new()
     vals.push(self.success_variant_index())
     let targets: Vec[i32] = Vec.new()
-    targets.push(pass_bb)
+    targets.push(pass_bb as i32)
     let table = self.body.new_switch_table(vals, targets)
     self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
 
@@ -3096,7 +3096,7 @@ fn MirBuilder.lower_double_question(self: MirBuilder, expr: i32, default_expr: i
     let vals: Vec[i32] = Vec.new()
     vals.push(self.success_variant_index())
     let targets: Vec[i32] = Vec.new()
-    targets.push(some_bb)
+    targets.push(some_bb as i32)
     let table = self.body.new_switch_table(vals, targets)
     self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
 
@@ -3277,7 +3277,7 @@ fn MirBuilder.lower_optional_chain(self: MirBuilder, node: i32) -> i32:
     let vals: Vec[i32] = Vec.new()
     vals.push(self.success_variant_index())
     let targets: Vec[i32] = Vec.new()
-    targets.push(some_bb)
+    targets.push(some_bb as i32)
     let table = self.body.new_switch_table(vals, targets)
     self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
 
