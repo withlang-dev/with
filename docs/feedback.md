@@ -7,17 +7,15 @@ open item in `docs/finalize.md`.
 
 ## 1. `distinct` Keyword (Phase 2)
 
-**Status: ALREADY IMPLEMENTED. Phase 2 is NOT blocked.**
+**Status: IMPLEMENTED. Transparent LLVM lowering. BlockId migrated.**
 
-Evidence:
-- `src/Parser.w` line 741: parses `type X = distinct Y` syntax
-- `src/Sema.w` line 1992-2005: creates single-field struct wrapper
-- `src/Codegen.w` line 3735-3754: generates LLVM struct type
-- `src/MirLower.w` line 3552: dispatches distinct constructors
-- `docs/with-specification.md` line 1419: documents the feature
+`distinct` is fully functional with transparent LLVM lowering (no
+wrapper struct — distinct types are bare integers at LLVM level).
+21-test compatibility suite at `test/behavior/behav_distinct_compat.w`.
 
-The `distinct` keyword works. Phase 2 (NodeId, TypeId, BlockId as
-distinct i32) can proceed immediately.
+`type BlockId = distinct i32` migrated in Mir.w + MirLower.w (15
+boundary casts). NodeId and TypeId deferred (450+ and 300+ sites
+respectively — very large mechanical changes).
 
 ### How to use:
 ```
@@ -31,10 +29,10 @@ fn lookup(id: NodeId) -> ...:
 
 ---
 
-## 2. Generic Type Erasure Bug (Phase 3.5 + Phase II-2)
+## 2. Generic Type Erasure Bug (Phase 3.5 + Phase II-2) — FIXED ✓
 
-**Root cause: Codegen caches Vec types by LLVM element type pointer,
-not by sema type identity.**
+**Root cause was: Codegen caches Vec types by LLVM element type pointer,
+not by sema type identity. Fixed: cache by sema_tid.**
 
 ### Five Whys:
 
@@ -91,35 +89,13 @@ Same fix needed for `get_or_create_hashmap_type`,
 
 ---
 
-## 3. Builtin Trait Names (Phase 6.1)
+## 3. Builtin Trait Names (Phase 6.1) — FIXED ✓
 
-### Problem:
-`sema_is_builtin_trait_name` (Sema.w line 2594) hardcodes 17 trait
-names: Copy, Drop, Scoped, ScopedMut, Debug, Display, Default, Iter,
-IntoIter, Eq, Hash, Ord, Contains, Index, IndexMut, Send, ScopedSend.
-
-### Where it's used (5 call sites):
-1. **Line 2658** — `collect_impl_decl`: Auto-recognizes builtin traits
-   in `impl Trait for Type` without requiring explicit trait lookup.
-2. **Line 2663** — Orphan rule: Builtin traits bypass orphan checks
-   (you can impl Copy on your type anywhere).
-3. **Line 2974** — Type validation: Permits `dyn Trait` for builtin
-   traits without prior declaration.
-4. **Line 3001** — Where clause: Allows `T: Copy` bounds without
-   explicit trait declaration.
-5. **Line 3331** — Type resolution: Permits builtin trait objects in
-   function signatures.
-
-### Constraint:
-These traits need to be recognized even without importing the prelude,
-because they're language-level concepts (Copy affects move semantics,
-Drop affects destruction). They can't just be "imported from prelude"
-because the prelude uses them in its own declarations.
-
-### Design question for you:
-Should these remain hardcoded (as language-level traits like Rust's
-`Copy`, `Drop`, `Send`, `Sync`), or should they be resolved from a
-"core" prelude that's always available even with `--prelude=none`?
+Deleted `sema_is_builtin_trait_name`. Replaced with `lang_trait_syms`
+HashMap containing 4 language-level traits (Copy, Drop, Send,
+ScopedSend). Other 13 traits resolve from prelude imports. Orphan rule
+now only enforced for local (user) impl decls, not prelude impls.
+Commit: `392de03`.
 
 ---
 
@@ -243,16 +219,16 @@ i32 constants, parameter types). The problematic ones are fallbacks
 where the actual type is unknown and i32 is used as a default. These
 need to be audited individually — not all 103 are bugs.
 
-### P5: HashMap Determinism
-HashMap iteration in the compiler is minimal (3 sites found). The
-fixpoint test (stage2 == stage3) already proves output determinism.
-This is a verification task, not a code change.
+### P5: HashMap Determinism — DONE ✓
+Audit complete: all 160 HashMaps are lookup-only, no iteration found.
+Fixpoint proves determinism.
 
-### P8: Poisoned Nodes
-No `NK_POISONED` node kind exists. Error recovery in the parser uses
-token skipping and returns 0 (null node). Downstream phases receive
-null nodes and may crash or produce confusing secondary errors.
-Adding NK_POISONED would improve error recovery quality.
+### P8: Poisoned Nodes — DONE ✓
+`NK_POISONED_EXPR` (69) was already defined in Ast.w but never emitted.
+Added `Parser.poisoned_expr()` helper. Converted 15 expression-level
+error sites to return poisoned nodes. Added MirLower handler (returns
+unit_operand). Sema already handled it (returns TY_ERR). 4 new tests.
+Commit: `73c6116`.
 
 ### P11: File Complexity Budget
 - Codegen.w: 10,494 lines (2x the 5,000 line budget)
@@ -261,14 +237,10 @@ The compiler supports methods on a type defined in separate files via
 `use`. Splitting requires creating new files (e.g., CodegenMir.w) that
 import Codegen and define `fn Codegen.method(...)` implementations.
 
-### P13: Phase Boundary Tests
-All 6 dump flags work (--dump-tokens, --dump-ast, --dump-resolved,
---dump-typed, --dump-mir, --dump-async-mir). No systematic tests
-verify dump output. Need `//! expect-dump-ast: <substring>` directives.
+### P13: Phase Boundary Tests — DONE ✓
+13 tests covering --dump-tokens, --dump-ast, --dump-mir. Added
+`expect-check-stdout` directive to test runner. Commit: `a7f22d8`.
 
-### P14: Reserved Syntax
-`errdefer` is implemented (Parser.w has `parse_errdefer`). `move`
-closures work (Parser.w marks `move_closure_nodes`). `const` and `it`
-work. `where` clauses work. `async`/`await`/`yield` work.
-Candidates for additional reservations: `macro`, `trait`, `impl`
-(as keywords — currently they're regular identifiers).
+### P14: Reserved Syntax — DONE ✓
+11 tests verify all reserved keywords work or emit proper errors.
+Commit: `3e1ef15`.
