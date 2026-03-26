@@ -4,9 +4,13 @@ Each item is analyzed with evidence, scope, and implementation steps.
 
 ---
 
-## Phase 6.1: Delete sema_is_builtin_trait_name
+## Phase 6.1: Delete sema_is_builtin_trait_name — DONE ✓
 
-**Location:** `src/Sema.w:2612-2629`
+Replaced with `lang_trait_syms` HashMap (4 language-level traits:
+Copy, Drop, Send, ScopedSend). Other 13 resolve from prelude.
+Orphan rule only enforced for local impl decls. Commit: `392de03`.
+
+~~**Location:** `src/Sema.w:2612-2629`~~
 
 **Problem:** 17 trait names are hardcoded in a function. Five call sites
 check "is this a builtin trait?" before allowing impl/bound/trait-object
@@ -98,7 +102,7 @@ This masks type resolution bugs silently.
 
 ---
 
-## P5: HashMap Determinism Audit
+## P5: HashMap Determinism Audit — DONE ✓ (already safe, no iteration found)
 
 **Location:** All src/ files — 160 HashMap declarations
 
@@ -176,7 +180,7 @@ in a separate file via `use`. Test with a small example first.
 
 ---
 
-## P13: Phase Boundary Tests
+## P13: Phase Boundary Tests — DONE ✓ (13 tests, commit `a7f22d8`)
 
 **Location:** `test/` directory
 
@@ -198,7 +202,7 @@ in a separate file via `use`. Test with a small example first.
 
 ---
 
-## P14: Verify Reserved Syntax
+## P14: Verify Reserved Syntax — DONE ✓ (11 tests, commit `3e1ef15`)
 
 **Location:** `src/Token.w`, `src/Parser.w`
 
@@ -335,16 +339,16 @@ pass/fail. No `@[test]` discovery, no `--filter`.
 
 ## Priority Order
 
-| Priority | Item | Impact | Effort |
-|----------|------|--------|--------|
-| 1 | P5 (HashMap audit) | Verification | None (already safe) |
-| 2 | P14 (reserved syntax) | Test coverage | Small |
-| 3 | P13 (phase tests) | Test coverage | Small |
-| 4 | P8 (poisoned nodes) | Error quality | Medium |
-| 5 | Phase 6.1 (builtin traits) | Code quality | Medium |
-| 6 | Phase 6.2 (pre-intern) | Performance | Medium |
-| 7 | P2 (i32 fallbacks) | Correctness | Medium-High |
-| 8 | P11 (split Codegen.w) | Maintainability | Large |
-| 9 | Phase II-6 (tooling) | User experience | Large |
-| 10 | Phase II-2 (generics) | Correctness | Large |
-| 11 | Phase II-5 (C backend) | Portability | High |
+| Priority | Item | Impact | Effort | Status |
+|----------|------|--------|--------|--------|
+| 1 | P5 (HashMap audit) | Verification | None | **DONE** ✓ |
+| 2 | P14 (reserved syntax) | Test coverage | Small | **DONE** ✓ |
+| 3 | P13 (phase tests) | Test coverage | Small | **DONE** ✓ |
+| 4 | P8 (poisoned nodes) | Error quality | Medium | Open |
+| 5 | Phase 6.1 (builtin traits) | Code quality | Medium | **DONE** ✓ |
+| 6 | Phase 6.2 (pre-intern) | Performance | Medium | Open |
+| 7 | P2 (i32 fallbacks) | Correctness | Medium-High | Open |
+| 8 | P11 (split Codegen.w) | Maintainability | Large | Open |
+| 9 | Phase II-6 (tooling) | User experience | Large | Open |
+| 10 | Phase II-2 (generics) | Correctness | Large | Open |
+| 11 | Phase II-5 (C backend) | Portability | High | Open |
