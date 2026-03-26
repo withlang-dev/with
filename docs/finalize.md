@@ -346,14 +346,18 @@ Orphan rule only enforced for local impl decls. Commit: `392de03`.
 - [x] Replace with proper trait resolution from prelude imports
 - [x] `make build && make fixpoint`
 
-### 6.2 Reduce String-Based Dispatch in Codegen
+### 6.2 Reduce String-Based Dispatch in Codegen — DONE ✓
 
-**Current:** 74 string comparisons (`method_name == "..."`) in Codegen.w
+Pre-interned 36 dispatch symbols (container types, builtins, field
+names) in Codegen struct. Converted all 59 string comparison sites
+to O(1) symbol ID comparisons. 34 string comparisons remain
+(intentionally kept: 12 primitive types, 9 ABI names, 10 runtime
+C function names, 3 other).
 
-- [ ] Categorize: language primitives (must stay) vs prelude-provided (remove)
-- [ ] Replace prelude-provided dispatch with type-based dispatch
-      (Vec methods, HashMap methods, Option/Result methods, string methods)
-- [ ] `make build && make fixpoint` after each category
+- [x] Categorize: language primitives (must stay) vs prelude-provided
+- [x] Pre-intern ~36 symbols at codegen init
+- [x] Convert all 59 dispatch sites to symbol comparison
+- [x] `make build && make fixpoint`
 
 ### 6.3 Verify --no-prelude Makes println Unavailable — DONE ✓
 
@@ -624,7 +628,7 @@ If the build breaks, stop and bisect. Do not batch changes.
 - [x] find_source_arg documented and deduplicated
 - [x] Driver deleted or reduced to thin adapter
 - [ ] main.w routes through compiler.Compilation
-- [ ] No string-based method dispatch in Codegen (prelude-provided)
+- [x] No string-based method dispatch in Codegen (pre-interned symbols)
 - [x] `--no-prelude` makes println unavailable (verified + automated tests)
 - [x] Compiler source uses f-strings consistently (zero int_to_string)
 - [ ] `--emit-c` cross-compiles the compiler for four targets

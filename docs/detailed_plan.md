@@ -47,9 +47,14 @@ ScopedSend.
 
 ---
 
-## Phase 6.2: Pre-intern String Dispatch Symbols
+## Phase 6.2: Pre-intern String Dispatch Symbols — DONE ✓
 
-**Location:** `src/Codegen.w` — 92 string comparisons
+Added 36 pre-interned sym_* fields to Codegen struct. Converted all
+59 string dispatch sites to O(1) symbol ID comparisons. 34 string
+comparisons remain intentionally (primitive types, ABI names, runtime
+C functions).
+
+~~**Location:** `src/Codegen.w` — 92 string comparisons~~
 
 **Problem:** Codegen dispatches on type/function names using string
 equality (`name == "Vec"`, `name == "Option"`, etc.). This is O(n)
@@ -354,7 +359,7 @@ pass/fail. No `@[test]` discovery, no `--filter`.
 | 3 | P13 (phase tests) | Test coverage | Small | **DONE** ✓ |
 | 4 | P8 (poisoned nodes) | Error quality | Medium | **DONE** ✓ |
 | 5 | Phase 6.1 (builtin traits) | Code quality | Medium | **DONE** ✓ |
-| 6 | Phase 6.2 (pre-intern) | Performance | Medium | Open |
+| 6 | Phase 6.2 (pre-intern) | Performance | Medium | **DONE** ✓ |
 | 7 | P2 (i32 fallbacks) | Correctness | Medium-High | Open |
 | 8 | P11 (split Codegen.w) | Maintainability | Large | Open |
 | 9 | Phase II-6 (tooling) | User experience | Large | Open |
