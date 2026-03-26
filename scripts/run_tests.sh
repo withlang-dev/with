@@ -68,6 +68,7 @@ run_single_test() {
   local expect_stdout=""
   local expect_check_fail=""
   local expect_build_fail=""
+  local expect_check_stdout=""
   local check_only=0
   local extra_args=""
   local name
@@ -98,6 +99,9 @@ run_single_test() {
         ;;
       "//! check-only"*)
         check_only=1
+        ;;
+      "//! expect-check-stdout: "*)
+        expect_check_stdout="${line#//! expect-check-stdout: }"
         ;;
       "//! args: "*)
         extra_args="${line#//! args: }"
@@ -141,6 +145,23 @@ run_single_test() {
     fi
     local stem="${file%.w}"
     rm -f "$stem" "${stem}.o" 2>/dev/null || true
+    rm -rf "$my_tmp"
+    return
+  fi
+
+  # Case 2b: check with expected stdout (for dump tests)
+  if [[ -n "$expect_check_stdout" ]]; then
+    local rc=0
+    timeout "$RUN_TIMEOUT_SECS" "$COMPILER" check $extra_args "$file" >"$my_tmp/out" 2>"$my_tmp/err" || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+      echo "FAIL $name (check failed with rc=$rc)" > "$result_file"
+    elif grep -Fq "$expect_check_stdout" "$my_tmp/out"; then
+      echo "PASS $name" > "$result_file"
+    else
+      local got
+      got="$(head -5 "$my_tmp/out")"
+      echo "FAIL $name (missing output: $expect_check_stdout, got: $got)" > "$result_file"
+    fi
     rm -rf "$my_tmp"
     return
   fi
