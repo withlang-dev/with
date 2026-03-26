@@ -3337,6 +3337,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         // Null pointer literal: lower as integer 0 (codegen emits wl_const_null for ptr targets)
         return self.const_operand(ConstKind.CK_INT, 0, self.sema.ty_i32)
 
+    if kind == NodeKind.NK_POISONED_EXPR:
+        return self.unit_operand()
+
     if kind == NodeKind.NK_UNSAFE_BLOCK:
         // Transparent pass-through: just lower the inner body
         return self.lower_expr(self.ast.get_data0(node))

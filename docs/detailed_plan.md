@@ -124,9 +124,17 @@ in `docs/finalize.md` documenting the audit result.
 
 ---
 
-## P8: NK_POISONED Error Recovery
+## P8: NK_POISONED Error Recovery — DONE ✓
 
-**Location:** `src/Ast.w` (lines 26, 78), `src/Parser.w`
+Added `Parser.poisoned_expr()` helper that creates NK_POISONED_EXPR
+nodes. Changed 15 expression-level error sites in Parser.w to return
+poisoned nodes instead of 0. Added NK_POISONED_EXPR handler in
+MirLower.w (returns unit_operand). Sema already handled it (returns
+TY_ERR). Bottom-of-stack dispatchers (parse_primary, parse_pattern,
+parse_type_expr) advance past bad token for forward progress.
+4 new error recovery tests. Commit: pending.
+
+~~**Location:** `src/Ast.w` (lines 26, 78), `src/Parser.w`~~
 
 **Problem:** Parser returns `0` (null node) after errors. Downstream
 passes receive null nodes and may crash or produce confusing secondary
@@ -344,7 +352,7 @@ pass/fail. No `@[test]` discovery, no `--filter`.
 | 1 | P5 (HashMap audit) | Verification | None | **DONE** ✓ |
 | 2 | P14 (reserved syntax) | Test coverage | Small | **DONE** ✓ |
 | 3 | P13 (phase tests) | Test coverage | Small | **DONE** ✓ |
-| 4 | P8 (poisoned nodes) | Error quality | Medium | Open |
+| 4 | P8 (poisoned nodes) | Error quality | Medium | **DONE** ✓ |
 | 5 | Phase 6.1 (builtin traits) | Code quality | Medium | **DONE** ✓ |
 | 6 | Phase 6.2 (pre-intern) | Performance | Medium | Open |
 | 7 | P2 (i32 fallbacks) | Correctness | Medium-High | Open |
