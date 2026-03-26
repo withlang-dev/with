@@ -132,7 +132,7 @@ poisoned nodes instead of 0. Added NK_POISONED_EXPR handler in
 MirLower.w (returns unit_operand). Sema already handled it (returns
 TY_ERR). Bottom-of-stack dispatchers (parse_primary, parse_pattern,
 parse_type_expr) advance past bad token for forward progress.
-4 new error recovery tests. Commit: pending.
+4 new error recovery tests. Commit: `73c6116`.
 
 ~~**Location:** `src/Ast.w` (lines 26, 78), `src/Parser.w`~~
 
