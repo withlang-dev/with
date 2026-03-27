@@ -135,7 +135,7 @@ fn Codegen.mir_build_closure_fn_type(self: Codegen, sema_ty: i32) -> i64:
     var tk = self.mir_input.mir_get_type_kind(resolved)
     // Type created after MIR snapshot — read from sema directly
     if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
-        resolved = self.sema.resolve_alias(resolved)
+        resolved = self.sema.resolve_alias(resolved) as i32
         tk = self.sema.get_type_kind(resolved)
     if tk != TypeKind.TY_FN:
         return 0
@@ -1608,7 +1608,7 @@ fn Codegen.mir_index_elem_sema_type(self: Codegen, sema_ty: i32) -> i32:
     if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
         return self.mir_input.mir_get_type_d0(resolved)
     if tk == TypeKind.TY_STR:
-        return self.sema.ty_i32
+        return self.sema.ty_i32 as i32
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.mir_input.mir_get_type_d0(resolved)
         let arg_count = self.mir_input.mir_get_type_d2(resolved)
@@ -4747,7 +4747,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
                     let cl_type_sym = self.pool.get_data0(cl_p_type_node)
                     let cl_prim = self.sema.primitive_type_by_sym(cl_type_sym)
                     if cl_prim != 0:
-                        cl_p_sema_ty = cl_prim
+                        cl_p_sema_ty = cl_prim as TypeId
                     else if self.sema.named_types.contains(cl_type_sym):
                         cl_p_sema_ty = self.sema.named_types.get(cl_type_sym).unwrap()
         let cl_p_local = closure_builder.body.new_local(cl_p_sema_ty, 1, cl_p_name, 1)

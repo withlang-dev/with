@@ -249,28 +249,28 @@ fn MirBuilder.lookup_local(self: MirBuilder, sym: i32) -> i32:
 
 fn MirBuilder.expr_type(self: MirBuilder, node: i32) -> i32:
     if node == 0:
-        return self.sema.ty_void
+        return self.sema.ty_void as i32
     if self.sema.typed_expr_types.contains(node):
         let typed = self.sema.typed_expr_types.get(node).unwrap()
         if typed != 0:
-            return typed
+            return typed as i32
     self.fallback_expr_type(node)
 
 fn MirBuilder.binding_type(self: MirBuilder, node: i32) -> i32:
     if self.sema.typed_binding_types.contains(node):
         let typed = self.sema.typed_binding_types.get(node).unwrap()
         if typed != 0:
-            return typed
+            return typed as i32
     let rhs = self.ast.get_data1(node)
     let rhs_ty = self.expr_type(rhs)
     if rhs_ty != 0:
         return rhs_ty
-    self.sema.ty_void
+    self.sema.ty_void as i32
 
 fn MirBuilder.local_type(self: MirBuilder, local_id: i32) -> i32:
     if local_id < 0 or local_id >= self.body.local_type_ids.len() as i32:
-        return self.sema.ty_void
-    self.body.local_type_ids.get(local_id as i64)
+        return self.sema.ty_void as i32
+    self.body.local_type_ids.get(local_id as i64) as i32
 
 fn MirBuilder.ident_type(self: MirBuilder, sym: i32) -> i32:
     let local = self.lookup_local(sym)
@@ -278,12 +278,12 @@ fn MirBuilder.ident_type(self: MirBuilder, sym: i32) -> i32:
         return self.local_type(local)
     let sig_idx = self.sema.get_sig(sym)
     if sig_idx >= 0:
-        return self.sema.sig_type_ids.get(sig_idx as i64)
+        return self.sema.sig_type_ids.get(sig_idx as i64) as i32
     if self.sema.named_types.contains(sym):
-        return self.sema.named_types.get(sym).unwrap()
+        return self.sema.named_types.get(sym).unwrap() as i32
     if self.sema.variant_lookup.contains(sym):
-        return self.sema.variant_type_ids.get(sym).unwrap()
-    self.sema.ty_void
+        return self.sema.variant_type_ids.get(sym).unwrap() as i32
+    self.sema.ty_void as i32
 
 fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
     // Resolve NodeKind.NK_INDEX(NodeKind.NK_IDENT("Vec"), type_arg) to a TypeKind.TY_GENERIC_INST.
@@ -362,7 +362,7 @@ fn MirBuilder.vec_literal_type(self: MirBuilder, node: i32) -> i32:
     let vec_ty = self.expr_type(node)
     if vec_ty == 0 or vec_ty == self.sema.ty_void:
         return 0
-    let resolved = self.sema.resolve_alias(vec_ty)
+    let resolved = self.sema.resolve_alias(vec_ty) as i32
     if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
         return 0
     let base_sym = self.sema.get_type_d0(resolved)
@@ -374,33 +374,33 @@ fn MirBuilder.vec_literal_type(self: MirBuilder, node: i32) -> i32:
 
 fn MirBuilder.call_return_type(self: MirBuilder, callee: i32) -> i32:
     if callee == 0:
-        return self.sema.ty_void
+        return self.sema.ty_void as i32
     let kind = self.ast.kind(callee)
     if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(callee)
         let sig_idx = self.sema.get_sig(sym)
         if sig_idx >= 0:
-            return self.sema.sig_return_type(sig_idx)
-        return self.sema.ty_void
+            return self.sema.sig_return_type(sig_idx) as i32
+        return self.sema.ty_void as i32
     if kind == NodeKind.NK_FIELD_ACCESS:
         let base = self.ast.get_data0(callee)
         let method_sym = self.ast.get_data1(callee)
         let resolved = self.resolve_method_callee_sym(base, method_sym)
         let resolved_sig = self.sema.get_sig(resolved)
         if resolved_sig >= 0:
-            return self.sema.sig_return_type(resolved_sig)
+            return self.sema.sig_return_type(resolved_sig) as i32
         let bare_sig = self.sema.get_sig(method_sym)
         if bare_sig >= 0:
-            return self.sema.sig_return_type(bare_sig)
+            return self.sema.sig_return_type(bare_sig) as i32
         // Intrinsic methods (Vec/HashMap/Option/str) have no sema sigs.
         // Resolve their return types from the receiver type + method name.
         var base_ty = self.expr_type(base)
-        if base_ty == 0 or base_ty == self.sema.ty_void:
+        if base_ty == 0 or base_ty == self.sema.ty_void as i32:
             base_ty = self.type_receiver_type(base)
-        if base_ty != 0 and base_ty != self.sema.ty_void:
+        if base_ty != 0 and base_ty != self.sema.ty_void as i32:
             let method_name = self.pool.resolve_symbol(method_sym)
             let iret = self.intrinsic_return_type(base_ty, method_name)
-            if iret != 0 and iret != self.sema.ty_void:
+            if iret != 0 and iret != self.sema.ty_void as i32:
                 return iret
             // Sema reports raw value types for Option-returning intrinsics
             // (e.g. HashMap.get returns str, not Option[str]). When .unwrap()
@@ -409,26 +409,26 @@ fn MirBuilder.call_return_type(self: MirBuilder, callee: i32) -> i32:
             if method_name == "unwrap":
                 return base_ty
             if method_name == "is_some" or method_name == "is_none":
-                return self.sema.ty_bool
-    self.sema.ty_void
+                return self.sema.ty_bool as i32
+    self.sema.ty_void as i32
 
 fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_name: str) -> i32:
     // Return known return types for intrinsic (builtin) methods.
     // These methods have no sema signatures, so call_return_type can't resolve them.
-    let resolved = self.sema.resolve_alias(recv_type)
+    let resolved = self.sema.resolve_alias(recv_type) as i32
     let tk = self.sema.get_type_kind(resolved)
     let type_name_sym = self.sema.get_type_name(resolved)
     if type_name_sym != 0:
         let type_name = self.pool.resolve_symbol(type_name_sym)
         if type_name == "Vec":
-            if method_name == "len": return self.sema.ty_i64
+            if method_name == "len": return self.sema.ty_i64 as i32
             if method_name == "new": return recv_type
             if method_name == "push" or method_name == "set_i32" or method_name == "remove" or method_name == "clear":
-                return self.sema.ty_void
+                return self.sema.ty_void as i32
             if method_name == "get" or method_name == "pop":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
-            if method_name == "join": return self.sema.ty_str
+            if method_name == "join": return self.sema.ty_str as i32
             if method_name == "filter": return recv_type
             if method_name == "map": return self.expr_type(self.cur_node)
             if method_name == "iter":
@@ -441,9 +441,9 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                             let found = self.sema.find_generic_inst(vi_sym, elem_ty)
                             if found != 0:
                                 return found
-                    return self.sema.named_types.get(vi_sym).unwrap()
-                return self.sema.ty_void
-            return self.sema.ty_void
+                    return self.sema.named_types.get(vi_sym).unwrap() as i32
+                return self.sema.ty_void as i32
+            return self.sema.ty_void as i32
         if type_name == "VecIter":
             if method_name == "next":
                 // VecIter[T].next() returns Option[T].
@@ -454,26 +454,26 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                     if opt_tid != 0:
                         return opt_tid
                     return elem_ty
-            return self.sema.ty_void
+            return self.sema.ty_void as i32
         if type_name == "HashMap":
-            if method_name == "len": return self.sema.ty_i64
-            if method_name == "contains": return self.sema.ty_bool
+            if method_name == "len": return self.sema.ty_i64 as i32
+            if method_name == "contains": return self.sema.ty_bool as i32
             if method_name == "new": return recv_type
             if method_name == "insert" or method_name == "clear":
-                return self.sema.ty_void
+                return self.sema.ty_void as i32
             if method_name == "get" or method_name == "remove":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 1)
-            return self.sema.ty_void
+            return self.sema.ty_void as i32
         if type_name == "HashSet":
-            if method_name == "len": return self.sema.ty_i64
-            if method_name == "contains" or method_name == "remove": return self.sema.ty_bool
+            if method_name == "len": return self.sema.ty_i64 as i32
+            if method_name == "contains" or method_name == "remove": return self.sema.ty_bool as i32
             if method_name == "new": return recv_type
             if method_name == "insert" or method_name == "clear":
-                return self.sema.ty_void
-            return self.sema.ty_void
+                return self.sema.ty_void as i32
+            return self.sema.ty_void as i32
         if type_name == "Option":
-            if method_name == "is_some" or method_name == "is_none": return self.sema.ty_bool
+            if method_name == "is_some" or method_name == "is_none": return self.sema.ty_bool as i32
             if method_name == "unwrap":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
@@ -487,39 +487,39 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
             if method_name == "unwrap_or_else":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
-            return self.sema.ty_void
+            return self.sema.ty_void as i32
         if type_name == "Result":
-            if method_name == "is_ok": return self.sema.ty_bool
+            if method_name == "is_ok": return self.sema.ty_bool as i32
             if method_name == "unwrap":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
-            return self.sema.ty_void
+            return self.sema.ty_void as i32
     if tk == TypeKind.TY_STR:
-        if method_name == "len": return self.sema.ty_i64
-        if method_name == "byte_at": return self.sema.ty_i32
-        if method_name == "slice": return self.sema.ty_str
+        if method_name == "len": return self.sema.ty_i64 as i32
+        if method_name == "byte_at": return self.sema.ty_i32 as i32
+        if method_name == "slice": return self.sema.ty_str as i32
         if method_name == "contains" or method_name == "starts_with" or method_name == "ends_with":
-            return self.sema.ty_bool
-        if method_name == "find": return self.sema.ty_i64
-        if method_name == "repeat": return self.sema.ty_str
+            return self.sema.ty_bool as i32
+        if method_name == "find": return self.sema.ty_i64 as i32
+        if method_name == "repeat": return self.sema.ty_str as i32
         if method_name == "trim" or method_name == "to_upper" or method_name == "to_lower" or method_name == "replace":
-            return self.sema.ty_str
-        if method_name == "index_of": return self.sema.ty_i64
+            return self.sema.ty_str as i32
+        if method_name == "index_of": return self.sema.ty_i64 as i32
         if method_name == "split":
             // str.split() returns Vec[str]
             let vec_sym = self.sema.pool_intern("Vec")
-            let found = self.sema.find_generic_inst(vec_sym, self.sema.ty_str)
+            let found = self.sema.find_generic_inst(vec_sym, self.sema.ty_str as i32)
             if found != 0:
                 return found
-            return self.sema.ty_void
-        return self.sema.ty_void
+            return self.sema.ty_void as i32
+        return self.sema.ty_void as i32
     if tk == TypeKind.TY_ARRAY:
-        if method_name == "len": return self.sema.ty_i32
-        return self.sema.ty_void
+        if method_name == "len": return self.sema.ty_i32 as i32
+        return self.sema.ty_void as i32
     if tk == TypeKind.TY_INT:
         if method_name == "rotate_left" or method_name == "rotate_right" or method_name == "swap_bytes":
             return recv_type
-    self.sema.ty_void
+    self.sema.ty_void as i32
 
 fn MirBuilder.struct_field_type(self: MirBuilder, struct_tid: i32, field_sym: i32) -> i32:
     let resolved = self.sema.resolve_alias(struct_tid)
@@ -553,7 +553,7 @@ fn MirBuilder.struct_field_type(self: MirBuilder, struct_tid: i32, field_sym: i3
                 if fi < td_fc:
                     let ast_base = td_extra + 1 + fi * 3
                     let f_type_node = self.ast.get_extra(ast_base + 1)
-                    return self.sema.resolve_type_expr(f_type_node)
+                    return self.sema.resolve_type_expr(f_type_node) as i32
             return 0
     0
 
@@ -568,12 +568,12 @@ fn MirBuilder.tuple_elem_type(self: MirBuilder, tuple_tid: i32, field_idx: i32) 
     self.sema.type_extra.get((elem_start + field_idx) as i64)
 
 fn MirBuilder.indexed_element_type(self: MirBuilder, collection_tid: i32) -> i32:
-    let resolved = self.sema.resolve_alias(collection_tid)
+    let resolved = self.sema.resolve_alias(collection_tid) as i32
     let tk = self.sema.get_type_kind(resolved)
     if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
         return self.sema.get_type_d0(resolved)
     if tk == TypeKind.TY_STR:
-        return self.sema.ty_i32
+        return self.sema.ty_i32 as i32
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.sema.get_generic_inst_base(resolved)
         if self.pool.resolve_symbol(base_sym) == "Vec" and self.sema.get_generic_inst_arg_count(resolved) > 0:
@@ -626,7 +626,7 @@ fn MirBuilder.enum_payload_type(self: MirBuilder, enum_tid: i32, variant_idx: i3
 
 fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     if node == 0:
-        return self.sema.ty_void
+        return self.sema.ty_void as i32
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_IDENT:
         return self.ident_type(self.ast.get_data0(node))
@@ -636,24 +636,24 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         let base_node = self.ast.get_data0(node)
         let field_sym = self.ast.get_data1(node)
         let base_ty = self.expr_type(base_node)
-        if base_ty != 0 and base_ty != self.sema.ty_void:
+        if base_ty != 0 and base_ty != self.sema.ty_void as i32:
             let ft = self.struct_field_type(base_ty, field_sym)
             if ft != 0:
                 return ft
-        return self.sema.ty_void
+        return self.sema.ty_void as i32
     if kind == NodeKind.NK_INT_LIT:
         let value = self.ast.int_lit_value(node)
         if value < -2147483648 or value > 2147483647:
-            return self.sema.ty_i64
-        return self.sema.ty_i32
+            return self.sema.ty_i64 as i32
+        return self.sema.ty_i32 as i32
     if kind == NodeKind.NK_BOOL_LIT:
-        return self.sema.ty_bool
+        return self.sema.ty_bool as i32
     if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT:
-        return self.sema.ty_str
+        return self.sema.ty_str as i32
     if kind == NodeKind.NK_FSTRING:
-        return self.sema.ty_str
+        return self.sema.ty_str as i32
     if kind == NodeKind.NK_NULL_LIT:
-        return self.sema.ty_i32
+        return self.sema.ty_i32 as i32
     if kind == NodeKind.NK_UNSAFE_BLOCK:
         return self.expr_type(self.ast.get_data0(node))
     if kind == NodeKind.NK_CALL:
@@ -661,7 +661,7 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_STRUCT_LIT:
         let st_name = self.ast.get_data0(node)
         if self.sema.named_types.contains(st_name):
-            return self.sema.named_types.get(st_name).unwrap()
+            return self.sema.named_types.get(st_name).unwrap() as i32
         // Self struct literal — resolve via method context
         let st_name_str = self.sema.pool_resolve(st_name)
         if st_name_str == "Self":
@@ -672,7 +672,7 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
                     let owner_name = fn_name_str.slice(0, ci as i64)
                     let owner_sym = self.sema.pool_intern(owner_name)
                     if self.sema.named_types.contains(owner_sym):
-                        return self.sema.named_types.get(owner_sym).unwrap()
+                        return self.sema.named_types.get(owner_sym).unwrap() as i32
                     break
     if kind == NodeKind.NK_MATCH:
         // Infer match type from first arm body
@@ -696,8 +696,8 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_INDEX:
         let base_node = self.ast.get_data0(node)
         let base_ty = self.expr_type(base_node)
-        if base_ty != 0 and base_ty != self.sema.ty_void:
-            let resolved = self.sema.resolve_alias(base_ty)
+        if base_ty != 0 and base_ty != self.sema.ty_void as i32:
+            let resolved = self.sema.resolve_alias(base_ty) as i32
             let tk = self.sema.get_type_kind(resolved)
             if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
                 return self.sema.get_type_d0(resolved)
@@ -706,14 +706,14 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         let lhs_ty = self.expr_type(self.ast.get_data1(node))
         let rhs_ty = self.expr_type(self.ast.get_data2(node))
         if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE or op == BinaryOp.OP_AND or op == BinaryOp.OP_OR:
-            return self.sema.ty_bool
-        if lhs_ty != 0 and lhs_ty != self.sema.ty_void:
-            let lhs_resolved = self.sema.resolve_alias(lhs_ty)
+            return self.sema.ty_bool as i32
+        if lhs_ty != 0 and lhs_ty != self.sema.ty_void as i32:
+            let lhs_resolved = self.sema.resolve_alias(lhs_ty) as i32
             let lhs_tk = self.sema.get_type_kind(lhs_resolved)
             if (op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB) and (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF):
                 return lhs_ty
-        if rhs_ty != 0 and rhs_ty != self.sema.ty_void:
-            let rhs_resolved = self.sema.resolve_alias(rhs_ty)
+        if rhs_ty != 0 and rhs_ty != self.sema.ty_void as i32:
+            let rhs_resolved = self.sema.resolve_alias(rhs_ty) as i32
             let rhs_tk = self.sema.get_type_kind(rhs_resolved)
             if op == BinaryOp.OP_ADD and (rhs_tk == TypeKind.TY_PTR or rhs_tk == TypeKind.TY_REF):
                 return rhs_ty
@@ -724,44 +724,44 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         if uop == UnaryOp.UOP_TRY:
             let inner_node = self.ast.get_data1(node)
             let inner_ty = self.expr_type(inner_node)
-            let unwrapped = self.sema.try_unwrapped_type(inner_ty)
+            let unwrapped = self.sema.try_unwrapped_type(inner_ty) as i32
             if unwrapped != 0:
                 return unwrapped
             return inner_ty
         if uop == UnaryOp.UOP_DEREF:
             let inner_node = self.ast.get_data1(node)
             let inner_ty = self.expr_type(inner_node)
-            if inner_ty != 0 and inner_ty != self.sema.ty_void:
-                let resolved = self.sema.resolve_alias(inner_ty)
+            if inner_ty != 0 and inner_ty != self.sema.ty_void as i32:
+                let resolved = self.sema.resolve_alias(inner_ty) as i32
                 let tk = self.sema.get_type_kind(resolved)
                 if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
                     return self.sema.get_type_d0(resolved)
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
         let vs_sym = self.ast.get_data0(node)
         if self.sema.variant_lookup.contains(vs_sym):
-            return self.sema.variant_type_ids.get(vs_sym).unwrap()
+            return self.sema.variant_type_ids.get(vs_sym).unwrap() as i32
     if kind == NodeKind.NK_RANGE:
         let range_start = self.ast.get_data0(node)
         let range_end = self.ast.get_data1(node)
         let range_inclusive = self.ast.get_data2(node)
-        var range_elem = self.sema.ty_i32
+        var range_elem = self.sema.ty_i32 as i32
         if range_start != 0:
             range_elem = self.expr_type(range_start)
         else if range_end != 0:
             range_elem = self.expr_type(range_end)
-        let range_found = self.sema.find_range_type(range_elem, range_inclusive)
+        let range_found = self.sema.find_range_type(range_elem, range_inclusive) as i32
         if range_found != 0:
             return range_found
-        return self.sema.ty_void
-    self.sema.ty_void
+        return self.sema.ty_void as i32
+    self.sema.ty_void as i32
 
 fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
     if place_id < 0 or place_id >= self.body.place_locals.len() as i32:
-        return self.sema.ty_void
+        return self.sema.ty_void as i32
     let local_id = self.body.place_locals.get(place_id as i64)
     if local_id < 0 or local_id >= self.body.local_type_ids.len() as i32:
-        return self.sema.ty_void
-    var current_ty = self.body.local_type_ids.get(local_id as i64)
+        return self.sema.ty_void as i32
+    var current_ty = self.body.local_type_ids.get(local_id as i64) as i32
     let proj_start = self.body.place_proj_starts.get(place_id as i64)
     let proj_count = self.body.place_proj_counts.get(place_id as i64)
     var active_variant_idx = -1
@@ -769,14 +769,14 @@ fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
     for pi in 0..proj_count:
         let proj_kind = self.body.proj_kinds.get((proj_start + pi) as i64)
         let proj_d0 = self.body.proj_d0.get((proj_start + pi) as i64)
-        let resolved = self.sema.resolve_alias(current_ty)
+        let resolved = self.sema.resolve_alias(current_ty) as i32
         let tk = self.sema.get_type_kind(resolved)
 
         if proj_kind == ProjKind.PK_DOWNCAST:
             if tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
                 active_variant_idx = proj_d0
                 continue
-            return self.sema.ty_void
+            return self.sema.ty_void as i32
 
         if proj_kind == ProjKind.PK_FIELD:
             var field_ty = 0
@@ -787,7 +787,7 @@ fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
             else:
                 field_ty = self.struct_field_type(current_ty, proj_d0)
             if field_ty == 0:
-                return self.sema.ty_void
+                return self.sema.ty_void as i32
             current_ty = field_ty
             active_variant_idx = -1
             continue
@@ -795,7 +795,7 @@ fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
         if proj_kind == ProjKind.PK_INDEX:
             let elem_ty = self.indexed_element_type(current_ty)
             if elem_ty == 0:
-                return self.sema.ty_void
+                return self.sema.ty_void as i32
             current_ty = elem_ty
             active_variant_idx = -1
             continue
@@ -805,9 +805,9 @@ fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
                 current_ty = self.sema.get_type_d0(resolved)
                 active_variant_idx = -1
                 continue
-            return self.sema.ty_void
+            return self.sema.ty_void as i32
 
-        return self.sema.ty_void
+        return self.sema.ty_void as i32
 
     current_ty
 
@@ -938,12 +938,12 @@ fn MirBuilder.try_resolve_module_const_type(self: MirBuilder, sym: i32) -> i32:
         if self.ast.get_data0(decl) != sym:
             continue
         if self.sema.typed_binding_types.contains(decl):
-            return self.sema.typed_binding_types.get(decl).unwrap()
+            return self.sema.typed_binding_types.get(decl).unwrap() as i32
         let flags = self.ast.get_data2(decl)
         let type_extra_packed = flags / 4
         if type_extra_packed > 0:
             let type_ann_node = self.ast.get_extra(type_extra_packed - 1)
-            let resolved = self.sema.resolve_type_expr(type_ann_node)
+            let resolved = self.sema.resolve_type_expr(type_ann_node) as i32
             if resolved != 0:
                 return resolved
     0
@@ -1139,7 +1139,7 @@ fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
         let type_extra_packed = flags / 4
         if type_extra_packed > 0:
             let type_node = self.ast.get_extra(type_extra_packed - 1)
-            let annotated = self.sema.resolve_type_expr(type_node)
+            let annotated = self.sema.resolve_type_expr(type_node) as i32
             if annotated > 0:
                 gty = annotated
         let val_node = self.ast.get_data1(decl)
@@ -1154,7 +1154,7 @@ fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
             if inferred != 0:
                 gty = inferred
         if gty == 0:
-            gty = self.sema.ty_i32
+            gty = self.sema.ty_i32 as i32
         let local_id = self.body.new_local(gty, is_mut, sym, 1)
         self.bind_local(sym, local_id)
         return local_id
@@ -2531,7 +2531,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let sp_head_count = self.ast.get_data1(pat_node)
         // Get element type from scrutinee's array type
         let sp_arr_ty = self.place_local_type(scrutinee_place)
-        var sp_elem_ty = self.sema.ty_i32
+        var sp_elem_ty = self.sema.ty_i32 as i32
         let sp_arr_tk = self.sema.get_type_kind(sp_arr_ty)
         if sp_arr_tk == TypeKind.TY_ARRAY:
             let ety = self.sema.get_type_d0(sp_arr_ty)
@@ -2951,7 +2951,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
             self.body.set_call_ast_node(gc_args_id, node)
             var gc_ret_ty = self.expr_type(node)
             if gc_ret_ty == 0:
-                gc_ret_ty = self.sema.ty_i32
+                gc_ret_ty = self.sema.ty_i32 as i32
             let gc_result = self.new_temp(gc_ret_ty)
             let gc_place = self.place_for_local(gc_result)
             let gc_next = self.new_block()
@@ -3374,9 +3374,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         // shallow-copied Sema — see resolve_type_expr aliasing bug).
         var cast_tid = 0
         if self.sema.typed_expr_types.contains(node):
-            cast_tid = self.sema.typed_expr_types.get(node).unwrap()
+            cast_tid = self.sema.typed_expr_types.get(node).unwrap() as i32
         else:
-            cast_tid = self.sema.resolve_type_expr(self.ast.get_data1(node))
+            cast_tid = self.sema.resolve_type_expr(self.ast.get_data1(node)) as i32
         return self.lower_cast(self.ast.get_data0(node), cast_tid, node)
 
     if kind == NodeKind.NK_FIELD_ACCESS:
@@ -3525,7 +3525,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             self.body.set_call_ast_node(gc_args_id, node)
             var gc_ret_ty = self.expr_type(node)
             if gc_ret_ty == 0:
-                gc_ret_ty = self.sema.ty_i32
+                gc_ret_ty = self.sema.ty_i32 as i32
             let gc_result = self.new_temp(gc_ret_ty)
             let gc_place = self.place_for_local(gc_result)
             let gc_next = self.new_block()
@@ -3598,7 +3598,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 self.body.set_call_ast_node(gc_args_id, node)
                 var gc_ret_ty = self.expr_type(node)
                 if gc_ret_ty == 0:
-                    gc_ret_ty = self.sema.ty_i32
+                    gc_ret_ty = self.sema.ty_i32 as i32
                 let gc_result = self.new_temp(gc_ret_ty)
                 let gc_place = self.place_for_local(gc_result)
                 let gc_next = self.new_block()
@@ -3619,7 +3619,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 self.body.set_call_ast_node(bu_args_id, node)
                 var bu_ret_ty = self.expr_type(node)
                 if bu_ret_ty == 0:
-                    bu_ret_ty = self.sema.ty_i32
+                    bu_ret_ty = self.sema.ty_i32 as i32
                 let bu_result = self.new_temp(bu_ret_ty)
                 let bu_place = self.place_for_local(bu_result)
                 let bu_next = self.new_block()
@@ -3860,7 +3860,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
                 if p_type_node > 0:
                     p_ty = builder.expr_type(p_type_node)
                 if p_ty == 0:
-                    p_ty = builder.sema.ty_i32
+                    p_ty = builder.sema.ty_i32 as i32
             let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
             builder.bind_local(p_name, local_id)
             builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, local_id, 0, builder.ast.get_start(fn_node))
