@@ -21,6 +21,7 @@ extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_str_len(s: str) -> i64
 extern fn with_str_byte_at(s: str, index: i64) -> i32
 extern fn with_str_starts_with(s: str, prefix: str) -> i32
+extern fn with_str_contains(s: str, needle: str) -> i32
 extern fn with_str_slice(s: str, start: i64, end: i64) -> str
 extern fn with_eprintln(s: str) -> void
 extern fn with_system(cmd: str) -> i32
@@ -142,6 +143,17 @@ fn cli_test_verbose(argc: i32) -> bool:
 
 fn cli_test_quiet(argc: i32) -> bool:
     cli_has_flag(argc, "-q") or cli_has_flag(argc, "--quiet")
+
+fn cli_test_filter(argc: i32) -> str:
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if with_str_starts_with(arg, "--filter=") != 0:
+            return with_str_slice(arg, 9, with_str_len(arg))
+        if (arg == "--filter" or arg == "-f") and i + 1 < argc:
+            return with_arg_at(i + 1)
+        i = i + 1
+    ""
 
 fn cli_prelude_mode(argc: i32) -> i32:
     var mode = PreludeMode.FullMode
@@ -599,6 +611,11 @@ fn discover_test_functions(text: str) -> TestDiscovery:
             has_main = true
         if with_str_starts_with(fn_name, "test_") != 0:
             test_names.push(fn_name)
+        else:
+            // Check @[test] attribute via fn metadata flags
+            let meta = pool.find_fn_meta(decl)
+            if meta >= 0 and (pool.fn_meta_flags(meta) % 8192) / 4096 == 1:
+                test_names.push(fn_name)
     TestDiscovery { parse_ok: true, has_main, test_names }
 
 fn synthesize_test_main_source(text: str, test_names: Vec[str]) -> str:
@@ -723,7 +740,7 @@ fn run_named_test_binary(bin_path: str, test_name: str, quiet: bool) -> i32:
         cmd = "WITH_TEST_SHORT=1 " ++ cmd
     with_system(cmd)
 
-fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool) -> i32:
+fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str) -> i32:
     let discovery = discover_tests_for_target(target)
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
@@ -739,6 +756,8 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
         var failed = 0
         for ti in 0..discovery.test_names.len() as i32:
             let test_name = discovery.test_names.get(ti as i64)
+            if filter.len() > 0 and with_str_contains(test_name, filter) == 0:
+                continue
             let rc = run_named_test_binary(bin_path, test_name, quiet and not verbose)
             if rc == 0:
                 passed = passed + 1
@@ -766,6 +785,7 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
 fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let verbose = cli_test_verbose(argc)
     let quiet = if verbose: false else: cli_test_quiet(argc)
+    let filter = cli_test_filter(argc)
     // Find test file/dir argument
     let target = find_source_arg(argc)
     if target == "":
@@ -778,12 +798,12 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
             return 1
         for ti in 0..test_files.len() as i32:
             let test_file = test_files.get(ti as i64)
-            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet)
+            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet, filter)
             if run_rc != 0:
                 with_eprintln("error: test failed in '" ++ test_file ++ "'")
                 return run_rc
         return 0
-    run_test_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet)
+    run_test_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet, filter)
 
 fn run_clean_command -> i32:
     let result = with_system("rm -rf out .with")
