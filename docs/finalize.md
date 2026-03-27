@@ -395,13 +395,12 @@ already correct. Remaining: remove redundant codegen parallel tracking.
 
 - [x] Fix generic type erasure (codegen sema_tid cache keys)
 - [x] Generic distinctness test (`behav_generic_distinct.w`)
-- [x] Remove 5 dead cache fields (option_err_types, option_enum_syms,
-      result_enum_syms, hm_type_to_is_str, hm_type_to_val)
+- [x] Remove 10 dead cache fields + 4 reverse lookup functions
+- [x] Layer 1: place_sema_types in MIR (every place carries sema type)
+- [x] Layer 2: Replace Option/Result reverse lookups with sema queries
+- [x] Layer 3: Simplify caches — direct key→LLVM maps, set-only tracking
 - [ ] Instantiation cache: `(base_type, type_args)` → TypeId
 - [ ] Type substitution function
-- [ ] Delete remaining codegen parallel type tracking (requires threading
-      sema type IDs through MIR codegen — deep refactor, 26 reverse
-      lookup sites depend on LLVM type → metadata mapping)
 
 ---
 

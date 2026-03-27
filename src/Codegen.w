@@ -559,12 +559,12 @@ type Codegen {
     gen_current_yield: i32,
 
     // Vec type cache
-    // Vec type cache: forward (elem → vec) and reverse (vec → elem) maps
+    // Vec type cache
     vec_cache_map: HashMap[i64, i64],
-    vec_type_to_elem: HashMap[i64, i64],
+    vec_is_vec: HashMap[i64, i32],
     // HashMap type cache
     hm_cache_map: HashMap[i64, i64],
-    hm_type_to_key: HashMap[i64, i64],
+    hm_is_hm: HashMap[i64, i32],
 
     // HashSet type cache (elem LLVM type → HashSet LLVM struct type)
     hs_cache_map: HashMap[i64, i64],
@@ -816,9 +816,9 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         gen_yield_count: 0,
         gen_current_yield: 0,
         vec_cache_map: HashMap.new(),
-        vec_type_to_elem: HashMap.new(),
+        vec_is_vec: HashMap.new(),
         hm_cache_map: HashMap.new(),
-        hm_type_to_key: HashMap.new(),
+        hm_is_hm: HashMap.new(),
         hs_cache_map: HashMap.new(),
         type_binding_syms: Vec.new(),
         type_binding_types: Vec.new(),
@@ -3320,7 +3320,7 @@ fn Codegen.cache_vec_type(self: Codegen, sema_tid: i32, elem_ty: i64, vec_ty: i6
     if cached.is_some():
         return cached.unwrap()
     self.vec_cache_map.insert(cache_key, vec_ty)
-    self.vec_type_to_elem.insert(vec_ty, elem_ty)
+    self.vec_is_vec.insert(vec_ty, 1)
     vec_ty
 
 fn Codegen.get_or_create_hashmap_type(self: Codegen, sema_tid: i32, key_ty: i64, val_ty: i64) -> i64:
@@ -3328,7 +3328,7 @@ fn Codegen.get_or_create_hashmap_type(self: Codegen, sema_tid: i32, key_ty: i64,
     let cached = self.hm_cache_map.get(hash)
     if cached.is_some():
         let existing = cached.unwrap() as i64
-        if self.hm_type_to_key.contains(existing):
+        if self.hm_is_hm.contains(existing):
             return existing
     // HashMap is opaque { ptr }
     let body: Vec[i64] = Vec.new()
@@ -3344,12 +3344,12 @@ fn Codegen.cache_hashmap_type(self: Codegen, sema_tid: i32, key_ty: i64, val_ty:
     let cached = self.hm_cache_map.get(hash)
     if cached.is_some():
         let existing = cached.unwrap()
-        if self.hm_type_to_key.contains(existing):
+        if self.hm_is_hm.contains(existing):
             return existing
-    if self.hm_type_to_key.contains(hm_ty):
+    if self.hm_is_hm.contains(hm_ty):
         self.hm_cache_map.insert(hash, hm_ty)
         return hm_ty
-    self.hm_type_to_key.insert(hm_ty, key_ty)
+    self.hm_is_hm.insert(hm_ty, 1)
     self.hm_cache_map.insert(hash, hm_ty)
     hm_ty
 
