@@ -394,9 +394,14 @@ cache by sema_tid instead of LLVM pointer. Sema-level types were
 already correct. Remaining: remove redundant codegen parallel tracking.
 
 - [x] Fix generic type erasure (codegen sema_tid cache keys)
+- [x] Generic distinctness test (`behav_generic_distinct.w`)
+- [x] Remove 4 dead cache fields (option_err_types, option_enum_syms,
+      result_enum_syms, hm_type_to_is_str) + 8 lines of dead writes
 - [ ] Instantiation cache: `(base_type, type_args)` → TypeId
 - [ ] Type substitution function
-- [ ] Delete codegen parallel type tracking (~2000 lines)
+- [ ] Delete remaining codegen parallel type tracking (requires threading
+      sema type IDs through MIR codegen — deep refactor, 26 reverse
+      lookup sites depend on LLVM type → metadata mapping)
 
 ---
 

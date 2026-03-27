@@ -467,15 +467,12 @@ type Codegen {
     option_cache_map: HashMap[i64, i32],
     option_llvm_types: Vec[i64],
     option_payload_types: Vec[i64],
-    option_err_types: Vec[i64],
-    option_enum_syms: Vec[i32],
 
     // Result type cache: "ok_ty:err_ty" → index
     result_cache_map: HashMap[str, i32],
     result_llvm_types: Vec[i64],
     result_ok_types: Vec[i64],
     result_err_types: Vec[i64],
-    result_enum_syms: Vec[i32],
 
     // Slice element types: sym → elem LLVM type
     slice_elem_types: HashMap[i32, i64],
@@ -574,7 +571,6 @@ type Codegen {
     hm_cache_map: HashMap[i64, i64],
     hm_type_to_key: HashMap[i64, i64],
     hm_type_to_val: HashMap[i64, i64],
-    hm_type_to_is_str: HashMap[i64, i32],
 
     // HashSet type cache (elem LLVM type → HashSet LLVM struct type)
     hs_cache_map: HashMap[i64, i64],
@@ -771,13 +767,10 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         option_cache_map: HashMap.new(),
         option_llvm_types: Vec.new(),
         option_payload_types: Vec.new(),
-        option_err_types: Vec.new(),
-        option_enum_syms: Vec.new(),
         result_cache_map: HashMap.new(),
         result_llvm_types: Vec.new(),
         result_ok_types: Vec.new(),
         result_err_types: Vec.new(),
-        result_enum_syms: Vec.new(),
         slice_elem_types: HashMap.new(),
         enum_local_types: HashMap.new(),
         drop_fn_values: HashMap.new(),
@@ -838,7 +831,6 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         hm_cache_map: HashMap.new(),
         hm_type_to_key: HashMap.new(),
         hm_type_to_val: HashMap.new(),
-        hm_type_to_is_str: HashMap.new(),
         hs_cache_map: HashMap.new(),
         type_binding_syms: Vec.new(),
         type_binding_types: Vec.new(),
@@ -3261,8 +3253,6 @@ fn Codegen.get_or_create_option_type(self: Codegen, sema_tid: i32, payload_ty: i
     let idx = self.option_llvm_types.len() as i32
     self.option_llvm_types.push(opt_type)
     self.option_payload_types.push(payload_ty)
-    self.option_err_types.push(0)
-    self.option_enum_syms.push(self.sym_option)
     self.option_cache_map.insert(cache_key, idx)
     opt_type
 
@@ -3288,7 +3278,6 @@ fn Codegen.get_or_create_result_type(self: Codegen, sema_tid: i32, ok_ty: i64, e
     self.result_llvm_types.push(res_type)
     self.result_ok_types.push(ok_ty)
     self.result_err_types.push(err_ty)
-    self.result_enum_syms.push(self.sym_result)
     self.result_cache_map.insert(cache_key, idx)
     res_type
 
@@ -3385,14 +3374,6 @@ fn Codegen.cache_hashmap_type(self: Codegen, sema_tid: i32, key_ty: i64, val_ty:
         return hm_ty
     self.hm_type_to_key.insert(hm_ty, key_ty)
     self.hm_type_to_val.insert(hm_ty, val_ty)
-    // Check if str key
-    let str_sym = self.intern.intern("str")
-    let str_opt = self.struct_type_map.get(str_sym)
-    var is_str = 0
-    if str_opt.is_some():
-        if key_ty == self.struct_llvm_types.get(str_opt.unwrap() as i64):
-            is_str = 1
-    self.hm_type_to_is_str.insert(hm_ty, is_str)
     self.hm_cache_map.insert(hash, hm_ty)
     hm_ty
 
