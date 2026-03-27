@@ -43,6 +43,8 @@ enum TypeKind: i32:
     TY_NEVER = 18
     TY_GENERIC_INST = 19
 
+type TypeId = i32
+
 enum VarState: i32:
     LIVE = 0
     MOVED = 1
@@ -238,8 +240,8 @@ type Sema {
 
     // Current state
     source_text: str,
-    current_return_type: i32,
-    current_gen_yield_type: i32,
+    current_return_type: TypeId,
+    current_gen_yield_type: TypeId,
     has_gen_yield_type: i32,
     in_pipeline_rhs: i32,
     match_in_stmt_pos: i32,
@@ -247,11 +249,11 @@ type Sema {
     no_std: i32,
     alloc: i32,
     in_defer: i32,
-    break_value_type: i32,
+    break_value_type: TypeId,
     has_break_value_type: i32,
     loop_depth: i32,
     closure_direct_arg_depth: i32,
-    expected_expr_type: i32,
+    expected_expr_type: TypeId,
     has_expected_type: i32,
     local_file_id: i32,
     collecting_types: i32,
@@ -259,26 +261,26 @@ type Sema {
     suppress_errors: i32,
 
     // Canonical primitive TypeIds
-    ty_i8: i32,
-    ty_i16: i32,
-    ty_i32: i32,
-    ty_i64: i32,
-    ty_i128: i32,
-    ty_u8: i32,
-    ty_u16: i32,
-    ty_u32: i32,
-    ty_u64: i32,
-    ty_u128: i32,
-    ty_f32: i32,
-    ty_f64: i32,
-    ty_bool: i32,
-    ty_void: i32,
-    ty_never: i32,
-    ty_str: i32,
-    ty_str_view: i32,
-    ty_usize: i32,
-    ty_isize: i32,
-    ty_const_i8_ptr: i32,
+    ty_i8: TypeId,
+    ty_i16: TypeId,
+    ty_i32: TypeId,
+    ty_i64: TypeId,
+    ty_i128: TypeId,
+    ty_u8: TypeId,
+    ty_u16: TypeId,
+    ty_u32: TypeId,
+    ty_u64: TypeId,
+    ty_u128: TypeId,
+    ty_f32: TypeId,
+    ty_f64: TypeId,
+    ty_bool: TypeId,
+    ty_void: TypeId,
+    ty_never: TypeId,
+    ty_str: TypeId,
+    ty_str_view: TypeId,
+    ty_usize: TypeId,
+    ty_isize: TypeId,
+    ty_const_i8_ptr: TypeId,
 
     // Per-module scoping: tracks which module each declaration belongs to
     // and which symbols are visible in each module context.
@@ -877,7 +879,7 @@ fn Sema.extract_fn_param_name(self: Sema, node: i32, param_index: i32) -> str:
 
 // ── Type management ──────────────────────────────────────────────
 
-fn Sema.add_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
+fn Sema.add_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
     if self.types_frozen != 0:
         with_eprintln("BUG: Sema.add_type called after freeze_types")
     let id = self.type_kinds.len() as i32
@@ -897,7 +899,7 @@ fn Sema.type_extra_matches(self: Sema, extra_start: i32, values: Vec[i32], count
             return 0
     1
 
-fn Sema.find_exact_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
+fn Sema.find_exact_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
         if self.type_kinds.get(ti as i64) != kind:
@@ -911,7 +913,7 @@ fn Sema.find_exact_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> i32
         return ti
     0
 
-fn Sema.ensure_exact_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
+fn Sema.ensure_exact_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
     let existing = self.find_exact_type(kind, d0, d1, d2)
     if existing != 0:
         return existing
@@ -919,7 +921,7 @@ fn Sema.ensure_exact_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> i
         return 0
     self.add_type(kind, d0, d1, d2)
 
-fn Sema.find_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> i32:
+fn Sema.find_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> TypeId:
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
         if self.type_kinds.get(ti as i64) != TypeKind.TY_TUPLE:
@@ -931,7 +933,7 @@ fn Sema.find_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> i32:
             return ti
     0
 
-fn Sema.ensure_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> i32:
+fn Sema.ensure_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> TypeId:
     let existing = self.find_tuple_type(elems, elem_count)
     if existing != 0:
         return existing
@@ -942,7 +944,7 @@ fn Sema.ensure_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> i32:
         self.type_extra.push(elems.get(ei as i64))
     self.add_type(TypeKind.TY_TUPLE, te_start, elem_count, 0)
 
-fn Sema.find_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: i32) -> i32:
+fn Sema.find_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
         if self.type_kinds.get(ti as i64) != TypeKind.TY_FN:
@@ -956,7 +958,7 @@ fn Sema.find_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: i32) -
             return ti
     0
 
-fn Sema.ensure_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: i32) -> i32:
+fn Sema.ensure_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
     let existing = self.find_fn_type(params, param_count, ret)
     if existing != 0:
         return existing
@@ -974,7 +976,7 @@ fn Sema.generic_inst_cache_key(self: Sema, base_sym: i32, args: Vec[i32], arg_co
         key = key ++ f":{arg_val}"
     key
 
-fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> i32:
+fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> TypeId:
     let cache_key = self.generic_inst_cache_key(base_sym, args, arg_count)
     if self.generic_inst_cache.contains(cache_key):
         return self.generic_inst_cache.get(cache_key).unwrap()
@@ -992,7 +994,7 @@ fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_co
             return ti
     0
 
-fn Sema.ensure_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> i32:
+fn Sema.ensure_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> TypeId:
     let existing = self.find_generic_inst_type(base_sym, args, arg_count)
     if existing != 0:
         return existing
@@ -1015,7 +1017,7 @@ fn Sema.find_generic_inst(self: Sema, base_sym: i32, arg_tid: i32) -> i32:
 
 // Look up an existing TypeKind.TY_RANGE(elem_tid, inclusive) in the type tables.
 // Returns the TypeId, or 0 if not found.
-fn Sema.find_range_type(self: Sema, elem_tid: i32, inclusive: i32) -> i32:
+fn Sema.find_range_type(self: Sema, elem_tid: TypeId, inclusive: i32) -> TypeId:
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
         if self.type_kinds.get(ti as i64) == TypeKind.TY_RANGE:
@@ -1281,27 +1283,27 @@ fn Sema.substitute_type(self: Sema, tid: i32, subst_syms: Vec[i32], subst_tids: 
     // All other kinds: return unchanged
     tid
 
-fn Sema.get_type_kind(self: Sema, tid: i32) -> i32:
+fn Sema.get_type_kind(self: Sema, tid: TypeId) -> i32:
     if tid < 0 or tid >= self.type_kinds.len() as i32:
         return TypeKind.TY_ERR
     self.type_kinds.get(tid as i64)
 
-fn Sema.get_type_d0(self: Sema, tid: i32) -> i32:
+fn Sema.get_type_d0(self: Sema, tid: TypeId) -> i32:
     if tid < 0 or tid >= self.type_d0.len() as i32:
         return 0
     self.type_d0.get(tid as i64)
 
-fn Sema.get_type_d1(self: Sema, tid: i32) -> i32:
+fn Sema.get_type_d1(self: Sema, tid: TypeId) -> i32:
     if tid < 0 or tid >= self.type_d1.len() as i32:
         return 0
     self.type_d1.get(tid as i64)
 
-fn Sema.get_type_d2(self: Sema, tid: i32) -> i32:
+fn Sema.get_type_d2(self: Sema, tid: TypeId) -> i32:
     if tid < 0 or tid >= self.type_d2.len() as i32:
         return 0
     self.type_d2.get(tid as i64)
 
-fn Sema.resolve_alias(self: Sema, tid: i32) -> i32:
+fn Sema.resolve_alias(self: Sema, tid: TypeId) -> TypeId:
     var current = tid
     for depth in 0..32:
         if self.get_type_kind(current) == TypeKind.TY_ALIAS:
@@ -3251,7 +3253,7 @@ fn Sema.primitive_type_by_sym(self: Sema, sym: i32) -> i32:
 
 // ── Type expression resolution ───────────────────────────────────
 
-fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
+fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
     if node == 0:
         return 0
 
@@ -3752,7 +3754,7 @@ fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
         return self.expr_is_ephemeral_task(node)
     0
 
-fn Sema.check_expr(self: Sema, node: i32) -> i32:
+fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if node == 0:
         return 0
 
@@ -5917,7 +5919,7 @@ fn Sema.fn_min_expected_arg_count(self: Sema, fn_sym: i32, fallback_expected: i3
         return fallback_expected
     required
 
-fn Sema.check_expr_with_expected(self: Sema, node: i32, expected: i32) -> i32:
+fn Sema.check_expr_with_expected(self: Sema, node: i32, expected: TypeId) -> TypeId:
     let saved_expected = self.expected_expr_type
     let saved_has = self.has_expected_type
     self.expected_expr_type = expected
@@ -7636,7 +7638,7 @@ fn Sema.method_key(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     self.method_key_cache.insert(cache_key, out)
     out
 
-fn Sema.get_type_name(self: Sema, tid: i32) -> i32:
+fn Sema.get_type_name(self: Sema, tid: TypeId) -> i32:
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
     if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
@@ -7660,7 +7662,7 @@ fn Sema.enum_repr_type(self: Sema, tid: i32) -> i32:
 
 // ── Type compatibility ───────────────────────────────────────────
 
-fn Sema.types_compatible_fast(self: Sema, expected: i32, actual: i32) -> i32:
+fn Sema.types_compatible_fast(self: Sema, expected: TypeId, actual: TypeId) -> i32:
     if expected == actual:
         return 1
     if expected == 0 or actual == 0:
@@ -7737,7 +7739,7 @@ fn Sema.types_compatible_fast(self: Sema, expected: i32, actual: i32) -> i32:
         return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
     0
 
-fn Sema.types_compatible(self: Sema, expected: i32, actual: i32) -> i32:
+fn Sema.types_compatible(self: Sema, expected: TypeId, actual: TypeId) -> i32:
     if self.types_compatible_fast(expected, actual) != 0:
         return 1
 
@@ -7832,7 +7834,7 @@ fn Sema.types_compatible(self: Sema, expected: i32, actual: i32) -> i32:
                 return 1
     0
 
-fn Sema.arithmetic_result_type(self: Sema, lhs: i32, rhs: i32) -> i32:
+fn Sema.arithmetic_result_type(self: Sema, lhs: TypeId, rhs: TypeId) -> TypeId:
     if lhs == 0:
         return rhs
     if rhs == 0:
@@ -7869,7 +7871,7 @@ fn Sema.arithmetic_result_type(self: Sema, lhs: i32, rhs: i32) -> i32:
         return rhs_numeric
     0
 
-fn Sema.is_copy(self: Sema, tid: i32) -> i32:
+fn Sema.is_copy(self: Sema, tid: TypeId) -> i32:
     if tid == 0:
         return 1
     let resolved = self.resolve_alias(tid)
