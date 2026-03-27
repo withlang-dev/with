@@ -1754,9 +1754,14 @@ fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) 
     ty
 
 fn Codegen.mir_place_sema_type(self: Codegen, body: MirBody, place_id: i32) -> i32:
-    // Get the sema type for a MIR place, walking through field projections (using sema snapshot).
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return 0
+    // Use stored sema type if available (populated by MirLower)
+    if place_id < body.place_sema_types.len() as i32:
+        let stored = body.place_sema_types.get(place_id as i64)
+        if stored > 0:
+            return stored
+    // Fallback: walk projections using sema snapshot
     let local_id = body.place_locals.get(place_id as i64)
     if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
         return 0
