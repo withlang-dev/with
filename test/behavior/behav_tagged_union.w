@@ -3,7 +3,8 @@
 // Tests: tagged unions (enums with payloads), nested payloads,
 //        multiple payload types, match destructuring
 
-enum Value {  | IntVal(i32) }
+enum Value:
+    | IntVal(i32)
     | FloatVal(f64)
     | BoolVal(bool)
     | NoneVal
@@ -43,7 +44,8 @@ fn test_tagged_union_discriminant:
     assert(not is_int_val(Value.FloatVal(0.0)))
     assert(not is_int_val(Value.NoneVal))
 
-enum Message {  | Quit }
+enum Message:
+    | Quit
     | Echo(str)
     | Move(x: i32, y: i32)
 

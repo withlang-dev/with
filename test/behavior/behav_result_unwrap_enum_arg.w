@@ -1,9 +1,11 @@
 //! expect-stdout: ok
 
-enum DType {  | Int32 }
+enum DType:
+    | Int32
     | Float32
 
-enum E {  | ParseError(msg: str) }
+enum E:
+    | ParseError(msg: str)
 
 fn parse_dtype(token: str) -> Result[DType, E]:
     if token == "i32":

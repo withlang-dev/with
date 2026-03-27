@@ -1,6 +1,7 @@
 //! expect-stdout: ok
 
-enum D {  | X }
+enum D:
+    | X
     | Y
 
 type S {
