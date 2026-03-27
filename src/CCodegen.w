@@ -95,6 +95,117 @@ fn cc_builtin_opt_unwrap -> i32:
 fn cc_builtin_vec_pop -> i32:
     16
 
+fn cc_builtin_str_len -> i32:
+    17
+
+fn cc_builtin_str_byte_at -> i32:
+    18
+
+fn cc_builtin_str_slice -> i32:
+    19
+
+fn cc_builtin_str_contains -> i32:
+    20
+
+fn cc_builtin_str_starts_with -> i32:
+    21
+
+fn cc_builtin_str_ends_with -> i32:
+    22
+
+fn cc_builtin_str_find -> i32:
+    23
+
+fn cc_builtin_map_clear -> i32:
+    24
+
+fn cc_builtin_veciter_next -> i32:
+    25
+
+fn cc_builtin_vec_iter -> i32:
+    26
+
+fn cc_builtin_opt_is_none -> i32:
+    27
+
+fn cc_builtin_str_split -> i32:
+    28
+
+fn cc_builtin_str_trim -> i32:
+    29
+
+fn cc_builtin_str_to_upper -> i32:
+    30
+
+fn cc_builtin_str_to_lower -> i32:
+    31
+
+fn cc_builtin_str_replace -> i32:
+    32
+
+fn cc_builtin_str_index_of -> i32:
+    33
+
+fn cc_builtin_map_increment -> i32:
+    34
+
+fn cc_builtin_vec_map -> i32:
+    35
+
+fn cc_builtin_vec_filter -> i32:
+    36
+
+fn cc_builtin_vec_fold -> i32:
+    37
+
+fn cc_builtin_vec_contains -> i32:
+    38
+
+fn cc_builtin_str_repeat -> i32:
+    39
+
+fn cc_builtin_arr_len -> i32:
+    40
+
+fn cc_builtin_generic_call -> i32:
+    41
+
+fn cc_builtin_vec_join -> i32:
+    42
+
+fn cc_builtin_dyn_vtable_cmp -> i32:
+    43
+
+fn cc_builtin_dyn_downcast -> i32:
+    44
+
+fn cc_builtin_opt_filter -> i32:
+    45
+
+fn cc_builtin_rotate_left -> i32:
+    46
+
+fn cc_builtin_rotate_right -> i32:
+    47
+
+fn cc_builtin_vec_with_capacity -> i32:
+    48
+
+fn cc_builtin_fmt_to_str -> i32:
+    49
+
+fn cc_builtin_fmt_debug_str -> i32:
+    50
+
+fn cc_builtin_fmt_debug -> i32:
+    51
+
+fn cc_builtin_fmt_spec -> i32:
+    52
+
+fn cc_builtin_int_swap_bytes -> i32:
+    53
+
 fn cc_callee_hint_none -> i32:
     0
 
@@ -2735,6 +2846,43 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE: return cc_builtin_map_remove()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME: return cc_builtin_opt_is_some()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP: return cc_builtin_opt_unwrap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_LEN: return cc_builtin_str_len()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_BYTE_AT: return cc_builtin_str_byte_at()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_SLICE: return cc_builtin_str_slice()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_CONTAINS: return cc_builtin_str_contains()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_STARTS_WITH: return cc_builtin_str_starts_with()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_ENDS_WITH: return cc_builtin_str_ends_with()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_FIND: return cc_builtin_str_find()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR: return cc_builtin_map_clear()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECITER_NEXT: return cc_builtin_veciter_next()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_ITER: return cc_builtin_vec_iter()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_IS_NONE: return cc_builtin_opt_is_none()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_SPLIT: return cc_builtin_str_split()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_TRIM: return cc_builtin_str_trim()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_TO_UPPER: return cc_builtin_str_to_upper()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_TO_LOWER: return cc_builtin_str_to_lower()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_REPLACE: return cc_builtin_str_replace()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_INDEX_OF: return cc_builtin_str_index_of()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_INCREMENT: return cc_builtin_map_increment()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_MAP: return cc_builtin_vec_map()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_FILTER: return cc_builtin_vec_filter()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_FOLD: return cc_builtin_vec_fold()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_CONTAINS: return cc_builtin_vec_contains()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_REPEAT: return cc_builtin_str_repeat()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_ARR_LEN: return cc_builtin_arr_len()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL: return cc_builtin_generic_call()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_JOIN: return cc_builtin_vec_join()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_DYN_VTABLE_CMP: return cc_builtin_dyn_vtable_cmp()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_DYN_DOWNCAST: return cc_builtin_dyn_downcast()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_FILTER: return cc_builtin_opt_filter()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_ROTATE_LEFT: return cc_builtin_rotate_left()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_ROTATE_RIGHT: return cc_builtin_rotate_right()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_WITH_CAPACITY: return cc_builtin_vec_with_capacity()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_TO_STR: return cc_builtin_fmt_to_str()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_DEBUG_STR: return cc_builtin_fmt_debug_str()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_DEBUG: return cc_builtin_fmt_debug()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_SPEC: return cc_builtin_fmt_spec()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_INT_SWAP_BYTES: return cc_builtin_int_swap_bytes()
     cc_builtin_none()
 
 fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> str:
@@ -2970,6 +3118,523 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         let opt_text = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
         let dst = self.place_text(body, dest_place)
         var out = "    " ++ dst ++ " = ((" ++ opt_text ++ ") - 1);\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_len():
+        if argc < 1:
+            self.fail("str.len expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_len(" ++ recv ++ ");\n"
+        else:
+            out = out ++ "    (void)with_str_len(" ++ recv ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_byte_at():
+        if argc < 2:
+            self.fail("str.byte_at expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_byte_at(" ++ recv ++ ", (int64_t)(" ++ idx ++ "));\n"
+        else:
+            out = out ++ "    (void)with_str_byte_at(" ++ recv ++ ", (int64_t)(" ++ idx ++ "));\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_slice():
+        if argc < 3:
+            self.fail("str.slice expects three arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let start = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        let end_ = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_slice(" ++ recv ++ ", (int64_t)(" ++ start ++ "), (int64_t)(" ++ end_ ++ "));\n"
+        else:
+            out = out ++ "    (void)with_str_slice(" ++ recv ++ ", (int64_t)(" ++ start ++ "), (int64_t)(" ++ end_ ++ "));\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_contains():
+        if argc < 2:
+            self.fail("str.contains expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let needle = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_contains(" ++ recv ++ ", " ++ needle ++ ");\n"
+        else:
+            out = out ++ "    (void)with_str_contains(" ++ recv ++ ", " ++ needle ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_starts_with():
+        if argc < 2:
+            self.fail("str.starts_with expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let prefix = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_starts_with(" ++ recv ++ ", " ++ prefix ++ ");\n"
+        else:
+            out = out ++ "    (void)with_str_starts_with(" ++ recv ++ ", " ++ prefix ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_ends_with():
+        if argc < 2:
+            self.fail("str.ends_with expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let suffix = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_ends_with(" ++ recv ++ ", " ++ suffix ++ ");\n"
+        else:
+            out = out ++ "    (void)with_str_ends_with(" ++ recv ++ ", " ++ suffix ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_find():
+        if argc < 2:
+            self.fail("str.find expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let needle = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_index_of(" ++ recv ++ ", " ++ needle ++ ");\n"
+        else:
+            out = out ++ "    (void)with_str_index_of(" ++ recv ++ ", " ++ needle ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_index_of():
+        if argc < 2:
+            self.fail("str.index_of expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let needle = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_index_of(" ++ recv ++ ", " ++ needle ++ ");\n"
+        else:
+            out = out ++ "    (void)with_str_index_of(" ++ recv ++ ", " ++ needle ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_split():
+        if argc < 2:
+            self.fail("str.split expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let delim = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    with_str_split_vec(&(" ++ self.place_text(body, dest_place) ++ "), " ++ recv ++ ", " ++ delim ++ ");\n"
+        else:
+            out = out ++ "    " ++ cc_lbrace() ++ " with_vec __with_tmp_split; with_str_split_vec(&__with_tmp_split, " ++ recv ++ ", " ++ delim ++ "); " ++ cc_rbrace() ++ "\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_trim():
+        if argc < 1:
+            self.fail("str.trim expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_trim(" ++ recv ++ ");\n"
+        else:
+            out = out ++ "    (void)with_str_trim(" ++ recv ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_to_upper():
+        if argc < 1:
+            self.fail("str.to_upper expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_to_upper(" ++ recv ++ ");\n"
+        else:
+            out = out ++ "    (void)with_str_to_upper(" ++ recv ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_to_lower():
+        if argc < 1:
+            self.fail("str.to_lower expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_to_lower(" ++ recv ++ ");\n"
+        else:
+            out = out ++ "    (void)with_str_to_lower(" ++ recv ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_replace():
+        if argc < 3:
+            self.fail("str.replace expects three arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let old_s = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        let new_s = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_replace(" ++ recv ++ ", " ++ old_s ++ ", " ++ new_s ++ ");\n"
+        else:
+            out = out ++ "    (void)with_str_replace(" ++ recv ++ ", " ++ old_s ++ ", " ++ new_s ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_str_repeat():
+        if argc < 2:
+            self.fail("str.repeat expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let n = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_repeat(" ++ recv ++ ", (int64_t)(" ++ n ++ "));\n"
+        else:
+            out = out ++ "    (void)with_str_repeat(" ++ recv ++ ", (int64_t)(" ++ n ++ "));\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_map_clear():
+        if argc < 1:
+            self.fail("map.clear expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = "    if ((" ++ recv ++ ") != 0) with_hashmap_clear((void*)(intptr_t)(" ++ recv ++ "));\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_map_increment():
+        if argc < 2:
+            self.fail("map.increment expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let key_operand = self.call_arg_operand(body, args_id, 1)
+        let key_text = self.operand_text(body, key_operand)
+        var key_tid = self.operand_tid(body, key_operand)
+        if key_tid == 0 or self.is_void_tid(key_tid) != 0:
+            key_tid = self.sema.ty_i64 as i32
+        let key_ty = self.c_type(key_tid, 0)
+        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
+        var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; with_hashmap_increment((void*)(intptr_t)(" ++ recv ++ "), &__with_k, " ++ is_str_key ++ "); " ++ cc_rbrace() ++ "\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_opt_is_none():
+        if argc < 1:
+            self.fail("Option.is_none expects one argument")
+            return "    abort();"
+        let opt_text = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = ((" ++ opt_text ++ ") == 0);\n"
+        else:
+            out = out ++ "    (void)((" ++ opt_text ++ ") == 0);\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_vec_iter():
+        // Vec is its own iterator in C — return the vec as the iterator value
+        if argc < 1:
+            self.fail("vec.iter expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ dst ++ " = " ++ recv ++ ";\n"
+        else:
+            out = out ++ "    (void)0;\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_veciter_next():
+        // Advance iterator: returns Option (0 = None, value+1 = Some(value))
+        // args: recv = {vec, index_i64} — treat as vec + separate index local
+        if argc < 1:
+            self.fail("veciter.next expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let dst = self.place_text(body, dest_place)
+        var out = "    " ++ cc_lbrace() ++ " int64_t __with_n = with_vec_len(&(" ++ recv ++ ")); int64_t __with_i = 0;"
+        out = out ++ " if (__with_i < __with_n) " ++ cc_lbrace()
+        out = out ++ " int64_t __with_elem = 0; memcpy(&__with_elem, with_vec_get_ptr(&(" ++ recv ++ "), __with_i), sizeof(int64_t));"
+        out = out ++ " " ++ dst ++ " = __with_elem + 1; " ++ cc_rbrace()
+        out = out ++ " else " ++ cc_lbrace() ++ " " ++ dst ++ " = 0; " ++ cc_rbrace()
+        out = out ++ " " ++ cc_rbrace() ++ "\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_vec_contains():
+        if argc < 2:
+            self.fail("vec.contains expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let elem_operand = self.call_arg_operand(body, args_id, 1)
+        let elem_text = self.operand_text(body, elem_operand)
+        var elem_tid = self.operand_tid(body, elem_operand)
+        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            elem_tid = self.sema.ty_i64 as i32
+        let elem_ty = self.c_type(elem_tid, 0)
+        let dst = self.place_text(body, dest_place)
+        var out = "    " ++ cc_lbrace() ++ " int64_t __with_found = 0; int64_t __with_ci; int64_t __with_cn = with_vec_len(&(" ++ recv ++ ")); " ++ elem_ty ++ " __with_needle = " ++ elem_text ++ ";"
+        out = out ++ " for (__with_ci = 0; __with_ci < __with_cn; __with_ci++) " ++ cc_lbrace()
+        out = out ++ " " ++ elem_ty ++ " __with_cur; memcpy(&__with_cur, with_vec_get_ptr(&(" ++ recv ++ "), __with_ci), sizeof(" ++ elem_ty ++ "));"
+        out = out ++ " if (memcmp(&__with_cur, &__with_needle, sizeof(" ++ elem_ty ++ ")) == 0) " ++ cc_lbrace() ++ " __with_found = 1; break; " ++ cc_rbrace()
+        out = out ++ " " ++ cc_rbrace()
+        if has_ret != 0:
+            out = out ++ " " ++ dst ++ " = __with_found;"
+        out = out ++ " " ++ cc_rbrace() ++ "\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_vec_join():
+        if argc < 2:
+            self.fail("vec.join expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let sep = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_vec_join_str(&(" ++ recv ++ "), " ++ sep ++ ");\n"
+        else:
+            out = out ++ "    (void)with_vec_join_str(&(" ++ recv ++ "), " ++ sep ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_arr_len():
+        if argc < 1:
+            self.fail("arr.len expects one argument")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (int64_t)(sizeof(" ++ recv ++ ") / sizeof((" ++ recv ++ ")[0]));\n"
+        else:
+            out = out ++ "    (void)(sizeof(" ++ recv ++ ") / sizeof((" ++ recv ++ ")[0]));\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_vec_with_capacity():
+        // Capacity hint is ignored in C; just initialize an empty vec
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";\n"
+        else:
+            out = out ++ "    (void)0;\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_rotate_left():
+        if argc < 2:
+            self.fail("rotate_left expects two arguments")
+            return "    abort();"
+        let val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let n = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ cc_lbrace() ++ " uint32_t __with_v = (uint32_t)(" ++ val ++ "); uint32_t __with_n = (uint32_t)(" ++ n ++ ") & 31u;"
+            out = out ++ " " ++ dst ++ " = (int32_t)((__with_v << __with_n) | (__with_v >> (32u - __with_n))); " ++ cc_rbrace() ++ "\n"
+        else:
+            out = out ++ "    (void)0;\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_rotate_right():
+        if argc < 2:
+            self.fail("rotate_right expects two arguments")
+            return "    abort();"
+        let val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let n = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ cc_lbrace() ++ " uint32_t __with_v = (uint32_t)(" ++ val ++ "); uint32_t __with_n = (uint32_t)(" ++ n ++ ") & 31u;"
+            out = out ++ " " ++ dst ++ " = (int32_t)((__with_v >> __with_n) | (__with_v << (32u - __with_n))); " ++ cc_rbrace() ++ "\n"
+        else:
+            out = out ++ "    (void)0;\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_int_swap_bytes():
+        if argc < 1:
+            self.fail("int_swap_bytes expects one argument")
+            return "    abort();"
+        let val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ dst ++ " = (int32_t)__builtin_bswap32((uint32_t)(" ++ val ++ "));\n"
+        else:
+            out = out ++ "    (void)__builtin_bswap32((uint32_t)(" ++ val ++ "));\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_fmt_to_str():
+        if argc < 1:
+            self.fail("fmt.to_str expects one argument")
+            return "    abort();"
+        let val_operand = self.call_arg_operand(body, args_id, 0)
+        let val_text = self.operand_text(body, val_operand)
+        var val_tid = self.operand_tid(body, val_operand)
+        if val_tid == 0 or self.is_void_tid(val_tid) != 0:
+            val_tid = self.sema.ty_i64 as i32
+        let resolved = self.sema.resolve_alias(val_tid as TypeId)
+        let tk = self.sema.get_type_kind(resolved)
+        let fmt_fn = if tk == TypeKind.TY_STR: "with_fmt_str"
+            else if tk == TypeKind.TY_BOOL: "with_fmt_bool"
+            else if tk == TypeKind.TY_FLOAT: "with_fmt_f64"
+            else: "with_fmt_i64"
+        let cast_prefix = if tk == TypeKind.TY_FLOAT: "(double)("
+            else if tk == TypeKind.TY_BOOL: "(int32_t)("
+            else if tk == TypeKind.TY_STR: "("
+            else: "(int64_t)("
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ fmt_fn ++ "(" ++ cast_prefix ++ val_text ++ "));\n"
+        else:
+            out = out ++ "    (void)" ++ fmt_fn ++ "(" ++ cast_prefix ++ val_text ++ "));\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_fmt_debug_str():
+        if argc < 1:
+            self.fail("fmt.debug_str expects one argument")
+            return "    abort();"
+        let val_text = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_fmt_str_debug(" ++ val_text ++ ");\n"
+        else:
+            out = out ++ "    (void)with_fmt_str_debug(" ++ val_text ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_fmt_debug():
+        if argc < 1:
+            self.fail("fmt.debug expects one argument")
+            return "    abort();"
+        let val_operand = self.call_arg_operand(body, args_id, 0)
+        let val_text = self.operand_text(body, val_operand)
+        var val_tid = self.operand_tid(body, val_operand)
+        if val_tid == 0 or self.is_void_tid(val_tid) != 0:
+            val_tid = self.sema.ty_i64 as i32
+        let resolved = self.sema.resolve_alias(val_tid as TypeId)
+        let tk = self.sema.get_type_kind(resolved)
+        let fmt_fn = if tk == TypeKind.TY_STR: "with_fmt_str_debug"
+            else if tk == TypeKind.TY_BOOL: "with_fmt_bool"
+            else if tk == TypeKind.TY_FLOAT: "with_fmt_f64"
+            else: "with_fmt_i64"
+        let cast_prefix = if tk == TypeKind.TY_FLOAT: "(double)("
+            else if tk == TypeKind.TY_BOOL: "(int32_t)("
+            else if tk == TypeKind.TY_STR: "("
+            else: "(int64_t)("
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ fmt_fn ++ "(" ++ cast_prefix ++ val_text ++ "));\n"
+        else:
+            out = out ++ "    (void)" ++ fmt_fn ++ "(" ++ cast_prefix ++ val_text ++ "));\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_fmt_spec():
+        // args: value, flags(i64), width(i32), precision(i32)
+        if argc < 4:
+            self.fail("fmt.spec expects four arguments")
+            return "    abort();"
+        let val_operand = self.call_arg_operand(body, args_id, 0)
+        let val_text = self.operand_text(body, val_operand)
+        let flags_text = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        let width_text = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
+        let prec_text = self.operand_text(body, self.call_arg_operand(body, args_id, 3))
+        var val_tid = self.operand_tid(body, val_operand)
+        if val_tid == 0 or self.is_void_tid(val_tid) != 0:
+            val_tid = self.sema.ty_i64 as i32
+        let resolved = self.sema.resolve_alias(val_tid as TypeId)
+        let tk = self.sema.get_type_kind(resolved)
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            if tk == TypeKind.TY_FLOAT:
+                out = out ++ "    " ++ dst ++ " = with_fmt_f64_spec((double)(" ++ val_text ++ "), (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "));\n"
+            else if tk == TypeKind.TY_STR:
+                out = out ++ "    " ++ dst ++ " = with_fmt_str_spec(" ++ val_text ++ ", (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "));\n"
+            else:
+                out = out ++ "    " ++ dst ++ " = with_fmt_int_spec((int64_t)(" ++ val_text ++ "), 0, (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "));\n"
+        else:
+            out = out ++ "    (void)0;\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_dyn_vtable_cmp():
+        // Dynamic trait vtable comparison
+        if argc < 2:
+            self.fail("dyn_vtable_cmp expects two arguments")
+            return "    abort();"
+        let obj_text = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let vtable_text = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = ((" ++ obj_text ++ ").vtable == (void*)(" ++ vtable_text ++ "));\n"
+        else:
+            out = out ++ "    (void)0;\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_dyn_downcast():
+        // Dynamic trait downcast — not fully implementable without type info; abort
+        var out = "    /* dyn_downcast: not supported in C backend */ abort();\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_opt_filter():
+        // opt.filter requires closure support — not available in C backend
+        var out = "    /* opt.filter: requires closure support */ abort();\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_vec_map():
+        // vec.map requires closure support — not available in C backend
+        var out = "    /* vec.map: requires closure support */ abort();\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_vec_filter():
+        // vec.filter requires closure support — not available in C backend
+        var out = "    /* vec.filter: requires closure support */ abort();\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_vec_fold():
+        // vec.fold requires closure support — not available in C backend
+        var out = "    /* vec.fold: requires closure support */ abort();\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_generic_call():
+        // GENERIC_CALL should be resolved before reaching the C backend
+        var out = "    /* generic_call: should be resolved before C backend */ abort();\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 
