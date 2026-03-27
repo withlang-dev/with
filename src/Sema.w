@@ -3343,8 +3343,14 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> i32:
 
     if kind == NodeKind.NK_TYPE_OPTIONAL:
         let inner = self.resolve_type_expr(self.ast.get_data0(node))
-        // Optional lowering remains deferred in bootstrap sema path.
-        return 0
+        if inner == 0:
+            return 0
+        let opt_sym = self.pool_intern("Option")
+        if not self.named_types.contains(opt_sym):
+            return 0
+        let opt_args: Vec[i32] = Vec.new()
+        opt_args.push(inner)
+        return self.ensure_generic_inst_type(opt_sym, opt_args, 1)
 
     if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
         let trait_sym = self.ast.get_data0(node)
