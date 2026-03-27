@@ -363,5 +363,5 @@ pass/fail. No `@[test]` discovery, no `--filter`.
 | 7 | P2 (i32 fallbacks) | Correctness | Medium-High | **DONE** ✓ |
 | 8 | P11 (split Codegen.w) | Maintainability | Large | **DONE** ✓ |
 | 9 | Phase II-6 (tooling) | User experience | Large | Open |
-| 10 | Phase II-2 (generics) | Correctness | Large | **Partial** |
+| 10 | Phase II-2 (generics) | Correctness | Large | **DONE** ✓ |
 | 11 | Phase II-5 (C backend) | Portability | High | Open |

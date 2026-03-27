@@ -222,7 +222,7 @@ fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32)
 
     // Vec types are created dynamically and not registered in the struct field
     // registry. Resolve their field names by layout: {ptr, len, cap, elem_size}.
-    if self.vec_type_to_elem.contains(agg_ty):
+    if self.vec_is_vec.contains(agg_ty):
         if field_token == self.sym_ptr: return 0
         if field_token == self.sym_len: return 1
         if field_token == self.sym_cap: return 2
@@ -1625,9 +1625,6 @@ fn Codegen.mir_index_elem_llvm_type(self: Codegen, sema_ty: i32, cur_ty: i64) ->
             if elem_llvm != 0:
                 return elem_llvm
     if cur_ty != 0:
-        let vec_elem = self.find_vec_elem_type_by_llvm(cur_ty)
-        if vec_elem != 0:
-            return vec_elem
         if self.is_str_type(cur_ty):
             return wl_i8_type(self.context)
     0
@@ -4169,11 +4166,6 @@ fn Codegen.find_binding_type(self: Codegen, syms: Vec[i32], tys: Vec[i64], sym: 
             return tys.get(i as i64)
     0
 
-fn Codegen.find_vec_elem_type_by_llvm(self: Codegen, vec_ty: i64) -> i64:
-    let elem = self.vec_type_to_elem.get(vec_ty)
-    if elem.is_some():
-        return elem.unwrap()
-    0
 
 fn Codegen.sema_type_mangle(self: Codegen, sema_ty: i32) -> str:
     if sema_ty <= 0:
