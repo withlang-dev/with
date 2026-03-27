@@ -886,8 +886,10 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
         self.typed_expr_types.insert(node, variant_tid)
         return variant_tid
 
-    // Unknown identifier
-    self.emit_error("undefined variable", node)
+    // Unknown identifier — suggest close matches
+    let target_name = self.pool_resolve(sym)
+    let suggestion = self.suggest_name(target_name, node)
+    self.emit_error_with_suggestion("undefined variable", node, suggestion)
     0
 
 fn Sema.check_fstring(self: Sema, node: i32) -> i32:
