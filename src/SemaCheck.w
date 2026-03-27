@@ -1558,11 +1558,13 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
                                 ci_arg2_type = a2_prim
                             else if self.named_types.contains(a2_sym):
                                 ci_arg2_type = self.named_types.get(a2_sym).unwrap()
-                    var ci_cache_key = f"{ci_base_sym}:{ci_arg_type}"
+                    let ci_args: Vec[i32] = Vec.new()
+                    ci_args.push(ci_arg_type)
                     var ci_arg_count = 1
                     if ci_arg2_type > 0:
-                        ci_cache_key = ci_cache_key ++ f":{ci_arg2_type}"
+                        ci_args.push(ci_arg2_type)
                         ci_arg_count = 2
+                    let ci_cache_key = sema_generic_inst_hash(ci_base_sym, ci_args, ci_arg_count)
                     if self.generic_inst_cache.contains(ci_cache_key):
                         let ci_result = self.generic_inst_cache.get(ci_cache_key).unwrap()
                         self.typed_expr_types.insert(node, ci_result)

@@ -229,7 +229,7 @@ type Sema {
     generic_subst_param_syms: Vec[i32],
     generic_subst_type_ids: Vec[i32],
     generic_specialization_cache: HashMap[str, i32],
-    generic_inst_cache: HashMap[str, i32],
+    generic_inst_cache: HashMap[i64, i32],
 
     // Associated type bindings from current impl (for Self.Name resolution)
     assoc_type_bindings: HashMap[i32, i32],
@@ -363,6 +363,9 @@ fn sema_new_map_i32_str -> HashMap[i32, str]:
 fn sema_new_map_str_i32 -> HashMap[str, i32]:
     HashMap.new()
 
+fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
+    HashMap.new()
+
 fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     let named_types = sema_new_map_i32_i32()
     let type_decl_nodes = sema_new_map_i32_i32()
@@ -403,7 +406,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let typed_binding_muts = sema_new_map_i32_i32()
     let typed_dump_seen_nodes = sema_new_map_i32_i32()
     let generic_specialization_cache = sema_new_map_str_i32()
-    let generic_inst_cache = sema_new_map_str_i32()
+    let generic_inst_cache = sema_new_map_i64_i32()
     var s = Sema {
         pool: pool,
         diags: diags,
@@ -969,17 +972,16 @@ fn Sema.ensure_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: Type
         self.type_extra.push(params.get(pi as i64))
     self.add_type(TypeKind.TY_FN, te_start, param_count, ret as i32)
 
-fn Sema.generic_inst_cache_key(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> str:
-    var key = f"{base_sym}"
+fn sema_generic_inst_hash(base_sym: i32, args: Vec[i32], arg_count: i32) -> i64:
+    var h: i64 = base_sym as i64
     for ai in 0..arg_count:
-        let arg_val = args.get(ai as i64)
-        key = key ++ f":{arg_val}"
-    key
+        h = h * 31 + (args.get(ai as i64) as i64)
+    h
 
 fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> TypeId:
-    let cache_key = self.generic_inst_cache_key(base_sym, args, arg_count)
-    if self.generic_inst_cache.contains(cache_key):
-        return self.generic_inst_cache.get(cache_key).unwrap() as TypeId
+    let key = sema_generic_inst_hash(base_sym, args, arg_count)
+    if self.generic_inst_cache.contains(key):
+        return self.generic_inst_cache.get(key).unwrap() as TypeId
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
         if self.type_kinds.get(ti as i64) != TypeKind.TY_GENERIC_INST:
@@ -990,7 +992,7 @@ fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_co
             continue
         let te_start = self.type_d1.get(ti as i64)
         if self.type_extra_matches(te_start, args, arg_count) != 0:
-            self.generic_inst_cache.insert(cache_key, ti)
+            self.generic_inst_cache.insert(key, ti)
             return ti as TypeId
     (0) as TypeId
 
@@ -1004,8 +1006,8 @@ fn Sema.ensure_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_
     for ai in 0..arg_count:
         self.type_extra.push(args.get(ai as i64))
     let tid = self.add_type(TypeKind.TY_GENERIC_INST, base_sym, te_start, arg_count)
-    let cache_key = self.generic_inst_cache_key(base_sym, args, arg_count)
-    self.generic_inst_cache.insert(cache_key, tid as i32)
+    let key = sema_generic_inst_hash(base_sym, args, arg_count)
+    self.generic_inst_cache.insert(key, tid as i32)
     tid
 
 // Look up an existing TypeKind.TY_GENERIC_INST(base_sym, [arg_tid]) in the cache.
@@ -1042,7 +1044,9 @@ fn Sema.preregister_mir_types(self: Sema):
                 let arg_count = self.type_d2.get(ti as i64)
                 if arg_count >= 1:
                     let elem_ty = self.type_extra.get(extra_start as i64)
-                    let vi_key = f"{vi_sym}:{elem_ty}"
+                    let vi_args: Vec[i32] = Vec.new()
+                    vi_args.push(elem_ty)
+                    let vi_key = sema_generic_inst_hash(vi_sym, vi_args, 1)
                     if not self.generic_inst_cache.contains(vi_key):
                         let te_start = self.type_extra.len() as i32
                         self.type_extra.push(elem_ty)
@@ -1050,7 +1054,9 @@ fn Sema.preregister_mir_types(self: Sema):
                         self.generic_inst_cache.insert(vi_key, tid as i32)
 
     // Register Vec[str] for str.split() return type.
-    let vec_str_key = f"{vec_sym}:{self.ty_str as i32}"
+    let vec_str_args: Vec[i32] = Vec.new()
+    vec_str_args.push(self.ty_str as i32)
+    let vec_str_key = sema_generic_inst_hash(vec_sym, vec_str_args, 1)
     if not self.generic_inst_cache.contains(vec_str_key):
         let te_start = self.type_extra.len() as i32
         self.type_extra.push(self.ty_str as i32)
@@ -1058,7 +1064,9 @@ fn Sema.preregister_mir_types(self: Sema):
         self.generic_inst_cache.insert(vec_str_key, tid as i32)
 
     // Also register VecIter[str] in case Vec[str].iter() is called.
-    let vi_str_key = f"{vi_sym}:{self.ty_str as i32}"
+    let vi_str_args: Vec[i32] = Vec.new()
+    vi_str_args.push(self.ty_str as i32)
+    let vi_str_key = sema_generic_inst_hash(vi_sym, vi_str_args, 1)
     if not self.generic_inst_cache.contains(vi_str_key):
         let te_start = self.type_extra.len() as i32
         self.type_extra.push(self.ty_str as i32)
