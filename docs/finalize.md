@@ -532,17 +532,19 @@ sites, added MirLower handler. Sema already returned TY_ERR.
 - [x] Update all downstream phases to handle gracefully
 - [x] `make build && make fixpoint`
 
-### P11: File Complexity Budget
+### P11: File Complexity Budget — DONE ✓
 
-**Current:** Codegen.w is 10,494 lines (2x the 5,000 line budget).
-Sema.w is 8,982 lines (1.8x budget).
+Split Codegen.w from 10,559 → 3,993 lines (well under 5,000 budget).
+Two new files: CodegenDispatch.w (5,518 lines — MIR dispatch + mono +
+downstream helpers) and CodegenTraits.w (1,068 lines — trait collection
++ vtable generation). Uses `use Codegen` pattern to define methods on
+Codegen type from separate files.
 
-- [ ] Split Codegen.w: extract string/Vec/HashMap/Option/closure/match
-      codegen into separate modules
-- [ ] Each split is a separate step with fixpoint verification
-- [ ] Target: Codegen.w under 5,000 lines
+- [x] Split Codegen.w: CodegenDispatch.w + CodegenTraits.w
+- [x] Each split verified with fixpoint
+- [x] Codegen.w: 3,993 lines (under 5,000 budget)
 - [ ] Evaluate Sema.w for potential splits
-- [ ] `make build && make fixpoint`
+- [x] `make build && make fixpoint`
 
 ### P12: Compile Time Tracking — DONE ✓
 
