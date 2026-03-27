@@ -570,7 +570,6 @@ type Codegen {
     // HashMap type cache
     hm_cache_map: HashMap[i64, i64],
     hm_type_to_key: HashMap[i64, i64],
-    hm_type_to_val: HashMap[i64, i64],
 
     // HashSet type cache (elem LLVM type → HashSet LLVM struct type)
     hs_cache_map: HashMap[i64, i64],
@@ -830,7 +829,6 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         vec_type_to_elem: HashMap.new(),
         hm_cache_map: HashMap.new(),
         hm_type_to_key: HashMap.new(),
-        hm_type_to_val: HashMap.new(),
         hs_cache_map: HashMap.new(),
         type_binding_syms: Vec.new(),
         type_binding_types: Vec.new(),
@@ -3373,7 +3371,6 @@ fn Codegen.cache_hashmap_type(self: Codegen, sema_tid: i32, key_ty: i64, val_ty:
         self.hm_cache_map.insert(hash, hm_ty)
         return hm_ty
     self.hm_type_to_key.insert(hm_ty, key_ty)
-    self.hm_type_to_val.insert(hm_ty, val_ty)
     self.hm_cache_map.insert(hash, hm_ty)
     hm_ty
 

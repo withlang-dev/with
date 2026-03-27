@@ -2662,7 +2662,17 @@ fn Codegen.mir_emit_opt_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
     let recv_tk = wl_get_type_kind(obj_ty)
     if recv_tk != wl_struct_type_kind() and recv_tk != wl_pointer_type_kind():
         return recv
-    let payload_ty = if recv_tk == wl_pointer_type_kind(): obj_ty else: self.find_option_payload_type_by_llvm(obj_ty)
+    // Get payload type via sema (Option[T] → T), fallback to LLVM reverse lookup
+    let arg_start_of = body.call_arg_starts.get(args_id as i64)
+    let recv_op_id = body.call_arg_operands.get(arg_start_of as i64)
+    let recv_sema = self.mir_operand_sema_type(body, recv_op_id)
+    var payload_ty: i64 = 0
+    if recv_tk == wl_pointer_type_kind():
+        payload_ty = obj_ty
+    else:
+        payload_ty = self.mir_builtin_variant_payload_llvm_type(recv_sema, 0)
+        if payload_ty == 0:
+            payload_ty = self.find_option_payload_type_by_llvm(obj_ty)
     let elem_ty = if payload_ty != 0: payload_ty else: self.type_fallback()
     let is_some = if recv_tk == wl_pointer_type_kind():
         wl_build_icmp(self.builder, wl_int_ne(), recv, wl_const_null(obj_ty))

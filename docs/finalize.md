@@ -395,8 +395,8 @@ already correct. Remaining: remove redundant codegen parallel tracking.
 
 - [x] Fix generic type erasure (codegen sema_tid cache keys)
 - [x] Generic distinctness test (`behav_generic_distinct.w`)
-- [x] Remove 4 dead cache fields (option_err_types, option_enum_syms,
-      result_enum_syms, hm_type_to_is_str) + 8 lines of dead writes
+- [x] Remove 5 dead cache fields (option_err_types, option_enum_syms,
+      result_enum_syms, hm_type_to_is_str, hm_type_to_val)
 - [ ] Instantiation cache: `(base_type, type_args)` → TypeId
 - [ ] Type substitution function
 - [ ] Delete remaining codegen parallel type tracking (requires threading
