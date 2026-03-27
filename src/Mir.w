@@ -185,6 +185,7 @@ type MirBody {
 
     // Places
     place_locals: Vec[i32],
+    place_sema_types: Vec[i32],
     place_proj_starts: Vec[i32],
     place_proj_counts: Vec[i32],
     proj_kinds: Vec[i32],
@@ -366,6 +367,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         stmt_d1: Vec.new(),
         stmt_spans: Vec.new(),
         place_locals: Vec.new(),
+        place_sema_types: Vec.new(),
         place_proj_starts: Vec.new(),
         place_proj_counts: Vec.new(),
         proj_kinds: Vec.new(),
@@ -456,11 +458,22 @@ fn MirBody.new_temp(self: &mut MirBody, type_id: i32) -> i32:
 fn MirBody.new_place(self: &mut MirBody, local_id: i32) -> i32:
     let id = self.place_locals.len() as i32
     self.place_locals.push(local_id)
+    // Sema type defaults to the local's type (overridden by projected places)
+    let sema_ty = if local_id >= 0 and local_id < self.local_type_ids.len() as i32: self.local_type_ids.get(local_id as i64) else: 0
+    self.place_sema_types.push(sema_ty)
     self.place_proj_starts.push(self.proj_kinds.len() as i32)
     self.place_proj_counts.push(0)
     id
 
-fn MirBody.new_place_with_projection(self: &mut MirBody, base: i32, proj_kind: i32, proj_data: i32) -> i32:
+fn MirBody.new_place_typed(self: &mut MirBody, local_id: i32, sema_ty: i32) -> i32:
+    let id = self.place_locals.len() as i32
+    self.place_locals.push(local_id)
+    self.place_sema_types.push(sema_ty)
+    self.place_proj_starts.push(self.proj_kinds.len() as i32)
+    self.place_proj_counts.push(0)
+    id
+
+fn MirBody.new_place_with_projection(self: &mut MirBody, base: i32, proj_kind: i32, proj_data: i32, sema_ty: i32) -> i32:
     if base < 0 or base >= self.place_locals.len() as i32:
         return self.new_place(0)
 
@@ -478,21 +491,22 @@ fn MirBody.new_place_with_projection(self: &mut MirBody, base: i32, proj_kind: i
 
     let id = self.place_locals.len() as i32
     self.place_locals.push(base_local)
+    self.place_sema_types.push(sema_ty)
     self.place_proj_starts.push(new_proj_start)
     self.place_proj_counts.push(base_proj_count + 1)
     id
 
-fn MirBody.new_field_place(self: &mut MirBody, base: i32, field_idx: i32) -> i32:
-    self.new_place_with_projection(base, ProjKind.PK_FIELD, field_idx)
+fn MirBody.new_field_place(self: &mut MirBody, base: i32, field_idx: i32, sema_ty: i32) -> i32:
+    self.new_place_with_projection(base, ProjKind.PK_FIELD, field_idx, sema_ty)
 
-fn MirBody.new_index_place(self: &mut MirBody, base: i32, idx_local: i32) -> i32:
-    self.new_place_with_projection(base, ProjKind.PK_INDEX, idx_local)
+fn MirBody.new_index_place(self: &mut MirBody, base: i32, idx_local: i32, sema_ty: i32) -> i32:
+    self.new_place_with_projection(base, ProjKind.PK_INDEX, idx_local, sema_ty)
 
 fn MirBody.new_deref_place(self: &mut MirBody, base: i32) -> i32:
-    self.new_place_with_projection(base, ProjKind.PK_DEREF, 0)
+    self.new_place_with_projection(base, ProjKind.PK_DEREF, 0, 0)
 
-fn MirBody.new_downcast_place(self: &mut MirBody, base: i32, variant_idx: i32) -> i32:
-    self.new_place_with_projection(base, ProjKind.PK_DOWNCAST, variant_idx)
+fn MirBody.new_downcast_place(self: &mut MirBody, base: i32, variant_idx: i32, sema_ty: i32) -> i32:
+    self.new_place_with_projection(base, ProjKind.PK_DOWNCAST, variant_idx, sema_ty)
 
 fn MirBody.new_rvalue(self: &mut MirBody, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
     let id = self.rval_kinds.len() as i32

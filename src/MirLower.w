@@ -1373,7 +1373,7 @@ fn MirBuilder.lower_cast(self: MirBuilder, expr: i32, target_type_id: i32, node:
 
 fn MirBuilder.lower_field_access(self: MirBuilder, base_expr: i32, field_idx: i32) -> i32:
     let base = self.lower_field_base_place(base_expr)
-    self.body.new_field_place(base, field_idx)
+    self.body.new_field_place(base, field_idx, 0)
 
 fn MirBuilder.lower_field_base_place(self: MirBuilder, base_expr: i32) -> i32:
     var base = self.lower_expr_place(base_expr)
@@ -1394,7 +1394,7 @@ fn MirBuilder.lower_index(self: MirBuilder, base_expr: i32, index_expr: i32) -> 
     let idx_local = self.new_temp(idx_ty)
     let idx_place = self.place_for_local(idx_local)
     self.assign_operand_to_place(idx_place, idx_op, self.ast.get_start(index_expr))
-    self.body.new_index_place(base, idx_local)
+    self.body.new_index_place(base, idx_local, 0)
 
 fn MirBuilder.lower_vec_literal_push(self: MirBuilder, vec_place: i32, elem_node: i32, elem_ty: i32):
     if elem_node == 0:
@@ -1486,7 +1486,7 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         let base = self.lower_field_base_place(self.ast.get_data0(node))
         let field_sym = self.ast.get_data1(node)
         // Field symbol is mapped deterministically to a projection index by symbol value.
-        return self.body.new_field_place(base, field_sym)
+        return self.body.new_field_place(base, field_sym, 0)
 
     if kind == NodeKind.NK_INDEX:
         if self.vec_literal_type(node) != 0:
@@ -1552,7 +1552,7 @@ fn MirBuilder.lower_tuple_destructure(self: MirBuilder, node: i32):
         let local_id = self.body.new_local(elem_ty, 0, n_sym, 1)
         self.bind_local(n_sym, local_id)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(node))
-        let field_place = self.body.new_field_place(rhs_place, ni)
+        let field_place = self.body.new_field_place(rhs_place, ni, 0)
         let field_op = self.body.new_operand(OperandKind.OK_COPY, field_place)
         let dst_place = self.place_for_local(local_id)
         self.assign_operand_to_place(dst_place, field_op, self.ast.get_start(node))
@@ -1993,7 +1993,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, pat_or_sym: i32, iter_expr: i32,
 
     // Body: bind element = slice[counter]
     self.switch_to(body_bb)
-    let idx_place = self.body.new_index_place(slice_place, counter_local)
+    let idx_place = self.body.new_index_place(slice_place, counter_local, 0)
     let elem_op = self.body.new_operand(OperandKind.OK_COPY, idx_place)
 
     if pat_or_sym != 0:
@@ -2219,7 +2219,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
                 disc_idx = self.sema.disc_values.get(variant_sym).unwrap()
         var success_bb = arm_bb
         var needs_payload_checks = false
-        let variant_place = self.body.new_downcast_place(scrutinee_place, variant_idx)
+        let variant_place = self.body.new_downcast_place(scrutinee_place, variant_idx, 0)
         for bi in 0..payload_count:
             let inner_pat = self.pattern_payload_node(pat_node, self.ast.get_extra(payload_start + bi))
             if inner_pat == 0:
@@ -2248,7 +2248,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             let inner_pk = self.ast.kind(inner_pat)
             if inner_pk == NodeKind.NK_PAT_WILDCARD or inner_pk == NodeKind.NK_PAT_IDENT:
                 continue
-            let field_place = self.body.new_field_place(variant_place, bi)
+            let field_place = self.body.new_field_place(variant_place, bi, 0)
             let next_test_bb = self.new_block()
             self.switch_to(cur_test_bb)
             self.lower_pattern_match(field_place, inner_pat, next_test_bb, fail_bb)
@@ -2321,7 +2321,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             let elem_pk = self.ast.kind(elem_pat)
             if elem_pk == NodeKind.NK_PAT_WILDCARD or elem_pk == NodeKind.NK_PAT_IDENT:
                 continue
-            let elem_place = self.body.new_field_place(scrutinee_place, ti)
+            let elem_place = self.body.new_field_place(scrutinee_place, ti, 0)
             let next_test = self.new_block()
             self.switch_to(cur_test_bb)
             self.lower_pattern_match(elem_place, elem_pat, next_test, fail_bb)
@@ -2436,10 +2436,10 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let variant_sym = self.ast.get_data0(pat_node)
         let bind_start = self.ast.get_data1(pat_node)
         let bind_count = self.ast.get_data2(pat_node)
-        let variant_place = self.body.new_downcast_place(scrutinee_place, self.variant_index(variant_sym))
+        let variant_place = self.body.new_downcast_place(scrutinee_place, self.variant_index(variant_sym), 0)
         for bi in 0..bind_count:
             let raw = self.ast.get_extra(bind_start + bi)
-            let field_place = self.body.new_field_place(variant_place, bi)
+            let field_place = self.body.new_field_place(variant_place, bi, 0)
             let inner_pat = self.pattern_payload_node(pat_node, raw)
             if inner_pat != 0:
                 let inner = self.lower_pattern(inner_pat, field_place)
@@ -2463,7 +2463,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let t_count = self.ast.get_data1(pat_node)
         for ti in 0..t_count:
             let elem_pat = self.ast.get_extra(t_start + ti)
-            let field_place = self.body.new_field_place(scrutinee_place, ti)
+            let field_place = self.body.new_field_place(scrutinee_place, ti, 0)
             let inner = self.lower_pattern(elem_pat, field_place)
             for i in 0..inner.len() as i32:
                 out.push(inner.get(i as i64))
@@ -2475,7 +2475,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         for si in 0..s_count:
             let field_name = self.ast.get_extra(s_start + 1 + si * 2)
             let field_pat = self.ast.get_extra(s_start + 1 + si * 2 + 1)
-            let field_place = self.body.new_field_place(scrutinee_place, field_name)
+            let field_place = self.body.new_field_place(scrutinee_place, field_name, 0)
             if field_pat != 0:
                 let inner = self.lower_pattern(field_pat, field_place)
                 for i in 0..inner.len() as i32:
@@ -2544,7 +2544,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             let sym = self.ast.get_extra(sp_extra + 1 + si)
             if sym == 0:
                 continue
-            let field_place = self.body.new_field_place(scrutinee_place, si)
+            let field_place = self.body.new_field_place(scrutinee_place, si, 0)
             let local_id = self.body.new_local(sp_elem_ty, 0, sym, 1)
             self.bind_local(sym, local_id)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
@@ -2559,7 +2559,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             if sym == 0:
                 continue
             let field_idx = sp_arr_len - sp_tail_count + ti
-            let field_place = self.body.new_field_place(scrutinee_place, field_idx)
+            let field_place = self.body.new_field_place(scrutinee_place, field_idx, 0)
             let local_id = self.body.new_local(sp_elem_ty, 0, sym, 1)
             self.bind_local(sym, local_id)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
@@ -3072,8 +3072,8 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
     self.switch_to(pass_bb)
     let result_local = self.new_temp(result_ty)
     let result_place = self.place_for_local(result_local)
-    let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index())
-    let payload_place = self.body.new_field_place(downcast_place, 0)
+    let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(), 0)
+    let payload_place = self.body.new_field_place(downcast_place, 0, 0)
     let pass_op = self.body.new_operand(if self.sema.is_copy(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, payload_place)
     self.assign_operand_to_place(result_place, pass_op, self.ast.get_start(expr))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -3109,8 +3109,8 @@ fn MirBuilder.lower_double_question(self: MirBuilder, expr: i32, default_expr: i
     let result_place = self.place_for_local(result_local)
 
     self.switch_to(some_bb)
-    let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index())
-    let payload_place = self.body.new_field_place(downcast_place, 0)
+    let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(), 0)
+    let payload_place = self.body.new_field_place(downcast_place, 0, 0)
     let some_op = self.body.new_operand(if self.sema.is_copy(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, payload_place)
     self.assign_operand_to_place(result_place, some_op, self.ast.get_start(expr))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -3207,7 +3207,7 @@ fn MirBuilder.lower_record_update(self: MirBuilder, base_expr: i32, field_update
                 self.expected_type = field_ty
             let f_val = self.lower_expr(f_val_node)
             self.expected_type = saved_expected
-            let field_place = self.body.new_field_place(base_place, f_name_sym)
+            let field_place = self.body.new_field_place(base_place, f_name_sym, 0)
             let field_rv = self.body.new_rvalue(RvalueKind.RK_USE, f_val, 0, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, field_place, field_rv, self.ast.get_start(node))
     self.body.new_operand(OperandKind.OK_COPY, base_place)
@@ -3296,7 +3296,7 @@ fn MirBuilder.lower_optional_chain(self: MirBuilder, node: i32) -> i32:
         self.terminate(TermKind.TK_CALL, self.unit_operand(), args_id, result_place, call_next_bb)
         self.switch_to(call_next_bb)
     else:
-        let field_place = self.body.new_field_place(base_place, member_sym)
+        let field_place = self.body.new_field_place(base_place, member_sym, 0)
         let field_op = self.body.new_operand(OperandKind.OK_COPY, field_place)
         self.assign_operand_to_place(result_place, field_op, self.ast.get_start(node))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
