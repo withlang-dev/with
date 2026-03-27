@@ -1525,7 +1525,7 @@ fn Sema.compute_method_origins(self: Sema):
                     break
                 let fn_name = self.ast.get_data0(md)
                 self.method_decl_origins.insert(j, origin)
-                self.method_impl_nodes.insert(fn_name, decl)
+                self.method_impl_nodes.insert(fn_name, decl as i32)
                 self.method_symbol_flags.insert(fn_name, 1)
                 if origin == 0:
                     self.method_has_inherent.insert(fn_name, 1)
@@ -2877,12 +2877,12 @@ fn Sema.type_is_dyn_object(self: Sema, tid: i32) -> i32:
         return self.type_is_dyn_object(self.get_type_d0(resolved))
     0
 
-fn Sema.find_trait_decl_node(self: Sema, trait_sym: i32) -> i32:
+fn Sema.find_trait_decl_node(self: Sema, trait_sym: i32) -> NodeId:
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NodeKind.NK_TRAIT_DECL and self.ast.get_data0(decl) == trait_sym:
             return decl
-    0
+    (0) as NodeId
 
 fn Sema.emit_trait_object_safety_error(self: Sema, trait_sym: i32, method_sym: i32, reason: str, node: i32):
     let trait_name = self.pool_resolve(trait_sym)
@@ -8036,7 +8036,7 @@ fn Sema.emit_argument_type_mismatch(self: Sema, call_name: str, fn_sym: i32, arg
     let primary = Span { file: self.local_file_id, start: start, end: end }
     let expected_name = self.type_name(expected_ty)
     let actual_name = self.type_name(actual_ty)
-    let expr_text = render_expr(self.ast, self.pool, arg_node, 0)
+    let expr_text = render_expr(self.ast, self.pool, (arg_node) as NodeId, 0)
     var msg = "wrong argument type"
     if call_name.len() > 0:
         msg = msg ++ " in call to '" ++ call_name ++ "'"

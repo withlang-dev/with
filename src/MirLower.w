@@ -3928,7 +3928,7 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
         // with lowering_failed=1 and fall back to AST codegen.
 
         var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
-        let body = lower_fn(builder, decl)
+        let body = lower_fn(builder, decl as i32)
         mir_mod.add_body(body)
 
     mir_mod

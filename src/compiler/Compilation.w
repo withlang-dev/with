@@ -68,7 +68,7 @@ fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
             kind_name = "distinct"
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)
-        let msg = f"[type-names] {stage} decl={di} node={decl} kind={kind_name} name_sym={name_sym} name={name}"
+        let msg = f"[type-names] {stage} decl={di} node={decl as i32} kind={kind_name} name_sym={name_sym} name={name}"
         with_eprintln(msg)
 
 // Transitional orchestration root:

@@ -85,7 +85,7 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
             kind_name = "distinct"
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)
-        let msg = f"[type-names] {stage} decl={di} node={decl} kind={kind_name} name_sym={name_sym} name={name}"
+        let msg = f"[type-names] {stage} decl={di} node={decl as i32} kind={kind_name} name_sym={name_sym} name={name}"
         with_eprintln(msg)
 
 fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
@@ -111,7 +111,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for i in 0..base_count:
         let decl = out.get_decl(i)
         if out.kind(decl) != NodeKind.NK_C_IMPORT:
-            ordered.push(decl)
+            ordered.push(decl as i32)
             ordered_paths.push(self.decl_source_path_frontend(i))
             ordered_file_ids.push(self.decl_source_file_id_frontend(i))
             let ci_f = if i < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(i as i64) else: 0
@@ -121,7 +121,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         // Preserve the original c_import declaration as an ownership marker so
         // later sema passes can still tell which modules directly use c_import,
         // even if header expansion is deduplicated elsewhere in the merged AST.
-        ordered.push(decl)
+        ordered.push(decl as i32)
         ordered_paths.push(self.decl_source_path_frontend(i))
         ordered_file_ids.push(self.decl_source_file_id_frontend(i))
         ordered_ci.push(0)
@@ -184,7 +184,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let ci_owner_file_id = self.decl_source_file_id_frontend(i)
         var di = before
         while di < after:
-            ordered.push(out.get_decl(di))
+            ordered.push(out.get_decl(di) as i32)
             ordered_paths.push(ci_owner_path)
             ordered_file_ids.push(ci_owner_file_id)
             ordered_ci.push(1)  // c_import origin
@@ -876,7 +876,7 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for i in 0..out.decl_count():
         let decl = out.get_decl(i)
         if out.kind(decl) != NodeKind.NK_USE_DECL:
-            ordered.push(decl)
+            ordered.push(decl as i32)
             ordered_paths.push(self.decl_source_path_frontend(i))
             ordered_file_ids.push(self.decl_source_file_id_frontend(i))
             let ci_flag = if i < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(i as i64) else: 0
@@ -931,7 +931,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             let decl = merged_pool.get_decl(pi)
             let kind = merged_pool.kind(decl)
             if kind != NodeKind.NK_USE_DECL:
-                prelude_ordered.push(decl)
+                prelude_ordered.push(decl as i32)
                 prelude_paths.push(self.decl_source_path_frontend(pi))
                 prelude_file_ids.push(self.decl_source_file_id_frontend(pi))
                 pi = pi + 1
@@ -956,7 +956,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let decl = merged_pool.get_decl(ui)
         let kind = merged_pool.kind(decl)
         if kind != NodeKind.NK_USE_DECL:
-            root_ordered.push(decl)
+            root_ordered.push(decl as i32)
             root_paths.push(self.decl_source_path_frontend(ui))
             root_file_ids.push(self.decl_source_file_id_frontend(ui))
             continue
@@ -977,7 +977,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let decl = merged_pool.get_decl(ui2)
         let kind = merged_pool.kind(decl)
         if kind != NodeKind.NK_USE_DECL:
-            user_import_ordered.push(decl)
+            user_import_ordered.push(decl as i32)
             user_import_paths.push(self.decl_source_path_frontend(ui2))
             user_import_file_ids.push(self.decl_source_file_id_frontend(ui2))
             ui2 = ui2 + 1
