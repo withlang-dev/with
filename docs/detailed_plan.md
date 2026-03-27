@@ -360,7 +360,7 @@ pass/fail. No `@[test]` discovery, no `--filter`.
 | 4 | P8 (poisoned nodes) | Error quality | Medium | **DONE** ✓ |
 | 5 | Phase 6.1 (builtin traits) | Code quality | Medium | **DONE** ✓ |
 | 6 | Phase 6.2 (pre-intern) | Performance | Medium | **DONE** ✓ |
-| 7 | P2 (i32 fallbacks) | Correctness | Medium-High | Open |
+| 7 | P2 (i32 fallbacks) | Correctness | Medium-High | **DONE** ✓ |
 | 8 | P11 (split Codegen.w) | Maintainability | Large | Open |
 | 9 | Phase II-6 (tooling) | User experience | Large | Open |
 | 10 | Phase II-2 (generics) | Correctness | Large | Open |

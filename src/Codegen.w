@@ -883,6 +883,14 @@ fn Codegen.print_ir(self: Codegen):
 fn Codegen.verify(self: Codegen) -> i32:
     wl_verify_module(self.llmod)
 
+// ── Type fallback helper ─────────────────────────────────────────
+
+// Returns i32 type as a fallback when type resolution fails.
+// Sets had_error so the compilation is marked as failed.
+fn Codegen.type_fallback(self: Codegen) -> i64:
+    self.had_error = 1
+    wl_i32_type(self.context)
+
 // ── Debug info helpers ────────────────────────────────────────────
 
 fn Codegen.debug_init_module(self: Codegen):
@@ -2104,7 +2112,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
 
     // Fallback — always warn so silent miscompilation is visible
     with_eprintln(f"warning: [type-resolve] unhandled type node kind={kind} node={type_node} span={self.pool.get_start(type_node)}..{self.pool.get_end(type_node)}")
-    wl_i32_type(self.context)
+    self.type_fallback()
 
 fn Codegen.resolve_primitive_named_type(self: Codegen, sym: i32) -> i64:
     if sym == self.sym_bool: return wl_i1_type(self.context)
@@ -2261,7 +2269,7 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
                 if ti < arg_count:
                     arg_ty = self.sema_type_to_llvm(self.sema.get_generic_inst_arg(resolved_tid, ti))
                 if arg_ty == 0:
-                    arg_ty = wl_i32_type(self.context)
+                    arg_ty = self.type_fallback()
                 tp_types.push(arg_ty)
             self.type_binding_syms = tp_syms
             self.type_binding_types = tp_types
@@ -2286,6 +2294,7 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             return wl_i64_type(self.context)
         if bits == 128:
             return wl_i128_type(self.context)
+        // bits == 0 means default-width int, which is i32
         return wl_i32_type(self.context)
     if tk == TypeKind.TY_BOOL:
         return wl_i1_type(self.context)
@@ -2901,7 +2910,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         self.current_method_owner_sym = method_owner_sym
 
     let ret_ty_raw = self.resolve_type(ret_type_node)
-    let ret_ty = if ret_ty_raw != 0: ret_ty_raw else: wl_i32_type(self.context)
+    let ret_ty = if ret_ty_raw != 0: ret_ty_raw else: self.type_fallback()
 
     // Check if this returns Result
     if self.is_result_return_type(ret_type_node):
@@ -2918,7 +2927,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         let p_name = self.pool.fn_param_name(param_start, pi)
         let p_type_node = self.pool.fn_param_type(param_start, pi)
         if p_type_node == 0:
-            param_types.push(wl_i32_type(self.context))
+            param_types.push(self.type_fallback())
             pi = pi + 1
             continue
 
@@ -2960,7 +2969,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         if trait_sym != 0:
             var dyn_ty = self.resolve_type(p_type_node)
             if dyn_ty == 0:
-                dyn_ty = wl_i32_type(self.context)
+                dyn_ty = self.type_fallback()
             param_types.push(dyn_ty)
             self.record_dyn_param(name_sym, pi, param_count, trait_sym)
             if alias_sym != 0:
@@ -3292,7 +3301,7 @@ fn Codegen.get_or_create_context_error_type(self: Codegen, source_ty: i64) -> i6
         let str_ty = self.struct_llvm_types.get(st_opt.unwrap() as i64)
         body.push(str_ty)
     else:
-        body.push(wl_i32_type(self.context))
+        body.push(self.type_fallback())
     body.push(source_ty)
     wl_struct_type(self.context, vec_data_i64(&body), 2, 0)
 
@@ -3440,10 +3449,10 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
                     bound_ty = self.type_binding_types.get(bi as i64)
                     break
             if bound_ty == 0:
-                bound_ty = wl_i32_type(self.context)
+                bound_ty = self.type_fallback()
             arg_types.push(bound_ty)
     while arg_types.len() as i32 < tp_count:
-        arg_types.push(wl_i32_type(self.context))
+        arg_types.push(self.type_fallback())
 
     let base_name = self.intern.resolve(name_sym)
     var mangled = base_name
@@ -3498,7 +3507,7 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
             with_eprintln("error: unresolved type for field '" ++ self.intern.resolve(f_name) ++ "' in struct '" ++ base_name ++ "'")
             invalid_layout = 1
             self.had_error = 1
-            f_ty = wl_i32_type(self.context)
+            f_ty = self.type_fallback()
         self.struct_field_names.push(f_name)
         self.struct_field_types.push(f_ty)
         self.struct_field_type_nodes.push(f_type_node)
@@ -3578,7 +3587,7 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
         if p_type_node != 0:
             var p_ty = self.resolve_type(p_type_node)
             if p_ty == 0:
-                p_ty = wl_i32_type(self.context)
+                p_ty = self.type_fallback()
             // Methods pass struct self as pointer
             if pi == 0:
                 let p_kind = self.pool.kind(p_type_node)
@@ -3597,10 +3606,10 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
                         p_ty = wl_ptr_type(self.context)
             mono_param_types.push(p_ty)
         else:
-            mono_param_types.push(wl_i32_type(self.context))
+            mono_param_types.push(self.type_fallback())
 
     let mono_ret_ty_raw = self.resolve_type(ret_type_node)
-    let mono_ret_ty = if mono_ret_ty_raw != 0: mono_ret_ty_raw else: wl_i32_type(self.context)
+    let mono_ret_ty = if mono_ret_ty_raw != 0: mono_ret_ty_raw else: self.type_fallback()
 
     let mono_ft = wl_function_type(mono_ret_ty, vec_data_i64(&mono_param_types), param_count, 0)
     let mono_fn = wl_add_function(self.llmod, mangled, mono_ft)
@@ -4231,7 +4240,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
                 continue
         var p_ty = self.resolve_trait_method_type_for_impl(p_type_node, impl_type_sym)
         if p_ty == 0:
-            p_ty = wl_i32_type(self.context)
+            p_ty = self.type_fallback()
         param_types.push(p_ty)
 
     let ret_ty = if ret_node != 0:
@@ -5130,7 +5139,7 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
             let elem_tid = self.mir_input.mir_get_type_extra(te_start + i)
             var elem_llvm = self.mir_sema_type_to_llvm(elem_tid)
             if elem_llvm == 0:
-                elem_llvm = wl_i32_type(self.context)
+                elem_llvm = self.type_fallback()
             elem_types.push(elem_llvm)
         if te_count > 0:
             return wl_struct_type(self.context, vec_data_i64(&elem_types), te_count, 0)
@@ -5140,7 +5149,7 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
         let arr_len = self.mir_input.mir_get_type_d1(resolved)
         var arr_elem_llvm = self.mir_sema_type_to_llvm(arr_elem_tid)
         if arr_elem_llvm == 0:
-            arr_elem_llvm = wl_i32_type(self.context)
+            arr_elem_llvm = self.type_fallback()
         return wl_array_type(arr_elem_llvm, arr_len as i64)
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
         return wl_ptr_type(self.context)
@@ -5188,14 +5197,14 @@ fn Codegen.mir_build_closure_fn_type(self: Codegen, sema_ty: i32) -> i64:
         if p_llvm_ty != 0:
             param_types.push(p_llvm_ty)
         else:
-            param_types.push(wl_i32_type(self.context))
+            param_types.push(self.type_fallback())
     wl_function_type(llvm_ret, vec_data_i64(&param_types), param_count + 1, 0)
 
 fn Codegen.mir_get_or_create_local_ptr(self: Codegen, local_id: i32, ty: i64) -> i64:
     let existing = self.mir_local_ptrs.get(local_id)
     if existing.is_some():
         return existing.unwrap() as i64
-    let alloc_ty = if ty != 0: ty else: wl_i32_type(self.context)
+    let alloc_ty = if ty != 0: ty else: self.type_fallback()
     let ptr = self.create_entry_alloca(alloc_ty)
     self.mir_local_ptrs.insert(local_id, ptr)
     ptr
@@ -5416,7 +5425,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
     if cur_ptr == 0:
         if create_base:
             cur_ptr = self.mir_get_or_create_local_ptr(base_local, create_type)
-            let alloc_ty = if create_type != 0: create_type else: wl_i32_type(self.context)
+            let alloc_ty = if create_type != 0: create_type else: self.type_fallback()
             self.mir_local_types.insert(base_local, alloc_ty)
             let _ = self.mir_try_init_const_local(body, base_local, cur_ptr, alloc_ty)
         else:
@@ -7695,7 +7704,7 @@ fn Codegen.mir_emit_opt_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
     if recv_tk != wl_struct_type_kind() and recv_tk != wl_pointer_type_kind():
         return recv
     let payload_ty = if recv_tk == wl_pointer_type_kind(): obj_ty else: self.find_option_payload_type_by_llvm(obj_ty)
-    let elem_ty = if payload_ty != 0: payload_ty else: wl_i32_type(self.context)
+    let elem_ty = if payload_ty != 0: payload_ty else: self.type_fallback()
     let is_some = if recv_tk == wl_pointer_type_kind():
         wl_build_icmp(self.builder, wl_int_ne(), recv, wl_const_null(obj_ty))
     else:
@@ -9512,8 +9521,8 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
         else if pi < arg_count:
             mono_param_types.push(arg_tys.get(pi as i64))
         else:
-            mono_param_types.push(wl_i32_type(self.context))
-    let mono_ret_ty = if ret_type_node != 0: self.resolve_type(ret_type_node) else: wl_i32_type(self.context)
+            mono_param_types.push(self.type_fallback())
+    let mono_ret_ty = if ret_type_node != 0: self.resolve_type(ret_type_node) else: self.type_fallback()
     if mono_ret_ty == 0:
         self.type_binding_syms = saved_bind_syms
         self.type_binding_types = saved_bind_tys
