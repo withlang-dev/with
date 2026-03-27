@@ -1512,6 +1512,92 @@ fn sema_str_contains_char(text: str, needle: i32) -> i32:
             return 1
     0
 
+// ── "Did you mean?" suggestions ─────────────────────────────────
+
+fn sema_levenshtein(a: str, b: str, max: i32) -> i32:
+    let al = a.len() as i32
+    let bl = b.len() as i32
+    if al == 0: return bl
+    if bl == 0: return al
+    let diff = if al > bl: al - bl else: bl - al
+    if diff > max: return max + 1
+    // Single-row DP with early exit
+    var prev: Vec[i32] = Vec.new()
+    for j in 0..bl + 1:
+        prev.push(j)
+    for i in 1..al + 1:
+        var row_min = max + 1
+        var cur: Vec[i32] = Vec.new()
+        cur.push(i)
+        for j in 1..bl + 1:
+            let cost = if a[(i - 1) as i64] == b[(j - 1) as i64]: 0 else: 1
+            let del = prev.get(j as i64) + 1
+            let ins = cur.get((j - 1) as i64) + 1
+            let sub = prev.get((j - 1) as i64) + cost
+            var best = del
+            if ins < best: best = ins
+            if sub < best: best = sub
+            cur.push(best)
+            if best < row_min: row_min = best
+        prev = cur
+        if row_min > max: return max + 1
+    prev.get(bl as i64)
+
+fn Sema.suggest_name(self: Sema, target: str, node: i32) -> str:
+    if target.len() == 0: return ""
+    let max_dist = if target.len() as i32 <= 3: 1 else: 2
+    var best_name = ""
+    var best_dist = max_dist + 1
+    // Search scope bindings
+    for idx in 0..self.bind_names.len():
+        let sym = self.bind_names.get(idx)
+        let name = self.pool_resolve(sym)
+        if name.len() > 0:
+            let d = sema_levenshtein(target, name, max_dist)
+            if d < best_dist:
+                best_dist = d
+                best_name = name
+    // Search function signatures
+    for si in 0..self.sig_names.len():
+        let sym = self.sig_names.get(si)
+        if self.is_ci_visible(sym) != 0:
+            let name = self.pool_resolve(sym)
+            if name.len() > 0:
+                let d = sema_levenshtein(target, name, max_dist)
+                if d < best_dist:
+                    best_dist = d
+                    best_name = name
+    best_name
+
+fn Sema.suggest_type_name(self: Sema, target: str, node: i32) -> str:
+    if target.len() == 0: return ""
+    let max_dist = if target.len() as i32 <= 3: 1 else: 2
+    var best_name = ""
+    var best_dist = max_dist + 1
+    // Search named types by scanning type table
+    for ti in 1..self.type_kinds.len():
+        let tk = self.type_kinds.get(ti)
+        if tk == TypeKind.TY_STRUCT as i32 or tk == TypeKind.TY_ENUM as i32:
+            let sym = self.type_d0.get(ti)
+            if sym > 0:
+                let name = self.pool_resolve(sym)
+                if name.len() > 0 and not sema_str_contains_char(name, 46) != 0:
+                    let d = sema_levenshtein(target, name, max_dist)
+                    if d < best_dist:
+                        best_dist = d
+                        best_name = name
+    best_name
+
+fn Sema.emit_error_with_suggestion(self: Sema, msg: str, node: i32, suggestion: str):
+    if self.suppress_errors != 0:
+        return
+    let start = self.ast.get_start(node)
+    let end = self.ast.get_end(node)
+    let diag = Diagnostic.err(msg, Span { file: self.local_file_id, start: start, end: end })
+    if suggestion.len() > 0:
+        diag.add_help("did you mean '" ++ suggestion ++ "'?")
+    self.diags.emit(diag)
+
 // ── Type compatibility ───────────────────────────────────────────
 
 fn Sema.types_compatible_fast(self: Sema, expected: TypeId, actual: TypeId) -> i32:
