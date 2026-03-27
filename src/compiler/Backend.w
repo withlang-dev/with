@@ -1,5 +1,7 @@
 use Ast
 use Codegen
+use CodegenDispatch
+use CodegenTraits
 use compiler.Zcu
 
 extern fn with_eprintln(s: str) -> void

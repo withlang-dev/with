@@ -361,7 +361,7 @@ pass/fail. No `@[test]` discovery, no `--filter`.
 | 5 | Phase 6.1 (builtin traits) | Code quality | Medium | **DONE** ✓ |
 | 6 | Phase 6.2 (pre-intern) | Performance | Medium | **DONE** ✓ |
 | 7 | P2 (i32 fallbacks) | Correctness | Medium-High | **DONE** ✓ |
-| 8 | P11 (split Codegen.w) | Maintainability | Large | Open |
+| 8 | P11 (split Codegen.w) | Maintainability | Large | **DONE** ✓ |
 | 9 | Phase II-6 (tooling) | User experience | Large | Open |
 | 10 | Phase II-2 (generics) | Correctness | Large | Open |
 | 11 | Phase II-5 (C backend) | Portability | High | Open |
