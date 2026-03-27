@@ -3,6 +3,9 @@ use Lexer
 use Parser
 use Source
 use Sema
+use SemaDecl
+use SemaCheck
+use SemaDiag
 use Resolve
 use Span
 use Diagnostic
