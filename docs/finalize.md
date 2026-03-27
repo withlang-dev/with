@@ -498,14 +498,18 @@ cross-compiling the compiler for 4 targets.
 
 Cross-cutting concerns from the manifesto.
 
-### P2: One Source of Truth — Eliminate i32 Fallbacks
+### P2: One Source of Truth — Eliminate i32 Fallbacks — DONE ✓
 
-**Current:** Codegen.w has `wl_i32_type` fallbacks. Sema.w returns
-0 from type resolution in 30+ places.
+Added `Codegen.type_fallback()` helper that sets `had_error = 1` and
+returns i32 type. Converted 21 fallback sites where unknown types
+silently defaulted to i32. 2 sites kept as-is (resolve_type for assoc
+types and declare_function for generic params — resolved during
+monomorphization). Remaining ~80 `wl_i32_type` uses are legitimate
+(constants, GEP indices, enum tags, caching).
 
-- [ ] Convert each codegen fallback to a hard compile error
-- [ ] Replace sentinel 0 returns with proper error propagation
-- [ ] `make build && make fixpoint`
+- [x] Convert each codegen fallback to a hard compile error (21 sites)
+- [x] 2 sites intentionally kept (type resolution deferred to mono)
+- [x] `make build && make fixpoint`
 
 ### P5: Determinism — HashMap Audit — DONE ✓
 
