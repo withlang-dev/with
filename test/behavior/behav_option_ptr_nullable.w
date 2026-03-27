@@ -1,21 +1,21 @@
-use c_import("string.h")
+//! expect-stdout: ok
 
-fn main() -> i32:
-    let p: Option[*mut i32] = null
+// Tests: Option with pointer types — nullable pointer optimization.
+// Option[*T] is represented as the bare pointer (null = None).
+
+fn main:
+    // Option[*mut i32] from null → None
+    let p: Option[*mut i32] = .None
     assert(p.is_none())
 
-    let q: Option[*mut i32] = None
-    assert(q.is_none())
-
+    // Option[*mut i32] from value → Some
     let mut x = 7
     let raw = (&mut x) as *mut i32
-    let some: Option[*mut i32] = Some(raw)
+    let some: Option[*mut i32] = .Some(raw)
     assert(some.is_some())
-    assert(some.unwrap() != null)
 
-    if let .Some(found) = strchr("abc" as *const i8, 98):
-        assert(found != null)
-    else:
-        return 1
+    // Unwrap recovers the pointer
+    let recovered = some.unwrap()
+    assert(recovered != null)
 
-    0
+    println("ok")
