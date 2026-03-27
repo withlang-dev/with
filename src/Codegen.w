@@ -463,16 +463,11 @@ type Codegen {
     expected_type: i64,
     expected_type_node: i32,
 
-    // Option type cache: payload_type → index
-    option_cache_map: HashMap[i64, i32],
-    option_llvm_types: Vec[i64],
-    option_payload_types: Vec[i64],
+    // Option type cache: sema_tid/payload_ty → LLVM type
+    option_cache_map: HashMap[i64, i64],
 
-    // Result type cache: "ok_ty:err_ty" → index
-    result_cache_map: HashMap[str, i32],
-    result_llvm_types: Vec[i64],
-    result_ok_types: Vec[i64],
-    result_err_types: Vec[i64],
+    // Result type cache: "sema_tid" or "ok_ty:err_ty" → LLVM type
+    result_cache_map: HashMap[str, i64],
 
     // Slice element types: sym → elem LLVM type
     slice_elem_types: HashMap[i32, i64],
@@ -764,12 +759,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         expected_type: 0,
         expected_type_node: 0,
         option_cache_map: HashMap.new(),
-        option_llvm_types: Vec.new(),
-        option_payload_types: Vec.new(),
         result_cache_map: HashMap.new(),
-        result_llvm_types: Vec.new(),
-        result_ok_types: Vec.new(),
-        result_err_types: Vec.new(),
         slice_elem_types: HashMap.new(),
         enum_local_types: HashMap.new(),
         drop_fn_values: HashMap.new(),
@@ -3238,8 +3228,7 @@ fn Codegen.get_or_create_option_type(self: Codegen, sema_tid: i32, payload_ty: i
     let cache_key = if sema_tid > 0: sema_tid as i64 else: payload_ty
     let cached = self.option_cache_map.get(cache_key)
     if cached.is_some():
-        let idx = cached.unwrap()
-        return self.option_llvm_types.get(idx as i64)
+        return cached.unwrap()
 
     // Option[T] = { i32 tag, T payload }
     let body: Vec[i64] = Vec.new()
@@ -3247,19 +3236,14 @@ fn Codegen.get_or_create_option_type(self: Codegen, sema_tid: i32, payload_ty: i
     if payload_ty != 0:
         body.push(payload_ty)
     let opt_type = wl_struct_type(self.context, vec_data_i64(&body), body.len() as i32, 0)
-
-    let idx = self.option_llvm_types.len() as i32
-    self.option_llvm_types.push(opt_type)
-    self.option_payload_types.push(payload_ty)
-    self.option_cache_map.insert(cache_key, idx)
+    self.option_cache_map.insert(cache_key, opt_type)
     opt_type
 
 fn Codegen.get_or_create_result_type(self: Codegen, sema_tid: i32, ok_ty: i64, err_ty: i64) -> i64:
     let cache_key = if sema_tid > 0: f"{sema_tid}" else: f"{ok_ty}:{err_ty}"
     let cached = self.result_cache_map.get(cache_key)
     if cached.is_some():
-        let idx = cached.unwrap()
-        return self.result_llvm_types.get(idx as i64)
+        return cached.unwrap()
 
     let ok_size = self.abi_size_of(ok_ty)
     let err_size = self.abi_size_of(err_ty)
@@ -3271,12 +3255,7 @@ fn Codegen.get_or_create_result_type(self: Codegen, sema_tid: i32, ok_ty: i64, e
     if max_size > 0:
         body.push(wl_array_type(wl_i8_type(self.context), max_size))
     let res_type = wl_struct_type(self.context, vec_data_i64(&body), body.len() as i32, 0)
-
-    let idx = self.result_llvm_types.len() as i32
-    self.result_llvm_types.push(res_type)
-    self.result_ok_types.push(ok_ty)
-    self.result_err_types.push(err_ty)
-    self.result_cache_map.insert(cache_key, idx)
+    self.result_cache_map.insert(cache_key, res_type)
     res_type
 
 fn Codegen.get_or_create_context_error_type(self: Codegen, source_ty: i64) -> i64:
@@ -3646,7 +3625,7 @@ fn Codegen.build_option_some(self: Codegen, payload: i64, opt_type: i64) -> i64:
     let elem_count = wl_count_struct_elem_types(opt_type)
     if elem_count > 1:
         let payload_ptr = wl_build_struct_gep(self.builder, opt_type, alloca, 1)
-        let payload_ty = self.find_option_payload_type_by_llvm(opt_type)
+        let payload_ty = wl_struct_get_type_at(opt_type, 1)
         let payload_val = if payload_ty != 0: self.coerce_value_to_type(payload, payload_ty) else: payload
         wl_build_store(self.builder, payload_val, payload_ptr)
     wl_build_load(self.builder, opt_type, alloca)

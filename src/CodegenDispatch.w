@@ -343,28 +343,14 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                         if payload_ty != 0:
                             cur_ty = payload_ty
                             dc_found = true
-            // Check Option types: {i32, T} → wrap payload in {T} for ProjKind.PK_FIELD access
+            // Check Option/Result via sema variant payload
             if not dc_found:
-                let opt_idx = self.find_option_idx_by_llvm(cur_ty)
-                if opt_idx >= 0:
-                    let opt_payload = self.option_payload_types.get(opt_idx as i64)
-                    if opt_payload != 0:
+                let dc_sema_payload = self.mir_builtin_variant_payload_sema_type(cur_sema_ty, pd)
+                if dc_sema_payload > 0:
+                    let dc_sema_llvm = self.mir_sema_type_to_llvm(dc_sema_payload)
+                    if dc_sema_llvm != 0:
                         let wrap: Vec[i64] = Vec.new()
-                        wrap.push(opt_payload)
-                        cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
-                        dc_found = true
-            // Check Result types: {i32, [N x i8]} → wrap ok/err payload in {T} for ProjKind.PK_FIELD
-            if not dc_found:
-                let res_idx = self.find_result_idx_by_llvm(cur_ty)
-                if res_idx >= 0:
-                    var res_payload: i64 = 0
-                    if pd == 0:
-                        res_payload = self.result_ok_types.get(res_idx as i64)
-                    else if pd == 1:
-                        res_payload = self.result_err_types.get(res_idx as i64)
-                    if res_payload != 0:
-                        let wrap: Vec[i64] = Vec.new()
-                        wrap.push(res_payload)
+                        wrap.push(dc_sema_llvm)
                         cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
                         dc_found = true
         else:
@@ -535,34 +521,16 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                     else:
                         cur_ty = 0
                     dc_handled = true
-            // Option types: { i32, T } → GEP to field 1, wrap T in {T}
+            // Option/Result types via sema variant payload
             if not dc_handled:
-                let dc_opt_idx = self.find_option_idx_by_llvm(cur_ty)
-                if dc_opt_idx >= 0:
-                    let dc_opt_payload = self.option_payload_types.get(dc_opt_idx as i64)
+                let dc_pp_sema = self.mir_builtin_variant_payload_sema_type(cur_sema_ty, pd)
+                if dc_pp_sema > 0:
+                    let dc_pp_llvm = self.mir_sema_type_to_llvm(dc_pp_sema)
                     if wl_count_struct_elem_types(cur_ty) > 1:
                         cur_ptr = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 1)
-                    if dc_opt_payload != 0:
+                    if dc_pp_llvm != 0:
                         let wrap: Vec[i64] = Vec.new()
-                        wrap.push(dc_opt_payload)
-                        cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
-                    else:
-                        cur_ty = 0
-                    dc_handled = true
-            // Result types: { i32, [N x i8] } → GEP to field 1, wrap ok/err in {T}
-            if not dc_handled:
-                let dc_res_idx = self.find_result_idx_by_llvm(cur_ty)
-                if dc_res_idx >= 0:
-                    var dc_res_payload: i64 = 0
-                    if pd == 0:
-                        dc_res_payload = self.result_ok_types.get(dc_res_idx as i64)
-                    else if pd == 1:
-                        dc_res_payload = self.result_err_types.get(dc_res_idx as i64)
-                    if wl_count_struct_elem_types(cur_ty) > 1:
-                        cur_ptr = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 1)
-                    if dc_res_payload != 0:
-                        let wrap: Vec[i64] = Vec.new()
-                        wrap.push(dc_res_payload)
+                        wrap.push(dc_pp_llvm)
                         cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
                     else:
                         cur_ty = 0
@@ -2171,9 +2139,9 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
                 if payload_ty == 0:
                     payload_ty = self.mir_builtin_variant_payload_llvm_type(recv_sema, 0)
                 if payload_ty == 0:
-                    let res_idx = self.find_result_idx_by_llvm(recv_ty)
-                    if res_idx >= 0:
-                        payload_ty = self.result_ok_types.get(res_idx as i64)
+                    let res_ok_sema = self.mir_builtin_variant_payload_sema_type(recv_sema, 0)
+                    if res_ok_sema > 0:
+                        payload_ty = self.mir_sema_type_to_llvm(res_ok_sema)
                 result = self.extract_result_payload(recv, payload_ty)
             else:
                 result = wl_build_extract_value(self.builder, recv, 1)
@@ -2667,17 +2635,17 @@ fn Codegen.mir_emit_opt_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
     let recv_tk = wl_get_type_kind(obj_ty)
     if recv_tk != wl_struct_type_kind() and recv_tk != wl_pointer_type_kind():
         return recv
-    // Get payload type via sema (Option[T] → T), fallback to LLVM reverse lookup
-    let arg_start_of = body.call_arg_starts.get(args_id as i64)
-    let recv_op_id = body.call_arg_operands.get(arg_start_of as i64)
-    let recv_sema = self.mir_operand_sema_type(body, recv_op_id)
+    // Get payload type: sema first, then LLVM struct field fallback
     var payload_ty: i64 = 0
     if recv_tk == wl_pointer_type_kind():
         payload_ty = obj_ty
     else:
+        let arg_start_of = body.call_arg_starts.get(args_id as i64)
+        let recv_op_id = body.call_arg_operands.get(arg_start_of as i64)
+        let recv_sema = self.mir_operand_sema_type(body, recv_op_id)
         payload_ty = self.mir_builtin_variant_payload_llvm_type(recv_sema, 0)
-        if payload_ty == 0:
-            payload_ty = self.find_option_payload_type_by_llvm(obj_ty)
+        if payload_ty == 0 and wl_count_struct_elem_types(obj_ty) > 1:
+            payload_ty = wl_struct_get_type_at(obj_ty, 1)
     let elem_ty = if payload_ty != 0: payload_ty else: self.type_fallback()
     let is_some = if recv_tk == wl_pointer_type_kind():
         wl_build_icmp(self.builder, wl_int_ne(), recv, wl_const_null(obj_ty))
@@ -4206,26 +4174,6 @@ fn Codegen.find_vec_elem_type_by_llvm(self: Codegen, vec_ty: i64) -> i64:
     if elem.is_some():
         return elem.unwrap()
     0
-
-
-
-fn Codegen.find_option_payload_type_by_llvm(self: Codegen, opt_ty: i64) -> i64:
-    for i in 0..self.option_llvm_types.len() as i32:
-        if self.option_llvm_types.get(i as i64) == opt_ty:
-            return self.option_payload_types.get(i as i64)
-    0
-
-fn Codegen.find_option_idx_by_llvm(self: Codegen, opt_ty: i64) -> i32:
-    for i in 0..self.option_llvm_types.len() as i32:
-        if self.option_llvm_types.get(i as i64) == opt_ty:
-            return i
-    0 - 1
-
-fn Codegen.find_result_idx_by_llvm(self: Codegen, res_ty: i64) -> i32:
-    for i in 0..self.result_llvm_types.len() as i32:
-        if self.result_llvm_types.get(i as i64) == res_ty:
-            return i
-    0 - 1
 
 fn Codegen.sema_type_mangle(self: Codegen, sema_ty: i32) -> str:
     if sema_ty <= 0:
