@@ -4116,7 +4116,7 @@ fn Codegen.reverse_struct_lookup(self: Codegen, idx: i32) -> i32:
     if st.is_some() and st.unwrap() == idx: return str_sym
     0
 
-fn Codegen.find_struct_decl_node(self: Codegen, type_sym: i32) -> i32:
+fn Codegen.find_struct_decl_node(self: Codegen, type_sym: i32) -> NodeId:
     for di in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(di)
         if self.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
@@ -4126,11 +4126,11 @@ fn Codegen.find_struct_decl_node(self: Codegen, type_sym: i32) -> i32:
         let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
         if sub_kind == TypeDeclKind.Struct:
             return decl
-    0
+    (0) as NodeId
 
 fn Codegen.find_field_index_from_ast(self: Codegen, type_sym: i32, field_sym: i32) -> i32:
     let decl = self.find_struct_decl_node(type_sym)
-    if decl == 0:
+    if (decl as i32) == 0:
         return 0 - 1
     let extra_start = self.pool.get_data1(decl)
     let field_count = self.pool.get_extra(extra_start)
@@ -4258,7 +4258,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
                 continue
             let dmeta = self.pool.find_fn_meta(decl)
             if dmeta >= 0 and self.pool.fn_meta_tp_count(dmeta) > 0:
-                generic_node = decl
+                generic_node = decl as i32
                 meta = dmeta
                 break
 

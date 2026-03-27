@@ -96,7 +96,7 @@ fn AsyncLower.lower_body(self: AsyncLower, mir_body: MirBody):
     self.cur_body = AsyncMirBody.init(mir_body.fn_sym, flavor)
 
     if fn_decl != 0:
-        let fn_body_node = async_ast_get_data1(self.ast, fn_decl)
+        let fn_body_node = async_ast_get_data1(self.ast, fn_decl as i32)
         self.walk_expr(fn_body_node)
 
     if flavor != AsyncBodyKind.Generator:
@@ -323,15 +323,15 @@ fn async_extra_or_zero(ast: AstPool, idx: i32) -> i32:
         return 0
     ast.get_extra(idx)
 
-fn async_find_fn_decl(ast: AstPool, fn_sym: i32) -> i32:
+fn async_find_fn_decl(ast: AstPool, fn_sym: i32) -> NodeId:
     for di in 0..ast.decl_count():
         let decl = ast.get_decl(di)
         if ast.kind(decl) == NodeKind.NK_FN_DECL and ast.get_data0(decl) == fn_sym:
             return decl
-    0
+    (0) as NodeId
 
-fn async_fn_flavor(ast: AstPool, fn_decl: i32) -> i32:
-    if fn_decl == 0:
+fn async_fn_flavor(ast: AstPool, fn_decl: NodeId) -> i32:
+    if (fn_decl as i32) == 0:
         return AsyncBodyKind.Sync
     let flags = ast.get_data2(fn_decl)
     if (flags / FnFlags.GEN) % 2 == 1:

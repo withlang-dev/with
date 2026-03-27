@@ -3745,7 +3745,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             continue
         if sub_kind == TypeDeclKind.Struct:
             if self.type_decl_tp_count(decl) > 0:
-                self.generic_structs.insert(name_sym, decl)
+                self.generic_structs.insert(name_sym, decl as i32)
             else:
                 self.predeclare_struct_type(name_sym)
             continue
@@ -3837,7 +3837,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
         if meta >= 0:
             let tp_count = self.pool.fn_meta_tp_count(meta)
             if tp_count > 0:
-                self.generic_fns.insert(name_sym, decl)
+                self.generic_fns.insert(name_sym, decl as i32)
             else if (flags / FnFlags.ASYNC) % 2 == 1:
                 self.declare_async_function(decl)
             else:

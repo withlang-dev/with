@@ -339,7 +339,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
             self.add_binding(module_scope, name_sym, did)
 
         if kind == NodeKind.NK_FN_DECL:
-            pending_fn_nodes.push(decl)
+            pending_fn_nodes.push(decl as i32)
             pending_fn_defs.push(did)
 
     self.module_import_counts.set_i32(module_id as i64, import_index)
@@ -368,7 +368,7 @@ fn resolve_decl_def_kind(kind: i32) -> i32:
     if kind == NodeKind.NK_IMPL_DECL: return DefKind.DK_IMPL
     -1
 
-fn resolve_decl_name(pool: AstPool, decl: i32) -> i32:
+fn resolve_decl_name(pool: AstPool, decl: NodeId) -> i32:
     let kind = pool.kind(decl)
     if kind == NodeKind.NK_FN_DECL: return pool.get_data0(decl)
     if kind == NodeKind.NK_TYPE_DECL: return pool.get_data0(decl)

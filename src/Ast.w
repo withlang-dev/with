@@ -13,6 +13,8 @@ extern fn with_eprintln(s: str) -> void
 
 // ── Node kinds ───────────────────────────────────────────────────
 
+type NodeId = i32
+
 enum NodeKind: i32:
     // Declarations
     NK_FN_DECL = 1
@@ -410,7 +412,7 @@ fn AstPool.freeze(self: &mut AstPool):
     self.frozen = 1
 
 // Add a node to the pool, returns the node index.
-fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> i32:
+fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
     if self.frozen != 0:
         with_eprintln("BUG: AstPool.add_node called after freeze")
     let idx = self.kinds.len() as i32
@@ -421,7 +423,7 @@ fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32
     self.data1.push(d1)
     self.data2.push(d2)
     self.literal_suffixes.push(LiteralSuffix.None)
-    idx
+    (idx) as NodeId
 
 // Add extra data, returns the index in the extra array.
 fn AstPool.add_extra(self: &mut AstPool, value: i32) -> i32:
@@ -440,24 +442,24 @@ fn AstPool.add_string(self: &mut AstPool, s: str) -> i32:
     idx
 
 // Get node kind at index
-fn AstPool.kind(self: &AstPool, idx: i32) -> i32:
-    self.kinds.get(idx as i64)
+fn AstPool.kind(self: &AstPool, idx: NodeId) -> i32:
+    self.kinds.get((idx as i32) as i64)
 
 // Get node data fields
-fn AstPool.get_data0(self: &AstPool, idx: i32) -> i32:
-    self.data0.get(idx as i64)
+fn AstPool.get_data0(self: &AstPool, idx: NodeId) -> i32:
+    self.data0.get((idx as i32) as i64)
 
-fn AstPool.get_data1(self: &AstPool, idx: i32) -> i32:
-    self.data1.get(idx as i64)
+fn AstPool.get_data1(self: &AstPool, idx: NodeId) -> i32:
+    self.data1.get((idx as i32) as i64)
 
-fn AstPool.get_data2(self: &AstPool, idx: i32) -> i32:
-    self.data2.get(idx as i64)
+fn AstPool.get_data2(self: &AstPool, idx: NodeId) -> i32:
+    self.data2.get((idx as i32) as i64)
 
-fn AstPool.literal_suffix(self: &AstPool, idx: i32) -> i32:
-    self.literal_suffixes.get(idx as i64)
+fn AstPool.literal_suffix(self: &AstPool, idx: NodeId) -> i32:
+    self.literal_suffixes.get((idx as i32) as i64)
 
-fn AstPool.set_literal_suffix(self: &mut AstPool, idx: i32, suffix: i32):
-    self.literal_suffixes.set_i32(idx as i64, suffix)
+fn AstPool.set_literal_suffix(self: &mut AstPool, idx: NodeId, suffix: i32):
+    self.literal_suffixes.set_i32((idx as i32) as i64, suffix)
 
 const AST_INT_PART_BASE: i64 = 2097152
 const AST_INT_PART_BASE2: i64 = 4398046511104
@@ -474,7 +476,7 @@ fn ast_int_part2(value: i64) -> i32:
 fn ast_int_from_parts(d0: i32, d1: i32, d2: i32) -> i64:
     (d0 as i64) + (d1 as i64) * AST_INT_PART_BASE + (d2 as i64) * AST_INT_PART_BASE2
 
-fn AstPool.int_lit_value(self: &AstPool, idx: i32) -> i64:
+fn AstPool.int_lit_value(self: &AstPool, idx: NodeId) -> i64:
     ast_int_from_parts(self.get_data0(idx), self.get_data1(idx), self.get_data2(idx))
 
 fn AstPool.get_extra(self: &AstPool, idx: i32) -> i32:
@@ -483,25 +485,25 @@ fn AstPool.get_extra(self: &AstPool, idx: i32) -> i32:
 fn AstPool.get_string(self: &AstPool, idx: i32) -> str:
     self.strings.get(idx as i64)
 
-fn AstPool.get_start(self: &AstPool, idx: i32) -> i32:
-    self.starts.get(idx as i64)
+fn AstPool.get_start(self: &AstPool, idx: NodeId) -> i32:
+    self.starts.get((idx as i32) as i64)
 
-fn AstPool.get_end(self: &AstPool, idx: i32) -> i32:
-    self.ends.get(idx as i64)
+fn AstPool.get_end(self: &AstPool, idx: NodeId) -> i32:
+    self.ends.get((idx as i32) as i64)
 
 fn AstPool.node_count(self: &AstPool) -> i32:
     self.kinds.len() as i32
 
-fn AstPool.add_decl(self: &mut AstPool, node_idx: i32):
+fn AstPool.add_decl(self: &mut AstPool, node_idx: NodeId):
     if self.frozen != 0:
         with_eprintln("BUG: AstPool.add_decl called after freeze")
-    self.decls.push(node_idx)
+    self.decls.push(node_idx as i32)
 
 fn AstPool.decl_count(self: &AstPool) -> i32:
     self.decls.len() as i32
 
-fn AstPool.get_decl(self: &AstPool, idx: i32) -> i32:
-    self.decls.get(idx as i64)
+fn AstPool.get_decl(self: &AstPool, idx: i32) -> NodeId:
+    (self.decls.get(idx as i64)) as NodeId
 
 fn AstPool.set_local_decl_count(self: &mut AstPool, n: i32):
     self.local_decl_count = n
@@ -518,36 +520,36 @@ fn AstPool.prelude_decl_count(self: &AstPool) -> i32:
 fn AstPool.extra_len(self: &AstPool) -> i32:
     self.extra.len() as i32
 
-fn AstPool.set_data0(self: &mut AstPool, idx: i32, val: i32):
-    self.data0.set_i32(idx as i64, val)
+fn AstPool.set_data0(self: &mut AstPool, idx: NodeId, val: i32):
+    self.data0.set_i32((idx as i32) as i64, val)
 
-fn AstPool.set_data1(self: &mut AstPool, idx: i32, val: i32):
-    self.data1.set_i32(idx as i64, val)
+fn AstPool.set_data1(self: &mut AstPool, idx: NodeId, val: i32):
+    self.data1.set_i32((idx as i32) as i64, val)
 
-fn AstPool.set_data2(self: &mut AstPool, idx: i32, val: i32):
-    self.data2.set_i32(idx as i64, val)
+fn AstPool.set_data2(self: &mut AstPool, idx: NodeId, val: i32):
+    self.data2.set_i32((idx as i32) as i64, val)
 
-fn AstPool.set_start(self: &mut AstPool, idx: i32, val: i32):
-    self.starts.set_i32(idx as i64, val)
+fn AstPool.set_start(self: &mut AstPool, idx: NodeId, val: i32):
+    self.starts.set_i32((idx as i32) as i64, val)
 
-fn AstPool.set_end(self: &mut AstPool, idx: i32, val: i32):
-    self.ends.set_i32(idx as i64, val)
+fn AstPool.set_end(self: &mut AstPool, idx: NodeId, val: i32):
+    self.ends.set_i32((idx as i32) as i64, val)
 
 // Store fn decl metadata: [node, flags, ret_type, param_start, param_count, tp_start, tp_count]
-fn AstPool.add_fn_meta(self: &mut AstPool, node: i32, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):
+fn AstPool.add_fn_meta(self: &mut AstPool, node: NodeId, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):
     let idx = self.fn_meta.len() as i32
-    self.fn_meta.push(node)
+    self.fn_meta.push(node as i32)
     self.fn_meta.push(flags)
     self.fn_meta.push(ret)
     self.fn_meta.push(ps)
     self.fn_meta.push(pc)
     self.fn_meta.push(ts)
     self.fn_meta.push(tc)
-    self.fn_meta_map.insert(node, idx)
+    self.fn_meta_map.insert(node as i32, idx)
 
 // Get fn metadata for a given fn decl node. Returns 7-int record start or -1.
-fn AstPool.find_fn_meta(self: &AstPool, node: i32) -> i32:
-    let opt = self.fn_meta_map.get(node)
+fn AstPool.find_fn_meta(self: &AstPool, node: NodeId) -> i32:
+    let opt = self.fn_meta_map.get(node as i32)
     if opt.is_some():
         return opt.unwrap()
     0 - 1
@@ -579,15 +581,15 @@ fn AstPool.fn_param_type(self: &AstPool, param_start: i32, param_idx: i32) -> i3
 fn AstPool.fn_param_flags(self: &AstPool, param_start: i32, param_idx: i32) -> i32:
     self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 2)
 
-fn AstPool.add_type_meta(self: &mut AstPool, node: i32, derive_start: i32, derive_count: i32):
+fn AstPool.add_type_meta(self: &mut AstPool, node: NodeId, derive_start: i32, derive_count: i32):
     let idx = self.type_meta.len() as i32
-    self.type_meta.push(node)
+    self.type_meta.push(node as i32)
     self.type_meta.push(derive_start)
     self.type_meta.push(derive_count)
-    self.type_meta_map.insert(node, idx)
+    self.type_meta_map.insert(node as i32, idx)
 
-fn AstPool.find_type_meta(self: &AstPool, node: i32) -> i32:
-    let opt = self.type_meta_map.get(node)
+fn AstPool.find_type_meta(self: &AstPool, node: NodeId) -> i32:
+    let opt = self.type_meta_map.get(node as i32)
     if opt.is_some():
         return opt.unwrap()
     0 - 1
@@ -598,101 +600,101 @@ fn AstPool.type_meta_derive_start(self: &AstPool, meta: i32) -> i32:
 fn AstPool.type_meta_derive_count(self: &AstPool, meta: i32) -> i32:
     self.type_meta.get((meta + 2) as i64)
 
-fn AstPool.add_pattern_qualifier(self: &mut AstPool, node: i32, type_sym: i32):
+fn AstPool.add_pattern_qualifier(self: &mut AstPool, node: NodeId, type_sym: i32):
     let idx = self.pattern_qualifiers.len() as i32
-    self.pattern_qualifiers.push(node)
+    self.pattern_qualifiers.push(node as i32)
     self.pattern_qualifiers.push(type_sym)
-    self.pattern_qualifier_map.insert(node, idx)
+    self.pattern_qualifier_map.insert(node as i32, idx)
 
-fn AstPool.pattern_qualifier(self: &AstPool, node: i32) -> i32:
-    let opt = self.pattern_qualifier_map.get(node)
+fn AstPool.pattern_qualifier(self: &AstPool, node: NodeId) -> i32:
+    let opt = self.pattern_qualifier_map.get(node as i32)
     if opt.is_some():
         return self.pattern_qualifiers.get((opt.unwrap() + 1) as i64)
     0
 
-fn AstPool.mark_must_use_type(self: &mut AstPool, node: i32):
-    self.must_use_type_nodes.push(node)
-    self.must_use_type_set.insert(node, 1)
+fn AstPool.mark_must_use_type(self: &mut AstPool, node: NodeId):
+    self.must_use_type_nodes.push(node as i32)
+    self.must_use_type_set.insert(node as i32, 1)
 
-fn AstPool.is_must_use_type_node(self: &AstPool, node: i32) -> i32:
-    if self.must_use_type_set.contains(node): return 1
+fn AstPool.is_must_use_type_node(self: &AstPool, node: NodeId) -> i32:
+    if self.must_use_type_set.contains(node as i32): return 1
     0
 
-fn AstPool.mark_sealed_trait(self: &mut AstPool, node: i32):
-    self.sealed_trait_nodes.push(node)
-    self.sealed_trait_set.insert(node, 1)
+fn AstPool.mark_sealed_trait(self: &mut AstPool, node: NodeId):
+    self.sealed_trait_nodes.push(node as i32)
+    self.sealed_trait_set.insert(node as i32, 1)
 
-fn AstPool.is_sealed_trait_node(self: &AstPool, node: i32) -> i32:
-    if self.sealed_trait_set.contains(node): return 1
+fn AstPool.is_sealed_trait_node(self: &AstPool, node: NodeId) -> i32:
+    if self.sealed_trait_set.contains(node as i32): return 1
     0
 
-fn AstPool.mark_move_closure(self: &mut AstPool, node: i32):
-    self.move_closure_nodes.push(node)
-    self.move_closure_set.insert(node, 1)
+fn AstPool.mark_move_closure(self: &mut AstPool, node: NodeId):
+    self.move_closure_nodes.push(node as i32)
+    self.move_closure_set.insert(node as i32, 1)
 
-fn AstPool.is_move_closure(self: &AstPool, node: i32) -> i32:
-    if self.move_closure_set.contains(node): return 1
+fn AstPool.is_move_closure(self: &AstPool, node: NodeId) -> i32:
+    if self.move_closure_set.contains(node as i32): return 1
     0
 
-fn AstPool.mark_non_escaping_closure(self: &mut AstPool, node: i32):
-    self.non_escaping_closure_nodes.push(node)
-    self.non_escaping_closure_set.insert(node, 1)
+fn AstPool.mark_non_escaping_closure(self: &mut AstPool, node: NodeId):
+    self.non_escaping_closure_nodes.push(node as i32)
+    self.non_escaping_closure_set.insert(node as i32, 1)
 
-fn AstPool.is_non_escaping_closure(self: &AstPool, node: i32) -> i32:
-    if self.non_escaping_closure_set.contains(node): return 1
+fn AstPool.is_non_escaping_closure(self: &AstPool, node: NodeId) -> i32:
+    if self.non_escaping_closure_set.contains(node as i32): return 1
     0
 
-fn AstPool.add_where_meta(self: &mut AstPool, fn_node: i32, extra_start: i32, clause_count: i32):
+fn AstPool.add_where_meta(self: &mut AstPool, fn_node: NodeId, extra_start: i32, clause_count: i32):
     let idx = self.where_meta.len() as i32
-    self.where_meta.push(fn_node)
+    self.where_meta.push(fn_node as i32)
     self.where_meta.push(extra_start)
     self.where_meta.push(clause_count)
-    self.where_meta_map.insert(fn_node, idx)
+    self.where_meta_map.insert(fn_node as i32, idx)
 
-fn AstPool.find_where_meta(self: &AstPool, fn_node: i32) -> i32:
-    let opt = self.where_meta_map.get(fn_node)
+fn AstPool.find_where_meta(self: &AstPool, fn_node: NodeId) -> i32:
+    let opt = self.where_meta_map.get(fn_node as i32)
     if opt.is_some():
         return opt.unwrap()
     0 - 1
 
-fn AstPool.add_impl_type_params(self: &mut AstPool, impl_node: i32, tp_start: i32, tp_count: i32):
+fn AstPool.add_impl_type_params(self: &mut AstPool, impl_node: NodeId, tp_start: i32, tp_count: i32):
     let idx = self.impl_type_params.len() as i32
-    self.impl_type_params.push(impl_node)
+    self.impl_type_params.push(impl_node as i32)
     self.impl_type_params.push(tp_start)
     self.impl_type_params.push(tp_count)
-    self.impl_type_params_map.insert(impl_node, idx)
+    self.impl_type_params_map.insert(impl_node as i32, idx)
 
-fn AstPool.find_impl_type_params(self: &AstPool, impl_node: i32) -> i32:
-    let opt = self.impl_type_params_map.get(impl_node)
+fn AstPool.find_impl_type_params(self: &AstPool, impl_node: NodeId) -> i32:
+    let opt = self.impl_type_params_map.get(impl_node as i32)
     if opt.is_some():
         return opt.unwrap()
     0 - 1
 
-fn AstPool.add_impl_target_type_node(self: &mut AstPool, impl_node: i32, type_node: i32):
-    self.impl_target_type_nodes.push(impl_node)
-    self.impl_target_type_nodes.push(type_node)
-    self.impl_target_type_nodes_map.insert(impl_node, type_node)
+fn AstPool.add_impl_target_type_node(self: &mut AstPool, impl_node: NodeId, type_node: NodeId):
+    self.impl_target_type_nodes.push(impl_node as i32)
+    self.impl_target_type_nodes.push(type_node as i32)
+    self.impl_target_type_nodes_map.insert(impl_node as i32, type_node as i32)
 
-fn AstPool.find_impl_target_type_node(self: &AstPool, impl_node: i32) -> i32:
-    let opt = self.impl_target_type_nodes_map.get(impl_node)
+fn AstPool.find_impl_target_type_node(self: &AstPool, impl_node: NodeId) -> NodeId:
+    let opt = self.impl_target_type_nodes_map.get(impl_node as i32)
     if opt.is_some():
-        return opt.unwrap()
+        return (opt.unwrap()) as NodeId
     var i = 0
     while i < self.impl_target_type_nodes.len() as i32:
-        if self.impl_target_type_nodes.get(i as i64) == impl_node:
-            return self.impl_target_type_nodes.get((i + 1) as i64)
+        if self.impl_target_type_nodes.get(i as i64) == (impl_node as i32):
+            return (self.impl_target_type_nodes.get((i + 1) as i64)) as NodeId
         i = i + 2
-    0
+    (0) as NodeId
 
-fn AstPool.add_impl_trait_type_args(self: &mut AstPool, impl_node: i32, args_start: i32, args_count: i32):
+fn AstPool.add_impl_trait_type_args(self: &mut AstPool, impl_node: NodeId, args_start: i32, args_count: i32):
     let idx = self.impl_trait_type_args.len() as i32
-    self.impl_trait_type_args.push(impl_node)
+    self.impl_trait_type_args.push(impl_node as i32)
     self.impl_trait_type_args.push(args_start)
     self.impl_trait_type_args.push(args_count)
-    self.impl_trait_type_args_map.insert(impl_node, idx)
+    self.impl_trait_type_args_map.insert(impl_node as i32, idx)
 
-fn AstPool.find_impl_trait_type_args(self: &AstPool, impl_node: i32) -> i32:
-    let opt = self.impl_trait_type_args_map.get(impl_node)
+fn AstPool.find_impl_trait_type_args(self: &AstPool, impl_node: NodeId) -> i32:
+    let opt = self.impl_trait_type_args_map.get(impl_node as i32)
     if opt.is_some():
         return opt.unwrap()
     0 - 1
@@ -700,21 +702,21 @@ fn AstPool.find_impl_trait_type_args(self: &AstPool, impl_node: i32) -> i32:
 fn AstPool.fn_param_patterns_len(self: &AstPool) -> i32:
     self.fn_param_patterns.len() as i32
 
-fn AstPool.add_fn_param_pattern_value(self: &mut AstPool, node: i32):
-    self.fn_param_patterns.push(node)
+fn AstPool.add_fn_param_pattern_value(self: &mut AstPool, node: NodeId):
+    self.fn_param_patterns.push(node as i32)
 
-fn AstPool.fn_param_pattern_value(self: &AstPool, idx: i32) -> i32:
-    self.fn_param_patterns.get(idx as i64)
+fn AstPool.fn_param_pattern_value(self: &AstPool, idx: i32) -> NodeId:
+    (self.fn_param_patterns.get(idx as i64)) as NodeId
 
-fn AstPool.add_fn_param_pattern_meta(self: &mut AstPool, node: i32, start: i32, count: i32):
+fn AstPool.add_fn_param_pattern_meta(self: &mut AstPool, node: NodeId, start: i32, count: i32):
     let idx = self.fn_param_pattern_meta.len() as i32
-    self.fn_param_pattern_meta.push(node)
+    self.fn_param_pattern_meta.push(node as i32)
     self.fn_param_pattern_meta.push(start)
     self.fn_param_pattern_meta.push(count)
-    self.fn_param_pattern_meta_map.insert(node, idx)
+    self.fn_param_pattern_meta_map.insert(node as i32, idx)
 
-fn AstPool.find_fn_param_pattern_meta(self: &AstPool, node: i32) -> i32:
-    let opt = self.fn_param_pattern_meta_map.get(node)
+fn AstPool.find_fn_param_pattern_meta(self: &AstPool, node: NodeId) -> i32:
+    let opt = self.fn_param_pattern_meta_map.get(node as i32)
     if opt.is_some():
         return opt.unwrap()
     0 - 1
@@ -725,15 +727,15 @@ fn AstPool.fn_param_pattern_meta_start(self: &AstPool, meta: i32) -> i32:
 fn AstPool.fn_param_pattern_meta_count(self: &AstPool, meta: i32) -> i32:
     self.fn_param_pattern_meta.get((meta + 2) as i64)
 
-fn AstPool.add_for_meta(self: &mut AstPool, node: i32, index_binding: i32, label: i32):
+fn AstPool.add_for_meta(self: &mut AstPool, node: NodeId, index_binding: i32, label: i32):
     let idx = self.for_meta.len() as i32
-    self.for_meta.push(node)
+    self.for_meta.push(node as i32)
     self.for_meta.push(index_binding)
     self.for_meta.push(label)
-    self.for_meta_map.insert(node, idx)
+    self.for_meta_map.insert(node as i32, idx)
 
-fn AstPool.find_for_meta(self: &AstPool, node: i32) -> i32:
-    let opt = self.for_meta_map.get(node)
+fn AstPool.find_for_meta(self: &AstPool, node: NodeId) -> i32:
+    let opt = self.for_meta_map.get(node as i32)
     if opt.is_some():
         return opt.unwrap()
     0 - 1

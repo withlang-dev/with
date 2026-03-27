@@ -94,17 +94,17 @@ fn backend_dump_struct_extras(pool: AstPool, intern: InternPool):
         let es = pool.get_data1(decl)
         let fc = pool.get_extra(es)
         if fc <= 0 or fc > 100:
-            with_eprintln(f"[sd] BAD {name} d={decl} es={es} fc={fc}")
+            with_eprintln(f"[sd] BAD {name} d={decl as i32} es={es} fc={fc}")
             continue
         var ok = 1
         for fi in 0..fc:
             let o = es + 1 + fi * 3
             let tn = pool.get_extra(o + 1)
-            let k = pool.kind(tn)
+            let k = pool.kind((tn) as NodeId)
             if k < 50 or k > 200:
                 ok = 0
                 with_eprintln(f"[sd] {name} f{fi} tn={tn} k={k} es={es} o={o}")
         if ok == 1 and (name == "Codegen" or name == "ContextError"):
-            with_eprintln(f"[sd] OK {name} d={decl} es={es} fc={fc}")
+            with_eprintln(f"[sd] OK {name} d={decl as i32} es={es} fc={fc}")
 
 let _backend_eof_guard = 0
