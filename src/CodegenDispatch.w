@@ -74,6 +74,11 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
         let name_sym = self.mir_input.mir_get_type_d0(resolved)
         if name_sym != 0:
+            // Distinct types are transparent at LLVM level — resolve to inner type
+            if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(name_sym):
+                let dt_te_start = self.mir_input.mir_get_type_d1(resolved)
+                let inner_tid = self.mir_input.mir_get_type_extra(dt_te_start + 1)
+                return self.mir_sema_type_to_llvm(inner_tid)
             // Translate sema pool sym to codegen intern pool sym
             var cg_sym = name_sym
             if name_sym > 0 and name_sym < self.sema.pool.symbol_texts.len() as i32:

@@ -13,7 +13,7 @@ extern fn with_eprintln(s: str) -> void
 
 // ── Node kinds ───────────────────────────────────────────────────
 
-type NodeId = i32
+type NodeId = distinct i32
 
 enum NodeKind: i32:
     // Declarations
