@@ -127,7 +127,7 @@ fn InternPool.intern_type(self: InternPool, key: TypeKey) -> TypeId:
     let id = self.type_keys.len() as i32
     self.type_keys.push(key)
     self.type_map.insert(canon, id)
-    id
+    id as TypeId
 
 fn InternPool.resolve_type(self: InternPool, id: TypeId) -> TypeKey:
     if id <= 0 or id >= self.type_keys.len() as i32:

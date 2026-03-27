@@ -485,7 +485,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
                     let dtm_type_sym = self.pool.get_data0(dtm_p_type_node)
                     let dtm_prim = self.sema.primitive_type_by_sym(dtm_type_sym)
                     if dtm_prim != 0:
-                        dtm_p_sema_ty = dtm_prim
+                        dtm_p_sema_ty = dtm_prim as TypeId
                     else if self.sema.named_types.contains(dtm_type_sym):
                         dtm_p_sema_ty = self.sema.named_types.get(dtm_type_sym).unwrap()
         let dtm_p_local = dtm_builder.body.new_local(dtm_p_sema_ty, 1, dtm_p_name, 1)
@@ -813,7 +813,7 @@ fn Codegen.try_resolve_vec_new_global_type(self: Codegen, value_node: i32, flags
         let type_ann_node = self.pool.get_extra(type_extra_packed - 1)
         let annotated = self.sema.resolve_type_expr(type_ann_node)
         if annotated > 0:
-            return annotated
+            return annotated as i32
     if self.sema.typed_expr_types.contains(value_node):
         let inferred = self.sema.typed_expr_types.get(value_node).unwrap()
         if inferred > 0:

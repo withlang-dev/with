@@ -2164,15 +2164,15 @@ fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
                 return canon_opt.unwrap()
     // Literal types
     if nk == NodeKind.NK_STRING_LIT:
-        return self.sema.ty_str
+        return self.sema.ty_str as i32
     if nk == NodeKind.NK_FSTRING:
-        return self.sema.ty_str
+        return self.sema.ty_str as i32
     if nk == NodeKind.NK_INT_LIT:
-        return self.sema.ty_i32
+        return self.sema.ty_i32 as i32
     if nk == NodeKind.NK_FLOAT_LIT:
-        return self.sema.ty_f64
+        return self.sema.ty_f64 as i32
     if nk == NodeKind.NK_BOOL_LIT:
-        return self.sema.ty_bool
+        return self.sema.ty_bool as i32
     // Fall back to sema's typed_expr_types (populated by check_ident)
     if self.sema.typed_expr_types.contains(node):
         let typed = self.sema.typed_expr_types.get(node).unwrap()
@@ -2296,17 +2296,17 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
 
 // Reverse map: LLVM type → sema TypeId (for primitives and str)
 fn Codegen.llvm_type_to_sema_type(self: Codegen, ty: i64) -> i32:
-    if ty == wl_i32_type(self.context): return self.sema.ty_i32
-    if ty == wl_i64_type(self.context): return self.sema.ty_i64
-    if ty == wl_i128_type(self.context): return self.sema.ty_i128
-    if ty == wl_i1_type(self.context): return self.sema.ty_bool
-    if ty == wl_i8_type(self.context): return self.sema.ty_i8
-    if ty == wl_i16_type(self.context): return self.sema.ty_i16
-    if ty == wl_f64_type(self.context): return self.sema.ty_f64
-    if ty == wl_f32_type(self.context): return self.sema.ty_f32
+    if ty == wl_i32_type(self.context): return self.sema.ty_i32 as i32
+    if ty == wl_i64_type(self.context): return self.sema.ty_i64 as i32
+    if ty == wl_i128_type(self.context): return self.sema.ty_i128 as i32
+    if ty == wl_i1_type(self.context): return self.sema.ty_bool as i32
+    if ty == wl_i8_type(self.context): return self.sema.ty_i8 as i32
+    if ty == wl_i16_type(self.context): return self.sema.ty_i16 as i32
+    if ty == wl_f64_type(self.context): return self.sema.ty_f64 as i32
+    if ty == wl_f32_type(self.context): return self.sema.ty_f32 as i32
     if ty == wl_ptr_type(self.context):
         // Could be str, ptr, or struct-by-ref — default to str
-        return self.sema.ty_str
+        return self.sema.ty_str as i32
     0
 
 // ── Builtin str type ──────────────────────────────────────────────

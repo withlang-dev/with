@@ -470,7 +470,7 @@ fn CCodegen.struct_c_name(self: CCodegen, tid: i32) -> str:
     let name_sym = self.sema.get_type_d0(resolved)
     let raw = cc_intern_resolve(self.intern, name_sym)
     if raw.len() == 0:
-        return f"with_struct_{resolved}"
+        return f"with_struct_{resolved as i32}"
     let out = cc_sanitize_ident(raw)
     if self.check_interrupted() != 0:
         return "with_interrupted"
@@ -484,7 +484,7 @@ fn CCodegen.named_struct_tid(self: CCodegen, type_name: str) -> i32:
     let resolved = self.sema.resolve_alias(tid)
     if self.sema.get_type_kind(resolved) != TypeKind.TY_STRUCT:
         return 0
-    resolved
+    resolved as i32
 
 fn CCodegen.struct_field_tid(self: CCodegen, struct_tid: i32, field_sym: i32) -> i32:
     let resolved = self.sema.resolve_alias(struct_tid)
@@ -513,12 +513,12 @@ fn CCodegen.place_tid(self: CCodegen, body: MirBody, place_id: i32) -> i32:
     for i in 0..count:
         let pk = body.proj_kinds.get((start + i) as i64)
         let pd = body.proj_d0.get((start + i) as i64)
-        let resolved = self.sema.resolve_alias(tid)
+        let resolved = self.sema.resolve_alias(tid as TypeId)
         let tk = self.sema.get_type_kind(resolved)
         if pk == ProjKind.PK_FIELD:
             if tk == TypeKind.TY_STRUCT:
-                let ft_raw = self.struct_field_tid(resolved, pd)
-                let ft = self.effective_field_tid(resolved, pd, ft_raw)
+                let ft_raw = self.struct_field_tid(resolved as i32, pd)
+                let ft = self.effective_field_tid(resolved as i32, pd, ft_raw)
                 if ft == 0:
                     return 0
                 tid = ft
@@ -526,13 +526,13 @@ fn CCodegen.place_tid(self: CCodegen, body: MirBody, place_id: i32) -> i32:
             if tk == TypeKind.TY_STR:
                 let field_name = cc_intern_resolve(self.intern, pd)
                 if field_name == "len":
-                    tid = self.sema.ty_i64
+                    tid = self.sema.ty_i64 as i32
                     continue
                 return 0
             return 0
         if pk == ProjKind.PK_INDEX:
             if tk == TypeKind.TY_STR:
-                tid = self.sema.ty_i32
+                tid = self.sema.ty_i32 as i32
                 continue
             if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
                 tid = self.sema.get_type_d0(resolved)
@@ -560,12 +560,12 @@ fn CCodegen.place_tid_no_infer(self: CCodegen, body: MirBody, place_id: i32) -> 
     for i in 0..count:
         let pk = body.proj_kinds.get((start + i) as i64)
         let pd = body.proj_d0.get((start + i) as i64)
-        let resolved = self.sema.resolve_alias(tid)
+        let resolved = self.sema.resolve_alias(tid as TypeId)
         let tk = self.sema.get_type_kind(resolved)
         if pk == ProjKind.PK_FIELD:
             if tk == TypeKind.TY_STRUCT:
-                let ft_raw = self.struct_field_tid(resolved, pd)
-                let ft = self.effective_field_tid(resolved, pd, ft_raw)
+                let ft_raw = self.struct_field_tid(resolved as i32, pd)
+                let ft = self.effective_field_tid(resolved as i32, pd, ft_raw)
                 if ft == 0:
                     return 0
                 tid = ft
@@ -573,13 +573,13 @@ fn CCodegen.place_tid_no_infer(self: CCodegen, body: MirBody, place_id: i32) -> 
             if tk == TypeKind.TY_STR:
                 let field_name = cc_intern_resolve(self.intern, pd)
                 if field_name == "len":
-                    tid = self.sema.ty_i64
+                    tid = self.sema.ty_i64 as i32
                     continue
                 return 0
             return 0
         if pk == ProjKind.PK_INDEX:
             if tk == TypeKind.TY_STR:
-                tid = self.sema.ty_i32
+                tid = self.sema.ty_i32 as i32
                 continue
             if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
                 tid = self.sema.get_type_d0(resolved)
@@ -627,10 +627,10 @@ fn CCodegen.is_scalar_like_tid(self: CCodegen, tid: i32) -> i32:
     0
 
 fn CCodegen.prefer_inferred_tid(self: CCodegen, current_tid: i32, candidate_tid: i32) -> i32:
-    let cand = self.sema.resolve_alias(candidate_tid)
+    let cand = self.sema.resolve_alias(candidate_tid as TypeId) as i32
     if cand == 0 or self.is_void_tid(cand) != 0:
         return current_tid
-    if self.sema.get_type_kind(cand) == TypeKind.TY_ERR:
+    if self.sema.get_type_kind(cand as TypeId) == TypeKind.TY_ERR:
         return current_tid
     if current_tid == 0 or self.is_void_tid(current_tid) != 0:
         return cand
@@ -793,18 +793,18 @@ fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
     for i in 0..count:
         let pk = body.proj_kinds.get((start + i) as i64)
         let pd = body.proj_d0.get((start + i) as i64)
-        let resolved = self.sema.resolve_alias(current_tid)
+        let resolved = self.sema.resolve_alias(current_tid as TypeId)
         let tk = self.sema.get_type_kind(resolved)
         if pk == ProjKind.PK_FIELD:
             out = f"{out}.f{pd}"
             if tk == TypeKind.TY_STRUCT:
-                let ft_raw = self.struct_field_tid(resolved, pd)
-                let ft = self.effective_field_tid(resolved, pd, ft_raw)
+                let ft_raw = self.struct_field_tid(resolved as i32, pd)
+                let ft = self.effective_field_tid(resolved as i32, pd, ft_raw)
                 current_tid = ft
             else if tk == TypeKind.TY_STR:
                 let field_name = cc_intern_resolve(self.intern, pd)
                 if field_name == "len":
-                    current_tid = self.sema.ty_i64
+                    current_tid = self.sema.ty_i64 as i32
                 else:
                     current_tid = 0
             else:
@@ -813,7 +813,7 @@ fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
         if pk == ProjKind.PK_INDEX:
             if tk == TypeKind.TY_STR:
                 out = f"{out}.ptr[_{pd}]"
-                current_tid = self.sema.ty_i32
+                current_tid = self.sema.ty_i32 as i32
                 continue
             out = f"{out}[_{pd}]"
             if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
@@ -1557,7 +1557,7 @@ fn CCodegen.call_first_arg_resolved_tid(self: CCodegen, body: MirBody, args_id: 
         return 0
     let first_arg = self.call_arg_operand(body, args_id, 0)
     let first_arg_tid = self.operand_tid(body, first_arg)
-    self.sema.resolve_alias(first_arg_tid)
+    self.sema.resolve_alias(first_arg_tid as TypeId) as i32
 
 fn CCodegen.type_owner_text(self: CCodegen, tid: i32) -> str:
     let resolved = self.sema.resolve_alias(tid)
@@ -2172,21 +2172,21 @@ fn CCodegen.unqualified_builtin_method_ret_tid(self: CCodegen, body: MirBody, fn
         return 0
     let argc = self.call_arg_count(body, args_id)
     if raw == "len" and argc == 1:
-        return self.sema.ty_i64
+        return self.sema.ty_i64 as i32
     if raw == "is_empty" and argc == 1:
-        return self.sema.ty_bool
+        return self.sema.ty_bool as i32
     if raw == "starts_with" and argc == 2:
-        return self.sema.ty_bool
+        return self.sema.ty_bool as i32
     if raw == "ends_with" and argc == 2:
-        return self.sema.ty_bool
+        return self.sema.ty_bool as i32
     if raw == "contains" and argc == 2:
-        return self.sema.ty_bool
+        return self.sema.ty_bool as i32
     if raw == "find" and argc == 2:
-        return self.sema.ty_i64
+        return self.sema.ty_i64 as i32
     if raw == "slice" and argc == 3:
-        return self.sema.ty_str
+        return self.sema.ty_str as i32
     if raw == "byte_at" and argc == 2:
-        return self.sema.ty_i32
+        return self.sema.ty_i32 as i32
     0
 
 fn CCodegen.call_builtin_kind(self: CCodegen, body: MirBody, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
@@ -2321,7 +2321,7 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
     if kind == cc_builtin_vec_new():
         return cc_pseudo_tid_vec()
     if kind == cc_builtin_vec_push() or kind == cc_builtin_vec_set_i32() or kind == cc_builtin_vec_remove() or kind == cc_builtin_vec_clear():
-        return self.sema.ty_void
+        return self.sema.ty_void as i32
     if kind == cc_builtin_vec_pop():
         let hinted = self.call_dest_expected_tid(body, dest_place)
         if hinted != 0 and self.is_void_tid(hinted) == 0:
@@ -2329,7 +2329,7 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
         let dst = self.place_local_tid(body, dest_place)
         if dst != 0 and self.is_void_tid(dst) == 0:
             return dst
-        return self.sema.ty_i64
+        return self.sema.ty_i64 as i32
     if kind == cc_builtin_vec_get():
         let hinted = self.call_dest_expected_tid(body, dest_place)
         if hinted != 0 and self.is_void_tid(hinted) == 0:
@@ -2337,13 +2337,13 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
         let dst = self.place_local_tid(body, dest_place)
         if dst != 0 and self.is_void_tid(dst) == 0:
             return dst
-        return self.sema.ty_i64
+        return self.sema.ty_i64 as i32
     if kind == cc_builtin_vec_len():
-        return self.sema.ty_i64
+        return self.sema.ty_i64 as i32
     if kind == cc_builtin_map_new():
-        return self.sema.ty_i64
+        return self.sema.ty_i64 as i32
     if kind == cc_builtin_map_insert():
-        return self.sema.ty_void
+        return self.sema.ty_void as i32
     if kind == cc_builtin_map_get():
         let hinted = self.call_dest_expected_tid(body, dest_place)
         if hinted != 0 and self.is_void_tid(hinted) == 0:
@@ -2351,15 +2351,15 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
         let dst = self.place_local_tid(body, dest_place)
         if dst != 0 and self.is_void_tid(dst) == 0:
             return dst
-        return self.sema.ty_i64
+        return self.sema.ty_i64 as i32
     if kind == cc_builtin_map_contains():
-        return self.sema.ty_bool
+        return self.sema.ty_bool as i32
     if kind == cc_builtin_map_len():
-        return self.sema.ty_i64
+        return self.sema.ty_i64 as i32
     if kind == cc_builtin_map_remove():
-        return self.sema.ty_bool
+        return self.sema.ty_bool as i32
     if kind == cc_builtin_opt_is_some():
-        return self.sema.ty_bool
+        return self.sema.ty_bool as i32
     if kind == cc_builtin_opt_unwrap():
         let hinted = self.call_dest_expected_tid(body, dest_place)
         if hinted != 0 and self.is_void_tid(hinted) == 0:
@@ -2367,7 +2367,7 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
         let dst = self.place_local_tid(body, dest_place)
         if dst != 0 and self.is_void_tid(dst) == 0:
             return dst
-        return self.sema.ty_i64
+        return self.sema.ty_i64 as i32
     0
 
 fn CCodegen.resolve_call_named_callee(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> str:
@@ -2444,11 +2444,11 @@ fn CCodegen.call_return_tid_for_fn_sym(self: CCodegen, body: MirBody, fn_sym: i3
         return self.sema.sig_return_type(sig_idx)
     let raw = cc_intern_resolve(self.intern, fn_sym)
     if raw == "with_str_concat" or raw == "with_fs_read_file" or raw == "int_to_string":
-        return self.sema.ty_str
+        return self.sema.ty_str as i32
     if raw == "with_str_eq":
-        return self.sema.ty_bool
+        return self.sema.ty_bool as i32
     if raw == "dump_async_mir" or raw == "Driver.dump_async_mir":
-        return self.sema.ty_str
+        return self.sema.ty_str as i32
     fallback
 
 fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> str:
@@ -2592,10 +2592,10 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
                         recv_hint = cc_pseudo_tid_vec()
                 if kind == cc_builtin_map_new() or kind == cc_builtin_map_insert() or kind == cc_builtin_map_get() or kind == cc_builtin_map_contains() or kind == cc_builtin_map_len() or kind == cc_builtin_map_remove():
                     if recv_hint == 0:
-                        recv_hint = self.sema.ty_i64
+                        recv_hint = self.sema.ty_i64 as i32
                 if kind == cc_builtin_opt_is_some() or kind == cc_builtin_opt_unwrap():
                     if recv_hint == 0:
-                        recv_hint = self.sema.ty_i64
+                        recv_hint = self.sema.ty_i64 as i32
             if self.place_is_direct_local(body, dest_place, local_id) != 0:
                 let rt = self.call_return_tid(body, bb, callee_operand, args_id, dest_place)
                 if rt != 0 and self.is_void_tid(rt) == 0:
@@ -2624,9 +2624,9 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
                 continue
             if rk == RvalueKind.RK_BIN_OP:
                 if d0 == BinaryOp.OP_EQ or d0 == BinaryOp.OP_NEQ or d0 == BinaryOp.OP_LT or d0 == BinaryOp.OP_GT or d0 == BinaryOp.OP_LTE or d0 == BinaryOp.OP_GTE or d0 == BinaryOp.OP_AND or d0 == BinaryOp.OP_OR:
-                    return self.sema.ty_bool
+                    return self.sema.ty_bool as i32
                 if d0 == BinaryOp.OP_CONCAT:
-                    return self.sema.ty_str
+                    return self.sema.ty_str as i32
                 let lt = self.operand_tid(body, d1)
                 if lt != 0 and self.is_void_tid(lt) == 0:
                     return lt
@@ -2636,7 +2636,7 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
                 continue
             if rk == RvalueKind.RK_UN_OP:
                 if d0 == UnaryOp.UOP_NOT:
-                    return self.sema.ty_bool
+                    return self.sema.ty_bool as i32
                 let t = self.operand_tid(body, d1)
                 if t != 0 and self.is_void_tid(t) == 0:
                     return t
@@ -2646,9 +2646,9 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
                     return d1
                 continue
             if rk == RvalueKind.RK_DISCRIMINANT:
-                return self.sema.ty_i32
+                return self.sema.ty_i32 as i32
             if rk == RvalueKind.RK_LEN:
-                return self.sema.ty_i64
+                return self.sema.ty_i64 as i32
 
     if recv_hint != 0 and self.is_void_tid(recv_hint) == 0:
         return recv_hint
@@ -2769,7 +2769,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         let elem_text = self.operand_text(body, elem_operand)
         var elem_tid = self.operand_tid(body, elem_operand)
         if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
-            elem_tid = self.sema.ty_i64
+            elem_tid = self.sema.ty_i64 as i32
         let elem_ty = self.c_type(elem_tid, 0)
         var out = "    " ++ cc_lbrace() ++ " " ++ elem_ty ++ " __with_tmp = " ++ elem_text ++ "; with_vec_push(&(" ++ recv ++ "), &__with_tmp); " ++ cc_rbrace() ++ "\n"
         out = out ++ f"    goto bb{next_bb};"
@@ -2866,13 +2866,13 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         let val_text = self.operand_text(body, val_operand)
         var key_tid = self.operand_tid(body, key_operand)
         if key_tid == 0 or self.is_void_tid(key_tid) != 0:
-            key_tid = self.sema.ty_i64
+            key_tid = self.sema.ty_i64 as i32
         var val_tid = self.operand_tid(body, val_operand)
         if val_tid == 0 or self.is_void_tid(val_tid) != 0:
-            val_tid = self.sema.ty_i64
+            val_tid = self.sema.ty_i64 as i32
         let key_ty = self.c_type(key_tid, 0)
         let val_ty = self.c_type(val_tid, 0)
-        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid)) == TypeKind.TY_STR: "1" else: "0"
+        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
         var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; " ++ val_ty ++ " __with_v = " ++ val_text ++ ";"
         out = out ++ " if ((" ++ recv ++ ") == 0) " ++ cc_lbrace() ++ " " ++ recv ++ " = (int64_t)(intptr_t)with_hashmap_new(sizeof(__with_k), sizeof(__with_v)); " ++ cc_rbrace()
         out = out ++ " with_hashmap_insert((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_v, " ++ is_str_key ++ "); " ++ cc_rbrace() ++ "\n"
@@ -2888,9 +2888,9 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         let key_text = self.operand_text(body, key_operand)
         var key_tid = self.operand_tid(body, key_operand)
         if key_tid == 0 or self.is_void_tid(key_tid) != 0:
-            key_tid = self.sema.ty_i64
+            key_tid = self.sema.ty_i64 as i32
         let key_ty = self.c_type(key_tid, 0)
-        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid)) == TypeKind.TY_STR: "1" else: "0"
+        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
         var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; "
         if has_ret != 0:
             out = out ++ self.place_text(body, dest_place) ++ " = "
@@ -2920,9 +2920,9 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         let key_text = self.operand_text(body, key_operand)
         var key_tid = self.operand_tid(body, key_operand)
         if key_tid == 0 or self.is_void_tid(key_tid) != 0:
-            key_tid = self.sema.ty_i64
+            key_tid = self.sema.ty_i64 as i32
         let key_ty = self.c_type(key_tid, 0)
-        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid)) == TypeKind.TY_STR: "1" else: "0"
+        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
         var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; "
         if has_ret != 0:
             out = out ++ self.place_text(body, dest_place) ++ " = "
@@ -2939,9 +2939,9 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         let key_text = self.operand_text(body, key_operand)
         var key_tid = self.operand_tid(body, key_operand)
         if key_tid == 0 or self.is_void_tid(key_tid) != 0:
-            key_tid = self.sema.ty_i64
+            key_tid = self.sema.ty_i64 as i32
         let key_ty = self.c_type(key_tid, 0)
-        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid)) == TypeKind.TY_STR: "1" else: "0"
+        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
         let dst = self.place_text(body, dest_place)
         var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; int64_t __with_v = 0;"
         out = out ++ " if ((" ++ recv ++ ") != 0 && with_hashmap_get((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_v, " ++ is_str_key ++ ") != 0) "
@@ -3020,9 +3020,9 @@ fn CCodegen.rvalue_infer_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32
         return self.operand_tid(body, d0)
     if rk == RvalueKind.RK_BIN_OP:
         if d0 == BinaryOp.OP_EQ or d0 == BinaryOp.OP_NEQ or d0 == BinaryOp.OP_LT or d0 == BinaryOp.OP_GT or d0 == BinaryOp.OP_LTE or d0 == BinaryOp.OP_GTE or d0 == BinaryOp.OP_AND or d0 == BinaryOp.OP_OR:
-            return self.sema.ty_bool
+            return self.sema.ty_bool as i32
         if d0 == BinaryOp.OP_CONCAT:
-            return self.sema.ty_str
+            return self.sema.ty_str as i32
         let lt = if no_infer != 0: self.operand_tid_no_infer(body, d1) else: self.operand_tid(body, d1)
         if lt != 0 and self.is_void_tid(lt) == 0:
             return lt
@@ -3031,7 +3031,7 @@ fn CCodegen.rvalue_infer_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32
         return self.operand_tid(body, d2)
     if rk == RvalueKind.RK_UN_OP:
         if d0 == UnaryOp.UOP_NOT:
-            return self.sema.ty_bool
+            return self.sema.ty_bool as i32
         if no_infer != 0:
             return self.operand_tid_no_infer(body, d1)
         return self.operand_tid(body, d1)
@@ -3049,9 +3049,9 @@ fn CCodegen.rvalue_infer_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32
             return self.operand_tid_no_infer(body, first)
         return self.operand_tid(body, first)
     if rk == RvalueKind.RK_LEN:
-        return self.sema.ty_i64
+        return self.sema.ty_i64 as i32
     if rk == RvalueKind.RK_DISCRIMINANT:
-        return self.sema.ty_i32
+        return self.sema.ty_i32 as i32
     0
 
 fn CCodegen.record_field_tid_from_place(self: CCodegen, body: MirBody, place_id: i32, tid: i32):
@@ -3232,18 +3232,18 @@ fn CCodegen.infer_struct_field_tid_from_usage(self: CCodegen, struct_tid: i32, f
                                         rv_tid = body.const_types.get(od as i64)
                         else if rk == RvalueKind.RK_BIN_OP:
                             if rd0 == BinaryOp.OP_EQ or rd0 == BinaryOp.OP_NEQ or rd0 == BinaryOp.OP_LT or rd0 == BinaryOp.OP_GT or rd0 == BinaryOp.OP_LTE or rd0 == BinaryOp.OP_GTE or rd0 == BinaryOp.OP_AND or rd0 == BinaryOp.OP_OR:
-                                rv_tid = self.sema.ty_bool
+                                rv_tid = self.sema.ty_bool as i32
                             else if rd0 == BinaryOp.OP_CONCAT:
-                                rv_tid = self.sema.ty_str
+                                rv_tid = self.sema.ty_str as i32
                         else if rk == RvalueKind.RK_UN_OP:
                             if rd0 == UnaryOp.UOP_NOT:
-                                rv_tid = self.sema.ty_bool
+                                rv_tid = self.sema.ty_bool as i32
                         else if rk == RvalueKind.RK_CAST:
                             rv_tid = rd1
                         else if rk == RvalueKind.RK_LEN:
-                            rv_tid = self.sema.ty_i64
+                            rv_tid = self.sema.ty_i64 as i32
                         else if rk == RvalueKind.RK_DISCRIMINANT:
-                            rv_tid = self.sema.ty_i32
+                            rv_tid = self.sema.ty_i32 as i32
                     inferred = self.prefer_inferred_tid(inferred, rv_tid)
 
                 if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
@@ -3271,25 +3271,25 @@ fn CCodegen.infer_struct_field_tid_from_usage(self: CCodegen, struct_tid: i32, f
     inferred
 
 fn CCodegen.effective_field_tid(self: CCodegen, struct_tid: i32, field_sym: i32, raw_field_tid: i32) -> i32:
-    let resolved = self.sema.resolve_alias(raw_field_tid)
-    if resolved != 0 and self.is_void_tid(resolved) == 0 and self.sema.get_type_kind(resolved) != TypeKind.TY_ERR:
+    let resolved = self.sema.resolve_alias(raw_field_tid as TypeId) as i32
+    if resolved != 0 and self.is_void_tid(resolved) == 0 and self.sema.get_type_kind(resolved as TypeId) != TypeKind.TY_ERR:
         return resolved
     if self.in_field_cache_build != 0:
         if resolved != 0:
             return resolved
         return raw_field_tid
-    let owner_tid = self.sema.resolve_alias(struct_tid)
-    if owner_tid != 0 and self.sema.get_type_kind(owner_tid) == TypeKind.TY_STRUCT:
+    let owner_tid = self.sema.resolve_alias(struct_tid as TypeId) as i32
+    if owner_tid != 0 and self.sema.get_type_kind(owner_tid as TypeId) == TypeKind.TY_STRUCT:
         var cached = self.field_cache_lookup(owner_tid, field_sym)
         if cached == 0 - 1234567:
             self.build_field_cache_from_usage()
             cached = self.field_cache_lookup(owner_tid, field_sym)
         if cached != 0 - 1234567 and cached != 0 and self.is_void_tid(cached) == 0:
-            let cached_resolved = self.sema.resolve_alias(cached)
-            if cached_resolved != 0 and self.sema.get_type_kind(cached_resolved) != TypeKind.TY_ERR:
+            let cached_resolved = self.sema.resolve_alias(cached as TypeId) as i32
+            if cached_resolved != 0 and self.sema.get_type_kind(cached_resolved as TypeId) != TypeKind.TY_ERR:
                 return cached_resolved
             return cached
-        let owner_name = cc_intern_resolve(self.intern, self.sema.get_type_d0(owner_tid))
+        let owner_name = cc_intern_resolve(self.intern, self.sema.get_type_d0(owner_tid as TypeId))
         let field_name = cc_intern_resolve(self.intern, field_sym)
         if owner_name == "Parser":
             if field_name == "intern" or field_sym == 144:
@@ -3319,11 +3319,11 @@ fn CCodegen.effective_field_tid(self: CCodegen, struct_tid: i32, field_sym: i32,
                 if result_tid != 0:
                     return result_tid
             if field_name == "root_source_dir":
-                return self.sema.ty_str
+                return self.sema.ty_str as i32
             if field_name == "module_paths" or field_name == "module_dirs" or field_name == "module_file_ids" or field_name == "module_decl_counts" or field_name == "module_import_starts" or field_name == "module_import_counts" or field_name == "module_scope_ids" or field_name == "module_processed":
                 return cc_pseudo_tid_vec()
             if field_name == "module_map" or field_name == "link_lib_set" or field_name == "binding_map":
-                return self.sema.ty_i64
+                return self.sema.ty_i64 as i32
     raw_field_tid
 
 fn CCodegen.is_unit_rvalue(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
@@ -3489,7 +3489,7 @@ fn CCodegen.collect_struct_types_from_tid(self: CCodegen, out: Vec[i32], seen_na
         let name_sym = self.sema.get_type_d0(resolved)
         if not seen_names.contains(name_sym):
             seen_names.insert(name_sym, 1)
-            out.push(resolved)
+            out.push(resolved as i32)
         return
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
         let inner_tid = self.sema.get_type_d0(resolved)
@@ -3549,19 +3549,19 @@ fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
         for i in 0..struct_tids.len() as i32:
             if self.check_interrupted() != 0:
                 return ""
-            let resolved = self.sema.resolve_alias(struct_tids.get(i as i64))
-            let name_sym = self.sema.get_type_d0(resolved)
+            let resolved = self.sema.resolve_alias(struct_tids.get(i as i64) as TypeId) as i32
+            let name_sym = self.sema.get_type_d0(resolved as TypeId)
             if emitted_names.contains(name_sym):
                 continue
-            let start = self.sema.get_type_d1(resolved)
-            let count = self.sema.get_type_d2(resolved)
+            let start = self.sema.get_type_d1(resolved as TypeId)
+            let count = self.sema.get_type_d2(resolved as TypeId)
             var ready = 1
             for fi in 0..count:
                 if self.check_interrupted() != 0:
                     return ""
                 let field_sym = self.sema.type_extra.get((start + fi * 3) as i64)
                 let raw_field_tid = self.sema.type_extra.get((start + fi * 3 + 1) as i64)
-                let field_tid = self.sema.resolve_alias(self.effective_field_tid(resolved, field_sym, raw_field_tid))
+                let field_tid = self.sema.resolve_alias(self.effective_field_tid(resolved, field_sym, raw_field_tid) as TypeId)
                 if self.sema.get_type_kind(field_tid) != TypeKind.TY_STRUCT:
                     continue
                 let dep_name = self.sema.get_type_d0(field_tid)
@@ -3577,8 +3577,8 @@ fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
             for i in 0..struct_tids.len() as i32:
                 if self.check_interrupted() != 0:
                     return ""
-                let resolved = self.sema.resolve_alias(struct_tids.get(i as i64))
-                let name_sym = self.sema.get_type_d0(resolved)
+                let resolved = self.sema.resolve_alias(struct_tids.get(i as i64) as TypeId) as i32
+                let name_sym = self.sema.get_type_d0(resolved as TypeId)
                 if emitted_names.contains(name_sym):
                     continue
                 ordered.push(resolved)
