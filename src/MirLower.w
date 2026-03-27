@@ -1486,7 +1486,7 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         let base = self.lower_field_base_place(self.ast.get_data0(node))
         let field_sym = self.ast.get_data1(node)
         // Field symbol is mapped deterministically to a projection index by symbol value.
-        return self.body.new_field_place(base, field_sym, 0)
+        return self.body.new_field_place(base, field_sym, self.expr_type(node))
 
     if kind == NodeKind.NK_INDEX:
         if self.vec_literal_type(node) != 0:
@@ -1552,7 +1552,7 @@ fn MirBuilder.lower_tuple_destructure(self: MirBuilder, node: i32):
         let local_id = self.body.new_local(elem_ty, 0, n_sym, 1)
         self.bind_local(n_sym, local_id)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(node))
-        let field_place = self.body.new_field_place(rhs_place, ni, 0)
+        let field_place = self.body.new_field_place(rhs_place, ni, elem_ty)
         let field_op = self.body.new_operand(OperandKind.OK_COPY, field_place)
         let dst_place = self.place_for_local(local_id)
         self.assign_operand_to_place(dst_place, field_op, self.ast.get_start(node))
@@ -3072,8 +3072,8 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
     self.switch_to(pass_bb)
     let result_local = self.new_temp(result_ty)
     let result_place = self.place_for_local(result_local)
-    let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(), 0)
-    let payload_place = self.body.new_field_place(downcast_place, 0, 0)
+    let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(), value_ty)
+    let payload_place = self.body.new_field_place(downcast_place, 0, result_ty)
     let pass_op = self.body.new_operand(if self.sema.is_copy(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, payload_place)
     self.assign_operand_to_place(result_place, pass_op, self.ast.get_start(expr))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -3109,8 +3109,8 @@ fn MirBuilder.lower_double_question(self: MirBuilder, expr: i32, default_expr: i
     let result_place = self.place_for_local(result_local)
 
     self.switch_to(some_bb)
-    let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(), 0)
-    let payload_place = self.body.new_field_place(downcast_place, 0, 0)
+    let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(), value_ty)
+    let payload_place = self.body.new_field_place(downcast_place, 0, result_ty)
     let some_op = self.body.new_operand(if self.sema.is_copy(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, payload_place)
     self.assign_operand_to_place(result_place, some_op, self.ast.get_start(expr))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -3207,7 +3207,7 @@ fn MirBuilder.lower_record_update(self: MirBuilder, base_expr: i32, field_update
                 self.expected_type = field_ty
             let f_val = self.lower_expr(f_val_node)
             self.expected_type = saved_expected
-            let field_place = self.body.new_field_place(base_place, f_name_sym, 0)
+            let field_place = self.body.new_field_place(base_place, f_name_sym, field_ty)
             let field_rv = self.body.new_rvalue(RvalueKind.RK_USE, f_val, 0, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, field_place, field_rv, self.ast.get_start(node))
     self.body.new_operand(OperandKind.OK_COPY, base_place)
