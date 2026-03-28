@@ -3324,7 +3324,13 @@ fn Parser.parse_async_expr(self: Parser) -> NodeId:
     if self.is_ident_named("scope"):
         self.advance()
         var scope_name = self.intern.intern("s")
-        if self.peek() == TokenKind.TK_PIPE:
+        if self.peek() == TokenKind.TK_IDENT:
+            // async scope s => ...
+            scope_name = self.expect_ident()
+            if self.peek() == TokenKind.TK_FAT_ARROW:
+                self.advance()
+        else if self.peek() == TokenKind.TK_PIPE:
+            // async scope |s| ... (deprecated)
             self.advance()
             if self.peek() == TokenKind.TK_IDENT:
                 scope_name = self.expect_ident()
@@ -4648,6 +4654,7 @@ fn Parser.parse_param_attrs(self: Parser) -> i32:
 
 fn Parser.parse_param_list(self: Parser) -> i32:
     var params: Vec[i32] = Vec.new()
+    var default_nodes: Vec[i32] = Vec.new()
     let pattern_start = self.pool.fn_param_patterns_len()
     var pattern_count = 0
     var required_count = 0
@@ -4687,18 +4694,18 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             type_node = self.parse_type_expr()
 
         // Default value
-        var has_default = 0
+        var default_node = 0
         if self.peek() == TokenKind.TK_EQ:
             self.advance()
             self.skip_newlines()
-            self.parse_expr()
-            has_default = 1
-        if has_default == 0:
+            default_node = self.parse_expr() as i32
+        if default_node == 0:
             required_count = required_count + 1
 
         params.push(name)
         params.push(type_node as i32)
         params.push(param_flags)
+        default_nodes.push(default_node)
         self.pool.add_fn_param_pattern_value(param_pattern)
         pattern_count = pattern_count + 1
 
@@ -4710,8 +4717,14 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             break
 
     let count = (params.len() / (FN_PARAM_STRIDE as i64)) as i32
+    let param_start = self.pool.extra_len()
     for pi in 0..params.len() as i32:
         self.pool.add_extra(params.get(pi as i64))
+    // Store default value nodes for params that have them
+    for di in 0..default_nodes.len() as i32:
+        let def = default_nodes.get(di as i64)
+        if def != 0:
+            self.pool.set_fn_param_default(param_start, di, def)
     self.last_param_pattern_start = pattern_start
     self.last_param_pattern_count = pattern_count
     self.last_param_required_count = required_count
