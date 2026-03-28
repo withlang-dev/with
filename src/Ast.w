@@ -344,6 +344,8 @@ type AstPool {
     impl_trait_type_args_map: HashMap[i32, i32],
     fn_param_pattern_meta_map: HashMap[i32, i32],
     for_meta_map: HashMap[i32, i32],
+    // Default value nodes for function parameters: key = param_start * 1000 + param_idx
+    fn_param_defaults: HashMap[i32, i32],
     must_use_type_set: HashMap[i32, i32],
     sealed_trait_set: HashMap[i32, i32],
     move_closure_set: HashMap[i32, i32],
@@ -391,6 +393,7 @@ fn AstPool.new -> AstPool:
         impl_trait_type_args_map: HashMap.new(),
         fn_param_pattern_meta_map: HashMap.new(),
         for_meta_map: HashMap.new(),
+        fn_param_defaults: HashMap.new(),
         must_use_type_set: HashMap.new(),
         sealed_trait_set: HashMap.new(),
         move_closure_set: HashMap.new(),
@@ -580,6 +583,16 @@ fn AstPool.fn_param_type(self: &AstPool, param_start: i32, param_idx: i32) -> i3
 
 fn AstPool.fn_param_flags(self: &AstPool, param_start: i32, param_idx: i32) -> i32:
     self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 2)
+
+fn AstPool.set_fn_param_default(self: &mut AstPool, param_start: i32, param_idx: i32, default_node: i32):
+    let key = param_start * 1000 + param_idx
+    self.fn_param_defaults.insert(key, default_node)
+
+fn AstPool.get_fn_param_default(self: &AstPool, param_start: i32, param_idx: i32) -> i32:
+    let key = param_start * 1000 + param_idx
+    if self.fn_param_defaults.contains(key):
+        return self.fn_param_defaults.get(key).unwrap()
+    0
 
 fn AstPool.add_type_meta(self: &mut AstPool, node: NodeId, derive_start: i32, derive_count: i32):
     let idx = self.type_meta.len() as i32

@@ -2631,6 +2631,20 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
         let arg_node = self.ast.get_extra(arg_exprs_start + i)
         args.push(self.lower_call_arg(arg_node, sig_idx, i))
 
+    // Fill in default parameter values for missing arguments
+    if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT:
+        let callee_sym = self.ast.get_data0(fn_expr)
+        if self.sema.fn_decl_nodes.contains(callee_sym):
+            let fn_node = self.sema.fn_decl_nodes.get(callee_sym).unwrap()
+            let meta = self.ast.find_fn_meta(fn_node)
+            if meta >= 0:
+                let param_start = self.ast.fn_meta_param_start(meta)
+                let param_count = self.ast.fn_meta_param_count(meta)
+                for di in arg_exprs_count..param_count:
+                    let def_node = self.ast.get_fn_param_default(param_start, di)
+                    if def_node != 0:
+                        args.push(self.lower_call_arg(def_node, sig_idx, di))
+
     let args_id = self.body.new_call_args(args)
     let result_local = self.new_temp(ret_type_id)
     let result_place = self.place_for_local(result_local)

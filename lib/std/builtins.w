@@ -24,9 +24,9 @@ pub fn println_i64(n: i64) -> void:
 pub fn println_bool(v: bool) -> void:
     with_println_bool(v)
 
-pub fn assert(cond: bool) -> void:
+pub fn assert(cond: bool, msg: str = "assertion failed") -> void:
     if not cond:
-        with_panic("assertion failed", "", 0)
+        with_panic(msg, "", 0)
 
 pub fn require(cond: bool, msg: str) -> void:
     if not cond:
