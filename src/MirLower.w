@@ -3803,7 +3803,21 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             return self.lower_expr(inner)
         return self.unit_operand()
 
-    if kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE or kind == NodeKind.NK_SELECT_AWAIT:
+    if kind == NodeKind.NK_ASYNC_SCOPE:
+        // async scope: d0=name(sym), d1=body(node)
+        // Bind the scope variable as a unit value so s.track(expr) resolves.
+        // Actual structured concurrency is future work; for now scope body
+        // executes synchronously (like spawn/await pass-through).
+        let scope_sym = self.ast.get_data0(node)
+        if scope_sym > 0:
+            let scope_local = self.body.new_local(self.sema.ty_void as i32, 0, scope_sym, 1)
+            self.bind_local(scope_sym, scope_local)
+        let scope_body = self.ast.get_data1(node)
+        if scope_body != 0:
+            return self.lower_expr(scope_body)
+        return self.unit_operand()
+
+    if kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SELECT_AWAIT:
         // Async lowering is deferred to later waves.
         self.mark_unsupported()
         if self.ast.get_data0(node) != 0:

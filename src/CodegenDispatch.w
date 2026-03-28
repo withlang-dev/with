@@ -3347,9 +3347,25 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                                     wl_build_br(self.builder, dv_next)
                                 return true
 
+            // async scope s.track(expr) — pass-through: evaluate the argument
+            let gc_name = if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: "?"
+            if gc_name == "track":
+                let gc_mir_start2 = body.call_arg_starts.get(args_id as i64)
+                let gc_mir_count2 = body.call_arg_counts.get(args_id as i64)
+                // Evaluate the last argument (the async call), skip receiver
+                if gc_mir_count2 > 1:
+                    let gc_arg_op = body.call_arg_operands.get((gc_mir_start2 + gc_mir_count2 - 1) as i64)
+                    let gc_arg_val = self.mir_eval_operand(body, gc_arg_op, 0)
+                    if dest_place >= 0 and gc_arg_val != 0:
+                        let gc_dst_ptr = self.mir_place_ptr(body, dest_place, false, 0)
+                        if gc_dst_ptr != 0:
+                            wl_build_store(self.builder, gc_arg_val, gc_dst_ptr)
+                if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                    wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                return true
+
             // All patterns should be handled above. If we reach here, it's a genuine error
             // (unless we're in a blanket impl body where T-method calls can't be resolved).
-            let gc_name = if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: "?"
             var gc_is_blanket = false
             if self.current_method_owner_sym != 0:
                 let gc_owner_name = self.intern.resolve(self.current_method_owner_sym)
