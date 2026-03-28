@@ -945,9 +945,12 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     var value_node = self.pool.get_data1(let_node)
     if value_node == 0: return
 
-    // Unwrap comptime wrapper (const desugars to comptime)
+    // NK_COMPTIME wrapper is already removed by ComptimeTransform.
+    // Unwrap only as a fallback for cases the transform didn't handle.
     if self.pool.kind(value_node) == NodeKind.NK_COMPTIME:
-        value_node = self.pool.get_data0(value_node)
+        let ct_inner = self.pool.get_data0(value_node)
+        if ct_inner != 0:
+            value_node = ct_inner
 
     let flags = self.pool.get_data2(let_node)
     let is_mut = flags % 2

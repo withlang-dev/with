@@ -3765,21 +3765,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.lower_optional_chain(node)
 
     if kind == NodeKind.NK_COMPTIME:
-        // Comptime: unwrap and lower the inner expression.
+        // Comptime branches are already pruned by ComptimeTransform.
+        // Just unwrap and lower the inner expression.
         let inner = self.ast.get_data0(node)
         if inner != 0:
-            // comptime if: evaluate condition at compile time, only lower taken branch
-            if self.ast.kind(inner) == NodeKind.NK_IF_EXPR:
-                let ct_cond = self.ast.get_data0(inner)
-                let ct_then = self.ast.get_data1(inner)
-                let ct_else = self.ast.get_data2(inner)
-                let ct_val = self.try_eval_const(ct_cond)
-                if ct_val != -9223372036854775807:
-                    if ct_val != 0:
-                        return self.lower_expr(ct_then)
-                    if ct_else != 0:
-                        return self.lower_expr(ct_else)
-                    return self.unit_operand()
             return self.lower_expr(inner)
         return self.unit_operand()
 
