@@ -169,6 +169,7 @@ type Sema {
     must_use_fns: HashMap[i32, i32],
     result_option_fns: HashMap[i32, i32],
     task_fns: HashMap[i32, i32],
+    mutable_global_syms: HashMap[i32, i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
     sym_channel: i32,
@@ -394,6 +395,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let must_use_fns = sema_new_map_i32_i32()
     let result_option_fns = sema_new_map_i32_i32()
     let task_fns = sema_new_map_i32_i32()
+    let mutable_global_syms = sema_new_map_i32_i32()
     let method_impl_nodes = sema_new_map_i32_i32()
     let method_decl_origins = sema_new_map_i32_i32()
     let method_has_inherent = sema_new_map_i32_i32()
@@ -481,6 +483,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         must_use_fns,
         result_option_fns,
         task_fns,
+        mutable_global_syms,
         sym_channel: 0,
         sym_send: 0,
         sym_recv: 0,
@@ -1448,6 +1451,10 @@ fn Sema.scope_has(self: Sema, sym: i32) -> i32:
     if self.scope_name_map.contains(sym): return 1
     0
 
+fn Sema.is_mutable_global(self: Sema, sym: i32) -> i32:
+    if self.mutable_global_syms.contains(sym): return 1
+    0
+
 fn Sema.is_active_async_scope_symbol(self: Sema, sym: i32) -> i32:
     var i = self.async_scope_names.len() as i32 - 1
     while i >= 0:
@@ -1938,4 +1945,3 @@ fn Sema.expire_borrows_in_scope(self: Sema, scope_start: i32):
             else:
                 bi = bi + 1
         i = i - 1
-

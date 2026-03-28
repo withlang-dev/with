@@ -1070,6 +1070,8 @@ fn Sema.collect_let_decl(self: Sema, node: i32, is_local: i32):
         self.set_pretty_symbol(name, bind_name)
     let flags = self.ast.get_data2(node)
     let is_mut = flags % 2
+    if is_mut != 0:
+        self.mutable_global_syms.insert(name, 1)
     var bind_ty: TypeId = (0) as TypeId
     let type_extra = self.top_level_let_type_ann_extra(flags)
     if type_extra >= 0:
@@ -1757,4 +1759,3 @@ fn Sema.primitive_type_by_sym(self: Sema, sym: i32) -> i32:
     if with_str_eq(name, "usize") != 0: return self.ty_usize as i32
     if with_str_eq(name, "isize") != 0: return self.ty_isize as i32
     0
-
