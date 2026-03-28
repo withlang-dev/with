@@ -72,10 +72,11 @@ type Lexer {
     pos: i32,
     file_id: i32,
     token_start: i32,
+    emit_comments: i32,
 }
 
 fn Lexer.init(source: str, file_id: i32) -> Lexer:
-    Lexer { source, pos: 0, file_id, token_start: 0 }
+    Lexer { source, pos: 0, file_id, token_start: 0, emit_comments: 0 }
 
 // Tokenize the entire source, returning a token list ending with EOF.
 fn Lexer.tokenize(self: Lexer) -> TokenList:
@@ -86,6 +87,10 @@ fn Lexer.tokenize(self: Lexer) -> TokenList:
         if tag == TokenKind.TK_EOF:
             break
     tokens
+
+fn Lexer.tokenize_with_comments(self: Lexer) -> TokenList:
+    self.emit_comments = 1
+    self.tokenize()
 
 // Produce the next token. Sets token_start/pos and returns the tag.
 fn Lexer.next_token(self: Lexer) -> i32:
@@ -304,10 +309,10 @@ fn Lexer.next_token(self: Lexer) -> i32:
         if self.pos < slen:
             let c2 = src.byte_at((self.pos) as i64)
             if c2 == CharCode.Slash:  // // comment
-                // Skip the rest of the line (comment is dropped)
                 while self.pos < slen and src.byte_at((self.pos) as i64) != CharCode.Newline:
                     self.pos = self.pos + 1
-                // Recurse to get the next real token
+                if self.emit_comments != 0:
+                    return TokenKind.TK_COMMENT
                 return self.next_token()
             if c2 == CharCode.Eq:  // /=
                 self.pos = self.pos + 1

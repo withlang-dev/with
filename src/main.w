@@ -11,6 +11,7 @@ use Diagnostic
 use Source
 use Compilation
 use ConanClient
+use Fmt
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
@@ -315,8 +316,7 @@ fn run_cli(argc: i32) -> i32:
         with_eprintln("error: doc not yet available in self-hosted compiler")
         return 1
     if cli_command(argc) == "fmt":
-        with_eprintln("error: fmt not yet available in self-hosted compiler")
-        return 1
+        return run_fmt_command(argc)
     let command = cli_command(argc)
     with_eprintln("error: unknown command '" ++ command ++ "'")
     print_usage()
@@ -804,6 +804,48 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
                 return run_rc
         return 0
     run_test_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet, filter)
+
+fn run_fmt_command(argc: i32) -> i32:
+    let write_mode = cli_has_flag(argc, "-w")
+    let list_mode = cli_has_flag(argc, "-l")
+    let check_mode = cli_has_flag(argc, "--check")
+    // Collect file arguments
+    var files: Vec[str] = Vec.new()
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == "-w" or arg == "-l" or arg == "--check":
+            i = i + 1
+            continue
+        if with_str_starts_with(arg, "-") != 0:
+            i = i + 1
+            continue
+        files.push(arg)
+        i = i + 1
+    if files.len() == 0:
+        // Read from stdin
+        let source = with_fs_read_file("/dev/stdin")
+        let formatted = format_source(source)
+        print(formatted)
+        return 0
+    var any_changed = false
+    var fi = 0
+    while fi < files.len() as i32:
+        let path = files.get(fi as i64)
+        let source = with_fs_read_file(path)
+        let formatted = format_source(source)
+        if formatted != source:
+            any_changed = true
+            if list_mode:
+                print(path ++ "\n")
+            if write_mode:
+                with_fs_write_file(path, formatted)
+        if not write_mode and not list_mode and not check_mode:
+            print(formatted)
+        fi = fi + 1
+    if check_mode and any_changed:
+        return 1
+    0
 
 fn run_clean_command -> i32:
     let result = with_system("rm -rf out .with")
