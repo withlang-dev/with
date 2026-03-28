@@ -488,6 +488,18 @@ fn ast_int_from_parts(d0: i32, d1: i32, d2: i32) -> i64:
 fn AstPool.int_lit_value(self: &AstPool, idx: NodeId) -> i64:
     ast_int_from_parts(self.get_data0(idx), self.get_data1(idx), self.get_data2(idx))
 
+fn AstPool.has_comptime_branch_nodes(self: &AstPool) -> bool:
+    for ni in 1..self.node_count():
+        let nid = (ni) as NodeId
+        if self.kind(nid) == NodeKind.NK_COMPTIME:
+            let inner_i32 = self.get_data0(nid)
+            if inner_i32 > 0 and inner_i32 < self.node_count():
+                let inner = (inner_i32) as NodeId
+                let ik = self.kind(inner)
+                if ik == NodeKind.NK_IF_EXPR or ik == NodeKind.NK_FOR:
+                    return true
+    false
+
 fn AstPool.get_extra(self: &AstPool, idx: i32) -> i32:
     self.extra.get(idx as i64)
 
