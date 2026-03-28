@@ -316,6 +316,9 @@ type AstPool {
     // Sealed trait declaration nodes
     sealed_trait_nodes: Vec[i32],
 
+    // Declarations originating from a `comptime:` block
+    comptime_decl_nodes: Vec[i32],
+
     // Move closure nodes
     move_closure_nodes: Vec[i32],
 
@@ -348,6 +351,7 @@ type AstPool {
     fn_param_defaults: HashMap[i32, i32],
     must_use_type_set: HashMap[i32, i32],
     sealed_trait_set: HashMap[i32, i32],
+    comptime_decl_set: HashMap[i32, i32],
     move_closure_set: HashMap[i32, i32],
     non_escaping_closure_set: HashMap[i32, i32],
 
@@ -378,6 +382,7 @@ fn AstPool.new -> AstPool:
         for_meta: Vec.new(),
         must_use_type_nodes: Vec.new(),
         sealed_trait_nodes: Vec.new(),
+        comptime_decl_nodes: Vec.new(),
         move_closure_nodes: Vec.new(),
         non_escaping_closure_nodes: Vec.new(),
         where_meta: Vec.new(),
@@ -396,6 +401,7 @@ fn AstPool.new -> AstPool:
         fn_param_defaults: HashMap.new(),
         must_use_type_set: HashMap.new(),
         sealed_trait_set: HashMap.new(),
+        comptime_decl_set: HashMap.new(),
         move_closure_set: HashMap.new(),
         non_escaping_closure_set: HashMap.new(),
         frozen: 0,
@@ -639,6 +645,14 @@ fn AstPool.mark_sealed_trait(self: &mut AstPool, node: NodeId):
 
 fn AstPool.is_sealed_trait_node(self: &AstPool, node: NodeId) -> i32:
     if self.sealed_trait_set.contains(node as i32): return 1
+    0
+
+fn AstPool.mark_comptime_decl(self: &mut AstPool, node: NodeId):
+    self.comptime_decl_nodes.push(node as i32)
+    self.comptime_decl_set.insert(node as i32, 1)
+
+fn AstPool.is_comptime_decl_node(self: &AstPool, node: NodeId) -> i32:
+    if self.comptime_decl_set.contains(node as i32): return 1
     0
 
 fn AstPool.mark_move_closure(self: &mut AstPool, node: NodeId):

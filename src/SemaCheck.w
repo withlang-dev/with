@@ -264,7 +264,7 @@ fn Sema.check_fn_body(self: Sema, node: i32):
         self.has_gen_yield_type = 0
     let saved_comptime = self.in_comptime_fn
     if (flags / FnFlags.COMPTIME) % 2 == 1:
-        self.in_comptime_fn = 1
+        self.in_comptime_fn = self.in_comptime_fn + 1
 
     // Check body — set expected type to return type for tail expression resolution
     let saved_expected_et = self.expected_expr_type
@@ -697,6 +697,8 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_pipeline(node) as TypeId
 
     if kind == NodeKind.NK_UNSAFE_BLOCK:
+        if self.in_comptime_fn != 0:
+            self.emit_error("unsafe is not allowed in comptime", node)
         return self.check_expr(self.ast.get_data0(node))
 
     if kind == NodeKind.NK_COMPTIME_ERROR:
@@ -749,6 +751,8 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_tuple_destructure(node) as TypeId
 
     if kind == NodeKind.NK_AWAIT:
+        if self.in_comptime_fn != 0:
+            self.emit_error("await is not allowed in comptime", node)
         if self.has_live_await_guard() != 0:
             self.emit_error("E0701: may_suspend call while no_await_guard value is live", node)
         let inner = self.ast.get_data0(node)
@@ -768,9 +772,13 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
 
     if kind == NodeKind.NK_ASYNC_BLOCK:
+        if self.in_comptime_fn != 0:
+            self.emit_error("async is not allowed in comptime", node)
         return self.check_expr(self.ast.get_data0(node))
 
     if kind == NodeKind.NK_SPAWN:
+        if self.in_comptime_fn != 0:
+            self.emit_error("spawn is not allowed in comptime", node)
         let inner = self.ast.get_data0(node)
         self.check_expr(inner)
         if self.expr_is_task_value(inner) == 0:
@@ -778,13 +786,19 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.ty_void
 
     if kind == NodeKind.NK_YIELD:
+        if self.in_comptime_fn != 0:
+            self.emit_error("yield is not allowed in comptime", node)
         let inner = self.check_expr(self.ast.get_data0(node))
         if self.has_gen_yield_type == 0:
             self.emit_error("yield used outside generator function", node)
         return self.ty_void
 
     if kind == NodeKind.NK_COMPTIME:
-        return self.check_expr(self.ast.get_data0(node))
+        let saved_comptime = self.in_comptime_fn
+        self.in_comptime_fn = self.in_comptime_fn + 1
+        let result = self.check_expr(self.ast.get_data0(node))
+        self.in_comptime_fn = saved_comptime
+        return result
 
     if kind == NodeKind.NK_ASYNC_SCOPE:
         let body = self.ast.get_data1(node)
@@ -848,6 +862,8 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     // Check local/param scope (always visible — local bindings are never c_import)
     let tid = self.scope_lookup(sym)
     if tid >= 0:
+        if self.in_comptime_fn != 0 and self.is_mutable_global(sym) != 0:
+            self.emit_error("mutable global access is not allowed in comptime", node)
         let state = self.scope_lookup_state(sym)
         if state == VarState.MOVED:
             if sema_debug_move_enabled() != 0:
@@ -1072,6 +1088,9 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         // Pointer arithmetic: ptr + int → ptr, ptr - int → ptr
         let lhs_k = self.get_type_kind(self.resolve_alias(lhs))
         let rhs_k = self.get_type_kind(self.resolve_alias(rhs))
+        if self.in_comptime_fn != 0 and (lhs_k == TypeKind.TY_PTR or rhs_k == TypeKind.TY_PTR):
+            self.emit_error("raw pointer arithmetic is not allowed in comptime", node)
+            return 0
         if (op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB) and lhs_k == TypeKind.TY_PTR and (rhs_k == TypeKind.TY_INT or rhs == self.ty_i32 or rhs == self.ty_i64 or rhs == self.ty_usize or rhs == self.ty_isize):
             return lhs as i32
         let result = self.arithmetic_result_type(lhs, rhs)
@@ -1296,6 +1315,45 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
     if result_type != 0 and result_type != self.ty_void:
         self.typed_expr_types.insert(node, result_type as i32)
     result_type as i32
+
+fn Sema.fn_symbol_is_comptime(self: Sema, fn_sym: i32) -> i32:
+    if not self.fn_decl_nodes.contains(fn_sym):
+        return 0
+    let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
+    if self.ast.is_comptime_decl_node(fn_node) != 0:
+        return 1
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return 0
+    let flags = self.ast.fn_meta_flags(meta)
+    if (flags / FnFlags.COMPTIME) % 2 == 1:
+        return 1
+    0
+
+fn Sema.check_comptime_call_restriction(self: Sema, fn_sym: i32, node: i32) -> i32:
+    if self.in_comptime_fn == 0 or fn_sym == 0:
+        return 0
+    if self.extern_fn_names.contains(fn_sym):
+        self.emit_error("comptime call of extern function", node)
+        return 1
+    if self.is_intrinsic_fn_sym(fn_sym) != 0:
+        if fn_sym == self.sym_src or fn_sym == self.sym_embed_file or fn_sym == self.sym_todo or fn_sym == self.sym_unreachable:
+            return 0
+        self.emit_error("runtime intrinsic is not allowed in comptime", node)
+        return 1
+    if self.fn_decl_nodes.contains(fn_sym) or self.generic_fn_nodes.contains(fn_sym):
+        if self.fn_symbol_is_comptime(fn_sym) == 0:
+            self.emit_error("comptime can only call comptime functions", node)
+            return 1
+    0
+
+fn Sema.check_comptime_method_restriction(self: Sema, method_sym: i32, node: i32) -> i32:
+    if self.in_comptime_fn == 0 or method_sym == 0:
+        return 0
+    if self.fn_symbol_is_comptime(method_sym) == 0:
+        self.emit_error("comptime can only call comptime functions", node)
+        return 1
+    0
 
 fn Sema.check_return(self: Sema, node: i32) -> i32:
     if self.in_defer != 0:
@@ -2584,6 +2642,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     for ai in 0..arg_count:
         self.mark_moved_if_consumed(self.ast.get_extra(extra_start + ai))
 
+    if self.check_comptime_call_restriction(fn_sym, node) != 0:
+        return 0
+
     // Known function
     if sig_idx >= 0:
         let ret = self.sig_return_type(sig_idx)
@@ -3367,6 +3428,8 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
         let method_key = self.method_key(type_name_sym, field)
         let sig_idx = self.get_sig(method_key)
         if sig_idx >= 0:
+            if self.check_comptime_method_restriction(method_key, node) != 0:
+                return 0
             let mc_ret = self.sig_return_type(sig_idx)
             // For TypeKind.TY_GENERIC_INST receivers, check arg types and substitute return type
             let mc_resolved_tk = self.get_type_kind(resolved)
@@ -3532,6 +3595,8 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
         let method_key = self.method_key(static_type_sym, field)
         let sig_idx = self.get_sig(method_key)
         if sig_idx >= 0:
+            if self.check_comptime_method_restriction(method_key, node) != 0:
+                return 0
             return self.sig_return_type(sig_idx)
 
     0
@@ -4426,4 +4491,3 @@ fn Sema.enum_repr_type(self: Sema, tid: i32) -> i32:
     if opt.is_some():
         return opt.unwrap()
     0
-

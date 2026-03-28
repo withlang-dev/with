@@ -404,6 +404,11 @@ fn Parser.parse_module(self: Parser) -> AstPool:
             self.parse_trait_decl(Visibility.Private)
             self.skip_newlines()
             continue
+        else if self.peek() == TokenKind.TK_KW_COMPTIME:
+            if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON:
+                self.parse_comptime_decl_block()
+                self.skip_newlines()
+                continue
 
         let decl = self.parse_decl()
         if decl != 0:
@@ -469,6 +474,95 @@ fn Parser.parse_decl(self: Parser) -> NodeId:
 
     self.emit_error("expected declaration (fn, type, enum, let, use, extern)")
     (0) as NodeId
+
+fn Parser.mark_decl_comptime(self: Parser, decl: NodeId):
+    if decl == 0:
+        return
+    self.pool.mark_comptime_decl(decl)
+    if self.pool.kind(decl) != NodeKind.NK_FN_DECL:
+        return
+    let flags = self.pool.get_data2(decl)
+    if (flags / FnFlags.COMPTIME) % 2 == 0:
+        self.pool.set_data2(decl, flags + FnFlags.COMPTIME)
+    let meta = self.pool.find_fn_meta(decl)
+    if meta >= 0:
+        let meta_flags = self.pool.fn_meta_flags(meta)
+        if (meta_flags / FnFlags.COMPTIME) % 2 == 0:
+            self.pool.fn_meta.set_i32((meta + 1) as i64, meta_flags + FnFlags.COMPTIME)
+
+fn Parser.mark_new_comptime_decls(self: Parser, start_decl_count: i32):
+    var di = start_decl_count
+    while di < self.pool.decl_count():
+        self.mark_decl_comptime(self.pool.get_decl(di))
+        di = di + 1
+
+fn Parser.parse_comptime_decl_block(self: Parser):
+    if self.expect(TokenKind.TK_KW_COMPTIME) == 0:
+        return
+    if self.expect(TokenKind.TK_COLON) == 0:
+        return
+    if self.peek() != TokenKind.TK_NEWLINE:
+        self.emit_error("expected newline after 'comptime:'")
+        return
+    self.skip_newlines()
+    if self.peek() == TokenKind.TK_EOF:
+        return
+
+    let block_col = column_of(self.source, self.current_start())
+    while self.peek() != TokenKind.TK_EOF:
+        self.skip_newlines()
+        self.skip_attributes()
+        self.skip_newlines()
+        if self.peek() == TokenKind.TK_EOF:
+            break
+        let cur_col = column_of(self.source, self.current_start())
+        if cur_col < block_col:
+            break
+        if cur_col > block_col:
+            self.emit_error("unexpected indentation in comptime block")
+            break
+
+        if self.peek() == TokenKind.TK_KW_PUB:
+            let saved_pos = self.pos
+            self.advance()
+            if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
+                let decl_start = self.pool.decl_count()
+                self.parse_impl_block(Visibility.Public)
+                self.mark_new_comptime_decls(decl_start)
+                self.skip_newlines()
+                continue
+            if self.peek() == TokenKind.TK_KW_TRAIT:
+                let decl_start = self.pool.decl_count()
+                self.parse_trait_decl(Visibility.Public)
+                self.mark_new_comptime_decls(decl_start)
+                self.skip_newlines()
+                continue
+            self.pos = saved_pos
+        else if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
+            let decl_start = self.pool.decl_count()
+            self.parse_impl_block(Visibility.Private)
+            self.mark_new_comptime_decls(decl_start)
+            self.skip_newlines()
+            continue
+        else if self.peek() == TokenKind.TK_KW_TRAIT:
+            let decl_start = self.pool.decl_count()
+            self.parse_trait_decl(Visibility.Private)
+            self.mark_new_comptime_decls(decl_start)
+            self.skip_newlines()
+            continue
+        else if self.peek() == TokenKind.TK_KW_COMPTIME:
+            if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON:
+                self.parse_comptime_decl_block()
+                self.skip_newlines()
+                continue
+
+        let decl = self.parse_decl()
+        if decl != 0:
+            self.mark_decl_comptime(decl)
+            self.pool.add_decl(decl)
+        else:
+            self.recover_to_top_level()
+        self.skip_newlines()
 
 // ── fn decl ──────────────────────────────────────────────────────
 
