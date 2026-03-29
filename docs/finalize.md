@@ -13,10 +13,10 @@ compiler does the same thing, but the code is clean.
 Rule: One file at a time. Verify fixpoint after each file.
 Never batch multiple files.
 
-**Codebase stats (updated 2026-03-24):** 52,064 total lines
-across 62 source files (34 in src/, 28 in src/compiler/).
-Largest files: Codegen.w (10,494), Sema.w (8,982), CImport.w
-(4,628), Parser.w (4,403), MirLower.w (3,918), CCodegen.w (3,775).
+**Codebase stats (updated 2026-03-29):** 54,522 total lines
+across 63 source files. Largest files: CodegenDispatch.w (5,566),
+Parser.w (5,032), SemaCheck.w (4,811), CCodegen.w (4,440),
+Codegen.w (3,974), MirLower.w (3,965).
 
 ---
 
@@ -159,11 +159,10 @@ PK_* (4), DK_* (2), MIR_INTRINSIC_* (54)
 
 ---
 
-## Phase 2: Handle Types (distinct i32)
+## Phase 2: Handle Types (distinct i32) — DONE ✓
 
-`distinct` keyword is fully implemented. Transparent at LLVM level
-(no wrapper struct). BlockId migration done. NodeId/TypeId deferred
-(450+ sites each, mechanical but very large).
+All three handle types migrated to `distinct i32`:
+BlockId (Mir.w), NodeId (Ast.w), TypeId (Sema.w).
 
 ### 2.0 Implement `distinct` keyword support — DONE ✓
 
@@ -174,24 +173,26 @@ PK_* (4), DK_* (2), MIR_INTRINSIC_* (54)
 - [x] 21-test compatibility suite (`test/behavior/behav_distinct_compat.w`)
 - [x] `make build && make fixpoint`
 
-### 2.1 type NodeId = distinct i32
+### 2.1 type NodeId = distinct i32 — DONE ✓
 
-**File:** src/Ast.w — **Deferred** (450+ sites across 8 files)
+**File:** src/Ast.w — Two-phase migration (Phase A: type alias, Phase B: flip to distinct).
+Commits: `de304e7`, `551db26`.
 
-- [ ] Add `type NodeId = distinct i32` to src/Ast.w
-- [ ] Update AstPool functions to accept/return NodeId
-- [ ] Update all consumer files (Parser.w, Resolve.w, Sema.w,
+- [x] Add `type NodeId = distinct i32` to src/Ast.w
+- [x] Update AstPool functions to accept/return NodeId
+- [x] Update all consumer files (Parser.w, Resolve.w, Sema.w,
       Codegen.w, MirLower.w, render.w, etc.)
-- [ ] `make build && make fixpoint`
+- [x] `make build && make fixpoint`
 
-### 2.2 type TypeId = distinct i32
+### 2.2 type TypeId = distinct i32 — DONE ✓
 
-**File:** src/Sema.w — **Deferred** (300+ sites)
+**File:** src/Sema.w — Two-phase migration (Phase A: type alias, Phase B: flip to distinct).
+Commits: `4a54003`, `1aa2f50`.
 
-- [ ] Add `type TypeId = distinct i32` to src/Sema.w
-- [ ] Update type table functions to accept/return TypeId
-- [ ] Update all consumer files
-- [ ] `make build && make fixpoint`
+- [x] Add `type TypeId = distinct i32` to src/Sema.w
+- [x] Update type table functions to accept/return TypeId
+- [x] Update all consumer files
+- [x] `make build && make fixpoint`
 
 ### 2.3 type BlockId = distinct i32 — DONE ✓
 
@@ -399,8 +400,7 @@ already correct. Remaining: remove redundant codegen parallel tracking.
 - [x] Layer 1: place_sema_types in MIR (every place carries sema type)
 - [x] Layer 2: Replace Option/Result reverse lookups with sema queries
 - [x] Layer 3: Simplify caches — direct key→LLVM maps, set-only tracking
-- [ ] Instantiation cache: `(base_type, type_args)` → TypeId
-- [ ] Type substitution function
+- [x] Instantiation cache: replaced string-keyed cache with i64 hash (commit `9775c13`)
 
 ---
 
@@ -410,26 +410,30 @@ See Part I Phase 5. Driver.w deleted. main.w routes through Compilation.
 
 ---
 
-## Phase II-4: Hardcode Removal
+## Phase II-4: Hardcode Removal — DONE ✓
 
-See Part I Phase 6. Phase 6.1 done (builtin traits → lang_trait_syms).
+See Part I Phase 6. All sub-phases complete:
+Phase 6.1 done (builtin traits → lang_trait_syms).
+Phase 6.2 done (pre-interned 36 dispatch symbols).
 Phase 6.3 done (--no-prelude verified with automated tests).
-Phase 6.2 (string dispatch) remains open.
 
 ---
 
 ## Phase II-5: C Backend Completion
 
-**Current state:** CCodegen.w (3,775 lines) reads MIR. `--emit-c`
-flag works. Runtime files exist. Not yet capable of
-cross-compiling the compiler for 4 targets.
+**Current state:** CCodegen.w (4,440 lines). All 54 MIR intrinsics
+implemented (commit `f434b08`). `--emit-c` flag works. Runtime files
+exist. Not yet tested for self-compile or cross-compilation.
 
-### 5.1 Audit CCodegen Coverage Gaps
+### 5.1 Audit CCodegen Coverage Gaps — DONE ✓
 
-- [ ] Compile test programs with `--emit-c`, verify output compiles
-- [ ] List all 54 MIR intrinsics and verify CCodegen handles each
-- [ ] List all runtime functions called by CCodegen and verify they exist
-- [ ] `make build && make fixpoint`
+All 37 remaining intrinsics implemented (commit `f434b08`).
+CCodegen now handles all 54 MIR intrinsics.
+
+- [x] Compile test programs with `--emit-c`, verify output compiles
+- [x] List all 54 MIR intrinsics and verify CCodegen handles each
+- [x] List all runtime functions called by CCodegen and verify they exist
+- [x] `make build && make fixpoint`
 
 ### 5.2 Self-Compile via C Backend
 
@@ -461,40 +465,62 @@ cross-compiling the compiler for 4 targets.
 
 ## Phase II-6: Tooling
 
-### 6.1 `with fmt` — Code Formatter
+### 6.1 `with fmt` — Code Formatter — DONE ✓
 
-**Current state:** Stub in main.w.
+Implemented in main.w. Commit: `e72847c`.
+Supports `-w` (write) and `-l` (list) modes.
 
-- [ ] Design formatting rules (indent, width, whitespace)
-- [ ] Implement as AST round-trip: parse → walk → emit
-- [ ] Wire `with fmt` command in main.w
-- [ ] Run on compiler source, verify fixpoint holds
-- [ ] `make build && make fixpoint`
+- [x] Design formatting rules (indent, width, whitespace)
+- [x] Implement as AST round-trip: parse → walk → emit
+- [x] Wire `with fmt` command in main.w
+- [x] Run on compiler source, verify fixpoint holds
+- [x] `make build && make fixpoint`
 
-### 6.2 `with test` — Zero-Config Test Runner
+### 6.2 `with test` — Zero-Config Test Runner — DONE ✓
 
-**Current state:** Basic test runner exists. No `@[test]` discovery.
+`@[test]` attribute discovery and `--filter` implemented.
+Commit: `cbcfa85`.
 
-- [ ] Implement `@[test]` attribute support
-- [ ] Test function discovery and reporting
-- [ ] `--filter <pattern>` flag
-- [ ] `make build && make fixpoint`
+- [x] Implement `@[test]` attribute support
+- [x] Test function discovery and reporting
+- [x] `--filter <pattern>` flag
+- [x] `make build && make fixpoint`
 
-### 6.3 `with bench` — Zero-Config Benchmarking
+### 6.3 `with bench` — Zero-Config Benchmarking — DONE ✓
 
-**Current state:** No command handler.
+`@[bench]` attribute + `bench_*` naming convention. Go-style
+calibration (ramp up until ~1s elapsed). Reports name, N, ns/op.
+`--filter` support. `lib/test/bench.w` provides the `Bench` type.
 
-- [ ] Design `@[bench]` attribute support
-- [ ] Implement benchmark runner with timing
-- [ ] `make build && make fixpoint`
+- [x] Design `@[bench]` attribute support
+- [x] Implement benchmark runner with timing
+- [x] `make build && make fixpoint`
 
-### 6.4 Error Messages with Suggestions
+### 6.4 Error Messages with Suggestions — Partially DONE
 
+"Did you mean?" suggestions for undefined variables and types
+implemented (Levenshtein distance). Commit: `169dac7`.
+
+- [x] Add "did you mean?" for undefined variables (Levenshtein)
 - [ ] Audit errors missing source locations or suggestions
-- [ ] Add "did you mean?" for undefined variables (Levenshtein)
 - [ ] Add signature display for wrong argument count
 - [ ] Verify every error has a location
 - [ ] `make build && make fixpoint`
+
+---
+
+## Phase II-7: Comptime System
+
+Compile-time evaluation system. Phases 1-4 and 7-9 implemented.
+
+- [x] Phase 1: Basic comptime expression evaluation (commit `c2b0044`)
+- [x] Phase 3: Integrate comptime transform before sema — dead branch pruning (commit `9472580`)
+- [x] Phase 4: Remove ad-hoc comptime evaluation from MIR lowering (commit `cde6297`)
+- [x] Phase 7: Comptime derive lowering (commit `a9448d7`)
+- [x] Phase 8: Comptime intrinsics (commit `949b021`)
+- [x] Phase 9: Comptime collection freezing (commit `0250772`)
+- [ ] Remaining phases (if any)
+- [x] `make build && make fixpoint`
 
 ---
 
@@ -538,16 +564,19 @@ sites, added MirLower handler. Sema already returned TY_ERR.
 
 ### P11: File Complexity Budget — DONE ✓
 
-Split Codegen.w from 10,559 → 3,993 lines (well under 5,000 budget).
-Two new files: CodegenDispatch.w (5,518 lines — MIR dispatch + mono +
-downstream helpers) and CodegenTraits.w (1,068 lines — trait collection
-+ vtable generation). Uses `use Codegen` pattern to define methods on
-Codegen type from separate files.
+Split Codegen.w from 10,559 → 3,974 lines. Two new files:
+CodegenDispatch.w (5,566 lines) and CodegenTraits.w (1,380 lines).
+
+Split Sema.w from 9,112 → 1,997 lines (commit `c694460`). Three new
+files: SemaCheck.w (4,811 lines), SemaDecl.w (1,761 lines),
+SemaDiag.w (1,130 lines).
+
+All files now under or near the 5,000 line budget.
 
 - [x] Split Codegen.w: CodegenDispatch.w + CodegenTraits.w
+- [x] Split Sema.w: SemaCheck.w + SemaDecl.w + SemaDiag.w
 - [x] Each split verified with fixpoint
-- [x] Codegen.w: 3,993 lines (under 5,000 budget)
-- [ ] Evaluate Sema.w for potential splits
+- [x] Codegen.w: 3,974 lines, Sema.w: 1,997 lines (both under budget)
 - [x] `make build && make fixpoint`
 
 ### P12: Compile Time Tracking — DONE ✓
@@ -600,27 +629,16 @@ For each change:
 
 If the build breaks, stop and bisect. Do not batch changes.
 
-**Recommended order:**
+**Remaining work:**
 
-1. Phase 4 (quality improvements) — lowest risk, immediate benefit
-2. Phase 1.5 + 1.6 (Sema.w small enums) — well-contained
-3. Phase 1.7 (Mir.w enums) — well-contained
-4. Phase 1.8 (Resolve.w enums) — small
-5. Phase 1.4 (Token.w enums) — medium scope
-6. Phase 1.1 (Ast.w NodeKind) — largest enum, most consumers
-7. Phase 2 (distinct types) — depends on enum conversions + `distinct` keyword
-8. Phase 3 (idiomatic patterns) — can be done incrementally
-9. Phase 5 (pipeline ownership) — nearly done, just delete Driver
-10. Phase 6 (hardcode removal) — depends on Phase 5 and generics
-11. Phase II-5 (C backend) — depends on core compiler stability
-12. Phase II-6 (tooling) — independent, can be done anytime
-13. Principle enforcement — ongoing, interleave with other phases
+1. Phase II-5.2-5.5 (C backend self-compile + cross-compilation)
+2. Phase II-6.3 (`with bench`)
+3. Phase II-6.4 (remaining error message improvements)
+4. P13 (C backend round-trip tests)
+5. P15 (seed safety check + C seed replacement)
+6. Comptime system (phases 1-4, 7-9 implemented, ongoing)
 
-**Dependencies:**
-- Phase 2.1/2.2 unblocked (`distinct` implemented) but deferred (large)
-- Phase 6.2 partially depends on generics (TypeId-based dispatch)
-- Phase 1 complete (all enum conversions done)
-- Phase 3.5 complete (generic erasure fixed, f-strings migrated)
+All other phases are complete.
 
 ---
 
@@ -630,18 +648,18 @@ If the build breaks, stop and bisect. Do not batch changes.
       OP_*, UOP_*, TDK_*, VIS_*, DEF_KIND_*, SCOPE_KIND_*,
       IMPORT_KIND_*, FSTR_SEG_*, MIR_INTRINSIC_* constants are
       discriminant enums
-- [ ] NodeId, TypeId, BlockId are distinct i32 types
+- [x] NodeId, TypeId, BlockId are distinct i32 types
 - [x] No if-chains for node kind dispatch (all converted to match)
 - [x] All 9 AstPool metadata lookups use O(1) HashMap
 - [x] Sema scope lookup uses HashMap overlay
 - [x] No magic number characters in Lexer.w
 - [x] find_source_arg documented and deduplicated
 - [x] Driver deleted or reduced to thin adapter
-- [ ] main.w routes through compiler.Compilation
+- [x] main.w routes through compiler.Compilation
 - [x] No string-based method dispatch in Codegen (pre-interned symbols)
 - [x] `--no-prelude` makes println unavailable (verified + automated tests)
 - [x] Compiler source uses f-strings consistently (zero int_to_string)
 - [ ] `--emit-c` cross-compiles the compiler for four targets
-- [ ] `with fmt` exists and compiler source passes it
+- [x] `with fmt` exists and compiler source passes it
 - [ ] All tests pass
 - [ ] `make fixpoint` holds after every change

@@ -1291,7 +1291,7 @@ fn Codegen.restore_loop_state(self: Codegen, state: LoopState):
 
 fn Codegen.push_loop_context(self: Codegen, break_bb: i64, continue_bb: i64, result_alloca: i64, label_sym: i32):
     let idx = self.loop_depth
-    let mut labels: Vec[i32] = self.loop_labels
+    var labels: Vec[i32] = self.loop_labels
     with_codegen_loop_set_break(idx, break_bb)
     with_codegen_loop_set_continue(idx, continue_bb)
     with_codegen_loop_set_result(idx, result_alloca)
@@ -1300,7 +1300,7 @@ fn Codegen.push_loop_context(self: Codegen, break_bb: i64, continue_bb: i64, res
     self.loop_depth = idx + 1
 
 fn Codegen.pop_loop_context(self: Codegen):
-    let mut labels: Vec[i32] = self.loop_labels
+    var labels: Vec[i32] = self.loop_labels
     let _ = labels.pop()
     self.loop_labels = labels
     self.loop_depth = self.loop_depth - 1

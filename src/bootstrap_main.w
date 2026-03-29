@@ -202,7 +202,7 @@ fn print_help_let:
     print(
         "Bindings and constants:\n\n" ++
         "  let value = 42\n" ++
-        "  let mut total = 0\n" ++
+        "  var total = 0\n" ++
         "  const NAME: str = \"with\"\n"
     )
 

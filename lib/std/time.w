@@ -3,6 +3,7 @@
 // Provides basic time operations wrapping C stdlib functions.
 
 extern fn with_time_now() -> i64
+extern fn with_clock_nanos() -> i64
 extern fn usleep(usecs: i32) -> i32
 extern fn clock() -> i64
 
@@ -35,6 +36,10 @@ pub fn sleep_secs(secs: i32) -> i32:
 // Async sleep for Duration values.
 pub async fn sleep(d: Duration) -> i32:
     usleep(d * 1000)
+
+// Get monotonic time in nanoseconds (for benchmarking)
+pub fn now_ns() -> i64:
+    with_clock_nanos()
 
 // Get CPU clock ticks (for basic benchmarking)
 pub fn clock_ticks -> i64:

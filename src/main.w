@@ -65,6 +65,12 @@ type TestDiscovery {
     test_names: Vec[str],
 }
 
+type BenchDiscovery {
+    parse_ok: bool,
+    has_main: bool,
+    bench_names: Vec[str],
+}
+
 fn empty_test_discovery -> TestDiscovery:
     TestDiscovery { parse_ok: false, has_main: false, test_names: Vec.new() }
 
@@ -290,6 +296,8 @@ fn run_cli(argc: i32) -> i32:
         return dump_tokens(source, deterministic_mode)
     if cli_command(argc) == "test":
         return run_test_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+    if cli_command(argc) == "bench":
+        return run_bench_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
     if cli_command(argc) == "version" or cli_command(argc) == "--version":
         print("with WITH_VERSION_PLACEHOLDER\n")
         return 0
@@ -618,6 +626,53 @@ fn discover_test_functions(text: str) -> TestDiscovery:
                 test_names.push(fn_name)
     TestDiscovery { parse_ok: true, has_main, test_names }
 
+fn discover_bench_functions(text: str) -> BenchDiscovery:
+    var lexer = Lexer.init(text, 0)
+    let tokens = lexer.tokenize()
+    var intern = InternPool.init()
+    var diags = DiagnosticList.init()
+    var parser = Parser.init(tokens, text, 0, intern, diags)
+    let pool = parser.parse_module()
+    intern = parser.intern
+    diags = parser.diags
+
+    let bench_names: Vec[str] = Vec.new()
+    if diags.has_errors():
+        return BenchDiscovery { parse_ok: false, has_main: false, bench_names }
+
+    var has_main = false
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NodeKind.NK_FN_DECL:
+            continue
+        let fn_name = intern.resolve(pool.get_data0(decl))
+        if fn_name == "main":
+            has_main = true
+        if with_str_starts_with(fn_name, "bench_") != 0:
+            bench_names.push(fn_name)
+        else:
+            let meta = pool.find_fn_meta(decl)
+            if meta >= 0 and (pool.fn_meta_flags(meta) % 65536) / 32768 == 1:
+                bench_names.push(fn_name)
+    BenchDiscovery { parse_ok: true, has_main, bench_names }
+
+fn synthesize_bench_main_source(text: str, bench_names: Vec[str]) -> str:
+    var out = text
+    if out.len() > 0 and with_str_byte_at(out, with_str_len(out) - 1) != 10:
+        out = out ++ "\n"
+    out = out ++ "\nuse test.bench\n"
+    out = out ++ "extern fn with_getenv_str(name: str) -> str\n"
+    out = out ++ "extern fn with_str_contains(s: str, needle: str) -> i32\n"
+    out = out ++ "\nfn main:\n"
+    out = out ++ "    let __with_bench_filter = with_getenv_str(\"WITH_BENCH_FILTER\")\n"
+    for bi in 0..bench_names.len() as i32:
+        let bench_name = bench_names.get(bi as i64)
+        out = out ++ "    if __with_bench_filter.len() == 0 or with_str_contains(\"" ++ bench_name ++ "\", __with_bench_filter) != 0:\n"
+        out = out ++ "        var __b = Bench.new()\n"
+        out = out ++ "        __b.run(" ++ bench_name ++ ")\n"
+        out = out ++ "        __b.report(\"" ++ bench_name ++ "\")\n"
+    out
+
 fn synthesize_test_main_source(text: str, test_names: Vec[str]) -> str:
     var out = text
     if out.len() > 0 and with_str_byte_at(out, with_str_len(out) - 1) != 10:
@@ -805,6 +860,62 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
         return 0
     run_test_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet, filter)
 
+fn run_bench_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, filter: str) -> i32:
+    let text = with_fs_read_file(target)
+    if text.len() == 0:
+        with_eprintln("error: could not read '" ++ target ++ "'")
+        return 1
+    let discovery = discover_bench_functions(text)
+    if not discovery.parse_ok:
+        with_eprintln("error: parse failed for '" ++ target ++ "'")
+        return 1
+    if discovery.bench_names.len() == 0:
+        with_eprintln("error: no benchmarks found in '" ++ target ++ "'")
+        return 1
+    let synthetic_source = synthesize_bench_main_source(text, discovery.bench_names)
+    var comp = Compilation.init()
+    comp.configure(opt_level, no_std, alloc_mode)
+    comp.set_prelude_mode(prelude_mode)
+    comp.set_debug_info(debug_info)
+    let bin_path = comp.build_binary_from_source(target, synthetic_source)
+    if bin_path == "":
+        with_eprintln("error: bench build failed for '" ++ target ++ "'")
+        return 1
+    var cmd = test_shell_quote(bin_path)
+    if filter.len() > 0:
+        cmd = "WITH_BENCH_FILTER=" ++ test_shell_quote(filter) ++ " " ++ cmd
+    let rc = with_system(cmd)
+    cleanup_binary_artifacts(bin_path)
+    rc
+
+fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+    let filter = cli_test_filter(argc)
+    let target = find_source_arg(argc)
+    if target == "":
+        with_eprintln("error: 'bench' requires a source file or directory argument")
+        return 1
+    if test_target_is_directory(target):
+        let files = collect_test_files(target)
+        if files.len() == 0:
+            with_eprintln("error: no sources found in '" ++ target ++ "'")
+            return 1
+        var any_failed = false
+        for fi in 0..files.len() as i32:
+            let file = files.get(fi as i64)
+            let text = with_fs_read_file(file)
+            if text.len() == 0:
+                continue
+            let disc = discover_bench_functions(text)
+            if not disc.parse_ok or disc.bench_names.len() == 0:
+                continue
+            let rc = run_bench_file(file, opt_level, no_std, alloc_mode, prelude_mode, debug_info, filter)
+            if rc != 0:
+                any_failed = true
+        if any_failed:
+            return 1
+        return 0
+    run_bench_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, filter)
+
 fn run_fmt_command(argc: i32) -> i32:
     let write_mode = cli_has_flag(argc, "-w")
     let list_mode = cli_has_flag(argc, "-l")
@@ -968,11 +1079,11 @@ fn print_help_let:
     print(
         "Bindings and constants:\n\n" ++
         "  let answer = 42\n" ++
-        "  let mut total = 0\n" ++
+        "  var total = 0\n" ++
         "  const VERSION: str = \"1.0.0\"\n\n" ++
         "Notes:\n\n" ++
-        "  - 'let' introduces locals.\n" ++
-        "  - Mutability is written as 'let mut'. There is no 'var' declaration form.\n" ++
+        "  - 'let' introduces immutable locals.\n" ++
+        "  - 'var' introduces mutable locals.\n" ++
         "  - 'const' values are compile-time constants and inline at use sites.\n"
     )
 

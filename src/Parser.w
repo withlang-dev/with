@@ -32,6 +32,7 @@ type Parser {
     pending_test: i32,
     pending_before: i32,
     pending_after: i32,
+    pending_bench: i32,
     pending_derive_start: i32,
     pending_derive_count: i32,
     pending_sealed: i32,
@@ -71,6 +72,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_test: 0,
         pending_before: 0,
         pending_after: 0,
+        pending_bench: 0,
         pending_derive_start: 0,
         pending_derive_count: 0,
         pending_sealed: 0,
@@ -234,6 +236,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_test = 0
     self.pending_before = 0
     self.pending_after = 0
+    self.pending_bench = 0
     self.pending_sealed = 0
     self.pending_flags = 0
     self.pending_packed = 0
@@ -307,6 +310,9 @@ fn Parser.skip_attributes(self: Parser):
             self.advance()
         else if self.is_ident_named("after"):
             self.pending_after = 1
+            self.advance()
+        else if self.is_ident_named("bench"):
+            self.pending_bench = 1
             self.advance()
         else if self.is_ident_named("sealed"):
             // Already handled by standalone check above
@@ -651,6 +657,8 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
         flags = flags + FnFlags.BEFORE
     if self.pending_after != 0:
         flags = flags + FnFlags.AFTER
+    if self.pending_bench != 0:
+        flags = flags + FnFlags.BENCH
 
     // Store extra: type params then params already in extra from parsing.
     // We encode: d0=name, d1=body, d2=flags
@@ -1646,6 +1654,7 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> NodeId:
     self.advance()
     var is_mut = is_var
     if not is_var and self.peek() == TokenKind.TK_KW_MUT:
+        self.emit_error("'let mut' is not supported; use 'var' for mutable bindings")
         is_mut = true
         self.advance()
     let name = self.expect_ident()
@@ -4027,6 +4036,7 @@ fn Parser.parse_let_binding(self: Parser) -> NodeId:
     self.advance()
     var is_mut = is_var
     if not is_var and self.peek() == TokenKind.TK_KW_MUT:
+        self.emit_error("'let mut' is not supported; use 'var' for mutable bindings")
         is_mut = true
         self.advance()
 
