@@ -1870,6 +1870,20 @@ fn Codegen.ensure_memcmp_declared(self: Codegen) -> i64:
     let fn_ty = self.get_memcmp_fn_type()
     wl_add_function(self.llmod, "memcmp", fn_ty)
 
+fn Codegen.compare_value_eq(self: Codegen, lhs: i64, rhs: i64, val_ty: i64, op: i32) -> i64:
+    let kind = wl_get_type_kind(val_ty)
+    if self.is_str_type(val_ty):
+        return self.compare_str_eq(lhs, rhs, op)
+    if kind == wl_struct_type_kind() or kind == wl_array_type_kind():
+        return self.compare_aggregate_eq(lhs, rhs, op)
+    if kind == wl_float_type_kind() or kind == wl_double_type_kind():
+        if op == BinaryOp.OP_EQ:
+            return wl_build_fcmp(self.builder, wl_real_oeq(), lhs, rhs)
+        return wl_build_fcmp(self.builder, wl_real_one(), lhs, rhs)
+    if op == BinaryOp.OP_EQ:
+        return wl_build_icmp(self.builder, wl_int_eq(), lhs, rhs)
+    wl_build_icmp(self.builder, wl_int_ne(), lhs, rhs)
+
 fn Codegen.compare_aggregate_eq(self: Codegen, lhs: i64, rhs: i64, op: i32) -> i64:
     let lhs_ty = wl_type_of(lhs)
     let rhs_ty = wl_type_of(rhs)
@@ -1898,19 +1912,29 @@ fn Codegen.compare_aggregate_eq(self: Codegen, lhs: i64, rhs: i64, op: i32) -> i
         while fi < field_count:
             let lf = wl_build_extract_value(self.builder, lhs, fi)
             let rf = wl_build_extract_value(self.builder, rhs, fi)
-            let fk = wl_get_type_kind(wl_struct_get_type_at(lhs_ty, fi))
-            var field_eq: i64 = 0
-            if fk == wl_struct_type_kind():
-                field_eq = self.compare_aggregate_eq(lf, rf, BinaryOp.OP_EQ)
-            else if self.is_str_type(wl_struct_get_type_at(lhs_ty, fi)):
-                field_eq = self.compare_str_eq(lf, rf, BinaryOp.OP_EQ)
-            else:
-                if fk == wl_float_type_kind() or fk == wl_double_type_kind():
-                    field_eq = wl_build_fcmp(self.builder, wl_real_oeq(), lf, rf)
-                else:
-                    field_eq = wl_build_icmp(self.builder, wl_int_eq(), lf, rf)
+            let field_ty = wl_struct_get_type_at(lhs_ty, fi)
+            let field_eq = self.compare_value_eq(lf, rf, field_ty, BinaryOp.OP_EQ)
             result = wl_build_and(self.builder, result, field_eq)
             fi = fi + 1
+        if op == BinaryOp.OP_EQ:
+            return result
+        return wl_build_not(self.builder, result)
+
+    if ty_kind == wl_array_type_kind():
+        let elem_count = wl_get_array_length(lhs_ty) as i32
+        if elem_count == 0:
+            if op == BinaryOp.OP_EQ:
+                return wl_const_int(i1_ty, 1, 0)
+            return wl_const_int(i1_ty, 0, 0)
+        let elem_ty = wl_get_element_type(lhs_ty)
+        var result = wl_const_int(i1_ty, 1, 0)
+        var ai = 0
+        while ai < elem_count:
+            let lf = wl_build_extract_value(self.builder, lhs, ai)
+            let rf = wl_build_extract_value(self.builder, rhs, ai)
+            let elem_eq = self.compare_value_eq(lf, rf, elem_ty, BinaryOp.OP_EQ)
+            result = wl_build_and(self.builder, result, elem_eq)
+            ai = ai + 1
         if op == BinaryOp.OP_EQ:
             return result
         return wl_build_not(self.builder, result)
