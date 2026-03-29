@@ -3846,9 +3846,6 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     // Pass 1.3: synthesize missing impl methods from trait defaults.
     self.generate_default_trait_methods()
 
-    // Pass 1.35: generate derive(Clone) methods.
-    self.generate_clone_derives()
-
     // Pass 1.25: synthesize trait vtables after all method declarations exist.
     self.generate_trait_vtables()
 
@@ -3947,4 +3944,3 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
         else:
             self.coerce_int(main_call, i32_ty)
     let _ = wl_build_ret(self.builder, exit_val)
-

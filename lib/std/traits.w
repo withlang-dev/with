@@ -23,6 +23,9 @@ pub trait Display =
 pub trait Default =
     fn default() -> Self
 
+pub trait Clone =
+    fn clone(self: &Self) -> Self
+
 pub trait Drop =
     fn drop(self) -> void
 
@@ -109,4 +112,3 @@ impl Hash for str =
             h = (h *% 1099511628211) ^ self[i]
             i = i + 1
         h
-
