@@ -119,6 +119,17 @@ fn comptime_source_loc(text: str, offset: i32) -> ComptimeSourceLoc:
         i = i + 1
     ComptimeSourceLoc { line: line, col: col }
 
+fn comptime_type_name_has_base(type_name: str, base_name: str) -> i32:
+    if type_name == base_name:
+        return 1
+    if type_name.len() <= base_name.len():
+        return 0
+    if type_name.slice(0, base_name.len()) != base_name:
+        return 0
+    if type_name.byte_at(base_name.len() as i64) == 91:
+        return 1
+    0
+
 fn comptime_eval_result_invalid() -> ComptimeEvalResult:
     ComptimeEvalResult {
         value: comptime_value_invalid(),
@@ -276,6 +287,38 @@ fn ComptimeEvaluator.current_source_text(self: ComptimeEvaluator) -> str:
 fn ComptimeEvaluator.push_extra_value(self: ComptimeEvaluator, value: ComptimeValue):
     self.extra_values.push(value)
 
+fn ComptimeEvaluator.binding_sym(self: ComptimeEvaluator, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_IDENT:
+        return self.ast.get_data0(node)
+    if kind == NodeKind.NK_GROUPED:
+        return self.binding_sym(self.ast.get_data0(node))
+    0
+
+fn ComptimeEvaluator.copy_extra_slice(self: ComptimeEvaluator, start: i32, count: i32) -> i32:
+    let new_start = self.extra_values.len() as i32
+    for i in 0..count:
+        self.extra_values.push(self.extra_values.get((start + i) as i64))
+    new_start
+
+fn ComptimeEvaluator.copy_vec_snapshot(self: ComptimeEvaluator, value: ComptimeValue) -> i32:
+    self.copy_extra_slice(value.extra_start, value.extra_count)
+
+fn ComptimeEvaluator.copy_map_snapshot(self: ComptimeEvaluator, value: ComptimeValue) -> i32:
+    self.copy_extra_slice(value.extra_start, value.extra_count * 2)
+
+fn ComptimeEvaluator.rebind_collection_receiver(self: ComptimeEvaluator, diags: &mut DiagnosticList, recv_node: i32, value: ComptimeValue, node: i32) -> ComptimeControl:
+    let sym = self.binding_sym(recv_node)
+    if sym == 0:
+        return self.fail(diags, node, "comptime collection mutation requires a local identifier receiver")
+    let idx = self.lookup_slot_index(sym)
+    if idx < 0:
+        return self.fail(diags, node, "comptime collection mutation requires a local identifier receiver")
+    self.bind_value(sym, value, self.slot_muts.get(idx as i64))
+    comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+
 fn ComptimeEvaluator.node_type_or(self: ComptimeEvaluator, node: i32, fallback: i32) -> i32:
     if self.sema.typed_expr_types.contains(node):
         let typed = self.sema.typed_expr_types.get(node).unwrap()
@@ -283,21 +326,52 @@ fn ComptimeEvaluator.node_type_or(self: ComptimeEvaluator, node: i32, fallback: 
             return typed
     fallback
 
-fn ComptimeEvaluator.static_receiver_type(self: ComptimeEvaluator, node: i32) -> i32:
-    let typed = self.node_type_or(node, 0)
-    if typed != 0:
-        return typed
+fn ComptimeEvaluator.static_type_expr(self: ComptimeEvaluator, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
+    if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+        return self.sema.resolve_type_expr(node) as i32
+    if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
         let prim = self.sema.primitive_type_by_sym(sym)
         if prim != 0:
             return prim
         if self.sema.named_types.contains(sym):
             return self.sema.named_types.get(sym).unwrap()
+        return 0
+    if kind == NodeKind.NK_INDEX:
+        let base = self.ast.get_data0(node)
+        let base_sym =
+            if self.ast.kind(base) == NodeKind.NK_IDENT or self.ast.kind(base) == NodeKind.NK_TYPE_NAMED:
+                self.ast.get_data0(base)
+            else:
+                0
+        if base_sym == 0:
+            return 0
+        let arg1 = self.static_type_expr(self.ast.get_data1(node))
+        if arg1 == 0:
+            return 0
+        let args: Vec[i32] = Vec.new()
+        args.push(arg1)
+        var arg_count = 1
+        if self.ast.get_data2(node) != 0:
+            let arg2 = self.static_type_expr(self.ast.get_data2(node))
+            if arg2 == 0:
+                return 0
+            args.push(arg2)
+            arg_count = 2
+        return self.sema.find_generic_inst_type(base_sym, args, arg_count) as i32
     0
+
+fn ComptimeEvaluator.static_receiver_type(self: ComptimeEvaluator, node: i32) -> i32:
+    let sym = self.binding_sym(node)
+    if sym != 0:
+        if self.lookup_slot_index(sym) >= 0:
+            return 0
+        if self.find_module_let_decl(sym) != 0:
+            return 0
+    self.static_type_expr(node)
 
 fn ComptimeEvaluator.struct_field_index(self: ComptimeEvaluator, type_id: i32, field_sym: i32) -> i32:
     let field_count = self.sema.type_reflection_field_count(type_id)
@@ -361,6 +435,204 @@ fn ComptimeEvaluator.eval_type_variants_array(self: ComptimeEvaluator, type_id: 
         self.extra_values.push(payload_values.get(pi as i64))
     comptime_control_value(comptime_value_array(array_tid, arr_start, variant_count))
 
+fn ComptimeEvaluator.eval_static_collection_new(self: ComptimeEvaluator, diags: &mut DiagnosticList, result_type: i32, node: i32, arg_count: i32) -> ComptimeControl:
+    if arg_count != 0:
+        return self.fail(diags, node, "collection.new() takes no arguments in comptime")
+    let resolved = self.sema.resolve_alias(result_type)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return self.fail(diags, node, "collection.new() requires a concrete generic type")
+    let type_name = self.sema.type_name(result_type)
+    let empty_start = self.extra_values.len() as i32
+    if comptime_type_name_has_base(type_name, "Vec") != 0:
+        return comptime_control_value(comptime_value_vec(result_type, empty_start, 0))
+    if comptime_type_name_has_base(type_name, "HashMap") != 0:
+        return comptime_control_value(comptime_value_map(result_type, empty_start, 0))
+    self.fail(diags, node, "static method is not comptime-evaluable yet")
+
+fn ComptimeEvaluator.eval_vec_method_call(self: ComptimeEvaluator, diags: &mut DiagnosticList, recv_node: i32, recv_value: ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    let method = self.pool.resolve(field)
+
+    if method == "push":
+        if arg_count != 1:
+            return self.fail(diags, node, "Vec.push() expects exactly one argument")
+        let arg_signal = self.eval_expr(diags, self.ast.get_extra(extra_start))
+        if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return arg_signal
+        let new_start = self.copy_vec_snapshot(recv_value)
+        self.extra_values.push(arg_signal.value)
+        let updated = comptime_value_vec(recv_value.type_id, new_start, recv_value.extra_count + 1)
+        return self.rebind_collection_receiver(diags, recv_node, updated, node)
+
+    if method == "len":
+        if arg_count != 0:
+            return self.fail(diags, node, "Vec.len() takes no arguments")
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), recv_value.extra_count as i64))
+
+    if method == "contains":
+        if arg_count != 1:
+            return self.fail(diags, node, "Vec.contains() expects exactly one argument")
+        let needle_signal = self.eval_expr(diags, self.ast.get_extra(extra_start))
+        if needle_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return needle_signal
+        for i in 0..recv_value.extra_count:
+            let item = self.extra_values.get((recv_value.extra_start + i) as i64)
+            if comptime_values_equal(item, needle_signal.value, self.extra_values) != 0:
+                return comptime_control_value(comptime_value_bool(1))
+        return comptime_control_value(comptime_value_bool(0))
+
+    if method == "get":
+        if arg_count != 1:
+            return self.fail(diags, node, "Vec.get() expects exactly one argument")
+        let index_signal = self.eval_expr(diags, self.ast.get_extra(extra_start))
+        if index_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return index_signal
+        if comptime_value_is_intlike(index_signal.value) == 0:
+            return self.fail(diags, node, "Vec.get() index must be an integer")
+        let index = comptime_value_intlike(index_signal.value)
+        if index < 0 or index >= recv_value.extra_count as i64:
+            return self.fail(diags, node, "Vec.get() index out of bounds in comptime")
+        return comptime_control_value(self.extra_values.get((recv_value.extra_start + index as i32) as i64))
+
+    if method == "clear":
+        if arg_count != 0:
+            return self.fail(diags, node, "Vec.clear() takes no arguments")
+        let updated = comptime_value_vec(recv_value.type_id, self.extra_values.len() as i32, 0)
+        return self.rebind_collection_receiver(diags, recv_node, updated, node)
+
+    if method == "pop":
+        if arg_count != 0:
+            return self.fail(diags, node, "Vec.pop() takes no arguments")
+        if recv_value.extra_count <= 0:
+            return self.fail(diags, node, "Vec.pop() on empty comptime vector")
+        let removed = self.extra_values.get((recv_value.extra_start + recv_value.extra_count - 1) as i64)
+        let new_start = self.copy_extra_slice(recv_value.extra_start, recv_value.extra_count - 1)
+        let updated = comptime_value_vec(recv_value.type_id, new_start, recv_value.extra_count - 1)
+        let rebind = self.rebind_collection_receiver(diags, recv_node, updated, node)
+        if rebind.kind != ComptimeControlKind.CTL_VALUE:
+            return rebind
+        return comptime_control_value(removed)
+
+    if method == "remove":
+        if arg_count != 1:
+            return self.fail(diags, node, "Vec.remove() expects exactly one argument")
+        let index_signal = self.eval_expr(diags, self.ast.get_extra(extra_start))
+        if index_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return index_signal
+        if comptime_value_is_intlike(index_signal.value) == 0:
+            return self.fail(diags, node, "Vec.remove() index must be an integer")
+        let index = comptime_value_intlike(index_signal.value) as i32
+        if index < 0 or index >= recv_value.extra_count:
+            return self.fail(diags, node, "Vec.remove() index out of bounds in comptime")
+        let removed = self.extra_values.get((recv_value.extra_start + index) as i64)
+        let new_start = self.extra_values.len() as i32
+        for i in 0..recv_value.extra_count:
+            if i == index:
+                continue
+            self.extra_values.push(self.extra_values.get((recv_value.extra_start + i) as i64))
+        let updated = comptime_value_vec(recv_value.type_id, new_start, recv_value.extra_count - 1)
+        let rebind = self.rebind_collection_receiver(diags, recv_node, updated, node)
+        if rebind.kind != ComptimeControlKind.CTL_VALUE:
+            return rebind
+        return comptime_control_value(removed)
+
+    self.fail(diags, node, "Vec method is not comptime-evaluable yet")
+
+fn ComptimeEvaluator.eval_map_method_call(self: ComptimeEvaluator, diags: &mut DiagnosticList, recv_node: i32, recv_value: ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    let method = self.pool.resolve(field)
+
+    if method == "insert":
+        if arg_count != 2:
+            return self.fail(diags, node, "HashMap.insert() expects exactly two arguments")
+        let key_signal = self.eval_expr(diags, self.ast.get_extra(extra_start))
+        if key_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return key_signal
+        let value_signal = self.eval_expr(diags, self.ast.get_extra(extra_start + 1))
+        if value_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return value_signal
+        let new_start = self.extra_values.len() as i32
+        var replaced = 0
+        for i in 0..recv_value.extra_count:
+            let base = recv_value.extra_start + i * 2
+            let old_key = self.extra_values.get(base as i64)
+            self.extra_values.push(old_key)
+            if comptime_values_equal(old_key, key_signal.value, self.extra_values) != 0:
+                self.extra_values.push(value_signal.value)
+                replaced = 1
+            else:
+                self.extra_values.push(self.extra_values.get((base + 1) as i64))
+        if replaced == 0:
+            self.extra_values.push(key_signal.value)
+            self.extra_values.push(value_signal.value)
+        let new_count = if replaced != 0: recv_value.extra_count else: recv_value.extra_count + 1
+        let updated = comptime_value_map(recv_value.type_id, new_start, new_count)
+        return self.rebind_collection_receiver(diags, recv_node, updated, node)
+
+    if method == "len":
+        if arg_count != 0:
+            return self.fail(diags, node, "HashMap.len() takes no arguments")
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), recv_value.extra_count as i64))
+
+    if method == "contains":
+        if arg_count != 1:
+            return self.fail(diags, node, "HashMap.contains() expects exactly one argument")
+        let key_signal = self.eval_expr(diags, self.ast.get_extra(extra_start))
+        if key_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return key_signal
+        for i in 0..recv_value.extra_count:
+            let base = recv_value.extra_start + i * 2
+            let old_key = self.extra_values.get(base as i64)
+            if comptime_values_equal(old_key, key_signal.value, self.extra_values) != 0:
+                return comptime_control_value(comptime_value_bool(1))
+        return comptime_control_value(comptime_value_bool(0))
+
+    if method == "get":
+        if arg_count != 1:
+            return self.fail(diags, node, "HashMap.get() expects exactly one argument")
+        let key_signal = self.eval_expr(diags, self.ast.get_extra(extra_start))
+        if key_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return key_signal
+        for i in 0..recv_value.extra_count:
+            let base = recv_value.extra_start + i * 2
+            let old_key = self.extra_values.get(base as i64)
+            if comptime_values_equal(old_key, key_signal.value, self.extra_values) != 0:
+                return comptime_control_value(self.extra_values.get((base + 1) as i64))
+        return self.fail(diags, node, "HashMap.get() missing key in comptime")
+
+    if method == "clear":
+        if arg_count != 0:
+            return self.fail(diags, node, "HashMap.clear() takes no arguments")
+        let updated = comptime_value_map(recv_value.type_id, self.extra_values.len() as i32, 0)
+        return self.rebind_collection_receiver(diags, recv_node, updated, node)
+
+    if method == "remove":
+        if arg_count != 1:
+            return self.fail(diags, node, "HashMap.remove() expects exactly one argument")
+        let key_signal = self.eval_expr(diags, self.ast.get_extra(extra_start))
+        if key_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return key_signal
+        let new_start = self.extra_values.len() as i32
+        var found = 0
+        var removed = comptime_value_invalid()
+        for i in 0..recv_value.extra_count:
+            let base = recv_value.extra_start + i * 2
+            let old_key = self.extra_values.get(base as i64)
+            let old_value = self.extra_values.get((base + 1) as i64)
+            if comptime_values_equal(old_key, key_signal.value, self.extra_values) != 0:
+                found = 1
+                removed = old_value
+                continue
+            self.extra_values.push(old_key)
+            self.extra_values.push(old_value)
+        if found == 0:
+            return self.fail(diags, node, "HashMap.remove() missing key in comptime")
+        let updated = comptime_value_map(recv_value.type_id, new_start, recv_value.extra_count - 1)
+        let rebind = self.rebind_collection_receiver(diags, recv_node, updated, node)
+        if rebind.kind != ComptimeControlKind.CTL_VALUE:
+            return rebind
+        return comptime_control_value(removed)
+
+    self.fail(diags, node, "HashMap method is not comptime-evaluable yet")
+
 fn ComptimeEvaluator.eval_static_type_method_call(self: ComptimeEvaluator, diags: &mut DiagnosticList, recv_type: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
     let layout_sema = self.sema
     let method = self.pool.resolve(field)
@@ -407,7 +679,7 @@ fn ComptimeEvaluator.eval_static_type_method_call(self: ComptimeEvaluator, diags
         if self.sema.type_reflection_variant_base(recv_type) == 0:
             return self.fail(diags, node, "type.variants() requires an enum type")
         return self.eval_type_variants_array(recv_type)
-    self.fail(diags, node, "method is not comptime-evaluable yet")
+    self.fail(diags, node, "type method '" ++ method ++ "' is not comptime-evaluable yet")
 
 fn ComptimeEvaluator.eval_module_let_decl(self: ComptimeEvaluator, diags: &mut DiagnosticList, decl: i32, use_node: i32) -> ComptimeControl:
     let sym = self.ast.get_data0(decl)
@@ -472,6 +744,52 @@ fn ComptimeEvaluator.eval_tuple(self: ComptimeEvaluator, diags: &mut DiagnosticL
             return elem_signal
         self.push_extra_value(elem_signal.value)
     comptime_control_value(comptime_value_tuple(self.node_type_or(node, 0), start, count))
+
+fn ComptimeEvaluator.eval_struct_lit(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32) -> ComptimeControl:
+    var type_id = self.node_type_or(node, 0)
+    if type_id == 0:
+        let name = self.ast.get_data0(node)
+        if self.sema.named_types.contains(name):
+            type_id = self.sema.named_types.get(name).unwrap()
+    if type_id == 0:
+        return self.fail(diags, node, "comptime struct literal is missing type information")
+
+    let resolved = self.sema.resolve_alias(type_id)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_GENERIC_INST:
+        return self.fail(diags, node, "comptime struct literal requires a struct type")
+
+    let field_total = self.sema.type_reflection_field_count(type_id)
+    let extra_start = self.ast.get_data1(node)
+    let init_count = self.ast.get_data2(node)
+    let init_syms: Vec[i32] = Vec.new()
+    let init_values: Vec[ComptimeValue] = Vec.new()
+
+    for fi in 0..init_count:
+        let field_sym = self.ast.get_extra(extra_start + fi * 2)
+        if self.struct_field_index(type_id, field_sym) < 0:
+            return self.fail(diags, node, "unknown comptime struct field '" ++ self.pool.resolve(field_sym) ++ "' for '" ++ self.sema.type_name(type_id) ++ "'")
+        for pi in 0..init_syms.len() as i32:
+            if init_syms.get(pi as i64) == field_sym:
+                return self.fail(diags, node, "duplicate comptime struct field '" ++ self.pool.resolve(field_sym) ++ "'")
+        let field_signal = self.eval_expr(diags, self.ast.get_extra(extra_start + fi * 2 + 1))
+        if field_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return field_signal
+        init_syms.push(field_sym)
+        init_values.push(field_signal.value)
+
+    let start = self.extra_values.len() as i32
+    for fi in 0..field_total:
+        let field_sym = self.sema.type_reflection_field_name(type_id, fi)
+        var found = 0 - 1
+        for pi in 0..init_syms.len() as i32:
+            if init_syms.get(pi as i64) == field_sym:
+                found = pi
+                break
+        if found < 0:
+            return self.fail(diags, node, "missing comptime struct field '" ++ self.pool.resolve(field_sym) ++ "'")
+        self.push_extra_value(init_values.get(found as i64))
+    comptime_control_value(comptime_value_struct(type_id, start, field_total))
 
 fn ComptimeEvaluator.eval_range(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32) -> ComptimeControl:
     let start_node = self.ast.get_data0(node)
@@ -590,7 +908,7 @@ fn ComptimeEvaluator.eval_binary_compare(self: ComptimeEvaluator, diags: &mut Di
 
 fn ComptimeEvaluator.eval_binary_membership(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32, lhs: ComptimeValue, rhs: ComptimeValue, negate: i32) -> ComptimeControl:
     var matched = 0
-    if rhs.kind == ComptimeValueKind.CV_ARRAY or rhs.kind == ComptimeValueKind.CV_TUPLE:
+    if rhs.kind == ComptimeValueKind.CV_ARRAY or rhs.kind == ComptimeValueKind.CV_TUPLE or rhs.kind == ComptimeValueKind.CV_VEC:
         for i in 0..rhs.extra_count:
             let item = self.extra_values.get((rhs.extra_start + i) as i64)
             if comptime_values_equal(lhs, item, self.extra_values) != 0:
@@ -876,7 +1194,7 @@ fn ComptimeEvaluator.eval_for(self: ComptimeEvaluator, diags: &mut DiagnosticLis
     let binding = self.ast.get_data0(node)
     let body = self.ast.get_data2(node)
     var count = 0
-    if iterable_signal.value.kind == ComptimeValueKind.CV_ARRAY or iterable_signal.value.kind == ComptimeValueKind.CV_TUPLE:
+    if iterable_signal.value.kind == ComptimeValueKind.CV_ARRAY or iterable_signal.value.kind == ComptimeValueKind.CV_TUPLE or iterable_signal.value.kind == ComptimeValueKind.CV_VEC:
         count = iterable_signal.value.extra_count
     else if iterable_signal.value.kind == ComptimeValueKind.CV_RANGE:
         let start_value = iterable_signal.value.data0
@@ -885,7 +1203,7 @@ fn ComptimeEvaluator.eval_for(self: ComptimeEvaluator, diags: &mut DiagnosticLis
         if count < 0:
             count = 0
     else:
-        return self.fail(diags, node, "comptime for requires an array, tuple, or range")
+        return self.fail(diags, node, "comptime for requires an array, tuple, vec, or range")
 
     let for_meta = self.ast.find_for_meta(node)
     let index_binding = if for_meta >= 0: self.ast.for_meta_index_binding(for_meta) else: 0
@@ -920,11 +1238,26 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, diags: &mut DiagnosticLi
     let arg_count = self.ast.get_data2(node)
     if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
         let recv_node = self.ast.get_data0(callee)
-        if self.sema.static_receiver_type_is_known(recv_node) != 0:
-            let recv_type = self.static_receiver_type(recv_node)
-            if recv_type != 0:
-                return self.eval_static_type_method_call(diags, recv_type, self.ast.get_data1(callee), self.ast.get_data1(node), arg_count, node)
-        return self.fail(diags, node, "only type reflection method calls are comptime-evaluable yet")
+        let field = self.ast.get_data1(callee)
+        let method_name = self.pool.resolve(field)
+        let recv_type = self.static_receiver_type(recv_node)
+        if recv_type != 0:
+            if method_name == "new":
+                let result_type = self.node_type_or(node, recv_type)
+                if result_type != 0:
+                    let resolved_result = self.sema.resolve_alias(result_type)
+                    let result_name = self.sema.type_name(resolved_result)
+                    if comptime_type_name_has_base(result_name, "Vec") != 0 or comptime_type_name_has_base(result_name, "HashMap") != 0:
+                        return self.eval_static_collection_new(diags, result_type, node, arg_count)
+            return self.eval_static_type_method_call(diags, recv_type, field, self.ast.get_data1(node), arg_count, node)
+        let recv_signal = self.eval_expr(diags, recv_node)
+        if recv_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return recv_signal
+        if recv_signal.value.kind == ComptimeValueKind.CV_VEC:
+            return self.eval_vec_method_call(diags, recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
+        if recv_signal.value.kind == ComptimeValueKind.CV_MAP:
+            return self.eval_map_method_call(diags, recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
+        return self.fail(diags, node, "method '" ++ self.pool.resolve(field) ++ "' is not comptime-evaluable yet")
     if self.ast.kind(callee) != NodeKind.NK_IDENT:
         return self.fail(diags, node, "only direct comptime function calls are supported")
     let fn_sym = self.ast.get_data0(callee)
@@ -1110,6 +1443,8 @@ fn ComptimeEvaluator.eval_expr(self: ComptimeEvaluator, diags: &mut DiagnosticLi
         return self.eval_array(diags, node)
     if kind == NodeKind.NK_TUPLE:
         return self.eval_tuple(diags, node)
+    if kind == NodeKind.NK_STRUCT_LIT:
+        return self.eval_struct_lit(diags, node)
     if kind == NodeKind.NK_RANGE:
         return self.eval_range(diags, node)
     if kind == NodeKind.NK_COMPTIME_ERROR:
