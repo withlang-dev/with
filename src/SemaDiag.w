@@ -129,6 +129,7 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_UNARY: return "unary"
     if kind == NodeKind.NK_CALL: return "call"
     if kind == NodeKind.NK_FIELD_ACCESS: return "field_access"
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS: return "computed_field_access"
     if kind == NodeKind.NK_INDEX: return "index"
     if kind == NodeKind.NK_SLICE: return "slice"
     if kind == NodeKind.NK_BLOCK: return "block"
@@ -836,6 +837,11 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
 
     if kind == NodeKind.NK_FIELD_ACCESS:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return
+
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:

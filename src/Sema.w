@@ -282,6 +282,8 @@ type Sema {
     ty_usize: TypeId,
     ty_isize: TypeId,
     ty_const_i8_ptr: TypeId,
+    ty_field_info: TypeId,
+    ty_variant_info: TypeId,
 
     // Per-module scoping: tracks which module each declaration belongs to
     // and which symbols are visible in each module context.
@@ -558,6 +560,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ty_f32: 0, ty_f64: 0, ty_bool: 0, ty_void: 0,
         ty_never: 0, ty_str: 0, ty_str_view: 0,
         ty_usize: 0, ty_isize: 0, ty_const_i8_ptr: 0,
+        ty_field_info: 0, ty_variant_info: 0,
         decl_source_paths: Vec.new(),
         decl_source_file_ids: Vec.new(),
         decl_is_c_import: Vec.new(),
@@ -624,6 +627,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.register_prim("StrView", s.ty_str_view)
     s.register_prim("usize", s.ty_usize)
     s.register_prim("isize", s.ty_isize)
+    s.init_builtin_reflection_types()
     s.discard_sym = s.pool_intern("_")
 
     // Push root scope marker
@@ -635,6 +639,48 @@ fn Sema.register_prim(self: &mut Sema, name: str, tid: i32):
     let sym = self.pool_intern(name)
     self.named_types.insert(sym, tid)
     self.pretty_symbol_names.insert(sym, name)
+
+fn Sema.register_builtin_struct_type(self: &mut Sema, name: str, field_names: Vec[str], field_types: Vec[i32], field_count: i32) -> i32:
+    let name_sym = self.pool_intern(name)
+    let te_start = self.type_extra.len() as i32
+    for fi in 0..field_count:
+        let field_sym = self.pool_intern(field_names.get(fi as i64))
+        self.type_extra.push(field_sym)
+        self.type_extra.push(field_types.get(fi as i64))
+        self.type_extra.push(0)
+    for _ in 0..field_count:
+        self.type_extra.push(0)
+    let tid = self.add_type(TypeKind.TY_STRUCT, name_sym, te_start, field_count)
+    self.named_types.insert(name_sym, tid as i32)
+    self.pretty_symbol_names.insert(name_sym, name)
+    tid as i32
+
+fn Sema.init_builtin_reflection_types(self: &mut Sema):
+    let field_info_names: Vec[str] = Vec.new()
+    field_info_names.push("name")
+    field_info_names.push("type_name")
+    field_info_names.push("offset")
+    field_info_names.push("size")
+    field_info_names.push("is_ephemeral")
+    let field_info_types: Vec[i32] = Vec.new()
+    field_info_types.push(self.ty_str as i32)
+    field_info_types.push(self.ty_str as i32)
+    field_info_types.push(self.ty_usize as i32)
+    field_info_types.push(self.ty_usize as i32)
+    field_info_types.push(self.ty_bool as i32)
+    self.ty_field_info = self.register_builtin_struct_type("FieldInfo", field_info_names, field_info_types, 5) as TypeId
+
+    let variant_info_names: Vec[str] = Vec.new()
+    variant_info_names.push("name")
+    variant_info_names.push("discriminant")
+    variant_info_names.push("has_payload")
+    variant_info_names.push("payload_type_name")
+    let variant_info_types: Vec[i32] = Vec.new()
+    variant_info_types.push(self.ty_str as i32)
+    variant_info_types.push(self.ty_i64 as i32)
+    variant_info_types.push(self.ty_bool as i32)
+    variant_info_types.push(self.ty_str as i32)
+    self.ty_variant_info = self.register_builtin_struct_type("VariantInfo", variant_info_names, variant_info_types, 4) as TypeId
 
 fn Sema.init_intrinsic_symbols(self: &mut Sema):
     self.sym_channel = self.pool_intern("Channel")
@@ -1511,13 +1557,16 @@ fn Sema.set_sig_return_type(self: Sema, idx: i32, ret: i32):
 // ── Main entry point ─────────────────────────────────────────────
 
 fn Sema.check_module(self: Sema):
+    self.prepare_for_comptime_transform()
+    self.check_bodies()
+
+fn Sema.prepare_for_comptime_transform(self: Sema):
     self.compute_method_origins()
     self.collect_declarations()
     self.build_ci_scoping()
     self.build_ci_destructor_map()
     self.validate_copy_derives()
     self.validate_generic_type_decls()
-    self.check_bodies()
 
 // ── Utility functions ────────────────────────────────────────────
 

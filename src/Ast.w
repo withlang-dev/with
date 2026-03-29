@@ -82,6 +82,7 @@ enum NodeKind: i32:
     NK_COMPTIME_ERROR = 71
     NK_FSTRING = 72       // d0=segment_count, d1=0, extra=[seg_kind, seg_data...]
     NK_FSTRING_SPEC = 73  // d0=packed_flags, d1=width, d2=precision
+    NK_COMPUTED_FIELD_ACCESS = 74  // d0=expr(node), d1=field_expr(node), d2=0
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -820,6 +821,7 @@ fn AstPool.for_meta_label(self: &AstPool, meta: i32) -> i32:
 // NodeKind.NK_UNARY:         d0=op(UOP_*), d1=operand(node), d2=0
 // NodeKind.NK_CALL:          d0=callee(node), d1=extra_start, d2=arg_count
 // NodeKind.NK_FIELD_ACCESS:  d0=expr(node), d1=field(sym), d2=0
+// NodeKind.NK_COMPUTED_FIELD_ACCESS: d0=expr(node), d1=field_expr(node), d2=0
 // NodeKind.NK_INDEX:         d0=expr(node), d1=index(node), d2=0
 // NodeKind.NK_SLICE:         d0=expr(node), d1=start(node,0=none), d2=end(node,0=none)
 // NodeKind.NK_BLOCK:         d0=extra_start, d1=stmt_count, d2=tail(node,0=none)
