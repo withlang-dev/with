@@ -4,6 +4,7 @@ use Ast
 use Span
 use Diagnostic
 use InternPool
+use TypeLayout
 
 const COMPTIME_RECURSION_LIMIT: i32 = 256
 const COMPTIME_STEP_LIMIT: i32 = 50000
@@ -221,6 +222,132 @@ fn ComptimeEvaluator.node_type_or(self: ComptimeEvaluator, node: i32, fallback: 
             return typed
     fallback
 
+fn ComptimeEvaluator.static_receiver_type(self: ComptimeEvaluator, node: i32) -> i32:
+    let typed = self.node_type_or(node, 0)
+    if typed != 0:
+        return typed
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
+        let sym = self.ast.get_data0(node)
+        let prim = self.sema.primitive_type_by_sym(sym)
+        if prim != 0:
+            return prim
+        if self.sema.named_types.contains(sym):
+            return self.sema.named_types.get(sym).unwrap()
+    0
+
+fn ComptimeEvaluator.struct_field_index(self: ComptimeEvaluator, type_id: i32, field_sym: i32) -> i32:
+    let field_count = self.sema.type_reflection_field_count(type_id)
+    for fi in 0..field_count:
+        if self.sema.type_reflection_field_name(type_id, fi) == field_sym:
+            return fi
+    0 - 1
+
+fn ComptimeEvaluator.variant_payload_name(self: ComptimeEvaluator, type_id: i32, variant_index: i32) -> str:
+    let payload_count = self.sema.type_reflection_variant_payload_count(type_id, variant_index)
+    if payload_count <= 0:
+        return ""
+    if payload_count == 1:
+        let payload_tid = self.sema.type_reflection_variant_payload_type(type_id, variant_index, 0)
+        return self.sema.type_name(payload_tid)
+    var out = "("
+    for pi in 0..payload_count:
+        if pi > 0:
+            out = out ++ ", "
+        let payload_tid = self.sema.type_reflection_variant_payload_type(type_id, variant_index, pi)
+        out = out ++ self.sema.type_name(payload_tid)
+    out ++ ")"
+
+fn ComptimeEvaluator.eval_type_fields_array(self: ComptimeEvaluator, type_id: i32) -> ComptimeControl:
+    let layout_sema = self.sema
+    let field_count = self.sema.type_reflection_field_count(type_id)
+    let array_tid = self.sema.ensure_exact_type(TypeKind.TY_ARRAY, self.sema.ty_field_info as i32, field_count, 0) as i32
+    let arr_start = self.extra_values.len() as i32
+    let payload_start = arr_start + field_count
+    let payload_values: Vec[ComptimeValue] = Vec.new()
+    for fi in 0..field_count:
+        let row_start = payload_start + payload_values.len() as i32
+        self.extra_values.push(comptime_value_struct(self.sema.ty_field_info as i32, row_start, 5))
+        let field_sym = self.sema.type_reflection_field_name(type_id, fi)
+        let field_tid = self.sema.type_reflection_field_type(type_id, fi)
+        payload_values.push(comptime_value_str(self.pool.resolve(field_sym)))
+        payload_values.push(comptime_value_str(self.sema.type_name(field_tid)))
+        payload_values.push(comptime_value_int(self.sema.ty_usize as i32, layout_sema.type_layout_struct_field_offset(type_id, fi)))
+        payload_values.push(comptime_value_int(self.sema.ty_usize as i32, layout_sema.type_layout_size_of(field_tid)))
+        payload_values.push(comptime_value_bool(self.sema.type_is_ephemeral_value(field_tid)))
+    for pi in 0..payload_values.len() as i32:
+        self.extra_values.push(payload_values.get(pi as i64))
+    comptime_control_value(comptime_value_array(array_tid, arr_start, field_count))
+
+fn ComptimeEvaluator.eval_type_variants_array(self: ComptimeEvaluator, type_id: i32) -> ComptimeControl:
+    let variant_count = self.sema.type_reflection_variant_count(type_id)
+    let array_tid = self.sema.ensure_exact_type(TypeKind.TY_ARRAY, self.sema.ty_variant_info as i32, variant_count, 0) as i32
+    let arr_start = self.extra_values.len() as i32
+    let payload_start = arr_start + variant_count
+    let payload_values: Vec[ComptimeValue] = Vec.new()
+    for vi in 0..variant_count:
+        let row_start = payload_start + payload_values.len() as i32
+        self.extra_values.push(comptime_value_struct(self.sema.ty_variant_info as i32, row_start, 4))
+        let variant_sym = self.sema.type_reflection_variant_name(type_id, vi)
+        let payload_count = self.sema.type_reflection_variant_payload_count(type_id, vi)
+        payload_values.push(comptime_value_str(self.pool.resolve(variant_sym)))
+        payload_values.push(comptime_value_int(self.sema.ty_i64 as i32, self.sema.type_reflection_variant_discriminant(type_id, vi)))
+        payload_values.push(comptime_value_bool(if payload_count > 0: 1 else: 0))
+        payload_values.push(comptime_value_str(self.variant_payload_name(type_id, vi)))
+    for pi in 0..payload_values.len() as i32:
+        self.extra_values.push(payload_values.get(pi as i64))
+    comptime_control_value(comptime_value_array(array_tid, arr_start, variant_count))
+
+fn ComptimeEvaluator.eval_static_type_method_call(self: ComptimeEvaluator, diags: &mut DiagnosticList, recv_type: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    let layout_sema = self.sema
+    let method = self.pool.resolve(field)
+    if method == "name":
+        if arg_count != 0:
+            return self.fail(diags, node, "type.name() takes no arguments")
+        return comptime_control_value(comptime_value_str(self.sema.type_name(recv_type)))
+    if method == "size":
+        if arg_count != 0:
+            return self.fail(diags, node, "type.size() takes no arguments")
+        return comptime_control_value(comptime_value_int(self.sema.ty_usize as i32, layout_sema.type_layout_size_of(recv_type)))
+    if method == "align":
+        if arg_count != 0:
+            return self.fail(diags, node, "type.align() takes no arguments")
+        return comptime_control_value(comptime_value_int(self.sema.ty_usize as i32, layout_sema.type_layout_align_of(recv_type)))
+    if method == "is_copy":
+        if arg_count != 0:
+            return self.fail(diags, node, "type.is_copy() takes no arguments")
+        return comptime_control_value(comptime_value_bool(self.sema.is_copy(recv_type)))
+    if method == "implements":
+        if arg_count != 1:
+            return self.fail(diags, node, "type.implements() expects exactly one trait argument")
+        let trait_node = self.ast.get_extra(extra_start)
+        if trait_node == 0:
+            return self.fail(diags, node, "type.implements() requires a trait name")
+        let trait_kind = self.ast.kind(trait_node)
+        if trait_kind != NodeKind.NK_IDENT and trait_kind != NodeKind.NK_TYPE_NAMED:
+            return self.fail(diags, trait_node, "type.implements() requires a trait name")
+        let trait_sym = self.ast.get_data0(trait_node)
+        if not self.sema.lang_trait_syms.contains(trait_sym) and not self.sema.trait_lookup.contains(trait_sym):
+            return self.fail(diags, trait_node, "unknown trait '" ++ self.pool.resolve(trait_sym) ++ "'")
+        return comptime_control_value(comptime_value_bool(self.sema.type_implements_trait(recv_type, trait_sym)))
+    if method == "fields":
+        if arg_count != 0:
+            return self.fail(diags, node, "type.fields() takes no arguments")
+        let resolved = self.sema.resolve_alias(recv_type)
+        let tk = self.sema.get_type_kind(resolved)
+        if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_GENERIC_INST:
+            return self.fail(diags, node, "type.fields() requires a struct type")
+        return self.eval_type_fields_array(recv_type)
+    if method == "variants":
+        if arg_count != 0:
+            return self.fail(diags, node, "type.variants() takes no arguments")
+        if self.sema.type_reflection_variant_base(recv_type) == 0:
+            return self.fail(diags, node, "type.variants() requires an enum type")
+        return self.eval_type_variants_array(recv_type)
+    self.fail(diags, node, "method is not comptime-evaluable yet")
+
 fn ComptimeEvaluator.eval_module_let_decl(self: ComptimeEvaluator, diags: &mut DiagnosticList, decl: i32, use_node: i32) -> ComptimeControl:
     let sym = self.ast.get_data0(decl)
     for i in 0..self.active_global_syms.len() as i32:
@@ -322,6 +449,14 @@ fn ComptimeEvaluator.eval_field_access(self: ComptimeEvaluator, diags: &mut Diag
                 if self.sema.variant_lookup.contains(qual_sym):
                     return self.eval_disc_variant_sym(diags, qual_sym, node)
                 return self.eval_disc_variant_sym(diags, field, node)
+    let base_signal = self.eval_expr(diags, base)
+    if base_signal.kind != ComptimeControlKind.CTL_VALUE:
+        return base_signal
+    if base_signal.value.kind == ComptimeValueKind.CV_STRUCT:
+        let field_index = self.struct_field_index(base_signal.value.type_id, field)
+        if field_index < 0:
+            return self.fail(diags, node, "unknown comptime struct field")
+        return comptime_control_value(self.extra_values.get((base_signal.value.extra_start + field_index) as i64))
     self.unsupported(diags, node)
 
 fn ComptimeEvaluator.eval_unary(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32) -> ComptimeControl:
@@ -696,6 +831,13 @@ fn ComptimeEvaluator.eval_for(self: ComptimeEvaluator, diags: &mut DiagnosticLis
 
 fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32) -> ComptimeControl:
     let callee = self.ast.get_data0(node)
+    if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+        let recv_node = self.ast.get_data0(callee)
+        if self.sema.static_receiver_type_is_known(recv_node) != 0:
+            let recv_type = self.static_receiver_type(recv_node)
+            if recv_type != 0:
+                return self.eval_static_type_method_call(diags, recv_type, self.ast.get_data1(callee), self.ast.get_data1(node), self.ast.get_data2(node), node)
+        return self.fail(diags, node, "only type reflection method calls are comptime-evaluable yet")
     if self.ast.kind(callee) != NodeKind.NK_IDENT:
         return self.fail(diags, node, "only direct comptime function calls are supported")
     let fn_sym = self.ast.get_data0(callee)

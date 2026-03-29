@@ -2946,6 +2946,16 @@ fn Parser.parse_dot(self: Parser, lhs: i32) -> NodeId:
     if self.peek() == TokenKind.TK_KW_AWAIT:
         self.advance()
         return self.pool.add_node(NodeKind.NK_AWAIT, self.pool.get_start(lhs), self.prev_end(), lhs, 0, 0)
+    if self.peek() == TokenKind.TK_L_BRACE:
+        self.advance()
+        self.skip_newlines()
+        let field_expr = self.parse_expr()
+        if field_expr == 0:
+            return (0) as NodeId
+        self.skip_newlines()
+        if self.expect(TokenKind.TK_R_BRACE) == 0:
+            return (0) as NodeId
+        return self.pool.add_node(NodeKind.NK_COMPUTED_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field_expr, 0)
     // Tuple field .0 .1
     if self.peek() == TokenKind.TK_INT_LIT:
         let field = self.intern_current()

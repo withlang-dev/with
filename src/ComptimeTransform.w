@@ -163,7 +163,7 @@ fn ct_clone_leaf(pool: &mut AstPool, node: i32) -> i32:
 fn ct_empty_block(pool: &mut AstPool, node: i32) -> i32:
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), pool.extra_len(), 0, 0) as i32
 
-fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
     if value.kind == ComptimeValueKind.CV_INT:
         return pool.add_node(
             NodeKind.NK_INT_LIT,
@@ -191,7 +191,7 @@ fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, value: Compt
         let extra_start = pool.extra_len()
         for i in 0..value.extra_count:
             let elem = extras.get((value.extra_start + i) as i64)
-            let elem_node = ct_build_value_tree(pool, intern, elem, node, extras)
+            let elem_node = ct_build_value_tree(pool, intern, sema, elem, node, extras)
             if elem_node == 0:
                 return 0
             pool.add_extra(elem_node)
@@ -215,6 +215,23 @@ fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, value: Compt
             ast_int_part2(value.data1)
         )
         return pool.add_node(NodeKind.NK_RANGE, pool.get_start(node), pool.get_end(node), start_node as i32, end_node as i32, value.extra_start) as i32
+    if value.kind == ComptimeValueKind.CV_STRUCT:
+        let resolved = sema.resolve_alias(value.type_id)
+        if sema.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+            return 0
+        let name_sym = sema.get_type_d0(resolved)
+        let te_start = sema.get_type_d1(resolved)
+        let field_count = sema.get_type_d2(resolved)
+        let struct_extra = pool.extra_len()
+        for fi in 0..field_count:
+            let field_sym = sema.type_extra.get((te_start + fi * 3) as i64)
+            let field_value = extras.get((value.extra_start + fi) as i64)
+            let field_node = ct_build_value_tree(pool, intern, sema, field_value, node, extras)
+            if field_node == 0:
+                return 0
+            pool.add_extra(field_sym)
+            pool.add_extra(field_node)
+        return pool.add_node(NodeKind.NK_STRUCT_LIT, pool.get_start(node), pool.get_end(node), name_sym, struct_extra, field_count) as i32
     0
 
 fn ct_eval_truthy(source_ast: AstPool, sema: &mut Sema, diags: &mut DiagnosticList, node: i32) -> i32:
@@ -230,17 +247,19 @@ fn ct_eval_truthy(source_ast: AstPool, sema: &mut Sema, diags: &mut DiagnosticLi
 fn ct_transform_fstring(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, diags: &mut DiagnosticList, node: i32):
     let seg_count = pool.get_data0(node)
     let extra_start = pool.get_data1(node)
-    for si in 0..seg_count:
-        let base = extra_start + si * 3
-        let seg_kind = pool.get_extra(base)
-        if seg_kind != FStringSegmentKind.EXPR:
+    var pos = extra_start
+    for _ in 0..seg_count:
+        let seg_kind = pool.get_extra(pos)
+        if seg_kind == FStringSegmentKind.LITERAL:
+            pos = pos + 2
             continue
-        let expr_node = pool.get_extra(base + 1)
-        let spec_node = pool.get_extra(base + 2)
+        let expr_node = pool.get_extra(pos + 1)
+        let spec_node = pool.get_extra(pos + 2)
         if expr_node != 0:
-            pool.extra.set_i32((base + 1) as i64, ct_transform_expr(source_ast, pool, sema, intern, diags, expr_node))
+            pool.extra.set_i32((pos + 1) as i64, ct_transform_expr(source_ast, pool, sema, intern, diags, expr_node))
         if spec_node != 0:
-            pool.extra.set_i32((base + 2) as i64, ct_transform_expr(source_ast, pool, sema, intern, diags, spec_node))
+            pool.extra.set_i32((pos + 2) as i64, ct_transform_expr(source_ast, pool, sema, intern, diags, spec_node))
+        pos = pos + 3
 
 fn ct_transform_match_arm(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, diags: &mut DiagnosticList, node: i32):
     let body = pool.get_data1(node)
@@ -275,14 +294,43 @@ fn ct_iter_count(value: ComptimeValue) -> i32:
         return span as i32
     0 - 1
 
-fn ct_iter_item_node(pool: &mut AstPool, intern: &mut InternPool, iterable: ComptimeValue, index: i32, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn ct_iter_item_node(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, iterable: ComptimeValue, index: i32, node: i32, extras: Vec[ComptimeValue]) -> i32:
     if iterable.kind == ComptimeValueKind.CV_RANGE:
         let item = comptime_value_int(0, iterable.data0 + index as i64)
-        return ct_build_value_tree(pool, intern, item, node, extras)
+        return ct_build_value_tree(pool, intern, sema, item, node, extras)
     if iterable.kind == ComptimeValueKind.CV_ARRAY or iterable.kind == ComptimeValueKind.CV_TUPLE:
         let item = extras.get((iterable.extra_start + index) as i64)
-        return ct_build_value_tree(pool, intern, item, node, extras)
+        return ct_build_value_tree(pool, intern, sema, item, node, extras)
     0
+
+fn ct_struct_lit_field_value(pool: &mut AstPool, node: i32, field: i32) -> i32:
+    if node == 0 or pool.kind(node) != NodeKind.NK_STRUCT_LIT:
+        return 0
+    let extra_start = pool.get_data1(node)
+    let field_count = pool.get_data2(node)
+    for fi in 0..field_count:
+        let base = extra_start + fi * 2
+        if pool.get_extra(base) == field:
+            return pool.get_extra(base + 1)
+    0
+
+fn ct_try_fold_type_call(pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, diags: &mut DiagnosticList, node: i32) -> i32:
+    if node == 0 or pool.kind(node) != NodeKind.NK_CALL:
+        return node
+    let callee = pool.get_data0(node)
+    if callee == 0 or pool.kind(callee) != NodeKind.NK_FIELD_ACCESS:
+        return node
+    let recv = pool.get_data0(callee)
+    if sema.static_receiver_type_is_known(recv) == 0:
+        return node
+    let eval_ast = unsafe: *pool
+    let evald = comptime_try_eval_expr_result(sema as *mut Sema, diags, eval_ast, sema.pool, node)
+    if comptime_value_is_valid(evald.value) == 0:
+        return node
+    let folded = ct_build_value_tree(pool, intern, sema, evald.value, node, evald.extras)
+    if folded != 0:
+        return folded
+    node
 
 fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst_node: i32, index_sym: i32, index_node: i32) -> i32:
     if node == 0:
@@ -308,14 +356,27 @@ fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst
         let operand = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), operand, pool.get_data2(node), pool.literal_suffix(node))
 
-    if kind == NodeKind.NK_BINARY or kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE:
+    if kind == NodeKind.NK_BINARY:
         let lhs = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
         let rhs = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), lhs, rhs, pool.literal_suffix(node))
 
+    if kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE:
+        let lhs = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let rhs = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), lhs, rhs, pool.get_data2(node), pool.literal_suffix(node))
+
     if kind == NodeKind.NK_FIELD_ACCESS:
         let base = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let folded_value = ct_struct_lit_field_value(pool, base, pool.get_data1(node))
+        if folded_value != 0:
+            return ct_clone_tree_with_subst(pool, folded_value, 0, 0, 0, 0)
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), base, pool.get_data1(node), 0, pool.literal_suffix(node))
+
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        let base = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let field_expr = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), base, field_expr, 0, pool.literal_suffix(node))
 
     if kind == NodeKind.NK_INDEX:
         let base = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
@@ -335,24 +396,30 @@ fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), cond, then_body, else_body, pool.literal_suffix(node))
 
     if kind == NodeKind.NK_CALL or kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT or kind == NodeKind.NK_PAT_TUPLE or kind == NodeKind.NK_PAT_OR:
-        let new_extra = pool.extra_len()
         let extra_start = if kind == NodeKind.NK_CALL: pool.get_data1(node) else: pool.get_data0(node)
         let count = if kind == NodeKind.NK_CALL: pool.get_data2(node) else: pool.get_data1(node)
+        let cloned_items: Vec[i32] = Vec.new()
         for i in 0..count:
             let child = ct_clone_tree_with_subst(pool, pool.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
-            pool.add_extra(child)
+            cloned_items.push(child)
+        let new_extra = pool.extra_len()
+        for i in 0..cloned_items.len() as i32:
+            pool.add_extra(cloned_items.get(i as i64))
         if kind == NodeKind.NK_CALL:
             let callee = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
             return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), callee, new_extra, count, pool.literal_suffix(node))
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), new_extra, count, 0, pool.literal_suffix(node))
 
     if kind == NodeKind.NK_BLOCK:
-        let stmt_extra = pool.extra_len()
         let extra_start = pool.get_data0(node)
         let stmt_count = pool.get_data1(node)
+        let stmt_nodes: Vec[i32] = Vec.new()
         for i in 0..stmt_count:
             let stmt = ct_clone_tree_with_subst(pool, pool.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
-            pool.add_extra(stmt)
+            stmt_nodes.push(stmt)
+        let stmt_extra = pool.extra_len()
+        for i in 0..stmt_nodes.len() as i32:
+            pool.add_extra(stmt_nodes.get(i as i64))
         let tail = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), stmt_extra, stmt_count, tail, pool.literal_suffix(node))
 
@@ -389,12 +456,15 @@ fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), value, pool.get_data1(node), 0, pool.literal_suffix(node))
 
     if kind == NodeKind.NK_MATCH:
-        let new_extra = pool.extra_len()
         let extra_start = pool.get_data1(node)
         let arm_count = pool.get_data2(node)
+        let arm_nodes: Vec[i32] = Vec.new()
         for i in 0..arm_count:
             let arm = ct_clone_tree_with_subst(pool, pool.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
-            pool.add_extra(arm)
+            arm_nodes.push(arm)
+        let new_extra = pool.extra_len()
+        for i in 0..arm_nodes.len() as i32:
+            pool.add_extra(arm_nodes.get(i as i64))
         let subject = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), subject, new_extra, arm_count, pool.literal_suffix(node))
 
@@ -405,14 +475,17 @@ fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pat, body, guard, pool.literal_suffix(node))
 
     if kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_RECORD_UPDATE:
-        let new_extra = pool.extra_len()
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
+        let field_extras: Vec[i32] = Vec.new()
         for i in 0..field_count:
             let base = extra_start + i * 2
-            pool.add_extra(pool.get_extra(base))
+            field_extras.push(pool.get_extra(base))
             let value = ct_clone_tree_with_subst(pool, pool.get_extra(base + 1), subst_sym, subst_node, index_sym, index_node)
-            pool.add_extra(value)
+            field_extras.push(value)
+        let new_extra = pool.extra_len()
+        for i in 0..field_extras.len() as i32:
+            pool.add_extra(field_extras.get(i as i64))
         let source = if kind == NodeKind.NK_RECORD_UPDATE: ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node) else: pool.get_data0(node)
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), source, new_extra, field_count, pool.literal_suffix(node))
 
@@ -428,33 +501,43 @@ fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
         let arg_count = pool.get_data2(node)
         let extra_start = pool.get_data1(node)
-        let new_extra = pool.extra_len()
+        let arg_nodes: Vec[i32] = Vec.new()
         for i in 0..arg_count:
             let arg = ct_clone_tree_with_subst(pool, pool.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
-            pool.add_extra(arg)
+            arg_nodes.push(arg)
+        let new_extra = pool.extra_len()
+        for i in 0..arg_nodes.len() as i32:
+            pool.add_extra(arg_nodes.get(i as i64))
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), new_extra, arg_count, pool.literal_suffix(node))
 
     if kind == NodeKind.NK_ENUM_VARIANT:
         let old_extra = pool.get_data2(node)
         let arg_count = pool.get_extra(old_extra)
-        let new_extra = pool.extra_len()
-        pool.add_extra(arg_count)
+        let arg_nodes: Vec[i32] = Vec.new()
         for i in 0..arg_count:
             let arg = ct_clone_tree_with_subst(pool, pool.get_extra(old_extra + 1 + i), subst_sym, subst_node, index_sym, index_node)
-            pool.add_extra(arg)
+            arg_nodes.push(arg)
+        let new_extra = pool.extra_len()
+        pool.add_extra(arg_count)
+        for i in 0..arg_nodes.len() as i32:
+            pool.add_extra(arg_nodes.get(i as i64))
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), pool.get_data1(node), new_extra, pool.literal_suffix(node))
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
-        let new_extra = pool.extra_len()
         let old_extra = pool.get_data2(node)
         let has_args = pool.get_extra(old_extra)
-        pool.add_extra(has_args)
+        let arg_nodes: Vec[i32] = Vec.new()
         let arg_count = if has_args != 0: pool.get_extra(old_extra + 1) else: 0
         if has_args != 0:
-            pool.add_extra(arg_count)
             for i in 0..arg_count:
                 let arg = ct_clone_tree_with_subst(pool, pool.get_extra(old_extra + 2 + i), subst_sym, subst_node, index_sym, index_node)
-                pool.add_extra(arg)
+                arg_nodes.push(arg)
+        let new_extra = pool.extra_len()
+        pool.add_extra(has_args)
+        if has_args != 0:
+            pool.add_extra(arg_count)
+            for i in 0..arg_nodes.len() as i32:
+                pool.add_extra(arg_nodes.get(i as i64))
         let base = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), base, pool.get_data1(node), new_extra, pool.literal_suffix(node))
 
@@ -487,34 +570,41 @@ fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), body, 0, pool.literal_suffix(node))
 
     if kind == NodeKind.NK_SELECT_AWAIT:
-        let new_extra = pool.extra_len()
         let extra_start = pool.get_data0(node)
         let arm_count = pool.get_data1(node)
+        let arm_extras: Vec[i32] = Vec.new()
         for i in 0..arm_count:
             let base = extra_start + i * 3
-            pool.add_extra(pool.get_extra(base))
+            arm_extras.push(pool.get_extra(base))
             let task_expr = ct_clone_tree_with_subst(pool, pool.get_extra(base + 1), subst_sym, subst_node, index_sym, index_node)
             let body = ct_clone_tree_with_subst(pool, pool.get_extra(base + 2), subst_sym, subst_node, index_sym, index_node)
-            pool.add_extra(task_expr)
-            pool.add_extra(body)
+            arm_extras.push(task_expr)
+            arm_extras.push(body)
+        let new_extra = pool.extra_len()
+        for i in 0..arm_extras.len() as i32:
+            pool.add_extra(arm_extras.get(i as i64))
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), new_extra, arm_count, 0, pool.literal_suffix(node))
 
     if kind == NodeKind.NK_FSTRING:
         let seg_count = pool.get_data0(node)
         let old_extra = pool.get_data1(node)
-        let new_extra = pool.extra_len()
-        for si in 0..seg_count:
-            let base = old_extra + si * 3
-            let seg_kind = pool.get_extra(base)
-            pool.add_extra(seg_kind)
+        let seg_extras: Vec[i32] = Vec.new()
+        var pos = old_extra
+        for _ in 0..seg_count:
+            let seg_kind = pool.get_extra(pos)
+            seg_extras.push(seg_kind)
             if seg_kind == FStringSegmentKind.EXPR:
-                let expr_node = ct_clone_tree_with_subst(pool, pool.get_extra(base + 1), subst_sym, subst_node, index_sym, index_node)
-                let spec_node = ct_clone_tree_with_subst(pool, pool.get_extra(base + 2), subst_sym, subst_node, index_sym, index_node)
-                pool.add_extra(expr_node)
-                pool.add_extra(spec_node)
+                let expr_node = ct_clone_tree_with_subst(pool, pool.get_extra(pos + 1), subst_sym, subst_node, index_sym, index_node)
+                let spec_node = ct_clone_tree_with_subst(pool, pool.get_extra(pos + 2), subst_sym, subst_node, index_sym, index_node)
+                seg_extras.push(expr_node)
+                seg_extras.push(spec_node)
+                pos = pos + 3
             else:
-                pool.add_extra(pool.get_extra(base + 1))
-                pool.add_extra(pool.get_extra(base + 2))
+                seg_extras.push(pool.get_extra(pos + 1))
+                pos = pos + 2
+        let new_extra = pool.extra_len()
+        for i in 0..seg_extras.len() as i32:
+            pool.add_extra(seg_extras.get(i as i64))
         return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), seg_count, new_extra, 0, pool.literal_suffix(node))
 
     if kind == NodeKind.NK_CLOSURE:
@@ -548,12 +638,12 @@ fn ct_rewrite_comptime_for(source_ast: AstPool, pool: &mut AstPool, sema: &mut S
         return wrapper
 
     let template_body = ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data2(inner))
-    let stmt_extra = pool.extra_len()
+    let stmt_nodes: Vec[i32] = Vec.new()
     let binding = pool.get_data0(inner)
     let for_meta = pool.find_for_meta(inner)
     let index_binding = if for_meta >= 0: pool.for_meta_index_binding(for_meta) else: 0
     for i in 0..iter_count:
-        let item_node = ct_iter_item_node(pool, intern, iterable, i, wrapper, evald.extras)
+        let item_node = ct_iter_item_node(pool, intern, sema, iterable, i, wrapper, evald.extras)
         if item_node == 0:
             ct_emit_error(sema, diags, source_ast, inner, "failed to materialize comptime for item")
             return wrapper
@@ -561,9 +651,13 @@ fn ct_rewrite_comptime_for(source_ast: AstPool, pool: &mut AstPool, sema: &mut S
         if index_binding != 0:
             let index_value = comptime_value_int(sema.ty_i64 as i32, i as i64)
             let empty_values: Vec[ComptimeValue] = Vec.new()
-            index_node = ct_build_value_tree(pool, intern, index_value, wrapper, empty_values)
+            index_node = ct_build_value_tree(pool, intern, sema, index_value, wrapper, empty_values)
         let cloned_body = ct_clone_tree_with_subst(pool, template_body, binding, item_node, index_binding, index_node)
-        pool.add_extra(cloned_body)
+        let eval_ast = unsafe: *pool
+        stmt_nodes.push(ct_transform_expr(eval_ast, pool, sema, intern, diags, cloned_body))
+    let stmt_extra = pool.extra_len()
+    for i in 0..stmt_nodes.len() as i32:
+        pool.add_extra(stmt_nodes.get(i as i64))
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(wrapper), pool.get_end(wrapper), stmt_extra, iter_count, 0) as i32
 
 fn ct_rewrite_comptime(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, diags: &mut DiagnosticList, node: i32) -> i32:
@@ -580,7 +674,7 @@ fn ct_rewrite_comptime(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema,
     let value = evald.value
     if comptime_value_is_valid(value) == 0:
         return node
-    let folded = ct_build_value_tree(pool, intern, value, node, evald.extras)
+    let folded = ct_build_value_tree(pool, intern, sema, value, node, evald.extras)
     if folded == 0:
         ct_emit_error(sema, diags, source_ast, inner, "comptime value cannot be embedded yet")
         return node
@@ -614,11 +708,30 @@ fn ct_transform_expr(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, i
         for i in 0..arg_count:
             let arg_idx = extra_start + i
             pool.extra.set_i32(arg_idx as i64, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_extra(arg_idx)))
-        return node
+        return ct_try_fold_type_call(pool, sema, intern, diags, node)
 
     if kind == NodeKind.NK_FIELD_ACCESS:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data0(node)))
+        let base = ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data0(node))
+        pool.set_data0(node, base)
+        let folded_value = ct_struct_lit_field_value(pool, base, pool.get_data1(node))
+        if folded_value != 0:
+            return ct_clone_tree_with_subst(pool, folded_value, 0, 0, 0, 0)
         return node
+
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        let base = ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data0(node))
+        let field_expr = ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data1(node))
+        pool.set_data0(node, base)
+        pool.set_data1(node, field_expr)
+        let eval_ast = unsafe: *pool
+        let evald = comptime_try_eval_expr_result(sema as *mut Sema, diags, eval_ast, sema.pool, field_expr)
+        if comptime_value_is_valid(evald.value) == 0:
+            return node
+        if evald.value.kind != ComptimeValueKind.CV_STR:
+            ct_emit_error(sema, diags, source_ast, node, "computed field access requires comptime string field name")
+            return node
+        let field_sym = intern.intern(evald.value.text)
+        return pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), base, field_sym, 0) as i32
 
     if kind == NodeKind.NK_INDEX:
         pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data0(node)))

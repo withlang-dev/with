@@ -336,6 +336,11 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let field = intern.resolve(pool.get_data1(node))
         return prefix ++ render_expr(pool, intern, (expr) as NodeId, 0) ++ "." ++ field
 
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        let expr = pool.get_data0(node)
+        let field_expr = pool.get_data1(node)
+        return prefix ++ render_expr(pool, intern, (expr) as NodeId, 0) ++ ".{" ++ render_expr(pool, intern, (field_expr) as NodeId, 0) ++ "}"
+
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         let expr = pool.get_data0(node)
         let member = intern.resolve(pool.get_data1(node))

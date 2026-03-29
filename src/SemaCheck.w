@@ -6,6 +6,7 @@ use BorrowCfg
 use Span
 use Diagnostic
 use InternPool
+use TypeLayout
 use render
 
 extern fn print(s: str) -> void
@@ -663,6 +664,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_FIELD_ACCESS:
         return self.check_field_access(node) as TypeId
+
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        return self.check_computed_field_access(node) as TypeId
 
     if kind == NodeKind.NK_INDEX:
         return self.check_index(node) as TypeId
@@ -1530,6 +1534,20 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
             return field_base as i32
         return 0
 
+    0
+
+fn Sema.check_computed_field_access(self: Sema, node: i32) -> i32:
+    let expr = self.ast.get_data0(node)
+    let field_expr = self.ast.get_data1(node)
+    let _ = self.check_expr(expr)
+    let field_ty = self.check_expr(field_expr)
+    if self.in_comptime_fn == 0:
+        self.emit_error("computed field access requires comptime context", node)
+        return 0
+    if field_ty != 0 and self.resolve_alias(field_ty) != self.ty_str:
+        self.emit_error("computed field access requires a string field name", field_expr)
+    // Defer concrete field resolution until the comptime transform rewrites
+    // this node to a normal NK_FIELD_ACCESS.
     0
 
 fn Sema.index_expr_is_type_level(self: Sema, expr: i32) -> bool:
@@ -3174,6 +3192,28 @@ fn Sema.select_trait_impl_for_generic_inst(self: Sema, tid: i32, trait_sym: i32)
     let base_sym = self.get_type_d0(tid)
     self.select_trait_impl(base_sym, trait_sym)
 
+fn Sema.type_implements_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
+    if tid == 0 or trait_sym == 0:
+        return 0
+    let resolved = self.resolve_alias(tid)
+    let copy_sym = self.pool_intern("Copy")
+    if trait_sym == copy_sym:
+        return self.is_copy(resolved)
+    let drop_sym = self.pool_intern("Drop")
+    if trait_sym == drop_sym:
+        let drop_name = self.get_type_name(resolved)
+        if drop_name != 0:
+            return self.has_drop_method(drop_name)
+        return 0
+    if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+        return self.select_trait_impl_for_generic_inst(resolved as i32, trait_sym)
+    var type_sym = self.get_type_name(resolved)
+    if type_sym == 0:
+        type_sym = self.pool_intern(self.type_name(resolved as i32))
+    if type_sym == 0:
+        return 0
+    self.select_trait_impl(type_sym, trait_sym)
+
 // Resolve an associated type from a specific impl: find the impl block for (type_sym, trait_sym)
 // and look up the associated type binding for assoc_sym.
 fn Sema.resolve_impl_assoc_type(self: Sema, type_sym: i32, trait_sym: i32, assoc_sym: i32) -> i32:
@@ -3362,6 +3402,16 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     let field = self.ast.get_data1(callee)
     let obj_type = self.check_expr(expr)
     let static_type_sym = self.static_receiver_base_sym(expr)
+
+    if obj_type != 0 and static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
+        let static_type_result = self.check_static_type_method_call(obj_type as i32, field, extra_start, arg_count, node)
+        if static_type_result != 0:
+            if static_type_result < 0:
+                return 0
+            return static_type_result
+        if static_type_result < 0:
+            return 0
+    
 
     // Check all arguments
     let arg_types: Vec[i32] = Vec.new()
@@ -3715,6 +3765,217 @@ fn Sema.static_receiver_type_is_known(self: Sema, expr: i32) -> i32:
         return 1
     0
 
+fn Sema.type_reflection_field_count(self: Sema, tid: i32) -> i32:
+    let resolved = self.resolve_alias(tid)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_STRUCT:
+        return self.get_type_d2(resolved)
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        if self.named_types.contains(base_sym):
+            let base_tid = self.named_types.get(base_sym).unwrap()
+            if self.get_type_kind(self.resolve_alias(base_tid as TypeId)) == TypeKind.TY_STRUCT:
+                return self.get_type_d2(self.resolve_alias(base_tid as TypeId))
+    0
+
+fn Sema.type_reflection_field_name(self: Sema, tid: i32, field_index: i32) -> i32:
+    let resolved = self.resolve_alias(tid)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_STRUCT:
+        let te_start = self.get_type_d1(resolved)
+        let field_count = self.get_type_d2(resolved)
+        if field_index < 0 or field_index >= field_count:
+            return 0
+        return self.type_extra.get((te_start + field_index * 3) as i64)
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        if self.named_types.contains(base_sym):
+            let base_tid = self.named_types.get(base_sym).unwrap()
+            let base_resolved = self.resolve_alias(base_tid as TypeId)
+            if self.get_type_kind(base_resolved) == TypeKind.TY_STRUCT:
+                let te_start = self.get_type_d1(base_resolved)
+                let field_count = self.get_type_d2(base_resolved)
+                if field_index < 0 or field_index >= field_count:
+                    return 0
+                return self.type_extra.get((te_start + field_index * 3) as i64)
+    0
+
+fn Sema.type_reflection_field_type(self: Sema, tid: i32, field_index: i32) -> i32:
+    let resolved = self.resolve_alias(tid)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_STRUCT:
+        let te_start = self.get_type_d1(resolved)
+        let field_count = self.get_type_d2(resolved)
+        if field_index < 0 or field_index >= field_count:
+            return 0
+        return self.type_extra.get((te_start + field_index * 3 + 1) as i64)
+    if tk == TypeKind.TY_GENERIC_INST:
+        let layout_sema = self
+        return layout_sema.type_layout_generic_struct_field_type(resolved as i32, field_index)
+    0
+
+fn Sema.type_reflection_variant_base(self: Sema, tid: i32) -> i32:
+    let resolved = self.resolve_alias(tid)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_ENUM:
+        return resolved as i32
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        if self.named_types.contains(base_sym):
+            let base_tid = self.named_types.get(base_sym).unwrap()
+            let base_resolved = self.resolve_alias(base_tid as TypeId)
+            if self.get_type_kind(base_resolved) == TypeKind.TY_ENUM:
+                return base_resolved as i32
+    0
+
+fn Sema.type_reflection_variant_position(self: Sema, base_tid: i32, variant_index: i32) -> i32:
+    let resolved = self.resolve_alias(base_tid)
+    if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
+        return 0 - 1
+    let te_start = self.get_type_d1(resolved)
+    let variant_count = self.get_type_d2(resolved)
+    if variant_index < 0 or variant_index >= variant_count:
+        return 0 - 1
+    var pos = te_start
+    for vi in 0..variant_count:
+        if vi == variant_index:
+            return pos
+        let payload_count = self.type_extra.get((pos + 1) as i64)
+        pos = pos + 2 + payload_count
+    0 - 1
+
+fn Sema.type_reflection_variant_count(self: Sema, tid: i32) -> i32:
+    let base_tid = self.type_reflection_variant_base(tid)
+    if base_tid == 0:
+        return 0
+    self.get_type_d2(base_tid)
+
+fn Sema.type_reflection_variant_name(self: Sema, tid: i32, variant_index: i32) -> i32:
+    let base_tid = self.type_reflection_variant_base(tid)
+    if base_tid == 0:
+        return 0
+    let pos = self.type_reflection_variant_position(base_tid, variant_index)
+    if pos < 0:
+        return 0
+    self.type_extra.get(pos as i64)
+
+fn Sema.type_reflection_variant_payload_count(self: Sema, tid: i32, variant_index: i32) -> i32:
+    let base_tid = self.type_reflection_variant_base(tid)
+    if base_tid == 0:
+        return 0
+    let pos = self.type_reflection_variant_position(base_tid, variant_index)
+    if pos < 0:
+        return 0
+    self.type_extra.get((pos + 1) as i64)
+
+fn Sema.type_reflection_variant_discriminant(self: Sema, tid: i32, variant_index: i32) -> i64:
+    let name_sym = self.type_reflection_variant_name(tid, variant_index)
+    if name_sym == 0:
+        return 0
+    if self.disc_values.contains(name_sym):
+        return self.disc_values.get(name_sym).unwrap() as i64
+    variant_index as i64
+
+fn Sema.type_reflection_variant_payload_type(self: Sema, tid: i32, variant_index: i32, payload_index: i32) -> i32:
+    let base_tid = self.type_reflection_variant_base(tid)
+    if base_tid == 0:
+        return 0
+    let pos = self.type_reflection_variant_position(base_tid, variant_index)
+    if pos < 0:
+        return 0
+    let payload_count = self.type_extra.get((pos + 1) as i64)
+    if payload_index < 0 or payload_index >= payload_count:
+        return 0
+    let resolved = self.resolve_alias(tid)
+    if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        let name_sym = self.type_extra.get(pos as i64)
+        let payloads = self.resolve_generic_enum_payload(resolved as i32, base_sym, name_sym, payload_count)
+        if payload_index < payloads.len() as i32:
+            let payload_tid = payloads.get(payload_index as i64)
+            if payload_tid != 0:
+                return payload_tid
+    self.type_extra.get((pos + 2 + payload_index) as i64)
+
+fn Sema.check_static_type_method_call(self: Sema, obj_type: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
+    let method = self.pool_resolve(field)
+    let is_type_method =
+        method == "fields" or
+        method == "variants" or
+        method == "name" or
+        method == "size" or
+        method == "align" or
+        method == "implements" or
+        method == "is_copy"
+    if not is_type_method:
+        return 0
+
+    if method == "name":
+        if arg_count != 0:
+            self.emit_error("type.name() takes no arguments", node)
+            return 0 - 1
+        self.typed_expr_types.insert(node, self.ty_str as i32)
+        return self.ty_str as i32
+
+    if method == "size" or method == "align":
+        if arg_count != 0:
+            self.emit_error("type size/align methods take no arguments", node)
+            return 0 - 1
+        self.typed_expr_types.insert(node, self.ty_usize as i32)
+        return self.ty_usize as i32
+
+    if method == "implements":
+        if arg_count != 1:
+            self.emit_error("type.implements() expects exactly one trait argument", node)
+            return 0 - 1
+        let trait_node = self.ast.get_extra(extra_start)
+        if trait_node == 0:
+            self.emit_error("type.implements() requires a trait name", node)
+            return 0 - 1
+        let trait_kind = self.ast.kind(trait_node)
+        if trait_kind != NodeKind.NK_IDENT and trait_kind != NodeKind.NK_TYPE_NAMED:
+            self.emit_error("type.implements() requires a trait name", trait_node)
+            return 0 - 1
+        let trait_sym = self.ast.get_data0(trait_node)
+        if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
+            self.emit_error("unknown trait '" ++ self.pool_resolve(trait_sym) ++ "'", trait_node)
+            return 0 - 1
+        self.typed_expr_types.insert(node, self.ty_bool as i32)
+        return self.ty_bool as i32
+
+    if method == "is_copy":
+        if arg_count != 0:
+            self.emit_error("type.is_copy() takes no arguments", node)
+            return 0 - 1
+        self.typed_expr_types.insert(node, self.ty_bool as i32)
+        return self.ty_bool as i32
+
+    if method == "fields":
+        if arg_count != 0:
+            self.emit_error("type.fields() takes no arguments", node)
+            return 0 - 1
+        let resolved = self.resolve_alias(obj_type)
+        let tk = self.get_type_kind(resolved)
+        if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_GENERIC_INST:
+            self.emit_error("type.fields() requires a struct type", node)
+            return 0 - 1
+        let field_count = self.type_reflection_field_count(obj_type)
+        let result = self.ensure_exact_type(TypeKind.TY_ARRAY, self.ty_field_info as i32, field_count, 0)
+        self.typed_expr_types.insert(node, result as i32)
+        return result as i32
+
+    let base_tid = self.type_reflection_variant_base(obj_type)
+    if arg_count != 0:
+        self.emit_error("type.variants() takes no arguments", node)
+        return 0 - 1
+    if base_tid == 0:
+        self.emit_error("type.variants() requires an enum type", node)
+        return 0 - 1
+    let variant_count = self.type_reflection_variant_count(obj_type)
+    let result = self.ensure_exact_type(TypeKind.TY_ARRAY, self.ty_variant_info as i32, variant_count, 0)
+    self.typed_expr_types.insert(node, result as i32)
+    result as i32
+
 fn Sema.type_expr_contains_ref(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
@@ -3790,6 +4051,8 @@ fn Sema.borrow_root_place(self: Sema, node: i32) -> i32:
         return self.ast.get_data0(node)
     if kind == NodeKind.NK_FIELD_ACCESS:
         return self.borrow_root_place(self.ast.get_data0(node))
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        return self.borrow_root_place(self.ast.get_data0(node))
     if kind == NodeKind.NK_INDEX:
         return self.borrow_root_place(self.ast.get_data0(node))
     if kind == NodeKind.NK_GROUPED:
@@ -3812,6 +4075,9 @@ fn Sema.borrow_collect_path_inner(self: Sema, node: i32):
         // Recurse into base first (root-to-leaf ordering)
         self.borrow_collect_path_inner(self.ast.get_data0(node))
         self.borrow_path_data.push(self.ast.get_data1(node))
+        return
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        self.borrow_collect_path_inner(self.ast.get_data0(node))
     // NodeKind.NK_IDENT, NodeKind.NK_INDEX, NodeKind.NK_GROUPED: no field to add
 
 fn Sema.borrow_field(self: Sema, node: i32) -> i32:
@@ -3971,6 +4237,10 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
         return 0
     if kind == NodeKind.NK_FIELD_ACCESS:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
@@ -4164,6 +4434,10 @@ fn Sema.expr_mutates_place(self: Sema, node: i32, sym: i32) -> i32:
         return self.expr_mutates_place(self.ast.get_data0(node), sym)
     if kind == NodeKind.NK_FIELD_ACCESS:
         return self.expr_mutates_place(self.ast.get_data0(node), sym)
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        if self.expr_mutates_place(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_mutates_place(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_INDEX:
         if self.expr_mutates_place(self.ast.get_data0(node), sym) != 0:
             return 1
@@ -4187,7 +4461,7 @@ fn Sema.place_root_sym(self: Sema, node: i32) -> i32:
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_IDENT:
         return self.ast.get_data0(node)
-    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED:
         return self.place_root_sym(self.ast.get_data0(node))
     0
 
@@ -4209,6 +4483,10 @@ fn Sema.capture_is_field_only(self: Sema, node: i32, sym: i32) -> i32:
         if self.ast.kind(base) == NodeKind.NK_IDENT and self.ast.get_data0(base) == sym:
             return 1
         return self.capture_is_field_only(base, sym)
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        if self.capture_is_field_only(self.ast.get_data0(node), sym) == 0:
+            return 0
+        return self.capture_is_field_only(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_BINARY:
         if self.capture_is_field_only(self.ast.get_data1(node), sym) == 0:
             return 0
@@ -4280,6 +4558,10 @@ fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
                 self.capture_field_kinds.push(BorrowKind.SHARED)
             return
         self.collect_capture_fields(base, sym)
+        return
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        self.collect_capture_fields(self.ast.get_data0(node), sym)
+        self.collect_capture_fields(self.ast.get_data1(node), sym)
         return
     if kind == NodeKind.NK_ASSIGN:
         // Check if target is sym.field — if so, mark that field as exclusive

@@ -11,6 +11,7 @@ enum ComptimeValueKind: i32:
     CV_ARRAY = 5
     CV_TUPLE = 6
     CV_RANGE = 7
+    CV_STRUCT = 8
 
 type ComptimeValue {
     kind: i32,
@@ -110,6 +111,17 @@ fn comptime_value_range(type_id: i32, start_value: i64, end_value: i64, inclusiv
         extra_count: 0,
     }
 
+fn comptime_value_struct(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
+    ComptimeValue {
+        kind: ComptimeValueKind.CV_STRUCT,
+        type_id,
+        data0: 0,
+        data1: 0,
+        text: "",
+        extra_start,
+        extra_count,
+    }
+
 fn comptime_value_is_valid(value: ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_INVALID:
         return 0
@@ -138,6 +150,7 @@ fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_ARRAY: return "array"
     if kind == ComptimeValueKind.CV_TUPLE: return "tuple"
     if kind == ComptimeValueKind.CV_RANGE: return "range"
+    if kind == ComptimeValueKind.CV_STRUCT: return "struct"
     "invalid"
 
 fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema: Sema) -> str:
@@ -163,6 +176,19 @@ fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema:
                 out = out ++ ", "
             out = out ++ comptime_value_format(extras.get((value.extra_start + i) as i64), extras, sema)
         return out ++ close
+    if value.kind == ComptimeValueKind.CV_STRUCT:
+        let resolved = sema.resolve_alias(value.type_id)
+        if sema.get_type_kind(resolved) == TypeKind.TY_STRUCT:
+            let te_start = sema.get_type_d1(resolved)
+            let field_count = sema.get_type_d2(resolved)
+            var out = sema.type_name(value.type_id) ++ " { "
+            for fi in 0..field_count:
+                if fi > 0:
+                    out = out ++ ", "
+                let field_sym = sema.type_extra.get((te_start + fi * 3) as i64)
+                let field_value = extras.get((value.extra_start + fi) as i64)
+                out = out ++ sema.pool_resolve(field_sym) ++ ": " ++ comptime_value_format(field_value, extras, sema)
+            return out ++ " }"
     if value.type_id != 0:
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
@@ -186,6 +212,15 @@ fn comptime_values_equal(lhs: ComptimeValue, rhs: ComptimeValue, extras: Vec[Com
         return 0
     if lhs.kind == ComptimeValueKind.CV_ARRAY or lhs.kind == ComptimeValueKind.CV_TUPLE:
         if lhs.extra_count != rhs.extra_count:
+            return 0
+        for i in 0..lhs.extra_count:
+            let left = extras.get((lhs.extra_start + i) as i64)
+            let right = extras.get((rhs.extra_start + i) as i64)
+            if comptime_values_equal(left, right, extras) == 0:
+                return 0
+        return 1
+    if lhs.kind == ComptimeValueKind.CV_STRUCT:
+        if lhs.type_id != rhs.type_id or lhs.extra_count != rhs.extra_count:
             return 0
         for i in 0..lhs.extra_count:
             let left = extras.get((lhs.extra_start + i) as i64)
