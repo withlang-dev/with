@@ -1837,6 +1837,9 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                             let gi = self.add_type(TypeKind.TY_GENERIC_INST, name, te, tp_count)
                             self.typed_expr_types.insert(node, gi as i32)
                             return gi as i32
+            if expected_struct_ty != 0:
+                self.typed_expr_types.insert(node, expected_struct_ty as i32)
+                return expected_struct_ty as i32
             self.typed_expr_types.insert(node, resolved as i32)
             return resolved as i32
     0
