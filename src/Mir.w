@@ -1350,3 +1350,411 @@ fn validate_mir_body(body: MirBody) -> str:
                 return f"call args table{ai}: operand out of range"
 
     ""
+
+type MirValidationError {
+    fn_sym: i32,
+    span: i32,
+    message: str,
+}
+
+fn mir_validation_ok -> MirValidationError:
+    MirValidationError {
+        fn_sym: 0,
+        span: 0,
+        message: "",
+    }
+
+fn mir_validation_fail(fn_sym: i32, span: i32, message: str) -> MirValidationError:
+    MirValidationError {
+        fn_sym: fn_sym,
+        span: span,
+        message: message,
+    }
+
+fn mir_validation_has_error(err: MirValidationError) -> bool:
+    err.message.len() > 0
+
+fn mir_validate_find_named_type(mir_mod: MirModule, type_sym: i32) -> i32:
+    for ti in 0..mir_mod.sema_type_kinds.len() as i32:
+        let tk = mir_mod.sema_type_kinds.get(ti as i64)
+        if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_ENUM and tk != TypeKind.TY_ALIAS:
+            continue
+        if mir_mod.sema_type_d0.get(ti as i64) == type_sym:
+            return ti
+    0
+
+fn mir_validate_find_int_type(mir_mod: MirModule, bits: i32, signed: i32) -> i32:
+    for ti in 0..mir_mod.sema_type_kinds.len() as i32:
+        if mir_mod.sema_type_kinds.get(ti as i64) != TypeKind.TY_INT:
+            continue
+        if mir_mod.sema_type_d0.get(ti as i64) == bits and mir_mod.sema_type_d1.get(ti as i64) == signed:
+            return ti
+    0
+
+fn mir_validate_get_generic_inst_arg_count(mir_mod: MirModule, tid: i32) -> i32:
+    mir_mod.mir_get_type_d2(tid)
+
+fn mir_validate_get_generic_inst_arg(mir_mod: MirModule, tid: i32, index: i32) -> i32:
+    let extra_start = mir_mod.mir_get_type_d1(tid)
+    mir_mod.mir_get_type_extra(extra_start + index)
+
+fn mir_validate_struct_field_type(mir_mod: MirModule, struct_tid: i32, field_sym: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(struct_tid)
+    let tk = mir_mod.mir_get_type_kind(resolved)
+    if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+        let inner = mir_mod.mir_get_type_d0(resolved)
+        return mir_validate_struct_field_type(mir_mod, inner, field_sym)
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = mir_mod.mir_get_type_d0(resolved)
+        let base_tid = mir_validate_find_named_type(mir_mod, base_sym)
+        if base_tid > 0:
+            return mir_validate_struct_field_type(mir_mod, base_tid, field_sym)
+        return 0
+    if tk != TypeKind.TY_STRUCT:
+        return 0
+    let extra_start = mir_mod.mir_get_type_d1(resolved)
+    let field_count = mir_mod.mir_get_type_d2(resolved)
+    for fi in 0..field_count:
+        let f_name = mir_mod.mir_get_type_extra(extra_start + fi * 3)
+        if f_name == field_sym:
+            return mir_mod.mir_get_type_extra(extra_start + fi * 3 + 1)
+    0
+
+fn mir_validate_tuple_elem_type(mir_mod: MirModule, tuple_tid: i32, field_idx: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(tuple_tid)
+    if mir_mod.mir_get_type_kind(resolved) != TypeKind.TY_TUPLE:
+        return 0
+    let elem_start = mir_mod.mir_get_type_d0(resolved)
+    let elem_count = mir_mod.mir_get_type_d1(resolved)
+    if field_idx < 0 or field_idx >= elem_count:
+        return 0
+    mir_mod.mir_get_type_extra(elem_start + field_idx)
+
+fn mir_validate_indexed_element_type(mir_mod: MirModule, collection_tid: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(collection_tid)
+    let tk = mir_mod.mir_get_type_kind(resolved)
+    if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+        return mir_mod.mir_get_type_d0(resolved)
+    if tk == TypeKind.TY_STR:
+        return mir_validate_find_int_type(mir_mod, 32, 1)
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = mir_mod.mir_get_type_d0(resolved)
+        if base_sym != 0 and mir_validate_get_generic_inst_arg_count(mir_mod, resolved) > 0:
+            return mir_validate_get_generic_inst_arg(mir_mod, resolved, 0)
+    0
+
+fn mir_validate_variant_exists(mir_mod: MirModule, enum_tid: i32, variant_idx: i32) -> bool:
+    if variant_idx < 0:
+        return false
+    let resolved = mir_mod.mir_resolve_alias(enum_tid)
+    let tk = mir_mod.mir_get_type_kind(resolved)
+    if tk == TypeKind.TY_ENUM:
+        return variant_idx < mir_mod.mir_get_type_d2(resolved)
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = mir_mod.mir_get_type_d0(resolved)
+        let base_tid = mir_validate_find_named_type(mir_mod, base_sym)
+        if base_tid > 0 and mir_mod.mir_get_type_kind(base_tid) == TypeKind.TY_ENUM:
+            return variant_idx < mir_mod.mir_get_type_d2(base_tid)
+    false
+
+fn mir_validate_enum_payload_type(mir_mod: MirModule, enum_tid: i32, variant_idx: i32, field_idx: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(enum_tid)
+    let tk = mir_mod.mir_get_type_kind(resolved)
+    if variant_idx < 0 or field_idx < 0:
+        return 0
+
+    if tk == TypeKind.TY_ENUM:
+        let te_start = mir_mod.mir_get_type_d1(resolved)
+        let variant_count = mir_mod.mir_get_type_d2(resolved)
+        var pos = te_start
+        for vi in 0..variant_count:
+            let payload_count = mir_mod.mir_get_type_extra(pos + 1)
+            if vi == variant_idx:
+                if field_idx < payload_count:
+                    return mir_mod.mir_get_type_extra(pos + 2 + field_idx)
+                return 0
+            pos = pos + 2 + payload_count
+        return 0
+
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = mir_mod.mir_get_type_d0(resolved)
+        let base_tid = mir_validate_find_named_type(mir_mod, base_sym)
+        if base_tid <= 0 or mir_mod.mir_get_type_kind(base_tid) != TypeKind.TY_ENUM:
+            return 0
+        let arg_count = mir_validate_get_generic_inst_arg_count(mir_mod, resolved)
+        let te_start = mir_mod.mir_get_type_d1(base_tid)
+        let variant_count = mir_mod.mir_get_type_d2(base_tid)
+
+        // Option[T]: one generic arg, exactly one payload-bearing variant.
+        if arg_count == 1 and field_idx == 0:
+            var pos = te_start
+            var payload_variant = 0 - 1
+            for vi in 0..variant_count:
+                let payload_count = mir_mod.mir_get_type_extra(pos + 1)
+                if payload_count == 1:
+                    payload_variant = vi
+                    break
+                pos = pos + 2 + payload_count
+            if payload_variant == variant_idx:
+                return mir_validate_get_generic_inst_arg(mir_mod, resolved, 0)
+        // Result[T, E]: two generic args, both variants carry one payload in declaration order.
+        if arg_count == 2 and variant_count == 2 and field_idx == 0:
+            return mir_validate_get_generic_inst_arg(mir_mod, resolved, variant_idx)
+
+        // Fallback to the erased base payload type for non-substituted generic enums.
+        return mir_validate_enum_payload_type(mir_mod, base_tid, variant_idx, field_idx)
+    0
+
+fn mir_validate_type_compatible_fast(mir_mod: MirModule, expected: i32, actual: i32) -> i32:
+    if expected <= 0 or actual <= 0:
+        return 0
+    if expected == actual:
+        return 1
+    let exp_r = mir_mod.mir_resolve_alias(expected)
+    let act_r = mir_mod.mir_resolve_alias(actual)
+    if exp_r == act_r:
+        return 1
+    let exp_k = mir_mod.mir_get_type_kind(exp_r)
+    let act_k = mir_mod.mir_get_type_kind(act_r)
+    if act_k == TypeKind.TY_NEVER:
+        return 1
+    if exp_k == TypeKind.TY_STRUCT and act_k == TypeKind.TY_STRUCT:
+        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+    if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_ENUM:
+        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+    if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_GENERIC_INST:
+        if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r):
+            let arg_count = mir_validate_get_generic_inst_arg_count(mir_mod, exp_r)
+            if arg_count == mir_validate_get_generic_inst_arg_count(mir_mod, act_r):
+                for ai in 0..arg_count:
+                    let exp_arg = mir_validate_get_generic_inst_arg(mir_mod, exp_r, ai)
+                    let act_arg = mir_validate_get_generic_inst_arg(mir_mod, act_r, ai)
+                    if mir_validate_type_compatible_fast(mir_mod, exp_arg, act_arg) == 0:
+                        return 0
+                return 1
+        return 0
+    if exp_k == TypeKind.TY_GENERIC_INST and (act_k == TypeKind.TY_STRUCT or act_k == TypeKind.TY_ENUM):
+        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+    if (exp_k == TypeKind.TY_STRUCT or exp_k == TypeKind.TY_ENUM) and act_k == TypeKind.TY_GENERIC_INST:
+        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+    if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_PTR:
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_REF:
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_REF:
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_PTR:
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_SLICE and act_k == TypeKind.TY_SLICE:
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_ARRAY and act_k == TypeKind.TY_ARRAY:
+        if mir_mod.mir_get_type_d1(exp_r) != mir_mod.mir_get_type_d1(act_r):
+            return 0
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_TUPLE and act_k == TypeKind.TY_TUPLE:
+        let exp_count = mir_mod.mir_get_type_d1(exp_r)
+        let act_count = mir_mod.mir_get_type_d1(act_r)
+        if exp_count != act_count:
+            return 0
+        let exp_start = mir_mod.mir_get_type_d0(exp_r)
+        let act_start = mir_mod.mir_get_type_d0(act_r)
+        for ei in 0..exp_count:
+            if mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_extra(exp_start + ei), mir_mod.mir_get_type_extra(act_start + ei)) == 0:
+                return 0
+        return 1
+    0
+
+fn mir_validate_single_field_inner(mir_mod: MirModule, tid: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(tid)
+    if mir_mod.mir_get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return 0
+    if mir_mod.mir_get_type_d2(resolved) != 1:
+        return 0
+    let extra_start = mir_mod.mir_get_type_d1(resolved)
+    mir_mod.mir_get_type_extra(extra_start + 1)
+
+fn mir_validate_place_type(mir_mod: MirModule, body: MirBody, place_id: i32) -> i32:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return 0
+    if place_id < body.place_sema_types.len() as i32:
+        let stored = body.place_sema_types.get(place_id as i64)
+        if stored > 0:
+            return stored
+    let local_id = body.place_locals.get(place_id as i64)
+    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        return 0
+    var current_ty = body.local_type_ids.get(local_id as i64)
+    let proj_start = body.place_proj_starts.get(place_id as i64)
+    let proj_count = body.place_proj_counts.get(place_id as i64)
+    if proj_count <= 0:
+        return current_ty
+    var active_variant_idx = 0 - 1
+
+    for pi in 0..proj_count:
+        let proj_kind = body.proj_kinds.get((proj_start + pi) as i64)
+        let proj_d0 = body.proj_d0.get((proj_start + pi) as i64)
+        let resolved = mir_mod.mir_resolve_alias(current_ty)
+        let tk = mir_mod.mir_get_type_kind(resolved)
+
+        if proj_kind == ProjKind.PK_DOWNCAST:
+            if not mir_validate_variant_exists(mir_mod, current_ty, proj_d0):
+                return 0
+            active_variant_idx = proj_d0
+            continue
+
+        if proj_kind == ProjKind.PK_FIELD:
+            var field_ty = 0
+            if active_variant_idx >= 0:
+                field_ty = mir_validate_enum_payload_type(mir_mod, current_ty, active_variant_idx, proj_d0)
+            else if tk == TypeKind.TY_TUPLE:
+                field_ty = mir_validate_tuple_elem_type(mir_mod, current_ty, proj_d0)
+            else:
+                field_ty = mir_validate_struct_field_type(mir_mod, current_ty, proj_d0)
+            if field_ty == 0:
+                return 0
+            current_ty = field_ty
+            active_variant_idx = 0 - 1
+            continue
+
+        if proj_kind == ProjKind.PK_INDEX:
+            let elem_ty = mir_validate_indexed_element_type(mir_mod, current_ty)
+            if elem_ty == 0:
+                return 0
+            current_ty = elem_ty
+            active_variant_idx = 0 - 1
+            continue
+
+        if proj_kind == ProjKind.PK_DEREF:
+            if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+                current_ty = mir_mod.mir_get_type_d0(resolved)
+                active_variant_idx = 0 - 1
+                continue
+            return 0
+
+        return 0
+
+    current_ty
+
+fn mir_validate_operand_type(mir_mod: MirModule, body: MirBody, operand_id: i32) -> i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return 0
+    let op_kind = body.operand_kinds.get(operand_id as i64)
+    let d0 = body.operand_d0.get(operand_id as i64)
+    if op_kind == OperandKind.OK_CONSTANT:
+        if d0 >= 0 and d0 < body.const_types.len() as i32:
+            return body.const_types.get(d0 as i64)
+        return 0
+    if op_kind == OperandKind.OK_COPY or op_kind == OperandKind.OK_MOVE:
+        return mir_validate_place_type(mir_mod, body, d0)
+    0
+
+fn mir_validate_is_compare_op(op: i32) -> bool:
+    op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
+
+fn mir_validate_compare_sensitive_type(mir_mod: MirModule, tid: i32) -> bool:
+    if tid <= 0:
+        return false
+    let resolved = mir_mod.mir_resolve_alias(tid)
+    let tk = mir_mod.mir_get_type_kind(resolved)
+    tk == TypeKind.TY_STR or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_TUPLE
+
+fn mir_validate_cast_supported(mir_mod: MirModule, src_ty: i32, dst_ty: i32) -> bool:
+    if src_ty <= 0 or dst_ty <= 0:
+        return true
+    let src_inner = mir_validate_single_field_inner(mir_mod, src_ty)
+    if src_inner > 0 and src_inner != src_ty:
+        if mir_validate_cast_supported(mir_mod, src_inner, dst_ty):
+            return true
+    let dst_inner = mir_validate_single_field_inner(mir_mod, dst_ty)
+    if dst_inner > 0 and dst_inner != dst_ty:
+        if mir_validate_cast_supported(mir_mod, src_ty, dst_inner):
+            return true
+    if mir_validate_type_compatible_fast(mir_mod, dst_ty, src_ty) != 0 or
+       mir_validate_type_compatible_fast(mir_mod, src_ty, dst_ty) != 0:
+        return true
+    let src_resolved = mir_mod.mir_resolve_alias(src_ty)
+    let dst_resolved = mir_mod.mir_resolve_alias(dst_ty)
+    let src_kind = mir_mod.mir_get_type_kind(src_resolved)
+    let dst_kind = mir_mod.mir_get_type_kind(dst_resolved)
+    if src_kind == TypeKind.TY_NEVER:
+        return true
+    if src_kind == TypeKind.TY_PTR or src_kind == TypeKind.TY_REF or
+       dst_kind == TypeKind.TY_PTR or dst_kind == TypeKind.TY_REF:
+        return true
+    if src_kind == TypeKind.TY_STR:
+        return dst_kind == TypeKind.TY_PTR or dst_kind == TypeKind.TY_REF or dst_kind == TypeKind.TY_STR
+    if src_kind == TypeKind.TY_STRUCT or src_kind == TypeKind.TY_ENUM or src_kind == TypeKind.TY_GENERIC_INST or src_kind == TypeKind.TY_ARRAY or src_kind == TypeKind.TY_SLICE or src_kind == TypeKind.TY_TUPLE:
+        return false
+    true
+
+fn validate_typed_mir_body(mir_mod: MirModule, body: MirBody) -> MirValidationError:
+    let stmt_count = body.stmt_count()
+    for si in 0..stmt_count:
+        let stmt_kind = body.stmt_kinds.get(si as i64)
+        let d0 = body.stmt_d0.get(si as i64)
+        let d1 = body.stmt_d1.get(si as i64)
+        let span = body.stmt_spans.get(si as i64)
+
+        if stmt_kind == StmtKind.Assign:
+            let dest_ty = mir_validate_place_type(mir_mod, body, d0)
+            if dest_ty == 0:
+                return mir_validation_fail(body.fn_sym, span, "assign destination does not resolve to a concrete MIR type")
+            if d1 < 0 or d1 >= body.rval_kinds.len() as i32:
+                return mir_validation_fail(body.fn_sym, span, "assign rvalue is out of range during typed MIR verification")
+            let rk = body.rval_kinds.get(d1 as i64)
+            let rv_d0 = body.rval_d0.get(d1 as i64)
+            let rv_d1 = body.rval_d1.get(d1 as i64)
+            let rv_d2 = body.rval_d2.get(d1 as i64)
+
+            if rk == RvalueKind.RK_REF:
+                if mir_validate_place_type(mir_mod, body, rv_d1) == 0:
+                    return mir_validation_fail(body.fn_sym, span, "ref rvalue does not resolve to a concrete place type")
+            else if rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN:
+                if mir_validate_place_type(mir_mod, body, rv_d0) == 0:
+                    return mir_validation_fail(body.fn_sym, span, "place-based rvalue does not resolve to a concrete place type")
+
+            if rk == RvalueKind.RK_BIN_OP and mir_validate_is_compare_op(rv_d0):
+                let lhs_ty = mir_validate_operand_type(mir_mod, body, rv_d1)
+                let rhs_ty = mir_validate_operand_type(mir_mod, body, rv_d2)
+                if lhs_ty > 0 and rhs_ty > 0 and
+                   mir_validate_compare_sensitive_type(mir_mod, lhs_ty) and
+                   mir_validate_compare_sensitive_type(mir_mod, rhs_ty) and
+                   mir_validate_type_compatible_fast(mir_mod, lhs_ty, rhs_ty) == 0 and
+                   mir_validate_type_compatible_fast(mir_mod, rhs_ty, lhs_ty) == 0:
+                    return mir_validation_fail(body.fn_sym, span, "comparison operands have incompatible MIR types")
+
+            if rk == RvalueKind.RK_CAST:
+                let src_ty = if rv_d2 > 0: rv_d2 else: mir_validate_operand_type(mir_mod, body, rv_d0)
+                let cast_ty = if rv_d1 > 0: rv_d1 else: dest_ty
+                if src_ty > 0 and cast_ty > 0 and not mir_validate_cast_supported(mir_mod, src_ty, cast_ty):
+                    return mir_validation_fail(body.fn_sym, span, "unsupported cast in MIR")
+            continue
+
+        if stmt_kind == StmtKind.Drop:
+            if mir_validate_place_type(mir_mod, body, d0) == 0:
+                return mir_validation_fail(body.fn_sym, span, "drop target does not resolve to a concrete MIR type")
+
+    let bb_count = body.block_count()
+    for bb in 0..bb_count:
+        let term_kind = body.bb_term_kinds.get(bb as i64)
+        let d0 = body.bb_term_d0.get(bb as i64)
+        let d2 = body.bb_term_d2.get(bb as i64)
+        let span = body.bb_term_spans.get(bb as i64)
+
+        if term_kind == TermKind.TK_SWITCH_INT:
+            if mir_validate_operand_type(mir_mod, body, d0) == 0:
+                return mir_validation_fail(body.fn_sym, span, "switch operand does not resolve to a concrete MIR type")
+            continue
+
+    mir_validation_ok()
+
+fn validate_typed_mir_module(mir_mod: MirModule) -> MirValidationError:
+    let shape_err = validate_mir_module(mir_mod)
+    if shape_err.len() > 0:
+        return mir_validation_fail(0, 0, shape_err)
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = mir_mod.bodies.get(bi as i64)
+        let err = validate_typed_mir_body(mir_mod, body)
+        if mir_validation_has_error(err):
+            return err
+    mir_validation_ok()
