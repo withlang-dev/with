@@ -1377,7 +1377,9 @@ fn mir_validation_has_error(err: MirValidationError) -> bool:
 fn mir_validate_find_named_type(mir_mod: MirModule, type_sym: i32) -> i32:
     for ti in 0..mir_mod.sema_type_kinds.len() as i32:
         let tk = mir_mod.sema_type_kinds.get(ti as i64)
-        if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_ENUM and tk != TypeKind.TY_ALIAS:
+        // Only match TY_STRUCT and TY_ENUM — their d0 stores the name symbol.
+        // TY_ALIAS d0 stores the alias TARGET, not the name.
+        if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_ENUM:
             continue
         if mir_mod.sema_type_d0.get(ti as i64) == type_sym:
             return ti

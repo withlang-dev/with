@@ -2786,7 +2786,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // Known function
     if sig_idx >= 0:
-        let ret = self.sig_return_type(sig_idx)
+        let ret = self.sig_return_type(sig_idx) as i32
         // Check arg count (supports default parameters via required-count
         // metadata packed into fn_meta flags by the parser).
         let expected = self.sig_get_param_count(sig_idx)
