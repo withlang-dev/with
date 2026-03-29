@@ -776,12 +776,11 @@ fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, dep
         if not path_value.ok:
             return path_value
         let path = self.resolve_embed_file_path(source_path, path_value.text)
-        let content = with_fs_read_file(path)
-        if content.len() == 0:
+        if with_fs_file_exists(path) == 0:
             with_eprintln("error: embed_file: could not read '" ++ path ++ "'")
             self.had_error = 1
             return const_string_eval_fail()
-        return const_string_eval_ok(content)
+        return const_string_eval_ok(with_fs_read_file(path))
 
     const_string_eval_fail()
 
@@ -1068,4 +1067,3 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             wl_set_global_constant(global, 1)
         wl_set_linkage(global, wl_internal_linkage())
         self.module_constants.insert(name_sym, global)
-

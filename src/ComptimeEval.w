@@ -6,6 +6,9 @@ use Diagnostic
 use InternPool
 use TypeLayout
 
+extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_file_exists(path: str) -> i32
+
 const COMPTIME_RECURSION_LIMIT: i32 = 256
 const COMPTIME_STEP_LIMIT: i32 = 50000
 
@@ -46,6 +49,11 @@ type ComptimeEvalResult {
     extras: Vec[ComptimeValue],
 }
 
+type ComptimeSourceLoc {
+    line: i32,
+    col: i32,
+}
+
 fn comptime_control_value(value: ComptimeValue) -> ComptimeControl:
     ComptimeControl { kind: ComptimeControlKind.CTL_VALUE, value, label: 0 }
 
@@ -80,6 +88,36 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         require_success,
         had_error: 0,
     }
+
+fn comptime_dirname(path: str) -> str:
+    var last_slash = 0 - 1
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            last_slash = i
+    if last_slash < 0:
+        return ""
+    path.slice(0, last_slash as i64)
+
+fn comptime_resolve_embed_file_path(source_path: str, raw_path: str) -> str:
+    if raw_path.len() > 0 and raw_path.byte_at(0) == 47:
+        return raw_path
+    let dir = comptime_dirname(source_path)
+    if dir.len() == 0:
+        return raw_path
+    dir ++ "/" ++ raw_path
+
+fn comptime_source_loc(text: str, offset: i32) -> ComptimeSourceLoc:
+    var line = 1
+    var col = 1
+    var i = 0
+    while i < offset and i < text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            line = line + 1
+            col = 1
+        else:
+            col = col + 1
+        i = i + 1
+    ComptimeSourceLoc { line: line, col: col }
 
 fn comptime_eval_result_invalid() -> ComptimeEvalResult:
     ComptimeEvalResult {
@@ -211,6 +249,29 @@ fn ComptimeEvaluator.decl_file_id(self: ComptimeEvaluator, decl_node: i32) -> i3
     if decl_idx >= 0 and decl_idx < self.sema.decl_source_file_ids.len() as i32:
         return self.sema.decl_source_file_ids.get(decl_idx as i64)
     self.sema.local_file_id
+
+fn ComptimeEvaluator.decl_path(self: ComptimeEvaluator, decl_node: i32) -> str:
+    let decl_idx = self.find_decl_index(decl_node)
+    if decl_idx >= 0 and decl_idx < self.sema.decl_source_paths.len() as i32:
+        let path = self.sema.decl_source_paths.get(decl_idx as i64)
+        if path.len() > 0:
+            return path
+    if self.sema.current_module_path.len() > 0:
+        return self.sema.current_module_path
+    ""
+
+fn ComptimeEvaluator.current_source_path(self: ComptimeEvaluator) -> str:
+    if self.sema.current_module_path.len() > 0:
+        return self.sema.current_module_path
+    "<unknown>"
+
+fn ComptimeEvaluator.current_source_text(self: ComptimeEvaluator) -> str:
+    let path = self.current_source_path()
+    if path != "<unknown>":
+        let text = with_fs_read_file(path)
+        if text.len() > 0 or with_fs_file_exists(path) != 0:
+            return text
+    self.sema.source_text
 
 fn ComptimeEvaluator.push_extra_value(self: ComptimeEvaluator, value: ComptimeValue):
     self.extra_values.push(value)
@@ -358,12 +419,37 @@ fn ComptimeEvaluator.eval_module_let_decl(self: ComptimeEvaluator, diags: &mut D
         return self.fail(diags, use_node, "missing constant value")
 
     let saved_file = self.sema.local_file_id
+    let saved_path = self.sema.current_module_path
     self.sema.local_file_id = self.decl_file_id(decl)
+    self.sema.current_module_path = self.decl_path(decl)
     self.active_global_syms.push(sym)
     let result = self.eval_expr(diags, value_node)
     self.active_global_syms.pop()
     self.sema.local_file_id = saved_file
+    self.sema.current_module_path = saved_path
     result
+
+fn ComptimeEvaluator.eval_src_call(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32, arg_count: i32) -> ComptimeControl:
+    if arg_count != 0:
+        return self.fail(diags, node, "src() takes no arguments")
+    let path = self.current_source_path()
+    let text = self.current_source_text()
+    let loc = comptime_source_loc(text, self.ast.get_start(node))
+    comptime_control_value(comptime_value_str(f"{path}:{loc.line}:{loc.col}"))
+
+fn ComptimeEvaluator.eval_embed_file_call(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32, arg_count: i32) -> ComptimeControl:
+    if arg_count != 1:
+        return self.fail(diags, node, "embed_file() takes exactly one string argument")
+    let args_start = self.ast.get_data1(node)
+    let arg_signal = self.eval_expr(diags, self.ast.get_extra(args_start))
+    if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
+        return arg_signal
+    if arg_signal.value.kind != ComptimeValueKind.CV_STR:
+        return self.fail(diags, node, "embed_file() argument must be a comptime string")
+    let path = comptime_resolve_embed_file_path(self.current_source_path(), arg_signal.value.text)
+    if with_fs_file_exists(path) == 0:
+        return self.fail(diags, node, "embed_file: could not read '" ++ path ++ "'")
+    comptime_control_value(comptime_value_str(with_fs_read_file(path)))
 
 fn ComptimeEvaluator.eval_array(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32) -> ComptimeControl:
     let extra_start = self.ast.get_data0(node)
@@ -831,16 +917,21 @@ fn ComptimeEvaluator.eval_for(self: ComptimeEvaluator, diags: &mut DiagnosticLis
 
 fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32) -> ComptimeControl:
     let callee = self.ast.get_data0(node)
+    let arg_count = self.ast.get_data2(node)
     if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
         let recv_node = self.ast.get_data0(callee)
         if self.sema.static_receiver_type_is_known(recv_node) != 0:
             let recv_type = self.static_receiver_type(recv_node)
             if recv_type != 0:
-                return self.eval_static_type_method_call(diags, recv_type, self.ast.get_data1(callee), self.ast.get_data1(node), self.ast.get_data2(node), node)
+                return self.eval_static_type_method_call(diags, recv_type, self.ast.get_data1(callee), self.ast.get_data1(node), arg_count, node)
         return self.fail(diags, node, "only type reflection method calls are comptime-evaluable yet")
     if self.ast.kind(callee) != NodeKind.NK_IDENT:
         return self.fail(diags, node, "only direct comptime function calls are supported")
     let fn_sym = self.ast.get_data0(callee)
+    if fn_sym == self.sema.sym_src:
+        return self.eval_src_call(diags, node, arg_count)
+    if fn_sym == self.sema.sym_embed_file:
+        return self.eval_embed_file_call(diags, node, arg_count)
     if self.sema.fn_symbol_is_comptime(fn_sym) == 0:
         return self.fail(diags, node, "comptime can only call comptime functions")
     if self.sema.generic_fn_nodes.contains(fn_sym):
@@ -851,7 +942,6 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, diags: &mut DiagnosticLi
         return self.fail(diags, node, "comptime recursion limit exceeded")
 
     let extra_start = self.ast.get_data1(node)
-    let arg_count = self.ast.get_data2(node)
     let fn_node = self.sema.fn_decl_nodes.get(fn_sym).unwrap()
     let meta = self.ast.find_fn_meta(fn_node)
     if meta < 0:
@@ -869,7 +959,9 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, diags: &mut DiagnosticLi
         arg_values.push(arg_signal.value)
 
     let saved_file = self.sema.local_file_id
+    let saved_path = self.sema.current_module_path
     self.sema.local_file_id = self.decl_file_id(fn_node)
+    self.sema.current_module_path = self.decl_path(fn_node)
     self.active_fn_syms.push(fn_sym)
     self.push_scope()
 
@@ -883,12 +975,14 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, diags: &mut DiagnosticLi
                 self.pop_scope()
                 self.active_fn_syms.pop()
                 self.sema.local_file_id = saved_file
+                self.sema.current_module_path = saved_path
                 return self.fail(diags, node, "wrong argument count in comptime call")
             let default_signal = self.eval_expr(diags, default_node)
             if default_signal.kind != ComptimeControlKind.CTL_VALUE:
                 self.pop_scope()
                 self.active_fn_syms.pop()
                 self.sema.local_file_id = saved_file
+                self.sema.current_module_path = saved_path
                 return default_signal
             self.bind_value(param_name, default_signal.value, 0)
 
@@ -908,12 +1002,14 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, diags: &mut DiagnosticLi
                         self.pop_scope()
                         self.active_fn_syms.pop()
                         self.sema.local_file_id = saved_file
+                        self.sema.current_module_path = saved_path
                         return self.fail(diags, ppat, "comptime argument did not match parameter pattern")
 
     let body_signal = self.eval_expr(diags, self.ast.get_data1(fn_node))
     self.pop_scope()
     self.active_fn_syms.pop()
     self.sema.local_file_id = saved_file
+    self.sema.current_module_path = saved_path
     if body_signal.kind == ComptimeControlKind.CTL_RETURN:
         return comptime_control_value(body_signal.value)
     if body_signal.kind == ComptimeControlKind.CTL_BREAK or body_signal.kind == ComptimeControlKind.CTL_CONTINUE:
@@ -1025,6 +1121,8 @@ fn Sema.force_eval_comptime_expr(self: &mut Sema, node: i32) -> i32:
     comptime_value_is_valid(value)
 
 fn Sema.check_top_level_comptime_let_values(self: &mut Sema):
+    if self.diags.has_errors():
+        return
     for di in 0..self.ast.decl_count():
         self.update_decl_source_context(di)
         let decl = self.ast.get_decl(di)
@@ -1044,4 +1142,8 @@ fn Sema.check_top_level_comptime_let_values(self: &mut Sema):
                     self.emit_error("type mismatch in binding", decl)
         if val_type != 0 and ann_type == 0:
             self.typed_binding_types.insert(decl as i32, val_type as i32)
+        if self.diags.has_errors():
+            return
         let _ = self.force_eval_comptime_expr(value)
+        if self.diags.has_errors():
+            return

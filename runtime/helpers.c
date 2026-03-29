@@ -1637,6 +1637,16 @@ with_str with_fs_read_file(with_str path) {
     return out;
 }
 
+int32_t with_fs_file_exists(with_str path) {
+    char *cpath = with_str_to_cstring(path);
+    if (!cpath) return 0;
+    FILE *f = fopen(cpath, "rb");
+    free(cpath);
+    if (!f) return 0;
+    fclose(f);
+    return 1;
+}
+
 // Create directories recursively (like mkdir -p). Returns 0 on success.
 int32_t with_fs_mkdir_p(with_str path) {
     char *cpath = with_str_to_cstring(path);

@@ -148,6 +148,7 @@ int32_t with_interrupt_requested(void);
 // ── File I/O ───────────────────────────────────────────────────────
 
 with_str with_fs_read_file(with_str path);
+int32_t with_fs_file_exists(with_str path);
 int32_t with_fs_write_file(with_str path, with_str data);
 int32_t with_fs_mkdir_p(with_str path);
 int64_t with_str_hash(with_str s);

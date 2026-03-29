@@ -9,5 +9,5 @@ fn main:
     assert(EMPTY == "")
     assert(GREETING == "hello\n")
     assert(DATA == "embedded const data\n")
-    assert(embed_file(PATH) == "embedded const data\n")
+    assert((comptime embed_file(PATH)) == "embedded const data\n")
     print("ok")

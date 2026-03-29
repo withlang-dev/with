@@ -17,6 +17,7 @@ use Source
 
 extern fn exit(code: i32) -> void
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_parse_float(s: str) -> f64
 extern fn with_eprintln(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
