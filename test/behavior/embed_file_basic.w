@@ -1,7 +1,8 @@
 //! expect-stdout: ok
 extern fn print(s: str) -> void
 
+const CONTENT: str = embed_file("embed_file_data.txt")
+
 fn main:
-    let content = embed_file("embed_file_data.txt")
-    assert(content == "embedded content here")
+    assert(CONTENT == "embedded content here")
     print("ok")

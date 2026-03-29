@@ -1558,6 +1558,7 @@ fn Sema.set_sig_return_type(self: Sema, idx: i32, ret: i32):
 
 fn Sema.check_module(self: Sema):
     self.prepare_for_comptime_transform()
+    self.check_top_level_comptime_let_values()
     self.check_bodies()
 
 fn Sema.prepare_for_comptime_transform(self: Sema):

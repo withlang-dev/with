@@ -670,7 +670,7 @@ fn ct_rewrite_comptime(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema,
     if inner_kind == NodeKind.NK_FOR:
         return ct_rewrite_comptime_for(source_ast, pool, sema, intern, diags, node, inner)
 
-    let evald = comptime_try_eval_expr_result(sema as *mut Sema, diags, source_ast, sema.pool, inner)
+    let evald = comptime_force_eval_expr_result(sema as *mut Sema, diags, source_ast, sema.pool, inner)
     let value = evald.value
     if comptime_value_is_valid(value) == 0:
         return node

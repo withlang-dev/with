@@ -5201,12 +5201,11 @@ fn Codegen.gen_embed_file(self: Codegen, node: i32) -> i64:
     else:
         self.source_file
     let path = self.resolve_embed_file_path(base_path, path_value.text)
-    let content = with_fs_read_file(path)
-    if content.len() == 0:
+    if with_fs_file_exists(path) == 0:
         with_eprintln("error: embed_file: could not read '" ++ path ++ "'")
         self.had_error = 1
         return wl_get_undef(wl_i32_type(self.context))
-    self.gen_string_literal_raw(content)
+    self.gen_string_literal_raw(with_fs_read_file(path))
 
 fn Codegen.extract_str_ptr(self: Codegen, str_val: i64) -> i64:
     // Extract ptr (field 0) from str struct

@@ -804,9 +804,9 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         self.set_typed_snapshot("", AstPool.new())
         return AstPool.new()
 
-    // Comptime transform: prune dead comptime if/for branches before sema
-    // so that undefined symbols in dead branches don't cause type errors.
-    if pool.has_comptime_branch_nodes() or pool.has_type_derives():
+    // Comptime transform: fold forced comptime expressions and prune dead
+    // comptime branches before final sema.
+    if pool.has_comptime_nodes() or pool.has_type_derives():
         if zcu_debug_init_enabled() != 0:
             with_eprintln("[frontend] compile_source:comptime-transform")
         var pre_sema = Sema.init(self.pool, self.diagnostics, pool)

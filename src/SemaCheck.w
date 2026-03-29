@@ -3,6 +3,8 @@
 use Sema
 use Ast
 use BorrowCfg
+use ComptimeEval
+use ComptimeValue
 use Span
 use Diagnostic
 use InternPool
@@ -11,8 +13,26 @@ use render
 
 extern fn print(s: str) -> void
 extern fn with_eprintln(s: str) -> void
+extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn int_to_string(n: i32) -> str
+
+fn sema_dirname(path: str) -> str:
+    var last_slash = 0 - 1
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            last_slash = i
+    if last_slash < 0:
+        return ""
+    path.slice(0, last_slash as i64)
+
+fn sema_resolve_embed_file_path(source_path: str, raw_path: str) -> str:
+    if raw_path.len() > 0 and raw_path.byte_at(0) == 47:
+        return raw_path
+    let dir = sema_dirname(source_path)
+    if dir.len() == 0:
+        return raw_path
+    dir ++ "/" ++ raw_path
 
 // ── Type expression resolution ───────────────────────────────────
 
@@ -3735,9 +3755,25 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
             self.emit_error("src() takes no arguments", node)
         return self.ty_str as i32
     if fn_sym == self.sym_embed_file:
+        if self.in_comptime_fn == 0:
+            self.emit_error("embed_file() is only allowed in comptime context", node)
+            return self.ty_str as i32
         if arg_count != 1:
             self.emit_error("embed_file() takes exactly one string argument", node)
             return self.ty_str as i32
+        let path_ty = arg_types.get(0)
+        if path_ty != 0 and self.types_compatible(self.ty_str as i32, path_ty) == 0:
+            self.emit_error("embed_file() argument must be str-compatible", self.ast.get_extra(args_start))
+            return self.ty_str as i32
+        let path_node = self.ast.get_extra(args_start)
+        let path_value = comptime_force_eval_expr(self as *mut Sema, &mut self.diags, self.ast, self.pool, path_node)
+        if comptime_value_is_valid(path_value) == 0 or path_value.kind != ComptimeValueKind.CV_STR:
+            self.emit_error("embed_file() argument must be a comptime string", path_node)
+            return self.ty_str as i32
+        let source_path = if self.current_module_path.len() > 0: self.current_module_path else: ""
+        let resolved_path = sema_resolve_embed_file_path(source_path, path_value.text)
+        if with_fs_file_exists(resolved_path) == 0:
+            self.emit_error("embed_file: could not read '" ++ resolved_path ++ "'", node)
         return self.ty_str as i32
     0
 
