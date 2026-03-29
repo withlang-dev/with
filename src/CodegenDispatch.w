@@ -1185,7 +1185,25 @@ fn Codegen.mir_pointer_elem_llvm_type(self: Codegen, sema_ty: i32) -> i64:
         return 0
     self.mir_sema_type_to_llvm(pointee)
 
-fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: i64) -> i64:
+fn Codegen.mir_enum_variant_payload_llvm_type(self: Codegen, enum_sema_ty: i32, variant_idx: i32) -> i64:
+    let builtin_payload = self.mir_builtin_variant_payload_llvm_type(enum_sema_ty, variant_idx)
+    if builtin_payload != 0:
+        return builtin_payload
+    if enum_sema_ty <= 0 or variant_idx < 0:
+        return 0
+    let enum_sym = self.mir_input.mir_get_type_name(enum_sema_ty)
+    if enum_sym <= 0:
+        return 0
+    let et_opt = self.enum_type_map.get(enum_sym)
+    if not et_opt.is_some():
+        return 0
+    let enum_idx = et_opt.unwrap()
+    let v_start = self.enum_variant_starts.get(enum_idx as i64)
+    if v_start + variant_idx < 0 or v_start + variant_idx >= self.enum_variant_payloads.len() as i32:
+        return 0
+    self.enum_variant_payloads.get((v_start + variant_idx) as i64)
+
+fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: i64, dest_sema_ty: i32) -> i64:
     let fallback_ty = if dest_ty != 0: dest_ty else: wl_i32_type(self.context)
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         if self.debug_fallback_enabled():
@@ -1295,8 +1313,11 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             if self.debug_mir_codegen_enabled():
                 with_eprintln(f"[mir-agg] fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count} dest_ty_kind={if dest_ty != 0: wl_get_type_kind(dest_ty) else: -1} dest_ty_fields={if dest_ty != 0 and wl_get_type_kind(dest_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(dest_ty) else: -1}")
             if agg_count == 0 and d0 != 1:
-                let zero_ty = if struct_ty != 0: struct_ty else: fallback_ty
-                return self.build_default_value(zero_ty)
+                if struct_ty == 0:
+                    with_eprintln(f"error: aggregate rvalue missing destination type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
+                    self.had_error = 1
+                    return wl_get_undef(fallback_ty)
+                return self.build_default_value(struct_ty)
             if struct_ty != 0 and wl_get_type_kind(struct_ty) == wl_array_type_kind():
                 // Array aggregate: [N x T]
                 let alloca = self.create_entry_alloca(struct_ty)
@@ -1328,44 +1349,31 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                 wl_build_store(self.builder, wl_const_int(ev_tag_ty, ev_tag as i64, 0), ev_tag_ptr)
                 // Store payload in field 1 if any
                 if agg_count > 0 and wl_count_struct_elem_types(struct_ty) > 1:
-                    // Build payload struct type from operand types
-                    let ev_payload_types: Vec[i64] = Vec.new()
-                    let ev_payload_vals: Vec[i64] = Vec.new()
-                    for evi in 0..agg_count:
-                        let ev_op = body.agg_field_operands.get((agg_start + evi) as i64)
-                        let ev_val = self.mir_eval_operand(body, ev_op, 0)
-                        ev_payload_types.push(wl_type_of(ev_val))
-                        ev_payload_vals.push(ev_val)
-                    let ev_payload_ty = wl_struct_type(self.context, vec_data_i64(&ev_payload_types), agg_count, 0)
+                    let ev_payload_ty = self.mir_enum_variant_payload_llvm_type(dest_sema_ty, ev_tag)
+                    if ev_payload_ty == 0:
+                        with_eprintln(f"error: aggregate enum payload missing destination payload type fn={self.intern.resolve(self.current_function_name_sym)} variant={ev_tag}")
+                        self.had_error = 1
+                        return wl_get_undef(fallback_ty)
                     let ev_data_ptr = wl_build_struct_gep(self.builder, struct_ty, ev_alloca, 1)
-                    for evi in 0..agg_count:
-                        let ev_field_ptr = wl_build_struct_gep(self.builder, ev_payload_ty, ev_data_ptr, evi)
-                        wl_build_store(self.builder, ev_payload_vals.get(evi as i64), ev_field_ptr)
+                    if wl_get_type_kind(ev_payload_ty) == wl_struct_type_kind():
+                        let ev_payload_ptr = wl_build_bitcast(self.builder, ev_data_ptr, wl_ptr_type(self.context))
+                        let ev_field_count = wl_count_struct_elem_types(ev_payload_ty)
+                        for evi in 0..agg_count:
+                            if evi >= ev_field_count:
+                                continue
+                            let ev_op = body.agg_field_operands.get((agg_start + evi) as i64)
+                            let ev_field_ty = wl_struct_get_type_at(ev_payload_ty, evi)
+                            let ev_val = self.mir_eval_operand(body, ev_op, ev_field_ty)
+                            let ev_field_ptr = wl_build_struct_gep(self.builder, ev_payload_ty, ev_payload_ptr, evi)
+                            wl_build_store(self.builder, self.coerce_value_to_type(ev_val, ev_field_ty), ev_field_ptr)
+                    else:
+                        let ev_op = body.agg_field_operands.get(agg_start as i64)
+                        let ev_val = self.mir_eval_operand(body, ev_op, ev_payload_ty)
+                        wl_build_store(self.builder, self.coerce_value_to_type(ev_val, ev_payload_ty), ev_data_ptr)
                 return wl_build_load(self.builder, struct_ty, ev_alloca)
             if struct_ty == 0 or wl_get_type_kind(struct_ty) != wl_struct_type_kind():
-                // Try to construct type from operands
-                if agg_count > 0:
-                    let first_op = body.agg_field_operands.get(agg_start as i64)
-                    let first_val = self.mir_eval_operand(body, first_op, 0)
-                    let elem_types: Vec[i64] = Vec.new()
-                    elem_types.push(wl_type_of(first_val))
-                    for i in 1..agg_count:
-                        let oi = body.agg_field_operands.get((agg_start + i) as i64)
-                        let vi = self.mir_eval_operand(body, oi, 0)
-                        elem_types.push(wl_type_of(vi))
-                    struct_ty = wl_struct_type(self.context, vec_data_i64(&elem_types), agg_count, 0)
-                    let alloca = self.create_entry_alloca(struct_ty)
-                    wl_build_store(self.builder, self.build_default_value(struct_ty), alloca)
-                    // Re-store the already-evaluated values
-                    let gep0 = wl_build_struct_gep(self.builder, struct_ty, alloca, 0)
-                    wl_build_store(self.builder, first_val, gep0)
-                    for i in 1..agg_count:
-                        let oi = body.agg_field_operands.get((agg_start + i) as i64)
-                        let vi = self.mir_eval_operand(body, oi, 0)
-                        let gepi = wl_build_struct_gep(self.builder, struct_ty, alloca, i)
-                        wl_build_store(self.builder, vi, gepi)
-                    return wl_build_load(self.builder, struct_ty, alloca)
-                with_eprintln(f"error: RvalueKind.RK_AGGREGATE with unknown dest type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
+                with_eprintln(f"error: aggregate rvalue missing destination struct type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
+                self.had_error = 1
                 return wl_get_undef(fallback_ty)
             let alloca = self.create_entry_alloca(struct_ty)
             wl_build_store(self.builder, self.build_default_value(struct_ty), alloca)
@@ -1496,33 +1504,13 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
         let dst_local = body.place_locals.get(d0 as i64)
         var dst_ptr = self.mir_place_ptr(body, d0, false, 0)
         let has_projections = body.place_proj_counts.get(d0 as i64) > 0
-        var dst_ty: i64 = 0
-        // For projected places (field access), use the projected field's sema type
-        // to get the correct LLVM type. Using the base local's type is wrong —
-        // e.g., storing i32 to self.field would get ptr type from self instead of i32.
-        if has_projections:
-            let proj_sema = self.mir_place_sema_type(body, d0)
-            if proj_sema > 0:
-                dst_ty = self.mir_sema_type_to_llvm(proj_sema)
+        let dst_sema_ty = self.mir_place_sema_type(body, d0)
+        var dst_ty = self.mir_dest_llvm_type(body, d0)
         if dst_ty == 0:
             let dst_ty_opt = self.mir_local_types.get(dst_local)
             if dst_ptr != 0 and dst_ty_opt.is_some():
                 dst_ty = dst_ty_opt.unwrap() as i64
-        // Resolve type via sema when LLVM type is not yet known
-        if dst_ty == 0 and dst_local >= 0 and dst_local < body.local_type_ids.len() as i32:
-            let sema_ty = body.local_type_ids.get(dst_local as i64)
-            if sema_ty > 0:
-                dst_ty = self.mir_sema_type_to_llvm(sema_ty)
-            // For RvalueKind.RK_AGGREGATE (struct construction), if sema type didn't resolve,
-            // fall back to the function's return type (local 0).
-            if dst_ty == 0 and d1 >= 0 and d1 < body.rval_kinds.len() as i32:
-                if body.rval_kinds.get(d1 as i64) == RvalueKind.RK_AGGREGATE:
-                    let ret_ty_opt = self.mir_local_types.get(0)
-                    if ret_ty_opt.is_some():
-                        let ret_ty = ret_ty_opt.unwrap() as i64
-                        if wl_get_type_kind(ret_ty) == wl_struct_type_kind():
-                            dst_ty = ret_ty
-        let value = self.mir_eval_rvalue(body, d1, dst_ty)
+        let value = self.mir_eval_rvalue(body, d1, dst_ty, dst_sema_ty)
         if dst_ptr == 0:
             if has_projections:
                 return false
@@ -1820,10 +1808,7 @@ fn Codegen.mir_dest_llvm_type(self: Codegen, body: MirBody, dest_place: i32) -> 
     // Get the LLVM type for a destination place from its sema type.
     if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
         return 0
-    let local_id = body.place_locals.get(dest_place as i64)
-    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
-        return 0
-    let sema_ty = body.local_type_ids.get(local_id as i64)
+    let sema_ty = self.mir_place_sema_type(body, dest_place)
     if sema_ty <= 0:
         return 0
     self.mir_sema_type_to_llvm(sema_ty)
