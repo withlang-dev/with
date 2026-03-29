@@ -501,6 +501,14 @@ fn AstPool.has_comptime_branch_nodes(self: &AstPool) -> bool:
                     return true
     false
 
+fn AstPool.has_type_derives(self: &AstPool) -> bool:
+    var meta = 0
+    while meta < self.type_meta.len() as i32:
+        if self.type_meta_derive_count(meta) > 0:
+            return true
+        meta = meta + 3
+    false
+
 fn AstPool.get_extra(self: &AstPool, idx: i32) -> i32:
     self.extra.get(idx as i64)
 

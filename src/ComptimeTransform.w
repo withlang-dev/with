@@ -955,6 +955,30 @@ fn ct_transform_type_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Se
         if field_default != 0:
             pool.extra.set_i32(default_idx as i64, ct_transform_expr(source_ast, pool, sema, intern, diags, field_default))
 
+fn ct_decl_source_path(sema: &mut Sema, di: i32) -> str:
+    if di >= 0 and di < sema.decl_source_paths.len() as i32:
+        return sema.decl_source_paths.get(di as i64)
+    ""
+
+fn ct_decl_source_file_id(sema: &mut Sema, di: i32) -> i32:
+    if di >= 0 and di < sema.decl_source_file_ids.len() as i32:
+        return sema.decl_source_file_ids.get(di as i64)
+    0
+
+fn ct_decl_is_c_import(sema: &mut Sema, di: i32) -> i32:
+    if di >= 0 and di < sema.decl_is_c_import.len() as i32:
+        return sema.decl_is_c_import.get(di as i64)
+    0
+
+fn ct_source_decl_is_local(ast: AstPool, decl_index: i32) -> i32:
+    let limit = ast.local_decl_count()
+    if limit < 0:
+        return 1
+    let total = ast.decl_count()
+    if decl_index >= total - limit:
+        return 1
+    0
+
 fn ct_transform_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, diags: &mut DiagnosticList, node: i32):
     let kind = pool.kind(node)
     if kind == NodeKind.NK_FN_DECL:
@@ -977,9 +1001,105 @@ fn ct_transform_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, i
 
 fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: &mut InternPool, diags: &mut DiagnosticList) -> AstPool:
     var out = astpool_clone_deep(source_ast)
-    for di in 0..out.decl_count():
-        if di < sema.decl_source_file_ids.len() as i32:
-            sema.local_file_id = sema.decl_source_file_ids.get(di as i64)
+
+    let clone_trait_sym = intern.intern("Clone")
+    let clone_method_sym = intern.intern("clone")
+    let self_sym = intern.intern("self")
+    let self_type_sym = intern.intern("Self")
+
+    let ordered: Vec[i32] = Vec.new()
+    let ordered_paths: Vec[str] = Vec.new()
+    let ordered_file_ids: Vec[i32] = Vec.new()
+    let ordered_ci: Vec[i32] = Vec.new()
+    let base_decl_count = out.decl_count()
+    var generated_local_count = 0
+
+    for di in 0..base_decl_count:
         let decl = out.get_decl(di)
-        ct_transform_decl(source_ast, &mut out, sema, intern, diags, decl as i32)
+        let decl_path = ct_decl_source_path(sema, di)
+        let decl_file_id = ct_decl_source_file_id(sema, di)
+        let decl_ci = ct_decl_is_c_import(sema, di)
+
+        ordered.push(decl as i32)
+        ordered_paths.push(decl_path)
+        ordered_file_ids.push(decl_file_id)
+        ordered_ci.push(decl_ci)
+
+        if out.kind(decl) != NodeKind.NK_TYPE_DECL:
+            continue
+        if sema.type_decl_has_derive(decl as i32, clone_trait_sym) == 0:
+            continue
+        if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
+            continue
+
+        let type_name_sym = out.get_data0(decl)
+        let method_key = sema.method_key(type_name_sym, clone_method_sym)
+        if sema.get_sig(method_key) >= 0:
+            continue
+        if sema.select_trait_impl(type_name_sym, clone_trait_sym) != 0:
+            continue
+
+        let type_name = intern.resolve(type_name_sym)
+        let fn_sym = intern.intern(type_name ++ ".clone")
+        let start = out.get_start(decl)
+        let end = out.get_end(decl)
+
+        let self_ident = out.add_node(NodeKind.NK_IDENT, start, end, self_sym, 0, 0)
+        let self_pointee_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, self_type_sym, 0, 0)
+        let self_param_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, self_pointee_type as i32, 0, 0)
+        let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, self_type_sym, 0, 0)
+        let body = out.add_node(NodeKind.NK_UNARY, start, end, UnaryOp.UOP_DEREF, self_ident as i32, 0)
+        let param_start = out.extra_len()
+        out.add_extra(self_sym)
+        out.add_extra(self_param_type as i32)
+        out.add_extra(0)
+
+        let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
+        out.add_fn_meta(fn_node, 0, ret_type as i32, param_start, 1, 0, 0)
+
+        let impl_extra = out.extra_len()
+        out.add_extra(0)
+        out.add_extra(1)
+        let impl_node = out.add_node(NodeKind.NK_IMPL_DECL, start, end, type_name_sym, impl_extra, clone_trait_sym)
+
+        ordered.push(fn_node as i32)
+        ordered_paths.push(decl_path)
+        ordered_file_ids.push(decl_file_id)
+        ordered_ci.push(decl_ci)
+        ordered.push(impl_node as i32)
+        ordered_paths.push(decl_path)
+        ordered_file_ids.push(decl_file_id)
+        ordered_ci.push(decl_ci)
+
+        if ct_source_decl_is_local(source_ast, di) != 0:
+            generated_local_count = generated_local_count + 2
+    while out.decl_count() > 0:
+        out.decls.pop()
+    for oi in 0..ordered.len() as i32:
+        out.add_decl(ordered.get(oi as i64))
+
+    let local_limit = source_ast.local_decl_count()
+    if local_limit >= 0:
+        out.set_local_decl_count(local_limit + generated_local_count)
+
+    sema.decl_source_paths = ordered_paths
+    sema.decl_source_file_ids = ordered_file_ids
+    sema.decl_is_c_import = ordered_ci
+
+    let transform_pool = unsafe: *intern
+    let transform_diags = unsafe: *diags
+    var transform_sema = Sema.init(transform_pool, transform_diags, out)
+    transform_sema.source_text = sema.source_text
+    transform_sema.decl_source_paths = sema.decl_source_paths
+    transform_sema.decl_source_file_ids = sema.decl_source_file_ids
+    transform_sema.decl_is_c_import = sema.decl_is_c_import
+    transform_sema.prepare_for_comptime_transform()
+    if transform_sema.diags.has_errors():
+        return out
+
+    for di in 0..out.decl_count():
+        transform_sema.update_decl_source_context(di)
+        let decl = out.get_decl(di)
+        let live_ast = out
+        ct_transform_decl(live_ast, &mut out, &mut transform_sema, intern, diags, decl as i32)
     out
