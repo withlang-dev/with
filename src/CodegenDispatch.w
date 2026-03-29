@@ -742,6 +742,54 @@ fn Codegen.mir_sema_type_is_unsigned(self: Codegen, sema_ty: i32) -> bool:
         return self.mir_input.mir_get_type_d1(resolved) == 0
     false
 
+fn Codegen.mir_compare_dispatch_kind(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    let tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == TypeKind.TY_STR:
+        return 1
+    if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_GENERIC_INST or tk == TypeKind.TY_SLICE:
+        return 2
+    if tk == TypeKind.TY_FLOAT:
+        return 3
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_GENERIC_FN:
+        return 4
+    if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL:
+        return 5
+    0
+
+fn Codegen.mir_coerce_compare_operand(self: Codegen, val: i64, sema_ty: i32) -> i64:
+    if sema_ty <= 0:
+        return val
+    let llvm_ty = self.mir_sema_type_to_llvm(sema_ty)
+    if llvm_ty == 0 or wl_type_of(val) == llvm_ty:
+        return val
+    self.coerce_value_to_type(val, llvm_ty)
+
+fn Codegen.mir_build_eq_from_sema(self: Codegen, op: i32, lhs: i64, rhs: i64, lhs_sema: i32, rhs_sema: i32) -> i64:
+    let lhs_kind = self.mir_compare_dispatch_kind(lhs_sema)
+    let rhs_kind = self.mir_compare_dispatch_kind(rhs_sema)
+    if lhs_kind == 0 or rhs_kind == 0 or lhs_kind != rhs_kind:
+        return 0
+
+    let lhs_cmp = self.mir_coerce_compare_operand(lhs, lhs_sema)
+    let rhs_cmp = self.mir_coerce_compare_operand(rhs, rhs_sema)
+    let lhs_ty = wl_type_of(lhs_cmp)
+    let rhs_ty = wl_type_of(rhs_cmp)
+    if lhs_ty == 0 or rhs_ty == 0 or lhs_ty != rhs_ty:
+        return 0
+
+    if lhs_kind == 1 and self.is_str_type(lhs_ty):
+        return self.compare_str_eq(lhs_cmp, rhs_cmp, op)
+
+    if lhs_kind == 2:
+        let cmp_kind = wl_get_type_kind(lhs_ty)
+        if cmp_kind == wl_struct_type_kind() or cmp_kind == wl_array_type_kind():
+            return self.compare_aggregate_eq(lhs_cmp, rhs_cmp, op)
+
+    0
+
 fn Codegen.coerce_float_operand_to(self: Codegen, val: i64, target_ty: i64) -> i64:
     let val_ty = wl_type_of(val)
     if val_ty == target_ty or target_ty == 0:
@@ -752,7 +800,7 @@ fn Codegen.coerce_float_operand_to(self: Codegen, val: i64, target_ty: i64) -> i
         return wl_build_fp_cast(self.builder, val, target_ty)
     val
 
-fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsigned: bool) -> i64:
+fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsigned: bool, lhs_sema: i32, rhs_sema: i32) -> i64:
     let lk = wl_get_type_kind(wl_type_of(lhs))
     let rk = wl_get_type_kind(wl_type_of(rhs))
 
@@ -765,6 +813,9 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
             return wl_build_gep(self.builder, wl_i8_type(self.context), lhs, vec_data_i64(&indices), 1)
 
     if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ:
+        let sema_cmp = self.mir_build_eq_from_sema(op, lhs, rhs, lhs_sema, rhs_sema)
+        if sema_cmp != 0:
+            return sema_cmp
         if lk == wl_pointer_type_kind() and rk == wl_integer_type_kind():
             if wl_is_constant(rhs) != 0 and wl_const_int_sext_val(rhs) == 0:
                 let cmp_rhs = wl_const_null(wl_type_of(lhs))
@@ -1172,7 +1223,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                 indices.push(lhs)
                 return wl_build_gep(self.builder, if elem_ty != 0: elem_ty else: wl_i8_type(self.context), rhs, vec_data_i64(&indices), 1)
         let is_unsigned = self.mir_operand_is_unsigned(body, d1)
-        let out = self.mir_build_bin_op(d0, lhs, rhs, is_unsigned)
+        let out = self.mir_build_bin_op(d0, lhs, rhs, is_unsigned, lhs_sema, rhs_sema)
         if d0 == BinaryOp.OP_CONCAT:
             return out
         if dest_ty != 0:
