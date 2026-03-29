@@ -287,6 +287,9 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                     let proj_owner_ty = self.resolve_named_type(self.current_method_owner_sym)
                     if proj_owner_ty != 0:
                         cur_ty = proj_owner_ty
+            let field_sema_ty = self.mir_project_field_sema_type(cur_sema_ty, pd)
+            if field_sema_ty > 0:
+                cur_sema_ty = field_sema_ty
             let fi = self.mir_resolve_field_index(cur_ty, pd)
             if fi < 0:
                 return 0
@@ -427,6 +430,9 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                     let owner_ty = self.resolve_named_type(self.current_method_owner_sym)
                     if owner_ty != 0:
                         cur_ty = owner_ty
+            let field_sema_ty = self.mir_project_field_sema_type(cur_sema_ty, pd)
+            if field_sema_ty > 0:
+                cur_sema_ty = field_sema_ty
             let fi = self.mir_resolve_field_index(cur_ty, pd)
             if fi < 0:
                 return 0
