@@ -674,11 +674,11 @@ fn print_help_let:
     print(
         "Bindings and constants:\n\n" ++
         "  let answer = 42\n" ++
-        "  let mut total = 0\n" ++
+        "  var total = 0\n" ++
         "  const VERSION: str = \"1.0.0\"\n\n" ++
         "Notes:\n\n" ++
-        "  - 'let' introduces locals.\n" ++
-        "  - Mutability is written as 'let mut'. There is no 'var' declaration form.\n" ++
+        "  - 'let' introduces immutable locals.\n" ++
+        "  - 'var' introduces mutable locals.\n" ++
         "  - 'const' values are compile-time constants and inline at use sites.\n"
     )
 

@@ -178,9 +178,10 @@ enum FnFlags: i32:
     TEST = 4096
     BEFORE = 8192
     AFTER = 16384
+    BENCH = 32768
 // Metadata packing unit used to encode required-parameter count into
 // fn_meta flags without affecting existing FnFlags.* parity checks.
-const FN_META_REQUIRED_UNIT: i32 = 32768
+const FN_META_REQUIRED_UNIT: i32 = 65536
 const FN_PARAM_STRIDE: i32 = 3
 const FN_PARAM_FLAG_NOALIAS: i32 = 1
 

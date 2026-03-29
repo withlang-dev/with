@@ -165,31 +165,21 @@ statements in Parser.w after `emit_error` calls.
 
 ---
 
-## P11: Split Codegen.w
+## P11: Split Codegen.w and Sema.w — DONE ✓
 
-**Location:** `src/Codegen.w` — 10,491 lines (budget: 5,000)
+Both large files split to under budget:
 
-**Problem:** 2.1x over the file complexity budget.
+**Codegen.w:** 10,491 → 3,974 lines. Split into:
+- CodegenDispatch.w (5,566 lines — MIR dispatch + mono)
+- CodegenTraits.w (1,380 lines — trait collection + vtables)
 
-**Largest sections (split candidates):**
-1. `gen_function_dispatch` — lines 4967-8835 — **3,869 lines** (37%)
-2. `Collect trait info` — lines 3842-4901 — **1,060 lines** (10%)
-3. `gen_function_mir_mono` — lines 8836-9500 — **665 lines**
-4. `Helper: is method symbol` — lines 955-1619 — **665 lines**
+**Sema.w:** 9,112 → 1,997 lines (commit `c694460`). Split into:
+- SemaCheck.w (4,811 lines — type checking)
+- SemaDecl.w (1,761 lines — declaration processing)
+- SemaDiag.w (1,130 lines — diagnostics)
 
-**Implementation:**
-1. Extract `gen_function_dispatch` + MIR eval into `src/CodegenMir.w`
-   (~3,900 lines). File does `use Codegen` and defines methods on
-   the Codegen type.
-2. Extract trait collection into `src/CodegenTraits.w` (~1,060 lines)
-3. Extract monomorphization into `src/CodegenMono.w` (~665 lines)
-4. Each extraction: `make build && make fixpoint`
-5. Target: Codegen.w under 5,000 lines after 3 splits
-
-**Complexity:** Large (structural). Files: `src/Codegen.w` → 3-4 new files
-
-**Prerequisite:** Verify the compiler supports defining methods on a type
-in a separate file via `use`. Test with a small example first.
+Uses `use Codegen`/`use Sema` pattern to define methods on the type
+from separate files.
 
 ---
 
@@ -240,113 +230,62 @@ but unimplemented: `ERRDEFER` (partially), `MOVE` (partially),
 
 ---
 
-## Phase II-2: Fix Generic Type Erasure in Sema
+## Phase II-2: Fix Generic Type Erasure in Sema — DONE ✓
 
-**Location:** `src/Sema.w` (generic_inst_cache), `src/Codegen.w`
-(parallel type tracking)
-
-**Problem:** Sema creates `TY_GENERIC_INST` types correctly with
-distinct type_extra entries for `Vec[i32]` vs `Vec[str]`. But codegen
-had parallel caches that could collide. A codegen-level fix was applied
-(sema_tid cache keys). The sema level is correct.
-
-**What remains:**
-1. Add tests proving `Vec[i32] != Vec[str]` in sema
-2. Remove ~2,000 lines of codegen parallel type tracking that duplicate
-   sema's work (now that sema_tid is used as cache key)
-3. Clean up the 12 remaining `int_to_string` cache key sites (unblocked
-   now but was previously blocked by this bug)
-
-**Implementation:**
-1. Write `test/behavior/behav_generic_distinct.w` proving Vec[i32] and
-   Vec[str] produce different types
-2. Audit codegen's `vec_type_to_elem`, `option_payload_types` etc. —
-   which are still needed after the sema_tid fix?
-3. Remove redundant parallel tracking
-4. `make build && make fixpoint`
+Codegen caches fixed to key by sema_tid. Dead cache fields removed.
+MIR places carry sema types. Option/Result reverse lookups replaced
+with sema queries. Instantiation cache replaced with i64 hash keys
+(commit `9775c13`). All layers complete.
 
 **Complexity:** Large. Files: `src/Codegen.w`, `src/Sema.w`, new tests
 
 ---
 
-## Phase II-5: C Backend Completion
+## Phase II-5: C Backend Completion — Intrinsics DONE ✓
 
-**Location:** `src/CCodegen.w` (3,775 lines)
+**Location:** `src/CCodegen.w` (4,440 lines)
 
-**Problem:** Only 16 of 54 MIR intrinsics handled (29.6%). Cannot
-self-compile.
+All 54 MIR intrinsics now handled (commit `f434b08`). CCodegen.w
+grew from 3,775 → 4,440 lines with the 37 new intrinsic handlers.
 
-**Unhandled intrinsics by category:**
-- String methods (14): STR_LEN through STR_REPEAT
-- Advanced Vec (7): VEC_MAP, VEC_FILTER, VEC_FOLD, VEC_ITER, etc.
-- HashMap (2): MAP_CLEAR, MAP_INCREMENT
-- Option (2): OPT_IS_NONE, OPT_FILTER
-- Format (4): FMT_TO_STR, FMT_DEBUG_STR, FMT_DEBUG, FMT_SPEC
-- Integer (3): ROTATE_LEFT, ROTATE_RIGHT, INT_SWAP_BYTES
-- Array (1): ARR_LEN
-- Dynamic dispatch (2): DYN_VTABLE_CMP, DYN_DOWNCAST
-- Generic (1): GENERIC_CALL
-
-**Implementation order (by impact):**
-1. String methods — most programs use strings (14 intrinsics, ~200 lines)
-2. ARR_LEN, ROTATE_LEFT/RIGHT — trivial (3 intrinsics, ~30 lines)
-3. FMT_TO_STR — f-string support (1 intrinsic, ~50 lines)
-4. VEC_ITER, VECITER_NEXT, VEC_WITH_CAPACITY (3 intrinsics, ~100 lines)
-5. OPT_IS_NONE, OPT_FILTER (2 intrinsics, ~40 lines)
-6. MAP_CLEAR, MAP_INCREMENT (2 intrinsics, ~20 lines)
-7. DYN_VTABLE_CMP, DYN_DOWNCAST (2 intrinsics, ~60 lines)
-8. VEC_MAP, VEC_FILTER, VEC_FOLD (3 intrinsics, ~200 lines)
-9. FMT_DEBUG_STR, FMT_DEBUG, FMT_SPEC (3 intrinsics, ~100 lines)
-10. GENERIC_CALL (1 intrinsic, ~300 lines — requires monomorphization)
-11. INT_SWAP_BYTES, VEC_JOIN, VEC_CONTAINS (3 intrinsics, ~60 lines)
+**Remaining work:** Self-compile + cross-compilation testing.
 
 **Path to self-compile:**
-1. Handle all intrinsics above
+1. ~~Handle all intrinsics~~ — DONE
 2. `with build --emit-c src/main.w` produces `out/main.c`
 3. `gcc out/main.c runtime/*.c -o with_from_c`
 4. `./with_from_c check src/main.w` must succeed
 
-**Complexity:** High. Files: `src/CCodegen.w`. Timeline: 3-4 weeks.
+**Complexity:** Medium (intrinsics done, integration testing remains).
+Files: `src/CCodegen.w`
 
 ---
 
-## Phase II-6: Tooling
+## Phase II-6: Tooling — Mostly DONE
 
-### `with fmt` — Code Formatter
+### `with fmt` — Code Formatter — DONE ✓
 
-**Current state:** Stub error in main.w:305-307.
-**Approach:** Parse source → walk AST → emit formatted text.
-**Rules:** 4-space indent, 80-column width, trim trailing whitespace.
-**Files:** `src/main.w` (routing), new `src/Formatter.w`
-**Complexity:** Medium (requires AST → text emission)
+Implemented in main.w (commit `e72847c`). Supports `-w` (write)
+and `-l` (list) modes. AST round-trip formatting.
 
 ### `with bench` — Benchmarking
 
 **Current state:** No command handler.
 **Approach:** `@[bench]` attribute on functions, iteration harness.
-**Files:** `src/main.w`, `src/Parser.w` (attribute), new `src/Bench.w`
+**Files:** `src/main.w`, `src/Parser.w` (attribute)
 **Complexity:** Low-Medium
 
-### `with test` improvements
+### `with test` improvements — DONE ✓
 
-**Current state:** Basic runner (30% complete). Runs files, reports
-pass/fail. No `@[test]` discovery, no `--filter`.
-**Improvements:**
-1. `@[test]` attribute discovery
-2. `--filter <pattern>` for selective execution
-3. Test count and summary reporting
-**Files:** `src/main.w`
-**Complexity:** Low
+`@[test]` attribute discovery and `--filter` implemented
+(commit `cbcfa85`).
 
-### Error message suggestions
+### Error message suggestions — Partially DONE
 
-**Current state:** 143 diagnostic sites, only 7 (5%) include help.
-**Improvements:**
-1. "did you mean?" for undefined variables (Levenshtein distance)
-2. Function signature display on arity mismatch
-3. "use :? for debug" hint on struct display (already done for some)
-**Files:** `src/Sema.w`, possible new `src/Suggestions.w`
-**Complexity:** Low per site, medium total
+"Did you mean?" for undefined variables/types implemented with
+Levenshtein distance (commit `169dac7`). Remaining: function
+signature display on arity mismatch, audit for missing locations.
+**Files:** `src/Sema.w`, `src/SemaDiag.w`
 
 ---
 
@@ -361,7 +300,7 @@ pass/fail. No `@[test]` discovery, no `--filter`.
 | 5 | Phase 6.1 (builtin traits) | Code quality | Medium | **DONE** ✓ |
 | 6 | Phase 6.2 (pre-intern) | Performance | Medium | **DONE** ✓ |
 | 7 | P2 (i32 fallbacks) | Correctness | Medium-High | **DONE** ✓ |
-| 8 | P11 (split Codegen.w) | Maintainability | Large | **DONE** ✓ |
-| 9 | Phase II-6 (tooling) | User experience | Large | Open |
+| 8 | P11 (split Codegen+Sema) | Maintainability | Large | **DONE** ✓ |
+| 9 | Phase II-6 (tooling) | User experience | Large | **Mostly DONE** |
 | 10 | Phase II-2 (generics) | Correctness | Large | **DONE** ✓ |
-| 11 | Phase II-5 (C backend) | Portability | High | Open |
+| 11 | Phase II-5 (C backend) | Portability | High | **Intrinsics DONE** |
