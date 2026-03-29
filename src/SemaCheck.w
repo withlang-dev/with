@@ -922,7 +922,8 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
 
     // Check enum variants
     if self.variant_lookup.contains(sym) and self.is_ci_visible(sym) != 0:
-        let variant_tid = self.variant_type_ids.get(sym).unwrap()
+        let variant_expected_tid = self.expected_variant_constructor_type(sym)
+        let variant_tid = if variant_expected_tid != 0: variant_expected_tid else: self.variant_type_ids.get(sym).unwrap()
         self.typed_expr_types.insert(node, variant_tid)
         return variant_tid
 
@@ -1322,14 +1323,16 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
     let else_body = self.ast.get_data2(node)
 
     self.check_expr(cond)
-    let then_type = self.check_expr(then_body)
+    let outer_expected: TypeId = if self.has_expected_type != 0: self.expected_expr_type else: (0) as TypeId
+    let then_type = if outer_expected != 0: self.check_expr_with_expected(then_body, outer_expected) else: self.check_expr(then_body)
 
     var result_type: TypeId = self.ty_void
     if else_body != 0:
-        let else_type = self.check_expr(else_body)
+        let else_expected: TypeId = if then_type != 0 and then_type != self.ty_void: then_type else: outer_expected
+        let else_type = if else_expected != 0: self.check_expr_with_expected(else_body, else_expected) else: self.check_expr(else_body)
         if then_type != 0 and else_type != 0:
             if self.types_compatible(then_type as i32, else_type as i32):
-                result_type = then_type
+                result_type = self.preferred_compatible_type(then_type, else_type)
             else:
                 result_type = self.arithmetic_result_type(then_type, else_type)
         else if then_type != 0:
@@ -1425,6 +1428,27 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         self.scope_set_is_ephemeral_task(target_sym, self.expr_is_ephemeral_task(value))
 
     self.ty_void as i32
+
+fn Sema.preferred_compatible_type(self: Sema, lhs: TypeId, rhs: TypeId) -> TypeId:
+    if lhs == 0:
+        return rhs
+    if rhs == 0:
+        return lhs
+
+    let lhs_resolved = self.resolve_alias(lhs)
+    let rhs_resolved = self.resolve_alias(rhs)
+    if lhs_resolved == rhs_resolved:
+        return lhs
+
+    let lhs_kind = self.get_type_kind(lhs_resolved)
+    let rhs_kind = self.get_type_kind(rhs_resolved)
+    if lhs_kind == TypeKind.TY_GENERIC_INST and (rhs_kind == TypeKind.TY_STRUCT or rhs_kind == TypeKind.TY_ENUM):
+        if self.get_type_d0(lhs_resolved) == self.get_type_d0(rhs_resolved):
+            return lhs
+    if rhs_kind == TypeKind.TY_GENERIC_INST and (lhs_kind == TypeKind.TY_STRUCT or lhs_kind == TypeKind.TY_ENUM):
+        if self.get_type_d0(lhs_resolved) == self.get_type_d0(rhs_resolved):
+            return rhs
+    lhs
 
 fn Sema.check_for(self: Sema, node: i32) -> i32:
     let binding = self.ast.get_data0(node)
@@ -1845,6 +1869,8 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
         else if result_type == self.ty_never and arm_type != 0:
             // Bottom-type merge: allow concrete arm types after Never arms.
             result_type = arm_type
+        else if arm_type != 0 and self.types_compatible(result_type, arm_type) != 0:
+            result_type = self.preferred_compatible_type(result_type, arm_type)
 
     // Exhaustiveness checking for enum and bool subjects.
     // Expression-position match always requires exhaustiveness.
@@ -1988,6 +2014,78 @@ fn sema_pattern_covers_variant(ast: AstPool, pat: i32, variant_sym: i32) -> bool
             if sema_pattern_covers_variant(ast, inner, variant_sym):
                 return true
     false
+
+fn Sema.generic_type_param_index(self: Sema, tp_start: i32, tp_count: i32, param_sym: i32) -> i32:
+    var tp_pos = tp_start
+    for ti in 0..tp_count:
+        if self.ast.get_extra(tp_pos) == param_sym:
+            return ti
+        let bound_count = self.ast.get_extra(tp_pos + 1)
+        tp_pos = tp_pos + 2 + bound_count
+    0 - 1
+
+// Infer a concrete generic enum type for direct variant constructor calls like
+// Some(7) when the payload directly names the enum's type parameter.
+fn Sema.infer_generic_enum_variant_type(self: Sema, variant_sym: i32, arg_types: Vec[i32], arg_count: i32) -> i32:
+    if not self.variant_type_ids.contains(variant_sym):
+        return 0
+    let enum_tid = self.resolve_alias(self.variant_type_ids.get(variant_sym).unwrap() as TypeId) as i32
+    if self.get_type_kind(enum_tid) != TypeKind.TY_ENUM:
+        return 0
+    let base_sym = self.get_type_d0(enum_tid)
+    if base_sym == 0 or not self.type_decl_nodes.contains(base_sym):
+        return 0
+    let td_node = self.type_decl_nodes.get(base_sym).unwrap()
+    let tp_count = self.type_decl_tp_count(td_node)
+    if tp_count <= 0:
+        return 0
+    let tp_start = self.type_decl_tp_start(td_node)
+    if tp_start <= 0:
+        return 0
+
+    let extra_start = self.ast.get_data1(td_node)
+    let td_packed = self.ast.get_data2(td_node)
+    if type_decl_sub_kind(td_packed) != TypeDeclKind.Enum:
+        return 0
+
+    let inferred_args: Vec[i32] = Vec.new()
+    for _ in 0..tp_count:
+        inferred_args.push(0)
+
+    let variant_count = self.ast.get_extra(extra_start)
+    var pos = extra_start + 1
+    for _ in 0..variant_count:
+        let name_sym = self.ast.get_extra(pos)
+        pos = pos + 1
+        let payload_count = self.ast.get_extra(pos)
+        pos = pos + 1
+        if name_sym == variant_sym:
+            if payload_count != arg_count:
+                return 0
+            for ai in 0..payload_count:
+                let payload_type_node = self.ast.get_extra(pos + ai)
+                if payload_type_node == 0:
+                    continue
+                if self.ast.kind(payload_type_node) != NodeKind.NK_TYPE_NAMED:
+                    continue
+                let payload_sym = self.ast.get_data0(payload_type_node)
+                let param_index = self.generic_type_param_index(tp_start, tp_count, payload_sym)
+                if param_index < 0:
+                    continue
+                let actual_ty = arg_types.get(ai as i64)
+                if actual_ty == 0:
+                    continue
+                let existing = inferred_args.get(param_index as i64)
+                if existing != 0 and self.types_compatible(existing as TypeId, actual_ty as TypeId) == 0:
+                    return 0
+                let preferred = self.preferred_compatible_type(existing as TypeId, actual_ty as TypeId)
+                inferred_args.set_i32(param_index as i64, preferred as i32)
+            for ai in 0..tp_count:
+                if inferred_args.get(ai as i64) == 0:
+                    return 0
+            return self.ensure_generic_inst_type(base_sym, inferred_args, tp_count) as i32
+        pos = pos + payload_count
+    0
 
 // Resolve payload types for a variant of a generic enum (e.g., Option[i32].Some → [i32]).
 // Walks the AST type declaration with type param substitution active.
@@ -2735,9 +2833,13 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // Enum variant constructor
     if self.variant_lookup.contains(fn_sym):
-        if variant_expected_ty != 0:
-            return variant_expected_ty
-        return self.variant_type_ids.get(fn_sym).unwrap()
+        let inferred_variant_ty = self.infer_generic_enum_variant_type(fn_sym, arg_types, arg_count)
+        let variant_tid = self.variant_type_ids.get(fn_sym).unwrap()
+        var final_variant_ty: TypeId = if variant_expected_ty != 0: variant_expected_ty as TypeId else: variant_tid as TypeId
+        if inferred_variant_ty != 0:
+            final_variant_ty = self.preferred_compatible_type(final_variant_ty, inferred_variant_ty as TypeId)
+        self.typed_expr_types.insert(node, final_variant_ty as i32)
+        return final_variant_ty as i32
 
     // Distinct type constructor: Meters(42) → Meters { value: 42 }
     if self.distinct_type_names.contains(fn_sym):
