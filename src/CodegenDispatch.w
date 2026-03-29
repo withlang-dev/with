@@ -1712,21 +1712,10 @@ fn Codegen.mir_project_field_sema_type(self: Codegen, agg_ty: i32, field_token: 
         return 0
     let resolved = self.mir_input.mir_resolve_alias(agg_ty)
     let tk = self.mir_input.mir_get_type_kind(resolved)
-    if tk == TypeKind.TY_STRUCT:
-        let extra = self.mir_input.mir_get_type_d1(resolved)
-        let count = self.mir_input.mir_get_type_d2(resolved)
-        if field_token >= 0 and field_token < count:
-            return self.mir_input.mir_get_type_extra(extra + field_token * 3 + 1)
-        for fi in 0..count:
-            let name_sym = self.mir_input.mir_get_type_extra(extra + fi * 3)
-            if name_sym == field_token:
-                return self.mir_input.mir_get_type_extra(extra + fi * 3 + 1)
-    if tk == TypeKind.TY_GENERIC_INST:
-        let base_sym = self.mir_input.mir_get_type_name(resolved)
-        if base_sym != 0 and self.sema.named_types.contains(base_sym):
-            let base_tid = self.sema.named_types.get(base_sym).unwrap()
-            return self.mir_project_field_sema_type(base_tid, field_token)
-    0
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        let inner = self.mir_input.mir_get_type_d0(resolved)
+        return self.mir_project_field_sema_type(inner, field_token)
+    self.sema.struct_field_type(resolved as i32, field_token)
 
 fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) -> i32:
     // Get the sema type for a MIR operand, handling projected places.
@@ -1740,33 +1729,7 @@ fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) 
         return 0
     if od < 0 or od >= body.place_locals.len() as i32:
         return 0
-    let local_id = body.place_locals.get(od as i64)
-    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
-        return 0
-    var ty = body.local_type_ids.get(local_id as i64)
-    // Walk projections to resolve through struct fields (using sema snapshot).
-    let p_count = body.place_proj_counts.get(od as i64)
-    if p_count > 0:
-        let p_start = body.place_proj_starts.get(od as i64)
-        for pi in 0..p_count:
-            let pk = body.proj_kinds.get((p_start + pi) as i64)
-            let pd = body.proj_d0.get((p_start + pi) as i64)
-            if pk == ProjKind.PK_FIELD:
-                let field_ty = self.mir_project_field_sema_type(ty, pd)
-                if field_ty > 0:
-                    ty = field_ty
-            else if pk == ProjKind.PK_DEREF:
-                let d_resolved = self.mir_input.mir_resolve_alias(ty)
-                let d_tk = self.mir_input.mir_get_type_kind(d_resolved)
-                if d_tk == TypeKind.TY_PTR or d_tk == TypeKind.TY_REF:
-                    ty = self.mir_input.mir_get_type_d0(d_resolved)
-            else if pk == ProjKind.PK_INDEX:
-                let elem_ty = self.mir_index_elem_sema_type(ty)
-                if elem_ty > 0:
-                    ty = elem_ty
-            else if pk == ProjKind.PK_DOWNCAST:
-                continue
-    ty
+    self.mir_place_sema_type(body, od)
 
 fn Codegen.mir_place_sema_type(self: Codegen, body: MirBody, place_id: i32) -> i32:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:

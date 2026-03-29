@@ -537,35 +537,7 @@ fn MirBuilder.struct_field_type(self: MirBuilder, struct_tid: i32, field_sym: i3
     if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
         let inner = self.sema.get_type_d0(resolved)
         return self.struct_field_type(inner, field_sym)
-    if tk == TypeKind.TY_GENERIC_INST:
-        let base_sym = self.sema.get_type_d0(resolved)
-        if self.sema.named_types.contains(base_sym):
-            let base_tid = self.sema.named_types.get(base_sym).unwrap()
-            return self.struct_field_type(base_tid, field_sym)
-        return 0
-    if tk != TypeKind.TY_STRUCT:
-        return 0
-    let extra_start = self.sema.get_type_d1(resolved)
-    let field_count = self.sema.get_type_d2(resolved)
-    for fi in 0..field_count:
-        let f_name = self.sema.type_extra.get((extra_start + fi * 3) as i64)
-        if f_name == field_sym:
-            let f_type = self.sema.type_extra.get((extra_start + fi * 3 + 1) as i64)
-            if f_type != 0:
-                return f_type
-            // Forward-referenced field type stored as 0 during collect_type_decl.
-            // Re-resolve from the AST type declaration node.
-            let struct_name_sym = self.sema.get_type_d0(resolved)
-            if self.sema.type_decl_nodes.contains(struct_name_sym):
-                let td_node = self.sema.type_decl_nodes.get(struct_name_sym).unwrap()
-                let td_extra = self.ast.get_data1(td_node)
-                let td_fc = self.ast.get_extra(td_extra)
-                if fi < td_fc:
-                    let ast_base = td_extra + 1 + fi * 3
-                    let f_type_node = self.ast.get_extra(ast_base + 1)
-                    return self.sema.resolve_type_expr(f_type_node) as i32
-            return 0
-    0
+    self.sema.struct_field_type(resolved as i32, field_sym)
 
 fn MirBuilder.tuple_elem_type(self: MirBuilder, tuple_tid: i32, field_idx: i32) -> i32:
     let resolved = self.sema.resolve_alias(tuple_tid)
