@@ -12,6 +12,8 @@ enum ComptimeValueKind: i32:
     CV_TUPLE = 6
     CV_RANGE = 7
     CV_STRUCT = 8
+    CV_VEC = 9
+    CV_MAP = 10
 
 type ComptimeValue {
     kind: i32,
@@ -122,6 +124,28 @@ fn comptime_value_struct(type_id: i32, extra_start: i32, extra_count: i32) -> Co
         extra_count,
     }
 
+fn comptime_value_vec(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
+    ComptimeValue {
+        kind: ComptimeValueKind.CV_VEC,
+        type_id,
+        data0: 0,
+        data1: 0,
+        text: "",
+        extra_start,
+        extra_count,
+    }
+
+fn comptime_value_map(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
+    ComptimeValue {
+        kind: ComptimeValueKind.CV_MAP,
+        type_id,
+        data0: 0,
+        data1: 0,
+        text: "",
+        extra_start,
+        extra_count,
+    }
+
 fn comptime_value_is_valid(value: ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_INVALID:
         return 0
@@ -151,6 +175,8 @@ fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_TUPLE: return "tuple"
     if kind == ComptimeValueKind.CV_RANGE: return "range"
     if kind == ComptimeValueKind.CV_STRUCT: return "struct"
+    if kind == ComptimeValueKind.CV_VEC: return "vec"
+    if kind == ComptimeValueKind.CV_MAP: return "map"
     "invalid"
 
 fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema: Sema) -> str:
@@ -189,6 +215,23 @@ fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema:
                 let field_value = extras.get((value.extra_start + fi) as i64)
                 out = out ++ sema.pool_resolve(field_sym) ++ ": " ++ comptime_value_format(field_value, extras, sema)
             return out ++ " }"
+    if value.kind == ComptimeValueKind.CV_VEC:
+        var out = sema.type_name(value.type_id) ++ "(["
+        for i in 0..value.extra_count:
+            if i > 0:
+                out = out ++ ", "
+            out = out ++ comptime_value_format(extras.get((value.extra_start + i) as i64), extras, sema)
+        return out ++ "])"
+    if value.kind == ComptimeValueKind.CV_MAP:
+        var out = sema.type_name(value.type_id) ++ " { "
+        for i in 0..value.extra_count:
+            if i > 0:
+                out = out ++ ", "
+            let base = value.extra_start + i * 2
+            let key = extras.get(base as i64)
+            let item = extras.get((base + 1) as i64)
+            out = out ++ comptime_value_format(key, extras, sema) ++ ": " ++ comptime_value_format(item, extras, sema)
+        return out ++ " }"
     if value.type_id != 0:
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
@@ -226,6 +269,29 @@ fn comptime_values_equal(lhs: ComptimeValue, rhs: ComptimeValue, extras: Vec[Com
             let left = extras.get((lhs.extra_start + i) as i64)
             let right = extras.get((rhs.extra_start + i) as i64)
             if comptime_values_equal(left, right, extras) == 0:
+                return 0
+        return 1
+    if lhs.kind == ComptimeValueKind.CV_VEC:
+        if lhs.type_id != rhs.type_id or lhs.extra_count != rhs.extra_count:
+            return 0
+        for i in 0..lhs.extra_count:
+            let left = extras.get((lhs.extra_start + i) as i64)
+            let right = extras.get((rhs.extra_start + i) as i64)
+            if comptime_values_equal(left, right, extras) == 0:
+                return 0
+        return 1
+    if lhs.kind == ComptimeValueKind.CV_MAP:
+        if lhs.type_id != rhs.type_id or lhs.extra_count != rhs.extra_count:
+            return 0
+        for i in 0..lhs.extra_count:
+            let base = i * 2
+            let left_key = extras.get((lhs.extra_start + base) as i64)
+            let right_key = extras.get((rhs.extra_start + base) as i64)
+            if comptime_values_equal(left_key, right_key, extras) == 0:
+                return 0
+            let left_value = extras.get((lhs.extra_start + base + 1) as i64)
+            let right_value = extras.get((rhs.extra_start + base + 1) as i64)
+            if comptime_values_equal(left_value, right_value, extras) == 0:
                 return 0
         return 1
     0

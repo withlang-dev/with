@@ -853,6 +853,302 @@ fn Codegen.emit_vec_new_global(self: Codegen, name_sym: i32, vec_tid: i32, is_mu
     self.module_constants.insert(name_sym, global)
     true
 
+fn Codegen.queue_module_runtime_init(self: Codegen, name_sym: i32, value_node: i32, result_tid: i32) -> bool:
+    let global_ty = self.sema_type_to_llvm(result_tid)
+    if global_ty == 0:
+        return false
+    let name_str = self.intern.resolve(name_sym)
+    let global = wl_add_global(self.llmod, global_ty, name_str)
+    wl_set_initializer(global, wl_const_null(global_ty))
+    wl_set_linkage(global, wl_internal_linkage())
+    self.module_constants.insert(name_sym, global)
+    self.module_runtime_init_syms.push(name_sym)
+    self.module_runtime_init_nodes.push(value_node)
+    self.module_runtime_init_type_ids.push(result_tid)
+    true
+
+fn Codegen.emit_module_runtime_init_fn(self: Codegen, name_sym: i32, value_node: i32, result_tid: i32) -> i64:
+    let ret_ty = self.sema_type_to_llvm(result_tid)
+    if ret_ty == 0:
+        return 0
+    let init_name = "__with_init_const_" ++ self.intern.resolve(name_sym)
+    let existing = wl_get_named_function(self.llmod, init_name)
+    if existing != 0:
+        return existing
+
+    let ft = wl_function_type(ret_ty, 0, 0, 0)
+    let function = wl_add_function(self.llmod, init_name, ft)
+    wl_set_linkage(function, wl_internal_linkage())
+
+    let saved_fn = self.current_function
+    let saved_ret = self.current_ret_type
+    let saved_owner = self.current_method_owner_sym
+    let saved_allocas = self.local_allocas
+    let saved_types = self.local_types
+    let saved_muts = self.local_muts
+    let saved_fn_sigs = self.local_fn_sigs
+    let saved_pointees = self.local_pointee_structs
+    let saved_tasks = self.task_locals
+    let saved_trait_locals = self.trait_locals
+    let saved_trait_concrete = self.trait_local_concrete_types
+    let saved_scope_syms = self.scope_local_syms
+    let saved_scope_allocas = self.scope_local_allocas
+    let saved_scope_types = self.scope_local_types
+    let saved_scope_count = self.scope_local_count
+    let saved_defer = self.defer_stack
+    let saved_errdefer = self.errdefer_stack
+    let saved_enum_local_types = self.enum_local_types
+    let saved_sema_local_types = self.local_sema_types
+    let saved_expected = self.expected_type
+    let saved_expected_node = self.expected_type_node
+    let saved_result_err = self.current_result_err_symbol
+    let saved_returns_result = self.current_fn_returns_result
+    let saved_saw_return = self.current_fn_saw_explicit_return
+    let saved_tail_bb = self.tailrec_body_bb
+    let saved_tail_sym = self.tailrec_fn_sym
+    let saved_tail_allocas = self.tailrec_param_allocas
+    let saved_loops = self.capture_loop_state()
+    let saved_bb = wl_get_insert_block(self.builder)
+
+    let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
+    let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
+    let fresh_local_pointees: HashMap[i32, i32] = HashMap.new()
+    let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
+    let fresh_trait_concrete: HashMap[i32, i32] = HashMap.new()
+    let fresh_enum_local_types: HashMap[i32, i32] = HashMap.new()
+    let fresh_scope_syms: Vec[i32] = Vec.new()
+    let fresh_scope_allocas: Vec[i64] = Vec.new()
+    let fresh_scope_types: Vec[i64] = Vec.new()
+    let fresh_defer_stack: Vec[i32] = Vec.new()
+    let fresh_errdefer_stack: Vec[i32] = Vec.new()
+    let fresh_tail_allocas: Vec[i64] = Vec.new()
+
+    self.current_function = function
+    self.current_ret_type = ret_ty
+    self.current_method_owner_sym = 0
+    self.local_allocas = fresh_local_allocas
+    self.local_types = fresh_local_types
+    self.local_muts = fresh_local_muts
+    self.local_fn_sigs = fresh_local_fn_sigs
+    self.local_pointee_structs = fresh_local_pointees
+    self.task_locals = fresh_task_locals
+    self.trait_locals = fresh_trait_locals
+    self.trait_local_concrete_types = fresh_trait_concrete
+    self.enum_local_types = fresh_enum_local_types
+    self.scope_local_syms = fresh_scope_syms
+    self.scope_local_allocas = fresh_scope_allocas
+    self.scope_local_types = fresh_scope_types
+    self.scope_local_count = 0
+    self.defer_stack = fresh_defer_stack
+    self.errdefer_stack = fresh_errdefer_stack
+    self.local_sema_types = HashMap.new()
+    self.expected_type = ret_ty
+    self.expected_type_node = 0
+    self.current_result_err_symbol = 0
+    self.current_fn_returns_result = false
+    self.current_fn_saw_explicit_return = false
+    self.tailrec_body_bb = 0
+    self.tailrec_fn_sym = 0
+    self.tailrec_param_allocas = fresh_tail_allocas
+    self.reset_loop_state()
+
+    let entry = wl_append_bb(self.context, function, "entry")
+    wl_position_at_end(self.builder, entry)
+
+    let saved_mir_locals = self.mir_local_ptrs
+    let saved_mir_local_types = self.mir_local_types
+    let saved_mir_bbs = self.mir_bb_values
+    let saved_mir_unreachable = self.mir_default_unreachable_bbs
+    self.mir_local_ptrs = HashMap.new()
+    self.mir_local_types = HashMap.new()
+    self.mir_bb_values = Vec.new()
+    self.mir_default_unreachable_bbs = Vec.new()
+
+    let init_sym = self.intern.intern(init_name)
+    var init_builder = MirBuilder.init(self.sema, self.pool, self.intern, init_sym)
+    init_builder.body.local_type_ids.set_i32(0, result_tid)
+    init_builder.push_scope()
+    init_builder.expected_type = result_tid
+    let init_result = init_builder.lower_expr(value_node)
+    let init_ret_place = init_builder.place_for_local(0)
+    init_builder.assign_operand_to_place(init_ret_place, init_result, self.pool.get_end(value_node))
+    init_builder.pop_scope_inline()
+    init_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+    let init_body = init_builder.body
+
+    let ret_alloca = self.create_entry_alloca(ret_ty)
+    self.mir_local_ptrs.insert(0, ret_alloca)
+    self.mir_local_types.insert(0, ret_ty)
+
+    for gli in 0..init_body.local_names.len() as i32:
+        let gl_name = init_body.local_names.get(gli as i64)
+        if gl_name == 0:
+            continue
+        let gl_opt = self.module_constants.get(gl_name)
+        if gl_opt.is_some():
+            self.mir_local_ptrs.insert(gli, gl_opt.unwrap() as i64)
+
+    for bb in 0..init_body.block_count():
+        let llbb = wl_append_bb(self.context, function, f"mir.bb{bb}")
+        self.mir_bb_values.push(llbb)
+
+    if self.mir_bb_values.len() as i32 > 0:
+        wl_build_br(self.builder, self.mir_bb_values.get(0))
+    else:
+        let _ = wl_build_ret(self.builder, wl_const_null(ret_ty))
+
+    for bb in 0..init_body.block_count():
+        if bb < 0 or bb >= self.mir_bb_values.len() as i32:
+            continue
+        let llbb = self.mir_bb_values.get(bb as i64)
+        wl_position_at_end(self.builder, llbb)
+        let stmt_start = init_body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = init_body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            if not self.mir_emit_stmt(init_body, stmt_id):
+                if wl_get_bb_terminator(llbb) == 0:
+                    wl_build_unreachable(self.builder)
+        if wl_get_bb_terminator(llbb) == 0:
+            if not self.mir_emit_term(init_body, bb):
+                if wl_get_bb_terminator(llbb) == 0:
+                    let _ = wl_build_ret(self.builder, wl_const_null(ret_ty))
+
+    self.mir_local_ptrs = saved_mir_locals
+    self.mir_local_types = saved_mir_local_types
+    self.mir_bb_values = saved_mir_bbs
+    self.mir_default_unreachable_bbs = saved_mir_unreachable
+
+    self.current_function = saved_fn
+    self.current_ret_type = saved_ret
+    self.current_method_owner_sym = saved_owner
+    self.local_allocas = saved_allocas
+    self.local_types = saved_types
+    self.local_muts = saved_muts
+    self.local_fn_sigs = saved_fn_sigs
+    self.local_pointee_structs = saved_pointees
+    self.task_locals = saved_tasks
+    self.trait_locals = saved_trait_locals
+    self.trait_local_concrete_types = saved_trait_concrete
+    self.enum_local_types = saved_enum_local_types
+    self.scope_local_syms = saved_scope_syms
+    self.scope_local_allocas = saved_scope_allocas
+    self.scope_local_types = saved_scope_types
+    self.scope_local_count = saved_scope_count
+    self.defer_stack = saved_defer
+    self.errdefer_stack = saved_errdefer
+    self.local_sema_types = saved_sema_local_types
+    self.expected_type = saved_expected
+    self.expected_type_node = saved_expected_node
+    self.current_result_err_symbol = saved_result_err
+    self.current_fn_returns_result = saved_returns_result
+    self.current_fn_saw_explicit_return = saved_saw_return
+    self.tailrec_body_bb = saved_tail_bb
+    self.tailrec_fn_sym = saved_tail_sym
+    self.tailrec_param_allocas = saved_tail_allocas
+    self.restore_loop_state(saved_loops)
+    if saved_bb != 0:
+        wl_position_at_end(self.builder, saved_bb)
+
+    function
+
+fn Codegen.emit_module_runtime_init_helpers(self: Codegen):
+    for i in 0..self.module_runtime_init_syms.len() as i32:
+        let name_sym = self.module_runtime_init_syms.get(i as i64)
+        let value_node = self.module_runtime_init_nodes.get(i as i64)
+        let result_tid = self.module_runtime_init_type_ids.get(i as i64)
+        let global_opt = self.module_constants.get(name_sym)
+        if not global_opt.is_some():
+            with_eprintln("error: missing global storage for runtime-initialized module constant '" ++ self.intern.resolve(name_sym) ++ "'")
+            self.had_error = 1
+            return
+        let init_fn = self.emit_module_runtime_init_fn(name_sym, value_node, result_tid)
+        let init_ty = self.sema_type_to_llvm(result_tid)
+        if init_fn == 0 or init_ty == 0:
+            with_eprintln("error: failed to emit runtime initializer for module constant '" ++ self.intern.resolve(name_sym) ++ "'")
+            self.had_error = 1
+            return
+        self.module_runtime_init_globals.push(global_opt.unwrap() as i64)
+        self.module_runtime_init_fns.push(init_fn)
+        self.module_runtime_init_types.push(init_ty)
+
+fn Codegen.is_collection_runtime_intrinsic(self: Codegen, intrinsic: i32) -> bool:
+    let _ = self
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_NEW or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_WITH_CAPACITY or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_PUSH or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_GET or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_LEN or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_SET or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_REMOVE or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_CLEAR or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_POP or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_ITER or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_MAP or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_FILTER or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_FOLD or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_CONTAINS or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_JOIN:
+        return true
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_NEW or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_INSERT or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_GET or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CONTAINS or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_LEN or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_INCREMENT:
+        return true
+    false
+
+fn Codegen.module_const_contains_runtime_collection(self: Codegen, node: i32) -> bool:
+    if node == 0:
+        return false
+    let kind = self.pool.kind(node)
+    if kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN:
+        return self.module_const_contains_runtime_collection(self.pool.get_data0(node))
+    if kind == NodeKind.NK_UNARY:
+        return self.module_const_contains_runtime_collection(self.pool.get_data1(node))
+    if kind == NodeKind.NK_BINARY or kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_INDEX:
+        if self.module_const_contains_runtime_collection(self.pool.get_data0(node)):
+            return true
+        if self.module_const_contains_runtime_collection(self.pool.get_data1(node)):
+            return true
+        return self.module_const_contains_runtime_collection(self.pool.get_data2(node))
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        return self.module_const_contains_runtime_collection(self.pool.get_data0(node))
+    if kind == NodeKind.NK_CALL:
+        let callee = self.pool.get_data0(node)
+        if self.pool.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            let recv = self.pool.get_data0(callee)
+            let method_sym = self.pool.get_data1(callee)
+            let intrinsic = self.classify_generic_call_intrinsic(self.ast_static_type_expr(recv), method_sym)
+            if self.is_collection_runtime_intrinsic(intrinsic):
+                return true
+            if self.module_const_contains_runtime_collection(recv):
+                return true
+        else if self.module_const_contains_runtime_collection(callee):
+            return true
+        let extra_start = self.pool.get_data1(node)
+        let arg_count = self.pool.get_data2(node)
+        for i in 0..arg_count:
+            if self.module_const_contains_runtime_collection(self.pool.get_extra(extra_start + i)):
+                return true
+        return false
+    if kind == NodeKind.NK_LET_BINDING:
+        return self.module_const_contains_runtime_collection(self.pool.get_data1(node))
+    if kind == NodeKind.NK_BLOCK:
+        let stmt_start = self.pool.get_data0(node)
+        let stmt_count = self.pool.get_data1(node)
+        for i in 0..stmt_count:
+            if self.module_const_contains_runtime_collection(self.pool.get_extra(stmt_start + i)):
+                return true
+        return self.module_const_contains_runtime_collection(self.pool.get_data2(node))
+    if kind == NodeKind.NK_STRUCT_LIT:
+        let field_start = self.pool.get_data1(node)
+        let field_count = self.pool.get_data2(node)
+        for i in 0..field_count:
+            let value_node = self.pool.get_extra(field_start + i * 2 + 1)
+            if self.module_const_contains_runtime_collection(value_node):
+                return true
+        return false
+    if kind == NodeKind.NK_ARRAY_LIT or kind == NodeKind.NK_TUPLE:
+        let extra_start = self.pool.get_data1(node)
+        let item_count = self.pool.get_data2(node)
+        for i in 0..item_count:
+            if self.module_const_contains_runtime_collection(self.pool.get_extra(extra_start + i)):
+                return true
+        return false
+    if kind == NodeKind.NK_IF_EXPR:
+        if self.module_const_contains_runtime_collection(self.pool.get_data0(node)):
+            return true
+        if self.module_const_contains_runtime_collection(self.pool.get_data1(node)):
+            return true
+        return self.module_const_contains_runtime_collection(self.pool.get_data2(node))
+    false
+
 fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
     let kind = self.pool.kind(node)
     if kind == NodeKind.NK_INT_LIT:
@@ -1067,3 +1363,18 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             wl_set_global_constant(global, 1)
         wl_set_linkage(global, wl_internal_linkage())
         self.module_constants.insert(name_sym, global)
+        return
+
+    let runtime_tid =
+        if binding_ty != 0:
+            binding_ty as i32
+        else if self.sema.typed_expr_types.contains(value_node):
+            self.sema.typed_expr_types.get(value_node).unwrap()
+        else:
+            0
+    if runtime_tid != 0:
+        let resolved_runtime = self.sema.resolve_alias(runtime_tid as TypeId)
+        let runtime_kind = self.sema.get_type_kind(resolved_runtime)
+        if runtime_kind != TypeKind.TY_INT and runtime_kind != TypeKind.TY_FLOAT and runtime_kind != TypeKind.TY_STR:
+            if self.module_const_contains_runtime_collection(value_node) and self.queue_module_runtime_init(name_sym, value_node, runtime_tid):
+                return

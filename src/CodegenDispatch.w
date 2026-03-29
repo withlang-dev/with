@@ -1786,6 +1786,134 @@ fn Codegen.mir_vec_elem_type(self: Codegen, body: MirBody, recv_op_id: i32) -> i
                     return self.mir_sema_type_to_llvm(elem_tid)
     0
 
+fn Codegen.mir_hashmap_key_type(self: Codegen, body: MirBody, recv_op_id: i32) -> i64:
+    let sema_ty = self.mir_operand_sema_type(body, recv_op_id)
+    if sema_ty > 0:
+        let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+        let tk = self.mir_input.mir_get_type_kind(resolved)
+        if tk == TypeKind.TY_GENERIC_INST:
+            let base_sym = self.mir_input.mir_get_type_d0(resolved)
+            let arg_count = self.mir_input.mir_get_type_d2(resolved)
+            if base_sym == self.sym_hashmap and arg_count > 0:
+                let te_start = self.mir_input.mir_get_type_d1(resolved)
+                let key_tid = self.mir_input.mir_get_type_extra(te_start)
+                if key_tid > 0:
+                    return self.mir_sema_type_to_llvm(key_tid)
+    0
+
+fn Codegen.mir_hashmap_value_type(self: Codegen, body: MirBody, recv_op_id: i32) -> i64:
+    let sema_ty = self.mir_operand_sema_type(body, recv_op_id)
+    if sema_ty > 0:
+        let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+        let tk = self.mir_input.mir_get_type_kind(resolved)
+        if tk == TypeKind.TY_GENERIC_INST:
+            let base_sym = self.mir_input.mir_get_type_d0(resolved)
+            let arg_count = self.mir_input.mir_get_type_d2(resolved)
+            if base_sym == self.sym_hashmap and arg_count > 1:
+                let te_start = self.mir_input.mir_get_type_d1(resolved)
+                let value_tid = self.mir_input.mir_get_type_extra(te_start + 1)
+                if value_tid > 0:
+                    return self.mir_sema_type_to_llvm(value_tid)
+    0
+
+fn Codegen.ast_static_type_expr(self: Codegen, node: i32) -> i32:
+    if node == 0:
+        return 0
+    if self.sema.typed_expr_types.contains(node):
+        let typed = self.sema.typed_expr_types.get(node).unwrap()
+        if typed != 0:
+            return typed
+    let kind = self.pool.kind(node)
+    if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
+        let sym = self.pool.get_data0(node)
+        let prim = self.sema.primitive_type_by_sym(sym)
+        if prim != 0:
+            return prim as i32
+        if self.sema.named_types.contains(sym):
+            return self.sema.named_types.get(sym).unwrap() as i32
+        return 0
+    if kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+        return self.sema.resolve_type_expr(node) as i32
+    if kind == NodeKind.NK_INDEX:
+        let base = self.pool.get_data0(node)
+        let base_sym =
+            if self.pool.kind(base) == NodeKind.NK_IDENT or self.pool.kind(base) == NodeKind.NK_TYPE_NAMED:
+                self.pool.get_data0(base)
+            else:
+                0
+        if base_sym == 0:
+            return 0
+        let arg1 = self.ast_static_type_expr(self.pool.get_data1(node))
+        if arg1 == 0:
+            return 0
+        let args: Vec[i32] = Vec.new()
+        args.push(arg1)
+        var arg_count = 1
+        if self.pool.get_data2(node) != 0:
+            let arg2 = self.ast_static_type_expr(self.pool.get_data2(node))
+            if arg2 == 0:
+                return 0
+            args.push(arg2)
+            arg_count = 2
+        return self.sema.find_generic_inst_type(base_sym, args, arg_count) as i32
+    0
+
+fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method_sym: i32) -> i32:
+    if recv_type == 0 or method_sym == 0:
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    let resolved = self.sema.resolve_alias(recv_type as TypeId)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TypeKind.TY_STR:
+        if method_sym == self.sym_len:
+            return MirIntrinsic.MIR_INTRINSIC_STR_LEN
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if tk == TypeKind.TY_ARRAY:
+        if method_sym == self.sym_len:
+            return MirIntrinsic.MIR_INTRINSIC_ARR_LEN
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    let type_name_sym = self.sema.get_type_name(resolved)
+    if type_name_sym == 0:
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    let type_name = self.intern.resolve(type_name_sym)
+    let method_name = self.intern.resolve(method_sym)
+    if type_name == "Vec":
+        if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_VEC_NEW
+        if method_name == "with_capacity": return MirIntrinsic.MIR_INTRINSIC_VEC_WITH_CAPACITY
+        if method_name == "push": return MirIntrinsic.MIR_INTRINSIC_VEC_PUSH
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VEC_GET
+        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_VEC_LEN
+        if method_name == "set_i32": return MirIntrinsic.MIR_INTRINSIC_VEC_SET
+        if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_VEC_REMOVE
+        if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_VEC_CLEAR
+        if method_name == "pop": return MirIntrinsic.MIR_INTRINSIC_VEC_POP
+        if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
+        if method_name == "map": return MirIntrinsic.MIR_INTRINSIC_VEC_MAP
+        if method_name == "filter": return MirIntrinsic.MIR_INTRINSIC_VEC_FILTER
+        if method_name == "fold": return MirIntrinsic.MIR_INTRINSIC_VEC_FOLD
+        if method_name == "contains": return MirIntrinsic.MIR_INTRINSIC_VEC_CONTAINS
+        if method_name == "join": return MirIntrinsic.MIR_INTRINSIC_VEC_JOIN
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "VecIter":
+        if method_name == "next":
+            return MirIntrinsic.MIR_INTRINSIC_VECITER_NEXT
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "HashMap":
+        if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_MAP_NEW
+        if method_name == "insert": return MirIntrinsic.MIR_INTRINSIC_MAP_INSERT
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_MAP_GET
+        if method_name == "contains": return MirIntrinsic.MIR_INTRINSIC_MAP_CONTAINS
+        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_MAP_LEN
+        if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE
+        if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR
+        if method_name == "increment": return MirIntrinsic.MIR_INTRINSIC_MAP_INCREMENT
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "Option":
+        if method_name == "unwrap": return MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP
+        if method_name == "is_some": return MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME
+        if method_name == "is_none": return MirIntrinsic.MIR_INTRINSIC_OPT_IS_NONE
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    MirIntrinsic.MIR_INTRINSIC_NONE
+
 fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
     let i64_ty = wl_i64_type(self.context)
     let i32_ty = wl_i32_type(self.context)
@@ -1993,8 +2121,13 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_INSERT:
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
         let map_ptr = self.mir_extract_map_ptr(recv)
-        let key = self.mir_intrinsic_arg(body, args_id, 1)
-        let val = self.mir_intrinsic_arg(body, args_id, 2)
+        let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
+        let val_raw = self.mir_intrinsic_arg(body, args_id, 2)
+        let key_ty = self.mir_hashmap_key_type(body, recv_op)
+        let val_ty = self.mir_hashmap_value_type(body, recv_op)
+        let key = if key_ty != 0 and wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
+        let val = if val_ty != 0 and wl_type_of(val_raw) != val_ty: self.coerce_value_to_type(val_raw, val_ty) else: val_raw
         let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
         let val_alloca = wl_build_alloca(self.builder, wl_type_of(val))
         wl_build_store(self.builder, key, key_alloca)
@@ -2017,7 +2150,10 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_GET:
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
         let map_ptr = self.mir_extract_map_ptr(recv)
-        let key = self.mir_intrinsic_arg(body, args_id, 1)
+        let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
+        let key_ty = self.mir_hashmap_key_type(body, recv_op)
+        let key = if key_ty != 0 and wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
         let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
         wl_build_store(self.builder, key, key_alloca)
         // Determine value type for the output buffer.
@@ -2055,7 +2191,10 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CONTAINS:
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
         let map_ptr = self.mir_extract_map_ptr(recv)
-        let key = self.mir_intrinsic_arg(body, args_id, 1)
+        let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
+        let key_ty = self.mir_hashmap_key_type(body, recv_op)
+        let key = if key_ty != 0 and wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
         let key_alloca = wl_build_alloca(self.builder, wl_type_of(key))
         wl_build_store(self.builder, key, key_alloca)
         let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
@@ -3124,9 +3263,16 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
             if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
                 let gc_self_expr_node = self.pool.get_data0(gc_callee_field)
                 let gc_method_sym = self.pool.get_data1(gc_callee_field)
-                let gc_method_name = self.intern.resolve(gc_method_sym)
                 let gc_mir_start = body.call_arg_starts.get(args_id as i64)
                 let gc_mir_count = body.call_arg_counts.get(args_id as i64)
+                var gc_recv_type = self.ast_static_type_expr(gc_self_expr_node)
+                if gc_recv_type == 0 and gc_mir_count > 0:
+                    let gc_recv_op = body.call_arg_operands.get(gc_mir_start as i64)
+                    gc_recv_type = self.mir_operand_sema_type(body, gc_recv_op)
+                let gc_intrinsic = self.classify_generic_call_intrinsic(gc_recv_type, gc_method_sym)
+                if gc_intrinsic != MirIntrinsic.MIR_INTRINSIC_NONE:
+                    return self.mir_emit_intrinsic_call(body, gc_intrinsic, args_id, dest_place, next_bb)
+                let gc_method_name = self.intern.resolve(gc_method_sym)
                 // Eval receiver from MIR operand 0
                 if gc_mir_count > 0:
                     let gc_recv_op = body.call_arg_operands.get(gc_mir_start as i64)
@@ -3340,7 +3486,19 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         if not self.enum_type_map.get(self.current_method_owner_sym).is_some():
                             gc_is_blanket = true
             if not gc_is_blanket:
-                with_eprintln(f"FATAL: unhandled MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL sym={gc_name} node_kind={self.pool.kind(gc_node)}")
+                let fatal_callee_field = self.pool.get_data0(gc_node)
+                let fatal_recv =
+                    if self.pool.kind(fatal_callee_field) == NodeKind.NK_FIELD_ACCESS:
+                        self.pool.get_data0(fatal_callee_field)
+                    else:
+                        0
+                var fatal_recv_ty = self.ast_static_type_expr(fatal_recv)
+                let fatal_mir_start = body.call_arg_starts.get(args_id as i64)
+                let fatal_mir_count = body.call_arg_counts.get(args_id as i64)
+                if fatal_recv_ty == 0 and fatal_mir_count > 0:
+                    let fatal_recv_op = body.call_arg_operands.get(fatal_mir_start as i64)
+                    fatal_recv_ty = self.mir_operand_sema_type(body, fatal_recv_op)
+                with_eprintln(f"FATAL: unhandled MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL sym={gc_name} node_kind={self.pool.kind(gc_node)} recv_ty={fatal_recv_ty} recv_kind={if fatal_recv != 0: self.pool.kind(fatal_recv) else: -1} arg_count={fatal_mir_count}")
                 self.had_error = 1
             if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                 let gc_next_val = self.mir_bb_values.get(next_bb as i64)

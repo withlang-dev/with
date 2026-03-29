@@ -432,6 +432,13 @@ type Codegen {
 
     // Module constants: sym → LLVM global
     module_constants: HashMap[i32, i64],
+    // Module constants that require runtime reconstruction before user main.
+    module_runtime_init_syms: Vec[i32],
+    module_runtime_init_nodes: Vec[i32],
+    module_runtime_init_type_ids: Vec[i32],
+    module_runtime_init_globals: Vec[i64],
+    module_runtime_init_fns: Vec[i64],
+    module_runtime_init_types: Vec[i64],
     // Constant integer values: parallel arrays for sym → i64 value lookup
     const_int_syms: Vec[i32],
     const_int_vals: Vec[i64],
@@ -741,6 +748,12 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         mono_types: HashMap.new(),
         type_aliases: HashMap.new(),
         module_constants: HashMap.new(),
+        module_runtime_init_syms: Vec.new(),
+        module_runtime_init_nodes: Vec.new(),
+        module_runtime_init_type_ids: Vec.new(),
+        module_runtime_init_globals: Vec.new(),
+        module_runtime_init_fns: Vec.new(),
+        module_runtime_init_types: Vec.new(),
         const_int_syms: Vec.new(),
         const_int_vals: Vec.new(),
         decl_source_paths: Vec.new(),
@@ -3872,6 +3885,10 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     if self.had_error != 0:
         return 1
 
+    self.emit_module_runtime_init_helpers()
+    if self.had_error != 0:
+        return 1
+
     // Wrap main for exit
     self.wrap_main_for_exit()
 
@@ -3925,6 +3942,16 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
         runtime_init_fn = wl_add_function(self.llmod, "with_runtime_init", runtime_init_ft_new)
     let runtime_init_ft = wl_global_get_value_type(runtime_init_fn)
     wl_build_call(self.builder, runtime_init_ft, runtime_init_fn, 0, 0)
+
+    for i in 0..self.module_runtime_init_fns.len() as i32:
+        let init_fn = self.module_runtime_init_fns.get(i as i64)
+        let init_ty = self.module_runtime_init_types.get(i as i64)
+        let init_global = self.module_runtime_init_globals.get(i as i64)
+        if init_fn == 0 or init_ty == 0 or init_global == 0:
+            continue
+        let init_ft = wl_global_get_value_type(init_fn)
+        let init_value = wl_build_call(self.builder, init_ft, init_fn, 0, 0)
+        wl_build_store(self.builder, init_value, init_global)
 
     let main_call = wl_build_call(self.builder, main_ft, main_fn, 0, 0)
 

@@ -163,6 +163,175 @@ fn ct_clone_leaf(pool: &mut AstPool, node: i32) -> i32:
 fn ct_empty_block(pool: &mut AstPool, node: i32) -> i32:
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), pool.extra_len(), 0, 0) as i32
 
+fn ct_fresh_sym(intern: &mut InternPool, prefix: str, seed: i32) -> i32:
+    intern.intern(prefix ++ f"{seed}" ++ "_" ++ f"{intern.symbol_texts.len() as i32}")
+
+fn ct_build_type_expr(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, type_id: i32, node: i32) -> i32:
+    let resolved = sema.resolve_alias(type_id)
+    let start = pool.get_start(node)
+    let end = pool.get_end(node)
+    let tk = sema.get_type_kind(resolved)
+
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = intern.intern(sema.pool_resolve(sema.get_type_d0(resolved)))
+        let extra_start = sema.get_type_d1(resolved)
+        let arg_count = sema.get_type_d2(resolved)
+        let arg_nodes: Vec[i32] = Vec.new()
+        for ai in 0..arg_count:
+            let arg_tid = sema.type_extra.get((extra_start + ai) as i64)
+            let arg_node = ct_build_type_expr(pool, intern, sema, arg_tid, node)
+            if arg_node == 0:
+                return 0
+            arg_nodes.push(arg_node)
+        let new_extra = pool.extra_len()
+        for ai in 0..arg_nodes.len() as i32:
+            pool.add_extra(arg_nodes.get(ai as i64))
+        return pool.add_node(NodeKind.NK_TYPE_GENERIC, start, end, base_sym, new_extra, arg_count) as i32
+
+    if tk == TypeKind.TY_ARRAY:
+        let elem_node = ct_build_type_expr(pool, intern, sema, sema.get_type_d0(resolved), node)
+        if elem_node == 0:
+            return 0
+        return pool.add_node(NodeKind.NK_TYPE_ARRAY, start, end, elem_node, sema.get_type_d1(resolved), 0) as i32
+
+    if tk == TypeKind.TY_SLICE:
+        let elem_node = ct_build_type_expr(pool, intern, sema, sema.get_type_d0(resolved), node)
+        if elem_node == 0:
+            return 0
+        return pool.add_node(NodeKind.NK_TYPE_SLICE, start, end, elem_node, 0, 0) as i32
+
+    if tk == TypeKind.TY_TUPLE:
+        let extra_start = sema.get_type_d0(resolved)
+        let elem_count = sema.get_type_d1(resolved)
+        let elem_nodes: Vec[i32] = Vec.new()
+        for ei in 0..elem_count:
+            let elem_tid = sema.type_extra.get((extra_start + ei) as i64)
+            let elem_node = ct_build_type_expr(pool, intern, sema, elem_tid, node)
+            if elem_node == 0:
+                return 0
+            elem_nodes.push(elem_node)
+        let new_extra = pool.extra_len()
+        for ei in 0..elem_nodes.len() as i32:
+            pool.add_extra(elem_nodes.get(ei as i64))
+        return pool.add_node(NodeKind.NK_TYPE_TUPLE, start, end, new_extra, elem_count, 0) as i32
+
+    if tk == TypeKind.TY_PTR:
+        let pointee = ct_build_type_expr(pool, intern, sema, sema.get_type_d0(resolved), node)
+        if pointee == 0:
+            return 0
+        return pool.add_node(NodeKind.NK_TYPE_PTR, start, end, pointee, sema.get_type_d1(resolved), sema.get_type_d2(resolved)) as i32
+
+    if tk == TypeKind.TY_REF:
+        let pointee = ct_build_type_expr(pool, intern, sema, sema.get_type_d0(resolved), node)
+        if pointee == 0:
+            return 0
+        return pool.add_node(NodeKind.NK_TYPE_REF, start, end, pointee, sema.get_type_d1(resolved), 0) as i32
+
+    if tk == TypeKind.TY_FN:
+        let param_start = sema.get_type_d0(resolved)
+        let param_count = sema.get_type_d1(resolved)
+        let param_nodes: Vec[i32] = Vec.new()
+        for pi in 0..param_count:
+            let param_tid = sema.type_extra.get((param_start + pi) as i64)
+            let param_node = ct_build_type_expr(pool, intern, sema, param_tid, node)
+            if param_node == 0:
+                return 0
+            param_nodes.push(param_node)
+        let new_extra = pool.extra_len()
+        for pi in 0..param_nodes.len() as i32:
+            pool.add_extra(param_nodes.get(pi as i64))
+        let ret_node = ct_build_type_expr(pool, intern, sema, sema.get_type_d2(resolved), node)
+        if ret_node == 0:
+            return 0
+        return pool.add_node(NodeKind.NK_TYPE_FN, start, end, new_extra, param_count, ret_node) as i32
+
+    if tk == TypeKind.TY_TRAIT_OBJ:
+        let trait_sym = intern.intern(sema.pool_resolve(sema.get_type_d0(resolved)))
+        return pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, end, trait_sym, 0, 0) as i32
+
+    let type_sym = intern.intern(sema.type_name(type_id))
+    pool.add_node(NodeKind.NK_TYPE_NAMED, start, end, type_sym, 0, 0) as i32
+
+fn ct_build_call(pool: &mut AstPool, node: i32, callee: i32, args: Vec[i32]) -> i32:
+    let extra_start = pool.extra_len()
+    for ai in 0..args.len() as i32:
+        pool.add_extra(args.get(ai as i64))
+    pool.add_node(NodeKind.NK_CALL, pool.get_start(node), pool.get_end(node), callee, extra_start, args.len() as i32) as i32
+
+fn ct_build_collection_ctor(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, type_id: i32, node: i32) -> i32:
+    let type_node = ct_build_type_expr(pool, intern, sema, type_id, node)
+    if type_node == 0:
+        return 0
+    let new_sym = intern.intern("new")
+    let callee = pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), type_node, new_sym, 0)
+    let no_args: Vec[i32] = Vec.new()
+    ct_build_call(pool, node, callee as i32, no_args)
+
+fn ct_build_typed_binding(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, name_sym: i32, value: i32, type_id: i32, node: i32, is_mut: i32) -> i32:
+    let type_node = ct_build_type_expr(pool, intern, sema, type_id, node)
+    if type_node == 0:
+        return 0
+    let type_extra = pool.extra_len()
+    pool.add_extra(type_node)
+    let flags = (if is_mut != 0: 1 else: 0) + (type_extra + 1) * 2
+    pool.add_node(NodeKind.NK_LET_BINDING, pool.get_start(node), pool.get_end(node), name_sym, value, flags) as i32
+
+fn ct_build_vec_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+    let tmp_sym = ct_fresh_sym(intern, "__ct_vec_", node)
+    let ctor = ct_build_collection_ctor(pool, intern, sema, value.type_id, node)
+    if ctor == 0:
+        return 0
+    let stmts: Vec[i32] = Vec.new()
+    let tmp_binding = ct_build_typed_binding(pool, intern, sema, tmp_sym, ctor, value.type_id, node, 1)
+    if tmp_binding == 0:
+        return 0
+    stmts.push(tmp_binding)
+    let push_sym = intern.intern("push")
+    for i in 0..value.extra_count:
+        let elem = extras.get((value.extra_start + i) as i64)
+        let elem_node = ct_build_value_tree(pool, intern, sema, elem, node, extras)
+        if elem_node == 0:
+            return 0
+        let recv_ident = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
+        let callee = pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), recv_ident as i32, push_sym, 0)
+        let args: Vec[i32] = Vec.new()
+        args.push(elem_node)
+        stmts.push(ct_build_call(pool, node, callee as i32, args))
+    let stmt_extra = pool.extra_len()
+    for si in 0..stmts.len() as i32:
+        pool.add_extra(stmts.get(si as i64))
+    let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
+    pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
+
+fn ct_build_map_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+    let tmp_sym = ct_fresh_sym(intern, "__ct_map_", node)
+    let ctor = ct_build_collection_ctor(pool, intern, sema, value.type_id, node)
+    if ctor == 0:
+        return 0
+    let stmts: Vec[i32] = Vec.new()
+    let tmp_binding = ct_build_typed_binding(pool, intern, sema, tmp_sym, ctor, value.type_id, node, 1)
+    if tmp_binding == 0:
+        return 0
+    stmts.push(tmp_binding)
+    let insert_sym = intern.intern("insert")
+    for i in 0..value.extra_count:
+        let base = value.extra_start + i * 2
+        let key_node = ct_build_value_tree(pool, intern, sema, extras.get(base as i64), node, extras)
+        let item_node = ct_build_value_tree(pool, intern, sema, extras.get((base + 1) as i64), node, extras)
+        if key_node == 0 or item_node == 0:
+            return 0
+        let recv_ident = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
+        let callee = pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), recv_ident as i32, insert_sym, 0)
+        let args: Vec[i32] = Vec.new()
+        args.push(key_node)
+        args.push(item_node)
+        stmts.push(ct_build_call(pool, node, callee as i32, args))
+    let stmt_extra = pool.extra_len()
+    for si in 0..stmts.len() as i32:
+        pool.add_extra(stmts.get(si as i64))
+    let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
+    pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
+
 fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
     if value.kind == ComptimeValueKind.CV_INT:
         return pool.add_node(
@@ -188,13 +357,16 @@ fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &mut S
     if value.kind == ComptimeValueKind.CV_VOID:
         return ct_empty_block(pool, node)
     if value.kind == ComptimeValueKind.CV_ARRAY or value.kind == ComptimeValueKind.CV_TUPLE:
-        let extra_start = pool.extra_len()
+        let elem_nodes: Vec[i32] = Vec.new()
         for i in 0..value.extra_count:
             let elem = extras.get((value.extra_start + i) as i64)
             let elem_node = ct_build_value_tree(pool, intern, sema, elem, node, extras)
             if elem_node == 0:
                 return 0
-            pool.add_extra(elem_node)
+            elem_nodes.push(elem_node)
+        let extra_start = pool.extra_len()
+        for i in 0..elem_nodes.len() as i32:
+            pool.add_extra(elem_nodes.get(i as i64))
         let out_kind = if value.kind == ComptimeValueKind.CV_ARRAY: NodeKind.NK_ARRAY_LIT else: NodeKind.NK_TUPLE
         return pool.add_node(out_kind, pool.get_start(node), pool.get_end(node), extra_start, value.extra_count, 0) as i32
     if value.kind == ComptimeValueKind.CV_RANGE:
@@ -219,19 +391,28 @@ fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &mut S
         let resolved = sema.resolve_alias(value.type_id)
         if sema.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return 0
-        let name_sym = sema.get_type_d0(resolved)
+        let name_sym = intern.intern(sema.pool_resolve(sema.get_type_d0(resolved)))
         let te_start = sema.get_type_d1(resolved)
         let field_count = sema.get_type_d2(resolved)
-        let struct_extra = pool.extra_len()
+        let field_syms: Vec[i32] = Vec.new()
+        let field_nodes: Vec[i32] = Vec.new()
         for fi in 0..field_count:
-            let field_sym = sema.type_extra.get((te_start + fi * 3) as i64)
+            let field_sym = intern.intern(sema.pool_resolve(sema.type_extra.get((te_start + fi * 3) as i64)))
             let field_value = extras.get((value.extra_start + fi) as i64)
             let field_node = ct_build_value_tree(pool, intern, sema, field_value, node, extras)
             if field_node == 0:
                 return 0
-            pool.add_extra(field_sym)
-            pool.add_extra(field_node)
+            field_syms.push(field_sym)
+            field_nodes.push(field_node)
+        let struct_extra = pool.extra_len()
+        for fi in 0..field_count:
+            pool.add_extra(field_syms.get(fi as i64))
+            pool.add_extra(field_nodes.get(fi as i64))
         return pool.add_node(NodeKind.NK_STRUCT_LIT, pool.get_start(node), pool.get_end(node), name_sym, struct_extra, field_count) as i32
+    if value.kind == ComptimeValueKind.CV_VEC:
+        return ct_build_vec_value_tree(pool, intern, sema, value, node, extras)
+    if value.kind == ComptimeValueKind.CV_MAP:
+        return ct_build_map_value_tree(pool, intern, sema, value, node, extras)
     0
 
 fn ct_eval_truthy(source_ast: AstPool, sema: &mut Sema, diags: &mut DiagnosticList, node: i32) -> i32:
@@ -285,7 +466,7 @@ fn ct_rewrite_comptime_if(source_ast: AstPool, pool: &mut AstPool, sema: &mut Se
     ct_empty_block(pool, wrapper)
 
 fn ct_iter_count(value: ComptimeValue) -> i32:
-    if value.kind == ComptimeValueKind.CV_ARRAY or value.kind == ComptimeValueKind.CV_TUPLE:
+    if value.kind == ComptimeValueKind.CV_ARRAY or value.kind == ComptimeValueKind.CV_TUPLE or value.kind == ComptimeValueKind.CV_VEC:
         return value.extra_count
     if value.kind == ComptimeValueKind.CV_RANGE:
         let span = if value.extra_start != 0: value.data1 - value.data0 + 1 else: value.data1 - value.data0
@@ -298,7 +479,7 @@ fn ct_iter_item_node(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sem
     if iterable.kind == ComptimeValueKind.CV_RANGE:
         let item = comptime_value_int(0, iterable.data0 + index as i64)
         return ct_build_value_tree(pool, intern, sema, item, node, extras)
-    if iterable.kind == ComptimeValueKind.CV_ARRAY or iterable.kind == ComptimeValueKind.CV_TUPLE:
+    if iterable.kind == ComptimeValueKind.CV_ARRAY or iterable.kind == ComptimeValueKind.CV_TUPLE or iterable.kind == ComptimeValueKind.CV_VEC:
         let item = extras.get((iterable.extra_start + index) as i64)
         return ct_build_value_tree(pool, intern, sema, item, node, extras)
     0
@@ -319,6 +500,8 @@ fn ct_try_fold_type_call(pool: &mut AstPool, sema: &mut Sema, intern: &mut Inter
         return node
     let callee = pool.get_data0(node)
     if callee == 0 or pool.kind(callee) != NodeKind.NK_FIELD_ACCESS:
+        return node
+    if intern.resolve(pool.get_data1(callee)) == "new":
         return node
     let recv = pool.get_data0(callee)
     if sema.static_receiver_type_is_known(recv) == 0:

@@ -261,6 +261,13 @@ fn MirBuilder.binding_type(self: MirBuilder, node: i32) -> i32:
         let typed = self.sema.typed_binding_types.get(node).unwrap()
         if typed != 0:
             return typed as i32
+    let flags = self.ast.get_data2(node)
+    let ann_extra = self.sema.local_let_type_ann_extra(flags)
+    if ann_extra >= 0:
+        let ann_node = self.ast.get_extra(ann_extra)
+        let ann_type = self.sema.resolve_type_expr(ann_node)
+        if ann_type != 0:
+            return ann_type as i32
     let rhs = self.ast.get_data1(node)
     let rhs_ty = self.expr_type(rhs)
     if rhs_ty != 0:
@@ -330,6 +337,9 @@ fn MirBuilder.type_receiver_type(self: MirBuilder, node: i32) -> i32:
     // Resolve a type-level receiver expression to its base sema type.
     // Used for intrinsic classification (Vec, HashMap, etc.)
     // Handles: Vec (NodeKind.NK_IDENT), Vec[i32] (NodeKind.NK_INDEX of NodeKind.NK_IDENT)
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+        return self.sema.resolve_type_expr(node) as i32
     if self.ast.kind(node) == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
         if self.sema.named_types.contains(sym):
@@ -2944,13 +2954,15 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
             var gc_is_static = false
             if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
                 let gc_id_sym = self.ast.get_data0(self_expr)
-                if self.sema.named_types.contains(gc_id_sym):
+                if self.lookup_local(gc_id_sym) < 0 and self.sema.named_types.contains(gc_id_sym):
                     gc_is_static = true
+            if self.ast.kind(self_expr) == NodeKind.NK_TYPE_NAMED or self.ast.kind(self_expr) == NodeKind.NK_TYPE_GENERIC or self.ast.kind(self_expr) == NodeKind.NK_TYPE_PTR or self.ast.kind(self_expr) == NodeKind.NK_TYPE_REF or self.ast.kind(self_expr) == NodeKind.NK_TYPE_ARRAY or self.ast.kind(self_expr) == NodeKind.NK_TYPE_SLICE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TUPLE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_FN or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TRAIT_OBJ:
+                gc_is_static = true
             if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
                 let gc_idx_base = self.ast.get_data0(self_expr)
                 if self.ast.kind(gc_idx_base) == NodeKind.NK_IDENT:
                     let gc_idx_sym = self.ast.get_data0(gc_idx_base)
-                    if self.sema.named_types.contains(gc_idx_sym):
+                    if self.lookup_local(gc_idx_sym) < 0 and self.sema.named_types.contains(gc_idx_sym):
                         gc_is_static = true
             if not gc_is_static:
                 gc_args.push(self.lower_expr(self_expr))
@@ -2980,14 +2992,16 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     var is_static_call = false
     if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
         let recv_sym = self.ast.get_data0(self_expr)
-        if self.sema.named_types.contains(recv_sym):
+        if self.lookup_local(recv_sym) < 0 and self.sema.named_types.contains(recv_sym):
             is_static_call = true
+    if self.ast.kind(self_expr) == NodeKind.NK_TYPE_NAMED or self.ast.kind(self_expr) == NodeKind.NK_TYPE_GENERIC or self.ast.kind(self_expr) == NodeKind.NK_TYPE_PTR or self.ast.kind(self_expr) == NodeKind.NK_TYPE_REF or self.ast.kind(self_expr) == NodeKind.NK_TYPE_ARRAY or self.ast.kind(self_expr) == NodeKind.NK_TYPE_SLICE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TUPLE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_FN or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TRAIT_OBJ:
+        is_static_call = true
     // Also detect Vec[i32].method() as static
     if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
         let idx_base = self.ast.get_data0(self_expr)
         if self.ast.kind(idx_base) == NodeKind.NK_IDENT:
             let recv_sym = self.ast.get_data0(idx_base)
-            if self.sema.named_types.contains(recv_sym):
+            if self.lookup_local(recv_sym) < 0 and self.sema.named_types.contains(recv_sym):
                 is_static_call = true
     if not is_static_call:
         arg_nodes.push(self_expr)
