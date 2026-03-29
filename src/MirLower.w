@@ -2116,7 +2116,12 @@ fn MirBuilder.lower_continue(self: MirBuilder, _node: i32) -> i32:
 
 fn MirBuilder.lower_return(self: MirBuilder, node: i32) -> i32:
     let value_expr = self.ast.get_data0(node)
+    let saved_expected = self.expected_type
+    let ret_ty = self.body.local_type_ids.get(0)
+    if ret_ty > 0:
+        self.expected_type = ret_ty
     let ret_op = if value_expr != 0: self.lower_expr(value_expr) else: self.unit_operand()
+    self.expected_type = saved_expected
     let ret_place = self.place_for_local(0)
     self.assign_operand_to_place(ret_place, ret_op, self.ast.get_start(node))
 
