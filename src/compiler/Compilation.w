@@ -1,7 +1,9 @@
 use Ast
+use Diagnostic
 use Resolve
 use InternPool
 use Sema
+use Span
 use Mir
 use MirLower
 use AsyncMir
@@ -70,6 +72,28 @@ fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
         let name = intern.resolve(name_sym)
         let msg = f"[type-names] {stage} decl={di} node={decl as i32} kind={kind_name} name_sym={name_sym} name={name}"
         with_eprintln(msg)
+
+fn compilation_find_fn_decl_index(pool: AstPool, fn_sym: i32) -> i32:
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NodeKind.NK_FN_DECL:
+            continue
+        if pool.get_data0(decl) == fn_sym:
+            return di
+    0 - 1
+
+fn compilation_mir_error_span(zcu: Zcu, pool: AstPool, fn_sym: i32, raw_span: i32) -> Span:
+    let decl_index = compilation_find_fn_decl_index(pool, fn_sym)
+    if decl_index >= 0:
+        let decl = pool.get_decl(decl_index)
+        let file_id = zcu.decl_source_file_id_frontend(decl_index)
+        let start = if raw_span > 0: raw_span else: pool.get_start(decl)
+        var end = if raw_span > 0: raw_span + 1 else: pool.get_end(decl)
+        if end <= start:
+            end = start + 1
+        return Span { file: file_id, start: start, end: end }
+    let start = if raw_span > 0: raw_span else: 0
+    Span { file: 0, start: start, end: start + 1 }
 
 // Transitional orchestration root:
 // owns compiler-facing config/Zcu state while reusing Driver execution per call.
@@ -341,6 +365,16 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
         return zcu.last_mir_module
 
     let mir_mod: MirModule = lower_module(sema, active_pool, zcu.pool)
+    let mir_err = validate_typed_mir_module(mir_mod)
+    if mir_validation_has_error(mir_err):
+        let diag_span = compilation_mir_error_span(zcu, active_pool, mir_err.fn_sym, mir_err.span)
+        sema.diags.emit(Diagnostic.err("invalid MIR before codegen: " ++ mir_err.message, diag_span))
+        zcu.sync_from_sema(sema)
+        compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
+        zcu.render_all_diagnostics_frontend()
+        zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
+        self.zcu = zcu
+        return zcu.last_mir_module
     let async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, zcu.pool, sema, zcu.diagnostics)
     zcu.diagnostics = async_artifacts.diags
     compilation_dump_type_names("post-mir-lower", active_pool, zcu.pool)
