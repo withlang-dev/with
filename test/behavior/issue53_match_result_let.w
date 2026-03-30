@@ -54,4 +54,4 @@ fn main:
     test_match_result_ok()
     test_two_returns()
     test_option_return()
-    println("ok")
+    print("ok")

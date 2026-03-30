@@ -114,4 +114,4 @@ fn main:
     test_side_effects()
     test_void_function()
     test_gcd()
-    println("ok")
+    print("ok")

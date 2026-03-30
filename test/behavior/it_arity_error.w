@@ -5,4 +5,4 @@ fn apply2(f: fn(i32, i32) -> i32) -> i32:
 
 fn main:
     let r = apply2(it + 1)
-    println("{r}")
+    print("{r}")

@@ -12,8 +12,8 @@ use Diagnostic
 use InternPool
 use render
 
-extern fn print(s: str) -> void
-extern fn with_eprintln(s: str) -> void
+extern fn with_write(s: str) -> void
+extern fn with_eprint(s: str) -> void
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn int_to_string(n: i32) -> str
@@ -329,7 +329,7 @@ fn Sema.debug_unknown_type(self: Sema, sym: i32, node: i32, context: str):
     let name = self.pool_resolve_symbol(sym)
     let prim = self.primitive_type_by_sym(sym)
     let named = if self.named_types.contains(sym): 1 else: 0
-    with_eprintln(f"[unknown-type] {context} sym={sym} name={name} prim={prim} named={named} collecting={self.collecting_types} node_kind={self.ast.kind(node)}")
+    with_eprint(f"[unknown-type] {context} sym={sym} name={name} prim={prim} named={named} collecting={self.collecting_types} node_kind={self.ast.kind(node)}")
 
 fn Sema.pool_resolve_symbol(self: Sema, sym: i32) -> str:
     if sym <= 0 or sym >= self.pool.symbol_texts.len() as i32:
@@ -933,7 +933,7 @@ fn Sema.extract_fn_param_name(self: Sema, node: i32, param_index: i32) -> str:
 
 fn Sema.add_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
     if self.types_frozen != 0:
-        with_eprintln("BUG: Sema.add_type called after freeze_types")
+        with_eprint("BUG: Sema.add_type called after freeze_types")
     let id = self.type_kinds.len() as i32
     self.type_kinds.push(kind)
     self.type_d0.push(d0)
@@ -1895,7 +1895,7 @@ fn Sema.is_copy(self: Sema, tid: TypeId) -> i32:
             let name = self.get_type_d0(resolved)
             if self.has_drop_method(name):
                 if sema_debug_move_enabled() != 0:
-                    with_eprintln("[noncopy] type=" ++ self.pool_resolve(name) ++ " reason=drop")
+                    with_eprint("[noncopy] type=" ++ self.pool_resolve(name) ++ " reason=drop")
                 out = 0
             else:
                 let struct_te_start = self.get_type_d1(resolved)
@@ -1905,7 +1905,7 @@ fn Sema.is_copy(self: Sema, tid: TypeId) -> i32:
                     if self.is_copy(ft) == 0:
                         if sema_debug_move_enabled() != 0:
                             let field_name = self.type_extra.get((struct_te_start + fi * 3) as i64)
-                            with_eprintln(
+                            with_eprint(
                                 "[noncopy] type=" ++ self.pool_resolve(name) ++
                                 " field=" ++ self.pool_resolve(field_name) ++
                                 " field_ty=" ++ self.type_name(ft)

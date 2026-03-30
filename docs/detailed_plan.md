@@ -261,19 +261,19 @@ Files: `src/CCodegen.w`
 
 ---
 
-## Phase II-6: Tooling — Mostly DONE
+## Phase II-6: Tooling — DONE ✓
 
 ### `with fmt` — Code Formatter — DONE ✓
 
 Implemented in main.w (commit `e72847c`). Supports `-w` (write)
 and `-l` (list) modes. AST round-trip formatting.
 
-### `with bench` — Benchmarking
+### `with bench` — Benchmarking — DONE ✓
 
-**Current state:** No command handler.
-**Approach:** `@[bench]` attribute on functions, iteration harness.
-**Files:** `src/main.w`, `src/Parser.w` (attribute)
-**Complexity:** Low-Medium
+`@[bench]` attribute + `bench_*` naming convention. Go-style
+auto-calibration (ramp up until ~1s elapsed). Reports name, N, ns/op.
+`--filter` support. `lib/test/bench.w` provides the `Bench` type.
+Commit: `6ef5b8b`.
 
 ### `with test` improvements — DONE ✓
 
@@ -301,6 +301,6 @@ signature display on arity mismatch, audit for missing locations.
 | 6 | Phase 6.2 (pre-intern) | Performance | Medium | **DONE** ✓ |
 | 7 | P2 (i32 fallbacks) | Correctness | Medium-High | **DONE** ✓ |
 | 8 | P11 (split Codegen+Sema) | Maintainability | Large | **DONE** ✓ |
-| 9 | Phase II-6 (tooling) | User experience | Large | **Mostly DONE** |
+| 9 | Phase II-6 (tooling) | User experience | Large | **DONE** ✓ |
 | 10 | Phase II-2 (generics) | Correctness | Large | **DONE** ✓ |
 | 11 | Phase II-5 (C backend) | Portability | High | **Intrinsics DONE** |

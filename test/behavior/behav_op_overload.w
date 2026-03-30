@@ -36,4 +36,4 @@ fn main:
     test_comparison_ops()
     test_bool_ops()
     test_string_concat()
-    println("ok")
+    print("ok")

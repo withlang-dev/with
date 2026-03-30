@@ -41,4 +41,4 @@ fn main:
     test_debug_str_empty()
     test_debug_str_in_context()
     test_debug_int_in_context()
-    println("ok")
+    print("ok")

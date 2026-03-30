@@ -42,4 +42,4 @@ fn main:
     test_exclusive_for()
     test_inclusive_vs_exclusive()
     test_inclusive_range_in_match()
-    println("ok")
+    print("ok")

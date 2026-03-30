@@ -255,4 +255,4 @@ fn main:
     test_multi_error_recovery_golden()
     test_c_import_malformed_syntax_matrix()
     test_chained_sugar_precedence_and_associativity()
-    println("ok")
+    print("ok")

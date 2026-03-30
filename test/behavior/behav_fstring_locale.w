@@ -27,4 +27,4 @@ fn main:
     test_negative_int_locale()
     test_bool_locale()
     test_str_passthrough()
-    println("ok")
+    print("ok")

@@ -120,4 +120,4 @@ fn test_imported_projection_matrix:
 fn main:
     test_local_projection_matrix()
     test_imported_projection_matrix()
-    println("ok")
+    print("ok")

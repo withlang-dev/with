@@ -47,4 +47,4 @@ fn main:
         "  |         ^\n"
     assert(rendered == expected)
 
-    println("ok")
+    print("ok")

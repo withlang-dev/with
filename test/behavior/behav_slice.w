@@ -46,4 +46,4 @@ fn main:
     test_array_in_loop()
     test_vec_as_dynamic_slice()
     test_empty_array()
-    println("ok")
+    print("ok")

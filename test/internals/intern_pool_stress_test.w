@@ -41,4 +41,4 @@ fn main:
     assert(p1.symbol_count() == unique)
     assert(p2.symbol_count() == unique)
 
-    println("ok")
+    print("ok")

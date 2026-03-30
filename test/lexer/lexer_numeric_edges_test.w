@@ -31,4 +31,4 @@ fn main:
     assert(t2.get_tag(0) == TokenKind.TK_FLOAT_LIT())
     assert(t2.get_tag(1) == TokenKind.TK_EOF())
 
-    println("ok")
+    print("ok")

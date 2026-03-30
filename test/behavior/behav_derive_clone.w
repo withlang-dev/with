@@ -13,4 +13,4 @@ fn main:
     assert(p.y == 20)
     assert(q.x == 10)
     assert(q.y == 20)
-    println("ok")
+    print("ok")

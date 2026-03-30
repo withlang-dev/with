@@ -27,4 +27,4 @@ fn main:
         .Ok(v) => assert(v == 1)
         .Err(_) => assert(false)
     let _ = value
-    println("ok")
+    print("ok")

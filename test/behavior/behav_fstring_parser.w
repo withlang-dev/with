@@ -67,4 +67,4 @@ fn main:
     test_adjacent_holes()
     test_negative_in_hole()
     test_bool_in_hole()
-    println("ok")
+    print("ok")

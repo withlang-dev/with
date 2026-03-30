@@ -505,7 +505,7 @@ fn first(xs: &Vec[i32]) -> Option[&i32]:
 fn caller(xs: &Vec[i32]):
     let r = first(xs)        // OK: ephemeral local binding
     match r
-        Some(v) => println(v) // OK: local use
+        Some(v) => print(v) // OK: local use
         None    => ()
 
 // OK: wraps ephemeral return in another ephemeral return
@@ -532,7 +532,7 @@ not until the end of the enclosing block.
 ```
 var x = 5
 let r = &x
-println(r)       // last use of r; borrow ends here
+print(r)       // last use of r; borrow ends here
 x = 10           // OK: no active borrow
 ```
 
@@ -611,7 +611,7 @@ When a function takes `&T` and you pass an owned `T`, the compiler
 automatically borrows it:
 
 ```
-fn print_user(u: &User): println(u.name)
+fn print_user(u: &User): print(u.name)
 
 let alice = User { name: "Alice" }
 print_user(alice)           // compiler inserts &alice automatically
@@ -646,7 +646,7 @@ trait Logger:
     fn log(self: &Self, msg: &str)
 type ConsoleLog {}
 impl Logger for ConsoleLog:
-    fn log(self: &Self, msg: &str): println(msg)
+    fn log(self: &Self, msg: &str): print(msg)
 
 fn process(logger: &dyn Logger): logger.log("processing")
 
@@ -1493,7 +1493,7 @@ fn swap[A, B](pair: (A, B)) -> (B, A):
 
 // HashMap iteration yields (K, V) tuples
 for (key, value) in map:
-    println(f"{key}: {value}")
+    print(f"{key}: {value}")
 
 // Functions can return multiple values naturally
 fn divmod(a: i32, b: i32) -> (i32, i32):
@@ -1631,7 +1631,7 @@ this, but `with fmt` may suggest it.
 ### 4.10 Implicit Default Return
 
 When a function's return type implements the `Default` trait and the
-body's last expression is `Unit` (a statement like `println`), the
+body's last expression is `Unit` (a statement like `print`), the
 compiler implicitly returns `T.default()`.
 
 ```
@@ -1639,14 +1639,14 @@ compiler implicitly returns `T.default()`.
 fn demo_strings -> i32:
     let hello = "Hello, C interop!"
     puts(hello)
-    println(f"strlen = {strlen(hello)}")
+    print(f"strlen = {strlen(hello)}")
     0                                      // annoying boilerplate
 
 // After: implicit default return
 fn demo_strings -> i32:
     let hello = "Hello, C interop!"
     puts(hello)
-    println(f"strlen = {strlen(hello)}")
+    print(f"strlen = {strlen(hello)}")
     // implicitly returns 0 (i32.default())
 ```
 
@@ -1684,7 +1684,7 @@ type Config {
 }
 
 fn make_config -> Config:
-    println("Creating default config...")
+    print("Creating default config...")
     // implicitly returns Config.default()
 ```
 
@@ -2402,11 +2402,11 @@ when the function returns `Unit` (void). The colon `:` introduces
 the body — either inline on the same line or indented on the next.
 
 ```
-fn greet: println("hello")               // no args, no return type
-fn greet(): println("hello")             // also legal, parens optional
+fn greet: print("hello")               // no args, no return type
+fn greet(): print("hello")             // also legal, parens optional
 fn get_pi -> f64: 3.14159                // no args, returns f64
 fn double(x: i32) -> i32: x * 2         // args + return type
-fn log(msg: str): println(msg)           // args, returns Unit
+fn log(msg: str): print(msg)           // args, returns Unit
 ```
 
 ### 9.1a Default Function Parameters
@@ -2415,7 +2415,7 @@ Parameters may have default values, specified with `= expr` after the type annot
 
 ```
 fn greet(name: str, greeting: str = "Hello"):
-    println(f"{greeting}, {name}!")
+    print(f"{greeting}, {name}!")
 
 greet("Alice")              // greeting defaults to "Hello"
 greet("Bob", "Hey")         // explicit override
@@ -2430,7 +2430,7 @@ greet("Bob", "Hey")         // explicit override
 ```
 fn assert_eq(left: i32, right: i32, file: str = __FILE__, line: u32 = __LINE__):
     if left != right:
-        println(f"assertion failed at {file}:{line}")
+        print(f"assertion failed at {file}:{line}")
         abort()
 ```
 
@@ -2485,7 +2485,7 @@ marked `@[tailrec]`. Non-tail-position recursive calls in a
 ```
 x => x + 1
 (x, y) => x * y
-() => println("hello")
+() => print("hello")
 ```
 
 The `=>` token means "produces this value" and is used in both closures
@@ -2609,7 +2609,7 @@ data |> parse |> validate? |> transform |> summarize
 
 **Backward application:**
 ```
-println <| f"{key}: {value}"
+print <| f"{key}: {value}"
 ```
 
 `f <| x` desugars to `f(x)`. Right-associative. Useful for avoiding
@@ -2810,7 +2810,7 @@ let [first, ..rest] = items else return Err(.Empty)
 **`if let`:**
 ```
 if let Some(user) = find_user(id):
-    println(f"found: {user.name}")
+    print(f"found: {user.name}")
 ```
 
 **Chained `if let`:** Multiple conditional bindings in a single `if`,
@@ -2889,7 +2889,7 @@ for (id, entity) in world.entities():
     process(id, entity)
 
 for { name, age, .. } in users:
-    println(f"{name}: {age}")
+    print(f"{name}: {age}")
 ```
 
 Exhaustiveness depends on position:
@@ -2935,11 +2935,11 @@ let items: Vec[(str, i32)] = vec![("alice", 1), ("bob", 2)]
 // .iter() yields &(str, i32)
 // Destructuring binds key: &str, val: &i32 automatically
 for (key, val) in items:
-    println(f"{key}: {val}")
+    print(f"{key}: {val}")
 
 // Equivalent explicit form (also valid but unnecessary):
 for &(key, val) in items:
-    println(f"{key}: {val}")
+    print(f"{key}: {val}")
 
 // Works with match on borrowed enums:
 fn describe(opt: &Option[String]) -> &str:
@@ -3177,7 +3177,7 @@ always start with the `in` keyword.
 // Basic membership
 let vowels = ['a', 'e', 'i', 'o', 'u']
 if ch in vowels:
-    println("vowel")
+    print("vowel")
 
 // String search
 if "error" in log_line:
@@ -3604,7 +3604,7 @@ Explicit bounds remain available as optional contracts:
 
 ```
 fn debug[T: Show + Hash](x: &T):
-    println(f"{x.show()} (hash: {x.hash()})")
+    print(f"{x.show()} (hash: {x.hash()})")
 ```
 
 Use bounds when they improve the public API contract or produce
@@ -3621,7 +3621,7 @@ fn display[T](x: T) where T: Printable:
     print(x.to_string())
 
 fn multi[T](x: T) where T: Show, T: Hash:
-    println(f"{x.show()} (hash: {x.hash()})")
+    print(f"{x.show()} (hash: {x.hash()})")
 ```
 
 `where` clauses are equivalent to inline bounds (`T: Trait` in the generic
@@ -3809,7 +3809,7 @@ satisfying a bound:
 
 ```
 impl[T: Display] Printable for T:
-    fn print(self: &Self): println(self.display())
+    fn print(self: &Self): print(self.display())
 ```
 
 The compiler checks for overlaps between blanket and direct impls to prevent
@@ -4096,7 +4096,7 @@ structural representation of a value. See §15.4.7 for full details.
 type Point { x: i32, y: i32 }
 
 let p = Point { x: 1, y: 2 }
-println(f"{p:?}")    // prints "Point { x: 1, y: 2 }"
+print(f"{p:?}")    // prints "Point { x: 1, y: 2 }"
 ```
 
 Debug formatting is generated inline by the compiler at compile time
@@ -4141,7 +4141,7 @@ some_struct.callback = x => x // stored in a field: escaping
 The following are **non-escaping**:
 
 ```
-items.for_each(x => println(x))      // direct argument: non-escaping
+items.for_each(x => print(x))      // direct argument: non-escaping
 items |> filter(x => x > 0)          // direct argument: non-escaping
 with lock.read() as data:           // with block body: non-escaping
     data.iter() |> map(x => x + 1)   // direct argument: non-escaping
@@ -4231,7 +4231,7 @@ unambiguous type inference — the compiler knows exactly what type
 ```
 // OK: Vec[i32]'s iterator yields &i32
 for x in my_vec:
-    println(x)           // x: &i32, unambiguous
+    print(x)           // x: &i32, unambiguous
 
 // ERROR: conflicting Iter implementations
 impl Iter[u8] for MyBuffer: ...
@@ -4433,7 +4433,7 @@ gen fn ok_generator -> str:
     let s = "hello".to_owned()
     yield s.clone()      // OK: yields an owned value
     let r = &s           // OK: r does not cross a yield
-    println(r)
+    print(r)
 ```
 
 This restriction does NOT apply to `async fn` — fibers have real
@@ -4484,7 +4484,7 @@ for item in collection:
     process(item)
 
 for (i, item) in collection.enumerate():
-    println(f"{i}: {item}")
+    print(f"{i}: {item}")
 ```
 
 **Implicit iteration:** When the expression after `in` implements
@@ -4760,7 +4760,7 @@ async scope s =>
     )
     s.track(async:
         for msg in rx:
-            println(msg)
+            print(msg)
     )
 ```
 
@@ -5047,9 +5047,9 @@ branch of the first to complete. Remaining expressions are cancelled.
 
 ```
 select await
-    msg = rx_fast.recv() => println(f"fast: {msg}")
-    msg = rx_slow.recv() => println(f"slow: {msg}")
-    _ = timeout(1.secs()) => println("timeout")
+    msg = rx_fast.recv() => print(f"fast: {msg}")
+    msg = rx_slow.recv() => print(f"slow: {msg}")
+    _ = timeout(1.secs()) => print("timeout")
 ```
 
 Each branch has the form `pattern = async_expr => body`. The runtime
@@ -5256,7 +5256,7 @@ Because fibers have real stacks, references across `await` are safe:
 async fn process(data: &mut Vec[i32]):
     let first = &data[0]
     some_io().await              // fiber suspends; reference still valid
-    println(first)               // safe to use
+    print(first)               // safe to use
     data.push(42)
 ```
 
@@ -5584,7 +5584,7 @@ tools, not alternatives.
 ```
 async fn main:
     let listener = net.listen("0.0.0.0:8080").await
-    println("Listening on :8080")
+    print("Listening on :8080")
 
     loop:
         let conn = listener.accept().await
@@ -5725,7 +5725,7 @@ is an implementation detail or FFI-specific.
 
 ```
 type User { name: str, email: str }    // owned strings in structs
-fn greet(name: &str): println(f"Hello, {name}")  // borrowed for reading
+fn greet(name: &str): print(f"Hello, {name}")  // borrowed for reading
 fn get_name -> str: "Alice"            // return owned string
 ```
 
@@ -5784,7 +5784,7 @@ fn register(name: str): ...
 register("Alice")                                          // just works
 
 // Passing to fn(&str) auto-borrows (no allocation):
-fn greet(name: &str): println(f"hello {name}")
+fn greet(name: &str): print(f"hello {name}")
 greet("world")                               // OK: str auto-borrows to &str
 
 // Explicit &str for zero-cost static reference:
@@ -6044,6 +6044,53 @@ let s = f"value: {x}"
 // Error:
 let s = "value: " ++ x    // error if x is not str
 ```
+
+### 15.7 Output Functions
+
+Four output functions. `print` and `eprint` append a newline.
+`write` and `ewrite` do not.
+
+| Function | Target | Newline |
+|----------|--------|---------|
+| `print(s)` | stdout | Always |
+| `eprint(s)` | stderr | Always |
+| `write(s)` | stdout | Never |
+| `ewrite(s)` | stderr | Never |
+
+```
+print("hello")               // stdout: hello\n
+print(f"count: {n}")         // stdout: count: 42\n
+eprint("warning: not found") // stderr: warning: not found\n
+write("loading...")           // stdout: loading... (no newline)
+write(f"\r{pct}%")           // overwrite current line
+ewrite("progress: ")          // stderr, no newline
+```
+
+All four take a single `str` argument. Formatting is done via
+f-strings, not via the output function itself. There are no format
+arguments, no varargs, no separator or end parameters.
+
+```
+let name = "alice"
+let score = 42
+print(f"{name}: {score}")    // alice: 42\n
+
+// Multiple values: use f-strings, not multiple arguments
+print(f"{x} {y} {z}")       // not print(x, y, z)
+```
+
+**`println` and `eprintln` do not exist.** `print` and `eprint`
+always append a newline. Use `write` when raw output without a
+newline is needed.
+
+**Design rationale:**
+- The overwhelmingly common case is line-terminated output
+- Forgetting a newline produces garbled terminal output; forgetting
+  to suppress one is harmless
+- The `ln` suffix is visual noise on nearly every print call
+- F-strings handle all formatting — no need for `sep`/`end` parameters
+- `write`/`ewrite` are the explicit opt-in for no-newline output
+  (progress bars, prompts, terminal control)
 
 ---
 
@@ -6570,8 +6617,8 @@ With provides two built-in magic constants, evaluated at the point of use:
 | `__LINE__` | `u32` | Line number of the expression |
 
 ```
-println(__FILE__)    // prints "src/main.w"
-println(__LINE__)    // prints the current line number
+print(__FILE__)    // prints "src/main.w"
+print(__LINE__)    // prints the current line number
 ```
 
 These are especially useful as default parameter values for assertion
@@ -6579,7 +6626,7 @@ and logging functions:
 
 ```
 fn log(msg: str, file: str = __FILE__, line: u32 = __LINE__):
-    println(f"[{file}:{line}] {msg}")
+    print(f"[{file}:{line}] {msg}")
 
 log("hello")  // prints "[src/main.w:5] hello"
 ```
@@ -6626,7 +6673,7 @@ parameters directly. Inside comptime context, types are objects:
 ```
 comptime fn print_fields[T: type]:
     for field in T.fields():           // T is a type object
-        println(f"field: {field.name}, size: {field.size}")
+        print(f"field: {field.name}, size: {field.size}")
 ```
 
 The `TypeInfo` module provides the same API for non-generic contexts:
@@ -6893,7 +6940,7 @@ use math.vector.{Vec3, dot, cross}
 - `Unit`
 - `Vec[T]`, `String` / `str`
 - Traits: `Eq`, `Ord`, `Hash`, `Debug`, `Display`, `Default`, `Drop`, `Scoped`, `ScopedMut`
-- `print`, `println`, `eprint`, `eprintln`
+- `print`, `eprint`
 - `assert`, `assert_eq`, `assert_ne`, `require`, `check`, `panic`, `unreachable`, `todo`
 - `drop[T](val: T)` — explicitly drop a value to trigger cleanup
 
@@ -6970,8 +7017,8 @@ what users import.
 | `Writer` trait | Write bytes to a destination |
 | `BufReader[R]` | Buffered reader wrapper |
 | `BufWriter[W]` | Buffered writer wrapper |
-| `print(s)`, `println(s)` | Write to stdout (prelude) |
-| `eprint(s)`, `eprintln(s)` | Write to stderr |
+| `print(s)`, `print(s)` | Write to stdout (prelude) |
+| `eprint(s)`, `eprint(s)` | Write to stderr |
 
 Replaces: `stdio.h` (printf, fread, fwrite, stdin, stdout, stderr)
 
@@ -7384,7 +7431,7 @@ that doesn't need a heap allocator or OS:
 | `Vec[T]` | Yes | Heap-allocated |
 | `HashMap`, `HashSet` | Yes | Heap-allocated |
 | `Box[T]` | Yes | Heap-allocated |
-| `println`, `print` | Yes | Needs stdout |
+| `print`, `eprint`, `write`, `ewrite` | Yes | Needs stdout/stderr |
 | `std.io`, `std.fs` | Yes | Needs OS |
 | `std.net` | Yes | Needs OS |
 | `async fn`, `.await` | Yes | Needs fiber runtime |
@@ -7770,7 +7817,7 @@ leftover from refactoring.
 // ERROR:
 fn example -> i32:
     return 42
-    println("hello")    // unreachable
+    print("hello")    // unreachable
 
 // ERROR:
 for x in items:
@@ -8046,7 +8093,7 @@ fn test:
 fn test:
     let x = 42
     let r = &x
-    println(r)
+    print(r)
 
 // FAIL: reference in struct
 type Bad { data: &i32 }        // ERROR
@@ -8061,13 +8108,13 @@ fn test:
 fn test:
     let x = 42
     let r = &x
-    vec![1, 2, 3].for_each(item => println(f"{item} {r}"))
+    vec![1, 2, 3].for_each(item => print(f"{item} {r}"))
 
 // FAIL: escaping closure captures ref
 fn test:
     let x = 42
     let r = &x
-    thread.spawn_os(() => println(r))   // ERROR
+    thread.spawn_os(() => print(r))   // ERROR
 ```
 
 ### 25.3 Returning References (Section 3.4)
@@ -8080,7 +8127,7 @@ fn first(xs: &Vec[i32]) -> Option[&i32]:
 fn test:
     let v = vec![1, 2, 3]
     match first(&v)
-        Some(x) => println(x)
+        Some(x) => print(x)
         None    => ()
 
 // PASS: ephemeral to owned conversion
@@ -8095,7 +8142,7 @@ fn owned(user: &User) -> String: get_name(user).to_string()
 fn test:
     var x = 5
     let r = &x
-    println(r)
+    print(r)
     x = 10           // OK
 
 // FAIL: mutation while borrow active
@@ -8103,7 +8150,7 @@ fn test:
     var x = 5
     let r = &x
     x = 10           // ERROR
-    println(r)
+    print(r)
 
 // PASS: mutable then shared
 fn test:
@@ -8111,7 +8158,7 @@ fn test:
     let r = &mut x
     *r = 10          // last use
     let s = &x       // OK
-    println(s)
+    print(s)
 ```
 
 ### 25.5 Disjoint Field Borrowing (Section 3.6)
@@ -8149,7 +8196,7 @@ fn test(p: &mut Pair):
 // PASS: ephemeral local
 fn test:
     let v = "hello".as_view()
-    println(v)
+    print(v)
 
 // FAIL: ephemeral in struct
 type Bad { view: StrView }      // ERROR
@@ -8175,7 +8222,7 @@ fn test(lock: &Mutex[HashMap[str, i32]]):
 // PASS: multi
 fn test(a: &RwLock[Vec[i32]], b: &RwLock[Vec[i32]]):
     with a.read() as xs, b.read() as ys:
-        println(xs.len() + ys.len())
+        print(xs.len() + ys.len())
 
 // PASS: expression returning owned
 fn test(lock: &Mutex[HashMap[str, i32]]) -> Option[i32]:
@@ -8304,8 +8351,8 @@ fn load(path: &str) -> Result[Ast, AppError]:
 // PASS: match converted error
 fn handle(e: AppError):
     match e
-        AppError.Io(io)    => println(f"io: {io}")
-        AppError.Parse(pe) => println(f"parse: {pe}")
+        AppError.Io(io)    => print(f"io: {io}")
+        AppError.Parse(pe) => print(f"parse: {pe}")
 
 // FAIL: non-exhaustive
 fn bad(e: AppError):
@@ -8419,7 +8466,7 @@ fn classify(day: Day) -> str:
 
 // PASS: if-let
 fn test(opt: Option[i32]):
-    if let Some(x) = opt: println(x)
+    if let Some(x) = opt: print(x)
 
 // PASS: range
 fn category(code: i32) -> str:
@@ -8572,7 +8619,7 @@ fn regular_function:
     // task is Task[Result[String, IoError]]
     // can store it, pass it around
     let result = task.await
-    println(result)
+    print(result)
 
 // WARNING: let _ = ... immediately CANCELS the task
 fn bad_fire_and_forget:
@@ -8782,7 +8829,7 @@ fn test:
 fn test:
     let pairs = vec![(1, "a"), (2, "b")]
     for (num, letter) in pairs:
-        println(f"{num}: {letter}")
+        print(f"{num}: {letter}")
 ```
 
 ### 25.26 Enum Constructor Imports (Section 4.4, 18.2)
@@ -8854,34 +8901,34 @@ fn chain -> Result[User, DbError]:
 ### 25.27c Implicit Default Return (Section 4.10)
 
 ```
-// PASS: i32 function ending with println — returns 0
+// PASS: i32 function ending with print — returns 0
 fn demo -> i32:
-    println("hello")
+    print("hello")
     // implicit 0
 
 // PASS: bool function ending with statement — returns false
 fn setup -> bool:
-    println("initializing...")
+    print("initializing...")
     // implicit false
 
 // PASS: f64 function ending with statement — returns 0.0
 fn measure -> f64:
-    println("measuring...")
+    print("measuring...")
     // implicit 0.0
 
 // PASS: Option[T] function ending with statement — returns None
 fn maybe_find -> Option[i32]:
-    println("searching...")
+    print("searching...")
     // implicit None
 
 // PASS: explicit return still works
 fn explicit_return -> i32:
-    println("hello")
+    print("hello")
     42                       // not Unit — returned as-is
 
 // FAIL: return type without Default — type mismatch
 fn bad -> SomeTypeWithoutDefault:
-    println("oops")
+    print("oops")
     // error: last expression is Unit but return type
     // SomeTypeWithoutDefault does not implement Default
 
@@ -8890,7 +8937,7 @@ fn bad -> SomeTypeWithoutDefault:
 type Config { port: i32, debug: bool }
 
 fn make_config -> Config:
-    println("creating config...")
+    print("creating config...")
     // implicit Config { port: 0, debug: false }
 
 // PASS: composes with implicit Ok wrapping
@@ -9018,24 +9065,24 @@ fn test:
 // FAIL: unreachable code after return
 fn test -> i32:
     return 42
-    println("hello")             // ERROR: unreachable
+    print("hello")             // ERROR: unreachable
 
 // FAIL: unreachable code after break
 fn test:
     for x in 0..10:
         break
-        println("hello")        // ERROR: unreachable
+        print("hello")        // ERROR: unreachable
 
 // FAIL: unreachable code after continue
 fn test:
     for x in 0..10:
         continue
-        println("hello")        // ERROR: unreachable
+        print("hello")        // ERROR: unreachable
 
 // PASS: conditionally reachable code
 fn test(flag: bool) -> i32:
     if flag then return 42
-    println("still reachable")   // OK: return is conditional
+    print("still reachable")   // OK: return is conditional
     0
 ```
 
@@ -9936,10 +9983,10 @@ async fn test:
 async fn test:
     async scope s =>
         s.track(async:
-            println("hello from fiber 1")
+            print("hello from fiber 1")
         )
         s.track(async:
-            println("hello from fiber 2")
+            print("hello from fiber 2")
         )
 
 // PASS: async: block captures variables
@@ -9991,7 +10038,7 @@ impl Drop for Handle:
 type Wrapper { name: String, handle: Handle }
 impl Drop for Wrapper:
     fn drop(self: Self):
-        println(f"dropping {self.name}")
+        print(f"dropping {self.name}")
         // after this returns, Handle::drop runs for self.handle
         // then String::drop runs for self.name
 
@@ -10728,10 +10775,10 @@ fn test:
 fn test:
     let v = Vec.new()     // ERROR: Vec requires alloc
 
-// FAIL: println requires std
+// FAIL: print requires std
 // @[cfg(no_std)]
 fn test:
-    println("hello")      // ERROR: println requires std (stdout)
+    print("hello")      // ERROR: print requires std (stdout)
 
 // FAIL: str literal is &str in no_std (no allocator for owned str)
 // @[cfg(no_std)]
@@ -10939,7 +10986,7 @@ optimization.
 
 Implement the standard library module map defined in §18.6:
 
-**Phase 3a (Core):** `std.io` (Reader, Writer, print/println),
+**Phase 3a (Core):** `std.io` (Reader, Writer, print/eprint/write),
 `std.fs` (File, read_file, write_file), `std.mem` (size_of,
 align_of, copy), `std.fmt` (Display, Debug, format),
 `std.collections` (Vec, HashMap, HashSet, SlotMap, Handle),

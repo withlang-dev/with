@@ -30,4 +30,4 @@ fn main:
     test_debug_struct_basic()
     test_debug_struct_with_str()
     test_debug_struct_in_context()
-    println("ok")
+    print("ok")

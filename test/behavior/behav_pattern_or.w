@@ -16,4 +16,4 @@ fn main:
     assert(classify(5) == "medium")
     assert(classify(6) == "medium")
     assert(classify(7) == "large")
-    println("ok")
+    print("ok")

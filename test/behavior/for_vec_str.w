@@ -12,4 +12,4 @@ fn main:
         count = count + 1
 
     assert(count == 2)
-    println("ok")
+    print("ok")

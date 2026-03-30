@@ -30,4 +30,4 @@ fn main:
     assert(t5.get_tag(0) == TokenKind.TK_STRING_LIT())
     assert(t5.get_tag(1) == TokenKind.TK_EOF())
 
-    println("ok")
+    print("ok")

@@ -6,4 +6,4 @@ fn main:
     v.push(3)
     v.push(4)
     let sum = v.fold(0, (acc, x) => acc + x)
-    println(int_to_string(sum))
+    print(int_to_string(sum))

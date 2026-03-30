@@ -35,4 +35,4 @@ fn main:
     let r6 = apply(x => constant, 999)
     assert(r6 == 42)
 
-    println("ok")
+    print("ok")

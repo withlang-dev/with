@@ -43,4 +43,4 @@ fn main:
     check_vec_str()
     check_both()
     check_hashmap()
-    println("ok")
+    print("ok")

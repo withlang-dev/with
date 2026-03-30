@@ -10,4 +10,4 @@ fn extract(v: Val) -> i32:
 fn main:
     let x: Val = Num(42)
     let r = extract(x)
-    println("val=" ++ int_to_string(r))
+    print("val=" ++ int_to_string(r))

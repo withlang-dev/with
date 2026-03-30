@@ -4,7 +4,7 @@
 use std.tls
 use std.net
 
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 extern fn int_to_string(n: i32) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 

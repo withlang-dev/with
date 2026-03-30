@@ -35,4 +35,4 @@ fn main:
     }, 7, 9)
     assert(vars.v7 == 9)
     assert(vars.v2 == 0)
-    println("ok")
+    print("ok")

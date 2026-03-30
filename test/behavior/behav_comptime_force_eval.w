@@ -14,4 +14,4 @@ fn main:
     assert(FIB7 == 13)
     assert(MIXED == 6)
     assert(local_sum == 42)
-    println("ok")
+    print("ok")

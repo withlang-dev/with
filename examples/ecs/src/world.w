@@ -104,12 +104,12 @@ extend World:
     // --- Debug ---
 
     fn print_stats(self: &World):
-        println("=== World Stats ===")
-        println("  Entities:       {self.entities.len()}")
-        println("  Transforms:     {self.transforms.len()}")
-        println("  Velocities:     {self.velocities.len()}")
-        println("  Colliders:      {self.colliders.len()}")
-        println("  Sprites:        {self.sprites.len()}")
-        println("  Input states:   {self.input_states.len()}")
-        println("  Frame:          {self.frame}")
-        println("  Time:           {self.time:.2}s")
+        print("=== World Stats ===")
+        print("  Entities:       {self.entities.len()}")
+        print("  Transforms:     {self.transforms.len()}")
+        print("  Velocities:     {self.velocities.len()}")
+        print("  Colliders:      {self.colliders.len()}")
+        print("  Sprites:        {self.sprites.len()}")
+        print("  Input states:   {self.input_states.len()}")
+        print("  Frame:          {self.frame}")
+        print("  Time:           {self.time:.2}s")

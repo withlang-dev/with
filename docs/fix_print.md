@@ -51,16 +51,18 @@ print("hello")        // hello\n
 eprint("error")       // error\n
 ```
 
-### 1.4 Future: `write` for raw output
+### 1.4 `write` and `ewrite`
 
-When raw output without a newline is needed (progress bars, prompts, terminal control), a `write` function will be added:
+`write` outputs a string to stdout with NO newline. `ewrite` does the same to stderr. These are the explicit opt-in for raw output.
 
 ```
-write("loading...")           // no newline
+write("loading...")           // stdout, no newline
 write(f"\r{percent}%")        // carriage return, no newline
+write("Enter name: ")         // prompt without trailing newline
+ewrite("progress: ")          // stderr, no newline
 ```
 
-`write` is not part of the initial implementation. It will be added when a real use case requires it. Until then, `print` covers 99% of output needs.
+Use cases: progress bars, prompts, terminal control, building output character by character.
 
 ### 1.5 Design Rationale
 
@@ -138,6 +140,20 @@ void with_eprint(with_str s) {
 }
 ```
 
+Add `with_write` and `with_ewrite` (raw output, no newline):
+
+```c
+void with_write(with_str s) {
+    if (s.ptr && s.len > 0)
+        fwrite(s.ptr, 1, (size_t)s.len, stdout);
+}
+
+void with_ewrite(with_str s) {
+    if (s.ptr && s.len > 0)
+        fwrite(s.ptr, 1, (size_t)s.len, stderr);
+}
+```
+
 ### 2.3 Prelude Changes
 
 **`lib/std/prelude.w`** (or wherever builtins are declared):
@@ -151,6 +167,8 @@ extern fn eprintln(s: str)
 // After:
 extern fn print(s: str)       // stdout + newline
 extern fn eprint(s: str)      // stderr + newline
+extern fn write(s: str)       // stdout, no newline
+extern fn ewrite(s: str)      // stderr, no newline
 // println removed
 // eprintln renamed to eprint
 ```
@@ -249,11 +267,12 @@ These hints can be added to Sema's undefined variable handler by checking if the
 |----------|--------|---------|--------|
 | `print(s)` | stdout | Always | **Changed** (was no-newline) |
 | `eprint(s)` | stderr | Always | **New** (replaces `eprintln`) |
+| `write(s)` | stdout | Never | **New** (raw output) |
+| `ewrite(s)` | stderr | Never | **New** (raw stderr output) |
 | `println(s)` | stdout | Always | **Removed** (use `print`) |
 | `eprintln(s)` | stderr | Always | **Removed** (use `eprint`) |
-| `write(s)` | stdout | Never | **Future** (not in v1) |
 
-One print function for stdout. One for stderr. Both add newlines. No suffixes to remember. No parameters to configure. Format with f-strings.
+Two line-printing functions (`print`, `eprint`) and two raw-output functions (`write`, `ewrite`). No suffixes to remember. No parameters to configure. Format with f-strings.
 
 ---
 

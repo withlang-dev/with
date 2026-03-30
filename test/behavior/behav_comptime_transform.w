@@ -22,4 +22,4 @@ fn main:
     assert(select_then() == 42)
     assert(select_else() == 7)
     assert(sum_unrolled() == 15)
-    println("ok")
+    print("ok")

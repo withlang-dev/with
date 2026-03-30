@@ -12,4 +12,4 @@ fn main:
     assert(describe(1) == 101)
     assert(describe(2) == 202)
     assert(describe(3) == 0)
-    println("ok")
+    print("ok")

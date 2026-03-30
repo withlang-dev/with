@@ -49,4 +49,4 @@ fn main:
     test_loop_accumulate()
     test_while_true_break()
     test_nested_loops()
-    println("ok")
+    print("ok")

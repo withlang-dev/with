@@ -53,4 +53,4 @@ fn main:
     test_ranges()
     test_break_continue()
     test_nested_and_accumulate()
-    println("ok")
+    print("ok")

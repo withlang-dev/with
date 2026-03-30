@@ -50,4 +50,4 @@ fn main:
     test_defer_ordering()
     test_defer_on_scope_exit()
     test_defer_after_body()
-    println("ok")
+    print("ok")

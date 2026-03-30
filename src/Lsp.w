@@ -14,7 +14,7 @@ use Diagnostic
 use InternPool
 use Parser
 
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 
 type Lsp {
     documents: HashMap[str, str],
@@ -26,5 +26,5 @@ fn Lsp.init -> Lsp:
     }
 
 fn Lsp.run(self: Lsp) -> i32:
-    with_eprintln("LSP server not yet implemented in self-hosted compiler")
+    with_eprint("LSP server not yet implemented in self-hosted compiler")
     1

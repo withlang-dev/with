@@ -1,7 +1,7 @@
 extern fn with_system(cmd: str) -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_read_file(path: str) -> str
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 extern fn with_extract_runtime_obj(name: str, path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 
@@ -225,12 +225,12 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
     if needs_fiber_runtime != 0:
         let fiber_path = link_stage_find_runtime_object_path("fiber.o")
         if fiber_path.len() == 0:
-            with_eprintln("error: missing runtime/fiber.o")
+            with_eprint("error: missing runtime/fiber.o")
             return false
         extras.push(fiber_path)
         let fiber_asm_path = link_stage_find_runtime_object_path("fiber_asm.o")
         if fiber_asm_path.len() == 0:
-            with_eprintln("error: missing runtime/fiber_asm.o")
+            with_eprint("error: missing runtime/fiber_asm.o")
             return false
         extras.push(fiber_asm_path)
 
@@ -238,12 +238,12 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
     if needs_helpers_runtime != 0:
         let support_runtime_path = link_stage_find_runtime_object_path("support_runtime.o")
         if support_runtime_path.len() == 0:
-            with_eprintln("error: missing runtime/support_runtime.o")
+            with_eprint("error: missing runtime/support_runtime.o")
             return false
         extras.push(support_runtime_path)
         let helpers_path = link_stage_find_runtime_object_path("helpers.o")
         if helpers_path.len() == 0:
-            with_eprintln("error: missing runtime/helpers.o")
+            with_eprint("error: missing runtime/helpers.o")
             return false
         extras.push(helpers_path)
 
@@ -270,7 +270,7 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 extras.push(clang_bridge_path)
             extras.push("@" ++ rsp_path)
             return link_stage_link_with_llvm(obj_path, bin_path, extras, link_libs, cc_path)
-        with_eprintln("error: missing LLVM static bridge (need llvm_bridge.o + llvm_link.rsp + llvm_cc)")
+        with_eprint("error: missing LLVM static bridge (need llvm_bridge.o + llvm_link.rsp + llvm_cc)")
         return false
 
     if extras.len() == 0 and link_libs.len() == 0:

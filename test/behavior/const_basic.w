@@ -2,4 +2,4 @@
 const MAX: i32 = 100
 
 fn main:
-    println(int_to_string(MAX))
+    print(int_to_string(MAX))

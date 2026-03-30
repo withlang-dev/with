@@ -35,4 +35,4 @@ fn main:
     assert(symbol_is_valid(s))
     assert(arena_id_is_valid(a))
 
-    println("ok")
+    print("ok")

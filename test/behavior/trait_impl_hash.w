@@ -25,4 +25,4 @@ fn main:
     assert(s1.hash_value() == s2.hash_value())
     assert(s1.hash_value() != s3.hash_value())
 
-    println("ok")
+    print("ok")

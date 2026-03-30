@@ -40,4 +40,4 @@ fn main:
     test_vec_empty()
     test_vec_large()
     test_vec_push_pop_pattern()
-    println("ok")
+    print("ok")

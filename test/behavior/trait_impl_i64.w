@@ -10,4 +10,4 @@ fn main:
     assert(a.eq(b))
     assert(not a.eq(c))
 
-    println("ok")
+    print("ok")

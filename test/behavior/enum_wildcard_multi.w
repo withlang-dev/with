@@ -10,4 +10,4 @@ fn describe(c: Color) -> str:
 fn main:
     let b = describe(.Blue)
     let y = describe(.Yellow)
-    println("blue=" ++ b ++ " yellow=" ++ y)
+    print("blue=" ++ b ++ " yellow=" ++ y)

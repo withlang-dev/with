@@ -37,4 +37,4 @@ fn main:
     test_narrowing()
     test_bool_to_int()
     test_int_comparison_cast()
-    println("ok")
+    print("ok")

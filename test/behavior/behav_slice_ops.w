@@ -78,4 +78,4 @@ fn main:
     test_vec_sum()
     test_vec_for_loop()
     test_vec_in_function()
-    println("ok")
+    print("ok")

@@ -68,4 +68,4 @@ fn main:
     test_result_unwrap()
     test_result_match_variants()
     test_conditional_result()
-    println("ok")
+    print("ok")

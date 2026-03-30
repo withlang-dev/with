@@ -132,9 +132,10 @@ void with_println_i32(int32_t n);
 void with_println_i64(int64_t n);
 void with_println_bool(bool b);
 void with_print_str(with_str s);
-void print(with_str s);
-void eprintln(with_str s);
 void with_eprintln(with_str s);
+void with_eprint(with_str s);
+void with_write(with_str s);
+void with_ewrite(with_str s);
 
 // ── Process ────────────────────────────────────────────────────────
 

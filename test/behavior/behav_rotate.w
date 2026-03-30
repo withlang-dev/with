@@ -41,4 +41,4 @@ fn main:
     test_rotate_zero()
     test_rotate_left_right_inverse()
     test_rotate_u16()
-    println("ok")
+    print("ok")

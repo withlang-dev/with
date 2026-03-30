@@ -7,7 +7,7 @@ extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_system(cmd: str) -> i32
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 fn CONAN_CENTER_URL -> str: "https://center.conan.io"
 
 use std.http
@@ -165,23 +165,23 @@ fn conan_download_and_extract(name: str, version: str, rev: str, pkg_id: str, de
     let latest_url = CONAN_CENTER_URL() ++ "/v2/conans/" ++ name ++ "/" ++ version ++ "/_/_/revisions/" ++ rev ++ "/packages/" ++ pkg_id ++ "/latest"
     let latest = conan_http_get(latest_url)
     if latest.len() == 0:
-        with_eprintln("error: failed to get package revision for " ++ name)
+        with_eprint("error: failed to get package revision for " ++ name)
         return -1
     let pkg_rev = json_extract_string(latest, "revision")
     if pkg_rev.len() == 0:
-        with_eprintln("error: failed to parse package revision for " ++ name)
+        with_eprint("error: failed to parse package revision for " ++ name)
         return -1
     // Download conan_package.tgz
     let tgz_url = CONAN_CENTER_URL() ++ "/v2/conans/" ++ name ++ "/" ++ version ++ "/_/_/revisions/" ++ rev ++ "/packages/" ++ pkg_id ++ "/revisions/" ++ pkg_rev ++ "/files/conan_package.tgz"
     let tgz_path = dest_dir ++ "/conan_package.tgz"
-    with_eprintln("  downloading " ++ name ++ "/" ++ version ++ "...")
+    with_eprint("  downloading " ++ name ++ "/" ++ version ++ "...")
     if conan_http_download(tgz_url, tgz_path) != 0:
-        with_eprintln("error: failed to download package for " ++ name)
+        with_eprint("error: failed to download package for " ++ name)
         return -1
     // Extract
-    with_eprintln("  extracting...")
+    with_eprint("  extracting...")
     if conan_extract_tgz(tgz_path, dest_dir) != 0:
-        with_eprintln("error: failed to extract package for " ++ name)
+        with_eprint("error: failed to extract package for " ++ name)
         return -1
     0
 
@@ -202,26 +202,26 @@ fn conan_write_metadata(dest_dir: str, name: str, version: str) -> i32:
 // ── Public API ─────────────────────────────────────────────────────
 
 fn conan_install(name: str, version_hint: str, project_root: str) -> i32:
-    with_eprintln("resolving " ++ name ++ "...")
+    with_eprint("resolving " ++ name ++ "...")
     // Use provided version or resolve latest
     var version = version_hint
     if version.len() == 0:
         // TODO: resolve latest version from search API
-        with_eprintln("error: version required (latest resolution not yet implemented)")
-        with_eprintln("  usage: with get c." ++ name ++ "@<version>")
+        with_eprint("error: version required (latest resolution not yet implemented)")
+        with_eprint("  usage: with get c." ++ name ++ "@<version>")
         return -1
     // Get latest recipe revision
     let rev = conan_get_latest_recipe_rev(name, version)
     if rev.len() == 0:
-        with_eprintln("error: package " ++ name ++ "/" ++ version ++ " not found on Conan Center")
+        with_eprint("error: package " ++ name ++ "/" ++ version ++ " not found on Conan Center")
         return -1
-    with_eprintln("  revision: " ++ rev.slice(0, if rev.len() > 12: 12 else: rev.len()))
+    with_eprint("  revision: " ++ rev.slice(0, if rev.len() > 12: 12 else: rev.len()))
     // Find binary for current platform
     let pkg_id = conan_find_matching_package(name, version, rev)
     if pkg_id.len() == 0:
-        with_eprintln("error: no prebuilt binary found for " ++ name ++ "/" ++ version ++ " on this platform")
+        with_eprint("error: no prebuilt binary found for " ++ name ++ "/" ++ version ++ " on this platform")
         return -1
-    with_eprintln("  binary: " ++ pkg_id.slice(0, if pkg_id.len() > 12: 12 else: pkg_id.len()))
+    with_eprint("  binary: " ++ pkg_id.slice(0, if pkg_id.len() > 12: 12 else: pkg_id.len()))
     // Download and extract
     let dep_dir = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version
     with_fs_mkdir_p(dep_dir)
@@ -229,7 +229,7 @@ fn conan_install(name: str, version_hint: str, project_root: str) -> i32:
         return -1
     // Write metadata.json
     if conan_write_metadata(dep_dir, name, version) != 0:
-        with_eprintln("error: failed to write metadata for " ++ name)
+        with_eprint("error: failed to write metadata for " ++ name)
         return -1
-    with_eprintln("  installed to .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
+    with_eprint("  installed to .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
     0

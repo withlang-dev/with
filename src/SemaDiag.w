@@ -7,7 +7,7 @@ use Diagnostic
 use InternPool
 use render
 
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 extern fn int_to_string(n: i32) -> str
 
 // ── Diagnostics ──────────────────────────────────────────────────
@@ -181,7 +181,7 @@ fn typed_indent(indent: i32) -> str:
 
 fn emit_typed_indent(indent: i32):
     for i in 0..indent:
-        print("  ")
+        with_write("  ")
 
 fn Sema.safe_symbol_text(self: Sema, sym: i32) -> str:
     if sym <= 0:
@@ -392,7 +392,7 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
     var dump_decl_count = total_decl_count
     if requested_limit > 0 and requested_limit <= total_decl_count:
         dump_decl_count = requested_limit
-    print(f"typed module decls={dump_decl_count}\n")
+    with_write(f"typed module decls={dump_decl_count}\n")
 
     for di in 0..dump_decl_count:
         let decl = self.ast.get_decl(di)
@@ -400,7 +400,7 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
         let start = self.ast.get_start(decl)
         let end = self.ast.get_end(decl)
 
-        print(f"decl[{di}] kind={typed_decl_kind_name(kind)} span={start}..{end}\n")
+        with_write(f"decl[{di}] kind={typed_decl_kind_name(kind)} span={start}..{end}\n")
 
         if kind == NodeKind.NK_FN_DECL:
             let fn_name_sym = self.ast.get_data0(decl)
@@ -414,9 +414,9 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
                     fn_name = owner_type_name ++ "." ++ fn_name
             let sig_idx = self.get_sig(fn_name_sym)
             if fn_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
-                print("  fn ")
-                print(fn_name)
-                print("(")
+                with_write("  fn ")
+                with_write(fn_name)
+                with_write("(")
                 let meta = self.ast.find_fn_meta(decl)
                 var param_start = 0
                 var meta_param_count = 0
@@ -426,21 +426,21 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
                 let param_count = self.clamp_sig_param_count(sig_idx, meta_param_count)
                 for pi in 0..param_count:
                     if pi > 0:
-                        print(", ")
+                        with_write(", ")
                     let p_name_sym = if meta >= 0: self.ast.fn_param_name(param_start, pi) else: 0
                     let p_name = if p_name_sym != 0: self.safe_symbol_text(p_name_sym) else: "_"
-                    print(p_name)
-                    print(": ")
-                    print(self.type_name(self.sig_param_type(sig_idx, pi)))
-                print(") -> ")
-                print(self.type_name(self.sig_return_type(sig_idx)))
-                print("\n")
+                    with_write(p_name)
+                    with_write(": ")
+                    with_write(self.type_name(self.sig_param_type(sig_idx, pi)))
+                with_write(") -> ")
+                with_write(self.type_name(self.sig_return_type(sig_idx)))
+                with_write("\n")
                 let inferred_ret = if meta >= 0 and self.ast.fn_meta_ret(meta) == 0: self.sig_return_type(sig_idx) else: 0
-                print(if inferred_ret != 0 and inferred_ret != self.ty_void: "  inferred_return: " ++ self.type_name(inferred_ret) ++ "\n" else: "")
+                with_write(if inferred_ret != 0 and inferred_ret != self.ty_void: "  inferred_return: " ++ self.type_name(inferred_ret) ++ "\n" else: "")
             else:
-                print("  fn ")
-                print(fn_name)
-                print("(<unknown>)\n")
+                with_write("  fn ")
+                with_write(fn_name)
+                with_write("(<unknown>)\n")
             self.emit_typed_expr_tree(self.ast.get_data1(decl), 2)
             continue
 
@@ -449,9 +449,9 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
             let ext_name = self.safe_symbol_text(ext_name_sym)
             let sig_idx = self.get_sig(ext_name_sym)
             if ext_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
-                print("  extern fn ")
-                print(ext_name)
-                print("(")
+                with_write("  extern fn ")
+                with_write(ext_name)
+                with_write("(")
                 let meta = self.ast.find_fn_meta(decl)
                 var param_start = 0
                 var meta_param_count = 0
@@ -461,17 +461,17 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
                 let param_count = self.clamp_sig_param_count(sig_idx, meta_param_count)
                 for pi in 0..param_count:
                     if pi > 0:
-                        print(", ")
+                        with_write(", ")
                     let p_name_sym = if meta >= 0: self.ast.fn_param_name(param_start, pi) else: 0
                     let p_name = if p_name_sym != 0: self.safe_symbol_text(p_name_sym) else: "_"
-                    print(p_name)
-                    print(": ")
-                    print(self.type_name(self.sig_param_type(sig_idx, pi)))
-                print(") -> ")
-                print(self.type_name(self.sig_return_type(sig_idx)))
-                print("\n")
+                    with_write(p_name)
+                    with_write(": ")
+                    with_write(self.type_name(self.sig_param_type(sig_idx, pi)))
+                with_write(") -> ")
+                with_write(self.type_name(self.sig_return_type(sig_idx)))
+                with_write("\n")
             else:
-                print("  extern fn (<unknown>)\n")
+                with_write("  extern fn (<unknown>)\n")
             continue
 
         if kind == NodeKind.NK_LET_DECL:
@@ -480,69 +480,69 @@ fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
             if has_resolved:
                 let ty = self.typed_binding_types.get(decl).unwrap()
                 let is_mut = if self.typed_binding_muts.contains(decl): self.typed_binding_muts.get(decl).unwrap() else: 0
-                print("  let ")
-                print(name)
+                with_write("  let ")
+                with_write(name)
                 if is_mut != 0:
-                    print(" (mut)")
-                print(": ")
-                print(self.type_name(ty))
-                print("\n")
+                    with_write(" (mut)")
+                with_write(": ")
+                with_write(self.type_name(ty))
+                with_write("\n")
             else:
                 let flags = self.ast.get_data2(decl)
                 let has_ann = self.top_level_let_type_ann_extra(flags) >= 0
-                print("  let ")
-                print(name)
-                print(": ")
-                print(if has_ann: "<annotated>" else: "<inferred>")
-                print("\n")
+                with_write("  let ")
+                with_write(name)
+                with_write(": ")
+                with_write(if has_ann: "<annotated>" else: "<inferred>")
+                with_write("\n")
             continue
 
         if kind == NodeKind.NK_TYPE_DECL:
-            print("  type ")
-            print(self.safe_symbol_text(self.ast.get_data0(decl)))
-            print("\n")
+            with_write("  type ")
+            with_write(self.safe_symbol_text(self.ast.get_data0(decl)))
+            with_write("\n")
             continue
 
         if kind == NodeKind.NK_TRAIT_DECL:
-            print("  trait ")
-            print(self.safe_symbol_text(self.ast.get_data0(decl)))
-            print("\n")
+            with_write("  trait ")
+            with_write(self.safe_symbol_text(self.ast.get_data0(decl)))
+            with_write("\n")
             continue
 
         if kind == NodeKind.NK_IMPL_DECL:
             let type_name = self.safe_symbol_text(self.ast.get_data0(decl))
             let trait_sym = self.ast.get_data2(decl)
             if trait_sym != 0:
-                print("  impl ")
-                print(self.safe_symbol_text(trait_sym))
-                print(" for ")
-                print(type_name)
-                print("\n")
+                with_write("  impl ")
+                with_write(self.safe_symbol_text(trait_sym))
+                with_write(" for ")
+                with_write(type_name)
+                with_write("\n")
             else:
-                print("  impl ")
-                print(type_name)
-                print("\n")
+                with_write("  impl ")
+                with_write(type_name)
+                with_write("\n")
             continue
 
         if kind == NodeKind.NK_USE_DECL:
             let extra_start = self.ast.get_data0(decl)
             let path_count = self.ast.get_data1(decl)
-            print("  use ")
+            with_write("  use ")
             for pi in 0..path_count:
                 if pi > 0:
-                    print(".")
-                print(self.safe_symbol_text(self.ast.get_extra(extra_start + pi)))
-            print("\n")
+                    with_write(".")
+                with_write(self.safe_symbol_text(self.ast.get_extra(extra_start + pi)))
+            with_write("\n")
             continue
 
         if kind == NodeKind.NK_C_IMPORT:
-            print("  c_import \"")
-            print(self.safe_symbol_text(self.ast.get_data0(decl)))
-            print("\"\n")
+            with_write("  c_import \"")
+            with_write(self.safe_symbol_text(self.ast.get_data0(decl)))
+            with_write("\"\n")
             continue
 
         if kind == NodeKind.NK_POISONED_DECL:
-            print("  <poisoned>\n")
+            with_write("  <poisoned>\n")
 
 fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
     if node == 0:
@@ -798,24 +798,24 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
     if has_typed_expr:
         let tid = self.typed_expr_types.get(node).unwrap()
         emit_typed_indent(indent)
-        print("expr ")
-        print(typed_expr_kind_name(kind))
-        print(f" span={start}..{end} : ")
-        print(self.type_name(tid))
-        print("\n")
+        with_write("expr ")
+        with_write(typed_expr_kind_name(kind))
+        with_write(f" span={start}..{end} : ")
+        with_write(self.type_name(tid))
+        with_write("\n")
 
     if kind == NodeKind.NK_LET_BINDING:
         if self.typed_binding_types.contains(node):
             let name_sym = if self.typed_binding_names.contains(node): self.typed_binding_names.get(node).unwrap() else: self.ast.get_data0(node)
             let is_mut = if self.typed_binding_muts.contains(node): self.typed_binding_muts.get(node).unwrap() else: (self.ast.get_data2(node) % 2)
             emit_typed_indent(indent + 1)
-            print("bind ")
-            print(self.safe_symbol_text(name_sym))
+            with_write("bind ")
+            with_write(self.safe_symbol_text(name_sym))
             if is_mut != 0:
-                print(" (mut)")
-            print(": ")
-            print(self.type_name(self.typed_binding_types.get(node).unwrap()))
-            print("\n")
+                with_write(" (mut)")
+            with_write(": ")
+            with_write(self.type_name(self.typed_binding_types.get(node).unwrap()))
+            with_write("\n")
 
     if kind == NodeKind.NK_BINARY:
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)

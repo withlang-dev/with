@@ -67,4 +67,4 @@ fn main:
     test_unwrap_or_pattern()
     test_is_ok_pattern()
     test_result_in_array()
-    println("ok")
+    print("ok")

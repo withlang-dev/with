@@ -53,4 +53,4 @@ fn main:
     assert(t4.get_tag(8) == TokenKind.TK_INT_LIT())
     assert(t4.get_tag(9) == TokenKind.TK_EOF())
 
-    println("ok")
+    print("ok")

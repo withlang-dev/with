@@ -22,4 +22,4 @@ fn main:
     assert(VALUES.get(0) == 10)
     assert(VALUES.get(1) == 20)
     assert(VALUES.get(2) == 30)
-    println("ok")
+    print("ok")

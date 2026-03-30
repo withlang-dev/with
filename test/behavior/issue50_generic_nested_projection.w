@@ -72,4 +72,4 @@ fn main:
     assert(loop_find_rank(looped, 7))
     assert(not loop_find_rank(looped, 99))
 
-    println("ok")
+    print("ok")

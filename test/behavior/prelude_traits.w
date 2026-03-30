@@ -22,4 +22,4 @@ fn main:
     assert(a.eq(b))
     assert(not a.eq(c))
     assert(a.debug_str() == "Point")
-    println("ok")
+    print("ok")

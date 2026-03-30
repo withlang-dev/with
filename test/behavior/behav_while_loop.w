@@ -124,4 +124,4 @@ fn main:
     test_while_multiple_conditions()
     test_while_nested_break()
     test_while_collatz()
-    println("ok")
+    print("ok")

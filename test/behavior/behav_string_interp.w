@@ -42,4 +42,4 @@ fn main:
     test_concat_multiple()
     test_concat_identity()
     test_no_concat()
-    println("ok")
+    print("ok")

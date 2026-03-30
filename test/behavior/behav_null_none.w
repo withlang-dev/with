@@ -80,4 +80,4 @@ fn main:
     test_option_safe_div()
     test_option_chain()
     test_option_multiple_returns()
-    println("ok")
+    print("ok")

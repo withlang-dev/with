@@ -9,4 +9,4 @@ fn helper(x: i32) -> i32:
 fn main:
     let result = helper(41)
     if result == 42:
-        println("ok")
+        print("ok")

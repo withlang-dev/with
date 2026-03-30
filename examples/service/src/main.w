@@ -38,7 +38,7 @@ async fn main -> Result[Unit, ServiceError]:
     let state = Arc.new(AppState { service: Arc.new(service) })
 
     let listener = std.net.TcpListener.bind("0.0.0.0:8080").await?
-    println("Listening on :8080")
+    print("Listening on :8080")
 
     // Structured concurrency: all connection fibers are children of this scope.
     // On shutdown, the scope cancels all children and waits for cleanup.
@@ -53,13 +53,13 @@ async fn main -> Result[Unit, ServiceError]:
                         Ok(conn) ->
                             s.track(handle_connection(state.clone(), conn))
                         Err(e) ->
-                            eprintln("Accept error: {e}")
+                            eprint("Accept error: {e}")
                 _ = shutdown ->
-                    println("Shutdown signal received, draining connections...")
+                    print("Shutdown signal received, draining connections...")
                     break
 
     // Scope guarantees: all spawned fibers have completed or been cancelled.
-    println("Service shut down cleanly.")
+    print("Service shut down cleanly.")
 
 
 async fn listen_for_shutdown:

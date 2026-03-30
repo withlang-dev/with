@@ -73,4 +73,4 @@ fn main:
     test_discriminant_enum()
     test_discriminant_cast()
     test_discriminant_shorthand()
-    println("ok")
+    print("ok")

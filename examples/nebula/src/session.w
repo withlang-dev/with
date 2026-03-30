@@ -164,7 +164,7 @@ pub async fn handle_client(
                     db.insert_bulk(&valid_packets)?
 
             _ = timeout(30.secs()) ->
-                println("Session timeout for handle {handle}")
+                print("Session timeout for handle {handle}")
                 break
 
 // --- Session Stats ---

@@ -7,7 +7,7 @@ use Diagnostic
 use InternPool
 use render
 
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn int_to_string(n: i32) -> str
 

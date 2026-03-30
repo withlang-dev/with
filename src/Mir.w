@@ -12,7 +12,7 @@ type BlockId = distinct i32
 extern fn int_to_string(n: i32) -> str
 extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
-extern fn print(s: str) -> void
+extern fn with_write(s: str) -> void
 
 fn lbrace -> str:
     str_from_byte(123)
@@ -671,12 +671,12 @@ fn dump_mir_module(mir_mod: MirModule, pool: InternPool, sema: Sema) -> str:
 // Streaming variant of dump_mir_module to avoid quadratic whole-module
 // concatenation when dumping large MIR corpora.
 fn print_mir_module(mir_mod: MirModule, pool: InternPool, sema: Sema):
-    print(f"mir module functions={mir_mod.bodies.len() as i32}\n")
+    with_write(f"mir module functions={mir_mod.bodies.len() as i32}\n")
     for i in 0..mir_mod.bodies.len() as i32:
         if i > 0:
-            print("\n")
+            with_write("\n")
         let body: MirBody = mir_mod.bodies.get(i as i64)
-        print(dump_mir_body(body, pool, sema))
+        with_write(dump_mir_body(body, pool, sema))
 
 fn mir_clip_text(s: str, max_len: i32) -> str:
     if max_len <= 0:
@@ -1734,7 +1734,7 @@ fn validate_typed_mir_body(mir_mod: MirModule, body: MirBody) -> MirValidationEr
                    mir_validate_type_compatible_fast(mir_mod, rhs_ty, lhs_ty) == 0:
                     let __lk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(lhs_ty)) as i32
                     let __rk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(rhs_ty)) as i32
-                    with_eprintln(f"DEBUG cmp fail: lhs_ty={lhs_ty} lhs_kind={__lk} rhs_ty={rhs_ty} rhs_kind={__rk}")
+                    with_eprint(f"DEBUG cmp fail: lhs_ty={lhs_ty} lhs_kind={__lk} rhs_ty={rhs_ty} rhs_kind={__rk}")
                     return mir_validation_fail(body.fn_sym, span, "comparison operands have incompatible MIR types")
 
             if rk == RvalueKind.RK_CAST:

@@ -33,4 +33,4 @@ fn main:
     test_defer_not_premature()
     test_multiple_defers_not_premature()
     test_defer_after_body_work()
-    println("ok")
+    print("ok")

@@ -28,4 +28,4 @@ fn main:
     test_let_binding_widening()
     test_fn_arg_widening()
     test_arithmetic_widening()
-    println("ok")
+    print("ok")

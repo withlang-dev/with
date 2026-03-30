@@ -54,4 +54,4 @@ fn main:
     test_block_scope_var()
     test_nested_if_scope()
     test_for_loop_scope()
-    println("ok")
+    print("ok")

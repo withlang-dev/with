@@ -35,4 +35,4 @@ fn main:
     test_basic_trait()
     test_trait_dispatch()
     test_trait_with_computation()
-    println("ok")
+    print("ok")

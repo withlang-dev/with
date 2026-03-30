@@ -114,4 +114,4 @@ fn main:
     test_cast_in_arithmetic()
     test_f64_to_i64()
     test_i64_to_f64()
-    println("ok")
+    print("ok")

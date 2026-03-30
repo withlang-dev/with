@@ -198,11 +198,11 @@ fn ptr_to_string(ptr: *const u8) -> str:
 // --- Main Demo ---
 
 fn main -> Result[Unit, SqliteError]:
-    println("=== SQLite C Interop Demo ===\n")
+    print("=== SQLite C Interop Demo ===\n")
 
     // Open an in-memory database
     let db = Database.open(":memory:")?
-    println("Opened in-memory database")
+    print("Opened in-memory database")
 
     // Create table
     db.execute("
@@ -213,7 +213,7 @@ fn main -> Result[Unit, SqliteError]:
             score REAL DEFAULT 0.0
         )
     ")?
-    println("Created users table")
+    print("Created users table")
 
     // Insert with prepared statement inside a transaction
     let inserted = db.transaction(db =>
@@ -236,13 +236,13 @@ fn main -> Result[Unit, SqliteError]:
             stmt.step()?
             count = count + 1
 
-        println("Inserted {count} users")
+        print("Inserted {count} users")
         count
     )?
-    println("Transaction committed ({inserted} rows)\n")
+    print("Transaction committed ({inserted} rows)\n")
 
     // Query with prepared statement
-    println("--- All users (score >= 80) ---")
+    print("--- All users (score >= 80) ---")
     let query = db.prepare("SELECT id, name, email, score FROM users WHERE score >= ? ORDER BY score DESC")?
     query.bind_f64(1, 80.0)?
 
@@ -251,32 +251,32 @@ fn main -> Result[Unit, SqliteError]:
         let name  = row.column_text(1)
         let email = row.column_text(2)
         let score = row.column_f64(3)
-        println("  #{id} {name} <{email}> score={score:.1}")
+        print("  #{id} {name} <{email}> score={score:.1}")
 
     // Aggregate query
-    println("\n--- Stats ---")
+    print("\n--- Stats ---")
     let stats = db.prepare("SELECT COUNT(*), AVG(score), MAX(score), MIN(score) FROM users")?
     if stats.step()?:
         let count = stats.column_int(0)
         let avg   = stats.column_f64(1)
         let max   = stats.column_f64(2)
         let min   = stats.column_f64(3)
-        println("  count={count} avg={avg:.1} max={max:.1} min={min:.1}")
+        print("  count={count} avg={avg:.1} max={max:.1} min={min:.1}")
 
     // Update with pipeline
-    println("\n--- Bonus round: +5 to everyone ---")
+    print("\n--- Bonus round: +5 to everyone ---")
     db.execute("UPDATE users SET score = score + 5.0")?
-    println("  updated {db.changes()} rows")
+    print("  updated {db.changes()} rows")
 
     // Re-query to show updated scores
     let all = db.prepare("SELECT name, score FROM users ORDER BY name")?
     for row in rows(&all):
-        println("  {row.column_text(0)}: {row.column_f64(1):.1}")
+        print("  {row.column_text(0)}: {row.column_f64(1):.1}")
 
     // Demonstrate error handling
-    println("\n--- Error handling ---")
+    print("\n--- Error handling ---")
     match db.execute("INSERT INTO users (name, email) VALUES ('Duplicate', 'alice@example.com')")
-        Ok(_)  => println("  unexpected success")
-        Err(e) => println("  expected error: {e}")
+        Ok(_)  => print("  unexpected success")
+        Err(e) => print("  expected error: {e}")
 
-    println("\n=== Demo complete ===")
+    print("\n=== Demo complete ===")

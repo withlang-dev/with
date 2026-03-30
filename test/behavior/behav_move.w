@@ -65,4 +65,4 @@ fn main:
     test_var_reassign()
     test_shadow_move()
     test_string_pass()
-    println("ok")
+    print("ok")

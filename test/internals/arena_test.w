@@ -31,4 +31,4 @@ fn main:
     assert(a.contains(id2))
     assert(a.get_i32(id2) == 7)
 
-    println("ok")
+    print("ok")

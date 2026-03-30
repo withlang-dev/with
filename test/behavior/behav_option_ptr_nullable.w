@@ -18,4 +18,4 @@ fn main:
     let recovered = some.unwrap()
     assert(recovered != null)
 
-    println("ok")
+    print("ok")

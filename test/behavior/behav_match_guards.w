@@ -36,4 +36,4 @@ fn main:
     test_basic_guards()
     test_guard_with_binding()
     test_guard_fallthrough()
-    println("ok")
+    print("ok")

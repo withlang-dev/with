@@ -28,4 +28,4 @@ fn main:
     assert(a.debug_str() == "MyInt")
     let d = MyInt.default()
     assert(d.val == 0)
-    println("ok")
+    print("ok")

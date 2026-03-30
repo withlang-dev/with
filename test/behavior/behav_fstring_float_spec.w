@@ -28,4 +28,4 @@ fn main:
     test_float_precision_0()
     test_float_precision_6()
     test_float_sign()
-    println("ok")
+    print("ok")

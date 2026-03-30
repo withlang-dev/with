@@ -17,4 +17,4 @@ fn main:
     let b = get_none()
     assert(extract_or_default(a) == 42)
     assert(extract_or_default(b) == -1)
-    println("ok")
+    print("ok")

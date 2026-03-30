@@ -13,4 +13,4 @@ fn is_fatal_with_code(status: Status, expected: i32) -> bool:
 fn main:
     let status: Status = .Fatal(code: 99)
     assert(is_fatal_with_code(status, 99))
-    println("ok")
+    print("ok")

@@ -5,4 +5,4 @@
 fn main:
     let s = "hello"
     let x = s as i32
-    println(int_to_string(x))
+    print(int_to_string(x))

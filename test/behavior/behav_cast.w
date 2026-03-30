@@ -51,4 +51,4 @@ fn main:
     test_bool_to_i64()
     test_comparison_cast()
     test_cast_in_expression()
-    println("ok")
+    print("ok")

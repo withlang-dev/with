@@ -109,4 +109,4 @@ fn main:
     test_enum_many_variants()
     test_option_like_enum()
     test_enum_expression_eval()
-    println("ok")
+    print("ok")

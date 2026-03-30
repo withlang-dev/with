@@ -71,4 +71,4 @@ fn main:
     test_while_false()
     test_nested_while()
     test_while_complex_condition()
-    println("ok")
+    print("ok")

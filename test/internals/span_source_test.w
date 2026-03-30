@@ -28,4 +28,4 @@ fn main:
     assert(src.line_text(2) == "line2")
     assert(src.line_text(99) == "")
 
-    println("ok")
+    print("ok")

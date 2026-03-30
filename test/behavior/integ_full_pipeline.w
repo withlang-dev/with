@@ -9,4 +9,4 @@ fn double(x: i32) -> i32:
 fn main:
     let n = 21
     let result = double(n)
-    println(int_to_string(result))
+    print(int_to_string(result))

@@ -12,4 +12,4 @@ use shadow_helper2
 
 fn main:
     assert(map(5) == 500)
-    println("ok")
+    print("ok")

@@ -121,7 +121,7 @@ CCodegen.w (4,440 lines) handles all 54 MIR intrinsics (commit
 
 ---
 
-## 6. Tooling (Phase II-6) — Mostly DONE
+## 6. Tooling (Phase II-6) — DONE ✓
 
 ### `with fmt` — Code Formatter — DONE ✓
 Implemented in main.w (commit `e72847c`). Supports `-w` (write)
@@ -131,9 +131,10 @@ and `-l` (list) modes. AST round-trip formatting.
 `@[test]` attribute discovery and `--filter` implemented
 (commit `cbcfa85`).
 
-### `with bench` — Benchmarking
-**Current:** No command handler.
-**Needed:** `@[bench]` attribute, iteration harness, timing.
+### `with bench` — Benchmarking — DONE ✓
+`@[bench]` attribute + `bench_*` naming. Go-style auto-calibration.
+Reports name, N, ns/op. `--filter` support. `lib/test/bench.w`.
+Commit: `6ef5b8b`.
 
 ### Error Messages with Suggestions — Partially DONE
 "Did you mean?" for undefined variables/types implemented with
@@ -141,6 +142,25 @@ Levenshtein distance (commit `169dac7`).
 **Remaining:**
 - Show function signature when wrong argument count
 - Audit errors for missing source locations
+
+---
+
+## 8. MIR Verification and Regression Testing
+
+### Typed MIR Verifier — DONE ✓
+408-line verifier in `src/Mir.w` runs before codegen (commit `99ceb09`).
+Validates type consistency across MIR.
+
+### Bug Fixes (5 with regression tests)
+- Generic option match inference (`4b69f1d`)
+- Nested Vec field string comparisons (`bd1021a`)
+- MIR aggregate destination typing (`47240f3`)
+- Semantic comparison dispatch (`13003db`)
+- Nested projection typing (`6411c91`)
+
+### Regression Matrix — DONE ✓
+Comprehensive regression suites (commit `c1c302d`):
+`regression_aggregate_flow_matrix.w`, `regression_projection_import_matrix.w`.
 
 ---
 

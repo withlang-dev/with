@@ -61,4 +61,4 @@ fn main:
     test_compound_bool()
     test_bool_in_if()
     test_equality_of_bools()
-    println("ok")
+    print("ok")

@@ -59,4 +59,4 @@ fn main:
     test_combined_bitops()
     test_bitwise_identity()
     test_bitwise_with_vars()
-    println("ok")
+    print("ok")

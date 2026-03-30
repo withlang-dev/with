@@ -31,4 +31,4 @@ fn main:
     assert(classify_signed(50) == "positive")
     assert(classify_signed(100) == "positive")
     assert(classify_signed(101) == "other")
-    println("ok")
+    print("ok")

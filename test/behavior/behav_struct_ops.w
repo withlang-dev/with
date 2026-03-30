@@ -137,4 +137,4 @@ fn main:
     test_struct_mixed_types()
     test_struct_copy()
     test_struct_in_array()
-    println("ok")
+    print("ok")

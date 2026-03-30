@@ -33,4 +33,4 @@ fn main:
     let g: ?i32 = .Some(99)
     assert(f.unwrap() == g.unwrap())
 
-    println("ok")
+    print("ok")

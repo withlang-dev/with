@@ -8,7 +8,7 @@ use compiler.foundation.Values
 
 extern fn with_hashmap_new_at(base: &i8, offset: i64, key_size: i64, val_size: i64) -> void
 extern fn with_getenv_str(name: str) -> str
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 
 fn intern_debug_init_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
@@ -19,7 +19,7 @@ fn intern_debug_init_enabled() -> i32:
 fn intern_debug_init(msg: str):
     if intern_debug_init_enabled() == 0:
         return
-    with_eprintln("[intern-init] " ++ msg)
+    with_eprint("[intern-init] " ++ msg)
 
 type Symbol = i32
 type TypeId = i32

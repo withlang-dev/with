@@ -46,4 +46,4 @@ fn main:
     test_array_iteration()
     test_array_iteration_larger()
     test_array_negative_values()
-    println("ok")
+    print("ok")

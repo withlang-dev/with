@@ -17,4 +17,4 @@ fn main:
     let b = 10 |> sub_one |> triple
     assert(b == 27)
 
-    println("ok")
+    print("ok")

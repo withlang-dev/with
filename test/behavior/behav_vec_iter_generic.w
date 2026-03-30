@@ -5,4 +5,4 @@ fn main:
     v.push("hello")
     v.push("world")
     for s in v:
-        println(s)
+        print(s)

@@ -24,4 +24,4 @@ fn main:
     let r3 = compute(0).await
     assert(r3 == 1)
 
-    println("ok")
+    print("ok")

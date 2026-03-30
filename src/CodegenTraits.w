@@ -6,7 +6,7 @@ use InternPool
 use Diagnostic
 use Source
 
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 
 // ── Collect trait info ────────────────────────────────────────────
 
@@ -777,7 +777,7 @@ fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, dep
             return path_value
         let path = self.resolve_embed_file_path(source_path, path_value.text)
         if with_fs_file_exists(path) == 0:
-            with_eprintln("error: embed_file: could not read '" ++ path ++ "'")
+            with_eprint("error: embed_file: could not read '" ++ path ++ "'")
             self.had_error = 1
             return const_string_eval_fail()
         return const_string_eval_ok(with_fs_read_file(path))
@@ -1062,13 +1062,13 @@ fn Codegen.emit_module_runtime_init_helpers(self: Codegen):
         let result_tid = self.module_runtime_init_type_ids.get(i as i64)
         let global_opt = self.module_constants.get(name_sym)
         if not global_opt.is_some():
-            with_eprintln("error: missing global storage for runtime-initialized module constant '" ++ self.intern.resolve(name_sym) ++ "'")
+            with_eprint("error: missing global storage for runtime-initialized module constant '" ++ self.intern.resolve(name_sym) ++ "'")
             self.had_error = 1
             return
         let init_fn = self.emit_module_runtime_init_fn(name_sym, value_node, result_tid)
         let init_ty = self.sema_type_to_llvm(result_tid)
         if init_fn == 0 or init_ty == 0:
-            with_eprintln("error: failed to emit runtime initializer for module constant '" ++ self.intern.resolve(name_sym) ++ "'")
+            with_eprint("error: failed to emit runtime initializer for module constant '" ++ self.intern.resolve(name_sym) ++ "'")
             self.had_error = 1
             return
         self.module_runtime_init_globals.push(global_opt.unwrap() as i64)
@@ -1306,7 +1306,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     if str_value.ok:
         let st_opt = self.struct_type_map.get(self.sym_str)
         if not st_opt.is_some():
-            with_eprintln("warning: [string-global] str struct type not found")
+            with_eprint("warning: [string-global] str struct type not found")
             return
         let str_ty = self.struct_llvm_types.get(st_opt.unwrap() as i64)
         let name_str = self.intern.resolve(name_sym)

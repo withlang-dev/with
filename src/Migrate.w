@@ -4,7 +4,7 @@
 // requires file system traversal and language-specific parsing.
 // Direct port of bootstrap/src/Migrate.zig to With.
 
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 
 enum MigrateLang: i32:
     Rust = 0
@@ -17,5 +17,5 @@ enum MigrateMode: i32:
     Diff = 2
 
 fn run(lang: str, path: str, mode: i32) -> i32:
-    with_eprintln("migrate: not yet implemented in self-hosted compiler")
+    with_eprint("migrate: not yet implemented in self-hosted compiler")
     1

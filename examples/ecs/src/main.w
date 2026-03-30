@@ -33,59 +33,59 @@ fn main:
     let enemies = spawn_enemies(&mut world, 5)
     let walls = spawn_walls(&mut world)
 
-    println("=== ECS Demo: {world.entity_count()} entities spawned ===\n")
+    print("=== ECS Demo: {world.entity_count()} entities spawned ===\n")
     world.print_stats()
-    println("")
+    print("")
 
     // --- Simulate 5 frames ---
 
     // Frame 0: player presses Right
-    println("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    print("--- Frame {world.frame} (t={world.time:.2}s) ---")
     run_frame(&mut world, &[.KeyDown(.Right)])
 
     // Frame 1: key held (no new events)
-    println("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    print("--- Frame {world.frame} (t={world.time:.2}s) ---")
     run_frame(&mut world, &[])
 
     // Frame 2: player also presses Up (diagonal movement)
-    println("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    print("--- Frame {world.frame} (t={world.time:.2}s) ---")
     run_frame(&mut world, &[.KeyDown(.Up)])
 
     // Frame 3: release Right, keep Up
-    println("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    print("--- Frame {world.frame} (t={world.time:.2}s) ---")
     run_frame(&mut world, &[.KeyUp(.Right)])
 
     // Frame 4: release everything
-    println("--- Frame {world.frame} (t={world.time:.2}s) ---")
+    print("--- Frame {world.frame} (t={world.time:.2}s) ---")
     run_frame(&mut world, &[.KeyUp(.Up)])
 
     // --- Final State ---
 
-    println("\n=== After 5 frames ===")
+    print("\n=== After 5 frames ===")
     world.print_stats()
 
     // Print entity positions using query pipeline
-    println("\nEntity positions:")
+    print("\nEntity positions:")
     for (entity, tf, sprite) in query2(&world.transforms, &world.sprites):
         with world.entity_name(entity) as name:
             let label = name.unwrap_or("?")
-            println("  {label} -> ({tf.position.x:.1}, {tf.position.y:.1}) tex={texture_name(sprite.texture)}")
+            print("  {label} -> ({tf.position.x:.1}, {tf.position.y:.1}) tex={texture_name(sprite.texture)}")
 
     // --- Demonstrate despawning ---
 
-    println("\nDespawning first enemy...")
+    print("\nDespawning first enemy...")
     if let Some(first_enemy) = enemies.first():
         world.despawn(*first_enemy)
 
-    println("Entities after despawn: {world.entity_count()}")
+    print("Entities after despawn: {world.entity_count()}")
 
     // Verify the handle is invalidated
     if let Some(first_enemy) = enemies.first():
         assert(not world.is_alive(*first_enemy))
         assert(world.transforms.get(*first_enemy).is_none())
-        println("Handle correctly invalidated (generation mismatch)")
+        print("Handle correctly invalidated (generation mismatch)")
 
-    println("\n=== Demo complete ===")
+    print("\n=== Demo complete ===")
 
 // --- Entity Spawning Helpers ---
 

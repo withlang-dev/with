@@ -82,4 +82,4 @@ fn main:
     test_option_is_some()
     test_option_map_pattern()
     test_option_chain_pattern()
-    println("ok")
+    print("ok")

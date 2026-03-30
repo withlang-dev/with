@@ -49,4 +49,4 @@ fn main:
     test_closure_as_fn_ptr()
     test_apply_twice()
     test_predicate_fn_ptr()
-    println("ok")
+    print("ok")

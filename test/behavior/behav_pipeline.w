@@ -28,4 +28,4 @@ fn main:
     test_basic_pipeline()
     test_pipeline_chain()
     test_pipeline_three_stages()
-    println("ok")
+    print("ok")

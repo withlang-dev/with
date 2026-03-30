@@ -934,7 +934,7 @@ fn MirBuilder.mark_unsupported(self: MirBuilder):
     if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
         let node_kind = if self.cur_node != 0: self.ast.kind(self.cur_node) else: 0
         let fn_name = self.pool.resolve(self.body.fn_sym)
-        with_eprintln(f"[mir-lower-fail] kind={node_kind} fn={fn_name}")
+        with_eprint(f"[mir-lower-fail] kind={node_kind} fn={fn_name}")
     var b = self.body
     b.lowering_failed = 1
     self.body = b
@@ -1215,7 +1215,7 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
     if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
         let var_name = self.pool.resolve(sym)
         let fn_name = self.pool.resolve(self.body.fn_sym)
-        with_eprintln("[mir-var-miss] sym=" ++ var_name ++ " fn=" ++ fn_name)
+        with_eprint("[mir-var-miss] sym=" ++ var_name ++ " fn=" ++ fn_name)
     self.mark_unsupported()
     self.unit_operand()
 

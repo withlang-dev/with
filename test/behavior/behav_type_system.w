@@ -17,7 +17,7 @@ fn test_struct:
     let p = Point { x: 42, y: 10 }
     assert(p.x == 42)
     assert(p.y == 10)
-    println(int_to_string(p.x))
+    print(int_to_string(p.x))
 
 fn test_struct_from_fn:
     let p = make_point(3, 4)
@@ -51,4 +51,4 @@ fn main:
     test_enum()
     test_enum_equality()
     test_array()
-    println("ok")
+    print("ok")

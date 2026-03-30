@@ -84,4 +84,4 @@ fn main:
     test_method_chain()
     test_counter_methods()
     test_rect_methods()
-    println("ok")
+    print("ok")

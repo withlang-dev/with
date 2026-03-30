@@ -196,4 +196,4 @@ fn main:
     test_pass_by_ptr()
     test_multiple_returns()
     test_match_basic()
-    println("ok")
+    print("ok")

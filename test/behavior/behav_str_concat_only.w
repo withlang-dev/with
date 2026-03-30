@@ -60,4 +60,4 @@ fn main:
     test_fstring_expr_formatting()
     test_fstring_multi_type_holes()
     test_concat_chain()
-    println("ok")
+    print("ok")

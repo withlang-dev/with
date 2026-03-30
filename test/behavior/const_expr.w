@@ -4,4 +4,4 @@ const HEIGHT: i32 = 21
 const AREA: i32 = WIDTH * HEIGHT
 
 fn main:
-    println(int_to_string(AREA))
+    print(int_to_string(AREA))

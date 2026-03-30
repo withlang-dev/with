@@ -3,7 +3,7 @@
 type NodeId = distinct i32
 type TypeId = distinct i32
 
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 
 var pass_count: i32 = 0
 var fail_count: i32 = 0
@@ -12,7 +12,7 @@ fn check(name: str, ok: bool):
     if ok:
         pass_count = pass_count + 1
     else:
-        with_eprintln(f"FAIL: {name}")
+        with_eprint(f"FAIL: {name}")
         fail_count = fail_count + 1
 
 fn main:
@@ -88,11 +88,11 @@ fn main:
     check("negative", neg == NodeId(-1))
     check("negative as i32", neg as i32 == -1)
 
-    println(f"Passed: {pass_count}/{pass_count + fail_count}")
+    print(f"Passed: {pass_count}/{pass_count + fail_count}")
     if fail_count == 0:
-        println("ok")
+        print("ok")
     else:
-        println(f"FAILED: {fail_count}")
+        print(f"FAILED: {fail_count}")
 
 fn process_node(id: NodeId) -> NodeId:
     NodeId(id as i32 * 2)

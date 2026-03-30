@@ -16,8 +16,8 @@ type ConnectionPool = { url: str }
 // The `enter` function uses `defer` to guarantee cleanup.
 impl Scoped[DbConnection] for ConnectionPool:
     fn enter[R](self: &ConnectionPool, f: fn(&DbConnection) -> R) -> R:
-        println("Acquiring connection to {self.url}...")
-        defer println("Releasing connection...")
+        print("Acquiring connection to {self.url}...")
+        defer print("Releasing connection...")
 
         let conn = DbConnection { id: 42 }
         f(&conn)
@@ -91,7 +91,7 @@ async fn test_async_ephemeral_interaction -> Result[Unit, AppError]:
             if conn1.id != conn2.id:
                 // Non-local control flow! This returns from `test_async_ephemeral`.
                 // The compiler safely unwinds the `enter` closures, triggering
-                // the `defer println("Releasing...")` calls automatically.
+                // the `defer print("Releasing...")` calls automatically.
                 return Err(.ProcessError)
 
             // Suspension point! The fiber yields.

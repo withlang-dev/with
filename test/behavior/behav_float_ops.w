@@ -97,4 +97,4 @@ fn main:
     test_float_accumulator()
     test_float_interpolation()
     test_float_large_values()
-    println("ok")
+    print("ok")

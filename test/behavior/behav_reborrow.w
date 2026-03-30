@@ -36,4 +36,4 @@ fn test_reborrow_chained:
 fn main:
     test_reborrow_basic()
     test_reborrow_chained()
-    println("ok")
+    print("ok")

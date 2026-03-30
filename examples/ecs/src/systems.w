@@ -182,9 +182,9 @@ fn run_render(
     entries.sort_by((a, b) => a.layer.cmp(&b.layer))
 
     // Draw (mock — print to stdout for this demo)
-    println("  Render: {entries.len()} sprites")
+    print("  Render: {entries.len()} sprites")
     for entry in entries:
-        println("    [{entry.layer}] {texture_name(entry.texture)} at ({entry.position.x:.1}, {entry.position.y:.1})")
+        print("    [{entry.layer}] {texture_name(entry.texture)} at ({entry.position.x:.1}, {entry.position.y:.1})")
 
 // --- Collision Response ---
 //
@@ -197,7 +197,7 @@ fn run_collision_response(world: &mut World):
             with world.entity_name(event.entity_b) as name_b:
                 let a_str = name_a.unwrap_or("?")
                 let b_str = name_b.unwrap_or("?")
-                println("  Collision: {a_str} <-> {b_str} (overlap: {event.overlap:.1})")
+                print("  Collision: {a_str} <-> {b_str} (overlap: {event.overlap:.1})")
 
 // ===================================================================
 // Frame orchestration — this is where parallel execution happens.

@@ -14,4 +14,4 @@ fn main:
     let result = task.await
     assert(result == 30)
 
-    println("ok")
+    print("ok")

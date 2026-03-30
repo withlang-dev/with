@@ -13,4 +13,4 @@ fn main:
     assert(G.len() == 2)
     assert(G[1] == 9)
 
-    println("ok")
+    print("ok")

@@ -19,7 +19,7 @@ extern fn exit(code: i32) -> void
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_parse_float(s: str) -> f64
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn with_codegen_loop_set_break(idx: i32, bb: i64) -> void
@@ -303,8 +303,8 @@ extern fn wl_di_create_lexical_block(b: i64, scope: i64, file: i64, line: i32, c
 // Runtime helpers
 extern fn with_str_concat(a: str, b: str) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
-extern fn print(s: str) -> void
-extern fn eprintln(s: str) -> void
+extern fn with_write(s: str) -> void
+extern fn eprint(s: str) -> void
 
 // ── Codegen state ─────────────────────────────────────────────────
 
@@ -1037,7 +1037,7 @@ fn Codegen.abi_size_of(self: Codegen, ty: i64) -> i64:
 fn Codegen.gen_module_from_mir(self: Codegen, mir_mod: MirModule, pool: AstPool) -> i32:
     let mir_err = validate_mir_module(mir_mod)
     if mir_err.len() > 0:
-        with_eprintln("error: invalid MIR input for LLVM backend: " ++ mir_err)
+        with_eprint("error: invalid MIR input for LLVM backend: " ++ mir_err)
         self.had_error = 1
         return 1
     self.mir_input = mir_mod
@@ -1264,7 +1264,7 @@ fn Codegen.debug_type_layout_field(self: Codegen, owner_name: str, field_index: 
         let struct_name = wl_get_struct_name(resolved_ty)
         if struct_name.len() > 0:
             msg = msg ++ f" llvm_name={struct_name}"
-    with_eprintln(msg)
+    with_eprint(msg)
 
 fn Codegen.capture_loop_state(self: Codegen) -> LoopState:
     LoopState {
@@ -1338,7 +1338,7 @@ fn Codegen.debug_call_coerce_failure(self: Codegen, context: str, call_node: i32
         let arg_text = self.ident_text_from_node(arg_node)
         if arg_text.len() > 0:
             msg = msg ++ f" arg_text={arg_text}"
-    with_eprintln(msg)
+    with_eprint(msg)
 
 fn Codegen.enforce_coerced_type(self: Codegen, value: i64, expected_ty: i64, context: str) -> i64:
     if value == 0 or expected_ty == 0:
@@ -1361,7 +1361,7 @@ fn Codegen.enforce_coerced_type(self: Codegen, value: i64, expected_ty: i64, con
             return coerced_str
 
     self.had_error = 1
-    with_eprintln("error: " ++ context)
+    with_eprint("error: " ++ context)
     self.build_default_value(expected_ty)
 
 fn Codegen.canonical_local_sym(self: Codegen, sym: i32) -> i32:
@@ -1390,7 +1390,7 @@ fn Codegen.record_local(self: Codegen, sym: i32, local_ptr: i64, ty: i64, is_mut
         if sym_text.len() > 0:
             msg = msg ++ f" name={sym_text}"
         msg = msg ++ f" ty={self.llvm_type_mangle(ty)}"
-        with_eprintln(msg)
+        with_eprint(msg)
 
 fn Codegen.record_local_fn_sig(self: Codegen, sym: i32, fn_sig: i64):
     self.local_fn_sigs.insert(sym, fn_sig)
@@ -1975,7 +1975,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
     if type_node == 0: return wl_void_type(self.context)
     let kind = self.pool.kind(type_node)
 
-    // with_eprintln(f"[codegen] resolve_type node={type_node} kind={kind}")
+    // with_eprint(f"[codegen] resolve_type node={type_node} kind={kind}")
 
     if kind == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(type_node)
@@ -2129,7 +2129,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         return wl_i32_type(self.context)
 
     // Fallback — always warn so silent miscompilation is visible
-    with_eprintln(f"warning: [type-resolve] unhandled type node kind={kind} node={type_node} span={self.pool.get_start(type_node)}..{self.pool.get_end(type_node)}")
+    with_eprint(f"warning: [type-resolve] unhandled type node kind={kind} node={type_node} span={self.pool.get_start(type_node)}..{self.pool.get_end(type_node)}")
     self.type_fallback()
 
 fn Codegen.resolve_primitive_named_type(self: Codegen, sym: i32) -> i64:
@@ -2470,16 +2470,16 @@ fn Codegen.declare_struct_type(self: Codegen, name_sym: i32, type_node: i32):
         self.debug_type_layout_field(name_str, fi, f_name, f_type_node, f_ty)
 
         if f_ty == 0:
-            with_eprintln("error: unresolved type for field '" ++ self.intern.resolve(f_name) ++ "' in struct '" ++ name_str ++ "'")
+            with_eprint("error: unresolved type for field '" ++ self.intern.resolve(f_name) ++ "' in struct '" ++ name_str ++ "'")
             invalid_layout = 1
             self.had_error = 1
         if f_ty == st_type:
-            with_eprintln("error: recursive value field '" ++ self.intern.resolve(f_name) ++ "' in struct '" ++ name_str ++ "' (use pointer or reference)")
+            with_eprint("error: recursive value field '" ++ self.intern.resolve(f_name) ++ "' in struct '" ++ name_str ++ "' (use pointer or reference)")
             invalid_layout = 1
             self.had_error = 1
         let dep_idx = self.find_struct_index_by_type(f_ty)
         if dep_idx >= 0 and dep_idx != idx and self.struct_reaches_type(dep_idx, st_type):
-            with_eprintln("error: recursive value-cycle detected while lowering struct '" ++ name_str ++ "'")
+            with_eprint("error: recursive value-cycle detected while lowering struct '" ++ name_str ++ "'")
             invalid_layout = 1
             self.had_error = 1
 
@@ -2624,7 +2624,7 @@ fn Codegen.declare_enum_type(self: Codegen, name_sym: i32, type_node: i32):
                 let payload_type_node = self.pool.get_extra(offset + pi)
                 let field_ty = self.resolve_type(payload_type_node)
                 if field_ty == 0:
-                    with_eprintln("error: unresolved payload type for enum variant '" ++ self.intern.resolve(v_name) ++ "' in '" ++ enum_name ++ "'")
+                    with_eprint("error: unresolved payload type for enum variant '" ++ self.intern.resolve(v_name) ++ "' in '" ++ enum_name ++ "'")
                     self.had_error = 1
                     invalid_layout = 1
                 payload_fields.push(field_ty)
@@ -3499,7 +3499,7 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
         var f_ty = self.resolve_type(f_type_node)
         self.debug_type_layout_field(mangled, fi, f_name, f_type_node, f_ty)
         if f_ty == 0:
-            with_eprintln("error: unresolved type for field '" ++ self.intern.resolve(f_name) ++ "' in struct '" ++ base_name ++ "'")
+            with_eprint("error: unresolved type for field '" ++ self.intern.resolve(f_name) ++ "' in struct '" ++ base_name ++ "'")
             invalid_layout = 1
             self.had_error = 1
             f_ty = self.type_fallback()
@@ -3529,7 +3529,7 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
 fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, method_name: str, decl: i32, obj: i64, obj_node: i32, obj_ty: i64, args_start: i32, arg_count: i32, call_node: i32, pre_args: Vec[i64]) -> i64:
     let tp_start_opt = self.mono_struct_tp_starts.get(mono_type_sym)
     if not tp_start_opt.is_some():
-        with_eprintln("error: no type param bindings for monomorphized struct")
+        with_eprint("error: no type param bindings for monomorphized struct")
         self.had_error = 1
         return wl_get_undef(wl_i32_type(self.context))
     let tp_flat_start = tp_start_opt.unwrap()
@@ -3758,10 +3758,10 @@ fn Codegen.build_fn_type_from_ast(self: Codegen, fn_type_node: i32) -> i64:
 
 fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     if self.debug_pool_flow_enabled():
-        with_eprintln(f"[llvm-cg] gen_module input.decls={pool.decl_count()} input.nodes={pool.node_count()}")
+        with_eprint(f"[llvm-cg] gen_module input.decls={pool.decl_count()} input.nodes={pool.node_count()}")
     self.pool = pool
     if self.debug_pool_flow_enabled():
-        with_eprintln(f"[llvm-cg] gen_module self.decls={self.pool.decl_count()} self.nodes={self.pool.node_count()}")
+        with_eprint(f"[llvm-cg] gen_module self.decls={self.pool.decl_count()} self.nodes={self.pool.node_count()}")
 
     self.debug_init_module()
 

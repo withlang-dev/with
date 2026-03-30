@@ -41,4 +41,4 @@ fn main:
     test_unsafe_fn_read()
     test_unsafe_fn_write()
     test_unsafe_fn_struct_deref()
-    println("ok")
+    print("ok")

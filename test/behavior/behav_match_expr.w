@@ -132,4 +132,4 @@ fn main:
     test_match_or_pattern()
     test_match_at_binding()
     test_match_multiple_ranges()
-    println("ok")
+    print("ok")

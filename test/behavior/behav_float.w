@@ -17,4 +17,4 @@ fn test_float_ops:
 
 fn main:
     test_float_ops()
-    println("ok")
+    print("ok")
