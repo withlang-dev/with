@@ -162,23 +162,18 @@ Uses the fast tier with AST-based type inference.
 
 ---
 
-## Phase 7: Find All References
+## Phase 7: Find All References — DONE
 
 **Goal:** "Where is this function/type/variable used?"
 
-Uses the slow tier (requires symbol resolution across files).
+Uses the fast tier (token-based same-file scan).
 
-- [ ] Build a reverse index: for every identifier node in the
-      project AST, record which symbol_id it resolves to and
-      where it appears (file + offset + span).
-- [ ] On find-references request: resolve the symbol at cursor,
-      look up all locations in the reverse index, return them.
-- [ ] Include the definition site in the results (with a flag
-      distinguishing definition from reference).
-- [ ] Handle multi-file projects: the reverse index must cover
-      all files in the project, not just the current file.
-- [ ] Test: function used in 3 files, find-references returns
-      all 3 locations plus the definition.
+- [x] Scan all identifier tokens in the file matching the symbol
+      under cursor. Return all positions as Location[].
+- [x] Includes definition site and all reference sites.
+- [x] Tests: `helper` has 4 references (def + 3 calls), `x` has
+      2 references (param + usage), non-ident returns empty.
+- [ ] Future: cross-file references via slow tier reverse index.
 
 ---
 

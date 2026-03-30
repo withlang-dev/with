@@ -237,6 +237,52 @@ check "dot param: age" "$out_du" '"label":"age"'
 
 echo ""
 
+# ── Phase 7: Find references ───────────────────────────────
+echo "Phase 7: Find references"
+
+cat > /tmp/lsp_refs_test.w << 'EOF'
+fn helper(x: i32) -> i32:
+    x * 2
+
+fn main:
+    let a = helper(1)
+    let b = helper(2)
+    let c = helper(a + b)
+    print(c)
+EOF
+
+# References for 'helper' — should find 4 (def + 3 calls)
+req_ref='{"jsonrpc":"2.0","id":2,"method":"textDocument/references","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":0,"character":3},"context":{"includeDeclaration":true}}}'
+out_ref=$(lsp_test /tmp/lsp_refs_test.w "$req_ref")
+# Count occurrences of "range" in the result (one per reference)
+ref_count=$(echo "$out_ref" | grep -o '"range"' | wc -l | tr -d ' ')
+if [ "$ref_count" -ge 4 ]; then
+    PASS=$((PASS + 1))
+    echo "  PASS: helper has 4+ references"
+else
+    FAIL=$((FAIL + 1))
+    echo "  FAIL: helper references (expected 4+, got $ref_count)"
+fi
+
+# References for 'x' parameter — should find 2 (param + usage)
+req_ref_x='{"jsonrpc":"2.0","id":2,"method":"textDocument/references","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":0,"character":10},"context":{"includeDeclaration":true}}}'
+out_ref_x=$(lsp_test /tmp/lsp_refs_test.w "$req_ref_x")
+ref_count_x=$(echo "$out_ref_x" | grep -o '"range"' | wc -l | tr -d ' ')
+if [ "$ref_count_x" -ge 2 ]; then
+    PASS=$((PASS + 1))
+    echo "  PASS: x has 2+ references"
+else
+    FAIL=$((FAIL + 1))
+    echo "  FAIL: x references (expected 2+, got $ref_count_x)"
+fi
+
+# References for unknown identifier — should return empty
+req_ref_none='{"jsonrpc":"2.0","id":2,"method":"textDocument/references","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":7,"character":0},"context":{"includeDeclaration":true}}}'
+out_ref_none=$(lsp_test /tmp/lsp_refs_test.w "$req_ref_none")
+check "refs: empty for non-ident" "$out_ref_none" '"result":\[\]'
+
+echo ""
+
 # ── Summary ─────────────────────────────────────────────────
 echo "=== Results: $PASS passed, $FAIL failed ==="
 if [ "$FAIL" -gt 0 ]; then

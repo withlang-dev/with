@@ -1118,6 +1118,44 @@ fn lsp_signature_help(id: i32, uri: str, text: str, line: i32, col: i32):
     let result = jobj_start() ++ jkv_raw("signatures", jarr_start() ++ sig ++ jarr_end()) ++ "," ++ jkv_int("activeSignature", 0) ++ "," ++ jkv_int("activeParameter", comma_count) ++ jobj_end()
     lsp_write_response(jrpc_result(id, result))
 
+// ── Find references ──────────────────────────────────────────
+
+fn lsp_find_references(id: i32, uri: str, text: str, line: i32, col: i32):
+    let offset = lsp_line_col_to_offset(text, line, col)
+
+    // Find the identifier at cursor
+    var lexer = Lexer.init(text, 0)
+    let tokens = lexer.tokenize()
+    var target = ""
+    for i in 0..tokens.len():
+        if offset >= tokens.get_start(i) and offset < tokens.get_end(i):
+            if tokens.get_tag(i) == TokenKind.TK_IDENT:
+                target = text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
+            break
+
+    if target.len() == 0:
+        lsp_write_response(jrpc_result(id, "[]"))
+        return
+
+    // Scan all identifier tokens for matches (same-file references)
+    var locs = jarr_start()
+    var first = true
+    for i in 0..tokens.len():
+        if tokens.get_tag(i) != TokenKind.TK_IDENT:
+            continue
+        let tok_text = text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
+        if tok_text != target:
+            continue
+        let rl = lsp_offset_to_line(text, tokens.get_start(i))
+        let rc = lsp_offset_to_col(text, tokens.get_start(i))
+        let re = lsp_offset_to_col(text, tokens.get_end(i))
+        if not first:
+            locs = locs ++ ","
+        first = false
+        locs = locs ++ jobj_start() ++ jkv_str("uri", uri) ++ "," ++ jkv_raw("range", jrange(rl, rc, rl, re)) ++ jobj_end()
+    locs = locs ++ jarr_end()
+    lsp_write_response(jrpc_result(id, locs))
+
 // ── Document symbols ─────────────────────────────────────────
 
 fn lsp_document_symbols(id: i32, state: LspState, uri: str, text: str):
@@ -1190,7 +1228,7 @@ fn run_lsp() -> i32:
             state.initialized = true
             let completion_opts = jobj_start() ++ jkv_raw("triggerCharacters", "[\".\"]") ++ jobj_end()
             let sig_help_opts = jobj_start() ++ jkv_raw("triggerCharacters", "[\"(\", \",\"]") ++ jobj_end()
-            let caps = jobj_start() ++ jkv_int("textDocumentSync", 1) ++ "," ++ jkv_bool("hoverProvider", true) ++ "," ++ jkv_bool("definitionProvider", true) ++ "," ++ jkv_bool("documentFormattingProvider", true) ++ "," ++ jkv_raw("completionProvider", completion_opts) ++ "," ++ jkv_raw("signatureHelpProvider", sig_help_opts) ++ "," ++ jkv_bool("documentSymbolProvider", true) ++ jobj_end()
+            let caps = jobj_start() ++ jkv_int("textDocumentSync", 1) ++ "," ++ jkv_bool("hoverProvider", true) ++ "," ++ jkv_bool("definitionProvider", true) ++ "," ++ jkv_bool("documentFormattingProvider", true) ++ "," ++ jkv_raw("completionProvider", completion_opts) ++ "," ++ jkv_raw("signatureHelpProvider", sig_help_opts) ++ "," ++ jkv_bool("documentSymbolProvider", true) ++ "," ++ jkv_bool("referencesProvider", true) ++ jobj_end()
             let info = jobj_start() ++ jkv_str("name", "with-lsp") ++ "," ++ jkv_str("version", "0.1.0") ++ jobj_end()
             let result = jobj_start() ++ jkv_raw("capabilities", caps) ++ "," ++ jkv_raw("serverInfo", info) ++ jobj_end()
             lsp_write_response(jrpc_result(id, result))
@@ -1286,6 +1324,17 @@ fn run_lsp() -> i32:
                 lsp_signature_help(id, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
             else:
                 lsp_write_response(jrpc_result_null(id))
+
+        else if method == "textDocument/references":
+            let td = json_get_object(params, "textDocument")
+            let uri = json_get_string(td, "uri")
+            let pos = json_get_object(params, "position")
+            let idx = state.find_doc(uri)
+            if idx >= 0:
+                let doc = state.documents.get(idx as i64)
+                lsp_find_references(id, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
+            else:
+                lsp_write_response(jrpc_result(id, "[]"))
 
         else if method == "textDocument/documentSymbol":
             let td = json_get_object(params, "textDocument")
