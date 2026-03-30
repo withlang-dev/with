@@ -4,18 +4,28 @@
 // Single-pass tokenizer. Tokens store byte offsets into the source string.
 // Always includes parent links. Non-strict mode.
 
-// Token types
+/// Token type: undefined/uninitialized.
 let JSON_UNDEFINED: i32 = 0
+/// Token type: JSON object `{}`.
 let JSON_OBJECT: i32 = 1
+/// Token type: JSON array `[]`.
 let JSON_ARRAY: i32 = 2
+/// Token type: JSON string `"..."`.
 let JSON_STRING: i32 = 4
+/// Token type: JSON primitive (number, boolean, null).
 let JSON_PRIMITIVE: i32 = 8
 
-// Error codes
+/// Error: not enough token slots. Allocate a larger token array.
 let JSON_ERROR_NOMEM: i32 = -1
+/// Error: invalid/malformed JSON.
 let JSON_ERROR_INVAL: i32 = -2
+/// Error: incomplete JSON, more data expected.
 let JSON_ERROR_PART: i32 = -3
 
+/// A parsed JSON token. Stores byte offsets into the source string.
+/// `tok_type` is one of JSON_OBJECT, JSON_ARRAY, JSON_STRING, JSON_PRIMITIVE.
+/// `size` is the number of direct children (keys for objects, elements for arrays).
+/// `parent` is the index of the parent token (-1 for root).
 type JsonToken {
     tok_type: i32,
     start: i32,
@@ -24,12 +34,14 @@ type JsonToken {
     parent: i32,
 }
 
+/// Parser state. Create with `JsonParser.new()`, pass to `json_parse()`.
 type JsonParser {
     pos: i32,
     toknext: i32,
     toksuper: i32,
 }
 
+/// Create a new JSON parser, ready to parse.
 pub fn JsonParser.new() -> JsonParser:
     JsonParser { pos: 0, toknext: 0, toksuper: -1 }
 
@@ -222,13 +234,15 @@ unsafe fn json_parse_impl(parser: *mut JsonParser, js: str, len: i32, tokens: *m
 
     count
 
+/// Parse a JSON string into tokens. Returns token count on success,
+/// or a negative error code (JSON_ERROR_NOMEM, JSON_ERROR_INVAL, JSON_ERROR_PART).
 pub fn json_parse(parser: *mut JsonParser, js: str, tokens: *mut JsonToken, num_tokens: i32) -> i32:
     let len = js.len() as i32
     unsafe: json_parse_impl(parser, js, len, tokens, num_tokens)
 
 // ── Lookup helpers ──────────────────────────────────────────────
 
-// Extract token text from the source string.
+/// Extract the text of a token from the source JSON string.
 pub fn json_str(js: str, tokens: *mut JsonToken, idx: i32) -> str:
     var start: i32 = 0
     var end: i32 = 0
@@ -237,8 +251,8 @@ pub fn json_str(js: str, tokens: *mut JsonToken, idx: i32) -> str:
         end = (*(tokens + idx as u64)).end
     js.slice(start as i64, end as i64)
 
-// Find the value token index for a key in a JSON object.
-// Returns -1 if not found.
+/// Find the value token for a key in a JSON object.
+/// Returns the token index of the value, or -1 if not found.
 pub fn json_find(js: str, tokens: *mut JsonToken, parent: i32, key: str) -> i32:
     var tok_type: i32 = 0
     var size: i32 = 0
@@ -259,7 +273,7 @@ pub fn json_find(js: str, tokens: *mut JsonToken, parent: i32, key: str) -> i32:
         i = i + 1
     -1
 
-// Parse a primitive token as an integer.
+/// Parse a primitive token as an integer. Returns 0 for non-numeric tokens.
 pub fn json_int(js: str, tokens: *mut JsonToken, idx: i32) -> i32:
     var start: i32 = 0
     var end: i32 = 0

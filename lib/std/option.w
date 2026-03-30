@@ -4,4 +4,11 @@
 // the lowering/runtime behavior for option methods and constructors; this
 // module provides the user-facing type name so it resolves by import.
 
+/// A value that may or may not be present.
+/// `Some(value)` contains a value, `None` represents absence.
+///
+/// Use `.unwrap()` to extract the value (panics if None),
+/// `.unwrap_or(default)` for a safe fallback,
+/// `.is_some()` / `.is_none()` to check,
+/// `.map(fn)` to transform the inner value.
 enum Option[T] { Some(T) | None }
