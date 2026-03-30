@@ -96,10 +96,16 @@ RUNTIME_ARTIFACTS := \
 	$(CLANG_BRIDGE_OBJ) \
 	$(LLVM_LINK_STAMP)
 
+# Version resolution:
+#   Source of truth: src/version (e.g., "v0.12.0")
+#   Git provides: commit count + short hash for dev builds
+#   Override: WITH_VERSION env var
+# No --dirty flag: version reflects committed state only.
+# No commit required: base version always works.
 define RESOLVE_VERSION_SH
 set -euo pipefail; \
-fallback_version="$$(sed -n '1{s/[[:space:]]*$$//;p;}' "$(VERSION_SOURCE_FILE)")"; \
-if [ -z "$$fallback_version" ]; then \
+base="$$(sed -n '1{s/[[:space:]]*$$//;p;}' "$(VERSION_SOURCE_FILE)")"; \
+if [ -z "$$base" ]; then \
 	echo "error: empty or missing version in $(VERSION_SOURCE_FILE)" >&2; \
 	exit 1; \
 fi; \
@@ -108,29 +114,14 @@ if [ -n "$${WITH_VERSION:-}" ]; then \
 	exit 0; \
 fi; \
 if git -C "$(ROOT_DIR)" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-	describe="$$(git -C "$(ROOT_DIR)" describe --tags --dirty --always --match 'v*' 2>/dev/null || true)"; \
-	if [ -n "$$describe" ]; then \
-		clean_describe="$${describe%-dirty}"; \
-		if [[ "$$clean_describe" == v* ]]; then \
-			if [[ ! "$$clean_describe" =~ -[0-9]+-g[0-9a-f]+$$ ]] && [ "$$clean_describe" != "$$fallback_version" ]; then \
-				echo "error: $(VERSION_SOURCE_FILE) ($$fallback_version) does not match current tag ($$clean_describe)" >&2; \
-				exit 1; \
-			fi; \
-			printf '%s\n' "$$describe"; \
-			exit 0; \
-		fi; \
-	fi; \
 	short_hash="$$(git -C "$(ROOT_DIR)" rev-parse --short=9 HEAD 2>/dev/null || true)"; \
-	if [ -n "$$short_hash" ]; then \
-		dirty_suffix=""; \
-		if ! git -C "$(ROOT_DIR)" diff --quiet --ignore-submodules=dirty -- || ! git -C "$(ROOT_DIR)" diff --cached --quiet --ignore-submodules=dirty --; then \
-			dirty_suffix="-dirty"; \
-		fi; \
-		printf '%s-g%s%s\n' "$$fallback_version" "$$short_hash" "$$dirty_suffix"; \
+	commit_count="$$(git -C "$(ROOT_DIR)" rev-list --count HEAD 2>/dev/null || true)"; \
+	if [ -n "$$short_hash" ] && [ -n "$$commit_count" ]; then \
+		printf '%s-%s-g%s\n' "$$base" "$$commit_count" "$$short_hash"; \
 		exit 0; \
 	fi; \
 fi; \
-printf '%s\n' "$$fallback_version"
+printf '%s\n' "$$base"
 endef
 
 define HOST_COMPILE
