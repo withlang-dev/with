@@ -20,6 +20,7 @@ extern fn with_read_line_stdin() -> str
 extern fn with_read_bytes_stdin(count: i32) -> str
 extern fn with_write_stdout(s: str) -> void
 extern fn with_flush_stdout() -> void
+extern fn with_fs_read_file(path: str) -> str
 extern fn with_embedded_std_list_modules() -> str
 
 // ── JSON-RPC framing ─────────────────────────────────────────
@@ -387,27 +388,53 @@ fn lsp_definition(id: i32, state: LspState, uri: str, text: str, line: i32, col:
         lsp_write_response(jrpc_result_null(id))
         return
 
+    // Try slow tier first (cross-file via decl_source_paths)
     let idx = state.find_doc(uri)
     if idx >= 0:
         state.documents.get(idx as i64).ensure_analyzed()
-    var pool = AstPool.new()
-    var intern = InternPool.init()
+    var slow_pool = AstPool.new()
+    var slow_intern = InternPool.init()
+    var slow_paths: Vec[str] = Vec.new()
+    var slow_valid = false
     if idx >= 0 and state.documents.get(idx as i64).cache_valid:
-        pool = state.documents.get(idx as i64).cached_pool
-        intern = state.documents.get(idx as i64).cached_intern
-    else:
-        var comp = Compilation.init()
-        comp.set_prelude_mode(1)
-        pool = comp.compile_source_text(uri_to_path(uri), text)
-        intern = comp.zcu.pool
+        slow_pool = state.documents.get(idx as i64).cached_pool
+        slow_intern = state.documents.get(idx as i64).cached_intern
+        slow_paths = state.documents.get(idx as i64).cached_decl_paths
+        slow_valid = true
+    if slow_valid:
+        for di in 0..slow_pool.decl_count():
+            let decl = slow_pool.get_decl(di)
+            let kind = slow_pool.kind(decl)
+            if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_EXTERN_FN:
+                let name = slow_intern.resolve(slow_pool.get_data0(decl))
+                if name == token_text:
+                    let ds = slow_pool.get_start(decl)
+                    var def_uri = uri
+                    var def_text = text
+                    if di < slow_paths.len() as i32:
+                        let decl_path = slow_paths.get(di as i64)
+                        if decl_path.len() > 0 and decl_path != uri_to_path(uri):
+                            def_uri = "file://" ++ decl_path
+                            let file_text = with_fs_read_file(decl_path)
+                            if file_text.len() > 0:
+                                def_text = file_text
+                            else:
+                                continue
+                    let dl = lsp_offset_to_line(def_text, ds)
+                    let dc = lsp_offset_to_col(def_text, ds)
+                    let loc = jobj_start() ++ jkv_str("uri", def_uri) ++ "," ++ jkv_raw("range", jrange(dl, dc, dl, dc + name.len() as i32)) ++ jobj_end()
+                    lsp_write_response(jrpc_result(id, loc))
+                    return
 
-    for di in 0..pool.decl_count():
-        let decl = pool.get_decl(di)
-        let kind = pool.kind(decl)
+    // Fall back to fast-tier same-file lookup (parse-only)
+    let parsed = lsp_parse_file(text)
+    for di in 0..parsed.pool.decl_count():
+        let decl = parsed.pool.get_decl(di)
+        let kind = parsed.pool.kind(decl)
         if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_LET_DECL:
-            let name = intern.resolve(pool.get_data0(decl))
+            let name = parsed.intern.resolve(parsed.pool.get_data0(decl))
             if name == token_text:
-                let ds = pool.get_start(decl)
+                let ds = parsed.pool.get_start(decl)
                 let dl = lsp_offset_to_line(text, ds)
                 let dc = lsp_offset_to_col(text, ds)
                 let loc = jobj_start() ++ jkv_str("uri", uri) ++ "," ++ jkv_raw("range", jrange(dl, dc, dl, dc + name.len() as i32)) ++ jobj_end()
