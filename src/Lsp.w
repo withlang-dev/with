@@ -1120,39 +1120,80 @@ fn lsp_signature_help(id: i32, uri: str, text: str, line: i32, col: i32):
 
 // ── Find references ──────────────────────────────────────────
 
-fn lsp_find_references(id: i32, uri: str, text: str, line: i32, col: i32):
+fn lsp_find_references(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
     let offset = lsp_line_col_to_offset(text, line, col)
 
     // Find the identifier at cursor
-    var lexer = Lexer.init(text, 0)
-    let tokens = lexer.tokenize()
+    var lex0 = Lexer.init(text, 0)
+    let tok0 = lex0.tokenize()
     var target = ""
-    for i in 0..tokens.len():
-        if offset >= tokens.get_start(i) and offset < tokens.get_end(i):
-            if tokens.get_tag(i) == TokenKind.TK_IDENT:
-                target = text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
+    for i in 0..tok0.len():
+        if offset >= tok0.get_start(i) and offset < tok0.get_end(i):
+            if tok0.get_tag(i) == TokenKind.TK_IDENT:
+                target = text.slice(tok0.get_start(i) as i64, tok0.get_end(i) as i64)
             break
 
     if target.len() == 0:
         lsp_write_response(jrpc_result(id, "[]"))
         return
 
-    // Scan all identifier tokens for matches (same-file references)
+    // Scan current file for matching identifiers
     var locs = jarr_start()
     var first = true
-    for i in 0..tokens.len():
-        if tokens.get_tag(i) != TokenKind.TK_IDENT:
+    var lex1 = Lexer.init(text, 0)
+    let toks1 = lex1.tokenize()
+    for ti in 0..toks1.len():
+        if toks1.get_tag(ti) != TokenKind.TK_IDENT:
             continue
-        let tok_text = text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
-        if tok_text != target:
+        let tt = text.slice(toks1.get_start(ti) as i64, toks1.get_end(ti) as i64)
+        if tt != target:
             continue
-        let rl = lsp_offset_to_line(text, tokens.get_start(i))
-        let rc = lsp_offset_to_col(text, tokens.get_start(i))
-        let re = lsp_offset_to_col(text, tokens.get_end(i))
+        let rl = lsp_offset_to_line(text, toks1.get_start(ti))
+        let rc = lsp_offset_to_col(text, toks1.get_start(ti))
+        let re = lsp_offset_to_col(text, toks1.get_end(ti))
         if not first:
             locs = locs ++ ","
         first = false
         locs = locs ++ jobj_start() ++ jkv_str("uri", uri) ++ "," ++ jkv_raw("range", jrange(rl, rc, rl, re)) ++ jobj_end()
+
+    // Cross-file: scan imported files via slow tier's decl_source_paths
+    let idx = state.find_doc(uri)
+    if idx >= 0:
+        state.documents.get(idx as i64).ensure_analyzed()
+    var cached_paths: Vec[str] = Vec.new()
+    if idx >= 0 and state.documents.get(idx as i64).cache_valid:
+        cached_paths = state.documents.get(idx as i64).cached_decl_paths
+    if cached_paths.len() > 0:
+        var scanned_paths = uri_to_path(uri) ++ "\n"
+        for di in 0..cached_paths.len() as i32:
+            let dpath = cached_paths.get(di as i64)
+            if dpath.len() == 0:
+                continue
+            if dpath.starts_with("<embedded"):
+                continue
+            if lsp_find_substr(scanned_paths, dpath) >= 0:
+                continue
+            scanned_paths = scanned_paths ++ dpath ++ "\n"
+            let ft = with_fs_read_file(dpath)
+            if ft.len() == 0:
+                continue
+            let file_uri = "file://" ++ dpath
+            var lex2 = Lexer.init(ft, 0)
+            let toks2 = lex2.tokenize()
+            for ti2 in 0..toks2.len():
+                if toks2.get_tag(ti2) != TokenKind.TK_IDENT:
+                    continue
+                let tt2 = ft.slice(toks2.get_start(ti2) as i64, toks2.get_end(ti2) as i64)
+                if tt2 != target:
+                    continue
+                let rl2 = lsp_offset_to_line(ft, toks2.get_start(ti2))
+                let rc2 = lsp_offset_to_col(ft, toks2.get_start(ti2))
+                let re2 = lsp_offset_to_col(ft, toks2.get_end(ti2))
+                if not first:
+                    locs = locs ++ ","
+                first = false
+                locs = locs ++ jobj_start() ++ jkv_str("uri", file_uri) ++ "," ++ jkv_raw("range", jrange(rl2, rc2, rl2, re2)) ++ jobj_end()
+
     locs = locs ++ jarr_end()
     lsp_write_response(jrpc_result(id, locs))
 
@@ -1332,7 +1373,7 @@ fn run_lsp() -> i32:
             let idx = state.find_doc(uri)
             if idx >= 0:
                 let doc = state.documents.get(idx as i64)
-                lsp_find_references(id, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
+                lsp_find_references(id, state, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
             else:
                 lsp_write_response(jrpc_result(id, "[]"))
 
