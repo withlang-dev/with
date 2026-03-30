@@ -5,41 +5,54 @@
 // even without explicit import. The source definitions here make them
 // available through the prelude for documentation and tooling.
 
+/// Equality comparison. Implement to enable `==` and `!=` operators.
 pub trait Eq =
     fn eq(self, other: Self) -> bool
 
+/// Ordering comparison. Implement to enable `<`, `>`, `<=`, `>=`.
+/// Return negative for less-than, 0 for equal, positive for greater-than.
 pub trait Ord =
     fn cmp(self, other: Self) -> i32
 
+/// Hashing. Implement to use a type as a HashMap key or HashSet element.
 pub trait Hash =
     fn hash_value(self) -> i64
 
+/// Debug formatting. Used by `f"{value:?}"` format specifier.
 pub trait Debug =
     fn debug_str(self) -> str
 
+/// Display formatting. Used by `f"{value}"` string interpolation.
 pub trait Display =
     fn to_str(self) -> str
 
+/// Default value construction. Call `Type.default()` to get the zero value.
 pub trait Default =
     fn default() -> Self
 
+/// Cloning. Creates an independent copy of a value.
 pub trait Clone =
     fn clone(self: &Self) -> Self
 
+/// Destructor. Called automatically when a value goes out of scope.
 pub trait Drop =
     fn drop(self) -> void
 
+/// Scoped access (immutable). Used with `with` blocks for lock-based access.
 pub trait Scoped =
     fn enter(self) -> Self
     fn exit(self) -> void
 
+/// Scoped access (mutable). Used with `with` blocks for mutable lock-based access.
 pub trait ScopedMut =
     fn enter(self) -> Self
     fn exit(self) -> void
 
+/// Iterator protocol. Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
 pub trait Iter[T] =
     fn next(self) -> Option[T]
 
+/// Conversion to iterator. Enables `for x in collection.iter()`.
 pub trait IntoIter[T] =
     fn iter(self) -> VecIter[T]
 

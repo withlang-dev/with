@@ -14,19 +14,20 @@ extern fn with_setenv_str(name: str, value: str) -> i32
 extern fn with_vec_new_out(v: *void, elem_size: i64) -> void
 extern fn with_vec_push_str(v: *void, val: str) -> void
 extern fn with_str_len(s: str) -> i64
-// Exit the process with given code
+
+/// Exit the process with the given status code.
 pub fn exit_code(code: i32) -> void:
     exit(code)
 
-// Execute a shell command, returns exit status
+/// Execute a shell command. Returns the exit status.
 pub fn system_cmd(cmd: str) -> i32:
     system(cmd as *const i8)
 
-// Get the process ID
+/// Get the current process ID.
 pub fn pid -> i32:
     getpid()
 
-// Command-line arguments.
+/// Get command-line arguments as a Vec of strings.
 pub fn args -> Vec[str]:
     let n = with_arg_count()
     let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
@@ -37,25 +38,28 @@ pub fn args -> Vec[str]:
         i = i + 1
     out
 
-// Environment variable lookup (empty string when missing).
+/// Get an environment variable. Returns "" if not set.
 pub fn env(name: str) -> str:
     let v = with_getenv_str(name)
     if with_str_len(v) == 0 then "" else v
 
-// Set environment variable (0 on success).
+/// Set an environment variable. Returns 0 on success.
 pub fn set_env(name: str, value: str) -> i32:
     with_setenv_str(name, value)
 
-// Minimal command runner wrapper.
+/// A shell command wrapper.
 type Command  {
     cmd: str,
 }
 
+/// Create a Command from a shell command string.
 pub fn command(cmd: str) -> Command:
     Command { cmd: cmd }
 
+/// Run the command. Returns the exit status.
 fn Command.run(self: Command) -> i32:
     system(self.cmd as *const i8)
 
+/// Run the command and return its exit status.
 fn Command.status(self: Command) -> i32:
     system(self.cmd as *const i8)

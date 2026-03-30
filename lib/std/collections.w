@@ -5,6 +5,8 @@
 // collection types; this module provides the user-facing names so they
 // resolve through normal imports instead of hardcoded sema allowlists.
 
+/// A growable array. Create with `Vec.new()`, add with `.push()`,
+/// read with `.get()`. Supports iteration via `.iter()`.
 type Vec[T]  {
     ptr: *const T,
     len: i64,
@@ -12,17 +14,19 @@ type Vec[T]  {
     elem_size: i64,
 }
 
+/// An unordered key-value map. Create with `HashMap.new()`,
+/// insert with `.insert(key, val)`, read with `.get(key)`.
 type HashMap[K, V]  {
     ptr: *const i8,
 }
 
+/// An unordered set of unique values. Create with `HashSet.new()`.
 type HashSet[T]  {
     ptr: *const i8,
 }
 
 // ── Iterators ─────────────────────────────────────────────────────
 
-// VecIter[T] — generic iterator over Vec[T].
-// Stores a raw data pointer and iterates by index.
-// .next() is a codegen intrinsic that returns Option[T].
+/// Iterator over Vec[T]. Obtain via `vec.iter()`.
+/// Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
 type VecIter[T]  { data_ptr: i64, len: i64, idx: i64 }

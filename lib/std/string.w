@@ -22,53 +22,53 @@ use c_import("string.h")
 extern fn with_lines_out(out: *void, s: str) -> void
 extern fn with_parse_i64(s: str) -> i64
 
-// String length (same as s.len())
+/// String length (same as `s.len()`).
 pub fn string_len(s: str) -> i64:
     strlen(s as *const i8) as i64
 
-// StrView length helper (same as v.len)
+/// StrView length helper.
 pub fn view_len(v: &str) -> i64:
     v.len
 
-// StrView emptiness helper
+/// StrView emptiness helper.
 pub fn view_is_empty(v: &str) -> bool:
     v.len == 0
 
-// StrView equality helper
+/// StrView equality helper.
 pub fn view_eq(a: &str, b: &str) -> bool:
     a == b
 
-// String comparison (returns true if equal)
+/// Compare two strings for equality. Returns true if equal.
 pub fn string_eq(a: str, b: str) -> bool:
     strcmp(a as *const i8, b as *const i8) == 0
 
-// String comparison (returns negative, 0, or positive)
+/// Compare two strings lexicographically. Returns negative, 0, or positive.
 pub fn string_cmp(a: str, b: str) -> i32:
     strcmp(a as *const i8, b as *const i8)
 
-// Check if character is alphabetic
+/// Returns true if the character code is alphabetic (A-Z, a-z).
 pub fn is_alpha(c: i32) -> bool:
     (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
 
-// Check if character is a digit
+/// Returns true if the character code is a decimal digit (0-9).
 pub fn is_digit(c: i32) -> bool:
     c >= 48 and c <= 57
 
-// Check if character is whitespace
+/// Returns true if the character code is whitespace (space, tab, newline, etc.).
 pub fn is_space(c: i32) -> bool:
     c == 32 or c == 9 or c == 10 or c == 13 or c == 12 or c == 11
 
-// Convert string to integer
+/// Convert a string to an i64 integer. Returns 0 on invalid input.
 pub fn string_to_int(s: str) -> i64:
     with_parse_i64(s)
 
-// Split text by newline boundaries.
+/// Split text into lines. Returns a Vec of strings, one per line.
 pub fn lines(s: str) -> Vec[str]:
     let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
     with_lines_out(&out, s)
     out
 
-// Parse a trimmed string into i32.
+/// Parse a string as an i32 integer.
 pub fn parse(s: str) -> i32:
     let n = string_to_int(s)
     n as i32
