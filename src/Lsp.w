@@ -562,10 +562,10 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
     let parse_pool = parsed.pool
     let parse_intern = parsed.intern
     let enclosing_fn = lsp_find_enclosing_fn(parse_pool, offset)
-    let scope_names: Vec[str] = Vec.new()
+    var scope_names: Vec[str] = Vec.new()
     if enclosing_fn as i32 != 0:
         let params = lsp_collect_fn_params(parse_pool, parse_intern, enclosing_fn)
-        let seen: Vec[str] = Vec.new()
+        var seen: Vec[str] = Vec.new()
         for pi in 0..params.len() as i32:
             let p = params.get(pi as i64)
             scope_names.push(p)
@@ -660,13 +660,29 @@ fn lsp_parse_file(text: str) -> LspParseResult:
     LspParseResult { pool, intern: parser.intern }
 
 fn lsp_find_enclosing_fn(pool: AstPool, offset: i32) -> NodeId:
+    // Find the function whose span contains the cursor. Use the start of
+    // the NEXT declaration as the upper bound, not get_end — the parser's
+    // end span may not cover trailing blank lines inside the function.
+    var best: NodeId = 0 as NodeId
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_FN_DECL:
             continue
-        if offset >= pool.get_start(decl) and offset <= pool.get_end(decl):
-            return decl
-    0 as NodeId
+        let fn_start = pool.get_start(decl)
+        if fn_start > offset:
+            break
+        // Cursor is after this fn's start. Check if it's before the next decl.
+        var fn_upper = pool.get_end(decl)
+        // Look for the next declaration to use as upper bound
+        for di2 in (di + 1)..pool.decl_count():
+            let next = pool.get_decl(di2)
+            let ns = pool.get_start(next)
+            if ns > fn_start:
+                fn_upper = ns
+                break
+        if offset >= fn_start and offset <= fn_upper:
+            best = decl
+    best
 
 fn lsp_collect_fn_params(pool: AstPool, intern: InternPool, fn_node: NodeId) -> Vec[str]:
     let names: Vec[str] = Vec.new()

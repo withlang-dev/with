@@ -1,0 +1,182 @@
+#!/bin/bash
+# LSP integration tests using expect for proper stdio interaction.
+set -euo pipefail
+
+WITH="${WITH:-./out/bin/with-stage2}"
+PASS=0
+FAIL=0
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+check() {
+    local name="$1"
+    local output="$2"
+    local pattern="$3"
+    if echo "$output" | grep -q "$pattern"; then
+        PASS=$((PASS + 1))
+        echo "  PASS: $name"
+    else
+        FAIL=$((FAIL + 1))
+        echo "  FAIL: $name"
+        echo "    expected: $pattern"
+        echo "    got: $(echo "$output" | head -c 200)"
+    fi
+}
+
+check_not() {
+    local name="$1"
+    local output="$2"
+    local pattern="$3"
+    if echo "$output" | grep -q "$pattern"; then
+        FAIL=$((FAIL + 1))
+        echo "  FAIL: $name (should NOT match)"
+    else
+        PASS=$((PASS + 1))
+        echo "  PASS: $name"
+    fi
+}
+
+# Send LSP messages and capture output. Uses python for correct JSON encoding.
+lsp_test() {
+    local text_file="$1"
+    local request="$2"
+    python3 -c "
+import sys, json
+
+text = open(sys.argv[1]).read()
+request = sys.argv[2]
+
+init = json.dumps({'jsonrpc':'2.0','id':1,'method':'initialize','params':{'capabilities':{}}})
+didopen = json.dumps({'jsonrpc':'2.0','method':'textDocument/didOpen','params':{'textDocument':{'uri':'file:///tmp/lsp_test.w','languageId':'with','version':1,'text':text}}})
+
+def frame(msg):
+    return f'Content-Length: {len(msg)}\r\n\r\n{msg}'
+
+sys.stdout.write(frame(init) + frame(didopen) + frame(request))
+sys.stdout.flush()
+" "$text_file" "$request" | timeout 10 "$WITH" lsp 2>/dev/null || true
+}
+
+echo "=== LSP Integration Tests ==="
+echo ""
+
+# ── Phase 2: Error-tolerant parser ──────────────────────────
+echo "Phase 2: Error-tolerant parser"
+
+for f in test/compile_errors/err_recovery_*.w; do
+    name=$(basename "$f" .w)
+    result=$(timeout 5 "$WITH" check "$f" 2>&1 || true)
+    check "$name: error without crash" "$result" "error:"
+    if echo "$result" | grep -qi "panic\|SIGSEGV\|abort"; then
+        FAIL=$((FAIL + 1))
+        echo "  FAIL: $name crashed!"
+    fi
+done
+
+echo ""
+
+# ── Phase 3: Scope-aware completion ─────────────────────────
+echo "Phase 3: Scope-aware completion"
+
+cat > /tmp/lsp_scope_test.w << 'EOF'
+fn greet(name: str, age: i32):
+    let greeting = "hello"
+    var count = 0
+    count
+
+fn main:
+    greet("hi", 5)
+EOF
+
+# Cursor at line 3, col 4 — inside greet(), on the line "    count"
+req_comp='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":3,"character":4}}}'
+output=$(lsp_test /tmp/lsp_scope_test.w "$req_comp")
+check "params: name" "$output" '"label":"name"'
+check "params: age" "$output" '"label":"age"'
+check "binding: greeting" "$output" '"label":"greeting"'
+check "binding: count" "$output" '"label":"count"'
+check "keywords present" "$output" '"label":"fn"'
+
+# Cursor in main — should NOT see greet's locals
+req_main='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":6,"character":4}}}'
+output_main=$(lsp_test /tmp/lsp_scope_test.w "$req_main")
+check_not "no leak: greeting in main" "$output_main" '"label":"greeting"'
+check_not "no leak: count in main" "$output_main" '"label":"count"'
+
+# use std. module completion
+cat > /tmp/lsp_use_test.w << 'EOF'
+use std.
+
+fn main:
+    print("hi")
+EOF
+
+req_use='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":0,"character":8}}}'
+output_use=$(lsp_test /tmp/lsp_use_test.w "$req_use")
+check "use std. → collections" "$output_use" '"label":"collections"'
+check "use std. → time" "$output_use" '"label":"time"'
+
+echo ""
+
+# ── Phase 4: Go-to-definition ──────────────────────────────
+echo "Phase 4: Go-to-definition"
+
+cat > /tmp/lsp_def_test.w << 'EOF'
+fn helper() -> i32:
+    42
+
+fn main:
+    let x = helper()
+EOF
+
+req_def='{"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":4,"character":12}}}'
+output_def=$(lsp_test /tmp/lsp_def_test.w "$req_def")
+check "def: line 0" "$output_def" '"line":0'
+check "def: has URI" "$output_def" '"uri":'
+
+# Unknown symbol
+req_unk='{"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":4,"character":0}}}'
+output_unk=$(lsp_test /tmp/lsp_def_test.w "$req_unk")
+check "def: unknown → null" "$output_unk" '"result":null'
+
+echo ""
+
+# ── Phase 5: Signature help ────────────────────────────────
+echo "Phase 5: Signature help"
+
+cat > /tmp/lsp_sig_test.w << 'EOF'
+fn greet(name: str, age: i32, active: bool):
+    print(name)
+
+fn main:
+    greet("hi", 25, true)
+EOF
+
+# Param 0 (after opening paren)
+req_s0='{"jsonrpc":"2.0","id":2,"method":"textDocument/signatureHelp","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":4,"character":10}}}'
+out_s0=$(lsp_test /tmp/lsp_sig_test.w "$req_s0")
+check "sig: param 0" "$out_s0" '"activeParameter":0'
+check "sig: has label" "$out_s0" '"label":"fn greet'
+check "sig: name param" "$out_s0" '"label":"name: str"'
+
+# Param 1 (after first comma)
+req_s1='{"jsonrpc":"2.0","id":2,"method":"textDocument/signatureHelp","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":4,"character":16}}}'
+out_s1=$(lsp_test /tmp/lsp_sig_test.w "$req_s1")
+check "sig: param 1" "$out_s1" '"activeParameter":1'
+
+# Param 2 (after second comma)
+req_s2='{"jsonrpc":"2.0","id":2,"method":"textDocument/signatureHelp","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":4,"character":20}}}'
+out_s2=$(lsp_test /tmp/lsp_sig_test.w "$req_s2")
+check "sig: param 2" "$out_s2" '"activeParameter":2'
+
+# Outside call → null
+req_sn='{"jsonrpc":"2.0","id":2,"method":"textDocument/signatureHelp","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":1,"character":4}}}'
+out_sn=$(lsp_test /tmp/lsp_sig_test.w "$req_sn")
+check "sig: null outside call" "$out_sn" '"result":null'
+
+echo ""
+
+# ── Summary ─────────────────────────────────────────────────
+echo "=== Results: $PASS passed, $FAIL failed ==="
+if [ "$FAIL" -gt 0 ]; then
+    exit 1
+fi
