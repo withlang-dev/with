@@ -121,28 +121,20 @@ Uses the slow tier (full compilation with imports resolved).
 
 ---
 
-## Phase 5: Signature Help
+## Phase 5: Signature Help — DONE
 
 **Goal:** While typing function arguments, show parameter names
-and types. This is high value for a new language because users
-don't know the API yet.
+and types.
 
-Uses the fast tier for call detection, slow tier for type info.
-
-- [ ] Detect trigger: cursor is inside a call expression (after `(`
-      or after `,`). Walk tokens backward from cursor to find the
-      opening `(` and the function name.
-- [ ] Determine active parameter index by counting commas between
-      the opening `(` and the cursor.
-- [ ] Look up function signature: first try the slow tier's sema
-      data (parameter names + types). If unavailable, fall back to
-      the fast tier — parse the file, find the function declaration,
-      read parameter names from the AST.
-- [ ] Return `SignatureHelp` response with `activeParameter` set.
-- [ ] Register `(` and `,` as trigger characters in server
-      capabilities.
-- [ ] Test: cursor at each parameter position in a multi-arg call.
-      Verify correct parameter is highlighted.
+- [x] Walk tokens backward from cursor to find opening `(` and
+      function name. Count commas for active parameter index.
+- [x] Look up function in fast-tier parse, read fn_meta for
+      parameter names + types (NK_TYPE_NAMED, NK_TYPE_REF).
+- [x] Return SignatureHelp with label, parameters, activeParameter.
+- [x] Registered `(` and `,` as trigger characters.
+- [x] Tested: `greet("hi", |)` shows activeParameter=1,
+      `greet(|)` shows activeParameter=0. Full signature label
+      includes parameter types.
 
 ---
 
