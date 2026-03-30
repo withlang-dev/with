@@ -91,4 +91,4 @@ fn main:
     test_for_break_in_nested()
     test_for_accumulate_product()
     test_for_find_max()
-    println("ok")
+    print("ok")

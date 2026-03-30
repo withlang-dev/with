@@ -15,7 +15,7 @@ use compiler.Frontend
 use compiler.Link
 use compiler.Zcu
 
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_system(cmd: str) -> i32
@@ -29,7 +29,7 @@ fn compilation_debug_init_enabled() -> i32:
 fn compilation_debug_init(msg: str):
     if compilation_debug_init_enabled() == 0:
         return
-    with_eprintln("[comp-init] " ++ msg)
+    with_eprint("[comp-init] " ++ msg)
 
 fn compilation_debug_pool_flow_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_POOL_FLOW")
@@ -40,7 +40,7 @@ fn compilation_debug_pool_flow_enabled() -> i32:
 fn compilation_debug_pool_flow(label: str, pool: InternPool, typed_pool: AstPool, sema: Sema):
     if compilation_debug_pool_flow_enabled() == 0:
         return
-    with_eprintln(f"[comp] {label} pool.symbols={pool.symbol_texts.len() as i32} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
+    with_eprint(f"[comp] {label} pool.symbols={pool.symbol_texts.len() as i32} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
 
 fn compilation_debug_type_names_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_TYPE_NAMES")
@@ -53,7 +53,7 @@ fn compilation_debug_type_names_enabled() -> i32:
 fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
     if compilation_debug_type_names_enabled() == 0:
         return
-    with_eprintln(f"[type-names] stage={stage} decls={pool.decl_count()}")
+    with_eprint(f"[type-names] stage={stage} decls={pool.decl_count()}")
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_TYPE_DECL:
@@ -71,7 +71,7 @@ fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)
         let msg = f"[type-names] {stage} decl={di} node={decl as i32} kind={kind_name} name_sym={name_sym} name={name}"
-        with_eprintln(msg)
+        with_eprint(msg)
 
 fn compilation_find_fn_decl_index(pool: AstPool, fn_sym: i32) -> i32:
     for di in 0..pool.decl_count():
@@ -241,7 +241,7 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
     if pool.decl_count() == 0:
         return ""
     if not self.ensure_codegen_mir(pool):
-        with_eprintln("error: C emission failed during MIR lowering")
+        with_eprint("error: C emission failed during MIR lowering")
         return ""
     let typed_pool: AstPool = self.active_pool(pool)
 
@@ -252,12 +252,12 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
 
     let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, self.zcu.pool, self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text)
     if emitted.ok == 0:
-        with_eprintln("error: C emission failed: " ++ emitted.err_msg)
+        with_eprint("error: C emission failed: " ++ emitted.err_msg)
         return ""
 
     let write_rc = with_fs_write_file(final_output, emitted.source)
     if write_rc != 0:
-        with_eprintln("error: failed to write '" ++ final_output ++ "'")
+        with_eprint("error: failed to write '" ++ final_output ++ "'")
         return ""
 
     final_output
@@ -266,7 +266,7 @@ fn Compilation.emit_typed(self: Compilation, pool: AstPool) -> bool:
     var zcu = self.zcu
     let typed_pool = pool
     if typed_pool.decl_count() == 0:
-        with_eprintln("error: no source loaded for typed emission")
+        with_eprint("error: no source loaded for typed emission")
         return false
     if zcu.last_sema.ast.decl_count() == typed_pool.decl_count() and typed_pool.decl_count() > 0:
         zcu.last_sema.emit_typed_module(0)

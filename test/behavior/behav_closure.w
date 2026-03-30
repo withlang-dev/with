@@ -37,4 +37,4 @@ fn main:
     let r6 = apply(double, apply(double, 3))
     assert(r6 == 12)
 
-    println("ok")
+    print("ok")

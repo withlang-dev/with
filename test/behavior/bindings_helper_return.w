@@ -14,4 +14,4 @@ fn bindings_from(entries: Vec[BindEntry]) -> Bindings:
 fn main:
     let bindings = bindings_from(Vec.new())
     if bindings.entries.len() == 0:
-        println("ok")
+        print("ok")

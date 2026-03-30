@@ -7,6 +7,6 @@ fn main:
     var result: Vec[i32] = Vec.new()
     for v in items:
         result.push(v * 2)
-    println(int_to_string(result.len()))
+    print(int_to_string(result.len()))
     for v in result:
-        println(int_to_string(v))
+        print(int_to_string(v))

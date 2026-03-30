@@ -42,4 +42,4 @@ fn main:
     test_tuple_mixed_types()
     test_tuple_pass_to_fn()
     test_tuple_match()
-    println("ok")
+    print("ok")

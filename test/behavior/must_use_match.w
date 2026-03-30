@@ -15,24 +15,24 @@ fn test_must_use_exhaustive_match:
     // Must-use type with exhaustive match (all variants covered) — ok
     let s: Status = .Ok
     match s
-        .Ok => println("ok status")
-        .Err => println("err status")
+        .Ok => print("ok status")
+        .Err => print("err status")
 
 fn test_must_use_with_wildcard:
     // Must-use type with wildcard — ok (wildcard counts as catch-all)
     let s: Status = .Ok
     match s
-        .Ok => println("ok status")
-        _ => println("other")
+        .Ok => print("ok status")
+        _ => print("other")
 
 fn test_non_must_use_partial:
     // Non-must-use type with partial match in statement position — ok
     let c: Color = .Red
     match c
-        .Red => println("red")
+        .Red => print("red")
 
 fn main:
     test_must_use_exhaustive_match()
     test_must_use_with_wildcard()
     test_non_must_use_partial()
-    println("ok")
+    print("ok")

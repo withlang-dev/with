@@ -13,10 +13,10 @@ compiler does the same thing, but the code is clean.
 Rule: One file at a time. Verify fixpoint after each file.
 Never batch multiple files.
 
-**Codebase stats (updated 2026-03-29):** 54,522 total lines
-across 63 source files. Largest files: CodegenDispatch.w (5,566),
-Parser.w (5,032), SemaCheck.w (4,811), CCodegen.w (4,440),
-Codegen.w (3,974), MirLower.w (3,965).
+**Codebase stats (updated 2026-03-29):** 55,192 total lines
+across 63 source files. Largest files: CodegenDispatch.w (5,571),
+Parser.w (5,042), SemaCheck.w (4,916), CImport.w (4,628),
+CCodegen.w (4,440), Codegen.w (3,998), MirLower.w (3,937).
 
 ---
 
@@ -524,6 +524,36 @@ Compile-time evaluation system. Phases 1-4 and 7-9 implemented.
 
 ---
 
+## Phase II-8: MIR Verification and Regression Testing
+
+### Typed MIR Verifier — DONE ✓
+
+408-line verifier in `src/Mir.w` runs before codegen (commit `99ceb09`).
+Validates MIR type consistency (aggregate destinations, projection
+typing, operand types).
+
+- [x] Implement MIR verifier pass
+- [x] Integrate into Compilation pipeline
+- [x] `make build && make fixpoint`
+
+### Bug Fixes with Regression Tests
+
+Five codegen/sema bugs fixed, each with a regression test:
+
+- [x] Generic option match inference (`4b69f1d`) — SemaCheck.w
+- [x] Nested Vec field string comparisons (`bd1021a`) — CodegenDispatch.w
+- [x] MIR aggregate destination typing (`47240f3`) — CodegenDispatch.w
+- [x] Semantic comparison dispatch (`13003db`) — Codegen.w + CodegenDispatch.w
+- [x] Nested projection typing (`6411c91`) — CodegenDispatch.w + MirLower.w
+
+### Compiler Regression Matrix — DONE ✓
+
+Comprehensive regression test suites (commit `c1c302d`):
+- `regression_aggregate_flow_matrix.w` (110 lines)
+- `regression_projection_import_matrix.w` (123 lines)
+
+---
+
 ## Principle Enforcement
 
 Cross-cutting concerns from the manifesto.
@@ -632,11 +662,9 @@ If the build breaks, stop and bisect. Do not batch changes.
 **Remaining work:**
 
 1. Phase II-5.2-5.5 (C backend self-compile + cross-compilation)
-2. Phase II-6.3 (`with bench`)
-3. Phase II-6.4 (remaining error message improvements)
-4. P13 (C backend round-trip tests)
-5. P15 (seed safety check + C seed replacement)
-6. Comptime system (phases 1-4, 7-9 implemented, ongoing)
+2. Phase II-6.4 (remaining error message improvements)
+3. P13 (C backend round-trip tests)
+4. P15 (seed safety check + C seed replacement)
 
 All other phases are complete.
 

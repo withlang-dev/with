@@ -7,4 +7,4 @@ fn main:
     v.push(42)
     assert(v.len() == 1)
     assert(v.get(0) == 42)
-    println("ok")
+    print("ok")

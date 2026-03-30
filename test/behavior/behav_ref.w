@@ -50,4 +50,4 @@ fn main:
     test_ref_multiple_reads()
     test_multiple_refs()
     test_ref_after_use()
-    println("ok")
+    print("ok")

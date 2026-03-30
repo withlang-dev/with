@@ -8,4 +8,4 @@ fn main:
     items.push(20)
     let r1 = items.map(double)
     for v in r1:
-        println(int_to_string(v))
+        print(int_to_string(v))

@@ -6,7 +6,7 @@ use InternPool
 use Diagnostic
 use Source
 
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 
 // ── gen_function_dispatch: MIR-first, AST fallback for unsupported patterns ──
 
@@ -27,7 +27,7 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
         if body.lowering_failed == 0 and body.block_count() > 0:
             if self.debug_mir_codegen_enabled():
                 let fn_name = self.intern.resolve(fn_sym)
-                with_eprintln("[mir-dispatch] using MIR for: " ++ fn_name)
+                with_eprint("[mir-dispatch] using MIR for: " ++ fn_name)
             let fv = self.fn_values.get(fn_sym)
             if fv.is_some():
                 self.current_function_name_sym = fn_sym
@@ -562,7 +562,7 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
     let fallback_ty = if materialize_ty != 0: materialize_ty else: wl_i32_type(self.context)
     if const_id < 0 or const_id >= body.const_kinds.len() as i32:
         if self.debug_fallback_enabled():
-            with_eprintln(f"warning: [fallback] mir_const_value: invalid const_id={const_id}")
+            with_eprint(f"warning: [fallback] mir_const_value: invalid const_id={const_id}")
         return wl_get_undef(fallback_ty)
 
     let ck = body.const_kinds.get(const_id as i64)
@@ -619,7 +619,7 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         // so gen_closure can find captured variables and their types.
         let closure_node = cd
         if closure_node <= 0 or closure_node >= self.pool.node_count():
-            with_eprintln(f"warning: [ck-closure] invalid node={closure_node}")
+            with_eprint(f"warning: [ck-closure] invalid node={closure_node}")
             return wl_get_undef(fallback_ty)
         for li in 0..body.local_count():
             let name_sym = body.local_names.get(li as i64)
@@ -649,15 +649,15 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         if fv_opt.is_some():
             if self.debug_mir_codegen_enabled():
                 let fn_name = self.function_symbol_name(translated_sym)
-                with_eprintln(f"[ck-fn] sym={fn_sym} -> {fn_name}")
+                with_eprint(f"[ck-fn] sym={fn_sym} -> {fn_name}")
             return fv_opt.unwrap() as i64
         let fn_name = self.function_symbol_name(translated_sym)
         let found = wl_get_named_function(self.llmod, fn_name)
         if found != 0:
             if self.debug_mir_codegen_enabled():
-                with_eprintln(f"[ck-fn] sym={fn_sym} -> {fn_name} (llmod)")
+                with_eprint(f"[ck-fn] sym={fn_sym} -> {fn_name} (llmod)")
             return found
-        with_eprintln(f"warning: [ck-fn] NOT FOUND sym={fn_sym} name={fn_name}")
+        with_eprint(f"warning: [ck-fn] NOT FOUND sym={fn_sym} name={fn_name}")
         return wl_get_undef(fallback_ty)
 
     wl_get_undef(fallback_ty)
@@ -666,7 +666,7 @@ fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expec
     let fallback_ty = if expected_ty != 0: expected_ty else: wl_i32_type(self.context)
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         if self.debug_fallback_enabled():
-            with_eprintln(f"warning: [fallback] mir_eval_operand: invalid operand_id={operand_id}")
+            with_eprint(f"warning: [fallback] mir_eval_operand: invalid operand_id={operand_id}")
         return wl_get_undef(fallback_ty)
 
     let ok = body.operand_kinds.get(operand_id as i64)
@@ -904,7 +904,7 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
         if is_unsigned: return wl_build_lshr(self.builder, l, r)
         return wl_build_ashr(self.builder, l, r)
     if op == BinaryOp.OP_CONCAT: return self.mir_str_concat(lhs, rhs)
-    with_eprintln("warning: [mir-binop] unhandled binary op")
+    with_eprint("warning: [mir-binop] unhandled binary op")
     wl_get_undef(wl_i32_type(self.context))
 
 fn Codegen.mir_str_concat(self: Codegen, lhs: i64, rhs: i64) -> i64:
@@ -1207,7 +1207,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
     let fallback_ty = if dest_ty != 0: dest_ty else: wl_i32_type(self.context)
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         if self.debug_fallback_enabled():
-            with_eprintln(f"warning: [fallback] mir_eval_rvalue: invalid rval_id={rval_id}")
+            with_eprint(f"warning: [fallback] mir_eval_rvalue: invalid rval_id={rval_id}")
         return wl_get_undef(fallback_ty)
 
     let rk = body.rval_kinds.get(rval_id as i64)
@@ -1311,10 +1311,10 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             let agg_count = body.agg_field_counts.get(agg_fields_id as i64)
             var struct_ty = dest_ty
             if self.debug_mir_codegen_enabled():
-                with_eprintln(f"[mir-agg] fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count} dest_ty_kind={if dest_ty != 0: wl_get_type_kind(dest_ty) else: -1} dest_ty_fields={if dest_ty != 0 and wl_get_type_kind(dest_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(dest_ty) else: -1}")
+                with_eprint(f"[mir-agg] fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count} dest_ty_kind={if dest_ty != 0: wl_get_type_kind(dest_ty) else: -1} dest_ty_fields={if dest_ty != 0 and wl_get_type_kind(dest_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(dest_ty) else: -1}")
             if agg_count == 0 and d0 != 1:
                 if struct_ty == 0:
-                    with_eprintln(f"error: aggregate rvalue missing destination type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
+                    with_eprint(f"error: aggregate rvalue missing destination type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
                     self.had_error = 1
                     return wl_get_undef(fallback_ty)
                 return self.build_default_value(struct_ty)
@@ -1351,7 +1351,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                 if agg_count > 0 and wl_count_struct_elem_types(struct_ty) > 1:
                     let ev_payload_ty = self.mir_enum_variant_payload_llvm_type(dest_sema_ty, ev_tag)
                     if ev_payload_ty == 0:
-                        with_eprintln(f"error: aggregate enum payload missing destination payload type fn={self.intern.resolve(self.current_function_name_sym)} variant={ev_tag}")
+                        with_eprint(f"error: aggregate enum payload missing destination payload type fn={self.intern.resolve(self.current_function_name_sym)} variant={ev_tag}")
                         self.had_error = 1
                         return wl_get_undef(fallback_ty)
                     let ev_data_ptr = wl_build_struct_gep(self.builder, struct_ty, ev_alloca, 1)
@@ -1372,7 +1372,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                         wl_build_store(self.builder, self.coerce_value_to_type(ev_val, ev_payload_ty), ev_data_ptr)
                 return wl_build_load(self.builder, struct_ty, ev_alloca)
             if struct_ty == 0 or wl_get_type_kind(struct_ty) != wl_struct_type_kind():
-                with_eprintln(f"error: aggregate rvalue missing destination struct type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
+                with_eprint(f"error: aggregate rvalue missing destination struct type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
                 self.had_error = 1
                 return wl_get_undef(fallback_ty)
             let alloca = self.create_entry_alloca(struct_ty)
@@ -2300,7 +2300,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_LEN:
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
         if self.debug_mir_codegen_enabled():
-            with_eprintln(f"[mir-str-len] recv_ty_kind={wl_get_type_kind(wl_type_of(recv))}")
+            with_eprint(f"[mir-str-len] recv_ty_kind={wl_get_type_kind(wl_type_of(recv))}")
         result = wl_build_extract_value(self.builder, recv, 1)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_BYTE_AT:
@@ -3076,7 +3076,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     // These have meaningless ConstKind.CK_FN syms — dispatch by intrinsic kind instead.
     let mir_intrinsic = body.call_intrinsic(args_id)
     if self.debug_mir_codegen_enabled():
-        with_eprintln(f"[mir-call-pre] intrinsic={mir_intrinsic} callee_op={callee_operand} args_id={args_id} dest={dest_place}")
+        with_eprint(f"[mir-call-pre] intrinsic={mir_intrinsic} callee_op={callee_operand} args_id={args_id} dest={dest_place}")
     if mir_intrinsic == MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL:
         let gc_node = body.call_ast_node(args_id)
         if gc_node > 0:
@@ -3503,7 +3503,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 if fatal_recv_ty == 0 and fatal_mir_count > 0:
                     let fatal_recv_op = body.call_arg_operands.get(fatal_mir_start as i64)
                     fatal_recv_ty = self.mir_operand_sema_type(body, fatal_recv_op)
-                with_eprintln(f"FATAL: unhandled MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL sym={gc_name} node_kind={self.pool.kind(gc_node)} recv_ty={fatal_recv_ty} recv_kind={if fatal_recv != 0: self.pool.kind(fatal_recv) else: -1} arg_count={fatal_mir_count}")
+                with_eprint(f"FATAL: unhandled MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL sym={gc_name} node_kind={self.pool.kind(gc_node)} recv_ty={fatal_recv_ty} recv_kind={if fatal_recv != 0: self.pool.kind(fatal_recv) else: -1} arg_count={fatal_mir_count}")
                 self.had_error = 1
             if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                 let gc_next_val = self.mir_bb_values.get(next_bb as i64)
@@ -3522,7 +3522,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 let raw_sym = body.const_d0.get(co_d as i64)
                 if raw_sym > 0 and raw_sym < self.sema.pool.symbol_texts.len() as i32:
                     dbg_name = self.sema.pool.symbol_texts.get(raw_sym as i64)
-        with_eprintln(f"[mir-call] callee={dbg_name} callee_ty_kind={wl_get_type_kind(wl_type_of(callee))}")
+        with_eprint(f"[mir-call] callee={dbg_name} callee_ty_kind={wl_get_type_kind(wl_type_of(callee))}")
     let call_context = self.mir_call_context(body, callee_operand)
     var call_ft: i64 = 0
     var is_indirect = false
@@ -3649,10 +3649,10 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     let actual_callee = if is_indirect: fn_ptr_val else: callee
     let actual_arg_count = if is_indirect: arg_count + 1 else: arg_count
     if self.debug_mir_codegen_enabled():
-        with_eprintln(f"[mir-call] building call arg_count={actual_arg_count} ft_params={wl_count_param_types(call_ft)}")
+        with_eprint(f"[mir-call] building call arg_count={actual_arg_count} ft_params={wl_count_param_types(call_ft)}")
         for di in 0..args.len() as i32:
             let a = args.get(di as i64)
-            with_eprintln(f"[mir-call]   arg[{di}] ty_kind={wl_get_type_kind(wl_type_of(a))}")
+            with_eprint(f"[mir-call]   arg[{di}] ty_kind={wl_get_type_kind(wl_type_of(a))}")
     let call_val = wl_build_call(self.builder, call_ft, actual_callee, vec_data_i64(&args), actual_arg_count)
     let ret_ty = wl_get_return_type(call_ft)
     if ret_ty != wl_void_type(self.context):
@@ -3674,7 +3674,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         dst_ty = resolved_llvm
             self.mir_local_types.insert(dst_local, dst_ty)
         if self.debug_mir_codegen_enabled():
-            with_eprintln(f"[mir-call-ret] dst_local={dst_local} ret_ty_kind={wl_get_type_kind(ret_ty)} dst_ty_kind={wl_get_type_kind(dst_ty)} is_str={if self.is_str_type(dst_ty): 1 else: 0}")
+            with_eprint(f"[mir-call-ret] dst_local={dst_local} ret_ty_kind={wl_get_type_kind(ret_ty)} dst_ty_kind={wl_get_type_kind(dst_ty)} is_str={if self.is_str_type(dst_ty): 1 else: 0}")
         let dst_ptr = self.mir_place_ptr(body, dest_place, true, dst_ty)
         if dst_ptr == 0:
             return false
@@ -3698,7 +3698,7 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
     let d2 = body.bb_term_d2.get(bb as i64)
     let d3 = body.bb_term_d3.get(bb as i64)
     if self.debug_mir_codegen_enabled():
-        with_eprintln(f"[mir-term] bb={bb} tk={tk}")
+        with_eprint(f"[mir-term] bb={bb} tk={tk}")
 
     if tk == TermKind.TK_GOTO:
         if d0 < 0 or d0 >= self.mir_bb_values.len() as i32:
@@ -3783,16 +3783,16 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         return
     let fv = self.fn_values.get(name_sym)
     if not fv.is_some():
-        with_eprintln("error: no fn_value for MIR function: " ++ name_str)
+        with_eprint("error: no fn_value for MIR function: " ++ name_str)
         return
     let function = fv.unwrap() as i64
     let ft = self.fn_fn_types.get(name_sym)
     if not ft.is_some():
-        with_eprintln("error: no fn_type for MIR function: " ++ name_str)
+        with_eprint("error: no fn_type for MIR function: " ++ name_str)
         return
     let fn_type = ft.unwrap() as i64
     if self.debug_mir_codegen_enabled():
-        with_eprintln(f"[mir-cg] fn={name_str} blocks={body.block_count()}")
+        with_eprint(f"[mir-cg] fn={name_str} blocks={body.block_count()}")
 
     self.current_function = function
     self.current_function_name_sym = name_sym
@@ -3939,7 +3939,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
             continue
         let llbb = self.mir_bb_values.get(bb as i64)
         if self.debug_mir_codegen_enabled():
-            with_eprintln(f"[mir-cg] fn={name_str} bb={bb} llbb={llbb}")
+            with_eprint(f"[mir-cg] fn={name_str} bb={bb} llbb={llbb}")
         wl_position_at_end(self.builder, llbb)
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
         let stmt_count = body.bb_stmt_counts.get(bb as i64)
@@ -3956,7 +3956,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
                 self.debug_set_location(stmt_span)
             if not self.mir_emit_stmt(body, stmt_id):
                 if self.debug_mir_codegen_enabled():
-                    with_eprintln(f"[mir-cg] fn={name_str} bb={bb} stmt_fail={stmt_id}")
+                    with_eprint(f"[mir-cg] fn={name_str} bb={bb} stmt_fail={stmt_id}")
                 if wl_get_bb_terminator(llbb) == 0:
                     wl_build_unreachable(self.builder)
                 break
@@ -3969,7 +3969,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
                 var ok_i = 0
                 if ok:
                     ok_i = 1
-                with_eprintln(f"[mir-cg] fn={name_str} bb={bb} term_ok={ok_i}")
+                with_eprint(f"[mir-cg] fn={name_str} bb={bb} term_ok={ok_i}")
             if not ok and wl_get_bb_terminator(llbb) == 0:
                 wl_build_unreachable(self.builder)
 
@@ -4002,12 +4002,12 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     let name_str = self.intern.resolve(mono_sym)
     let fv = self.fn_values.get(mono_sym)
     if not fv.is_some():
-        with_eprintln("error: no fn_value for MIR mono function: " ++ name_str)
+        with_eprint("error: no fn_value for MIR mono function: " ++ name_str)
         return
     let function = fv.unwrap() as i64
     let ft = self.fn_fn_types.get(mono_sym)
     if not ft.is_some():
-        with_eprintln("error: no fn_type for MIR mono function: " ++ name_str)
+        with_eprint("error: no fn_type for MIR mono function: " ++ name_str)
         return
     let fn_type = ft.unwrap() as i64
 
@@ -4412,7 +4412,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
                 break
 
     if meta < 0:
-        with_eprintln("warning: [optional-chain] chain resolution failed")
+        with_eprint("warning: [optional-chain] chain resolution failed")
         return wl_get_undef(wl_i32_type(self.context))
 
     let ret_type_node = self.pool.fn_meta_ret(meta)
@@ -4422,7 +4422,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
     let tp_count = self.pool.fn_meta_tp_count(meta)
     let body_node = self.pool.get_data1(generic_node)
     if param_count < 0 or param_count > 64:
-        with_eprintln("warning: [optional-chain] chain resolution failed")
+        with_eprint("warning: [optional-chain] chain resolution failed")
         return wl_get_undef(wl_i32_type(self.context))
 
     let tp_syms: Vec[i32] = Vec.new()
@@ -4517,7 +4517,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
         let tp_sym = tp_syms.get(ti as i64)
         let bty = self.find_binding_type(bind_syms, bind_tys, tp_sym)
         if bty == 0:
-            with_eprintln("error: unknown type")
+            with_eprint("error: unknown type")
             self.had_error = 1
             return wl_get_undef(wl_i32_type(self.context))
         // Use sema type for mangling when available (LLVM types lose struct identity)
@@ -4577,7 +4577,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
                 self.type_binding_syms = saved_bind_syms
                 self.type_binding_types = saved_bind_tys
                 self.type_bindings_len = saved_bind_len
-                with_eprintln("error: unknown type")
+                with_eprint("error: unknown type")
                 self.had_error = 1
                 return wl_get_undef(wl_i32_type(self.context))
             mono_param_types.push(p_ty)
@@ -4590,7 +4590,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
         self.type_binding_syms = saved_bind_syms
         self.type_binding_types = saved_bind_tys
         self.type_bindings_len = saved_bind_len
-        with_eprintln("error: unknown type")
+        with_eprint("error: unknown type")
         self.had_error = 1
         return wl_get_undef(wl_i32_type(self.context))
     let mono_ft = wl_function_type(mono_ret_ty, vec_data_i64(&mono_param_types), param_count, 0)
@@ -5324,7 +5324,7 @@ fn Codegen.gen_string_literal_raw(self: Codegen, text: str) -> i64:
     let str_sym = self.intern.intern("str")
     let st_opt = self.struct_type_map.get(str_sym)
     if not st_opt.is_some():
-        with_eprintln("warning: [string-lit] str struct type not found")
+        with_eprint("warning: [string-lit] str struct type not found")
         return wl_get_undef(wl_i32_type(self.context))
     let str_type = self.struct_llvm_types.get(st_opt.unwrap() as i64)
     let global_str = wl_build_global_string_ptr(self.builder, text)
@@ -5356,7 +5356,7 @@ fn Codegen.gen_embed_file(self: Codegen, node: i32) -> i64:
     let arg_node = self.pool.get_extra(args_start)
     let path_value = self.try_eval_const_string(arg_node, self.current_decl_source_file, 0)
     if not path_value.ok:
-        with_eprintln("error: embed_file() argument must be a compile-time string")
+        with_eprint("error: embed_file() argument must be a compile-time string")
         self.had_error = 1
         return wl_get_undef(wl_i32_type(self.context))
     let base_path = if self.current_decl_source_file.len() > 0 and self.current_decl_source_file != "<unknown>":
@@ -5365,7 +5365,7 @@ fn Codegen.gen_embed_file(self: Codegen, node: i32) -> i64:
         self.source_file
     let path = self.resolve_embed_file_path(base_path, path_value.text)
     if with_fs_file_exists(path) == 0:
-        with_eprintln("error: embed_file: could not read '" ++ path ++ "'")
+        with_eprint("error: embed_file: could not read '" ++ path ++ "'")
         self.had_error = 1
         return wl_get_undef(wl_i32_type(self.context))
     self.gen_string_literal_raw(with_fs_read_file(path))
@@ -5386,7 +5386,7 @@ fn Codegen.build_str_value(self: Codegen, ptr: i64, len: i64) -> i64:
     let str_sym = self.intern.intern("str")
     let st_opt = self.struct_type_map.get(str_sym)
     if not st_opt.is_some():
-        with_eprintln("warning: [build-str] str struct type not found")
+        with_eprint("warning: [build-str] str struct type not found")
         return wl_get_undef(wl_i32_type(self.context))
     let str_type = self.struct_llvm_types.get(st_opt.unwrap() as i64)
     var result = wl_get_undef(str_type)

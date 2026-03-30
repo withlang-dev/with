@@ -52,4 +52,4 @@ fn main:
     test_auto_deref_write()
     test_auto_deref_str_field()
     test_auto_deref_ref()
-    println("ok")
+    print("ok")

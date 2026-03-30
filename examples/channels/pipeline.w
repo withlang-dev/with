@@ -86,13 +86,13 @@ async fn collect_results(
             select await
                 opt = rx.recv() ->
                     let Some(item) = opt else
-                        println("  channel closed with {remaining} items remaining")
+                        print("  channel closed with {remaining} items remaining")
                         break
-                    println("  collected #{item.id} from worker {item.worker_id}: {item.result}")
+                    print("  collected #{item.id} from worker {item.worker_id}: {item.result}")
                     results.push(item)
                     remaining = remaining - 1
                 _ = timeout(Duration.from_secs(5)) ->
-                    println("  timeout waiting for results!")
+                    print("  timeout waiting for results!")
                     break
 
 // --- Stage 4: Stats Aggregator ---
@@ -113,7 +113,7 @@ fn compute_stats(results: &[ProcessedItem]):
 // --- Demo 1: Simple Pipeline ---
 
 async fn demo_simple_pipeline:
-    println("=== Demo 1: Simple Pipeline ===\n")
+    print("=== Demo 1: Simple Pipeline ===\n")
 
     let (work_tx, work_rx) = chan[WorkItem](buffer: 8)
     let (result_tx, result_rx) = chan[ProcessedItem](buffer: 8)
@@ -130,12 +130,12 @@ async fn demo_simple_pipeline:
         let results = collect_results(result_rx, item_count).await
         let stats = compute_stats(&results)
 
-        println("\nStats: {stats.total} total, {stats.successes} ok, {stats.failures} failed")
+        print("\nStats: {stats.total} total, {stats.successes} ok, {stats.failures} failed")
 
 // --- Demo 2: Fan-out / Fan-in ---
 
 async fn demo_fan_out:
-    println("\n=== Demo 2: Fan-out / Fan-in (3 workers) ===\n")
+    print("\n=== Demo 2: Fan-out / Fan-in (3 workers) ===\n")
 
     let (work_tx, work_rx) = chan[WorkItem](buffer: 16)
     let (result_tx, result_rx) = chan[ProcessedItem](buffer: 16)
@@ -160,7 +160,7 @@ async fn demo_fan_out:
         let results = collect_results(result_rx, item_count).await
         let stats = compute_stats(&results)
 
-        println("\nStats: {stats.total} total, {stats.successes} ok, {stats.failures} failed")
+        print("\nStats: {stats.total} total, {stats.successes} ok, {stats.failures} failed")
 
         // Show which worker handled what
         with Vec.new() as mut worker_counts:
@@ -176,12 +176,12 @@ async fn demo_fan_out:
                 if not found:
                     worker_counts.push((r.worker_id, 1 as u64))
             for pair in worker_counts:
-                println("  worker {pair.0}: {pair.1} items")
+                print("  worker {pair.0}: {pair.1} items")
 
 // --- Demo 3: Select with Multiple Sources ---
 
 async fn demo_select:
-    println("\n=== Demo 3: Select with Multiple Sources ===\n")
+    print("\n=== Demo 3: Select with Multiple Sources ===\n")
 
     let (fast_tx, fast_rx) = chan[str](buffer: 4)
     let (slow_tx, slow_rx) = chan[str](buffer: 4)
@@ -209,25 +209,25 @@ async fn demo_select:
             select await
                 opt = fast_rx.recv() ->
                     let Some(msg) = opt else break
-                    println("  fast: {msg}")
+                    print("  fast: {msg}")
                     total = total + 1
                 opt = slow_rx.recv() ->
                     let Some(msg) = opt else break
-                    println("  slow: {msg}")
+                    print("  slow: {msg}")
                     total = total + 1
                 _ = timeout(Duration.from_secs(1)) ->
-                    println("  timeout — done waiting")
+                    print("  timeout — done waiting")
                     break
 
-    println("\nReceived {total} messages total")
+    print("\nReceived {total} messages total")
 
 // --- Main ---
 
 async fn main:
-    println("=== Channel Pipeline Demo ===\n")
+    print("=== Channel Pipeline Demo ===\n")
 
     demo_simple_pipeline().await
     demo_fan_out().await
     demo_select().await
 
-    println("\n=== Demo complete ===")
+    print("\n=== Demo complete ===")

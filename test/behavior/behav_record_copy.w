@@ -46,4 +46,4 @@ fn main:
     test_record_update()
     test_record_update_both()
     test_copy_semantics()
-    println("ok")
+    print("ok")

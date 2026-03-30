@@ -38,4 +38,4 @@ fn main:
     test_ref_basic()
     test_pass_by_value()
     test_nested_bindings()
-    println("ok")
+    print("ok")

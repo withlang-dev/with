@@ -19,4 +19,4 @@ fn main:
         total += i
     assert(total == 6)
 
-    println("ok")
+    print("ok")

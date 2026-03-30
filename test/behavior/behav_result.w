@@ -66,4 +66,4 @@ fn main:
     test_err_message()
     test_multiple_ok()
     test_try_operator()
-    println("ok")
+    print("ok")

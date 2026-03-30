@@ -33,4 +33,4 @@ fn main:
     assert(neg_range(1) == "positive")
     assert(neg_range(100) == "positive")
     assert(neg_range(101) == "huge")
-    println("ok")
+    print("ok")

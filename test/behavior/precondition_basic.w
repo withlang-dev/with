@@ -14,4 +14,4 @@ fn main:
     assert(true)
 
     // All three are available without use (prelude)
-    println("ok")
+    print("ok")

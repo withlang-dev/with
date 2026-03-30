@@ -124,4 +124,4 @@ fn main:
     test_fstring_in_condition()
     test_empty_fstring()
     test_literal_only()
-    println("ok")
+    print("ok")

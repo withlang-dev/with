@@ -1,4 +1,4 @@
 //! expect-stdout: Hello, World!
 
 fn main:
-    println("Hello, World!")
+    print("Hello, World!")

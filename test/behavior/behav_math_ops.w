@@ -132,4 +132,4 @@ fn main:
     test_power()
     test_power_of_two()
     test_i64_arithmetic()
-    println("ok")
+    print("ok")

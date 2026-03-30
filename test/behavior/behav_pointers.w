@@ -87,4 +87,4 @@ fn main:
     test_pointer_accumulate()
     test_pointer_to_struct()
     test_multiple_pointers()
-    println("ok")
+    print("ok")

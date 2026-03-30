@@ -24,4 +24,4 @@ fn test_simple_vec2:
 fn main:
     test_nested_struct_with_primitives()
     test_simple_vec2()
-    println("ok")
+    print("ok")

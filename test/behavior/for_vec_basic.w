@@ -13,4 +13,4 @@ fn main:
         total = total + x
 
     assert(total == 60)
-    println("ok")
+    print("ok")

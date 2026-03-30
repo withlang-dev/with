@@ -50,4 +50,4 @@ fn main:
     test_min_max_destructure()
     test_tuple_match_destructure()
     test_nested_tuple_access()
-    println("ok")
+    print("ok")

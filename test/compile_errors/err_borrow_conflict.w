@@ -6,4 +6,4 @@ fn main:
     var x = 5
     let r1 = &x
     let r2 = &mut x
-    println(int_to_string(*r1 + *r2))
+    print(int_to_string(*r1 + *r2))

@@ -55,4 +55,4 @@ fn main:
     test_struct_pass_to_fn()
     test_two_structs()
     test_nested_field_expression()
-    println("ok")
+    print("ok")

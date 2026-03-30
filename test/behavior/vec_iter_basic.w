@@ -38,4 +38,4 @@ fn main:
     let iter = vec_iter(v)
     let total = iter_sum(iter)
     assert(total == 60)
-    println("ok")
+    print("ok")

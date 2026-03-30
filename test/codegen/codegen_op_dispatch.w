@@ -25,4 +25,4 @@ fn main:
     let e = Vec2 { x: 4, y: 6 }
     assert(c == e)
 
-    println("ok")
+    print("ok")

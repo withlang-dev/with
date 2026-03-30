@@ -4,7 +4,7 @@ use Span
 use Source
 use DiagnosticRender
 
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 
 enum DiagSeverity: i32:
     Error = 1
@@ -76,28 +76,28 @@ fn Diagnostic.add_help(self: Diagnostic, message: str):
 fn Diagnostic.render(self: Diagnostic, source: Source):
     let code: str = self.code
     let message: str = self.message
-    with_eprintln(render_diag_header(self.severity, code, message))
+    with_eprint(render_diag_header(self.severity, code, message))
 
     let loc = source.offset_to_location(self.primary.start)
     let source_path: str = source.path
-    with_eprintln(render_diag_location(source_path, loc.line, loc.col))
+    with_eprint(render_diag_location(source_path, loc.line, loc.col))
 
     let line_text: str = source.line_text(loc.line)
-    with_eprintln(render_diag_source_line(loc.line, line_text))
-    with_eprintln(render_diag_marker_line(loc.col, span_underline_len(self.primary.start, self.primary.end)))
+    with_eprint(render_diag_source_line(loc.line, line_text))
+    with_eprint(render_diag_marker_line(loc.col, span_underline_len(self.primary.start, self.primary.end)))
 
     for i in 0..self.labels.len() as i32:
         let lab: DiagnosticLabel = self.labels.get(i as i64)
         let lloc = source.offset_to_location(lab.span.start)
         let label_message: str = lab.message
-        with_eprintln(render_diag_label_line(lloc.line, lloc.col, label_message))
+        with_eprint(render_diag_label_line(lloc.line, lloc.col, label_message))
 
     for i in 0..self.notes.len() as i32:
         let note: str = self.notes.get(i as i64)
-        with_eprintln(render_diag_note_line(note))
+        with_eprint(render_diag_note_line(note))
     for i in 0..self.helps.len() as i32:
         let help: str = self.helps.get(i as i64)
-        with_eprintln(render_diag_help_line(help))
+        with_eprint(render_diag_help_line(help))
 
 type DiagnosticList {
     items: Vec[Diagnostic],
@@ -132,7 +132,7 @@ fn DiagnosticList.render_all(self: DiagnosticList, source: Source):
     for i in 0..self.items.len() as i32:
         self.items.get(i as i64).render(source)
         if i + 1 < self.items.len() as i32:
-            with_eprintln("")
+            with_eprint("")
 
 fn DiagnosticList.render_warnings(self: DiagnosticList, source: Source):
     var printed = 0
@@ -140,6 +140,6 @@ fn DiagnosticList.render_warnings(self: DiagnosticList, source: Source):
         if self.items.get(i as i64).severity != DiagSeverity.Warning:
             continue
         if printed != 0:
-            with_eprintln("")
+            with_eprint("")
         self.items.get(i as i64).render(source)
         printed = printed + 1

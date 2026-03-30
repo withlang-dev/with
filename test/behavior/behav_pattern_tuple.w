@@ -14,4 +14,4 @@ fn main:
     assert(classify((0, 5)) == "y-axis")
     assert(classify((3, 0)) == "x-axis")
     assert(classify((1, 2)) == "other")
-    println("ok")
+    print("ok")

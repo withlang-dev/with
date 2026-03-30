@@ -17,4 +17,4 @@ fn main:
     assert(map(5) == 10)
     assert(filter(5) == 6)
     assert(sum(3, 4) == 7)
-    println("ok")
+    print("ok")

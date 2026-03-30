@@ -26,4 +26,4 @@ fn main:
     if let .Some(v) = a:
         found = true
     assert(found)
-    println("ok")
+    print("ok")

@@ -95,4 +95,4 @@ fn main:
     test_multiple_defers_with_early_return()
     test_defer_does_not_run_prematurely()
     test_nested_function_defers()
-    println("ok")
+    print("ok")

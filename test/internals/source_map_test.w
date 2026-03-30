@@ -25,4 +25,4 @@ fn main:
     assert(sm.line_text(f1, 0) == "abc")
     assert(sm.line_text(f1, 1) == "def")
 
-    println("ok")
+    print("ok")

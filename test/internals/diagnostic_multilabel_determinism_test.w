@@ -34,4 +34,4 @@ fn main:
         "  = label @1:9 lhs operand\n"
     assert(r1 == expected)
 
-    println("ok")
+    print("ok")

@@ -10,8 +10,8 @@ type ConnectionPool = { url: str }
 
 impl Scoped[DbConnection] for ConnectionPool:
     fn enter[R](self: &ConnectionPool, f: fn(&DbConnection) -> R) -> R:
-        println("Acquiring connection to {self.url}...")
-        defer println("Releasing connection...")
+        print("Acquiring connection to {self.url}...")
+        defer print("Releasing connection...")
 
         let conn = DbConnection { id: 42 }
         f(&conn)

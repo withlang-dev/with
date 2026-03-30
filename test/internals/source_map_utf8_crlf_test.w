@@ -34,4 +34,4 @@ fn main:
     assert(sm.line_text(file, 1) == "b😀\r")
     assert(sm.line_text(file, 2) == "")
 
-    println("ok")
+    print("ok")

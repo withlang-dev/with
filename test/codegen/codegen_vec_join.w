@@ -5,4 +5,4 @@ fn main:
     v.push("b")
     v.push("c")
     let result = v.join(",")
-    println(result)
+    print(result)

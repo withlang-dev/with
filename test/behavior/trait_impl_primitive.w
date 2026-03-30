@@ -17,4 +17,4 @@ fn main:
     assert(not t.eq(f))
     let df = bool.default()
     assert(not df)
-    println("ok")
+    print("ok")

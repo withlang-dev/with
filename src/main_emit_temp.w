@@ -13,10 +13,10 @@ use Source
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 extern fn with_system(cmd: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
-extern fn print(s: str) -> void
+extern fn with_write(s: str) -> void
 extern fn exit(code: i32) -> void
 extern fn with_install_interrupt_handlers() -> void
 extern fn with_raise_stack_limit() -> void
@@ -101,21 +101,21 @@ fn main -> void:
         return
     if command == "run":
         if emit_c_mode:
-            with_eprintln("error: '--emit-c' is only supported with 'build'")
+            with_eprint("error: '--emit-c' is only supported with 'build'")
             exit(1)
             return
         exit(run_run_command(source_file, opt_level, no_std, alloc_mode))
         return
     if command == "ir":
         if source_file == "":
-            with_eprintln("error: 'ir' requires a source file argument")
+            with_eprint("error: 'ir' requires a source file argument")
             exit(1)
             return
         var comp = Compilation.init()
         comp.configure(opt_level, no_std, alloc_mode)
         let pool = comp.compile_file(source_file)
         if pool.decl_count() == 0:
-            with_eprintln("error: IR generation failed during compilation")
+            with_eprint("error: IR generation failed during compilation")
             exit(1)
             return
         let ok = comp.emit_ir(pool)
@@ -125,14 +125,14 @@ fn main -> void:
         return
     if command == "ast":
         if source_file == "":
-            with_eprintln("error: 'ast' requires a source file argument")
+            with_eprint("error: 'ast' requires a source file argument")
             exit(1)
             return
         exit(dump_ast(source_file, no_std, alloc_mode, deterministic_mode))
         return
     if command == "check":
         if source_file == "":
-            with_eprintln("error: 'check' requires a source file argument")
+            with_eprint("error: 'check' requires a source file argument")
             exit(1)
             return
         if dump_tokens_flag:
@@ -162,15 +162,15 @@ fn main -> void:
         comp.configure(0, no_std, alloc_mode)
         let pool = comp.compile_file(source_file)
         if pool.decl_count() == 0:
-            with_eprintln("error: check failed during compilation")
+            with_eprint("error: check failed during compilation")
             exit(1)
             return
-        print("ok\n")
+        with_write("ok\n")
         comp.print_warnings()
         return
     if command == "tokens":
         if source_file == "":
-            with_eprintln("error: 'tokens' requires a source file argument")
+            with_eprint("error: 'tokens' requires a source file argument")
             exit(1)
             return
         exit(dump_tokens(source_file, deterministic_mode))
@@ -179,7 +179,7 @@ fn main -> void:
         exit(run_test_command(argc, opt_level, no_std, alloc_mode))
         return
     if command == "version" or command == "--version":
-        print("with WITH_VERSION_PLACEHOLDER\n")
+        with_write("with WITH_VERSION_PLACEHOLDER\n")
         return
     if command == "help" or command == "--help" or command == "-h":
         exit(run_help_command(argc))
@@ -188,27 +188,27 @@ fn main -> void:
         exit(run_clean_command())
         return
     if command == "lsp":
-        with_eprintln("error: LSP not yet available in self-hosted compiler")
+        with_eprint("error: LSP not yet available in self-hosted compiler")
         exit(1)
         return
     if command == "migrate":
-        with_eprintln("error: migrate not yet available in self-hosted compiler")
+        with_eprint("error: migrate not yet available in self-hosted compiler")
         exit(1)
         return
     if command == "repl":
-        with_eprintln("error: REPL not yet available in self-hosted compiler")
+        with_eprint("error: REPL not yet available in self-hosted compiler")
         exit(1)
         return
     if command == "doc":
-        with_eprintln("error: doc not yet available in self-hosted compiler")
+        with_eprint("error: doc not yet available in self-hosted compiler")
         exit(1)
         return
     if command == "fmt":
-        with_eprintln("error: fmt not yet available in self-hosted compiler")
+        with_eprint("error: fmt not yet available in self-hosted compiler")
         exit(1)
         return
 
-    with_eprintln("error: unknown command '{command}'")
+    with_eprint("error: unknown command '{command}'")
     print_usage()
     exit(1)
 
@@ -244,36 +244,36 @@ fn find_output_arg(argc: i32) -> str:
 
 fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, output_path: str) -> i32:
     if source_file == "":
-        with_eprintln("error: 'build' requires a source file argument")
+        with_eprint("error: 'build' requires a source file argument")
         return 1
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     if emit_c_mode:
         let c_path = comp.emit_c(source_file, output_path)
         if c_path == "":
-            with_eprintln("error: build failed")
+            with_eprint("error: build failed")
             return 1
-        with_eprintln("emitted C: " ++ c_path)
-        with_eprintln("compile with zig cc (example):")
-        with_eprintln("  zig cc -target <triple> -I runtime " ++ c_path ++ " runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_<arch>.s -o <output>")
+        with_eprint("emitted C: " ++ c_path)
+        with_eprint("compile with zig cc (example):")
+        with_eprint("  zig cc -target <triple> -I runtime " ++ c_path ++ " runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_<arch>.s -o <output>")
         comp.print_warnings()
         return 0
     let bin_path = comp.build_binary(source_file)
     if bin_path == "":
-        with_eprintln("error: build failed")
+        with_eprint("error: build failed")
         return 1
     comp.print_warnings()
     0
 
 fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool) -> i32:
     if source_file == "":
-        with_eprintln("error: 'run' requires a source file argument")
+        with_eprint("error: 'run' requires a source file argument")
         return 1
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     let bin_path = comp.build_binary(source_file)
     if bin_path == "":
-        with_eprintln("error: run command failed to build target")
+        with_eprint("error: run command failed to build target")
         return 1
     comp.print_warnings()
     with_system(bin_path)
@@ -281,7 +281,7 @@ fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: b
 fn dump_ast(source_file: str, no_std: bool, alloc_mode: bool, include_header: bool) -> i32:
     let text = with_fs_read_file(source_file)
     if text.len() == 0:
-        with_eprintln("error: cannot read '{source_file}'")
+        with_eprint("error: cannot read '{source_file}'")
         return 1
 
     var lexer = Lexer.init(text, 0)
@@ -306,18 +306,18 @@ fn dump_ast(source_file: str, no_std: bool, alloc_mode: bool, include_header: bo
             let last_decl = pool.get_decl(pool.decl_count() - 1)
             module_start = pool.get_start(first_decl)
             module_end = pool.get_end(last_decl)
-        print(f"module span={module_start}..{module_end} decls={pool.decl_count()}\n")
+        with_write(f"module span={module_start}..{module_end} decls={pool.decl_count()}\n")
         for i in 0..pool.decl_count():
             let decl = pool.get_decl(i)
             let kind_name = ast_decl_kind_name(pool.kind(decl))
-            print(f"decl[{i}] kind={kind_name} span={pool.get_start(decl)}..{pool.get_end(decl)}\n")
-        print("---\n")
+            with_write(f"decl[{i}] kind={kind_name} span={pool.get_start(decl)}..{pool.get_end(decl)}\n")
+        with_write("---\n")
 
     let rendered = render_module(pool, intern)
     if rendered.len() == 0:
-        with_eprintln("error: parser produced an empty AST without diagnostics")
+        with_eprint("error: parser produced an empty AST without diagnostics")
         return 1
-    print(rendered)
+    with_write(rendered)
     0
 
 fn ast_decl_kind_name(kind: i32) -> str:
@@ -335,12 +335,12 @@ fn ast_decl_kind_name(kind: i32) -> str:
 fn dump_tokens(source_file: str, deterministic: bool) -> i32:
     let text = with_fs_read_file(source_file)
     if text.len() == 0:
-        with_eprintln("error: cannot read '{source_file}'")
+        with_eprint("error: cannot read '{source_file}'")
         return 1
     var lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
     if deterministic:
-        print(f"tokens file={source_file} count={tokens.len()}\n")
+        with_write(f"tokens file={source_file} count={tokens.len()}\n")
         for i in 0..tokens.len():
             let tk = tokens.get_tag(i)
             let start = tokens.get_start(i)
@@ -348,7 +348,7 @@ fn dump_tokens(source_file: str, deterministic: bool) -> i32:
             let text_slice = text.slice(start as i64, end as i64)
             let escaped = text_slice |> escape_dump_lexeme
             let tag_text = dump_tag_name(tk, text_slice)
-            print(f"tok[{i}] tag={tag_text} span={start}..{end} lex=\"{escaped}\"\n")
+            with_write(f"tok[{i}] tag={tag_text} span={start}..{end} lex=\"{escaped}\"\n")
         return 0
 
     // Compatibility debug output, similar to stage0 `tokens` command.
@@ -358,7 +358,7 @@ fn dump_tokens(source_file: str, deterministic: bool) -> i32:
         let end = tokens.get_end(i)
         let text_slice = text.slice(start as i64, end as i64)
         let tag_text = dump_tag_name(tk, text_slice)
-        print(tag_text ++ " |" ++ text_slice ++ "|\n")
+        with_write(tag_text ++ " |" ++ text_slice ++ "|\n")
     0
 
 fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
@@ -366,10 +366,10 @@ fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i
     comp.configure(0, no_std, alloc_mode)
     let result = comp.resolve_file(source_file, true)
     if comp.has_errors():
-        with_eprintln("error: resolved dump failed")
+        with_eprint("error: resolved dump failed")
         return 1
     let resolved_text = dump_resolved(result, comp.get_pool(), source_file)
-    print(resolved_text)
+    with_write(resolved_text)
     0
 
 fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
@@ -377,7 +377,7 @@ fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
     comp.configure(0, no_std, alloc_mode)
     let typed_ok = comp.emit_typed_file(source_file)
     if not typed_ok:
-        with_eprintln("error: typed dump failed during compilation or semantic analysis")
+        with_eprint("error: typed dump failed during compilation or semantic analysis")
         return 1
     0
 
@@ -386,7 +386,7 @@ fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> i32:
     comp.configure(0, no_std, alloc_mode)
     let mir_ok = comp.print_mir_file(source_file)
     if not mir_ok:
-        with_eprintln("error: mir dump failed during compilation or mir lowering")
+        with_eprint("error: mir dump failed during compilation or mir lowering")
         return 1
     0
 
@@ -395,9 +395,9 @@ fn dump_async_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool) -> 
     comp.configure(0, no_std, alloc_mode)
     let async_mir_text = comp.dump_async_mir_file(source_file)
     if async_mir_text.len() == 0:
-        with_eprintln("error: async-mir dump failed during compilation or lowering")
+        with_eprint("error: async-mir dump failed during compilation or lowering")
         return 1
-    print(async_mir_text)
+    with_write(async_mir_text)
     0
 
 fn escape_dump_lexeme(text: str) -> str:
@@ -536,7 +536,7 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool) ->
     let synthetic_source = maybe_synthesize_test_source(target)
     let bin_path = if synthetic_source.len() > 0: comp.build_binary_from_source(target, synthetic_source) else: comp.build_binary(target)
     if bin_path == "":
-        with_eprintln("error: test build failed")
+        with_eprint("error: test build failed")
         return 1
     let run_rc = with_system(bin_path)
     cleanup_binary_artifacts(bin_path)
@@ -546,18 +546,18 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool) -
     // Find test file/dir argument
     let target = find_source_arg(argc)
     if target == "":
-        with_eprintln("error: 'test' requires a source file or directory argument")
+        with_eprint("error: 'test' requires a source file or directory argument")
         return 1
     if test_target_is_directory(target):
         let test_files = collect_test_files(target)
         if test_files.len() == 0:
-            with_eprintln("error: no test sources found in '" ++ target ++ "'")
+            with_eprint("error: no test sources found in '" ++ target ++ "'")
             return 1
         for ti in 0..test_files.len() as i32:
             let test_file = test_files.get(ti as i64)
             let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode)
             if run_rc != 0:
-                with_eprintln("error: test failed in '" ++ test_file ++ "'")
+                with_eprint("error: test failed in '" ++ test_file ++ "'")
                 return run_rc
         return 0
     run_test_file(target, opt_level, no_std, alloc_mode)
@@ -565,35 +565,35 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool) -
 fn run_clean_command -> i32:
     let result = with_system("rm -rf .with")
     if result != 0:
-        with_eprintln("error: clean failed")
+        with_eprint("error: clean failed")
         return 1
-    print("cleaned .with/\n")
+    with_write("cleaned .with/\n")
     0
 
 fn print_usage:
-    print("Usage: with <command> [options]\n")
-    print("\n")
-    print("Commands:\n")
-    print("  build [file.w]    Build a source file (use --emit-c to emit C)\n")
-    print("  run [file.w]      Build + run a source file\n")
-    print("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir/--dump-async-mir)\n")
-    print("  test <file.w|dir> Run tests from a source file or directory\n")
-    print("  clean             Delete .with/ artifacts\n")
-    print("  ir <file.w>       Dump LLVM IR (debug)\n")
-    print("  ast <file.w>      Parse and dump the AST (debug)\n")
-    print("  tokens <file.w>   Lex and dump tokens (debug)\n")
-    print("  version           Print compiler version\n")
-    print("  help [topic]      Show CLI help or language quick reference\n")
-    print("\n")
-    print("Language quick reference:\n")
-    print("  with help use         Import syntax and module resolution\n")
-    print("  with help fn          Function declarations and signatures\n")
-    print("  with help type        Type declarations and aliases\n")
-    print("  with help let         Local bindings, mutability, and const\n")
-    print("  with help extern      FFI declarations and c_import\n")
-    print("  with help keywords    Reserved words\n")
-    print("  with help operators   Operator precedence\n")
-    print("  with help attributes  Common attributes and parser support\n")
+    with_write("Usage: with <command> [options]\n")
+    with_write("\n")
+    with_write("Commands:\n")
+    with_write("  build [file.w]    Build a source file (use --emit-c to emit C)\n")
+    with_write("  run [file.w]      Build + run a source file\n")
+    with_write("  check <file.w>    Parse and type-check a source file (supports --dump-tokens/--dump-ast/--dump-resolved/--dump-typed/--dump-mir/--dump-async-mir)\n")
+    with_write("  test <file.w|dir> Run tests from a source file or directory\n")
+    with_write("  clean             Delete .with/ artifacts\n")
+    with_write("  ir <file.w>       Dump LLVM IR (debug)\n")
+    with_write("  ast <file.w>      Parse and dump the AST (debug)\n")
+    with_write("  tokens <file.w>   Lex and dump tokens (debug)\n")
+    with_write("  version           Print compiler version\n")
+    with_write("  help [topic]      Show CLI help or language quick reference\n")
+    with_write("\n")
+    with_write("Language quick reference:\n")
+    with_write("  with help use         Import syntax and module resolution\n")
+    with_write("  with help fn          Function declarations and signatures\n")
+    with_write("  with help type        Type declarations and aliases\n")
+    with_write("  with help let         Local bindings, mutability, and const\n")
+    with_write("  with help extern      FFI declarations and c_import\n")
+    with_write("  with help keywords    Reserved words\n")
+    with_write("  with help operators   Operator precedence\n")
+    with_write("  with help attributes  Common attributes and parser support\n")
 
 fn run_help_command(argc: i32) -> i32:
     let topic = cli_help_topic(argc)
@@ -624,12 +624,12 @@ fn run_help_command(argc: i32) -> i32:
     if topic == "attributes":
         print_help_attributes()
         return 0
-    with_eprintln("error: unknown help topic '" ++ topic ++ "'")
-    with_eprintln("available help topics: use, fn, type, let, extern, keywords, operators, attributes")
+    with_eprint("error: unknown help topic '" ++ topic ++ "'")
+    with_eprint("available help topics: use, fn, type, let, extern, keywords, operators, attributes")
     1
 
 fn print_help_use:
-    print(
+    with_write(
         "Import syntax:\n\n" ++
         "  use foo.bar\n" ++
         "  use foo.bar.*\n" ++
@@ -643,7 +643,7 @@ fn print_help_use:
     )
 
 fn print_help_fn:
-    print(
+    with_write(
         "Function declarations:\n\n" ++
         "  fn greet(name: str) -> str:\n" ++
         "      \"hello {name}\"\n\n" ++
@@ -656,7 +656,7 @@ fn print_help_fn:
     )
 
 fn print_help_type:
-    print(
+    with_write(
         "Type and enum declarations:\n\n" ++
         "  type Point { x: i32, y: i32 }\n" ++
         "  enum Color { Red | Green | Blue }\n" ++
@@ -671,7 +671,7 @@ fn print_help_type:
     )
 
 fn print_help_let:
-    print(
+    with_write(
         "Bindings and constants:\n\n" ++
         "  let answer = 42\n" ++
         "  var total = 0\n" ++
@@ -683,7 +683,7 @@ fn print_help_let:
     )
 
 fn print_help_extern:
-    print(
+    with_write(
         "FFI declarations:\n\n" ++
         "  extern fn puts(text: *const i8) -> i32\n" ++
         "  use c_import(\"sqlite3.h\", link: \"sqlite3\")\n\n" ++
@@ -694,7 +694,7 @@ fn print_help_extern:
     )
 
 fn print_help_keywords:
-    print(
+    with_write(
         "Reserved words that cannot be used as identifiers:\n\n" ++
         "  fn let var if else then match for in while loop return break continue\n" ++
         "  with as mut type trait impl extend dyn use module pub async await spawn\n" ++
@@ -703,7 +703,7 @@ fn print_help_keywords:
     )
 
 fn print_help_operators:
-    print(
+    with_write(
         "Operator precedence (low to high):\n\n" ++
         "  1. or\n" ++
         "  2. and\n" ++
@@ -721,7 +721,7 @@ fn print_help_operators:
     )
 
 fn print_help_attributes:
-    print(
+    with_write(
         "Common attributes:\n\n" ++
         "  @[packed]          Packed struct layout\n" ++
         "  @[inline]          Inline hint for functions\n" ++

@@ -38,4 +38,4 @@ fn main:
     test_sub_wrap_assign()
     test_mul_wrap_assign()
     test_wrap_assign_loop()
-    println("ok")
+    print("ok")

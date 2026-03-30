@@ -1,4 +1,4 @@
 //! expect-check-fail: format mode requires string type
 fn main:
     let x = 42
-    println(f"{x:s}")
+    print(f"{x:s}")

@@ -62,4 +62,4 @@ fn main:
     test_if_else_chain()
     test_if_in_function()
     test_if_bool_conditions()
-    println("ok")
+    print("ok")

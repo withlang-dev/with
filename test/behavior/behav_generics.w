@@ -74,4 +74,4 @@ fn main:
     test_generic_pair()
     test_generic_higher_order()
     test_generic_with_multiple_calls()
-    println("ok")
+    print("ok")

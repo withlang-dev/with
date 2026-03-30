@@ -42,4 +42,4 @@ fn main:
     assert(not VAL_HAS_NAMED)
     assert(point_fields_summary() == "x:0:4:i32;y:4:4:i32;")
     assert(variant_summary() == "Num:i32:0;Empty:1;")
-    println("ok")
+    print("ok")

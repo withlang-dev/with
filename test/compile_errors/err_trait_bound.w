@@ -7,7 +7,7 @@ trait Show:
     fn show(self) -> str
 
 fn print_it[T: Show](x: T):
-    println(x.show())
+    print(x.show())
 
 fn main:
     print_it(42)

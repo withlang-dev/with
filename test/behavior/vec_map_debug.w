@@ -7,8 +7,8 @@ fn main:
     items.push(10)
     items.push(20)
     items.push(30)
-    println(int_to_string(items.len()))
+    print(int_to_string(items.len()))
     let doubled = items.map(double)
-    println(int_to_string(doubled.len()))
+    print(int_to_string(doubled.len()))
     for v in doubled:
-        println(int_to_string(v))
+        print(int_to_string(v))

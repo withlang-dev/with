@@ -86,4 +86,4 @@ fn main:
     assert(rv.text_value == "hello")
     assert(p.value_count() == 4)
 
-    println("ok")
+    print("ok")

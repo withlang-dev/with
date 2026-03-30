@@ -9,4 +9,4 @@ type Tree {
 }
 
 fn main:
-    println("should not compile")
+    print("should not compile")

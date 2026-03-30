@@ -59,4 +59,4 @@ fn main:
     test_small_unsigned_to_larger_signed()
     test_float_widening()
     test_signed_widening()
-    println("ok")
+    print("ok")

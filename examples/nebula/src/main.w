@@ -45,8 +45,8 @@ fn main:
     // Initialize the database schema
     db.init_schema().expect("failed to initialize schema")
 
-    println("=== Nebula Telemetry Daemon ===")
-    println("Config: {config.host}:{config.port}, max_clients={config.max_clients}")
+    print("=== Nebula Telemetry Daemon ===")
+    print("Config: {config.host}:{config.port}, max_clients={config.max_clients}")
 
     // Channel for shutdown coordination.
     // Dropping the sender automatically closes the receiver.
@@ -69,7 +69,7 @@ fn main:
 
     let server_task = async:
         let listener = TcpListener.bind("{config.host}:{config.port}").await?
-        println("Listening on {config.host}:{config.port}")
+        print("Listening on {config.host}:{config.port}")
 
         // Structured concurrency: async scope guarantees all tracked
         // fibers complete or are cancelled before the scope exits.
@@ -85,18 +85,18 @@ fn main:
                         s.track(handle_client(stream, pool.clone(), db.clone()))
 
                     _ = shutdown_rx.recv() ->
-                        println("\nSIGINT received. Draining connections...")
+                        print("\nSIGINT received. Draining connections...")
                         break
 
         // Scope guarantees: all spawned fibers have completed or
         // been cancelled. Destructors have run. Resources are freed.
         let stats = compute_stats(&pool)
-        println("Final stats: {stats.active_count} active, {stats.total_packets} packets")
+        print("Final stats: {stats.active_count} active, {stats.total_packets} packets")
 
     // Postfix await blocks the main thread until the server completes.
     match server_task.await
-        Ok()   => println("Clean shutdown complete.")
-        Err(e) => eprintln("Fatal error: {e}")
+        Ok()   => print("Clean shutdown complete.")
+        Err(e) => eprint("Fatal error: {e}")
 
 // --- Background Analyzer ---
 //
@@ -112,9 +112,9 @@ fn background_analyzer(db: Arc[Database], pool: SessionPool):
         // Snapshot session stats from the arena
         let stats = compute_stats(&pool)
         if stats.total_packets > 0:
-            println("[analyzer] {stats.active_count} sessions, {stats.total_packets} packets ingested")
+            print("[analyzer] {stats.active_count} sessions, {stats.total_packets} packets ingested")
 
         // Periodic maintenance — blocking is safe on OS threads
         match db.execute("DELETE FROM telemetry WHERE ts < strftime('%s','now') - 86400")
             Ok()   => ()
-            Err(e) => eprintln("[analyzer] cleanup error: {e}")
+            Err(e) => eprint("[analyzer] cleanup error: {e}")

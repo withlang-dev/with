@@ -8,4 +8,4 @@ fn main:
     let v: Vec[i32] = Vec.new()
     v.push(1)
     assert(v.len() == 1)
-    println("ok")
+    print("ok")

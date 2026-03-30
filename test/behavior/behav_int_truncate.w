@@ -74,4 +74,4 @@ fn main:
     test_i64_to_i32()
     test_i32_to_i8()
     test_truncate_low_bits_preserved()
-    println("ok")
+    print("ok")

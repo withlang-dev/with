@@ -45,4 +45,4 @@ fn main:
     test_string_concat_chain()
     test_string_with_numbers()
     test_empty_string()
-    println("ok")
+    print("ok")

@@ -60,4 +60,4 @@ fn main:
     test_global_read_from_function()
     test_global_reset()
     test_global_accumulate()
-    println("ok")
+    print("ok")

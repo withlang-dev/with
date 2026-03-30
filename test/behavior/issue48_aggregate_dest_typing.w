@@ -60,4 +60,4 @@ fn main:
     assert(match_false.left == 3)
     assert(match_false.right == 4)
 
-    println("ok")
+    print("ok")

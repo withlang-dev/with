@@ -72,13 +72,13 @@ fn Bench.run(self: &mut Bench, f: fn() -> void):
 fn Bench.report(self: &Bench, name: str):
     let ns = self.ns_per_op()
     let pad_len = 40 - with_str_len(name)
-    print(name)
+    write(name)
     var pi = 0
     while pi < pad_len:
-        print(" ")
+        write(" ")
         pi = pi + 1
     if self.bytes_per_op > 0 and ns > 0:
         let mb_s = self.bytes_per_op * 1000 / ns
-        println(f"{self.n}\t{ns} ns/op\t{mb_s} MB/s")
+        print(f"{self.n}\t{ns} ns/op\t{mb_s} MB/s")
     else:
-        println(f"{self.n}\t{ns} ns/op")
+        print(f"{self.n}\t{ns} ns/op")

@@ -27,4 +27,4 @@ fn main:
     test_defer_basic()
     test_defer_with_body()
     test_multiple_defers()
-    println("ok")
+    print("ok")

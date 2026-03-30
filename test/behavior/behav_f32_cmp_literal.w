@@ -8,4 +8,4 @@ fn main:
     assert(x <= 3.5)
     assert(x > 3.0)
     assert(x >= 3.5)
-    println("ok")
+    print("ok")

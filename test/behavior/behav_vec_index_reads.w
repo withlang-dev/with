@@ -46,4 +46,4 @@ fn main:
     assert(first_plain.a == -1)
     assert(first_plain.b == 0)
 
-    println("ok")
+    print("ok")

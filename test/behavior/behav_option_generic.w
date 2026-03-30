@@ -4,4 +4,4 @@ fn main:
     let val = match x
         .Some(n) => n
         .None => -1
-    println(int_to_string(val))
+    print(int_to_string(val))

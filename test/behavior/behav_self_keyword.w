@@ -28,4 +28,4 @@ fn main:
     assert(q.x == 11)
     assert(q.y == 22)
 
-    println("ok")
+    print("ok")

@@ -5,4 +5,4 @@ type Node {
 }
 
 fn main:
-    println("should not compile")
+    print("should not compile")

@@ -41,4 +41,4 @@ fn main:
     test_if_let_some()
     test_if_let_none()
     test_if_let_else()
-    println("ok")
+    print("ok")

@@ -79,4 +79,4 @@ fn main:
     test_tagged_union_discriminant()
     test_message_variants()
     test_tree()
-    println("ok")
+    print("ok")

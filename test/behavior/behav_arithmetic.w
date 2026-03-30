@@ -58,4 +58,4 @@ fn main:
     test_compound_assign()
     test_zero_and_identity()
     test_negative_arithmetic()
-    println("ok")
+    print("ok")

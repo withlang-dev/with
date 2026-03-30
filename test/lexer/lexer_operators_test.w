@@ -34,4 +34,4 @@ fn main:
     assert(t2.get_tag(7) == TokenKind.TK_INVALID())
     assert(t2.get_tag(8) == TokenKind.TK_EOF())
 
-    println("ok")
+    print("ok")

@@ -42,5 +42,5 @@ fn main:
     test_function_calls()
     test_nested_scope()
     test_bool_and_comparison()
-    println(int_to_string(10))
-    println("ok")
+    print(int_to_string(10))
+    print("ok")

@@ -24,4 +24,4 @@ fn main:
         .None => 0
     assert(v == 10)
 
-    println("ok")
+    print("ok")

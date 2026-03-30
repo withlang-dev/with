@@ -70,7 +70,7 @@ fn identity[T](x: T) -> T: x
 
 fn first_of[T](a: T, b: T) -> T: a
 
-fn display_user(user: User): println("User #{user.id}: {user.name}")
+fn display_user(user: User): print("User #{user.id}: {user.name}")
 
 @[test]
 fn test_service_example:

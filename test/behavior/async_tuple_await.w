@@ -22,4 +22,4 @@ fn main:
     assert(c == 2)
     assert(d == 3)
 
-    println("ok")
+    print("ok")

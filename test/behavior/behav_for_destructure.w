@@ -17,4 +17,4 @@ fn test_for_inclusive:
 fn main:
     test_basic_for()
     test_for_inclusive()
-    println("ok")
+    print("ok")

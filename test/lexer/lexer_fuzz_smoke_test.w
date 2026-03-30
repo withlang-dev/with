@@ -27,4 +27,4 @@ fn main:
     assert_deterministic("a |> |> b")
     assert_deterministic("?? ?? ..= ... << >>")
 
-    println("ok")
+    print("ok")

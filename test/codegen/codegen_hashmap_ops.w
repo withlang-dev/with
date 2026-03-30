@@ -5,4 +5,4 @@ fn main:
     m.increment("count")
     let val = m.get("count")
     if val.is_some():
-        println(int_to_string(val.unwrap() as i32))
+        print(int_to_string(val.unwrap() as i32))

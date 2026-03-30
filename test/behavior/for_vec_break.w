@@ -20,4 +20,4 @@ fn main:
         total = total + x
 
     assert(total == 4)  // 1 + 3
-    println("ok")
+    print("ok")

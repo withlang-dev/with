@@ -43,4 +43,4 @@ fn main:
     test_hashmap_overwrite()
     test_hashmap_missing()
     test_hashmap_many()
-    println("ok")
+    print("ok")

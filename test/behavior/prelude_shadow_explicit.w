@@ -9,4 +9,4 @@ use shadow_helper
 
 fn main:
     assert(map(5) == 50)
-    println("ok")
+    print("ok")

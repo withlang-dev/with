@@ -39,4 +39,4 @@ fn main:
     assert(PACKAGE_SECOND == 8)
     assert(PACKAGE_LEFT == 11)
     assert(PACKAGE_RIGHT == 22)
-    println("ok")
+    print("ok")

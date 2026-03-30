@@ -39,4 +39,4 @@ fn main:
     test_range_patterns()
     test_wildcard_pattern()
     test_inline_or_pattern()
-    println("ok")
+    print("ok")

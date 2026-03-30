@@ -63,4 +63,4 @@ fn main:
     test_match_bool()
     test_match_expression()
     test_match_nested_if()
-    println("ok")
+    print("ok")

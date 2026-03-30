@@ -50,4 +50,4 @@ fn main:
     test_none()
     test_option_with_if_let()
     test_option_chaining()
-    println("ok")
+    print("ok")

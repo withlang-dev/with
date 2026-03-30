@@ -78,4 +78,4 @@ fn main:
     test_higher_order()
     test_composition()
     test_early_return()
-    println("ok")
+    print("ok")

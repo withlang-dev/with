@@ -107,4 +107,4 @@ fn test_imported_aggregate_flow:
 fn main:
     test_local_aggregate_flow()
     test_imported_aggregate_flow()
-    println("ok")
+    print("ok")

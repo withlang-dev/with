@@ -124,4 +124,4 @@ fn main:
     test_array_min()
     test_array_all_positive()
     test_array_reverse_copy()
-    println("ok")
+    print("ok")

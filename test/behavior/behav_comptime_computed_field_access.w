@@ -18,4 +18,4 @@ fn main:
     let value = Pair { x: 40, y: 2 }
     assert(describe_pair(value) == "x=40;y=2;")
     assert(sum_pair(value) == 42)
-    println("ok")
+    print("ok")

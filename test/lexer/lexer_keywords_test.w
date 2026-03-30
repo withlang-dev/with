@@ -21,4 +21,4 @@ fn main:
     assert(tokens2.get_tag(3) == TokenKind.TK_IDENT())
     assert(tokens2.get_tag(4) == TokenKind.TK_EOF())
 
-    println("ok")
+    print("ok")

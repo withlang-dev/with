@@ -83,4 +83,4 @@ fn main:
     test_u32_shift()
     test_shift_in_expression()
     test_bit_set_clear()
-    println("ok")
+    print("ok")

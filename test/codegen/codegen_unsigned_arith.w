@@ -30,4 +30,4 @@ fn main:
     assert(u8_gte(200, 200))
     assert(u8_lte(100, 100))
 
-    println("ok")
+    print("ok")

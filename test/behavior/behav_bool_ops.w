@@ -74,4 +74,4 @@ fn main:
     test_short_circuit_or()
     test_short_circuit_and()
     test_bool_not()
-    println("ok")
+    print("ok")

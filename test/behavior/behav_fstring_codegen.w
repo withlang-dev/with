@@ -85,4 +85,4 @@ fn main:
     test_fstring_nested_calls()
     test_fstring_with_fn_call()
     test_fstring_concatenation()
-    println("ok")
+    print("ok")

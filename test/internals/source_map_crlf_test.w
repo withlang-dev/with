@@ -15,4 +15,4 @@ fn main:
     assert(sm.line_text(file, 0) == "a\r")
     assert(sm.line_text(file, 1) == "b\r")
 
-    println("ok")
+    print("ok")

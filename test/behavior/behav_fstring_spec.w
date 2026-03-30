@@ -35,4 +35,4 @@ fn main:
     test_int_zero_pad()
     test_int_sign()
     test_int_alt_hex()
-    println("ok")
+    print("ok")

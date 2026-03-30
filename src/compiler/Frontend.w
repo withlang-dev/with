@@ -19,7 +19,7 @@ extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_str_hash(s: str) -> i64
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
@@ -72,7 +72,7 @@ fn frontend_debug_type_names_enabled() -> i32:
 fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
     if frontend_debug_type_names_enabled() == 0:
         return
-    with_eprintln(f"[type-names] stage={stage} decls={pool.decl_count()}")
+    with_eprint(f"[type-names] stage={stage} decls={pool.decl_count()}")
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_TYPE_DECL:
@@ -90,7 +90,7 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)
         let msg = f"[type-names] {stage} decl={di} node={decl as i32} kind={kind_name} name_sym={name_sym} name={name}"
-        with_eprintln(msg)
+        with_eprint(msg)
 
 fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var out = pool
@@ -141,25 +141,25 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         if cached.len() > 0:
             // Already injected in this compilation — skip to avoid duplicate declarations
             if self.trace_c_import_cache != 0:
-                with_eprintln("c_import cache hit (memory) — skipping duplicate")
+                with_eprint("c_import cache hit (memory) — skipping duplicate")
             continue
         else:
             // Check file-system cache
             let fs_cached = c_import_fs_cache_lookup(cache_key)
             if fs_cached.len() > 0:
                 if self.trace_c_import_cache != 0:
-                    with_eprintln("c_import cache hit (fs)")
+                    with_eprint("c_import cache hit (fs)")
                 synthetic = fs_cached
                 self.c_import_cache_store(cache_key, synthetic)
                 // Populate dedup table so subsequent c_imports don't re-emit these names
                 ci_mark_cached_names(synthetic)
             else:
                 if self.trace_c_import_cache != 0:
-                    with_eprintln("c_import cache miss")
+                    with_eprint("c_import cache miss")
                 let libclang_result = process_c_import(resolved_header_spec)
                 if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
-                    with_eprintln("c_import generated:")
-                    with_eprintln(libclang_result)
+                    with_eprint("c_import generated:")
+                    with_eprint(libclang_result)
                 if libclang_result.len() > 0:
                     synthetic = libclang_result
                 else:
@@ -724,28 +724,28 @@ fn Zcu.parse_with_prelude_first(self: Zcu, text: str, file_id: i32) -> AstPool:
 
 fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
     if zcu_debug_init_enabled() != 0:
-        with_eprintln("[frontend] compile_file:start " ++ path)
+        with_eprint("[frontend] compile_file:start " ++ path)
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
     self.project_config = project_config_load_for_source(path)
 
     let text = with_fs_read_file(path)
     if text.len() == 0:
-        with_eprintln("error: cannot open '" ++ path ++ "'")
+        with_eprint("error: cannot open '" ++ path ++ "'")
         self.set_resolve_snapshot(ResolveResult.init(), path)
         return AstPool.new()
 
     self.set_current_source(source_dir, path, text)
     if zcu_debug_init_enabled() != 0:
-        with_eprintln(f"[frontend] compile_file:source_ready bytes={text.len() as i32}")
+        with_eprint(f"[frontend] compile_file:source_ready bytes={text.len() as i32}")
     let pool = self.compile_source_frontend(text, path, 0)
     if pool.decl_count() == 0 and not self.diagnostics.has_errors():
-        with_eprintln("error: compiler produced an empty module for '" ++ path ++ "'")
+        with_eprint("error: compiler produced an empty module for '" ++ path ++ "'")
     pool
 
 fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) -> AstPool:
     if zcu_debug_init_enabled() != 0:
-        with_eprintln("[frontend] compile_source:parse")
+        with_eprint("[frontend] compile_source:parse")
 
     // Phase 1+2: Lex + Parse.  When prelude is enabled, parse the prelude
     // USE declaration first so it appears at decl position 0, ensuring
@@ -772,7 +772,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         return AstPool.new()
 
     if zcu_debug_init_enabled() != 0:
-        with_eprintln("[frontend] compile_source:resolve")
+        with_eprint("[frontend] compile_source:resolve")
     // Wave 4: sidecar resolved artifact.
     let artifacts = resolve_from_root_pool(name, text, file_id, pool, self.pool, self.diagnostics, false)
     self.pool = artifacts.pool
@@ -787,7 +787,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         return AstPool.new()
 
     if zcu_debug_init_enabled() != 0:
-        with_eprintln("[frontend] compile_source:imports")
+        with_eprint("[frontend] compile_source:imports")
     // Build the sema/codegen pool via recursive syntactic import expansion.
     // This still sees implicit prelude imports because `inject_prelude_frontend`
     // materializes them as normal `use` declarations in the root pool.
@@ -808,7 +808,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     // comptime branches before final sema.
     if pool.has_comptime_nodes() or pool.has_type_derives():
         if zcu_debug_init_enabled() != 0:
-            with_eprintln("[frontend] compile_source:comptime-transform")
+            with_eprint("[frontend] compile_source:comptime-transform")
         var pre_sema = Sema.init(self.pool, self.diagnostics, pool)
         pre_sema.source_text = text
         pre_sema.decl_source_paths = self.decl_source_paths
@@ -830,7 +830,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     pool.freeze()
 
     if zcu_debug_init_enabled() != 0:
-        with_eprintln("[frontend] compile_source:sema")
+        with_eprint("[frontend] compile_source:sema")
     var sema = Sema.init(self.pool, self.diagnostics, pool)
     sema.source_text = text
     sema.decl_source_paths = self.decl_source_paths
@@ -847,7 +847,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         return AstPool.new()
 
     if pool.decl_count() == 0:
-        with_eprintln("error: parser returned an empty module without diagnostics for '" ++ name ++ "'")
+        with_eprint("error: parser returned an empty module without diagnostics for '" ++ name ++ "'")
         return AstPool.new()
 
     pool

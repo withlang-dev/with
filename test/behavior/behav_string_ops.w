@@ -66,4 +66,4 @@ fn main:
     test_string_length()
     test_string_from_condition()
     test_string_in_match()
-    println("ok")
+    print("ok")

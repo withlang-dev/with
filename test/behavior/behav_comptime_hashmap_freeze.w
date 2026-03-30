@@ -21,4 +21,4 @@ fn main:
     assert(TABLE.get("alpha").unwrap() == 3)
     assert(TABLE.get("beta").unwrap() == 2)
     assert(TABLE.get("missing").is_none())
-    println("ok")
+    print("ok")

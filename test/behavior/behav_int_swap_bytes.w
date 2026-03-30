@@ -25,4 +25,4 @@ fn main:
     test_swap_u16()
     test_swap_u32_roundtrip()
     test_swap_zero()
-    println("ok")
+    print("ok")

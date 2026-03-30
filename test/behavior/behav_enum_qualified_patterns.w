@@ -41,4 +41,4 @@ fn main:
     test_match()
     test_if_let()
     test_nested_match()
-    println("ok")
+    print("ok")

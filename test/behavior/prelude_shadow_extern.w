@@ -7,8 +7,8 @@
 
 fn assert(cond: bool):
     if not cond:
-        println("FAIL")
+        print("FAIL")
 
 fn main:
     assert(true)
-    println("ok")
+    print("ok")

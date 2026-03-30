@@ -14,4 +14,4 @@ fn main:
     let s = "hello"
     assert(s.debug_str() == "\"hello\"")
 
-    println("ok")
+    print("ok")

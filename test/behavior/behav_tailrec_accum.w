@@ -40,4 +40,4 @@ fn main:
     test_factorial()
     test_sum()
     test_fibonacci()
-    println("ok")
+    print("ok")

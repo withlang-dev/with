@@ -69,4 +69,4 @@ fn main:
     test_const_in_comparison()
     test_const_in_shift()
     test_const_in_array_size()
-    println("ok")
+    print("ok")

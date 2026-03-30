@@ -32,4 +32,4 @@ fn main:
     assert(ret_u64() == 0u64)
     assert(p.x == 0.0)
     assert(arr[3] == 3u8)
-    println("ok")
+    print("ok")

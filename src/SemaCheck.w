@@ -11,8 +11,8 @@ use InternPool
 use TypeLayout
 use render
 
-extern fn print(s: str) -> void
-extern fn with_eprintln(s: str) -> void
+extern fn with_write(s: str) -> void
+extern fn with_eprint(s: str) -> void
 extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn int_to_string(n: i32) -> str
@@ -892,7 +892,7 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
         if state == VarState.MOVED:
             if sema_debug_move_enabled() != 0:
                 let name = self.pool_resolve(sym)
-                with_eprintln(
+                with_eprint(
                     f"[moved-use] sym={name} tid={tid} node_kind={self.ast.kind(node)}"
                 )
             self.emit_error("use of moved value", node)
@@ -4874,7 +4874,7 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
                 if sema_debug_move_enabled() != 0:
                     let resolved = self.resolve_alias(tid as TypeId)
                     let name = self.pool_resolve(sym)
-                    with_eprintln(
+                    with_eprint(
                         f"[move] sym={name} tid={tid} resolved={resolved as i32} kind={self.get_type_kind(resolved)}"
                     )
                 self.scope_set_state(sym, VarState.MOVED)

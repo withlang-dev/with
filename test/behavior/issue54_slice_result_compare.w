@@ -36,4 +36,4 @@ fn test_slice_compare_option:
 fn main:
     test_slice_compare_result()
     test_slice_compare_option()
-    println("ok")
+    print("ok")

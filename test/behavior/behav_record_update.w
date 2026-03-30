@@ -25,4 +25,4 @@ fn test_update_multiple_fields:
 fn main:
     test_basic_update()
     test_update_multiple_fields()
-    println("ok")
+    print("ok")

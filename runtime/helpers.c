@@ -748,16 +748,28 @@ void with_eprintln(with_str s) {
     fputc('\n', stderr);
 }
 
-// Aliases used by self-hosted compiler externs.
-void eprintln(with_str s) {
+// Print a string to stderr without trailing newline.
+void with_ewrite(with_str s) {
+    if (s.ptr && s.len > 0) {
+        fwrite(s.ptr, 1, (size_t)s.len, stderr);
+    }
+}
+
+// Print a string to stderr with trailing newline (alias for with_eprintln).
+void with_eprint(with_str s) {
     with_eprintln(s);
 }
 
-void print(with_str s) {
+// Print a string to stdout without trailing newline.
+void with_write(with_str s) {
     if (s.ptr && s.len > 0) {
         fwrite(s.ptr, 1, (size_t)s.len, stdout);
     }
 }
+
+// Aliases used by self-hosted compiler externs.
+// Note: C-level name is with_write to avoid POSIX write() conflict.
+// The With prelude maps write() -> with_write().
 
 // Convert a single byte value to a one-char string.
 with_str str_from_byte(int32_t b) {

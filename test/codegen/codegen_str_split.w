@@ -5,7 +5,7 @@
 fn main:
     let s = "hello,world,foo"
     let parts = s.split(",")
-    println(int_to_string(parts.len() as i32))
+    print(int_to_string(parts.len() as i32))
     for i in 0..parts.len():
         let p = parts.get(i)
-        println(p)
+        print(p)

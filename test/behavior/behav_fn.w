@@ -66,4 +66,4 @@ fn main:
     test_recursion()
     test_early_return()
     noop()
-    println("ok")
+    print("ok")

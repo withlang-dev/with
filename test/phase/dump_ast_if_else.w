@@ -4,6 +4,6 @@
 fn main:
     let x = 10
     if x > 5:
-        println("big")
+        print("big")
     else:
-        println("small")
+        print("small")

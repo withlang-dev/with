@@ -9,7 +9,7 @@ fn apply_void(f: fn() -> i32):
 fn main:
     // Capture a string
     let s = "hello"
-    let f = () => println(s)
+    let f = () => print(s)
     apply_void(f)
 
     // Capture an integer
@@ -23,4 +23,4 @@ fn main:
     let h = () => a + b
     assert(apply(h) == 30)
 
-    println("ok")
+    print("ok")

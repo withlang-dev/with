@@ -4,7 +4,7 @@ use CodegenDispatch
 use CodegenTraits
 use compiler.Zcu
 
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
 
 fn backend_debug_pool_flow_enabled() -> i32:
@@ -15,7 +15,7 @@ fn backend_debug_pool_flow_enabled() -> i32:
 
 fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, output_path: str, debug_info: bool) -> i32:
     if self.last_mir_module.body_count() == 0:
-        with_eprintln("error: missing MIR input for LLVM backend")
+        with_eprint("error: missing MIR input for LLVM backend")
         return 1
     var backend_pool = pool
     var backend_intern = self.pool
@@ -31,30 +31,30 @@ fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, outpu
     if not debug_info:
         cg.debug_info = 0
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-        with_eprintln(f"[backend] zcu.pool symbols={self.pool.symbol_texts.len() as i32}")
-        with_eprintln(f"[backend] frontend.pool symbols={self.frontend_pool.symbol_texts.len() as i32}")
-        with_eprintln(f"[backend] sema.pool symbols={self.last_sema.pool.symbol_texts.len() as i32}")
-        with_eprintln(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={self.last_sema.ast.decl_count()}")
+        with_eprint(f"[backend] zcu.pool symbols={self.pool.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] sema.pool symbols={self.last_sema.pool.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={self.last_sema.ast.decl_count()}")
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or cg.intern.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-        with_eprintln(f"[backend] cg.intern symbols={cg.intern.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] cg.intern symbols={cg.intern.symbol_texts.len() as i32}")
     if backend_debug_pool_flow_enabled() != 0:
-        with_eprintln(f"[backend-diag] pool.extra_len={backend_pool.extra_len()} pool.nodes={backend_pool.node_count()}")
+        with_eprint(f"[backend-diag] pool.extra_len={backend_pool.extra_len()} pool.nodes={backend_pool.node_count()}")
         backend_dump_struct_extras(backend_pool, backend_intern)
     let result = cg.gen_module_from_mir(self.last_mir_module, backend_pool)
     if result != 0:
-        with_eprintln("error: code generation failed")
+        with_eprint("error: code generation failed")
         return 1
     if opt_level > 0:
         cg.optimize(opt_level)
     let emit_result = cg.emit_object_file(output_path)
     if emit_result != 0:
-        with_eprintln("error: failed to emit object file")
+        with_eprint("error: failed to emit object file")
         return 1
     0
 
 fn Zcu.emit_ir_backend(self: Zcu, pool: AstPool, opt_level: i32) -> bool:
     if self.last_mir_module.body_count() == 0:
-        with_eprintln("error: missing MIR input for LLVM backend")
+        with_eprint("error: missing MIR input for LLVM backend")
         return false
     var backend_pool = pool
     var backend_intern = self.pool
@@ -68,15 +68,15 @@ fn Zcu.emit_ir_backend(self: Zcu, pool: AstPool, opt_level: i32) -> bool:
     cg.decl_source_paths = self.decl_source_paths
     cg.current_decl_source_file = self.current_source_path
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-        with_eprintln(f"[backend] zcu.pool symbols={self.pool.symbol_texts.len() as i32}")
-        with_eprintln(f"[backend] frontend.pool symbols={self.frontend_pool.symbol_texts.len() as i32}")
-        with_eprintln(f"[backend] sema.pool symbols={self.last_sema.pool.symbol_texts.len() as i32}")
-        with_eprintln(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={self.last_sema.ast.decl_count()}")
+        with_eprint(f"[backend] zcu.pool symbols={self.pool.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] sema.pool symbols={self.last_sema.pool.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={self.last_sema.ast.decl_count()}")
     if self.pool.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.symbol_texts.len() as i32 <= 4 or cg.intern.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
-        with_eprintln(f"[backend] cg.intern symbols={cg.intern.symbol_texts.len() as i32}")
+        with_eprint(f"[backend] cg.intern symbols={cg.intern.symbol_texts.len() as i32}")
     let result = cg.gen_module_from_mir(self.last_mir_module, backend_pool)
     if result != 0:
-        with_eprintln("error: code generation failed")
+        with_eprint("error: code generation failed")
         return false
     cg.print_ir()
     true
@@ -94,7 +94,7 @@ fn backend_dump_struct_extras(pool: AstPool, intern: InternPool):
         let es = pool.get_data1(decl)
         let fc = pool.get_extra(es)
         if fc <= 0 or fc > 100:
-            with_eprintln(f"[sd] BAD {name} d={decl as i32} es={es} fc={fc}")
+            with_eprint(f"[sd] BAD {name} d={decl as i32} es={es} fc={fc}")
             continue
         var ok = 1
         for fi in 0..fc:
@@ -103,8 +103,8 @@ fn backend_dump_struct_extras(pool: AstPool, intern: InternPool):
             let k = pool.kind((tn) as NodeId)
             if k < 50 or k > 200:
                 ok = 0
-                with_eprintln(f"[sd] {name} f{fi} tn={tn} k={k} es={es} o={o}")
+                with_eprint(f"[sd] {name} f{fi} tn={tn} k={k} es={es} o={o}")
         if ok == 1 and (name == "Codegen" or name == "ContextError"):
-            with_eprintln(f"[sd] OK {name} d={decl as i32} es={es} fc={fc}")
+            with_eprint(f"[sd] OK {name} d={decl as i32} es={es} fc={fc}")
 
 let _backend_eof_guard = 0

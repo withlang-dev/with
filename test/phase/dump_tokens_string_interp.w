@@ -3,4 +3,4 @@
 
 fn main:
     let name = "world"
-    println(f"hello {name}")
+    print(f"hello {name}")

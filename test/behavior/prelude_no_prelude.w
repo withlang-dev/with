@@ -5,4 +5,4 @@
 // println should not be available without the prelude.
 
 fn main:
-    println("should fail")
+    print("should fail")

@@ -90,4 +90,4 @@ fn main:
     test_u8_to_i32_not_sign_extended()
     test_cast_chain()
     test_cast_in_arithmetic()
-    println("ok")
+    print("ok")

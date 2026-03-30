@@ -359,39 +359,39 @@ extend JsonValue:
 fn main:
     let input = "{\"name\": \"With Language\", \"version\": 3.2, \"features\": [\"handles\", \"fibers\", \"comptime\"], \"meta\": {\"stable\": false, \"authors\": [\"core-team\"], \"stats\": {\"stars\": 0, \"forks\": null}}}"
 
-    println("=== JSON Parser Demo ===\n")
-    println("Input ({input.len()} bytes):\n{input}\n")
+    print("=== JSON Parser Demo ===\n")
+    print("Input ({input.len()} bytes):\n{input}\n")
 
     match parse(input)
         Ok(value) ->
-            println("Parsed successfully!\n")
-            println("Pretty: {value}\n")
+            print("Parsed successfully!\n")
+            print("Pretty: {value}\n")
 
             // Access nested values via optional chaining + ??
             let name = value.get("name")?.as_str() ?? "unknown"
-            println("Name: {name}")
+            print("Name: {name}")
 
             let version = value.get("version")?.as_number() ?? 0.0
-            println("Version: {version}")
+            print("Version: {version}")
 
             // Access array elements
             let first_feature = value.get("features")?.index(0)?.as_str() ?? "none"
-            println("First feature: {first_feature}")
+            print("First feature: {first_feature}")
 
             // Walk all leaves using generator
-            println("\nAll leaf paths:")
+            print("\nAll leaf paths:")
             for (path, leaf) in walk_leaves(&value, ""):
-                println("  {path} = {leaf}")
+                print("  {path} = {leaf}")
 
             // Count features using optional chaining
             let feature_count = value.get("features")?.as_array()?.len() ?? 0
-            println("\nFeature count: {feature_count}")
+            print("\nFeature count: {feature_count}")
 
         Err(e) ->
-            println("Parse error: {e}")
+            print("Parse error: {e}")
 
     // Demonstrate error handling
-    println("\n--- Error cases ---")
+    print("\n--- Error cases ---")
     let bad_inputs = [
         ("{\"key\": }", "missing value"),
         ("[1, 2,",      "unterminated array"),
@@ -399,7 +399,7 @@ fn main:
     ]
     for (input, description) in bad_inputs:
         match parse(input.to_string())
-            Ok(_)  => println("  {description}: unexpectedly succeeded")
-            Err(e) => println("  {description}: {e}")
+            Ok(_)  => print("  {description}: unexpectedly succeeded")
+            Err(e) => print("  {description}: {e}")
 
-    println("\n=== Demo complete ===")
+    print("\n=== Demo complete ===")

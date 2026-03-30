@@ -44,4 +44,4 @@ fn main:
     test_if_else_chain()
     test_else_block()
     test_nested_if_else()
-    println("ok")
+    print("ok")

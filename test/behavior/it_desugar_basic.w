@@ -5,4 +5,4 @@ fn apply(f: fn(i32) -> i32, x: i32) -> i32:
 
 fn main:
     let r = apply(it * 2, 21)
-    println(int_to_string(r))
+    print(int_to_string(r))

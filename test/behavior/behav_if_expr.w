@@ -108,4 +108,4 @@ fn main:
     test_if_with_comparison()
     test_if_in_return()
     test_if_helper_fns()
-    println("ok")
+    print("ok")

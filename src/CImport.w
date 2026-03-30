@@ -96,7 +96,7 @@ extern fn with_cimport_struct_align(session: i64, idx: i32) -> i64
 
 extern fn int_to_string(n: i32) -> str
 extern fn i64_to_string(n: i64) -> str
-extern fn with_eprintln(s: str) -> void
+extern fn with_eprint(s: str) -> void
 
 // CXCursorKind constants (old API — decl-level)
 let CK_STRUCT: i32 = 2

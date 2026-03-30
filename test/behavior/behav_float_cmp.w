@@ -14,4 +14,4 @@ fn test_float_equality:
 
 fn main:
     test_float_equality()
-    println("ok")
+    print("ok")

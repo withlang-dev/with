@@ -7,4 +7,4 @@ fn apply(f: fn(i32) -> i32, x: i32) -> i32:
 
 fn main:
     let result = apply(double, 21)
-    println(int_to_string(result))
+    print(int_to_string(result))

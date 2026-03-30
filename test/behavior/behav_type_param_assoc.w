@@ -17,4 +17,4 @@ fn extract[T: Container](c: T) -> T.Item:
 fn main:
     let b = Box32 { value: 42 }
     let result = b.get()
-    println(int_to_string(result))
+    print(int_to_string(result))

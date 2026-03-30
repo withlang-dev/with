@@ -31,4 +31,4 @@ fn main:
         None => -1
     assert(missing_val == -1)
 
-    println("ok")
+    print("ok")

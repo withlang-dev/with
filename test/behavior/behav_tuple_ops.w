@@ -64,4 +64,4 @@ fn main:
     test_tuple_destructure()
     test_tuple_match()
     test_tuple_match_values()
-    println("ok")
+    print("ok")

@@ -13,4 +13,4 @@ impl Container for NoEqType =
 
 fn main:
     let n = NoEqType { x: 42 }
-    println(int_to_string(n.get()))
+    print(int_to_string(n.get()))
