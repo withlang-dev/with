@@ -732,7 +732,10 @@ fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, dep
     let kind = self.pool.kind(node)
     if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT:
         let sym = self.pool.get_data0(node)
-        return const_string_eval_ok(self.decode_string_escapes(self.intern.resolve(sym)))
+        let raw = self.intern.resolve(sym)
+        if raw.len() >= 5 and raw.byte_at(0) == 1 and raw.byte_at(1) == 114 and raw.byte_at(2) == 97 and raw.byte_at(3) == 119 and raw.byte_at(4) == 1:
+            return const_string_eval_ok(raw.slice(5, raw.len()))
+        return const_string_eval_ok(self.decode_string_escapes(raw))
 
     if kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_GROUPED:
         return self.try_eval_const_string(self.pool.get_data0(node), source_path, depth + 1)

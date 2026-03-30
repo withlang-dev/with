@@ -586,7 +586,13 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         return wl_const_int(wl_i1_type(self.context), cd as i64, 0)
 
     if ck == ConstKind.CK_STR:
-        let text = if cd != 0: self.decode_string_escapes(self.intern.resolve(cd)) else: ""
+        var text = ""
+        if cd != 0:
+            let raw = self.intern.resolve(cd)
+            if raw.len() >= 5 and raw.byte_at(0) == 1 and raw.byte_at(1) == 114 and raw.byte_at(2) == 97 and raw.byte_at(3) == 119 and raw.byte_at(4) == 1:
+                text = raw.slice(5, raw.len())
+            else:
+                text = self.decode_string_escapes(raw)
         return self.gen_string_literal_raw(text)
 
     if ck == ConstKind.CK_UNIT:
@@ -4275,7 +4281,7 @@ fn Codegen.find_struct_decl_node(self: Codegen, type_sym: i32) -> NodeId:
         let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
         if sub_kind == TypeDeclKind.Struct:
             return decl
-    (0) as NodeId
+    0 as NodeId
 
 fn Codegen.find_field_index_from_ast(self: Codegen, type_sym: i32, field_sym: i32) -> i32:
     let decl = self.find_struct_decl_node(type_sym)

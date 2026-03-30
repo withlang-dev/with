@@ -357,7 +357,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
         if self.pos < slen and src.byte_at((self.pos) as i64) == CharCode.Backslash:
             if self.pos + 1 < slen:
                 var p = self.pos + 1
-                if src.byte_at((p) as i64) == CharCode.LowerX and p + 2 < slen:  // xNN
+                if src.byte_at(p as i64) == CharCode.LowerX and p + 2 < slen:  // xNN
                     p = p + 2
                 if p + 1 < slen and src.byte_at((p + 1) as i64) == CharCode.Squote:
                     self.pos = p + 2
@@ -410,43 +410,13 @@ fn Lexer.lex_string(self: Lexer) -> i32:
         // Unterminated multi-line string — return STRING_LIT for parser recovery.
         return TokenKind.TK_STRING_LIT
 
-    // Track brace depth so that `"` inside interpolation holes `{...}` is not
-    // treated as the end of the string.
-    var brace_depth = 0
+    // Regular strings: no interpolation. Scan for closing `"`, handle `\` escapes.
     while self.pos < slen:
         let ch = src.byte_at((self.pos) as i64)
-        if ch == CharCode.Lbrace and brace_depth == 0:
-            // Don't count escaped braces. Count consecutive backslashes
-            // preceding this '{' — an odd count means the brace is escaped.
-            var bs = 0
-            while bs < self.pos and src.byte_at((self.pos - 1 - bs) as i64) == CharCode.Backslash:
-                bs = bs + 1
-            if bs % 2 == 0:
-                brace_depth = brace_depth + 1
-                self.pos = self.pos + 1
-                continue
-        if ch == CharCode.Lbrace and brace_depth > 0:
-            brace_depth = brace_depth + 1
-            self.pos = self.pos + 1
-            continue
-        if ch == CharCode.Rbrace and brace_depth > 0:
-            brace_depth = brace_depth - 1
-            self.pos = self.pos + 1
-            continue
-        if ch == CharCode.Dquote and brace_depth == 0:  // closing "
+        if ch == CharCode.Dquote:
             self.pos = self.pos + 1
             return TokenKind.TK_STRING_LIT
-        if ch == CharCode.Dquote and brace_depth > 0:
-            // Inside an interpolation hole: skip nested string literal.
-            self.pos = self.pos + 1
-            while self.pos < slen and src.byte_at((self.pos) as i64) != CharCode.Dquote:
-                if src.byte_at((self.pos) as i64) == CharCode.Backslash:
-                    self.pos = self.pos + 1
-                self.pos = self.pos + 1
-            if self.pos < slen:
-                self.pos = self.pos + 1
-            continue
-        if ch == CharCode.Backslash:  // backslash escape
+        if ch == CharCode.Backslash:
             self.pos = self.pos + 1
         self.pos = self.pos + 1
     // Unterminated — return STRING_LIT for parser recovery.
@@ -507,11 +477,11 @@ fn Lexer.lex_number(self: Lexer) -> i32:
 
     // Check for type suffix: 100i64, 3.14f32, 0xFFu32.
     var suffix_pos = self.pos
-    if suffix_pos < slen and src.byte_at((suffix_pos) as i64) == CharCode.Underscore:
+    if suffix_pos < slen and src.byte_at(suffix_pos as i64) == CharCode.Underscore:
         suffix_pos = suffix_pos + 1
     let suffix_len = numeric_suffix_len(src, suffix_pos, slen)
     if suffix_len > 0:
-        let suffix_head = src.byte_at((suffix_pos) as i64)
+        let suffix_head = src.byte_at(suffix_pos as i64)
         self.pos = suffix_pos + suffix_len
         if suffix_head == CharCode.LowerF:
             is_float = true
@@ -523,7 +493,7 @@ fn Lexer.lex_number(self: Lexer) -> i32:
 fn numeric_suffix_len(src: str, pos: i32, slen: i32) -> i32:
     if pos >= slen:
         return 0
-    let ch = src.byte_at((pos) as i64)
+    let ch = src.byte_at(pos as i64)
     if ch != CharCode.LowerI and ch != CharCode.LowerU and ch != CharCode.LowerF:
         return 0
     if suffix_accept(src, pos, slen, "usize", 5):
@@ -646,10 +616,10 @@ fn Lexer.lex_raw_string_prefixed(self: Lexer) -> i32:
     let slen = src.len() as i32
     var p = self.pos
     var hash_count = 0
-    while p < slen and src.byte_at((p) as i64) == CharCode.Hash:
+    while p < slen and src.byte_at(p as i64) == CharCode.Hash:
         hash_count = hash_count + 1
         p = p + 1
-    if p >= slen or src.byte_at((p) as i64) != CharCode.Dquote:  // opening "
+    if p >= slen or src.byte_at(p as i64) != CharCode.Dquote:  // opening "
         return -1
 
     // Consume opening delimiter.
@@ -701,6 +671,6 @@ fn column_of(source: str, pos: i32) -> i32:
     var p = pos
     while p > 0:
         p = p - 1
-        if source.byte_at((p) as i64) == CharCode.Newline:
+        if source.byte_at(p as i64) == CharCode.Newline:
             return pos - p - 1
     pos
