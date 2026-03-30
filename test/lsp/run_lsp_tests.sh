@@ -175,6 +175,68 @@ check "sig: null outside call" "$out_sn" '"result":null'
 
 echo ""
 
+# ── Phase 6: Dot completion ────────────────────────────────
+echo "Phase 6: Dot completion"
+
+# str methods
+cat > /tmp/lsp_dot_str.w << 'EOF'
+fn main:
+    let name = "hello"
+    name.
+EOF
+req_ds='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":2,"character":9}}}'
+out_ds=$(lsp_test /tmp/lsp_dot_str.w "$req_ds")
+check "dot str: len" "$out_ds" '"label":"len"'
+check "dot str: slice" "$out_ds" '"label":"slice"'
+check "dot str: contains" "$out_ds" '"label":"contains"'
+
+# Struct fields
+cat > /tmp/lsp_dot_struct.w << 'EOF'
+type Point {
+    x: i32,
+    y: i32,
+    name: str,
+}
+
+fn main:
+    let p = Point { x: 1, y: 2, name: "origin" }
+    p.
+EOF
+req_dp='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":8,"character":6}}}'
+out_dp=$(lsp_test /tmp/lsp_dot_struct.w "$req_dp")
+check "dot struct: x" "$out_dp" '"label":"x"'
+check "dot struct: y" "$out_dp" '"label":"y"'
+check "dot struct: name" "$out_dp" '"label":"name"'
+
+# Vec methods
+cat > /tmp/lsp_dot_vec.w << 'EOF'
+fn main:
+    let v = Vec.new()
+    v.
+EOF
+req_dv='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":2,"character":6}}}'
+out_dv=$(lsp_test /tmp/lsp_dot_vec.w "$req_dv")
+check "dot vec: push" "$out_dv" '"label":"push"'
+check "dot vec: len" "$out_dv" '"label":"len"'
+check "dot vec: get" "$out_dv" '"label":"get"'
+
+# Parameter with type annotation
+cat > /tmp/lsp_dot_param.w << 'EOF'
+type User {
+    name: str,
+    age: i32,
+}
+
+fn greet(u: User):
+    u.
+EOF
+req_du='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":6,"character":6}}}'
+out_du=$(lsp_test /tmp/lsp_dot_param.w "$req_du")
+check "dot param: name" "$out_du" '"label":"name"'
+check "dot param: age" "$out_du" '"label":"age"'
+
+echo ""
+
 # ── Summary ─────────────────────────────────────────────────
 echo "=== Results: $PASS passed, $FAIL failed ==="
 if [ "$FAIL" -gt 0 ]; then

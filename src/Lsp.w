@@ -499,6 +499,181 @@ fn lsp_hover(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32)
     let content = jobj_start() ++ jkv_str("kind", "markdown") ++ "," ++ jkv_str("value", "`" ++ hover ++ "`") ++ jobj_end()
     lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("contents", content) ++ jobj_end()))
 
+// ── Dot completion ───────────────────────────────────────────
+
+fn lsp_dot_completion(id: i32, text: str, offset: i32, dot_pos: i32):
+    // Find the receiver identifier before the dot
+    var recv_end = dot_pos
+    var recv_start = recv_end - 1
+    while recv_start >= 0 and lsp_is_ident_char(text.byte_at(recv_start as i64)):
+        recv_start = recv_start - 1
+    recv_start = recv_start + 1
+    if recv_start >= recv_end:
+        lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", "[]") ++ jobj_end()))
+        return
+    let receiver = text.slice(recv_start as i64, recv_end as i64)
+
+    // Parse file to find receiver's type
+    let parsed = lsp_parse_file(text)
+    let type_name = lsp_resolve_receiver_type(parsed.pool, parsed.intern, receiver, offset)
+
+    // Build items JSON inline (Vec is pass-by-value, can't use helpers)
+    var items = jarr_start()
+    var first = true
+
+    if type_name == "str":
+        // str methods
+        let str_methods = "len,slice,starts_with,ends_with,contains,find,replace,to_upper,to_lower,trim,split,byte_at,repeat"
+        var sm_start = 0
+        for smi in 0..str_methods.len() as i32:
+            if str_methods.byte_at(smi as i64) == 44 or smi == str_methods.len() as i32 - 1:
+                let sm_end = if str_methods.byte_at(smi as i64) == 44: smi else: smi + 1
+                let m = str_methods.slice(sm_start as i64, sm_end as i64)
+                if not first: items = items ++ ","
+                first = false
+                items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
+                sm_start = smi + 1
+
+    else if type_name == "Vec":
+        let vec_methods = "push,pop,get,len,is_empty,contains,clear"
+        var vm_start = 0
+        for vmi in 0..vec_methods.len() as i32:
+            if vec_methods.byte_at(vmi as i64) == 44 or vmi == vec_methods.len() as i32 - 1:
+                let vm_end = if vec_methods.byte_at(vmi as i64) == 44: vmi else: vmi + 1
+                let m = vec_methods.slice(vm_start as i64, vm_end as i64)
+                if not first: items = items ++ ","
+                first = false
+                items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
+                vm_start = vmi + 1
+
+    else if type_name == "HashMap":
+        let hm_methods = "get,insert,contains,remove,len,is_empty,clear"
+        var hm_start = 0
+        for hmi in 0..hm_methods.len() as i32:
+            if hm_methods.byte_at(hmi as i64) == 44 or hmi == hm_methods.len() as i32 - 1:
+                let hm_end = if hm_methods.byte_at(hmi as i64) == 44: hmi else: hmi + 1
+                let m = hm_methods.slice(hm_start as i64, hm_end as i64)
+                if not first: items = items ++ ","
+                first = false
+                items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
+                hm_start = hmi + 1
+
+    else if type_name.len() > 0:
+        // User struct: find fields from type declaration
+        for di in 0..parsed.pool.decl_count():
+            let decl = parsed.pool.get_decl(di)
+            if parsed.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
+                continue
+            let dname = parsed.intern.resolve(parsed.pool.get_data0(decl))
+            if dname != type_name:
+                continue
+            let sub = type_decl_sub_kind(parsed.pool.get_data2(decl))
+            if sub != TypeDeclKind.Struct:
+                continue
+            // Walk struct fields from extra data
+            let es = parsed.pool.get_data1(decl)
+            let fc = parsed.pool.get_extra(es)
+            for fi in 0..fc:
+                let field_name_node = parsed.pool.get_extra(es + 1 + fi * 3)
+                if field_name_node != 0:
+                    let fname = parsed.intern.resolve(field_name_node)
+                    if fname.len() > 0:
+                        if not first: items = items ++ ","
+                        first = false
+                        items = items ++ jobj_start() ++ jkv_str("label", fname) ++ "," ++ jkv_int("kind", 5) ++ jobj_end()
+            break
+        // Find methods from extend blocks
+        for di in 0..parsed.pool.decl_count():
+            let decl = parsed.pool.get_decl(di)
+            if parsed.pool.kind(decl) != NodeKind.NK_IMPL_DECL:
+                continue
+            let impl_type = parsed.intern.resolve(parsed.pool.get_data0(decl))
+            if impl_type != type_name:
+                continue
+            // Walk impl methods from extra data
+            let es = parsed.pool.get_data1(decl)
+            let mc = parsed.pool.get_data2(decl)
+            // mc is trait name, not method count. Impl methods are nested fn_decls.
+            // For now, skip — extend block methods need different AST walking.
+
+    items = items ++ jarr_end()
+    lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
+
+fn lsp_is_ident_char(ch: i32) -> bool:
+    (ch >= 97 and ch <= 122) or (ch >= 65 and ch <= 90) or (ch >= 48 and ch <= 57) or ch == 95
+
+fn lsp_resolve_receiver_type(pool: AstPool, intern: InternPool, receiver: str, offset: i32) -> str:
+    // Find the enclosing function, then look for:
+    // 1. Parameter with type annotation: fn foo(x: MyType) → "MyType"
+    // 2. Let binding with type annotation: let x: MyType = ... → "MyType"
+    // 3. Known builtin names: "str" literal → "str"
+    let fn_node = lsp_find_enclosing_fn(pool, offset)
+    if fn_node as i32 == 0:
+        return ""
+
+    // Check parameters
+    let meta = pool.find_fn_meta(fn_node)
+    if meta >= 0:
+        let param_start = pool.fn_meta_param_start(meta)
+        let param_count = pool.fn_meta_param_count(meta)
+        for pi in 0..param_count:
+            let pname = intern.resolve(pool.fn_param_name(param_start, pi))
+            if pname == receiver:
+                let ptype_node = pool.fn_param_type(param_start, pi)
+                if ptype_node > 0:
+                    return lsp_type_node_to_name(pool, intern, ptype_node)
+
+    // Check let/var bindings in the body
+    let body = pool.get_data1(fn_node)
+    if body != 0 and pool.kind(body as NodeId) == NodeKind.NK_BLOCK:
+        let blk = body as NodeId
+        let es = pool.get_data0(blk)
+        let sc = pool.get_data1(blk)
+        for si in 0..sc:
+            let stmt = pool.get_extra(es + si)
+            if stmt == 0:
+                continue
+            if pool.kind(stmt as NodeId) != NodeKind.NK_LET_BINDING:
+                continue
+            let sym = pool.get_data0(stmt as NodeId)
+            if sym != 0 and intern.resolve(sym) == receiver:
+                // Check for type annotation — data2 has flags, but the
+                // value expression (data1) might give type info
+                // For now, check if there's a struct literal as value
+                let value = pool.get_data1(stmt as NodeId)
+                if value != 0:
+                    let vk = pool.kind(value as NodeId)
+                    if vk == NodeKind.NK_STRUCT_LIT:
+                        let struct_sym = pool.get_data0(value as NodeId)
+                        if struct_sym != 0:
+                            return intern.resolve(struct_sym)
+                    if vk == NodeKind.NK_STRING_LIT or vk == NodeKind.NK_FSTRING:
+                        return "str"
+                    if vk == NodeKind.NK_CALL:
+                        // Vec.new(), HashMap.new() etc.
+                        let callee = pool.get_data0(value as NodeId)
+                        if callee != 0 and pool.kind(callee as NodeId) == NodeKind.NK_FIELD_ACCESS:
+                            let base = pool.get_data0(callee as NodeId)
+                            if base != 0 and pool.kind(base as NodeId) == NodeKind.NK_IDENT:
+                                return intern.resolve(pool.get_data0(base as NodeId))
+    ""
+
+fn lsp_type_node_to_name(pool: AstPool, intern: InternPool, type_node: i32) -> str:
+    let tk = pool.kind(type_node as NodeId)
+    if tk == NodeKind.NK_TYPE_NAMED:
+        return intern.resolve(pool.get_data0(type_node as NodeId))
+    if tk == NodeKind.NK_TYPE_REF:
+        let inner = pool.get_data0(type_node as NodeId)
+        if inner > 0:
+            return lsp_type_node_to_name(pool, intern, inner)
+    if tk == NodeKind.NK_TYPE_GENERIC or tk == NodeKind.NK_INDEX:
+        let base = pool.get_data0(type_node as NodeId)
+        if base > 0 and pool.kind(base as NodeId) == NodeKind.NK_IDENT:
+            return intern.resolve(pool.get_data0(base as NodeId))
+    ""
+
+// (helpers removed — items built inline due to pass-by-value)
+
 // ── Completion ───────────────────────────────────────────────
 
 fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
@@ -513,7 +688,7 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
     var items = jarr_start()
     var first = true
 
-    // Context: "use std." → suggest embedded stdlib modules
+    // Context: "use std." / "use test." → module completion (check before dot)
     if lsp_find_substr(line_text, "use std.") >= 0:
         let modules = lsp_list_embedded_modules("std/")
         for i in 0..modules.len() as i32:
@@ -537,6 +712,14 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
             items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 9) ++ jobj_end()
         items = items ++ jarr_end()
         lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
+        return
+
+    // Detect dot context: character before cursor is '.'
+    var dot_pos = offset - 1
+    while dot_pos >= 0 and text.byte_at(dot_pos as i64) == 32:
+        dot_pos = dot_pos - 1
+    if dot_pos >= 0 and text.byte_at(dot_pos as i64) == 46:
+        lsp_dot_completion(id, text, offset, dot_pos)
         return
 
     // Get cached analysis
