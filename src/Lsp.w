@@ -385,6 +385,199 @@ fn lsp_hover(id: i32, uri: str, text: str, line: i32, col: i32):
     let content = jobj_start() ++ jkv_str("kind", "markdown") ++ "," ++ jkv_str("value", "`" ++ hover ++ "`") ++ jobj_end()
     lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("contents", content) ++ jobj_end()))
 
+// ── Completion ───────────────────────────────────────────────
+
+fn lsp_completion(id: i32, uri: str, text: str, line: i32, col: i32):
+    let offset = lsp_line_col_to_offset(text, line, col)
+
+    // Find the line text up to cursor to detect context
+    var line_start = offset
+    while line_start > 0 and text.byte_at((line_start - 1) as i64) != 10:
+        line_start = line_start - 1
+    let line_text = text.slice(line_start as i64, offset as i64)
+
+    var items = jarr_start()
+    var first = true
+
+    // Context: "use std." → suggest stdlib modules
+    if lsp_find_substr(line_text, "use std.") >= 0:
+        let modules = lsp_std_modules()
+        for i in 0..modules.len() as i32:
+            let m = modules.get(i as i64)
+            if not first:
+                items = items ++ ","
+            first = false
+            items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 9) ++ jobj_end()
+        items = items ++ jarr_end()
+        lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
+        return
+
+    // Context: "use test." → suggest test modules
+    if lsp_find_substr(line_text, "use test.") >= 0:
+        let test_mods = lsp_test_modules()
+        for i in 0..test_mods.len() as i32:
+            let m = test_mods.get(i as i64)
+            if not first:
+                items = items ++ ","
+            first = false
+            items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 9) ++ jobj_end()
+        items = items ++ jarr_end()
+        lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
+        return
+
+    // General: suggest keywords + declarations from current file
+    let keywords = lsp_keywords()
+    for i in 0..keywords.len() as i32:
+        let kw = keywords.get(i as i64)
+        if not first:
+            items = items ++ ","
+        first = false
+        items = items ++ jobj_start() ++ jkv_str("label", kw) ++ "," ++ jkv_int("kind", 14) ++ jobj_end()
+
+    // Add declarations from the file
+    let path = uri_to_path(uri)
+    var comp = Compilation.init()
+    comp.set_prelude_mode(0)
+    let pool = comp.compile_source_text(path, text)
+    let intern = comp.zcu.pool
+
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        let kind = pool.kind(decl)
+        var label = ""
+        var ck = 0
+        if kind == NodeKind.NK_FN_DECL:
+            label = intern.resolve(pool.get_data0(decl))
+            ck = 3
+        else if kind == NodeKind.NK_TYPE_DECL:
+            label = intern.resolve(pool.get_data0(decl))
+            ck = 22
+        else if kind == NodeKind.NK_TRAIT_DECL:
+            label = intern.resolve(pool.get_data0(decl))
+            ck = 8
+        else if kind == NodeKind.NK_LET_DECL:
+            label = intern.resolve(pool.get_data0(decl))
+            ck = 6
+        if label.len() > 0:
+            if not first:
+                items = items ++ ","
+            first = false
+            items = items ++ jobj_start() ++ jkv_str("label", label) ++ "," ++ jkv_int("kind", ck) ++ jobj_end()
+
+    items = items ++ jarr_end()
+    lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
+
+fn lsp_std_modules() -> Vec[str]:
+    let m: Vec[str] = Vec.new()
+    m.push("collections")
+    m.push("fmt")
+    m.push("fs")
+    m.push("hash")
+    m.push("http")
+    m.push("io")
+    m.push("iter")
+    m.push("json")
+    m.push("math")
+    m.push("mem")
+    m.push("net")
+    m.push("option")
+    m.push("process")
+    m.push("random")
+    m.push("result")
+    m.push("signal")
+    m.push("string")
+    m.push("sync")
+    m.push("sysinfo")
+    m.push("thread")
+    m.push("time")
+    m.push("tls")
+    m.push("traits")
+    m
+
+fn lsp_test_modules() -> Vec[str]:
+    let m: Vec[str] = Vec.new()
+    m.push("testing")
+    m.push("bench")
+    m.push("runner")
+    m
+
+fn lsp_keywords() -> Vec[str]:
+    let k: Vec[str] = Vec.new()
+    k.push("fn")
+    k.push("let")
+    k.push("var")
+    k.push("type")
+    k.push("enum")
+    k.push("trait")
+    k.push("impl")
+    k.push("extend")
+    k.push("use")
+    k.push("if")
+    k.push("else")
+    k.push("match")
+    k.push("for")
+    k.push("while")
+    k.push("loop")
+    k.push("return")
+    k.push("break")
+    k.push("continue")
+    k.push("defer")
+    k.push("const")
+    k.push("pub")
+    k.push("extern")
+    k.push("async")
+    k.push("await")
+    k.push("spawn")
+    k.push("comptime")
+    k.push("error")
+    k
+
+// ── Document symbols ─────────────────────────────────────────
+
+fn lsp_document_symbols(id: i32, uri: str, text: str):
+    let path = uri_to_path(uri)
+    var comp = Compilation.init()
+    comp.set_prelude_mode(0)
+    let pool = comp.compile_source_text(path, text)
+    let intern = comp.zcu.pool
+
+    var items = jarr_start()
+    var first = true
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        let kind = pool.kind(decl)
+        var label = ""
+        var sk = 0
+        if kind == NodeKind.NK_FN_DECL:
+            label = intern.resolve(pool.get_data0(decl))
+            sk = 12
+        else if kind == NodeKind.NK_TYPE_DECL:
+            label = intern.resolve(pool.get_data0(decl))
+            sk = 23
+        else if kind == NodeKind.NK_TRAIT_DECL:
+            label = intern.resolve(pool.get_data0(decl))
+            sk = 11
+        else if kind == NodeKind.NK_LET_DECL:
+            label = intern.resolve(pool.get_data0(decl))
+            sk = 13
+        else if kind == NodeKind.NK_EXTERN_FN:
+            label = intern.resolve(pool.get_data0(decl))
+            sk = 12
+        if label.len() > 0:
+            let ds = pool.get_start(decl)
+            let de = pool.get_end(decl)
+            let sl = lsp_offset_to_line(text, ds)
+            let sc = lsp_offset_to_col(text, ds)
+            let el = lsp_offset_to_line(text, de)
+            let ec = lsp_offset_to_col(text, de)
+            let range = jrange(sl, sc, el, ec)
+            if not first:
+                items = items ++ ","
+            first = false
+            items = items ++ jobj_start() ++ jkv_str("name", label) ++ "," ++ jkv_int("kind", sk) ++ "," ++ jkv_raw("range", range) ++ "," ++ jkv_raw("selectionRange", range) ++ jobj_end()
+    items = items ++ jarr_end()
+    lsp_write_response(jrpc_result(id, items))
+
 // ── Main loop ────────────────────────────────────────────────
 
 fn run_lsp() -> i32:
@@ -401,7 +594,8 @@ fn run_lsp() -> i32:
 
         if method == "initialize":
             state.initialized = true
-            let caps = jobj_start() ++ jkv_int("textDocumentSync", 1) ++ "," ++ jkv_bool("hoverProvider", true) ++ "," ++ jkv_bool("definitionProvider", true) ++ "," ++ jkv_bool("documentFormattingProvider", true) ++ jobj_end()
+            let completion_opts = jobj_start() ++ jkv_raw("triggerCharacters", "[\".\"]") ++ jobj_end()
+            let caps = jobj_start() ++ jkv_int("textDocumentSync", 1) ++ "," ++ jkv_bool("hoverProvider", true) ++ "," ++ jkv_bool("definitionProvider", true) ++ "," ++ jkv_bool("documentFormattingProvider", true) ++ "," ++ jkv_raw("completionProvider", completion_opts) ++ "," ++ jkv_bool("documentSymbolProvider", true) ++ jobj_end()
             let info = jobj_start() ++ jkv_str("name", "with-lsp") ++ "," ++ jkv_str("version", "0.1.0") ++ jobj_end()
             let result = jobj_start() ++ jkv_raw("capabilities", caps) ++ "," ++ jkv_raw("serverInfo", info) ++ jobj_end()
             lsp_write_response(jrpc_result(id, result))
@@ -473,6 +667,27 @@ fn run_lsp() -> i32:
                     lsp_write_response(jrpc_result(id, edit))
                 else:
                     lsp_write_response(jrpc_result(id, "[]"))
+            else:
+                lsp_write_response(jrpc_result(id, "[]"))
+
+        else if method == "textDocument/completion":
+            let td = json_get_object(params, "textDocument")
+            let uri = json_get_string(td, "uri")
+            let pos = json_get_object(params, "position")
+            let idx = state.find_doc(uri)
+            if idx >= 0:
+                let doc = state.documents.get(idx as i64)
+                lsp_completion(id, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
+            else:
+                lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", "[]") ++ jobj_end()))
+
+        else if method == "textDocument/documentSymbol":
+            let td = json_get_object(params, "textDocument")
+            let uri = json_get_string(td, "uri")
+            let idx = state.find_doc(uri)
+            if idx >= 0:
+                let doc = state.documents.get(idx as i64)
+                lsp_document_symbols(id, uri, doc.text)
             else:
                 lsp_write_response(jrpc_result(id, "[]"))
 
