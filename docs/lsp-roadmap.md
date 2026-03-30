@@ -171,9 +171,13 @@ Uses the fast tier (token-based same-file scan).
 - [x] Scan all identifier tokens in the file matching the symbol
       under cursor. Return all positions as Location[].
 - [x] Includes definition site and all reference sites.
+- [x] Cross-file: scans imported files from `cached_decl_paths`,
+      tokenizes each, finds matching identifiers.
 - [x] Tests: `helper` has 4 references (def + 3 calls), `x` has
       2 references (param + usage), non-ident returns empty.
-- [ ] Future: cross-file references via slow tier reverse index.
+- [ ] Limitation: token-based text matching, not sema-based symbol
+      resolution. May produce false positives for same-named symbols
+      in different scopes across files.
 
 ---
 
