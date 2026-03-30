@@ -323,7 +323,7 @@ define build_stage
 	trap 'cleanup_build_stage 129 HUP' HUP; \
 	rm -f "$$tmp" "$$gen_bin" "$@"; \
 	rm -rf "$$dsym" "$$gen_dsym" "$@.dSYM"; \
-	$(1) build $(GEN_MAIN_ENTRY) -o "$$tmp" & \
+	$(1) build $(GEN_MAIN_ENTRY) -o "$$tmp" $(4) & \
 	child_pid="$$!"; \
 	wait "$$child_pid"; \
 	rc=$$?; \
@@ -341,7 +341,7 @@ endef
 
 $(STAGE1_BIN): $(GEN_STAMP) $(RUNTIME_LINK)
 	@if [ -z "$(WITH)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
-	$(call build_stage,$(WITH),stage1,$(STAGE1_TMP))
+	$(call build_stage,$(WITH),stage1,$(STAGE1_TMP),-O0)
 
 $(STAGE2_BIN): $(STAGE1_BIN) $(GEN_STAMP) $(RUNTIME_LINK)
 	@rm -rf "$(HOME)/.cache/with/c_import"
