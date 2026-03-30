@@ -1689,12 +1689,7 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
                         let ci_result = self.generic_inst_cache.get(ci_cache_key).unwrap()
                         self.typed_expr_types.insert(node, ci_result)
                         return ci_result
-                    let ci_te_start = self.type_extra.len() as i32
-                    self.type_extra.push(ci_arg_type)
-                    if ci_arg2_type > 0:
-                        self.type_extra.push(ci_arg2_type)
-                    let ci_tid = self.add_type(TypeKind.TY_GENERIC_INST, ci_base_sym, ci_te_start, ci_arg_count)
-                    self.generic_inst_cache.insert(ci_cache_key, ci_tid as i32)
+                    let ci_tid = self.ensure_generic_inst_type(ci_base_sym, ci_args, ci_arg_count)
                     self.typed_expr_types.insert(node, ci_tid as i32)
                     return ci_tid as i32
     0
@@ -1829,12 +1824,12 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                                         break
                             tp_pos = tp_pos + 2 + bc
                         if inferred == tp_count:
-                            let te = self.type_extra.len() as i32
-                            if tp_count > 0: self.type_extra.push(ga0)
-                            if tp_count > 1: self.type_extra.push(ga1)
-                            if tp_count > 2: self.type_extra.push(ga2)
-                            if tp_count > 3: self.type_extra.push(ga3)
-                            let gi = self.add_type(TypeKind.TY_GENERIC_INST, name, te, tp_count)
+                            let gi_args: Vec[i32] = Vec.new()
+                            if tp_count > 0: gi_args.push(ga0)
+                            if tp_count > 1: gi_args.push(ga1)
+                            if tp_count > 2: gi_args.push(ga2)
+                            if tp_count > 3: gi_args.push(ga3)
+                            let gi = self.ensure_generic_inst_type(name, gi_args, tp_count)
                             self.typed_expr_types.insert(node, gi as i32)
                             return gi as i32
             if expected_struct_ty != 0:
@@ -2483,12 +2478,26 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
 fn Sema.check_tuple(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data0(node)
     let elem_count = self.ast.get_data1(node)
-    let te_start = self.type_extra.len() as i32
+    var expected_tuple = 0
+    var expected_elem_start = 0
+    if self.has_expected_type != 0 and self.expected_expr_type != 0:
+        let expected = self.resolve_alias(self.expected_expr_type)
+        if self.get_type_kind(expected) == TypeKind.TY_TUPLE and self.get_type_d1(expected) == elem_count:
+            expected_tuple = expected as i32
+            expected_elem_start = self.get_type_d0(expected)
+    let tuple_elems: Vec[i32] = Vec.new()
     for ei in 0..elem_count:
         let elem = self.ast.get_extra(extra_start + ei)
-        let et = self.check_expr(elem)
-        self.type_extra.push(et as i32)
-    let result = self.add_type(TypeKind.TY_TUPLE, te_start, elem_count, 0)
+        let expected_elem = if expected_tuple != 0: self.type_extra.get((expected_elem_start + ei) as i64) else: 0
+        let et = if expected_elem != 0:
+            self.check_expr_with_expected(elem, expected_elem as TypeId)
+        else:
+            self.check_expr(elem)
+        tuple_elems.push(et as i32)
+    let result = if expected_tuple != 0:
+        self.expected_expr_type
+    else:
+        self.ensure_tuple_type(tuple_elems, elem_count)
     self.typed_expr_types.insert(node, result as i32)
     result as i32
 
@@ -2577,15 +2586,14 @@ fn Sema.check_tuple_destructure(self: Sema, node: i32) -> i32:
         let after_rest = name_count - rest_pos - 1
         let rest_elem_count = elem_count - rest_pos - after_rest
         if rest_sym > 0 and rest_elem_count > 0:
-            // Build sub-tuple type
-            let te_start = self.type_extra.len() as i32
+            let rest_elems: Vec[i32] = Vec.new()
             for ri in 0..rest_elem_count:
                 let idx = rest_pos + ri
                 if idx < elem_count:
-                    self.type_extra.push(self.type_extra.get((elem_start + idx) as i64))
+                    rest_elems.push(self.type_extra.get((elem_start + idx) as i64))
                 else:
-                    self.type_extra.push(0)
-            let rest_ty = self.add_type(TypeKind.TY_TUPLE, 0, te_start, rest_elem_count)
+                    rest_elems.push(0)
+            let rest_ty = self.ensure_tuple_type(rest_elems, rest_elem_count)
             self.scope_put(rest_sym, rest_ty as i32, 0)
         else if rest_sym > 0:
             self.scope_put(rest_sym, self.ty_void as i32, 0)
@@ -2756,6 +2764,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 self.emit_warning("ephemeral Task passed by value may escape", arg_node)
 
         self.check_dyn_trait_call_compat(fn_sym, extra_start, arg_types, arg_count, param_offset)
+        self.typed_expr_types.insert(node, ret)
         return ret
 
     // Local variable (function pointer)
@@ -2763,14 +2772,18 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     if local_tid >= 0:
         let resolved = self.resolve_alias(local_tid)
         if self.get_type_kind(resolved) == TypeKind.TY_FN:
-            return self.get_type_d2(resolved)
+            let ret = self.get_type_d2(resolved)
+            self.typed_expr_types.insert(node, ret)
+            return ret
         self.emit_error("value is not callable", callee)
         return 0
 
     // Generic function
     if self.generic_fn_nodes.contains(fn_sym):
         let fn_node = self.generic_fn_nodes.get(fn_sym).unwrap()
-        return self.check_generic_call(fn_sym, fn_node, arg_types, arg_count, node)
+        let ret = self.check_generic_call(fn_sym, fn_node, arg_types, arg_count, node)
+        self.typed_expr_types.insert(node, ret)
+        return ret
 
     // Enum variant constructor
     if self.variant_lookup.contains(fn_sym):
@@ -2788,6 +2801,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         if arg_count != 1:
             self.emit_error("distinct type constructor requires exactly 1 argument", node)
             return 0
+        self.typed_expr_types.insert(node, dt_tid)
         return dt_tid
 
     // Callable type syntax: TypeName(args) → TypeName.new(args)
@@ -2800,11 +2814,14 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             let new_expected = self.sig_get_param_count(new_sig)
             if arg_count > new_expected:
                 self.emit_error("too many arguments for " ++ self.pool_resolve(fn_sym) ++ "()", node)
+            self.typed_expr_types.insert(node, new_ret)
             return new_ret
 
     // Intrinsic function
     if self.is_intrinsic_fn_sym(fn_sym) != 0:
-        return self.check_intrinsic_call(fn_sym, node, arg_types, arg_count)
+        let ret = self.check_intrinsic_call(fn_sym, node, arg_types, arg_count)
+        self.typed_expr_types.insert(node, ret)
+        return ret
 
     let callee_ty = self.check_ident(fn_sym, callee)
     if callee_ty != 0:
@@ -2976,10 +2993,13 @@ fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: Vec
 
     let spec_key = self.generic_specialization_key(fn_sym, tp_start, tp_count)
     if self.generic_specialization_cache.contains(spec_key):
-        return self.generic_specialization_cache.get(spec_key).unwrap()
+        let cached = self.generic_specialization_cache.get(spec_key).unwrap()
+        self.typed_expr_types.insert(call_node, cached)
+        return cached
 
     let resolved_ret = self.resolve_generic_return_type_node(ret_node, tp_start, tp_count)
     self.generic_specialization_cache.insert(spec_key, resolved_ret)
+    self.typed_expr_types.insert(call_node, resolved_ret)
     resolved_ret
 
 fn Sema.clear_generic_substitution(self: Sema):

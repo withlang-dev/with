@@ -3773,15 +3773,17 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
 
         // Or-pattern: A | B | C
         if self.peek() == TokenKind.TK_PIPE:
-            let or_start = self.pool.extra_len()
-            self.pool.add_extra(pattern as i32)
-            var or_count = 1
+            let or_patterns: Vec[i32] = Vec.new()
+            or_patterns.push(pattern as i32)
             while self.peek() == TokenKind.TK_PIPE:
                 self.advance()
                 self.skip_newlines()
                 let alt = self.parse_pattern()
-                self.pool.add_extra(alt)
-                or_count = or_count + 1
+                or_patterns.push(alt as i32)
+            let or_start = self.pool.extra_len()
+            let or_count = or_patterns.len() as i32
+            for oi in 0..or_count:
+                self.pool.add_extra(or_patterns.get(oi as i64))
             pattern = self.pool.add_node(NodeKind.NK_PAT_OR, arm_start, self.prev_end(), or_start, or_count, 0)
 
         // Guard clause
@@ -3904,18 +3906,20 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 self.skip_newlines()
-                let extra_start = self.pool.extra_len()
-                var binding_count = 0
+                let payload_patterns: Vec[i32] = Vec.new()
                 while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                     let inner = self.parse_pattern()
-                    self.pool.add_extra(inner as i32)
-                    binding_count = binding_count + 1
+                    payload_patterns.push(inner as i32)
                     self.skip_newlines()
                     if self.peek() == TokenKind.TK_COMMA:
                         self.advance()
                         self.skip_newlines()
                 self.skip_newlines()
                 self.expect(TokenKind.TK_R_PAREN)
+                let extra_start = self.pool.extra_len()
+                let binding_count = payload_patterns.len() as i32
+                for pi in 0..binding_count:
+                    self.pool.add_extra(payload_patterns.get(pi as i64))
                 let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), variant_name, extra_start, binding_count)
                 self.pool.add_pattern_qualifier(pat, name)
                 return pat
@@ -3926,18 +3930,20 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
         if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
             self.skip_newlines()
-            let extra_start = self.pool.extra_len()
-            var binding_count = 0
+            let payload_patterns: Vec[i32] = Vec.new()
             while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                 let inner = self.parse_pattern()
-                self.pool.add_extra(inner as i32)
-                binding_count = binding_count + 1
+                payload_patterns.push(inner as i32)
                 self.skip_newlines()
                 if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
             self.skip_newlines()
             self.expect(TokenKind.TK_R_PAREN)
+            let extra_start = self.pool.extra_len()
+            let binding_count = payload_patterns.len() as i32
+            for pi in 0..binding_count:
+                self.pool.add_extra(payload_patterns.get(pi as i64))
             return self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name, extra_start, binding_count)
         // Uppercase = unit variant
         if name_str.len() > 0 and name_str.byte_at(0 as i64) >= 65 and name_str.byte_at(0 as i64) <= 90:
@@ -3964,30 +3970,30 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
         if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
             self.skip_newlines()
-            let extra_start = self.pool.extra_len()
-            var binding_count = 0
+            let payload_patterns: Vec[i32] = Vec.new()
             while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                 let inner = self.parse_pattern()
-                self.pool.add_extra(inner as i32)
-                binding_count = binding_count + 1
+                payload_patterns.push(inner as i32)
                 self.skip_newlines()
                 if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
             self.skip_newlines()
             self.expect(TokenKind.TK_R_PAREN)
+            let extra_start = self.pool.extra_len()
+            let binding_count = payload_patterns.len() as i32
+            for pi in 0..binding_count:
+                self.pool.add_extra(payload_patterns.get(pi as i64))
             return self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, start, self.prev_end(), name, extra_start, binding_count)
         return self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, start, self.prev_end(), name, 0, 0)
 
     if t == TokenKind.TK_L_PAREN:
         self.advance()
         self.skip_newlines()
-        let extra_start = self.pool.extra_len()
-        var count = 0
+        let tuple_patterns: Vec[i32] = Vec.new()
         if self.peek() != TokenKind.TK_R_PAREN:
             let p = self.parse_pattern()
-            self.pool.add_extra(p as i32)
-            count = count + 1
+            tuple_patterns.push(p as i32)
             self.skip_newlines()
             while self.peek() == TokenKind.TK_COMMA:
                 self.advance()
@@ -3995,11 +4001,14 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
                 if self.peek() == TokenKind.TK_R_PAREN:
                     break
                 let p2 = self.parse_pattern()
-                self.pool.add_extra(p2)
-                count = count + 1
+                tuple_patterns.push(p2 as i32)
                 self.skip_newlines()
         self.skip_newlines()
         self.expect(TokenKind.TK_R_PAREN)
+        let extra_start = self.pool.extra_len()
+        let count = tuple_patterns.len() as i32
+        for ti in 0..count:
+            self.pool.add_extra(tuple_patterns.get(ti as i64))
         return self.pool.add_node(NodeKind.NK_PAT_TUPLE, start, self.prev_end(), extra_start, count, 0)
 
     if t == TokenKind.TK_L_BRACE:
@@ -4016,9 +4025,7 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
 fn Parser.parse_struct_pattern(self: Parser, type_name: i32, start: i32) -> NodeId:
     self.advance()  // consume {
     self.skip_newlines()
-    let extra_start = self.pool.extra_len()
-    let has_rest_idx = self.pool.add_extra(0)
-    var field_count = 0
+    let field_entries: Vec[i32] = Vec.new()
     var has_rest = 0
 
     while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
@@ -4036,15 +4043,18 @@ fn Parser.parse_struct_pattern(self: Parser, type_name: i32, start: i32) -> Node
             self.advance()
             self.skip_newlines()
             fpat = self.parse_pattern()
-        self.pool.add_extra(fname)
-        self.pool.add_extra(fpat)
-        field_count = field_count + 1
+        field_entries.push(fname)
+        field_entries.push(fpat as i32)
         if self.peek() == TokenKind.TK_COMMA:
             self.advance()
             self.skip_newlines()
 
     self.expect(TokenKind.TK_R_BRACE)
-    self.pool.extra.set_i32(has_rest_idx as i64, has_rest)
+    let extra_start = self.pool.extra_len()
+    self.pool.add_extra(has_rest)
+    let field_count = (field_entries.len() as i32) / 2
+    for fi in 0..field_entries.len() as i32:
+        self.pool.add_extra(field_entries.get(fi as i64))
     self.pool.add_node(NodeKind.NK_PAT_STRUCT, start, self.prev_end(), type_name, extra_start, field_count)
 
 fn Parser.parse_slice_pattern(self: Parser, start: i32) -> NodeId:

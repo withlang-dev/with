@@ -853,9 +853,12 @@ fn ct_rewrite_comptime(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema,
     if inner_kind == NodeKind.NK_FOR:
         return ct_rewrite_comptime_for(source_ast, pool, sema, intern, diags, node, inner)
 
+    let diag_count_before = diags.count()
     let evald = comptime_force_eval_expr_result(sema as *mut Sema, diags, source_ast, sema.pool, inner)
     let value = evald.value
     if comptime_value_is_valid(value) == 0:
+        if evald.error_msg.len() > 0 and diags.count() == diag_count_before:
+            ct_emit_error(sema, diags, source_ast, inner, evald.error_msg)
         return node
     let folded = ct_build_value_tree(pool, intern, sema, value, node, evald.extras)
     if folded == 0:
@@ -1182,7 +1185,7 @@ fn ct_transform_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, i
         ct_transform_trait_decl(source_ast, pool, sema, intern, diags, node)
         return
 
-fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: &mut InternPool, diags: &mut DiagnosticList) -> AstPool:
+fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: &mut InternPool) -> AstPool:
     var out = astpool_clone_deep(source_ast)
 
     let clone_trait_sym = intern.intern("Clone")
@@ -1270,19 +1273,20 @@ fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: &mut 
     sema.decl_is_c_import = ordered_ci
 
     let transform_pool = unsafe: *intern
-    let transform_diags = unsafe: *diags
-    var transform_sema = Sema.init(transform_pool, transform_diags, out)
+    var transform_sema = Sema.init(transform_pool, sema.diags, out)
     transform_sema.source_text = sema.source_text
     transform_sema.decl_source_paths = sema.decl_source_paths
     transform_sema.decl_source_file_ids = sema.decl_source_file_ids
     transform_sema.decl_is_c_import = sema.decl_is_c_import
     transform_sema.prepare_for_comptime_transform()
     if transform_sema.diags.has_errors():
+        sema.diags = transform_sema.diags
         return out
 
     for di in 0..out.decl_count():
         transform_sema.update_decl_source_context(di)
         let decl = out.get_decl(di)
         let live_ast = out
-        ct_transform_decl(live_ast, &mut out, &mut transform_sema, intern, diags, decl as i32)
+        ct_transform_decl(live_ast, &mut out, &mut transform_sema, intern, &mut transform_sema.diags, decl as i32)
+    sema.diags = transform_sema.diags
     out

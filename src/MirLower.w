@@ -3689,9 +3689,20 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let elem_count = self.ast.get_data1(node)
         let tup_fields: Vec[i32] = Vec.new()
         let tup_names: Vec[i32] = Vec.new()
+        let saved_expected = self.expected_type
+        var expected_tuple = 0
+        var expected_elem_start = 0
+        if saved_expected > 0:
+            let expected_resolved = self.sema.resolve_alias(saved_expected)
+            if self.sema.get_type_kind(expected_resolved) == TypeKind.TY_TUPLE and self.sema.get_type_d1(expected_resolved) == elem_count:
+                expected_tuple = expected_resolved as i32
+                expected_elem_start = self.sema.get_type_d0(expected_resolved)
         for i in 0..elem_count:
             let elem_node = self.ast.get_extra(extra_start + i)
+            if expected_tuple != 0:
+                self.expected_type = self.sema.type_extra.get((expected_elem_start + i) as i64)
             tup_fields.push(self.lower_expr(elem_node))
+            self.expected_type = saved_expected
             tup_names.push(0)
         let tup_fid = self.body.new_agg_fields(tup_fields, tup_names)
         let tup_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, tup_fid, 0)

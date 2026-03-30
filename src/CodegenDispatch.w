@@ -265,12 +265,13 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
         if cur_sema_ty > 0:
             let type_name_sym = self.mir_input.mir_get_type_name(cur_sema_ty)
             if type_name_sym != 0:
-                cur_ty = self.resolve_named_type(type_name_sym)
+                cur_ty = self.resolve_named_type(self.sema_sym_to_codegen_sym(type_name_sym))
             if cur_ty == 0:
                 cur_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
     if cur_ty == 0:
         return 0
     let p_start = body.place_proj_starts.get(place_id as i64)
+    var active_variant_idx = 0 - 1
     for i in 0..p_count:
         let pk = body.proj_kinds.get((p_start + i) as i64)
         let pd = body.proj_d0.get((p_start + i) as i64)
@@ -281,13 +282,16 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                     if sema_ty > 0:
                         let type_name_sym = self.mir_input.mir_get_type_name(sema_ty)
                         if type_name_sym != 0:
-                            cur_ty = self.resolve_named_type(type_name_sym)
+                            cur_ty = self.resolve_named_type(self.sema_sym_to_codegen_sym(type_name_sym))
                 // Fallback: use method owner type for self parameter
                 if (cur_ty == 0 or wl_get_type_kind(cur_ty) == wl_pointer_type_kind()) and self.current_method_owner_sym != 0:
                     let proj_owner_ty = self.resolve_named_type(self.current_method_owner_sym)
                     if proj_owner_ty != 0:
                         cur_ty = proj_owner_ty
-            let field_sema_ty = self.mir_project_field_sema_type(cur_sema_ty, pd)
+            let field_sema_ty = if active_variant_idx >= 0:
+                self.mir_enum_payload_sema_type(cur_sema_ty, active_variant_idx, pd)
+            else:
+                self.mir_project_field_sema_type(cur_sema_ty, pd)
             if field_sema_ty > 0:
                 cur_sema_ty = field_sema_ty
             let fi = self.mir_resolve_field_index(cur_ty, pd)
@@ -299,6 +303,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                 cur_ty = wl_struct_get_type_at(cur_ty, fi)
             else:
                 return 0
+            active_variant_idx = 0 - 1
         else if pk == 2: // ProjKind.PK_DEREF
             // Resolve pointee type from base local's sema type (via MIR snapshot)
             var deref_ty: i64 = 0
@@ -314,6 +319,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                 cur_ty = deref_ty
             else:
                 return 0
+            active_variant_idx = 0 - 1
         else if pk == 1: // ProjKind.PK_INDEX
             let idx_elem_ty = self.mir_index_elem_llvm_type(cur_sema_ty, cur_ty)
             let idx_elem_sema = self.mir_index_elem_sema_type(cur_sema_ty)
@@ -323,6 +329,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                 cur_ty = idx_elem_ty
             else:
                 return 0
+            active_variant_idx = 0 - 1
         else if pk == 3: // ProjKind.PK_DOWNCAST
             // For projected_type, we need the variant's payload struct type.
             var dc_found = false
@@ -361,6 +368,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
                         wrap.push(dc_sema_llvm)
                         cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
                         dc_found = true
+            active_variant_idx = pd
         else:
             return 0
     cur_ty
@@ -401,11 +409,12 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
         if cur_sema_ty > 0:
             let type_name_sym = self.mir_input.mir_get_type_name(cur_sema_ty)
             if type_name_sym != 0:
-                cur_ty = self.resolve_named_type(type_name_sym)
+                cur_ty = self.resolve_named_type(self.sema_sym_to_codegen_sym(type_name_sym))
             if cur_ty == 0:
                 cur_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
             if cur_ty != 0:
                 self.mir_local_types.insert(base_local, cur_ty)
+    var active_variant_idx = 0 - 1
     for i in 0..p_count:
         let pk = body.proj_kinds.get((p_start + i) as i64)
         let pd = body.proj_d0.get((p_start + i) as i64)
@@ -422,7 +431,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                     if sema_ty > 0:
                         let type_name_sym = self.mir_input.mir_get_type_name(sema_ty)
                         if type_name_sym != 0:
-                            cur_ty = self.resolve_named_type(type_name_sym)
+                            cur_ty = self.resolve_named_type(self.sema_sym_to_codegen_sym(type_name_sym))
                         if cur_ty == 0:
                             cur_ty = self.mir_sema_type_to_llvm(sema_ty)
                 // Fallback: use method owner type for self parameter
@@ -430,7 +439,10 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                     let owner_ty = self.resolve_named_type(self.current_method_owner_sym)
                     if owner_ty != 0:
                         cur_ty = owner_ty
-            let field_sema_ty = self.mir_project_field_sema_type(cur_sema_ty, pd)
+            let field_sema_ty = if active_variant_idx >= 0:
+                self.mir_enum_payload_sema_type(cur_sema_ty, active_variant_idx, pd)
+            else:
+                self.mir_project_field_sema_type(cur_sema_ty, pd)
             if field_sema_ty > 0:
                 cur_sema_ty = field_sema_ty
             let fi = self.mir_resolve_field_index(cur_ty, pd)
@@ -451,6 +463,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                     cur_ty = wl_struct_get_type_at(cur_ty, llvm_fi)
                 else:
                     cur_ty = 0
+            active_variant_idx = 0 - 1
         else if pk == 2: // ProjKind.PK_DEREF
             // Load the pointer value, then use it as the new base
             cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
@@ -468,6 +481,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 cur_ty = deref_ptr_ty
             else:
                 cur_ty = 0
+            active_variant_idx = 0 - 1
         else if pk == 1: // ProjKind.PK_INDEX
             // pd is a local_id holding the index value
             let idx_ptr_opt = self.mir_local_ptrs.get(pd)
@@ -497,6 +511,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 indices.push(idx_val)
                 cur_ptr = wl_build_gep(self.builder, elem_llvm, raw_ptr, vec_data_i64(&indices), 1)
                 cur_ty = elem_llvm
+            active_variant_idx = 0 - 1
         else if pk == 3: // ProjKind.PK_DOWNCAST
             // GEP to field 1 of enum/option/result struct for payload access.
             var dc_handled = false
@@ -548,6 +563,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                     dc_handled = true
             if not dc_handled:
                 cur_ty = 0
+            active_variant_idx = pd
         else:
             return 0
 
@@ -1197,7 +1213,7 @@ fn Codegen.mir_enum_variant_payload_llvm_type(self: Codegen, enum_sema_ty: i32, 
         return builtin_payload
     if enum_sema_ty <= 0 or variant_idx < 0:
         return 0
-    let enum_sym = self.mir_input.mir_get_type_name(enum_sema_ty)
+    let enum_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_name(enum_sema_ty))
     if enum_sym <= 0:
         return 0
     let et_opt = self.enum_type_map.get(enum_sym)
@@ -1292,11 +1308,13 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             return wl_get_undef(wl_i32_type(self.context))
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return wl_get_undef(wl_i32_type(self.context))
-        let local_id = body.place_locals.get(d0 as i64)
-        let place_ty_opt = self.mir_local_types.get(local_id)
-        if not place_ty_opt.is_some():
-            return wl_get_undef(wl_i32_type(self.context))
-        let place_ty = place_ty_opt.unwrap() as i64
+        var place_ty = self.mir_place_projected_type(body, d0)
+        if place_ty == 0:
+            let local_id = body.place_locals.get(d0 as i64)
+            let place_ty_opt = self.mir_local_types.get(local_id)
+            if not place_ty_opt.is_some():
+                return wl_get_undef(wl_i32_type(self.context))
+            place_ty = place_ty_opt.unwrap() as i64
         if wl_get_type_kind(place_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(place_ty) > 0:
             let loaded = wl_build_load(self.builder, place_ty, ptr)
             return wl_build_extract_value(self.builder, loaded, 0)
@@ -1361,7 +1379,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                         self.had_error = 1
                         return wl_get_undef(fallback_ty)
                     let ev_data_ptr = wl_build_struct_gep(self.builder, struct_ty, ev_alloca, 1)
-                    if wl_get_type_kind(ev_payload_ty) == wl_struct_type_kind():
+                    if agg_count > 1 and wl_get_type_kind(ev_payload_ty) == wl_struct_type_kind():
                         let ev_payload_ptr = wl_build_bitcast(self.builder, ev_data_ptr, wl_ptr_type(self.context))
                         let ev_field_count = wl_count_struct_elem_types(ev_payload_ty)
                         for evi in 0..agg_count:
@@ -1661,7 +1679,7 @@ fn Codegen.mir_index_elem_sema_type(self: Codegen, sema_ty: i32) -> i32:
     if tk == TypeKind.TY_STR:
         return self.sema.ty_i32 as i32
     if tk == TypeKind.TY_GENERIC_INST:
-        let base_sym = self.mir_input.mir_get_type_d0(resolved)
+        let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
         let arg_count = self.mir_input.mir_get_type_d2(resolved)
         if base_sym == self.sym_vec and arg_count > 0:
             let te_start = self.mir_input.mir_get_type_d1(resolved)
@@ -1685,13 +1703,24 @@ fn Codegen.mir_index_elem_llvm_type(self: Codegen, sema_ty: i32, cur_ty: i64) ->
             return wl_i8_type(self.context)
     0
 
+fn Codegen.mir_find_named_type(self: Codegen, type_sym: i32) -> i32:
+    if type_sym <= 0:
+        return 0
+    for ti in 0..self.mir_input.sema_type_kinds.len() as i32:
+        let tk = self.mir_input.sema_type_kinds.get(ti as i64)
+        if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_ENUM:
+            continue
+        if self.mir_input.sema_type_d0.get(ti as i64) == type_sym:
+            return ti
+    0
+
 fn Codegen.mir_builtin_variant_payload_sema_type(self: Codegen, sema_ty: i32, variant_idx: i32) -> i32:
     if sema_ty <= 0 or variant_idx < 0:
         return 0
     let resolved = self.mir_input.mir_resolve_alias(sema_ty)
     if self.mir_input.mir_get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
         return 0
-    let base_sym = self.mir_input.mir_get_type_d0(resolved)
+    let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
     if base_sym <= 0:
         return 0
     let arg_count = self.mir_input.mir_get_type_d2(resolved)
@@ -1713,6 +1742,56 @@ fn Codegen.mir_builtin_variant_payload_llvm_type(self: Codegen, sema_ty: i32, va
         return 0
     self.mir_sema_type_to_llvm(payload_sema)
 
+fn Codegen.mir_enum_payload_sema_type(self: Codegen, enum_sema_ty: i32, variant_idx: i32, field_idx: i32) -> i32:
+    if enum_sema_ty <= 0 or variant_idx < 0 or field_idx < 0:
+        return 0
+    let builtin_payload = self.mir_builtin_variant_payload_sema_type(enum_sema_ty, variant_idx)
+    if builtin_payload > 0:
+        if field_idx == 0:
+            return builtin_payload
+        return 0
+
+    let resolved = self.mir_input.mir_resolve_alias(enum_sema_ty)
+    let tk = self.mir_input.mir_get_type_kind(resolved)
+
+    if tk == TypeKind.TY_ENUM:
+        let te_start = self.mir_input.mir_get_type_d1(resolved)
+        let variant_count = self.mir_input.mir_get_type_d2(resolved)
+        var pos = te_start
+        for vi in 0..variant_count:
+            let payload_count = self.mir_input.mir_get_type_extra(pos + 1)
+            if vi == variant_idx:
+                if field_idx < payload_count:
+                    return self.mir_input.mir_get_type_extra(pos + 2 + field_idx)
+                return 0
+            pos = pos + 2 + payload_count
+        return 0
+
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.mir_input.mir_get_type_d0(resolved)
+        if not self.sema.named_types.contains(base_sym):
+            return 0
+        let base_tid = self.sema.named_types.get(base_sym).unwrap()
+        if self.sema.get_type_kind(base_tid) != TypeKind.TY_ENUM:
+            return 0
+        let te_start = self.sema.get_type_d1(base_tid)
+        let variant_count = self.sema.get_type_d2(base_tid)
+        var pos = te_start
+        for vi in 0..variant_count:
+            let variant_name = self.sema.type_extra.get(pos as i64)
+            let payload_count = self.sema.type_extra.get((pos + 1) as i64)
+            if vi == variant_idx:
+                let payload_types = self.sema.resolve_generic_enum_payload(resolved, base_sym, variant_name, payload_count)
+                if field_idx < payload_types.len() as i32:
+                    let payload_ty = payload_types.get(field_idx as i64)
+                    if payload_ty != 0:
+                        return payload_ty
+                if field_idx < payload_count:
+                    return self.sema.type_extra.get((pos + 2 + field_idx) as i64)
+                return 0
+            pos = pos + 2 + payload_count
+    0
+
 fn Codegen.mir_project_field_sema_type(self: Codegen, agg_ty: i32, field_token: i32) -> i32:
     if agg_ty <= 0:
         return 0
@@ -1721,7 +1800,32 @@ fn Codegen.mir_project_field_sema_type(self: Codegen, agg_ty: i32, field_token: 
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
         let inner = self.mir_input.mir_get_type_d0(resolved)
         return self.mir_project_field_sema_type(inner, field_token)
-    self.sema.struct_field_type(resolved as i32, field_token)
+    if tk == TypeKind.TY_TUPLE:
+        let elem_start = self.mir_input.mir_get_type_d0(resolved)
+        let elem_count = self.mir_input.mir_get_type_d1(resolved)
+        if field_token >= 0 and field_token < elem_count:
+            return self.mir_input.mir_get_type_extra(elem_start + field_token)
+        return 0
+    if tk == TypeKind.TY_GENERIC_INST:
+        // Preserve generic substitutions when projecting fields through a
+        // specialized struct like Outer[Entry] -> wrapped: Wrapper[Entry].
+        let generic_field_ty = self.sema.struct_field_type(resolved, field_token)
+        if generic_field_ty > 0:
+            return generic_field_ty
+        let base_sym = self.mir_input.mir_get_type_d0(resolved)
+        let base_tid = self.mir_find_named_type(base_sym)
+        if base_tid > 0:
+            return self.mir_project_field_sema_type(base_tid, field_token)
+        return 0
+    if tk != TypeKind.TY_STRUCT:
+        return 0
+    let extra_start = self.mir_input.mir_get_type_d1(resolved)
+    let field_count = self.mir_input.mir_get_type_d2(resolved)
+    for fi in 0..field_count:
+        let name_sym = self.mir_input.mir_get_type_extra(extra_start + fi * 3)
+        if name_sym == field_token:
+            return self.mir_input.mir_get_type_extra(extra_start + fi * 3 + 1)
+    0
 
 fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) -> i32:
     // Get the sema type for a MIR operand, handling projected places.
@@ -1740,37 +1844,52 @@ fn Codegen.mir_operand_sema_type(self: Codegen, body: MirBody, operand_id: i32) 
 fn Codegen.mir_place_sema_type(self: Codegen, body: MirBody, place_id: i32) -> i32:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return 0
-    // Use stored sema type if available (populated by MirLower)
+    let local_id = body.place_locals.get(place_id as i64)
+    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        return 0
+    let p_count = body.place_proj_counts.get(place_id as i64)
+    let local_ty = body.local_type_ids.get(local_id as i64)
+    if p_count <= 0:
+        if local_ty > 0:
+            return local_ty
+        if place_id < body.place_sema_types.len() as i32:
+            let stored = body.place_sema_types.get(place_id as i64)
+            if stored > 0:
+                return stored
+        return 0
+    // Projected places can carry a more precise cached sema type.
     if place_id < body.place_sema_types.len() as i32:
         let stored = body.place_sema_types.get(place_id as i64)
         if stored > 0:
             return stored
     // Fallback: walk projections using sema snapshot
-    let local_id = body.place_locals.get(place_id as i64)
-    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
-        return 0
-    var ty = body.local_type_ids.get(local_id as i64)
-    let p_count = body.place_proj_counts.get(place_id as i64)
-    if p_count > 0:
-        let p_start = body.place_proj_starts.get(place_id as i64)
-        for pi in 0..p_count:
-            let pk = body.proj_kinds.get((p_start + pi) as i64)
-            let pd = body.proj_d0.get((p_start + pi) as i64)
-            if pk == ProjKind.PK_FIELD:
-                let field_ty = self.mir_project_field_sema_type(ty, pd)
-                if field_ty > 0:
-                    ty = field_ty
-            else if pk == ProjKind.PK_DEREF:
-                let d_resolved = self.mir_input.mir_resolve_alias(ty)
-                let d_tk = self.mir_input.mir_get_type_kind(d_resolved)
-                if d_tk == TypeKind.TY_PTR or d_tk == TypeKind.TY_REF:
-                    ty = self.mir_input.mir_get_type_d0(d_resolved)
-            else if pk == ProjKind.PK_INDEX:
-                let elem_ty = self.mir_index_elem_sema_type(ty)
-                if elem_ty > 0:
-                    ty = elem_ty
-            else if pk == ProjKind.PK_DOWNCAST:
-                continue
+    var ty = local_ty
+    var active_variant_idx = 0 - 1
+    let p_start = body.place_proj_starts.get(place_id as i64)
+    for pi in 0..p_count:
+        let pk = body.proj_kinds.get((p_start + pi) as i64)
+        let pd = body.proj_d0.get((p_start + pi) as i64)
+        if pk == ProjKind.PK_FIELD:
+            let field_ty = if active_variant_idx >= 0:
+                self.mir_enum_payload_sema_type(ty, active_variant_idx, pd)
+            else:
+                self.mir_project_field_sema_type(ty, pd)
+            if field_ty > 0:
+                ty = field_ty
+            active_variant_idx = 0 - 1
+        else if pk == ProjKind.PK_DEREF:
+            let d_resolved = self.mir_input.mir_resolve_alias(ty)
+            let d_tk = self.mir_input.mir_get_type_kind(d_resolved)
+            if d_tk == TypeKind.TY_PTR or d_tk == TypeKind.TY_REF:
+                ty = self.mir_input.mir_get_type_d0(d_resolved)
+            active_variant_idx = 0 - 1
+        else if pk == ProjKind.PK_INDEX:
+            let elem_ty = self.mir_index_elem_sema_type(ty)
+            if elem_ty > 0:
+                ty = elem_ty
+            active_variant_idx = 0 - 1
+        else if pk == ProjKind.PK_DOWNCAST:
+            active_variant_idx = pd
     ty
 
 fn Codegen.mir_dest_llvm_type(self: Codegen, body: MirBody, dest_place: i32) -> i64:
@@ -1803,7 +1922,7 @@ fn Codegen.mir_hashmap_key_type(self: Codegen, body: MirBody, recv_op_id: i32) -
         let resolved = self.mir_input.mir_resolve_alias(sema_ty)
         let tk = self.mir_input.mir_get_type_kind(resolved)
         if tk == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.mir_input.mir_get_type_d0(resolved)
+            let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
             let arg_count = self.mir_input.mir_get_type_d2(resolved)
             if base_sym == self.sym_hashmap and arg_count > 0:
                 let te_start = self.mir_input.mir_get_type_d1(resolved)
@@ -1818,7 +1937,7 @@ fn Codegen.mir_hashmap_value_type(self: Codegen, body: MirBody, recv_op_id: i32)
         let resolved = self.mir_input.mir_resolve_alias(sema_ty)
         let tk = self.mir_input.mir_get_type_kind(resolved)
         if tk == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.mir_input.mir_get_type_d0(resolved)
+            let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
             let arg_count = self.mir_input.mir_get_type_d2(resolved)
             if base_sym == self.sym_hashmap and arg_count > 1:
                 let te_start = self.mir_input.mir_get_type_d1(resolved)
@@ -2386,7 +2505,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             let resolved_dest = self.mir_input.mir_resolve_alias(dest_sema)
             let dest_tk = self.mir_input.mir_get_type_kind(resolved_dest)
             if dest_tk == TypeKind.TY_GENERIC_INST:
-                let dest_name_sym = self.mir_input.mir_get_type_name(resolved_dest)
+                let dest_name_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_name(resolved_dest))
                 if dest_name_sym != 0:
                     if dest_name_sym == self.sym_option and self.mir_input.mir_get_type_d2(resolved_dest) > 0:
                         let te_start = self.mir_input.mir_get_type_d1(resolved_dest)
