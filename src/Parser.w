@@ -525,7 +525,7 @@ fn Parser.parse_decl(self: Parser) -> NodeId:
         return self.parse_const_decl(is_pub, start)
 
     self.emit_error("expected declaration (fn, type, enum, let, use, extern)")
-    (0) as NodeId
+    0 as NodeId
 
 fn Parser.mark_decl_comptime(self: Parser, decl: NodeId):
     if decl == 0:
@@ -655,7 +655,7 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
             return self.poisoned_expr()
 
     // Return type
-    var ret_type: NodeId = (0) as NodeId
+    var ret_type: NodeId = 0 as NodeId
     if self.peek() == TokenKind.TK_ARROW:
         self.advance()
         ret_type = self.parse_type_expr()
@@ -759,7 +759,7 @@ fn Parser.parse_extern_decl(self: Parser, start: i32) -> NodeId:
     if self.expect(TokenKind.TK_R_PAREN) == 0:
         return self.poisoned_expr()
 
-    var ret_type: NodeId = (0) as NodeId
+    var ret_type: NodeId = 0 as NodeId
     if self.peek() == TokenKind.TK_ARROW:
         self.advance()
         ret_type = self.parse_type_expr()
@@ -788,7 +788,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     let tp_count = self.parse_type_params()
     self.parse_optional_where_clause()
 
-    var repr_type_node: NodeId = (0) as NodeId
+    var repr_type_node: NodeId = 0 as NodeId
     var is_ephemeral = 0
     if self.peek() == TokenKind.TK_KW_EPHEMERAL:
         is_ephemeral = 1
@@ -920,7 +920,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
         return self.finish_type_decl(node)
 
     self.emit_error("expected type body")
-    (0) as NodeId
+    0 as NodeId
 
 fn Parser.parse_enum_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     if self.expect(TokenKind.TK_KW_ENUM) == 0:
@@ -948,7 +948,7 @@ fn Parser.emit_legacy_struct_decl_error(self: Parser):
     self.emit_error("drop '=' in struct type declarations")
 
 fn Parser.parse_enum_named_decl(self: Parser, start: i32, name: i32, is_pub: i32, tp_start: i32, tp_count: i32, is_ephemeral: i32) -> NodeId:
-    var repr_type_node: NodeId = (0) as NodeId
+    var repr_type_node: NodeId = 0 as NodeId
     var use_block_body = 0
     var use_braced_body = 0
 
@@ -1046,7 +1046,7 @@ fn Parser.parse_struct_body(self: Parser) -> i32:
         let field_type = self.parse_type_expr()
 
         // Optional default value
-        var field_default: NodeId = (0) as NodeId
+        var field_default: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_EQ:
             self.advance()
             self.skip_newlines()
@@ -1115,7 +1115,7 @@ fn Parser.parse_struct_body_block(self: Parser) -> i32:
         if self.expect(TokenKind.TK_COLON) == 0:
             break
         let field_type = self.parse_type_expr()
-        var field_default: NodeId = (0) as NodeId
+        var field_default: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_EQ:
             self.advance()
             self.skip_newlines()
@@ -1707,7 +1707,7 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> NodeId:
     if name == 0:
         return self.poisoned_expr()
 
-    var type_ann: NodeId = (0) as NodeId
+    var type_ann: NodeId = 0 as NodeId
     if self.peek() == TokenKind.TK_COLON:
         self.advance()
         type_ann = self.parse_type_expr()
@@ -1861,7 +1861,7 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
                     if b2 != 0:
                         assoc_bounds_flat.push(b2)
                         bound_count = bound_count + 1
-            var default_ty: NodeId = (0) as NodeId
+            var default_ty: NodeId = 0 as NodeId
             if self.peek() == TokenKind.TK_EQ:
                 self.advance()
                 default_ty = self.parse_type_expr()
@@ -1894,14 +1894,14 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
                 params_start = self.pool.extra_len() - param_count * FN_PARAM_STRIDE
             self.expect(TokenKind.TK_R_PAREN)
 
-        var ret_type: NodeId = (0) as NodeId
+        var ret_type: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_ARROW:
             self.advance()
             ret_type = self.parse_type_expr()
 
         self.parse_optional_where_clause()
 
-        var method_body: NodeId = (0) as NodeId
+        var method_body: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
             self.advance()
             method_body = self.parse_block_or_expr()
@@ -2004,7 +2004,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
 
     var trait_name = 0
     var type_name = first_name
-    var target_type_node: NodeId = (0) as NodeId
+    var target_type_node: NodeId = 0 as NodeId
     var trait_arg_extra_start = 0
     var trait_arg_count = 0
     if self.peek() == TokenKind.TK_L_BRACKET:
@@ -2111,7 +2111,7 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
                 m_params_start = self.pool.extra_len() - param_count * FN_PARAM_STRIDE
             self.expect(TokenKind.TK_R_PAREN)
 
-        var ret_type: NodeId = (0) as NodeId
+        var ret_type: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_ARROW:
             self.advance()
             ret_type = self.parse_type_expr()
@@ -2397,8 +2397,8 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
         return self.poisoned_expr()
 
     self.emit_error("expected expression")
-    if self.peek() != TokenKind.TK_EOF:
-        self.advance()
+    // Skip to next statement boundary for recovery
+    self.recover_to_statement()
     self.poisoned_expr()
 
 // ── Literal parsing ─────────────────────────────────────────────
@@ -2577,7 +2577,7 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
                 expr_end_pos = colon_pos
             let expr_text = content.slice(expr_start_pos as i64, expr_end_pos as i64)
             let expr_node = self.parse_interpolated_expr(expr_text, start)
-            var spec_node: NodeId = (0) as NodeId
+            var spec_node: NodeId = 0 as NodeId
             if colon_pos > 0:
                 let spec_text = content.slice((colon_pos + 1) as i64, j as i64)
                 spec_node = self.parse_format_spec_text(spec_text, start, end)
@@ -2757,8 +2757,8 @@ fn Parser.parse_char_literal(self: Parser) -> NodeId:
     // Supported escapes mirror bootstrap parser behavior.
     var value = 0
     // Support b'X' byte literals as a char-literal token form.
-    let base = if text.len() >= 1 and text.byte_at((0) as i64) == 98: 2 else: 1
-    if text.len() >= base + 3 and text.byte_at((base) as i64) == 92:  // '\'
+    let base = if text.len() >= 1 and text.byte_at(0 as i64) == 98: 2 else: 1
+    if text.len() >= base + 3 and text.byte_at(base as i64) == 92:  // '\'
         let esc = text.byte_at((base + 1) as i64)
         if esc == 110:  // n
             value = 10
@@ -2784,7 +2784,7 @@ fn Parser.parse_char_literal(self: Parser) -> NodeId:
         else:
             value = esc as i32
     else if text.len() >= base + 2:
-        value = text.byte_at((base) as i64) as i32
+        value = text.byte_at(base as i64) as i32
     let value64 = value as i64
     self.pool.add_node(NodeKind.NK_INT_LIT, start, end, ast_int_part0(value64), ast_int_part1(value64), ast_int_part2(value64))
 
@@ -2792,21 +2792,21 @@ fn strip_string_token_text(text: str) -> str:
     // f"..." → content between f" and closing "
     if text.len() >= 3 and text.byte_at(0) == 102 and text.byte_at(1) == 34:  // f"
         return text.slice(2, text.len() as i64 - 1)
-    if text.len() >= 2 and text.byte_at((0) as i64) == 114:  // r
+    if text.len() >= 2 and text.byte_at(0 as i64) == 114:  // r
         var i = 1
-        while i < text.len() as i32 and text.byte_at((i) as i64) == 35:  // #
+        while i < text.len() as i32 and text.byte_at(i as i64) == 35:  // #
             i = i + 1
-        if i < text.len() as i32 and text.byte_at((i) as i64) == 34:  // opening "
+        if i < text.len() as i32 and text.byte_at(i as i64) == 34:  // opening "
             let content_start = i + 1
             var end_q = text.len() as i32 - 1
-            while end_q >= content_start and text.byte_at((end_q) as i64) == 35:
+            while end_q >= content_start and text.byte_at(end_q as i64) == 35:
                 end_q = end_q - 1
-            if end_q >= content_start and text.byte_at((end_q) as i64) == 34:
+            if end_q >= content_start and text.byte_at(end_q as i64) == 34:
                 return text.slice(content_start as i64, end_q as i64)
 
     if text.len() >= 6 and text.slice(0, 3) == "\"\"\"":
         var content = text.slice(3, text.len() as i64 - 3)
-        if content.len() > 0 and content.byte_at((0) as i64) == 10:
+        if content.len() > 0 and content.byte_at(0 as i64) == 10:
             content = content.slice(1, content.len())
         if content.len() > 0 and content.byte_at((content.len() as i32 - 1) as i64) == 10:
             content = content.slice(0, content.len() - 1)
@@ -2824,12 +2824,12 @@ fn is_fstring_token_text(text: str) -> bool:
 fn is_raw_string_token_text(text: str) -> bool:
     if text.len() < 3:
         return false
-    if text.byte_at((0) as i64) != 114:  // r
+    if text.byte_at(0 as i64) != 114:  // r
         return false
     var i = 1
-    while i < text.len() as i32 and text.byte_at((i) as i64) == 35:  // #
+    while i < text.len() as i32 and text.byte_at(i as i64) == 35:  // #
         i = i + 1
-    if i < text.len() as i32 and text.byte_at((i) as i64) == 34:  // "
+    if i < text.len() as i32 and text.byte_at(i as i64) == 34:  // "
         return true
     false
 
@@ -2839,14 +2839,14 @@ fn dedent_multiline(text: str) -> str:
     var line_start = 0
     var i = 0
     while i <= len:
-        if i == len or text.byte_at((i) as i64) == 10:
+        if i == len or text.byte_at(i as i64) == 10:
             var j = line_start
-            while j < i and (text.byte_at((j) as i64) == 32 or text.byte_at((j) as i64) == 9):
+            while j < i and (text.byte_at(j as i64) == 32 or text.byte_at(j as i64) == 9):
                 j = j + 1
             var has_non_ws = 0
             var k = j
             while k < i:
-                if text.byte_at((k) as i64) != 32 and text.byte_at((k) as i64) != 9:
+                if text.byte_at(k as i64) != 32 and text.byte_at(k as i64) != 9:
                     has_non_ws = 1
                 k = k + 1
             if has_non_ws != 0:
@@ -2863,10 +2863,10 @@ fn dedent_multiline(text: str) -> str:
     line_start = 0
     i = 0
     while i <= len:
-        if i == len or text.byte_at((i) as i64) == 10:
+        if i == len or text.byte_at(i as i64) == 10:
             var cut = min_indent
             var j = line_start
-            while cut > 0 and j < i and (text.byte_at((j) as i64) == 32 or text.byte_at((j) as i64) == 9):
+            while cut > 0 and j < i and (text.byte_at(j as i64) == 32 or text.byte_at(j as i64) == 9):
                 j = j + 1
                 cut = cut - 1
             out = out ++ text.slice(j as i64, i as i64)
@@ -2896,7 +2896,7 @@ fn Parser.parse_ident_or_call(self: Parser) -> NodeId:
 // ── Postfix parsing ──────────────────────────────────────────────
 
 fn Parser.parse_postfix(self: Parser, lhs_in: i32) -> NodeId:
-    var lhs: NodeId = (lhs_in) as NodeId
+    var lhs: NodeId = lhs_in as NodeId
     while true:
         let t = self.peek()
         if t == TokenKind.TK_L_PAREN:
@@ -3122,14 +3122,14 @@ fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> NodeId:
     if self.peek() == TokenKind.TK_DOT_DOT:
         self.advance()
         self.skip_newlines()
-        var end_expr: NodeId = (0) as NodeId
+        var end_expr: NodeId = 0 as NodeId
         if self.peek() != TokenKind.TK_R_BRACKET:
             end_expr = self.parse_expr()
             self.skip_newlines()
         self.expect(TokenKind.TK_R_BRACKET)
         return self.pool.add_node(NodeKind.NK_SLICE, self.pool.get_start(lhs), self.prev_end(), lhs, index, end_expr)
     // Support two-arg subscript for HashMap[K, V].new() syntax
-    var second: NodeId = (0) as NodeId
+    var second: NodeId = 0 as NodeId
     if self.peek() == TokenKind.TK_COMMA:
         self.advance()
         self.skip_newlines()
@@ -3338,7 +3338,7 @@ fn Parser.parse_if_expr(self: Parser) -> NodeId:
     // stealing an outer if's else. Inline ifs and else-if chains are exempt.
     let is_stmt_if = use_block and is_first_on_line(self.source, start) != 0
     let then_body = if use_block: self.parse_block_or_expr() else: self.parse_expr()
-    var else_body: NodeId = (0) as NodeId
+    var else_body: NodeId = 0 as NodeId
     let save = self.pos
     self.skip_newlines()
     let crossed_newline = self.pos != save
@@ -3404,7 +3404,7 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
     let is_stmt_if = use_block and is_first_on_line(self.source, start) != 0
     let then_body = if use_block: self.parse_block_or_expr() else: self.parse_expr()
 
-    var else_body: NodeId = (0) as NodeId
+    var else_body: NodeId = 0 as NodeId
     let save = self.pos
     self.skip_newlines()
     let crossed_newline = self.pos != save
@@ -3448,7 +3448,7 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
 fn Parser.parse_return(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()
-    var value: NodeId = (0) as NodeId
+    var value: NodeId = 0 as NodeId
     let t = self.peek()
     if t != TokenKind.TK_NEWLINE and t != TokenKind.TK_EOF and t != TokenKind.TK_R_PAREN and t != TokenKind.TK_R_BRACE:
         value = self.parse_expr()
@@ -3710,7 +3710,7 @@ fn Parser.parse_break(self: Parser) -> NodeId:
         let le = self.current_end()
         label = self.intern.intern(self.source.slice((ls + 1) as i64, le as i64))
         self.advance()
-    var value: NodeId = (0) as NodeId
+    var value: NodeId = 0 as NodeId
     let t = self.peek()
     if t != TokenKind.TK_NEWLINE and t != TokenKind.TK_EOF and t != TokenKind.TK_R_BRACE and t != TokenKind.TK_R_PAREN and t != TokenKind.TK_R_BRACKET:
         value = self.parse_expr()
@@ -3755,8 +3755,8 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
             arm_col = cur_col
 
         let arm_start = self.current_start()
-        var pattern: NodeId = (0) as NodeId
-        var in_guard_expr: NodeId = (0) as NodeId
+        var pattern: NodeId = 0 as NodeId
+        var in_guard_expr: NodeId = 0 as NodeId
 
         // `in expr` pattern: desugar to `__v if __v in expr`
         if self.peek() == TokenKind.TK_KW_IN:
@@ -3785,7 +3785,7 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
             pattern = self.pool.add_node(NodeKind.NK_PAT_OR, arm_start, self.prev_end(), or_start, or_count, 0)
 
         // Guard clause
-        var guard: NodeId = (0) as NodeId
+        var guard: NodeId = 0 as NodeId
         if in_guard_expr != 0:
             guard = in_guard_expr
         else if self.peek() == TokenKind.TK_KW_IF:
@@ -3940,7 +3940,7 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
             self.expect(TokenKind.TK_R_PAREN)
             return self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name, extra_start, binding_count)
         // Uppercase = unit variant
-        if name_str.len() > 0 and name_str.byte_at((0) as i64) >= 65 and name_str.byte_at((0) as i64) <= 90:
+        if name_str.len() > 0 and name_str.byte_at(0 as i64) >= 65 and name_str.byte_at(0 as i64) <= 90:
             if self.peek() == TokenKind.TK_L_BRACE:
                 return self.parse_struct_pattern(name, start)
             return self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name, 0, 0)
@@ -4031,7 +4031,7 @@ fn Parser.parse_struct_pattern(self: Parser, type_name: i32, start: i32) -> Node
             self.skip_newlines()
             continue
         let fname = self.expect_ident()
-        var fpat: NodeId = (0) as NodeId
+        var fpat: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
@@ -4196,7 +4196,7 @@ fn Parser.parse_let_binding(self: Parser) -> NodeId:
     if name_sym == 0:
         return self.poisoned_expr()
     let name_str = self.intern.resolve(name_sym)
-    let is_upper = name_str.len() > 0 and name_str.byte_at((0) as i64) >= 65 and name_str.byte_at((0) as i64) <= 90
+    let is_upper = name_str.len() > 0 and name_str.byte_at(0 as i64) >= 65 and name_str.byte_at(0 as i64) <= 90
 
     // Let-else variant: let Some(x) = expr else body
     if is_upper and self.peek() == TokenKind.TK_L_PAREN:
@@ -4243,7 +4243,7 @@ fn Parser.parse_let_binding(self: Parser) -> NodeId:
             flags = 1
         return self.pool.add_node(NodeKind.NK_LET_BINDING, start, self.prev_end(), name_sym, value, flags)
 
-    var type_ann: NodeId = (0) as NodeId
+    var type_ann: NodeId = 0 as NodeId
     if self.peek() == TokenKind.TK_COLON:
         self.advance()
         type_ann = self.parse_type_expr()
@@ -4330,7 +4330,7 @@ fn Parser.parse_record_update(self: Parser) -> NodeId:
     var field_count = 0
     while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
         let fname = self.expect_ident()
-        var val: NodeId = (0) as NodeId
+        var val: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
@@ -4384,7 +4384,7 @@ fn Parser.parse_array_literal(self: Parser) -> NodeId:
             let binding = self.expect_ident()
             self.expect(TokenKind.TK_KW_IN)
             let iterable = self.parse_expr()
-            var filter: NodeId = (0) as NodeId
+            var filter: NodeId = 0 as NodeId
             if self.peek() == TokenKind.TK_KW_IF:
                 self.advance()
                 filter = self.parse_expr()
@@ -4559,9 +4559,17 @@ fn Parser.parse_block_or_expr(self: Parser) -> NodeId:
     var last_expr = self.parse_expr()
 
     while true:
-        if self.peek() != TokenKind.TK_NEWLINE and self.peek() != TokenKind.TK_EOF:
+        let cur = self.peek()
+        if cur == TokenKind.TK_EOF:
             break
-        if self.peek() == TokenKind.TK_EOF:
+        // After error recovery, the current token may be a statement keyword
+        // (not a newline). Check column to decide if it's still in this block.
+        if cur != TokenKind.TK_NEWLINE:
+            let cur_col = column_of(self.source, self.current_start())
+            if cur_col >= block_col and (cur == TokenKind.TK_KW_LET or cur == TokenKind.TK_KW_VAR or cur == TokenKind.TK_KW_RETURN or cur == TokenKind.TK_KW_IF or cur == TokenKind.TK_KW_FOR or cur == TokenKind.TK_KW_WHILE or cur == TokenKind.TK_KW_MATCH or cur == TokenKind.TK_KW_DEFER):
+                stmts.push(last_expr as i32)
+                last_expr = self.parse_expr()
+                continue
             break
 
         let save = self.pos
@@ -4848,7 +4856,7 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             self.advance()
 
         var name = 0
-        var param_pattern: NodeId = (0) as NodeId
+        var param_pattern: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_IDENT:
             name = self.expect_ident()
         else:
@@ -4862,7 +4870,7 @@ fn Parser.parse_param_list(self: Parser) -> i32:
         if name == 0:
             break
 
-        var type_node: NodeId = (0) as NodeId
+        var type_node: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
@@ -4914,7 +4922,7 @@ fn Parser.parse_one_param(self: Parser) -> i32:
     let name = self.expect_ident()
     if name == 0:
         return 0
-    var type_node: NodeId = (0) as NodeId
+    var type_node: NodeId = 0 as NodeId
     if self.peek() == TokenKind.TK_COLON:
         self.advance()
         type_node = self.parse_type_expr()
