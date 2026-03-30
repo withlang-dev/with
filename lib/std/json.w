@@ -1,0 +1,310 @@
+// std.json — Minimal JSON tokenizer
+//
+// Port of jsmn (https://github.com/zserge/jsmn) by Serge Zaitsev.
+// Single-pass tokenizer. Tokens store byte offsets into the source string.
+// Always includes parent links. Non-strict mode.
+
+// Token types
+let JSON_UNDEFINED: i32 = 0
+let JSON_OBJECT: i32 = 1
+let JSON_ARRAY: i32 = 2
+let JSON_STRING: i32 = 4
+let JSON_PRIMITIVE: i32 = 8
+
+// Error codes
+let JSON_ERROR_NOMEM: i32 = -1
+let JSON_ERROR_INVAL: i32 = -2
+let JSON_ERROR_PART: i32 = -3
+
+type JsonToken {
+    tok_type: i32,
+    start: i32,
+    end: i32,
+    size: i32,
+    parent: i32,
+}
+
+type JsonParser {
+    pos: i32,
+    toknext: i32,
+    toksuper: i32,
+}
+
+pub fn JsonParser.new() -> JsonParser:
+    JsonParser { pos: 0, toknext: 0, toksuper: -1 }
+
+// Allocate a token slot. Returns index or -1 if full.
+unsafe fn alloc_token(parser: *mut JsonParser, tokens: *mut JsonToken, num_tokens: i32) -> i32:
+    if parser.toknext >= num_tokens:
+        return -1
+    let idx = parser.toknext
+    parser.toknext = parser.toknext + 1
+    let tok = tokens + idx as u64
+    tok.start = -1
+    tok.end = -1
+    tok.size = 0
+    tok.parent = -1
+    tok.tok_type = JSON_UNDEFINED
+    idx
+
+// Set token type and boundaries.
+unsafe fn fill_token(tokens: *mut JsonToken, idx: i32, tok_type: i32, start: i32, end: i32):
+    let tok = tokens + idx as u64
+    tok.tok_type = tok_type
+    tok.start = start
+    tok.end = end
+    tok.size = 0
+
+// Parse a primitive (number, boolean, null).
+unsafe fn parse_primitive(parser: *mut JsonParser, js: str, len: i32, tokens: *mut JsonToken, num_tokens: i32) -> i32:
+    let start = parser.pos
+    while parser.pos < len:
+        let c = js.byte_at(parser.pos as i64) as i32
+        if c == 0:
+            break
+        // Terminators: : \t \r \n space , ] }
+        if c == 58 or c == 9 or c == 13 or c == 10 or c == 32 or c == 44 or c == 93 or c == 125:
+            break
+        if c < 32 or c >= 127:
+            parser.pos = start
+            return JSON_ERROR_INVAL
+        parser.pos = parser.pos + 1
+    // Allocate and fill
+    let tok_idx = alloc_token(parser, tokens, num_tokens)
+    if tok_idx < 0:
+        parser.pos = start
+        return JSON_ERROR_NOMEM
+    fill_token(tokens, tok_idx, JSON_PRIMITIVE, start, parser.pos)
+    (*(tokens + tok_idx as u64)).parent = parser.toksuper
+    parser.pos = parser.pos - 1
+    0
+
+// Parse a JSON string with escape handling.
+unsafe fn parse_string(parser: *mut JsonParser, js: str, len: i32, tokens: *mut JsonToken, num_tokens: i32) -> i32:
+    let start = parser.pos
+    // Skip opening quote
+    parser.pos = parser.pos + 1
+    while parser.pos < len:
+        let c = js.byte_at(parser.pos as i64) as i32
+        if c == 0:
+            break
+        // Closing quote
+        if c == 34:
+            let tok_idx = alloc_token(parser, tokens, num_tokens)
+            if tok_idx < 0:
+                parser.pos = start
+                return JSON_ERROR_NOMEM
+            fill_token(tokens, tok_idx, JSON_STRING, start + 1, parser.pos)
+            (*(tokens + tok_idx as u64)).parent = parser.toksuper
+            return 0
+        // Backslash escape
+        if c == 92 and parser.pos + 1 < len:
+            parser.pos = parser.pos + 1
+            let esc = js.byte_at(parser.pos as i64) as i32
+            // " / \ b f r n t
+            if esc == 34 or esc == 47 or esc == 92 or esc == 98 or esc == 102 or esc == 114 or esc == 110 or esc == 116:
+                0  // valid escape, continue
+            else if esc == 117:
+                // \uXXXX
+                parser.pos = parser.pos + 1
+                var hi = 0
+                while hi < 4 and parser.pos < len:
+                    let hc = js.byte_at(parser.pos as i64) as i32
+                    if hc == 0:
+                        break
+                    if not ((hc >= 48 and hc <= 57) or (hc >= 65 and hc <= 70) or (hc >= 97 and hc <= 102)):
+                        parser.pos = start
+                        return JSON_ERROR_INVAL
+                    parser.pos = parser.pos + 1
+                    hi = hi + 1
+                parser.pos = parser.pos - 1
+            else:
+                parser.pos = start
+                return JSON_ERROR_INVAL
+        parser.pos = parser.pos + 1
+    parser.pos = start
+    JSON_ERROR_PART
+
+// Parse JSON string into tokens.
+// Returns token count on success, negative error code on failure.
+unsafe fn json_parse_impl(parser: *mut JsonParser, js: str, len: i32, tokens: *mut JsonToken, num_tokens: i32) -> i32:
+    var count = parser.toknext
+
+    while parser.pos < len:
+        let c = js.byte_at(parser.pos as i64) as i32
+        if c == 0:
+            break
+
+        // { or [
+        if c == 123 or c == 91:
+            count = count + 1
+            let tok_idx = alloc_token(parser, tokens, num_tokens)
+            if tok_idx < 0:
+                return JSON_ERROR_NOMEM
+            if parser.toksuper != -1:
+                let sup = tokens + parser.toksuper as u64
+                sup.size = sup.size + 1
+                (*(tokens + tok_idx as u64)).parent = parser.toksuper
+            if c == 123:
+                (*(tokens + tok_idx as u64)).tok_type = JSON_OBJECT
+            else:
+                (*(tokens + tok_idx as u64)).tok_type = JSON_ARRAY
+            (*(tokens + tok_idx as u64)).start = parser.pos
+            parser.toksuper = parser.toknext - 1
+
+        // } or ]
+        else if c == 125 or c == 93:
+            var expected_type = JSON_OBJECT
+            if c == 93:
+                expected_type = JSON_ARRAY
+            if parser.toknext < 1:
+                return JSON_ERROR_INVAL
+            // Walk parent links to find matching opener
+            var ti = parser.toknext - 1
+            var matched = false
+            while not matched:
+                let tok = tokens + ti as u64
+                if tok.start != -1 and tok.end == -1:
+                    if tok.tok_type != expected_type:
+                        return JSON_ERROR_INVAL
+                    tok.end = parser.pos + 1
+                    parser.toksuper = tok.parent
+                    matched = true
+                else if tok.parent == -1:
+                    if tok.tok_type != expected_type or parser.toksuper == -1:
+                        return JSON_ERROR_INVAL
+                    matched = true
+                else:
+                    ti = tok.parent
+
+        // "
+        else if c == 34:
+            let r = parse_string(parser, js, len, tokens, num_tokens)
+            if r < 0:
+                return r
+            count = count + 1
+            if parser.toksuper != -1:
+                (*(tokens + parser.toksuper as u64)).size = (*(tokens + parser.toksuper as u64)).size + 1
+
+        // whitespace
+        else if c == 9 or c == 13 or c == 10 or c == 32:
+            0  // skip
+
+        // :
+        else if c == 58:
+            parser.toksuper = parser.toknext - 1
+
+        // ,
+        else if c == 44:
+            if parser.toksuper != -1:
+                let sup = tokens + parser.toksuper as u64
+                if sup.tok_type != JSON_ARRAY and sup.tok_type != JSON_OBJECT:
+                    parser.toksuper = sup.parent
+
+        // default: primitive
+        else:
+            let r = parse_primitive(parser, js, len, tokens, num_tokens)
+            if r < 0:
+                return r
+            count = count + 1
+            if parser.toksuper != -1:
+                (*(tokens + parser.toksuper as u64)).size = (*(tokens + parser.toksuper as u64)).size + 1
+
+        parser.pos = parser.pos + 1
+
+    // Check for unclosed containers
+    var i = parser.toknext - 1
+    while i >= 0:
+        let tok = tokens + i as u64
+        if tok.start != -1 and tok.end == -1:
+            return JSON_ERROR_PART
+        i = i - 1
+
+    count
+
+pub fn json_parse(parser: *mut JsonParser, js: str, tokens: *mut JsonToken, num_tokens: i32) -> i32:
+    let len = js.len() as i32
+    unsafe: json_parse_impl(parser, js, len, tokens, num_tokens)
+
+// ── Lookup helpers ──────────────────────────────────────────────
+
+// Extract token text from the source string.
+pub fn json_str(js: str, tokens: *mut JsonToken, idx: i32) -> str:
+    var start: i32 = 0
+    var end: i32 = 0
+    unsafe:
+        start = (*(tokens + idx as u64)).start
+        end = (*(tokens + idx as u64)).end
+    js.slice(start as i64, end as i64)
+
+// Find the value token index for a key in a JSON object.
+// Returns -1 if not found.
+pub fn json_find(js: str, tokens: *mut JsonToken, parent: i32, key: str) -> i32:
+    var tok_type: i32 = 0
+    var size: i32 = 0
+    unsafe:
+        tok_type = (*(tokens + parent as u64)).tok_type
+        size = (*(tokens + parent as u64)).size
+    if tok_type != JSON_OBJECT:
+        return -1
+    var i = 0
+    var idx = parent + 1
+    while i < size:
+        // Each object child is a key-value pair: key at idx, value at idx+1
+        let k = json_str(js, tokens, idx)
+        if k == key:
+            return idx + 1
+        // Skip over the value (and any nested tokens)
+        idx = json_skip(tokens, idx + 1)
+        i = i + 1
+    -1
+
+// Parse a primitive token as an integer.
+pub fn json_int(js: str, tokens: *mut JsonToken, idx: i32) -> i32:
+    var start: i32 = 0
+    var end: i32 = 0
+    unsafe:
+        start = (*(tokens + idx as u64)).start
+        end = (*(tokens + idx as u64)).end
+    // Manual int parse
+    var val = 0
+    var neg = false
+    var pos = start
+    if pos < end and js.byte_at(pos as i64) == 45:
+        neg = true
+        pos = pos + 1
+    while pos < end:
+        let d = js.byte_at(pos as i64) as i32
+        if d >= 48 and d <= 57:
+            val = val * 10 + (d - 48)
+        else:
+            break
+        pos = pos + 1
+    if neg: 0 - val else: val
+
+// Skip over a token and all its nested children. Returns the next token index.
+fn json_skip(tokens: *mut JsonToken, idx: i32) -> i32:
+    var tok_type: i32 = 0
+    var size: i32 = 0
+    unsafe:
+        tok_type = (*(tokens + idx as u64)).tok_type
+        size = (*(tokens + idx as u64)).size
+    if tok_type == JSON_OBJECT:
+        // Object: skip size key-value pairs
+        var i = 0
+        var next = idx + 1
+        while i < size:
+            next = json_skip(tokens, next)  // skip key
+            next = json_skip(tokens, next)  // skip value
+            i = i + 1
+        return next
+    if tok_type == JSON_ARRAY:
+        // Array: skip size elements
+        var i = 0
+        var next = idx + 1
+        while i < size:
+            next = json_skip(tokens, next)
+            i = i + 1
+        return next
+    // Primitive or string: just skip this one token
+    idx + 1
