@@ -839,7 +839,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         pre_sema.decl_source_file_ids = self.decl_source_file_ids
         pre_sema.decl_is_c_import = self.decl_is_c_import
         pre_sema.prepare_for_comptime_transform()
-        pool = comptime_transform_module(pool, &mut pre_sema, &mut self.pool, &mut self.diagnostics)
+        pool = comptime_transform_module(pool, &mut pre_sema, &mut self.pool)
         self.pool = pre_sema.pool
         self.diagnostics = pre_sema.diags
         self.decl_source_paths = pre_sema.decl_source_paths

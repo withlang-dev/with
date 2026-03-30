@@ -1689,6 +1689,9 @@ fn mir_validate_cast_supported(mir_mod: MirModule, src_ty: i32, dst_ty: i32) -> 
     let dst_kind = mir_mod.mir_get_type_kind(dst_resolved)
     if src_kind == TypeKind.TY_NEVER:
         return true
+    if (src_kind == TypeKind.TY_ENUM and dst_kind == TypeKind.TY_INT) or
+       (src_kind == TypeKind.TY_INT and dst_kind == TypeKind.TY_ENUM):
+        return true
     if src_kind == TypeKind.TY_PTR or src_kind == TypeKind.TY_REF or
        dst_kind == TypeKind.TY_PTR or dst_kind == TypeKind.TY_REF:
         return true

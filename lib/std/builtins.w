@@ -8,15 +8,16 @@ extern fn with_println_str(s: str) -> void
 extern fn with_println_i32(n: i32) -> void
 extern fn with_println_i64(n: i64) -> void
 extern fn with_println_bool(v: bool) -> void
+extern fn with_print_str(s: str) -> void
 extern fn with_eprint(s: str) -> void
 extern fn with_write(s: str) -> void
 extern fn with_ewrite(s: str) -> void
 extern fn with_panic(msg: str, file: str, line: i32) -> void
 extern fn int_to_string(n: i32) -> str
 
-/// Print a string to stdout followed by a newline.
+/// Print a string to stdout without a trailing newline.
 pub fn print(s: str) -> void:
-    with_println_str(s)
+    with_print_str(s)
 
 /// Print a string to stderr followed by a newline.
 pub fn eprint(s: str) -> void:

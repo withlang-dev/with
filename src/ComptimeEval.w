@@ -42,11 +42,13 @@ type ComptimeEvaluator {
     recursion_limit: i32,
     require_success: i32,
     had_error: i32,
+    last_error_msg: str,
 }
 
 type ComptimeEvalResult {
     value: ComptimeValue,
     extras: Vec[ComptimeValue],
+    error_msg: str,
 }
 
 type ComptimeSourceLoc {
@@ -87,6 +89,7 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         recursion_limit: COMPTIME_RECURSION_LIMIT,
         require_success,
         had_error: 0,
+        last_error_msg: "",
     }
 
 fn comptime_dirname(path: str) -> str:
@@ -134,6 +137,7 @@ fn comptime_eval_result_invalid() -> ComptimeEvalResult:
     ComptimeEvalResult {
         value: comptime_value_invalid(),
         extras: Vec.new(),
+        error_msg: "",
     }
 
 fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
@@ -143,6 +147,7 @@ fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList
     ComptimeEvalResult {
         value,
         extras: evaluator.extra_values,
+        error_msg: evaluator.last_error_msg,
     }
 
 fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
@@ -152,6 +157,7 @@ fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticLi
     ComptimeEvalResult {
         value,
         extras: evaluator.extra_values,
+        error_msg: evaluator.last_error_msg,
     }
 
 fn comptime_try_eval_expr(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
@@ -175,6 +181,7 @@ fn ComptimeEvaluator.eval_root(self: ComptimeEvaluator, diags: &mut DiagnosticLi
     comptime_value_invalid()
 
 fn ComptimeEvaluator.fail(self: ComptimeEvaluator, diags: &mut DiagnosticList, node: i32, msg: str) -> ComptimeControl:
+    self.last_error_msg = msg
     if self.had_error == 0 and self.require_success != 0 and self.sema.suppress_errors == 0:
         let start = self.ast.get_start(node)
         let end = self.ast.get_end(node)

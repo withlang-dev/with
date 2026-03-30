@@ -9,7 +9,7 @@ fn main:
     assert(p.is_none())
 
     // Option[*mut i32] from value → Some
-    let mut x = 7
+    var x = 7
     let raw = (&mut x) as *mut i32
     let some: Option[*mut i32] = .Some(raw)
     assert(some.is_some())

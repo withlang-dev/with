@@ -2230,6 +2230,18 @@ fn Codegen.sema_generic_arg_llvm(self: Codegen, sema_tid: i32, arg_idx: i32) -> 
     let inner_tid = self.sema.get_generic_inst_arg(sema_tid, arg_idx)
     self.sema_type_to_llvm(inner_tid)
 
+fn Codegen.sema_sym_to_codegen_sym(self: Codegen, sym: i32) -> i32:
+    if sym <= 0:
+        return 0
+    if sym < self.sema.pool.symbol_texts.len() as i32:
+        let sema_text = self.sema.pool.symbol_texts.get(sym as i64)
+        if sema_text.len() > 0:
+            return self.intern.intern(sema_text)
+    let resolved = self.sema.pool_resolve(sym)
+    if resolved.len() > 0:
+        return self.intern.intern(resolved)
+    0
+
 // Map sema TypeId to LLVM type. Handles TypeKind.TY_GENERIC_INST for builtin containers.
 fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
     if tid <= 0:
@@ -2238,30 +2250,31 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
     let tk = self.sema.get_type_kind(resolved_tid)
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.sema.get_type_d0(resolved_tid)
+        let cg_base_sym = self.sema_sym_to_codegen_sym(base_sym)
         let arg_count = self.sema.get_generic_inst_arg_count(resolved_tid)
-        if base_sym == self.sym_vec and arg_count > 0:
+        if cg_base_sym == self.sym_vec and arg_count > 0:
             let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let elem_ty = self.sema_type_to_llvm(elem_tid)
             if elem_ty != 0:
                 return self.get_or_create_vec_type(resolved_tid, elem_ty)
-        if base_sym == self.sym_hashmap and arg_count > 1:
+        if cg_base_sym == self.sym_hashmap and arg_count > 1:
             let key_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let val_tid = self.sema.get_generic_inst_arg(resolved_tid, 1)
             let key_ty = self.sema_type_to_llvm(key_tid)
             let val_ty = self.sema_type_to_llvm(val_tid)
             if key_ty != 0 and val_ty != 0:
                 return self.get_or_create_hashmap_type(resolved_tid, key_ty, val_ty)
-        if base_sym == self.sym_hashset and arg_count > 0:
+        if cg_base_sym == self.sym_hashset and arg_count > 0:
             let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let elem_ty = self.sema_type_to_llvm(elem_tid)
             if elem_ty != 0:
                 return self.get_or_create_hashset_type(resolved_tid, elem_ty)
-        if base_sym == self.sym_option and arg_count > 0:
+        if cg_base_sym == self.sym_option and arg_count > 0:
             let payload_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let payload_ty = self.sema_type_to_llvm(payload_tid)
             if payload_ty != 0:
                 return self.get_or_create_option_type(resolved_tid, payload_ty)
-        if base_sym == self.sym_result and arg_count > 1:
+        if cg_base_sym == self.sym_result and arg_count > 1:
             let ok_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let err_tid = self.sema.get_generic_inst_arg(resolved_tid, 1)
             let ok_ty = self.sema_type_to_llvm(ok_tid)
@@ -2269,13 +2282,13 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             if ok_ty != 0 and err_ty != 0:
                 return self.get_or_create_result_type(resolved_tid, ok_ty, err_ty)
         // User-defined generic structs: monomorphize via type bindings
-        if base_sym != 0 and self.generic_structs.contains(base_sym):
+        if cg_base_sym != 0 and self.generic_structs.contains(cg_base_sym):
             let saved_len = self.type_bindings_len
             let saved_syms = self.type_binding_syms
             let saved_types = self.type_binding_types
             let tp_syms: Vec[i32] = Vec.new()
             let tp_types: Vec[i64] = Vec.new()
-            let gs_node = self.generic_structs.get(base_sym).unwrap()
+            let gs_node = self.generic_structs.get(cg_base_sym).unwrap()
             let tp_count = self.type_decl_tp_count(gs_node)
             var tp_pos = self.type_decl_tp_start(gs_node)
             for ti in 0..tp_count:
@@ -2292,7 +2305,7 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             self.type_binding_syms = tp_syms
             self.type_binding_types = tp_types
             self.type_bindings_len = tp_count
-            let mono_ty = self.monomorphize_struct(base_sym, 0, 0)
+            let mono_ty = self.monomorphize_struct(cg_base_sym, 0, 0)
             self.type_bindings_len = saved_len
             self.type_binding_syms = saved_syms
             self.type_binding_types = saved_types
@@ -2327,6 +2340,9 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
         if self.sema.distinct_type_names.contains(sym):
             let inner_tid = self.sema.type_extra.get((self.sema.get_type_d1(resolved_tid) + 1) as i64)
             return self.sema_type_to_llvm(inner_tid)
+        let cg_sym = self.sema_sym_to_codegen_sym(sym)
+        if cg_sym != 0:
+            return self.resolve_named_type(cg_sym)
         return self.resolve_named_type(sym)
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
         return wl_ptr_type(self.context)
