@@ -21,6 +21,7 @@ extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_str_hash(s: str) -> i64
 extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
+extern fn with_clock_nanos() -> i64
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
 fn count_non_use_decls_frontend(pool: AstPool) -> i32:
@@ -723,17 +724,22 @@ fn Zcu.parse_with_prelude_first(self: Zcu, text: str, file_id: i32) -> AstPool:
     pool
 
 fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
+    let do_profile = with_getenv_str("WITH_PROFILE").len() > 0
     if zcu_debug_init_enabled() != 0:
         with_eprint("[frontend] compile_file:start " ++ path)
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
     self.project_config = project_config_load_for_source(path)
 
+    let t_read = with_clock_nanos()
     let text = with_fs_read_file(path)
     if text.len() == 0:
         with_eprint("error: cannot open '" ++ path ++ "'")
         self.set_resolve_snapshot(ResolveResult.init(), path)
         return AstPool.new()
+    if do_profile:
+        let read_ns = with_clock_nanos() - t_read
+        with_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={text.len() as i32}")
 
     self.set_current_source(source_dir, path, text)
     if zcu_debug_init_enabled() != 0:
@@ -744,12 +750,14 @@ fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
     pool
 
 fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) -> AstPool:
+    let do_profile = with_getenv_str("WITH_PROFILE").len() > 0
     if zcu_debug_init_enabled() != 0:
         with_eprint("[frontend] compile_source:parse")
 
     // Phase 1+2: Lex + Parse.  When prelude is enabled, parse the prelude
     // USE declaration first so it appears at decl position 0, ensuring
     // prelude-provided types are imported before user modules.
+    let t_parse = with_clock_nanos()
     var pool: AstPool = AstPool.new()
     if self.prelude_mode != PRELUDE_NONE():
         pool = self.parse_with_prelude_first(text, file_id)
@@ -762,6 +770,9 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         self.diagnostics = parser.diags
 
     self.seed_decl_source_paths(pool, name, file_id)
+    if do_profile:
+        let parse_ns = with_clock_nanos() - t_parse
+        with_eprint(f"[profile] frontend.parse  {parse_ns / 1000000}.{(parse_ns % 1000000) / 1000} ms  decls={pool.decl_count()}")
 
     let root_local_decl_count = count_non_use_decls_frontend(pool)
 
@@ -774,7 +785,11 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     if zcu_debug_init_enabled() != 0:
         with_eprint("[frontend] compile_source:resolve")
     // Wave 4: sidecar resolved artifact.
+    let t_resolve = with_clock_nanos()
     let artifacts = resolve_from_root_pool(name, text, file_id, pool, self.pool, self.diagnostics, false)
+    if do_profile:
+        let resolve_ns = with_clock_nanos() - t_resolve
+        with_eprint(f"[profile] frontend.resolve  {resolve_ns / 1000000}.{(resolve_ns % 1000000) / 1000} ms")
     self.pool = artifacts.pool
     self.diagnostics = artifacts.diags
     self.set_resolve_snapshot(artifacts.result, name)
@@ -791,9 +806,17 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     // Build the sema/codegen pool via recursive syntactic import expansion.
     // This still sees implicit prelude imports because `inject_prelude_frontend`
     // materializes them as normal `use` declarations in the root pool.
+    let t_imports = with_clock_nanos()
     pool = self.process_imports_frontend(pool)
+    if do_profile:
+        let imports_ns = with_clock_nanos() - t_imports
+        with_eprint(f"[profile] frontend.imports  {imports_ns / 1000000}.{(imports_ns % 1000000) / 1000} ms")
+    let t_cimport = with_clock_nanos()
     self.trace_c_import_cache = self.read_trace_c_import_cache_frontend()
     pool = self.expand_c_imports_frontend(pool)
+    if do_profile:
+        let cimport_ns = with_clock_nanos() - t_cimport
+        with_eprint(f"[profile] frontend.c_import  {cimport_ns / 1000000}.{(cimport_ns % 1000000) / 1000} ms")
     pool.set_local_decl_count(root_local_decl_count)
     self.set_typed_snapshot("", pool)
     self.set_frontend_pool(self.pool)
@@ -806,6 +829,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
 
     // Comptime transform: fold forced comptime expressions and prune dead
     // comptime branches before final sema.
+    let t_comptime = with_clock_nanos()
     if pool.has_comptime_nodes() or pool.has_type_derives():
         if zcu_debug_init_enabled() != 0:
             with_eprint("[frontend] compile_source:comptime-transform")
@@ -826,17 +850,26 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
             self.set_typed_snapshot("", AstPool.new())
             return AstPool.new()
 
+    if do_profile:
+        let comptime_ns = with_clock_nanos() - t_comptime
+        if comptime_ns > 100000:
+            with_eprint(f"[profile] frontend.comptime  {comptime_ns / 1000000}.{(comptime_ns % 1000000) / 1000} ms")
+
     // AstPool construction is complete — freeze to catch any future mutations.
     pool.freeze()
 
     if zcu_debug_init_enabled() != 0:
         with_eprint("[frontend] compile_source:sema")
+    let t_sema = with_clock_nanos()
     var sema = Sema.init(self.pool, self.diagnostics, pool)
     sema.source_text = text
     sema.decl_source_paths = self.decl_source_paths
     sema.decl_source_file_ids = self.decl_source_file_ids
     sema.decl_is_c_import = self.decl_is_c_import
     sema.check_module()
+    if do_profile:
+        let sema_ns = with_clock_nanos() - t_sema
+        with_eprint(f"[profile] frontend.sema  {sema_ns / 1000000}.{(sema_ns % 1000000) / 1000} ms  decls={pool.decl_count()}")
     self.sync_from_sema(sema)
     frontend_dump_type_decl_names("post-sema", self.last_sema.ast, self.last_sema.pool)
     self.last_typed_dump = ""
