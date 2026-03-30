@@ -6,6 +6,7 @@ use compiler.Zcu
 
 extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
+extern fn with_clock_nanos() -> i64
 
 fn backend_debug_pool_flow_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_POOL_FLOW")
@@ -40,16 +41,29 @@ fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, outpu
     if backend_debug_pool_flow_enabled() != 0:
         with_eprint(f"[backend-diag] pool.extra_len={backend_pool.extra_len()} pool.nodes={backend_pool.node_count()}")
         backend_dump_struct_extras(backend_pool, backend_intern)
+    let do_profile = with_getenv_str("WITH_PROFILE").len() > 0
+    let t_codegen = with_clock_nanos()
     let result = cg.gen_module_from_mir(self.last_mir_module, backend_pool)
     if result != 0:
         with_eprint("error: code generation failed")
         return 1
+    if do_profile:
+        let codegen_ns = with_clock_nanos() - t_codegen
+        with_eprint(f"[profile] llvm.gen_module  {codegen_ns / 1000000}.{(codegen_ns % 1000000) / 1000} ms")
     if opt_level > 0:
+        let t_opt = with_clock_nanos()
         cg.optimize(opt_level)
+        if do_profile:
+            let opt_ns = with_clock_nanos() - t_opt
+            with_eprint(f"[profile] llvm.optimize  {opt_ns / 1000000}.{(opt_ns % 1000000) / 1000} ms")
+    let t_emit = with_clock_nanos()
     let emit_result = cg.emit_object_file(output_path)
     if emit_result != 0:
         with_eprint("error: failed to emit object file")
         return 1
+    if do_profile:
+        let emit_ns = with_clock_nanos() - t_emit
+        with_eprint(f"[profile] llvm.emit_object  {emit_ns / 1000000}.{(emit_ns % 1000000) / 1000} ms")
     0
 
 fn Zcu.emit_ir_backend(self: Zcu, pool: AstPool, opt_level: i32) -> bool:

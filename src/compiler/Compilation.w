@@ -19,6 +19,22 @@ extern fn with_eprint(s: str) -> void
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_system(cmd: str) -> i32
+extern fn with_clock_nanos() -> i64
+
+fn profile_enabled() -> bool:
+    with_getenv_str("WITH_PROFILE").len() > 0
+
+fn profile_now() -> i64:
+    with_clock_nanos()
+
+fn profile_emit(name: str, start: i64, counters: str):
+    let elapsed_ns = with_clock_nanos() - start
+    let ms_whole = elapsed_ns / 1000000
+    let ms_frac = (elapsed_ns % 1000000) / 1000
+    if counters.len() > 0:
+        with_eprint(f"[profile] {name}  {ms_whole}.{ms_frac} ms  {counters}")
+    else:
+        with_eprint(f"[profile] {name}  {ms_whole}.{ms_frac} ms")
 
 fn compilation_debug_init_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
@@ -195,6 +211,7 @@ fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_
     let requires_async_runtime = self.zcu.last_async_mir_module.requires_async_runtime()
     compilation_debug_pool_flow("build_binary_to_path:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
     compilation_debug_init("build_binary_to_path:compile_to_object_backend")
+    let t_backend = profile_now()
     let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info)
     if backend_rc != 0:
         compilation_debug_init(f"build_binary_to_path:backend FAILED rc={backend_rc}")
@@ -205,12 +222,18 @@ fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_
     var all_link_libs = self.zcu.last_link_lib_names
     for dli in 0..self.zcu.project_config.dep_link_libs.len() as i32:
         all_link_libs.push(self.zcu.project_config.dep_link_libs.get(dli as i64))
+    let t_link = profile_now()
     if not link_stage_link_object_to_binary(obj_path, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, requires_async_runtime):
         compilation_debug_init("build_binary_to_path:link FAILED")
         compilation_cleanup_build_products(obj_path, bin_path)
         return ""
+    if profile_enabled():
+        profile_emit("link", t_link, "")
     if self.config.debug_info:
+        let t_dsym = profile_now()
         let _ = ("dsymutil " ++ bin_path ++ " 2>/dev/null") |> with_system
+        if profile_enabled():
+            profile_emit("dsymutil", t_dsym, "")
     let _ = ("rm -f " ++ obj_path) |> with_system
     bin_path
 
@@ -338,6 +361,7 @@ fn Compilation.active_pool(self: Compilation, pool: AstPool) -> AstPool:
     pool
 
 fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
+    let do_profile = profile_enabled()
     var zcu = self.zcu
     let active_pool = pool
     compilation_debug_pool_flow("run_mir_lower:start", zcu.pool, active_pool, zcu.last_sema)
@@ -350,9 +374,12 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
         sema.no_std = 1
     if self.config.alloc_mode:
         sema.alloc = 1
+    let t_sema = profile_now()
     sema.check_module()
     sema.preregister_mir_types()
     sema.freeze_types()
+    if do_profile:
+        profile_emit("sema", t_sema, f"types={sema.type_kinds.len() as i32}")
     compilation_debug_pool_flow("run_mir_lower:after_check", zcu.pool, active_pool, sema)
 
     // Check for sema errors before lowering
@@ -364,8 +391,14 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
         self.zcu = zcu
         return zcu.last_mir_module
 
+    let t_mir = profile_now()
     let mir_mod: MirModule = lower_module(sema, active_pool, zcu.pool)
+    if do_profile:
+        profile_emit("mir.lower", t_mir, f"bodies={mir_mod.body_count()}")
+    let t_mir_validate = profile_now()
     let mir_err = validate_typed_mir_module(mir_mod)
+    if do_profile:
+        profile_emit("mir.validate", t_mir_validate, "")
     if mir_validation_has_error(mir_err):
         let diag_span = compilation_mir_error_span(zcu, active_pool, mir_err.fn_sym, mir_err.span)
         sema.diags.emit(Diagnostic.err("invalid MIR before codegen: " ++ mir_err.message, diag_span))
@@ -375,7 +408,10 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
         zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
         self.zcu = zcu
         return zcu.last_mir_module
+    let t_async = profile_now()
     let async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, zcu.pool, sema, zcu.diagnostics)
+    if do_profile:
+        profile_emit("async.lower", t_async, "")
     zcu.diagnostics = async_artifacts.diags
     compilation_dump_type_names("post-mir-lower", active_pool, zcu.pool)
 
