@@ -2215,14 +2215,15 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
 
     if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
         let v_name = self.ast.get_data0(node)
-        if self.validate_variant_pattern_subject(node, subject_type, v_name) == 0:
+        let pattern_enum_ty = self.resolve_variant_pattern_enum_type(node, subject_type, v_name)
+        if pattern_enum_ty == 0:
             return
         let v_extra = self.ast.get_data1(node)
         let bind_count = self.ast.get_data2(node)
         var payload_start = 0
         var payload_count = 0
         var found_variant = 0
-        let resolved = self.resolve_alias(subject_type)
+        let resolved = self.resolve_alias(pattern_enum_ty)
         let resolved_kind = self.get_type_kind(resolved)
         if resolved_kind == TypeKind.TY_ENUM:
             let te_start = self.get_type_d1(resolved)
@@ -2891,33 +2892,64 @@ fn Sema.enum_pattern_owner_sym(self: Sema, type_id: i32) -> i32:
                 return base_sym
     0
 
-fn Sema.validate_variant_pattern_subject(self: Sema, node: i32, subject_type: i32, variant_name: i32) -> i32:
+fn Sema.enum_pattern_type(self: Sema, type_id: i32) -> i32:
+    if type_id == 0:
+        return 0
+    let resolved = self.resolve_alias(type_id)
+    let resolved_kind = self.get_type_kind(resolved)
+    if resolved_kind == TypeKind.TY_ENUM:
+        return resolved as i32
+    if resolved_kind == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved)
+        if self.named_types.contains(base_sym):
+            let base_tid = self.named_types.get(base_sym).unwrap()
+            if self.get_type_kind(self.resolve_alias(base_tid)) == TypeKind.TY_ENUM:
+                return resolved as i32
+    0
+
+fn Sema.enum_pattern_subject_matches_repr(self: Sema, subject_type: i32, enum_tid: i32) -> i32:
+    if subject_type == 0 or enum_tid == 0:
+        return 0
+    let repr_ty = self.enum_repr_type(enum_tid)
+    if repr_ty == 0:
+        return 0
+    if self.resolve_alias(subject_type) == self.resolve_alias(repr_ty):
+        return 1
+    0
+
+fn Sema.resolve_variant_pattern_enum_type(self: Sema, node: i32, subject_type: i32, variant_name: i32) -> i32:
     if subject_type == 0:
         return 0
-    let subject_enum_sym = self.enum_pattern_owner_sym(subject_type)
+    let subject_enum_ty = self.enum_pattern_type(subject_type)
+    let subject_enum_sym = if subject_enum_ty != 0: self.enum_pattern_owner_sym(subject_enum_ty) else: 0
     let qualifier_sym = self.ast.pattern_qualifier(node)
     if qualifier_sym != 0:
         if not self.named_types.contains(qualifier_sym):
             self.emit_error("unknown type '" ++ self.pool_resolve(qualifier_sym) ++ "' in qualified enum pattern", node)
             return 0
         let qualifier_tid = self.named_types.get(qualifier_sym).unwrap()
-        let qualifier_enum_sym = self.enum_pattern_owner_sym(qualifier_tid)
+        let qualifier_enum_ty = self.enum_pattern_type(qualifier_tid)
+        let qualifier_enum_sym = if qualifier_enum_ty != 0: self.enum_pattern_owner_sym(qualifier_enum_ty) else: 0
         if qualifier_enum_sym == 0:
             self.emit_error("qualified enum pattern type '" ++ self.pool_resolve(qualifier_sym) ++ "' is not an enum", node)
             return 0
-        if subject_enum_sym == 0:
+        if subject_enum_sym == 0 and self.enum_pattern_subject_matches_repr(subject_type, qualifier_enum_ty) == 0:
             self.emit_error("qualified enum pattern requires an enum subject", node)
             return 0
-        if qualifier_enum_sym != subject_enum_sym:
+        if subject_enum_sym != 0 and qualifier_enum_sym != subject_enum_sym:
             self.emit_error("qualified enum pattern type '" ++ self.pool_resolve(qualifier_sym) ++ "' does not match subject type '" ++ self.pool_resolve(subject_enum_sym) ++ "'", node)
             return 0
+        if self.enum_has_variant(qualifier_enum_ty, variant_name) == 0:
+            self.emit_error("variant '" ++ self.pool_resolve(variant_name) ++ "' does not belong to enum '" ++ self.pool_resolve(qualifier_enum_sym) ++ "'", node)
+            return 0
+        return qualifier_enum_ty
     else if subject_enum_sym == 0:
         self.emit_error("variant pattern requires an enum subject", node)
         return 0
-    if subject_enum_sym != 0 and self.enum_has_variant(subject_type, variant_name) == 0:
+    if self.enum_has_variant(subject_enum_ty, variant_name) == 0:
         self.emit_error("variant '" ++ self.pool_resolve(variant_name) ++ "' does not belong to enum '" ++ self.pool_resolve(subject_enum_sym) ++ "'", node)
         return 0
-    1
+    subject_enum_ty
 
 fn Sema.check_dyn_trait_call_compat(self: Sema, fn_sym: i32, call_extra_start: i32, arg_types: Vec[i32], arg_count: i32, param_offset: i32):
     if not self.fn_decl_nodes.contains(fn_sym):
