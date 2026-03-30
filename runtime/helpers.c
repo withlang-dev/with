@@ -1649,6 +1649,53 @@ with_str with_fs_read_file(with_str path) {
     return out;
 }
 
+// ---- LSP / stdin I/O ----
+
+// Read a line from stdin (up to newline). Returns the line without the newline.
+with_str with_read_line_stdin(void) {
+    with_str out = { NULL, 0 };
+    char *buf = NULL;
+    size_t cap = 0;
+    ssize_t n = getline(&buf, &cap, stdin);
+    if (n <= 0) { free(buf); return out; }
+    // Strip trailing \r\n or \n
+    while (n > 0 && (buf[n-1] == '\n' || buf[n-1] == '\r')) n--;
+    buf[n] = '\0';
+    out.ptr = buf;
+    out.len = (int64_t)n;
+    return out;
+}
+
+// Read exactly N bytes from stdin. Returns empty string on EOF/error.
+with_str with_read_bytes_stdin(int32_t count) {
+    with_str out = { NULL, 0 };
+    if (count <= 0) return out;
+    char *buf = (char *)malloc((size_t)count + 1);
+    if (!buf) return out;
+    size_t total = 0;
+    while (total < (size_t)count) {
+        size_t got = fread(buf + total, 1, (size_t)count - total, stdin);
+        if (got == 0) { free(buf); return out; }
+        total += got;
+    }
+    buf[count] = '\0';
+    out.ptr = buf;
+    out.len = (int64_t)count;
+    return out;
+}
+
+// Write raw bytes to stdout (no newline, no flushing).
+void with_write_stdout(with_str s) {
+    if (s.ptr && s.len > 0) {
+        fwrite(s.ptr, 1, (size_t)s.len, stdout);
+    }
+}
+
+// Flush stdout.
+void with_flush_stdout(void) {
+    fflush(stdout);
+}
+
 int32_t with_fs_file_exists(with_str path) {
     char *cpath = with_str_to_cstring(path);
     if (!cpath) return 0;

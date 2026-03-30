@@ -136,6 +136,10 @@ void with_eprintln(with_str s);
 void with_eprint(with_str s);
 void with_write(with_str s);
 void with_ewrite(with_str s);
+with_str with_read_line_stdin(void);
+with_str with_read_bytes_stdin(int32_t count);
+void with_write_stdout(with_str s);
+void with_flush_stdout(void);
 
 // ── Process ────────────────────────────────────────────────────────
 

@@ -37,3 +37,26 @@ pub fn file_write(fp: *const i8, s: str) -> i32:
 // Read bytes from a file
 pub fn file_read(fp: *const i8, buf: *const i8, size: u64) -> u64:
     fread(buf, 1, size, fp)
+
+// ── stdin/stdout ──────────────────────────────────────────────
+
+extern fn with_read_line_stdin() -> str
+extern fn with_read_bytes_stdin(count: i32) -> str
+extern fn with_write_stdout(s: str) -> void
+extern fn with_flush_stdout() -> void
+
+// Read a line from stdin (strips trailing newline).
+pub fn read_line() -> str:
+    with_read_line_stdin()
+
+// Read exactly N bytes from stdin.
+pub fn read_bytes(count: i32) -> str:
+    with_read_bytes_stdin(count)
+
+// Write raw bytes to stdout (no newline, no flush).
+pub fn write_raw(s: str) -> void:
+    with_write_stdout(s)
+
+// Flush stdout.
+pub fn flush() -> void:
+    with_flush_stdout()
