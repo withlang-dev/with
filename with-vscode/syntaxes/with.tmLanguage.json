@@ -1,0 +1,126 @@
+{
+  "scopeName": "source.with",
+  "name": "With",
+  "fileTypes": ["w"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#attributes" },
+    { "include": "#function-def" },
+    { "include": "#type-def" },
+    { "include": "#keywords" },
+    { "include": "#builtins" },
+    { "include": "#types" },
+    { "include": "#constants" },
+    { "include": "#numbers" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "match": "//!.*$",
+          "name": "comment.line.documentation.with"
+        },
+        {
+          "match": "//.*$",
+          "name": "comment.line.double-slash.with"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.with",
+          "begin": "f\"",
+          "end": "\"",
+          "beginCaptures": { "0": { "name": "string.quoted.double.with punctuation.definition.string.begin.with" } },
+          "endCaptures": { "0": { "name": "string.quoted.double.with punctuation.definition.string.end.with" } },
+          "patterns": [
+            {
+              "name": "meta.interpolation.with",
+              "begin": "\\{",
+              "end": "\\}",
+              "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.with" } },
+              "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.with" } },
+              "patterns": [{ "include": "source.with" }]
+            },
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.with"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.double.with",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.with"
+            }
+          ]
+        }
+      ]
+    },
+    "attributes": {
+      "match": "@\\[[a-zA-Z_][a-zA-Z0-9_]*(\\([^)]*\\))?\\]",
+      "name": "meta.attribute.with"
+    },
+    "function-def": {
+      "match": "\\b(fn)\\s+([a-zA-Z_][a-zA-Z0-9_.]*)",
+      "captures": {
+        "1": { "name": "keyword.control.with" },
+        "2": { "name": "entity.name.function.with" }
+      }
+    },
+    "type-def": {
+      "match": "\\b(type|enum|error|trait)\\s+([A-Z][a-zA-Z0-9_]*)",
+      "captures": {
+        "1": { "name": "keyword.control.with" },
+        "2": { "name": "entity.name.type.with" }
+      }
+    },
+    "keywords": {
+      "match": "\\b(fn|let|var|type|use|if|else|match|for|while|return|break|continue|and|or|not|in|as|mut|pub|impl|trait|extend|defer|with|comptime|const|true|false|async|await|extern|unsafe|gen|yield|spawn|error|select|scope|move|where|enum|loop)\\b",
+      "name": "keyword.control.with"
+    },
+    "builtins": {
+      "match": "\\b(print|eprint|write|ewrite|assert|require|check|panic|todo|unreachable|sizeof|alignof|transmute|nameof)\\b",
+      "name": "support.function.with"
+    },
+    "types": {
+      "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|bool|str|void|usize|isize|Self|Option|Result|Vec|HashMap|HashSet|Box)\\b",
+      "name": "entity.name.type.with"
+    },
+    "constants": {
+      "match": "\\b(true|false|None|Some|Ok|Err)\\b",
+      "name": "constant.language.with"
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b0x[0-9a-fA-F_]+\\b",
+          "name": "constant.numeric.hex.with"
+        },
+        {
+          "match": "\\b0b[01_]+\\b",
+          "name": "constant.numeric.binary.with"
+        },
+        {
+          "match": "\\b0o[0-7_]+\\b",
+          "name": "constant.numeric.octal.with"
+        },
+        {
+          "match": "\\b[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?\\b",
+          "name": "constant.numeric.with"
+        }
+      ]
+    },
+    "operators": {
+      "match": "\\|>|=>|->|\\.\\.|\\.\\.\\.|\\.\\.<|\\+\\+|\\?",
+      "name": "keyword.operator.with"
+    }
+  }
+}

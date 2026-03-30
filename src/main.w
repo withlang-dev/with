@@ -12,6 +12,7 @@ use Source
 use Compilation
 use ConanClient
 use Fmt
+use Lsp
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
@@ -312,8 +313,7 @@ fn run_cli(argc: i32) -> i32:
     if cli_command(argc) == "remove":
         return run_remove_command(argc)
     if cli_command(argc) == "lsp":
-        with_eprint("error: LSP not yet available in self-hosted compiler")
-        return 1
+        return run_lsp()
     if cli_command(argc) == "migrate":
         with_eprint("error: migrate not yet available in self-hosted compiler")
         return 1
