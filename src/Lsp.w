@@ -476,7 +476,6 @@ fn lsp_hover(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32)
 
 fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
     let offset = lsp_line_col_to_offset(text, line, col)
-    // (debug removed)
 
     // Find the line text up to cursor to detect context
     var line_start = offset
@@ -531,7 +530,49 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
     // Phase 2: scope-aware completion via AST walking.
     // Find the enclosing function, collect its parameters and local bindings
     // that are visible at the cursor position.
-    let scope_names = lsp_collect_scope_names(text, offset)
+    // Fast-tier scope-aware completion: parse-only, no imports, no sema.
+    let parsed = lsp_parse_file(text)
+    let parse_pool = parsed.pool
+    let parse_intern = parsed.intern
+    let enclosing_fn = lsp_find_enclosing_fn(parse_pool, offset)
+    let scope_names: Vec[str] = Vec.new()
+    if enclosing_fn as i32 != 0:
+        let params = lsp_collect_fn_params(parse_pool, parse_intern, enclosing_fn)
+        let seen: Vec[str] = Vec.new()
+        for pi in 0..params.len() as i32:
+            let p = params.get(pi as i64)
+            scope_names.push(p)
+            seen.push(p)
+        // Walk body block to collect let/var/for bindings before cursor.
+        // Vec is pass-by-value in With so we collect inline rather than
+        // in a recursive helper (push modifies copy not original).
+        let body = parse_pool.get_data1(enclosing_fn)
+        if body != 0 and parse_pool.kind(body as NodeId) == NodeKind.NK_BLOCK:
+            let blk = body as NodeId
+            let es = parse_pool.get_data0(blk)
+            let sc = parse_pool.get_data1(blk)
+            for si in 0..sc:
+                let stmt = parse_pool.get_extra(es + si)
+                if stmt == 0:
+                    continue
+                let sk = parse_pool.kind(stmt as NodeId)
+                let ss = parse_pool.get_start(stmt as NodeId)
+                if ss >= offset:
+                    continue
+                if sk == NodeKind.NK_LET_BINDING:
+                    let sym = parse_pool.get_data0(stmt as NodeId)
+                    if sym != 0:
+                        let bname = parse_intern.resolve(sym)
+                        if bname.len() > 0 and lsp_vec_str_contains(seen, bname) == 0:
+                            scope_names.push(bname)
+                            seen.push(bname)
+                if sk == NodeKind.NK_FOR:
+                    let sym = parse_pool.get_data0(stmt as NodeId)
+                    if sym != 0:
+                        let bname = parse_intern.resolve(sym)
+                        if bname.len() > 0 and bname != "_" and lsp_vec_str_contains(seen, bname) == 0:
+                            scope_names.push(bname)
+                            seen.push(bname)
     for si in 0..scope_names.len() as i32:
         let sname = scope_names.get(si as i64)
         if not first:
@@ -575,66 +616,54 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
     items = items ++ jarr_end()
     lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
 
-// ── AST-based scope collection ───────────────────────────────
+// ── Fast-tier parse + scope collection ───────────────────────
 
-fn lsp_collect_scope_names(text: str, offset: i32) -> Vec[str]:
-    // Parse the file directly (not through Compilation) to get a clean AST
-    // with correct spans. The compiled pool may be empty due to import errors.
+type LspParseResult {
+    pool: AstPool,
+    intern: InternPool,
+}
+
+fn lsp_parse_file(text: str) -> LspParseResult:
     var lexer = Lexer.init(text, 0)
     let tokens = lexer.tokenize()
     var intern = InternPool.init()
     var diags = DiagnosticList.init()
     var parser = Parser.init(tokens, text, 0, intern, diags)
     let pool = parser.parse_module()
-    intern = parser.intern
+    LspParseResult { pool, intern: parser.intern }
 
-    let names: Vec[str] = Vec.new()
-    let seen: Vec[str] = Vec.new()
-    // Find the enclosing function declaration
+fn lsp_find_enclosing_fn(pool: AstPool, offset: i32) -> NodeId:
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
-        let dk = pool.kind(decl) as i32
         if pool.kind(decl) != NodeKind.NK_FN_DECL:
             continue
-        let fn_start = pool.get_start(decl)
-        let fn_end = pool.get_end(decl)
-        if offset < fn_start or offset > fn_end:
-            continue
+        if offset >= pool.get_start(decl) and offset <= pool.get_end(decl):
+            return decl
+    0 as NodeId
 
-        // Found enclosing function. Collect parameters.
-        let meta = pool.find_fn_meta(decl)
-        if meta >= 0:
-            let param_start = pool.fn_meta_param_start(meta)
-            let param_count = pool.fn_meta_param_count(meta)
-            for pi in 0..param_count:
-                let psym = pool.fn_param_name(param_start, pi)
-                if psym != 0:
-                    let pname = intern.resolve(psym)
-                    if pname != "self" and lsp_vec_str_contains(seen, pname) == 0:
-                        names.push(pname)
-                        seen.push(pname)
-
-        // Walk the function body to collect let/var/for bindings before cursor
-        let body = pool.get_data1(decl)
-        if body != 0:
-            lsp_collect_bindings_in_node(pool, intern, body, offset, names, seen)
-
-        break
+fn lsp_collect_fn_params(pool: AstPool, intern: InternPool, fn_node: NodeId) -> Vec[str]:
+    let names: Vec[str] = Vec.new()
+    let meta = pool.find_fn_meta(fn_node)
+    if meta < 0:
+        return names
+    let param_start = pool.fn_meta_param_start(meta)
+    let param_count = pool.fn_meta_param_count(meta)
+    for pi in 0..param_count:
+        let psym = pool.fn_param_name(param_start, pi)
+        if psym != 0:
+            let pname = intern.resolve(psym)
+            if pname != "self" and pname.len() > 0:
+                names.push(pname)
     names
 
-fn lsp_collect_bindings_in_node(pool: AstPool, intern: InternPool, node: i32, offset: i32, names: Vec[str], seen: Vec[str]):
+fn lsp_collect_bindings(pool: AstPool, intern: InternPool, node: i32, offset: i32, names: Vec[str], seen: Vec[str]):
     if node == 0:
         return
-    let nid = (node) as NodeId
+    let nid = node as NodeId
     let kind = pool.kind(nid)
-    with_eprint(f"[walk] node={node} kind={kind as i32}")
     let node_start = pool.get_start(nid)
 
-    // Only collect bindings that appear before the cursor
     if kind == NodeKind.NK_LET_BINDING:
-        let bsym = pool.get_data0(nid)
-        let bname = intern.resolve(bsym)
-        with_eprint(f"[walk] let_binding name='{bname}' sym={bsym} start={node_start} offset={offset}")
         if node_start < offset:
             let sym = pool.get_data0(nid)
             if sym != 0:
@@ -644,7 +673,6 @@ fn lsp_collect_bindings_in_node(pool: AstPool, intern: InternPool, node: i32, of
                     seen.push(name)
         return
 
-    // for <binding> in <iterable>: <body>
     if kind == NodeKind.NK_FOR:
         if node_start < offset:
             let sym = pool.get_data0(nid)
@@ -653,59 +681,51 @@ fn lsp_collect_bindings_in_node(pool: AstPool, intern: InternPool, node: i32, of
                 if name.len() > 0 and name != "_" and lsp_vec_str_contains(seen, name) == 0:
                     names.push(name)
                     seen.push(name)
-        // Recurse into body
         let for_body = pool.get_data2(nid)
         if for_body != 0:
-            lsp_collect_bindings_in_node(pool, intern, for_body, offset, names, seen)
+            lsp_collect_bindings(pool, intern, for_body, offset, names, seen)
         return
 
-    // Block: iterate statements + tail
     if kind == NodeKind.NK_BLOCK:
         let extra_start = pool.get_data0(nid)
         let stmt_count = pool.get_data1(nid)
-        with_eprint(f"[walk] block stmts={stmt_count} extra_start={extra_start}")
         let tail = pool.get_data2(nid)
         for i in 0..stmt_count:
-            let stmt = pool.get_extra(extra_start + i)
-            lsp_collect_bindings_in_node(pool, intern, stmt, offset, names, seen)
+            lsp_collect_bindings(pool, intern, pool.get_extra(extra_start + i), offset, names, seen)
         if tail != 0:
-            lsp_collect_bindings_in_node(pool, intern, tail, offset, names, seen)
+            lsp_collect_bindings(pool, intern, tail, offset, names, seen)
         return
 
-    // If expression: recurse into then and else branches
     if kind == NodeKind.NK_IF_EXPR:
         let then_body = pool.get_data1(nid)
         let else_body = pool.get_data2(nid)
         if then_body != 0:
-            lsp_collect_bindings_in_node(pool, intern, then_body, offset, names, seen)
+            lsp_collect_bindings(pool, intern, then_body, offset, names, seen)
         if else_body != 0:
-            lsp_collect_bindings_in_node(pool, intern, else_body, offset, names, seen)
+            lsp_collect_bindings(pool, intern, else_body, offset, names, seen)
         return
 
-    // While: recurse into body
     if kind == NodeKind.NK_WHILE:
         let body = pool.get_data1(nid)
         if body != 0:
-            lsp_collect_bindings_in_node(pool, intern, body, offset, names, seen)
+            lsp_collect_bindings(pool, intern, body, offset, names, seen)
         return
 
-    // Match: recurse into arms
     if kind == NodeKind.NK_MATCH:
         let arms_start = pool.get_data1(nid)
         let arms_count = pool.get_data2(nid)
         for ai in 0..arms_count:
             let arm = pool.get_extra(arms_start + ai)
             if arm != 0:
-                let arm_body = pool.get_data1((arm) as NodeId)
+                let arm_body = pool.get_data1(arm as NodeId)
                 if arm_body != 0:
-                    lsp_collect_bindings_in_node(pool, intern, arm_body, offset, names, seen)
+                    lsp_collect_bindings(pool, intern, arm_body, offset, names, seen)
         return
 
-    // Loop: recurse into body
     if kind == NodeKind.NK_LOOP:
         let body = pool.get_data0(nid)
         if body != 0:
-            lsp_collect_bindings_in_node(pool, intern, body, offset, names, seen)
+            lsp_collect_bindings(pool, intern, body, offset, names, seen)
         return
 
 fn lsp_vec_str_contains(v: Vec[str], s: str) -> i32:
