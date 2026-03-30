@@ -24,25 +24,19 @@ the cache. Invalidated on `didChange`.
 
 Commit: Phase 1 of LSP roadmap.
 
-## Phase 2: Scope-Aware Completion
+## Phase 2: Scope-Aware Completion — DONE
 
 **Goal:** When typing inside a function body, suggest locals, parameters,
 and imported names — not just top-level declarations.
 
-**rust-analyzer approach (fake identifier):**
-1. Insert `__COMPLETION_MARKER__` at cursor position
-2. Re-parse the modified text
-3. Find the marker in the AST
-4. Walk up from the marker to determine context:
-   - Inside a function body → suggest locals + params + imported names
-   - After a dot → suggest fields + methods of the receiver type
-   - After `use` → suggest modules
-   - At top level → suggest keywords + declaration starts
+Implemented via token scanning: the LSP scans tokens before the cursor
+for `let`/`var` bindings and `fn` parameter names. Local variables and
+parameters appear first in the completion list, followed by keywords,
+then top-level declarations.
 
-**Implementation:**
-- Add `lsp_completion_with_context()` that inserts marker + re-parses
-- For function body context: walk sema's scope to collect in-scope names
-- For dot context: resolve receiver type, list fields + methods
+Not yet implemented: full sema scope walking (requires deeper compiler
+integration), dot completion (type-based field/method suggestions).
+These remain as Phase 3.
 
 ## Phase 3: Type-Aware Dot Completion
 
