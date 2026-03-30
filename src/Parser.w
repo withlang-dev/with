@@ -2575,11 +2575,26 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
     let node = self.pool.add_node(NodeKind.NK_FSTRING, start, end, seg_count, extra_start, 0)
     self.parse_postfix(node)
 
+fn interp_brace_char(code: i32) -> str:
+    str_from_byte(code)
+
 fn Parser.interp_clean_segment(self: Parser, content: str, from: i32, to: i32) -> str:
-    // Extract raw segment. Escaped {{ and }} stay as-is for now — the lexer
-    // already consumed them. The desugar loop skips over {{ and }} pairs,
-    // so they don't appear in segments adjacent to holes.
-    content.slice(from as i64, to as i64)
+    // Replace {{ → { and }} → } in literal segments (Python-style brace escaping).
+    var out = ""
+    var i = from
+    while i < to:
+        let ch = content.byte_at(i as i64)
+        if ch == 123 and i + 1 < to and content.byte_at((i + 1) as i64) == 123:
+            out = out ++ interp_brace_char(123)
+            i = i + 2
+            continue
+        if ch == 125 and i + 1 < to and content.byte_at((i + 1) as i64) == 125:
+            out = out ++ interp_brace_char(125)
+            i = i + 2
+            continue
+        out = out ++ content.slice(i as i64, (i + 1) as i64)
+        i = i + 1
+    out
 
 fn Parser.parse_format_spec_text(self: Parser, spec_text: str, start: i32, end: i32) -> NodeId:
     // Parse format spec grammar: [[fill]align][sign]['#']['0'][width]['.' precision][mode]
