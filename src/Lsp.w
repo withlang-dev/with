@@ -818,6 +818,107 @@ fn lsp_keywords() -> Vec[str]:
     k.push("error")
     k
 
+// ── Signature help ───────────────────────────────────────────
+
+fn lsp_signature_help(id: i32, uri: str, text: str, line: i32, col: i32):
+    let offset = lsp_line_col_to_offset(text, line, col)
+
+    // Walk tokens backward from cursor to find the opening ( and function name.
+    var lexer = Lexer.init(text, 0)
+    let tokens = lexer.tokenize()
+
+    // Find the token at or just before cursor
+    var cursor_tok = -1
+    for i in 0..tokens.len():
+        if tokens.get_start(i) >= offset:
+            cursor_tok = i - 1
+            break
+    if cursor_tok < 0:
+        cursor_tok = tokens.len() - 1
+
+    // Walk backward to find the opening ( and count commas for active param
+    var paren_depth = 0
+    var comma_count = 0
+    var fn_name_tok = -1
+    var ti = cursor_tok
+    while ti >= 0:
+        let tag = tokens.get_tag(ti)
+        if tag == TokenKind.TK_R_PAREN:
+            paren_depth = paren_depth + 1
+        else if tag == TokenKind.TK_L_PAREN:
+            if paren_depth > 0:
+                paren_depth = paren_depth - 1
+            else:
+                // Found the opening paren. The token before it is the function name.
+                if ti > 0 and tokens.get_tag(ti - 1) == TokenKind.TK_IDENT:
+                    fn_name_tok = ti - 1
+                break
+        else if tag == TokenKind.TK_COMMA and paren_depth == 0:
+            comma_count = comma_count + 1
+        ti = ti - 1
+
+    if fn_name_tok < 0:
+        lsp_write_response(jrpc_result_null(id))
+        return
+
+    let fn_name = text.slice(tokens.get_start(fn_name_tok) as i64, tokens.get_end(fn_name_tok) as i64)
+
+    // Look up the function declaration in the parsed AST (fast tier)
+    let parsed = lsp_parse_file(text)
+    var sig_label = ""
+    let param_labels: Vec[str] = Vec.new()
+
+    for di in 0..parsed.pool.decl_count():
+        let decl = parsed.pool.get_decl(di)
+        if parsed.pool.kind(decl) != NodeKind.NK_FN_DECL:
+            continue
+        let name = parsed.intern.resolve(parsed.pool.get_data0(decl))
+        if name != fn_name:
+            continue
+        // Found the function. Build signature label from parameters.
+        let meta = parsed.pool.find_fn_meta(decl)
+        if meta < 0:
+            continue
+        let param_start = parsed.pool.fn_meta_param_start(meta)
+        let param_count = parsed.pool.fn_meta_param_count(meta)
+        var label = "fn " ++ fn_name ++ "("
+        for pi in 0..param_count:
+            let pname = parsed.intern.resolve(parsed.pool.fn_param_name(param_start, pi))
+            let ptype_node = parsed.pool.fn_param_type(param_start, pi)
+            var ptype_str = ""
+            if ptype_node > 0:
+                let ptk = parsed.pool.kind(ptype_node as NodeId)
+                if ptk == NodeKind.NK_TYPE_NAMED:
+                    ptype_str = parsed.intern.resolve(parsed.pool.get_data0(ptype_node as NodeId))
+                else if ptk == NodeKind.NK_TYPE_REF:
+                    let inner = parsed.pool.get_data0(ptype_node as NodeId)
+                    if inner > 0 and parsed.pool.kind(inner as NodeId) == NodeKind.NK_TYPE_NAMED:
+                        ptype_str = "&" ++ parsed.intern.resolve(parsed.pool.get_data0(inner as NodeId))
+            let param_text = if ptype_str.len() > 0: pname ++ ": " ++ ptype_str else: pname
+            param_labels.push(param_text)
+            if pi > 0:
+                label = label ++ ", "
+            label = label ++ param_text
+        label = label ++ ")"
+        sig_label = label
+        break
+
+    if sig_label.len() == 0:
+        lsp_write_response(jrpc_result_null(id))
+        return
+
+    // Build SignatureHelp response
+    var params_json = jarr_start()
+    for pi in 0..param_labels.len() as i32:
+        if pi > 0:
+            params_json = params_json ++ ","
+        params_json = params_json ++ jobj_start() ++ jkv_str("label", param_labels.get(pi as i64)) ++ jobj_end()
+    params_json = params_json ++ jarr_end()
+
+    let sig = jobj_start() ++ jkv_str("label", sig_label) ++ "," ++ jkv_raw("parameters", params_json) ++ jobj_end()
+    let result = jobj_start() ++ jkv_raw("signatures", jarr_start() ++ sig ++ jarr_end()) ++ "," ++ jkv_int("activeSignature", 0) ++ "," ++ jkv_int("activeParameter", comma_count) ++ jobj_end()
+    lsp_write_response(jrpc_result(id, result))
+
 // ── Document symbols ─────────────────────────────────────────
 
 fn lsp_document_symbols(id: i32, state: LspState, uri: str, text: str):
@@ -889,7 +990,8 @@ fn run_lsp() -> i32:
         if method == "initialize":
             state.initialized = true
             let completion_opts = jobj_start() ++ jkv_raw("triggerCharacters", "[\".\"]") ++ jobj_end()
-            let caps = jobj_start() ++ jkv_int("textDocumentSync", 1) ++ "," ++ jkv_bool("hoverProvider", true) ++ "," ++ jkv_bool("definitionProvider", true) ++ "," ++ jkv_bool("documentFormattingProvider", true) ++ "," ++ jkv_raw("completionProvider", completion_opts) ++ "," ++ jkv_bool("documentSymbolProvider", true) ++ jobj_end()
+            let sig_help_opts = jobj_start() ++ jkv_raw("triggerCharacters", "[\"(\", \",\"]") ++ jobj_end()
+            let caps = jobj_start() ++ jkv_int("textDocumentSync", 1) ++ "," ++ jkv_bool("hoverProvider", true) ++ "," ++ jkv_bool("definitionProvider", true) ++ "," ++ jkv_bool("documentFormattingProvider", true) ++ "," ++ jkv_raw("completionProvider", completion_opts) ++ "," ++ jkv_raw("signatureHelpProvider", sig_help_opts) ++ "," ++ jkv_bool("documentSymbolProvider", true) ++ jobj_end()
             let info = jobj_start() ++ jkv_str("name", "with-lsp") ++ "," ++ jkv_str("version", "0.1.0") ++ jobj_end()
             let result = jobj_start() ++ jkv_raw("capabilities", caps) ++ "," ++ jkv_raw("serverInfo", info) ++ jobj_end()
             lsp_write_response(jrpc_result(id, result))
@@ -974,6 +1076,17 @@ fn run_lsp() -> i32:
                 lsp_completion(id, state, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
             else:
                 lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", "[]") ++ jobj_end()))
+
+        else if method == "textDocument/signatureHelp":
+            let td = json_get_object(params, "textDocument")
+            let uri = json_get_string(td, "uri")
+            let pos = json_get_object(params, "position")
+            let idx = state.find_doc(uri)
+            if idx >= 0:
+                let doc = state.documents.get(idx as i64)
+                lsp_signature_help(id, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
+            else:
+                lsp_write_response(jrpc_result_null(id))
 
         else if method == "textDocument/documentSymbol":
             let td = json_get_object(params, "textDocument")
