@@ -44,10 +44,14 @@ fn lsp_write_response(json: str):
 
 fn lsp_parse_int(s: str) -> i32:
     var result = 0
+    var started = false
     for i in 0..s.len() as i32:
         let ch = s.byte_at(i as i64)
         if ch >= 48 and ch <= 57:
             result = result * 10 + (ch - 48)
+            started = true
+        else if started:
+            break
     result
 
 // ── Minimal JSON helpers ─────────────────────────────────────
@@ -68,7 +72,36 @@ fn json_get_string(json: str, key: str) -> str:
         if json.byte_at(end as i64) == 92:
             end = end + 1
         end = end + 1
-    json.slice(pos as i64, end as i64)
+    // Unescape JSON string: \n → newline, \t → tab, \" → ", \\ → \
+    let raw = json.slice(pos as i64, end as i64)
+    json_unescape(raw)
+
+fn json_unescape(s: str) -> str:
+    if lsp_find_substr(s, "\\") < 0:
+        return s
+    var out = ""
+    var i = 0
+    while i < s.len() as i32:
+        let ch = s.byte_at(i as i64)
+        if ch == 92 and i + 1 < s.len() as i32:
+            let next = s.byte_at((i + 1) as i64)
+            if next == 110:
+                out = out ++ str_from_byte(10)
+            else if next == 116:
+                out = out ++ str_from_byte(9)
+            else if next == 114:
+                out = out ++ str_from_byte(13)
+            else if next == 34:
+                out = out ++ str_from_byte(34)
+            else if next == 92:
+                out = out ++ str_from_byte(92)
+            else:
+                out = out ++ s.slice(i as i64, (i + 2) as i64)
+            i = i + 2
+        else:
+            out = out ++ s.slice(i as i64, (i + 1) as i64)
+            i = i + 1
+    out
 
 fn json_get_int(json: str, key: str) -> i32:
     let search = "\"" ++ key ++ "\":"
@@ -217,7 +250,7 @@ fn LspDocument.ensure_analyzed(self: LspDocument):
     if self.cache_valid and self.cached_text_len == self.text.len() as i32:
         return
     var comp = Compilation.init()
-    comp.set_prelude_mode(0)
+    comp.set_prelude_mode(1)
     let pool = comp.compile_source_text(self.path, self.text)
     self.cached_pool = pool
     self.cached_intern = comp.zcu.pool
@@ -310,7 +343,7 @@ fn lsp_publish_diagnostics(state: LspState, uri: str, text: str):
         dl = state.documents.get(idx as i64).cached_diags
     else:
         var comp = Compilation.init()
-        comp.set_prelude_mode(0)
+        comp.set_prelude_mode(1)
         let pool = comp.compile_source_text(uri_to_path(uri), text)
         dl = comp.zcu.diagnostics
 
@@ -364,7 +397,7 @@ fn lsp_definition(id: i32, state: LspState, uri: str, text: str, line: i32, col:
         intern = state.documents.get(idx as i64).cached_intern
     else:
         var comp = Compilation.init()
-        comp.set_prelude_mode(0)
+        comp.set_prelude_mode(1)
         pool = comp.compile_source_text(uri_to_path(uri), text)
         intern = comp.zcu.pool
 
@@ -411,7 +444,7 @@ fn lsp_hover(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32)
         intern = state.documents.get(idx as i64).cached_intern
     else:
         var comp = Compilation.init()
-        comp.set_prelude_mode(0)
+        comp.set_prelude_mode(1)
         pool = comp.compile_source_text(uri_to_path(uri), text)
         intern = comp.zcu.pool
 
@@ -443,6 +476,7 @@ fn lsp_hover(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32)
 
 fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
     let offset = lsp_line_col_to_offset(text, line, col)
+    // (debug removed)
 
     // Find the line text up to cursor to detect context
     var line_start = offset
@@ -479,60 +513,7 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
         lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
         return
 
-    // Scan tokens before cursor for local let/var bindings and fn parameters.
-    // This gives scope-aware completion without full sema integration.
-    var lexer = Lexer.init(text, 0)
-    let tokens = lexer.tokenize()
-    let local_names: Vec[str] = Vec.new()
-    let seen_locals: Vec[str] = Vec.new()
-    var ti = 0
-    while ti < tokens.len():
-        let tok_start = tokens.get_start(ti)
-        if tok_start >= offset:
-            break
-        let tag = tokens.get_tag(ti)
-        // let <name> or var <name>
-        if (tag == TokenKind.TK_KW_LET or tag == TokenKind.TK_KW_VAR) and ti + 1 < tokens.len():
-            let next_tag = tokens.get_tag(ti + 1)
-            if next_tag == TokenKind.TK_IDENT:
-                let name = text.slice(tokens.get_start(ti + 1) as i64, tokens.get_end(ti + 1) as i64)
-                if lsp_vec_str_contains(seen_locals, name) == 0:
-                    local_names.push(name)
-                    seen_locals.push(name)
-        // fn <name>(<param>: <type>, ...)
-        // After fn and ident, look for ( ... ) and collect param names
-        if tag == TokenKind.TK_KW_FN and ti + 2 < tokens.len():
-            if tokens.get_tag(ti + 1) == TokenKind.TK_IDENT and tokens.get_tag(ti + 2) == TokenKind.TK_L_PAREN:
-                var pi = ti + 3
-                while pi < tokens.len() and tokens.get_tag(pi) != TokenKind.TK_R_PAREN and tokens.get_start(pi) < offset:
-                    if tokens.get_tag(pi) == TokenKind.TK_IDENT:
-                        // Check if next is : (parameter pattern)
-                        if pi + 1 < tokens.len() and tokens.get_tag(pi + 1) == TokenKind.TK_COLON:
-                            let pname = text.slice(tokens.get_start(pi) as i64, tokens.get_end(pi) as i64)
-                            if pname != "self" and lsp_vec_str_contains(seen_locals, pname) == 0:
-                                local_names.push(pname)
-                                seen_locals.push(pname)
-                    pi = pi + 1
-        ti = ti + 1
-
-    // Emit local variables first (most relevant)
-    for li in 0..local_names.len() as i32:
-        let lname = local_names.get(li as i64)
-        if not first:
-            items = items ++ ","
-        first = false
-        items = items ++ jobj_start() ++ jkv_str("label", lname) ++ "," ++ jkv_int("kind", 6) ++ jobj_end()
-
-    // Then keywords
-    let keywords = lsp_keywords()
-    for i in 0..keywords.len() as i32:
-        let kw = keywords.get(i as i64)
-        if not first:
-            items = items ++ ","
-        first = false
-        items = items ++ jobj_start() ++ jkv_str("label", kw) ++ "," ++ jkv_int("kind", 14) ++ jobj_end()
-
-    // Add declarations from the file (use cache)
+    // Get cached analysis
     let cidx = state.find_doc(uri)
     if cidx >= 0:
         state.documents.get(cidx as i64).ensure_analyzed()
@@ -543,10 +524,31 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
         intern = state.documents.get(cidx as i64).cached_intern
     else:
         var comp = Compilation.init()
-        comp.set_prelude_mode(0)
+        comp.set_prelude_mode(1)
         pool = comp.compile_source_text(uri_to_path(uri), text)
         intern = comp.zcu.pool
 
+    // Phase 2: scope-aware completion via AST walking.
+    // Find the enclosing function, collect its parameters and local bindings
+    // that are visible at the cursor position.
+    let scope_names = lsp_collect_scope_names(text, offset)
+    for si in 0..scope_names.len() as i32:
+        let sname = scope_names.get(si as i64)
+        if not first:
+            items = items ++ ","
+        first = false
+        items = items ++ jobj_start() ++ jkv_str("label", sname) ++ "," ++ jkv_int("kind", 6) ++ jobj_end()
+
+    // Keywords
+    let keywords = lsp_keywords()
+    for i in 0..keywords.len() as i32:
+        let kw = keywords.get(i as i64)
+        if not first:
+            items = items ++ ","
+        first = false
+        items = items ++ jobj_start() ++ jkv_str("label", kw) ++ "," ++ jkv_int("kind", 14) ++ jobj_end()
+
+    // Top-level declarations
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         let kind = pool.kind(decl)
@@ -572,6 +574,139 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
 
     items = items ++ jarr_end()
     lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
+
+// ── AST-based scope collection ───────────────────────────────
+
+fn lsp_collect_scope_names(text: str, offset: i32) -> Vec[str]:
+    // Parse the file directly (not through Compilation) to get a clean AST
+    // with correct spans. The compiled pool may be empty due to import errors.
+    var lexer = Lexer.init(text, 0)
+    let tokens = lexer.tokenize()
+    var intern = InternPool.init()
+    var diags = DiagnosticList.init()
+    var parser = Parser.init(tokens, text, 0, intern, diags)
+    let pool = parser.parse_module()
+    intern = parser.intern
+
+    let names: Vec[str] = Vec.new()
+    let seen: Vec[str] = Vec.new()
+    // Find the enclosing function declaration
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        let dk = pool.kind(decl) as i32
+        if pool.kind(decl) != NodeKind.NK_FN_DECL:
+            continue
+        let fn_start = pool.get_start(decl)
+        let fn_end = pool.get_end(decl)
+        if offset < fn_start or offset > fn_end:
+            continue
+
+        // Found enclosing function. Collect parameters.
+        let meta = pool.find_fn_meta(decl)
+        if meta >= 0:
+            let param_start = pool.fn_meta_param_start(meta)
+            let param_count = pool.fn_meta_param_count(meta)
+            for pi in 0..param_count:
+                let psym = pool.fn_param_name(param_start, pi)
+                if psym != 0:
+                    let pname = intern.resolve(psym)
+                    if pname != "self" and lsp_vec_str_contains(seen, pname) == 0:
+                        names.push(pname)
+                        seen.push(pname)
+
+        // Walk the function body to collect let/var/for bindings before cursor
+        let body = pool.get_data1(decl)
+        if body != 0:
+            lsp_collect_bindings_in_node(pool, intern, body, offset, names, seen)
+
+        break
+    names
+
+fn lsp_collect_bindings_in_node(pool: AstPool, intern: InternPool, node: i32, offset: i32, names: Vec[str], seen: Vec[str]):
+    if node == 0:
+        return
+    let nid = (node) as NodeId
+    let kind = pool.kind(nid)
+    with_eprint(f"[walk] node={node} kind={kind as i32}")
+    let node_start = pool.get_start(nid)
+
+    // Only collect bindings that appear before the cursor
+    if kind == NodeKind.NK_LET_BINDING:
+        let bsym = pool.get_data0(nid)
+        let bname = intern.resolve(bsym)
+        with_eprint(f"[walk] let_binding name='{bname}' sym={bsym} start={node_start} offset={offset}")
+        if node_start < offset:
+            let sym = pool.get_data0(nid)
+            if sym != 0:
+                let name = intern.resolve(sym)
+                if name.len() > 0 and lsp_vec_str_contains(seen, name) == 0:
+                    names.push(name)
+                    seen.push(name)
+        return
+
+    // for <binding> in <iterable>: <body>
+    if kind == NodeKind.NK_FOR:
+        if node_start < offset:
+            let sym = pool.get_data0(nid)
+            if sym != 0:
+                let name = intern.resolve(sym)
+                if name.len() > 0 and name != "_" and lsp_vec_str_contains(seen, name) == 0:
+                    names.push(name)
+                    seen.push(name)
+        // Recurse into body
+        let for_body = pool.get_data2(nid)
+        if for_body != 0:
+            lsp_collect_bindings_in_node(pool, intern, for_body, offset, names, seen)
+        return
+
+    // Block: iterate statements + tail
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = pool.get_data0(nid)
+        let stmt_count = pool.get_data1(nid)
+        with_eprint(f"[walk] block stmts={stmt_count} extra_start={extra_start}")
+        let tail = pool.get_data2(nid)
+        for i in 0..stmt_count:
+            let stmt = pool.get_extra(extra_start + i)
+            lsp_collect_bindings_in_node(pool, intern, stmt, offset, names, seen)
+        if tail != 0:
+            lsp_collect_bindings_in_node(pool, intern, tail, offset, names, seen)
+        return
+
+    // If expression: recurse into then and else branches
+    if kind == NodeKind.NK_IF_EXPR:
+        let then_body = pool.get_data1(nid)
+        let else_body = pool.get_data2(nid)
+        if then_body != 0:
+            lsp_collect_bindings_in_node(pool, intern, then_body, offset, names, seen)
+        if else_body != 0:
+            lsp_collect_bindings_in_node(pool, intern, else_body, offset, names, seen)
+        return
+
+    // While: recurse into body
+    if kind == NodeKind.NK_WHILE:
+        let body = pool.get_data1(nid)
+        if body != 0:
+            lsp_collect_bindings_in_node(pool, intern, body, offset, names, seen)
+        return
+
+    // Match: recurse into arms
+    if kind == NodeKind.NK_MATCH:
+        let arms_start = pool.get_data1(nid)
+        let arms_count = pool.get_data2(nid)
+        for ai in 0..arms_count:
+            let arm = pool.get_extra(arms_start + ai)
+            if arm != 0:
+                let arm_body = pool.get_data1((arm) as NodeId)
+                if arm_body != 0:
+                    lsp_collect_bindings_in_node(pool, intern, arm_body, offset, names, seen)
+        return
+
+    // Loop: recurse into body
+    if kind == NodeKind.NK_LOOP:
+        let body = pool.get_data0(nid)
+        if body != 0:
+            lsp_collect_bindings_in_node(pool, intern, body, offset, names, seen)
+        return
 
 fn lsp_vec_str_contains(v: Vec[str], s: str) -> i32:
     for i in 0..v.len() as i32:
@@ -649,7 +784,7 @@ fn lsp_document_symbols(id: i32, state: LspState, uri: str, text: str):
         intern = state.documents.get(idx as i64).cached_intern
     else:
         var comp = Compilation.init()
-        comp.set_prelude_mode(0)
+        comp.set_prelude_mode(1)
         pool = comp.compile_source_text(uri_to_path(uri), text)
         intern = comp.zcu.pool
 

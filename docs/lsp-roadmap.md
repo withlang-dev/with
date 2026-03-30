@@ -1,163 +1,253 @@
-# LSP Roadmap — Full Implementation Plan
+# LSP Roadmap
 
-Based on analysis of rust-analyzer, gopls, and ZLS architectures.
+## Architecture
 
-## Current State (v0.1)
+The LSP maintains two analysis tiers:
 
-- Single-threaded, synchronous main loop
-- Re-compiles from scratch on every request (no caching)
-- Completion: keyword list + top-level declarations + embedded module names
-- Go-to-definition: top-level declaration name matching only
-- Hover: declaration kind + name only
-- No cross-file navigation
-- No scope-aware completion
-- No type-aware dot completion
+**Fast tier (parse-only).** On every keystroke, the LSP re-parses
+the current file with no imports, no prelude, no sema. This produces
+an AST with correct spans in under 50ms. Used for completion,
+scope-aware suggestions, structural navigation, signature help,
+and document symbols.
 
-## Phase 1: Cached Per-File Analysis — DONE
+**Slow tier (full compilation).** On save or after a debounce timer
+(200ms after last edit), the LSP runs the full compilation pipeline
+with imports and sema. Used for type-aware dot completion, cross-file
+go-to-definition, hover with type info, and diagnostics.
 
-**Goal:** Don't re-compile on every keystroke.
+Every handler knows which tier it needs. Most requests use the fast
+tier. The slow tier result is opportunistic — if it's available and
+fresh, use it. If not, degrade gracefully to fast-tier results.
 
-`LspDocument` now caches `{ cached_pool, cached_intern, cached_diags }`.
-`ensure_analyzed()` only re-compiles when text changes (length mismatch).
-All handlers (diagnostics, hover, definition, completion, symbols) use
-the cache. Invalidated on `didChange`.
+```
+LspDocument = {
+    text: str,
+    // Fast tier — always current
+    parsed_pool: AstPool,
+    parsed_intern: InternPool,
+    // Slow tier — may be stale
+    compiled_pool: AstPool,
+    compiled_intern: InternPool,
+    compiled_diags: DiagnosticList,
+    compiled_version: i32,      // text version when last compiled
+}
+```
 
-Commit: Phase 1 of LSP roadmap.
+---
 
-## Phase 2: Scope-Aware Completion — DONE
+## Phase 1: Cached Per-File Analysis
 
-**Goal:** When typing inside a function body, suggest locals, parameters,
-and imported names — not just top-level declarations.
+**Status: DONE**
 
-Implemented via token scanning: the LSP scans tokens before the cursor
-for `let`/`var` bindings and `fn` parameter names. Local variables and
-parameters appear first in the completion list, followed by keywords,
-then top-level declarations.
+LspDocument caches compiled results. `ensure_analyzed()` skips
+recompilation when text hasn't changed. All handlers use the cache.
 
-Not yet implemented: full sema scope walking (requires deeper compiler
-integration), dot completion (type-based field/method suggestions).
-These remain as Phase 3.
+- [x] LspDocument with cached pool/intern/diags
+- [x] Invalidation on didChange
+- [x] All handlers read from cache
 
-## Phase 3: Type-Aware Dot Completion
+---
 
-**Goal:** `foo.` suggests fields and methods based on `foo`'s resolved type.
+## Phase 2: Error-Tolerant Parser — DONE
 
-**Requires:** Phase 2 (context detection) + sema type information.
+**Goal:** The parser produces a useful AST for broken code.
 
-**Implementation:**
-- After resolving receiver type from sema, query:
-  - Struct fields (from type declaration)
-  - Methods defined in `extend` blocks
-  - Trait methods for implemented traits
-  - Builtin methods (Vec.push, str.len, etc.)
-- Score by relevance: exact type match > compatible > trait method
+- [x] Converted all 59 `return (0) as NodeId` sites to return
+      `self.poisoned_expr()` with correct spans. The parser never
+      returns a null node for a construct it attempted to parse.
+- [x] Added `Parser.poisoned_decl()` helper alongside existing
+      `poisoned_expr()`.
+- [x] Added `Parser.recover_to_statement()` — skips to next
+      statement keyword at line start, for statement-level recovery.
+- [x] Sema already propagates TY_ERR through NK_POISONED_EXPR
+      (SemaCheck.w:878) and MirLower handles it (MirLower.w:3354).
+- [x] Test suite: 5 broken file tests (missing colon, unclosed
+      paren, incomplete match, truncated body, incomplete dot
+      expression). Parser produces walkable AST with correct spans
+      for non-broken declarations.
+- [x] Verified: parse of broken file produces all 3 declarations
+      with correct spans, despite parse error in first function.
+- [x] Fixed `lsp_parse_int` bug: was reading all digits in string
+      (not stopping at first non-digit), causing `{"line":3,"character":4}`
+      to parse line as 34.
+- [x] Fixed `json_get_string` to unescape `\n`, `\t`, `\"`, `\\`
+      in JSON string values (LSP sends escaped text in didOpen).
+
+---
+
+## Phase 3: Scope-Aware Completion
+
+**Goal:** When typing inside a function body, suggest locals,
+parameters, and imported names — not just top-level declarations.
+
+Uses the fast tier (parse-only AST). No sema needed.
+
+- [ ] Implement `lsp_parse_file(text) -> (AstPool, InternPool)` —
+      a minimal parse with no imports, no prelude, no sema. This
+      is the fast tier entry point.
+- [ ] Implement `lsp_find_enclosing_fn(pool, offset) -> NodeId` —
+      iterate declarations, find the NK_FN_DECL whose span
+      contains the cursor offset.
+- [ ] Implement `lsp_collect_fn_params(pool, intern, fn_node)` —
+      read fn_meta to get parameter names. Verify that fn_meta is
+      populated by the parser (not only by sema). If not, fall
+      back to walking the parameter list AST nodes directly.
+- [ ] Implement `lsp_collect_bindings(pool, intern, body, offset)`
+      — recursive AST walk collecting NK_LET_BINDING and NK_FOR
+      binding names where the binding's start position is before
+      the cursor. Respect scope boundaries: a let inside an
+      if-block's then-branch is not visible after the if-block.
+- [ ] Wire into completion handler: scope names first (kind=6,
+      Variable), then keywords (kind=14, Keyword), then top-level
+      declarations (kind=3, Function / kind=22, Struct).
+- [ ] Test: file with nested scopes, shadowed variables, for-loop
+      bindings. Verify correct names appear at each cursor position.
+
+---
 
 ## Phase 4: Cross-File Go-to-Definition
 
-**Goal:** Click on a symbol from an imported module, jump to its definition
-in the imported file.
+**Goal:** Click on a symbol from an imported module, jump to its
+definition in the source file.
 
-**Implementation:**
-- During compilation, record a `symbol → definition_location` map
-  where location includes file path + byte offset
-- The compiler already resolves imports in `Frontend.w` →
-  `process_imports_frontend`. Each imported declaration knows its
-  source file via `decl_source_paths`.
-- On go-to-definition request: look up the symbol in the resolution
-  map, return the source file + position.
+Uses the slow tier (full compilation with imports resolved).
 
-## Phase 5: Error-Tolerant Parser Improvements
+- [ ] During compilation, build a `symbol_id -> SourceLocation` map
+      where `SourceLocation = { file_path: str, offset: i32 }`.
+      The compiler already resolves imports in `Frontend.w` and
+      tracks `decl_source_paths` — surface this data.
+- [ ] Store the resolution map on LspDocument as part of the slow
+      tier cache.
+- [ ] In the go-to-definition handler: resolve the identifier at
+      cursor to a symbol_id (via token + intern pool lookup), look
+      up the symbol_id in the resolution map, return the file URI
+      and position.
+- [ ] Handle the case where the slow tier result is stale or
+      unavailable — fall back to same-file definition lookup
+      (current behavior).
+- [ ] Test: file A imports file B, go-to-definition on a function
+      from B returns the correct location in B.
 
-**Goal:** The parser produces a useful AST even when code is broken
-mid-keystroke.
+---
 
-**Current state:** NK_POISONED_EXPR nodes exist but are used in only
-15 sites. Many error paths still return 0 (null node).
+## Phase 5: Signature Help
 
-**Go approach:** `BadExpr`, `BadStmt`, `BadDecl` placeholder nodes with
-position ranges. Parser never aborts — always returns a tree.
+**Goal:** While typing function arguments, show parameter names
+and types. This is high value for a new language because users
+don't know the API yet.
 
-**rust-analyzer approach:** Lossless parser captures every byte. ERROR
-nodes wrap problematic tokens. Tree is always complete.
+Uses the fast tier for call detection, slow tier for type info.
 
-**Implementation for With:**
-- Convert remaining `return 0` after `emit_error` to return
-  `NK_POISONED_EXPR` / `NK_POISONED_DECL`
-- Add statement-level recovery: on unexpected token at statement
-  position, skip to next line at same/lower indentation, insert
-  error node, continue parsing
-- Ensure sema handles all poisoned nodes (returns TY_ERR, no
-  secondary errors)
-- Test with deliberately broken files to verify recovery quality
+- [ ] Detect trigger: cursor is inside a call expression (after `(`
+      or after `,`). Walk tokens backward from cursor to find the
+      opening `(` and the function name.
+- [ ] Determine active parameter index by counting commas between
+      the opening `(` and the cursor.
+- [ ] Look up function signature: first try the slow tier's sema
+      data (parameter names + types). If unavailable, fall back to
+      the fast tier — parse the file, find the function declaration,
+      read parameter names from the AST.
+- [ ] Return `SignatureHelp` response with `activeParameter` set.
+- [ ] Register `(` and `,` as trigger characters in server
+      capabilities.
+- [ ] Test: cursor at each parameter position in a multi-arg call.
+      Verify correct parameter is highlighted.
 
-## Phase 6: Find All References
+---
+
+## Phase 6: Type-Aware Dot Completion
+
+**Goal:** `foo.` suggests fields and methods based on `foo`'s
+resolved type.
+
+Uses the slow tier (requires sema type resolution).
+
+This is the hardest feature. It requires resolving the type of an
+arbitrary expression at the cursor position in a potentially broken
+file. Defer until Phases 2-5 are solid.
+
+- [ ] In the completion handler, detect dot context: the character
+      before the cursor (ignoring whitespace) is `.`, and there's
+      an identifier or expression before the dot.
+- [ ] Resolve the receiver expression's type from the slow tier's
+      `typed_expr_types` map. This requires finding the AST node
+      for the receiver expression and looking up its sema type.
+- [ ] For struct types: list fields from the type declaration
+      (walk type_extra to get field names and types).
+- [ ] For types with `extend` blocks: list methods defined in
+      extend blocks for that type.
+- [ ] For types with trait implementations: list trait methods.
+- [ ] For builtin types (Vec, str, HashMap): list known methods.
+- [ ] Handle the case where the slow tier result is stale — show
+      no dot completions rather than wrong completions.
+- [ ] Test: dot completion on struct instances, Vec instances,
+      str values, nested field access.
+
+---
+
+## Phase 7: Find All References
 
 **Goal:** "Where is this function/type/variable used?"
 
-**Implementation:**
-- Walk the entire project AST looking for identifier nodes that
-  resolve to the target symbol
-- Requires the symbol resolution map from Phase 4
-- For each reference, return file + range
+Uses the slow tier (requires symbol resolution across files).
 
-## Phase 7: Rename Symbol
+- [ ] Build a reverse index: for every identifier node in the
+      project AST, record which symbol_id it resolves to and
+      where it appears (file + offset + span).
+- [ ] On find-references request: resolve the symbol at cursor,
+      look up all locations in the reverse index, return them.
+- [ ] Include the definition site in the results (with a flag
+      distinguishing definition from reference).
+- [ ] Handle multi-file projects: the reverse index must cover
+      all files in the project, not just the current file.
+- [ ] Test: function used in 3 files, find-references returns
+      all 3 locations plus the definition.
+
+---
+
+## Phase 8: Rename Symbol
 
 **Goal:** Rename a symbol across all files.
 
-**Requires:** Find All References (Phase 6).
-- Collect all reference locations
-- Return a `WorkspaceEdit` with text edits for each location
+Depends on Phase 7 (find all references).
 
-## Phase 8: Signature Help
+- [ ] Collect all reference locations from find-references.
+- [ ] Return a `WorkspaceEdit` with `TextEdit` entries for each
+      location, replacing the old name with the new name.
+- [ ] Validate: the new name must be a valid identifier.
+- [ ] Validate: the new name must not conflict with an existing
+      name in any scope where the symbol is used.
+- [ ] Test: rename a function used across files, verify all
+      references updated.
 
-**Goal:** While typing function arguments, show parameter names + types.
+---
 
-**Triggered by:** `(` and `,` characters.
-
-**Implementation:**
-- Determine which function call the cursor is inside
-- Look up the function's signature (parameter names + types)
-- Determine which parameter position the cursor is at
-- Return `SignatureHelp` with active parameter highlighted
-
-## Phase 9: Incremental Analysis (salsa-style)
+## Phase 9: Incremental Analysis
 
 **Goal:** Only re-analyze what changed, not the whole project.
 
-**Only pursue if Phase 1 caching proves insufficient.**
+Only pursue if the slow tier's full recompilation becomes a
+bottleneck (>500ms for typical projects).
 
-**Architecture:**
-- Track file dependency graph (from `use` declarations)
-- When file A changes: re-analyze A, then re-analyze any file that
-  imports A (transitively)
-- Cache intermediate results (parse tree, resolved AST, typed AST)
-  at each stage boundary
-- Invalidation is per-file, not per-project
+- [ ] Track file dependency graph from `use` declarations.
+- [ ] On file change: re-analyze that file, then re-analyze files
+      that import it (transitively).
+- [ ] Cache intermediate results (parse tree, resolved names,
+      typed AST) per file. Invalidate only affected caches.
+
+---
 
 ## Phase 10: Background Analysis + Cancellation
 
-**Goal:** Analysis runs on a background thread; main thread handles I/O.
+**Goal:** Analysis runs off the main thread. Main thread handles
+JSON-RPC I/O without blocking.
 
-**Implementation:**
-- Main thread: read JSON-RPC, dispatch requests, write responses
-- Worker thread: runs compilation, produces results
-- On new `didChange`: cancel in-flight analysis, start fresh
-- Debounce: wait 100-200ms after last edit before starting analysis
+Only pursue if synchronous analysis causes visible UI lag.
 
-## Priority Order
-
-| Phase | Impact | Effort | Prerequisite |
-|-------|--------|--------|--------------|
-| 1. Cached analysis | High | Small | None |
-| 2. Scope-aware completion | High | Medium | Phase 1 |
-| 3. Dot completion | High | Medium | Phase 2 |
-| 4. Cross-file go-to-def | Medium | Medium | Phase 1 |
-| 5. Error-tolerant parser | High | Large | None |
-| 6. Find references | Medium | Medium | Phase 4 |
-| 7. Rename | Medium | Small | Phase 6 |
-| 8. Signature help | Medium | Small | Phase 2 |
-| 9. Incremental analysis | Low | Large | Phase 4 |
-| 10. Background thread | Low | Large | Phase 9 |
-
-Phases 1-4 make the LSP genuinely useful. Phase 5 makes it robust.
-Phases 6-8 are polish. Phases 9-10 are optimization.
+- [ ] Main thread: read JSON-RPC, dispatch requests, write
+      responses.
+- [ ] Worker thread: runs slow-tier compilation, produces results.
+- [ ] On new didChange: cancel in-flight analysis, restart after
+      debounce timer (200ms).
+- [ ] Fast-tier parse runs synchronously on the main thread
+      (it's fast enough). Only the slow tier moves to the worker.
