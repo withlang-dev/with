@@ -115,6 +115,33 @@ output_use=$(lsp_test /tmp/lsp_use_test.w "$req_use")
 check "use std. → collections" "$output_use" '"label":"collections"'
 check "use std. → time" "$output_use" '"label":"time"'
 
+# Test: for-loop bindings visible inside loop
+cat > /tmp/lsp_for_test.w << 'EOF'
+fn main:
+    for item in 0..10:
+        let doubled = item * 2
+        doubled
+EOF
+req_for='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":3,"character":8}}}'
+out_for=$(lsp_test /tmp/lsp_for_test.w "$req_for")
+check "for binding: item" "$out_for" '"label":"item"'
+check "for binding: doubled" "$out_for" '"label":"doubled"'
+
+# Test: scope boundary — inner not visible after if-block
+cat > /tmp/lsp_scope_boundary.w << 'EOF'
+fn main:
+    let x = 10
+    if x > 5:
+        let inner = 42
+        inner
+    let y = 20
+    y
+EOF
+req_scope='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":5,"character":4}}}'
+out_scope=$(lsp_test /tmp/lsp_scope_boundary.w "$req_scope")
+check "scope: x visible" "$out_scope" '"label":"x"'
+check_not "scope: inner NOT visible" "$out_scope" '"label":"inner"'
+
 echo ""
 
 # ── Phase 4: Go-to-definition ──────────────────────────────

@@ -748,41 +748,14 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
     var scope_names: Vec[str] = Vec.new()
     if enclosing_fn as i32 != 0:
         let params = lsp_collect_fn_params(parse_pool, parse_intern, enclosing_fn)
-        var seen: Vec[str] = Vec.new()
         for pi in 0..params.len() as i32:
-            let p = params.get(pi as i64)
-            scope_names.push(p)
-            seen.push(p)
-        // Walk body block to collect let/var/for bindings before cursor.
-        // Vec is pass-by-value in With so we collect inline rather than
-        // in a recursive helper (push modifies copy not original).
+            scope_names.push(params.get(pi as i64))
+        // Walk body recursively to collect bindings visible at cursor.
         let body = parse_pool.get_data1(enclosing_fn)
-        if body != 0 and parse_pool.kind(body as NodeId) == NodeKind.NK_BLOCK:
-            let blk = body as NodeId
-            let es = parse_pool.get_data0(blk)
-            let sc = parse_pool.get_data1(blk)
-            for si in 0..sc:
-                let stmt = parse_pool.get_extra(es + si)
-                if stmt == 0:
-                    continue
-                let sk = parse_pool.kind(stmt as NodeId)
-                let ss = parse_pool.get_start(stmt as NodeId)
-                if ss >= offset:
-                    continue
-                if sk == NodeKind.NK_LET_BINDING:
-                    let sym = parse_pool.get_data0(stmt as NodeId)
-                    if sym != 0:
-                        let bname = parse_intern.resolve(sym)
-                        if bname.len() > 0 and lsp_vec_str_contains(seen, bname) == 0:
-                            scope_names.push(bname)
-                            seen.push(bname)
-                if sk == NodeKind.NK_FOR:
-                    let sym = parse_pool.get_data0(stmt as NodeId)
-                    if sym != 0:
-                        let bname = parse_intern.resolve(sym)
-                        if bname.len() > 0 and bname != "_" and lsp_vec_str_contains(seen, bname) == 0:
-                            scope_names.push(bname)
-                            seen.push(bname)
+        if body != 0:
+            let bindings = lsp_collect_bindings_rec(parse_pool, parse_intern, body, offset)
+            for bi in 0..bindings.len() as i32:
+                scope_names.push(bindings.get(bi as i64))
     for si in 0..scope_names.len() as i32:
         let sname = scope_names.get(si as i64)
         if not first:
@@ -881,6 +854,96 @@ fn lsp_collect_fn_params(pool: AstPool, intern: InternPool, fn_node: NodeId) -> 
             if pname != "self" and pname.len() > 0:
                 names.push(pname)
     names
+
+fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset: i32) -> Vec[str]:
+    let empty: Vec[str] = Vec.new()
+    if node == 0:
+        return empty
+    let nid = node as NodeId
+    let kind = pool.kind(nid)
+    let node_start = pool.get_start(nid)
+    let node_end = pool.get_end(nid)
+
+    if kind == NodeKind.NK_LET_BINDING:
+        if node_start < offset:
+            let sym = pool.get_data0(nid)
+            if sym != 0:
+                let name = intern.resolve(sym)
+                if name.len() > 0:
+                    let result: Vec[str] = Vec.new()
+                    result.push(name)
+                    return result
+        return empty
+
+    if kind == NodeKind.NK_FOR:
+        var result: Vec[str] = Vec.new()
+        if node_start < offset and offset <= node_end:
+            let sym = pool.get_data0(nid)
+            if sym != 0:
+                let name = intern.resolve(sym)
+                if name.len() > 0 and name != "_":
+                    result.push(name)
+        let for_body = pool.get_data2(nid)
+        if for_body != 0:
+            let inner = lsp_collect_bindings_rec(pool, intern, for_body, offset)
+            for ii in 0..inner.len() as i32:
+                result.push(inner.get(ii as i64))
+        return result
+
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = pool.get_data0(nid)
+        let stmt_count = pool.get_data1(nid)
+        let tail = pool.get_data2(nid)
+        var result: Vec[str] = Vec.new()
+        for i in 0..stmt_count:
+            let stmt = pool.get_extra(extra_start + i)
+            let inner = lsp_collect_bindings_rec(pool, intern, stmt, offset)
+            for ii in 0..inner.len() as i32:
+                result.push(inner.get(ii as i64))
+        if tail != 0:
+            let inner = lsp_collect_bindings_rec(pool, intern, tail, offset)
+            for ii in 0..inner.len() as i32:
+                result.push(inner.get(ii as i64))
+        return result
+
+    if kind == NodeKind.NK_IF_EXPR:
+        let then_body = pool.get_data1(nid)
+        let else_body = pool.get_data2(nid)
+        var result: Vec[str] = Vec.new()
+        if then_body != 0 and offset >= pool.get_start(then_body as NodeId) and offset <= pool.get_end(then_body as NodeId):
+            let inner = lsp_collect_bindings_rec(pool, intern, then_body, offset)
+            for ii in 0..inner.len() as i32:
+                result.push(inner.get(ii as i64))
+        if else_body != 0 and offset >= pool.get_start(else_body as NodeId) and offset <= pool.get_end(else_body as NodeId):
+            let inner = lsp_collect_bindings_rec(pool, intern, else_body, offset)
+            for ii in 0..inner.len() as i32:
+                result.push(inner.get(ii as i64))
+        return result
+
+    if kind == NodeKind.NK_WHILE:
+        let body = pool.get_data1(nid)
+        if body != 0:
+            return lsp_collect_bindings_rec(pool, intern, body, offset)
+        return empty
+
+    if kind == NodeKind.NK_LOOP:
+        let body = pool.get_data0(nid)
+        if body != 0:
+            return lsp_collect_bindings_rec(pool, intern, body, offset)
+        return empty
+
+    if kind == NodeKind.NK_MATCH:
+        let arms_start = pool.get_data1(nid)
+        let arms_count = pool.get_data2(nid)
+        for ai in 0..arms_count:
+            let arm = pool.get_extra(arms_start + ai)
+            if arm != 0:
+                let arm_body = pool.get_data1(arm as NodeId)
+                if arm_body != 0 and offset >= pool.get_start(arm_body as NodeId) and offset <= pool.get_end(arm_body as NodeId):
+                    return lsp_collect_bindings_rec(pool, intern, arm_body, offset)
+        return empty
+
+    empty
 
 fn lsp_collect_bindings(pool: AstPool, intern: InternPool, node: i32, offset: i32, names: Vec[str], seen: Vec[str]):
     if node == 0:
