@@ -22,7 +22,7 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         out.add_extra(src.get_extra(ei))
 
     for ni in 1..src.node_count():
-        let src_node = (ni) as NodeId
+        let src_node = ni as NodeId
         let node = out.add_node(
             src.kind(src_node),
             src.get_start(src_node),

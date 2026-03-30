@@ -55,7 +55,7 @@ fn Sema.emit_argument_type_mismatch(self: Sema, call_name: str, fn_sym: i32, arg
     let primary = Span { file: self.local_file_id, start: start, end: end }
     let expected_name = self.type_name(expected_ty)
     let actual_name = self.type_name(actual_ty)
-    let expr_text = render_expr(self.ast, self.pool, (arg_node) as NodeId, 0)
+    let expr_text = render_expr(self.ast, self.pool, arg_node as NodeId, 0)
     var msg = "wrong argument type"
     if call_name.len() > 0:
         msg = msg ++ " in call to '" ++ call_name ++ "'"

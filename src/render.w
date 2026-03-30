@@ -742,7 +742,11 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: NodeId) -> str:
             for bi in 0..binding_count:
                 if bi > 0:
                     out = out ++ ", "
-                out = out ++ intern.resolve(pool.get_extra(extra_start + bi))
+                let item = pool.get_extra(extra_start + bi)
+                if is_pattern_node(pool, (item) as NodeId):
+                    out = out ++ render_pattern(pool, intern, (item) as NodeId)
+                else:
+                    out = out ++ intern.resolve(item)
             out = out ++ ")"
         return out
 

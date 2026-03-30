@@ -34,6 +34,32 @@ Always **root-cause the issue**.
 
 ---
 
+## Filing Bugs
+
+Repository: `QuixiAI/with`. Use `gh issue create --repo QuixiAI/with`.
+
+When the compiler rejects valid code or produces incorrect output,
+that is a **compiler bug**, not a reason to restructure your code.
+
+**Do not silently work around compiler limitations.**
+
+If the spec (`docs/with-specification.md`) says something should work
+and the compiler disagrees, file an issue. Every issue must include:
+
+* **Spec reference** — cite the section (e.g., "§9.7 Pattern Matching")
+* **Minimal reproduction** — shortest code that triggers the bug
+* **Expected vs actual** — what the spec says should happen vs what does
+* **Workaround** — if you used one, describe it so the fix can remove it
+
+Examples of things to file, not work around:
+
+* `match` on a discriminant enum value fails with "requires enum subject"
+* A `use` import causes type errors in unrelated files
+* A builtin method (`HashMap.keys()`) crashes codegen
+* Magic numbers instead of named constants because the import breaks
+
+---
+
 # Build System
 
 The compiler compiles itself.

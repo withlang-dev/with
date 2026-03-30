@@ -963,14 +963,14 @@ fn Sema.find_exact_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> Typ
         if self.type_d2.get(ti as i64) != d2:
             continue
         return ti as TypeId
-    (0) as TypeId
+    0 as TypeId
 
 fn Sema.ensure_exact_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
     let existing = self.find_exact_type(kind, d0, d1, d2)
     if existing != 0:
         return existing
     if self.types_frozen != 0:
-        return (0) as TypeId
+        return 0 as TypeId
     self.add_type(kind, d0, d1, d2)
 
 fn Sema.find_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> TypeId:
@@ -983,14 +983,14 @@ fn Sema.find_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> TypeId:
         let te_start = self.type_d0.get(ti as i64)
         if self.type_extra_matches(te_start, elems, elem_count) != 0:
             return ti as TypeId
-    (0) as TypeId
+    0 as TypeId
 
 fn Sema.ensure_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> TypeId:
     let existing = self.find_tuple_type(elems, elem_count)
     if existing != 0:
         return existing
     if self.types_frozen != 0:
-        return (0) as TypeId
+        return 0 as TypeId
     let te_start = self.type_extra.len() as i32
     for ei in 0..elem_count:
         self.type_extra.push(elems.get(ei as i64))
@@ -1008,14 +1008,14 @@ fn Sema.find_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId
         let te_start = self.type_d0.get(ti as i64)
         if self.type_extra_matches(te_start, params, param_count) != 0:
             return ti as TypeId
-    (0) as TypeId
+    0 as TypeId
 
 fn Sema.ensure_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
     let existing = self.find_fn_type(params, param_count, ret)
     if existing != 0:
         return existing
     if self.types_frozen != 0:
-        return (0) as TypeId
+        return 0 as TypeId
     let te_start = self.type_extra.len() as i32
     for pi in 0..param_count:
         self.type_extra.push(params.get(pi as i64))
@@ -1043,14 +1043,14 @@ fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_co
         if self.type_extra_matches(te_start, args, arg_count) != 0:
             self.generic_inst_cache.insert(key, ti)
             return ti as TypeId
-    (0) as TypeId
+    0 as TypeId
 
 fn Sema.ensure_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> TypeId:
     let existing = self.find_generic_inst_type(base_sym, args, arg_count)
     if existing != 0:
         return existing
     if self.types_frozen != 0:
-        return (0) as TypeId
+        return 0 as TypeId
     let te_start = self.type_extra.len() as i32
     for ai in 0..arg_count:
         self.type_extra.push(args.get(ai as i64))
@@ -1075,7 +1075,7 @@ fn Sema.find_range_type(self: Sema, elem_tid: TypeId, inclusive: i32) -> TypeId:
             if self.type_d0.get(ti as i64) == elem_tid as i32:
                 if self.type_d1.get(ti as i64) == inclusive:
                     return ti as TypeId
-    (0) as TypeId
+    0 as TypeId
 
 // Pre-register generic instantiation types needed by MirLower so that
 // downstream passes never need to mutate the type tables.
@@ -1344,6 +1344,22 @@ fn Sema.get_type_kind(self: Sema, tid: TypeId) -> i32:
     if tid < 0 or tid >= self.type_kinds.len() as i32:
         return TypeKind.TY_ERR
     self.type_kinds.get(tid as i64)
+
+fn Sema.get_type_name_for_lsp(self: Sema, tid: i32) -> str:
+    if tid <= 0 or tid >= self.type_kinds.len() as i32:
+        return ""
+    let kind = self.type_kinds.get(tid as i64)
+    if kind == TypeKind.TY_STR:
+        return "str"
+    if kind == TypeKind.TY_INT:
+        return "i32"
+    if kind == TypeKind.TY_FLOAT:
+        return "f64"
+    if kind == TypeKind.TY_BOOL:
+        return "bool"
+    if kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_ALIAS or kind == TypeKind.TY_GENERIC_INST:
+        return self.pool_resolve(self.type_d0.get(tid as i64))
+    ""
 
 fn Sema.get_type_d0(self: Sema, tid: TypeId) -> i32:
     if tid < 0 or tid >= self.type_d0.len() as i32:
@@ -1872,7 +1888,7 @@ fn Sema.arithmetic_result_type(self: Sema, lhs: TypeId, rhs: TypeId) -> TypeId:
         if lb >= rb:
             return lhs_numeric as TypeId
         return rhs_numeric as TypeId
-    (0) as TypeId
+    0 as TypeId
 
 fn Sema.is_copy(self: Sema, tid: TypeId) -> i32:
     if tid == 0:

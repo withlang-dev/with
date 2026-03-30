@@ -38,7 +38,7 @@ fn sema_resolve_embed_file_path(source_path: str, raw_path: str) -> str:
 
 fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
     if node == 0:
-        return (0) as TypeId
+        return 0 as TypeId
 
     let kind = self.ast.kind(node)
 
@@ -52,12 +52,12 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
         // Self is resolved at codegen time
         let sym_name = self.pool_resolve(sym)
         if sym_name == "Self":
-            return (0) as TypeId
+            return 0 as TypeId
         if self.collecting_types != 0:
-            return (0) as TypeId
+            return 0 as TypeId
         self.debug_unknown_type(sym, node, "resolve_type_expr")
         self.emit_unknown_type_error(sym, node)
-        return (0) as TypeId
+        return 0 as TypeId
 
     if kind == NodeKind.NK_TYPE_ASSOC:
         let base_sym = self.ast.get_data0(node)
@@ -81,7 +81,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
                                 let resolved_at = self.resolve_impl_assoc_type(concrete_sym, trait_sym_t, assoc_sym)
                                 if resolved_at != 0:
                                     return resolved_at as TypeId
-        return (0) as TypeId
+        return 0 as TypeId
 
     if kind == NodeKind.NK_TYPE_GENERIC:
         return self.resolve_generic_type(node) as TypeId
@@ -129,10 +129,10 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_TYPE_OPTIONAL:
         let inner = self.resolve_type_expr(self.ast.get_data0(node))
         if inner == 0:
-            return (0) as TypeId
+            return 0 as TypeId
         let opt_sym = self.pool_intern("Option")
         if not self.named_types.contains(opt_sym):
-            return (0) as TypeId
+            return 0 as TypeId
         let opt_args: Vec[i32] = Vec.new()
         opt_args.push(inner as i32)
         return self.ensure_generic_inst_type(opt_sym, opt_args, 1)
@@ -141,20 +141,20 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
         let trait_sym = self.ast.get_data0(node)
         if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
             self.emit_error("unknown trait", node)
-            return (0) as TypeId
+            return 0 as TypeId
         if self.ensure_trait_object_safe(trait_sym, node) == 0:
-            return (0) as TypeId
+            return 0 as TypeId
         return self.ensure_exact_type(TypeKind.TY_TRAIT_OBJ, trait_sym, 0, 0)
 
     if kind == NodeKind.NK_TYPE_INFERRED:
-        return (0) as TypeId
+        return 0 as TypeId
 
     // @TypeOf(expr) — in generic functions, resolved at monomorphization time
     // via resolve_generic_return_type_node. Return a placeholder here.
     if kind == NodeKind.NK_TYPE_TYPEOF:
         return self.ty_i32
 
-    (0) as TypeId
+    0 as TypeId
 
 // ── Pass 2: Check function bodies ────────────────────────────────
 
@@ -281,7 +281,7 @@ fn Sema.check_fn_body(self: Sema, node: i32):
         self.has_gen_yield_type = 1
     else:
         self.current_return_type = ret_type as TypeId
-        self.current_gen_yield_type = (0) as TypeId
+        self.current_gen_yield_type = 0 as TypeId
         self.has_gen_yield_type = 0
     let saved_comptime = self.in_comptime_fn
     if (flags / FnFlags.COMPTIME) % 2 == 1:
@@ -539,7 +539,7 @@ fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
 
 fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if node == 0:
-        return (0) as TypeId
+        return 0 as TypeId
 
     let kind = self.ast.kind(node)
 
@@ -637,7 +637,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_LOOP:
         let saved_break = self.break_value_type
         let saved_has = self.has_break_value_type
-        self.break_value_type = (0) as TypeId
+        self.break_value_type = 0 as TypeId
         self.has_break_value_type = 0
         self.loop_depth = self.loop_depth + 1
         self.check_expr(self.ast.get_data0(node))
@@ -710,7 +710,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_closure(node) as TypeId
 
     if kind == NodeKind.NK_CAST:
-        self.check_expr_with_expected(self.ast.get_data0(node), (0) as TypeId)
+        self.check_expr_with_expected(self.ast.get_data0(node), 0 as TypeId)
         let cast_tid = self.resolve_type_expr(self.ast.get_data1(node))
         // Store resolved cast type so MIR lowering can read it without
         // calling resolve_type_expr (which would add_type on a shallow-copied Sema).
@@ -755,12 +755,12 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             let exp_kind = self.get_type_kind(exp_resolved)
             if exp_kind == TypeKind.TY_ENUM:
                 self.emit_error("enum variant shorthand does not match expected enum type", node)
-                return (0) as TypeId
+                return 0 as TypeId
         if self.variant_lookup.contains(name):
             let vs_tid = self.variant_type_ids.get(name).unwrap()
             self.typed_expr_types.insert(node, vs_tid)
             return vs_tid as TypeId
-        return (0) as TypeId
+        return 0 as TypeId
 
     if kind == NodeKind.NK_WITH_EXPR:
         return self.check_with_expr(node) as TypeId
@@ -876,9 +876,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return base
 
     if kind == NodeKind.NK_POISONED_EXPR:
-        return (0) as TypeId
+        return 0 as TypeId
 
-    (0) as TypeId
+    0 as TypeId
 
 // ── Expression checking helpers ──────────────────────────────────
 
@@ -953,7 +953,7 @@ fn Sema.check_fstring(self: Sema, node: i32) -> i32:
                 self.validate_fstring_spec(spec_node, expr_ty as i32, expr_node)
             else:
                 // Bare {expr} without spec: reject structs (no default display)
-                let resolved = if expr_ty != 0: self.resolve_alias(expr_ty) else: (0) as TypeId
+                let resolved = if expr_ty != 0: self.resolve_alias(expr_ty) else: 0 as TypeId
                 let tk = if resolved != 0: self.get_type_kind(resolved) else: 0
                 if tk == TypeKind.TY_STRUCT:
                     self.emit_error("struct type has no default display; use :? for debug", expr_node)
@@ -1020,8 +1020,8 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
     let rhs_node = self.ast.get_data2(node)
     let lhs_is_num_lit = sema_node_is_numeric_literal(self.ast, lhs_node)
     let rhs_is_num_lit = sema_node_is_numeric_literal(self.ast, rhs_node)
-    var lhs: TypeId = (0) as TypeId
-    var rhs: TypeId = (0) as TypeId
+    var lhs: TypeId = 0 as TypeId
+    var rhs: TypeId = 0 as TypeId
     if op == BinaryOp.OP_DEFAULT:
         lhs = self.check_expr(lhs_node)
         if lhs == 0:
@@ -1253,7 +1253,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     let is_mut = flags % 2
 
     let ann_extra = self.local_let_type_ann_extra(flags)
-    var ann_type: TypeId = (0) as TypeId
+    var ann_type: TypeId = 0 as TypeId
     var ann_type_node = 0
     if ann_extra >= 0:
         ann_type_node = self.ast.get_extra(ann_extra)
@@ -1323,7 +1323,7 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
     let else_body = self.ast.get_data2(node)
 
     self.check_expr(cond)
-    let outer_expected: TypeId = if self.has_expected_type != 0: self.expected_expr_type else: (0) as TypeId
+    let outer_expected: TypeId = if self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
     let then_type = if outer_expected != 0: self.check_expr_with_expected(then_body, outer_expected) else: self.check_expr(then_body)
 
     var result_type: TypeId = self.ty_void
@@ -1390,7 +1390,7 @@ fn Sema.check_return(self: Sema, node: i32) -> i32:
         let val_type = if self.current_return_type != 0: self.check_expr_with_expected(value, self.current_return_type) else: self.check_expr(value)
         if self.current_return_type != 0 and val_type != 0:
             let compat = self.types_compatible(self.current_return_type as i32, val_type as i32)
-            let arith = if compat == 0: self.arithmetic_result_type(self.current_return_type, val_type) else: (1) as TypeId
+            let arith = if compat == 0: self.arithmetic_result_type(self.current_return_type, val_type) else: 1 as TypeId
             if compat == 0:
                 if arith == 0:
                     self.emit_error("return type mismatch", node)
@@ -1766,7 +1766,7 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
         let tid = self.named_types.get(name).unwrap()
         let resolved = self.resolve_alias(tid as TypeId)
         if self.get_type_kind(resolved) == TypeKind.TY_STRUCT:
-            var expected_struct_ty: TypeId = (0) as TypeId
+            var expected_struct_ty: TypeId = 0 as TypeId
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
                 let expected_resolved = self.resolve_alias(self.expected_expr_type)
                 let expected_tk = self.get_type_kind(expected_resolved)
@@ -1850,8 +1850,8 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
     let arm_count = self.ast.get_data2(node)
 
     let subject_type = self.check_expr(subject)
-    var result_type: TypeId = (0) as TypeId
-    let match_expected: TypeId = if self.has_expected_type != 0: self.expected_expr_type else: (0) as TypeId
+    var result_type: TypeId = 0 as TypeId
+    let match_expected: TypeId = if self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
 
     for ai in 0..arm_count:
         let arm_node = self.ast.get_extra(extra_start + ai)
@@ -2218,7 +2218,7 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
             self.scope_put(bind_sym, subject_type, 0)
         return
 
-    if kind == NodeKind.NK_PAT_VARIANT:
+    if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
         let v_name = self.ast.get_data0(node)
         if self.validate_variant_pattern_subject(node, subject_type, v_name) == 0:
             return
@@ -2275,68 +2275,6 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                 if gi_ty != 0:
                     inner_ty = gi_ty
             self.check_pattern(inner_pat, inner_ty)
-        return
-
-    if kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
-        let v_name = self.ast.get_data0(node)
-        if self.validate_variant_pattern_subject(node, subject_type, v_name) == 0:
-            return
-        let v_extra = self.ast.get_data1(node)
-        let bind_count = self.ast.get_data2(node)
-        var payload_start = 0
-        var payload_count = 0
-        var found_variant = 0
-        let resolved = self.resolve_alias(subject_type)
-        let resolved_kind = self.get_type_kind(resolved)
-        if resolved_kind == TypeKind.TY_ENUM:
-            let te_start = self.get_type_d1(resolved)
-            let variant_count = self.get_type_d2(resolved)
-            var pos = te_start
-            for vi in 0..variant_count:
-                let name_sym = self.type_extra.get(pos as i64)
-                let pc = self.type_extra.get((pos + 1) as i64)
-                if name_sym == v_name:
-                    found_variant = 1
-                    payload_start = pos + 2
-                    payload_count = pc
-                    break
-                pos = pos + 2 + pc
-        else if resolved_kind == TypeKind.TY_GENERIC_INST:
-            let gi_base = self.get_generic_inst_base(resolved)
-            if self.named_types.contains(gi_base):
-                let base_tid = self.named_types.get(gi_base).unwrap()
-                if self.get_type_kind(base_tid) == TypeKind.TY_ENUM:
-                    let te_start = self.get_type_d1(base_tid)
-                    let variant_count = self.get_type_d2(base_tid)
-                    var pos = te_start
-                    for vi in 0..variant_count:
-                        let name_sym = self.type_extra.get(pos as i64)
-                        let pc = self.type_extra.get((pos + 1) as i64)
-                        if name_sym == v_name:
-                            found_variant = 1
-                            payload_start = pos + 2
-                            payload_count = pc
-                            break
-                        pos = pos + 2 + pc
-        if found_variant == 0:
-            return
-        // For TypeKind.TY_GENERIC_INST, re-resolve payload types from AST with substitution.
-        var gi_payload_types_sh: Vec[i32] = Vec.new()
-        if resolved_kind == TypeKind.TY_GENERIC_INST and payload_count > 0:
-            let gi_base = self.get_generic_inst_base(resolved)
-            gi_payload_types_sh = self.resolve_generic_enum_payload(resolved, gi_base, v_name, payload_count)
-        for bi in 0..bind_count:
-            let inner = self.ast.get_extra(v_extra + bi)
-            // Extras may be NodeKind.NK_PAT_IDENT nodes (from parser); extract symbol.
-            var bind_sym = inner
-            if inner > 0 and inner < self.ast.node_count() and self.ast.kind(inner) == NodeKind.NK_PAT_IDENT:
-                bind_sym = self.ast.get_data0(inner)
-            var bind_ty = if bi < payload_count: self.type_extra.get((payload_start + bi) as i64) else: 0
-            if bi < gi_payload_types_sh.len() as i32:
-                let gi_ty = gi_payload_types_sh.get(bi as i64)
-                if gi_ty != 0:
-                    bind_ty = gi_ty
-            self.scope_put(bind_sym, bind_ty, 0)
         return
 
     if kind == NodeKind.NK_PAT_OR:

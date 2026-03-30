@@ -1072,7 +1072,7 @@ fn Sema.collect_let_decl(self: Sema, node: i32, is_local: i32):
     let is_mut = flags % 2
     if is_mut != 0:
         self.mutable_global_syms.insert(name, 1)
-    var bind_ty: TypeId = (0) as TypeId
+    var bind_ty: TypeId = 0 as TypeId
     let type_extra = self.top_level_let_type_ann_extra(flags)
     if type_extra >= 0:
         let type_node = self.ast.get_extra(type_extra)
@@ -1393,7 +1393,7 @@ fn Sema.find_trait_decl_node(self: Sema, trait_sym: i32) -> NodeId:
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NodeKind.NK_TRAIT_DECL and self.ast.get_data0(decl) == trait_sym:
             return decl
-    (0) as NodeId
+    0 as NodeId
 
 fn Sema.emit_trait_object_safety_error(self: Sema, trait_sym: i32, method_sym: i32, reason: str, node: i32):
     let trait_name = self.pool_resolve(trait_sym)

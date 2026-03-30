@@ -434,7 +434,7 @@ fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32
     self.data1.push(d1)
     self.data2.push(d2)
     self.literal_suffixes.push(LiteralSuffix.None)
-    (idx) as NodeId
+    idx as NodeId
 
 // Add extra data, returns the index in the extra array.
 fn AstPool.add_extra(self: &mut AstPool, value: i32) -> i32:
@@ -492,18 +492,18 @@ fn AstPool.int_lit_value(self: &AstPool, idx: NodeId) -> i64:
 
 fn AstPool.has_comptime_nodes(self: &AstPool) -> bool:
     for ni in 1..self.node_count():
-        let nid = (ni) as NodeId
+        let nid = ni as NodeId
         if self.kind(nid) == NodeKind.NK_COMPTIME:
             return true
     false
 
 fn AstPool.has_comptime_branch_nodes(self: &AstPool) -> bool:
     for ni in 1..self.node_count():
-        let nid = (ni) as NodeId
+        let nid = ni as NodeId
         if self.kind(nid) == NodeKind.NK_COMPTIME:
             let inner_i32 = self.get_data0(nid)
             if inner_i32 > 0 and inner_i32 < self.node_count():
-                let inner = (inner_i32) as NodeId
+                let inner = inner_i32 as NodeId
                 let ik = self.kind(inner)
                 if ik == NodeKind.NK_IF_EXPR or ik == NodeKind.NK_FOR:
                     return true
@@ -740,7 +740,7 @@ fn AstPool.find_impl_target_type_node(self: &AstPool, impl_node: NodeId) -> Node
         if self.impl_target_type_nodes.get(i as i64) == (impl_node as i32):
             return (self.impl_target_type_nodes.get((i + 1) as i64)) as NodeId
         i = i + 2
-    (0) as NodeId
+    0 as NodeId
 
 fn AstPool.add_impl_trait_type_args(self: &mut AstPool, impl_node: NodeId, args_start: i32, args_count: i32):
     let idx = self.impl_trait_type_args.len() as i32

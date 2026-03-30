@@ -3967,8 +3967,8 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
             let extra_start = self.pool.extra_len()
             var binding_count = 0
             while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
-                let b = self.expect_ident()
-                self.pool.add_extra(b)
+                let inner = self.parse_pattern()
+                self.pool.add_extra(inner as i32)
                 binding_count = binding_count + 1
                 self.skip_newlines()
                 if self.peek() == TokenKind.TK_COMMA:
