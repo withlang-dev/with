@@ -188,14 +188,45 @@ fn jrpc_error(id: i32, code: i32, message: str) -> str:
     let err = jobj_start() ++ jkv_int("code", code) ++ "," ++ jkv_str("message", message) ++ jobj_end()
     jobj_start() ++ jkv_str("jsonrpc", "2.0") ++ "," ++ jkv_int("id", id) ++ "," ++ jkv_raw("error", err) ++ jobj_end()
 
-// ── Document state ───────────────────────────────────────────
+// ── Document state + analysis cache ──────────────────────────
 
 type LspDocument {
     uri: str,
     path: str,
     text: str,
     version: i32,
+    // Cached analysis results (invalidated when text changes)
+    cached_text_len: i32,
+    cached_pool: AstPool,
+    cached_intern: InternPool,
+    cached_diags: DiagnosticList,
+    cache_valid: bool,
 }
+
+fn LspDocument.new(uri: str, path: str, text: str, version: i32) -> LspDocument:
+    LspDocument {
+        uri, path, text, version,
+        cached_text_len: 0,
+        cached_pool: AstPool.new(),
+        cached_intern: InternPool.init(),
+        cached_diags: DiagnosticList.init(),
+        cache_valid: false,
+    }
+
+fn LspDocument.ensure_analyzed(self: LspDocument):
+    if self.cache_valid and self.cached_text_len == self.text.len() as i32:
+        return
+    var comp = Compilation.init()
+    comp.set_prelude_mode(0)
+    let pool = comp.compile_source_text(self.path, self.text)
+    self.cached_pool = pool
+    self.cached_intern = comp.zcu.pool
+    self.cached_diags = comp.zcu.diagnostics
+    self.cached_text_len = self.text.len() as i32
+    self.cache_valid = true
+
+fn LspDocument.invalidate(self: LspDocument):
+    self.cache_valid = false
 
 type LspState {
     initialized: bool,
@@ -212,17 +243,15 @@ fn LspState.find_doc(self: LspState, uri: str) -> i32:
     -1
 
 fn LspState.set_doc(self: LspState, uri: str, text: str, version: i32):
-    // Replace existing or append new. Vec.set may not be available,
-    // so rebuild the list when replacing.
-    let doc = LspDocument { uri, path: uri_to_path(uri), text, version }
     let idx = self.find_doc(uri)
     if idx < 0:
-        self.documents.push(doc)
+        self.documents.push(LspDocument.new(uri, uri_to_path(uri), text, version))
         return
-    // Rebuild without the old entry, then add updated
+    // Update text and invalidate cache
     let new_docs: Vec[LspDocument] = Vec.new()
     for i in 0..self.documents.len() as i32:
         if i == idx:
+            var doc = LspDocument.new(uri, uri_to_path(uri), text, version)
             new_docs.push(doc)
         else:
             new_docs.push(self.documents.get(i as i64))
@@ -270,14 +299,22 @@ fn lsp_line_col_to_offset(text: str, line: i32, col: i32) -> i32:
 
 // ── Diagnostics ──────────────────────────────────────────────
 
-fn lsp_publish_diagnostics(uri: str, text: str):
-    let path = uri_to_path(uri)
-    var comp = Compilation.init()
-    comp.set_prelude_mode(0)
-    let pool = comp.compile_source_text(path, text)
+fn lsp_publish_diagnostics(state: LspState, uri: str, text: str):
+    let idx = state.find_doc(uri)
+    if idx >= 0:
+        state.documents.get(idx as i64).ensure_analyzed()
+
+    // Use cached diagnostics if available
+    var dl = DiagnosticList.init()
+    if idx >= 0 and state.documents.get(idx as i64).cache_valid:
+        dl = state.documents.get(idx as i64).cached_diags
+    else:
+        var comp = Compilation.init()
+        comp.set_prelude_mode(0)
+        let pool = comp.compile_source_text(uri_to_path(uri), text)
+        dl = comp.zcu.diagnostics
 
     var diags = jarr_start()
-    let dl = comp.zcu.diagnostics
     var first = true
     for i in 0..dl.count():
         let d = dl.items.get(i as i64)
@@ -301,8 +338,7 @@ fn lsp_publish_diagnostics(uri: str, text: str):
 
 // ── Go to definition ─────────────────────────────────────────
 
-fn lsp_definition(id: i32, uri: str, text: str, line: i32, col: i32):
-    let path = uri_to_path(uri)
+fn lsp_definition(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
     let offset = lsp_line_col_to_offset(text, line, col)
 
     var lexer = Lexer.init(text, 0)
@@ -318,10 +354,19 @@ fn lsp_definition(id: i32, uri: str, text: str, line: i32, col: i32):
         lsp_write_response(jrpc_result_null(id))
         return
 
-    var comp = Compilation.init()
-    comp.set_prelude_mode(0)
-    let pool = comp.compile_source_text(path, text)
-    let intern = comp.zcu.pool
+    let idx = state.find_doc(uri)
+    if idx >= 0:
+        state.documents.get(idx as i64).ensure_analyzed()
+    var pool = AstPool.new()
+    var intern = InternPool.init()
+    if idx >= 0 and state.documents.get(idx as i64).cache_valid:
+        pool = state.documents.get(idx as i64).cached_pool
+        intern = state.documents.get(idx as i64).cached_intern
+    else:
+        var comp = Compilation.init()
+        comp.set_prelude_mode(0)
+        pool = comp.compile_source_text(uri_to_path(uri), text)
+        intern = comp.zcu.pool
 
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
@@ -340,8 +385,7 @@ fn lsp_definition(id: i32, uri: str, text: str, line: i32, col: i32):
 
 // ── Hover ────────────────────────────────────────────────────
 
-fn lsp_hover(id: i32, uri: str, text: str, line: i32, col: i32):
-    let path = uri_to_path(uri)
+fn lsp_hover(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
     let offset = lsp_line_col_to_offset(text, line, col)
 
     var lexer = Lexer.init(text, 0)
@@ -357,10 +401,19 @@ fn lsp_hover(id: i32, uri: str, text: str, line: i32, col: i32):
         lsp_write_response(jrpc_result_null(id))
         return
 
-    var comp = Compilation.init()
-    comp.set_prelude_mode(0)
-    let pool = comp.compile_source_text(path, text)
-    let intern = comp.zcu.pool
+    let idx = state.find_doc(uri)
+    if idx >= 0:
+        state.documents.get(idx as i64).ensure_analyzed()
+    var pool = AstPool.new()
+    var intern = InternPool.init()
+    if idx >= 0 and state.documents.get(idx as i64).cache_valid:
+        pool = state.documents.get(idx as i64).cached_pool
+        intern = state.documents.get(idx as i64).cached_intern
+    else:
+        var comp = Compilation.init()
+        comp.set_prelude_mode(0)
+        pool = comp.compile_source_text(uri_to_path(uri), text)
+        intern = comp.zcu.pool
 
     var hover = ""
     for di in 0..pool.decl_count():
@@ -388,7 +441,7 @@ fn lsp_hover(id: i32, uri: str, text: str, line: i32, col: i32):
 
 // ── Completion ───────────────────────────────────────────────
 
-fn lsp_completion(id: i32, uri: str, text: str, line: i32, col: i32):
+fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
     let offset = lsp_line_col_to_offset(text, line, col)
 
     // Find the line text up to cursor to detect context
@@ -435,12 +488,20 @@ fn lsp_completion(id: i32, uri: str, text: str, line: i32, col: i32):
         first = false
         items = items ++ jobj_start() ++ jkv_str("label", kw) ++ "," ++ jkv_int("kind", 14) ++ jobj_end()
 
-    // Add declarations from the file
-    let path = uri_to_path(uri)
-    var comp = Compilation.init()
-    comp.set_prelude_mode(0)
-    let pool = comp.compile_source_text(path, text)
-    let intern = comp.zcu.pool
+    // Add declarations from the file (use cache)
+    let cidx = state.find_doc(uri)
+    if cidx >= 0:
+        state.documents.get(cidx as i64).ensure_analyzed()
+    var pool = AstPool.new()
+    var intern = InternPool.init()
+    if cidx >= 0 and state.documents.get(cidx as i64).cache_valid:
+        pool = state.documents.get(cidx as i64).cached_pool
+        intern = state.documents.get(cidx as i64).cached_intern
+    else:
+        var comp = Compilation.init()
+        comp.set_prelude_mode(0)
+        pool = comp.compile_source_text(uri_to_path(uri), text)
+        intern = comp.zcu.pool
 
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
@@ -527,12 +588,20 @@ fn lsp_keywords() -> Vec[str]:
 
 // ── Document symbols ─────────────────────────────────────────
 
-fn lsp_document_symbols(id: i32, uri: str, text: str):
-    let path = uri_to_path(uri)
-    var comp = Compilation.init()
-    comp.set_prelude_mode(0)
-    let pool = comp.compile_source_text(path, text)
-    let intern = comp.zcu.pool
+fn lsp_document_symbols(id: i32, state: LspState, uri: str, text: str):
+    let idx = state.find_doc(uri)
+    if idx >= 0:
+        state.documents.get(idx as i64).ensure_analyzed()
+    var pool = AstPool.new()
+    var intern = InternPool.init()
+    if idx >= 0 and state.documents.get(idx as i64).cache_valid:
+        pool = state.documents.get(idx as i64).cached_pool
+        intern = state.documents.get(idx as i64).cached_intern
+    else:
+        var comp = Compilation.init()
+        comp.set_prelude_mode(0)
+        pool = comp.compile_source_text(uri_to_path(uri), text)
+        intern = comp.zcu.pool
 
     var items = jarr_start()
     var first = true
@@ -607,7 +676,7 @@ fn run_lsp() -> i32:
             let uri = json_get_string(td, "uri")
             let text = json_get_string(td, "text")
             state.set_doc(uri, text, json_get_int(td, "version"))
-            lsp_publish_diagnostics(uri, text)
+            lsp_publish_diagnostics(state, uri, text)
 
         else if method == "textDocument/didChange":
             let td = json_get_object(params, "textDocument")
@@ -615,7 +684,7 @@ fn run_lsp() -> i32:
             let text = json_get_string(msg, "text")
             if text.len() > 0:
                 state.set_doc(uri, text, 0)
-                lsp_publish_diagnostics(uri, text)
+                lsp_publish_diagnostics(state, uri, text)
 
         else if method == "textDocument/didSave":
             let td = json_get_object(params, "textDocument")
@@ -623,7 +692,7 @@ fn run_lsp() -> i32:
             let idx = state.find_doc(uri)
             if idx >= 0:
                 let doc = state.documents.get(idx as i64)
-                lsp_publish_diagnostics(uri, doc.text)
+                lsp_publish_diagnostics(state, uri, doc.text)
 
         else if method == "textDocument/hover":
             let td = json_get_object(params, "textDocument")
@@ -632,7 +701,7 @@ fn run_lsp() -> i32:
             let idx = state.find_doc(uri)
             if idx >= 0:
                 let doc = state.documents.get(idx as i64)
-                lsp_hover(id, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
+                lsp_hover(id, state, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
             else:
                 lsp_write_response(jrpc_result_null(id))
 
@@ -643,7 +712,7 @@ fn run_lsp() -> i32:
             let idx = state.find_doc(uri)
             if idx >= 0:
                 let doc = state.documents.get(idx as i64)
-                lsp_definition(id, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
+                lsp_definition(id, state, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
             else:
                 lsp_write_response(jrpc_result_null(id))
 
@@ -670,7 +739,7 @@ fn run_lsp() -> i32:
             let idx = state.find_doc(uri)
             if idx >= 0:
                 let doc = state.documents.get(idx as i64)
-                lsp_completion(id, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
+                lsp_completion(id, state, uri, doc.text, json_get_int(pos, "line"), json_get_int(pos, "character"))
             else:
                 lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", "[]") ++ jobj_end()))
 
@@ -680,7 +749,7 @@ fn run_lsp() -> i32:
             let idx = state.find_doc(uri)
             if idx >= 0:
                 let doc = state.documents.get(idx as i64)
-                lsp_document_symbols(id, uri, doc.text)
+                lsp_document_symbols(id, state, uri, doc.text)
             else:
                 lsp_write_response(jrpc_result(id, "[]"))
 
