@@ -328,7 +328,7 @@ fn async_find_fn_decl(ast: AstPool, fn_sym: i32) -> NodeId:
         let decl = ast.get_decl(di)
         if ast.kind(decl) == NodeKind.NK_FN_DECL and ast.get_data0(decl) == fn_sym:
             return decl
-    (0) as NodeId
+    0 as NodeId
 
 fn async_fn_flavor(ast: AstPool, fn_decl: NodeId) -> i32:
     if (fn_decl as i32) == 0:

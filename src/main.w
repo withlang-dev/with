@@ -563,7 +563,7 @@ fn escape_dump_lexeme(text: str) -> str:
     var out = ""
     var run_start = 0
     for i in 0..text.len():
-        let ch = text.byte_at((i) as i64)
+        let ch = text.byte_at(i as i64)
         var esc = ""
         if ch == 92:  // '\'
             esc = "\\\\"

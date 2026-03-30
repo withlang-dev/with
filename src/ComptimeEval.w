@@ -1469,7 +1469,7 @@ fn Sema.check_top_level_comptime_let_values(self: &mut Sema):
 
         let flags = self.ast.get_data2(decl)
         let ann_extra = self.top_level_let_type_ann_extra(flags)
-        let ann_type = if ann_extra >= 0: self.resolve_type_expr(self.ast.get_extra(ann_extra)) else: (0) as TypeId
+        let ann_type = if ann_extra >= 0: self.resolve_type_expr(self.ast.get_extra(ann_extra)) else: 0 as TypeId
         let val_type = if ann_type != 0: self.check_expr_with_expected(value, ann_type) else: self.check_expr(value)
         if ann_type != 0 and val_type != 0:
             if self.types_compatible(ann_type as i32, val_type as i32) == 0:

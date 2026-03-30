@@ -308,6 +308,187 @@ req_ref_none='{"jsonrpc":"2.0","id":2,"method":"textDocument/references","params
 out_ref_none=$(lsp_test /tmp/lsp_refs_test.w "$req_ref_none")
 check "refs: empty for non-ident" "$out_ref_none" '"result":\[\]'
 
+# Extend block methods
+cat > /tmp/lsp_dot_extend.w << 'EOF'
+type Point {
+    x: i32,
+    y: i32,
+}
+
+extend Point:
+    fn distance(self: Point) -> i32:
+        self.x + self.y
+
+    fn translate(self: Point, dx: i32) -> Point:
+        Point { x: self.x + dx, y: self.y }
+
+fn main:
+    let p = Point { x: 1, y: 2 }
+    p.
+EOF
+req_de='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":14,"character":6}}}'
+out_de=$(lsp_test /tmp/lsp_dot_extend.w "$req_de")
+check "dot extend: x field" "$out_de" '"label":"x"'
+check "dot extend: y field" "$out_de" '"label":"y"'
+check "dot extend: distance" "$out_de" '"label":"distance"'
+check "dot extend: translate" "$out_de" '"label":"translate"'
+
+echo ""
+
+# ── Phase 8: Rename symbol ────────────────────────────────
+echo "Phase 8: Rename symbol"
+
+cat > /tmp/lsp_rename_test.w << 'EOF'
+fn helper(x: i32) -> i32:
+    x * 2
+
+fn main:
+    let a = helper(1)
+    let b = helper(2)
+EOF
+req_rename='{"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":0,"character":3},"newName":"util"}}'
+out_rename=$(lsp_test /tmp/lsp_rename_test.w "$req_rename")
+# Should return a WorkspaceEdit with TextEdit entries
+rename_count=$(echo "$out_rename" | grep -o '"newText":"util"' | wc -l | tr -d ' ')
+if [ "$rename_count" -ge 3 ]; then
+    PASS=$((PASS + 1))
+    echo "  PASS: rename helper→util ($rename_count edits)"
+else
+    FAIL=$((FAIL + 1))
+    echo "  FAIL: rename (expected 3+ edits, got $rename_count)"
+    echo "    output: $(echo "$out_rename" | head -c 300)"
+fi
+
+# Rename on non-ident should return null
+req_rename_none='{"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":5,"character":0},"newName":"foo"}}'
+out_rename_none=$(lsp_test /tmp/lsp_rename_test.w "$req_rename_none")
+check "rename: null for non-ident" "$out_rename_none" '"result":null'
+
+# Rename with invalid identifier should return error
+req_rename_bad='{"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":0,"character":3},"newName":"123bad"}}'
+out_rename_bad=$(lsp_test /tmp/lsp_rename_test.w "$req_rename_bad")
+check "rename: invalid ident error" "$out_rename_bad" '"error"'
+
+echo ""
+
+# ── Doc comments on hover ────────────────────────────────
+echo "Doc comments on hover"
+
+cat > /tmp/lsp_doc_test.w << 'EOF'
+/// Adds two numbers together.
+/// Returns the sum.
+fn add(a: i32, b: i32) -> i32:
+    a + b
+
+fn main:
+    add(1, 2)
+EOF
+req_doc='{"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":6,"character":4}}}'
+out_doc=$(lsp_test /tmp/lsp_doc_test.w "$req_doc")
+check "hover: has fn name" "$out_doc" 'fn add'
+check "hover: has doc comment" "$out_doc" 'Adds two numbers'
+
+echo ""
+
+# ── Prelude completions ──────────────────────────────────
+echo "Prelude completions"
+
+cat > /tmp/lsp_prelude_test.w << 'EOF'
+fn main:
+    pri
+EOF
+req_prelude='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":1,"character":7}}}'
+out_prelude=$(lsp_test /tmp/lsp_prelude_test.w "$req_prelude")
+check "prelude: print" "$out_prelude" '"label":"print"'
+check "prelude: Vec" "$out_prelude" '"label":"Vec"'
+check "prelude: Option" "$out_prelude" '"label":"Option"'
+check "prelude: assert" "$out_prelude" '"label":"assert"'
+
+echo ""
+
+# ── Trait method completion ──────────────────────────────
+echo "Trait method completion"
+
+cat > /tmp/lsp_trait_test.w << 'EOF'
+trait Drawable =
+    fn draw(self) -> str
+    fn area(self) -> i32
+
+type Circle {
+    radius: i32,
+}
+
+impl Drawable for Circle =
+    fn draw(self: Circle) -> str:
+        "circle"
+    fn area(self: Circle) -> i32:
+        self.radius * self.radius
+
+fn main:
+    let c = Circle { radius: 5 }
+    c.
+EOF
+req_trait='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":16,"character":6}}}'
+out_trait=$(lsp_test /tmp/lsp_trait_test.w "$req_trait")
+check "trait: radius field" "$out_trait" '"label":"radius"'
+check "trait: draw method" "$out_trait" '"label":"draw"'
+check "trait: area method" "$out_trait" '"label":"area"'
+
+# ── Scope-aware references (item 2) ──────────────────────
+echo "Scope-aware references"
+
+# Local variable 'x' in one function should NOT find 'x' in another function
+cat > /tmp/lsp_scope_refs.w << 'EOF'
+fn foo():
+    let x = 1
+    print(x)
+
+fn bar():
+    let x = 2
+    print(x)
+EOF
+# References for 'x' at line 1 (inside foo) — should find 2 (def + use in foo), NOT 4
+req_scope_ref='{"jsonrpc":"2.0","id":2,"method":"textDocument/references","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":1,"character":8},"context":{"includeDeclaration":true}}}'
+out_scope_ref=$(lsp_test /tmp/lsp_scope_refs.w "$req_scope_ref")
+# Extract only the refs response (contains "id":2), count ranges in it
+scope_refs_response=$(echo "$out_scope_ref" | tr '\n' ' ' | grep -o '"id":2[^}]*\[.*\]' | head -1)
+scope_ref_count=$(echo "$scope_refs_response" | grep -o '"range"' | wc -l | tr -d ' ')
+if [ "$scope_ref_count" -ge 1 ] && [ "$scope_ref_count" -le 3 ]; then
+    PASS=$((PASS + 1))
+    echo "  PASS: local x scoped to foo ($scope_ref_count refs)"
+else
+    FAIL=$((FAIL + 1))
+    echo "  FAIL: local x scope (got $scope_ref_count refs, expected 1-3)"
+fi
+
+echo ""
+
+# ── Slow-tier type inference (item 3) ────────────────────
+echo "Slow-tier type inference"
+
+# Type inferred from function return value — fast tier can't resolve this,
+# but slow tier's typed_expr_types should provide the type.
+cat > /tmp/lsp_slow_type.w << 'EOF'
+type Widget {
+    name: str,
+    width: i32,
+}
+
+fn make_widget() -> Widget:
+    Widget { name: "btn", width: 100 }
+
+fn main:
+    let w = make_widget()
+    w.
+EOF
+req_slow='{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/lsp_test.w"},"position":{"line":10,"character":6}}}'
+out_slow=$(lsp_test /tmp/lsp_slow_type.w "$req_slow")
+# Fast tier can't resolve make_widget() return type. Slow tier should.
+# At minimum, extend methods (Widget.xxx) should appear from fast tier.
+# If slow tier works, we get struct fields too.
+check "slow type: name field" "$out_slow" '"label":"name"'
+check "slow type: width field" "$out_slow" '"label":"width"'
+
 echo ""
 
 # ── Summary ─────────────────────────────────────────────────

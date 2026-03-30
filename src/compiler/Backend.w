@@ -114,7 +114,7 @@ fn backend_dump_struct_extras(pool: AstPool, intern: InternPool):
         for fi in 0..fc:
             let o = es + 1 + fi * 3
             let tn = pool.get_extra(o + 1)
-            let k = pool.kind((tn) as NodeId)
+            let k = pool.kind(tn as NodeId)
             if k < 50 or k > 200:
                 ok = 0
                 with_eprint(f"[sd] {name} f{fi} tn={tn} k={k} es={es} o={o}")
