@@ -2953,6 +2953,13 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
             self.body.set_call_intrinsic(gc_args_id, MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL)
             self.body.set_call_ast_node(gc_args_id, node)
             var gc_ret_ty = self.expr_type(node)
+            // For static constructors (Vec.new, HashMap.new), use expected_type
+            // to resolve the generic instance when expr_type returns a bare struct.
+            if gc_is_static and self.expected_type > 0:
+                let gc_et_tk = self.sema.get_type_kind(self.expected_type)
+                let gc_rt_tk = self.sema.get_type_kind(gc_ret_ty)
+                if gc_et_tk == TypeKind.TY_GENERIC_INST and (gc_ret_ty == 0 or gc_ret_ty == self.sema.ty_void or gc_rt_tk == TypeKind.TY_STRUCT):
+                    gc_ret_ty = self.expected_type
             if gc_ret_ty == 0:
                 gc_ret_ty = self.sema.ty_i32 as i32
             let gc_result = self.new_temp(gc_ret_ty)
@@ -3007,7 +3014,9 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
     // For static constructors (Vec.new, HashMap.new), expr_type often returns
     // the bare struct type (TypeKind.TY_STRUCT) instead of the generic instance
     // (TypeKind.TY_GENERIC_INST). Use the expected type from the let binding if available.
-    if self.expected_type > 0:
+    // Only apply to static constructors — instance methods (str.slice, vec.len) must
+    // keep their own return type, not inherit the function's generic return type.
+    if is_static and self.expected_type > 0:
         let et_tk = self.sema.get_type_kind(self.expected_type)
         if et_tk == TypeKind.TY_GENERIC_INST:
             ret_type = self.expected_type

@@ -1564,6 +1564,15 @@ fn mir_validate_type_compatible_fast(mir_mod: MirModule, expected: i32, actual: 
             if mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_extra(exp_start + ei), mir_mod.mir_get_type_extra(act_start + ei)) == 0:
                 return 0
         return 1
+    // Primitive types: same kind means compatible (str, int, bool, float, void)
+    if exp_k == act_k:
+        if exp_k == TypeKind.TY_STR or exp_k == TypeKind.TY_BOOL or exp_k == TypeKind.TY_VOID:
+            return 1
+        if exp_k == TypeKind.TY_INT:
+            // Same width and signedness
+            return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r) and mir_mod.mir_get_type_d1(exp_r) == mir_mod.mir_get_type_d1(act_r): 1 else: 0
+        if exp_k == TypeKind.TY_FLOAT:
+            return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
     0
 
 fn mir_validate_single_field_inner(mir_mod: MirModule, tid: i32) -> i32:
@@ -1723,6 +1732,9 @@ fn validate_typed_mir_body(mir_mod: MirModule, body: MirBody) -> MirValidationEr
                    mir_validate_compare_sensitive_type(mir_mod, rhs_ty) and
                    mir_validate_type_compatible_fast(mir_mod, lhs_ty, rhs_ty) == 0 and
                    mir_validate_type_compatible_fast(mir_mod, rhs_ty, lhs_ty) == 0:
+                    let __lk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(lhs_ty)) as i32
+                    let __rk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(rhs_ty)) as i32
+                    with_eprintln(f"DEBUG cmp fail: lhs_ty={lhs_ty} lhs_kind={__lk} rhs_ty={rhs_ty} rhs_kind={__rk}")
                     return mir_validation_fail(body.fn_sym, span, "comparison operands have incompatible MIR types")
 
             if rk == RvalueKind.RK_CAST:
