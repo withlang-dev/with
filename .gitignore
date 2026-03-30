@@ -22,6 +22,9 @@ out/
 *.dylib
 *.dSYM/
 
+# Dependencies
+node_modules/
+
 # Editor / OS
 .DS_Store
 *.swp
