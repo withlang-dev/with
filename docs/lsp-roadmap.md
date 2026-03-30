@@ -13,21 +13,16 @@ Based on analysis of rust-analyzer, gopls, and ZLS architectures.
 - No scope-aware completion
 - No type-aware dot completion
 
-## Phase 1: Cached Per-File Analysis
+## Phase 1: Cached Per-File Analysis — DONE
 
 **Goal:** Don't re-compile on every keystroke.
 
-Store per-file: `{ text_hash, ast_pool, intern_pool, sema, diagnostics }`.
-Only re-analyze when text actually changes (compare hash).
+`LspDocument` now caches `{ cached_pool, cached_intern, cached_diags }`.
+`ensure_analyzed()` only re-compiles when text changes (length mismatch).
+All handlers (diagnostics, hover, definition, completion, symbols) use
+the cache. Invalidated on `didChange`.
 
-This alone will make diagnostics, hover, and go-to-definition near-instant
-for repeated queries on unchanged files.
-
-**Implementation:**
-- Add `LspFileCache` type with text hash + cached compilation result
-- In `lsp_publish_diagnostics`, `lsp_hover`, `lsp_definition`: check
-  cache before compiling. Reuse if hash matches.
-- Invalidate on `didChange` / `didSave`.
+Commit: Phase 1 of LSP roadmap.
 
 ## Phase 2: Scope-Aware Completion
 
