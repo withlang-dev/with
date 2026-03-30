@@ -345,11 +345,11 @@ $(STAGE1_BIN): $(GEN_STAMP) $(RUNTIME_LINK)
 
 $(STAGE2_BIN): $(STAGE1_BIN) $(GEN_STAMP) $(RUNTIME_LINK)
 	@rm -rf "$(HOME)/.cache/with/c_import"
-	$(call build_stage,$(STAGE1_BIN),stage2,$(STAGE_BUILD_TMP))
+	$(call build_stage,$(STAGE1_BIN),stage2,$(STAGE_BUILD_TMP),-O0)
 
 $(STAGE3_BIN): $(STAGE2_BIN) $(GEN_STAMP) $(RUNTIME_LINK)
 	@rm -rf "$(HOME)/.cache/with/c_import"
-	$(call build_stage,$(STAGE2_BIN),stage3,$(STAGE_BUILD_TMP))
+	$(call build_stage,$(STAGE2_BIN),stage3,$(STAGE_BUILD_TMP),-O0)
 
 $(CANONICAL_BIN): $(STAGE2_BIN) | $(OUT_BIN_DIR)
 	@rm -f "$@" && rm -rf "$@.dSYM"
