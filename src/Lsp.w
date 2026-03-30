@@ -20,6 +20,7 @@ extern fn with_read_line_stdin() -> str
 extern fn with_read_bytes_stdin(count: i32) -> str
 extern fn with_write_stdout(s: str) -> void
 extern fn with_flush_stdout() -> void
+extern fn with_embedded_std_list_modules() -> str
 
 // ── JSON-RPC framing ─────────────────────────────────────────
 
@@ -399,9 +400,9 @@ fn lsp_completion(id: i32, uri: str, text: str, line: i32, col: i32):
     var items = jarr_start()
     var first = true
 
-    // Context: "use std." → suggest stdlib modules
+    // Context: "use std." → suggest embedded stdlib modules
     if lsp_find_substr(line_text, "use std.") >= 0:
-        let modules = lsp_std_modules()
+        let modules = lsp_list_embedded_modules("std/")
         for i in 0..modules.len() as i32:
             let m = modules.get(i as i64)
             if not first:
@@ -412,9 +413,9 @@ fn lsp_completion(id: i32, uri: str, text: str, line: i32, col: i32):
         lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
         return
 
-    // Context: "use test." → suggest test modules
+    // Context: "use test." → suggest embedded test modules
     if lsp_find_substr(line_text, "use test.") >= 0:
-        let test_mods = lsp_test_modules()
+        let test_mods = lsp_list_embedded_modules("test/")
         for i in 0..test_mods.len() as i32:
             let m = test_mods.get(i as i64)
             if not first:
@@ -467,39 +468,31 @@ fn lsp_completion(id: i32, uri: str, text: str, line: i32, col: i32):
     items = items ++ jarr_end()
     lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
 
-fn lsp_std_modules() -> Vec[str]:
-    let m: Vec[str] = Vec.new()
-    m.push("collections")
-    m.push("fmt")
-    m.push("fs")
-    m.push("hash")
-    m.push("http")
-    m.push("io")
-    m.push("iter")
-    m.push("json")
-    m.push("math")
-    m.push("mem")
-    m.push("net")
-    m.push("option")
-    m.push("process")
-    m.push("random")
-    m.push("result")
-    m.push("signal")
-    m.push("string")
-    m.push("sync")
-    m.push("sysinfo")
-    m.push("thread")
-    m.push("time")
-    m.push("tls")
-    m.push("traits")
-    m
-
-fn lsp_test_modules() -> Vec[str]:
-    let m: Vec[str] = Vec.new()
-    m.push("testing")
-    m.push("bench")
-    m.push("runner")
-    m
+fn lsp_list_embedded_modules(prefix: str) -> Vec[str]:
+    // Query the embedded stdlib listing and filter by prefix.
+    // Returns module names without prefix or .w extension.
+    // e.g. prefix="std/" returns ["collections", "fmt", "fs", ...]
+    let listing = with_embedded_std_list_modules()
+    let result: Vec[str] = Vec.new()
+    if listing.len() == 0:
+        return result
+    // Split by newline and filter
+    var start = 0
+    var i = 0
+    while i <= listing.len() as i32:
+        let at_end = i == listing.len() as i32
+        let ch = if at_end: 10 else: listing.byte_at(i as i64)
+        if ch == 10:
+            let entry = listing.slice(start as i64, i as i64)
+            if entry.starts_with(prefix) and entry.ends_with(".w"):
+                // Extract module name: strip prefix and .w
+                let name = entry.slice(prefix.len(), entry.len() - 2)
+                // Skip subdir modules (contain /) for top-level completion
+                if lsp_find_substr(name, "/") < 0:
+                    result.push(name)
+            start = i + 1
+        i = i + 1
+    result
 
 fn lsp_keywords() -> Vec[str]:
     let k: Vec[str] = Vec.new()

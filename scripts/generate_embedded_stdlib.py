@@ -60,6 +60,17 @@ def main() -> int:
             out.write(f"        , {len(data)} }};\n")
             out.write("    }\n")
         out.write('    return (with_str){ "", 0 };\n')
+        out.write("}\n\n")
+
+        # Generate module listing function for LSP completion.
+        # Returns a newline-separated string of all embedded module relative paths.
+        all_rels = []
+        for file_path in files:
+            rel = file_path.relative_to(root / "lib").as_posix()
+            all_rels.append(rel)
+        listing = "\\n".join(all_rels)
+        out.write(f'with_str with_embedded_std_list_modules(void) {{\n')
+        out.write(f'    return (with_str){{ "{listing}", {len(listing)} }};\n')
         out.write("}\n")
 
     return 0

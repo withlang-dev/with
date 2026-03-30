@@ -57,6 +57,10 @@ with_str with_embedded_std_source(with_str path) {
     with_str out = { "", 0 };
     return out;
 }
+with_str with_embedded_std_list_modules(void) {
+    with_str out = { "", 0 };
+    return out;
+}
 #endif
 #else
 #include WITH_EMBEDDED_STDLIB_HEADER
