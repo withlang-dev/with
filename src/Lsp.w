@@ -479,7 +479,51 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
         lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
         return
 
-    // General: suggest keywords + declarations from current file
+    // Scan tokens before cursor for local let/var bindings and fn parameters.
+    // This gives scope-aware completion without full sema integration.
+    var lexer = Lexer.init(text, 0)
+    let tokens = lexer.tokenize()
+    let local_names: Vec[str] = Vec.new()
+    let seen_locals: Vec[str] = Vec.new()
+    var ti = 0
+    while ti < tokens.len():
+        let tok_start = tokens.get_start(ti)
+        if tok_start >= offset:
+            break
+        let tag = tokens.get_tag(ti)
+        // let <name> or var <name>
+        if (tag == TokenKind.TK_KW_LET or tag == TokenKind.TK_KW_VAR) and ti + 1 < tokens.len():
+            let next_tag = tokens.get_tag(ti + 1)
+            if next_tag == TokenKind.TK_IDENT:
+                let name = text.slice(tokens.get_start(ti + 1) as i64, tokens.get_end(ti + 1) as i64)
+                if lsp_vec_str_contains(seen_locals, name) == 0:
+                    local_names.push(name)
+                    seen_locals.push(name)
+        // fn <name>(<param>: <type>, ...)
+        // After fn and ident, look for ( ... ) and collect param names
+        if tag == TokenKind.TK_KW_FN and ti + 2 < tokens.len():
+            if tokens.get_tag(ti + 1) == TokenKind.TK_IDENT and tokens.get_tag(ti + 2) == TokenKind.TK_L_PAREN:
+                var pi = ti + 3
+                while pi < tokens.len() and tokens.get_tag(pi) != TokenKind.TK_R_PAREN and tokens.get_start(pi) < offset:
+                    if tokens.get_tag(pi) == TokenKind.TK_IDENT:
+                        // Check if next is : (parameter pattern)
+                        if pi + 1 < tokens.len() and tokens.get_tag(pi + 1) == TokenKind.TK_COLON:
+                            let pname = text.slice(tokens.get_start(pi) as i64, tokens.get_end(pi) as i64)
+                            if pname != "self" and lsp_vec_str_contains(seen_locals, pname) == 0:
+                                local_names.push(pname)
+                                seen_locals.push(pname)
+                    pi = pi + 1
+        ti = ti + 1
+
+    // Emit local variables first (most relevant)
+    for li in 0..local_names.len() as i32:
+        let lname = local_names.get(li as i64)
+        if not first:
+            items = items ++ ","
+        first = false
+        items = items ++ jobj_start() ++ jkv_str("label", lname) ++ "," ++ jkv_int("kind", 6) ++ jobj_end()
+
+    // Then keywords
     let keywords = lsp_keywords()
     for i in 0..keywords.len() as i32:
         let kw = keywords.get(i as i64)
@@ -528,6 +572,12 @@ fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col:
 
     items = items ++ jarr_end()
     lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
+
+fn lsp_vec_str_contains(v: Vec[str], s: str) -> i32:
+    for i in 0..v.len() as i32:
+        if v.get(i as i64) == s:
+            return 1
+    0
 
 fn lsp_list_embedded_modules(prefix: str) -> Vec[str]:
     // Query the embedded stdlib listing and filter by prefix.
