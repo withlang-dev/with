@@ -47,8 +47,9 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
         let prim = self.primitive_type_by_sym(sym)
         if prim != 0:
             return prim as TypeId
-        if self.named_types.contains(sym) and (self.collecting_types != 0 or self.is_ci_visible(sym) != 0):
-            return self.named_types.get(sym).unwrap() as TypeId
+        let named_tid = self.lookup_named_type_visible(sym)
+        if named_tid != 0 and (self.collecting_types != 0 or self.is_ci_visible(sym) != 0):
+            return named_tid as TypeId
         // Self is resolved at codegen time
         let sym_name = self.pool_resolve(sym)
         if sym_name == "Self":
@@ -159,14 +160,15 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
 // ── Pass 2: Check function bodies ────────────────────────────────
 
 fn Sema.update_module_context(self: Sema, di: i32):
-    if self.scoping_active == 0:
-        return
     if di < self.decl_source_paths.len() as i32:
         let path = self.decl_source_paths.get(di as i64)
         if path != self.current_module_path:
             self.current_module_path = path
-            let path_sym = self.pool_intern(path)
-            self.current_module_has_ci = if self.ci_modules.contains(path_sym): 1 else: 0
+            if self.scoping_active != 0:
+                let path_sym = self.pool_intern(path)
+                self.current_module_has_ci = if self.ci_modules.contains(path_sym): 1 else: 0
+            else:
+                self.current_module_has_ci = 0
 
 fn Sema.update_decl_source_context(self: Sema, di: i32):
     self.local_file_id = 0
@@ -915,8 +917,8 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     if prim != 0:
         self.typed_expr_types.insert(node, prim)
         return prim
-    if self.named_types.contains(sym) and self.is_ci_visible(sym) != 0:
-        let named_tid = self.named_types.get(sym).unwrap()
+    let named_tid = self.lookup_named_type_visible(sym)
+    if named_tid != 0 and self.is_ci_visible(sym) != 0:
         self.typed_expr_types.insert(node, named_tid)
         return named_tid
 
@@ -1506,8 +1508,8 @@ fn Sema.struct_field_type(self: Sema, struct_type: i32, field: i32) -> i32:
                             let f_type_node = self.ast.get_extra(base + 1)
                             return self.resolve_generic_return_type_node(f_type_node, tp_start, tp_count)
                 else:
-                    if self.named_types.contains(gi_base_sym):
-                        let gi_struct_tid = self.named_types.get(gi_base_sym).unwrap()
+                    let gi_struct_tid = self.lookup_named_type_visible(gi_base_sym)
+                    if gi_struct_tid != 0:
                         let gi_te_start = self.get_type_d1(gi_struct_tid)
                         for gi_fi in 0..fc:
                             let gi_f_name = self.type_extra.get((gi_te_start + gi_fi * 3) as i64)
@@ -1600,7 +1602,7 @@ fn Sema.index_expr_is_type_level(self: Sema, expr: i32) -> bool:
     let kind = self.ast.kind(expr)
     if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(expr)
-        return self.named_types.contains(sym)
+        return self.has_named_type_visible(sym) != 0
     if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED:
         return self.index_expr_is_type_level(self.ast.get_data0(expr))
     false
@@ -1655,7 +1657,7 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
     if tk == TypeKind.TY_STRUCT:
         if self.ast.kind(expr) == NodeKind.NK_IDENT:
             let ci_base_sym = self.ast.get_data0(expr)
-            if self.named_types.contains(ci_base_sym):
+            if self.has_named_type_visible(ci_base_sym) != 0:
                 let arg_kind = self.ast.kind(index)
                 var ci_arg_type = 0
                 if arg_kind == NodeKind.NK_IDENT or arg_kind == NodeKind.NK_TYPE_NAMED:
@@ -1663,8 +1665,8 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
                     let prim = self.primitive_type_by_sym(arg_sym)
                     if prim != 0:
                         ci_arg_type = prim
-                    else if self.named_types.contains(arg_sym):
-                        ci_arg_type = self.named_types.get(arg_sym).unwrap()
+                    else:
+                        ci_arg_type = self.lookup_named_type_visible(arg_sym)
                 if ci_arg_type > 0:
                     // Check for second type arg (d2 of NodeKind.NK_INDEX) — HashMap[K, V]
                     let ci_index2 = self.ast.get_data2(node)
@@ -1676,8 +1678,8 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
                             let a2_prim = self.primitive_type_by_sym(a2_sym)
                             if a2_prim != 0:
                                 ci_arg2_type = a2_prim
-                            else if self.named_types.contains(a2_sym):
-                                ci_arg2_type = self.named_types.get(a2_sym).unwrap()
+                            else:
+                                ci_arg2_type = self.lookup_named_type_visible(a2_sym)
                     let ci_args: Vec[i32] = Vec.new()
                     ci_args.push(ci_arg_type)
                     var ci_arg_count = 1
@@ -1757,8 +1759,8 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data1(node)
     let field_count = self.ast.get_data2(node)
 
-    if self.named_types.contains(name):
-        let tid = self.named_types.get(name).unwrap()
+    let tid = self.lookup_named_type_visible(name)
+    if tid != 0:
         let resolved = self.resolve_alias(tid as TypeId)
         if self.get_type_kind(resolved) == TypeKind.TY_STRUCT:
             var expected_struct_ty: TypeId = 0 as TypeId
@@ -2145,9 +2147,9 @@ fn Sema.enum_variant_payload_types(self: Sema, enum_tid: i32, variant_name: i32)
         return result
     if kind == TypeKind.TY_GENERIC_INST:
         let base_sym = self.get_generic_inst_base(resolved)
-        if not self.named_types.contains(base_sym):
+        let base_tid = self.lookup_named_type_visible(base_sym)
+        if base_tid == 0:
             return result
-        let base_tid = self.named_types.get(base_sym).unwrap()
         if self.get_type_kind(base_tid) != TypeKind.TY_ENUM:
             return result
         let te_start = self.get_type_d1(base_tid)
@@ -2177,8 +2179,8 @@ fn Sema.expected_variant_constructor_type(self: Sema, variant_name: i32) -> i32:
         return 0
     if exp_kind == TypeKind.TY_GENERIC_INST:
         let gi_base = self.get_type_d0(expected)
-        if self.named_types.contains(gi_base):
-            let base_tid = self.named_types.get(gi_base).unwrap()
+        let base_tid = self.lookup_named_type_visible(gi_base)
+        if base_tid != 0:
             if self.get_type_kind(base_tid as TypeId) == TypeKind.TY_ENUM:
                 if self.enum_has_variant(base_tid, variant_name) != 0:
                     return expected as i32
@@ -2205,8 +2207,7 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         let bind_sym = self.ast.get_data0(node)
         let type_sym = self.ast.get_data1(node)
         var concrete_type = 0
-        if self.named_types.contains(type_sym):
-            concrete_type = self.named_types.get(type_sym).unwrap()
+        concrete_type = self.lookup_named_type_visible(type_sym)
         if concrete_type != 0:
             self.scope_put(bind_sym, concrete_type, 0)
         else:
@@ -2240,8 +2241,8 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                 pos = pos + 2 + pc
         else if resolved_kind == TypeKind.TY_GENERIC_INST:
             let gi_base = self.get_generic_inst_base(resolved)
-            if self.named_types.contains(gi_base):
-                let base_tid = self.named_types.get(gi_base).unwrap()
+            let base_tid = self.lookup_named_type_visible(gi_base)
+            if base_tid != 0:
                 if self.get_type_kind(base_tid) == TypeKind.TY_ENUM:
                     let te_start = self.get_type_d1(base_tid)
                     let variant_count = self.get_type_d2(base_tid)
@@ -2358,8 +2359,9 @@ fn Sema.check_enum_variant(self: Sema, node: i32) -> i32:
     let arg_count = self.ast.get_extra(extra_start)
     for ai in 0..arg_count:
         self.check_expr(self.ast.get_extra(extra_start + 1 + ai))
-    if self.named_types.contains(type_name):
-        return self.resolve_alias(self.named_types.get(type_name).unwrap() as TypeId) as i32
+    let visible_tid = self.lookup_named_type_visible(type_name)
+    if visible_tid != 0:
+        return self.resolve_alias(visible_tid as TypeId) as i32
     0
 
 fn Sema.check_closure(self: Sema, node: i32) -> i32:
@@ -2861,8 +2863,9 @@ fn Sema.enum_has_variant(self: Sema, enum_tid: i32, variant_sym: i32) -> i32:
     let resolved_kind = self.get_type_kind(resolved)
     if resolved_kind == TypeKind.TY_GENERIC_INST:
         let base_sym = self.get_generic_inst_base(resolved)
-        if self.named_types.contains(base_sym):
-            return self.enum_has_variant(self.named_types.get(base_sym).unwrap(), variant_sym)
+        let base_tid = self.lookup_named_type_visible(base_sym)
+        if base_tid != 0:
+            return self.enum_has_variant(base_tid, variant_sym)
         return 0
     if resolved_kind != TypeKind.TY_ENUM:
         return 0
@@ -2886,8 +2889,8 @@ fn Sema.enum_pattern_owner_sym(self: Sema, type_id: i32) -> i32:
         return self.get_type_d0(resolved)
     if resolved_kind == TypeKind.TY_GENERIC_INST:
         let base_sym = self.get_generic_inst_base(resolved)
-        if self.named_types.contains(base_sym):
-            let base_tid = self.named_types.get(base_sym).unwrap()
+        let base_tid = self.lookup_named_type_visible(base_sym)
+        if base_tid != 0:
             if self.get_type_kind(self.resolve_alias(base_tid)) == TypeKind.TY_ENUM:
                 return base_sym
     0
@@ -2901,8 +2904,8 @@ fn Sema.enum_pattern_type(self: Sema, type_id: i32) -> i32:
         return resolved as i32
     if resolved_kind == TypeKind.TY_GENERIC_INST:
         let base_sym = self.get_generic_inst_base(resolved)
-        if self.named_types.contains(base_sym):
-            let base_tid = self.named_types.get(base_sym).unwrap()
+        let base_tid = self.lookup_named_type_visible(base_sym)
+        if base_tid != 0:
             if self.get_type_kind(self.resolve_alias(base_tid)) == TypeKind.TY_ENUM:
                 return resolved as i32
     0
@@ -2924,10 +2927,10 @@ fn Sema.resolve_variant_pattern_enum_type(self: Sema, node: i32, subject_type: i
     let subject_enum_sym = if subject_enum_ty != 0: self.enum_pattern_owner_sym(subject_enum_ty) else: 0
     let qualifier_sym = self.ast.pattern_qualifier(node)
     if qualifier_sym != 0:
-        if not self.named_types.contains(qualifier_sym):
+        let qualifier_tid = self.lookup_named_type_visible(qualifier_sym)
+        if qualifier_tid == 0:
             self.emit_error("unknown type '" ++ self.pool_resolve(qualifier_sym) ++ "' in qualified enum pattern", node)
             return 0
-        let qualifier_tid = self.named_types.get(qualifier_sym).unwrap()
         let qualifier_enum_ty = self.enum_pattern_type(qualifier_tid)
         let qualifier_enum_sym = if qualifier_enum_ty != 0: self.enum_pattern_owner_sym(qualifier_enum_ty) else: 0
         if qualifier_enum_sym == 0:
@@ -3900,7 +3903,7 @@ fn Sema.static_receiver_type_is_known(self: Sema, expr: i32) -> i32:
         return 0
     if self.primitive_type_by_sym(base_sym) != 0:
         return 1
-    if self.named_types.contains(base_sym):
+    if self.has_named_type_visible(base_sym) != 0:
         return 1
     0
 
@@ -3911,8 +3914,8 @@ fn Sema.type_reflection_field_count(self: Sema, tid: i32) -> i32:
         return self.get_type_d2(resolved)
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.get_generic_inst_base(resolved as i32)
-        if self.named_types.contains(base_sym):
-            let base_tid = self.named_types.get(base_sym).unwrap()
+        let base_tid = self.lookup_named_type_visible(base_sym)
+        if base_tid != 0:
             if self.get_type_kind(self.resolve_alias(base_tid as TypeId)) == TypeKind.TY_STRUCT:
                 return self.get_type_d2(self.resolve_alias(base_tid as TypeId))
     0
@@ -3928,8 +3931,8 @@ fn Sema.type_reflection_field_name(self: Sema, tid: i32, field_index: i32) -> i3
         return self.type_extra.get((te_start + field_index * 3) as i64)
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.get_generic_inst_base(resolved as i32)
-        if self.named_types.contains(base_sym):
-            let base_tid = self.named_types.get(base_sym).unwrap()
+        let base_tid = self.lookup_named_type_visible(base_sym)
+        if base_tid != 0:
             let base_resolved = self.resolve_alias(base_tid as TypeId)
             if self.get_type_kind(base_resolved) == TypeKind.TY_STRUCT:
                 let te_start = self.get_type_d1(base_resolved)
@@ -3960,8 +3963,8 @@ fn Sema.type_reflection_variant_base(self: Sema, tid: i32) -> i32:
         return resolved as i32
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.get_generic_inst_base(resolved as i32)
-        if self.named_types.contains(base_sym):
-            let base_tid = self.named_types.get(base_sym).unwrap()
+        let base_tid = self.lookup_named_type_visible(base_sym)
+        if base_tid != 0:
             let base_resolved = self.resolve_alias(base_tid as TypeId)
             if self.get_type_kind(base_resolved) == TypeKind.TY_ENUM:
                 return base_resolved as i32

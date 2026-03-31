@@ -291,6 +291,16 @@ type Sema {
     decl_source_file_ids: Vec[i32],  // one file id per decl index (from Frontend)
     decl_is_c_import: Vec[i32],      // 1 if decl came from c_import, 0 otherwise
     current_module_path: str,        // module path being checked right now
+    module_paths: Vec[str],          // resolved module graph paths
+    module_import_starts: Vec[i32],  // per-module start into module_import_targets
+    module_import_counts: Vec[i32],  // per-module import edge count
+    module_import_targets: Vec[i32], // flattened target module indices
+    module_index_by_path: HashMap[str, i32],   // path -> module index
+    global_visible_module_paths: HashMap[str, i32], // prelude-visible modules
+    module_visibility_cache: HashMap[str, i32], // "from->to" -> visibility
+    named_type_candidate_syms: Vec[i32],       // every registered named type symbol
+    named_type_candidate_tids: Vec[i32],       // parallel type id for candidate
+    named_type_candidate_paths: Vec[str],      // defining module path or "" for global
     // c_import scoping: tracks which symbols are c_import-origin
     ci_syms: HashMap[i32, i32],      // sym → 1 for c_import-origin symbols
     ci_modules: HashMap[i32, i32],   // module-path-sym → 1 for modules that have c_import
@@ -368,6 +378,9 @@ fn sema_new_map_str_i32 -> HashMap[str, i32]:
 
 fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
     HashMap.new()
+
+fn sema_visibility_cache_key(from_path: str, to_path: str) -> str:
+    from_path ++ "->" ++ to_path
 
 fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     let named_types = sema_new_map_i32_i32()
@@ -565,6 +578,16 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         decl_source_file_ids: Vec.new(),
         decl_is_c_import: Vec.new(),
         current_module_path: "",
+        module_paths: Vec.new(),
+        module_import_starts: Vec.new(),
+        module_import_counts: Vec.new(),
+        module_import_targets: Vec.new(),
+        module_index_by_path: sema_new_map_str_i32(),
+        global_visible_module_paths: sema_new_map_str_i32(),
+        module_visibility_cache: sema_new_map_str_i32(),
+        named_type_candidate_syms: Vec.new(),
+        named_type_candidate_tids: Vec.new(),
+        named_type_candidate_paths: Vec.new(),
         ci_syms: sema_new_map_i32_i32(),
         ci_modules: sema_new_map_i32_i32(),
         scoping_active: 0,
@@ -637,8 +660,86 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
 
 fn Sema.register_prim(self: &mut Sema, name: str, tid: i32):
     let sym = self.pool_intern(name)
+    self.record_named_type(sym, tid)
+
+fn Sema.record_named_type(self: &mut Sema, sym: i32, tid: i32):
     self.named_types.insert(sym, tid)
-    self.pretty_symbol_names.insert(sym, name)
+    self.named_type_candidate_syms.push(sym)
+    self.named_type_candidate_tids.push(tid)
+    let path = if self.current_module_path.len() > 0: self.current_module_path else: ""
+    self.named_type_candidate_paths.push(path)
+
+fn Sema.module_is_visible_from_current(self: Sema, target_path: str) -> i32:
+    if target_path.len() == 0:
+        return 1
+    if self.global_visible_module_paths.contains(target_path):
+        return 1
+    if self.current_module_path.len() == 0:
+        return 1
+    if target_path == self.current_module_path:
+        return 1
+    if not self.module_index_by_path.contains(self.current_module_path):
+        return 1
+    if not self.module_index_by_path.contains(target_path):
+        return 1
+    let cache_key = sema_visibility_cache_key(self.current_module_path, target_path)
+    if self.module_visibility_cache.contains(cache_key):
+        return self.module_visibility_cache.get(cache_key).unwrap()
+    let start_idx = self.module_index_by_path.get(self.current_module_path).unwrap()
+    let target_idx = self.module_index_by_path.get(target_path).unwrap()
+    if start_idx == target_idx:
+        self.module_visibility_cache.insert(cache_key, 1)
+        return 1
+    let seen: HashMap[i32, i32] = sema_new_map_i32_i32()
+    let stack: Vec[i32] = Vec.new()
+    stack.push(start_idx)
+    while stack.len() as i32 > 0:
+        let last = stack.len() as i32 - 1
+        let current = stack.get(last as i64)
+        stack.pop()
+        if seen.contains(current):
+            continue
+        seen.insert(current, 1)
+        if current == target_idx:
+            self.module_visibility_cache.insert(cache_key, 1)
+            return 1
+        if current >= 0 and current < self.module_import_starts.len() as i32:
+            let edge_start = self.module_import_starts.get(current as i64)
+            let edge_count = self.module_import_counts.get(current as i64)
+            for ei in 0..edge_count:
+                stack.push(self.module_import_targets.get((edge_start + ei) as i64))
+    self.module_visibility_cache.insert(cache_key, 0)
+    0
+
+fn Sema.lookup_named_type_visible(self: Sema, sym: i32) -> i32:
+    let named_tid = if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
+    var global_tid = 0
+    var saw_recorded = 0
+    var saw_named_tid = 0
+    var i = self.named_type_candidate_syms.len() as i32 - 1
+    while i >= 0:
+        if self.named_type_candidate_syms.get(i as i64) == sym:
+            saw_recorded = 1
+            let candidate_tid = self.named_type_candidate_tids.get(i as i64)
+            let candidate_path = self.named_type_candidate_paths.get(i as i64)
+            if named_tid != 0 and candidate_tid == named_tid:
+                saw_named_tid = 1
+            if candidate_path.len() == 0:
+                if global_tid == 0:
+                    global_tid = candidate_tid
+            else if self.module_is_visible_from_current(candidate_path) != 0:
+                return candidate_tid
+        i = i - 1
+    if named_tid != 0 and (saw_recorded == 0 or saw_named_tid == 0):
+        return named_tid
+    if global_tid != 0:
+        return global_tid
+    0
+
+fn Sema.has_named_type_visible(self: Sema, sym: i32) -> i32:
+    if self.lookup_named_type_visible(sym) != 0:
+        return 1
+    0
 
 fn Sema.register_builtin_struct_type(self: &mut Sema, name: str, field_names: Vec[str], field_types: Vec[i32], field_count: i32) -> i32:
     let name_sym = self.pool_intern(name)
@@ -651,7 +752,7 @@ fn Sema.register_builtin_struct_type(self: &mut Sema, name: str, field_names: Ve
     for _ in 0..field_count:
         self.type_extra.push(0)
     let tid = self.add_type(TypeKind.TY_STRUCT, name_sym, te_start, field_count)
-    self.named_types.insert(name_sym, tid as i32)
+    self.record_named_type(name_sym, tid as i32)
     self.pretty_symbol_names.insert(name_sym, name)
     tid as i32
 
@@ -1127,7 +1228,8 @@ fn Sema.preregister_mir_types(self: Sema):
 
 fn Sema.resolve_generic_type(self: Sema, node: i32) -> i32:
     let gi_base_sym = self.ast.get_data0(node)
-    if not self.named_types.contains(gi_base_sym):
+    let gi_base_tid = self.lookup_named_type_visible(gi_base_sym)
+    if gi_base_tid == 0:
         let gi_name = self.pool_resolve_symbol(gi_base_sym)
         self.emit_error("unknown type: " ++ gi_name, node)
         return 0

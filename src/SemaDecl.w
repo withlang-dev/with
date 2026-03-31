@@ -132,10 +132,10 @@ fn Sema.resolve_deferred_non_generic_type_decls(self: Sema):
 
 fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
     let name = self.ast.get_data0(decl)
-    if not self.named_types.contains(name):
+    let tid = self.lookup_named_type_visible(name)
+    if tid == 0:
         return
 
-    let tid = self.named_types.get(name).unwrap()
     let extra_start = self.ast.get_data1(decl)
     let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
     let resolved = self.resolve_alias(tid)
@@ -422,7 +422,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         for fi in 0..field_count:
             self.type_extra.push(self.ast.get_extra(align_base + fi))
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
-        self.named_types.insert(name, tid as i32)
+        self.record_named_type(name, tid as i32)
 
     if sub_kind == TypeDeclKind.Enum:
         let variant_count = self.ast.get_extra(extra_start)
@@ -445,7 +445,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             // Register variant lookup
             self.variant_lookup.insert(v_name, vi)
         let tid = self.add_type(TypeKind.TY_ENUM, name, te_start, variant_count)
-        self.named_types.insert(name, tid as i32)
+        self.record_named_type(name, tid as i32)
         // Re-register variants with actual enum TypeId (bare + qualified names)
         let plain_type_name_str = self.pool_resolve(name)
         var vpos = te_start
@@ -498,7 +498,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
                 self.type_extra.push(pt_tid as i32)
             self.variant_lookup.insert(v_name, vi)
         let tid = self.add_type(TypeKind.TY_ENUM, name, te_start, variant_count)
-        self.named_types.insert(name, tid as i32)
+        self.record_named_type(name, tid as i32)
         self.disc_repr_types.insert(tid as i32, repr_type_tid as i32)
         // Check if any variant has payloads
         var any_payload = 0
@@ -536,7 +536,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         let aliased_node = self.ast.get_extra(extra_start)
         let target = self.resolve_type_expr(aliased_node)
         let tid = self.add_type(TypeKind.TY_ALIAS, target as i32, 0, 0)
-        self.named_types.insert(name, tid as i32)
+        self.record_named_type(name, tid as i32)
 
     if sub_kind == TypeDeclKind.Distinct:
         let inner_node = self.ast.get_extra(extra_start)
@@ -550,14 +550,14 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         self.type_extra.push(inner as i32)
         self.type_extra.push(0)
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, 1)
-        self.named_types.insert(name, tid as i32)
+        self.record_named_type(name, tid as i32)
         self.distinct_type_names.insert(name, tid as i32)
 
     if sub_kind == TypeDeclKind.Opaque:
         // Opaque type: register as struct with 0 fields
         let te_start = self.type_extra.len() as i32
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, 0)
-        self.named_types.insert(name, tid as i32)
+        self.record_named_type(name, tid as i32)
 
     if sub_kind == TypeDeclKind.Union:
         // Union type: register fields like a struct (codegen handles layout)
@@ -586,7 +586,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         for fi in 0..field_count:
             self.type_extra.push(self.ast.get_extra(align_base + fi))
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
-        self.named_types.insert(name, tid as i32)
+        self.record_named_type(name, tid as i32)
 
     if is_ephemeral != 0:
         self.ephemeral_types.insert(name, 1)
@@ -849,8 +849,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
         if fn_name_str.byte_at(ci as i64) == 46:
             let owner_name = fn_name_str.slice(0, ci as i64)
             let owner_sym = self.pool_intern(owner_name)
-            if self.named_types.contains(owner_sym):
-                self_type_id = self.named_types.get(owner_sym).unwrap()
+            self_type_id = self.lookup_named_type_visible(owner_sym)
+            if self_type_id != 0:
                 self.named_types.insert(self_sym, self_type_id)
             break
 
@@ -1219,7 +1219,7 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32):
                 if self.impl_extra.get((drop_start + di) as i64) == drop_sym:
                     self.emit_error("type '" ++ self.pool_resolve(type_name) ++ "' cannot implement Copy because it implements Drop", node)
                     return
-        let type_tid = if self.named_types.contains(type_name): self.named_types.get(type_name).unwrap() else: 0
+        let type_tid = self.lookup_named_type_visible(type_name)
         if type_tid > 0:
             let tk = self.get_type_kind(self.resolve_alias(type_tid))
             if tk == TypeKind.TY_STRUCT:
@@ -1460,7 +1460,7 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
         let sym = self.ast.get_data0(node)
         if self.primitive_type_by_sym(sym) != 0:
             return
-        if self.named_types.contains(sym):
+        if self.has_named_type_visible(sym) != 0:
             return
         if self.type_param_exists(tp_start, tp_count, sym) != 0:
             return
@@ -1494,7 +1494,7 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
     if kind == NodeKind.NK_TYPE_GENERIC:
         let base_sym = self.ast.get_data0(node)
         let base_prim = self.primitive_type_by_sym(base_sym)
-        if base_prim == 0 and not self.named_types.contains(base_sym) and self.type_param_exists(tp_start, tp_count, base_sym) == 0:
+        if base_prim == 0 and self.has_named_type_visible(base_sym) == 0 and self.type_param_exists(tp_start, tp_count, base_sym) == 0:
             self.debug_unknown_type(base_sym, node, "validate_type_generic")
             self.emit_unknown_type_error(base_sym, node)
         let extra_start = self.ast.get_data1(node)
@@ -1613,9 +1613,9 @@ fn Sema.validate_copy_derives(self: Sema):
             self.emit_error("type cannot be both Copy and Drop", decl)
             continue
 
-        if not self.named_types.contains(type_name):
+        let tid = self.lookup_named_type_visible(type_name)
+        if tid == 0:
             continue
-        let tid = self.named_types.get(type_name).unwrap()
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             continue
