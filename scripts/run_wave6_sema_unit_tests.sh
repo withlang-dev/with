@@ -182,6 +182,18 @@ run_expect_pass_typed "method_resolution_multi_trait_order" \
   "test/wave6/cases/method_resolution_multi_trait_order_pass.w" \
   "trait Left"
 
+run_expect_pass_typed "issue61_imported_query_matrix_typed" \
+  "test/behavior/issue61_query_feature_matrix_dump_typed.w" \
+  "bind combined: i32"
+
+run_expect_pass_typed "issue61_selfhost_internpool_typed" \
+  "src/InternPool.w" \
+  "fn InternPool.intern_str"
+
+run_expect_pass_typed "issue61_selfhost_sema_check_typed" \
+  "src/SemaCheck.w" \
+  "fn Sema.check_method_call"
+
 # ── Trait and impl declarations ──────────────────────────────────
 
 run_expect_pass_typed "trait_impl_decl" \
@@ -277,6 +289,9 @@ run_determinism_check "determinism_trait_impl" \
 
 run_determinism_check "determinism_method_resolution_order" \
   "test/wave6/cases/method_resolution_multi_trait_order_pass.w"
+
+run_determinism_check "determinism_issue61_imported_query_matrix_typed" \
+  "test/behavior/issue61_query_feature_matrix_dump_typed.w"
 
 # ── Summary ──────────────────────────────────────────────────────
 
