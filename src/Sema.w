@@ -108,6 +108,7 @@ type Sema {
     disc_repr_types: HashMap[i32, i32],
     disc_values: HashMap[i32, i32],
     disc_has_payload: HashMap[i32, i32],
+    bitpacked_types: HashMap[i32, i32],  // type_id → 1 if bitpacked
 
     // Trait declarations
     trait_method_names: Vec[i32],
@@ -469,6 +470,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         disc_repr_types,
         disc_values,
         disc_has_payload,
+        bitpacked_types: sema_new_map_i32_i32(),
         trait_method_names: Vec.new(),
         trait_method_starts: Vec.new(),
         trait_method_counts: Vec.new(),
@@ -643,6 +645,14 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.ty_usize = s.add_type(TypeKind.TY_INT, 64, 0, 1)
     s.ty_isize = s.add_type(TypeKind.TY_INT, 64, 1, 1)
     s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_i8, 0, 0)
+
+    // Sub-byte and non-standard integer widths for bitpacked structs.
+    for w in 1..8:
+        s.add_type(TypeKind.TY_INT, w, 0, 0)  // u1-u7
+        s.add_type(TypeKind.TY_INT, w, 1, 0)  // i1-i7
+    s.add_type(TypeKind.TY_INT, 12, 0, 0)  // u12
+    s.add_type(TypeKind.TY_INT, 21, 0, 0)  // u21
+    s.add_type(TypeKind.TY_INT, 24, 0, 0)  // u24
 
     // Register primitive names.
     s.register_prim("i8", s.ty_i8)

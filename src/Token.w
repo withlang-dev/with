@@ -144,6 +144,13 @@ enum TokenKind: i32:
     TK_MINUS_WRAP_EQ = 123
     TK_STAR_WRAP_EQ = 124
     TK_KW_ENUM = 125
+    TK_PLUS_SAT = 126
+    TK_MINUS_SAT = 127
+    TK_STAR_SAT = 128
+    TK_PLUS_SAT_EQ = 129
+    TK_MINUS_SAT_EQ = 130
+    TK_STAR_SAT_EQ = 131
+    TK_KW_ASM = 132
 
 // Lookup table: keyword string -> tag. Returns -1 if not a keyword.
 fn tag_from_keyword(s: str) -> i32:
@@ -199,6 +206,7 @@ fn tag_from_keyword(s: str) -> i32:
     if s == "null": return TokenKind.TK_KW_NULL
     if s == "union": return TokenKind.TK_KW_UNION
     if s == "enum": return TokenKind.TK_KW_ENUM
+    if s == "asm": return TokenKind.TK_KW_ASM
     -1
 
 // Returns a human-readable name for a token tag (for diagnostics).
@@ -274,6 +282,10 @@ fn tag_name(tag: i32) -> str:
     if tag == TokenKind.TK_PLUS_WRAP: return "'+%'"
     if tag == TokenKind.TK_MINUS_WRAP: return "'-%'"
     if tag == TokenKind.TK_STAR_WRAP: return "'*%'"
+    if tag == TokenKind.TK_PLUS_SAT: return "'+|'"
+    if tag == TokenKind.TK_MINUS_SAT: return "'-|'"
+    if tag == TokenKind.TK_STAR_SAT: return "'*|'"
+    if tag == TokenKind.TK_KW_ASM: return "'asm'"
     if tag == TokenKind.TK_EQ: return "'='"
     if tag == TokenKind.TK_EQ_EQ: return "'=='"
     if tag == TokenKind.TK_BANG: return "'!'"

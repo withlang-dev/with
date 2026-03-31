@@ -132,6 +132,24 @@ enum MirIntrinsic: i32:
     MIR_INTRINSIC_FMT_SPEC = 52
     MIR_INTRINSIC_INT_SWAP_BYTES = 53
     MIR_INTRINSIC_MAP_KEYS = 54
+    MIR_INTRINSIC_POPCOUNT = 55
+    MIR_INTRINSIC_CLZ = 56
+    MIR_INTRINSIC_CTZ = 57
+    MIR_INTRINSIC_BITREVERSE = 58
+    MIR_INTRINSIC_MIN = 59
+    MIR_INTRINSIC_MAX = 60
+    MIR_INTRINSIC_ABS = 61
+    MIR_INTRINSIC_FMA = 62
+    MIR_INTRINSIC_ASM = 63
+    MIR_INTRINSIC_ATOMIC_LOAD = 64
+    MIR_INTRINSIC_ATOMIC_STORE = 65
+    MIR_INTRINSIC_ATOMIC_SWAP = 66
+    MIR_INTRINSIC_ATOMIC_FETCH_ADD = 67
+    MIR_INTRINSIC_ATOMIC_FETCH_SUB = 68
+    MIR_INTRINSIC_ATOMIC_FETCH_AND = 69
+    MIR_INTRINSIC_ATOMIC_FETCH_OR = 70
+    MIR_INTRINSIC_ATOMIC_FETCH_XOR = 71
+    MIR_INTRINSIC_ATOMIC_CAS = 72
 
 // ── Projection kinds ─────────────────────────────────────────────
 
@@ -245,6 +263,7 @@ type MirModule {
     sema_type_d1: Vec[i32],
     sema_type_d2: Vec[i32],
     sema_type_extra: Vec[i32],
+    sema_bitpacked_types: HashMap[i32, i32],
 }
 
 // ── MirModule helpers ────────────────────────────────────────────
@@ -259,6 +278,7 @@ fn MirModule.init -> MirModule:
         sema_type_d1: Vec.new(),
         sema_type_d2: Vec.new(),
         sema_type_extra: Vec.new(),
+        sema_bitpacked_types: HashMap.new(),
     }
 
 fn MirModule.snapshot_sema_types(self: MirModule, sema: Sema):
@@ -272,6 +292,10 @@ fn MirModule.snapshot_sema_types(self: MirModule, sema: Sema):
         self.sema_type_d2.push(sema.type_d2.get(i as i64))
     for i in 0..sema.type_extra.len() as i32:
         self.sema_type_extra.push(sema.type_extra.get(i as i64))
+    self.sema_bitpacked_types = sema.bitpacked_types
+
+fn MirModule.mir_is_bitpacked(self: MirModule, tid: i32) -> bool:
+    self.sema_bitpacked_types.contains(tid)
 
 fn MirModule.mir_get_type_kind(self: MirModule, tid: i32) -> i32:
     if tid < 0 or tid >= self.sema_type_kinds.len() as i32:
@@ -1699,6 +1723,13 @@ fn mir_validate_cast_supported(mir_mod: MirModule, src_ty: i32, dst_ty: i32) -> 
     if src_kind == TypeKind.TY_STR:
         return dst_kind == TypeKind.TY_PTR or dst_kind == TypeKind.TY_REF or dst_kind == TypeKind.TY_STR
     if src_kind == TypeKind.TY_STRUCT or src_kind == TypeKind.TY_ENUM or src_kind == TypeKind.TY_GENERIC_INST or src_kind == TypeKind.TY_ARRAY or src_kind == TypeKind.TY_SLICE or src_kind == TypeKind.TY_TUPLE:
+        // Allow bitpacked struct ↔ integer casts
+        if src_kind == TypeKind.TY_STRUCT and dst_kind == TypeKind.TY_INT:
+            if mir_mod.mir_is_bitpacked(src_resolved as i32):
+                return true
+        if dst_kind == TypeKind.TY_STRUCT and src_kind == TypeKind.TY_INT:
+            if mir_mod.mir_is_bitpacked(dst_resolved as i32):
+                return true
         return false
     true
 

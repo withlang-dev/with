@@ -61,6 +61,7 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
         if bits == 16: return wl_i16_type(self.context)
         if bits == 64: return wl_i64_type(self.context)
         if bits == 128: return wl_i128_type(self.context)
+        if bits > 0 and bits != 32: return wl_int_type_n(self.context, bits)
         return wl_i32_type(self.context)
     if tk == TypeKind.TY_FLOAT:
         let bits = self.mir_input.mir_get_type_d0(resolved)
@@ -211,6 +212,14 @@ fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32)
         if field_token >= 0 and field_token < wl_get_array_length(agg_ty) as i32:
             return field_token
         return 0 - 1
+    // Bitpacked structs: look up field by name in the struct registry
+    if self.is_bitpacked_struct(agg_ty):
+        let bp_idx = self.find_bitpacked_index_by_type(agg_ty)
+        if bp_idx >= 0:
+            let bp_sym = self.struct_index_syms.get(bp_idx as i64)
+            if bp_sym != 0:
+                return self.find_field_index(bp_sym, field_token)
+        return 0 - 1
     if wl_get_type_kind(agg_ty) != wl_struct_type_kind():
         return 0 - 1
     let elem_count = wl_count_struct_elem_types(agg_ty)
@@ -297,7 +306,15 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
             let fi = self.mir_resolve_field_index(cur_ty, pd)
             if fi < 0:
                 return 0
-            if wl_get_type_kind(cur_ty) == wl_array_type_kind():
+            if self.is_bitpacked_struct(cur_ty):
+                // Bitpacked: field type is the sub-byte integer
+                let bp_pinfo = self.get_bitpacked_field_info(cur_ty, fi)
+                if bp_pinfo >= 0:
+                    let bp_pw = bp_pinfo % 65536
+                    cur_ty = wl_int_type_n(self.context, bp_pw)
+                else:
+                    return 0
+            else if wl_get_type_kind(cur_ty) == wl_array_type_kind():
                 cur_ty = wl_get_element_type(cur_ty)
             else if fi < wl_count_struct_elem_types(cur_ty):
                 cur_ty = wl_struct_get_type_at(cur_ty, fi)
@@ -448,7 +465,16 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
             let fi = self.mir_resolve_field_index(cur_ty, pd)
             if fi < 0:
                 return 0
-            if wl_get_type_kind(cur_ty) == wl_array_type_kind():
+            if self.is_bitpacked_struct(cur_ty):
+                // Bitpacked field: don't GEP — record bit offset/width for later shift+mask.
+                // cur_ptr stays pointing to the backing iN, cur_ty stays as iN.
+                let bp_info = self.get_bitpacked_field_info(cur_ty, fi)
+                if bp_info >= 0:
+                    self.bitpacked_place_proj.insert(place_id, bp_info)
+                // cur_ty becomes the field's type (for subsequent use)
+                let bp_bit_width = bp_info % 65536
+                cur_ty = wl_int_type_n(self.context, bp_bit_width)
+            else if wl_get_type_kind(cur_ty) == wl_array_type_kind():
                 // Array field access: GEP with [0, index]
                 let arr_elem_ty = wl_get_element_type(cur_ty)
                 let gep_indices: Vec[i64] = Vec.new()
@@ -723,7 +749,32 @@ fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expec
                 ptr_ty = self.mir_sema_type_to_llvm(sema_ty)
         if ptr_ty == 0:
             return wl_get_undef(fallback_ty)
-        let loaded = wl_build_load(self.builder, ptr_ty, ptr)
+        // Bitpacked field extraction: if this place has a bitpacked projection,
+        // load the full backing integer, then apply shift+mask to extract the field.
+        let bp_proj = self.bitpacked_place_proj.get(od)
+        if bp_proj.is_some():
+            // Override ptr_ty to the backing integer type (the alloca type)
+            ptr_ty = wl_get_allocated_type(ptr)
+        var loaded = wl_build_load(self.builder, ptr_ty, ptr)
+        if bp_proj.is_some():
+            let bp_info = bp_proj.unwrap() as i32
+            let bp_bit_offset = bp_info / 65536
+            let bp_bit_width = bp_info % 65536
+            let bp_total_bits = wl_get_int_type_width(ptr_ty)
+            // MSB-first: shift right by (total - offset - width)
+            let bp_shift_amt = bp_total_bits - bp_bit_offset - bp_bit_width
+            if bp_shift_amt > 0:
+                let bp_shift = wl_const_int(ptr_ty, bp_shift_amt as i64, 0)
+                loaded = wl_build_lshr(self.builder, loaded, bp_shift)
+            // Mask to field width
+            if bp_bit_width < bp_total_bits:
+                let bp_mask = wl_const_int(ptr_ty, ((1 as i64) << (bp_bit_width as i64)) - 1, 0)
+                loaded = wl_build_and(self.builder, loaded, bp_mask)
+            // Truncate to field type
+            let bp_field_ty = wl_int_type_n(self.context, bp_bit_width)
+            if bp_bit_width < bp_total_bits:
+                loaded = wl_build_trunc(self.builder, loaded, bp_field_ty)
+            self.bitpacked_place_proj.remove(od)
         if expected_ty != 0:
             // Don't coerce between incompatible struct types — the local's
             // LLVM type (from a prior store, e.g. intrinsic result) is
@@ -889,6 +940,54 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
     if op == BinaryOp.OP_ADD_WRAP: return wl_build_add(self.builder, l, r)
     if op == BinaryOp.OP_SUB_WRAP: return wl_build_sub(self.builder, l, r)
     if op == BinaryOp.OP_MUL_WRAP: return wl_build_mul(self.builder, l, r)
+    if op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT:
+        let sat_width = wl_get_int_type_width(wider_ty)
+        let sat_prefix = if op == BinaryOp.OP_ADD_SAT: if is_unsigned: "llvm.uadd.sat.i" else: "llvm.sadd.sat.i" else: if is_unsigned: "llvm.usub.sat.i" else: "llvm.ssub.sat.i"
+        let sat_fn_name = if sat_width == 8: sat_prefix ++ "8" else: if sat_width == 16: sat_prefix ++ "16" else: if sat_width == 32: sat_prefix ++ "32" else: sat_prefix ++ "64"
+        let sat_sym = self.intern.intern(sat_fn_name)
+        let sat_fv = self.fn_values.get(sat_sym)
+        let sat_ft = self.fn_fn_types.get(sat_sym)
+        if sat_fv.is_some() and sat_ft.is_some():
+            let sat_args: Vec[i64] = Vec.new()
+            sat_args.push(l)
+            sat_args.push(r)
+            return wl_build_call(self.builder, sat_ft.unwrap() as i64, sat_fv.unwrap() as i64, vec_data_i64(&sat_args), 2)
+        else:
+            let sat_pts: Vec[i64] = Vec.new()
+            sat_pts.push(wider_ty)
+            sat_pts.push(wider_ty)
+            let sat_fnt = wl_function_type(wider_ty, vec_data_i64(&sat_pts), 2, 0)
+            let sat_func = wl_add_function(self.llmod, sat_fn_name, sat_fnt)
+            self.fn_values.insert(sat_sym, sat_func)
+            self.fn_fn_types.insert(sat_sym, sat_fnt)
+            let sat_args: Vec[i64] = Vec.new()
+            sat_args.push(l)
+            sat_args.push(r)
+            return wl_build_call(self.builder, sat_fnt, sat_func, vec_data_i64(&sat_args), 2)
+    if op == BinaryOp.OP_MUL_SAT:
+        // Widening multiply + clamp: multiply in 2x width, clamp to [MIN, MAX], truncate
+        let ms_width = wl_get_int_type_width(wider_ty)
+        let ms_dbl_width = ms_width * 2
+        let ms_dbl_ty = if ms_dbl_width == 16: wl_i16_type(self.context) else: if ms_dbl_width == 32: wl_i32_type(self.context) else: if ms_dbl_width == 64: wl_i64_type(self.context) else: wl_i128_type(self.context)
+        let ms_wide_l = if is_unsigned: wl_build_zext(self.builder, l, ms_dbl_ty) else: wl_build_sext(self.builder, l, ms_dbl_ty)
+        let ms_wide_r = if is_unsigned: wl_build_zext(self.builder, r, ms_dbl_ty) else: wl_build_sext(self.builder, r, ms_dbl_ty)
+        let ms_wide_result = wl_build_mul(self.builder, ms_wide_l, ms_wide_r)
+        // Clamp using saturating add of 0 in the original width (truncate + sat)
+        // Actually: just truncate and check for overflow with icmp
+        if is_unsigned:
+            let ms_max_val = wl_const_int(ms_dbl_ty, ((1 as i64) << (ms_width as i64)) - 1, 0)
+            let ms_overflow = wl_build_icmp(self.builder, wl_int_ugt(), ms_wide_result, ms_max_val)
+            let ms_clamped = wl_build_select(self.builder, ms_overflow, ms_max_val, ms_wide_result)
+            return wl_build_trunc(self.builder, ms_clamped, wider_ty)
+        else:
+            let ms_half = ms_width as i64 - 1
+            let ms_max_val = wl_const_int(ms_dbl_ty, ((1 as i64) << ms_half) - 1, 0)
+            let ms_min_val = wl_const_int(ms_dbl_ty, -((1 as i64) << ms_half), 1)
+            let ms_too_big = wl_build_icmp(self.builder, wl_int_sgt(), ms_wide_result, ms_max_val)
+            let ms_too_small = wl_build_icmp(self.builder, wl_int_slt(), ms_wide_result, ms_min_val)
+            let ms_clamped_hi = wl_build_select(self.builder, ms_too_big, ms_max_val, ms_wide_result)
+            let ms_clamped = wl_build_select(self.builder, ms_too_small, ms_min_val, ms_clamped_hi)
+            return wl_build_trunc(self.builder, ms_clamped, wider_ty)
     if op == BinaryOp.OP_ADD:
         if is_unsigned: return wl_build_add(self.builder, l, r)
         return wl_build_nsw_add(self.builder, l, r)
@@ -1399,10 +1498,51 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                         let ev_val = self.mir_eval_operand(body, ev_op, ev_payload_ty)
                         wl_build_store(self.builder, self.coerce_value_to_type(ev_val, ev_payload_ty), ev_data_ptr)
                 return wl_build_load(self.builder, struct_ty, ev_alloca)
-            if struct_ty == 0 or wl_get_type_kind(struct_ty) != wl_struct_type_kind():
+            // Check if this struct is bitpacked (stored as iN) — must check before rejecting non-struct types
+            if struct_ty != 0 and self.is_bitpacked_struct(struct_ty):
+                // Fall through to bitpacked handler below
+                0
+            else if struct_ty == 0 or wl_get_type_kind(struct_ty) != wl_struct_type_kind():
                 with_eprint(f"error: aggregate rvalue missing destination struct type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
                 self.had_error = 1
                 return wl_get_undef(fallback_ty)
+            // Check if this struct is bitpacked (stored as iN)
+            if self.is_bitpacked_struct(struct_ty):
+                // Bitpacked struct literal: OR-shift fields into backing integer
+                var bp_result = wl_const_int(struct_ty, 0, 0)
+                let bp_total_bits = wl_get_int_type_width(struct_ty)
+                for i in 0..agg_count:
+                    let op_id = body.agg_field_operands.get((agg_start + i) as i64)
+                    var fi = i
+                    if (agg_start + i) < body.agg_field_name_syms.len() as i32:
+                        let name_sym = body.agg_field_name_syms.get((agg_start + i) as i64)
+                        if name_sym != 0:
+                            let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym)
+                            if resolved_fi >= 0:
+                                fi = resolved_fi
+                    let bp_info = self.get_bitpacked_field_info(struct_ty, fi)
+                    if bp_info < 0: continue
+                    let bp_bit_offset = bp_info / 65536
+                    let bp_bit_width = bp_info % 65536
+                    let val = self.mir_eval_operand(body, op_id, 0)
+                    // Zero-extend or truncate field value to backing type width
+                    var field_val = val
+                    let val_width = wl_get_int_type_width(wl_type_of(val))
+                    if val_width < bp_total_bits:
+                        field_val = wl_build_zext(self.builder, val, struct_ty)
+                    else if val_width > bp_total_bits:
+                        field_val = wl_build_trunc(self.builder, val, struct_ty)
+                    // Mask to field width, shift to position (MSB-first layout)
+                    let bp_shift_amt = bp_total_bits - bp_bit_offset - bp_bit_width
+                    if bp_bit_width < bp_total_bits:
+                        let bp_mask = wl_const_int(struct_ty, ((1 as i64) << (bp_bit_width as i64)) - 1, 0)
+                        field_val = wl_build_and(self.builder, field_val, bp_mask)
+                    if bp_shift_amt > 0:
+                        let bp_shift = wl_const_int(struct_ty, bp_shift_amt as i64, 0)
+                        field_val = wl_build_shl(self.builder, field_val, bp_shift)
+                    bp_result = wl_build_or(self.builder, bp_result, field_val)
+                return bp_result
+
             let alloca = self.create_entry_alloca(struct_ty)
             wl_build_store(self.builder, self.build_default_value(struct_ty), alloca)
             let struct_field_count = wl_count_struct_elem_types(struct_ty)
@@ -1557,7 +1697,41 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
         var coerced = value
         if wl_type_of(value) != final_ty:
             coerced = self.coerce_value_to_type(value, final_ty)
-        wl_build_store(self.builder, coerced, dst_ptr)
+        // Bitpacked field store: read-modify-write the backing integer
+        let bp_store_proj = self.bitpacked_place_proj.get(d0)
+        if bp_store_proj.is_some():
+            let bp_si = bp_store_proj.unwrap() as i32
+            let bp_sbit_offset = bp_si / 65536
+            let bp_sbit_width = bp_si % 65536
+            let bp_sbacking_ty = wl_get_allocated_type(dst_ptr)
+            let bp_stotal_bits = wl_get_int_type_width(bp_sbacking_ty)
+            let bp_sshift_amt = bp_stotal_bits - bp_sbit_offset - bp_sbit_width
+            // Load current backing value
+            let bp_sold = wl_build_load(self.builder, bp_sbacking_ty, dst_ptr)
+            // Clear field bits
+            let bp_sfield_mask = ((1 as i64) << (bp_sbit_width as i64)) - 1
+            let bp_sclear_mask_val = (bp_sfield_mask << (bp_sshift_amt as i64)) ^ (-1 as i64)
+            let bp_sclear_mask = wl_const_int(bp_sbacking_ty, bp_sclear_mask_val, 0)
+            let bp_scleared = wl_build_and(self.builder, bp_sold, bp_sclear_mask)
+            // Extend new value to backing width and shift into position
+            var bp_snew_val = coerced
+            let bp_snew_width = wl_get_int_type_width(wl_type_of(coerced))
+            if bp_snew_width < bp_stotal_bits:
+                bp_snew_val = wl_build_zext(self.builder, coerced, bp_sbacking_ty)
+            else if bp_snew_width > bp_stotal_bits:
+                bp_snew_val = wl_build_trunc(self.builder, coerced, bp_sbacking_ty)
+            // Mask to field width
+            let bp_sval_mask = wl_const_int(bp_sbacking_ty, bp_sfield_mask, 0)
+            bp_snew_val = wl_build_and(self.builder, bp_snew_val, bp_sval_mask)
+            if bp_sshift_amt > 0:
+                let bp_sshift = wl_const_int(bp_sbacking_ty, bp_sshift_amt as i64, 0)
+                bp_snew_val = wl_build_shl(self.builder, bp_snew_val, bp_sshift)
+            // OR new value in
+            let bp_sfinal = wl_build_or(self.builder, bp_scleared, bp_snew_val)
+            wl_build_store(self.builder, bp_sfinal, dst_ptr)
+            self.bitpacked_place_proj.remove(d0)
+        else:
+            wl_build_store(self.builder, coerced, dst_ptr)
         return true
 
     if sk == StmtKind.StorageLive:
@@ -2107,6 +2281,16 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "unwrap": return MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP
         if method_name == "is_some": return MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME
         if method_name == "is_none": return MirIntrinsic.MIR_INTRINSIC_OPT_IS_NONE
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "Atomic":
+        if method_name == "load": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_LOAD
+        if method_name == "store": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_STORE
+        if method_name == "swap": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP
+        if method_name == "fetch_add": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD
+        if method_name == "fetch_sub": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB
+        if method_name == "fetch_and": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND
+        if method_name == "fetch_or": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR
+        if method_name == "fetch_xor": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR
         return MirIntrinsic.MIR_INTRINSIC_NONE
     MirIntrinsic.MIR_INTRINSIC_NONE
 
@@ -2678,6 +2862,62 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), f2)
         result = wl_build_load(self.builder, iter_struct_ty, iter_alloca)
 
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_LOAD:
+        // Atomic[T].load(order) — atomic load from field 0 (val)
+        let al_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let al_order_raw = self.mir_intrinsic_arg(body, args_id, 1)
+        // Get the element type from the Atomic struct (field 0)
+        let al_recv_ty = wl_get_allocated_type(al_recv_ptr)
+        let al_elem_ty = wl_struct_get_type_at(al_recv_ty, 0)
+        // GEP to field 0 (val)
+        let al_val_ptr = wl_build_struct_gep(self.builder, al_recv_ty, al_recv_ptr, 0)
+        // Extract ordering constant (default to seq_cst = 4)
+        let al_order = if wl_is_constant(al_order_raw) != 0: wl_const_int_sext_val(al_order_raw) as i32 else: 4
+        result = wl_build_atomic_load(self.builder, al_elem_ty, al_val_ptr, al_order)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_STORE:
+        // Atomic[T].store(val, order) — atomic store to field 0
+        let as_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let as_val = self.mir_intrinsic_arg(body, args_id, 1)
+        let as_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
+        let as_recv_ty = wl_get_allocated_type(as_recv_ptr)
+        let as_val_ptr = wl_build_struct_gep(self.builder, as_recv_ty, as_recv_ptr, 0)
+        let as_order = if wl_is_constant(as_order_raw) != 0: wl_const_int_sext_val(as_order_raw) as i32 else: 4
+        wl_build_atomic_store(self.builder, as_val, as_val_ptr, as_order)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR:
+        // Atomic[T].fetch_*(val, order) — atomicrmw on field 0
+        let ar_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let ar_val = self.mir_intrinsic_arg(body, args_id, 1)
+        let ar_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
+        let ar_recv_ty = wl_get_allocated_type(ar_recv_ptr)
+        let ar_val_ptr = wl_build_struct_gep(self.builder, ar_recv_ty, ar_recv_ptr, 0)
+        let ar_order = if wl_is_constant(ar_order_raw) != 0: wl_const_int_sext_val(ar_order_raw) as i32 else: 4
+        let ar_rmw_op = if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP: 0 else: if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD: 1 else: if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB: 2 else: if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND: 3 else: if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR: 4 else: 5
+        result = wl_build_atomic_rmw(self.builder, ar_rmw_op, ar_val_ptr, ar_val, ar_order)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ASM:
+        // Inline assembly: read template and constraints from AST node
+        let asm_node = body.call_ast_node(args_id)
+        if asm_node != 0:
+            let asm_tmpl_sym = self.pool.get_data0(asm_node)
+            let asm_constr_sym = self.pool.get_data1(asm_node)
+            let asm_flags = self.pool.get_data2(asm_node)
+            let asm_tmpl = self.intern.resolve(asm_tmpl_sym)
+            let asm_constr = self.intern.resolve(asm_constr_sym)
+            let asm_is_volatile = (asm_flags & 1) != 0
+            // Create void() function type for the asm call
+            let asm_void_ty = wl_void_type(self.context)
+            let asm_pts: Vec[i64] = Vec.new()
+            let asm_fn_ty = wl_function_type(asm_void_ty, vec_data_i64(&asm_pts), 0, 0)
+            let asm_val = wl_get_inline_asm(asm_fn_ty, asm_tmpl, asm_constr, if asm_is_volatile: 1 else: 0, 0)
+            let asm_args: Vec[i64] = Vec.new()
+            wl_build_call(self.builder, asm_fn_ty, asm_val, vec_data_i64(&asm_args), 0)
+        // Branch to next bb
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+        return true
+
     else:
         return self.mir_emit_intrinsic_call_ext(body, intrinsic, args_id, dest_place, next_bb)
 
@@ -2862,6 +3102,184 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
                 let sb_args: Vec[i64] = Vec.new()
                 sb_args.push(sb_val)
                 result = wl_build_call(self.builder, sb_fnt, sb_func, vec_data_i64(&sb_args), 1)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_POPCOUNT:
+        let pc_val = self.mir_intrinsic_arg(body, args_id, 0)
+        let pc_ty = wl_type_of(pc_val)
+        let pc_width = wl_get_int_type_width(pc_ty)
+        let pc_fn_name = if pc_width == 8: "llvm.ctpop.i8" else: if pc_width == 16: "llvm.ctpop.i16" else: if pc_width == 32: "llvm.ctpop.i32" else: "llvm.ctpop.i64"
+        let pc_sym = self.intern.intern(pc_fn_name)
+        let pc_fv = self.fn_values.get(pc_sym)
+        let pc_ft = self.fn_fn_types.get(pc_sym)
+        if pc_fv.is_some() and pc_ft.is_some():
+            let pc_args: Vec[i64] = Vec.new()
+            pc_args.push(pc_val)
+            let pc_raw = wl_build_call(self.builder, pc_ft.unwrap() as i64, pc_fv.unwrap() as i64, vec_data_i64(&pc_args), 1)
+            result = if pc_width == 32: pc_raw else: wl_build_zext(self.builder, pc_raw, wl_i32_type(self.context))
+        else:
+            let pc_pts: Vec[i64] = Vec.new()
+            pc_pts.push(pc_ty)
+            let pc_fnt = wl_function_type(pc_ty, vec_data_i64(&pc_pts), 1, 0)
+            let pc_func = wl_add_function(self.llmod, pc_fn_name, pc_fnt)
+            self.fn_values.insert(pc_sym, pc_func)
+            self.fn_fn_types.insert(pc_sym, pc_fnt)
+            let pc_args: Vec[i64] = Vec.new()
+            pc_args.push(pc_val)
+            let pc_raw = wl_build_call(self.builder, pc_fnt, pc_func, vec_data_i64(&pc_args), 1)
+            result = if pc_width == 32: pc_raw else: wl_build_zext(self.builder, pc_raw, wl_i32_type(self.context))
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_CLZ or intrinsic == MirIntrinsic.MIR_INTRINSIC_CTZ:
+        let ct_val = self.mir_intrinsic_arg(body, args_id, 0)
+        let ct_ty = wl_type_of(ct_val)
+        let ct_width = wl_get_int_type_width(ct_ty)
+        let ct_prefix = if intrinsic == MirIntrinsic.MIR_INTRINSIC_CLZ: "llvm.ctlz.i" else: "llvm.cttz.i"
+        let ct_fn_name = if ct_width == 8: ct_prefix ++ "8" else: if ct_width == 16: ct_prefix ++ "16" else: if ct_width == 32: ct_prefix ++ "32" else: ct_prefix ++ "64"
+        let ct_sym = self.intern.intern(ct_fn_name)
+        let ct_fv = self.fn_values.get(ct_sym)
+        let ct_ft = self.fn_fn_types.get(ct_sym)
+        let ct_i1_ty = wl_i1_type(self.context)
+        let ct_false = wl_const_int(ct_i1_ty, 0, 0)
+        if ct_fv.is_some() and ct_ft.is_some():
+            let ct_args: Vec[i64] = Vec.new()
+            ct_args.push(ct_val)
+            ct_args.push(ct_false)
+            let ct_raw = wl_build_call(self.builder, ct_ft.unwrap() as i64, ct_fv.unwrap() as i64, vec_data_i64(&ct_args), 2)
+            result = if ct_width == 32: ct_raw else: wl_build_zext(self.builder, ct_raw, wl_i32_type(self.context))
+        else:
+            let ct_pts: Vec[i64] = Vec.new()
+            ct_pts.push(ct_ty)
+            ct_pts.push(ct_i1_ty)
+            let ct_fnt = wl_function_type(ct_ty, vec_data_i64(&ct_pts), 2, 0)
+            let ct_func = wl_add_function(self.llmod, ct_fn_name, ct_fnt)
+            self.fn_values.insert(ct_sym, ct_func)
+            self.fn_fn_types.insert(ct_sym, ct_fnt)
+            let ct_args: Vec[i64] = Vec.new()
+            ct_args.push(ct_val)
+            ct_args.push(ct_false)
+            let ct_raw = wl_build_call(self.builder, ct_fnt, ct_func, vec_data_i64(&ct_args), 2)
+            result = if ct_width == 32: ct_raw else: wl_build_zext(self.builder, ct_raw, wl_i32_type(self.context))
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_BITREVERSE:
+        let br_val = self.mir_intrinsic_arg(body, args_id, 0)
+        let br_ty = wl_type_of(br_val)
+        let br_width = wl_get_int_type_width(br_ty)
+        let br_fn_name = if br_width == 8: "llvm.bitreverse.i8" else: if br_width == 16: "llvm.bitreverse.i16" else: if br_width == 32: "llvm.bitreverse.i32" else: "llvm.bitreverse.i64"
+        let br_sym = self.intern.intern(br_fn_name)
+        let br_fv = self.fn_values.get(br_sym)
+        let br_ft = self.fn_fn_types.get(br_sym)
+        if br_fv.is_some() and br_ft.is_some():
+            let br_args: Vec[i64] = Vec.new()
+            br_args.push(br_val)
+            result = wl_build_call(self.builder, br_ft.unwrap() as i64, br_fv.unwrap() as i64, vec_data_i64(&br_args), 1)
+        else:
+            let br_pts: Vec[i64] = Vec.new()
+            br_pts.push(br_ty)
+            let br_fnt = wl_function_type(br_ty, vec_data_i64(&br_pts), 1, 0)
+            let br_func = wl_add_function(self.llmod, br_fn_name, br_fnt)
+            self.fn_values.insert(br_sym, br_func)
+            self.fn_fn_types.insert(br_sym, br_fnt)
+            let br_args: Vec[i64] = Vec.new()
+            br_args.push(br_val)
+            result = wl_build_call(self.builder, br_fnt, br_func, vec_data_i64(&br_args), 1)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MIN or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAX:
+        let mm_a = self.mir_intrinsic_arg(body, args_id, 0)
+        let mm_b = self.mir_intrinsic_arg(body, args_id, 1)
+        let mm_ty = wl_type_of(mm_a)
+        let mm_tk = wl_get_type_kind(mm_ty)
+        let mm_is_float = mm_tk == wl_float_type_kind() or mm_tk == wl_double_type_kind()
+        if mm_is_float:
+            let mm_fn_prefix = if intrinsic == MirIntrinsic.MIR_INTRINSIC_MIN: "llvm.minnum." else: "llvm.maxnum."
+            let mm_suffix = if mm_tk == wl_float_type_kind(): "f32" else: "f64"
+            let mm_fn_name = mm_fn_prefix ++ mm_suffix
+            let mm_sym = self.intern.intern(mm_fn_name)
+            let mm_fv = self.fn_values.get(mm_sym)
+            let mm_ft = self.fn_fn_types.get(mm_sym)
+            if mm_fv.is_some() and mm_ft.is_some():
+                let mm_args: Vec[i64] = Vec.new()
+                mm_args.push(mm_a)
+                mm_args.push(mm_b)
+                result = wl_build_call(self.builder, mm_ft.unwrap() as i64, mm_fv.unwrap() as i64, vec_data_i64(&mm_args), 2)
+            else:
+                let mm_pts: Vec[i64] = Vec.new()
+                mm_pts.push(mm_ty)
+                mm_pts.push(mm_ty)
+                let mm_fnt = wl_function_type(mm_ty, vec_data_i64(&mm_pts), 2, 0)
+                let mm_func = wl_add_function(self.llmod, mm_fn_name, mm_fnt)
+                self.fn_values.insert(mm_sym, mm_func)
+                self.fn_fn_types.insert(mm_sym, mm_fnt)
+                let mm_args: Vec[i64] = Vec.new()
+                mm_args.push(mm_a)
+                mm_args.push(mm_b)
+                result = wl_build_call(self.builder, mm_fnt, mm_func, vec_data_i64(&mm_args), 2)
+        else:
+            // Integer min/max: icmp + select
+            let mm_is_min = intrinsic == MirIntrinsic.MIR_INTRINSIC_MIN
+            let mm_pred = if mm_is_min: wl_int_slt() else: wl_int_sgt()
+            let mm_cmp = wl_build_icmp(self.builder, mm_pred, mm_a, mm_b)
+            result = wl_build_select(self.builder, mm_cmp, mm_a, mm_b)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ABS:
+        let abs_val = self.mir_intrinsic_arg(body, args_id, 0)
+        let abs_ty = wl_type_of(abs_val)
+        let abs_tk = wl_get_type_kind(abs_ty)
+        let abs_is_float = abs_tk == wl_float_type_kind() or abs_tk == wl_double_type_kind()
+        if abs_is_float:
+            let abs_fn_name = if abs_tk == wl_float_type_kind(): "llvm.fabs.f32" else: "llvm.fabs.f64"
+            let abs_sym = self.intern.intern(abs_fn_name)
+            let abs_fv = self.fn_values.get(abs_sym)
+            let abs_ft = self.fn_fn_types.get(abs_sym)
+            if abs_fv.is_some() and abs_ft.is_some():
+                let abs_args: Vec[i64] = Vec.new()
+                abs_args.push(abs_val)
+                result = wl_build_call(self.builder, abs_ft.unwrap() as i64, abs_fv.unwrap() as i64, vec_data_i64(&abs_args), 1)
+            else:
+                let abs_pts: Vec[i64] = Vec.new()
+                abs_pts.push(abs_ty)
+                let abs_fnt = wl_function_type(abs_ty, vec_data_i64(&abs_pts), 1, 0)
+                let abs_func = wl_add_function(self.llmod, abs_fn_name, abs_fnt)
+                self.fn_values.insert(abs_sym, abs_func)
+                self.fn_fn_types.insert(abs_sym, abs_fnt)
+                let abs_args: Vec[i64] = Vec.new()
+                abs_args.push(abs_val)
+                result = wl_build_call(self.builder, abs_fnt, abs_func, vec_data_i64(&abs_args), 1)
+        else:
+            // Integer abs: negate + select on sign
+            let abs_zero = wl_const_int(abs_ty, 0, 0)
+            let abs_neg = wl_build_sub(self.builder, abs_zero, abs_val)
+            let abs_is_neg = wl_build_icmp(self.builder, wl_int_slt(), abs_val, abs_zero)
+            result = wl_build_select(self.builder, abs_is_neg, abs_neg, abs_val)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMA:
+        let fma_a = self.mir_intrinsic_arg(body, args_id, 0)
+        let fma_b = self.mir_intrinsic_arg(body, args_id, 1)
+        let fma_c = self.mir_intrinsic_arg(body, args_id, 2)
+        let fma_ty = wl_type_of(fma_a)
+        let fma_tk = wl_get_type_kind(fma_ty)
+        let fma_fn_name = if fma_tk == wl_float_type_kind(): "llvm.fma.f32" else: "llvm.fma.f64"
+        let fma_sym = self.intern.intern(fma_fn_name)
+        let fma_fv = self.fn_values.get(fma_sym)
+        let fma_ft = self.fn_fn_types.get(fma_sym)
+        if fma_fv.is_some() and fma_ft.is_some():
+            let fma_args: Vec[i64] = Vec.new()
+            fma_args.push(fma_a)
+            fma_args.push(fma_b)
+            fma_args.push(fma_c)
+            result = wl_build_call(self.builder, fma_ft.unwrap() as i64, fma_fv.unwrap() as i64, vec_data_i64(&fma_args), 3)
+        else:
+            let fma_pts: Vec[i64] = Vec.new()
+            fma_pts.push(fma_ty)
+            fma_pts.push(fma_ty)
+            fma_pts.push(fma_ty)
+            let fma_fnt = wl_function_type(fma_ty, vec_data_i64(&fma_pts), 3, 0)
+            let fma_func = wl_add_function(self.llmod, fma_fn_name, fma_fnt)
+            self.fn_values.insert(fma_sym, fma_func)
+            self.fn_fn_types.insert(fma_sym, fma_fnt)
+            let fma_args: Vec[i64] = Vec.new()
+            fma_args.push(fma_a)
+            fma_args.push(fma_b)
+            fma_args.push(fma_c)
+            result = wl_build_call(self.builder, fma_fnt, fma_func, vec_data_i64(&fma_args), 3)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_FILTER:
         result = self.mir_emit_opt_filter(body, args_id)

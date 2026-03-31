@@ -799,6 +799,42 @@ These always produce the two's complement result, regardless of
 build mode. Use them for hash functions, checksums, and
 cryptographic code.
 
+**Explicit saturating operators** clamp to the type's representable range:
+
+```
+a +| b      // saturating addition
+a -| b      // saturating subtraction
+a *| b      // saturating multiplication
+```
+
+When the mathematical result exceeds the type's maximum, the result
+is the maximum. When it falls below the minimum, the result is the
+minimum. This is useful for audio processing, color blending, health
+bars, and any domain where clamping is the correct overflow behavior.
+
+```
+let x: u8 = 250
+let y: u8 = x +| 20        // 255 (clamped, not 14 or panic)
+
+let a: i8 = 120
+let b: i8 = a +| 20        // 127 (clamped)
+
+let c: u8 = 5
+let d: u8 = c -| 10        // 0 (clamped, not 251 or panic)
+```
+
+Saturating operators are defined for all integer types. They are not
+defined for floating-point types (floats already saturate to ±infinity
+per IEEE 754). Using them with floats is a compile error.
+
+**All three overflow modes coexist:**
+
+```
+x + y       // checked: panic on overflow (default)
+x +% y      // wrapping: two's complement wrap
+x +| y      // saturating: clamp to min/max
+```
+
 #### 4.2.4 Bitwise Operators
 
 ```
@@ -898,6 +934,56 @@ let word = u32_from_be(buf, 0)      // read big-endian u32
 u32_to_le(out, 4, value)            // write little-endian u32
 ```
 
+**Bit counting:**
+
+```
+x.popcount()        // count set bits (number of 1-bits)
+x.clz()             // count leading zeros (from MSB)
+x.ctz()             // count trailing zeros (from LSB)
+```
+
+Available on all integer types. Return type is `i32` regardless of
+input width. Returns the type's bit width when the value is zero
+(for `clz` and `ctz`).
+
+```
+let x: u32 = 0b00010000
+x.popcount()        // 1
+x.clz()             // 27
+x.ctz()             // 4
+
+let zero: u32 = 0
+zero.clz()          // 32
+zero.ctz()          // 32
+
+0xFFu8.popcount()   // 8
+```
+
+Compiles to single hardware instructions on all modern architectures
+(via LLVM's `ctpop`, `ctlz`, `cttz` intrinsics).
+
+**Bit reversal:**
+
+```
+x.bitreverse()      // reverse the order of all bits
+```
+
+Available on all integer types. Return type matches the input type.
+Bit 0 becomes the MSB, bit 1 becomes MSB-1, etc.
+
+```
+let x: u8 = 0b10110000
+x.bitreverse()      // 0b00001101
+
+let y: u32 = 0x80000000
+y.bitreverse()      // 0x00000001
+```
+
+Compiles to LLVM's `llvm.bitreverse` intrinsic.
+
+**Compile-time evaluation:** All bit manipulation methods can be
+evaluated at compile time when the receiver is a constant.
+
 #### 4.2.5 Compound Assignment Operators
 
 ```
@@ -914,6 +1000,9 @@ a >>= n     // a = a >> n
 a +%= b     // a = a +% b (wrapping addition)
 a -%= b     // a = a -% b (wrapping subtraction)
 a *%= b     // a = a *% b (wrapping multiplication)
+a +|= b     // a = a +| b (saturating addition)
+a -|= b     // a = a -| b (saturating subtraction)
+a *|= b     // a = a *| b (saturating multiplication)
 ```
 
 Compound assignment requires `a` to be a mutable binding (`var`)
@@ -1162,6 +1251,100 @@ match items
     [only]          => "single"
     [first, ..rest] => "head: {first}, {rest.len()} more"
 ```
+
+### 4.3b Bitpacked Structs
+
+The `@[bitpacked]` attribute provides bit-level field packing where
+fields occupy exactly their declared bit width with no padding.
+
+```
+@[bitpacked]
+type Flags = {
+    enabled: bool,         // 1 bit
+    priority: u3,          // 3 bits
+    mode: u4,              // 4 bits
+}
+// Total: 8 bits = 1 byte. sizeof[Flags]() == 1
+```
+
+```
+@[bitpacked]
+type IpHeader = {
+    version: u4,           // 4 bits
+    ihl: u4,               // 4 bits
+    dscp: u6,              // 6 bits
+    ecn: u2,               // 2 bits
+    total_length: u16,     // 16 bits
+    identification: u16,   // 16 bits
+    flags_frag: u16,       // 16 bits
+    ttl: u8,               // 8 bits
+    protocol: u8,          // 8 bits
+    checksum: u16,         // 16 bits
+    src_addr: u32,         // 32 bits
+    dst_addr: u32,         // 32 bits
+}
+// Total: 160 bits = 20 bytes
+```
+
+**Rules:**
+
+1. Fields are laid out MSB-first (network byte order) from first
+   field to last, with no gaps.
+2. Total size is `ceil(sum_of_field_bits / 8)` bytes.
+3. All field types must have a known bit width. Pointers, slices,
+   strings, structs (except nested bitpacked), and Vecs are not
+   allowed. Compile error: "bitpacked fields must be integer, bool,
+   or bitpacked struct type."
+4. `bool` occupies 1 bit. `true` is `1`, `false` is `0`.
+5. Non-byte-sized integer types are valid field types (see below).
+6. Nested `@[bitpacked]` structs are allowed; their bits are inlined.
+
+**Field access** uses the same dot syntax as regular structs. The
+compiler generates shift-and-mask operations:
+
+```
+var flags = Flags { enabled: true, priority: 5, mode: 12 }
+let p = flags.priority        // extracts bits, returns u3
+flags.mode = 3                // inserts bits
+```
+
+**Pointers to bitpacked fields** are a compile error. The field may
+not be byte-aligned:
+
+```
+let f = Flags { enabled: true, priority: 5, mode: 12 }
+let p = &f.priority     // error: cannot take address of bitpacked field
+```
+
+**Casting** to and from the backing integer type:
+
+```
+let flags = Flags { enabled: true, priority: 5, mode: 12 }
+let byte = flags as u8    // 0b_1_101_1100 = 0xBC
+
+let flags2 = 0xBCu8 as Flags
+// flags2.enabled == true, flags2.priority == 5, flags2.mode == 12
+```
+
+The backing integer type is the smallest unsigned integer that holds
+all bits: `u8` for 1-8 bits, `u16` for 9-16, `u32` for 17-32,
+`u64` for 33-64.
+
+**Non-byte-sized integer types:**
+
+To support bitpacked structs, With provides integer types with
+non-standard widths:
+
+```
+u1, u2, u3, u4, u5, u6, u7     // unsigned sub-byte
+i1, i2, i3, i4, i5, i6, i7     // signed sub-byte
+u12, u21, u24                    // selected wider non-standard widths
+```
+
+When used as local variables, non-byte-sized integers are stored in
+the next larger standard-width register (e.g., `u3` occupies an `i32`
+register with the upper bits zeroed). Arithmetic works normally; the
+result is masked to the type's range.
 
 ### 4.4 Enums (Algebraic Data Types)
 
@@ -5406,6 +5589,71 @@ async scope s =>
 All implement `Scoped`/`ScopedMut` for `with` blocks. Lock operations
 are fiber-aware: contended locks yield the fiber, not the OS thread.
 
+#### 14.17.1 Atomic[T]
+
+`Atomic[T]` provides lock-free atomic operations on integer and
+pointer types. `T` must be an integer type (`i32`, `i64`, `u32`,
+`u64`, etc.) or a pointer type.
+
+```
+use std.sync.Atomic
+
+var counter: Atomic[i32] = Atomic.new(0)
+
+counter.store(42, .release)
+let val = counter.load(.acquire)
+
+let old = counter.fetch_add(1, .seq_cst)
+```
+
+**Memory orderings:**
+
+```
+.relaxed       // no ordering guarantees (fastest)
+.acquire       // reads after this see writes before a paired release
+.release       // writes before this are visible after a paired acquire
+.acq_rel       // both acquire and release
+.seq_cst       // total order across all threads (strongest, default)
+```
+
+**Operations:**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `Atomic.new(val)` | `fn(T) -> Atomic[T]` | Create with initial value |
+| `.load(order)` | `fn(Order) -> T` | Atomic read |
+| `.store(val, order)` | `fn(T, Order) -> void` | Atomic write |
+| `.swap(val, order)` | `fn(T, Order) -> T` | Exchange, return old |
+| `.fetch_add(val, order)` | `fn(T, Order) -> T` | Add, return old |
+| `.fetch_sub(val, order)` | `fn(T, Order) -> T` | Subtract, return old |
+| `.fetch_and(val, order)` | `fn(T, Order) -> T` | Bitwise AND, return old |
+| `.fetch_or(val, order)` | `fn(T, Order) -> T` | Bitwise OR, return old |
+| `.fetch_xor(val, order)` | `fn(T, Order) -> T` | Bitwise XOR, return old |
+| `.fetch_min(val, order)` | `fn(T, Order) -> T` | Min, return old |
+| `.fetch_max(val, order)` | `fn(T, Order) -> T` | Max, return old |
+| `.compare_exchange(expected, desired, success, failure)` | `fn(T, T, Order, Order) -> Result[T, T]` | CAS, strong |
+| `.compare_exchange_weak(expected, desired, success, failure)` | `fn(T, T, Order, Order) -> Result[T, T]` | CAS, weak |
+
+`compare_exchange` returns `Ok(old_value)` on success or
+`Err(actual_value)` on failure.
+
+**Atomic fences:**
+
+```
+use std.sync.fence
+
+fence(.acquire)
+fence(.release)
+fence(.seq_cst)
+```
+
+**Ordering constraints (compile-time validated):**
+
+- `.store` cannot use `.acquire` or `.acq_rel`
+- `.load` cannot use `.release` or `.acq_rel`
+- `compare_exchange` failure ordering cannot be stronger than
+  success ordering, and cannot be `.release` or `.acq_rel`
+
 ### 14.18 The Fiber Runtime
 
 The fiber scheduler is part of the standard library. It is:
@@ -6481,6 +6729,37 @@ Reading a field that wasn't last written requires `unsafe`. Writing any
 field is safe. Construction requires exactly one field initializer.
 `c_import` translates C union declarations directly.
 
+**Custom alignment:**
+
+Variables, struct fields, and function parameters can specify custom
+alignment using the `align` attribute:
+
+```
+type CacheLine = {
+    @[align(64)]
+    data: [64]u8,
+}
+
+@[align(16)]
+var buffer: [256]u8 = [0; 256]
+
+fn process(@[align(16)] data: *[4]f32):
+    // data is guaranteed 16-byte aligned
+```
+
+Rules:
+
+1. Alignment must be a power of two.
+2. Alignment must be at least the natural alignment of the type.
+3. Alignment cannot exceed a platform-defined maximum (65536).
+4. Violations are compile-time errors.
+
+When a local variable has custom alignment, the compiler emits an
+aligned stack allocation. When a struct has an aligned field, the
+struct's own alignment becomes the maximum of all field alignments.
+
+**Bitpacked layout** is described in §4.3b.
+
 ### 16.5 Exporting to C
 
 ```
@@ -6595,6 +6874,66 @@ let bits: u32 = unsafe: transmute[u32](3.14f32)
 
 Reinterprets the bits of one type as another. Both types must have
 the same size (compile error otherwise). Requires `unsafe` context.
+
+### 16.13 Inline Assembly
+
+The `asm` expression embeds target-specific assembly instructions.
+It requires `unsafe` context.
+
+```
+let sp: u64 = unsafe:
+    asm("mov %sp, {out}" : out("x0") -> u64)
+
+unsafe:
+    asm("dmb sy" ::: "memory")
+```
+
+**Full syntax:**
+
+```
+asm(template : outputs : inputs : clobbers)
+```
+
+Each section is optional. A trailing `:` section can be omitted.
+
+**Template:** A string literal containing assembly instructions.
+Register placeholders use `{name}` syntax, where `name` matches
+an output or input binding.
+
+**Outputs:** Comma-separated list of `name(constraint) -> type`.
+
+```
+asm("mrs {out}, CNTPCT_EL0" : out("x0") -> u64)
+```
+
+**Inputs:** Comma-separated list of `name(constraint) value`.
+
+```
+asm("add {out}, {a}, {b}"
+    : out("x0") -> i32
+    : a("x1") val_a, b("x2") val_b)
+```
+
+**Clobbers:** Comma-separated list of registers or `"memory"` /
+`"cc"` that the assembly modifies but that are not outputs.
+
+```
+asm("syscall"
+    : out("rax") -> i64
+    : a("rax") syscall_num, b("rdi") arg1
+    : "rcx", "r11", "memory")
+```
+
+**Volatile:** Marks the assembly as having side effects that the
+optimizer must not eliminate:
+
+```
+asm volatile("wfe" :::)
+```
+
+Assembly is inherently non-portable. The `@[target("aarch64")]` or
+`@[target("x86_64")]` attribute can guard architecture-specific
+blocks.
 
 ---
 
@@ -6870,6 +7209,53 @@ const TEMPLATE: str = embed_file("templates/page.html")
 The path is resolved relative to the source file. If the file does not
 exist, a compile error is emitted. The file contents are embedded verbatim
 as a string constant in the binary.
+
+**Numeric builtins:**
+
+```
+a.min(b)            // smaller of two values
+a.max(b)            // larger of two values
+x.abs()             // absolute value
+a.mul_add(b, c)     // fused multiply-add: a * b + c
+```
+
+**`min` and `max`** — Return the smaller or larger of two values.
+Both operands must be the same type. Defined for all integer and
+floating-point types. Return type matches the input type.
+
+```
+3.min(7)            // 3
+3.max(7)            // 7
+3.14.min(2.71)      // 2.71
+```
+
+For floats, `min` and `max` follow IEEE 754-2019 minimum/maximum
+semantics: NaN is never selected unless both operands are NaN.
+
+**`abs`** — Returns the absolute value. For signed integers, the
+return type is the corresponding unsigned type to avoid `abs(INT_MIN)`
+undefined behavior:
+
+```
+(-42).abs()         // 42     (i32 → u32)
+42.abs()            // 42     (i32 → u32)
+(-3.14).abs()       // 3.14   (f64 → f64)
+```
+
+For unsigned integers: identity function. For floats: return type is
+the same float type (clears the sign bit per IEEE 754).
+
+**`mul_add`** — Fused multiply-add. Computes `a * b + c` as a single
+floating-point operation with one rounding step. Available for `f32`
+and `f64` only. Critical for numerical algorithms where accumulated
+rounding error matters.
+
+```
+let result = 3.0.mul_add(4.0, 5.0)    // 17.0
+```
+
+Maps to a single hardware instruction on all modern architectures
+(via LLVM's `llvm.fma` intrinsic).
 
 ### 17.7 Constraints
 
@@ -7611,6 +7997,7 @@ All code is safe unless explicitly `unsafe`.
 
 - Raw pointer dereference
 - FFI function calls
+- Inline assembly (`asm` expressions)
 - Intrusive / self-referential structures
 - Manual memory management beyond allocators
 - Calling functions marked `unsafe`

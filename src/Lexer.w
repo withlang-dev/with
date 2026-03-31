@@ -172,6 +172,12 @@ fn Lexer.next_token(self: Lexer) -> i32:
                     self.pos = self.pos + 1
                     return TokenKind.TK_PLUS_WRAP_EQ
                 return TokenKind.TK_PLUS_WRAP
+            if c2 == CharCode.Pipe:  // +| or +|=
+                self.pos = self.pos + 1
+                if self.pos < slen and src.byte_at((self.pos) as i64) == CharCode.Eq:
+                    self.pos = self.pos + 1
+                    return TokenKind.TK_PLUS_SAT_EQ
+                return TokenKind.TK_PLUS_SAT
             if c2 == CharCode.Eq:  // +=
                 self.pos = self.pos + 1
                 return TokenKind.TK_PLUS_EQ
@@ -191,6 +197,12 @@ fn Lexer.next_token(self: Lexer) -> i32:
                     self.pos = self.pos + 1
                     return TokenKind.TK_MINUS_WRAP_EQ
                 return TokenKind.TK_MINUS_WRAP
+            if c2 == CharCode.Pipe:  // -| or -|=
+                self.pos = self.pos + 1
+                if self.pos < slen and src.byte_at((self.pos) as i64) == CharCode.Eq:
+                    self.pos = self.pos + 1
+                    return TokenKind.TK_MINUS_SAT_EQ
+                return TokenKind.TK_MINUS_SAT
             if c2 == CharCode.Eq:  // -=
                 self.pos = self.pos + 1
                 return TokenKind.TK_MINUS_EQ
@@ -207,6 +219,12 @@ fn Lexer.next_token(self: Lexer) -> i32:
                     self.pos = self.pos + 1
                     return TokenKind.TK_STAR_WRAP_EQ
                 return TokenKind.TK_STAR_WRAP
+            if c2 == CharCode.Pipe:  // *| or *|=
+                self.pos = self.pos + 1
+                if self.pos < slen and src.byte_at((self.pos) as i64) == CharCode.Eq:
+                    self.pos = self.pos + 1
+                    return TokenKind.TK_STAR_SAT_EQ
+                return TokenKind.TK_STAR_SAT
             if c2 == CharCode.Eq:  // *=
                 self.pos = self.pos + 1
                 return TokenKind.TK_STAR_EQ

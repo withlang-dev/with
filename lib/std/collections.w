@@ -25,6 +25,13 @@ type HashSet[T]  {
     ptr: *const i8,
 }
 
+/// Lock-free atomic operations on integer types.
+/// Create with `Atomic.new(0)`, read with `.load(order)`,
+/// write with `.store(val, order)`.
+type Atomic[T]  {
+    val: T,
+}
+
 // ── Iterators ─────────────────────────────────────────────────────
 
 /// Iterator over Vec[T]. Obtain via `vec.iter()`.
