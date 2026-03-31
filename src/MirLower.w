@@ -2954,13 +2954,6 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
             self.body.set_call_intrinsic(gc_args_id, MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL)
             self.body.set_call_ast_node(gc_args_id, node)
             var gc_ret_ty = self.expr_type(node)
-            // For static constructors (Vec.new, HashMap.new), use expected_type
-            // to resolve the generic instance when expr_type returns a bare struct.
-            if gc_is_static and self.expected_type > 0:
-                let gc_et_tk = self.sema.get_type_kind(self.expected_type)
-                let gc_rt_tk = self.sema.get_type_kind(gc_ret_ty)
-                if gc_et_tk == TypeKind.TY_GENERIC_INST and (gc_ret_ty == 0 or gc_ret_ty == self.sema.ty_void or gc_rt_tk == TypeKind.TY_STRUCT):
-                    gc_ret_ty = self.expected_type
             if gc_ret_ty == 0:
                 gc_ret_ty = self.sema.ty_i32 as i32
             let gc_result = self.new_temp(gc_ret_ty)
@@ -3676,7 +3669,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             self.expected_type = saved_expected
         let sl_fid = self.body.new_agg_fields(sl_fields, sl_names)
         let sl_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, sl_fid, 0)
-        let sl_ty = self.expr_type(node)
+        var sl_ty = self.expr_type(node)
+        if (sl_ty == 0 or sl_ty == self.sema.ty_void) and self.expected_type > 0:
+            sl_ty = self.expected_type
         let sl_tmp = self.new_temp(sl_ty)
         let sl_place = self.place_for_local(sl_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, sl_place, sl_rv, self.ast.get_start(node))

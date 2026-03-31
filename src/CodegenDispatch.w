@@ -1334,6 +1334,10 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             let agg_start = body.agg_field_starts.get(agg_fields_id as i64)
             let agg_count = body.agg_field_counts.get(agg_fields_id as i64)
             var struct_ty = dest_ty
+            if struct_ty == 0 and dest_sema_ty > 0:
+                struct_ty = self.mir_sema_type_to_llvm(dest_sema_ty)
+            if struct_ty == 0 and self.current_ret_type != 0 and wl_get_type_kind(self.current_ret_type) == wl_struct_type_kind():
+                struct_ty = self.current_ret_type
             if self.debug_mir_codegen_enabled():
                 with_eprint(f"[mir-agg] fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count} dest_ty_kind={if dest_ty != 0: wl_get_type_kind(dest_ty) else: -1} dest_ty_fields={if dest_ty != 0 and wl_get_type_kind(dest_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(dest_ty) else: -1}")
             if agg_count == 0 and d0 != 1:
@@ -1900,6 +1904,67 @@ fn Codegen.mir_dest_llvm_type(self: Codegen, body: MirBody, dest_place: i32) -> 
     if sema_ty <= 0:
         return 0
     self.mir_sema_type_to_llvm(sema_ty)
+
+fn Codegen.mir_struct_sym_from_sema_type(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    let snapshot_len = self.mir_input.sema_type_kinds.len() as i32
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == 0 and resolved >= snapshot_len and resolved > 0:
+        let live_resolved = self.sema.resolve_alias(resolved)
+        let live_tk = self.sema.get_type_kind(live_resolved)
+        if live_tk == TypeKind.TY_STRUCT:
+            let live_name_sym = self.sema.get_type_d0(live_resolved)
+            let live_cg_sym = self.sema_sym_to_codegen_sym(live_name_sym)
+            if live_cg_sym != 0 and self.struct_type_map.get(live_cg_sym).is_some():
+                return live_cg_sym
+            if self.struct_type_map.get(live_name_sym).is_some():
+                return live_name_sym
+            return 0
+        if live_tk == TypeKind.TY_GENERIC_INST:
+            let live_base_sym = self.sema_sym_to_codegen_sym(self.sema.get_type_d0(live_resolved))
+            if live_base_sym == 0 or not self.generic_structs.contains(live_base_sym):
+                return 0
+            let _ = self.sema_type_to_llvm(live_resolved)
+            var live_mangled = self.intern.resolve(live_base_sym)
+            let live_arg_count = self.sema.get_generic_inst_arg_count(live_resolved)
+            for ai in 0..live_arg_count:
+                let arg_tid = self.sema.get_generic_inst_arg(live_resolved, ai)
+                var arg_llvm = self.sema_type_to_llvm(arg_tid)
+                if arg_llvm == 0:
+                    arg_llvm = self.type_fallback()
+                live_mangled = live_mangled ++ "__" ++ self.llvm_type_mangle(arg_llvm)
+            let live_mono_sym = self.intern.intern(live_mangled)
+            if self.struct_type_map.get(live_mono_sym).is_some():
+                return live_mono_sym
+        return 0
+    if tk == TypeKind.TY_STRUCT:
+        let name_sym = self.mir_input.mir_get_type_d0(resolved)
+        let cg_sym = self.sema_sym_to_codegen_sym(name_sym)
+        if cg_sym != 0 and self.struct_type_map.get(cg_sym).is_some():
+            return cg_sym
+        if self.struct_type_map.get(name_sym).is_some():
+            return name_sym
+        return 0
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
+        if base_sym == 0 or not self.generic_structs.contains(base_sym):
+            return 0
+        let _ = self.mir_sema_type_to_llvm(resolved)
+        var mangled = self.intern.resolve(base_sym)
+        let arg_count = self.mir_input.mir_get_type_d2(resolved)
+        let te_start = self.mir_input.mir_get_type_d1(resolved)
+        for ai in 0..arg_count:
+            let arg_tid = self.mir_input.mir_get_type_extra(te_start + ai)
+            var arg_llvm = self.mir_sema_type_to_llvm(arg_tid)
+            if arg_llvm == 0:
+                arg_llvm = self.type_fallback()
+            mangled = mangled ++ "__" ++ self.llvm_type_mangle(arg_llvm)
+        let mono_sym = self.intern.intern(mangled)
+        if self.struct_type_map.get(mono_sym).is_some():
+            return mono_sym
+    0
 
 fn Codegen.mir_vec_elem_type(self: Codegen, body: MirBody, recv_op_id: i32) -> i64:
     // Infer Vec element LLVM type from the receiver's sema type (using snapshot).
@@ -3467,8 +3532,75 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
                     return true
 
-            // Try method call dispatch for generic struct methods
             let gc_callee_field = self.pool.get_data0(gc_node)
+
+            // Static generic struct methods: Cell.wrap(v) needs the concrete
+            // owner instantiation before its signature can be lowered.
+            if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
+                let gc_static_self = self.pool.get_data0(gc_callee_field)
+                let gc_static_method_sym = self.pool.get_data1(gc_callee_field)
+                var gc_static_owner_sym = 0
+                let gc_static_self_kind = self.pool.kind(gc_static_self)
+                if gc_static_self_kind == NodeKind.NK_IDENT or gc_static_self_kind == NodeKind.NK_TYPE_NAMED:
+                    gc_static_owner_sym = self.pool.get_data0(gc_static_self)
+                else if gc_static_self_kind == NodeKind.NK_INDEX or gc_static_self_kind == NodeKind.NK_TYPE_GENERIC:
+                    let gc_static_base = self.pool.get_data0(gc_static_self)
+                    let gc_static_base_kind = self.pool.kind(gc_static_base)
+                    if gc_static_base_kind == NodeKind.NK_IDENT or gc_static_base_kind == NodeKind.NK_TYPE_NAMED:
+                        gc_static_owner_sym = self.pool.get_data0(gc_static_base)
+                if gc_static_owner_sym != 0 and self.generic_structs.contains(gc_static_owner_sym):
+                    let gc_static_owner_name = self.intern.resolve(gc_static_owner_sym)
+                    let gc_static_method_name = self.intern.resolve(gc_static_method_sym)
+                    let gc_static_qualified = gc_static_owner_name ++ "." ++ gc_static_method_name
+                    let gc_static_fn_sym = self.intern.intern(gc_static_qualified)
+                    let gc_static_decl = self.generic_struct_methods.get(gc_static_fn_sym)
+                    if gc_static_decl.is_some():
+                        let gc_static_mir_start = body.call_arg_starts.get(args_id as i64)
+                        let gc_static_mir_count = body.call_arg_counts.get(args_id as i64)
+                        let gc_static_call_args_start = self.pool.get_data1(gc_node)
+                        let gc_static_args: Vec[i64] = Vec.new()
+                        let gc_static_arg_tys: Vec[i64] = Vec.new()
+                        let gc_static_arg_nodes: Vec[i32] = Vec.new()
+                        for gc_static_ai in 0..gc_static_mir_count:
+                            let gc_static_arg_node = self.pool.get_extra(gc_static_call_args_start + gc_static_ai)
+                            let gc_static_op = body.call_arg_operands.get((gc_static_mir_start + gc_static_ai) as i64)
+                            let gc_static_val = self.mir_eval_operand(body, gc_static_op, 0)
+                            gc_static_arg_nodes.push(gc_static_arg_node)
+                            gc_static_args.push(gc_static_val)
+                            gc_static_arg_tys.push(wl_type_of(gc_static_val))
+                        var gc_static_mono_sym = 0
+                        if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+                            let gc_static_local_id = body.place_locals.get(dest_place as i64)
+                            if gc_static_local_id >= 0 and gc_static_local_id < body.local_type_ids.len() as i32:
+                                gc_static_mono_sym = self.mir_struct_sym_from_sema_type(body.local_type_ids.get(gc_static_local_id as i64))
+                        var gc_static_llvm_ty = self.mir_dest_llvm_type(body, dest_place)
+                        var gc_static_call_type = self.ast_static_type_expr(gc_node)
+                        if gc_static_call_type == 0:
+                            gc_static_call_type = self.ast_static_type_expr(gc_static_self)
+                        if gc_static_mono_sym == 0 and gc_static_call_type > 0:
+                            gc_static_mono_sym = self.mir_struct_sym_from_sema_type(gc_static_call_type)
+                        if gc_static_mono_sym == 0:
+                            gc_static_mono_sym = self.infer_static_generic_struct_mono_sym(gc_static_owner_sym, gc_static_decl.unwrap(), gc_static_self, gc_static_arg_tys, gc_static_arg_nodes, gc_static_call_type)
+                        if gc_static_llvm_ty == 0 and gc_static_call_type > 0:
+                            gc_static_llvm_ty = self.sema_type_to_llvm(gc_static_call_type)
+                        if gc_static_mono_sym == 0 and gc_static_llvm_ty != 0:
+                            gc_static_mono_sym = self.find_struct_type_by_llvm(gc_static_llvm_ty)
+                        if gc_static_mono_sym != 0:
+                            let gc_static_result = self.monomorphize_struct_static_method_core(gc_static_mono_sym, gc_static_method_name, gc_static_decl.unwrap(), gc_static_call_args_start, gc_static_mir_count, gc_node, gc_static_args)
+                            if dest_place >= 0 and gc_static_result != 0:
+                                let gc_static_ret_ty = wl_type_of(gc_static_result)
+                                if gc_static_ret_ty != wl_void_type(self.context):
+                                    let gc_static_local = body.place_locals.get(dest_place as i64)
+                                    let gc_static_alloca = self.create_entry_alloca(gc_static_ret_ty)
+                                    wl_build_store(self.builder, gc_static_result, gc_static_alloca)
+                                    self.mir_local_ptrs.insert(gc_static_local, gc_static_alloca)
+                                    self.mir_local_types.insert(gc_static_local, gc_static_ret_ty)
+                            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                let gc_static_next_val = self.mir_bb_values.get(next_bb as i64)
+                                wl_build_br(self.builder, gc_static_next_val)
+                            return true
+
+            // Try method call dispatch for generic struct methods
             if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
                 let gc_self_expr_node = self.pool.get_data0(gc_callee_field)
                 let gc_method_sym = self.pool.get_data1(gc_callee_field)
@@ -3487,7 +3619,9 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                     let gc_recv_op = body.call_arg_operands.get(gc_mir_start as i64)
                     let gc_recv_val = self.mir_eval_operand(body, gc_recv_op, 0)
                     let gc_recv_ty = wl_type_of(gc_recv_val)
-                    let gc_recv_type_sym = self.find_struct_type_by_llvm(gc_recv_ty)
+                    var gc_recv_type_sym = self.mir_struct_sym_from_sema_type(gc_recv_type)
+                    if gc_recv_type_sym == 0:
+                        gc_recv_type_sym = self.find_struct_type_by_llvm(gc_recv_ty)
                     // Generic struct method: receiver is monomorphized generic struct
                     let gc_base_opt = self.mono_struct_base.get(gc_recv_type_sym)
                     if gc_base_opt.is_some():
@@ -4517,6 +4651,195 @@ fn Codegen.find_binding_type(self: Codegen, syms: Vec[i32], tys: Vec[i64], sym: 
     for i in 0..syms.len() as i32:
         if syms.get(i as i64) == sym:
             return tys.get(i as i64)
+    0
+
+fn Codegen.infer_static_generic_struct_mono_sym(self: Codegen, owner_sym: i32, decl: i32, owner_expr_node: i32, arg_tys: Vec[i64], arg_nodes: Vec[i32], call_sema_ty: i32) -> i32:
+    let owner_decl_opt = self.generic_structs.get(owner_sym)
+    if not owner_decl_opt.is_some():
+        return 0
+    let owner_decl = owner_decl_opt.unwrap()
+    let tp_count = self.type_decl_tp_count(owner_decl)
+    if tp_count <= 0:
+        return owner_sym
+
+    let tp_syms: Vec[i32] = Vec.new()
+    var tp_pos = self.type_decl_tp_start(owner_decl)
+    for ti in 0..tp_count:
+        tp_syms.push(self.pool.get_extra(tp_pos))
+        let bound_count = self.pool.get_extra(tp_pos + 1)
+        tp_pos = tp_pos + 2 + bound_count
+
+    let bind_syms: Vec[i32] = Vec.new()
+    let bind_tys: Vec[i64] = Vec.new()
+    let bind_sema_tys: Vec[i32] = Vec.new()
+
+    if call_sema_ty > 0:
+        let call_resolved = self.sema.resolve_alias(call_sema_ty)
+        if self.sema.get_type_kind(call_resolved) == TypeKind.TY_GENERIC_INST:
+            let call_base = self.sema_sym_to_codegen_sym(self.sema.get_type_d0(call_resolved))
+            if call_base == owner_sym:
+                let call_arg_count = self.sema.get_generic_inst_arg_count(call_resolved)
+                for ai in 0..call_arg_count:
+                    if ai >= tp_syms.len() as i32:
+                        break
+                    let arg_tid = self.sema.get_generic_inst_arg(call_resolved, ai)
+                    var arg_llvm = self.sema_type_to_llvm(arg_tid)
+                    if arg_llvm == 0:
+                        arg_llvm = self.type_fallback()
+                    let tp_sym = tp_syms.get(ai as i64)
+                    var already_bound = false
+                    for bi in 0..bind_syms.len() as i32:
+                        if bind_syms.get(bi as i64) == tp_sym:
+                            already_bound = true
+                            break
+                    if not already_bound:
+                        bind_syms.push(tp_sym)
+                        bind_tys.push(arg_llvm)
+                        bind_sema_tys.push(arg_tid)
+
+    let owner_kind = self.pool.kind(owner_expr_node)
+    if owner_kind == NodeKind.NK_INDEX or owner_kind == NodeKind.NK_TYPE_GENERIC:
+        let owner_args_start = self.pool.get_data1(owner_expr_node)
+        let owner_arg_count = self.pool.get_data2(owner_expr_node)
+        for ai in 0..owner_arg_count:
+            if ai >= tp_syms.len() as i32:
+                break
+            let arg_node = self.pool.get_extra(owner_args_start + ai)
+            let arg_sema_ty = self.ast_static_type_expr(arg_node)
+            var arg_llvm = self.sema_type_to_llvm(arg_sema_ty)
+            if arg_llvm == 0:
+                arg_llvm = self.type_fallback()
+            let tp_sym = tp_syms.get(ai as i64)
+            var already_bound = false
+            for bi in 0..bind_syms.len() as i32:
+                if bind_syms.get(bi as i64) == tp_sym:
+                    already_bound = true
+                    break
+            if not already_bound:
+                bind_syms.push(tp_sym)
+                bind_tys.push(arg_llvm)
+                bind_sema_tys.push(arg_sema_ty)
+
+    let meta = self.pool.find_fn_meta(decl)
+    let param_start = self.pool.fn_meta_param_start(meta)
+    let param_count = self.pool.fn_meta_param_count(meta)
+    for pi in 0..param_count:
+        if pi >= arg_tys.len() as i32:
+            break
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
+        if p_type_node == 0:
+            continue
+
+        let arg_ty = arg_tys.get(pi as i64)
+        let arg_node = arg_nodes.get(pi as i64)
+        let p_kind = self.pool.kind(p_type_node)
+
+        if p_kind == NodeKind.NK_TYPE_NAMED or p_kind == NodeKind.NK_IDENT:
+            let p_sym = self.pool.get_data0(p_type_node)
+            let arg_sema = self.sema_type_of_node(arg_node)
+            var canonical_tp_sym = 0
+            let want_text = self.intern.resolve(p_sym)
+            for ti in 0..tp_syms.len() as i32:
+                let candidate = tp_syms.get(ti as i64)
+                if candidate == p_sym:
+                    canonical_tp_sym = candidate
+                    break
+                if want_text.len() > 0 and self.intern.resolve(candidate) == want_text:
+                    canonical_tp_sym = candidate
+                    break
+            if canonical_tp_sym != 0:
+                var already_bound = false
+                for bi in 0..bind_syms.len() as i32:
+                    if bind_syms.get(bi as i64) == canonical_tp_sym:
+                        already_bound = true
+                        break
+                if not already_bound:
+                    bind_syms.push(canonical_tp_sym)
+                    bind_tys.push(arg_ty)
+                    bind_sema_tys.push(if arg_sema > 0: arg_sema else: self.llvm_type_to_sema_type(arg_ty))
+            continue
+
+        if p_kind == NodeKind.NK_TYPE_GENERIC:
+            let g_extra = self.pool.get_data1(p_type_node)
+            let g_count = self.pool.get_data2(p_type_node)
+            let arg_sema_tid = self.sema_type_of_node(arg_node)
+            if arg_sema_tid > 0 and self.sema.get_type_kind(arg_sema_tid) == TypeKind.TY_GENERIC_INST:
+                for gi in 0..g_count:
+                    let inner_node = self.pool.get_extra(g_extra + gi)
+                    let inner_kind = self.pool.kind(inner_node)
+                    if inner_kind != NodeKind.NK_TYPE_NAMED and inner_kind != NodeKind.NK_IDENT:
+                        continue
+                    let inner_sym = self.pool.get_data0(inner_node)
+                    let inner_llvm = self.sema_generic_arg_llvm(arg_sema_tid, gi)
+                    if inner_llvm == 0:
+                        continue
+                    let inner_sema = self.sema.get_generic_inst_arg(arg_sema_tid, gi)
+                    var canonical_inner_sym = 0
+                    let inner_text = self.intern.resolve(inner_sym)
+                    for ti in 0..tp_syms.len() as i32:
+                        let candidate = tp_syms.get(ti as i64)
+                        if candidate == inner_sym:
+                            canonical_inner_sym = candidate
+                            break
+                        if inner_text.len() > 0 and self.intern.resolve(candidate) == inner_text:
+                            canonical_inner_sym = candidate
+                            break
+                    if canonical_inner_sym != 0:
+                        var already_bound = false
+                        for bi in 0..bind_syms.len() as i32:
+                            if bind_syms.get(bi as i64) == canonical_inner_sym:
+                                already_bound = true
+                                break
+                        if not already_bound:
+                            bind_syms.push(canonical_inner_sym)
+                            bind_tys.push(inner_llvm)
+                            bind_sema_tys.push(inner_sema)
+
+    for ti in 0..tp_syms.len() as i32:
+        if self.find_binding_type(bind_syms, bind_tys, tp_syms.get(ti as i64)) == 0:
+            return 0
+
+    let saved_bind_syms = self.type_binding_syms
+    let saved_bind_tys = self.type_binding_types
+    let saved_bind_len = self.type_bindings_len
+    let fresh_bind_syms: Vec[i32] = Vec.new()
+    let fresh_bind_tys: Vec[i64] = Vec.new()
+    self.type_binding_syms = fresh_bind_syms
+    self.type_binding_types = fresh_bind_tys
+    self.type_bindings_len = 0
+    for ti in 0..tp_syms.len() as i32:
+        let tp_sym = tp_syms.get(ti as i64)
+        let bty = self.find_binding_type(bind_syms, bind_tys, tp_sym)
+        self.type_binding_syms.push(tp_sym)
+        self.type_binding_types.push(bty)
+        self.type_bindings_len = self.type_bindings_len + 1
+    let mono_ty = self.monomorphize_struct(owner_sym, 0, 0)
+    self.type_binding_syms = saved_bind_syms
+    self.type_binding_types = saved_bind_tys
+    self.type_bindings_len = saved_bind_len
+
+    let mono_sym = self.find_struct_type_by_llvm(mono_ty)
+    if mono_sym != 0:
+        return mono_sym
+
+    let base_name = self.intern.resolve(owner_sym)
+    var mangled = base_name
+    for ti in 0..tp_syms.len() as i32:
+        let tp_sym = tp_syms.get(ti as i64)
+        let bty = self.find_binding_type(bind_syms, bind_tys, tp_sym)
+        var sema_mangle = "unknown"
+        for bi in 0..bind_syms.len() as i32:
+            if bind_syms.get(bi as i64) == tp_sym:
+                let sema_ty = bind_sema_tys.get(bi as i64)
+                if sema_ty > 0:
+                    sema_mangle = self.sema_type_mangle(sema_ty)
+                break
+        if sema_mangle == "unknown":
+            sema_mangle = self.llvm_type_mangle(bty)
+        mangled = mangled ++ "__" ++ sema_mangle
+    let inferred_sym = self.intern.intern(mangled)
+    if self.struct_type_map.get(inferred_sym).is_some():
+        return inferred_sym
     0
 
 
