@@ -349,6 +349,21 @@ fn Sema.pool_resolve_symbol(self: Sema, sym: i32) -> str:
 fn Sema.pool_resolve(self: Sema, sym: i32) -> str:
     self.pool_resolve_symbol(sym)
 
+fn Sema.pool_lookup_symbol(self: Sema, name: str) -> i32:
+    if name.len() == 0:
+        return 0
+    let existing = self.pool.symbol_map.get(name)
+    if existing.is_some():
+        return existing.unwrap()
+
+    var i = 1
+    while i < self.pool.symbol_texts.len() as i32:
+        let existing_text = self.pool.symbol_texts.get(i as i64)
+        if sema_str_eq(existing_text, name) != 0:
+            return i
+        i = i + 1
+    0
+
 fn Sema.pool_intern(self: &mut Sema, name: str) -> i32:
     let existing = self.pool.symbol_map.get(name)
     if existing.is_some():

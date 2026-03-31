@@ -4882,13 +4882,27 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
     if kind == NodeKind.NK_GROUPED:
         self.mark_moved_if_consumed(self.ast.get_data0(node))
 
-fn Sema.method_key(self: Sema, type_sym: i32, method_sym: i32) -> i32:
+fn Sema.lookup_method_key(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     if type_sym <= 0 or method_sym <= 0:
         return 0
     let cache_key = f"{type_sym}|{method_sym}"
     let cached = self.method_key_cache.get(cache_key)
     if cached.is_some():
         return cached.unwrap()
+    self.pool_lookup_symbol("$m$" ++ cache_key)
+
+fn Sema.method_key(self: &mut Sema, type_sym: i32, method_sym: i32) -> i32:
+    if type_sym <= 0 or method_sym <= 0:
+        return 0
+    let cache_key = f"{type_sym}|{method_sym}"
+    let cached = self.method_key_cache.get(cache_key)
+    if cached.is_some():
+        return cached.unwrap()
+
+    let existing = self.pool_lookup_symbol("$m$" ++ cache_key)
+    if existing != 0:
+        self.method_key_cache.insert(cache_key, existing)
+        return existing
 
     let out = self.pool_intern("$m$" ++ cache_key)
     self.method_key_cache.insert(cache_key, out)
