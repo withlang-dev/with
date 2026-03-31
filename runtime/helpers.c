@@ -1494,6 +1494,22 @@ void with_hashmap_clear(void *handle) {
     m->len = 0;
 }
 
+void with_hashmap_keys_out(with_vec *out, void *handle, int64_t key_size) {
+    if (!out) return;
+    WithHashMap *m = (WithHashMap *)handle;
+    int64_t effective_key_size = key_size;
+    if (m && !hashmap_invalid(m) && m->key_size > 0) {
+        effective_key_size = m->key_size;
+    }
+    with_vec_new_out(out, effective_key_size > 0 ? effective_key_size : 1);
+    if (hashmap_invalid(m)) return;
+    for (int64_t i = 0; i < m->cap; i++) {
+        if (m->states[i] == 1) {
+            with_vec_push(out, m->keys + i * m->key_size);
+        }
+    }
+}
+
 void with_hashmap_free(void *handle) {
     WithHashMap *m = (WithHashMap *)handle;
     free(m->keys);

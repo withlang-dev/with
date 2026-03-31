@@ -131,6 +131,7 @@ enum MirIntrinsic: i32:
     MIR_INTRINSIC_FMT_DEBUG = 51
     MIR_INTRINSIC_FMT_SPEC = 52
     MIR_INTRINSIC_INT_SWAP_BYTES = 53
+    MIR_INTRINSIC_MAP_KEYS = 54
 
 // ── Projection kinds ─────────────────────────────────────────────
 
