@@ -723,10 +723,15 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_UNSAFE_BLOCK:
         if self.in_comptime_fn != 0:
             self.emit_error("unsafe is not allowed in comptime", node)
-        return self.check_expr(self.ast.get_data0(node))
+        let saved_unsafe = self.in_unsafe
+        self.in_unsafe = 1
+        let unsafe_result = self.check_expr(self.ast.get_data0(node))
+        self.in_unsafe = saved_unsafe
+        return unsafe_result
 
     if kind == NodeKind.NK_ASM_EXPR:
-        // asm expressions produce void
+        if self.in_unsafe == 0:
+            self.emit_error("asm requires unsafe context", node)
         return self.ty_void
 
     if kind == NodeKind.NK_COMPTIME_ERROR:
@@ -1149,8 +1154,12 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
     if op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP:
         return lhs as i32
 
-    // Saturating arithmetic
+    // Saturating arithmetic — integers only
     if op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL_SAT:
+        let sat_resolved = self.resolve_alias(lhs)
+        if self.get_type_kind(sat_resolved) == TypeKind.TY_FLOAT:
+            self.emit_error("saturating arithmetic is not defined for floating-point types", node)
+            return 0
         return lhs as i32
 
     // Concat (++) — both operands must be str
@@ -1184,10 +1193,17 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         return operand as i32
     if op == UnaryOp.UOP_NOT:
         return self.ty_bool as i32
-    if op == UnaryOp.UOP_REF:
-        self.check_borrow_create(operand_node, BorrowKind.SHARED, node)
-        return self.add_type(TypeKind.TY_REF, operand as i32, 0, 0) as i32
-    if op == UnaryOp.UOP_MUT_REF:
+    if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF:
+        // Reject address-of bitpacked fields — they may not be byte-aligned
+        if self.ast.kind(operand_node) == NodeKind.NK_FIELD_ACCESS:
+            let ref_recv = self.ast.get_data0(operand_node)
+            let ref_recv_ty = self.resolve_alias(self.check_expr(ref_recv))
+            if self.bitpacked_types.contains(ref_recv_ty as i32):
+                self.emit_error("cannot take address of bitpacked field", node)
+                return 0
+        if op == UnaryOp.UOP_REF:
+            self.check_borrow_create(operand_node, BorrowKind.SHARED, node)
+            return self.add_type(TypeKind.TY_REF, operand as i32, 0, 0) as i32
         self.check_borrow_create(operand_node, BorrowKind.EXCLUSIVE, node)
         return self.add_type(TypeKind.TY_REF, operand as i32, 1, 0) as i32
     if op == UnaryOp.UOP_DEREF:
@@ -3533,14 +3549,17 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
             return 0
     
 
-    // Check all arguments
+    // Check all arguments (with expected-type propagation for Atomic ordering params)
+    let mc_order_type = self.resolve_atomic_order_type(obj_type as i32)
     let arg_types: Vec[i32] = Vec.new()
     for ai in 0..arg_count:
         let mc_arg_node = self.ast.get_extra(extra_start + ai)
         let mc_is_closure = self.ast.kind(mc_arg_node) == NodeKind.NK_CLOSURE
         if mc_is_closure:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
-        arg_types.push(self.check_expr(mc_arg_node) as i32)
+        let mc_expected = self.atomic_method_expected_arg_type(mc_order_type, field, ai)
+        let mc_arg_ty = if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId) else: self.check_expr(mc_arg_node)
+        arg_types.push(mc_arg_ty as i32)
         if mc_is_closure:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
 
