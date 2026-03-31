@@ -11,6 +11,13 @@ use compiler.ProjectConfig
 
 extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
+extern fn with_str_clone(s: str) -> str
+
+fn zcu_owned_text(text: str) -> str:
+    if text.len() == 0:
+        return ""
+    with_str_clone(text)
+
 fn zcu_debug_init_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
@@ -123,26 +130,29 @@ fn Zcu.has_imported_path(self: Zcu, path: str) -> i32:
     0
 
 fn Zcu.add_imported_path(self: Zcu, path: str):
-    self.imported_paths.push(path)
+    self.imported_paths.push(zcu_owned_text(path))
 
 fn Zcu.seed_decl_source_paths(self: Zcu, pool: AstPool, path: str, file_id: i32):
     self.decl_source_paths = Vec.new()
     self.decl_source_file_ids = Vec.new()
     self.decl_is_c_import = Vec.new()
+    let owned = zcu_owned_text(path)
     for _ in 0..pool.decl_count():
-        self.decl_source_paths.push(path)
+        self.decl_source_paths.push(owned)
         self.decl_source_file_ids.push(file_id)
         self.decl_is_c_import.push(0)
 
 fn Zcu.append_decl_source_paths(self: Zcu, count: i32, path: str, file_id: i32):
+    let owned = zcu_owned_text(path)
     for _ in 0..count:
-        self.decl_source_paths.push(path)
+        self.decl_source_paths.push(owned)
         self.decl_source_file_ids.push(file_id)
         self.decl_is_c_import.push(0)
 
 fn Zcu.append_c_import_decl_paths(self: Zcu, count: i32, path: str, file_id: i32):
+    let owned = zcu_owned_text(path)
     for _ in 0..count:
-        self.decl_source_paths.push(path)
+        self.decl_source_paths.push(owned)
         self.decl_source_file_ids.push(file_id)
         self.decl_is_c_import.push(1)
 

@@ -1219,8 +1219,7 @@ fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: &mut 
             continue
 
         let type_name_sym = out.get_data0(decl)
-        let method_key = sema.method_key(type_name_sym, clone_method_sym)
-        if sema.get_sig(method_key) >= 0:
+        if sema.lookup_method_sig(type_name_sym, clone_method_sym) >= 0:
             continue
         if sema.select_trait_impl(type_name_sym, clone_trait_sym) != 0:
             continue

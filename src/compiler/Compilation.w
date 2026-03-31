@@ -377,6 +377,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     let t_sema = profile_now()
     sema.check_module()
     sema.preregister_mir_types()
+    sema.freeze_symbols()
     sema.freeze_types()
     if do_profile:
         profile_emit("sema", t_sema, f"types={sema.type_kinds.len() as i32}")

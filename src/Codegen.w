@@ -21,6 +21,7 @@ extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_parse_float(s: str) -> f64
 extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
+extern fn with_str_clone(s: str) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn with_codegen_loop_set_break(idx: i32, bb: i64) -> void
 extern fn with_codegen_loop_set_continue(idx: i32, bb: i64) -> void
@@ -351,6 +352,7 @@ type Codegen {
     pool: AstPool,
     intern: InternPool,
     sema: Sema,
+    sema_symbol_texts: Vec[str],
 
     // Current function state
     current_ret_type: i64,
@@ -676,6 +678,7 @@ fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: In
     var cg = Codegen.init_with_opt(module_name, opt_level)
     cg.intern = intern
     cg.sema = sema
+    cg.capture_sema_symbol_texts()
     // Pre-intern dispatch symbols for O(1) comparisons
     cg.sym_vec = cg.intern.intern("Vec")
     cg.sym_option = cg.intern.intern("Option")
@@ -732,6 +735,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         pool: AstPool.new(),
         intern: InternPool.init(),
         sema: Sema.init(InternPool.init(), DiagnosticList.init(), AstPool.new()),
+        sema_symbol_texts: Vec.new(),
         current_ret_type: 0,
         current_function: 0,
         current_function_name_sym: 0,
@@ -2043,6 +2047,24 @@ fn Codegen.create_entry_alloca(self: Codegen, ty: i64) -> i64:
 fn vec_data_i64(v: &Vec[i64]) -> i64:
     wl_vec_data_ptr(v)
 
+fn codegen_owned_text(text: str) -> str:
+    if text.len() == 0:
+        return ""
+    with_str_clone(text)
+
+fn Codegen.capture_sema_symbol_texts(self: &mut Codegen):
+    let texts: Vec[str] = Vec.new()
+    for i in 0..self.sema.pool.symbol_texts.len() as i32:
+        texts.push(codegen_owned_text(self.sema.pool.symbol_texts.get(i as i64)))
+    self.sema_symbol_texts = texts
+
+fn Codegen.sema_symbol_text(self: Codegen, sym: i32) -> str:
+    if sym > 0 and sym < self.sema_symbol_texts.len() as i32:
+        return self.sema_symbol_texts.get(sym as i64)
+    if sym > 0 and sym < self.sema.pool.symbol_texts.len() as i32:
+        return self.sema.pool.symbol_texts.get(sym as i64)
+    self.sema.pool_resolve(sym)
+
 // ── Resolve type expression → LLVM type ───────────────────────────
 
 fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
@@ -2317,13 +2339,9 @@ fn Codegen.sema_generic_arg_llvm(self: Codegen, sema_tid: i32, arg_idx: i32) -> 
 fn Codegen.sema_sym_to_codegen_sym(self: Codegen, sym: i32) -> i32:
     if sym <= 0:
         return 0
-    if sym < self.sema.pool.symbol_texts.len() as i32:
-        let sema_text = self.sema.pool.symbol_texts.get(sym as i64)
-        if sema_text.len() > 0:
-            return self.intern.intern(sema_text)
-    let resolved = self.sema.pool_resolve(sym)
-    if resolved.len() > 0:
-        return self.intern.intern(resolved)
+    let sema_text = self.sema_symbol_text(sym)
+    if sema_text.len() > 0:
+        return self.intern.intern(sema_text)
     0
 
 // Map sema TypeId to LLVM type. Handles TypeKind.TY_GENERIC_INST for builtin containers.

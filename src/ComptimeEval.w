@@ -1268,9 +1268,9 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, diags: &mut DiagnosticLi
     if self.ast.kind(callee) != NodeKind.NK_IDENT:
         return self.fail(diags, node, "only direct comptime function calls are supported")
     let fn_sym = self.ast.get_data0(callee)
-    if fn_sym == self.sema.sym_src:
+    if fn_sym == self.sema.syms.src:
         return self.eval_src_call(diags, node, arg_count)
-    if fn_sym == self.sema.sym_embed_file:
+    if fn_sym == self.sema.syms.embed_file:
         return self.eval_embed_file_call(diags, node, arg_count)
     if self.sema.fn_symbol_is_comptime(fn_sym) == 0:
         return self.fail(diags, node, "comptime can only call comptime functions")

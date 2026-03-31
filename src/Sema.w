@@ -16,6 +16,7 @@ extern fn with_write(s: str) -> void
 extern fn with_eprint(s: str) -> void
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_getenv_str(name: str) -> str
+extern fn with_str_clone(s: str) -> str
 extern fn int_to_string(n: i32) -> str
 extern fn with_hashmap_new(key_size: i64, val_size: i64) -> *i8
 
@@ -57,6 +58,75 @@ enum DeriveReq: i32:
     COPY = 0
     CLONE = 1
     EQ = 2
+
+type SemaBuiltinSymbols {
+    channel: i32,
+    send: i32,
+    recv: i32,
+    close: i32,
+    cancel: i32,
+    is_done: i32,
+    todo: i32,
+    unreachable: i32,
+    track: i32,
+    src: i32,
+    embed_file: i32,
+    copy: i32,
+    drop: i32,
+    self_type: i32,
+    vec: i32,
+    veciter: i32,
+    option: i32,
+    result: i32,
+    hashmap: i32,
+    hashset: i32,
+    box: i32,
+    ok: i32,
+    err: i32,
+    some: i32,
+    none: i32,
+    new: i32,
+    push: i32,
+    insert: i32,
+    get: i32,
+    remove: i32,
+    len: i32,
+    contains: i32,
+    join: i32,
+    iter: i32,
+    filter: i32,
+    map: i32,
+    fold: i32,
+    clear: i32,
+    pop: i32,
+    set_i32: i32,
+    keys: i32,
+    next: i32,
+    unwrap: i32,
+    is_some: i32,
+    is_none: i32,
+    is_ok: i32,
+    is_err: i32,
+    starts_with: i32,
+    ends_with: i32,
+    trim: i32,
+    to_lower: i32,
+    to_upper: i32,
+    replace: i32,
+    slice: i32,
+    fields: i32,
+    variants: i32,
+    name: i32,
+    size: i32,
+    align: i32,
+    implements: i32,
+    is_copy: i32,
+}
+
+type SemaMethodLookup {
+    sig_lookup: HashMap[i64, i32],
+    fn_lookup: HashMap[i64, i32],
+}
 
 // ── Sema state ───────────────────────────────────────────────────
 
@@ -136,8 +206,8 @@ type Sema {
     impl_type_syms: Vec[i32],
     impl_lookup: HashMap[i32, i32],
     // Generic inst impls: impl Trait for Type[Args]
-    // Key: "TypeId:trait_sym" → 1
-    impl_generic_inst: HashMap[str, i32],
+    // Key: pair(type_id, trait_sym) → 1
+    impl_generic_inst: HashMap[i64, i32],
     // Blanket impls: impl[T: Bound] Trait for T
     blanket_trait_syms: Vec[i32],
     blanket_bound_syms: Vec[i32],
@@ -149,9 +219,9 @@ type Sema {
     obligation_trait_syms: Vec[i32],
     obligation_type_syms: Vec[i32],
     obligation_nodes: Vec[i32],
-    selection_cache: HashMap[str, i32],
+    selection_cache: HashMap[i64, i32],
     // Blanket impl recursion guard: keys currently being resolved
-    blanket_guard: Vec[str],
+    blanket_guard: Vec[i64],
 
     // Local trait/type names
     local_trait_names: HashMap[i32, i32],
@@ -173,24 +243,14 @@ type Sema {
     mutable_global_syms: HashMap[i32, i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
-    sym_channel: i32,
-    sym_send: i32,
-    sym_recv: i32,
-    sym_close: i32,
-    sym_cancel: i32,
-    sym_is_done: i32,
-    sym_todo: i32,
-    sym_unreachable: i32,
-    sym_track: i32,
-    sym_src: i32,
-    sym_embed_file: i32,
+    syms: SemaBuiltinSymbols,
 
     // Method origin tracking
     method_impl_nodes: HashMap[i32, i32],
     method_decl_origins: HashMap[i32, i32],
     method_has_inherent: HashMap[i32, i32],
     method_symbol_flags: HashMap[i32, i32],
-    method_key_cache: HashMap[str, i32],
+    method_lookup: SemaMethodLookup,
     drop_method_cache: HashMap[i32, i32],
     copy_visit_stack: Vec[i32],
 
@@ -236,8 +296,9 @@ type Sema {
     // Associated type bindings from current impl (for Self.Name resolution)
     assoc_type_bindings: HashMap[i32, i32],
 
-    // Frozen flag: set to 1 after check_module + preregister completes.
-    // When frozen, add_type will error.
+    // Frozen flags: set to 1 after check_module + preregister completes.
+    // When frozen, add_type and new semantic symbol interning will error.
+    symbols_frozen: i32,
     types_frozen: i32,
 
     // Current state
@@ -366,6 +427,12 @@ fn Sema.pool_lookup_symbol(self: Sema, name: str) -> i32:
     0
 
 fn Sema.pool_intern(self: &mut Sema, name: str) -> i32:
+    if self.symbols_frozen != 0:
+        let existing = self.pool_lookup_symbol(name)
+        if existing != 0:
+            return existing
+        with_eprint("BUG: Sema.pool_intern called after symbol freeze")
+        return 0
     let existing = self.pool.symbol_map.get(name)
     if existing.is_some():
         return existing.unwrap()
@@ -379,8 +446,9 @@ fn Sema.pool_intern(self: &mut Sema, name: str) -> i32:
         i = i + 1
 
     let id = self.pool.symbol_texts.len() as i32
-    self.pool.symbol_texts.push(name)
-    self.pool.symbol_map.insert(name, id)
+    let owned = sema_owned_text(name)
+    self.pool.symbol_texts.push(owned)
+    self.pool.symbol_map.insert(owned, id)
     id
 
 fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
@@ -394,6 +462,85 @@ fn sema_new_map_str_i32 -> HashMap[str, i32]:
 
 fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
     HashMap.new()
+
+fn sema_owned_text(text: str) -> str:
+    if text.len() == 0:
+        return ""
+    with_str_clone(text)
+
+fn sema_pair_key(a: i32, b: i32) -> i64:
+    (a as i64) * 4294967296 + (b as i64)
+
+fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
+    SemaBuiltinSymbols {
+        channel: 0,
+        send: 0,
+        recv: 0,
+        close: 0,
+        cancel: 0,
+        is_done: 0,
+        todo: 0,
+        unreachable: 0,
+        track: 0,
+        src: 0,
+        embed_file: 0,
+        copy: 0,
+        drop: 0,
+        self_type: 0,
+        vec: 0,
+        veciter: 0,
+        option: 0,
+        result: 0,
+        hashmap: 0,
+        hashset: 0,
+        box: 0,
+        ok: 0,
+        err: 0,
+        some: 0,
+        none: 0,
+        new: 0,
+        push: 0,
+        insert: 0,
+        get: 0,
+        remove: 0,
+        len: 0,
+        contains: 0,
+        join: 0,
+        iter: 0,
+        filter: 0,
+        map: 0,
+        fold: 0,
+        clear: 0,
+        pop: 0,
+        set_i32: 0,
+        keys: 0,
+        next: 0,
+        unwrap: 0,
+        is_some: 0,
+        is_none: 0,
+        is_ok: 0,
+        is_err: 0,
+        starts_with: 0,
+        ends_with: 0,
+        trim: 0,
+        to_lower: 0,
+        to_upper: 0,
+        replace: 0,
+        slice: 0,
+        fields: 0,
+        variants: 0,
+        name: 0,
+        size: 0,
+        align: 0,
+        implements: 0,
+        is_copy: 0,
+    }
+
+fn sema_method_lookup_new -> SemaMethodLookup:
+    SemaMethodLookup {
+        sig_lookup: sema_new_map_i64_i32(),
+        fn_lookup: sema_new_map_i64_i32(),
+    }
 
 fn sema_visibility_cache_key(from_path: str, to_path: str) -> str:
     from_path ++ "->" ++ to_path
@@ -413,7 +560,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let disc_has_payload = sema_new_map_i32_i32()
     let trait_lookup = sema_new_map_i32_i32()
     let impl_lookup = sema_new_map_i32_i32()
-    let selection_cache = sema_new_map_str_i32()
+    let selection_cache = sema_new_map_i64_i32()
     let local_trait_names = sema_new_map_i32_i32()
     let lang_trait_syms = sema_new_map_i32_i32()
     let local_type_names = sema_new_map_i32_i32()
@@ -431,7 +578,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let method_decl_origins = sema_new_map_i32_i32()
     let method_has_inherent = sema_new_map_i32_i32()
     let method_symbol_flags = sema_new_map_i32_i32()
-    let method_key_cache = sema_new_map_str_i32()
+    let method_lookup = sema_method_lookup_new()
     let drop_method_cache = sema_new_map_i32_i32()
     let typed_expr_types = sema_new_map_i32_i32()
     let typed_binding_types = sema_new_map_i32_i32()
@@ -516,22 +663,12 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         result_option_fns,
         task_fns,
         mutable_global_syms,
-        sym_channel: 0,
-        sym_send: 0,
-        sym_recv: 0,
-        sym_close: 0,
-        sym_cancel: 0,
-        sym_is_done: 0,
-        sym_todo: 0,
-        sym_unreachable: 0,
-        sym_track: 0,
-        sym_src: 0,
-        sym_embed_file: 0,
+        syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
         method_decl_origins,
         method_has_inherent,
         method_symbol_flags,
-        method_key_cache,
+        method_lookup,
         drop_method_cache,
         copy_visit_stack: Vec.new(),
         bind_names: Vec.new(),
@@ -564,6 +701,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         generic_specialization_cache,
         generic_inst_cache,
         assoc_type_bindings: sema_new_map_i32_i32(),
+        symbols_frozen: 0,
         types_frozen: 0,
         source_text: "",
         current_return_type: 0,
@@ -692,7 +830,7 @@ fn Sema.record_named_type(self: &mut Sema, sym: i32, tid: i32):
     self.named_type_candidate_syms.push(sym)
     self.named_type_candidate_tids.push(tid)
     let path = if self.current_module_path.len() > 0: self.current_module_path else: ""
-    self.named_type_candidate_paths.push(path)
+    self.named_type_candidate_paths.push(sema_owned_text(path))
 
 fn Sema.module_is_visible_from_current(self: Sema, target_path: str) -> i32:
     if target_path.len() == 0:
@@ -713,7 +851,7 @@ fn Sema.module_is_visible_from_current(self: Sema, target_path: str) -> i32:
     let start_idx = self.module_index_by_path.get(self.current_module_path).unwrap()
     let target_idx = self.module_index_by_path.get(target_path).unwrap()
     if start_idx == target_idx:
-        self.module_visibility_cache.insert(cache_key, 1)
+        self.module_visibility_cache.insert(sema_owned_text(cache_key), 1)
         return 1
     let seen: HashMap[i32, i32] = sema_new_map_i32_i32()
     let stack: Vec[i32] = Vec.new()
@@ -726,14 +864,14 @@ fn Sema.module_is_visible_from_current(self: Sema, target_path: str) -> i32:
             continue
         seen.insert(current, 1)
         if current == target_idx:
-            self.module_visibility_cache.insert(cache_key, 1)
+            self.module_visibility_cache.insert(sema_owned_text(cache_key), 1)
             return 1
         if current >= 0 and current < self.module_import_starts.len() as i32:
             let edge_start = self.module_import_starts.get(current as i64)
             let edge_count = self.module_import_counts.get(current as i64)
             for ei in 0..edge_count:
                 stack.push(self.module_import_targets.get((edge_start + ei) as i64))
-    self.module_visibility_cache.insert(cache_key, 0)
+    self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
     0
 
 fn Sema.lookup_named_type_visible(self: Sema, sym: i32) -> i32:
@@ -778,7 +916,7 @@ fn Sema.register_builtin_struct_type(self: &mut Sema, name: str, field_names: Ve
         self.type_extra.push(0)
     let tid = self.add_type(TypeKind.TY_STRUCT, name_sym, te_start, field_count)
     self.record_named_type(name_sym, tid as i32)
-    self.pretty_symbol_names.insert(name_sym, name)
+    self.pretty_symbol_names.insert(name_sym, sema_owned_text(name))
     tid as i32
 
 fn Sema.init_builtin_reflection_types(self: &mut Sema):
@@ -809,21 +947,71 @@ fn Sema.init_builtin_reflection_types(self: &mut Sema):
     self.ty_variant_info = self.register_builtin_struct_type("VariantInfo", variant_info_names, variant_info_types, 4) as TypeId
 
 fn Sema.init_intrinsic_symbols(self: &mut Sema):
-    self.sym_channel = self.pool_intern("Channel")
-    self.sym_send = self.pool_intern("send")
-    self.sym_recv = self.pool_intern("recv")
-    self.sym_close = self.pool_intern("close")
-    self.sym_cancel = self.pool_intern("cancel")
-    self.sym_is_done = self.pool_intern("is_done")
-    self.sym_todo = self.pool_intern("todo")
-    self.sym_unreachable = self.pool_intern("unreachable")
-    self.sym_track = self.pool_intern("track")
-    self.sym_src = self.pool_intern("src")
-    self.sym_embed_file = self.pool_intern("embed_file")
+    self.syms.channel = self.pool_intern("Channel")
+    self.syms.send = self.pool_intern("send")
+    self.syms.recv = self.pool_intern("recv")
+    self.syms.close = self.pool_intern("close")
+    self.syms.cancel = self.pool_intern("cancel")
+    self.syms.is_done = self.pool_intern("is_done")
+    self.syms.todo = self.pool_intern("todo")
+    self.syms.unreachable = self.pool_intern("unreachable")
+    self.syms.track = self.pool_intern("track")
+    self.syms.src = self.pool_intern("src")
+    self.syms.embed_file = self.pool_intern("embed_file")
+    self.syms.copy = self.pool_intern("Copy")
+    self.syms.drop = self.pool_intern("Drop")
+    self.syms.self_type = self.pool_intern("Self")
+    self.syms.vec = self.pool_intern("Vec")
+    self.syms.veciter = self.pool_intern("VecIter")
+    self.syms.option = self.pool_intern("Option")
+    self.syms.result = self.pool_intern("Result")
+    self.syms.hashmap = self.pool_intern("HashMap")
+    self.syms.hashset = self.pool_intern("HashSet")
+    self.syms.box = self.pool_intern("Box")
+    self.syms.ok = self.pool_intern("Ok")
+    self.syms.err = self.pool_intern("Err")
+    self.syms.some = self.pool_intern("Some")
+    self.syms.none = self.pool_intern("None")
+    self.syms.new = self.pool_intern("new")
+    self.syms.push = self.pool_intern("push")
+    self.syms.insert = self.pool_intern("insert")
+    self.syms.get = self.pool_intern("get")
+    self.syms.remove = self.pool_intern("remove")
+    self.syms.len = self.pool_intern("len")
+    self.syms.contains = self.pool_intern("contains")
+    self.syms.join = self.pool_intern("join")
+    self.syms.iter = self.pool_intern("iter")
+    self.syms.filter = self.pool_intern("filter")
+    self.syms.map = self.pool_intern("map")
+    self.syms.fold = self.pool_intern("fold")
+    self.syms.clear = self.pool_intern("clear")
+    self.syms.pop = self.pool_intern("pop")
+    self.syms.set_i32 = self.pool_intern("set_i32")
+    self.syms.keys = self.pool_intern("keys")
+    self.syms.next = self.pool_intern("next")
+    self.syms.unwrap = self.pool_intern("unwrap")
+    self.syms.is_some = self.pool_intern("is_some")
+    self.syms.is_none = self.pool_intern("is_none")
+    self.syms.is_ok = self.pool_intern("is_ok")
+    self.syms.is_err = self.pool_intern("is_err")
+    self.syms.starts_with = self.pool_intern("starts_with")
+    self.syms.ends_with = self.pool_intern("ends_with")
+    self.syms.trim = self.pool_intern("trim")
+    self.syms.to_lower = self.pool_intern("to_lower")
+    self.syms.to_upper = self.pool_intern("to_upper")
+    self.syms.replace = self.pool_intern("replace")
+    self.syms.slice = self.pool_intern("slice")
+    self.syms.fields = self.pool_intern("fields")
+    self.syms.variants = self.pool_intern("variants")
+    self.syms.name = self.pool_intern("name")
+    self.syms.size = self.pool_intern("size")
+    self.syms.align = self.pool_intern("align")
+    self.syms.implements = self.pool_intern("implements")
+    self.syms.is_copy = self.pool_intern("is_copy")
     // Language-level traits: these affect codegen semantics (copy vs move,
     // destruction, thread safety). Always recognized regardless of prelude.
-    self.lang_trait_syms.insert(self.pool_intern("Copy"), 1)
-    self.lang_trait_syms.insert(self.pool_intern("Drop"), 1)
+    self.lang_trait_syms.insert(self.syms.copy, 1)
+    self.lang_trait_syms.insert(self.syms.drop, 1)
     self.lang_trait_syms.insert(self.pool_intern("Send"), 1)
     self.lang_trait_syms.insert(self.pool_intern("ScopedSend"), 1)
 
@@ -1039,7 +1227,7 @@ fn Sema.set_pretty_symbol(self: Sema, sym: i32, name: str):
             return
     // Keep textual pretty names detached from pooled symbol storage to avoid
     // lifetime issues during typed dump rendering.
-    self.pretty_symbol_names.insert(sym, name ++ "")
+    self.pretty_symbol_names.insert(sym, sema_owned_text(name))
 
 fn Sema.extract_fn_param_name(self: Sema, node: i32, param_index: i32) -> str:
     if self.source_text.len() == 0:
@@ -1056,6 +1244,9 @@ fn Sema.extract_fn_param_name(self: Sema, node: i32, param_index: i32) -> str:
     extract_fn_param_name_in_text(self.source_text.slice(start as i64, end as i64), param_index)
 
 // ── Type management ──────────────────────────────────────────────
+
+fn Sema.freeze_symbols(self: Sema):
+    self.symbols_frozen = 1
 
 fn Sema.add_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
     if self.types_frozen != 0:
@@ -1207,8 +1398,8 @@ fn Sema.find_range_type(self: Sema, elem_tid: TypeId, inclusive: i32) -> TypeId:
 // downstream passes never need to mutate the type tables.
 // Must be called after check_module() and before freeze_types().
 fn Sema.preregister_mir_types(self: Sema):
-    let vec_sym = self.pool_intern("Vec")
-    let vi_sym = self.pool_intern("VecIter")
+    let vec_sym = self.syms.vec
+    let vi_sym = self.syms.veciter
 
     // For every Vec[T] type registered, also register VecIter[T].
     let type_count = self.type_kinds.len() as i32
@@ -1376,7 +1567,7 @@ fn Sema.is_option_pointer_type(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)
     if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
         return 0
-    if self.get_type_d0(resolved) != self.pool_intern("Option"):
+    if self.get_type_d0(resolved) != self.syms.option:
         return 0
     if self.get_type_d2(resolved) <= 0:
         return 0
@@ -1395,12 +1586,10 @@ fn Sema.option_pointer_payload_type(self: Sema, tid: i32) -> i32:
 fn Sema.try_unwrapped_type(self: Sema, tid: i32) -> i32:
     if tid <= 0:
         return 0
-    let ok_sym = self.pool_intern("Ok")
-    let ok_payloads = self.enum_variant_payload_types(tid, ok_sym)
+    let ok_payloads = self.enum_variant_payload_types(tid, self.syms.ok)
     if ok_payloads.len() as i32 == 1:
         return ok_payloads.get(0)
-    let some_sym = self.pool_intern("Some")
-    let some_payloads = self.enum_variant_payload_types(tid, some_sym)
+    let some_payloads = self.enum_variant_payload_types(tid, self.syms.some)
     if some_payloads.len() as i32 == 1:
         return some_payloads.get(0)
     0

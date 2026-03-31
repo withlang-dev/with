@@ -22,7 +22,13 @@ extern fn with_str_hash(s: str) -> i64
 extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
 extern fn with_clock_nanos() -> i64
+extern fn with_str_clone(s: str) -> str
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
+
+fn frontend_owned_text(text: str) -> str:
+    if text.len() == 0:
+        return ""
+    with_str_clone(text)
 
 fn count_non_use_decls_frontend(pool: AstPool) -> i32:
     var count = 0
@@ -104,7 +110,8 @@ fn Zcu.seed_sema_module_graph_frontend(self: Zcu, sema: &mut Sema):
 
     for mi in 0..self.last_resolved.modules.len() as i32:
         let mod = self.last_resolved.modules.get(mi as i64)
-        sema.module_paths.push(mod.path)
+        let owned_path = frontend_owned_text(mod.path)
+        sema.module_paths.push(owned_path)
         sema.module_import_starts.push(sema.module_import_targets.len() as i32)
         var visible_count = 0
         for ii in 0..mod.import_count:
@@ -113,7 +120,7 @@ fn Zcu.seed_sema_module_graph_frontend(self: Zcu, sema: &mut Sema):
                 sema.module_import_targets.push(imp.target_module)
                 visible_count = visible_count + 1
         sema.module_import_counts.push(visible_count)
-        sema.module_index_by_path.insert(mod.path, mod.module_id)
+        sema.module_index_by_path.insert(owned_path, mod.module_id)
     if self.last_resolved.modules.len() > 0:
         let global_frontier: Vec[i32] = Vec.new()
         let root = self.last_resolved.modules.get(0)
@@ -132,7 +139,7 @@ fn Zcu.seed_sema_module_graph_frontend(self: Zcu, sema: &mut Sema):
                 continue
             seen_global.insert(mid, 1)
             let mod = self.last_resolved.modules.get(mid as i64)
-            sema.global_visible_module_paths.insert(mod.path, 1)
+            sema.global_visible_module_paths.insert(frontend_owned_text(mod.path), 1)
             for ii in 0..mod.import_count:
                 let imp = self.last_resolved.imports.get((mod.import_start + ii) as i64)
                 if imp.target_module >= 0:

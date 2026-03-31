@@ -2730,53 +2730,53 @@ fn MirBuilder.lower_call_arg(self: MirBuilder, arg_node: i32, sig_idx: i32, arg_
     lowered
 
 fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method_sym: i32) -> i32:
-    // Translate method_sym from AST pool to sema pool for method_key lookups
+    // Translate method_sym from AST pool to sema pool for method lookups.
     let sema_method_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(method_sym))
     let obj_type = self.expr_type(self_expr)
     if obj_type != 0 and obj_type != self.sema.ty_void:
         let resolved = self.sema.resolve_alias(obj_type)
         let type_name_sym = self.sema.get_type_name(resolved)
         if type_name_sym != 0:
-            let method_key = self.sema.lookup_method_key(type_name_sym, sema_method_sym)
-            if self.sema.get_sig(method_key) >= 0:
-                return method_key
+            let method_fn = self.sema.lookup_method_fn(type_name_sym, sema_method_sym)
+            if method_fn != 0 and self.sema.lookup_method_sig(type_name_sym, sema_method_sym) >= 0:
+                return method_fn
         // For builtin types (i32, str, bool, etc.), try the type kind name
         let tk = self.sema.get_type_kind(resolved)
         if tk == TypeKind.TY_INT:
             let int_sym = self.sema.pool_lookup_symbol("i32")
-            let method_key = self.sema.lookup_method_key(int_sym, sema_method_sym)
-            if self.sema.get_sig(method_key) >= 0:
-                return method_key
+            let method_fn = self.sema.lookup_method_fn(int_sym, sema_method_sym)
+            if method_fn != 0 and self.sema.lookup_method_sig(int_sym, sema_method_sym) >= 0:
+                return method_fn
         if tk == TypeKind.TY_STR:
             let str_sym = self.sema.pool_lookup_symbol("str")
-            let method_key = self.sema.lookup_method_key(str_sym, sema_method_sym)
-            if self.sema.get_sig(method_key) >= 0:
-                return method_key
+            let method_fn = self.sema.lookup_method_fn(str_sym, sema_method_sym)
+            if method_fn != 0 and self.sema.lookup_method_sig(str_sym, sema_method_sym) >= 0:
+                return method_fn
         if tk == TypeKind.TY_BOOL:
             let bool_sym = self.sema.pool_lookup_symbol("bool")
-            let method_key = self.sema.lookup_method_key(bool_sym, sema_method_sym)
-            if self.sema.get_sig(method_key) >= 0:
-                return method_key
+            let method_fn = self.sema.lookup_method_fn(bool_sym, sema_method_sym)
+            if method_fn != 0 and self.sema.lookup_method_sig(bool_sym, sema_method_sym) >= 0:
+                return method_fn
         if tk == TypeKind.TY_FLOAT:
             let float_sym = self.sema.pool_lookup_symbol("f64")
-            let method_key = self.sema.lookup_method_key(float_sym, sema_method_sym)
-            if self.sema.get_sig(method_key) >= 0:
-                return method_key
+            let method_fn = self.sema.lookup_method_fn(float_sym, sema_method_sym)
+            if method_fn != 0 and self.sema.lookup_method_sig(float_sym, sema_method_sym) >= 0:
+                return method_fn
 
     if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
         let type_sym = self.ast.get_data0(self_expr)
-        let method_key = self.sema.lookup_method_key(type_sym, method_sym)
-        if self.sema.get_sig(method_key) >= 0:
-            return method_key
+        let method_fn = self.sema.lookup_method_fn(type_sym, method_sym)
+        if method_fn != 0 and self.sema.lookup_method_sig(type_sym, method_sym) >= 0:
+            return method_fn
 
     // Handle Vec[i32].method() — receiver is NodeKind.NK_INDEX of a type name
     if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
         let base = self.ast.get_data0(self_expr)
         if self.ast.kind(base) == NodeKind.NK_IDENT:
             let type_sym = self.ast.get_data0(base)
-            let method_key = self.sema.lookup_method_key(type_sym, method_sym)
-            if self.sema.get_sig(method_key) >= 0:
-                return method_key
+            let method_fn = self.sema.lookup_method_fn(type_sym, method_sym)
+            if method_fn != 0 and self.sema.lookup_method_sig(type_sym, method_sym) >= 0:
+                return method_fn
 
     method_sym
 
@@ -3896,7 +3896,7 @@ fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
     if sig_idx < 0:
         let sema_fn_sym = builder.sema.pool_lookup_symbol(builder.pool.resolve_symbol(fn_sym))
         sig_idx = builder.sema.get_sig(sema_fn_sym)
-    // Also try method_key for methods: "Type.method" → method_key(type_sym, method_sym)
+    // Also try method lookup for methods: "Type.method" → fn_sym for (type_sym, method_sym)
     if sig_idx < 0:
         let fn_name = builder.pool.resolve_symbol(fn_sym)
         // Split "Type.method" on the dot
@@ -3910,8 +3910,7 @@ fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
             let method_part = fn_name.slice((dot_pos + 1) as i64, fn_name.len())
             let sema_type_sym = builder.sema.pool_lookup_symbol(type_part)
             let sema_method_sym = builder.sema.pool_lookup_symbol(method_part)
-            let mk = builder.sema.lookup_method_key(sema_type_sym, sema_method_sym)
-            sig_idx = builder.sema.get_sig(mk)
+            sig_idx = builder.sema.lookup_method_sig(sema_type_sym, sema_method_sym)
     lower_fn_with_sig(builder, fn_node, sig_idx)
 
 fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody:
