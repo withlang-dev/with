@@ -3870,7 +3870,9 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
 
         if self.expect(TokenKind.TK_FAT_ARROW) == 0:
             break
-        self.skip_newlines()
+        // Preserve a leading newline so parse_block_or_expr can recognize an
+        // indented multi-statement arm body instead of truncating it to the
+        // first expression and treating the tail as outer scope.
         let body = self.parse_block_or_expr()
 
         let arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, arm_start, self.prev_end(), pattern, body, guard)
