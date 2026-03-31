@@ -507,7 +507,10 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
         if type_name == "Atomic":
             if method_name == "new": return recv_type
             if method_name == "store": return self.sema.ty_void as i32
-            if method_name == "load" or method_name == "swap" or method_name == "fetch_add" or method_name == "fetch_sub" or method_name == "fetch_and" or method_name == "fetch_or" or method_name == "fetch_xor":
+            if method_name == "load" or method_name == "swap" or method_name == "fetch_add" or method_name == "fetch_sub" or method_name == "fetch_and" or method_name == "fetch_or" or method_name == "fetch_xor" or method_name == "fetch_min" or method_name == "fetch_max":
+                if tk == TypeKind.TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 0)
+            if method_name == "compare_exchange" or method_name == "compare_exchange_weak":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
             return self.sema.ty_void as i32
@@ -2880,6 +2883,10 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "fetch_and": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND
         if method_name == "fetch_or": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR
         if method_name == "fetch_xor": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR
+        if method_name == "fetch_min": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MIN
+        if method_name == "fetch_max": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MAX
+        if method_name == "compare_exchange": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS
+        if method_name == "compare_exchange_weak": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS_WEAK
         return MirIntrinsic.MIR_INTRINSIC_NONE
     MirIntrinsic.MIR_INTRINSIC_NONE
 

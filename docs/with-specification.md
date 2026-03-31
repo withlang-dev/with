@@ -5596,24 +5596,24 @@ pointer types. `T` must be an integer type (`i32`, `i64`, `u32`,
 `u64`, etc.) or a pointer type.
 
 ```
-use std.sync.Atomic
+use std.collections
 
-var counter: Atomic[i32] = Atomic.new(0)
+var counter: Atomic[i32] = Atomic { val: 0 }
 
-counter.store(42, .release)
-let val = counter.load(.acquire)
+counter.store(42, .Release)
+let val = counter.load(.Acquire)
 
-let old = counter.fetch_add(1, .seq_cst)
+let old = counter.fetch_add(1, .SeqCst)
 ```
 
 **Memory orderings:**
 
 ```
-.relaxed       // no ordering guarantees (fastest)
-.acquire       // reads after this see writes before a paired release
-.release       // writes before this are visible after a paired acquire
-.acq_rel       // both acquire and release
-.seq_cst       // total order across all threads (strongest, default)
+.Relaxed       // no ordering guarantees (fastest)
+.Acquire       // reads after this see writes before a paired release
+.Release       // writes before this are visible after a paired acquire
+.AcqRel        // both acquire and release
+.SeqCst        // total order across all threads (strongest, default)
 ```
 
 **Operations:**
@@ -5642,17 +5642,17 @@ let old = counter.fetch_add(1, .seq_cst)
 ```
 use std.sync.fence
 
-fence(.acquire)
-fence(.release)
-fence(.seq_cst)
+fence(.Acquire)
+fence(.Release)
+fence(.SeqCst)
 ```
 
 **Ordering constraints (compile-time validated):**
 
-- `.store` cannot use `.acquire` or `.acq_rel`
-- `.load` cannot use `.release` or `.acq_rel`
+- `.store` cannot use `.Acquire` or `.AcqRel`
+- `.load` cannot use `.Release` or `.AcqRel`
 - `compare_exchange` failure ordering cannot be stronger than
-  success ordering, and cannot be `.release` or `.acq_rel`
+  success ordering, and cannot be `.Release` or `.AcqRel`
 
 ### 14.18 The Fiber Runtime
 
