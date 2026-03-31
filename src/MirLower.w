@@ -544,7 +544,7 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
         if method_name == "min" or method_name == "max":
             return recv_type
         if method_name == "abs":
-            return recv_type
+            return self.sema.unsigned_counterpart(recv_type)
     if tk == TypeKind.TY_FLOAT:
         if method_name == "min" or method_name == "max" or method_name == "abs" or method_name == "mul_add":
             return recv_type
@@ -658,6 +658,15 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_UNSAFE_BLOCK:
         return self.expr_type(self.ast.get_data0(node))
     if kind == NodeKind.NK_ASM_EXPR:
+        let asm_d2 = self.ast.get_data2(node)
+        if (asm_d2 & 2) != 0:  // has_output flag
+            let asm_es = asm_d2 >> 8
+            if asm_es > 0:
+                let asm_ot = self.ast.get_extra(asm_es)
+                if asm_ot != 0:
+                    let asm_rt = self.sema.resolve_type_expr(asm_ot)
+                    if asm_rt != 0:
+                        return asm_rt as i32
         return self.sema.ty_void as i32
     if kind == NodeKind.NK_CALL:
         return self.call_return_type(self.ast.get_data0(node))
@@ -3404,16 +3413,27 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
     if kind == NodeKind.NK_ASM_EXPR:
         // Inline assembly — emit as a call with MIR_INTRINSIC_ASM marker
+        // Lower input expression values as MIR args
+        let asm_packed_d2 = self.ast.get_data2(node)
+        let asm_extra_start = asm_packed_d2 >> 8
         let asm_args: Vec[i32] = Vec.new()
+        if asm_extra_start > 0:
+            let asm_input_count = self.ast.get_extra(asm_extra_start + 1)
+            for asm_ii in 0..asm_input_count:
+                let asm_in_node = self.ast.get_extra(asm_extra_start + 2 + asm_ii)
+                asm_args.push(self.lower_expr(asm_in_node))
         let asm_args_id = self.body.new_call_args(asm_args)
         self.body.set_call_intrinsic(asm_args_id, MirIntrinsic.MIR_INTRINSIC_ASM)
         self.body.set_call_ast_node(asm_args_id, node)
-        let asm_result_local = self.new_temp(self.sema.ty_void as i32)
+        let asm_ret_ty = self.expr_type(node)
+        let asm_result_local = self.new_temp(asm_ret_ty)
         let asm_result_place = self.place_for_local(asm_result_local)
         let asm_callee = self.unit_operand()
         let asm_next_bb = self.new_block()
         self.terminate(TermKind.TK_CALL, asm_callee, asm_args_id, asm_result_place, asm_next_bb)
         self.switch_to(asm_next_bb)
+        if asm_ret_ty != self.sema.ty_void as i32:
+            return self.body.new_operand(OperandKind.OK_COPY, asm_result_place)
         return self.unit_operand()
 
     if kind == NodeKind.NK_COMPTIME_ERROR:
@@ -3698,6 +3718,25 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 self.terminate(TermKind.TK_CALL, bu_fn_op, bu_args_id, bu_place, bu_next)
                 self.switch_to(bu_next)
                 return self.body.new_operand(OperandKind.OK_COPY, bu_place)
+        // Intrinsic free functions: fence(order)
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            let ifn_sym = self.ast.get_data0(callee)
+            let ifn_name = self.pool.resolve(ifn_sym)
+            if ifn_name == "fence":
+                let ifn_args: Vec[i32] = Vec.new()
+                let ifn_as = self.ast.get_data1(node)
+                let ifn_ac = self.ast.get_data2(node)
+                for ifn_ai in 0..ifn_ac:
+                    ifn_args.push(self.lower_expr(self.ast.get_extra(ifn_as + ifn_ai)))
+                let ifn_args_id = self.body.new_call_args(ifn_args)
+                self.body.set_call_intrinsic(ifn_args_id, MirIntrinsic.MIR_INTRINSIC_ATOMIC_FENCE)
+                let ifn_callee = self.unit_operand()
+                let ifn_result = self.new_temp(self.sema.ty_void as i32)
+                let ifn_place = self.place_for_local(ifn_result)
+                let ifn_next = self.new_block()
+                self.terminate(TermKind.TK_CALL, ifn_callee, ifn_args_id, ifn_place, ifn_next)
+                self.switch_to(ifn_next)
+                return self.unit_operand()
         return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), self.expr_type(node), node)
 
     if kind == NodeKind.NK_PIPELINE:

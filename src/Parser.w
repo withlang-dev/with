@@ -3500,9 +3500,7 @@ fn Parser.parse_asm_expr(self: Parser) -> NodeId:
     var flags: i32 = 0
     // Check for 'volatile' identifier
     if self.peek() == TokenKind.TK_IDENT:
-        let vol_start = self.current_start()
-        let vol_end = self.current_end()
-        let vol_text = self.source.slice(vol_start as i64, vol_end as i64)
+        let vol_text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
         if vol_text == "volatile":
             flags = flags | 1  // bit 0 = volatile
             self.advance()
@@ -3515,38 +3513,79 @@ fn Parser.parse_asm_expr(self: Parser) -> NodeId:
     let tmpl_text = strip_string_token_text(tmpl_raw)
     let tmpl_sym = self.intern.intern(tmpl_text)
     self.advance()
-    // Parse optional sections separated by ':'
-    // For now: collect constraints string from outputs/inputs, and clobbers
+    // Build LLVM constraint string and collect input expression nodes.
+    // LLVM format: "output_constraints,input_constraints,~{clobber1},~{clobber2}"
     var constraints_str = ""
-    var output_count: i32 = 0
-    var input_count: i32 = 0
+    var has_output = false
+    var output_type_node: NodeId = 0 as NodeId
+    let input_exprs: Vec[NodeId] = Vec.new()
+    var first_constraint = true
     // Section 1: outputs
     if self.peek() == TokenKind.TK_COLON:
         self.advance()
-        // Parse output constraints: name(reg) -> type
-        // For initial impl: just skip to next ':'
+        // Parse output: ident("constraint") -> type
+        if self.peek() == TokenKind.TK_IDENT and self.peek() != TokenKind.TK_COLON:
+            self.advance()  // consume output name (e.g. "out")
+            if self.peek() == TokenKind.TK_L_PAREN:
+                self.advance()
+                if self.peek() == TokenKind.TK_STRING_LIT:
+                    let out_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                    let out_reg = strip_string_token_text(out_raw)
+                    constraints_str = "={" ++ out_reg ++ "}"
+                    first_constraint = false
+                    self.advance()
+                self.expect(TokenKind.TK_R_PAREN)
+            if self.peek() == TokenKind.TK_ARROW:
+                self.advance()
+                output_type_node = self.parse_type_expr()
+                has_output = true
+                flags = flags | 2  // bit 1 = has_output
         // Section 2: inputs
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
+            // Parse inputs: ident("constraint") expr, ...
+            while self.peek() == TokenKind.TK_IDENT:
+                self.advance()  // consume input name
+                if self.peek() == TokenKind.TK_L_PAREN:
+                    self.advance()
+                    if self.peek() == TokenKind.TK_STRING_LIT:
+                        let in_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                        let in_reg = strip_string_token_text(in_raw)
+                        if not first_constraint:
+                            constraints_str = constraints_str ++ ","
+                        constraints_str = constraints_str ++ "{" ++ in_reg ++ "}"
+                        first_constraint = false
+                        self.advance()
+                    self.expect(TokenKind.TK_R_PAREN)
+                // Parse the input value expression
+                let in_expr = self.parse_expr()
+                input_exprs.push(in_expr)
+                if self.peek() == TokenKind.TK_COMMA:
+                    self.advance()
             // Section 3: clobbers
             if self.peek() == TokenKind.TK_COLON:
                 self.advance()
-                // Parse clobber list: comma-separated string literals
-                var first_clobber = true
                 while self.peek() == TokenKind.TK_STRING_LIT:
                     let clob_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
                     let clob = strip_string_token_text(clob_raw)
-                    if not first_clobber:
+                    if not first_constraint:
                         constraints_str = constraints_str ++ ","
                     constraints_str = constraints_str ++ "~{" ++ clob ++ "}"
-                    first_clobber = false
+                    first_constraint = false
                     self.advance()
                     if self.peek() == TokenKind.TK_COMMA:
                         self.advance()
     self.expect(TokenKind.TK_R_PAREN)
     let constr_sym = self.intern.intern(constraints_str)
-    // d0=template_sym, d1=constraints_sym, d2=flags
-    self.pool.add_node(NodeKind.NK_ASM_EXPR, start, self.prev_end(), tmpl_sym, constr_sym, flags)
+    // Store input expressions and output type in extras
+    let extra_start = self.pool.extra_len()
+    self.pool.add_extra(output_type_node as i32)
+    self.pool.add_extra(input_exprs.len() as i32)
+    for i in 0..input_exprs.len() as i32:
+        self.pool.add_extra(input_exprs.get(i as i64) as i32)
+    // d0=template_sym, d1=constraints_sym, d2=flags | (extra_start << 8)
+    let packed_d2 = flags | (extra_start << 8)
+    self.pool.add_node(NodeKind.NK_ASM_EXPR, start, self.prev_end(), tmpl_sym, constr_sym, packed_d2)
 
 fn Parser.parse_yield(self: Parser) -> NodeId:
     let start = self.current_start()

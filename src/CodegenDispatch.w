@@ -2926,22 +2926,39 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_build_fence(self.builder, fence_order)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ASM:
-        // Inline assembly: read template and constraints from AST node
+        // Inline assembly: read template, constraints, and operands from AST node
         let asm_node = body.call_ast_node(args_id)
         if asm_node != 0:
             let asm_tmpl_sym = self.pool.get_data0(asm_node)
             let asm_constr_sym = self.pool.get_data1(asm_node)
-            let asm_flags = self.pool.get_data2(asm_node)
+            let asm_packed_d2 = self.pool.get_data2(asm_node)
+            let asm_flags = asm_packed_d2 & 0xFF
+            let asm_extra_start = asm_packed_d2 >> 8
             let asm_tmpl = self.intern.resolve(asm_tmpl_sym)
             let asm_constr = self.intern.resolve(asm_constr_sym)
             let asm_is_volatile = (asm_flags & 1) != 0
-            // Create void() function type for the asm call
-            let asm_void_ty = wl_void_type(self.context)
-            let asm_pts: Vec[i64] = Vec.new()
-            let asm_fn_ty = wl_function_type(asm_void_ty, vec_data_i64(&asm_pts), 0, 0)
+            let asm_has_output = (asm_flags & 2) != 0
+            // Determine return type and collect input values
+            var asm_ret_ty = wl_void_type(self.context)
+            let asm_input_vals: Vec[i64] = Vec.new()
+            let asm_param_tys: Vec[i64] = Vec.new()
+            if asm_extra_start > 0:
+                let asm_out_type_node = self.pool.get_extra(asm_extra_start)
+                let asm_input_count = self.pool.get_extra(asm_extra_start + 1)
+                if asm_has_output and asm_out_type_node != 0:
+                    asm_ret_ty = self.resolve_type(asm_out_type_node)
+                    if asm_ret_ty == 0:
+                        asm_ret_ty = wl_i64_type(self.context)
+                // Collect input values from MIR args
+                for asm_ii in 0..asm_input_count:
+                    let asm_in_val = self.mir_intrinsic_arg(body, args_id, asm_ii)
+                    asm_input_vals.push(asm_in_val)
+                    asm_param_tys.push(wl_type_of(asm_in_val))
+            let asm_fn_ty = wl_function_type(asm_ret_ty, vec_data_i64(&asm_param_tys), asm_param_tys.len() as i32, 0)
             let asm_val = wl_get_inline_asm(asm_fn_ty, asm_tmpl, asm_constr, if asm_is_volatile: 1 else: 0, 0)
-            let asm_args: Vec[i64] = Vec.new()
-            wl_build_call(self.builder, asm_fn_ty, asm_val, vec_data_i64(&asm_args), 0)
+            let asm_call_result = wl_build_call(self.builder, asm_fn_ty, asm_val, vec_data_i64(&asm_input_vals), asm_input_vals.len() as i32)
+            if asm_has_output:
+                result = asm_call_result
         // Branch to next bb
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))

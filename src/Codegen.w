@@ -2639,6 +2639,11 @@ fn Codegen.declare_struct_type(self: Codegen, name_sym: i32, type_node: i32):
             let f_tk = wl_get_type_kind(f_ty)
             if f_tk == wl_integer_type_kind():
                 field_bits = wl_get_int_type_width(f_ty)
+            else if self.is_bitpacked_struct(f_ty):
+                // Nested bitpacked struct: inline its bits
+                let nested_idx = self.find_bitpacked_index_by_type(f_ty)
+                let nested_bits = self.bitpacked_total_bits.get(nested_idx)
+                field_bits = if nested_bits.is_some(): nested_bits.unwrap() as i32 else: (wl_size_of(f_ty) * 8) as i32
             else:
                 // Non-integer field: use 8 bits per byte of ABI size
                 field_bits = (wl_size_of(f_ty) * 8) as i32

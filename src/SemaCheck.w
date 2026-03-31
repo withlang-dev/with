@@ -3563,6 +3563,10 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
         if mc_is_closure:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
 
+    // Validate atomic ordering constraints (spec §14.17.1)
+    if mc_order_type != 0:
+        self.validate_atomic_ordering(field, extra_start, arg_count, node)
+
     // Task/ScopedTask surface methods (spec §14.7): cancel(), is_done().
     if field == self.syms.cancel or field == self.syms.is_done:
         if self.expr_is_task_value(expr) == 0 and self.expr_is_scoped_task_value(expr) == 0:
