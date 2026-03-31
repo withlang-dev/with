@@ -2155,6 +2155,12 @@ fn Codegen.resolve_primitive_named_type(self: Codegen, sym: i32) -> i64:
     0
 
 fn Codegen.resolve_user_named_type(self: Codegen, sym: i32) -> i64:
+    let de_opt = self.disc_enum_type_map.get(sym)
+    if de_opt.is_some():
+        let de_idx = de_opt.unwrap()
+        if de_idx >= 0 and de_idx < self.disc_enum_has_payload.len() as i32:
+            if self.disc_enum_has_payload.get(de_idx as i64) == 0:
+                return self.disc_enum_repr_types.get(de_idx as i64)
     // User-defined struct types
     let st_opt = self.struct_type_map.get(sym)
     if st_opt.is_some():
@@ -3786,6 +3792,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
     // Pass 0a: predeclare all struct/enum names so forward references resolve.
     for i in 0..self.pool.decl_count():
+        self.sync_decl_context(i)
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
         if kind != NodeKind.NK_TYPE_DECL:
@@ -3809,6 +3816,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             self.predeclare_enum_type(name_sym)
 
         if sub_kind == TypeDeclKind.DiscEnum:
+            self.predeclare_enum_type(name_sym)
             continue
         if sub_kind == TypeDeclKind.Opaque:
             self.predeclare_struct_type(name_sym)
@@ -3816,6 +3824,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
     // Pass 0b: define struct/enum bodies and type aliases.
     for i in 0..self.pool.decl_count():
+        self.sync_decl_context(i)
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
         if kind != NodeKind.NK_TYPE_DECL:
@@ -3859,19 +3868,21 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
     // Pass 0.5: collect trait declarations
     for i in 0..self.pool.decl_count():
+        self.sync_decl_context(i)
         let decl = self.pool.get_decl(i)
         if self.pool.kind(decl) == NodeKind.NK_TRAIT_DECL:
             self.collect_trait_info(decl)
 
     // Pass 0.6: process top-level let declarations as module constants
     for i in 0..self.pool.decl_count():
+        self.sync_decl_context(i)
         let decl = self.pool.get_decl(i)
         if self.pool.kind(decl) == NodeKind.NK_LET_DECL:
-            self.current_decl_source_file = self.decl_source_path(i)
             self.gen_module_constant(decl)
 
     // Pass 1: declare all functions and externs (forward declarations)
     for i in 0..self.pool.decl_count():
+        self.sync_decl_context(i)
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
         if kind == NodeKind.NK_EXTERN_FN:
@@ -3908,6 +3919,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
     // Pass 2: generate function bodies
     for i in 0..self.pool.decl_count():
+        self.sync_decl_context(i)
         let decl = self.pool.get_decl(i)
         let kind = self.pool.kind(decl)
         if kind == NodeKind.NK_FN_DECL:
@@ -3919,7 +3931,6 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             if meta >= 0:
                 let tp_count = self.pool.fn_meta_tp_count(meta)
                 if tp_count == 0:
-                    self.current_decl_source_file = self.decl_source_path(i)
                     self.gen_function_dispatch(decl)
 
     if self.had_error != 0:
