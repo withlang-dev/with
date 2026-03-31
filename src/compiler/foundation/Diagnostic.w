@@ -2,9 +2,10 @@
 
 use compiler.foundation.Span
 
-fn DiagSeverity.Error -> i32: 1
-fn DiagSeverity.Warning -> i32: 2
-fn DiagSeverity.Note -> i32: 3
+enum DiagSeverity: i32:
+    Error = 1
+    Warning = 2
+    Note = 3
 
 type DiagnosticLabel {
     span: Span,

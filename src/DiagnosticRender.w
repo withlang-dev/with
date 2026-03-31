@@ -1,5 +1,10 @@
 // Wave 1 foundations: deterministic diagnostic rendering helpers.
 
+enum DiagSeverity: i32:
+    Error = 1
+    Warning = 2
+    Note = 3
+
 fn render_diag_header(severity: i32, code: str, message: str) -> str:
     var out = render_severity(severity) ++ ": " ++ message
     if code.len() > 0:

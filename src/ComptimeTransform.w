@@ -1278,6 +1278,13 @@ fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: &mut 
     transform_sema.decl_source_paths = sema.decl_source_paths
     transform_sema.decl_source_file_ids = sema.decl_source_file_ids
     transform_sema.decl_is_c_import = sema.decl_is_c_import
+    transform_sema.module_paths = sema.module_paths
+    transform_sema.module_import_starts = sema.module_import_starts
+    transform_sema.module_import_counts = sema.module_import_counts
+    transform_sema.module_import_targets = sema.module_import_targets
+    transform_sema.module_index_by_path = sema.module_index_by_path
+    transform_sema.global_visible_module_paths = sema.global_visible_module_paths
+    transform_sema.module_visibility_cache = HashMap.new()
     transform_sema.prepare_for_comptime_transform()
     if transform_sema.diags.has_errors():
         sema.diags = transform_sema.diags
