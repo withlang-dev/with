@@ -33,6 +33,11 @@ enum Order: i32:
     AcqRel = 3
     SeqCst = 4
 
+/// Atomic memory fence. Enforces ordering without an associated operation.
+fn fence(order: Order):
+    // Compiler intrinsic — body is replaced by MIR_INTRINSIC_ATOMIC_FENCE
+    0
+
 /// Lock-free atomic operations on integer types.
 /// Create with `Atomic.new(0)`, read with `.load(.acquire)`,
 /// write with `.store(val, .release)`.

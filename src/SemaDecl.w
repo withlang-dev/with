@@ -156,6 +156,20 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
                 if self.is_opaque_value_type(field_tid) != 0:
                     self.emit_error("opaque types cannot be stored in struct fields; use a pointer or reference", field_type_node)
                 self.type_extra.set_i32(field_slot as i64, field_tid)
+        // Validate bitpacked field types: must be integer, bool, or nested bitpacked
+        let packed_kind = self.ast.get_data2(decl)
+        if type_decl_is_bitpacked(packed_kind) != 0:
+            for fi in 0..field_count:
+                let bp_field_slot = te_start + fi * 3 + 1
+                let bp_field_tid = self.type_extra.get(bp_field_slot as i64)
+                if bp_field_tid > 0:
+                    let bp_resolved = self.resolve_alias(bp_field_tid as TypeId)
+                    let bp_tk = self.get_type_kind(bp_resolved)
+                    if bp_tk != TypeKind.TY_INT and bp_tk != TypeKind.TY_BOOL:
+                        if bp_tk != TypeKind.TY_STRUCT or not self.bitpacked_types.contains(bp_resolved as i32):
+                            let bp_field_base = extra_start + 1 + fi * 3
+                            let bp_field_type_node = self.ast.get_extra(bp_field_base + 1)
+                            self.emit_error("bitpacked fields must be integer, bool, or bitpacked struct type", bp_field_type_node)
         return
 
     if sub_kind == TypeDeclKind.Enum:
@@ -1785,6 +1799,22 @@ fn Sema.primitive_type_by_sym(self: Sema, sym: i32) -> i32:
                                 return ti
     0
 
+// Return the unsigned counterpart of a signed integer type (i32→u32, etc.).
+// Returns the input type unchanged if already unsigned or not an integer.
+fn Sema.unsigned_counterpart(self: Sema, tid: i32) -> i32:
+    let resolved = self.resolve_alias(tid as TypeId)
+    let tk = self.get_type_kind(resolved)
+    if tk != TypeKind.TY_INT: return tid
+    let is_signed = self.get_type_d1(resolved)
+    if is_signed == 0: return tid  // already unsigned
+    let width = self.get_type_d0(resolved)
+    // Search for unsigned type with same width
+    for ti in 0..self.type_kinds.len() as i32:
+        if self.type_kinds.get(ti as i64) == TypeKind.TY_INT:
+            if self.type_d0.get(ti as i64) == width and self.type_d1.get(ti as i64) == 0 and self.type_d2.get(ti as i64) == 0:
+                return ti
+    tid  // fallback: return original
+
 // Resolve the Order enum type for Atomic[T] method argument type propagation.
 fn Sema.resolve_atomic_order_type(self: Sema, obj_type: i32) -> i32:
     if obj_type == 0: return 0
@@ -1809,3 +1839,45 @@ fn Sema.atomic_method_expected_arg_type(self: Sema, order_type: i32, method_sym:
     if arg_index == 1 and method_name != "load" and method_name != "store" and method_name != "compare_exchange" and method_name != "compare_exchange_weak":
         return order_type
     0
+
+// Validate ordering constraints for Atomic methods.
+// Checks disc enum variant value at sema time.
+fn Sema.validate_atomic_ordering(self: Sema, method_sym: i32, extra_start: i32, arg_count: i32, node: i32):
+    let method_name = self.pool_resolve_symbol(method_sym)
+    // store cannot use Acquire(1) or AcqRel(3)
+    if method_name == "store" and arg_count >= 2:
+        let order_node = self.ast.get_extra(extra_start + 1)
+        let order_val = self.try_resolve_disc_enum_value(order_node)
+        if order_val == 1 or order_val == 3:
+            self.emit_error("store cannot use Acquire or AcqRel ordering", order_node)
+    // load cannot use Release(2) or AcqRel(3)
+    if method_name == "load" and arg_count >= 1:
+        let order_node = self.ast.get_extra(extra_start)
+        let order_val = self.try_resolve_disc_enum_value(order_node)
+        if order_val == 2 or order_val == 3:
+            self.emit_error("load cannot use Release or AcqRel ordering", order_node)
+
+// Try to resolve the discriminant value of a disc enum variant expression.
+// Returns -1 if the node is not a resolvable variant.
+fn Sema.try_resolve_disc_enum_value(self: Sema, node: i32) -> i32:
+    if node == 0: return -1
+    let kind = self.ast.kind(node)
+    // Order.Acquire → NK_FIELD_ACCESS on Order type
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        let field_sym = self.ast.get_data1(node)
+        let field_name = self.pool_resolve_symbol(field_sym)
+        if field_name == "Relaxed": return 0
+        if field_name == "Acquire": return 1
+        if field_name == "Release": return 2
+        if field_name == "AcqRel": return 3
+        if field_name == "SeqCst": return 4
+    // .Acquire → NK_VARIANT_SHORTHAND
+    if kind == NodeKind.NK_VARIANT_SHORTHAND:
+        let var_sym = self.ast.get_data0(node)
+        let var_name = self.pool_resolve_symbol(var_sym)
+        if var_name == "Relaxed": return 0
+        if var_name == "Acquire": return 1
+        if var_name == "Release": return 2
+        if var_name == "AcqRel": return 3
+        if var_name == "SeqCst": return 4
+    -1
