@@ -2036,6 +2036,7 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE
         if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR
         if method_name == "increment": return MirIntrinsic.MIR_INTRINSIC_MAP_INCREMENT
+        if method_name == "keys": return MirIntrinsic.MIR_INTRINSIC_MAP_KEYS
         return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "Option":
         if method_name == "unwrap": return MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP
@@ -2377,6 +2378,35 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let args: Vec[i64] = Vec.new()
         args.push(map_ptr)
         result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_KEYS:
+        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let map_ptr = self.mir_extract_map_ptr(recv)
+        let recv_op = body.call_arg_operands.get(arg_start as i64)
+        var key_ty = self.mir_hashmap_key_type(body, recv_op)
+        if key_ty == 0:
+            key_ty = i64_ty
+        let key_size = self.abi_size_of(key_ty)
+        var vec_ty = self.mir_dest_llvm_type(body, dest_place)
+        if vec_ty == 0:
+            vec_ty = self.get_or_create_vec_type(0, key_ty)
+        let out_alloca = wl_build_alloca(self.builder, vec_ty)
+        wl_build_store(self.builder, self.build_default_value(vec_ty), out_alloca)
+        let keys_name = "with_hashmap_keys_out"
+        var keys_fn = wl_get_named_function(self.llmod, keys_name)
+        let keys_params: Vec[i64] = Vec.new()
+        keys_params.push(ptr_ty)
+        keys_params.push(ptr_ty)
+        keys_params.push(i64_ty)
+        let keys_ty = wl_function_type(void_ty, vec_data_i64(&keys_params), 3, 0)
+        if keys_fn == 0:
+            keys_fn = wl_add_function(self.llmod, keys_name, keys_ty)
+        let keys_args: Vec[i64] = Vec.new()
+        keys_args.push(out_alloca)
+        keys_args.push(map_ptr)
+        keys_args.push(wl_const_int(i64_ty, key_size, 0))
+        let _ = wl_build_call(self.builder, keys_ty, keys_fn, vec_data_i64(&keys_args), 3)
+        result = wl_build_load(self.builder, vec_ty, out_alloca)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME:
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
@@ -2778,7 +2808,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_FOLD:
         result = self.mir_emit_vec_fold(body, args_id)
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_CONTAINS:
-        result = wl_const_int(wl_i1_type(self.context), 0, 0)
+        result = self.mir_emit_vec_contains(body, args_id)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_JOIN:
         let vj_recv = self.mir_intrinsic_arg(body, args_id, 0)
@@ -3130,6 +3160,55 @@ fn Codegen.mir_emit_vec_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
     wl_build_br(self.builder, cb)
     wl_position_at_end(self.builder, eb)
     wl_build_load(self.builder, vt, ra)
+
+fn Codegen.mir_emit_vec_contains(self: Codegen, body: MirBody, args_id: i32) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    let i1_ty = wl_i1_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let recv = self.mir_intrinsic_arg(body, args_id, 0)
+    let needle_raw = self.mir_intrinsic_arg(body, args_id, 1)
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    var elem_ty = self.mir_vec_elem_type(body, recv_op)
+    if elem_ty == 0:
+        elem_ty = wl_type_of(needle_raw)
+    if elem_ty == 0:
+        elem_ty = i64_ty
+    let needle = if wl_type_of(needle_raw) != elem_ty: self.coerce_value_to_type(needle_raw, elem_ty) else: needle_raw
+    let len = wl_build_extract_value(self.builder, recv, 1)
+    let sa = self.create_entry_alloca(wl_type_of(recv))
+    wl_build_store(self.builder, recv, sa)
+    let ctr = self.create_entry_alloca(i64_ty)
+    wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), ctr)
+    let found = self.create_entry_alloca(i1_ty)
+    wl_build_store(self.builder, wl_const_int(i1_ty, 0, 0), found)
+    let cb = wl_append_bb(self.context, self.current_function, "vc.c")
+    let bb = wl_append_bb(self.context, self.current_function, "vc.b")
+    let ib = wl_append_bb(self.context, self.current_function, "vc.i")
+    let fb = wl_append_bb(self.context, self.current_function, "vc.f")
+    let eb = wl_append_bb(self.context, self.current_function, "vc.e")
+    wl_build_br(self.builder, cb)
+    wl_position_at_end(self.builder, cb)
+    let cv = wl_build_load(self.builder, i64_ty, ctr)
+    wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_slt(), cv, len), bb, eb)
+    wl_position_at_end(self.builder, bb)
+    let gf = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+    let gt = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
+    let ga: Vec[i64] = Vec.new()
+    ga.push(sa)
+    ga.push(wl_build_load(self.builder, i64_ty, ctr))
+    let ep = wl_build_call(self.builder, gt, gf, vec_data_i64(&ga), 2)
+    let cur = wl_build_load(self.builder, elem_ty, ep)
+    let eq = self.compare_value_eq(cur, needle, elem_ty, BinaryOp.OP_EQ)
+    wl_build_cond_br(self.builder, eq, fb, ib)
+    wl_position_at_end(self.builder, fb)
+    wl_build_store(self.builder, wl_const_int(i1_ty, 1, 0), found)
+    wl_build_br(self.builder, eb)
+    wl_position_at_end(self.builder, ib)
+    wl_build_store(self.builder, wl_build_add(self.builder, wl_build_load(self.builder, i64_ty, ctr), wl_const_int(i64_ty, 1, 0)), ctr)
+    wl_build_br(self.builder, cb)
+    wl_position_at_end(self.builder, eb)
+    wl_build_load(self.builder, i1_ty, found)
 
 fn Codegen.mir_emit_vec_fold(self: Codegen, body: MirBody, args_id: i32) -> i64:
     let i64_ty = wl_i64_type(self.context)

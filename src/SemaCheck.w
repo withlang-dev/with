@@ -3722,6 +3722,14 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 return self.get_generic_inst_arg(resolved, 1)
             if mc_method == "len":
                 return self.ty_i64 as i32
+            if mc_method == "keys":
+                let key_ty = self.get_generic_inst_arg(resolved, 0)
+                let key_vec_tid = self.find_generic_inst(mc_vec_sym, key_ty)
+                if key_vec_tid != 0:
+                    return key_vec_tid
+                let key_vec_args: Vec[i32] = Vec.new()
+                key_vec_args.push(key_ty)
+                return self.ensure_generic_inst_type(mc_vec_sym, key_vec_args, 1) as i32
         if mc_base_name == "HashSet":
             if mc_method == "insert" or mc_method == "clear":
                 return self.ty_void as i32

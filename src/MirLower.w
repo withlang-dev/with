@@ -2821,6 +2821,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE
         if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR
         if method_name == "increment": return MirIntrinsic.MIR_INTRINSIC_MAP_INCREMENT
+        if method_name == "keys": return MirIntrinsic.MIR_INTRINSIC_MAP_KEYS
         return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "HashSet":
         if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_MAP_NEW
