@@ -2919,30 +2919,15 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
                 method_key_sym = self.intern.intern(mk_str)
             break
 
-    // Defer methods on generic structs that use struct type params
+    // Methods owned by generic structs are always compiled lazily against a
+    // concrete owner instantiation. Even "static" methods like Foo.wrap(x: T)
+    // or methods returning Self need the owner bindings before their LLVM
+    // signature can be resolved correctly.
     if method_owner_sym != 0:
         let gs_decl_opt = self.generic_structs.get(method_owner_sym)
         if gs_decl_opt.is_some():
-            let struct_decl = gs_decl_opt.unwrap()
-            let stp_count = self.type_decl_tp_count(struct_decl)
-            if stp_count > 0 and param_count > 0:
-                let p0_tn = self.pool.fn_param_type(param_start, 0)
-                if p0_tn != 0 and self.pool.kind(p0_tn) == NodeKind.NK_TYPE_GENERIC:
-                    let p0_extra = self.pool.get_data1(p0_tn)
-                    let p0_count = self.pool.get_data2(p0_tn)
-                    var stp_pos = self.type_decl_tp_start(struct_decl)
-                    var has_struct_tp = false
-                    for sti in 0..stp_count:
-                        let stp_sym = self.pool.get_extra(stp_pos)
-                        for gi in 0..p0_count:
-                            let arg_nd = self.pool.get_extra(p0_extra + gi)
-                            if self.pool.kind(arg_nd) == NodeKind.NK_TYPE_NAMED and self.pool.get_data0(arg_nd) == stp_sym:
-                                has_struct_tp = true
-                        let bc = self.pool.get_extra(stp_pos + 1)
-                        stp_pos = stp_pos + 2 + bc
-                    if has_struct_tp:
-                        self.generic_struct_methods.insert(name_sym, fn_node)
-                        return
+            self.generic_struct_methods.insert(name_sym, fn_node)
+            return
 
     // Set method owner before resolving return type so Self can resolve
     let saved_owner = self.current_method_owner_sym
@@ -3595,6 +3580,8 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
     let param_start = self.pool.fn_meta_param_start(meta)
     let param_count = self.pool.fn_meta_param_count(meta)
     let body_node = self.pool.get_data1(decl)
+    let saved_owner = self.current_method_owner_sym
+    self.current_method_owner_sym = mono_type_sym
 
     // Resolve param and return types with type bindings active
     let mono_param_types: Vec[i64] = Vec.new()
@@ -3658,6 +3645,7 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
     self.type_binding_syms = saved_bind_syms
     self.type_binding_types = saved_bind_tys
     self.type_bindings_len = saved_bind_len
+    self.current_method_owner_sym = saved_owner
 
     // Now call the monomorphized method
     let call_args: Vec[i64] = Vec.new()
@@ -3669,6 +3657,85 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
         call_args.push(pre_args.get(ai as i64))
     let coerced = self.coerce_call_args_for_fn_value(mono_sym, mono_fn, args_start, 1, call_args, arg_count + 1, "method " ++ mangled, call_node)
     wl_build_call(self.builder, mono_ft, mono_fn, vec_data_i64(&coerced), arg_count + 1)
+
+fn Codegen.monomorphize_struct_static_method_core(self: Codegen, mono_type_sym: i32, method_name: str, decl: i32, args_start: i32, arg_count: i32, call_node: i32, pre_args: Vec[i64]) -> i64:
+    let tp_start_opt = self.mono_struct_tp_starts.get(mono_type_sym)
+    if not tp_start_opt.is_some():
+        with_eprint("error: no type param bindings for monomorphized struct")
+        self.had_error = 1
+        return wl_get_undef(wl_i32_type(self.context))
+    let tp_flat_start = tp_start_opt.unwrap()
+    let tp_count = self.mono_struct_tp_counts.get(mono_type_sym).unwrap()
+
+    let mono_type_name = self.intern.resolve(mono_type_sym)
+    let mangled = mono_type_name ++ "." ++ method_name
+    let mono_sym = self.intern.intern(mangled)
+
+    let cached_fv = self.fn_values.get(mono_sym)
+    let cached_ft = self.fn_fn_types.get(mono_sym)
+    if cached_fv.is_some() and cached_ft.is_some():
+        let coerced = self.coerce_call_args_for_fn_value(mono_sym, cached_fv.unwrap() as i64, args_start, 0, pre_args, arg_count, "method " ++ mangled, call_node)
+        return wl_build_call(self.builder, cached_ft.unwrap() as i64, cached_fv.unwrap() as i64, vec_data_i64(&coerced), arg_count)
+
+    let saved_bind_syms = self.type_binding_syms
+    let saved_bind_tys = self.type_binding_types
+    let saved_bind_len = self.type_bindings_len
+    let saved_owner = self.current_method_owner_sym
+    let fresh_bind_syms: Vec[i32] = Vec.new()
+    let fresh_bind_tys: Vec[i64] = Vec.new()
+    self.type_binding_syms = fresh_bind_syms
+    self.type_binding_types = fresh_bind_tys
+    self.type_bindings_len = 0
+    self.current_method_owner_sym = mono_type_sym
+    for ti in 0..tp_count:
+        self.type_binding_syms.push(self.mono_struct_tp_flat_syms.get((tp_flat_start + ti) as i64))
+        self.type_binding_types.push(self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64))
+        self.type_bindings_len = self.type_bindings_len + 1
+
+    let meta = self.pool.find_fn_meta(decl)
+    let ret_type_node = self.pool.fn_meta_ret(meta)
+    let param_start = self.pool.fn_meta_param_start(meta)
+    let param_count = self.pool.fn_meta_param_count(meta)
+    let mono_param_types: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
+        if p_type_node != 0:
+            var p_ty = self.resolve_type(p_type_node)
+            if p_ty == 0:
+                p_ty = self.type_fallback()
+            mono_param_types.push(p_ty)
+        else:
+            mono_param_types.push(self.type_fallback())
+
+    let mono_ret_ty_raw = self.resolve_type(ret_type_node)
+    let mono_ret_ty = if mono_ret_ty_raw != 0: mono_ret_ty_raw else: self.type_fallback()
+
+    let mono_ft = wl_function_type(mono_ret_ty, vec_data_i64(&mono_param_types), param_count, 0)
+    let mono_fn = wl_add_function(self.llmod, mangled, mono_ft)
+    self.apply_noalias_param_attrs(mono_fn, param_start, param_count)
+    self.fn_values.insert(mono_sym, mono_fn)
+    self.fn_fn_types.insert(mono_sym, mono_ft)
+
+    let sm_tp_syms: Vec[i32] = Vec.new()
+    let sm_tp_sema_tys: Vec[i32] = Vec.new()
+    for ti in 0..tp_count:
+        let tp_sym = self.mono_struct_tp_flat_syms.get((tp_flat_start + ti) as i64)
+        let tp_llvm = self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64)
+        sm_tp_syms.push(tp_sym)
+        sm_tp_sema_tys.push(self.llvm_type_to_sema_type(tp_llvm))
+
+    let sig_idx = self.sema.check_fn_body_concrete(decl, sm_tp_syms, sm_tp_sema_tys, mono_sym)
+    var mir_builder = MirBuilder.init(self.sema, self.pool, self.intern, mono_sym)
+    let mir_body = lower_fn_with_sig(mir_builder, decl, sig_idx)
+    self.gen_function_mir_mono(mono_sym, decl, mir_body)
+
+    self.type_binding_syms = saved_bind_syms
+    self.type_binding_types = saved_bind_tys
+    self.type_bindings_len = saved_bind_len
+    self.current_method_owner_sym = saved_owner
+
+    let coerced = self.coerce_call_args_for_fn_value(mono_sym, mono_fn, args_start, 0, pre_args, arg_count, "method " ++ mangled, call_node)
+    wl_build_call(self.builder, mono_ft, mono_fn, vec_data_i64(&coerced), arg_count)
 
 // ── Build Option Some/None ────────────────────────────────────────
 
