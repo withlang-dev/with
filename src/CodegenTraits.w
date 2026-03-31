@@ -776,7 +776,7 @@ fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, dep
         if self.pool.kind(callee) != NodeKind.NK_IDENT:
             return const_string_eval_fail()
         let callee_sym = self.pool.get_data0(callee)
-        if callee_sym != self.sema.sym_embed_file or self.pool.get_data2(node) != 1:
+        if callee_sym != self.sema.syms.embed_file or self.pool.get_data2(node) != 1:
             return const_string_eval_fail()
         let args_start = self.pool.get_data1(node)
         let path_value = self.try_eval_const_string(self.pool.get_extra(args_start), source_path, depth + 1)

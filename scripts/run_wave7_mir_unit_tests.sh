@@ -203,6 +203,7 @@ run_expect_no_pattern "async_generator_boundary_no_surface_tokens" "test/wave7/c
 run_expect_pattern "lower_array_aggregate" "bootstrap/test/cases/arrays.w" "aggregate\\(|const .*(i32|ty[0-9]+)"
 run_expect_pattern "lower_vec_call" "bootstrap/test/cases/vec_push_pop.w" "call "
 run_expect_pattern "lower_hashmap_call" "bootstrap/test/cases/hashmap_basic.w" "call "
+run_expect_pattern "issue61_imported_query_stress" "test/behavior/issue61_query_state_stress_dump_mir.w" "mir module functions=|call "
 
 # String lowering.
 run_expect_pattern "lower_string_const" "bootstrap/test/cases/string_concat.w" "const "
@@ -266,6 +267,7 @@ run_determinism_check "determinism_defer" "bootstrap/test/cases/defer_complex.w"
 run_determinism_check "determinism_option" "bootstrap/test/cases/option_chain.w"
 run_determinism_check "determinism_result" "bootstrap/test/cases/result_chain.w"
 run_determinism_check "determinism_vec" "bootstrap/test/cases/vec_operations.w"
+run_determinism_check "determinism_issue61_queries" "test/behavior/issue61_query_state_stress_dump_mir.w"
 
 if [[ "$failures" -ne 0 ]]; then
   echo "wave7 MIR unit tests: $failures failure(s)"

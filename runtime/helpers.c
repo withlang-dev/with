@@ -1118,6 +1118,22 @@ with_str with_str_slice(with_str s, int64_t start, int64_t end) {
     return with_str_substr(s, start, end - start);
 }
 
+with_str with_str_clone(with_str s) {
+    if (s.len <= 0) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    char *buf = (char *)malloc((size_t)s.len + 1);
+    if (!buf) {
+        with_str out = { "", 0 };
+        return out;
+    }
+    memcpy(buf, s.ptr, (size_t)s.len);
+    buf[s.len] = '\0';
+    with_str out = { buf, s.len };
+    return out;
+}
+
 int32_t with_str_byte_at(with_str s, int64_t index) {
     if (index < 0 || index >= s.len) return 0;
     return (int32_t)(unsigned char)s.ptr[index];

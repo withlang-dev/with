@@ -9,6 +9,7 @@ use compiler.foundation.Values
 extern fn with_hashmap_new_at(base: &i8, offset: i64, key_size: i64, val_size: i64) -> void
 extern fn with_getenv_str(name: str) -> str
 extern fn with_eprint(s: str) -> void
+extern fn with_str_clone(s: str) -> str
 
 fn intern_debug_init_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
@@ -54,6 +55,11 @@ fn intern_text_eq(a: str, b: str) -> bool:
             return false
         i = i + 1
     true
+
+fn intern_owned_text(text: str) -> str:
+    if text.len() == 0:
+        return ""
+    with_str_clone(text)
 
 fn InternPool.init -> InternPool:
     intern_debug_init("InternPool.init:start")
@@ -109,8 +115,9 @@ fn InternPool.intern_str(self: InternPool, s: str) -> Symbol:
         i = i + 1
 
     let id = self.symbol_texts.len() as i32
-    self.symbol_texts.push(s)
-    self.symbol_map.insert(s, id)
+    let owned = intern_owned_text(s)
+    self.symbol_texts.push(owned)
+    self.symbol_map.insert(owned, id)
     id
 
 fn InternPool.resolve_symbol(self: InternPool, sym: Symbol) -> str:
@@ -126,7 +133,7 @@ fn InternPool.intern_type(self: InternPool, key: TypeKey) -> TypeId:
 
     let id = self.type_keys.len() as i32
     self.type_keys.push(key)
-    self.type_map.insert(canon, id)
+    self.type_map.insert(intern_owned_text(canon), id)
     id as TypeId
 
 fn InternPool.resolve_type(self: InternPool, id: TypeId) -> TypeKey:
@@ -142,7 +149,7 @@ fn InternPool.intern_value(self: InternPool, key: ValueKey) -> ValueId:
 
     let id = self.value_keys.len() as i32
     self.value_keys.push(key)
-    self.value_map.insert(canon, id)
+    self.value_map.insert(intern_owned_text(canon), id)
     id
 
 fn InternPool.resolve_value(self: InternPool, id: ValueId) -> ValueKey:

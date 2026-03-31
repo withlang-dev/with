@@ -844,7 +844,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let tp_count = self.ast.fn_meta_tp_count(meta)
 
     // Bind Self to method owner type for dot-name methods
-    let self_sym = self.pool_intern("Self")
+    let self_sym = self.syms.self_type
     var self_type_id = 0
     let fn_name_str = self.pool_resolve(fn_name)
     for ci in 0..fn_name_str.len() as i32:
@@ -1047,8 +1047,9 @@ fn Sema.register_method_sig_alias(self: Sema, node: i32, fn_sym: i32, sig_idx: i
 
     let owner_sym = self.pool_intern(owner_name)
     let method_sym = self.pool_intern(method_name)
-    let key_sym = self.method_key(owner_sym, method_sym)
-    self.sig_lookup.insert(key_sym, sig_idx)
+    let key = sema_pair_key(owner_sym, method_sym)
+    self.method_lookup.sig_lookup.insert(key, sig_idx)
+    self.method_lookup.fn_lookup.insert(key, fn_sym)
     self.method_symbol_flags.insert(fn_sym, 1)
 
 fn Sema.top_level_let_type_ann_extra(self: Sema, flags: i32) -> i32:
@@ -1212,7 +1213,7 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32):
     if trait_name == "Copy":
         // Check if this type already has a Drop impl (via impl_extra, since
         // Drop methods aren't collected yet at this point in Pass 2)
-        let drop_sym = self.pool_intern("Drop")
+        let drop_sym = self.syms.drop
         if self.impl_lookup.contains(type_name):
             let drop_idx = self.impl_lookup.get(type_name).unwrap()
             let drop_start = self.impl_starts.get(drop_idx as i64)
@@ -1321,7 +1322,7 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32):
     if target_type_node != 0:
         let target_tid = self.resolve_type_expr(target_type_node)
         if target_tid != 0 and self.get_type_kind(target_tid) == TypeKind.TY_GENERIC_INST:
-            let gi_key = i64_to_string(target_tid as i64) ++ ":" ++ i64_to_string(trait_sym as i64)
+            let gi_key = sema_pair_key(target_tid as i32, trait_sym)
             self.impl_generic_inst.insert(gi_key, 1)
 
     // Overlap check: direct impl vs existing blanket impls
@@ -1420,7 +1421,7 @@ fn Sema.ensure_trait_object_safe(self: Sema, trait_sym: i32, node: i32) -> i32:
     pos = pos + 1
 
     let self_name_sym = self.pool_intern("self")
-    let self_type_sym = self.pool_intern("Self")
+    let self_type_sym = self.syms.self_type
     for mi in 0..method_count:
         let method_sym = self.ast.get_extra(pos)
         pos = pos + 1
@@ -1602,7 +1603,7 @@ fn Sema.type_decl_has_derive(self: Sema, node: i32, trait_sym: i32) -> i32:
     0
 
 fn Sema.validate_copy_derives(self: Sema):
-    let copy_sym = self.pool_intern("Copy")
+    let copy_sym = self.syms.copy
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:

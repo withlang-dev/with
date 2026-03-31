@@ -82,10 +82,9 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
                 return self.mir_sema_type_to_llvm(inner_tid)
             // Translate sema pool sym to codegen intern pool sym
             var cg_sym = name_sym
-            if name_sym > 0 and name_sym < self.sema.pool.symbol_texts.len() as i32:
-                let sema_text = self.sema.pool.symbol_texts.get(name_sym as i64)
-                if sema_text.len() > 0:
-                    cg_sym = self.intern.intern(sema_text)
+            let sema_text = self.sema_symbol_text(name_sym)
+            if sema_text.len() > 0:
+                cg_sym = self.intern.intern(sema_text)
             let named_ty = self.resolve_named_type(cg_sym)
             if named_ty != 0:
                 return named_ty
@@ -689,10 +688,9 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         // ConstKind.CK_FN sym from MirLower is in sema pool — must translate to codegen pool.
         // Direct fn_values lookup would return wrong function (pool ID collision).
         var translated_sym = fn_sym
-        if fn_sym > 0 and fn_sym < self.sema.pool.symbol_texts.len() as i32:
-            let sema_text = self.sema.pool.symbol_texts.get(fn_sym as i64)
-            if sema_text.len() > 0:
-                translated_sym = self.intern.intern(sema_text)
+        let sema_text = self.sema_symbol_text(fn_sym)
+        if sema_text.len() > 0:
+            translated_sym = self.intern.intern(sema_text)
         let fv_opt = self.fn_values.get(translated_sym)
         if fv_opt.is_some():
             if self.debug_mir_codegen_enabled():
@@ -1138,9 +1136,7 @@ fn Codegen.gen_debug_struct(self: Codegen, val: i64, sema_ty: i32, str_ty: i64) 
     let type_name_sym = self.mir_input.mir_get_type_d0(sema_ty)
     var type_name = ""
     if type_name_sym > 0:
-        type_name = self.sema.pool_resolve(type_name_sym)
-        if type_name.len() == 0 and type_name_sym < self.sema.pool.symbol_texts.len() as i32:
-            type_name = self.sema.pool.symbol_texts.get(type_name_sym as i64)
+        type_name = self.sema_symbol_text(type_name_sym)
 
     // Find struct index in codegen tables
     let cg_sym = self.intern.intern(type_name)
@@ -3352,10 +3348,9 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let dd_type_sym = wl_const_int_sext_val(dd_type_sym_val) as i32
         // Translate AST pool sym to codegen intern pool sym
         var dd_cg_type_sym = dd_type_sym
-        if dd_type_sym > 0 and dd_type_sym < self.sema.pool.symbol_texts.len() as i32:
-            let dd_text = self.sema.pool.symbol_texts.get(dd_type_sym as i64)
-            if dd_text.len() > 0:
-                dd_cg_type_sym = self.intern.intern(dd_text)
+        let dd_text = self.sema_symbol_text(dd_type_sym)
+        if dd_text.len() > 0:
+            dd_cg_type_sym = self.intern.intern(dd_text)
         // Extract data_ptr from fat pointer (field 0)
         let dd_data_ptr = wl_build_extract_value(self.builder, dd_recv, 0)
         // Load concrete struct from data_ptr
@@ -3377,15 +3372,13 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let dv_trait_sym = wl_const_int_sext_val(dv_trait_sym_val) as i32
         // Translate AST pool syms to codegen intern pool syms
         var dv_cg_type_sym = dv_type_sym
-        if dv_type_sym > 0 and dv_type_sym < self.sema.pool.symbol_texts.len() as i32:
-            let dv_text = self.sema.pool.symbol_texts.get(dv_type_sym as i64)
-            if dv_text.len() > 0:
-                dv_cg_type_sym = self.intern.intern(dv_text)
+        let dv_text = self.sema_symbol_text(dv_type_sym)
+        if dv_text.len() > 0:
+            dv_cg_type_sym = self.intern.intern(dv_text)
         var dv_cg_trait_sym = dv_trait_sym
-        if dv_trait_sym > 0 and dv_trait_sym < self.sema.pool.symbol_texts.len() as i32:
-            let dv_tt = self.sema.pool.symbol_texts.get(dv_trait_sym as i64)
-            if dv_tt.len() > 0:
-                dv_cg_trait_sym = self.intern.intern(dv_tt)
+        let dv_tt = self.sema_symbol_text(dv_trait_sym)
+        if dv_tt.len() > 0:
+            dv_cg_trait_sym = self.intern.intern(dv_tt)
         // Look up vtable global
         let dv_key = codegen_hash_type_trait_key(dv_cg_type_sym, dv_cg_trait_sym)
         let dv_vt_opt = self.vtable_globals.get(dv_key)
@@ -4309,8 +4302,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
             if body.const_kinds.get(co_d as i64) == ConstKind.CK_FN:
                 let raw_sym = body.const_d0.get(co_d as i64)
-                if raw_sym > 0 and raw_sym < self.sema.pool.symbol_texts.len() as i32:
-                    dbg_name = self.sema.pool.symbol_texts.get(raw_sym as i64)
+                dbg_name = self.sema_symbol_text(raw_sym)
         with_eprint(f"[mir-call] callee={dbg_name} callee_ty_kind={wl_get_type_kind(wl_type_of(callee))}")
     let call_context = self.mir_call_context(body, callee_operand)
     var call_ft: i64 = 0
@@ -4375,10 +4367,9 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
             if body.const_kinds.get(co_d as i64) == ConstKind.CK_FN:
                 let raw_sym = body.const_d0.get(co_d as i64)
                 // Translate sema pool sym to codegen intern pool sym
-                if raw_sym > 0 and raw_sym < self.sema.pool.symbol_texts.len() as i32:
-                    let sym_text = self.sema.pool.symbol_texts.get(raw_sym as i64)
-                    if sym_text.len() > 0:
-                        callee_fn_sym = self.intern.intern(sym_text)
+                let sym_text = self.sema_symbol_text(raw_sym)
+                if sym_text.len() > 0:
+                    callee_fn_sym = self.intern.intern(sym_text)
 
     let args: Vec[i64] = Vec.new()
     if is_indirect:
