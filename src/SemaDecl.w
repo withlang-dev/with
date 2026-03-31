@@ -423,6 +423,8 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             self.type_extra.push(self.ast.get_extra(align_base + fi))
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
         self.record_named_type(name, tid as i32)
+        if type_decl_is_bitpacked(packed_kind) != 0:
+            self.bitpacked_types.insert(tid as i32, 1)
 
     if sub_kind == TypeDeclKind.Enum:
         let variant_count = self.ast.get_extra(extra_start)
@@ -1758,4 +1760,26 @@ fn Sema.primitive_type_by_sym(self: Sema, sym: i32) -> i32:
     if with_str_eq(name, "StrView") != 0: return self.ty_str_view as i32
     if with_str_eq(name, "usize") != 0: return self.ty_usize as i32
     if with_str_eq(name, "isize") != 0: return self.ty_isize as i32
+    // Sub-byte and non-standard integer widths: u1-u7, i1-i7, u12, u21, u24
+    let nlen = name.len()
+    if nlen >= 2 and nlen <= 3:
+        let first = name.byte_at(0)
+        if first == 117 or first == 105:  // 'u' or 'i'
+            let is_signed = if first == 105: 1 else: 0
+            var width: i32 = 0
+            var all_digits = true
+            for di in 1..nlen as i32:
+                let ch = name.byte_at(di as i64)
+                if ch >= 48 and ch <= 57:
+                    width = width * 10 + (ch - 48)
+                else:
+                    all_digits = false
+            if all_digits and width > 0 and width < 128:
+                // Already handled standard widths above
+                if width != 8 and width != 16 and width != 32 and width != 64 and width != 128:
+                    // Search pre-registered sub-byte types
+                    for ti in 0..self.type_kinds.len() as i32:
+                        if self.type_kinds.get(ti as i64) == TypeKind.TY_INT:
+                            if self.type_d0.get(ti as i64) == width and self.type_d1.get(ti as i64) == is_signed:
+                                return ti
     0

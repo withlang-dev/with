@@ -206,6 +206,30 @@ fn cc_builtin_fmt_spec -> i32:
 fn cc_builtin_int_swap_bytes -> i32:
     53
 
+fn cc_builtin_min -> i32:
+    59
+
+fn cc_builtin_max -> i32:
+    60
+
+fn cc_builtin_abs -> i32:
+    61
+
+fn cc_builtin_fma -> i32:
+    62
+
+fn cc_builtin_popcount -> i32:
+    55
+
+fn cc_builtin_clz -> i32:
+    56
+
+fn cc_builtin_ctz -> i32:
+    57
+
+fn cc_builtin_bitreverse -> i32:
+    58
+
 fn cc_callee_hint_none -> i32:
     0
 
@@ -994,9 +1018,9 @@ fn CCodegen.operand_text(self: CCodegen, body: MirBody, operand_id: i32) -> str:
     "0"
 
 fn CCodegen.binop_token(self: CCodegen, op: i32) -> str:
-    if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP: return "+"
-    if op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_WRAP: return "-"
-    if op == BinaryOp.OP_MUL or op == BinaryOp.OP_MUL_WRAP: return "*"
+    if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_ADD_SAT: return "+"
+    if op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_SUB_SAT: return "-"
+    if op == BinaryOp.OP_MUL or op == BinaryOp.OP_MUL_WRAP or op == BinaryOp.OP_MUL_SAT: return "*"
     if op == BinaryOp.OP_DIV: return "/"
     if op == BinaryOp.OP_MOD: return "%"
     if op == BinaryOp.OP_EQ: return "=="
@@ -2883,6 +2907,14 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_DEBUG: return cc_builtin_fmt_debug()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_SPEC: return cc_builtin_fmt_spec()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_INT_SWAP_BYTES: return cc_builtin_int_swap_bytes()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_POPCOUNT: return cc_builtin_popcount()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_CLZ: return cc_builtin_clz()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_CTZ: return cc_builtin_ctz()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_BITREVERSE: return cc_builtin_bitreverse()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MIN: return cc_builtin_min()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAX: return cc_builtin_max()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_ABS: return cc_builtin_abs()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMA: return cc_builtin_fma()
     cc_builtin_none()
 
 fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> str:
@@ -3488,6 +3520,114 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             out = out ++ "    " ++ dst ++ " = (int32_t)__builtin_bswap32((uint32_t)(" ++ val ++ "));\n"
         else:
             out = out ++ "    (void)__builtin_bswap32((uint32_t)(" ++ val ++ "));\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_popcount():
+        if argc < 1:
+            self.fail("popcount expects one argument")
+            return "    abort();"
+        let pc_val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ dst ++ " = (int32_t)__builtin_popcount((unsigned int)(" ++ pc_val ++ "));\n"
+        else:
+            out = out ++ "    (void)__builtin_popcount((unsigned int)(" ++ pc_val ++ "));\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_clz():
+        if argc < 1:
+            self.fail("clz expects one argument")
+            return "    abort();"
+        let clz_val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ dst ++ " = (" ++ clz_val ++ ") == 0 ? 32 : (int32_t)__builtin_clz((unsigned int)(" ++ clz_val ++ "));\n"
+        else:
+            out = out ++ "    (void)0;\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_ctz():
+        if argc < 1:
+            self.fail("ctz expects one argument")
+            return "    abort();"
+        let ctz_val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ dst ++ " = (" ++ ctz_val ++ ") == 0 ? 32 : (int32_t)__builtin_ctz((unsigned int)(" ++ ctz_val ++ "));\n"
+        else:
+            out = out ++ "    (void)0;\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_bitreverse():
+        if argc < 1:
+            self.fail("bitreverse expects one argument")
+            return "    abort();"
+        let brv_val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ dst ++ " = (int32_t)__builtin_bitreverse32((uint32_t)(" ++ brv_val ++ "));\n"
+        else:
+            out = out ++ "    (void)__builtin_bitreverse32((uint32_t)(" ++ brv_val ++ "));\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_min():
+        if argc < 2:
+            self.fail("min expects two arguments")
+            return "    abort();"
+        let mna = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let mnb = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ dst ++ " = (" ++ mna ++ ") < (" ++ mnb ++ ") ? (" ++ mna ++ ") : (" ++ mnb ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_max():
+        if argc < 2:
+            self.fail("max expects two arguments")
+            return "    abort();"
+        let mxa = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let mxb = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ dst ++ " = (" ++ mxa ++ ") > (" ++ mxb ++ ") ? (" ++ mxa ++ ") : (" ++ mxb ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_abs():
+        if argc < 1:
+            self.fail("abs expects one argument")
+            return "    abort();"
+        let abv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ dst ++ " = (" ++ abv ++ ") < 0 ? -(" ++ abv ++ ") : (" ++ abv ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_fma():
+        if argc < 3:
+            self.fail("mul_add expects three arguments")
+            return "    abort();"
+        let fa = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let fb = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        let fc = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
+        var out = ""
+        if has_ret != 0:
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ dst ++ " = fma((" ++ fa ++ "), (" ++ fb ++ "), (" ++ fc ++ "));\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 

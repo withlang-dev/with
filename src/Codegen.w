@@ -42,6 +42,7 @@ extern fn wl_builder_dispose(b: i64) -> void
 // Target
 extern fn wl_init_native_target() -> i32
 extern fn wl_init_native_asm_printer() -> i32
+extern fn wl_init_native_asm_parser() -> i32
 extern fn wl_init_target_machine(m: i64, level: i32) -> i64
 extern fn wl_dispose_target_machine(tm: i64) -> void
 
@@ -52,6 +53,7 @@ extern fn wl_i16_type(c: i64) -> i64
 extern fn wl_i32_type(c: i64) -> i64
 extern fn wl_i64_type(c: i64) -> i64
 extern fn wl_i128_type(c: i64) -> i64
+extern fn wl_int_type_n(c: i64, bits: i32) -> i64
 extern fn wl_f32_type(c: i64) -> i64
 extern fn wl_f64_type(c: i64) -> i64
 extern fn wl_void_type(c: i64) -> i64
@@ -251,6 +253,14 @@ extern fn wl_get_module_data_layout(m: i64) -> i64
 extern fn wl_abi_size_of(dl: i64, ty: i64) -> i64
 extern fn wl_abi_align_of(dl: i64, ty: i64) -> i32
 
+// Atomic operations
+extern fn wl_build_atomic_load(b: i64, ty: i64, ptr: i64, order: i32) -> i64
+extern fn wl_build_atomic_store(b: i64, val: i64, ptr: i64, order: i32) -> void
+extern fn wl_build_atomic_rmw(b: i64, rmw_op: i32, ptr: i64, val: i64, order: i32) -> i64
+
+// Inline assembly
+extern fn wl_get_inline_asm(fn_ty: i64, asm_str: str, constraints: str, has_side_effects: i32, is_align_stack: i32) -> i64
+
 // Struct name
 extern fn wl_get_struct_name(ty: i64) -> str
 
@@ -390,6 +400,19 @@ type Codegen {
     struct_field_type_nodes: Vec[i32],
     struct_field_defaults: Vec[i32],
     struct_llvm_field_indices: Vec[i32],
+
+    // Bitpacked struct tracking: which struct indices are bitpacked,
+    // and per-field bit offsets/widths for shift/mask codegen
+    bitpacked_structs: HashMap[i32, i32],  // struct_idx → bp_info_start (index into bitpacked_field_* Vecs)
+    bitpacked_total_bits: HashMap[i32, i32],  // struct_idx → total_bits
+    bitpacked_backing_types: HashMap[i32, i64],  // struct_idx → LLVM iN type (64-bit pointer)
+    bitpacked_by_llvm_type: HashMap[i64, i32],  // LLVM iN type → struct_idx (reverse lookup)
+    bitpacked_field_bit_offsets: Vec[i32],  // indexed by bp_info_start + field_idx
+    bitpacked_field_bit_widths: Vec[i32],   // indexed by bp_info_start + field_idx
+    // Per-place bitpacked projection: when a place resolves to a bitpacked field,
+    // stores (bit_offset << 16 | bit_width) keyed by place_id.
+    // mir_eval_operand checks this after loading to apply shift+mask extraction.
+    bitpacked_place_proj: HashMap[i32, i32],
 
     // Enum types: sym → index into enum_* arrays
     enum_type_map: HashMap[i32, i32],
@@ -674,6 +697,7 @@ fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: In
 fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
     wl_init_native_target()
     wl_init_native_asm_printer()
+    wl_init_native_asm_parser()
     let ctx = wl_context_create()
     let mod = wl_module_create(module_name, ctx)
     let bld = wl_builder_create(ctx)
@@ -720,6 +744,13 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         struct_field_type_nodes: Vec.new(),
         struct_field_defaults: Vec.new(),
         struct_llvm_field_indices: Vec.new(),
+        bitpacked_structs: HashMap.new(),
+        bitpacked_total_bits: HashMap.new(),
+        bitpacked_backing_types: HashMap.new(),
+        bitpacked_by_llvm_type: HashMap.new(),
+        bitpacked_field_bit_offsets: Vec.new(),
+        bitpacked_field_bit_widths: Vec.new(),
+        bitpacked_place_proj: HashMap.new(),
         enum_type_map: HashMap.new(),
         enum_llvm_types: Vec.new(),
         enum_variant_starts: Vec.new(),
@@ -1728,6 +1759,27 @@ fn Codegen.find_struct_index_by_type(self: Codegen, llvm_ty: i64) -> i32:
             return i
     0 - 1
 
+fn Codegen.is_bitpacked_struct(self: Codegen, llvm_ty: i64) -> bool:
+    self.bitpacked_by_llvm_type.contains(llvm_ty)
+
+fn Codegen.find_bitpacked_index_by_type(self: Codegen, llvm_ty: i64) -> i32:
+    let opt = self.bitpacked_by_llvm_type.get(llvm_ty)
+    if opt.is_some(): return opt.unwrap() as i32
+    -1
+
+fn Codegen.get_bitpacked_field_info(self: Codegen, llvm_ty: i64, field_idx: i32) -> i32:
+    // Returns bit_offset * 65536 + bit_width, or -1 if not bitpacked
+    let struct_idx = self.find_bitpacked_index_by_type(llvm_ty)
+    if struct_idx < 0: return -1
+    let bp_start_opt = self.bitpacked_structs.get(struct_idx)
+    if not bp_start_opt.is_some(): return -1
+    let bp_base = bp_start_opt.unwrap() as i32
+    let f_count = self.struct_field_counts.get(struct_idx as i64)
+    if field_idx < 0 or field_idx >= f_count: return -1
+    let bit_offset = self.bitpacked_field_bit_offsets.get((bp_base + field_idx) as i64)
+    let bit_width = self.bitpacked_field_bit_widths.get((bp_base + field_idx) as i64)
+    bit_offset * 65536 + bit_width
+
 // Map source field index to LLVM struct field index (accounting for padding).
 // Returns source_fi unchanged if no alignment padding exists for this struct.
 fn Codegen.get_llvm_field_index(self: Codegen, llvm_ty: i64, source_fi: i32) -> i32:
@@ -2165,6 +2217,10 @@ fn Codegen.resolve_user_named_type(self: Codegen, sym: i32) -> i64:
     let st_opt = self.struct_type_map.get(sym)
     if st_opt.is_some():
         let idx = st_opt.unwrap()
+        // Bitpacked structs: return the iN backing type
+        let bp_ty = self.bitpacked_backing_types.get(idx)
+        if bp_ty.is_some():
+            return bp_ty.unwrap()
         return self.struct_llvm_types.get(idx as i64)
     // User-defined enum types
     let et_opt = self.enum_type_map.get(sym)
@@ -2331,6 +2387,9 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             return wl_i64_type(self.context)
         if bits == 128:
             return wl_i128_type(self.context)
+        if bits > 0:
+            // Non-standard bit width (sub-byte or custom): use LLVM arbitrary-width int
+            return wl_int_type_n(self.context, bits)
         // bits == 0 means default-width int, which is i32
         return wl_i32_type(self.context)
     if tk == TypeKind.TY_BOOL:
@@ -2527,6 +2586,36 @@ fn Codegen.declare_struct_type(self: Codegen, name_sym: i32, type_node: i32):
 
     let packed_kind = self.pool.get_data2(type_node)
     let is_packed = type_decl_is_packed(packed_kind)
+    let is_bitpacked = type_decl_is_bitpacked(packed_kind)
+
+    if is_bitpacked:
+        // Bitpacked struct: store as iN where N = sum of field bit widths.
+        // Fields are packed MSB-first with no gaps.
+        var total_bits: i32 = 0
+        let bp_field_start = self.bitpacked_field_bit_offsets.len() as i32
+        for fi in 0..field_count:
+            let f_ty = ft_vec.get(fi as i64)
+            var field_bits: i32 = 0
+            let f_tk = wl_get_type_kind(f_ty)
+            if f_tk == wl_integer_type_kind():
+                field_bits = wl_get_int_type_width(f_ty)
+            else:
+                // Non-integer field: use 8 bits per byte of ABI size
+                field_bits = (wl_size_of(f_ty) * 8) as i32
+            self.bitpacked_field_bit_offsets.push(total_bits)
+            self.bitpacked_field_bit_widths.push(field_bits)
+            total_bits = total_bits + field_bits
+        // Use iN as the backing type
+        let backing_ty = wl_int_type_n(self.context, total_bits)
+        self.bitpacked_structs.insert(idx, bp_field_start)
+        self.bitpacked_total_bits.insert(idx, total_bits)
+        // Store the backing integer type separately (struct_llvm_types keeps the named struct)
+        self.bitpacked_backing_types.insert(idx, backing_ty)
+        self.bitpacked_by_llvm_type.insert(backing_ty, idx)
+        // Identity field index mapping (not used for GEP but needed for bookkeeping)
+        for fi in 0..field_count:
+            self.struct_llvm_field_indices.push(fi)
+        return
 
     if has_alignment and not is_packed:
         // Build padded LLVM struct type (Zig-style approach).

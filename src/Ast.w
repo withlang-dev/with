@@ -83,6 +83,7 @@ enum NodeKind: i32:
     NK_FSTRING = 72       // d0=segment_count, d1=0, extra=[seg_kind, seg_data...]
     NK_FSTRING_SPEC = 73  // d0=packed_flags, d1=width, d2=precision
     NK_COMPUTED_FIELD_ACCESS = 74  // d0=expr(node), d1=field_expr(node), d2=0
+    NK_ASM_EXPR = 75  // d0=template(string_sym), d1=constraints(string_sym), d2=flags (bit0=volatile, bit1=has_output)
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -145,6 +146,7 @@ enum TypeDeclKind: i32:
 // Type decl flag bits (combined with TypeDeclKind via arithmetic)
 const TDK_FLAG_EPHEMERAL: i32 = 8
 const TDK_FLAG_PACKED: i32 = 16
+const TDK_FLAG_BITPACKED: i32 = 32
 
 fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
     if is_ephemeral != 0:
@@ -159,6 +161,9 @@ fn type_decl_is_ephemeral(packed: i32) -> i32:
 
 fn type_decl_is_packed(packed: i32) -> i32:
     (packed / TDK_FLAG_PACKED) % 2
+
+fn type_decl_is_bitpacked(packed: i32) -> i32:
+    (packed / TDK_FLAG_BITPACKED) % 2
 
 // Fn decl flag bits (stored in data2 field)
 @[flags]
@@ -220,6 +225,9 @@ enum BinaryOp: i32:
     OP_MUL_WRAP = 22
     OP_IN = 23
     OP_NOT_IN = 24
+    OP_ADD_SAT = 25
+    OP_SUB_SAT = 26
+    OP_MUL_SAT = 27
 
 // Unary operators
 enum UnaryOp: i32:

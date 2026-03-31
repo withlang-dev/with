@@ -52,6 +52,7 @@ void    wl_builder_dispose(int64_t b) { LLVMDisposeBuilder(B(b)); }
 // ── Target initialization ──────────────────────────────────
 int32_t wl_init_native_target(void) { return LLVMInitializeNativeTarget(); }
 int32_t wl_init_native_asm_printer(void) { return LLVMInitializeNativeAsmPrinter(); }
+int32_t wl_init_native_asm_parser(void) { return LLVMInitializeNativeAsmParser(); }
 
 // Combined: init target machine + set module triple/layout. Returns TM or 0.
 static LLVMCodeGenOptLevel with_codegen_level(int32_t level) {
@@ -93,6 +94,7 @@ int64_t wl_i16_type(int64_t c)  { return P2I(LLVMInt16TypeInContext(C(c))); }
 int64_t wl_i32_type(int64_t c)  { return P2I(LLVMInt32TypeInContext(C(c))); }
 int64_t wl_i64_type(int64_t c)  { return P2I(LLVMInt64TypeInContext(C(c))); }
 int64_t wl_i128_type(int64_t c) { return P2I(LLVMInt128TypeInContext(C(c))); }
+int64_t wl_int_type_n(int64_t c, int32_t bits) { return P2I(LLVMIntTypeInContext(C(c), (unsigned)bits)); }
 int64_t wl_f32_type(int64_t c)  { return P2I(LLVMFloatTypeInContext(C(c))); }
 int64_t wl_f64_type(int64_t c)  { return P2I(LLVMDoubleTypeInContext(C(c))); }
 int64_t wl_void_type(int64_t c) { return P2I(LLVMVoidTypeInContext(C(c))); }
@@ -826,4 +828,61 @@ int64_t wl_di_create_lexical_block(int64_t builder, int64_t scope,
     return P2I(LLVMDIBuilderCreateLexicalBlock(
         (LLVMDIBuilderRef)(intptr_t)builder,
         DI(scope), DI(file), (unsigned)line, (unsigned)col));
+}
+
+// ── Atomic Operations ───────────────────────────────────────
+// ordering: 0=monotonic(relaxed), 1=acquire, 2=release, 3=acq_rel, 4=seq_cst
+static LLVMAtomicOrdering map_ordering(int32_t order) {
+    switch (order) {
+        case 0: return LLVMAtomicOrderingMonotonic;
+        case 1: return LLVMAtomicOrderingAcquire;
+        case 2: return LLVMAtomicOrderingRelease;
+        case 3: return LLVMAtomicOrderingAcquireRelease;
+        case 4: return LLVMAtomicOrderingSequentiallyConsistent;
+        default: return LLVMAtomicOrderingSequentiallyConsistent;
+    }
+}
+
+int64_t wl_build_atomic_load(int64_t b, int64_t ty, int64_t ptr, int32_t order) {
+    LLVMValueRef load = LLVMBuildLoad2(B(b), T(ty), V(ptr), "atomic_load");
+    LLVMSetOrdering(load, map_ordering(order));
+    LLVMSetAlignment(load, LLVMABIAlignmentOfType(
+        LLVMGetModuleDataLayout(LLVMGetGlobalParent(LLVMGetBasicBlockParent(LLVMGetInsertBlock(B(b))))), T(ty)));
+    return P2I(load);
+}
+
+void wl_build_atomic_store(int64_t b, int64_t val, int64_t ptr, int32_t order) {
+    LLVMValueRef store = LLVMBuildStore(B(b), V(val), V(ptr));
+    LLVMSetOrdering(store, map_ordering(order));
+    LLVMSetAlignment(store, LLVMABIAlignmentOfType(
+        LLVMGetModuleDataLayout(LLVMGetGlobalParent(LLVMGetBasicBlockParent(LLVMGetInsertBlock(B(b))))),
+        LLVMTypeOf(V(val))));
+}
+
+// rmw_op: 0=xchg, 1=add, 2=sub, 3=and, 4=or, 5=xor
+int64_t wl_build_atomic_rmw(int64_t b, int32_t rmw_op, int64_t ptr, int64_t val, int32_t order) {
+    LLVMAtomicRMWBinOp op;
+    switch (rmw_op) {
+        case 0: op = LLVMAtomicRMWBinOpXchg; break;
+        case 1: op = LLVMAtomicRMWBinOpAdd; break;
+        case 2: op = LLVMAtomicRMWBinOpSub; break;
+        case 3: op = LLVMAtomicRMWBinOpAnd; break;
+        case 4: op = LLVMAtomicRMWBinOpOr; break;
+        case 5: op = LLVMAtomicRMWBinOpXor; break;
+        default: op = LLVMAtomicRMWBinOpXchg; break;
+    }
+    return P2I(LLVMBuildAtomicRMW(B(b), op, V(ptr), V(val), map_ordering(order), 0));
+}
+
+// ── Inline Assembly ─────────────────────────────────────────
+int64_t wl_get_inline_asm(int64_t fn_ty, with_str asm_str, with_str constraints,
+    int32_t has_side_effects, int32_t is_align_stack) {
+    return P2I(LLVMGetInlineAsm(
+        T(fn_ty),
+        (char*)asm_str.ptr, (size_t)asm_str.len,
+        (char*)constraints.ptr, (size_t)constraints.len,
+        has_side_effects ? 1 : 0,
+        is_align_stack ? 1 : 0,
+        LLVMInlineAsmDialectATT,
+        /* CanThrow */ 0));
 }

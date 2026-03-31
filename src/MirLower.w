@@ -504,6 +504,13 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
             return self.sema.ty_void as i32
+        if type_name == "Atomic":
+            if method_name == "new": return recv_type
+            if method_name == "store": return self.sema.ty_void as i32
+            if method_name == "load" or method_name == "swap" or method_name == "fetch_add" or method_name == "fetch_sub" or method_name == "fetch_and" or method_name == "fetch_or" or method_name == "fetch_xor":
+                if tk == TypeKind.TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 0)
+            return self.sema.ty_void as i32
     if tk == TypeKind.TY_STR:
         if method_name == "len": return self.sema.ty_i64 as i32
         if method_name == "byte_at": return self.sema.ty_i32 as i32
@@ -527,7 +534,16 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
         if method_name == "len": return self.sema.ty_i32 as i32
         return self.sema.ty_void as i32
     if tk == TypeKind.TY_INT:
-        if method_name == "rotate_left" or method_name == "rotate_right" or method_name == "swap_bytes":
+        if method_name == "rotate_left" or method_name == "rotate_right" or method_name == "swap_bytes" or method_name == "bitreverse":
+            return recv_type
+        if method_name == "popcount" or method_name == "clz" or method_name == "ctz":
+            return self.sema.ty_i32 as i32
+        if method_name == "min" or method_name == "max":
+            return recv_type
+        if method_name == "abs":
+            return recv_type
+    if tk == TypeKind.TY_FLOAT:
+        if method_name == "min" or method_name == "max" or method_name == "abs" or method_name == "mul_add":
             return recv_type
     self.sema.ty_void as i32
 
@@ -638,6 +654,8 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         return self.sema.ty_i32 as i32
     if kind == NodeKind.NK_UNSAFE_BLOCK:
         return self.expr_type(self.ast.get_data0(node))
+    if kind == NodeKind.NK_ASM_EXPR:
+        return self.sema.ty_void as i32
     if kind == NodeKind.NK_CALL:
         return self.call_return_type(self.ast.get_data0(node))
     if kind == NodeKind.NK_STRUCT_LIT:
@@ -2788,6 +2806,18 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "rotate_left": return MirIntrinsic.MIR_INTRINSIC_ROTATE_LEFT
         if method_name == "rotate_right": return MirIntrinsic.MIR_INTRINSIC_ROTATE_RIGHT
         if method_name == "swap_bytes": return MirIntrinsic.MIR_INTRINSIC_INT_SWAP_BYTES
+        if method_name == "popcount": return MirIntrinsic.MIR_INTRINSIC_POPCOUNT
+        if method_name == "clz": return MirIntrinsic.MIR_INTRINSIC_CLZ
+        if method_name == "ctz": return MirIntrinsic.MIR_INTRINSIC_CTZ
+        if method_name == "bitreverse": return MirIntrinsic.MIR_INTRINSIC_BITREVERSE
+        if method_name == "min": return MirIntrinsic.MIR_INTRINSIC_MIN
+        if method_name == "max": return MirIntrinsic.MIR_INTRINSIC_MAX
+        if method_name == "abs": return MirIntrinsic.MIR_INTRINSIC_ABS
+    if tk == TypeKind.TY_FLOAT:
+        if method_name == "min": return MirIntrinsic.MIR_INTRINSIC_MIN
+        if method_name == "max": return MirIntrinsic.MIR_INTRINSIC_MAX
+        if method_name == "abs": return MirIntrinsic.MIR_INTRINSIC_ABS
+        if method_name == "mul_add": return MirIntrinsic.MIR_INTRINSIC_FMA
     let type_name_sym = self.sema.get_type_name(resolved)
     if type_name_sym == 0:
         return MirIntrinsic.MIR_INTRINSIC_NONE
@@ -2840,6 +2870,16 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
     if type_name == "Result":
         if method_name == "is_ok": return MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME
         if method_name == "unwrap": return MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "Atomic":
+        if method_name == "load": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_LOAD
+        if method_name == "store": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_STORE
+        if method_name == "swap": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP
+        if method_name == "fetch_add": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD
+        if method_name == "fetch_sub": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB
+        if method_name == "fetch_and": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND
+        if method_name == "fetch_or": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR
+        if method_name == "fetch_xor": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR
         return MirIntrinsic.MIR_INTRINSIC_NONE
     MirIntrinsic.MIR_INTRINSIC_NONE
 
@@ -3351,6 +3391,20 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_UNSAFE_BLOCK:
         // Transparent pass-through: just lower the inner body
         return self.lower_expr(self.ast.get_data0(node))
+
+    if kind == NodeKind.NK_ASM_EXPR:
+        // Inline assembly — emit as a call with MIR_INTRINSIC_ASM marker
+        let asm_args: Vec[i32] = Vec.new()
+        let asm_args_id = self.body.new_call_args(asm_args)
+        self.body.set_call_intrinsic(asm_args_id, MirIntrinsic.MIR_INTRINSIC_ASM)
+        self.body.set_call_ast_node(asm_args_id, node)
+        let asm_result_local = self.new_temp(self.sema.ty_void as i32)
+        let asm_result_place = self.place_for_local(asm_result_local)
+        let asm_callee = self.unit_operand()
+        let asm_next_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, asm_callee, asm_args_id, asm_result_place, asm_next_bb)
+        self.switch_to(asm_next_bb)
+        return self.unit_operand()
 
     if kind == NodeKind.NK_COMPTIME_ERROR:
         // Emit unreachable — if this code is ever reached, it's a compile error

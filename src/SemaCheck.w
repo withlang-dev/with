@@ -727,6 +727,10 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             self.emit_error("unsafe is not allowed in comptime", node)
         return self.check_expr(self.ast.get_data0(node))
 
+    if kind == NodeKind.NK_ASM_EXPR:
+        // asm expressions produce void
+        return self.ty_void
+
     if kind == NodeKind.NK_COMPTIME_ERROR:
         return TypeKind.TY_NEVER as TypeId
 
@@ -1063,6 +1067,7 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
                     rhs = self.check_expr(rhs_node)
     else if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD or
        op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP or
+       op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL_SAT or
        op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR or
        op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
         if lhs_is_num_lit and rhs_is_num_lit:
@@ -1145,6 +1150,10 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
 
     // Wrapping arithmetic
     if op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP:
+        return lhs as i32
+
+    // Saturating arithmetic
+    if op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL_SAT:
         return lhs as i32
 
     // Concat (++) — both operands must be str

@@ -38,6 +38,7 @@ type Parser {
     pending_sealed: i32,
     pending_flags: i32,
     pending_packed: i32,
+    pending_bitpacked: i32,
     pending_callconv: i32,
     pending_unsafe_fn: i32,
     saw_implicit_it: i32,
@@ -78,6 +79,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_sealed: 0,
         pending_flags: 0,
         pending_packed: 0,
+        pending_bitpacked: 0,
         pending_callconv: 0,
         pending_unsafe_fn: 0,
         saw_implicit_it: 0,
@@ -286,6 +288,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_sealed = 0
     self.pending_flags = 0
     self.pending_packed = 0
+    self.pending_bitpacked = 0
     self.pending_callconv = 0
     var derive_syms: Vec[i32] = Vec.new()
 
@@ -310,6 +313,8 @@ fn Parser.skip_attributes(self: Parser):
                 self.pending_sealed = 1
             if attr_text == "packed":
                 self.pending_packed = 1
+            if attr_text == "bitpacked":
+                self.pending_bitpacked = 1
 
         if self.is_ident_named("derive"):
             self.advance()
@@ -806,6 +811,8 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
             var struct_kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
             if self.pending_packed != 0:
                 struct_kind = struct_kind + TDK_FLAG_PACKED
+            if self.pending_bitpacked != 0:
+                struct_kind = struct_kind + TDK_FLAG_BITPACKED
             let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
             return self.finish_type_decl(node)
         repr_type_node = self.parse_type_expr()
@@ -818,6 +825,8 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
         var struct_kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
         if self.pending_packed != 0:
             struct_kind = struct_kind + TDK_FLAG_PACKED
+        if self.pending_bitpacked != 0:
+            struct_kind = struct_kind + TDK_FLAG_BITPACKED
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
         return self.finish_type_decl(node)
 
@@ -851,6 +860,8 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
         var struct_kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
         if self.pending_packed != 0:
             struct_kind = struct_kind + TDK_FLAG_PACKED
+        if self.pending_bitpacked != 0:
+            struct_kind = struct_kind + TDK_FLAG_BITPACKED
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
         return self.finish_type_decl(node)
 
@@ -2201,6 +2212,9 @@ fn Parser.compound_assign_op(self: Parser) -> i32:
     if t == TokenKind.TK_PLUS_WRAP_EQ: return BinaryOp.OP_ADD_WRAP
     if t == TokenKind.TK_MINUS_WRAP_EQ: return BinaryOp.OP_SUB_WRAP
     if t == TokenKind.TK_STAR_WRAP_EQ: return BinaryOp.OP_MUL_WRAP
+    if t == TokenKind.TK_PLUS_SAT_EQ: return BinaryOp.OP_ADD_SAT
+    if t == TokenKind.TK_MINUS_SAT_EQ: return BinaryOp.OP_SUB_SAT
+    if t == TokenKind.TK_STAR_SAT_EQ: return BinaryOp.OP_MUL_SAT
     -1
 
 // ── Pratt precedence climbing ────────────────────────────────────
@@ -2291,10 +2305,13 @@ fn Parser.infix_op(self: Parser) -> i32:
     if t == TokenKind.TK_MINUS: return 11 * 1000 + BinaryOp.OP_SUB
     if t == TokenKind.TK_PLUS_WRAP: return 11 * 1000 + BinaryOp.OP_ADD_WRAP
     if t == TokenKind.TK_MINUS_WRAP: return 11 * 1000 + BinaryOp.OP_SUB_WRAP
+    if t == TokenKind.TK_PLUS_SAT: return 11 * 1000 + BinaryOp.OP_ADD_SAT
+    if t == TokenKind.TK_MINUS_SAT: return 11 * 1000 + BinaryOp.OP_SUB_SAT
     if t == TokenKind.TK_STAR: return 12 * 1000 + BinaryOp.OP_MUL
     if t == TokenKind.TK_SLASH: return 12 * 1000 + BinaryOp.OP_DIV
     if t == TokenKind.TK_PERCENT: return 12 * 1000 + BinaryOp.OP_MOD
     if t == TokenKind.TK_STAR_WRAP: return 12 * 1000 + BinaryOp.OP_MUL_WRAP
+    if t == TokenKind.TK_STAR_SAT: return 12 * 1000 + BinaryOp.OP_MUL_SAT
     0
 
 // ── Primary expression ──────────────────────────────────────────
@@ -2348,6 +2365,7 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
     if t == TokenKind.TK_KW_CONTINUE: return self.parse_continue()
     if t == TokenKind.TK_LABEL: return self.parse_labeled_loop()
     if t == TokenKind.TK_KW_UNSAFE: return self.parse_unsafe()
+    if t == TokenKind.TK_KW_ASM: return self.parse_asm_expr()
     if t == TokenKind.TK_KW_DEFER: return self.parse_defer()
     if t == TokenKind.TK_KW_ERRDEFER: return self.parse_errdefer()
     if t == TokenKind.TK_KW_SPAWN: return self.parse_spawn()
@@ -3473,6 +3491,62 @@ fn Parser.parse_unsafe(self: Parser) -> NodeId:
         self.advance()
     let body = self.parse_block_or_expr()
     self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, start, self.prev_end(), body, 0, 0)
+
+fn Parser.parse_asm_expr(self: Parser) -> NodeId:
+    // asm("template" : outputs : inputs : clobbers)
+    // asm volatile("template" ::: "memory")
+    let start = self.current_start()
+    self.advance()  // consume 'asm'
+    var flags: i32 = 0
+    // Check for 'volatile' identifier
+    if self.peek() == TokenKind.TK_IDENT:
+        let vol_start = self.current_start()
+        let vol_end = self.current_end()
+        let vol_text = self.source.slice(vol_start as i64, vol_end as i64)
+        if vol_text == "volatile":
+            flags = flags | 1  // bit 0 = volatile
+            self.advance()
+    self.expect(TokenKind.TK_L_PAREN)
+    // Parse template string
+    if self.peek() != TokenKind.TK_STRING_LIT:
+        self.emit_error("expected assembly template string")
+        return self.pool.add_node(NodeKind.NK_POISONED_EXPR, start, self.prev_end(), 0, 0, 0)
+    let tmpl_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+    let tmpl_text = strip_string_token_text(tmpl_raw)
+    let tmpl_sym = self.intern.intern(tmpl_text)
+    self.advance()
+    // Parse optional sections separated by ':'
+    // For now: collect constraints string from outputs/inputs, and clobbers
+    var constraints_str = ""
+    var output_count: i32 = 0
+    var input_count: i32 = 0
+    // Section 1: outputs
+    if self.peek() == TokenKind.TK_COLON:
+        self.advance()
+        // Parse output constraints: name(reg) -> type
+        // For initial impl: just skip to next ':'
+        // Section 2: inputs
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+            // Section 3: clobbers
+            if self.peek() == TokenKind.TK_COLON:
+                self.advance()
+                // Parse clobber list: comma-separated string literals
+                var first_clobber = true
+                while self.peek() == TokenKind.TK_STRING_LIT:
+                    let clob_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                    let clob = strip_string_token_text(clob_raw)
+                    if not first_clobber:
+                        constraints_str = constraints_str ++ ","
+                    constraints_str = constraints_str ++ "~{" ++ clob ++ "}"
+                    first_clobber = false
+                    self.advance()
+                    if self.peek() == TokenKind.TK_COMMA:
+                        self.advance()
+    self.expect(TokenKind.TK_R_PAREN)
+    let constr_sym = self.intern.intern(constraints_str)
+    // d0=template_sym, d1=constraints_sym, d2=flags
+    self.pool.add_node(NodeKind.NK_ASM_EXPR, start, self.prev_end(), tmpl_sym, constr_sym, flags)
 
 fn Parser.parse_yield(self: Parser) -> NodeId:
     let start = self.current_start()

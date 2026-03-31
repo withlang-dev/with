@@ -979,11 +979,11 @@ fn ComptimeEvaluator.eval_binary(self: ComptimeEvaluator, diags: &mut Diagnostic
     let lv = comptime_value_intlike(lhs)
     let rv = comptime_value_intlike(rhs)
     let result_ty = self.node_type_or(node, if lhs.type_id != 0: lhs.type_id else: rhs.type_id)
-    if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP:
+    if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_ADD_SAT:
         return comptime_control_value(comptime_value_int(result_ty, lv + rv))
-    if op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_WRAP:
+    if op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_SUB_SAT:
         return comptime_control_value(comptime_value_int(result_ty, lv - rv))
-    if op == BinaryOp.OP_MUL or op == BinaryOp.OP_MUL_WRAP:
+    if op == BinaryOp.OP_MUL or op == BinaryOp.OP_MUL_WRAP or op == BinaryOp.OP_MUL_SAT:
         return comptime_control_value(comptime_value_int(result_ty, lv * rv))
     if op == BinaryOp.OP_DIV:
         if rv == 0:
