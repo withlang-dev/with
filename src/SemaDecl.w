@@ -1784,3 +1784,28 @@ fn Sema.primitive_type_by_sym(self: Sema, sym: i32) -> i32:
                             if self.type_d0.get(ti as i64) == width and self.type_d1.get(ti as i64) == is_signed:
                                 return ti
     0
+
+// Resolve the Order enum type for Atomic[T] method argument type propagation.
+fn Sema.resolve_atomic_order_type(self: Sema, obj_type: i32) -> i32:
+    if obj_type == 0: return 0
+    let resolved = self.resolve_alias(obj_type as TypeId)
+    let name_sym = self.get_type_name(resolved as i32)
+    if name_sym == 0: return 0
+    let name = self.pool_resolve_symbol(name_sym)
+    if name == "Atomic":
+        let order_sym = self.pool_intern("Order")
+        return self.lookup_named_type_visible(order_sym)
+    0
+
+// Determine expected argument type for an Atomic method call.
+fn Sema.atomic_method_expected_arg_type(self: Sema, order_type: i32, method_sym: i32, arg_index: i32) -> i32:
+    if order_type == 0: return 0
+    let method_name = self.pool_resolve_symbol(method_sym)
+    if method_name == "load" and arg_index == 0: return order_type
+    if method_name == "store" and arg_index == 1: return order_type
+    if method_name == "compare_exchange" and (arg_index == 2 or arg_index == 3): return order_type
+    if method_name == "compare_exchange_weak" and (arg_index == 2 or arg_index == 3): return order_type
+    // swap, fetch_add, fetch_sub, etc.: arg 1 is the ordering
+    if arg_index == 1 and method_name != "load" and method_name != "store" and method_name != "compare_exchange" and method_name != "compare_exchange_weak":
+        return order_type
+    0
