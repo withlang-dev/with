@@ -698,6 +698,10 @@ fn Codegen.decl_source_path(self: Codegen, decl_index: i32) -> str:
         return self.current_decl_source_file
     self.source_file
 
+fn Codegen.sync_decl_context(self: Codegen, decl_index: i32):
+    self.current_decl_source_file = self.decl_source_path(decl_index)
+    self.sema.update_decl_source_context(decl_index)
+
 fn Codegen.find_module_let_decl_index(self: Codegen, sym: i32) -> i32:
     for di in 0..self.pool.decl_count():
         let decl = self.pool.get_decl(di)
