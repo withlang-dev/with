@@ -254,9 +254,31 @@ extern fn wl_abi_size_of(dl: i64, ty: i64) -> i64
 extern fn wl_abi_align_of(dl: i64, ty: i64) -> i32
 
 // Atomic operations
+enum AtomicRmwOp: i32:
+    XCHG = 0
+    ADD = 1
+    SUB = 2
+    AND = 3
+    OR = 4
+    XOR = 5
+    MIN = 6
+    MAX = 7
+    UMIN = 8
+    UMAX = 9
+
+enum AtomicOrdering: i32:
+    RELAXED = 0
+    ACQUIRE = 1
+    RELEASE = 2
+    ACQ_REL = 3
+    SEQ_CST = 4
+
 extern fn wl_build_atomic_load(b: i64, ty: i64, ptr: i64, order: i32) -> i64
 extern fn wl_build_atomic_store(b: i64, val: i64, ptr: i64, order: i32) -> void
 extern fn wl_build_atomic_rmw(b: i64, rmw_op: i32, ptr: i64, val: i64, order: i32) -> i64
+extern fn wl_build_cmpxchg(b: i64, ptr: i64, expected: i64, desired: i64, success_order: i32, failure_order: i32, is_weak: i32) -> i64
+extern fn wl_extract_value(b: i64, agg: i64, index: i32) -> i64
+extern fn wl_build_fence(b: i64, order: i32) -> void
 
 // Inline assembly
 extern fn wl_get_inline_asm(fn_ty: i64, asm_str: str, constraints: str, has_side_effects: i32, is_align_stack: i32) -> i64

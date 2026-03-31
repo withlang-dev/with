@@ -25,9 +25,17 @@ type HashSet[T]  {
     ptr: *const i8,
 }
 
+/// Memory ordering for atomic operations.
+enum Order: i32:
+    Relaxed = 0
+    Acquire = 1
+    Release = 2
+    AcqRel = 3
+    SeqCst = 4
+
 /// Lock-free atomic operations on integer types.
-/// Create with `Atomic.new(0)`, read with `.load(order)`,
-/// write with `.store(val, order)`.
+/// Create with `Atomic.new(0)`, read with `.load(.acquire)`,
+/// write with `.store(val, .release)`.
 type Atomic[T]  {
     val: T,
 }

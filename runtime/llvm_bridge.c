@@ -859,7 +859,7 @@ void wl_build_atomic_store(int64_t b, int64_t val, int64_t ptr, int32_t order) {
         LLVMTypeOf(V(val))));
 }
 
-// rmw_op: 0=xchg, 1=add, 2=sub, 3=and, 4=or, 5=xor
+// rmw_op: 0=xchg, 1=add, 2=sub, 3=and, 4=or, 5=xor, 6=min, 7=max, 8=umin, 9=umax
 int64_t wl_build_atomic_rmw(int64_t b, int32_t rmw_op, int64_t ptr, int64_t val, int32_t order) {
     LLVMAtomicRMWBinOp op;
     switch (rmw_op) {
@@ -869,9 +869,33 @@ int64_t wl_build_atomic_rmw(int64_t b, int32_t rmw_op, int64_t ptr, int64_t val,
         case 3: op = LLVMAtomicRMWBinOpAnd; break;
         case 4: op = LLVMAtomicRMWBinOpOr; break;
         case 5: op = LLVMAtomicRMWBinOpXor; break;
+        case 6: op = LLVMAtomicRMWBinOpMin; break;
+        case 7: op = LLVMAtomicRMWBinOpMax; break;
+        case 8: op = LLVMAtomicRMWBinOpUMin; break;
+        case 9: op = LLVMAtomicRMWBinOpUMax; break;
         default: op = LLVMAtomicRMWBinOpXchg; break;
     }
     return P2I(LLVMBuildAtomicRMW(B(b), op, V(ptr), V(val), map_ordering(order), 0));
+}
+
+// cmpxchg: returns {T, i1} struct. Caller extracts fields.
+// Returns the old value (first element). success_bit is second element.
+int64_t wl_build_cmpxchg(int64_t b, int64_t ptr, int64_t expected, int64_t desired,
+    int32_t success_order, int32_t failure_order, int32_t is_weak) {
+    LLVMValueRef result = LLVMBuildAtomicCmpXchg(B(b), V(ptr), V(expected), V(desired),
+        map_ordering(success_order), map_ordering(failure_order),
+        0 /* single-threaded = false */);
+    if (is_weak) LLVMSetWeak(result, 1);
+    return P2I(result);
+}
+
+// Extract value (index 0) or success flag (index 1) from cmpxchg result
+int64_t wl_extract_value(int64_t b, int64_t agg, int32_t index) {
+    return P2I(LLVMBuildExtractValue(B(b), V(agg), (unsigned)index, ""));
+}
+
+void wl_build_fence(int64_t b, int32_t order) {
+    LLVMBuildFence(B(b), map_ordering(order), 0 /* single-threaded = false */, "");
 }
 
 // ── Inline Assembly ─────────────────────────────────────────

@@ -2291,6 +2291,10 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "fetch_and": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND
         if method_name == "fetch_or": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR
         if method_name == "fetch_xor": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR
+        if method_name == "fetch_min": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MIN
+        if method_name == "fetch_max": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MAX
+        if method_name == "compare_exchange": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS
+        if method_name == "compare_exchange_weak": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS_WEAK
         return MirIntrinsic.MIR_INTRINSIC_NONE
     MirIntrinsic.MIR_INTRINSIC_NONE
 
@@ -2872,7 +2876,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         // GEP to field 0 (val)
         let al_val_ptr = wl_build_struct_gep(self.builder, al_recv_ty, al_recv_ptr, 0)
         // Extract ordering constant (default to seq_cst = 4)
-        let al_order = if wl_is_constant(al_order_raw) != 0: wl_const_int_sext_val(al_order_raw) as i32 else: 4
+        let al_order = if wl_is_constant(al_order_raw) != 0: wl_const_int_sext_val(al_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         result = wl_build_atomic_load(self.builder, al_elem_ty, al_val_ptr, al_order)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_STORE:
@@ -2882,19 +2886,48 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let as_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
         let as_recv_ty = wl_get_allocated_type(as_recv_ptr)
         let as_val_ptr = wl_build_struct_gep(self.builder, as_recv_ty, as_recv_ptr, 0)
-        let as_order = if wl_is_constant(as_order_raw) != 0: wl_const_int_sext_val(as_order_raw) as i32 else: 4
+        let as_order = if wl_is_constant(as_order_raw) != 0: wl_const_int_sext_val(as_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         wl_build_atomic_store(self.builder, as_val, as_val_ptr, as_order)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR:
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MIN or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MAX:
         // Atomic[T].fetch_*(val, order) — atomicrmw on field 0
         let ar_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let ar_val = self.mir_intrinsic_arg(body, args_id, 1)
         let ar_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
         let ar_recv_ty = wl_get_allocated_type(ar_recv_ptr)
         let ar_val_ptr = wl_build_struct_gep(self.builder, ar_recv_ty, ar_recv_ptr, 0)
-        let ar_order = if wl_is_constant(ar_order_raw) != 0: wl_const_int_sext_val(ar_order_raw) as i32 else: 4
-        let ar_rmw_op = if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP: 0 else: if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD: 1 else: if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB: 2 else: if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND: 3 else: if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR: 4 else: 5
+        let ar_order = if wl_is_constant(ar_order_raw) != 0: wl_const_int_sext_val(ar_order_raw) as i32 else: AtomicOrdering.SEQ_CST
+        let ar_rmw_op = if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP: AtomicRmwOp.XCHG
+            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD: AtomicRmwOp.ADD
+            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB: AtomicRmwOp.SUB
+            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND: AtomicRmwOp.AND
+            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR: AtomicRmwOp.OR
+            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR: AtomicRmwOp.XOR
+            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MIN: AtomicRmwOp.MIN
+            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MAX: AtomicRmwOp.MAX
+            else: AtomicRmwOp.XCHG
         result = wl_build_atomic_rmw(self.builder, ar_rmw_op, ar_val_ptr, ar_val, ar_order)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS_WEAK:
+        // compare_exchange(expected, desired, success_order, failure_order)
+        let cas_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let cas_expected = self.mir_intrinsic_arg(body, args_id, 1)
+        let cas_desired = self.mir_intrinsic_arg(body, args_id, 2)
+        let cas_success_raw = self.mir_intrinsic_arg(body, args_id, 3)
+        let cas_failure_raw = self.mir_intrinsic_arg(body, args_id, 4)
+        let cas_recv_ty = wl_get_allocated_type(cas_recv_ptr)
+        let cas_val_ptr = wl_build_struct_gep(self.builder, cas_recv_ty, cas_recv_ptr, 0)
+        let cas_success_order = if wl_is_constant(cas_success_raw) != 0: wl_const_int_sext_val(cas_success_raw) as i32 else: AtomicOrdering.SEQ_CST
+        let cas_failure_order = if wl_is_constant(cas_failure_raw) != 0: wl_const_int_sext_val(cas_failure_raw) as i32 else: AtomicOrdering.SEQ_CST
+        let cas_is_weak = if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS_WEAK: 1 else: 0
+        let cas_result = wl_build_cmpxchg(self.builder, cas_val_ptr, cas_expected, cas_desired, cas_success_order, cas_failure_order, cas_is_weak)
+        // Extract old value (index 0) from {T, i1} result
+        result = wl_extract_value(self.builder, cas_result, 0)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FENCE:
+        let fence_order_raw = self.mir_intrinsic_arg(body, args_id, 0)
+        let fence_order = if wl_is_constant(fence_order_raw) != 0: wl_const_int_sext_val(fence_order_raw) as i32 else: AtomicOrdering.SEQ_CST
+        wl_build_fence(self.builder, fence_order)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ASM:
         // Inline assembly: read template and constraints from AST node
